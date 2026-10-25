@@ -21,12 +21,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        # v0.1 ships on macOS only (owner decision, Oct 24, 2026). Add `windows-latest` back when the
+        # Windows milestone starts; the Windows steps below are kept for that day.
+        os: [macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
-    # Windows is compile-only until after v0.1 (owner decision, Oct 24, 2026): its job reports
-    # problems but does not fail the run. Remove this line when the Windows milestone starts.
-    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

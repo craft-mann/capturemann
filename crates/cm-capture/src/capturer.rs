@@ -860,7 +860,9 @@ mod tests {
         let cap = c.capture(req, None).unwrap().unwrap();
         let e = t.elapsed();
         assert!(e >= Duration::from_millis(300), "{e:?}");
-        assert!(e < Duration::from_millis(400), "{e:?}");
+        // The lower bound proves the delay happens; the upper one only that it is not a longer wait
+        // (a loaded CI runner took 426 ms once, so it is generous).
+        assert!(e < Duration::from_millis(2000), "{e:?}");
         assert!(cap.waited >= Duration::from_millis(300) && cap.waited <= e);
     }
 
