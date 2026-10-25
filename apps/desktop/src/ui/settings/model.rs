@@ -342,6 +342,7 @@ pub(crate) fn tool_title(name: &str) -> String {
         "list_devices" => tr!("List cameras and microphones"),
         "publish_video" => tr!("Publish a video"),
         "delete_capture" => tr!("Delete a capture"),
+        "move_library" => tr!("Change the library folder"),
         "run_fps_selftest" => tr!("Run the 60 fps self-test"),
         "trim" => tr!("Trim a recording"),
         "cut_segments" => tr!("Cut parts of a recording"),
@@ -875,6 +876,7 @@ mod tests {
             "run_fps_selftest",
             "download_model",
             "remove_model",
+            "move_library",
         ] {
             let r = rows.iter().find(|r| r.tool == t).unwrap();
             assert_eq!(r.label, PermissionLabel::AskFirst, "{t}");

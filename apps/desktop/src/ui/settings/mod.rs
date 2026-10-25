@@ -18,6 +18,7 @@ use crate::ui::text_field::{TextField, TextFieldEvent};
 pub mod agents;
 pub mod destinations;
 mod general;
+mod library_folder;
 pub mod model;
 mod privacy;
 mod problem;
@@ -26,6 +27,10 @@ mod recording;
 pub(crate) mod reset;
 mod rows;
 mod shortcuts_page;
+pub(crate) mod webcam_model;
+mod webcam_view;
+#[cfg(test)]
+mod webcam_width_tests;
 pub(crate) mod widgets;
 
 use model::SettingsSection;
@@ -73,6 +78,8 @@ pub struct SettingsView {
     rebinding: Option<crate::shortcuts::ShortcutAction>,
     /// General page: why the login item could not be changed.
     pub(super) login_error: Option<String>,
+    /// General page: the library's size and free space, measured off the UI thread (LIB-2).
+    pub(super) lib_size: std::cell::RefCell<crate::library_move::SizeCache>,
     rebind_error: Option<app::RebindError>,
     rebind_focus: FocusHandle,
     _perm_poll: Task<()>,
@@ -82,11 +89,25 @@ pub struct SettingsView {
     pub(super) dest: destinations::DestState,
     /// Destinations page: the YouTube card of "Publish to" and its panel (PUB-1).
     pub(super) yt: publish_card::YouTubeCard,
+    /// Webcam & audio page: the device lists, the open dropdown and the live preview (R13).
+    pub(super) webcam: webcam_view::WebcamState,
 }
 
 impl SettingsView {
     pub fn new(app: Entity<AppModel>, cx: &mut Context<Self>) -> Self {
-        cx.observe(&app, |_, _, cx| cx.notify()).detach();
+        // A route or permission change can end the live camera preview at once (R13).
+        cx.observe(&app, |this, _, cx| {
+            this.webcam_sync(cx);
+            cx.notify()
+        })
+        .detach();
+        // A camera plugged in or out refreshes the Camera dropdown (the Record sheet's epoch).
+        let rec = app.read(cx).rec.clone();
+        cx.observe(&rec, |this, _, cx| {
+            this.webcam_sync(cx);
+            cx.notify()
+        })
+        .detach();
         let client_input = cx.new(|cx| {
             TextField::new(
                 tr_ctx!("field", "Client name"),
@@ -143,8 +164,10 @@ impl SettingsView {
         let mut view = SettingsView {
             dest,
             yt,
+            webcam: webcam_view::WebcamState::new(),
             rebinding: None,
             login_error: None,
+            lib_size: Default::default(),
             rebind_error: None,
             rebind_focus: cx.focus_handle(),
             _perm_poll: poll,
@@ -161,6 +184,9 @@ impl SettingsView {
             copied_timer: None,
         };
         view.yt_reload(cx);
+        // A copy that was running when the app quit resumes by itself; the row shows it again.
+        let app3 = view.app.clone();
+        crate::ui::library_move_flow::adopt_running(&app3, cx);
         view
     }
 
@@ -315,12 +341,17 @@ impl SettingsView {
 }
 
 impl Render for SettingsView {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = cx.global::<ThemeGlobal>().0;
         let route = self.app.read(cx).route.clone();
         self.sync_request(cx);
+        self.webcam_watch_window(window, cx);
         self.refresh_field_labels(cx);
         let current = self.current_section(&route);
+        self.webcam_sync(cx);
+        if current == SettingsSection::Webcam {
+            self.webcam_ensure_devices(cx);
+        }
         let header = current;
         let body = match current {
             SettingsSection::General => self.general(&t, cx),

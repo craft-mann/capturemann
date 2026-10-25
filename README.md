@@ -20,7 +20,7 @@ and every feature available to AI agents through MCP and a CLI.
 <img alt="Platform: macOS 13+" src="https://img.shields.io/badge/platform-macOS%2013%2B-lightgrey">
 </p>
 
-> **Status: 0.1.0, first release (macOS 13+, Apple Silicon only).** Windows follows later. Most
+> **Status: 0.1.0, first release (macOS 13+, Apple Silicon only).** After this release: Intel Macs, then Windows, then Linux. Most
 > results are tested with scripted fakes, plus checks on real devices by the owner on one Mac; there
 > are few stored hardware reports. What is still unverified is tracked in
 > [`specs/04-delivery-plan.md`](specs/04-delivery-plan.md) under "Verification debt".
@@ -38,7 +38,7 @@ and every feature available to AI agents through MCP and a CLI.
   zoom and silence-cut suggestions. Models download only when you press Download.
 - **Library** of self-contained capture bundles, stored in a folder you choose.
 - **Share**: save to local folders or Google Drive, publish to YouTube (private by default).
-- **For agents**: 54 MCP tools plus resources and prompts, and an identical `capturemann` CLI. Risky
+- **For agents**: 55 MCP tools plus resources and prompts, and an identical `capturemann` CLI. Risky
   actions (start recording, publish, delete) need an on-screen confirmation.
 - **Private by design**: no telemetry, and no network traffic unless you connect a destination or
   download a model. You bring your own Google credentials; secrets live in the macOS Keychain.
@@ -46,7 +46,7 @@ and every feature available to AI agents through MCP and a CLI.
 
 ## Install
 
-Requires a Mac with Apple Silicon and macOS 13 or later. Intel Macs are not supported.
+Requires a Mac with Apple Silicon and macOS 13 or later. Intel Macs are not supported in 0.1.0; they follow in the next release.
 
 1. Download `CaptureMann-<version>-macos-arm64.dmg` and its `.sha256` file from
    [Releases](https://github.com/craft-mann/capturemann/releases).

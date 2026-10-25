@@ -656,3 +656,62 @@ fn agt_2_ac11_the_ask_first_rows_are_the_parameter_lines() {
     let rows = confirm_rows("tool_ask_first", &json!({"some_new_key": "x"}), &json!({}));
     assert_eq!(rows[0].0, "Some new key");
 }
+
+/// LIB-2: the Confirm dialog of an agent's `move_library`. In English the words are the daemon's
+/// own (copied from `cm_daemon::library_move`); in Vietnamese they come from the parameters.
+#[test]
+fn move_library_confirmation_is_worded_from_its_parameters() {
+    let params = json!({
+        "mode": "move", "from": "/Users/me/Movies/CaptureMann", "to": "/Volumes/Big/CaptureMann",
+        "size_bytes": 3_200_000_000u64, "bundles": 12,
+    });
+    let english = "Move the library from /Users/me/Movies/CaptureMann to /Volumes/Big/CaptureMann (3.2 GB, 12 captures)";
+    assert_eq!(confirm_summary("move_library", &params, english), english);
+    let details = json!({
+        "from": "/Users/me/Movies/CaptureMann", "to": "/Volumes/Big/CaptureMann",
+        "size": "3.2 GB", "captures": 12,
+        "result": "The captures are copied and checked; nothing is deleted from the old folder",
+        "restart": "CaptureMann starts using the new folder after it restarts",
+    });
+    let rows = confirm_rows("move_library", &details, &params);
+    let as_sent: Vec<String> = details
+        .as_object()
+        .unwrap()
+        .values()
+        .map(|v| plain_value(v).unwrap())
+        .collect();
+    assert_eq!(
+        rows.iter().map(|r| r.1.clone()).collect::<Vec<_>>(),
+        as_sent
+    );
+    assert_eq!(rows[0].0, "From");
+    // Fresh and use-existing.
+    let fresh = json!({"mode": "fresh", "from": "/a", "to": "/b", "size_bytes": 0, "bundles": 0});
+    assert_eq!(
+        confirm_summary("move_library", &fresh, "x"),
+        "Start a new empty library at /b; the captures in /a stay where they are"
+    );
+    let used =
+        json!({"mode": "use_existing", "from": "/a", "to": "/b", "size_bytes": 5, "bundles": 4});
+    assert_eq!(
+        confirm_summary("move_library", &used, "x"),
+        "Switch to the existing library at /b (4 captures); the captures in /a stay where they are"
+    );
+    with_language(Lang::Vi, || {
+        let vi = confirm_summary("move_library", &params, english);
+        assert_ne!(vi, english);
+        assert!(
+            vi.contains("/Volumes/Big/CaptureMann") && vi.contains("3,2 GB"),
+            "{vi}"
+        );
+        let rows = confirm_rows("move_library", &details, &params);
+        assert_eq!(rows[2].1, "3,2 GB");
+        assert_ne!(rows[4].1, as_sent[4], "the result row is worded");
+    });
+    // A mode this version does not know keeps the daemon's English.
+    let future = json!({"mode": "teleport", "from": "/a", "to": "/b"});
+    assert_eq!(
+        confirm_summary("move_library", &future, "Later words"),
+        "Later words"
+    );
+}

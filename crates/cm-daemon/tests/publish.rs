@@ -268,16 +268,6 @@ fn request(id: &str) -> Value {
     })
 }
 
-async fn until<T>(mut f: impl AsyncFnMut() -> Option<T>) -> T {
-    for _ in 0..3000 {
-        if let Some(v) = f().await {
-            return v;
-        }
-        tokio::time::sleep(Duration::from_millis(10)).await;
-    }
-    panic!("condition not reached in 30 s");
-}
-
 async fn wait_job(d: &Daemon, id: &str, pred: impl Fn(&Value) -> bool) -> Value {
     let mut last = Value::Null;
     for _ in 0..3000 {

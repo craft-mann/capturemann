@@ -754,10 +754,6 @@ msgid "Changes apply to the selected annotation."
 msgstr "Thay đổi áp dụng cho chú thích đang chọn."
 
 #, fuzzy
-msgid "Changing the folder (move or start fresh) arrives with the storage slice. Set library.path with the CLI meanwhile."
-msgstr "Việc đổi thư mục (di chuyển hoặc bắt đầu mới) sẽ có cùng phần lưu trữ. Trong lúc chờ, hãy đặt library.path bằng CLI."
-
-#, fuzzy
 msgid "Check a job"
 msgstr "Kiểm tra một tác vụ"
 
@@ -4134,14 +4130,6 @@ msgstr "Không thể bắt đầu xem trước camera"
 msgid "The camera was disconnected"
 msgstr "Camera đã bị ngắt kết nối"
 
-#, fuzzy
-msgid "The camera you used last time isn’t connected. Using the system default."
-msgstr "Camera dùng lần trước chưa được kết nối. Đang dùng camera mặc định của hệ thống."
-
-#, fuzzy
-msgid "The camera, microphone and system audio are chosen in the Record sheet; your choices are remembered."
-msgstr "Camera, micrô và âm thanh hệ thống được chọn trong bảng Quay; lựa chọn của bạn được ghi nhớ."
-
 # FACT: owner review required
 #, fuzzy
 msgid "The captions as they are when you confirm. If YouTube refuses them, the video is still published."
@@ -7340,11 +7328,6 @@ msgid "Webcam & audio"
 msgstr "Webcam & âm thanh"
 
 #, fuzzy
-msgctxt "settings row"
-msgid "Devices"
-msgstr "Thiết bị"
-
-#, fuzzy
 msgctxt "shortcut"
 msgid "Annotate last capture"
 msgstr "Chú thích bản chụp gần nhất"
@@ -8912,3 +8895,426 @@ msgstr "Đã đổi"
 msgctxt "agent decision"
 msgid "allowed by your setting"
 msgstr "được cho phép theo cài đặt của bạn"
+
+# ---- Webcam page: devices and preview ----
+#, fuzzy
+msgctxt "settings row"
+msgid "Camera"
+msgstr "Camera"
+
+#, fuzzy
+msgctxt "settings row"
+msgid "Microphone"
+msgstr "Micrô"
+
+#, fuzzy
+msgid "Used for the bubble and the camera track."
+msgstr "Dùng cho bong bóng và rãnh camera."
+
+#, fuzzy
+msgid "System default input unless you pick one."
+msgstr "Dùng đầu vào mặc định của hệ thống nếu bạn không chọn thiết bị khác."
+
+#, fuzzy
+msgid "{device_kind}: {device}"
+msgstr "{device_kind}: {device}"
+
+#, fuzzy
+msgctxt "device"
+msgid "System default"
+msgstr "Mặc định của hệ thống"
+
+#, fuzzy
+msgctxt "device"
+msgid "Saved camera"
+msgstr "Camera đã lưu"
+
+#, fuzzy
+msgctxt "device"
+msgid "Saved microphone"
+msgstr "Micrô đã lưu"
+
+#, fuzzy
+msgctxt "device hint"
+msgid "Default"
+msgstr "Mặc định"
+
+#, fuzzy
+msgctxt "device hint"
+msgid "Not connected"
+msgstr "Chưa kết nối"
+
+#, fuzzy
+msgid "Using the system default until it is plugged in."
+msgstr "Đang dùng thiết bị mặc định của hệ thống cho đến khi thiết bị được cắm lại."
+
+#, fuzzy
+msgid "The camera chosen in Settings isn’t connected. Using the system default."
+msgstr "Camera đã chọn trong Cài đặt chưa được kết nối. Đang dùng camera mặc định của hệ thống."
+
+#, fuzzy
+msgid "Camera permission is missing"
+msgstr "Thiếu quyền truy cập camera"
+
+#, fuzzy
+msgid "Show live camera"
+msgstr "Hiện camera trực tiếp"
+
+#, fuzzy
+msgid "Hide live camera"
+msgstr "Ẩn camera trực tiếp"
+
+#, fuzzy
+msgid "Webcam bubble preview"
+msgstr "Xem trước bong bóng webcam"
+
+#, fuzzy
+msgid "Preview · {size}, {shape}, {mirror}"
+msgstr "Xem trước · {size}, {shape}, {mirror}"
+
+#, fuzzy
+msgctxt "preview caption shape"
+msgid "circle"
+msgstr "tròn"
+
+#, fuzzy
+msgctxt "preview caption shape"
+msgid "rounded"
+msgstr "bo góc"
+
+#, fuzzy
+msgctxt "preview caption mirror"
+msgid "mirrored"
+msgstr "đã lật"
+
+#, fuzzy
+msgctxt "preview caption mirror"
+msgid "not mirrored"
+msgstr "không lật"
+
+# ---- Library: change folder ----
+#, fuzzy
+msgid "A recording is running. Stop it, then change the library folder."
+msgstr "Đang có bản ghi chạy. Hãy dừng nó rồi đổi thư mục thư viện."
+
+#, fuzzy
+msgid "Can’t use this folder"
+msgstr "Không thể dùng thư mục này"
+
+#, fuzzy
+msgid "CaptureMann can’t write to “{path}”. Choose a folder you can save files in."
+msgstr "CaptureMann không thể ghi vào “{path}”. Hãy chọn thư mục có thể lưu tệp."
+
+#, fuzzy
+msgid "CaptureMann starts using the new folder after it restarts"
+msgstr "CaptureMann dùng thư mục mới sau khi khởi động lại"
+
+#, fuzzy
+msgid "Change the library folder"
+msgstr "Đổi thư mục thư viện"
+
+#, fuzzy
+msgid "Change the library folder?"
+msgstr "Đổi thư mục thư viện?"
+
+#, fuzzy
+msgid "Changing the folder copies your captures and checks each one. Nothing is deleted from the old folder. CaptureMann uses the new folder after it restarts."
+msgstr "Khi đổi thư mục, các bản chụp được sao chép và kiểm tra từng bản. Không có gì bị xoá khỏi thư mục cũ. CaptureMann dùng thư mục mới sau khi khởi động lại."
+
+#, fuzzy
+msgid "Choose another folder…"
+msgstr "Chọn thư mục khác…"
+
+#, fuzzy
+msgid "Copying your captures to {path}: {percent}%"
+msgstr "Đang sao chép các bản chụp tới {path}: {percent}%"
+
+#, fuzzy
+msgid "Couldn’t change the library folder"
+msgstr "Không thể đổi thư mục thư viện"
+
+#, fuzzy
+msgid "Couldn’t move the old copies to the Trash"
+msgstr "Không thể chuyển các bản sao cũ vào Thùng rác"
+
+#, fuzzy
+msgid "Move my captures to the new folder"
+msgstr "Chuyển các bản chụp của tôi sang thư mục mới"
+
+#, fuzzy
+msgid "Move the library"
+msgstr "Chuyển thư viện"
+
+#, fuzzy
+msgid "Move the library from {from} to {to} ({size}, {n} captures)"
+msgstr "Chuyển thư viện từ {from} sang {to} ({size}, {n} bản chụp)"
+
+#, fuzzy
+msgid "Move the old copies to the Trash?"
+msgstr "Chuyển các bản sao cũ vào Thùng rác?"
+
+#, fuzzy
+msgid "Move the old copies to the Trash…"
+msgstr "Chuyển các bản sao cũ vào Thùng rác…"
+
+#, fuzzy
+msgid "Move to the Trash"
+msgstr "Chuyển vào Thùng rác"
+
+#, fuzzy
+msgid "Moved {n} capture to the Trash"
+msgid_plural "Moved {n} captures to the Trash"
+msgstr[0] "Đã chuyển {n} bản chụp vào Thùng rác"
+
+#, fuzzy
+msgid "Moving the library"
+msgstr "Đang chuyển thư viện"
+
+#, fuzzy
+msgid "Not enough room to move"
+msgstr "Không đủ chỗ để chuyển"
+
+#, fuzzy
+msgid "Not right now"
+msgstr "Chưa thể lúc này"
+
+#, fuzzy
+msgid "Nothing is copied; the old files stay where they are"
+msgstr "Không sao chép gì; các tệp cũ vẫn ở nguyên chỗ"
+
+#, fuzzy
+msgid "Start a new empty library at {to}; the captures in {from} stay where they are"
+msgstr "Bắt đầu thư viện trống mới tại {to}; các bản chụp trong {from} vẫn ở nguyên chỗ"
+
+#, fuzzy
+msgid "Start a new library"
+msgstr "Bắt đầu thư viện mới"
+
+#, fuzzy
+msgid "Start with an empty library there"
+msgstr "Bắt đầu với thư viện trống ở đó"
+
+#, fuzzy
+msgid "Start with an empty library there instead"
+msgstr "Thay vào đó, bắt đầu với thư viện trống ở đó"
+
+#, fuzzy
+msgid "Switch to the existing library at {to} ({n} captures); the captures in {from} stay where they are"
+msgstr "Chuyển sang thư viện có sẵn tại {to} ({n} bản chụp); các bản chụp trong {from} vẫn ở nguyên chỗ"
+
+#, fuzzy
+msgid "That folder already holds a CaptureMann library."
+msgstr "Thư mục đó đã có một thư viện CaptureMann."
+
+#, fuzzy
+msgid "That folder contains the current library. Choose a folder that doesn’t."
+msgstr "Thư mục đó chứa thư viện hiện tại. Hãy chọn thư mục không chứa nó."
+
+#, fuzzy
+msgid "That folder holds no CaptureMann captures."
+msgstr "Thư mục đó không có bản chụp CaptureMann nào."
+
+#, fuzzy
+msgid "That folder is inside the current library. Choose a folder outside it."
+msgstr "Thư mục đó nằm trong thư viện hiện tại. Hãy chọn thư mục bên ngoài."
+
+#, fuzzy
+msgid "That is already the library folder."
+msgstr "Đó đã là thư mục thư viện."
+
+#, fuzzy
+msgid "The 60 fps self-test is running. Wait for it to finish, then change the library folder."
+msgstr "Đang chạy bài tự kiểm tra 60 fps. Hãy chờ xong rồi đổi thư mục thư viện."
+
+#, fuzzy
+msgid "The captures are copied and checked; nothing is deleted from the old folder"
+msgstr "Các bản chụp được sao chép và kiểm tra; không có gì bị xoá khỏi thư mục cũ"
+
+#, fuzzy
+msgid "The captures copied so far are in {path}. Nothing was deleted from the old folder, which is still in use. Retry to carry on."
+msgstr "Các bản chụp đã sao chép nằm trong {path}. Không có gì bị xoá khỏi thư mục cũ, vẫn đang được dùng. Hãy thử lại để tiếp tục."
+
+#, fuzzy
+msgid "The current library folder “{path}” can’t be read. If it is on a drive, connect the drive and try again."
+msgstr "Không đọc được thư mục thư viện hiện tại “{path}”. Nếu nó nằm trên ổ đĩa, hãy kết nối ổ đĩa rồi thử lại."
+
+#, fuzzy
+msgid "The library folder changed"
+msgstr "Thư mục thư viện đã đổi"
+
+#, fuzzy
+msgid "The library folder changed to {path}. Restart CaptureMann to use it. The captures in the old folder were not moved or deleted."
+msgstr "Thư mục thư viện đã đổi sang {path}. Hãy khởi động lại CaptureMann để dùng. Các bản chụp trong thư mục cũ không bị chuyển hay xoá."
+
+#, fuzzy
+msgid "The library folder is now {path}. Restart CaptureMann to use it. The captures in {old} were not moved or deleted."
+msgstr "Thư mục thư viện giờ là {path}. Hãy khởi động lại CaptureMann để dùng. Các bản chụp trong {old} không bị chuyển hay xoá."
+
+#, fuzzy
+msgid "The library has no captures yet, so nothing is copied. CaptureMann uses the new folder after it restarts."
+msgstr "Thư viện chưa có bản chụp nào nên không sao chép gì. CaptureMann dùng thư mục mới sau khi khởi động lại."
+
+#, fuzzy
+msgid "The library is already being moved."
+msgstr "Thư viện đang được chuyển."
+
+#, fuzzy
+msgid "The library move stopped"
+msgstr "Việc chuyển thư viện đã dừng"
+
+#, fuzzy
+msgid "The library moved"
+msgstr "Thư viện đã được chuyển"
+
+#, fuzzy
+msgid "The library moved to {path}. Restart CaptureMann to use it."
+msgstr "Thư viện đã được chuyển tới {path}. Hãy khởi động lại CaptureMann để dùng."
+
+#, fuzzy
+msgid "The library moved to {path}. Restart CaptureMann to use it. Your old captures were not deleted."
+msgstr "Thư viện đã được chuyển tới {path}. Hãy khởi động lại CaptureMann để dùng. Các bản chụp cũ không bị xoá."
+
+#, fuzzy
+msgid "The move stopped"
+msgstr "Việc chuyển đã dừng"
+
+#, fuzzy
+msgid "The move was cancelled"
+msgstr "Việc chuyển đã bị huỷ"
+
+#, fuzzy
+msgid "The old library is still in use. The captures copied so far stay in {path}."
+msgstr "Thư viện cũ vẫn đang được dùng. Các bản chụp đã sao chép vẫn nằm trong {path}."
+
+#, fuzzy
+msgid "There isn’t enough room: the move needs {needed} free and the new folder has {free}."
+msgstr "Không đủ chỗ: việc chuyển cần trống {needed} nhưng thư mục mới chỉ có {free}."
+
+#, fuzzy
+msgid "This folder already holds a CaptureMann library with {n} capture ({size}). CaptureMann uses it after it restarts. The captures in your current library stay where they are."
+msgid_plural "This folder already holds a CaptureMann library with {n} captures ({size}). CaptureMann uses it after it restarts. The captures in your current library stay where they are."
+msgstr[0] "Thư mục này đã có một thư viện CaptureMann với {n} bản chụp ({size}). CaptureMann dùng nó sau khi khởi động lại. Các bản chụp trong thư viện hiện tại vẫn ở nguyên chỗ."
+
+#, fuzzy
+msgid "Use that library"
+msgstr "Dùng thư viện đó"
+
+#, fuzzy
+msgid "Use the library in this folder?"
+msgstr "Dùng thư viện trong thư mục này?"
+
+#, fuzzy
+msgid "Use the new folder"
+msgstr "Dùng thư mục mới"
+
+#, fuzzy
+msgid "Your captures need {needed} free and the new folder has {free}. You can start with an empty library there instead. The captures in the old folder stay where they are."
+msgstr "Các bản chụp cần trống {needed} nhưng thư mục mới chỉ có {free}. Bạn có thể bắt đầu với thư viện trống ở đó. Các bản chụp trong thư mục cũ vẫn ở nguyên chỗ."
+
+#, fuzzy
+msgid "Your {n} capture ({size}) is copied to the new folder and checked. Nothing is deleted from the old folder. CaptureMann uses the new folder after it restarts."
+msgid_plural "Your {n} captures ({size}) are copied to the new folder and checked. Nothing is deleted from the old folder. CaptureMann uses the new folder after it restarts."
+msgstr[0] "{n} bản chụp ({size}) được sao chép sang thư mục mới và kiểm tra. Không có gì bị xoá khỏi thư mục cũ. CaptureMann dùng thư mục mới sau khi khởi động lại."
+
+#, fuzzy
+msgid "{kind} is still running. Wait for it to finish, then change the library folder. Nothing is cancelled for you."
+msgstr "{kind} vẫn đang chạy. Hãy chờ xong rồi đổi thư mục thư viện. Không có gì bị huỷ thay bạn."
+
+#, fuzzy
+msgid "{n} capture in the old folder was copied and checked. It moves to the Trash, where you can restore it. Anything that changed since the copy stays where it is."
+msgid_plural "{n} captures in the old folder were copied and checked. They move to the Trash, where you can restore them. Anything that changed since the copy stays where it is."
+msgstr[0] "{n} bản chụp trong thư mục cũ đã được sao chép và kiểm tra. Chúng được chuyển vào Thùng rác, nơi bạn có thể khôi phục. Bản nào đã thay đổi sau khi sao chép vẫn ở nguyên chỗ."
+
+#, fuzzy
+msgid "{n} capture stayed in the old folder: it changed after it was copied, or it was not found."
+msgid_plural "{n} captures stayed in the old folder: they changed after they were copied, or they were not found."
+msgstr[0] "{n} bản chụp vẫn ở thư mục cũ: đã thay đổi sau khi sao chép hoặc không tìm thấy."
+
+#, fuzzy
+msgid "{path} · Calculating…"
+msgstr "{path} · Đang tính…"
+
+#, fuzzy
+msgid "{path} · size unknown"
+msgstr "{path} · không rõ dung lượng"
+
+#, fuzzy
+msgid "{path} · {used} used"
+msgstr "{path} · đã dùng {used}"
+
+#, fuzzy
+msgid "{path} · {used} used · {free} free"
+msgstr "{path} · đã dùng {used} · còn trống {free}"
+
+#, fuzzy
+msgid "“{path}” is a file, not a folder. Choose a folder."
+msgstr "“{path}” là một tệp, không phải thư mục. Hãy chọn một thư mục."
+
+#, fuzzy
+msgid "“{path}” is not a full folder path."
+msgstr "“{path}” không phải đường dẫn thư mục đầy đủ."
+
+#, fuzzy
+msgctxt "button"
+msgid "Change…"
+msgstr "Đổi…"
+
+#, fuzzy
+msgctxt "dialog row"
+msgid "Captures"
+msgstr "Bản chụp"
+
+#, fuzzy
+msgctxt "dialog row"
+msgid "Folder"
+msgstr "Thư mục"
+
+#, fuzzy
+msgctxt "dialog row"
+msgid "Free space"
+msgstr "Còn trống"
+
+#, fuzzy
+msgctxt "dialog row"
+msgid "From"
+msgstr "Từ"
+
+#, fuzzy
+msgctxt "dialog row"
+msgid "Restart"
+msgstr "Khởi động lại"
+
+#, fuzzy
+msgctxt "dialog row"
+msgid "Size"
+msgstr "Dung lượng"
+
+#, fuzzy
+msgctxt "dialog row"
+msgid "To"
+msgstr "Tới"
+
+#, fuzzy
+msgctxt "job kind, starts a sentence"
+msgid "A background job"
+msgstr "Một tác vụ nền"
+
+#, fuzzy
+msgctxt "job kind, starts a sentence"
+msgid "A publish"
+msgstr "Một lượt đăng"
+
+#, fuzzy
+msgctxt "job kind, starts a sentence"
+msgid "A transcription"
+msgstr "Một lượt chép lời"
+
+#, fuzzy
+msgctxt "job kind, starts a sentence"
+msgid "An export"
+msgstr "Một lượt xuất"
+
+#, fuzzy
+msgctxt "job kind, starts a sentence"
+msgid "An upload"
+msgstr "Một lượt tải lên"

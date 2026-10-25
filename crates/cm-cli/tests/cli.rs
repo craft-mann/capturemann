@@ -1374,6 +1374,76 @@ async fn library_rename_rm_and_annotate_no_image() {
     assert_eq!(again.code, cm_cli::exit_code_for("not_found"));
 }
 
+/// LIB-2.AC5, AC6: `capturemann library move` asks on screen (Confirm), copies in a job, waits,
+/// and the fresh and use-existing modes only switch.
+#[tokio::test]
+async fn library_move_asks_copies_and_waits() {
+    use cm_daemon::testing::FixedConfirmer;
+    use cm_daemon::Decision;
+    let dir = tempfile::tempdir().unwrap();
+    let endpoint = Endpoint::Path(dir.path().join("d.sock"));
+    let lib_dir = dir.path().join("lib");
+    let lib = Library::open_or_create(&lib_dir).unwrap();
+    let confirmer = Arc::new(FixedConfirmer::new(Decision::Approve));
+    let daemon = Daemon::builder(Capturer::new(desktop()).with_own_pid(None), lib)
+        .confirmer(confirmer.clone())
+        .jobs(cm_daemon::library_job_queue(&lib_dir).unwrap())
+        .build();
+    daemon.register_library_move_handler().unwrap();
+    daemon.start_jobs().unwrap();
+    serve(&daemon, &endpoint);
+    let r = Rig {
+        dir,
+        endpoint,
+        daemon,
+    };
+    let shot = cli(&r, &["capture", "screenshot", "--display", "1", "--json"]).await;
+    assert_eq!(shot.code, 0, "{}", shot.err);
+    let to = r.dir.path().join("elsewhere");
+    let to_s = to.to_str().unwrap();
+    let o = cli(&r, &["library", "move", to_s, "--wait", "--json"]).await;
+    assert_eq!(o.code, 0, "{} {}", o.out, o.err);
+    assert_eq!(o.json()["result"]["bundles"], 1);
+    assert_eq!(o.json()["result"]["restart_required"], true);
+    assert_eq!(confirmer.shown().len(), 1);
+    assert_eq!(confirmer.shown()[0].kind, "move_library");
+    assert!(std::fs::read_dir(&to)
+        .unwrap()
+        .flatten()
+        .any(|e| e.file_name().to_string_lossy().ends_with(".cmshot")));
+    // The folder now holds a library: a plain move is refused with `invalid_input` (exit 2)...
+    let again = cli(&r, &["library", "move", to_s]).await;
+    assert_eq!(
+        again.code,
+        cm_cli::exit_code_for("invalid_input"),
+        "{}",
+        again.err
+    );
+    assert!(again.err.contains("use_existing"), "{}", again.err);
+    // ...and `--use-existing` switches without a job; `--fresh` conflicts with it.
+    let used = cli(&r, &["library", "move", to_s, "--use-existing"]).await;
+    assert_eq!(used.code, 0, "{}", used.err);
+    assert!(used.out.contains("Restart CaptureMann"), "{}", used.out);
+    let clash = cli(&r, &["library", "move", to_s, "--fresh", "--use-existing"]).await;
+    assert_eq!(clash.code, 2);
+    // Fresh in a new folder.
+    let fresh = r.dir.path().join("fresh");
+    let f = cli(
+        &r,
+        &[
+            "library",
+            "move",
+            fresh.to_str().unwrap(),
+            "--fresh",
+            "--json",
+        ],
+    )
+    .await;
+    assert_eq!(f.code, 0, "{}", f.err);
+    assert_eq!(f.json()["mode"], "fresh");
+    assert!(f.json()["job_id"].is_null());
+}
+
 /// AGT-1.AC4: every daemon action has a CLI mapping entry (or is a known gap).
 #[test]
 fn cli_parity_table_covers_every_action() {

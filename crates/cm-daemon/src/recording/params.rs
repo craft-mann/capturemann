@@ -150,7 +150,66 @@ pub struct ResolvedStart {
     pub exclude: ExcludeParams,
 }
 
+/// The device a `camera.device` / `audio.mic_device` setting names (`None`: unset, null or empty,
+/// which means the system default).
+pub fn configured_device(settings: &Map<String, Value>, key: &str) -> Option<String> {
+    settings
+        .get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|d| !d.is_empty())
+        .map(str::to_owned)
+}
+
+/// The ids in a `list_devices` reply: `(cameras, mics)`.
+pub fn listed_device_ids(devices: &Value) -> (Vec<String>, Vec<String>) {
+    let ids = |key: &str| -> Vec<String> {
+        devices
+            .get(key)
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(|d| d.get("id").and_then(Value::as_str).map(str::to_owned))
+            .collect()
+    };
+    (ids("cameras"), ids("mics"))
+}
+
+/// Which sensors of `resolved` would use a configured default device (a sensor that is on and
+/// names no device, while the matching setting is set). The engine lists the devices only then.
+pub fn wants_configured_device(resolved: &ResolvedStart, settings: &Map<String, Value>) -> bool {
+    let cam = resolved
+        .camera
+        .as_ref()
+        .is_some_and(|c| c.device_id.is_none())
+        && configured_device(settings, "camera.device").is_some();
+    let mic = resolved.mic.as_ref().is_some_and(|m| m.device_id.is_none())
+        && configured_device(settings, "audio.mic_device").is_some();
+    cam || mic
+}
+
 impl ResolvedStart {
+    /// Fills the camera and the microphone a request left unnamed (`camera: on`, `mic: default`)
+    /// with the devices of the `camera.device` and `audio.mic_device` settings, when those are
+    /// connected (listed in `cameras` / `mics`). A configured device that is not connected leaves
+    /// the system default in place for this recording; the setting itself is never touched. A
+    /// device the request named is never replaced.
+    pub fn apply_default_devices(
+        &mut self,
+        settings: &Map<String, Value>,
+        cameras: &[String],
+        mics: &[String],
+    ) {
+        if let Some(c) = self.camera.as_mut().filter(|c| c.device_id.is_none()) {
+            c.device_id = configured_device(settings, "camera.device")
+                .filter(|d| cameras.iter().any(|x| x == d));
+        }
+        if let Some(m) = self.mic.as_mut().filter(|m| m.device_id.is_none()) {
+            m.device_id = configured_device(settings, "audio.mic_device")
+                .filter(|d| mics.iter().any(|x| x == d));
+        }
+    }
+
     pub fn mic_denoise(&self) -> bool {
         self.mic.as_ref().and_then(|m| m.denoise).unwrap_or(true)
     }
@@ -610,6 +669,81 @@ mod tests {
 
     fn rest(v: Value) -> Map<String, Value> {
         v.as_object().cloned().unwrap_or_default()
+    }
+
+    fn device_settings(cam: Option<&str>, mic: Option<&str>) -> Map<String, Value> {
+        let mut m = Map::new();
+        if let Some(c) = cam {
+            m.insert("camera.device".into(), json!(c));
+        }
+        if let Some(c) = mic {
+            m.insert("audio.mic_device".into(), json!(c));
+        }
+        m
+    }
+
+    fn resolved_with(camera: Value, mic: Value) -> ResolvedStart {
+        StartParams::parse(&rest(
+            json!({"target": {"display_id": 1}, "camera": camera, "mic": mic}),
+        ))
+        .unwrap()
+        .resolve(&Map::new())
+    }
+
+    fn ids(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| (*s).to_owned()).collect()
+    }
+
+    /// Settings -> Webcam & audio: the configured devices are the defaults of a request that
+    /// names none; every combination.
+    #[test]
+    fn configured_default_devices_fill_unnamed_sensors_only() {
+        let (cams, mics) = (ids(&["cam-a", "cam-b"]), ids(&["mic-a", "mic-b"]));
+        let st = device_settings(Some("cam-b"), Some("mic-b"));
+        // None named (`camera: true`, `mic: "default"`): the configured devices, when present.
+        let mut r = resolved_with(json!(true), json!("default"));
+        assert!(wants_configured_device(&r, &st));
+        r.apply_default_devices(&st, &cams, &mics);
+        assert_eq!(r.camera.unwrap().device_id.as_deref(), Some("cam-b"));
+        assert_eq!(r.mic.unwrap().device_id.as_deref(), Some("mic-b"));
+        // Named devices win.
+        let mut r = resolved_with(json!({"device_id": "cam-a"}), json!({"device_id": "mic-a"}));
+        assert!(!wants_configured_device(&r, &st));
+        r.apply_default_devices(&st, &cams, &mics);
+        assert_eq!(r.camera.unwrap().device_id.as_deref(), Some("cam-a"));
+        assert_eq!(r.mic.unwrap().device_id.as_deref(), Some("mic-a"));
+        // Configured but not connected: the system default, for this recording only.
+        let gone = device_settings(Some("cam-x"), Some("mic-x"));
+        let mut r = resolved_with(json!(true), json!(true));
+        r.apply_default_devices(&gone, &cams, &mics);
+        assert_eq!(r.camera.unwrap().device_id, None);
+        assert_eq!(r.mic.unwrap().device_id, None);
+        // Nothing configured, or an empty or null value: the system default, no listing needed.
+        for none in [
+            Map::new(),
+            device_settings(Some(""), Some("  ")),
+            [("camera.device".to_owned(), Value::Null)]
+                .into_iter()
+                .collect(),
+        ] {
+            let mut r = resolved_with(json!(true), json!(true));
+            assert!(!wants_configured_device(&r, &none));
+            r.apply_default_devices(&none, &cams, &mics);
+            assert_eq!(r.camera.unwrap().device_id, None);
+            assert_eq!(r.mic.unwrap().device_id, None);
+        }
+        // Off stays off: a configured camera never turns it on.
+        let mut r = resolved_with(json!(false), json!(false));
+        assert!(!wants_configured_device(&r, &st));
+        r.apply_default_devices(&st, &cams, &mics);
+        assert!(r.camera.is_none() && r.mic.is_none());
+    }
+
+    #[test]
+    fn list_devices_ids_are_read_from_the_reply() {
+        let v = json!({"cameras": [{"id": "c1"}, {"name": "no id"}], "mics": [{"id": "m1"}]});
+        assert_eq!(listed_device_ids(&v), (ids(&["c1"]), ids(&["m1"])));
+        assert_eq!(listed_device_ids(&json!({})), (vec![], vec![]));
     }
 
     #[test]

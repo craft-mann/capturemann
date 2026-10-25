@@ -270,6 +270,15 @@ struct FactoryState {
     panic_on_tick: AtomicBool,
     quality: Mutex<Option<ScreenQuality>>,
     last_plan: Mutex<Option<cm_capture::record::CapturePlan>>,
+    last_devices: Mutex<LastDevices>,
+}
+
+/// The device ids of the latest build: `None` for a sensor that was off, `Some(None)` for one on
+/// with the system default.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct LastDevices {
+    pub camera: Option<Option<String>>,
+    pub mic: Option<Option<String>>,
 }
 
 /// The fake [`SourceFactory`]. Cheap to clone; clones share state.
@@ -363,6 +372,11 @@ impl FakeSources {
         lock(&self.state.last_plan).clone()
     }
 
+    /// Which camera and microphone the latest build was asked to open.
+    pub fn last_devices(&self) -> LastDevices {
+        lock(&self.state.last_devices).clone()
+    }
+
     /// The track of `kind` from the latest build.
     pub fn handle(&self, kind: TrackKind) -> Option<FakeTrackHandle> {
         lock(&self.state.tracks)
@@ -426,6 +440,10 @@ impl SourceFactory for FakeSources {
         self.state.builds.fetch_add(1, Ordering::SeqCst);
         *lock(&self.state.last_plan) = Some(cx.plan.clone());
         let p = cx.params;
+        *lock(&self.state.last_devices) = LastDevices {
+            camera: p.camera.as_ref().map(|c| c.device_id.clone()),
+            mic: p.mic.as_ref().map(|m| m.device_id.clone()),
+        };
         let mut kinds = vec![TrackKind::Screen];
         if p.cursor {
             kinds.push(TrackKind::Cursor);

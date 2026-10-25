@@ -79,6 +79,7 @@ pub const CLI_COMMANDS: &[(&str, Option<&str>)] = &[
     ("list_publish_accounts", Some("publish accounts")),
     ("publish_video", Some("publish")),
     ("delete_capture", Some("library rm")),
+    ("move_library", Some("library move")),
     ("list_models", Some("ai models")),
     ("download_model", Some("ai models download")),
     ("import_model", Some("ai models import")),

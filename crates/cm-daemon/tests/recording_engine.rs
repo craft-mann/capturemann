@@ -1332,6 +1332,61 @@ async fn list_devices_returns_the_factory_listing() {
     assert_eq!(v["microphone_permission"], "authorized");
 }
 
+/// Settings -> Webcam & audio: `camera.device` and `audio.mic_device` are the devices a start
+/// opens when the request names none (CLI `--mic default`, MCP `camera: true`); a named device
+/// wins; a configured device that is not connected falls back to the system default and stays
+/// saved; off stays off.
+#[tokio::test]
+async fn configured_devices_are_the_defaults_of_a_start() {
+    use cm_daemon::testing::LastDevices;
+    let r = rig();
+    let set = |v: Value| {
+        let d = r.daemon.clone();
+        async move {
+            user(&d, "set_settings", json!({ "values": v }))
+                .await
+                .unwrap()
+        }
+    };
+    async fn run(r: &Rig, extra: Value) -> LastDevices {
+        let v = start(r, extra).await;
+        assert_eq!(v["state"], "recording");
+        let seen = r.sources.last_devices();
+        user(&r.daemon, "stop_recording", json!({})).await.unwrap();
+        seen
+    }
+    let some = |s: &str| Some(Some(s.to_owned()));
+    // Nothing configured: the system default.
+    let seen = run(&r, json!({ "camera": true, "mic": "default" })).await;
+    assert_eq!((seen.camera, seen.mic), (Some(None), Some(None)));
+    // Configured and connected.
+    set(json!({ "camera.device": "fake-cam", "audio.mic_device": "fake-mic" })).await;
+    let seen = run(&r, json!({ "camera": true, "mic": "default" })).await;
+    assert_eq!(
+        (seen.camera, seen.mic),
+        (some("fake-cam"), some("fake-mic"))
+    );
+    // A device the request names is used as named.
+    let seen = run(
+        &r,
+        json!({ "camera": { "device_id": "other-cam" }, "mic": { "device_id": "other-mic" } }),
+    )
+    .await;
+    assert_eq!(
+        (seen.camera, seen.mic),
+        (some("other-cam"), some("other-mic"))
+    );
+    // Off stays off.
+    let seen = run(&r, json!({ "camera": false, "mic": false })).await;
+    assert_eq!((seen.camera, seen.mic), (None, None));
+    // Configured but unplugged: the system default for this recording, the setting is kept.
+    set(json!({ "camera.device": "gone-cam", "audio.mic_device": "gone-mic" })).await;
+    let seen = run(&r, json!({ "camera": true, "mic": true })).await;
+    assert_eq!((seen.camera, seen.mic), (Some(None), Some(None)));
+    let all = user(&r.daemon, "get_settings", json!({})).await.unwrap();
+    assert_eq!(all["settings"]["camera.device"], "gone-cam");
+}
+
 // ---- confirmation (AGT-2, NFR-11) ---------------------------------------------------------
 
 /// AGT-2: an agent's start waits for the dialog, and the dialog says exactly what will happen:

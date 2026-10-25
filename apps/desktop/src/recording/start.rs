@@ -18,7 +18,7 @@
 //! | `privacy.excluded_apps` | bundle ids added to the engine's default exclusions (REC-6) |
 //! | `recording.last_target` | `display`, `window` or `region`: the sheet's remembered target kind |
 //! | `recording.camera`, `recording.mic`, `recording.system_audio` | remembered on/off choices |
-//! | `camera.device`, `audio.mic_device` | remembered devices (CAM-4.AC2: fall back to the default) |
+//! | `camera.device`, `audio.mic_device` | the devices chosen in Settings -> Webcam & audio (R13): the default of every start that names none, here and in the daemon; a missing one falls back to the system default (CAM-4.AC2) and stays saved. A device picked in the sheet is for that recording only and is not written |
 //! | `camera.shape`, `camera.size`, `camera.mirror`, `camera.position` | the bubble (CAM-1); the position is only restored when `camera.remember_position` is on, else every recording starts bottom-left |
 //! | `camera.remember_position` | bool, default false (CAM-1.AC8) |
 //! | `recording.hud_positions` | `{ "<display>": [x, y] }` HUD center fractions (REC-5.AC4) |
@@ -200,7 +200,9 @@ impl StartOptions {
         Value::Object(p)
     }
 
-    /// The settings to remember after a start (so the next sheet opens the same way).
+    /// The settings to remember after a start (so the next sheet opens the same way). The devices
+    /// are not among them: `camera.device` and `audio.mic_device` are set in Settings -> Webcam &
+    /// audio, and a device picked in the sheet counts for that recording only.
     pub fn remembered(&self) -> Map<String, Value> {
         let mut m = Map::new();
         m.insert(KEY_LAST_TARGET.into(), json!(self.target.kind().key()));
@@ -208,16 +210,10 @@ impl StartOptions {
         m.insert(KEY_MIC_ON.into(), json!(self.mic));
         m.insert(KEY_SYSTEM_AUDIO.into(), json!(self.system_audio));
         if let Some(c) = &self.camera {
-            if let Some(d) = &c.device {
-                m.insert(KEY_CAMERA_DEVICE.into(), json!(d));
-            }
             // The position this recording starts at (CAM-1): written before the start so the
             // layout at stop sees any later drag as a change. Ignored by the next start unless
             // `camera.remember_position` is on.
             m.insert(KEY_BUBBLE_POSITION.into(), c.position.to_json());
-        }
-        if let Some(d) = &self.mic_device {
-            m.insert(KEY_MIC_DEVICE.into(), json!(d));
         }
         m
     }
@@ -340,6 +336,11 @@ pub fn quick_defaults(
         )
     };
     let mut out = defaults.clone();
+    // No sheet checked the devices: the daemon applies the saved ones when they are connected and
+    // the system default otherwise, instead of failing on a device that was unplugged.
+    out.camera_device = None;
+    out.mic_device = None;
+    out.bubble.device = None;
     let mut dropped = Vec::new();
     if out.mic && blocked(mic) {
         out.mic = false;
@@ -681,6 +682,9 @@ mod tests {
             system_audio: true,
         };
         let mut stored = o.remembered();
+        // The devices are never written by a start (Settings owns them).
+        assert!(!stored.contains_key(KEY_CAMERA_DEVICE) && !stored.contains_key(KEY_MIC_DEVICE));
+        stored.insert(KEY_CAMERA_DEVICE.into(), json!("cam-2"));
         stored.insert(KEY_BUBBLE_SHAPE.into(), json!("rounded"));
         stored.insert(KEY_BUBBLE_SIZE.into(), json!("s"));
         stored.insert(KEY_BUBBLE_MIRROR.into(), json!(false));
@@ -696,6 +700,43 @@ mod tests {
         assert_eq!(back.bubble, o.camera.clone().unwrap());
         // The target is chosen again; everything else is the same request.
         assert_eq!(back.options(o.target).to_params(), o.to_params());
+    }
+
+    /// R13: the configured devices are the sheet's first choice; a hotkey start leaves them to
+    /// the daemon; a device picked for one recording is not saved.
+    #[test]
+    fn configured_devices_are_the_initial_choice() {
+        let st = map(
+            json!({"camera.device": "cam-b", "audio.mic_device": "mic-b",
+                            "recording.camera": true}),
+        );
+        let d = SheetDefaults::from_settings(&st);
+        assert_eq!(d.camera_device.as_deref(), Some("cam-b"));
+        assert_eq!(d.mic_device.as_deref(), Some("mic-b"));
+        assert_eq!(d.bubble.device.as_deref(), Some("cam-b"));
+        let p = d.options(Target::Display { display_id: 1 }).to_params();
+        assert_eq!(p["camera"]["device_id"], json!("cam-b"));
+        assert_eq!(p["mic"], json!({"device_id": "mic-b"}));
+        // Null (the system default) and a missing key read the same.
+        for none in [map(json!({"camera.device": null})), Map::new()] {
+            let n = SheetDefaults::from_settings(&none);
+            assert_eq!((n.camera_device, n.mic_device), (None, None));
+        }
+        // The hotkey path names none: the daemon resolves them.
+        let (q, _) = quick_defaults(
+            &d,
+            crate::permissions::State::Granted,
+            crate::permissions::State::Granted,
+        );
+        let p = q.options(Target::Display { display_id: 1 }).to_params();
+        assert_eq!(p["camera"].get("device_id"), None);
+        assert_eq!(p["mic"], json!(true));
+        // Picking another device for one recording writes nothing about devices.
+        let mut o = d.options(Target::Display { display_id: 1 });
+        o.mic_device = Some("mic-a".into());
+        o.camera.as_mut().unwrap().device = Some("cam-a".into());
+        assert!(!o.remembered().contains_key(KEY_MIC_DEVICE));
+        assert!(!o.remembered().contains_key(KEY_CAMERA_DEVICE));
     }
 
     #[test]

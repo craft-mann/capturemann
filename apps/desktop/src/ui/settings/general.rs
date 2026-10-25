@@ -7,7 +7,7 @@ use serde_json::json;
 use super::rows::{plain_row, tile, toggle_row};
 use super::widgets::{
     caption, group_with_card, list_card, segment, segment_with_icon, segmented, settings_row,
-    small_button_with_icon, warning_caption,
+    small_button_with_icon,
 };
 use super::SettingsView;
 use crate::library::LibraryStatus;
@@ -206,9 +206,14 @@ impl SettingsView {
             ),
             _ => (status(t, StatusKind::Ok, tr!("Available")), None),
         };
-        let library_path = root
-            .map(|p| p.display().to_string())
-            .unwrap_or_else(|| tr!("Not set"));
+        let library_group = self.library_group(
+            t,
+            (&text.library, &text.library_folder),
+            root,
+            library_pill.into_any_element(),
+            library_note,
+            cx,
+        );
         let mut behavior = vec![
             toggle_row(
                 t,
@@ -243,29 +248,7 @@ impl SettingsView {
             .flex()
             .flex_col()
             .gap(px(24.))
-            .child(
-                group_with_card(
-                    t,
-                    &text.library,
-                    None,
-                    // TODO(design): the board's "Change..." button and "used / free" sizes are not
-                    // built: moving the library arrives with the storage slice (`library` is an
-                    // app-only key group). The caption below says so.
-                    list_card(t).child(settings_row(
-                        t,
-                        Some(tile::LIBRARY),
-                        text.library_folder.clone(),
-                        Some(SharedString::from(library_path)),
-                        Some(library_pill.into_any_element()),
-                        true,
-                    )),
-                )
-                .children(library_note.map(|n| warning_caption(t, n)))
-                .child(caption(
-                    t,
-                    tr!("Changing the folder (move or start fresh) arrives with the storage slice. Set library.path with the CLI meanwhile."),
-                )),
-            )
+            .child(library_group)
             .child(group_with_card(
                 t,
                 &text.appearance,

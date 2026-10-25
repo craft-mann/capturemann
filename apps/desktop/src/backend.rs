@@ -271,6 +271,10 @@ impl Backend {
             if let Err(e) = daemon.register_publish_handler() {
                 eprintln!("cm-desktop: publishing is unavailable: {e}");
             }
+            // Moving the library folder (LIB-2): the copy job.
+            if let Err(e) = daemon.register_library_move_handler() {
+                eprintln!("cm-desktop: moving the library is unavailable: {e}");
+            }
             // Local AI (M5): the job executors for model downloads and transcription. Nothing is
             // downloaded or loaded until the user asks; the automatic transcription after a
             // recording needs an installed model.

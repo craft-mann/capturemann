@@ -358,6 +358,7 @@ pub fn confirm_summary(kind: &str, params: &Value, english: &str) -> String {
         "discard_recording" => Some(tr!("Discard the current recording and delete its files")),
         "publish_video" => publish_summary(params),
         "delete_capture" => delete_summary(params),
+        "move_library" => move_library_summary(params),
         "download_model" => model_summary(params, true),
         "remove_model" => model_summary(params, false),
         "tool_ask_first" => ask_first_summary(params),
@@ -499,6 +500,10 @@ pub fn row_label(key: &str) -> String {
         "size_mb" => tr!("Size mb"),
         "destination" => tr!("Destination"),
         "network" => tr!("Network"),
+        "from" => tr_ctx!("dialog row", "From"),
+        "to" => tr_ctx!("dialog row", "To"),
+        "captures" => tr_ctx!("dialog row", "Captures"),
+        "restart" => tr_ctx!("dialog row", "Restart"),
         other => humanize_key(other),
     }
 }
@@ -513,6 +518,7 @@ fn row_value(kind: &str, key: &str, p: &Value) -> Option<String> {
         },
         "publish_video" => publish_row(key, p),
         "delete_capture" => delete_row(key, p),
+        "move_library" => move_library_row(key, p),
         "download_model" => match key {
             "network" => Some(tr!("Downloads the model from the internet")),
             _ => None,
@@ -889,6 +895,48 @@ fn delete_row(key: &str, p: &Value) -> Option<String> {
                 tr!("Moved to the Trash")
             }
         }
+        _ => return None,
+    })
+}
+
+// -- move_library --
+
+fn move_library_summary(p: &Value) -> Option<String> {
+    let (from, to) = (text(p, "from")?, text(p, "to")?);
+    let n = num(p, "bundles").unwrap_or(0);
+    Some(match text(p, "mode")? {
+        "move" => tr!(
+            "Move the library from {from} to {to} ({size}, {n} captures)",
+            from = from,
+            to = to,
+            size = size_text(num(p, "size_bytes")?),
+            n = n
+        ),
+        "fresh" => tr!(
+            "Start a new empty library at {to}; the captures in {from} stay where they are",
+            to = to,
+            from = from
+        ),
+        "use_existing" => tr!(
+            "Switch to the existing library at {to} ({n} captures); the captures in {from} stay where they are",
+            to = to,
+            from = from,
+            n = n
+        ),
+        _ => return None,
+    })
+}
+
+fn move_library_row(key: &str, p: &Value) -> Option<String> {
+    Some(match key {
+        "size" => size_text(num(p, "size_bytes")?),
+        "result" => match text(p, "mode")? {
+            "move" => {
+                tr!("The captures are copied and checked; nothing is deleted from the old folder")
+            }
+            _ => tr!("Nothing is copied; the old files stay where they are"),
+        },
+        "restart" => tr!("CaptureMann starts using the new folder after it restarts"),
         _ => return None,
     })
 }

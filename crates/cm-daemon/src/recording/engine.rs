@@ -500,6 +500,11 @@ impl RecordingEngine {
         ENGINE_ACTIONS.contains(&method)
     }
 
+    /// Whether the 60 fps self-test is running.
+    pub fn selftest_running(&self) -> bool {
+        lock(&self.inner.state).selftest.is_some()
+    }
+
     /// Whether a recording is in progress (any phase).
     pub fn is_active(&self) -> bool {
         lock(&self.inner.state).active.is_some()
@@ -524,7 +529,15 @@ impl RecordingEngine {
         let parsed = StartParams::parse(&params.rest)?;
         self.ensure_idle()?;
         let settings = self.inner.deps.settings.all().unwrap_or_default();
-        let resolved = parsed.resolve(&settings);
+        let mut resolved = parsed.resolve(&settings);
+        // The camera and microphone the request left unnamed: the devices set in Settings ->
+        // Webcam & audio when they are connected, else the system default.
+        if super::params::wants_configured_device(&resolved, &settings) {
+            if let Ok(devices) = self.devices().await {
+                let (cameras, mics) = super::params::listed_device_ids(&devices);
+                resolved.apply_default_devices(&settings, &cameras, &mics);
+            }
+        }
         // 60 fps needs a passing self-test (REC-3): refused when asked for, dropped to 30 when it
         // only came from the `recording.fps` default.
         let gate = Some(parsed.fps.is_some());

@@ -387,7 +387,7 @@ impl SheetModel {
         }
         if self.camera_fell_back {
             return Some(Note::Info(tr!(
-                "The camera you used last time isn\u{2019}t connected. Using the system default."
+                "The camera chosen in Settings isn\u{2019}t connected. Using the system default."
             )));
         }
         None

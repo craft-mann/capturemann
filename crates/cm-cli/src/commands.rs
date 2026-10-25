@@ -2,7 +2,7 @@
 
 use std::fmt::Write as _;
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use base64::Engine as _;
 use cm_core::ErrorCode;
@@ -13,7 +13,7 @@ mod ai;
 
 use crate::args::{
     AnnotateArgs, CaptureCmd, Cli, Command, DaemonCmd, EditCmd, ExportArgs, GetArgs, JobsCmd,
-    LibraryCmd, LibraryListArgs, LibraryPaging, PublishArgs, PublishCmd, PublishSendArgs,
+    LibraryCmd, LibraryListArgs, LibraryPaging, MoveArgs, PublishArgs, PublishCmd, PublishSendArgs,
     RecordCmd, RecordMicArgs, RecordRefArgs, RecordSelftestArgs, RecordStartArgs, RevisionArgs,
     ScreenshotArgs, SettingsCmd, UploadArgs,
 };
@@ -93,6 +93,7 @@ pub async fn execute(cli: Cli, env: &mut Env) -> Result<(), CliError> {
             LibraryCmd::List(a) => library_list(&mut cx, a).await,
             LibraryCmd::Rename { id, title } => library_rename(&mut cx, id, title).await,
             LibraryCmd::Rm { id, also_remote } => library_rm(&mut cx, id, also_remote).await,
+            LibraryCmd::Move(a) => library_move(&mut cx, a).await,
             LibraryCmd::Search { text, paging } => {
                 library_list(
                     &mut cx,
@@ -936,6 +937,119 @@ async fn send_edit(
         )
     });
     Ok(())
+}
+
+/// `~`, `~/x` and relative paths made absolute (the daemon wants an absolute path).
+fn absolute_path(p: &str) -> Result<String, CliError> {
+    let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" });
+    let expanded = match (p, &home) {
+        ("~", Some(h)) => PathBuf::from(h),
+        (p, Some(h)) if p.starts_with("~/") => PathBuf::from(h).join(&p[2..]),
+        _ => PathBuf::from(p),
+    };
+    std::path::absolute(&expanded)
+        .map(|a| a.to_string_lossy().into_owned())
+        .map_err(|e| CliError::invalid_input(format!("cannot resolve `{p}`: {e}")))
+}
+
+async fn library_move(cx: &mut Ctx<'_>, a: MoveArgs) -> Result<(), CliError> {
+    let mut p = json!({ "path": absolute_path(&a.path)? });
+    if a.fresh {
+        p["mode"] = json!("fresh");
+    } else if a.use_existing {
+        p["mode"] = json!("use_existing");
+    }
+    let params = cx.mutating(p, "");
+    let mut c = cx.client().await?;
+    let started = c.call("move_library", params).await?;
+    let describe = |r: &Value| {
+        format!(
+            "{} -> {} ({} captures, {} bytes)",
+            plain(&r["from"]),
+            plain(&r["to"]),
+            plain(&r["bundles"]),
+            plain(&r["bytes"])
+        )
+    };
+    if started["job_id"].is_null() {
+        cx.emit(&started, |r| {
+            format!(
+                "Library folder changed ({}): {}\n  Restart CaptureMann to use it. The old files were left where they are.",
+                plain(&r["mode"]),
+                describe(r)
+            )
+        });
+        return Ok(());
+    }
+    if !a.wait {
+        cx.emit(&started, |r| {
+            format!(
+                "Moving the library: {}: job {}\n  watch it with `capturemann jobs get {}`; restart CaptureMann when it is done",
+                describe(r),
+                plain(&r["job_id"]),
+                plain(&r["job_id"]),
+            )
+        });
+        return Ok(());
+    }
+    let job_id = plain(&started["job_id"]);
+    let mut last_pct = -1i64;
+    let deadline = a
+        .timeout
+        .map(|s| tokio::time::Instant::now() + std::time::Duration::from_secs_f64(s));
+    loop {
+        let j = c.call("get_job", json!({ "job_id": job_id })).await?;
+        match j["state"].as_str() {
+            Some("done") => {
+                cx.emit(&j, |j| {
+                    format!(
+                        "Moved {} captures ({} bytes) to {}\n  Restart CaptureMann to use the new folder. The old copies were not deleted.",
+                        plain(&j["result"]["bundles"]),
+                        plain(&j["result"]["bytes"]),
+                        plain(&j["result"]["to"]),
+                    )
+                });
+                return Ok(());
+            }
+            Some("failed") => {
+                let reason = j["error"]["reason"]
+                    .as_str()
+                    .unwrap_or("unknown")
+                    .to_owned();
+                let mut e = CliError::new(ErrorCode::JobFailed, reason);
+                e.data = json!({ "job_id": job_id });
+                return Err(e);
+            }
+            Some("cancelled") => {
+                return Err(CliError::new(
+                    ErrorCode::JobFailed,
+                    "the move was cancelled; the old library is still in use",
+                ));
+            }
+            _ => {}
+        }
+        if let Some(d) = deadline {
+            if tokio::time::Instant::now() >= d {
+                let mut e = CliError::new(
+                    ErrorCode::Busy,
+                    format!(
+                        "the move is still running after {} s; it keeps running in the daemon (job {job_id})",
+                        a.timeout.unwrap_or_default()
+                    ),
+                );
+                e.data = json!({ "job_id": job_id, "state": j["state"], "timed_out": true });
+                return Err(e);
+            }
+        }
+        if !cx.json {
+            let pct = (j["progress"].as_f64().unwrap_or(0.0) * 100.0).floor() as i64;
+            if pct != last_pct {
+                last_pct = pct;
+                let _ = writeln!(cx.env.err, "copying... {pct}%");
+            }
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+    }
 }
 
 async fn library_rm(cx: &mut Ctx<'_>, id: String, also_remote: bool) -> Result<(), CliError> {

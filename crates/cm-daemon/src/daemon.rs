@@ -156,6 +156,10 @@ pub(crate) struct Inner {
     pub(crate) settings: Arc<dyn SettingsStore>,
     pub(crate) external: Arc<dyn ExternalActions>,
     pub(crate) trasher: Arc<dyn Trasher>,
+    /// Free space of a volume (the library move's space check).
+    pub(crate) free_space: Arc<dyn cm_capture::disk::FreeSpace>,
+    /// Copies the files of a library move.
+    pub(crate) move_copier: Arc<dyn crate::library_move::FileCopier>,
     pub(crate) clock: Arc<dyn Clock>,
     pub(crate) events: EventBus,
     /// The engines behind the AI actions (M5); [`AiServices::default`] has none.
@@ -220,6 +224,8 @@ pub struct DaemonBuilder {
     settings: Arc<dyn SettingsStore>,
     external: Arc<dyn ExternalActions>,
     trasher: Arc<dyn Trasher>,
+    free_space: Arc<dyn cm_capture::disk::FreeSpace>,
+    move_copier: Arc<dyn crate::library_move::FileCopier>,
     ai: AiServices,
     destinations: Option<cm_storage::DestinationStore>,
     cloud: crate::storage_cloud::CloudBackend,
@@ -246,6 +252,8 @@ impl DaemonBuilder {
             settings: Arc::new(MemorySettings::default()),
             external: Arc::new(NoExternalActions),
             trasher: Arc::new(SystemTrasher),
+            free_space: Arc::new(cm_capture::disk::SystemFreeSpace),
+            move_copier: Arc::new(crate::library_move::StdCopier),
             ai: AiServices::default(),
             destinations: None,
             cloud: crate::storage_cloud::CloudBackend::default(),
@@ -381,6 +389,19 @@ impl DaemonBuilder {
         self
     }
 
+    /// Free-space reading of the library move's space check. Default: the real volume; tests pass
+    /// [`cm_capture::disk::FakeFreeSpace`].
+    pub fn free_space(mut self, f: impl cm_capture::disk::FreeSpace + 'static) -> Self {
+        self.free_space = Arc::new(f);
+        self
+    }
+
+    /// How the library move copies files (tests break it on purpose).
+    pub fn move_copier(mut self, c: impl crate::library_move::FileCopier + 'static) -> Self {
+        self.move_copier = Arc::new(c);
+        self
+    }
+
     /// The engines behind the local-AI actions (speech models, transcription, captions,
     /// suggestions). Default: none; every AI action then fails with `not_implemented` and the
     /// Confirm-tier ones are refused before a dialog opens. Register the job executors with
@@ -463,6 +484,8 @@ impl DaemonBuilder {
                 settings: self.settings,
                 external: self.external,
                 trasher: self.trasher,
+                free_space: self.free_space,
+                move_copier: self.move_copier,
                 clock: self.clock,
                 ai: self.ai,
                 destinations: self.destinations,
@@ -912,6 +935,9 @@ impl Daemon {
         // `delete_capture` is planned too: with `also_delete_remote` the dialog lists the remote
         // copies, and exactly that list is deleted.
         let mut prepared_delete: Option<crate::library_ops::DeletePlan> = None;
+        // `move_library` is checked before its dialog (every precondition), and the dialog says
+        // what the check found.
+        let mut prepared_move: Option<crate::library_move::MovePrepared> = None;
         // AGT-2.AC9: the tier this call is gated by. The table's tier for the user; for an
         // agent, changed by the live per-tool permissions (read now, so a setting changed while
         // this call waits behind another dialog applies to the next call, not to this one).
@@ -1035,6 +1061,12 @@ impl Daemon {
                     prepared_publish = Some(plan);
                     sd
                 }
+                (_, Action::MoveLibrary(p)) => {
+                    let pr = self.inner.plan_move_library(p).await?;
+                    let sd = (pr.summary.clone(), pr.details.clone(), pr.params.clone());
+                    prepared_move = Some(pr);
+                    sd
+                }
                 // The dialog is built from the live model list: name, size, where it goes.
                 (_, Action::Ai(p)) => self.inner.plan_ai(p).await?,
                 _ => (action.summary(), action.details(), action.confirm_params()),
@@ -1085,14 +1117,18 @@ impl Daemon {
             }
             (a, _) => a,
         };
-        let result = match (action, prepared_publish, prepared_delete) {
-            (Action::PublishVideo(p), Some(plan), _) => {
-                self.inner.run_publish(&actor, plan, p.request_id).await?
+        let result = if let Some(pr) = prepared_move {
+            self.inner.run_move_library(pr).await?
+        } else {
+            match (action, prepared_publish, prepared_delete) {
+                (Action::PublishVideo(p), Some(plan), _) => {
+                    self.inner.run_publish(&actor, plan, p.request_id).await?
+                }
+                (Action::DeleteCapture(p), _, Some(plan)) => {
+                    self.inner.delete_capture(&actor, p, Some(plan)).await?
+                }
+                (action, _, _) => self.run(&actor, action, prepared, prepared_test).await?,
             }
-            (Action::DeleteCapture(p), _, Some(plan)) => {
-                self.inner.delete_capture(&actor, p, Some(plan)).await?
-            }
-            (action, _, _) => self.run(&actor, action, prepared, prepared_test).await?,
         };
         if let Some(k) = key {
             let now = self.inner.clock.now();
@@ -1143,6 +1179,10 @@ impl Daemon {
             Action::ListLibrary(p) => inner.list_library(p).await,
             Action::RenameCapture(p) => inner.rename_capture(actor, p).await,
             Action::RescanLibrary => inner.rescan_library().await,
+            Action::MoveLibrary(p) => {
+                let pr = inner.plan_move_library(&p).await?;
+                inner.run_move_library(pr).await
+            }
             Action::StartRecording(p) => match &inner.recording {
                 Some(e) => {
                     let prep = match prepared {
@@ -1246,7 +1286,7 @@ impl Inner {
         let n = spec.name;
         // The local part of `delete_capture` is built in; an external engine, if it claims the
         // action, takes over (it then owns the remote copies too).
-        if n == "delete_capture" {
+        if n == "delete_capture" || n == "move_library" {
             return true;
         }
         // The built-in YouTube publisher needs the accounts file; an external engine, if it

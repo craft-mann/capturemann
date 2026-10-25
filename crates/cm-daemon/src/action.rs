@@ -104,6 +104,9 @@ pub const ACTIONS: &[ActionSpec] = &[
     spec("run_fps_selftest", Tier::Confirm, true),
     spec("publish_video", Tier::Confirm, true),
     spec("delete_capture", Tier::Confirm, true),
+    // LIB-2: changing the library folder. Confirm for agents and not loosenable: no setting
+    // changes a tier. The copy runs as the `library_move` job; the switch needs a restart.
+    spec("move_library", Tier::Confirm, true),
     // Local AI (M5, specs/features/07-ai.md). Everything is Free except what uses the network or
     // deletes a model file: `download_model` (the only network traffic of the AI features, only
     // when asked) and `remove_model`. Suggestions only read; accepting one is `set_zooms` or
@@ -498,6 +501,14 @@ pub struct RecordingStatusParams {
     pub recording_id: Option<String>,
 }
 
+/// `move_library { path, mode?, request_id? }` (see [`crate::library_move`]).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct MoveLibraryParams {
+    pub path: String,
+    pub mode: crate::library_move::MoveMode,
+    pub request_id: Option<String>,
+}
+
 /// Confirm-tier actions whose engines live outside the daemon core (recording, publishing,
 /// deleting). The daemon validates the envelope, runs the gate, then hands the action to
 /// [`crate::ExternalActions`].
@@ -571,6 +582,8 @@ pub enum Action {
     RunFpsSelftest(ExternalParams),
     PublishVideo(ExternalParams),
     DeleteCapture(ExternalParams),
+    /// `move_library` (see [`crate::library_move`]).
+    MoveLibrary(MoveLibraryParams),
 }
 
 /// Largest accepted `request_id`.
@@ -1067,6 +1080,20 @@ impl Action {
                 f.only(&[])?;
                 Action::RescanLibrary
             }
+            "move_library" => {
+                f.only(&["path", "mode", "request_id"])?;
+                let mode = match f.str_opt("mode")? {
+                    None => crate::library_move::MoveMode::Move,
+                    Some(m) => crate::library_move::MoveMode::parse(&m).ok_or_else(|| {
+                        CmError::invalid_field("mode", "must be `move`, `fresh` or `use_existing`")
+                    })?,
+                };
+                Action::MoveLibrary(MoveLibraryParams {
+                    path: f.str_req("path")?,
+                    mode,
+                    request_id: f.request_id()?,
+                })
+            }
             "get_capture" => {
                 f.only(&["capture_id", "revision", "include_image"])?;
                 let revision = match f.obj.get("revision") {
@@ -1347,6 +1374,7 @@ impl Action {
             Action::RunFpsSelftest(_) => "run_fps_selftest",
             Action::PublishVideo(_) => "publish_video",
             Action::DeleteCapture(_) => "delete_capture",
+            Action::MoveLibrary(_) => "move_library",
         }
     }
 
@@ -1375,6 +1403,7 @@ impl Action {
             Action::RetryJob(p) => p.request_id.as_deref(),
             Action::ExportVideo(p) => p.request_id.as_deref(),
             Action::SetMicMuted(p) => p.request_id.as_deref(),
+            Action::MoveLibrary(p) => p.request_id.as_deref(),
             Action::PauseRecording(p)
             | Action::ResumeRecording(p)
             | Action::StopRecording(p)
@@ -1433,6 +1462,17 @@ impl Action {
                 format!("Delete capture {}", p.capture_id.as_deref().unwrap_or("?"))
             }
             Action::RenameCapture(p) => format!("Rename {} to \"{}\"", p.capture_id, p.title),
+            Action::MoveLibrary(p) => match p.mode {
+                crate::library_move::MoveMode::Move => {
+                    format!("Move the library to {}", p.path)
+                }
+                crate::library_move::MoveMode::Fresh => {
+                    format!("Start a new empty library at {}", p.path)
+                }
+                crate::library_move::MoveMode::UseExisting => {
+                    format!("Switch to the existing library at {}", p.path)
+                }
+            },
             Action::Edit(p) => crate::edit_ops::summary(p),
             Action::Ai(p) => crate::ai::summary(p),
             Action::ListDestinations => "List the destinations".to_owned(),
@@ -1456,6 +1496,7 @@ impl Action {
                 "platform": p.rest.get("platform").and_then(Value::as_str),
             }),
             Action::DeleteCapture(p) => json!({ "capture_id": p.capture_id }),
+            Action::MoveLibrary(p) => json!({ "to": p.path, "mode": p.mode.as_str() }),
             Action::RenameCapture(p) => json!({ "capture_id": p.capture_id, "title": p.title }),
             Action::Ai(p) => crate::ai::confirm_params(p),
             Action::ExportVideo(p) => json!({
@@ -1579,6 +1620,10 @@ mod tests {
                 json!({"capture_id": "rec_1", "platform": "youtube"}),
             ),
             ("delete_capture", json!({"capture_id": "rec_1"})),
+            (
+                "move_library",
+                json!({"path": "/Volumes/X/CaptureMann", "mode": "fresh", "request_id": "r"}),
+            ),
             ("list_models", json!({})),
             (
                 "download_model",
@@ -1665,6 +1710,7 @@ mod tests {
                     | "run_fps_selftest"
                     | "publish_video"
                     | "delete_capture"
+                    | "move_library"
                     | "discard_recording"
                     | "restart_recording"
                     | "download_model"

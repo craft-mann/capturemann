@@ -7,7 +7,7 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [0.1.0] - Unreleased
 
-First public release. macOS 13+ on Apple Silicon only; Windows follows later.
+First public release. macOS 13+ on Apple Silicon only; Intel Macs follow after 0.1.0, then Windows and Linux.
 
 ### Added
 
@@ -31,7 +31,7 @@ First public release. macOS 13+ on Apple Silicon only; Windows follows later.
   added or changed outside the app are picked up.
 - Storage to local folders and Google Drive (your own Google client), and publishing to YouTube
   (private by default, asks for confirmation every time).
-- Every feature as an MCP tool (54 tools, plus resources and prompts) and a `capturemann` command
+- Every feature as an MCP tool (55 tools, plus resources and prompts) and a `capturemann` command
   line, with per-client permission tiers and on-screen confirmation for recording, publishing and
   deleting.
 - Per-tool agent permissions (Settings, Agents & CLI): mutating tools can be set to Allow or Ask first, and starting a recording can be allowed without asking; publish and delete always ask.

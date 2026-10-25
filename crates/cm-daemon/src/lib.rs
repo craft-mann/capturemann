@@ -56,6 +56,7 @@ mod handlers;
 mod idem;
 pub mod ipc;
 mod jobs;
+pub mod library_move;
 mod library_ops;
 pub mod publish_ops;
 mod publish_records;
@@ -91,6 +92,7 @@ pub use gate::{
 };
 pub use ipc::{connect, Endpoint, IpcServer};
 pub use jobs::{library_job_queue, library_jobs_path, JOBS_RELATIVE_PATH};
+pub use library_move::{MoveMode, MovePlan, MoveProblem, TrashReport};
 pub use library_ops::{DeleteDescription, SystemTrasher, Trasher};
 pub use recording::{EngineOptions, RecordingEngine, SourceFactory, SystemSources};
 pub use recovery::{RecoveredRecording, RecoveredRecordings};

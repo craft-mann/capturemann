@@ -1368,6 +1368,47 @@ async fn library_management_tools_rename_delete_and_annotate_without_image() {
     c.cancel().await.unwrap();
 }
 
+/// LIB-2: `move_library` is a Confirm tool (same schema as the daemon parses, typed errors).
+#[tokio::test]
+async fn move_library_is_a_confirm_tool_with_typed_errors() {
+    let confirmer = Arc::new(FixedConfirmer::new(Decision::Approve));
+    let (b, dir) = builder();
+    let d = b.confirmer(confirmer.clone()).build();
+    let (conn, _) = duplex_connector(d);
+    let c = mcp_client(conn, "claude-desktop").await;
+    let tools = c.list_all_tools().await.unwrap();
+    let t = tools.iter().find(|t| t.name == "move_library").unwrap();
+    assert!(t
+        .description
+        .as_deref()
+        .unwrap_or_default()
+        .contains("Confirm"));
+    // Bad input and a path inside the library fail before any dialog, with a typed reason.
+    let bad = call(&c, "move_library", json!({"path": "/x", "mode": "copy"})).await;
+    assert_eq!(err_code(&bad), "invalid_input");
+    let inside = call(
+        &c,
+        "move_library",
+        json!({"path": dir.path().join("inner"), "mode": "fresh"}),
+    )
+    .await;
+    assert_eq!(err_code(&inside), "invalid_input");
+    assert!(confirmer.shown().is_empty());
+    // Fresh in another folder: asked, then done at once.
+    let other = tempfile::tempdir().unwrap();
+    let ok_r = call(
+        &c,
+        "move_library",
+        json!({"path": other.path(), "mode": "fresh"}),
+    )
+    .await;
+    assert_eq!(ok(&ok_r)["restart_required"], true);
+    assert!(ok(&ok_r)["job_id"].is_null());
+    assert_eq!(confirmer.shown().len(), 1);
+    assert_eq!(confirmer.shown()[0].kind, "move_library");
+    c.cancel().await.unwrap();
+}
+
 // ---- event notifications ---------------------------------------------------------------------
 
 mod notifications {

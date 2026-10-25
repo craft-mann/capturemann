@@ -689,6 +689,44 @@ fn cases() -> Vec<Case> {
             "Discard and restart",
             Box::new(|| cm_i18n::tr!("Discard and restart")),
         ),
+        // LIB-2: the library folder questions the app asks itself, and the agent's version.
+        (
+            "Move my captures to the new folder",
+            Box::new(|| cm_i18n::tr!("Move my captures to the new folder")),
+        ),
+        (
+            "Start with an empty library there",
+            Box::new(|| cm_i18n::tr!("Start with an empty library there")),
+        ),
+        (
+            "Use that library",
+            Box::new(|| cm_i18n::tr!("Use that library")),
+        ),
+        (
+            "Use the new folder",
+            Box::new(|| cm_i18n::tr!("Use the new folder")),
+        ),
+        ("Check again", Box::new(|| cm_i18n::tr!("Check again"))),
+        (
+            "Choose another folder",
+            Box::new(|| cm_i18n::tr!("Choose another folder\u{2026}")),
+        ),
+        (
+            "Restart CaptureMann",
+            Box::new(|| cm_i18n::tr!("Restart CaptureMann")),
+        ),
+        (
+            "Move to the Trash",
+            Box::new(|| cm_i18n::tr!("Move to the Trash")),
+        ),
+        (
+            "Move the library",
+            Box::new(|| cm_i18n::tr!("Move the library")),
+        ),
+        (
+            "Start a new library",
+            Box::new(|| cm_i18n::tr!("Start a new library")),
+        ),
     ];
     let mut footer = Case::new(
         "Confirmation dialog buttons (Cancel + primary)",
@@ -1182,6 +1220,13 @@ fn sheet_and_dialog_height_estimates_hold_in_every_language() {
                     "",
                 ),
             ]
+            .into_iter()
+            .chain(
+                crate::library_move::all_dialogs_for_tests()
+                    .into_iter()
+                    .map(|d| d.summary),
+            )
+            .collect::<Vec<_>>()
         });
         for text in summaries {
             let est = text.chars().count().div_ceil(60).max(1);

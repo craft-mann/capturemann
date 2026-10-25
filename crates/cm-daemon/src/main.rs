@@ -193,6 +193,10 @@ async fn main() -> ExitCode {
     if let Err(e) = daemon.register_publish_handler() {
         eprintln!("publishing is unavailable: {e}");
     }
+    // Moving the library folder (LIB-2).
+    if let Err(e) = daemon.register_library_move_handler() {
+        eprintln!("moving the library is unavailable: {e}");
+    }
     // Local AI (M5): the job executors for model downloads and transcription, and the automatic
     // transcription after a recording (only with an installed model; nothing is downloaded
     // silently). The real engine (`ai_engine::real_services`) loads a model only inside a job.

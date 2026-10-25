@@ -27,6 +27,8 @@
 
 **Agent interface** — `list_devices` → mics `{ id, name, channels, max_channels, sample_rate, default }`, `microphone_permission`; `start_recording { mic: false | true | "default" | device_id | { device_id?, denoise? } }`. `get_recording_status` includes `mic_level_dbfs` (peak), `mic_rms_dbfs` and `mic_clip_events`.
 
+**Settings (Settings → Webcam & audio, board R13)** — `audio.mic_device` (a device id string; a missing key, `null` or `""` means the system default input; agent-writable in the `audio` family) is the microphone used when none is named, in this order: (1) the microphone named by the request (`start_recording` `mic: "<id>"` or `{ device_id }`, `capturemann record start --mic ID`) or picked in the Record sheet for one recording (not saved); (2) `audio.mic_device` when that microphone is connected; (3) the system default input. `mic: true` / `mic: "default"` / `--mic default` mean (2) then (3). A saved microphone that is not connected is replaced by the system default for that recording, and the Settings row shows its name with "Not connected" and "Using the system default until it is plugged in."; the saved id is kept. The Microphone dropdown never offers Off (the Record sheet's microphone switch and `mic: false` do that).
+
 **Out of scope** — Multi-mic recording, audio monitoring through headphones.
 
 **Test notes** — S3 sync measurement automated: generated flash/beep video, FFmpeg analysis of `final.mp4` (the method used on Oct 19).

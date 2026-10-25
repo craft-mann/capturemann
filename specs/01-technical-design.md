@@ -257,7 +257,7 @@ pub trait PublishProvider {
 | `recording.fps60_selftest` | app-only (written by the self-test only) | `{ version, results: { "<display>:<w>x<h>:<codec>": {...} } }` | REC-3 |
 | `recording.last_target`, `recording.camera`, `recording.mic`, `recording.system_audio` | agent-writable | the start sheet's remembered choices: `"display"`, `"window"` or `"region"`, and booleans | REC-1 |
 | `recording.hud_positions` | app-only | object `{ "<display>": [x, y] }` of HUD center fractions | REC-5.AC4 |
-| `camera.device`, `audio.mic_device` | agent-writable | remembered device ids; fall back to the system default when missing | CAM-4, AUD-1 |
+| `camera.device`, `audio.mic_device` | agent-writable | the default camera and microphone chosen in Settings > Webcam & audio (a device id; absent means the system default); used when a start names no device; a missing device falls back to the system default for that recording and the id is kept | CAM-4, AUD-1 |
 | `camera.shape`, `camera.size`, `camera.mirror`, `camera.position` | agent-writable | `"circle"` or `"rounded"`; `"s"`, `"m"` (default) or `"l"`; boolean, `true`; a position name (default `"bottom-left"`) or `[x, y]` fractions; the stored position is only restored when `camera.remember_position` is on | CAM-1 |
 | `camera.remember_position` | agent-writable (like the other `camera.*` keys; the desktop toggle writes it) | boolean, `false`: every recording starts bottom-left; `true`: restore the last dragged `camera.position` | CAM-1.AC8 |
 | `audio.noise_suppression` | agent-writable | boolean, `true` | AUD-3 |

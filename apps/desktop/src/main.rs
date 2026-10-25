@@ -404,6 +404,10 @@ fn main() {
                     if ev.name.starts_with("export.") || ev.name.starts_with("job.") {
                         cx.update(|cx| cm_desktop::ui::export_ui::on_event(&app2, &ev, cx));
                     }
+                    // An agent (CLI or MCP) changed the library folder: the Library row follows.
+                    if ev.name == "library.move_started" || ev.name == "library.moved" {
+                        cx.update(|cx| cm_desktop::ui::library_move_flow::on_event(&app2, &ev, cx));
+                    }
                     // The tray's Attention state: failed publishes, an offline library.
                     if ev.name.starts_with("job.")
                         || ev.name == "publish.done"

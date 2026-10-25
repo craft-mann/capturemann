@@ -29,6 +29,12 @@ pub const CAPTURE_DELETED: &str = "capture.deleted";
 pub const LIBRARY_OFFLINE: &str = "library.offline";
 /// The library folder can be read again after `library.offline`: `{ path }`.
 pub const LIBRARY_ONLINE: &str = "library.online";
+/// A library move (`move_library`, mode `move`) was queued: `{ job_id, from, to, bundles, bytes }`.
+pub const LIBRARY_MOVE_STARTED: &str = "library.move_started";
+/// The library folder was changed (after a verified copy, or at once for `fresh` and
+/// `use_existing`): `{ from, to, mode, bundles, bytes, skipped, restart_required }`. The new
+/// folder is used after a restart.
+pub const LIBRARY_MOVED: &str = "library.moved";
 pub const CONFIRMATION_REQUESTED: &str = "confirmation.requested";
 pub const CONFIRMATION_RESOLVED: &str = "confirmation.resolved";
 pub const RECORDING_COUNTDOWN: &str = "recording.countdown";

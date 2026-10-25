@@ -8,6 +8,7 @@ use gpui::{div, prelude::*, px, AnyElement, Context};
 use serde_json::{json, Value};
 
 use super::rows::{card_group, choice_row, plain_row, seconds_row, tile, toggle_row};
+use super::webcam_model::DeviceKind;
 use super::widgets::{caption, group_with_card, segment_with_icon, segmented};
 use super::SettingsView;
 use crate::recording::geometry::{BubbleShape, BubbleSize};
@@ -272,17 +273,23 @@ impl SettingsView {
                 app::set_setting(&app, keys::KEY_BUBBLE_SIZE, json!(sz.key()), cx)
             })
         });
-        // TODO(design): the board's preview card and its Camera and Microphone dropdowns are not
-        // built (no preview feature; devices are chosen in the Record sheet).
+        // R13: the Camera and Microphone rows choose `camera.device` and `audio.mic_device`, the
+        // devices used when nothing names one; the Record sheet's chips override them for one
+        // recording. The card on top draws the bubble as set below.
+        let camera_rows = self.device_rows(t, DeviceKind::Camera, false, cx);
+        let mic_rows = self.device_rows(t, DeviceKind::Mic, false, cx);
+        let preview = self.preview_card(t, cx);
         div()
             .flex()
             .flex_col()
             .gap(px(24.))
+            .child(preview)
             .child(group_with_card(
                 t,
                 &tr!("Webcam bubble"),
                 None,
                 card_group(t, "webcam-bubble-settings", &tr!("Webcam bubble settings"))
+                    .children(camera_rows)
                     .child(plain_row(
                         t,
                         tile::BUBBLE_SHAPE,
@@ -343,6 +350,7 @@ impl SettingsView {
                 &tr!("Microphone and system audio"),
                 None,
                 card_group(t, "audio-settings", &tr!("Audio settings"))
+                    .children(mic_rows)
                     .child(toggle_row(
                         t,
                         &app,
@@ -352,14 +360,6 @@ impl SettingsView {
                         &tr!("Reduces steady background noise on the microphone track. The original sound is kept too."),
                         keys::KEY_NOISE,
                         s.noise_suppression,
-                        false,
-                    ))
-                    .child(plain_row(
-                        t,
-                        tile::DEVICES,
-                        &tr_ctx!("settings row", "Devices"),
-                        &tr!("The camera, microphone and system audio are chosen in the Record sheet; your choices are remembered."),
-                        None,
                         true,
                     )),
             ))

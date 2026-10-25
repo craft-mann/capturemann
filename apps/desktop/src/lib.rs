@@ -28,6 +28,7 @@ pub mod launcher;
 #[cfg(test)]
 mod layout_width_tests;
 pub mod library;
+pub mod library_move;
 pub mod login_item;
 pub mod nav;
 pub mod overlay;

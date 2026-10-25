@@ -13,6 +13,7 @@ pub mod editor_view;
 pub mod export_ui;
 pub mod kit;
 pub mod launcher_window;
+pub mod library_move_flow;
 pub mod library_view;
 pub mod pages;
 pub mod paint;

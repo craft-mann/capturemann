@@ -556,6 +556,30 @@ pub enum LibraryCmd {
         #[arg(long)]
         also_remote: bool,
     },
+    /// Change the folder the library lives in (`move_library`). The user must approve on screen
+    /// (the dialog names the old and the new folder and the size); nothing is deleted from the
+    /// old folder. The app uses the new folder after it restarts. Prints the job id; `--wait`
+    /// blocks until the copy ends.
+    Move(MoveArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct MoveArgs {
+    /// The new library folder (relative paths and `~` are resolved here; the folder is created
+    /// if it does not exist).
+    pub path: String,
+    /// Start an empty library there instead of copying (the old files stay where they are).
+    #[arg(long, conflicts_with = "use_existing")]
+    pub fresh: bool,
+    /// The folder already holds a CaptureMann library: switch to it without copying.
+    #[arg(long = "use-existing")]
+    pub use_existing: bool,
+    /// Wait for the copy to finish (exit 6 if it fails or is cancelled).
+    #[arg(long)]
+    pub wait: bool,
+    /// With `--wait`: give up after this many seconds (exit 6; the job keeps running).
+    #[arg(long, value_name = "SECS", requires = "wait", value_parser = positive_secs)]
+    pub timeout: Option<f64>,
 }
 
 #[derive(Debug, Args)]
@@ -901,7 +925,7 @@ pub struct RecordStartArgs {
     /// Bitrate preset.
     #[arg(long, value_parser = ["high", "balanced", "small"])]
     pub quality: Option<String>,
-    /// Record the webcam: `on` (default camera), `off`, or a camera id (see `devices`).
+    /// Record the webcam: `on` (the camera chosen in Settings > Webcam & audio if it is connected, else the system default), `off`, or a camera id (see `devices`).
     #[arg(long, value_name = "on|off|ID", num_args = 0..=1, default_missing_value = "on")]
     pub camera: Option<String>,
     /// Camera resolution.
@@ -919,7 +943,7 @@ pub struct RecordStartArgs {
     /// Store the camera display mirror flag off (the recorded pixels are never flipped).
     #[arg(long)]
     pub no_camera_mirror: bool,
-    /// Record the microphone: `default`, `off`, or a microphone id (see `devices`).
+    /// Record the microphone: `default` (the microphone chosen in Settings > Webcam & audio if it is connected, else the system default input), `off`, or a microphone id (see `devices`).
     #[arg(long, value_name = "default|off|ID", num_args = 0..=1, default_missing_value = "default")]
     pub mic: Option<String>,
     /// Do not write the noise-suppressed microphone track.

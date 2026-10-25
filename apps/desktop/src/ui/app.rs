@@ -122,6 +122,8 @@ pub struct AppModel {
     /// Real library counts for the sidebar, set by the library view after an unfiltered load.
     pub counts: NavCounts,
     pub copy_after_capture: bool,
+    /// The library folder change in progress (Settings, General; LIB-2).
+    pub library_move: crate::library_move::Phase,
     /// The AI page: speech models, downloads the user started, the notice and the switches.
     pub ai: crate::ai::models::ModelsVm,
     /// Transcriptions in flight (the details card and the recording editor read them).
@@ -208,6 +210,7 @@ impl AppModel {
             theme_override: None,
             counts: NavCounts::default(),
             copy_after_capture,
+            library_move: crate::library_move::Phase::default(),
             ai: crate::ai::models::ModelsVm {
                 notice_dismissed: settings
                     .get(crate::ui::ai::KEY_NOTICE_DISMISSED)

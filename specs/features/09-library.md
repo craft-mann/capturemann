@@ -32,13 +32,13 @@
 ---
 
 ### LIB-2 Configurable library location
-**Priority** P0 · **Status** In progress (built on macOS: while the library folder is unavailable the watcher pauses, removes nothing from the index and resumes by diffing when it returns (tested with fakes; `tests/manual/LIB-2.md` covers the real unplug, AC2 and AC3 as far as the watcher goes); the `library.path` setting and its default resolution (`~/Movies/CaptureMann`), the fallback folder and the "Library unavailable" hint; Move existing captures with verification (AC1, AC4), the fallback-recording move (AC3) and the banner flow are not built; the setting is app-only: an agent cannot change it) · **Crates** cm-library, apps/desktop, cm-daemon · **Depends on** LIB-1, STO-1
+**Priority** P0 · **Status** In progress (built on macOS: while the library folder is unavailable the watcher pauses, removes nothing from the index and resumes by diffing when it returns (tested with fakes; `tests/manual/LIB-2.md` covers the real unplug, AC2 and AC3 as far as the watcher goes); the `library.path` setting and its default resolution (`~/Movies/CaptureMann`), the fallback folder and the "Library unavailable" hint; the library move is built (Oct 25, 2026, tested with fakes and temp folders, never run on a real external drive, the UI not seen by eye: Settings → General → Change..., the checks, the verified copy as the `library_move` job, the restart prompt and the optional Trash step, AC5 to AC13; `tests/manual/LIB-MOVE.md` is not run); the SHA-256 check of AC1 is replaced by file counts, byte sizes and the manifest; the fallback-recording move (AC2, AC3) and the banner flow are not built; the setting is app-only: an agent cannot write it, and changes it only through `move_library`) · **Crates** cm-library, apps/desktop, cm-daemon · **Depends on** LIB-1, STO-1
 
 **User story** — As a creator with big 4K files, I want my library on an external drive or NAS, so that my laptop disk doesn't fill up.
 
 **Description**
 - Settings → General → Library folder: default `~/Movies/CaptureMann` (macOS) or `%USERPROFILE%\Videos\CaptureMann` (Windows).
-- Changing the folder offers: **Move existing captures** (copy, verify size + SHA-256, then delete originals) or **Start fresh** (old library stays where it is, can be re-added later).
+- Changing the folder (Settings → General → **Change...**, a native folder picker, then one question) offers: **Move my captures to the new folder** (the default: copy, verify, switch; **nothing is deleted from the old folder**) or **Start with an empty library there** (old library stays where it is); a folder that already holds captures offers **Use that library**. The switch takes effect after a restart (the index, the job queue and the watcher live in the library folder). Afterwards the user may move the old copies to the Trash, a separate step with its own confirmation. The Library row shows the path (home as `~`), the size used and the free space of the volume (measured off the UI thread, kept 60 s, "Calculating..." meanwhile, decimal MB/GB), and the Available pill.
 - External drive or NAS offline → library shows "Library unavailable — connect `<name>`" and new recordings go to a fallback folder on the internal disk, moved later with the user's consent.
 - Space check before recording uses the library folder's volume.
 
@@ -47,14 +47,23 @@
 - **AC2** Given the drive is unplugged, when the user records, then the recording goes to the fallback folder and a banner explains it.
 - **AC3** Given the drive is reconnected, then the user is offered to move fallback recordings to the library.
 - **AC4** Given a move is interrupted (drive unplugged), then no capture is lost and the move can resume.
+- **AC5** Given Change... and a new folder, then a question offers exactly Move my captures (default), Start with an empty library there, and Cancel; with Move, every capture folder is copied beside its final name, verified against the original (same files, same byte sizes, `manifest.json` identical and parsing) and only then renamed, and `library.path` changes only after every capture verified; nothing is deleted from the old folder.
+- **AC6** Given `move_library` from an agent, then the Confirm dialog always appears (a headless daemon refuses with `no_confirmer`), it states the old path, the new path, the size and whether it is a move or a fresh start, and no setting or client policy turns it off.
+- **AC7** Given an agent calls `set_settings` with `library.path`, then it is refused (`app_only_setting`); the only agent route is `move_library`.
+- **AC8** Given a recording or the self-test is running, or an export, upload, publish or transcription job is queued or running, or a move is already running, then the change is refused with `busy` (no job is cancelled) and the app offers "Check again"; given the folder is a file, not writable, the same as the library, inside it, or contains it, it is refused with `invalid_input`; given less than 1.1 times the library's size is free, with `disk_full` (a fresh start is still offered); given the old library cannot be read, with `not_found`. All of it before anything is copied.
+- **AC9** Given the chosen folder already holds captures, then the dialog says so and offers Use that library instead of a move (`mode: use_existing`); a plain move there is refused.
+- **AC10** Given Start with an empty library there, then only `library.path` is written (the space check is skipped), the old files stay where they are, and the dialog says so.
+- **AC11** Given the copy fails (drive unplugged, disk full, a copy that does not match), then the job fails with a message that says nothing was deleted, the old library stays in use, the new folder holds only complete captures, and Retry resumes: captures that still match their originals are not copied again, a half-copied one is redone.
+- **AC12** Given the user cancels the copy, then the captures already copied stay in the new folder, the old library stays active and `library.path` is unchanged; a capture that is being recorded is skipped and reported; symbolic links are never followed.
+- **AC13** Given a finished move, then the app says the library moved and offers Restart CaptureMann; the separate Move the old copies to the Trash step, with its own confirmation, takes only captures that were verified copied and still match their copy, moves them to the Trash and never deletes them.
 
 **Edge cases and errors** — Network drives (SMB) with high latency: recording always writes locally first to the fallback/temp folder and moves to the NAS after stop (recording directly to a NAS is unsupported in v0.1, noted in settings).
 
-**Agent interface** — `get_settings` reads `library.path`. `set_settings` **refuses** it from agents (an app-only key: it redirects every later capture, and the spec requires moving files to be a Confirm-tier dialog); only the app's own UI writes it. A headless daemon started by the CLI resolves the same default and the same file-backed settings as the app, so both see one library.
+**Agent interface** — `get_settings` reads `library.path`. `set_settings` **refuses** it from agents (an app-only key: it redirects every later capture, and the spec requires moving files to be a Confirm-tier dialog); only the app's own UI writes it. MCP `move_library { path, mode?: "move" | "fresh" | "use_existing", request_id? }` → `{ job_id, state, mode, from, to, bytes, bundles, restart_required }` (Confirm, always; job type `library_move`; events `library.move_started` and `library.moved`; typed `error.data.reason` for each precondition); CLI `capturemann library move PATH [--fresh] [--use-existing] [--wait]`. A headless daemon started by the CLI resolves the same default and the same file-backed settings as the app, so both see one library.
 
 **Out of scope** — Multiple libraries at once (P2).
 
-**Test notes** — Move/verify tests with simulated interruption; manual SMB test.
+**Test notes** — Move/verify tests with simulated interruption (`crates/cm-daemon/tests/library_move.rs`, the unit tests in `crates/cm-daemon/src/library_move.rs`, `apps/desktop/src/library_move.rs`); manual SMB test and the external-drive steps in `tests/manual/LIB-MOVE.md`.
 
 ---
 

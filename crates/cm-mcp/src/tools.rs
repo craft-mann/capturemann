@@ -774,10 +774,10 @@ pub fn all() -> Vec<ToolSpec> {
                 "fps": { "type": "integer", "enum": [30, 60], "description": "Default 30 or the `recording.fps` setting. 60 is accepted only after a passing `run_fps_selftest` for this display, size and codec (valid 30 days); otherwise `invalid_input` with `data.suggestion` (30 fps, a lower size, or run the self-test). A default of 60 from the setting falls back to 30 with a warning." },
                 "codec": { "type": "string", "enum": ["auto", "hevc", "h264"], "description": "`auto`: HEVC above 1920 px wide, else H.264." },
                 "quality": { "type": "string", "enum": ["high", "balanced", "small"] },
-                "camera": { "description": "Record the webcam: false (default), true (default camera), a device id, or an object. The bubble facts (shape, size, position) are stored and shown by the app; the camera is its own track.",
+                "camera": { "description": "Record the webcam: false (default), true (the camera set in Settings > Webcam & audio (`camera.device`) when it is connected, else the system default camera), a device id, or an object. The bubble facts (shape, size, position) are stored and shown by the app; the camera is its own track.",
                     "oneOf": [
                         { "type": "boolean" },
-                        { "type": "string", "description": "A camera id from list_devices, or `default`/`off`." },
+                        { "type": "string", "description": "A camera id from list_devices, `default` (same as true) or `off`." },
                         { "type": "object", "properties": {
                             "on": { "type": "boolean", "default": true },
                             "device_id": { "type": "string" },
@@ -790,7 +790,7 @@ pub fn all() -> Vec<ToolSpec> {
                                 { "type": "array", "items": { "type": "number", "minimum": 0, "maximum": 1 }, "minItems": 2, "maxItems": 2 } ],
                                 "default": "bottom-left" } },
                           "additionalProperties": false } ] },
-                "mic": { "description": "Record the microphone: false (default), true or `default` (system default input), a device id from list_devices, or an object.",
+                "mic": { "description": "Record the microphone: false (default), true or `default` (the microphone set in Settings > Webcam & audio (`audio.mic_device`) when it is connected, else the system default input), a device id from list_devices, or an object.",
                     "oneOf": [
                         { "type": "boolean" },
                         { "type": "string" },
@@ -1089,6 +1089,29 @@ pub fn all() -> Vec<ToolSpec> {
                         "failed": { "type": "array", "items": { "type": "object" } },
                         "not_tried": { "type": "array", "items": { "type": "string" } } } } },
                 "required": ["capture_id", "moved_to_trash"] }),
+        },
+        ToolSpec {
+            name: "move_library",
+            tier: Tier::Confirm,
+            mutating: true,
+            destructive: false,
+            spec: "LIB-2",
+            summary: "Change the folder the library lives in (for example to an external drive). The user always has to approve on screen, and this cannot be switched off: the dialog states the old path, the new path, the size and whether it is a move, a fresh start or a switch to a library that is already there. `mode: move` (default) copies every capture to the new folder as the background job `library_move`: each capture is copied beside its final name, checked against the original (same files and byte sizes, `manifest.json` identical) and only then renamed, so a name in the new folder always holds a complete capture; nothing is ever deleted from the old folder, an interrupted or cancelled job leaves the old library active and can be retried (`retry_job`) to resume, and captures that are being recorded are skipped and reported. When every capture is verified the library setting changes (an agent cannot write it with `set_settings`). `mode: fresh` switches to an empty library there and copies nothing (the old files stay). `mode: use_existing` switches to a folder that already holds captures. Everything is checked before any dialog or copy and fails with a typed `error.data.reason`: `recording_running`, `selftest_running`, `job_running` (names the job; nothing is cancelled for you) and `move_running` (`busy`); `target_not_absolute`, `target_is_file`, `target_not_writable`, `target_inside_library`, `target_contains_library`, `same_folder`, `target_has_library` (use `use_existing`), `target_has_no_library` (`invalid_input`); `not_enough_space` (`disk_full`, needs 1.1 times the library size free) and `source_unreadable` (`not_found`). The running app keeps using the old library until it restarts: the result and the `library.moved` event say `restart_required: true`. Moving the old copies to the Trash is not available to agents.",
+            input: json!({ "type": "object", "properties": {
+                "path": { "type": "string", "minLength": 1, "description": "Absolute path of the new library folder (created if it does not exist)." },
+                "mode": { "type": "string", "enum": ["move", "fresh", "use_existing"], "default": "move", "description": "`move` copies the captures, `fresh` starts empty, `use_existing` switches to a library already in the folder." },
+                "request_id": request_id() },
+                "required": ["path"], "additionalProperties": false }),
+            output: json!({ "type": "object", "properties": {
+                "job_id": { "type": ["string", "null"], "description": "The `library_move` job (mode `move`); null for `fresh` and `use_existing`, which are done at once." },
+                "state": { "type": "string", "description": "`queued` for a move, `done` otherwise." },
+                "mode": { "type": "string", "enum": ["move", "fresh", "use_existing"] },
+                "from": { "type": "string" }, "to": { "type": "string" },
+                "bytes": { "type": "integer", "description": "Bytes to copy (move) or already in the new folder (use_existing)." },
+                "bundles": { "type": "integer", "description": "Captures to copy (move) or already in the new folder (use_existing)." },
+                "restart_required": { "type": "boolean", "description": "Always true: CaptureMann uses the new folder after it restarts." },
+                "warnings": { "type": "array", "items": { "type": "string" } } },
+                "required": ["job_id", "state", "mode", "restart_required"] }),
         },
     ];
     // Recording edits (EDT-1 to EDT-3).

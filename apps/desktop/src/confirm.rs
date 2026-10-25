@@ -167,6 +167,20 @@ impl DialogModel {
                 (tr!("Publish video?"), label, false)
             }
             "delete_capture" => (tr!("Delete capture?"), tr!("Delete capture"), true),
+            // LIB-2: an agent asks to change the library folder.
+            "move_library" => {
+                let mode = r
+                    .params
+                    .get("mode")
+                    .and_then(Value::as_str)
+                    .unwrap_or("move");
+                let label = match mode {
+                    "fresh" => tr!("Start a new library"),
+                    "use_existing" => tr!("Use that library"),
+                    _ => tr!("Move the library"),
+                };
+                (tr!("Change the library folder?"), label, false)
+            }
             // REC-5: discarding or restarting deletes the take; both are destructive (red is
             // reserved: a destructive primary looks like any primary, per OD-12) and name the exact action.
             "discard_recording" => (tr!("Discard this take?"), tr!("Discard take"), true),

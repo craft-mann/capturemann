@@ -31,6 +31,7 @@ pub mod tile {
     pub const BUBBLE_SIZE: &str = "maximize";
     pub const MIRROR: &str = "flip-horizontal-2";
     pub const POSITION: &str = "move-up-right";
+    pub const CAMERA: &str = "camera";
     pub const NOISE: &str = "audio-lines";
     pub const DEVICES: &str = "mic";
     pub const APP: &str = "app-window";
@@ -57,6 +58,7 @@ pub mod tile {
         BUBBLE_SIZE,
         MIRROR,
         POSITION,
+        CAMERA,
         NOISE,
         DEVICES,
         APP,
