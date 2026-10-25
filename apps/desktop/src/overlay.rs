@@ -39,6 +39,8 @@ pub enum OverlayOutcome {
     },
     /// Esc, or the overlay closed without a capture.
     Cancelled,
+    /// Tab in the hover mode (R19): nothing was captured, the window list should open.
+    SwitchToList,
 }
 
 /// What `cm-overlay --pick` returns: the chosen target, nothing captured (REC-1: the start sheet
@@ -103,9 +105,9 @@ pub fn parse_pick(
     }
     match parse_result(exit_code, stdout, stderr)? {
         OverlayOutcome::Cancelled => Ok(None),
-        OverlayOutcome::Captured { .. } => Err(OverlayError::BadOutput(
-            "the overlay took a screenshot instead of picking".to_owned(),
-        )),
+        OverlayOutcome::SwitchToList | OverlayOutcome::Captured { .. } => Err(
+            OverlayError::BadOutput("the overlay took a screenshot instead of picking".to_owned()),
+        ),
     }
 }
 
@@ -195,6 +197,10 @@ pub fn parse_result(
         if v.get("cancelled").and_then(Value::as_bool) == Some(true) {
             return Ok(OverlayOutcome::Cancelled);
         }
+        if v.get("switch_to").and_then(Value::as_str) == Some("list") && exit_code.unwrap_or(0) == 0
+        {
+            return Ok(OverlayOutcome::SwitchToList);
+        }
         if let Some(id) = v.get("capture_id").and_then(Value::as_str) {
             if exit_code.unwrap_or(0) == 0 {
                 return Ok(OverlayOutcome::Captured {
@@ -280,6 +286,13 @@ impl OverlayLauncher {
         a
     }
 
+    /// Whether the overlay is told `--tab-to-list`: the hover window mode of a screenshot, where
+    /// Tab hands over to the window list (R19). Never with `--pick` (the Record sheet's picker
+    /// has no list to hand over to).
+    pub fn tab_to_list(mode: CaptureMode, pick: bool) -> bool {
+        mode == CaptureMode::Window && !pick
+    }
+
     pub fn is_available(&self) -> bool {
         self.binary.is_some()
     }
@@ -306,8 +319,11 @@ impl OverlayLauncher {
         };
         crate::trace::mark("overlay_task_started");
         let mut cmd = tokio::process::Command::new(bin);
-        cmd.args(self.args_with(mode, pick))
-            .stdin(std::process::Stdio::null())
+        cmd.args(self.args_with(mode, pick));
+        if Self::tab_to_list(mode, pick) {
+            cmd.arg("--tab-to-list");
+        }
+        cmd.stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .kill_on_drop(true);
@@ -366,6 +382,28 @@ mod tests {
                 capture_id: "shot_1".into()
             })
         );
+    }
+
+    /// R19: Tab in the hover mode ends the overlay with a hand-over, not a capture and not an error.
+    #[test]
+    fn tab_hands_over_to_the_list() {
+        assert_eq!(
+            parse_result(Some(0), "{\"switch_to\":\"list\"}\n", ""),
+            Ok(OverlayOutcome::SwitchToList)
+        );
+        // An unknown target or a non-zero exit is not a hand-over.
+        assert!(parse_result(Some(0), "{\"switch_to\":\"moon\"}", "").is_err());
+        assert!(parse_result(Some(1), "{\"switch_to\":\"list\"}", "").is_err());
+        // The Record sheet's `--pick` never gets one.
+        assert!(parse_pick(Some(0), "{\"switch_to\":\"list\"}", "").is_err());
+    }
+
+    #[test]
+    fn only_a_screenshot_window_overlay_gets_the_tab_flag() {
+        assert!(OverlayLauncher::tab_to_list(CaptureMode::Window, false));
+        assert!(!OverlayLauncher::tab_to_list(CaptureMode::Window, true));
+        assert!(!OverlayLauncher::tab_to_list(CaptureMode::Region, false));
+        assert!(!OverlayLauncher::tab_to_list(CaptureMode::Display, false));
     }
 
     /// CAP-1.AC6: Esc closes the overlay and nothing is saved: no error, no capture.

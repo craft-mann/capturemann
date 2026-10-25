@@ -531,6 +531,7 @@ mod tests {
                 },
                 scale: ScaleFactor::new(1.0).unwrap(),
                 is_primary: true,
+                is_builtin: false,
             }],
             windows: vec![],
         }

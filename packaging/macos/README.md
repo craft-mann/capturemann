@@ -128,21 +128,70 @@ into `Contents/Resources/FFmpeg/`.
 * arm64 only, macOS 13 or later. A universal (arm64 + x86_64) binary needs a second build with
   `nasm` and `lipo`; Windows needs its own build (see `packaging/ffmpeg/README.md`).
 
-## TODO: Developer ID and notarization (NFR-15), not implemented
+## Releasing (Developer ID, notarization, DMG)
 
-Needs an Apple Developer account and a "Developer ID Application" certificate:
+Release scope: Apple Silicon (arm64), macOS 13+, manual updates, one signed + notarized + stapled
+DMG. Written and tested before the Developer ID certificate existed: the scripts were run with
+fakes (`--dry-run`, a fake bundle) and with a throwaway self-signed identity in a throwaway
+keychain; **no real Developer ID signature, notarization or stapling has ever been run**.
+
+| Script | Usage |
+| --- | --- |
+| `dmg.sh <CaptureMann.app> <out.dmg>` | UDZO read-only DMG with the app and an `/Applications` symlink (hdiutil + ditto only, no Finder scripting, plain window). Signs the DMG when `CM_SIGN_IDENTITY` is set and not `-` (`--timestamp`; `CM_KEYCHAIN` optional). `CM_DMG_VOLNAME` (default `CaptureMann`). Prints the path and SHA-256 and writes `<out>.sha256`. |
+| `notarize.sh [--dry-run] [--check-env] <file.dmg\|file.zip>` | `notarytool submit --wait`, on a non-Accepted verdict prints `notarytool log` and exits 1, on success `stapler staple` + `stapler validate` (DMG only). Credentials: API key (`APPLE_API_KEY_ID`, `APPLE_API_ISSUER`, `APPLE_API_KEY_PATH` = the .p8) or Apple ID (`APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_PASSWORD`) or `CM_NOTARY_PROFILE`. `--dry-run` checks the environment and prints the commands with secrets masked. |
+| `verify-release.sh [--allow-unsigned] <file.dmg\|App.app>` | Mounts a DMG read-only (always unmounted). Checks: `codesign --verify --deep --strict`, designated requirement, hardened runtime + secure timestamp on the bundle and every Mach-O, one identity everywhere, no `get-task-allow`, entitlements equal to `CaptureMann.entitlements`, `spctl`, `stapler validate`, LGPL FFmpeg (no gpl/nonfree/libx264/libx265/libfdk-aac) with its notices, LICENSE/NOTICE/THIRD_PARTY_LICENSES.md, Info.plist version = workspace version, arm64 only, minimum macOS 13. Gatekeeper rejecting a non-Developer-ID signature is a labelled WARNING, a Developer ID signature that is rejected is an ERROR. `--allow-unsigned` turns Gatekeeper, ticket, hardened runtime, timestamp, missing DMG signature and missing FFmpeg into warnings (local builds). Exit 1 on any ERROR. |
+| `ci-keychain.sh setup\|teardown` | GitHub Actions: temporary keychain with a random password, imports `APPLE_CERT_P12_BASE64` (password `APPLE_CERT_PASSWORD`), `set-key-partition-list`, puts it first in the search list (the old list is saved), appends `CM_SIGN_IDENTITY=<SHA-1>` and `CM_KEYCHAIN=<path>` to `$GITHUB_ENV`, masks secrets. `teardown` deletes the keychain and restores the list. |
+
+Make targets: `make dmg` (needs `target/bundle/CaptureMann.app`), `make notarize`,
+`make verify-release` (`ARGS=--allow-unsigned` for a local build), and `make release` =
+`CM_HARDENED=1 make bundle-release`, then `dmg`, `notarize`, `verify-release`; it first lists what
+is missing from the environment. The DMG is `target/bundle/CaptureMann-<version>-arm64.dmg`
+(`DMG=...` and `APP=...` override).
+
+By hand, once the certificate is in your keychain:
 
 ```
-CM_SIGN_IDENTITY="Developer ID Application: NAME (TEAMID)" CM_HARDENED=1 packaging/macos/bundle.sh
-ditto -c -k --keepParent target/bundle/CaptureMann.app target/bundle/CaptureMann.zip
-xcrun notarytool submit target/bundle/CaptureMann.zip --keychain-profile "AC_NOTARY" --wait
-xcrun stapler staple target/bundle/CaptureMann.app
-spctl --assess --type execute -vv target/bundle/CaptureMann.app
+make ffmpeg                                         # once; make release needs the LGPL FFmpeg
+export CM_SIGN_IDENTITY="Developer ID Application: NAME (TEAMID)"
+export APPLE_API_KEY_ID=... APPLE_API_ISSUER=... APPLE_API_KEY_PATH=/path/AuthKey_XXXX.p8
+make release
 ```
 
-(`notarytool store-credentials AC_NOTARY` creates the profile once.) The entitlements above are
-already passed by `bundle.sh`; the hardened runtime itself was only verified with a local identity
-(`flags=0x10000(runtime)`), never submitted to Apple. Ship a `.dmg` after stapling.
+Things to know:
+
+* **Order matters**: `bundle.sh` signs every inner binary, then the bundle (hardened runtime +
+  timestamp for all of them: notarization rejects a binary without either). The DMG is signed
+  after it is built; the ticket is stapled to the DMG (the app inside carries none, and
+  `verify-release.sh` accepts that when the DMG is stapled).
+* **Expected failures on a local build**: `spctl` rejects any signature that is not Developer ID
+  plus notarized, and `stapler` finds no ticket. Run `verify-release.sh --allow-unsigned` there.
+* **Timestamp** needs network access to Apple's timestamp server (`CM_HARDENED=1` makes
+  `bundle.sh` ask for it).
+* The Apple ID password is passed to `notarytool` on its command line (visible in `ps` while it
+  runs); prefer the API key. Nothing secret is printed or written by these scripts.
+* Test them with `packaging/macos/tests/release-scripts.sh` (by hand, not in CI; needs
+  `target/release` binaries; uses a throwaway identity and keychain and removes them).
+
+### Hardened runtime review (Oct 25, 2026, tested with a throwaway identity)
+
+A `CM_HARDENED=1` bundle signed with a throwaway self-signed identity ran, from the bundle,
+`capturemann --version`, the bundled LGPL `ffmpeg -version`, a hardened copy of `cm-daemon` with
+`cm-mcp` answering the MCP `initialize` over stdio, and hardened copies of the `cm-render`
+compositor tests (wgpu/Metal, 16 tests) and the `cm-ai` real-model test (whisper.cpp with Metal,
+`small` model, a synthetic speech clip transcribed correctly). All of it worked with the two
+entitlements below and without any JIT or library-validation entitlement. Not covered: the GUI
+(`cm-desktop`, GPUI), real camera/microphone/Screen Recording under the hardened runtime, and
+the keychain prompt for OAuth tokens.
+
+Entitlements (`CaptureMann.entitlements`), each justified:
+
+* `device.camera`, `device.audio-input`: needed, the hardened runtime blocks capture without them.
+* Not needed, not set: `allow-jit` / `allow-unsigned-executable-memory` (Metal shaders compile
+  out of process; wgpu and ggml-metal ran without them), `network.client` (only meaningful in a
+  sandbox; the app is not sandboxed), `disable-library-validation` (every binary and the FFmpeg are
+  signed with the same identity and nothing is `dlopen`ed from outside; the Mach-O list in
+  `verify-release.sh` shows no third-party dylibs), `get-task-allow` (debug only; notarization
+  rejects it), Apple Events (the app sends none).
 
 ## CI
 

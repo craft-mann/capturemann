@@ -174,6 +174,9 @@ pub struct Theme {
     pub primary_fg: Color,
     pub primary_hover: Color,
     pub scrim: Color,
+    /// The tint over the main window while a pop-up sheet or dialog is open (board R9/R20:
+    /// `rgba(5,5,6,0.66)`; the board's 3 px blur has no GPUI equivalent).
+    pub modal_scrim: Color,
 }
 
 pub const INK: Color = Color::rgb(0x0A0A0B);
@@ -210,6 +213,7 @@ impl Theme {
         primary_fg: INK,
         primary_hover: Color::rgb(0xD9D9DC),
         scrim: Color::rgb_a(0x000000, 55),
+        modal_scrim: Color::rgb_a(0x050506, 66),
     };
 
     /// The kit's light theme (`EditorLight`): primary is ink on white, red stays rare. Not
@@ -246,6 +250,7 @@ impl Theme {
         primary_fg: Color::rgb(0xFFFFFF),
         primary_hover: Color::rgb(0x2A2A30),
         scrim: Color::rgb_a(0x000000, 55),
+        modal_scrim: Color::rgb_a(0x000000, 45),
     };
 
     pub fn for_mode(mode: Mode) -> Theme {
@@ -305,6 +310,17 @@ pub mod derived {
     pub const AGENT_TILE_BORDER: Color = Theme::DARK.agent.with_alpha(40);
     /// Launcher selected row (kit `#232328`, no token).
     pub const LAUNCHER_SELECTED: Color = Color::rgb(0x232328);
+    /// The window picker (R19): the palette fill (`rgba(19,19,22,.97)`), its footer, a card, the
+    /// selected card, a card's border, and the thumbnail well with its border. Kit values, no token.
+    pub const PICKER_FILL: Color = Color::rgb_a(0x131316, 97);
+    pub const PICKER_FOOTER: Color = Color::rgb(0x0F0F11);
+    pub const PICKER_CARD: Color = Color::rgb(0x141417);
+    pub const PICKER_CARD_SELECTED: Color = Color::rgb(0x1C1C21);
+    pub const PICKER_CARD_BORDER: Color = Color::rgb(0x26262B);
+    pub const PICKER_THUMB: Color = Color::rgb(0x1A1B22);
+    pub const PICKER_THUMB_BORDER: Color = Color::rgb(0x26262E);
+    /// The outline drawn on the real window: the 6 px ring (`rgba(237,237,239,.18)`).
+    pub const PICKER_OUTLINE_RING: Color = Color::rgb_a(0xEDEDEF, 18);
     /// A warning banner's tint.
     pub const WARNING_TINT: Color = Theme::DARK.warning.with_alpha(14);
     /// The bubble before the camera delivers a frame.

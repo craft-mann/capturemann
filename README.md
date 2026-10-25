@@ -11,10 +11,10 @@ and every feature available to AI agents through MCP and a CLI.
 <img alt="Platform: macOS 13+" src="https://img.shields.io/badge/platform-macOS%2013%2B-lightgrey">
 </p>
 
-> **Status: early development (0.0.1, macOS only).** Windows follows after the first release. Most
-> results are tested with scripted fakes rather than on real hardware; what is still unverified is
-> tracked in [`specs/04-delivery-plan.md`](specs/04-delivery-plan.md) under "Verification debt".
-> There is no signed download yet.
+> **Status: 0.1.0, first release (macOS 13+, Apple Silicon only).** Windows follows later. Most
+> results are tested with scripted fakes, plus checks on real devices by the owner on one Mac; there
+> are few stored hardware reports. What is still unverified is tracked in
+> [`specs/04-delivery-plan.md`](specs/04-delivery-plan.md) under "Verification debt".
 
 ## Features
 
@@ -37,7 +37,19 @@ and every feature available to AI agents through MCP and a CLI.
 
 ## Install
 
-There is no release yet. Until the first signed build, [build it from source](docs/building.md).
+Requires a Mac with Apple Silicon and macOS 13 or later. Intel Macs are not supported.
+
+1. Download `CaptureMann-<version>-macos-arm64.dmg` and its `.sha256` file from
+   [Releases](https://github.com/craft-mann/capturemann/releases).
+2. Check the download (in the folder with both files):
+   `shasum -a 256 -c CaptureMann-<version>-macos-arm64.dmg.sha256` must print `OK`.
+3. Open the DMG and drag CaptureMann to Applications.
+
+The release notes say whether a build is notarized. A build that is **ad hoc signed and not
+notarized** is blocked by Gatekeeper at first launch: right-click the app and choose Open, or run
+`xattr -dr com.apple.quarantine /Applications/CaptureMann.app`. Updates are manual: download the new
+DMG. To build it yourself instead, see [building from source](docs/building.md). More on verifying a
+download: [docs/releasing.md](docs/releasing.md#how-users-verify-a-download).
 
 ## Quick start
 

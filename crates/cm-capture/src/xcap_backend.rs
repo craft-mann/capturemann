@@ -222,6 +222,18 @@ fn monitor_scale(m: &Monitor) -> ScaleFactor {
         .unwrap_or(ScaleFactor::ONE)
 }
 
+/// Whether the display is the laptop's own panel. xcap's monitor id is the `CGDirectDisplayID`.
+#[cfg(target_os = "macos")]
+fn display_is_builtin(id: u32) -> bool {
+    objc2_core_graphics::CGDisplayIsBuiltin(id)
+}
+
+/// Windows: not determined yet (the display filter shows every display as external).
+#[cfg(not(target_os = "macos"))]
+fn display_is_builtin(_id: u32) -> bool {
+    false
+}
+
 fn display_info(m: &Monitor) -> Result<DisplayInfo, XCapError> {
     let scale = monitor_scale(m);
     let name = m
@@ -234,6 +246,7 @@ fn display_info(m: &Monitor) -> Result<DisplayInfo, XCapError> {
         bounds: to_physical(m.x()?, m.y()?, m.width()?, m.height()?, scale.get()),
         scale,
         is_primary: m.is_primary().unwrap_or(false),
+        is_builtin: display_is_builtin(m.id()?),
     })
 }
 

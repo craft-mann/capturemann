@@ -701,6 +701,100 @@ fn cases() -> Vec<Case> {
         ),
     );
 
+    // ---- Record sheet > Window (R20) -------------------------------------------------------------
+    // Search placeholder: 554 - 8 gap - ~56 keycaps - 8 gap - 130 for "Pick on screen" = 352 for the
+    // field; 20 padding, 2 border, a 16 px icon and an 8 px gap leave 306. Cut by the field.
+    v.push(
+        Case::new(
+            "Window list search placeholder",
+            "554 - 8 - 56 - 8 - 130 - 46",
+            306.,
+            ui,
+            400,
+            one,
+        )
+        .text("Search {n} windows by title or app", || {
+            cm_i18n::trn!(
+                "Search {n} window by title or app",
+                "Search {n} windows by title or app",
+                22,
+                n = 22
+            )
+        }),
+    );
+    // "Pick on screen": 12 padding twice, 2 border, a 14 px icon, a 7 px gap; the button may be 150.
+    v.push(
+        Case::new(
+            "Window list Pick on screen button",
+            "150 - 24 - 2 - 14 - 7",
+            150. - 47.,
+            12.5,
+            400,
+            one,
+        )
+        .text("Pick on screen", || cm_i18n::tr!("Pick on screen")),
+    );
+    // A row: 554 - 12 margin - 2 border - 24 padding - 12 scroll gutter = 504; thumbnail 64, badge
+    // 20, radio 18 and three 12 px gaps leave 366 for the title column and the size text. The size
+    // text is mono 11.5 and must leave the title at least 160.
+    v.push(
+        Case::new(
+            "Window row size text",
+            "366 - 160 for the title",
+            206.,
+            11.5,
+            400,
+            one,
+        )
+        .text("size, external", || {
+            cm_i18n::tr!("{size} \u{00B7} External", size = "3840 \u{00D7} 2160")
+        }),
+    );
+    // Group headers: uppercase 11.5 semibold in a 554 - 12 - 28 wide row.
+    v.push(
+        Case::new(
+            "Window list group header",
+            "554 - 2 - 28",
+            524.,
+            11.5,
+            600,
+            one,
+        )
+        .text("Last used", || {
+            cm_i18n::tr_ctx!("window list", "Last used").to_uppercase()
+        })
+        .text("Front to back", || {
+            cm_i18n::tr_ctx!("window list", "Front to back").to_uppercase()
+        }),
+    );
+    // Include chips wrap, so each must fit alone in 554: 10 + 15 icon + 8 gap + label (13) + 8 gap
+    // + 13 icon + 12 padding + 2 border.
+    v.push(
+        Case::new("Include chip", "554 (chips wrap)", 554., 13., 400, one)
+            .needed("longest of the three chips", || {
+                ["Webcam bubble", "Microphone", "System audio"]
+                    .iter()
+                    .map(|l| {
+                        let label = match *l {
+                            "Webcam bubble" => cm_i18n::tr!("Webcam bubble"),
+                            "Microphone" => cm_i18n::tr!("Microphone"),
+                            _ => cm_i18n::tr!("System audio"),
+                        };
+                        width(&label, Face::Regular, 13.) + 10. + 15. + 8. + 8. + 13. + 12. + 2.
+                    })
+                    .fold(0., f32::max)
+            })
+            // The three chips and the "Include" label side by side: reported, they wrap when short.
+            .needed("all three in one row", || {
+                let w = |l: String| width(&l, Face::Regular, 13.) + 68.;
+                w(cm_i18n::tr!("Webcam bubble"))
+                    + w(cm_i18n::tr!("Microphone"))
+                    + w(cm_i18n::tr!("System audio"))
+                    + 16.
+                    + 50.
+            }),
+    );
+
     // ---- annotation editor inspector 300 ---------------------------------------------------------
     // 300 - 2 border - 32 padding = 266; the status pill adds 20 padding, 2 border, 12 icon, 6 gap.
     v.push(
@@ -728,6 +822,68 @@ fn cases() -> Vec<Case> {
         .text("Accept all", || cm_i18n::tr!("Accept all"))
         .text("Accept", || cm_i18n::tr_ctx!("button", "Accept"))
         .text("Dismiss", || cm_i18n::tr_ctx!("button", "Dismiss")),
+    );
+
+    // ---- window picker (R19): 1000 wide, rail 230, main column 1000 - 230 - 36 = 734 ---------------
+    // A rail row: 230 - 20 container padding - 20 row padding = 190, less the 22 px tile, a 10 px
+    // gap each side of the label and a two-digit count (about 18 px).
+    v.push(
+        Case::new(
+            "Window picker rail row (All windows)",
+            "190 - 22 tile - 10 - 10 gaps - 18 count",
+            190. - 22. - 20. - 18.,
+            13.5,
+            400,
+            one,
+        )
+        .text("All windows", crate::ui::window_picker::all_windows),
+    );
+    // The toolbar line above the cards: the main column less the clock icon (13 + 8 gap) and the
+    // Grid / List toggle (2 x 28 + 2 + 6 padding + 2 border + 8 gap).
+    v.push(
+        Case::new(
+            "Window picker sort hint",
+            "734 - 21 icon - 74 toggle - 8 gap",
+            734. - 21. - 74. - 8.,
+            cap,
+            400,
+            one,
+        )
+        .text("blank query", || crate::ui::window_picker::sort_hint(true))
+        .text("with a query", || {
+            crate::ui::window_picker::sort_hint(false)
+        }),
+    );
+    // The dashed note under the cards: 734 - 28 padding - 2 border - 14 icon - 10 gap.
+    v.push(
+        Case::new(
+            "Window picker match note",
+            "734 - 28 - 2 - 14 - 10",
+            734. - 54.,
+            12.5,
+            400,
+            one,
+        )
+        .text("match_note", crate::ui::window_picker::match_note),
+    );
+    // The display filter segments sit on the search row, which keeps 1000 - 36 padding - 34 tile
+    // - 24 gaps for the field, the count and the control: the control (3 segments) must not push
+    // the field out, so each label stays short.
+    v.push(
+        Case::new(
+            "Window picker display segment",
+            "segment 10 padding each side, 13 icon, 6 gap: label room 140",
+            140.,
+            12.5,
+            400,
+            one,
+        )
+        .text(
+            "All displays",
+            crate::ui::window_picker::filter_all_displays,
+        )
+        .text("Built-in", crate::ui::window_picker::filter_built_in)
+        .text("External", crate::ui::window_picker::filter_external),
     );
 
     v

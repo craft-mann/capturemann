@@ -46,6 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         text: &text,
         show_loupe: true,
         show_hint: true,
+        tab_to_list: false,
     };
     if !paint(&mut canvas, &frame, &scene) {
         return Err("size mismatch".into());

@@ -2423,6 +2423,10 @@ msgid "No display found"
 msgstr "Không tìm thấy màn hình"
 
 #, fuzzy
+msgid "No display found. If the screen is locked or asleep, unlock it and try again."
+msgstr "Không tìm thấy màn hình nào. Nếu màn hình đang khóa hoặc đang ngủ, hãy mở khóa rồi thử lại."
+
+#, fuzzy
 msgid "No display was found."
 msgstr "Không tìm thấy màn hình nào."
 
@@ -8494,3 +8498,216 @@ msgstr "âm thanh hệ thống"
 #, fuzzy
 msgid "Timeline zoomed to {from}-{to}"
 msgstr "Dòng thời gian đang phóng to: {from}-{to}"
+
+# ---- Record sheet > Window (board R20) ----
+
+#, fuzzy
+msgid "Looking for windows…"
+msgstr "Đang tìm cửa sổ…"
+
+#, fuzzy
+msgid "No window matches “{query}”."
+msgstr "Không có cửa sổ nào khớp với “{query}”."
+
+#, fuzzy
+msgid "No windows are open."
+msgstr "Không có cửa sổ nào đang mở."
+
+# ---- Window picker (R19) ----
+
+#, fuzzy
+msgid "All apps, {n} window"
+msgid_plural "All apps, {n} windows"
+msgstr[0] "Tất cả ứng dụng, {n} cửa sổ"
+
+#, fuzzy
+msgid "All windows"
+msgstr "Tất cả cửa sổ"
+
+#, fuzzy
+msgid "Apps"
+msgstr "Ứng dụng"
+
+#, fuzzy
+msgid "Best matches first, then front to back"
+msgstr "Kết quả khớp nhất trước, rồi từ trước ra sau"
+
+#, fuzzy
+msgid "Capture a window"
+msgstr "Chụp một cửa sổ"
+
+#, fuzzy
+msgid "Couldn’t open the window picker"
+msgstr "Không thể mở bộ chọn cửa sổ"
+
+#, fuzzy
+msgid "Front to back, most recently used first"
+msgstr "Từ trước ra sau, cửa sổ dùng gần nhất lên đầu"
+
+#, fuzzy
+msgid "Grid"
+msgstr "Lưới"
+
+#, fuzzy
+msgid "Layout"
+msgstr "Bố cục"
+
+#, fuzzy
+msgid "List"
+msgstr "Danh sách"
+
+#, fuzzy
+msgid "Matches the window title and the app name."
+msgstr "Khớp với tiêu đề cửa sổ và tên ứng dụng."
+
+#, fuzzy
+msgid "No window matches “{query}”"
+msgstr "Không có cửa sổ nào khớp với “{query}”"
+
+#, fuzzy
+msgid "No windows to capture"
+msgstr "Không có cửa sổ nào để chụp"
+
+#, fuzzy
+msgid "Open the window you want, then try again, or use Pick on screen."
+msgstr "Mở cửa sổ bạn muốn chụp rồi thử lại, hoặc dùng Chọn trên màn hình."
+
+#, fuzzy
+msgid "Pick from list"
+msgstr "Chọn từ danh sách"
+
+#, fuzzy
+msgid "Pick on screen"
+msgstr "Chọn trực tiếp"
+
+#, fuzzy
+msgid "Search windows"
+msgstr "Tìm cửa sổ"
+
+#, fuzzy
+msgid "Search windows by title or app"
+msgstr "Tìm cửa sổ theo tiêu đề hoặc ứng dụng"
+
+#, fuzzy
+msgid "Search {n} window by title or app"
+msgid_plural "Search {n} windows by title or app"
+msgstr[0] "Tìm {n} cửa sổ theo tiêu đề hoặc ứng dụng"
+
+#, fuzzy
+msgid "The windows could not be listed."
+msgstr "Không thể liệt kê các cửa sổ."
+
+msgid "Search windows or apps"
+msgstr "Tìm cửa sổ hoặc ứng dụng"
+
+#, fuzzy
+msgid "Try another word, or clear the search to see every window."
+msgstr "Thử từ khoá khác, hoặc xoá ô tìm kiếm để xem mọi cửa sổ."
+
+#, fuzzy
+msgid "Windows"
+msgstr "Cửa sổ"
+
+# NOTE: one note for all apps hidden by Privacy; {apps} is a list of app names.
+#, fuzzy
+msgid "{apps} is hidden by your Privacy settings."
+msgid_plural "{apps} are hidden by your Privacy settings."
+msgstr[0] "{apps} bị ẩn theo cài đặt Quyền riêng tư của bạn."
+
+#, fuzzy
+msgid "{size} · External"
+msgstr "{size} · Màn hình ngoài"
+
+#, fuzzy
+msgid "{title} · {app}"
+msgstr "{title} · {app}"
+
+#, fuzzy
+msgid "{title}, {app}, {size}"
+msgstr "{title}, {app}, {size}"
+
+#, fuzzy
+msgid "{title}, {app}, {size}, external display"
+msgstr "{title}, {app}, {size}, màn hình ngoài"
+
+#, fuzzy
+msgctxt "record sheet"
+msgid "Include"
+msgstr "Gồm"
+
+#, fuzzy
+msgctxt "window list"
+msgid "Front to back"
+msgstr "Trước ra sau"
+
+#, fuzzy
+msgctxt "window list"
+msgid "Last used"
+msgstr "Dùng gần đây"
+
+#, fuzzy
+msgid "{app}, {n} window"
+msgid_plural "{app}, {n} windows"
+msgstr[0] "{app}, {n} cửa sổ"
+
+#, fuzzy
+msgid "{n} window"
+msgid_plural "{n} windows"
+msgstr[0] "{n} cửa sổ"
+
+#, fuzzy
+msgid "{shown} of {total} windows"
+msgstr "{shown} trong {total} cửa sổ"
+
+#, fuzzy
+msgid "{title}, {app}, {width} by {height} pixels"
+msgstr "{title}, {app}, {width} × {height} điểm ảnh"
+
+#, fuzzy
+msgid "{title}, {app}, {width} by {height} pixels, on {display}"
+msgstr "{title}, {app}, {width} × {height} điểm ảnh, trên {display}"
+
+#, fuzzy
+msgctxt "window picker card"
+msgid "{size} · {display}"
+msgstr "{size} · {display}"
+
+#, fuzzy
+msgctxt "window picker display"
+msgid "All displays"
+msgstr "Mọi màn hình"
+
+#, fuzzy
+msgctxt "window picker display"
+msgid "Built-in"
+msgstr "Tích hợp"
+
+#, fuzzy
+msgctxt "window picker display"
+msgid "Display"
+msgstr "Màn hình"
+
+#, fuzzy
+msgctxt "window picker display"
+msgid "External"
+msgstr "Ngoài"
+
+#, fuzzy
+msgctxt "window picker footer"
+msgid "App"
+msgstr "Ứng dụng"
+
+#, fuzzy
+msgctxt "window picker footer"
+msgid "Cancel"
+msgstr "Huỷ"
+
+#, fuzzy
+msgctxt "window picker footer"
+msgid "Capture"
+msgstr "Chụp"
+
+#, fuzzy
+msgctxt "window picker footer"
+msgid "Move"
+msgstr "Di chuyển"

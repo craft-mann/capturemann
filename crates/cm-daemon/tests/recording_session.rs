@@ -62,6 +62,7 @@ fn targets(width: u32, height: u32) -> Targets {
             },
             scale: ScaleFactor::new(1.0).unwrap(),
             is_primary: true,
+            is_builtin: false,
         }],
         windows: vec![],
     }

@@ -439,6 +439,7 @@ mod tests {
                 bounds: rect(3024, 0, 3024, 1964),
                 scale: ScaleFactor::new(2.0).unwrap(),
                 is_primary: false,
+                is_builtin: false,
             }],
             windows: vec![WindowInfo {
                 id: 7,

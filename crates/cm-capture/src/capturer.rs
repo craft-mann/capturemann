@@ -235,6 +235,20 @@ impl Capturer {
             .ok_or_else(|| CmError::not_found(format!("No window title contains \"{needle}\"")))
     }
 
+    /// One capture of a window, downscaled so the longer edge is at most `max_px` (aspect
+    /// kept). The window picker's thumbnail: the capture itself is at full physical size, so
+    /// this costs the same 50 to 200 ms as a window screenshot. Errors are those of
+    /// [`Capturer::capture`] (`not_found` for an unknown window, `permission_missing`).
+    pub fn window_thumbnail(&self, window_id: u32, max_px: u32) -> Result<Frame, CmError> {
+        let cap = self
+            .capture(
+                CaptureRequest::new(CaptureTarget::Window { window_id }),
+                None,
+            )?
+            .ok_or_else(|| CmError::invalid_input("capture was cancelled"))?;
+        cap.frame.downscaled(max_px)
+    }
+
     /// Captures `request.target` after `request.delay`. `Ok(None)` means `cancel` fired during
     /// the delay and nothing was captured (CAP-5.AC2).
     ///

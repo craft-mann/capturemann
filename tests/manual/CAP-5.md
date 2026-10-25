@@ -30,8 +30,11 @@ Use the bundle (`make run-bundle`) when permissions matter.
 5. **AC3: Region.** With 5 s: click Region in the sidebar dock, then open the context menu on the desktop
    during the countdown. Expected: when the pill closes the screen freezes and the picker opens
    showing the menu; drag a region over the menu and confirm the saved image contains it.
-6. **Window mode.** With 3 s: click Window, hover and open a menu during the delay; after the
-   countdown the picker opens, pick a window and confirm the capture.
+6. **Window mode.** With 3 s: click Window. The window picker (R19, see `CAP-WINDOW.md`) opens at
+   once: choose a window and press Enter. Expected: the picker closes, the pill counts down 3 s
+   (open a menu in that window now), then that window is captured with the menu in it; Esc on
+   the pill cancels and nothing is saved. Then press Tab in the picker to use the pointer mode:
+   the pill counts down first, then the overlay opens (the old flow).
 7. **Two displays.** Start a delayed capture with the pointer on the second display: the pill
    shows in that display's top right corner.
 8. **Reduced motion.** Turn on System Settings -> Accessibility -> Display -> Reduce motion:

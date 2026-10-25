@@ -32,6 +32,7 @@ pub mod thumbs;
 pub mod toast_window;
 pub mod tooltip;
 pub mod upload_ui;
+pub mod window_picker;
 
 #[cfg(test)]
 mod icon_tests;

@@ -19,7 +19,7 @@ use time::format_description::well_known::Rfc3339;
 use crate::action::{
     AnnotateParams, CaptureFromFrameParams, CaptureRefParams, CaptureScreenshotParams,
     FrameTransport, FreezeDisplayParams, GetCaptureParams, GetSettingsParams, ListLibraryParams,
-    ReleaseFrameParams, SetSettingsParams, SuggestRedactionsParams,
+    ReleaseFrameParams, SetSettingsParams, SuggestRedactionsParams, WindowThumbnailParams,
 };
 use crate::daemon::{blocking, lock_library, settings_result, Inner};
 use crate::engines::{check_setting_writes, validate_setting_key};
@@ -290,6 +290,25 @@ impl Inner {
             return Err(e);
         }
         Ok(out)
+    }
+
+    /// `window_thumbnail`: one window capture, downscaled, as a PNG. Nothing is cached or stored.
+    pub(crate) async fn window_thumbnail(
+        &self,
+        p: WindowThumbnailParams,
+    ) -> Result<Value, DaemonError> {
+        let capturer = self.capturer.clone();
+        blocking(move || {
+            let frame = capturer.window_thumbnail(p.window_id, p.max_px)?;
+            let png = frame.to_png()?;
+            Ok(json!({
+                "window_id": p.window_id,
+                "width": frame.width(),
+                "height": frame.height(),
+                "png_base64": base64::engine::general_purpose::STANDARD.encode(png),
+            }))
+        })
+        .await
     }
 
     pub(crate) fn release_frame(&self, p: &ReleaseFrameParams) -> Result<Value, DaemonError> {

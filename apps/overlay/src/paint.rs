@@ -155,6 +155,8 @@ pub struct Scene<'a> {
     pub show_loupe: bool,
     /// Key hints at the bottom center.
     pub show_hint: bool,
+    /// Window mode: Tab leaves for the desktop app's window list (the hint says so).
+    pub tab_to_list: bool,
 }
 
 fn dev(logical: f64, scale: f64) -> i32 {
@@ -488,6 +490,13 @@ fn hint_items(scene: &Scene<'_>) -> Vec<HintItem> {
             Key("Esc"),
             Label(tr!("Cancel")),
         ],
+        Mode::Window if scene.tab_to_list => vec![
+            Label(tr!("Click a window")),
+            Key("Tab"),
+            Label(tr!("Pick from list")),
+            Key("Esc"),
+            Label(tr!("Cancel")),
+        ],
         Mode::Window => vec![
             Label(tr!("Click a window")),
             Key("Esc"),
@@ -604,6 +613,7 @@ mod tests {
             text: &text,
             show_loupe: loupe,
             show_hint: hint,
+            tab_to_list: false,
         };
         assert!(paint(&mut c, frame, &scene));
         buf
@@ -845,6 +855,7 @@ mod tests {
             text: &text,
             show_loupe: false,
             show_hint: false,
+            tab_to_list: false,
         };
         assert!(!paint(&mut c, &frame, &scene));
     }

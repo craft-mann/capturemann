@@ -21,7 +21,10 @@ use crate::recording::sheet::{
     clamp_into, fit_height, kind_icon, Devices, Note, SheetModel, TargetsProblem, SHEET_MARGIN,
     SOURCE_ICONS,
 };
-use crate::recording::start::{SheetDefaults, Target, TargetKind};
+use crate::recording::start::{RecordingSettings, SheetDefaults, Target, TargetKind};
+use crate::recording::window_rows::{
+    self as win_rows, KeyOutcome, ListKey, WindowList, WindowsLoad, KEY_LAST_USED,
+};
 use crate::shortcuts::ShortcutAction;
 use crate::theme::{scale, type_scale, Theme};
 use crate::ui::app::{self, AppModel};
@@ -31,8 +34,11 @@ use crate::ui::components::{
 };
 use crate::ui::kit::{tone_colors, Tone};
 use crate::ui::paint::{rgba_of, ui_features, TextExt, UI_FONT};
+use crate::ui::recording::window_list;
 use crate::ui::recording::{self as rec, RecState};
 use crate::ui::settings::widgets::caption;
+use crate::ui::text_field::{TextField, TextFieldEvent};
+use crate::window_picker::LastUsed;
 
 pub use crate::recording::sheet::SHEET_WIDTH;
 
@@ -69,6 +75,16 @@ pub struct StartSheet {
     display: Rect,
     /// The last `RecState::camera_list_epoch` this sheet reloaded for.
     seen_camera_epoch: u64,
+    /// R20: the window list of the Window kind.
+    windows: WindowList,
+    /// The list's search box (Cmd+F focuses it).
+    search: Entity<TextField>,
+    /// The list's scroll state.
+    list_scroll: ScrollHandle,
+    /// The row thumbnails (the same service as the R19 picker), asked for visible rows only.
+    thumbs: Entity<crate::window_picker::thumbs::Thumbs>,
+    /// A keyboard move happened: scroll the cursor row into view at the next paint.
+    reveal: bool,
     _subs: Vec<Subscription>,
 }
 
@@ -110,15 +126,39 @@ impl StartSheet {
         .countdown_s;
         let countdown_s = preset.countdown_s.unwrap_or(countdown_s);
         let seen_camera_epoch = rec.read(cx).camera_list_epoch;
-        let subs = vec![cx.observe(&rec, |this, rec, cx| {
-            // CAM-1: a camera was plugged in or unplugged while the sheet is open.
-            let epoch = rec.read(cx).camera_list_epoch;
-            if epoch != this.seen_camera_epoch {
-                this.seen_camera_epoch = epoch;
-                this.load_devices(cx);
-            }
-            cx.notify()
-        })];
+        let search = cx.new(|cx| {
+            TextField::new(
+                tr!("Search windows"),
+                tr!("Search windows by title or app"),
+                cx,
+            )
+            .height(34.)
+        });
+        let subs = vec![
+            cx.subscribe(&search, |this, _, ev: &TextFieldEvent, cx| match ev {
+                TextFieldEvent::Changed(text) => {
+                    this.windows.set_query(text);
+                    this.list_scroll.set_offset(gpui::point(px(0.), px(0.)));
+                    cx.notify();
+                }
+                TextFieldEvent::Submitted => this.search_enter(cx),
+                // Escape bubbles up to the sheet, which cancels.
+                TextFieldEvent::Escaped => {}
+            }),
+            cx.observe(&rec, |this, rec, cx| {
+                // CAM-1: a camera was plugged in or unplugged while the sheet is open.
+                let epoch = rec.read(cx).camera_list_epoch;
+                if epoch != this.seen_camera_epoch {
+                    this.seen_camera_epoch = epoch;
+                    this.load_devices(cx);
+                }
+                cx.notify()
+            }),
+        ];
+        let backend_for_thumbs = app.read(cx).backend.clone();
+        let thumbs = cx.new(|_| crate::window_picker::thumbs::Thumbs::new(backend_for_thumbs));
+        let mut subs = subs;
+        subs.push(cx.observe(&thumbs, |_, _, cx| cx.notify()));
         let mut this = StartSheet {
             app,
             _rec: rec,
@@ -132,9 +172,15 @@ impl StartSheet {
             scroll: ScrollHandle::new(),
             display,
             seen_camera_epoch,
+            windows: WindowList::default(),
+            search,
+            list_scroll: ScrollHandle::new(),
+            thumbs,
+            reveal: false,
             _subs: subs,
         };
         this.load(cx);
+        this.load_windows(cx);
         if std::env::var_os("CM_DEMO_SHEET_TRACE").is_some() {
             // Debug only: re-render now and then so the measured overflow can be read once the
             // layout has settled.
@@ -225,6 +271,170 @@ impl StartSheet {
         self.load(cx);
     }
 
+    /// R20: reads the windows (`list_targets`, front to back, own windows omitted) and the
+    /// Last used memory. Called when the sheet opens on Window, when the kind changes to Window
+    /// and after "Pick on screen" returns.
+    fn load_windows(&mut self, cx: &mut Context<Self>) {
+        if self.model.kind != TargetKind::Window {
+            return;
+        }
+        let backend = self.app.read(cx).backend.clone();
+        let snapshot = backend.settings.snapshot();
+        let excluded = RecordingSettings::from_settings(&snapshot).excluded_apps;
+        if let Some(v) = snapshot.get(KEY_LAST_USED) {
+            self.windows.last_used = LastUsed::from_value(v);
+        }
+        let Some(daemon) = backend.daemon.clone() else {
+            self.windows.set_failed(&tr!(
+                "CaptureMann\u{2019}s background service is not running."
+            ));
+            return;
+        };
+        self.windows.load = WindowsLoad::Loading;
+        let rt = backend.rt.clone();
+        cx.spawn(async move |this, cx| {
+            let res = rt
+                .spawn(async move {
+                    Backend::call_coded(&daemon, "list_targets", json!({ "windows": true })).await
+                })
+                .await;
+            this.update(cx, |this, cx| {
+                match &res {
+                    Ok(Ok(v)) => this.windows.apply(v, &excluded),
+                    Ok(Err(e)) => this
+                        .windows
+                        .set_failed(&crate::daemon_text::error_text(e.code, &e.message)),
+                    Err(e) => this.windows.set_failed(&e.to_string()),
+                }
+                let chosen = this.chosen_window();
+                this.windows.cursor_to(chosen);
+                let placeholder = this.windows.placeholder();
+                this.search.update(cx, |s, cx| {
+                    s.set_labels(tr!("Search windows"), placeholder, cx)
+                });
+                this.reveal = true;
+                cx.notify();
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    /// The id of the window chosen for the recording, if the target is a window.
+    fn chosen_window(&self) -> Option<u32> {
+        match self.model.picked {
+            Some(Target::Window { window_id }) if self.model.kind == TargetKind::Window => {
+                Some(window_id)
+            }
+            _ => None,
+        }
+    }
+
+    pub(super) fn choose_window(&mut self, id: u32, cx: &mut Context<Self>) {
+        self.model.pick(Target::Window { window_id: id });
+        self.windows.cursor = Some(id);
+        cx.notify();
+    }
+
+    /// "Pick on screen": the old hover mode; the choice comes back into the list.
+    pub(super) fn pick_on_screen(&mut self, cx: &mut Context<Self>) {
+        self.choose(CaptureMode::Window, cx);
+    }
+
+    /// An Include chip was pressed (R20): the same state and permission asks as the switches.
+    pub(super) fn toggle_chip(
+        &mut self,
+        source: crate::recording::sheet::Source,
+        cx: &mut Context<Self>,
+    ) {
+        use crate::recording::sheet::Source;
+        if !self.model.toggle_source(source) {
+            return;
+        }
+        match source {
+            Source::Webcam if self.model.camera => self.ask_before_use(PermId::Camera, cx),
+            Source::Microphone if self.model.mic => self.ask_before_use(PermId::Microphone, cx),
+            _ => {}
+        }
+        if source == Source::Webcam {
+            self.sync_preview(cx);
+        }
+        cx.notify();
+    }
+
+    fn on_key(&mut self, ev: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        let k = &ev.keystroke;
+        let key = k.key.as_str();
+        if key == "escape" {
+            self.cancel(cx);
+            return;
+        }
+        if self.model.kind == TargetKind::Window {
+            let find = if cfg!(target_os = "macos") {
+                k.modifiers.platform
+            } else {
+                k.modifiers.control
+            };
+            // Cmd+F (Ctrl+F on Windows) goes to the search box.
+            if find && key == "f" {
+                let focus = self.search.read(cx).focus.clone();
+                window.focus(&focus, cx);
+                return;
+            }
+            let plain = !(k.modifiers.platform || k.modifiers.control || k.modifiers.alt);
+            let in_search = self.search.read(cx).focus.is_focused(window);
+            let on_sheet = self.focus.is_focused(window);
+            // Up and Down also work from the search box; the other keys only when nothing with
+            // its own meaning (a chip, the search text) has the focus.
+            let list_key = match key {
+                "up" if plain && (on_sheet || in_search) => Some(ListKey::Up),
+                "down" if plain && (on_sheet || in_search) => Some(ListKey::Down),
+                "home" if plain && on_sheet => Some(ListKey::Home),
+                "end" if plain && on_sheet => Some(ListKey::End),
+                "space" if plain && on_sheet => Some(ListKey::Space),
+                "enter" if plain && on_sheet => Some(ListKey::Enter),
+                _ => None,
+            };
+            if let Some(lk) = list_key {
+                self.list_key(lk, cx);
+                return;
+            }
+        }
+        if key == "enter" {
+            self.start(cx);
+        }
+    }
+
+    /// Enter in the search box: choose the top result (or start when it is already chosen).
+    fn search_enter(&mut self, cx: &mut Context<Self>) {
+        let chosen = self.chosen_window();
+        if self.windows.cursor.is_none() && self.windows.is_searching() {
+            self.windows.key(ListKey::Home, chosen);
+        }
+        let outcome = self.windows.key(ListKey::Enter, chosen);
+        self.apply_outcome(outcome, cx);
+        self.reveal = true;
+        cx.notify();
+    }
+
+    fn apply_outcome(&mut self, outcome: KeyOutcome, cx: &mut Context<Self>) {
+        match outcome {
+            KeyOutcome::Nothing => {}
+            KeyOutcome::Select(id) => self.choose_window(id, cx),
+            KeyOutcome::Start => self.start(cx),
+        }
+    }
+
+    /// A key for the list (arrows, Home, End, Space, Enter). Returns whether it was used.
+    fn list_key(&mut self, key: ListKey, cx: &mut Context<Self>) -> bool {
+        let chosen = self.chosen_window();
+        let outcome = self.windows.key(key, chosen);
+        self.apply_outcome(outcome, cx);
+        self.reveal = true;
+        cx.notify();
+        true
+    }
+
     /// PRM-1.AC7: turning the camera or microphone on asks the OS first when it never asked, then
     /// reads the devices again. Never silent: this runs from the toggle the user pressed.
     fn ask_before_use(&mut self, id: PermId, cx: &mut Context<Self>) {
@@ -296,6 +506,21 @@ impl StartSheet {
         let Some(opts) = self.model.options() else {
             return;
         };
+        // R20: the window being recorded becomes the first of "Last used" (app-only setting,
+        // written like the sheet's other choices, through the daemon's `set_settings`).
+        if let Target::Window { window_id } = opts.target {
+            if let Some(value) = self.windows.remember(window_id) {
+                let backend = self.app.read(cx).backend.clone();
+                if let Some(daemon) = backend.daemon.clone() {
+                    let mut values = serde_json::Map::new();
+                    values.insert(KEY_LAST_USED.to_owned(), value);
+                    backend.rt.spawn(async move {
+                        let _ = Backend::call(&daemon, "set_settings", json!({ "values": values }))
+                            .await;
+                    });
+                }
+            }
+        }
         let app = self.app.clone();
         let extra = self.preset.extra_params();
         cx.defer(move |cx| rec::start_with(&app, opts, extra, cx));
@@ -322,7 +547,13 @@ impl StartSheet {
             this.update(cx, |this, cx| {
                 this.picking = false;
                 match res {
-                    Ok(Ok(Some(p))) => this.model.pick(p.target()),
+                    Ok(Ok(Some(p))) => {
+                        this.model.pick(p.target());
+                        // R20: the chosen window shows in the list (it may be new to it).
+                        let chosen = this.chosen_window();
+                        this.windows.cursor_to(chosen);
+                        this.load_windows(cx);
+                    }
                     Ok(Ok(None)) => {}
                     Ok(Err(e)) => {
                         let app = this.app.clone();
@@ -392,15 +623,20 @@ impl Render for StartSheet {
         let can_start = blocker.is_none() && !self.picking;
 
         // What to record.
-        let kinds = TargetKind::ALL.into_iter().map(|k| {
-            kind_tile(&t, k, m.kind == k).on_click(cx.listener(move |this, _, _, cx| {
-                this.model.set_kind(k);
-                cx.notify();
-            }))
-        });
+        let kinds = TargetKind::ALL
+            .into_iter()
+            .map(|k| {
+                kind_tile(&t, k, m.kind == k).on_click(cx.listener(move |this, _, _, cx| {
+                    this.model.set_kind(k);
+                    this.load_windows(cx);
+                    cx.notify();
+                }))
+            })
+            .collect::<Vec<_>>();
         // With several displays the chips carry the name and size, so the summary line only
         // shows for one display, a window or a region (M32).
-        let show_summary = !(m.kind == TargetKind::Display && m.displays.len() > 1);
+        let show_summary = !(m.kind == TargetKind::Display && m.displays.len() > 1)
+            && m.kind != TargetKind::Window;
         let target_row = show_summary.then(|| {
             let summary = m.target_summary();
             let chosen = m.target().is_some();
@@ -668,6 +904,11 @@ impl Render for StartSheet {
                     .map(|n| note_view(&t, &n, "Privacy_Camera").into_any_element()),
             )
             .collect();
+        let (camera_extras, camera_extras_for_chips) = if m.kind == TargetKind::Window {
+            (Vec::new(), camera_extras)
+        } else {
+            (camera_extras, Vec::new())
+        };
         let mic_extras: Vec<gpui::AnyElement> = m
             .mic_note()
             .map(|n| note_view(&t, &n, "Privacy_Microphone").into_any_element())
@@ -712,6 +953,66 @@ impl Render for StartSheet {
                 true,
             ));
 
+        // R20: the Window kind shows the list and the Include chips instead of the target row and
+        // the three source rows. The camera choice and the problem notes stay under the chips.
+        let window_blocks: Vec<gpui::AnyElement> = if m.kind == TargetKind::Window {
+            if self.reveal {
+                self.reveal = false;
+                window_list::reveal_cursor(&self.windows, &self.list_scroll);
+            }
+            let find_keys = match platform {
+                crate::shortcuts::Platform::Mac => vec!["\u{2318}".to_owned(), "F".to_owned()],
+                _ => vec!["Ctrl".to_owned(), "F".to_owned()],
+            };
+            let chosen = self.chosen_window();
+            let mut extras: Vec<gpui::AnyElement> = Vec::new();
+            extras.extend(camera_extras_for_chips);
+            extras.extend(
+                m.mic_note()
+                    .map(|n| note_view(&t, &n, "Privacy_Microphone").into_any_element()),
+            );
+            extras.extend(m.system_audio_note().map(|n| {
+                div()
+                    .text_size(px(type_scale::CAPTION))
+                    .text_color(rgba_of(t.mist))
+                    .child(SharedString::from(n))
+                    .into_any_element()
+            }));
+            vec![
+                div()
+                    .flex_none()
+                    .flex()
+                    .flex_col()
+                    .gap(px(win_rows::SEARCH_GAP))
+                    .child(window_list::search_bar(
+                        &t,
+                        &self.search,
+                        &find_keys,
+                        self.picking,
+                        cx,
+                    ))
+                    .child(window_list::list_card(
+                        &t,
+                        &self.windows,
+                        chosen,
+                        &self.list_scroll,
+                        &self.thumbs,
+                        cx,
+                    ))
+                    .into_any_element(),
+                div()
+                    .flex_none()
+                    .flex()
+                    .flex_col()
+                    .gap(px(10.))
+                    .child(window_list::include_row(&t, m.include_chips(), cx))
+                    .children(extras)
+                    .into_any_element(),
+            ]
+        } else {
+            Vec::new()
+        };
+
         let countdown_text = if self.countdown_s == 0 {
             tr!("Starts immediately")
         } else {
@@ -720,6 +1021,29 @@ impl Render for StartSheet {
                 secs = self.countdown_s
             )
         };
+        // R20: the footer echoes the chosen window ("Docs: Q4 launch plan \u{00B7} Google Chrome").
+        let footer_window = (m.kind == TargetKind::Window).then(|| {
+            let chosen_text = win_rows::footer_text(self.chosen_window(), &self.windows);
+            let text = chosen_text.clone().unwrap_or_else(|| m.target_summary());
+            div()
+                .id("target-summary")
+                .role(Role::Status)
+                .aria_label(SharedString::from(tr!(
+                    "Recording target: {summary}",
+                    summary = text
+                )))
+                .flex()
+                .items_center()
+                .gap(px(6.))
+                .text_size(px(type_scale::CAPTION))
+                .text_color(rgba_of(if chosen_text.is_some() {
+                    t.text_2
+                } else {
+                    t.mist
+                }))
+                .child(icon("app-window", 13., t.text_2))
+                .child(ellipsis_text(text))
+        });
         let header = div()
             .flex_shrink_0()
             .px(px(22.))
@@ -797,7 +1121,8 @@ impl Render for StartSheet {
             .children(problem.map(|p| problem_card(&t, p)))
             .children(display_choices)
             .children(target_row)
-            .child(sources);
+            .children(window_blocks)
+            .children((m.kind != TargetKind::Window).then_some(sources));
         let footer = div()
             .flex_shrink_0()
             .px(px(22.))
@@ -831,6 +1156,7 @@ impl Render for StartSheet {
                             .flex()
                             .flex_col()
                             .gap(px(4.))
+                            .children(footer_window)
                             .child(
                                 div()
                                     .flex()
@@ -841,14 +1167,14 @@ impl Render for StartSheet {
                                     .child(icon("timer", 13., t.mist))
                                     .child(shrink_text(countdown_text)),
                             )
-                            .child(
+                            .children((m.kind != TargetKind::Window).then(|| {
                                 div()
                                     .flex()
                                     .items_center()
                                     .gap(px(6.))
                                     .child(caption(&t, tr!("Start or stop from anywhere")))
-                                    .child(keycaps(&t, &toggle_keys)),
-                            ),
+                                    .child(keycaps(&t, &toggle_keys))
+                            })),
                     )
                     .child(
                         div()
@@ -904,13 +1230,9 @@ impl Render for StartSheet {
             .font_features(ui_features())
             .text_color(rgba_of(t.text))
             .text_size(px(type_scale::UI))
-            .on_key_down(cx.listener(|this, ev: &KeyDownEvent, _, cx| {
-                match ev.keystroke.key.as_str() {
-                    "escape" => this.cancel(cx),
-                    "enter" => this.start(cx),
-                    _ => {}
-                }
-            }))
+            .on_key_down(
+                cx.listener(|this, ev: &KeyDownEvent, window, cx| this.on_key(ev, window, cx)),
+            )
             .child(panel)
     }
 }

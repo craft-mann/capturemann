@@ -2793,7 +2793,11 @@ impl RecordingEngine {
                     .iter()
                     .find(|d| d.is_primary)
                     .or_else(|| targets.displays.first())
-                    .ok_or_else(|| CmError::not_found("No display found"))?;
+                    .ok_or_else(|| {
+                        CmError::not_found(
+                            "No display found. If the screen is locked or asleep, unlock it and try again.",
+                        )
+                    })?;
                 ScreenshotTarget::Display { display_id: d.id }
             }
         };

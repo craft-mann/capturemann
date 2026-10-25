@@ -289,6 +289,7 @@ async fn frame_target_errors_and_policy() {
             "rescan_library",
             "freeze_display",
             "release_frame",
+            "window_thumbnail",
             "discard_recording",
             "restart_recording",
             "skip_countdown"

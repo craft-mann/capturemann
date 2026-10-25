@@ -71,6 +71,7 @@ pub const ACTIONS: &[ActionSpec] = &[
     spec("set_reframe", Tier::Free, true),
     spec("freeze_display", Tier::Free, true),
     spec("release_frame", Tier::Free, false),
+    spec("window_thumbnail", Tier::Free, true),
     // Jobs (EXP-4, STO-3): Free per the spec's tool table, `cancel_job` included. Cancelling
     // changes state (so read-only clients are refused) but never reaches remote services.
     spec("get_job", Tier::Free, false),
@@ -136,6 +137,10 @@ pub const ACTIONS: &[ActionSpec] = &[
 /// * `freeze_display` and `release_frame` serve the overlay's picker (CAP-1): an agent that
 ///   wants a screenshot calls `capture_screenshot`, which already covers every target.
 ///
+/// * `window_thumbnail` serves the window picker (R19, R20): a downscaled PNG of one window. An
+///   agent that wants to see a window calls `capture_screenshot`. It hands out screen pixels, so
+///   it counts as mutating for read-only clients, like `freeze_display`.
+///
 /// * `discard_recording`, `restart_recording` and `skip_countdown` are the HUD's Discard, Restart
 ///   and "Space skips the countdown" (REC-5, REC-1.AC5). The spec gives Restart and Discard no MCP
 ///   tool or CLI command on purpose: an agent stops (`stop_recording`) and starts again
@@ -152,6 +157,7 @@ pub const ACTIONS: &[ActionSpec] = &[
 pub const INTERNAL_ACTIONS: &[&str] = &[
     "freeze_display",
     "release_frame",
+    "window_thumbnail",
     "discard_recording",
     "restart_recording",
     "skip_countdown",
@@ -324,6 +330,20 @@ pub struct ReleaseFrameParams {
     pub frame_id: String,
 }
 
+/// Default and clamp range of `window_thumbnail`'s `max_px`.
+pub const THUMBNAIL_DEFAULT_PX: u32 = 360;
+pub const THUMBNAIL_MIN_PX: u32 = 64;
+pub const THUMBNAIL_MAX_PX: u32 = 1024;
+
+/// `window_thumbnail { window_id, max_px? }`: one capture of the window, downscaled so the
+/// longer edge is at most `max_px` (default 360, clamped to 64..=1024), as a PNG. Serves the
+/// window picker; nothing is cached or stored. Returns `{ window_id, width, height, png_base64 }`.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct WindowThumbnailParams {
+    pub window_id: u32,
+    pub max_px: u32,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct AnnotateParams {
     pub capture_id: String,
@@ -491,6 +511,7 @@ pub enum Action {
     CaptureFromFrame(CaptureFromFrameParams),
     FreezeDisplay(FreezeDisplayParams),
     ReleaseFrame(ReleaseFrameParams),
+    WindowThumbnail(WindowThumbnailParams),
     GetJob(GetJobParams),
     ListJobs(ListJobsParams),
     CancelJob(CancelJobParams),
@@ -836,6 +857,28 @@ impl Action {
                 Action::ReleaseFrame(ReleaseFrameParams {
                     frame_id: f.str_req("frame_id")?,
                 })
+            }
+            "window_thumbnail" => {
+                f.only(&["window_id", "max_px"])?;
+                let window_id = f
+                    .obj
+                    .get("window_id")
+                    .and_then(Value::as_u64)
+                    .and_then(|n| u32::try_from(n).ok())
+                    .ok_or_else(|| {
+                        CmError::invalid_field("window_id", "must be a non-negative integer")
+                    })?;
+                let max_px = match f.obj.get("max_px") {
+                    None | Some(Value::Null) => THUMBNAIL_DEFAULT_PX,
+                    Some(v) => v
+                        .as_u64()
+                        .ok_or_else(|| {
+                            CmError::invalid_field("max_px", "must be a non-negative integer")
+                        })?
+                        .clamp(u64::from(THUMBNAIL_MIN_PX), u64::from(THUMBNAIL_MAX_PX))
+                        as u32,
+                };
+                Action::WindowThumbnail(WindowThumbnailParams { window_id, max_px })
             }
             "get_job" => {
                 f.only(&["job_id"])?;
@@ -1242,6 +1285,7 @@ impl Action {
             Action::CaptureScreenshot(_) | Action::CaptureFromFrame(_) => "capture_screenshot",
             Action::FreezeDisplay(_) => "freeze_display",
             Action::ReleaseFrame(_) => "release_frame",
+            Action::WindowThumbnail(_) => "window_thumbnail",
             Action::GetJob(_) => "get_job",
             Action::ListJobs(_) => "list_jobs",
             Action::CancelJob(_) => "cancel_job",
@@ -1478,6 +1522,7 @@ mod tests {
             ),
             ("freeze_display", json!({"display_id": 1})),
             ("release_frame", json!({"frame_id": "frame_1"})),
+            ("window_thumbnail", json!({"window_id": 5, "max_px": 200})),
             ("get_job", json!({"job_id": "job_1"})),
             (
                 "list_jobs",
@@ -1651,6 +1696,43 @@ mod tests {
     }
 
     #[test]
+    fn window_thumbnail_params_are_validated() {
+        let parse = |p: Value| Action::parse("window_thumbnail", &p);
+        assert!(matches!(
+            parse(json!({"window_id": 7})).unwrap(),
+            Action::WindowThumbnail(WindowThumbnailParams {
+                window_id: 7,
+                max_px: 360
+            })
+        ));
+        // max_px is clamped to 64..=1024, not refused.
+        for (given, want) in [(10, 64), (64, 64), (500, 500), (1024, 1024), (99_999, 1024)] {
+            match parse(json!({"window_id": 1, "max_px": given})).unwrap() {
+                Action::WindowThumbnail(p) => assert_eq!(p.max_px, want, "{given}"),
+                other => panic!("{other:?}"),
+            }
+        }
+        for (p, field) in [
+            (json!({}), "window_id"),
+            (json!({"window_id": -1}), "window_id"),
+            (json!({"window_id": "7"}), "window_id"),
+            (json!({"window_id": 4_294_967_296u64}), "window_id"),
+            (json!({"window_id": 1, "max_px": "big"}), "max_px"),
+            (json!({"window_id": 1, "max_px": -5}), "max_px"),
+            (json!({"window_id": 1, "max_px": 1.5}), "max_px"),
+            (json!({"window_id": 1, "request_id": "r"}), "request_id"),
+        ] {
+            let e = parse(p.clone()).unwrap_err();
+            assert!(e.to_string().starts_with(field), "{p}: {e}");
+        }
+        assert_eq!(
+            spec_for("window_thumbnail").map(|s| (s.tier, s.mutating)),
+            Some((Tier::Free, true))
+        );
+        assert!(is_internal("window_thumbnail"));
+    }
+
+    #[test]
     fn freeze_and_release_params_are_validated() {
         let a = Action::parse(
             "freeze_display",
@@ -1702,7 +1784,7 @@ mod tests {
         ] {
             assert!(!is_internal(public), "{public}");
         }
-        assert_eq!(INTERNAL_ACTIONS.len(), 6);
+        assert_eq!(INTERNAL_ACTIONS.len(), 7);
     }
 
     #[test]

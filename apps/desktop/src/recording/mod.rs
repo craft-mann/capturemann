@@ -35,3 +35,4 @@ pub mod start;
 pub mod toasts;
 pub mod tray;
 pub mod uploads;
+pub mod window_rows;

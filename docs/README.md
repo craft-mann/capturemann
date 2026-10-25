@@ -5,6 +5,8 @@
 | [User guide](user-guide.md) | Screenshots, recording, editing, captions, publishing, agents |
 | [Connect Google Drive and YouTube](google-setup.md) | Create your own Google client and connect |
 | [Building from source](building.md) | Toolchain, tests, the macOS bundle, FFmpeg |
+| [Releasing](releasing.md) | Cut a release: tag, workflow, signing secrets, notarization, rollback |
+| [Demo script](demo-script.md) | Script and shot list for the 0.1.0 demo video |
 | [macOS permissions](macos-permissions.md) | Screen Recording, signing identity, keychain prompts |
 | [PLAN.md](PLAN.md) | Milestones and what is open |
 | [DESIGN.md](DESIGN.md) | Product surfaces mapped to the design kit in [`design/`](../design/CLAUDE.md) |

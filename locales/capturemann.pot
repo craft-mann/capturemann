@@ -229,6 +229,11 @@ msgstr ""
 msgid "Agents stay on this computer"
 msgstr ""
 
+msgid "All apps, {n} window"
+msgid_plural "All apps, {n} windows"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "All captures"
 msgstr ""
 
@@ -236,6 +241,9 @@ msgid "All changes saved"
 msgstr ""
 
 msgid "All set. Every permission is granted."
+msgstr ""
+
+msgid "All windows"
 msgstr ""
 
 msgid "Allow clients that are not in the list"
@@ -322,6 +330,9 @@ msgstr ""
 msgid "Applied for now, but it could not be saved: {reason}"
 msgstr ""
 
+msgid "Apps"
+msgstr ""
+
 msgid "Apps excluded from recordings"
 msgstr ""
 
@@ -380,6 +391,9 @@ msgid "Before a screenshot"
 msgstr ""
 
 msgid "Behavior"
+msgstr ""
+
+msgid "Best matches first, then front to back"
 msgstr ""
 
 msgid "Bubble position"
@@ -464,6 +478,9 @@ msgid "Captions were left out: this recording has no transcript yet."
 msgstr ""
 
 msgid "Capture"
+msgstr ""
+
+msgid "Capture a window"
 msgstr ""
 
 msgid "Capture actions"
@@ -907,6 +924,9 @@ msgid "Couldn’t open the video"
 msgstr ""
 
 msgid "Couldn’t open the window"
+msgstr ""
+
+msgid "Couldn’t open the window picker"
 msgstr ""
 
 msgid "Couldn’t open this capture"
@@ -1424,6 +1444,9 @@ msgstr ""
 msgid "Free and open source under Apache-2.0."
 msgstr ""
 
+msgid "Front to back, most recently used first"
+msgstr ""
+
 msgid "Getting the picture…"
 msgstr ""
 
@@ -1461,6 +1484,9 @@ msgid "Google will say “Google hasn’t verified this app” when you sign in.
 msgstr ""
 
 msgid "Grant access…"
+msgstr ""
+
+msgid "Grid"
 msgstr ""
 
 msgid "Hide the bubble"
@@ -1589,6 +1615,9 @@ msgstr ""
 msgid "Launch at login"
 msgstr ""
 
+msgid "Layout"
+msgstr ""
+
 msgid "Leave the clipboard alone"
 msgstr ""
 
@@ -1638,6 +1667,9 @@ msgstr ""
 msgid "Link copied to the clipboard"
 msgstr ""
 
+msgid "List"
+msgstr ""
+
 msgid "List cameras and microphones"
 msgstr ""
 
@@ -1684,6 +1716,9 @@ msgstr ""
 msgid "Looking for emails and keys…"
 msgstr ""
 
+msgid "Looking for windows…"
+msgstr ""
+
 msgid "Looking up your channel…"
 msgstr ""
 
@@ -1724,6 +1759,9 @@ msgid "Manage {name}"
 msgstr ""
 
 msgid "Match case"
+msgstr ""
+
+msgid "Matches the window title and the app name."
 msgstr ""
 
 msgid "Max duration"
@@ -1918,6 +1956,9 @@ msgstr ""
 msgid "No display found"
 msgstr ""
 
+msgid "No display found. If the screen is locked or asleep, unlock it and try again."
+msgstr ""
+
 msgid "No display was found."
 msgstr ""
 
@@ -1997,6 +2038,18 @@ msgid "No webcam, no sound"
 msgstr ""
 
 msgid "No webcam, no system audio"
+msgstr ""
+
+msgid "No window matches “{query}”"
+msgstr ""
+
+msgid "No window matches “{query}”."
+msgstr ""
+
+msgid "No windows are open."
+msgstr ""
+
+msgid "No windows to capture"
 msgstr ""
 
 msgid "No zoom spots found in this recording."
@@ -2183,6 +2236,9 @@ msgstr ""
 msgid "Open the recording to edit its captions."
 msgstr ""
 
+msgid "Open the window you want, then try again, or use Pick on screen."
+msgstr ""
+
 msgid "Opening the capture…"
 msgstr ""
 
@@ -2272,6 +2328,12 @@ msgid "Pick a tool, or click an annotation to edit it."
 msgstr ""
 
 msgid "Pick an annotation"
+msgstr ""
+
+msgid "Pick from list"
+msgstr ""
+
+msgid "Pick on screen"
 msgstr ""
 
 msgid "Place at the center"
@@ -2944,6 +3006,20 @@ msgstr ""
 msgid "Search commands…"
 msgstr ""
 
+msgid "Search windows"
+msgstr ""
+
+msgid "Search windows by title or app"
+msgstr ""
+
+msgid "Search windows or apps"
+msgstr ""
+
+msgid "Search {n} window by title or app"
+msgid_plural "Search {n} windows by title or app"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "Select a cut (the hatched part) to restore it"
 msgstr ""
 
@@ -3524,6 +3600,9 @@ msgstr ""
 msgid "The window follows the cursor and only moves when the cursor leaves its middle 80%."
 msgstr ""
 
+msgid "The windows could not be listed."
+msgstr ""
+
 msgid "The {track} file ended early ({detail}); what was written is kept"
 msgstr ""
 
@@ -3661,6 +3740,9 @@ msgid "Trim a recording"
 msgstr ""
 
 msgid "Try again"
+msgstr ""
+
+msgid "Try another word, or clear the search to see every window."
 msgstr ""
 
 msgid "Two actions share a shortcut; only the first one is registered."
@@ -3866,6 +3948,9 @@ msgid "Window {id} not found"
 msgstr ""
 
 msgid "Window {window_id}"
+msgstr ""
+
+msgid "Windows"
 msgstr ""
 
 msgid "With 5 s delay"
@@ -4241,6 +4326,16 @@ msgstr ""
 msgid "your library folder"
 msgstr ""
 
+msgid "{apps} is hidden by your Privacy settings."
+msgid_plural "{apps} are hidden by your Privacy settings."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{app}, {n} window"
+msgid_plural "{app}, {n} windows"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "{at} of {total}"
 msgstr ""
 
@@ -4490,6 +4585,11 @@ msgid_plural "{n} suggested. Nothing is blurred until you accept. Click a dashed
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "{n} window"
+msgid_plural "{n} windows"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "{n} word"
 msgid_plural "{n} words"
 msgstr[0] ""
@@ -4557,6 +4657,12 @@ msgstr ""
 msgid "{shape} shape"
 msgstr ""
 
+msgid "{shown} of {total} windows"
+msgstr ""
+
+msgid "{size} · External"
+msgstr ""
+
 msgid "{start} · {scale}× · {reason}"
 msgstr ""
 
@@ -4569,10 +4675,25 @@ msgstr ""
 msgid "{title} · Making one MP4 with the camera bubble and audio: {pct}%"
 msgstr ""
 
+msgid "{title} · {app}"
+msgstr ""
+
 msgid "{title}, shortcut {shortcut}"
 msgstr ""
 
 msgid "{title}, unavailable"
+msgstr ""
+
+msgid "{title}, {app}, {size}"
+msgstr ""
+
+msgid "{title}, {app}, {size}, external display"
+msgstr ""
+
+msgid "{title}, {app}, {width} by {height} pixels"
+msgstr ""
+
+msgid "{title}, {app}, {width} by {height} pixels, on {display}"
 msgstr ""
 
 msgid "{title}, {hint}"
@@ -5806,6 +5927,10 @@ msgid "unlisted"
 msgstr ""
 
 msgctxt "record sheet"
+msgid "Include"
+msgstr ""
+
+msgctxt "record sheet"
 msgid "Record"
 msgstr ""
 
@@ -6355,6 +6480,50 @@ msgstr ""
 
 msgctxt "what to copy"
 msgid "Export"
+msgstr ""
+
+msgctxt "window list"
+msgid "Front to back"
+msgstr ""
+
+msgctxt "window list"
+msgid "Last used"
+msgstr ""
+
+msgctxt "window picker card"
+msgid "{size} · {display}"
+msgstr ""
+
+msgctxt "window picker display"
+msgid "All displays"
+msgstr ""
+
+msgctxt "window picker display"
+msgid "Built-in"
+msgstr ""
+
+msgctxt "window picker display"
+msgid "Display"
+msgstr ""
+
+msgctxt "window picker display"
+msgid "External"
+msgstr ""
+
+msgctxt "window picker footer"
+msgid "App"
+msgstr ""
+
+msgctxt "window picker footer"
+msgid "Cancel"
+msgstr ""
+
+msgctxt "window picker footer"
+msgid "Capture"
+msgstr ""
+
+msgctxt "window picker footer"
+msgid "Move"
 msgstr ""
 
 msgctxt "zoom"

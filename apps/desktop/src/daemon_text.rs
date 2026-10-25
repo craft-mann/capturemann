@@ -261,7 +261,9 @@ fn translated(p: &MessageParts) -> Option<String> {
         "recording_ended" => tr!("The recording has already ended"),
         "recording_ended_before_answer" => tr!("The recording ended before it could answer"),
         "recording_ended_before_restart" => tr!("The recording ended before it could restart"),
-        "no_display" => tr!("No display found"),
+        "no_display" => tr!(
+            "No display found. If the screen is locked or asleep, unlock it and try again."
+        ),
         "display_not_found" => tr!("Display {id} not found", id = g("id")),
         "window_not_found" => tr!("Window {id} not found", id = g("id")),
         "window_minimized" => tr!("Window is minimized"),

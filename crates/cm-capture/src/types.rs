@@ -9,6 +9,10 @@ pub struct DisplayInfo {
     pub bounds: PhysicalRect,
     pub scale: ScaleFactor,
     pub is_primary: bool,
+    /// The laptop's own panel (macOS `CGDisplayIsBuiltin`). `false` on Windows for now and when
+    /// the OS does not say. Absent in older JSON, which parses as `false`.
+    #[serde(default)]
+    pub is_builtin: bool,
 }
 
 /// A top-level window, as reported by `list_targets`.

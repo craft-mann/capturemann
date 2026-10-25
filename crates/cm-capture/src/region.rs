@@ -75,6 +75,7 @@ mod tests {
             },
             scale: ScaleFactor::new(scale).unwrap(),
             is_primary: true,
+            is_builtin: false,
         }
     }
 

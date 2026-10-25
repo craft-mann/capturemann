@@ -82,6 +82,55 @@ impl Frame {
         Frame::new(rect.size.width, rect.size.height, out)
     }
 
+    /// A copy whose longer edge is at most `max_edge` px (aspect kept, each side at least 1 px),
+    /// averaged over the exact source area of every output pixel (a box filter with fractional
+    /// edge weights, alpha-weighted). A frame already within `max_edge` is returned unchanged.
+    /// `max_edge` 0 is `invalid_input`.
+    pub fn downscaled(&self, max_edge: u32) -> Result<Frame, CmError> {
+        if max_edge == 0 {
+            return Err(CmError::invalid_input("max_edge must be at least 1"));
+        }
+        let longer = self.width.max(self.height);
+        if longer <= max_edge {
+            return Ok(self.clone());
+        }
+        let scale = f64::from(max_edge) / f64::from(longer);
+        let dw = ((f64::from(self.width) * scale).round() as u32).clamp(1, max_edge);
+        let dh = ((f64::from(self.height) * scale).round() as u32).clamp(1, max_edge);
+        let xs = axis_spans(self.width, dw);
+        let ys = axis_spans(self.height, dh);
+        let stride = self.width as usize * 4;
+        let mut out = Vec::with_capacity(dw as usize * dh as usize * 4);
+        for yspan in &ys {
+            for xspan in &xs {
+                let (mut r, mut g, mut b, mut a, mut wsum) =
+                    (0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64);
+                for &(sy, wy) in yspan {
+                    let row = sy as usize * stride;
+                    for &(sx, wx) in xspan {
+                        let i = row + sx as usize * 4;
+                        let w = wx * wy;
+                        let pa = f64::from(self.rgba[i + 3]);
+                        r += f64::from(self.rgba[i]) * pa * w;
+                        g += f64::from(self.rgba[i + 1]) * pa * w;
+                        b += f64::from(self.rgba[i + 2]) * pa * w;
+                        a += pa * w;
+                        wsum += w;
+                    }
+                }
+                if a <= 0.0 || wsum <= 0.0 {
+                    out.extend_from_slice(&[0, 0, 0, 0]);
+                } else {
+                    out.push((r / a).round().clamp(0.0, 255.0) as u8);
+                    out.push((g / a).round().clamp(0.0, 255.0) as u8);
+                    out.push((b / a).round().clamp(0.0, 255.0) as u8);
+                    out.push((a / wsum).round().clamp(0.0, 255.0) as u8);
+                }
+            }
+        }
+        Frame::new(dw, dh, out)
+    }
+
     /// Encodes as an 8-bit RGBA PNG.
     pub fn to_png(&self) -> Result<Vec<u8>, CmError> {
         let mut out = Vec::new();
@@ -101,10 +150,99 @@ impl Frame {
     }
 }
 
+/// For each of `dst` output pixels along one axis, the source pixels it covers with their
+/// overlap lengths (fractional at the two ends).
+fn axis_spans(src: u32, dst: u32) -> Vec<Vec<(u32, f64)>> {
+    let ratio = f64::from(src) / f64::from(dst);
+    (0..dst)
+        .map(|d| {
+            let (a, b) = (f64::from(d) * ratio, f64::from(d + 1) * ratio);
+            let first = a.floor() as u32;
+            let last = (b.ceil() as u32).min(src);
+            (first..last)
+                .filter_map(|s| {
+                    let w = (b.min(f64::from(s) + 1.0) - a.max(f64::from(s))).max(0.0);
+                    (w > 0.0).then_some((s, w))
+                })
+                .collect()
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use cm_core::PhysicalPoint;
+
+    fn solid(w: u32, h: u32, px: [u8; 4]) -> Frame {
+        Frame::new(w, h, px.repeat(w as usize * h as usize)).unwrap()
+    }
+
+    #[test]
+    fn downscaled_keeps_a_small_frame_as_is() {
+        let f = gradient(40, 30);
+        assert_eq!(f.downscaled(40).unwrap(), f);
+        assert_eq!(f.downscaled(360).unwrap(), f);
+        assert!(f.downscaled(0).is_err());
+    }
+
+    #[test]
+    fn downscaled_keeps_aspect_and_limits_the_longer_edge() {
+        let d = solid(300, 100, [9, 8, 7, 255]).downscaled(60).unwrap();
+        assert_eq!((d.width(), d.height()), (60, 20));
+        let d = solid(100, 300, [9, 8, 7, 255]).downscaled(60).unwrap();
+        assert_eq!((d.width(), d.height()), (20, 60));
+        // Odd sizes: 101x51 -> 50 wide, 25.25 rounds to 25 high; never above the limit.
+        let d = solid(101, 51, [1, 2, 3, 255]).downscaled(50).unwrap();
+        assert_eq!((d.width(), d.height()), (50, 25));
+        assert!(d
+            .rgba()
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .all(|p| *p == [1, 2, 3, 255]));
+    }
+
+    #[test]
+    fn downscaled_never_makes_a_side_zero() {
+        let d = solid(1000, 1, [5, 5, 5, 255]).downscaled(10).unwrap();
+        assert_eq!((d.width(), d.height()), (10, 1));
+        let d = solid(1, 1, [5, 5, 5, 255]).downscaled(1).unwrap();
+        assert_eq!((d.width(), d.height()), (1, 1));
+        let d = solid(7, 5, [5, 5, 5, 255]).downscaled(1).unwrap();
+        assert_eq!((d.width(), d.height()), (1, 1));
+    }
+
+    #[test]
+    fn downscaled_averages_the_covered_pixels() {
+        // Left half black, right half white, halved to 2x1: exact halves.
+        let mut v = Vec::new();
+        for _ in 0..2 {
+            for x in 0..4 {
+                let c = if x < 2 { 0 } else { 255 };
+                v.extend_from_slice(&[c, c, c, 255]);
+            }
+        }
+        let d = Frame::new(4, 2, v).unwrap().downscaled(2).unwrap();
+        assert_eq!((d.width(), d.height()), (2, 1));
+        assert_eq!(d.pixel(0, 0), Some([0, 0, 0, 255]));
+        assert_eq!(d.pixel(1, 0), Some([255, 255, 255, 255]));
+        // A 3 -> 2 split blends the middle pixel: (0 * 1 + 255 * 0.5) / 1.5 = 85 in the left.
+        let v: Vec<u8> = [0u8, 255, 255]
+            .iter()
+            .flat_map(|&c| [c, c, c, 255])
+            .collect();
+        let d = Frame::new(3, 1, v).unwrap().downscaled(2).unwrap();
+        assert_eq!(d.pixel(0, 0), Some([85, 85, 85, 255]));
+        assert_eq!(d.pixel(1, 0), Some([255, 255, 255, 255]));
+    }
+
+    #[test]
+    fn downscaled_ignores_transparent_pixels_in_the_colour() {
+        let v = vec![255, 0, 0, 255, 0, 255, 0, 0];
+        let d = Frame::new(2, 1, v).unwrap().downscaled(1).unwrap();
+        assert_eq!(d.pixel(0, 0), Some([255, 0, 0, 128]));
+    }
 
     fn rect(x: i32, y: i32, w: u32, h: u32) -> PhysicalRect {
         PhysicalRect {

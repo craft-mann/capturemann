@@ -183,6 +183,28 @@ fn release_escape(cx: &App) {
 /// Starts a capture after `secs` seconds with the pill on screen. Ignored while another capture
 /// or delay is running (CAP-2).
 pub fn start(app: &Entity<AppModel>, mode: CaptureMode, secs: u32, cx: &mut App) {
+    start_inner(app, mode, secs, None, cx);
+}
+
+/// The same delay for a window already chosen in the window picker (R19): the daemon waits and
+/// then captures that window by id, Esc cancels like a delayed display capture (CAP-5.AC2).
+pub fn start_window(app: &Entity<AppModel>, window_id: u32, secs: u32, cx: &mut App) {
+    start_inner(
+        app,
+        CaptureMode::Window,
+        secs,
+        Some(json!({ "window_id": window_id })),
+        cx,
+    );
+}
+
+fn start_inner(
+    app: &Entity<AppModel>,
+    mode: CaptureMode,
+    secs: u32,
+    fixed_target: Option<serde_json::Value>,
+    cx: &mut App,
+) {
     let (backend, busy, seq) = {
         let m = app.read(cx);
         (m.backend.clone(), m.capture_busy, m.delay_seq + 1)
@@ -232,7 +254,12 @@ pub fn start(app: &Entity<AppModel>, mode: CaptureMode, secs: u32, cx: &mut App)
 
     // Display mode waits in the daemon: Esc is `cancel_delayed_capture(request_id)`.
     let display_id = target.and_then(|(id, _)| u32::try_from(u64::from(id)).ok());
-    if let (CaptureMode::Display, Some(display_id)) = (mode, display_id) {
+    let daemon_target = match (fixed_target, mode, display_id) {
+        (Some(t), _, _) => Some(t),
+        (None, CaptureMode::Display, Some(display_id)) => Some(json!({ "display_id": display_id })),
+        _ => None,
+    };
+    if let Some(daemon_target) = daemon_target {
         // A launcher action's one-off copy choice (LNC-1 Actions), else the setting. Region and
         // Window read it when the picker opens at the end of the delay.
         let copy = app::take_copy(app, cx);
@@ -244,7 +271,7 @@ pub fn start(app: &Entity<AppModel>, mode: CaptureMode, secs: u32, cx: &mut App)
                 .rt
                 .spawn(async move {
                     let params = json!({
-                        "target": {"display_id": display_id},
+                        "target": daemon_target,
                         "delay_s": secs,
                         "request_id": rid,
                     });

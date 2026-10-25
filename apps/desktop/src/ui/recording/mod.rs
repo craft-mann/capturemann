@@ -51,6 +51,7 @@ pub mod hud;
 pub mod indicator;
 pub mod sheet;
 pub mod transcript_card;
+pub mod window_list;
 
 use bubble::BubbleView;
 use countdown_view::CountdownView;
@@ -1381,7 +1382,10 @@ pub fn open_sheet_with(
         },
     );
     if let Ok(handle) = opened {
-        rec.update(cx, |r, _| r.sheet_win = Some(handle));
+        rec.update(cx, |r, cx| {
+            r.sheet_win = Some(handle);
+            cx.notify(); // the main window's scrim follows the sheet
+        });
         cx.activate(true);
     }
 }
@@ -1432,8 +1436,9 @@ pub fn is_active(app: &Entity<AppModel>, cx: &App) -> bool {
 /// Closes the start sheet and its setup bubble without recording.
 pub fn cancel_sheet(app: &Entity<AppModel>, cx: &mut App) {
     let rec = rec_of(app, cx);
-    let (sheet, was_setup) = rec.update(cx, |r, _| {
+    let (sheet, was_setup) = rec.update(cx, |r, cx| {
         let s = r.sheet_win.take();
+        cx.notify(); // the main window's scrim follows the sheet
         let setup = std::mem::take(&mut r.setup_preview);
         if setup {
             r.preview = None;

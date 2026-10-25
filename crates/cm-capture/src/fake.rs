@@ -64,7 +64,16 @@ impl FakeBackend {
             },
             scale: ScaleFactor::new(scale).unwrap_or(ScaleFactor::ONE),
             is_primary: self.displays.is_empty(),
+            is_builtin: false,
         });
+        self
+    }
+
+    /// Marks display `id` as the laptop's built-in panel (default: none is).
+    pub fn with_builtin(mut self, id: u32) -> Self {
+        for d in self.displays.iter_mut().filter(|d| d.id == id) {
+            d.is_builtin = true;
+        }
         self
     }
 

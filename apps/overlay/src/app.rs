@@ -57,6 +57,8 @@ pub struct Options {
     pub magnifier: bool,
     pub hint: bool,
     pub confirm_on_release: bool,
+    /// Window mode: Tab ends the overlay with [`Finish::SwitchToList`] (R19 "Pick on screen").
+    pub tab_to_list: bool,
     /// Benchmark: finish as soon as every display has painted its first frame.
     pub exit_after_first_frame: bool,
 }
@@ -67,6 +69,9 @@ pub enum Finish {
     Chosen(Choice),
     /// Esc, or every display went away (CAP-1.AC6): nothing is saved.
     Cancelled,
+    /// Tab in window mode with `tab_to_list`: nothing is captured, the desktop app shows its
+    /// window list instead.
+    SwitchToList,
     /// `exit_after_first_frame`: every display showed its first frame.
     FirstFrame,
 }
@@ -241,6 +246,11 @@ fn cursor_icon(h: CursorHint) -> CursorIcon {
         CursorHint::Resize(Handle::NorthEast | Handle::SouthWest) => CursorIcon::NeswResize,
         CursorHint::Resize(Handle::NorthWest | Handle::SouthEast) => CursorIcon::NwseResize,
     }
+}
+
+/// Tab, once (not a key repeat), when the desktop app asked for the hand-over.
+fn is_tab_to_list(enabled: bool, event: &winit::event::KeyEvent) -> bool {
+    enabled && !event.repeat && matches!(&event.logical_key, WinKey::Named(NamedKey::Tab))
 }
 
 fn map_key(event: &winit::event::KeyEvent, shift: bool) -> Option<Key> {
@@ -571,6 +581,7 @@ impl App {
                     text,
                     show_loupe: magnifier,
                     show_hint,
+                    tab_to_list: self.opts.tab_to_list,
                 };
                 if !paint(&mut canvas, frame, &scene) {
                     // Window and frame disagree (see the `mapping` trace): show black, not junk.
@@ -770,7 +781,10 @@ impl ApplicationHandler<()> for App {
                 self.submit_pointer(i, ev, el);
             }
             WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => {
-                if let Some(key) = map_key(&event, self.shift) {
+                if is_tab_to_list(self.opts.tab_to_list, &event) {
+                    self.finish = Some(Finish::SwitchToList);
+                    el.exit();
+                } else if let Some(key) = map_key(&event, self.shift) {
                     // Keys go to the display the pointer is on, not the window the OS made key.
                     let target = if self.active < self.views.len() {
                         self.active

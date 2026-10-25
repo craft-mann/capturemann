@@ -8,7 +8,8 @@ use crate::error::OverlayError;
 use crate::picker::Mode;
 
 pub const USAGE: &str = "usage: cm-overlay <region|window|display> [--socket PATH] \
-[--confirm-on-release] [--no-magnifier] [--no-hint] [--pick] [--exit-after-first-frame]
+[--confirm-on-release] [--no-magnifier] [--no-hint] [--pick] [--tab-to-list] \
+[--exit-after-first-frame]
 
 Shows a frozen, dimmed copy of every display and lets you pick a region (drag, then Enter),
 a window (click) or a display (click). Prints the capture as JSON on stdout.
@@ -20,6 +21,8 @@ Esc cancels (exit 3, nothing saved). Exit codes follow the shared error table.
   --no-hint             hide the key hints
   --pick                only choose: print the chosen target as JSON (`{\"picked\": ...}`) and take no
                         screenshot (the desktop app uses it to pick what to record)
+  --tab-to-list         window mode: Tab leaves the picker and prints {\"switch_to\": \"list\"} with no
+                        screenshot (the desktop app then shows its window list)
   --exit-after-first-frame
                         benchmark: print the phase timings (ms since process start) as JSON
                         and exit once every display has painted its first frame";
@@ -33,6 +36,8 @@ pub struct Args {
     pub hint: bool,
     /// Print the chosen target instead of capturing it (REC-1: the recording start sheet).
     pub pick: bool,
+    /// Window mode: Tab hands over to the desktop app's window list (R19).
+    pub tab_to_list: bool,
     pub exit_after_first_frame: bool,
 }
 
@@ -61,6 +66,7 @@ pub fn parse<I: IntoIterator<Item = String>>(
     let (mut confirm_on_release, mut magnifier, mut hint) = (false, true, true);
     let mut exit_after_first_frame = false;
     let mut pick = false;
+    let mut tab_to_list = false;
     let mut it = args.into_iter();
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -75,6 +81,7 @@ pub fn parse<I: IntoIterator<Item = String>>(
             "--no-magnifier" => magnifier = false,
             "--no-hint" => hint = false,
             "--pick" => pick = true,
+            "--tab-to-list" => tab_to_list = true,
             "--exit-after-first-frame" => exit_after_first_frame = true,
             "region" | "window" | "display" => {
                 if mode.is_some() {
@@ -105,6 +112,7 @@ pub fn parse<I: IntoIterator<Item = String>>(
         magnifier,
         hint,
         pick,
+        tab_to_list,
         exit_after_first_frame,
     }))
 }
@@ -128,6 +136,18 @@ mod tests {
             panic!("expected Run");
         };
         assert!(b.exit_after_first_frame);
+    }
+
+    #[test]
+    fn tab_to_list_flag_is_opt_in() {
+        let Ok(Parsed::Run(a)) = p(&["window", "--tab-to-list"]) else {
+            panic!("expected Run");
+        };
+        assert!(a.tab_to_list);
+        let Ok(Parsed::Run(b)) = p(&["window"]) else {
+            panic!("expected Run");
+        };
+        assert!(!b.tab_to_list);
     }
 
     #[test]

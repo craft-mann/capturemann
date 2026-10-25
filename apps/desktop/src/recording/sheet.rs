@@ -502,6 +502,24 @@ pub fn kind_icon(kind: TargetKind) -> &'static str {
 /// The icons of the three source rows, in order: webcam bubble, microphone, system audio.
 pub const SOURCE_ICONS: [&str; 3] = ["cm-webcam-bubble", "mic", "volume-2"];
 
+/// A source of the recording besides the screen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Source {
+    Webcam,
+    Microphone,
+    SystemAudio,
+}
+
+/// One Include chip of the Window kind (R20).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IncludeChip {
+    pub source: Source,
+    pub icon: &'static str,
+    pub label: String,
+    pub on: bool,
+    pub enabled: bool,
+}
+
 fn lines(text: &str) -> f64 {
     text.chars().count().div_ceil(row::CHARS_PER_LINE).max(1) as f64
 }
@@ -557,6 +575,9 @@ impl SheetModel {
                 SECTION_GAP + PROBLEM_PAD + CAPTION_LINE * lines(&message) + 6.0 + BUTTON
             }
         };
+        if self.kind == TargetKind::Window {
+            return self.window_heights(body);
+        }
         body += SECTION_GAP
             + match self.kind {
                 TargetKind::Display if self.displays.len() > 1 => CHIPS,
@@ -598,6 +619,90 @@ impl SheetModel {
             body,
             footer,
         }
+    }
+
+    /// R20: the Window kind replaces the target row and the three source rows with the window
+    /// list (a fixed-height block) and one row of Include chips; the problem notes and the camera
+    /// chips stay under that row. `body` is the height so far (top padding, kind tiles and the
+    /// listing problem card).
+    fn window_heights(&self, mut body: f64) -> SheetHeights {
+        use crate::recording::window_rows::{INCLUDE_ROW_H, LIST_BLOCK_H};
+        use row::*;
+        let note = |n: Option<Note>| match n {
+            None => 0.0,
+            Some(Note::Info(t)) => NOTE_GAP + CAPTION_LINE * lines(&t),
+            Some(Note::Problem { text, settings }) => {
+                NOTE_GAP + CAPTION_LINE * lines(&text) + if settings { 6.0 + BUTTON } else { 0.0 }
+            }
+        };
+        body += SECTION_GAP + f64::from(LIST_BLOCK_H);
+        body += SECTION_GAP + f64::from(INCLUDE_ROW_H);
+        if self.camera && self.devices.cameras.len() > 1 {
+            body += NOTE_GAP + CHIPS;
+        }
+        body += note(self.camera_note());
+        body += note(self.mic_note());
+        if let Some(t) = self.system_audio_note() {
+            body += NOTE_GAP + CAPTION_LINE * lines(&t);
+        }
+        body += BODY_BOTTOM;
+        let footer = FOOTER
+            + if self.blocker().is_some() {
+                BLOCKER
+            } else {
+                0.0
+            };
+        SheetHeights {
+            header: HEADER,
+            body,
+            footer,
+        }
+    }
+
+    /// R20: the three sources as compact toggle chips (same state and rules as the switch rows of
+    /// the other kinds: no camera or no system audio means a disabled chip, a blocked microphone
+    /// shows off).
+    pub fn include_chips(&self) -> [IncludeChip; 3] {
+        let [cam_icon, mic_icon, sys_icon] = SOURCE_ICONS;
+        let cam_enabled = self.camera_available();
+        let sys_enabled = self.system_audio_note().is_none();
+        [
+            IncludeChip {
+                source: Source::Webcam,
+                icon: cam_icon,
+                label: tr!("Webcam bubble"),
+                on: self.camera && cam_enabled,
+                enabled: cam_enabled,
+            },
+            IncludeChip {
+                source: Source::Microphone,
+                icon: mic_icon,
+                label: tr!("Microphone"),
+                on: self.mic && !self.devices.mic_permission.blocked(),
+                enabled: true,
+            },
+            IncludeChip {
+                source: Source::SystemAudio,
+                icon: sys_icon,
+                label: tr!("System audio"),
+                on: self.system_audio && sys_enabled,
+                enabled: sys_enabled,
+            },
+        ]
+    }
+
+    /// Flips a source; `false` when it cannot change (a disabled chip). The caller asks for the
+    /// OS permission after a turn-on and syncs the camera preview.
+    pub fn toggle_source(&mut self, source: Source) -> bool {
+        match source {
+            Source::Webcam if self.camera_available() => self.camera = !self.camera,
+            Source::Microphone => self.mic = !self.mic,
+            Source::SystemAudio if self.system_audio_note().is_none() => {
+                self.system_audio = !self.system_audio
+            }
+            _ => return false,
+        }
+        true
     }
 
     /// The caption of the webcam row (the live preview text when the bubble is on).
@@ -1043,13 +1148,27 @@ mod tests {
             window.footer > display.footer,
             "the reason line is in the footer"
         );
-        // R9: the chips row (32) is replaced by the Choose row (40).
+        // R20: the Window kind has the window list (a fixed-height block) and one Include row
+        // instead of the target row and the three source rows; Region keeps the Choose row.
+        use crate::recording::window_rows::{INCLUDE_ROW_H, LIST_BLOCK_H};
+        let list_and_chips = row::SECTION_GAP
+            + f64::from(LIST_BLOCK_H)
+            + row::SECTION_GAP
+            + f64::from(INCLUDE_ROW_H);
+        let source_card =
+            row::SECTION_GAP + row::CARD_BORDER + 3.0 * row::ROW + 2.0 * row::ROW_DIVIDER;
+        let display_target = row::SECTION_GAP + row::CHIPS;
         assert_eq!(
             window.body - display.body,
+            list_and_chips - display_target - source_card,
+            "the list and the chips replace the chips and the three rows"
+        );
+        assert_eq!(
+            region.body - display.body,
             row::BUTTON - row::CHIPS,
             "no chips, the Choose row instead"
         );
-        assert_eq!(window, region);
+        assert_eq!(window.footer, region.footer);
         assert!(window.total() > 0.0 && display.total() > 0.0);
         // A choice made through the picker clears the reason again.
         m.pick(Target::Display { display_id: 1 });
@@ -1200,6 +1319,107 @@ mod tests {
         let tall = initial_frame(&Rect::new(0.0, 38.0, 1512.0, 500.0), SHEET_WIDTH, 900.0);
         assert_eq!(tall.y, 38.0 + SHEET_MARGIN);
         assert_eq!(tall.h, 500.0 - 2.0 * SHEET_MARGIN);
+    }
+
+    // ---- R20: the Window kind --------------------------------------------------------------
+
+    /// Start stays off, with the existing footer reason, until a window is chosen; choosing one
+    /// in the list (a `Target::Window`) turns it on and the request carries that window.
+    #[test]
+    fn r20_start_needs_a_chosen_window() {
+        let mut m = sheet();
+        m.set_kind(TargetKind::Window);
+        assert_eq!(m.blocker().as_deref(), Some("Choose a window to record."));
+        assert!(m.options().is_none());
+        assert_eq!(m.target_summary(), "Choose a window");
+        m.pick(Target::Window { window_id: 42 });
+        assert!(m.blocker().is_none());
+        assert_eq!(
+            m.options().unwrap().target,
+            Target::Window { window_id: 42 }
+        );
+        // A pick of a window on the Display kind switches the kind, as before.
+        let mut d = sheet();
+        d.pick(Target::Window { window_id: 7 });
+        assert_eq!(d.kind, TargetKind::Window);
+        // Switching away drops the window.
+        d.set_kind(TargetKind::Display);
+        assert_eq!(d.picked, None);
+    }
+
+    /// The chips carry the same state as the switch rows and the same limits.
+    #[test]
+    fn r20_chips_follow_the_sources() {
+        let mut m = sheet();
+        m.camera = false;
+        m.mic = true;
+        m.system_audio = false;
+        let chips = m.include_chips();
+        assert_eq!(chips.clone().map(|c| c.on), [false, true, false]);
+        assert!(chips.iter().all(|c| c.enabled));
+        assert_eq!(
+            chips.clone().map(|c| c.label),
+            ["Webcam bubble", "Microphone", "System audio"]
+        );
+        assert_eq!(chips.map(|c| c.icon), SOURCE_ICONS);
+        // Toggling flips the same fields the switches flip, and what Start sends follows.
+        assert!(m.toggle_source(Source::Webcam));
+        assert!(m.toggle_source(Source::SystemAudio));
+        assert!(m.toggle_source(Source::Microphone));
+        assert_eq!(m.include_chips().map(|c| c.on), [true, false, true]);
+        m.pick(Target::Window { window_id: 1 });
+        let o = m.options().unwrap();
+        assert!(o.camera.is_some() && !o.mic && o.system_audio);
+    }
+
+    #[test]
+    fn r20_unavailable_sources_are_disabled_chips() {
+        let mut m = sheet();
+        m.camera = true;
+        m.system_audio = true;
+        let mut v = devices_json();
+        v["cameras"] = json!([]);
+        v["system_audio"] =
+            json!({"supported": false, "reason": "System audio needs macOS 13 or later"});
+        v["microphone_permission"] = json!("denied");
+        m.set_devices(Devices::parse(&v));
+        let chips = m.include_chips();
+        // No camera: off and disabled. No system audio: off and disabled. Mic blocked: off.
+        assert_eq!(
+            chips.clone().map(|c| (c.on, c.enabled)),
+            [(false, false), (false, true), (false, false)]
+        );
+        let before = m.clone();
+        assert!(!m.toggle_source(Source::Webcam));
+        assert!(!m.toggle_source(Source::SystemAudio));
+        assert_eq!(m, before, "a disabled chip changes nothing");
+    }
+
+    /// Notes under the chips grow the sheet, the list block is fixed and the footer stays whole.
+    #[test]
+    fn r20_window_layout_is_fixed_list_plus_notes() {
+        let mut m = sheet();
+        m.set_kind(TargetKind::Window);
+        m.camera = false;
+        let calm = m.heights();
+        m.camera = true;
+        // Two cameras: the camera chips appear under the Include row.
+        assert!(m.heights().body > calm.body + 30.0);
+        let tall = {
+            let mut t = tallest();
+            t.set_kind(TargetKind::Window);
+            t
+        };
+        assert!(tall.heights().body > calm.body + 100.0);
+        for visible in [300.0, 600.0, 900.0, 1400.0] {
+            let h = tall.heights();
+            assert!(split(&h, fit_height(&h, visible)).footer_visible);
+        }
+        // The list area is a fixed height, so the body does not depend on how many windows
+        // there are; choosing one changes the body not at all.
+        let body = m.heights().body;
+        m.pick(Target::Window { window_id: 3 });
+        assert_eq!(m.heights().body, body);
     }
 
     /// I18N P2: the model's texts are produced when asked, so they follow the language.

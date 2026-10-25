@@ -125,7 +125,11 @@ pub const TEMPLATES: &[Template] = &[
         "FFmpeg at `{path}` cannot be run (permission denied). FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy.",
     ),
     // Targets.
-    t("no_display", ErrorCode::NotFound, "No display found"),
+    t(
+        "no_display",
+        ErrorCode::NotFound,
+        "No display found. If the screen is locked or asleep, unlock it and try again.",
+    ),
     t(
         "display_not_found",
         ErrorCode::NotFound,

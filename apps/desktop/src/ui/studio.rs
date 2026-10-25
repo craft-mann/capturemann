@@ -130,8 +130,11 @@ impl Studio {
         let focus = cx.focus_handle();
         let app2 = app.clone();
         let app3 = app.clone();
+        let rec_for_scrim = app.read(cx).rec.clone();
         let subs = vec![
             cx.observe(&app, |_, _, cx| cx.notify()),
+            // The Record sheet opening or closing dims or clears the main window.
+            cx.observe(&rec_for_scrim, |_, _, cx| cx.notify()),
             window.observe_window_appearance(move |_, cx| app::apply_theme(&app2, cx)),
             // R1-6: when the window comes to the front, look at the bundle folders (throttled).
             cx.observe_window_activation(window, move |_, window, cx| {
@@ -299,6 +302,10 @@ impl Render for Studio {
             ))
         .then(|| self.title_row(&t, &route, &counts));
         let app_for_search = app.clone();
+        let dim = {
+            let m = self.app.read(cx);
+            modal_dim_wanted(m.rec.read(cx).sheet_win.is_some(), m.confirms_open())
+        };
         div()
             .id("studio")
             .role(Role::Application)
@@ -331,6 +338,7 @@ impl Render for Studio {
             })
             .on_action(|_: &CloseWindow, window, _| window.remove_window())
             .size_full()
+            .relative()
             .flex()
             .bg(rgba_of(t.ground))
             .text_color(rgba_of(t.text))
@@ -350,12 +358,40 @@ impl Render for Studio {
                     .children(title)
                     .child(div().flex_1().min_h(px(0.)).child(main)),
             )
+            // Board R9/R20: the app behind a pop-up sheet or dialog is greyed out, and a click on
+            // it does nothing (the pop-up is a window of its own, so this is only a tint here).
+            .when(dim, |d| {
+                d.child(
+                    div()
+                        .id("modal-scrim")
+                        .absolute()
+                        .top_0()
+                        .left_0()
+                        .size_full()
+                        .bg(rgba_of(t.modal_scrim))
+                        .occlude(),
+                )
+            })
     }
+}
+
+/// Whether the main window is dimmed: the Record sheet or a confirmation dialog is open.
+/// The window picker and the launcher are not (their boards show the real desktop behind them).
+pub(crate) fn modal_dim_wanted(sheet_open: bool, confirms_open: usize) -> bool {
+    sheet_open || confirms_open > 0
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_main_window_is_dimmed_only_behind_the_sheet_or_a_dialog() {
+        assert!(!modal_dim_wanted(false, 0));
+        assert!(modal_dim_wanted(true, 0));
+        assert!(modal_dim_wanted(false, 1));
+        assert!(modal_dim_wanted(true, 2));
+    }
 
     /// I18N P2: the menu bar is built by one function (rebuilt on a language switch); in English
     /// it has the same items as before.

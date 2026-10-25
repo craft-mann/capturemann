@@ -103,6 +103,7 @@ pub fn run(args: &Args, started: Instant) -> Result<Value, OverlayError> {
         magnifier: args.magnifier,
         hint: args.hint,
         confirm_on_release: args.confirm_on_release,
+        tab_to_list: args.tab_to_list && args.mode == picker::Mode::Window,
         exit_after_first_frame: args.exit_after_first_frame,
     };
     // Windows are closed when `app::run` returns, before the final capture is taken.
@@ -136,6 +137,10 @@ pub fn run(args: &Args, started: Instant) -> Result<Value, OverlayError> {
             finish: Finish::Cancelled,
             ..
         }) => Err(OverlayError::cancelled()),
+        Ok(app::Finished {
+            finish: Finish::SwitchToList,
+            ..
+        }) => Ok(json!({ "switch_to": "list" })),
         Ok(app::Finished {
             finish: Finish::FirstFrame,
             ..

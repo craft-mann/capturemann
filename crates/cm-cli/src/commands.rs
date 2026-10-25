@@ -351,9 +351,14 @@ async fn targets(cx: &mut Ctx<'_>, displays_only: bool) -> Result<(), CliError> 
         for d in r["displays"].as_array().into_iter().flatten() {
             let _ = writeln!(
                 s,
-                "  {}  {}  {}  scale {}{}",
+                "  {}  {}{}  {}  scale {}{}",
                 d["id"],
                 plain(&d["name"]),
+                if d["is_builtin"] == json!(true) {
+                    " (built-in)"
+                } else {
+                    ""
+                },
                 rect_text(&d["bounds"]),
                 d["scale"],
                 if d["is_primary"] == json!(true) {

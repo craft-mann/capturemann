@@ -397,7 +397,8 @@ pub fn all() -> Vec<ToolSpec> {
         "properties": {
             "displays": { "type": "array", "items": { "type": "object", "properties": {
                 "id": { "type": "integer" }, "name": { "type": "string" },
-                "bounds": { "type": "object" }, "scale": {}, "is_primary": { "type": "boolean" } },
+                "bounds": { "type": "object" }, "scale": {}, "is_primary": { "type": "boolean" },
+                "is_builtin": { "type": "boolean" } },
                 "required": ["id", "bounds", "scale"] } },
             "windows": { "type": "array", "items": { "type": "object", "properties": {
                 "id": { "type": "integer" }, "title": { "type": "string" }, "app": { "type": "string" },

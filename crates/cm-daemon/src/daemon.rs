@@ -992,6 +992,7 @@ impl Daemon {
             Action::CaptureFromFrame(p) => inner.capture_from_frame(actor, p).await,
             Action::FreezeDisplay(p) => inner.freeze_display(actor, p).await,
             Action::ReleaseFrame(p) => inner.release_frame(&p),
+            Action::WindowThumbnail(p) => inner.window_thumbnail(p).await,
             Action::GetJob(p) => inner.get_job(p).await,
             Action::ListJobs(p) => inner.list_jobs(p).await,
             Action::CancelJob(p) => inner.cancel_job(p).await,
