@@ -247,8 +247,22 @@ fn start_error_toast_now(
 }
 
 /// REC-5: the agent toast for a recording an agent started.
-pub fn agent_started_toast(client: &str, tool: &str) -> ToastSpec {
-    ToastSpec::agent(tool, client)
+pub fn agent_started_toast(client: &str, tool: &str, recording_id: Option<&str>) -> ToastSpec {
+    match recording_id {
+        Some(id) => ToastSpec::agent_with_stop(tool, client, id),
+        None => ToastSpec::agent(tool, client),
+    }
+}
+
+/// Whether the Stop button of an agent toast still has something to stop: recording `id` is the
+/// one in progress (running, paused or resuming), not a later take and not one already ending.
+pub fn stop_applies(
+    phase: crate::recording::model::Phase,
+    current: Option<&str>,
+    id: &str,
+) -> bool {
+    use crate::recording::model::Phase;
+    current == Some(id) && matches!(phase, Phase::Recording | Phase::Paused | Phase::Resuming)
 }
 
 #[cfg(test)]
@@ -469,12 +483,33 @@ mod tests {
     /// AGT-2 / DESIGN 4: the agent toast carries the tool and the client.
     #[test]
     fn agent_toast_text() {
-        let t = agent_started_toast("claude-desktop", "start_recording");
+        let t = agent_started_toast("claude-desktop", "start_recording", Some("rec_1"));
         assert_eq!(t.title, "Started by agent via MCP");
+        assert_eq!(t.buttons.len(), 1);
+        assert_eq!(
+            t.buttons[0].action,
+            ToastAction::StopRecording("rec_1".into())
+        );
+        assert!(agent_started_toast("c", "t", None).buttons.is_empty());
         let a = t.agent.unwrap();
         assert_eq!(
             (a.tool.as_str(), a.client.as_str()),
             ("start_recording", "claude-desktop")
         );
+    }
+
+    /// The agent toast's Stop only acts on the recording it was made for, while it runs.
+    #[test]
+    fn stop_applies_only_to_the_running_recording() {
+        use crate::recording::model::Phase;
+        assert!(stop_applies(Phase::Recording, Some("r1"), "r1"));
+        assert!(stop_applies(Phase::Paused, Some("r1"), "r1"));
+        assert!(!stop_applies(Phase::Stopping, Some("r1"), "r1"));
+        assert!(!stop_applies(Phase::Idle, None, "r1"));
+        assert!(
+            !stop_applies(Phase::Recording, Some("r2"), "r1"),
+            "a later take"
+        );
+        assert!(!stop_applies(Phase::Countdown, Some("r1"), "r1"));
     }
 }

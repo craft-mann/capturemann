@@ -26,6 +26,7 @@ use image::Frame;
 
 use crate::poster::decode_poster;
 use crate::publish::backend as pback;
+use crate::publish::cancel::{CancelState, Step};
 use crate::publish::form::{privacy_note, Check, Field, PublishForm, Quota, Readiness};
 use crate::publish::job::{Failure, Outcome, OwnFailure, Tracker};
 use crate::publish::sheet::{progress_text, request_key, retry_key, Stage, View};
@@ -35,6 +36,7 @@ use crate::recording::exports::Phase as ExportPhase;
 use crate::recording::files::{self, Details};
 use crate::recording::model::clock_text;
 use crate::theme::{scale, type_scale, Theme};
+use crate::toast::{ToastKind, ToastSpec};
 use crate::ui::app::{self, AppModel, Route};
 use crate::ui::components::{
     button, button_with_icon, card, icon, icon_button, label_fill, shrink_text, switch, ButtonKind,
@@ -170,6 +172,8 @@ pub struct PublishPage {
     accounts_error: Option<String>,
     quota: Option<Quota>,
     stage: Stage,
+    /// Cancel was pressed for the running job and it has not stopped yet.
+    cancel: CancelState,
     thumb: Thumb,
     counter: u64,
     copied: bool,
@@ -286,6 +290,7 @@ impl PublishPage {
             accounts_error: None,
             quota: None,
             stage: Stage::Editing,
+            cancel: CancelState::default(),
             thumb: Thumb::default(),
             counter: 0,
             copied: false,
@@ -673,15 +678,19 @@ impl PublishPage {
         cx.notify();
     }
 
-    /// Asks `get_job` every few seconds until the job has ended, so a result is never missed
-    /// (events are lossy for a slow client).
+    /// Asks `get_job` every few seconds (every half second while a cancel is pending) until the
+    /// job has ended, so a result is never missed (events are lossy for a slow client, and a
+    /// cancelled job sends none).
     fn watch_job(&mut self, job_id: String, cx: &mut Context<Self>) {
         let Some(daemon) = self.app.read(cx).backend.daemon.clone() else {
             return;
         };
         let rt = self.app.read(cx).backend.rt.clone();
         self.tasks.push(cx.spawn(async move |this, cx| loop {
-            cx.background_executor().timer(Duration::from_secs(3)).await;
+            let wait = this
+                .update(cx, |this, _| this.cancel.poll_interval())
+                .unwrap_or(crate::publish::cancel::POLL_IDLE);
+            cx.background_executor().timer(wait).await;
             let id = job_id.clone();
             let d = daemon.clone();
             let answer = rt.spawn(async move { pback::job(&d, &id).await }).await;
@@ -693,15 +702,122 @@ impl PublishPage {
                     if this.stage != Stage::Job(job_id.clone()) {
                         return false;
                     }
-                    lock(&TRACKER).on_job(&job);
-                    cx.notify();
-                    matches!(job["state"].as_str(), Some("queued" | "running" | "paused"))
+                    this.apply_job(&job_id, &job, cx)
                 })
                 .unwrap_or(false);
             if !keep_going {
                 break;
             }
         }));
+    }
+
+    /// Takes a `get_job` answer; `true` while the job is still going.
+    fn apply_job(&mut self, job_id: &str, job: &serde_json::Value, cx: &mut Context<Self>) -> bool {
+        let state = job["state"].as_str().unwrap_or_default();
+        let step = self.cancel.on_job(job_id, state);
+        if !self.apply_cancel_step(job_id, step, cx) {
+            return false;
+        }
+        lock(&TRACKER).on_job(job);
+        cx.notify();
+        matches!(state, "queued" | "running" | "paused")
+    }
+
+    /// Acts on what a cancel answer or job state meant. Returns `false` when the page went back
+    /// to the form (the job was cancelled), `true` otherwise.
+    fn apply_cancel_step(&mut self, job_id: &str, step: Step, cx: &mut Context<Self>) -> bool {
+        match step {
+            Step::Wait => true,
+            Step::Cancelled => {
+                lock(&TRACKER).reset(job_id);
+                self.stage = Stage::Editing;
+                app::push_toast(
+                    &self.app,
+                    ToastSpec::new(ToastKind::Info, tr!("Publish cancelled")),
+                    cx,
+                );
+                cx.notify();
+                false
+            }
+            Step::Ended => {
+                // The job finished by itself: its result is read like any other.
+                self.poll_job_now(job_id.to_owned(), cx);
+                true
+            }
+            Step::Error { message, .. } => {
+                app::push_toast(
+                    &self.app,
+                    crate::flows::error_toast_live(
+                        || tr!("Couldn\u{2019}t cancel the publish"),
+                        message,
+                    ),
+                    cx,
+                );
+                cx.notify();
+                true
+            }
+        }
+    }
+
+    /// One `get_job` now (after a cancel that raced the end of the job).
+    fn poll_job_now(&mut self, job_id: String, cx: &mut Context<Self>) {
+        let Some(daemon) = self.app.read(cx).backend.daemon.clone() else {
+            return;
+        };
+        let rt = self.app.read(cx).backend.rt.clone();
+        self.tasks.push(cx.spawn(async move |this, cx| {
+            let id = job_id.clone();
+            let answer = rt
+                .spawn(async move { pback::job(&daemon, &id).await })
+                .await;
+            if let Ok(Ok(job)) = answer {
+                this.update(cx, |this, cx| {
+                    if this.stage == Stage::Job(job_id.clone()) {
+                        lock(&TRACKER).on_job(&job);
+                        cx.notify();
+                    }
+                })
+                .ok();
+            }
+        }));
+    }
+
+    /// Cancel on the progress line: no question, `cancel_job` as the user, "Cancelling..."
+    /// until the job has stopped.
+    fn cancel_publish(&mut self, cx: &mut Context<Self>) {
+        let Stage::Job(job_id) = self.stage.clone() else {
+            return;
+        };
+        let running = matches!(self.stage.view(&lock(&TRACKER)), View::Running { .. });
+        if !self.cancel.press(&job_id, running) {
+            return;
+        }
+        let Some(daemon) = self.app.read(cx).backend.daemon.clone() else {
+            self.cancel = CancelState::Idle;
+            return;
+        };
+        let rt = self.app.read(cx).backend.rt.clone();
+        let id = job_id.clone();
+        let work = rt.spawn(async move { pback::cancel(&daemon, &id).await });
+        self.tasks.push(cx.spawn(async move |this, cx| {
+            let result = work.await;
+            this.update(cx, |this, cx| {
+                if this.stage != Stage::Job(job_id.clone()) {
+                    return;
+                }
+                let step = match &result {
+                    Ok(Ok(job)) => this.cancel.on_reply(&job_id, Ok(job)),
+                    Ok(Err(e)) => this
+                        .cancel
+                        .on_reply(&job_id, Err((e.code, e.message.as_str()))),
+                    Err(e) => this.cancel.on_reply(&job_id, Err((None, &e.to_string()))),
+                };
+                this.apply_cancel_step(&job_id, step, cx);
+                cx.notify();
+            })
+            .ok();
+        }));
+        cx.notify();
     }
 
     /// Retry on a failed job (`retry_job`); the upload continues from the confirmed byte.
@@ -850,6 +966,8 @@ impl Render for PublishPage {
             self.relabel(cx);
         }
         self.sync_form(cx);
+        let running = matches!(self.stage.view(&lock(&TRACKER)), View::Running { .. });
+        self.cancel.sync(running);
         let slider_focused = self.thumb_focus.is_focused(window);
         let header = self.header(&t, cx);
         let (body, footer): (AnyElement, Option<AnyElement>) = match &self.load {
@@ -1756,9 +1874,9 @@ impl PublishPage {
                     View::Failed(f) => Some(self.failure_block(t, f, cx)),
                     _ => None,
                 };
-                // TODO(design): the board has a Cancel button next to Publish; the back button
-                // leaves the page and the page has no cancel of its own (an upload runs on in
-                // the background), so none is drawn.
+                // The board's Cancel next to Publish only leaves the page, which the back button
+                // already does, so none is drawn here; cancelling a running upload is on the
+                // progress line (no board draws that state).
                 let (publish, status): (AnyElement, AnyElement) = match &check.blocker {
                     None => (
                         button_with_icon(
@@ -1823,17 +1941,56 @@ impl PublishPage {
                 .text_size(px(type_scale::UI))
                 .child(SharedString::from(tr!("Waiting for your confirmation. A dialog asks you to confirm the channel, visibility, title and file before anything is sent.")))
                 .into_any_element()]),
-            View::Running { progress, message } => bar(vec![
-                div()
-                    .id("pub-progress")
-                    .role(Role::Status)
-                    .text_size(px(type_scale::UI))
-                    .child(SharedString::from(progress_text(*progress, message.as_deref())))
-                    .into_any_element(),
-                progress_bar(t, *progress).into_any_element(),
-                caption(t, tr!("You can leave this page; the upload continues in the background and resumes if the connection drops."))
-                    .into_any_element(),
-            ]),
+            View::Running { progress, message } => {
+                let cancelling =
+                    matches!(&self.stage, Stage::Job(j) if self.cancel.is_cancelling(j));
+                let line = if cancelling {
+                    tr!("Cancelling\u{2026}")
+                } else {
+                    progress_text(*progress, message.as_deref())
+                };
+                let stop: AnyElement = if cancelling {
+                    disabled_button(
+                        t,
+                        "pub-cancel",
+                        &tr_ctx!("button", "Cancelling\u{2026}"),
+                        &tr!("The upload is stopping."),
+                        false,
+                    )
+                    .into_any_element()
+                } else {
+                    button(
+                        t,
+                        "pub-cancel",
+                        tr_ctx!("button", "Cancel"),
+                        ButtonKind::Secondary,
+                    )
+                    .aria_label(SharedString::from(tr!("Cancel the upload to YouTube")))
+                    .on_click(cx.listener(|this, _, _, cx| this.cancel_publish(cx)))
+                    .into_any_element()
+                };
+                bar(vec![
+                    div()
+                        .flex()
+                        .flex_wrap()
+                        .items_center()
+                        .gap(px(16.))
+                        .child(
+                            div()
+                                .id("pub-progress")
+                                .role(Role::Status)
+                                .flex_1()
+                                .min_w(px(240.))
+                                .text_size(px(type_scale::UI))
+                                .child(SharedString::from(line)),
+                        )
+                        .child(stop)
+                        .into_any_element(),
+                    progress_bar(t, *progress).into_any_element(),
+                    caption(t, tr!("You can leave this page; the upload continues in the background and resumes if the connection drops."))
+                        .into_any_element(),
+                ])
+            }
             View::Done(o) => bar(self.done_block(t, o, cx)),
         }
     }

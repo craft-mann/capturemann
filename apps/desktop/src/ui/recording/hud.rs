@@ -42,7 +42,8 @@ enum HudHint {
     Stop,
     Resume,
     Pause,
-    MicOn,
+    MicMute,
+    MicUnmute,
     MicOff,
     WebcamOff,
     HideBubble,
@@ -59,7 +60,8 @@ impl HudHint {
             HudHint::Stop => tr!("Stop recording"),
             HudHint::Resume => tr_ctx!("recording hud", "Resume"),
             HudHint::Pause => tr_ctx!("recording hud", "Pause"),
-            HudHint::MicOn => tr!("Microphone is recording. Muting isn\u{2019}t available yet."),
+            HudHint::MicMute => tr!("Mute microphone"),
+            HudHint::MicUnmute => tr!("Unmute microphone"),
             HudHint::MicOff => tr!("Microphone is off for this recording"),
             HudHint::WebcamOff => tr!("Webcam off for this recording"),
             HudHint::HideBubble => tr!("Hide webcam bubble"),
@@ -76,8 +78,8 @@ impl HudHint {
 pub(crate) fn all_hints() -> Vec<String> {
     use HudHint::*;
     [
-        CancelTest, Stop, Resume, Pause, MicOn, MicOff, WebcamOff, HideBubble, ShowBubble, Draw,
-        Restart, Discard,
+        CancelTest, Stop, Resume, Pause, MicMute, MicUnmute, MicOff, WebcamOff, HideBubble,
+        ShowBubble, Draw, Restart, Discard,
     ]
     .into_iter()
     .map(HudHint::text)
@@ -245,6 +247,7 @@ impl Render for HudView {
         let key = |a: ShortcutAction| shortcuts.get(a).keycaps(platform);
         let bubble_shown = state.camera_on() && !state.bubble_hidden;
         let mic_on = state.mic_on();
+        let mic_btn = hud_layout::MicButton::new(mic_on, state.mic_is_muted(), live);
         let bars = mic_bars(if paused { None } else { state.mic_dbfs });
 
         // Pulse: the dot blinks once a second while recording, rests in `mist` while paused.
@@ -364,40 +367,44 @@ impl Render for HudView {
         })
         .child(icon(hud_layout::pause_icon(paused), 18., t.text));
 
-        // Mic: a level meter and the state. Muting is not an engine feature yet, so the button
-        // reports and does not pretend (REC-5.AC15).
+        // Mic: a level meter and the mute toggle (AUD-6). The track keeps running; muted time is
+        // silence in the files. Dead, with its reason as the hint, when the take has no mic.
+        let mic_hint = if !mic_btn.has_mic {
+            HudHint::MicOff
+        } else if mic_btn.muted {
+            HudHint::MicUnmute
+        } else {
+            HudHint::MicMute
+        };
         let mic = hud_button(
             &t,
             "hud-mic",
-            &if mic_on {
-                tr!("Microphone on, level meter")
-            } else {
-                tr!("Microphone off")
-            },
-            mic_on,
-            false,
+            &mic_btn.label(),
+            mic_btn.muted,
+            mic_btn.enabled,
         )
         .on_hover(cx.listener(move |this, over: &bool, _, cx| {
-            this.set_hint(
-                over.then(|| {
-                    (
-                        if mic_on {
-                            HudHint::MicOn
-                        } else {
-                            HudHint::MicOff
-                        },
-                        Vec::new(),
-                    )
-                }),
-                cx,
-            );
+            this.set_hint(over.then(|| (mic_hint, Vec::new())), cx);
         }))
+        .when(mic_btn.enabled, |d| {
+            let app = app.clone();
+            d.on_click(move |_, _, cx| {
+                let app = app.clone();
+                cx.defer(move |cx| rec::toggle_mic_mute(&app, cx));
+            })
+        })
         .child(div().mt(px(-5.)).child(icon(
-            hud_layout::mic_icon(mic_on),
+            mic_btn.icon(),
             18.,
-            if mic_on { t.text } else { t.mist },
+            if mic_btn.muted {
+                t.rec_soft
+            } else if mic_btn.off {
+                t.mist
+            } else {
+                t.text
+            },
         )))
-        .when(mic_on, |d| d.child(meter(&t, bars, true)));
+        .when(mic_on && !mic_btn.muted, |d| d.child(meter(&t, bars, true)));
 
         let cam_on = state.camera_on();
         let webcam_hint = if !cam_on {

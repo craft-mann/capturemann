@@ -21,6 +21,7 @@ mod fake;
 pub mod level;
 mod mic;
 pub mod mix;
+pub mod mute;
 mod permission;
 pub mod pipeline;
 pub mod playback;
@@ -41,6 +42,7 @@ pub use level::{to_dbfs, Level, LevelHandle, LevelMeter, FLOOR_DBFS};
 pub use mic::{
     cpal_mic_factory, MicConfig, MicMonitor, MicRecorder, MIC_DENOISED_FILE, MIC_RAW_FILE,
 };
+pub use mute::{MuteChange, MuteControl, MuteSpan};
 pub use permission::{
     microphone_permission, request_microphone_access, require_microphone,
     screen_recording_permission, PermissionState,

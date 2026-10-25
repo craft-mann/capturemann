@@ -261,7 +261,7 @@ impl ServerHandler for McpServer {
                  call is one undo step), suggest_redactions (read-only: proposes blur \
                  rectangles, apply the ones you accept with annotate), get_capture. Recording: list_devices, start_recording \
                  (the user approves on screen and sees a countdown), get_recording_status, \
-                 pause_recording / resume_recording, stop_recording (returns the capture id); \
+                 pause_recording / resume_recording, set_mic_muted (mute the mic without stopping it), stop_recording (returns the capture id); \
                  60 fps needs a passing run_fps_selftest first. \
                  Read-only resources (resources/list and resources/templates/list): the library, \
                  jobs, a capture, its transcript and the platform rules. Prompts (prompts/list): \

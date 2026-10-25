@@ -60,6 +60,7 @@ pub const CLI_COMMANDS: &[(&str, Option<&str>)] = &[
     ("start_recording", Some("record start")),
     ("pause_recording", Some("record pause")),
     ("resume_recording", Some("record resume")),
+    ("set_mic_muted", Some("record mic")),
     ("stop_recording", Some("record stop")),
     ("get_recording_status", Some("record status")),
     ("list_devices", Some("devices")),

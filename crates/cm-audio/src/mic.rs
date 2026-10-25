@@ -104,6 +104,17 @@ impl MicRecorder {
         self.inner.device_format()
     }
 
+    /// Mutes or unmutes the track without stopping it (AUD-6): see
+    /// [`AudioRecorder::set_muted`].
+    pub fn set_muted(&self, muted: bool) -> Result<crate::MuteChange, CmError> {
+        self.inner.set_muted(muted)
+    }
+
+    /// Whether the microphone is muted now.
+    pub fn is_muted(&self) -> bool {
+        self.inner.is_muted()
+    }
+
     /// Test hook: the raw file fails (disk full) after `bytes` of audio.
     #[doc(hidden)]
     #[must_use]

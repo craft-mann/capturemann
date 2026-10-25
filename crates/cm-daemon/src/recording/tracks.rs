@@ -9,7 +9,7 @@
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use cm_audio::{AudioEvent, LevelHandle, MicRecorder, SystemAudioRecorder};
+use cm_audio::{AudioEvent, LevelHandle, MicRecorder, MuteChange, SystemAudioRecorder};
 use cm_camera::{CameraRecorder, RecorderEvent as CameraEvent};
 use cm_capture::record::{
     CapturePlan, HaltReason, RecorderEvent as ScreenEvent, RecorderOptions, ScreenRecorder,
@@ -110,6 +110,11 @@ pub trait SessionTrack: Send {
     /// Events since the last call. Called by the session's `tick`.
     fn poll(&mut self) -> Vec<TrackNote> {
         Vec::new()
+    }
+
+    /// Mutes or unmutes the track without stopping it (AUD-6; only the microphone can).
+    fn set_muted(&mut self, _muted: bool) -> Result<MuteChange, CmError> {
+        Err(CmError::invalid_input("This track cannot be muted"))
     }
 
     /// The live meter (mic and system audio).
@@ -376,7 +381,7 @@ pub fn planned_bitrate_bps(
 }
 
 macro_rules! audio_track {
-    ($name:ident, $rec:ty, $kind:expr, $what:literal) => {
+    ($name:ident, $rec:ty, $kind:expr, $what:literal $(, { $($extra:item)* })?) => {
         #[doc = concat!("The ", $what, " track (optional).")]
         pub struct $name {
             rec: $rec,
@@ -433,11 +438,16 @@ macro_rules! audio_track {
             fn recovery_hint(&self) -> Option<Value> {
                 self.rec.recovery_hint()
             }
+            $($($extra)*)?
         }
     };
 }
 
-audio_track!(MicTrack, MicRecorder, TrackKind::Mic, "microphone");
+audio_track!(MicTrack, MicRecorder, TrackKind::Mic, "microphone", {
+    fn set_muted(&mut self, muted: bool) -> Result<MuteChange, CmError> {
+        self.rec.set_muted(muted)
+    }
+});
 audio_track!(
     SystemAudioTrack,
     SystemAudioRecorder,

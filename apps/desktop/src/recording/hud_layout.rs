@@ -66,13 +66,57 @@ pub fn pause_icon(paused: bool) -> &'static str {
         "rec-pause"
     }
 }
-/// The mic is read-only (no mute action exists): the slashed icon means off for this take. The kit
-/// has no `mic-off`, so the app's `rec-mic-off` stays.
+/// The mic: the slashed icon means off for this take or muted (AUD-6). The kit has no
+/// `mic-off`, so the app's `rec-mic-off` stays.
 pub fn mic_icon(on: bool) -> &'static str {
     if on {
         "mic"
     } else {
         "rec-mic-off"
+    }
+}
+
+/// What the Mic button is and does (AUD-6): a toggle for the mute while the take has a mic
+/// track, dead (with the reason as its hint) when it has none or the take is not live.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MicButton {
+    /// Click toggles the mute.
+    pub enabled: bool,
+    /// The slashed, red-tinted state: muted, or no microphone at all.
+    pub off: bool,
+    pub muted: bool,
+    pub has_mic: bool,
+}
+
+impl MicButton {
+    pub fn new(has_mic: bool, muted: bool, live: bool) -> Self {
+        MicButton {
+            enabled: has_mic && live,
+            off: !has_mic || muted,
+            muted: has_mic && muted,
+            has_mic,
+        }
+    }
+
+    /// The icon for this state.
+    pub fn icon(&self) -> &'static str {
+        mic_icon(!self.off)
+    }
+
+    /// The text that goes in the hint strip.
+    pub fn hint_is_unmute(&self) -> bool {
+        self.muted
+    }
+
+    /// The accessible label: the action a click does, or the reason it does nothing.
+    pub fn label(&self) -> String {
+        if !self.has_mic {
+            tr!("Microphone is off for this recording")
+        } else if self.muted {
+            tr!("Unmute microphone")
+        } else {
+            tr!("Mute microphone")
+        }
     }
 }
 /// Camera on, or the slashed icon when the take has no camera.
@@ -191,6 +235,8 @@ mod tests {
         assert_eq!(STOP_ICON, "cm-stop");
         assert_eq!((pause_icon(false), pause_icon(true)), ("rec-pause", "play"));
         assert_eq!((mic_icon(true), mic_icon(false)), ("mic", "rec-mic-off"));
+        assert_eq!(MicButton::new(true, false, true).icon(), "mic");
+        assert_eq!(MicButton::new(true, true, true).icon(), "rec-mic-off");
         assert_eq!(
             (camera_icon(true), camera_icon(false)),
             ("video", "video-off")
@@ -223,6 +269,24 @@ mod tests {
         assert_eq!(HUD_BAR, bar_size(None));
         assert_eq!(HUD_WINDOW, window_size(None));
         assert_eq!(HUD_STRIP, STRIP_H);
+    }
+
+    /// AUD-6: the Mic button toggles the mute only on a live take with a mic track; its label is
+    /// the action, or the reason it is dead.
+    #[test]
+    fn mic_button_states_and_labels() {
+        let on = MicButton::new(true, false, true);
+        assert!(on.enabled && !on.off && !on.muted);
+        assert_eq!(on.label(), "Mute microphone");
+        let muted = MicButton::new(true, true, true);
+        assert!(muted.enabled && muted.off && muted.muted && muted.hint_is_unmute());
+        assert_eq!(muted.label(), "Unmute microphone");
+        let none = MicButton::new(false, false, true);
+        assert!(!none.enabled && none.off && !none.muted);
+        assert_eq!(none.label(), "Microphone is off for this recording");
+        // A mute flag with no mic track is ignored; a take that is not live cannot toggle.
+        assert!(!MicButton::new(false, true, true).muted);
+        assert!(!MicButton::new(true, false, false).enabled);
     }
 
     #[test]

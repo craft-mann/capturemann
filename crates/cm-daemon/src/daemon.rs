@@ -1047,6 +1047,12 @@ impl Daemon {
             }
             Action::PauseRecording(p) => inner.engine()?.pause(p.recording_id.as_deref()).await,
             Action::ResumeRecording(p) => inner.engine()?.resume(p.recording_id.as_deref()).await,
+            Action::SetMicMuted(p) => {
+                inner
+                    .engine()?
+                    .set_mic_muted(p.recording_id.as_deref(), p.muted)
+                    .await
+            }
             Action::SkipCountdown(p) => {
                 inner
                     .engine()?

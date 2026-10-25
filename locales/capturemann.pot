@@ -453,6 +453,12 @@ msgstr ""
 msgid "Cancel the 60 fps test"
 msgstr ""
 
+msgid "Cancel the upload to YouTube"
+msgstr ""
+
+msgid "Cancelling…"
+msgstr ""
+
 msgid "Caption at {time}, editing: {text}"
 msgstr ""
 
@@ -881,10 +887,19 @@ msgstr ""
 msgid "Couldn’t apply the edit"
 msgstr ""
 
+msgid "Couldn’t cancel the publish"
+msgstr ""
+
+msgid "Couldn’t cancel the upload"
+msgstr ""
+
 msgid "Couldn’t change it: {error}"
 msgstr ""
 
 msgid "Couldn’t change the captions"
+msgstr ""
+
+msgid "Couldn’t change the microphone"
 msgstr ""
 
 msgid "Couldn’t change the recording"
@@ -1303,6 +1318,12 @@ msgstr ""
 msgid "Every request is refused."
 msgstr ""
 
+msgid "Every shortcut already has its default keys."
+msgstr ""
+
+msgid "Every shortcut on this page goes back to its default keys. Other settings are not changed."
+msgstr ""
+
 msgid "Everything CaptureMann can use is allowed."
 msgstr ""
 
@@ -1600,6 +1621,9 @@ msgstr ""
 msgid "Keyboard shortcuts"
 msgstr ""
 
+msgid "Keyboard shortcuts reset to their defaults"
+msgstr ""
+
 msgid "Kind"
 msgstr ""
 
@@ -1791,15 +1815,6 @@ msgstr ""
 msgid "Microphone is off for this recording"
 msgstr ""
 
-msgid "Microphone is recording. Muting isn’t available yet."
-msgstr ""
-
-msgid "Microphone off"
-msgstr ""
-
-msgid "Microphone on, level meter"
-msgstr ""
-
 msgid "Microphone {requested} is not available; using {using}"
 msgstr ""
 
@@ -1864,6 +1879,12 @@ msgid "Move the zoom focus up"
 msgstr ""
 
 msgid "Moved to the Trash"
+msgstr ""
+
+msgid "Mute microphone"
+msgstr ""
+
+msgid "Mute or unmute the microphone"
 msgstr ""
 
 msgid "Name"
@@ -2435,6 +2456,9 @@ msgstr ""
 msgid "Publish a video"
 msgstr ""
 
+msgid "Publish cancelled"
+msgstr ""
+
 msgid "Publish capture {id} to {platform}"
 msgstr ""
 
@@ -2787,6 +2811,15 @@ msgid "Required permissions are in place. Optional ones can be granted any time.
 msgstr ""
 
 msgid "Reset crop"
+msgstr ""
+
+msgid "Reset shortcuts"
+msgstr ""
+
+msgid "Reset the keyboard shortcuts to their defaults?"
+msgstr ""
+
+msgid "Reset to defaults"
 msgstr ""
 
 msgid "Resolution"
@@ -3579,6 +3612,9 @@ msgstr ""
 msgid "The upload finished but the daemon sent no link."
 msgstr ""
 
+msgid "The upload is stopping."
+msgstr ""
+
 msgid "The upload limit for today is used up; try again after midnight Pacific time."
 msgstr ""
 
@@ -3784,10 +3820,16 @@ msgstr ""
 msgid "Unknown platform"
 msgstr ""
 
+msgid "Unmute microphone"
+msgstr ""
+
 msgid "Unreadable"
 msgstr ""
 
 msgid "Upload automatically"
+msgstr ""
+
+msgid "Upload cancelled"
 msgstr ""
 
 msgid "Upload captions (SRT) with the video"
@@ -3817,7 +3859,13 @@ msgstr ""
 msgid "Uploading to YouTube {pct}%"
 msgstr ""
 
+msgid "Uploading to {destination}"
+msgstr ""
+
 msgid "Uploading to {destination}: {pct}%"
+msgstr ""
+
+msgid "Uploading {title} to {destination}"
 msgstr ""
 
 msgid "Uploads are waiting. They go on after you sign in again."
@@ -3924,6 +3972,9 @@ msgid "Where finished captures are saved, and the accounts you publish to."
 msgstr ""
 
 msgid "Whole recording"
+msgstr ""
+
+msgid "Will change"
 msgstr ""
 
 msgid "Window \"{title}\" of {app}"
@@ -4609,7 +4660,22 @@ msgstr ""
 msgid "{path} · always on"
 msgstr ""
 
+msgid "{pct}%"
+msgstr ""
+
 msgid "{pct}% of screen frames were late over the last 30 s"
+msgstr ""
+
+msgid "{pct}% · Waiting…"
+msgstr ""
+
+msgid "{pct}% · about {n} min left"
+msgstr ""
+
+msgid "{pct}% · about {n} sec left"
+msgstr ""
+
+msgid "{pct}% · less than a minute left"
 msgstr ""
 
 msgid "{platform} is still processing the video"
@@ -5019,6 +5085,10 @@ msgid "Cancel"
 msgstr ""
 
 msgctxt "button"
+msgid "Cancelling…"
+msgstr ""
+
+msgctxt "button"
 msgid "Close"
 msgstr ""
 
@@ -5112,6 +5182,10 @@ msgstr ""
 
 msgctxt "button"
 msgid "Source on GitHub"
+msgstr ""
+
+msgctxt "button"
+msgid "Stop"
 msgstr ""
 
 msgctxt "button"

@@ -740,6 +740,17 @@ pub fn push_toast(app: &Entity<AppModel>, spec: ToastSpec, cx: &mut App) {
     sync_toasts(app, cx);
 }
 
+/// Removes the agent toasts that carry a Stop button (the recording ended).
+pub fn dismiss_stop_toasts(app: &Entity<AppModel>, cx: &mut App) {
+    let ids: Vec<u64> = app
+        .read(cx)
+        .toasts
+        .with_action(|a| matches!(a, ToastAction::StopRecording(_)));
+    for id in ids {
+        dismiss_toast(app, id, cx);
+    }
+}
+
 pub fn dismiss_toast(app: &Entity<AppModel>, id: u64, cx: &mut App) {
     app.update(cx, |m, cx| {
         m.toasts.dismiss(id);
@@ -1151,6 +1162,10 @@ fn toast_action(app: &Entity<AppModel>, action: ToastAction, cx: &mut App) {
         ToastAction::RevealPath(path) => crate::ui::upload_ui::reveal_path(app, &path, cx),
         ToastAction::RetryJob(id) => crate::ui::upload_ui::retry(app, &id, cx),
         ToastAction::OpenDestinations => crate::ui::upload_ui::open_destinations(app, cx),
+        ToastAction::StopRecording(id) => {
+            crate::ui::recording::stop_recording_if_running(app, &id, cx)
+        }
+        ToastAction::CancelJob(id) => crate::ui::upload_ui::cancel(app, &id, cx),
     }
 }
 

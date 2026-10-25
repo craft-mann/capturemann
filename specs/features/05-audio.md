@@ -110,3 +110,14 @@
 **Out of scope** — Per-segment volume automation (P2).
 
 **Test notes** — ffmpeg `ebur128` measurement in CI; S3 mono regression fixture.
+
+### AUD-6 Mute the microphone while recording
+**Priority** P1 · **Status** In progress (built on macOS Oct 25, 2026 and tested with fakes only: the scripted mic source, fake tracks and the daemon; the HUD button is not seen by eye and no hardware run is recorded, script `tests/manual/AUD-MUTE.md`) · **Crates** cm-audio, cm-daemon, cm-mcp, cm-cli, apps/desktop · **Depends on** AUD-1, REC-5
+
+**Behavior** — The HUD Mic button (board R18), `capturemann record mic --mute|--unmute` and the MCP tool `set_mic_muted { muted }` mute and unmute the microphone of the running recording, also while it is paused. Muting never stops or restarts the track, so sync and the session clock are untouched. While muted, `mic.wav` and `mic.denoised.wav` hold digital silence (exact zeros) and the files keep their length. The muted spans are listed in the manifest as `mic_muted: [{ from, to }]` in session ticks (also in `session.mic_muted` and `tracks.mic.muted`); `to` is `null` only for a span still open when a crash was recovered, and a span open at stop ends at the stop time. Muting twice changes nothing (`changed: false`). It needs a recording with a mic track (`invalid_input` otherwise, `not_found` with no recording). Events `recording.mic_muted` and `recording.mic_unmuted`; `get_recording_status` and `recording.stats` carry `mic_muted`, which is how the HUD follows a mute made elsewhere.
+
+**Boundary rule** — A frame is silenced if and only if its capture time (the OS stamp of its chunk plus its offset in the chunk, plus the calibration offset) is at or after the mute time and before the unmute time. The rule is on the stamp axis like the pause gates, so it does not depend on how the OS cut the audio into chunks. The mute time is read under the lock the recorder's worker reads the spans with, so no real sample of a muted span can reach a file; the output frames of a muted span are zeroed after the resampler and the denoiser as well, so their filter tails cannot leak into it. The digital-silence warning (`mic_silent`) looks at the live signal and is not raised by a deliberate mute.
+
+**Agent interface** — `set_mic_muted { muted, recording_id?, request_id? }` → `{ recording_id, muted, changed, at_ms }` (Free: the recording itself was confirmed). CLI `capturemann record mic --mute|--unmute [--id]`. No global shortcut in v0.1.
+
+**Test notes** — `cargo test -p cm-audio --test mic_mute` (boundary exactness, denoised file, 44.1 kHz, pause while muted, mute before the first sample), `cargo test -p cm-daemon --test recording_session aud6`, `--test recording_engine aud6`, the MCP and CLI tests, and `apps/desktop` model and layout tests.

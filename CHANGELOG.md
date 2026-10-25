@@ -31,7 +31,7 @@ First public release. macOS 13+ on Apple Silicon only; Windows follows later.
   added or changed outside the app are picked up.
 - Storage to local folders and Google Drive (your own Google client), and publishing to YouTube
   (private by default, asks for confirmation every time).
-- Every feature as an MCP tool (53 tools, plus resources and prompts) and a `capturemann` command
+- Every feature as an MCP tool (54 tools, plus resources and prompts) and a `capturemann` command
   line, with per-client permission tiers and on-screen confirmation for recording, publishing and
   deleting.
 - English and Vietnamese interface (Settings, General, Language).

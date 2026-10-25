@@ -16,6 +16,7 @@ use cm_core::{CmError, MediaTime, TrackContext, TrackInfo, TrackKind, TrackStats
 use serde::{Deserialize, Serialize};
 
 use crate::level::{LevelHandle, LevelMeter, DEFAULT_METER_HZ};
+use crate::mute::{MuteChange, MuteControl};
 use crate::pipeline::{Pipeline, PipelineConfig};
 use crate::source::{
     AudioSource, Counters, DeviceSelector, Msg, SourceFactory, SourceFormat, SourceSink,
@@ -77,6 +78,8 @@ pub struct AudioRecorder {
     start_timeout: Duration,
     fault_after: Option<u64>,
     hint: Arc<Mutex<Option<serde_json::Value>>>,
+    mute: Arc<MuteControl>,
+    clock: Option<cm_core::SessionClock>,
 }
 
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
@@ -96,7 +99,30 @@ impl AudioRecorder {
             start_timeout: START_TIMEOUT,
             fault_after: None,
             hint: Arc::new(Mutex::new(None)),
+            mute: Arc::new(MuteControl::new()),
+            clock: None,
         }
+    }
+
+    /// Mutes or unmutes (AUD-6). The track keeps running; frames captured while muted are
+    /// written as digital silence to the raw and the denoised file (see [`crate::mute`] for the
+    /// boundary rule). Idempotent: `changed` is `false` when the state already was `muted`.
+    /// Needs a started recorder.
+    pub fn set_muted(&self, muted: bool) -> Result<MuteChange, CmError> {
+        self.worker()?;
+        let clock = self
+            .clock
+            .as_ref()
+            .ok_or_else(|| CmError::invalid_input("audio recorder is not running"))?;
+        Ok(self.mute.set(muted, || {
+            let at = clock.now();
+            (at, i128::from(clock.to_host_ns(at)))
+        }))
+    }
+
+    /// Whether the recorder is muted now.
+    pub fn is_muted(&self) -> bool {
+        self.mute.is_muted()
     }
 
     /// Test hook: the raw file fails (disk full) after `bytes` of audio.
@@ -173,6 +199,7 @@ impl AudioRecorder {
             .chain(self.settings.denoised_file.iter())
             .map(|f| ctx.dir.join(f))
             .collect();
+        self.clock = Some(ctx.clock.clone());
         let args = WorkerArgs {
             rx,
             tx: tx.clone(),
@@ -185,6 +212,7 @@ impl AudioRecorder {
             format: self.format.clone(),
             fault_after: self.fault_after,
             hint: self.hint.clone(),
+            mute: self.mute.clone(),
         };
         let join = std::thread::Builder::new()
             .name(format!("cm-audio-{}", self.settings.kind.as_str()))
@@ -265,6 +293,7 @@ struct WorkerArgs {
     format: Arc<Mutex<Option<SourceFormat>>>,
     fault_after: Option<u64>,
     hint: Arc<Mutex<Option<serde_json::Value>>>,
+    mute: Arc<MuteControl>,
 }
 
 struct Live {
@@ -369,6 +398,7 @@ fn run_worker(
         }
     };
     pipeline.set_hint_cell(a.hint.clone());
+    pipeline.set_mute_control(a.mute.clone());
     if let Some(bytes) = a.fault_after {
         pipeline.inject_write_fault_after(bytes);
     }

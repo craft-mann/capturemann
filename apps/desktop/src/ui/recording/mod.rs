@@ -362,7 +362,12 @@ fn handle_change(app: &Entity<AppModel>, change: Change, cx: &mut App) {
             open_recording_windows(app, cx);
             start_poll(app, cx);
             if let Some((client, tool)) = agent {
-                app::push_toast(app, toasts::agent_started_toast(&client, &tool), cx);
+                let id = rec_of(app, cx).read(cx).hud.recording_id.clone();
+                app::push_toast(
+                    app,
+                    toasts::agent_started_toast(&client, &tool, id.as_deref()),
+                    cx,
+                );
             }
         }
         Change::Restarting => {
@@ -429,6 +434,8 @@ pub fn resync(app: &Entity<AppModel>, cx: &mut App) {
 }
 
 fn end_all(app: &Entity<AppModel>, e: &Ended, cx: &mut App) {
+    // The agent toast's Stop has nothing left to stop.
+    app::dismiss_stop_toasts(app, cx);
     let rec = rec_of(app, cx);
     let (hud, ind, cd, bub) = rec.update(cx, |r, _| {
         r.poll = None;
@@ -1024,6 +1031,19 @@ pub fn stop(app: &Entity<AppModel>, cx: &mut App) {
     );
 }
 
+/// The agent toast's "Stop": the HUD's Stop path, only while that recording still runs. The toast
+/// goes away either way (the caller dismisses it).
+pub fn stop_recording_if_running(app: &Entity<AppModel>, id: &str, cx: &mut App) {
+    let (phase, current) = {
+        let rec = rec_of(app, cx);
+        let r = rec.read(cx);
+        (r.hud.phase, r.hud.recording_id.clone())
+    };
+    if toasts::stop_applies(phase, current.as_deref(), id) {
+        stop(app, cx);
+    }
+}
+
 pub fn toggle_pause(app: &Entity<AppModel>, cx: &mut App) {
     let paused = rec_of(app, cx).read(cx).hud.is_paused();
     let method = if paused {
@@ -1040,6 +1060,29 @@ pub fn toggle_pause(app: &Entity<AppModel>, cx: &mut App) {
                 app,
                 crate::flows::error_toast_live(
                     || tr!("Couldn\u{2019}t change the recording"),
+                    e.message.clone(),
+                ),
+                cx,
+            );
+        },
+        cx,
+    );
+}
+
+/// The HUD's Mic button (AUD-6): mutes or unmutes the microphone track of the running take.
+/// The model follows the `recording.mic_muted` / `mic_unmuted` events (the same ones an agent's
+/// or the CLI's call publishes), so nothing is guessed here.
+pub fn toggle_mic_mute(app: &Entity<AppModel>, cx: &mut App) {
+    let muted = rec_of(app, cx).read(cx).hud.mic_is_muted();
+    call(
+        app,
+        "set_mic_muted",
+        json!({ "muted": !muted }),
+        |app, e, cx| {
+            app::push_toast(
+                app,
+                crate::flows::error_toast_live(
+                    || tr!("Couldn\u{2019}t change the microphone"),
                     e.message.clone(),
                 ),
                 cx,

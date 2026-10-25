@@ -2565,3 +2565,48 @@ async fn pub_publish_accounts_and_publish_commands() {
     assert_ne!(missing.code, 0);
     assert!(missing.err.contains("not_found"), "{}", missing.err);
 }
+
+/// AUD-6: `record mic --mute|--unmute` is `set_mic_muted`; it is idempotent, the status shows it
+/// in both forms, `--json` returns the tool result, and the flags are validated by the parser.
+#[tokio::test]
+async fn record_mic_mutes_and_unmutes() {
+    let r = recording::rec_rig(
+        cm_daemon::Decision::Approve,
+        cm_daemon::testing::FakeSources::new(),
+    );
+    // Nothing running: not_found (exit 2), like pause.
+    let none = cli(&r.rig, &["record", "mic", "--mute"]).await;
+    assert_eq!(none.code, 2, "{}", none.err);
+    assert!(none.err.contains("error[not_found]"), "{}", none.err);
+
+    let o = cli(&r.rig, &["record", "start", "--countdown", "0", "--mic"]).await;
+    assert_eq!(o.code, 0, "{}", o.err);
+    let shown = r.confirmer.shown().len();
+
+    let m = cli(&r.rig, &["record", "mic", "--mute"]).await;
+    assert_eq!(m.code, 0, "{}", m.err);
+    assert!(m.out.starts_with("Microphone muted at 00:00"), "{}", m.out);
+    let again = cli(&r.rig, &["record", "mic", "--mute"]).await;
+    assert!(again.out.contains("already muted"), "{}", again.out);
+    let st = cli(&r.rig, &["record", "status"]).await;
+    assert!(st.out.contains("microphone: muted"), "{}", st.out);
+    let st = cli(&r.rig, &["--json", "record", "status"]).await.json();
+    assert_eq!(st["mic_muted"], true);
+    let j = cli(&r.rig, &["--json", "record", "mic", "--unmute"])
+        .await
+        .json();
+    assert_eq!(j["muted"], false);
+    assert_eq!(j["changed"], true);
+    assert!(j["recording_id"].as_str().unwrap().starts_with("rec_"));
+    assert_eq!(r.confirmer.shown().len(), shown, "no dialog for a mute");
+
+    // The parser wants exactly one of the two flags.
+    for args in [
+        vec!["record", "mic"],
+        vec!["record", "mic", "--mute", "--unmute"],
+    ] {
+        let bad = cli(&r.rig, &args).await;
+        assert_eq!(bad.code, 2, "{args:?}: {}{}", bad.out, bad.err);
+    }
+    cli(&r.rig, &["record", "stop"]).await;
+}

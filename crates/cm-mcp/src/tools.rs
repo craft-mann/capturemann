@@ -860,6 +860,26 @@ pub fn all() -> Vec<ToolSpec> {
                 "required": ["recording_id"] }),
         },
         ToolSpec {
+            name: "set_mic_muted",
+            tier: Tier::Free,
+            mutating: true,
+            destructive: false,
+            spec: "AUD-6",
+            summary: "Mute or unmute the microphone of the running recording (also while paused). The mic track keeps running, so sync and the clock are untouched; while muted the mic files hold digital silence, and the muted spans are listed in the manifest (`mic_muted`, session time). Works only on a recording that has a microphone track. Muting a muted mic changes nothing (`changed: false`).",
+            input: json!({ "type": "object", "properties": {
+                "muted": { "type": "boolean", "description": "true mutes, false unmutes." },
+                "recording_id": { "type": "string", "minLength": 1,
+                                  "description": "From start_recording; optional while only one recording exists." },
+                "request_id": request_id() },
+                "required": ["muted"], "additionalProperties": false }),
+            output: json!({ "type": "object", "properties": {
+                "recording_id": { "type": "string" },
+                "muted": { "type": "boolean", "description": "The state now." },
+                "changed": { "type": "boolean" },
+                "at_ms": { "type": "integer", "description": "Session time of the change (of the last one when nothing changed)." } },
+                "required": ["recording_id", "muted", "changed"] }),
+        },
+        ToolSpec {
             name: "stop_recording",
             tier: Tier::Free,
             mutating: true,

@@ -17,13 +17,31 @@ use crate::ui::paint::rgba_of;
 use cm_i18n::{tr, tr_ctx};
 
 impl SettingsView {
+    /// The board's "Reset to defaults" (R16, page header, right): enabled only when a shortcut
+    /// differs from its default; asks first.
+    pub(super) fn shortcuts_reset_control(&self, t: &Theme, cx: &mut Context<Self>) -> AnyElement {
+        let (platform, map) = {
+            let m = self.app.read(cx);
+            (m.platform, m.shortcuts.clone())
+        };
+        let enabled = !super::reset::shortcut_reset_targets(&map, platform).is_empty();
+        let app = self.app.clone();
+        let b = super::reset::reset_button(t, enabled);
+        if enabled {
+            b.on_click(move |_, _, cx| super::reset::ask_reset_shortcuts(&app, cx))
+                .into_any_element()
+        } else {
+            b.into_any_element()
+        }
+    }
+
     pub(super) fn shortcuts(&self, t: &Theme, cx: &mut Context<Self>) -> AnyElement {
         let (platform, map, reg) = {
             let m = self.app.read(cx);
             (m.platform, m.shortcuts.clone(), m.registration.clone())
         };
         let rows = model::shortcut_rows(&map, platform);
-        // TODO(design): the board's "Reset to defaults" and its rows "Skip the countdown", "Draw
+        // TODO(design): the board's rows "Skip the countdown", "Draw
         // on screen", "Show or hide the webcam bubble" and "Mute or unmute the microphone" are
         // not built: there is no such action, and D, T and A are Discard, Restart and Annotate.
         let groups =

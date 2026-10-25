@@ -23,6 +23,7 @@ mod privacy;
 mod problem;
 mod publish_card;
 mod recording;
+pub(crate) mod reset;
 mod rows;
 mod shortcuts_page;
 pub(crate) mod widgets;
@@ -333,7 +334,8 @@ impl Render for SettingsView {
             SettingsSection::Shortcuts => self.shortcuts(&t, cx),
         };
         // The MCP pill lives in the Agents hero now; no other page has a header action.
-        let right: Option<gpui::AnyElement> = None;
+        let right: Option<gpui::AnyElement> =
+            (current == SettingsSection::Shortcuts).then(|| self.shortcuts_reset_control(&t, cx));
         div().id("settings-page").size_full().flex().child(
             div()
                 .id("settings-scroll")

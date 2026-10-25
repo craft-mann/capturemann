@@ -326,6 +326,9 @@ pub struct HudState {
     anchored_at: Option<Instant>,
     /// Latest mic peak in dBFS.
     pub mic_dbfs: Option<f64>,
+    /// The microphone is muted (AUD-6): from the status, `recording.stats` and the mute events,
+    /// so a mute made by an agent or the CLI shows too.
+    pub mic_muted: bool,
     pub health: Health,
     pub warnings: Vec<Warning>,
     pub pauses: u32,
@@ -351,6 +354,7 @@ impl Default for HudState {
             recorded_ms: 0,
             anchored_at: None,
             mic_dbfs: None,
+            mic_muted: false,
             health: Health::Ok,
             warnings: Vec::new(),
             pauses: 0,
@@ -646,6 +650,17 @@ impl HudState {
                 self.anchored_at = Some(now);
                 Change::Updated
             }
+            "recording.mic_muted" | "recording.mic_unmuted" => {
+                if self.phase == Phase::Idle || !self.belongs(data) {
+                    return Change::None;
+                }
+                let muted = name == "recording.mic_muted";
+                if self.mic_muted == muted {
+                    return Change::None;
+                }
+                self.mic_muted = muted;
+                Change::Updated
+            }
             "recording.stats" => {
                 // A stats event that trails `recording.stopped` must not revive an idle model.
                 if self.phase == Phase::Idle || !self.belongs(data) {
@@ -866,6 +881,7 @@ impl HudState {
         self.idle_polls = 0;
         let before = (
             self.phase,
+            self.mic_muted,
             self.mic_dbfs,
             self.countdown.is_some(),
             self.selftest_remaining_s.map(|s| s.ceil() as i64),
@@ -888,6 +904,9 @@ impl HudState {
                 self.rebase(ms, now);
             }
             self.mic_dbfs = v.get("mic_level_dbfs").and_then(Value::as_f64);
+            if let Some(m) = v.get("mic_muted").and_then(Value::as_bool) {
+                self.mic_muted = m;
+            }
             self.pauses = v
                 .get("pauses")
                 .and_then(Value::as_u64)
@@ -899,6 +918,7 @@ impl HudState {
         }
         let after = (
             self.phase,
+            self.mic_muted,
             self.mic_dbfs,
             self.countdown.is_some(),
             self.selftest_remaining_s.map(|s| s.ceil() as i64),
@@ -945,6 +965,11 @@ impl HudState {
 
     pub fn mic_on(&self) -> bool {
         self.indicator.as_ref().is_some_and(|i| i.mic)
+    }
+
+    /// The mic track exists and is muted now.
+    pub fn mic_is_muted(&self) -> bool {
+        self.mic_on() && self.mic_muted
     }
 
     pub fn started_by_agent(&self) -> Option<(&str, &str)> {
@@ -1067,6 +1092,56 @@ mod tests {
             s.started_by_agent(),
             Some(("claude-desktop", "start_recording"))
         );
+    }
+
+    /// AUD-6: the HUD follows the mute events and the status (a mute by an agent or the CLI
+    /// shows), ignores other recordings' events, is unmuted by a new take, and a take without a
+    /// mic track never reports muted.
+    #[test]
+    fn aud6_mic_mute_follows_events_and_status() {
+        let t0 = Instant::now();
+        let mut s = HudState::default();
+        assert_eq!(
+            s.apply_event("recording.mic_muted", &json!({"recording_id": "rec_1"}), t0),
+            Change::None,
+            "idle model"
+        );
+        s.apply_event("recording.started", &started("rec_1", user()), t0);
+        assert!(!s.mic_is_muted());
+        let c = s.apply_event("recording.mic_muted", &json!({"recording_id": "rec_1"}), t0);
+        assert_eq!(c, Change::Updated);
+        assert!(s.mic_is_muted());
+        // The same event again, and another recording's event, change nothing.
+        assert_eq!(
+            s.apply_event("recording.mic_muted", &json!({"recording_id": "rec_1"}), t0),
+            Change::None
+        );
+        assert_eq!(
+            s.apply_event(
+                "recording.mic_unmuted",
+                &json!({"recording_id": "rec_2"}),
+                t0
+            ),
+            Change::None
+        );
+        assert!(s.mic_is_muted());
+        // The 1 Hz status carries the flag too (a missed event heals).
+        let mut st = status("recording", 1000);
+        st["mic_muted"] = json!(false);
+        assert_eq!(s.apply_status(&st, t0 + ms(1000)), Change::Updated);
+        assert!(!s.mic_is_muted());
+        s.apply_event("recording.mic_muted", &json!({"recording_id": "rec_1"}), t0);
+        s.apply_event(
+            "recording.mic_unmuted",
+            &json!({"recording_id": "rec_1"}),
+            t0,
+        );
+        assert!(!s.mic_is_muted());
+        // A new take starts unmuted.
+        s.apply_event("recording.mic_muted", &json!({"recording_id": "rec_1"}), t0);
+        s.apply_event("recording.stopped", &json!({"recording_id": "rec_1"}), t0);
+        s.apply_event("recording.started", &started("rec_2", user()), t0);
+        assert!(!s.mic_muted);
     }
 
     /// REC-4.AC1: 10 s recorded, 20 s paused, 10 s recorded shows 00:20.

@@ -818,6 +818,10 @@ pub enum RecordCmd {
     Pause(RecordRefArgs),
     /// Resume a paused recording (`resume_recording`).
     Resume(RecordRefArgs),
+    /// Mute or unmute the microphone of the running recording without stopping it
+    /// (`set_mic_muted`). Muted time is digital silence in the mic files and is listed in the
+    /// manifest. Works while recording or paused, on a recording that has a microphone track.
+    Mic(RecordMicArgs),
     /// Stop and save the recording (`stop_recording`). Also cancels a countdown and a running
     /// 60 fps self-test.
     Stop(RecordRefArgs),
@@ -850,6 +854,20 @@ pub struct RecordSelftestArgs {
     /// Video codec to test (default: the `recording.codec` setting, else auto).
     #[arg(long, value_parser = ["auto", "hevc", "h264"])]
     pub codec: Option<String>,
+}
+
+#[derive(Debug, Args)]
+#[command(group(clap::ArgGroup::new("state").required(true).args(["mute", "unmute"])))]
+pub struct RecordMicArgs {
+    /// Mute the microphone.
+    #[arg(long)]
+    pub mute: bool,
+    /// Unmute the microphone.
+    #[arg(long)]
+    pub unmute: bool,
+    /// Recording id (default: the running recording).
+    #[arg(long = "id", value_name = "RECORDING_ID")]
+    pub recording_id: Option<String>,
 }
 
 #[derive(Debug, Args)]

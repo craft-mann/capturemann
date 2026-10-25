@@ -34,6 +34,7 @@
 //! | `recording.starting` | the countdown is over and the tracks are being started (R3-4); `begin` waits for the slowest track (camera up to 3 s, ScreenCaptureKit up to 20 s), so the HUD and the indicator show now | `by`, `indicator`, `tracks_planned`, `countdown_s`, `restart_of` |
 //! | `recording.started` | every track is delivering | `capture_id`, `title`, `live_at_ms`, `by`, `tracks`, `warnings`, `indicator`, `restart_of`, `max_duration_s` |
 //! | `recording.paused` / `recording.resumed` | pause, resume | `recorded_ms` (`paused_ms` on resume) |
+//! | `recording.mic_muted` / `recording.mic_unmuted` | `set_mic_muted` changed the state (AUD-6) | `at_ms` (session time), `recorded_ms` |
 //! | `recording.stats` | 1 Hz while recording or paused | the status object of `get_recording_status` |
 //! | `recording.health` | every 5 s | `status` (`ok`, `degraded`), `late_frame_pct`, `disk_left_minutes` |
 //! | `recording.warning` | a track or the disk guard noted something | `code`, `message`, `track`, `level` |
@@ -457,10 +458,11 @@ pub struct RecordingEngine {
 }
 
 /// Names of the actions the engine runs itself.
-const ENGINE_ACTIONS: [&str; 9] = [
+const ENGINE_ACTIONS: [&str; 10] = [
     "start_recording",
     "pause_recording",
     "resume_recording",
+    "set_mic_muted",
     "stop_recording",
     "get_recording_status",
     "discard_recording",
@@ -900,6 +902,56 @@ impl RecordingEngine {
     /// Resumes, after the resume countdown (default 1 s).
     pub async fn resume(&self, id: Option<&str>) -> Result<Value, DaemonError> {
         self.ask(id, Cmd::Resume).await
+    }
+
+    /// Mutes or unmutes the microphone (AUD-6): `{ recording_id, muted, changed, at_ms }`
+    /// (`at_ms` is the session time of the change). Works while recording, paused or in the
+    /// resume countdown; it does not go through the driver's command queue, so it never
+    /// interrupts a countdown. Without a recording: `not_found` (like pause); during the start
+    /// countdown or without a microphone track: `invalid_input`.
+    pub async fn set_mic_muted(&self, id: Option<&str>, muted: bool) -> Result<Value, DaemonError> {
+        let sh = self.active_for(id)?;
+        let phase = lock(&sh.meta).phase;
+        if !matches!(phase, Phase::Recording | Phase::Paused | Phase::Resuming) {
+            return Err(CmError::invalid_input(format!(
+                "The recording is {}, not running",
+                phase.as_str()
+            ))
+            .into());
+        }
+        let sh2 = sh.clone();
+        let joined = tokio::task::spawn_blocking(move || {
+            let mut g = lock(&sh2.session);
+            match g.as_mut() {
+                Some(s) => s.set_mic_muted(muted).map(|c| (c, s.status())),
+                None => Err(CmError::internal("the recording session is gone")),
+            }
+        })
+        .await;
+        let (change, st) = match joined {
+            Ok(r) => r?,
+            Err(e) => return Err(CmError::internal(format!("worker failed: {e}")).into()),
+        };
+        lock(&sh.meta).status = Some(session_status_json(&st));
+        let at_ms = change.at.as_millis_floor();
+        if change.changed {
+            let name = if muted {
+                events::RECORDING_MIC_MUTED
+            } else {
+                events::RECORDING_MIC_UNMUTED
+            };
+            self.inner.publish(
+                &sh,
+                name,
+                json!({ "at_ms": at_ms, "recorded_ms": st.recorded.as_millis_floor() }),
+            );
+        }
+        Ok(json!({
+            "recording_id": sh.id,
+            "muted": st.mic_muted,
+            "changed": change.changed,
+            "at_ms": at_ms,
+        }))
     }
 
     /// Skips the running countdown (Space, REC-1.AC5).
@@ -2285,6 +2337,7 @@ fn session_status_json(st: &SessionStatus) -> Value {
         "recent_late_frame_pct": live("recent_late_pct"),
         "disk_left_minutes": st.disk_minutes_left.map_or_else(|| live("disk_left_minutes"), |m| json!(m)),
         "stop_requested": st.stop_requested,
+        "mic_muted": st.mic_muted,
     })
 }
 

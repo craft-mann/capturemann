@@ -2229,19 +2229,6 @@ msgstr "Micrô và âm thanh hệ thống"
 msgid "Microphone is off for this recording"
 msgstr "Micrô tắt cho bản ghi này"
 
-# FACT: owner review required
-#, fuzzy
-msgid "Microphone is recording. Muting isn’t available yet."
-msgstr "Micrô đang ghi. Chưa thể tắt tiếng."
-
-#, fuzzy
-msgid "Microphone off"
-msgstr "Micrô tắt"
-
-#, fuzzy
-msgid "Microphone on, level meter"
-msgstr "Micrô bật, có thanh mức âm"
-
 #, fuzzy
 msgid "Mirror camera"
 msgstr "Lật camera"
@@ -8711,3 +8698,118 @@ msgstr "Chụp"
 msgctxt "window picker footer"
 msgid "Move"
 msgstr "Di chuyển"
+
+# ---- Toasts: agent Stop, upload progress ----
+
+#, fuzzy
+msgctxt "button"
+msgid "Stop"
+msgstr "Dừng"
+
+#, fuzzy
+msgid "Uploading {title} to {destination}"
+msgstr "Đang tải “{title}” lên {destination}"
+
+#, fuzzy
+msgid "Uploading to {destination}"
+msgstr "Đang tải lên {destination}"
+
+#, fuzzy
+msgid "{pct}%"
+msgstr "{pct}%"
+
+#, fuzzy
+msgid "{pct}% · Waiting…"
+msgstr "{pct}% · Đang chờ…"
+
+#, fuzzy
+msgid "{pct}% · less than a minute left"
+msgstr "{pct}% · còn chưa đến 1 phút"
+
+#, fuzzy
+msgid "{pct}% · about {n} sec left"
+msgstr "{pct}% · còn khoảng {n} giây"
+
+#, fuzzy
+msgid "{pct}% · about {n} min left"
+msgstr "{pct}% · còn khoảng {n} phút"
+
+#, fuzzy
+msgid "Upload cancelled"
+msgstr "Đã huỷ tải lên"
+
+#, fuzzy
+msgid "Couldn’t cancel the upload"
+msgstr "Không thể huỷ tải lên"
+
+# ---- Settings: reset to defaults, Publish: cancel ----
+
+#, fuzzy
+msgid "Reset to defaults"
+msgstr "Đặt lại mặc định"
+
+#, fuzzy
+msgid "Every shortcut already has its default keys."
+msgstr "Mọi phím tắt đều đang ở mặc định."
+
+#, fuzzy
+msgid "Reset the keyboard shortcuts to their defaults?"
+msgstr "Đặt lại các phím tắt về mặc định?"
+
+#, fuzzy
+msgid "Every shortcut on this page goes back to its default keys. Other settings are not changed."
+msgstr "Mọi phím tắt trên trang này trở về tổ hợp phím mặc định. Các cài đặt khác không thay đổi."
+
+#, fuzzy
+msgid "Will change"
+msgstr "Sẽ thay đổi"
+
+#, fuzzy
+msgid "Reset shortcuts"
+msgstr "Đặt lại phím tắt"
+
+#, fuzzy
+msgid "Keyboard shortcuts reset to their defaults"
+msgstr "Đã đặt lại phím tắt về mặc định"
+
+#, fuzzy
+msgid "Publish cancelled"
+msgstr "Đã huỷ đăng"
+
+#, fuzzy
+msgid "Couldn’t cancel the publish"
+msgstr "Không thể huỷ việc đăng"
+
+#, fuzzy
+msgid "Cancelling…"
+msgstr "Đang huỷ…"
+
+#, fuzzy
+msgctxt "button"
+msgid "Cancelling…"
+msgstr "Đang huỷ…"
+
+#, fuzzy
+msgid "The upload is stopping."
+msgstr "Đang dừng tải lên."
+
+#, fuzzy
+msgid "Cancel the upload to YouTube"
+msgstr "Huỷ việc tải lên YouTube"
+
+# ---- HUD: mic mute ----
+#, fuzzy
+msgid "Mute microphone"
+msgstr "Tắt tiếng micrô"
+
+#, fuzzy
+msgid "Unmute microphone"
+msgstr "Bật tiếng micrô"
+
+#, fuzzy
+msgid "Couldn’t change the microphone"
+msgstr "Không thể đổi micrô"
+
+#, fuzzy
+msgid "Mute or unmute the microphone"
+msgstr "Tắt hoặc bật tiếng micrô"

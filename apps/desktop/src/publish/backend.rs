@@ -123,6 +123,13 @@ pub async fn retry(daemon: &Daemon, job_id: &str, request_id: &str) -> Result<()
     .map_err(|e| failure(e, Some(job_id)))
 }
 
+/// "Cancel" on a running publish (`cancel_job`, as the user): the job object, with `cancelling:
+/// true` until the upload has stopped. The typed error is kept (a job that already ended is
+/// `invalid_input`).
+pub async fn cancel(daemon: &Daemon, job_id: &str) -> Result<Value, crate::backend::CallError> {
+    Backend::call_coded(daemon, "cancel_job", json!({ "job_id": job_id })).await
+}
+
 /// The job as the daemon has it (`get_job`).
 pub async fn job(daemon: &Daemon, job_id: &str) -> Result<Value, String> {
     Backend::call(daemon, "get_job", json!({ "job_id": job_id })).await

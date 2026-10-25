@@ -1314,3 +1314,150 @@ fn r3_21_a_camera_runtime_error_warns_and_does_not_stop() {
     assert_eq!(s.state(), SessionState::Recording);
     let _ = s.stop();
 }
+
+// ---- AUD-6: mic mute ---------------------------------------------------------------------------
+
+/// The f32 samples of a mono WAV the recorder wrote (RIFF header, one `data` chunk).
+fn wav_samples(path: &Path) -> Vec<f32> {
+    let b = std::fs::read(path).unwrap();
+    let at = b.windows(4).position(|w| w == b"data").unwrap() + 8;
+    b[at..]
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|c| f32::from_le_bytes(*c))
+        .collect()
+}
+
+const MUTE_MIC: Which = Which {
+    mic: true,
+    camera: false,
+    cursor: true,
+};
+
+/// AUD-6: the muted spans reach the files exactly (digital silence for the muted frames, the
+/// 0.5 constant of the fake mic elsewhere, a gapless file across the pause), the manifest lists
+/// them in session time next to the pause gaps, and the track is never restarted.
+#[test]
+fn aud6_muted_spans_reach_the_file_and_the_manifest_across_a_pause() {
+    let (mut rig, tracks) = build(Options {
+        which: MUTE_MIC,
+        ..Default::default()
+    });
+    let mut s = RecordingSession::begin(rig.config(), tracks).unwrap();
+    let dir = s.dir().to_owned();
+    assert!(!s.status().mic_muted);
+    rig.run_until(2000);
+    let m = s.set_mic_muted(true).unwrap();
+    assert!(m.changed);
+    assert_eq!(m.at, ms(2000));
+    assert!(s.status().mic_muted);
+    let again = s.set_mic_muted(true).unwrap();
+    assert!(!again.changed);
+    assert_eq!(again.at, ms(2000), "the time of the change in force");
+    rig.run_until(3000);
+    s.pause().unwrap();
+    rig.run_until(3500);
+    s.resume().unwrap();
+    assert!(s.is_mic_muted(), "a pause does not unmute");
+    rig.run_until(4000);
+    let u = s.set_mic_muted(false).unwrap();
+    assert!(u.changed);
+    assert_eq!(u.at, ms(4000));
+    rig.run_until(5000);
+    let stopped = s.stop().unwrap();
+    stopped.finalize().unwrap();
+
+    let m = read_manifest(&dir);
+    assert_eq!(
+        m.extra["mic_muted"],
+        serde_json::json!([{ "from": 2000 * 120, "to": 4000 * 120 }])
+    );
+    assert_eq!(m.extra["session"]["mic_muted"], m.extra["mic_muted"]);
+    assert_eq!(
+        m.tracks["mic"]["muted"],
+        serde_json::json!([{ "from": 2000 * 120, "to": 4000 * 120 }])
+    );
+    assert_eq!(m.gaps.len(), 1);
+
+    // The mic starts 100 ms in; the pause (3000..3500) is not in the file. Session 2000 is file
+    // frame (2000 - 100) * 48; session 4000 is (4000 - 500 - 100) * 48.
+    let samples = wav_samples(&dir.join("mic.wav"));
+    assert_eq!(samples.len(), (5000 - 500 - 100) * 48);
+    let (from, to) = (1900 * 48, 3400 * 48);
+    assert!(samples[..from - 2].iter().all(|v| *v == 0.5));
+    assert!(
+        samples[from + 2..to - 2].iter().all(|v| *v == 0.0),
+        "digital silence for the muted span"
+    );
+    assert!(samples[to + 2..].iter().all(|v| *v == 0.5));
+}
+
+/// AUD-6: mute needs a running recording with a mic track.
+#[test]
+fn aud6_mute_is_refused_without_a_mic_track_or_a_running_recording() {
+    let (rig, tracks) = build(Options {
+        which: SCREEN_CURSOR,
+        ..Default::default()
+    });
+    let mut s = RecordingSession::begin(rig.config(), tracks).unwrap();
+    let e = s.set_mic_muted(true).unwrap_err();
+    assert_eq!(e.code(), ErrorCode::InvalidInput);
+    assert!(e.to_string().contains("no microphone"), "{e}");
+    assert!(!s.status().mic_muted);
+    let _ = s.stop().unwrap();
+    assert_eq!(
+        s.set_mic_muted(true).unwrap_err().code(),
+        ErrorCode::InvalidInput
+    );
+}
+
+/// AUD-6 with REC-8: the spans are kept in the lock, so a crash while muted recovers them; the
+/// span that was open has `to: null`.
+#[test]
+fn aud6_crash_while_muted_recovers_the_spans() {
+    let (mut rig, tracks) = build(Options {
+        which: MUTE_MIC,
+        ..Default::default()
+    });
+    let mut s = RecordingSession::begin(rig.config(), tracks).unwrap();
+    let dir = s.dir().to_owned();
+    rig.run_until(1000);
+    s.set_mic_muted(true).unwrap();
+    rig.run_until(2000);
+    s.set_mic_muted(false).unwrap();
+    rig.run_until(3000);
+    s.set_mic_muted(true).unwrap();
+    rig.run_until(4000);
+
+    std::mem::forget(s);
+    std::thread::sleep(Duration::from_millis(1200));
+    let _ = std::fs::remove_file(dir.join(cm_library::rec::OWNER_FILE));
+    let lock_path = dir.join(LOCK_FILE);
+    let mut lock: Value =
+        serde_json::from_str(&std::fs::read_to_string(&lock_path).unwrap()).unwrap();
+    assert_eq!(
+        lock["extra"]["mic_muted"],
+        serde_json::json!([
+            { "from": 1000 * 120, "to": 2000 * 120 },
+            { "from": 3000 * 120, "to": null },
+        ]),
+        "the lock keeps the spans as they happen"
+    );
+    lock["pid"] = Value::from(4_000_000u32);
+    std::fs::write(&lock_path, serde_json::to_vec_pretty(&lock).unwrap()).unwrap();
+
+    let mut lib = Library::open_or_create(rig.root.path()).unwrap();
+    let summary = lib.recover_incomplete().unwrap();
+    assert_eq!(summary.recovered.len(), 1, "{summary:?}");
+    let m = read_manifest(&dir);
+    assert_eq!(
+        m.extra["mic_muted"],
+        serde_json::json!([
+            { "from": 1000 * 120, "to": 2000 * 120 },
+            { "from": 3000 * 120, "to": null },
+        ])
+    );
+    // The manifest still parses as a whole (additive field).
+    assert!(m.tracks.contains_key("mic"));
+}

@@ -4,10 +4,10 @@
 
 use std::time::{Duration, Instant};
 
-// TODO(design): the R17 board also draws a Stop action on the agent toast, a "Change library"
-// action on the disk-full toast, an upload progress toast with an ETA ("Uploading to YouTube 38%")
-// and a "Published without captions" warning. None of them exists in the app (no such action, no
-// such trigger), so they are not built; the kinds and actions below are the shipped ones.
+// TODO(design): the R17 board also draws a "Change library" action on the disk-full toast and a
+// "Published without captions" warning. Neither exists in the app (no such action, no such
+// trigger), so they are not built. The Stop action of the agent toast and the upload progress
+// toast (a bar, the percentage, an ETA, Cancel) are built.
 
 pub const MAX_TOASTS: usize = 3;
 pub const AUTO_DISMISS: Duration = Duration::from_secs(6);
@@ -52,6 +52,11 @@ pub enum ToastAction {
     RetryJob(String),
     /// Settings -> Destinations (to reconnect an account).
     OpenDestinations,
+    /// `stop_recording` as the user, through the HUD's Stop path, only while recording `id` (its
+    /// recording id) is still the one running.
+    StopRecording(String),
+    /// `cancel_job` on a running upload.
+    CancelJob(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -105,6 +110,8 @@ impl ToastAction {
             ToastAction::OpenLink(_) => "external-link",
             ToastAction::RetryJob(_) => "rotate-cw",
             ToastAction::OpenDestinations => "plug",
+            ToastAction::StopRecording(_) => "cm-stop",
+            ToastAction::CancelJob(_) => "x",
         }
     }
 }
@@ -140,6 +147,8 @@ pub struct Toast {
     pub agent: Option<AgentCall>,
     /// Makes the toast's words again after a language switch (see [`ToastSpec::live`]).
     pub rebuild: Option<Rebuild>,
+    /// A progress bar under the text, 0..=100 percent (a running upload).
+    pub progress: Option<u8>,
     pub created: Instant,
     /// Since when the pointer has been over the toast (its clock is paused).
     pub hovered_since: Option<Instant>,
@@ -167,6 +176,7 @@ pub struct ToastSpec {
     pub buttons: Vec<ToastButton>,
     pub agent: Option<AgentCall>,
     pub rebuild: Option<Rebuild>,
+    pub progress: Option<u8>,
 }
 
 impl ToastSpec {
@@ -179,6 +189,7 @@ impl ToastSpec {
             buttons: Vec::new(),
             agent: None,
             rebuild: None,
+            progress: None,
         }
     }
 
@@ -199,6 +210,22 @@ impl ToastSpec {
             client: client.into(),
         });
         spec
+    }
+
+    /// The agent toast with a "Stop" button for recording `recording_id` (REC-5: the user can
+    /// stop what an agent started).
+    pub fn agent_with_stop(
+        tool: impl Into<String>,
+        client: impl Into<String>,
+        recording_id: &str,
+    ) -> Self {
+        let (tool, client, id) = (tool.into(), client.into(), recording_id.to_owned());
+        ToastSpec::live(move || {
+            ToastSpec::agent(tool.clone(), client.clone()).button(
+                cm_i18n::tr_ctx!("button", "Stop"),
+                ToastAction::StopRecording(id.clone()),
+            )
+        })
     }
 
     pub fn body(mut self, b: impl Into<String>) -> Self {
@@ -246,6 +273,9 @@ pub fn estimate_height(t: &Toast) -> f32 {
     if let Some(b) = &t.body {
         col += 4. + 18. * wrapped_lines(b, 48) as f32;
     }
+    if t.progress.is_some() {
+        col += 4. + 4.;
+    }
     if !t.hints.is_empty() {
         col += 8. + 22.;
     }
@@ -283,6 +313,7 @@ impl ToastQueue {
             buttons: spec.buttons,
             agent: spec.agent,
             rebuild: spec.rebuild,
+            progress: spec.progress,
             created: now,
             hovered_since: None,
         });
@@ -308,6 +339,7 @@ impl ToastQueue {
                     buttons: spec.buttons,
                     agent: spec.agent,
                     rebuild: spec.rebuild,
+                    progress: spec.progress,
                     created: now,
                     hovered_since: None,
                 };
@@ -355,6 +387,15 @@ impl ToastQueue {
                         .any(|b| b.action == ToastAction::OpenCapture(capture_id.to_owned()))
             })
             .map(|t| t.id)
+    }
+
+    /// Ids of the toasts with a button whose action satisfies `f`.
+    pub fn with_action(&self, f: impl Fn(&ToastAction) -> bool) -> Vec<u64> {
+        self.toasts
+            .iter()
+            .filter(|t| t.buttons.iter().any(|b| f(&b.action)))
+            .map(|t| t.id)
+            .collect()
     }
 
     pub fn dismiss(&mut self, id: u64) -> bool {
@@ -665,6 +706,8 @@ mod tests {
             RevealPath("a".into()),
             RetryJob("a".into()),
             OpenDestinations,
+            StopRecording("a".into()),
+            CancelJob("a".into()),
         ] {
             assert!(!a.icon().is_empty());
         }
@@ -674,6 +717,40 @@ mod tests {
     #[test]
     fn toasts_are_440_wide() {
         assert_eq!(TOAST_WIDTH, 440.);
+    }
+
+    /// R17: the agent toast can carry Stop; a running toast with a bar is sticky (it has Cancel),
+    /// is replaced in place and grows by the bar.
+    #[test]
+    fn agent_stop_and_progress_toasts() {
+        let mut q = ToastQueue::default();
+        let t = Instant::now();
+        let a = q.push(
+            ToastSpec::agent_with_stop("start_recording", "claude", "rec_9"),
+            t,
+        );
+        let toast = &q.toasts()[0];
+        assert_eq!(toast.kind, ToastKind::Agent);
+        assert!(toast.agent.is_some());
+        assert_eq!(
+            toast.buttons[0].action,
+            ToastAction::StopRecording("rec_9".into())
+        );
+        assert!(toast.sticky(), "a toast with an action stays");
+        q.dismiss(a);
+        let mut spec = ToastSpec::new(ToastKind::Info, "Uploading")
+            .button("Cancel", ToastAction::CancelJob("j".into()));
+        spec.progress = Some(38);
+        let id = q.push(spec.clone(), t);
+        assert_eq!(q.next_expiry(t), None, "never auto-dismissed while running");
+        let with_bar = estimate_height(&q.toasts()[0]);
+        let mut plain = q.toasts()[0].clone();
+        plain.progress = None;
+        assert!(with_bar > estimate_height(&plain));
+        spec.progress = Some(50);
+        assert!(q.replace(id, spec, t));
+        assert_eq!(q.toasts()[0].progress, Some(50));
+        assert_eq!(q.toasts().len(), 1, "updated in place");
     }
 
     #[test]

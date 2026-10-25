@@ -26,6 +26,7 @@ use cm_core::{CmError, MediaTime, SessionClock, TrackInfo, TrackKind};
 use serde_json::json;
 
 use crate::denoise::Denoiser;
+use crate::mute::{first_frame_at_or_after, split_by_mute, zero_ranges, MuteControl};
 use crate::resample::StreamResampler;
 use crate::source::{AudioChunk, Counters, SourceFormat};
 use crate::wav::WavWriter;
@@ -163,6 +164,17 @@ pub struct Pipeline {
     zero_run_frames: u64,
     silence_alerted: bool,
     silence_pending: bool,
+    /// The mute spans (AUD-6), shared with the recorder that toggles them.
+    mute: Option<Arc<MuteControl>>,
+    /// Input frames fed to the current resampler.
+    rs_in: u64,
+    /// Output frames written before the current resampler took over (device change).
+    out_base: u64,
+    /// Output frames handed to the raw and to the denoised writer so far.
+    raw_pos: u64,
+    den_pos: u64,
+    /// Muted ranges in output (file) frames; both files are silenced inside them.
+    mute_out: Vec<(u64, u64)>,
 }
 
 fn map_io(e: std::io::Error, what: &str) -> CmError {
@@ -274,6 +286,12 @@ impl Pipeline {
             zero_run_frames: 0,
             silence_alerted: false,
             silence_pending: false,
+            mute: None,
+            rs_in: 0,
+            out_base: 0,
+            raw_pos: 0,
+            den_pos: 0,
+            mute_out: Vec::new(),
             counters,
             cfg,
         })
@@ -283,6 +301,11 @@ impl Pipeline {
     /// session copies them into `recording.lock` so a crash keeps the audio's start offset.
     pub fn set_hint_cell(&mut self, cell: Arc<Mutex<Option<serde_json::Value>>>) {
         self.hint = Some(cell);
+    }
+
+    /// Silences the frames inside the mute spans of `control` (AUD-6).
+    pub fn set_mute_control(&mut self, control: Arc<MuteControl>) {
+        self.mute = Some(control);
     }
 
     fn publish_hint(&self, first_ns: i128) {
@@ -388,6 +411,8 @@ impl Pipeline {
         self.write_out(&tail);
         tail.clear();
         self.tmp = tail;
+        self.out_base = self.raw_pos;
+        self.rs_in = 0;
         self.resampler = StreamResampler::new(input.sample_rate, TRACK_RATE, self.out_channels)?;
         if let Some(exp) = self.expected_ns() {
             self.ref_ns = Some(exp);
@@ -470,12 +495,37 @@ impl Pipeline {
             keep = subtract(&keep, a, b);
         }
 
+        // Mute spans in chunk frames: a frame is silenced when its capture time is inside one.
+        let muted: Vec<(usize, usize)> = self
+            .mute
+            .as_ref()
+            .map(|m| m.snapshot())
+            .unwrap_or_default()
+            .iter()
+            .filter_map(|sp| {
+                let a = first_frame_at_or_after(sp.from_ns - t0, self.in_rate, n);
+                let b = sp
+                    .to_ns
+                    .map_or(n, |t| first_frame_at_or_after(t - t0, self.in_rate, n));
+                (b > a).then_some((a, b))
+            })
+            .collect();
+
         let mut cursor = 0usize;
         let mut reset = self.pending_reset;
         for (a, b) in keep {
             let paused_before = pause_drops.iter().any(|&(ps, pe)| pe > cursor && ps < a);
-            let start = t0 + i128::from(self.ns_of_frames_in(a));
-            self.ingest(start, &data[a * ch..b * ch], reset || paused_before);
+            let mut first = true;
+            for (sa, sb, is_muted) in split_by_mute(a, b, &muted) {
+                let start = t0 + i128::from(self.ns_of_frames_in(sa));
+                self.ingest(
+                    start,
+                    &data[sa * ch..sb * ch],
+                    first && (reset || paused_before),
+                    is_muted,
+                );
+                first = false;
+            }
             reset = false;
             cursor = b;
         }
@@ -510,7 +560,7 @@ impl Pipeline {
         i64::try_from(self.frames_to_ns(frames as u64)).unwrap_or(i64::MAX)
     }
 
-    fn ingest(&mut self, start: i128, data: &[f32], reset: bool) {
+    fn ingest(&mut self, start: i128, data: &[f32], reset: bool, muted: bool) {
         let ch = usize::from(self.out_channels);
         let n = data.len() / ch;
         if n == 0 {
@@ -570,7 +620,7 @@ impl Pipeline {
         }
         let n = data.len() / ch;
         self.epoch_received += n as u64;
-        self.feed(data);
+        self.feed(data, muted);
     }
 
     fn insert_silence(&mut self, mut frames: u64) {
@@ -579,15 +629,40 @@ impl Pipeline {
         while frames > 0 {
             let k = frames.min(block);
             let zeros = vec![0.0f32; k as usize * ch];
-            self.feed(&zeros);
+            self.feed(&zeros, false);
             frames -= k;
         }
     }
 
     /// Feeds aligned input-rate audio through the resampler and writers; advances the timeline.
-    fn feed(&mut self, data: &[f32]) {
+    ///
+    /// `muted` input is replaced by zeros here, before the resampler, and the output frames it
+    /// maps to are recorded in `mute_out`, so the files are exactly zero there whatever the
+    /// resampler and the denoiser do at the edges of the span.
+    fn feed(&mut self, data: &[f32], muted: bool) {
         let ch = usize::from(self.out_channels);
-        self.ref_frames += (data.len() / ch) as u64;
+        let frames = (data.len() / ch) as u64;
+        self.ref_frames += frames;
+        if muted && frames > 0 {
+            let to_out = |f: u64| {
+                (u128::from(f) * u128::from(TRACK_RATE) + u128::from(self.in_rate) / 2)
+                    / u128::from(self.in_rate.max(1))
+            };
+            let a = self.out_base + to_out(self.rs_in) as u64;
+            let b = self.out_base + to_out(self.rs_in + frames) as u64;
+            match self.mute_out.last_mut() {
+                Some(last) if last.1 >= a => last.1 = last.1.max(b),
+                _ => self.mute_out.push((a, b)),
+            }
+        }
+        self.rs_in += frames;
+        let zeroed;
+        let data = if muted {
+            zeroed = vec![0.0f32; data.len()];
+            &zeroed[..]
+        } else {
+            data
+        };
         let mut out = std::mem::take(&mut self.tmp);
         out.clear();
         if let Err(e) = self.resampler.process(data, &mut out) {
@@ -601,6 +676,16 @@ impl Pipeline {
         if out.is_empty() || self.error.is_some() {
             return;
         }
+        let ch = usize::from(self.out_channels);
+        let mut masked;
+        let out = if self.mute_out.is_empty() {
+            out
+        } else {
+            masked = out.to_vec();
+            zero_ranges(&mut masked, ch, self.raw_pos, &self.mute_out);
+            &masked[..]
+        };
+        self.raw_pos += (out.len() / ch) as u64;
         if let Some(w) = self.raw.as_mut() {
             if let Err(e) = w.write(out) {
                 self.error = Some(map_io(e, &self.cfg.raw_file));
@@ -610,6 +695,8 @@ impl Pipeline {
         if let (Some(d), Some(w)) = (self.denoiser.as_mut(), self.den.as_mut()) {
             self.tmp2.clear();
             d.process(out, &mut self.tmp2);
+            zero_ranges(&mut self.tmp2, ch, self.den_pos, &self.mute_out);
+            self.den_pos += (self.tmp2.len() / ch) as u64;
             if let Err(e) = w.write(&self.tmp2) {
                 self.error = Some(map_io(
                     e,
@@ -632,6 +719,13 @@ impl Pipeline {
             if let (Some(d), Some(w)) = (self.denoiser.as_mut(), self.den.as_mut()) {
                 let mut rest = Vec::new();
                 d.finish(&mut rest);
+                zero_ranges(
+                    &mut rest,
+                    usize::from(self.out_channels),
+                    self.den_pos,
+                    &self.mute_out,
+                );
+                self.den_pos += (rest.len() / usize::from(self.out_channels)) as u64;
                 if let Err(e) = w.write(&rest) {
                     self.error = Some(map_io(e, "denoised"));
                 }
@@ -702,6 +796,14 @@ impl Pipeline {
             .iter()
             .map(|g| json!({"from": ticks(g.from_ns), "to": ticks(g.to_ns), "reason": g.reason}))
             .collect();
+        let muted: Vec<_> = self
+            .mute
+            .as_ref()
+            .map(|m| m.snapshot())
+            .unwrap_or_default()
+            .iter()
+            .map(|s| json!({ "from": ticks(s.from_ns), "to": s.to_ns.map_or(end.ticks(), ticks) }))
+            .collect();
         let changes: Vec<_> = self
             .device_changes
             .iter()
@@ -737,6 +839,7 @@ impl Pipeline {
             },
             "gaps": gaps,
             "pauses": pauses,
+            "muted": muted,
             "device_changes": changes,
             "timestamp_shifted": self.ts_shift_ns != 0,
             "truncated_at": truncated_at,

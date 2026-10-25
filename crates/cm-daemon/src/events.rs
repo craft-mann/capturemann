@@ -39,6 +39,11 @@ pub const RECORDING_STARTING: &str = "recording.starting";
 pub const RECORDING_STARTED: &str = "recording.started";
 pub const RECORDING_PAUSED: &str = "recording.paused";
 pub const RECORDING_RESUMED: &str = "recording.resumed";
+/// The microphone was muted (AUD-6): `{ recording_id, at_ms, recorded_ms }`. The track keeps
+/// running; the file holds digital silence from `at_ms` (session time) on.
+pub const RECORDING_MIC_MUTED: &str = "recording.mic_muted";
+/// The microphone was unmuted: `{ recording_id, at_ms, recorded_ms }`.
+pub const RECORDING_MIC_UNMUTED: &str = "recording.mic_unmuted";
 pub const RECORDING_STATS: &str = "recording.stats";
 pub const RECORDING_HEALTH: &str = "recording.health";
 pub const RECORDING_WARNING: &str = "recording.warning";

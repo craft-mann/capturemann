@@ -180,6 +180,21 @@ fn toast_view(t: &Theme, toast: &Toast, app: &Entity<AppModel>) -> gpui::Div {
                                     .text_color(rgba_of(t.text_3))
                                     .child(SharedString::from(b))
                             }))
+                            .children(toast.progress.map(|pct| {
+                                // A 4 px bar in the tone colour; the card stays neutral.
+                                div()
+                                    .w_full()
+                                    .h(px(4.))
+                                    .rounded(px(2.))
+                                    .bg(rgba_of(t.line))
+                                    .child(
+                                        div()
+                                            .h_full()
+                                            .rounded(px(2.))
+                                            .w(gpui::relative(f32::from(pct.min(100)) / 100.))
+                                            .bg(rgba_of(tone.icon)),
+                                    )
+                            }))
                             .when(!toast.hints.is_empty(), |d| {
                                 d.child(
                                     div()

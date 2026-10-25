@@ -11,16 +11,21 @@
 //!
 //! * Done: "Uploaded to <destination>" with "Copy link" (when there is a link) and "Open" (the link
 //!   for a cloud destination, the file in the file manager for a local folder).
+//! * Running: "Uploading <title> to <destination>" with a bar, the percentage, an ETA from the
+//!   recent throughput and "Cancel" (`cancel_job`); it updates in place (see `upload_progress`).
+//!   `job.progress` carries only the fraction, so there are no byte counts.
 //! * Failed: "Upload to <destination> failed" with the reason and "Retry" (`retry_job`).
 //! * `auth_expired`: one "Reconnect needed for <destination>" toast per destination until an
 //!   upload to it runs again, with a button that opens Settings → Destinations.
 
 use std::collections::{HashMap, HashSet};
+use std::time::Instant;
 
 use cm_i18n::{tr, tr_ctx};
 use serde_json::Value;
 
 use crate::clipboard::TextClipboard;
+use crate::recording::upload_progress::{Eta, ProgressTracker, ProgressView};
 use crate::toast::{ToastAction, ToastKind, ToastSpec};
 
 /// What the tracker needs to know about a destination, from `destinations.json`.
@@ -85,6 +90,13 @@ pub enum Effect {
         destination_id: String,
         destination: String,
     },
+    /// A running upload's toast: update it in place.
+    Progress {
+        job_id: String,
+        title: Option<String>,
+        destination: String,
+        view: ProgressView,
+    },
     /// The job is not known: ask the daemon (`get_job`), call [`UploadTracker::learn`] with the
     /// answer, then apply the same event again.
     Lookup { job_id: String },
@@ -102,6 +114,8 @@ pub struct UploadTracker {
     /// Destinations with an upload failed or paused as `auth_expired` that the user has not yet
     /// dismissed, retried or reconnected: the tray's Attention state while it is not empty.
     attention: HashSet<String>,
+    /// Throughput, ETA and repaint throttle of the running uploads.
+    progress: ProgressTracker,
 }
 
 /// The `error.data.reason` of a `job.failed` event (the readable reason), else its message.
@@ -165,6 +179,17 @@ impl UploadTracker {
 
     /// Applies one daemon event; returns what to show.
     pub fn on_event(&mut self, name: &str, data: &Value, lookup: Lookup) -> Vec<Effect> {
+        self.on_event_at(name, data, lookup, Instant::now())
+    }
+
+    /// [`Self::on_event`] with the clock given (tests).
+    pub fn on_event_at(
+        &mut self,
+        name: &str,
+        data: &Value,
+        lookup: Lookup,
+        now: Instant,
+    ) -> Vec<Effect> {
         let job_id = text(&data["job_id"]).unwrap_or_default();
         if name == "upload.queued" {
             self.insert(UploadStatus {
@@ -203,14 +228,26 @@ impl UploadTracker {
                     j.phase = Phase::Running;
                 }
                 // An upload to this destination runs again: a later `auth_expired` is news again.
+                let raw = j.progress;
+                let finished = j.phase == Phase::Done;
                 if let Some(d) = j.destination_id.clone() {
                     self.reconnect_told.remove(&d);
                     self.attention.remove(&d);
                 }
-                Vec::new()
+                if finished {
+                    return Vec::new();
+                }
+                match self.progress.on_progress(&job_id, raw, now) {
+                    Some(view) => vec![self.progress_effect(&job_id, view, lookup)],
+                    None => Vec::new(),
+                }
             }
-            "job.done" => self.done(&job_id, data, lookup),
+            "job.done" => {
+                self.progress.finish(&job_id);
+                self.done(&job_id, data, lookup)
+            }
             "job.failed" => {
+                self.progress.finish(&job_id);
                 let reason = failure_reason(data);
                 let (dest_id, dest_name, title) = {
                     let j = self.jobs.get_mut(&job_id).expect("known job");
@@ -236,6 +273,7 @@ impl UploadTracker {
                 }]
             }
             "job.paused" if data["pause_reason"] == "auth_expired" => {
+                self.progress.finish(&job_id);
                 let status = {
                     let j = self.jobs.get_mut(&job_id).expect("known job");
                     j.phase = Phase::Paused;
@@ -246,6 +284,46 @@ impl UploadTracker {
             }
             _ => Vec::new(),
         }
+    }
+
+    fn progress_effect(&self, job_id: &str, view: ProgressView, lookup: Lookup) -> Effect {
+        let status = self.jobs[job_id].clone();
+        Effect::Progress {
+            job_id: job_id.to_owned(),
+            title: status.title.clone(),
+            destination: self.name_of(&status, lookup),
+            view,
+        }
+    }
+
+    /// Running uploads that went quiet for 10 s: their toast turns to "Waiting...". Call from a
+    /// timer while [`Self::watching_progress`].
+    pub fn stalled(&mut self, now: Instant, lookup: Lookup) -> Vec<Effect> {
+        let stalled = self.progress.stalled(now);
+        stalled
+            .into_iter()
+            .filter(|(id, _)| self.jobs.get(id).is_some_and(|j| j.phase == Phase::Running))
+            .map(|(id, view)| self.progress_effect(&id, view, lookup))
+            .collect()
+    }
+
+    /// The user cancelled the upload (`cancel_job` answered): the daemon sends no event for it, so
+    /// the job is closed here and its progress forgotten.
+    pub fn cancelled(&mut self, job_id: &str) {
+        self.progress.finish(job_id);
+        if let Some(j) = self.jobs.get_mut(job_id) {
+            j.phase = Phase::Failed;
+        }
+    }
+
+    /// Some running upload has a toast the timer must watch.
+    pub fn watching_progress(&self) -> bool {
+        self.progress.watching()
+    }
+
+    /// The user closed the running toast of `job_id`: it does not come back while the job runs.
+    pub fn progress_toast_closed(&mut self, job_id: &str) {
+        self.progress.dismissed(job_id);
     }
 
     fn reconnect(&mut self, destination_id: Option<String>, name: Option<String>) -> Vec<Effect> {
@@ -447,6 +525,15 @@ pub fn toast_for(effect: &Effect) -> Option<(String, ToastSpec)> {
             format!("upload:{job_id}"),
             upload_failed_toast(job_id, title.as_deref(), destination, reason),
         )),
+        Effect::Progress {
+            job_id,
+            title,
+            destination,
+            view,
+        } => Some((
+            format!("upload:{job_id}"),
+            running_toast(job_id, title.as_deref(), destination, *view),
+        )),
         Effect::Reconnect {
             destination_id,
             destination,
@@ -456,6 +543,65 @@ pub fn toast_for(effect: &Effect) -> Option<(String, ToastSpec)> {
         )),
         Effect::Lookup { .. } => None,
     }
+}
+
+/// The recording's name in the toast title is cut at this many characters.
+const TITLE_CHARS: usize = 28;
+
+/// `text` cut to `max` characters with an ellipsis (a long recording name must not push the
+/// destination out of the title).
+fn ellipsize(text: &str, max: usize) -> String {
+    if text.chars().count() <= max {
+        return text.to_owned();
+    }
+    let cut: String = text.chars().take(max.saturating_sub(1)).collect();
+    format!("{}\u{2026}", cut.trim_end())
+}
+
+/// The running-upload toast, worded again when the language changes.
+pub fn running_toast(
+    job_id: &str,
+    title: Option<&str>,
+    destination: &str,
+    view: ProgressView,
+) -> ToastSpec {
+    let (job_id, title, destination) = (
+        job_id.to_owned(),
+        title.map(str::to_owned),
+        destination.to_owned(),
+    );
+    ToastSpec::live(move || running_toast_now(&job_id, title.as_deref(), &destination, view))
+}
+
+/// "Uploading <title> to <destination>", a bar, "38% · about 2 min left" and "Cancel".
+fn running_toast_now(
+    job_id: &str,
+    title: Option<&str>,
+    destination: &str,
+    view: ProgressView,
+) -> ToastSpec {
+    let head = match title {
+        Some(t) => tr!(
+            "Uploading {title} to {destination}",
+            title = ellipsize(t, TITLE_CHARS),
+            destination = destination
+        ),
+        None => tr!("Uploading to {destination}", destination = destination),
+    };
+    let pct = u32::from(view.percent);
+    let body = match view.eta {
+        Eta::Unknown => tr!("{pct}%", pct = pct),
+        Eta::Waiting => tr!("{pct}% \u{00B7} Waiting\u{2026}", pct = pct),
+        Eta::LessThanMinute => tr!("{pct}% \u{00B7} less than a minute left", pct = pct),
+        Eta::Seconds(n) => tr!("{pct}% \u{00B7} about {n} sec left", pct = pct, n = n),
+        Eta::Minutes(n) => tr!("{pct}% \u{00B7} about {n} min left", pct = pct, n = n),
+    };
+    let mut spec = ToastSpec::new(ToastKind::Info, head).body(body).button(
+        tr_ctx!("button", "Cancel"),
+        ToastAction::CancelJob(job_id.to_owned()),
+    );
+    spec.progress = Some(view.percent);
+    spec
 }
 
 /// "Uploaded to <destination>" with "Copy link" and "Open". Without a link a cloud upload has
@@ -580,5 +726,7 @@ pub fn running_text(s: &UploadStatus, destination: &str) -> String {
 
 #[cfg(test)]
 mod copy_tests;
+#[cfg(test)]
+mod progress_tests;
 #[cfg(test)]
 mod tests;

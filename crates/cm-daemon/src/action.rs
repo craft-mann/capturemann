@@ -89,6 +89,9 @@ pub const ACTIONS: &[ActionSpec] = &[
     spec("start_recording", Tier::Confirm, true),
     spec("pause_recording", Tier::Free, true),
     spec("resume_recording", Tier::Free, true),
+    // Mic mute (AUD-6): the track keeps running, the file gets digital silence for the muted
+    // span. Free and mutating like pause and resume: the recording itself was confirmed.
+    spec("set_mic_muted", Tier::Free, true),
     spec("stop_recording", Tier::Free, true),
     spec("get_recording_status", Tier::Free, false),
     spec("list_devices", Tier::Free, false),
@@ -481,6 +484,14 @@ pub struct RecordingRefParams {
     pub request_id: Option<String>,
 }
 
+/// `set_mic_muted { muted, recording_id?, request_id? }`.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SetMicMutedParams {
+    pub muted: bool,
+    pub recording_id: Option<String>,
+    pub request_id: Option<String>,
+}
+
 /// `get_recording_status { recording_id? }`.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct RecordingStatusParams {
@@ -548,6 +559,7 @@ pub enum Action {
     StartRecording(ExternalParams),
     PauseRecording(RecordingRefParams),
     ResumeRecording(RecordingRefParams),
+    SetMicMuted(SetMicMutedParams),
     StopRecording(RecordingRefParams),
     GetRecordingStatus(RecordingStatusParams),
     ListDevices,
@@ -1205,6 +1217,21 @@ impl Action {
                     _ => Action::SkipCountdown(p),
                 }
             }
+            "set_mic_muted" => {
+                f.only(&["muted", "recording_id", "request_id"])?;
+                let muted = match f.obj.get("muted") {
+                    Some(Value::Bool(b)) => *b,
+                    None | Some(Value::Null) => {
+                        return Err(CmError::invalid_field("muted", "is required"))
+                    }
+                    Some(_) => return Err(CmError::invalid_field("muted", "must be a boolean")),
+                };
+                Action::SetMicMuted(SetMicMutedParams {
+                    muted,
+                    recording_id: recording_id(&f)?,
+                    request_id: f.request_id()?,
+                })
+            }
             "get_recording_status" => {
                 f.only(&["recording_id"])?;
                 Action::GetRecordingStatus(RecordingStatusParams {
@@ -1310,6 +1337,7 @@ impl Action {
             Action::StartRecording(_) => "start_recording",
             Action::PauseRecording(_) => "pause_recording",
             Action::ResumeRecording(_) => "resume_recording",
+            Action::SetMicMuted(_) => "set_mic_muted",
             Action::StopRecording(_) => "stop_recording",
             Action::GetRecordingStatus(_) => "get_recording_status",
             Action::ListDevices => "list_devices",
@@ -1346,6 +1374,7 @@ impl Action {
             Action::CancelJob(p) => p.request_id.as_deref(),
             Action::RetryJob(p) => p.request_id.as_deref(),
             Action::ExportVideo(p) => p.request_id.as_deref(),
+            Action::SetMicMuted(p) => p.request_id.as_deref(),
             Action::PauseRecording(p)
             | Action::ResumeRecording(p)
             | Action::StopRecording(p)
@@ -1537,6 +1566,7 @@ mod tests {
             ("start_recording", json!({"target": {"display_id": 1}})),
             ("pause_recording", json!({})),
             ("resume_recording", json!({"recording_id": "rec_1"})),
+            ("set_mic_muted", json!({"muted": true, "request_id": "r"})),
             ("stop_recording", json!({"request_id": "r"})),
             ("get_recording_status", json!({})),
             ("list_devices", json!({})),

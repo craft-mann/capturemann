@@ -1537,9 +1537,12 @@ async fn agt2_read_only_clients_cannot_control_recordings() {
         "start_recording",
         "discard_recording",
         "skip_countdown",
+        "set_mic_muted",
     ] {
         let p = if m == "start_recording" {
             start_params()
+        } else if m == "set_mic_muted" {
+            json!({ "muted": true })
         } else {
             json!({})
         };
@@ -2260,5 +2263,219 @@ async fn prm1_cursor_permissions_do_not_stop_a_recording() {
     r.sources.revoke_permission(Permission::Accessibility);
     tokio::time::sleep(Duration::from_millis(120)).await;
     assert!(r.daemon.recording_active());
+    user(&r.daemon, "stop_recording", json!({})).await.unwrap();
+}
+
+// ---- AUD-6: mic mute ------------------------------------------------------------------------
+
+async fn mute(r: &Rig, muted: bool) -> Value {
+    user(&r.daemon, "set_mic_muted", json!({ "muted": muted }))
+        .await
+        .unwrap()
+}
+
+/// AUD-6: `set_mic_muted` toggles the mic track without stopping it, answers
+/// `{ recording_id, muted, changed }`, publishes `recording.mic_muted` / `mic_unmuted` once per
+/// real change, shows in the status, and the spans end up in the manifest in session time.
+#[tokio::test]
+async fn aud6_mute_unmute_events_status_and_manifest_spans() {
+    let r = rig();
+    user(
+        &r.daemon,
+        "set_settings",
+        json!({ "values": { "recording.resume_countdown_s": 0 } }),
+    )
+    .await
+    .unwrap();
+    let mut rx = r.daemon.subscribe();
+    let started = start(&r, json!({ "mic": true, "title": "Mute" })).await;
+    let rec_id = started["recording_id"].as_str().unwrap().to_owned();
+    let st = user(&r.daemon, "get_recording_status", json!({}))
+        .await
+        .unwrap();
+    assert_eq!(st["mic_muted"], false);
+
+    r.host.advance_ns(5 * SEC);
+    let m = mute(&r, true).await;
+    assert_eq!(m["recording_id"], rec_id.as_str());
+    assert_eq!(m["muted"], true);
+    assert_eq!(m["changed"], true);
+    assert_eq!(m["at_ms"], 5000);
+    // Idempotent: the second call changes nothing and publishes nothing.
+    let again = mute(&r, true).await;
+    assert_eq!(again["muted"], true);
+    assert_eq!(again["changed"], false);
+    let st = status_where(&r.daemon, |s| s["mic_muted"] == true).await;
+    assert_eq!(st["state"], "recording");
+    assert_eq!(
+        st["tracks"].as_array().unwrap().len(),
+        3,
+        "the track keeps running"
+    );
+
+    // Muting while paused is allowed; here: unmute while paused, mute again, resume muted.
+    r.host.advance_ns(2 * SEC);
+    user(&r.daemon, "pause_recording", json!({})).await.unwrap();
+    r.host.advance_ns(3 * SEC);
+    let un = mute(&r, false).await;
+    assert_eq!(un["muted"], false);
+    assert_eq!(un["changed"], true);
+    assert_eq!(un["at_ms"], 10_000);
+    mute(&r, true).await;
+    r.host.advance_ns(SEC);
+    user(&r.daemon, "resume_recording", json!({}))
+        .await
+        .unwrap();
+    r.host.advance_ns(2 * SEC);
+    let stopped = user(&r.daemon, "stop_recording", json!({})).await.unwrap();
+    assert_eq!(stopped["reason"], "user");
+
+    let calls = r.sources.handle(TrackKind::Mic).unwrap().calls();
+    assert_eq!(
+        calls,
+        ["start", "mute", "pause", "unmute", "mute", "resume", "stop"],
+        "never stopped or restarted, and the repeated mute did not reach the track"
+    );
+    let ev = drain(&mut rx);
+    let muted_events: Vec<(String, Value)> = ev
+        .iter()
+        .filter(|e| e.name.starts_with("recording.mic_"))
+        .map(|e| (e.name.clone(), e.data["at_ms"].clone()))
+        .collect();
+    assert_eq!(
+        muted_events,
+        [
+            ("recording.mic_muted".to_owned(), json!(5000)),
+            ("recording.mic_unmuted".to_owned(), json!(10_000)),
+            ("recording.mic_muted".to_owned(), json!(10_000)),
+        ]
+    );
+    assert!(ev
+        .iter()
+        .filter(|e| e.name.starts_with("recording.mic_"))
+        .all(|e| e.data["recording_id"] == rec_id.as_str()));
+
+    // The manifest lists the spans in session time (120 000 ticks per second); the one still
+    // open at the stop is closed at the stop time (13 s of session: 5 + 2 + 3 + 1 + 2).
+    let m = manifest(&r, "Mute.cmrec");
+    assert_eq!(
+        m["mic_muted"],
+        json!([
+            { "from": 5 * 120_000, "to": 10 * 120_000 },
+            { "from": 10 * 120_000, "to": 13 * 120_000 },
+        ])
+    );
+    assert_eq!(m["session"]["mic_muted"], m["mic_muted"]);
+}
+
+/// AUD-6: a missing recording, a recording without a mic track and an unknown id are refused
+/// with the shared codes (`not_found` like pause, `invalid_input`).
+#[tokio::test]
+async fn aud6_mute_needs_a_running_recording_with_a_mic_track() {
+    let r = rig();
+    let e = user(&r.daemon, "set_mic_muted", json!({ "muted": true }))
+        .await
+        .unwrap_err();
+    assert_eq!(err_code(&e), ErrorCode::NotFound);
+    let pause_err = user(&r.daemon, "pause_recording", json!({}))
+        .await
+        .unwrap_err();
+    assert_eq!(err_code(&e), err_code(&pause_err), "same code as pause");
+
+    start(&r, json!({})).await;
+    let e = user(&r.daemon, "set_mic_muted", json!({ "muted": true }))
+        .await
+        .unwrap_err();
+    assert_eq!(err_code(&e), ErrorCode::InvalidInput);
+    assert!(e.to_string().contains("no microphone"), "{e}");
+    let st = user(&r.daemon, "get_recording_status", json!({}))
+        .await
+        .unwrap();
+    assert_eq!(st["mic_muted"], false);
+    let e = user(
+        &r.daemon,
+        "set_mic_muted",
+        json!({ "muted": true, "recording_id": "rec_nope" }),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(err_code(&e), ErrorCode::NotFound);
+    user(&r.daemon, "stop_recording", json!({})).await.unwrap();
+}
+
+/// AUD-6: the action is Free for agents (the recording was confirmed already) and bad input is
+/// rejected before anything runs.
+#[tokio::test]
+async fn aud6_agents_mute_without_a_dialog_and_input_is_validated() {
+    let r = rig_with(FakeSources::new(), Some(Decision::Approve));
+    r.daemon
+        .execute_method(
+            agent("claude"),
+            0,
+            "start_recording",
+            &json!({ "target": { "display_id": 1 }, "countdown_s": 0, "mic": true }),
+        )
+        .await
+        .unwrap();
+    let shown = r.confirmer.as_ref().unwrap().shown().len();
+    let v = r
+        .daemon
+        .execute_method(
+            agent("claude"),
+            0,
+            "set_mic_muted",
+            &json!({ "muted": true, "request_id": "m1" }),
+        )
+        .await
+        .unwrap();
+    assert_eq!(v["muted"], true);
+    assert_eq!(
+        r.confirmer.as_ref().unwrap().shown().len(),
+        shown,
+        "no dialog"
+    );
+    for bad in [
+        json!({}),
+        json!({ "muted": "yes" }),
+        json!({ "muted": true, "x": 1 }),
+    ] {
+        let e = user(&r.daemon, "set_mic_muted", bad.clone())
+            .await
+            .unwrap_err();
+        assert_eq!(err_code(&e), ErrorCode::InvalidInput, "{bad}");
+    }
+    // The agent's mute shows in the status a HUD polls.
+    let st = user(&r.daemon, "get_recording_status", json!({}))
+        .await
+        .unwrap();
+    assert_eq!(st["mic_muted"], true);
+    user(&r.daemon, "stop_recording", json!({})).await.unwrap();
+}
+
+/// AUD-6: muting during the resume countdown works and does not cancel the resume.
+#[tokio::test]
+async fn aud6_mute_during_the_resume_countdown_does_not_interrupt_it() {
+    let r = rig();
+    user(
+        &r.daemon,
+        "set_settings",
+        json!({ "values": { "recording.resume_countdown_s": 3 } }),
+    )
+    .await
+    .unwrap();
+    start(&r, json!({ "mic": true })).await;
+    user(&r.daemon, "pause_recording", json!({})).await.unwrap();
+    let d = r.daemon.clone();
+    let resuming = tokio::spawn(async move { user(&d, "resume_recording", json!({})).await });
+    status_where(&r.daemon, |s| s["state"] == "resuming").await;
+    let m = mute(&r, true).await;
+    assert_eq!(m["changed"], true);
+    let res = resuming.await.unwrap().unwrap();
+    assert_eq!(res["state"], "recording", "{res}");
+    let st = user(&r.daemon, "get_recording_status", json!({}))
+        .await
+        .unwrap();
+    assert_eq!(st["state"], "recording");
+    assert_eq!(st["mic_muted"], true);
     user(&r.daemon, "stop_recording", json!({})).await.unwrap();
 }

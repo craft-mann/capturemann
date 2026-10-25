@@ -1,4 +1,13 @@
-<h1 align="center">CaptureMann</h1>
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="design/brand/logo/svg/lockup-horizontal-on-dark.svg">
+    <img alt="CaptureMann" src="design/brand/logo/svg/lockup-horizontal-on-light.svg" height="56">
+  </picture>
+</h1>
+
+<p align="center">
+  <a href="https://www.craftmann.app/"><img alt="a CraftMann app" src="apps/desktop/assets/brand/endorsement-craftmann.svg" height="22"></a>
+</p>
 
 <p align="center">
 Free, open-source screenshots and screen recording with a webcam bubble, local AI captions,<br>
@@ -29,7 +38,7 @@ and every feature available to AI agents through MCP and a CLI.
   zoom and silence-cut suggestions. Models download only when you press Download.
 - **Library** of self-contained capture bundles, stored in a folder you choose.
 - **Share**: save to local folders or Google Drive, publish to YouTube (private by default).
-- **For agents**: 53 MCP tools plus resources and prompts, and an identical `capturemann` CLI. Risky
+- **For agents**: 54 MCP tools plus resources and prompts, and an identical `capturemann` CLI. Risky
   actions (start recording, publish, delete) need an on-screen confirmation.
 - **Private by design**: no telemetry, and no network traffic unless you connect a destination or
   download a model. You bring your own Google credentials; secrets live in the macOS Keychain.

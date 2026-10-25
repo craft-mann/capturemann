@@ -217,6 +217,34 @@ pub struct TrackStatus {
     pub start_ms: f64,
 }
 
+/// A span of session time in which the microphone was muted (AUD-6). `to` is `None` while it
+/// still is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MicMuteSpan {
+    pub from: MediaTime,
+    pub to: Option<MediaTime>,
+}
+
+/// What [`RecordingSession::set_mic_muted`] did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MicMuteChange {
+    /// `false` when the microphone already was in the asked state.
+    pub changed: bool,
+    /// Session time of the change (of the last one when nothing changed).
+    pub at: MediaTime,
+}
+
+/// The manifest `mic_muted` list: `[{from, to}]` in session ticks; `to` is `null` only for a
+/// span still open (a crash recovered the bundle while the mic was muted).
+pub fn mic_muted_json(spans: &[MicMuteSpan]) -> Value {
+    Value::Array(
+        spans
+            .iter()
+            .map(|s| json!({ "from": s.from.ticks(), "to": s.to.map(MediaTime::ticks) }))
+            .collect(),
+    )
+}
+
 /// What the HUD shows (`get_recording_status`).
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SessionStatus {
@@ -228,6 +256,8 @@ pub struct SessionStatus {
     pub live_at: MediaTime,
     pub paused_total: MediaTime,
     pub tracks: Vec<TrackStatus>,
+    /// The microphone is muted now (AUD-6).
+    pub mic_muted: bool,
     pub warnings: usize,
     pub disk_minutes_left: Option<f64>,
     pub stop_requested: Option<String>,
@@ -252,6 +282,8 @@ pub struct RecordingSession {
     state: SessionState,
     paused_at: Option<MediaTime>,
     gaps: Vec<PauseGap>,
+    /// Muted spans of the microphone, in session time (AUD-6).
+    mic_muted: Vec<MicMuteSpan>,
     live_at: MediaTime,
     requested: Vec<TrackKind>,
     warnings: Vec<SessionNote>,
@@ -484,6 +516,7 @@ impl RecordingSession {
             state: SessionState::Recording,
             paused_at: None,
             gaps: Vec::new(),
+            mic_muted: Vec::new(),
             live_at,
             requested,
             warnings,
@@ -592,6 +625,7 @@ impl RecordingSession {
                     start_ms: s.start_ms,
                 })
                 .collect(),
+            mic_muted: self.is_mic_muted(),
             warnings: self.warnings.len(),
             disk_minutes_left: self.disk_minutes,
             stop_requested: self.stop_requested.clone(),
@@ -727,6 +761,59 @@ impl RecordingSession {
         Some(note)
     }
 
+    /// The microphone is muted now.
+    pub fn is_mic_muted(&self) -> bool {
+        self.mic_muted.last().is_some_and(|s| s.to.is_none())
+    }
+
+    /// The muted spans so far, in session time.
+    pub fn mic_muted_spans(&self) -> &[MicMuteSpan] {
+        &self.mic_muted
+    }
+
+    /// Mutes or unmutes the microphone (AUD-6) while recording or paused. The track keeps
+    /// running; its files hold digital silence for the muted frames. Idempotent. Without a
+    /// running microphone track: `invalid_input`.
+    pub fn set_mic_muted(&mut self, muted: bool) -> Result<MicMuteChange, CmError> {
+        if !matches!(self.state, SessionState::Recording | SessionState::Paused) {
+            return Err(CmError::invalid_input("The recording is not running"));
+        }
+        let slot = self
+            .slots
+            .iter_mut()
+            .find(|s| s.track.kind() == TrackKind::Mic && s.state == TrackState::Running)
+            .ok_or_else(|| CmError::invalid_input("This recording has no microphone track"))?;
+        if self.mic_muted.last().is_some_and(|s| s.to.is_none()) == muted {
+            let last = self
+                .mic_muted
+                .last()
+                .map(|s| s.to.unwrap_or(s.from))
+                .unwrap_or_else(|| self.clock.now());
+            return Ok(MicMuteChange {
+                changed: false,
+                at: last,
+            });
+        }
+        let change = slot.track.set_muted(muted)?;
+        if muted {
+            self.mic_muted.push(MicMuteSpan {
+                from: change.at,
+                to: None,
+            });
+        } else if let Some(last) = self.mic_muted.last_mut() {
+            last.to = Some(change.at.max(last.from));
+        }
+        // Best effort: the lock keeps the spans for crash recovery; the final list is written at
+        // stop and a failure here must not undo a mute that already is in force.
+        if let Some(b) = self.bundle.as_mut() {
+            let _ = b.set_extra("mic_muted", mic_muted_json(&self.mic_muted));
+        }
+        Ok(MicMuteChange {
+            changed: true,
+            at: change.at,
+        })
+    }
+
     /// Pauses every track at one instant (REC-4).
     pub fn pause(&mut self) -> Result<(), CmError> {
         if self.state != SessionState::Recording {
@@ -830,6 +917,9 @@ impl RecordingSession {
             if let Some(b) = self.bundle.as_mut() {
                 b.add_gap(gap)?;
             }
+        }
+        if let Some(open) = self.mic_muted.last_mut().filter(|s| s.to.is_none()) {
+            open.to = Some(at.max(open.from));
         }
         let t0 = Instant::now();
         let results: Vec<Option<Result<TrackInfo, CmError>>> = std::thread::scope(|s| {
@@ -966,9 +1056,13 @@ impl RecordingSession {
             .bundle
             .take()
             .ok_or_else(|| CmError::internal("the recording bundle is gone"))?;
+        if !self.mic_muted.is_empty() {
+            bundle.set_extra("mic_muted", mic_muted_json(&self.mic_muted))?;
+        }
         bundle.set_extra(
             "session",
             json!({
+                "mic_muted": mic_muted_json(&self.mic_muted),
                 "live_at": self.live_at.ticks(),
                 "wall_end": at.ticks(),
                 "paused": paused,

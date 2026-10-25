@@ -12,7 +12,7 @@ use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
-use cm_audio::{LevelHandle, LevelMeter};
+use cm_audio::{LevelHandle, LevelMeter, MuteChange};
 use cm_core::{CmError, MediaTime, Permission, TrackContext, TrackInfo, TrackKind, TrackStats};
 use serde_json::{json, Value};
 
@@ -118,6 +118,8 @@ struct FakeTrack {
     state: Arc<TrackState>,
     dir: Option<std::path::PathBuf>,
     started: bool,
+    clock: Option<cm_core::SessionClock>,
+    muted: bool,
 }
 
 impl FakeTrack {
@@ -153,6 +155,7 @@ impl SessionTrack for FakeTrack {
         std::fs::write(ctx.dir.join(self.file()), b"fake media")
             .map_err(|e| CmError::internal(format!("fake track cannot write: {e}")))?;
         self.dir = Some(ctx.dir);
+        self.clock = Some(ctx.clock);
         self.started = true;
         Ok(())
     }
@@ -165,6 +168,17 @@ impl SessionTrack for FakeTrack {
     fn resume(&mut self, _at: MediaTime) -> Result<(), CmError> {
         self.log("resume");
         Ok(())
+    }
+
+    fn set_muted(&mut self, muted: bool) -> Result<MuteChange, CmError> {
+        if self.kind != TrackKind::Mic {
+            return Err(CmError::invalid_input("This track cannot be muted"));
+        }
+        let at = self.clock.as_ref().map_or(MediaTime::ZERO, |c| c.now());
+        let changed = self.muted != muted;
+        self.muted = muted;
+        self.log(if muted { "mute" } else { "unmute" });
+        Ok(MuteChange { changed, at })
     }
 
     fn stop(&mut self, at: MediaTime) -> Result<TrackInfo, CmError> {
@@ -454,6 +468,8 @@ impl SourceFactory for FakeSources {
                 state,
                 dir: None,
                 started: false,
+                clock: None,
+                muted: false,
             }));
         }
         Ok(out)

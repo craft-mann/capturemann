@@ -4,8 +4,9 @@
 //! buttons. The decisions live in `recording::uploads` (unit tested without a display).
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{LazyLock, Mutex, MutexGuard, PoisonError};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use cm_daemon::events::Event;
 use cm_i18n::{tr, tr_ctx};
@@ -30,6 +31,9 @@ static ATTENTION: LazyLock<Mutex<AttentionTracker>> = LazyLock::new(Mutex::defau
 /// The toast showing each key (`upload:<job>`, `reconnect:<destination>`), so a newer toast for the
 /// same thing replaces the older one in place.
 static TOASTS: LazyLock<Mutex<HashMap<String, u64>>> = LazyLock::new(Mutex::default);
+
+/// A timer is running that turns quiet uploads into "Waiting...".
+static TICKING: AtomicBool = AtomicBool::new(false);
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(PoisonError::into_inner)
@@ -110,6 +114,7 @@ fn apply(app: &Entity<AppModel>, name: &str, data: &Value, cx: &mut App) {
             upsert(app, &key, spec, cx);
         }
     }
+    start_ticker(app, cx);
     // The details card shows running uploads: wake it for progress and results.
     if name.starts_with("job.") || name == "upload.queued" {
         app.update(cx, |_, cx| cx.notify());
@@ -155,6 +160,86 @@ pub fn toast_dismissed(app: &Entity<AppModel>, toast_id: u64, cx: &mut App) {
         lock(&TRACKER).acknowledged(&dest);
         crate::ui::recording::sync_tray(app, cx);
     }
+    // A closed running-upload toast does not come back while the job runs.
+    let job = {
+        let toasts = lock(&TOASTS);
+        toasts
+            .iter()
+            .find(|(_, id)| **id == toast_id)
+            .and_then(|(key, _)| key.strip_prefix("upload:").map(str::to_owned))
+    };
+    if let Some(job) = job {
+        lock(&TRACKER).progress_toast_closed(&job);
+    }
+}
+
+/// While an upload toast is on screen, once a second: an upload with no progress for 10 s
+/// becomes "Waiting...". Stops by itself when nothing is left to watch.
+fn start_ticker(app: &Entity<AppModel>, cx: &mut App) {
+    if !lock(&TRACKER).watching_progress() || TICKING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let app = app.clone();
+    cx.spawn(async move |cx| loop {
+        cx.background_executor().timer(Duration::from_secs(1)).await;
+        let keep = cx.update(|cx| {
+            let effects = lock(&TRACKER).stalled(Instant::now(), &dest_info);
+            for effect in effects {
+                if let Some((key, spec)) = toast_for(&effect) {
+                    upsert(&app, &key, spec, cx);
+                }
+            }
+            let keep = lock(&TRACKER).watching_progress();
+            if !keep {
+                TICKING.store(false, Ordering::SeqCst);
+            }
+            keep
+        });
+        if !keep {
+            break;
+        }
+    })
+    .detach();
+}
+
+/// Toast "Cancel" on a running upload: `cancel_job` as the user. The daemon sends no event for a
+/// cancelled job, so the answer closes it here and a short "Upload cancelled" toast says so.
+pub fn cancel(app: &Entity<AppModel>, job_id: &str, cx: &mut App) {
+    let backend = app.read(cx).backend.clone();
+    let Some(daemon) = backend.daemon.clone() else {
+        return;
+    };
+    lock(&TRACKER).progress_toast_closed(job_id);
+    let (app2, id) = (app.clone(), job_id.to_owned());
+    cx.spawn(async move |cx| {
+        let id2 = id.clone();
+        let res = backend
+            .rt
+            .spawn(async move {
+                Backend::call_coded(&daemon, "cancel_job", json!({ "job_id": id2 })).await
+            })
+            .await;
+        cx.update(|cx| match res {
+            Ok(Ok(_)) => {
+                lock(&TRACKER).cancelled(&id);
+                app::push_toast(
+                    &app2,
+                    ToastSpec::new(ToastKind::Info, tr!("Upload cancelled")),
+                    cx,
+                );
+                app2.update(cx, |_, cx| cx.notify());
+            }
+            other => {
+                let why = match other {
+                    Ok(Err(e)) => crate::daemon_text::call_error_text(&e),
+                    Err(e) => e.to_string(),
+                    Ok(Ok(_)) => unreachable!(),
+                };
+                error_toast(&app2, &tr!("Couldn\u{2019}t cancel the upload"), &why, cx);
+            }
+        });
+    })
+    .detach();
 }
 
 /// An upload the app did not see being queued (started by the CLI or an agent): ask the daemon

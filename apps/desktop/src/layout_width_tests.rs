@@ -264,8 +264,15 @@ fn row_label_keys() -> Vec<String> {
         .collect()
 }
 
+fn running_view(
+    eta: crate::recording::upload_progress::Eta,
+) -> crate::recording::upload_progress::ProgressView {
+    crate::recording::upload_progress::ProgressView { percent: 38, eta }
+}
+
 fn toast_specs() -> Vec<(&'static str, crate::toast::ToastSpec)> {
     use crate::recording::model::Ended;
+    use crate::recording::upload_progress::Eta;
     use crate::recording::{exports, toasts, uploads};
     vec![
         (
@@ -300,6 +307,45 @@ fn toast_specs() -> Vec<(&'static str, crate::toast::ToastSpec)> {
             exports::exported_toast("rec_1", "My take", Some("burned")),
         ),
         ("uploads: reconnect", uploads::reconnect_toast("My Drive")),
+        (
+            "uploads: running, no ETA yet",
+            uploads::running_toast(
+                "j",
+                Some("My take"),
+                "Google Drive",
+                running_view(Eta::Unknown),
+            ),
+        ),
+        (
+            "uploads: running, seconds, long title",
+            uploads::running_toast(
+                "j",
+                Some("Recording 2026-10-23 08.40 about the whole quarterly planning"),
+                "Google Drive",
+                running_view(Eta::Seconds(45)),
+            ),
+        ),
+        (
+            "uploads: running, minutes",
+            uploads::running_toast("j", None, "My Drive", running_view(Eta::Minutes(12))),
+        ),
+        (
+            "uploads: running, less than a minute",
+            uploads::running_toast(
+                "j",
+                Some("My take"),
+                "My Drive",
+                running_view(Eta::LessThanMinute),
+            ),
+        ),
+        (
+            "uploads: running, waiting",
+            uploads::running_toast("j", Some("My take"), "My Drive", running_view(Eta::Waiting)),
+        ),
+        (
+            "agent: started with Stop",
+            crate::toast::ToastSpec::agent_with_stop("start_recording", "claude-desktop", "rec_1"),
+        ),
         (
             "uploads: failed",
             uploads::upload_failed_toast("job_1", Some("My take"), "My Drive", "quota"),
@@ -824,6 +870,48 @@ fn cases() -> Vec<Case> {
         .text("Dismiss", || cm_i18n::tr_ctx!("button", "Dismiss")),
     );
 
+    // Settings -> Shortcuts header button (R16): 32 px, 12 px side padding, 1 px border, a 14 px
+    // icon and its gap; the header wraps, so the button must fit alone in a 260 px room.
+    v.push(
+        Case::new(
+            "Shortcuts reset button",
+            "260 - 24 padding - 2 border - 14 icon - 6 gap",
+            260. - 46.,
+            cap,
+            400,
+            one,
+        )
+        .text("Reset to defaults", || cm_i18n::tr!("Reset to defaults")),
+    );
+    // Publish footer progress row: Cancel / Cancelling... are 40 px secondary buttons with 16 px
+    // padding and a border, in the 150 px the status text leaves free on the narrowest page.
+    v.push(
+        Case::new(
+            "Publish cancel button",
+            "150 - 32 padding - 2 border",
+            150. - 34.,
+            ui,
+            600,
+            one,
+        )
+        .text("Cancel", || cm_i18n::tr_ctx!("button", "Cancel"))
+        .text("Cancelling", || {
+            cm_i18n::tr_ctx!("button", "Cancelling\u{2026}")
+        }),
+    );
+    // The progress line while a cancel is pending shares the row with the button.
+    v.push(
+        Case::new(
+            "Publish cancelling line",
+            "240 min width",
+            240.,
+            ui,
+            400,
+            one,
+        )
+        .text("Cancelling", || cm_i18n::tr!("Cancelling\u{2026}")),
+    );
+
     // ---- window picker (R19): 1000 wide, rail 230, main column 1000 - 230 - 36 = 734 ---------------
     // A rail row: 230 - 20 container padding - 20 row padding = 190, less the 22 px tile, a 10 px
     // gap each side of the label and a two-digit count (about 18 px).
@@ -1059,6 +1147,7 @@ fn sheet_and_dialog_height_estimates_hold_in_every_language() {
                 crate::confirm::delete_dialog("x").summary,
                 crate::confirm::discard_dialog(true, "0:10", None).summary,
                 crate::confirm::discard_dialog(false, "0:10", None).summary,
+                crate::ui::settings::reset::reset_dialog(&[]).summary,
             ]
         });
         for text in summaries {

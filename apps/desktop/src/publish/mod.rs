@@ -3,6 +3,7 @@
 //! talks to the daemon. `ui::publish_sheet` only draws it.
 
 pub mod backend;
+pub mod cancel;
 pub mod form;
 pub mod job;
 pub mod sheet;

@@ -991,7 +991,12 @@ async fn rec_tools_have_the_spec_tiers_and_schemas() {
         assert!(props.contains_key(k), "start_recording.{k}");
     }
     assert_eq!(props["fps"]["enum"], json!([30, 60]));
-    for n in ["pause_recording", "resume_recording", "stop_recording"] {
+    for n in [
+        "pause_recording",
+        "resume_recording",
+        "set_mic_muted",
+        "stop_recording",
+    ] {
         let t = get(n);
         assert!(
             t.description.as_deref().unwrap().contains("Tier: Free"),
@@ -1098,6 +1103,21 @@ async fn rec_mcp_start_status_pause_resume_stop() {
     assert_eq!(ok(&p)["state"], "paused");
     let r = call(&c, "resume_recording", json!({})).await;
     assert_eq!(ok(&r)["state"], "recording");
+    // AUD-6: Free, no dialog, idempotent, shown by the status; a bad input is invalid_input.
+    let shown = confirmer.shown().len();
+    let m = call(&c, "set_mic_muted", json!({ "muted": true })).await;
+    assert_eq!(ok(&m)["muted"], true);
+    assert_eq!(ok(&m)["changed"], true);
+    assert_eq!(ok(&m)["recording_id"], started["recording_id"]);
+    let m = call(&c, "set_mic_muted", json!({ "muted": true })).await;
+    assert_eq!(ok(&m)["changed"], false);
+    let st = call(&c, "get_recording_status", json!({})).await;
+    assert_eq!(ok(&st)["mic_muted"], true);
+    let bad = call(&c, "set_mic_muted", json!({})).await;
+    assert_eq!(err_code(&bad), "invalid_input");
+    let m = call(&c, "set_mic_muted", json!({ "muted": false })).await;
+    assert_eq!(ok(&m)["muted"], false);
+    assert_eq!(confirmer.shown().len(), shown, "set_mic_muted never asks");
     let s = call(&c, "stop_recording", json!({ "request_id": "s-1" })).await;
     let stopped = ok(&s).clone();
     assert_eq!(stopped["capture_id"], started["capture_id"]);
@@ -1186,8 +1206,18 @@ async fn rec_mcp_errors_carry_shared_codes() {
     .await;
     assert_eq!(err_code(&r), "busy");
     let v = mcp_client(conn, "viewer").await;
-    for tool in ["pause_recording", "resume_recording", "stop_recording"] {
-        let r = call(&v, tool, json!({})).await;
+    for tool in [
+        "pause_recording",
+        "resume_recording",
+        "stop_recording",
+        "set_mic_muted",
+    ] {
+        let args = if tool == "set_mic_muted" {
+            json!({ "muted": true })
+        } else {
+            json!({})
+        };
+        let r = call(&v, tool, args).await;
         assert_eq!(err_code(&r), "user_declined", "{tool}");
         assert_eq!(
             r.structured_content.as_ref().unwrap()["data"]["reason"],

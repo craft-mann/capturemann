@@ -14,8 +14,8 @@ mod ai;
 use crate::args::{
     AnnotateArgs, CaptureCmd, Cli, Command, DaemonCmd, EditCmd, ExportArgs, GetArgs, JobsCmd,
     LibraryCmd, LibraryListArgs, LibraryPaging, PublishArgs, PublishCmd, PublishSendArgs,
-    RecordCmd, RecordRefArgs, RecordSelftestArgs, RecordStartArgs, RevisionArgs, ScreenshotArgs,
-    SettingsCmd, UploadArgs,
+    RecordCmd, RecordMicArgs, RecordRefArgs, RecordSelftestArgs, RecordStartArgs, RevisionArgs,
+    ScreenshotArgs, SettingsCmd, UploadArgs,
 };
 use crate::client::{describe, Client};
 use crate::error::CliError;
@@ -112,6 +112,7 @@ pub async fn execute(cli: Cli, env: &mut Env) -> Result<(), CliError> {
             RecordCmd::Start(a) => record_start(&mut cx, *a).await,
             RecordCmd::Pause(a) => record_control(&mut cx, "pause_recording", a).await,
             RecordCmd::Resume(a) => record_control(&mut cx, "resume_recording", a).await,
+            RecordCmd::Mic(a) => record_mic(&mut cx, a).await,
             RecordCmd::Stop(a) => record_control(&mut cx, "stop_recording", a).await,
             RecordCmd::Status(a) => record_status(&mut cx, a).await,
             RecordCmd::Selftest(a) => record_selftest(&mut cx, a).await,
@@ -1718,6 +1719,33 @@ async fn record_control(
     Ok(())
 }
 
+async fn record_mic(cx: &mut Ctx<'_>, a: RecordMicArgs) -> Result<(), CliError> {
+    let mut p = Map::new();
+    p.insert("muted".into(), json!(a.mute));
+    if let Some(id) = &a.recording_id {
+        p.insert("recording_id".into(), json!(id));
+    }
+    let params = cx.mutating(Value::Object(p), "");
+    let mut c = cx.client().await?;
+    let r = c.call("set_mic_muted", params).await?;
+    cx.emit(&r, |r| {
+        let now = if r["muted"] == json!(true) {
+            "muted"
+        } else {
+            "unmuted"
+        };
+        if r["changed"] == json!(false) {
+            format!("The microphone is already {now}.")
+        } else {
+            format!(
+                "Microphone {now} at {}",
+                clock_text(r["at_ms"].as_i64().unwrap_or(0))
+            )
+        }
+    });
+    Ok(())
+}
+
 async fn record_status(cx: &mut Ctx<'_>, a: RecordRefArgs) -> Result<(), CliError> {
     let params = match &a.recording_id {
         Some(id) => json!({ "recording_id": id }),
@@ -1767,6 +1795,9 @@ async fn record_status(cx: &mut Ctx<'_>, a: RecordRefArgs) -> Result<(), CliErro
         let _ = writeln!(s, "  tracks: {}", tracks.join(", "));
         if let Some(db) = r["mic_level_dbfs"].as_f64() {
             let _ = writeln!(s, "  mic level: {db:.0} dBFS");
+        }
+        if r["mic_muted"] == json!(true) {
+            let _ = writeln!(s, "  microphone: muted");
         }
         if let Some(p) = r["late_frame_pct"].as_f64() {
             let _ = writeln!(s, "  late frames: {p:.1}%");
