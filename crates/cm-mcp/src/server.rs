@@ -269,7 +269,10 @@ impl ServerHandler for McpServer {
                  caption-cleanup, make-short-clip. \
                  Daemon events (capture.*, job.*, export.*, recording.*) arrive as \
                  notifications/message from logger capturemann.events; the data is the event. \
-                 Tools marked Confirm wait for the user to approve on screen. \
+                 Tools marked Confirm wait for the user to approve on screen. The user can also set any \
+                 tool that changes something to Ask first, and may let start_recording run without a \
+                 dialog; publish_video and delete_capture always ask. A call that is asked first \
+                 fails with user_declined (data.reason ask_first) when the user cancels. \
                  Errors carry a shared code in structuredContent.code (invalid_input, not_found, \
                  user_declined, confirmation_timeout, permission_missing, not_implemented, ...).",
         )

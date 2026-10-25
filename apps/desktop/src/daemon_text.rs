@@ -360,9 +360,33 @@ pub fn confirm_summary(kind: &str, params: &Value, english: &str) -> String {
         "delete_capture" => delete_summary(params),
         "download_model" => model_summary(params, true),
         "remove_model" => model_summary(params, false),
+        "tool_ask_first" => ask_first_summary(params),
         _ => None,
     };
     built.unwrap_or_else(|| english.to_owned())
+}
+
+/// The title of the tool a generic ask-first dialog is about: the Agents page's own title for a
+/// tool this version knows (translated), else the daemon's English one.
+pub fn ask_first_tool_title(params: &Value) -> Option<String> {
+    let tool = text(params, "tool")?;
+    let known = crate::ui::settings::model::tool_title(tool);
+    if known != crate::ui::settings::model::tool_title("") {
+        return Some(known);
+    }
+    Some(text(params, "title").map_or_else(|| humanize_key(tool), str::to_owned))
+}
+
+/// AGT-2.AC11: the sentence of the generic dialog for a tool the user set to Ask first. `None`
+/// (the daemon's English is shown) when the parameters are not understood.
+fn ask_first_summary(p: &Value) -> Option<String> {
+    let title = ask_first_tool_title(p)?;
+    let agent = crate::confirm::display_client_name(text(p, "client")?);
+    Some(tr!(
+        "{agent} is asking to run \u{201C}{title}\u{201D}. You set this tool to Ask first in Settings \u{2192} Agents & CLI.",
+        agent = agent,
+        title = title
+    ))
 }
 
 /// The dialog's rows for action `kind`: the daemon's English `details` (label to text) with the

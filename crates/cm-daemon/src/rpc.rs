@@ -19,7 +19,9 @@
 //!   waiting confirmation dialog closes); the cancelled request gets no response. Clients send
 //!   it when their own caller gave up (MCP `notifications/cancelled`). It answers
 //!   `{ cancelled: bool }` when it has an `id` of its own;
-//! * `actions.list` returns `[{name, tier, mutating, available, internal}]` (`internal`:
+//! * `actions.list` returns `[{name, tier, effective_tier, mutating, available, internal}]`
+//!   (`effective_tier` is the tier an agent's call gets now, after the user's per-tool
+//!   permissions; `internal`:
 //!   plumbing for first-party GUI clients, not a CLI command or MCP tool). A blocked client gets
 //!   `client_blocked` for `events.subscribe` and `actions.list` too.
 //!
@@ -485,11 +487,12 @@ impl Conn {
     fn actions_list(&self) -> Value {
         Value::Array(
             self.daemon
-                .actions()
+                .actions_effective()
                 .into_iter()
-                .map(|(s, available)| {
+                .map(|(s, available, effective)| {
                     json!({
                         "name": s.name, "tier": s.tier,
+                        "effective_tier": effective,
                         "mutating": s.mutating, "available": available,
                         "internal": crate::action::is_internal(s.name),
                     })

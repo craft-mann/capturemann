@@ -591,3 +591,68 @@ fn a_missing_ffmpeg_is_translated_by_id() {
         });
     }
 }
+
+// ---- AGT-2.AC11: the generic dialog of a tool set to Ask first ------------------------------
+
+fn ask_first_params(tool: &str, title: &str) -> Value {
+    json!({
+        "tool": tool, "title": title, "client": "claude-desktop",
+        "lines": [{"key": "target", "value": "{...}"}], "omitted": 0,
+    })
+}
+
+const ASK_FIRST_ENGLISH: &str = "claude-desktop wants to run `capture_screenshot` (Capture screenshot). You set this tool to Ask first.";
+
+#[test]
+fn agt_2_ac11_the_ask_first_sentence_names_the_agent_and_the_tool() {
+    let p = ask_first_params("capture_screenshot", "Capture screenshot");
+    assert_eq!(
+        confirm_summary("tool_ask_first", &p, ASK_FIRST_ENGLISH),
+        "Claude Desktop is asking to run \u{201C}Take screenshots\u{201D}. You set this tool to Ask first in Settings \u{2192} Agents & CLI."
+    );
+    // A tool this version has no title for: the daemon's English title.
+    let p = ask_first_params("brand_new_tool", "Brand new tool");
+    assert!(confirm_summary("tool_ask_first", &p, ASK_FIRST_ENGLISH)
+        .contains("\u{201C}Brand new tool\u{201D}"));
+    // Parameters that are not understood: the daemon's English sentence.
+    assert_eq!(
+        confirm_summary("tool_ask_first", &json!({}), ASK_FIRST_ENGLISH),
+        ASK_FIRST_ENGLISH
+    );
+    // The pseudo-locale changes the sentence (it is a wrapped message).
+    with_language(Lang::EnXa, || {
+        let p = ask_first_params("capture_screenshot", "Capture screenshot");
+        assert_ne!(
+            confirm_summary("tool_ask_first", &p, ASK_FIRST_ENGLISH),
+            "Claude Desktop is asking to run \u{201C}Take screenshots\u{201D}. You set this tool to Ask first in Settings \u{2192} Agents & CLI."
+        );
+    });
+}
+
+#[test]
+fn agt_2_ac11_the_ask_first_sentence_is_vietnamese() {
+    let p = ask_first_params("capture_screenshot", "Capture screenshot");
+    with_language(Lang::Vi, || {
+        let s = confirm_summary("tool_ask_first", &p, ASK_FIRST_ENGLISH);
+        assert!(s.starts_with("Claude Desktop muốn chạy \u{201C}"), "{s}");
+        assert!(s.contains("Hỏi trước"), "{s}");
+        assert!(!s.contains("{agent}") && !s.contains("{title}"), "{s}");
+    });
+}
+
+#[test]
+fn agt_2_ac11_the_ask_first_rows_are_the_parameter_lines() {
+    let details = json!({"capture_id": "shot_1", "title": "A title", "values": "{...}"});
+    let rows = confirm_rows("tool_ask_first", &details, &json!({}));
+    assert_eq!(
+        rows,
+        [
+            ("Capture id".to_owned(), "shot_1".to_owned()),
+            ("Title".to_owned(), "A title".to_owned()),
+            ("Values".to_owned(), "{...}".to_owned()),
+        ]
+    );
+    // An English key this version has no label for is shown humanized, not blank.
+    let rows = confirm_rows("tool_ask_first", &json!({"some_new_key": "x"}), &json!({}));
+    assert_eq!(rows[0].0, "Some new key");
+}

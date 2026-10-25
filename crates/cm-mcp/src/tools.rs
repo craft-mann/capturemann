@@ -44,7 +44,8 @@ impl ToolSpec {
     /// The MCP `Tool` definition: description with the tier, schemas, hints.
     pub fn to_tool(&self) -> Tool {
         let tier = match self.tier {
-            Tier::Free => "Tier: Free (runs immediately; undoable where it edits a capture).".to_owned(),
+            Tier::Free if self.mutating => "Tier: Free (runs immediately; undoable where it edits a capture). The user can set this tool to Ask first in CaptureMann\u{2019}s settings: the call then waits up to 5 minutes for an on-screen confirmation and fails with `user_declined` (`data.reason` is `ask_first`) or `confirmation_timeout`; the daemon\u{2019}s `actions.list` reports the `effective_tier`.".to_owned(),
+            Tier::Free => "Tier: Free (runs immediately; read-only, never asks).".to_owned(),
             Tier::Confirm => "Tier: Confirm (the user must approve on screen; the call waits up to 5 minutes, then fails with `user_declined` or `confirmation_timeout`; the app may also not support it, then it fails with `not_implemented`).".to_owned(),
         };
         let idem = if self.mutating {
@@ -758,7 +759,7 @@ pub fn all() -> Vec<ToolSpec> {
             mutating: true,
             destructive: false,
             spec: "REC-1-4, CAM-1, AUD-1, AUD-2, AGT-2",
-            summary: "Start a screen recording of a display, a window or a region (physical px relative to the display, like capture_screenshot), optionally with the webcam, the microphone and system audio. The user sees a confirmation that says exactly what will be recorded, then a countdown (default 3 s), and the recording shows the usual border, timer and stop button. Returns when recording has started, with the recording id, the capture id it will have in the library and the indicator facts. Fails with `busy` if a recording is running and `permission_missing` (data.permission: screen, microphone or camera) before anything is asked. Stop it with stop_recording.",
+            summary: "Start a screen recording of a display, a window or a region (physical px relative to the display, like capture_screenshot), optionally with the webcam, the microphone and system audio. The user sees a confirmation that says exactly what will be recorded (unless they turned that off for AI agents in CaptureMann\u{2019}s settings; the recording indicator and a Stop button on the screen always show), then a countdown (default 3 s), and the recording shows the usual border, timer and stop button. Returns when recording has started, with the recording id, the capture id it will have in the library and the indicator facts. Fails with `busy` if a recording is running and `permission_missing` (data.permission: screen, microphone or camera) before anything is asked. Stop it with stop_recording.",
             input: json!({ "type": "object", "properties": {
                 "target": { "oneOf": [
                     { "type": "object", "properties": { "display_id": { "type": "integer", "minimum": 0 } },

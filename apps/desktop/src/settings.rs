@@ -62,6 +62,9 @@ pub const KEY_SAVE_FOLDER: &str = "capture.save_folder";
 /// CAP-4: the file name pattern (app-only, no UI: edit `settings.json`).
 pub const KEY_SAVE_PATTERN: &str = "capture.save_pattern";
 pub const KEY_CLIENT_POLICIES: &str = "agents.client_policies";
+/// AGT-2.AC9 to AC14: `{ "<tool>": "allow" | "ask" }`, only the tools that differ from their
+/// default (app-only for agents; the daemon reads it on every agent call).
+pub const KEY_TOOL_POLICY: &str = cm_daemon::tool_policy::KEY;
 /// Unknown agent clients are blocked until the user reviews the list (set when the policy store
 /// was unreadable and could not be restored). App-internal, hidden from agents.
 pub const KEY_DENY_UNKNOWN: &str = "agents.deny_unknown_clients";
@@ -414,6 +417,27 @@ impl FileSettings {
         Ok(())
     }
 
+    /// The per-tool permissions the rules allow (an unreadable or hand-edited value counts as the
+    /// defaults, the same reading the daemon does at call time).
+    pub fn tool_policy(
+        &self,
+    ) -> std::collections::BTreeMap<String, cm_daemon::tool_policy::ToolSetting> {
+        cm_daemon::tool_policy::parse_lenient(
+            self.map
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .get(KEY_TOOL_POLICY),
+        )
+    }
+
+    /// Persists the per-tool permissions (validated like any write of that key). An empty map
+    /// stores `{}`, which is the defaults.
+    pub fn set_tool_policy(&self, value: Value) -> Result<(), CmError> {
+        let values: Map<String, Value> =
+            [(KEY_TOOL_POLICY.to_owned(), value)].into_iter().collect();
+        SettingsStore::set(self, &values).map(|_| ())
+    }
+
     /// Persists the client policies (app-internal; bypasses the daemon-facing key guard).
     pub fn set_client_policies(&self, policies: &[(String, ClientPolicy)]) -> Result<(), CmError> {
         let mut g = self.map.lock().unwrap_or_else(PoisonError::into_inner);
@@ -486,6 +510,9 @@ fn validate(values: &Map<String, Value>) -> Result<(), CmError> {
                 if crate::delay::from_setting(Some(v)) == 0 && v.as_u64() != Some(0) =>
             {
                 return Err(CmError::invalid_field(k, "must be 0, 3, 5 or 10"));
+            }
+            KEY_TOOL_POLICY => {
+                cm_daemon::tool_policy::parse_strict(v)?;
             }
             KEY_CLIENT_POLICIES if !v.is_object() => {
                 return Err(CmError::invalid_field(k, "must be an object"));
@@ -658,6 +685,57 @@ mod tests {
         assert!(s.set(&bad).is_err());
         // A rejected set changes nothing.
         assert_eq!(s.all().unwrap()[KEY_THEME], "light");
+    }
+
+    /// AGT-2.AC10: the app's own write path refuses the locked rules, keeps the last good value,
+    /// survives a restart, and reads a hand-edited file leniently (publish and delete stay
+    /// Ask first).
+    #[test]
+    fn agt_2_ac10_tool_policy_is_validated_persisted_and_read_leniently() {
+        use cm_daemon::tool_policy::ToolSetting;
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("settings.json");
+        let s = FileSettings::load(file.clone());
+        assert!(s.tool_policy().is_empty());
+        s.set_tool_policy(json!({"capture_screenshot": "ask", "start_recording": "allow"}))
+            .unwrap();
+        assert_eq!(
+            s.tool_policy().get("start_recording"),
+            Some(&ToolSetting::Allow)
+        );
+        for bad in [
+            json!("ask"),
+            json!({"publish_video": "allow"}),
+            json!({"delete_capture": "allow"}),
+            json!({"list_library": "ask"}),
+            json!({"nope": "ask"}),
+            json!({"annotate": "sometimes"}),
+        ] {
+            assert!(s.set_tool_policy(bad.clone()).is_err(), "{bad}");
+        }
+        // The rejected writes changed nothing; the value survives a restart.
+        assert_eq!(s.tool_policy().len(), 2);
+        assert_eq!(FileSettings::load(file.clone()).tool_policy().len(), 2);
+        // Reset is one write of `{}`.
+        s.set_tool_policy(json!({})).unwrap();
+        assert!(FileSettings::load(file.clone()).tool_policy().is_empty());
+        // A hand-edited file: the locked entries are ignored, the allowed ones kept.
+        std::fs::write(
+            &file,
+            r#"{"agents.tool_policy": {"publish_video": "allow", "delete_capture": "allow",
+                "run_fps_selftest": "allow", "list_jobs": "ask", "annotate": "ask"}}"#,
+        )
+        .unwrap();
+        let edited = FileSettings::load(file.clone());
+        let got = edited.tool_policy();
+        assert_eq!(
+            got.keys().map(String::as_str).collect::<Vec<_>>(),
+            ["annotate"]
+        );
+        // The daemon-side store (the same map) is not blocked from reading it either.
+        assert!(SettingsStore::all(&edited)
+            .unwrap()
+            .contains_key(KEY_TOOL_POLICY));
     }
 
     /// STO-4: the link is copied by default; only a boolean can change it.

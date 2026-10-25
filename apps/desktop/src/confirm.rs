@@ -8,7 +8,7 @@
 
 use async_trait::async_trait;
 use cm_daemon::{ConfirmationRequest, Confirmer, Decision};
-use cm_i18n::tr;
+use cm_i18n::{tr, tr_ctx, trn};
 use serde_json::Value;
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, oneshot};
@@ -24,6 +24,10 @@ pub fn dialog_height(m: &DialogModel) -> f32 {
     let summary_lines = m.summary.chars().count().div_ceil(60).max(1) as f32;
     // Padding, the 44 px title row, the summary.
     let mut h = 24. + 44. + 14. + 21. * summary_lines;
+    // A long title wraps next to the tile (and the agent chip takes room from it).
+    let per_line = if m.agent_name().is_some() { 24 } else { 36 };
+    let title_lines = m.title.chars().count().div_ceil(per_line).max(1);
+    h += 22. * (title_lines - 1) as f32;
     if !m.details.is_empty() {
         // The details box: a long value (a file path, a title) wraps onto more lines.
         let rows: f32 = m
@@ -147,7 +151,11 @@ fn platform_name(p: &str) -> String {
 
 impl DialogModel {
     pub fn from_request(r: &ConfirmationRequest) -> DialogModel {
+        let ask_first = r.kind == cm_daemon::tool_policy::KIND_ASK_FIRST;
         let (title, primary, danger) = match r.tool.as_str() {
+            // AGT-2.AC11: a tool the user set to Ask first; the sentence and rows come from the
+            // typed parameters below.
+            _ if ask_first => (tr!("Allow this action?"), tr_ctx!("button", "Allow"), false),
             "start_recording" => (tr!("Start recording?"), tr!("Start recording"), false),
             "publish_video" => {
                 let label = r
@@ -180,6 +188,20 @@ impl DialogModel {
         let kind = if r.kind.is_empty() { &r.tool } else { &r.kind };
         let params = daemon_text::params_of(&r.params);
         details.extend(daemon_text::confirm_rows(kind, &r.details, &params));
+        if let Some(n) = ask_first
+            .then(|| params.get("omitted").and_then(Value::as_u64))
+            .flatten()
+            .filter(|n| *n > 0)
+        {
+            details.push((
+                tr!("More"),
+                trn!(
+                    "{n} more parameter not shown",
+                    "{n} more parameters not shown",
+                    n
+                ),
+            ));
+        }
         let agent = display_client_name(&r.client);
         DialogModel {
             id: r.id.clone(),
@@ -221,6 +243,62 @@ pub fn delete_dialog(title: &str) -> DialogModel {
         allow_session: false,
         option: None,
     }
+}
+
+/// Id of the dialog before letting agents start recordings without asking.
+pub const LOCAL_LOOSEN_ID: &str = "local_loosen_start";
+
+/// Id of the dialog before resetting several tool permissions.
+pub const LOCAL_RESET_TOOLS_ID: &str = "local_reset_tools";
+
+fn local_dialog(
+    id: &str,
+    title: String,
+    summary: String,
+    details: Vec<(String, String)>,
+    primary_label: String,
+) -> DialogModel {
+    DialogModel {
+        id: id.to_owned(),
+        chip: String::new(),
+        agent: String::new(),
+        tool: String::new(),
+        title,
+        summary,
+        details,
+        primary_label,
+        primary_is_danger: false,
+        primary_is_record: false,
+        allow_session: false,
+        option: None,
+    }
+}
+
+/// AGT-2.AC13: asked by Settings -> Agents & CLI before `start_recording` is set to Allow. Asked
+/// by the app itself (no agent chip); only after the answer is the setting written.
+pub fn loosen_start_dialog() -> DialogModel {
+    local_dialog(
+        LOCAL_LOOSEN_ID,
+        tr!("Let AI agents start recordings without asking?"),
+        tr!("An AI agent will be able to start a recording as soon as it asks, with no confirmation. What it records (the screen, camera and microphone) follows your Recording settings. The recording indicator and the tray icon still show, and you can stop from the toast. You can turn this off here at any time."),
+        Vec::new(),
+        tr!("Allow without asking"),
+    )
+}
+
+/// AGT-2.AC9: asked before "Reset to defaults" when more than three tools were changed.
+pub fn reset_tools_dialog(changed: usize) -> DialogModel {
+    local_dialog(
+        LOCAL_RESET_TOOLS_ID,
+        tr!("Reset tool permissions?"),
+        trn!(
+            "{n} tool is set differently from its default. Resetting puts every tool back to its default: tools that change something run without asking, and starting a recording asks first.",
+            "{n} tools are set differently from their defaults. Resetting puts every tool back to its default: tools that change something run without asking, and starting a recording asks first.",
+            changed
+        ),
+        Vec::new(),
+        tr!("Reset to defaults"),
+    )
 }
 
 /// The HUD's confirmation before deleting a take (REC-5.AC3, AC12): "Discard this take?" for
@@ -609,6 +687,104 @@ mod tests {
         let m = DialogModel::from_request(&n);
         assert_eq!(m.summary, "Do the brand new thing");
         assert_eq!(m.primary_label, "Brand new");
+    }
+
+    /// AGT-2.AC11: the generic dialog of a tool set to Ask first, built from what the daemon
+    /// really sends: the agent chip, the tool row and the parameter rows, a neutral primary.
+    #[test]
+    fn agt_2_ac11_ask_first_dialog_model() {
+        let spec = *cm_daemon::spec_for("rename_capture").unwrap();
+        let input = json!({"capture_id": "shot_1", "title": "x".repeat(300), "request_id": "r"});
+        let (summary, details, params) =
+            cm_daemon::tool_policy::ask_first_dialog("claude-desktop", &spec, &input);
+        let r = ConfirmationRequest {
+            id: "conf_9".into(),
+            client: "claude-desktop".into(),
+            tool: "rename_capture".into(),
+            summary,
+            details,
+            kind: cm_daemon::tool_policy::KIND_ASK_FIRST.into(),
+            params,
+            allow_session: false,
+        };
+        let m = DialogModel::from_request(&r);
+        assert_eq!(m.title, "Allow this action?");
+        assert_eq!(m.primary_label, "Allow");
+        assert!(!m.primary_is_danger && !m.primary_is_record && !m.allow_session);
+        assert_eq!(m.agent_name(), Some("Claude Desktop"));
+        assert_eq!(m.chip, "Requested by Claude Desktop");
+        assert_eq!(
+            m.summary,
+            "Claude Desktop is asking to run \u{201C}Rename a capture\u{201D}. You set this tool to Ask first in Settings \u{2192} Agents & CLI."
+        );
+        assert_eq!(m.details[0], ("Tool".into(), "rename_capture".into()));
+        let get = |k: &str| {
+            m.details
+                .iter()
+                .find(|(l, _)| l == k)
+                .map(|(_, v)| v.clone())
+        };
+        assert_eq!(get("Capture id").as_deref(), Some("shot_1"));
+        assert_eq!(
+            get("Title").unwrap().chars().count(),
+            123,
+            "cut at 120 characters"
+        );
+        assert!(m.details.iter().all(|(k, _)| k != "Request id"));
+        assert_eq!(m.title_icon(), "shield-alert");
+        assert_eq!(m.checkbox_label(), None);
+
+        // Parameters that did not fit are counted in a last row.
+        let mut many = r.clone();
+        many.params["omitted"] = json!(3);
+        let m = DialogModel::from_request(&many);
+        assert_eq!(
+            m.details.last().unwrap(),
+            &("More".to_owned(), "3 more parameters not shown".to_owned())
+        );
+        many.params["omitted"] = json!(1);
+        assert_eq!(
+            DialogModel::from_request(&many).details.last().unwrap().1,
+            "1 more parameter not shown"
+        );
+        // A tool the app has no title for still reads.
+        let mut future = r.clone();
+        future.tool = "brand_new_tool".into();
+        future.params["tool"] = json!("brand_new_tool");
+        future.params["title"] = json!("Brand new tool");
+        assert!(DialogModel::from_request(&future)
+            .summary
+            .contains("\u{201C}Brand new tool\u{201D}"));
+    }
+
+    /// AGT-2.AC13 / AC9: the two questions Settings asks itself have no agent chip, a neutral
+    /// primary that names the action, and follow the language.
+    #[test]
+    fn agt_2_ac13_settings_dialogs() {
+        use cm_i18n::{with_language, Lang};
+        let l = loosen_start_dialog();
+        assert_eq!(l.title, "Let AI agents start recordings without asking?");
+        assert_eq!(l.primary_label, "Allow without asking");
+        assert!(l.agent_name().is_none() && !l.primary_is_danger && !l.primary_is_record);
+        for needle in [
+            "screen, camera and microphone",
+            "Recording settings",
+            "indicator",
+            "toast",
+        ] {
+            assert!(l.summary.contains(needle), "{needle}: {}", l.summary);
+        }
+        let r4 = reset_tools_dialog(4);
+        assert!(r4.summary.starts_with("4 tools are set differently"));
+        assert!(reset_tools_dialog(1)
+            .summary
+            .starts_with("1 tool is set differently"));
+        assert_eq!(r4.primary_label, "Reset to defaults");
+        assert_ne!(l.id, r4.id);
+        with_language(Lang::EnXa, || {
+            assert_ne!(loosen_start_dialog().title, l.title);
+            assert_ne!(reset_tools_dialog(4).summary, r4.summary);
+        });
     }
 
     fn delete_dialog_english_summary() -> String {

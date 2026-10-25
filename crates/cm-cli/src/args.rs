@@ -812,7 +812,8 @@ pub enum JobsCmd {
 #[derive(Debug, Subcommand)]
 pub enum RecordCmd {
     /// Start a recording (`start_recording`). Asks for confirmation in the CaptureMann window
-    /// and waits (up to 5 minutes) for the answer and for the countdown.
+    /// and waits (up to 5 minutes) for the answer and for the countdown, unless the user turned
+    /// the confirmation off for AI agents in Settings.
     Start(Box<RecordStartArgs>),
     /// Pause the running recording (`pause_recording`).
     Pause(RecordRefArgs),

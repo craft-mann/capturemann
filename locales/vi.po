@@ -316,12 +316,6 @@ msgstr "Cho phép ứng dụng khách không có trong danh sách"
 msgid "Allow for this session"
 msgstr "Cho phép trong phiên này"
 
-# FACT: owner review required
-#. FACT: owner review required (confirmation guarantee)
-#, fuzzy
-msgid "Allow runs immediately. Ask first always shows a confirmation on screen and is locked: starting a recording, publishing and deleting can’t be switched off. Restrict a whole client below."
-msgstr "Chọn “Cho phép” để thực hiện ngay. Với “Hỏi trước”, hộp thoại xác nhận luôn xuất hiện trên màn hình. Các thao tác bắt đầu quay, đăng và xoá luôn yêu cầu xác nhận; bạn không thể tắt yêu cầu này. Bạn có thể hạn chế toàn bộ ứng dụng khách bên dưới."
-
 #, fuzzy
 msgid "Allow this action?"
 msgstr "Cho phép hành động này?"
@@ -8813,3 +8807,108 @@ msgstr "Không thể đổi micrô"
 #, fuzzy
 msgid "Mute or unmute the microphone"
 msgstr "Tắt hoặc bật tiếng micrô"
+
+# ---- Agents: per-tool permissions ----
+
+# FACT: owner review required
+#. FACT: owner review required (confirmation guarantee)
+#, fuzzy
+msgid "AI agents can start recordings without asking. The indicator still shows and you can stop from the toast."
+msgstr "Tác nhân AI có thể bắt đầu quay mà không cần hỏi. Chỉ báo vẫn hiển thị và bạn có thể dừng từ thông báo."
+
+# FACT: owner review required
+#. FACT: owner review required (confirmation guarantee)
+#, fuzzy
+msgid "Allow runs immediately. Ask first shows a confirmation on screen before the tool runs. Tools that change something can be set either way. Publishing and deleting always ask first and stay locked. Reading tools never need asking. Restrict a whole client below."
+msgstr "“Cho phép” thực hiện ngay. “Hỏi trước” hiện hộp thoại xác nhận trên màn hình trước khi công cụ chạy. Công cụ làm thay đổi dữ liệu có thể đặt theo cả hai cách. Đăng và xoá luôn hỏi trước và bị khoá. Công cụ chỉ đọc không bao giờ cần hỏi. Bạn có thể hạn chế toàn bộ ứng dụng khách bên dưới."
+
+#, fuzzy
+msgid "Allow without asking"
+msgstr "Cho phép không cần hỏi"
+
+# FACT: owner review required
+#. FACT: owner review required (confirmation guarantee)
+#, fuzzy
+msgid "An AI agent will be able to start a recording as soon as it asks, with no confirmation. What it records (the screen, camera and microphone) follows your Recording settings. The recording indicator and the tray icon still show, and you can stop from the toast. You can turn this off here at any time."
+msgstr "Tác nhân AI sẽ có thể bắt đầu quay ngay khi yêu cầu, không cần xác nhận. Nội dung được quay (màn hình, camera và micrô) theo Cài đặt quay của bạn. Chỉ báo quay và biểu tượng trên thanh menu vẫn hiển thị, và bạn có thể dừng từ thông báo. Bạn có thể tắt tuỳ chọn này tại đây bất cứ lúc nào."
+
+# FACT: owner review required
+#. FACT: owner review required (confirmation guarantee)
+#, fuzzy
+msgid "Downloading and deleting speech models always ask first."
+msgstr "Tải xuống và xoá mô hình giọng nói luôn hỏi trước."
+
+# FACT: owner review required
+#. FACT: owner review required (confirmation guarantee)
+#, fuzzy
+msgid "Let AI agents start recordings without asking?"
+msgstr "Cho phép tác nhân AI bắt đầu quay mà không cần hỏi?"
+
+#, fuzzy
+msgid "More"
+msgstr "Thêm"
+
+#, fuzzy
+msgid "Permission for {title}"
+msgstr "Quyền cho {title}"
+
+# FACT: owner review required
+#. FACT: owner review required (confirmation guarantee)
+#, fuzzy
+msgid "Publishing and deleting always ask first."
+msgstr "Đăng và xoá luôn hỏi trước."
+
+#, fuzzy
+msgid "Reading never needs asking."
+msgstr "Chỉ đọc thì không bao giờ cần hỏi."
+
+#, fuzzy
+msgid "Reset every tool permission to its default"
+msgstr "Đặt lại mọi quyền của công cụ về mặc định"
+
+#, fuzzy
+msgid "Reset tool permissions?"
+msgstr "Đặt lại quyền của công cụ?"
+
+# FACT: owner review required
+#. FACT: owner review required (confirmation guarantee)
+#, fuzzy
+msgid "The 60 fps test records your screen, so it always asks first."
+msgstr "Phép thử 60 fps quay màn hình của bạn nên luôn hỏi trước."
+
+# FACT: owner review required
+#. FACT: owner review required (confirmation guarantee)
+#, fuzzy
+msgid "{agent} is asking to run “{title}”. You set this tool to Ask first in Settings → Agents & CLI."
+msgstr "{agent} muốn chạy “{title}”. Bạn đã đặt công cụ này ở chế độ Hỏi trước trong Cài đặt → Tác nhân & CLI."
+
+#, fuzzy
+msgid "{n} more parameter not shown"
+msgid_plural "{n} more parameters not shown"
+msgstr[0] "{n} tham số khác không được hiển thị"
+
+# FACT: owner review required
+#. FACT: owner review required (confirmation guarantee)
+#, fuzzy
+msgid "{n} tool is set differently from its default. Resetting puts every tool back to its default: tools that change something run without asking, and starting a recording asks first."
+msgid_plural "{n} tools are set differently from their defaults. Resetting puts every tool back to its default: tools that change something run without asking, and starting a recording asks first."
+msgstr[0] "{n} công cụ đang khác với mặc định. Đặt lại sẽ đưa mọi công cụ về mặc định: công cụ làm thay đổi dữ liệu chạy không cần hỏi, còn việc bắt đầu quay sẽ hỏi trước."
+
+#, fuzzy
+msgid "{row}. Changed from the default."
+msgstr "{row}. Đã khác với mặc định."
+
+#, fuzzy
+msgctxt "button"
+msgid "Allow"
+msgstr "Cho phép"
+
+#, fuzzy
+msgctxt "tool permission"
+msgid "Changed"
+msgstr "Đã đổi"
+
+#, fuzzy
+msgctxt "agent decision"
+msgid "allowed by your setting"
+msgstr "được cho phép theo cài đặt của bạn"

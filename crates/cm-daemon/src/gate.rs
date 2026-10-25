@@ -230,16 +230,20 @@ impl ConfirmationGate {
             .retain(|(s, _)| *s != session);
     }
 
+    #[allow(clippy::too_many_arguments)] // the request's fields, as the dialog shows them
     pub(crate) async fn confirm(
         &self,
         client: &str,
         session: u64,
         spec: &ActionSpec,
+        kind: &str,
         summary: String,
         details: Value,
         params: Value,
     ) -> GateOutcome {
-        let allow_session = spec.name == "start_recording";
+        // "Allow for this session" belongs to the start dialog only, not to the generic
+        // ask-first dialog of a tightened tool.
+        let allow_session = spec.name == "start_recording" && kind == spec.name;
         let key = (session, spec.name.to_owned());
         if !self.confirmer.is_attached() {
             return GateOutcome::NoConfirmer;
@@ -280,7 +284,7 @@ impl ConfirmationGate {
             tool: spec.name.to_owned(),
             summary: summary.clone(),
             details,
-            kind: spec.name.to_owned(),
+            kind: kind.to_owned(),
             params,
             allow_session,
         };
@@ -448,6 +452,17 @@ impl ClientPolicies {
     }
 }
 
+/// Who approved a call that ran (AGT-2.AC6, AC13): the person at a confirmation dialog, or the
+/// user's own setting (`start_recording` set to Allow in Settings -> Agents & CLI).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Approval {
+    /// Answered at the on-screen dialog.
+    User,
+    /// No dialog: the per-tool permission lets the agent do it.
+    Policy,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ActivityDecision {
@@ -468,6 +483,9 @@ pub struct ActivityEntry {
     pub tool: String,
     pub summary: String,
     pub decision: ActivityDecision,
+    /// How an approved call was approved (`"user"` or `"policy"`); absent for refusals.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub approval: Option<Approval>,
 }
 
 /// In-memory log of confirmed, declined, timed-out and policy-refused requests, pruned to
@@ -585,6 +603,7 @@ mod tests {
                 tool: "t".repeat(1000),
                 summary: "s".repeat(100_000),
                 decision: ActivityDecision::Approved,
+                approval: None,
             });
         }
         let all = log.entries(t0 + time::Duration::days(1));
@@ -614,14 +633,30 @@ mod tests {
         for _ in 0..MAX_PENDING_PER_CLIENT {
             let g = gate.clone();
             tasks.push(tokio::spawn(async move {
-                g.confirm("a", 1, &sp, "s".into(), Value::Null, json!({}))
-                    .await
+                g.confirm(
+                    "a",
+                    1,
+                    &sp,
+                    "delete_capture",
+                    "s".into(),
+                    Value::Null,
+                    json!({}),
+                )
+                .await
             }));
         }
         tokio::task::yield_now().await;
         assert_eq!(
-            gate.confirm("a", 1, &sp, "s".into(), Value::Null, json!({}))
-                .await,
+            gate.confirm(
+                "a",
+                1,
+                &sp,
+                "delete_capture",
+                "s".into(),
+                Value::Null,
+                json!({})
+            )
+            .await,
             GateOutcome::Busy
         );
         // Other clients fill the total.
@@ -629,14 +664,30 @@ mod tests {
             let g = gate.clone();
             let name = format!("c{}", i / MAX_PENDING_PER_CLIENT);
             tasks.push(tokio::spawn(async move {
-                g.confirm(&name, 1, &sp, "s".into(), Value::Null, json!({}))
-                    .await
+                g.confirm(
+                    &name,
+                    1,
+                    &sp,
+                    "delete_capture",
+                    "s".into(),
+                    Value::Null,
+                    json!({}),
+                )
+                .await
             }));
         }
         tokio::task::yield_now().await;
         assert_eq!(
-            gate.confirm("zz", 1, &sp, "s".into(), Value::Null, json!({}))
-                .await,
+            gate.confirm(
+                "zz",
+                1,
+                &sp,
+                "delete_capture",
+                "s".into(),
+                Value::Null,
+                json!({})
+            )
+            .await,
             GateOutcome::Busy
         );
         // Cancelling the waiters frees their slots.
@@ -648,8 +699,16 @@ mod tests {
         }
         let g = gate.clone();
         let t = tokio::spawn(async move {
-            g.confirm("zz", 1, &sp, "s".into(), Value::Null, json!({}))
-                .await
+            g.confirm(
+                "zz",
+                1,
+                &sp,
+                "delete_capture",
+                "s".into(),
+                Value::Null,
+                json!({}),
+            )
+            .await
         });
         tokio::task::yield_now().await;
         assert!(!t.is_finished(), "a slot was free again");
@@ -665,6 +724,7 @@ mod tests {
                 "a",
                 1,
                 &spec("delete_capture"),
+                "delete_capture",
                 "s".into(),
                 Value::Null,
                 json!({}),
@@ -713,6 +773,7 @@ mod tests {
             tool: "t".into(),
             summary: "s".into(),
             decision: ActivityDecision::Approved,
+            approval: None,
         };
         log.record(mk(t0));
         log.record(mk(t0 + time::Duration::days(31)));

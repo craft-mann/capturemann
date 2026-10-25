@@ -279,11 +279,16 @@ async fn until<T>(mut f: impl AsyncFnMut() -> Option<T>) -> T {
 }
 
 async fn wait_job(d: &Daemon, id: &str, pred: impl Fn(&Value) -> bool) -> Value {
-    until(async || {
+    let mut last = Value::Null;
+    for _ in 0..3000 {
         let j = user(d, "get_job", json!({ "job_id": id })).await;
-        pred(&j).then_some(j)
-    })
-    .await
+        if pred(&j) {
+            return j;
+        }
+        last = j;
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    panic!("the job did not reach the wanted state in 30 s; its last state: {last}");
 }
 
 async fn wait_done(d: &Daemon, id: &str) -> Value {

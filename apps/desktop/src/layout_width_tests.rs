@@ -362,6 +362,27 @@ fn cases() -> Vec<Case> {
 
     let mut v = Vec::new();
 
+    // ---- Agents & CLI: the Allow / Ask first segments of a tool row (AGT-2.AC9) ----------------
+    // A segment is `segment_with_icon`: 14 px padding each side, a 14 px icon and its 6 px gap. The
+    // control sits beside the title in a card at least 380 px wide (18 px padding), and the two
+    // segments may use up to 70 % of the 344 px row between them (the title wraps in the rest).
+    v.push(
+        Case::new(
+            "Agents tool row segment",
+            "(344 * 0.7) / 2 - 2*14 padding - 14 icon - 6 gap",
+            (344. * 0.7) / 2. - 28. - 14. - 6.,
+            ui,
+            500,
+            one,
+        )
+        .text("Allow", || {
+            crate::ui::settings::model::PermissionLabel::Allow.text()
+        })
+        .text("Ask first", || {
+            crate::ui::settings::model::PermissionLabel::AskFirst.text()
+        }),
+    );
+
     // ---- HUD: the window is exactly the 506 px bar --------------------------------------------
     // Stop is `hud_button` (44 px) widened to STOP_W 88, no padding, 1 px border: room beside the
     // 16 px icon and its 8 px gap.
@@ -1148,11 +1169,39 @@ fn sheet_and_dialog_height_estimates_hold_in_every_language() {
                 crate::confirm::discard_dialog(true, "0:10", None).summary,
                 crate::confirm::discard_dialog(false, "0:10", None).summary,
                 crate::ui::settings::reset::reset_dialog(&[]).summary,
+                // AGT-2.AC9, AC11, AC13: the Agents page's own questions and the generic dialog.
+                crate::confirm::loosen_start_dialog().summary,
+                crate::confirm::reset_tools_dialog(1).summary,
+                crate::confirm::reset_tools_dialog(7).summary,
+                crate::daemon_text::confirm_summary(
+                    "tool_ask_first",
+                    &serde_json::json!({
+                        "tool": "set_reframe", "title": "Set reframe",
+                        "client": "claude-desktop", "lines": [], "omitted": 0,
+                    }),
+                    "",
+                ),
             ]
         });
         for text in summaries {
             let est = text.chars().count().div_ceil(60).max(1);
             let need = lines(&text, Face::Regular, 14., 472.);
+            assert!(
+                need.is_some_and(|n| n <= est),
+                "{lang:?}: {text:?} needs {need:?} lines, the dialog reserves {est}"
+            );
+        }
+        // The title row: 520 - 48 padding - 44 tile - 14 gap = 414 px at 17 px semibold (the
+        // agent chip, when there is one, takes more; `dialog_height` allows for both).
+        let titles = with_language(lang, || {
+            vec![
+                crate::confirm::loosen_start_dialog().title,
+                crate::confirm::reset_tools_dialog(4).title,
+            ]
+        });
+        for text in titles {
+            let est = text.chars().count().div_ceil(36).max(1);
+            let need = lines(&text, Face::SemiBold, 17., 414.);
             assert!(
                 need.is_some_and(|n| n <= est),
                 "{lang:?}: {text:?} needs {need:?} lines, the dialog reserves {est}"

@@ -34,6 +34,7 @@ First public release. macOS 13+ on Apple Silicon only; Windows follows later.
 - Every feature as an MCP tool (54 tools, plus resources and prompts) and a `capturemann` command
   line, with per-client permission tiers and on-screen confirmation for recording, publishing and
   deleting.
+- Per-tool agent permissions (Settings, Agents & CLI): mutating tools can be set to Allow or Ask first, and starting a recording can be allowed without asking; publish and delete always ask.
 - English and Vietnamese interface (Settings, General, Language).
 - No telemetry; no network traffic unless you connect a destination or download a model.
 - Release builds are a DMG with a SHA-256 file on GitHub Releases.

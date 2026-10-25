@@ -124,6 +124,18 @@ pub fn decision_label(d: ActivityDecision) -> String {
     }
 }
 
+/// What the activity log says about one entry: [`decision_label`], except that a call the user's
+/// own setting let through (`start_recording` set to Allow, AGT-2.AC13) says so instead of
+/// "approved", because nobody was asked.
+pub fn entry_label(e: &ActivityEntry) -> String {
+    match (e.decision, e.approval) {
+        (ActivityDecision::Approved, Some(cm_daemon::Approval::Policy)) => {
+            tr_ctx!("agent decision", "allowed by your setting")
+        }
+        (d, _) => decision_label(d),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -136,6 +148,7 @@ mod tests {
             tool: tool.to_owned(),
             summary: String::new(),
             decision,
+            approval: None,
         }
     }
 
@@ -195,6 +208,22 @@ mod tests {
         assert!(started_by_agent(ActivityDecision::ApprovedForSession));
         assert!(!started_by_agent(ActivityDecision::Declined));
         assert!(!started_by_agent(ActivityDecision::ClientBlocked));
+    }
+
+    /// AGT-2.AC13: a call the user's own setting let through is not "approved": nobody was asked.
+    #[test]
+    fn agt_2_ac13_a_policy_approval_says_so() {
+        let mut e = entry("start_recording", "claude", ActivityDecision::Approved);
+        assert_eq!(entry_label(&e), "approved");
+        e.approval = Some(cm_daemon::Approval::User);
+        assert_eq!(entry_label(&e), "approved");
+        e.approval = Some(cm_daemon::Approval::Policy);
+        assert_eq!(entry_label(&e), "allowed by your setting");
+        // It still counts as something the agent was let do, for the toast.
+        assert!(started_by_agent(e.decision));
+        cm_i18n::with_language(cm_i18n::Lang::Vi, || {
+            assert_ne!(entry_label(&e), "allowed by your setting");
+        });
     }
 
     #[test]

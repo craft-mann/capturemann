@@ -8,7 +8,9 @@
 //! 2. Idempotency (`request_id`): a repeat returns the first result, even for Confirm-tier
 //!    actions, without asking again (AGT-3.AC4). Keyed by actor + `request_id`, scoped to the
 //!    action name; only successes are remembered, so a failed call can be retried.
-//! 3. Confirmation (Confirm tier, agents only): queued, one dialog at a time, 5 min.
+//! 3. Confirmation (Confirm tier, agents only): queued, one dialog at a time, 5 min. The tier an
+//!    agent's call is gated by is the *effective* tier: the table's tier changed by the user's
+//!    per-tool permissions (`agents.tool_policy`, [`crate::tool_policy`]), read at call time.
 //! 4. The action runs; actions on one capture are serialized (AGT-3).
 //!
 //! The user (`Actor::User`, the in-process GUI) skips 1 and 3: the GUI has its own confirmation
@@ -34,8 +36,8 @@ use crate::error::DaemonError;
 use crate::events::{self, Event, EventBus, JobEvents};
 use crate::frames::{FrameCache, DEFAULT_FRAME_TTL};
 use crate::gate::{
-    ActivityDecision, ActivityEntry, ActivityLog, ClientPolicies, ConfirmationGate, Confirmer,
-    DenyAll, DEFAULT_CONFIRM_TIMEOUT,
+    ActivityDecision, ActivityEntry, ActivityLog, Approval, ClientPolicies, ConfirmationGate,
+    Confirmer, DenyAll, DEFAULT_CONFIRM_TIMEOUT,
 };
 use crate::jobs::JobsRuntime;
 use crate::library_ops::{SystemTrasher, Trasher};
@@ -517,6 +519,34 @@ impl Daemon {
             .collect()
     }
 
+    /// The tier an **agent's** call to `tool` is gated by right now: the table's tier changed by
+    /// the live `agents.tool_policy` setting (a tightened Free tool is Confirm, `start_recording`
+    /// set to Allow is Free). `Actor::User` is never asked, so its tier is the table's. `None`
+    /// for a name that is not an exposed action. Read from the settings on every call, so a
+    /// change applies to the next call and a dialog that is already open is not affected.
+    pub fn effective_tier(&self, tool: &str, actor: &Actor) -> Option<Tier> {
+        let spec = crate::action::spec_for(tool)?;
+        Some(match actor {
+            Actor::User => spec.tier,
+            Actor::Agent(_) => self.inner.effective_tier(spec),
+        })
+    }
+
+    /// [`Daemon::actions`] with the effective tier an agent's call has (`actions.list`).
+    pub fn actions_effective(&self) -> Vec<(ActionSpec, bool, Tier)> {
+        let entries = self.inner.tool_entries();
+        ACTIONS
+            .iter()
+            .map(|s| {
+                (
+                    *s,
+                    self.inner.supports(s),
+                    crate::tool_policy::effective_tier(s, &entries),
+                )
+            })
+            .collect()
+    }
+
     /// Per-client allow-list (Settings -> Agents).
     pub fn policies(&self) -> &ClientPolicies {
         &self.inner.policies
@@ -726,12 +756,24 @@ impl Daemon {
     }
 
     fn log(&self, client: &str, action: &Action, summary: String, decision: ActivityDecision) {
+        self.log_with(client, action, summary, decision, None);
+    }
+
+    fn log_with(
+        &self,
+        client: &str,
+        action: &Action,
+        summary: String,
+        decision: ActivityDecision,
+        approval: Option<Approval>,
+    ) {
         self.inner.activity.record(ActivityEntry {
             at: self.inner.clock.now(),
             client: client.to_owned(),
             tool: action.method().to_owned(),
             summary,
             decision,
+            approval,
         });
     }
 
@@ -870,7 +912,76 @@ impl Daemon {
         // `delete_capture` is planned too: with `also_delete_remote` the dialog lists the remote
         // copies, and exactly that list is deleted.
         let mut prepared_delete: Option<crate::library_ops::DeletePlan> = None;
-        if spec.tier == Tier::Confirm {
+        // AGT-2.AC9: the tier this call is gated by. The table's tier for the user; for an
+        // agent, changed by the live per-tool permissions (read now, so a setting changed while
+        // this call waits behind another dialog applies to the next call, not to this one).
+        let tier = if agent.is_some() {
+            self.inner.effective_tier(&spec)
+        } else {
+            spec.tier
+        };
+        if let (Some(name), Tier::Confirm, Tier::Free) = (&agent, tier, spec.tier) {
+            // A tightened Free tool: the generic dialog, built from the call's own parameters.
+            if !self.inner.supports(&spec) {
+                return Err(DaemonError::NotImplemented(format!(
+                    "`{}` is not implemented yet",
+                    spec.name
+                )));
+            }
+            let (summary, details, params) =
+                crate::tool_policy::ask_first_dialog(name, &spec, &action.details());
+            let outcome = self
+                .inner
+                .gate
+                .confirm(
+                    name,
+                    session,
+                    &spec,
+                    crate::tool_policy::KIND_ASK_FIRST,
+                    summary.clone(),
+                    details,
+                    params,
+                )
+                .await;
+            let (decision, err) = outcome.resolve(self.inner.confirm_timeout);
+            self.log_with(
+                name,
+                &action,
+                summary,
+                decision,
+                matches!(
+                    decision,
+                    ActivityDecision::Approved | ActivityDecision::ApprovedForSession
+                )
+                .then_some(Approval::User),
+            );
+            if let Some(e) = err {
+                return Err(match e {
+                    DaemonError::Cm(CmError::UserDeclined { message }) => DaemonError::Declined {
+                        reason: crate::tool_policy::DECLINED_REASON,
+                        message,
+                    },
+                    other => other,
+                });
+            }
+        } else if let (Some(name), Tier::Free, Tier::Confirm) = (&agent, tier, spec.tier) {
+            // `start_recording` set to Allow: no dialog. The engine plans and starts it below
+            // exactly as after an approval (HUD, tray indicator and the agent toast included);
+            // the log says the user's setting approved it.
+            if !self.inner.supports(&spec) {
+                return Err(DaemonError::NotImplemented(format!(
+                    "`{}` is not implemented yet",
+                    spec.name
+                )));
+            }
+            self.log_with(
+                name,
+                &action,
+                action.summary(),
+                ActivityDecision::Approved,
+                Some(Approval::Policy),
+            );
+        } else if spec.tier == Tier::Confirm {
             if !self.inner.supports(&spec) {
                 return Err(DaemonError::NotImplemented(format!(
                     "`{}` is not implemented yet",
@@ -932,10 +1043,28 @@ impl Daemon {
                 let outcome = self
                     .inner
                     .gate
-                    .confirm(name, session, &spec, summary.clone(), details, params)
+                    .confirm(
+                        name,
+                        session,
+                        &spec,
+                        spec.name,
+                        summary.clone(),
+                        details,
+                        params,
+                    )
                     .await;
                 let (decision, err) = outcome.resolve(self.inner.confirm_timeout);
-                self.log(name, &action, summary, decision);
+                self.log_with(
+                    name,
+                    &action,
+                    summary,
+                    decision,
+                    matches!(
+                        decision,
+                        ActivityDecision::Approved | ActivityDecision::ApprovedForSession
+                    )
+                    .then_some(Approval::User),
+                );
                 if let Some(e) = err {
                     return Err(e);
                 }
@@ -1089,6 +1218,20 @@ impl Daemon {
 }
 
 impl Inner {
+    /// The entries of `agents.tool_policy` the rules allow (an unreadable store or a bad value
+    /// means the defaults).
+    fn tool_entries(&self) -> std::collections::BTreeMap<String, crate::tool_policy::ToolSetting> {
+        match self.settings.all() {
+            Ok(all) => crate::tool_policy::parse_lenient(all.get(crate::tool_policy::KEY)),
+            Err(_) => Default::default(),
+        }
+    }
+
+    /// The tier an agent's call to `spec` is gated by (see [`Daemon::effective_tier`]).
+    pub(crate) fn effective_tier(&self, spec: &ActionSpec) -> Tier {
+        crate::tool_policy::effective_tier(spec, &self.tool_entries())
+    }
+
     fn engine(&self) -> Result<&RecordingEngine, DaemonError> {
         self.recording.as_ref().ok_or_else(|| {
             DaemonError::NotImplemented(

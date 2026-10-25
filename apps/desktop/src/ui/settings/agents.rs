@@ -2,28 +2,34 @@
 //! real `capturemann mcp` command and daemon socket, the permission list from the daemon's `ACTIONS`
 //! table, per-client policies and recent gated requests.
 
-use cm_daemon::{ActivityDecision, ClientPolicy};
+use std::collections::BTreeMap;
+
+use cm_daemon::tool_policy::ToolSetting;
+use cm_daemon::{ActivityDecision, ClientPolicy, Decision};
 use cm_i18n::{tr, tr_ctx};
-use gpui::{div, prelude::*, px, AnyElement, Context, FontWeight, Role, SharedString};
+use gpui::{div, prelude::*, px, AnyElement, App, Context, Entity, FontWeight, Role, SharedString};
 
 use super::model::SettingsSection;
 use super::model::{
-    self, capability_rows, client_config, client_rows, endpoint_arg, locate_mcp, policy_hint,
-    policy_label, PermissionLabel, POLICIES,
+    self, capability_rows, changed_tools, client_config, client_rows, endpoint_arg, locate_mcp,
+    needs_loosen_confirm, policy_hint, policy_label, reset_needs_confirm, tool_policy_value,
+    with_setting, PermissionLabel, POLICIES,
 };
 use super::widgets::{
     caption, card_row, list_card, segment_with_icon, segmented, small_button,
     small_button_with_icon,
 };
 use super::SettingsView;
-use crate::agent_status::decision_label;
+use crate::agent_status::entry_label;
 use crate::theme::{scale, type_scale, Theme};
+use crate::ui::app::{self, AppModel};
 use crate::ui::components::{
     button_with_icon, card, dot, icon, label_fill, shrink_text, ButtonKind,
 };
 use crate::ui::kit::{self, Tone};
 use crate::ui::paint::{rgba_of, TextExt};
 use crate::ui::studio::agent_status_of;
+use crate::ui::tooltip::tip;
 
 const MAX_RECENT: usize = 10;
 
@@ -107,7 +113,98 @@ fn row_tile(t: &Theme, glyph: &'static str) -> gpui::Div {
         .child(icon(glyph, 18., t.text_2))
 }
 
+/// Writes the per-tool permissions (`agents.tool_policy`, validated like any write of that key)
+/// through the app's own settings and tells every open view. The daemon reads the value on its
+/// next agent call, so nothing else is needed (AGT-2.AC14).
+pub(super) fn write_tool_policy(
+    app: &Entity<AppModel>,
+    entries: &BTreeMap<String, ToolSetting>,
+    cx: &mut App,
+) {
+    let settings = app.read(cx).backend.settings.clone();
+    match settings.set_tool_policy(tool_policy_value(entries)) {
+        Ok(()) => app.update(cx, |_, cx| cx.notify()),
+        Err(e) => app::push_toast(
+            app,
+            crate::flows::error_toast_live(
+                || tr!("Couldn\u{2019}t save the setting"),
+                e.to_string(),
+            ),
+            cx,
+        ),
+    }
+}
+
+/// Sets one tool from the live stored value (not from what the page showed when it was clicked).
+fn apply_tool_setting(app: &Entity<AppModel>, tool: &str, setting: ToolSetting, cx: &mut App) {
+    let current = app.read(cx).backend.settings.tool_policy();
+    if let Some(next) = with_setting(&current, tool, setting) {
+        write_tool_policy(app, &next, cx);
+    }
+}
+
 impl SettingsView {
+    /// A row's Allow / Ask first control (AGT-2.AC9). Setting `start_recording` to Allow asks
+    /// first, in the app's own dialog, and writes only after the answer (AGT-2.AC13).
+    pub(super) fn set_tool_setting(
+        &mut self,
+        tool: &'static str,
+        setting: ToolSetting,
+        cx: &mut Context<Self>,
+    ) {
+        let app = self.app.clone();
+        let current = app.read(cx).backend.settings.tool_policy();
+        let now = model::capability_rows(&current)
+            .into_iter()
+            .find(|r| r.tool == tool)
+            .map(|r| r.label);
+        let wanted = match setting {
+            ToolSetting::Allow => PermissionLabel::Allow,
+            ToolSetting::Ask => PermissionLabel::AskFirst,
+        };
+        if now.is_none_or(|n| n == wanted) {
+            return;
+        }
+        if needs_loosen_confirm(tool, setting) {
+            app::ask_confirm(
+                &app,
+                crate::confirm::loosen_start_dialog(),
+                move |app, decision, cx| {
+                    if decision != Decision::Decline {
+                        apply_tool_setting(app, tool, setting, cx);
+                    }
+                },
+                cx,
+            );
+        } else {
+            apply_tool_setting(&app, tool, setting, cx);
+        }
+    }
+
+    /// "Reset to defaults": one write that empties `agents.tool_policy`; the app's confirm
+    /// dialog first when more than three tools differ.
+    pub(super) fn reset_tool_policy(&mut self, cx: &mut Context<Self>) {
+        let app = self.app.clone();
+        let changed = changed_tools(&app.read(cx).backend.settings.tool_policy()).len();
+        if changed == 0 {
+            return;
+        }
+        if reset_needs_confirm(changed) {
+            app::ask_confirm(
+                &app,
+                crate::confirm::reset_tools_dialog(changed),
+                |app, decision, cx| {
+                    if decision != Decision::Decline {
+                        write_tool_policy(app, &BTreeMap::new(), cx);
+                    }
+                },
+                cx,
+            );
+        } else {
+            write_tool_policy(&app, &BTreeMap::new(), cx);
+        }
+    }
+
     /// Applies a policy to the daemon and saves the table (AGT-2.AC4). A failed save keeps the
     /// policy for this run and says so.
     pub(super) fn set_client_policy(
@@ -359,27 +456,86 @@ impl SettingsView {
             }));
 
         // ---- Permissions card -------------------------------------------------------
-        let caps = capability_rows();
+        let tool_entries = self.app.read(cx).backend.settings.tool_policy();
+        let caps = capability_rows(&tool_entries);
+        let nchanged = caps.iter().filter(|c| c.changed).count();
         let cap_rows = caps.into_iter().enumerate().map(|(i, c)| {
             let (tone, glyph) = tier_pill_parts(c.label);
+            let tool = c.tool;
+            let reason = c.lock_reason.map(model::LockReason::text);
+            let mut aria = if c.locked {
+                tr!(
+                    "{title}, {tool}: {tier}, locked",
+                    title = c.title,
+                    tool = c.tool,
+                    tier = c.label.text()
+                )
+            } else {
+                tr!(
+                    "{title}, {tool}: {tier}",
+                    title = c.title,
+                    tool = c.tool,
+                    tier = c.label.text()
+                )
+            };
+            if let Some(r) = &reason {
+                aria = format!("{aria}. {r}");
+            }
+            if c.changed {
+                aria = tr!("{row}. Changed from the default.", row = aria);
+            }
+            // Editable rows: the Allow / Ask first segments. Locked rows: the pill and a lock.
+            let control: AnyElement = if c.locked {
+                let why = reason.clone().unwrap_or_default();
+                div()
+                    .flex()
+                    .flex_none()
+                    .items_center()
+                    .gap(px(8.))
+                    .child(kit::pill(t, tone, Some(glyph), c.label.text()))
+                    .child(
+                        div()
+                            .id(("cap-lock", i))
+                            .role(Role::Image)
+                            .aria_label(SharedString::from(why.clone()))
+                            .size(px(24.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .tooltip(tip(why, Vec::new()))
+                            .child(icon("lock", 14., t.mist)),
+                    )
+                    .into_any_element()
+            } else {
+                let opts = [ToolSetting::Allow, ToolSetting::Ask].map(|setting| {
+                    let (label, glyph, id) = match setting {
+                        ToolSetting::Allow => (PermissionLabel::Allow, "circle-check", "allow"),
+                        ToolSetting::Ask => (PermissionLabel::AskFirst, "hand", "ask"),
+                    };
+                    segment_with_icon(
+                        t,
+                        SharedString::from(format!("cap-{i}-{id}")),
+                        &label.text(),
+                        c.label == label,
+                        Some(glyph),
+                    )
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.set_tool_setting(tool, setting, cx);
+                    }))
+                });
+                segmented(
+                    t,
+                    ("cap-setting", i),
+                    &tr!("Permission for {title}", title = c.title),
+                )
+                .flex_none()
+                .children(opts)
+                .into_any_element()
+            };
             div()
                 .id(("cap", i))
                 .role(Role::ListItem)
-                .aria_label(SharedString::from(if c.locked {
-                    tr!(
-                        "{title}, {tool}: {tier}, locked",
-                        title = c.title,
-                        tool = c.tool,
-                        tier = c.label.text()
-                    )
-                } else {
-                    tr!(
-                        "{title}, {tool}: {tier}",
-                        title = c.title,
-                        tool = c.tool,
-                        tier = c.label.text()
-                    )
-                }))
+                .aria_label(SharedString::from(aria))
                 .min_h(px(56.))
                 .py(px(8.))
                 .flex()
@@ -396,8 +552,28 @@ impl SettingsView {
                         .gap(px(2.))
                         .child(
                             div()
-                                .text_size(px(type_scale::UI))
-                                .child(SharedString::from(c.title.clone())),
+                                .flex()
+                                .flex_wrap()
+                                .items_center()
+                                .gap(px(8.))
+                                .child(
+                                    div()
+                                        .min_w(px(0.))
+                                        .text_size(px(type_scale::UI))
+                                        .child(SharedString::from(c.title.clone())),
+                                )
+                                .when(c.changed, |d| {
+                                    d.child(
+                                        div()
+                                            .id(("cap-changed", i))
+                                            .child(kit::pill(
+                                                t,
+                                                Tone::Neutral,
+                                                None,
+                                                tr_ctx!("tool permission", "Changed"),
+                                            )),
+                                    )
+                                }),
                         )
                         .child(
                             div()
@@ -405,9 +581,18 @@ impl SettingsView {
                                 .text_color(rgba_of(t.mist))
                                 .mono()
                                 .child(SharedString::from(c.tool.to_owned())),
-                        ),
+                        )
+                        .when(c.is_loosened(), |d| {
+                            d.child(
+                                div()
+                                    .id("cap-start-warning")
+                                    .text_size(px(type_scale::CAPTION))
+                                    .text_color(rgba_of(t.warning))
+                                    .child(tr!("AI agents can start recordings without asking. The indicator still shows and you can stop from the toast.")),
+                            )
+                        }),
                 )
-                .child(kit::pill(t, tone, Some(glyph), c.label.text()))
+                .child(control)
         });
         let perms_card = card(t)
             .px(px(18.))
@@ -421,16 +606,33 @@ impl SettingsView {
                 div()
                     .py(px(4.))
                     .flex()
+                    .flex_wrap()
                     .items_center()
                     .justify_between()
+                    .gap(px(8.))
                     .child(card_title(t, None, &tr!("Tool permissions")))
                     .child(
                         div()
                             .flex()
+                            .flex_wrap()
+                            .items_center()
                             .gap(px(12.))
                             .text_size(px(type_scale::CAPTION))
                             .child(legend(t, PermissionLabel::Allow))
-                            .child(legend(t, PermissionLabel::AskFirst)),
+                            .child(legend(t, PermissionLabel::AskFirst))
+                            .when(nchanged > 0, |d| {
+                                d.child(
+                                    small_button(t, "reset-tool-policy", &tr!("Reset to defaults"))
+                                        .aria_label(SharedString::from(tr!(
+                                            "Reset every tool permission to its default"
+                                        )))
+                                        .on_click(
+                                            cx.listener(|this, _, _, cx| {
+                                                this.reset_tool_policy(cx)
+                                            }),
+                                        ),
+                                )
+                            }),
                     ),
             )
             // The list is long: it scrolls inside the card (the page does not scroll with it) and
@@ -450,7 +652,7 @@ impl SettingsView {
             .child(div().pt(px(8.)).child(caption(
                 t,
                 // TRANSLATORS: FACT: owner review required (confirmation guarantee)
-                tr!("Allow runs immediately. Ask first always shows a confirmation on screen and is locked: starting a recording, publishing and deleting can\u{2019}t be switched off. Restrict a whole client below."),
+                tr!("Allow runs immediately. Ask first shows a confirmation on screen before the tool runs. Tools that change something can be set either way. Publishing and deleting always ask first and stay locked. Reading tools never need asking. Restrict a whole client below."),
             )));
 
         // ---- Client policies --------------------------------------------------------
@@ -657,7 +859,7 @@ impl SettingsView {
                     "{tool} from {client}, {decision}",
                     tool = e.tool,
                     client = e.client,
-                    decision = decision_label(e.decision)
+                    decision = entry_label(&e)
                 )))
                 .min_h(px(scale::ROW_H))
                 .justify_between()
@@ -685,7 +887,7 @@ impl SettingsView {
                 )
                 .child({
                     let (tone, glyph) = decision_pill_parts(e.decision);
-                    kit::pill(t, tone, Some(glyph), decision_label(e.decision))
+                    kit::pill(t, tone, Some(glyph), entry_label(&e))
                 })
         });
         let recent_card = list_card(t)

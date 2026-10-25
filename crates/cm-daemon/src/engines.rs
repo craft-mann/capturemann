@@ -70,7 +70,7 @@ impl SettingsStore for MemorySettings {
 /// never exposed, R2-4). Matched case-insensitively against the **whole** key, not per dotted
 /// segment, so `auth.access_token`, `youtube.refresh_token`, `db.password_hash` and
 /// `youtube.api_key_id` are all refused.
-const SECRET_SUBSTRINGS: &[&str] = &[
+pub(crate) const SECRET_SUBSTRINGS: &[&str] = &[
     "token",
     "secret",
     "password",
@@ -227,6 +227,11 @@ pub fn check_setting_writes(agent: bool, values: &Map<String, Value>) -> Result<
                 reason: "app_only_setting",
                 message: format!("`{k}` can only be changed in the CaptureMann app (Settings)"),
             });
+        }
+        // AGT-2.AC10: the per-tool permissions are validated on every write. (An agent never gets
+        // here: `agents.*` is app-only above.)
+        if k == crate::tool_policy::KEY {
+            crate::tool_policy::parse_strict(v)?;
         }
         if agent && !AGENT_WRITABLE_FAMILIES.contains(&k.split('.').next().unwrap_or_default()) {
             return Err(CmError::invalid_field(

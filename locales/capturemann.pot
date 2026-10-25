@@ -83,6 +83,9 @@ msgstr ""
 msgid "A zoom eases in over {secs} seconds, holds, and eases out"
 msgstr ""
 
+msgid "AI agents can start recordings without asking. The indicator still shows and you can stop from the toast."
+msgstr ""
+
 msgid "AI models"
 msgstr ""
 
@@ -253,13 +256,16 @@ msgid "Allow for this session"
 msgstr ""
 
 #. FACT: owner review required (confirmation guarantee)
-msgid "Allow runs immediately. Ask first always shows a confirmation on screen and is locked: starting a recording, publishing and deleting can’t be switched off. Restrict a whole client below."
+msgid "Allow runs immediately. Ask first shows a confirmation on screen before the tool runs. Tools that change something can be set either way. Publishing and deleting always ask first and stay locked. Reading tools never need asking. Restrict a whole client below."
 msgstr ""
 
 msgid "Allow this action?"
 msgstr ""
 
 msgid "Allow unknown clients"
+msgstr ""
+
+msgid "Allow without asking"
 msgstr ""
 
 msgid "Already split here"
@@ -283,6 +289,9 @@ msgid "Also save a PNG to a folder"
 msgstr ""
 
 msgid "Also save a PNG to a folder after capture"
+msgstr ""
+
+msgid "An AI agent will be able to start a recording as soon as it asks, with no confirmation. What it records (the screen, camera and microphone) follows your Recording settings. The recording indicator and the tray icon still show, and you can stop from the toast. You can turn this off here at any time."
 msgstr ""
 
 msgid "Annotate captures"
@@ -1237,6 +1246,9 @@ msgstr ""
 msgid "Download {size}"
 msgstr ""
 
+msgid "Downloading and deleting speech models always ask first."
+msgstr ""
+
 msgid "Downloading {percent}%"
 msgstr ""
 
@@ -1655,6 +1667,9 @@ msgstr ""
 msgid "Left out of recordings, not of screenshots"
 msgstr ""
 
+msgid "Let AI agents start recordings without asking?"
+msgstr ""
+
 #. FACT: owner review required (what the permission is for)
 msgid "Lets CaptureMann see your screen so it can take screenshots and record. System audio is recorded under this same permission."
 msgstr ""
@@ -1837,6 +1852,9 @@ msgid "Model for this run"
 msgstr ""
 
 msgid "Models are not available"
+msgstr ""
+
+msgid "More"
 msgstr ""
 
 msgid "Most accurate, slow. Best for accents and noisy audio."
@@ -2339,6 +2357,9 @@ msgstr ""
 msgid "Permanent"
 msgstr ""
 
+msgid "Permission for {title}"
+msgstr ""
+
 msgid "Permissions…"
 msgstr ""
 
@@ -2489,6 +2510,10 @@ msgstr ""
 msgid "Published videos"
 msgstr ""
 
+#. FACT: owner review required (confirmation guarantee)
+msgid "Publishing and deleting always ask first."
+msgstr ""
+
 msgid "Publishing is not available in this build yet: {message}"
 msgstr ""
 
@@ -2535,6 +2560,9 @@ msgid "Read recording status"
 msgstr ""
 
 msgid "Read settings"
+msgstr ""
+
+msgid "Reading never needs asking."
 msgstr ""
 
 msgid "Reading the model list…"
@@ -2813,6 +2841,9 @@ msgstr ""
 msgid "Reset crop"
 msgstr ""
 
+msgid "Reset every tool permission to its default"
+msgstr ""
+
 msgid "Reset shortcuts"
 msgstr ""
 
@@ -2820,6 +2851,9 @@ msgid "Reset the keyboard shortcuts to their defaults?"
 msgstr ""
 
 msgid "Reset to defaults"
+msgstr ""
+
+msgid "Reset tool permissions?"
 msgstr ""
 
 msgid "Resolution"
@@ -3356,6 +3390,9 @@ msgid "The 60 fps self-test is running; wait for it to finish or stop it"
 msgstr ""
 
 msgid "The 60 fps test couldn’t finish"
+msgstr ""
+
+msgid "The 60 fps test records your screen, so it always asks first."
 msgstr ""
 
 msgid "The AI actions are not available in this build of the daemon."
@@ -4377,6 +4414,9 @@ msgstr ""
 msgid "your library folder"
 msgstr ""
 
+msgid "{agent} is asking to run “{title}”. You set this tool to Ask first in Settings → Agents & CLI."
+msgstr ""
+
 msgid "{apps} is hidden by your Privacy settings."
 msgid_plural "{apps} are hidden by your Privacy settings."
 msgstr[0] ""
@@ -4611,6 +4651,11 @@ msgstr[1] ""
 msgid "{n} min ago"
 msgstr ""
 
+msgid "{n} more parameter not shown"
+msgid_plural "{n} more parameters not shown"
+msgstr[0] ""
+msgstr[1] ""
+
 #. the find bar's match counter: the current match and how many there are.
 msgid "{n} of {m}"
 msgstr ""
@@ -4633,6 +4678,11 @@ msgstr[1] ""
 
 msgid "{n} suggested. Nothing is blurred until you accept. Click a dashed box on the image to accept just that one."
 msgid_plural "{n} suggested. Nothing is blurred until you accept. Click a dashed box on the image to accept just that one."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{n} tool is set differently from its default. Resetting puts every tool back to its default: tools that change something run without asking, and starting a recording asks first."
+msgid_plural "{n} tools are set differently from their defaults. Resetting puts every tool back to its default: tools that change something run without asking, and starting a recording asks first."
 msgstr[0] ""
 msgstr[1] ""
 
@@ -4706,6 +4756,9 @@ msgid "{reason}; the fallback folder failed too: {e}"
 msgstr ""
 
 msgid "{reported} (you asked for {asked})"
+msgstr ""
+
+msgid "{row}. Changed from the default."
 msgstr ""
 
 msgid "{secs} s countdown · Space skips, Esc cancels"
@@ -4854,6 +4907,10 @@ msgstr ""
 
 msgctxt "accounts"
 msgid "Channel"
+msgstr ""
+
+msgctxt "agent decision"
+msgid "allowed by your setting"
 msgstr ""
 
 msgctxt "agent decision"
@@ -5074,6 +5131,10 @@ msgstr ""
 
 msgctxt "button"
 msgid "Add client"
+msgstr ""
+
+msgctxt "button"
+msgid "Allow"
 msgstr ""
 
 msgctxt "button"
@@ -6394,6 +6455,10 @@ msgstr ""
 
 msgctxt "tool"
 msgid "Text"
+msgstr ""
+
+msgctxt "tool permission"
+msgid "Changed"
 msgstr ""
 
 msgctxt "track"

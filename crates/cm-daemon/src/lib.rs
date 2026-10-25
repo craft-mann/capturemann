@@ -66,6 +66,7 @@ pub mod rpc;
 pub mod storage_cloud;
 pub mod storage_ops;
 pub mod testing;
+pub mod tool_policy;
 mod upload_records;
 pub mod watcher;
 
@@ -85,8 +86,8 @@ pub use error::{rpc_code_for, DaemonError};
 pub use events::{Event, EventBus, JobEvent, JobEventKind, JobEvents};
 pub use frames::{DEFAULT_FRAME_TTL, MAX_FRAMES, MAX_FRAME_BYTES};
 pub use gate::{
-    ActivityDecision, ActivityEntry, ClientPolicies, ClientPolicy, ConfirmationRequest, Confirmer,
-    Decision, DenyAll, DEFAULT_CONFIRM_TIMEOUT, FIRST_PARTY_CLIENTS,
+    ActivityDecision, ActivityEntry, Approval, ClientPolicies, ClientPolicy, ConfirmationRequest,
+    Confirmer, Decision, DenyAll, DEFAULT_CONFIRM_TIMEOUT, FIRST_PARTY_CLIENTS,
 };
 pub use ipc::{connect, Endpoint, IpcServer};
 pub use jobs::{library_job_queue, library_jobs_path, JOBS_RELATIVE_PATH};
