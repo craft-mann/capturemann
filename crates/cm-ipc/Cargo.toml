@@ -1,0 +1,24 @@
+[package]
+name = "cm-ipc"
+description = "Client side of the daemon's local IPC: endpoints, connecting, JSON-RPC line client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+serde_json = "1"
+# MIT
+tokio = { version = "1", features = ["rt", "net", "io-util", "time"] }
+
+[target.'cfg(unix)'.dependencies]
+# MIT OR Apache-2.0 (geteuid, to check who owns the runtime directory)
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

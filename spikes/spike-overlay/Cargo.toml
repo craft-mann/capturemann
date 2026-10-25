@@ -1,0 +1,15 @@
+[package]
+name = "spike-overlay"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+xcap.workspace = true
+winit = "0.30"
+softbuffer = "0.4"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"

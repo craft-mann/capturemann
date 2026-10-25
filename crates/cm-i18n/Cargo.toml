@@ -1,0 +1,19 @@
+[package]
+name = "cm-i18n"
+description = "UI languages: gettext-style catalogues, tr! macros, locale-aware formatting, extraction checks"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+# No dependencies on purpose: the .po parser, the extractor and the formatters are small, and the
+# crate must stay buildable without a display or any licence question.
+[dependencies]
+
+[[bin]]
+name = "cm-i18n"
+path = "src/bin/cm-i18n.rs"

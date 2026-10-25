@@ -1,0 +1,37 @@
+[package]
+name = "cm-ai"
+description = "Local AI: Whisper transcripts and captions, model manager, auto-zoom and cut suggestions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+cm-core = { path = "../cm-core" }
+cm-cursor = { path = "../cm-cursor" }
+cm-library = { path = "../cm-library" }
+# FFmpeg lookup only (`tools::locate`): one set of rules for CM_FFMPEG, next to the exe, PATH.
+cm-media = { path = "../cm-media" }
+serde = { version = "1", features = ["derive"] }
+# Unicode composition (NFC) and grapheme boundaries for the Vietnamese-exact text matching of the
+# glossary and of find and replace in captions (the same crates the desktop app already uses).
+icu_normalizer = { version = "2", default-features = false, features = ["compiled_data"] }
+unicode-segmentation = "1"
+serde_json = "1"
+# MIT OR Apache-2.0
+sha2 = "0.10"
+# MIT OR Apache-2.0. The system TLS stack (Security.framework, schannel): no ring, no bundled root list.
+ureq = { version = "3.5", default-features = false, features = ["native-tls-no-default"] }
+# Unlicense (a public domain dedication). It builds whisper.cpp and ggml (MIT) from source, so it
+# needs `cmake` and a C++ toolchain at build time. See `[[licenses.exceptions]]` in deny.toml.
+whisper-rs = "0.16"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+whisper-rs = { version = "0.16", features = ["metal"] }
+
+[dev-dependencies]
+tempfile = "3"

@@ -1,0 +1,43 @@
+[workspace]
+resolver = "2"
+members = ["crates/*", "apps/*"]
+exclude = ["spikes"]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+repository = "https://github.com/craft-mann/capturemann"
+homepage = "https://www.craftmann.app/capturemann/"
+authors = ["The CaptureMann contributors"]
+rust-version = "1.90"
+
+[workspace.dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+time = { version = "0.3", default-features = false, features = ["std", "serde-well-known"] }
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+# Error types carry a serde_json::Value of detail, whose size grows when GPUI enables serde_json features through
+# workspace feature unification. Errors are rare and end an operation, so boxing them is not worth it.
+result_large_err = "allow"
+
+# Debug builds filled the disk (80+ GB of target/debug). Our own crates keep file and line
+# numbers in backtraces; third-party crates (gpui, objc2, wgpu) carry no debug info. Release is
+# unchanged. Use `debug = true` locally if you need lldb to inspect variables.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
+[profile.release]
+debug = 1

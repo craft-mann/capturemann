@@ -1,0 +1,85 @@
+/* CaptureMann design tokens — dark is the default theme. Generated from tokens.json. */
+@font-face { font-family: 'Geist'; src: url('../fonts/Geist-Variable.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: 'Geist Mono'; src: url('../fonts/GeistMono-Variable.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
+
+:root {
+  --cm-font-sans: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --cm-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Consolas, monospace;
+
+  /* Theme (dark) */
+  --cm-ground: #0A0A0B;
+  --cm-sidebar: #0E0E10;
+  --cm-surface: #111113;
+  --cm-surface-2: #141417;
+  --cm-raised: #1E1E22;
+  --cm-field: #0D0D0F;
+  /* Naming: --cm-border is the redesign kit's --line; --cm-line is its --line-strong. */
+  --cm-border: #222226;
+  --cm-line: #2E2E34;
+  --cm-text: #EDEDEF;
+  --cm-text-2: #C9C9CF;
+  --cm-text-3: #A1A1A9;
+  --cm-mist: #8B8B93;
+  --cm-faint: #6E6E76;      /* disabled, placeholders, decoration; below 4.5:1 */
+
+  /* Brand signals (theme-independent) */
+  --cm-rec: #FF4F3A;        /* Record, Stop, destructive confirmations; text on it = --cm-on-rec */
+  --cm-rec-hover: #FF6551;
+  --cm-rec-soft: #FF6E5C;   /* rec icon on a dark rec tint */
+  --cm-on-rec: #0A0A0B;
+  --cm-agent: #5B8CFF;      /* MCP / CLI activity */
+  --cm-agent-text: #8FB0FF;
+  --cm-success: #3DD68C;
+  --cm-warning: #F5B84A;
+
+  /* Primary button (OD-17): neutral. Red is only for Record, Stop and destructive confirms. */
+  --cm-primary-bg: #EDEDEF;
+  --cm-primary-fg: #0A0A0B;
+  --cm-primary-hover: #D9D9DC;
+
+  /* Radii */
+  --cm-r-xs: 6px; --cm-r-sm: 8px; --cm-r-md: 10px; --cm-r-lg: 14px; --cm-r-xl: 16px; --cm-r-2xl: 20px; --cm-r-dialog: 18px; --cm-r-pill: 999px;
+
+  /* Spacing */
+  --cm-s-1: 4px; --cm-s-2: 8px; --cm-s-3: 12px; --cm-s-4: 16px; --cm-s-5: 20px; --cm-s-6: 24px; --cm-s-8: 32px; --cm-s-10: 40px;
+
+  /* Sizes */
+  --cm-control: 40px; --cm-target: 44px; --cm-sidebar-w: 248px; --cm-rail-w: 64px; --cm-toast-w: 440px; --cm-inspector-w: 300px; --cm-launcher-w: 760px;
+
+  /* Elevation */
+  --cm-shadow-float: 0 30px 80px rgba(0,0,0,0.6);
+  --cm-shadow-hud: 0 18px 50px rgba(0,0,0,0.6);
+}
+
+[data-theme="light"] {
+  --cm-ground: #F6F6F4;
+  --cm-sidebar: #EFEFEC;
+  --cm-surface: #FFFFFF;
+  --cm-surface-2: #FAFAF8;
+  --cm-raised: #F6F6F4;
+  --cm-field: #EFEFEC;
+  --cm-border: #E4E4E0;
+  --cm-line: #D6D6D1;
+  --cm-text: #0A0A0B;
+  --cm-text-2: #2A2A30;
+  --cm-text-3: #44444B;
+  --cm-mist: #55555C;
+  --cm-faint: #6B6B72;
+  --cm-rec-soft: #D93A27;
+  --cm-agent: #3B6FE8;
+  --cm-agent-text: #2F5FD0;
+  /* On light, primary = ink fill with white text (no rec dot since OD-17) */
+  --cm-primary-bg: #0A0A0B;
+  --cm-primary-fg: #FFFFFF;
+  --cm-primary-hover: #2A2A30;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --cm-ground: #F6F6F4; --cm-sidebar: #EFEFEC; --cm-surface: #FFFFFF; --cm-raised: #F6F6F4;
+    --cm-border: #E4E4E0; --cm-line: #D6D6D1; --cm-text: #0A0A0B; --cm-text-2: #2A2A30;
+    --cm-text-3: #44444B; --cm-mist: #55555C; --cm-agent: #3B6FE8; --cm-agent-text: #2F5FD0;
+    --cm-surface-2: #FAFAF8; --cm-field: #EFEFEC; --cm-faint: #6B6B72; --cm-rec-soft: #D93A27;
+    --cm-primary-bg: #0A0A0B; --cm-primary-fg: #FFFFFF; --cm-primary-hover: #2A2A30;
+  }
+}

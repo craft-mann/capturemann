@@ -1,0 +1,38 @@
+[package]
+name = "cm-publish"
+description = "PublishProvider trait, platform rules and metadata validation, and the YouTube provider"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+cm-core = { path = "../cm-core" }
+# The HTTP seam (`StorageHttp`), `TokenSource`, `Progress` and `ResumeState` are shared with the
+# storage providers instead of being copied.
+cm-storage = { path = "../cm-storage" }
+# `scrub_secrets` only: server text is scrubbed before it reaches a message.
+cm-jobs = { path = "../cm-jobs" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# MIT OR Apache-2.0
+async-trait = "0.1"
+# MIT OR Apache-2.0
+sha2 = "0.10"
+# MIT
+tokio = { version = "1", features = ["rt", "time", "sync"] }
+# MIT OR Apache-2.0
+percent-encoding = "2"
+
+[features]
+# The in-process fake YouTube server, for the tests of other crates.
+testing = ["cm-storage/testing"]
+
+[dev-dependencies]
+cm-storage = { path = "../cm-storage", features = ["testing"] }
+tempfile = "3"
+tokio = { version = "1", features = ["rt", "macros", "test-util"] }

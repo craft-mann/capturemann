@@ -1,0 +1,95 @@
+# Export presets (EXP-2, EXP-3). Embedded in the app; a file with the same shape named by
+# CAPTUREMANN_PLATFORM_RULES (or `platform_rules.toml` in the config folder) replaces it at the
+# next export without rebuilding (EXP-2.AC4). `version` changes when the shape changes.
+version = 1
+
+# ---- MP4 (H.264 High, AAC) ----------------------------------------------------------------------
+# frame      = [w, h] output frame, or "master" (the recording's size, capped for H.264 level 5.2)
+# fps        = "source" (the recording's fps) or a number
+# mbps_30    = video bitrate in Mbps at 30 fps or less, mbps_60 above 30 fps (YouTube's recommended
+#              ranges are 35-45 / 53-68 Mbps at 4K, 16 / 24 at 1440p and 8 / 12 at 1080p)
+# loudness_lufs = integrated loudness target applied to the audio unless the request names one
+# refuse_upscale = refuse when fitting the recording into the frame would enlarge it
+# safe_bottom_pct, safe_right_pct = platform UI zones the camera bubble stays out of
+
+[[preset]]
+id = "youtube-4k"
+label = "YouTube 4K"
+kind = "mp4"
+frame = [3840, 2160]
+fps = "source"
+mbps_30 = 40
+mbps_60 = 60
+loudness_lufs = -14
+refuse_upscale = true
+
+[[preset]]
+id = "youtube-1440p"
+label = "YouTube 1440p"
+kind = "mp4"
+frame = [2560, 1440]
+fps = "source"
+mbps_30 = 16
+mbps_60 = 24
+loudness_lufs = -14
+
+[[preset]]
+id = "youtube-1080p"
+label = "YouTube 1080p"
+kind = "mp4"
+frame = [1920, 1080]
+fps = "source"
+mbps_30 = 8
+mbps_60 = 12
+loudness_lufs = -14
+
+[[preset]]
+id = "vertical-1080"
+label = "Shorts, TikTok, Reels (9:16)"
+kind = "mp4"
+frame = [1080, 1920]
+fps = "source"
+mbps_30 = 12
+mbps_60 = 12
+loudness_lufs = -14
+safe_bottom_pct = 20
+safe_right_pct = 12
+
+[[preset]]
+id = "square-1080"
+label = "Square feed (1:1)"
+kind = "mp4"
+frame = [1080, 1080]
+fps = "source"
+mbps_30 = 8
+mbps_60 = 8
+loudness_lufs = -14
+
+[[preset]]
+id = "source"
+label = "Source size"
+kind = "mp4"
+frame = "master"
+fps = "source"
+
+# ---- GIF and WebM (EXP-3) -----------------------------------------------------------------------
+# width / fps = the defaults; widths / fps_choices = the allowed values (GIF)
+# max_seconds = refuse longer clips, warn_seconds = note longer clips in the export settings
+
+[[preset]]
+id = "gif"
+label = "GIF"
+kind = "gif"
+width = 800
+widths = [480, 640, 800, 1024]
+fps = 15
+fps_choices = [10, 15, 24]
+max_seconds = 30
+warn_seconds = 15
+
+[[preset]]
+id = "webm"
+label = "WebM (VP9)"
+kind = "webm"
+width = 1280
+fps = 30

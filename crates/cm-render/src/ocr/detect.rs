@@ -1,0 +1,690 @@
+//! Finding things worth redacting in recognized text (ANN-2 Auto-redact): email addresses,
+//! API keys and other long tokens, plus phone numbers and IPv4 addresses as lower-confidence
+//! extras. Pure Rust over [`TextLine`]s, so it is tested with fixtures and no OCR engine.
+//!
+//! A hit that is only part of a line (an email inside a sentence) gets a rectangle for just
+//! that span: the word box is split in proportion to the characters, which is an estimate for
+//! proportional fonts, and the padding absorbs the error. Nothing here applies anything; the
+//! caller turns accepted suggestions into blur ops.
+
+use super::{TextLine, TextWord};
+use cm_core::Rc;
+
+/// What a suggestion is about. Ordered by priority when two suggestions overlap.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum RedactionKind {
+    Email,
+    /// API keys, JWTs and other long random-looking strings.
+    Token,
+    IpAddress,
+    Phone,
+}
+
+impl RedactionKind {
+    pub const ALL: [RedactionKind; 4] = [
+        RedactionKind::Email,
+        RedactionKind::Token,
+        RedactionKind::IpAddress,
+        RedactionKind::Phone,
+    ];
+
+    /// The name used in results, MCP and the CLI.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            RedactionKind::Email => "email",
+            RedactionKind::Token => "token",
+            RedactionKind::IpAddress => "ip_address",
+            RedactionKind::Phone => "phone",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<RedactionKind> {
+        RedactionKind::ALL.into_iter().find(|k| k.as_str() == s)
+    }
+}
+
+/// One proposed blur rectangle, in original-image pixels.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RedactionSuggestion {
+    pub rect: Rc,
+    pub kind: RedactionKind,
+    /// 0.0..=1.0: how sure the detector is, scaled by the recognizer's confidence.
+    pub confidence: f32,
+    /// The text, masked: first and last two characters only (see [`mask_preview`]).
+    pub text_preview: String,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct SuggestOptions {
+    /// Kinds to look for; empty means all.
+    pub kinds: Vec<RedactionKind>,
+}
+
+impl SuggestOptions {
+    fn wants(&self, k: RedactionKind) -> bool {
+        self.kinds.is_empty() || self.kinds.contains(&k)
+    }
+}
+
+/// Masks a secret for display: `"jo...om"`. Short strings are starred out entirely, so the
+/// preview never reveals more than four characters of anything.
+pub fn mask_preview(s: &str) -> String {
+    let c: Vec<char> = s.chars().collect();
+    if c.len() < 8 {
+        return "*".repeat(c.len());
+    }
+    let head: String = c[..2].iter().collect();
+    let tail: String = c[c.len() - 2..].iter().collect();
+    format!("{head}...{tail}")
+}
+
+/// Detects redaction candidates in `lines` of an `image`-sized picture. Rectangles are padded,
+/// clipped to the image and merged where two cover mostly the same area.
+pub fn suggest_redactions(
+    lines: &[TextLine],
+    image: (u32, u32),
+    opts: &SuggestOptions,
+) -> Vec<RedactionSuggestion> {
+    let mut found = Vec::new();
+    for line in lines {
+        scan_line(line, opts, &mut found);
+    }
+    let bounds = Rc::new(0.0, 0.0, f64::from(image.0), f64::from(image.1));
+    let mut padded: Vec<RedactionSuggestion> = found
+        .into_iter()
+        .filter_map(|mut s| {
+            let h = s.rect.h;
+            let pad = (h * 0.15).max(2.0);
+            let r = Rc::new(
+                s.rect.x - pad,
+                s.rect.y - pad,
+                s.rect.w + 2.0 * pad,
+                s.rect.h + 2.0 * pad,
+            );
+            s.rect = intersect(r, bounds)?;
+            (s.rect.w >= 1.0 && s.rect.h >= 1.0).then_some(s)
+        })
+        .collect();
+    padded.sort_by(|a, b| {
+        a.rect
+            .y
+            .total_cmp(&b.rect.y)
+            .then(a.rect.x.total_cmp(&b.rect.x))
+    });
+    merge(padded)
+}
+
+fn area(r: Rc) -> f64 {
+    r.w.max(0.0) * r.h.max(0.0)
+}
+
+fn intersect(a: Rc, b: Rc) -> Option<Rc> {
+    let x0 = a.x.max(b.x);
+    let y0 = a.y.max(b.y);
+    let x1 = (a.x + a.w).min(b.x + b.w);
+    let y1 = (a.y + a.h).min(b.y + b.h);
+    (x1 > x0 && y1 > y0).then(|| Rc::new(x0, y0, x1 - x0, y1 - y0))
+}
+
+fn union(a: Rc, b: Rc) -> Rc {
+    let x0 = a.x.min(b.x);
+    let y0 = a.y.min(b.y);
+    let x1 = (a.x + a.w).max(b.x + b.w);
+    let y1 = (a.y + a.h).max(b.y + b.h);
+    Rc::new(x0, y0, x1 - x0, y1 - y0)
+}
+
+/// Merges rectangles when the overlap is at least half of the smaller one. Two emails on
+/// neighbouring lines keep separate rectangles; the same secret found twice does not.
+fn merge(mut v: Vec<RedactionSuggestion>) -> Vec<RedactionSuggestion> {
+    'again: loop {
+        for i in 0..v.len() {
+            for j in (i + 1)..v.len() {
+                let Some(o) = intersect(v[i].rect, v[j].rect) else {
+                    continue;
+                };
+                let smaller = area(v[i].rect).min(area(v[j].rect));
+                if smaller > 0.0 && area(o) >= 0.5 * smaller {
+                    let b = v.remove(j);
+                    let a = &mut v[i];
+                    a.rect = union(a.rect, b.rect);
+                    if b.kind < a.kind {
+                        a.kind = b.kind;
+                        a.text_preview = b.text_preview;
+                    }
+                    a.confidence = a.confidence.max(b.confidence);
+                    continue 'again;
+                }
+            }
+        }
+        return v;
+    }
+}
+
+/// A line flattened to characters, each with the box it occupies (None for the separator
+/// between words).
+struct Flat {
+    chars: Vec<char>,
+    cells: Vec<Option<Rc>>,
+}
+
+fn flatten(line: &TextLine) -> Flat {
+    let mut chars = Vec::new();
+    let mut cells = Vec::new();
+    let spread = |text: &str, rect: Rc, chars: &mut Vec<char>, cells: &mut Vec<Option<Rc>>| {
+        let n = text.chars().count().max(1);
+        let w = rect.w / n as f64;
+        for (i, c) in text.chars().enumerate() {
+            chars.push(c);
+            cells.push(Some(Rc::new(rect.x + w * i as f64, rect.y, w, rect.h)));
+        }
+    };
+    let words: Vec<&TextWord> = line
+        .words
+        .iter()
+        .filter(|w| !w.text.trim().is_empty())
+        .collect();
+    if words.is_empty() {
+        spread(&line.text, line.rect, &mut chars, &mut cells);
+    } else {
+        for (i, w) in words.iter().enumerate() {
+            if i > 0 {
+                chars.push(' ');
+                cells.push(None);
+            }
+            spread(w.text.trim(), w.rect, &mut chars, &mut cells);
+        }
+    }
+    Flat { chars, cells }
+}
+
+struct Span {
+    start: usize,
+    end: usize,
+    kind: RedactionKind,
+    confidence: f32,
+}
+
+fn scan_line(line: &TextLine, opts: &SuggestOptions, out: &mut Vec<RedactionSuggestion>) {
+    let flat = flatten(line);
+    let c = &flat.chars;
+    let mut spans: Vec<Span> = Vec::new();
+    let push = |s: Span, spans: &mut Vec<Span>| {
+        if s.end > s.start && !spans.iter().any(|t| s.start < t.end && t.start < s.end) {
+            spans.push(s);
+        }
+    };
+    if opts.wants(RedactionKind::Email) {
+        for s in find_emails(c) {
+            push(s, &mut spans);
+        }
+    }
+    if opts.wants(RedactionKind::Token) {
+        for s in find_tokens(c) {
+            push(s, &mut spans);
+        }
+    }
+    if opts.wants(RedactionKind::IpAddress) {
+        for s in find_ips(c) {
+            push(s, &mut spans);
+        }
+    }
+    if opts.wants(RedactionKind::Phone) {
+        for s in find_phones(c) {
+            push(s, &mut spans);
+        }
+    }
+    let line_conf = line.confidence.clamp(0.0, 1.0);
+    for s in spans {
+        let mut rect: Option<Rc> = None;
+        for cell in flat.cells[s.start..s.end].iter().flatten() {
+            rect = Some(rect.map_or(*cell, |r| union(r, *cell)));
+        }
+        let Some(rect) = rect else { continue };
+        let text: String = c[s.start..s.end].iter().collect();
+        out.push(RedactionSuggestion {
+            rect,
+            kind: s.kind,
+            confidence: s.confidence * line_conf,
+            text_preview: mask_preview(&text),
+        });
+    }
+}
+
+fn is_local(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '%' | '+' | '-')
+}
+
+fn is_domain(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-')
+}
+
+fn find_emails(c: &[char]) -> Vec<Span> {
+    let mut out: Vec<Span> = Vec::new();
+    for (i, &ch) in c.iter().enumerate() {
+        if ch != '@' {
+            continue;
+        }
+        let mut start = i;
+        while start > 0 && is_local(c[start - 1]) {
+            start -= 1;
+        }
+        while start < i && c[start] == '.' {
+            start += 1;
+        }
+        let mut end = i + 1;
+        while end < c.len() && is_domain(c[end]) {
+            end += 1;
+        }
+        // Cut at an empty label and drop trailing dots and hyphens.
+        let domain_start = i + 1;
+        let mut e = domain_start;
+        while e < end {
+            if c[e] == '.' && (e == domain_start || e + 1 >= end || c[e + 1] == '.') {
+                break;
+            }
+            e += 1;
+        }
+        let mut end = e;
+        while end > domain_start && matches!(c[end - 1], '.' | '-') {
+            end -= 1;
+        }
+        if start >= i || end <= domain_start {
+            continue;
+        }
+        let domain: String = c[domain_start..end].iter().collect();
+        let Some((_, tld)) = domain.rsplit_once('.') else {
+            continue;
+        };
+        if tld.len() < 2 || !tld.chars().all(|x| x.is_ascii_alphabetic()) {
+            continue;
+        }
+        if out.last().is_some_and(|s| s.end > start) {
+            continue;
+        }
+        out.push(Span {
+            start,
+            end,
+            kind: RedactionKind::Email,
+            confidence: 0.95,
+        });
+    }
+    out
+}
+
+fn is_token_char(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '+' | '/')
+}
+
+fn find_tokens(c: &[char]) -> Vec<Span> {
+    let mut out = Vec::new();
+    // JWTs first: three base64url segments with dots between them.
+    let mut i = 0;
+    while i < c.len() {
+        let run_end = (i..c.len())
+            .find(|&j| !(is_token_char(c[j]) || c[j] == '.'))
+            .unwrap_or(c.len());
+        let run: String = c[i..run_end].iter().collect();
+        if run.starts_with("eyJ") {
+            let trimmed = run.trim_end_matches('.');
+            let parts: Vec<&str> = trimmed.split('.').collect();
+            if parts.len() == 3 && parts.iter().all(|p| p.len() >= 8) {
+                out.push(Span {
+                    start: i,
+                    end: i + trimmed.chars().count(),
+                    kind: RedactionKind::Token,
+                    confidence: 0.9,
+                });
+                i = run_end.max(i + 1);
+                continue;
+            }
+        }
+        i = run_end.max(i + 1);
+    }
+    // Everything else: runs of token characters (a '.' or '=' ends one; trailing '=' padding
+    // belongs to it).
+    let mut i = 0;
+    while i < c.len() {
+        if !is_token_char(c[i]) {
+            i += 1;
+            continue;
+        }
+        let mut j = i;
+        while j < c.len() && is_token_char(c[j]) {
+            j += 1;
+        }
+        let mut end = j;
+        while end < c.len() && end < j + 2 && c[end] == '=' {
+            end += 1;
+        }
+        let word: String = c[i..j].iter().collect();
+        if let Some(conf) = classify_token(&word) {
+            if !out.iter().any(|s: &Span| i < s.end && s.start < end) {
+                out.push(Span {
+                    start: i,
+                    end,
+                    kind: RedactionKind::Token,
+                    confidence: conf,
+                });
+            }
+        }
+        i = j.max(i + 1);
+    }
+    out
+}
+
+fn classify_token(w: &str) -> Option<f32> {
+    let n = w.chars().count();
+    let alnum_upper = |s: &str| {
+        s.chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
+    };
+    // Well-known key shapes.
+    let prefixed: &[(&str, usize)] = &[
+        ("sk-", 20),
+        ("ghp_", 30),
+        ("gho_", 30),
+        ("ghu_", 30),
+        ("ghs_", 30),
+        ("ghr_", 30),
+        ("github_pat_", 30),
+        ("sk_live_", 20),
+        ("pk_live_", 20),
+        ("rk_live_", 20),
+        ("AIza", 35),
+    ];
+    if prefixed
+        .iter()
+        .any(|(p, min)| w.starts_with(p) && n >= *min)
+    {
+        return Some(0.95);
+    }
+    if (w.starts_with("AKIA") || w.starts_with("ASIA")) && n == 20 && alnum_upper(w) {
+        return Some(0.95);
+    }
+    if w.starts_with("xox") && w.as_bytes().get(3).is_some_and(|b| b"baprs".contains(b)) && n >= 15
+    {
+        return Some(0.95);
+    }
+    // Long, random-looking: letters and digits mixed (hex, base64).
+    if n >= 24 {
+        let digits = w.chars().filter(char::is_ascii_digit).count();
+        let letters = w.chars().filter(char::is_ascii_alphabetic).count();
+        if digits >= 3 && letters >= 3 && digits * 100 >= n * 7 && !w.starts_with('/') {
+            return Some(0.6);
+        }
+    }
+    None
+}
+
+fn find_ips(c: &[char]) -> Vec<Span> {
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < c.len() {
+        if !c[i].is_ascii_digit() {
+            i += 1;
+            continue;
+        }
+        let mut j = i;
+        while j < c.len() && (c[j].is_ascii_digit() || c[j] == '.') {
+            j += 1;
+        }
+        let run: String = c[i..j].iter().collect();
+        let run = run.trim_end_matches('.');
+        let parts: Vec<&str> = run.split('.').collect();
+        let ok = parts.len() == 4
+            && parts
+                .iter()
+                .all(|p| !p.is_empty() && p.len() <= 3 && p.parse::<u16>().is_ok_and(|v| v <= 255));
+        let before_ok = i == 0 || !c[i - 1].is_ascii_alphanumeric();
+        if ok && before_ok {
+            out.push(Span {
+                start: i,
+                end: i + run.chars().count(),
+                kind: RedactionKind::IpAddress,
+                confidence: 0.5,
+            });
+        }
+        i = j.max(i + 1);
+    }
+    out
+}
+
+fn find_phones(c: &[char]) -> Vec<Span> {
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < c.len() {
+        let starts = c[i].is_ascii_digit() || c[i] == '+' || c[i] == '(';
+        // Not the tail of a longer number or date ("2026-10-23 1415 5550").
+        let before_ok =
+            i == 0 || !(c[i - 1].is_ascii_alphanumeric() || matches!(c[i - 1], '-' | '.' | '/'));
+        if !(starts && before_ok) {
+            i += 1;
+            continue;
+        }
+        let mut j = i;
+        while j < c.len()
+            && (c[j].is_ascii_digit() || matches!(c[j], ' ' | '(' | ')' | '+' | '.' | '-'))
+        {
+            j += 1;
+        }
+        // Trim to the last digit or closing parenthesis.
+        let mut end = j;
+        while end > i && !(c[end - 1].is_ascii_digit() || c[end - 1] == ')') {
+            end -= 1;
+        }
+        let after_ok = end >= c.len() || !c[end].is_ascii_alphanumeric();
+        let text: String = c[i..end].iter().collect();
+        let digits = text.chars().filter(char::is_ascii_digit).count();
+        let seps = text
+            .chars()
+            .filter(|ch| matches!(ch, ' ' | '(' | ')' | '.' | '-'))
+            .count();
+        let iso_date = text.len() >= 10
+            && text.as_bytes()[4] == b'-'
+            && text[..4].chars().all(|d| d.is_ascii_digit());
+        if after_ok
+            && (10..=15).contains(&digits)
+            && (seps >= 2 || text.starts_with('+'))
+            && !iso_date
+            && !text.contains("  ")
+        {
+            out.push(Span {
+                start: i,
+                end,
+                kind: RedactionKind::Phone,
+                confidence: 0.5,
+            });
+            i = end.max(i + 1);
+        } else {
+            i += 1;
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const IMG: (u32, u32) = (1200, 800);
+
+    fn line(text: &str, y: f64) -> TextLine {
+        TextLine::laid_out(text, 100.0, y, 10.0, 20.0)
+    }
+
+    fn run(texts: &[&str]) -> Vec<RedactionSuggestion> {
+        let lines: Vec<TextLine> = texts
+            .iter()
+            .enumerate()
+            .map(|(i, t)| line(t, 100.0 + 60.0 * i as f64))
+            .collect();
+        suggest_redactions(&lines, IMG, &SuggestOptions::default())
+    }
+
+    /// ANN-2.AC4: two email addresses give two proposed rectangles.
+    #[test]
+    fn ann_2_ac4_two_emails_give_two_rects() {
+        let r = run(&[
+            "From: jane.doe@example.com",
+            "Cc: ops-team+alerts@mail.example.co.uk",
+        ]);
+        assert_eq!(r.len(), 2, "{r:?}");
+        assert!(r.iter().all(|s| s.kind == RedactionKind::Email));
+    }
+
+    #[test]
+    fn email_in_a_sentence_gets_a_rect_for_just_that_span() {
+        // "Contact " is 8 chars = 80 px, so the address starts at x = 180 and is 20 chars.
+        let r = run(&["Contact jane.doe@example.com today"]);
+        assert_eq!(r.len(), 1);
+        let rc = r[0].rect;
+        let pad = 3.0; // 15% of 20 px
+        assert!((rc.x - (180.0 - pad)).abs() < 0.01, "{rc:?}");
+        assert!((rc.w - (200.0 + 2.0 * pad)).abs() < 0.01, "{rc:?}");
+        assert!((rc.y - (100.0 - pad)).abs() < 0.01);
+    }
+
+    #[test]
+    fn emails_with_trailing_punctuation_and_in_brackets() {
+        for t in [
+            "<a.b@x.io>,",
+            "(a.b@x.io).",
+            "mailto:a.b@x.io;",
+            "a.b@x.io.",
+        ] {
+            let r = run(&[t]);
+            assert_eq!(r.len(), 1, "{t}: {r:?}");
+        }
+        // Not emails.
+        for t in ["@mention", "user@localhost", "a@b.c", "x@.com", "1 @ 2"] {
+            assert!(run(&[t]).is_empty(), "{t}");
+        }
+    }
+
+    #[test]
+    fn api_keys_are_found_by_shape() {
+        let keys = [
+            "sk-proj-abcdefghijklmnopqrstuvwx",
+            "ghp_abcdefghijklmnopqrstuvwxyz0123456789",
+            "AKIAIOSFODNN7EXAMPLE",
+            "xoxb-1234567890-abcdefghijkl",
+            "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dBjftJeZ4CVPmB92K27uhbUJU1p1r",
+        ];
+        for k in keys {
+            let r = run(&[&format!("token = {k}")]);
+            assert_eq!(r.len(), 1, "{k}: {r:?}");
+            assert_eq!(r[0].kind, RedactionKind::Token, "{k}");
+            assert!(r[0].confidence >= 0.9, "{k}");
+        }
+    }
+
+    #[test]
+    fn long_mixed_strings_are_tokens_with_lower_confidence() {
+        let r = run(&["id 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"]);
+        assert_eq!(r.len(), 1);
+        assert_eq!(r[0].kind, RedactionKind::Token);
+        assert!(r[0].confidence < 0.9 && r[0].confidence >= 0.5);
+        let r = run(&["Zm9vYmFyMTIzNDU2Nzg5MGFiY2RlZg=="]);
+        assert_eq!(r.len(), 1);
+    }
+
+    #[test]
+    fn ordinary_text_is_left_alone() {
+        let r = run(&[
+            "The quick brown fox jumps over the lazy dog",
+            "NSApplicationDidFinishLaunchingNotification",
+            "/Users/someone/Documents/Projects/report.pdf",
+            "https://example.com/docs/getting-started",
+            "version 1.2.3 build 2026-10-23 14:05",
+            "AKIA short",
+            "1234567890123456",
+        ]);
+        assert!(r.is_empty(), "{r:?}");
+    }
+
+    #[test]
+    fn phones_and_ips_are_extras_with_low_confidence() {
+        let r = run(&["Call +1 (415) 555-0132 or 192.168.10.24"]);
+        assert_eq!(r.len(), 2, "{r:?}");
+        assert!(r.iter().all(|s| s.confidence <= 0.5));
+        let mut kinds: Vec<_> = r.iter().map(|s| s.kind).collect();
+        kinds.sort();
+        assert_eq!(kinds, [RedactionKind::IpAddress, RedactionKind::Phone]);
+        assert!(run(&["order 2026-10-23 1415 5550"]).is_empty());
+        assert!(run(&["300.1.1.1 and 1.2.3"]).is_empty());
+    }
+
+    #[test]
+    fn kinds_filter_limits_what_is_found() {
+        let lines = [line("a@b.io 192.168.0.1 sk-abcdefghijklmnopqrstuv", 50.0)];
+        let only = |k| {
+            suggest_redactions(&lines, IMG, &SuggestOptions { kinds: vec![k] })
+                .iter()
+                .map(|s| s.kind)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(only(RedactionKind::Email), [RedactionKind::Email]);
+        assert_eq!(only(RedactionKind::Token), [RedactionKind::Token]);
+        assert_eq!(only(RedactionKind::IpAddress), [RedactionKind::IpAddress]);
+    }
+
+    #[test]
+    fn a_token_inside_an_email_is_one_rect_not_two() {
+        // A 30-character mixed local part is both an email and a "long token".
+        let r = run(&["a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3@example.com"]);
+        assert_eq!(r.len(), 1);
+        assert_eq!(r[0].kind, RedactionKind::Email);
+    }
+
+    #[test]
+    fn rects_are_padded_clipped_to_the_image_and_merged_only_when_mostly_overlapping() {
+        // Near the top-left corner the padding is clipped.
+        let l = TextLine::laid_out("a@b.io", 0.0, 0.0, 10.0, 20.0);
+        let r = suggest_redactions(&[l], IMG, &SuggestOptions::default());
+        assert_eq!(r.len(), 1);
+        assert!(r[0].rect.x >= 0.0 && r[0].rect.y >= 0.0);
+        // The same address on two OCR lines (a duplicate) merges into one.
+        let a = line("a@b.io", 100.0);
+        let r = suggest_redactions(&[a.clone(), a], IMG, &SuggestOptions::default());
+        assert_eq!(r.len(), 1);
+        // Two emails on adjacent lines (padded boxes touch a little) stay separate.
+        let l1 = TextLine::laid_out("a@b.io", 100.0, 100.0, 10.0, 20.0);
+        let l2 = TextLine::laid_out("c@d.io", 100.0, 122.0, 10.0, 20.0);
+        let r = suggest_redactions(&[l1, l2], IMG, &SuggestOptions::default());
+        assert_eq!(r.len(), 2);
+    }
+
+    #[test]
+    fn a_line_without_word_boxes_uses_the_line_box() {
+        let l = TextLine {
+            text: "mail a@b.io now".into(),
+            rect: Rc::new(100.0, 100.0, 150.0, 20.0),
+            confidence: 0.8,
+            words: Vec::new(),
+        };
+        let r = suggest_redactions(&[l], IMG, &SuggestOptions::default());
+        assert_eq!(r.len(), 1);
+        // chars 5..11 of 15 -> x from 150 to 190, minus/plus padding.
+        assert!((r[0].rect.x - 147.0).abs() < 0.01, "{:?}", r[0].rect);
+        assert!((r[0].confidence - 0.95 * 0.8).abs() < 1e-6);
+    }
+
+    #[test]
+    fn previews_never_echo_the_secret() {
+        assert_eq!(mask_preview("jane.doe@example.com"), "ja...om");
+        assert_eq!(mask_preview("short"), "*****");
+        assert_eq!(mask_preview(""), "");
+        let r = run(&["sk-proj-abcdefghijklmnopqrstuvwx"]);
+        assert_eq!(r[0].text_preview, "sk...wx");
+        assert!(!r[0].text_preview.contains("proj"));
+    }
+
+    #[test]
+    fn kind_names_round_trip() {
+        for k in RedactionKind::ALL {
+            assert_eq!(RedactionKind::parse(k.as_str()), Some(k));
+        }
+        assert_eq!(RedactionKind::parse("face"), None);
+    }
+}

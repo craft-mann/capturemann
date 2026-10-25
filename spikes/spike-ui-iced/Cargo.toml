@@ -1,0 +1,9 @@
+[package]
+name = "spike-ui-iced"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+iced = { version = "0.14", features = ["wgpu", "tokio", "advanced"] }

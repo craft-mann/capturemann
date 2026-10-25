@@ -1,0 +1,35 @@
+[package]
+name = "cm-auth"
+description = "OAuth for a desktop app (PKCE + loopback redirect), token refresh, OS keychain secret store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+cm-core = { path = "../cm-core" }
+# `scrub_secrets` only: one scrubber convention for text that may come from a server.
+cm-jobs = { path = "../cm-jobs" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# MIT OR Apache-2.0
+async-trait = "0.1"
+# MIT OR Apache-2.0
+base64 = "0.22"
+# MIT OR Apache-2.0
+sha2 = "0.10"
+# MIT OR Apache-2.0
+getrandom = "0.4"
+# MIT OR Apache-2.0
+percent-encoding = "2"
+# MIT OR Apache-2.0. Default features (`v1`): Keychain on macOS, Credential Manager on Windows.
+keyring = "4.2"
+# MIT. Opens the system browser.
+open = "5.4"
+# MIT OR Apache-2.0. The system TLS stack, as in cm-ai (see `UreqClient`).
+ureq = { version = "3.5", default-features = false, features = ["native-tls-no-default"] }
+tokio = { version = "1", features = ["rt", "net", "io-util", "time", "sync", "macros"] }

@@ -1,0 +1,29 @@
+[package]
+name = "cm-media"
+description = "FFmpeg sidecar runner, quick exporter (screen + camera bubble + audio) and its filter-graph builder"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+cm-core = { path = "../cm-core" }
+cm-render = { path = "../cm-render" }
+cm-audio = { path = "../cm-audio" }
+cm-cursor = { path = "../cm-cursor" }
+serde_json = "1"
+# MIT OR Apache-2.0: the preset table (data/presets.toml and the user's override).
+toml = { version = "0.8", default-features = false, features = ["parse"] }
+# MIT OR Apache-2.0: renders the bubble mask and ring PNGs the filter graph reads.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+
+[target.'cfg(unix)'.dependencies]
+# kill(pid, 0): is the process that owns a `.work-*` folder still running?
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"

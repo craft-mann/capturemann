@@ -1,0 +1,62 @@
+name: Security scan
+
+# Trivy scans the repository (dependency lockfiles, committed secrets, misconfigurations) and sends
+# the findings to the Security tab. `cargo deny` in CI still gates licences and RustSec advisories.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 3 * * 1" # Mondays 03:17 UTC: new advisories appear without new commits
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  trivy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write # upload SARIF to code scanning
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # Report everything of HIGH or CRITICAL severity in the Security tab (never fails the run).
+      - name: Trivy scan (SARIF)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          skip-dirs: target,spikes/spike-out
+          format: sarif
+          output: trivy.sarif
+          exit-code: "0"
+
+      - name: Upload to code scanning
+        if: github.event_name != 'pull_request' # forks cannot write security events
+        uses: github/codeql-action/upload-sarif@4bfa242aa49c5f7c6770b98670d354a7dfac05f8 # v3
+        with:
+          sarif_file: trivy.sarif
+          category: trivy
+
+      # Fail the run on a CRITICAL finding or a committed secret.
+      - name: Trivy gate (CRITICAL and secrets)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret
+          severity: CRITICAL
+          ignore-unfixed: true
+          skip-dirs: target,spikes/spike-out
+          format: table
+          exit-code: "1"

@@ -1,0 +1,23 @@
+# Justified exceptions to tests/layout_guard.rs (see locales/README.md, "Layout: long translations").
+# One per line: RULE|path|snippet  # why. The snippet is printed by the failing test; a line that
+# matches nothing fails the test, so remove an entry when its code goes.
+
+# The label sits in a button that grows with its content (flex_none) on the transport pill; the
+# pill and the button never get less room than their text.
+L2|src/ui/editor_view.rs|tr!("Auto-redact")  # content-sized button in a content-sized pill
+
+# The brand name is never translated and is short; the spacer only pushes the verb to the right.
+L1|src/ui/launcher_window.rs|div().flex_1().child("CaptureMann")  # untranslated brand name
+
+# Badges drawn over a thumbnail: absolute, content-sized, a word or a platform name.
+L2|src/ui/library_view.rs|label  # REC / SHOT badge on a thumbnail, content-sized
+L2|src/ui/published_view.rs|SharedString::from(platform.to_owned())  # platform name chip on a poster
+
+# The 60 fps self-test bar is content-sized: the window follows the bar, not the other way round.
+L2|src/ui/recording/hud.rs|SharedString::from(label)  # self-test status, mono, sized to its text
+
+# A one-word breadcrumb in a content-sized, self_start link.
+L2|src/ui/recording_editor/panels.rs|tr_ctx!("breadcrumb", "Recordings")  # one word, self_start link
+
+# The zoom region label inside the zoom lane is "1.5x" style numbers; the block is overflow_hidden.
+L2|src/ui/recording_editor/view_cards.rs|SharedString::from(label)  # zoom factor, clipped by its block

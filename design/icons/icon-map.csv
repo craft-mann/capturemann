@@ -1,0 +1,279 @@
+surface,element,icon,priority,size_px,note
+Studio sidebar,Recordings,film,P1,18,"nav item, leading"
+Studio sidebar,Screenshots,image,P1,18,image.svg is already registered but unused
+Studio sidebar,Published,send,P1,18,same glyph as the Published empty state
+Studio sidebar,AI & Agents,sparkles,P1,18,
+Studio sidebar,Settings,settings,P1,18,
+Studio sidebar,MCP card title (ready / offline),bot,P1,14,"agent blue when ready, mist when offline; keep the 8 px dot or replace it"
+Studio sidebar,Recordings hint: notice,bot,keep,16,
+Studio sidebar,Recordings hint: Open AI,sparkles,P2,14,
+Studio page header,Display,monitor,P2,16,
+Studio page header,Window,app-window,P2,16,
+Studio page header,Capture region,cm-capture-region,P2,16,brand crop corners + centre crosshair
+Studio page header,Record…,cm-record,P2,16,on the rec-red Primary button the glyph is ink
+Library,Search field,search,keep,16,
+Library,Filter: All,layout-grid,P1,14,chip leading icon
+Library,Filter: Recordings,film,P1,14,
+Library,Filter: Screenshots,image,P1,14,
+Library,Filter: Uploaded (disabled),cloud-upload,P1,14,
+Library,Filter: Published (disabled),send,P1,14,
+Library,Sort: Date / Title / Duration / Size,calendar / arrow-down-a-z / clock / hard-drive,P2,14,optional; the direction matters more
+Library,Sort direction (replaces text ↓ / ↑),arrow-down / arrow-up,P1,14,"trailing, on the active sort chip"
+Library,Card: duration badge,,text,,keep mono text
+Library,Card: Broken pill,triangle-alert,P1,12,replaces the dot inside the pill
+Library,Card: No preview placeholder,image,P1,24,film for recordings
+Library,Card: Unreadable placeholder,file-x-2,P1,24,
+Library,Context menu: Open,external-link,P1,16,"in-app menu (not native), so icons are fine"
+Library,Context menu: Copy link,link,P1,16,
+Library,Context menu: Reveal in Finder / Show in folder,folder-open,P1,16,
+Library,Context menu: Rename…,pencil,P1,16,
+Library,Context menu: Delete…,trash-2,P1,16,warning colour like the label
+Library,Delete dialog: Delete capture,trash-2,P2,16,
+Library,Banner: Library unavailable,hard-drive,P1,18,"banner leading icon, warning"
+Library,Banner: Screen Recording missing,shield-alert,P1,18,
+Library,Banner: Grant access… / Open System Settings / Restart / Open Permissions…,shield-check / external-link / rotate-cw / shield-check,P2,16,
+Library,Banner: CLI and agents offline,bot,P1,18,agent blue
+Library,"Banner: newest 5,000 shown",info,P1,18,
+Library,Empty: Nothing captured yet,images,P1,32,empty-state tile like Published
+Library,Empty: Library unavailable,hard-drive,P1,32,
+Library,Empty: Couldn't load,circle-alert,P1,32,
+Library,Empty: Loading library…,loader-circle,P1,20,rotate while loading; static with reduced motion
+Library,Empty: No matches,search-x,P1,32,
+Library,Empty: Try again,rotate-cw,P2,16,
+Library,Empty: Clear search,x,P2,16,
+Recording details,Recordings / (crumb),chevron-left,P2,14,optional back chevron before the crumb
+Recording details,Poster placeholder,video,keep,28,
+Recording details,Edit,square-pen,P2,16,
+Recording details,Play export / Play in system player / Play original,play,P2,16,rec-play exists; use one play glyph app-wide
+Recording details,Export MP4 / Export again,file-output,P2,16,
+Recording details,Publish…,send,P2,16,
+Recording details,Reveal export / Reveal in Finder,folder-open,P2,16,
+Recording details,Burn in captions (switch row),captions,P2,16,
+Recording details,Exports: Copy link / Open,link / external-link,P2,14,
+Recording details,Exports: Export failed / Upload waiting (warning rows),triangle-alert,P1,14,
+Recording details,Exports: Uploading / Exporting row,loader-circle,P1,14,
+Recording details,Exports: Uploaded row,cloud-check,P1,14,
+Recording details,Transcript: Transcribe,audio-lines,P2,14,
+Recording details,Transcript: Open captions,captions,P2,14,
+Recording details,Transcript: Download TXT / SRT / VTT,download,P2,14,"one icon on the group, not each format"
+Recording details,Transcript: Re-generate,refresh-cw,P2,14,
+Recording details,Transcript: Open AI,sparkles,P2,14,
+Published,Empty state tile,send,keep,24,
+Published,Privacy pill: Private / Unlisted / Public,lock / link / globe,P1,12,replaces the dot; warning tint when privacy is locked
+Published,Open,external-link,P2,14,
+Published,Copy link,link,P2,14,
+Published,Status: processing,loader-circle,P1,14,
+Published,Status: processed / published,circle-check,P1,14,
+AI page,Tab: AI,sparkles,P1,16,
+AI page,Tab: Agents & CLI,bot,P1,16,
+AI page,Notice: No speech model,bot,keep,20,"consider sparkles for AI, keep bot for agents"
+AI page,Speech model row (identity),audio-lines,P1,18,
+AI page,Download / Download {size},download,P2,14,
+AI page,Import from file,file-input,P2,14,
+AI page,Resume,play,P2,14,
+AI page,Use this model,check,P2,14,
+AI page,Remove / Remove model,trash-2,P2,14,
+AI page,Cancel (download),x,P2,14,
+AI page,Status: Download failed,triangle-alert,P1,12,
+AI page,Status: In use,circle-check,P1,12,
+AI page,Status: Paused at n%,circle-pause,P1,12,
+AI page,Auto transcribe switch row,audio-lines,P2,16,
+Settings nav,General,sliders-horizontal,P1,16,
+Settings nav,Capture & recording,cm-capture-region,P1,16,
+Settings nav,Webcam & audio,webcam,P1,16,
+Settings nav,Destinations,folder-output,P1,16,
+Settings nav,Permissions,shield-check,P1,16,
+Settings nav,Privacy,eye-off,P1,16,
+Settings nav,Shortcuts,keyboard,P1,16,
+Settings nav,About · Apache-2.0,info,P1,16,
+Settings: General,Theme: System / Dark / Light,monitor / moon / sun,P1,14,icon + label segments
+Settings: General,Library folder: Available / Unavailable,circle-check / triangle-alert,P1,14,
+Settings: Capture & recording,"Resolution, Frame rate, Codec, Quality, Countdown segments",,text,,values read best as text
+Settings: Capture & recording,Record the cursor (switch row),mouse-pointer-2,P2,16,
+Settings: Capture & recording,Create a single MP4 (switch row),file-output,P2,16,
+Settings: Capture & recording,Countdown rows,timer,P2,16,
+Settings: Webcam & audio,Shape: Circle / Rounded,circle / square,P1,14,
+Settings: Webcam & audio,Size S / M / L,,text,,letters stay
+Settings: Webcam & audio,Mirror the preview,flip-horizontal-2,P2,16,
+Settings: Webcam & audio,Remember bubble position,pin,P2,16,
+Settings: Webcam & audio,Noise suppression,audio-lines,P2,16,
+Settings: Destinations,Library folder row tile (replaces '~'),hard-drive,P1,18,inside the 36 px glyph tile
+Settings: Destinations,Local folder row tile (replaces '~'),folder,P1,18,
+Settings: Destinations,Google Drive / OneDrive / Dropbox tiles,"letters G / O / D, or official logos",text,,"do not redraw third-party logos; use each provider's official asset under its brand rules, or keep letters"
+Settings: Destinations,YouTube / TikTok / Facebook card titles,official logos or none,text,,same rule
+Settings: Destinations,Status: Online / Connected,circle-check,P1,12,
+Settings: Destinations,Status: Offline / Reconnect needed,triangle-alert,P1,12,
+Settings: Destinations,Status: Checking,loader-circle,P1,12,
+Settings: Destinations,Default pill,star,P2,12,
+Settings: Destinations,Add local folder…,folder-plus,P2,14,
+Settings: Destinations,Connect / Connect another / Connect account,plug,P2,14,
+Settings: Destinations,Reconnect / Sign in again,refresh-cw,P2,14,
+Settings: Destinations,Manage,settings-2,P2,14,
+Settings: Destinations,Test connection,zap,P2,14,
+Settings: Destinations,Make default,star,P2,14,
+Settings: Destinations,Remove… / Disconnect…,trash-2 / unplug,P2,14,
+Settings: Destinations,Continue in browser,external-link,P2,14,
+Settings: Destinations,Coming soon caption,clock,P1,12,
+Settings: Destinations,Upload automatically / What to copy / Link after upload segments,,text,,
+Settings: Permissions,Card: Screen Recording,screen-share,P1,20,
+Settings: Permissions,Card: Microphone,mic,P1,20,rec-mic exists; prefer one mic glyph
+Settings: Permissions,Card: Camera,camera,P1,20,
+Settings: Permissions,Card: Input Monitoring,keyboard,P1,20,
+Settings: Permissions,State: Granted,circle-check,P1,12,
+Settings: Permissions,State: Not granted / Denied / Restricted / Restart required,circle-alert / ban / lock / rotate-cw,P1,12,
+Settings: Permissions,State: Checking… / Not asked yet,loader-circle / circle-dashed,P1,12,
+Settings: Permissions,Grant access…,shield-check,P2,16,
+Settings: Permissions,Open System Settings / Open Settings,external-link,P2,16,
+Settings: Permissions,Restart CaptureMann,rotate-cw,P2,16,
+Settings: Permissions,Reopen setup / Check again,list-checks / refresh-cw,P2,14,
+Settings: Privacy,Excluded app: remove,x,keep,14,
+Settings: Privacy,Add app,plus,P2,14,
+Settings: Privacy,Fact: No telemetry,eye-off,P1,18,
+Settings: Privacy,Fact: Local-first,hard-drive,P1,18,
+Settings: Privacy,Fact: No network traffic by default,wifi-off,P1,18,
+Settings: Privacy,Fact: Agents stay on this computer,laptop,P1,18,
+Settings: Shortcuts,Change,pencil,P2,14,
+Settings: Shortcuts,Couldn't register (warning),triangle-alert,P1,12,
+Agents & CLI,MCP ready / offline pill,bot,P1,14,
+Agents & CLI,Copy / Copied,copy / check,P2,14,
+Agents & CLI,Tier pill: Allow / Ask first,circle-check / hand,P1,12,
+Agents & CLI,Client policy: Allowed / Read-only / Blocked,circle-check / eye / ban,P1,14,icon + label segments
+Agents & CLI,Add client,user-plus,P2,14,
+Agents & CLI,Allow unknown clients,circle-check,P2,14,
+Agents & CLI,Decision pill: approved / for session / declined / timed out / refused,check / check-check / x / clock / ban,P1,12,
+Toasts,Kind: Info,info,P1,18,replaces the 8 px dot (keep dot colour as the icon colour)
+Toasts,Kind: Success,circle-check,P1,18,
+Toasts,Kind: Warning,triangle-alert,P1,18,
+Toasts,Kind: Error,octagon-alert,P1,18,"distinct shape from warning, not only colour"
+Toasts,Kind: Agent,bot,P1,18,
+Toasts,Dismiss,x,keep,16,
+Toasts,Annotate,pen-line,P2,16,
+Toasts,Copy,copy,P2,16,
+Toasts,Save as…,save,P2,16,
+Toasts,Delete,trash-2,P2,16,
+Toasts,Copy link,link,P2,16,
+Toasts,Open (link) / Open (capture),external-link / arrow-up-right,P2,16,
+Toasts,Play / Reveal,play / folder-open,P2,16,
+Toasts,Retry,rotate-cw,P2,16,
+Toasts,Reconnect…,refresh-cw,P2,16,
+Toasts,Open Permissions… / Open System Settings,shield-check / external-link,P2,16,
+Confirm dialog,Title icon: Start recording?,cm-record,P1,24,
+Confirm dialog,Title icon: Publish video?,send,P1,24,
+Confirm dialog,Title icon: Delete / Discard,trash-2,P1,24,
+Confirm dialog,Title icon: Allow this action?,bot,P1,24,
+Confirm dialog,Allow for this session (replaces text ✓),rec-check,keep,12,rec-check.svg is registered but unused today; use it here
+Screenshot editor,Tool rail (11 tools),"mouse-pointer-2, move-up-right, slash, square, circle, type, highlighter, hash, droplet, grid-3x3, crop",keep,20,
+Screenshot editor,Undo / Redo / Revert / Zoom out / Zoom in,undo-2 / redo-2 / rotate-ccw / zoom-out / zoom-in,keep,18,
+Screenshot editor,Fit (replaces maximize),shrink,P1,18,"maximize is four corner brackets, the same shape as cm-capture-region; shrink also means Fit in the Reframe card"
+Screenshot editor,Save as…,save,P2,16,
+Screenshot editor,Reveal,folder-open,P2,16,
+Screenshot editor,Copy image,copy,P2,16,
+Screenshot editor,Blur / Pixelate stepper − / +,minus / plus,P1,16,replaces text '-' '+'
+Screenshot editor,Reset crop,crop,P2,16,
+Screenshot editor,Duplicate,copy-plus,P2,16,
+Screenshot editor,Delete,trash-2,P2,16,
+Screenshot editor,Save status: saved / saving / couldn't save,circle-check / loader-circle / triangle-alert,P1,12,
+Screenshot editor,Back to library (failed screen),chevron-left,P2,16,
+Recording editor,Recording details (header),info,P2,16,
+Recording editor,Play / Pause,rec-play / rec-pause,keep,18,
+Recording editor,Timeline: In (I) / Out (O),cm-trim-in / cm-trim-out,P1,16,keep the key letter in the tooltip
+Recording editor,Timeline: Split (S),cm-split,P1,16,
+Recording editor,Timeline: Cut (⌫),scissors,P1,16,
+Recording editor,Timeline: Restore (R),archive-restore,P1,16,
+Recording editor,Timeline: Undo / Redo,undo-2 / redo-2,P1,16,same glyphs as the screenshot editor
+Recording editor,Timeline: Snap on/off,magnet,P1,16,toggle; pressed background when on
+Recording editor,Timeline: zoom − / +,zoom-out / zoom-in,P1,16,
+Recording editor,Zoom chip: follow cursor (replaces ⊙),locate,P1,12,
+Recording editor,Card title: Speed,gauge,P1,16,
+Recording editor,Card title: Camera,webcam,P1,16,
+Recording editor,Card title: Zoom,zoom-in,P1,16,
+Recording editor,Card title: Cursor,mouse-pointer-2,P1,16,
+Recording editor,Card title: Reframe,ratio,P1,16,
+Recording editor,Card title: Background,wallpaper,P1,16,
+Recording editor,Card title: Captions,captions,P1,16,
+Recording editor,Card title: Suggestions,sparkles,P1,16,
+Recording editor,Card title: Output,file-output,P1,16,
+Recording editor,Camera layout: Bubble / Screen only / Camera full / Side by side,cm-layout-bubble / cm-layout-screen / cm-layout-camera / cm-layout-split,P1,20,icon-over-label segments
+Recording editor,Bubble position: 4 corners,cm-corner-top-left / -top-right / -bottom-left / -bottom-right,P1,18,icon-only segments with aria labels
+Recording editor,Bubble shape: Circle / Rounded,circle / square,P1,16,
+Recording editor,Ring / Mirror camera / Smooth move,circle-dot / flip-horizontal-2 / blend,P2,16,
+Recording editor,Preview aspect: 16:9 / 9:16 / 1:1,rectangle-horizontal / rectangle-vertical / square,P1,16,icon + label
+Recording editor,Reframe mode: Fit / Fixed / Follow,shrink / pin / locate-fixed,P1,16,
+Recording editor,"Steppers − / + (zoom, cursor, reframe, background)",minus / plus,P1,14,
+Recording editor,Add zoom (Z),zoom-in,P2,14,
+Recording editor,Follow cursor (switch),locate,P2,16,
+Recording editor,Remove zoom,trash-2,P2,14,
+Recording editor,Click effect: None / Ring / Ripple,,text,,
+Recording editor,Hide when idle,eye-off,P2,16,
+Recording editor,Shadow (switch),blend,P2,16,
+Recording editor,Captions: Add at playhead,plus,P2,14,
+Recording editor,Captions: Save SRT / VTT / TXT,download,P2,14,
+Recording editor,Captions: Save changes,save,P2,14,
+Recording editor,Caption line issue (replaces '!'),circle-alert,P1,12,
+Recording editor,Caption line: Split / Merge with next / Remove,cm-split / merge / trash-2,P2,14,
+Recording editor,Suggest zooms / Suggest cuts,sparkles,P2,14,
+Recording editor,Accept / Accept all,check / check-check,P2,14,
+Recording editor,Dismiss suggestion (replaces Unicode ✕),x,P1,14,
+Recording editor,Export MP4 / Publish…,file-output / send,P2,16,
+Publish sheet,Connect YouTube,plug,P2,16,
+Publish sheet,Quota line,gauge,P1,14,
+Publish sheet,Video to upload: file row,file-video,P1,18,
+Publish sheet,Export MP4,file-output,P2,16,
+Publish sheet,Upload captions (switch),captions,P2,16,
+Publish sheet,Visibility: Private / Unlisted / Public,lock / link / globe,P1,16,icon + label segments
+Publish sheet,Public confirmation (switch),triangle-alert,P2,16,
+Publish sheet,Choose image…,image-plus,P2,16,
+Publish sheet,Remove thumbnail,x,P2,16,
+Publish sheet,Publish…,send,P2,16,
+Publish sheet,Retry / Edit and try again / Open Destinations,rotate-cw / square-pen / folder-output,P2,16,
+Publish sheet,Done: Open / Copy link,external-link / link,P2,16,
+Publish sheet,Uploaded headline,circle-check,P1,20,
+Publish sheet,Warnings list,triangle-alert,P1,14,
+Record sheet,Close,x,keep,16,
+Record sheet,What to record: Display / Window / Region,monitor / app-window / cm-capture-region,P1,18,icon-over-label segments
+Record sheet,Choose a window… / Choose a region… / Choose another…,mouse-pointer-click,P2,16,
+Record sheet,Webcam bubble row,cm-webcam-bubble,P1,18,"replaces rec-video here: the row is about the bubble, not the camera"
+Record sheet,Microphone row,rec-mic,keep,18,
+Record sheet,System audio row,volume-2,P1,18,FIX: today it borrows rec-play (a play triangle)
+Record sheet,Retry,rotate-cw,P2,16,
+Record sheet,Start recording (replaces ↵ glyph),cm-record,P2,16,keep the ↵ keycap after the label
+Recording HUD,Stop (today a drawn div),cm-stop,P1,18,filled; ink on the rec-red button
+Recording HUD,Pause / Resume,rec-pause / rec-play,keep,18,
+Recording HUD,Mic on / off,rec-mic / rec-mic-off,keep,18,
+Recording HUD,Webcam show / hide,rec-video / rec-video-off,keep,18,
+Recording HUD,Draw (coming soon),rec-pencil,keep,18,
+Recording HUD,Restart,rec-restart,keep,18,
+Recording HUD,Discard,trash-2,P1,18,x reads as 'close the HUD'; discard deletes the take
+Recording HUD,Chip: Agent · {client},bot,P1,12,
+Recording HUD,Chip: Dropping frames / engine warning,triangle-alert,P1,12,
+Webcam bubble toolbar,Size S / M / L,,text,,letters stay
+Webcam bubble toolbar,Shape toggle (today a drawn box),circle / square,P1,14,shows the shape you'll switch to
+Webcam bubble toolbar,Mirror (replaces ⇆ glyph),flip-horizontal-2,P1,14,
+Webcam bubble toolbar,Hide the bubble,rec-video-off,keep,14,
+Launcher,Search,search,keep,20,
+Launcher,Record screen + webcam,logo mark,keep,16,
+Launcher,Record region / Screenshot region,launcher-frame → cm-capture-region,keep,16,same drawing; adopt the cm- name when convenient
+Launcher,Screenshot window,launcher-window → app-window,keep,16,
+Launcher,Screenshot display,launcher-monitor → monitor,keep,16,
+Launcher,Open library / Open settings,launcher-library / launcher-settings,keep,16,
+Launcher,Permissions… (today shares the settings icon),shield-check,P1,16,
+Launcher,Publish last recording…,launcher-upload,keep,16,
+Launcher,Save to cloud drive,cloud,keep,16,
+Launcher,Copy MCP server config,launcher-terminal,keep,16,
+Launcher,Actions: Without webcam / Screen + mic only / Screen only,video-off / mic / volume-x,P1,16,
+Launcher,Actions: Record at 60 fps / Start in 5 s / With 5 s delay,gauge / timer / timer,P1,16,
+Launcher,Actions: Include webcam / Without audio,cm-webcam-bubble / volume-x,P1,16,
+Launcher,Actions: Take screenshot / Save only / Copy and save / Copy only,cm-capture-region / save / copy / copy,P1,16,
+Tray,Idle,TrayTemplate (existing),keep,16,
+Tray,"Recording (also Starting, Countdown, Stopping)",tray-recording (existing),keep,16,
+Tray,Paused (new state),cm-tray-paused,P1,16,new PNG/ICO in tray/; needs a TrayState::Paused
+Tray,Attention: error or reconnect needed (new state),cm-tray-attention,P1,16,new; e.g. upload failed or library offline
+Tray,Tray menu and menu-bar menu items,,text,,native menus stay text-only (macOS convention)
+Planned,Auto-redact,scan-eye,plan,20,
+Planned,Audio gain / mute / solo,volume-2 / volume-x / headphones,plan,16,
+Planned,Loop,repeat,plan,16,
+Planned,Frame step back / forward,step-back / step-forward,plan,16,
+Planned,Timeline Fit,shrink,plan,16,
+Planned,Export preset picker,file-video,plan,16,
+Planned,Export Cancel / Retry / Copy path,x / rotate-cw / copy,plan,16,
+Planned,Library rescan,refresh-cw,plan,16,

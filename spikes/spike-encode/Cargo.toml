@@ -1,0 +1,26 @@
+[package]
+name = "spike-encode"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+block2 = "0.6"
+dispatch2 = "0.3"
+objc2-foundation = { version = "0.3", default-features = true }
+objc2-app-kit = { version = "0.3", features = ["objc2-core-graphics", "objc2-quartz-core", "block2"] }
+objc2-av-foundation = { version = "0.3", features = ["objc2-core-media", "objc2-core-video", "objc2-quartz-core", "objc2-core-graphics", "block2", "dispatch2", "objc2-uniform-type-identifiers"] }
+objc2-core-media = { version = "0.3", features = ["objc2-core-video", "block2", "dispatch2"] }
+objc2-core-video = { version = "0.3", features = ["objc2-core-graphics", "block2"] }
+objc2-core-graphics = { version = "0.3", default-features = true }
+objc2-screen-capture-kit = { version = "0.3", features = ["objc2-core-media", "objc2-core-graphics", "objc2-core-foundation", "block2", "dispatch2", "libc"] }
+objc2-quartz-core = { version = "0.3", default-features = true }
+libc = "0.2"
+mach2 = "0.4"
+objc2-uniform-type-identifiers = "0.3"
+objc2-core-foundation = "0.3"

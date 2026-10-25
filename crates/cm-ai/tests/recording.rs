@@ -1,0 +1,220 @@
+//! `transcribe_recording` on hand-made bundles: audio tracks, pause gaps, session time. Needs
+//! FFmpeg to make the audio files; without it each test prints SKIPPED.
+
+#![allow(clippy::unwrap_used)]
+
+use std::path::Path;
+use std::process::Command;
+use std::sync::Mutex;
+
+use cm_ai::recording::{
+    read_transcript, transcribe_recording, write_transcript, TranscribeOptions,
+};
+use cm_ai::transcribe::{
+    is_cancelled, media_secs, Pcm16k, ScriptedTranscriber, Transcriber, Transcript,
+};
+use cm_core::{CmError, MediaTime};
+
+fn ffmpeg() -> Option<std::path::PathBuf> {
+    cm_media::tools::locate().ok().map(|t| t.ffmpeg)
+}
+
+/// A mono sine file of `secs` seconds.
+fn tone(ffmpeg: &Path, out: &Path, secs: f64) {
+    let ok = Command::new(ffmpeg)
+        .args(["-v", "error", "-f", "lavfi", "-i"])
+        .arg(format!("sine=frequency=300:duration={secs}"))
+        .args(["-ar", "48000", "-ac", "1", "-y"])
+        .arg(out)
+        .status()
+        .unwrap()
+        .success();
+    assert!(ok, "FFmpeg could not make {}", out.display());
+}
+
+fn ticks(secs: f64) -> i64 {
+    media_secs(secs).ticks()
+}
+
+fn manifest(tracks: serde_json::Value, gaps: serde_json::Value) -> String {
+    serde_json::json!({
+        "schema": 1,
+        "id": "rec_test",
+        "title": "test",
+        "created": "2026-10-22T10:00:00Z",
+        "tick_rate": 120000,
+        "tracks": tracks,
+        "edits": [],
+        "revisions": [],
+        "gaps": gaps,
+    })
+    .to_string()
+}
+
+/// Remembers what the transcriber was given.
+struct Probe {
+    seen: Mutex<Option<(usize, MediaTime)>>,
+    inner: ScriptedTranscriber,
+}
+
+impl Transcriber for Probe {
+    fn transcribe(
+        &self,
+        audio: Pcm16k<'_>,
+        language: Option<&str>,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Transcript, CmError> {
+        *self.seen.lock().unwrap() = Some((audio.samples.len(), audio.start));
+        self.inner.transcribe(audio, language, progress)
+    }
+}
+
+fn secs(t: MediaTime) -> f64 {
+    t.as_secs_f64()
+}
+
+/// Words come back in session time even when the recording was paused: the mic file has no
+/// pause in it, the session clock does.
+#[test]
+fn words_after_a_pause_land_after_it_in_session_time() {
+    let Some(ff) = ffmpeg() else {
+        println!("SKIPPED: FFmpeg not found");
+        return;
+    };
+    let dir = tempfile::tempdir().unwrap();
+    tone(&ff, &dir.path().join("mic.wav"), 4.0);
+    // The mic starts 0.1 s into the session; the session was paused from 2.0 s to 3.0 s.
+    std::fs::write(
+        dir.path().join("manifest.json"),
+        manifest(
+            serde_json::json!({"mic": {"file": "mic.wav", "start": ticks(0.1), "end": ticks(5.1)}}),
+            serde_json::json!([{"from": ticks(2.0), "to": ticks(3.0)}]),
+        ),
+    )
+    .unwrap();
+    let t = ScriptedTranscriber::from_secs(&[("before", 0.5, 0.9), ("after", 2.2, 2.6)]);
+    let mut seen = Vec::new();
+    let out = transcribe_recording(
+        dir.path(),
+        &t,
+        &TranscribeOptions {
+            model_id: Some("scripted"),
+            ..Default::default()
+        },
+        &mut |p| {
+            seen.push(p);
+            true
+        },
+    )
+    .unwrap();
+    assert_eq!(out.words.len(), 2);
+    // "before": audio offset 0.5 s -> file 0.6 s -> session 0.6 s (the pause is later).
+    assert!((secs(out.words[0].start) - 0.6).abs() < 1e-6);
+    // "after": audio offset 2.2 s -> file 2.3 s, past the pause at file 2.0 s -> session 3.3 s.
+    assert!(
+        (secs(out.words[1].start) - 3.3).abs() < 1e-6,
+        "{:?}",
+        out.words[1]
+    );
+    assert!((secs(out.words[1].end) - 3.7).abs() < 1e-6);
+    assert!(seen.first().is_some_and(|p| *p == 0.0) && seen.last().is_some_and(|p| *p == 1.0));
+    // Nothing is stored by transcribing: the caller decides.
+    assert!(read_transcript(dir.path()).unwrap().is_none());
+    write_transcript(dir.path(), &out).unwrap();
+    assert_eq!(read_transcript(dir.path()).unwrap().unwrap(), out);
+}
+
+#[test]
+fn system_audio_is_mixed_in_only_when_asked_and_alone_without_a_mic() {
+    let Some(ff) = ffmpeg() else {
+        println!("SKIPPED: FFmpeg not found");
+        return;
+    };
+    let dir = tempfile::tempdir().unwrap();
+    tone(&ff, &dir.path().join("mic.wav"), 3.0);
+    tone(&ff, &dir.path().join("system.wav"), 2.0);
+    let both = manifest(
+        serde_json::json!({
+            "mic": {"file": "mic.wav", "start": ticks(0.1)},
+            "system": {"file": "system.wav", "start": ticks(1.0)},
+        }),
+        serde_json::json!([]),
+    );
+    std::fs::write(dir.path().join("manifest.json"), both).unwrap();
+    let probe = |include_system: bool| {
+        let p = Probe {
+            seen: Mutex::new(None),
+            inner: ScriptedTranscriber::from_secs(&[("x", 0.0, 0.1)]),
+        };
+        transcribe_recording(
+            dir.path(),
+            &p,
+            &TranscribeOptions {
+                include_system,
+                ..Default::default()
+            },
+            &mut |_| true,
+        )
+        .unwrap();
+        let seen = *p.seen.lock().unwrap();
+        seen.unwrap()
+    };
+    // Mic only: 3 s starting at the mic's first sample (file time 0.1 s).
+    let (len, start) = probe(false);
+    assert!((47_900..=48_100).contains(&len), "{len}");
+    assert!((secs(start) - 0.1).abs() < 1e-6);
+    // Both: the system track (0.9 s in, 2 s long) ends inside the mic's 3 s, so the length holds.
+    let (len, start) = probe(true);
+    assert!((47_900..=48_100).contains(&len), "{len}");
+    assert!((secs(start) - 0.1).abs() < 1e-6);
+
+    // A recording with only system audio uses it, and a missing mic file is not an error.
+    let only_system = manifest(
+        serde_json::json!({
+            "mic": {"file": "gone.wav", "start": 0, "missing": true},
+            "system": {"file": "system.wav", "start": ticks(1.0)},
+        }),
+        serde_json::json!([]),
+    );
+    std::fs::write(dir.path().join("manifest.json"), only_system).unwrap();
+    let (len, start) = probe(false);
+    assert!((31_900..=32_100).contains(&len), "{len}");
+    assert!((secs(start) - 1.0).abs() < 1e-6);
+}
+
+#[test]
+fn a_recording_without_audio_is_an_input_error_and_cancel_is_reported() {
+    let Some(ff) = ffmpeg() else {
+        println!("SKIPPED: FFmpeg not found");
+        return;
+    };
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("manifest.json"),
+        manifest(
+            serde_json::json!({"screen": {"file": "screen.mp4", "start": 0}}),
+            serde_json::json!([]),
+        ),
+    )
+    .unwrap();
+    let t = ScriptedTranscriber::from_secs(&[("x", 0.0, 0.1)]);
+    let e = transcribe_recording(dir.path(), &t, &TranscribeOptions::default(), &mut |_| true)
+        .unwrap_err();
+    assert_eq!(e.code().as_str(), "invalid_input");
+    assert!(e.to_string().contains("no microphone"), "{e}");
+
+    tone(&ff, &dir.path().join("mic.wav"), 1.0);
+    std::fs::write(
+        dir.path().join("manifest.json"),
+        manifest(
+            serde_json::json!({"mic": {"file": "mic.wav", "start": 0}}),
+            serde_json::json!([]),
+        ),
+    )
+    .unwrap();
+    let e = transcribe_recording(dir.path(), &t, &TranscribeOptions::default(), &mut |_| {
+        false
+    })
+    .unwrap_err();
+    assert!(is_cancelled(&e), "{e}");
+}

@@ -1,0 +1,37 @@
+[package]
+name = "cm-cli"
+description = "capturemann command-line interface"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+cm-core = { path = "../cm-core" }
+cm-ipc = { path = "../cm-ipc" }
+serde_json = "1"
+# MIT OR Apache-2.0
+clap = { version = "4", features = ["derive", "env", "std", "help", "usage", "error-context", "suggestions"] }
+# MIT
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "io-util", "time", "macros", "signal"] }
+# MIT OR Apache-2.0
+base64 = "0.22"
+
+[dev-dependencies]
+cm-daemon = { path = "../cm-daemon" }
+cm-capture = { path = "../cm-capture" }
+cm-library = { path = "../cm-library" }
+cm-jobs = { path = "../cm-jobs" }
+cm-storage = { path = "../cm-storage" }
+cm-publish = { path = "../cm-publish" }
+tempfile = "3"
+time.workspace = true
+tokio = { version = "1", features = ["test-util"] }
+
+[[bin]]
+name = "capturemann"
+path = "src/main.rs"

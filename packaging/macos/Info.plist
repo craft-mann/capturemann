@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Template for CaptureMann.app/Contents/Info.plist. packaging/macos/bundle.sh replaces the
+  @TOKENS@ (bundle id, version) and runs `plutil -lint` on the result.
+
+  LSUIElement is deliberately NOT set: the app has a Studio window, a launcher and a tray icon,
+  so it shows in the Dock like a normal app. `--background` (login item, CAP-2.AC5) only skips
+  opening the Studio window; the Dock icon is still there. NSAppleEventsUsageDescription is
+  omitted because the app sends no Apple Events.
+-->
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key><string>en</string>
+    <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+    <key>CFBundleName</key><string>CaptureMann</string>
+    <key>CFBundleDisplayName</key><string>CaptureMann</string>
+    <key>CFBundleIdentifier</key><string>@BUNDLE_ID@</string>
+    <key>CFBundleExecutable</key><string>cm-desktop</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleShortVersionString</key><string>@VERSION@</string>
+    <key>CFBundleVersion</key><string>@BUILD@</string>
+    <key>LSMinimumSystemVersion</key><string>13.0</string>
+    <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
+    <key>NSPrincipalClass</key><string>NSApplication</string>
+    <key>NSHighResolutionCapable</key><true/>
+    <key>NSHumanReadableCopyright</key><string>Copyright the CaptureMann contributors. Apache-2.0.</string>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>CaptureMann captures your screen when you take a screenshot or record.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>CaptureMann shows your webcam in the bubble when you record.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>CaptureMann records your microphone when you turn it on.</string>
+    <key>NSRemovableVolumesUsageDescription</key>
+    <string>CaptureMann saves and opens your captures in the library folder you chose, which may be on a removable drive.</string>
+    <key>NSNetworkVolumesUsageDescription</key>
+    <string>CaptureMann saves and opens your captures in the library folder you chose, which may be on a network volume.</string>
+    <key>NSCameraUseContinuityCameraDeviceType</key><true/>
+</dict>
+</plist>

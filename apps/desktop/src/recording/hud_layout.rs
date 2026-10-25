@@ -1,0 +1,242 @@
+//! The recording HUD's layout decisions (redesign R18), display-free: the order of the controls,
+//! which icon each state shows, and how wide the bar is (the window is exactly the bar, so the
+//! sizes here are what `ui::recording::hud` draws and what `geometry` snaps and places).
+//!
+//! Order (kit): Stop (red, `cm-stop`, with its label), the timer, a divider, Pause or Resume, Mic,
+//! Camera, Draw (disabled, "Coming soon"), a divider, Restart, Discard, then the agent chip when an
+//! agent started the take. Hints, the "Dropping frames" and warning chips and the self-test bar
+//! stay in the strip above the bar.
+
+use cm_i18n::{tr, tr_ctx};
+
+/// A control of the bar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HudControl {
+    Stop,
+    Timer,
+    Pause,
+    Mic,
+    Camera,
+    Draw,
+    Restart,
+    Discard,
+    AgentChip,
+}
+
+/// One slot of the bar, left to right.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HudItem {
+    Control(HudControl),
+    Divider,
+}
+
+/// The bar's slots, left to right. The agent chip is only there when an agent started the take.
+pub fn hud_items(agent: bool) -> Vec<HudItem> {
+    use HudControl::*;
+    let mut v = vec![
+        HudItem::Control(Stop),
+        HudItem::Control(Timer),
+        HudItem::Divider,
+        HudItem::Control(Pause),
+        HudItem::Control(Mic),
+        HudItem::Control(Camera),
+        HudItem::Control(Draw),
+        HudItem::Divider,
+        HudItem::Control(Restart),
+        HudItem::Control(Discard),
+    ];
+    if agent {
+        v.push(HudItem::Control(AgentChip));
+    }
+    v
+}
+
+/// The Stop button's icon.
+pub const STOP_ICON: &str = "cm-stop";
+/// The label next to it.
+pub fn stop_label() -> String {
+    tr_ctx!("recording hud", "Stop")
+}
+/// Pause while recording, Resume (play) while paused. The kit has no plain `pause`: the app's
+/// `rec-pause` stays.
+pub fn pause_icon(paused: bool) -> &'static str {
+    if paused {
+        "play"
+    } else {
+        "rec-pause"
+    }
+}
+/// The mic is read-only (no mute action exists): the slashed icon means off for this take. The kit
+/// has no `mic-off`, so the app's `rec-mic-off` stays.
+pub fn mic_icon(on: bool) -> &'static str {
+    if on {
+        "mic"
+    } else {
+        "rec-mic-off"
+    }
+}
+/// Camera on, or the slashed icon when the take has no camera.
+pub fn camera_icon(on: bool) -> &'static str {
+    if on {
+        "video"
+    } else {
+        "video-off"
+    }
+}
+/// Draw is not built (REC-9): disabled, hint "Coming soon".
+pub const DRAW_ICON: &str = "pen-line";
+pub const RESTART_ICON: &str = "rotate-cw";
+pub const DISCARD_ICON: &str = "trash-2";
+pub const AGENT_ICON: &str = "bot";
+
+/// The agent chip's text.
+pub fn agent_chip_text(client: &str) -> String {
+    tr!("Started by {client}", client = client)
+}
+
+// ---- sizes (logical px) ----------------------------------------------------------------------
+
+/// Padding inside the bar and the gap between its slots.
+pub const PAD: f64 = 6.0;
+pub const GAP: f64 = 6.0;
+/// The border of the bar (1 px each side).
+pub const BORDER: f64 = 2.0;
+/// Bar height: 6 + a 44 px button + 6, plus the border.
+pub const BAR_H: f64 = 58.0;
+/// A 44 px icon button (the hit target).
+pub const BUTTON: f64 = 44.0;
+/// Stop with its label: 16 px padding, a 16 px icon, 8 px gap and "Stop" at 14/600.
+pub const STOP_W: f64 = 88.0;
+/// The timer: dot, mono 15 px text and 12 px padding each side.
+pub const TIMER_W: f64 = 84.0;
+pub const DIVIDER_W: f64 = 1.0;
+/// Room of the strip above the bar for hints and chips.
+pub const STRIP_H: f64 = 36.0;
+/// The agent chip: 10 px padding each side, a 12 px icon and a 6 px gap around the text.
+const CHIP_FIXED: f64 = 10.0 + 12.0 + 6.0 + 10.0 + 2.0;
+/// Average width of a 12 px character, rounded up so the text is never clipped.
+const CHIP_CHAR: f64 = 6.6;
+/// The chip never grows beyond this; a longer name is cut with an ellipsis.
+pub const CHIP_MAX: f64 = 240.0;
+
+fn slot_width(item: HudItem, agent: Option<&str>) -> f64 {
+    match item {
+        HudItem::Divider => DIVIDER_W,
+        HudItem::Control(c) => match c {
+            HudControl::Stop => STOP_W,
+            HudControl::Timer => TIMER_W,
+            HudControl::AgentChip => agent.map_or(0.0, agent_chip_width),
+            _ => BUTTON,
+        },
+    }
+}
+
+/// The width of the agent chip for a client name.
+pub fn agent_chip_width(client: &str) -> f64 {
+    let chars = agent_chip_text(client).chars().count() as f64;
+    (CHIP_FIXED + chars * CHIP_CHAR).min(CHIP_MAX).ceil()
+}
+
+/// The bar's width: every slot, the gaps between them, the padding and the border.
+pub fn bar_width(agent: Option<&str>) -> f64 {
+    let items = hud_items(agent.is_some());
+    let slots: f64 = items.iter().map(|i| slot_width(*i, agent)).sum();
+    slots + GAP * (items.len() - 1) as f64 + 2.0 * PAD + BORDER
+}
+
+/// The bar without an agent chip: what `HUD_BAR` is.
+pub fn bar_size(agent: Option<&str>) -> (f64, f64) {
+    (bar_width(agent), BAR_H)
+}
+
+/// The window: the bar under the strip.
+pub fn window_size(agent: Option<&str>) -> (f64, f64) {
+    (bar_width(agent), BAR_H + STRIP_H)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Redesign R18: Stop, timer | Pause, Mic, Camera, Draw | Restart, Discard, then the chip.
+    #[test]
+    fn the_bar_follows_the_board_order() {
+        use HudControl::*;
+        use HudItem::*;
+        assert_eq!(
+            hud_items(false),
+            [
+                Control(Stop),
+                Control(Timer),
+                Divider,
+                Control(Pause),
+                Control(Mic),
+                Control(Camera),
+                Control(Draw),
+                Divider,
+                Control(Restart),
+                Control(Discard),
+            ]
+        );
+        let with = hud_items(true);
+        assert_eq!(with.len(), 11);
+        assert_eq!(with[10], Control(AgentChip));
+        assert_eq!(&with[..10], hud_items(false).as_slice());
+    }
+
+    /// The icon table: the kit's names, the slashed ones when off, the app's own where the kit
+    /// has none (`rec-pause`, `rec-mic-off`).
+    #[test]
+    fn icons_per_state() {
+        assert_eq!(STOP_ICON, "cm-stop");
+        assert_eq!((pause_icon(false), pause_icon(true)), ("rec-pause", "play"));
+        assert_eq!((mic_icon(true), mic_icon(false)), ("mic", "rec-mic-off"));
+        assert_eq!(
+            (camera_icon(true), camera_icon(false)),
+            ("video", "video-off")
+        );
+        assert_eq!(
+            (DRAW_ICON, RESTART_ICON, DISCARD_ICON, AGENT_ICON),
+            ("pen-line", "rotate-cw", "trash-2", "bot")
+        );
+    }
+
+    /// The bar is 506 wide without the chip and grows by a gap and the chip with it; the height
+    /// and the strip are unchanged.
+    #[test]
+    fn bar_widths() {
+        assert_eq!(bar_width(None), 506.0);
+        assert_eq!(BAR_H, 58.0);
+        let w = bar_width(Some("Claude Code"));
+        assert_eq!(w, 506.0 + GAP + agent_chip_width("Claude Code"));
+        assert!(agent_chip_width("a") < agent_chip_width("Claude Code"));
+        // A very long name is capped.
+        assert_eq!(agent_chip_width(&"x".repeat(200)), CHIP_MAX);
+        assert_eq!(window_size(None), (506.0, 58.0 + 36.0));
+        assert_eq!(bar_size(None), (506.0, 58.0));
+    }
+
+    /// The window constants of `ui::recording` are this module's sizes.
+    #[test]
+    fn window_constants_match_the_layout() {
+        use crate::ui::recording::{HUD_BAR, HUD_STRIP, HUD_WINDOW};
+        assert_eq!(HUD_BAR, bar_size(None));
+        assert_eq!(HUD_WINDOW, window_size(None));
+        assert_eq!(HUD_STRIP, STRIP_H);
+    }
+
+    #[test]
+    fn chip_text_names_the_client() {
+        assert_eq!(agent_chip_text("Claude Code"), "Started by Claude Code");
+    }
+
+    /// I18N P2: the chip text names the client in every language, and the width follows the text.
+    #[test]
+    fn i18n_chip_text_keeps_the_client() {
+        use cm_i18n::{with_language, Lang};
+        let pseudo = with_language(Lang::EnXa, || agent_chip_text("Claude Code"));
+        assert!(pseudo.contains("Claude Code"), "{pseudo}");
+        assert_ne!(pseudo, "Started by Claude Code");
+        assert_eq!(stop_label(), "Stop");
+    }
+}

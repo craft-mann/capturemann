@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = ["spike-*"]
+exclude = ["spike-out"]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[workspace.dependencies]
+anyhow = "1"
+xcap = "0.9"
+
+[profile.release]
+debug = 1

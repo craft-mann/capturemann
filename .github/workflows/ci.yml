@@ -1,0 +1,78 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Least privilege: no job writes to the repository.
+permissions:
+  contents: read
+
+# A new push to a PR cancels its older run; main runs always finish.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    # Windows is compile-only until after v0.1 (owner decision, Oct 24, 2026): its job reports
+    # problems but does not fail the run. Remove this line when the Windows milestone starts.
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      # The FFmpeg-gated tests (export: EXP AC3, AC6-AC8) print SKIPPED and pass when no ffmpeg is
+      # on PATH, so install one; otherwise CI would not cover the export path at all.
+      - name: Install FFmpeg (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
+      - name: Install FFmpeg (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ffmpeg --no-progress -y
+      - run: ffmpeg -hide_banner -version
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --locked
+
+  bundle-macos:
+    if: github.event_name == 'push'
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: make licenses
+      - run: bash packaging/macos/bundle.sh
+      - run: codesign --verify --deep --strict target/bundle/CaptureMann.app
+      - name: Show entitlements
+        run: codesign -d --entitlements - target/bundle/CaptureMann.app
+      - run: ditto -c -k --keepParent target/bundle/CaptureMann.app target/bundle/CaptureMann.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CaptureMann-macos-adhoc
+          path: target/bundle/CaptureMann.zip
+          retention-days: 3
+
+  licenses:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          # `command` is the whole subcommand line: `arguments` goes after it and would be read as
+          # a second subcommand (the job failed with "unrecognized subcommand 'licenses'").
+          command: check licenses bans sources advisories

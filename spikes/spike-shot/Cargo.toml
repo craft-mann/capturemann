@@ -1,0 +1,10 @@
+[package]
+name = "spike-shot"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+xcap.workspace = true

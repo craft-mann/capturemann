@@ -1,0 +1,84 @@
+[package]
+name = "cm-desktop"
+description = "Editor, library, settings and publish sheet"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "cm_desktop"
+path = "src/lib.rs"
+
+[[bin]]
+name = "cm-desktop"
+path = "src/main.rs"
+
+[dependencies]
+cm-core = { path = "../../crates/cm-core" }
+cm-library = { path = "../../crates/cm-library" }
+# UI languages: tr!, the catalogues in locales/, locale-aware sizes and dates.
+cm-i18n = { path = "../../crates/cm-i18n" }
+cm-capture = { path = "../../crates/cm-capture" }
+cm-daemon = { path = "../../crates/cm-daemon" }
+cm-storage = { path = "../../crates/cm-storage" }
+cm-publish = { path = "../../crates/cm-publish" }
+# Connect a cloud drive (STO-2): OAuth with the system browser, secrets in the keychain.
+cm-auth = { path = "../../crates/cm-auth" }
+# Connect YouTube (PUB-1) and the publish sheet's rules and validation (PUB-2).
+cm-render = { path = "../../crates/cm-render" }
+# `tools::locate()`: one place that finds FFmpeg (CM_FFMPEG, the bundle, PATH) for the poster frames.
+cm-media = { path = "../../crates/cm-media" }
+cm-camera = { path = "../../crates/cm-camera" }
+# Non-prompting permission checks only (Settings > Privacy, the Screen Recording banner).
+cm-audio = { path = "../../crates/cm-audio" }
+cm-cursor = { path = "../../crates/cm-cursor" }
+# Local AI types shared with the daemon (models, transcript, captions, suggestions).
+cm-ai = { path = "../../crates/cm-ai" }
+# Destinations (STO-1): the app is the only writer of destinations.json.
+# GPUI (Apache-2.0), exact pin per docs/SPIKES.md S5. `runtime_shaders` compiles Metal shaders at
+# run time (no full Xcode needed); `font-kit` is required or no text is drawn.
+gpui = { package = "gpui-pre", version = "=0.3.9" }
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.9", features = ["runtime_shaders", "font-kit"] }
+anyhow = "1"
+# Grapheme clusters for the caret and backspace (MIT/Apache-2.0, already in the lock file).
+unicode-segmentation = "1"
+# NFC for the caption find (Vietnamese typed as NFC or NFD matches the same; Unicode-3.0, already in the lock file via url).
+icu_normalizer = { version = "2", default-features = false, features = ["compiled_data"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+async-trait = "0.1"
+base64 = "0.22"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "process", "io-util", "net"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "ico", "tiff"] }
+time = { version = "0.3", default-features = false, features = ["std", "formatting", "parsing", "local-offset"] }
+# MIT OR Apache-2.0
+global-hotkey = "0.9.0"
+tray-icon = "0.26.1"
+dirs = "7.0.0"
+# MIT OR Apache-2.0 OR Zlib: the NSWindow behind a GPUI window (capture exclusion, click-through).
+raw-window-handle = "0.6"
+
+[dev-dependencies]
+tempfile = "3"
+# The fake Drive server for the connect-flow tests.
+cm-storage = { path = "../../crates/cm-storage", features = ["testing"] }
+
+# Dock icon at run time (macOS only); versions already in the lockfile through tray-icon.
+# Windows clipboard (macOS writes the pasteboard itself, with a TIFF flavor).
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+arboard = { version = "3.7.0", default-features = false, features = ["image-data"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# Large-block allocator (src/alloc.rs); already in the lockfile.
+libc = "0.2"
+objc2 = "0.6"
+# The CVPixelBuffer path into GPUI's `surface()`; same versions as GPUI (one copy in the lockfile).
+objc2-core-video = "0.3"
+objc2-core-foundation = "0.3"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSEvent", "NSImage", "NSResponder", "NSRunningApplication", "NSWorkspace", "NSAccessibility", "NSWindow", "NSView", "NSScreen", "NSColor", "NSPasteboard"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSData", "NSArray", "NSGeometry", "NSString"] }

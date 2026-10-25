@@ -1,0 +1,55 @@
+[package]
+name = "cm-daemon"
+description = "Action bus, sessions, JSON-RPC server, event stream, confirmation gate"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+cm-core = { path = "../cm-core" }
+cm-ipc = { path = "../cm-ipc" }
+cm-library = { path = "../cm-library" }
+cm-capture = { path = "../cm-capture" }
+cm-encode = { path = "../cm-encode" }
+cm-audio = { path = "../cm-audio" }
+cm-camera = { path = "../cm-camera" }
+cm-cursor = { path = "../cm-cursor" }
+cm-render = { path = "../cm-render" }
+cm-jobs = { path = "../cm-jobs" }
+cm-media = { path = "../cm-media" }
+cm-ai = { path = "../cm-ai" }
+cm-storage = { path = "../cm-storage" }
+# The YouTube provider, platform rules and the accounts store of `publish_video`.
+cm-publish = { path = "../cm-publish" }
+# Token source of the cloud destinations (keychain tokens, refresh on demand).
+cm-auth = { path = "../cm-auth" }
+serde = { version = "1", features = ["derive"] }
+# preserve_order: the confirmation dialog rows keep the order they are built in (R2-10)
+serde_json = { version = "1", features = ["preserve_order"] }
+time = { version = "0.3", default-features = false, features = ["std", "serde-well-known", "formatting", "parsing"] }
+# MIT
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "time", "macros", "net", "io-util", "signal"] }
+# MIT OR Apache-2.0
+async-trait = "0.1"
+base64 = "0.22"
+# MIT OR Apache-2.0
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+
+# macOS: `delete_capture` moves a bundle to the Trash with NSFileManager. Same objc2 family and
+# versions the capture and camera crates already use (MIT / Zlib / Apache-2.0).
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSFileManager", "NSURL", "NSString", "NSError"] }
+
+[dev-dependencies]
+# The fake Drive server for the cloud upload tests.
+cm-storage = { path = "../cm-storage", features = ["testing"] }
+# The fake YouTube server for the publish tests.
+cm-publish = { path = "../cm-publish", features = ["testing"] }
+tempfile = "3"
+tokio = { version = "1", features = ["test-util"] }
+time = { version = "0.3", features = ["macros"] }

@@ -1,0 +1,3 @@
+# Unwrapped UI string literals in apps/desktop/src (heuristic of cm_i18n::extract).
+# May only go down. Wrap strings in tr!, then run `cargo run -p cm-i18n -- baseline`.
+0

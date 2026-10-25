@@ -1,0 +1,44 @@
+[package]
+name = "cm-mcp"
+description = "MCP server (stdio and local HTTP)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "cm-mcp"
+path = "src/main.rs"
+
+[dependencies]
+cm-core = { path = "../cm-core" }
+cm-ipc = { path = "../cm-ipc" }
+# Apache-2.0
+rmcp = { version = "3.5.1", default-features = false, features = ["server", "client", "macros", "transport-io", "transport-async-rw", "transport-streamable-http-server"] }
+# MIT
+http = "1"
+bytes = "1"
+http-body-util = "0.1"
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+# MIT OR Apache-2.0
+getrandom = "0.4"
+serde_json = "1"
+# MIT
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "time", "macros", "io-util", "io-std"] }
+
+[dev-dependencies]
+cm-daemon = { path = "../cm-daemon" }
+cm-capture = { path = "../cm-capture" }
+cm-library = { path = "../cm-library" }
+cm-jobs = { path = "../cm-jobs" }
+cm-storage = { path = "../cm-storage" }
+cm-publish = { path = "../cm-publish" }
+tempfile = "3"
+# MIT OR Apache-2.0
+async-trait = "0.1"
+tokio = { version = "1", features = ["process"] }

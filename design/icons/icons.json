@@ -1,0 +1,1350 @@
+{
+  "grid": 24,
+  "stroke": 2,
+  "linecap": "round",
+  "linejoin": "round",
+  "color": "currentColor",
+  "lucide_version": "1.60.0",
+  "icons": [
+    {
+      "name": "app-window",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Launcher: Screenshot window",
+        "Record sheet: What to record: Display / Window / Region",
+        "Studio page header: Window"
+      ]
+    },
+    {
+      "name": "archive-restore",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Timeline: Restore (R)"
+      ]
+    },
+    {
+      "name": "arrow-down",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Library: Sort direction (replaces text ↓ / ↑)"
+      ]
+    },
+    {
+      "name": "arrow-down-a-z",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Library: Sort: Date / Title / Duration / Size"
+      ]
+    },
+    {
+      "name": "arrow-up",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Library: Sort direction (replaces text ↓ / ↑)"
+      ]
+    },
+    {
+      "name": "arrow-up-right",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Toasts: Open (link) / Open (capture)"
+      ]
+    },
+    {
+      "name": "audio-lines",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "AI page: Auto transcribe switch row",
+        "AI page: Speech model row (identity)",
+        "Recording details: Transcript: Transcribe",
+        "Settings: Webcam & audio: Noise suppression"
+      ]
+    },
+    {
+      "name": "ban",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Agents & CLI: Client policy: Allowed / Read-only / Blocked",
+        "Agents & CLI: Decision pill: approved / for session / declined / timed out / refused",
+        "Settings: Permissions: State: Not granted / Denied / Restricted / Restart required"
+      ]
+    },
+    {
+      "name": "blend",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Ring / Mirror camera / Smooth move",
+        "Recording editor: Shadow (switch)"
+      ]
+    },
+    {
+      "name": "bot",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "AI page: Notice: No speech model",
+        "AI page: Tab: Agents & CLI",
+        "Agents & CLI: MCP ready / offline pill",
+        "Confirm dialog: Title icon: Allow this action?",
+        "Library: Banner: CLI and agents offline",
+        "Recording HUD: Chip: Agent · {client}",
+        "Studio sidebar: MCP card title (ready / offline)",
+        "Studio sidebar: Recordings hint: notice",
+        "Toasts: Kind: Agent"
+      ]
+    },
+    {
+      "name": "calendar",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Library: Sort: Date / Title / Duration / Size"
+      ]
+    },
+    {
+      "name": "camera",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Settings: Permissions: Card: Camera"
+      ]
+    },
+    {
+      "name": "captions",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Publish sheet: Upload captions (switch)",
+        "Recording details: Burn in captions (switch row)",
+        "Recording details: Transcript: Open captions",
+        "Recording editor: Card title: Captions"
+      ]
+    },
+    {
+      "name": "check",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "AI page: Use this model",
+        "Agents & CLI: Copy / Copied",
+        "Agents & CLI: Decision pill: approved / for session / declined / timed out / refused",
+        "Recording editor: Accept / Accept all"
+      ]
+    },
+    {
+      "name": "check-check",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Agents & CLI: Decision pill: approved / for session / declined / timed out / refused",
+        "Recording editor: Accept / Accept all"
+      ]
+    },
+    {
+      "name": "chevron-left",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Recording details: Recordings / (crumb)",
+        "Screenshot editor: Back to library (failed screen)"
+      ]
+    },
+    {
+      "name": "circle",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "Recording editor: Bubble shape: Circle / Rounded",
+        "Screenshot editor: Tool rail (11 tools)",
+        "Settings: Webcam & audio: Shape: Circle / Rounded",
+        "Webcam bubble toolbar: Shape toggle (today a drawn box)"
+      ]
+    },
+    {
+      "name": "circle-alert",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Library: Empty: Couldn't load",
+        "Recording editor: Caption line issue (replaces '!')",
+        "Settings: Permissions: State: Not granted / Denied / Restricted / Restart required"
+      ]
+    },
+    {
+      "name": "circle-check",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "AI page: Status: In use",
+        "Agents & CLI: Allow unknown clients",
+        "Agents & CLI: Client policy: Allowed / Read-only / Blocked",
+        "Agents & CLI: Tier pill: Allow / Ask first",
+        "Publish sheet: Uploaded headline",
+        "Published: Status: processed / published",
+        "Screenshot editor: Save status: saved / saving / couldn't save",
+        "Settings: Destinations: Status: Online / Connected",
+        "Settings: General: Library folder: Available / Unavailable",
+        "Settings: Permissions: State: Granted",
+        "Toasts: Kind: Success"
+      ]
+    },
+    {
+      "name": "circle-dashed",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Settings: Permissions: State: Checking… / Not asked yet"
+      ]
+    },
+    {
+      "name": "circle-dot",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Ring / Mirror camera / Smooth move"
+      ]
+    },
+    {
+      "name": "circle-pause",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "AI page: Status: Paused at n%"
+      ]
+    },
+    {
+      "name": "clock",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Agents & CLI: Decision pill: approved / for session / declined / timed out / refused",
+        "Library: Sort: Date / Title / Duration / Size",
+        "Settings: Destinations: Coming soon caption"
+      ]
+    },
+    {
+      "name": "cloud",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "Launcher: Save to cloud drive"
+      ]
+    },
+    {
+      "name": "cloud-check",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Recording details: Exports: Uploaded row"
+      ]
+    },
+    {
+      "name": "cloud-upload",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Library: Filter: Uploaded (disabled)"
+      ]
+    },
+    {
+      "name": "cm-capture-region",
+      "source": "custom",
+      "status": "new",
+      "used_for": [
+        "Launcher: Actions: Take screenshot / Save only / Copy and save / Copy only",
+        "Launcher: Record region / Screenshot region",
+        "Record sheet: What to record: Display / Window / Region",
+        "Settings nav: Capture & recording",
+        "Studio page header: Capture region"
+      ]
+    },
+    {
+      "name": "cm-corner-bottom-left",
+      "source": "custom",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Bubble position: 4 corners"
+      ]
+    },
+    {
+      "name": "cm-corner-bottom-right",
+      "source": "custom",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Bubble position: 4 corners"
+      ]
+    },
+    {
+      "name": "cm-corner-top-left",
+      "source": "custom",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Bubble position: 4 corners"
+      ]
+    },
+    {
+      "name": "cm-corner-top-right",
+      "source": "custom",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Bubble position: 4 corners"
+      ]
+    },
+    {
+      "name": "cm-layout-bubble",
+      "source": "custom",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Camera layout: Bubble / Screen only / Camera full / Side by side"
+      ]
+    },
+    {
+      "name": "cm-layout-camera",
+      "source": "custom",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Camera layout: Bubble / Screen only / Camera full / Side by side"
+      ]
+    },
+    {
+      "name": "cm-layout-screen",
+      "source": "custom",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Camera layout: Bubble / Screen only / Camera full / Side by side"
+      ]
+    },
+    {
+      "name": "cm-layout-split",
+      "source": "custom",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Camera layout: Bubble / Screen only / Camera full / Side by side"
+      ]
+    },
+    {
+      "name": "cm-record",
+      "source": "custom",
+      "status": "new",
+      "used_for": [
+        "Confirm dialog: Title icon: Start recording?",
+        "Record sheet: Start recording (replaces ↵ glyph)",
+        "Studio page header: Record…"
+      ]
+    },
+    {
+      "name": "cm-split",
+      "source": "custom",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Caption line: Split / Merge with next / Remove",
+        "Recording editor: Timeline: Split (S)"
+      ]
+    },
+    {
+      "name": "cm-stop",
+      "source": "custom",
+      "status": "new",
+      "used_for": [
+        "Recording HUD: Stop (today a drawn div)"
+      ]
+    },
+    {
+      "name": "cm-trim-in",
+      "source": "custom",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Timeline: In (I) / Out (O)"
+      ]
+    },
+    {
+      "name": "cm-trim-out",
+      "source": "custom",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Timeline: In (I) / Out (O)"
+      ]
+    },
+    {
+      "name": "cm-webcam-bubble",
+      "source": "custom",
+      "status": "new",
+      "used_for": [
+        "Launcher: Actions: Include webcam / Without audio",
+        "Record sheet: Webcam bubble row"
+      ]
+    },
+    {
+      "name": "copy",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Agents & CLI: Copy / Copied",
+        "Launcher: Actions: Take screenshot / Save only / Copy and save / Copy only",
+        "Planned: Export Cancel / Retry / Copy path",
+        "Screenshot editor: Copy image",
+        "Toasts: Copy"
+      ]
+    },
+    {
+      "name": "copy-plus",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Screenshot editor: Duplicate"
+      ]
+    },
+    {
+      "name": "crop",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "Screenshot editor: Reset crop",
+        "Screenshot editor: Tool rail (11 tools)"
+      ]
+    },
+    {
+      "name": "download",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "AI page: Download / Download {size}",
+        "Recording details: Transcript: Download TXT / SRT / VTT",
+        "Recording editor: Captions: Save SRT / VTT / TXT"
+      ]
+    },
+    {
+      "name": "droplet",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "Screenshot editor: Tool rail (11 tools)"
+      ]
+    },
+    {
+      "name": "external-link",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Library: Banner: Grant access… / Open System Settings / Restart / Open Permissions…",
+        "Library: Context menu: Open",
+        "Publish sheet: Done: Open / Copy link",
+        "Published: Open",
+        "Recording details: Exports: Copy link / Open",
+        "Settings: Destinations: Continue in browser",
+        "Settings: Permissions: Open System Settings / Open Settings",
+        "Toasts: Open (link) / Open (capture)",
+        "Toasts: Open Permissions… / Open System Settings"
+      ]
+    },
+    {
+      "name": "eye",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Agents & CLI: Client policy: Allowed / Read-only / Blocked"
+      ]
+    },
+    {
+      "name": "eye-off",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Hide when idle",
+        "Settings nav: Privacy",
+        "Settings: Privacy: Fact: No telemetry"
+      ]
+    },
+    {
+      "name": "file-input",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "AI page: Import from file"
+      ]
+    },
+    {
+      "name": "file-output",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Publish sheet: Export MP4",
+        "Recording details: Export MP4 / Export again",
+        "Recording editor: Card title: Output",
+        "Recording editor: Export MP4 / Publish…",
+        "Settings: Capture & recording: Create a single MP4 (switch row)"
+      ]
+    },
+    {
+      "name": "file-video",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Planned: Export preset picker",
+        "Publish sheet: Video to upload: file row"
+      ]
+    },
+    {
+      "name": "file-x-2",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Library: Card: Unreadable placeholder"
+      ]
+    },
+    {
+      "name": "film",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Library: Filter: Recordings",
+        "Studio sidebar: Recordings"
+      ]
+    },
+    {
+      "name": "flip-horizontal-2",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Ring / Mirror camera / Smooth move",
+        "Settings: Webcam & audio: Mirror the preview",
+        "Webcam bubble toolbar: Mirror (replaces ⇆ glyph)"
+      ]
+    },
+    {
+      "name": "folder",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Settings: Destinations: Local folder row tile (replaces '~')"
+      ]
+    },
+    {
+      "name": "folder-open",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Library: Context menu: Reveal in Finder / Show in folder",
+        "Recording details: Reveal export / Reveal in Finder",
+        "Screenshot editor: Reveal",
+        "Toasts: Play / Reveal"
+      ]
+    },
+    {
+      "name": "folder-output",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Publish sheet: Retry / Edit and try again / Open Destinations",
+        "Settings nav: Destinations"
+      ]
+    },
+    {
+      "name": "folder-plus",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Settings: Destinations: Add local folder…"
+      ]
+    },
+    {
+      "name": "gauge",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Launcher: Actions: Record at 60 fps / Start in 5 s / With 5 s delay",
+        "Publish sheet: Quota line",
+        "Recording editor: Card title: Speed"
+      ]
+    },
+    {
+      "name": "globe",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Publish sheet: Visibility: Private / Unlisted / Public",
+        "Published: Privacy pill: Private / Unlisted / Public"
+      ]
+    },
+    {
+      "name": "grid-3x3",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "Screenshot editor: Tool rail (11 tools)"
+      ]
+    },
+    {
+      "name": "hand",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Agents & CLI: Tier pill: Allow / Ask first"
+      ]
+    },
+    {
+      "name": "hard-drive",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Library: Banner: Library unavailable",
+        "Library: Empty: Library unavailable",
+        "Library: Sort: Date / Title / Duration / Size",
+        "Settings: Destinations: Library folder row tile (replaces '~')",
+        "Settings: Privacy: Fact: Local-first"
+      ]
+    },
+    {
+      "name": "hash",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "Screenshot editor: Tool rail (11 tools)"
+      ]
+    },
+    {
+      "name": "headphones",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Planned: Audio gain / mute / solo"
+      ]
+    },
+    {
+      "name": "highlighter",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "Screenshot editor: Tool rail (11 tools)"
+      ]
+    },
+    {
+      "name": "image",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "Library: Card: No preview placeholder",
+        "Library: Filter: Screenshots",
+        "Studio sidebar: Screenshots"
+      ]
+    },
+    {
+      "name": "image-plus",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Publish sheet: Choose image…"
+      ]
+    },
+    {
+      "name": "images",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Library: Empty: Nothing captured yet"
+      ]
+    },
+    {
+      "name": "info",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Library: Banner: newest 5,000 shown",
+        "Recording editor: Recording details (header)",
+        "Settings nav: About · Apache-2.0",
+        "Toasts: Kind: Info"
+      ]
+    },
+    {
+      "name": "keyboard",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Settings nav: Shortcuts",
+        "Settings: Permissions: Card: Input Monitoring"
+      ]
+    },
+    {
+      "name": "laptop",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Settings: Privacy: Fact: Agents stay on this computer"
+      ]
+    },
+    {
+      "name": "layout-grid",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Library: Filter: All"
+      ]
+    },
+    {
+      "name": "link",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Library: Context menu: Copy link",
+        "Publish sheet: Done: Open / Copy link",
+        "Publish sheet: Visibility: Private / Unlisted / Public",
+        "Published: Copy link",
+        "Published: Privacy pill: Private / Unlisted / Public",
+        "Recording details: Exports: Copy link / Open",
+        "Toasts: Copy link"
+      ]
+    },
+    {
+      "name": "list-checks",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Settings: Permissions: Reopen setup / Check again"
+      ]
+    },
+    {
+      "name": "loader-circle",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Library: Empty: Loading library…",
+        "Published: Status: processing",
+        "Recording details: Exports: Uploading / Exporting row",
+        "Screenshot editor: Save status: saved / saving / couldn't save",
+        "Settings: Destinations: Status: Checking",
+        "Settings: Permissions: State: Checking… / Not asked yet"
+      ]
+    },
+    {
+      "name": "locate",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Follow cursor (switch)",
+        "Recording editor: Zoom chip: follow cursor (replaces ⊙)"
+      ]
+    },
+    {
+      "name": "locate-fixed",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Reframe mode: Fit / Fixed / Follow"
+      ]
+    },
+    {
+      "name": "lock",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Publish sheet: Visibility: Private / Unlisted / Public",
+        "Published: Privacy pill: Private / Unlisted / Public",
+        "Settings: Permissions: State: Not granted / Denied / Restricted / Restart required"
+      ]
+    },
+    {
+      "name": "magnet",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Timeline: Snap on/off"
+      ]
+    },
+    {
+      "name": "merge",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Caption line: Split / Merge with next / Remove"
+      ]
+    },
+    {
+      "name": "mic",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Launcher: Actions: Without webcam / Screen + mic only / Screen only",
+        "Settings: Permissions: Card: Microphone"
+      ]
+    },
+    {
+      "name": "minus",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Steppers − / + (zoom, cursor, reframe, background)",
+        "Screenshot editor: Blur / Pixelate stepper − / +"
+      ]
+    },
+    {
+      "name": "monitor",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Launcher: Screenshot display",
+        "Record sheet: What to record: Display / Window / Region",
+        "Settings: General: Theme: System / Dark / Light",
+        "Studio page header: Display"
+      ]
+    },
+    {
+      "name": "moon",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Settings: General: Theme: System / Dark / Light"
+      ]
+    },
+    {
+      "name": "mouse-pointer-2",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "Recording editor: Card title: Cursor",
+        "Screenshot editor: Tool rail (11 tools)",
+        "Settings: Capture & recording: Record the cursor (switch row)"
+      ]
+    },
+    {
+      "name": "mouse-pointer-click",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Record sheet: Choose a window… / Choose a region… / Choose another…"
+      ]
+    },
+    {
+      "name": "move-up-right",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "Screenshot editor: Tool rail (11 tools)"
+      ]
+    },
+    {
+      "name": "octagon-alert",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Toasts: Kind: Error"
+      ]
+    },
+    {
+      "name": "pen-line",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Toasts: Annotate"
+      ]
+    },
+    {
+      "name": "pencil",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Library: Context menu: Rename…",
+        "Settings: Shortcuts: Change"
+      ]
+    },
+    {
+      "name": "pin",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Reframe mode: Fit / Fixed / Follow",
+        "Settings: Webcam & audio: Remember bubble position"
+      ]
+    },
+    {
+      "name": "play",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "AI page: Resume",
+        "Recording details: Play export / Play in system player / Play original",
+        "Toasts: Play / Reveal"
+      ]
+    },
+    {
+      "name": "plug",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Publish sheet: Connect YouTube",
+        "Settings: Destinations: Connect / Connect another / Connect account"
+      ]
+    },
+    {
+      "name": "plus",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Captions: Add at playhead",
+        "Recording editor: Steppers − / + (zoom, cursor, reframe, background)",
+        "Screenshot editor: Blur / Pixelate stepper − / +",
+        "Settings: Privacy: Add app"
+      ]
+    },
+    {
+      "name": "ratio",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Card title: Reframe"
+      ]
+    },
+    {
+      "name": "rectangle-horizontal",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Preview aspect: 16:9 / 9:16 / 1:1"
+      ]
+    },
+    {
+      "name": "rectangle-vertical",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Preview aspect: 16:9 / 9:16 / 1:1"
+      ]
+    },
+    {
+      "name": "redo-2",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "Recording editor: Timeline: Undo / Redo",
+        "Screenshot editor: Undo / Redo / Revert / Zoom out / Zoom in"
+      ]
+    },
+    {
+      "name": "refresh-cw",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Planned: Library rescan",
+        "Recording details: Transcript: Re-generate",
+        "Settings: Destinations: Reconnect / Sign in again",
+        "Settings: Permissions: Reopen setup / Check again",
+        "Toasts: Reconnect…"
+      ]
+    },
+    {
+      "name": "repeat",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Planned: Loop"
+      ]
+    },
+    {
+      "name": "rotate-ccw",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "Screenshot editor: Undo / Redo / Revert / Zoom out / Zoom in"
+      ]
+    },
+    {
+      "name": "rotate-cw",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Library: Banner: Grant access… / Open System Settings / Restart / Open Permissions…",
+        "Library: Empty: Try again",
+        "Planned: Export Cancel / Retry / Copy path",
+        "Publish sheet: Retry / Edit and try again / Open Destinations",
+        "Record sheet: Retry",
+        "Settings: Permissions: Restart CaptureMann",
+        "Settings: Permissions: State: Not granted / Denied / Restricted / Restart required",
+        "Toasts: Retry"
+      ]
+    },
+    {
+      "name": "save",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Launcher: Actions: Take screenshot / Save only / Copy and save / Copy only",
+        "Recording editor: Captions: Save changes",
+        "Screenshot editor: Save as…",
+        "Toasts: Save as…"
+      ]
+    },
+    {
+      "name": "scan-eye",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Planned: Auto-redact"
+      ]
+    },
+    {
+      "name": "scissors",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Timeline: Cut (⌫)"
+      ]
+    },
+    {
+      "name": "screen-share",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Settings: Permissions: Card: Screen Recording"
+      ]
+    },
+    {
+      "name": "search",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "Launcher: Search",
+        "Library: Search field"
+      ]
+    },
+    {
+      "name": "search-x",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Library: Empty: No matches"
+      ]
+    },
+    {
+      "name": "send",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "Confirm dialog: Title icon: Publish video?",
+        "Library: Filter: Published (disabled)",
+        "Publish sheet: Publish…",
+        "Published: Empty state tile",
+        "Recording details: Publish…",
+        "Recording editor: Export MP4 / Publish…",
+        "Studio sidebar: Published"
+      ]
+    },
+    {
+      "name": "settings",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Studio sidebar: Settings"
+      ]
+    },
+    {
+      "name": "settings-2",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Settings: Destinations: Manage"
+      ]
+    },
+    {
+      "name": "shield-alert",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Library: Banner: Screen Recording missing"
+      ]
+    },
+    {
+      "name": "shield-check",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Launcher: Permissions… (today shares the settings icon)",
+        "Library: Banner: Grant access… / Open System Settings / Restart / Open Permissions…",
+        "Settings nav: Permissions",
+        "Settings: Permissions: Grant access…",
+        "Toasts: Open Permissions… / Open System Settings"
+      ]
+    },
+    {
+      "name": "shrink",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Planned: Timeline Fit",
+        "Recording editor: Reframe mode: Fit / Fixed / Follow",
+        "Screenshot editor: Fit (replaces maximize)"
+      ]
+    },
+    {
+      "name": "slash",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "Screenshot editor: Tool rail (11 tools)"
+      ]
+    },
+    {
+      "name": "sliders-horizontal",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Settings nav: General"
+      ]
+    },
+    {
+      "name": "sparkles",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "AI page: Tab: AI",
+        "Recording details: Transcript: Open AI",
+        "Recording editor: Card title: Suggestions",
+        "Recording editor: Suggest zooms / Suggest cuts",
+        "Studio sidebar: AI & Agents",
+        "Studio sidebar: Recordings hint: Open AI"
+      ]
+    },
+    {
+      "name": "square",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "Recording editor: Bubble shape: Circle / Rounded",
+        "Recording editor: Preview aspect: 16:9 / 9:16 / 1:1",
+        "Screenshot editor: Tool rail (11 tools)",
+        "Settings: Webcam & audio: Shape: Circle / Rounded",
+        "Webcam bubble toolbar: Shape toggle (today a drawn box)"
+      ]
+    },
+    {
+      "name": "square-pen",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Publish sheet: Retry / Edit and try again / Open Destinations",
+        "Recording details: Edit"
+      ]
+    },
+    {
+      "name": "star",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Settings: Destinations: Default pill",
+        "Settings: Destinations: Make default"
+      ]
+    },
+    {
+      "name": "step-back",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Planned: Frame step back / forward"
+      ]
+    },
+    {
+      "name": "step-forward",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Planned: Frame step back / forward"
+      ]
+    },
+    {
+      "name": "sun",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Settings: General: Theme: System / Dark / Light"
+      ]
+    },
+    {
+      "name": "timer",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Launcher: Actions: Record at 60 fps / Start in 5 s / With 5 s delay",
+        "Settings: Capture & recording: Countdown rows"
+      ]
+    },
+    {
+      "name": "trash-2",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "AI page: Remove / Remove model",
+        "Confirm dialog: Title icon: Delete / Discard",
+        "Library: Context menu: Delete…",
+        "Library: Delete dialog: Delete capture",
+        "Recording HUD: Discard",
+        "Recording editor: Caption line: Split / Merge with next / Remove",
+        "Recording editor: Remove zoom",
+        "Screenshot editor: Delete",
+        "Settings: Destinations: Remove… / Disconnect…",
+        "Toasts: Delete"
+      ]
+    },
+    {
+      "name": "triangle-alert",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "AI page: Status: Download failed",
+        "Library: Card: Broken pill",
+        "Publish sheet: Public confirmation (switch)",
+        "Publish sheet: Warnings list",
+        "Recording HUD: Chip: Dropping frames / engine warning",
+        "Recording details: Exports: Export failed / Upload waiting (warning rows)",
+        "Screenshot editor: Save status: saved / saving / couldn't save",
+        "Settings: Destinations: Status: Offline / Reconnect needed",
+        "Settings: General: Library folder: Available / Unavailable",
+        "Settings: Shortcuts: Couldn't register (warning)",
+        "Toasts: Kind: Warning"
+      ]
+    },
+    {
+      "name": "type",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "Screenshot editor: Tool rail (11 tools)"
+      ]
+    },
+    {
+      "name": "undo-2",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "Recording editor: Timeline: Undo / Redo",
+        "Screenshot editor: Undo / Redo / Revert / Zoom out / Zoom in"
+      ]
+    },
+    {
+      "name": "unplug",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Settings: Destinations: Remove… / Disconnect…"
+      ]
+    },
+    {
+      "name": "user-plus",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Agents & CLI: Add client"
+      ]
+    },
+    {
+      "name": "video",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "Recording details: Poster placeholder"
+      ]
+    },
+    {
+      "name": "video-off",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Launcher: Actions: Without webcam / Screen + mic only / Screen only"
+      ]
+    },
+    {
+      "name": "volume-2",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Planned: Audio gain / mute / solo",
+        "Record sheet: System audio row"
+      ]
+    },
+    {
+      "name": "volume-x",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Launcher: Actions: Include webcam / Without audio",
+        "Launcher: Actions: Without webcam / Screen + mic only / Screen only",
+        "Planned: Audio gain / mute / solo"
+      ]
+    },
+    {
+      "name": "wallpaper",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Card title: Background"
+      ]
+    },
+    {
+      "name": "webcam",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Recording editor: Card title: Camera",
+        "Settings nav: Webcam & audio"
+      ]
+    },
+    {
+      "name": "wifi-off",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Settings: Privacy: Fact: No network traffic by default"
+      ]
+    },
+    {
+      "name": "x",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "AI page: Cancel (download)",
+        "Agents & CLI: Decision pill: approved / for session / declined / timed out / refused",
+        "Library: Empty: Clear search",
+        "Planned: Export Cancel / Retry / Copy path",
+        "Publish sheet: Remove thumbnail",
+        "Record sheet: Close",
+        "Recording editor: Dismiss suggestion (replaces Unicode ✕)",
+        "Settings: Privacy: Excluded app: remove",
+        "Toasts: Dismiss"
+      ]
+    },
+    {
+      "name": "zap",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Settings: Destinations: Test connection"
+      ]
+    },
+    {
+      "name": "zoom-in",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "Recording editor: Add zoom (Z)",
+        "Recording editor: Card title: Zoom",
+        "Recording editor: Timeline: zoom − / +",
+        "Screenshot editor: Undo / Redo / Revert / Zoom out / Zoom in"
+      ]
+    },
+    {
+      "name": "zoom-out",
+      "source": "lucide@1.60.0",
+      "status": "in app today",
+      "used_for": [
+        "Recording editor: Timeline: zoom − / +",
+        "Screenshot editor: Undo / Redo / Revert / Zoom out / Zoom in"
+      ]
+    }
+  ]
+}

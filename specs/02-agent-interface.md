@@ -1,0 +1,201 @@
+# Agent interface
+
+## Principles and permission model
+
+Agents get the same actions as the GUI through one action bus; three kinds of action always pause for a human confirmation on screen, because they record people, publish publicly, or destroy data.
+
+| Tier | Actions | Behavior |
+| --- | --- | --- |
+| **Free** | List, read, capture screenshot, annotate, trim, layout, export, transcribe, generate metadata, upload to a connected drive | Runs immediately; logged as a revision by `agent:<client name>`; undoable |
+| **Confirm** | Start recording, publish to any platform, delete a capture or a remote upload, discard or restart a recording take (internal actions, below) | Native dialog shows exactly what will happen (target, privacy, title, account); the tool call waits up to 5 min, then returns `user_declined` or `confirmation_timeout` |
+| **Never** | Read or export OAuth tokens or API keys; change privacy settings of existing remote posts; disable the recording indicator | Not exposed at all |
+
+**Rules**
+
+- **Least surprise.** A recording started by an agent shows the same border, timer and stop button as a manual one.
+- **One call, one undo step.** Each tool call is one action and one batch of commands.
+- **Idempotency.** Mutating tools accept an optional `request_id`; a repeated id returns the first result instead of acting twice (important for upload and publish).
+- **Long work is a job.** Tools that take more than a few seconds return a `job_id` at once; clients follow progress with `get_job` or the event stream.
+- **Typed and versioned.** Every tool has a JSON Schema for input and output; breaking changes bump the tool name (`publish_video_v2`).
+- **Per-client allow-list.** Settings → Agents & CLI lists connected MCP clients; each can be limited to read-only or blocked. **The policy is keyed by the name a client declares in `session.hello`, so it is not a security boundary against a malicious local process** (which can declare any name): it limits well-behaved agents and tells the user who asked. A connection's name is immutable after its first `session.hello`, and `session.hello`, `events.subscribe` and `actions.list` obey the policy too (a Blocked client gets `client_blocked`). The Confirm gate, the app-only settings and the resource limits do not depend on names. Failing closed is built: when the desktop cannot restore the policy list, clients with no entry are refused with `data.reason: "default_deny"` until the user reviews the list (setting `agents.deny_unknown_clients`, Settings → Agents & CLI); on a normal install a client with no entry is allowed.
+- **Two controls, one model.** The design kit's Settings → Agents & CLI shows a per-capability control with the labels **Allow** and **Ask first**. These are UI labels for the tiers, not new tiers: **Allow** = the capability runs as **Free** (no dialog); **Ask first** = it pauses on the **Confirm** dialog. Rows for Confirm-tier capabilities (start recording, publish, delete) are fixed at **Ask first** and show the control locked, because AGT-2 and NFR-11 forbid turning their dialog off; the kit's screen shows "Start & stop recording: Allow", which this spec overrides (decision OD-2, Oct 21, 2026). Per-capability tightening of Free actions to **Ask first** (the kit's "Save to cloud drives: Ask first") is not in v0.1 and is planned for P2; in v0.1 Free rows show **Allow** and the user limits agents with the per-client policy below. Per-client policy (Allowed / Read-only / Blocked) is separate and stricter-wins. The kit's capability rows group real tools: Take screenshots = `capture_screenshot`; Start & stop recording = `start_recording` / `stop_recording`; Save to cloud drives = `upload`; Publish to social = `publish_video`.
+- **Tool names.** Names shown in the kit (`capture.screenshot`, `capture.region`, `record.start`, `save.cloud`, `publish.*`) are illustrative. The real names are the ones in this document (`capture_screenshot`, `start_recording`, `upload`, `publish_video`); the UI shows these in mono.
+
+## MCP tools (v0.1)
+
+The v0.1 MCP server is specified as the tools in the table below, in 9 groups; each maps to one action, and each has the same name as its CLI subcommand (`capture_screenshot` ↔ `capturemann capture screenshot`). Build status (Oct 22, 2026, macOS): **53 tools** are registered in `cm-mcp` (`crates/cm-mcp/src/tools.rs`: discovery, settings, screenshot, annotate, `suggest_redactions` (ANN-2.AC4), undo and redo (screenshots and recordings), library including `rename_capture`, jobs, `export_video`, the recording tools including `run_fps_selftest`, the edit tools `trim`, `cut_segments`, `restore_segments`, `split`, `set_speed`, `set_background`, `set_audio_mix`, `set_camera_layout`, `set_zooms`, `set_cursor_style` and `set_reframe` (EDT-1 to EDT-5, CAM-3, AUD-4), the destination tools `list_destinations` and `upload` (STO-1, STO-3, STO-5; Free, the upload is a background job), the publishing tools `list_publish_accounts` (Free) and `publish_video` (Confirm; PUB-1, PUB-2), the local-AI tools `list_models`, `download_model`, `import_model`, `select_model`, `remove_model`, `transcribe`, `get_transcript`, `set_captions`, `replace_in_captions` (AI-6a), `export_captions`, `suggest_zooms` and `suggest_cuts` (AI-1, AI-3, AI-4, AI-6a; tested with a scripted engine, the speech engine itself is not plugged in yet and they answer `not_implemented` until it is), `publish_video` and `delete_capture`); the daemon registry (`ACTIONS` in `crates/cm-daemon/src/action.rs`) has 57 entries, the other 6 being the internal first-party actions (`freeze_display`, `release_frame`, `discard_recording`, `restart_recording`, `skip_countdown`, `rescan_library`); `publish_video` has its YouTube engine (Oct 23, 2026, tested with fakes, never run against a real account; other platforms answer `not_implemented` before any dialog) and `list_publish_accounts` is the Free read of the accounts; `delete_capture` with `also_delete_remote: true` deletes the recorded remote copies (Google Drive, local destination folders, YouTube; tested with fakes, never run against a real account). The rest arrive with their milestones. Count tools from the table, not from a number in prose.
+
+| Tool | Input | Output | Tier | Spec |
+| --- | --- | --- | --- | --- |
+| **Discovery** |  |  |  |  |
+| `list_targets` | `windows?` (default true; false = displays only, no window enumeration) | displays, windows (id, title, app, bounds, scale) | Free | CAP-1 |
+| `list_devices` | — | `cameras` (id, name, kind, default, modes), `mics` (id, name, channels, sample rate, default), `system_audio` (`supported`, `backend`), and the permission states: `camera_permission`, `microphone_permission`, `screen_recording_permission`, and `cursor.clicks` with `cursor.missing_permission`; `cameras_error` when enumeration failed. Checking never prompts | Free | CAM-4, AUD-1 |
+| `get_settings` / `set_settings` | keys / values (resolution, fps, codec, camera, audio) | effective settings | Free | — |
+
+`set_settings` limits for agents (socket clients): the app-only keys `library.*`, `privacy.*`, `shortcuts.*`, `permissions.*`, `agents.*`, `storage.*`, `export.*`, `mcp.*`, `auth.*`, `appearance.language`, `recording.fps60_selftest`, `recording.hud_positions`, `app.*` and `launch_at_login` are refused with `user_declined` and `data.reason: "app_only_setting"`; keys are dotted lowercase paths of at most 128 bytes, a value is at most 16 KiB serialized and 8 levels deep, a call has at most 64 keys, and a key containing `token`, `secret`, `password`, `passwd`, `api_key`, `apikey`, `credential`, `private_key` or `bearer` is refused. The registry of all keys, owners and defaults is in the Technical design tab (Settings keys).
+
+**Confirmation requests also carry a structured form (built Oct 24, 2026, tested with fakes; additive, so clients that ignore it are unaffected):** `ConfirmationRequest` and the `confirmation.requested` event add `kind` (the action id, for example `start_recording`, `publish_video`, `delete_capture`) and `params` (the plan as typed values: title, platform, privacy, destination, counts, sizes) next to the unchanged English `summary` and `details`. The desktop app builds its translated dialog text from `kind` and `params` and falls back to `summary` for an unknown kind; CLI and MCP keep the English text. Error codes and exit codes are unchanged; the app translates errors through an id table in `cm_core::message` (the English message stays the wire payload).
+
+| **Screenshot** |  |  |  |  |
+| `capture_screenshot` | target or region, delay, copy_to_clipboard | capture id, image | Free | CAP-1, CAP-4, CAP-5 |
+| `freeze_display` / `release_frame` (internal: daemon and first-party GUI only, no CLI command or MCP tool) | display id / frame id | frame id and pixels (no capture is created); `capture_screenshot` then accepts `target: { frame_id, rect }` to crop the frozen frame | Free | CAP-1 |
+| `run_fps_selftest` | `{ target?, size?, codec?, request_id? }` (default: the primary display and the `recording.size` / `recording.codec` settings) | `{ selftest_id, state: "passed" \| "failed", passed, late_pct, dropped, dropped_pct, frames, size, codec, display_id, at, stored, message, suggestion? }`. Records about 10 s of the screen at 60 fps (no audio, camera or cursor), measures late and dropped frames (pass: at most 1% of each), deletes the video and stores only the verdict in the `recording.fps60_selftest` setting; `start_recording { fps: 60 }` is then accepted for that display, size and codec for 30 days. `busy` while a recording runs; `stop_recording` cancels it | **Confirm** (it captures real pixels, NFR-11; in-process user: no dialog) | REC-3, AGT-2 |
+| `discard_recording` / `restart_recording` / `skip_countdown` (internal, same rule: the HUD's Discard, Restart and Space-skips-countdown; no CLI command or MCP tool) | `{ recording_id? }`; restart reuses the running take's settings | `{ recording_id, state: "discarded", discarded: true, capture_id, reason }` (restart then returns the new run's start result with `restart_of`); `skip_countdown` returns the state | `discard_recording` and `restart_recording` **Confirm** for agents (they delete a take; the HUD runs them directly after its own "Discard this take?" dialog), `skip_countdown` Free | REC-5, REC-1.AC5 |
+| `annotate` | capture id, ops (arrow, rect, ellipse, line, text, highlight, step, blur, pixelate, crop), `copy_to_clipboard?`, `return_image?` (default true; false skips encoding the image into the result; CLI `--no-image`), `replace?` (a replace diffs the new list against the old by op id: one undo step) | revision, image (unless `return_image` is false); with `copy_to_clipboard` the **rendered** image (annotations and redactions applied, never the original) is copied and the result reports `copied_to_clipboard` | Free | ANN-1, ANN-2 |
+| `suggest_redactions` | capture id, `kinds?` (any of `email`, `token`, `ip_address`, `phone`; default all) | `{ capture_id, recognizer, image_size, rects: [{ rect: [x, y, w, h], kind, confidence, text_preview }], applied: false }`: blur rects for emails, API keys and long tokens (and, at lower confidence, phone numbers and IPv4 addresses) found with on-device text recognition on `original.png`; padded, in physical px of the original image, **never applied** (accept with `annotate` blur ops, one undo step); `text_preview` is masked (first and last two characters) so a secret is never echoed back; `not_implemented` with a clear message when the machine has no recognizer (Windows until Windows.Media.Ocr); CLI `annotate <id> --suggest-redactions` (`--redact-emails` for emails only) | Free | ANN-2 |
+| `get_capture` | capture id, revision | metadata, tracks, uploads, image or poster frame | Free | ANN-3 |
+| **Recording** |  |  |  |  |
+| `start_recording` | `target` (`{display_id}`, `{window_id}` or `{display_id, rect: [x, y, w, h]}`; rect in physical px relative to the display, as in `capture_screenshot`), `size` (`source`, `2160p`, `1440p`, `1080p`, `720p`), `fps` (30, 60), `codec` (`auto`, `hevc`, `h264`), `quality` (`high`, `balanced`, `small`), `camera` (`false` · `true` · device id · `{ on, device_id, resolution: 720p\|1080p, mirror, shape: circle\|rounded, size: s\|m\|l, position: name or [x, y] }`), `mic` (`false` · `true` · `"default"` · device id · `{ on, device_id, denoise }`), `system_audio`, `cursor` (default on), `max_duration_s`, `countdown_s` (0 to 10; `countdown` is accepted as an alias), `title`, `exclude` (`{ bundle_ids, window_ids }`, added to the REC-6 list). Missing values come from the settings, then the defaults | `{ recording_id, capture_id, state, live_at_ms, tracks, warnings, indicator }` (returned once every track is delivering, after the countdown) | Confirm | REC-1–3, CAM-1 |
+| `pause_recording` / `resume_recording` | recording id (optional: the running recording) | `{ recording_id, state, changed, recorded_ms }`; pausing during the countdown cancels the start, resuming first runs the resume countdown | Free | REC-4 |
+| `stop_recording` | recording id (optional: the running recording) | `{ recording_id, capture_id, duration_s, tracks, reason, already_stopped? }`; `already_stopped: true` when the recording had ended on its own (disk full, max duration, window closed) before the call; during the countdown it cancels with nothing recorded (`cancelled: true`, no `capture_id`) | Free | REC-1 |
+| `get_recording_status` | recording id (optional) | `{ recording_id, state, capture_id, recorded_ms, elapsed_ms, paused_ms, pauses, live_at_ms, late_frame_pct, recent_late_frame_pct, mic_level_dbfs (peak), mic_rms_dbfs, mic_clip_events, disk_left_minutes, tracks, warnings, indicator, started_by, stop_reason, countdown_remaining, max_duration_s }`; when nothing runs, `{ state: "idle", last }` with the last run's result | Free | REC-3, REC-5, REC-8 |
+| `get_cursor_track` | capture id, time range | cursor moves and clicks in video coordinates | Free | REC-7 |
+| **Editing** |  |  |  |  |
+| `trim` | capture id, start, end | revision | Free | EDT-1 |
+| `cut_segments` / `restore_segments` | capture id, ranges | revision | Free | EDT-1 |
+| `split` | capture id, at | revision | Free | EDT-1 |
+| `set_speed` | capture id, range, factor, keep audio | revision | Free | EDT-2 |
+| `set_camera_layout` | capture id, range, layout, shape, rect | revision | Free | CAM-3 |
+| `set_background` | capture id, kind, value, padding, radius, shadow | revision | Free | EDT-3 |
+| `set_audio_mix` | capture id, mic/system gain (dB), mic/system mute, denoise | revision | Free | AUD-4 |
+| `set_cursor_style` | capture id, size, smoothing, click effect, hide idle | revision | Free | EDT-4 |
+| `set_zooms` | capture id, zooms (at, length, focus, scale, follow cursor) | revision | Free | EDT-4 |
+| `set_reframe` | capture id, aspect, mode, focus (window centre), at | revision | Free | EDT-5 |
+| `set_audio_mix` | capture id, gains, mutes, denoise | revision | Free | AUD-3, AUD-4 |
+| `undo` / `redo` | capture id | revision | Free | ANN-3, AGT-3 |
+| **AI** |  |  |  |  |
+| `list_models` | none | `{ models: [{ id, label, size_mb, hint, installed, active, path }], active, dir }`; CLI `ai models` | Free | AI-1 |
+| `download_model` | model | `{ job_id, model, state, reused }`; a `model_download` job (progress as `job.progress` and `model.download.progress`, resumable, cancellable); the only network use of the AI features; CLI `ai models download` | **Confirm** (dialog: model, size, destination) | AI-1 |
+| `import_model` | model, path | `{ model, installed }`; installs a file the user has, no network | Free | AI-1 |
+| `select_model` | model | `{ active }`; the default for `transcribe` | Free | AI-1 |
+| `remove_model` | model | `{ model, removed }`; `busy` while a transcription or download uses it | **Confirm** | AI-1 |
+| `transcribe` | capture id, language (`auto` or a code), model (default: the active one) | `{ job_id, capture_id, model, language, state, reused }`; writes `transcript.json`; without an installed model: `invalid_input` with `data.reason = "no_model"` (message points to the AI page and `capturemann ai models`); a named model that is not installed: `data.reason = "model_not_installed"`; CLI `ai transcribe` | Free | AI-1 |
+| `get_captions` | capture id | `{ lines: [{ start, end, text }], source: "edited"\|"generated" }`; the user's edited lines, else lines built from the transcript; `not_found` until there is a transcript or edited lines; CLI `ai captions get` | Free | AI-1 |
+| `get_transcript` | capture id | `{ transcript: { language, model, words, note }, captions, captions_source: "edited"\|"generated" }`; `not_found` before `transcribe` finishes; CLI `ai transcript` | Free | AI-1 |
+| `set_captions` | capture id, lines (`start`, `end`, `text`; at most 2 rows of 42 characters and 7 s, in order, no overlap; `[]` clears) | `{ revision, lines, can_undo, can_redo }`; one revision, one undo step; CLI `ai captions set` | Free | AI-1 |
+| `replace_in_captions` | capture id, replacements (1 to 100 of `{ find, replace, match_case?: false, whole_word?: false }`, at most 200 characters each), `request_id?` | `{ replacements, lines_touched, changed, revision, can_undo, can_redo }`; find and replace over all caption lines (the edited ones, else those generated from the transcript), matched like the editor's find: Unicode NFC, Vietnamese diacritics exact (`dê` never matches `đê`), a match may span the row break; a result over 2 rows of 42 characters is refused and nothing changes; nothing found writes no revision; one revision, one undo step, idempotent with `request_id`; `transcript.json` is not modified; CLI `ai captions replace <id> --find X --replace Y [--match-case] [--whole-word]` or `--file pairs.json` | Free | AI-6a |
+| `generate_metadata` | capture id, platform, notes, provider | titles, description, chapters, tags | Free (Confirm when the provider is not local) | AI-2, **after v0.1, not built** |
+| `suggest_zooms` | capture id (as built: no `max` yet; the engine decides how many) | `{ suggestions: [{ start_s, end_s, focus, scale, reason }], apply_with: "set_zooms" }` (not applied); CLI `ai suggest zooms` | Free | AI-3 |
+| `suggest_cuts` | capture id (as built: no silence threshold, minimum silence or filler list yet; raised for the owner) | `{ suggestions: [{ start_s, end_s, kind: "silence"\|"filler", detail }], apply_with: "cut_segments" }` (not applied); CLI `ai suggest cuts` | Free | AI-4 |
+| **Export** |  |  |  |  |
+| `export_video` | capture id, preset or size/fps/codec/format, `captions` (`burn` burns the captions into the picture and fails with `not_found` before `transcribe`; `none` leaves them out; omitted follows the recording's `set_caption_options` burn_in), loudness | job id → file path | Free | EXP-1–4, AI-1 |
+| `set_caption_options` | capture id, `enabled` (show captions in the editor's preview), `burn_in` (burn them into exports by default); at least one | `{ enabled, burn_in, changed, revision?, can_undo?, can_redo? }`; one revision and one undo step, none when nothing changes; CLI `ai captions options <id> [--show\|--hide] [--burn\|--no-burn]` | Free | AI-1 |
+| `export_captions` | capture id, format (srt, vtt, txt), timestamps (txt only, default false) | `{ path, format, lines }` in the capture's `exports/` folder; the lines are the edited ones if any, else generated, with the edit list applied (cuts remove lines, speed scales times); `not_found` before `transcribe`; CLI `export <id> --captions srt\|vtt` | Free | AI-1 |
+| `export_image` | capture id, format | file path | Free | CAP-4 |
+| **Library and storage** |  |  |  |  |
+| `list_library` | query, kind, status, limit, cursor | captures; transcript hits carry `transcript { snippet, start_s }`; `status` is `uploaded`, `not_uploaded`, `published` or `not_published` (records in `uploads[]` / `publishes[]`; other values `invalid_input`), combined with `query` and `kind`, CLI `library list --status`; a cursor above 2,147,483,647 is `invalid_input` | Free | LIB-1 |
+| `rename_capture` | `{ capture_id, title, request_id? }` | `{ capture_id, title, path, kind }`; renames the bundle folder (a suffix if the name is taken); not an undo step; refused with `busy` while the capture is being recorded or exported; publishes `capture.revised` with `renamed: true`; CLI `library rename` | Free (mutating) | LIB-1 |
+| `list_destinations` | — | connected folders and drives | Free | STO-1, STO-2 |
+| `upload` | capture id or file, destination, folder, what | job id → remote id, share link | Free | STO-1–5 |
+| **Publishing** |  |  |  |  |
+| `list_publish_accounts` | — | `{ accounts: [{ account_id, id, platform, name, status (connected \| needs_reconnect), default_privacy (never public), uploads_today, uploads_limit, quota { used, limit }, resets_at }], platforms }`; never a key or token; the app writes the accounts file; CLI `publish accounts` | Free | PUB-1 |
+| `get_platform_rules` | platform | limits, required fields, privacy options, preset | Free | EXP-2 |
+| `publish_video` | `{ capture_id, platform: "youtube", account_id?, title, description?, tags?, privacy?, made_for_kids, thumbnail?, export_preset? \| export_path?, captions?, category?, playlist_id?, metadata? (the same fields nested; top-level wins), request_id? }` | `{ job_id, capture_id, platform, account_id, account, title, privacy, made_for_kids, file, export_preset, export_job_id, captions, state }`; the job `publish` ends with `{ url, video_id, status (processing \| processed \| privacy_locked), privacy, privacy_requested, warnings[], uploads_today }`. Everything is validated before the dialog (field-named `invalid_input`); the dialog shows platform, account, title, privacy, made for kids, file and size, the `playlist` id when one is given (the id only, never its title), "uploads over the internet" and the day's count; a missing `privacy` is the account default and never `public`; there is no action or parameter that changes the privacy of an existing remote video. CLI `publish <capture_id> --title ... --made-for-kids yes\|no [--privacy] [--export-preset]` | Confirm | PUB-2 |
+| **Jobs and housekeeping** |  |  |  |  |
+| `retry_job` | job id, request id | the job, queued again; a failed job keeps its saved progress, a cancelled one starts over, a job waiting with `auth_expired` continues (it pauses again until the account is connected in the app); a queued or running job is returned unchanged; a done job or one the user paused is `invalid_input` | Free | STO-3 |
+| `get_job` / `list_jobs` / `cancel_job` | job id / `{ state?, type?, limit? }` / job id, request id | state (`queued`, `running`, `paused`, `failed`, `done`, `cancelled`), `held` (waiting for a recording to end), progress, result or error; cancelling a cancelled job is a no-op, and cancellation emits no event (read the state); a cancel that races a handler finishing successfully ends `done` | Free | EXP-4, STO-3 |
+| `delete_capture` | `{ capture_id, also_delete_remote?, request_id? }` (unknown fields are refused) | — ; moves the bundle to the Trash (macOS: `NSFileManager trashItemAtURL`, through a `Trasher` trait), removes the index row and publishes `capture.deleted`; `also_delete_remote: true` first deletes, permanently, the remote copies the manifest records (`uploads[]`: Google Drive files and bundle folders by id, copies in local destination folders below their root; `publishes[]`: YouTube videos), the dialog lists each one and each copy left in place (OneDrive, Dropbox, removed destinations or accounts, older Drive bundle copies without a folder id) and says it is permanent, and nothing runs that the dialog did not list; if a remote step fails the capture is kept and the error (`auth_expired`, `network`, `platform_rejected`, ...) carries `data.remote` with `deleted`, `already_gone`, `left_in_place`, `failed` and `not_tried`, the manifest records the outcome (`remote_deletions`) and drops the records of the copies that are gone; after a `network` failure the remaining steps are not tried; `busy` while the capture is being recorded or while an export, upload or publish job names it (queued, running or paused; the message names the job); CLI `library rm [--also-remote]` | Confirm | LIB-1 |
+
+Build note (Oct 22, 2026): `export_video` is `{ capture_id, preset?, format?, width?, fps?, max_mb?, loudness_lufs?, request_id? }` → `{ job_id, capture_id, preset, loudness_lufs, state, reused }`: `preset` is `quick` (default), `youtube-4k`, `youtube-1440p`, `youtube-1080p`, `vertical-1080`, `square-1080`, `source`, `gif` or `webm` (the table is data, EXP-2); `format` `gif` or `webm` is the same as that preset; `width`, `fps` and `max_mb` are for GIF and WebM only (EXP-3); the preset is checked against the recording before a job is queued (`invalid_input`, for example `youtube-4k` for a recording smaller than 2160p); the custom `size`, `codec`, `quality`, `captions` and `out_dir` are refused; the finished job's `result` is `{ capture_id, preset, file, path, size_bytes, duration_s, duration_ms, encoder, elapsed_ms }`. A recording that stops normally is exported automatically (setting `export.auto_on_stop`, default true); asking again for a capture and preset that is already queued or running returns that job (`reused: true`). The job fails with `not_found` ("FFmpeg was not found: install it with Homebrew (brew install ffmpeg) ...") when no FFmpeg is installed; the **automatic** export is not queued in that case and `export.skipped` is published instead. `capturemann export --wait` takes `--timeout <s>` and shows a held job as held instead of waiting for it without end.
+
+Build note (Oct 24, 2026, wording in the app): the Confirm dialog of `delete_capture` carries the remote copies as structured data, `params.remote_items` (also `describe_delete`): one object per copy with `state` (`delete`, `gone`, `left`), `n` (its number in `remote_delete_N`, `remote_gone_N`, `remote_left_N`), `form` (`drive_file`, `drive_folder`, `local_bundle` with `files`, `local_file`, `youtube`, `copy`), `path`, `title`, `url`, `channel`, `place` (`{type: "folder", path}` or `{type: "service", service, account?, name}`) and, for a copy that stays, `reason` (`{id}`: `destination_removed`, `provider_unavailable {service}`, `drive_no_folder_id`, `drive_no_file_id`, `bundle_unreadable`, `no_folder_in_destination`, `path_outside_destination`, `platform_unsupported`, `no_video_id`, `account_not_connected`). The English rows and `summary` are unchanged. The result and the error data of `delete_capture` gain `remote.items` (the same objects with `outcome`, and `error` and `message` for a failure) and, when the manifest could not be written, `remote.warning_kind: "outcome_not_saved"` with `warning_detail`. A missing FFmpeg: see the export spec (`error.data.reason_code` on `job.failed`).
+
+Full behavior, inputs and acceptance criteria for every tool are in the **Feature specs** tabs.
+
+## MCP resources, prompts and events
+
+Resources let an agent read state without calling tools; prompts package common multi-step jobs; events keep long-running work observable.
+
+**Resources** (built Oct 24, 2026 in `cm-mcp`, tested with fakes; every read is a Free daemon action, bounded to 1 MB, read-only, policy as for tools; `resources/subscribe` is not offered; **not built:** the cursor row, and the poster frame in the capture row, which carries no image: `get_capture` returns it)
+
+| URI | Content |
+| --- | --- |
+| `capturemann://library` | Recent captures (id, title, kind, duration, created) |
+| `capturemann://capture/{id}` | Manifest, poster frame, tracks, revisions |
+| `capturemann://capture/{id}/transcript` | Word-level transcript with times |
+| `capturemann://capture/{id}/cursor` | Cursor moves and clicks in video coordinates |
+| `capturemann://jobs` | Active and recent jobs with progress |
+| `capturemann://platforms/{name}/rules` | Current limits and required fields per platform |
+
+**Prompts** (built Oct 24, 2026: text templates that name the real tools, checked by a test against the tool table; two more than the table: `caption-cleanup` (get_transcript, replace_in_captions, set_captions) and `make-short-clip` (trim, set_zooms, set_reframe, export_video with `vertical-1080`). The four below are adapted to what exists: the steps use the tools in this document, YouTube is the only publish platform, and nothing is published or recorded without the on-screen confirmation)
+
+| Prompt | Steps it guides the agent through |
+| --- | --- |
+| `record-tutorial` | Check devices → confirm recording with webcam → stop → transcribe → suggest cuts and zooms → show the user a summary |
+| `publish-everywhere` | Export YouTube 16:9 and 9:16 cuts → generate metadata per platform → confirm publish per platform → return URLs |
+| `bug-report-screenshot` | Capture a window → blur emails and tokens → number the steps → copy to clipboard |
+| `lesson-to-drive` | Record with webcam → trim silence at both ends → export 1080p → upload to Drive → return the share link |
+
+**Events** (the JSON-RPC stream of `events.subscribe`; **built for MCP, tested with fakes**: `cm-mcp` subscribes at session start and forwards each event as an MCP `notifications/message` with `logger: "capturemann.events"` and `data` = the event object `{ seq, event, at, data }`; severity is `error` for `job.failed`, `warning` for `recording.warning` and `events.dropped`, `info` otherwise, and `logging/setLevel` filters. The per-client policy applies (a blocked client gets none). `recording.stats`, `recording.health` and `recording.countdown` are not forwarded (poll `get_recording_status`); a slow MCP client loses events and gets one `events.dropped`): `capture.created`, `capture.revised` (a rename carries `renamed: true`), `capture.deleted` (all three are also published by the library watcher for bundles changed outside the daemon, copied in, restored, renamed or deleted in Finder: they then carry `by: "watcher"`, `external: true` and `title`; `capture.created` adds `broken: true` for a bundle whose manifest never parsed), `library.offline` and `library.online` (`{ path }`, published by the library watcher when the library folder cannot be read, for example an unplugged drive, and when it can be read again; the desktop tray shows Attention while it is offline), `recording.*` (below), `camera.connected` and `camera.disconnected` (**built, tested with fakes**: `{ device_id, name, kind, is_default }`, published by the daemon's camera watcher whenever a camera appears or goes away, also while idle, so a Record sheet can refresh its list; the macOS watcher polls the device list every 2 s; forwarded to MCP like the others; a camera lost during a recording additionally raises the `recording.warning` code `camera_lost` and the session continues), `job.progress`, `job.done`, `job.failed`, `job.paused` (`{ job_id, type, state: "paused", pause_reason: "auth_expired" }`, published only when an upload waits for its account to sign in again; other pauses publish nothing), `publish.queued` (`{ job_id, capture_id, title, video_title, platform, account_id, account, privacy, export_job_id }`), `publish.done` (`{ job_id, capture_id, title, platform, account_id, account, video_id, url, privacy, status, warnings }`), `model.download.progress` (`{ model, bytes_done, bytes_total, fraction }`; not forwarded to MCP, `job.progress` carries it), `model.changed` (`{ model, change }`, `change` one of `downloaded`, `imported`, `selected`, `removed`), `transcript.ready` (`{ capture_id, model, language, words }`), `export.queued` (`{ job_id, capture_id, title, preset, auto }`, plus `recovered: true` and `was_interrupted` when it is re-published after a restart so the UI resumes), `export.skipped` (`{ capture_id, title, reason: "ffmpeg_not_found", message }`: the automatic export was not queued because no FFmpeg was found), `events.dropped` (a slow subscriber lost events), `export.done` (`{ job_id, capture_id, title, preset, file, path, size_bytes, duration_s, encoder }`, followed by `capture.revised` for the new `export` revision), `confirmation.requested`, `confirmation.resolved`.
+
+Recording events all carry `recording_id` (except `recording.selftest`, which carries `selftest_id`):
+
+| Event | When | Extra data |
+| --- | --- | --- |
+| `recording.starting` | the countdown is over and the tracks are being started (a slow camera or ScreenCaptureKit start can take seconds), so the HUD and tray show the state now | `by`, `indicator`, `tracks_planned`, `countdown_s`, `restart_of` |
+| `recording.countdown` | each second of the countdown | `remaining`, `total`, `context` (`start` or `resume`) |
+| `recording.started` | every track is delivering | `capture_id`, `title`, `live_at_ms`, `by`, `tracks`, `warnings`, `indicator`, `restart_of`, `max_duration_s` |
+| `recording.paused` / `recording.resumed` | pause, resume | `recorded_ms` (`paused_ms` on resume) |
+| `recording.stats` | 1 Hz while recording or paused | the `get_recording_status` object, so the HUD needs no polling |
+| `recording.health` | every 5 s | `status` (`ok` or `degraded`), `late_frame_pct`, `disk_left_minutes` |
+| `recording.warning` | a track or the disk guard noted something: `disk_low`, `capture_stalled` (no frame for over 1 s), `track_failed` (a track can no longer be written), `mic_silent`, `camera_lost`, `screen_degraded`, `fps60_unverified_with_camera`, `screen_stopped_early`, `audio_device_*`, `permission_revoked` (with `permission`: `screen`, `camera` or `microphone`; only `screen` stops the run, see PRM-1), a permission fallback | `code`, `message`, `track`, `level` |
+| `recording.stopped` | the bundle is closed, or the stop failed | `capture_id`, `duration_s`, `tracks`, `reason`, `error?` |
+| `recording.selftest` | the 60 fps self-test (REC-3); carries `selftest_id` instead of `recording_id` | `state` (`started`, `running`, `passed`, `failed`, `cancelled`, `error`), `remaining_s`, `late_pct`, `total_s`; `indicator` (the same facts as `recording.started`, plus `selftest: true`) on `started`; `result` on `passed` and `failed`; `error` on `error` |
+| `recording.discarded` | a take was deleted, the countdown was cancelled, or the start failed | `capture_id` (null before the session existed), `reason`, and `error { code, message }` when `reason` is `start_failed` |
+| `recording.recovered` | at launch, per crashed recording that was repaired | `capture_id`, `lost_ms` (upper bound, one fragment), `title`, `duration_s`, `missing_tracks` (no `recording_id`: it is not a run of this process) |
+
+`reason` in `stopped` and `discarded` says who or what ended the run: `user` (a stop call), `max_duration`, `disk_full`, `screen_halted` (window closed or display gone), `screen_encoder_failed`, `permission_revoked` (the OS removed Screen Recording access mid-recording: the run stops cleanly, the take is kept, and `stopped` also carries `permission: "screen"` and a `message`), `shutdown` (app quit), `engine_failed`, `no_frames` (stopped before the first frame), `engine_dropped` (the capture session was dropped by the OS), `error`; for discards also `restart`, `countdown_cancelled`, `starter_gone` and `start_failed`. The self-test events (`recording.selftest`) carry the same `indicator` as a recording on `started`. `capture.created` follows `recording.stopped` and `recording.recovered`.
+
+**`recording_id` and `capture_id`.** `recording_id` names one *run* of the recorder and exists as soon as a start is accepted, including during the countdown; a cancelled or discarded run has a `recording_id` and no capture. `capture_id` is the library id of the bundle, created when `recording.started` fires, and is what every capture tool (`get_capture`, `trim`, `export_video`, ...) takes. The pause, resume, stop and status tools take the `recording_id` (or none, meaning the running one).
+
+## CLI and JSON-RPC
+
+The CLI is a thin client of the running daemon (it starts one if none is running); every command takes `--json` for machine-readable output, and the JSON-RPC methods use the same names as the MCP tools.
+
+```bash
+# discovery and settings
+capturemann targets --json
+capturemann devices
+capturemann settings set recording.size source recording.fps 60 recording.codec hevc
+
+# screenshot
+capturemann capture screenshot --window "Visual Studio Code" --annotate ops.json --out step1.png
+
+# record a 4K60 lesson with a circle webcam bubble bottom-right (asks for confirmation)
+capturemann record start --display 1 --size source --fps 60 \
+  --camera on --camera-shape circle --camera-pos bottom-right --mic default --system-audio
+capturemann record pause        # also: resume, stop, status; each takes --id <recording_id>
+capturemann record status --json
+capturemann record watch        # streams recording.* events (--topic, --max-events)
+capturemann record stop
+
+# AI and editing
+capturemann ai transcribe rec_01JA8K2M7Q
+capturemann ai suggest-cuts rec_01JA8K2M7Q --apply
+capturemann ai metadata rec_01JA8K2M7Q --platform youtube --json > meta.json
+
+# export, store, publish
+capturemann export rec_01JA8K2M7Q --preset youtube-4k
+capturemann export rec_01JA8K2M7Q --preset vertical-1080
+capturemann export rec_01JA8K2M7Q --wait            # built: the interim `quick` preset, waits for the file
+capturemann upload rec_01JA8K2M7Q --to gdrive:/Lessons --copy-link
+capturemann publish rec_01JA8K2M7Q --to youtube --meta meta.json --privacy unlisted
+capturemann jobs watch
+
+# MCP server for agents
+capturemann mcp            # runs `cm-mcp` (stdio; `--http` for local HTTP with a bearer token)
+capturemann mcp --http     # local HTTP on 127.0.0.1, token-protected
+```
+
+Build note (Oct 25, 2026): the MCP server is the separate `cm-mcp` binary (stdio, or `--http`), and `capturemann mcp [--http]` launches it (run against a scripted client, see `verification/REGRESSION-2026-10-25-claude.md`). `publish_video` without `account_id` publishes to the platform's default account (the only one, or the one marked Default in Settings → Destinations; owner decision Oct 25, 2026), and the confirmation dialog names it. The CLI covers recording (`record start|pause|resume|stop|status|watch`), `devices`, `export` (presets and GIF/WebM), `ai`, `upload` and `publish`.
+
+**JSON-RPC transport**: Unix socket on macOS (`~/Library/Application Support/CaptureMann/daemon.sock`, 0600 in a 0700 directory), named pipe on Windows (`\\.\pipe\capturemann`, not built); JSON-RPC 2.0, one request per line. Besides the tool names the daemon answers `session.hello { client }` (declares the client name, immutable per connection), `events.subscribe { topics? }`, `actions.list` and `rpc.cancel { id }` (cancels one in-flight request of the same connection; MCP forwards `notifications/cancelled` through it so a waiting confirmation dialog closes). Requests without an `id` are notifications; `id: null` is accepted but discouraged; an `id` that is not a string, number or null, and any batch (array), is refused with `-32600`. Limits per connection: 64 requests in flight (more get `busy`), 16 MiB per line, 32 MiB of unread output; per daemon: 64 connections, 3 pending confirmations per client and 16 in total, an activity log of 2,000 entries and an idempotency cache of 512 entries and 64 MB (images are dropped from cached results above 64 KiB, so a replay of a very large result omits the image).
+
+```json
+{"jsonrpc":"2.0","id":7,"method":"publish_video",
+ "params":{"capture_id":"rec_01JA8K2M7Q","platform":"youtube","account":"UCx…",
+           "metadata":{"title":"Kubernetes probes in 5 minutes","privacy":"unlisted"},
+           "request_id":"pub-2026-10-19-001"}}
+```
+
+**Exit codes**: 0 success, 1 internal error or not implemented, 2 bad input or not found, 3 user declined a confirmation or it timed out, 4 permission missing (screen, camera, mic), 5 platform, network, disk or daemon-unreachable error (`daemon_unavailable`, also for `capturemann daemon status`), 6 job failed or busy. The authoritative table is in `specs/README.md`.
