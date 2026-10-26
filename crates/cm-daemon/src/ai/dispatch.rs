@@ -44,6 +44,12 @@ impl Daemon {
                 service: inner.ai.speakers.clone(),
                 settings: inner.settings.clone(),
             }),
+        )?;
+        self.register_job_handler(
+            JOB_REPORT,
+            Arc::new(reports::ReportHandler {
+                inner: Arc::downgrade(&self.inner),
+            }),
         )
     }
 
@@ -286,6 +292,42 @@ impl Inner {
             } => self.diarize(actor, capture_id, hints, headset).await,
             AiOp::SetSpeakers { capture_id, edit } => {
                 self.set_speakers(actor, capture_id, edit).await
+            }
+            AiOp::ListReportTemplates => Ok(reports::list_templates()),
+            AiOp::GenerateReport {
+                capture_id,
+                template,
+                language,
+                context,
+                report_id,
+            } => {
+                self.generate_report(actor, capture_id, template, language, context, report_id)
+                    .await
+            }
+            AiOp::GetReport {
+                capture_id,
+                report_id,
+            } => self.get_report(capture_id, report_id).await,
+            AiOp::ExportReport {
+                capture_id,
+                report_id,
+                format,
+                out_dir,
+            } => {
+                self.export_report(capture_id, report_id, format, out_dir)
+                    .await
+            }
+            AiOp::DeleteReport {
+                capture_id,
+                report_id,
+            } => self.delete_report(actor, capture_id, report_id).await,
+            AiOp::EditReport {
+                capture_id,
+                report_id,
+                markdown,
+            } => {
+                self.edit_report(actor, capture_id, report_id, markdown)
+                    .await
             }
             AiOp::SuggestZooms { capture_id } => self.suggest(&capture_id, true).await,
             AiOp::SuggestCuts { capture_id } => self.suggest(&capture_id, false).await,

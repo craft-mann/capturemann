@@ -50,6 +50,8 @@ Run **spike S8** first (it picks the default model). Then: OpenAI-compatible cli
 
 Templates as data in `crates/cm-ai/data/reports/` with `additionalProperties: false` schemas; citation check and `dropped_uncited`; interview schema with no score field; storage `reports/<id>.json` and `.md`; Report tab setup, report view and exports (V5, V6); tools `list_report_templates`, `generate_report`, `get_report`, `export_report`, `delete_report`; events. Review set scored by hand in `verification/`.
 
+**Built (Oct 26, 2026, backend only, tested with fakes):** everything above except the Report tab, the report view and Copy (V5, V6) and the review set; plus `edit_report`. Local text model only (remote deferred by maintainer decision). See "As built, AI-9" in `specs/features/07-ai.md`.
+
 ## Stage 6: speaker labels (AI-8)
 
 Run **spike S7** first (model, licence, `ort` versus `sherpa-onnx`). Then: model download and licence display, diarization job, word assignment, `diarization.json`, rename, merge and reassign revisions, the Speakers lane and tab, `Speaker names` export switch, headset shortcut, `profile.display_name`; `diarize` and `set_speakers`. `ai.auto_speakers` stays off until S7 passes. No voiceprints on disk (AC6 check).

@@ -161,6 +161,93 @@ pub enum AiCmd {
     /// (`set_speakers`). Runs on this computer; without a speaker model it fails with exit 2
     /// (`no_speaker_model`).
     Speakers(SpeakersArgs),
+    /// Write a report from a recording's transcript with the local text model
+    /// (`generate_report`): `report <id> --template minutes`; or `report templates|get|export|
+    /// delete|edit` (`list_report_templates`, `get_report`, `export_report`, `delete_report`,
+    /// `edit_report`). Needs a transcript and a local text model (exit 2, `no_text_model`).
+    Report(ReportArgs),
+}
+
+#[derive(Debug, Args)]
+#[command(args_conflicts_with_subcommands = true, subcommand_negates_reqs = true)]
+pub struct ReportArgs {
+    #[command(subcommand)]
+    pub cmd: Option<ReportCmd>,
+    /// Capture id of a recording that has a transcript.
+    #[arg(required = true)]
+    pub id: Option<String>,
+    /// The template: `summary`, `minutes`, `one_on_one`, `interview`, `product_recap` or
+    /// `lecture` (see `ai report templates`).
+    #[arg(long, value_name = "ID", required = true)]
+    pub template: Option<String>,
+    /// Write the note text in this language (`vi`, `es`, ...); default the transcript's.
+    #[arg(long, value_name = "LANG")]
+    pub lang: Option<String>,
+    /// Title of the report.
+    #[arg(long)]
+    pub title: Option<String>,
+    /// An attendee (repeat for several); owners and names come from these and the speakers.
+    #[arg(long = "attendee", value_name = "NAME")]
+    pub attendees: Vec<String>,
+    /// The agenda, as text.
+    #[arg(long)]
+    pub agenda: Option<String>,
+    /// Interview notes: the role.
+    #[arg(long)]
+    pub role: Option<String>,
+    /// Interview notes: a competency to collect evidence for (repeat for several).
+    #[arg(long = "competency", value_name = "TEXT")]
+    pub competencies: Vec<String>,
+    /// Regenerate this report (the old one is replaced only when the new one succeeds).
+    #[arg(long, value_name = "REPORT")]
+    pub report: Option<String>,
+    /// Wait for the job to finish (exit 6 if it fails).
+    #[arg(long)]
+    pub wait: bool,
+    /// With `--wait`: give up after this many seconds (the job keeps running).
+    #[arg(long, value_name = "SECS", requires = "wait", value_parser = positive_secs)]
+    pub timeout: Option<f64>,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ReportCmd {
+    /// List the templates (`list_report_templates`).
+    Templates,
+    /// Print a report as Markdown, or `--json`-style with the global flag; without a report id
+    /// list the reports of the recording (`get_report`).
+    Get {
+        /// Capture id of a recording.
+        id: String,
+        /// The report (see `ai report get <id>` for the list).
+        report: Option<String>,
+    },
+    /// Write a report as a Markdown or text file (`export_report`).
+    Export {
+        /// Capture id of a recording.
+        id: String,
+        report: String,
+        /// `md` or `txt`.
+        #[arg(long, default_value = "md", value_parser = ["md", "txt"])]
+        format: String,
+        /// An existing absolute folder; default the recording's `exports/`.
+        #[arg(long, value_name = "DIR")]
+        out_dir: Option<PathBuf>,
+    },
+    /// Delete a report. One undo step.
+    Delete {
+        /// Capture id of a recording.
+        id: String,
+        report: String,
+    },
+    /// Replace a report's Markdown with the text of a file (`-` reads stdin). One undo step.
+    Edit {
+        /// Capture id of a recording.
+        id: String,
+        report: String,
+        /// The Markdown file.
+        #[arg(long, value_name = "FILE")]
+        file: PathBuf,
+    },
 }
 
 #[derive(Debug, Subcommand)]

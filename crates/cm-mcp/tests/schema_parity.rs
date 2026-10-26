@@ -116,6 +116,10 @@ fn field(path: &str, schema: &Value, all: bool, variant: usize) -> Value {
         // AI-5: the caption tools take a translation's language code; translate needs a target.
         p if p.ends_with("_captions.language") => json!("vi"),
         p if p.ends_with("translate_captions.target_language") => json!("vi"),
+        // AI-9: ids that match the pattern, a context the first template (summary) accepts.
+        p if p.ends_with(".report_id") => json!("rpt_00000001"),
+        p if p.ends_with("generate_report.language") => json!("vi"),
+        p if p.ends_with("generate_report.context") => json!({ "title": "Weekly" }),
         p if p.ends_with("set_captions.lines") => {
             json!([{ "start": 1, "end": 2, "text": "Hi" }])
         }

@@ -40,6 +40,21 @@ pub struct TextModelState {
     secrets: Option<Arc<dyn SecretStore>>,
     /// The result of the last Test for the settings it ran with: `(fingerprint, structured)`.
     last_test: Mutex<Option<(String, bool)>>,
+    /// A model used instead of the HTTP client (tests and embedding; see
+    /// [`crate::Daemon::set_text_model_override`]).
+    override_model: Mutex<Option<Arc<dyn TextModel>>>,
+}
+
+/// Lends a shared model to a caller that wants a `Box<dyn TextModel>`.
+struct SharedModel(Arc<dyn TextModel>);
+
+impl TextModel for SharedModel {
+    fn complete_json(
+        &self,
+        req: &text_model::JsonRequest,
+    ) -> Result<text_model::JsonReply, TextModelError> {
+        self.0.complete_json(req)
+    }
 }
 
 impl TextModelState {
@@ -47,6 +62,7 @@ impl TextModelState {
         TextModelState {
             secrets,
             last_test: Mutex::new(None),
+            override_model: Mutex::new(None),
         }
     }
 
@@ -108,6 +124,15 @@ impl Inner {
         &self,
         config: &TextModelConfig,
     ) -> Result<Box<dyn TextModel>, CmError> {
+        if let Some(m) = self
+            .text_model
+            .override_model
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+        {
+            return Ok(Box::new(SharedModel(m)));
+        }
         let key = self.text_model_key(config)?;
         Ok(text_model::build(config, key))
     }
@@ -222,6 +247,18 @@ impl crate::daemon::Daemon {
     /// still to be shown. The app records the answer in `ai.text.remote_notice_host`.
     pub fn text_model_notice_pending(&self) -> Result<bool, DaemonError> {
         self.inner.text_model_notice_pending()
+    }
+
+    /// Replaces the HTTP text model by `model` (or restores it with `None`). For tests and for
+    /// embedding a model that is not behind an HTTP server. The settings are still read: the
+    /// provider must not be `none`, and a non-local provider is still refused.
+    pub fn set_text_model_override(&self, model: Option<Arc<dyn TextModel>>) {
+        *self
+            .inner
+            .text_model
+            .override_model
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = model;
     }
 
     /// The text model for the current settings, key included. Blocking: call it inside

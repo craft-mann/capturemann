@@ -1,0 +1,329 @@
+{
+  "id": "minutes",
+  "name": "Meeting minutes",
+  "version": 1,
+  "description": "Summary, attendees, topics, decisions, action items, open questions and marked moments.",
+  "context_fields": [
+    "title",
+    "attendees",
+    "agenda"
+  ],
+  "suggested_for": [
+    "in_the_room",
+    "online_meeting"
+  ],
+  "instructions": "Write minutes for a meeting. The summary is at most 150 words. Attendees are the people who spoke or are named in the context; give a role only if it was said. For each topic give a short title and its key points. Decisions are things that were agreed. Action items need a task, an owner and a due date only if one was said (otherwise the due field is an empty string). Open questions were raised and not answered.",
+  "sections": [
+    {
+      "id": "summary",
+      "title": "Summary",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 3,
+      "fields": [
+        {
+          "id": "text",
+          "label": "Text"
+        }
+      ]
+    },
+    {
+      "id": "attendees",
+      "title": "Attendees",
+      "source": "model",
+      "layout": "inline",
+      "at_optional": true,
+      "max_items": 30,
+      "fields": [
+        {
+          "id": "name",
+          "label": "Name",
+          "person": "attendee"
+        },
+        {
+          "id": "role",
+          "label": "Role",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "id": "topics",
+      "title": "Topics",
+      "source": "model",
+      "layout": "block",
+      "max_items": 30,
+      "fields": [
+        {
+          "id": "topic",
+          "label": "Topic"
+        },
+        {
+          "id": "key_points",
+          "label": "Key points",
+          "kind": "list"
+        }
+      ]
+    },
+    {
+      "id": "decisions",
+      "title": "Decisions",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 30,
+      "fields": [
+        {
+          "id": "text",
+          "label": "Text"
+        }
+      ]
+    },
+    {
+      "id": "action_items",
+      "title": "Action items",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 40,
+      "fields": [
+        {
+          "id": "task",
+          "label": "Task"
+        },
+        {
+          "id": "owner",
+          "label": "Owner",
+          "person": "owner"
+        },
+        {
+          "id": "due",
+          "label": "Due",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "id": "open_questions",
+      "title": "Open questions",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 30,
+      "fields": [
+        {
+          "id": "text",
+          "label": "Text"
+        }
+      ]
+    },
+    {
+      "id": "marked_moments",
+      "title": "Marked moments",
+      "source": "markers",
+      "layout": "inline",
+      "max_items": 100,
+      "fields": [
+        {
+          "id": "label",
+          "label": "Label"
+        }
+      ]
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "properties": {
+      "summary": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "text",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 3
+      },
+      "attendees": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "role": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8
+            }
+          },
+          "required": [
+            "name",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 30
+      },
+      "topics": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "topic": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "key_points": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 600
+              },
+              "maxItems": 12
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "topic",
+            "key_points",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 30
+      },
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "text",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 30
+      },
+      "action_items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "task": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "owner": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "due": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "task",
+            "owner",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 40
+      },
+      "open_questions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "text",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 30
+      }
+    },
+    "required": [
+      "summary",
+      "attendees",
+      "topics",
+      "decisions",
+      "action_items",
+      "open_questions"
+    ],
+    "additionalProperties": false
+  }
+}

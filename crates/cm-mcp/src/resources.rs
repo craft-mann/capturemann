@@ -8,6 +8,7 @@
 //! | `capturemann://jobs` | `list_jobs { limit: 50 }` |
 //! | `capturemann://capture/{id}` | `get_capture { include_image: false }` |
 //! | `capturemann://capture/{id}/transcript` | `get_transcript` |
+//! | `capturemann://capture/{id}/reports` | `get_report` (without a report id) |
 //! | `capturemann://platforms/{name}/rules` | `list_publish_accounts` (only its `platforms` part) |
 //!
 //! Not built: `capturemann://capture/{id}/cursor` (no daemon action serves the cursor log
@@ -32,6 +33,7 @@ pub enum Target {
     Jobs,
     Capture(String),
     Transcript(String),
+    Reports(String),
     PlatformRules(String),
 }
 
@@ -68,6 +70,7 @@ pub fn parse(uri: &str) -> Result<Target, UriError> {
         ["jobs"] => Ok(Target::Jobs),
         ["capture", id] => Ok(Target::Capture(segment(id, "capture id")?)),
         ["capture", id, "transcript"] => Ok(Target::Transcript(segment(id, "capture id")?)),
+        ["capture", id, "reports"] => Ok(Target::Reports(segment(id, "capture id")?)),
         ["platforms", name, "rules"] => Ok(Target::PlatformRules(segment(name, "platform name")?)),
         _ => Err(UriError::Unknown),
     }
@@ -84,6 +87,7 @@ impl Target {
                 json!({ "capture_id": id, "include_image": false }),
             ),
             Target::Transcript(id) => ("get_transcript", json!({ "capture_id": id })),
+            Target::Reports(id) => ("get_report", json!({ "capture_id": id })),
             Target::PlatformRules(_) => ("list_publish_accounts", json!({})),
         }
     }
@@ -140,6 +144,10 @@ pub fn templates() -> Vec<ResourceTemplate> {
         ResourceTemplate::new("capturemann://capture/{id}/transcript", "transcript")
             .with_title("Transcript")
             .with_description("Word-level transcript with times and the caption lines of a recording; not found until it is transcribed.")
+            .with_mime_type(JSON_MIME),
+        ResourceTemplate::new("capturemann://capture/{id}/reports", "reports")
+            .with_title("Reports")
+            .with_description("The AI-9 reports of a recording: the list (`reports`) and the newest one in full (`latest`, JSON and Markdown).")
             .with_mime_type(JSON_MIME),
         ResourceTemplate::new("capturemann://platforms/{name}/rules", "platform-rules")
             .with_title("Platform rules")

@@ -101,6 +101,12 @@ pub const CLI_COMMANDS: &[(&str, Option<&str>)] = &[
     ("test_text_model", Some("ai text-model test")),
     ("diarize", Some("ai speakers")),
     ("set_speakers", Some("ai speakers rename")),
+    ("list_report_templates", Some("ai report templates")),
+    ("generate_report", Some("ai report")),
+    ("get_report", Some("ai report get")),
+    ("export_report", Some("ai report export")),
+    ("delete_report", Some("ai report delete")),
+    ("edit_report", Some("ai report edit")),
 ];
 
 /// Everything the CLI touches outside its arguments.

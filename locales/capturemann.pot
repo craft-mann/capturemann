@@ -1180,6 +1180,9 @@ msgstr[1] ""
 msgid "Delete a capture"
 msgstr ""
 
+msgid "Delete a report"
+msgstr ""
+
 msgid "Delete a speech model"
 msgstr ""
 
@@ -1363,6 +1366,9 @@ msgstr ""
 msgid "Each segment has its own window: split the recording, then move the playhead into a segment to move its window."
 msgstr ""
 
+msgid "Edit a report"
+msgstr ""
+
 msgid "Edit and try again"
 msgstr ""
 
@@ -1412,6 +1418,9 @@ msgid "Export MP4"
 msgstr ""
 
 msgid "Export a recording to MP4"
+msgstr ""
+
+msgid "Export a report"
 msgstr ""
 
 msgid "Export again"
@@ -1791,6 +1800,9 @@ msgid "List jobs"
 msgstr ""
 
 msgid "List publish accounts"
+msgstr ""
+
+msgid "List report templates"
 msgstr ""
 
 msgid "List save destinations"
@@ -2700,6 +2712,9 @@ msgid "Re-generating replaces this transcript. Your caption edits are kept where
 msgstr ""
 
 msgid "Read a capture"
+msgstr ""
+
+msgid "Read a report"
 msgstr ""
 
 msgid "Read a transcript"
@@ -4382,6 +4397,9 @@ msgid "Works: a small test file was uploaded and deleted."
 msgstr ""
 
 msgid "Works: signed in as {channel}."
+msgstr ""
+
+msgid "Write a report from a transcript"
 msgstr ""
 
 msgid "Yes"

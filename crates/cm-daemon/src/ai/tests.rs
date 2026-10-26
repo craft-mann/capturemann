@@ -57,10 +57,33 @@ fn ai_methods_parse_to_themselves() {
                    "merge": [{"from": 3, "into": "1"}],
                    "assign": [{"start": 1.0, "end": 2.5, "speaker": 2}]}),
         ),
+        ("list_report_templates", json!({})),
+        (
+            "generate_report",
+            json!({"capture_id": "rec_1", "template": "minutes", "language": "vi",
+                   "context": {"title": "Weekly", "attendees": ["Linh"]},
+                   "report_id": "rpt_00000001", "request_id": "r"}),
+        ),
+        (
+            "get_report",
+            json!({"capture_id": "rec_1", "report_id": "rpt_00000001"}),
+        ),
+        (
+            "export_report",
+            json!({"capture_id": "rec_1", "report_id": "rpt_00000001", "format": "txt"}),
+        ),
+        (
+            "delete_report",
+            json!({"capture_id": "rec_1", "report_id": "rpt_00000001"}),
+        ),
+        (
+            "edit_report",
+            json!({"capture_id": "rec_1", "report_id": "rpt_00000001", "markdown": "# Mine"}),
+        ),
     ] {
         assert_eq!(parse_ok(m, p).op.method(), m);
     }
-    assert_eq!(AI_METHODS.len(), 16);
+    assert_eq!(AI_METHODS.len(), 22);
 }
 
 #[test]

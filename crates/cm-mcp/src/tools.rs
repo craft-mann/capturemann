@@ -1252,6 +1252,14 @@ fn ai_tool(
     }
 }
 
+fn report_revision_output() -> Value {
+    json!({ "type": "object", "properties": {
+        "capture_id": { "type": "string" }, "report_id": { "type": "string" },
+        "revision": { "type": "integer" }, "action": { "type": "string" }, "by": { "type": "string" },
+        "can_undo": { "type": "boolean" }, "can_redo": { "type": "boolean" } },
+        "required": ["capture_id", "report_id", "revision"] })
+}
+
 fn job_started_output(extra: Value) -> Value {
     let mut props = json!({
         "job_id": { "type": "string", "description": "Watch it with get_job or the `job.*` events." },
@@ -1535,6 +1543,104 @@ fn ai_tools() -> Vec<ToolSpec> {
                 "required": ["capture_id", "changed", "speakers"] }),
         ),
         ai_tool(
+            "list_report_templates",
+            Tier::Free,
+            false,
+            "AI-9",
+            "List the built-in report templates (Summary, Meeting minutes, One-on-one notes, Interview notes, Product presentation recap, Lecture notes): their sections, the context fields each one uses and which recording presets suggest it. Interview notes only collect evidence; they never score a candidate.",
+            json!({}),
+            &[],
+            json!({ "type": "object", "properties": {
+                "templates": { "type": "array", "items": { "type": "object", "properties": {
+                    "id": { "type": "string" }, "name": { "type": "string" },
+                    "version": { "type": "integer" }, "description": { "type": "string" },
+                    "sections": { "type": "array", "items": { "type": "object", "properties": {
+                        "id": { "type": "string" }, "title": { "type": "string" } },
+                        "required": ["id", "title"] } },
+                    "context_fields": { "type": "array", "items": { "type": "string" } },
+                    "suggested_for": { "type": "array", "items": { "type": "string" } },
+                    "notes_only": { "type": "string" } },
+                    "required": ["id", "name", "sections", "context_fields"] } } },
+                "required": ["templates"] }),
+        ),
+        ai_tool(
+            "generate_report",
+            Tier::Free,
+            true,
+            "AI-9",
+            "Write a structured report (meeting minutes, notes, recap, summary) from a recording's transcript with the local text model (Ollama or LM Studio; a remote provider is not supported yet and gives `no_text_model`). Runs in the background and returns a `job_id`; the job result is `{ report_id, dropped_uncited }` and `report.ready` is published. Every item cites the recording with `at` times; items whose citations do not match the transcript are dropped and counted in `dropped_uncited`. The transcript must exist (run `transcribe`) and have at least 30 words. Pass `report_id` to regenerate a report: the old one is replaced only when the new one succeeds. One undo step.",
+            json!({ "template": { "type": "string", "enum": ["summary", "minutes", "one_on_one", "interview", "product_recap", "lecture"],
+                        "description": "A template id from list_report_templates." },
+                    "language": { "type": "string", "description": "Language of the note text (`vi`, `es`, `pt-br`); default the transcript's. Quotes stay as spoken." },
+                    "context": { "type": "object", "additionalProperties": false,
+                        "description": "Optional facts the notes may use. Only the fields the template lists in `context_fields` are accepted.",
+                        "properties": {
+                            "title": { "type": "string", "maxLength": 200 },
+                            "attendees": { "type": "array", "maxItems": 50, "items": { "type": "string", "maxLength": 80 },
+                                "description": "Names an owner or attendee may be." },
+                            "agenda": { "type": "string", "maxLength": 4000 },
+                            "role": { "type": "string", "maxLength": 200, "description": "Interview notes: the role." },
+                            "competencies": { "type": "array", "maxItems": 30, "items": { "type": "string", "maxLength": 120 },
+                                "description": "Interview notes: competencies to collect evidence for." } } },
+                    "report_id": { "type": "string", "pattern": "^rpt_[0-9a-f]{8}$", "description": "Regenerate this report." } }),
+            &["capture_id", "template"],
+            job_started_output(json!({
+                "capture_id": { "type": "string" }, "template": { "type": "string" },
+                "report_id": { "type": ["string", "null"] } })),
+        ),
+        ai_tool(
+            "get_report",
+            Tier::Free,
+            false,
+            "AI-9",
+            "Read a report as JSON (`report.content`: sections of items with `at` times in seconds) and as Markdown. Without `report_id` it lists the recording's reports (`reports`) and returns the newest one in full (`latest`).",
+            json!({ "report_id": { "type": "string", "pattern": "^rpt_[0-9a-f]{8}$" } }),
+            &["capture_id"],
+            json!({ "type": "object", "properties": {
+                "capture_id": { "type": "string" }, "report_id": { "type": "string" },
+                "report": { "type": "object", "description": "The stored report: template, model, provider, created, language, context, content, dropped_uncited, edited." },
+                "markdown": { "type": "string" },
+                "reports": { "type": "array", "items": { "type": "object" } },
+                "latest": { "type": ["object", "null"] } },
+                "required": ["capture_id"] }),
+        ),
+        ai_tool(
+            "export_report",
+            Tier::Free,
+            true,
+            "AI-9",
+            "Write a report as a Markdown (`md`) or plain text (`txt`) file, into `out_dir` (an existing absolute folder) or the recording's `exports/` folder. Never overwrites a file.",
+            json!({ "report_id": { "type": "string", "pattern": "^rpt_[0-9a-f]{8}$" },
+                    "format": { "type": "string", "enum": ["md", "txt"] },
+                    "out_dir": { "type": "string", "description": "An existing absolute folder." } }),
+            &["capture_id", "report_id", "format"],
+            json!({ "type": "object", "properties": {
+                "capture_id": { "type": "string" }, "report_id": { "type": "string" },
+                "format": { "type": "string" }, "path": { "type": "string" } },
+                "required": ["capture_id", "report_id", "format", "path"] }),
+        ),
+        ai_tool(
+            "delete_report",
+            Tier::Free,
+            true,
+            "AI-9",
+            "Delete one report of a recording. One revision; `undo` brings it back.",
+            json!({ "report_id": { "type": "string", "pattern": "^rpt_[0-9a-f]{8}$" } }),
+            &["capture_id", "report_id"],
+            report_revision_output(),
+        ),
+        ai_tool(
+            "edit_report",
+            Tier::Free,
+            true,
+            "AI-9",
+            "Replace a report's Markdown with your own text (the Report panel's edit). The report is marked `edited`; its structured `content` stays as generated. One revision; `undo` brings the previous text back.",
+            json!({ "report_id": { "type": "string", "pattern": "^rpt_[0-9a-f]{8}$" },
+                    "markdown": { "type": "string", "minLength": 1, "maxLength": 400000 } }),
+            &["capture_id", "report_id", "markdown"],
+            report_revision_output(),
+        ),
+        ai_tool(
             "suggest_zooms",
             Tier::Free,
             false,
@@ -1586,6 +1692,11 @@ fn with_capture_input(mut t: ToolSpec) -> ToolSpec {
             | "suggest_cuts"
             | "diarize"
             | "set_speakers"
+            | "generate_report"
+            | "get_report"
+            | "export_report"
+            | "delete_report"
+            | "edit_report"
     );
     if on_capture {
         if let Some(p) = t.input["properties"].as_object_mut() {
