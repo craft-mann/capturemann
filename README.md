@@ -48,10 +48,10 @@ and every feature available to AI agents through MCP and a CLI.
 
 Requires a Mac with Apple Silicon and macOS 13 or later. Intel Macs are not supported in 0.1.0; they follow in the next release.
 
-1. Download `CaptureMann-<version>-macos-arm64.dmg` and its `.sha256` file from
+1. Download `CaptureMann-v<version>-macos-arm64.dmg` and its `.sha256` file from
    [Releases](https://github.com/craft-mann/capturemann/releases).
 2. Check the download (in the folder with both files):
-   `shasum -a 256 -c CaptureMann-<version>-macos-arm64.dmg.sha256` must print `OK`.
+   `shasum -a 256 -c CaptureMann-v<version>-macos-arm64.dmg.sha256` must print `OK`.
 3. Open the DMG and drag CaptureMann to Applications.
 
 The release DMG is signed with a Developer ID certificate and notarized by Apple, so it opens

@@ -147,7 +147,7 @@ running from it. Upload by hand with `gh release create vX.Y.Z --draft ...` if y
 In the folder with both files:
 
 ```sh
-shasum -a 256 -c CaptureMann-X.Y.Z-macos-arm64.dmg.sha256     # prints: ...dmg: OK
+shasum -a 256 -c CaptureMann-vX.Y.Z-macos-arm64.dmg.sha256     # prints: ...dmg: OK
 ```
 
 After copying the app to Applications (for a notarized build):
@@ -158,7 +158,7 @@ codesign --verify --deep --strict --verbose=2 /Applications/CaptureMann.app
 xcrun stapler validate /Applications/CaptureMann.app
 ```
 
-For the DMG itself: `spctl --assess --type open --context context:primary-signature --verbose CaptureMann-X.Y.Z-macos-arm64.dmg`.
+For the DMG itself: `spctl --assess --type open --context context:primary-signature --verbose CaptureMann-vX.Y.Z-macos-arm64.dmg`.
 An ad hoc build is rejected by `spctl`; that is expected, see the release notes for the first launch.
 The checksum only proves the download matches what was uploaded; it does not replace the signature.
 
