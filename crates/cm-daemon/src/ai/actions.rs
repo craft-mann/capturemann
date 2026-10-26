@@ -31,18 +31,43 @@ pub enum AiOp {
     },
     GetCaptions {
         capture_id: String,
+        /// `None`: the original captions; a code: that translation (AI-5).
+        language: Option<String>,
     },
     SetCaptions {
         capture_id: String,
         lines: Vec<CaptionLine>,
+        language: Option<String>,
     },
     ReplaceInCaptions {
         capture_id: String,
         replacements: Vec<Replacement>,
+        language: Option<String>,
     },
     ExportCaptions {
         capture_id: String,
         format: CaptionFormat,
+        language: Option<String>,
+        /// SRT only: prefix every cue with `NAME:` (AI-8; default off).
+        speaker_names: bool,
+    },
+    /// AI-5: translate the captions into `target_language` (a job).
+    TranslateCaptions {
+        capture_id: String,
+        target_language: String,
+        engine: cm_ai::translate::EngineChoice,
+    },
+    /// AI-8: a `diarize` job.
+    Diarize {
+        capture_id: String,
+        hints: cm_ai::speakers::DiarizeHints,
+        /// "My microphone only hears me" for this recording (AI-8.AC7).
+        headset: bool,
+    },
+    /// AI-8: rename, merge and reassign speakers as one revision.
+    SetSpeakers {
+        capture_id: String,
+        edit: cm_ai::speakers::SpeakerEdit,
     },
     SuggestZooms {
         capture_id: String,
@@ -66,8 +91,11 @@ impl AiOp {
             AiOp::SetCaptions { .. } => "set_captions",
             AiOp::ReplaceInCaptions { .. } => "replace_in_captions",
             AiOp::ExportCaptions { .. } => "export_captions",
+            AiOp::Diarize { .. } => "diarize",
+            AiOp::SetSpeakers { .. } => "set_speakers",
             AiOp::SuggestZooms { .. } => "suggest_zooms",
             AiOp::SuggestCuts { .. } => "suggest_cuts",
+            AiOp::TranslateCaptions { .. } => "translate_captions",
         }
     }
 
@@ -76,10 +104,13 @@ impl AiOp {
         match self {
             AiOp::Transcribe { capture_id, .. }
             | AiOp::GetTranscript { capture_id }
-            | AiOp::GetCaptions { capture_id }
+            | AiOp::GetCaptions { capture_id, .. }
             | AiOp::SetCaptions { capture_id, .. }
             | AiOp::ReplaceInCaptions { capture_id, .. }
             | AiOp::ExportCaptions { capture_id, .. }
+            | AiOp::TranslateCaptions { capture_id, .. }
+            | AiOp::Diarize { capture_id, .. }
+            | AiOp::SetSpeakers { capture_id, .. }
             | AiOp::SuggestZooms { capture_id }
             | AiOp::SuggestCuts { capture_id } => Some(capture_id),
             _ => None,
@@ -94,6 +125,12 @@ pub struct Replacement {
     pub replace: String,
     pub match_case: bool,
     pub whole_word: bool,
+}
+
+fn insert_language(o: &mut Map<String, Value>, language: &Option<String>) {
+    if let Some(l) = language {
+        o.insert("language".into(), json!(l));
+    }
 }
 
 /// An AI action with its idempotency key.
@@ -132,25 +169,97 @@ impl AiParams {
                 }
             }
             AiOp::GetTranscript { capture_id }
-            | AiOp::GetCaptions { capture_id }
             | AiOp::SuggestZooms { capture_id }
             | AiOp::SuggestCuts { capture_id } => {
                 o.insert("capture_id".into(), json!(capture_id));
             }
-            AiOp::SetCaptions { capture_id, lines } => {
+            AiOp::GetCaptions {
+                capture_id,
+                language,
+            } => {
+                o.insert("capture_id".into(), json!(capture_id));
+                insert_language(&mut o, language);
+            }
+            AiOp::SetCaptions {
+                capture_id,
+                lines,
+                language,
+            } => {
                 o.insert("capture_id".into(), json!(capture_id));
                 o.insert("lines".into(), json!(lines));
+                insert_language(&mut o, language);
             }
             AiOp::ReplaceInCaptions {
                 capture_id,
                 replacements,
+                language,
             } => {
                 o.insert("capture_id".into(), json!(capture_id));
                 o.insert("replacements".into(), json!(replacements));
+                insert_language(&mut o, language);
             }
-            AiOp::ExportCaptions { capture_id, format } => {
+            AiOp::ExportCaptions {
+                capture_id,
+                format,
+                language,
+                speaker_names,
+            } => {
                 o.insert("capture_id".into(), json!(capture_id));
                 o.insert("format".into(), json!(format.ext()));
+                insert_language(&mut o, language);
+                if *speaker_names {
+                    o.insert("speaker_names".into(), json!(true));
+                }
+            }
+            AiOp::TranslateCaptions {
+                capture_id,
+                target_language,
+                engine,
+            } => {
+                o.insert("capture_id".into(), json!(capture_id));
+                o.insert("target_language".into(), json!(target_language));
+                o.insert("engine".into(), json!(engine));
+            }
+            AiOp::Diarize {
+                capture_id,
+                hints,
+                headset,
+            } => {
+                o.insert("capture_id".into(), json!(capture_id));
+                for (k, v) in [
+                    ("num_speakers", hints.num_speakers),
+                    ("min_speakers", hints.min_speakers),
+                    ("max_speakers", hints.max_speakers),
+                ] {
+                    if let Some(n) = v {
+                        o.insert(k.into(), json!(n));
+                    }
+                }
+                if *headset {
+                    o.insert("headset".into(), json!(true));
+                }
+            }
+            AiOp::SetSpeakers { capture_id, edit } => {
+                o.insert("capture_id".into(), json!(capture_id));
+                if !edit.rename.is_empty() {
+                    let m: Map<String, Value> = edit
+                        .rename
+                        .iter()
+                        .map(|(id, name)| (id.to_string(), json!(name)))
+                        .collect();
+                    o.insert("rename".into(), Value::Object(m));
+                }
+                if !edit.merge.is_empty() {
+                    let v: Vec<Value> = edit
+                        .merge
+                        .iter()
+                        .map(|(from, into)| json!({ "from": from, "into": into }))
+                        .collect();
+                    o.insert("merge".into(), json!(v));
+                }
+                if !edit.assign.is_empty() {
+                    o.insert("assign".into(), json!(edit.assign));
+                }
             }
         }
         Value::Object(o)
@@ -181,22 +290,34 @@ pub(crate) fn summary(p: &AiParams) -> String {
         }
         AiOp::SelectModel { model } => format!("Use the speech model `{model}`"),
         AiOp::Transcribe { capture_id, .. } => format!("Transcribe {capture_id}"),
-        AiOp::SetCaptions { capture_id, lines } => {
+        AiOp::SetCaptions {
+            capture_id, lines, ..
+        } => {
             format!("Set {} caption lines of {capture_id}", lines.len())
         }
+        AiOp::TranslateCaptions {
+            capture_id,
+            target_language,
+            ..
+        } => format!("Translate the captions of {capture_id} into `{target_language}`"),
         AiOp::ReplaceInCaptions {
             capture_id,
             replacements,
+            ..
         } => format!(
             "Replace text in the captions of {capture_id} ({} pairs)",
             replacements.len()
         ),
-        AiOp::ExportCaptions { capture_id, format } => {
+        AiOp::ExportCaptions {
+            capture_id, format, ..
+        } => {
             format!(
                 "Export {capture_id} captions as {}",
                 format.ext().to_uppercase()
             )
         }
+        AiOp::Diarize { capture_id, .. } => format!("Tell the speakers of {capture_id} apart"),
+        AiOp::SetSpeakers { capture_id, .. } => format!("Change the speakers of {capture_id}"),
         other => format!("Run {}", other.method()),
     }
 }
@@ -210,10 +331,14 @@ pub(crate) fn confirm_params(p: &AiParams) -> Value {
         | AiOp::ImportModel { model, .. }
         | AiOp::SelectModel { model } => json!({ "model": model }),
         AiOp::Transcribe { capture_id, .. } => json!({ "capture_id": capture_id }),
-        AiOp::SetCaptions { capture_id, lines } => {
+        AiOp::SetCaptions {
+            capture_id, lines, ..
+        } => {
             json!({ "capture_id": capture_id, "lines": lines.len() })
         }
-        AiOp::ExportCaptions { capture_id, format } => {
+        AiOp::ExportCaptions {
+            capture_id, format, ..
+        } => {
             json!({ "capture_id": capture_id, "format": format.ext().to_uppercase() })
         }
         _ => json!({}),
@@ -259,6 +384,14 @@ fn language(f: &Fields<'_>) -> Result<Option<String>, CmError> {
             }
         }
     }
+}
+
+/// The optional `language` of the caption actions: a translation's code (`vi`, `pt-br`). Absent
+/// means the original captions; `auto` is not a translation.
+fn translation_language(f: &Fields<'_>) -> Result<Option<String>, CmError> {
+    f.str_opt("language")?
+        .map(|l| cm_ai::translate::language_code(&l))
+        .transpose()
 }
 
 /// `lines` of `set_captions`: times as seconds or `"t:<ticks>"`, in order, not overlapping, at
@@ -389,6 +522,111 @@ fn replacements(f: &Fields<'_>) -> Result<Vec<Replacement>, CmError> {
     Ok(out)
 }
 
+/// A speaker id: a whole number or a numeric string such as `"2"`.
+fn speaker_id(v: &Value, field: &str) -> Result<u32, CmError> {
+    let id = match v {
+        Value::Number(n) => n.as_u64(),
+        Value::String(s) => s.trim().parse::<u64>().ok(),
+        _ => None,
+    };
+    id.filter(|n| *n <= u64::from(u32::MAX))
+        .map(|n| n as u32)
+        .ok_or_else(|| CmError::invalid_field(field, "must be a speaker id such as 2"))
+}
+
+/// `rename`, `merge` and `assign` of `set_speakers` (AI-8).
+fn speaker_edit(f: &Fields<'_>) -> Result<cm_ai::speakers::SpeakerEdit, CmError> {
+    use cm_ai::speakers::{Assign, SpeakerEdit, MAX_NAME_CHARS};
+    let mut edit = SpeakerEdit::default();
+    match f.obj.get("rename") {
+        None | Some(Value::Null) => {}
+        Some(Value::Object(o)) => {
+            if o.len() > MAX_SPEAKER_CHANGES {
+                return Err(CmError::invalid_field("rename", "too many speakers"));
+            }
+            for (k, v) in o {
+                let id = speaker_id(&Value::String(k.clone()), "rename")?;
+                let name = v
+                    .as_str()
+                    .ok_or_else(|| CmError::invalid_field("rename", "a name must be a string"))?;
+                if name.chars().count() > MAX_NAME_CHARS {
+                    return Err(CmError::invalid_field(
+                        "rename",
+                        format!("a name has at most {MAX_NAME_CHARS} characters"),
+                    ));
+                }
+                edit.rename.push((id, name.to_owned()));
+            }
+        }
+        Some(_) => {
+            return Err(CmError::invalid_field(
+                "rename",
+                "must be an object such as {\"2\": \"Linh\"}",
+            ))
+        }
+    }
+    let list = |key: &str| -> Result<Vec<&Map<String, Value>>, CmError> {
+        match f.obj.get(key) {
+            None | Some(Value::Null) => Ok(Vec::new()),
+            Some(Value::Array(a)) if a.len() <= MAX_SPEAKER_CHANGES => a
+                .iter()
+                .map(|i| {
+                    i.as_object()
+                        .ok_or_else(|| CmError::invalid_field(key, "each item must be an object"))
+                })
+                .collect(),
+            Some(Value::Array(_)) => Err(CmError::invalid_field(key, "too many items")),
+            Some(_) => Err(CmError::invalid_field(key, "must be an array")),
+        }
+    };
+    for o in list("merge")? {
+        if let Some(k) = o.keys().find(|k| !matches!(k.as_str(), "from" | "into")) {
+            return Err(CmError::invalid_field(
+                &format!("merge.{k}"),
+                "unknown parameter",
+            ));
+        }
+        let get = |k: &str| {
+            o.get(k)
+                .ok_or_else(|| CmError::invalid_field(&format!("merge.{k}"), "is required"))
+                .and_then(|v| speaker_id(v, &format!("merge.{k}")))
+        };
+        edit.merge.push((get("from")?, get("into")?));
+    }
+    for o in list("assign")? {
+        if let Some(k) = o
+            .keys()
+            .find(|k| !matches!(k.as_str(), "start" | "end" | "speaker"))
+        {
+            return Err(CmError::invalid_field(
+                &format!("assign.{k}"),
+                "unknown parameter",
+            ));
+        }
+        let time = |k: &str| match o.get(k) {
+            Some(v) => parse_time(&format!("assign.{k}"), v),
+            None => Err(CmError::invalid_field(
+                &format!("assign.{k}"),
+                "is required",
+            )),
+        };
+        // `end` after `start` is checked when the edit runs (`apply_edit`).
+        let (start, end) = (time("start")?, time("end")?);
+        let speaker = o
+            .get("speaker")
+            .ok_or_else(|| CmError::invalid_field("assign.speaker", "is required"))
+            .and_then(|v| speaker_id(v, "assign.speaker"))?;
+        edit.assign.push(Assign {
+            start,
+            end,
+            speaker,
+        });
+    }
+    // An empty edit is refused when it runs (`Nothing to change`), not here: the tool's schema
+    // lists all three as optional.
+    Ok(edit)
+}
+
 /// Validates the input of one AI method.
 pub(crate) fn parse(method: &str, f: &Fields<'_>) -> Result<Action, CmError> {
     let op = match method {
@@ -424,54 +662,138 @@ pub(crate) fn parse(method: &str, f: &Fields<'_>) -> Result<Action, CmError> {
                 model,
             }
         }
-        "get_transcript" | "get_captions" | "suggest_zooms" | "suggest_cuts" => {
+        "get_transcript" | "suggest_zooms" | "suggest_cuts" => {
             f.only(&["capture_id"])?;
             let capture_id = f.str_req("capture_id")?;
             match method {
                 "get_transcript" => AiOp::GetTranscript { capture_id },
-                "get_captions" => AiOp::GetCaptions { capture_id },
                 "suggest_zooms" => AiOp::SuggestZooms { capture_id },
                 _ => AiOp::SuggestCuts { capture_id },
             }
         }
+        "get_captions" => {
+            f.only(&["capture_id", "language"])?;
+            AiOp::GetCaptions {
+                capture_id: f.str_req("capture_id")?,
+                language: translation_language(f)?,
+            }
+        }
         "set_captions" => {
-            f.only(&["capture_id", "lines", "request_id"])?;
+            f.only(&["capture_id", "lines", "language", "request_id"])?;
             AiOp::SetCaptions {
                 capture_id: f.str_req("capture_id")?,
                 lines: caption_lines(f)?,
+                language: translation_language(f)?,
             }
         }
         "replace_in_captions" => {
-            f.only(&["capture_id", "replacements", "request_id"])?;
+            f.only(&["capture_id", "replacements", "language", "request_id"])?;
             AiOp::ReplaceInCaptions {
                 capture_id: f.str_req("capture_id")?,
                 replacements: replacements(f)?,
+                language: translation_language(f)?,
+            }
+        }
+        "translate_captions" => {
+            f.only(&["capture_id", "target_language", "engine", "request_id"])?;
+            let target = f.str_req("target_language")?;
+            let target_language = cm_ai::translate::language_code(&target).map_err(|_| {
+                CmError::invalid_field(
+                    "target_language",
+                    "must be a language code such as `en`, `vi`, `es` or `pt-br`",
+                )
+            })?;
+            let engine = match f.str_opt("engine")? {
+                None => cm_ai::translate::EngineChoice::Auto,
+                Some(e) => cm_ai::translate::EngineChoice::parse(&e)?,
+            };
+            AiOp::TranslateCaptions {
+                capture_id: f.str_req("capture_id")?,
+                target_language,
+                engine,
             }
         }
         "export_captions" => {
-            f.only(&["capture_id", "format", "timestamps", "request_id"])?;
+            f.only(&[
+                "capture_id",
+                "format",
+                "timestamps",
+                "language",
+                "speaker_names",
+                "request_id",
+            ])?;
             let timestamps = f.bool_or("timestamps", false)?;
+            let speaker_names = f.bool_or("speaker_names", false)?;
             let format = match f.str_req("format")?.as_str() {
                 "srt" => CaptionFormat::Srt,
                 "vtt" => CaptionFormat::Vtt,
                 "txt" if timestamps => CaptionFormat::TxtTimed,
                 "txt" => CaptionFormat::Txt,
+                "md" => CaptionFormat::Md,
                 _ => {
                     return Err(CmError::invalid_field(
                         "format",
-                        "must be `srt`, `vtt` or `txt`",
+                        "must be `srt`, `vtt`, `txt` or `md`",
                     ))
                 }
             };
-            if timestamps && !format.is_text() {
+            if timestamps && format != CaptionFormat::TxtTimed {
                 return Err(CmError::invalid_field(
                     "timestamps",
-                    "only applies to the `txt` format (SRT and VTT always have times)",
+                    "only applies to the `txt` format (SRT and VTT always have times, Markdown always has them)",
+                ));
+            }
+            if speaker_names && format != CaptionFormat::Srt {
+                return Err(CmError::invalid_field(
+                    "speaker_names",
+                    "only applies to `srt` (VTT, TXT and Markdown always name the speakers when they are known)",
                 ));
             }
             AiOp::ExportCaptions {
                 capture_id: f.str_req("capture_id")?,
                 format,
+                language: translation_language(f)?,
+                speaker_names,
+            }
+        }
+        "diarize" => {
+            f.only(&[
+                "capture_id",
+                "num_speakers",
+                "min_speakers",
+                "max_speakers",
+                "headset",
+                "request_id",
+            ])?;
+            let count = |key: &str| -> Result<Option<u32>, CmError> {
+                match f.obj.get(key) {
+                    None | Some(Value::Null) => Ok(None),
+                    Some(v) => v
+                        .as_u64()
+                        .filter(|n| (1..=32).contains(n))
+                        .map(|n| Some(n as u32))
+                        .ok_or_else(|| {
+                            CmError::invalid_field(key, "must be a whole number from 1 to 32")
+                        }),
+                }
+            };
+            let hints = cm_ai::speakers::DiarizeHints {
+                num_speakers: count("num_speakers")?,
+                min_speakers: count("min_speakers")?,
+                max_speakers: count("max_speakers")?,
+            };
+            hints.check()?;
+            AiOp::Diarize {
+                capture_id: f.str_req("capture_id")?,
+                hints,
+                headset: f.bool_or("headset", false)?,
+            }
+        }
+        "set_speakers" => {
+            f.only(&["capture_id", "rename", "merge", "assign", "request_id"])?;
+            AiOp::SetSpeakers {
+                capture_id: f.str_req("capture_id")?,
+                edit: speaker_edit(f)?,
             }
         }
         other => {

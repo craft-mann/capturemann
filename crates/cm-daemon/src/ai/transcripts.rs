@@ -125,14 +125,27 @@ impl Inner {
                 },
             };
             let options = cm_library::rec_edit::caption_options(&manifest);
-            Ok(json!({
+            // AI-8 (additive): `speaker` on each word and `speakers` in the result, once the
+            // recording has been diarized.
+            let mut transcript_json = json!(transcript);
+            let mut speakers = None;
+            if let Some(state) = cm_ai::speakers::SpeakerState::from_manifest(&manifest) {
+                let (t, s) = super::speakers::annotate_transcript(&transcript, &state);
+                transcript_json = t;
+                speakers = Some(s);
+            }
+            let mut out = json!({
                 "capture_id": id,
-                "transcript": transcript,
+                "transcript": transcript_json,
                 "made_at": made_at,
                 "captions": lines,
                 "captions_source": source,
                 "caption_options": {"enabled": options.enabled, "burn_in": options.burn_in},
-            }))
+            });
+            if let (Some(o), Some(s)) = (out.as_object_mut(), speakers) {
+                o.insert("speakers".into(), s);
+            }
+            Ok(out)
         })
         .await
     }

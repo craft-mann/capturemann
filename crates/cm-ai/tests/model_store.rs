@@ -166,6 +166,8 @@ fn entry(port: u16, path: &str, data: &[u8], sha256: String) -> CatalogEntry {
         sha256,
         bytes: data.len() as u64,
         ram_mb: 0,
+        aliases: Vec::new(),
+        pending_pin: false,
     }
 }
 
@@ -436,6 +438,8 @@ fn select_remove_and_the_active_choice() {
                 sha256: h.clone(),
                 bytes: 5,
                 ram_mb: 0,
+                aliases: Vec::new(),
+                pending_pin: false,
             })
             .collect(),
     };

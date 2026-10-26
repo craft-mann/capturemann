@@ -141,10 +141,99 @@ pub enum AiCmd {
         #[command(subcommand)]
         cmd: CaptionsCmd,
     },
+    /// Translate the captions into another language (`translate_captions`): into English with
+    /// Whisper's translate task (offline, needs the large-v3 or medium model; large-v3-turbo
+    /// cannot translate), into any other language with a text model (not available yet: exit 2,
+    /// `no_text_model`). Read the result with `ai captions get <id> --language <LANG>`.
+    Translate(TranslateArgs),
     /// Suggestions only, nothing is applied (`suggest_zooms`, `suggest_cuts`).
     Suggest {
         #[command(subcommand)]
         cmd: SuggestCmd,
+    },
+    /// Show how the text model is set up (`get_text_model`), or test it: `text-model test`
+    /// (`test_text_model`). The settings are changed in the app only.
+    TextModel {
+        #[command(subcommand)]
+        cmd: Option<TextModelCmd>,
+    },
+    /// Find who spoke when (`diarize`), or fix the speakers: `speakers rename|merge|assign|list`
+    /// (`set_speakers`). Runs on this computer; without a speaker model it fails with exit 2
+    /// (`no_speaker_model`).
+    Speakers(SpeakersArgs),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum TextModelCmd {
+    /// Send one short prompt to the configured text model and report the reply time (exit 2 with
+    /// `no_text_model` when none is set up).
+    Test,
+}
+
+#[derive(Debug, Args)]
+#[command(args_conflicts_with_subcommands = true, subcommand_negates_reqs = true)]
+pub struct SpeakersArgs {
+    #[command(subcommand)]
+    pub cmd: Option<SpeakersCmd>,
+    /// Capture id of a recording with a microphone or system-audio track.
+    #[arg(required = true)]
+    pub id: Option<String>,
+    /// Exactly this many speakers (wins over `--min` and `--max`).
+    #[arg(long, value_name = "N", value_parser = clap::value_parser!(u32).range(1..=32))]
+    pub num: Option<u32>,
+    /// At least this many speakers.
+    #[arg(long, value_name = "N", value_parser = clap::value_parser!(u32).range(1..=32))]
+    pub min: Option<u32>,
+    /// At most this many speakers.
+    #[arg(long, value_name = "N", value_parser = clap::value_parser!(u32).range(1..=32))]
+    pub max: Option<u32>,
+    /// My microphone only hears me: label the microphone with `profile.display_name` (default
+    /// `Me`) and tell speakers apart on the system-audio track only.
+    #[arg(long)]
+    pub headset: bool,
+    /// Wait for the job to finish (exit 6 if it fails).
+    #[arg(long)]
+    pub wait: bool,
+    /// With `--wait`: give up after this many seconds (the job keeps running).
+    #[arg(long, value_name = "SECS", requires = "wait", value_parser = positive_secs)]
+    pub timeout: Option<f64>,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum SpeakersCmd {
+    /// Name a speaker: `speakers rename <id> 2 Linh`. One undo step.
+    Rename {
+        /// Capture id of a recording.
+        id: String,
+        /// Speaker number (see `speakers list`).
+        speaker: u32,
+        /// The new name.
+        name: String,
+    },
+    /// Fold one speaker into another: `speakers merge <id> 3 1`. One undo step.
+    Merge {
+        /// Capture id of a recording.
+        id: String,
+        /// The speaker that goes away.
+        from: u32,
+        /// The speaker that keeps all the words.
+        into: u32,
+    },
+    /// Give a time range to a speaker: `speakers assign <id> 2 10.5 18`. One undo step.
+    Assign {
+        /// Capture id of a recording.
+        id: String,
+        /// Speaker number.
+        speaker: u32,
+        /// Start, in seconds or `t:<ticks>`.
+        start: String,
+        /// End, in seconds or `t:<ticks>`.
+        end: String,
+    },
+    /// List the speakers of a recording.
+    List {
+        /// Capture id of a recording.
+        id: String,
     },
 }
 
@@ -192,6 +281,26 @@ pub struct TranscribeArgs {
     pub timeout: Option<f64>,
 }
 
+#[derive(Debug, Args)]
+pub struct TranslateArgs {
+    /// Capture id of a recording that has a transcript.
+    pub id: String,
+    /// The language to translate into, a code such as `en`, `vi`, `es` or `pt-br`.
+    #[arg(long, value_name = "LANG")]
+    pub to: String,
+    /// `auto` (the default: Whisper for English, the text model for other languages), `whisper`
+    /// or `text-model`.
+    #[arg(long, value_name = "ENGINE", default_value = "auto",
+          value_parser = ["auto", "whisper", "text-model", "text_model"])]
+    pub engine: String,
+    /// Wait for the translation to finish (exit 6 if it fails).
+    #[arg(long)]
+    pub wait: bool,
+    /// With `--wait`: give up after this many seconds (the job keeps running).
+    #[arg(long, value_name = "SECS", requires = "wait", value_parser = positive_secs)]
+    pub timeout: Option<f64>,
+}
+
 #[derive(Debug, Subcommand)]
 pub enum CaptionsCmd {
     /// Print the caption lines: the edited ones, else lines built from the transcript
@@ -199,6 +308,9 @@ pub enum CaptionsCmd {
     Get {
         /// Capture id of a recording.
         id: String,
+        /// Read a translation (made by `ai translate`) instead of the original captions.
+        #[arg(long, value_name = "LANG")]
+        language: Option<String>,
     },
     /// Replace the caption lines from a JSON file, `-` for stdin: an array of
     /// `{ "start": 1.5, "end": 3, "text": "..." }` (seconds or `t:<ticks>`; at most 2 rows of 42
@@ -213,6 +325,10 @@ pub enum CaptionsCmd {
         /// Remove the edited lines (the generated ones come back).
         #[arg(long)]
         clear: bool,
+        /// Replace the lines of this translation instead of the original captions (written to
+        /// its file; not an undo step).
+        #[arg(long, value_name = "LANG")]
+        language: Option<String>,
     },
     /// Find and replace text across all caption lines (`replace_in_captions`): the same matching
     /// as the editor's find (Unicode, Vietnamese diacritics exact, NFC and NFD equal). Give
@@ -238,6 +354,9 @@ pub enum CaptionsCmd {
         /// `{ "find": "...", "replace": "...", "match_case": false, "whole_word": false }`.
         #[arg(long, value_name = "FILE", conflicts_with = "find")]
         file: Option<String>,
+        /// Work on this translation instead of the original captions.
+        #[arg(long, value_name = "LANG")]
+        language: Option<String>,
     },
     /// Show or hide the captions on the video, and choose whether exports burn them in by
     /// default (`set_caption_options`). Give at least one option. One undo step.
@@ -382,8 +501,24 @@ pub struct ExportArgs {
     #[arg(long, default_value = "quick", value_name = "PRESET")]
     pub preset: String,
     /// `gif` or `webm`: the same as `--preset gif` / `--preset webm`.
-    #[arg(long, value_name = "FORMAT", value_parser = ["mp4", "gif", "webm"])]
+    /// With `--audio`, `m4a` (the default) or `wav`; `m4a` and `wav` alone imply `--audio`.
+    #[arg(long, value_name = "FORMAT", value_parser = ["mp4", "gif", "webm", "m4a", "wav"])]
     pub format: Option<String>,
+    /// Export the audio only (`export_audio`): M4A (AAC, 48 kHz) or, with `--format wav`, 48 kHz
+    /// 24-bit WAV, with the recording's cuts and speed applied, in the capture's `exports/`
+    /// folder. For an audio recording or a screen recording; no video is encoded. M4A is
+    /// normalised to -16 LUFS unless `--loudness` says otherwise.
+    #[arg(
+        long,
+        conflicts_with_all = ["preset", "width", "fps", "max_mb", "captions", "burn_captions", "no_captions"]
+    )]
+    pub audio: bool,
+    /// For the audio export (`--audio`, or `--format m4a|wav`): which tracks, `mix` (the default), `mic` or `system`.
+    #[arg(long, value_name = "TRACKS", value_parser = ["mix", "mic", "system"])]
+    pub tracks: Option<String>,
+    /// For the audio export: also copy the file into this existing folder (never overwrites).
+    #[arg(long, value_name = "DIR")]
+    pub out_dir: Option<std::path::PathBuf>,
     /// GIF and WebM width in px (GIF: 480, 640, 800 or 1024).
     #[arg(long, value_name = "PX")]
     pub width: Option<u32>,
@@ -396,15 +531,16 @@ pub struct ExportArgs {
     pub max_mb: Option<f64>,
     /// Normalise the integrated loudness to this level in LUFS (-40 to -5; -14 is the usual
     /// platform target), with a -1 dBTP true-peak limiter. Default: keep the recorded level.
-    #[arg(long, value_name = "LUFS", allow_negative_numbers = true, value_parser = loudness_lufs)]
-    pub loudness: Option<f64>,
-    /// Write the captions as a file instead of a video: `srt`, `vtt` or `txt` (plain text, one
-    /// caption line per row) in the capture's `exports/` folder (`export_captions`), with the
+    /// With `--audio`: `off` turns the normalisation off (the default for M4A is -16).
+    #[arg(long, value_name = "LUFS|off", allow_negative_numbers = true, value_parser = loudness_arg)]
+    pub loudness: Option<Loudness>,
+    /// Write the captions as a file instead of a video: `srt`, `vtt`, `txt` (plain text, one
+    /// caption line per row) or `md` (Markdown) in the capture's `exports/` folder (`export_captions`), with the
     /// recording's cuts and speed applied. Run `capturemann ai transcribe` first.
     #[arg(
         long,
         value_name = "FORMAT",
-        value_parser = ["srt", "vtt", "txt"],
+        value_parser = ["srt", "vtt", "txt", "md"],
         conflicts_with_all = ["preset", "format", "width", "fps", "max_mb", "loudness", "wait", "timeout"]
     )]
     pub captions: Option<String>,
@@ -412,6 +548,14 @@ pub struct ExportArgs {
     /// recordings).
     #[arg(long, requires = "captions")]
     pub timestamps: bool,
+    /// With `--captions`: write this translation (made by `ai translate`) instead of the original
+    /// captions. The file is `<title> - captions.<LANG>.<format>`.
+    #[arg(long, value_name = "LANG", requires = "captions")]
+    pub language: Option<String>,
+    /// With `--captions srt`: start every cue with `NAME:` once the recording has speakers
+    /// (VTT, TXT and Markdown name them on their own).
+    #[arg(long = "speaker-names", requires = "captions")]
+    pub speaker_names: bool,
     /// Burn the captions into the video (white text on a dark box, inside the platform's safe
     /// area). The default is the recording's `ai captions options --burn` setting. Needs a
     /// transcript: run `capturemann ai transcribe` first.
@@ -430,6 +574,20 @@ pub struct ExportArgs {
     /// Without it the command waits for as long as the job is queued, held or running.
     #[arg(long, value_name = "SECS", requires = "wait", value_parser = positive_secs)]
     pub timeout: Option<f64>,
+}
+
+/// A `--loudness` value: a target in LUFS, or `off` (audio export only).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Loudness {
+    Off,
+    Lufs(f64),
+}
+
+fn loudness_arg(s: &str) -> Result<Loudness, String> {
+    if s == "off" {
+        return Ok(Loudness::Off);
+    }
+    loudness_lufs(s).map(Loudness::Lufs)
 }
 
 fn loudness_lufs(s: &str) -> Result<f64, String> {

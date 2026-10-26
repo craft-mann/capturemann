@@ -13,6 +13,7 @@
 //! | `set_captions { capture_id, lines }` | Free | edited caption lines: one revision, one undo step |
 //! | `replace_in_captions { capture_id, replacements }` | Free | find and replace over the caption lines (AI-6a): one revision, one undo step |
 //! | `export_captions { capture_id, format }` | Free | SRT or VTT in `exports/`, mapped through the edit list |
+//! | `translate_captions { capture_id, target_language, engine? }` | Free | a `translate` job; `translations/<lang>.json` (AI-5); `get_captions`, `set_captions`, `replace_in_captions` and `export_captions` take an optional `language` |
 //! | `suggest_zooms`, `suggest_cuts` | Free | suggestions only; accepting uses `set_zooms` / `cut_segments` |
 //!
 //! # Nothing is downloaded silently
@@ -37,7 +38,8 @@
 //! `model.download.progress` (`{ model, bytes_done, bytes_total, fraction }`), `model.changed`
 //! (`{ model, change }`, `change` one of `downloaded`, `imported`, `selected`, `removed`) and
 //! `transcript.ready` (`{ capture_id, model, language, words, replaced, captions_cleared,
-//! captions_shown, reapplied, dropped, glossary_replaced }`); jobs also emit the usual
+//! captions_shown, reapplied, dropped, glossary_replaced }`), `translation.ready` (`{ capture_id,
+//! language, engine, model, lines, untranslated, path, kept_edits, dropped_edits }`); jobs also emit the usual
 //! `job.progress`, `job.done` and `job.failed`.
 
 use std::path::{Path, PathBuf};
@@ -81,6 +83,11 @@ pub const MAX_CAPTION_SECONDS: f64 = 7.0;
 pub const MAX_REPLACEMENTS: usize = 100;
 pub const MAX_REPLACE_CHARS: usize = 200;
 
+/// Job type of a speaker-labelling run (AI-8).
+pub const JOB_DIARIZE: &str = "diarize";
+/// Most renames, merges or reassignments one `set_speakers` call may carry.
+pub const MAX_SPEAKER_CHANGES: usize = 500;
+
 /// The action names of this module, as MCP tools and CLI commands.
 pub const AI_METHODS: &[&str] = &[
     "list_models",
@@ -96,6 +103,9 @@ pub const AI_METHODS: &[&str] = &[
     "export_captions",
     "suggest_zooms",
     "suggest_cuts",
+    "translate_captions",
+    "diarize",
+    "set_speakers",
 ];
 
 /// Whether `name` is one of [`AI_METHODS`].
@@ -135,11 +145,14 @@ mod dispatch;
 mod jobs;
 mod models;
 mod services;
+mod speakers;
 mod suggest;
 #[cfg(test)]
 mod tests;
 mod transcripts;
+mod translation;
 
 pub use self::actions::*;
 pub use self::jobs::*;
 pub use self::services::*;
+pub use self::translation::*;

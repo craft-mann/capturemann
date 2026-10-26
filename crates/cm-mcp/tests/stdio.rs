@@ -85,8 +85,10 @@ async fn agt_1_ac1_stdio_binary_lists_tools_and_calls_list_targets() {
     let list = tools["result"]["tools"].as_array().unwrap();
     // 12 + rename_capture + get_job, list_jobs, cancel_job + export_video + pause/resume/stop_recording, set_mic_muted,
     // get_recording_status, list_devices and run_fps_selftest (the HUD's internal actions are not
-    // tools), the eleven recording edit tools and the eleven local-AI tools and list_destinations and upload, and suggest_redactions, and replace_in_captions (AI-6a), and add_marker (VOC-1).
-    assert_eq!(list.len(), 56);
+    // tools), the eleven recording edit tools and the eleven local-AI tools and list_destinations and upload, and suggest_redactions, and replace_in_captions (AI-6a),
+    // and get_text_model, test_text_model (AI-7), export_audio (VOC-2), diarize, set_speakers (AI-8),
+    // and translate_captions (AI-5), and add_marker (VOC-1).
+    assert_eq!(list.len(), 62);
     assert!(list
         .iter()
         .all(|t| t["inputSchema"].is_object() && t["outputSchema"].is_object()));

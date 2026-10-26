@@ -79,6 +79,23 @@ pub trait Transcriber: Send + Sync {
         let _ = prompt;
         self.transcribe(audio, language, progress)
     }
+
+    /// The Whisper *translate* task (AI-5): the same audio, written in English whatever language
+    /// is spoken. `source_language` is a hint (`None`: detect). The returned transcript has
+    /// `language == "en"`. An implementation without the task answers `not_implemented`.
+    /// Models that were not trained for it (`large-v3-turbo`) refuse with `invalid_input`; the
+    /// daemon never picks one ([`crate::translate::choose_translation_model`]).
+    fn translate_to_english(
+        &self,
+        audio: Pcm16k<'_>,
+        source_language: Option<&str>,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Transcript, CmError> {
+        let _ = (audio, source_language, progress);
+        Err(CmError::not_implemented(
+            "this speech engine cannot translate to English",
+        ))
+    }
 }
 
 const CANCELLED_MESSAGE: &str = "Transcription was cancelled";
@@ -104,6 +121,11 @@ pub struct ScriptedTranscriber {
     pub steps: u32,
     /// The prompt of every run so far (`None` when a run had none), for tests of the glossary.
     pub prompts: std::sync::Arc<std::sync::Mutex<Vec<Option<String>>>>,
+    /// What the translate task returns (offsets from the start of the audio, like `words`);
+    /// `None`: the engine cannot translate.
+    pub translation: Option<Vec<Word>>,
+    /// The source-language hint of every translate run so far, for tests of the engine choice.
+    pub translate_runs: std::sync::Arc<std::sync::Mutex<Vec<Option<String>>>>,
 }
 
 impl ScriptedTranscriber {
@@ -114,7 +136,15 @@ impl ScriptedTranscriber {
             words,
             steps: 4,
             prompts: Default::default(),
+            translation: None,
+            translate_runs: Default::default(),
         }
+    }
+
+    /// The script of the translate task, from `(text, start seconds, end seconds)`.
+    pub fn with_translation(mut self, words: &[(&str, f64, f64)]) -> Self {
+        self.translation = Some(ScriptedTranscriber::from_secs(words).words);
+        self
     }
 
     /// Builds the script from `(text, start seconds, end seconds)`.
@@ -173,6 +203,42 @@ impl Transcriber for ScriptedTranscriber {
         Ok(Transcript {
             version: TRANSCRIPT_VERSION,
             language: self.language.clone(),
+            model: self.model.clone(),
+            words,
+            note,
+        })
+    }
+
+    fn translate_to_english(
+        &self,
+        audio: Pcm16k<'_>,
+        source_language: Option<&str>,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Transcript, CmError> {
+        let script = self.translation.as_ref().ok_or_else(|| {
+            CmError::not_implemented("this speech engine cannot translate to English")
+        })?;
+        self.translate_runs
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push(source_language.map(str::to_owned));
+        for i in 1..=self.steps.max(1) {
+            if !progress(i as f32 / self.steps.max(1) as f32) {
+                return Err(cancelled());
+            }
+        }
+        let words = script
+            .iter()
+            .map(|w| Word {
+                start: audio.start + w.start,
+                end: audio.start + w.end,
+                ..w.clone()
+            })
+            .collect::<Vec<_>>();
+        let note = words.is_empty().then(|| "No speech detected".to_owned());
+        Ok(Transcript {
+            version: TRANSCRIPT_VERSION,
+            language: "en".into(),
             model: self.model.clone(),
             words,
             note,

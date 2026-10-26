@@ -24,8 +24,9 @@ use cm_library::rec_edit::load_edits;
 use serde_json::Value;
 
 use crate::ai::{
-    AiServices, CaptionFormat, CaptionService, ModelService, SuggestService, TranscribeRequest,
-    TranscribeService,
+    AiServices, CaptionFormat, CaptionService, DiarizeRequest, ModelService, SpeakerService,
+    SuggestService, TranscribeRequest, TranscribeService, TranslateOutput, TranslateRequest,
+    TranslateService,
 };
 
 /// The services backed by `cm-ai`. Plug into [`crate::DaemonBuilder::ai`].
@@ -43,9 +44,53 @@ pub fn services_with(root: PathBuf, engine: Option<Arc<dyn Transcriber>>) -> AiS
 fn services(root: Option<PathBuf>, engine: Option<Arc<dyn Transcriber>>) -> AiServices {
     AiServices {
         models: Arc::new(RealModels { root: root.clone() }),
-        transcribe: Arc::new(RealTranscribe { root, engine }),
+        transcribe: Arc::new(RealTranscribe {
+            root: root.clone(),
+            engine: engine.clone(),
+        }),
         captions: Arc::new(RealCaptions),
         suggest: Arc::new(RealSuggest),
+        translate: Arc::new(RealTranslate { root, engine }),
+        // Until spike S7 picks a speaker model, speakers answer `no_speaker_model` (AI-8). The
+        // real ONNX diarizer replaces `NoSpeakerModel` here and nowhere else.
+        speakers: Arc::new(RealSpeakers {
+            diarizer: Arc::new(cm_ai::speakers::NoSpeakerModel),
+        }),
+    }
+}
+
+/// Speaker labels with a [`Diarizer`] (the seam where the real model plugs in).
+struct RealSpeakers {
+    diarizer: Arc<dyn cm_ai::speakers::Diarizer>,
+}
+
+impl SpeakerService for RealSpeakers {
+    fn ready(&self) -> Result<(), CmError> {
+        self.diarizer.ready()
+    }
+
+    fn diarize(
+        &self,
+        req: &DiarizeRequest,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Option<cm_ai::speakers::Diarized>, CmError> {
+        self.diarizer.ready()?;
+        let opts = cm_ai::speakers::DiarizeOptions {
+            hints: req.hints,
+            headset: req.headset,
+            display_name: &req.display_name,
+            created: &req.created,
+        };
+        match cm_ai::speakers::diarize_recording(
+            &req.bundle_dir,
+            self.diarizer.as_ref(),
+            &opts,
+            progress,
+        ) {
+            Ok(d) => Ok(Some(d)),
+            Err(e) if is_cancelled(&e) => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -133,6 +178,53 @@ impl TranscribeService for RealTranscribe {
     }
 }
 
+/// Caption translation (AI-5). Only the Whisper engine exists here: the text model is the AI-7
+/// provider, so [`TranslateService::has_text_model`] stays false and a non-English target fails
+/// with `no_text_model`.
+struct RealTranslate {
+    root: Option<PathBuf>,
+    engine: Option<Arc<dyn Transcriber>>,
+}
+
+impl TranslateService for RealTranslate {
+    fn whisper(
+        &self,
+        req: &TranslateRequest,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Option<TranslateOutput>, CmError> {
+        // The model is resolved and loaded for this job only, like a transcription. Turbo cannot
+        // translate; the daemon never asks for it, and this refuses it all the same.
+        let (id, path) = store(&self.root).resolve(Some(&req.model))?;
+        if !cm_ai::translate::model_can_translate(&id) {
+            return Err(cm_ai::translate::turbo_cannot_translate(&id));
+        }
+        let whisper;
+        let engine: &dyn Transcriber = match &self.engine {
+            Some(e) => e.as_ref(),
+            None => {
+                whisper = WhisperTranscriber::load(&path, &id, true)?;
+                &whisper
+            }
+        };
+        match cm_ai::translate::translate_with_whisper(
+            &req.bundle_dir,
+            engine,
+            Some(&req.source_language),
+            &id,
+            &req.source_lines,
+            progress,
+        ) {
+            Ok(lines) => Ok(Some(TranslateOutput {
+                lines,
+                model: id,
+                untranslated: 0,
+            })),
+            Err(e) if is_cancelled(&e) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+}
+
 struct RealCaptions;
 
 impl CaptionService for RealCaptions {
@@ -153,6 +245,15 @@ impl CaptionService for RealCaptions {
             CaptionFormat::Vtt => to_vtt(&mapped),
             CaptionFormat::Txt => to_txt(&mapped, false),
             CaptionFormat::TxtTimed => to_txt(&mapped, true),
+            CaptionFormat::Md => cm_ai::speakers::to_markdown_speakers(
+                &mapped
+                    .into_iter()
+                    .map(|line| cm_ai::speakers::SpokenLine {
+                        line,
+                        speaker: None,
+                    })
+                    .collect::<Vec<_>>(),
+            ),
         })
     }
 }

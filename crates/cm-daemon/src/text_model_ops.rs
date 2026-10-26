@@ -1,0 +1,256 @@
+//! `get_text_model` and `test_text_model` (AI-7), and the helpers the later callers (AI-5
+//! translation, AI-9 reports, AI-2 summaries) use to reach the text model.
+//!
+//! The settings are `ai.text.*` ([`cm_ai::text_model`]); they are app-only (`ai.*` is on the
+//! [`crate::engines::APP_ONLY_SETTINGS`] list, so `set_settings` from an agent is refused). The
+//! API key lives in the keychain under the name in `ai.text.key_name`; this module reads it only
+//! to build a request and never returns it, logs it or puts it in an event.
+//!
+//! # For callers
+//!
+//! * [`Inner::text_model_config`] reads the settings, [`Inner::text_model_client`] builds the
+//!   [`TextModel`] (key included) off the async threads' worry: it is blocking, call it inside
+//!   [`blocking`](crate::daemon::blocking).
+//! * [`Inner::text_model_gate`] is the one place that decides what a caller must do before text
+//!   leaves the machine: provider `none` is `invalid_input` with `data.reason = "no_text_model"`;
+//!   a remote provider returns a [`SendPlan`] whose `text` and `details` go into the caller's
+//!   Confirm dialog (host and number of characters, AI-7.AC3); a local provider returns `None`
+//!   (Free). The app additionally shows the first-use notice ([`Inner::text_model_notice_pending`])
+//!   before the first send and records the host in `ai.text.remote_notice_host`.
+
+use std::sync::{Arc, Mutex, PoisonError};
+
+use cm_ai::text_model::{
+    self, ErrorKind, Provider, SendPlan, TextModel, TextModelConfig, TextModelError,
+    KEY_NOTICE_HOST,
+};
+use cm_auth::{SecretStore, VaultStore};
+use cm_core::CmError;
+use serde_json::{json, Value};
+
+use crate::daemon::{blocking, Inner};
+use crate::error::DaemonError;
+use crate::storage_cloud::KEYCHAIN_SERVICE;
+
+/// The action names of this module.
+pub const TEXT_MODEL_METHODS: &[&str] = &["get_text_model", "test_text_model"];
+
+/// Keychain access and the last test result.
+pub struct TextModelState {
+    secrets: Option<Arc<dyn SecretStore>>,
+    /// The result of the last Test for the settings it ran with: `(fingerprint, structured)`.
+    last_test: Mutex<Option<(String, bool)>>,
+}
+
+impl TextModelState {
+    pub fn new(secrets: Option<Arc<dyn SecretStore>>) -> Self {
+        TextModelState {
+            secrets,
+            last_test: Mutex::new(None),
+        }
+    }
+
+    fn store(&self) -> Arc<dyn SecretStore> {
+        self.secrets
+            .clone()
+            .unwrap_or_else(|| Arc::new(VaultStore::system(KEYCHAIN_SERVICE)))
+    }
+}
+
+/// What identifies the settings a test result belongs to (no key).
+fn fingerprint(c: &TextModelConfig) -> String {
+    format!(
+        "{}|{}|{}",
+        c.provider.as_str(),
+        c.effective_base_url(),
+        c.model
+    )
+}
+
+/// The URL without any `user:password@` part.
+fn display_url(url: &str) -> String {
+    match url.split_once("://") {
+        Some((scheme, rest)) => {
+            let (authority, tail) = rest.split_at(rest.find(['/', '?', '#']).unwrap_or(rest.len()));
+            let host = authority.rsplit('@').next().unwrap_or(authority);
+            format!("{scheme}://{host}{tail}")
+        }
+        None => String::new(),
+    }
+}
+
+/// A setup problem (no provider, bad address) as the shared `invalid_input` error with the
+/// `data.reason` clients branch on.
+pub fn setup_error(e: TextModelError) -> DaemonError {
+    let data = e.error_data();
+    DaemonError::WithData {
+        error: CmError::invalid_input(e.message),
+        data,
+    }
+}
+
+impl Inner {
+    /// The `ai.text.*` settings.
+    pub(crate) fn text_model_config(&self) -> Result<TextModelConfig, DaemonError> {
+        Ok(TextModelConfig::from_settings(&self.settings.all()?))
+    }
+
+    /// The API key by the name in the settings; `None` without a name. Blocking (keychain).
+    fn text_model_key(&self, config: &TextModelConfig) -> Result<Option<String>, CmError> {
+        match &config.key_name {
+            Some(name) => self.text_model.store().get(name),
+            None => Ok(None),
+        }
+    }
+
+    /// The text model for the current settings, key included. Blocking (keychain).
+    pub(crate) fn text_model_client(
+        &self,
+        config: &TextModelConfig,
+    ) -> Result<Box<dyn TextModel>, CmError> {
+        let key = self.text_model_key(config)?;
+        Ok(text_model::build(config, key))
+    }
+
+    /// What a caller must do before it sends `chars` characters to the text model (AI-7.AC2,
+    /// AC3): `Err(no_text_model)` for provider `none`, `Some(plan)` for a remote provider (the
+    /// caller makes its action Confirm tier and shows the plan), `None` when it can run at once.
+    pub(crate) fn text_model_gate(&self, chars: usize) -> Result<Option<SendPlan>, DaemonError> {
+        let config = self.text_model_config()?;
+        config.check_endpoint().map_err(setup_error)?;
+        Ok(config.send_plan(chars))
+    }
+
+    /// Whether the app still has to show "Text from your recordings will be sent to <host>" before
+    /// the first send (a remote provider whose host the user has not been told about).
+    pub(crate) fn text_model_notice_pending(&self) -> Result<bool, DaemonError> {
+        let config = self.text_model_config()?;
+        let told = self
+            .settings
+            .all()?
+            .get(KEY_NOTICE_HOST)
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        Ok(config.is_remote() && told != config.host())
+    }
+
+    /// `get_text_model`: the provider, model and limits; never the key.
+    pub(crate) async fn get_text_model(&self) -> Result<Value, DaemonError> {
+        let c = self.text_model_config()?;
+        let key_set = match (&c.key_name, c.provider) {
+            (Some(_), Provider::OpenAiCompatible | Provider::Anthropic) => {
+                let store = self.text_model.store();
+                let name = c.key_name.clone().unwrap_or_default();
+                blocking(move || store.get(&name))
+                    .await
+                    .ok()
+                    .flatten()
+                    .is_some()
+            }
+            _ => false,
+        };
+        let structured = match c.provider {
+            Provider::None => Value::Null,
+            // Anthropic's tool input is schema-shaped by construction.
+            Provider::Anthropic => json!(true),
+            _ => self
+                .text_model
+                .last_test
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .as_ref()
+                .filter(|(f, _)| *f == fingerprint(&c))
+                .map_or(Value::Null, |(_, s)| json!(s)),
+        };
+        Ok(json!({
+            "provider": c.provider.as_str(),
+            "model": c.model,
+            "local": c.is_local(),
+            "host": c.host(),
+            "base_url": display_url(&c.effective_base_url()),
+            "context_tokens": c.context_tokens,
+            "timeout_s": c.timeout_s,
+            "structured_output": structured,
+            "has_key": key_set,
+            "remote_notice_pending": self.text_model_notice_pending()?,
+        }))
+    }
+
+    /// `test_text_model`: one short fixed prompt to the configured provider (and only to it).
+    /// A failure is an answer (`ok: false`, `reason`, `message`), not an error, so the AI page
+    /// can show it; provider `none` and unusable settings are `invalid_input`.
+    pub(crate) async fn test_text_model(&self) -> Result<Value, DaemonError> {
+        let c = self.text_model_config()?;
+        c.check_endpoint().map_err(setup_error)?;
+        if c.model.is_empty() {
+            return Err(setup_error(TextModelError::invalid_input(
+                "Choose a text model on the AI page first",
+            )));
+        }
+        let (cfg, secrets) = (c.clone(), self.text_model.store());
+        let outcome = blocking(move || {
+            let key = match &cfg.key_name {
+                Some(n) => secrets.get(n)?,
+                None => None,
+            };
+            let model = text_model::build(&cfg, key);
+            Ok(text_model::test_model(model.as_ref(), &cfg.model))
+        })
+        .await?;
+        if outcome.ok || outcome.reason.as_deref() != Some("invalid_input") {
+            *self
+                .text_model
+                .last_test
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner) =
+                Some((fingerprint(&c), outcome.ok && outcome.structured_output));
+        }
+        serde_json::to_value(&outcome).map_err(|e| DaemonError::Internal(e.to_string()))
+    }
+}
+
+impl crate::daemon::Daemon {
+    /// What a caller must do before sending `chars` characters of recording text to the text
+    /// model ([`Inner::text_model_gate`]): `Err` with `data.reason = "no_text_model"` for provider
+    /// `none`, `Some(plan)` for a remote provider (make the action Confirm tier and show
+    /// `plan.text`), `None` when it can run at once.
+    pub fn text_model_gate(&self, chars: usize) -> Result<Option<SendPlan>, DaemonError> {
+        self.inner.text_model_gate(chars)
+    }
+
+    /// Whether the first-use notice ("Text from your recordings will be sent to <host>") is
+    /// still to be shown. The app records the answer in `ai.text.remote_notice_host`.
+    pub fn text_model_notice_pending(&self) -> Result<bool, DaemonError> {
+        self.inner.text_model_notice_pending()
+    }
+
+    /// The text model for the current settings, key included. Blocking: call it inside
+    /// `spawn_blocking`.
+    pub fn text_model_client(&self) -> Result<Box<dyn TextModel>, DaemonError> {
+        let config = self.inner.text_model_config()?;
+        Ok(self.inner.text_model_client(&config)?)
+    }
+}
+
+/// Whether `e` is the error of provider `none`.
+pub fn is_no_text_model(e: &TextModelError) -> bool {
+    e.kind == ErrorKind::NoTextModel
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn urls_are_shown_without_credentials() {
+        assert_eq!(
+            display_url("https://me:pw@host.example/v1"),
+            "https://host.example/v1"
+        );
+        assert_eq!(
+            display_url("http://127.0.0.1:11434/v1"),
+            "http://127.0.0.1:11434/v1"
+        );
+        assert_eq!(display_url(""), "");
+    }
+}

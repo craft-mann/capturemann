@@ -57,6 +57,7 @@ pub const CLI_COMMANDS: &[(&str, Option<&str>)] = &[
     ("cancel_job", Some("jobs cancel")),
     ("retry_job", Some("jobs retry")),
     ("export_video", Some("export")),
+    ("export_audio", Some("export --audio")),
     ("start_recording", Some("record start")),
     ("pause_recording", Some("record pause")),
     ("resume_recording", Some("record resume")),
@@ -93,8 +94,13 @@ pub const CLI_COMMANDS: &[(&str, Option<&str>)] = &[
     ("replace_in_captions", Some("ai captions replace")),
     ("set_caption_options", Some("ai captions options")),
     ("export_captions", Some("export")),
+    ("translate_captions", Some("ai translate")),
     ("suggest_zooms", Some("ai suggest zooms")),
     ("suggest_cuts", Some("ai suggest cuts")),
+    ("get_text_model", Some("ai text-model")),
+    ("test_text_model", Some("ai text-model test")),
+    ("diarize", Some("ai speakers")),
+    ("set_speakers", Some("ai speakers rename")),
 ];
 
 /// Everything the CLI touches outside its arguments.

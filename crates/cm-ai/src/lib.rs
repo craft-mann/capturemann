@@ -13,6 +13,7 @@
 //! | [`recording`] | engine | transcribe a bundle (tracks, pause gaps, session time), `transcript.json` |
 //! | [`caption`] | engine | caption line building (42 chars, 2 lines, 1 to 7 s), SRT and VTT, cut and speed mapping |
 //! | [`suggest`] | suggestions | auto-zoom (AI-3) and silence and filler cuts (AI-4); deterministic |
+//! | [`translate`] | translation | `translations/<lang>.json`, Whisper translate task, engine and model choice (turbo rule), line re-wrap and split, the `TextTranslator` seam (AI-5) |
 //!
 //! # Actions the daemon, MCP and CLI expose (names are final; the daemon stream implements them)
 //!
@@ -49,8 +50,11 @@ pub mod glossary;
 pub mod model;
 pub mod reapply;
 pub mod recording;
+pub mod speakers;
 pub mod suggest;
+pub mod text_model;
 pub mod textmatch;
 pub mod transcribe;
+pub mod translate;
 pub mod vad;
 pub mod whisper;

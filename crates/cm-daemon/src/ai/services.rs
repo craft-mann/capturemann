@@ -12,6 +12,8 @@ pub enum CaptionFormat {
     Txt,
     /// Plain text with a `[mm:ss]` (or `[hh:mm:ss]`) prefix on every line.
     TxtTimed,
+    /// Markdown, one paragraph per caption line (per speaker turn when speakers are known).
+    Md,
 }
 
 impl CaptionFormat {
@@ -20,11 +22,15 @@ impl CaptionFormat {
             CaptionFormat::Srt => "srt",
             CaptionFormat::Vtt => "vtt",
             CaptionFormat::Txt | CaptionFormat::TxtTimed => "txt",
+            CaptionFormat::Md => "md",
         }
     }
 
     pub fn is_text(self) -> bool {
-        matches!(self, CaptionFormat::Txt | CaptionFormat::TxtTimed)
+        matches!(
+            self,
+            CaptionFormat::Txt | CaptionFormat::TxtTimed | CaptionFormat::Md
+        )
     }
 }
 
@@ -78,6 +84,41 @@ pub trait TranscribeService: Send + Sync {
     ) -> Result<Option<Transcript>, CmError>;
 }
 
+/// What a diarization needs: the bundle (the service decodes the audio) and the choices.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DiarizeRequest {
+    pub capture_id: String,
+    pub bundle_dir: PathBuf,
+    pub hints: cm_ai::speakers::DiarizeHints,
+    /// "My microphone only hears me": the mic track is the user, only the system track is
+    /// diarized (AI-8.AC7).
+    pub headset: bool,
+    /// The user's name for headset mode (`profile.display_name`, default "Me").
+    pub display_name: String,
+    /// RFC 3339 time for `diarization.json`.
+    pub created: String,
+}
+
+/// Runs a diarization (`cm_ai::speakers`): decodes the audio of the bundle and calls the speaker
+/// model. Blocking. Nothing here may keep a voiceprint (AI-8 privacy).
+pub trait SpeakerService: Send + Sync {
+    fn available(&self) -> bool {
+        true
+    }
+    /// Whether a speaker model is installed: `Err` with [`cm_ai::speakers::no_speaker_model`]
+    /// (`invalid_input`, `data.reason = "no_speaker_model"`) when not. Checked before a job is
+    /// queued.
+    fn ready(&self) -> Result<(), CmError> {
+        Ok(())
+    }
+    /// `progress` gets 0.0 to 1.0 and returns `false` to interrupt, which gives `Ok(None)`.
+    fn diarize(
+        &self,
+        req: &DiarizeRequest,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Option<cm_ai::speakers::Diarized>, CmError>;
+}
+
 /// Caption lines and files (`cm_ai::caption`).
 pub trait CaptionService: Send + Sync {
     fn available(&self) -> bool {
@@ -113,7 +154,7 @@ pub trait SuggestService: Send + Sync {
 pub const NOT_BUILT: &str =
     "local AI is not available in this build yet: the speech engine has not been plugged into the daemon";
 
-fn not_built() -> CmError {
+pub(super) fn not_built() -> CmError {
     CmError::not_implemented(NOT_BUILT)
 }
 
@@ -158,6 +199,22 @@ impl TranscribeService for Unavailable {
     }
 }
 
+impl SpeakerService for Unavailable {
+    fn available(&self) -> bool {
+        false
+    }
+    fn ready(&self) -> Result<(), CmError> {
+        Err(not_built())
+    }
+    fn diarize(
+        &self,
+        _: &DiarizeRequest,
+        _: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Option<cm_ai::speakers::Diarized>, CmError> {
+        Err(not_built())
+    }
+}
+
 impl CaptionService for Unavailable {
     fn available(&self) -> bool {
         false
@@ -189,6 +246,10 @@ pub struct AiServices {
     pub transcribe: Arc<dyn TranscribeService>,
     pub captions: Arc<dyn CaptionService>,
     pub suggest: Arc<dyn SuggestService>,
+    /// Caption translation (AI-5).
+    pub translate: Arc<dyn TranslateService>,
+    /// Speaker labels (AI-8).
+    pub speakers: Arc<dyn SpeakerService>,
 }
 
 impl Default for AiServices {
@@ -198,6 +259,8 @@ impl Default for AiServices {
             transcribe: Arc::new(Unavailable),
             captions: Arc::new(Unavailable),
             suggest: Arc::new(Unavailable),
+            translate: Arc::new(Unavailable),
+            speakers: Arc::new(Unavailable),
         }
     }
 }
@@ -209,6 +272,7 @@ impl AiServices {
             "list_models" | "download_model" | "import_model" | "select_model" | "remove_model" => {
                 self.models.available()
             }
+            "diarize" => self.speakers.available(),
             _ => true,
         }
     }

@@ -442,7 +442,7 @@ impl Inner {
         if plan.captions {
             // The SRT is made now, from the captions as they are at the moment of approval.
             let srt = self
-                .export_captions(&plan.capture_id, CaptionFormat::Srt)
+                .export_captions(&plan.capture_id, CaptionFormat::Srt, false)
                 .await?;
             inputs["captions_file"] = srt.get("path").cloned().unwrap_or(Value::Null);
         }

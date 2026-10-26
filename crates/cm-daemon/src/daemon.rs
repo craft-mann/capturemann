@@ -172,6 +172,8 @@ pub(crate) struct Inner {
     pub(crate) publish_accounts: Option<cm_publish::PublishAccountStore>,
     /// Retry and chunk settings of the YouTube provider (tests shorten the backoff).
     pub(crate) youtube: cm_publish::YouTubeConfig,
+    /// Keychain access and last test result of the AI-7 text model.
+    pub(crate) text_model: crate::text_model_ops::TextModelState,
     gate: ConfirmationGate,
     policies: ClientPolicies,
     activity: ActivityLog,
@@ -231,6 +233,7 @@ pub struct DaemonBuilder {
     cloud: crate::storage_cloud::CloudBackend,
     publish_accounts: Option<cm_publish::PublishAccountStore>,
     youtube: cm_publish::YouTubeConfig,
+    text_secrets: Option<Arc<dyn cm_auth::SecretStore>>,
     confirmer: Arc<dyn Confirmer>,
     confirm_timeout: Duration,
     clock: Arc<dyn Clock>,
@@ -261,6 +264,7 @@ impl DaemonBuilder {
             cloud: crate::storage_cloud::CloudBackend::default(),
             publish_accounts: None,
             youtube: cm_publish::YouTubeConfig::default(),
+            text_secrets: None,
             confirmer: Arc::new(DenyAll),
             confirm_timeout: DEFAULT_CONFIRM_TIMEOUT,
             clock: Arc::new(SystemClock),
@@ -359,6 +363,13 @@ impl DaemonBuilder {
     /// token sources and HTTP client are the ones of [`DaemonBuilder::cloud_backend`].
     pub fn publish_accounts(mut self, store: cm_publish::PublishAccountStore) -> Self {
         self.publish_accounts = Some(store);
+        self
+    }
+
+    /// Where the text model's API key is read from, by the name in `ai.text.key_name` (the
+    /// system keychain when not set; tests pass a memory store).
+    pub fn text_model_secrets(mut self, store: Arc<dyn cm_auth::SecretStore>) -> Self {
+        self.text_secrets = Some(store);
         self
     }
 
@@ -500,6 +511,7 @@ impl DaemonBuilder {
                 cloud: self.cloud,
                 publish_accounts: self.publish_accounts,
                 youtube: self.youtube,
+                text_model: crate::text_model_ops::TextModelState::new(self.text_secrets),
                 gate: ConfirmationGate::new(self.confirmer, self.confirm_timeout, events.clone()),
                 events,
                 policies: ClientPolicies::default(),
@@ -1171,6 +1183,7 @@ impl Daemon {
             Action::CancelJob(p) => inner.cancel_job(p).await,
             Action::RetryJob(p) => inner.retry_job(p).await,
             Action::ExportVideo(p) => inner.export_video(actor, p).await,
+            Action::ExportAudio(p) => inner.export_audio(actor, p).await,
             Action::Annotate(p) => inner.annotate(actor, p).await,
             Action::GetCapture(p) => inner.get_capture(p).await,
             Action::SuggestRedactions(p) => inner.suggest_redactions(p).await,
@@ -1182,6 +1195,8 @@ impl Daemon {
             Action::Ai(p) => inner.ai_op(actor, p).await,
             Action::ListDestinations => inner.list_destinations().await,
             Action::ListPublishAccounts => inner.list_publish_accounts().await,
+            Action::GetTextModel => inner.get_text_model().await,
+            Action::TestTextModel => inner.test_text_model().await,
             Action::Upload(p) => inner.upload(actor, p).await,
             Action::CaptionOptions(p) => inner.set_caption_options(actor, p).await,
             Action::ListLibrary(p) => inner.list_library(p).await,

@@ -81,6 +81,10 @@ fn samples() -> Vec<(&'static str, Value)> {
             "export_video",
             json!({"capture_id": "rec_1", "preset": "quick", "request_id": "r"}),
         ),
+        (
+            "export_audio",
+            json!({"capture_id": "rec_1", "format": "wav", "tracks": "mic", "request_id": "r"}),
+        ),
         ("start_recording", json!({"target": {"display_id": 1}})),
         ("pause_recording", json!({})),
         ("resume_recording", json!({"recording_id": "rec_1"})),
@@ -134,14 +138,26 @@ fn samples() -> Vec<(&'static str, Value)> {
             "export_captions",
             json!({"capture_id": "rec_1", "format": "vtt"}),
         ),
+        (
+            "translate_captions",
+            json!({"capture_id": "rec_1", "target_language": "vi", "engine": "text_model",
+                   "request_id": "r"}),
+        ),
         ("suggest_zooms", json!({"capture_id": "rec_1"})),
         ("suggest_cuts", json!({"capture_id": "rec_1"})),
+        ("diarize", json!({"capture_id": "rec_1", "num_speakers": 2})),
+        (
+            "set_speakers",
+            json!({"capture_id": "rec_1", "rename": {"2": "Linh"}}),
+        ),
         (
             "set_caption_options",
             json!({"capture_id": "rec_1", "enabled": true, "burn_in": false}),
         ),
         ("list_destinations", json!({})),
         ("list_publish_accounts", json!({})),
+        ("get_text_model", json!({})),
+        ("test_text_model", json!({})),
         (
             "upload",
             json!({"capture_id": "rec_1", "destination_id": "nas", "what": "both",
