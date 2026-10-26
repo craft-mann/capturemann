@@ -4541,16 +4541,6 @@ msgstr "Đang chép lời… {percent}%"
 msgid "Transcript ready"
 msgstr "Bản ghi lời nói đã sẵn sàng"
 
-#. FACT: owner review required (privacy statement)
-# FACT: owner review required
-#, fuzzy
-msgid "Transcription runs on this Mac. Nothing is downloaded unless you press Download, and your audio never leaves this machine."
-msgstr "Việc chép lời chạy ngay trên máy Mac này. Không có gì được tải xuống trừ khi bạn nhấn Tải xuống, và âm thanh của bạn không bao giờ rời khỏi máy."
-
-#, fuzzy
-msgid "Transcripts and captions, made on this Mac."
-msgstr "Bản ghi lời nói và phụ đề, tạo ngay trên máy Mac này."
-
 #, fuzzy
 msgid "Trim a recording"
 msgstr "Cắt đầu cuối bản ghi"
@@ -7918,10 +7908,6 @@ msgid "Needs about {memory} of memory"
 msgstr "Cần khoảng {memory} bộ nhớ"
 
 #, fuzzy
-msgid "The most accurate and the slowest. For difficult audio and many languages on a Mac with plenty of memory."
-msgstr "Chính xác nhất và chậm nhất. Dành cho âm thanh khó nghe và nhiều ngôn ngữ trên máy Mac có nhiều bộ nhớ."
-
-#, fuzzy
 msgid "Include in exported video"
 msgstr "Đưa vào video đã xuất"
 
@@ -9966,4 +9952,247 @@ msgstr "đã dịch"
 msgctxt "transcript turn"
 msgid "overlap"
 msgstr "nói chồng"
+
+msgid "About 6.7 GB to load"
+msgstr "Cần khoảng 6,7 GB để nạp"
+
+#, fuzzy
+msgid "Another server on this Mac (address)"
+msgstr "Máy chủ khác trên máy Mac này (địa chỉ)"
+
+#, fuzzy
+msgid "Best accuracy and translation to English"
+msgstr "Chính xác nhất và dịch sang tiếng Anh"
+
+#, fuzzy
+msgid "Choose a model"
+msgstr "Chọn một mô hình"
+
+#, fuzzy
+msgid "Choose a model first."
+msgstr "Hãy chọn một mô hình trước."
+
+#, fuzzy
+msgid "Choose a text model provider first."
+msgstr "Hãy chọn nơi chạy mô hình văn bản trước."
+
+#, fuzzy
+msgid "Downloading speaker models is not available yet."
+msgstr "Chưa thể tải mô hình nhận diện người nói."
+
+#, fuzzy
+msgid "Everything here runs on this Mac. Nothing is downloaded unless you press Download, and nothing is sent anywhere unless you choose a remote text model."
+msgstr "Mọi thứ ở đây chạy ngay trên máy Mac này. Không có gì được tải xuống trừ khi bạn nhấn Tải xuống, và không có gì được gửi đi đâu cả."
+
+#, fuzzy
+msgid "Fast, accurate — not for translation"
+msgstr "Nhanh, chính xác — không dùng để dịch"
+
+#, fuzzy
+msgid "Find speakers after each transcript"
+msgstr "Tìm người nói sau mỗi bản chép lời"
+
+#, fuzzy
+msgid "Good default candidate · strong multilingual"
+msgstr "Ứng viên mặc định tốt · đa ngôn ngữ mạnh"
+
+#, fuzzy
+msgid "Highest quality, fast for its size"
+msgstr "Chất lượng cao nhất, nhanh so với kích thước"
+
+#, fuzzy
+msgid "Install a model in Ollama or LM Studio, then pick it above. CaptureMann never downloads text models itself. Default decided by S8."
+msgstr "Hãy cài một mô hình trong Ollama hoặc LM Studio rồi chọn ở trên. CaptureMann không bao giờ tự tải mô hình văn bản. Mặc định do S8 quyết định."
+
+#, fuzzy
+msgid "Installed: {name}"
+msgstr "Đã cài: {name}"
+
+#, fuzzy
+msgid "Model name"
+msgstr "Tên mô hình"
+
+#, fuzzy
+msgid "Model · {count} on {server}"
+msgstr "Mô hình · {count} trên {server}"
+
+#, fuzzy
+msgid "Models on this server"
+msgstr "Các mô hình trên máy chủ này"
+
+#, fuzzy
+msgid "Needs a speaker model"
+msgstr "Cần một mô hình nhận diện người nói"
+
+#, fuzzy
+msgid "No text model. Reports and translation to other languages are off."
+msgstr "Chưa có mô hình văn bản. Báo cáo và dịch sang ngôn ngữ khác đang tắt."
+
+#, fuzzy
+msgid "Not running"
+msgstr "Không chạy"
+
+#, fuzzy
+msgid "Off by default"
+msgstr "Mặc định tắt"
+
+#, fuzzy
+msgid "Only addresses on this Mac work here, like http://127.0.0.1:1234/v1."
+msgstr "Ở đây chỉ dùng được địa chỉ trên máy Mac này, ví dụ http://127.0.0.1:1234/v1."
+
+#, fuzzy
+msgid "Recommended for your Mac"
+msgstr "Gợi ý cho máy Mac của bạn"
+
+#, fuzzy
+msgid "Replied in {seconds} s"
+msgstr "Phản hồi sau {seconds} giây"
+
+#, fuzzy
+msgid "Reports and translation to any language"
+msgstr "Báo cáo và dịch sang mọi ngôn ngữ"
+
+#, fuzzy
+msgid "Running"
+msgstr "Đang chạy"
+
+#, fuzzy
+msgid "Server address"
+msgstr "Địa chỉ máy chủ"
+
+#, fuzzy
+msgid "Servers on this Mac"
+msgstr "Máy chủ trên máy Mac này"
+
+#, fuzzy
+msgid "Short English summaries; weak for Vietnamese and long meetings"
+msgstr "Tóm tắt tiếng Anh ngắn; yếu với tiếng Việt và cuộc họp dài"
+
+#, fuzzy
+msgid "Speaker labels"
+msgstr "Nhãn người nói"
+
+#, fuzzy
+msgid "Speaker model"
+msgstr "Mô hình người nói"
+
+#, fuzzy
+msgid "Speaker model not available yet"
+msgstr "Chưa có mô hình người nói"
+
+#, fuzzy
+msgid "Speech to text"
+msgstr "Giọng nói thành văn bản"
+
+#, fuzzy
+msgid "Start Ollama or LM Studio, then press Check again."
+msgstr "Hãy mở Ollama hoặc LM Studio rồi nhấn Kiểm tra lại."
+
+#, fuzzy
+msgid "Structured output did not work; replies are checked and retried"
+msgstr "Đầu ra có cấu trúc chưa hoạt động; các phản hồi được kiểm tra và thử lại"
+
+#, fuzzy
+msgid "Structured output works"
+msgstr "Đầu ra có cấu trúc hoạt động"
+
+#, fuzzy
+msgid "Text model"
+msgstr "Mô hình văn bản"
+
+#, fuzzy
+msgid "Text model provider"
+msgstr "Nơi chạy mô hình văn bản"
+
+#, fuzzy
+msgid "The test failed"
+msgstr "Kiểm thử không thành công"
+
+#, fuzzy
+msgid "The text model did not answer."
+msgstr "Mô hình văn bản không phản hồi."
+
+#, fuzzy
+msgid "This server lists no models. Pull or load one first."
+msgstr "Máy chủ này chưa có mô hình nào. Hãy tải hoặc nạp một mô hình trước."
+
+#, fuzzy
+msgid "Transcripts, speakers, translations and reports, made on this Mac."
+msgstr "Bản chép lời, người nói, bản dịch và báo cáo, tạo ngay trên máy Mac này."
+
+#, fuzzy
+msgid "Used for “My microphone only hears me”"
+msgstr "Dùng cho tùy chọn “Micrô của tôi chỉ nghe thấy tôi”"
+
+#, fuzzy
+msgid "Whisper · transcripts, captions, translation to English"
+msgstr "Whisper · chép lời, phụ đề, dịch sang tiếng Anh"
+
+#, fuzzy
+msgid "Who spoke when, from the voices"
+msgstr "Ai nói khi nào, nhận từ giọng nói"
+
+#, fuzzy
+msgid "Your name in transcripts"
+msgstr "Tên của bạn trong bản chép lời"
+
+#, fuzzy
+msgid "candidate"
+msgstr "ứng viên"
+
+#, fuzzy
+msgid "fits this Mac"
+msgstr "hợp với máy này"
+
+#, fuzzy
+msgid "only talks to {host}"
+msgstr "chỉ kết nối tới {host}"
+
+#, fuzzy
+msgid "open licences only"
+msgstr "chỉ giấy phép mở"
+
+#, fuzzy
+msgid "this Mac has {memory} GB · open licences only"
+msgstr "máy này có {memory} GB · chỉ giấy phép mở"
+
+#, fuzzy
+msgid "{count} context"
+msgstr "ngữ cảnh {count}"
+
+#, fuzzy
+msgid "{count}K context"
+msgstr "ngữ cảnh {count}K"
+
+#, fuzzy
+msgid "{count}M context"
+msgstr "ngữ cảnh {count}M"
+
+#, fuzzy
+msgid "{name} · {licence} · {size}, shown before you download"
+msgstr "{name} · {licence} · {size}, hiển thị trước khi bạn tải"
+
+#, fuzzy
+msgid "{name}, {state}"
+msgstr "{name}, {state}"
+
+#, fuzzy
+msgctxt "speaker model"
+msgid "Download"
+msgstr "Tải xuống"
+
+#, fuzzy
+msgctxt "text model"
+msgid "Test"
+msgstr "Kiểm thử"
+
+#, fuzzy
+msgctxt "text model provider"
+msgid "None"
+msgstr "Không"
+
+#, fuzzy
+msgctxt "text model provider"
+msgid "On this Mac"
+msgstr "Trên máy Mac này"
 

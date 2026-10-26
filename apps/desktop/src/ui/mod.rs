@@ -3,6 +3,7 @@
 
 pub mod ai;
 pub mod ai_view;
+pub mod ai_voice;
 pub mod app;
 pub mod audio_cache;
 pub mod brand;

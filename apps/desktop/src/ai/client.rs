@@ -138,6 +138,17 @@ impl AiClient {
         AiClient { transport }
     }
 
+    /// `get_text_model` (AI-7): provider, model, host, limits, `has_key`, `remote_notice_pending`.
+    /// Never the key.
+    pub async fn get_text_model(&self) -> Result<Value, AiError> {
+        self.transport.call("get_text_model", json!({})).await
+    }
+
+    /// `test_text_model` (AI-7): one short prompt to the configured provider only.
+    pub async fn test_text_model(&self) -> Result<Value, AiError> {
+        self.transport.call("test_text_model", json!({})).await
+    }
+
     pub async fn list_models(&self) -> Result<ModelList, AiError> {
         let v = self.transport.call("list_models", json!({})).await?;
         parse("list_models", v)

@@ -39,7 +39,7 @@ pub fn transcribe_hint() -> String {
 
 // TRANSLATORS: FACT: owner review required (privacy statement)
 pub fn privacy_copy() -> String {
-    tr!("Transcription runs on this Mac. Nothing is downloaded unless you press Download, and your audio never leaves this machine.")
+    tr!("Everything here runs on this Mac. Nothing is downloaded unless you press Download, and nothing is sent anywhere unless you choose a remote text model.")
 }
 
 /// One download in flight or interrupted.
@@ -156,9 +156,8 @@ fn model_hint(id: &str, catalogue: &str) -> String {
         "base" => tr!("Fast, fine for clear speech in a quiet room."),
         "small" => tr!("Balanced accuracy and speed. The best choice for most recordings."),
         "medium" => tr!("Most accurate, slow. Best for accents and noisy audio."),
-        "large" => tr!(
-            "The most accurate and the slowest. For difficult audio and many languages on a Mac with plenty of memory."
-        ),
+        "large" => tr!("Best accuracy and translation to English"),
+        "large-v3-turbo" => tr!("Fast, accurate \u{2014} not for translation"),
         _ => catalogue.to_owned(),
     }
 }
@@ -227,6 +226,8 @@ pub struct ModelsVm {
     pub auto_transcribe: bool,
     /// `ai.glossary` (AI-6a): names and terms spelled the user's way in new transcripts.
     pub glossary: Vec<cm_ai::glossary::GlossaryEntry>,
+    /// The voice part of the page: speaker labels and the text model (V8).
+    pub voice: crate::ai::voice::VoiceVm,
     /// An import or select or remove call is running.
     pub busy: bool,
     /// The last error of an import, select or remove, shown on the page.
