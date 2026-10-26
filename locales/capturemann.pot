@@ -2705,6 +2705,9 @@ msgstr ""
 msgid "Read settings"
 msgstr ""
 
+msgid "Read the text model settings"
+msgstr ""
+
 msgid "Reading never needs asking."
 msgstr ""
 
@@ -3530,6 +3533,9 @@ msgid "Test microphone"
 msgstr ""
 
 msgid "Test pattern (FFmpeg not found)"
+msgstr ""
+
+msgid "Test the text model"
 msgstr ""
 
 msgid "Testing 60 fps"

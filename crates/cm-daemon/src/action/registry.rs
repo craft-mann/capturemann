@@ -125,6 +125,10 @@ pub const ACTIONS: &[ActionSpec] = &[
     // Publishing (M6, PUB-1, PUB-2): the accounts are set up in the app; an agent can read them
     // (label, defaults, quota; never a key or token). `publish_video` above is the Confirm one.
     spec("list_publish_accounts", Tier::Free, false),
+    // AI-7: the text model provider. Both read the app-only `ai.text.*` settings; the key is never
+    // returned. `test_text_model` sends one fixed short prompt to the configured provider only.
+    spec("get_text_model", Tier::Free, false),
+    spec("test_text_model", Tier::Free, false),
 ];
 
 /// Actions that are plumbing for first-party GUI clients and are deliberately **not** exposed

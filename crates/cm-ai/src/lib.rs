@@ -50,6 +50,7 @@ pub mod model;
 pub mod reapply;
 pub mod recording;
 pub mod suggest;
+pub mod text_model;
 pub mod textmatch;
 pub mod transcribe;
 pub mod vad;

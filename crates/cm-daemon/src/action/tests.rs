@@ -138,6 +138,8 @@ fn samples() -> Vec<(&'static str, Value)> {
         ),
         ("list_destinations", json!({})),
         ("list_publish_accounts", json!({})),
+        ("get_text_model", json!({})),
+        ("test_text_model", json!({})),
         (
             "upload",
             json!({"capture_id": "rec_1", "destination_id": "nas", "what": "both",

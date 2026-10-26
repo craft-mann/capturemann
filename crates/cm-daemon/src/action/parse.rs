@@ -265,6 +265,14 @@ impl Action {
                 Action::ListDestinations
             }
             "upload" => return crate::storage_ops::parse_upload(&f),
+            "get_text_model" => {
+                f.only(&[])?;
+                Action::GetTextModel
+            }
+            "test_text_model" => {
+                f.only(&[])?;
+                Action::TestTextModel
+            }
             "list_publish_accounts" => {
                 f.only(&[])?;
                 Action::ListPublishAccounts
