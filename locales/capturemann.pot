@@ -4089,6 +4089,9 @@ msgstr ""
 msgid "Transcripts and captions, made on this Mac."
 msgstr ""
 
+msgid "Translate captions"
+msgstr ""
+
 msgid "Trim a recording"
 msgstr ""
 

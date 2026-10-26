@@ -31,18 +31,29 @@ pub enum AiOp {
     },
     GetCaptions {
         capture_id: String,
+        /// `None`: the original captions; a code: that translation (AI-5).
+        language: Option<String>,
     },
     SetCaptions {
         capture_id: String,
         lines: Vec<CaptionLine>,
+        language: Option<String>,
     },
     ReplaceInCaptions {
         capture_id: String,
         replacements: Vec<Replacement>,
+        language: Option<String>,
     },
     ExportCaptions {
         capture_id: String,
         format: CaptionFormat,
+        language: Option<String>,
+    },
+    /// AI-5: translate the captions into `target_language` (a job).
+    TranslateCaptions {
+        capture_id: String,
+        target_language: String,
+        engine: cm_ai::translate::EngineChoice,
     },
     SuggestZooms {
         capture_id: String,
@@ -68,6 +79,7 @@ impl AiOp {
             AiOp::ExportCaptions { .. } => "export_captions",
             AiOp::SuggestZooms { .. } => "suggest_zooms",
             AiOp::SuggestCuts { .. } => "suggest_cuts",
+            AiOp::TranslateCaptions { .. } => "translate_captions",
         }
     }
 
@@ -76,10 +88,11 @@ impl AiOp {
         match self {
             AiOp::Transcribe { capture_id, .. }
             | AiOp::GetTranscript { capture_id }
-            | AiOp::GetCaptions { capture_id }
+            | AiOp::GetCaptions { capture_id, .. }
             | AiOp::SetCaptions { capture_id, .. }
             | AiOp::ReplaceInCaptions { capture_id, .. }
             | AiOp::ExportCaptions { capture_id, .. }
+            | AiOp::TranslateCaptions { capture_id, .. }
             | AiOp::SuggestZooms { capture_id }
             | AiOp::SuggestCuts { capture_id } => Some(capture_id),
             _ => None,
@@ -94,6 +107,12 @@ pub struct Replacement {
     pub replace: String,
     pub match_case: bool,
     pub whole_word: bool,
+}
+
+fn insert_language(o: &mut Map<String, Value>, language: &Option<String>) {
+    if let Some(l) = language {
+        o.insert("language".into(), json!(l));
+    }
 }
 
 /// An AI action with its idempotency key.
@@ -132,25 +151,52 @@ impl AiParams {
                 }
             }
             AiOp::GetTranscript { capture_id }
-            | AiOp::GetCaptions { capture_id }
             | AiOp::SuggestZooms { capture_id }
             | AiOp::SuggestCuts { capture_id } => {
                 o.insert("capture_id".into(), json!(capture_id));
             }
-            AiOp::SetCaptions { capture_id, lines } => {
+            AiOp::GetCaptions {
+                capture_id,
+                language,
+            } => {
+                o.insert("capture_id".into(), json!(capture_id));
+                insert_language(&mut o, language);
+            }
+            AiOp::SetCaptions {
+                capture_id,
+                lines,
+                language,
+            } => {
                 o.insert("capture_id".into(), json!(capture_id));
                 o.insert("lines".into(), json!(lines));
+                insert_language(&mut o, language);
             }
             AiOp::ReplaceInCaptions {
                 capture_id,
                 replacements,
+                language,
             } => {
                 o.insert("capture_id".into(), json!(capture_id));
                 o.insert("replacements".into(), json!(replacements));
+                insert_language(&mut o, language);
             }
-            AiOp::ExportCaptions { capture_id, format } => {
+            AiOp::ExportCaptions {
+                capture_id,
+                format,
+                language,
+            } => {
                 o.insert("capture_id".into(), json!(capture_id));
                 o.insert("format".into(), json!(format.ext()));
+                insert_language(&mut o, language);
+            }
+            AiOp::TranslateCaptions {
+                capture_id,
+                target_language,
+                engine,
+            } => {
+                o.insert("capture_id".into(), json!(capture_id));
+                o.insert("target_language".into(), json!(target_language));
+                o.insert("engine".into(), json!(engine));
             }
         }
         Value::Object(o)
@@ -181,17 +227,27 @@ pub(crate) fn summary(p: &AiParams) -> String {
         }
         AiOp::SelectModel { model } => format!("Use the speech model `{model}`"),
         AiOp::Transcribe { capture_id, .. } => format!("Transcribe {capture_id}"),
-        AiOp::SetCaptions { capture_id, lines } => {
+        AiOp::SetCaptions {
+            capture_id, lines, ..
+        } => {
             format!("Set {} caption lines of {capture_id}", lines.len())
         }
+        AiOp::TranslateCaptions {
+            capture_id,
+            target_language,
+            ..
+        } => format!("Translate the captions of {capture_id} into `{target_language}`"),
         AiOp::ReplaceInCaptions {
             capture_id,
             replacements,
+            ..
         } => format!(
             "Replace text in the captions of {capture_id} ({} pairs)",
             replacements.len()
         ),
-        AiOp::ExportCaptions { capture_id, format } => {
+        AiOp::ExportCaptions {
+            capture_id, format, ..
+        } => {
             format!(
                 "Export {capture_id} captions as {}",
                 format.ext().to_uppercase()
@@ -210,10 +266,14 @@ pub(crate) fn confirm_params(p: &AiParams) -> Value {
         | AiOp::ImportModel { model, .. }
         | AiOp::SelectModel { model } => json!({ "model": model }),
         AiOp::Transcribe { capture_id, .. } => json!({ "capture_id": capture_id }),
-        AiOp::SetCaptions { capture_id, lines } => {
+        AiOp::SetCaptions {
+            capture_id, lines, ..
+        } => {
             json!({ "capture_id": capture_id, "lines": lines.len() })
         }
-        AiOp::ExportCaptions { capture_id, format } => {
+        AiOp::ExportCaptions {
+            capture_id, format, ..
+        } => {
             json!({ "capture_id": capture_id, "format": format.ext().to_uppercase() })
         }
         _ => json!({}),
@@ -259,6 +319,14 @@ fn language(f: &Fields<'_>) -> Result<Option<String>, CmError> {
             }
         }
     }
+}
+
+/// The optional `language` of the caption actions: a translation's code (`vi`, `pt-br`). Absent
+/// means the original captions; `auto` is not a translation.
+fn translation_language(f: &Fields<'_>) -> Result<Option<String>, CmError> {
+    f.str_opt("language")?
+        .map(|l| cm_ai::translate::language_code(&l))
+        .transpose()
 }
 
 /// `lines` of `set_captions`: times as seconds or `"t:<ticks>"`, in order, not overlapping, at
@@ -424,32 +492,65 @@ pub(crate) fn parse(method: &str, f: &Fields<'_>) -> Result<Action, CmError> {
                 model,
             }
         }
-        "get_transcript" | "get_captions" | "suggest_zooms" | "suggest_cuts" => {
+        "get_transcript" | "suggest_zooms" | "suggest_cuts" => {
             f.only(&["capture_id"])?;
             let capture_id = f.str_req("capture_id")?;
             match method {
                 "get_transcript" => AiOp::GetTranscript { capture_id },
-                "get_captions" => AiOp::GetCaptions { capture_id },
                 "suggest_zooms" => AiOp::SuggestZooms { capture_id },
                 _ => AiOp::SuggestCuts { capture_id },
             }
         }
+        "get_captions" => {
+            f.only(&["capture_id", "language"])?;
+            AiOp::GetCaptions {
+                capture_id: f.str_req("capture_id")?,
+                language: translation_language(f)?,
+            }
+        }
         "set_captions" => {
-            f.only(&["capture_id", "lines", "request_id"])?;
+            f.only(&["capture_id", "lines", "language", "request_id"])?;
             AiOp::SetCaptions {
                 capture_id: f.str_req("capture_id")?,
                 lines: caption_lines(f)?,
+                language: translation_language(f)?,
             }
         }
         "replace_in_captions" => {
-            f.only(&["capture_id", "replacements", "request_id"])?;
+            f.only(&["capture_id", "replacements", "language", "request_id"])?;
             AiOp::ReplaceInCaptions {
                 capture_id: f.str_req("capture_id")?,
                 replacements: replacements(f)?,
+                language: translation_language(f)?,
+            }
+        }
+        "translate_captions" => {
+            f.only(&["capture_id", "target_language", "engine", "request_id"])?;
+            let target = f.str_req("target_language")?;
+            let target_language = cm_ai::translate::language_code(&target).map_err(|_| {
+                CmError::invalid_field(
+                    "target_language",
+                    "must be a language code such as `en`, `vi`, `es` or `pt-br`",
+                )
+            })?;
+            let engine = match f.str_opt("engine")? {
+                None => cm_ai::translate::EngineChoice::Auto,
+                Some(e) => cm_ai::translate::EngineChoice::parse(&e)?,
+            };
+            AiOp::TranslateCaptions {
+                capture_id: f.str_req("capture_id")?,
+                target_language,
+                engine,
             }
         }
         "export_captions" => {
-            f.only(&["capture_id", "format", "timestamps", "request_id"])?;
+            f.only(&[
+                "capture_id",
+                "format",
+                "timestamps",
+                "language",
+                "request_id",
+            ])?;
             let timestamps = f.bool_or("timestamps", false)?;
             let format = match f.str_req("format")?.as_str() {
                 "srt" => CaptionFormat::Srt,
@@ -472,6 +573,7 @@ pub(crate) fn parse(method: &str, f: &Fields<'_>) -> Result<Action, CmError> {
             AiOp::ExportCaptions {
                 capture_id: f.str_req("capture_id")?,
                 format,
+                language: translation_language(f)?,
             }
         }
         other => {

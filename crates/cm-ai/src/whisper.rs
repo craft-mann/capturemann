@@ -201,7 +201,8 @@ fn dtw_preset(model_id: &str) -> Option<DtwModelPreset> {
         "base" => Some(DtwModelPreset::Base),
         "small" => Some(DtwModelPreset::Small),
         "medium" => Some(DtwModelPreset::Medium),
-        "large" => Some(DtwModelPreset::LargeV3),
+        "large" | "large-v3" => Some(DtwModelPreset::LargeV3),
+        "large-v3-turbo" => Some(DtwModelPreset::LargeV3Turbo),
         _ => None,
     }
 }
@@ -219,12 +220,14 @@ struct RunOutput {
     language: String,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run(
     ctx: &WhisperContext,
     samples: &[f32],
     language: String,
     threads: i32,
     prompt: Option<&str>,
+    translate: bool,
     progress: Arc<AtomicI32>,
     cancel: Arc<AtomicBool>,
 ) -> Result<RunOutput, CmError> {
@@ -236,7 +239,8 @@ fn run(
         .map_err(|e| internal("could not start", &e))?;
     let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
     params.set_n_threads(threads);
-    params.set_translate(false);
+    // The translate task makes the model write English whatever language it hears (AI-5).
+    params.set_translate(translate);
     params.set_language(Some(language.as_str()));
     params.set_print_special(false);
     params.set_print_progress(false);
@@ -387,6 +391,32 @@ impl Transcriber for WhisperTranscriber {
         prompt: Option<&str>,
         progress: &mut dyn FnMut(f32) -> bool,
     ) -> Result<Transcript, CmError> {
+        self.run_task(audio, language, prompt, false, progress)
+    }
+
+    fn translate_to_english(
+        &self,
+        audio: Pcm16k<'_>,
+        source_language: Option<&str>,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Transcript, CmError> {
+        if !crate::translate::model_can_translate(&self.model) {
+            return Err(crate::translate::turbo_cannot_translate(&self.model));
+        }
+        self.run_task(audio, source_language, None, true, progress)
+    }
+}
+
+impl WhisperTranscriber {
+    /// One Whisper run: the transcribe task, or the translate-to-English task (`translate`).
+    fn run_task(
+        &self,
+        audio: Pcm16k<'_>,
+        language: Option<&str>,
+        prompt: Option<&str>,
+        translate: bool,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Transcript, CmError> {
         // whisper-rs panics on a NUL byte in the prompt.
         let prompt = prompt
             .map(|p| p.replace('\0', ""))
@@ -409,7 +439,7 @@ impl Transcriber for WhisperTranscriber {
         if audio.samples.len() < 1600 {
             return Ok(Transcript {
                 version: TRANSCRIPT_VERSION,
-                language: if requested == "auto" {
+                language: if translate || requested == "auto" {
                     "en".into()
                 } else {
                     requested
@@ -431,6 +461,7 @@ impl Transcriber for WhisperTranscriber {
                     requested.clone(),
                     self.threads,
                     prompt.as_deref(),
+                    translate,
                     pct2,
                     cancel2,
                 )
@@ -453,7 +484,10 @@ impl Transcriber for WhisperTranscriber {
         let note = words.is_empty().then(|| "No speech detected".to_owned());
         Ok(Transcript {
             version: TRANSCRIPT_VERSION,
-            language: if requested == "auto" {
+            // The translate task writes English whatever the source was.
+            language: if translate {
+                "en".to_owned()
+            } else if requested == "auto" {
                 out.language
             } else {
                 requested

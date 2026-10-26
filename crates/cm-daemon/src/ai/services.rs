@@ -113,7 +113,7 @@ pub trait SuggestService: Send + Sync {
 pub const NOT_BUILT: &str =
     "local AI is not available in this build yet: the speech engine has not been plugged into the daemon";
 
-fn not_built() -> CmError {
+pub(super) fn not_built() -> CmError {
     CmError::not_implemented(NOT_BUILT)
 }
 
@@ -189,6 +189,8 @@ pub struct AiServices {
     pub transcribe: Arc<dyn TranscribeService>,
     pub captions: Arc<dyn CaptionService>,
     pub suggest: Arc<dyn SuggestService>,
+    /// Caption translation (AI-5).
+    pub translate: Arc<dyn TranslateService>,
 }
 
 impl Default for AiServices {
@@ -198,6 +200,7 @@ impl Default for AiServices {
             transcribe: Arc::new(Unavailable),
             captions: Arc::new(Unavailable),
             suggest: Arc::new(Unavailable),
+            translate: Arc::new(Unavailable),
         }
     }
 }

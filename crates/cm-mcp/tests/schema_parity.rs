@@ -113,6 +113,9 @@ fn field(path: &str, schema: &Value, all: bool, variant: usize) -> Value {
         // AI-1: a model id, a language code, and caption lines that are in order and not empty.
         p if p.ends_with(".model") => json!("small"),
         p if p.ends_with("transcribe.language") => json!("en"),
+        // AI-5: the caption tools take a translation's language code; translate needs a target.
+        p if p.ends_with("_captions.language") => json!("vi"),
+        p if p.ends_with("translate_captions.target_language") => json!("vi"),
         p if p.ends_with("set_captions.lines") => {
             json!([{ "start": 1, "end": 2, "text": "Hi" }])
         }

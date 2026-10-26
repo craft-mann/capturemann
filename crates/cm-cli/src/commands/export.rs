@@ -16,7 +16,7 @@ pub(super) async fn export_video(cx: &mut Ctx<'_>, a: ExportArgs) -> Result<(), 
                 "--timestamps only applies to --captions txt (SRT and VTT always have times)",
             ));
         }
-        return ai::export_captions(cx, a.id, format, a.timestamps).await;
+        return ai::export_captions(cx, a.id, format, a.timestamps, a.language).await;
     }
     let mut p = json!({ "capture_id": a.id, "preset": a.preset });
     if let Some(f) = &a.format {

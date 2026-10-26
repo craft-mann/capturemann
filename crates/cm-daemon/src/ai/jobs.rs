@@ -91,7 +91,7 @@ pub(super) fn write_atomic(dir: &Path, name: &str, bytes: &[u8]) -> Result<PathB
 }
 
 /// Sets a flag when the job is interrupted (cancel, hold or shutdown), for blocking code.
-fn interrupt_flag(ctx: &JobContext) -> (Arc<AtomicBool>, tokio::task::JoinHandle<()>) {
+pub(super) fn interrupt_flag(ctx: &JobContext) -> (Arc<AtomicBool>, tokio::task::JoinHandle<()>) {
     let flag = Arc::new(AtomicBool::new(false));
     let watcher = {
         let mut token = ctx.cancel.clone();

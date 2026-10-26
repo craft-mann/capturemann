@@ -130,6 +130,11 @@ fn samples() -> Vec<(&'static str, Value)> {
             "export_captions",
             json!({"capture_id": "rec_1", "format": "vtt"}),
         ),
+        (
+            "translate_captions",
+            json!({"capture_id": "rec_1", "target_language": "vi", "engine": "text_model",
+                   "request_id": "r"}),
+        ),
         ("suggest_zooms", json!({"capture_id": "rec_1"})),
         ("suggest_cuts", json!({"capture_id": "rec_1"})),
         (

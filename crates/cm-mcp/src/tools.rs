@@ -1294,7 +1294,7 @@ fn ai_tools() -> Vec<ToolSpec> {
             false,
             "AI-1",
             "Read a recording's caption lines (start and end in session time, ticks of 1/120000 s, and text of at most 2 rows of 42 characters): the user's edited lines if there are any (`source: \"edited\"`), else lines generated from the transcript (`\"generated\"`). Fails with `not_found` until transcribe has finished and nothing was edited.",
-            json!({ "capture_id": capture_id() }),
+            json!({ "capture_id": capture_id(), "language": { "type": "string", "description": "A translation's language code (`vi`, `pt-br`) made by translate_captions; omit for the original captions." } }),
             &["capture_id"],
             json!({ "type": "object", "properties": {
                 "capture_id": { "type": "string" },
@@ -1302,7 +1302,14 @@ fn ai_tools() -> Vec<ToolSpec> {
                     "start": { "type": "integer" }, "end": { "type": "integer" },
                     "text": { "type": "string" } },
                     "required": ["start", "end", "text"] } },
-                "source": { "type": "string", "enum": ["edited", "generated"] } },
+                "source": { "type": "string", "enum": ["edited", "generated", "translation"] },
+                "language": { "type": "string", "description": "Only for a translation." },
+                "engine": { "type": "string", "description": "Only for a translation: `whisper` or `text_model`." },
+                "model": { "type": "string" }, "edited": { "type": "boolean" },
+                "edited_lines": { "type": "array", "items": { "type": "integer" },
+                    "description": "Only for a translation: indexes of lines changed by hand." },
+                "untranslated_lines": { "type": "array", "items": { "type": "integer" },
+                    "description": "Only for a translation: indexes of lines the text model did not return." } },
                 "required": ["capture_id", "lines", "source"] }),
         ),
         ai_tool(
@@ -1310,12 +1317,13 @@ fn ai_tools() -> Vec<ToolSpec> {
             Tier::Free,
             true,
             "AI-1",
-            "Replace a recording's caption lines with edited ones. Each line has `start`, `end` (session time: seconds or \"t:<ticks>\") and `text` of at most 2 rows of 42 characters (rows are separated by a newline), lasts at most 7 s, and lines must be in order and not overlap. An empty list removes the edited lines (the generated ones come back). One undo step, tagged with the caller; undo restores the lines before.",
+            "Replace a recording's caption lines with edited ones (with `language`, the lines of that translation: written to its file, not an undo step; a line you leave as it was keeps its record, a changed one counts as edited and survives a re-translate while its source line is unchanged). Each line has `start`, `end` (session time: seconds or \"t:<ticks>\") and `text` of at most 2 rows of 42 characters (rows are separated by a newline), lasts at most 7 s, and lines must be in order and not overlap. An empty list removes the edited lines (the generated ones come back). One undo step, tagged with the caller; undo restores the lines before.",
             json!({ "lines": { "type": "array", "maxItems": 5000, "items": { "type": "object", "properties": {
                         "start": time("Line start"), "end": time("Line end"),
                         "text": { "type": "string", "minLength": 1,
                                   "description": "At most 2 rows of 42 characters; separate rows with a newline." } },
-                    "required": ["start", "end", "text"], "additionalProperties": false } } }),
+                    "required": ["start", "end", "text"], "additionalProperties": false } },
+                    "language": { "type": "string", "description": "A translation's language code (`vi`, `pt-br`) made by translate_captions; omit for the original captions." } }),
             &["lines"],
             json!({ "type": "object", "properties": {
                 "capture_id": { "type": "string" },
@@ -1335,7 +1343,8 @@ fn ai_tools() -> Vec<ToolSpec> {
                         "replace": { "type": "string", "maxLength": 200, "description": "Replacement; may be empty to delete the match." },
                         "match_case": { "type": "boolean", "description": "Default false." },
                         "whole_word": { "type": "boolean", "description": "Default false." } },
-                    "required": ["find", "replace"], "additionalProperties": false } } }),
+                    "required": ["find", "replace"], "additionalProperties": false } },
+                    "language": { "type": "string", "description": "A translation's language code (`vi`, `pt-br`) made by translate_captions; omit for the original captions." } }),
             &["replacements"],
             json!({ "type": "object", "properties": {
                 "capture_id": { "type": "string" },
@@ -1351,15 +1360,32 @@ fn ai_tools() -> Vec<ToolSpec> {
             Tier::Free,
             true,
             "AI-1",
-            "Write the captions as an SRT, VTT or plain-text (`txt`) file in the capture's `exports/` folder (`txt` is `<title>.txt`: one caption line per row, add `timestamps: true` for a `[mm:ss]` prefix on every line). The lines are the edited ones if there are any, else generated from the transcript, and the recording's edits apply: cut ranges remove their lines and shift the later ones, and speed scales the times, so no caption refers to cut content. Fails with `not_found` before transcribe has run.",
+            "Write the captions as an SRT, VTT or plain-text (`txt`) file in the capture's `exports/` folder (with `language`, a translation: `<title> - captions.<lang>.srt`, `<title>.<lang>.txt`; `txt` is `<title>.txt`: one caption line per row, add `timestamps: true` for a `[mm:ss]` prefix on every line). The lines are the edited ones if there are any, else generated from the transcript, and the recording's edits apply: cut ranges remove their lines and shift the later ones, and speed scales the times, so no caption refers to cut content. Fails with `not_found` before transcribe has run.",
             json!({ "format": { "type": "string", "enum": ["srt", "vtt", "txt"] },
                     "timestamps": { "type": "boolean",
-                        "description": "Only with `txt`: prefix every line with [mm:ss] (or [hh:mm:ss] for long recordings). Default false." } }),
+                        "description": "Only with `txt`: prefix every line with [mm:ss] (or [hh:mm:ss] for long recordings). Default false." },
+                    "language": { "type": "string", "description": "A translation's language code (`vi`, `pt-br`) made by translate_captions; omit for the original captions." } }),
             &["format"],
             json!({ "type": "object", "properties": {
                 "capture_id": { "type": "string" }, "format": { "type": "string" },
                 "path": { "type": "string" }, "lines": { "type": "integer" } },
                 "required": ["capture_id", "format", "path", "lines"] }),
+        ),
+        ai_tool(
+            "translate_captions",
+            Tier::Free,
+            true,
+            "AI-5",
+            "Translate a recording's captions into another language. Runs in the background and returns a `job_id`; the result is `translations/<lang>.json` in the capture (read it with get_captions `language`, edit it with set_captions or replace_in_captions `language`, export it with export_captions `language`); `translation.ready` is published when it is done. Engines: `whisper` re-runs the audio with Whisper's translate task, into English only, offline; it uses the active model if that can translate, else large-v3, else medium (large-v3-turbo cannot translate and is never used), and fails with `invalid_input` and `data.reason = \"translation_model_missing\"` when neither is installed (nothing is downloaded). `text_model` uses the text model provider (not available yet: `invalid_input` with `data.reason = \"no_text_model\"`). `auto` (default) picks whisper for English and the text model for every other language. A target equal to the recording's language fails with `data.reason = \"same_language\"`. Hand edits to an earlier translation are kept when their source caption line is unchanged. The recording needs a transcript (`not_found` otherwise) and a microphone or system-audio track.",
+            json!({ "target_language": { "type": "string",
+                        "description": "The language to translate into: a code such as `en`, `vi`, `es` or `pt-br`." },
+                    "engine": { "type": "string", "enum": ["auto", "whisper", "text_model"], "default": "auto" } }),
+            &["capture_id", "target_language"],
+            job_started_output(json!({
+                "capture_id": { "type": "string" }, "language": { "type": "string" },
+                "engine": { "type": "string", "enum": ["whisper", "text_model"] },
+                "model": { "type": "string", "description": "The Whisper model that will run (empty for the text model)." },
+                "source_language": { "type": "string" } })),
         ),
         ai_tool(
             "suggest_zooms",
@@ -1408,6 +1434,7 @@ fn with_capture_input(mut t: ToolSpec) -> ToolSpec {
             | "set_captions"
             | "replace_in_captions"
             | "export_captions"
+            | "translate_captions"
             | "suggest_zooms"
             | "suggest_cuts"
     );

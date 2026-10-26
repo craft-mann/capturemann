@@ -50,7 +50,7 @@ fn ai_methods_parse_to_themselves() {
     ] {
         assert_eq!(parse_ok(m, p).op.method(), m);
     }
-    assert_eq!(AI_METHODS.len(), 13);
+    assert_eq!(AI_METHODS.len(), 14);
 }
 
 #[test]

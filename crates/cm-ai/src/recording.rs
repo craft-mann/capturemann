@@ -136,6 +136,28 @@ pub fn transcribe_recording(
     opts: &TranscribeOptions<'_>,
     progress: &mut dyn FnMut(f32) -> bool,
 ) -> Result<Transcript, CmError> {
+    run_recording(bundle, transcriber, opts, false, progress)
+}
+
+/// The same audio and the same time mapping as [`transcribe_recording`], but with the Whisper
+/// *translate* task (AI-5): the words are English (`language == "en"`). `opts.language` is the
+/// spoken language (a hint); `opts.prompt` is not used. Nothing is stored.
+pub fn translate_recording(
+    bundle: &Path,
+    transcriber: &dyn Transcriber,
+    opts: &TranscribeOptions<'_>,
+    progress: &mut dyn FnMut(f32) -> bool,
+) -> Result<Transcript, CmError> {
+    run_recording(bundle, transcriber, opts, true, progress)
+}
+
+fn run_recording(
+    bundle: &Path,
+    transcriber: &dyn Transcriber,
+    opts: &TranscribeOptions<'_>,
+    translate: bool,
+    progress: &mut dyn FnMut(f32) -> bool,
+) -> Result<Transcript, CmError> {
     let manifest = cm_library::rec::read_manifest(bundle)?;
     let mic = audio_track(bundle, &manifest.tracks, "mic");
     let system = audio_track(bundle, &manifest.tracks, "system");
@@ -165,15 +187,15 @@ pub fn transcribe_recording(
         let offset = ((*file_start - base).as_secs_f64() * f64::from(SAMPLE_RATE)).round() as usize;
         mix_at(&mut mixed, &samples, offset);
     }
-    let mut t = transcriber.transcribe_prompted(
-        Pcm16k {
-            samples: &mixed,
-            start: base,
-        },
-        opts.language,
-        opts.prompt,
-        progress,
-    )?;
+    let audio = Pcm16k {
+        samples: &mixed,
+        start: base,
+    };
+    let mut t = if translate {
+        transcriber.translate_to_english(audio, opts.language, progress)?
+    } else {
+        transcriber.transcribe_prompted(audio, opts.language, opts.prompt, progress)?
+    };
     t.words = t
         .words
         .into_iter()

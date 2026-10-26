@@ -8,7 +8,7 @@ use cm_core::ErrorCode;
 use serde_json::{json, Value};
 
 use super::{plain, Ctx};
-use crate::args::{AiCmd, CaptionsCmd, ModelsCmd, SuggestCmd, TranscribeArgs};
+use crate::args::{AiCmd, CaptionsCmd, ModelsCmd, SuggestCmd, TranscribeArgs, TranslateArgs};
 use crate::client::Client;
 use crate::error::CliError;
 
@@ -78,12 +78,19 @@ pub(super) async fn ai(cx: &mut Ctx<'_>, cmd: AiCmd) -> Result<(), CliError> {
         }
         AiCmd::Transcribe(a) => transcribe(cx, a).await,
         AiCmd::Transcript { id, words } => transcript(cx, id, words).await,
+        AiCmd::Translate(a) => translate(cx, a).await,
         AiCmd::Captions {
-            cmd: CaptionsCmd::Get { id },
-        } => captions_get(cx, id).await,
+            cmd: CaptionsCmd::Get { id, language },
+        } => captions_get(cx, id, language).await,
         AiCmd::Captions {
-            cmd: CaptionsCmd::Set { id, file, clear },
-        } => captions_set(cx, id, file, clear).await,
+            cmd:
+                CaptionsCmd::Set {
+                    id,
+                    file,
+                    clear,
+                    language,
+                },
+        } => captions_set(cx, id, file, clear, language).await,
         AiCmd::Captions {
             cmd:
                 CaptionsCmd::Replace {
@@ -93,8 +100,14 @@ pub(super) async fn ai(cx: &mut Ctx<'_>, cmd: AiCmd) -> Result<(), CliError> {
                     match_case,
                     whole_word,
                     file,
+                    language,
                 },
-        } => captions_replace(cx, id, find, replace, match_case, whole_word, file).await,
+        } => {
+            captions_replace(
+                cx, id, find, replace, match_case, whole_word, file, language,
+            )
+            .await
+        }
         AiCmd::Captions {
             cmd:
                 CaptionsCmd::Options {
@@ -251,6 +264,60 @@ async fn transcribe(cx: &mut Ctx<'_>, a: TranscribeArgs) -> Result<(), CliError>
     Ok(())
 }
 
+/// `ai translate`: `translate_captions`, then (with `--wait`) polls the job.
+async fn translate(cx: &mut Ctx<'_>, a: TranslateArgs) -> Result<(), CliError> {
+    let p = json!({ "capture_id": a.id, "target_language": a.to,
+                    "engine": a.engine.replace('-', "_") });
+    let params = cx.mutating(p, "");
+    let mut c = cx.client().await?;
+    let started = c.call("translate_captions", params).await?;
+    if !a.wait {
+        cx.emit(&started, |r| {
+            format!(
+                "Translating {} into `{}` with {}{}: job {}{}\n  watch it with `capturemann jobs get {}`",
+                plain(&r["capture_id"]),
+                plain(&r["language"]),
+                plain(&r["engine"]),
+                match r["model"].as_str() {
+                    Some(m) if !m.is_empty() => format!(" (model `{m}`)"),
+                    _ => String::new(),
+                },
+                plain(&r["job_id"]),
+                if r["reused"] == json!(true) {
+                    " (already running)"
+                } else {
+                    ""
+                },
+                plain(&r["job_id"]),
+            )
+        });
+        return Ok(());
+    }
+    let job = wait_job(
+        cx,
+        &mut c,
+        &plain(&started["job_id"]),
+        "translating",
+        a.timeout,
+    )
+    .await?;
+    cx.emit(&job, |j| {
+        let r = &j["result"];
+        format!(
+            "Translated {} into `{}`: {} lines ({} left untranslated), {} `{}`\n  read it with `capturemann ai captions get {} --language {}`",
+            plain(&r["capture_id"]),
+            plain(&r["language"]),
+            plain(&r["lines"]),
+            plain(&r["untranslated"]),
+            plain(&r["engine"]),
+            plain(&r["model"]),
+            plain(&r["capture_id"]),
+            plain(&r["language"]),
+        )
+    });
+    Ok(())
+}
+
 /// Polls a job to its end. A failed job keeps its kind: `not_found` and `invalid_input` stay
 /// themselves (exit 2), everything else is `job_failed` (exit 6).
 async fn wait_job(
@@ -370,9 +437,17 @@ async fn transcript(cx: &mut Ctx<'_>, id: String, words: bool) -> Result<(), Cli
     Ok(())
 }
 
-async fn captions_get(cx: &mut Ctx<'_>, id: String) -> Result<(), CliError> {
+async fn captions_get(
+    cx: &mut Ctx<'_>,
+    id: String,
+    language: Option<String>,
+) -> Result<(), CliError> {
+    let mut p = json!({ "capture_id": id });
+    if let Some(l) = language {
+        p["language"] = json!(l);
+    }
     let mut c = cx.client().await?;
-    let r = c.call("get_captions", json!({ "capture_id": id })).await?;
+    let r = c.call("get_captions", p).await?;
     cx.emit(&r, |r| {
         let lines = r["lines"].as_array().cloned().unwrap_or_default();
         let mut s = format!(
@@ -380,8 +455,19 @@ async fn captions_get(cx: &mut Ctx<'_>, id: String) -> Result<(), CliError> {
             plain(&r["capture_id"]),
             lines.len(),
             match r["source"].as_str() {
-                Some("edited") => "edited",
-                _ => "generated",
+                Some("edited") => "edited".to_owned(),
+                Some("translation") => format!(
+                    "translation to {} by {} `{}`{}",
+                    plain(&r["language"]),
+                    plain(&r["engine"]),
+                    plain(&r["model"]),
+                    if r["edited"] == json!(true) {
+                        ", edited"
+                    } else {
+                        ""
+                    }
+                ),
+                _ => "generated".to_owned(),
             }
         );
         for l in &lines {
@@ -403,6 +489,7 @@ async fn captions_set(
     id: String,
     file: Option<String>,
     clear: bool,
+    language: Option<String>,
 ) -> Result<(), CliError> {
     let lines: Value = if clear {
         json!([])
@@ -428,10 +515,22 @@ async fn captions_set(
         }
         v
     };
-    let params = cx.mutating(json!({ "capture_id": id, "lines": lines }), "");
+    let mut p = json!({ "capture_id": id, "lines": lines });
+    if let Some(l) = &language {
+        p["language"] = json!(l);
+    }
+    let params = cx.mutating(p, "");
     let mut c = cx.client().await?;
     let r = c.call("set_captions", params).await?;
     cx.emit(&r, |r| {
+        if r["language"].is_string() {
+            return format!(
+                "Set {} lines of the `{}` translation of {}",
+                plain(&r["lines"]),
+                plain(&r["language"]),
+                plain(&r["capture_id"]),
+            );
+        }
         format!(
             "Set {} caption lines of {} (revision {})\n  undo with `capturemann undo {}`",
             plain(&r["lines"]),
@@ -444,6 +543,7 @@ async fn captions_set(
 }
 
 /// `ai captions replace`: `replace_in_captions` with one pair from the flags or many from a file.
+#[allow(clippy::too_many_arguments)]
 async fn captions_replace(
     cx: &mut Ctx<'_>,
     id: String,
@@ -452,6 +552,7 @@ async fn captions_replace(
     match_case: bool,
     whole_word: bool,
     file: Option<String>,
+    language: Option<String>,
 ) -> Result<(), CliError> {
     let pairs: Value = match (find, file) {
         (Some(find), _) => json!([{
@@ -480,11 +581,23 @@ async fn captions_replace(
             v
         }
     };
-    let params = cx.mutating(json!({ "capture_id": id, "replacements": pairs }), "");
+    let mut p = json!({ "capture_id": id, "replacements": pairs });
+    if let Some(l) = &language {
+        p["language"] = json!(l);
+    }
+    let params = cx.mutating(p, "");
     let mut c = cx.client().await?;
     let r = c.call("replace_in_captions", params).await?;
     cx.emit(&r, |r| {
-        if r["changed"] == json!(true) {
+        if r["changed"] == json!(true) && r["language"].is_string() {
+            format!(
+                "Replaced {} matches in {} lines of the `{}` translation of {}",
+                plain(&r["replacements"]),
+                plain(&r["lines_touched"]),
+                plain(&r["language"]),
+                plain(&r["capture_id"]),
+            )
+        } else if r["changed"] == json!(true) {
             format!(
                 "Replaced {} matches in {} caption lines of {} (revision {})\n  undo with `capturemann undo {}`",
                 plain(&r["replacements"]),
@@ -620,10 +733,14 @@ pub(super) async fn export_captions(
     id: String,
     format: String,
     timestamps: bool,
+    language: Option<String>,
 ) -> Result<(), CliError> {
     let mut p = json!({ "capture_id": id, "format": format });
     if timestamps {
         p["timestamps"] = json!(true);
+    }
+    if let Some(l) = language {
+        p["language"] = json!(l);
     }
     let params = cx.mutating(p, "");
     let mut c = cx.client().await?;

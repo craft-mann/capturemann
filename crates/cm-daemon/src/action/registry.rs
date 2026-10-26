@@ -114,6 +114,9 @@ pub const ACTIONS: &[ActionSpec] = &[
     // AI-6a: find and replace over the caption lines, one undo step. The transcript is untouched.
     spec("replace_in_captions", Tier::Free, true),
     spec("export_captions", Tier::Free, true),
+    // AI-5: a `translate` job writing `translations/<lang>.json`. Free with Whisper or a local
+    // text model; a remote text model will make it Confirm (AI-7, not built).
+    spec("translate_captions", Tier::Free, true),
     spec("suggest_zooms", Tier::Free, false),
     spec("suggest_cuts", Tier::Free, false),
     // The caption switches (show in the preview, burn into exports): one revision, one undo step.

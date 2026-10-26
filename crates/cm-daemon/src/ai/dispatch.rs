@@ -25,6 +25,16 @@ impl Daemon {
                 captions: inner.ai.captions.clone(),
                 settings: inner.settings.clone(),
             }),
+        )?;
+        self.register_job_handler(
+            JOB_TRANSLATE,
+            Arc::new(TranslateHandler {
+                library: inner.library.clone(),
+                events: inner.events.clone(),
+                service: inner.ai.translate.clone(),
+                captions: inner.ai.captions.clone(),
+                settings: inner.settings.clone(),
+            }),
         )
     }
 
@@ -210,19 +220,54 @@ impl Inner {
                 model,
             } => self.transcribe(actor, capture_id, language, model).await,
             AiOp::GetTranscript { capture_id } => self.get_transcript(&capture_id).await,
-            AiOp::GetCaptions { capture_id } => self.get_captions(&capture_id).await,
-            AiOp::SetCaptions { capture_id, lines } => {
-                self.set_captions(actor, capture_id, lines).await
+            AiOp::GetCaptions {
+                capture_id,
+                language,
+            } => self.get_captions_in(&capture_id, language.as_deref()).await,
+            AiOp::SetCaptions {
+                capture_id,
+                lines,
+                language: None,
+            } => self.set_captions(actor, capture_id, lines).await,
+            AiOp::SetCaptions {
+                capture_id,
+                lines,
+                language: Some(language),
+            } => {
+                self.set_translation_lines(capture_id, language, lines)
+                    .await
             }
             AiOp::ReplaceInCaptions {
                 capture_id,
                 replacements,
+                language: None,
             } => {
                 self.replace_in_captions(actor, capture_id, replacements)
                     .await
             }
-            AiOp::ExportCaptions { capture_id, format } => {
-                self.export_captions(&capture_id, format).await
+            AiOp::ReplaceInCaptions {
+                capture_id,
+                replacements,
+                language: Some(language),
+            } => {
+                self.replace_in_translation(capture_id, language, replacements)
+                    .await
+            }
+            AiOp::ExportCaptions {
+                capture_id,
+                format,
+                language,
+            } => {
+                self.export_captions_in(&capture_id, format, language.as_deref())
+                    .await
+            }
+            AiOp::TranslateCaptions {
+                capture_id,
+                target_language,
+                engine,
+            } => {
+                self.translate_captions(actor, capture_id, target_language, engine)
+                    .await
             }
             AiOp::SuggestZooms { capture_id } => self.suggest(&capture_id, true).await,
             AiOp::SuggestCuts { capture_id } => self.suggest(&capture_id, false).await,

@@ -47,6 +47,7 @@ pub const TOPICS: &[&str] = &[
     // progress of `model.download.progress` is left out (`job.progress` carries it).
     "model.changed",
     "transcript.ready",
+    "translation.ready",
 ];
 
 /// The minimum level a client asked for (`logging/setLevel`), shared with the forwarder.

@@ -92,6 +92,7 @@ pub const CLI_COMMANDS: &[(&str, Option<&str>)] = &[
     ("replace_in_captions", Some("ai captions replace")),
     ("set_caption_options", Some("ai captions options")),
     ("export_captions", Some("export")),
+    ("translate_captions", Some("ai translate")),
     ("suggest_zooms", Some("ai suggest zooms")),
     ("suggest_cuts", Some("ai suggest cuts")),
 ];

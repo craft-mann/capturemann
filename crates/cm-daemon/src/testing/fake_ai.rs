@@ -14,7 +14,7 @@ use cm_core::{CmError, EditList, MediaTime};
 
 use crate::ai::{
     AiServices, CaptionFormat, CaptionService, ModelService, SuggestService, TranscribeRequest,
-    TranscribeService,
+    TranscribeService, TranslateOutput, TranslateRequest, TranslateService,
 };
 
 struct Model {
@@ -36,6 +36,9 @@ struct State {
     fail_transcribe: Option<CmError>,
     /// Words every transcription returns instead of the built-in ones.
     words: Option<Vec<Word>>,
+    translate_calls: Vec<TranslateRequest>,
+    /// What the Whisper translate task returns (English words), `None` = a fixed sentence.
+    translation: Option<Vec<Word>>,
 }
 
 /// The shared fake. Cheap to clone.
@@ -75,6 +78,8 @@ impl FakeAi {
             render_calls: vec![],
             fail_transcribe: None,
             words: None,
+            translate_calls: vec![],
+            translation: None,
         })))
     }
 
@@ -94,6 +99,42 @@ impl FakeAi {
             s.active = Some("small".into());
         }
         self
+    }
+
+    /// These models are installed (and `active` is the active one).
+    pub fn with_installed(self, ids: &[&str], active: Option<&str>) -> FakeAi {
+        {
+            let mut s = self.state();
+            // The large models of AI-5 are added on demand, so the default list stays three.
+            for (id, label, size_mb) in [
+                ("large", "Large v3", 3100),
+                ("large-v3-turbo", "Large v3 Turbo", 1600),
+            ] {
+                if ids.contains(&id) && !s.models.iter().any(|m| m.id == id) {
+                    s.models.push(Model {
+                        id,
+                        label,
+                        size_mb,
+                        installed: false,
+                    });
+                }
+            }
+            for m in &mut s.models {
+                m.installed = ids.contains(&m.id);
+            }
+            s.active = active.map(str::to_owned);
+        }
+        self
+    }
+
+    /// The Whisper translate task returns these words from now on.
+    pub fn set_translation(&self, words: Vec<Word>) {
+        self.state().translation = Some(words);
+    }
+
+    /// Every translation run so far.
+    pub fn translate_calls(&self) -> Vec<TranslateRequest> {
+        self.state().translate_calls.clone()
     }
 
     /// Downloads take `steps` steps of `step_ms` milliseconds (so a test can cancel one).
@@ -156,6 +197,7 @@ impl FakeAi {
             transcribe: Arc::new(self.clone()),
             captions: Arc::new(self.clone()),
             suggest: Arc::new(self.clone()),
+            translate: Arc::new(self.clone()),
         }
     }
 
@@ -303,6 +345,56 @@ impl TranscribeService for FakeAi {
             t.words = w;
         }
         Ok(Some(t))
+    }
+}
+
+impl TranslateService for FakeAi {
+    fn whisper(
+        &self,
+        req: &TranslateRequest,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Option<TranslateOutput>, CmError> {
+        let (words, steps, step_ms) = {
+            let mut s = self.state();
+            s.translate_calls.push(req.clone());
+            (s.translation.clone(), s.download_steps.max(4), s.step_ms)
+        };
+        for i in 1..=steps {
+            if step_ms > 0 {
+                std::thread::sleep(Duration::from_millis(step_ms));
+            }
+            if !progress(i as f32 / steps as f32) {
+                return Ok(None);
+            }
+        }
+        let w = |text: &str, a: f64, b: f64| Word {
+            text: text.to_owned(),
+            start: t(a),
+            end: t(b),
+            confidence: 0.9,
+        };
+        let words = words.unwrap_or_else(|| {
+            vec![
+                w("Hello", 1.0, 1.4),
+                w("and", 1.5, 1.7),
+                w("welcome", 1.8, 2.3),
+                w("to", 2.4, 2.5),
+                w("the", 2.6, 2.7),
+                w("demo.", 2.8, 3.4),
+            ]
+        });
+        let english = Transcript {
+            version: 1,
+            language: "en".into(),
+            model: req.model.clone(),
+            words,
+            note: None,
+        };
+        Ok(Some(TranslateOutput {
+            lines: cm_ai::translate::whisper_lines(&english, &req.source_lines),
+            model: req.model.clone(),
+            untranslated: 0,
+        }))
     }
 }
 

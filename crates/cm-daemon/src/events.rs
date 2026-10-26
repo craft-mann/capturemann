@@ -92,6 +92,9 @@ pub const MODEL_DOWNLOAD_PROGRESS: &str = "model.download.progress";
 pub const MODEL_CHANGED: &str = "model.changed";
 /// A transcript was written: `{ capture_id, model, language, words }`.
 pub const TRANSCRIPT_READY: &str = "transcript.ready";
+/// A caption translation was written (AI-5): `{ capture_id, language, engine, model, lines,
+/// untranslated, path, kept_edits, dropped_edits }`.
+pub const TRANSLATION_READY: &str = "translation.ready";
 pub const JOB_PROGRESS: &str = "job.progress";
 pub const JOB_DONE: &str = "job.done";
 pub const JOB_FAILED: &str = "job.failed";

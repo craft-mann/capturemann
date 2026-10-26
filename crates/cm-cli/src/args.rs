@@ -141,6 +141,11 @@ pub enum AiCmd {
         #[command(subcommand)]
         cmd: CaptionsCmd,
     },
+    /// Translate the captions into another language (`translate_captions`): into English with
+    /// Whisper's translate task (offline, needs the large-v3 or medium model; large-v3-turbo
+    /// cannot translate), into any other language with a text model (not available yet: exit 2,
+    /// `no_text_model`). Read the result with `ai captions get <id> --language <LANG>`.
+    Translate(TranslateArgs),
     /// Suggestions only, nothing is applied (`suggest_zooms`, `suggest_cuts`).
     Suggest {
         #[command(subcommand)]
@@ -192,6 +197,26 @@ pub struct TranscribeArgs {
     pub timeout: Option<f64>,
 }
 
+#[derive(Debug, Args)]
+pub struct TranslateArgs {
+    /// Capture id of a recording that has a transcript.
+    pub id: String,
+    /// The language to translate into, a code such as `en`, `vi`, `es` or `pt-br`.
+    #[arg(long, value_name = "LANG")]
+    pub to: String,
+    /// `auto` (the default: Whisper for English, the text model for other languages), `whisper`
+    /// or `text-model`.
+    #[arg(long, value_name = "ENGINE", default_value = "auto",
+          value_parser = ["auto", "whisper", "text-model", "text_model"])]
+    pub engine: String,
+    /// Wait for the translation to finish (exit 6 if it fails).
+    #[arg(long)]
+    pub wait: bool,
+    /// With `--wait`: give up after this many seconds (the job keeps running).
+    #[arg(long, value_name = "SECS", requires = "wait", value_parser = positive_secs)]
+    pub timeout: Option<f64>,
+}
+
 #[derive(Debug, Subcommand)]
 pub enum CaptionsCmd {
     /// Print the caption lines: the edited ones, else lines built from the transcript
@@ -199,6 +224,9 @@ pub enum CaptionsCmd {
     Get {
         /// Capture id of a recording.
         id: String,
+        /// Read a translation (made by `ai translate`) instead of the original captions.
+        #[arg(long, value_name = "LANG")]
+        language: Option<String>,
     },
     /// Replace the caption lines from a JSON file, `-` for stdin: an array of
     /// `{ "start": 1.5, "end": 3, "text": "..." }` (seconds or `t:<ticks>`; at most 2 rows of 42
@@ -213,6 +241,10 @@ pub enum CaptionsCmd {
         /// Remove the edited lines (the generated ones come back).
         #[arg(long)]
         clear: bool,
+        /// Replace the lines of this translation instead of the original captions (written to
+        /// its file; not an undo step).
+        #[arg(long, value_name = "LANG")]
+        language: Option<String>,
     },
     /// Find and replace text across all caption lines (`replace_in_captions`): the same matching
     /// as the editor's find (Unicode, Vietnamese diacritics exact, NFC and NFD equal). Give
@@ -238,6 +270,9 @@ pub enum CaptionsCmd {
         /// `{ "find": "...", "replace": "...", "match_case": false, "whole_word": false }`.
         #[arg(long, value_name = "FILE", conflicts_with = "find")]
         file: Option<String>,
+        /// Work on this translation instead of the original captions.
+        #[arg(long, value_name = "LANG")]
+        language: Option<String>,
     },
     /// Show or hide the captions on the video, and choose whether exports burn them in by
     /// default (`set_caption_options`). Give at least one option. One undo step.
@@ -412,6 +447,10 @@ pub struct ExportArgs {
     /// recordings).
     #[arg(long, requires = "captions")]
     pub timestamps: bool,
+    /// With `--captions`: write this translation (made by `ai translate`) instead of the original
+    /// captions. The file is `<title> - captions.<LANG>.<format>`.
+    #[arg(long, value_name = "LANG", requires = "captions")]
+    pub language: Option<String>,
     /// Burn the captions into the video (white text on a dark box, inside the platform's safe
     /// area). The default is the recording's `ai captions options --burn` setting. Needs a
     /// transcript: run `capturemann ai transcribe` first.

@@ -100,6 +100,16 @@ pub struct CatalogEntry {
     /// Memory needed while it runs, in MB (the whisper.cpp README's figure); 0 when not given.
     #[serde(default)]
     pub ram_mb: u32,
+    /// Other ids that name this model (`large-v3` for `large`, which is that file). Lookups by
+    /// alias find the entry; the canonical `id` is what the store and the AI page use.
+    #[serde(default)]
+    pub aliases: Vec<String>,
+    /// The checksum and size are not pinned yet (no network when the entry was written). Such an
+    /// entry is not offered by [`ModelStore::list`] and every store action on it is refused, so
+    /// nothing unverified can be downloaded. The maintainer fills in `sha256`, `bytes` and
+    /// `ram_mb`, confirms the URL and removes this flag.
+    #[serde(default)]
+    pub pending_pin: bool,
 }
 
 /// The list of models the app offers.
@@ -144,6 +154,16 @@ impl Catalog {
                     m.id
                 )));
             }
+            if !(m.url.starts_with("https://") || m.url.starts_with("http://")) {
+                return Err(CmError::invalid_input(format!(
+                    "model catalog: `{}` has a bad URL",
+                    m.id
+                )));
+            }
+            if m.pending_pin {
+                // Not downloadable until pinned: the checks below do not apply yet.
+                continue;
+            }
             if m.sha256.len() != 64 || !m.sha256.chars().all(|c| c.is_ascii_hexdigit()) {
                 return Err(CmError::invalid_input(format!(
                     "model catalog: `{}` has no valid SHA-256",
@@ -153,12 +173,6 @@ impl Catalog {
             if m.bytes == 0 {
                 return Err(CmError::invalid_input(format!(
                     "model catalog: `{}` has no size",
-                    m.id
-                )));
-            }
-            if !(m.url.starts_with("https://") || m.url.starts_with("http://")) {
-                return Err(CmError::invalid_input(format!(
-                    "model catalog: `{}` has a bad URL",
                     m.id
                 )));
             }
@@ -197,7 +211,11 @@ impl Catalog {
     }
 
     pub fn get(&self, id: &str) -> Option<&CatalogEntry> {
-        self.models.iter().find(|m| m.id == id)
+        self.models.iter().find(|m| m.id == id).or_else(|| {
+            self.models
+                .iter()
+                .find(|m| m.aliases.iter().any(|a| a == id))
+        })
     }
 }
 
@@ -282,13 +300,29 @@ impl ModelStore {
     }
 
     fn entry(&self, id: &str) -> Result<&CatalogEntry, CmError> {
-        self.catalog.get(id).ok_or_else(|| {
-            let known: Vec<&str> = self.catalog.models.iter().map(|m| m.id.as_str()).collect();
+        let e = self.catalog.get(id).ok_or_else(|| {
+            let known: Vec<&str> = self
+                .catalog
+                .models
+                .iter()
+                .filter(|m| !m.pending_pin)
+                .map(|m| m.id.as_str())
+                .collect();
             CmError::invalid_field(
                 "model",
                 format!("unknown model `{id}` (available: {})", known.join(", ")),
             )
-        })
+        })?;
+        if e.pending_pin {
+            return Err(CmError::invalid_field(
+                "model",
+                format!(
+                    "`{}` cannot be downloaded yet: its checksum has not been pinned in the model list",
+                    e.id
+                ),
+            ));
+        }
+        Ok(e)
     }
 
     /// Installed means the final file exists: a download only renames a verified file into place
@@ -318,9 +352,9 @@ impl ModelStore {
     /// Errors with [`no_model`] when none can be used.
     pub fn resolve(&self, requested: Option<&str>) -> Result<(String, PathBuf), CmError> {
         if let Some(id) = requested.filter(|s| !s.is_empty()) {
-            self.entry(id)?;
-            let p = self.path_of(id).ok_or_else(|| no_model(Some(id)))?;
-            return Ok((id.to_owned(), p));
+            let e = self.entry(id)?;
+            let p = self.path_of(&e.id).ok_or_else(|| no_model(Some(id)))?;
+            return Ok((e.id.clone(), p));
         }
         if let Some(id) = self.active() {
             if let Some(p) = self.path_of(&id) {
@@ -331,7 +365,7 @@ impl ModelStore {
             .catalog
             .models
             .iter()
-            .filter(|m| self.file_of(m).is_file())
+            .filter(|m| !m.pending_pin && self.file_of(m).is_file())
             .collect();
         if let [only] = installed.as_slice() {
             return Ok((only.id.clone(), self.file_of(only)));
@@ -346,6 +380,7 @@ impl ModelStore {
             .catalog
             .models
             .iter()
+            .filter(|e| !e.pending_pin)
             .map(|e| {
                 let path = self.file_of(e);
                 let installed = path.is_file();
@@ -370,14 +405,14 @@ impl ModelStore {
 
     /// Makes an installed model the default one.
     pub fn select(&self, id: &str) -> Result<(), CmError> {
-        self.entry(id)?;
-        if !self.is_installed(id) {
+        let id = self.entry(id)?.id.clone();
+        if !self.is_installed(&id) {
             return Err(CmError::invalid_field(
                 "model",
                 format!("`{id}` is not installed: download or import it first"),
             ));
         }
-        self.write_state(Some(id))
+        self.write_state(Some(&id))
     }
 
     fn write_state(&self, active: Option<&str>) -> Result<(), CmError> {
@@ -392,7 +427,7 @@ impl ModelStore {
     /// removed. Removing the active model clears the choice.
     pub fn remove(&self, id: &str) -> Result<bool, CmError> {
         let e = self.entry(id)?.clone();
-        let was_active = self.active().as_deref() == Some(id);
+        let was_active = self.active().as_deref() == Some(e.id.as_str());
         let mut removed = false;
         for p in [self.file_of(&e), self.part_of(&e)] {
             match fs::remove_file(&p) {
@@ -441,7 +476,7 @@ impl ModelStore {
         let tmp = self.part_of(&e);
         fs::copy(src, &tmp).map_err(io_error)?;
         fs::rename(&tmp, &dest).map_err(io_error)?;
-        self.activate_if_first(id)?;
+        self.activate_if_first(&e.id)?;
         Ok(dest)
     }
 
@@ -559,7 +594,7 @@ impl ModelStore {
         }
         let dest = self.file_of(&e);
         fs::rename(&part, &dest).map_err(io_error)?;
-        self.activate_if_first(id)?;
+        self.activate_if_first(&e.id)?;
         let _ = progress(DownloadProgress {
             model: e.id.clone(),
             bytes_done: e.bytes,
@@ -647,9 +682,64 @@ mod tests {
     fn builtin_catalog_is_valid() {
         let c = Catalog::parse(BUILTIN_CATALOG).unwrap();
         let ids: Vec<&str> = c.models.iter().map(|m| m.id.as_str()).collect();
-        assert_eq!(ids, ["tiny", "base", "small", "medium", "large"]);
+        assert_eq!(
+            ids,
+            ["tiny", "base", "small", "medium", "large", "large-v3-turbo"]
+        );
         assert!(c.models.iter().all(|m| m.url.contains("/resolve/")));
         assert_eq!(Catalog::builtin(), c);
+        // Every entry except the ones waiting for the maintainer's pin has a real checksum.
+        for m in c.models.iter().filter(|m| !m.pending_pin) {
+            assert_eq!(m.sha256.len(), 64, "{}", m.id);
+            assert!(m.bytes > 0, "{}", m.id);
+        }
+        // `large` is large-v3 under its stable id.
+        assert_eq!(c.get("large-v3").map(|m| m.id.as_str()), Some("large"));
+        assert_eq!(c.get("large").unwrap().file, "ggml-large-v3.bin");
+    }
+
+    /// The turbo model is catalogued but unpinned: it is not listed, and the store refuses every
+    /// action on it (the downloader never sees an entry without a checksum).
+    #[test]
+    fn an_unpinned_entry_is_hidden_and_refused() {
+        let c = Catalog::builtin();
+        let turbo = c.get("large-v3-turbo").unwrap();
+        assert!(
+            turbo.pending_pin,
+            "fill in sha256/bytes/ram_mb, then clear pending_pin"
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let store = ModelStore::with_catalog(dir.path(), c);
+        let listed: Vec<String> = store.list().models.into_iter().map(|m| m.id).collect();
+        assert_eq!(listed, ["tiny", "base", "small", "medium", "large"]);
+        let mut never =
+            |_p: DownloadProgress| -> bool { panic!("no network for an unpinned model") };
+        let e = store.download("large-v3-turbo", &mut never).unwrap_err();
+        assert!(
+            e.to_string().contains("checksum has not been pinned"),
+            "{e}"
+        );
+        assert!(store.select("large-v3-turbo").is_err());
+        assert!(store.resolve(Some("large-v3-turbo")).is_err());
+        assert!(store.remove("large-v3-turbo").is_err());
+        // A pinned catalogue row still needs a valid checksum.
+        let bad = r#"{"models":[{"id":"a","label":"A","file":"a.bin","url":"https://x/a","sha256":"","bytes":0}]}"#;
+        assert!(Catalog::parse(bad).is_err());
+        let pending = bad.replace("\"bytes\":0", "\"bytes\":0,\"pending_pin\":true");
+        assert!(Catalog::parse(&pending).is_ok());
+    }
+
+    /// An alias finds the canonical entry everywhere the store takes an id.
+    #[test]
+    fn an_alias_resolves_to_the_canonical_id() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = ModelStore::with_catalog(dir.path(), Catalog::builtin());
+        fs::create_dir_all(store.models_dir()).unwrap();
+        fs::write(store.models_dir().join("ggml-large-v3.bin"), b"x").unwrap();
+        assert!(store.is_installed("large-v3"));
+        store.select("large-v3").unwrap();
+        assert_eq!(store.active().as_deref(), Some("large"));
+        assert_eq!(store.resolve(Some("large-v3")).unwrap().0, "large");
     }
 
     /// Regression: the first `https://` download used to panic because the agent defaulted to a TLS

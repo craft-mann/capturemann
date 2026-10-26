@@ -37,6 +37,8 @@ Manual: `tests/manual/VOC-2.md`.
 
 ## Stage 3: Whisper models and translation to English (AI-1, AI-5)
 
+**Status Oct 26, 2026:** P3.2 backend built (tested with fakes); P3.1 entry added but unpinned (checksum, size, memory and URL check are the maintainer's), no UI. Details: AI-5 "as built" in `../features/07-ai.md`.
+
 **P3.1** Pin `large-v3-turbo` and `large-v3` in `crates/cm-ai/data/models.json` (commit-pinned URL, SHA-256, size, `ram_mb`); AI page rows and labels (V8 speech section).
 **P3.2** Whisper translate task in `cm-ai/src/whisper.rs`; the turbo rule (large-v3, else medium, else `translation_model_missing`); `translations/<lang>.json`; language switcher in the transcript; per-language exports; `translate_captions` tool and CLI. The text-model engine arrives in Stage 4.
 

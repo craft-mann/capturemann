@@ -25,7 +25,7 @@ use serde_json::Value;
 
 use crate::ai::{
     AiServices, CaptionFormat, CaptionService, ModelService, SuggestService, TranscribeRequest,
-    TranscribeService,
+    TranscribeService, TranslateOutput, TranslateRequest, TranslateService,
 };
 
 /// The services backed by `cm-ai`. Plug into [`crate::DaemonBuilder::ai`].
@@ -43,9 +43,13 @@ pub fn services_with(root: PathBuf, engine: Option<Arc<dyn Transcriber>>) -> AiS
 fn services(root: Option<PathBuf>, engine: Option<Arc<dyn Transcriber>>) -> AiServices {
     AiServices {
         models: Arc::new(RealModels { root: root.clone() }),
-        transcribe: Arc::new(RealTranscribe { root, engine }),
+        transcribe: Arc::new(RealTranscribe {
+            root: root.clone(),
+            engine: engine.clone(),
+        }),
         captions: Arc::new(RealCaptions),
         suggest: Arc::new(RealSuggest),
+        translate: Arc::new(RealTranslate { root, engine }),
     }
 }
 
@@ -127,6 +131,53 @@ impl TranscribeService for RealTranscribe {
         };
         match transcribe_recording(&req.bundle_dir, engine, &opts, progress) {
             Ok(t) => Ok(Some(t)),
+            Err(e) if is_cancelled(&e) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+/// Caption translation (AI-5). Only the Whisper engine exists here: the text model is the AI-7
+/// provider, so [`TranslateService::has_text_model`] stays false and a non-English target fails
+/// with `no_text_model`.
+struct RealTranslate {
+    root: Option<PathBuf>,
+    engine: Option<Arc<dyn Transcriber>>,
+}
+
+impl TranslateService for RealTranslate {
+    fn whisper(
+        &self,
+        req: &TranslateRequest,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Option<TranslateOutput>, CmError> {
+        // The model is resolved and loaded for this job only, like a transcription. Turbo cannot
+        // translate; the daemon never asks for it, and this refuses it all the same.
+        let (id, path) = store(&self.root).resolve(Some(&req.model))?;
+        if !cm_ai::translate::model_can_translate(&id) {
+            return Err(cm_ai::translate::turbo_cannot_translate(&id));
+        }
+        let whisper;
+        let engine: &dyn Transcriber = match &self.engine {
+            Some(e) => e.as_ref(),
+            None => {
+                whisper = WhisperTranscriber::load(&path, &id, true)?;
+                &whisper
+            }
+        };
+        match cm_ai::translate::translate_with_whisper(
+            &req.bundle_dir,
+            engine,
+            Some(&req.source_language),
+            &id,
+            &req.source_lines,
+            progress,
+        ) {
+            Ok(lines) => Ok(Some(TranslateOutput {
+                lines,
+                model: id,
+                untranslated: 0,
+            })),
             Err(e) if is_cancelled(&e) => Ok(None),
             Err(e) => Err(e),
         }

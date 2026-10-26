@@ -367,6 +367,7 @@ pub(crate) fn tool_title(name: &str) -> String {
         "replace_in_captions" => tr!("Replace text in captions"),
         "set_caption_options" => tr!("Show or hide captions"),
         "export_captions" => tr!("Export captions (SRT, VTT, TXT)"),
+        "translate_captions" => tr!("Translate captions"),
         "suggest_zooms" => tr!("Suggest zoom regions"),
         "suggest_cuts" => tr!("Suggest cuts"),
         "list_destinations" => tr!("List save destinations"),
