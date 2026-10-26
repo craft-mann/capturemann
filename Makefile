@@ -1,11 +1,12 @@
 # Small convenience entry points. Run `make help`.
-.PHONY: report help bundle bundle-release run-bundle licenses report ffmpeg dmg notarize verify-release release
+.PHONY: report help bundle bundle-dev bundle-release run-bundle run-bundle-dev licenses report ffmpeg dmg notarize verify-release release
 
 help:
 	@echo "make ffmpeg      build the LGPL FFmpeg (ffmpeg, ffprobe, libvpx, libopus) into packaging/ffmpeg/out (macOS arm64)"
 	@echo "make bundle      build release binaries and assemble target/bundle/CaptureMann.app (macOS); bundles packaging/ffmpeg/out when it exists (CM_NO_FFMPEG=1 skips)"
 	@echo "make bundle-release  like bundle, but fails unless the LGPL FFmpeg and its licence files are bundled"
 	@echo "make run-bundle  bundle, then open the app (permissions attach to CaptureMann)"
+	@echo "make bundle-dev  like bundle, with the bundle id dev.capturemann.app.dev: keeps your own builds' permission grants apart from the installed release (make run-bundle-dev opens it)"
 	@echo "make report     run the tests, cargo deny and Trivy and write reports/ (commit it with a release)"
 	@echo "make licenses    regenerate THIRD_PARTY_LICENSES.md (bundled into the app)"
 	@echo "make dmg         build target/bundle/CaptureMann-<version>-arm64.dmg from target/bundle/CaptureMann.app (signed when CM_SIGN_IDENTITY is a real identity)"
@@ -30,6 +31,16 @@ bundle-release:
 	CM_REQUIRE_FFMPEG=1 bash packaging/macos/bundle.sh
 
 run-bundle: bundle
+	open target/bundle/CaptureMann.app
+
+# Development builds under their own bundle id (the TCC identity), so a release installed in
+# /Applications and a build from this checkout do not fight over Screen Recording grants.
+DEV_BUNDLE_ID ?= dev.capturemann.app.dev
+
+bundle-dev:
+	CM_BUNDLE_ID=$(DEV_BUNDLE_ID) bash packaging/macos/bundle.sh
+
+run-bundle-dev: bundle-dev
 	open target/bundle/CaptureMann.app
 
 # --- Release (macOS, Apple Silicon). See packaging/macos/README.md, section "Releasing". ---

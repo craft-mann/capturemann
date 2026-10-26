@@ -1,14 +1,36 @@
 version: 2
 updates:
+  # Rust crates. One monthly PR for minor and patch updates. Major versions are not proposed for
+  # the crates that are pinned together with GPUI or only matter on Windows (a wgpu, windows or
+  # objc2 major bump breaks the GPUI build); take those on purpose, with the GPUI upgrade.
   - package-ecosystem: cargo
     directory: /
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 3
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: wgpu*
+        update-types: ["version-update:semver-major"]
+      - dependency-name: gpui*
+        update-types: ["version-update:semver-major"]
+      - dependency-name: windows*
+        update-types: ["version-update:semver-major"]
+      - dependency-name: objc2*
+        update-types: ["version-update:semver-major"]
+      - dependency-name: sha2
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions. All updates in one PR a month. Every action is pinned to a commit SHA with
+  # the version in a comment; Dependabot updates both. Read the release notes of a major bump
+  # before merging: the workflows run with signing secrets.
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    open-pull-requests-limit: 2
+    groups:
+      actions:
+        patterns: ["*"]

@@ -39,7 +39,7 @@ window; the Dock icon stays.
 
 | Variable | Meaning |
 | --- | --- |
-| `CM_BUNDLE_ID` | Bundle identifier, default `dev.capturemann.app`. The owner may change it before the first release; it is the TCC identity, so changing it later makes everyone re-grant permissions. |
+| `CM_BUNDLE_ID` | Bundle identifier, default `dev.capturemann.app`. It is the TCC identity (the Screen Recording grant belongs to it plus the signing requirement), so changing it makes everyone re-grant permissions. `make bundle-dev` builds with `dev.capturemann.app.dev` so a local build does not clash with the notarized release installed under `dev.capturemann.app`. |
 | `CM_SIGN_IDENTITY` | codesign identity (certificate name or SHA-1). When unset, `bundle.sh` uses "CaptureMann Local Dev" if `security find-identity -v -p codesigning` lists it, else ad-hoc (`-`). It prints the mode it chose and never creates or changes keychain items. |
 | `CM_HARDENED=1` | Add `--options runtime --timestamp` (only useful with a real identity; required for notarization). |
 | `CM_SKIP_BUILD=1` | Reuse `target/release` instead of running `cargo build --release`. |

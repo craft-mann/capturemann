@@ -10,6 +10,11 @@ missing" at the top of the library. Fix it once by using a stable signing identi
 `packaging/macos/create-dev-identity.sh` (it asks before touching your keychain). After that
 `make bundle` signs with "CaptureMann Local Dev" automatically and the grant survives rebuilds.
 
+**A release installed next to your own builds.** The notarized release and a local build must not
+share a bundle id, or each one's Screen Recording grant fails the other's check. Build local copies
+with `make bundle-dev` (bundle id `dev.capturemann.app.dev`); see
+[Building from source](../development/building.md#a-development-build-next-to-an-installed-release).
+
 Other things worth knowing:
 
 - If a grant is stale, switch the CaptureMann entry off and on in System Settings → Privacy &

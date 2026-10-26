@@ -24,14 +24,26 @@ purpose and one at a time (commands in [`CLAUDE.md`](../../CLAUDE.md)). Manual t
 make ffmpeg          # builds the LGPL FFmpeg from pinned sources (about 10 minutes, arm64)
 make bundle          # target/bundle/CaptureMann.app (CM_NO_FFMPEG=1 skips FFmpeg)
 make run-bundle      # same, and opens it
+make bundle-dev      # same as bundle, under the bundle id dev.capturemann.app.dev (see below)
 make bundle-release  # same, and fails unless FFmpeg and its licence files are bundled
 make licenses        # regenerates THIRD_PARTY_LICENSES.md (after Cargo.lock changes)
 ```
 
 Run the app as a bundle, not as a bare binary, so macOS permissions are granted to "CaptureMann"
-rather than to the terminal that launched it. Signing, the stable local identity and the notarization
-TODO are in [`packaging/macos/README.md`](../../packaging/macos/README.md); the FFmpeg build is in
+rather than to the terminal that launched it. Signing, the stable local identity and notarization
+are in [`packaging/macos/README.md`](../../packaging/macos/README.md); the FFmpeg build is in
 [`packaging/ffmpeg/README.md`](../../packaging/ffmpeg/README.md).
+
+## A development build next to an installed release
+
+macOS ties the Screen Recording grant to the bundle id **and** the signing requirement. A release
+(notarized, Developer ID) and a build from this checkout (local identity or ad hoc) both use
+`dev.capturemann.app` by default, so whichever you open second fails the other's grant: the log shows
+`Failed to match existing code requirement`, and the permissions screen says "not granted" although
+the switch is on. Build your own copies with `make bundle-dev` (bundle id `dev.capturemann.app.dev`)
+and each keeps its own grants. The Keychain item (service `dev.capturemann.app`) is still shared, so
+the first launch of a differently signed copy asks once for the login password: choose **Always
+Allow**.
 
 ## Permissions on a development Mac
 
