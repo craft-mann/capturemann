@@ -1,0 +1,249 @@
+{
+  "id": "product_recap",
+  "name": "Product presentation recap",
+  "version": 1,
+  "description": "Product and audience, features shown, questions, concerns and next steps.",
+  "context_fields": [
+    "title",
+    "attendees",
+    "agenda"
+  ],
+  "suggested_for": [
+    "product_demo"
+  ],
+  "instructions": "Write a recap of a product presentation or demo. Say which product was shown and who the audience was, if it was said. List the features shown, the questions the audience asked, the concerns raised and the agreed next steps (with an owner for each).",
+  "sections": [
+    {
+      "id": "product_audience",
+      "title": "Product and audience",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 3,
+      "fields": [
+        {
+          "id": "product",
+          "label": "Product"
+        },
+        {
+          "id": "audience",
+          "label": "Audience",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "id": "features_shown",
+      "title": "Features shown",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 40,
+      "fields": [
+        {
+          "id": "text",
+          "label": "Text"
+        }
+      ]
+    },
+    {
+      "id": "questions_asked",
+      "title": "Questions asked",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 40,
+      "fields": [
+        {
+          "id": "text",
+          "label": "Text"
+        }
+      ]
+    },
+    {
+      "id": "concerns_raised",
+      "title": "Concerns raised",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 30,
+      "fields": [
+        {
+          "id": "text",
+          "label": "Text"
+        }
+      ]
+    },
+    {
+      "id": "next_steps",
+      "title": "Next steps",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 30,
+      "fields": [
+        {
+          "id": "task",
+          "label": "Step"
+        },
+        {
+          "id": "owner",
+          "label": "Owner",
+          "person": "owner"
+        }
+      ]
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "properties": {
+      "product_audience": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "product": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "audience": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "product",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 3
+      },
+      "features_shown": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "text",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 40
+      },
+      "questions_asked": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "text",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 40
+      },
+      "concerns_raised": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "text",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 30
+      },
+      "next_steps": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "task": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "owner": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "task",
+            "owner",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 30
+      }
+    },
+    "required": [
+      "product_audience",
+      "features_shown",
+      "questions_asked",
+      "concerns_raised",
+      "next_steps"
+    ],
+    "additionalProperties": false
+  }
+}

@@ -9,8 +9,8 @@ use serde_json::{json, Value};
 
 use super::{plain, Ctx};
 use crate::args::{
-    AiCmd, CaptionsCmd, ModelsCmd, SpeakersArgs, SpeakersCmd, SuggestCmd, TextModelCmd,
-    TranscribeArgs, TranslateArgs,
+    AiCmd, CaptionsCmd, ModelsCmd, ReportArgs, ReportCmd, SpeakersArgs, SpeakersCmd, SuggestCmd,
+    TextModelCmd, TranscribeArgs, TranslateArgs,
 };
 use crate::client::Client;
 use crate::error::CliError;
@@ -79,6 +79,7 @@ pub(super) async fn ai(cx: &mut Ctx<'_>, cmd: AiCmd) -> Result<(), CliError> {
             });
             Ok(())
         }
+        AiCmd::Report(a) => report(cx, a).await,
         AiCmd::Transcribe(a) => transcribe(cx, a).await,
         AiCmd::Transcript { id, words } => transcript(cx, id, words).await,
         AiCmd::Translate(a) => translate(cx, a).await,
@@ -206,6 +207,191 @@ fn time_arg(field: &str, s: &str) -> Result<Value, CliError> {
         .ok_or_else(|| {
             CliError::invalid_input(format!("{field}: `{s}` is not seconds or t:<ticks>"))
         })
+}
+
+/// `ai report ...`: the AI-9 reports.
+async fn report(cx: &mut Ctx<'_>, a: ReportArgs) -> Result<(), CliError> {
+    match a.cmd {
+        Some(ReportCmd::Templates) => {
+            let mut c = cx.client().await?;
+            let r = c.call("list_report_templates", json!({})).await?;
+            cx.emit(&r, |r| {
+                let mut s = String::new();
+                for t in r["templates"].as_array().cloned().unwrap_or_default() {
+                    let _ = writeln!(s, "{:<14} {}", plain(&t["id"]), plain(&t["name"]));
+                    let _ = writeln!(s, "{:<14} {}", "", plain(&t["description"]));
+                    let fields: Vec<String> = t["context_fields"]
+                        .as_array()
+                        .map(|a| a.iter().map(plain).collect())
+                        .unwrap_or_default();
+                    let _ = writeln!(s, "{:<14} context: {}", "", fields.join(", "));
+                    if let Some(n) = t["notes_only"].as_str() {
+                        let _ = writeln!(s, "{:<14} {n}", "");
+                    }
+                }
+                s
+            });
+            Ok(())
+        }
+        Some(ReportCmd::Get { id, report }) => {
+            let mut p = json!({ "capture_id": id });
+            if let Some(r) = report {
+                p["report_id"] = json!(r);
+            }
+            let mut c = cx.client().await?;
+            let r = c.call("get_report", p).await?;
+            cx.emit(&r, |r| {
+                if let Some(md) = r["markdown"].as_str().filter(|_| r["report"].is_object()) {
+                    return md.to_owned();
+                }
+                let mut s = format!("Reports of {}:\n", plain(&r["capture_id"]));
+                for x in r["reports"].as_array().cloned().unwrap_or_default() {
+                    let _ = writeln!(
+                        s,
+                        "  {}  {}  {}{}",
+                        plain(&x["report_id"]),
+                        plain(&x["template_name"]),
+                        plain(&x["created"]),
+                        if x["edited"] == json!(true) {
+                            "  (edited)"
+                        } else {
+                            ""
+                        },
+                    );
+                }
+                if r["reports"].as_array().is_none_or(Vec::is_empty) {
+                    s.push_str("  (none)\n");
+                }
+                s
+            });
+            Ok(())
+        }
+        Some(ReportCmd::Export {
+            id,
+            report,
+            format,
+            out_dir,
+        }) => {
+            let mut p = json!({ "capture_id": id, "report_id": report, "format": format });
+            if let Some(d) = out_dir {
+                p["out_dir"] = json!(d.to_string_lossy());
+            }
+            let params = cx.mutating(p, "");
+            let mut c = cx.client().await?;
+            let r = c.call("export_report", params).await?;
+            cx.emit(&r, |r| format!("Wrote {}", plain(&r["path"])));
+            Ok(())
+        }
+        Some(ReportCmd::Delete { id, report }) => {
+            let params = cx.mutating(json!({ "capture_id": id, "report_id": report }), "");
+            let mut c = cx.client().await?;
+            let r = c.call("delete_report", params).await?;
+            cx.emit(&r, |r| {
+                format!(
+                    "Deleted the report {} of {}\n  undo with `capturemann undo {}`",
+                    plain(&r["report_id"]),
+                    plain(&r["capture_id"]),
+                    plain(&r["capture_id"]),
+                )
+            });
+            Ok(())
+        }
+        Some(ReportCmd::Edit { id, report, file }) => {
+            let markdown = if file.as_os_str() == "-" {
+                let mut s = String::new();
+                cx.env
+                    .stdin
+                    .read_to_string(&mut s)
+                    .map_err(|e| CliError::invalid_input(format!("cannot read stdin: {e}")))?;
+                s
+            } else {
+                std::fs::read_to_string(&file).map_err(|e| {
+                    CliError::invalid_input(format!("cannot read `{}`: {e}", file.display()))
+                })?
+            };
+            let p = json!({ "capture_id": id, "report_id": report, "markdown": markdown });
+            let params = cx.mutating(p, "");
+            let mut c = cx.client().await?;
+            let r = c.call("edit_report", params).await?;
+            cx.emit(&r, |r| {
+                format!(
+                    "Edited the report {} of {} (revision {})\n  undo with `capturemann undo {}`",
+                    plain(&r["report_id"]),
+                    plain(&r["capture_id"]),
+                    plain(&r["revision"]),
+                    plain(&r["capture_id"]),
+                )
+            });
+            Ok(())
+        }
+        None => generate_report(cx, a).await,
+    }
+}
+
+async fn generate_report(cx: &mut Ctx<'_>, a: ReportArgs) -> Result<(), CliError> {
+    let mut p = json!({ "capture_id": a.id.unwrap_or_default(),
+                        "template": a.template.unwrap_or_default() });
+    if let Some(l) = a.lang {
+        p["language"] = json!(l);
+    }
+    if let Some(r) = a.report {
+        p["report_id"] = json!(r);
+    }
+    let mut context = serde_json::Map::new();
+    if let Some(t) = a.title {
+        context.insert("title".into(), json!(t));
+    }
+    if !a.attendees.is_empty() {
+        context.insert("attendees".into(), json!(a.attendees));
+    }
+    if let Some(t) = a.agenda {
+        context.insert("agenda".into(), json!(t));
+    }
+    if let Some(t) = a.role {
+        context.insert("role".into(), json!(t));
+    }
+    if !a.competencies.is_empty() {
+        context.insert("competencies".into(), json!(a.competencies));
+    }
+    if !context.is_empty() {
+        p["context"] = Value::Object(context);
+    }
+    let params = cx.mutating(p, "");
+    let mut c = cx.client().await?;
+    let started = c.call("generate_report", params).await?;
+    if !a.wait {
+        cx.emit(&started, |r| {
+            format!(
+                "Writing the `{}` report of {}: job {}{}\n  watch it with `capturemann jobs get {}`",
+                plain(&r["template"]),
+                plain(&r["capture_id"]),
+                plain(&r["job_id"]),
+                if r["reused"] == json!(true) { " (already running)" } else { "" },
+                plain(&r["job_id"]),
+            )
+        });
+        return Ok(());
+    }
+    let job = wait_job(
+        cx,
+        &mut c,
+        &plain(&started["job_id"]),
+        "writing the report",
+        a.timeout,
+    )
+    .await?;
+    cx.emit(&job, |j| {
+        let r = &j["result"];
+        format!(
+            "Wrote report {} of {} ({} items dropped without a matching citation)\n  read it with `capturemann ai report get {} {}`",
+            plain(&r["report_id"]),
+            plain(&r["capture_id"]),
+            plain(&r["dropped_uncited"]),
+            plain(&r["capture_id"]),
+            plain(&r["report_id"]),
+        )
+    });
+    Ok(())
 }
 
 /// `ai speakers <id>` (`diarize`) and `ai speakers rename|merge|assign|list` (`set_speakers`,

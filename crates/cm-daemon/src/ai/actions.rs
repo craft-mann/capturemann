@@ -75,6 +75,37 @@ pub enum AiOp {
     SuggestCuts {
         capture_id: String,
     },
+    /// AI-9: the built-in report templates.
+    ListReportTemplates,
+    /// AI-9: a `report` job. `report_id` regenerates that report (replaced only on success).
+    GenerateReport {
+        capture_id: String,
+        /// A template id.
+        template: String,
+        language: Option<String>,
+        context: cm_ai::report::ReportContext,
+        report_id: Option<String>,
+    },
+    GetReport {
+        capture_id: String,
+        report_id: Option<String>,
+    },
+    ExportReport {
+        capture_id: String,
+        report_id: String,
+        format: ReportFormat,
+        out_dir: Option<String>,
+    },
+    DeleteReport {
+        capture_id: String,
+        report_id: String,
+    },
+    /// The Report panel's "edit as Markdown".
+    EditReport {
+        capture_id: String,
+        report_id: String,
+        markdown: String,
+    },
 }
 
 impl AiOp {
@@ -96,6 +127,12 @@ impl AiOp {
             AiOp::SuggestZooms { .. } => "suggest_zooms",
             AiOp::SuggestCuts { .. } => "suggest_cuts",
             AiOp::TranslateCaptions { .. } => "translate_captions",
+            AiOp::ListReportTemplates => "list_report_templates",
+            AiOp::GenerateReport { .. } => "generate_report",
+            AiOp::GetReport { .. } => "get_report",
+            AiOp::ExportReport { .. } => "export_report",
+            AiOp::DeleteReport { .. } => "delete_report",
+            AiOp::EditReport { .. } => "edit_report",
         }
     }
 
@@ -111,6 +148,11 @@ impl AiOp {
             | AiOp::TranslateCaptions { capture_id, .. }
             | AiOp::Diarize { capture_id, .. }
             | AiOp::SetSpeakers { capture_id, .. }
+            | AiOp::GenerateReport { capture_id, .. }
+            | AiOp::GetReport { capture_id, .. }
+            | AiOp::ExportReport { capture_id, .. }
+            | AiOp::DeleteReport { capture_id, .. }
+            | AiOp::EditReport { capture_id, .. }
             | AiOp::SuggestZooms { capture_id }
             | AiOp::SuggestCuts { capture_id } => Some(capture_id),
             _ => None,
@@ -239,6 +281,62 @@ impl AiParams {
                     o.insert("headset".into(), json!(true));
                 }
             }
+            AiOp::ListReportTemplates => {}
+            AiOp::GenerateReport {
+                capture_id,
+                template,
+                language,
+                context,
+                report_id,
+            } => {
+                o.insert("capture_id".into(), json!(capture_id));
+                o.insert("template".into(), json!(template));
+                insert_language(&mut o, language);
+                if !context.used_fields().is_empty() {
+                    o.insert("context".into(), json!(context));
+                }
+                if let Some(r) = report_id {
+                    o.insert("report_id".into(), json!(r));
+                }
+            }
+            AiOp::GetReport {
+                capture_id,
+                report_id,
+            } => {
+                o.insert("capture_id".into(), json!(capture_id));
+                if let Some(r) = report_id {
+                    o.insert("report_id".into(), json!(r));
+                }
+            }
+            AiOp::ExportReport {
+                capture_id,
+                report_id,
+                format,
+                out_dir,
+            } => {
+                o.insert("capture_id".into(), json!(capture_id));
+                o.insert("report_id".into(), json!(report_id));
+                o.insert("format".into(), json!(format.ext()));
+                if let Some(d) = out_dir {
+                    o.insert("out_dir".into(), json!(d));
+                }
+            }
+            AiOp::DeleteReport {
+                capture_id,
+                report_id,
+            } => {
+                o.insert("capture_id".into(), json!(capture_id));
+                o.insert("report_id".into(), json!(report_id));
+            }
+            AiOp::EditReport {
+                capture_id,
+                report_id,
+                markdown,
+            } => {
+                o.insert("capture_id".into(), json!(capture_id));
+                o.insert("report_id".into(), json!(report_id));
+                o.insert("characters".into(), json!(markdown.chars().count()));
+            }
             AiOp::SetSpeakers { capture_id, edit } => {
                 o.insert("capture_id".into(), json!(capture_id));
                 if !edit.rename.is_empty() {
@@ -318,6 +416,20 @@ pub(crate) fn summary(p: &AiParams) -> String {
         }
         AiOp::Diarize { capture_id, .. } => format!("Tell the speakers of {capture_id} apart"),
         AiOp::SetSpeakers { capture_id, .. } => format!("Change the speakers of {capture_id}"),
+        AiOp::GenerateReport {
+            capture_id,
+            template,
+            ..
+        } => format!("Write a `{template}` report of {capture_id}"),
+        AiOp::DeleteReport {
+            capture_id,
+            report_id,
+        } => format!("Delete the report {report_id} of {capture_id}"),
+        AiOp::EditReport {
+            capture_id,
+            report_id,
+            ..
+        } => format!("Edit the report {report_id} of {capture_id}"),
         other => format!("Run {}", other.method()),
     }
 }
@@ -627,6 +739,81 @@ fn speaker_edit(f: &Fields<'_>) -> Result<cm_ai::speakers::SpeakerEdit, CmError>
     Ok(edit)
 }
 
+fn report_id_opt(f: &Fields<'_>) -> Result<Option<String>, CmError> {
+    match f.str_opt("report_id")? {
+        None => Ok(None),
+        Some(r) if cm_ai::report::store::valid_id(&r) => Ok(Some(r)),
+        Some(_) => Err(CmError::invalid_field(
+            "report_id",
+            "must be a report id such as `rpt_1a2b3c4d` (see `get_report`)",
+        )),
+    }
+}
+
+/// The `context` object of `generate_report`: `title`, `attendees`, `agenda`, `role`,
+/// `competencies`; the template must use every field that is set.
+fn report_context(
+    f: &Fields<'_>,
+    template: &cm_ai::report::Template,
+) -> Result<cm_ai::report::ReportContext, CmError> {
+    let ctx = match f.obj.get("context") {
+        None | Some(Value::Null) => return Ok(Default::default()),
+        Some(v) => v,
+    };
+    let o = ctx
+        .as_object()
+        .ok_or_else(|| CmError::invalid_field("context", "must be an object"))?;
+    for k in o.keys() {
+        if !matches!(
+            k.as_str(),
+            "title" | "attendees" | "agenda" | "role" | "competencies"
+        ) {
+            return Err(CmError::invalid_field(
+                &format!("context.{k}"),
+                "unknown parameter",
+            ));
+        }
+    }
+    let string = |k: &str| -> Result<Option<String>, CmError> {
+        match o.get(k) {
+            None | Some(Value::Null) => Ok(None),
+            Some(Value::String(s)) => Ok(Some(s.clone())),
+            Some(_) => Err(CmError::invalid_field(
+                &format!("context.{k}"),
+                "must be a string",
+            )),
+        }
+    };
+    let list = |k: &str| -> Result<Vec<String>, CmError> {
+        match o.get(k) {
+            None | Some(Value::Null) => Ok(vec![]),
+            Some(Value::Array(a)) => a
+                .iter()
+                .map(|x| {
+                    x.as_str().map(str::to_owned).ok_or_else(|| {
+                        CmError::invalid_field(
+                            &format!("context.{k}"),
+                            "must be an array of strings",
+                        )
+                    })
+                })
+                .collect(),
+            Some(_) => Err(CmError::invalid_field(
+                &format!("context.{k}"),
+                "must be an array of strings",
+            )),
+        }
+    };
+    cm_ai::report::ReportContext {
+        title: string("title")?,
+        attendees: list("attendees")?,
+        agenda: string("agenda")?,
+        role: string("role")?,
+        competencies: list("competencies")?,
+    }
+    .checked(template)
+}
+
 /// Validates the input of one AI method.
 pub(crate) fn parse(method: &str, f: &Fields<'_>) -> Result<Action, CmError> {
     let op = match method {
@@ -794,6 +981,76 @@ pub(crate) fn parse(method: &str, f: &Fields<'_>) -> Result<Action, CmError> {
             AiOp::SetSpeakers {
                 capture_id: f.str_req("capture_id")?,
                 edit: speaker_edit(f)?,
+            }
+        }
+        "list_report_templates" => {
+            f.only(&[])?;
+            AiOp::ListReportTemplates
+        }
+        "generate_report" => {
+            f.only(&[
+                "capture_id",
+                "template",
+                "language",
+                "context",
+                "report_id",
+                "request_id",
+            ])?;
+            let raw = f.str_req("template")?;
+            let template = cm_ai::report::find_template(&raw)
+                .ok_or_else(|| cm_ai::report::unknown_template(&raw))?;
+            AiOp::GenerateReport {
+                capture_id: f.str_req("capture_id")?,
+                template: template.id.clone(),
+                language: translation_language(f)?,
+                context: report_context(f, template)?,
+                report_id: report_id_opt(f)?,
+            }
+        }
+        "get_report" => {
+            f.only(&["capture_id", "report_id"])?;
+            AiOp::GetReport {
+                capture_id: f.str_req("capture_id")?,
+                report_id: report_id_opt(f)?,
+            }
+        }
+        "export_report" => {
+            f.only(&["capture_id", "report_id", "format", "out_dir", "request_id"])?;
+            let format = match f.str_req("format")?.as_str() {
+                "md" => ReportFormat::Md,
+                "txt" => ReportFormat::Txt,
+                _ => return Err(CmError::invalid_field("format", "must be `md` or `txt`")),
+            };
+            AiOp::ExportReport {
+                capture_id: f.str_req("capture_id")?,
+                report_id: report_id_opt(f)?
+                    .ok_or_else(|| CmError::invalid_field("report_id", "is required"))?,
+                format,
+                out_dir: f.str_opt("out_dir")?,
+            }
+        }
+        "delete_report" => {
+            f.only(&["capture_id", "report_id", "request_id"])?;
+            AiOp::DeleteReport {
+                capture_id: f.str_req("capture_id")?,
+                report_id: report_id_opt(f)?
+                    .ok_or_else(|| CmError::invalid_field("report_id", "is required"))?,
+            }
+        }
+        "edit_report" => {
+            f.only(&["capture_id", "report_id", "markdown", "request_id"])?;
+            let markdown = f.str_req("markdown")?;
+            if markdown.chars().count() > MAX_REPORT_MARKDOWN_CHARS {
+                return Err(CmError::invalid_field(
+                    "markdown",
+                    format!("at most {MAX_REPORT_MARKDOWN_CHARS} characters"),
+                ));
+            }
+            AiOp::EditReport {
+                capture_id: f.str_req("capture_id")?,
+                report_id: report_id_opt(f)?
+                    .ok_or_else(|| CmError::invalid_field("report_id", "is required"))?,
+                markdown,
             }
         }
         other => {

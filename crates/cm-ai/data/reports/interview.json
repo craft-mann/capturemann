@@ -1,0 +1,234 @@
+{
+  "id": "interview",
+  "name": "Interview notes",
+  "version": 1,
+  "description": "Questions and answers in order, evidence per competency, the candidate's questions and follow-ups. Notes only.",
+  "context_fields": [
+    "title",
+    "role",
+    "competencies",
+    "attendees"
+  ],
+  "suggested_for": [],
+  "instructions": "Write notes of an interview. Collect evidence; do not judge. Never score, rate, rank or compare the candidate and never say whether to hire. Do not infer personal traits such as age, accent, emotion or personality. List the questions and answers as pairs in the order they were asked, with the answer as a faithful short summary. For each competency in the context, quote what the candidate said as evidence (a verbatim quote in the original language, plus a one-line note on what it shows); skip competencies with no evidence. Then list the candidate's own questions and follow-ups for the interviewer.",
+  "notes_only": "Notes only — CaptureMann doesn't score candidates. Using AI to assess candidates is regulated in some places.",
+  "sections": [
+    {
+      "id": "role_candidate",
+      "title": "Role and candidate",
+      "source": "context",
+      "layout": "inline",
+      "max_items": 1,
+      "fields": [
+        {
+          "id": "role",
+          "label": "Role"
+        },
+        {
+          "id": "people",
+          "label": "People",
+          "kind": "list"
+        }
+      ]
+    },
+    {
+      "id": "questions_answers",
+      "title": "Questions and answers",
+      "source": "model",
+      "layout": "block",
+      "max_items": 60,
+      "fields": [
+        {
+          "id": "question",
+          "label": "Question"
+        },
+        {
+          "id": "answer",
+          "label": "Answer"
+        }
+      ]
+    },
+    {
+      "id": "evidence",
+      "title": "Evidence per competency",
+      "source": "model",
+      "layout": "block",
+      "max_items": 60,
+      "fields": [
+        {
+          "id": "competency",
+          "label": "Competency"
+        },
+        {
+          "id": "quote",
+          "label": "Quote"
+        },
+        {
+          "id": "note",
+          "label": "What it shows",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "id": "candidate_questions",
+      "title": "Candidate's questions",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 30,
+      "fields": [
+        {
+          "id": "text",
+          "label": "Text"
+        }
+      ]
+    },
+    {
+      "id": "follow_ups",
+      "title": "Follow-ups",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 30,
+      "fields": [
+        {
+          "id": "text",
+          "label": "Text"
+        }
+      ]
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "properties": {
+      "questions_answers": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "question": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "answer": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "question",
+            "answer",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 60
+      },
+      "evidence": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "competency": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "quote": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "note": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "competency",
+            "quote",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 60
+      },
+      "candidate_questions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "text",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 30
+      },
+      "follow_ups": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "text",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 30
+      }
+    },
+    "required": [
+      "questions_answers",
+      "evidence",
+      "candidate_questions",
+      "follow_ups"
+    ],
+    "additionalProperties": false
+  }
+}

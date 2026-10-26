@@ -50,6 +50,9 @@ pub const TOPICS: &[&str] = &[
     "translation.ready",
     // AI-8: the speakers of a recording were found.
     "speakers.ready",
+    // AI-9: a report was written, or its run failed.
+    "report.ready",
+    "report.failed",
 ];
 
 /// The minimum level a client asked for (`logging/setLevel`), shared with the forwarder.
@@ -88,7 +91,7 @@ fn rank(level: LoggingLevel) -> u8 {
 /// The severity an event is sent with.
 pub fn level_of(event: &str) -> LoggingLevel {
     match event {
-        "job.failed" => LoggingLevel::Error,
+        "job.failed" | "report.failed" => LoggingLevel::Error,
         "recording.warning" | "events.dropped" => LoggingLevel::Warning,
         _ => LoggingLevel::Info,
     }

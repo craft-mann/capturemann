@@ -128,6 +128,15 @@ pub const ACTIONS: &[ActionSpec] = &[
     // `set_speakers` renames, merges or reassigns as one undoable revision.
     spec("diarize", Tier::Free, true),
     spec("set_speakers", Tier::Free, true),
+    // AI-9 reports. `generate_report` is a `report` job on the local text model (a non-local
+    // provider is refused as `no_text_model`: remote providers are deferred); create, edit and
+    // delete are one undoable revision each.
+    spec("list_report_templates", Tier::Free, false),
+    spec("generate_report", Tier::Free, true),
+    spec("get_report", Tier::Free, false),
+    spec("export_report", Tier::Free, true),
+    spec("delete_report", Tier::Free, true),
+    spec("edit_report", Tier::Free, true),
     // The caption switches (show in the preview, burn into exports): one revision, one undo step.
     spec("set_caption_options", Tier::Free, true),
     // Storage (M6, STO-1 to STO-5): copies go only to destinations the user set up in the app;

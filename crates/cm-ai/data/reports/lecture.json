@@ -1,0 +1,206 @@
+{
+  "id": "lecture",
+  "name": "Lecture notes",
+  "version": 1,
+  "description": "Key points, definitions, examples and five review questions with answers.",
+  "context_fields": [
+    "title",
+    "agenda"
+  ],
+  "suggested_for": [
+    "lecture"
+  ],
+  "instructions": "Write study notes for a lecture or talk. Key points are the main ideas in order. Definitions give a term and its meaning as the speaker defined it. Examples are the examples the speaker gave. Finish with exactly five review questions that the lecture answers, each with a short answer.",
+  "sections": [
+    {
+      "id": "key_points",
+      "title": "Key points",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 40,
+      "fields": [
+        {
+          "id": "text",
+          "label": "Text"
+        }
+      ]
+    },
+    {
+      "id": "definitions",
+      "title": "Definitions",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 40,
+      "fields": [
+        {
+          "id": "term",
+          "label": "Term"
+        },
+        {
+          "id": "definition",
+          "label": "Definition"
+        }
+      ]
+    },
+    {
+      "id": "examples",
+      "title": "Examples",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 30,
+      "fields": [
+        {
+          "id": "text",
+          "label": "Text"
+        }
+      ]
+    },
+    {
+      "id": "review_questions",
+      "title": "Review questions",
+      "source": "model",
+      "layout": "block",
+      "max_items": 5,
+      "fields": [
+        {
+          "id": "question",
+          "label": "Question"
+        },
+        {
+          "id": "answer",
+          "label": "Answer"
+        }
+      ]
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "properties": {
+      "key_points": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "text",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 40
+      },
+      "definitions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "term": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "definition": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "term",
+            "definition",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 40
+      },
+      "examples": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "text",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 30
+      },
+      "review_questions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "question": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "answer": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "question",
+            "answer",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 5
+      }
+    },
+    "required": [
+      "key_points",
+      "definitions",
+      "examples",
+      "review_questions"
+    ],
+    "additionalProperties": false
+  }
+}

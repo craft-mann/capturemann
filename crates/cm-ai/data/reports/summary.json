@@ -1,0 +1,105 @@
+{
+  "id": "summary",
+  "name": "Summary",
+  "version": 1,
+  "description": "A short summary and the key points.",
+  "context_fields": [
+    "title"
+  ],
+  "suggested_for": [
+    "voice_note"
+  ],
+  "instructions": "Write the summary in at most 150 words in total (one to three items). Then list the key points, each one sentence.",
+  "sections": [
+    {
+      "id": "summary",
+      "title": "Summary",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 3,
+      "fields": [
+        {
+          "id": "text",
+          "label": "Text"
+        }
+      ]
+    },
+    {
+      "id": "key_points",
+      "title": "Key points",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 12,
+      "fields": [
+        {
+          "id": "text",
+          "label": "Text"
+        }
+      ]
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "properties": {
+      "summary": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "text",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 3
+      },
+      "key_points": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "text",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 12
+      }
+    },
+    "required": [
+      "summary",
+      "key_points"
+    ],
+    "additionalProperties": false
+  }
+}

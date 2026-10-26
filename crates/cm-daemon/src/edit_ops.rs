@@ -794,6 +794,10 @@ impl Inner {
                 lib.index_dir(&dir)?;
             }
             let m = cm_library::read_manifest(&dir)?;
+            if out.is_some() {
+                // AI-9: undo and redo move the report index; make the files match it.
+                cm_ai::report::store::sync_live(&dir, &cm_ai::report::store::index_of(&m));
+            }
             Ok((out, cm_library::rec_edit::history_flags(&m)))
         })
         .await?;

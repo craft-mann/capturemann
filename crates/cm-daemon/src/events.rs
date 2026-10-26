@@ -99,6 +99,10 @@ pub const TRANSCRIPT_READY: &str = "transcript.ready";
 pub const TRANSLATION_READY: &str = "translation.ready";
 /// A diarization finished (AI-8): `{ capture_id, model, speakers, segments, note, headset }`.
 pub const SPEAKERS_READY: &str = "speakers.ready";
+/// A report was written (AI-9): `{ capture_id, report_id, template, dropped_uncited, chunks }`.
+pub const REPORT_READY: &str = "report.ready";
+/// A report run failed (AI-9): `{ capture_id, template, reason, message }`.
+pub const REPORT_FAILED: &str = "report.failed";
 pub const JOB_PROGRESS: &str = "job.progress";
 pub const JOB_DONE: &str = "job.done";
 pub const JOB_FAILED: &str = "job.failed";

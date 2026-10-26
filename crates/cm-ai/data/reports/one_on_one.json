@@ -1,0 +1,329 @@
+{
+  "id": "one_on_one",
+  "name": "One-on-one notes",
+  "version": 1,
+  "description": "Updates, wins, concerns, feedback and agreed actions for a one-on-one.",
+  "context_fields": [
+    "title",
+    "attendees",
+    "agenda"
+  ],
+  "suggested_for": [],
+  "instructions": "Write notes for a one-on-one conversation. Keep what each person said about themselves in 'updates'. Feedback given and feedback received are from the point of view of the person whose notes these are (the first attendee, or the first speaker). Agreed actions need a task and an owner. Follow-ups are topics to pick up next time.",
+  "sections": [
+    {
+      "id": "updates",
+      "title": "Updates",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 30,
+      "fields": [
+        {
+          "id": "text",
+          "label": "Text"
+        }
+      ]
+    },
+    {
+      "id": "wins",
+      "title": "Wins",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 30,
+      "fields": [
+        {
+          "id": "text",
+          "label": "Text"
+        }
+      ]
+    },
+    {
+      "id": "concerns",
+      "title": "Concerns",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 30,
+      "fields": [
+        {
+          "id": "text",
+          "label": "Text"
+        }
+      ]
+    },
+    {
+      "id": "feedback_given",
+      "title": "Feedback given",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 30,
+      "fields": [
+        {
+          "id": "text",
+          "label": "Text"
+        }
+      ]
+    },
+    {
+      "id": "feedback_received",
+      "title": "Feedback received",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 30,
+      "fields": [
+        {
+          "id": "text",
+          "label": "Text"
+        }
+      ]
+    },
+    {
+      "id": "agreed_actions",
+      "title": "Agreed actions",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 30,
+      "fields": [
+        {
+          "id": "task",
+          "label": "Task"
+        },
+        {
+          "id": "owner",
+          "label": "Owner",
+          "person": "owner"
+        },
+        {
+          "id": "due",
+          "label": "Due",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "id": "follow_ups",
+      "title": "Follow-ups for next time",
+      "source": "model",
+      "layout": "inline",
+      "max_items": 30,
+      "fields": [
+        {
+          "id": "text",
+          "label": "Text"
+        }
+      ]
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "properties": {
+      "updates": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "text",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 30
+      },
+      "wins": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "text",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 30
+      },
+      "concerns": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "text",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 30
+      },
+      "feedback_given": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "text",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 30
+      },
+      "feedback_received": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "text",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 30
+      },
+      "agreed_actions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "task": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "owner": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "due": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "task",
+            "owner",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 30
+      },
+      "follow_ups": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 1500
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "maxItems": 8,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "text",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        "maxItems": 30
+      }
+    },
+    "required": [
+      "updates",
+      "wins",
+      "concerns",
+      "feedback_given",
+      "feedback_received",
+      "agreed_actions",
+      "follow_ups"
+    ],
+    "additionalProperties": false
+  }
+}

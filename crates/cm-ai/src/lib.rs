@@ -50,6 +50,7 @@ pub mod glossary;
 pub mod model;
 pub mod reapply;
 pub mod recording;
+pub mod report;
 pub mod speakers;
 pub mod suggest;
 pub mod text_model;

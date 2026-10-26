@@ -158,6 +158,29 @@ fn samples() -> Vec<(&'static str, Value)> {
         ("list_publish_accounts", json!({})),
         ("get_text_model", json!({})),
         ("test_text_model", json!({})),
+        ("list_report_templates", json!({})),
+        (
+            "generate_report",
+            json!({"capture_id": "rec_1", "template": "minutes", "language": "vi",
+                   "context": {"title": "Weekly", "attendees": ["Linh"]},
+                   "report_id": "rpt_00000001", "request_id": "r"}),
+        ),
+        (
+            "get_report",
+            json!({"capture_id": "rec_1", "report_id": "rpt_00000001"}),
+        ),
+        (
+            "export_report",
+            json!({"capture_id": "rec_1", "report_id": "rpt_00000001", "format": "txt"}),
+        ),
+        (
+            "delete_report",
+            json!({"capture_id": "rec_1", "report_id": "rpt_00000001"}),
+        ),
+        (
+            "edit_report",
+            json!({"capture_id": "rec_1", "report_id": "rpt_00000001", "markdown": "# Mine"}),
+        ),
         (
             "upload",
             json!({"capture_id": "rec_1", "destination_id": "nas", "what": "both",

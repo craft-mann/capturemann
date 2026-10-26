@@ -14,6 +14,7 @@
 //! | `replace_in_captions { capture_id, replacements }` | Free | find and replace over the caption lines (AI-6a): one revision, one undo step |
 //! | `export_captions { capture_id, format }` | Free | SRT or VTT in `exports/`, mapped through the edit list |
 //! | `translate_captions { capture_id, target_language, engine? }` | Free | a `translate` job; `translations/<lang>.json` (AI-5); `get_captions`, `set_captions`, `replace_in_captions` and `export_captions` take an optional `language` |
+//! | `list_report_templates`, `generate_report { capture_id, template, language?, context?, report_id? }`, `get_report`, `export_report`, `delete_report`, `edit_report` | Free | AI-9 reports (a `report` job; local text model only) |
 //! | `suggest_zooms`, `suggest_cuts` | Free | suggestions only; accepting uses `set_zooms` / `cut_segments` |
 //!
 //! # Nothing is downloaded silently
@@ -106,6 +107,12 @@ pub const AI_METHODS: &[&str] = &[
     "translate_captions",
     "diarize",
     "set_speakers",
+    "list_report_templates",
+    "generate_report",
+    "get_report",
+    "export_report",
+    "delete_report",
+    "edit_report",
 ];
 
 /// Whether `name` is one of [`AI_METHODS`].
@@ -144,6 +151,7 @@ mod captions;
 mod dispatch;
 mod jobs;
 mod models;
+mod reports;
 mod services;
 mod speakers;
 mod suggest;
@@ -154,5 +162,6 @@ mod translation;
 
 pub use self::actions::*;
 pub use self::jobs::*;
+pub use self::reports::{ReportFormat, JOB_REPORT, MAX_REPORT_MARKDOWN_CHARS};
 pub use self::services::*;
 pub use self::translation::*;

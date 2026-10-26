@@ -1955,6 +1955,7 @@ mod resources_and_prompts {
             t,
             BTreeSet::from([
                 "capturemann://capture/{id}",
+                "capturemann://capture/{id}/reports",
                 "capturemann://capture/{id}/transcript",
                 "capturemann://platforms/{name}/rules"
             ])
