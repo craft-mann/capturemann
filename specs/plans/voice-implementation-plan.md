@@ -44,6 +44,8 @@ Manual: `tests/manual/VOC-2.md`.
 
 ## Stage 4: text model provider (AI-7), then the rest of AI-5
 
+**Scope (maintainer, Oct 26, 2026): local text models only for now.** The Remote and Anthropic providers, API-key entry, the first-send notice and the remote Confirm tier are deferred; the AI page shows None and On this Mac only, and the daemon must treat any other provider value as `none`. The backend code for them exists from the first Stage 4 pass and stays dormant until the maintainer asks for it.
+
 Run **spike S8** first (it picks the default model). Then: OpenAI-compatible client with Ollama and LM Studio presets and loopback detection; Anthropic and remote keys through `keyring`; `ai.text.*` settings (app-only); schema-validated output with one retry; map-reduce chunking helper; Test button; AI page text-model section (V8); `get_text_model`, `test_text_model`. Then text-model translation to any language (AI-5.AC3 to AC7). Test server is scripted; loopback-only check.
 
 ## Stage 5: reports (AI-9)
