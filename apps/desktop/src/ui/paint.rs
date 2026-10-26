@@ -675,6 +675,31 @@ pub(crate) const ASSETS: &[(&str, &str)] = &[
         "icons/volume-x.svg",
         include_str!("../../assets/icons/volume-x.svg"),
     ),
+    // Voice (V4, V7): not in the icon kit yet; the board's own Lucide paths.
+    (
+        "icons/users.svg",
+        include_str!("../../assets/icons/users.svg"),
+    ),
+    (
+        "icons/file-text.svg",
+        include_str!("../../assets/icons/file-text.svg"),
+    ),
+    (
+        "icons/bookmark.svg",
+        include_str!("../../assets/icons/bookmark.svg"),
+    ),
+    (
+        "icons/languages.svg",
+        include_str!("../../assets/icons/languages.svg"),
+    ),
+    (
+        "icons/file-headphone.svg",
+        include_str!("../../assets/icons/file-headphone.svg"),
+    ),
+    (
+        "icons/venn.svg",
+        include_str!("../../assets/icons/venn.svg"),
+    ),
     (
         "icons/wallpaper.svg",
         include_str!("../../assets/icons/wallpaper.svg"),

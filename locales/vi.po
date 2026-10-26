@@ -9589,6 +9589,260 @@ msgstr "ÂM THANH"
 msgctxt "navigation"
 msgid "Audio"
 msgstr "Âm thanh"
+msgid "48 kHz · 24-bit. Lossless, about 10× larger."
+msgstr "48 kHz · 24-bit. Không suy hao, lớn hơn khoảng 10 lần."
+
+#, fuzzy
+msgid "AAC, 48 kHz · 128 kbps mono or 192 kbps stereo. Plays everywhere."
+msgstr "AAC, 48 kHz · 128 kbps mono hoặc 192 kbps stereo. Phát được ở mọi nơi."
+
+#, fuzzy
+msgid "Add a marker at the playhead"
+msgstr "Thêm điểm đánh dấu tại đầu phát"
+
+#, fuzzy
+msgid "Also save a copy to"
+msgstr "Lưu thêm một bản sao vào"
+
+#, fuzzy
+msgid "Always kept in the recording’s exports folder too"
+msgstr "Luôn được giữ cả trong thư mục xuất của bản ghi"
+
+#, fuzzy
+msgid "Audio exported"
+msgstr "Đã xuất âm thanh"
+
+#, fuzzy
+msgid "Back to the library"
+msgstr "Quay lại thư viện"
+
+#, fuzzy
+msgid "Choose a folder…"
+msgstr "Chọn thư mục…"
+
+#, fuzzy
+msgid "Choose the folder for the copy"
+msgstr "Chọn thư mục cho bản sao"
+
+#, fuzzy
+msgid "Couldn’t translate the transcript"
+msgstr "Không thể dịch bản chép lời"
+
+#, fuzzy
+msgid "Don’t save a copy"
+msgstr "Không lưu bản sao"
+
+#, fuzzy
+msgid "Even out the loudness"
+msgstr "Cân bằng độ lớn âm thanh"
+
+#, fuzzy
+msgid "Export audio"
+msgstr "Xuất âm thanh"
+
+#, fuzzy
+msgid "Export audio only"
+msgstr "Chỉ xuất âm thanh"
+
+#, fuzzy
+msgid "Export audio…"
+msgstr "Xuất âm thanh…"
+
+#, fuzzy
+msgid "Export the audio of a capture"
+msgstr "Xuất âm thanh của một bản chụp"
+
+#, fuzzy
+msgid "Export {format}"
+msgstr "Xuất {format}"
+
+#, fuzzy
+msgid "Exporting audio…"
+msgstr "Đang xuất âm thanh…"
+
+#, fuzzy
+msgid "Exporting the audio: {pct}%"
+msgstr "Đang xuất âm thanh: {pct}%"
+
+#, fuzzy
+msgid "FFmpeg is needed to export audio and was not found."
+msgstr "Cần FFmpeg để xuất âm thanh nhưng không tìm thấy."
+
+#, fuzzy
+msgid "Find who speaks when"
+msgstr "Tìm ai nói khi nào"
+
+#, fuzzy
+msgid "Format"
+msgstr "Định dạng"
+
+#, fuzzy
+msgid "Just the call or app sound"
+msgstr "Chỉ âm thanh của cuộc gọi hoặc ứng dụng"
+
+#, fuzzy
+msgid "Just your microphone"
+msgstr "Chỉ micrô của bạn"
+
+#, fuzzy
+msgid "Mark a moment in a recording"
+msgstr "Đánh dấu một thời điểm trong bản ghi"
+
+#, fuzzy
+msgid "Marker (M)"
+msgstr "Điểm đánh dấu (M)"
+
+#, fuzzy
+msgid "Marker {label} at {time}"
+msgstr "Điểm đánh dấu {label} lúc {time}"
+
+#, fuzzy
+msgid "Meeting minutes and notes"
+msgstr "Biên bản họp và ghi chú"
+
+#, fuzzy
+msgid "Microphone and system audio together"
+msgstr "Micrô và âm thanh hệ thống cùng nhau"
+
+#, fuzzy
+msgid "No transcript yet. Transcribe the recording to read it here; it runs on this Mac."
+msgstr "Chưa có bản chép lời. Hãy chép lời bản ghi để đọc ở đây; việc này chạy ngay trên máy Mac này."
+
+#, fuzzy
+msgid "Normalise to {lufs} LUFS, the level podcasts and players expect"
+msgstr "Chuẩn hoá về {lufs} LUFS, mức mà podcast và trình phát mong đợi"
+
+#, fuzzy
+msgid "Now speaking"
+msgstr "Đang nói"
+
+#, fuzzy
+msgid "Play to follow the words here."
+msgstr "Hãy phát để theo dõi lời nói ở đây."
+
+#, fuzzy
+msgid "Put the speakers’ names in the SRT file"
+msgstr "Ghi tên người nói vào tệp SRT"
+
+#, fuzzy
+msgid "Read the text model settings"
+msgstr "Đọc cài đặt mô hình văn bản"
+
+#, fuzzy
+msgid "Rename or fix speakers"
+msgstr "Đổi tên hoặc sửa người nói"
+
+#, fuzzy
+msgid "Reports are coming here: minutes, decisions and action items."
+msgstr "Báo cáo sẽ có ở đây: biên bản, quyết định và việc cần làm."
+
+#, fuzzy
+msgid "Runs in the background; you can keep working"
+msgstr "Chạy nền; bạn có thể tiếp tục làm việc"
+
+#, fuzzy
+msgid "Speaker labels are coming here: names, talk time and merging."
+msgstr "Nhãn người nói sẽ có ở đây: tên, thời lượng nói và gộp."
+
+#, fuzzy
+msgid "Speaker names"
+msgstr "Tên người nói"
+
+#, fuzzy
+msgid "Suggested cut: {detail} at {time}"
+msgstr "Gợi ý xoá đoạn: {detail} lúc {time}"
+
+#, fuzzy
+msgid "Suggested cut: {detail} at {time} (and {more} more)"
+msgstr "Gợi ý xoá đoạn: {detail} lúc {time} (và {more} đoạn nữa)"
+
+#, fuzzy
+msgid "Test the text model"
+msgstr "Thử mô hình văn bản"
+
+#, fuzzy
+msgid "The audio couldn’t be exported"
+msgstr "Không thể xuất âm thanh"
+
+#, fuzzy
+msgid "The export applies trims, cuts and speed, and can even out the loudness. M4A or WAV; the title and date are written into the file."
+msgstr "Bản xuất áp dụng cắt đầu cuối, xoá đoạn và tốc độ, và có thể cân bằng độ lớn âm thanh. M4A hoặc WAV; tiêu đề và ngày được ghi vào tệp."
+
+#, fuzzy
+msgid "The upload couldn’t start"
+msgstr "Không thể bắt đầu tải lên"
+
+#, fuzzy
+msgid "The words appear here once the recording has a transcript."
+msgstr "Lời nói sẽ hiện ở đây khi bản ghi có bản chép lời."
+
+#, fuzzy
+msgid "There are no lines in this language yet."
+msgstr "Chưa có dòng nào bằng ngôn ngữ này."
+
+#, fuzzy
+msgid "Title and date are written into the file"
+msgstr "Tiêu đề và ngày được ghi vào tệp"
+
+#, fuzzy
+msgid "Tracks"
+msgstr "Rãnh"
+
+#, fuzzy
+msgid "Transcript"
+msgstr "Bản chép lời"
+
+#, fuzzy
+msgid "Transcript language"
+msgstr "Ngôn ngữ bản chép lời"
+
+#, fuzzy
+msgid "Translate captions"
+msgstr "Dịch phụ đề"
+
+#, fuzzy
+msgid "Translate the transcript to"
+msgstr "Dịch bản chép lời sang"
+
+#, fuzzy
+msgid "Translate to"
+msgstr "Dịch sang"
+
+#, fuzzy
+msgid "Translate…"
+msgstr "Dịch…"
+
+#, fuzzy
+msgid "Translation ready: {language}"
+msgstr "Bản dịch đã sẵn sàng: {language}"
+
+#, fuzzy
+msgid "What Export audio will produce"
+msgstr "Xuất âm thanh sẽ tạo ra gì"
+
+#, fuzzy
+msgid "Who said what"
+msgstr "Ai nói gì"
+
+#, fuzzy
+msgid "click a time to jump there"
+msgstr "nhấp vào thời gian để nhảy tới đó"
+
+#, fuzzy
+msgid "{from} – {to} of {total}"
+msgstr "{from} – {to} trên {total}"
+
+#, fuzzy
+msgid "{language} …"
+msgstr "{language} …"
+
+#, fuzzy
+msgid "{name} · {size}"
+msgstr "{name} · {size}"
+
+#, fuzzy
+msgid "{name} · {size} · {lufs} LUFS"
+msgstr "{name} · {size} · {lufs} LUFS"
 
 #, fuzzy
 msgid "{n} speaker"
@@ -9596,5 +9850,120 @@ msgid_plural "{n} speakers"
 msgstr[0] "{n} người nói"
 
 #, fuzzy
+msgid "{title} · Exporting the audio: {pct}%"
+msgstr "{title} · Đang xuất âm thanh: {pct}%"
+
+#, fuzzy
+msgid "{title} · cuts and speed applied"
+msgstr "{title} · đã áp dụng xoá đoạn và tốc độ"
+
+#, fuzzy
+msgctxt "breadcrumb"
+msgid "Audio"
+msgstr "Âm thanh"
+
+#, fuzzy
+msgctxt "button"
+msgid "Show in Finder"
+msgstr "Hiện trong Finder"
+
+#, fuzzy
+msgctxt "button"
+msgid "Upload"
+msgstr "Tải lên"
+
+#, fuzzy
+msgctxt "editor shortcut"
+msgid "Marker"
+msgstr "Đánh dấu"
+
+#, fuzzy
+msgctxt "editor shortcut"
+msgid "Shuttle"
+msgstr "Tua"
+
+#, fuzzy
+msgctxt "export tracks"
+msgid "Mic only"
+msgstr "Chỉ micrô"
+
+#, fuzzy
+msgctxt "export tracks"
+msgid "Mix"
+msgstr "Hòa trộn"
+
+#, fuzzy
+msgctxt "export tracks"
+msgid "System only"
+msgstr "Chỉ hệ thống"
+
+#, fuzzy
+msgctxt "inspector tab"
+msgid "Report"
+msgstr "Báo cáo"
+
+#, fuzzy
+msgctxt "inspector tab"
+msgid "Speakers"
+msgstr "Người nói"
+
+#, fuzzy
+msgctxt "inspector tab"
 msgid "Transcript"
 msgstr "Bản chép lời"
+
+#, fuzzy
+msgctxt "lane"
+msgid "Markers"
+msgstr "Đánh dấu"
+
+#, fuzzy
+msgctxt "lane"
+msgid "Speakers"
+msgstr "Người nói"
+
+#, fuzzy
+msgctxt "lane"
+msgid "call audio"
+msgstr "cuộc gọi"
+
+#, fuzzy
+msgctxt "lane"
+msgid "microphone"
+msgstr "micrô"
+
+#, fuzzy
+msgctxt "language"
+msgid "Original"
+msgstr "Bản gốc"
+
+#, fuzzy
+msgctxt "marker"
+msgid "Marker"
+msgstr "Điểm đánh dấu"
+
+#, fuzzy
+msgctxt "timeline"
+msgid "Marker"
+msgstr "Đánh dấu"
+
+#, fuzzy
+msgctxt "track"
+msgid "System"
+msgstr "Hệ thống"
+
+#, fuzzy
+msgctxt "transcript language"
+msgid "original"
+msgstr "gốc"
+
+#, fuzzy
+msgctxt "transcript language"
+msgid "translated"
+msgstr "đã dịch"
+
+#, fuzzy
+msgctxt "transcript turn"
+msgid "overlap"
+msgstr "nói chồng"
+

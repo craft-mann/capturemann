@@ -63,6 +63,9 @@ impl RecordingEditor {
         let Load::Ready(s) = &self.load else {
             return div().into_any_element();
         };
+        if s.voice.audio {
+            return self.audio_ready(t, s, cx);
+        }
         div()
             .size_full()
             .flex()
@@ -112,6 +115,9 @@ impl RecordingEditor {
         self.last_selection = Some(s.model.selection);
         self.last_zoom = s.model.zoom_selected;
         self.tab = super::tabs::next_tab(self.tab, false, seg_changed, zoom_changed, has_camera);
+        if s.voice.audio && self.tab == Inspector::Captions {
+            self.tab = Inspector::Transcript;
+        }
     }
 
     /// The burn-in choice the Output panel shows: `None` when the recording has no transcript.
@@ -424,9 +430,9 @@ impl RecordingEditor {
     }
 
     /// The rail and the open panel.
-    fn inspector(&self, t: &Theme, s: &Session, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn inspector(&self, t: &Theme, s: &Session, cx: &mut Context<Self>) -> AnyElement {
         let has_camera = s.rows.iter().any(|r| r.kind == RowKind::Camera);
-        let tabs: Vec<AnyElement> = Inspector::ALL
+        let tabs: Vec<AnyElement> = Inspector::set(s.voice.audio)
             .iter()
             .map(|&tab| {
                 tab_button(
@@ -450,6 +456,9 @@ impl RecordingEditor {
             Inspector::Reframe => self.reframe_panel(t, s, cx),
             Inspector::Background => self.background_panel(t, s, cx),
             Inspector::Captions => self.captions_panel(t, s, cx),
+            Inspector::Transcript => self.transcript_panel(t, s, cx),
+            Inspector::Speakers => self.speakers_panel(t, s, cx),
+            Inspector::Report => self.report_panel(t, s, cx),
             Inspector::Suggestions => self.suggest_panel(t, s, cx),
             Inspector::Output => self.output_panel(t, s, cx),
         };
@@ -458,7 +467,7 @@ impl RecordingEditor {
             // 400 px (board: 380 to 440 at 1440), 600 px on the Captions tab when the window
             // leaves the preview 360 px; it shrinks to `INSPECTOR_MIN_W` before the preview does.
             .w(px(inspector_width(
-                self.tab == Inspector::Captions,
+                self.tab.is_wide(),
                 self.ai.view.window_w.get(),
             )))
             .min_w(px(INSPECTOR_MIN_W))
@@ -966,6 +975,9 @@ impl RecordingEditor {
     }
 
     fn output_panel(&self, t: &Theme, s: &Session, cx: &mut Context<Self>) -> AnyElement {
+        if s.voice.audio {
+            return self.audio_output_panel(t, s, cx);
+        }
         let m = &s.model;
         let kept = m.output_duration();
         let id = self.id.clone().unwrap_or_default();
@@ -1032,6 +1044,20 @@ impl RecordingEditor {
                         cx.defer(move |cx| crate::ui::ai::set_export_burn(&app, &id, !on, cx));
                     }),
                 )
+                .into_any_element(),
+            );
+        }
+        // VOC-2: the sound of a screen recording on its own, with the same cuts (V7).
+        if s.voice.available().any() {
+            body.push(
+                button_with_icon(
+                    t,
+                    "re-export-audio-only",
+                    tr!("Export audio only"),
+                    ButtonKind::Secondary,
+                    Some("file-headphone"),
+                )
+                .on_click(cx.listener(|this, _, _, cx| this.open_export_sheet(cx)))
                 .into_any_element(),
             );
         }

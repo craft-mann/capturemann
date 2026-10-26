@@ -14,8 +14,8 @@ use serde_json::json;
 
 use crate::backend::Backend;
 use crate::recording::exports::{
-    export_failed_toast, export_skipped_toast, exported_toast, exporting_toast, Effect,
-    ExportStatus, ExportTracker,
+    audio_export_failed_toast, audio_exported_toast, audio_exporting_toast, export_failed_toast,
+    export_skipped_toast, exported_toast, exporting_toast, Effect, ExportStatus, ExportTracker,
 };
 use crate::recording::files;
 use crate::toast::{ToastKind, ToastSpec};
@@ -78,6 +78,47 @@ pub fn on_event(app: &Entity<AppModel>, ev: &Event, cx: &mut App) {
                     app,
                     &capture_id,
                     exported_toast(&capture_id, &title, captions.as_deref()),
+                    false,
+                    cx,
+                );
+                lock(&TOASTS).remove(&capture_id);
+            }
+            // The audio export (VOC-2) has its own toasts; they never replace the take's
+            // "Recording saved" toast.
+            Effect::AudioProgress {
+                capture_id,
+                title,
+                pct,
+                ..
+            } => upsert(
+                app,
+                &capture_id,
+                audio_exporting_toast(&capture_id, title.as_deref(), pct),
+                false,
+                cx,
+            ),
+            Effect::AudioDone {
+                capture_id, done, ..
+            } => {
+                upsert(
+                    app,
+                    &capture_id,
+                    audio_exported_toast(&capture_id, &done),
+                    false,
+                    cx,
+                );
+                lock(&TOASTS).remove(&capture_id);
+            }
+            Effect::AudioFailed {
+                capture_id,
+                reason,
+                ffmpeg_missing,
+                ..
+            } => {
+                upsert(
+                    app,
+                    &capture_id,
+                    audio_export_failed_toast(&reason, ffmpeg_missing),
                     false,
                     cx,
                 );

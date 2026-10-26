@@ -394,6 +394,7 @@ fn main() {
                     // M5: model downloads, transcripts and the job events of both.
                     if ev.name.starts_with("model.")
                         || ev.name.starts_with("transcript.")
+                        || ev.name.starts_with("translation.")
                         || ev.name.starts_with("job.")
                     {
                         cx.update(|cx| cm_desktop::ui::ai::on_event(&app2, &ev, cx));

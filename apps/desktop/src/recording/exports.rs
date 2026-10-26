@@ -57,6 +57,20 @@ pub struct ExportStatus {
     pub reason: Option<String>,
     /// Order of arrival (the newest job of a capture wins in [`ExportTracker::status_of`]).
     pub seq: u64,
+    /// An audio export (VOC-2): M4A or WAV, not the combined MP4.
+    pub audio: bool,
+}
+
+/// What a finished audio export tells (`export.done` with `kind: "audio"`).
+#[derive(Debug, Clone, PartialEq)]
+pub struct AudioDone {
+    /// The file in the recording's `exports/` folder.
+    pub path: String,
+    pub size_bytes: u64,
+    /// The loudness target that was applied, if any.
+    pub loudness_lufs: Option<f64>,
+    /// Where the extra copy went, when one was asked for.
+    pub copy_path: Option<String>,
 }
 
 /// What the window glue should do after an event.
@@ -84,6 +98,26 @@ pub enum Effect {
     },
     /// The automatic export did not run (`export.skipped`): a hint, not an error.
     Skipped { capture_id: String, ffmpeg: bool },
+    /// An audio export is running (VOC-2).
+    AudioProgress {
+        capture_id: String,
+        title: Option<String>,
+        pct: u32,
+        first: bool,
+    },
+    /// An audio export finished.
+    AudioDone {
+        capture_id: String,
+        title: String,
+        done: AudioDone,
+    },
+    /// An audio export failed.
+    AudioFailed {
+        capture_id: String,
+        title: Option<String>,
+        reason: String,
+        ffmpeg_missing: bool,
+    },
 }
 
 /// The running and recently finished export jobs.
@@ -129,6 +163,7 @@ impl ExportTracker {
                 let capture_id = data["capture_id"].as_str().unwrap_or_default().to_owned();
                 let title = data["title"].as_str().map(str::to_owned);
                 let auto = data["auto"].as_bool().unwrap_or(false);
+                let audio = data["kind"].as_str() == Some("audio");
                 self.next_seq += 1;
                 let seq = self.next_seq;
                 self.jobs.insert(
@@ -143,8 +178,17 @@ impl ExportTracker {
                         toast_pct: 0,
                         reason: None,
                         seq,
+                        audio,
                     },
                 );
+                if audio {
+                    return vec![Effect::AudioProgress {
+                        capture_id,
+                        title,
+                        pct: 0,
+                        first: true,
+                    }];
+                }
                 vec![Effect::Progress {
                     capture_id,
                     title,
@@ -163,6 +207,14 @@ impl ExportTracker {
                 let step = i64::from(TOAST_STEP_PCT);
                 if pct / step > j.toast_pct / step && pct < 100 {
                     j.toast_pct = pct / step * step;
+                    if j.audio {
+                        return vec![Effect::AudioProgress {
+                            capture_id: j.capture_id.clone(),
+                            title: j.title.clone(),
+                            pct: j.toast_pct as u32,
+                            first: false,
+                        }];
+                    }
                     return vec![Effect::Progress {
                         capture_id: j.capture_id.clone(),
                         title: j.title.clone(),
@@ -183,8 +235,21 @@ impl ExportTracker {
                         j.title.clone_from(&title);
                     }
                 }
+                let title = title.unwrap_or_else(|| tr_ctx!("fallback title", "recording"));
+                if data["kind"].as_str() == Some("audio") {
+                    return vec![Effect::AudioDone {
+                        capture_id,
+                        title,
+                        done: AudioDone {
+                            path: data["path"].as_str().unwrap_or_default().to_owned(),
+                            size_bytes: data["size_bytes"].as_u64().unwrap_or(0),
+                            loudness_lufs: data["loudness_lufs"].as_f64(),
+                            copy_path: data["copy_path"].as_str().map(str::to_owned),
+                        },
+                    }];
+                }
                 vec![Effect::Done {
-                    title: title.unwrap_or_else(|| tr_ctx!("fallback title", "recording")),
+                    title,
                     capture_id,
                     captions: data["captions"].as_str().map(str::to_owned),
                 }]
@@ -203,6 +268,17 @@ impl ExportTracker {
                 };
                 j.phase = Phase::Failed;
                 j.reason = Some(reason.clone());
+                if j.audio {
+                    return vec![Effect::AudioFailed {
+                        capture_id: j.capture_id.clone(),
+                        title: j.title.clone(),
+                        ffmpeg_missing: is_ffmpeg_missing(&reason)
+                            || data["error"]["data"]["reason_code"]
+                                .as_str()
+                                .is_some_and(|c| c.starts_with("ffmpeg_")),
+                        reason,
+                    }];
+                }
                 vec![Effect::Failed {
                     capture_id: j.capture_id.clone(),
                     title: j.title.clone(),
@@ -280,6 +356,72 @@ pub fn exporting_toast(
         ),
     };
     spec.body(body)
+}
+
+/// "Exporting audio..." with progress (VOC-2).
+pub fn audio_exporting_toast(capture_id: &str, title: Option<&str>, pct: u32) -> ToastSpec {
+    let body = match title {
+        Some(t) => tr!(
+            "{title} \u{00B7} Exporting the audio: {pct}%",
+            title = t,
+            pct = pct
+        ),
+        None => tr!("Exporting the audio: {pct}%", pct = pct),
+    };
+    ToastSpec::new(ToastKind::Info, tr!("Exporting audio\u{2026}"))
+        .body(body)
+        .button(
+            tr_ctx!("button", "Open"),
+            ToastAction::OpenCapture(capture_id.to_owned()),
+        )
+}
+
+/// "Audio exported": the file name, its size and the loudness, with Show in Finder and Upload
+/// (redesign V7). A live toast: it is worded again when the language changes.
+pub fn audio_exported_toast(capture_id: &str, done: &AudioDone) -> ToastSpec {
+    let (capture_id, done) = (capture_id.to_owned(), done.clone());
+    ToastSpec::live(move || audio_exported_toast_now(&capture_id, &done))
+}
+
+fn audio_exported_toast_now(capture_id: &str, done: &AudioDone) -> ToastSpec {
+    let name = crate::recedit::audio_export::file_name(&done.path);
+    let size = crate::recedit::audio_export::size_text(done.size_bytes);
+    let body = match done.loudness_lufs {
+        Some(l) => tr!(
+            "{name} \u{00B7} {size} \u{00B7} {lufs} LUFS",
+            name = name,
+            size = size,
+            lufs = format!("\u{2212}{}", cm_i18n::fmt::decimal(l.abs(), 0))
+        ),
+        None => tr!("{name} \u{00B7} {size}", name = name, size = size),
+    };
+    ToastSpec::new(ToastKind::Success, tr!("Audio exported"))
+        .body(body)
+        .button(
+            tr_ctx!("button", "Show in Finder"),
+            ToastAction::RevealPath(done.path.clone()),
+        )
+        .button(
+            tr_ctx!("button", "Upload"),
+            ToastAction::UploadFile(capture_id.to_owned(), done.path.clone()),
+        )
+}
+
+/// "Audio export failed" (VOC-2), with the reason.
+pub fn audio_export_failed_toast(reason: &str, ffmpeg_missing: bool) -> ToastSpec {
+    let reason = reason.to_owned();
+    ToastSpec::live(move || {
+        let why = if ffmpeg_missing {
+            tr!("FFmpeg is needed to export audio and was not found.")
+        } else {
+            crate::daemon_text::any_error_text(&reason)
+        };
+        ToastSpec::new(
+            ToastKind::Error,
+            tr!("The audio couldn\u{2019}t be exported"),
+        )
+        .body(why)
+    })
 }
 
 /// [`exported_toast`] as a live toast: it is worded again when the language changes.
@@ -661,5 +803,114 @@ mod tests {
             "running jobs are never pruned"
         );
         assert_eq!(t.jobs.len(), 1);
+    }
+
+    fn audio_queued(job: &str) -> Value {
+        json!({"job_id": job, "capture_id": "rec_1", "title": "Weekly sync", "kind": "audio",
+               "preset": "audio-mix", "auto": false})
+    }
+
+    /// VOC-2: an audio export (`kind: "audio"`) has its own progress, result and failure
+    /// effects, so it never shows the MP4 wording or the take's "Recording saved" toast.
+    #[test]
+    fn an_audio_export_has_its_own_effects() {
+        let mut t = ExportTracker::default();
+        let e = t.on_event("export.queued", &audio_queued("a1"));
+        assert_eq!(
+            e,
+            vec![Effect::AudioProgress {
+                capture_id: "rec_1".into(),
+                title: Some("Weekly sync".into()),
+                pct: 0,
+                first: true,
+            }]
+        );
+        assert!(t.status_of("rec_1").unwrap().audio);
+        let e = t.on_event(
+            "job.progress",
+            &json!({"job_id": "a1", "type": "export", "progress": 0.5}),
+        );
+        assert!(matches!(
+            e.as_slice(),
+            [Effect::AudioProgress {
+                pct: 50,
+                first: false,
+                ..
+            }]
+        ));
+        let e = t.on_event(
+            "export.done",
+            &json!({"job_id": "a1", "capture_id": "rec_1", "title": "Weekly sync",
+                    "kind": "audio", "path": "/lib/rec_1/exports/Weekly sync.m4a",
+                    "size_bytes": 44_000_000, "loudness_lufs": -16.0,
+                    "copy_path": "/Users/a/Meetings/Weekly sync.m4a"}),
+        );
+        let [Effect::AudioDone { done, .. }] = e.as_slice() else {
+            panic!("{e:?}")
+        };
+        assert_eq!(done.size_bytes, 44_000_000);
+        assert_eq!(done.loudness_lufs, Some(-16.0));
+        assert_eq!(
+            done.copy_path.as_deref(),
+            Some("/Users/a/Meetings/Weekly sync.m4a")
+        );
+        assert_eq!(t.status_of("rec_1").unwrap().phase, Phase::Done);
+    }
+
+    /// V7: the done toast names the file, its size and the loudness, and offers Show in Finder
+    /// (the file) and Upload (the file, not the capture).
+    #[test]
+    fn the_audio_done_toast_offers_finder_and_upload() {
+        let done = AudioDone {
+            path: "/lib/rec_1/exports/Weekly sync.m4a".into(),
+            size_bytes: 44_000_000,
+            loudness_lufs: Some(-16.0),
+            copy_path: None,
+        };
+        let toast = audio_exported_toast_now("rec_1", &done);
+        assert_eq!(toast.kind, ToastKind::Success);
+        assert_eq!(toast.title, "Audio exported");
+        assert_eq!(
+            toast.body.as_deref(),
+            Some("Weekly sync.m4a \u{00B7} 44 MB \u{00B7} \u{2212}16 LUFS")
+        );
+        let actions: Vec<_> = toast.buttons.iter().map(|b| b.action.clone()).collect();
+        assert_eq!(
+            actions,
+            vec![
+                ToastAction::RevealPath(done.path.clone()),
+                ToastAction::UploadFile("rec_1".into(), done.path.clone()),
+            ]
+        );
+        // Without a loudness target the line has no LUFS.
+        let plain = audio_exported_toast_now(
+            "rec_1",
+            &AudioDone {
+                loudness_lufs: None,
+                ..done
+            },
+        );
+        assert_eq!(
+            plain.body.as_deref(),
+            Some("Weekly sync.m4a \u{00B7} 44 MB")
+        );
+    }
+
+    #[test]
+    fn a_failed_audio_export_says_what_is_missing() {
+        let mut t = ExportTracker::default();
+        t.on_event("export.queued", &audio_queued("a2"));
+        let e = t.on_event(
+            "job.failed",
+            &json!({"job_id": "a2", "type": "export",
+                    "error": {"message": "x", "data": {"reason_code": "ffmpeg_not_found"}}}),
+        );
+        assert!(matches!(
+            e.as_slice(),
+            [Effect::AudioFailed {
+                ffmpeg_missing: true,
+                ..
+            }]
+        ));
     }
 }

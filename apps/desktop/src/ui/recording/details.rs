@@ -856,6 +856,24 @@ impl Render for RecordingDetails {
                         cx.defer(move |cx| export_ui::request(&app, &id, burn_choice, cx));
                     })
                 });
+                // VOC-2: the sound alone, with the same cuts (the Export audio sheet).
+                let has_audio = d
+                    .tracks
+                    .iter()
+                    .any(|t| matches!(t.name.as_str(), "mic" | "system") && !t.missing);
+                let audio_button = has_audio.then(|| {
+                    let (app, id) = (self.app.clone(), d.id.clone());
+                    small_button_with_icon(
+                        &t,
+                        "rec-export-audio",
+                        &tr!("Export audio only"),
+                        Some("file-headphone"),
+                    )
+                    .on_click(move |_, _, cx| {
+                        let (app, id) = (app.clone(), id.clone());
+                        cx.defer(move |cx| crate::ui::ai::open_export_audio(&app, &id, cx));
+                    })
+                });
                 let burn_row = burn_choice.filter(|_| !exporting).map(|on| {
                     let (app, id) = (self.app.clone(), d.id.clone());
                     div()
@@ -908,6 +926,7 @@ impl Render for RecordingDetails {
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .child(tr!("Exports & uploads")),
                             )
+                            .children(audio_button)
                             .children(export_button),
                     )
                     .children(rows)

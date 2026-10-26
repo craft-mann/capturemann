@@ -429,6 +429,15 @@ pub fn open_captions(app: &Entity<AppModel>, capture_id: &str, cx: &mut App) {
     app::set_route(app, app::Route::RecordingEditor(capture_id.to_owned()), cx);
 }
 
+/// "Export audio only" (the details page, the Output tab): the recording editor with the Export
+/// audio sheet open (VOC-2).
+pub fn open_export_audio(app: &Entity<AppModel>, capture_id: &str, cx: &mut App) {
+    app.update(cx, |m, _| {
+        m.transcribe.export_audio_focus = Some(capture_id.to_owned());
+    });
+    app::set_route(app, app::Route::RecordingEditor(capture_id.to_owned()), cx);
+}
+
 /// The Timestamps switch of the TXT download.
 pub fn set_txt_timestamps(app: &Entity<AppModel>, on: bool, cx: &mut App) {
     app.update(cx, |m, cx| {
@@ -583,6 +592,25 @@ pub fn on_event(app: &Entity<AppModel>, ev: &cm_daemon::events::Event, cx: &mut 
                     cx,
                 );
             }
+        }
+        // AI-5: a translation was written (the audio editor's language switcher reads it again).
+        "translation.ready" => {
+            let language = str_of("language").unwrap_or_default();
+            app.update(cx, |m, cx| {
+                m.transcribe.voice_epoch += 1;
+                cx.notify();
+            });
+            app::push_toast(
+                app,
+                ToastSpec::new(
+                    ToastKind::Success,
+                    tr!(
+                        "Translation ready: {language}",
+                        language = crate::recedit::voice::language_name(&language)
+                    ),
+                ),
+                cx,
+            );
         }
         "job.progress" => {
             if let (Some(job), Some(p)) = (
