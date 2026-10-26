@@ -1,6 +1,6 @@
 # CaptureMann specs
 
-Implementation-ready specs for CaptureMann v0.1: 62 requirements and 256 acceptance criteria in 14 feature files (recounted Oct 21, 2026, after the fix wave added AGT-1.AC6; recount when you add or remove criteria). The top-level documents hold the why and the system design; `features/` holds the exact behavior a coding agent builds and tests against. When two documents disagree, raise it; don't guess. These files are exported from the claude.ai doc "CaptureMann — Product & Technical Spec v0.1" (Oct 19, 2026); "tab" in the text means the matching file below.
+Implementation-ready specs for CaptureMann v0.1 and the next release: 70 requirements and 330 acceptance criteria in 15 feature files (recounted Oct 26, 2026, after adding the voice and meetings specs; recount when you add or remove criteria). The top-level documents hold the why and the system design; `features/` holds the exact behavior a coding agent builds and tests against. When two documents disagree, raise it; don't guess. These files are exported from the claude.ai doc "CaptureMann — Product & Technical Spec v0.1" (Oct 19, 2026); "tab" in the text means the matching file below.
 
 ## Documents
 
@@ -24,6 +24,7 @@ Plans for larger features and the design-kit traceability table live in `plans/`
 | `plans/i18n-plan.md` | UI languages: approach, phases, decisions, what was built |
 | `plans/caption-editor-plan.md` | The caption editor (kit board R3c) |
 | `plans/webcam-audio-check-plan.md` | Settings → Webcam & audio check (kit board R13b) |
+| `plans/voice-and-meetings-plan.md` | Audio-only recording, speaker labels, text model and AI reports: release split, model choices, spikes S7 and S8 |
 
 ## Feature files
 
@@ -35,7 +36,7 @@ Plans for larger features and the design-kit traceability table live in `plans/`
 | `features/04-webcam.md` | Webcam | CAM-1 … CAM-5 |
 | `features/05-audio.md` | Audio | AUD-1 … AUD-4 |
 | `features/06-editing.md` | Editing | EDT-1 … EDT-5 |
-| `features/07-ai.md` | AI | AI-1 … AI-6 |
+| `features/07-ai.md` | AI | AI-1 … AI-9 |
 | `features/08-export.md` | Export | EXP-1 … EXP-4 |
 | `features/09-library.md` | Library | LIB-1 … LIB-3 |
 | `features/10-storage.md` | Storage | STO-1 … STO-5 |
@@ -43,6 +44,7 @@ Plans for larger features and the design-kit traceability table live in `plans/`
 | `features/12-agent.md` | Agent | AGT-1 … AGT-3 |
 | `features/13-launcher.md` | Launcher | LNC-1 |
 | `features/14-permissions.md` | Permissions | PRM-1 |
+| `features/15-voice.md` | Voice and meetings | VOC-1 … VOC-3 |
 
 Related: `../design/` (brand and UI kit, source of truth for visuals; start at `../design/CLAUDE.md`), `../docs/development/design-surfaces.md` (surfaces mapped to the kit), `plans/design-implementation.md` (kit traceability and build status), `../docs/project/spikes.md` (feasibility results).
 

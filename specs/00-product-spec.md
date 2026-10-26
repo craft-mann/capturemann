@@ -120,8 +120,15 @@ P0 items block the v0.1 release; P1 items ship in v0.1 unless they threaten the 
 | AI-2 | Title, description, chapters and tags from the transcript (a text model: a local server or the user's API key) | P1 | **No: after v0.1** (maintainer decision, Oct 24, 2026) |
 | AI-3 | Auto-zoom suggestions from cursor dwell | P1 | Yes |
 | AI-4 | Silence and filler-word removal suggestions | P1 | Yes |
-| AI-5 | Caption translation | P2 | Yes |
+| AI-5 | Transcript and caption translation: Whisper to English, the text model to any language (raised to P1 on Oct 26, 2026, next release) | P1 | Yes |
 | AI-6 | Transcript editor: correct words, names and grammar | P1 | Yes |
+| AI-7 | Text model provider: a local OpenAI-compatible server (Ollama, LM Studio) or a remote provider with the user's key | P1 | Read-only |
+| AI-8 | Speaker labels from voices (diarization), rename and merge speakers | P1 | Yes |
+| AI-9 | Reports from a recording: summary, meeting minutes, 1:1, interview, product presentation and lecture notes, each item cited with a time | P1 | Yes |
+| **Voice and meetings** (added Oct 26, 2026; next release) |  |  |  |
+| VOC-1 | Audio-only recording: microphone, system audio or both, markers, consent notice, presets for meetings, interviews and lectures | P1 | Yes |
+| VOC-2 | Audio editor view (waveforms, transcript with speakers) and audio export (M4A, WAV) | P1 | Yes |
+| VOC-3 | Live transcript while recording | P2 | Yes |
 | **Export** |  |  |  |
 | EXP-1 | Export MP4 (H.264 or HEVC + AAC) at source resolution or a preset | P0 | Yes |
 | EXP-2 | Platform presets: YouTube 16:9, YouTube Shorts / TikTok / Reels 9:16, square | P0 | Yes |

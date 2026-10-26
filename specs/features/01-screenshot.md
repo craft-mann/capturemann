@@ -61,6 +61,8 @@
 | Discard recording (HUD, REC-5) | ⌥⇧D | Ctrl+Alt+Shift+D |
 | Restart recording (HUD, REC-5) | ⌥⇧T | Ctrl+Alt+Shift+T |
 | Annotate last capture | ⌥⇧A | Ctrl+Alt+Shift+A |
+| Start/stop audio recording (VOC-1, planned) | ⌥⇧V | Ctrl+Alt+Shift+V |
+| Add a marker while recording (VOC-1, planned) | ⌥⇧M | Ctrl+Alt+Shift+M |
 
 - Defaults avoid the OS screenshot keys (⌘⇧3/4/5 on macOS, Win+Shift+S on Windows), common editor shortcuts (⌘⇧P, Ctrl+Shift+P), and plain Ctrl+Alt on Windows (it equals AltGr on many European layouts). Settings offers "Replace system screenshot shortcuts" on macOS as an opt-in that explains how to turn off the system ones first.
 

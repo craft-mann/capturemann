@@ -1,0 +1,66 @@
+# Voice and meetings: implementation plan
+
+Status: **Planned Oct 26, 2026.** Nothing built. Behaviour: `../features/15-voice.md` (VOC-1 to VOC-3), `../features/07-ai.md` (AI-5, AI-7, AI-8, AI-9). Approach, models and spikes: `voice-and-meetings-plan.md`. Screens: the redesign kit boards V0 to V8 (`design/redesign/`, kit copy `capturemann-redesign 5/`); the kit's `CLAUDE.md` says which board builds which part.
+
+No release dates (maintainer, Oct 26, 2026). Work in the order below; each stage leaves the app working and is merged when fmt, clippy, tests and `cm-i18n check` pass. Masters stay WAV.
+
+## Rules for every package
+
+- Actions first: GUI, CLI and MCP go through `cm-daemon` actions; each user-facing feature has an MCP tool and CLI command with identical behaviour (CLAUDE.md).
+- Hardware behind traits with fakes; no test may record for real. Real-hardware checks are manual scripts in `tests/manual/` plus a report in `verification/`.
+- UI strings through `cm_i18n` with Vietnamese; follow the board for the surface and `design/CLAUDE.md`.
+- Speaker colours are `#8FB0FF`, `#7FD6C2`, `#F2B880`, `#C9A7F5`, then repeat; never status colours.
+
+## Stage 0: foundation (blocks everything)
+
+**P0.1 Audio kind.** Add `CaptureKind::Audio` (`cm-library/src/manifest.rs`), index it (`kind = audio`), and make code that assumes a `screen` track tolerate its absence (`index.rs`, `rec_edit.rs`, details and library views). Fixture: extend `make_fixture` with `--audio-only`.
+**P0.2 Markers.** `manifest.markers: [{ at, label? }]` in session time (pauses removed), a revision-tagged edit, `add_marker` action, MCP tool and CLI `record marker`; also callable after stop with `capture_id` + `at`.
+**P0.3 Audio-only session.** `RecordingSession` with no screen, camera or cursor track; `mode: "audio"` on `start_recording` with the `invalid_input` rule for screen-only fields (VOC-1.AC9); `preset`, `title`, `max_duration_s`; Confirm dialog text. Idle-sleep assertion and `reason: "system_sleep"` stop. Microphone-only must not request Screen Recording.
+**P0.4 Settings.** `recording.consent_notice` (default on), `recording.audio_max_duration_s`, shortcut entries ⌥⇧V and ⌥⇧M (also fixes the CAP-2 table).
+Tests: VOC-1.AC1, AC4, AC5, AC7 to AC9 with scripted devices; kill -9 recovery with the existing e2e example (`--tracks mic`).
+
+## Stage 1: audio recording (VOC-1)
+
+**P1.1 Record sheet, Audio mode** (board V1): mode switch, five presets, mic and system sources with the live meter, "How many people?", "After you stop" row, consent line, disk and duration footer.
+**P1.2 Compact HUD** (V2): timer, 14-bar meter, Pause, Mute, Marker, Discard; agent chip; ⌥⇧M and M; the marker toast.
+**P1.3 Entry points:** tray, launcher (LNC-1), sidebar mic button and rail, ⌥⇧V.
+**P1.4 Library Audio** (V3): sidebar item with count, waveform thumbnails (peaks computed after stop, cached in the bundle), status badges, transcript search.
+P1.1 to P1.3 touch `apps/overlay` and `apps/desktop` recording code; P1.4 touches the library UI. Disjoint, so they can run as parallel worktree agents after Stage 0.
+Manual: `tests/manual/VOC-1.md` (permissions, consent, HUD, lid hint) and a 3-hour soak report (AC6).
+
+## Stage 2: audio editor and export (VOC-2)
+
+**P2.1 Editor shell for `kind: "audio"`** (V4): "now speaking" card, lanes (Markers, one waveform per track, suggested cuts), overview strip, Transcript tab in wide mode, tab set `audio`. Reuses the caption editor and the R3c wide mode.
+**P2.2 FFmpeg:** add the `wav` muxer and `pcm_s24le` encoder to `packaging/ffmpeg/build-macos.sh` (lists and self-check), rebuild with `make ffmpeg`.
+**P2.3 `export_audio`** job (V7): M4A and WAV, Mix / Mic / System, `loudnorm` to −16 LUFS, tags, optional copy folder; "Export audio only" for screen recordings (Output tab and Details); done toast. Golden tests with `ebur128`.
+Manual: `tests/manual/VOC-2.md`.
+
+## Stage 3: Whisper models and translation to English (AI-1, AI-5)
+
+**P3.1** Pin `large-v3-turbo` and `large-v3` in `crates/cm-ai/data/models.json` (commit-pinned URL, SHA-256, size, `ram_mb`); AI page rows and labels (V8 speech section).
+**P3.2** Whisper translate task in `cm-ai/src/whisper.rs`; the turbo rule (large-v3, else medium, else `translation_model_missing`); `translations/<lang>.json`; language switcher in the transcript; per-language exports; `translate_captions` tool and CLI. The text-model engine arrives in Stage 4.
+
+## Stage 4: text model provider (AI-7), then the rest of AI-5
+
+Run **spike S8** first (it picks the default model). Then: OpenAI-compatible client with Ollama and LM Studio presets and loopback detection; Anthropic and remote keys through `keyring`; `ai.text.*` settings (app-only); schema-validated output with one retry; map-reduce chunking helper; Test button; AI page text-model section (V8); `get_text_model`, `test_text_model`. Then text-model translation to any language (AI-5.AC3 to AC7). Test server is scripted; loopback-only check.
+
+## Stage 5: reports (AI-9)
+
+Templates as data in `crates/cm-ai/data/reports/` with `additionalProperties: false` schemas; citation check and `dropped_uncited`; interview schema with no score field; storage `reports/<id>.json` and `.md`; Report tab setup, report view and exports (V5, V6); tools `list_report_templates`, `generate_report`, `get_report`, `export_report`, `delete_report`; events. Review set scored by hand in `verification/`.
+
+## Stage 6: speaker labels (AI-8)
+
+Run **spike S7** first (model, licence, `ort` versus `sherpa-onnx`). Then: model download and licence display, diarization job, word assignment, `diarization.json`, rename, merge and reassign revisions, the Speakers lane and tab, `Speaker names` export switch, headset shortcut, `profile.display_name`; `diarize` and `set_speakers`. `ai.auto_speakers` stays off until S7 passes. No voiceprints on disk (AC6 check).
+
+## Later (P2)
+
+VOC-3 live transcript (needs its own board), embedded llama.cpp, custom report templates, per-app audio, FLAC or "Compact this recording".
+
+## Decisions still open
+
+- `profile.display_name` or the macOS account name for "Me" (AI-8.AC7). Default if unanswered: the setting, falling back to "Me".
+- Whether Stage 4 and Stage 3 swap places: translation to English works without a text model, so Stage 3 stays first.
+
+## Docs to update as each stage lands
+
+`docs/project/status.md`, `docs/project/plan.md`, `docs/user/user-guide.md`, `CHANGELOG.md`, `locales/`, `specs/plans/design-implementation.md` (traceability for V0 to V8), and the "planned, not built" markers in `specs/02-agent-interface.md`.
