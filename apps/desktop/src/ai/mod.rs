@@ -14,6 +14,7 @@ pub mod jobs;
 pub mod models;
 pub mod suggest;
 pub mod summary;
+pub mod voice;
 
 #[cfg(test)]
 mod details_contract;

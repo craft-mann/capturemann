@@ -9,6 +9,9 @@ use gpui::{
 
 use cm_i18n::{tr, tr_ctx};
 
+mod voice;
+use voice::VoiceField;
+
 use crate::ai::glossary::{heard_text, remove, row_hint, upsert, GlossaryError};
 use crate::ui::text_field::{CaretAt, TextField, TextFieldEvent};
 
@@ -26,6 +29,11 @@ use crate::ui::settings::widgets::{
 };
 use crate::ui::studio::ThemeGlobal;
 
+/// The placeholder of the name box: the stored default.
+fn voice_default_name() -> &'static str {
+    crate::ai::voice::DEFAULT_DISPLAY_NAME
+}
+
 pub struct AiPage {
     app: Entity<AppModel>,
     /// The glossary form: `None` closed, `Some(None)` adding, `Some(Some(i))` editing entry `i`.
@@ -33,6 +41,12 @@ pub struct AiPage {
     glossary_error: Option<GlossaryError>,
     term_field: Entity<TextField>,
     heard_field: Entity<TextField>,
+    /// The voice sections' boxes (V8): your name, a custom loopback address, the typed model.
+    name_field: Entity<TextField>,
+    url_field: Entity<TextField>,
+    model_field: Entity<TextField>,
+    /// What the name, address and model boxes were last loaded with (`None`: never).
+    synced: (Option<String>, Option<String>, Option<String>),
     _subs: Vec<Subscription>,
 }
 
@@ -43,7 +57,25 @@ impl AiPage {
         let heard_field = cx.new(|cx| {
             TextField::new(tr!("Often heard as"), tr!("Logo Drive, Gu gồ Drai"), cx).without_icon()
         });
-        let subs = vec![
+        let me = voice_default_name();
+        let name_field =
+            cx.new(|cx| TextField::new(tr!("Your name in transcripts"), me, cx).without_icon());
+        let url_field = cx.new(|cx| {
+            TextField::new(tr!("Server address"), "http://127.0.0.1:1234/v1", cx).without_icon()
+        });
+        let model_field =
+            cx.new(|cx| TextField::new(tr!("Text model"), tr!("Model name"), cx).without_icon());
+        let mut voice_subs = Vec::new();
+        for (f, which) in [
+            (&name_field, VoiceField::Name),
+            (&url_field, VoiceField::Url),
+            (&model_field, VoiceField::Model),
+        ] {
+            voice_subs.push(cx.subscribe(f, move |this, _f, ev: &TextFieldEvent, cx| {
+                this.voice_field_event(which, ev, cx)
+            }));
+        }
+        let mut subs = vec![
             cx.observe(&app, |_, _, cx| cx.notify()),
             cx.subscribe(&term_field, |this, _f, ev: &TextFieldEvent, cx| {
                 this.glossary_field_event(ev, cx)
@@ -52,8 +84,13 @@ impl AiPage {
                 this.glossary_field_event(ev, cx)
             }),
         ];
+        subs.extend(voice_subs);
         AiPage {
             app,
+            name_field,
+            url_field,
+            model_field,
+            synced: (None, None, None),
             glossary_edit: None,
             glossary_error: None,
             term_field,
@@ -491,9 +528,11 @@ pub fn action_icon(a: &RowAction) -> Option<&'static str> {
 }
 
 impl Render for AiPage {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = cx.global::<ThemeGlobal>().0;
         ai::ensure_loaded(&self.app, cx);
+        crate::ui::ai_voice::ensure_voice_loaded(&self.app, cx);
+        self.voice_sync_fields(cx);
         let (rows, show_banner, load_error, action_error, busy, auto, active) = {
             let m = self.app.read(cx);
             (
@@ -518,6 +557,8 @@ impl Render for AiPage {
         )
         .on_click(cx.listener(move |_, _, _, cx| ai::set_auto_transcribe(&app, !auto, cx)));
         let glossary = self.glossary_section(&t, cx);
+        let speakers = self.speakers_section(&t, cx);
+        let text_model = self.text_model_section(&t, window, cx);
         let models: AnyElement = if let Some(e) = &load_error {
             card(&t)
                 .flex()
@@ -594,7 +635,7 @@ impl Render for AiPage {
                                     div()
                                         .text_size(px(type_scale::UI))
                                         .text_color(rgba_of(t.text_3))
-                                        .child(tr!("Transcripts and captions, made on this Mac.")),
+                                        .child(tr!("Transcripts, speakers, translations and reports, made on this Mac.")),
                                 ),
                         ),
                 )
@@ -610,30 +651,51 @@ impl Render for AiPage {
                 .child(
                     div()
                         .flex()
-                        .flex_col()
-                        .gap(px(12.))
+                        .flex_wrap()
+                        .items_start()
+                        .gap(px(24.))
                         .child(
                             div()
-                                .text_size(px(type_scale::BODY))
-                                .font_weight(FontWeight::MEDIUM)
-                                .child(tr!("Speech models")),
+                                .flex_1()
+                                .min_w(px(voice::COLUMN_MIN_W))
+                                .flex()
+                                .flex_col()
+                                .gap(px(24.))
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_col()
+                                        .gap(px(12.))
+                                        .child(voice::section_title(
+                                            &t,
+                                            tr!("Speech to text"),
+                                            tr!("Whisper \u{b7} transcripts, captions, translation to English"),
+                                        ))
+                                        .child(models)
+                                        .children(action_error.map(|e| caption(&t, e.text())))
+                                        .children(busy.then(|| caption(&t, tr!("Working\u{2026}")))),
+                                )
+                                .child(list_card(&t).child(settings_row(
+                                    &t,
+                                    Some("captions"),
+                                    tr!("Transcribe after each recording"),
+                                    Some(SharedString::from(match active {
+                                        Some(a) => tr!("Uses {model}", model = a),
+                                        None => tr!("Needs a model above"),
+                                    })),
+                                    Some(auto_switch.into_any_element()),
+                                    true,
+                                )))
+                                .child(speakers)
+                                .child(glossary),
                         )
-                        .child(models)
-                        .children(action_error.map(|e| caption(&t, e.text())))
-                        .children(busy.then(|| caption(&t, tr!("Working\u{2026}")))),
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w(px(voice::COLUMN_MIN_W))
+                                .child(text_model),
+                        ),
                 )
-                .child(list_card(&t).child(settings_row(
-                    &t,
-                    Some("captions"),
-                    tr!("Transcribe after each recording"),
-                    Some(SharedString::from(match active {
-                        Some(a) => tr!("Uses {model}", model = a),
-                        None => tr!("Needs a model above"),
-                    })),
-                    Some(auto_switch.into_any_element()),
-                    true,
-                )))
-                .child(glossary),
         )
     }
 }

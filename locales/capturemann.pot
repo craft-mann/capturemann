@@ -107,6 +107,9 @@ msgstr ""
 msgid "APIs & Services → OAuth consent screen: choose External, give the app a name, and add your own Google address as a test user. Add the YouTube scopes “youtube.upload” and “youtube” if the console asks which ones the app uses."
 msgstr ""
 
+msgid "About 6.7 GB to load"
+msgstr ""
+
 msgid "About {minutes} minutes of disk space left"
 msgstr ""
 
@@ -321,6 +324,9 @@ msgstr ""
 msgid "Another app owns the socket"
 msgstr ""
 
+msgid "Another server on this Mac (address)"
+msgstr ""
+
 msgid "Answer “Is this video made for kids?” to publish."
 msgstr ""
 
@@ -409,6 +415,9 @@ msgid "Before a screenshot"
 msgstr ""
 
 msgid "Behavior"
+msgstr ""
+
+msgid "Best accuracy and translation to English"
 msgstr ""
 
 msgid "Best matches first, then front to back"
@@ -710,7 +719,13 @@ msgstr ""
 msgid "Choose a folder by its full path."
 msgstr ""
 
+msgid "Choose a model"
+msgstr ""
+
 msgid "Choose a model file"
+msgstr ""
+
+msgid "Choose a model first."
 msgstr ""
 
 msgid "Choose a region"
@@ -720,6 +735,9 @@ msgid "Choose a region to record."
 msgstr ""
 
 msgid "Choose a region…"
+msgstr ""
+
+msgid "Choose a text model provider first."
 msgstr ""
 
 msgid "Choose a thumbnail"
@@ -1315,6 +1333,9 @@ msgstr ""
 msgid "Downloading and deleting speech models always ask first."
 msgstr ""
 
+msgid "Downloading speaker models is not available yet."
+msgstr ""
+
 msgid "Downloading {percent}%"
 msgstr ""
 
@@ -1405,6 +1426,10 @@ msgstr ""
 msgid "Everything CaptureMann can use is allowed."
 msgstr ""
 
+#. FACT: owner review required (privacy statement)
+msgid "Everything here runs on this Mac. Nothing is downloaded unless you press Download, and nothing is sent anywhere unless you choose a remote text model."
+msgstr ""
+
 msgid "Excluded windows"
 msgstr ""
 
@@ -1480,6 +1505,9 @@ msgstr ""
 msgid "FFmpeg: {error}"
 msgstr ""
 
+msgid "Fast, accurate — not for translation"
+msgstr ""
+
 msgid "Fast, fine for clear speech in a quiet room."
 msgstr ""
 
@@ -1508,6 +1536,9 @@ msgid "Find and replace"
 msgstr ""
 
 msgid "Find in the captions"
+msgstr ""
+
+msgid "Find speakers after each transcript"
 msgstr ""
 
 msgid "Find who speaks when"
@@ -1570,6 +1601,9 @@ msgstr ""
 msgid "Glossary term"
 msgstr ""
 
+msgid "Good default candidate · strong multilingual"
+msgstr ""
+
 msgid "Google Drive"
 msgstr ""
 
@@ -1601,6 +1635,9 @@ msgid "Hide when idle"
 msgstr ""
 
 msgid "Higher quality makes bigger files."
+msgstr ""
+
+msgid "Highest quality, fast for its size"
 msgstr ""
 
 msgid "Hold a modifier key (Control, Option or Shift, Command or Windows) too."
@@ -1669,7 +1706,13 @@ msgstr ""
 msgid "Inspector tabs"
 msgstr ""
 
+msgid "Install a model in Ollama or LM Studio, then pick it above. CaptureMann never downloads text models itself. Default decided by S8."
+msgstr ""
+
 msgid "Install a speech model from a file"
+msgstr ""
+
+msgid "Installed: {name}"
 msgstr ""
 
 msgid "Is this video made for kids?"
@@ -1944,7 +1987,16 @@ msgstr ""
 msgid "Model for this run"
 msgstr ""
 
+msgid "Model name"
+msgstr ""
+
+msgid "Model · {count} on {server}"
+msgstr ""
+
 msgid "Models are not available"
+msgstr ""
+
+msgid "Models on this server"
 msgstr ""
 
 msgid "More"
@@ -2043,6 +2095,9 @@ msgid "Needed for: {features}"
 msgstr ""
 
 msgid "Needs a model above"
+msgstr ""
+
+msgid "Needs a speaker model"
 msgstr ""
 
 msgid "Needs about {memory} of memory"
@@ -2192,6 +2247,9 @@ msgstr ""
 msgid "No terms yet. Add a name or a word you want spelled your way."
 msgstr ""
 
+msgid "No text model. Reports and translation to other languages are off."
+msgstr ""
+
 msgid "No transcript yet. Transcribe the microphone to get captions; it runs on this Mac."
 msgstr ""
 
@@ -2244,6 +2302,9 @@ msgid "Not recording"
 msgstr ""
 
 msgid "Not right now"
+msgstr ""
+
+msgid "Not running"
 msgstr ""
 
 msgid "Not serving"
@@ -2301,6 +2362,9 @@ msgstr ""
 msgid "Off"
 msgstr ""
 
+msgid "Off by default"
+msgstr ""
+
 msgid "Off: every recording starts bottom-left."
 msgstr ""
 
@@ -2341,6 +2405,9 @@ msgid "One MP4 with the screen, camera bubble and audio. The original tracks are
 msgstr ""
 
 msgid "One MP4 with the screen, camera bubble and audio. The original tracks are untouched. {captions}"
+msgstr ""
+
+msgid "Only addresses on this Mac work here, like http://127.0.0.1:1234/v1."
 msgstr ""
 
 msgid "Only helps the model spell it"
@@ -2732,6 +2799,9 @@ msgstr ""
 msgid "Recent captures"
 msgstr ""
 
+msgid "Recommended for your Mac"
+msgstr ""
+
 msgid "Reconnect YouTube"
 msgstr ""
 
@@ -2987,6 +3057,12 @@ msgid_plural "Replaced {n} places in the captions."
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "Replied in {seconds} s"
+msgstr ""
+
+msgid "Reports and translation to any language"
+msgstr ""
+
 msgid "Requested by {name}"
 msgstr ""
 
@@ -3089,6 +3165,9 @@ msgid "Run the 60 fps self-test: record {target} at {w} x {h}, 60 fps, for {dura
 msgstr ""
 
 msgid "Run the 60 fps test in Settings first"
+msgstr ""
+
+msgid "Running"
 msgstr ""
 
 msgid "Runs as the permissions above say."
@@ -3287,6 +3366,12 @@ msgstr ""
 msgid "Separated by commas."
 msgstr ""
 
+msgid "Server address"
+msgstr ""
+
+msgid "Servers on this Mac"
+msgstr ""
+
 msgid "Set In point"
 msgstr ""
 
@@ -3306,6 +3391,9 @@ msgid "Settings sections"
 msgstr ""
 
 msgid "Shadow"
+msgstr ""
+
+msgid "Short English summaries; weak for Vietnamese and long meetings"
 msgstr ""
 
 msgid "Shortcut {key}"
@@ -3393,7 +3481,19 @@ msgstr ""
 msgid "Speak as you would while recording"
 msgstr ""
 
+msgid "Speaker labels"
+msgstr ""
+
+msgid "Speaker model"
+msgstr ""
+
+msgid "Speaker model not available yet"
+msgstr ""
+
 msgid "Speech models"
+msgstr ""
+
+msgid "Speech to text"
 msgstr ""
 
 msgid "Split (S)"
@@ -3410,6 +3510,9 @@ msgid "Split at the text cursor · {key} done"
 msgstr ""
 
 msgid "Split the timeline {key} to set a different layout for each part."
+msgstr ""
+
+msgid "Start Ollama or LM Studio, then press Check again."
 msgstr ""
 
 msgid "Start a new empty library at {to}; the captures in {from} stay where they are"
@@ -3479,6 +3582,12 @@ msgid "Stop playing this line"
 msgstr ""
 
 msgid "Stop recording"
+msgstr ""
+
+msgid "Structured output did not work; replies are checked and retried"
+msgstr ""
+
+msgid "Structured output works"
 msgstr ""
 
 msgid "Style the cursor"
@@ -3557,6 +3666,12 @@ msgid "Testing 60 fps · {left}"
 msgstr ""
 
 msgid "Testing…"
+msgstr ""
+
+msgid "Text model"
+msgstr ""
+
+msgid "Text model provider"
 msgstr ""
 
 msgid "That account no longer exists."
@@ -3807,9 +3922,6 @@ msgstr ""
 msgid "The microphone has delivered only silence for 15 s (muted, or its access was revoked); the recording continues"
 msgstr ""
 
-msgid "The most accurate and the slowest. For difficult audio and many languages on a Mac with plenty of memory."
-msgstr ""
-
 msgid "The move stopped"
 msgstr ""
 
@@ -3927,7 +4039,13 @@ msgstr ""
 msgid "The take is deleted and cannot be recovered"
 msgstr ""
 
+msgid "The test failed"
+msgstr ""
+
 msgid "The test sound didn’t play"
+msgstr ""
+
+msgid "The text model did not answer."
 msgstr ""
 
 msgid "The upload failed."
@@ -4040,6 +4158,9 @@ msgstr ""
 msgid "This recording’s folder couldn’t be found in the library."
 msgstr ""
 
+msgid "This server lists no models. Pull or load one first."
+msgstr ""
+
 msgid "Thumbnail"
 msgstr ""
 
@@ -4100,11 +4221,7 @@ msgstr ""
 msgid "Transcript ready"
 msgstr ""
 
-#. FACT: owner review required (privacy statement)
-msgid "Transcription runs on this Mac. Nothing is downloaded unless you press Download, and your audio never leaves this machine."
-msgstr ""
-
-msgid "Transcripts and captions, made on this Mac."
+msgid "Transcripts, speakers, translations and reports, made on this Mac."
 msgstr ""
 
 msgid "Translate captions"
@@ -4245,6 +4362,9 @@ msgstr ""
 msgid "Use this model"
 msgstr ""
 
+msgid "Used for “My microphone only hears me”"
+msgstr ""
+
 msgid "Uses {model}"
 msgstr ""
 
@@ -4328,6 +4448,12 @@ msgid "When you press Publish, CaptureMann asks you to confirm in a separate dia
 msgstr ""
 
 msgid "Where finished captures are saved, and the accounts you publish to."
+msgstr ""
+
+msgid "Whisper · transcripts, captions, translation to English"
+msgstr ""
+
+msgid "Who spoke when, from the voices"
 msgstr ""
 
 msgid "Whole recording"
@@ -4433,6 +4559,9 @@ msgstr ""
 msgid "Your captures need {needed} free and the new folder has {free}. You can start with an empty library there instead. The captures in the old folder stay where they are."
 msgstr ""
 
+msgid "Your name in transcripts"
+msgstr ""
+
 #. FACT: owner review required (every permission note states what macOS does)
 msgid "Your organization or Screen Time blocks this. Only an administrator can allow it."
 msgstr ""
@@ -4522,6 +4651,9 @@ msgstr ""
 msgid "an earlier session"
 msgstr ""
 
+msgid "candidate"
+msgstr ""
+
 msgid "cannot decode poster: {error}"
 msgstr ""
 
@@ -4582,6 +4714,9 @@ msgstr ""
 msgid "ffmpeg: {error}"
 msgstr ""
 
+msgid "fits this Mac"
+msgstr ""
+
 msgid "folder \"{path}\""
 msgstr ""
 
@@ -4631,6 +4766,12 @@ msgid "not given: the account's default"
 msgstr ""
 
 msgid "not supported on this OS"
+msgstr ""
+
+msgid "only talks to {host}"
+msgstr ""
+
+msgid "open licences only"
 msgstr ""
 
 msgid "original bundle {path} at \"{name}\""
@@ -4711,6 +4852,9 @@ msgstr ""
 msgid "the window \"{title}\""
 msgstr ""
 
+msgid "this Mac has {memory} GB · open licences only"
+msgstr ""
+
 msgid "this capture"
 msgstr ""
 
@@ -4775,7 +4919,16 @@ msgstr ""
 msgid "{count} / {max} bytes"
 msgstr ""
 
+msgid "{count} context"
+msgstr ""
+
 msgid "{count} of {max} characters"
+msgstr ""
+
+msgid "{count}K context"
+msgstr ""
+
+msgid "{count}M context"
 msgstr ""
 
 msgid "{device_kind}: {device}"
@@ -4876,6 +5029,9 @@ msgstr ""
 msgid "{name} {pos} of {total}, selected"
 msgstr ""
 
+msgid "{name} · {licence} · {size}, shown before you download"
+msgstr ""
+
 msgid "{name} · {w} × {h}"
 msgstr ""
 
@@ -4928,6 +5084,9 @@ msgid "{name}, {policy}. {hint}"
 msgstr ""
 
 msgid "{name}, {size}, {status}"
+msgstr ""
+
+msgid "{name}, {state}"
 msgstr ""
 
 msgid "{name}, {status}."
@@ -6801,6 +6960,10 @@ msgctxt "sort key"
 msgid "Title"
 msgstr ""
 
+msgctxt "speaker model"
+msgid "Download"
+msgstr ""
+
 msgctxt "speech model"
 msgid "Cancel"
 msgstr ""
@@ -6867,6 +7030,18 @@ msgstr ""
 
 msgctxt "system audio status"
 msgid "Listening…"
+msgstr ""
+
+msgctxt "text model"
+msgid "Test"
+msgstr ""
+
+msgctxt "text model provider"
+msgid "None"
+msgstr ""
+
+msgctxt "text model provider"
+msgid "On this Mac"
 msgstr ""
 
 msgctxt "theme"
