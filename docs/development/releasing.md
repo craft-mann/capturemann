@@ -53,7 +53,11 @@ Only the last job has `contents: write`.
 8. **Review the draft** under Releases: the notes, the two assets, and the line saying whether the
    build is notarized. Download the DMG and run the checks below on a Mac that is not your build
    machine.
-9. **Publish** the draft. Then update the website download link (manual, see below).
+9. **Publish** the draft. Then update the website download link (manual, see below) and the
+   Homebrew cask: in a checkout of `craft-mann/homebrew-tap` run
+   `scripts/update-homebrew-cask.sh X.Y.Z <path to the tap checkout>`, then commit and push the tap.
+   The script reads the checksum from the release's `.sha256` asset, so the release must be public
+   first. Test with `brew install --cask --appdir=/tmp/cm-brew-test craft-mann/tap/capturemann`.
 
 ## GitHub secrets
 
@@ -177,14 +181,16 @@ The checksum only proves the download matches what was uploaded; it does not rep
 
 ## What is not automated
 
-- The Apple Developer ID certificate and notarization credentials do not exist until the enrolment is
-  complete. Until then every release is ad hoc signed and not notarized.
+- **0.1.0 was built, notarized and uploaded by hand** (`make release` steps, then `gh release create`
+  with the workflow disabled); see `verification/RELEASE-0.1.0-2026-10-26-maintainer.md`. The
+  workflow itself needs the five repository secrets above and a first run on a fork.
 - **Gatekeeper check on a clean Mac** (no Xcode, no Homebrew, a user account that never ran the
   build): download the DMG from the draft in a browser (so it carries the quarantine flag), open
   it, drag the app out, launch it, and grant the permissions. This is the only way to see what a
   user sees; the workflow cannot do it. Record the run in `verification/`.
 - Checking that the bundled FFmpeg runs on a Mac without Homebrew.
 - The website download link and version on <https://www.craftmann.app/capturemann/>.
+- The Homebrew cask in `craft-mann/homebrew-tap` (a script updates it, see step 9).
 - Announcing the release.
 - A changelog entry and the "Known limitations" list: written by hand.
 - No update mechanism, no appcast and no automatic deletion of old releases.

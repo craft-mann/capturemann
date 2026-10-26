@@ -48,6 +48,17 @@ and every feature available to AI agents through MCP and a CLI.
 
 Requires a Mac with Apple Silicon and macOS 13 or later. Intel Macs are not supported in 0.1.0; they follow in the next release.
 
+**With Homebrew:**
+
+```sh
+brew install --cask craft-mann/tap/capturemann
+```
+
+This also links the `capturemann` command line into Homebrew's `bin`. Update with
+`brew upgrade --cask capturemann`.
+
+**From the release page:**
+
 1. Download `CaptureMann-v<version>-macos-arm64.dmg` and its `.sha256` file from
    [Releases](https://github.com/craft-mann/capturemann/releases).
 2. Check the download (in the folder with both files):
