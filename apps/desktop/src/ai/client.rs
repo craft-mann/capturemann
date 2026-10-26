@@ -339,15 +339,59 @@ impl AiClient {
         format: CaptionFormat,
         timestamps: bool,
     ) -> Result<PathBuf, AiError> {
+        self.export_captions_for(capture_id, format, timestamps, None, false)
+            .await
+    }
+
+    /// [`Self::export_captions`] for one language of the transcript (`None`: the original) and,
+    /// for SRT, with the speakers' names before each line (VOC-2, AI-8; VTT and TXT always name
+    /// the speakers when they are known, so the daemon refuses the flag for them).
+    pub async fn export_captions_for(
+        &self,
+        capture_id: &str,
+        format: CaptionFormat,
+        timestamps: bool,
+        language: Option<&str>,
+        speaker_names: bool,
+    ) -> Result<PathBuf, AiError> {
         let mut p = json!({ "capture_id": capture_id, "format": format.as_str() });
         if timestamps && format == CaptionFormat::Txt {
             p["timestamps"] = json!(true);
+        }
+        if let Some(l) = language {
+            p["language"] = json!(l);
+        }
+        if speaker_names && format == CaptionFormat::Srt {
+            p["speaker_names"] = json!(true);
         }
         let v = self.transport.call("export_captions", p).await?;
         v.get("path")
             .and_then(Value::as_str)
             .map(PathBuf::from)
             .ok_or_else(|| AiError::message("export_captions: the answer has no path"))
+    }
+
+    /// `translate_captions`: starts the `translate` job for `target_language`; the engine is
+    /// chosen by the daemon (AI-5). The result arrives as `translation.ready`.
+    pub async fn translate_captions(
+        &self,
+        capture_id: &str,
+        target_language: &str,
+    ) -> Result<String, AiError> {
+        let v = self
+            .transport
+            .call(
+                "translate_captions",
+                json!({ "capture_id": capture_id, "target_language": target_language }),
+            )
+            .await?;
+        job_id("translate_captions", &v)
+    }
+
+    /// `export_audio` (VOC-2): starts the audio export job; the result arrives as `export.done`.
+    pub async fn export_audio(&self, params: Value) -> Result<String, AiError> {
+        let v = self.transport.call("export_audio", params).await?;
+        job_id("export_audio", &v)
     }
 
     pub async fn suggest_zooms(&self, capture_id: &str) -> Result<Vec<ZoomSuggestion>, AiError> {
@@ -764,5 +808,45 @@ mod tests {
         let cuts = run(c.suggest_cuts("cap_1")).unwrap();
         assert_eq!(cuts[0].kind, "silence");
         assert_eq!(cuts[0].start, MediaTime::from_ticks(1_200_000));
+    }
+
+    /// VOC-2: the transcript's language and the speakers' names go out only when asked for, and
+    /// the names only for SRT (the daemon refuses them for the other formats).
+    #[test]
+    fn export_captions_for_sends_language_and_speaker_names_only_when_asked() {
+        let t = ScriptedTransport::new();
+        t.answer("export_captions", Ok(json!({"path": "/x/a.srt"})));
+        let c = AiClient::new(t.clone());
+        run(c.export_captions("cap_1", CaptionFormat::Srt, false)).unwrap();
+        run(c.export_captions_for("cap_1", CaptionFormat::Srt, false, Some("vi"), true)).unwrap();
+        run(c.export_captions_for("cap_1", CaptionFormat::Vtt, false, None, true)).unwrap();
+        let calls = t.calls_of("export_captions");
+        assert_eq!(calls[0], json!({"capture_id": "cap_1", "format": "srt"}));
+        assert_eq!(
+            calls[1],
+            json!({"capture_id": "cap_1", "format": "srt", "language": "vi", "speaker_names": true})
+        );
+        assert_eq!(calls[2], json!({"capture_id": "cap_1", "format": "vtt"}));
+    }
+
+    /// VOC-2: Translate sends the target language; Export audio sends its parameters and returns
+    /// the job.
+    #[test]
+    fn translate_and_export_audio_return_their_jobs() {
+        let t = ScriptedTransport::new();
+        t.answer("translate_captions", Ok(json!({"job_id": "job_7"})));
+        t.answer(
+            "export_audio",
+            Ok(json!({"job_id": "job_8", "state": "queued"})),
+        );
+        let c = AiClient::new(t.clone());
+        assert_eq!(run(c.translate_captions("cap_1", "en")).unwrap(), "job_7");
+        assert_eq!(
+            t.calls_of("translate_captions"),
+            vec![json!({"capture_id": "cap_1", "target_language": "en"})]
+        );
+        let p = json!({"capture_id": "cap_1", "format": "wav"});
+        assert_eq!(run(c.export_audio(p.clone())).unwrap(), "job_8");
+        assert_eq!(t.calls_of("export_audio"), vec![p]);
     }
 }

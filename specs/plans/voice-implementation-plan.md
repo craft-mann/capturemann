@@ -30,6 +30,8 @@ Manual: `tests/manual/VOC-1.md` (permissions, consent, HUD, lid hint) and a 3-ho
 
 ## Stage 2: audio editor and export (VOC-2)
 
+**Status Oct 26, 2026:** P2.1 and the UI of P2.3 built (tested with fakes, not checked by eye; see VOC-2 "As built, UI" in `../features/15-voice.md`); the Speakers and Report tabs are stubs for Stages 5 and 6; P2.2 (FFmpeg rebuild) is the maintainer's.
+
 **P2.1 Editor shell for `kind: "audio"`** (V4): "now speaking" card, lanes (Markers, one waveform per track, suggested cuts), overview strip, Transcript tab in wide mode, tab set `audio`. Reuses the caption editor and the R3c wide mode.
 **P2.2 FFmpeg:** add the `wav` muxer and `pcm_s24le` encoder to `packaging/ffmpeg/build-macos.sh` (lists and self-check), rebuild with `make ffmpeg`.
 **P2.3 `export_audio`** job (V7): M4A and WAV, Mix / Mic / System, `loudnorm` to −16 LUFS, tags, optional copy folder; "Export audio only" for screen recordings (Output tab and Details); done toast. Golden tests with `ebur128`.

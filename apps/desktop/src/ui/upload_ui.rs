@@ -202,6 +202,42 @@ fn start_ticker(app: &Entity<AppModel>, cx: &mut App) {
     .detach();
 }
 
+/// `upload` as the user, to the default destination: a capture (`capture_id`: what its destination
+/// asks for) or a file made from it (`file`: the exported audio). The progress and the result
+/// arrive as events; a refusal (no destination, nothing to send) is a toast.
+pub fn upload(app: &Entity<AppModel>, capture_id: Option<&str>, file: Option<&str>, cx: &mut App) {
+    let backend = app.read(cx).backend.clone();
+    let Some(daemon) = backend.daemon.clone() else {
+        return;
+    };
+    let params = upload_params(capture_id, file);
+    let app2 = app.clone();
+    cx.spawn(async move |cx| {
+        let res = backend
+            .rt
+            .spawn(async move { Backend::call_coded(&daemon, "upload", params).await })
+            .await;
+        cx.update(|cx| {
+            let why = match res {
+                Ok(Ok(_)) => return,
+                Ok(Err(e)) => crate::daemon_text::call_error_text(&e),
+                Err(e) => e.to_string(),
+            };
+            error_toast(&app2, &tr!("The upload couldn\u{2019}t start"), &why, cx);
+        });
+    })
+    .detach();
+}
+
+/// The `upload` request: a file wins over a capture (the daemon takes only one of them).
+fn upload_params(capture_id: Option<&str>, file: Option<&str>) -> Value {
+    match (file, capture_id) {
+        (Some(f), _) => json!({ "file": f }),
+        (None, Some(c)) => json!({ "capture_id": c }),
+        (None, None) => json!({}),
+    }
+}
+
 /// Toast "Cancel" on a running upload: `cancel_job` as the user. The daemon sends no event for a
 /// cancelled job, so the answer closes it here and a short "Upload cancelled" toast says so.
 pub fn cancel(app: &Entity<AppModel>, job_id: &str, cx: &mut App) {
@@ -376,4 +412,24 @@ pub fn retry(app: &Entity<AppModel>, job_id: &str, cx: &mut App) {
         });
     })
     .detach();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// VOC-2: the toast's Upload sends the exported file, the header's Upload the capture; the
+    /// daemon takes only one of them.
+    #[test]
+    fn the_upload_request_names_a_file_or_a_capture_never_both() {
+        assert_eq!(
+            upload_params(Some("rec_1"), Some("/x/a.m4a")),
+            json!({"file": "/x/a.m4a"})
+        );
+        assert_eq!(
+            upload_params(Some("rec_1"), None),
+            json!({"capture_id": "rec_1"})
+        );
+        assert_eq!(upload_params(None, None), json!({}));
+    }
 }

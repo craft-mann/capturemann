@@ -9,10 +9,17 @@
 //! that look at the screen.
 
 mod ai_cards;
+#[cfg(test)]
+mod audio_tests;
+mod audio_view;
 mod caption_panel;
+mod export_sheet;
 mod panels;
+mod report_tab;
+mod speakers_tab;
 pub(crate) mod tabs;
 mod timeline;
+mod transcript_tab;
 mod view_cards;
 
 use std::cell::Cell;
@@ -43,6 +50,7 @@ use crate::recedit::pacer::{Pacer, Tick};
 use crate::recedit::render::{PreviewRenderer, RenderRequest, ViewContext, ViewSpec};
 use crate::recedit::snap::{self, FrameGrid};
 use crate::recedit::source;
+use crate::recedit::voice::{VoiceData, Wave};
 use crate::recedit::BgSpec;
 use crate::recording::files;
 use crate::ui::app::{self, AppModel};
@@ -72,6 +80,8 @@ pub(crate) enum RowKind {
     Screen,
     Camera,
     Mic,
+    /// The system audio track (audio recordings and screen recordings with system sound).
+    System,
 }
 
 impl RowKind {
@@ -81,6 +91,7 @@ impl RowKind {
             RowKind::Screen => tr_ctx!("track", "Screen"),
             RowKind::Camera => tr_ctx!("track", "Webcam"),
             RowKind::Mic => tr_ctx!("track", "Mic"),
+            RowKind::System => tr_ctx!("track", "System"),
         }
     }
 }
@@ -149,6 +160,10 @@ pub(crate) struct Session {
     /// Output time (seconds) of the picture last shown while playing.
     out_now: f64,
     pub drag: Option<Drag>,
+    /// Markers, speakers and translations (VOC-2); `voice.audio` says the recording is audio.
+    pub voice: VoiceData,
+    /// The waveform of each audio track, on the session clock (audio recordings only).
+    pub waves: Vec<(RowKind, Wave)>,
 }
 
 enum Load {
@@ -174,6 +189,8 @@ struct Loaded {
     /// The decoded audio tracks (read in the background so opening never blocks the window).
     audio: Option<AudioBank>,
     audio_note: Option<String>,
+    voice: VoiceData,
+    waves: Vec<(RowKind, Wave)>,
 }
 
 pub struct RecordingEditor {
@@ -193,7 +210,12 @@ pub struct RecordingEditor {
     /// What the tabs last followed on the timeline (a changed pick opens its tab).
     last_selection: Option<Selection>,
     last_zoom: Option<MediaTime>,
+    /// The audio editor's own state (VOC-2): language, translate chooser, scroll, the sheet.
+    voice_ui: audio_view::VoiceUi,
 }
+
+/// Buckets per second of a waveform (50 ms each: a pixel at the widest zoom out of an hour).
+const WAVE_PER_SEC: u32 = 20;
 
 fn load_blocking(root: Option<PathBuf>, id: &str) -> Result<Loaded, files::FileError> {
     let root = root.ok_or(files::FileError::NoLibrary)?;
@@ -228,14 +250,27 @@ fn load_blocking(root: Option<PathBuf>, id: &str) -> Result<Loaded, files::FileE
             .and_then(|s| s.get("fps"))
             .and_then(serde_json::Value::as_f64),
     );
-    let mut rows = vec![TrackRow {
-        kind: RowKind::Screen,
-        from: screen
-            .and_then(|s| tick(s, "start"))
-            .unwrap_or(MediaTime::ZERO),
-        to: basis.end,
-    }];
-    for (name, kind) in [("camera", RowKind::Camera), ("mic", RowKind::Mic)] {
+    let voice = VoiceData::read(&dir, &m);
+    // An audio recording has no screen row: its lanes are drawn by the audio view.
+    let mut rows = if voice.audio {
+        Vec::new()
+    } else {
+        vec![TrackRow {
+            kind: RowKind::Screen,
+            from: screen
+                .and_then(|s| tick(s, "start"))
+                .unwrap_or(MediaTime::ZERO),
+            to: basis.end,
+        }]
+    };
+    for (name, kind) in [
+        ("camera", RowKind::Camera),
+        ("mic", RowKind::Mic),
+        ("system", RowKind::System),
+    ] {
+        if kind == RowKind::System && !voice.audio {
+            continue;
+        }
         if let Some(t) = present(name) {
             rows.push(TrackRow {
                 kind,
@@ -245,7 +280,15 @@ fn load_blocking(root: Option<PathBuf>, id: &str) -> Result<Loaded, files::FileE
         }
     }
     let details = files::read_details(&dir)?;
-    let (source, note) = source::open(&dir, &m);
+    // An audio recording shows no picture: the test pattern stands in and is never drawn.
+    let (source, note) = if voice.audio {
+        (
+            Box::new(source::SyntheticFrames::default()) as Box<dyn source::FrameSource>,
+            None,
+        )
+    } else {
+        source::open(&dir, &m)
+    };
     // Where the cursor track is and how the recorded area maps to the picture (EDT-4, EDT-5).
     let screen_info = serde_json::to_value(&m)
         .ok()
@@ -274,8 +317,23 @@ fn load_blocking(root: Option<PathBuf>, id: &str) -> Result<Loaded, files::FileE
             ),
         }
     };
+    let waves = match (&audio, voice.audio) {
+        (Some(bank), true) => [
+            (RowKind::Mic, cm_media::edit_plan::AudioKind::Mic),
+            (RowKind::System, cm_media::edit_plan::AudioKind::System),
+        ]
+        .into_iter()
+        .filter_map(|(row, kind)| {
+            let lane = bank.lane_peaks(kind, WAVE_PER_SEC)?;
+            Some((row, Wave::from_lane(&lane, &basis.gaps, basis.end)))
+        })
+        .collect(),
+        _ => Vec::new(),
+    };
     Ok(Loaded {
         bundle: dir.clone(),
+        voice,
+        waves,
         audio,
         audio_note,
         title: details.title,
@@ -306,6 +364,7 @@ impl RecordingEditor {
             tab: tabs::Inspector::Speed,
             last_selection: None,
             last_zoom: None,
+            voice_ui: audio_view::VoiceUi::new(),
         }
     }
 
@@ -323,6 +382,7 @@ impl RecordingEditor {
         self.tab = tabs::Inspector::Speed;
         self.last_selection = None;
         self.last_zoom = None;
+        self.voice_ui = audio_view::VoiceUi::new();
         self.load = Load::Loading;
         let root = self.app.read(cx).backend.library_root.clone();
         let id = id.to_owned();
@@ -419,12 +479,19 @@ impl RecordingEditor {
         if matches!(method, "undo" | "redo") {
             self.ai.reload = true;
         }
+        // A marker or an undo changes what the audio view reads from the bundle.
+        if matches!(method, "undo" | "redo" | "add_marker") {
+            self.voice_ui.stale = true;
+        }
         if let Some(s) = self.session() {
             s.running = false;
             match res {
                 Ok(v) => {
                     // An undo with nothing to undo answers `changed: false` and no edit list.
                     s.model.adopt(&v);
+                    if method == "add_marker" {
+                        s.model.can_undo = true;
+                    }
                     // The timeline under the playhead may have changed: restart the clock.
                     s.pacer.stop();
                 }
@@ -649,6 +716,36 @@ impl RecordingEditor {
             cx.stop_propagation();
             return;
         }
+        // The sheet has the keyboard while it is open (Esc closes it).
+        if self.voice_ui.sheet.is_some() {
+            if k.key == "escape" {
+                self.voice_ui.sheet = None;
+                cx.stop_propagation();
+                cx.notify();
+            }
+            return;
+        }
+        if self.session().is_some_and(|s| s.voice.audio) {
+            let playing = self.session().is_some_and(|s| s.model.playing);
+            match crate::recedit::voice::audio_key(
+                &k.key,
+                k.modifiers.shift,
+                secondary,
+                k.modifiers.alt,
+                playing,
+            ) {
+                Some(crate::recedit::voice::AudioKey::Cmd(cmd)) => {
+                    cx.stop_propagation();
+                    self.run(cmd, cx);
+                }
+                Some(crate::recedit::voice::AudioKey::Marker) => {
+                    cx.stop_propagation();
+                    self.add_marker_here(cx);
+                }
+                None => {}
+            }
+            return;
+        }
         if let Some(cmd) = map_key(&k.key, k.modifiers.shift, secondary, k.modifiers.alt) {
             cx.stop_propagation();
             self.run(cmd, cx);
@@ -673,6 +770,8 @@ impl Session {
             None => (None, l.audio_note),
         };
         Session {
+            voice: l.voice,
+            waves: l.waves,
             model: EditorModel::new(id, l.basis, l.list, l.grid, l.flags),
             audio,
             audio_note,
@@ -834,6 +933,7 @@ impl Render for RecordingEditor {
         // Captions: read the transcript when the recording changed or a new one arrived.
         self.ai_sync(cx);
         // The open tab follows the timeline selection and "Open captions".
+        self.voice_sync(cx);
         self.sync_tab(cx);
         // The caption list: what has the keyboard, how wide the window is, and any move that
         // waited for a window (Enter to the next line, back from the find bar).
@@ -851,7 +951,10 @@ impl Render for RecordingEditor {
         // Frame work first: playback, the request for a new picture, the picture that arrived.
         let mut redraw = false;
         if let Load::Ready(s) = &mut self.load {
-            s.sync_captions(captions_on, captions_rev);
+            let audio = s.voice.audio;
+            if !audio {
+                s.sync_captions(captions_on, captions_rev);
+            }
             s.tick();
             // "Play this line" pauses at the end of the line, or is forgotten when playback was
             // stopped some other way.
@@ -861,14 +964,16 @@ impl Render for RecordingEditor {
                     self.ai.line_play = None;
                 }
             }
-            s.request_picture();
+            if !audio {
+                s.request_picture();
+            }
             if let Some(done) = s.renderer.take() {
                 s.shown_seq = done.seq;
                 s.plain = done.plain;
                 s.preview_error = done.error;
                 self.presenter.set(&done.image, window, cx);
             }
-            redraw = s.model.playing || s.waiting();
+            redraw = s.model.playing || (!audio && s.waiting());
         }
         if redraw {
             window.request_animation_frame();
@@ -901,12 +1006,14 @@ impl Render for RecordingEditor {
             .key_context("RecordingEditor")
             .track_focus(&self.focus)
             .on_key_down(cx.listener(Self::on_key_down))
+            .relative()
             .size_full()
             .flex()
             .flex_col()
             .bg(rgba_of(t.ground))
             .text_color(rgba_of(t.text))
             .child(body)
+            .children(self.export_sheet_overlay(&t, cx))
     }
 }
 

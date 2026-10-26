@@ -31,6 +31,12 @@ pub struct TranscribeVm {
     pub regen: HashMap<String, RegenDraft>,
     /// Put `[mm:ss]` before every line of a TXT export.
     pub txt_timestamps: bool,
+    /// Bumped when a translation was written (`translation.ready`): the audio editor reads the
+    /// languages of the recording again.
+    pub voice_epoch: u64,
+    /// "Export audio only" from another screen: the recording whose editor opens the Export audio
+    /// sheet (VOC-2).
+    pub export_audio_focus: Option<String>,
     /// "Open captions": the recording whose editor should scroll to the Captions card.
     pub captions_focus: Option<String>,
     /// The "Burn in captions" choice made for the next export of a recording, until it is

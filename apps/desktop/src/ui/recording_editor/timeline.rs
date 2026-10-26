@@ -33,6 +33,7 @@ fn row_icon(k: RowKind) -> &'static str {
         RowKind::Screen => "monitor",
         RowKind::Camera => "video",
         RowKind::Mic => "mic",
+        RowKind::System => "volume-2",
     }
 }
 
@@ -74,7 +75,7 @@ impl RecordingEditor {
                     .border_1()
                     .border_color(rgba_of(t.border))
                     .bg(rgba_of(t.surface))
-                    .child(self.toolbar(t, s, cx))
+                    .child(self.toolbar(t, s, false, cx))
                     .child(
                         div()
                             .px(px(12.))
@@ -181,7 +182,14 @@ impl RecordingEditor {
         }
     }
 
-    fn toolbar(&self, t: &Theme, s: &Session, cx: &mut Context<Self>) -> AnyElement {
+    /// The tools above the lanes. `audio` adds the Marker button (M) of an audio recording.
+    pub(super) fn toolbar(
+        &self,
+        t: &Theme,
+        s: &Session,
+        audio: bool,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let m = &s.model;
         let sel = m.selection;
         let can_cut = matches!(sel, Selection::Range(_) | Selection::Segment(_));
@@ -337,6 +345,22 @@ impl RecordingEditor {
                 t,
                 cx,
             ))
+            .when(audio, |d| {
+                d.child(
+                    Self::tool_button(
+                        t,
+                        "re-marker",
+                        tr!("Marker (M)"),
+                        "bookmark",
+                        tr!("Add a marker at the playhead"),
+                        Some("M"),
+                        Some(tr_ctx!("timeline", "Marker")),
+                        true,
+                        None,
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.add_marker_here(cx))),
+                )
+            })
             .child(self.tool(
                 (
                     "re-restore",

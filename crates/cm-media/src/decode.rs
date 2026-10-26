@@ -555,11 +555,73 @@ impl AudioBank {
             },
         )
     }
+
+    /// The waveform of the first track of `kind` (VOC-2): its loudest sample per `1 / per_sec`
+    /// seconds of the file, with the file's own start. `None` when the recording has no such
+    /// track.
+    pub fn lane_peaks(&self, kind: AudioKind, per_sec: u32) -> Option<LanePeaks> {
+        let t = self.tracks.iter().find(|t| t.kind == kind)?;
+        Some(LanePeaks {
+            start: t.start,
+            per_sec,
+            peaks: peaks(&t.samples, t.channels, AUDIO_RATE, per_sec),
+        })
+    }
+}
+
+/// A track's waveform at a coarse resolution, for drawing (not for audio).
+#[derive(Debug, Clone, PartialEq)]
+pub struct LanePeaks {
+    /// Where the file starts on the session clock (before the pause gaps are added).
+    pub start: MediaTime,
+    /// Buckets per second of file time.
+    pub per_sec: u32,
+    /// Each bucket's loudest absolute sample, 0.0 to 1.0 (clamped).
+    pub peaks: Vec<f32>,
+}
+
+/// The loudest absolute sample of every `1 / per_sec` seconds of interleaved `samples`. A last
+/// partial bucket counts; no samples gives no buckets.
+pub fn peaks(samples: &[f32], channels: u16, rate: u32, per_sec: u32) -> Vec<f32> {
+    let frames_per = (rate / per_sec.max(1)).max(1) as usize;
+    let stride = frames_per * usize::from(channels.max(1));
+    samples
+        .chunks(stride)
+        .map(|c| c.iter().fold(0.0_f32, |m, s| m.max(s.abs())).min(1.0))
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// VOC-2: one bucket per `1 / per_sec` seconds, the loudest sample of any channel, clamped.
+    #[test]
+    fn peaks_take_the_loudest_sample_of_each_bucket() {
+        // 4 frames per bucket (rate 8, 2 per second), 2 channels.
+        let mut s = vec![0.0_f32; 8 * 2 * 2];
+        s[3] = -0.5; // bucket 0, channel 1
+        s[20] = 2.0; // bucket 2, clamped
+        let p = super::peaks(&s, 2, 8, 2);
+        assert_eq!(p, vec![0.5, 0.0, 1.0, 0.0]);
+        assert!(super::peaks(&[], 1, 48_000, 20).is_empty());
+        // A partial last bucket still counts.
+        assert_eq!(super::peaks(&[0.25; 5], 1, 4, 1), vec![0.25, 0.25]);
+    }
+
+    #[test]
+    fn lane_peaks_find_the_track_of_a_kind() {
+        let bank = AudioBank::from_tracks(vec![PcmTrack {
+            kind: AudioKind::System,
+            start: t(500),
+            channels: 1,
+            samples: vec![0.5; AUDIO_RATE as usize],
+        }]);
+        assert!(bank.lane_peaks(AudioKind::Mic, 20).is_none());
+        let l = bank.lane_peaks(AudioKind::System, 20).unwrap();
+        assert_eq!(l.start, t(500));
+        assert_eq!(l.peaks.len(), 20);
+    }
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Arc as StdArc;
 

@@ -4,6 +4,7 @@
 //! preview come from [`source`] and [`render`].
 
 pub mod audio;
+pub mod audio_export;
 pub mod camera;
 pub mod captions;
 #[cfg(test)]
@@ -18,6 +19,7 @@ pub mod render;
 pub mod snap;
 pub mod source;
 pub mod viewedit;
+pub mod voice;
 
 pub use geom::{Geom, Hit, Seg, SegKind};
 pub use inspector::{BgSpec, Preset};

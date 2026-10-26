@@ -121,6 +121,8 @@ pub(super) struct AiEditor {
     pub(super) epoch_seen: u64,
     pub(super) loading: bool,
     pub(super) has_transcript: bool,
+    /// The language the transcript was made in (`en`, `vi`, ...).
+    pub(super) transcript_language: Option<String>,
     pub(super) note: Option<AiNote>,
     pub(super) captions: CaptionEditor,
     /// The in-place field of the line being edited.
@@ -206,6 +208,7 @@ impl AiEditor {
             epoch_seen: 0,
             loading: false,
             has_transcript: false,
+            transcript_language: None,
             note: None,
             captions: CaptionEditor::default(),
             field,
@@ -239,6 +242,7 @@ impl AiEditor {
         self.loaded_for = None;
         self.loading = false;
         self.has_transcript = false;
+        self.transcript_language = None;
         self.note = None;
         self.captions = CaptionEditor::default();
         self.field_for = None;
@@ -370,6 +374,7 @@ impl RecordingEditor {
                         let lines = stored.unwrap_or_else(|| lines_from_words(&tr.words));
                         this.ai.words = Rc::new(tr.words.clone());
                         this.ai.has_transcript = true;
+                        this.ai.transcript_language = Some(tr.language.clone());
                         this.ai.options = options;
                         this.ai.captions = CaptionEditor::new(lines);
                         this.ai.note = tr.note.map(AiNote::Transcript);
@@ -654,10 +659,12 @@ impl RecordingEditor {
     pub(super) fn suggest_panel(
         &self,
         t: &Theme,
-        _s: &Session,
+        s: &Session,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let ai = &self.ai;
+        // Zooms are for pictures: an audio recording is offered cuts only (VOC-2).
+        let audio = s.voice.audio;
         // Design gap: the board puts a subtitle under each tile ("Proposed on the Zoom track",
         // "Proposed as ranges to cut"); that is new copy, so the tiles carry the title only.
         let tile = |id: &'static str, glyph: &'static str, label: String, busy: bool| {
@@ -704,15 +711,15 @@ impl RecordingEditor {
             div()
                 .flex()
                 .gap(px(10.))
-                .child(
+                .children((!audio).then(|| {
                     tile(
                         "re-suggest-zooms",
                         "zoom-in",
                         tr!("Suggest zooms"),
                         ai.asking_zooms,
                     )
-                        .on_click(cx.listener(|this, _, _, cx| this.ai_suggest_zooms(cx))),
-                )
+                        .on_click(cx.listener(|this, _, _, cx| this.ai_suggest_zooms(cx)))
+                }))
                 .child(
                     tile(
                         "re-suggest-cuts",
@@ -733,7 +740,7 @@ impl RecordingEditor {
         if let Some(n) = &ai.suggest_note {
             body.push(hint(t, "info", n.text()).into_any_element());
         }
-        if let Some(z) = &ai.zooms {
+        if let Some(z) = ai.zooms.as_ref().filter(|_| !audio) {
             body.push(self.suggestion_block(
                 t,
                 trn!("Zooms ({n})", "Zooms ({n})", z.items().len()),

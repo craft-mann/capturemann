@@ -57,6 +57,8 @@ pub enum ToastAction {
     StopRecording(String),
     /// `cancel_job` on a running upload.
     CancelJob(String),
+    /// `upload { file }` of a file made from a capture (the exported audio): capture id, path.
+    UploadFile(String, String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -112,6 +114,7 @@ impl ToastAction {
             ToastAction::OpenDestinations => "plug",
             ToastAction::StopRecording(_) => "cm-stop",
             ToastAction::CancelJob(_) => "x",
+            ToastAction::UploadFile(..) => "cloud-upload",
         }
     }
 }

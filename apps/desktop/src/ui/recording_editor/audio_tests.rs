@@ -1,0 +1,362 @@
+//! The audio editor in the headless GPUI platform (VOC-2): a real `RecordingEditor` over a real
+//! daemon and a hand-made audio recording (two tracks, two speakers, a marker, a transcript and a
+//! translation). It checks what loads, that the page draws, that M adds a marker through the
+//! daemon and that the Export audio sheet opens with the recording's tracks. Nothing here uses the
+//! screen, the camera or a microphone.
+
+use std::sync::Arc;
+
+use super::tabs::Inspector;
+use super::*;
+use crate::backend::{Backend, StartConfig};
+use crate::library::LocalClock;
+use crate::recording::preview::PreviewSource;
+use crate::settings::FileSettings;
+use crate::shortcuts::{Platform, ShortcutMap};
+use crate::ui::app::{AppHandle, AppModel};
+use crate::ui::recording::RecState;
+use cm_capture::fake::FakeBackend;
+use cm_capture::Capturer;
+use cm_daemon::testing::RecordingClipboard;
+use cm_daemon::DenyAll;
+use gpui::{TestAppContext, VisualTestContext};
+
+/// An empty config directory for this test process (never the real keychain or account).
+fn isolated_config_dir() {
+    static DIR: std::sync::OnceLock<tempfile::TempDir> = std::sync::OnceLock::new();
+    let dir = DIR.get_or_init(|| tempfile::tempdir().unwrap());
+    std::env::set_var("CAPTUREMANN_CONFIG_DIR", dir.path());
+}
+
+struct World {
+    _rt: tokio::runtime::Runtime,
+    _dir: tempfile::TempDir,
+    bundle: PathBuf,
+}
+
+const SECS: i64 = 6;
+
+/// A mono 16-bit 48 kHz WAV of a quiet tone, `SECS` long.
+fn wav() -> Vec<u8> {
+    let n = 48_000 * SECS as usize;
+    let mut data = Vec::with_capacity(n * 2);
+    for i in 0..n {
+        let v = ((i as f32 / 48.0).sin() * 8_000.0) as i16;
+        data.extend_from_slice(&v.to_le_bytes());
+    }
+    let mut out = Vec::new();
+    out.extend_from_slice(b"RIFF");
+    out.extend_from_slice(&(36 + data.len() as u32).to_le_bytes());
+    out.extend_from_slice(b"WAVEfmt ");
+    out.extend_from_slice(&16u32.to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes()); // PCM
+    out.extend_from_slice(&1u16.to_le_bytes()); // mono
+    out.extend_from_slice(&48_000u32.to_le_bytes());
+    out.extend_from_slice(&96_000u32.to_le_bytes());
+    out.extend_from_slice(&2u16.to_le_bytes());
+    out.extend_from_slice(&16u16.to_le_bytes());
+    out.extend_from_slice(b"data");
+    out.extend_from_slice(&(data.len() as u32).to_le_bytes());
+    out.extend_from_slice(&data);
+    out
+}
+
+fn word(text: &str, a: i64, b: i64) -> serde_json::Value {
+    serde_json::json!({"text": text, "start": a * 120, "end": b * 120, "confidence": 0.9})
+}
+
+/// The editor opened on a hand-made audio recording.
+fn editor(cx: &mut TestAppContext) -> (World, Entity<RecordingEditor>, &mut VisualTestContext) {
+    cx.executor().allow_parking();
+    isolated_config_dir();
+    let dir = tempfile::tempdir().unwrap();
+    let lib = dir.path().join("lib");
+    let bundle = lib.join("Weekly sync.cmrec");
+    std::fs::create_dir_all(bundle.join("translations")).unwrap();
+    let tps = 120_000_i64;
+    std::fs::write(
+        bundle.join("manifest.json"),
+        serde_json::json!({
+            "schema": 1, "id": "rec_audio", "title": "Weekly sync", "kind": "audio",
+            "created": "2026-10-26T10:00:00Z", "tick_rate": tps,
+            "tracks": {
+                "mic": {"file": "mic.wav", "start": 0, "end": SECS * tps, "channels": 1},
+                "system": {"file": "system.wav", "start": 0, "end": SECS * tps, "channels": 1}
+            },
+            "edits": [], "revisions": [], "gaps": [], "duration": SECS * tps,
+            "markers": [{"at": 2 * tps, "label": "Pricing decision"}],
+            "speakers": [{"id": 1, "name": "Trung (me)"}, {"id": 2, "name": "Linh"}],
+            "speaker_segments": [
+                {"start": 0, "end": 3 * tps, "speaker": 1},
+                {"start": 3 * tps, "end": SECS * tps, "speaker": 2}
+            ],
+        })
+        .to_string(),
+    )
+    .unwrap();
+    std::fs::write(bundle.join("mic.wav"), wav()).unwrap();
+    std::fs::write(bundle.join("system.wav"), wav()).unwrap();
+    // Words every half second: the first three seconds are Trung's, the rest Linh's.
+    let words: Vec<_> = [
+        ("Let's", 0, 500),
+        ("start", 500, 1_000),
+        ("with", 1_000, 1_500),
+        ("pricing.", 1_500, 3_000),
+        ("Sounds", 3_000, 4_000),
+        ("good", 4_000, 5_000),
+        ("to", 5_000, 5_500),
+        ("me.", 5_500, 6_000),
+    ]
+    .iter()
+    .map(|(t, a, b)| word(t, *a, *b))
+    .collect();
+    std::fs::write(
+        bundle.join("transcript.json"),
+        serde_json::json!({"version": 1, "language": "en", "model": "base",
+                           "words": words, "note": null})
+        .to_string(),
+    )
+    .unwrap();
+    std::fs::write(
+        bundle.join("translations").join("vi.json"),
+        serde_json::json!({
+            "version": 1, "language": "vi", "engine": "text_model", "model": "test",
+            "created": "2026-10-26T10:05:00Z", "edited": false,
+            "lines": [
+                {"start": 0, "end": 3 * tps, "text": "Hay bat dau voi gia."},
+                {"start": 3 * tps, "end": SECS * tps, "text": "Nghe on do."}
+            ]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .unwrap();
+    let backend = Arc::new(Backend::start(
+        &rt,
+        StartConfig {
+            library_path: Some(lib),
+            fallback_path: dir.path().join("fb"),
+            settings: Arc::new(FileSettings::load(dir.path().join("s.json"))),
+            endpoint: None,
+            overlay_binary: None,
+            recording: crate::backend::RecordingMode::Off,
+        },
+        Capturer::new(FakeBackend::new().with_display(1, 0, 0, 120, 80, 1.0)).with_own_pid(None),
+        Arc::new(Arc::new(RecordingClipboard::default())),
+        DenyAll,
+    ));
+    cx.update(|cx| {
+        cx.set_global(ThemeGlobal(crate::theme::Theme::DARK));
+        let platform = Platform::current();
+        let rec = cx.new(|_| RecState::new(PreviewSource::Fake));
+        let model = cx.new(|_| {
+            AppModel::new(
+                backend.clone(),
+                ShortcutMap::defaults(platform),
+                platform,
+                LocalClock {
+                    offset: time::UtcOffset::UTC,
+                },
+                rec,
+            )
+        });
+        cx.set_global(AppHandle(model));
+    });
+    let app = cx.update(|cx| cx.global::<AppHandle>().0.clone());
+    // The library knows the folder (the editor finds the bundle by id).
+    let daemon = backend.daemon.clone().unwrap();
+    rt.block_on(async { Backend::rescan_library(&daemon).await.unwrap() });
+    let window = cx.add_window(|_, cx| RecordingEditor::new(app, cx));
+    let entity = window.root(cx).unwrap();
+    let vcx = VisualTestContext::from_window(window.into(), cx).into_mut();
+    entity.update(vcx, |e, cx| e.set_capture("rec_audio", cx));
+    for _ in 0..100 {
+        vcx.run_until_parked();
+        let ready = entity.read_with(vcx, |e, _| matches!(e.load, Load::Ready(_)));
+        let ai = entity.read_with(vcx, |e, _| e.ai.has_transcript);
+        if ready && ai {
+            break;
+        }
+        // A frame: the editor reads the transcript while it draws.
+        vcx.update(|window, _| window.refresh());
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    vcx.run_until_parked();
+    (
+        World {
+            _rt: rt,
+            _dir: dir,
+            bundle,
+        },
+        entity,
+        vcx,
+    )
+}
+
+#[gpui::test]
+fn an_audio_recording_opens_with_its_lanes_and_the_transcript_tab(cx: &mut TestAppContext) {
+    let (_w, e, vcx) = editor(cx);
+    vcx.update(|window, _| window.refresh());
+    vcx.run_until_parked();
+    e.read_with(vcx, |e, _| {
+        let Load::Ready(s) = &e.load else {
+            panic!("not ready")
+        };
+        assert!(s.voice.audio, "the manifest says audio");
+        // No screen row: the mic and the system track.
+        assert_eq!(
+            s.rows.iter().map(|r| r.kind).collect::<Vec<_>>(),
+            vec![RowKind::Mic, RowKind::System]
+        );
+        // One waveform per track when FFmpeg can decode them (CI installs it; a Mac without it
+        // shows lanes without waves and says so in the card).
+        if cm_media::tools::locate().is_ok() {
+            assert_eq!(
+                s.waves.iter().map(|(k, _)| *k).collect::<Vec<_>>(),
+                vec![RowKind::Mic, RowKind::System]
+            );
+            let peak = s.waves[0].1.peaks.iter().fold(0.0_f32, |m, p| m.max(*p));
+            assert!(peak > 0.1, "the tone shows in the waveform: {peak}");
+        } else {
+            eprintln!("SKIPPED the waveform check: no FFmpeg");
+        }
+        assert_eq!(s.voice.markers.len(), 1);
+        assert_eq!(s.voice.markers[0].label, "Pricing decision");
+        assert_eq!(s.voice.speakers.len(), 2);
+        assert!(s.voice.lines_for("vi").is_some(), "the translation is read");
+        // An audio recording opens on its transcript, in the audio rail.
+        assert_eq!(e.tab, Inspector::Transcript);
+        assert!(Inspector::set(true).contains(&e.tab));
+        assert!(e.ai.has_transcript, "the transcript was read");
+    });
+}
+
+#[gpui::test]
+fn the_transcript_groups_lines_by_speaker_and_puts_the_marker_between(cx: &mut TestAppContext) {
+    let (_w, e, vcx) = editor(cx);
+    e.read_with(vcx, |e, _| {
+        let Load::Ready(s) = &e.load else {
+            panic!("not ready")
+        };
+        let (lines, turns, rows) = e.voice_turns(s);
+        assert!(!lines.is_empty());
+        let speakers: Vec<_> = turns.iter().map(|t| t.speaker).collect();
+        assert_eq!(speakers, vec![Some(1), Some(2)], "{lines:?}");
+        // The marker at 2 s falls inside the first turn: it goes before the second.
+        assert_eq!(
+            rows.as_slice(),
+            &[
+                crate::recedit::voice::Row::Turn(0),
+                crate::recedit::voice::Row::Marker(0),
+                crate::recedit::voice::Row::Turn(1)
+            ]
+        );
+    });
+    // The translation is a language of the switcher and builds its own turns.
+    e.update(vcx, |e, cx| {
+        e.voice_ui.lang = Some("vi".to_owned());
+        cx.notify();
+    });
+    e.read_with(vcx, |e, _| {
+        let Load::Ready(s) = &e.load else {
+            panic!("not ready")
+        };
+        let (lines, turns, _) = e.voice_turns(s);
+        assert_eq!(lines.len(), 2);
+        assert_eq!(turns.len(), 2);
+        assert_eq!(turns[0].speaker, Some(1));
+    });
+    vcx.update(|window, _| window.refresh());
+    vcx.run_until_parked();
+}
+
+#[gpui::test]
+fn m_sets_a_marker_through_the_daemon(cx: &mut TestAppContext) {
+    let (w, e, vcx) = editor(cx);
+    e.update(vcx, |e, cx| {
+        if let Some(s) = e.session() {
+            s.model.seek(MediaTime::from_secs(4));
+        }
+        e.add_marker_here(cx);
+    });
+    // The call runs on the daemon's runtime; wait for it to land in the bundle.
+    let mut count = 0;
+    for _ in 0..100 {
+        vcx.run_until_parked();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        let m = cm_library::read_manifest(&w.bundle).unwrap();
+        count = m.markers.len();
+        if count == 2 {
+            break;
+        }
+    }
+    assert_eq!(count, 2, "add_marker reached the manifest");
+    let m = cm_library::read_manifest(&w.bundle).unwrap();
+    assert_eq!(m.markers[1].at, MediaTime::from_secs(4));
+    // The view reads the bundle again and shows it.
+    for _ in 0..100 {
+        vcx.run_until_parked();
+        vcx.update(|window, _| window.refresh());
+        let n = e.read_with(vcx, |e, _| e.session_voice_markers());
+        if n == 2 {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    assert_eq!(e.read_with(vcx, |e, _| e.session_voice_markers()), 2);
+}
+
+impl RecordingEditor {
+    fn session_voice_markers(&self) -> usize {
+        match &self.load {
+            Load::Ready(s) => s.voice.markers.len(),
+            _ => 0,
+        }
+    }
+}
+
+#[gpui::test]
+fn the_export_sheet_opens_with_the_tracks_of_the_recording(cx: &mut TestAppContext) {
+    let (_w, e, vcx) = editor(cx);
+    e.update(vcx, |e, cx| e.open_export_sheet(cx));
+    vcx.update(|window, _| window.refresh());
+    vcx.run_until_parked();
+    e.read_with(vcx, |e, _| {
+        let sheet = e.voice_ui.sheet.as_ref().expect("the sheet is open");
+        assert!(sheet.avail.mic && sheet.avail.system);
+        assert_eq!(sheet.form.format, crate::recedit::audio_export::Format::M4a);
+        assert!(sheet.form.loudness, "on by default for M4A");
+        assert_eq!(
+            sheet.form.params("rec_audio")["tracks"],
+            serde_json::json!("mix")
+        );
+    });
+    // Esc closes it.
+    vcx.simulate_keystrokes("escape");
+    vcx.run_until_parked();
+    // (The key goes to the focused editor; without focus the sheet is closed the same way.)
+    e.update(vcx, |e, cx| {
+        e.voice_ui.sheet = None;
+        cx.notify();
+    });
+    assert!(e.read_with(vcx, |e, _| e.voice_ui.sheet.is_none()));
+}
+
+#[gpui::test]
+fn export_audio_only_from_another_page_opens_the_sheet(cx: &mut TestAppContext) {
+    let (_w, e, vcx) = editor(cx);
+    let app = e.read_with(vcx, |e, _| e.app.clone());
+    app.update(vcx, |m, _| {
+        m.transcribe.export_audio_focus = Some("rec_audio".to_owned());
+    });
+    vcx.update(|window, _| window.refresh());
+    vcx.run_until_parked();
+    assert!(e.read_with(vcx, |e, _| e.voice_ui.sheet.is_some()));
+    // The request is used up: it does not reopen the sheet later.
+    vcx.run_until_parked();
+    assert!(app.read_with(vcx, |m, _| m.transcribe.export_audio_focus.is_none()));
+}

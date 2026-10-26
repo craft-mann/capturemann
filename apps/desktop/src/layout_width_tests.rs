@@ -555,6 +555,7 @@ fn cases() -> Vec<Case> {
                 crate::ui::recording_editor::RowKind::Screen,
                 crate::ui::recording_editor::RowKind::Camera,
                 crate::ui::recording_editor::RowKind::Mic,
+                crate::ui::recording_editor::RowKind::System,
             ]
             .into_iter()
             .map(|k| t(format!("RowKind::label({k:?})"), move || k.label())),
@@ -574,6 +575,64 @@ fn cases() -> Vec<Case> {
         .text("lane Captions", || {
             cm_i18n::tr_ctx!("timeline lane", "Captions")
         }),
+    );
+    // The audio editor's lanes (VOC-2) use the same column: Markers, Speakers and the waveform
+    // rows with their second line at 11 px.
+    v.push(
+        Case::new(
+            "Audio lane label",
+            "LABEL_W 100 - 14 icon - 8 gap",
+            crate::recedit::geom::LABEL_W - 22.,
+            13.,
+            400,
+            one,
+        )
+        .text("lane Markers", || cm_i18n::tr_ctx!("lane", "Markers"))
+        .text("lane Speakers", || cm_i18n::tr_ctx!("lane", "Speakers")),
+    );
+    v.push(
+        Case::new(
+            "Audio lane sublabel",
+            "LABEL_W 100 - 14 icon - 8 gap",
+            crate::recedit::geom::LABEL_W - 22.,
+            11.,
+            400,
+            one,
+        )
+        .text("lane call audio", || cm_i18n::tr_ctx!("lane", "call audio"))
+        .text("lane microphone", || cm_i18n::tr_ctx!("lane", "microphone")),
+    );
+    // Export audio sheet: 580 wide, 22 padding, 8 gaps; a track card is a third of what is left,
+    // less 2 border, 24 padding, a 14 px glyph and a 7 px gap.
+    v.push(
+        Case::new(
+            "Export audio track card title",
+            "(580 - 44 - 16) / 3 - 2 - 24 - 14 - 7",
+            (580. - 44. - 16.) / 3. - 2. - 24. - 14. - 7.,
+            13.5,
+            600,
+            one,
+        )
+        .text("tracks Mix", || cm_i18n::tr_ctx!("export tracks", "Mix"))
+        .text("tracks Mic only", || {
+            cm_i18n::tr_ctx!("export tracks", "Mic only")
+        })
+        .text("tracks System only", || {
+            cm_i18n::tr_ctx!("export tracks", "System only")
+        }),
+    );
+    // The transcript's language chips and the turn's overlap chip, in the 560 px wide inspector:
+    // the panel is 560 - 54 rail - 10 gap - 2 border - 40 padding = 454.
+    v.push(
+        Case::new(
+            "Transcript turn overlap chip",
+            "chip 11.5 px with 2 x 8 padding and a border",
+            90. - 18.,
+            11.5,
+            400,
+            one,
+        )
+        .text("overlap", || cm_i18n::tr_ctx!("transcript turn", "overlap")),
     );
     // Camera layout tiles: the panel is 400 - 54 rail - 10 gap - 2 border - 40 padding = 294; two
     // columns 8 px apart; a tile has 14 px padding, a 20 px glyph, a 10 px gap, 2 px border. The

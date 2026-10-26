@@ -16,7 +16,8 @@ use crate::theme::{scale, type_scale, Theme};
 use crate::ui::components::{icon, icon_size, shrink_text};
 use crate::ui::paint::{rgba_of, TextExt};
 
-/// The nine inspector tabs, in the order of the rail (`UiInspectorTabs`).
+/// The inspector tabs (`UiInspectorTabs`): [`Inspector::VIDEO`] is the rail of a screen recording,
+/// [`Inspector::AUDIO`] the one of an audio recording (VOC-2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) enum Inspector {
     Speed,
@@ -26,12 +27,18 @@ pub(crate) enum Inspector {
     Reframe,
     Background,
     Captions,
+    /// Audio recordings only: the transcript with its speakers (the Captions tab of a video).
+    Transcript,
+    Speakers,
+    Report,
     Suggestions,
     Output,
 }
 
 impl Inspector {
-    pub const ALL: [Inspector; 9] = [
+    /// Every tab (for checks over all of them).
+    #[cfg(test)]
+    pub const ALL: [Inspector; 12] = [
         Inspector::Speed,
         Inspector::Camera,
         Inspector::Zoom,
@@ -39,9 +46,51 @@ impl Inspector {
         Inspector::Reframe,
         Inspector::Background,
         Inspector::Captions,
+        Inspector::Transcript,
+        Inspector::Speakers,
+        Inspector::Report,
         Inspector::Suggestions,
         Inspector::Output,
     ];
+
+    /// The rail of a screen recording (board `set="video"`, 11 tabs).
+    pub const VIDEO: [Inspector; 11] = [
+        Inspector::Speed,
+        Inspector::Camera,
+        Inspector::Zoom,
+        Inspector::Cursor,
+        Inspector::Reframe,
+        Inspector::Background,
+        Inspector::Captions,
+        Inspector::Speakers,
+        Inspector::Report,
+        Inspector::Suggestions,
+        Inspector::Output,
+    ];
+
+    /// The rail of an audio recording (board `set="audio"`, 6 tabs).
+    pub const AUDIO: [Inspector; 6] = [
+        Inspector::Speed,
+        Inspector::Transcript,
+        Inspector::Speakers,
+        Inspector::Report,
+        Inspector::Suggestions,
+        Inspector::Output,
+    ];
+
+    /// The rail for a recording of the given kind.
+    pub fn set(audio: bool) -> &'static [Inspector] {
+        if audio {
+            &Self::AUDIO
+        } else {
+            &Self::VIDEO
+        }
+    }
+
+    /// A tab that works on the whole transcript: it gets the wide inspector (R3c, V4).
+    pub fn is_wide(self) -> bool {
+        matches!(self, Inspector::Captions | Inspector::Transcript)
+    }
 
     /// The tab's name (its tooltip, its accessible name and the panel's title).
     pub fn label(self) -> String {
@@ -53,6 +102,9 @@ impl Inspector {
             Inspector::Reframe => tr_ctx!("inspector tab", "Reframe"),
             Inspector::Background => tr_ctx!("inspector tab", "Background"),
             Inspector::Captions => tr_ctx!("inspector tab", "Captions"),
+            Inspector::Transcript => tr_ctx!("inspector tab", "Transcript"),
+            Inspector::Speakers => tr_ctx!("inspector tab", "Speakers"),
+            Inspector::Report => tr_ctx!("inspector tab", "Report"),
             Inspector::Suggestions => tr_ctx!("inspector tab", "Suggestions"),
             Inspector::Output => tr_ctx!("inspector tab", "Output"),
         }
@@ -68,6 +120,9 @@ impl Inspector {
             Inspector::Reframe => "ratio",
             Inspector::Background => "wallpaper",
             Inspector::Captions => "captions",
+            Inspector::Transcript => "captions",
+            Inspector::Speakers => "users",
+            Inspector::Report => "file-text",
             Inspector::Suggestions => "sparkles",
             Inspector::Output => "file-output",
         }
@@ -82,6 +137,9 @@ impl Inspector {
             Inspector::Reframe => "re-tab-reframe",
             Inspector::Background => "re-tab-background",
             Inspector::Captions => "re-tab-captions",
+            Inspector::Transcript => "re-tab-transcript",
+            Inspector::Speakers => "re-tab-speakers",
+            Inspector::Report => "re-tab-report",
             Inspector::Suggestions => "re-tab-suggestions",
             Inspector::Output => "re-tab-output",
         }
@@ -106,7 +164,12 @@ pub(crate) fn auto_tab(current: Inspector, picked: Picked, has_camera: bool) -> 
         Picked::Zoom => Inspector::Zoom,
         Picked::Segment => match current {
             Inspector::Speed | Inspector::Camera => current,
-            Inspector::Captions | Inspector::Suggestions | Inspector::Output => current,
+            Inspector::Captions
+            | Inspector::Transcript
+            | Inspector::Speakers
+            | Inspector::Report
+            | Inspector::Suggestions
+            | Inspector::Output => current,
             Inspector::Zoom | Inspector::Cursor | Inspector::Reframe | Inspector::Background => {
                 if has_camera {
                     Inspector::Camera
@@ -572,10 +635,22 @@ pub(crate) fn ease_diagram(t: &Theme) -> AnyElement {
 mod tests {
     use super::*;
 
-    /// UiInspectorTabs: nine tabs in the board's order, each with its own id, name and glyph.
+    fn assert_distinct(set: &[Inspector]) {
+        let mut ids: Vec<_> = set.iter().map(|t| t.id()).collect();
+        ids.sort_unstable();
+        ids.dedup();
+        assert_eq!(ids.len(), set.len());
+        let mut glyphs: Vec<_> = set.iter().map(|t| t.icon()).collect();
+        glyphs.sort_unstable();
+        glyphs.dedup();
+        assert_eq!(glyphs.len(), set.len());
+    }
+
+    /// UiInspectorTabs `set="video"`: eleven tabs in the board's order, each with its own id,
+    /// name and glyph.
     #[test]
-    fn nine_tabs_in_the_boards_order() {
-        let names: Vec<_> = Inspector::ALL.iter().map(|t| t.label()).collect();
+    fn eleven_video_tabs_in_the_boards_order() {
+        let names: Vec<_> = Inspector::VIDEO.iter().map(|t| t.label()).collect();
         assert_eq!(
             names,
             [
@@ -586,18 +661,54 @@ mod tests {
                 "Reframe",
                 "Background",
                 "Captions",
+                "Speakers",
+                "Report",
                 "Suggestions",
                 "Output"
             ]
         );
-        let mut ids: Vec<_> = Inspector::ALL.iter().map(|t| t.id()).collect();
-        ids.sort_unstable();
-        ids.dedup();
-        assert_eq!(ids.len(), 9);
-        let mut glyphs: Vec<_> = Inspector::ALL.iter().map(|t| t.icon()).collect();
-        glyphs.sort_unstable();
-        glyphs.dedup();
-        assert_eq!(glyphs.len(), 9);
+        assert_distinct(&Inspector::VIDEO);
+    }
+
+    /// UiInspectorTabs `set="audio"`: Speed, Transcript, Speakers, Report, Suggestions, Output.
+    #[test]
+    fn six_audio_tabs_in_the_boards_order() {
+        let names: Vec<_> = Inspector::AUDIO.iter().map(|t| t.label()).collect();
+        assert_eq!(
+            names,
+            [
+                "Speed",
+                "Transcript",
+                "Speakers",
+                "Report",
+                "Suggestions",
+                "Output"
+            ]
+        );
+        assert_distinct(&Inspector::AUDIO);
+        assert_eq!(Inspector::set(true), &Inspector::AUDIO);
+        assert_eq!(Inspector::set(false), &Inspector::VIDEO);
+        assert!(!Inspector::VIDEO.contains(&Inspector::Transcript));
+        for gone in [
+            Inspector::Camera,
+            Inspector::Zoom,
+            Inspector::Cursor,
+            Inspector::Reframe,
+            Inspector::Background,
+            Inspector::Captions,
+        ] {
+            assert!(!Inspector::AUDIO.contains(&gone));
+        }
+        assert!(Inspector::ALL
+            .iter()
+            .all(|t| Inspector::VIDEO.contains(t) || Inspector::AUDIO.contains(t)));
+    }
+
+    /// V4: the two wide tabs are the ones that work on the whole transcript.
+    #[test]
+    fn captions_and_transcript_are_the_wide_tabs() {
+        let wide: Vec<_> = Inspector::ALL.iter().filter(|t| t.is_wide()).collect();
+        assert_eq!(wide, [&Inspector::Captions, &Inspector::Transcript]);
     }
 
     /// Q3: a zoom chip opens Zoom; a segment opens Camera (Speed without a camera) from the
@@ -648,6 +759,9 @@ mod tests {
         );
         for keep in [
             Inspector::Captions,
+            Inspector::Transcript,
+            Inspector::Speakers,
+            Inspector::Report,
             Inspector::Suggestions,
             Inspector::Output,
         ] {

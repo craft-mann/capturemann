@@ -13,6 +13,9 @@ msgstr ""
 msgid "30 fps suits most screens; 60 fps is smoother for motion."
 msgstr ""
 
+msgid "48 kHz · 24-bit. Lossless, about 10× larger."
+msgstr ""
+
 msgid "60 fps is accepted. The on-device 60 fps self-test isn’t built yet, so this computer hasn’t been checked for it; if frames drop, the HUD shows a warning."
 msgstr ""
 
@@ -83,6 +86,9 @@ msgstr ""
 msgid "A zoom eases in over {secs} seconds, holds, and eases out"
 msgstr ""
 
+msgid "AAC, 48 kHz · 128 kbps mono or 192 kbps stereo. Plays everywhere."
+msgstr ""
+
 msgid "AI agents can start recordings without asking. The indicator still shows and you can stop from the toast."
 msgstr ""
 
@@ -147,6 +153,9 @@ msgid "Add a client by name"
 msgstr ""
 
 msgid "Add a local folder, drive or network folder"
+msgstr ""
+
+msgid "Add a marker at the playhead"
 msgstr ""
 
 #. FACT: owner review required (nothing is downloaded unless the user presses Download)
@@ -297,6 +306,12 @@ msgstr ""
 msgid "Also save a PNG to a folder after capture"
 msgstr ""
 
+msgid "Also save a copy to"
+msgstr ""
+
+msgid "Always kept in the recording’s exports folder too"
+msgstr ""
+
 msgid "An AI agent will be able to start a recording as soon as it asks, with no confirmation. What it records (the screen, camera and microphone) follows your Recording settings. The recording indicator and the tray icon still show, and you can stop from the toast. You can turn this off here at any time."
 msgstr ""
 
@@ -363,6 +378,9 @@ msgstr ""
 msgid "Audio device {name} was lost; recording silence"
 msgstr ""
 
+msgid "Audio exported"
+msgstr ""
+
 msgid "Audio follows the speed, pitch unchanged"
 msgstr ""
 
@@ -391,6 +409,9 @@ msgid "Back to library"
 msgstr ""
 
 msgid "Back to recordings"
+msgstr ""
+
+msgid "Back to the library"
 msgstr ""
 
 msgid "Back to the recording"
@@ -710,6 +731,9 @@ msgstr ""
 msgid "Choose a folder by its full path."
 msgstr ""
 
+msgid "Choose a folder…"
+msgstr ""
+
 msgid "Choose a model file"
 msgstr ""
 
@@ -747,6 +771,9 @@ msgid "Choose image…"
 msgstr ""
 
 msgid "Choose mic"
+msgstr ""
+
+msgid "Choose the folder for the copy"
 msgstr ""
 
 msgid "Choose the one you picked in the App Console. App folder: files go into Apps/<your app> in your Dropbox. Full Dropbox: files go into a CaptureMann folder at the top."
@@ -1085,6 +1112,9 @@ msgstr ""
 msgid "Couldn’t stop the recording"
 msgstr ""
 
+msgid "Couldn’t translate the transcript"
+msgstr ""
+
 msgid "Countdown"
 msgstr ""
 
@@ -1294,6 +1324,9 @@ msgstr ""
 msgid "Displays unavailable"
 msgstr ""
 
+msgid "Don’t save a copy"
+msgstr ""
+
 msgid "Download TXT"
 msgstr ""
 
@@ -1390,6 +1423,9 @@ msgstr ""
 msgid "Enter the client’s name."
 msgstr ""
 
+msgid "Even out the loudness"
+msgstr ""
+
 msgid "Every CaptureMann feature is available as an MCP tool and a CLI command."
 msgstr ""
 
@@ -1417,6 +1453,15 @@ msgstr ""
 msgid "Export again"
 msgstr ""
 
+msgid "Export audio"
+msgstr ""
+
+msgid "Export audio only"
+msgstr ""
+
+msgid "Export audio…"
+msgstr ""
+
 msgid "Export captions (SRT, VTT, TXT)"
 msgstr ""
 
@@ -1429,10 +1474,19 @@ msgstr ""
 msgid "Export the recording first; the export is what gets uploaded."
 msgstr ""
 
+msgid "Export {format}"
+msgstr ""
+
 msgid "Exported first with the `{preset}` preset"
 msgstr ""
 
 msgid "Exported {title}"
+msgstr ""
+
+msgid "Exporting audio…"
+msgstr ""
+
+msgid "Exporting the audio: {pct}%"
 msgstr ""
 
 msgid "Exporting {pct}%"
@@ -1451,6 +1505,9 @@ msgid "FFmpeg at `{path}` cannot be run (permission denied). FFmpeg was not foun
 msgstr ""
 
 msgid "FFmpeg could not read a frame at that position."
+msgstr ""
+
+msgid "FFmpeg is needed to export audio and was not found."
 msgstr ""
 
 msgid "FFmpeg is not installed, so the preview shows a test pattern."
@@ -1535,6 +1592,9 @@ msgid "Folder: the {n} copied files of {path} in {place} (files you added there 
 msgstr ""
 
 msgid "Follow cursor"
+msgstr ""
+
+msgid "Format"
 msgstr ""
 
 msgid "Frame from the video"
@@ -1688,6 +1748,12 @@ msgid "JPG or PNG up to 2 MB; 1280 × 720 is best. A custom thumbnail needs a ve
 msgstr ""
 
 msgid "Jump to {time}"
+msgstr ""
+
+msgid "Just the call or app sound"
+msgstr ""
+
+msgid "Just your microphone"
 msgstr ""
 
 msgid "Keep audio"
@@ -1878,6 +1944,12 @@ msgstr ""
 msgid "Mark a moment in a recording"
 msgstr ""
 
+msgid "Marker (M)"
+msgstr ""
+
+msgid "Marker {label} at {time}"
+msgstr ""
+
 msgid "Match case"
 msgstr ""
 
@@ -1888,6 +1960,9 @@ msgid "Max duration"
 msgstr ""
 
 msgid "Measures late and dropped frames at 60 fps; only the result (pass or fail) is kept"
+msgstr ""
+
+msgid "Meeting minutes and notes"
 msgstr ""
 
 msgid "Menu bar icon unavailable"
@@ -1909,6 +1984,9 @@ msgid "Microphone access needed"
 msgstr ""
 
 msgid "Microphone and system audio"
+msgstr ""
+
+msgid "Microphone and system audio together"
 msgstr ""
 
 msgid "Microphone is off"
@@ -2195,6 +2273,9 @@ msgstr ""
 msgid "No transcript yet. Transcribe the microphone to get captions; it runs on this Mac."
 msgstr ""
 
+msgid "No transcript yet. Transcribe the recording to read it here; it runs on this Mac."
+msgstr ""
+
 msgid "No webcam, no sound"
 msgstr ""
 
@@ -2217,6 +2298,9 @@ msgid "No zoom spots found in this recording."
 msgstr ""
 
 msgid "Noise suppression"
+msgstr ""
+
+msgid "Normalise to {lufs} LUFS, the level podcasts and players expect"
 msgstr ""
 
 msgid "Not available for this recording"
@@ -2296,6 +2380,9 @@ msgid "Nothing to redo"
 msgstr ""
 
 msgid "Nothing to undo"
+msgstr ""
+
+msgid "Now speaking"
 msgstr ""
 
 msgid "Off"
@@ -2542,6 +2629,9 @@ msgstr ""
 msgid "Play this line"
 msgstr ""
 
+msgid "Play to follow the words here."
+msgstr ""
+
 msgid "Playback speed"
 msgstr ""
 
@@ -2673,6 +2763,9 @@ msgid "Publish…"
 msgstr ""
 
 msgid "Purpose"
+msgstr ""
+
+msgid "Put the speakers’ names in the SRT file"
 msgstr ""
 
 msgid "Quality"
@@ -2987,6 +3080,9 @@ msgid_plural "Replaced {n} places in the captions."
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "Reports are coming here: minutes, decisions and action items."
+msgstr ""
+
 msgid "Requested by {name}"
 msgstr ""
 
@@ -3092,6 +3188,9 @@ msgid "Run the 60 fps test in Settings first"
 msgstr ""
 
 msgid "Runs as the permissions above say."
+msgstr ""
+
+msgid "Runs in the background; you can keep working"
 msgstr ""
 
 msgid "Save"
@@ -3393,6 +3492,12 @@ msgstr ""
 msgid "Speak as you would while recording"
 msgstr ""
 
+msgid "Speaker labels are coming here: names, talk time and merging."
+msgstr ""
+
+msgid "Speaker names"
+msgstr ""
+
 msgid "Speech models"
 msgstr ""
 
@@ -3494,6 +3599,12 @@ msgid "Suggest zoom regions"
 msgstr ""
 
 msgid "Suggest zooms"
+msgstr ""
+
+msgid "Suggested cut: {detail} at {time}"
+msgstr ""
+
+msgid "Suggested cut: {detail} at {time} (and {more} more)"
 msgstr ""
 
 msgid "Switch to the existing library at {to} ({n} captures); the captures in {from} stay where they are"
@@ -3647,6 +3758,9 @@ msgstr ""
 msgid "The app has no daemon to publish with."
 msgstr ""
 
+msgid "The audio couldn’t be exported"
+msgstr ""
+
 msgid "The audio file could not be written ({detail}); the track ends here and the recording continues"
 msgstr ""
 
@@ -3735,6 +3849,9 @@ msgid "The destinations file could not be read, so none are listed: {error}"
 msgstr ""
 
 msgid "The displays could not be listed."
+msgstr ""
+
+msgid "The export applies trims, cuts and speed, and can even out the loudness. M4A or WAV; the title and date are written into the file."
 msgstr ""
 
 msgid "The export failed."
@@ -3930,6 +4047,9 @@ msgstr ""
 msgid "The test sound didn’t play"
 msgstr ""
 
+msgid "The upload couldn’t start"
+msgstr ""
+
 msgid "The upload failed."
 msgstr ""
 
@@ -3960,6 +4080,9 @@ msgstr ""
 msgid "The windows could not be listed."
 msgstr ""
 
+msgid "The words appear here once the recording has a transcript."
+msgstr ""
+
 msgid "The {track} file ended early ({detail}); what was written is kept"
 msgstr ""
 
@@ -3970,6 +4093,9 @@ msgid "Theme"
 msgstr ""
 
 msgid "There are no caption lines yet. Add one at the playhead."
+msgstr ""
+
+msgid "There are no lines in this language yet."
 msgstr ""
 
 msgid "There is already a destination named “{name}”."
@@ -4064,6 +4190,9 @@ msgstr ""
 msgid "Title"
 msgstr ""
 
+msgid "Title and date are written into the file"
+msgstr ""
+
 msgid "Today {time}"
 msgstr ""
 
@@ -4082,6 +4211,9 @@ msgstr ""
 msgid "Tool permissions"
 msgstr ""
 
+msgid "Tracks"
+msgstr ""
+
 msgid "Transcribe a recording"
 msgstr ""
 
@@ -4097,6 +4229,12 @@ msgstr ""
 msgid "Transcribing… {percent}%"
 msgstr ""
 
+msgid "Transcript"
+msgstr ""
+
+msgid "Transcript language"
+msgstr ""
+
 msgid "Transcript ready"
 msgstr ""
 
@@ -4108,6 +4246,18 @@ msgid "Transcripts and captions, made on this Mac."
 msgstr ""
 
 msgid "Translate captions"
+msgstr ""
+
+msgid "Translate the transcript to"
+msgstr ""
+
+msgid "Translate to"
+msgstr ""
+
+msgid "Translate…"
+msgstr ""
+
+msgid "Translation ready: {language}"
 msgstr ""
 
 msgid "Trim a recording"
@@ -4312,6 +4462,9 @@ msgstr ""
 msgid "What Export MP4 and Publish… will produce"
 msgstr ""
 
+msgid "What Export audio will produce"
+msgstr ""
+
 msgid "What is this video about?"
 msgstr ""
 
@@ -4328,6 +4481,9 @@ msgid "When you press Publish, CaptureMann asks you to confirm in a separate dia
 msgstr ""
 
 msgid "Where finished captures are saved, and the accounts you publish to."
+msgstr ""
+
+msgid "Who said what"
 msgstr ""
 
 msgid "Whole recording"
@@ -4538,6 +4694,9 @@ msgid "cannot read the screen track: {error}"
 msgstr ""
 
 msgid "cannot write {path}: {e}"
+msgstr ""
+
+msgid "click a time to jump there"
 msgstr ""
 
 msgid "comma separated"
@@ -4808,6 +4967,9 @@ msgstr ""
 msgid "{free} GB free, room for about {left} at this setting (an estimate)"
 msgstr ""
 
+msgid "{from} – {to} of {total}"
+msgstr ""
+
 msgid "{granted} of {total} granted."
 msgstr ""
 
@@ -4852,6 +5014,9 @@ msgstr ""
 msgid "{label}, {hint}"
 msgstr ""
 
+msgid "{language} …"
+msgstr ""
+
 msgid "{month} {day}, {year}"
 msgstr ""
 
@@ -4874,6 +5039,12 @@ msgid "{name} was not found next to the app ({dir}) or on PATH. Build or install
 msgstr ""
 
 msgid "{name} {pos} of {total}, selected"
+msgstr ""
+
+msgid "{name} · {size}"
+msgstr ""
+
+msgid "{name} · {size} · {lufs} LUFS"
 msgstr ""
 
 msgid "{name} · {w} × {h}"
@@ -5025,6 +5196,11 @@ msgid_plural "{n} seconds"
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "{n} speaker"
+msgid_plural "{n} speakers"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "{n} suggested. Nothing is blurred until you accept. Click a dashed box on the image to accept just that one."
 msgid_plural "{n} suggested. Nothing is blurred until you accept. Click a dashed box on the image to accept just that one."
 msgstr[0] ""
@@ -5146,10 +5322,19 @@ msgstr ""
 msgid "{start} · {secs} s · {what}"
 msgstr ""
 
+msgid "{time} after cuts · about {size}"
+msgstr ""
+
 msgid "{title} panel"
 msgstr ""
 
+msgid "{title} · Exporting the audio: {pct}%"
+msgstr ""
+
 msgid "{title} · Making one MP4 with the camera bubble and audio: {pct}%"
+msgstr ""
+
+msgid "{title} · cuts and speed applied"
 msgstr ""
 
 msgid "{title} · {app}"
@@ -5406,6 +5591,10 @@ msgid "Soft gray"
 msgstr ""
 
 msgctxt "breadcrumb"
+msgid "Audio"
+msgstr ""
+
+msgctxt "breadcrumb"
 msgid "Intelligence /"
 msgstr ""
 
@@ -5614,6 +5803,10 @@ msgid "Reveal"
 msgstr ""
 
 msgctxt "button"
+msgid "Show in Finder"
+msgstr ""
+
+msgctxt "button"
 msgid "Source on GitHub"
 msgstr ""
 
@@ -5623,6 +5816,10 @@ msgstr ""
 
 msgctxt "button"
 msgid "Transcribe"
+msgstr ""
+
+msgctxt "button"
+msgid "Upload"
 msgstr ""
 
 msgctxt "button"
@@ -5946,6 +6143,10 @@ msgid "Loop"
 msgstr ""
 
 msgctxt "editor shortcut"
+msgid "Marker"
+msgstr ""
+
+msgctxt "editor shortcut"
 msgid "Out"
 msgstr ""
 
@@ -5963,6 +6164,10 @@ msgstr ""
 
 msgctxt "editor shortcut"
 msgid "Second"
+msgstr ""
+
+msgctxt "editor shortcut"
+msgid "Shuttle"
 msgstr ""
 
 msgctxt "editor shortcut"
@@ -5987,6 +6192,18 @@ msgstr ""
 
 msgctxt "export row"
 msgid "Exporting"
+msgstr ""
+
+msgctxt "export tracks"
+msgid "Mic only"
+msgstr ""
+
+msgctxt "export tracks"
+msgid "Mix"
+msgstr ""
+
+msgctxt "export tracks"
+msgid "System only"
 msgstr ""
 
 msgctxt "exports list"
@@ -6094,11 +6311,23 @@ msgid "Reframe"
 msgstr ""
 
 msgctxt "inspector tab"
+msgid "Report"
+msgstr ""
+
+msgctxt "inspector tab"
+msgid "Speakers"
+msgstr ""
+
+msgctxt "inspector tab"
 msgid "Speed"
 msgstr ""
 
 msgctxt "inspector tab"
 msgid "Suggestions"
+msgstr ""
+
+msgctxt "inspector tab"
+msgid "Transcript"
 msgstr ""
 
 msgctxt "inspector tab"
@@ -6131,6 +6360,26 @@ msgstr ""
 
 msgctxt "landmark"
 msgid "Main"
+msgstr ""
+
+msgctxt "lane"
+msgid "Markers"
+msgstr ""
+
+msgctxt "lane"
+msgid "Speakers"
+msgstr ""
+
+msgctxt "lane"
+msgid "call audio"
+msgstr ""
+
+msgctxt "lane"
+msgid "microphone"
+msgstr ""
+
+msgctxt "language"
+msgid "Original"
 msgstr ""
 
 msgctxt "launcher action"
@@ -6351,6 +6600,10 @@ msgstr ""
 
 msgctxt "made for kids"
 msgid "No, it is not"
+msgstr ""
+
+msgctxt "marker"
+msgid "Marker"
 msgstr ""
 
 msgctxt "menu"
@@ -6882,6 +7135,10 @@ msgid "System"
 msgstr ""
 
 msgctxt "timeline"
+msgid "Marker"
+msgstr ""
+
+msgctxt "timeline"
 msgid "Snap"
 msgstr ""
 
@@ -6962,6 +7219,10 @@ msgid "Screen"
 msgstr ""
 
 msgctxt "track"
+msgid "System"
+msgstr ""
+
+msgctxt "track"
 msgid "Webcam"
 msgstr ""
 
@@ -7019,6 +7280,18 @@ msgstr ""
 
 msgctxt "transcript language"
 msgid "Vietnamese"
+msgstr ""
+
+msgctxt "transcript language"
+msgid "original"
+msgstr ""
+
+msgctxt "transcript language"
+msgid "translated"
+msgstr ""
+
+msgctxt "transcript turn"
+msgid "overlap"
 msgstr ""
 
 msgctxt "tray menu"
