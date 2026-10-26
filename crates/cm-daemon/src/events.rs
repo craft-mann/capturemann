@@ -92,6 +92,8 @@ pub const MODEL_DOWNLOAD_PROGRESS: &str = "model.download.progress";
 pub const MODEL_CHANGED: &str = "model.changed";
 /// A transcript was written: `{ capture_id, model, language, words }`.
 pub const TRANSCRIPT_READY: &str = "transcript.ready";
+/// A diarization finished (AI-8): `{ capture_id, model, speakers, segments, note, headset }`.
+pub const SPEAKERS_READY: &str = "speakers.ready";
 pub const JOB_PROGRESS: &str = "job.progress";
 pub const JOB_DONE: &str = "job.done";
 pub const JOB_FAILED: &str = "job.failed";

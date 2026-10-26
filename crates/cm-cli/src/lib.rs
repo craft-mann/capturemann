@@ -94,6 +94,8 @@ pub const CLI_COMMANDS: &[(&str, Option<&str>)] = &[
     ("export_captions", Some("export")),
     ("suggest_zooms", Some("ai suggest zooms")),
     ("suggest_cuts", Some("ai suggest cuts")),
+    ("diarize", Some("ai speakers")),
+    ("set_speakers", Some("ai speakers rename")),
 ];
 
 /// Everything the CLI touches outside its arguments.

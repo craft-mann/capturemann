@@ -231,6 +231,88 @@ pub fn apply_captions(
     Ok(outcome(&m, revision))
 }
 
+/// Sets top-level manifest keys (`None` removes a key) as ONE revision named `action` and one undo
+/// step; `undo` / `redo` restore the keys as they were before / after (`extra_before`,
+/// `extra_after` in the step). The edit list is unchanged. Used for the speaker labels (AI-8:
+/// `speakers`, `speaker_segments`). The keys must not be ones the manifest struct owns.
+pub fn apply_extra(
+    dir: &Path,
+    action: &str,
+    changes: Vec<(String, Option<Value>)>,
+    by: Actor,
+    at: OffsetDateTime,
+) -> Result<EditOutcome, CmError> {
+    let mut m = read_manifest(dir)?;
+    let mut before = serde_json::Map::new();
+    let mut after = serde_json::Map::new();
+    for (key, value) in changes {
+        before.insert(
+            key.clone(),
+            m.extra.get(&key).cloned().unwrap_or(Value::Null),
+        );
+        match value {
+            Some(v) => {
+                m.extra.insert(key.clone(), v.clone());
+                after.insert(key, v);
+            }
+            None => {
+                m.extra.remove(&key);
+                after.insert(key, Value::Null);
+            }
+        }
+    }
+    let edits_now = load_edits(&m).to_json();
+    let (cursor, mut steps) = history_mut(&mut m)?;
+    steps.truncate(cursor);
+    let revision = push_revision(&mut m, action, by.clone(), at);
+    steps.push(json!({
+        "rev": revision.rev,
+        "action": action,
+        "by": by.to_string(),
+        "before": edits_now,
+        "after": edits_now,
+        "extra_before": before,
+        "extra_after": after,
+    }));
+    let over = steps.len().saturating_sub(DEFAULT_REVISION_LIMIT);
+    steps.drain(..over);
+    let cursor = steps.len();
+    store_history(&mut m, cursor, steps);
+    write_manifest(dir, &m)?;
+    Ok(outcome(&m, revision))
+}
+
+/// Sets top-level manifest keys WITHOUT a revision or an undo step (`None` removes a key): for
+/// data a job produced, like the speakers of a new diarization (AI-8), where nothing was edited
+/// by the user. A previous undo step that touched the same keys is dropped from the history so
+/// that undo can never bring back data of an older run.
+pub fn set_extra(dir: &Path, changes: Vec<(String, Option<Value>)>) -> Result<(), CmError> {
+    let mut m = read_manifest(dir)?;
+    let keys: Vec<String> = changes.iter().map(|(k, _)| k.clone()).collect();
+    for (key, value) in changes {
+        match value {
+            Some(v) => {
+                m.extra.insert(key, v);
+            }
+            None => {
+                m.extra.remove(&key);
+            }
+        }
+    }
+    let (cursor, steps) = history_mut(&mut m)?;
+    let touches = |s: &Value| {
+        s.get("extra_before")
+            .and_then(Value::as_object)
+            .is_some_and(|o| keys.iter().any(|k| o.contains_key(k)))
+    };
+    if steps.iter().any(touches) {
+        let kept_before_cursor = steps.iter().take(cursor).filter(|s| !touches(s)).count();
+        let kept: Vec<Value> = steps.into_iter().filter(|s| !touches(s)).collect();
+        store_history(&mut m, kept_before_cursor, kept);
+    }
+    write_manifest(dir, &m)
+}
+
 /// How captions are used for a recording (AI-1): the two switches in the manifest's `captions`
 /// object. Both default to off when the keys are missing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -371,6 +453,21 @@ pub fn step_history(
     if let Some(c) = steps.get(step).and_then(|s| s.get(side)) {
         m.captions = c.clone();
     }
+    // A step from `apply_extra` carries the keys it set on both sides (null = absent).
+    let extra_side = if undo { "extra_before" } else { "extra_after" };
+    if let Some(keys) = steps
+        .get(step)
+        .and_then(|s| s.get(extra_side))
+        .and_then(Value::as_object)
+    {
+        for (k, v) in keys {
+            if v.is_null() {
+                m.extra.remove(k);
+            } else {
+                m.extra.insert(k.clone(), v.clone());
+            }
+        }
+    }
     let revision = push_revision(&mut m, if undo { "undo" } else { "redo" }, by, at);
     store_history(&mut m, new_cursor, steps);
     write_manifest(dir, &m)?;
@@ -428,6 +525,57 @@ mod tests {
 
     fn cut(dir: &Path, ranges: &[Span], by: Actor) -> Result<EditOutcome, CmError> {
         apply_edit(dir, "cut_segments", by, NOW, |l, _| l.cut(ranges))
+    }
+
+    /// AI-8.AC4/AC5: a change to top-level keys is one revision and one undo step; undo and redo
+    /// restore them (an absent key stays absent).
+    #[test]
+    fn ai_8_extra_keys_are_one_undoable_revision() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = recording(tmp.path());
+        let one = |v: &str| vec![("speakers".to_owned(), Some(json!([{"id": 1, "name": v}])))];
+        let o = apply_extra(&dir, "set_speakers", one("Speaker 1"), Actor::User, NOW).unwrap();
+        assert_eq!(o.revision.action, "set_speakers");
+        let o = apply_extra(
+            &dir,
+            "set_speakers",
+            one("Linh"),
+            Actor::agent("claude").unwrap(),
+            NOW,
+        )
+        .unwrap();
+        assert_eq!(o.revision.by.to_string(), "agent:claude");
+        let name = |d: &Path| read_manifest(d).unwrap().extra["speakers"][0]["name"].clone();
+        assert_eq!(name(&dir), "Linh");
+        step_history(&dir, true, Actor::User, NOW).unwrap().unwrap();
+        assert_eq!(name(&dir), "Speaker 1");
+        step_history(&dir, true, Actor::User, NOW).unwrap().unwrap();
+        assert!(!read_manifest(&dir).unwrap().extra.contains_key("speakers"));
+        step_history(&dir, false, Actor::User, NOW)
+            .unwrap()
+            .unwrap();
+        step_history(&dir, false, Actor::User, NOW)
+            .unwrap()
+            .unwrap();
+        assert_eq!(name(&dir), "Linh");
+        // Removing a key is undoable too.
+        apply_extra(
+            &dir,
+            "set_speakers",
+            vec![("speakers".into(), None)],
+            Actor::User,
+            NOW,
+        )
+        .unwrap();
+        assert!(!read_manifest(&dir).unwrap().extra.contains_key("speakers"));
+        step_history(&dir, true, Actor::User, NOW).unwrap().unwrap();
+        assert_eq!(name(&dir), "Linh");
+        // A new run replaces the keys without a revision, and no undo brings the old ones back.
+        set_extra(&dir, vec![("speakers".into(), Some(json!([])))]).unwrap();
+        assert_eq!(read_manifest(&dir).unwrap().extra["speakers"], json!([]));
+        assert!(step_history(&dir, true, Actor::User, NOW)
+            .unwrap()
+            .is_none());
     }
 
     /// AI-1: the first transcript switches the preview captions on and leaves burn-in off, once,

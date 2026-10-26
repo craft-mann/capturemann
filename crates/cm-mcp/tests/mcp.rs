@@ -1656,6 +1656,8 @@ async fn ai_tools_no_model_error_and_confirmed_download() {
         "set_captions",
         "replace_in_captions",
         "suggest_cuts",
+        "diarize",
+        "set_speakers",
     ] {
         assert!(
             tool(n)

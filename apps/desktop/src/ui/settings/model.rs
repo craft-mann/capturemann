@@ -369,6 +369,8 @@ pub(crate) fn tool_title(name: &str) -> String {
         "export_captions" => tr!("Export captions (SRT, VTT, TXT)"),
         "suggest_zooms" => tr!("Suggest zoom regions"),
         "suggest_cuts" => tr!("Suggest cuts"),
+        "diarize" => tr!("Find who speaks when"),
+        "set_speakers" => tr!("Rename or fix speakers"),
         "list_destinations" => tr!("List save destinations"),
         "upload" => tr!("Copy a capture to a destination"),
         "list_publish_accounts" => tr!("List publish accounts"),

@@ -8,7 +8,9 @@ use cm_core::ErrorCode;
 use serde_json::{json, Value};
 
 use super::{plain, Ctx};
-use crate::args::{AiCmd, CaptionsCmd, ModelsCmd, SuggestCmd, TranscribeArgs};
+use crate::args::{
+    AiCmd, CaptionsCmd, ModelsCmd, SpeakersArgs, SpeakersCmd, SuggestCmd, TranscribeArgs,
+};
 use crate::client::Client;
 use crate::error::CliError;
 
@@ -111,7 +113,163 @@ pub(super) async fn ai(cx: &mut Ctx<'_>, cmd: AiCmd) -> Result<(), CliError> {
         AiCmd::Suggest {
             cmd: SuggestCmd::Cuts { id },
         } => suggest(cx, id, false).await,
+        AiCmd::Speakers(a) => speakers(cx, a).await,
     }
+}
+
+/// A time argument: seconds (`12.5`) or ticks (`t:1500000`), passed on for the daemon to check.
+fn time_arg(field: &str, s: &str) -> Result<Value, CliError> {
+    if s.strip_prefix("t:")
+        .is_some_and(|t| t.parse::<i64>().is_ok())
+    {
+        return Ok(json!(s));
+    }
+    s.parse::<f64>()
+        .ok()
+        .filter(|n| n.is_finite())
+        .map(|n| json!(n))
+        .ok_or_else(|| {
+            CliError::invalid_input(format!("{field}: `{s}` is not seconds or t:<ticks>"))
+        })
+}
+
+/// `ai speakers <id>` (`diarize`) and `ai speakers rename|merge|assign|list` (`set_speakers`,
+/// `get_transcript`).
+async fn speakers(cx: &mut Ctx<'_>, a: SpeakersArgs) -> Result<(), CliError> {
+    match a.cmd {
+        Some(SpeakersCmd::Rename { id, speaker, name }) => {
+            let p = json!({ "capture_id": id, "rename": { speaker.to_string(): name } });
+            set_speakers(cx, p).await
+        }
+        Some(SpeakersCmd::Merge { id, from, into }) => {
+            let p = json!({ "capture_id": id, "merge": [{ "from": from, "into": into }] });
+            set_speakers(cx, p).await
+        }
+        Some(SpeakersCmd::Assign {
+            id,
+            speaker,
+            start,
+            end,
+        }) => {
+            let p = json!({ "capture_id": id, "assign": [{
+                "start": time_arg("start", &start)?, "end": time_arg("end", &end)?,
+                "speaker": speaker }] });
+            set_speakers(cx, p).await
+        }
+        Some(SpeakersCmd::List { id }) => {
+            let mut c = cx.client().await?;
+            let r = c
+                .call("get_transcript", json!({ "capture_id": id }))
+                .await?;
+            cx.emit(&r, |r| match r["speakers"].as_array() {
+                Some(list) => speaker_list(&plain(&r["capture_id"]), list),
+                None => format!(
+                    "{} has no speakers yet; run `capturemann ai speakers {}`",
+                    plain(&r["capture_id"]),
+                    plain(&r["capture_id"])
+                ),
+            });
+            Ok(())
+        }
+        None => diarize(cx, a).await,
+    }
+}
+
+fn speaker_list(id: &str, list: &[Value]) -> String {
+    let mut s = format!("Speakers of {id}:\n");
+    for sp in list {
+        let _ = writeln!(s, "  {}  {}", plain(&sp["id"]), plain(&sp["name"]));
+    }
+    if list.is_empty() {
+        s.push_str("  (none)\n");
+    }
+    s
+}
+
+async fn set_speakers(cx: &mut Ctx<'_>, p: Value) -> Result<(), CliError> {
+    let params = cx.mutating(p, "");
+    let mut c = cx.client().await?;
+    let r = c.call("set_speakers", params).await?;
+    cx.emit(&r, |r| {
+        let list = r["speakers"].as_array().cloned().unwrap_or_default();
+        let head = if r["changed"] == json!(true) {
+            format!(
+                "Changed the speakers of {} (revision {})\n  undo with `capturemann undo {}`\n",
+                plain(&r["capture_id"]),
+                plain(&r["revision"]),
+                plain(&r["capture_id"]),
+            )
+        } else {
+            format!("Nothing changed in {}\n", plain(&r["capture_id"]))
+        };
+        format!("{head}{}", speaker_list(&plain(&r["capture_id"]), &list))
+    });
+    Ok(())
+}
+
+async fn diarize(cx: &mut Ctx<'_>, a: SpeakersArgs) -> Result<(), CliError> {
+    let id = a.id.unwrap_or_default();
+    let mut p = json!({ "capture_id": id });
+    for (k, v) in [
+        ("num_speakers", a.num),
+        ("min_speakers", a.min),
+        ("max_speakers", a.max),
+    ] {
+        if let Some(n) = v {
+            p[k] = json!(n);
+        }
+    }
+    if a.headset {
+        p["headset"] = json!(true);
+    }
+    let params = cx.mutating(p, "");
+    let mut c = cx.client().await?;
+    let started = c.call("diarize", params).await?;
+    if !a.wait {
+        cx.emit(&started, |r| {
+            format!(
+                "Finding the speakers of {}: job {}{}\n  watch it with `capturemann jobs get {}`",
+                plain(&r["capture_id"]),
+                plain(&r["job_id"]),
+                if r["reused"] == json!(true) {
+                    " (already running)"
+                } else {
+                    ""
+                },
+                plain(&r["job_id"]),
+            )
+        });
+        return Ok(());
+    }
+    let job = wait_job(
+        cx,
+        &mut c,
+        &plain(&started["job_id"]),
+        "finding the speakers",
+        a.timeout,
+    )
+    .await?;
+    cx.emit(&job, |j| {
+        let r = &j["result"];
+        let list = r["speakers"].as_array().cloned().unwrap_or_default();
+        let mut s = format!(
+            "Found {} speakers in {} (model `{}`)\n",
+            list.len(),
+            plain(&r["capture_id"]),
+            plain(&r["model"]),
+        );
+        if let Some(note) = r["note"].as_str() {
+            let _ = writeln!(s, "  {note}");
+        }
+        s.push_str(&speaker_list(&plain(&r["capture_id"]), &list));
+        let _ = write!(
+            s,
+            "  rename one with `capturemann ai speakers rename {} <number> <name>`",
+            plain(&r["capture_id"])
+        );
+        s
+    });
+    Ok(())
 }
 
 fn model_table(r: &Value) -> String {
@@ -620,10 +778,14 @@ pub(super) async fn export_captions(
     id: String,
     format: String,
     timestamps: bool,
+    speaker_names: bool,
 ) -> Result<(), CliError> {
     let mut p = json!({ "capture_id": id, "format": format });
     if timestamps {
         p["timestamps"] = json!(true);
+    }
+    if speaker_names {
+        p["speaker_names"] = json!(true);
     }
     let params = cx.mutating(p, "");
     let mut c = cx.client().await?;

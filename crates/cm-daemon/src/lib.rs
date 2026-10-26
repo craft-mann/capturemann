@@ -75,8 +75,8 @@ pub use action::{
     is_internal, spec_for, tier_of, Action, ActionSpec, Tier, ACTIONS, INTERNAL_ACTIONS, NEVER_TIER,
 };
 pub use ai::{
-    AiServices, CaptionFormat, CaptionService, ModelService, SuggestService, TranscribeRequest,
-    TranscribeService,
+    AiServices, CaptionFormat, CaptionService, DiarizeRequest, ModelService, SpeakerService,
+    SuggestService, TranscribeRequest, TranscribeService,
 };
 pub use clock::{Clock, ManualClock, SystemClock};
 pub use daemon::{ActionCall, Daemon, DaemonBuilder};

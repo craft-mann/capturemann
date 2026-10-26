@@ -132,6 +132,11 @@ fn samples() -> Vec<(&'static str, Value)> {
         ),
         ("suggest_zooms", json!({"capture_id": "rec_1"})),
         ("suggest_cuts", json!({"capture_id": "rec_1"})),
+        ("diarize", json!({"capture_id": "rec_1", "num_speakers": 2})),
+        (
+            "set_speakers",
+            json!({"capture_id": "rec_1", "rename": {"2": "Linh"}}),
+        ),
         (
             "set_caption_options",
             json!({"capture_id": "rec_1", "enabled": true, "burn_in": false}),

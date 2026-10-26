@@ -9,14 +9,19 @@ use crate::error::CliError;
 
 /// `export <id> [--preset quick] [--wait]`: `export_video`, then (with `--wait`) polls the job.
 pub(super) async fn export_video(cx: &mut Ctx<'_>, a: ExportArgs) -> Result<(), CliError> {
-    // `--captions srt|vtt|txt` writes the caption file (AI-1) instead of rendering a video.
+    // `--captions srt|vtt|txt|md` writes the caption file (AI-1) instead of rendering a video.
     if let Some(format) = a.captions {
         if a.timestamps && format != "txt" {
             return Err(CliError::invalid_input(
                 "--timestamps only applies to --captions txt (SRT and VTT always have times)",
             ));
         }
-        return ai::export_captions(cx, a.id, format, a.timestamps).await;
+        if a.speaker_names && format != "srt" {
+            return Err(CliError::invalid_input(
+                "--speaker-names only applies to --captions srt (VTT, TXT and Markdown name the speakers on their own)",
+            ));
+        }
+        return ai::export_captions(cx, a.id, format, a.timestamps, a.speaker_names).await;
     }
     let mut p = json!({ "capture_id": a.id, "preset": a.preset });
     if let Some(f) = &a.format {
