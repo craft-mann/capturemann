@@ -835,6 +835,37 @@ impl RecordingSession {
         Ok(marker)
     }
 
+    /// Gives the marker set at `at` (within 1 ms) its label: the HUD's "Add a label" after a
+    /// marker. `not_found` when no marker is there.
+    pub fn relabel_marker(
+        &mut self,
+        at: cm_core::MediaTime,
+        label: Option<&str>,
+    ) -> Result<Marker, CmError> {
+        if self.state == SessionState::Stopped {
+            return Err(CmError::invalid_input("The recording is already stopped"));
+        }
+        let label = cm_library::rec_edit::normalize_marker_label(label)?;
+        let target = at.as_millis_floor();
+        let Some(m) = self
+            .markers
+            .iter_mut()
+            .find(|m| (m.at.as_millis_floor() - target).abs() <= 1)
+        else {
+            return Err(CmError::not_found("There is no marker at that time"));
+        };
+        m.label = label;
+        let marker = m.clone();
+        if let Some(b) = self.bundle.as_mut() {
+            b.set_extra(
+                "markers",
+                serde_json::to_value(&self.markers)
+                    .map_err(|e| CmError::internal(format!("markers: {e}")))?,
+            )?;
+        }
+        Ok(marker)
+    }
+
     /// The markers set so far.
     pub fn markers(&self) -> &[Marker] {
         &self.markers

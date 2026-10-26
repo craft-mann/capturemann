@@ -61,12 +61,12 @@
 | Discard recording (HUD, REC-5) | ⌥⇧D | Ctrl+Alt+Shift+D |
 | Restart recording (HUD, REC-5) | ⌥⇧T | Ctrl+Alt+Shift+T |
 | Annotate last capture | ⌥⇧A | Ctrl+Alt+Shift+A |
-| Start/stop audio recording (VOC-1, planned) | ⌥⇧V | Ctrl+Alt+Shift+V |
-| Add a marker while recording (VOC-1, planned) | ⌥⇧M | Ctrl+Alt+Shift+M |
+| Start/stop audio recording (VOC-1; built Oct 26, 2026, not seen by eye) | ⌥⇧V | Ctrl+Alt+Shift+V |
+| Add a marker while recording (VOC-1; built Oct 26, 2026, not seen by eye) | ⌥⇧M | Ctrl+Alt+Shift+M |
 
 - Defaults avoid the OS screenshot keys (⌘⇧3/4/5 on macOS, Win+Shift+S on Windows), common editor shortcuts (⌘⇧P, Ctrl+Shift+P), and plain Ctrl+Alt on Windows (it equals AltGr on many European layouts). Settings offers "Replace system screenshot shortcuts" on macOS as an opt-in that explains how to turn off the system ones first.
 
-- Tray/menu-bar menu (native menu, not custom-drawn): Capture region, Capture window, Capture display, Record…, Open library, Recent captures (last 5), Settings, Quit. While recording, the icon switches to the kit's recording variant (see AC7), with elapsed time as the title text on macOS (tooltip on Windows) and Stop recording becomes the first item.
+- Tray/menu-bar menu (native menu, not custom-drawn): Capture region, Capture window, Capture display, Record…, Record audio (VOC-1), Open library, Recent captures (last 5), Settings, Quit. While recording, the icon switches to the kit's recording variant (see AC7), with elapsed time as the title text on macOS (tooltip on Windows) and Stop recording becomes the first item.
 - The app keeps running in the tray when its windows are closed. **Launch at login** is a LaunchAgent (`~/Library/LaunchAgents/dev.capturemann.app.plist`) installed only for an installed `.app` bundle, never for a dev binary. **Default off**: a login item is persistence on the user's machine, so it needs an explicit opt-in. This is a deliberate deviation from the original "default on" (decided with the AC5 implementation; the product maintainer accepted it on Oct 21, 2026 (OD-13): it ships default off and stays off, to be revisited with an installer). The choice is a `launch_at_login` file beside `settings.json`, not a setting, so an agent cannot change it through `set_settings`.
 
 **Acceptance criteria**

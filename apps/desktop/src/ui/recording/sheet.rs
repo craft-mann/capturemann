@@ -16,6 +16,7 @@ use serde_json::json;
 use crate::backend::Backend;
 use crate::overlay::CaptureMode;
 use crate::permissions::{self, Action as PermAction, Id as PermId, State as PermState};
+use crate::recording::audio_sheet::{AudioDefaults, AudioSheetModel, AUDIO_SHEET_WIDTH};
 use crate::recording::geometry::Rect;
 use crate::recording::sheet::{
     clamp_into, fit_height, kind_icon, Devices, Note, SheetModel, TargetsProblem, SHEET_MARGIN,
@@ -42,6 +43,16 @@ use crate::window_picker::LastUsed;
 
 pub use crate::recording::sheet::SHEET_WIDTH;
 
+mod audio;
+
+/// What the sheet records: the screen (display, window or region) or audio only (VOC-1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SheetMode {
+    #[default]
+    Screen,
+    Audio,
+}
+
 /// How a sheet is opened: what the caller pre-filled and where the window was placed.
 pub struct SheetOpen {
     /// A window or region picked first.
@@ -54,12 +65,20 @@ pub struct SheetOpen {
     pub height: f64,
     /// The display it opened on (global points).
     pub display: Rect,
+    /// The mode it opens in (Audio from the tray, the launcher and the mic button).
+    pub mode: SheetMode,
 }
 
 pub struct StartSheet {
     app: Entity<AppModel>,
     _rec: Entity<RecState>,
     model: SheetModel,
+    /// Screen or Audio (VOC-1): which of the two models the body shows.
+    mode: SheetMode,
+    /// The Audio mode's model (`recording::audio_sheet`).
+    audio: AudioSheetModel,
+    /// The live microphone meter of the Audio mode.
+    meter: audio::MeterState,
     focus: FocusHandle,
     /// The overlay picker is open.
     picking: bool,
@@ -108,7 +127,11 @@ impl StartSheet {
             preset,
             height: initial_h,
             display,
+            mode,
         } = open;
+        let audio = AudioSheetModel::new(&AudioDefaults::from_settings(
+            &app.read(cx).backend.settings.snapshot(),
+        ));
         let mut model = SheetModel::new(&defaults);
         if let Some(t) = target {
             model.pick(t);
@@ -163,6 +186,9 @@ impl StartSheet {
             app,
             _rec: rec,
             model,
+            mode,
+            audio,
+            meter: audio::MeterState::default(),
             focus,
             picking: false,
             countdown_s,
@@ -208,6 +234,12 @@ impl StartSheet {
             );
             return;
         };
+        if self.mode == SheetMode::Audio {
+            // VOC-1: an audio recording never touches the screen, so the displays are not even
+            // listed until the user switches to Screen. Only the devices are read.
+            self.load_devices(cx);
+            return;
+        }
         let rt = backend.rt.clone();
         cx.spawn(async move |this, cx| {
             let (d1, d2) = (daemon.clone(), daemon);
@@ -228,10 +260,12 @@ impl StartSheet {
                         .apply_targets(Err((None, e.to_string().as_str()))),
                 }
                 if let Ok(Ok(v)) = devices {
-                    this.model
-                        .set_devices(Devices::parse(&demo_overrides::devices(v)));
+                    let d = Devices::parse(&demo_overrides::devices(v));
+                    this.audio.set_devices(d.clone());
+                    this.model.set_devices(d);
                 }
                 this.sync_preview(cx);
+                this.mic_sync(cx);
                 cx.notify();
             })
             .ok();
@@ -253,9 +287,11 @@ impl StartSheet {
                 .await;
             this.update(cx, |this, cx| {
                 if let Ok(Ok(v)) = devices {
-                    this.model
-                        .set_devices(Devices::parse(&demo_overrides::devices(v)));
+                    let d = Devices::parse(&demo_overrides::devices(v));
+                    this.audio.set_devices(d.clone());
+                    this.model.set_devices(d);
                     this.sync_preview(cx);
+                    this.mic_sync(cx);
                     cx.notify();
                 }
             })
@@ -275,7 +311,7 @@ impl StartSheet {
     /// Last used memory. Called when the sheet opens on Window, when the kind changes to Window
     /// and after "Pick on screen" returns.
     fn load_windows(&mut self, cx: &mut Context<Self>) {
-        if self.model.kind != TargetKind::Window {
+        if self.model.kind != TargetKind::Window || self.mode == SheetMode::Audio {
             return;
         }
         let backend = self.app.read(cx).backend.clone();
@@ -369,7 +405,7 @@ impl StartSheet {
             self.cancel(cx);
             return;
         }
-        if self.model.kind == TargetKind::Window {
+        if self.mode == SheetMode::Screen && self.model.kind == TargetKind::Window {
             let find = if cfg!(target_os = "macos") {
                 k.modifiers.platform
             } else {
@@ -457,8 +493,10 @@ impl StartSheet {
     /// CAM-4: the bubble shows the live camera as soon as the camera is on, before recording.
     fn sync_preview(&mut self, cx: &mut Context<Self>) {
         let app = self.app.clone();
+        // The webcam bubble belongs to the screen sheet: Audio mode shows no camera preview.
         let (on, dev) = (
-            self.model.camera
+            self.mode == SheetMode::Screen
+                && self.model.camera
                 && self.model.camera_available()
                 && !self.model.devices.camera_permission.blocked(),
             self.model.camera_device.clone(),
@@ -477,7 +515,10 @@ impl StartSheet {
         let visible = crate::platform_window::visible_frame_at(x + w / 2.0, y + 8.0)
             .map(|(vx, vy, vw, vh)| rec::demo_short(Rect::new(vx, vy, vw, vh)));
         let Some(visible) = visible else { return };
-        let heights = self.model.heights();
+        let (heights, want_w) = match self.mode {
+            SheetMode::Screen => (self.model.heights(), SHEET_WIDTH),
+            SheetMode::Audio => (self.audio.heights(), AUDIO_SHEET_WIDTH),
+        };
         if std::env::var_os("CM_DEMO_SHEET_TRACE").is_some() {
             // Debug: what the body cannot show at this height is the estimate's error.
             let overflow = f64::from(f32::from(self.scroll.max_offset().y.abs()));
@@ -487,11 +528,14 @@ impl StartSheet {
             );
         }
         let want = fit_height(&heights, visible.h);
-        if (want - self.fitted_h).abs() < 0.5 && (want - h).abs() < 1.5 {
+        if (want - self.fitted_h).abs() < 0.5 && (want - h).abs() < 1.5 && (want_w - w).abs() < 1.5
+        {
             return;
         }
         self.fitted_h = want;
-        let to = clamp_into(Rect::new(x, y, w, want), &visible, SHEET_MARGIN);
+        // A mode with another width keeps the window's centre.
+        let x = x - (want_w - w) / 2.0;
+        let to = clamp_into(Rect::new(x, y, want_w, want), &visible, SHEET_MARGIN);
         // After the current window update (see `NativeWindow`), or the new size is never drawn.
         if let Some(n) = self.native.clone() {
             cx.spawn(async move |_, _| n.set_frame(to.x, to.y, to.w, to.h))
@@ -500,6 +544,9 @@ impl StartSheet {
     }
 
     fn start(&mut self, cx: &mut Context<Self>) {
+        if self.mode == SheetMode::Audio {
+            return self.start_audio(cx);
+        }
         if self.model.blocker().is_some() || self.picking {
             return;
         }
@@ -527,6 +574,7 @@ impl StartSheet {
     }
 
     fn cancel(&mut self, cx: &mut Context<Self>) {
+        self.mic_stop();
         let app = self.app.clone();
         cx.defer(move |cx| rec::cancel_sheet(&app, cx));
     }
@@ -609,6 +657,15 @@ fn note_view(t: &Theme, note: &Note, pane: &'static str) -> gpui::Div {
 
 impl Render for StartSheet {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        match self.mode {
+            SheetMode::Screen => self.render_screen(window, cx).into_any_element(),
+            SheetMode::Audio => self.render_audio(window, cx).into_any_element(),
+        }
+    }
+}
+
+impl StartSheet {
+    fn render_screen(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = Theme::overlay();
         let m = self.model.clone();
         let (platform, shortcuts) = {
@@ -1082,9 +1139,10 @@ impl Render for StartSheet {
                         div()
                             .text_size(px(13.))
                             .text_color(rgba_of(t.mist))
-                            .child(tr!("Choose what goes in the recording.")),
+                            .child(ellipsis_text(tr!("Choose what goes in the recording."))),
                     ),
             )
+            .child(self.mode_switch(&t, cx))
             .child(
                 button(&t, "sheet-close", "", ButtonKind::Ghost)
                     .aria_label(tr!("Close"))

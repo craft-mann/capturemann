@@ -112,6 +112,8 @@ pub mod ids {
     pub const PERMISSIONS: &str = "permissions";
     pub const QUIT: &str = "quit";
     pub const RECORD: &str = "record";
+    /// "Record audio" (VOC-1): opens the start sheet in Audio mode.
+    pub const RECORD_AUDIO: &str = "record_audio";
     pub const REC_STOP: &str = "rec_stop";
     pub const REC_PAUSE: &str = "rec_pause";
 }
@@ -250,11 +252,21 @@ pub fn set_dock_icon() {}
 
 /// The ids of the Record / Pause / Stop group in menu order (CAP-2.AC4): while recording, Stop is
 /// first and sits at the top of the menu, so it is the item under the pointer.
-pub fn recording_group(recording: bool) -> [&'static str; 3] {
+pub fn recording_group(recording: bool) -> [&'static str; 4] {
     if recording {
-        [ids::REC_STOP, ids::REC_PAUSE, ids::RECORD]
+        [
+            ids::REC_STOP,
+            ids::REC_PAUSE,
+            ids::RECORD,
+            ids::RECORD_AUDIO,
+        ]
     } else {
-        [ids::RECORD, ids::REC_PAUSE, ids::REC_STOP]
+        [
+            ids::RECORD,
+            ids::RECORD_AUDIO,
+            ids::REC_PAUSE,
+            ids::REC_STOP,
+        ]
     }
 }
 
@@ -277,6 +289,7 @@ pub fn menu_text(id: &str) -> String {
         ids::CAPTURE_WINDOW => tr!("Capture window"),
         ids::CAPTURE_DISPLAY => tr!("Capture display"),
         ids::RECORD => tr!("Record\u{2026}"),
+        ids::RECORD_AUDIO => tr!("Record audio"),
         ids::REC_PAUSE => tr!("Pause recording"),
         ids::REC_STOP => tr!("Stop recording"),
         ids::OPEN_LIBRARY => tr!("Open library"),
@@ -298,6 +311,7 @@ pub struct TrayHandle {
     delays: Vec<(u32, CheckMenuItem)>,
     delay_menu: Submenu,
     record: MenuItem,
+    record_audio: MenuItem,
     stop: MenuItem,
     pause: MenuItem,
     /// The other plain items, by id, for a live language switch.
@@ -340,6 +354,7 @@ impl TrayHandle {
         }
         let _ = self.tray.set_tooltip(Some(plan.tooltip.clone()));
         self.record.set_enabled(plan.record_enabled);
+        self.record_audio.set_enabled(plan.record_enabled);
         self.stop.set_enabled(plan.stop_enabled);
         self.pause.set_enabled(plan.pause_enabled);
         self.pause.set_text(&plan.pause_label);
@@ -351,10 +366,16 @@ impl TrayHandle {
             match id {
                 ids::REC_STOP => &self.stop,
                 ids::REC_PAUSE => &self.pause,
+                ids::RECORD_AUDIO => &self.record_audio,
                 _ => &self.record,
             }
         };
-        for id in [ids::RECORD, ids::REC_PAUSE, ids::REC_STOP] {
+        for id in [
+            ids::RECORD,
+            ids::RECORD_AUDIO,
+            ids::REC_PAUSE,
+            ids::REC_STOP,
+        ] {
             let _ = self.menu.remove(item(id));
         }
         let start = recording_group_start(recording);
@@ -379,6 +400,7 @@ impl TrayHandle {
             item.set_text(menu_text(id));
         }
         self.record.set_text(menu_text(ids::RECORD));
+        self.record_audio.set_text(menu_text(ids::RECORD_AUDIO));
         self.stop.set_text(menu_text(ids::REC_STOP));
         self.pause.set_text(menu_text(ids::REC_PAUSE));
         self.recent.set_text(menu_text("recent"));
@@ -413,6 +435,7 @@ pub fn build_tray() -> Result<TrayHandle, String> {
     let item =
         |id: &str, enabled: bool| MenuItem::with_id(MenuId::new(id), menu_text(id), enabled, None);
     let record = item(ids::RECORD, true);
+    let record_audio = item(ids::RECORD_AUDIO, true);
     let pause = item(ids::REC_PAUSE, false);
     let stop = item(ids::REC_STOP, false);
     let recent = Submenu::with_id(MenuId::new("recent"), menu_text("recent"), true);
@@ -457,6 +480,7 @@ pub fn build_tray() -> Result<TrayHandle, String> {
         plain_item(ids::CAPTURE_DISPLAY),
         &delay_menu,
         &record,
+        &record_audio,
         &pause,
         &stop,
         &PredefinedMenuItem::separator(),
@@ -494,6 +518,7 @@ pub fn build_tray() -> Result<TrayHandle, String> {
         delay_menu,
         plain,
         record,
+        record_audio,
         stop,
         pause,
         state: std::cell::Cell::new(TrayState::Idle),
@@ -531,7 +556,12 @@ mod tests {
         assert_eq!(recording_group_start(true), 0);
         assert_eq!(
             recording_group(false),
-            [ids::RECORD, ids::REC_PAUSE, ids::REC_STOP]
+            [
+                ids::RECORD,
+                ids::RECORD_AUDIO,
+                ids::REC_PAUSE,
+                ids::REC_STOP
+            ]
         );
         // Capture region, window, display and the delay submenu come first (CAP-5).
         assert_eq!(recording_group_start(false), 4);
@@ -539,7 +569,7 @@ mod tests {
         let mut b = recording_group(false);
         a.sort_unstable();
         b.sort_unstable();
-        assert_eq!(a, b, "the same three items either way");
+        assert_eq!(a, b, "the same four items either way");
     }
 
     #[test]

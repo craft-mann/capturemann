@@ -1245,7 +1245,7 @@ impl Daemon {
                 } else {
                     inner
                         .engine()?
-                        .add_marker(actor, p.recording_id.as_deref(), p.label.as_deref())
+                        .add_marker(actor, p.recording_id.as_deref(), p.label.as_deref(), p.at)
                         .await
                 }
             }

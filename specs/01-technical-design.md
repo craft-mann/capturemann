@@ -242,7 +242,7 @@ pub trait PublishProvider {
 | `library.path` | app-only | folder path string; absent means `CAPTUREMANN_LIBRARY`, then `~/Movies/CaptureMann` | LIB-2 |
 | `permissions.onboarded` | app-only | boolean, set once the setup screen was seen | PRM-1.AC11 |
 | `privacy.excluded_apps` | app-only | array of bundle ids or executable names, added to the built-in list; a request can add, never remove | REC-6 |
-| `shortcuts.capture_region`, `.capture_window`, `.capture_display`, `.toggle_recording`, `.pause_recording`, `.open_library`, `.open_launcher`, `.discard_recording`, `.restart_recording`, `.annotate_last` | app-only | chord string such as `alt+shift+1` (at least one modifier and one key); defaults in CAP-2 | CAP-2 |
+| `shortcuts.capture_region`, `.capture_window`, `.capture_display`, `.toggle_recording`, `.pause_recording`, `.open_library`, `.open_launcher`, `.discard_recording`, `.restart_recording`, `.annotate_last`, `.toggle_audio_recording`, `.add_marker` | app-only | chord string such as `alt+shift+1` (at least one modifier and one key); defaults in CAP-2 | CAP-2 |
 | `agents.client_policies` | app-only (hidden from `get_settings`) | object `{ "<client name>": "allowed" \| "read_only" \| "blocked" }`; mirrored in `client_policies.json` | AGT-2 |
 | `agents.deny_unknown_clients` | app-only | boolean, absent means `false`; set when the policy list could not be restored, so clients with no entry are blocked (`default_deny`) until the user chooses "Allow unknown clients" | AGT-2 |
 | `storage.pause_uploads_while_recording` | app-only | boolean, `true` | EXP-4, STO-3 |

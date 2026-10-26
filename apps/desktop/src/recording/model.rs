@@ -115,6 +115,10 @@ pub struct Indicator {
     pub system_audio: bool,
     pub cursor: bool,
     pub started_by: StartedBy,
+    /// An audio recording (VOC-1, `mode: "audio"`): no area, no brackets, the compact HUD.
+    pub audio: bool,
+    /// The audio preset (`room`, `online`, `lecture`, `product`, `note`), when one was chosen.
+    pub preset: Option<String>,
 }
 
 /// `(code, message)` of an `error` field that is a string or `{code, message}`.
@@ -217,6 +221,8 @@ impl Indicator {
                 .unwrap_or(false),
             cursor: v.get("cursor").and_then(Value::as_bool).unwrap_or(true),
             started_by,
+            audio: v.get("mode").and_then(Value::as_str) == Some("audio"),
+            preset: v.get("preset").and_then(Value::as_str).map(str::to_owned),
         })
     }
 }
@@ -248,6 +254,18 @@ pub struct Warning {
     pub code: String,
     pub message: String,
     pub track: Option<String>,
+}
+
+/// How long the HUD offers a label for the marker just added (VOC-1, board V2).
+pub const MARKER_PROMPT_TTL: Duration = Duration::from_secs(8);
+
+/// The "Marker at 12:48 / Add a label (optional)" prompt after a marker was set from the HUD, the
+/// keyboard or the shortcut. The marker already exists (at `at_ms`); a label only names it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MarkerPrompt {
+    /// Recorded time of the marker, ms (the HUD timer when it was set).
+    pub at_ms: i64,
+    pub shown_at: Instant,
 }
 
 /// The countdown in progress.
@@ -334,6 +352,10 @@ pub struct HudState {
     pub pauses: u32,
     pub max_duration_s: Option<f64>,
     pub restart_of: Option<String>,
+    /// Markers set on this recording so far (`recording.marker`, VOC-1).
+    pub markers: u32,
+    /// The label prompt of the newest user marker, until it is answered or times out.
+    pub marker_prompt: Option<MarkerPrompt>,
     /// The bubble was hidden with the Webcam button (the camera keeps recording).
     pub bubble_hidden: bool,
     /// Seconds left in the self-test.
@@ -360,6 +382,8 @@ impl Default for HudState {
             pauses: 0,
             max_duration_s: None,
             restart_of: None,
+            markers: 0,
+            marker_prompt: None,
             bubble_hidden: false,
             selftest_remaining_s: None,
             idle_polls: 0,
@@ -690,6 +714,31 @@ impl HudState {
                 self.push_warning(data);
                 Change::Updated
             }
+            "recording.marker" => {
+                if self.phase == Phase::Idle || !self.belongs(data) {
+                    return Change::None;
+                }
+                self.markers = data
+                    .get("count")
+                    .and_then(Value::as_u64)
+                    .and_then(|n| u32::try_from(n).ok())
+                    .unwrap_or(self.markers + 1);
+                let at_ms = data.get("at_ms").and_then(Value::as_i64).unwrap_or(0);
+                let by_user = data.get("by").and_then(Value::as_str) == Some("user");
+                let labelled = data.get("label").is_some_and(|l| !l.is_null());
+                if labelled {
+                    // The label arrived (typed in the prompt, or an agent named it).
+                    if self.marker_prompt.is_some_and(|p| p.at_ms == at_ms) {
+                        self.marker_prompt = None;
+                    }
+                } else if by_user {
+                    self.marker_prompt = Some(MarkerPrompt {
+                        at_ms,
+                        shown_at: now,
+                    });
+                }
+                Change::Updated
+            }
             "recording.stopped" => {
                 if !self.belongs(data) {
                     return Change::None;
@@ -961,6 +1010,28 @@ impl HudState {
 
     pub fn camera_on(&self) -> bool {
         self.indicator.as_ref().is_some_and(|i| i.camera.is_some())
+    }
+
+    /// The take is an audio recording (VOC-1): the compact HUD, no area indicator.
+    pub fn is_audio(&self) -> bool {
+        self.indicator.as_ref().is_some_and(|i| i.audio)
+    }
+
+    /// The label prompt that is still on offer at `now`.
+    pub fn marker_prompt_at(&self, now: Instant) -> Option<MarkerPrompt> {
+        self.marker_prompt
+            .filter(|p| now.saturating_duration_since(p.shown_at) < MARKER_PROMPT_TTL)
+    }
+
+    /// Closes the prompt (Enter, Esc, a timeout); `None` closes whichever is open.
+    pub fn close_marker_prompt(&mut self, at_ms: Option<i64>) -> bool {
+        match self.marker_prompt {
+            Some(p) if at_ms.is_none_or(|a| a == p.at_ms) => {
+                self.marker_prompt = None;
+                true
+            }
+            _ => false,
+        }
     }
 
     pub fn mic_on(&self) -> bool {
@@ -1828,5 +1899,115 @@ mod tests {
             t,
         );
         assert_eq!(s.status_label(t), "Paused, 00:42");
+    }
+
+    /// What the daemon sends in `recording.started` for `mode: "audio"` (VOC-1): no area, no
+    /// output, no camera, no cursor.
+    fn started_audio(id: &str, by: Value) -> Value {
+        json!({
+            "recording_id": id, "capture_id": "rec_aud", "title": "Voice 10.30",
+            "state": "recording", "live_at_ms": 0, "by": "user",
+            "indicator": {
+                "mode": "audio", "preset": "room", "area": null, "output": null,
+                "camera": null, "mic": true, "system_audio": false, "cursor": false,
+                "started_by": by,
+            },
+            "warnings": [],
+        })
+    }
+
+    /// VOC-1: an audio recording is read as audio (the compact HUD, no area indicator), keeps the
+    /// preset and the agent that started it, and a screen recording is not audio.
+    #[test]
+    fn voc1_the_indicator_says_audio() {
+        let t0 = Instant::now();
+        let mut s = HudState::default();
+        let c = s.apply_event("recording.started", &started_audio("a1", user()), t0);
+        assert_eq!(c, Change::Started { agent: None });
+        assert!(s.is_audio() && s.mic_on() && !s.camera_on());
+        let i = s.indicator.clone().unwrap();
+        assert_eq!(i.preset.as_deref(), Some("room"));
+        assert!(i.area.bounds.is_none() && i.output.is_none());
+        let agent = json!({ "kind": "agent", "client": "Claude Code", "tool": "start_recording" });
+        let mut s = HudState::default();
+        let c = s.apply_event("recording.started", &started_audio("a2", agent), t0);
+        assert_eq!(
+            c,
+            Change::Started {
+                agent: Some(("Claude Code".to_owned(), "start_recording".to_owned()))
+            }
+        );
+        let mut s = HudState::default();
+        s.apply_event("recording.started", &started("rec_1", user()), t0);
+        assert!(!s.is_audio());
+    }
+
+    fn marker(at_ms: i64, label: Value, by: &str, count: u32) -> Value {
+        json!({ "recording_id": "a1", "at_ms": at_ms, "label": label, "by": by, "count": count })
+    }
+
+    /// VOC-1, board V2: a marker set by the user opens the label prompt at its time; the label
+    /// arriving, Esc or the timeout closes it; an agent's marker and one on a finished take do
+    /// not open it.
+    #[test]
+    fn voc1_a_user_marker_offers_a_label() {
+        let t0 = Instant::now();
+        let mut s = HudState::default();
+        s.apply_event("recording.started", &started_audio("a1", user()), t0);
+        assert!(s.marker_prompt_at(t0).is_none());
+        s.apply_event(
+            "recording.marker",
+            &marker(768_000, Value::Null, "user", 1),
+            t0,
+        );
+        assert_eq!(s.markers, 1);
+        let p = s.marker_prompt_at(t0).unwrap();
+        assert_eq!(p.at_ms, 768_000);
+        assert_eq!(clock_text(p.at_ms), "12:48");
+        // On offer for a few seconds, then gone by itself.
+        assert!(s.marker_prompt_at(t0 + MARKER_PROMPT_TTL / 2).is_some());
+        assert!(s.marker_prompt_at(t0 + MARKER_PROMPT_TTL).is_none());
+        // The label (typed in the prompt) closes it, and counts no new marker.
+        s.apply_event(
+            "recording.marker",
+            &marker(768_000, json!("Budget"), "user", 1),
+            t0,
+        );
+        assert!(s.marker_prompt.is_none());
+        assert_eq!(s.markers, 1);
+        // A label for another marker leaves a newer prompt alone.
+        s.apply_event(
+            "recording.marker",
+            &marker(900_000, Value::Null, "user", 2),
+            t0,
+        );
+        s.apply_event(
+            "recording.marker",
+            &marker(768_000, json!("x"), "user", 2),
+            t0,
+        );
+        assert_eq!(s.marker_prompt.map(|p| p.at_ms), Some(900_000));
+        assert!(!s.close_marker_prompt(Some(1)));
+        assert!(s.close_marker_prompt(Some(900_000)));
+        assert!(!s.close_marker_prompt(None));
+        // An agent's marker is counted but not asked about.
+        s.apply_event(
+            "recording.marker",
+            &marker(950_000, Value::Null, "agent:claude", 3),
+            t0,
+        );
+        assert_eq!((s.markers, s.marker_prompt.is_none()), (3, true));
+        // Another recording's marker is ignored.
+        s.apply_event(
+            "recording.marker",
+            &json!({"recording_id": "other", "at_ms": 1, "label": null, "by": "user", "count": 9}),
+            t0,
+        );
+        assert_eq!(s.markers, 3);
+        // A new take starts clean.
+        s.apply_event("recording.marker", &marker(1, Value::Null, "user", 4), t0);
+        s.apply_event("recording.stopped", &json!({"recording_id": "a1"}), t0);
+        s.apply_event("recording.started", &started_audio("a3", user()), t0);
+        assert_eq!((s.markers, s.marker_prompt.is_none()), (0, true));
     }
 }

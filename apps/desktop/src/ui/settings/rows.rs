@@ -75,6 +75,8 @@ pub fn shortcut_tile(key: &str) -> &'static str {
         "shortcuts.discard_recording" => "trash-2",
         "shortcuts.restart_recording" => "rotate-cw",
         "shortcuts.annotate_last" => "pencil",
+        "shortcuts.toggle_audio_recording" => "mic",
+        "shortcuts.add_marker" => "bookmark",
         _ => tile::SHORTCUT_FALLBACK,
     }
 }

@@ -149,6 +149,34 @@ fn corpus() -> Vec<(String, String)> {
     for a in ShortcutAction::ALL {
         c.add(format!("ShortcutAction::label({a:?})"), a.label());
     }
+    // VOC-1: the audio start sheet.
+    {
+        use crate::recording::audio_sheet::{self as aud, AudioSheetModel, People, Preset};
+        for p in Preset::ALL {
+            c.add(format!("Preset::title({p:?})"), p.title());
+            c.add(format!("Preset::blurb({p:?})"), p.blurb());
+            c.add(format!("Preset::report({p:?})"), p.report());
+        }
+        for p in People::ALL {
+            if p.count().is_none() && p.at_least().is_none() {
+                c.add(format!("People::label({p:?})"), p.label());
+            }
+        }
+        c.add("audio subtitle", aud::subtitle());
+        c.add("audio consent", AudioSheetModel::consent_text());
+        c.add("audio lid", AudioSheetModel::lid_text());
+        c.add(
+            "audio system hint",
+            AudioSheetModel::system_hint(crate::shortcuts::Platform::Mac),
+        );
+        let m = AudioSheetModel::new(&aud::AudioDefaults::from_settings(&Default::default()));
+        c.add("audio disk", m.disk_text());
+        c.add("audio limit", m.limit_text());
+        for (i, (label, _)) in m.after_stop().into_iter().enumerate() {
+            c.add(format!("audio after_stop[{i}]"), label);
+        }
+        c.add("audio duration", aud::duration_text(5400.0));
+    }
     for (i, (title, hint, _)) in sm::shortcut_groups().into_iter().enumerate() {
         c.add(format!("shortcut_groups[{i}]: title"), title);
         c.add(format!("shortcut_groups[{i}]: hint"), hint);

@@ -570,6 +570,10 @@ pub fn shortcut_label(a: ShortcutAction) -> String {
         ShortcutAction::DiscardRecording => tr_ctx!("shortcut", "Discard recording"),
         ShortcutAction::RestartRecording => tr_ctx!("shortcut", "Restart recording"),
         ShortcutAction::AnnotateLast => tr_ctx!("shortcut", "Annotate last capture"),
+        ShortcutAction::ToggleAudioRecording => {
+            tr_ctx!("shortcut", "Start or stop audio recording")
+        }
+        ShortcutAction::AddMarker => tr_ctx!("shortcut", "Add a marker"),
     }
 }
 
@@ -607,7 +611,9 @@ pub fn shortcut_groups() -> [(String, String, Vec<ShortcutAction>); 2] {
             tr_ctx!("shortcut scope", "Global"),
             vec![
                 ShortcutAction::ToggleRecording,
+                ShortcutAction::ToggleAudioRecording,
                 ShortcutAction::PauseRecording,
+                ShortcutAction::AddMarker,
                 ShortcutAction::RestartRecording,
                 ShortcutAction::DiscardRecording,
             ],

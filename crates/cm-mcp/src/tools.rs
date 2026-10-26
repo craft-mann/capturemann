@@ -924,7 +924,7 @@ pub fn all() -> Vec<ToolSpec> {
                 "recording_id": { "type": "string", "minLength": 1,
                                   "description": "From start_recording; optional while only one recording exists. Not with `capture_id`." },
                 "capture_id": { "type": "string", "minLength": 1, "description": "A finished recording; needs `at`." },
-                "at": { "type": "number", "minimum": 0, "description": "Seconds of recorded time (pauses removed), for a finished recording only." },
+                "at": { "type": "number", "minimum": 0, "description": "Seconds of recorded time (pauses removed). With `capture_id`: where to add the marker to a finished recording. Without it, and with `label`: the running recording's marker set at that time gets the label (nothing is added)." },
                 "label": { "type": "string", "maxLength": 200, "description": "Optional short label." },
                 "request_id": request_id() },
                 "additionalProperties": false }),

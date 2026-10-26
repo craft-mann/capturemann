@@ -116,6 +116,12 @@ msgstr ""
 msgid "About 6.7 GB to load"
 msgstr ""
 
+msgid "About {gb} GB per hour"
+msgstr ""
+
+msgid "About {gb} GB per hour · {free} GB free"
+msgstr ""
+
 msgid "About {minutes} minutes of disk space left"
 msgstr ""
 
@@ -155,7 +161,13 @@ msgstr ""
 msgid "Add a client by name"
 msgstr ""
 
+msgid "Add a label (optional)"
+msgstr ""
+
 msgid "Add a local folder, drive or network folder"
+msgstr ""
+
+msgid "Add a marker"
 msgstr ""
 
 msgid "Add a marker at the playhead"
@@ -223,6 +235,9 @@ msgid "After granting, quit and reopen CaptureMann."
 msgstr ""
 
 msgid "After recording"
+msgstr ""
+
+msgid "After you stop"
 msgstr ""
 
 msgid "Agent clients"
@@ -394,6 +409,9 @@ msgid "Audio is kept"
 msgstr ""
 
 msgid "Audio is muted above 2×"
+msgstr ""
+
+msgid "Audio only: no screen, camera or cursor."
 msgstr ""
 
 msgid "Audio settings"
@@ -998,6 +1016,9 @@ msgstr ""
 msgid "Could not reach the server: {error} Check your connection and try again."
 msgstr ""
 
+msgid "Couldn’t add the marker"
+msgstr ""
+
 msgid "Couldn’t apply the edit"
 msgstr ""
 
@@ -1038,6 +1059,9 @@ msgid "Couldn’t delete the capture"
 msgstr ""
 
 msgid "Couldn’t discard the take"
+msgstr ""
+
+msgid "Couldn’t label the marker"
 msgstr ""
 
 msgid "Couldn’t load the library"
@@ -1208,6 +1232,9 @@ msgstr ""
 msgid "Default channel"
 msgstr ""
 
+msgid "Default microphone"
+msgstr ""
+
 msgid "Default visibility"
 msgstr ""
 
@@ -1343,6 +1370,9 @@ msgid "Displays unavailable"
 msgstr ""
 
 msgid "Don’t save a copy"
+msgstr ""
+
+msgid "Don’t show again"
 msgstr ""
 
 msgid "Download TXT"
@@ -1625,6 +1655,12 @@ msgstr ""
 msgid "Follow cursor"
 msgstr ""
 
+msgid "For online calls: the other people’s voices."
+msgstr ""
+
+msgid "For online calls: the other people’s voices. Needs Screen Recording permission on macOS; microphone-only recordings never ask for it."
+msgstr ""
+
 msgid "Format"
 msgstr ""
 
@@ -1685,6 +1721,9 @@ msgstr ""
 msgid "Grid"
 msgstr ""
 
+msgid "Helps tell the voices apart for speaker labels."
+msgstr ""
+
 msgid "Hide the bubble"
 msgstr ""
 
@@ -1706,6 +1745,12 @@ msgstr ""
 msgid "Hold and drag to pan"
 msgstr ""
 
+msgid "How many people"
+msgstr ""
+
+msgid "How many people?"
+msgstr ""
+
 msgid "I understand that everyone will be able to find and watch this video."
 msgstr ""
 
@@ -1725,6 +1770,9 @@ msgid "Import from file"
 msgstr ""
 
 msgid "In (I)"
+msgstr ""
+
+msgid "In the room"
 msgstr ""
 
 msgid "Include captions in the exported video"
@@ -1775,6 +1823,12 @@ msgstr ""
 msgid "Installed: {name}"
 msgstr ""
 
+msgid "Interview, 1:1, meeting around a laptop"
+msgstr ""
+
+msgid "Introduction or demo call"
+msgstr ""
+
 msgid "Is this video made for kids?"
 msgstr ""
 
@@ -1796,6 +1850,9 @@ msgstr ""
 msgid "Just the call or app sound"
 msgstr ""
 
+msgid "Just you"
+msgstr ""
+
 msgid "Just your microphone"
 msgstr ""
 
@@ -1803,6 +1860,9 @@ msgid "Keep audio"
 msgstr ""
 
 msgid "Keep it"
+msgstr ""
+
+msgid "Keep the lid open: closing it stops the recording"
 msgstr ""
 
 msgid "Keep the name to {max} characters."
@@ -1835,6 +1895,12 @@ msgstr ""
 msgid "Leave the clipboard alone"
 msgstr ""
 
+msgid "Lecture notes"
+msgstr ""
+
+msgid "Lecture or talk"
+msgstr ""
+
 msgid "Left and right arrows move the playhead one frame, with Shift one second."
 msgstr ""
 
@@ -1846,6 +1912,9 @@ msgid "Left out of recordings, not of screenshots"
 msgstr ""
 
 msgid "Let AI agents start recordings without asking?"
+msgstr ""
+
+msgid "Let everyone know they’re being recorded."
 msgstr ""
 
 #. FACT: owner review required (what the permission is for)
@@ -1987,7 +2056,19 @@ msgstr ""
 msgid "Mark a moment in a recording"
 msgstr ""
 
+msgid "Mark a moment while recording"
+msgstr ""
+
+msgid "Mark this moment"
+msgstr ""
+
 msgid "Marker (M)"
+msgstr ""
+
+msgid "Marker at"
+msgstr ""
+
+msgid "Marker label"
 msgstr ""
 
 msgid "Marker {label} at {time}"
@@ -2005,6 +2086,9 @@ msgstr ""
 msgid "Measures late and dropped frames at 60 fps; only the result (pass or fail) is kept"
 msgstr ""
 
+msgid "Meeting minutes"
+msgstr ""
+
 msgid "Meeting minutes and notes"
 msgstr ""
 
@@ -2017,7 +2101,13 @@ msgstr ""
 msgid "Microphone"
 msgstr ""
 
+msgid "Microphone access is off for CaptureMann."
+msgstr ""
+
 msgid "Microphone access is off. Turn it on in System Settings > Privacy & Security > Microphone."
+msgstr ""
+
+msgid "Microphone access is off. Turn it on in System Settings to record your voice."
 msgstr ""
 
 msgid "Microphone access is off. Turn it on in System Settings; recording starts without it."
@@ -2038,10 +2128,19 @@ msgstr ""
 msgid "Microphone is off for this recording"
 msgstr ""
 
+msgid "Microphone level"
+msgstr ""
+
 msgid "Microphone level, {level}"
 msgstr ""
 
 msgid "Microphone {requested} is not available; using {using}"
+msgstr ""
+
+msgid "Microphone: {name}"
+msgstr ""
+
+msgid "Microphones"
 msgstr ""
 
 msgid "Mirror camera"
@@ -2057,6 +2156,9 @@ msgid "Mirror the preview"
 msgstr ""
 
 msgid "Mirrored, like the bubble"
+msgstr ""
+
+msgid "Mode"
 msgstr ""
 
 msgid "Model"
@@ -2296,7 +2398,13 @@ msgstr ""
 msgid "No recording is running"
 msgstr ""
 
+msgid "No recording to mark"
+msgstr ""
+
 msgid "No remote copy is recorded for this capture, so nothing is deleted remotely"
+msgstr ""
+
+msgid "No screen, microphone and calls"
 msgstr ""
 
 msgid "No silences found in this recording."
@@ -2403,6 +2511,9 @@ msgstr ""
 msgid "Not signed in on this Mac."
 msgstr ""
 
+msgid "Not sure"
+msgstr ""
+
 msgid "Note"
 msgstr ""
 
@@ -2497,6 +2608,12 @@ msgstr ""
 msgid "One MP4 with the screen, camera bubble and audio. The original tracks are untouched. {captions}"
 msgstr ""
 
+msgid "One speaker, a room"
+msgstr ""
+
+msgid "Online meeting"
+msgstr ""
+
 msgid "Only addresses on this Mac work here, like http://127.0.0.1:1234/v1."
 msgstr ""
 
@@ -2567,6 +2684,9 @@ msgid "Open the Microsoft Entra admin center (entra.microsoft.com) and sign in w
 msgstr ""
 
 msgid "Open the recording to edit its captions."
+msgstr ""
+
+msgid "Open the sheet"
 msgstr ""
 
 msgid "Open the window you want, then try again, or use Pick on screen."
@@ -2777,6 +2897,12 @@ msgstr ""
 msgid "Processed"
 msgstr ""
 
+msgid "Product demo"
+msgstr ""
+
+msgid "Product presentation recap"
+msgstr ""
+
 msgid "Proposals only"
 msgstr ""
 
@@ -2916,6 +3042,9 @@ msgstr ""
 msgid "Record at 60 fps"
 msgstr ""
 
+msgid "Record audio"
+msgstr ""
+
 msgid "Record audio, shortcut {chord}"
 msgstr ""
 
@@ -2950,6 +3079,9 @@ msgid "Recording `{id}` is not running"
 msgstr ""
 
 msgid "Recording at 30 fps. {detail}"
+msgstr ""
+
+msgid "Recording audio"
 msgstr ""
 
 msgid "Recording behavior"
@@ -3598,6 +3730,9 @@ msgstr ""
 msgid "Speaker labels are coming here: names, talk time and merging."
 msgstr ""
 
+msgid "Speaker labels, if turned on"
+msgstr ""
+
 msgid "Speaker model"
 msgstr ""
 
@@ -3638,7 +3773,13 @@ msgstr ""
 msgid "Start a new library"
 msgstr ""
 
+msgid "Start a recording first, then add markers while it runs."
+msgstr ""
+
 msgid "Start in 5 s"
+msgstr ""
+
+msgid "Start or stop audio recording"
 msgstr ""
 
 msgid "Start or stop from anywhere"
@@ -3701,6 +3842,9 @@ msgstr ""
 msgid "Stop recording"
 msgstr ""
 
+msgid "Stops by itself after {duration}"
+msgstr ""
+
 msgid "Structured output did not work; replies are checked and retried"
 msgstr ""
 
@@ -3722,10 +3866,16 @@ msgstr ""
 msgid "Suggest zooms"
 msgstr ""
 
+msgid "Suggest: {report}"
+msgstr ""
+
 msgid "Suggested cut: {detail} at {time}"
 msgstr ""
 
 msgid "Suggested cut: {detail} at {time} (and {more} more)"
+msgstr ""
+
+msgid "Summary"
 msgstr ""
 
 msgid "Switch to the existing library at {to} ({n} captures); the captures in {from} stay where they are"
@@ -3744,6 +3894,12 @@ msgid "System audio level"
 msgstr ""
 
 msgid "System audio needs Screen Recording access. Check your output is not muted."
+msgstr ""
+
+msgid "System audio needs Screen Recording permission on macOS."
+msgstr ""
+
+msgid "System audio needs Screen Recording permission. Turn it on in System Settings, or record the microphone only."
 msgstr ""
 
 msgid "System default input"
@@ -4153,6 +4309,9 @@ msgstr ""
 msgid "The ring is always the record color."
 msgstr ""
 
+msgid "The selected sources are not available."
+msgstr ""
+
 msgid "The selection is outside the kept part"
 msgstr ""
 
@@ -4353,6 +4512,12 @@ msgstr ""
 msgid "Transcribe after each recording"
 msgstr ""
 
+msgid "Transcribe · {model}"
+msgstr ""
+
+msgid "Transcribe, if turned on"
+msgstr ""
+
 msgid "Transcribing needs a speech model. Add one on the AI page."
 msgstr ""
 
@@ -4405,6 +4570,9 @@ msgid "Turn off microphone"
 msgstr ""
 
 msgid "Turn on camera"
+msgstr ""
+
+msgid "Turn on the microphone or system audio to record."
 msgstr ""
 
 msgid "Two actions share a shortcut; only the first one is registered."
@@ -4545,6 +4713,9 @@ msgstr ""
 msgid "Video to upload"
 msgstr ""
 
+msgid "Voice note"
+msgstr ""
+
 msgid "Waiting for the system…"
 msgstr ""
 
@@ -4595,6 +4766,9 @@ msgid "What Export MP4 and Publish… will produce"
 msgstr ""
 
 msgid "What Export audio will produce"
+msgstr ""
+
+msgid "What are you recording?"
 msgstr ""
 
 msgid "What is this video about?"
@@ -4770,6 +4944,9 @@ msgid "Zoom {scale} times"
 msgstr ""
 
 msgid "Zoom {scale} times, selected"
+msgstr ""
+
+msgid "Zoom, Meet, Teams, a browser call"
 msgstr ""
 
 msgid "Zooms ({n})"
@@ -5144,6 +5321,12 @@ msgstr ""
 msgid "{hint} · last request: {tool}"
 msgstr ""
 
+msgid "{h} h"
+msgstr ""
+
+msgid "{h} h {m} min"
+msgstr ""
+
 msgid "{id}, excluded by you"
 msgstr ""
 
@@ -5183,6 +5366,9 @@ msgid "{language} …"
 msgstr ""
 
 msgid "{month} {day}, {year}"
+msgstr ""
+
+msgid "{m} min"
 msgstr ""
 
 msgid "{name} (the file was deleted)"
@@ -6658,6 +6844,10 @@ msgid "area"
 msgstr ""
 
 msgctxt "launcher keyword"
+msgid "audio"
+msgstr ""
+
+msgctxt "launcher keyword"
 msgid "bubble"
 msgstr ""
 
@@ -6722,7 +6912,15 @@ msgid "input monitoring"
 msgstr ""
 
 msgctxt "launcher keyword"
+msgid "interview"
+msgstr ""
+
+msgctxt "launcher keyword"
 msgid "json"
+msgstr ""
+
+msgctxt "launcher keyword"
+msgid "meeting"
 msgstr ""
 
 msgctxt "launcher keyword"
@@ -6795,6 +6993,10 @@ msgstr ""
 
 msgctxt "launcher keyword"
 msgid "video"
+msgstr ""
+
+msgctxt "launcher keyword"
+msgid "voice"
 msgstr ""
 
 msgctxt "launcher keyword"
@@ -6903,6 +7105,10 @@ msgstr ""
 
 msgctxt "page title"
 msgid "Screenshot"
+msgstr ""
+
+msgctxt "people hint"
+msgid "optional"
 msgstr ""
 
 msgctxt "permission"
@@ -7017,6 +7223,14 @@ msgctxt "record sheet"
 msgid "Record"
 msgstr ""
 
+msgctxt "record sheet mode"
+msgid "Audio"
+msgstr ""
+
+msgctxt "record sheet mode"
+msgid "Screen"
+msgstr ""
+
 msgctxt "record target"
 msgid "Display"
 msgstr ""
@@ -7031,6 +7245,10 @@ msgstr ""
 
 msgctxt "recording codec"
 msgid "Auto"
+msgstr ""
+
+msgctxt "recording hud"
+msgid "Marker"
 msgstr ""
 
 msgctxt "recording hud"
@@ -7178,6 +7396,10 @@ msgid "Microphone"
 msgstr ""
 
 msgctxt "shortcut"
+msgid "Add a marker"
+msgstr ""
+
+msgctxt "shortcut"
 msgid "Annotate last capture"
 msgstr ""
 
@@ -7219,6 +7441,10 @@ msgstr ""
 
 msgctxt "shortcut"
 msgid "Restart recording"
+msgstr ""
+
+msgctxt "shortcut"
+msgid "Start or stop audio recording"
 msgstr ""
 
 msgctxt "shortcut"

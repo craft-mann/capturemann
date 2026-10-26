@@ -21,6 +21,7 @@
 //! * [`exports`]: the quick export's jobs and toasts ("Recording saved - exporting...").
 
 pub mod attention;
+pub mod audio_sheet;
 pub mod countdown;
 pub mod demo;
 pub mod drag;

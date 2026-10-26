@@ -583,13 +583,16 @@ impl RecordingEngine {
 
     /// Sets a marker on the running recording at the current recorded time (VOC-1.AC4): the HUD
     /// timer, so a pause does not move it. `{ recording_id, marker: { at, at_ms, label, by },
-    /// count }`. Works while recording, paused or in the resume countdown; during the start
+    /// count }`. With `relabel_at` (the `at` of a marker set earlier) nothing is added: the marker
+    /// at that time gets `label` (`not_found` when there is none). Works while recording, paused
+    /// or in the resume countdown; during the start
     /// countdown it is `invalid_input`, without a recording `not_found`.
     pub async fn add_marker(
         &self,
         actor: &Actor,
         id: Option<&str>,
         label: Option<&str>,
+        relabel_at: Option<cm_core::MediaTime>,
     ) -> Result<Value, DaemonError> {
         let sh = self.active_for(id)?;
         let phase = lock(&sh.meta).phase;
@@ -604,9 +607,11 @@ impl RecordingEngine {
         let joined = tokio::task::spawn_blocking(move || {
             let mut g = lock(&sh2.session);
             match g.as_mut() {
-                Some(s) => s
-                    .add_marker(label2.as_deref(), &by)
-                    .map(|m| (m, s.markers().len())),
+                Some(s) => match relabel_at {
+                    Some(at) => s.relabel_marker(at, label2.as_deref()),
+                    None => s.add_marker(label2.as_deref(), &by),
+                }
+                .map(|m| (m, s.markers().len())),
                 None => Err(CmError::internal("the recording session is gone")),
             }
         })

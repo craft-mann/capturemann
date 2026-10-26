@@ -53,6 +53,38 @@ pub(crate) const ASSETS: &[(&str, &str)] = &[
     ),
     ("icons/x.svg", include_str!("../../assets/icons/x.svg")),
     (
+        "icons/bookmark.svg",
+        include_str!("../../assets/icons/bookmark.svg"),
+    ),
+    (
+        "icons/chevron-down.svg",
+        include_str!("../../assets/icons/chevron-down.svg"),
+    ),
+    (
+        "icons/chevron-right.svg",
+        include_str!("../../assets/icons/chevron-right.svg"),
+    ),
+    (
+        "icons/file-text.svg",
+        include_str!("../../assets/icons/file-text.svg"),
+    ),
+    (
+        "icons/graduation-cap.svg",
+        include_str!("../../assets/icons/graduation-cap.svg"),
+    ),
+    (
+        "icons/hourglass.svg",
+        include_str!("../../assets/icons/hourglass.svg"),
+    ),
+    (
+        "icons/presentation.svg",
+        include_str!("../../assets/icons/presentation.svg"),
+    ),
+    (
+        "icons/users.svg",
+        include_str!("../../assets/icons/users.svg"),
+    ),
+    (
         "icons/brand-youtube.svg",
         include_str!("../../assets/icons/brand-youtube.svg"),
     ),

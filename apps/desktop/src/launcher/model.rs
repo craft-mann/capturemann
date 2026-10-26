@@ -305,15 +305,17 @@ mod tests {
     #[test]
     fn empty_query_shows_all_in_group_order() {
         let m = model(vec![]);
-        assert_eq!(m.visible_len(), 11);
+        assert_eq!(m.visible_len(), 12);
         assert_eq!(m.groups(), Group::ORDER.to_vec());
         let v = ids(&m);
-        // Capture: the recording commands lead (kit order), all enabled; Publish is disabled.
+        // Capture: the recording commands lead (kit order, Record audio after the screen ones),
+        // all enabled; Publish is disabled.
         assert_eq!(v[0], CommandId::RecordScreen);
         assert_eq!(v[1], CommandId::RecordRegion);
-        assert_eq!(v[2], CommandId::ScreenshotRegion);
-        assert_eq!(v[7], CommandId::OpenPermissions);
-        assert_eq!(v[10], CommandId::CopyMcpConfig);
+        assert_eq!(v[2], CommandId::RecordAudio);
+        assert_eq!(v[3], CommandId::ScreenshotRegion);
+        assert_eq!(v[8], CommandId::OpenPermissions);
+        assert_eq!(v[11], CommandId::CopyMcpConfig);
     }
 
     /// LNC-1.AC2: typing "rec" keeps only matching commands and selects the first.

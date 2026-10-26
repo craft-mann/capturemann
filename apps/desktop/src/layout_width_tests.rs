@@ -446,6 +446,102 @@ fn cases() -> Vec<Case> {
         )
         .text("Dropping frames", || cm_i18n::tr!("Dropping frames")),
     );
+    // The audio HUD (VOC-1, board V2): the Marker button is MARKER_W 124 with 12 px padding, a
+    // 1 px border, an 18 px icon, two 6 px gaps and the 10.5 px key hint "M" (about 9 px).
+    v.push(
+        Case::new(
+            "Audio HUD Marker button",
+            "MARKER_W 124 - 2 border - 24 padding - 18 icon - 12 gaps - 9 key",
+            crate::recording::hud_layout::MARKER_W as f32 - 2. - 24. - 18. - 12. - 9.,
+            13.,
+            400,
+            one,
+        )
+        .text("marker_label", crate::recording::hud_layout::marker_label),
+    );
+    // The label prompt in the strip over the audio bar: "Marker at 12:48" beside a 200 px field,
+    // in the bar's 567 px minus 20 padding, 2 border, 14 icon, 3 gaps of 8, 200 field and about
+    // 40 px of time.
+    v.push(
+        Case::new(
+            "Audio HUD marker prompt",
+            "bar - 20 - 2 - 14 icon - 24 gaps - 200 field - 40 time",
+            crate::recording::hud_layout::bar_width_for(true, None) as f32
+                - 20.
+                - 2.
+                - 14.
+                - 24.
+                - 200.
+                - 40.,
+            cap,
+            400,
+            one,
+        )
+        .text("Marker at", || cm_i18n::tr!("Marker at"))
+        .text("Add a label (optional)", || {
+            cm_i18n::tr!("Add a label (optional)")
+        }),
+    );
+    // The audio start sheet (board V1): 760 wide, five preset cards of (760 - 44 - 4*8) / 5 =
+    // 136.8 px with 12 px padding and a 1 px border: 110 px of text.
+    let card_text =
+        (crate::recording::audio_sheet::AUDIO_SHEET_WIDTH as f32 - 44. - 32.) / 5. - 24. - 2.;
+    v.push(
+        Case::new(
+            "Audio sheet preset title",
+            "(760 - 44 - 4*8) / 5 - 24 padding - 2 border",
+            card_text,
+            13.,
+            600,
+            Overflow::Lines(2),
+        )
+        .texts(
+            crate::recording::audio_sheet::Preset::ALL
+                .into_iter()
+                .map(|p| t(format!("Preset::title({p:?})"), move || p.title())),
+        ),
+    );
+    v.push(
+        Case::new(
+            "Audio sheet preset blurb",
+            "(760 - 44 - 4*8) / 5 - 24 padding - 2 border; 3 lines in the board, 4 allowed",
+            card_text,
+            11.5,
+            400,
+            Overflow::Lines(4),
+        )
+        .texts(
+            crate::recording::audio_sheet::Preset::ALL
+                .into_iter()
+                .map(|p| t(format!("Preset::blurb({p:?})"), move || p.blurb())),
+        ),
+    );
+    // The mode switch: two segments of 12 px padding, a 14 px icon, 7 px gaps, the label and the
+    // key hint (about 34 px); the header leaves 760 - 44 - 40 icon - 34 close - 3*14 gaps for
+    // the title and the switch together (the title block shrinks, the switch keeps its width).
+    v.push(
+        Case::new(
+            "Sheet mode switch segment",
+            "(760 - 44 - 40 - 34 - 42 - 190 title) / 2 - 24 padding - 14 icon - 14 gaps - 34 keys",
+            (crate::recording::audio_sheet::AUDIO_SHEET_WIDTH as f32
+                - 44.
+                - 40.
+                - 34.
+                - 42.
+                - 190.
+                - 10.)
+                / 2.
+                - 24.
+                - 14.
+                - 14.
+                - 34.,
+            13.,
+            500,
+            one,
+        )
+        .text("Screen", || crate::recording::audio_sheet::mode_labels().0)
+        .text("Audio", || crate::recording::audio_sheet::mode_labels().1),
+    );
     // The agent chip's width is estimated from the number of characters (CHIP_CHAR); the real
     // text must fit what the estimate gives.
     for client in ["Claude", "Claude Desktop", "Claude Code CLI"] {
@@ -1375,5 +1471,40 @@ fn the_report_table_can_be_written() {
     assert!(md.lines().count() > 10);
     if let Ok(path) = std::env::var("LAYOUT_WIDTH_REPORT") {
         std::fs::write(path, md).expect("write the report");
+    }
+}
+
+/// The audio start sheet (VOC-1) is sized from fixed line counts: a preset blurb has 3 lines in a
+/// 110 px card and the system audio hint 2 lines (`AudioSheetModel::heights`). The body scrolls,
+/// so a longer text costs scrolling, never a hidden button; this keeps the estimate honest.
+#[test]
+fn audio_sheet_height_estimates_hold_in_every_language() {
+    use crate::recording::audio_sheet::{AudioSheetModel, Preset, AUDIO_SHEET_WIDTH};
+    let card = (AUDIO_SHEET_WIDTH as f32 - 44. - 32.) / 5. - 24. - 2.;
+    // 760 - 44 body padding - 28 row padding - 32 tile - 24 gaps - 44 switch.
+    let hint_w = AUDIO_SHEET_WIDTH as f32 - 44. - 28. - 32. - 24. - 44.;
+    for lang in [Lang::En, Lang::Vi] {
+        for p in Preset::ALL {
+            let blurb = with_language(lang, || p.blurb());
+            let need = lines(&blurb, Face::Regular, 11.5, card);
+            assert!(
+                need.is_some_and(|n| n <= 3),
+                "{lang:?} {p:?}: {blurb:?} needs {need:?} lines, the sheet reserves 3"
+            );
+            let title = with_language(lang, || p.title());
+            let need = lines(&title, Face::of(false, 600), 13., card);
+            assert!(
+                need.is_some_and(|n| n <= 2),
+                "{lang:?} {p:?}: {title:?} needs {need:?} title lines, the sheet reserves 2"
+            );
+        }
+        for platform in [Platform::Mac, Platform::Windows] {
+            let hint = with_language(lang, || AudioSheetModel::system_hint(platform));
+            let need = lines(&hint, Face::Regular, 12., hint_w);
+            assert!(
+                need.is_some_and(|n| n <= 2),
+                "{lang:?}: {hint:?} needs {need:?} lines, the sheet reserves 2"
+            );
+        }
     }
 }
