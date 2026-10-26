@@ -93,6 +93,53 @@ fn open_capture(app: &Entity<AppModel>, action: DockAction, cx: &mut App) {
     }
 }
 
+/// The mic button's click: the Record sheet for audio (VOC-1, `RecordSheetMode::Audio`).
+///
+/// TODO(voice P1.1/P1.3): the Record sheet has no Audio mode yet. Until its owner wires
+/// `nav::RecordSheetMode::Audio` into `open_sheet_with`, this opens the sheet as it is.
+pub(crate) fn open_record_audio(app: &Entity<AppModel>, cx: &mut App) {
+    let mode = nav::RecordSheetMode::Audio;
+    let app = app.clone();
+    cx.defer(move |cx| {
+        let _ = mode;
+        crate::ui::recording::open_sheet(&app, None, None, cx)
+    });
+}
+
+/// The mic button of the dock and the rail: a rec-tinted square beside Record (board
+/// `UiSidebar`: 42 px in the dock, 14 % rec fill, 45 % rec border, soft-red mic).
+fn record_audio_button(
+    t: &Theme,
+    p: &SidebarProps,
+    app: &Entity<AppModel>,
+    size: f32,
+) -> Stateful<gpui::Div> {
+    let keys = nav::record_audio_keys(&p.shortcuts, p.platform);
+    let app = app.clone();
+    let focus = rgba_of(t.text);
+    div()
+        .id(nav::RECORD_AUDIO_ID)
+        .role(Role::Button)
+        .aria_label(SharedString::from(nav::record_audio_aria(&keys)))
+        .focusable()
+        .tab_stop(true)
+        .size(px(size))
+        .flex_none()
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded(px(scale::RADIUS_MD))
+        .border_1()
+        .border_color(rgba_of(t.rec.with_alpha(45)))
+        .bg(rgba_of(t.rec.with_alpha(14)))
+        .cursor_pointer()
+        .hover(|s| s.opacity(0.85))
+        .focus_visible(move |s| s.border_color(focus))
+        .tooltip(tip(nav::record_audio_label(), keys))
+        .on_click(move |_, _, cx| open_record_audio(&app, cx))
+        .child(icon("mic", 18., t.rec_soft))
+}
+
 fn nav_button(
     t: &Theme,
     app: &Entity<AppModel>,
@@ -201,7 +248,6 @@ fn mcp_card(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> AnyElement {
 fn dock(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> AnyElement {
     let entries = nav::dock(&p.shortcuts, p.platform);
     let record = &entries[0];
-    let record_keys = nav::tile_keys(&record.keys);
     let rec_app = app.clone();
     let record_btn = button_with_icon(
         t,
@@ -210,32 +256,32 @@ fn dock(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> AnyElement {
         ButtonKind::Record,
         Some(record.action.icon()),
     )
-    .w_full()
+    .flex_1()
+    .min_w(px(0.))
     .h(px(42.))
     .aria_label(SharedString::from(record.action.aria(&record.keys)))
     .child(div().flex_1())
+    // One chip with the whole chord (board `UiSidebar`), so the mic button fits beside it.
     .child(
         div()
+            .h(px(22.))
+            .px(px(6.))
             .flex()
             .items_center()
-            .gap(px(2.))
-            .children(record_keys.into_iter().map(|k| {
-                div()
-                    .min_w(px(20.))
-                    .h(px(22.))
-                    .px(px(5.))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .rounded(px(scale::RADIUS_XS))
-                    .bg(rgba_of(t.ink.with_alpha(14)))
-                    .text_size(px(12.))
-                    .text_color(rgba_of(t.on_rec))
-                    .mono()
-                    .child(SharedString::from(k))
-            })),
+            .rounded(px(scale::RADIUS_XS))
+            .bg(rgba_of(t.ink.with_alpha(16)))
+            .text_size(px(11.))
+            .font_weight(FontWeight::MEDIUM)
+            .text_color(rgba_of(t.on_rec))
+            .mono()
+            .child(SharedString::from(nav::tile_keys(&record.keys).join(""))),
     )
     .on_click(move |_, _, cx| open_capture(&rec_app, DockAction::Record, cx));
+    let record_row = div()
+        .flex()
+        .gap(px(6.))
+        .child(record_btn)
+        .child(record_audio_button(t, p, app, 42.));
 
     let tiles = entries.iter().skip(1).map(|e| {
         let action = e.action;
@@ -306,7 +352,7 @@ fn dock(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> AnyElement {
         .border_1()
         .border_color(rgba_of(t.border))
         .bg(rgba_of(t.surface_2))
-        .child(record_btn)
+        .child(record_row)
         .child(div().flex().gap(px(6.)).children(tiles))
         .into_any_element()
 }
@@ -397,6 +443,9 @@ fn rail_body(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> Vec<AnyElem
                 )
                 .on_click(move |_, _, cx| open_capture(&app, DockAction::Region, cx))
                 .into_any_element()
+            }
+            RailEntry::RecordAudio => {
+                record_audio_button(t, p, app, scale::TARGET).into_any_element()
             }
             RailEntry::Divider => div()
                 .w(px(32.))

@@ -2090,6 +2090,9 @@ msgstr ""
 msgid "No answer within {wait}"
 msgstr ""
 
+msgid "No audio recordings yet"
+msgstr ""
+
 msgid "No camera found"
 msgstr ""
 
@@ -2744,7 +2747,13 @@ msgstr ""
 msgid "Reconnect {name}"
 msgstr ""
 
+msgid "Record a meeting, a lecture or a voice note and it will show up here."
+msgstr ""
+
 msgid "Record at 60 fps"
+msgstr ""
+
+msgid "Record audio, shortcut {chord}"
 msgstr ""
 
 msgid "Record region"
@@ -3238,6 +3247,9 @@ msgid "Search commands"
 msgstr ""
 
 msgid "Search commands…"
+msgstr ""
+
+msgid "Search titles and what was said"
 msgstr ""
 
 msgid "Search windows"
@@ -4095,6 +4107,9 @@ msgid "Transcribing…"
 msgstr ""
 
 msgid "Transcribing… {percent}%"
+msgstr ""
+
+msgid "Transcript"
 msgstr ""
 
 msgid "Transcript ready"
@@ -5025,6 +5040,11 @@ msgid_plural "{n} seconds"
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "{n} speaker"
+msgid_plural "{n} speakers"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "{n} suggested. Nothing is blurred until you accept. Click a dashed box on the image to accept just that one."
 msgid_plural "{n} suggested. Nothing is blurred until you accept. Click a dashed box on the image to accept just that one."
 msgstr[0] ""
@@ -5373,12 +5393,44 @@ msgctxt "annotation setting"
 msgid "Text size"
 msgstr ""
 
+msgctxt "audio badge"
+msgid "Report"
+msgstr ""
+
+msgctxt "audio badge"
+msgid "Speakers"
+msgstr ""
+
 msgctxt "audio check"
 msgid "Microphone"
 msgstr ""
 
 msgctxt "audio check"
 msgid "System audio"
+msgstr ""
+
+msgctxt "audio preset"
+msgid "Audio"
+msgstr ""
+
+msgctxt "audio preset"
+msgid "In the room"
+msgstr ""
+
+msgctxt "audio preset"
+msgid "Lecture"
+msgstr ""
+
+msgctxt "audio preset"
+msgid "Online meeting"
+msgstr ""
+
+msgctxt "audio preset"
+msgid "Product demo"
+msgstr ""
+
+msgctxt "audio preset"
+msgid "Voice note"
 msgstr ""
 
 msgctxt "automatic upload"
@@ -5698,6 +5750,10 @@ msgid "Display"
 msgstr ""
 
 msgctxt "capture dock"
+msgid "Record audio"
+msgstr ""
+
+msgctxt "capture dock"
 msgid "Record…"
 msgstr ""
 
@@ -5710,11 +5766,19 @@ msgid "Window"
 msgstr ""
 
 msgctxt "capture kind"
+msgid "Audio"
+msgstr ""
+
+msgctxt "capture kind"
 msgid "Recording"
 msgstr ""
 
 msgctxt "capture kind"
 msgid "Screenshot"
+msgstr ""
+
+msgctxt "card badge"
+msgid "AUDIO"
 msgstr ""
 
 msgctxt "card badge"
@@ -6379,6 +6443,10 @@ msgstr ""
 
 msgctxt "mic verdict"
 msgid "Too quiet"
+msgstr ""
+
+msgctxt "navigation"
+msgid "Audio"
 msgstr ""
 
 msgctxt "navigation"

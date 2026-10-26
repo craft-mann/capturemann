@@ -11,6 +11,8 @@ use time::{OffsetDateTime, UtcOffset};
 pub enum Kind {
     Screenshot,
     Recording,
+    /// An audio-only recording (`kind: "audio"`, VOC-1).
+    Audio,
 }
 
 /// What the context menu of a library card offers (LIB-1): Open, Reveal in Finder, Rename, Delete.
@@ -90,6 +92,7 @@ impl Kind {
         match self {
             Kind::Screenshot => tr_ctx!("capture kind", "Screenshot"),
             Kind::Recording => tr_ctx!("capture kind", "Recording"),
+            Kind::Audio => tr_ctx!("capture kind", "Audio"),
         }
     }
 }
@@ -120,6 +123,7 @@ impl CaptureItem {
         let kind = match v.get("kind")?.as_str()? {
             "screenshot" => Kind::Screenshot,
             "recording" => Kind::Recording,
+            "audio" => Kind::Audio,
             _ => return None,
         };
         let created = OffsetDateTime::parse(
@@ -219,6 +223,8 @@ pub enum Filter {
     All,
     Recordings,
     Screenshots,
+    /// Audio-only recordings (the Audio sidebar item).
+    Audio,
 }
 
 impl Filter {
@@ -227,6 +233,7 @@ impl Filter {
         match self {
             Filter::Recordings => Some("recording"),
             Filter::Screenshots => Some("screenshot"),
+            Filter::Audio => Some("audio"),
             Filter::All => None,
         }
     }
@@ -1411,5 +1418,25 @@ mod tests {
         assert_eq!(SortKey::Size.key(), "Size");
         assert_eq!(CardAction::Reveal.key(true), "Reveal in Finder");
         assert_eq!(CardAction::Reveal.label(false), "Show in folder");
+    }
+
+    /// VOC-1.AC10: an audio capture parses as its own kind with a duration, and appears in the
+    /// unfiltered list next to the others.
+    #[test]
+    fn audio_captures_parse_and_list_with_the_rest() {
+        let page = json!({"captures": [
+            {"id": "rec_a", "title": "Weekly sync", "kind": "audio", "created": "2026-10-26T10:02:00Z",
+             "duration": 5_544_000_i64, "size_bytes": 1000},
+            {"id": "rec_b", "title": "Demo", "kind": "recording", "created": "2026-10-26T09:00:00Z",
+             "duration": 120_000_i64},
+        ]});
+        let (items, _, skipped) = parse_page(&page).unwrap();
+        assert_eq!(skipped, 0);
+        assert_eq!(items[0].kind, Kind::Audio);
+        assert_eq!(items[0].duration_ticks, Some(5_544_000));
+        assert_eq!(items[0].kind.label(), "Audio");
+        assert_eq!(items[1].kind, Kind::Recording);
+        assert_eq!(Filter::Audio.daemon_kind(), Some("audio"));
+        assert_eq!(Filter::All.daemon_kind(), None);
     }
 }

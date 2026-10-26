@@ -61,6 +61,7 @@ raw-window-handle = "0.6"
 
 [dev-dependencies]
 tempfile.workspace = true
+hound.workspace = true
 # GPUI's headless test platform: keystrokes and text input without a window server.
 gpui = { package = "gpui-pre", version = "=0.3.9", features = ["test-support"] }
 # The fake Drive server for the connect-flow tests.

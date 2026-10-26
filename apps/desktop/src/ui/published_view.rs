@@ -176,7 +176,9 @@ impl PublishedView {
                 let (app, id) = (app_open.clone(), id.clone());
                 cx.defer(move |cx| {
                     let route = match kind {
-                        crate::library::Kind::Recording => Route::Recording(id),
+                        crate::library::Kind::Recording | crate::library::Kind::Audio => {
+                            Route::Recording(id)
+                        }
                         crate::library::Kind::Screenshot => Route::Editor(id),
                     };
                     app::set_route(&app, route, cx)

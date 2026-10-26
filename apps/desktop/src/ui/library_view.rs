@@ -26,6 +26,7 @@ use crate::overlay::CaptureMode;
 use crate::shortcuts::ShortcutAction;
 use crate::theme::{scale, type_scale, Theme};
 use crate::ui::app::{self, AppModel, Command, Route};
+use crate::ui::audio_cache::{self, AudioCache};
 use crate::ui::components::{
     button, button_with_icon, icon, icon_size, keycaps, status_pill, ButtonKind,
 };
@@ -37,6 +38,7 @@ use crate::ui::studio::{
 };
 use crate::ui::text_field::{TextField, TextFieldEvent};
 use crate::ui::thumbs::{Thumb, ThumbCache};
+use crate::ui::tooltip::tip;
 
 /// Side padding of the page (board: 26 top, 32 sides).
 const PAGE_PADDING: f32 = 32.;
@@ -68,6 +70,8 @@ pub struct LibraryView {
     rows: Arc<Vec<Row>>,
     search: Entity<TextField>,
     thumbs: Entity<ThumbCache>,
+    /// Waveform bars and status badges of the audio cards (VOC-1.AC10).
+    audio: Entity<AudioCache>,
     list: ListState,
     list_focus: FocusHandle,
     cols: usize,
@@ -75,6 +79,8 @@ pub struct LibraryView {
     seen_epoch: u64,
     /// The `cm_i18n` epoch the cached day headers and field labels were made in.
     seen_lang: u64,
+    /// The route whose search hint the field shows (the Audio page says what it searches).
+    seen_search_route: Option<Route>,
     debounce: Option<Task<()>>,
     /// Move keyboard focus from the search box to the list on the next render.
     focus_list_next: bool,
@@ -95,6 +101,7 @@ impl LibraryView {
         let search =
             cx.new(|cx| TextField::new(tr!("Search captures"), tr!("Search by title"), cx));
         let thumbs = cx.new(|_| ThumbCache::new(backend.clone()));
+        let audio = cx.new(|_| AudioCache::new(backend.clone()));
         let rename_input = cx.new(|cx| {
             TextField::new(tr!("New title"), tr_ctx!("field", "Title"), cx).without_icon()
         });
@@ -127,7 +134,7 @@ impl LibraryView {
                     // Not on screen: remember, and reload when it is (R1-7).
                     if matches!(
                         app.read(cx).route,
-                        Route::Library | Route::Screenshots | Route::Recordings
+                        Route::Library | Route::Screenshots | Route::Recordings | Route::Audio
                     ) {
                         this.reload(cx);
                     } else {
@@ -137,6 +144,7 @@ impl LibraryView {
                 cx.notify();
             }),
             cx.observe(&thumbs, |_, _, cx| cx.notify()),
+            cx.observe(&audio, |_, _, cx| cx.notify()),
             cx.subscribe(&rename_input, |this, _, ev: &TextFieldEvent, cx| match ev {
                 TextFieldEvent::Submitted => this.commit_rename(cx),
                 TextFieldEvent::Escaped => this.close_menu(cx),
@@ -155,12 +163,14 @@ impl LibraryView {
             rows: Arc::new(Vec::new()),
             search,
             thumbs,
+            audio,
             list: ListState::new(0, ListAlignment::Top, px(600.)),
             list_focus: cx.focus_handle(),
             cols: 1,
             rows_dirty: true,
             seen_epoch,
             seen_lang: cm_i18n::epoch(),
+            seen_search_route: None,
             debounce: None,
             focus_list_next: false,
             stale: false,
@@ -213,6 +223,11 @@ impl LibraryView {
                     this.sync_items();
                     // Only the captures that changed lose their poster; the rest keep theirs.
                     let changed = std::mem::take(&mut this.pending_invalidate);
+                    this.audio.update(cx, |a, cx| {
+                        for id in &changed {
+                            a.invalidate(id, cx);
+                        }
+                    });
                     this.thumbs.update(cx, |t, cx| {
                         for id in &changed {
                             t.invalidate(id, cx);
@@ -240,6 +255,7 @@ impl LibraryView {
             NavCounts {
                 screenshots: Some(n(Kind::Screenshot)),
                 recordings: Some(n(Kind::Recording)),
+                audio: Some(n(Kind::Audio)),
                 // Not this view's to know: the Published page counts its own.
                 published: self.app.read(cx).counts.published,
             }
@@ -476,6 +492,7 @@ struct RowCtx {
     /// The card whose menu is open: its "..." button stays visible.
     menu_ix: Option<usize>,
     thumbs: Entity<ThumbCache>,
+    audio: Entity<AudioCache>,
     view: WeakEntity<LibraryView>,
     clock: LocalClock,
     avail: f32,
@@ -493,6 +510,7 @@ fn kind_pill(item: &CaptureItem) -> AnyElement {
     let (glyph, label) = match item.kind {
         Kind::Recording => ("film", tr_ctx!("card badge", "REC")),
         Kind::Screenshot => ("image", tr_ctx!("card badge", "SHOT")),
+        Kind::Audio => ("audio-lines", tr_ctx!("card badge", "AUDIO")),
     };
     div()
         .absolute()
@@ -576,6 +594,162 @@ fn thumb_frame(ctx: &RowCtx, item: &CaptureItem, width: f32, cx: &mut gpui::App)
     frame
 }
 
+/// The "Record audio" button of the Audio page header (board V3): the rec tint of the sidebar's
+/// mic button, the label and the chord.
+fn record_audio_header_button(t: &Theme, keys: &[String], app: &Entity<AppModel>) -> AnyElement {
+    let app = app.clone();
+    let focus = rgba_of(t.text);
+    div()
+        .id("audio-record")
+        .role(Role::Button)
+        .aria_label(SharedString::from(nav::record_audio_aria(keys)))
+        .focusable()
+        .tab_stop(true)
+        .h(px(38.))
+        .px(px(14.))
+        .flex_none()
+        .flex()
+        .items_center()
+        .gap(px(8.))
+        .rounded(px(scale::RADIUS_MD))
+        .border_1()
+        .border_color(rgba_of(t.rec.with_alpha(45)))
+        .bg(rgba_of(t.rec.with_alpha(8)))
+        .text_size(px(type_scale::UI))
+        .text_color(rgba_of(t.text))
+        .cursor_pointer()
+        .hover(|s| s.opacity(0.85))
+        .focus_visible(move |s| s.border_color(focus))
+        .on_click(move |_, _, cx| crate::ui::sidebar::open_record_audio(&app, cx))
+        .child(icon("mic", 16., t.rec_soft))
+        .child(nav::record_audio_label())
+        .child(
+            div()
+                .text_size(px(11.))
+                .text_color(rgba_of(t.mist))
+                .mono()
+                .child(SharedString::from(keys.join(""))),
+        )
+        .into_any_element()
+}
+
+/// The thumbnail of an audio card (board V3): the waveform on the dark tile, the preset chip
+/// top left, the status badges bottom left and the duration bottom right.
+fn audio_frame(
+    ctx: &RowCtx,
+    item: &CaptureItem,
+    width: f32,
+    group: SharedString,
+    cx: &mut gpui::App,
+) -> gpui::Div {
+    let t = &ctx.t;
+    let info = ctx.audio.update(cx, |a, cx| a.get(&item.id, cx));
+    let (preset, badges) = match &info {
+        Some(i) => (
+            audio_cache::preset_chip(i.card.preset.as_deref()),
+            audio_cache::badges(&i.card),
+        ),
+        None => (audio_cache::preset_chip(None), Vec::new()),
+    };
+    // The bars fill 88 % of the width: 3 px wide with a 2 px gap, as in the board.
+    let bar_count =
+        (((width * 0.88) / 5.).floor() as usize).clamp(8, cm_library::audio::PEAK_BUCKETS);
+    let bars = info
+        .as_ref()
+        .map(|i| audio_cache::bars_for(&i.peaks, bar_count))
+        .unwrap_or_default();
+    let (rest, lit) = (gpui::rgb(0x3A3A44), gpui::rgb(0x4A4A55));
+    let waveform = div()
+        .absolute()
+        .left(gpui::relative(0.06))
+        .right(gpui::relative(0.06))
+        .top(gpui::relative(0.22))
+        .bottom(gpui::relative(0.22))
+        .flex()
+        .items_center()
+        .gap(px(2.))
+        .children(bars.into_iter().map(|b| {
+            div()
+                .flex_1()
+                .h(gpui::relative(f32::from(b) / 255.))
+                .rounded(px(2.))
+                .bg(rest)
+                .group_hover(group.clone(), move |s| s.bg(lit))
+        }));
+    let chip = div()
+        .absolute()
+        .top(px(10.))
+        .left(px(10.))
+        .h(px(22.))
+        .px(px(8.))
+        .flex()
+        .items_center()
+        .gap(px(5.))
+        .rounded(px(6.))
+        .bg(overlay_bg(70))
+        .text_size(px(11.))
+        .text_color(rgba_of(t.text_2))
+        .child(icon(preset.0, 11., t.text_2))
+        .child(SharedString::from(preset.1));
+    let badge_row = div()
+        .absolute()
+        .bottom(px(10.))
+        .left(px(10.))
+        .flex()
+        .gap(px(4.))
+        .children(badges.into_iter().enumerate().map(|(i, (glyph, label))| {
+            div()
+                .id(("audio-badge", i))
+                .role(Role::Image)
+                .aria_label(SharedString::from(label.clone()))
+                .size(px(22.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded(px(6.))
+                .bg(overlay_bg(75))
+                .tooltip(tip(label, Vec::new()))
+                .child(icon(glyph, 12., Theme::DARK.text))
+        }));
+    let mut frame = div()
+        .relative()
+        .w(px(width))
+        .h(px((width * THUMB_ASPECT).round()))
+        .flex_none()
+        .overflow_hidden()
+        .rounded(px(scale::RADIUS_LG))
+        .border_1()
+        .bg(gpui::rgb(0x121216))
+        .child(waveform)
+        .child(chip)
+        .child(badge_row);
+    if let Some(ticks) = item.duration_ticks {
+        frame = frame.child(
+            div()
+                .absolute()
+                .bottom(px(10.))
+                .right(px(10.))
+                .h(px(22.))
+                .px(px(7.))
+                .flex()
+                .items_center()
+                .rounded(px(6.))
+                .bg(overlay_bg(80))
+                .text_size(px(11.5))
+                .text_color(rgba_of(Theme::DARK.text))
+                .mono()
+                .child(SharedString::from(format_duration(ticks))),
+        );
+    }
+    if item.broken {
+        frame =
+            frame.child(div().absolute().top(px(10.)).right(px(48.)).child(
+                status_pill(t, t.warning, tr_ctx!("status", "Broken")).bg(rgba_of(t.surface)),
+            ));
+    }
+    frame
+}
+
 /// Three dots, the "more" glyph (the icon kit has none).
 fn more_glyph(color: crate::theme::Color) -> gpui::Div {
     div()
@@ -597,7 +771,17 @@ fn card(ctx: &RowCtx, ix: usize, width: f32, cx: &mut gpui::App) -> AnyElement {
     let view = ctx.view.clone();
     let meta = {
         let mut m = ctx.clock.format_date(item.created);
-        if item.size_bytes > 0 {
+        if item.kind == Kind::Audio {
+            // The board: "Today 10:02 · 4 speakers" (no size).
+            let speakers = ctx
+                .audio
+                .update(cx, |a, cx| a.get(&item.id, cx))
+                .and_then(|i| i.card.speakers);
+            if let Some(n) = speakers {
+                m.push_str(" \u{00B7} ");
+                m.push_str(&trn!("{n} speaker", "{n} speakers", n));
+            }
+        } else if item.size_bytes > 0 {
             m.push_str(" \u{00B7} ");
             m.push_str(&format_size(item.size_bytes));
         }
@@ -614,9 +798,13 @@ fn card(ctx: &RowCtx, ix: usize, width: f32, cx: &mut gpui::App) -> AnyElement {
     };
     let group = SharedString::from(format!("card-{ix}"));
     let hover_border = rgba_of(t.line);
-    let frame = thumb_frame(ctx, item, width, cx)
-        .border_color(rgba_of(border))
-        .group_hover(group.clone(), move |s| s.border_color(hover_border));
+    let frame = if item.kind == Kind::Audio {
+        audio_frame(ctx, item, width, group.clone(), cx)
+    } else {
+        thumb_frame(ctx, item, width, cx)
+    }
+    .border_color(rgba_of(border))
+    .group_hover(group.clone(), move |s| s.border_color(hover_border));
     // The "..." button shows on hover, on keyboard focus, on the selected card while the list has
     // focus, and while its menu is open. It sits beside the clickable card (not inside it) and
     // occludes what is under it, so a click on it never also opens the capture.
@@ -877,6 +1065,7 @@ impl Render for LibraryView {
             self.search.update(cx, |s, cx| {
                 s.set_labels(tr!("Search captures"), tr!("Search by title"), cx)
             });
+            self.seen_search_route = None;
             self.rename_input.update(cx, |s, cx| {
                 s.set_labels(tr!("New title"), tr_ctx!("field", "Title"), cx)
             });
@@ -897,6 +1086,16 @@ impl Render for LibraryView {
                 m.ai.notice_visible(NoticeSite::Library),
             )
         };
+        if self.seen_search_route.as_ref() != Some(&route) {
+            self.seen_search_route = Some(route.clone());
+            let hint = if route == Route::Audio {
+                tr!("Search titles and what was said")
+            } else {
+                tr!("Search by title")
+            };
+            self.search
+                .update(cx, |s, cx| s.set_labels(tr!("Search captures"), hint, cx));
+        }
         let avail = (f32::from(window.viewport_size().width) - SIDEBAR_WIDTH - PAGE_PADDING * 2.)
             .max(CARD_FLOOR);
         let cols = columns_for_width(avail);
@@ -965,7 +1164,14 @@ impl Render for LibraryView {
                     .max_w_full()
                     .flex_none()
                     .child(self.search.clone()),
-            );
+            )
+            .children((route == Route::Audio).then(|| {
+                record_audio_header_button(
+                    &t,
+                    &nav::record_audio_keys(&shortcuts, platform),
+                    &self.app,
+                )
+            }));
 
         // ---- toolbar: the chips and the sort bar -------------------------------------------
         let chips = Chip::ALL.iter().map(|c| {
@@ -1197,6 +1403,17 @@ impl Render for LibraryView {
                 "",
                 None,
             ),
+            (_, Some(EmptyKind::NoCaptures)) if route == Route::Audio => empty_state(
+                &t,
+                "audio-lines",
+                &tr!("No audio recordings yet"),
+                &tr!("Record a meeting, a lecture or a voice note and it will show up here."),
+                Some(record_audio_header_button(
+                    &t,
+                    &nav::record_audio_keys(&shortcuts, platform),
+                    &app,
+                )),
+            ),
             (_, Some(EmptyKind::NoCaptures)) => {
                 let keys = shortcuts
                     .get(ShortcutAction::CaptureRegion)
@@ -1274,6 +1491,7 @@ impl Render for LibraryView {
                     list_focused,
                     menu_ix: self.menu.as_ref().map(|m| m.ix),
                     thumbs: self.thumbs.clone(),
+                    audio: self.audio.clone(),
                     view: view.clone(),
                     clock,
                     avail,

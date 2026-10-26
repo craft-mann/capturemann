@@ -60,6 +60,8 @@ pub enum Route {
     Screenshots,
     /// The recordings library (the grid filtered to recordings).
     Recordings,
+    /// The audio library (nav item "Audio", the grid filtered to `kind: "audio"`, VOC-1.AC10).
+    Audio,
     /// Not built yet: publishing and drive destinations show an honest "Not available yet" page.
     Published,
     Destinations,
