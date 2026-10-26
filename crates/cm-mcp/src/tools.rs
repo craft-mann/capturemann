@@ -754,6 +754,35 @@ pub fn all() -> Vec<ToolSpec> {
                 "required": ["job_id"] }),
         },
         ToolSpec {
+            name: "export_audio",
+            tier: Tier::Free,
+            mutating: true,
+            destructive: false,
+            spec: "VOC-2",
+            summary: "Export the audio of a capture (an audio recording, or \"Export audio only\" of a screen recording) as M4A (AAC-LC, 48 kHz, 128 kbps mono or 192 kbps stereo; the default) or WAV (48 kHz, 24-bit), in the background. Returns a `job_id` at once; watch it with get_job or the `job.progress` / `job.done` events (`export.done` carries the file). The result of the finished job is `{ path, size_bytes, duration_s, file, format, tracks, loudness_lufs, copy_path }`. The edits apply to all audio tracks together (trim, cuts, splits, speed, pauses removed, and the `set_audio_mix` gains and mutes); no picture is read or encoded. `tracks` is `mix` (the default), `mic` or `system`. M4A is normalised to -16 LUFS by default (two-pass loudnorm, -1.5 dBTP); WAV is left as recorded; `loudness_lufs` sets another target and `null` turns the normalisation off. The title and date are written as file tags. With `out_dir` (an existing absolute folder) a copy is also made there, under a name that never overwrites a file. Runs as an `export` job, one at a time, held while a recording runs. Fails with `invalid_input` when the capture has no such audio track or nothing is left after the cuts. Needs FFmpeg with the `wav` muxer and `pcm_s24le` encoder for WAV and the `loudnorm` filter for normalisation.",
+            input: json!({ "type": "object", "properties": {
+                "capture_id": capture_id(),
+                "format": { "type": "string", "enum": ["m4a", "wav"], "default": "m4a" },
+                "tracks": { "type": "string", "enum": ["mix", "mic", "system"], "default": "mix",
+                            "description": "`mix` sums the microphone and the system audio, `mic` and `system` export one of them." },
+                "loudness_lufs": { "type": ["number", "null"], "minimum": -40, "maximum": -5,
+                                   "description": "Integrated loudness target in LUFS. Default: -16 for M4A, none for WAV. `null` turns it off." },
+                "out_dir": { "type": "string", "description": "Absolute path of an existing folder to also copy the file to." },
+                "request_id": request_id() },
+                "required": ["capture_id"], "additionalProperties": false }),
+            output: json!({ "type": "object", "properties": {
+                "job_id": { "type": "string" },
+                "capture_id": { "type": "string" },
+                "kind": { "type": "string", "enum": ["audio"] },
+                "format": { "type": "string", "enum": ["m4a", "wav"] },
+                "tracks": { "type": "string", "enum": ["mix", "mic", "system"] },
+                "loudness_lufs": { "type": ["number", "null"] },
+                "out_dir": { "type": ["string", "null"] },
+                "state": { "type": "string" },
+                "reused": { "type": "boolean", "description": "true when an equal audio export of this capture was already queued or running." } },
+                "required": ["job_id"] }),
+        },
+        ToolSpec {
             name: "start_recording",
             tier: Tier::Confirm,
             mutating: true,
@@ -1026,6 +1055,41 @@ pub fn all() -> Vec<ToolSpec> {
                 "platforms": { "type": "object" } },
                 "required": ["accounts"] }),
         },
+        ai_tool(
+            "get_text_model",
+            Tier::Free,
+            false,
+            "AI-7",
+            "Read how the text model (summaries, translation to any language, reports) is set up: `provider` (`none`, `local` for Ollama or LM Studio on this computer, `openai_compatible`, `anthropic`), `model`, `local` (true when the server is on this computer; a server on the network or the internet is remote), `host`, `base_url`, `context_tokens`, `timeout_s`, `structured_output` (the last Test's result, null if untested), `has_key` (whether a key is stored; the key itself is never returned) and `remote_notice_pending`. With a remote provider, tools that send recording text to it ask the user to confirm and name the host and the number of characters. These settings (`ai.text.*`) can only be changed in the app.",
+            json!({}),
+            &[],
+            json!({ "type": "object", "properties": {
+                "provider": { "type": "string", "enum": ["none", "local", "openai_compatible", "anthropic"] },
+                "model": { "type": "string" },
+                "local": { "type": "boolean" },
+                "host": { "type": ["string", "null"] },
+                "base_url": { "type": "string" },
+                "context_tokens": { "type": "integer" },
+                "timeout_s": { "type": "integer" },
+                "structured_output": { "type": ["boolean", "null"] },
+                "has_key": { "type": "boolean" },
+                "remote_notice_pending": { "type": "boolean" } },
+                "required": ["provider", "model", "local", "context_tokens", "structured_output"] }),
+        ),
+        ai_tool(
+            "test_text_model",
+            Tier::Free,
+            false,
+            "AI-7",
+            "Send one short fixed prompt to the configured text model and report `ok`, `latency_ms`, `model` and whether structured output worked on the first try (`structured_output`). It sends no recording text and talks only to the configured provider. A server that is not running or a model that fails is an answer with `ok: false`, a `reason` (`text_model_unreachable`, `timeout`, `invalid_model_output`, `text_model_error`) and a `message`. With provider `none` it fails with `invalid_input` and `data.reason = \"no_text_model\"`.",
+            json!({}),
+            &[],
+            json!({ "type": "object", "properties": {
+                "ok": { "type": "boolean" }, "latency_ms": { "type": "integer" },
+                "model": { "type": "string" }, "structured_output": { "type": "boolean" },
+                "reason": { "type": "string" }, "message": { "type": "string" } },
+                "required": ["ok", "latency_ms", "model"] }),
+        ),
         ToolSpec {
             name: "publish_video",
             tier: Tier::Confirm,
@@ -1278,10 +1342,16 @@ fn ai_tools() -> Vec<ToolSpec> {
                     "model": { "type": "string" },
                     "words": { "type": "array", "items": { "type": "object", "properties": {
                         "text": { "type": "string" }, "start": { "type": "integer" },
-                        "end": { "type": "integer" }, "confidence": { "type": "number" } },
+                        "end": { "type": "integer" }, "confidence": { "type": "number" },
+                        "speaker": { "type": "integer", "description": "AI-8: the speaker's id (see `speakers`); present once `diarize` has run." },
+                        "overlap": { "type": "boolean", "description": "AI-8: other speakers talked at the same time." } },
                         "required": ["text", "start", "end"] } },
                     "note": { "type": ["string", "null"] } },
                     "required": ["language", "model", "words"] },
+                "speakers": { "type": "array", "description": "AI-8: present once `diarize` has run.",
+                    "items": { "type": "object", "properties": {
+                        "id": { "type": "integer" }, "name": { "type": "string" } },
+                        "required": ["id", "name"] } },
                 "captions": { "type": ["array", "null"], "items": { "type": "object", "properties": {
                     "start": { "type": "integer" }, "end": { "type": "integer" },
                     "text": { "type": "string" } } } },
@@ -1361,14 +1431,17 @@ fn ai_tools() -> Vec<ToolSpec> {
             true,
             "AI-1",
             "Write the captions as an SRT, VTT or plain-text (`txt`) file in the capture's `exports/` folder (with `language`, a translation: `<title> - captions.<lang>.srt`, `<title>.<lang>.txt`; `txt` is `<title>.txt`: one caption line per row, add `timestamps: true` for a `[mm:ss]` prefix on every line). The lines are the edited ones if there are any, else generated from the transcript, and the recording's edits apply: cut ranges remove their lines and shift the later ones, and speed scales the times, so no caption refers to cut content. Fails with `not_found` before transcribe has run.",
-            json!({ "format": { "type": "string", "enum": ["srt", "vtt", "txt"] },
+            json!({ "format": { "type": "string", "enum": ["srt", "vtt", "txt", "md"] },
+                    "language": { "type": "string", "description": "A translation's language code (`vi`, `pt-br`) made by translate_captions (srt, vtt or txt); omit for the original captions." },
                     "timestamps": { "type": "boolean",
                         "description": "Only with `txt`: prefix every line with [mm:ss] (or [hh:mm:ss] for long recordings). Default false." },
-                    "language": { "type": "string", "description": "A translation's language code (`vi`, `pt-br`) made by translate_captions; omit for the original captions." } }),
+                    "speaker_names": { "type": "boolean",
+                        "description": "Only with `srt`: start every cue with `NAME:` (AI-8). Default false. Once the recording has speakers, VTT always uses voice tags (`<v Name>`), and `txt` and `md` write `Name: text` per turn." } }),
             &["format"],
             json!({ "type": "object", "properties": {
                 "capture_id": { "type": "string" }, "format": { "type": "string" },
-                "path": { "type": "string" }, "lines": { "type": "integer" } },
+                "path": { "type": "string" }, "lines": { "type": "integer" },
+                "speaker_names": { "type": "boolean", "description": "The file names the speakers." } },
                 "required": ["capture_id", "format", "path", "lines"] }),
         ),
         ai_tool(
@@ -1386,6 +1459,48 @@ fn ai_tools() -> Vec<ToolSpec> {
                 "engine": { "type": "string", "enum": ["whisper", "text_model"] },
                 "model": { "type": "string", "description": "The Whisper model that will run (empty for the text model)." },
                 "source_language": { "type": "string" } })),
+        ),
+        ai_tool(
+            "diarize",
+            Tier::Free,
+            true,
+            "AI-8",
+            "Find who spoke when in a recording, on this computer (no network), so the transcript can show speaker names. Runs in the background and returns a `job_id`; the job result is `{ speakers, segments }` and `speakers.ready` is published when it is done. Speakers are numbered and named `Speaker 1..N` by first speech; `get_transcript` then adds `speaker` to each word and `speakers` to the result, and the caption exports use the names. Give `num_speakers` when you know how many people talk, or `min_speakers` / `max_speakers`. `headset: true` means the microphone only hears the user: every microphone word is labelled with the setting `profile.display_name` (default `Me`) and only the system-audio track is diarized. A recording shorter than 10 s is skipped with a note, and one detected speaker gives a note too. Without an installed speaker model it fails with `invalid_input` and `data.reason = \"no_speaker_model\"`: tell the user to open the AI page in CaptureMann (nothing is downloaded automatically). Running it again replaces the previous result and the renames made to it.",
+            json!({ "capture_id": capture_id(),
+                    "num_speakers": { "type": "integer", "minimum": 1, "maximum": 32, "description": "Exactly this many speakers; wins over min and max." },
+                    "min_speakers": { "type": "integer", "minimum": 1, "maximum": 32 },
+                    "max_speakers": { "type": "integer", "minimum": 1, "maximum": 32 },
+                    "headset": { "type": "boolean", "description": "My microphone only hears me. Default false." } }),
+            &["capture_id"],
+            job_started_output(json!({
+                "capture_id": { "type": "string" }, "headset": { "type": "boolean" } })),
+        ),
+        ai_tool(
+            "set_speakers",
+            Tier::Free,
+            true,
+            "AI-8",
+            "Rename, merge and reassign the speakers of a diarized recording (run `diarize` first). `rename` maps a speaker id to a new name (`{ \"2\": \"Linh\" }`; names are unique, 1 to 60 characters), `merge` folds `from` into `into` (the `from` speaker disappears and every word it had moves to `into`), `assign` gives the time range `start` to `end` (session time) to a speaker. They apply in that order and all together are ONE undo step, tagged with the caller; undo restores the earlier names and labels. A call that changes nothing makes no revision (`changed: false`). The words and exports show the new names at once.",
+            json!({ "rename": { "type": "object", "maxProperties": 500,
+                        "description": "Speaker id (as text) to the new name.",
+                        "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 60 } },
+                    "merge": { "type": "array", "maxItems": 500, "items": { "type": "object", "properties": {
+                        "from": { "type": "integer" }, "into": { "type": "integer" } },
+                        "required": ["from", "into"], "additionalProperties": false } },
+                    "assign": { "type": "array", "maxItems": 500, "items": { "type": "object", "properties": {
+                        "start": time("Range start"), "end": time("Range end"),
+                        "speaker": { "type": "integer" } },
+                        "required": ["start", "end", "speaker"], "additionalProperties": false } } }),
+            &["capture_id"],
+            json!({ "type": "object", "properties": {
+                "capture_id": { "type": "string" },
+                "changed": { "type": "boolean" },
+                "revision": { "type": ["integer", "null"] }, "action": { "type": "string" }, "by": { "type": "string" },
+                "speakers": { "type": "array", "items": { "type": "object", "properties": {
+                    "id": { "type": "integer" }, "name": { "type": "string" } },
+                    "required": ["id", "name"] } },
+                "can_undo": { "type": "boolean" }, "can_redo": { "type": "boolean" } },
+                "required": ["capture_id", "changed", "speakers"] }),
         ),
         ai_tool(
             "suggest_zooms",
@@ -1437,6 +1552,8 @@ fn with_capture_input(mut t: ToolSpec) -> ToolSpec {
             | "translate_captions"
             | "suggest_zooms"
             | "suggest_cuts"
+            | "diarize"
+            | "set_speakers"
     );
     if on_capture {
         if let Some(p) = t.input["properties"].as_object_mut() {

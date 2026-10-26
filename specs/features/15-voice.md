@@ -57,7 +57,7 @@ v0.1.0 has shipped, so "P1" in this file means **in the next stage of work** (or
 ---
 
 ### VOC-2 Audio editor view and audio export
-**Priority** P1 · **Status** Ready · **Crates** apps/desktop, cm-media, cm-daemon · **Depends on** VOC-1, EDT-1, AI-1, AI-4, DESIGN §5.5
+**Priority** P1 · **Status** In progress (audio export built, editor view not started) · **Crates** apps/desktop, cm-media, cm-daemon · **Depends on** VOC-1, EDT-1, AI-1, AI-4, DESIGN §5.5
 
 **User story** — As a meeting host, I want to review the recording with its transcript, cut the small talk and export the audio, so that I can share a clean recording or keep it as a record.
 
@@ -78,6 +78,8 @@ v0.1.0 has shipped, so "P1" in this file means **in the next stage of work** (or
 **Edge cases and errors** — No transcript yet → the panel shows Transcribe (AI-1) or the no-model hint. FFmpeg missing → as EXP-1 (`job_failed`, `reason_code`).
 
 **Agent interface** — `export_audio { capture_id, format?: "m4a"|"wav", tracks?: "mix"|"mic"|"system", loudness_lufs?: number|null, out_dir?, request_id? }` → `{ job_id }` → `{ path, size_bytes, duration_s }` (Free). Editing uses the existing tools (`trim`, `cut_segments`, `split`, `set_speed`). CLI `capturemann export <id> --audio [--format wav] [--tracks mic]`.
+
+**As built (Oct 26, 2026, audio export only)** — `cm-media::audio_export` builds the FFmpeg graph with the same cut/stretch/join code as the video export (`edit_plan::audio_graph`, so both apply `edits[0]` and the pause gaps identically) and runs **two-pass `loudnorm`** (pass 1 measures the edited mix, pass 2 applies the measured values in linear mode; it falls back to the single-pass filter if the measurement cannot be read, and skips normalising digital silence). Which audio exists comes from the files in the bundle (`mic.denoised.wav` or `mic.wav`, `system.wav`), not from the capture kind, so audio bundles and screen recordings take one path and no picture is read. Gains and mutes of `set_audio_mix` apply. The daemon runs it as an `export` job with `kind: "audio"` (`cm-daemon/src/export_audio.rs`); the entry in `manifest.exports` has `kind: "audio"` and the preset `audio-<tracks>` (one entry per tracks choice), and the video-only readers (upload's latest export, the player) skip it. `out_dir` must be an existing absolute folder; the copy never overwrites. Tested with fakes (argument-graph unit tests, validation through the daemon) and **with FFmpeg on PATH** (golden tests: duration within 20 ms after a cut, AAC 48 kHz, -16 ± 1 LUFS by `ebur128`, Mic-only correlation below 0.1 with a tone as system track, no video stream for a screen recording). They print `SKIPPED` when the FFmpeg lacks `aac`, `loudnorm`, `wav` or `pcm_s24le`. **Not yet:** AC1 and AC5 (the editor view; the 60-minute timing on an M-series Mac), the Output tab and Details entry points, the done toast, the `wav` muxer and `pcm_s24le` encoder in the bundled LGPL FFmpeg until `make ffmpeg` is rebuilt (the build script lists them), `tests/manual/VOC-2.md`. No `verification/` report exists, so this is not "verified".
 
 **Out of scope** — MP3 (needs an extra FFmpeg component; P2), multitrack WAV stems, audio effects (EQ, compression).
 

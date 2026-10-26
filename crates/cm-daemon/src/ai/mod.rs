@@ -84,6 +84,11 @@ pub const MAX_CAPTION_SECONDS: f64 = 7.0;
 pub const MAX_REPLACEMENTS: usize = 100;
 pub const MAX_REPLACE_CHARS: usize = 200;
 
+/// Job type of a speaker-labelling run (AI-8).
+pub const JOB_DIARIZE: &str = "diarize";
+/// Most renames, merges or reassignments one `set_speakers` call may carry.
+pub const MAX_SPEAKER_CHANGES: usize = 500;
+
 /// The action names of this module, as MCP tools and CLI commands.
 pub const AI_METHODS: &[&str] = &[
     "list_models",
@@ -100,6 +105,8 @@ pub const AI_METHODS: &[&str] = &[
     "suggest_zooms",
     "suggest_cuts",
     "translate_captions",
+    "diarize",
+    "set_speakers",
 ];
 
 /// Whether `name` is one of [`AI_METHODS`].
@@ -139,6 +146,7 @@ mod dispatch;
 mod jobs;
 mod models;
 mod services;
+mod speakers;
 mod suggest;
 #[cfg(test)]
 mod tests;

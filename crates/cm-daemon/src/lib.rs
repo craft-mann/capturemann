@@ -49,6 +49,7 @@ pub mod engines;
 pub mod error;
 pub mod events;
 pub mod export;
+pub mod export_audio;
 pub mod fixture;
 mod frames;
 pub mod gate;
@@ -67,6 +68,7 @@ pub mod rpc;
 pub mod storage_cloud;
 pub mod storage_ops;
 pub mod testing;
+pub mod text_model_ops;
 pub mod tool_policy;
 mod upload_records;
 pub mod watcher;
@@ -75,8 +77,8 @@ pub use action::{
     is_internal, spec_for, tier_of, Action, ActionSpec, Tier, ACTIONS, INTERNAL_ACTIONS, NEVER_TIER,
 };
 pub use ai::{
-    AiServices, CaptionFormat, CaptionService, ModelService, SuggestService, TranscribeRequest,
-    TranscribeService,
+    AiServices, CaptionFormat, CaptionService, DiarizeRequest, ModelService, SpeakerService,
+    SuggestService, TranscribeRequest, TranscribeService,
 };
 pub use clock::{Clock, ManualClock, SystemClock};
 pub use daemon::{ActionCall, Daemon, DaemonBuilder};

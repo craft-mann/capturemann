@@ -831,6 +831,20 @@ async fn exp1_export_video_tool() {
     let r = call(&c, "export_video", json!({"capture_id": capture_id})).await;
     assert_eq!(err_code(&r), "not_implemented");
 
+    // VOC-2: `export_audio` is the same kind of tool (Free, mutating, strict schema).
+    let a = tools.iter().find(|t| t.name == "export_audio").unwrap();
+    assert!(a.description.as_deref().unwrap().contains("Tier: Free"));
+    assert_eq!(a.input_schema["required"], json!(["capture_id"]));
+    assert_eq!(a.input_schema["additionalProperties"], false);
+    assert!(!a
+        .annotations
+        .as_ref()
+        .unwrap()
+        .read_only_hint
+        .unwrap_or(false));
+    let r = call(&c, "export_audio", json!({"capture_id": capture_id})).await;
+    assert_eq!(err_code(&r), "not_implemented");
+
     d.register_job_handler(
         "export",
         cm_jobs::handler_fn(|ctx| async move {
@@ -1656,6 +1670,8 @@ async fn ai_tools_no_model_error_and_confirmed_download() {
         "set_captions",
         "replace_in_captions",
         "suggest_cuts",
+        "diarize",
+        "set_speakers",
     ] {
         assert!(
             tool(n)

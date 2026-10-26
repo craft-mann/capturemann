@@ -48,6 +48,8 @@ pub const TOPICS: &[&str] = &[
     "model.changed",
     "transcript.ready",
     "translation.ready",
+    // AI-8: the speakers of a recording were found.
+    "speakers.ready",
 ];
 
 /// The minimum level a client asked for (`logging/setLevel`), shared with the forwarder.

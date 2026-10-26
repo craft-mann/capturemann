@@ -63,22 +63,22 @@ SOURCE_REPO="${CM_SOURCE_REPO:-https://github.com/craft-mann/capturemann}"
 # a listed encoder or filter is missing, and the export tests exercise the rest.
 # (The buffer, abuffer, buffersink, abuffersink, fifo and afifo filters are always built into
 # libavfilter and are not selectable components.)
-ENCODERS="h264_videotoolbox,hevc_videotoolbox,aac,libvpx_vp9,libopus,gif,ffv1,mjpeg,png,pcm_f32le,pcm_s16le,rawvideo,wrapped_avframe"
+ENCODERS="h264_videotoolbox,hevc_videotoolbox,aac,libvpx_vp9,libopus,gif,ffv1,mjpeg,png,pcm_f32le,pcm_s16le,pcm_s24le,rawvideo,wrapped_avframe"
 DECODERS="h264,hevc,aac,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_u8,png,mjpeg,ffv1,gif,rawvideo"
 HWACCELS="h264_videotoolbox,hevc_videotoolbox"
-MUXERS="mp4,mov,webm,matroska,gif,image2,rawvideo,pcm_f32le,pcm_s16le,null"
+MUXERS="mp4,mov,webm,matroska,gif,image2,rawvideo,wav,pcm_f32le,pcm_s16le,null"
 DEMUXERS="mov,matroska,wav,image2,rawvideo,gif,pcm_f32le,pcm_s16le"
 PARSERS="h264,hevc,aac,mjpeg,png,opus,vp9,ffv1,gif"
 BSFS="aac_adtstoasc,h264_mp4toannexb,hevc_mp4toannexb,extract_extradata,null,vp9_superframe,vp9_superframe_split"
 PROTOCOLS="file,pipe"
-FILTERS="alphamerge,aformat,aresample,atempo,atrim,adelay,amix,anull,apad,alimiter,asetpts,asplit,crop,format,fps,hflip,null,overlay,paletteuse,palettegen,scale,setpts,setsar,split,tpad,trim,volume,pan,loudnorm,ebur128"
+FILTERS="alphamerge,aformat,aresample,atempo,atrim,adelay,amix,anull,apad,alimiter,asetpts,asplit,crop,format,fps,hflip,null,overlay,paletteuse,palettegen,scale,setpts,setsar,split,tpad,trim,volume,pan,loudnorm,ebur128,concat,anullsrc,anullsink"
 
 # Encoders, decoders and filters the self-check requires in the finished binary.
-REQUIRED_ENCODERS="h264_videotoolbox aac libvpx-vp9 libopus gif ffv1 mjpeg pcm_f32le rawvideo"
+REQUIRED_ENCODERS="h264_videotoolbox aac libvpx-vp9 libopus gif ffv1 mjpeg pcm_f32le pcm_s24le rawvideo"
 REQUIRED_DECODERS="h264 hevc aac pcm_s16le pcm_f32le png mjpeg ffv1 rawvideo"
-REQUIRED_MUXERS="mp4 webm matroska gif image2 rawvideo f32le null"
+REQUIRED_MUXERS="mp4 webm matroska gif image2 rawvideo wav f32le null"
 REQUIRED_DEMUXERS="mov matroska wav image2 rawvideo f32le gif"
-REQUIRED_FILTERS="alphamerge aformat aresample atempo atrim adelay amix apad alimiter asetpts crop format fps hflip overlay paletteuse palettegen scale setpts setsar split tpad trim"
+REQUIRED_FILTERS="alphamerge aformat aresample atempo atrim adelay amix apad alimiter asetpts crop format fps hflip overlay paletteuse palettegen scale setpts setsar split tpad trim loudnorm ebur128 concat anullsrc anullsink"
 
 [ "$(uname -s)" = "Darwin" ] || die "this script only runs on macOS"
 [ "$(uname -m)" = "arm64" ] || die "arm64 only (see the header for what a universal build needs)"

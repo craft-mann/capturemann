@@ -1497,6 +1497,7 @@ dependencies = [
  "cm-core",
  "cm-cursor",
  "cm-render",
+ "hound",
  "image",
  "libc",
  "serde_json",

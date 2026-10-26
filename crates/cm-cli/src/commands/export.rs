@@ -4,22 +4,75 @@ use cm_core::ErrorCode;
 use serde_json::json;
 
 use super::{ai, plain, Ctx};
-use crate::args::ExportArgs;
+use crate::args::{ExportArgs, Loudness};
 use crate::error::CliError;
+
+/// The `export_audio` input of `export <id> --audio [--format wav] [--tracks mic] ...`.
+fn audio_params(a: &ExportArgs) -> Result<serde_json::Value, CliError> {
+    let mut p = json!({ "capture_id": a.id });
+    match a.format.as_deref() {
+        None | Some("m4a" | "wav") => {}
+        Some(other) => {
+            return Err(CliError::invalid_input(format!(
+                "--format {other} is a video format; use m4a or wav with --audio"
+            )))
+        }
+    }
+    if let Some(f) = &a.format {
+        p["format"] = json!(f);
+    }
+    if let Some(t) = &a.tracks {
+        p["tracks"] = json!(t);
+    }
+    match a.loudness {
+        Some(Loudness::Lufs(l)) => p["loudness_lufs"] = json!(l),
+        Some(Loudness::Off) => p["loudness_lufs"] = serde_json::Value::Null,
+        None => {}
+    }
+    if let Some(d) = &a.out_dir {
+        let abs = std::path::absolute(d)
+            .map_err(|e| CliError::invalid_input(format!("--out-dir `{}`: {e}", d.display())))?;
+        p["out_dir"] = json!(abs.to_string_lossy());
+    }
+    Ok(p)
+}
 
 /// `export <id> [--preset quick] [--wait]`: `export_video`, then (with `--wait`) polls the job.
 pub(super) async fn export_video(cx: &mut Ctx<'_>, a: ExportArgs) -> Result<(), CliError> {
-    // `--captions srt|vtt|txt` writes the caption file (AI-1) instead of rendering a video.
+    // `--captions srt|vtt|txt|md` writes the caption file (AI-1) instead of rendering a video.
     if let Some(format) = a.captions {
         if a.timestamps && format != "txt" {
             return Err(CliError::invalid_input(
                 "--timestamps only applies to --captions txt (SRT and VTT always have times)",
             ));
         }
-        return ai::export_captions(cx, a.id, format, a.timestamps, a.language).await;
+        if a.speaker_names && format != "srt" {
+            return Err(CliError::invalid_input(
+                "--speaker-names only applies to --captions srt (VTT, TXT and Markdown name the speakers on their own)",
+            ));
+        }
+        return ai::export_captions(cx, a.id, format, a.timestamps, a.language, a.speaker_names)
+            .await;
     }
-    let mut p = json!({ "capture_id": a.id, "preset": a.preset });
-    if let Some(f) = &a.format {
+    let audio = a.audio || matches!(a.format.as_deref(), Some("m4a" | "wav"));
+    if !audio && (a.tracks.is_some() || a.out_dir.is_some()) {
+        return Err(CliError::invalid_input(
+            "--tracks and --out-dir belong to the audio export: add --audio",
+        ));
+    }
+    let mut p = if audio {
+        audio_params(&a)?
+    } else {
+        json!({ "capture_id": a.id, "preset": a.preset })
+    };
+    let method = if audio {
+        "export_audio"
+    } else {
+        "export_video"
+    };
+    if audio {
+        // Everything video-only was refused by the argument parser or does not apply.
+    } else if let Some(f) = &a.format {
         // `--format gif` stands for the preset of that name; the default preset yields to it.
         if a.preset == "quick" && f != "mp4" {
             p["preset"] = json!(f);
@@ -27,10 +80,20 @@ pub(super) async fn export_video(cx: &mut Ctx<'_>, a: ExportArgs) -> Result<(), 
             p["format"] = json!(f);
         }
     }
-    if let Some(l) = a.loudness {
-        p["loudness_lufs"] = json!(l);
+    if !audio {
+        match a.loudness {
+            Some(Loudness::Lufs(l)) => p["loudness_lufs"] = json!(l),
+            Some(Loudness::Off) => {
+                return Err(CliError::invalid_input(
+                    "--loudness off only applies to --audio (a video keeps the recorded level without --loudness)",
+                ))
+            }
+            None => {}
+        }
     }
-    if a.burn_captions {
+    if audio {
+        // No captions in an audio file.
+    } else if a.burn_captions {
         p["captions"] = json!("burn");
     } else if a.no_captions {
         p["captions"] = json!("none");
@@ -46,13 +109,17 @@ pub(super) async fn export_video(cx: &mut Ctx<'_>, a: ExportArgs) -> Result<(), 
     }
     let params = cx.mutating(p, "");
     let mut c = cx.client().await?;
-    let started = c.call("export_video", params).await?;
+    let started = c.call(method, params).await?;
     if !a.wait {
         cx.emit(&started, |r| {
             format!(
                 "Exporting {} ({}): job {}{}\n  watch it with `capturemann jobs get {}`",
                 plain(&r["capture_id"]),
-                plain(&r["preset"]),
+                if r["preset"].is_null() {
+                    format!("audio {} {}", plain(&r["format"]), plain(&r["tracks"]))
+                } else {
+                    plain(&r["preset"])
+                },
                 plain(&r["job_id"]),
                 if r["reused"] == json!(true) {
                     " (already running)"
@@ -81,7 +148,11 @@ pub(super) async fn export_video(cx: &mut Ctx<'_>, a: ExportArgs) -> Result<(), 
                         plain(&j["result"]["path"]),
                         plain(&j["result"]["size_bytes"]),
                         plain(&j["result"]["duration_s"]),
-                        plain(&j["result"]["encoder"]),
+                        if j["result"]["encoder"].is_null() {
+                            plain(&j["result"]["format"])
+                        } else {
+                            plain(&j["result"]["encoder"])
+                        },
                     )
                 });
                 return Ok(());

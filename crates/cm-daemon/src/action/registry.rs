@@ -74,6 +74,8 @@ pub const ACTIONS: &[ActionSpec] = &[
     // Export (EXP-1, EXP-4): Free per the spec's tool table. The job runs in the background and is
     // watched with `get_job` / `job.*` events. Only the interim preset `quick` exists for now.
     spec("export_video", Tier::Free, true),
+    // VOC-2: the audio of a capture as M4A or WAV; the same `export` job type, `kind: "audio"`.
+    spec("export_audio", Tier::Free, true),
     // Recording (REC-1..REC-5). Starting asks the user; the rest of the controls are Free because
     // the recording itself was already confirmed (REC-4). `discard_recording` and
     // `restart_recording` delete a take: Confirm for agents, direct for the user in the HUD.
@@ -119,6 +121,10 @@ pub const ACTIONS: &[ActionSpec] = &[
     spec("translate_captions", Tier::Free, true),
     spec("suggest_zooms", Tier::Free, false),
     spec("suggest_cuts", Tier::Free, false),
+    // AI-8 speaker labels: `diarize` is a background job on this computer (no network);
+    // `set_speakers` renames, merges or reassigns as one undoable revision.
+    spec("diarize", Tier::Free, true),
+    spec("set_speakers", Tier::Free, true),
     // The caption switches (show in the preview, burn into exports): one revision, one undo step.
     spec("set_caption_options", Tier::Free, true),
     // Storage (M6, STO-1 to STO-5): copies go only to destinations the user set up in the app;
@@ -128,6 +134,10 @@ pub const ACTIONS: &[ActionSpec] = &[
     // Publishing (M6, PUB-1, PUB-2): the accounts are set up in the app; an agent can read them
     // (label, defaults, quota; never a key or token). `publish_video` above is the Confirm one.
     spec("list_publish_accounts", Tier::Free, false),
+    // AI-7: the text model provider. Both read the app-only `ai.text.*` settings; the key is never
+    // returned. `test_text_model` sends one fixed short prompt to the configured provider only.
+    spec("get_text_model", Tier::Free, false),
+    spec("test_text_model", Tier::Free, false),
 ];
 
 /// Actions that are plumbing for first-party GUI clients and are deliberately **not** exposed

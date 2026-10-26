@@ -47,10 +47,20 @@ fn ai_methods_parse_to_themselves() {
         ),
         ("suggest_zooms", json!({"capture_id": "rec_1"})),
         ("suggest_cuts", json!({"capture_id": "rec_1"})),
+        (
+            "diarize",
+            json!({"capture_id": "rec_1", "num_speakers": 2, "headset": true}),
+        ),
+        (
+            "set_speakers",
+            json!({"capture_id": "rec_1", "rename": {"2": "Linh"},
+                   "merge": [{"from": 3, "into": "1"}],
+                   "assign": [{"start": 1.0, "end": 2.5, "speaker": 2}]}),
+        ),
     ] {
         assert_eq!(parse_ok(m, p).op.method(), m);
     }
-    assert_eq!(AI_METHODS.len(), 14);
+    assert_eq!(AI_METHODS.len(), 16);
 }
 
 #[test]

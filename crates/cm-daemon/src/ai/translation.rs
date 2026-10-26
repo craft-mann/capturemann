@@ -383,9 +383,13 @@ impl Inner {
         capture_id: &str,
         format: CaptionFormat,
         language: Option<&str>,
+        speaker_names: bool,
     ) -> Result<Value, DaemonError> {
+        // A translation has no speaker data; `speaker_names` only applies to the original.
         let Some(language) = language else {
-            return self.export_captions(capture_id, format).await;
+            return self
+                .export_captions(capture_id, format, speaker_names)
+                .await;
         };
         let _serial = self.capture_locks.lock(capture_id).await;
         let (library, id, captions, language) = (
