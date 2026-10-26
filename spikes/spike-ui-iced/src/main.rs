@@ -1,4 +1,4 @@
-//! S5 prototype (iced 0.14): library grid + wgpu preview widget + keycap button, docs/DESIGN.md dark tokens.
+//! S5 prototype (iced 0.14): library grid + wgpu preview widget + keycap button, docs/development/design-surfaces.md dark tokens.
 //! The preview is a `shader` widget: a CPU-generated plasma is uploaded each frame into a
 //! wgpu texture owned by the widget pipeline, then drawn with a fullscreen triangle.
 //! `SPIKE_STATIC=1` stops the preview animation (idle-memory measurement).

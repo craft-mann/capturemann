@@ -454,7 +454,7 @@ impl PickerView {
         backend.rt.spawn(async move {
             let params = serde_json::json!({ "values": { session::KEY_LAST_USED: value } });
             if let Err(e) = Backend::call(&daemon, "set_settings", params).await {
-                eprintln!("cm-desktop: could not remember the picked window: {e}");
+                log::warn!("could not remember the picked window: {e}");
             }
         });
     }

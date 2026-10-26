@@ -5,7 +5,7 @@ and its wording, the made-for-kids gate, the form-to-request mapping, the Confir
 resumable upload and resume, the thumbnail, playlist and captions steps as warnings, the quota
 counter and the privacy-locked result are covered by `cargo test -p cm-publish -p cm-daemon -p
 cm-desktop` against fakes (PUB-2.AC1 to AC4 as far as a provider can meet them). This script also
-**settles the open question about unverified projects** (answered for the owner's project on Oct 23, 2026: an Unlisted request stayed Unlisted; Public was not tried; record what you see anyway): `specs/03-integrations.md` says "unverified
+**settles the open question about unverified projects** (answered for the maintainer's project on Oct 23, 2026: an Unlisted request stayed Unlisted; Public was not tried; record what you see anyway): `specs/03-integrations.md` says "unverified
 projects are not restricted to private" (a current reference), while the code treats a video that
 comes back private as a warning. Write down what you observe in the table of step 3. Do not guess
 and do not copy the spec's sentence: only a real upload answers it.
@@ -118,5 +118,5 @@ each privacy. When the table settles the question, update `specs/03-integrations
 ## Status of the author's runs
 
 (none yet; the first real publish on Oct 23, 2026 is in
-`verification/STO-2-PUB-2-gdrive-youtube-2026-10-23-owner.md`, as reported: it worked, and the
+`verification/STO-2-PUB-2-gdrive-youtube-2026-10-23-maintainer.md`, as reported: it worked, and the
 privacy chosen and applied were not recorded)

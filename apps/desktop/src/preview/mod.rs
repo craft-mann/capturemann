@@ -1,5 +1,5 @@
 //! The editor's video preview surface and the 1080p60 test that decides GPUI vs iced
-//! (docs/SPIKES.md S5, docs/PLAN.md M4). `frame` and `stats` are display-free and unit tested; `view` is
+//! (docs/project/spikes.md S5, docs/project/plan.md M4). `frame` and `stats` are display-free and unit tested; `view` is
 //! the GPUI element; `macos` is the `CVPixelBuffer` path into GPUI's `surface()`.
 //!
 //! Measured by `cargo run --release -p cm-desktop --example preview_bench`.

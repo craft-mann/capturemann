@@ -997,7 +997,7 @@ impl RecordingEditor {
                     .font_weight(FontWeight::MEDIUM)
                     .child(SharedString::from(timecode(kept, s.fps))),
             );
-        // TODO(design): the board draws "The MP4 applies" as chips (Trims, Cuts, Speed,
+        // Design gap: the board draws "The MP4 applies" as chips (Trims, Cuts, Speed,
         // Background, Captions on/off). Which edits are non-default is new derived UI, so the
         // sentence of the shipped build stays.
         let mut body: Vec<AnyElement> = vec![

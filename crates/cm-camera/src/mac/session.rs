@@ -139,8 +139,11 @@ define_class!(
     #[ivars = DelegateIvars]
     struct FrameDelegate;
 
+    // SAFETY: `FrameDelegate` is a direct NSObject subclass, so it satisfies NSObjectProtocol.
     unsafe impl NSObjectProtocol for FrameDelegate {}
 
+    // SAFETY: both methods below have exactly the types of the protocol's selectors; AVFoundation
+    // passes live objects that are only used within each call.
     unsafe impl AVCaptureVideoDataOutputSampleBufferDelegate for FrameDelegate {
         #[unsafe(method(captureOutput:didOutputSampleBuffer:fromConnection:))]
         unsafe fn capture_output(
@@ -149,8 +152,11 @@ define_class!(
             sb: &CMSampleBuffer,
             _conn: &AVCaptureConnection,
         ) {
-            let iv = self.ivars();
-            iv.disp.on_sample(iv.role, sb);
+            // A panic must not unwind into AVFoundation (abort/UB): catch it, drop the frame.
+            cm_core::guard::guard_unit("cm-camera capture_output", || {
+                let iv = self.ivars();
+                iv.disp.on_sample(iv.role, sb);
+            });
         }
 
         #[unsafe(method(captureOutput:didDropSampleBuffer:fromConnection:))]
@@ -160,8 +166,10 @@ define_class!(
             _sb: &CMSampleBuffer,
             _conn: &AVCaptureConnection,
         ) {
-            let iv = self.ivars();
-            iv.disp.on_dropped(iv.role);
+            cm_core::guard::guard_unit("cm-camera capture_dropped", || {
+                let iv = self.ivars();
+                iv.disp.on_dropped(iv.role);
+            });
         }
     }
 );
@@ -343,39 +351,44 @@ impl SharedSession {
         let mut obs = lock(&self.observers);
         let d1 = disp.clone();
         let on_disconnect = RcBlock::new(move |n: std::ptr::NonNull<NSNotification>| {
-            // SAFETY: the notification is valid for the block call.
-            let n = unsafe { n.as_ref() };
-            let dev = n
-                .object()
-                .and_then(|o| o.downcast::<AVCaptureDevice>().ok());
-            // SAFETY: property read on a valid device.
-            let same = dev.is_some_and(|d| unsafe { d.uniqueID() }.to_string() == my_id);
-            if same {
-                if let Some(d) = d1.upgrade() {
-                    d.broadcast(&CameraEvent::Disconnected);
+            // A panic must not unwind into Foundation (abort/UB): catch it, skip the event.
+            cm_core::guard::guard_unit("cm-camera on_disconnect", || {
+                // SAFETY: the notification is valid for the block call.
+                let n = unsafe { n.as_ref() };
+                let dev = n
+                    .object()
+                    .and_then(|o| o.downcast::<AVCaptureDevice>().ok());
+                // SAFETY: property read on a valid device.
+                let same = dev.is_some_and(|d| unsafe { d.uniqueID() }.to_string() == my_id);
+                if same {
+                    if let Some(d) = d1.upgrade() {
+                        d.broadcast(&CameraEvent::Disconnected);
+                    }
                 }
-            }
+            });
         });
         let on_error = RcBlock::new(move |n: std::ptr::NonNull<NSNotification>| {
-            // SAFETY: the notification is valid for the block call.
-            let n = unsafe { n.as_ref() };
-            let obj_ptr = n.object().map(|o| Retained::as_ptr(&o) as usize);
-            if obj_ptr == Some(session_ptr) {
-                if let Some(d) = disp.upgrade() {
-                    // The NSError sits in userInfo["AVCaptureSessionErrorKey"]; -11852 means the
-                    // user withdrew camera access (PRM-1).
-                    let code = runtime_error_code(n);
-                    let ev = if code == Some(AV_NOT_AUTHORIZED) {
-                        CameraEvent::PermissionRevoked
-                    } else {
-                        CameraEvent::Error(format!(
-                            "capture session runtime error{}",
-                            code.map(|c| format!(" ({c})")).unwrap_or_default()
-                        ))
-                    };
-                    d.broadcast(&ev);
+            cm_core::guard::guard_unit("cm-camera on_error", || {
+                // SAFETY: the notification is valid for the block call.
+                let n = unsafe { n.as_ref() };
+                let obj_ptr = n.object().map(|o| Retained::as_ptr(&o) as usize);
+                if obj_ptr == Some(session_ptr) {
+                    if let Some(d) = disp.upgrade() {
+                        // The NSError sits in userInfo["AVCaptureSessionErrorKey"]; -11852 means the
+                        // user withdrew camera access (PRM-1).
+                        let code = runtime_error_code(n);
+                        let ev = if code == Some(AV_NOT_AUTHORIZED) {
+                            CameraEvent::PermissionRevoked
+                        } else {
+                            CameraEvent::Error(format!(
+                                "capture session runtime error{}",
+                                code.map(|c| format!(" ({c})")).unwrap_or_default()
+                            ))
+                        };
+                        d.broadcast(&ev);
+                    }
                 }
-            }
+            });
         });
         // SAFETY: the notification names are framework constants; the blocks are copied by the
         // center and only touch Send data (a Weak<Dispatcher>, a String, an integer).

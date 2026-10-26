@@ -128,7 +128,7 @@ the preview (FFmpeg's RGBA decode, which assumes BT.601 for untagged video) and 
 (NV12 into the compositor, BT.709) will disagree about colours on real recordings by roughly
 7 of 255. Write down what it prints; that decides whether the recorder must write the colour tags.
 
-**Result so far (Oct 23, 2026, metadata only, nothing recorded or modified):** on the owner's real
+**Result so far (Oct 23, 2026, metadata only, nothing recorded or modified):** on the maintainer's real
 recording "Recording 2026-10-22 09.12" `screen.mp4` is HEVC 3024x1964 with `color_space=bt709`,
 `color_range=tv`, `camera.mp4` is H.264 1920x1080 `bt709` `tv`, and the microphone files are
 `pcm_f32le` WAV. So the recorder does write the colour tags and preview and export agree on colour for

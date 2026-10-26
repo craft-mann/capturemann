@@ -40,6 +40,10 @@ pub struct FrameSlot {
     mirror: AtomicBool,
     /// Why there are no frames (permission, camera busy, unplugged), for the placeholder.
     error: Mutex<Option<String>>,
+    /// Frames pushed since the slot was made (Settings -> Webcam & audio measures the fps).
+    pushed: AtomicU64,
+    /// The camera's own frame size of the newest frame, `width << 32 | height` (0: none yet).
+    source_size: AtomicU64,
 }
 
 impl FrameSlot {
@@ -65,8 +69,28 @@ impl FrameSlot {
         };
         *self.latest.lock().unwrap_or_else(PoisonError::into_inner) = Some(buf);
         self.present.store(true, Ordering::Release);
+        self.pushed.fetch_add(1, Ordering::Relaxed);
         self.seq.fetch_add(1, Ordering::Release);
         *self.error.lock().unwrap_or_else(PoisonError::into_inner) = None;
+    }
+
+    /// Frames pushed so far.
+    pub fn pushed(&self) -> u64 {
+        self.pushed.load(Ordering::Relaxed)
+    }
+
+    /// Records the camera's frame size (before the preview scales it down).
+    pub fn note_source_size(&self, width: u32, height: u32) {
+        self.source_size.store(
+            u64::from(width) << 32 | u64::from(height),
+            Ordering::Relaxed,
+        );
+    }
+
+    /// The camera's frame size, once a frame has arrived.
+    pub fn source_size(&self) -> Option<(u32, u32)> {
+        let v = self.source_size.load(Ordering::Relaxed);
+        (v != 0).then_some(((v >> 32) as u32, v as u32))
     }
 
     pub fn set_error(&self, message: Option<String>) {
@@ -145,13 +169,25 @@ pub fn start(
     device_id: Option<String>,
     slot: Arc<FrameSlot>,
 ) -> Result<PreviewRunner, CmError> {
+    start_at(source, device_id, slot, PREVIEW_FPS)
+}
+
+/// [`start`] asking for `fps` frames a second (the Settings camera check asks for 30, so the
+/// rate it shows is the camera's).
+pub fn start_at(
+    source: PreviewSource,
+    device_id: Option<String>,
+    slot: Arc<FrameSlot>,
+    fps: u32,
+) -> Result<PreviewRunner, CmError> {
     let opts = PreviewOptions {
         device_id,
-        fps: PREVIEW_FPS,
+        fps,
         ..PreviewOptions::default()
     };
     let (on_frame_slot, on_event_slot) = (slot.clone(), slot);
     let on_frame = move |f: &cm_camera::PreviewFrame| {
+        on_frame_slot.note_source_size(f.width, f.height);
         if let Some(img) = f.to_rgba(PREVIEW_EDGE, on_frame_slot.mirror()) {
             on_frame_slot.push(img);
         }
@@ -223,6 +259,20 @@ mod tests {
         assert_eq!(s.take_newer(seq).unwrap().1.as_raw()[2], 12);
         s.clear();
         assert!(!s.has_frame());
+    }
+
+    /// The Settings camera check measures the fps from the frames pushed and shows the camera's
+    /// own size.
+    #[test]
+    fn the_slot_counts_frames_and_remembers_the_source_size() {
+        let s = FrameSlot::new(false);
+        assert_eq!((s.pushed(), s.source_size()), (0, None));
+        s.note_source_size(1920, 1080);
+        s.push(img(1));
+        s.push(img(2));
+        s.clear();
+        assert_eq!(s.pushed(), 2, "clearing does not count");
+        assert_eq!(s.source_size(), Some((1920, 1080)));
     }
 
     #[test]

@@ -2,7 +2,7 @@
 
 Exports render master tracks + edit list through the `cm-render` compositor (Technical design → Export and render) into new files under the bundle's `exports/` folder (and optionally a user folder). The master is never changed.
 
-**Build status (Oct 21, 2026).** The compositor (M4) is not built. Until it ships, CaptureMann has an **interim exporter**, the preset `quick` (product-owner decision, Oct 21, 2026): after a recording stops, it renders **one combined MP4** (screen + round camera bubble with the 4 px `rec` ring + microphone and system audio) with the FFmpeg sidecar (`cm-media`), saves it as `exports/<title> - quick.mp4`, lists it in the library with Play and Reveal, and leaves the masters untouched. It is deliberately small, and it keeps the interface that the M4 exporter keeps, so nothing above it changes when the compositor replaces the renderer:
+**Build status (Oct 21, 2026).** The compositor (M4) is not built. Until it ships, CaptureMann has an **interim exporter**, the preset `quick` (product-maintainer decision, Oct 21, 2026): after a recording stops, it renders **one combined MP4** (screen + round camera bubble with the 4 px `rec` ring + microphone and system audio) with the FFmpeg sidecar (`cm-media`), saves it as `exports/<title> - quick.mp4`, lists it in the library with Play and Reveal, and leaves the masters untouched. It is deliberately small, and it keeps the interface that the M4 exporter keeps, so nothing above it changes when the compositor replaces the renderer:
 
 | Kept by M4 (stable) | Interim behavior |
 | --- | --- |

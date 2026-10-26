@@ -4,6 +4,9 @@ description = "Mic and system audio capture, level meters and denoise"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
 publish.workspace = true
 rust-version.workspace = true
 
@@ -11,7 +14,7 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-cm-core = { path = "../cm-core" }
+cm-core.workspace = true
 # Apache-2.0. Microphone input (CoreAudio / WASAPI); also WASAPI loopback of the default output on Windows.
 cpal = "0.18"
 # MIT OR Apache-2.0. Pure-Rust FFT resampler for non-48 kHz devices (exact ratios, no C code).
@@ -23,17 +26,17 @@ serde_json = "1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Zlib OR Apache-2.0 OR MIT (objc2 family) and MIT (block2, libc).
-objc2 = "0.6"
-block2 = "0.6"
-dispatch2 = "0.3"
+objc2.workspace = true
+block2.workspace = true
+dispatch2.workspace = true
 objc2-foundation = "0.3"
-objc2-av-foundation = "0.3"
-objc2-core-media = "0.3"
+objc2-av-foundation.workspace = true
+objc2-core-media.workspace = true
 objc2-core-audio-types = "0.3"
-objc2-screen-capture-kit = "0.3"
-objc2-core-graphics = "0.3"
-objc2-core-foundation = "0.3"
+objc2-screen-capture-kit.workspace = true
+objc2-core-graphics.workspace = true
+objc2-core-foundation.workspace = true
 
 [dev-dependencies]
-hound = "3.5"
-tempfile = "3"
+hound.workspace = true
+tempfile.workspace = true

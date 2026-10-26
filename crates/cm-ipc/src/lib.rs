@@ -23,7 +23,7 @@
 mod client;
 mod endpoint;
 
-pub use client::{RpcClient, RpcError};
+pub use client::{RpcClient, RpcError, MAX_LINE_BYTES};
 #[cfg(unix)]
 pub use endpoint::with_private_umask;
 pub use endpoint::{connect, ClientStream, Endpoint, MAX_SOCKET_PATH_BYTES};

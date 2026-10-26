@@ -149,8 +149,8 @@ fn apply_stored_policies(daemon: &Daemon, file: &FileSettings) {
     let loaded =
         settings::parse_client_policies(file.snapshot().get(settings::KEY_CLIENT_POLICIES));
     if loaded.dropped > 0 {
-        eprintln!(
-            "cm-desktop: ignored {} unusable entr{} in {}",
+        log::warn!(
+            "ignored {} unusable entr{} in {}",
             loaded.dropped,
             if loaded.dropped == 1 { "y" } else { "ies" },
             settings::KEY_CLIENT_POLICIES
@@ -164,7 +164,7 @@ fn apply_stored_policies(daemon: &Daemon, file: &FileSettings) {
     if file.deny_unknown() {
         daemon.policies().set_default(ClientPolicy::Blocked);
         if let Err(e) = file.set_deny_unknown(true) {
-            eprintln!("cm-desktop: cannot remember the deny-unknown-clients state: {e}");
+            log::warn!("cannot remember the deny-unknown-clients state: {e}");
         }
     }
 }
@@ -248,7 +248,7 @@ impl Backend {
                 ));
             match jobs {
                 Ok(queue) => builder = builder.jobs(queue),
-                Err(e) => eprintln!("cm-desktop: background jobs are unavailable: {e}"),
+                Err(e) => log::warn!("background jobs are unavailable: {e}"),
             }
             // REC-6.AC8: recordings and screenshots include the library window; every other
             // own window (HUD, bubble, toasts, ...) stays excluded by pid.
@@ -261,43 +261,43 @@ impl Backend {
             let daemon = builder.build();
             // The quick exporter (FFmpeg sidecar): one combined MP4 after every recording.
             if let Err(e) = daemon.register_export_handler() {
-                eprintln!("cm-desktop: export is unavailable: {e}");
+                log::warn!("export is unavailable: {e}");
             }
             // Uploads to the user's destinations (STO-1, STO-3).
             if let Err(e) = daemon.register_upload_handler() {
-                eprintln!("cm-desktop: upload is unavailable: {e}");
+                log::warn!("upload is unavailable: {e}");
             }
             // Publishing to YouTube (PUB-2).
             if let Err(e) = daemon.register_publish_handler() {
-                eprintln!("cm-desktop: publishing is unavailable: {e}");
+                log::warn!("publishing is unavailable: {e}");
             }
             // Moving the library folder (LIB-2): the copy job.
             if let Err(e) = daemon.register_library_move_handler() {
-                eprintln!("cm-desktop: moving the library is unavailable: {e}");
+                log::warn!("moving the library is unavailable: {e}");
             }
             // Local AI (M5): the job executors for model downloads and transcription. Nothing is
             // downloaded or loaded until the user asks; the automatic transcription after a
             // recording needs an installed model.
             if let Err(e) = daemon.register_ai_handlers() {
-                eprintln!("cm-desktop: local AI is unavailable: {e}");
+                log::warn!("local AI is unavailable: {e}");
             }
             {
                 // Recovers interrupted jobs and starts the worker (needs the runtime).
                 let _guard = rt.enter();
                 if let Err(e) = daemon.start_jobs() {
-                    eprintln!("cm-desktop: cannot start the job worker: {e}");
+                    log::warn!("cannot start the job worker: {e}");
                 }
                 daemon.start_ai_auto_transcribe();
                 // LIB-1: bundles copied in, restored or deleted outside the app appear on
                 // their own (`capture.created` / `capture.revised` / `capture.deleted`).
                 if let Err(e) = daemon.start_library_watcher() {
-                    eprintln!("cm-desktop: the library watcher is unavailable: {e}");
+                    log::warn!("the library watcher is unavailable: {e}");
                 }
             }
             // REC-8: recover recordings a crash left behind, before any client is served.
             match daemon.recover_recordings() {
                 Ok(r) => recovered = r.recovered,
-                Err(e) => eprintln!("cm-desktop: recording recovery failed: {e}"),
+                Err(e) => log::warn!("recording recovery failed: {e}"),
             }
             // AGT-2.AC4: stored client policies apply before any connection is served.
             apply_stored_policies(&daemon, &cfg.settings);

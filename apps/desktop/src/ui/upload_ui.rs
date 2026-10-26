@@ -104,7 +104,7 @@ fn apply(app: &Entity<AppModel>, name: &str, data: &Value, cx: &mut App) {
     let copy_on = copy_link_enabled(&app.read(cx).backend.settings.snapshot());
     for mut effect in effects {
         if let AutoCopy::Failed(e) = auto_copy(&mut effect, copy_on, &SystemClipboard::default()) {
-            eprintln!("cm-desktop: could not copy the share link: {e}");
+            log::warn!("could not copy the share link: {e}");
         }
         if let Effect::Lookup { job_id } = &effect {
             look_up(app, job_id, name, data, cx);

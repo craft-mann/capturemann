@@ -11,8 +11,19 @@ Implementation-ready specs for CaptureMann v0.1: 62 requirements and 256 accepta
 | `02-agent-interface.md` | Agent interface | Permission tiers, MCP tools, resources, prompts, events, CLI, JSON-RPC |
 | `03-integrations.md` | Integrations | BYO auth model, storage and publishing API details, sources |
 | `04-delivery-plan.md` | Delivery plan | Milestones M0–M7 with build status, v0.1 acceptance checklist, risks, open questions |
-| `design-implementation.md` | — | Traceability from design-kit screens and components to spec IDs and build status; decided design questions (OD-1 to OD-11) and the open ones (OD-12, OD-13) |
-| `../DESIGN.md` | — | Product-side design contract (surfaces mapped to the kit in `../design/`), referenced as "DESIGN §n" |
+| `plans/design-implementation.md` | — | Traceability from design-kit screens and components to spec IDs and build status; decided design questions (OD-1 to OD-11) and the open ones (OD-12, OD-13) |
+| `../docs/development/design-surfaces.md` | — | Product-side design contract (surfaces mapped to the kit in `../design/`), referenced as "DESIGN §n" |
+
+## Plans
+
+Plans for larger features and the design-kit traceability table live in `plans/`. They record the approach and decisions; the behavior and acceptance criteria stay in the feature files.
+
+| File | Contents |
+| --- | --- |
+| `plans/design-implementation.md` | Traceability from design-kit screens to spec IDs and build status; design decisions (OD-n) |
+| `plans/i18n-plan.md` | UI languages: approach, phases, decisions, what was built |
+| `plans/caption-editor-plan.md` | The caption editor (kit board R3c) |
+| `plans/webcam-audio-check-plan.md` | Settings → Webcam & audio check (kit board R13b) |
 
 ## Feature files
 
@@ -33,7 +44,7 @@ Implementation-ready specs for CaptureMann v0.1: 62 requirements and 256 accepta
 | `features/13-launcher.md` | Launcher | LNC-1 |
 | `features/14-permissions.md` | Permissions | PRM-1 |
 
-Related: `../design/` (brand and UI kit, source of truth for visuals; start at `../design/CLAUDE.md`), `../DESIGN.md` (surfaces mapped to the kit), `design-implementation.md` (kit traceability and build status), `../SPIKES.md` (feasibility results).
+Related: `../design/` (brand and UI kit, source of truth for visuals; start at `../design/CLAUDE.md`), `../docs/development/design-surfaces.md` (surfaces mapped to the kit), `plans/design-implementation.md` (kit traceability and build status), `../docs/project/spikes.md` (feasibility results).
 
 ## Conventions
 
@@ -73,7 +84,7 @@ Related: `../design/` (brand and UI kit, source of truth for visuals; start at `
 1. Story, description and every acceptance criterion are testable without asking the author.
 2. Dependencies are Done or stubbed behind a trait.
 3. Agent interface (tool name, inputs, outputs, tier) is fixed.
-4. Any UI follows a named surface in `docs/DESIGN.md` (which maps it to a kit screen in `design/`), or a sketch is attached.
+4. Any UI follows a named surface in `docs/development/design-surfaces.md` (which maps it to a kit screen in `design/`), or a sketch is attached.
 
 ## Definition of Done (before a feature is marked Done)
 
@@ -107,7 +118,7 @@ Used by the GUI, MCP (`error.data.code`), JSON-RPC and CLI exit codes.
 | `daemon_unavailable` | 5 | Client cannot reach the daemon (not running, socket refused); start it and retry |
 | `not_implemented` | 1 | Feature or platform backend not built yet (an action with no engine in this build, or a Windows backend that is still a stub). JSON-RPC `-32099`. Exit 1 is shared with `internal` on purpose: both mean "not your input, not a retry"; read the code to tell them apart |
 
-**Codes outside the table.** `method_not_found` and `invalid_request` are protocol errors of the JSON-RPC transport, not shared codes: the CLI maps any code outside the table to exit 1. `not_implemented` is a shared code (decided Oct 21, 2026, product owner): the daemon answers it (`-32099`, `error.data.code: "not_implemented"`) when an action is known but no engine implements it (for example `publish_video` and `delete_capture` today), and the platform stubs (the Windows encoder and capture, and the system-audio, camera and cursor recorders on unsupported systems) return it directly. Its payload is `{ "code": "not_implemented", "message": "<what is not built>", "data": null }`. `cm-core`'s `ErrorCode::NotImplemented` and `CmError::not_implemented(message)` carry it, so the table has 15 codes.
+**Codes outside the table.** `method_not_found` and `invalid_request` are protocol errors of the JSON-RPC transport, not shared codes: the CLI maps any code outside the table to exit 1. `not_implemented` is a shared code (decided Oct 21, 2026, product maintainer): the daemon answers it (`-32099`, `error.data.code: "not_implemented"`) when an action is known but no engine implements it (for example `publish_video` and `delete_capture` today), and the platform stubs (the Windows encoder and capture, and the system-audio, camera and cursor recorders on unsupported systems) return it directly. Its payload is `{ "code": "not_implemented", "message": "<what is not built>", "data": null }`. `cm-core`'s `ErrorCode::NotImplemented` and `CmError::not_implemented(message)` carry it, so the table has 15 codes.
 
 
 ## Glossary

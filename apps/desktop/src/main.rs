@@ -72,6 +72,7 @@ fn show_running_instance() {
 }
 
 fn main() {
+    cm_core::logging::init();
     cm_desktop::trace::init();
     let args: Vec<String> = std::env::args().skip(1).collect();
     let flag = |f: &str| args.iter().any(|a| a == f);
@@ -140,12 +141,12 @@ fn main() {
         match cm_desktop::instance::acquire(&config_dir) {
             cm_desktop::instance::Acquired::First(lock) => Some(lock),
             cm_desktop::instance::Acquired::AlreadyRunning => {
-                eprintln!("cm-desktop: CaptureMann is already running; showing it");
+                log::info!("CaptureMann is already running; showing it");
                 show_running_instance();
                 std::process::exit(0);
             }
             cm_desktop::instance::Acquired::Unavailable(e) => {
-                eprintln!("cm-desktop: single-instance lock unavailable: {e}");
+                log::warn!("single-instance lock unavailable: {e}");
                 None
             }
         }
@@ -153,7 +154,7 @@ fn main() {
     // CAP-2.AC5: bring the login item in line with the preference (a bundled app only).
     if _instance.is_some() {
         if let Err(e) = cm_desktop::login_item::sync(&config_dir) {
-            eprintln!("cm-desktop: could not update the login item: {e}");
+            log::warn!("could not update the login item: {e}");
         }
     }
     let file_settings = Arc::new(FileSettings::load(config_dir.join("settings.json")));
@@ -176,7 +177,7 @@ fn main() {
     {
         Ok(rt) => rt,
         Err(e) => {
-            eprintln!("cm-desktop: cannot start the async runtime: {e}");
+            log::warn!("cannot start the async runtime: {e}");
             std::process::exit(1);
         }
     };
@@ -221,13 +222,13 @@ fn main() {
         BoxedConfirmer(Arc::from(confirmer_for_daemon)),
     ));
     if let Some(root) = &backend.library_root {
-        eprintln!("cm-desktop: library at {}", root.display());
+        log::info!("library at {}", root.display());
     }
     if let Some(w) = &backend.ipc_warning {
-        eprintln!("cm-desktop: {w}");
+        log::warn!("{w}");
     }
     if !backend.overlay.is_available() {
-        eprintln!("cm-desktop: cm-overlay not found; capture hotkeys will show an error");
+        log::warn!("cm-overlay not found; capture hotkeys will show an error");
     }
 
     let handle = rt.handle().clone();
@@ -321,7 +322,7 @@ fn main() {
                 for (action, res) in &status {
                     if let Err(e) = res {
                         if action.is_available() {
-                            eprintln!("cm-desktop: could not register {}: {e}", action.label());
+                            log::warn!("could not register {}: {e}", action.label());
                         }
                     }
                 }
@@ -511,7 +512,7 @@ fn main() {
         if demo_confirm {
             demo_handle.spawn(async move {
                 let d = confirmer.confirm(&backend::demo_confirmation()).await;
-                eprintln!("cm-desktop: demo confirmation answered: {d:?}");
+                log::info!("demo confirmation answered: {d:?}");
             });
         }
     });

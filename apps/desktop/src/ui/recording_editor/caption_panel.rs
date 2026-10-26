@@ -1,4 +1,4 @@
-//! The Captions panel and the captions lane (R3c, `specs/caption-editor-plan.md`): one row per
+//! The Captions panel and the captions lane (R3c, `specs/plans/caption-editor-plan.md`): one row per
 //! line with its times, the text edited in place, hover actions, find and replace, the footer with
 //! the display switches and the exports, and the lane under the timeline. Drawing and events
 //! only: the rules are in `crate::ai::captions` (split at the caret, issues), the search in

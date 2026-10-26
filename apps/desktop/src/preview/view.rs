@@ -149,7 +149,7 @@ fn run_worker(
             PreviewPath::Surface => match super::macos::pixel_buffer(&nv12) {
                 Ok(b) => Payload::Surface(b),
                 Err(e) => {
-                    eprintln!("preview: {e}");
+                    log::warn!("preview: {e}");
                     break;
                 }
             },

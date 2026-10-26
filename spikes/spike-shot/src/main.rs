@@ -5,7 +5,7 @@
 //! For every display it prints logical size, scale factor, captured image size
 //! and capture time, then checks image size == logical size x scale (HiDPI).
 //! Then it captures up to N visible windows (default 5).
-//! Pass criteria (see docs/SPIKES.md): physical-size images, < 150 ms per 4K display.
+//! Pass criteria (see docs/project/spikes.md): physical-size images, < 150 ms per 4K display.
 
 use std::{path::PathBuf, time::Instant};
 
@@ -69,7 +69,7 @@ fn main() -> Result<()> {
 
         // xcap reports points (logical) on macOS, so the image must be
         // width x scale there. On Windows the reported size should already be
-        // physical pixels; record what you see in docs/SPIKES.md either way.
+        // physical pixels; record what you see in docs/project/spikes.md either way.
         let got = (img.width(), img.height());
         let expect_phys = (
             (w as f32 * scale).round() as u32,

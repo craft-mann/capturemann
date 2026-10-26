@@ -73,7 +73,7 @@ impl SettingsSection {
         match self {
             Self::General => tr!("Appearance, after-capture behavior and your library folder."),
             Self::Capture => tr!("Recording quality, frame rate and what gets captured."),
-            Self::Webcam => tr!("The webcam bubble, microphone and system audio."),
+            Self::Webcam => tr!("Check your camera and microphone, then set how the bubble looks."),
             Self::Destinations => {
                 tr!("Where finished captures are saved, and the accounts you publish to.")
             }

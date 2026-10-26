@@ -30,7 +30,7 @@ pub fn load_fonts(cx: &App) {
         .text_system()
         .add_fonts(FONTS.iter().map(|f| Cow::Borrowed(*f)).collect())
     {
-        eprintln!("cm-desktop: could not register the Geist fonts: {e}");
+        log::warn!("could not register the Geist fonts: {e}");
     }
 }
 
@@ -625,6 +625,19 @@ pub(crate) const ASSETS: &[(&str, &str)] = &[
     (
         "icons/user-plus.svg",
         include_str!("../../assets/icons/user-plus.svg"),
+    ),
+    (
+        "icons/mic-off.svg",
+        include_str!("../../assets/icons/mic-off.svg"),
+    ),
+    (
+        "icons/camera-off.svg",
+        include_str!("../../assets/icons/camera-off.svg"),
+    ),
+    ("icons/usb.svg", include_str!("../../assets/icons/usb.svg")),
+    (
+        "icons/move.svg",
+        include_str!("../../assets/icons/move.svg"),
     ),
     (
         "icons/video-off.svg",

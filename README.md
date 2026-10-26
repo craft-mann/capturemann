@@ -21,7 +21,7 @@ and every feature available to AI agents through MCP and a CLI.
 </p>
 
 > **Status: 0.1.0, first release (macOS 13+, Apple Silicon only).** After this release: Intel Macs, then Windows, then Linux. Most
-> results are tested with scripted fakes, plus checks on real devices by the owner on one Mac; there
+> results are tested with scripted fakes, plus checks on real devices by the maintainer on one Mac; there
 > are few stored hardware reports. What is still unverified is tracked in
 > [`specs/04-delivery-plan.md`](specs/04-delivery-plan.md) under "Verification debt".
 
@@ -57,8 +57,8 @@ Requires a Mac with Apple Silicon and macOS 13 or later. Intel Macs are not supp
 The release notes say whether a build is notarized. A build that is **ad hoc signed and not
 notarized** is blocked by Gatekeeper at first launch: right-click the app and choose Open, or run
 `xattr -dr com.apple.quarantine /Applications/CaptureMann.app`. Updates are manual: download the new
-DMG. To build it yourself instead, see [building from source](docs/building.md). More on verifying a
-download: [docs/releasing.md](docs/releasing.md#how-users-verify-a-download).
+DMG. To build it yourself instead, see [building from source](docs/development/building.md). More on verifying a
+download: [docs/development/releasing.md](docs/development/releasing.md#how-users-verify-a-download).
 
 ## Quick start
 
@@ -79,7 +79,7 @@ the CLI.
 
 ## Build from source
 
-Rust 1.90, Xcode command line tools and `cmake`:
+Rust 1.95, Xcode command line tools and `cmake`:
 
 ```sh
 cargo test --workspace --locked

@@ -194,8 +194,8 @@ impl JobsRuntime {
         let running = std::mem::replace(&mut *self.phase(), Phase::Stopped);
         if let Phase::Running { worker, bridge } = running {
             if !worker.shutdown_timeout(Some(limit)).await {
-                eprintln!(
-                    "cm-daemon: a job handler did not stop within {limit:?}; abandoning it \
+                log::warn!(
+                    "a job handler did not stop within {limit:?}; abandoning it \
                      (the job resumes at the next start)"
                 );
             }

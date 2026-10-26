@@ -54,7 +54,7 @@ clock, and learn whether `MicConfig::stamp_offset_ms` needs a non-zero default.
 
 Pass when `mic - system` is within a few ms (acoustic delay is about 3 ms per meter of distance
 between speaker and microphone, so expect a small positive number) and in any case inside 50 ms.
-Record the result in docs/SPIKES.md S3. A consistent offset larger than that means cpal's `capture`
+Record the result in docs/project/spikes.md S3. A consistent offset larger than that means cpal's `capture`
 stamp (callback time minus buffer latency) is off on this device: set `stamp_offset_ms` to cancel
 it. For a video-level check use the S3 flash/beep method on a finished recording once the session
 wiring lands (method of Oct 19: generated flash/beep video, FFmpeg analysis of `final.mp4`);

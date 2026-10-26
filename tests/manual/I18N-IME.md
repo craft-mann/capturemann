@@ -1,6 +1,6 @@
 # I18N-IME: input-method composition in the text fields
 
-Covers I18N S2 (`specs/i18n-plan.md`): Vietnamese (Telex, VNI), Japanese and Chinese input in every
+Covers I18N S2 (`specs/plans/i18n-plan.md`): Vietnamese (Telex, VNI), Japanese and Chinese input in every
 text field, plus grapheme-aware caret and delete. Status: **not run** (built and tested with fakes;
 the pure logic is in `apps/desktop/src/text_buffer.rs`, the wiring in `apps/desktop/src/ui/text_field.rs`).
 Report a run in `verification/` (see its README).

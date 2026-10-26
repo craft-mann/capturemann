@@ -559,16 +559,17 @@ impl App {
         let t0 = Instant::now();
         let mut newly_shown = false;
         if let Err(e) = surface.resize(w, h) {
-            eprintln!(
+            log::warn!(
                 "surface resize to {}x{} failed: {e}",
-                size.width, size.height
+                size.width,
+                size.height
             );
             return;
         }
         let mut buffer = match surface.buffer_mut() {
             Ok(b) => b,
             Err(e) => {
-                eprintln!("buffer_mut: {e}");
+                log::warn!("buffer_mut: {e}");
                 return;
             }
         };
@@ -593,7 +594,7 @@ impl App {
         view.painted = Some((size.width, size.height));
         let t_paint = t0.elapsed();
         if let Err(e) = buffer.present() {
-            eprintln!("present: {e}");
+            log::warn!("present: {e}");
         }
         if !view.shown {
             view.shown = true;
@@ -671,7 +672,7 @@ impl App {
         }
         if let Some(cb) = self.clipboard.as_mut() {
             if let Err(e) = cb.set_text(hex) {
-                eprintln!("could not copy the color: {e}");
+                log::warn!("could not copy the color: {e}");
             }
         }
     }

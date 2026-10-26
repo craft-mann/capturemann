@@ -4,7 +4,7 @@
 
 use std::time::{Duration, Instant};
 
-// TODO(design): the R17 board also draws a "Change library" action on the disk-full toast and a
+// Design gap: the R17 board also draws a "Change library" action on the disk-full toast and a
 // "Published without captions" warning. Neither exists in the app (no such action, no such
 // trigger), so they are not built. The Stop action of the agent toast and the upload progress
 // toast (a bar, the percentage, an ETA, Cancel) are built.

@@ -241,7 +241,7 @@ impl JobStore {
     /// with a reason (it cannot run with unreadable inputs). Never panics, never fails the
     /// caller: it logs one line.
     fn repair(conn: &Connection, id: &str, why: &str) {
-        eprintln!("cm-jobs: repairing unreadable job row `{id}`: {why}");
+        log::warn!("repairing unreadable job row `{id}`: {why}");
         let reason = scrub_secrets(&format!("The job record was unreadable ({why})"));
         let steps = [
             "UPDATE jobs SET inputs = '{}' WHERE id = ?1 AND NOT json_valid(inputs)",

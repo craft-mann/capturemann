@@ -4,6 +4,9 @@ description = "Hardware recording encoders and the fragmented MP4 writer"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
 publish.workspace = true
 rust-version.workspace = true
 
@@ -11,7 +14,7 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-cm-core = { path = "../cm-core" }
+cm-core.workspace = true
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
@@ -19,14 +22,14 @@ serde_json = "1"
 # bindings, no Swift bridge. The versions spike S6 proved. All MIT (dispatch2: Zlib OR Apache-2.0
 # OR MIT). `unsafe` is confined to `src/mac.rs`.
 [target.'cfg(target_os = "macos")'.dependencies]
-objc2 = "0.6"
-block2 = "0.6"
+objc2.workspace = true
+block2.workspace = true
 objc2-foundation = "0.3"
-objc2-av-foundation = { version = "0.3", features = ["objc2-core-media", "objc2-core-video", "objc2-quartz-core", "objc2-core-graphics", "block2", "dispatch2", "objc2-uniform-type-identifiers"] }
-objc2-core-media = { version = "0.3", features = ["objc2-core-video", "block2", "dispatch2"] }
-objc2-core-foundation = "0.3"
-objc2-core-video = "0.3"
-objc2-uniform-type-identifiers = "0.3"
+objc2-av-foundation = { workspace = true, features = ["objc2-core-media", "objc2-core-video", "objc2-quartz-core", "objc2-core-graphics", "block2", "dispatch2", "objc2-uniform-type-identifiers"] }
+objc2-core-media = { workspace = true, features = ["objc2-core-video", "block2", "dispatch2"] }
+objc2-core-foundation.workspace = true
+objc2-core-video.workspace = true
+objc2-uniform-type-identifiers.workspace = true
 
 [dev-dependencies]
-tempfile = "3"
+tempfile.workspace = true

@@ -74,7 +74,7 @@ pub fn auto_export_enabled(settings: &Map<String, Value>) -> bool {
 fn presets_in_force() -> Presets {
     let loaded = Presets::load_default();
     if let Some(w) = &loaded.warning {
-        eprintln!("cm-daemon: {w}");
+        log::warn!("{w}");
     }
     loaded.presets
 }
@@ -631,7 +631,7 @@ impl Inner {
                     cm_storage::AutoUpload::OnExport,
                     &crate::auto_upload::ExportState::Job(&job),
                 ) {
-                    eprintln!("cm-daemon: automatic upload not queued: {e}");
+                    log::warn!("automatic upload not queued: {e}");
                 }
             }
             Ok((job, reused))

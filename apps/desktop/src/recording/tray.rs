@@ -44,7 +44,7 @@ pub fn plan(state: &HudState, now: Instant) -> TrayPlan {
 
 /// [`plan`] with the attention signal: `UploadTracker::needs_attention` (an upload failed or
 /// paused as `auth_expired` and not yet dismissed, retried or reconnected). `ui::upload_ui`
-/// re-applies the tray whenever the tracker changes. TODO(design): the library going offline is
+/// re-applies the tray whenever the tracker changes. Design gap: the library going offline is
 /// not part of the signal.
 pub fn plan_with(state: &HudState, now: Instant, attention: bool) -> TrayPlan {
     let t = clock_text(state.recorded_ms(now));

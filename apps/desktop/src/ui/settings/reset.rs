@@ -20,7 +20,7 @@ use cm_i18n::tr;
 
 /// The settings keys of the Shortcuts page, in page order. Kept as a literal list on purpose: a
 /// test checks it against the keys the page reads ([`ShortcutAction::key`]).
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 pub const SHORTCUT_RESET_KEYS: [&str; 10] = [
     "shortcuts.capture_region",
     "shortcuts.capture_window",

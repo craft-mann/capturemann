@@ -4,6 +4,9 @@ description = "Action bus, sessions, JSON-RPC server, event stream, confirmation
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
 publish.workspace = true
 rust-version.workspace = true
 
@@ -11,34 +14,35 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-cm-core = { path = "../cm-core" }
-cm-ipc = { path = "../cm-ipc" }
-cm-library = { path = "../cm-library" }
-cm-capture = { path = "../cm-capture" }
-cm-encode = { path = "../cm-encode" }
-cm-audio = { path = "../cm-audio" }
-cm-camera = { path = "../cm-camera" }
-cm-cursor = { path = "../cm-cursor" }
-cm-render = { path = "../cm-render" }
-cm-jobs = { path = "../cm-jobs" }
-cm-media = { path = "../cm-media" }
-cm-ai = { path = "../cm-ai" }
-cm-storage = { path = "../cm-storage" }
+log.workspace = true
+cm-core.workspace = true
+cm-ipc.workspace = true
+cm-library.workspace = true
+cm-capture.workspace = true
+cm-encode.workspace = true
+cm-audio.workspace = true
+cm-camera.workspace = true
+cm-cursor.workspace = true
+cm-render.workspace = true
+cm-jobs.workspace = true
+cm-media.workspace = true
+cm-ai.workspace = true
+cm-storage.workspace = true
 # The YouTube provider, platform rules and the accounts store of `publish_video`.
-cm-publish = { path = "../cm-publish" }
+cm-publish.workspace = true
 # Token source of the cloud destinations (keychain tokens, refresh on demand).
-cm-auth = { path = "../cm-auth" }
+cm-auth.workspace = true
 serde = { version = "1", features = ["derive"] }
 # preserve_order: the confirmation dialog rows keep the order they are built in (R2-10)
 serde_json = { version = "1", features = ["preserve_order"] }
 time = { version = "0.3", default-features = false, features = ["std", "serde-well-known", "formatting", "parsing"] }
 # MIT
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "time", "macros", "net", "io-util", "signal"] }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "sync", "time", "macros", "net", "io-util", "signal"] }
 # MIT OR Apache-2.0
-async-trait = "0.1"
-base64 = "0.22"
+async-trait.workspace = true
+base64.workspace = true
 # MIT OR Apache-2.0
-image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+image = { workspace = true, features = ["png", "jpeg"] }
 
 # macOS: `delete_capture` moves a bundle to the Trash with NSFileManager. Same objc2 family and
 # versions the capture and camera crates already use (MIT / Zlib / Apache-2.0).
@@ -47,9 +51,9 @@ objc2-foundation = { version = "0.3", default-features = false, features = ["std
 
 [dev-dependencies]
 # The fake Drive server for the cloud upload tests.
-cm-storage = { path = "../cm-storage", features = ["testing"] }
+cm-storage = { workspace = true, features = ["testing"] }
 # The fake YouTube server for the publish tests.
-cm-publish = { path = "../cm-publish", features = ["testing"] }
-tempfile = "3"
-tokio = { version = "1", features = ["test-util"] }
+cm-publish = { workspace = true, features = ["testing"] }
+tempfile.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
 time = { version = "0.3", features = ["macros"] }

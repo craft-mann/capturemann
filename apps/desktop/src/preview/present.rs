@@ -45,7 +45,7 @@ impl Presenter {
     }
 
     /// Makes `picture` the one on screen. Call from inside `render`: the CPU path hands the old
-    /// image back to GPUI with the window (without it the atlas keeps every frame, docs/SPIKES.md S5).
+    /// image back to GPUI with the window (without it the atlas keeps every frame, docs/project/spikes.md S5).
     pub fn set(&mut self, picture: &RgbaImage, window: &mut Window, cx: &mut App) {
         let payload = match self.path {
             #[cfg(target_os = "macos")]
@@ -53,7 +53,7 @@ impl Presenter {
                 match super::macos::pixel_buffer(&super::convert::rgba_to_nv12(picture)) {
                     Ok(b) => Payload::Surface(b),
                     Err(e) => {
-                        eprintln!("cm-desktop: preview surface failed, using the CPU path: {e}");
+                        log::warn!("preview surface failed, using the CPU path: {e}");
                         self.path = PreviewPath::Cpu;
                         return self.set(picture, window, cx);
                     }

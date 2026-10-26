@@ -4,6 +4,9 @@ description = "UI languages: gettext-style catalogues, tr! macros, locale-aware 
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
 publish.workspace = true
 rust-version.workspace = true
 

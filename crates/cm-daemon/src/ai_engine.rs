@@ -57,7 +57,7 @@ fn store(root: &Option<PathBuf>) -> ModelStore {
         None => ModelStore::open_default(),
     };
     if let Some(w) = warning {
-        eprintln!("cm-daemon: {w}");
+        log::warn!("{w}");
     }
     store
 }

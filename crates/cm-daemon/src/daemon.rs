@@ -513,7 +513,7 @@ impl DaemonBuilder {
 }
 
 fn tracing_warn(e: &CmError) {
-    eprintln!("camera watcher not started: {e}");
+    log::warn!("camera watcher not started: {e}");
 }
 
 pub(crate) fn humanize(d: Duration) -> String {

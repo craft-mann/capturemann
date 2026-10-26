@@ -469,7 +469,7 @@ pub fn dismiss_notice(app: &Entity<AppModel>, cx: &mut App) {
         .settings
         .set_internal(KEY_NOTICE_DISMISSED, Value::Bool(true))
     {
-        eprintln!("cm-desktop: could not remember the dismissed AI notice: {e}");
+        log::warn!("could not remember the dismissed AI notice: {e}");
     }
     app.update(cx, |m, cx| {
         m.ai.notice_dismissed = true;

@@ -77,7 +77,7 @@ pub fn exclude_from_capture(window: &Window) {
             ..Tweaks::default()
         },
     ) {
-        eprintln!("cm-desktop: could not hide a window from capture: {e}");
+        log::warn!("could not hide a window from capture: {e}");
     }
 }
 

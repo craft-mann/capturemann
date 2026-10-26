@@ -323,10 +323,10 @@ impl TrayHandle {
                     self.tray.set_icon(Some(icon))
                 };
                 if let Err(e) = res {
-                    eprintln!("cm-desktop: could not switch the tray icon: {e}");
+                    log::warn!("could not switch the tray icon: {e}");
                 }
             }
-            Err(e) => eprintln!("cm-desktop: could not decode the tray icon: {e}"),
+            Err(e) => log::warn!("could not decode the tray icon: {e}"),
         }
     }
 

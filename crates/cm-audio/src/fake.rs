@@ -236,6 +236,11 @@ impl FakeHandle {
         lock(&self.shared).host_shift_ns += ns;
     }
 
+    /// Changes what the device hears from the next delivered sample on.
+    pub fn set_signal(&self, signal: FakeSignal) {
+        lock(&self.shared).cfg.signal = signal;
+    }
+
     /// Host time of the next undelivered sample.
     pub fn next_host_ns(&self) -> u64 {
         let s = lock(&self.shared);

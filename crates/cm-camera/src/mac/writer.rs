@@ -67,8 +67,11 @@ define_class!(
     #[ivars = SegIvars]
     struct SegmentSink;
 
+    // SAFETY: `SegmentSink` is a direct NSObject subclass, so it satisfies NSObjectProtocol.
     unsafe impl NSObjectProtocol for SegmentSink {}
 
+    // SAFETY: the method below has exactly the types of the `assetWriter:didOutputSegmentData:
+    // segmentType:segmentReport:` selector; it only copies the NSData valid for the call.
     unsafe impl AVAssetWriterDelegate for SegmentSink {
         #[unsafe(method(assetWriter:didOutputSegmentData:segmentType:segmentReport:))]
         unsafe fn did_output(
@@ -78,31 +81,34 @@ define_class!(
             ty: AVAssetSegmentType,
             report: Option<&AVAssetSegmentReport>,
         ) {
-            let bytes = data.to_vec();
-            let mut st = lock(&self.ivars().st);
-            if let Some(f) = st.file.as_mut() {
-                // `sync_data` per segment (~2 s): a power loss loses at most the segment in
-                // flight, like the screen writer (R3-12).
-                if let Err(e) = f.write_all(&bytes).and_then(|()| f.sync_data()) {
-                    st.write_error.get_or_insert(e.to_string());
+            // A panic must not unwind into AVFoundation (abort/UB): catch it, drop the segment.
+            cm_core::guard::guard_unit("cm-camera did_output", || {
+                let bytes = data.to_vec();
+                let mut st = lock(&self.ivars().st);
+                if let Some(f) = st.file.as_mut() {
+                    // `sync_data` per segment (~2 s): a power loss loses at most the segment in
+                    // flight, like the screen writer (R3-12).
+                    if let Err(e) = f.write_all(&bytes).and_then(|()| f.sync_data()) {
+                        st.write_error.get_or_insert(e.to_string());
+                    }
                 }
-            }
-            st.bytes += bytes.len() as u64;
-            if ty != AVAssetSegmentType::Initialization {
-                // SAFETY: the report and its track reports are valid for the delegate call.
-                let times = unsafe {
-                    report
-                        .and_then(|r| r.trackReports().iter().next())
-                        .map(|t| (t.earliestPresentationTimeStamp(), t.duration()))
-                };
-                if let Some((start, dur)) = times {
-                    st.fragments.push(FragmentInfo {
-                        start: MediaTime::from_ticks(ticks_of(start)),
-                        duration: MediaTime::from_ticks(ticks_of(dur)),
-                        bytes: bytes.len() as u64,
-                    });
+                st.bytes += bytes.len() as u64;
+                if ty != AVAssetSegmentType::Initialization {
+                    // SAFETY: the report and its track reports are valid for the delegate call.
+                    let times = unsafe {
+                        report
+                            .and_then(|r| r.trackReports().iter().next())
+                            .map(|t| (t.earliestPresentationTimeStamp(), t.duration()))
+                    };
+                    if let Some((start, dur)) = times {
+                        st.fragments.push(FragmentInfo {
+                            start: MediaTime::from_ticks(ticks_of(start)),
+                            duration: MediaTime::from_ticks(ticks_of(dur)),
+                            bytes: bytes.len() as u64,
+                        });
+                    }
                 }
-            }
+            });
         }
     }
 );

@@ -88,6 +88,7 @@ fn shareable_content() -> Result<Retained<SCShareableContent>, CmError> {
         // SAFETY: SCK passes either a valid content object or a valid error.
         let r = match unsafe { Retained::retain(c) } {
             Some(c) => Ok(SendBox(c)),
+            // SAFETY: with no content, SCK passes a valid NSError or null; `as_ref` handles null.
             None => Err(unsafe { e.as_ref() }.map_or_else(
                 || "unknown error".to_owned(),
                 |e| e.localizedDescription().to_string(),
@@ -184,6 +185,7 @@ pub fn capture_display_excluding(
         // for our own reference before the handler returns.
         let r = match unsafe { img.as_ref() } {
             Some(i) => Ok(SendBox(CFRetained::from(i))),
+            // SAFETY: with no image, SCK passes a valid NSError or null; `as_ref` handles null.
             None => Err(unsafe { e.as_ref() }.map_or_else(
                 || "unknown error".to_owned(),
                 |e| e.localizedDescription().to_string(),

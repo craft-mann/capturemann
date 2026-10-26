@@ -5,7 +5,7 @@
 //! Decisions from S6 that live here:
 //!
 //! * `minimumFrameInterval` is 1 / (1.1 x fps): asking SCK for exactly the display rate skips
-//!   vsyncs (docs/SPIKES.md S6); the pipeline coalesces the few extra frames back to constant rate.
+//!   vsyncs (docs/project/spikes.md S6); the pipeline coalesces the few extra frames back to constant rate.
 //! * NV12 (`420v`) capture, queue depth 8.
 //! * Own recorder windows are hidden with `SCContentFilter` exclusion (by pid and by window id);
 //!   their owners also set `sharingType = none` (use both, S6). The library window is the
@@ -87,13 +87,17 @@ struct OutputIvars {
 
 define_class!(
     /// Receives frames and the stop notification from `SCStream`.
+    // SAFETY: NSObject has no subclassing requirements; the only ivar is a plain Rust struct.
     #[unsafe(super(NSObject))]
     #[name = "CmCaptureScreenOutput"]
     #[ivars = OutputIvars]
     struct ScreenOutput;
 
+    // SAFETY: `ScreenOutput` is a direct NSObject subclass, so it satisfies NSObjectProtocol.
     unsafe impl NSObjectProtocol for ScreenOutput {}
 
+    // SAFETY: the method below has exactly the types of the `stream:didOutputSampleBuffer:ofType:`
+    // selector; SCK calls it with a valid stream and sample buffer.
     unsafe impl SCStreamOutput for ScreenOutput {
         #[unsafe(method(stream:didOutputSampleBuffer:ofType:))]
         unsafe fn stream_did_output(
@@ -102,55 +106,62 @@ define_class!(
             sb: &CMSampleBuffer,
             ty: SCStreamOutputType,
         ) {
-            if ty != SCStreamOutputType::Screen || self.ivars().closed.load(Ordering::Relaxed) {
-                return;
-            }
-            // SAFETY: reading the stamp and image buffer of a sample buffer that is alive for
-            // the duration of this callback.
-            let (host_ns, has_image) = unsafe {
-                (
-                    host_ns_of(sb.presentation_time_stamp()),
-                    sb.image_buffer().is_some(),
-                )
-            };
-            let ev = if has_image {
-                SourceEvent::Frame {
-                    host_ns,
-                    frame: MacFrame::retain(sb),
+            // A panic must not unwind into ScreenCaptureKit (abort/UB): catch it, drop the frame.
+            cm_core::guard::guard_unit("cm-capture stream_did_output", || {
+                if ty != SCStreamOutputType::Screen || self.ivars().closed.load(Ordering::Relaxed) {
+                    return;
                 }
-            } else {
-                // Idle / blank / suspended status samples carry no pixels.
-                SourceEvent::Idle { host_ns }
-            };
-            if let Ok(mut s) = self.ivars().sink.lock() {
-                if let Some(sink) = s.as_mut() {
-                    sink(ev);
+                // SAFETY: reading the stamp and image buffer of a sample buffer that is alive for
+                // the duration of this callback.
+                let (host_ns, has_image) = unsafe {
+                    (
+                        host_ns_of(sb.presentation_time_stamp()),
+                        sb.image_buffer().is_some(),
+                    )
+                };
+                let ev = if has_image {
+                    SourceEvent::Frame {
+                        host_ns,
+                        frame: MacFrame::retain(sb),
+                    }
+                } else {
+                    // Idle / blank / suspended status samples carry no pixels.
+                    SourceEvent::Idle { host_ns }
+                };
+                if let Ok(mut s) = self.ivars().sink.lock() {
+                    if let Some(sink) = s.as_mut() {
+                        sink(ev);
+                    }
                 }
-            }
+            });
         }
     }
 
+    // SAFETY: the method below matches the types of the `stream:didStopWithError:` selector; it
+    // only reads the NSError SCK passes (valid for the call).
     unsafe impl SCStreamDelegate for ScreenOutput {
         #[unsafe(method(stream:didStopWithError:))]
         unsafe fn stream_did_stop(&self, _stream: &SCStream, error: &NSError) {
-            if self.ivars().closed.load(Ordering::Relaxed) {
-                return;
-            }
-            let msg = error.localizedDescription().to_string();
-            // SCStreamError: -3813 no window list, -3814 no display list, -3815 no capture
-            // source, -3816 removing stream. These mean the window or display went away.
-            let reason = match error.code() {
-                -3816..=-3813 => StopReason::TargetClosed(msg),
-                // SCStreamErrorUserDeclined: "user declined TCCs", the grant was removed in
-                // System Settings while the stream ran.
-                -3801 => StopReason::PermissionRevoked(msg),
-                _ => StopReason::Error(msg),
-            };
-            if let Ok(mut s) = self.ivars().sink.lock() {
-                if let Some(sink) = s.as_mut() {
-                    sink(SourceEvent::Stopped(reason));
+            cm_core::guard::guard_unit("cm-capture stream_did_stop", || {
+                if self.ivars().closed.load(Ordering::Relaxed) {
+                    return;
                 }
-            }
+                let msg = error.localizedDescription().to_string();
+                // SCStreamError: -3813 no window list, -3814 no display list, -3815 no capture
+                // source, -3816 removing stream. These mean the window or display went away.
+                let reason = match error.code() {
+                    -3816..=-3813 => StopReason::TargetClosed(msg),
+                    // SCStreamErrorUserDeclined: "user declined TCCs", the grant was removed in
+                    // System Settings while the stream ran.
+                    -3801 => StopReason::PermissionRevoked(msg),
+                    _ => StopReason::Error(msg),
+                };
+                if let Ok(mut s) = self.ivars().sink.lock() {
+                    if let Some(sink) = s.as_mut() {
+                        sink(SourceEvent::Stopped(reason));
+                    }
+                }
+            });
         }
     }
 );
@@ -200,6 +211,7 @@ fn shareable_content() -> Result<Retained<SCShareableContent>, CmError> {
         // own reference, `as_ref` reads the error for the message.
         let r = match unsafe { Retained::retain(c) } {
             Some(c) => Ok(SendBox(c)),
+            // SAFETY: with no content, SCK passes a valid NSError or null; `as_ref` handles null.
             None => Err(unsafe { e.as_ref() }.map_or_else(
                 || "unknown error".to_owned(),
                 |e| e.localizedDescription().to_string(),

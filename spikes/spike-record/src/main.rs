@@ -61,7 +61,7 @@ fn parse_args() -> Result<Opts> {
             "--no-mic" => o.mic = false,
             "--out" => o.out_dir = PathBuf::from(val()?),
             "-h" | "--help" => {
-                println!("see the header of spike-record/src/main.rs or docs/SPIKES.md");
+                println!("see the header of spike-record/src/main.rs or docs/project/spikes.md");
                 std::process::exit(0);
             }
             other => bail!("unknown argument {other}"),

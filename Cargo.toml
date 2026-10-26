@@ -11,7 +11,7 @@ publish = false
 repository = "https://github.com/craft-mann/capturemann"
 homepage = "https://www.craftmann.app/capturemann/"
 authors = ["The CaptureMann contributors"]
-rust-version = "1.90"
+rust-version = "1.95"
 
 [workspace.dependencies]
 anyhow = "1"
@@ -20,12 +20,66 @@ serde_json = "1"
 thiserror = "2"
 time = { version = "0.3", default-features = false, features = ["std", "serde-well-known"] }
 
+# Internal crates: members depend on them with `cm-x.workspace = true`.
+cm-ai = { path = "crates/cm-ai" }
+cm-audio = { path = "crates/cm-audio" }
+cm-auth = { path = "crates/cm-auth" }
+cm-camera = { path = "crates/cm-camera" }
+cm-capture = { path = "crates/cm-capture" }
+cm-cli = { path = "crates/cm-cli" }
+cm-core = { path = "crates/cm-core" }
+cm-cursor = { path = "crates/cm-cursor" }
+cm-daemon = { path = "crates/cm-daemon" }
+cm-encode = { path = "crates/cm-encode" }
+cm-i18n = { path = "crates/cm-i18n" }
+cm-ipc = { path = "crates/cm-ipc" }
+cm-jobs = { path = "crates/cm-jobs" }
+cm-library = { path = "crates/cm-library" }
+cm-mcp = { path = "crates/cm-mcp" }
+cm-media = { path = "crates/cm-media" }
+cm-publish = { path = "crates/cm-publish" }
+cm-render = { path = "crates/cm-render" }
+cm-storage = { path = "crates/cm-storage" }
+desktop = { path = "apps/desktop" }
+overlay = { path = "apps/overlay" }
+
+# Third-party crates used by more than one member; features stay in the member that needs them.
+arboard = { version = "3.7.0", default-features = false }
+async-trait = "0.1"
+base64 = "0.22"
+block2 = "0.6"
+dispatch2 = "0.3"
+getrandom = "0.4"
+hound = "3.5"
+icu_normalizer = { version = "2", default-features = false }
+image = { version = "0.25", default-features = false }
+libc = "0.2"
+log = { version = "0.4", features = ["std"] }
+objc2 = "0.6"
+objc2-av-foundation = "0.3"
+objc2-core-foundation = "0.3"
+objc2-core-graphics = "0.3"
+objc2-core-media = "0.3"
+objc2-core-video = "0.3"
+objc2-screen-capture-kit = "0.3"
+objc2-uniform-type-identifiers = "0.3"
+percent-encoding = "2"
+png = "0.18"
+rusqlite = "0.37"
+sha2 = "0.10"
+tempfile = "3"
+tokio = "1"
+unicode-segmentation = "1"
+ureq = { version = "3.5", default-features = false }
+
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
 unwrap_used = "warn"
+undocumented_unsafe_blocks = "warn"
+missing_safety_doc = "warn"
 # Error types carry a serde_json::Value of detail, whose size grows when GPUI enables serde_json features through
 # workspace feature unification. Errors are rare and end an operation, so boxing them is not worth it.
 result_large_err = "allow"

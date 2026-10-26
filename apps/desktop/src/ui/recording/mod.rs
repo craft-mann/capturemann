@@ -302,7 +302,7 @@ pub fn harden(window: &gpui::Window, click_through: bool) {
             level: click_through.then_some(1000),
         },
     ) {
-        eprintln!("cm-desktop: could not hide a recording window from capture: {e}");
+        log::warn!("could not hide a recording window from capture: {e}");
     }
 }
 
@@ -1394,7 +1394,7 @@ pub fn open_sheet_with(
     };
     let visible = visible_part(&display.1);
     if std::env::var_os("CM_DEMO_SHEET_TRACE").is_some() {
-        eprintln!(
+        log::info!(
             "sheet: displays {:?} chosen {:?} visible {visible:?}",
             displays(cx),
             display

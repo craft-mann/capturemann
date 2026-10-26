@@ -2,7 +2,7 @@
 //!
 //! All `unsafe` in this crate lives in this module tree. The unsafe calls are Objective-C /
 //! CoreMedia calls through the `objc2-*` bindings; each block carries a SAFETY note naming the
-//! invariant. No Swift bridge, so no libswift link requirements (docs/SPIKES.md S6).
+//! invariant. No Swift bridge, so no libswift link requirements (docs/project/spikes.md S6).
 
 mod devices;
 mod sample;

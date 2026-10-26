@@ -67,6 +67,7 @@ static CTX: AtomicPtr<HookCtx> = AtomicPtr::new(std::ptr::null_mut());
 
 fn mods_now() -> Vec<Modifier> {
     // Only the pressed/not-pressed state of the four modifier keys: no other key is queried.
+    // SAFETY: GetAsyncKeyState takes a plain virtual-key code and touches no memory.
     let down = |vk: u16| (unsafe { GetAsyncKeyState(i32::from(vk)) } as u16) & 0x8000 != 0;
     let mut m = Vec::new();
     if down(VK_SHIFT.0) {
@@ -84,6 +85,9 @@ fn mods_now() -> Vec<Modifier> {
     m
 }
 
+/// # Safety
+/// Only Windows may call this, as the `WH_MOUSE_LL` hook procedure: for `code >= 0`, `lparam` is
+/// a pointer to a valid `MSLLHOOKSTRUCT`.
 unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     // Stamp first, before anything else can delay us.
     let host_ns = SystemHostClock.now_ns();
@@ -229,6 +233,7 @@ unsafe fn extract(icon: HICON) -> Option<CursorImage> {
         }
     }
     let (w, h, rgba) = out?;
+    // SAFETY: GetDpiForSystem takes no arguments and touches no memory.
     let scale = f64::from(unsafe { GetDpiForSystem() }) / 96.0;
     Some(CursorImage {
         width: w,
@@ -239,6 +244,9 @@ unsafe fn extract(icon: HICON) -> Option<CursorImage> {
     })
 }
 
+/// # Safety
+/// `hdc` must be a valid device context and `bm` a valid bitmap not selected into any DC; the
+/// bitmap must be `w` x `h` pixels.
 unsafe fn dib(
     hdc: windows::Win32::Graphics::Gdi::HDC,
     bm: HBITMAP,
@@ -273,6 +281,8 @@ unsafe fn dib(
     (lines != 0).then_some(buf)
 }
 
+/// # Safety
+/// `info` must hold the valid bitmap handles (or null/invalid for an absent one) from GetIconInfo.
 unsafe fn read_bitmaps(info: &ICONINFO) -> Option<(u32, u32, Vec<u8>)> {
     // SAFETY: GDI calls on bitmaps owned by the caller; the DC is released before returning.
     unsafe {

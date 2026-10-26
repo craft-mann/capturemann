@@ -936,12 +936,16 @@ impl JobHandler for PublishHandler {
         tokio::pin!(publish);
         let mut interrupted = false;
         let published = loop {
+            // Biased: when the cancel and the upload become ready together, the flag is set
+            // first, so the next chunk boundary sees it (a fast transport could otherwise finish
+            // the remaining chunks inside one poll).
             tokio::select! {
-                r = &mut publish => break r,
+                biased;
                 _ = cancel.interrupted(), if !interrupted => {
                     interrupted = true;
                     flag.store(true, Ordering::Relaxed);
                 }
+                r = &mut publish => break r,
             }
         }
         .map_err(|e| explain_auth(&account, e))?;

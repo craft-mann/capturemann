@@ -71,7 +71,9 @@ pub use youtube::{YouTubeConfig, YouTubeProvider};
 /// Where the video is on the platform.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PublishStatus {
-    /// Uploaded; the platform is still processing it (links work, quality options come later).
+    /// Uploaded; the platform may still be processing it (links work, quality options come later).
+    /// Recorded as `processing`; the app does not poll the platform again, so it shows this as
+    /// published.
     Processing,
     /// Uploaded and processed.
     Processed,

@@ -1,4 +1,4 @@
-//! S5 prototype (GPUI): library grid + preview surface + keycap button, docs/DESIGN.md dark tokens.
+//! S5 prototype (GPUI): library grid + preview surface + keycap button, docs/development/design-surfaces.md dark tokens.
 //! `SPIKE_STATIC=1` stops the preview animation (idle-memory measurement).
 use std::sync::Arc;
 use std::time::Instant;

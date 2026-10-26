@@ -81,6 +81,7 @@ fn capturer() -> Result<cm_capture::Capturer, String> {
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    cm_core::logging::init();
     let mut library: Option<PathBuf> = std::env::var_os("CAPTUREMANN_LIBRARY").map(PathBuf::from);
     let mut endpoint = Endpoint::from_env_or_default();
     let mut args = std::env::args().skip(1);
@@ -104,7 +105,7 @@ async fn main() -> ExitCode {
         }
     }
     let Some(library) = library.or_else(cm_daemon::config::default_library_path) else {
-        eprintln!("cm-daemon: cannot determine the library folder; pass --library <dir>");
+        log::error!("cannot determine the library folder; pass --library <dir>");
         return usage();
     };
     // An app (or another daemon) already serving this endpoint: say so, change nothing.
@@ -114,7 +115,7 @@ async fn main() -> ExitCode {
     )
     .await
     {
-        eprintln!(
+        log::warn!(
             "cm-daemon: the CaptureMann app or another daemon is already serving {}; nothing to do",
             endpoint.describe()
         );
@@ -123,21 +124,21 @@ async fn main() -> ExitCode {
     let mut stop = match Stop::new() {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("cm-daemon: cannot listen for signals: {e}");
+            log::error!("cannot listen for signals: {e}");
             return ExitCode::FAILURE;
         }
     };
     let lib = match Library::open_or_create(&library) {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("cannot open library: {e}");
+            log::error!("cannot open library: {e}");
             return ExitCode::from(u8::try_from(e.exit_code()).unwrap_or(1));
         }
     };
     let capturer = match capturer() {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("{e}");
+            log::error!("{e}");
             return ExitCode::FAILURE;
         }
     };
@@ -145,7 +146,7 @@ async fn main() -> ExitCode {
     let queue = match cm_daemon::library_job_queue(lib.root()) {
         Ok(q) => q,
         Err(e) => {
-            eprintln!("cannot open the job queue: {e}");
+            log::error!("cannot open the job queue: {e}");
             return ExitCode::from(u8::try_from(e.exit_code()).unwrap_or(1));
         }
     };
@@ -170,61 +171,63 @@ async fn main() -> ExitCode {
     match daemon.recover_recordings() {
         Ok(r) => {
             for rec in &r.recovered {
-                eprintln!(
+                log::warn!(
                     "recovered recording \"{}\" ({}, lost up to {} ms)",
-                    rec.title, rec.capture_id, rec.lost_ms
+                    rec.title,
+                    rec.capture_id,
+                    rec.lost_ms
                 );
             }
             for (folder, why) in &r.failed {
-                eprintln!("could not recover {folder}: {why}");
+                log::warn!("could not recover {folder}: {why}");
             }
         }
-        Err(e) => eprintln!("crash recovery failed: {e}"),
+        Err(e) => log::warn!("crash recovery failed: {e}"),
     }
     // The quick exporter (FFmpeg sidecar): a combined MP4 after every recording (REC-1, EXP-1).
     if let Err(e) = daemon.register_export_handler() {
-        eprintln!("export is unavailable: {e}");
+        log::warn!("export is unavailable: {e}");
     }
     // Uploads to the user's destinations (STO-1, STO-3).
     if let Err(e) = daemon.register_upload_handler() {
-        eprintln!("upload is unavailable: {e}");
+        log::warn!("upload is unavailable: {e}");
     }
     // Publishing to YouTube (PUB-2).
     if let Err(e) = daemon.register_publish_handler() {
-        eprintln!("publishing is unavailable: {e}");
+        log::warn!("publishing is unavailable: {e}");
     }
     // Moving the library folder (LIB-2).
     if let Err(e) = daemon.register_library_move_handler() {
-        eprintln!("moving the library is unavailable: {e}");
+        log::warn!("moving the library is unavailable: {e}");
     }
     // Local AI (M5): the job executors for model downloads and transcription, and the automatic
     // transcription after a recording (only with an installed model; nothing is downloaded
     // silently). The real engine (`ai_engine::real_services`) loads a model only inside a job.
     if let Err(e) = daemon.register_ai_handlers() {
-        eprintln!("local AI is unavailable: {e}");
+        log::warn!("local AI is unavailable: {e}");
     }
     if let Err(e) = daemon.start_jobs() {
-        eprintln!("cannot start the job worker: {e}");
+        log::error!("cannot start the job worker: {e}");
         return ExitCode::FAILURE;
     }
     daemon.start_ai_auto_transcribe();
     // Bundles copied in, restored or deleted from outside appear without a rescan (LIB-1).
     if let Err(e) = daemon.start_library_watcher() {
-        eprintln!("library watcher is unavailable: {e}");
+        log::warn!("library watcher is unavailable: {e}");
     }
     let server = match IpcServer::bind(&endpoint) {
         Ok(s) => s,
         Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
-            eprintln!("cm-daemon: {e}");
+            log::error!("{e}");
             daemon.shutdown_jobs().await;
             return ExitCode::SUCCESS;
         }
         Err(e) => {
-            eprintln!("cannot listen on {endpoint:?}: {e}");
+            log::error!("cannot listen on {endpoint:?}: {e}");
             return ExitCode::FAILURE;
         }
     };
-    eprintln!(
+    log::warn!(
         "cm-daemon listening on {} (library {})",
         endpoint.describe(),
         library.display()
@@ -233,12 +236,12 @@ async fn main() -> ExitCode {
     tokio::select! {
         r = server.run(daemon.clone()) => {
             if let Err(e) = r {
-                eprintln!("server stopped: {e}");
+                log::error!("server stopped: {e}");
                 failed = true;
             }
         }
         () = stop.wait() => {
-            eprintln!("cm-daemon: stopping (a second signal exits at once)");
+            log::info!("stopping (a second signal exits at once)");
         }
     }
     // Finalize a recording, then the job worker (bounded); a second signal forces the exit.
@@ -248,7 +251,7 @@ async fn main() -> ExitCode {
             daemon.shutdown_jobs().await;
         } => {}
         () = stop.wait() => {
-            eprintln!("cm-daemon: forced exit");
+            log::warn!("forced exit");
             std::process::exit(130);
         }
     }

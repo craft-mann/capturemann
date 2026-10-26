@@ -31,7 +31,7 @@ pub enum Preset {
     None,
     SoftGray,
     /// "Lens Violet gradient" in the EDT-3 spec; the design kit retires the Lens Violet palette
-    /// for the app's own chrome (docs/DESIGN.md), so the spec and the kit disagree on the name. The
+    /// for the app's own chrome (docs/development/design-surfaces.md), so the spec and the kit disagree on the name. The
     /// label follows the spec until the owner decides.
     LensViolet,
     Custom,

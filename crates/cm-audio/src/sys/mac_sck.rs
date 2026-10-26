@@ -64,13 +64,17 @@ struct OutputIvars {
 }
 
 define_class!(
+    // SAFETY: NSObject has no subclassing requirements; the only ivar is a plain Rust struct.
     #[unsafe(super(NSObject))]
     #[name = "CMAudioSckOutput"]
     #[ivars = OutputIvars]
     struct AudioOutput;
 
+    // SAFETY: `AudioOutput` is a direct NSObject subclass, so it satisfies NSObjectProtocol.
     unsafe impl NSObjectProtocol for AudioOutput {}
 
+    // SAFETY: the method below has exactly the types of the `stream:didOutputSampleBuffer:ofType:`
+    // selector; SCK calls it with a valid stream and sample buffer.
     unsafe impl SCStreamOutput for AudioOutput {
         #[unsafe(method(stream:didOutputSampleBuffer:ofType:))]
         unsafe fn stream_did_output(
@@ -79,28 +83,35 @@ define_class!(
             sb: &CMSampleBuffer,
             ty: SCStreamOutputType,
         ) {
-            // Video frames are requested only because SCK needs a screen output; discard them.
-            if ty != SCStreamOutputType::Audio {
-                return;
-            }
-            // SAFETY: `sb` is a valid sample buffer for the duration of this callback.
-            let Some((host_ns, data)) = (unsafe { extract_audio(sb) }) else {
-                return;
-            };
-            if let Ok(mut guard) = self.ivars().sink.lock() {
-                if let Some(sink) = guard.as_mut() {
-                    sink.push(host_ns, &data);
+            // A panic must not unwind into ScreenCaptureKit (abort/UB): catch it, drop the chunk.
+            cm_core::guard::guard_unit("cm-audio stream_did_output", || {
+                // Video frames are requested only because SCK needs a screen output; discard them.
+                if ty != SCStreamOutputType::Audio {
+                    return;
                 }
-            }
+                // SAFETY: `sb` is a valid sample buffer for the duration of this callback.
+                let Some((host_ns, data)) = (unsafe { extract_audio(sb) }) else {
+                    return;
+                };
+                if let Ok(mut guard) = self.ivars().sink.lock() {
+                    if let Some(sink) = guard.as_mut() {
+                        sink.push(host_ns, &data);
+                    }
+                }
+            });
         }
     }
 
+    // SAFETY: the method below matches the types of the `stream:didStopWithError:` selector; it
+    // only reads the NSError SCK passes (valid for the call) and uses a thread-safe notifier.
     unsafe impl SCStreamDelegate for AudioOutput {
         #[unsafe(method(stream:didStopWithError:))]
         unsafe fn stream_did_stop(&self, _stream: &SCStream, error: &NSError) {
-            self.ivars()
-                .notifier
-                .disconnected(error.localizedDescription().to_string());
+            cm_core::guard::guard_unit("cm-audio stream_did_stop", || {
+                self.ivars()
+                    .notifier
+                    .disconnected(error.localizedDescription().to_string());
+            });
         }
     }
 );
@@ -122,11 +133,11 @@ impl AudioOutput {
 /// # Safety
 /// `sb` must be a valid audio `CMSampleBuffer`.
 unsafe fn extract_audio(sb: &CMSampleBuffer) -> Option<(u64, Vec<f32>)> {
-    // SAFETY (whole function): the CoreMedia calls receive pointers to locals that outlive the
-    // calls; the AudioBufferList storage is sized by the first call and 8-byte aligned (Vec<u64>);
-    // buffer pointers are only read while the retained block buffer is alive.
+    // SAFETY: `sb` is valid per this function's contract.
     let host_ns = cm_ns(unsafe { sb.presentation_time_stamp() })?;
     let mut needed: usize = 0;
+    // SAFETY: size query only: every out-pointer is a local that outlives the call or null, and the
+    // list capacity is 0, so CoreMedia writes only `needed`.
     let st = unsafe {
         sb.audio_buffer_list_with_retained_block_buffer(
             &mut needed,
@@ -144,6 +155,8 @@ unsafe fn extract_audio(sb: &CMSampleBuffer) -> Option<(u64, Vec<f32>)> {
     let mut storage = vec![0u64; needed.div_ceil(8)];
     let list = storage.as_mut_ptr().cast::<AudioBufferList>();
     let mut block: *mut CMBlockBuffer = std::ptr::null_mut();
+    // SAFETY: `list` points to `needed` writable bytes (`storage`), 8-byte aligned via Vec<u64> as
+    // AudioBufferList requires; `block` is a local out-pointer.
     let st = unsafe {
         sb.audio_buffer_list_with_retained_block_buffer(
             std::ptr::null_mut(),
@@ -156,19 +169,25 @@ unsafe fn extract_audio(sb: &CMSampleBuffer) -> Option<(u64, Vec<f32>)> {
         )
     };
     // Own the retained block buffer so it is released on every path.
+    // SAFETY: on success CoreMedia returns `block` at +1 retain count, which we now own.
     let _block = NonNull::new(block).map(|p| unsafe { CFRetained::from_raw(p) });
     if st != 0 {
         return None;
     }
+    // SAFETY: `st == 0`, so `list` (inside `storage`, alive to the end) was filled by CoreMedia.
     let n_buffers = unsafe { (*list).mNumberBuffers } as usize;
+    // SAFETY: as above; this only computes the address of the trailing buffer array.
     let first = unsafe { (*list).mBuffers.as_ptr() };
     let mut planes: Vec<(&[f32], usize)> = Vec::new(); // (samples, channels in this buffer)
     for i in 0..n_buffers {
+        // SAFETY: `i < mNumberBuffers`, and the list holds that many AudioBuffers inside `storage`.
         let b = unsafe { &*first.add(i) };
         if b.mData.is_null() {
             return None;
         }
         let len = b.mDataByteSize as usize / 4;
+        // SAFETY: `mData` is non-null and holds `mDataByteSize` bytes of f32 audio (SCK delivers
+        // float PCM), kept alive by `_block`; the slice is copied before `_block` drops.
         let samples = unsafe { std::slice::from_raw_parts(b.mData.cast::<f32>(), len) };
         planes.push((samples, (b.mNumberChannels as usize).max(1)));
     }
@@ -226,6 +245,7 @@ fn get_content() -> Result<Retained<SCShareableContent>, CmError> {
         // error or null; retain keeps the content alive past the handler.
         let r = match unsafe { Retained::retain(c) } {
             Some(c) => Ok(SendBox(c)),
+            // SAFETY: with no content, SCK passes a valid NSError or null; `as_ref` handles null.
             None => Err(unsafe { e.as_ref() }
                 .map(|e| e.localizedDescription().to_string())
                 .unwrap_or_else(|| "unknown error".into())),

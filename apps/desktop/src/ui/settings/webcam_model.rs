@@ -1,6 +1,7 @@
-//! Settings -> Webcam & audio, board R13: the models behind the Camera and Microphone dropdowns,
-//! the preview card and the live-preview switch. Everything here is pure (no window, no device),
-//! so the rules are tested with fakes.
+//! Settings -> Webcam & audio, boards R13 and R13b: the models behind the Camera and Microphone
+//! dropdowns, the rules that start and stop a check (`CheckSession`, shared by the camera and the
+//! microphone) and the states of the Camera check card. Everything here is pure (no window, no
+//! device), so the rules are tested with fakes.
 //!
 //! # The two settings
 //!
@@ -14,7 +15,6 @@
 use cm_i18n::{tr, tr_ctx};
 use serde_json::{json, Value};
 
-use crate::recording::geometry::{bubble_dims, BubblePosition, BubbleShape, BubbleSize, Rect};
 use crate::recording::sheet::DeviceChoice;
 
 // ---- the dropdowns ---------------------------------------------------------------------------
@@ -163,127 +163,255 @@ pub fn live_device(devices: &[DeviceChoice], saved: Option<&str>) -> Option<Stri
         .map(str::to_owned)
 }
 
-// ---- the preview card ------------------------------------------------------------------------
+// ---- the check session: when a device may be on ----------------------------------------------
 
-/// The size of the display the card pretends to show, in logical px. The bubble is placed on it
-/// with the real rules and the card scales the result down.
-pub const VIRTUAL_SCREEN: (f64, f64) = (1440.0, 810.0);
-
-/// Where and how the bubble is drawn on the wireframe screen, in [`VIRTUAL_SCREEN`] px.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct PreviewBubble {
-    pub rect: Rect,
-    /// Outer corner radius.
-    pub radius: f64,
-    /// The silhouette is flipped (the preview is mirrored).
-    pub flip: bool,
-}
-
-pub fn preview_bubble(
-    size: BubbleSize,
-    shape: BubbleShape,
-    mirror: bool,
-    position: BubblePosition,
-) -> PreviewBubble {
-    let (w, h) = bubble_dims(size, shape);
-    let area = Rect::new(0.0, 0.0, VIRTUAL_SCREEN.0, VIRTUAL_SCREEN.1);
-    PreviewBubble {
-        rect: position.rect(&area, (w, h)),
-        radius: shape.radius(w, h),
-        flip: mirror,
-    }
-}
-
-impl PreviewBubble {
-    /// The rectangle on a card whose screen is `screen_w` px wide.
-    pub fn scaled(&self, screen_w: f64) -> Rect {
-        let k = screen_w / VIRTUAL_SCREEN.0;
-        Rect::new(
-            self.rect.x * k,
-            self.rect.y * k,
-            self.rect.w * k,
-            self.rect.h * k,
-        )
-    }
-}
-
-/// The corner (or edge) a position names.
-#[cfg(test)]
-pub fn anchor_of(position: BubblePosition) -> Option<crate::recording::geometry::Anchor> {
-    match position {
-        BubblePosition::Anchor(a) => Some(a),
-        BubblePosition::Fraction(..) => None,
-    }
-}
-
-/// The caption pill: "Preview · M, circle, mirrored". One sentence with named placeholders, so a
-/// language can order and inflect the three words as it needs.
-pub fn preview_caption(size: BubbleSize, shape: BubbleShape, mirror: bool) -> String {
-    let shape_word = match shape {
-        BubbleShape::Circle => tr_ctx!("preview caption shape", "circle"),
-        BubbleShape::Rounded => tr_ctx!("preview caption shape", "rounded"),
-    };
-    let mirror_word = if mirror {
-        tr_ctx!("preview caption mirror", "mirrored")
-    } else {
-        tr_ctx!("preview caption mirror", "not mirrored")
-    };
-    tr!(
-        "Preview \u{00B7} {size}, {shape}, {mirror}",
-        size = size.key().to_uppercase(),
-        shape = shape_word,
-        mirror = mirror_word
-    )
-}
-
-// ---- the live camera switch ------------------------------------------------------------------
-
-/// What decides whether the card shows the live camera.
+/// What decides whether the camera or the microphone of the check may be on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct LiveInputs {
-    /// The "Show live camera" switch.
-    pub requested: bool,
-    /// Camera permission is granted.
+pub struct Facts {
+    /// The permission (camera or microphone) is granted.
     pub permission: bool,
     /// The Webcam & audio page is the page on screen.
     pub on_page: bool,
     /// The app's window is in front (not hidden, not deactivated).
     pub window_active: bool,
+    /// A recording (or its countdown, or the Record sheet's own bubble) owns the devices.
+    pub recording: bool,
 }
 
+/// What the page has to do now.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LiveStep {
+pub enum Effect {
+    /// Open the device and start the stream.
     Start,
+    /// Close the device (the camera light and the orange microphone dot go out).
     Stop,
-    Keep,
+    /// Go to CaptureMann's own Settings -> Permissions page. Nothing is asked on the way.
+    OpenPermissions,
 }
 
-impl LiveInputs {
-    /// The camera may be on (and its indicator light with it).
-    pub fn should_run(self) -> bool {
-        self.requested && self.permission && self.on_page && self.window_active
+/// The user's wish for one check (the camera, or the microphone) and the rules that end it.
+///
+/// A check is off until the user presses Turn on camera / Test microphone. It is never saved. It
+/// ends when the user turns it off, leaves the page, the window is not in front, or the
+/// permission goes away. A recording does not end the wish: the check pauses and resumes when the
+/// recording is over (the window must then still be in front).
+#[derive(Debug, Clone, Default)]
+pub struct CheckSession {
+    requested: bool,
+    /// The user pressed the start button and the permission was missing: the "No permission"
+    /// block shows.
+    no_permission: bool,
+    /// The user pressed "Allow access": when they come back to the page with the permission
+    /// granted, the check starts by itself.
+    resume_after_permission: bool,
+    was_on_page: bool,
+}
+
+impl CheckSession {
+    pub fn requested(&self) -> bool {
+        self.requested
     }
 
-    /// What to do now that `running` (a preview is running or starting) and the inputs are known.
-    pub fn step(self, running: bool) -> LiveStep {
-        match (self.should_run(), running) {
-            (true, false) => LiveStep::Start,
-            (false, true) => LiveStep::Stop,
-            _ => LiveStep::Keep,
+    pub fn shows_no_permission(&self) -> bool {
+        self.no_permission
+    }
+
+    /// Turn on camera / Test microphone.
+    pub fn press_start(&mut self, f: Facts) {
+        if f.permission {
+            self.requested = true;
+            self.no_permission = false;
+        } else {
+            self.requested = false;
+            self.no_permission = true;
         }
     }
 
-    /// The switch after leaving the page, hiding or deactivating the window, or losing the
-    /// permission: it goes back off, and it is never remembered across launches.
-    pub fn requested_after(self) -> bool {
-        self.requested && self.permission && self.on_page && self.window_active
+    /// Turn off camera / Turn off microphone.
+    pub fn press_stop(&mut self) {
+        self.requested = false;
+        self.no_permission = false;
+    }
+
+    /// "Allow access": the page of the Permissions list opens; the request itself happens there.
+    pub fn press_allow_access(&mut self) -> Effect {
+        self.resume_after_permission = true;
+        Effect::OpenPermissions
+    }
+
+    /// The device could not be opened: the check is off again (the page shows why).
+    pub fn start_failed(&mut self, permission_missing: bool) {
+        self.requested = false;
+        self.no_permission = permission_missing;
+    }
+
+    /// Follows the page, the window, the permission and the recording. `running`: a stream is on
+    /// or starting. Called by everything that can change one of the facts; safe to call any time.
+    pub fn sync(&mut self, f: Facts, running: bool) -> Option<Effect> {
+        let entering = f.on_page && !self.was_on_page;
+        self.was_on_page = f.on_page;
+        if entering {
+            if self.resume_after_permission && f.permission {
+                self.requested = true;
+                self.no_permission = false;
+            }
+            self.resume_after_permission = false;
+        }
+        if !f.on_page {
+            self.requested = false;
+            self.no_permission = false;
+        } else if self.no_permission && f.permission {
+            // The user pressed the start button, then granted the permission: go on.
+            self.requested = true;
+            self.no_permission = false;
+        } else if self.requested && !f.permission {
+            self.requested = false;
+            self.no_permission = true;
+        }
+        if !f.window_active && !f.recording {
+            self.requested = false;
+        }
+        let should_run = self.should_run(f);
+        match (should_run, running) {
+            (true, false) => Some(Effect::Start),
+            (false, true) => Some(Effect::Stop),
+            _ => None,
+        }
+    }
+
+    /// The device may be on (and its indicator with it).
+    pub fn should_run(&self, f: Facts) -> bool {
+        self.requested && f.permission && f.on_page && f.window_active && !f.recording
+    }
+
+    /// The check is wanted but a recording holds the devices: a plain note shows.
+    pub fn paused_by_recording(&self, f: Facts) -> bool {
+        self.requested && f.recording && f.permission && f.on_page
+    }
+}
+
+// ---- the camera card -------------------------------------------------------------------------
+
+/// Why the camera did not open or stopped.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CamFailure {
+    /// Another app has it.
+    InUse,
+    /// No camera, or the one in use was unplugged.
+    NotFound,
+    /// Anything else (the platform's message).
+    Other(String),
+}
+
+/// What an error from the preview start means for the card.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StartError {
+    NoPermission,
+    Failure(CamFailure),
+}
+
+pub fn classify_start_error(code: cm_core::ErrorCode, message: &str) -> StartError {
+    use cm_core::ErrorCode;
+    match code {
+        ErrorCode::PermissionMissing => StartError::NoPermission,
+        ErrorCode::DeviceBusy => StartError::Failure(CamFailure::InUse),
+        ErrorCode::NotFound => StartError::Failure(CamFailure::NotFound),
+        _ => StartError::Failure(CamFailure::Other(message.to_owned())),
+    }
+}
+
+/// What the Camera check card shows.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CameraCard {
+    /// The default: "Camera is off", Turn on camera.
+    Off,
+    /// Asked, no frame yet.
+    Starting,
+    /// Frames are arriving.
+    Live,
+    /// A recording holds the camera.
+    Paused,
+    NoPermission,
+    InUse,
+    NotFound,
+    Other(String),
+}
+
+pub fn camera_card(
+    session: &CheckSession,
+    f: Facts,
+    failure: Option<&CamFailure>,
+    frames: bool,
+) -> CameraCard {
+    if session.shows_no_permission() {
+        return CameraCard::NoPermission;
+    }
+    if let Some(failure) = failure {
+        return match failure {
+            CamFailure::InUse => CameraCard::InUse,
+            CamFailure::NotFound => CameraCard::NotFound,
+            CamFailure::Other(m) => CameraCard::Other(m.clone()),
+        };
+    }
+    if session.paused_by_recording(f) {
+        return CameraCard::Paused;
+    }
+    match (session.requested(), frames) {
+        (true, true) => CameraCard::Live,
+        (true, false) => CameraCard::Starting,
+        (false, _) => CameraCard::Off,
+    }
+}
+
+/// The mono readout of the Live chip: `1920 × 1080 · 30 fps`. Each part shows only when known.
+pub fn readout(size: Option<(u32, u32)>, fps: Option<u32>) -> Option<String> {
+    match (size, fps) {
+        (Some((w, h)), Some(fps)) => Some(format!("{w} \u{00D7} {h} \u{00B7} {fps} fps")),
+        (Some((w, h)), None) => Some(format!("{w} \u{00D7} {h}")),
+        (None, Some(fps)) => Some(format!("{fps} fps")),
+        (None, None) => None,
+    }
+}
+
+/// Frames per second measured from the frames that arrive: the count at the start of a window
+/// of at least a second and the count at its end.
+#[derive(Debug, Clone, Default)]
+pub struct FpsMeter {
+    base: Option<(u64, u64)>,
+    fps: Option<u32>,
+}
+
+impl FpsMeter {
+    /// The window length, ms.
+    pub const WINDOW_MS: u64 = 1000;
+
+    /// `count`: frames pushed so far; `now_ms`: any monotonic clock. Returns the latest measure.
+    pub fn update(&mut self, count: u64, now_ms: u64) -> Option<u32> {
+        match self.base {
+            None => self.base = Some((count, now_ms)),
+            Some((c0, t0)) if now_ms.saturating_sub(t0) >= Self::WINDOW_MS => {
+                let dt = (now_ms - t0) as f64;
+                let n = count.saturating_sub(c0) as f64;
+                self.fps = Some((n * 1000.0 / dt).round() as u32);
+                self.base = Some((count, now_ms));
+            }
+            Some(_) => {}
+        }
+        self.fps
+    }
+
+    pub fn reset(&mut self) {
+        *self = FpsMeter::default();
+    }
+
+    pub fn fps(&self) -> Option<u32> {
+        self.fps
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::recording::geometry::Anchor;
     use cm_i18n::{with_language, Lang};
 
     fn dev(id: &str, name: &str, default: bool) -> DeviceChoice {
@@ -442,165 +570,351 @@ mod tests {
             .all(|o| !o.name.eq_ignore_ascii_case("off") && o.value.as_deref() != Some("off")));
     }
 
-    // ---- caption ----
+    // ---- the settings are the same ones as before ----
 
+    /// R13b moves rows around; every setting keeps its key and its reading (camera device, mic
+    /// device, shape, size, mirror, remember position, noise suppression).
     #[test]
-    fn the_caption_in_english_for_every_combination() {
-        with_language(Lang::En, || {
-            for (size, s) in [
-                (BubbleSize::S, "S"),
-                (BubbleSize::M, "M"),
-                (BubbleSize::L, "L"),
-            ] {
-                for (shape, sh) in [
-                    (BubbleShape::Circle, "circle"),
-                    (BubbleShape::Rounded, "rounded"),
-                ] {
-                    for (mirror, m) in [(true, "mirrored"), (false, "not mirrored")] {
-                        assert_eq!(
-                            preview_caption(size, shape, mirror),
-                            format!("Preview \u{00B7} {s}, {sh}, {m}")
-                        );
-                    }
-                }
-            }
-        });
-    }
+    fn every_existing_setting_keeps_its_key_and_round_trips() {
+        use crate::recording::geometry::{BubbleShape, BubbleSize};
+        use crate::recording::start as keys;
+        assert_eq!(keys::KEY_CAMERA_DEVICE, "camera.device");
+        assert_eq!(keys::KEY_MIC_DEVICE, "audio.mic_device");
+        assert_eq!(keys::KEY_BUBBLE_SHAPE, "camera.shape");
+        assert_eq!(keys::KEY_BUBBLE_SIZE, "camera.size");
+        assert_eq!(keys::KEY_BUBBLE_MIRROR, "camera.mirror");
+        assert_eq!(keys::KEY_BUBBLE_REMEMBER, "camera.remember_position");
+        assert_eq!(keys::KEY_NOISE, "audio.noise_suppression");
 
-    #[test]
-    fn the_caption_in_vietnamese_for_every_combination() {
-        with_language(Lang::Vi, || {
-            for size in BubbleSize::ALL {
-                for shape in [BubbleShape::Circle, BubbleShape::Rounded] {
-                    for mirror in [true, false] {
-                        let text = preview_caption(size, shape, mirror);
-                        assert!(text.starts_with("Xem trước"), "{text}");
-                        assert!(text.contains(&size.key().to_uppercase()), "{text}");
-                        assert!(
-                            text.contains(if shape == BubbleShape::Circle {
-                                "tròn"
-                            } else {
-                                "bo góc"
-                            }),
-                            "{text}"
-                        );
-                        assert!(
-                            text.contains(if mirror { "lật" } else { "không lật" }),
-                            "{text}"
-                        );
-                        assert!(!text.contains('{'), "{text}");
-                    }
-                }
-            }
-            assert_eq!(
-                preview_caption(BubbleSize::M, BubbleShape::Circle, true),
-                "Xem trước \u{00B7} M, tròn, đã lật"
-            );
-        });
-    }
-
-    // ---- geometry ----
-
-    #[test]
-    fn the_bubble_sits_in_the_remembered_corner() {
-        let at = |a| {
-            preview_bubble(
-                BubbleSize::M,
-                BubbleShape::Circle,
-                true,
-                BubblePosition::Anchor(a),
-            )
-        };
-        let (w, h) = VIRTUAL_SCREEN;
-        let bl = at(Anchor::BottomLeft);
-        assert_eq!((bl.rect.x, bl.rect.bottom()), (24.0, h - 24.0));
-        let tr = at(Anchor::TopRight);
-        assert_eq!((tr.rect.right(), tr.rect.y), (w - 24.0, 24.0));
-        let tl = at(Anchor::TopLeft);
-        assert_eq!((tl.rect.x, tl.rect.y), (24.0, 24.0));
-        let br = at(Anchor::BottomRight);
-        assert_eq!((br.rect.right(), br.rect.bottom()), (w - 24.0, h - 24.0));
-        // A dragged position (fractions of the area) keeps the bubble inside the screen.
-        let f = preview_bubble(
-            BubbleSize::L,
-            BubbleShape::Circle,
-            false,
-            BubblePosition::Fraction(1.0, 1.0),
+        let mut m = serde_json::Map::new();
+        m.insert(keys::KEY_CAMERA_DEVICE.into(), json!("c2"));
+        m.insert(keys::KEY_MIC_DEVICE.into(), json!("m1"));
+        m.insert(keys::KEY_BUBBLE_SHAPE.into(), json!("rounded"));
+        m.insert(keys::KEY_BUBBLE_SIZE.into(), json!("l"));
+        m.insert(keys::KEY_BUBBLE_MIRROR.into(), json!(false));
+        m.insert(keys::KEY_NOISE.into(), json!(false));
+        assert_eq!(
+            saved_device(&m, keys::KEY_CAMERA_DEVICE).as_deref(),
+            Some("c2")
         );
-        assert!(f.rect.right() <= w && f.rect.bottom() <= h);
+        assert_eq!(
+            saved_device(&m, keys::KEY_MIC_DEVICE).as_deref(),
+            Some("m1")
+        );
+        let b = keys::SheetDefaults::from_settings(&m).bubble;
+        assert_eq!(b.shape, BubbleShape::Rounded);
+        assert_eq!(b.size, BubbleSize::L);
+        assert!(!b.mirror);
+        assert!(!keys::RecordingSettings::from_settings(&m).noise_suppression);
+        // The sizes and shapes the segmented controls write read back as themselves.
+        for sz in BubbleSize::ALL {
+            m.insert(keys::KEY_BUBBLE_SIZE.into(), json!(sz.key()));
+            assert_eq!(keys::SheetDefaults::from_settings(&m).bubble.size, sz);
+        }
+        for sh in [BubbleShape::Circle, BubbleShape::Rounded] {
+            m.insert(keys::KEY_BUBBLE_SHAPE.into(), json!(sh.key()));
+            assert_eq!(keys::SheetDefaults::from_settings(&m).bubble.shape, sh);
+        }
     }
 
-    #[test]
-    fn size_and_shape_follow_the_real_bubble() {
-        let p = BubblePosition::default();
-        let s = preview_bubble(BubbleSize::S, BubbleShape::Circle, true, p);
-        let m = preview_bubble(BubbleSize::M, BubbleShape::Circle, true, p);
-        let l = preview_bubble(BubbleSize::L, BubbleShape::Circle, true, p);
-        assert_eq!((s.rect.w, m.rect.w, l.rect.w), (160.0, 240.0, 320.0));
-        assert_eq!((m.rect.w, m.rect.h), (240.0, 240.0));
-        assert_eq!(m.radius, 120.0, "a circle");
-        let r = preview_bubble(BubbleSize::M, BubbleShape::Rounded, true, p);
-        assert_eq!((r.rect.w, r.rect.h), (240.0, 180.0), "4:3");
-        assert_eq!(r.radius, 24.0);
-        // On the card the same proportions, scaled.
-        let on_card = m.scaled(720.0);
-        assert_eq!((on_card.w, on_card.h), (120.0, 120.0));
-    }
+    // ---- the check session ----
 
-    #[test]
-    fn mirror_flips_the_silhouette_only() {
-        let p = BubblePosition::default();
-        let a = preview_bubble(BubbleSize::M, BubbleShape::Circle, true, p);
-        let b = preview_bubble(BubbleSize::M, BubbleShape::Circle, false, p);
-        assert!(a.flip && !b.flip);
-        assert_eq!(a.rect, b.rect);
-        assert_eq!(anchor_of(p), Some(Anchor::BottomLeft));
-    }
-
-    // ---- live state machine ----
-
-    fn inputs(requested: bool, permission: bool, on_page: bool, window_active: bool) -> LiveInputs {
-        LiveInputs {
-            requested,
+    fn facts(permission: bool, on_page: bool, window_active: bool, recording: bool) -> Facts {
+        Facts {
             permission,
             on_page,
             window_active,
+            recording,
+        }
+    }
+
+    const OK: Facts = Facts {
+        permission: true,
+        on_page: true,
+        window_active: true,
+        recording: false,
+    };
+
+    /// A fake device layer: counts the opens, the closes and the system prompts.
+    #[derive(Default)]
+    struct FakeDevice {
+        open: bool,
+        opens: u32,
+        closes: u32,
+        prompts: u32,
+        permission_page_opens: u32,
+    }
+
+    impl FakeDevice {
+        fn apply(&mut self, e: Option<Effect>) {
+            match e {
+                Some(Effect::Start) => {
+                    self.open = true;
+                    self.opens += 1;
+                }
+                Some(Effect::Stop) => {
+                    self.open = false;
+                    self.closes += 1;
+                }
+                Some(Effect::OpenPermissions) => self.permission_page_opens += 1,
+                None => {}
+            }
+        }
+    }
+
+    /// Opening the page opens nothing and asks for nothing, however often it is drawn.
+    #[test]
+    fn opening_the_page_opens_no_device_and_asks_for_nothing() {
+        for permission in [true, false] {
+            let mut s = CheckSession::default();
+            let mut d = FakeDevice::default();
+            for _ in 0..5 {
+                d.apply(s.sync(facts(permission, true, true, false), d.open));
+            }
+            assert_eq!((d.opens, d.prompts, d.permission_page_opens), (0, 0, 0));
+            assert!(!s.requested() && !s.shows_no_permission());
         }
     }
 
     #[test]
-    fn the_camera_starts_only_when_everything_allows_it() {
-        assert_eq!(inputs(true, true, true, true).step(false), LiveStep::Start);
-        for off in [
-            inputs(false, true, true, true),
-            inputs(true, false, true, true),
-            inputs(true, true, false, true),
-            inputs(true, true, true, false),
-        ] {
-            assert_eq!(off.step(false), LiveStep::Keep, "{off:?}");
-        }
+    fn the_start_button_starts_the_device() {
+        let mut s = CheckSession::default();
+        let mut d = FakeDevice::default();
+        s.press_start(OK);
+        d.apply(s.sync(OK, d.open));
+        assert!(d.open);
+        assert_eq!(d.opens, 1);
+        // Further syncs keep it.
+        d.apply(s.sync(OK, d.open));
+        assert_eq!(d.opens, 1);
+        // Turn off.
+        s.press_stop();
+        d.apply(s.sync(OK, d.open));
+        assert!(!d.open);
+        assert_eq!(d.closes, 1);
+    }
+
+    /// Without the permission the button opens nothing, asks nothing and shows the block.
+    #[test]
+    fn the_start_button_without_permission_shows_the_block_only() {
+        let f = facts(false, true, true, false);
+        let mut s = CheckSession::default();
+        let mut d = FakeDevice::default();
+        s.press_start(f);
+        d.apply(s.sync(f, d.open));
+        assert_eq!((d.opens, d.prompts), (0, 0));
+        assert!(s.shows_no_permission());
+        // Allow access goes to the Permissions page and nowhere else.
+        d.apply(Some(s.press_allow_access()));
+        assert_eq!(d.permission_page_opens, 1);
+        assert_eq!(d.prompts, 0);
+    }
+
+    /// Allow access, then the user comes back with the permission: the check starts by itself,
+    /// once. Coming back without it starts nothing and forgets the wish.
+    #[test]
+    fn coming_back_with_the_permission_starts_the_check() {
+        let away = facts(false, false, true, false);
+        let mut s = CheckSession::default();
+        let mut d = FakeDevice::default();
+        s.sync(facts(false, true, true, false), d.open);
+        s.press_start(facts(false, true, true, false));
+        d.apply(Some(s.press_allow_access()));
+        // The Permissions page is another page.
+        d.apply(s.sync(away, d.open));
+        assert!(!s.shows_no_permission(), "the block goes with the page");
+        d.apply(s.sync(facts(true, true, true, false), d.open));
+        assert!(d.open && d.opens == 1);
+
+        // Back without the permission: nothing starts, and a later grant does not either.
+        let mut s = CheckSession::default();
+        let mut d = FakeDevice::default();
+        s.sync(facts(false, true, true, false), d.open);
+        s.press_start(facts(false, true, true, false));
+        s.press_allow_access();
+        s.sync(away, d.open);
+        d.apply(s.sync(facts(false, true, true, false), d.open));
+        s.sync(away, d.open);
+        d.apply(s.sync(facts(true, true, true, false), d.open));
+        assert_eq!(d.opens, 0);
+    }
+
+    /// The permission arrives while the block shows (granted in System Settings): the wish the
+    /// button expressed goes on.
+    #[test]
+    fn a_grant_while_the_block_shows_starts_the_check() {
+        let mut s = CheckSession::default();
+        let mut d = FakeDevice::default();
+        s.press_start(facts(false, true, true, false));
+        d.apply(s.sync(facts(false, true, true, false), d.open));
+        d.apply(s.sync(OK, d.open));
+        assert!(d.open);
+        assert!(!s.shows_no_permission());
     }
 
     #[test]
-    fn the_camera_stops_when_the_switch_goes_off_the_page_closes_or_the_app_deactivates() {
-        assert_eq!(inputs(true, true, true, true).step(true), LiveStep::Keep);
-        for off in [
-            inputs(false, true, true, true),
-            inputs(true, false, true, true),
-            inputs(true, true, false, true),
-            inputs(true, true, true, false),
-        ] {
-            assert_eq!(off.step(true), LiveStep::Stop, "{off:?}");
-        }
-        assert_eq!(inputs(false, true, true, true).step(false), LiveStep::Keep);
+    fn leaving_the_page_stops_the_device_and_forgets_the_wish() {
+        let mut s = CheckSession::default();
+        let mut d = FakeDevice::default();
+        s.press_start(OK);
+        d.apply(s.sync(OK, d.open));
+        d.apply(s.sync(facts(true, false, true, false), d.open));
+        assert!(!d.open);
+        // Back on the page: still off.
+        d.apply(s.sync(OK, d.open));
+        assert!(!d.open && d.opens == 1);
     }
 
     #[test]
-    fn the_switch_goes_back_off_and_is_not_remembered() {
-        assert!(inputs(true, true, true, true).requested_after());
-        assert!(!inputs(true, true, false, true).requested_after());
-        assert!(!inputs(true, true, true, false).requested_after());
-        assert!(!inputs(true, false, true, true).requested_after());
-        assert!(!inputs(false, true, true, true).requested_after());
+    fn a_window_that_is_not_in_front_stops_the_device() {
+        let mut s = CheckSession::default();
+        let mut d = FakeDevice::default();
+        s.press_start(OK);
+        d.apply(s.sync(OK, d.open));
+        d.apply(s.sync(facts(true, true, false, false), d.open));
+        assert!(!d.open);
+        d.apply(s.sync(OK, d.open));
+        assert!(!d.open, "it is not remembered across the window going away");
+    }
+
+    #[test]
+    fn losing_the_permission_stops_the_device_and_shows_the_block() {
+        let mut s = CheckSession::default();
+        let mut d = FakeDevice::default();
+        s.press_start(OK);
+        d.apply(s.sync(OK, d.open));
+        d.apply(s.sync(facts(false, true, true, false), d.open));
+        assert!(!d.open);
+        assert!(s.shows_no_permission());
+    }
+
+    /// A recording starting closes the device and shows the plain note; when it ends, the check
+    /// goes on if the window is in front. A window that is not in front then ends the wish.
+    #[test]
+    fn a_recording_pauses_the_check_and_it_resumes_after() {
+        let rec = facts(true, true, true, true);
+        let mut s = CheckSession::default();
+        let mut d = FakeDevice::default();
+        s.press_start(OK);
+        d.apply(s.sync(OK, d.open));
+        d.apply(s.sync(rec, d.open));
+        assert!(!d.open);
+        assert!(s.paused_by_recording(rec));
+        assert!(!s.shows_no_permission());
+        // Another app is in front during the recording: the wish survives it.
+        let rec_away = facts(true, true, false, true);
+        d.apply(s.sync(rec_away, d.open));
+        assert!(s.requested());
+        d.apply(s.sync(OK, d.open));
+        assert!(d.open && d.opens == 2);
+
+        // The recording ends while the window is not in front: the check does not come back.
+        let mut s = CheckSession::default();
+        let mut d = FakeDevice::default();
+        s.press_start(OK);
+        d.apply(s.sync(OK, d.open));
+        d.apply(s.sync(rec_away, d.open));
+        d.apply(s.sync(facts(true, true, false, false), d.open));
+        d.apply(s.sync(OK, d.open));
+        assert!(!d.open);
+    }
+
+    #[test]
+    fn a_failed_start_turns_the_check_off() {
+        let mut s = CheckSession::default();
+        s.press_start(OK);
+        s.start_failed(false);
+        assert!(!s.requested() && !s.shows_no_permission());
+        s.press_start(OK);
+        s.start_failed(true);
+        assert!(s.shows_no_permission());
+    }
+
+    // ---- the camera card ----
+
+    #[test]
+    fn camera_start_errors_map_to_the_blocks() {
+        use cm_core::ErrorCode;
+        assert_eq!(
+            classify_start_error(ErrorCode::PermissionMissing, "x"),
+            StartError::NoPermission
+        );
+        assert_eq!(
+            classify_start_error(ErrorCode::DeviceBusy, "x"),
+            StartError::Failure(CamFailure::InUse)
+        );
+        assert_eq!(
+            classify_start_error(ErrorCode::NotFound, "x"),
+            StartError::Failure(CamFailure::NotFound)
+        );
+        assert_eq!(
+            classify_start_error(ErrorCode::Internal, "boom"),
+            StartError::Failure(CamFailure::Other("boom".into()))
+        );
+    }
+
+    /// One state per block of the spec (section 4) plus the normal ones.
+    #[test]
+    fn the_camera_card_shows_the_block_that_matches() {
+        let idle = CheckSession::default();
+        assert_eq!(camera_card(&idle, OK, None, false), CameraCard::Off);
+        // Frames without a wish (a stale slot) are not Live.
+        assert_eq!(camera_card(&idle, OK, None, true), CameraCard::Off);
+
+        let mut on = CheckSession::default();
+        on.press_start(OK);
+        assert_eq!(camera_card(&on, OK, None, false), CameraCard::Starting);
+        assert_eq!(camera_card(&on, OK, None, true), CameraCard::Live);
+        assert_eq!(
+            camera_card(&on, facts(true, true, true, true), None, true),
+            CameraCard::Paused
+        );
+
+        let mut denied = CheckSession::default();
+        let f = facts(false, true, true, false);
+        denied.press_start(f);
+        assert_eq!(
+            camera_card(&denied, f, None, false),
+            CameraCard::NoPermission
+        );
+
+        assert_eq!(
+            camera_card(&idle, OK, Some(&CamFailure::InUse), false),
+            CameraCard::InUse
+        );
+        assert_eq!(
+            camera_card(&idle, OK, Some(&CamFailure::NotFound), false),
+            CameraCard::NotFound
+        );
+        assert_eq!(
+            camera_card(&idle, OK, Some(&CamFailure::Other("m".into())), false),
+            CameraCard::Other("m".into())
+        );
+    }
+
+    #[test]
+    fn the_readout_is_resolution_and_fps() {
+        assert_eq!(
+            readout(Some((1920, 1080)), Some(30)).as_deref(),
+            Some("1920 \u{00D7} 1080 \u{00B7} 30 fps")
+        );
+        assert_eq!(
+            readout(Some((1280, 720)), None).as_deref(),
+            Some("1280 \u{00D7} 720")
+        );
+        assert_eq!(readout(None, Some(24)).as_deref(), Some("24 fps"));
+        assert_eq!(readout(None, None), None);
+    }
+
+    #[test]
+    fn the_fps_is_measured_over_windows_of_a_second() {
+        let mut m = FpsMeter::default();
+        assert_eq!(m.update(0, 0), None);
+        assert_eq!(m.update(10, 400), None, "less than a window");
+        assert_eq!(m.update(30, 1000), Some(30));
+        assert_eq!(m.update(40, 1500), Some(30), "the last full window stays");
+        assert_eq!(m.update(54, 2000), Some(24));
+        m.reset();
+        assert_eq!(m.fps(), None);
     }
 }

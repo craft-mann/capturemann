@@ -5,5 +5,5 @@
   and fill in the template (version, macOS version, steps).
 - **Security problems:** do not open an issue, see [SECURITY.md](SECURITY.md).
 - **Contact:** <https://www.craftmann.app/capturemann/>. **Privacy policy:** <https://www.craftmann.app/capturemann/privacy/>.
-- **How to use it:** [`docs/user-guide.md`](docs/user-guide.md); connecting Google Drive and YouTube:
-  [`docs/google-setup.md`](docs/google-setup.md).
+- **How to use it:** [`docs/user/user-guide.md`](docs/user/user-guide.md); connecting Google Drive and YouTube:
+  [`docs/user/google-setup.md`](docs/user/google-setup.md).

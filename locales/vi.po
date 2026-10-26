@@ -52,10 +52,6 @@ msgid "A circle with your face on the recording."
 msgstr "Một hình tròn có khuôn mặt bạn trên bản ghi."
 
 #, fuzzy
-msgid "A circle, or a 4:3 rounded rectangle. The ring is always the record color."
-msgstr "Hình tròn hoặc hình chữ nhật bo góc 4:3. Viền luôn có màu quay."
-
-#, fuzzy
 msgid "A client name can’t contain control characters."
 msgstr "Tên ứng dụng khách không được chứa ký tự điều khiển."
 
@@ -1589,10 +1585,6 @@ msgid "Drag on the image to set the visible area. The original and the annotatio
 msgstr "Kéo trên ảnh để đặt vùng hiển thị. Ảnh gốc và các chú thích nằm ngoài vùng này vẫn được giữ."
 
 #, fuzzy
-msgid "Drag the bubble anywhere, before or during a recording. It snaps to a corner or edge midpoint when you let go near one."
-msgstr "Kéo bong bóng đến bất kỳ đâu, trước hoặc trong khi quay. Bong bóng tự bám vào góc hoặc điểm giữa cạnh khi bạn thả gần đó."
-
-#, fuzzy
 msgid "Drag the slider or use the arrow keys (Shift for bigger steps). JPG or PNG up to 2 MB; 1280 × 720 is best."
 msgstr "Kéo thanh trượt hoặc dùng phím mũi tên (giữ Shift để nhảy bước lớn hơn). JPG hoặc PNG tối đa 2 MB; nên dùng 1280 × 720."
 
@@ -1787,10 +1779,6 @@ msgstr "Chế độ Vừa khung hiển thị toàn bộ màn hình trên nền. 
 #, fuzzy
 msgid "Fix the problem and delete again; only the copies that are left are tried."
 msgstr "Hãy khắc phục sự cố rồi xoá lại; chỉ các bản sao còn lại được thử."
-
-#, fuzzy
-msgid "Flips what you see, like a mirror. The recorded camera track is never flipped."
-msgstr "Lật hình bạn thấy, như gương. Track camera đã ghi không bao giờ bị lật."
 
 #, fuzzy
 msgid "Focus left/right"
@@ -2607,10 +2595,6 @@ msgid "Off"
 msgstr "Tắt"
 
 #, fuzzy
-msgid "Off: every recording starts with the bubble in the bottom-left corner. On: it starts where you last left it."
-msgstr "Tắt: mọi bản ghi bắt đầu với bong bóng ở góc dưới bên trái. Bật: bong bóng bắt đầu ở nơi bạn để lần trước."
-
-#, fuzzy
 msgid "On"
 msgstr "Bật"
 
@@ -3305,10 +3289,6 @@ msgstr "Đã khôi phục bản ghi lúc {when} (mất tối đa {secs} giây)"
 #, fuzzy
 msgid "Redo"
 msgstr "Làm lại"
-
-#, fuzzy
-msgid "Reduces steady background noise on the microphone track. The original sound is kept too."
-msgstr "Giảm tiếng ồn nền ổn định trên rãnh micrô. Âm thanh gốc vẫn được giữ."
 
 #, fuzzy
 msgid "Reframe for vertical or square"
@@ -4402,10 +4382,6 @@ msgid "The video is on YouTube, but the thumbnail was not set: {warning}"
 msgstr "Video đã lên YouTube nhưng chưa đặt được ảnh bìa: {warning}"
 
 #, fuzzy
-msgid "The webcam bubble, microphone and system audio."
-msgstr "Bong bóng camera, micrô và âm thanh hệ thống."
-
-#, fuzzy
 msgid "The window follows the cursor and only moves when the cursor leaves its middle 80%."
 msgstr "Khung hiển thị bám theo con trỏ và chỉ dịch chuyển khi con trỏ rời khỏi 80% vùng giữa."
 
@@ -4911,10 +4887,6 @@ msgstr "Có, video này dành cho trẻ em"
 #, fuzzy
 msgid "Yesterday {time}"
 msgstr "Hôm qua {time}"
-
-#, fuzzy
-msgid "You can change it while recording from the bubble’s hover toolbar."
-msgstr "Có thể đổi trong lúc quay từ thanh công cụ hiện ra khi rê chuột vào bong bóng."
 
 #, fuzzy
 msgid "You can leave this page; the upload continues in the background and resumes if the connection drops."
@@ -5561,10 +5533,6 @@ msgstr "{path} không phải là thư mục."
 msgid "{path} · always on"
 msgstr "{path} · luôn bật"
 
-#, fuzzy
-msgid "{platform} is still processing the video"
-msgstr "{platform} vẫn đang xử lý video"
-
 # FACT: owner review required
 #, fuzzy
 msgid "{platform} keeps videos from an unverified API project private; the result says so if it happens"
@@ -5922,11 +5890,6 @@ msgstr "Thiết lập /"
 msgctxt "breadcrumb"
 msgid "Studio /"
 msgstr "Studio /"
-
-#, fuzzy
-msgctxt "bubble"
-msgid "Position"
-msgstr "Vị trí"
 
 #, fuzzy
 msgctxt "bubble"
@@ -8463,8 +8426,6 @@ msgstr "âm thanh hệ thống"
 msgid "Timeline zoomed to {from}-{to}"
 msgstr "Dòng thời gian đang phóng to: {from}-{to}"
 
-# ---- Record sheet > Window (board R20) ----
-
 #, fuzzy
 msgid "Looking for windows…"
 msgstr "Đang tìm cửa sổ…"
@@ -8476,8 +8437,6 @@ msgstr "Không có cửa sổ nào khớp với “{query}”."
 #, fuzzy
 msgid "No windows are open."
 msgstr "Không có cửa sổ nào đang mở."
-
-# ---- Window picker (R19) ----
 
 #, fuzzy
 msgid "All apps, {n} window"
@@ -8676,8 +8635,6 @@ msgctxt "window picker footer"
 msgid "Move"
 msgstr "Di chuyển"
 
-# ---- Toasts: agent Stop, upload progress ----
-
 #, fuzzy
 msgctxt "button"
 msgid "Stop"
@@ -8718,8 +8675,6 @@ msgstr "Đã huỷ tải lên"
 #, fuzzy
 msgid "Couldn’t cancel the upload"
 msgstr "Không thể huỷ tải lên"
-
-# ---- Settings: reset to defaults, Publish: cancel ----
 
 #, fuzzy
 msgid "Reset to defaults"
@@ -8790,8 +8745,6 @@ msgstr "Không thể đổi micrô"
 #, fuzzy
 msgid "Mute or unmute the microphone"
 msgstr "Tắt hoặc bật tiếng micrô"
-
-# ---- Agents: per-tool permissions ----
 
 # FACT: owner review required
 #. FACT: owner review required (confirmation guarantee)
@@ -8908,14 +8861,6 @@ msgid "Microphone"
 msgstr "Micrô"
 
 #, fuzzy
-msgid "Used for the bubble and the camera track."
-msgstr "Dùng cho bong bóng và rãnh camera."
-
-#, fuzzy
-msgid "System default input unless you pick one."
-msgstr "Dùng đầu vào mặc định của hệ thống nếu bạn không chọn thiết bị khác."
-
-#, fuzzy
 msgid "{device_kind}: {device}"
 msgstr "{device_kind}: {device}"
 
@@ -8951,46 +8896,6 @@ msgstr "Đang dùng thiết bị mặc định của hệ thống cho đến khi
 #, fuzzy
 msgid "The camera chosen in Settings isn’t connected. Using the system default."
 msgstr "Camera đã chọn trong Cài đặt chưa được kết nối. Đang dùng camera mặc định của hệ thống."
-
-#, fuzzy
-msgid "Camera permission is missing"
-msgstr "Thiếu quyền truy cập camera"
-
-#, fuzzy
-msgid "Show live camera"
-msgstr "Hiện camera trực tiếp"
-
-#, fuzzy
-msgid "Hide live camera"
-msgstr "Ẩn camera trực tiếp"
-
-#, fuzzy
-msgid "Webcam bubble preview"
-msgstr "Xem trước bong bóng webcam"
-
-#, fuzzy
-msgid "Preview · {size}, {shape}, {mirror}"
-msgstr "Xem trước · {size}, {shape}, {mirror}"
-
-#, fuzzy
-msgctxt "preview caption shape"
-msgid "circle"
-msgstr "tròn"
-
-#, fuzzy
-msgctxt "preview caption shape"
-msgid "rounded"
-msgstr "bo góc"
-
-#, fuzzy
-msgctxt "preview caption mirror"
-msgid "mirrored"
-msgstr "đã lật"
-
-#, fuzzy
-msgctxt "preview caption mirror"
-msgid "not mirrored"
-msgstr "không lật"
 
 # ---- Library: change folder ----
 #, fuzzy
@@ -9318,3 +9223,293 @@ msgstr "Một lượt xuất"
 msgctxt "job kind, starts a sentence"
 msgid "An upload"
 msgstr "Một lượt tải lên"
+
+#, fuzzy
+msgid "Allow access"
+msgstr "Cho phép truy cập"
+
+#, fuzzy
+msgid "Also on the bubble’s hover toolbar."
+msgstr "Cũng có trên thanh công cụ khi rê chuột vào bong bóng."
+
+#, fuzzy
+msgid "Another app is using {camera}. Close it, or pick another camera."
+msgstr "Một ứng dụng khác đang dùng {camera}. Hãy đóng ứng dụng đó hoặc chọn camera khác."
+
+#, fuzzy
+msgid "Camera access needed"
+msgstr "Cần quyền truy cập camera"
+
+#, fuzzy
+msgid "Camera is in use"
+msgstr "Camera đang được dùng"
+
+#, fuzzy
+msgid "Camera is off"
+msgstr "Camera đang tắt"
+
+#, fuzzy
+msgid "CaptureMann couldn’t open the camera. Try again, or pick another camera."
+msgstr "CaptureMann không mở được camera. Hãy thử lại hoặc chọn camera khác."
+
+#, fuzzy
+msgid "CaptureMann couldn’t open the microphone. Pick another one, or try again."
+msgstr "CaptureMann không mở được micrô. Hãy chọn micrô khác hoặc thử lại."
+
+#, fuzzy
+msgid "CaptureMann isn’t allowed to use the camera yet."
+msgstr "CaptureMann chưa được phép dùng camera."
+
+#, fuzzy
+msgid "CaptureMann isn’t allowed to use the microphone yet."
+msgstr "CaptureMann chưa được phép dùng micrô."
+
+#, fuzzy
+msgid "Check your camera and microphone, then set how the bubble looks."
+msgstr "Kiểm tra camera và micrô, rồi chỉnh giao diện bong bóng."
+
+#, fuzzy
+msgid "Chime not heard"
+msgstr "Không nghe thấy tiếng chuông"
+
+#, fuzzy
+msgid "Choose mic"
+msgstr "Chọn micrô"
+
+#, fuzzy
+msgid "Drag the bubble anywhere before or during a recording. It snaps to corners and edge midpoints."
+msgstr "Kéo bong bóng đến bất kỳ đâu trước hoặc trong khi quay. Bong bóng tự bám vào các góc và điểm giữa các cạnh."
+
+#, fuzzy
+msgid "Level only. Nothing is recorded; the mic turns off when you leave."
+msgstr "Chỉ đo mức âm. Không có gì được ghi; micrô tự tắt khi bạn rời trang."
+
+#, fuzzy
+msgid "Live camera"
+msgstr "Camera trực tiếp"
+
+#, fuzzy
+msgid "Look again"
+msgstr "Tìm lại"
+
+#, fuzzy
+msgid "Microphone access needed"
+msgstr "Cần quyền truy cập micrô"
+
+#, fuzzy
+msgid "Microphone is off"
+msgstr "Micrô đang tắt"
+
+#, fuzzy
+msgid "Microphone level, {level}"
+msgstr "Mức âm micrô, {level}"
+
+#, fuzzy
+msgid "Mirrored, like the bubble"
+msgstr "Đã lật, giống bong bóng"
+
+#, fuzzy
+msgid "No sound coming in"
+msgstr "Không có âm thanh vào"
+
+#, fuzzy
+msgid "Nothing is heard until you ask. The orange microphone dot stays off."
+msgstr "Sẽ không nghe gì cho đến khi bạn bật. Chấm cam của micrô vẫn tắt."
+
+#, fuzzy
+msgid "Nothing is shown until you ask. The light on your camera stays off."
+msgstr "Sẽ không hiện hình cho đến khi bạn bật. Đèn của camera vẫn tắt."
+
+#, fuzzy
+msgid "Off: every recording starts bottom-left."
+msgstr "Tắt: mỗi bản quay bắt đầu ở góc dưới bên trái."
+
+#, fuzzy
+msgid "Peaks hit the top. Lower the input volume in System Settings."
+msgstr "Đỉnh âm chạm mức tối đa. Hãy giảm âm lượng đầu vào trong Cài đặt Hệ thống."
+
+#, fuzzy
+msgid "Play test sound"
+msgstr "Phát âm thanh thử"
+
+#, fuzzy
+msgid "Plays a short chime and checks that CaptureMann can hear it. Uses the Screen Recording permission."
+msgstr "Phát một tiếng chuông ngắn và kiểm tra CaptureMann có nghe được không. Dùng quyền Ghi màn hình."
+
+#, fuzzy
+msgid "Plug in a camera, or record without the bubble."
+msgstr "Hãy cắm camera, hoặc quay không dùng bong bóng."
+
+#, fuzzy
+msgid "Preview only. Nothing is recorded, and the camera turns off when you leave this page."
+msgstr "Chỉ xem trước. Không có gì được ghi, và camera tự tắt khi bạn rời trang này."
+
+#, fuzzy
+msgid "Recording in progress"
+msgstr "Đang quay"
+
+#, fuzzy
+msgid "Recording in progress, the check is paused."
+msgstr "Đang quay, phần kiểm tra tạm dừng."
+
+#, fuzzy
+msgid "Reduces steady background noise. The original sound is kept too."
+msgstr "Giảm tiếng ồn nền đều đặn. Âm thanh gốc vẫn được giữ lại."
+
+#, fuzzy
+msgid "Screen Recording access needed"
+msgstr "Cần quyền Ghi màn hình"
+
+#, fuzzy
+msgid "Sound settings"
+msgstr "Cài đặt âm thanh"
+
+#, fuzzy
+msgid "Speak as you would while recording"
+msgstr "Hãy nói như khi bạn quay"
+
+#, fuzzy
+msgid "Starting the camera…"
+msgstr "Đang bật camera…"
+
+#, fuzzy
+msgid "System audio comes with Screen Recording, and CaptureMann isn’t allowed to use it yet."
+msgstr "Âm thanh hệ thống đi kèm quyền Ghi màn hình, và CaptureMann chưa được phép dùng quyền này."
+
+#, fuzzy
+msgid "System audio level"
+msgstr "Mức âm thanh hệ thống"
+
+#, fuzzy
+msgid "System audio needs Screen Recording access. Check your output is not muted."
+msgstr "Âm thanh hệ thống cần quyền Ghi màn hình. Hãy kiểm tra thiết bị phát chưa bị tắt tiếng."
+
+#, fuzzy
+msgid "Test microphone"
+msgstr "Thử micrô"
+
+#, fuzzy
+msgid "The camera didn’t start"
+msgstr "Camera không bật được"
+
+#, fuzzy
+msgid "The check could not run. Try again."
+msgstr "Không chạy được phần kiểm tra. Hãy thử lại."
+
+#, fuzzy
+msgid "The mic is selected but silent. It may be muted with a hardware switch."
+msgstr "Đã chọn micrô nhưng không có tiếng. Có thể micrô bị tắt bằng công tắc phần cứng."
+
+#, fuzzy
+msgid "The microphone didn’t start"
+msgstr "Micrô không bật được"
+
+#, fuzzy
+msgid "The recorded camera track is never flipped."
+msgstr "Rãnh camera được ghi không bao giờ bị lật."
+
+#, fuzzy
+msgid "The ring is always the record color."
+msgstr "Viền luôn có màu quay."
+
+#, fuzzy
+msgid "The test sound didn’t play"
+msgstr "Âm thanh thử không phát được"
+
+#, fuzzy
+msgid "Too loud, clipping"
+msgstr "Quá to, bị vỡ tiếng"
+
+#, fuzzy
+msgid "Too quiet"
+msgstr "Quá nhỏ"
+
+#, fuzzy
+msgid "Turn off camera"
+msgstr "Tắt camera"
+
+#, fuzzy
+msgid "Turn off microphone"
+msgstr "Tắt micrô"
+
+#, fuzzy
+msgid "Turn on camera"
+msgstr "Bật camera"
+
+#, fuzzy
+msgid "Your voice barely reaches the good range. Move closer or pick another mic."
+msgstr "Giọng bạn gần như không đạt mức tốt. Hãy lại gần hơn hoặc chọn micrô khác."
+
+#, fuzzy
+msgid "good range"
+msgstr "mức tốt"
+
+#, fuzzy
+msgctxt "audio check"
+msgid "Microphone"
+msgstr "Micrô"
+
+#, fuzzy
+msgctxt "audio check"
+msgid "System audio"
+msgstr "Âm thanh hệ thống"
+
+#, fuzzy
+msgctxt "camera status"
+msgid "Live"
+msgstr "Trực tiếp"
+
+#, fuzzy
+msgctxt "camera status"
+msgid "Starting…"
+msgstr "Đang bật…"
+
+#, fuzzy
+msgctxt "check card"
+msgid "Audio check"
+msgstr "Kiểm tra âm thanh"
+
+#, fuzzy
+msgctxt "check card"
+msgid "Camera check"
+msgstr "Kiểm tra camera"
+
+#, fuzzy
+msgctxt "meter end"
+msgid "loud"
+msgstr "to"
+
+#, fuzzy
+msgctxt "meter end"
+msgid "quiet"
+msgstr "nhỏ"
+
+#, fuzzy
+msgctxt "mic verdict"
+msgid "Good level"
+msgstr "Mức tốt"
+
+#, fuzzy
+msgctxt "mic verdict"
+msgid "Too loud"
+msgstr "Quá to"
+
+#, fuzzy
+msgctxt "mic verdict"
+msgid "Too quiet"
+msgstr "Quá nhỏ"
+
+#, fuzzy
+msgctxt "settings group"
+msgid "Microphone"
+msgstr "Micrô"
+
+#, fuzzy
+msgctxt "system audio status"
+msgid "Heard"
+msgstr "Đã nghe thấy"
+
+#, fuzzy
+msgctxt "system audio status"
+msgid "Listening…"
+msgstr "Đang nghe…"

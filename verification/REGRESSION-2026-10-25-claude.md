@@ -1,6 +1,6 @@
 # Regression run, Oct 25, 2026 (macOS, Apple M4 Pro, build of `main` plus the fixes below)
 
-- **Who:** Claude, on the owner's request ("run the screen, camera and mic tests, this is fine").
+- **Who:** Claude, on the maintainer's request ("run the screen, camera and mic tests, this is fine").
 - **Not covered:** anything by eye (UI), Drive/YouTube accounts, long soaks, optical/acoustic sync (NFR-3), 4K+camera.
 
 | Check | Result |
@@ -24,7 +24,7 @@
 
 ## Also done after the run
 
-4. The keychain vault (`cm-auth` `VaultStore`) read the keychain again on every missing key and on every write's legacy check; each read can ask for the password. A miss is now remembered for 30 s, a read made in the last 30 s is not repeated, and the old-layout item is looked for once per key (test: 150 lookups with two absent keys make at most 3 keychain reads). Tested with a counting fake; the real prompt count is for the owner to confirm.
+4. The keychain vault (`cm-auth` `VaultStore`) read the keychain again on every missing key and on every write's legacy check; each read can ask for the password. A miss is now remembered for 30 s, a read made in the last 30 s is not repeated, and the old-layout item is looked for once per key (test: 150 lookups with two absent keys make at most 3 keychain reads). Tested with a counting fake; the real prompt count is for the maintainer to confirm.
 
 ## Open
 

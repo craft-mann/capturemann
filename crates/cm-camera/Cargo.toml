@@ -4,6 +4,9 @@ description = "Camera enumeration, preview frames and the camera track"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
 publish.workspace = true
 rust-version.workspace = true
 
@@ -11,22 +14,22 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-cm-core = { path = "../cm-core" }
+cm-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
 # Same objc2 stack and versions as spikes/spike-encode (plain bindings, no Swift bridge).
 [target.'cfg(target_os = "macos")'.dependencies]
-objc2 = "0.6"
-block2 = "0.6"
-dispatch2 = "0.3"
+objc2.workspace = true
+block2.workspace = true
+dispatch2.workspace = true
 objc2-foundation = { version = "0.3", default-features = true }
-objc2-av-foundation = { version = "0.3", features = ["objc2-core-media", "objc2-core-video", "objc2-quartz-core", "objc2-core-graphics", "block2", "dispatch2", "objc2-uniform-type-identifiers"] }
-objc2-core-media = { version = "0.3", features = ["objc2-core-video", "block2", "dispatch2"] }
-objc2-core-video = { version = "0.3", features = ["objc2-core-graphics", "block2", "objc2-io-surface"] }
+objc2-av-foundation = { workspace = true, features = ["objc2-core-media", "objc2-core-video", "objc2-quartz-core", "objc2-core-graphics", "block2", "dispatch2", "objc2-uniform-type-identifiers"] }
+objc2-core-media = { workspace = true, features = ["objc2-core-video", "block2", "dispatch2"] }
+objc2-core-video = { workspace = true, features = ["objc2-core-graphics", "block2", "objc2-io-surface"] }
 objc2-io-surface = { version = "0.3", features = ["IOSurfaceRef", "IOSurfaceTypes"] }
-objc2-core-foundation = "0.3"
-objc2-uniform-type-identifiers = "0.3"
+objc2-core-foundation.workspace = true
+objc2-uniform-type-identifiers.workspace = true
 
 [target.'cfg(target_os = "macos")'.dev-dependencies]
 objc2-app-kit = { version = "0.3", features = ["objc2-core-graphics", "objc2-quartz-core", "block2"] }

@@ -2,7 +2,7 @@
 //! `CMSampleBuffer`s straight from ScreenCaptureKit, producing a fragmented MP4 through the
 //! writer's segment delegate. Plain `objc2-*` bindings, no Swift bridge.
 //!
-//! Design decisions proven by spike S6 (docs/SPIKES.md):
+//! Design decisions proven by spike S6 (docs/project/spikes.md):
 //!
 //! * `movieFragmentInterval` does nothing for MP4/MOV; the working path is the CMAF profile with a
 //!   segment delegate (`preferredOutputSegmentInterval` 2 s), which hands over the init segment
@@ -216,13 +216,17 @@ struct SinkIvars {
 
 define_class!(
     /// Receives the init segment and then one segment per ~2 s from `AVAssetWriter`.
+    // SAFETY: NSObject has no subclassing requirements; the only ivar is a plain Rust struct.
     #[unsafe(super(NSObject))]
     #[name = "CmEncodeSegmentSink"]
     #[ivars = SinkIvars]
     struct SegmentSink;
 
+    // SAFETY: `SegmentSink` is a direct NSObject subclass, so it satisfies NSObjectProtocol.
     unsafe impl NSObjectProtocol for SegmentSink {}
 
+    // SAFETY: the method below has exactly the types of the `assetWriter:didOutputSegmentData:
+    // segmentType:segmentReport:` selector; it only copies the NSData valid for the call.
     unsafe impl AVAssetWriterDelegate for SegmentSink {
         #[unsafe(method(assetWriter:didOutputSegmentData:segmentType:segmentReport:))]
         unsafe fn did_output(
@@ -232,13 +236,16 @@ define_class!(
             ty: AVAssetSegmentType,
             _report: Option<&AVAssetSegmentReport>,
         ) {
-            let bytes = data.to_vec();
-            let w = &self.ivars().writer;
-            if ty == AVAssetSegmentType::Initialization {
-                w.push_init(bytes);
-            } else {
-                w.push_segment(bytes);
-            }
+            // A panic must not unwind into AVFoundation (abort/UB): catch it, drop the segment.
+            cm_core::guard::guard_unit("cm-encode did_output", || {
+                let bytes = data.to_vec();
+                let w = &self.ivars().writer;
+                if ty == AVAssetSegmentType::Initialization {
+                    w.push_init(bytes);
+                } else {
+                    w.push_segment(bytes);
+                }
+            });
         }
     }
 );

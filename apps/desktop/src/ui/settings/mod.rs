@@ -16,6 +16,9 @@ use crate::ui::studio::ThemeGlobal;
 use crate::ui::text_field::{TextField, TextFieldEvent};
 
 pub mod agents;
+mod audio_check;
+pub(crate) mod audio_check_model;
+mod check_widgets;
 pub mod destinations;
 mod general;
 mod library_folder;
@@ -91,6 +94,8 @@ pub struct SettingsView {
     pub(super) yt: publish_card::YouTubeCard,
     /// Webcam & audio page: the device lists, the open dropdown and the live preview (R13).
     pub(super) webcam: webcam_view::WebcamState,
+    /// Webcam & audio page: the microphone and system audio checks (R13b).
+    pub(super) audio: audio_check::AudioCheckState,
 }
 
 impl SettingsView {
@@ -165,6 +170,7 @@ impl SettingsView {
             dest,
             yt,
             webcam: webcam_view::WebcamState::new(),
+            audio: audio_check::AudioCheckState::new(),
             rebinding: None,
             login_error: None,
             lib_size: Default::default(),
@@ -376,10 +382,10 @@ impl Render for SettingsView {
                 .overflow_y_scroll()
                 .child(
                     div()
-                        .max_w(px(if current == SettingsSection::Agents {
-                            1280.
-                        } else {
-                            900.
+                        .max_w(px(match current {
+                            SettingsSection::Agents => 1280.,
+                            SettingsSection::Webcam => 1060.,
+                            _ => 900.,
                         }))
                         .px(px(40.))
                         .pt(px(32.))

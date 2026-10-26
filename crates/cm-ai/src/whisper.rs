@@ -13,7 +13,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use cm_core::{CmError, MediaTime};
-use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
+use whisper_rs::{
+    DtwMode, DtwModelPreset, DtwParameters, FullParams, SamplingStrategy, WhisperContext,
+    WhisperContextParameters,
+};
 
 use crate::transcribe::{cancelled, Pcm16k, Transcriber, Transcript, Word, TRANSCRIPT_VERSION};
 
@@ -24,6 +27,11 @@ pub struct RawToken {
     pub t0: i64,
     pub t1: i64,
     pub p: f32,
+    /// The token's DTW alignment time (10 ms units; roughly where the token ends in the audio),
+    /// `-1` when the model ran without DTW. It does not depend on where the segment starts, which
+    /// the default token times do (they put the first words of a clip that opens with silence at
+    /// 0.0).
+    pub dtw: i64,
     /// A control token (`[_BEG_]`, `<|endoftext|>`, timestamp tokens).
     pub special: bool,
 }
@@ -41,9 +49,11 @@ const TICKS_PER_CENTISECOND: i64 = cm_core::TICKS_PER_SECOND / 100;
 /// Groups segments' tokens into timed words, offset by `base` (the time of the first sample).
 pub fn build_words(segments: &[RawSegment], base: MediaTime) -> Vec<Word> {
     let mut out: Vec<Word> = Vec::new();
+    // End of the last word so far, in 10 ms units: a word never starts before it.
+    let mut prev_end_cs = 0i64;
     for seg in segments {
-        // (text, t0, t1, probability sum, token count)
-        let mut words: Vec<(String, i64, i64, f32, u32)> = Vec::new();
+        // (text, t0, t1, probability sum, token count, DTW end or -1)
+        let mut words: Vec<(String, i64, i64, f32, u32, i64)> = Vec::new();
         for t in seg.tokens.iter().filter(|t| !t.special) {
             if t.text.is_empty() {
                 continue;
@@ -54,12 +64,13 @@ pub fn build_words(segments: &[RawSegment], base: MediaTime) -> Vec<Word> {
                 continue;
             }
             if starts_word {
-                words.push((piece.to_owned(), t.t0, t.t1, t.p, 1));
+                words.push((piece.to_owned(), t.t0, t.t1, t.p, 1, t.dtw));
             } else if let Some(w) = words.last_mut() {
                 w.0.push_str(piece);
                 w.2 = t.t1;
                 w.3 += t.p;
                 w.4 += 1;
+                w.5 = if w.5 < 0 || t.dtw < 0 { -1 } else { t.dtw };
             }
         }
         words.retain(|w| !is_annotation(&w.0));
@@ -69,7 +80,10 @@ pub fn build_words(segments: &[RawSegment], base: MediaTime) -> Vec<Word> {
         let monotonic = words.windows(2).all(|p| p[1].1 >= p[0].1);
         let usable =
             monotonic && words.iter().all(|w| w.2 >= w.1) && words.iter().any(|w| w.2 > w.1);
-        let spans: Vec<(i64, i64)> = if usable {
+        let dtw_ok = words.iter().all(|w| w.5 >= 0) && words.windows(2).all(|p| p[1].5 >= p[0].5);
+        let spans: Vec<(i64, i64)> = if dtw_ok {
+            dtw_spans(&words, prev_end_cs)
+        } else if usable {
             words
                 .iter()
                 .map(|w| (w.1.clamp(seg.t0, seg.t1), w.2.clamp(seg.t0, seg.t1)))
@@ -96,6 +110,7 @@ pub fn build_words(segments: &[RawSegment], base: MediaTime) -> Vec<Word> {
         };
         for (w, (a, b)) in words.into_iter().zip(spans) {
             let b = b.max(a);
+            prev_end_cs = b;
             out.push(Word {
                 text: w.0,
                 start: base + MediaTime::from_ticks(a * TICKS_PER_CENTISECOND),
@@ -105,6 +120,23 @@ pub fn build_words(segments: &[RawSegment], base: MediaTime) -> Vec<Word> {
         }
     }
     out
+}
+
+/// Word spans from the tokens' DTW times. A token's DTW time is about where it ends, so a word
+/// ends at its last token's time and starts where the word before it ended, but no more than a
+/// plausible spoken length earlier (about 90 ms a letter, 0.15 to 1.2 s): after a silence a word
+/// does not stretch back over it.
+fn dtw_spans(words: &[(String, i64, i64, f32, u32, i64)], mut prev_end: i64) -> Vec<(i64, i64)> {
+    words
+        .iter()
+        .map(|w| {
+            let end = w.5.max(prev_end);
+            let longest = (w.0.chars().count() as i64 * 9).clamp(15, 120);
+            let start = (end - longest).max(prev_end);
+            prev_end = end;
+            (start, end)
+        })
+        .collect()
 }
 
 /// `[BLANK_AUDIO]`, `[MUSIC]`, `(applause)`, `*sigh*`: sound descriptions, not speech.
@@ -131,16 +163,26 @@ impl WhisperTranscriber {
     /// backend is tried first and the CPU is used if it cannot start.
     pub fn load(model_path: &Path, model_id: &str, use_gpu: bool) -> Result<Self, CmError> {
         whisper_rs::install_logging_hooks();
-        let load = |gpu: bool| {
+        // DTW token times need the model's alignment heads, known for the stock models only; any
+        // other id (or a context that cannot start with DTW) runs without and uses the default
+        // token times.
+        let load = |gpu: bool, dtw: bool| {
             let mut params = WhisperContextParameters::default();
             params.use_gpu(gpu);
+            if let Some(preset) = dtw.then(|| dtw_preset(model_id)).flatten() {
+                params.dtw_parameters(DtwParameters {
+                    mode: DtwMode::ModelPreset {
+                        model_preset: preset,
+                    },
+                    dtw_mem_size: 128 * 1024 * 1024,
+                });
+            }
             WhisperContext::new_with_params(model_path, params)
         };
-        let ctx = match load(use_gpu) {
-            Ok(c) => c,
-            Err(_) if use_gpu => load(false).map_err(|e| bad_model(model_path, &e))?,
-            Err(e) => return Err(bad_model(model_path, &e)),
-        };
+        let ctx = load(use_gpu, true)
+            .or_else(|_| load(use_gpu, false))
+            .or_else(|e| if use_gpu { load(false, false) } else { Err(e) })
+            .map_err(|e| bad_model(model_path, &e))?;
         let threads = std::thread::available_parallelism()
             .map(|n| n.get().min(8))
             .unwrap_or(4) as i32;
@@ -149,6 +191,18 @@ impl WhisperTranscriber {
             model: model_id.to_owned(),
             threads,
         })
+    }
+}
+
+/// The alignment-head preset of a stock model id (`large` is large-v3).
+fn dtw_preset(model_id: &str) -> Option<DtwModelPreset> {
+    match model_id {
+        "tiny" => Some(DtwModelPreset::Tiny),
+        "base" => Some(DtwModelPreset::Base),
+        "small" => Some(DtwModelPreset::Small),
+        "medium" => Some(DtwModelPreset::Medium),
+        "large" => Some(DtwModelPreset::LargeV3),
+        _ => None,
     }
 }
 
@@ -199,9 +253,15 @@ fn run(
     // its callback reads it back as the concrete closure, so the "abort?" answer is garbage and
     // every run fails with whisper error -6 ("failed to encode"). This callback reads the flag
     // directly; `cancel` outlives `full`, which is the only place the pointer is used.
+    // SAFETY: whisper.cpp calls this only with the user-data pointer registered below, which is
+    // a live `Arc<AtomicBool>` pointer for as long as `full` runs.
     unsafe extern "C" fn abort_requested(data: *mut std::ffi::c_void) -> bool {
-        // SAFETY: `data` is `Arc::as_ptr` of the `cancel` flag below, alive for the whole call.
-        unsafe { &*(data as *const AtomicBool) }.load(Ordering::Relaxed)
+        // A panic must not unwind into whisper.cpp. If one happens the state is unknown, so answer
+        // "abort": the run ends with an error instead of continuing blind.
+        cm_core::guard::guard("whisper abort_requested", true, || {
+            // SAFETY: `data` is `Arc::as_ptr` of the `cancel` flag below, alive for the whole call.
+            unsafe { &*(data as *const AtomicBool) }.load(Ordering::Relaxed)
+        })
     }
     // SAFETY: the callback and its data pointer stay valid until `full` returns (see above).
     unsafe {
@@ -227,6 +287,7 @@ fn run(
                 t0: d.t0,
                 t1: d.t1,
                 p: d.p,
+                dtw: d.t_dtw,
             });
         }
         let tokens = join_split_characters(pieces);
@@ -249,6 +310,7 @@ pub(crate) struct TokenBytes {
     pub t0: i64,
     pub t1: i64,
     pub p: f32,
+    pub dtw: i64,
 }
 
 fn is_control(text: &str) -> bool {
@@ -272,6 +334,7 @@ pub(crate) fn join_split_characters(pieces: Vec<TokenBytes>) -> Vec<RawToken> {
                 t0: g.t0,
                 t1: g.t1,
                 p: g.p,
+                dtw: g.dtw,
                 special,
             });
         }
@@ -285,6 +348,7 @@ pub(crate) fn join_split_characters(pieces: Vec<TokenBytes>) -> Vec<RawToken> {
                 g.bytes.extend_from_slice(&piece.bytes);
                 g.t1 = piece.t1;
                 g.p = g.p.min(piece.p);
+                g.dtw = piece.dtw;
             }
             _ => {
                 flush(&mut group, &mut out);
@@ -407,6 +471,7 @@ mod tests {
 
     fn piece(bytes: &[u8], t0: i64, t1: i64, p: f32) -> TokenBytes {
         TokenBytes {
+            dtw: -1,
             bytes: bytes.to_vec(),
             t0,
             t1,
@@ -461,6 +526,7 @@ mod tests {
 
     fn tok(text: &str, t0: i64, t1: i64) -> RawToken {
         RawToken {
+            dtw: -1,
             text: text.into(),
             t0,
             t1,
@@ -471,6 +537,68 @@ mod tests {
 
     fn secs(w: &Word) -> (f64, f64) {
         (w.start.as_secs_f64(), w.end.as_secs_f64())
+    }
+
+    fn dtw_tok(text: &str, dtw: i64) -> RawToken {
+        RawToken {
+            dtw,
+            ..tok(text, 0, 0)
+        }
+    }
+
+    /// With DTW times a clip that opens with 2 s of silence gets its first word near the sound, not
+    /// at the segment start where the default token times put it.
+    #[test]
+    fn dtw_times_place_the_first_word_after_the_silence() {
+        let seg = RawSegment {
+            t0: 0,
+            t1: 500,
+            tokens: vec![
+                tok("[_BEG_]", 0, 0),
+                dtw_tok(" testing", 226),
+                dtw_tok(" then", 252),
+                dtw_tok(" record", 284),
+                tok("[_TT_250]", 500, 500),
+            ],
+        };
+        let words = build_words(&[seg], MediaTime::ZERO);
+        let (a, b) = secs(&words[0]);
+        assert_eq!(b, 2.26);
+        // A plausible spoken length before its end, not stretched back to 0.
+        assert!((1.5..2.2).contains(&a), "{a}");
+        assert_eq!(secs(&words[1]), (2.26, 2.52));
+        assert_eq!(secs(&words[2]), (2.52, 2.84));
+    }
+
+    /// After a pause a word does not stretch back over the silence.
+    #[test]
+    fn a_word_after_a_silence_keeps_a_spoken_length() {
+        let seg = RawSegment {
+            t0: 0,
+            t1: 1000,
+            tokens: vec![
+                dtw_tok(" yes", 100),
+                dtw_tok(" okay", 900),
+                tok("[_TT_1]", 1000, 1000),
+            ],
+        };
+        let words = build_words(&[seg], MediaTime::ZERO);
+        let (a, b) = secs(&words[1]);
+        assert_eq!(b, 9.0);
+        assert!((8.2..8.8).contains(&a), "{a}");
+    }
+
+    /// Tokens without DTW times (a model run without it) keep the default times.
+    #[test]
+    fn without_dtw_the_default_token_times_are_used() {
+        let seg = RawSegment {
+            t0: 0,
+            t1: 200,
+            tokens: vec![tok(" hi", 10, 30), tok(" there", 40, 80)],
+        };
+        let words = build_words(&[seg], MediaTime::ZERO);
+        assert_eq!(secs(&words[0]), (0.10, 0.30));
+        assert_eq!(secs(&words[1]), (0.40, 0.80));
     }
 
     #[test]

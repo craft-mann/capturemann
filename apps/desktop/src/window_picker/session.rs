@@ -39,7 +39,7 @@ pub struct Listing {
 /// scale, which is right for the common one-scale layouts.
 ///
 /// Minimized windows are left out (macOS does not list them today).
-/// TODO(design): R19 draws a "Minimized" card; build it when the capture API can capture a
+/// Design gap: R19 draws a "Minimized" card; build it when the capture API can capture a
 /// minimized window and the enumeration lists one.
 pub fn parse_targets(
     value: &Value,

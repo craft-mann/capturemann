@@ -4,35 +4,31 @@ description = "Region picker, webcam bubble window and recording control bar"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
 publish.workspace = true
 rust-version.workspace = true
 
 [lints]
 workspace = true
 
-[lib]
-name = "cm_overlay"
-path = "src/lib.rs"
-
-[[bin]]
-name = "cm-overlay"
-path = "src/main.rs"
-
 [dependencies]
-cm-core = { path = "../../crates/cm-core" }
+log.workspace = true
+cm-core.workspace = true
 # UI language of the hint labels (no dependencies of its own).
-cm-i18n = { path = "../../crates/cm-i18n" }
+cm-i18n.workspace = true
 # Client side only (`connect`, `Endpoint`, JSON-RPC client); the overlay never links an
 # engine crate.
-cm-ipc = { path = "../../crates/cm-ipc" }
+cm-ipc.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 # MIT
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "io-util", "time", "macros"] }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "io-util", "time", "macros"] }
 # MIT OR Apache-2.0
-base64 = "0.22"
+base64.workspace = true
 # MIT OR Apache-2.0
-image = { version = "0.25", default-features = false, features = ["png"] }
+image = { workspace = true, features = ["png"] }
 # Apache-2.0
 winit = "0.30"
 # MIT OR Apache-2.0
@@ -40,7 +36,7 @@ softbuffer = "0.4"
 # Apache-2.0
 ab_glyph = "0.2"
 # MIT OR Apache-2.0 (text only: no image-data feature)
-arboard = { version = "3", default-features = false }
+arboard.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # MIT. The same versions winit uses, so nothing extra is compiled.
@@ -52,7 +48,7 @@ windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_UI_Wind
 
 [dev-dependencies]
 # Tests run the overlay's session against an in-process daemon on a real socket.
-cm-daemon = { path = "../../crates/cm-daemon" }
-cm-capture = { path = "../../crates/cm-capture" }
-cm-library = { path = "../../crates/cm-library" }
-tempfile = "3"
+cm-daemon.workspace = true
+cm-capture.workspace = true
+cm-library.workspace = true
+tempfile.workspace = true

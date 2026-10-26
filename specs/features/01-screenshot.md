@@ -65,7 +65,7 @@
 - Defaults avoid the OS screenshot keys (⌘⇧3/4/5 on macOS, Win+Shift+S on Windows), common editor shortcuts (⌘⇧P, Ctrl+Shift+P), and plain Ctrl+Alt on Windows (it equals AltGr on many European layouts). Settings offers "Replace system screenshot shortcuts" on macOS as an opt-in that explains how to turn off the system ones first.
 
 - Tray/menu-bar menu (native menu, not custom-drawn): Capture region, Capture window, Capture display, Record…, Open library, Recent captures (last 5), Settings, Quit. While recording, the icon switches to the kit's recording variant (see AC7), with elapsed time as the title text on macOS (tooltip on Windows) and Stop recording becomes the first item.
-- The app keeps running in the tray when its windows are closed. **Launch at login** is a LaunchAgent (`~/Library/LaunchAgents/dev.capturemann.app.plist`) installed only for an installed `.app` bundle, never for a dev binary. **Default off**: a login item is persistence on the user's machine, so it needs an explicit opt-in. This is a deliberate deviation from the original "default on" (decided with the AC5 implementation; the product owner accepted it on Oct 21, 2026 (OD-13): it ships default off and stays off, to be revisited with an installer). The choice is a `launch_at_login` file beside `settings.json`, not a setting, so an agent cannot change it through `set_settings`.
+- The app keeps running in the tray when its windows are closed. **Launch at login** is a LaunchAgent (`~/Library/LaunchAgents/dev.capturemann.app.plist`) installed only for an installed `.app` bundle, never for a dev binary. **Default off**: a login item is persistence on the user's machine, so it needs an explicit opt-in. This is a deliberate deviation from the original "default on" (decided with the AC5 implementation; the product maintainer accepted it on Oct 21, 2026 (OD-13): it ships default off and stays off, to be revisited with an installer). The choice is a `launch_at_login` file beside `settings.json`, not a setting, so an agent cannot change it through `set_settings`.
 
 **Acceptance criteria**
 - **AC1** Given CaptureMann is running with no window open, when the user presses the region shortcut, then the region overlay appears within NFR-1 (≤ 150 ms).
@@ -125,7 +125,7 @@
   - Save to library (always).
   - Also save a PNG to a folder (default off; folder chosen by the user, file name pattern default `CaptureMann {yyyy-MM-dd} at {HH.mm.ss}.png`).
   - Open the editor (default off) or show a toast with Annotate / Copy / Save as / Delete (default on).
-- *As built (owner decided Oct 22, 2026: follow the spec):* the copy runs after each annotation save and from the Copy button. Saves queued back to back share one copy.
+- *As built (maintainer decided Oct 22, 2026: follow the spec):* the copy runs after each annotation save and from the Copy button. Saves queued back to back share one copy.
 - *As built:* the folder copy follows the same cadence as the clipboard copy: once after each capture, and once per burst of annotation saves (each burst writes a new file named by the time; earlier files are never replaced). The toast's Copy button does not write a file. A folder that is missing (an unplugged drive) is never created: the capture stays in the library and a warning toast says "Couldn't save to `<folder>`: drive not available" (or "permission denied", "disk full"). The three `capture.save_*` settings are app-only.
 - Clipboard content is the rendered image (with annotations) as PNG; on macOS also as TIFF for older apps.
 
@@ -154,7 +154,7 @@
 
 **Acceptance criteria**
 - **AC1** Given a 5 s delay in Display mode, when the user starts it, then the image is taken 5.0 s ± 100 ms later and the countdown pill is not in the image.
-- **AC2** Given a delay is running, when the user presses Esc, then nothing is captured. (Built: the delayed capture is cancelled when the requesting connection drops, and `Daemon::cancel_delayed_capture(request_id)` exists. The pill calls it for Display delays, and stops its own timer for Region and Window delays. The pill never takes focus (edge case below), so Esc is registered as a global hotkey only while a delay runs (owner decided Oct 22, 2026) and released when it ends or is cancelled. If another app owns Esc, the registration fails and Esc works after a click on the pill.)
+- **AC2** Given a delay is running, when the user presses Esc, then nothing is captured. (Built: the delayed capture is cancelled when the requesting connection drops, and `Daemon::cancel_delayed_capture(request_id)` exists. The pill calls it for Display delays, and stops its own timer for Region and Window delays. The pill never takes focus (edge case below), so Esc is registered as a global hotkey only while a delay runs (maintainer decided Oct 22, 2026) and released when it ends or is cancelled. If another app owns Esc, the registration fails and Esc works after a click on the pill.)
 - **AC3** Given Region mode with delay, then the freeze happens when the countdown ends, and the menus open at that moment are in the frozen image.
 
 **Edge cases and errors** — A menu that closes when the countdown pill appears: the pill must not take focus.

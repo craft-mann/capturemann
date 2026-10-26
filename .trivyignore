@@ -1,0 +1,7 @@
+# Trivy reads this file from the repository root.
+#
+# GHSA-wrw7-89jp-8q8g (RUSTSEC-2024-0429): unsoundness in glib 0.18.5 `VariantStrIter`. glib comes
+# only from gtk 0.18 -> libappindicator -> tray-icon, which tray-icon builds on Linux. It is not in
+# the macOS build (`cargo tree -i glib@0.18.5 --target aarch64-apple-darwin` finds nothing) and the
+# app never calls that API. Revisit when Linux support starts or tray-icon moves to gtk 0.20.
+GHSA-wrw7-89jp-8q8g

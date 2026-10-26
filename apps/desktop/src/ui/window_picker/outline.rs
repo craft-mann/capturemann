@@ -76,7 +76,7 @@ pub fn harden(window: &Window) {
             no_shadow: true,
         },
     ) {
-        eprintln!("cm-desktop: could not set up the window outline: {e}");
+        log::warn!("could not set up the window outline: {e}");
     }
 }
 

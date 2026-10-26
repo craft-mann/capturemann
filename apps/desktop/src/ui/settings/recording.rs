@@ -4,12 +4,11 @@
 //! edited from Privacy: its rows are in `privacy.rs`, the add and remove actions are here.
 
 use cm_i18n::{tr, tr_ctx};
-use gpui::{div, prelude::*, px, AnyElement, Context};
+use gpui::{div, prelude::*, px, AnyElement, Context, Div};
 use serde_json::{json, Value};
 
 use super::rows::{card_group, choice_row, plain_row, seconds_row, tile, toggle_row};
-use super::webcam_model::DeviceKind;
-use super::widgets::{caption, group_with_card, segment_with_icon, segmented};
+use super::widgets::{caption, group_header, group_with_card, segment_with_icon, segmented};
 use super::SettingsView;
 use crate::recording::geometry::{BubbleShape, BubbleSize};
 use crate::recording::start::{
@@ -18,6 +17,8 @@ use crate::recording::start::{
 };
 use crate::theme::Theme;
 use crate::ui::app;
+use crate::ui::components::{icon, label_fill};
+use crate::ui::paint::rgba_of;
 
 /// The options of a choice row with their labels in the current language (the value is the
 /// stored setting and never changes). `label` is `size_label`, `codec_label` or `quality_label`
@@ -92,7 +93,7 @@ impl SettingsView {
         let sizes = options_of(&SIZES, size_label);
         let codecs = options_of(&CODECS, codec_label);
         let qualities = options_of(&QUALITIES, quality_label);
-        // TODO(design): the board's banner ("Native on your display is W x H. At these settings a
+        // Design gap: the board's banner ("Native on your display is W x H. At these settings a
         // 10-minute recording is about N GB.") needs a display lookup and a size model; not built.
         div()
             .flex()
@@ -230,7 +231,8 @@ impl SettingsView {
             .into_any_element()
     }
 
-    /// Webcam & audio.
+    /// Webcam & audio (boards R13 and R13b): the Camera check and Audio check cards side by side
+    /// (stacked in a narrow window), then the Webcam bubble and Microphone settings.
     pub(super) fn webcam(&self, t: &Theme, cx: &mut Context<Self>) -> AnyElement {
         let snap = self.app.read(cx).backend.settings.snapshot();
         let defaults = crate::recording::start::SheetDefaults::from_settings(&snap);
@@ -265,7 +267,7 @@ impl SettingsView {
             segment_with_icon(
                 t,
                 format!("bubble-size-{}", sz.key()),
-                &format!("{} \u{00B7} {} px", sz.key().to_uppercase(), sz.px() as u32),
+                &format!("{} {}", sz.key().to_uppercase(), sz.px() as u32),
                 b.size == sz,
                 None,
             )
@@ -273,96 +275,144 @@ impl SettingsView {
                 app::set_setting(&app, keys::KEY_BUBBLE_SIZE, json!(sz.key()), cx)
             })
         });
-        // R13: the Camera and Microphone rows choose `camera.device` and `audio.mic_device`, the
-        // devices used when nothing names one; the Record sheet's chips override them for one
-        // recording. The card on top draws the bubble as set below.
-        let camera_rows = self.device_rows(t, DeviceKind::Camera, false, cx);
-        let mic_rows = self.device_rows(t, DeviceKind::Mic, false, cx);
-        let preview = self.preview_card(t, cx);
+        // The Camera and Microphone dropdowns live in the check cards; they choose
+        // `camera.device` and `audio.mic_device`, the devices used when nothing names one. The
+        // Record sheet's chips override them for one recording.
+        let camera_card = self
+            .camera_check_card(t, cx)
+            .flex_grow(1.45)
+            .flex_basis(px(420.))
+            .min_w(px(0.));
+        let audio_card = self
+            .audio_check_card(t, cx)
+            .flex_grow(1.)
+            .flex_basis(px(300.))
+            .min_w(px(0.));
+        let bubble_card = card_group(t, "webcam-bubble-settings", &tr!("Webcam bubble settings"))
+            .child(plain_row(
+                t,
+                tile::BUBBLE_SHAPE,
+                &tr_ctx!("bubble", "Shape"),
+                &tr!("The ring is always the record color."),
+                Some(
+                    segmented(t, "bubble-shape", &tr!("Bubble shape"))
+                        .children(shapes)
+                        .into_any_element(),
+                ),
+                false,
+            ))
+            .child(plain_row(
+                t,
+                tile::BUBBLE_SIZE,
+                &tr_ctx!("bubble", "Size"),
+                &tr!("Also on the bubble\u{2019}s hover toolbar."),
+                Some(
+                    segmented(t, "bubble-size", &tr!("Bubble size"))
+                        .children(sizes)
+                        .into_any_element(),
+                ),
+                false,
+            ))
+            .child(toggle_row(
+                t,
+                &app,
+                "bubble-mirror",
+                tile::MIRROR,
+                &tr!("Mirror the preview"),
+                &tr!("The recorded camera track is never flipped."),
+                keys::KEY_BUBBLE_MIRROR,
+                b.mirror,
+                false,
+            ))
+            .child(toggle_row(
+                t,
+                &app,
+                "bubble-remember-position",
+                tile::REMEMBER,
+                &tr!("Remember where I put the bubble"),
+                &tr!("Off: every recording starts bottom-left."),
+                keys::KEY_BUBBLE_REMEMBER,
+                remember_position,
+                true,
+            ));
+        // "Position" is not a row: it had no control. Its text is a hint under the card.
+        let position_hint = div()
+            .flex()
+            .items_start()
+            .gap(px(10.))
+            .px(px(14.))
+            .py(px(12.))
+            .rounded(px(12.))
+            .border_1()
+            .border_dashed()
+            .border_color(rgba_of(t.line))
+            .text_size(px(12.5))
+            .line_height(px(19.))
+            .text_color(rgba_of(t.mist))
+            .child(div().pt(px(2.)).child(icon("move", 14., t.mist)))
+            .child(label_fill(tr!(
+                "Drag the bubble anywhere before or during a recording. It snaps to corners and edge midpoints."
+            )));
+        let mic_card = card_group(t, "audio-settings", &tr!("Audio settings")).child(toggle_row(
+            t,
+            &app,
+            "audio-noise",
+            tile::NOISE,
+            &tr!("Noise suppression"),
+            &tr!("Reduces steady background noise. The original sound is kept too."),
+            keys::KEY_NOISE,
+            s.noise_suppression,
+            true,
+        ));
+        // The same grow and basis as the check cards above, so each column sits under its card.
+        let column = |content: Div, grow: f32, basis: f32| {
+            content
+                .flex()
+                .flex_col()
+                .gap(px(10.))
+                .flex_grow(grow)
+                .flex_basis(px(basis))
+                .min_w(px(0.))
+        };
         div()
             .flex()
             .flex_col()
-            .gap(px(24.))
-            .child(preview)
-            .child(group_with_card(
-                t,
-                &tr!("Webcam bubble"),
-                None,
-                card_group(t, "webcam-bubble-settings", &tr!("Webcam bubble settings"))
-                    .children(camera_rows)
-                    .child(plain_row(
-                        t,
-                        tile::BUBBLE_SHAPE,
-                        &tr_ctx!("bubble", "Shape"),
-                        &tr!("A circle, or a 4:3 rounded rectangle. The ring is always the record color."),
-                        Some(
-                            segmented(t, "bubble-shape", &tr!("Bubble shape"))
-                                .children(shapes)
-                                .into_any_element(),
-                        ),
-                        false,
+            .gap(px(22.))
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .items_stretch()
+                    .gap(px(16.))
+                    .child(camera_card)
+                    .child(audio_card),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .items_start()
+                    .gap(px(16.))
+                    .child(column(
+                        div()
+                            .child(group_header(t, &tr!("Webcam bubble"), None))
+                            .child(bubble_card)
+                            .child(position_hint),
+                        1.45,
+                        420.,
                     ))
-                    .child(plain_row(
-                        t,
-                        tile::BUBBLE_SIZE,
-                        &tr_ctx!("bubble", "Size"),
-                        &tr!("You can change it while recording from the bubble\u{2019}s hover toolbar."),
-                        Some(
-                            segmented(t, "bubble-size", &tr!("Bubble size"))
-                                .children(sizes)
-                                .into_any_element(),
-                        ),
-                        false,
-                    ))
-                    .child(toggle_row(
-                        t,
-                        &app,
-                        "bubble-mirror",
-                        tile::MIRROR,
-                        &tr!("Mirror the preview"),
-                        &tr!("Flips what you see, like a mirror. The recorded camera track is never flipped."),
-                        keys::KEY_BUBBLE_MIRROR,
-                        b.mirror,
-                        false,
-                    ))
-                    .child(toggle_row(
-                        t,
-                        &app,
-                        "bubble-remember-position",
-                        tile::POSITION,
-                        &tr!("Remember where I put the bubble"),
-                        &tr!("Off: every recording starts with the bubble in the bottom-left corner. On: it starts where you last left it."),
-                        keys::KEY_BUBBLE_REMEMBER,
-                        remember_position,
-                        false,
-                    ))
-                    .child(plain_row(
-                        t,
-                        tile::POSITION,
-                        &tr_ctx!("bubble", "Position"),
-                        &tr!("Drag the bubble anywhere, before or during a recording. It snaps to a corner or edge midpoint when you let go near one."),
-                        None,
-                        true,
+                    .child(column(
+                        div()
+                            .child(group_header(
+                                t,
+                                &tr_ctx!("settings group", "Microphone"),
+                                None,
+                            ))
+                            .child(mic_card),
+                        1.,
+                        300.,
                     )),
-            ))
-            .child(group_with_card(
-                t,
-                &tr!("Microphone and system audio"),
-                None,
-                card_group(t, "audio-settings", &tr!("Audio settings"))
-                    .children(mic_rows)
-                    .child(toggle_row(
-                        t,
-                        &app,
-                        "audio-noise",
-                        tile::NOISE,
-                        &tr!("Noise suppression"),
-                        &tr!("Reduces steady background noise on the microphone track. The original sound is kept too."),
-                        keys::KEY_NOISE,
-                        s.noise_suppression,
-                        true,
-                    )),
-            ))
+            )
             .into_any_element()
     }
 

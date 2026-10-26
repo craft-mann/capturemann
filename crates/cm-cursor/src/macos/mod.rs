@@ -99,7 +99,13 @@ struct TapCtx {
     tb: (u64, u64),
 }
 
-extern "C" fn tap_cb(_proxy: sys::Ptr, ty: u32, ev: sys::Ptr, user: sys::Ptr) -> sys::Ptr {
+/// The event-tap callback. A panic must not unwind into CoreGraphics; on one the event is passed
+/// on unchanged so input is never swallowed.
+extern "C" fn tap_cb(proxy: sys::Ptr, ty: u32, ev: sys::Ptr, user: sys::Ptr) -> sys::Ptr {
+    cm_core::guard::guard("cm-cursor tap_cb", ev, || tap_cb_inner(proxy, ty, ev, user))
+}
+
+fn tap_cb_inner(_proxy: sys::Ptr, ty: u32, ev: sys::Ptr, user: sys::Ptr) -> sys::Ptr {
     if user.is_null() || ev.is_null() {
         return ev;
     }

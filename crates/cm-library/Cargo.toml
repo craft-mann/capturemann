@@ -4,6 +4,9 @@ description = "Capture bundles (.cmshot/.cmrec), manifest, SQLite index, search,
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
 publish.workspace = true
 rust-version.workspace = true
 
@@ -11,18 +14,18 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-cm-core = { path = "../cm-core" }
-cm-encode = { path = "../cm-encode" }
+cm-core.workspace = true
+cm-encode.workspace = true
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 time = { version = "0.3", default-features = false, features = ["std", "serde-well-known", "formatting", "parsing", "macros"] }
 # SQLite (public domain) is compiled in via the `bundled` feature; rusqlite is MIT.
-rusqlite = { version = "0.37", features = ["bundled"] }
-image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
-sha2 = "0.10"
+rusqlite = { workspace = true, features = ["bundled"] }
+image = { workspace = true, features = ["png", "jpeg"] }
+sha2.workspace = true
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2"
+libc.workspace = true
 
 [dev-dependencies]
-tempfile = "3"
+tempfile.workspace = true

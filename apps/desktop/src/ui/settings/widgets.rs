@@ -367,7 +367,6 @@ pub fn warning_caption(t: &Theme, text: impl Into<SharedString>) -> Div {
 /// A settings group: a title row (with an optional note beside it), then one card whose `rows`
 /// ([`settings_row`]s, the last with `last = true` unless a `footer` follows) are separated by
 /// 1 px dividers, and an optional [`footer_row`].
-#[allow(dead_code)] // for pages that build their rows as a list
 pub fn settings_group(
     t: &Theme,
     title: &str,

@@ -1,6 +1,6 @@
 # AGT-POLICY manual script: per-tool permissions (Allow / Ask first)
 
-Covers AGT-2.AC7 to AC14 (owner decision OD-24, Oct 25, 2026) where automation cannot see the real
+Covers AGT-2.AC7 to AC14 (maintainer decision OD-24, Oct 25, 2026) where automation cannot see the real
 window. The daemon rules, the setting, the dialog content and the Agents page model are tested with
 fakes (`cargo test -p cm-daemon --test tool_policy`, `cargo test -p cm-desktop --lib agt_2`); this
 script is the by-eye run of the real app.

@@ -4,6 +4,9 @@ description = "PublishProvider trait, platform rules and metadata validation, an
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
 publish.workspace = true
 rust-version.workspace = true
 
@@ -11,28 +14,28 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-cm-core = { path = "../cm-core" }
+cm-core.workspace = true
 # The HTTP seam (`StorageHttp`), `TokenSource`, `Progress` and `ResumeState` are shared with the
 # storage providers instead of being copied.
-cm-storage = { path = "../cm-storage" }
+cm-storage.workspace = true
 # `scrub_secrets` only: server text is scrubbed before it reaches a message.
-cm-jobs = { path = "../cm-jobs" }
+cm-jobs.workspace = true
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # MIT OR Apache-2.0
-async-trait = "0.1"
+async-trait.workspace = true
 # MIT OR Apache-2.0
-sha2 = "0.10"
+sha2.workspace = true
 # MIT
-tokio = { version = "1", features = ["rt", "time", "sync"] }
+tokio = { workspace = true, features = ["rt", "time", "sync"] }
 # MIT OR Apache-2.0
-percent-encoding = "2"
+percent-encoding.workspace = true
 
 [features]
 # The in-process fake YouTube server, for the tests of other crates.
 testing = ["cm-storage/testing"]
 
 [dev-dependencies]
-cm-storage = { path = "../cm-storage", features = ["testing"] }
-tempfile = "3"
-tokio = { version = "1", features = ["rt", "macros", "test-util"] }
+cm-storage = { workspace = true, features = ["testing"] }
+tempfile.workspace = true
+tokio = { workspace = true, features = ["rt", "macros", "test-util"] }

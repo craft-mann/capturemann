@@ -79,7 +79,7 @@ impl SettingsView {
     pub(super) fn excluded_apps(&self, t: &Theme, cx: &mut Context<Self>) -> AnyElement {
         let s = self.recording_settings(cx);
         let defaults = default_exclusions();
-        // TODO(design): the board lists "Keychain Access" as a default and makes 1Password
+        // Design gap: the board lists "Keychain Access" as a default and makes 1Password
         // removable; the app's real defaults (REC-6) win. App names for user entries are not
         // resolved, so those rows show the bundle id.
         let self_row = settings_row(

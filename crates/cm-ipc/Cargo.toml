@@ -4,6 +4,9 @@ description = "Client side of the daemon's local IPC: endpoints, connecting, JSO
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
 publish.workspace = true
 rust-version.workspace = true
 
@@ -13,12 +16,12 @@ workspace = true
 [dependencies]
 serde_json = "1"
 # MIT
-tokio = { version = "1", features = ["rt", "net", "io-util", "time"] }
+tokio = { workspace = true, features = ["rt", "net", "io-util", "time"] }
 
 [target.'cfg(unix)'.dependencies]
 # MIT OR Apache-2.0 (geteuid, to check who owns the runtime directory)
-libc = "0.2"
+libc.workspace = true
 
 [dev-dependencies]
-tempfile = "3"
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tempfile.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

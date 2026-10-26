@@ -27,13 +27,11 @@ pub mod tile {
     pub const AUTO_EXPORT: &str = "file-output";
     pub const COUNTDOWN: &str = "timer";
     pub const SCREENSHOT_DELAY: &str = "camera";
-    pub const BUBBLE_SHAPE: &str = "cm-webcam-bubble";
-    pub const BUBBLE_SIZE: &str = "maximize";
+    pub const BUBBLE_SHAPE: &str = "circle";
+    pub const BUBBLE_SIZE: &str = "ratio";
     pub const MIRROR: &str = "flip-horizontal-2";
-    pub const POSITION: &str = "move-up-right";
-    pub const CAMERA: &str = "camera";
+    pub const REMEMBER: &str = "pin";
     pub const NOISE: &str = "audio-lines";
-    pub const DEVICES: &str = "mic";
     pub const APP: &str = "app-window";
     pub const SHORTCUT_FALLBACK: &str = "keyboard";
 
@@ -57,10 +55,8 @@ pub mod tile {
         BUBBLE_SHAPE,
         BUBBLE_SIZE,
         MIRROR,
-        POSITION,
-        CAMERA,
+        REMEMBER,
         NOISE,
-        DEVICES,
         APP,
         SHORTCUT_FALLBACK,
     ];

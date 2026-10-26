@@ -15,7 +15,7 @@ sends nothing anywhere.
 Setup. Make a text file or a note with made-up content, for example:
 
 ```
-Owner: jane.doe@example.com
+Maintainer: jane.doe@example.com
 Billing: ap@vendor.example.org
 API key: sk-proj-A1b2C3d4E5f6G7h8I9j0K1l2
 Server: 192.168.10.24    Phone: +1 (415) 555-0132

@@ -2,7 +2,7 @@
 
 One file per manual run, so a status can say "verified" with something to point at. A report is
 the filled-in template below, named `<script id>-<date>-<who>.md` (for example
-`EDT-1-2026-10-23-owner.md`), committed with the change it covers. Do not store recordings of your
+`EDT-1-2026-10-23-maintainer.md`), committed with the change it covers. Do not store recordings of your
 screen here; screenshots of the fixture or of the app window are fine.
 
 The scripts are in `tests/manual/` (`M4-GATE.md` lists the M4 ones). The words used in specs:

@@ -4,7 +4,7 @@
 
 # The label sits in a button that grows with its content (flex_none) on the transport pill; the
 # pill and the button never get less room than their text.
-L2|src/ui/editor_view.rs|tr!("Auto-redact")  # content-sized button in a content-sized pill
+L2|src/ui/editor_view/chrome.rs|tr!("Auto-redact")  # content-sized button in a content-sized pill
 
 # The brand name is never translated and is short; the spacer only pushes the verb to the right.
 L1|src/ui/launcher_window.rs|div().flex_1().child("CaptureMann")  # untranslated brand name

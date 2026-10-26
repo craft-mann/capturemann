@@ -4,11 +4,12 @@ CaptureMann is Apache-2.0 and open source. v0.1 ships **Google Drive** as the on
 **YouTube** as the one publish platform. Everything else is "Coming soon", and **pull requests that add
 a provider or a platform are welcome**. This page says where the code goes and what a good PR
 contains. Read `CLAUDE.md` (architecture, rules and commands) and `specs/README.md` (conventions)
-first.
+first. For a map of the crates, see [`docs/development/architecture.md`](docs/development/architecture.md).
 
 ## Ground rules
 
-- **Licence.** Apache-2.0. No GPL or AGPL code in anything we ship; `cargo deny check` must pass and a
+- **Licence.** Apache-2.0, in and out: by submitting a contribution you agree it is licensed under
+  Apache-2.0 (section 5 of the licence). There is no CLA and no sign-off line to add. No GPL or AGPL code in anything we ship; `cargo deny check` must pass and a
   new dependency needs a licence on the `deny.toml` allow list.
 - **No telemetry**, and no network traffic when destinations and AI keys are off.
 - **Bring your own credentials.** Users create their own OAuth client (client ID, and a secret only
@@ -32,7 +33,7 @@ cargo deny check
 ```
 
 Also update the Status line of the feature you touched in `specs/features/` and the M6 row of
-`docs/PLAN.md`. Keep IDs stable (never renumber `STO-n`, `PUB-n` or acceptance criteria).
+`docs/project/plan.md`. Keep IDs stable (never renumber `STO-n`, `PUB-n` or acceptance criteria).
 
 ## Already built, not offered yet: OneDrive and Dropbox
 

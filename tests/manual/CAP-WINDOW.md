@@ -89,6 +89,6 @@ fully covered by other windows), Terminal x2, Notes, Preview. Keep one Finder wi
     shows the "Capture didn't start" toast with "Open Permissions..." and no palette.
 
 Pass: every expected result above. Note anything that differs from the board
-(`capturemann-redesign 4/screens/png/NewWindowPicker.png`): the board has a dimmed backdrop over the
+(board R19, kit 4, removed from the repo): the board has a dimmed backdrop over the
 display, a "Minimized" card and a "hidden by Privacy" note on the rail; none of them is built
 (screenshots ignore the privacy exclusion list by design; minimized windows are not listed).

@@ -4,6 +4,9 @@ description = "Primitives (MediaTime, geometry), documents, actions, commands, u
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
 publish.workspace = true
 rust-version.workspace = true
 
@@ -15,15 +18,16 @@ workspace = true
 testing = []
 
 [dependencies]
+log.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 time.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
-libc = "0.2"
+libc.workspace = true
 
 [dev-dependencies]
 time = { workspace = true, features = ["macros"] }
-hound = "3.5"
-tempfile = "3"
+hound.workspace = true
+tempfile.workspace = true

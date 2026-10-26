@@ -1,6 +1,6 @@
 # CaptureMann — Design Handoff for Coding Agents
 
-> **Redesign (Oct 23, 2026, OD-16 to OD-20 in `specs/design-implementation.md`):** the app UI is being rebuilt to `design/redesign/` (read its `CLAUDE.md` first) with the icons in `design/icons/`. Where this file and the redesign disagree about layout, navigation, the primary button colour or icons, the redesign wins; tokens, fonts and the brand below still apply. Plan: `specs/redesign-plan.md`.
+> **Redesign (Oct 23, 2026, OD-16 to OD-20 in `specs/plans/design-implementation.md`):** the app UI is being rebuilt to `design/redesign/` (read its `CLAUDE.md` first) with the icons in `design/icons/`. Where this file and the redesign disagree about layout, navigation, the primary button colour or icons, the redesign wins; tokens, fonts and the brand below still apply. Plan: `specs/redesign-plan.md`.
 
 This folder is the source of truth for CaptureMann's brand and UI (v0.1). Read this file first. If you are building the app, website or docs, follow these specs. Don't invent new colors, fonts or logo variants.
 

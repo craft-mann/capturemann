@@ -41,7 +41,7 @@ impl SettingsView {
             (m.platform, m.shortcuts.clone(), m.registration.clone())
         };
         let rows = model::shortcut_rows(&map, platform);
-        // TODO(design): the board's rows "Skip the countdown", "Draw
+        // Design gap: the board's rows "Skip the countdown", "Draw
         // on screen", "Show or hide the webcam bubble" and "Mute or unmute the microphone" are
         // not built: there is no such action, and D, T and A are Discard, Restart and Annotate.
         let groups =

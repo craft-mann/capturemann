@@ -66,7 +66,7 @@ mod tests {
     }
 
     /// No recorder surface may publish a window: `studio_window::publish` is called from the
-    /// Studio watch in `ui/app.rs` only, and the recorder modules never touch this module.
+    /// Studio watch in `ui/app/watch.rs` only, and the recorder modules never touch this module.
     #[test]
     fn recorder_surfaces_never_publish_windows() {
         use std::path::Path;
@@ -94,8 +94,8 @@ mod tests {
         );
         assert!(
             hits.iter()
-                .all(|h| h.ends_with("ui/app.rs") || h.ends_with("studio_window.rs")),
-            "only ui/app.rs may publish: {hits:?}"
+                .all(|h| h.ends_with("ui/app/watch.rs") || h.ends_with("studio_window.rs")),
+            "only ui/app/watch.rs may publish: {hits:?}"
         );
     }
 }

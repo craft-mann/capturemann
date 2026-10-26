@@ -21,6 +21,7 @@ const LANG_ENV: &str = "CAPTUREMANN_LANG";
 
 fn main() -> ExitCode {
     let started = Instant::now();
+    cm_core::logging::init();
     cm_i18n::set_language(cm_i18n::Lang::from_setting(
         std::env::var(LANG_ENV).ok().as_deref(),
     ));

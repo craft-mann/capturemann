@@ -5,7 +5,7 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-10-26
 
 First public release. macOS 13+ on Apple Silicon only; Intel Macs follow after 0.1.0, then Windows and Linux.
 
@@ -26,7 +26,8 @@ First public release. macOS 13+ on Apple Silicon only; Intel Macs follow after 0
 - Local AI: Whisper transcripts and captions (SRT, VTT, TXT, or burned into the video), a caption
   editor (split at the cursor, find and replace, play this line), a glossary for names and terms,
   and suggestions for zoom regions and for cutting silences and filler words. Models download only
-  when you press Download.
+  when you press Download. Word times come from the model's DTW alignment and never start before
+  the first sound, so captions line up with the speech even when a recording opens with silence.
 - Library of `.cmshot` and `.cmrec` bundles with search and Uploaded and Published filters; bundles
   added or changed outside the app are picked up.
 - Storage to local folders and Google Drive (your own Google client), and publishing to YouTube
@@ -54,7 +55,7 @@ First public release. macOS 13+ on Apple Silicon only; Intel Macs follow after 0
   soon"; TikTok and Facebook Pages are not included. Contributions are welcome.
 - AI titles, descriptions and chapters are not included; there are no API keys and no text model in
   this release.
-- Most features are tested with scripted fakes. Hardware paths were checked by the owner on one Mac
+- Most features are tested with scripted fakes. Hardware paths were checked by the maintainer on one Mac
   (Apple M4 Pro, macOS 26) and are not stored as reports; the 60 fps self-test, long soaks and sync
   measurements are not done. Drive and YouTube were not run against a real account in automated
   tests. See `specs/04-delivery-plan.md`, "Verification debt".

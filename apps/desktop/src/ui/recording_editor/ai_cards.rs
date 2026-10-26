@@ -658,7 +658,7 @@ impl RecordingEditor {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let ai = &self.ai;
-        // TODO(design): the board puts a subtitle under each tile ("Proposed on the Zoom track",
+        // Design gap: the board puts a subtitle under each tile ("Proposed on the Zoom track",
         // "Proposed as ranges to cut"); that is new copy, so the tiles carry the title only.
         let tile = |id: &'static str, glyph: &'static str, label: String, busy: bool| {
             let shown = if busy { tr!("Looking\u{2026}") } else { label };

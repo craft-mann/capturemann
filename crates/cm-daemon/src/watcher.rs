@@ -522,9 +522,9 @@ pub(crate) fn spawn(
             state = st;
             if tick.available != was_available {
                 if tick.available {
-                    eprintln!("cm-daemon: the library folder is reachable again");
+                    log::info!("the library folder is reachable again");
                 } else {
-                    eprintln!("cm-daemon: the library folder is unavailable; watching paused");
+                    log::warn!("the library folder is unavailable; watching paused");
                 }
                 was_available = tick.available;
                 let path = lock_library(&library).root().display().to_string();
@@ -539,7 +539,7 @@ pub(crate) fn spawn(
             }
             if tick.error != last_error {
                 if let Some(e) = &tick.error {
-                    eprintln!("cm-daemon: library watcher could not index: {e}");
+                    log::warn!("library watcher could not index: {e}");
                 }
                 last_error = tick.error.clone();
             }

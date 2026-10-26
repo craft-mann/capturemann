@@ -481,7 +481,7 @@ impl StartSheet {
         if std::env::var_os("CM_DEMO_SHEET_TRACE").is_some() {
             // Debug: what the body cannot show at this height is the estimate's error.
             let overflow = f64::from(f32::from(self.scroll.max_offset().y.abs()));
-            eprintln!(
+            log::info!(
                 "sheet: window {h} est {} overflow {overflow}",
                 heights.total()
             );

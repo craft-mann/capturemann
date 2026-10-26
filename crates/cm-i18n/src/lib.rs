@@ -1,4 +1,4 @@
-//! UI languages for CaptureMann (`specs/i18n-plan.md`, decision D1).
+//! UI languages for CaptureMann (`specs/plans/i18n-plan.md`, decision D1).
 //!
 //! English is the source text: code writes `tr!("Copy link")` and the English stays in place, so
 //! a missing translation shows the English, never a key. Other languages are gettext `.po`

@@ -476,7 +476,7 @@ impl EditorDoc {
                         ),
                     }
                 } else if let Err(e) = res {
-                    eprintln!("cm-desktop: clipboard copy after editing failed: {e}");
+                    log::warn!("clipboard copy after editing failed: {e}");
                 }
             }
             StepOut::Folder(res) => match res {
@@ -485,7 +485,7 @@ impl EditorDoc {
                         app::push_toast(&self.app, toast, cx);
                     }
                 }
-                Err(e) => eprintln!("cm-desktop: folder save after editing failed: {e}"),
+                Err(e) => log::warn!("folder save after editing failed: {e}"),
             },
             StepOut::Save(res) => match res {
                 Ok(path) => app::push_toast(

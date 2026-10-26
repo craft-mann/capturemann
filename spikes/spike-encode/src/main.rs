@@ -1,7 +1,7 @@
 //! S6 `spike-encode`: 4K60-class native screen capture + 1080p camera, hardware encoded
 //! in-process to fragmented MP4, on one clock, with a camera bubble excluded from capture.
 //!
-//! Subcommands (macOS only; the Windows side is intentionally not written, see docs/SPIKES.md):
+//! Subcommands (macOS only; the Windows side is intentionally not written, see docs/project/spikes.md):
 //!
 //! ```text
 //! spike-encode preflight                      # permission + display + device report
@@ -40,7 +40,7 @@ fn main() {
 fn main() {
     eprintln!(
         "spike-encode: only the macOS implementation exists. The Windows version (WGC + Media \
-         Foundation hardware MFT + WDA_EXCLUDEFROMCAPTURE) is not written; see docs/SPIKES.md S6."
+         Foundation hardware MFT + WDA_EXCLUDEFROMCAPTURE) is not written; see docs/project/spikes.md S6."
     );
     std::process::exit(2);
 }

@@ -579,6 +579,7 @@ impl Render for TextField {
         let entity = cx.entity();
         div()
             .id("text-field")
+            .debug_selector(|| format!("text-field:{}", self.label))
             .role(Role::TextInput)
             .aria_label(self.label.clone())
             .aria_placeholder(self.placeholder.clone())
@@ -869,6 +870,7 @@ impl TextField {
         let body = nested_scroll(&t, &scroll, line_h * max_rows as f32, list);
         div()
             .id("text-field")
+            .debug_selector(|| format!("text-field:{}", self.label))
             .relative()
             .role(Role::MultilineTextInput)
             .aria_label(self.label.clone())

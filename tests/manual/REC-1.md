@@ -45,11 +45,11 @@ Without permission the tests print `SKIPPED: Screen Recording permission ...` an
 NFR-2 is only meaningful with something moving on screen. Static content makes SCK deliver few
 frames and the recorder repeats the last one (counted as `repeated`, not late). For a real
 measurement play a full-screen video or an animation while the 60 fps test runs and compare with
-S6 (0.26 to 0.33% at 3024x1964 and 3840x2160, docs/SPIKES.md). Record the machine, display and content
+S6 (0.26 to 0.33% at 3024x1964 and 3840x2160, docs/project/spikes.md). Record the machine, display and content
 next to the number.
 
 ## Manual checks
-1. REC-1.AC4 / REC-6: show the camera bubble or HUD (exclusion by window id and pid; the owner also
+1. REC-1.AC4 / REC-6: show the camera bubble or HUD (exclusion by window id and pid; the maintainer also
    sets `sharingType = none`), record 5 s, step through `screen.mp4` (QuickTime, frame by frame):
    neither appears. Repeat with 1Password or Passwords open and its bundle id in the exclusion list:
    its windows are transparent. Add Slack to the list mid-way (new recording): its windows are

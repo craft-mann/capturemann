@@ -40,9 +40,6 @@ msgstr ""
 msgid "A circle with your face on the recording."
 msgstr ""
 
-msgid "A circle, or a 4:3 rounded rectangle. The ring is always the record color."
-msgstr ""
-
 msgid "A client name can’t contain control characters."
 msgstr ""
 
@@ -252,6 +249,9 @@ msgstr ""
 msgid "All windows"
 msgstr ""
 
+msgid "Allow access"
+msgstr ""
+
 msgid "Allow clients that are not in the list"
 msgstr ""
 
@@ -288,6 +288,9 @@ msgid_plural "Also deleted {n} online copies for good."
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "Also on the bubble’s hover toolbar."
+msgstr ""
+
 msgid "Also save a PNG to a folder"
 msgstr ""
 
@@ -310,6 +313,9 @@ msgid "Annotation editor"
 msgstr ""
 
 msgid "Annotation tools"
+msgstr ""
+
+msgid "Another app is using {camera}. Close it, or pick another camera."
 msgstr ""
 
 msgid "Another app owns the socket"
@@ -450,10 +456,16 @@ msgstr ""
 msgid "Camera access is restricted by a device policy and cannot be granted here."
 msgstr ""
 
-msgid "Camera layout"
+msgid "Camera access needed"
 msgstr ""
 
-msgid "Camera permission is missing"
+msgid "Camera is in use"
+msgstr ""
+
+msgid "Camera is off"
+msgstr ""
+
+msgid "Camera layout"
 msgstr ""
 
 msgid "Can look but not change anything."
@@ -565,6 +577,18 @@ msgstr ""
 msgid "CaptureMann collects no usage data and sends no analytics or crash reports."
 msgstr ""
 
+msgid "CaptureMann couldn’t open the camera. Try again, or pick another camera."
+msgstr ""
+
+msgid "CaptureMann couldn’t open the microphone. Pick another one, or try again."
+msgstr ""
+
+msgid "CaptureMann isn’t allowed to use the camera yet."
+msgstr ""
+
+msgid "CaptureMann isn’t allowed to use the microphone yet."
+msgstr ""
+
 msgid "CaptureMann library"
 msgstr ""
 
@@ -659,6 +683,9 @@ msgstr ""
 msgid "Check the permission states again"
 msgstr ""
 
+msgid "Check your camera and microphone, then set how the bubble looks."
+msgstr ""
+
 msgid "Check your connection, then delete again."
 msgstr ""
 
@@ -669,6 +696,9 @@ msgid "Checking the account…"
 msgstr ""
 
 msgid "Checking…"
+msgstr ""
+
+msgid "Chime not heard"
 msgstr ""
 
 msgid "Choose Change, then press the new combination. A shortcut another action or another app already uses is refused. Esc cancels."
@@ -714,6 +744,9 @@ msgid "Choose folder…"
 msgstr ""
 
 msgid "Choose image…"
+msgstr ""
+
+msgid "Choose mic"
 msgstr ""
 
 msgid "Choose the one you picked in the App Console. App folder: files go into Apps/<your app> in your Dropbox. Full Dropbox: files go into a CaptureMann folder at the top."
@@ -1291,7 +1324,7 @@ msgstr ""
 msgid "Drag on the image to set the visible area. The original and the annotations outside it are kept."
 msgstr ""
 
-msgid "Drag the bubble anywhere, before or during a recording. It snaps to a corner or edge midpoint when you let go near one."
+msgid "Drag the bubble anywhere before or during a recording. It snaps to corners and edge midpoints."
 msgstr ""
 
 msgid "Drag the slider or use the arrow keys (Shift for bigger steps). JPG or PNG up to 2 MB; 1280 × 720 is best."
@@ -1480,9 +1513,6 @@ msgstr ""
 msgid "Fix the problem and delete again; only the copies that are left are tried."
 msgstr ""
 
-msgid "Flips what you see, like a mirror. The recorded camera track is never flipped."
-msgstr ""
-
 msgid "Focus left/right"
 msgstr ""
 
@@ -1553,9 +1583,6 @@ msgid "Grant access…"
 msgstr ""
 
 msgid "Grid"
-msgstr ""
-
-msgid "Hide live camera"
 msgstr ""
 
 msgid "Hide the bubble"
@@ -1714,6 +1741,9 @@ msgstr ""
 msgid "Lets recordings note mouse clicks and scroll direction. Without it only the cursor position is recorded."
 msgstr ""
 
+msgid "Level only. Nothing is recorded; the mic turns off when you leave."
+msgstr ""
+
 msgid "Library"
 msgstr ""
 
@@ -1769,6 +1799,9 @@ msgstr ""
 msgid "Listening"
 msgstr ""
 
+msgid "Live camera"
+msgstr ""
+
 msgid "Live preview on screen. Drag it anywhere; it stays out of the recording."
 msgstr ""
 
@@ -1783,6 +1816,9 @@ msgid "Local-first"
 msgstr ""
 
 msgid "Logo Drive, Gu gồ Drai"
+msgstr ""
+
+msgid "Look again"
 msgstr ""
 
 msgid "Looking for displays…"
@@ -1860,10 +1896,19 @@ msgstr ""
 msgid "Microphone access is off. Turn it on in System Settings; recording starts without it."
 msgstr ""
 
+msgid "Microphone access needed"
+msgstr ""
+
 msgid "Microphone and system audio"
 msgstr ""
 
+msgid "Microphone is off"
+msgstr ""
+
 msgid "Microphone is off for this recording"
+msgstr ""
+
+msgid "Microphone level, {level}"
 msgstr ""
 
 msgid "Microphone {requested} is not available; using {using}"
@@ -1879,6 +1924,9 @@ msgid "Mirror on"
 msgstr ""
 
 msgid "Mirror the preview"
+msgstr ""
+
+msgid "Mirrored, like the bubble"
 msgstr ""
 
 msgid "Model"
@@ -2112,6 +2160,9 @@ msgstr ""
 msgid "No silences or filler words found in this recording."
 msgstr ""
 
+msgid "No sound coming in"
+msgstr ""
+
 msgid "No sound in the preview: FFmpeg is not installed."
 msgstr ""
 
@@ -2216,7 +2267,13 @@ msgstr ""
 msgid "Nothing is copied; the old files stay where they are"
 msgstr ""
 
+msgid "Nothing is heard until you ask. The orange microphone dot stays off."
+msgstr ""
+
 msgid "Nothing is saved: the test video is deleted when the test ends"
+msgstr ""
+
+msgid "Nothing is shown until you ask. The light on your camera stays off."
 msgstr ""
 
 #. FACT: owner review required
@@ -2235,7 +2292,7 @@ msgstr ""
 msgid "Off"
 msgstr ""
 
-msgid "Off: every recording starts with the bubble in the bottom-left corner. On: it starts where you last left it."
+msgid "Off: every recording starts bottom-left."
 msgstr ""
 
 msgid "Often heard as"
@@ -2422,6 +2479,9 @@ msgstr ""
 msgid "Paused, {t}"
 msgstr ""
 
+msgid "Peaks hit the top. Lower the input volume in System Settings."
+msgstr ""
+
 msgid "People in my organization"
 msgstr ""
 
@@ -2467,6 +2527,9 @@ msgstr ""
 msgid "Play original"
 msgstr ""
 
+msgid "Play test sound"
+msgstr ""
+
 msgid "Play this line"
 msgstr ""
 
@@ -2477,6 +2540,12 @@ msgid "Playlist"
 msgstr ""
 
 msgid "Playlist (optional)"
+msgstr ""
+
+msgid "Plays a short chime and checks that CaptureMann can hear it. Uses the Screen Recording permission."
+msgstr ""
+
+msgid "Plug in a camera, or record without the bubble."
 msgstr ""
 
 msgid "Policy for the new client"
@@ -2518,7 +2587,7 @@ msgstr ""
 msgid "Preview of the edited recording"
 msgstr ""
 
-msgid "Preview · {size}, {shape}, {mirror}"
+msgid "Preview only. Nothing is recorded, and the camera turns off when you leave this page."
 msgstr ""
 
 msgid "Previous doubtful word"
@@ -2720,6 +2789,12 @@ msgstr ""
 msgid "Recording editor toolbar"
 msgstr ""
 
+msgid "Recording in progress"
+msgstr ""
+
+msgid "Recording in progress, the check is paused."
+msgstr ""
+
 msgid "Recording is dropping frames"
 msgstr ""
 
@@ -2814,7 +2889,7 @@ msgstr ""
 msgid "Redo"
 msgstr ""
 
-msgid "Reduces steady background noise on the microphone track. The original sound is kept too."
+msgid "Reduces steady background noise. The original sound is kept too."
 msgstr ""
 
 msgid "Reframe for vertical or square"
@@ -3067,6 +3142,9 @@ msgstr ""
 msgid "Screen Recording access is off. Turn it on in System Settings > Privacy & Security > Screen Recording, then restart CaptureMann."
 msgstr ""
 
+msgid "Screen Recording access needed"
+msgstr ""
+
 msgid "Screen Recording is required for screenshots and recording. The others are optional."
 msgstr ""
 
@@ -3230,9 +3308,6 @@ msgstr ""
 msgid "Show in preview"
 msgstr ""
 
-msgid "Show live camera"
-msgstr ""
-
 msgid "Show or hide captions"
 msgstr ""
 
@@ -3291,10 +3366,16 @@ msgstr ""
 msgid "Sort captures"
 msgstr ""
 
+msgid "Sound settings"
+msgstr ""
+
 msgid "Sounds from apps, without your own"
 msgstr ""
 
 msgid "Space skips it, Esc cancels it."
+msgstr ""
+
+msgid "Speak as you would while recording"
 msgstr ""
 
 msgid "Speech models"
@@ -3355,6 +3436,9 @@ msgstr ""
 msgid "Starting soon"
 msgstr ""
 
+msgid "Starting the camera…"
+msgstr ""
+
 msgid "Starts CaptureMann in the menu bar with no window. Takes effect for the installed app only."
 msgstr ""
 
@@ -3403,13 +3487,19 @@ msgstr ""
 msgid "System audio"
 msgstr ""
 
+msgid "System audio comes with Screen Recording, and CaptureMann isn’t allowed to use it yet."
+msgstr ""
+
 msgid "System audio is not available on this computer"
 msgstr ""
 
-msgid "System default input"
+msgid "System audio level"
 msgstr ""
 
-msgid "System default input unless you pick one."
+msgid "System audio needs Screen Recording access. Check your output is not muted."
+msgstr ""
+
+msgid "System default input"
 msgstr ""
 
 msgid "System follows the OS: dark by default, light when the OS is light."
@@ -3434,6 +3524,9 @@ msgid "Term, spelled the way you want it"
 msgstr ""
 
 msgid "Test connection"
+msgstr ""
+
+msgid "Test microphone"
 msgstr ""
 
 msgid "Test pattern (FFmpeg not found)"
@@ -3542,6 +3635,9 @@ msgstr ""
 msgid "The camera chosen in Settings isn’t connected. Using the system default."
 msgstr ""
 
+msgid "The camera didn’t start"
+msgstr ""
+
 msgid "The camera file could not be written: {detail}"
 msgstr ""
 
@@ -3585,6 +3681,9 @@ msgid "The captures are copied and checked; nothing is deleted from the old fold
 msgstr ""
 
 msgid "The captures copied so far are in {path}. Nothing was deleted from the old folder, which is still in use. Retry to carry on."
+msgstr ""
+
+msgid "The check could not run. Try again."
 msgstr ""
 
 msgid "The client ID has no spaces in it; copy it again."
@@ -3680,6 +3779,12 @@ msgstr ""
 msgid "The library moved to {path}. Restart CaptureMann to use it. Your old captures were not deleted."
 msgstr ""
 
+msgid "The mic is selected but silent. It may be muted with a hardware switch."
+msgstr ""
+
+msgid "The microphone didn’t start"
+msgstr ""
+
 #. FACT: owner review required (what happens when the microphone is silent)
 msgid "The microphone has delivered only silence for 15 s (muted, or its access was revoked); the recording continues"
 msgstr ""
@@ -3730,6 +3835,9 @@ msgid "The publish sheet starts with this. Public always needs one more confirma
 msgstr ""
 
 msgid "The publish was not confirmed, so nothing was sent to YouTube."
+msgstr ""
+
+msgid "The recorded camera track is never flipped."
 msgstr ""
 
 msgid "The recording could not start."
@@ -3783,6 +3891,9 @@ msgstr ""
 msgid "The remote copies are deleted, then the capture is moved to the Trash"
 msgstr ""
 
+msgid "The ring is always the record color."
+msgstr ""
+
 msgid "The selection is outside the kept part"
 msgstr ""
 
@@ -3796,6 +3907,9 @@ msgid "The sign-in was refused."
 msgstr ""
 
 msgid "The take is deleted and cannot be recovered"
+msgstr ""
+
+msgid "The test sound didn’t play"
 msgstr ""
 
 msgid "The upload failed."
@@ -3820,9 +3934,6 @@ msgid "The video is on YouTube, but it refused the thumbnail: a custom thumbnail
 msgstr ""
 
 msgid "The video is on YouTube, but the thumbnail was not set: {warning}"
-msgstr ""
-
-msgid "The webcam bubble, microphone and system audio."
 msgstr ""
 
 msgid "The window follows the cursor and only moves when the cursor leaves its middle 80%."
@@ -3938,7 +4049,13 @@ msgstr ""
 msgid "Today {time}"
 msgstr ""
 
+msgid "Too loud, clipping"
+msgstr ""
+
 msgid "Too many confirmation requests are waiting; answer or dismiss them first"
+msgstr ""
+
+msgid "Too quiet"
 msgstr ""
 
 msgid "Tool"
@@ -3979,6 +4096,15 @@ msgid "Try again"
 msgstr ""
 
 msgid "Try another word, or clear the search to see every window."
+msgstr ""
+
+msgid "Turn off camera"
+msgstr ""
+
+msgid "Turn off microphone"
+msgstr ""
+
+msgid "Turn on camera"
 msgstr ""
 
 msgid "Two actions share a shortcut; only the first one is registered."
@@ -4098,9 +4224,6 @@ msgstr ""
 msgid "Use this model"
 msgstr ""
 
-msgid "Used for the bubble and the camera track."
-msgstr ""
-
 msgid "Uses {model}"
 msgstr ""
 
@@ -4138,9 +4261,6 @@ msgid "Warning: {w}"
 msgstr ""
 
 msgid "Webcam bubble"
-msgstr ""
-
-msgid "Webcam bubble preview"
 msgstr ""
 
 msgid "Webcam bubble settings"
@@ -4252,9 +4372,6 @@ msgstr ""
 msgid "Yesterday {time}"
 msgstr ""
 
-msgid "You can change it while recording from the bubble’s hover toolbar."
-msgstr ""
-
 msgid "You can leave this page; the upload continues in the background and resumes if the connection drops."
 msgstr ""
 
@@ -4306,6 +4423,9 @@ msgid "Your settings file was unreadable"
 msgstr ""
 
 msgid "Your sign-in expired or was removed. Sign in again with the app credentials already saved in your Keychain:"
+msgstr ""
+
+msgid "Your voice barely reaches the good range. Move closer or pick another mic."
 msgstr ""
 
 msgid "Your {n} capture ({size}) is copied to the new folder and checked. Nothing is deleted from the old folder. CaptureMann uses the new folder after it restarts."
@@ -4445,6 +4565,9 @@ msgid "folder \"{path}\""
 msgstr ""
 
 msgid "from {client}"
+msgstr ""
+
+msgid "good range"
 msgstr ""
 
 msgid "just now"
@@ -4945,9 +5068,6 @@ msgstr ""
 msgid "{pct}% · less than a minute left"
 msgstr ""
 
-msgid "{platform} is still processing the video"
-msgstr ""
-
 msgid "{platform} keeps videos from an unverified API project private; the result says so if it happens"
 msgstr ""
 
@@ -5232,6 +5352,14 @@ msgctxt "annotation setting"
 msgid "Text size"
 msgstr ""
 
+msgctxt "audio check"
+msgid "Microphone"
+msgstr ""
+
+msgctxt "audio check"
+msgid "System audio"
+msgstr ""
+
 msgctxt "automatic upload"
 msgid "Off"
 msgstr ""
@@ -5286,10 +5414,6 @@ msgstr ""
 
 msgctxt "breadcrumb"
 msgid "Studio /"
-msgstr ""
-
-msgctxt "bubble"
-msgid "Position"
 msgstr ""
 
 msgctxt "bubble"
@@ -5528,6 +5652,14 @@ msgctxt "camera layout"
 msgid "Side by side"
 msgstr ""
 
+msgctxt "camera status"
+msgid "Live"
+msgstr ""
+
+msgctxt "camera status"
+msgid "Starting…"
+msgstr ""
+
 msgctxt "caption line"
 msgid "(empty)"
 msgstr ""
@@ -5602,6 +5734,14 @@ msgstr ""
 
 msgctxt "channel"
 msgid "Default"
+msgstr ""
+
+msgctxt "check card"
+msgid "Audio check"
+msgstr ""
+
+msgctxt "check card"
+msgid "Camera check"
 msgstr ""
 
 msgctxt "click effect"
@@ -6200,6 +6340,26 @@ msgctxt "menu"
 msgid "Settings…"
 msgstr ""
 
+msgctxt "meter end"
+msgid "loud"
+msgstr ""
+
+msgctxt "meter end"
+msgid "quiet"
+msgstr ""
+
+msgctxt "mic verdict"
+msgid "Good level"
+msgstr ""
+
+msgctxt "mic verdict"
+msgid "Too loud"
+msgstr ""
+
+msgctxt "mic verdict"
+msgid "Too quiet"
+msgstr ""
+
 msgctxt "navigation"
 msgid "Published"
 msgstr ""
@@ -6332,22 +6492,6 @@ msgctxt "permissions setup"
 msgid "Skip optional"
 msgstr ""
 
-msgctxt "preview caption mirror"
-msgid "mirrored"
-msgstr ""
-
-msgctxt "preview caption mirror"
-msgid "not mirrored"
-msgstr ""
-
-msgctxt "preview caption shape"
-msgid "circle"
-msgstr ""
-
-msgctxt "preview caption shape"
-msgid "rounded"
-msgstr ""
-
 msgctxt "privacy"
 msgid "Private"
 msgstr ""
@@ -6474,6 +6618,10 @@ msgstr ""
 
 msgctxt "settings group"
 msgid "Countdown"
+msgstr ""
+
+msgctxt "settings group"
+msgid "Microphone"
 msgstr ""
 
 msgctxt "settings group"
@@ -6690,6 +6838,14 @@ msgstr ""
 
 msgctxt "status"
 msgid "Unavailable"
+msgstr ""
+
+msgctxt "system audio status"
+msgid "Heard"
+msgstr ""
+
+msgctxt "system audio status"
+msgid "Listening…"
 msgstr ""
 
 msgctxt "theme"

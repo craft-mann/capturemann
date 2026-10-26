@@ -247,7 +247,7 @@ impl App {
             if covers {
                 "covers the whole display, 1:1"
             } else {
-                "1:1 but DOES NOT cover the whole display (note in docs/SPIKES.md if this is the final line)"
+                "1:1 but DOES NOT cover the whole display (note in docs/project/spikes.md if this is the final line)"
             }
         );
         self.prepare_frames(size.width, size.height);

@@ -13,7 +13,7 @@ default 12 s copy is enough; the camera is on, which also shows the bubble over 
 2. **Presets.** In the inspector, background: **None**, **Soft gray**, **Lens Violet gradient**,
    **Custom**. Choose **Soft gray**. Expected: the screen shrinks inside a light gray frame with
    about 8 % padding, rounded corners (12 px) and a soft shadow; the preview updates at once. The
-   third preset is a violet gradient (`#4b2bd6` to `#9a6bff`). docs/DESIGN.md retires "Lens Violet" for
+   third preset is a violet gradient (`#4b2bd6` to `#9a6bff`). docs/development/design-surfaces.md retires "Lens Violet" for
    the app's own chrome; a background is content, note whether the name or the colours look wrong
    to you.
 3. **Padding and radius (AC1).** `capturemann edit background ID --kind color --value "#e8e9ec"

@@ -104,5 +104,5 @@ spec only when that report exists and every step passed.
 
 ## Status of the author's runs
 
-(none yet; the owner's first connect on Oct 23, 2026 is in
-`verification/STO-2-PUB-2-gdrive-youtube-2026-10-23-owner.md`, as reported, steps 4 only)
+(none yet; the maintainer's first connect on Oct 23, 2026 is in
+`verification/STO-2-PUB-2-gdrive-youtube-2026-10-23-maintainer.md`, as reported, steps 4 only)

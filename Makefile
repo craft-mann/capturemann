@@ -1,17 +1,21 @@
 # Small convenience entry points. Run `make help`.
-.PHONY: help bundle bundle-release run-bundle licenses ffmpeg dmg notarize verify-release release
+.PHONY: report help bundle bundle-release run-bundle licenses report ffmpeg dmg notarize verify-release release
 
 help:
 	@echo "make ffmpeg      build the LGPL FFmpeg (ffmpeg, ffprobe, libvpx, libopus) into packaging/ffmpeg/out (macOS arm64)"
 	@echo "make bundle      build release binaries and assemble target/bundle/CaptureMann.app (macOS); bundles packaging/ffmpeg/out when it exists (CM_NO_FFMPEG=1 skips)"
 	@echo "make bundle-release  like bundle, but fails unless the LGPL FFmpeg and its licence files are bundled"
 	@echo "make run-bundle  bundle, then open the app (permissions attach to CaptureMann)"
+	@echo "make report     run the tests, cargo deny and Trivy and write reports/ (commit it with a release)"
 	@echo "make licenses    regenerate THIRD_PARTY_LICENSES.md (bundled into the app)"
 	@echo "make dmg         build target/bundle/CaptureMann-<version>-arm64.dmg from target/bundle/CaptureMann.app (signed when CM_SIGN_IDENTITY is a real identity)"
 	@echo "make notarize    submit that DMG to Apple, wait, staple (APPLE_API_KEY_ID/ISSUER/KEY_PATH or APPLE_ID/TEAM_ID/APP_PASSWORD)"
 	@echo "make verify-release  check the DMG: signature, hardened runtime, entitlements, Gatekeeper, ticket, LGPL FFmpeg, version (ARGS=--allow-unsigned for a local build)"
 	@echo "make release     bundle-release with CM_HARDENED=1, then dmg, notarize, verify-release (needs a Developer ID identity and notary credentials)"
 	@echo "env: CM_BUNDLE_OUT, CM_FFMPEG_BUNDLE, CM_NO_FFMPEG, CM_SIGN_IDENTITY, CM_BUNDLE_ID, CM_SKIP_BUILD=1 (see packaging/macos/README.md)"
+
+report:
+	bash scripts/quality-report.sh
 
 licenses:
 	bash packaging/macos/gen-third-party.sh

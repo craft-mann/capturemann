@@ -1,0 +1,22 @@
+# Line endings: LF everywhere in the repository (the editor config says the same).
+* text=auto eol=lf
+
+# Binary files: never diffed or merged as text.
+*.png binary
+*.icns binary
+*.ttf binary
+*.otf binary
+*.woff2 binary
+*.gif binary
+*.p8 binary
+
+# Generated files: collapsed in pull request diffs and ignored by language statistics.
+Cargo.lock                  linguist-generated=true -diff
+THIRD_PARTY_LICENSES.md     linguist-generated=true -diff
+locales/capturemann.pot     linguist-generated=true
+reports/*.json              linguist-generated=true -diff
+reports/*.md                linguist-generated=true
+
+# Vendored fonts and brand assets are not our source.
+crates/cm-render/assets/*   linguist-vendored
+design/fonts/**             linguist-vendored

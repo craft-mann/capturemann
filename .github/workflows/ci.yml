@@ -3,6 +3,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: "41 4 * * 1" # Mondays 04:41 UTC: catches a new stable Rust or a yanked dependency without a commit
 
 # Least privilege: no job writes to the repository.
 permissions:
@@ -21,17 +23,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # v0.1 ships on macOS only (owner decision, Oct 24, 2026). Add `windows-latest` back when the
+        # v0.1 ships on macOS only (maintainer decision, Oct 24, 2026). Add `windows-latest` back when the
         # Windows milestone starts; the Windows steps below are kept for that day.
         os: [macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable (branch tip)
         with:
+          toolchain: stable
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
       # The FFmpeg-gated tests (export: EXP AC3, AC6-AC8) print SKIPPED and pass when no ffmpeg is
       # on PATH, so install one; otherwise CI would not cover the export path at all.
       - name: Install FFmpeg (macOS)
@@ -45,32 +48,56 @@ jobs:
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
 
+  # `rust-version` in Cargo.toml is a promise; this job keeps it. 1.95 is the oldest compiler the
+  # GPUI dependency builds with (it uses `std::hint::cold_path`); 1.93 and older fail. `cargo +1.95`
+  # bypasses rust-toolchain.toml, which selects stable.
+  msrv:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable (branch tip)
+        with:
+          toolchain: "1.95"
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+      - run: cargo +1.95 check --workspace --all-targets --locked
+
   bundle-macos:
     if: github.event_name == 'push'
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable (branch tip)
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
       - run: make licenses
       - run: bash packaging/macos/bundle.sh
       - run: codesign --verify --deep --strict target/bundle/CaptureMann.app
       - name: Show entitlements
         run: codesign -d --entitlements - target/bundle/CaptureMann.app
       - run: ditto -c -k --keepParent target/bundle/CaptureMann.app target/bundle/CaptureMann.zip
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: CaptureMann-macos-adhoc
           path: target/bundle/CaptureMann.zip
           retention-days: 3
 
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # Every relative link in a Markdown file must point at a tracked file.
+      - run: python3 scripts/check_md_links.py
+
   licenses:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: EmbarkStudios/cargo-deny-action@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
         with:
           # `command` is the whole subcommand line: `arguments` goes after it and would be read as
           # a second subcommand (the job failed with "unrecognized subcommand 'licenses'").

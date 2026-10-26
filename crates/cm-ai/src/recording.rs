@@ -183,6 +183,18 @@ pub fn transcribe_recording(
             ..w
         })
         .collect();
+    // The model cannot place a word before the sound begins: whatever it timed earlier (words of
+    // a clip that opens with silence are pegged to its start) is moved up to the first speech.
+    if let Some((from, _)) = crate::vad::speech_bounds(&mixed) {
+        let onset_file = base + crate::transcribe::media_secs(from as f64 / f64::from(SAMPLE_RATE));
+        let onset = file_to_session(gaps, onset_file, false);
+        for w in &mut t.words {
+            if w.start < onset {
+                w.start = onset;
+                w.end = w.end.max(onset + crate::transcribe::media_secs(0.05));
+            }
+        }
+    }
     if t.model.is_empty() {
         if let Some(id) = opts.model_id {
             t.model = id.to_owned();

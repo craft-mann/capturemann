@@ -52,4 +52,5 @@ pub mod recording;
 pub mod suggest;
 pub mod textmatch;
 pub mod transcribe;
+pub mod vad;
 pub mod whisper;

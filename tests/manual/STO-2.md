@@ -4,7 +4,7 @@ Covers STO-2 AC1 to AC5 for Google Drive, the only cloud drive offered in v0.1 (
 say "Coming soon"; AC6 is checked only if you re-enable that provider in a dev build). The protocol
 is tested against in-process fake servers (`cargo test -p cm-storage`); nothing in CI talks to
 Google. The first real-account run (connect and one upload) is in
-`verification/STO-2-PUB-2-gdrive-youtube-2026-10-23-owner.md`. Status of the full script:
+`verification/STO-2-PUB-2-gdrive-youtube-2026-10-23-maintainer.md`. Status of the full script:
 **AC2 to AC5 not run by a human yet.**
 
 ## Privacy and safety

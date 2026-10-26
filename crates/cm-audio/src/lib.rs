@@ -6,6 +6,8 @@
 //!   `system.wav`.
 //! * [`list_audio_devices`], [`microphone_permission`], [`request_microphone_access`]: the audio half
 //!   of `list_devices` and the permission flow. Checking never prompts.
+//! * [`run_check`] (Settings system-audio check): plays a chime from `afplay` and reports whether
+//!   system capture heard it.
 //! * [`FakeAudioSource`]: a scripted source so sessions and CI can run without hardware.
 //!
 //! Both recorders implement `cm_core::TrackRecorder`. Pause drops audio inside the paused interval
@@ -14,6 +16,7 @@
 
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
+mod chime;
 mod cpal_source;
 pub mod denoise;
 mod devices;
@@ -32,6 +35,10 @@ mod sys;
 mod system;
 pub mod wav;
 
+pub use chime::{
+    chime_wav, run_check, AfplayPlayer, ChimeConfig, ChimeHandle, ChimeOutcome, ChimePlayer,
+    ChimeProcess, FakeChimePlayer, FakeChimeScript,
+};
 pub use cpal_source::{map_cpal_error, CpalSource};
 pub use devices::{
     list_audio_devices, system_audio_support, AudioDevices, MicDevice, RateRange,

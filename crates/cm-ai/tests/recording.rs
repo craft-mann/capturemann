@@ -218,3 +218,56 @@ fn a_recording_without_audio_is_an_input_error_and_cancel_is_reported() {
     .unwrap_err();
     assert!(is_cancelled(&e), "{e}");
 }
+
+/// A word the model timed before any sound (it pegs the first words of a clip that opens with
+/// silence to the start) is moved up to the first speech: a mic file that is silent for 2 s gives
+/// words that begin after that silence, not at the start of the track.
+#[test]
+fn no_word_starts_before_the_speech_does() {
+    let Some(ff) = ffmpeg() else {
+        println!("SKIPPED: FFmpeg not found");
+        return;
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let ok = Command::new(&ff)
+        .args([
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=300:duration=2",
+        ])
+        .args(["-af", "adelay=2000", "-ar", "48000", "-ac", "1", "-y"])
+        .arg(dir.path().join("mic.wav"))
+        .status()
+        .unwrap()
+        .success();
+    assert!(ok);
+    // The mic starts 0.1 s into the session; there are no pauses.
+    std::fs::write(
+        dir.path().join("manifest.json"),
+        manifest(
+            serde_json::json!({"mic": {"file": "mic.wav", "start": ticks(0.1), "end": ticks(4.1)}}),
+            serde_json::json!([]),
+        ),
+    )
+    .unwrap();
+    // The model puts "early" at 0.1 to 0.4 s (in the silence) and "late" inside the speech.
+    let t = ScriptedTranscriber::from_secs(&[("early", 0.1, 0.4), ("late", 2.5, 2.9)]);
+    let out =
+        transcribe_recording(dir.path(), &t, &TranscribeOptions::default(), &mut |_| true).unwrap();
+    // The speech starts 2.0 s into the file, which is 2.1 s into the session.
+    assert!(
+        (secs(out.words[0].start) - 2.1).abs() < 0.05,
+        "early word at {}",
+        secs(out.words[0].start)
+    );
+    assert!(out.words[0].end > out.words[0].start);
+    // A word already inside the speech is left alone (0.1 track start + 2.5).
+    assert!(
+        (secs(out.words[1].start) - 2.6).abs() < 0.001,
+        "late word at {}",
+        secs(out.words[1].start)
+    );
+}

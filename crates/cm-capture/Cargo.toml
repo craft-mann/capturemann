@@ -4,6 +4,9 @@ description = "Screen capture backends and session clock"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
 publish.workspace = true
 rust-version.workspace = true
 
@@ -11,12 +14,12 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-cm-core = { path = "../cm-core" }
-cm-encode = { path = "../cm-encode" }
+cm-core.workspace = true
+cm-encode.workspace = true
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-png = "0.18"
-libc = "0.2"
+png.workspace = true
+libc.workspace = true
 
 [target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
 xcap = "0.9"
@@ -25,19 +28,19 @@ xcap = "0.9"
 # Zlib OR Apache-2.0 OR MIT. The versions xcap already uses, so nothing extra is compiled.
 # `kCGWindowLayer` is how list_targets tells document windows from menu bar, Dock and
 # Control Center windows.
-objc2-core-foundation = "0.3"
-objc2-core-graphics = "0.3"
+objc2-core-foundation.workspace = true
+objc2-core-graphics.workspace = true
 # Screen recording (ScreenCaptureKit), plain objc2 bindings as in spike S6. MIT; dispatch2 is
 # Zlib OR Apache-2.0 OR MIT. `unsafe` for this lives in src/record/sck.rs.
-objc2 = "0.6"
-block2 = "0.6"
-dispatch2 = "0.3"
+objc2.workspace = true
+block2.workspace = true
+dispatch2.workspace = true
 objc2-foundation = "0.3"
-objc2-core-media = { version = "0.3", features = ["objc2-core-video", "block2", "dispatch2"] }
-objc2-screen-capture-kit = { version = "0.3", features = ["objc2-core-media", "objc2-core-graphics", "objc2-core-foundation", "block2", "dispatch2", "libc"] }
+objc2-core-media = { workspace = true, features = ["objc2-core-video", "block2", "dispatch2"] }
+objc2-screen-capture-kit = { workspace = true, features = ["objc2-core-media", "objc2-core-graphics", "objc2-core-foundation", "block2", "dispatch2", "libc"] }
 
 [dev-dependencies]
-tempfile = "3"
+tempfile.workspace = true
 # REC-8 end-to-end test: record, kill -9, recover (cm-library does not depend on cm-capture).
-cm-library = { path = "../cm-library" }
+cm-library.workspace = true
 time = { version = "0.3", default-features = false, features = ["std"] }

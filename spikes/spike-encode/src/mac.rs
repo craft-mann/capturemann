@@ -156,7 +156,7 @@ struct Opts {
     exclude: String,
     motion: bool,
     request_camera: bool,
-    /// SCK minimumFrameInterval denominator (default = 1.1 x fps; see docs/SPIKES.md)
+    /// SCK minimumFrameInterval denominator (default = 1.1 x fps; see docs/project/spikes.md)
     sck_rate: Option<i32>,
     container: String,
     out: PathBuf,

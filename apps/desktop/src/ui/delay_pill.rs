@@ -169,7 +169,7 @@ pub fn escape_hotkey_id() -> u32 {
 fn grab_escape(cx: &App) {
     if let Some(h) = cx.try_global::<crate::platform::HotkeyHolder>() {
         if let Err(e) = h.0.register(escape_hotkey()) {
-            eprintln!("cm-desktop: could not register Esc for the delay: {e}");
+            log::warn!("could not register Esc for the delay: {e}");
         }
     }
 }

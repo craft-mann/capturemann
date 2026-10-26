@@ -7,7 +7,7 @@ light theme and the pseudo-locale. The pure logic is covered by `cargo test -p c
 caption` (split at the caret with NFC, NFD and emoji, find and replace, line navigation, the
 follow rules, the lane geometry, the Captions-mode width rule) and the layout guards by
 `cargo test -p cm-desktop --test layout_guard` and `--lib layout_width_tests`. The plan is
-[`specs/caption-editor-plan.md`](../../specs/caption-editor-plan.md), the board
+[`specs/plans/caption-editor-plan.md`](../../specs/plans/caption-editor-plan.md), the board
 `design/redesign/screens/png/NewCaptions.png`. Status: built, tested with fakes, **never seen by
 eye** before this script is run (see `design/redesign/STATUS-captions.md`).
 

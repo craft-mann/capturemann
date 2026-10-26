@@ -5,10 +5,16 @@ use std::io;
 
 use serde_json::{json, Value};
 use tokio::io::{
-    AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader, ReadHalf, WriteHalf,
+    AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader, ReadHalf,
+    WriteHalf,
 };
 
 use crate::endpoint::ClientStream;
+
+/// The longest line the client accepts from the daemon, the same bound the daemon puts on a request
+/// (`cm_daemon::rpc::MAX_LINE_BYTES`). A longer line ends the call with an `InvalidData` error
+/// instead of growing the buffer without limit.
+pub const MAX_LINE_BYTES: usize = 16 * 1024 * 1024;
 
 /// Why a call produced no result.
 #[derive(Debug)]
@@ -75,17 +81,25 @@ impl<S: AsyncRead + AsyncWrite> RpcClient<S> {
 
     /// The next JSON message from the daemon (responses and notifications alike).
     pub async fn read_message(&mut self) -> Result<Value, RpcError> {
-        let mut line = String::new();
+        let mut buf = Vec::new();
         loop {
-            line.clear();
-            let n = self
-                .reader
-                .read_line(&mut line)
+            buf.clear();
+            let n = (&mut self.reader)
+                .take(MAX_LINE_BYTES as u64 + 1)
+                .read_until(b'\n', &mut buf)
                 .await
                 .map_err(|e| RpcError::Io(Some(e)))?;
             if n == 0 {
                 return Err(RpcError::Io(None));
             }
+            if buf.last() != Some(&b'\n') && buf.len() > MAX_LINE_BYTES {
+                return Err(RpcError::Io(Some(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "the daemon sent a line that is too long",
+                ))));
+            }
+            let line = std::str::from_utf8(&buf)
+                .map_err(|e| RpcError::Io(Some(io::Error::new(io::ErrorKind::InvalidData, e))))?;
             if line.trim().is_empty() {
                 continue;
             }

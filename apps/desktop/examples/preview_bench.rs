@@ -1,4 +1,4 @@
-//! 1080p60 preview test (docs/SPIKES.md S5 follow-up): shows synthetic 1920x1080 frames at 60 fps in
+//! 1080p60 preview test (docs/project/spikes.md S5 follow-up): shows synthetic 1920x1080 frames at 60 fps in
 //! a GPUI window for N seconds and prints presented fps, late frames, CPU and memory.
 //!
 //! `cargo run --release -p cm-desktop --example preview_bench -- [surface|cpu] [seconds]`

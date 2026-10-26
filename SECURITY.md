@@ -16,7 +16,7 @@ in the release notes if you wish. Please give us a reasonable time to ship a fix
 
 ## Supported versions
 
-CaptureMann is in early development (0.0.x). Only the latest release and `main` receive fixes.
+CaptureMann is at 0.1.x. Only the latest release and `main` receive fixes.
 
 ## Scope
 

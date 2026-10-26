@@ -12,12 +12,12 @@ use crate::library::{CaptureItem, Kind};
 /// What the platform says about a published video.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PublishState {
-    Processing,
+    /// Uploaded. Also what a `processing` record or a status this version does not know shows:
+    /// the app never asks the platform again, so it does not claim the video is still processing.
+    Published,
     Processed,
     /// The platform kept the video private although another privacy was asked for.
     PrivacyLocked,
-    /// A status this version does not know (a newer daemon).
-    Unknown,
 }
 
 /// One entry of a capture's `publishes[]`.
@@ -50,10 +50,9 @@ impl PublishRecord {
             privacy: text("privacy").unwrap_or_default(),
             privacy_requested: text("privacy_requested"),
             state: match v.get("status").and_then(Value::as_str) {
-                Some("processing") => PublishState::Processing,
                 Some("processed") => PublishState::Processed,
                 Some("privacy_locked") => PublishState::PrivacyLocked,
-                _ => PublishState::Unknown,
+                _ => PublishState::Published,
             },
             warnings: v
                 .get("warnings")
@@ -261,16 +260,13 @@ pub fn privacy_line(r: &PublishRecord) -> String {
 pub fn status_text(r: &PublishRecord) -> String {
     let p = platform_label(&r.platform);
     match r.state {
-        PublishState::Processing => {
-            tr!("{platform} is still processing the video", platform = p)
-        }
         PublishState::Processed => tr!("Processed"),
         PublishState::PrivacyLocked => tr!(
             "{platform} kept it {privacy}",
             platform = p,
             privacy = privacy_in_sentence(&r.privacy)
         ),
-        PublishState::Unknown => tr!("Published"),
+        PublishState::Published => tr!("Published"),
     }
 }
 
@@ -294,13 +290,12 @@ pub fn privacy_tone(r: &PublishRecord) -> crate::ui::kit::Tone {
     }
 }
 
-/// The icon and tone of the status line: a spinner while the platform processes, a check when
-/// it is done, a triangle when the platform changed what the user asked for.
+/// The icon and tone of the status line: a check, or a triangle when the platform changed what
+/// the user asked for.
 pub fn status_icon(state: PublishState) -> (&'static str, crate::ui::kit::Tone) {
     use crate::ui::kit::Tone;
     match state {
-        PublishState::Processing => ("loader-circle", Tone::Neutral),
-        PublishState::Processed | PublishState::Unknown => ("circle-check", Tone::Success),
+        PublishState::Published | PublishState::Processed => ("circle-check", Tone::Success),
         PublishState::PrivacyLocked => ("triangle-alert", Tone::Brass),
     }
 }
@@ -478,11 +473,9 @@ mod tests {
         let rec = |s, p, asked| {
             PublishRecord::from_json(&pub_rec("v", "2026-10-21T10:00:00Z", s, p, asked)).unwrap()
         };
+        // A `processing` record is never refreshed, so it reads as published.
         let processing = rec("processing", "unlisted", "unlisted");
-        assert_eq!(
-            status_text(&processing),
-            "YouTube is still processing the video"
-        );
+        assert_eq!(status_text(&processing), "Published");
         assert_eq!(privacy_line(&processing), "Unlisted");
         assert_eq!(
             status_text(&rec("processed", "public", "public")),
@@ -527,7 +520,7 @@ mod tests {
         .unwrap();
         assert_eq!(privacy_tone(&locked), Tone::Brass);
         assert_eq!(open_label(&locked), "Open on YouTube");
-        assert_eq!(status_icon(PublishState::Processing).0, "loader-circle");
+        assert_eq!(status_icon(PublishState::Published).0, "circle-check");
         assert_eq!(
             status_icon(PublishState::PrivacyLocked),
             ("triangle-alert", Tone::Brass)

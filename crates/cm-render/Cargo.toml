@@ -4,6 +4,9 @@ description = "Annotation and GPU compositor rendering (preview and export)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
 publish.workspace = true
 rust-version.workspace = true
 
@@ -11,9 +14,9 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-cm-core = { path = "../cm-core" }
+cm-core.workspace = true
 cosmic-text = { version = "0.19", default-features = false, features = ["std", "swash"] }
-image = { version = "0.25", default-features = false, features = ["png"] }
+image = { workspace = true, features = ["png"] }
 serde_json.workspace = true
 tiny-skia = "0.11"
 # MIT OR Apache-2.0 (the headless GPU compositor)
@@ -26,7 +29,7 @@ pollster = "0.4"
 [target.'cfg(target_os = "macos")'.dependencies]
 # Apple Vision text recognition (ANN-2 Auto-redact) through plain objc2 messages, as in the
 # capture crates: Zlib OR Apache-2.0 OR MIT. Vision itself is loaded with dlopen at run time.
-objc2 = "0.6"
+objc2.workspace = true
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSData", "NSDictionary", "NSError", "NSGeometry", "NSObject", "NSRange", "NSString"] }
 wgpu = { version = "29", default-features = false, features = ["std", "parking_lot", "wgsl", "metal"] }
 
