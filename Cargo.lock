@@ -1383,6 +1383,7 @@ dependencies = [
  "global-hotkey",
  "gpui-pre",
  "gpui-pre-platform",
+ "hound",
  "icu_normalizer",
  "image",
  "libc",
@@ -1454,6 +1455,7 @@ version = "0.1.0"
 dependencies = [
  "cm-core",
  "cm-encode",
+ "hound",
  "image",
  "libc",
  "rusqlite",

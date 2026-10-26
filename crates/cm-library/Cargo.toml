@@ -23,6 +23,7 @@ time = { version = "0.3", default-features = false, features = ["std", "serde-we
 rusqlite = { workspace = true, features = ["bundled"] }
 image = { workspace = true, features = ["png", "jpeg"] }
 sha2.workspace = true
+hound.workspace = true
 
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true

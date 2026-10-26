@@ -9513,3 +9513,88 @@ msgstr "Đã nghe thấy"
 msgctxt "system audio status"
 msgid "Listening…"
 msgstr "Đang nghe…"
+
+#, fuzzy
+msgid "No audio recordings yet"
+msgstr "Chưa có bản ghi âm nào"
+
+#, fuzzy
+msgid "Record a meeting, a lecture or a voice note and it will show up here."
+msgstr "Ghi âm cuộc họp, bài giảng hoặc ghi chú giọng nói, chúng sẽ hiện ở đây."
+
+#, fuzzy
+msgid "Record audio, shortcut {chord}"
+msgstr "Ghi âm, phím tắt {chord}"
+
+#, fuzzy
+msgid "Search titles and what was said"
+msgstr "Tìm theo tiêu đề và nội dung đã nói"
+
+#, fuzzy
+msgctxt "audio badge"
+msgid "Report"
+msgstr "Báo cáo"
+
+#, fuzzy
+msgctxt "audio badge"
+msgid "Speakers"
+msgstr "Người nói"
+
+#, fuzzy
+msgctxt "audio preset"
+msgid "Audio"
+msgstr "Âm thanh"
+
+#, fuzzy
+msgctxt "audio preset"
+msgid "In the room"
+msgstr "Trong phòng"
+
+#, fuzzy
+msgctxt "audio preset"
+msgid "Lecture"
+msgstr "Bài giảng"
+
+#, fuzzy
+msgctxt "audio preset"
+msgid "Online meeting"
+msgstr "Họp trực tuyến"
+
+#, fuzzy
+msgctxt "audio preset"
+msgid "Product demo"
+msgstr "Demo sản phẩm"
+
+#, fuzzy
+msgctxt "audio preset"
+msgid "Voice note"
+msgstr "Ghi chú giọng nói"
+
+#, fuzzy
+msgctxt "capture dock"
+msgid "Record audio"
+msgstr "Ghi âm"
+
+#, fuzzy
+msgctxt "capture kind"
+msgid "Audio"
+msgstr "Âm thanh"
+
+#, fuzzy
+msgctxt "card badge"
+msgid "AUDIO"
+msgstr "ÂM THANH"
+
+#, fuzzy
+msgctxt "navigation"
+msgid "Audio"
+msgstr "Âm thanh"
+
+#, fuzzy
+msgid "{n} speaker"
+msgid_plural "{n} speakers"
+msgstr[0] "{n} người nói"
+
+#, fuzzy
+msgid "Transcript"
+msgstr "Bản chép lời"

@@ -116,6 +116,7 @@ fn main() {
         "permissions" => Some(Route::Permissions),
         "settings-permissions" => Some(Route::Settings),
         "recordings" => Some(Route::Recordings),
+        "audio" => Some(Route::Audio),
         "screenshots" => Some(Route::Screenshots),
         "library" | "all" => Some(Route::Library),
         "published" => Some(Route::Published),

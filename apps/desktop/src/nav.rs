@@ -14,6 +14,8 @@ pub enum NavItem {
     /// Every capture, newest first (`Route::Library`, the default landing page).
     AllCaptures,
     Recordings,
+    /// Audio-only recordings (`Route::Audio`, VOC-1.AC10).
+    Audio,
     Screenshots,
     Published,
     /// The speech-model manager (`Route::Ai`).
@@ -31,12 +33,15 @@ pub struct NavCounts {
     pub recordings: Option<usize>,
     /// Published videos (the Published page loads the library itself).
     pub published: Option<usize>,
+    /// Audio-only recordings.
+    pub audio: Option<usize>,
 }
 
 impl NavItem {
-    pub const ALL: [NavItem; 7] = [
+    pub const ALL: [NavItem; 8] = [
         NavItem::AllCaptures,
         NavItem::Recordings,
+        NavItem::Audio,
         NavItem::Screenshots,
         NavItem::Published,
         NavItem::AiModels,
@@ -45,9 +50,10 @@ impl NavItem {
     ];
 
     /// The LIBRARY group of the app sidebar.
-    pub const LIBRARY: [NavItem; 4] = [
+    pub const LIBRARY: [NavItem; 5] = [
         NavItem::AllCaptures,
         NavItem::Recordings,
+        NavItem::Audio,
         NavItem::Screenshots,
         NavItem::Published,
     ];
@@ -59,6 +65,7 @@ impl NavItem {
         match self {
             NavItem::AllCaptures => tr!("All captures"),
             NavItem::Recordings => tr_ctx!("navigation", "Recordings"),
+            NavItem::Audio => tr_ctx!("navigation", "Audio"),
             NavItem::Screenshots => tr_ctx!("navigation", "Screenshots"),
             NavItem::Published => tr_ctx!("navigation", "Published"),
             NavItem::AiModels => tr!("AI models"),
@@ -71,6 +78,7 @@ impl NavItem {
         match self {
             NavItem::AllCaptures => "nav-all",
             NavItem::Recordings => "nav-recordings",
+            NavItem::Audio => "nav-audio",
             NavItem::Screenshots => "nav-screenshots",
             NavItem::Published => "nav-published",
             NavItem::AiModels => "nav-ai",
@@ -84,6 +92,7 @@ impl NavItem {
         match self {
             NavItem::AllCaptures => "layout-grid",
             NavItem::Recordings => "film",
+            NavItem::Audio => "audio-lines",
             NavItem::Screenshots => "image",
             NavItem::Published => "send",
             NavItem::AiModels => "sparkles",
@@ -96,6 +105,7 @@ impl NavItem {
         match self {
             NavItem::AllCaptures => Route::Library,
             NavItem::Recordings => Route::Recordings,
+            NavItem::Audio => Route::Audio,
             NavItem::Screenshots => Route::Screenshots,
             NavItem::Published => Route::Published,
             NavItem::AiModels => Route::Ai,
@@ -110,6 +120,7 @@ impl NavItem {
     pub fn of_route(route: &Route) -> NavItem {
         match route {
             Route::Library => NavItem::AllCaptures,
+            Route::Audio => NavItem::Audio,
             Route::Screenshots | Route::Editor(_) => NavItem::Screenshots,
             Route::Recordings | Route::Recording(_) | Route::RecordingEditor(_) => {
                 NavItem::Recordings
@@ -126,6 +137,7 @@ impl NavItem {
     pub fn count(self, counts: &NavCounts) -> Option<usize> {
         match self {
             NavItem::Recordings => counts.recordings,
+            NavItem::Audio => counts.audio,
             NavItem::Screenshots => counts.screenshots,
             NavItem::Published => counts.published,
             _ => None,
@@ -172,6 +184,7 @@ pub fn library_filter(route: &Route) -> Option<Filter> {
     match route {
         Route::Library => Some(Filter::All),
         Route::Recordings => Some(Filter::Recordings),
+        Route::Audio => Some(Filter::Audio),
         Route::Screenshots => Some(Filter::Screenshots),
         _ => None,
     }
@@ -181,11 +194,13 @@ pub fn library_filter(route: &Route) -> Option<Filter> {
 /// two kinds when both are known, Published its own. `None` while unknown (no placeholder).
 pub fn route_count(route: &Route, counts: &NavCounts) -> Option<usize> {
     match route {
+        // Audio joins the sum when its count is known (an older daemon has none: then 0).
         Route::Library => counts
             .recordings
             .zip(counts.screenshots)
-            .map(|(r, s)| r + s),
+            .map(|(r, s)| r + s + counts.audio.unwrap_or(0)),
         Route::Recordings => counts.recordings,
+        Route::Audio => counts.audio,
         Route::Screenshots => counts.screenshots,
         Route::Published => counts.published,
         _ => None,
@@ -197,7 +212,7 @@ pub fn route_count(route: &Route, counts: &NavCounts) -> Option<usize> {
 pub fn is_library_page(route: &Route) -> bool {
     matches!(
         route,
-        Route::Library | Route::Screenshots | Route::Recordings | Route::Published
+        Route::Library | Route::Screenshots | Route::Recordings | Route::Audio | Route::Published
     )
 }
 
@@ -228,6 +243,7 @@ impl SidebarMode {
             Route::Library
             | Route::Screenshots
             | Route::Recordings
+            | Route::Audio
             | Route::Published
             | Route::Ai
             | Route::Agents
@@ -249,22 +265,26 @@ pub enum RailEntry {
     Brand,
     Record,
     Region,
+    /// The mic button: Record audio (VOC-1, Option-Shift-V).
+    RecordAudio,
     Divider,
     Nav(NavItem),
     Spacer,
     Mcp,
 }
 
-/// The rail from the top: brand mark, Record, Region, a divider, the six destinations, then
+/// The rail from the top: brand mark, Record, Region, a divider, the seven destinations, then
 /// Settings and the MCP status button at the bottom.
 pub fn rail_layout() -> Vec<RailEntry> {
     vec![
         RailEntry::Brand,
         RailEntry::Record,
         RailEntry::Region,
+        RailEntry::RecordAudio,
         RailEntry::Divider,
         RailEntry::Nav(NavItem::AllCaptures),
         RailEntry::Nav(NavItem::Recordings),
+        RailEntry::Nav(NavItem::Audio),
         RailEntry::Nav(NavItem::Screenshots),
         RailEntry::Nav(NavItem::Published),
         RailEntry::Nav(NavItem::AiModels),
@@ -382,6 +402,42 @@ pub fn tile_keys(keys: &[String]) -> Vec<String> {
     }
 }
 
+/// Which mode the Record sheet opens in. The sidebar's mic button asks for `Audio`.
+///
+/// TODO(voice P1.1/P1.3, Record sheet owner): the sheet has no Audio mode yet, so
+/// `ui::sidebar::open_record_audio` opens it as it is; wire this hint into `open_sheet_with` when
+/// the mode switch lands, and add a `ShortcutAction::RecordAudio` for the chord below.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RecordSheetMode {
+    #[default]
+    Screen,
+    Audio,
+}
+
+/// Element id of the mic button (the dock and the rail).
+pub const RECORD_AUDIO_ID: &str = "rec-audio";
+
+/// The mic button's label.
+pub fn record_audio_label() -> String {
+    tr_ctx!("capture dock", "Record audio")
+}
+
+/// The chord hint of "Record audio" (VOC-1: Option-Shift-V on macOS). The shortcut map has no
+/// entry for it yet (the shortcuts owner adds `RecordAudio`); until then the hint is the default
+/// chord, derived from Record's modifiers so a platform keeps its own style.
+pub fn record_audio_keys(map: &ShortcutMap, platform: Platform) -> Vec<String> {
+    let mut keys = map.get(ShortcutAction::ToggleRecording).keycaps(platform);
+    if let Some(last) = keys.last_mut() {
+        *last = "V".to_owned();
+    }
+    keys
+}
+
+/// The accessible name of the mic button: the words and the live chord.
+pub fn record_audio_aria(keys: &[String]) -> String {
+    tr!("Record audio, shortcut {chord}", chord = keys.join(""))
+}
+
 /// Crumb and title of a route. The page headers are gone (OD-16); the title feeds the library
 /// pages' title row and the Published page.
 pub fn page_heading(route: &Route) -> (String, String) {
@@ -398,6 +454,10 @@ pub fn page_heading(route: &Route) -> (String, String) {
         Route::Recordings => (
             tr_ctx!("breadcrumb", "Library /"),
             tr_ctx!("navigation", "Recordings"),
+        ),
+        Route::Audio => (
+            tr_ctx!("breadcrumb", "Library /"),
+            tr_ctx!("navigation", "Audio"),
         ),
         Route::Recording(_) => (
             tr_ctx!("breadcrumb", "Recordings /"),
@@ -441,6 +501,7 @@ mod tests {
             Route::Library,
             Route::Screenshots,
             Route::Recordings,
+            Route::Audio,
             Route::Published,
             Route::Destinations,
             Route::Agents,
@@ -455,13 +516,14 @@ mod tests {
     }
 
     #[test]
-    fn seven_items_in_order_in_two_groups() {
+    fn eight_items_in_order_in_two_groups() {
         let labels: Vec<_> = NavItem::ALL.iter().map(|i| i.label()).collect();
         assert_eq!(
             labels,
             [
                 "All captures",
                 "Recordings",
+                "Audio",
                 "Screenshots",
                 "Published",
                 "AI models",
@@ -472,7 +534,13 @@ mod tests {
         let library: Vec<_> = NavItem::LIBRARY.iter().map(|i| i.label()).collect();
         assert_eq!(
             library,
-            ["All captures", "Recordings", "Screenshots", "Published"]
+            [
+                "All captures",
+                "Recordings",
+                "Audio",
+                "Screenshots",
+                "Published"
+            ]
         );
         let intelligence: Vec<_> = NavItem::INTELLIGENCE.iter().map(|i| i.label()).collect();
         assert_eq!(intelligence, ["AI models", "Agents & CLI"]);
@@ -550,9 +618,12 @@ mod tests {
             screenshots: Some(138),
             recordings: Some(0),
             published: Some(3),
+            audio: Some(5),
         };
         assert_eq!(NavItem::Screenshots.count(&c), Some(138));
         assert_eq!(NavItem::Recordings.count(&c), Some(0));
+        assert_eq!(NavItem::Audio.count(&c), Some(5));
+        assert_eq!(NavItem::Audio.count(&none), None);
         assert_eq!(
             NavItem::Published.count(&none),
             None,
@@ -608,6 +679,7 @@ mod tests {
         for r in [
             Route::Library,
             Route::Recordings,
+            Route::Audio,
             Route::Screenshots,
             Route::Published,
         ] {
@@ -617,8 +689,10 @@ mod tests {
             screenshots: Some(11),
             recordings: Some(24),
             published: Some(2),
+            audio: Some(6),
         };
-        assert_eq!(route_count(&Route::Library, &c), Some(35));
+        assert_eq!(route_count(&Route::Library, &c), Some(41));
+        assert_eq!(route_count(&Route::Audio, &c), Some(6));
         assert_eq!(route_count(&Route::Recordings, &c), Some(24));
         assert_eq!(route_count(&Route::Screenshots, &c), Some(11));
         assert_eq!(route_count(&Route::Published, &c), Some(2));
@@ -638,6 +712,7 @@ mod tests {
             Route::Library,
             Route::Screenshots,
             Route::Recordings,
+            Route::Audio,
             Route::Published,
         ] {
             assert!(is_library_page(&r), "{r:?}");
@@ -664,6 +739,7 @@ mod tests {
             (Route::Library, M::App),
             (Route::Screenshots, M::App),
             (Route::Recordings, M::App),
+            (Route::Audio, M::App),
             (Route::Published, M::App),
             (Route::Ai, M::App),
             (Route::Agents, M::App),
@@ -703,6 +779,7 @@ mod tests {
             [
                 NavItem::AllCaptures,
                 NavItem::Recordings,
+                NavItem::Audio,
                 NavItem::Screenshots,
                 NavItem::Published,
                 NavItem::AiModels,
@@ -712,7 +789,9 @@ mod tests {
         );
         let pos = |e: RailEntry| rail.iter().position(|x| *x == e).unwrap();
         assert!(pos(RailEntry::Record) < pos(RailEntry::Region));
-        assert!(pos(RailEntry::Region) < pos(RailEntry::Divider));
+        // The mic button sits with the capture buttons, above the divider (board UiSidebar).
+        assert!(pos(RailEntry::Region) < pos(RailEntry::RecordAudio));
+        assert!(pos(RailEntry::RecordAudio) < pos(RailEntry::Divider));
         assert!(pos(RailEntry::Divider) < pos(RailEntry::Nav(NavItem::AllCaptures)));
         assert!(pos(RailEntry::Nav(NavItem::Agents)) < pos(RailEntry::Spacer));
         // Settings and the MCP button are pinned below the spacer.
@@ -821,5 +900,32 @@ mod tests {
         assert_eq!(NavItem::of_route(&Route::Destinations), NavItem::Settings);
         assert_eq!(page_heading(&Route::Ai).1, "AI models");
         assert_eq!(page_heading(&Route::Agents).1, "Agents & CLI");
+    }
+
+    /// VOC-1.AC10 and the board: the mic button says Record audio with the chord of Record and
+    /// the key V; the Audio item sits between Recordings and Screenshots and has its own route.
+    #[test]
+    fn the_mic_button_and_the_audio_item() {
+        let mac = ShortcutMap::defaults(Platform::Mac);
+        assert_eq!(
+            record_audio_keys(&mac, Platform::Mac),
+            ["\u{2325}", "\u{21E7}", "V"]
+        );
+        let win = ShortcutMap::defaults(Platform::Windows);
+        assert_eq!(
+            record_audio_keys(&win, Platform::Windows).last().unwrap(),
+            "V"
+        );
+        assert_eq!(record_audio_label(), "Record audio");
+        assert_eq!(
+            record_audio_aria(&record_audio_keys(&mac, Platform::Mac)),
+            "Record audio, shortcut \u{2325}\u{21E7}V"
+        );
+        assert_eq!(RecordSheetMode::default(), RecordSheetMode::Screen);
+        assert_eq!(NavItem::Audio.route(), Route::Audio);
+        assert_eq!(library_filter(&Route::Audio), Some(Filter::Audio));
+        assert_eq!(Filter::Audio.daemon_kind(), Some("audio"));
+        assert_eq!(page_heading(&Route::Audio).1, "Audio");
+        assert_eq!(NavItem::Audio.icon(), "audio-lines");
     }
 }

@@ -104,6 +104,7 @@
 //! * File watching; callers call [`Library::rescan`].
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
+pub mod audio;
 pub mod bundle;
 pub mod history;
 pub mod index;

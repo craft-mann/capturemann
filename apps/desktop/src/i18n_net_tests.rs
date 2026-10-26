@@ -106,6 +106,7 @@ fn corpus() -> Vec<(String, String)> {
         Route::Library,
         Route::Screenshots,
         Route::Recordings,
+        Route::Audio,
         Route::Published,
         Route::Destinations,
         Route::Agents,

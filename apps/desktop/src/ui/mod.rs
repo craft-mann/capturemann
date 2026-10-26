@@ -4,6 +4,7 @@
 pub mod ai;
 pub mod ai_view;
 pub mod app;
+pub mod audio_cache;
 pub mod brand;
 pub mod components;
 pub mod confirm_window;

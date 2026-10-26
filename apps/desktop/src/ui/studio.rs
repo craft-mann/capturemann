@@ -257,7 +257,7 @@ impl Render for Studio {
             self.publish.update(cx, |p, cx| p.close(cx));
         }
         let main: AnyElement = match &route {
-            Route::Library | Route::Screenshots | Route::Recordings => {
+            Route::Library | Route::Screenshots | Route::Recordings | Route::Audio => {
                 // The three library pages share the grid; entering one shows its kind.
                 let filter = nav::library_filter(&route).unwrap_or(crate::library::Filter::All);
                 if self.shown != Some(filter) {
@@ -298,7 +298,7 @@ impl Render for Studio {
         let title = (nav::is_library_page(&route)
             && !matches!(
                 route,
-                Route::Library | Route::Screenshots | Route::Recordings
+                Route::Library | Route::Screenshots | Route::Recordings | Route::Audio
             ))
         .then(|| self.title_row(&t, &route, &counts));
         let app_for_search = app.clone();
