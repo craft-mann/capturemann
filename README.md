@@ -69,7 +69,9 @@ The release DMG is signed with a Developer ID certificate and notarized by Apple
 normally. A build you make yourself from source is signed locally or ad hoc and is **not
 notarized**: Gatekeeper blocks it at first launch, so right-click the app and choose Open, or run
 `xattr -dr com.apple.quarantine /Applications/CaptureMann.app`. Updates are manual: download the new
-DMG. To build it yourself instead, see [building from source](docs/development/building.md). More on verifying a
+DMG. The `capturemann` command line is inside the app; to use it as `capturemann`, link it once:
+`sudo ln -s /Applications/CaptureMann.app/Contents/MacOS/capturemann /usr/local/bin/capturemann`.
+To build it yourself instead, see [building from source](docs/development/building.md). More on verifying a
 download: [docs/development/releasing.md](docs/development/releasing.md#how-users-verify-a-download).
 
 ## Quick start

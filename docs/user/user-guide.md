@@ -89,6 +89,15 @@ one. Want another language? See [`locales/README.md`](../../locales/README.md).
 CaptureMann exposes every action to AI agents over MCP and to scripts through the `capturemann`
 command, both inside the app bundle (`CaptureMann.app/Contents/MacOS`).
 
+**Install the command.** With Homebrew it is linked for you. With the DMG, link it once (or call the
+full path `/Applications/CaptureMann.app/Contents/MacOS/capturemann`):
+
+```sh
+sudo ln -s /Applications/CaptureMann.app/Contents/MacOS/capturemann /usr/local/bin/capturemann
+```
+
+The command talks to the running app, so start CaptureMann first.
+
 ```sh
 capturemann library list                 # the library
 capturemann capture screenshot --window "Visual Studio Code"

@@ -19,6 +19,16 @@ The repo is a Cargo workspace (`Cargo.toml`, `crates/*`, `apps/*`; `spikes/` is 
 - **AI-6a (Oct 24, 2026):** glossary (`ai.glossary`, app-only write), doubtful-word underlines, caption edits kept on re-generate, `replace_in_captions` (55 MCP tools); tested with fakes only (`design/redesign/STATUS-ai6a.md`). AI-2 (titles, descriptions, chapters) and AI-6b are after v0.1: no API keys and no text model in the first release.
 - **Caption editor and brand marks (Oct 24, 2026):** the caption editor is the kit-3 board R3c (Captions mode, in-place rows, split at the cursor, Enter flow, play this line, find and replace, captions lane; `specs/plans/caption-editor-plan.md`, `design/redesign/STATUS-captions.md`); the service marks in Destinations and Publish are neutral icons in the theme colour (OD-21, `ui/brand.rs`, licences in `apps/desktop/assets/icons/BRAND-LICENSE.txt`); Settings → About carries the "a CraftMann app" line. Tested with fakes; seen and approved by the maintainer (as reported, not stored in `verification/`).
 
+## Release 0.1.0 (Oct 26, 2026)
+
+Released: signed (Developer ID), hardened, notarized (submission `70a3df49-d81f-4ba2-8458-530c63871ca3`, Accepted) and stapled DMG `CaptureMann-v0.1.0-macos-arm64.dmg` (sha256 `3d9822246dea1acc414fb30e58ef419bb6e56676154c518295a16aa74b0e2e05`) at <https://github.com/craft-mann/capturemann/releases/tag/v0.1.0> (tag `7fe4c97`). `make verify-release` passed with no warnings. The maintainer installed it on the build Mac (normal download dialog, permissions, short recording, YouTube publish; as reported). Report: `verification/RELEASE-0.1.0-2026-10-26-maintainer.md`.
+
+- **Install paths:** DMG, or `brew install --cask craft-mann/tap/capturemann` (tap `craft-mann/homebrew-tap`; update it after each release with `scripts/update-homebrew-cask.sh`). The official `homebrew/cask` needs notability (about 75 stars) and is skipped for now. The CLI is inside the app; Homebrew links it, a DMG user links it by hand (README, user guide).
+- **Not done:** the `Release` workflow has never run on GitHub (needs five secrets; test on a fork first); a first-install check on a second Mac or user account; the website download link. Mac App Store is not feasible as-is (App Sandbox conflicts with the CLI/MCP socket, the input-monitoring cursor telemetry, free library paths, the login item and the FFmpeg and `afplay` child processes).
+- **Repo hygiene:** rulesets "Protect main" (no deletion, no force-push) and "Protect release tags"; PR and required-check rules deferred until there are contributors; Dependabot monthly and grouped, no major bumps for the GPUI-pinned crates.
+- **Reports:** `make report` writes `reports/` (tests, Trivy, cargo deny, SBOM); the latest snapshot is 3234 passed, 0 failed, 41 ignored.
+- **Next:** Intel Macs (universal build), then Windows, then Linux (`plan.md`).
+
 ## Design follow-ups
 
 Gaps between the design board and the app, each noted in the code as a "Design gap:" comment. None has an issue yet; they are listed here so they are not lost.
