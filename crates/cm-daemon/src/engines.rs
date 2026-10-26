@@ -82,6 +82,10 @@ pub(crate) const SECRET_SUBSTRINGS: &[&str] = &[
     "bearer",
 ];
 
+/// Keys that contain a [`SECRET_SUBSTRINGS`] word but hold no secret: `ai.text.context_tokens` is a
+/// count of model tokens (AI-7).
+pub(crate) const NOT_SECRET_KEYS: &[&str] = &["ai.text.context_tokens"];
+
 /// Setting keys (or `prefix.*` families) that only the app itself may write (R2-3). A socket
 /// client (always an agent) is refused with `user_declined` / `data.reason =
 /// "app_only_setting"`; the in-process GUI (`Actor::User`) can write them.
@@ -170,7 +174,9 @@ pub fn validate_setting_key(key: &str) -> Result<(), CmError> {
         ));
     }
     let lower = key.to_ascii_lowercase();
-    if SECRET_SUBSTRINGS.iter().any(|w| lower.contains(w)) {
+    if !NOT_SECRET_KEYS.contains(&lower.as_str())
+        && SECRET_SUBSTRINGS.iter().any(|w| lower.contains(w))
+    {
         return Err(CmError::invalid_field(
             "values",
             format!("`{key}` is not available to clients"),

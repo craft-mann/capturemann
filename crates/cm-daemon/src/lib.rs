@@ -67,6 +67,7 @@ pub mod rpc;
 pub mod storage_cloud;
 pub mod storage_ops;
 pub mod testing;
+pub mod text_model_ops;
 pub mod tool_policy;
 mod upload_records;
 pub mod watcher;

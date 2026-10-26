@@ -8,7 +8,7 @@ use cm_core::ErrorCode;
 use serde_json::{json, Value};
 
 use super::{plain, Ctx};
-use crate::args::{AiCmd, CaptionsCmd, ModelsCmd, SuggestCmd, TranscribeArgs};
+use crate::args::{AiCmd, CaptionsCmd, ModelsCmd, SuggestCmd, TextModelCmd, TranscribeArgs};
 use crate::client::Client;
 use crate::error::CliError;
 
@@ -111,7 +111,68 @@ pub(super) async fn ai(cx: &mut Ctx<'_>, cmd: AiCmd) -> Result<(), CliError> {
         AiCmd::Suggest {
             cmd: SuggestCmd::Cuts { id },
         } => suggest(cx, id, false).await,
+        AiCmd::TextModel { cmd: None } => text_model_show(cx).await,
+        AiCmd::TextModel {
+            cmd: Some(TextModelCmd::Test),
+        } => text_model_test(cx).await,
     }
+}
+
+async fn text_model_show(cx: &mut Ctx<'_>) -> Result<(), CliError> {
+    let mut c = cx.client().await?;
+    let r = c.call("get_text_model", json!({})).await?;
+    cx.emit(&r, |r| {
+        if r["provider"] == json!("none") {
+            return "No text model is set up. Choose Ollama, LM Studio or a provider on the AI page of the app.\n"
+                .to_owned();
+        }
+        format!(
+            "Text model: {} ({}), model {}\n  address {}\n  context {} tokens, timeout {} s, structured output {}\n",
+            plain(&r["provider"]),
+            if r["local"] == json!(true) {
+                "on this computer"
+            } else {
+                "remote: text is sent to the host"
+            },
+            plain(&r["model"]),
+            plain(&r["base_url"]),
+            plain(&r["context_tokens"]),
+            plain(&r["timeout_s"]),
+            match &r["structured_output"] {
+                Value::Bool(true) => "works",
+                Value::Bool(false) => "did not work in the last test",
+                _ => "not tested yet",
+            },
+        )
+    });
+    Ok(())
+}
+
+async fn text_model_test(cx: &mut Ctx<'_>) -> Result<(), CliError> {
+    let mut c = cx.client().await?;
+    let r = c.call("test_text_model", json!({})).await?;
+    cx.emit(&r, |r| {
+        if r["ok"] == json!(true) {
+            format!(
+                "The text model `{}` answered in {} ms (structured output {}).\n",
+                plain(&r["model"]),
+                plain(&r["latency_ms"]),
+                if r["structured_output"] == json!(true) {
+                    "works"
+                } else {
+                    "needed a retry"
+                },
+            )
+        } else {
+            format!(
+                "The text model `{}` failed ({}): {}\n",
+                plain(&r["model"]),
+                plain(&r["reason"]),
+                plain(&r["message"]),
+            )
+        }
+    });
+    Ok(())
 }
 
 fn model_table(r: &Value) -> String {

@@ -146,6 +146,19 @@ pub enum AiCmd {
         #[command(subcommand)]
         cmd: SuggestCmd,
     },
+    /// Show how the text model is set up (`get_text_model`), or test it: `text-model test`
+    /// (`test_text_model`). The settings are changed in the app only.
+    TextModel {
+        #[command(subcommand)]
+        cmd: Option<TextModelCmd>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum TextModelCmd {
+    /// Send one short prompt to the configured text model and report the reply time (exit 2 with
+    /// `no_text_model` when none is set up).
+    Test,
 }
 
 #[derive(Debug, Subcommand)]

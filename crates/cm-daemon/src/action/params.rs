@@ -363,6 +363,10 @@ pub enum Action {
     Upload(crate::storage_ops::UploadParams),
     /// `list_publish_accounts` (see [`crate::publish_ops`]).
     ListPublishAccounts,
+    /// `get_text_model` (see [`crate::text_model_ops`]).
+    GetTextModel,
+    /// `test_text_model` (see [`crate::text_model_ops`]).
+    TestTextModel,
     /// Internal: rebuild the index from the bundle folders.
     RescanLibrary,
     /// `start_recording`. The payload stays pass-through JSON for compatibility; it was validated
