@@ -26,6 +26,9 @@ const CHIME_RATE: u32 = 48_000;
 /// Peak of the chime in dBFS.
 const CHIME_PEAK_DBFS: f64 = -12.0;
 /// The macOS command line player.
+/// The baseline takes at least this many level readings.
+const MIN_BASELINE_READS: u32 = 4;
+
 const AFPLAY: &str = "/usr/bin/afplay";
 
 /// A 0.6 s two-note sine chime (A5 then E6), 48 kHz mono 16-bit PCM WAV, peak about -12 dBFS, each
@@ -362,12 +365,18 @@ fn watch(
     let deadline = start + cfg.total;
     let mut next = start;
 
-    // Baseline: whatever the computer is already playing.
+    // Baseline: whatever the computer is already playing. At least `MIN_BASELINE_READS` readings,
+    // even when the time is up first (a stalled thread or a slow machine must not leave the
+    // baseline empty: steady music would then pass for the chime).
     let mut baseline = FLOOR_DBFS;
-    while Instant::now() < start + cfg.baseline.min(cfg.total) {
+    let mut reads = 0;
+    while (Instant::now() < start + cfg.baseline.min(cfg.total) || reads < MIN_BASELINE_READS)
+        && Instant::now() < deadline
+    {
         let p = level.read().peak_dbfs;
         baseline = baseline.max(p);
         on_level(p);
+        reads += 1;
         next += cfg.poll;
         sleep_until(next);
     }
@@ -550,16 +559,49 @@ mod tests {
         chime_test_gone(&player);
     }
 
+    /// Steady loud audio (music already playing) is part of the baseline, not the chime. The device
+    /// is driven from the level callback, one poll of audio per reading, so the result does not
+    /// depend on how a loaded machine schedules a feeder thread.
     #[test]
     fn steady_loud_audio_is_not_mistaken_for_the_chime() {
-        let (factory, _dev) = chime_test_device(chime_test_loud());
+        let (factory, mut dev) = chime_test_device(chime_test_loud());
+        dev.stop.store(true, Ordering::SeqCst);
+        dev.feeder.take().unwrap().join().unwrap();
         let player = FakeChimePlayer::new(FakeChimeScript::Plays {
             duration: Duration::from_millis(200),
             on_play: None,
         });
-        let (out, _) = chime_test_check(&player, factory);
+        let handle = dev.handle.clone();
+        let out = run_check(&player, factory, &chime_test_cfg(), &mut |_| {
+            handle.advance(0.033);
+            // The recorder's worker turns the chunk into a level reading.
+            std::thread::sleep(Duration::from_millis(10));
+        });
         assert_eq!(out, ChimeOutcome::NotHeard);
         chime_test_gone(&player);
+    }
+
+    /// The baseline takes at least `MIN_BASELINE_READS` readings even when its time is already up.
+    #[test]
+    fn the_baseline_never_ends_before_a_few_readings() {
+        let (factory, dev) = chime_test_device(FakeSignal::Silence);
+        let player = FakeChimePlayer::new(FakeChimeScript::Plays {
+            duration: Duration::from_millis(50),
+            on_play: None,
+        });
+        let cfg = ChimeConfig {
+            baseline: Duration::ZERO,
+            total: Duration::from_millis(600),
+            ..chime_test_cfg()
+        };
+        let mut before_play = 0;
+        let _ = run_check(&player, factory, &cfg, &mut |_| {
+            if player.played.lock().unwrap().is_empty() {
+                before_play += 1;
+            }
+        });
+        assert!(before_play >= MIN_BASELINE_READS as usize, "{before_play}");
+        drop(dev);
     }
 
     #[test]
