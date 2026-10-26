@@ -16,6 +16,11 @@
 //!   time. Media files are compacted (no gap content), exactly like a real pause.
 //! * **Cursor** (`cursor.jsonl`): a smooth path with three left clicks, in session time.
 //!
+//! With [`FixtureSpec::audio_only`] (`--audio-only`) the bundle is an audio recording (VOC-1,
+//! `kind: "audio"`): the microphone (beeps at the flash times of the schedule, in its own file
+//! time) and system audio only, no screen, camera or cursor, the same pause, and one marker at
+//! [`AUDIO_MARKER_S`] of recorded time.
+//!
 //! Track starts are offset like a real session: screen 390 ms, camera 580 ms, microphone 100 ms,
 //! system audio 390 ms after the session origin (all before the pause).
 //!
@@ -45,6 +50,8 @@ pub const SYNC_FIRST_S: f64 = 1.0;
 pub const SYNC_PERIOD_S: f64 = 3.0;
 /// Length of a flash or beep.
 pub const SYNC_LEN_S: f64 = 0.2;
+/// Recorded time (s) of the marker an audio-only fixture carries.
+pub const AUDIO_MARKER_S: f64 = 2.0;
 /// Where the tracks start after the session origin (ms).
 pub const SCREEN_START_MS: i64 = 390;
 pub const CAMERA_START_MS: i64 = 580;
@@ -85,6 +92,8 @@ pub struct FixtureSpec {
     pub camera: bool,
     pub audio: bool,
     pub cursor: bool,
+    /// An audio recording: microphone and system audio only, no screen, camera or cursor.
+    pub audio_only: bool,
     pub pause: Option<FixturePause>,
     /// `edits[0].layout.camera` (the bubble at stop).
     pub camera_layout: Value,
@@ -100,6 +109,7 @@ impl Default for FixtureSpec {
             camera: true,
             audio: true,
             cursor: true,
+            audio_only: false,
             pause: Some(FixturePause {
                 at_s: 5.5,
                 len_s: 1.0,
@@ -131,6 +141,22 @@ impl FixtureSpec {
             .filter(|p| file_s >= p.at_s)
             .map_or(0.0, |p| p.len_s);
         SCREEN_START_MS as f64 / 1000.0 + file_s + gap
+    }
+
+    /// Where the pause sits in session time: after the screen's start, or after the microphone's
+    /// start in an audio-only fixture (which has no screen).
+    fn pause_gap(&self) -> Option<PauseGap> {
+        let p = self.pause?;
+        let start = if self.audio_only {
+            MIC_START_MS as f64 / 1000.0 + p.at_s
+        } else {
+            self.session_of_screen_s(p.at_s - 1e-6)
+        };
+        let from = MediaTime::from_ticks(ticks(start));
+        Some(PauseGap {
+            from,
+            to: MediaTime::from_ticks(from.ticks() + ticks(p.len_s)),
+        })
     }
 }
 
@@ -290,6 +316,9 @@ pub fn make_fixture(tools: &Tools, library: &Path, spec: &FixtureSpec) -> Result
     let mut bundle = RecBundle::create(library, &spec.title, now, json!({}), &session)?;
     let d = bundle.dir().to_path_buf();
     let path = |n: &str| d.join(n).to_string_lossy().into_owned();
+    if spec.audio_only {
+        return make_audio_fixture(tools, spec, bundle, now);
+    }
 
     // Screen.
     let flash = format!(
@@ -439,12 +468,8 @@ pub fn make_fixture(tools: &Tools, library: &Path, spec: &FixtureSpec) -> Result
     }
 
     let screen_end = tracks[0].end;
-    if let Some(p) = spec.pause {
-        let from = MediaTime::from_ticks(ticks(spec.session_of_screen_s(p.at_s - 1e-6)));
-        bundle.add_gap(PauseGap {
-            from,
-            to: MediaTime::from_ticks(from.ticks() + ticks(p.len_s)),
-        })?;
+    if let Some(gap) = spec.pause_gap() {
+        bundle.add_gap(gap)?;
     }
     if spec.cursor {
         let text = cursor_lines(spec, screen_end.ticks() as f64 / TICKS_PER_SECOND as f64)?;
@@ -464,6 +489,102 @@ pub fn make_fixture(tools: &Tools, library: &Path, spec: &FixtureSpec) -> Result
     let live_at = tracks
         .iter()
         .filter(|t| t.kind != TrackKind::Cursor)
+        .map(|t| t.start)
+        .max()
+        .unwrap_or(MediaTime::ZERO);
+    bundle.set_extra("live_at", json!(live_at.ticks()))?;
+    let id = bundle.id().to_owned();
+    let title = bundle.title().to_owned();
+    let session_end_s = tracks
+        .iter()
+        .map(|t| t.end)
+        .max()
+        .map_or(0.0, |t| t.ticks() as f64 / TICKS_PER_SECOND as f64);
+    bundle.finalize(&tracks, now)?;
+    Ok(Fixture {
+        dir: d,
+        id,
+        title,
+        session_end_s,
+    })
+}
+
+/// The audio-only fixture (VOC-1): microphone with a beep at each sync time, a quiet system
+/// tone, the pause, and one marker.
+fn make_audio_fixture(
+    tools: &Tools,
+    spec: &FixtureSpec,
+    mut bundle: RecBundle,
+    now: OffsetDateTime,
+) -> Result<Fixture, CmError> {
+    let secs = f64::from(spec.secs);
+    let d = bundle.dir().to_path_buf();
+    let path = |n: &str| d.join(n).to_string_lossy().into_owned();
+    let gap_len = spec.pause.map_or(0.0, |p| p.len_s);
+    let end_of = |start_ms: i64| -> MediaTime {
+        let pause_inside = spec.pause.is_some_and(|p| p.at_s < secs);
+        MediaTime::from_ticks(ticks(
+            start_ms as f64 / 1000.0 + secs + if pause_inside { gap_len } else { 0.0 },
+        ))
+    };
+    let info = |kind, file: &str, start_ms: i64, details: Value| TrackInfo {
+        kind,
+        file: file.to_owned(),
+        start: MediaTime::from_millis(start_ms),
+        end: end_of(start_ms),
+        details,
+        stats: TrackStats::default(),
+    };
+    // Microphone: silence with a beep at each sync time of the file.
+    let mut a = s(&["-f", "lavfi", "-i"]);
+    a.push(format!(
+        "sine=frequency=1000:sample_rate=48000:duration={secs}"
+    ));
+    a.push("-af".into());
+    a.push(format!(
+        "volume=volume=0.6,volume=volume=0:enable='not({})',aformat=sample_fmts=flt:channel_layouts=mono",
+        flash_enable(spec, 0.0)
+    ));
+    a.extend(s(&["-c:a", "pcm_f32le"]));
+    a.push(path("mic.denoised.wav"));
+    ff(tools, &a)?;
+    // System audio: a quiet steady 300 Hz tone.
+    let mut a = s(&["-f", "lavfi", "-i"]);
+    a.push(format!(
+        "sine=frequency=300:sample_rate=48000:duration={secs}"
+    ));
+    a.extend(s(&[
+        "-af",
+        "volume=0.1,aformat=sample_fmts=flt:channel_layouts=stereo",
+        "-c:a",
+        "pcm_f32le",
+    ]));
+    a.push(path("system.wav"));
+    ff(tools, &a)?;
+    let tracks = vec![
+        info(
+            TrackKind::Mic,
+            "mic.denoised.wav",
+            MIC_START_MS,
+            json!({"rate": 48000, "channels": 1}),
+        ),
+        info(
+            TrackKind::System,
+            "system.wav",
+            SYSTEM_START_MS,
+            json!({"rate": 48000, "channels": 2}),
+        ),
+    ];
+    if let Some(gap) = spec.pause_gap() {
+        bundle.add_gap(gap)?;
+    }
+    bundle.set_extra("kind", json!("audio"))?;
+    bundle.set_extra(
+        "markers",
+        json!([{ "at": ticks(AUDIO_MARKER_S), "label": "Fixture marker", "by": "user" }]),
+    )?;
+    let live_at = tracks
+        .iter()
         .map(|t| t.start)
         .max()
         .unwrap_or(MediaTime::ZERO);
@@ -558,6 +679,41 @@ mod tests {
         let mut lib = cm_library::Library::open_or_create(dir.path()).unwrap();
         lib.rescan().unwrap();
         assert!(lib.get(&f.id).is_ok());
+    }
+
+    /// VOC-1.AC1: an audio-only fixture has `kind: "audio"`, mic and system tracks, no screen,
+    /// camera or cursor file, a pause and a marker, and the library indexes it as `audio`.
+    #[test]
+    fn audio_only_fixture_is_an_audio_recording_without_a_screen() {
+        let Some(t) = tools() else { return };
+        let dir = tempfile::tempdir().unwrap();
+        let spec = FixtureSpec {
+            secs: 6,
+            audio_only: true,
+            pause: Some(FixturePause {
+                at_s: 2.5,
+                len_s: 1.0,
+            }),
+            ..FixtureSpec::default()
+        };
+        let f = make_fixture(&t, dir.path(), &spec).unwrap();
+        let m = cm_library::rec::read_manifest(&f.dir).unwrap();
+        assert_eq!(m.capture_kind(), cm_library::manifest::CaptureKind::Audio);
+        let mut kinds: Vec<_> = m.tracks.keys().cloned().collect();
+        kinds.sort();
+        assert_eq!(kinds, vec!["mic".to_owned(), "system".to_owned()]);
+        for gone in ["screen.mp4", "camera.mp4", "cursor.jsonl"] {
+            assert!(!f.dir.join(gone).exists(), "{gone}");
+        }
+        assert_eq!(m.gaps.len(), 1);
+        assert_eq!(m.markers.len(), 1);
+        assert_eq!(m.markers[0].at.ticks(), ticks(AUDIO_MARKER_S));
+        let mut lib = cm_library::Library::open_or_create(dir.path()).unwrap();
+        lib.rescan().unwrap();
+        let rec = lib.get(&f.id).unwrap();
+        assert_eq!(rec.kind, cm_library::manifest::CaptureKind::Audio);
+        assert_eq!((rec.width, rec.height), (None, None));
+        assert!(rec.duration.is_some());
     }
 
     /// EDT-4: a fixture without a cursor log does not claim the cursor is stored separately.

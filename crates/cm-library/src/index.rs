@@ -20,7 +20,7 @@ use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
 /// `PRAGMA user_version` of the index this build writes. A different value means "rebuild".
-pub const INDEX_SCHEMA_VERSION: i32 = 2;
+pub const INDEX_SCHEMA_VERSION: i32 = 3;
 /// Index file location relative to the library root.
 pub const INDEX_RELATIVE_PATH: &str = ".capturemann/index.sqlite";
 
@@ -337,6 +337,12 @@ impl Library {
         if version == 0 {
             conn.execute_batch(SCHEMA).map_err(InitError::from_sql)?;
             conn.pragma_update(None, "user_version", INDEX_SCHEMA_VERSION)
+                .map_err(InitError::from_sql)?;
+        } else if version == 2 {
+            // Version 3 lets `kind` be `audio` (VOC-1). SQLite cannot change a CHECK constraint,
+            // so the table is rebuilt in place; a full rebuild of the index would lose the
+            // transcript search rows, which cannot be recovered from the folders.
+            conn.execute_batch(MIGRATE_2_TO_3)
                 .map_err(InitError::from_sql)?;
         } else if version != INDEX_SCHEMA_VERSION {
             return Err(InitError::Unusable);
@@ -1014,8 +1020,10 @@ impl Library {
                     publish_count: counts.1,
                 })
             }
-            CaptureKind::Recording => {
+            CaptureKind::Recording | CaptureKind::Audio => {
                 let m = RecManifest::from_json(&text).map_err(ManifestProblem::into_error)?;
+                // An audio recording has no screen track (VOC-1): no size, kind `audio`.
+                let kind = m.capture_kind();
                 let size = m
                     .tracks
                     .get("screen")
@@ -1108,12 +1116,39 @@ pub fn default_title(prefix: &str, now: OffsetDateTime) -> Result<String, CmErro
     Ok(format!("{prefix} {stamp}"))
 }
 
+const MIGRATE_2_TO_3: &str = "
+BEGIN;
+CREATE TABLE captures_v3 (
+  id           TEXT PRIMARY KEY,
+  path         TEXT NOT NULL UNIQUE,
+  title        TEXT NOT NULL,
+  kind         TEXT NOT NULL CHECK (kind IN ('screenshot', 'recording', 'audio')),
+  duration     INTEGER,
+  created      TEXT NOT NULL,
+  created_unix INTEGER NOT NULL,
+  size_bytes   INTEGER NOT NULL DEFAULT 0,
+  width        INTEGER,
+  height       INTEGER,
+  broken       INTEGER NOT NULL DEFAULT 0,
+  upload_count  INTEGER NOT NULL DEFAULT 0,
+  publish_count INTEGER NOT NULL DEFAULT 0
+);
+INSERT INTO captures_v3 (id, path, title, kind, duration, created, created_unix, size_bytes, width, height, broken, upload_count, publish_count)
+  SELECT id, path, title, kind, duration, created, created_unix, size_bytes, width, height, broken, upload_count, publish_count FROM captures;
+DROP TABLE captures;
+ALTER TABLE captures_v3 RENAME TO captures;
+CREATE INDEX captures_created ON captures (created_unix DESC);
+CREATE INDEX captures_kind ON captures (kind);
+PRAGMA user_version = 3;
+COMMIT;
+";
+
 const SCHEMA: &str = "
 CREATE TABLE captures (
   id           TEXT PRIMARY KEY,
   path         TEXT NOT NULL UNIQUE,
   title        TEXT NOT NULL,
-  kind         TEXT NOT NULL CHECK (kind IN ('screenshot', 'recording')),
+  kind         TEXT NOT NULL CHECK (kind IN ('screenshot', 'recording', 'audio')),
   duration     INTEGER,
   created      TEXT NOT NULL,
   created_unix INTEGER NOT NULL,

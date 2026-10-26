@@ -584,8 +584,8 @@ pub struct MoveArgs {
 
 #[derive(Debug, Args)]
 pub struct LibraryPaging {
-    /// Only `screenshot` or `recording`.
-    #[arg(long, value_parser = ["screenshot", "recording"])]
+    /// Only `screenshot`, `recording` (screen) or `audio`.
+    #[arg(long, value_parser = ["screenshot", "recording", "audio"])]
     pub kind: Option<String>,
     /// Only captures with or without upload or publish records.
     #[arg(long, value_parser = ["uploaded", "not_uploaded", "published", "not_published"])]
@@ -847,6 +847,10 @@ pub enum RecordCmd {
     /// (`set_mic_muted`). Muted time is digital silence in the mic files and is listed in the
     /// manifest. Works while recording or paused, on a recording that has a microphone track.
     Mic(RecordMicArgs),
+    /// Add a marker (a moment to come back to) to the running recording at the current time
+    /// (`add_marker`), or to a finished recording with `--capture` and `--at`. Markers are kept
+    /// in recorded time: a pause does not move them.
+    Marker(RecordMarkerArgs),
     /// Stop and save the recording (`stop_recording`). Also cancels a countdown and a running
     /// 60 fps self-test.
     Stop(RecordRefArgs),
@@ -896,6 +900,22 @@ pub struct RecordMicArgs {
 }
 
 #[derive(Debug, Args)]
+pub struct RecordMarkerArgs {
+    /// A short label for the marker.
+    #[arg(long)]
+    pub label: Option<String>,
+    /// Recording id (default: the running recording).
+    #[arg(long = "id", value_name = "RECORDING_ID", conflicts_with = "capture")]
+    pub recording_id: Option<String>,
+    /// A finished recording to mark (needs `--at`).
+    #[arg(long, value_name = "CAPTURE_ID", requires = "at")]
+    pub capture: Option<String>,
+    /// Seconds of recorded time for a finished recording (pauses removed).
+    #[arg(long, value_name = "SECONDS", requires = "capture")]
+    pub at: Option<f64>,
+}
+
+#[derive(Debug, Args)]
 pub struct RecordRefArgs {
     /// Recording id (default: the running recording).
     #[arg(long = "id", value_name = "RECORDING_ID")]
@@ -904,6 +924,23 @@ pub struct RecordRefArgs {
 
 #[derive(Debug, Args)]
 pub struct RecordStartArgs {
+    /// Record audio only (microphone and/or system audio; no screen, camera or cursor): the
+    /// result is an audio recording in the library. Use `--mic <ID>` for a specific microphone,
+    /// `--system-audio` for system audio and `--preset` for a use case.
+    #[arg(
+        long,
+        conflicts_with_all = [
+            "display", "window", "region", "size", "fps", "codec", "quality", "camera",
+            "camera_resolution", "camera_shape", "camera_size", "camera_pos", "no_camera_mirror",
+            "no_cursor", "cursor_separate", "exclude_apps", "exclude_windows"
+        ]
+    )]
+    pub audio: bool,
+    /// Use case of an audio recording: `room` (interview, 1:1, meeting around a laptop),
+    /// `online` (call: adds system audio), `lecture`, `product` (demo call: adds system audio) or
+    /// `note` (voice note).
+    #[arg(long, requires = "audio", value_parser = ["room", "online", "lecture", "product", "note"])]
+    pub preset: Option<String>,
     /// Display id to record (see `targets`; default: the primary display).
     #[arg(long, value_name = "ID", conflicts_with = "window")]
     pub display: Option<u32>,

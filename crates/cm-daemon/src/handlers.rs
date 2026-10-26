@@ -383,8 +383,7 @@ impl Inner {
         // A recording's undo steps are its edits (EDT-1 to EDT-3), not annotation ops.
         let (library, id) = (self.library.clone(), p.capture_id.clone());
         let is_recording =
-            blocking(move || Ok(lock_library(&library).get(&id)?.kind == CaptureKind::Recording))
-                .await?;
+            blocking(move || Ok(lock_library(&library).get(&id)?.kind.is_recording())).await?;
         if is_recording {
             return self.undo_redo_recording(actor, &p.capture_id, undo).await;
         }

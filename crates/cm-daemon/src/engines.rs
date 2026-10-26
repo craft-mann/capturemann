@@ -114,6 +114,9 @@ pub const APP_ONLY_SETTINGS: &[&str] = &[
     "launch_at_login",
     "recording.fps60_selftest",
     "recording.hud_positions",
+    // VOC-1: the legal one-liner of the audio start sheet; only the person at the keyboard may
+    // switch it off.
+    "recording.consent_notice",
     "capture.save_folder_enabled",
     "capture.save_folder",
     "capture.save_pattern",
@@ -194,6 +197,29 @@ pub fn validate_setting_value(key: &str, value: &Value) -> Result<(), CmError> {
             "values",
             format!("the value of `{key}` is nested deeper than {MAX_SETTING_DEPTH} levels"),
         ));
+    }
+    // VOC-1: the audio recording length limit and the consent notice switch have a fixed shape.
+    match key {
+        crate::recording::params::AUDIO_MAX_DURATION_SETTING
+            if !value.as_f64().is_some_and(|n| {
+                n > 0.0 && n <= crate::recording::params::AUDIO_MAX_DURATION_S
+            }) =>
+        {
+            return Err(CmError::invalid_field(
+                "values",
+                format!(
+                    "`{key}` must be a number of seconds above 0 and up to {}",
+                    crate::recording::params::AUDIO_MAX_DURATION_S
+                ),
+            ));
+        }
+        "recording.consent_notice" if !value.is_boolean() => {
+            return Err(CmError::invalid_field(
+                "values",
+                "`recording.consent_notice` must be true or false",
+            ));
+        }
+        _ => {}
     }
     let size = serde_json::to_vec(value).map_or(usize::MAX, |v| v.len());
     if size > MAX_SETTING_VALUE_BYTES {

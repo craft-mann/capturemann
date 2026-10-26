@@ -148,7 +148,9 @@ impl RecordingEngine {
             }
         };
         let start = StartParams {
-            target,
+            mode: RecordMode::Screen,
+            preset: None,
+            target: Some(target),
             size: parsed.size,
             fps: Some(60),
             codec: parsed.codec,

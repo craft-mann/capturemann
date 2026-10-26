@@ -25,17 +25,31 @@ pub struct SensorRequest {
     pub camera_device: Option<String>,
     pub system_audio: bool,
     pub cursor: bool,
+    /// An audio-only recording (VOC-1): no screen, camera or cursor track.
+    pub audio_only: bool,
 }
 
+/// Message of the `permission_missing` (`screen`) error for system audio without Screen Recording
+/// access (VOC-1 edge case).
+pub const SYSTEM_AUDIO_NEEDS_SCREEN_MESSAGE: &str = "System audio needs Screen Recording permission on macOS. Turn it on in System Settings > Privacy & Security > Screen Recording, then restart CaptureMann, or record the microphone only.";
+
 impl SensorRequest {
+    /// Whether the request needs Screen Recording access: a screen recording always does; an
+    /// audio recording only for system audio (macOS captures it through ScreenCaptureKit), so a
+    /// microphone-only recording never asks for it (VOC-1.AC1).
+    pub fn needs_screen_permission(&self) -> bool {
+        !self.audio_only || self.system_audio
+    }
+
     pub fn from_resolved(r: &ResolvedStart) -> Self {
         SensorRequest {
+            audio_only: r.mode == super::params::RecordMode::Audio,
             mic: r.mic.is_some(),
             mic_device: r.mic.as_ref().and_then(|m| m.device_id.clone()),
             camera: r.camera.is_some(),
             camera_device: r.camera.as_ref().and_then(|c| c.device_id.clone()),
             system_audio: r.system_audio,
-            cursor: r.cursor,
+            cursor: r.cursor && r.mode != super::params::RecordMode::Audio,
         }
     }
 }
@@ -76,7 +90,8 @@ pub struct BuildContext<'a> {
 
 /// Builds the tracks of a recording and answers device questions.
 pub trait SourceFactory: Send + Sync {
-    /// Permission and device checks for the requested sensors (screen is always checked).
+    /// Permission and device checks for the requested sensors (screen is checked unless
+    /// `req.needs_screen_permission()` says no).
     fn preflight(&self, req: &SensorRequest) -> Preflight;
 
     /// Names of the microphone and camera that would be used.
@@ -85,6 +100,16 @@ pub trait SourceFactory: Send + Sync {
     /// The tracks, screen first. The screen track must be required (see
     /// [`SessionTrack::required`]).
     fn build(&self, cx: &BuildContext<'_>) -> Result<Vec<Box<dyn SessionTrack>>, CmError>;
+
+    /// The tracks of an audio-only recording (VOC-1): the microphone and/or system audio from
+    /// `params`, no screen, camera or cursor. The first one is required: if none starts, nothing
+    /// is recorded.
+    fn build_audio(&self, params: &ResolvedStart) -> Result<Vec<Box<dyn SessionTrack>>, CmError> {
+        let _ = params;
+        Err(CmError::invalid_input(
+            "Audio recording is not available from this source",
+        ))
+    }
 
     /// The `list_devices` result: `cameras`, `mics`, `system_audio` and the permission states.
     fn devices(&self) -> Value;
@@ -236,12 +261,17 @@ mod real {
     impl SourceFactory for SystemSources {
         fn preflight(&self, req: &SensorRequest) -> Preflight {
             let mut out = Preflight::default();
-            // Screen Recording is needed by the screen track and by system audio.
-            if !screen_recording_permission().is_authorized() {
+            // Screen Recording is needed by the screen track and by system audio, never by a
+            // microphone-only recording (VOC-1.AC1).
+            if req.needs_screen_permission() && !screen_recording_permission().is_authorized() {
                 out.errors.push(CmError::permission_missing(
                     Permission::Screen,
-                    "Screen Recording access is off. Turn it on in System Settings > Privacy & \
-                     Security > Screen Recording, then restart CaptureMann.",
+                    if req.audio_only {
+                        SYSTEM_AUDIO_NEEDS_SCREEN_MESSAGE
+                    } else {
+                        "Screen Recording access is off. Turn it on in System Settings > Privacy & \
+                         Security > Screen Recording, then restart CaptureMann."
+                    },
                 ));
             }
             if req.mic {
@@ -330,6 +360,27 @@ mod real {
                     ..CameraConfig::default()
                 };
                 tracks.push(Box::new(CameraTrack::new(CameraRecorder::system(cfg))));
+            }
+            Ok(tracks)
+        }
+
+        fn build_audio(&self, p: &ResolvedStart) -> Result<Vec<Box<dyn SessionTrack>>, CmError> {
+            let mut tracks: Vec<Box<dyn SessionTrack>> = Vec::new();
+            if let Some(m) = &p.mic {
+                let cfg = MicConfig {
+                    device: m
+                        .device_id
+                        .as_deref()
+                        .map_or(DeviceSelector::Default, DeviceSelector::parse),
+                    denoise: p.mic_denoise(),
+                    ..MicConfig::default()
+                };
+                tracks.push(Box::new(MicTrack::new(MicRecorder::new(cfg))));
+            }
+            if p.system_audio {
+                tracks.push(Box::new(SystemAudioTrack::new(SystemAudioRecorder::new(
+                    SystemAudioConfig::default(),
+                ))));
             }
             Ok(tracks)
         }

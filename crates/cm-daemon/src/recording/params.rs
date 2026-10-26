@@ -21,6 +21,13 @@
 //!   "title": string, "exclude": { "bundle_ids"?: [string], "window_ids"?: [int] } }
 //! ```
 //!
+//! `mode: "audio"` (VOC-1) records the microphone and/or system audio only: `{ "mode": "audio",
+//! "mic"?, "system_audio"?, "preset"?: "room|online|lecture|product|note", "title"?,
+//! "max_duration_s"?, "countdown_s"? }`. Combined with `target`, `size`, `fps`, `codec`,
+//! `quality`, `camera`, `cursor`, `cursor_separate` or `exclude` it is `invalid_input` naming the
+//! field (VOC-1.AC9). The microphone is on unless `mic: false`; the presets `online` and `product`
+//! add system audio; `max_duration_s` defaults to `recording.audio_max_duration_s` (4 h).
+//!
 //! `rect` is `[x, y, w, h]` in **physical px relative to the display**, exactly like
 //! `capture_screenshot`. `countdown` is accepted as an alias of `countdown_s` (the spec's
 //! spelling). `camera.shape/size/position` are the bubble facts of CAM-1: the engine does not draw
@@ -43,6 +50,94 @@ pub const MAX_COUNTDOWN_S: u32 = 10;
 pub const DEFAULT_COUNTDOWN_S: u32 = 3;
 /// Default countdown before a resume (REC-4: 1 s).
 pub const DEFAULT_RESUME_COUNTDOWN_S: u32 = 1;
+
+/// Longest `max_duration_s` of an audio recording (12 h, VOC-1).
+pub const AUDIO_MAX_DURATION_S: f64 = 12.0 * 3600.0;
+/// Default longest audio recording (4 h, VOC-1): the `recording.audio_max_duration_s` default.
+pub const DEFAULT_AUDIO_MAX_DURATION_S: f64 = 4.0 * 3600.0;
+/// Setting that holds the audio recording length limit in seconds.
+pub const AUDIO_MAX_DURATION_SETTING: &str = "recording.audio_max_duration_s";
+/// Fields a screen recording has and an audio recording does not (VOC-1.AC9).
+const SCREEN_ONLY_FIELDS: [&str; 9] = [
+    "target",
+    "size",
+    "fps",
+    "codec",
+    "quality",
+    "camera",
+    "cursor",
+    "cursor_separate",
+    "exclude",
+];
+
+/// What `start_recording` records (VOC-1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RecordMode {
+    /// The screen, with optional camera, microphone, system audio and cursor.
+    #[default]
+    Screen,
+    /// Microphone and/or system audio only: a `kind: "audio"` bundle.
+    Audio,
+}
+
+/// The use-case presets of audio recording (VOC-1): they only set the default sources and the
+/// report suggested after stop; every source can still be changed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AudioPreset {
+    /// In the room: interview, 1:1, meeting around a laptop (mic).
+    Room,
+    /// Online meeting (mic + system audio).
+    Online,
+    /// Lecture or talk (mic).
+    Lecture,
+    /// Product introduction or demo call (mic + system audio).
+    Product,
+    /// Voice note (mic).
+    Note,
+}
+
+impl AudioPreset {
+    pub const ALL: [AudioPreset; 5] = [
+        AudioPreset::Room,
+        AudioPreset::Online,
+        AudioPreset::Lecture,
+        AudioPreset::Product,
+        AudioPreset::Note,
+    ];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AudioPreset::Room => "room",
+            AudioPreset::Online => "online",
+            AudioPreset::Lecture => "lecture",
+            AudioPreset::Product => "product",
+            AudioPreset::Note => "note",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|p| p.as_str() == s)
+    }
+
+    /// Whether the preset records system audio unless the request says otherwise.
+    pub fn wants_system_audio(self) -> bool {
+        matches!(self, AudioPreset::Online | AudioPreset::Product)
+    }
+}
+
+/// The `recording.audio_max_duration_s` setting in seconds: default 4 h, never above 12 h; an
+/// unusable stored value is ignored.
+pub fn audio_max_duration_setting(settings: &Map<String, Value>) -> f64 {
+    settings
+        .get(AUDIO_MAX_DURATION_SETTING)
+        .and_then(Value::as_f64)
+        .filter(|n| *n > 0.0)
+        .map_or(DEFAULT_AUDIO_MAX_DURATION_S, |n| {
+            n.min(AUDIO_MAX_DURATION_S)
+        })
+}
 
 const BUBBLE_SHAPES: [&str; 2] = ["circle", "rounded"];
 const BUBBLE_SIZES: [&str; 3] = ["s", "m", "l"];
@@ -111,7 +206,10 @@ pub struct ExcludeParams {
 /// A validated `start_recording` request, before the settings fill the gaps.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct StartParams {
-    pub target: ScreenshotTarget,
+    pub mode: RecordMode,
+    pub preset: Option<AudioPreset>,
+    /// `None` only in audio mode.
+    pub target: Option<ScreenshotTarget>,
     pub size: Option<OutputSize>,
     pub fps: Option<u32>,
     pub codec: Option<CodecChoice>,
@@ -131,7 +229,10 @@ pub struct StartParams {
 /// [`StartParams`] with every default applied: what actually gets recorded.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ResolvedStart {
-    pub target: ScreenshotTarget,
+    pub mode: RecordMode,
+    pub preset: Option<AudioPreset>,
+    /// `None` only in audio mode.
+    pub target: Option<ScreenshotTarget>,
     pub size: OutputSize,
     pub fps: u32,
     pub codec: CodecChoice,
@@ -216,6 +317,16 @@ impl ResolvedStart {
 
     /// What is stored in `manifest.settings` (and the lock): the request as used.
     pub fn settings_json(&self, requested_by: &str) -> Value {
+        if self.mode == RecordMode::Audio {
+            return json!({
+                "mode": "audio",
+                "preset": self.preset,
+                "mic": self.mic,
+                "system_audio": self.system_audio,
+                "max_duration_s": self.max_duration_s,
+                "requested_by": requested_by,
+            });
+        }
         json!({
             "target": self.target,
             "size": self.size,
@@ -502,6 +613,8 @@ impl StartParams {
         let empty = Map::new();
         let f = Fields::new(&value, &empty)?;
         f.only(&[
+            "mode",
+            "preset",
             "target",
             "size",
             "fps",
@@ -518,11 +631,48 @@ impl StartParams {
             "title",
             "exclude",
         ])?;
-        let target = ScreenshotTarget::parse(
-            f.obj
-                .get("target")
-                .ok_or_else(|| CmError::invalid_field("target", "is required"))?,
-        )?;
+        let mode = match f.obj.get("mode") {
+            None | Some(Value::Null) => RecordMode::Screen,
+            Some(Value::String(m)) if m == "screen" => RecordMode::Screen,
+            Some(Value::String(m)) if m == "audio" => RecordMode::Audio,
+            Some(_) => {
+                return Err(CmError::invalid_field(
+                    "mode",
+                    "must be \"screen\" or \"audio\"",
+                ))
+            }
+        };
+        let audio = mode == RecordMode::Audio;
+        if audio {
+            // VOC-1.AC9: nothing starts, and the error names the field.
+            for k in SCREEN_ONLY_FIELDS {
+                if f.obj.get(k).is_some_and(|v| !v.is_null()) {
+                    return Err(CmError::invalid_field(
+                        k,
+                        "is not allowed with mode \"audio\" (an audio recording has no screen, camera or cursor)",
+                    ));
+                }
+            }
+        }
+        let preset = match f.obj.get("preset") {
+            None | Some(Value::Null) => None,
+            Some(_) if !audio => {
+                return Err(CmError::invalid_field("preset", "needs mode \"audio\""))
+            }
+            Some(v) => Some(v.as_str().and_then(AudioPreset::parse).ok_or_else(|| {
+                CmError::invalid_field(
+                    "preset",
+                    "must be one of room, online, lecture, product, note",
+                )
+            })?),
+        };
+        let target = if audio {
+            None
+        } else {
+            Some(ScreenshotTarget::parse(f.obj.get("target").ok_or_else(
+                || CmError::invalid_field("target", "is required"),
+            )?)?)
+        };
         let fps = match f.obj.get("fps") {
             None | Some(Value::Null) => None,
             Some(v) => match v.as_u64() {
@@ -533,6 +683,15 @@ impl StartParams {
         let max_duration_s = match f.obj.get("max_duration_s") {
             None | Some(Value::Null) => None,
             Some(v) => match v.as_f64() {
+                Some(n) if audio && n > 0.0 && n <= AUDIO_MAX_DURATION_S => Some(n),
+                Some(_) if audio => {
+                    return Err(CmError::invalid_field(
+                        "max_duration_s",
+                        format!(
+                            "must be a number of seconds above 0 and up to {AUDIO_MAX_DURATION_S} for an audio recording"
+                        ),
+                    ))
+                }
                 Some(n) if n > 0.0 && n <= MAX_DURATION_S => Some(n),
                 _ => {
                     return Err(CmError::invalid_field(
@@ -586,15 +745,38 @@ impl StartParams {
                 ))
             }
         };
+        let mic = if audio {
+            // The microphone is on unless the request turns it off.
+            match f.obj.get("mic") {
+                None | Some(Value::Null) => Some(MicParams {
+                    device_id: None,
+                    denoise: None,
+                }),
+                Some(v) => parse_mic(v)?,
+            }
+        } else {
+            parse_mic(f.obj.get("mic").unwrap_or(&Value::Null))?
+        };
+        let system_audio = f.bool_or(
+            "system_audio",
+            audio && preset.is_some_and(AudioPreset::wants_system_audio),
+        )?;
+        if audio && mic.is_none() && !system_audio {
+            return Err(CmError::invalid_input(
+                "an audio recording needs a microphone or system audio (`mic` and `system_audio` are both off)",
+            ));
+        }
         Ok(StartParams {
+            mode,
+            preset,
             target,
             size: enum_field(&f, "size", "source, 2160p, 1440p, 1080p, 720p")?,
             fps,
             codec: enum_field(&f, "codec", "auto, hevc, h264")?,
             quality: enum_field(&f, "quality", "high, balanced, small")?,
             camera: parse_camera(f.obj.get("camera").unwrap_or(&Value::Null))?,
-            mic: parse_mic(f.obj.get("mic").unwrap_or(&Value::Null))?,
-            system_audio: f.bool_or("system_audio", false)?,
+            mic,
+            system_audio,
             cursor,
             cursor_separate,
             max_duration_s,
@@ -632,7 +814,10 @@ impl StartParams {
                 .cursor_separate
                 .or_else(|| setting(settings, "recording.cursor_separate"))
                 .unwrap_or(false);
+        let audio = self.mode == RecordMode::Audio;
         ResolvedStart {
+            mode: self.mode,
+            preset: self.preset,
             target: self.target,
             size: self
                 .size
@@ -653,9 +838,16 @@ impl StartParams {
                 ..m
             }),
             system_audio: self.system_audio,
-            cursor,
-            cursor_separate,
-            max_duration_s: self.max_duration_s,
+            cursor: cursor && !audio,
+            cursor_separate: cursor_separate && !audio,
+            max_duration_s: if audio {
+                Some(
+                    self.max_duration_s
+                        .unwrap_or_else(|| audio_max_duration_setting(settings)),
+                )
+            } else {
+                self.max_duration_s
+            },
             countdown_s,
             title: self.title.clone(),
             exclude: self.exclude.clone(),

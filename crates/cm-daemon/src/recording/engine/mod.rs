@@ -38,6 +38,7 @@
 //! | `recording.stats` | 1 Hz while recording or paused | the status object of `get_recording_status` |
 //! | `recording.health` | every 5 s | `status` (`ok`, `degraded`), `late_frame_pct`, `disk_left_minutes` |
 //! | `recording.warning` | a track or the disk guard noted something | `code`, `message`, `track`, `level` |
+//! | `recording.marker` | `add_marker` set a marker on the running recording (VOC-1) | `at_ms` (recorded time, pauses removed), `label`, `by`, `count` |
 //! | `recording.stopped` | the bundle is closed (or the stop failed) | `capture_id`, `duration_s`, `tracks`, `reason`, `error?` |
 //! | `recording.discarded` | take deleted, countdown cancelled, or the start failed | `capture_id` (null before the session existed), `reason` (`discard`, `restart`, `countdown_cancelled`, `starter_gone`, `start_failed` with `error: { code, message }`, R4-1) |
 //! | `export.skipped` | the automatic export was not queued because FFmpeg is missing, once per run (R5-3) | `capture_id`, `title`, `reason: "ffmpeg_not_found"`, `message` |
@@ -45,7 +46,7 @@
 //! | `recording.selftest` | the 60 fps self-test (REC-3), see below | `selftest_id`, `state`, `remaining_s`, `late_pct`, `indicator`, `result?`, `error?` |
 //!
 //! `reason` is who or what ended the run: `user` (a stop call), `max_duration`, `disk_full`,
-//! `screen_halted`, `screen_encoder_failed`, `permission_revoked` (the OS removed Screen Recording
+//! `screen_halted`, `screen_encoder_failed`, `system_sleep` (an audio recording: the computer slept, VOC-1), `permission_revoked` (the OS removed Screen Recording
 //! access mid-recording; `stopped` then also carries `permission` and `message`), `shutdown`, `engine_failed` (the driver panicked or
 //! was dropped), `engine_dropped`, `no_frames` (stopped before the first frame: the empty bundle
 //! was deleted, there is no capture) or `error`.
@@ -147,10 +148,12 @@ use time::format_description::well_known::Rfc3339;
 use tokio::sync::{mpsc, oneshot, watch, Notify};
 
 use super::params::{
-    countdown_setting, resume_countdown_setting, ExcludeParams, ResolvedStart, StartParams,
+    countdown_setting, resume_countdown_setting, ExcludeParams, RecordMode, ResolvedStart,
+    StartParams,
 };
 use super::selftest::{self, Fingerprint, Fps60Verdict, SelftestEntry, SelftestParams};
 use super::session::{RecordingSession, SessionConfig, SessionNote, SessionStatus, TrackState};
+use super::sleep::IdleSleepInhibitor;
 use super::sources::{BuildContext, DeviceNames, PreflightWarning, SensorRequest, SourceFactory};
 use super::tracks::{planned_bitrate_bps, NoteLevel};
 use crate::action::{ExternalParams, ScreenshotTarget};
@@ -215,6 +218,13 @@ pub struct EngineOptions {
     /// (REC-6.AC8). Queried when the plan is made and by the capture backend while recording.
     /// `None` (default): every window of the own process is excluded.
     pub kept_windows: Option<Arc<dyn Fn() -> Vec<u32> + Send + Sync>>,
+    /// Holds the OS "prevent idle sleep" state while an audio recording runs (VOC-1). `None`
+    /// (default): nothing is held. The daemon builder installs the real one with
+    /// `recording_system`; tests inject [`super::sleep::FakeIdleSleep`].
+    pub idle_sleep: Option<Arc<dyn IdleSleepInhibitor>>,
+    /// A wall-clock jump between two ticks longer than this means the computer slept: an audio
+    /// recording stops with `reason: "system_sleep"` (VOC-1). 20 s.
+    pub sleep_gap: Duration,
 }
 
 impl Default for EngineOptions {
@@ -238,6 +248,8 @@ impl Default for EngineOptions {
             selftest_dir: None,
             ffmpeg_probe: None,
             kept_windows: None,
+            idle_sleep: None,
+            sleep_gap: Duration::from_secs(20),
         }
     }
 }
@@ -359,8 +371,9 @@ impl Drop for JobHolds {
 #[derive(Debug)]
 pub struct PreparedStart {
     resolved: ResolvedStart,
-    plan: CapturePlan,
-    targets: Targets,
+    /// `None` for an audio recording (no screen to plan).
+    plan: Option<CapturePlan>,
+    targets: Option<Targets>,
     library_root: PathBuf,
     warnings: Vec<PreflightWarning>,
     indicator: Value,
@@ -458,11 +471,12 @@ pub struct RecordingEngine {
 }
 
 /// Names of the actions the engine runs itself.
-const ENGINE_ACTIONS: [&str; 10] = [
+const ENGINE_ACTIONS: [&str; 11] = [
     "start_recording",
     "pause_recording",
     "resume_recording",
     "set_mic_muted",
+    "add_marker",
     "stop_recording",
     "get_recording_status",
     "discard_recording",

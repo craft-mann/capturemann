@@ -5,7 +5,9 @@ use std::fmt::Write as _;
 
 use super::capture::{parse_region, primary_display, resolve_window};
 use super::{plain, Ctx};
-use crate::args::{RecordMicArgs, RecordRefArgs, RecordSelftestArgs, RecordStartArgs};
+use crate::args::{
+    RecordMarkerArgs, RecordMicArgs, RecordRefArgs, RecordSelftestArgs, RecordStartArgs,
+};
 use crate::error::CliError;
 
 /// `m:ss` or `h:mm:ss` of a millisecond count (the HUD timer format).
@@ -97,6 +99,16 @@ fn mic_json(a: &RecordStartArgs) -> Result<Option<Value>, CliError> {
 }
 
 fn area_text(ind: &Value) -> String {
+    if ind["mode"] == "audio" {
+        let mut sources = Vec::new();
+        if ind["mic"] == json!(true) {
+            sources.push("microphone");
+        }
+        if ind["system_audio"] == json!(true) {
+            sources.push("system audio");
+        }
+        return format!("audio only: {}", sources.join(" and "));
+    }
     let area = &ind["area"];
     let out = &ind["output"];
     let what = match area["kind"].as_str() {
@@ -125,6 +137,9 @@ pub(super) async fn record_start(cx: &mut Ctx<'_>, a: RecordStartArgs) -> Result
     let camera = camera_json(&a)?;
     let mic = mic_json(&a)?;
     let mut c = cx.client().await?;
+    if a.audio {
+        return record_start_audio(cx, &mut c, a, mic).await;
+    }
     let target = if let Some(w) = &a.window {
         let t = c.call("list_targets", json!({})).await?;
         json!({ "window_id": resolve_window(&t, w)? })
@@ -182,6 +197,44 @@ pub(super) async fn record_start(cx: &mut Ctx<'_>, a: RecordStartArgs) -> Result
             json!({ "bundle_ids": a.exclude_apps, "window_ids": a.exclude_windows }),
         );
     }
+    send_start(cx, &mut c, p).await
+}
+
+/// `record start --audio`: no target, no screen options (VOC-1).
+async fn record_start_audio(
+    cx: &mut Ctx<'_>,
+    c: &mut crate::client::Client,
+    a: RecordStartArgs,
+    mic: Option<Value>,
+) -> Result<(), CliError> {
+    let mut p = Map::new();
+    p.insert("mode".into(), json!("audio"));
+    if let Some(v) = mic {
+        p.insert("mic".into(), v);
+    }
+    if let Some(v) = &a.preset {
+        p.insert("preset".into(), json!(v));
+    }
+    if a.system_audio {
+        p.insert("system_audio".into(), json!(true));
+    }
+    if let Some(n) = a.countdown {
+        p.insert("countdown_s".into(), json!(n));
+    }
+    if let Some(n) = a.max_duration {
+        p.insert("max_duration_s".into(), json!(n));
+    }
+    if let Some(t) = &a.title {
+        p.insert("title".into(), json!(t));
+    }
+    send_start(cx, c, p).await
+}
+
+async fn send_start(
+    cx: &mut Ctx<'_>,
+    c: &mut crate::client::Client,
+    p: Map<String, Value>,
+) -> Result<(), CliError> {
     let params = cx.mutating(Value::Object(p), "");
     // The call blocks while the user answers the dialog (up to 5 minutes) and during the
     // countdown: say so, on stderr so `--json` output stays clean.
@@ -361,6 +414,36 @@ pub(super) async fn record_mic(cx: &mut Ctx<'_>, a: RecordMicArgs) -> Result<(),
                 "Microphone {now} at {}",
                 clock_text(r["at_ms"].as_i64().unwrap_or(0))
             )
+        }
+    });
+    Ok(())
+}
+
+pub(super) async fn record_marker(cx: &mut Ctx<'_>, a: RecordMarkerArgs) -> Result<(), CliError> {
+    let mut p = Map::new();
+    if let Some(l) = &a.label {
+        p.insert("label".into(), json!(l));
+    }
+    if let Some(id) = &a.recording_id {
+        p.insert("recording_id".into(), json!(id));
+    }
+    if let Some(id) = &a.capture {
+        p.insert("capture_id".into(), json!(id));
+    }
+    if let Some(at) = a.at {
+        p.insert("at".into(), json!(at));
+    }
+    let params = cx.mutating(Value::Object(p), "");
+    let mut c = cx.client().await?;
+    let r = c.call("add_marker", params).await?;
+    cx.emit(&r, |r| {
+        let at = clock_text(r["marker"]["at_ms"].as_i64().unwrap_or(0));
+        let label = r["marker"]["label"]
+            .as_str()
+            .map_or_else(String::new, |l| format!(" \"{l}\""));
+        match r["capture_id"].as_str() {
+            Some(id) => format!("Marker{label} added at {at} to {id}"),
+            None => format!("Marker{label} added at {at}"),
         }
     });
     Ok(())

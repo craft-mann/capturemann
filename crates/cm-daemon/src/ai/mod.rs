@@ -52,7 +52,6 @@ use cm_ai::transcribe::Transcript;
 use cm_core::edit::{parse_time, secs};
 use cm_core::{Actor, CmError, EditList};
 use cm_jobs::{Job, JobContext, JobFilter, JobHandler, JobQueue, JobState, NewJob, JOB_TRANSCRIBE};
-use cm_library::manifest::CaptureKind;
 use serde::{Serialize, Serializer};
 use serde_json::{json, Map, Value};
 
@@ -115,7 +114,7 @@ pub(crate) fn recording_bundle(
         let d = lib.bundle_path(&r);
         (r, d)
     };
-    if rec.kind != CaptureKind::Recording {
+    if !rec.kind.is_recording() {
         return Err(CmError::invalid_input(format!(
             "`{id}` is a screenshot; this works on recordings"
         )));

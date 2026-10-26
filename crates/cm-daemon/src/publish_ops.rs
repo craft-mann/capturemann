@@ -504,6 +504,9 @@ fn plan_blocking(
         let d = lib.bundle_path(&r);
         (r, d)
     };
+    if rec.kind == CaptureKind::Audio {
+        return Err(crate::export::audio_has_no_video(&rec.id));
+    }
     if rec.kind != CaptureKind::Recording {
         return Err(CmError::invalid_input(format!(
             "`{}` is a screenshot; only recordings can be published as video",

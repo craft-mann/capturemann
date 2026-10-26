@@ -15,7 +15,6 @@ use std::sync::Arc;
 use cm_ai::caption::{cues_for_timeline, CaptionLine};
 use cm_ai::transcribe::Transcript;
 use cm_core::{Actor, CmError};
-use cm_library::manifest::CaptureKind;
 use cm_media::{CaptionCue, CaptionSource};
 use serde_json::{json, Value};
 
@@ -155,7 +154,7 @@ impl Inner {
         let (outcome, options) = blocking(move || {
             let mut lib = lock_library(&library);
             let rec = lib.get(&id)?;
-            if rec.kind != CaptureKind::Recording {
+            if !rec.kind.is_recording() {
                 return Err(CmError::invalid_input(format!(
                     "`{id}` is a screenshot; captions belong to recordings"
                 )));

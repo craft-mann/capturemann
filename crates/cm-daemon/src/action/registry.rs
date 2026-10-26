@@ -83,6 +83,9 @@ pub const ACTIONS: &[ActionSpec] = &[
     // Mic mute (AUD-6): the track keeps running, the file gets digital silence for the muted
     // span. Free and mutating like pause and resume: the recording itself was confirmed.
     spec("set_mic_muted", Tier::Free, true),
+    // VOC-1: a marker is a label at a time (`manifest.markers`); Free like pause. On a finished
+    // recording it is one revision and one undo step.
+    spec("add_marker", Tier::Free, true),
     spec("stop_recording", Tier::Free, true),
     spec("get_recording_status", Tier::Free, false),
     spec("list_devices", Tier::Free, false),

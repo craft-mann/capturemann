@@ -17,8 +17,8 @@ use cm_core::{CmError, MediaTime, Permission, TrackContext, TrackInfo, TrackKind
 use serde_json::{json, Value};
 
 use crate::recording::{
-    BuildContext, DeviceNames, NoteLevel, Preflight, PreflightWarning, SensorRequest, SessionTrack,
-    SourceFactory, TrackNote,
+    BuildContext, DeviceNames, NoteLevel, Preflight, PreflightWarning, ResolvedStart,
+    SensorRequest, SessionTrack, SourceFactory, TrackNote,
 };
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -392,16 +392,18 @@ impl SourceFactory for FakeSources {
         let mut out = Preflight::default();
         for p in lock(&self.state.missing).iter() {
             let needed = match p {
-                Permission::Screen => true,
+                Permission::Screen => req.needs_screen_permission(),
                 Permission::Microphone => req.mic,
                 Permission::Camera => req.camera,
                 _ => false,
             };
             if needed {
-                out.errors.push(CmError::permission_missing(
-                    *p,
-                    format!("{} access is off (fake)", p.as_str()),
-                ));
+                let message = if *p == Permission::Screen && req.audio_only {
+                    crate::recording::sources::SYSTEM_AUDIO_NEEDS_SCREEN_MESSAGE.to_owned()
+                } else {
+                    format!("{} access is off (fake)", p.as_str())
+                };
+                out.errors.push(CmError::permission_missing(*p, message));
             }
         }
         if req.cursor && self.state.cursor_warning.load(Ordering::SeqCst) {
@@ -457,6 +459,39 @@ impl SourceFactory for FakeSources {
         if p.camera.is_some() {
             kinds.push(TrackKind::Camera);
         }
+        self.make_tracks(kinds)
+    }
+
+    fn build_audio(&self, p: &ResolvedStart) -> Result<Vec<Box<dyn SessionTrack>>, CmError> {
+        self.state.builds.fetch_add(1, Ordering::SeqCst);
+        *lock(&self.state.last_plan) = None;
+        *lock(&self.state.last_devices) = LastDevices {
+            camera: None,
+            mic: p.mic.as_ref().map(|m| m.device_id.clone()),
+        };
+        let mut kinds = Vec::new();
+        if p.mic.is_some() {
+            kinds.push(TrackKind::Mic);
+        }
+        if p.system_audio {
+            kinds.push(TrackKind::System);
+        }
+        self.make_tracks(kinds)
+    }
+
+    fn devices(&self) -> Value {
+        self.devices_json()
+    }
+
+    fn tick_hook(&self) {
+        if self.state.panic_on_tick.load(Ordering::SeqCst) {
+            panic!("injected panic in the recording driver");
+        }
+    }
+}
+
+impl FakeSources {
+    fn make_tracks(&self, kinds: Vec<TrackKind>) -> Result<Vec<Box<dyn SessionTrack>>, CmError> {
         let failing = lock(&self.state.fail_start).clone();
         let quality = (*lock(&self.state.quality)).unwrap_or(ScreenQuality {
             late_pct: 0.0,
@@ -493,7 +528,7 @@ impl SourceFactory for FakeSources {
         Ok(out)
     }
 
-    fn devices(&self) -> Value {
+    fn devices_json(&self) -> Value {
         json!({
             "cameras": [{ "id": "fake-cam", "name": "Fake Camera", "kind": "built_in",
                           "is_default": true, "max_size": [1920, 1080], "max_fps": 30.0,
@@ -510,11 +545,5 @@ impl SourceFactory for FakeSources {
             "screen_recording_permission": "authorized",
             "cursor": { "clicks": "available", "missing_permission": null },
         })
-    }
-
-    fn tick_hook(&self) {
-        if self.state.panic_on_tick.load(Ordering::SeqCst) {
-            panic!("injected panic in the recording driver");
-        }
     }
 }

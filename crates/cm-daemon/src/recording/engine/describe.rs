@@ -324,3 +324,127 @@ fn target_params(plan: &CapturePlan, targets: &Targets) -> Value {
         }
     }
 }
+
+// ---- audio recordings (VOC-1) ---------------------------------------------------------------
+
+/// The consent line of VOC-1.AC7: in the start sheet while `recording.consent_notice` is on, and
+/// always in the confirmation dialog an agent's `start_recording { mode: "audio" }` opens.
+pub const CONSENT_SENTENCE: &str = "Let everyone know they're being recorded.";
+
+/// The indicator facts of an audio recording: no area, no output size, no camera, no cursor.
+pub(super) fn indicator_json_audio(r: &ResolvedStart, actor: &Actor) -> Value {
+    let started_by = match actor {
+        Actor::User => json!({ "kind": "user", "client": null, "tool": null }),
+        Actor::Agent(name) => json!({ "kind": "agent", "client": name, "tool": "start_recording" }),
+    };
+    json!({
+        "mode": "audio",
+        "preset": r.preset,
+        "area": null,
+        "output": null,
+        "camera": null,
+        "mic": r.mic.is_some(),
+        "system_audio": r.system_audio,
+        "cursor": false,
+        "started_by": started_by,
+    })
+}
+
+/// The dialog sentence and rows of an audio recording: "Record audio", the microphone's name,
+/// no screen target (VOC-1.AC8), and the consent line (AC7).
+pub(super) fn describe_audio(
+    r: &ResolvedStart,
+    names: &DeviceNames,
+    root: &Path,
+    restart: bool,
+    consent_notice: bool,
+) -> (String, Value, Value) {
+    let mic_name = names.mic.as_deref().unwrap_or("the default microphone");
+    let sources = match (&r.mic, r.system_audio) {
+        (Some(_), false) => format!("the microphone \"{}\"", dialog_text(mic_name)),
+        (Some(_), true) => format!(
+            "the microphone \"{}\" and system audio",
+            dialog_text(mic_name)
+        ),
+        (None, _) => "system audio".to_owned(),
+    };
+    let lead = if restart {
+        "Discard the current take and start over: record audio"
+    } else {
+        "Record audio"
+    };
+    let summary = format!("{lead} from {sources}, and save it to {}", root.display());
+    let mic = match &r.mic {
+        None => "Off".to_owned(),
+        Some(_) => format!(
+            "On: {}{}",
+            dialog_text(mic_name),
+            if r.mic_denoise() {
+                ", noise suppression on"
+            } else {
+                ""
+            }
+        ),
+    };
+    let mut details = Map::new();
+    details.insert(
+        "mode".into(),
+        json!("Record audio (no screen, camera or cursor)"),
+    );
+    if let Some(p) = r.preset {
+        details.insert("preset".into(), json!(p.as_str()));
+    }
+    details.insert("microphone".into(), json!(mic));
+    details.insert(
+        "system_audio".into(),
+        json!(if r.system_audio { "On" } else { "Off" }),
+    );
+    details.insert(
+        "save_to".into(),
+        json!(format!(
+            "{}{}",
+            root.display(),
+            r.title
+                .as_deref()
+                .map_or(String::new(), |t| format!(" as \"{}\"", dialog_text(t)))
+        )),
+    );
+    details.insert(
+        "max_duration".into(),
+        json!(r
+            .max_duration_s
+            .map_or_else(|| "No limit".to_owned(), duration_words)),
+    );
+    details.insert(
+        "countdown".into(),
+        json!(if r.countdown_s == 0 {
+            "None".to_owned()
+        } else {
+            format!("{} s", r.countdown_s)
+        }),
+    );
+    details.insert("consent".into(), json!(CONSENT_SENTENCE));
+    if restart {
+        details.insert(
+            "discarded".into(),
+            json!("The current take is deleted and cannot be recovered"),
+        );
+    }
+    let params = json!({
+        "mode": "audio",
+        "restart": restart,
+        "preset": r.preset,
+        "microphone": r.mic.as_ref().map(|_| json!({
+            "device": names.mic,
+            "denoise": r.mic_denoise(),
+        })),
+        "system_audio": r.system_audio,
+        "save_to": root.display().to_string(),
+        "title": r.title.as_deref().map(dialog_text),
+        "max_duration_s": r.max_duration_s,
+        "countdown_s": r.countdown_s,
+        "consent": CONSENT_SENTENCE,
+        "consent_notice": consent_notice,
+    });
+    (summary, Value::Object(details), params)
+}

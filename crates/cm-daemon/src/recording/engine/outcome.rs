@@ -178,6 +178,16 @@ pub(super) fn disk_params(free_bytes: u64, minutes_left: f64) -> Value {
 
 /// The tracks a start will try to record, for `recording.starting`.
 pub(super) fn tracks_planned(r: &ResolvedStart) -> Vec<&'static str> {
+    if r.mode == RecordMode::Audio {
+        let mut v = Vec::new();
+        if r.mic.is_some() {
+            v.push("mic");
+        }
+        if r.system_audio {
+            v.push("system");
+        }
+        return v;
+    }
     let mut v = vec!["screen"];
     if r.camera.is_some() {
         v.push("camera");

@@ -124,8 +124,16 @@ fn field(path: &str, schema: &Value, all: bool, variant: usize) -> Value {
 /// today: `publish_video` is validated before its dialog (`PublishVideoParams::parse`).
 const PASS_THROUGH: &[&str] = &[];
 
-/// Properties that are aliases of another one (the daemon refuses both at once).
-const ALIASES: &[(&str, &str)] = &[("start_recording", "countdown"), ("upload", "file")];
+/// Properties that are aliases of another one (the daemon refuses both at once), or that only
+/// go with a value the filler does not pick (`preset` needs `mode: "audio"`, and an audio
+/// recording refuses the `target` the filler also adds; VOC-1).
+const ALIASES: &[(&str, &str)] = &[
+    ("start_recording", "countdown"),
+    ("start_recording", "preset"),
+    // The running recording or a finished one, not both.
+    ("add_marker", "recording_id"),
+    ("upload", "file"),
+];
 
 fn input_for(tool: &tools::ToolSpec, all: bool, variant: usize) -> Value {
     // `gen` would pick one `anyOf` alternative as the whole object; generate from the plain schema.

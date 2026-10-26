@@ -142,6 +142,10 @@ impl EngineInner {
     /// discard, a cancelled countdown or the 60 fps self-test (they do not pass through here).
     /// Failures are not the recording's problem: the take is saved either way.
     fn auto_export(&self, sh: &Shared, capture_id: &str, title: &str) {
+        // An audio recording has no video to export (VOC-2 brings audio export).
+        if sh.resolved.mode == RecordMode::Audio {
+            return;
+        }
         let export = self.queue_export(sh, capture_id, title, false);
         self.auto_upload(sh, capture_id, title, export);
     }

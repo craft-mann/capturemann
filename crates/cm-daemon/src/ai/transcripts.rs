@@ -26,7 +26,7 @@ impl Inner {
         blocking(move || {
             let lib = lock_library(&library);
             let rec = lib.get(&id)?;
-            if rec.kind != CaptureKind::Recording {
+            if !rec.kind.is_recording() {
                 return Err(CmError::invalid_input(format!(
                     "`{id}` is a screenshot; only recordings have speech to transcribe"
                 )));

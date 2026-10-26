@@ -20,7 +20,7 @@ use cm_core::{Actor, CmError, EditContext, EditList, MediaTime, Revision, DEFAUL
 use serde_json::{json, Value};
 use time::OffsetDateTime;
 
-use crate::manifest::RecManifest;
+use crate::manifest::{Marker, RecManifest};
 use crate::rec::{read_manifest, write_manifest};
 
 /// Reserved top-level manifest key holding the undo history.
@@ -231,6 +231,78 @@ pub fn apply_captions(
     Ok(outcome(&m, revision))
 }
 
+/// Longest marker label, in characters.
+pub const MARKER_LABEL_MAX: usize = 200;
+
+/// Adds a marker (VOC-1) to a finished recording as one revision (`add_marker`) and one undo
+/// step; the edit list and the media are untouched. `at` is the recorded time (the HUD timer,
+/// pauses removed) and must lie within the recording. Markers stay sorted by `at`. Returns the
+/// marker as stored and the outcome.
+pub fn apply_marker(
+    dir: &Path,
+    at: MediaTime,
+    label: Option<&str>,
+    by: Actor,
+    wall: OffsetDateTime,
+) -> Result<(Marker, EditOutcome), CmError> {
+    let mut m = read_manifest(dir)?;
+    if at < MediaTime::ZERO {
+        return Err(CmError::invalid_field("at", "must not be negative"));
+    }
+    if let Some(d) = m.duration.filter(|d| at > *d) {
+        return Err(CmError::invalid_field(
+            "at",
+            format!(
+                "is after the end of the recording ({:.3} s)",
+                d.as_secs_f64()
+            ),
+        ));
+    }
+    let label = normalize_marker_label(label)?;
+    let marker = Marker {
+        at,
+        label,
+        by: Some(by.to_string()),
+    };
+    let before = serde_json::to_value(&m.markers).unwrap_or(Value::Null);
+    m.markers.push(marker.clone());
+    m.markers.sort_by_key(|x| x.at);
+    let after = serde_json::to_value(&m.markers).unwrap_or(Value::Null);
+    let edits_now = load_edits(&m).to_json();
+    let (cursor, mut steps) = history_mut(&mut m)?;
+    steps.truncate(cursor);
+    let revision = push_revision(&mut m, "add_marker", by.clone(), wall);
+    steps.push(json!({
+        "rev": revision.rev,
+        "action": "add_marker",
+        "by": by.to_string(),
+        "before": edits_now,
+        "after": edits_now,
+        "markers_before": before,
+        "markers_after": after,
+    }));
+    let over = steps.len().saturating_sub(DEFAULT_REVISION_LIMIT);
+    steps.drain(..over);
+    let cursor = steps.len();
+    store_history(&mut m, cursor, steps);
+    write_manifest(dir, &m)?;
+    Ok((marker, outcome(&m, revision)))
+}
+
+/// Trims a marker label; an empty one means none. At most [`MARKER_LABEL_MAX`] characters.
+pub fn normalize_marker_label(label: Option<&str>) -> Result<Option<String>, CmError> {
+    let label = label.map(str::trim).filter(|l| !l.is_empty());
+    if let Some(l) = label {
+        if l.chars().count() > MARKER_LABEL_MAX {
+            return Err(CmError::invalid_field(
+                "label",
+                format!("must be at most {MARKER_LABEL_MAX} characters"),
+            ));
+        }
+    }
+    Ok(label.map(str::to_owned))
+}
+
 /// How captions are used for a recording (AI-1): the two switches in the manifest's `captions`
 /// object. Both default to off when the keys are missing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -370,6 +442,15 @@ pub fn step_history(
     };
     if let Some(c) = steps.get(step).and_then(|s| s.get(side)) {
         m.captions = c.clone();
+    }
+    // A marker step carries the marker list on both sides of it.
+    let mside = if undo {
+        "markers_before"
+    } else {
+        "markers_after"
+    };
+    if let Some(list) = steps.get(step).and_then(|s| s.get(mside)) {
+        m.markers = serde_json::from_value(list.clone()).unwrap_or_default();
     }
     let revision = push_revision(&mut m, if undo { "undo" } else { "redo" }, by, at);
     store_history(&mut m, new_cursor, steps);

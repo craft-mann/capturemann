@@ -50,7 +50,7 @@ impl Inner {
         let out = blocking(move || {
             let mut lib = lock_library(&library);
             let rec = lib.get(&id)?;
-            if rec.kind != CaptureKind::Recording {
+            if !rec.kind.is_recording() {
                 return Err(CmError::invalid_input(format!(
                     "`{id}` is a screenshot; captions belong to recordings"
                 )));
@@ -106,7 +106,7 @@ impl Inner {
         let out = blocking(move || {
             let mut lib = lock_library(&library);
             let rec = lib.get(&id)?;
-            if rec.kind != CaptureKind::Recording {
+            if !rec.kind.is_recording() {
                 return Err(CmError::invalid_input(format!(
                     "`{id}` is a screenshot; captions belong to recordings"
                 )));

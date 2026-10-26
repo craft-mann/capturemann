@@ -337,6 +337,7 @@ pub(crate) fn tool_title(name: &str) -> String {
         "pause_recording" => tr!("Pause a recording"),
         "resume_recording" => tr!("Resume a recording"),
         "set_mic_muted" => tr!("Mute or unmute the microphone"),
+        "add_marker" => tr!("Mark a moment in a recording"),
         "stop_recording" => tr!("Stop a recording"),
         "get_recording_status" => tr!("Read recording status"),
         "list_devices" => tr!("List cameras and microphones"),

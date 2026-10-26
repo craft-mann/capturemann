@@ -371,6 +371,8 @@ pub enum Action {
     PauseRecording(RecordingRefParams),
     ResumeRecording(RecordingRefParams),
     SetMicMuted(SetMicMutedParams),
+    /// `add_marker` (VOC-1, see [`crate::markers`]).
+    AddMarker(crate::markers::AddMarkerParams),
     StopRecording(RecordingRefParams),
     GetRecordingStatus(RecordingStatusParams),
     ListDevices,

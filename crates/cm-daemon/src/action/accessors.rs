@@ -34,6 +34,7 @@ impl Action {
             Action::PauseRecording(_) => "pause_recording",
             Action::ResumeRecording(_) => "resume_recording",
             Action::SetMicMuted(_) => "set_mic_muted",
+            Action::AddMarker(_) => crate::markers::METHOD,
             Action::StopRecording(_) => "stop_recording",
             Action::GetRecordingStatus(_) => "get_recording_status",
             Action::ListDevices => "list_devices",
@@ -72,6 +73,7 @@ impl Action {
             Action::RetryJob(p) => p.request_id.as_deref(),
             Action::ExportVideo(p) => p.request_id.as_deref(),
             Action::SetMicMuted(p) => p.request_id.as_deref(),
+            Action::AddMarker(p) => p.request_id.as_deref(),
             Action::MoveLibrary(p) => p.request_id.as_deref(),
             Action::PauseRecording(p)
             | Action::ResumeRecording(p)
@@ -97,6 +99,7 @@ impl Action {
             Action::Ai(p) => p.op.capture_id(),
             Action::Upload(p) => p.capture_id.as_deref(),
             Action::CaptionOptions(p) => Some(&p.capture_id),
+            Action::AddMarker(p) => p.capture_id.as_deref(),
             Action::ExportVideo(p) => Some(&p.capture_id),
             Action::PublishVideo(p) | Action::DeleteCapture(p) => p.capture_id.as_deref(),
             _ => None,
@@ -106,7 +109,13 @@ impl Action {
     /// One sentence for the confirmation dialog and the activity log.
     pub fn summary(&self) -> String {
         match self {
+            Action::StartRecording(p)
+                if p.rest.get("mode").and_then(Value::as_str) == Some("audio") =>
+            {
+                "Start an audio recording".to_owned()
+            }
             Action::StartRecording(_) => "Start a screen recording".to_owned(),
+            Action::AddMarker(p) => crate::markers::summary(p),
             Action::RunFpsSelftest(_) => {
                 "Record the screen for about 10 s to test 60 fps (nothing is saved)".to_owned()
             }

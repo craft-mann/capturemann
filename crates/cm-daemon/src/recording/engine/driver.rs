@@ -28,6 +28,10 @@ pub(super) struct Driver {
     /// Permissions the last tick's poll found revoked: one is acted on only when it shows on
     /// two ticks in a row (PRM-1), so a transient OS answer cannot end a take.
     pub(super) revoked_prev: Vec<Permission>,
+    /// The OS "prevent idle sleep" hold of an audio recording (VOC-1); released on every way out.
+    pub(super) idle_guard: Option<Box<dyn Send + Sync>>,
+    /// Wall time of the previous tick, to notice that the computer slept (audio recordings).
+    pub(super) last_tick_wall: Option<time::OffsetDateTime>,
 }
 
 fn cancelled_error() -> DaemonError {
@@ -174,6 +178,19 @@ impl Driver {
             );
         }
         let started_at = rfc3339(self.eng.deps.clock.now());
+        if prep.resolved.mode == RecordMode::Audio {
+            if let Some(inhibitor) = &self.eng.opts.idle_sleep {
+                match inhibitor.prevent("CaptureMann is recording audio") {
+                    Ok(g) => self.idle_guard = Some(g),
+                    Err(e) => warnings.push(
+                        json!({ "track": null, "code": "idle_sleep_unavailable",
+                                "message": format!("The computer may go to sleep during this recording: {e}"),
+                                "level": "warning", "at_ms": null }),
+                    ),
+                }
+            }
+            self.last_tick_wall = Some(self.eng.deps.clock.now());
+        }
         *lock(&self.sh.session) = Some(session);
         {
             let mut m = lock(&self.sh.meta);
@@ -190,6 +207,7 @@ impl Driver {
             "capture_id": capture_id,
             "title": title,
             "state": "recording",
+            "mode": if prep.resolved.mode == RecordMode::Audio { "audio" } else { "screen" },
             "live_at_ms": live_at.as_millis_floor(),
             "started_at": started_at,
             "by": self.sh.by,
@@ -219,17 +237,23 @@ impl Driver {
         let root = prep.library_root.clone();
         let by = self.sh.by.clone();
         let joined = tokio::task::spawn_blocking(move || {
-            let tracks = eng.factory.build(&BuildContext {
-                params: &resolved,
-                plan: &plan,
-                targets: &targets,
-            })?;
+            let audio = resolved.mode == RecordMode::Audio;
+            let tracks = match (&plan, &targets) {
+                (Some(plan), Some(targets)) if !audio => eng.factory.build(&BuildContext {
+                    params: &resolved,
+                    plan,
+                    targets,
+                })?,
+                _ if audio => eng.factory.build_audio(&resolved)?,
+                _ => return Err(CmError::internal("the recording has no screen plan")),
+            };
             let mut cfg = SessionConfig::new(&root);
             cfg.title = resolved.title.clone();
             cfg.settings = resolved.settings_json(&by);
+            cfg.audio_only = audio;
             cfg.displays = targets
-                .displays
                 .iter()
+                .flat_map(|t| t.displays.iter())
                 .map(|d| SessionDisplay {
                     id: d.id,
                     name: d.name.clone(),
@@ -540,6 +564,20 @@ impl Driver {
         ) {
             return Flow::Continue;
         }
+        // An audio recording notices that the computer slept (VOC-1): the wall clock jumped
+        // while the timer, which does not run during sleep, did not. It stops and keeps what was
+        // captured.
+        if self.sh.resolved.mode == RecordMode::Audio {
+            let now = self.eng.deps.clock.now();
+            let slept = self.last_tick_wall.is_some_and(|prev| {
+                (now - prev).as_seconds_f64() > self.eng.opts.sleep_gap.as_secs_f64()
+            });
+            self.last_tick_wall = Some(now);
+            if slept {
+                let _ = self.stop("system_sleep").await;
+                return Flow::End;
+            }
+        }
         let factory = self.eng.factory.clone();
         let prev = std::mem::take(&mut self.revoked_prev);
         let ticked = self
@@ -621,6 +659,7 @@ impl Driver {
 
     async fn stop(&mut self, reason: &str) -> Result<Value, DaemonError> {
         self.set_phase(Phase::Stopping);
+        self.idle_guard = None;
         lock(&self.sh.meta).stop_reason = Some(reason.to_owned());
         let session = lock(&self.sh.session).take();
         let Some(session) = session else {
@@ -699,6 +738,7 @@ impl Driver {
         keep_holds: bool,
     ) -> Result<DiscardDone, DaemonError> {
         self.set_phase(Phase::Stopping);
+        self.idle_guard = None;
         let session = lock(&self.sh.session).take();
         let capture_id = lock(&self.sh.meta).capture_id.clone();
         if let Some(session) = session {

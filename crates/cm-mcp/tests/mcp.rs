@@ -969,9 +969,36 @@ async fn rec_tools_have_the_spec_tiers_and_schemas() {
         .as_deref()
         .unwrap()
         .contains("Tier: Confirm"));
-    assert_eq!(start.input_schema["required"], json!(["target"]));
+    // `target` is required for a screen recording only: `mode: "audio"` has none (VOC-1), so the
+    // schema asks for a `target` or a `mode` and the daemon says which one is missing.
+    assert!(start.input_schema.get("required").is_none());
+    assert_eq!(
+        start.input_schema["anyOf"],
+        json!([{ "required": ["target"] }, { "required": ["mode"] }])
+    );
     assert_eq!(start.input_schema["additionalProperties"], false);
     let props = start.input_schema["properties"].as_object().unwrap();
+    assert_eq!(props["mode"]["enum"], json!(["screen", "audio"]));
+    assert_eq!(
+        props["preset"]["enum"],
+        json!(["room", "online", "lecture", "product", "note"])
+    );
+    let marker = get("add_marker");
+    assert!(marker
+        .description
+        .as_deref()
+        .unwrap()
+        .contains("Tier: Free"));
+    assert_eq!(
+        marker.annotations.as_ref().unwrap().read_only_hint,
+        Some(false)
+    );
+    for k in ["recording_id", "capture_id", "at", "label", "request_id"] {
+        assert!(marker.input_schema["properties"]
+            .as_object()
+            .unwrap()
+            .contains_key(k));
+    }
     for k in [
         "target",
         "size",
@@ -2046,4 +2073,80 @@ mod resources_and_prompts {
         assert_eq!(e.code, ErrorCode::INVALID_PARAMS);
         c.cancel().await.unwrap();
     }
+}
+
+/// VOC-1: an agent records audio through MCP: the dialog says "Record audio", a screen-only field
+/// is refused with the field's name before any dialog, `add_marker` sets a marker on the running
+/// recording and, with `capture_id` and `at`, on the finished one, and `list_library` takes
+/// `kind: "audio"`.
+#[tokio::test]
+async fn voc1_agent_records_audio_and_marks_moments() {
+    let (d, confirmer, _dir) =
+        recording_daemon(Decision::Approve, cm_daemon::testing::FakeSources::new());
+    let (conn, _) = duplex_connector(d);
+    let c = mcp_client(conn, "claude-desktop").await;
+
+    let r = call(
+        &c,
+        "start_recording",
+        json!({ "mode": "audio", "countdown_s": 0, "fps": 60 }),
+    )
+    .await;
+    assert_eq!(err_code(&r), "invalid_input");
+    assert!(format!("{r:?}").contains("fps"), "{r:?}");
+    assert!(confirmer.shown().is_empty(), "refused before any dialog");
+
+    let r = call(
+        &c,
+        "start_recording",
+        json!({ "mode": "audio", "mic": true, "countdown_s": 0, "title": "Interview" }),
+    )
+    .await;
+    let v = ok(&r);
+    assert_eq!(v["tracks"], json!(["mic"]));
+    assert_eq!(v["mode"], "audio");
+    let shown = confirmer.shown();
+    assert_eq!(shown.len(), 1);
+    assert!(
+        shown[0].summary.starts_with("Record audio"),
+        "{}",
+        shown[0].summary
+    );
+    assert_eq!(
+        shown[0].details["consent"],
+        "Let everyone know they're being recorded."
+    );
+
+    let m = call(
+        &c,
+        "add_marker",
+        json!({ "label": "Budget", "request_id": "m1" }),
+    )
+    .await;
+    assert_eq!(ok(&m)["marker"]["label"], "Budget");
+    assert_eq!(ok(&m)["marker"]["by"], "agent:claude-desktop");
+    let replay = call(
+        &c,
+        "add_marker",
+        json!({ "label": "Budget", "request_id": "m1" }),
+    )
+    .await;
+    assert_eq!(
+        ok(&replay)["count"],
+        1,
+        "a repeated request_id sets one marker"
+    );
+
+    let stopped = ok(&call(&c, "stop_recording", json!({})).await).clone();
+    let id = stopped["capture_id"].as_str().unwrap().to_owned();
+    let late = call(
+        &c,
+        "add_marker",
+        json!({ "capture_id": id, "at": 0, "label": "Intro" }),
+    )
+    .await;
+    assert_eq!(ok(&late)["action"], "add_marker");
+    let list = call(&c, "list_library", json!({ "kind": "audio" })).await;
+    assert_eq!(ok(&list)["captures"][0]["id"], id.as_str());
+    c.cancel().await.unwrap();
 }

@@ -50,6 +50,8 @@ pub const RECORDING_RESUMED: &str = "recording.resumed";
 pub const RECORDING_MIC_MUTED: &str = "recording.mic_muted";
 /// The microphone was unmuted: `{ recording_id, at_ms, recorded_ms }`.
 pub const RECORDING_MIC_UNMUTED: &str = "recording.mic_unmuted";
+/// A marker was set on the running recording (VOC-1): `{ recording_id, at_ms, label, by, count }`.
+pub const RECORDING_MARKER: &str = "recording.marker";
 pub const RECORDING_STATS: &str = "recording.stats";
 pub const RECORDING_HEALTH: &str = "recording.health";
 pub const RECORDING_WARNING: &str = "recording.warning";

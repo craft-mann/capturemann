@@ -356,6 +356,9 @@ fn load_recording(
         let d = lib.bundle_path(&r);
         (r, d)
     };
+    if record.kind == CaptureKind::Audio {
+        return Err(audio_has_no_video(capture_id));
+    }
     if record.kind != CaptureKind::Recording {
         return Err(CmError::invalid_input(format!(
             "`{capture_id}` is a screenshot; only recordings can be exported as video"
@@ -586,6 +589,9 @@ impl Inner {
         let burn_requested = p.captions == Some(CaptionChoice::Burn);
         let title = blocking(move || {
             let r = lock_library(&library).get(&id)?;
+            if r.kind == CaptureKind::Audio {
+                return Err(audio_has_no_video(&id));
+            }
             if r.kind != CaptureKind::Recording {
                 return Err(CmError::invalid_input(format!(
                     "`{id}` is a screenshot; only recordings can be exported as video"
@@ -647,6 +653,13 @@ impl Inner {
             "reused": reused,
         }))
     }
+}
+
+/// The refusal for a video export of an audio recording (VOC-1; `export_audio` is VOC-2).
+pub(crate) fn audio_has_no_video(id: &str) -> CmError {
+    CmError::invalid_input(format!(
+        "`{id}` is an audio recording: it has no video to export (audio export arrives with VOC-2)"
+    ))
 }
 
 #[cfg(test)]

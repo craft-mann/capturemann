@@ -396,6 +396,15 @@ fn build_manifest(
     // The reserved extra key `layout` (set with `RecBundle::set_extra("layout", ...)`) is the
     // layout at stop, e.g. `{ "camera": { visible, shape, rect } }`; it belongs to the edit list.
     let layout = extra.remove(LAYOUT_KEY);
+    // VOC-1: `kind` and the live markers are typed manifest fields; the session keeps them in
+    // the lock's extra map while recording so a crash does not lose them.
+    let kind = extra
+        .remove("kind")
+        .and_then(|v| v.as_str().map(str::to_owned));
+    let markers: Vec<crate::manifest::Marker> = extra
+        .remove("markers")
+        .and_then(|v| serde_json::from_value(v).ok())
+        .unwrap_or_default();
     let mut edit = json!({"in": 0, "out": duration.ticks(), "speed": 1.0});
     if let (Some(l), Some(o)) = (layout, edit.as_object_mut()) {
         o.insert("layout".into(), l);
@@ -419,6 +428,8 @@ fn build_manifest(
         settings: lock.settings.clone(),
         gaps: lock.gaps.clone(),
         captions: json!({"enabled": false, "burn_in": false}),
+        kind,
+        markers,
         extra,
     }
 }
@@ -710,6 +721,8 @@ pub fn recover_bundle(dir: &Path, now: OffsetDateTime) -> Result<RecoveryOutcome
         }
     }
     let lock = read_lock(dir).unwrap_or_else(|_| fallback_lock(dir, now));
+    // An audio recording (VOC-1) has no video: its WAV files are the media.
+    let audio_only = lock.extra.get("kind").and_then(Value::as_str) == Some("audio");
     let mut tracks = Map::new();
     let mut report_tracks = Vec::new();
     let mut duration = MediaTime::ZERO;
@@ -732,7 +745,7 @@ pub fn recover_bundle(dir: &Path, now: OffsetDateTime) -> Result<RecoveryOutcome
                         )
                     });
                 }
-                if matches!(kind, FileKind::Mp4) {
+                if matches!(kind, FileKind::Mp4) || (audio_only && matches!(kind, FileKind::Wav)) {
                     any_media = true;
                     duration = duration.max(file_end);
                 }
@@ -755,8 +768,9 @@ pub fn recover_bundle(dir: &Path, now: OffsetDateTime) -> Result<RecoveryOutcome
     }
     if !any_media {
         return Err(CmError::invalid_input(format!(
-            "`{}` has no recoverable video track",
-            dir.display()
+            "`{}` has no recoverable {} track",
+            dir.display(),
+            if audio_only { "audio" } else { "video" }
         )));
     }
     let mut manifest = build_manifest(&lock, tracks, duration, now);
@@ -913,6 +927,8 @@ fn recover_wav(
     // is the track's length.
     let mut main = info;
     let dir = path.parent().unwrap_or_else(|| Path::new("."));
+    // End of the track in file time (pauses removed): the length of an audio recording.
+    let mut file_end = MediaTime::ZERO;
     let mut entry = Map::new();
     entry.insert("file".into(), json!(file));
     entry.insert("channels".into(), json!(info.channels));
@@ -947,6 +963,7 @@ fn recover_wav(
                 .map(|g| g.to.ticks() - g.from.ticks())
                 .sum();
             let end_file = MediaTime::from_ticks(start - before_start + dur.ticks());
+            file_end = end_file;
             let end = file_end_to_session(gaps, end_file).ticks().max(start);
             let pauses: Vec<Value> = gaps
                 .iter()
@@ -981,7 +998,10 @@ fn recover_wav(
         }
     };
     entry.insert("frames".into(), json!(frames));
-    Ok((Value::Object(entry), outcome, MediaTime::ZERO))
+    if file_end == MediaTime::ZERO {
+        file_end = dur;
+    }
+    Ok((Value::Object(entry), outcome, file_end))
 }
 
 /// Is a process with this pid running? Used so a second instance does not "recover" a bundle

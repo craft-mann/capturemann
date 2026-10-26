@@ -10,12 +10,17 @@ use time::OffsetDateTime;
 /// Manifest schema version written and understood by this crate.
 pub const SCHEMA_VERSION: u32 = 1;
 
-/// The two kinds of capture bundle.
+/// The kinds of capture bundle.
+///
+/// `Audio` (VOC-1) is a `.cmrec` bundle whose manifest says `"kind": "audio"`: it has the same
+/// folder layout and tooling as a recording but no `screen` track. The folder extension cannot
+/// tell the two apart (see [`CaptureKind::from_extension`]); the manifest does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CaptureKind {
     Screenshot,
     Recording,
+    Audio,
 }
 
 impl CaptureKind {
@@ -23,12 +28,19 @@ impl CaptureKind {
         match self {
             CaptureKind::Screenshot => "screenshot",
             CaptureKind::Recording => "recording",
+            CaptureKind::Audio => "audio",
         }
+    }
+    /// A `.cmrec` bundle: a screen recording or an audio recording. Both are edited, transcribed
+    /// and captioned by the same code.
+    pub fn is_recording(self) -> bool {
+        matches!(self, CaptureKind::Recording | CaptureKind::Audio)
     }
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "screenshot" => Some(CaptureKind::Screenshot),
             "recording" => Some(CaptureKind::Recording),
+            "audio" => Some(CaptureKind::Audio),
             _ => None,
         }
     }
@@ -36,9 +48,11 @@ impl CaptureKind {
     pub fn extension(self) -> &'static str {
         match self {
             CaptureKind::Screenshot => "cmshot",
-            CaptureKind::Recording => "cmrec",
+            CaptureKind::Recording | CaptureKind::Audio => "cmrec",
         }
     }
+    /// The kind a folder extension stands for. `cmrec` gives `Recording`; an audio recording is
+    /// told apart by the `kind` field of its manifest ([`RecManifest::capture_kind`]).
     pub fn from_extension(ext: &str) -> Option<Self> {
         match ext {
             "cmshot" => Some(CaptureKind::Screenshot),
@@ -358,11 +372,39 @@ pub struct RecManifest {
     pub gaps: Vec<cm_core::PauseGap>,
     #[serde(default)]
     pub captions: Value,
+    /// `"audio"` for an audio-only recording (VOC-1); absent for a screen recording.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    /// Markers the user or an agent set (VOC-1), sorted by `at`. Times are the recording clock
+    /// (the HUD timer: pauses removed), in ticks.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub markers: Vec<Marker>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
 
+/// One marker of `manifest.markers` (VOC-1.AC4).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Marker {
+    /// Recorded time (pauses removed), ticks.
+    pub at: MediaTime,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// Who set it: `user` or `agent:<name>`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub by: Option<String>,
+}
+
 impl RecManifest {
+    /// `Audio` when the manifest says so, else `Recording`.
+    pub fn capture_kind(&self) -> CaptureKind {
+        if self.kind.as_deref() == Some("audio") {
+            CaptureKind::Audio
+        } else {
+            CaptureKind::Recording
+        }
+    }
+
     pub fn from_json(text: &str) -> Result<Self, ManifestProblem> {
         let corrupt = |e: serde_json::Error| {
             ManifestProblem::Corrupt(CmError::invalid_input(format!("manifest.json: {e}")))

@@ -1869,6 +1869,9 @@ msgstr ""
 msgid "Manage {name}"
 msgstr ""
 
+msgid "Mark a moment in a recording"
+msgstr ""
+
 msgid "Match case"
 msgstr ""
 

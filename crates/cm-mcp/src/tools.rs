@@ -591,7 +591,7 @@ pub fn all() -> Vec<ToolSpec> {
             summary: "List or search captures in the library, newest first, with paging.",
             input: json!({ "type": "object", "properties": {
                 "query": { "type": "string", "description": "Full-text search." },
-                "kind": { "type": "string", "enum": ["screenshot", "recording"] },
+                "kind": { "type": "string", "enum": ["screenshot", "recording", "audio"], "description": "`audio` lists audio-only recordings (VOC-1); `recording` lists screen recordings." },
                 "status": { "type": "string", "enum": ["uploaded", "not_uploaded", "published", "not_published"], "description": "Only captures with (or without) an upload record (`uploaded`: sent to a storage destination) or a publish record (`published`: on YouTube and the like). Combines with `kind` and `query`; paging stays correct." },
                 "limit": { "type": "integer", "minimum": 1, "maximum": 200, "default": 50 },
                 "cursor": { "type": "string", "description": "`next_cursor` of the previous page." } },
@@ -758,10 +758,12 @@ pub fn all() -> Vec<ToolSpec> {
             tier: Tier::Confirm,
             mutating: true,
             destructive: false,
-            spec: "REC-1-4, CAM-1, AUD-1, AUD-2, AGT-2",
-            summary: "Start a screen recording of a display, a window or a region (physical px relative to the display, like capture_screenshot), optionally with the webcam, the microphone and system audio. The user sees a confirmation that says exactly what will be recorded (unless they turned that off for AI agents in CaptureMann\u{2019}s settings; the recording indicator and a Stop button on the screen always show), then a countdown (default 3 s), and the recording shows the usual border, timer and stop button. Returns when recording has started, with the recording id, the capture id it will have in the library and the indicator facts. Fails with `busy` if a recording is running and `permission_missing` (data.permission: screen, microphone or camera) before anything is asked. Stop it with stop_recording.",
+            spec: "REC-1-4, CAM-1, AUD-1, AUD-2, AGT-2, VOC-1",
+            summary: "Start a screen recording of a display, a window or a region (physical px relative to the display, like capture_screenshot), optionally with the webcam, the microphone and system audio. With `mode: \"audio\"` it records the microphone and/or system audio only (no screen, camera or cursor; `kind: \"audio\"` in the library): `target`, `size`, `fps`, `codec`, `quality`, `camera`, `cursor`, `cursor_separate` and `exclude` are then refused with `invalid_input` naming the field. The microphone is on unless `mic: false`; `preset` sets the default sources (`online` and `product` add system audio). The dialog says \"Record audio\", names the microphone and carries the line \"Let everyone know they're being recorded.\". A microphone-only recording never needs Screen Recording access; system audio without it fails with `permission_missing` (data.permission: screen). It stops after `max_duration_s` (default 4 h, at most 12 h), or with reason `system_sleep` when the computer sleeps. The user sees a confirmation that says exactly what will be recorded (unless they turned that off for AI agents in CaptureMann\u{2019}s settings; the recording indicator and a Stop button on the screen always show), then a countdown (default 3 s), and the recording shows the usual border, timer and stop button. Returns when recording has started, with the recording id, the capture id it will have in the library and the indicator facts. Fails with `busy` if a recording is running and `permission_missing` (data.permission: screen, microphone or camera) before anything is asked. Stop it with stop_recording.",
             input: json!({ "type": "object", "properties": {
-                "target": { "oneOf": [
+                "mode": { "type": "string", "enum": ["screen", "audio"], "default": "screen", "description": "`audio`: microphone and/or system audio only (see above)." },
+                "preset": { "type": "string", "enum": ["room", "online", "lecture", "product", "note"], "description": "Only with `mode: \"audio\"`: the use case. `room` (interview, 1:1, meeting around a laptop), `lecture` and `note` record the microphone; `online` (call) and `product` (demo call) add system audio. Every source can still be set." },
+                "target": { "description": "Required for a screen recording; refused with `mode: \"audio\"`.", "oneOf": [
                     { "type": "object", "properties": { "display_id": { "type": "integer", "minimum": 0 } },
                       "required": ["display_id"], "additionalProperties": false },
                     { "type": "object", "properties": { "window_id": { "type": "integer", "minimum": 0 } },
@@ -811,7 +813,8 @@ pub fn all() -> Vec<ToolSpec> {
                     "window_ids": { "type": "array", "items": { "type": "integer", "minimum": 0 } } },
                     "additionalProperties": false },
                 "request_id": request_id() },
-                "required": ["target"], "additionalProperties": false }),
+                "anyOf": [ { "required": ["target"] }, { "required": ["mode"] } ],
+                "additionalProperties": false }),
             output: json!({ "type": "object", "properties": {
                 "recording_id": { "type": "string", "description": "Identifies this run; pass it to the other recording tools (optional while only one runs)." },
                 "capture_id": { "type": "string", "description": "The library id the recording has once stopped." },
@@ -821,7 +824,8 @@ pub fn all() -> Vec<ToolSpec> {
                 "started_at": { "type": "string" },
                 "by": { "type": "string" },
                 "countdown_s": { "type": "integer" },
-                "tracks": { "type": "array", "items": { "type": "string", "enum": ["screen", "cursor", "mic", "system", "camera"] }, "description": "Tracks that actually started; an optional track that failed is missing and listed in `warnings`." },
+                "mode": { "type": "string", "enum": ["screen", "audio"] },
+                "tracks": { "type": "array", "items": { "type": "string", "enum": ["screen", "cursor", "mic", "system", "camera"] }, "description": "Tracks that actually started; an optional track that failed is missing and listed in `warnings`. An audio recording lists only `mic` and/or `system`." },
                 "warnings": { "type": "array", "items": { "type": "object", "properties": {
                     "track": { "type": ["string", "null"] }, "code": { "type": "string" }, "message": { "type": "string" } } } },
                 "indicator": { "type": "object", "description": "What the on-screen indicator shows: area (kind, display_id, bounds), output size/fps/codec, camera bubble, sensors, who started it." },
@@ -879,6 +883,34 @@ pub fn all() -> Vec<ToolSpec> {
                 "changed": { "type": "boolean" },
                 "at_ms": { "type": "integer", "description": "Session time of the change (of the last one when nothing changed)." } },
                 "required": ["recording_id", "muted", "changed"] }),
+        },
+        ToolSpec {
+            name: "add_marker",
+            tier: Tier::Free,
+            mutating: true,
+            destructive: false,
+            spec: "VOC-1",
+            summary: "Add a marker (a moment worth coming back to, with an optional label) to the running recording at the current recorded time, or to a finished recording at `at`. Markers are stored in `manifest.markers` in recorded time (the timer: pauses do not count), so a marker set at 02:00 stays at 120 s after a pause. On a finished recording it is one revision and one undo step. Give nothing but `label` (and optionally `recording_id`) for the running recording; give `capture_id` and `at` (seconds) for a finished one.",
+            input: json!({ "type": "object", "properties": {
+                "recording_id": { "type": "string", "minLength": 1,
+                                  "description": "From start_recording; optional while only one recording exists. Not with `capture_id`." },
+                "capture_id": { "type": "string", "minLength": 1, "description": "A finished recording; needs `at`." },
+                "at": { "type": "number", "minimum": 0, "description": "Seconds of recorded time (pauses removed), for a finished recording only." },
+                "label": { "type": "string", "maxLength": 200, "description": "Optional short label." },
+                "request_id": request_id() },
+                "additionalProperties": false }),
+            output: json!({ "type": "object", "properties": {
+                "recording_id": { "type": "string" },
+                "capture_id": { "type": "string" },
+                "marker": { "type": "object", "properties": {
+                    "at": { "type": "number", "description": "Seconds of recorded time." },
+                    "at_ms": { "type": "integer" },
+                    "label": { "type": ["string", "null"] },
+                    "by": { "type": ["string", "null"], "description": "`user` or `agent:<name>`." } },
+                    "required": ["at", "at_ms"] },
+                "count": { "type": "integer", "description": "Markers on the running recording." },
+                "revision": { "type": "integer", "description": "Finished recording only." } },
+                "required": ["marker"] }),
         },
         ToolSpec {
             name: "stop_recording",

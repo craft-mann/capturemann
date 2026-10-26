@@ -74,7 +74,7 @@ use cm_core::{
     TrackContext, TrackInfo, TrackKind, TrackStats,
 };
 use cm_library::index::default_title;
-use cm_library::manifest::RecManifest;
+use cm_library::manifest::{Marker, RecManifest};
 use cm_library::rec::{SessionDisplay, SessionInfo};
 use cm_library::{Library, RecBundle};
 use serde::Serialize;
@@ -101,6 +101,9 @@ pub struct SessionConfig {
     pub disk_check_every: Duration,
     /// Wall time stamped on the bundle; `None` is now.
     pub now: Option<OffsetDateTime>,
+    /// An audio-only recording (VOC-1): no screen, camera or cursor track, only the microphone
+    /// and/or system audio; the manifest says `"kind": "audio"`.
+    pub audio_only: bool,
 }
 
 impl SessionConfig {
@@ -115,6 +118,7 @@ impl SessionConfig {
             free_space: Arc::new(SystemFreeSpace),
             disk_check_every: Duration::from_secs(5),
             now: None,
+            audio_only: false,
         }
     }
 }
@@ -288,6 +292,10 @@ pub struct RecordingSession {
     requested: Vec<TrackKind>,
     warnings: Vec<SessionNote>,
     stop_requested: Option<String>,
+    /// Markers set so far (VOC-1), sorted by time; also kept in the bundle's lock.
+    markers: Vec<Marker>,
+    /// An audio-only recording: it has no required track, so it fails when none could be kept.
+    audio_only: bool,
     free_space: Arc<dyn FreeSpace>,
     disk_every: Duration,
     last_disk_check: Option<Instant>,
@@ -328,7 +336,21 @@ impl RecordingSession {
                 )));
             }
         }
-        if tracks
+        if config.audio_only {
+            if tracks
+                .iter()
+                .any(|t| !matches!(t.kind(), TrackKind::Mic | TrackKind::System))
+            {
+                return Err(CmError::invalid_input(
+                    "An audio recording has no screen, camera or cursor track",
+                ));
+            }
+            if tracks.is_empty() {
+                return Err(CmError::invalid_input(
+                    "An audio recording needs a microphone or system audio track",
+                ));
+            }
+        } else if tracks
             .iter()
             .filter(|t| t.kind() == TrackKind::Screen)
             .count()
@@ -353,7 +375,14 @@ impl RecordingSession {
         let now_wall = config.now.unwrap_or_else(OffsetDateTime::now_utc);
         let title = match &config.title {
             Some(t) => t.clone(),
-            None => default_title("Recording", now_wall)?,
+            None => default_title(
+                if config.audio_only {
+                    "Audio recording"
+                } else {
+                    "Recording"
+                },
+                now_wall,
+            )?,
         };
         let requested: Vec<TrackKind> = tracks.iter().map(|t| t.kind()).collect();
         let mut info = SessionInfo {
@@ -373,6 +402,14 @@ impl RecordingSession {
         )?;
         let dir = bundle.dir().to_owned();
         let capture_id = bundle.id().to_owned();
+        if config.audio_only {
+            // In the lock from the first moment, so a recovered bundle is still an audio one.
+            if let Err(e) = bundle.set_extra("kind", json!("audio")) {
+                drop(bundle);
+                let _ = fs::remove_dir_all(&dir);
+                return Err(e);
+            }
+        }
 
         let mut slots: Vec<Slot> = tracks
             .into_iter()
@@ -413,12 +450,21 @@ impl RecordingSession {
         });
         let live_at = clock.now();
 
-        // A required track that failed: undo everything.
-        if let Some(pos) = results
-            .iter()
-            .enumerate()
-            .position(|(i, (r, _))| r.is_err() && slots[i].track.required())
-        {
+        // A required track that failed: undo everything. An audio recording has no screen track
+        // to be required: it fails when none of its tracks started.
+        let failed_required = if config.audio_only {
+            results
+                .iter()
+                .all(|(r, _)| r.is_err())
+                .then_some(0)
+                .filter(|_| !results.is_empty())
+        } else {
+            results
+                .iter()
+                .enumerate()
+                .position(|(i, (r, _))| r.is_err() && slots[i].track.required())
+        };
+        if let Some(pos) = failed_required {
             for (i, slot) in slots.iter_mut().enumerate() {
                 if results[i].0.is_ok() {
                     let _ = slot.track.stop(live_at);
@@ -521,6 +567,8 @@ impl RecordingSession {
             requested,
             warnings,
             stop_requested: None,
+            markers: Vec::new(),
+            audio_only: config.audio_only,
             free_space: config.free_space,
             disk_every: config.disk_check_every,
             last_disk_check: None,
@@ -762,6 +810,36 @@ impl RecordingSession {
     }
 
     /// The microphone is muted now.
+    /// Sets a marker at the current recorded time (the HUD timer: pauses removed) and keeps it in
+    /// the bundle's lock, so a crash does not lose it (VOC-1.AC4, AC5). `by` is the actor tag
+    /// (`user` or `agent:<name>`).
+    pub fn add_marker(&mut self, label: Option<&str>, by: &str) -> Result<Marker, CmError> {
+        if self.state == SessionState::Stopped {
+            return Err(CmError::invalid_input("The recording is already stopped"));
+        }
+        let label = cm_library::rec_edit::normalize_marker_label(label)?;
+        let marker = Marker {
+            at: self.status().recorded,
+            label,
+            by: Some(by.to_owned()),
+        };
+        self.markers.push(marker.clone());
+        self.markers.sort_by_key(|m| m.at);
+        if let Some(b) = self.bundle.as_mut() {
+            b.set_extra(
+                "markers",
+                serde_json::to_value(&self.markers)
+                    .map_err(|e| CmError::internal(format!("markers: {e}")))?,
+            )?;
+        }
+        Ok(marker)
+    }
+
+    /// The markers set so far.
+    pub fn markers(&self) -> &[Marker] {
+        &self.markers
+    }
+
     pub fn is_mic_muted(&self) -> bool {
         self.mic_muted.last().is_some_and(|s| s.to.is_none())
     }
@@ -951,6 +1029,7 @@ impl RecordingSession {
             .collect();
         let mut infos = Vec::new();
         let mut required_err = None;
+        let mut first_err: Option<CmError> = None;
         let mut notes = Vec::new();
         for (slot, res) in self.slots.iter_mut().zip(results) {
             let kind = slot.track.kind();
@@ -1009,6 +1088,9 @@ impl RecordingSession {
                     if slot.track.required() {
                         required_err.get_or_insert(e);
                     } else {
+                        if first_err.is_none() {
+                            first_err = Some(e.clone());
+                        }
                         // R3-1: files are removed only when a track fails to START. At stop
                         // whatever the track wrote is kept: hours of audio must not vanish
                         // because the last flush failed.
@@ -1034,6 +1116,9 @@ impl RecordingSession {
         }
         for n in notes {
             self.note(n);
+        }
+        if self.audio_only && infos.is_empty() && required_err.is_none() {
+            required_err = first_err;
         }
         if let Some(e) = required_err {
             if cm_encode::is_no_frames(&e) {

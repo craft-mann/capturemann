@@ -85,6 +85,10 @@ fn samples() -> Vec<(&'static str, Value)> {
         ("pause_recording", json!({})),
         ("resume_recording", json!({"recording_id": "rec_1"})),
         ("set_mic_muted", json!({"muted": true, "request_id": "r"})),
+        (
+            "add_marker",
+            json!({"label": "decision", "request_id": "r"}),
+        ),
         ("stop_recording", json!({"request_id": "r"})),
         ("get_recording_status", json!({})),
         ("list_devices", json!({})),

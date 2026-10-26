@@ -149,6 +149,11 @@ impl RecordingEngine {
         fps60_gate: Option<bool>,
     ) -> Result<PreparedStart, DaemonError> {
         let mut resolved = resolved;
+        if resolved.mode == RecordMode::Audio {
+            return self
+                .prepare_audio(actor, resolved, restart_of, &settings)
+                .await;
+        }
         let exclusions = self.exclusions(&resolved, &settings);
         let (mut plan, targets, mut warnings, names, root) =
             self.plan_blocking(&resolved, exclusions).await?;
@@ -196,35 +201,7 @@ impl RecordingEngine {
             resolved.system_audio,
             resolved.cursor,
         );
-        let disk = match self.inner.opts.free_space.free_bytes(&root) {
-            Some(free) => match assess_disk(free, bitrate) {
-                DiskStatus::Full { free_bytes } => {
-                    return Err(CmError::disk_full(format!(
-                        "Only {} MB free; recording needs more than 1 GB free to start",
-                        free_bytes / 1_000_000
-                    ))
-                    .into());
-                }
-                DiskStatus::Low { minutes_left } => {
-                    warnings.push(PreflightWarning {
-                        track: None,
-                        code: "disk_low".to_owned(),
-                        message: format!(
-                            "About {minutes_left:.0} minutes of disk space left at this setting"
-                        ),
-                    });
-                    Some((
-                        disk_text(free, minutes_left),
-                        disk_params(free, minutes_left),
-                    ))
-                }
-                DiskStatus::Ok { minutes_left } => Some((
-                    disk_text(free, minutes_left),
-                    disk_params(free, minutes_left),
-                )),
-            },
-            None => None,
-        };
+        let disk = self.disk_plan(&root, bitrate, &mut warnings)?;
         let indicator = indicator_json(&resolved, &plan, &targets, actor);
         let (summary, mut details, mut params) = describe(
             &resolved,
@@ -243,14 +220,113 @@ impl RecordingEngine {
         let camera_settings = crate::export::camera_settings(&settings);
         Ok(PreparedStart {
             resolved,
-            plan,
-            targets,
+            plan: Some(plan),
+            targets: Some(targets),
             library_root: root,
             warnings,
             indicator,
             restart_of,
             holds: None,
             camera_settings,
+            summary,
+            details,
+            params,
+        })
+    }
+
+    /// The disk part of a plan (R3-9 / REC-8.AC4): refuses to start with under 1 GB free, adds the
+    /// `disk_low` warning, and returns the dialog row (text and typed values) when the free space
+    /// is known.
+    fn disk_plan(
+        &self,
+        root: &Path,
+        bitrate: u64,
+        warnings: &mut Vec<PreflightWarning>,
+    ) -> Result<Option<(String, Value)>, DaemonError> {
+        let Some(free) = self.inner.opts.free_space.free_bytes(root) else {
+            return Ok(None);
+        };
+        Ok(match assess_disk(free, bitrate) {
+            DiskStatus::Full { free_bytes } => {
+                return Err(CmError::disk_full(format!(
+                    "Only {} MB free; recording needs more than 1 GB free to start",
+                    free_bytes / 1_000_000
+                ))
+                .into());
+            }
+            DiskStatus::Low { minutes_left } => {
+                warnings.push(PreflightWarning {
+                    track: None,
+                    code: "disk_low".to_owned(),
+                    message: format!(
+                        "About {minutes_left:.0} minutes of disk space left at this setting"
+                    ),
+                });
+                Some((
+                    disk_text(free, minutes_left),
+                    disk_params(free, minutes_left),
+                ))
+            }
+            DiskStatus::Ok { minutes_left } => Some((
+                disk_text(free, minutes_left),
+                disk_params(free, minutes_left),
+            )),
+        })
+    }
+
+    /// Plans an audio recording (VOC-1): the permission preflight (a microphone-only plan never
+    /// asks for Screen Recording; system audio without it is `permission_missing` `screen`), the
+    /// device names and the disk check. There is no screen to plan.
+    async fn prepare_audio(
+        &self,
+        actor: &Actor,
+        resolved: ResolvedStart,
+        restart_of: Option<String>,
+        settings: &Map<String, Value>,
+    ) -> Result<PreparedStart, DaemonError> {
+        let eng = self.inner.clone();
+        let req = SensorRequest::from_resolved(&resolved);
+        let (mut warnings, names, root) = crate::daemon::blocking(move || {
+            let pre = eng.factory.preflight(&req);
+            if let Some(e) = pre.errors.into_iter().next() {
+                return Err(e);
+            }
+            let names = eng.factory.device_names(&req);
+            let root = lock_library(&eng.deps.library).root().to_owned();
+            Ok((pre.warnings, names, root))
+        })
+        .await?;
+        let bitrate = planned_bitrate_bps(
+            0,
+            false,
+            resolved.mic.is_some(),
+            resolved.system_audio,
+            false,
+        );
+        let disk = self.disk_plan(&root, bitrate, &mut warnings)?;
+        let indicator = indicator_json_audio(&resolved, actor);
+        let consent = settings
+            .get("recording.consent_notice")
+            .and_then(Value::as_bool)
+            .unwrap_or(true);
+        let (summary, mut details, mut params) =
+            describe_audio(&resolved, &names, &root, restart_of.is_some(), consent);
+        if let (Some((text, typed)), Some(o)) = (disk, details.as_object_mut()) {
+            o.insert("disk_space".into(), json!(text));
+            if let Some(p) = params.as_object_mut() {
+                p.insert("disk".into(), typed);
+            }
+        }
+        Ok(PreparedStart {
+            resolved,
+            plan: None,
+            targets: None,
+            library_root: root,
+            warnings,
+            indicator,
+            restart_of,
+            holds: None,
+            camera_settings: Map::new(),
             summary,
             details,
             params,
@@ -276,9 +352,12 @@ impl RecordingEngine {
         let eng = self.inner.clone();
         let r2 = resolved.clone();
         crate::daemon::blocking(move || {
-            let want_windows = matches!(r2.target, ScreenshotTarget::Window { .. });
+            let target = r2
+                .target
+                .ok_or_else(|| CmError::internal("a screen recording has no target"))?;
+            let want_windows = matches!(target, ScreenshotTarget::Window { .. });
             let targets = eng.deps.capturer.list_targets_with(want_windows)?;
-            let mut screen = ScreenSettings::new(r2.target.to_capture_target());
+            let mut screen = ScreenSettings::new(target.to_capture_target());
             screen.video = VideoSettings {
                 size: r2.size,
                 fps: r2.fps,
@@ -333,6 +412,8 @@ impl RecordingEngine {
             holds: None,
             ticks: 0,
             revoked_prev: Vec::new(),
+            idle_guard: None,
+            last_tick_wall: None,
         };
         let handle = tokio::spawn(driver.run(prep, ready_tx));
         let eng = self.inner.clone();
@@ -497,6 +578,58 @@ impl RecordingEngine {
             "muted": st.mic_muted,
             "changed": change.changed,
             "at_ms": at_ms,
+        }))
+    }
+
+    /// Sets a marker on the running recording at the current recorded time (VOC-1.AC4): the HUD
+    /// timer, so a pause does not move it. `{ recording_id, marker: { at, at_ms, label, by },
+    /// count }`. Works while recording, paused or in the resume countdown; during the start
+    /// countdown it is `invalid_input`, without a recording `not_found`.
+    pub async fn add_marker(
+        &self,
+        actor: &Actor,
+        id: Option<&str>,
+        label: Option<&str>,
+    ) -> Result<Value, DaemonError> {
+        let sh = self.active_for(id)?;
+        let phase = lock(&sh.meta).phase;
+        if !matches!(phase, Phase::Recording | Phase::Paused | Phase::Resuming) {
+            return Err(CmError::invalid_input(format!(
+                "The recording is {}, not running",
+                phase.as_str()
+            ))
+            .into());
+        }
+        let (sh2, by, label2) = (sh.clone(), actor.to_string(), label.map(str::to_owned));
+        let joined = tokio::task::spawn_blocking(move || {
+            let mut g = lock(&sh2.session);
+            match g.as_mut() {
+                Some(s) => s
+                    .add_marker(label2.as_deref(), &by)
+                    .map(|m| (m, s.markers().len())),
+                None => Err(CmError::internal("the recording session is gone")),
+            }
+        })
+        .await;
+        let (marker, count) = match joined {
+            Ok(r) => r?,
+            Err(e) => return Err(CmError::internal(format!("worker failed: {e}")).into()),
+        };
+        let at_ms = marker.at.as_millis_floor();
+        self.inner.publish(
+            &sh,
+            events::RECORDING_MARKER,
+            json!({ "at_ms": at_ms, "label": marker.label, "by": marker.by, "count": count }),
+        );
+        Ok(json!({
+            "recording_id": sh.id,
+            "marker": {
+                "at": marker.at.as_secs_f64(),
+                "at_ms": at_ms,
+                "label": marker.label,
+                "by": marker.by,
+            },
+            "count": count,
         }))
     }
 

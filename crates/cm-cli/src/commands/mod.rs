@@ -29,7 +29,8 @@ use jobs::{jobs_cancel, jobs_get, jobs_list, jobs_retry, jobs_watch};
 use library::{library_list, library_move, library_rename, library_rm};
 use publish::{destinations, publish, upload};
 use record::{
-    record_control, record_mic, record_selftest, record_start, record_status, record_watch,
+    record_control, record_marker, record_mic, record_selftest, record_start, record_status,
+    record_watch,
 };
 use settings::{daemon_start, daemon_status, devices, mcp, settings_get, settings_set};
 
@@ -89,6 +90,7 @@ pub async fn execute(cli: Cli, env: &mut Env) -> Result<(), CliError> {
             RecordCmd::Pause(a) => record_control(&mut cx, "pause_recording", a).await,
             RecordCmd::Resume(a) => record_control(&mut cx, "resume_recording", a).await,
             RecordCmd::Mic(a) => record_mic(&mut cx, a).await,
+            RecordCmd::Marker(a) => record_marker(&mut cx, a).await,
             RecordCmd::Stop(a) => record_control(&mut cx, "stop_recording", a).await,
             RecordCmd::Status(a) => record_status(&mut cx, a).await,
             RecordCmd::Selftest(a) => record_selftest(&mut cx, a).await,

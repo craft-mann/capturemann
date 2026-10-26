@@ -272,6 +272,9 @@ impl Action {
             m if crate::ai::is_ai_method(m) => {
                 return crate::ai::parse(m, &f);
             }
+            crate::markers::METHOD => {
+                return crate::markers::parse(&f);
+            }
             crate::caption_options::METHOD => {
                 return crate::caption_options::parse(&f);
             }
@@ -399,10 +402,10 @@ impl Action {
                 }
                 let kind = f.str_opt("kind")?;
                 if let Some(k) = &kind {
-                    if !matches!(k.as_str(), "screenshot" | "recording") {
+                    if !matches!(k.as_str(), "screenshot" | "recording" | "audio") {
                         return Err(CmError::invalid_field(
                             "kind",
-                            "must be `screenshot` or `recording`",
+                            "must be `screenshot`, `recording` or `audio`",
                         ));
                     }
                 }

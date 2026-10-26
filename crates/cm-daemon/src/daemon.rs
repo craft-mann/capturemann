@@ -240,6 +240,8 @@ pub struct DaemonBuilder {
     recording_options: EngineOptions,
     kept_windows: Option<Arc<dyn Fn() -> Vec<u32> + Send + Sync>>,
     camera_watcher: Option<Box<dyn cm_camera::CameraWatcher>>,
+    /// `recording_system` was used: audio recordings hold the OS power assertion (VOC-1).
+    system_idle_sleep: bool,
 }
 
 impl DaemonBuilder {
@@ -268,6 +270,7 @@ impl DaemonBuilder {
             recording_options: EngineOptions::default(),
             kept_windows: None,
             camera_watcher: None,
+            system_idle_sleep: false,
         }
     }
 
@@ -288,6 +291,7 @@ impl DaemonBuilder {
     /// area outline and the tray state is the host's job.
     pub fn recording_system(self) -> Self {
         let mut me = self.recording_sources(SystemSources);
+        me.system_idle_sleep = true;
         if me.camera_watcher.is_none() {
             me.camera_watcher = Some(cm_camera::system_watcher());
         }
@@ -436,6 +440,10 @@ impl DaemonBuilder {
     pub fn build(self) -> Daemon {
         let events = EventBus::new(self.clock.clone());
         let mut recording_options = self.recording_options.clone();
+        if self.system_idle_sleep && recording_options.idle_sleep.is_none() {
+            // The one place the real power assertion is wired (VOC-1).
+            recording_options.idle_sleep = Some(Arc::new(crate::recording::SystemIdleSleep));
+        }
         let mut capturer = self.capturer;
         if let Some(p) = &self.kept_windows {
             if recording_options.kept_windows.is_none() {
@@ -1216,6 +1224,16 @@ impl Daemon {
             }
             Action::PauseRecording(p) => inner.engine()?.pause(p.recording_id.as_deref()).await,
             Action::ResumeRecording(p) => inner.engine()?.resume(p.recording_id.as_deref()).await,
+            Action::AddMarker(p) => {
+                if p.capture_id.is_some() {
+                    inner.add_marker_stored(actor, p).await
+                } else {
+                    inner
+                        .engine()?
+                        .add_marker(actor, p.recording_id.as_deref(), p.label.as_deref())
+                        .await
+                }
+            }
             Action::SetMicMuted(p) => {
                 inner
                     .engine()?

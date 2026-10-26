@@ -8,6 +8,7 @@ pub mod engine;
 pub mod params;
 pub mod selftest;
 pub mod session;
+pub mod sleep;
 pub mod sources;
 pub mod tracks;
 
@@ -15,12 +16,15 @@ pub use engine::{
     clock_text, EngineOptions, JobHolds, Phase, PreparedSelftest, PreparedStart, RecordingEngine,
     DEFAULT_EXCLUDED_BUNDLE_IDS, PAUSE_UPLOADS_SETTING,
 };
-pub use params::{CameraParams, ExcludeParams, MicParams, ResolvedStart, StartParams};
+pub use params::{
+    AudioPreset, CameraParams, ExcludeParams, MicParams, RecordMode, ResolvedStart, StartParams,
+};
 pub use selftest::{Fingerprint, Fps60Rejection, Fps60Verdict, SelftestEntry, SelftestParams};
 pub use session::{
     LevelReading, RecordingSession, SessionConfig, SessionNote, SessionState, SessionStatus,
     StoppedSession, TrackState, TrackStatus,
 };
+pub use sleep::{FakeIdleSleep, IdleSleepInhibitor, SystemIdleSleep};
 pub use sources::{
     BuildContext, DeviceNames, Preflight, PreflightWarning, SensorRequest, SourceFactory,
     SystemSources,

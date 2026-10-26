@@ -2680,3 +2680,121 @@ async fn record_mic_mutes_and_unmutes() {
     }
     cli(&r.rig, &["record", "stop"]).await;
 }
+
+/// VOC-1: `record start --audio` is `start_recording { mode: "audio" }`: no target lookup, the
+/// dialog says "Record audio", the screen options are refused by the parser, and the library
+/// lists the result under `library list --kind audio`.
+#[tokio::test]
+async fn record_start_audio_records_an_audio_bundle() {
+    let r = recording::rec_rig(
+        cm_daemon::Decision::Approve,
+        cm_daemon::testing::FakeSources::new(),
+    );
+    let o = cli(
+        &r.rig,
+        &[
+            "record",
+            "start",
+            "--audio",
+            "--countdown",
+            "0",
+            "--preset",
+            "online",
+            "--title",
+            "Standup",
+        ],
+    )
+    .await;
+    assert_eq!(o.code, 0, "{}", o.err);
+    assert!(
+        o.out.contains("audio only: microphone and system audio"),
+        "{}",
+        o.out
+    );
+    assert!(o.out.contains("tracks: mic, system"), "{}", o.out);
+    let shown = r.confirmer.shown();
+    assert_eq!(shown.len(), 1);
+    assert!(
+        shown[0].summary.starts_with("Record audio"),
+        "{}",
+        shown[0].summary
+    );
+
+    let m = cli(&r.rig, &["record", "marker", "--label", "Action item"]).await;
+    assert_eq!(m.code, 0, "{}{}", m.out, m.err);
+    assert!(
+        m.out.starts_with("Marker \"Action item\" added at 00:00"),
+        "{}",
+        m.out
+    );
+    let j = cli(&r.rig, &["--json", "record", "marker"]).await.json();
+    assert!(j["marker"]["by"].as_str().unwrap().starts_with("agent:"));
+    assert_eq!(j["count"], 2);
+    let stopped = cli(&r.rig, &["--json", "record", "stop"]).await.json();
+    let id = stopped["capture_id"].as_str().unwrap().to_owned();
+
+    let list = cli(&r.rig, &["--json", "library", "list", "--kind", "audio"])
+        .await
+        .json();
+    assert_eq!(list["captures"][0]["id"], id.as_str());
+    let none = cli(
+        &r.rig,
+        &["--json", "library", "list", "--kind", "recording"],
+    )
+    .await
+    .json();
+    assert!(none["captures"].as_array().unwrap().is_empty());
+
+    // A marker on the finished recording, and the parser's rules for the two forms.
+    let late = cli(
+        &r.rig,
+        &[
+            "record",
+            "marker",
+            "--capture",
+            &id,
+            "--at",
+            "0",
+            "--label",
+            "Start",
+        ],
+    )
+    .await;
+    assert_eq!(late.code, 0, "{}{}", late.out, late.err);
+    assert!(late.out.contains(&format!("to {id}")), "{}", late.out);
+    for args in [
+        vec!["record", "marker", "--capture", id.as_str()],
+        vec!["record", "marker", "--at", "3"],
+        vec![
+            "record",
+            "marker",
+            "--id",
+            "rec_x",
+            "--capture",
+            id.as_str(),
+            "--at",
+            "1",
+        ],
+    ] {
+        let bad = cli(&r.rig, &args).await;
+        assert_eq!(bad.code, 2, "{args:?}: {}{}", bad.out, bad.err);
+    }
+
+    // Screen-only options conflict with --audio at the parser (exit 2), before anything runs.
+    let before = r.confirmer.shown().len();
+    for extra in [
+        vec!["--display", "1"],
+        vec!["--camera"],
+        vec!["--fps", "60"],
+        vec!["--no-cursor"],
+        vec!["--size", "720p"],
+    ] {
+        let mut args = vec!["record", "start", "--audio"];
+        args.extend(extra.iter().copied());
+        let bad = cli(&r.rig, &args).await;
+        assert_eq!(bad.code, 2, "{args:?}: {}{}", bad.out, bad.err);
+    }
+    let bad = cli(&r.rig, &["record", "start", "--preset", "room"]).await;
+    assert_eq!(bad.code, 2, "--preset needs --audio");
+    assert_eq!(r.confirmer.shown().len(), before);
+}

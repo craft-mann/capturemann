@@ -14,7 +14,6 @@ use cm_core::{
     CameraMode, ClickEffect, CmError, CursorStyleUpdate, EditContext, EditList, LayoutTransition,
     MediaTime, ReframeMode, ReframeUpdate, Smoothing, Span, ZoomRegion, ZOOM_DEFAULT_SCALE,
 };
-use cm_library::manifest::CaptureKind;
 use cm_library::rec_edit::{apply_edit, step_history, EditOutcome};
 use serde::{Serialize, Serializer};
 use serde_json::{json, Value};
@@ -731,7 +730,7 @@ impl Inner {
         let out = blocking(move || {
             let mut lib = lock_library(&library);
             let rec = lib.get(&id)?;
-            if rec.kind != CaptureKind::Recording {
+            if !rec.kind.is_recording() {
                 return Err(CmError::invalid_input(format!(
                     "`{id}` is a screenshot: {} edits recordings (use `annotate` for screenshots)",
                     op.method()

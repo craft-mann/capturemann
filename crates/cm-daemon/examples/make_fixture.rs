@@ -18,7 +18,8 @@
 //!
 //! Flags: `--library DIR` (required), `--title T`, `--secs N` (screen file length, 4 to 120,
 //! default 12), `--size WxH` (default 1280x720), `--fps N` (default 30), `--no-camera`,
-//! `--no-audio`, `--no-cursor`, `--no-pause`, `--pause-at S --pause-for S` (screen file time).
+//! `--no-audio`, `--no-cursor`, `--no-pause`, `--audio-only` (an audio recording, VOC-1: microphone and
+//! system audio, a pause and one marker at 2 s; no screen, camera or cursor), `--pause-at S --pause-for S` (screen file time).
 //! Needs FFmpeg with libx264 (`brew install ffmpeg`).
 
 use std::path::PathBuf;
@@ -30,7 +31,7 @@ fn usage(msg: &str) -> ExitCode {
     eprintln!("make_fixture: {msg}");
     eprintln!(
         "usage: make_fixture --library DIR [--title T] [--secs N] [--size WxH] [--fps N] \
-         [--no-camera] [--no-audio] [--no-cursor] [--no-pause] [--pause-at S --pause-for S]"
+         [--no-camera] [--no-audio] [--no-cursor] [--no-pause] [--audio-only] [--pause-at S --pause-for S]"
     );
     ExitCode::from(2)
 }
@@ -76,6 +77,7 @@ fn main() -> ExitCode {
                 "--no-camera" => spec.camera = false,
                 "--no-audio" => spec.audio = false,
                 "--no-cursor" => spec.cursor = false,
+                "--audio-only" => spec.audio_only = true,
                 "--no-pause" => spec.pause = None,
                 "--pause-at" => {
                     pause_at = Some(
