@@ -188,6 +188,7 @@ impl Inner {
         &self,
         capture_id: &str,
         format: CaptionFormat,
+        speaker_names: bool,
     ) -> Result<Value, DaemonError> {
         let _serial = self.capture_locks.lock(capture_id).await;
         let (library, id, captions) = (
@@ -214,7 +215,16 @@ impl Inner {
                 }
             };
             let edits = cm_library::rec_edit::load_edits(&manifest);
-            let text = captions.render(&lines, format, &edits)?;
+            // AI-8: with speakers known, VTT gets voice tags, TXT and Markdown "Name: text" per
+            // turn and SRT a "NAME:" prefix when asked. Markdown always takes this path.
+            let speakers = cm_ai::speakers::SpeakerState::from_manifest(&manifest)
+                .filter(|s| !s.segments.is_empty());
+            let named = speakers.is_some() && (format != CaptionFormat::Srt || speaker_names);
+            let text = if named || format == CaptionFormat::Md {
+                render_spoken(&lines, format, &edits, speakers.as_ref())
+            } else {
+                captions.render(&lines, format, &edits)?
+            };
             let out_dir = dir.join("exports");
             std::fs::create_dir_all(&out_dir).map_err(|e| {
                 CmError::internal(format!("cannot create `{}`: {e}", out_dir.display()))
@@ -223,7 +233,7 @@ impl Inner {
             // The plain-text transcript is a document in its own right: `<title>.txt`; the
             // subtitle files say what they are.
             let name = if format.is_text() {
-                format!("{safe_title}.txt")
+                format!("{safe_title}.{}", format.ext())
             } else {
                 format!("{safe_title} - captions.{}", format.ext())
             };
@@ -234,8 +244,39 @@ impl Inner {
                 "format": format.ext(),
                 "path": path,
                 "lines": lines.len(),
+                "speaker_names": named,
             }))
         })
         .await
+    }
+}
+
+/// The caption file text with the speakers' names (AI-8): every line is mapped through the edit
+/// list on its own, so the speaker found in the source time stays with the line it came from.
+fn render_spoken(
+    lines: &[CaptionLine],
+    format: CaptionFormat,
+    edits: &EditList,
+    speakers: Option<&cm_ai::speakers::SpeakerState>,
+) -> String {
+    use cm_ai::speakers::{self as spk, SpokenLine};
+    let tl = edits.timeline();
+    let mut spoken = Vec::new();
+    for l in lines {
+        let who =
+            speakers.and_then(|s| spk::line_speaker(l, &s.segments).map(|(id, _)| s.name_of(id)));
+        for m in cm_ai::caption::map_lines_to_timeline(std::slice::from_ref(l), &tl) {
+            spoken.push(SpokenLine {
+                line: m,
+                speaker: who.clone(),
+            });
+        }
+    }
+    match format {
+        CaptionFormat::Srt => spk::to_srt_named(&spoken, true),
+        CaptionFormat::Vtt => spk::to_vtt_voiced(&spoken),
+        CaptionFormat::Txt => spk::to_txt_speakers(&spoken, false),
+        CaptionFormat::TxtTimed => spk::to_txt_speakers(&spoken, true),
+        CaptionFormat::Md => spk::to_markdown_speakers(&spoken),
     }
 }

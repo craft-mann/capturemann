@@ -1342,10 +1342,16 @@ fn ai_tools() -> Vec<ToolSpec> {
                     "model": { "type": "string" },
                     "words": { "type": "array", "items": { "type": "object", "properties": {
                         "text": { "type": "string" }, "start": { "type": "integer" },
-                        "end": { "type": "integer" }, "confidence": { "type": "number" } },
+                        "end": { "type": "integer" }, "confidence": { "type": "number" },
+                        "speaker": { "type": "integer", "description": "AI-8: the speaker's id (see `speakers`); present once `diarize` has run." },
+                        "overlap": { "type": "boolean", "description": "AI-8: other speakers talked at the same time." } },
                         "required": ["text", "start", "end"] } },
                     "note": { "type": ["string", "null"] } },
                     "required": ["language", "model", "words"] },
+                "speakers": { "type": "array", "description": "AI-8: present once `diarize` has run.",
+                    "items": { "type": "object", "properties": {
+                        "id": { "type": "integer" }, "name": { "type": "string" } },
+                        "required": ["id", "name"] } },
                 "captions": { "type": ["array", "null"], "items": { "type": "object", "properties": {
                     "start": { "type": "integer" }, "end": { "type": "integer" },
                     "text": { "type": "string" } } } },
@@ -1416,14 +1422,59 @@ fn ai_tools() -> Vec<ToolSpec> {
             true,
             "AI-1",
             "Write the captions as an SRT, VTT or plain-text (`txt`) file in the capture's `exports/` folder (`txt` is `<title>.txt`: one caption line per row, add `timestamps: true` for a `[mm:ss]` prefix on every line). The lines are the edited ones if there are any, else generated from the transcript, and the recording's edits apply: cut ranges remove their lines and shift the later ones, and speed scales the times, so no caption refers to cut content. Fails with `not_found` before transcribe has run.",
-            json!({ "format": { "type": "string", "enum": ["srt", "vtt", "txt"] },
+            json!({ "format": { "type": "string", "enum": ["srt", "vtt", "txt", "md"] },
                     "timestamps": { "type": "boolean",
-                        "description": "Only with `txt`: prefix every line with [mm:ss] (or [hh:mm:ss] for long recordings). Default false." } }),
+                        "description": "Only with `txt`: prefix every line with [mm:ss] (or [hh:mm:ss] for long recordings). Default false." },
+                    "speaker_names": { "type": "boolean",
+                        "description": "Only with `srt`: start every cue with `NAME:` (AI-8). Default false. Once the recording has speakers, VTT always uses voice tags (`<v Name>`), and `txt` and `md` write `Name: text` per turn." } }),
             &["format"],
             json!({ "type": "object", "properties": {
                 "capture_id": { "type": "string" }, "format": { "type": "string" },
-                "path": { "type": "string" }, "lines": { "type": "integer" } },
+                "path": { "type": "string" }, "lines": { "type": "integer" },
+                "speaker_names": { "type": "boolean", "description": "The file names the speakers." } },
                 "required": ["capture_id", "format", "path", "lines"] }),
+        ),
+        ai_tool(
+            "diarize",
+            Tier::Free,
+            true,
+            "AI-8",
+            "Find who spoke when in a recording, on this computer (no network), so the transcript can show speaker names. Runs in the background and returns a `job_id`; the job result is `{ speakers, segments }` and `speakers.ready` is published when it is done. Speakers are numbered and named `Speaker 1..N` by first speech; `get_transcript` then adds `speaker` to each word and `speakers` to the result, and the caption exports use the names. Give `num_speakers` when you know how many people talk, or `min_speakers` / `max_speakers`. `headset: true` means the microphone only hears the user: every microphone word is labelled with the setting `profile.display_name` (default `Me`) and only the system-audio track is diarized. A recording shorter than 10 s is skipped with a note, and one detected speaker gives a note too. Without an installed speaker model it fails with `invalid_input` and `data.reason = \"no_speaker_model\"`: tell the user to open the AI page in CaptureMann (nothing is downloaded automatically). Running it again replaces the previous result and the renames made to it.",
+            json!({ "capture_id": capture_id(),
+                    "num_speakers": { "type": "integer", "minimum": 1, "maximum": 32, "description": "Exactly this many speakers; wins over min and max." },
+                    "min_speakers": { "type": "integer", "minimum": 1, "maximum": 32 },
+                    "max_speakers": { "type": "integer", "minimum": 1, "maximum": 32 },
+                    "headset": { "type": "boolean", "description": "My microphone only hears me. Default false." } }),
+            &["capture_id"],
+            job_started_output(json!({
+                "capture_id": { "type": "string" }, "headset": { "type": "boolean" } })),
+        ),
+        ai_tool(
+            "set_speakers",
+            Tier::Free,
+            true,
+            "AI-8",
+            "Rename, merge and reassign the speakers of a diarized recording (run `diarize` first). `rename` maps a speaker id to a new name (`{ \"2\": \"Linh\" }`; names are unique, 1 to 60 characters), `merge` folds `from` into `into` (the `from` speaker disappears and every word it had moves to `into`), `assign` gives the time range `start` to `end` (session time) to a speaker. They apply in that order and all together are ONE undo step, tagged with the caller; undo restores the earlier names and labels. A call that changes nothing makes no revision (`changed: false`). The words and exports show the new names at once.",
+            json!({ "rename": { "type": "object", "maxProperties": 500,
+                        "description": "Speaker id (as text) to the new name.",
+                        "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 60 } },
+                    "merge": { "type": "array", "maxItems": 500, "items": { "type": "object", "properties": {
+                        "from": { "type": "integer" }, "into": { "type": "integer" } },
+                        "required": ["from", "into"], "additionalProperties": false } },
+                    "assign": { "type": "array", "maxItems": 500, "items": { "type": "object", "properties": {
+                        "start": time("Range start"), "end": time("Range end"),
+                        "speaker": { "type": "integer" } },
+                        "required": ["start", "end", "speaker"], "additionalProperties": false } } }),
+            &["capture_id"],
+            json!({ "type": "object", "properties": {
+                "capture_id": { "type": "string" },
+                "changed": { "type": "boolean" },
+                "revision": { "type": ["integer", "null"] }, "action": { "type": "string" }, "by": { "type": "string" },
+                "speakers": { "type": "array", "items": { "type": "object", "properties": {
+                    "id": { "type": "integer" }, "name": { "type": "string" } },
+                    "required": ["id", "name"] } },
+                "can_undo": { "type": "boolean" }, "can_redo": { "type": "boolean" } },
+                "required": ["capture_id", "changed", "speakers"] }),
         ),
         ai_tool(
             "suggest_zooms",
@@ -1474,6 +1525,8 @@ fn with_capture_input(mut t: ToolSpec) -> ToolSpec {
             | "export_captions"
             | "suggest_zooms"
             | "suggest_cuts"
+            | "diarize"
+            | "set_speakers"
     );
     if on_capture {
         if let Some(p) = t.input["properties"].as_object_mut() {

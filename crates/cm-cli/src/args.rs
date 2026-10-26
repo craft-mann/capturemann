@@ -152,6 +152,10 @@ pub enum AiCmd {
         #[command(subcommand)]
         cmd: Option<TextModelCmd>,
     },
+    /// Find who spoke when (`diarize`), or fix the speakers: `speakers rename|merge|assign|list`
+    /// (`set_speakers`). Runs on this computer; without a speaker model it fails with exit 2
+    /// (`no_speaker_model`).
+    Speakers(SpeakersArgs),
 }
 
 #[derive(Debug, Subcommand)]
@@ -159,6 +163,73 @@ pub enum TextModelCmd {
     /// Send one short prompt to the configured text model and report the reply time (exit 2 with
     /// `no_text_model` when none is set up).
     Test,
+}
+
+#[derive(Debug, Args)]
+#[command(args_conflicts_with_subcommands = true, subcommand_negates_reqs = true)]
+pub struct SpeakersArgs {
+    #[command(subcommand)]
+    pub cmd: Option<SpeakersCmd>,
+    /// Capture id of a recording with a microphone or system-audio track.
+    #[arg(required = true)]
+    pub id: Option<String>,
+    /// Exactly this many speakers (wins over `--min` and `--max`).
+    #[arg(long, value_name = "N", value_parser = clap::value_parser!(u32).range(1..=32))]
+    pub num: Option<u32>,
+    /// At least this many speakers.
+    #[arg(long, value_name = "N", value_parser = clap::value_parser!(u32).range(1..=32))]
+    pub min: Option<u32>,
+    /// At most this many speakers.
+    #[arg(long, value_name = "N", value_parser = clap::value_parser!(u32).range(1..=32))]
+    pub max: Option<u32>,
+    /// My microphone only hears me: label the microphone with `profile.display_name` (default
+    /// `Me`) and tell speakers apart on the system-audio track only.
+    #[arg(long)]
+    pub headset: bool,
+    /// Wait for the job to finish (exit 6 if it fails).
+    #[arg(long)]
+    pub wait: bool,
+    /// With `--wait`: give up after this many seconds (the job keeps running).
+    #[arg(long, value_name = "SECS", requires = "wait", value_parser = positive_secs)]
+    pub timeout: Option<f64>,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum SpeakersCmd {
+    /// Name a speaker: `speakers rename <id> 2 Linh`. One undo step.
+    Rename {
+        /// Capture id of a recording.
+        id: String,
+        /// Speaker number (see `speakers list`).
+        speaker: u32,
+        /// The new name.
+        name: String,
+    },
+    /// Fold one speaker into another: `speakers merge <id> 3 1`. One undo step.
+    Merge {
+        /// Capture id of a recording.
+        id: String,
+        /// The speaker that goes away.
+        from: u32,
+        /// The speaker that keeps all the words.
+        into: u32,
+    },
+    /// Give a time range to a speaker: `speakers assign <id> 2 10.5 18`. One undo step.
+    Assign {
+        /// Capture id of a recording.
+        id: String,
+        /// Speaker number.
+        speaker: u32,
+        /// Start, in seconds or `t:<ticks>`.
+        start: String,
+        /// End, in seconds or `t:<ticks>`.
+        end: String,
+    },
+    /// List the speakers of a recording.
+    List {
+        /// Capture id of a recording.
+        id: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -428,13 +499,13 @@ pub struct ExportArgs {
     /// With `--audio`: `off` turns the normalisation off (the default for M4A is -16).
     #[arg(long, value_name = "LUFS|off", allow_negative_numbers = true, value_parser = loudness_arg)]
     pub loudness: Option<Loudness>,
-    /// Write the captions as a file instead of a video: `srt`, `vtt` or `txt` (plain text, one
-    /// caption line per row) in the capture's `exports/` folder (`export_captions`), with the
+    /// Write the captions as a file instead of a video: `srt`, `vtt`, `txt` (plain text, one
+    /// caption line per row) or `md` (Markdown) in the capture's `exports/` folder (`export_captions`), with the
     /// recording's cuts and speed applied. Run `capturemann ai transcribe` first.
     #[arg(
         long,
         value_name = "FORMAT",
-        value_parser = ["srt", "vtt", "txt"],
+        value_parser = ["srt", "vtt", "txt", "md"],
         conflicts_with_all = ["preset", "format", "width", "fps", "max_mb", "loudness", "wait", "timeout"]
     )]
     pub captions: Option<String>,
@@ -442,6 +513,10 @@ pub struct ExportArgs {
     /// recordings).
     #[arg(long, requires = "captions")]
     pub timestamps: bool,
+    /// With `--captions srt`: start every cue with `NAME:` once the recording has speakers
+    /// (VTT, TXT and Markdown name them on their own).
+    #[arg(long = "speaker-names", requires = "captions")]
+    pub speaker_names: bool,
     /// Burn the captions into the video (white text on a dark box, inside the platform's safe
     /// area). The default is the recording's `ai captions options --burn` setting. Needs a
     /// transcript: run `capturemann ai transcribe` first.

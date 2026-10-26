@@ -134,6 +134,8 @@ pub const AGENT_WRITABLE_FAMILIES: &[&str] = &[
     "cursor",
     "capture",
     "appearance",
+    // `profile.display_name`: the name the user's own words get in headset mode (AI-8.AC7).
+    "profile",
 ];
 
 /// Longest settings key.

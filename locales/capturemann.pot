@@ -1510,6 +1510,9 @@ msgstr ""
 msgid "Find in the captions"
 msgstr ""
 
+msgid "Find who speaks when"
+msgstr ""
+
 msgid "Fit shows the whole screen on the background. Choose Fixed to crop a window, or Follow to keep the window on the cursor."
 msgstr ""
 
@@ -2956,6 +2959,9 @@ msgid "Remove “{name}”? It leaves this list. Files already copied there stay
 msgstr ""
 
 msgid "Rename a capture"
+msgstr ""
+
+msgid "Rename or fix speakers"
 msgstr ""
 
 msgid "Renders one video with the screen, the camera bubble and your audio into the recording’s exports folder. The original tracks are never changed. Needs FFmpeg (brew install ffmpeg)."

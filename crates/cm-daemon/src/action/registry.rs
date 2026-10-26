@@ -118,6 +118,10 @@ pub const ACTIONS: &[ActionSpec] = &[
     spec("export_captions", Tier::Free, true),
     spec("suggest_zooms", Tier::Free, false),
     spec("suggest_cuts", Tier::Free, false),
+    // AI-8 speaker labels: `diarize` is a background job on this computer (no network);
+    // `set_speakers` renames, merges or reassigns as one undoable revision.
+    spec("diarize", Tier::Free, true),
+    spec("set_speakers", Tier::Free, true),
     // The caption switches (show in the preview, burn into exports): one revision, one undo step.
     spec("set_caption_options", Tier::Free, true),
     // Storage (M6, STO-1 to STO-5): copies go only to destinations the user set up in the app;

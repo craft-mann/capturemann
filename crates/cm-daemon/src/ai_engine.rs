@@ -24,8 +24,8 @@ use cm_library::rec_edit::load_edits;
 use serde_json::Value;
 
 use crate::ai::{
-    AiServices, CaptionFormat, CaptionService, ModelService, SuggestService, TranscribeRequest,
-    TranscribeService,
+    AiServices, CaptionFormat, CaptionService, DiarizeRequest, ModelService, SpeakerService,
+    SuggestService, TranscribeRequest, TranscribeService,
 };
 
 /// The services backed by `cm-ai`. Plug into [`crate::DaemonBuilder::ai`].
@@ -46,6 +46,46 @@ fn services(root: Option<PathBuf>, engine: Option<Arc<dyn Transcriber>>) -> AiSe
         transcribe: Arc::new(RealTranscribe { root, engine }),
         captions: Arc::new(RealCaptions),
         suggest: Arc::new(RealSuggest),
+        // Until spike S7 picks a speaker model, speakers answer `no_speaker_model` (AI-8). The
+        // real ONNX diarizer replaces `NoSpeakerModel` here and nowhere else.
+        speakers: Arc::new(RealSpeakers {
+            diarizer: Arc::new(cm_ai::speakers::NoSpeakerModel),
+        }),
+    }
+}
+
+/// Speaker labels with a [`Diarizer`] (the seam where the real model plugs in).
+struct RealSpeakers {
+    diarizer: Arc<dyn cm_ai::speakers::Diarizer>,
+}
+
+impl SpeakerService for RealSpeakers {
+    fn ready(&self) -> Result<(), CmError> {
+        self.diarizer.ready()
+    }
+
+    fn diarize(
+        &self,
+        req: &DiarizeRequest,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Option<cm_ai::speakers::Diarized>, CmError> {
+        self.diarizer.ready()?;
+        let opts = cm_ai::speakers::DiarizeOptions {
+            hints: req.hints,
+            headset: req.headset,
+            display_name: &req.display_name,
+            created: &req.created,
+        };
+        match cm_ai::speakers::diarize_recording(
+            &req.bundle_dir,
+            self.diarizer.as_ref(),
+            &opts,
+            progress,
+        ) {
+            Ok(d) => Ok(Some(d)),
+            Err(e) if is_cancelled(&e) => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -153,6 +193,15 @@ impl CaptionService for RealCaptions {
             CaptionFormat::Vtt => to_vtt(&mapped),
             CaptionFormat::Txt => to_txt(&mapped, false),
             CaptionFormat::TxtTimed => to_txt(&mapped, true),
+            CaptionFormat::Md => cm_ai::speakers::to_markdown_speakers(
+                &mapped
+                    .into_iter()
+                    .map(|line| cm_ai::speakers::SpokenLine {
+                        line,
+                        speaker: None,
+                    })
+                    .collect::<Vec<_>>(),
+            ),
         })
     }
 }

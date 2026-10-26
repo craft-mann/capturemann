@@ -13,8 +13,8 @@ use cm_ai::transcribe::{Transcript, Word};
 use cm_core::{CmError, EditList, MediaTime};
 
 use crate::ai::{
-    AiServices, CaptionFormat, CaptionService, ModelService, SuggestService, TranscribeRequest,
-    TranscribeService,
+    AiServices, CaptionFormat, CaptionService, DiarizeRequest, ModelService, SpeakerService,
+    SuggestService, TranscribeRequest, TranscribeService,
 };
 
 struct Model {
@@ -36,6 +36,12 @@ struct State {
     fail_transcribe: Option<CmError>,
     /// Words every transcription returns instead of the built-in ones.
     words: Option<Vec<Word>>,
+    /// The scripted speakers `(start s, end s, label, level)`; `None` = no speaker model installed.
+    speaker_script: Option<Vec<(f64, f64, u32, f32)>>,
+    /// Where the fake microphone is loud, `(start s, end s)`, for headset mode.
+    mic_activity: Option<(f64, f64)>,
+    diarize_calls: Vec<DiarizeRequest>,
+    fail_diarize: Option<CmError>,
 }
 
 /// The shared fake. Cheap to clone.
@@ -75,6 +81,10 @@ impl FakeAi {
             render_calls: vec![],
             fail_transcribe: None,
             words: None,
+            speaker_script: None,
+            mic_activity: None,
+            diarize_calls: vec![],
+            fail_diarize: None,
         })))
     }
 
@@ -123,6 +133,27 @@ impl FakeAi {
         self.state().words = Some(words);
     }
 
+    /// Installs a scripted speaker model: every diarization finds these speakers (AI-8).
+    pub fn with_speaker_script(self, script: &[(f64, f64, u32, f32)]) -> FakeAi {
+        self.state().speaker_script = Some(script.to_vec());
+        self
+    }
+
+    /// The fake microphone is loud between these times (headset mode labels it as the user).
+    pub fn set_mic_activity(&self, start_s: f64, end_s: f64) {
+        self.state().mic_activity = Some((start_s, end_s));
+    }
+
+    /// The next diarization fails with this error.
+    pub fn fail_diarize_with(&self, e: CmError) {
+        self.state().fail_diarize = Some(e);
+    }
+
+    /// Every diarization asked for so far.
+    pub fn diarize_calls(&self) -> Vec<DiarizeRequest> {
+        self.state().diarize_calls.clone()
+    }
+
     pub fn downloads_started(&self) -> Vec<String> {
         self.state().downloads_started.clone()
     }
@@ -156,6 +187,7 @@ impl FakeAi {
             transcribe: Arc::new(self.clone()),
             captions: Arc::new(self.clone()),
             suggest: Arc::new(self.clone()),
+            speakers: Arc::new(self.clone()),
         }
     }
 
@@ -377,6 +409,75 @@ impl CaptionService for FakeAi {
             ));
         }
         Ok(out)
+    }
+}
+
+impl SpeakerService for FakeAi {
+    fn ready(&self) -> Result<(), CmError> {
+        match self.state().speaker_script {
+            Some(_) => Ok(()),
+            None => Err(cm_ai::speakers::no_speaker_model()),
+        }
+    }
+
+    fn diarize(
+        &self,
+        req: &DiarizeRequest,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Option<cm_ai::speakers::Diarized>, CmError> {
+        use cm_ai::speakers::{
+            diarize_audio, DiarizeInput, DiarizeOptions, ScriptedDiarizer, ME_ID,
+        };
+        let (script, mic, fail) = {
+            let mut s = self.state();
+            s.diarize_calls.push(req.clone());
+            (
+                s.speaker_script.clone(),
+                s.mic_activity,
+                s.fail_diarize.take(),
+            )
+        };
+        if let Some(e) = fail {
+            return Err(e);
+        }
+        let script = script.ok_or_else(cm_ai::speakers::no_speaker_model)?;
+        let secs = cm_library::read_manifest(&req.bundle_dir)
+            .ok()
+            .and_then(|m| m.duration)
+            .map_or(60.0, |d| d.as_secs_f64());
+        let rate = 16_000.0;
+        let silence = vec![0.0f32; (secs * rate) as usize];
+        let mut mic_buf = silence.clone();
+        if let Some((a, b)) = mic {
+            for (i, v) in mic_buf
+                .iter_mut()
+                .enumerate()
+                .take((b * rate) as usize)
+                .skip((a * rate) as usize)
+            {
+                *v = if i % 2 == 0 { 0.3 } else { -0.3 };
+            }
+        }
+        let _ = ME_ID;
+        let diarizer = ScriptedDiarizer::from_secs(&script);
+        let input = DiarizeInput {
+            mix: &silence,
+            mic: Some(&mic_buf),
+            system: Some(&silence),
+            start: MediaTime::ZERO,
+            gaps: &[],
+        };
+        let opts = DiarizeOptions {
+            hints: req.hints,
+            headset: req.headset,
+            display_name: &req.display_name,
+            created: &req.created,
+        };
+        match diarize_audio(&diarizer, &input, &opts, progress) {
+            Ok(d) => Ok(Some(d)),
+            Err(e) if cm_ai::transcribe::is_cancelled(&e) => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 }
 

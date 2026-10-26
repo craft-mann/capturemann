@@ -47,6 +47,8 @@ pub const TOPICS: &[&str] = &[
     // progress of `model.download.progress` is left out (`job.progress` carries it).
     "model.changed",
     "transcript.ready",
+    // AI-8: the speakers of a recording were found.
+    "speakers.ready",
 ];
 
 /// The minimum level a client asked for (`logging/setLevel`), shared with the forwarder.

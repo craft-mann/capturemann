@@ -25,6 +25,15 @@ impl Daemon {
                 captions: inner.ai.captions.clone(),
                 settings: inner.settings.clone(),
             }),
+        )?;
+        self.register_job_handler(
+            JOB_DIARIZE,
+            Arc::new(speakers::DiarizeHandler {
+                library: inner.library.clone(),
+                events: inner.events.clone(),
+                service: inner.ai.speakers.clone(),
+                settings: inner.settings.clone(),
+            }),
         )
     }
 
@@ -221,8 +230,21 @@ impl Inner {
                 self.replace_in_captions(actor, capture_id, replacements)
                     .await
             }
-            AiOp::ExportCaptions { capture_id, format } => {
-                self.export_captions(&capture_id, format).await
+            AiOp::ExportCaptions {
+                capture_id,
+                format,
+                speaker_names,
+            } => {
+                self.export_captions(&capture_id, format, speaker_names)
+                    .await
+            }
+            AiOp::Diarize {
+                capture_id,
+                hints,
+                headset,
+            } => self.diarize(actor, capture_id, hints, headset).await,
+            AiOp::SetSpeakers { capture_id, edit } => {
+                self.set_speakers(actor, capture_id, edit).await
             }
             AiOp::SuggestZooms { capture_id } => self.suggest(&capture_id, true).await,
             AiOp::SuggestCuts { capture_id } => self.suggest(&capture_id, false).await,
