@@ -339,6 +339,7 @@ pub enum Action {
     CancelJob(CancelJobParams),
     RetryJob(RetryJobParams),
     ExportVideo(ExportVideoParams),
+    ExportAudio(crate::export_audio::ExportAudioParams),
     Annotate(AnnotateParams),
     GetCapture(GetCaptureParams),
     SuggestRedactions(SuggestRedactionsParams),

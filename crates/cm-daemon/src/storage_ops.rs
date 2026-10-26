@@ -276,14 +276,20 @@ impl Inner {
 /// The newest export file of a recording that still exists: `(absolute path, relative name)`.
 pub(crate) fn latest_export(dir: &Path) -> Result<Option<PathBuf>, CmError> {
     let manifest = cm_library::read_manifest(dir)?;
-    Ok(cm_library::exports_of(&manifest)
-        .iter()
-        .rev()
-        .filter_map(|e| e.get("file").and_then(Value::as_str))
-        // An entry must stay inside the bundle.
-        .filter(|rel| !rel.starts_with('/') && !rel.split('/').any(|s| s == ".."))
-        .map(|rel| dir.join(rel))
-        .find(|p| p.is_file()))
+    let exports = cm_library::exports_of(&manifest);
+    // The newest still-existing file; an audio export (VOC-2) only when there is no other.
+    let newest = |audio: bool| {
+        exports
+            .iter()
+            .rev()
+            .filter(|e| (e.get("kind").and_then(Value::as_str) == Some("audio")) == audio)
+            .filter_map(|e| e.get("file").and_then(Value::as_str))
+            // An entry must stay inside the bundle.
+            .filter(|rel| !rel.starts_with('/') && !rel.split('/').any(|s| s == ".."))
+            .map(|rel| dir.join(rel))
+            .find(|p| p.is_file())
+    };
+    Ok(newest(false).or_else(|| newest(true)))
 }
 
 /// The relative names of [`walk`], for the remote delete.

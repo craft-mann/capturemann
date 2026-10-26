@@ -38,6 +38,7 @@
 
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
+pub mod audio_export;
 pub mod bubble;
 pub mod captions;
 pub mod decode;

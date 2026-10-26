@@ -333,6 +333,7 @@ pub(crate) fn tool_title(name: &str) -> String {
         "cancel_job" => tr!("Cancel a job"),
         "retry_job" => tr!("Retry a job"),
         "export_video" => tr!("Export a recording to MP4"),
+        "export_audio" => tr!("Export the audio of a capture"),
         "start_recording" => tr!("Start recording"),
         "pause_recording" => tr!("Pause a recording"),
         "resume_recording" => tr!("Resume a recording"),

@@ -1423,6 +1423,9 @@ msgstr ""
 msgid "Export failed"
 msgstr ""
 
+msgid "Export the audio of a capture"
+msgstr ""
+
 msgid "Export the recording first; the export is what gets uploaded."
 msgstr ""
 

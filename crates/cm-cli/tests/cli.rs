@@ -1127,6 +1127,25 @@ async fn exp1_export_command() {
         2,
         "an unknown format is a usage error"
     );
+
+    // VOC-2: `--audio` calls `export_audio`. This recording has no audio file, so the daemon
+    // refuses it by name; the flags that belong to a video (or only to --audio) are usage errors.
+    let o = cli(&r, &["export", &id, "--audio"]).await;
+    assert_eq!(o.code, 2, "{}", o.err);
+    assert!(o.err.contains("no audio track"), "{}", o.err);
+    let o = cli(&r, &["export", &id, "--format", "wav", "--tracks", "mic"]).await;
+    assert_eq!(o.code, 2, "{}", o.err);
+    assert!(o.err.contains("no microphone track"), "{}", o.err);
+    for args in [
+        vec!["export", &id, "--audio", "--preset", "quick"],
+        vec!["export", &id, "--audio", "--format", "gif"],
+        vec!["export", &id, "--tracks", "mic"],
+        vec!["export", &id, "--audio", "--tracks", "both"],
+        vec!["export", &id, "--loudness", "off"],
+        vec!["export", &id, "--audio", "--loudness", "-3"],
+    ] {
+        assert_eq!(cli(&r, &args).await.code, 2, "{args:?}");
+    }
 }
 
 /// R2-14: `export --wait --timeout` gives up on a held export (a recording holds exports),

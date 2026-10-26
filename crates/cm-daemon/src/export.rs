@@ -330,9 +330,9 @@ pub type ToolsFn = Arc<dyn Fn() -> Result<Tools, CmError> + Send + Sync>;
 
 /// Runs `export` jobs with `cm-media`.
 pub struct ExportHandler {
-    library: Arc<Mutex<Library>>,
-    events: EventBus,
-    tools: ToolsFn,
+    pub(crate) library: Arc<Mutex<Library>>,
+    pub(crate) events: EventBus,
+    pub(crate) tools: ToolsFn,
 }
 
 impl ExportHandler {
@@ -387,6 +387,10 @@ fn report(reporter: &ProgressReporter, p: f64, last: &mut f64) {
 impl JobHandler for ExportHandler {
     async fn run(&self, ctx: JobContext) -> Result<Value, CmError> {
         let inputs = ctx.job.inputs.clone();
+        // VOC-2: an audio export is an `export` job with `kind: "audio"`.
+        if inputs.get("kind").and_then(Value::as_str) == Some(crate::export_audio::AUDIO_KIND) {
+            return crate::export_audio::run_job(self, ctx).await;
+        }
         let capture_id = inputs
             .get("capture_id")
             .and_then(Value::as_str)

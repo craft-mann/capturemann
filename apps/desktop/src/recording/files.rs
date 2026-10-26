@@ -480,6 +480,10 @@ pub fn export_file(bundle: &Path) -> Option<PathBuf> {
     let files: Vec<(String, PathBuf)> = cm_library::exports_of(&m)
         .iter()
         .filter_map(|e| {
+            // An audio export (VOC-2) is not the video to play.
+            if e.get("kind").and_then(serde_json::Value::as_str) == Some("audio") {
+                return None;
+            }
             let file = e.get("file")?.as_str()?;
             let preset = e.get("preset").and_then(serde_json::Value::as_str)?;
             Some((preset.to_owned(), bundle.join(file)))

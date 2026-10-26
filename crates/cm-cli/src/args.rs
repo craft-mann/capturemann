@@ -382,8 +382,24 @@ pub struct ExportArgs {
     #[arg(long, default_value = "quick", value_name = "PRESET")]
     pub preset: String,
     /// `gif` or `webm`: the same as `--preset gif` / `--preset webm`.
-    #[arg(long, value_name = "FORMAT", value_parser = ["mp4", "gif", "webm"])]
+    /// With `--audio`, `m4a` (the default) or `wav`; `m4a` and `wav` alone imply `--audio`.
+    #[arg(long, value_name = "FORMAT", value_parser = ["mp4", "gif", "webm", "m4a", "wav"])]
     pub format: Option<String>,
+    /// Export the audio only (`export_audio`): M4A (AAC, 48 kHz) or, with `--format wav`, 48 kHz
+    /// 24-bit WAV, with the recording's cuts and speed applied, in the capture's `exports/`
+    /// folder. For an audio recording or a screen recording; no video is encoded. M4A is
+    /// normalised to -16 LUFS unless `--loudness` says otherwise.
+    #[arg(
+        long,
+        conflicts_with_all = ["preset", "width", "fps", "max_mb", "captions", "burn_captions", "no_captions"]
+    )]
+    pub audio: bool,
+    /// For the audio export (`--audio`, or `--format m4a|wav`): which tracks, `mix` (the default), `mic` or `system`.
+    #[arg(long, value_name = "TRACKS", value_parser = ["mix", "mic", "system"])]
+    pub tracks: Option<String>,
+    /// For the audio export: also copy the file into this existing folder (never overwrites).
+    #[arg(long, value_name = "DIR")]
+    pub out_dir: Option<std::path::PathBuf>,
     /// GIF and WebM width in px (GIF: 480, 640, 800 or 1024).
     #[arg(long, value_name = "PX")]
     pub width: Option<u32>,
@@ -396,8 +412,9 @@ pub struct ExportArgs {
     pub max_mb: Option<f64>,
     /// Normalise the integrated loudness to this level in LUFS (-40 to -5; -14 is the usual
     /// platform target), with a -1 dBTP true-peak limiter. Default: keep the recorded level.
-    #[arg(long, value_name = "LUFS", allow_negative_numbers = true, value_parser = loudness_lufs)]
-    pub loudness: Option<f64>,
+    /// With `--audio`: `off` turns the normalisation off (the default for M4A is -16).
+    #[arg(long, value_name = "LUFS|off", allow_negative_numbers = true, value_parser = loudness_arg)]
+    pub loudness: Option<Loudness>,
     /// Write the captions as a file instead of a video: `srt`, `vtt` or `txt` (plain text, one
     /// caption line per row) in the capture's `exports/` folder (`export_captions`), with the
     /// recording's cuts and speed applied. Run `capturemann ai transcribe` first.
@@ -430,6 +447,20 @@ pub struct ExportArgs {
     /// Without it the command waits for as long as the job is queued, held or running.
     #[arg(long, value_name = "SECS", requires = "wait", value_parser = positive_secs)]
     pub timeout: Option<f64>,
+}
+
+/// A `--loudness` value: a target in LUFS, or `off` (audio export only).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Loudness {
+    Off,
+    Lufs(f64),
+}
+
+fn loudness_arg(s: &str) -> Result<Loudness, String> {
+    if s == "off" {
+        return Ok(Loudness::Off);
+    }
+    loudness_lufs(s).map(Loudness::Lufs)
 }
 
 fn loudness_lufs(s: &str) -> Result<f64, String> {
