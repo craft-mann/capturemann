@@ -29,7 +29,8 @@ Known and documented limits (not vulnerabilities by themselves):
 - Per-client agent policies are keyed by a name the client declares. They stop mistakes, not a
   hostile local process. See `specs/02-agent-interface.md`.
 - Anything that can run code as you can talk to the daemon's local socket.
-- Local builds are signed with a local identity or ad hoc, and are not notarized yet.
+- Release DMGs are signed with a Developer ID certificate and notarized. Builds you make from
+  source are signed with a local identity or ad hoc and are not notarized.
 
 Out of scope: vulnerabilities in third-party services (Google, YouTube) or in dependencies without a
 way to exploit them through CaptureMann (report those upstream; `cargo deny` runs in CI).

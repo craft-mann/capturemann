@@ -54,8 +54,9 @@ Requires a Mac with Apple Silicon and macOS 13 or later. Intel Macs are not supp
    `shasum -a 256 -c CaptureMann-<version>-macos-arm64.dmg.sha256` must print `OK`.
 3. Open the DMG and drag CaptureMann to Applications.
 
-The release notes say whether a build is notarized. A build that is **ad hoc signed and not
-notarized** is blocked by Gatekeeper at first launch: right-click the app and choose Open, or run
+The release DMG is signed with a Developer ID certificate and notarized by Apple, so it opens
+normally. A build you make yourself from source is signed locally or ad hoc and is **not
+notarized**: Gatekeeper blocks it at first launch, so right-click the app and choose Open, or run
 `xattr -dr com.apple.quarantine /Applications/CaptureMann.app`. Updates are manual: download the new
 DMG. To build it yourself instead, see [building from source](docs/development/building.md). More on verifying a
 download: [docs/development/releasing.md](docs/development/releasing.md#how-users-verify-a-download).

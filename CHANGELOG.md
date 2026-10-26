@@ -38,18 +38,19 @@ First public release. macOS 13+ on Apple Silicon only; Intel Macs follow after 0
 - Per-tool agent permissions (Settings, Agents & CLI): mutating tools can be set to Allow or Ask first, and starting a recording can be allowed without asking; publish and delete always ask.
 - English and Vietnamese interface (Settings, General, Language).
 - No telemetry; no network traffic unless you connect a destination or download a model.
-- Release builds are a DMG with a SHA-256 file on GitHub Releases.
+- Release builds are a signed and notarized DMG with a SHA-256 file on GitHub Releases.
 
 ### Known limitations
 
 - macOS 13 or later on Apple Silicon (arm64) only. Intel Macs and Windows are not supported yet;
   Windows is planned after this release.
 - Minimized windows are not listed in the window picker.
-- Until the Apple Developer ID certificate is in place, builds are signed ad hoc and are not
-  notarized: on first launch right-click the app and choose Open, or run
-  `xattr -dr com.apple.quarantine /Applications/CaptureMann.app`. Each ad hoc build has a different
-  signature, so macOS asks for the Screen Recording permission again after you install a new one.
-  The release notes of each version say which kind of build it is.
+- The release DMG is signed with a Developer ID certificate and notarized by Apple, so it opens
+  without a Gatekeeper warning. A build you make yourself from source is signed with a local
+  identity or ad hoc and is not notarized: on first launch right-click the app and choose Open, or
+  run `xattr -dr com.apple.quarantine /Applications/CaptureMann.app`. Each ad hoc build has a
+  different signature, so macOS asks for the Screen Recording permission again after you install
+  a new one.
 - Updates are manual: download the new DMG from GitHub Releases. There is no update check.
 - Only Google Drive and YouTube are offered. OneDrive and Dropbox are built but shown as "Coming
   soon"; TikTok and Facebook Pages are not included. Contributions are welcome.
