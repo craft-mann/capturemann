@@ -87,6 +87,7 @@ pub fn asset(path: &str) -> Option<std::borrow::Cow<'static, [u8]>> {
 fn glyph_path(g: Glyph) -> Option<&'static str> {
     Some(match g {
         Glyph::Record => return None,
+        Glyph::Mic => "icons/mic.svg",
         Glyph::Frame => "icons/launcher-frame.svg",
         Glyph::Window => "icons/launcher-window.svg",
         Glyph::Monitor => "icons/launcher-monitor.svg",
@@ -510,6 +511,16 @@ fn execute(id: CommandId, option: LaunchOption, cx: &mut App) {
                         )
                     }
                 });
+            })
+            .detach();
+        }
+        // Opens the start sheet in Audio mode (VOC-1); pressing Start is the confirmation.
+        CommandId::RecordAudio => {
+            cx.spawn(async move |cx| {
+                cx.background_executor()
+                    .timer(Duration::from_millis(CAPTURE_DELAY_MS))
+                    .await;
+                cx.update(|cx| crate::ui::recording::open_audio_sheet(&app, cx));
             })
             .detach();
         }

@@ -6,6 +6,10 @@
 //! Camera, Draw (disabled, "Coming soon"), a divider, Restart, Discard, then the agent chip when an
 //! agent started the take. Hints, the "Dropping frames" and warning chips and the self-test bar
 //! stay in the strip above the bar.
+//!
+//! An audio recording (VOC-1, board V2) has a compact bar: Stop, the timer, the 14-bar mic meter,
+//! a divider, Pause or Resume, Mute mic, Marker, Discard, then the agent chip. No camera, Draw or
+//! Restart (there is no picture to redo or draw on).
 
 use cm_i18n::{tr, tr_ctx};
 
@@ -21,6 +25,10 @@ pub enum HudControl {
     Restart,
     Discard,
     AgentChip,
+    /// The 14-bar mic level next to the timer (audio HUD).
+    Meter,
+    /// "Marker" with its key hint (audio HUD).
+    Marker,
 }
 
 /// One slot of the bar, left to right.
@@ -49,6 +57,62 @@ pub fn hud_items(agent: bool) -> Vec<HudItem> {
         v.push(HudItem::Control(AgentChip));
     }
     v
+}
+
+/// The bar's slots of an audio recording, left to right (board V2).
+pub fn hud_items_audio(agent: bool) -> Vec<HudItem> {
+    use HudControl::*;
+    let mut v = vec![
+        HudItem::Control(Stop),
+        HudItem::Control(Timer),
+        HudItem::Control(Meter),
+        HudItem::Divider,
+        HudItem::Control(Pause),
+        HudItem::Control(Mic),
+        HudItem::Control(Marker),
+        HudItem::Control(Discard),
+    ];
+    if agent {
+        v.push(HudItem::Control(AgentChip));
+    }
+    v
+}
+
+/// The slots of the bar for a screen (`audio` false) or an audio recording.
+pub fn hud_items_for(audio: bool, agent: bool) -> Vec<HudItem> {
+    if audio {
+        hud_items_audio(agent)
+    } else {
+        hud_items(agent)
+    }
+}
+
+/// The bars of the audio HUD's mic meter and their size (board V2: 14 bars of 4 px, 2 px apart,
+/// 22 px tall, 6 px padding each side).
+pub const METER_BARS: usize = 14;
+pub const METER_BAR_W: f64 = 4.0;
+pub const METER_GAP: f64 = 2.0;
+pub const METER_H: f64 = 22.0;
+pub const METER_PAD: f64 = 6.0;
+/// The meter's slot: the bars, the gaps between them and the padding.
+pub const METER_W: f64 =
+    METER_BARS as f64 * METER_BAR_W + (METER_BARS - 1) as f64 * METER_GAP + 2.0 * METER_PAD;
+/// The Marker button: 12 px padding, an 18 px icon, 6 px gap, "Marker" at 13 px and the key hint.
+pub const MARKER_W: f64 = 124.0;
+
+/// Bar heights (px) of the meter for the level `bars` lit of [`METER_BARS`]: the board's
+/// skyline, so a lit meter looks like speech.
+pub const METER_SHAPE: [u8; METER_BARS] = [6, 9, 14, 18, 12, 16, 20, 15, 11, 17, 13, 8, 10, 6];
+
+/// How many of the 14 bars are lit for a peak in dBFS: bar `n` (from 1) lights from
+/// `-52 + 3.5 (n - 1)` dBFS, so silence lights none and a loud voice around -6 dBFS lights all.
+pub fn meter_lit(dbfs: Option<f64>) -> usize {
+    let Some(db) = dbfs.filter(|d| d.is_finite()) else {
+        return 0;
+    };
+    (1..=METER_BARS)
+        .filter(|n| db >= -52.0 + 3.5 * (*n as f64 - 1.0))
+        .count()
 }
 
 /// The Stop button's icon.
@@ -119,6 +183,12 @@ impl MicButton {
         }
     }
 }
+/// The Marker button's icon and the hint of its key.
+pub const MARKER_ICON: &str = "bookmark";
+pub const MARKER_KEY: &str = "M";
+pub fn marker_label() -> String {
+    tr_ctx!("recording hud", "Marker")
+}
 /// Camera on, or the slashed icon when the take has no camera.
 pub fn camera_icon(on: bool) -> &'static str {
     if on {
@@ -169,6 +239,8 @@ fn slot_width(item: HudItem, agent: Option<&str>) -> f64 {
         HudItem::Control(c) => match c {
             HudControl::Stop => STOP_W,
             HudControl::Timer => TIMER_W,
+            HudControl::Meter => METER_W,
+            HudControl::Marker => MARKER_W,
             HudControl::AgentChip => agent.map_or(0.0, agent_chip_width),
             _ => BUTTON,
         },
@@ -183,7 +255,12 @@ pub fn agent_chip_width(client: &str) -> f64 {
 
 /// The bar's width: every slot, the gaps between them, the padding and the border.
 pub fn bar_width(agent: Option<&str>) -> f64 {
-    let items = hud_items(agent.is_some());
+    bar_width_for(false, agent)
+}
+
+/// [`bar_width`] of a screen or an audio recording.
+pub fn bar_width_for(audio: bool, agent: Option<&str>) -> f64 {
+    let items = hud_items_for(audio, agent.is_some());
     let slots: f64 = items.iter().map(|i| slot_width(*i, agent)).sum();
     slots + GAP * (items.len() - 1) as f64 + 2.0 * PAD + BORDER
 }
@@ -195,7 +272,12 @@ pub fn bar_size(agent: Option<&str>) -> (f64, f64) {
 
 /// The window: the bar under the strip.
 pub fn window_size(agent: Option<&str>) -> (f64, f64) {
-    (bar_width(agent), BAR_H + STRIP_H)
+    window_size_for(false, agent)
+}
+
+/// [`window_size`] of a screen or an audio recording.
+pub fn window_size_for(audio: bool, agent: Option<&str>) -> (f64, f64) {
+    (bar_width_for(audio, agent), BAR_H + STRIP_H)
 }
 
 #[cfg(test)]
@@ -287,6 +369,60 @@ mod tests {
         // A mute flag with no mic track is ignored; a take that is not live cannot toggle.
         assert!(!MicButton::new(false, true, true).muted);
         assert!(!MicButton::new(true, false, false).enabled);
+    }
+
+    /// VOC-1 / board V2: the audio bar has Stop, timer, meter | Pause, Mic, Marker, Discard and
+    /// nothing of a screen recording (no camera, Draw or Restart); the agent chip comes last.
+    #[test]
+    fn the_audio_bar_follows_board_v2() {
+        use HudControl::*;
+        use HudItem::*;
+        assert_eq!(
+            hud_items_audio(false),
+            [
+                Control(Stop),
+                Control(Timer),
+                Control(Meter),
+                Divider,
+                Control(Pause),
+                Control(Mic),
+                Control(Marker),
+                Control(Discard),
+            ]
+        );
+        let with = hud_items_audio(true);
+        assert_eq!(with.last(), Some(&Control(AgentChip)));
+        for banned in [Camera, Draw, Restart] {
+            assert!(!with.contains(&Control(banned)));
+        }
+        assert_eq!(hud_items_for(false, true), hud_items(true));
+        // 14 bars of 4 px with 2 px gaps and 6 px padding.
+        assert_eq!(METER_W, 94.0);
+        // The chip adds a gap and its own width.
+        assert_eq!(bar_width_for(true, None), 579.0);
+        let w = bar_width_for(true, Some("Claude Code"));
+        assert_eq!(
+            w,
+            bar_width_for(true, None) + GAP + agent_chip_width("Claude Code")
+        );
+        assert_eq!(window_size_for(true, None).1, BAR_H + STRIP_H);
+        assert_eq!(bar_width_for(false, None), bar_width(None));
+    }
+
+    /// The meter lights from silence (none) to a loud voice (all 14); a missing or NaN level is
+    /// silence.
+    #[test]
+    fn the_audio_meter_lights_by_level() {
+        assert_eq!(meter_lit(None), 0);
+        assert_eq!(meter_lit(Some(f64::NAN)), 0);
+        assert_eq!(meter_lit(Some(-90.0)), 0);
+        assert_eq!(meter_lit(Some(-52.0)), 1);
+        assert_eq!(meter_lit(Some(-30.0)), 7);
+        assert_eq!(meter_lit(Some(-6.0)), METER_BARS);
+        assert_eq!(meter_lit(Some(0.0)), METER_BARS);
+        assert!(meter_lit(Some(-40.0)) < meter_lit(Some(-20.0)));
+        assert_eq!(MARKER_ICON, "bookmark");
+        assert_eq!(marker_label(), "Marker");
     }
 
     #[test]

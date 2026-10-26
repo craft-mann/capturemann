@@ -14,6 +14,8 @@ pub const CAPTURE_DELAY_MS: u64 = 150;
 pub enum CommandId {
     RecordScreen,
     RecordRegion,
+    /// "Record audio" (VOC-1): opens the start sheet in Audio mode.
+    RecordAudio,
     ScreenshotRegion,
     ScreenshotWindow,
     ScreenshotDisplay,
@@ -48,6 +50,8 @@ impl Group {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Glyph {
     Record,
+    /// The microphone (Record audio).
+    Mic,
     Frame,
     Window,
     Monitor,
@@ -419,6 +423,36 @@ fn build_rows(env: &Env<'_>) -> Vec<Command> {
             shortcut: Vec::new(),
             disabled: recording_off(),
             verb: tr!("Start recording"),
+            options: Vec::new(),
+        },
+        Command {
+            id: CommandId::RecordAudio,
+            group: Group::Capture,
+            title: tr!("Record audio"),
+            keywords: keywords(
+                vec![
+                    tr_ctx!("launcher keyword", "record"),
+                    tr_ctx!("launcher keyword", "audio"),
+                    tr_ctx!("launcher keyword", "voice"),
+                    tr_ctx!("launcher keyword", "meeting"),
+                    tr_ctx!("launcher keyword", "interview"),
+                    tr_ctx!("launcher keyword", "microphone"),
+                ],
+                "Record audio", // i18n-ignore: the English title is searched too
+                &[
+                    "record",
+                    "audio",
+                    "voice",
+                    "meeting",
+                    "interview",
+                    "microphone",
+                ],
+            ),
+            glyph: Glyph::Mic,
+            hint: Hint::Text(tr!("No screen, microphone and calls")),
+            shortcut: key(ShortcutAction::ToggleAudioRecording),
+            disabled: recording_off(),
+            verb: tr!("Open the sheet"),
             options: Vec::new(),
         },
         Command {

@@ -13,8 +13,8 @@ use std::time::{Duration, Instant};
 
 use cm_i18n::{tr, tr_ctx};
 use gpui::{
-    div, prelude::*, px, Context, Entity, FontWeight, MouseButton, Render, Role, SharedString,
-    Subscription, Task, Window,
+    div, prelude::*, px, Context, Entity, FocusHandle, FontWeight, KeyDownEvent, MouseButton,
+    Render, Role, SharedString, Subscription, Task, Window,
 };
 
 use crate::recording::drag::DragState;
@@ -28,6 +28,7 @@ use crate::ui::components::{dot, ellipsis_text, icon, keycaps};
 use crate::ui::kit::{pill, Tone};
 use crate::ui::paint::{rgba_of, ui_features, TextExt, UI_FONT};
 use crate::ui::recording::{self as rec, RecState, HUD_BAR};
+use crate::ui::text_field::{TextField, TextFieldEvent};
 
 /// HUD fill: `rgba(17,17,19,0.96)` (the kit; no blur, DESIGN 4 native caveat).
 const FILL: Color = crate::theme::derived::HUD_FILL;
@@ -51,6 +52,7 @@ enum HudHint {
     Draw,
     Restart,
     Discard,
+    Marker,
 }
 
 impl HudHint {
@@ -69,6 +71,7 @@ impl HudHint {
             HudHint::Draw => tr!("Draw \u{2014} Coming soon"),
             HudHint::Restart => tr!("Restart \u{2014} discard this take and start over"),
             HudHint::Discard => tr!("Discard this take"),
+            HudHint::Marker => tr!("Mark this moment"),
         }
     }
 }
@@ -79,7 +82,7 @@ pub(crate) fn all_hints() -> Vec<String> {
     use HudHint::*;
     [
         CancelTest, Stop, Resume, Pause, MicMute, MicUnmute, MicOff, WebcamOff, HideBubble,
-        ShowBubble, Draw, Restart, Discard,
+        ShowBubble, Draw, Restart, Discard, Marker,
     ]
     .into_iter()
     .map(HudHint::text)
@@ -93,6 +96,12 @@ pub struct HudView {
     /// The user started a drag; the next settled move is theirs (and is remembered).
     drag: DragState,
     settle: Option<Task<()>>,
+    /// The audio HUD's "Add a label (optional)" field after a marker (VOC-1, board V2).
+    label: Entity<TextField>,
+    /// The key focus of the bar: `M` adds a marker while the HUD is focused.
+    focus: FocusHandle,
+    /// The marker whose prompt the field was last cleared for.
+    prompt_for: Option<i64>,
     _subs: Vec<Subscription>,
 }
 
@@ -103,9 +112,40 @@ impl HudView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        let label = cx.new(|cx| {
+            TextField::new(tr!("Marker label"), tr!("Add a label (optional)"), cx)
+                .without_icon()
+                .height(26.)
+        });
         let subs = vec![
-            cx.observe(&rec, |_, _, cx| cx.notify()),
+            cx.observe(&rec, |this, rec, cx| {
+                // A new marker prompt starts with an empty field.
+                let prompt = rec.read(cx).hud.marker_prompt.map(|p| p.at_ms);
+                if prompt != this.prompt_for {
+                    this.prompt_for = prompt;
+                    this.label.update(cx, |f, cx| f.clear(cx));
+                }
+                cx.notify()
+            }),
             cx.observe_window_bounds(window, |this, window, cx| this.moved(window, cx)),
+            cx.subscribe(&label, |this, field, ev: &TextFieldEvent, cx| match ev {
+                TextFieldEvent::Submitted => {
+                    let text = field.read(cx).text().to_owned();
+                    let at = this.rec.read(cx).hud.marker_prompt.map(|p| p.at_ms);
+                    let app = this.app.clone();
+                    cx.defer(move |cx| {
+                        if let Some(at) = at {
+                            rec::label_marker(&app, at, &text, cx);
+                        }
+                        rec::close_marker_prompt(&app, cx);
+                    });
+                }
+                TextFieldEvent::Escaped => {
+                    let app = this.app.clone();
+                    cx.defer(move |cx| rec::close_marker_prompt(&app, cx));
+                }
+                TextFieldEvent::Changed(_) => {}
+            }),
         ];
         HudView {
             app,
@@ -113,6 +153,9 @@ impl HudView {
             hint: None,
             drag: DragState::default(),
             settle: None,
+            label,
+            focus: cx.focus_handle(),
+            prompt_for: None,
             _subs: subs,
         }
     }
@@ -203,6 +246,42 @@ fn hud_button_with(
         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
 }
 
+/// The audio HUD's 14-bar mic meter (board V2): the skyline of `METER_SHAPE`, the first `lit`
+/// bars drawn (grey, green from the tenth), the rest dim. Silence and a pause light none.
+fn audio_meter(t: &Theme, lit: usize) -> gpui::Stateful<gpui::Div> {
+    div()
+        .id("hud-meter")
+        .role(Role::Meter)
+        .aria_label(tr!("Microphone level"))
+        .w(px(hud_layout::METER_W as f32))
+        .h(px(scale::TARGET))
+        .flex_none()
+        .flex()
+        .items_center()
+        .child(
+            div()
+                .h(px(hud_layout::METER_H as f32))
+                .px(px(hud_layout::METER_PAD as f32))
+                .flex()
+                .items_end()
+                .gap(px(hud_layout::METER_GAP as f32))
+                .children(hud_layout::METER_SHAPE.iter().enumerate().map(|(i, h)| {
+                    let color = if i >= lit {
+                        t.line
+                    } else if i >= 9 {
+                        t.success
+                    } else {
+                        t.mist
+                    };
+                    div()
+                        .w(px(hud_layout::METER_BAR_W as f32))
+                        .h(px(f32::from(*h)))
+                        .rounded(px(1.))
+                        .bg(rgba_of(color))
+                })),
+        )
+}
+
 fn divider(t: &Theme) -> gpui::Div {
     div().w(px(1.)).h(px(24.)).flex_none().bg(rgba_of(t.line))
 }
@@ -245,6 +324,7 @@ impl Render for HudView {
         let acting = matches!(state.phase, Phase::Recording | Phase::Paused);
         let timer_text = state.timer_text(now);
         let key = |a: ShortcutAction| shortcuts.get(a).keycaps(platform);
+        let audio = state.is_audio();
         let bubble_shown = state.camera_on() && !state.bubble_hidden;
         let mic_on = state.mic_on();
         let mic_btn = hud_layout::MicButton::new(mic_on, state.mic_is_muted(), live);
@@ -393,7 +473,7 @@ impl Render for HudView {
                 cx.defer(move |cx| rec::toggle_mic_mute(&app, cx));
             })
         })
-        .child(div().mt(px(-5.)).child(icon(
+        .child(div().mt(px(if audio { 0. } else { -5. })).child(icon(
             mic_btn.icon(),
             18.,
             if mic_btn.muted {
@@ -404,7 +484,9 @@ impl Render for HudView {
                 t.text
             },
         )))
-        .when(mic_on && !mic_btn.muted, |d| d.child(meter(&t, bars, true)));
+        .when(mic_on && !mic_btn.muted && !audio, |d| {
+            d.child(meter(&t, bars, true))
+        });
 
         let cam_on = state.camera_on();
         let webcam_hint = if !cam_on {
@@ -532,7 +614,55 @@ impl Render for HudView {
             Some(discard.into_any_element()),
         );
         let mut chip = chip.map(IntoElement::into_any_element);
-        let slots = hud_layout::hud_items(agent.is_some())
+        // The audio bar's two own slots (VOC-1, board V2): the 14-bar meter and Marker.
+        let mut meter_slot = audio.then(|| {
+            audio_meter(
+                &t,
+                hud_layout::meter_lit(if paused { None } else { state.mic_dbfs }),
+            )
+            .into_any_element()
+        });
+        let marker_keys = key(ShortcutAction::AddMarker);
+        let mut marker = audio.then(|| {
+            let enabled = state.phase != Phase::Resuming && live;
+            let keys = marker_keys.clone();
+            hud_button_with(
+                &t,
+                "hud-marker",
+                &hud_layout::marker_label(),
+                false,
+                enabled,
+                t.raised,
+            )
+            .w(px(hud_layout::MARKER_W as f32))
+            .gap(px(6.))
+            .px(px(12.))
+            .bg(rgba_of(t.segment_selected()))
+            .text_size(px(13.))
+            .text_color(rgba_of(t.text))
+            .when(!enabled, |d| d.opacity(0.5))
+            .on_hover(cx.listener(move |this, over: &bool, _, cx| {
+                this.set_hint(over.then(|| (HudHint::Marker, keys.clone())), cx);
+            }))
+            .when(enabled, |d| {
+                let app = app.clone();
+                d.on_click(move |_, _, cx| {
+                    let app = app.clone();
+                    cx.defer(move |cx| rec::add_marker(&app, cx));
+                })
+            })
+            .child(icon(hud_layout::MARKER_ICON, 18., t.text))
+            .child(hud_layout::marker_label())
+            .child(
+                div()
+                    .text_size(px(10.5))
+                    .text_color(rgba_of(t.faint))
+                    .mono()
+                    .child(hud_layout::MARKER_KEY),
+            )
+            .into_any_element()
+        });
+        let slots = hud_layout::hud_items_for(audio, agent.is_some())
             .into_iter()
             .filter_map(|item| match item {
                 HudItem::Divider => Some(divider(&t).into_any_element()),
@@ -546,13 +676,15 @@ impl Render for HudView {
                     HudControl::Restart => restart.take(),
                     HudControl::Discard => discard.take(),
                     HudControl::AgentChip => chip.take(),
+                    HudControl::Meter => meter_slot.take(),
+                    HudControl::Marker => marker.take(),
                 },
             });
         let bar = div()
             .id("rec-hud")
             .role(Role::Toolbar)
             .aria_label(tr!("Recording controls"))
-            .w(px(hud_layout::bar_width(agent.as_deref()) as f32))
+            .w(px(hud_layout::bar_width_for(audio, agent.as_deref()) as f32))
             .h(px(HUD_BAR.1 as f32))
             .flex_none()
             .p(px(hud_layout::PAD as f32))
@@ -574,7 +706,34 @@ impl Render for HudView {
                 .items_center()
                 .pb(px(6.))
                 .gap(px(8.));
-            if let Some((hint, keys)) = self.hint.clone() {
+            let prompt = state.marker_prompt_at(now).filter(|_| audio && live);
+            if let Some(p) = prompt {
+                // "Marker at 12:48" and an optional label (board V2). The marker exists already;
+                // Enter names it, Esc or the timeout leaves it as it is.
+                base.child(
+                    div()
+                        .id("hud-marker-prompt")
+                        .role(Role::Group)
+                        .aria_label(tr!("Marker label"))
+                        .h(px(32.))
+                        .px(px(10.))
+                        .flex()
+                        .items_center()
+                        .gap(px(8.))
+                        .rounded(px(scale::RADIUS_SM))
+                        .border_1()
+                        .border_color(rgba_of(t.line))
+                        .bg(rgba_of(FILL))
+                        .text_size(px(type_scale::CAPTION))
+                        .text_color(rgba_of(t.text))
+                        .child(icon(hud_layout::MARKER_ICON, 14., t.text))
+                        .child(crate::ui::components::shrink_text(tr!("Marker at")))
+                        .child(div().mono().tnum().child(SharedString::from(
+                            crate::recording::model::clock_text(p.at_ms),
+                        )))
+                        .child(div().w(px(200.)).h(px(26.)).child(self.label.clone())),
+                )
+            } else if let Some((hint, keys)) = self.hint.clone() {
                 let text = hint.text();
                 base.child(
                     div()
@@ -646,6 +805,21 @@ impl Render for HudView {
         };
 
         div()
+            .track_focus(&self.focus)
+            .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+                // M adds a marker while the bar has the focus and the label field does not
+                // (VOC-1). The bar only has the focus after a click: it never takes it by itself.
+                let k = &ev.keystroke;
+                let plain = !(k.modifiers.platform
+                    || k.modifiers.control
+                    || k.modifiers.alt
+                    || k.modifiers.shift);
+                let typing = this.label.read(cx).focus.is_focused(window);
+                if k.key == "m" && plain && !typing && this.rec.read(cx).hud.is_audio() {
+                    let app = this.app.clone();
+                    cx.defer(move |cx| rec::add_marker(&app, cx));
+                }
+            }))
             .size_full()
             .flex()
             .flex_col()

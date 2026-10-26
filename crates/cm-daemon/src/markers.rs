@@ -51,10 +51,12 @@ pub(crate) fn parse(f: &Fields<'_>) -> Result<Action, CmError> {
                 "is required with `capture_id` (seconds of recorded time)",
             ))
         }
-        (None, Some(_), _) => {
+        // The running form with `at` and a label gives the marker set at that time its label
+        // (the HUD's "Add a label" after a marker); without a label it makes no sense.
+        (None, Some(_), _) if f.str_opt("label")?.is_none() => {
             return Err(CmError::invalid_field(
                 "at",
-                "is only for a finished recording: give `capture_id` too (a running recording is marked at the current time)",
+                "needs `label` for a running recording (it names the marker set at that time); give `capture_id` too for a finished one",
             ))
         }
         _ => {}
@@ -74,6 +76,7 @@ pub(crate) fn parse(f: &Fields<'_>) -> Result<Action, CmError> {
 pub(crate) fn summary(p: &AddMarkerParams) -> String {
     match (&p.capture_id, p.at) {
         (Some(id), Some(at)) => format!("Add a marker at {:.1} s to {id}", at.as_secs_f64()),
+        (None, Some(at)) => format!("Label the marker at {:.1} s", at.as_secs_f64()),
         _ => "Add a marker to the running recording".to_owned(),
     }
 }

@@ -573,6 +573,41 @@ async fn voc1_ac4_markers_are_in_recorded_time_and_survive_pauses() {
 
 /// Without a recording the running-recording form is `not_found`; during the countdown
 /// `invalid_input`.
+/// The HUD's "Add a label (optional)" after a marker: `at` with `label` names the marker set at
+/// that time and adds none; no marker there is `not_found`; `at` without a label is refused.
+#[tokio::test]
+async fn voc1_a_marker_can_be_labelled_after_it_was_set() {
+    let r = rig();
+    user(&r.daemon, "start_recording", audio(json!({})))
+        .await
+        .unwrap();
+    r.host.advance_ns(12 * SEC);
+    let m = user(&r.daemon, "add_marker", json!({})).await.unwrap();
+    let at = m["marker"]["at"].as_f64().unwrap();
+    let named = user(
+        &r.daemon,
+        "add_marker",
+        json!({ "at": at, "label": "Budget" }),
+    )
+    .await
+    .unwrap();
+    assert_eq!(named["marker"]["label"], "Budget");
+    assert_eq!(named["count"], 1, "{named}");
+    let e = user(&r.daemon, "add_marker", json!({ "at": 99.0, "label": "x" }))
+        .await
+        .unwrap_err();
+    assert_eq!(code(&e), ErrorCode::NotFound);
+    let e = user(&r.daemon, "add_marker", json!({ "at": at }))
+        .await
+        .unwrap_err();
+    assert_eq!(code(&e), ErrorCode::InvalidInput);
+    let stopped = user(&r.daemon, "stop_recording", json!({})).await.unwrap();
+    let m = manifest(&r, &path_of(&stopped));
+    let markers = m["markers"].as_array().unwrap();
+    assert_eq!(markers.len(), 1);
+    assert_eq!(markers[0]["label"], "Budget");
+}
+
 #[tokio::test]
 async fn voc1_a_marker_needs_a_running_recording() {
     let r = rig();

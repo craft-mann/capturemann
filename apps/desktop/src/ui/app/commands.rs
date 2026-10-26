@@ -17,6 +17,10 @@ pub fn handle_command(app: &Entity<AppModel>, cmd: Command, cx: &mut App) {
                 Some(ShortcutAction::DiscardRecording) => recording::ask_discard(app, false, cx),
                 Some(ShortcutAction::RestartRecording) => recording::ask_discard(app, true, cx),
                 Some(ShortcutAction::AnnotateLast) => annotate_last(app, cx),
+                Some(ShortcutAction::ToggleAudioRecording) => {
+                    recording::toggle_audio_hotkey(app, cx)
+                }
+                Some(ShortcutAction::AddMarker) => recording::add_marker_hotkey(app, cx),
                 None if id == crate::ui::delay_pill::escape_hotkey_id() => {
                     crate::ui::delay_pill::cancel(app, cx)
                 }
@@ -41,6 +45,7 @@ pub fn handle_command(app: &Entity<AppModel>, cmd: Command, cx: &mut App) {
                 "settings" => navigate(app, Route::Settings, cx),
                 crate::platform::ids::PERMISSIONS => open_permissions_page(app, cx),
                 crate::platform::ids::RECORD => recording::open_sheet(app, None, None, cx),
+                crate::platform::ids::RECORD_AUDIO => recording::open_audio_sheet(app, cx),
                 crate::platform::ids::REC_STOP => {
                     if app.read(cx).rec.read(cx).hud.phase
                         == crate::recording::model::Phase::Countdown

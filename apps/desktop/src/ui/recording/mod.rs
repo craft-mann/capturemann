@@ -333,12 +333,35 @@ pub fn on_event(app: &Entity<AppModel>, ev: &Event, cx: &mut App) {
     }
     let rec = rec_of(app, cx);
     let now = Instant::now();
-    let change = rec.update(cx, |r, cx| {
+    let (change, prompt) = rec.update(cx, |r, cx| {
+        let before = r.hud.marker_prompt;
         let c = r.hud.apply_event(&ev.name, &ev.data, now);
         cx.notify();
-        c
+        (c, r.hud.marker_prompt.filter(|p| Some(*p) != before))
     });
     handle_change(app, change, cx);
+    if let Some(p) = prompt {
+        expire_marker_prompt(&rec, p.at_ms, cx);
+    }
+}
+
+/// The label prompt after a marker closes by itself after [`MARKER_PROMPT_TTL`](crate::recording::model::MARKER_PROMPT_TTL)
+/// unless it was answered.
+fn expire_marker_prompt(rec: &Entity<RecState>, at_ms: i64, cx: &mut App) {
+    let rec = rec.clone();
+    cx.spawn(async move |cx| {
+        cx.background_executor()
+            .timer(crate::recording::model::MARKER_PROMPT_TTL)
+            .await;
+        cx.update(|cx| {
+            rec.update(cx, |r, cx| {
+                if r.hud.close_marker_prompt(Some(at_ms)) {
+                    cx.notify();
+                }
+            })
+        });
+    })
+    .detach();
 }
 
 /// Opens, updates and closes the windows a model change calls for, then re-syncs the tray. The
@@ -550,6 +573,11 @@ fn start_poll(app: &Entity<AppModel>, cx: &mut App) {
 
 fn indicator_area(rec: &RecState, cx: &App) -> Option<(Rect, (DisplayId, Rect))> {
     let ind = rec.hud.indicator.as_ref()?;
+    if ind.audio {
+        // VOC-1: an audio recording has no area. The HUD sits on the display with the pointer.
+        let d = pointer_display(cx)?;
+        return Some((d.1, d));
+    }
     let displays = displays(cx);
     let area = match ind.area.bounds {
         Some(b) => geometry::area_points(b, ind.area.scale),
@@ -617,9 +645,16 @@ fn hud_positions_key(display: &Rect) -> String {
 }
 
 /// REC-5.AC4: where the HUD opens on `display`: the remembered position, else bottom center.
-pub fn hud_rect(app: &Entity<AppModel>, display: &Rect, agent: Option<&str>, cx: &App) -> Rect {
-    // The window is exactly the bar under the strip; an agent chip makes it wider.
-    let window = crate::recording::hud_layout::window_size(agent);
+pub fn hud_rect(
+    app: &Entity<AppModel>,
+    display: &Rect,
+    agent: Option<&str>,
+    audio: bool,
+    cx: &App,
+) -> Rect {
+    // The window is exactly the bar under the strip; an agent chip makes it wider, and the audio
+    // bar is its own (narrower) one.
+    let window = crate::recording::hud_layout::window_size_for(audio, agent);
     let bar = (window.0, HUD_BAR.1);
     let stored = app
         .read(cx)
@@ -683,7 +718,8 @@ fn open_recording_windows(app: &Entity<AppModel>, cx: &mut App) {
             .hud
             .started_by_agent()
             .map(|(client, _)| client.to_owned());
-        let rect = hud_rect(app, &display.1, agent.as_deref(), cx);
+        let audio = rec.read(cx).hud.is_audio();
+        let rect = hud_rect(app, &display.1, agent.as_deref(), audio, cx);
         let (app2, rec2) = (app.clone(), rec.clone());
         let opened = cx.open_window(
             panel_options(display, rect, false, true),
@@ -698,7 +734,8 @@ fn open_recording_windows(app: &Entity<AppModel>, cx: &mut App) {
     }
     let old = rec.update(cx, |r, _| r.indicator_win.take());
     close(cx, old);
-    {
+    // An audio recording has no area to outline (VOC-1): the HUD and the tray are its indicator.
+    if !rec.read(cx).hud.is_audio() {
         let (app2, rec2) = (app.clone(), rec.clone());
         let opened = cx.open_window(
             panel_options(display, display.1, false, false),
@@ -1092,6 +1129,73 @@ pub fn toggle_mic_mute(app: &Entity<AppModel>, cx: &mut App) {
     );
 }
 
+/// The HUD's Marker button, the M key and Option+Shift+M (VOC-1): marks the running recording at
+/// the HUD timer. Pauses are not in that time, so a marker never shifts. The label prompt follows
+/// from the `recording.marker` event.
+pub fn add_marker(app: &Entity<AppModel>, cx: &mut App) {
+    let phase = rec_of(app, cx).read(cx).hud.phase;
+    if !matches!(phase, Phase::Recording | Phase::Paused | Phase::Resuming) {
+        app::push_toast(
+            app,
+            ToastSpec::new(ToastKind::Info, tr!("No recording to mark")).body(tr!(
+                "Start a recording first, then add markers while it runs."
+            )),
+            cx,
+        );
+        return;
+    }
+    call(
+        app,
+        "add_marker",
+        json!({}),
+        |app, e, cx| {
+            app::push_toast(
+                app,
+                crate::flows::error_toast_live(
+                    || tr!("Couldn\u{2019}t add the marker"),
+                    e.message.clone(),
+                ),
+                cx,
+            );
+        },
+        cx,
+    );
+}
+
+/// Names the marker set at `at_ms` (the label typed in the HUD's prompt, VOC-1): the same
+/// `add_marker` action, which gives the marker at that recorded time its label.
+pub fn label_marker(app: &Entity<AppModel>, at_ms: i64, label: &str, cx: &mut App) {
+    let label = label.trim();
+    if label.is_empty() {
+        return;
+    }
+    call(
+        app,
+        "add_marker",
+        json!({ "at": at_ms as f64 / 1000.0, "label": label }),
+        |app, e, cx| {
+            app::push_toast(
+                app,
+                crate::flows::error_toast_live(
+                    || tr!("Couldn\u{2019}t label the marker"),
+                    e.message.clone(),
+                ),
+                cx,
+            );
+        },
+        cx,
+    );
+}
+
+/// Closes the HUD's label prompt (Enter after a label, Esc, a click elsewhere).
+pub fn close_marker_prompt(app: &Entity<AppModel>, cx: &mut App) {
+    rec_of(app, cx).update(cx, |r, cx| {
+        if r.hud.close_marker_prompt(None) {
+            cx.notify();
+        }
+    });
+}
+
 /// Space during the countdown (REC-1.AC5).
 pub fn skip_countdown(app: &Entity<AppModel>, cx: &mut App) {
     call(app, "skip_countdown", json!({}), |_, _, _| {}, cx);
@@ -1235,6 +1339,95 @@ pub fn toggle_hotkey(app: &Entity<AppModel>, cx: &mut App) {
     }
 }
 
+/// ⌥⇧V: starts an audio recording with the last used preset and sources, or stops the running
+/// one (VOC-1.AC3). While a screen recording runs it does nothing but say so.
+pub fn toggle_audio_hotkey(app: &Entity<AppModel>, cx: &mut App) {
+    let (phase, audio) = {
+        let r = rec_of(app, cx).read(cx);
+        (r.hud.phase, r.hud.is_audio())
+    };
+    match tray::toggle_action(phase) {
+        ToggleAction::Stop if audio => toggle_hotkey(app, cx),
+        ToggleAction::Stop => app::push_toast(
+            app,
+            ToastSpec::new(ToastKind::Info, tr!("A recording is already running")),
+            cx,
+        ),
+        ToggleAction::Start => quick_start_audio(app, cx),
+        ToggleAction::Ignore => {}
+    }
+}
+
+/// ⌥⇧M: adds a marker to the running recording (VOC-1.AC4).
+pub fn add_marker_hotkey(app: &Entity<AppModel>, cx: &mut App) {
+    add_marker(app, cx);
+}
+
+/// Starts an audio recording with the remembered preset and sources, without the sheet (the
+/// shortcut and the launcher). The consent line, which the sheet would have shown, is shown as a
+/// toast while `recording.consent_notice` is on.
+pub fn quick_start_audio(app: &Entity<AppModel>, cx: &mut App) {
+    let backend = app.read(cx).backend.clone();
+    if !backend.recording_enabled || backend.daemon.is_none() {
+        app::push_toast(
+            app,
+            ToastSpec::new(ToastKind::Error, tr!("Recording is unavailable")).body(tr!(
+                "The library couldn\u{2019}t be opened, so there is nowhere to save recordings."
+            )),
+            cx,
+        );
+        return;
+    }
+    let defaults =
+        crate::recording::audio_sheet::AudioDefaults::from_settings(&backend.settings.snapshot());
+    let consent = defaults.consent_notice;
+    start_audio(app, defaults.quick_params(), None, cx);
+    if consent {
+        app::push_toast(
+            app,
+            ToastSpec::new(ToastKind::Info, tr!("Recording audio"))
+                .body(crate::recording::audio_sheet::AudioSheetModel::consent_text()),
+            cx,
+        );
+    }
+}
+
+/// Starts an audio recording (`start_recording { mode: "audio" }`): the user's own start, so no
+/// Confirm dialog. `remember` is written first (the sheet's choices).
+pub fn start_audio(
+    app: &Entity<AppModel>,
+    params: Value,
+    remember: Option<Map<String, Value>>,
+    cx: &mut App,
+) {
+    let rec = rec_of(app, cx);
+    if rec.read(cx).hud.phase.is_active() {
+        return;
+    }
+    let sheet = rec.update(cx, |r, cx| {
+        r.hud.begin_start();
+        r.camera_device = None;
+        cx.notify();
+        r.sheet_win.take()
+    });
+    close(cx, sheet);
+    let mut remember = remember.unwrap_or_default();
+    remember.insert(
+        crate::recording::audio_sheet::KEY_SEEN.to_owned(),
+        json!(true),
+    );
+    call_after(
+        app,
+        Some(Value::Object(remember)),
+        "start_recording",
+        params,
+        |_, _, _| {},
+        start_failed,
+        cx,
+    );
+    sync_tray(app, cx);
+}
+
 /// ⌥⇧P: pause or resume; during the countdown it cancels it (REC-4.AC4).
 pub fn pause_hotkey(app: &Entity<AppModel>, cx: &mut App) {
     let phase = rec_of(app, cx).read(cx).hud.phase;
@@ -1357,6 +1550,32 @@ pub fn open_sheet_with(
     preset: start::SheetPreset,
     cx: &mut App,
 ) {
+    open_sheet_mode(app, target, camera, preset, sheet::SheetMode::Screen, cx);
+}
+
+/// Opens the start sheet in Audio mode (the tray's "Record audio", the launcher, the mic button;
+/// VOC-1).
+pub fn open_audio_sheet(app: &Entity<AppModel>, cx: &mut App) {
+    open_sheet_mode(
+        app,
+        None,
+        None,
+        start::SheetPreset::default(),
+        sheet::SheetMode::Audio,
+        cx,
+    );
+}
+
+/// [`open_sheet_with`] in a given mode. A sheet that is already open is brought to the front
+/// and switched to `mode`.
+pub fn open_sheet_mode(
+    app: &Entity<AppModel>,
+    target: Option<Target>,
+    camera: Option<bool>,
+    preset: start::SheetPreset,
+    mode: sheet::SheetMode,
+    cx: &mut App,
+) {
     // PRM-1: read the permission states when the sheet opens (never asks).
     app::refresh_permissions(app, cx);
     let rec = rec_of(app, cx);
@@ -1369,8 +1588,11 @@ pub fn open_sheet_with(
         return;
     }
     if let Some(h) = rec.read(cx).sheet_win {
-        if h.update(cx, |_, window, _| window.activate_window())
-            .is_ok()
+        if h.update(cx, |this, window, cx| {
+            this.set_mode(mode, window, cx);
+            window.activate_window()
+        })
+        .is_ok()
         {
             return;
         }
@@ -1405,8 +1627,20 @@ pub fn open_sheet_with(
     if let Some(t) = target {
         first.pick(t);
     }
-    let h = crate::recording::sheet::fit_height(&first.heights(), visible.h);
-    let global = crate::recording::sheet::initial_frame(&visible, sheet::SHEET_WIDTH, h);
+    let (width, heights) = match mode {
+        sheet::SheetMode::Screen => (sheet::SHEET_WIDTH, first.heights()),
+        sheet::SheetMode::Audio => (
+            crate::recording::audio_sheet::AUDIO_SHEET_WIDTH,
+            crate::recording::audio_sheet::AudioSheetModel::new(
+                &crate::recording::audio_sheet::AudioDefaults::from_settings(
+                    &backend.settings.snapshot(),
+                ),
+            )
+            .heights(),
+        ),
+    };
+    let h = crate::recording::sheet::fit_height(&heights, visible.h);
+    let global = crate::recording::sheet::initial_frame(&visible, width, h);
     let (app2, rec2) = (app.clone(), rec.clone());
     let opened = cx.open_window(
         panel_options(display, global, true, false),
@@ -1419,6 +1653,7 @@ pub fn open_sheet_with(
                     preset,
                     height: global.h,
                     display: display.1,
+                    mode,
                 };
                 StartSheet::new(app2, rec2, defaults, open, window, cx)
             })

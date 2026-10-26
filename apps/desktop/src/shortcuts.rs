@@ -225,10 +225,15 @@ pub enum ShortcutAction {
     /// Open the newest capture of this session in the editor: the keyboard route to a toast's
     /// Annotate button (R4-12).
     AnnotateLast,
+    /// Start or stop an audio-only recording (VOC-1, Option+Shift+V): starts with the last used
+    /// audio sources, as Option+Shift+R does for the screen.
+    ToggleAudioRecording,
+    /// Add a marker to the running recording at the HUD timer (VOC-1, Option+Shift+M).
+    AddMarker,
 }
 
 impl ShortcutAction {
-    pub const ALL: [ShortcutAction; 10] = [
+    pub const ALL: [ShortcutAction; 12] = [
         ShortcutAction::CaptureRegion,
         ShortcutAction::CaptureWindow,
         ShortcutAction::CaptureDisplay,
@@ -239,6 +244,8 @@ impl ShortcutAction {
         ShortcutAction::DiscardRecording,
         ShortcutAction::RestartRecording,
         ShortcutAction::AnnotateLast,
+        ShortcutAction::ToggleAudioRecording,
+        ShortcutAction::AddMarker,
     ];
 
     /// Settings key (`get_settings` / `set_settings` can read and change `shortcuts.*`).
@@ -254,6 +261,8 @@ impl ShortcutAction {
             Self::DiscardRecording => "shortcuts.discard_recording",
             Self::RestartRecording => "shortcuts.restart_recording",
             Self::AnnotateLast => "shortcuts.annotate_last",
+            Self::ToggleAudioRecording => "shortcuts.toggle_audio_recording",
+            Self::AddMarker => "shortcuts.add_marker",
         }
     }
 
@@ -269,6 +278,8 @@ impl ShortcutAction {
             Self::DiscardRecording => tr!("Discard recording"),
             Self::RestartRecording => tr!("Restart recording"),
             Self::AnnotateLast => tr!("Annotate last capture"),
+            Self::ToggleAudioRecording => tr!("Start or stop audio recording"),
+            Self::AddMarker => tr!("Add a marker"),
         }
     }
 
@@ -289,6 +300,8 @@ impl ShortcutAction {
             Self::DiscardRecording => "d",
             Self::RestartRecording => "t",
             Self::AnnotateLast => "a",
+            Self::ToggleAudioRecording => "v",
+            Self::AddMarker => "m",
         }
     }
 
@@ -595,6 +608,41 @@ mod tests {
         keys.sort_unstable();
         keys.dedup();
         assert_eq!(keys.len(), ShortcutAction::ALL.len());
+    }
+
+    /// VOC-1.AC3: Option+Shift+V (Ctrl+Alt+Shift+V) starts and stops an audio recording and
+    /// Option+Shift+M adds a marker; neither collides with another default, and a rebinding onto
+    /// them is refused like any other.
+    #[test]
+    fn voc1_audio_and_marker_shortcuts() {
+        for p in [Platform::Mac, Platform::Windows] {
+            let m = ShortcutMap::defaults(p);
+            assert!(m.conflicts().is_empty());
+            assert_eq!(m.get(ShortcutAction::ToggleAudioRecording).key, "v");
+            assert_eq!(m.get(ShortcutAction::AddMarker).key, "m");
+        }
+        let mac = ShortcutMap::defaults(Platform::Mac);
+        assert_eq!(
+            mac.get(ShortcutAction::ToggleAudioRecording).to_setting(),
+            "alt+shift+v"
+        );
+        let win = ShortcutMap::defaults(Platform::Windows);
+        assert_eq!(
+            win.get(ShortcutAction::AddMarker)
+                .keycaps(Platform::Windows),
+            ["Ctrl", "Alt", "Shift", "M"]
+        );
+        let err = mac
+            .check_rebind(
+                ShortcutAction::OpenLibrary,
+                &Chord::parse("alt+shift+m").unwrap(),
+            )
+            .unwrap_err();
+        assert_eq!(err.to_string(), "Already used by Add a marker");
+        assert_eq!(
+            ShortcutAction::ToggleAudioRecording.key(),
+            "shortcuts.toggle_audio_recording"
+        );
     }
 
     /// CAP-2: the recording shortcuts (⌥⇧R toggles start/stop, ⌥⇧P pauses) are registered like the
