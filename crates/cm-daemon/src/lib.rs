@@ -49,6 +49,7 @@ pub mod engines;
 pub mod error;
 pub mod events;
 pub mod export;
+pub mod export_audio;
 pub mod fixture;
 mod frames;
 pub mod gate;

@@ -14,6 +14,7 @@ impl Action {
             Action::CancelJob(_) => "cancel_job",
             Action::RetryJob(_) => "retry_job",
             Action::ExportVideo(_) => "export_video",
+            Action::ExportAudio(_) => "export_audio",
             Action::Annotate(_) => "annotate",
             Action::GetCapture(_) => "get_capture",
             Action::SuggestRedactions(_) => "suggest_redactions",
@@ -73,6 +74,7 @@ impl Action {
             Action::CancelJob(p) => p.request_id.as_deref(),
             Action::RetryJob(p) => p.request_id.as_deref(),
             Action::ExportVideo(p) => p.request_id.as_deref(),
+            Action::ExportAudio(p) => p.request_id.as_deref(),
             Action::SetMicMuted(p) => p.request_id.as_deref(),
             Action::MoveLibrary(p) => p.request_id.as_deref(),
             Action::PauseRecording(p)
@@ -100,6 +102,7 @@ impl Action {
             Action::Upload(p) => p.capture_id.as_deref(),
             Action::CaptionOptions(p) => Some(&p.capture_id),
             Action::ExportVideo(p) => Some(&p.capture_id),
+            Action::ExportAudio(p) => Some(&p.capture_id),
             Action::PublishVideo(p) | Action::DeleteCapture(p) => p.capture_id.as_deref(),
             _ => None,
         }
@@ -152,6 +155,7 @@ impl Action {
             Action::TestTextModel => "Test the text model".to_owned(),
             Action::Upload(p) => crate::storage_ops::summary(p),
             Action::CaptionOptions(p) => crate::caption_options::summary(p),
+            Action::ExportAudio(p) => crate::export_audio::summary(p),
             Action::ExportVideo(p) => match p.loudness_lufs {
                 Some(l) => format!("Export {} as `{}` at {l} LUFS", p.capture_id, p.preset),
                 None => format!("Export {} as `{}`", p.capture_id, p.preset),
@@ -174,6 +178,10 @@ impl Action {
             Action::Ai(p) => crate::ai::confirm_params(p),
             Action::ExportVideo(p) => json!({
                 "capture_id": p.capture_id, "preset": p.preset, "loudness_lufs": p.loudness_lufs,
+            }),
+            Action::ExportAudio(p) => json!({
+                "capture_id": p.capture_id, "format": p.format.as_str(),
+                "tracks": p.tracks.as_str(), "loudness_lufs": p.loudness_lufs,
             }),
             _ => json!({}),
         }

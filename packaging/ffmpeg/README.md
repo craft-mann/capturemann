@@ -25,6 +25,14 @@ minimum the product calls, taken from every `ffmpeg` and `ffprobe` invocation in
 encoder, decoder or filter is missing, or if anything but system libraries is linked. When a new
 feature needs another component, add it to the lists at the top of `build-macos.sh`.
 
+**Audio export (VOC-2).** `export_audio` (`cm-media/src/audio_export.rs`) needs, beyond the
+video export: the `wav` muxer and the `pcm_s24le` encoder (WAV, 24-bit), the `loudnorm` filter
+(two-pass loudness to -16 LUFS, with `print_format=json` for pass 1) and the `concat`, `anullsrc`
+and `anullsink` filters (the same cut-and-join graph the video export uses for audio). `ebur128`
+is listed for tests and the loudness check. All are in `build-macos.sh` and its self-check;
+an FFmpeg built before they were added must be rebuilt with `make ffmpeg`. The audio export tests
+print `SKIPPED` when the FFmpeg they find lacks one of them.
+
 ## Building
 
 ```sh

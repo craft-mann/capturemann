@@ -1175,6 +1175,7 @@ impl Daemon {
             Action::CancelJob(p) => inner.cancel_job(p).await,
             Action::RetryJob(p) => inner.retry_job(p).await,
             Action::ExportVideo(p) => inner.export_video(actor, p).await,
+            Action::ExportAudio(p) => inner.export_audio(actor, p).await,
             Action::Annotate(p) => inner.annotate(actor, p).await,
             Action::GetCapture(p) => inner.get_capture(p).await,
             Action::SuggestRedactions(p) => inner.suggest_redactions(p).await,

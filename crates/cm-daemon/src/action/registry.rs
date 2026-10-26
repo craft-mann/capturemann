@@ -74,6 +74,8 @@ pub const ACTIONS: &[ActionSpec] = &[
     // Export (EXP-1, EXP-4): Free per the spec's tool table. The job runs in the background and is
     // watched with `get_job` / `job.*` events. Only the interim preset `quick` exists for now.
     spec("export_video", Tier::Free, true),
+    // VOC-2: the audio of a capture as M4A or WAV; the same `export` job type, `kind: "audio"`.
+    spec("export_audio", Tier::Free, true),
     // Recording (REC-1..REC-5). Starting asks the user; the rest of the controls are Free because
     // the recording itself was already confirmed (REC-4). `discard_recording` and
     // `restart_recording` delete a take: Confirm for agents, direct for the user in the HUD.

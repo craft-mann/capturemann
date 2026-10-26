@@ -81,6 +81,10 @@ fn samples() -> Vec<(&'static str, Value)> {
             "export_video",
             json!({"capture_id": "rec_1", "preset": "quick", "request_id": "r"}),
         ),
+        (
+            "export_audio",
+            json!({"capture_id": "rec_1", "format": "wav", "tracks": "mic", "request_id": "r"}),
+        ),
         ("start_recording", json!({"target": {"display_id": 1}})),
         ("pause_recording", json!({})),
         ("resume_recording", json!({"recording_id": "rec_1"})),

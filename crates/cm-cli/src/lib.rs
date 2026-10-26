@@ -57,6 +57,7 @@ pub const CLI_COMMANDS: &[(&str, Option<&str>)] = &[
     ("cancel_job", Some("jobs cancel")),
     ("retry_job", Some("jobs retry")),
     ("export_video", Some("export")),
+    ("export_audio", Some("export --audio")),
     ("start_recording", Some("record start")),
     ("pause_recording", Some("record pause")),
     ("resume_recording", Some("record resume")),
