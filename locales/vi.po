@@ -9533,66 +9533,6 @@ msgstr "Âm thanh"
 
 #, fuzzy
 msgctxt "audio preset"
-msgid "About {gb} GB per hour"
-msgstr "Khoảng {gb} GB mỗi giờ"
-
-#, fuzzy
-msgid "About {gb} GB per hour · {free} GB free"
-msgstr "Khoảng {gb} GB mỗi giờ · còn trống {free} GB"
-
-#, fuzzy
-msgid "Add a label (optional)"
-msgstr "Thêm nhãn (không bắt buộc)"
-
-#, fuzzy
-msgid "Add a marker"
-msgstr "Thêm dấu mốc"
-
-#, fuzzy
-msgid "After you stop"
-msgstr "Sau khi dừng"
-
-#, fuzzy
-msgid "Audio only: no screen, camera or cursor."
-msgstr "Chỉ âm thanh: không có màn hình, camera hay con trỏ."
-
-#, fuzzy
-msgid "Couldn’t add the marker"
-msgstr "Không thể thêm dấu mốc"
-
-#, fuzzy
-msgid "Couldn’t label the marker"
-msgstr "Không thể đặt nhãn cho dấu mốc"
-
-#, fuzzy
-msgid "Default microphone"
-msgstr "Micrô mặc định"
-
-#, fuzzy
-msgid "Don’t show again"
-msgstr "Đừng hiện lại"
-
-#, fuzzy
-msgid "For online calls: the other people’s voices."
-msgstr "Cho cuộc gọi trực tuyến: giọng của những người khác."
-
-#, fuzzy
-msgid "For online calls: the other people’s voices. Needs Screen Recording permission on macOS; microphone-only recordings never ask for it."
-msgstr "Cho cuộc gọi trực tuyến: giọng của những người khác. Cần quyền Ghi màn hình trên macOS; bản ghi chỉ có micrô không bao giờ yêu cầu quyền này."
-
-#, fuzzy
-msgid "Helps tell the voices apart for speaker labels."
-msgstr "Giúp phân biệt các giọng nói để gắn nhãn người nói."
-
-#, fuzzy
-msgid "How many people"
-msgstr "Có bao nhiêu người"
-
-#, fuzzy
-msgid "How many people?"
-msgstr "Có bao nhiêu người?"
-
-#, fuzzy
 msgid "In the room"
 msgstr "Trong phòng"
 
@@ -9603,103 +9543,11 @@ msgstr "Bài giảng"
 
 #, fuzzy
 msgctxt "audio preset"
-msgid "Interview, 1:1, meeting around a laptop"
-msgstr "Phỏng vấn, 1:1, họp quanh một máy tính"
-
-#, fuzzy
-msgid "Introduction or demo call"
-msgstr "Giới thiệu hoặc cuộc gọi demo"
-
-#, fuzzy
-msgid "Just you"
-msgstr "Chỉ mình bạn"
-
-#, fuzzy
-msgid "Keep the lid open: closing it stops the recording"
-msgstr "Giữ nắp máy mở: đóng nắp sẽ dừng bản ghi"
-
-#, fuzzy
-msgid "Lecture notes"
-msgstr "Ghi chú bài giảng"
-
-#, fuzzy
-msgid "Lecture or talk"
-msgstr "Bài giảng hoặc buổi nói chuyện"
-
-#, fuzzy
-msgid "Let everyone know they’re being recorded."
-msgstr "Hãy cho mọi người biết họ đang được ghi âm."
-
-#, fuzzy
-msgid "Mark a moment while recording"
-msgstr "Đánh dấu một thời điểm khi đang ghi"
-
-#, fuzzy
-msgid "Mark this moment"
-msgstr "Đánh dấu thời điểm này"
-
-#, fuzzy
-msgid "Marker at"
-msgstr "Dấu mốc tại"
-
-#, fuzzy
-msgid "Marker label"
-msgstr "Nhãn dấu mốc"
-
-#, fuzzy
-msgid "Meeting minutes"
-msgstr "Biên bản cuộc họp"
-
-#, fuzzy
-msgid "Microphone access is off for CaptureMann."
-msgstr "CaptureMann chưa được phép dùng micrô."
-
-#, fuzzy
-msgid "Microphone access is off. Turn it on in System Settings to record your voice."
-msgstr "Quyền truy cập micrô đang tắt. Hãy bật trong Cài đặt Hệ thống để ghi giọng của bạn."
-
-#, fuzzy
-msgid "Microphone level"
-msgstr "Mức micrô"
-
-#, fuzzy
-msgid "Microphone: {name}"
-msgstr "Micrô: {name}"
-
-#, fuzzy
-msgid "Microphones"
-msgstr "Các micrô"
-
-#, fuzzy
-msgid "Mode"
-msgstr "Chế độ"
-
-#, fuzzy
-msgid "No recording to mark"
-msgstr "Không có bản ghi để đánh dấu"
-
-#, fuzzy
-msgid "No screen, microphone and calls"
-msgstr "Không quay màn hình, chỉ micrô và cuộc gọi"
-
-#, fuzzy
-msgid "Not sure"
-msgstr "Chưa chắc"
-
-#, fuzzy
-msgid "One speaker, a room"
-msgstr "Một người nói, một căn phòng"
-
-#, fuzzy
 msgid "Online meeting"
 msgstr "Họp trực tuyến"
 
 #, fuzzy
 msgctxt "audio preset"
-msgid "Open the sheet"
-msgstr "Mở bảng ghi"
-
-#, fuzzy
 msgid "Product demo"
 msgstr "Demo sản phẩm"
 
@@ -9710,10 +9558,6 @@ msgstr "Ghi chú giọng nói"
 
 #, fuzzy
 msgctxt "capture dock"
-msgid "Product presentation recap"
-msgstr "Tóm tắt buổi giới thiệu sản phẩm"
-
-#, fuzzy
 msgid "Record audio"
 msgstr "Ghi âm"
 
@@ -9731,6 +9575,17 @@ msgstr "ÂM THANH"
 msgctxt "navigation"
 msgid "Audio"
 msgstr "Âm thanh"
+
+#, fuzzy
+msgid "{n} speaker"
+msgid_plural "{n} speakers"
+msgstr[0] "{n} người nói"
+
+#, fuzzy
+msgid "Transcript"
+msgstr "Bản chép lời"
+
+#, fuzzy
 msgid "48 kHz · 24-bit. Lossless, about 10× larger."
 msgstr "48 kHz · 24-bit. Không suy hao, lớn hơn khoảng 10 lần."
 
@@ -9931,10 +9786,6 @@ msgid "Tracks"
 msgstr "Rãnh"
 
 #, fuzzy
-msgid "Transcript"
-msgstr "Bản chép lời"
-
-#, fuzzy
 msgid "Transcript language"
 msgstr "Ngôn ngữ bản chép lời"
 
@@ -9987,9 +9838,8 @@ msgid "{name} · {size} · {lufs} LUFS"
 msgstr "{name} · {size} · {lufs} LUFS"
 
 #, fuzzy
-msgid "{n} speaker"
-msgid_plural "{n} speakers"
-msgstr[0] "{n} người nói"
+msgid "{time} after cuts · about {size}"
+msgstr "{time} sau khi xoá đoạn · khoảng {size}"
 
 #, fuzzy
 msgid "{title} · Exporting the audio: {pct}%"
@@ -10109,6 +9959,7 @@ msgctxt "transcript turn"
 msgid "overlap"
 msgstr "nói chồng"
 
+#, fuzzy
 msgid "About 6.7 GB to load"
 msgstr "Cần khoảng 6,7 GB để nạp"
 
@@ -10223,8 +10074,6 @@ msgstr "Máy chủ trên máy Mac này"
 #, fuzzy
 msgid "Short English summaries; weak for Vietnamese and long meetings"
 msgstr "Tóm tắt tiếng Anh ngắn; yếu với tiếng Việt và cuộc họp dài"
-msgid "Recording audio"
-msgstr "Đang ghi âm"
 
 #, fuzzy
 msgid "Speaker labels"
@@ -10354,6 +10203,183 @@ msgctxt "text model provider"
 msgid "On this Mac"
 msgstr "Trên máy Mac này"
 
+#, fuzzy
+msgid "About {gb} GB per hour"
+msgstr "Khoảng {gb} GB mỗi giờ"
+
+#, fuzzy
+msgid "About {gb} GB per hour · {free} GB free"
+msgstr "Khoảng {gb} GB mỗi giờ · còn trống {free} GB"
+
+#, fuzzy
+msgid "Add a label (optional)"
+msgstr "Thêm nhãn (không bắt buộc)"
+
+#, fuzzy
+msgid "Add a marker"
+msgstr "Thêm dấu mốc"
+
+#, fuzzy
+msgid "After you stop"
+msgstr "Sau khi dừng"
+
+#, fuzzy
+msgid "Audio only: no screen, camera or cursor."
+msgstr "Chỉ âm thanh: không có màn hình, camera hay con trỏ."
+
+#, fuzzy
+msgid "Couldn’t add the marker"
+msgstr "Không thể thêm dấu mốc"
+
+#, fuzzy
+msgid "Couldn’t label the marker"
+msgstr "Không thể đặt nhãn cho dấu mốc"
+
+#, fuzzy
+msgid "Default microphone"
+msgstr "Micrô mặc định"
+
+#, fuzzy
+msgid "Don’t show again"
+msgstr "Đừng hiện lại"
+
+#, fuzzy
+msgid "For online calls: the other people’s voices."
+msgstr "Cho cuộc gọi trực tuyến: giọng của những người khác."
+
+#, fuzzy
+msgid "For online calls: the other people’s voices. Needs Screen Recording permission on macOS; microphone-only recordings never ask for it."
+msgstr "Cho cuộc gọi trực tuyến: giọng của những người khác. Cần quyền Ghi màn hình trên macOS; bản ghi chỉ có micrô không bao giờ yêu cầu quyền này."
+
+#, fuzzy
+msgid "Helps tell the voices apart for speaker labels."
+msgstr "Giúp phân biệt các giọng nói để gắn nhãn người nói."
+
+#, fuzzy
+msgid "How many people"
+msgstr "Có bao nhiêu người"
+
+#, fuzzy
+msgid "How many people?"
+msgstr "Có bao nhiêu người?"
+
+#, fuzzy
+msgid "In the room"
+msgstr "Trong phòng"
+
+#, fuzzy
+msgid "Interview, 1:1, meeting around a laptop"
+msgstr "Phỏng vấn, 1:1, họp quanh một máy tính"
+
+#, fuzzy
+msgid "Introduction or demo call"
+msgstr "Giới thiệu hoặc cuộc gọi demo"
+
+#, fuzzy
+msgid "Just you"
+msgstr "Chỉ mình bạn"
+
+#, fuzzy
+msgid "Keep the lid open: closing it stops the recording"
+msgstr "Giữ nắp máy mở: đóng nắp sẽ dừng bản ghi"
+
+#, fuzzy
+msgid "Lecture notes"
+msgstr "Ghi chú bài giảng"
+
+#, fuzzy
+msgid "Lecture or talk"
+msgstr "Bài giảng hoặc buổi nói chuyện"
+
+#, fuzzy
+msgid "Let everyone know they’re being recorded."
+msgstr "Hãy cho mọi người biết họ đang được ghi âm."
+
+#, fuzzy
+msgid "Mark a moment while recording"
+msgstr "Đánh dấu một thời điểm khi đang ghi"
+
+#, fuzzy
+msgid "Mark this moment"
+msgstr "Đánh dấu thời điểm này"
+
+#, fuzzy
+msgid "Marker at"
+msgstr "Dấu mốc tại"
+
+#, fuzzy
+msgid "Marker label"
+msgstr "Nhãn dấu mốc"
+
+#, fuzzy
+msgid "Meeting minutes"
+msgstr "Biên bản cuộc họp"
+
+#, fuzzy
+msgid "Microphone access is off for CaptureMann."
+msgstr "CaptureMann chưa được phép dùng micrô."
+
+#, fuzzy
+msgid "Microphone access is off. Turn it on in System Settings to record your voice."
+msgstr "Quyền truy cập micrô đang tắt. Hãy bật trong Cài đặt Hệ thống để ghi giọng của bạn."
+
+#, fuzzy
+msgid "Microphone level"
+msgstr "Mức micrô"
+
+#, fuzzy
+msgid "Microphone: {name}"
+msgstr "Micrô: {name}"
+
+#, fuzzy
+msgid "Microphones"
+msgstr "Các micrô"
+
+#, fuzzy
+msgid "Mode"
+msgstr "Chế độ"
+
+#, fuzzy
+msgid "No recording to mark"
+msgstr "Không có bản ghi để đánh dấu"
+
+#, fuzzy
+msgid "No screen, microphone and calls"
+msgstr "Không quay màn hình, chỉ micrô và cuộc gọi"
+
+#, fuzzy
+msgid "Not sure"
+msgstr "Chưa chắc"
+
+#, fuzzy
+msgid "One speaker, a room"
+msgstr "Một người nói, một căn phòng"
+
+#, fuzzy
+msgid "Online meeting"
+msgstr "Họp trực tuyến"
+
+#, fuzzy
+msgid "Open the sheet"
+msgstr "Mở bảng ghi"
+
+#, fuzzy
+msgid "Product demo"
+msgstr "Demo sản phẩm"
+
+#, fuzzy
+msgid "Product presentation recap"
+msgstr "Tóm tắt buổi giới thiệu sản phẩm"
+
+#, fuzzy
+msgid "Record audio"
+msgstr "Ghi âm"
+
+#, fuzzy
+msgid "Recording audio"
+msgstr "Đang ghi âm"
+
+#, fuzzy
 msgid "Speaker labels, if turned on"
 msgstr "Nhãn người nói, nếu đã bật"
 
@@ -10474,4 +10500,3 @@ msgstr "Thêm dấu mốc"
 msgctxt "shortcut"
 msgid "Start or stop audio recording"
 msgstr "Bắt đầu hoặc dừng ghi âm"
-
