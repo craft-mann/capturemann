@@ -44,8 +44,8 @@ set -euo pipefail
 die() { echo "build-macos.sh: $*" >&2; exit 1; }
 
 # ---- pinned source (the maintainer fills these in; see above) ----
-LLAMA_TAG="PENDING_PIN"
-LLAMA_SHA256="PENDING_PIN"
+LLAMA_TAG="v0.7.0" # latest release when pinned (published Oct 15, 2026; read from the GitHub releases API on Oct 27, 2026)
+LLAMA_SHA256="55d67acf3ad2ad747a9bbeb75f9f0e173dbcc0d1753a471038a90c819421c5e1" # shasum -a 256 of the tag's source tarball (38183379 bytes), computed Oct 27, 2026
 LLAMA_URL="https://github.com/ggml-org/llama.cpp/archive/refs/tags/${LLAMA_TAG}.tar.gz"
 
 MIN_MACOS="13.0"
