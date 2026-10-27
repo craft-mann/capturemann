@@ -243,7 +243,7 @@ pub fn keycaps(t: &Theme, labels: &[String]) -> Div {
         .children(labels.iter().map(|l| keycap(t, l.clone())))
 }
 
-/// Neutral tag: mono, 1 px `line` border, radius 6 (the "v0.1" badge).
+/// Neutral tag: mono, 1 px `line` border, radius 6 (the version badge).
 pub fn badge(t: &Theme, text: impl Into<SharedString>) -> Div {
     div()
         .px(px(6.))

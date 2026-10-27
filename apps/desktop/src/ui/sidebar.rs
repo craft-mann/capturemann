@@ -179,7 +179,15 @@ fn brand_row(t: &Theme) -> AnyElement {
                 .font_weight(FontWeight::SEMIBOLD)
                 .child("CaptureMann"),
         )
-        .child(badge(t, "v0.1"))
+        // "v0.2": the version of this build (major.minor), not a fixed text.
+        .child(badge(
+            t,
+            format!(
+                "v{}.{}",
+                env!("CARGO_PKG_VERSION_MAJOR"),
+                env!("CARGO_PKG_VERSION_MINOR")
+            ),
+        ))
         .into_any_element()
 }
 
