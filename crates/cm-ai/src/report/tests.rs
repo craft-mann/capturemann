@@ -10,6 +10,8 @@ use crate::text_model::{JsonReply, JsonRequest, TextModel, TextModelError};
 struct Scripted {
     seen: Mutex<Vec<JsonRequest>>,
     answer: Box<dyn Fn(&JsonRequest) -> Value + Send + Sync>,
+    /// The streamed token counts reported before each answer (none: does not stream).
+    ticks: Vec<usize>,
 }
 
 impl Scripted {
@@ -17,11 +19,33 @@ impl Scripted {
         Scripted {
             seen: Mutex::new(vec![]),
             answer: Box::new(f),
+            ticks: vec![],
         }
+    }
+
+    fn streaming(mut self, ticks: &[usize]) -> Scripted {
+        self.ticks = ticks.to_vec();
+        self
     }
 }
 
 impl TextModel for Scripted {
+    fn complete_json_streaming(
+        &self,
+        req: &JsonRequest,
+        on_progress: &mut dyn FnMut(usize) -> bool,
+    ) -> Result<JsonReply, TextModelError> {
+        for t in &self.ticks {
+            if !on_progress(*t) {
+                return Err(TextModelError {
+                    kind: crate::text_model::ErrorKind::Cancelled,
+                    message: "cancelled".into(),
+                });
+            }
+        }
+        self.complete_json(req)
+    }
+
     fn complete_json(&self, req: &JsonRequest) -> Result<JsonReply, TextModelError> {
         self.seen.lock().unwrap().push(req.clone());
         Ok(JsonReply {
@@ -309,6 +333,84 @@ fn cancel_stops_the_run() {
     let e = generate(&model, &input(t, &lines, &ctx, &[]), &mut |_| false).unwrap_err();
     assert_eq!(e, generate::Error::Cancelled);
     assert!(model.seen.lock().unwrap().is_empty());
+}
+
+/// One call (the usual meeting) moves the bar while the answer is written: values rise, stay
+/// strictly between 0 and 1 until the end, 700 tokens is about half, and only the end is 1.0.
+#[test]
+fn one_call_reports_progress_from_the_streamed_tokens() {
+    let t = find_template("summary").unwrap();
+    let lines = meeting();
+    let ctx = ReportContext::default();
+    let model = Scripted::new(|_| json!({"summary": [], "key_points": []}))
+        .streaming(&[1, 100, 350, 700, 1400, 4000]);
+    let mut seen = vec![];
+    generate(&model, &input(t, &lines, &ctx, &[]), &mut |p| {
+        seen.push(p);
+        true
+    })
+    .unwrap();
+    assert_eq!(seen.pop(), Some(1.0));
+    assert!(seen.len() >= 7, "{seen:?}");
+    assert!(seen.windows(2).all(|w| w[0] <= w[1]), "{seen:?}");
+    assert!(
+        seen.iter().skip(1).all(|p| *p > 0.0 && *p < 1.0),
+        "{seen:?}"
+    );
+    // 700 tokens is about half of a single-call run (map share 0.95 of the bar).
+    assert!((seen[4] - 0.95 / 2.0).abs() < 0.01, "{seen:?}");
+}
+
+/// A long recording: map chunks and merge rounds each use their slice, the bar never goes back
+/// and stays below 1.0 until the end.
+#[test]
+fn chunks_and_merges_keep_the_bar_monotonic() {
+    let t = find_template("minutes").unwrap();
+    let lines: Vec<Line> = (0..600)
+        .map(|i| {
+            let s = f64::from(i) * 10.0;
+            line(
+                s,
+                s + 9.0,
+                None,
+                "this is a rather long sentence about the quarterly plan and the budget for the next \
+                 team to review together",
+            )
+        })
+        .collect();
+    let ctx = ReportContext::default();
+    let model = Scripted::new(|_| {
+        json!({"summary": [], "attendees": [], "topics": [], "decisions": [],
+               "action_items": [], "open_questions": []})
+    })
+    .streaming(&[10, 700, 3000]);
+    let mut seen = vec![];
+    let g = generate(&model, &input(t, &lines, &ctx, &[]), &mut |p| {
+        seen.push(p);
+        true
+    })
+    .unwrap();
+    assert!(g.chunks > 2 && g.model_calls > g.chunks);
+    assert_eq!(seen.pop(), Some(1.0));
+    assert!(seen.windows(2).all(|w| w[0] <= w[1]), "{seen:?}");
+    assert!(seen.iter().all(|p| *p < 1.0), "{seen:?}");
+}
+
+#[test]
+fn a_cancel_during_the_stream_ends_the_run() {
+    let t = find_template("summary").unwrap();
+    let lines = meeting();
+    let ctx = ReportContext::default();
+    let model =
+        Scripted::new(|_| json!({"summary": [], "key_points": []})).streaming(&[1, 100, 350, 700]);
+    let mut calls = 0;
+    let e = generate(&model, &input(t, &lines, &ctx, &[]), &mut |_| {
+        calls += 1;
+        calls < 4
+    })
+    .unwrap_err();
+    assert_eq!(e, generate::Error::Cancelled);
+    assert_eq!(calls, 4, "stopped at the refusing callback");
 }
 
 fn sample_report(t: &Template) -> store::Report {

@@ -584,6 +584,10 @@ pub fn translate_with_whisper(
 pub const BATCH_LINES: usize = 20;
 pub const CONTEXT_LINES: usize = 3;
 
+/// About how many tokens one translation call writes: inside a call the bar is at
+/// `n / (n + EXPECTED_TOKENS_PER_CALL)` of the call's share after `n` streamed tokens.
+pub const EXPECTED_TOKENS_PER_CALL: f32 = 700.0;
+
 /// One batch for a text model.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextTranslateRequest<'a> {
@@ -605,6 +609,18 @@ pub trait TextTranslator: Send + Sync {
     /// The model name stored in the translation.
     fn model_name(&self) -> String;
     fn translate(&self, req: &TextTranslateRequest<'_>) -> Result<Vec<String>, CmError>;
+
+    /// Like [`translate`](Self::translate); a translator that streams the model's answer calls
+    /// `on_tokens` with the pieces received so far, and stops with the cancelled error when it
+    /// returns `false`. The default never calls it.
+    fn translate_streaming(
+        &self,
+        req: &TextTranslateRequest<'_>,
+        on_tokens: &mut dyn FnMut(usize) -> bool,
+    ) -> Result<Vec<String>, CmError> {
+        let _ = on_tokens;
+        self.translate(req)
+    }
 }
 
 /// The [`TextTranslator`] over a [`TextModel`](crate::text_model::TextModel) (AI-7): one request
@@ -672,6 +688,24 @@ impl TextTranslator for ModelTranslator<'_> {
     }
 
     fn translate(&self, req: &TextTranslateRequest<'_>) -> Result<Vec<String>, CmError> {
+        self.ask(req, None)
+    }
+
+    fn translate_streaming(
+        &self,
+        req: &TextTranslateRequest<'_>,
+        on_tokens: &mut dyn FnMut(usize) -> bool,
+    ) -> Result<Vec<String>, CmError> {
+        self.ask(req, Some(on_tokens))
+    }
+}
+
+impl ModelTranslator<'_> {
+    fn ask(
+        &self,
+        req: &TextTranslateRequest<'_>,
+        on_tokens: Option<&mut dyn FnMut(usize) -> bool>,
+    ) -> Result<Vec<String>, CmError> {
         let schema = json!({
             "type": "object",
             "properties": { "lines": { "type": "array", "items": { "type": "string" } } },
@@ -682,10 +716,17 @@ impl TextTranslator for ModelTranslator<'_> {
         jr.system =
             Some("You are a careful subtitle translator. You answer with JSON only.".to_owned());
         jr.schema_name = "translation".to_owned();
-        let reply = self
-            .model
-            .complete_json(&jr)
-            .map_err(|e| e.into_cm_error(&self.job_id))?;
+        let reply = match on_tokens {
+            Some(f) => self.model.complete_json_streaming(&jr, f),
+            None => self.model.complete_json(&jr),
+        }
+        .map_err(|e| {
+            if e.kind == crate::text_model::ErrorKind::Cancelled {
+                crate::transcribe::cancelled()
+            } else {
+                e.into_cm_error(&self.job_id)
+            }
+        })?;
         reply.value["lines"]
             .as_array()
             .map(|a| {
@@ -721,8 +762,37 @@ pub fn translate_with_text_model(
     let mut lines = Vec::new();
     let mut untranslated = 0;
     let mut from = 0;
+    let total = source.len().max(1) as f32;
+    // The bar only moves forward and stays under 1.0 until the end; a call that streams moves it
+    // inside its share (`from..to` lines) by the tokens received (about EXPECTED_TOKENS_PER_CALL
+    // for half of the share).
+    let mut high = 0.0_f32;
+    let mut report = |p: f32, progress: &mut dyn FnMut(f32) -> bool| {
+        high = high.max(p.clamp(0.0, 0.999));
+        progress(high)
+    };
+    // One call of the translator with its streamed progress inside `share`.
+    macro_rules! call {
+        ($req:expr, $share:expr) => {{
+            let (lo, hi): (f32, f32) = $share;
+            let mut cancelled = false;
+            let r = translator.translate_streaming(&$req, &mut |n| {
+                let n = n as f32;
+                let ok = report(
+                    lo + (hi - lo) * n / (n + EXPECTED_TOKENS_PER_CALL),
+                    progress,
+                );
+                cancelled |= !ok;
+                ok
+            });
+            if cancelled {
+                return Err(crate::transcribe::cancelled());
+            }
+            r
+        }};
+    }
     while from < source.len() {
-        if !progress(from as f32 / source.len() as f32) {
+        if !report(from as f32 / total, progress) {
             return Err(crate::transcribe::cancelled());
         }
         let to = (from + BATCH_LINES).min(source.len());
@@ -735,14 +805,18 @@ pub fn translate_with_text_model(
             keep_as_written,
         };
         // One try, and one retry when the count is wrong or a glossary term is lost (AI-5.AC4).
-        let mut answer = translator.translate(&req)?;
+        let share = (
+            from as f32 / total,
+            (from + BATCH_LINES).min(source.len()) as f32 / total,
+        );
+        let mut answer = call!(req, share)?;
         let mut checked = enforce_batch(req.lines, answer, keep_as_written);
         if checked.is_none()
             || checked
                 .as_ref()
                 .is_some_and(|c| c.iter().any(Option::is_none))
         {
-            answer = translator.translate(&req)?;
+            answer = call!(req, share)?;
             checked = enforce_batch(req.lines, answer, keep_as_written);
         }
         // A model that keeps merging or splitting lines gets the batch one line at a time
@@ -759,7 +833,7 @@ pub fn translate_with_text_model(
                     after: &texts[i + 1..(i + 1 + CONTEXT_LINES).min(source.len())],
                     keep_as_written,
                 };
-                let got = translator.translate(&one)?;
+                let got = call!(one, (i as f32 / total, (i + 1) as f32 / total))?;
                 singles.push(
                     enforce_batch(one.lines, got, keep_as_written).and_then(|mut v| v.remove(0)),
                 );
@@ -1414,6 +1488,60 @@ mod tests {
         (0..n)
             .map(|i| cap(i as f64 * 2.0, i as f64 * 2.0 + 1.5, &format!("line {i}")))
             .collect()
+    }
+
+    /// Streams 100, 700 and 3000 tokens in every call.
+    struct Streaming;
+
+    impl TextTranslator for Streaming {
+        fn model_name(&self) -> String {
+            "streaming".into()
+        }
+        fn translate(&self, req: &TextTranslateRequest<'_>) -> Result<Vec<String>, CmError> {
+            Ok(req.lines.to_vec())
+        }
+        fn translate_streaming(
+            &self,
+            req: &TextTranslateRequest<'_>,
+            on_tokens: &mut dyn FnMut(usize) -> bool,
+        ) -> Result<Vec<String>, CmError> {
+            for n in [100, 700, 3000] {
+                if !on_tokens(n) {
+                    return Err(crate::transcribe::cancelled());
+                }
+            }
+            self.translate(req)
+        }
+    }
+
+    #[test]
+    fn streamed_tokens_move_the_bar_inside_each_batch() {
+        let src = many(45);
+        let mut seen = vec![];
+        translate_with_text_model(&Streaming, &src, "en", "vi", &[], &mut |p| {
+            seen.push(p);
+            true
+        })
+        .unwrap();
+        assert_eq!(seen.pop(), Some(1.0));
+        assert!(seen.windows(2).all(|w| w[0] <= w[1]), "{seen:?}");
+        assert!(seen.iter().all(|p| *p < 1.0), "{seen:?}");
+        // Batch 1 (20 of 45 lines) is not finished before the second batch starts.
+        let first_batch_max = 20.0 / 45.0;
+        assert!(
+            seen.iter().any(|p| *p > 0.1 && *p < first_batch_max),
+            "{seen:?}"
+        );
+        // 3 batches x (start + 3 tokens).
+        assert_eq!(seen.len(), 12);
+        // Cancel in the middle of a stream.
+        let mut n = 0;
+        let e = translate_with_text_model(&Streaming, &src, "en", "vi", &[], &mut |_| {
+            n += 1;
+            n < 3
+        })
+        .unwrap_err();
+        assert_eq!(e.to_string(), crate::transcribe::cancelled().to_string());
     }
 
     #[test]

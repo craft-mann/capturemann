@@ -448,7 +448,12 @@ impl EmbeddedTextModel {
         }
     }
 
-    fn once(&self, req: &JsonRequest) -> Result<JsonReply, TextModelError> {
+    fn once(
+        &self,
+        req: &JsonRequest,
+        streaming: bool,
+        on_progress: &mut dyn FnMut(usize) -> bool,
+    ) -> Result<JsonReply, TextModelError> {
         let base = self.engine.acquire(&self.spec)?;
         let cfg = TextModelConfig {
             provider: Provider::Local,
@@ -458,7 +463,12 @@ impl EmbeddedTextModel {
             timeout_s: self.timeout_s,
             ..TextModelConfig::default()
         };
-        let r = super::HttpTextModel::new(cfg, None).complete_json(req);
+        let http = super::HttpTextModel::new(cfg, None);
+        let r = if streaming {
+            http.complete_json_streaming(req, on_progress)
+        } else {
+            http.complete_json(req)
+        };
         self.engine.release();
         r
     }
@@ -466,20 +476,45 @@ impl EmbeddedTextModel {
 
 impl TextModel for EmbeddedTextModel {
     fn complete_json(&self, req: &JsonRequest) -> Result<JsonReply, TextModelError> {
-        match self.once(req) {
+        self.run(req, None)
+    }
+
+    fn complete_json_streaming(
+        &self,
+        req: &JsonRequest,
+        on_progress: &mut dyn FnMut(usize) -> bool,
+    ) -> Result<JsonReply, TextModelError> {
+        self.run(req, Some(on_progress))
+    }
+}
+
+impl EmbeddedTextModel {
+    fn run(
+        &self,
+        req: &JsonRequest,
+        on_progress: Option<&mut dyn FnMut(usize) -> bool>,
+    ) -> Result<JsonReply, TextModelError> {
+        let mut noop = |_: usize| true;
+        let (streaming, hook): (bool, &mut dyn FnMut(usize) -> bool) = match on_progress {
+            Some(f) => (true, f),
+            None => (false, &mut noop),
+        };
+        match self.once(req, streaming, &mut *hook) {
             // The helper stopped answering mid-way: acquire notices it is dead, starts it again
             // (once) and the request runs again.
-            Err(e) if e.kind == ErrorKind::Unreachable => self.once(req).map_err(|e2| {
-                if e2.kind == ErrorKind::Unreachable {
-                    engine_error(
-                        ErrorKind::EngineFailed,
-                        "The built-in text engine stopped answering. Try again; if it keeps \
+            Err(e) if e.kind == ErrorKind::Unreachable => {
+                self.once(req, streaming, hook).map_err(|e2| {
+                    if e2.kind == ErrorKind::Unreachable {
+                        engine_error(
+                            ErrorKind::EngineFailed,
+                            "The built-in text engine stopped answering. Try again; if it keeps \
                          happening, restart CaptureMann.",
-                    )
-                } else {
-                    e2
-                }
-            }),
+                        )
+                    } else {
+                        e2
+                    }
+                })
+            }
             other => other,
         }
     }
