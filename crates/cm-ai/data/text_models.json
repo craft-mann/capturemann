@@ -1,47 +1,44 @@
 {
-  "_comment": "Text models for the built-in engine (AI-7, provider `embedded`): GGUF files run by the bundled llama-server. Same rules as models.json: an entry with pending_pin true has no pinned checksum yet, so it is hidden from the AI page and every action on it is refused until the maintainer fills in url (pinned to a commit), file, sha256, bytes, ram_mb, license and context_tokens and removes the flag. The three entries below are PLACEHOLDERS for the 8 GB, 16 GB and 32 GB memory tiers; the model choice is made by the maintainer's research (spike S8), nothing here names a real model or a real file. tier_gb is the smallest Mac memory the entry is meant for; ram_mb is the memory the model needs while it runs (file plus context cache), in MB; context_tokens is the context the engine starts it with; license must be Apache-2.0 or MIT. To use another mirror or revision, put a file of this shape at <config dir>/ai/text/catalog.json or point CAPTUREMANN_TEXT_CATALOG at one: it replaces this list.",
+  "_comment": "Text models for the built-in engine (AI-7, provider `embedded`): GGUF files run by the bundled llama-server. Same rules as models.json: an entry with pending_pin true has no pinned checksum yet, so it is hidden from the AI page and every action on it is refused until the maintainer fills in url (pinned to a commit), file, sha256, bytes, ram_mb, license and context_tokens and removes the flag. The three entries are pinned from docs/research/text-model-pins-2026-10-27.md (checksums and sizes read from the Hugging Face LFS pointer files at the commits in the urls on Oct 27, 2026; no file downloaded yet; ram_mb is an estimate: file plus a 16K context cache plus buffers, not measured on a Mac). tier_gb is the smallest Mac memory the entry is meant for; ram_mb is the memory the model needs while it runs, in MB; context_tokens is the context the engine starts it with; license must be Apache-2.0 or MIT. To use another mirror or revision, put a file of this shape at <config dir>/ai/text/catalog.json or point CAPTUREMANN_TEXT_CATALOG at one: it replaces this list.",
   "models": [
     {
       "id": "text-8gb",
-      "label": "Built-in model for 8 GB Macs",
-      "hint": "Placeholder: smallest tier.",
-      "file": "pending-8gb.gguf",
-      "url": "https://example.invalid/pending-8gb.gguf",
-      "sha256": "",
-      "bytes": 0,
-      "ram_mb": 0,
+      "label": "Qwen3.5 4B",
+      "hint": "Fits 8 GB Macs. Good for short English summaries; check Vietnamese before relying on it.",
+      "file": "Qwen3.5-4B-Q4_K_M.gguf",
+      "url": "https://huggingface.co/lmstudio-community/Qwen3.5-4B-GGUF/resolve/f9f88ac3e234be915e23811a6d28ea287bdb927e/Qwen3.5-4B-Q4_K_M.gguf",
+      "sha256": "25082a7dd3776cc3c741c6347d3bd04523f05796607b3fbc32fa3a25dfa1418c",
+      "bytes": 2707513696,
+      "ram_mb": 4500,
       "tier_gb": 8,
-      "license": "",
-      "context_tokens": 8192,
-      "pending_pin": true
+      "license": "Apache-2.0",
+      "context_tokens": 16384
     },
     {
       "id": "text-16gb",
-      "label": "Built-in model for 16 GB Macs",
-      "hint": "Placeholder: middle tier.",
-      "file": "pending-16gb.gguf",
-      "url": "https://example.invalid/pending-16gb.gguf",
-      "sha256": "",
-      "bytes": 0,
-      "ram_mb": 0,
+      "label": "Qwen3.5 9B",
+      "hint": "Recommended for 16 GB Macs. Better notes and translation than the 4B model.",
+      "file": "Qwen3.5-9B-Q4_K_M.gguf",
+      "url": "https://huggingface.co/lmstudio-community/Qwen3.5-9B-GGUF/resolve/1379f25c6b505a3fc737bd7818cb09389cf807c1/Qwen3.5-9B-Q4_K_M.gguf",
+      "sha256": "cd76ec205963b3b33350093e6904d9de16c4e666fd104e1f632d25c7f15f2a13",
+      "bytes": 5627044256,
+      "ram_mb": 7600,
       "tier_gb": 16,
-      "license": "",
-      "context_tokens": 16384,
-      "pending_pin": true
+      "license": "Apache-2.0",
+      "context_tokens": 16384
     },
     {
       "id": "text-32gb",
-      "label": "Built-in model for 32 GB Macs and more",
-      "hint": "Placeholder: largest tier.",
-      "file": "pending-32gb.gguf",
-      "url": "https://example.invalid/pending-32gb.gguf",
-      "sha256": "",
-      "bytes": 0,
-      "ram_mb": 0,
+      "label": "Gemma 4 26B-A4B",
+      "hint": "For 32 GB Macs and more. Highest quality, fast for its size.",
+      "file": "gemma-4-26B-A4B-it-Q4_0.gguf",
+      "url": "https://huggingface.co/ggml-org/gemma-4-26B-A4B-it-GGUF/resolve/9cf8c8db0f83fb4582f15381f8fb1a7c1b0b9ca2/gemma-4-26B-A4B-it-Q4_0.gguf",
+      "sha256": "d208665ab1cd3a69f7a9a4bc59430e8448c8093d9b06334f566ac59d6d504a03",
+      "bytes": 14618145824,
+      "ram_mb": 16800,
       "tier_gb": 32,
-      "license": "",
-      "context_tokens": 32768,
-      "pending_pin": true
+      "license": "Apache-2.0",
+      "context_tokens": 16384
     }
   ]
 }

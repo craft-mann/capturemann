@@ -306,21 +306,34 @@ mod tests {
     }
 
     #[test]
-    fn the_builtin_catalogue_parses_and_offers_nothing_until_pinned() {
+    fn the_builtin_catalogue_is_pinned_and_open_licensed() {
         let c = TextCatalog::parse(BUILTIN).unwrap();
-        assert_eq!(c.models.len(), 3);
-        assert!(c.models.iter().all(|m| m.base.pending_pin));
         assert_eq!(
             c.models.iter().map(|m| m.tier_gb).collect::<Vec<_>>(),
             [8, 16, 32]
         );
+        assert!(c.models.iter().all(|m| !m.base.pending_pin));
+        assert!(c.models.iter().all(|m| m.base.sha256.len() == 64));
+        assert!(c
+            .models
+            .iter()
+            .all(|m| m.base.url.contains("/resolve/") && m.license == "Apache-2.0"));
+        let dir = tempfile::tempdir().unwrap();
+        let s = TextModelStore::with_catalog(dir.path(), c);
+        assert_eq!(s.list().models.len(), 3);
+    }
+
+    #[test]
+    fn an_unpinned_entry_is_hidden_and_refused() {
+        let pending = format!(r#"{{ "models": [{}] }}"#, entry("p", 8, true));
+        let c = TextCatalog::parse(&pending).unwrap();
         let dir = tempfile::tempdir().unwrap();
         let s = TextModelStore::with_catalog(dir.path(), c);
         assert!(s.list().models.is_empty(), "pending entries are hidden");
-        let e = s.download("text-8gb", &mut |_| true).unwrap_err();
+        let e = s.download("p", &mut |_| true).unwrap_err();
         assert!(e.to_string().contains("cannot be downloaded yet"), "{e}");
-        assert!(s.select("text-16gb").is_err());
-        assert!(s.remove("text-32gb").is_err());
+        assert!(s.select("p").is_err());
+        assert!(s.remove("p").is_err());
     }
 
     #[test]
