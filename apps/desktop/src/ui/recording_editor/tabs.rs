@@ -87,9 +87,13 @@ impl Inspector {
         }
     }
 
-    /// A tab that works on the whole transcript: it gets the wide inspector (R3c, V4).
+    /// A tab that is a heavy text editor on the whole transcript or a report: it gets the wide
+    /// inspector (R3c, V4; the Report tab too, setup and report alike, maintainer Oct 27, 2026).
     pub fn is_wide(self) -> bool {
-        matches!(self, Inspector::Captions | Inspector::Transcript)
+        matches!(
+            self,
+            Inspector::Captions | Inspector::Transcript | Inspector::Report
+        )
     }
 
     /// The tab's name (its tooltip, its accessible name and the panel's title).
@@ -704,11 +708,18 @@ mod tests {
             .all(|t| Inspector::VIDEO.contains(t) || Inspector::AUDIO.contains(t)));
     }
 
-    /// V4: the two wide tabs are the ones that work on the whole transcript.
+    /// V4: the wide tabs are the text editors: captions, transcript and report.
     #[test]
     fn captions_and_transcript_are_the_wide_tabs() {
         let wide: Vec<_> = Inspector::ALL.iter().filter(|t| t.is_wide()).collect();
-        assert_eq!(wide, [&Inspector::Captions, &Inspector::Transcript]);
+        assert_eq!(
+            wide,
+            [
+                &Inspector::Captions,
+                &Inspector::Transcript,
+                &Inspector::Report
+            ]
+        );
     }
 
     /// Q3: a zoom chip opens Zoom; a segment opens Camera (Speed without a camera) from the

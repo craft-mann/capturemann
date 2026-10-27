@@ -467,9 +467,7 @@ impl RecordingEditor {
             // 400 px (board: 380 to 440 at 1440), 600 px on the Captions tab when the window
             // leaves the preview 360 px; it shrinks to `INSPECTOR_MIN_W` before the preview does.
             .w(px(inspector_width(
-                // A report on view is read in the wide inspector (V6).
-                self.tab.is_wide()
-                    || (self.tab == Inspector::Report && self.report_view_open(s, cx)),
+                self.tab.is_wide(),
                 self.ai.view.window_w.get(),
             )))
             .min_w(px(INSPECTOR_MIN_W))
