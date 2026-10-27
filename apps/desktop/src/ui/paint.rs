@@ -529,24 +529,8 @@ pub(crate) const ASSETS: &[(&str, &str)] = &[
         include_str!("../../assets/icons/monitor-speaker.svg"),
     ),
     (
-        "icons/users.svg",
-        include_str!("../../assets/icons/users.svg"),
-    ),
-    (
-        "icons/graduation-cap.svg",
-        include_str!("../../assets/icons/graduation-cap.svg"),
-    ),
-    (
-        "icons/presentation.svg",
-        include_str!("../../assets/icons/presentation.svg"),
-    ),
-    (
         "icons/file.svg",
         include_str!("../../assets/icons/file.svg"),
-    ),
-    (
-        "icons/file-text.svg",
-        include_str!("../../assets/icons/file-text.svg"),
     ),
     (
         "icons/minus.svg",
@@ -708,18 +692,6 @@ pub(crate) const ASSETS: &[(&str, &str)] = &[
         include_str!("../../assets/icons/volume-x.svg"),
     ),
     // Voice (V4, V7): not in the icon kit yet; the board's own Lucide paths.
-    (
-        "icons/users.svg",
-        include_str!("../../assets/icons/users.svg"),
-    ),
-    (
-        "icons/file-text.svg",
-        include_str!("../../assets/icons/file-text.svg"),
-    ),
-    (
-        "icons/bookmark.svg",
-        include_str!("../../assets/icons/bookmark.svg"),
-    ),
     (
         "icons/languages.svg",
         include_str!("../../assets/icons/languages.svg"),

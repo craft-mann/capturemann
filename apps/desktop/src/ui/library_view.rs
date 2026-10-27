@@ -28,7 +28,7 @@ use crate::theme::{scale, type_scale, Theme};
 use crate::ui::app::{self, AppModel, Command, Route};
 use crate::ui::audio_cache::{self, AudioCache};
 use crate::ui::components::{
-    button, button_with_icon, icon, icon_size, keycaps, status_pill, ButtonKind,
+    button, button_with_icon, icon, icon_size, keycaps, shrink_text, status_pill, ButtonKind,
 };
 use crate::ui::kit::{callout, Tone};
 use crate::ui::paint::{rgba_of, TextExt};
@@ -690,7 +690,7 @@ fn audio_frame(
         .text_size(px(11.))
         .text_color(rgba_of(t.text_2))
         .child(icon(preset.0, 11., t.text_2))
-        .child(SharedString::from(preset.1));
+        .child(shrink_text(preset.1));
     let badge_row = div()
         .absolute()
         .bottom(px(10.))
