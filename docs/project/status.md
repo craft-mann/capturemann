@@ -69,8 +69,8 @@ Pending:
 | VOC-1 hardware checks: done, PASS as reported, report stored (Oct 27, 2026) | maintainer | `verification/VOC-1-2026-10-27-maintainer.md` |
 | VOC-2 export checks: done, PASS as reported, report stored (Oct 27, 2026) | maintainer | `verification/VOC-2-2026-10-27-maintainer.md` |
 | Upgrade test on a copy of a real pre-0.2 library | maintainer | `tests/manual/UPGRADE-0.2.md`; only a synthetic 0.1.0 library was tried |
-| ONNX Runtime `ThirdPartyNotices.txt` text for `THIRD_PARTY_LICENSES.md` | maintainer (needs network) | Take it from the `microsoft/onnxruntime` tag matching the ONNX Runtime inside sherpa-onnx v2.0.1, save it as `packaging/sherpa/licenses/ThirdPartyNotices-onnxruntime.txt`, make `packaging/macos/gen-third-party.sh` append it to the "ONNX Runtime" section, run `make licenses`, mention it in `NOTICE` (`packaging/sherpa/README.md`) |
-| `cargo deny check advisories` | maintainer (needs network) | Licences, bans and sources already pass |
+| ONNX Runtime `ThirdPartyNotices.txt` text for `THIRD_PARTY_LICENSES.md` | done Oct 27, 2026 | Added from the `microsoft/onnxruntime` tag v1.28.2 (the version string inside the static library) as `packaging/sherpa/licenses/ThirdPartyNotices-onnxruntime.txt`; `gen-third-party.sh` appends it |
+| `cargo deny check advisories` | done Oct 27, 2026 | "advisories ok"; one warning, `clipboard-win` 5.4.1 is yanked (a Windows-only dependency of `arboard`; not in the macOS build) |
 | Release machine: `make ffmpeg`, `make llama`, `make sherpa`, then `make bundle-release`; signing, notarization, release notes, date in the changelog | maintainer | `docs/development/releasing.md`; the `Release` workflow has never run on GitHub (test on a fork) |
 | Speaker accuracy at scale; AI-9 review set; Vietnamese and long-recording quality of the text model | users and team, then the maintainer | Over the coming weeks; no accuracy figure is claimed until then |
 | `tests/manual/FIRST-RUN-0.2.md` on a clean Mac and the packaged app run once from the DMG | maintainer | |
