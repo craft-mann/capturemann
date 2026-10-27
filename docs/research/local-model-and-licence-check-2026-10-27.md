@@ -4,7 +4,7 @@ Oct 27, 2026 · @Trung Tran
 
 ## Recommendations
 
-Ship speaker labels with **sherpa-onnx + pyannote segmentation-3.0 (MIT) + 3D-Speaker CAM++ VoxCeleb (Apache-2.0)**, and text reports with **llama.cpp** and **Qwen3.5-4B / Qwen3.5-9B / Gemma 4 26B-A4B** for 8 / 16 / 32 GB Macs; every file below was checked at its source on Oct 27, 2026.
+Ship speaker labels with **sherpa-onnx + pyannote segmentation-3.0 (MIT) + 3D-Speaker CAM++ VoxCeleb (Apache-2.0)**, **and text reports with llama.cpp and Gemma 4 E2B-it on every Mac (Qwen3.5-4B as the optional translation model; see B2)**; every file below was checked at its source on Oct 27, 2026.
 
 | Job | Pick | Licences | Verdict |
 | --- | --- | --- | --- |
@@ -12,9 +12,11 @@ Ship speaker labels with **sherpa-onnx + pyannote segmentation-3.0 (MIT) + 3D-Sp
 | Diarization models | `sherpa-onnx-pyannote-segmentation-3-0` (7.0 MB) + `3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx` (29.6 MB) | MIT; Apache-2.0 | Safe to ship (keep notices; see the VoxCeleb note) |
 | Diarization challenger for spike S7 | NVIDIA Nemotron-3-Diarization GGUF (107 MB, up to 8 speakers) on NeMo-Speech.cpp | OpenMDW-1.1; Apache-2.0 | Safe to ship, but macOS support for diarization is unverified |
 | Text runtime | llama.cpp `llama-server` (or the `llama-cpp-2` crate), static, Metal | MIT (llama.cpp and ggml) | Safe to ship |
-| 8 GB Macs | Qwen3.5-4B Q4\_K\_M (2.71 GB) | Apache-2.0 | Safe to ship |
-| 16 GB Macs | Qwen3.5-9B Q4\_K\_M (5.63 GB) | Apache-2.0 | Safe to ship |
-| 32 GB Macs | Gemma 4 26B-A4B-it Q4\_0 (14.6 GB) | Apache-2.0 | Safe to ship |
+| Report model, every Mac (default) | **Gemma 4 E2B-it Q4\_0** (2.84 GB file, about 3.7 GB in use); best score in our test (B2) | Apache-2.0 | Safe to ship |
+| Optional, 16 GB+ (best translation) | Qwen3.5-4B Q4\_K\_M (2.71 GB file, about 4.1 GB in use) | Apache-2.0 | Safe to ship |
+| Lowest-memory fallback | Qwen3.5-2B Q4\_K\_M (1.27 GB file, about 2.1 GB in use) | Apache-2.0 | Safe to ship; weaker extraction |
+
+*Revised Oct 27 after the small-model test (B2): reports don't need reasoning, so the 9B, 12B and 26B models in section B are no longer recommended; they stay listed for reference.*
 
 **Three facts that change the plan table from Oct 16.** Gemma 4 is licensed under plain Apache-2.0 (Gemma 3 and earlier used Google's own terms). Qwen3.8-27B (Apache-2.0, Aug 2026) is newer than Qwen3.6. NVIDIA's original Sortformer v1 is non-commercial (CC-BY-NC-4.0) and the 4-speaker models can't cover 6 speakers.
 
@@ -73,6 +75,26 @@ Qwen3.5-4B, Qwen3.5-9B and Gemma 4 26B-A4B fit 8, 16 and 32 GB Macs with room fo
 **Converted GGUF files keep the original licence** (the repos above tag Apache-2.0 or MIT). Mirroring them is allowed: keep the licence file and a NOTICE naming the source model. On 32 GB Macs, macOS limits how much memory the GPU may use by default; whether \~21 GB fits next to CaptureMann is **unverified**, which is why the 32 GB pick is the 14.6 GB Gemma model.
 
 **One measurement (not a Mac):** Qwen3.5-4B Q4\_K\_M in a static CPU build of `llama-server` on Linux with 16K context and 4 slots peaked at 5.3 GB resident. That build also keeps a CPU-optimised copy of the weights, so a Metal build should use less.
+
+## B2. Smaller models without reasoning (tested Oct 27)
+
+**Gemma 4 E2B-it is the best fit for transcript tasks:** in our test it got every decision, action item and owner right in both English and Vietnamese, from a 2.84 GB file. That is about half the memory of the earlier 16 GB pick. Reports, minutes and follow-up actions only extract and rephrase what the transcript says, so models of this size are enough; reasoning ("thinking") was turned off for every model.
+
+**Test.** Each model ran three tasks: English meeting minutes, Vietnamese meeting minutes (both as schema-constrained JSON), and translating a 6-line English excerpt into Vietnamese. Setup: same prompts, temperature 0.2, `llama-server` CPU build on Linux, 2 cores, 16K context, one slot. The answer key has 4 items per meeting: decisions, actions with owners, and open questions. One short sample per task, so treat this as a screen, not a verdict.
+
+| Model (GGUF file, licence) | File | Est. peak on Mac (16K) | Peak RSS in test (CPU) | EN minutes (of 4) | VI minutes (of 4) | EN→VI translation | Mistakes seen | Verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **Gemma 4 E2B-it** (`ggml-org/gemma-4-E2B-it-GGUF` → `gemma-4-E2B-it-Q4_0.gguf`, Apache-2.0) | 2.84 GB | \~3.7 GB | 4.0 GB | **4** | **4** | Good | Two redundant open questions; one timestamp on the line before the commitment | **Pick** for every Mac |
+| **Qwen3.5-4B** (`lmstudio-community/Qwen3.5-4B-GGUF` → `Qwen3.5-4B-Q4_K_M.gguf`, Apache-2.0) | 2.71 GB | \~4.1 GB | 5.3 GB | 4 | 3 | **Best** | Missed Hung's "ask HR" action; one junk open question (`"at"`) | Second choice; best for translation |
+| Qwen3.5-2B (`lmstudio-community/Qwen3.5-2B-GGUF` → `Qwen3.5-2B-Q4_K_M.gguf`, Apache-2.0) | 1.27 GB | \~2.1 GB | 2.3 GB | 3 | 3 | Good | Turned An's release-notes task into an open question; wrong timestamp on the launch decision | Fallback for very low memory |
+| Ministral 3 3B (`mistralai/Ministral-3-3B-Instruct-2512-GGUF` → `…Q4_K_M.gguf`, Apache-2.0) | 2.15 GB | \~4.5 GB (full-attention KV 1.7 GB) | 5.5 GB | 4 | 2 | Fair ("tính chất" for "feature") | Missed the Vietnamese decision, invented an open question | Not recommended |
+| Qwen3.5-0.8B (`lmstudio-community/Qwen3.5-0.8B-GGUF` → `Qwen3.5-0.8B-Q4_K_M.gguf`, Apache-2.0) | 0.53 GB | \~1.0 GB | 1.3 GB | 3 | 1 | Poor (dropped timestamps, "release" became "develop") | Wrong timestamps, missed most Vietnamese items | Not good enough |
+
+Relative speed on the same CPU (seconds for the three tasks together): 0.8B 40, 2B 89, Gemma 4 E2B 134, Ministral 3B 153, Qwen3.5-4B 194. On a Mac with Metal all are much faster; Gemma 4 E2B runs about 1.5× faster than Qwen3.5-4B here.
+
+**Checked and left out:** Qwen3-4B-Instruct-2507 (Apache-2.0, no thinking mode, but every layer keeps a KV cache: 2.4 GB at 16K); Phi-4-mini (MIT; Vietnamese not supported); IBM Granite 4.2 3B (Apache-2.0; built for reasoning, Vietnamese not among its tested languages); Liquid LFM2.5 ("lfm1.0" licence, not Apache/MIT).
+
+**Still to check in S8:** long transcripts (30–90 minutes, about 6,000–18,000 tokens), where the chunk-and-merge step and the citation checks matter more than in a 6-line sample. Gemma 4 E2B keeps a very small KV cache (sliding-window and shared layers), so 32K context stays cheap if a single pass is better than chunking.
 
 ## B. Vietnamese, structured JSON and current names
 
