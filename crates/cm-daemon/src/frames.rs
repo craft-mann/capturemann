@@ -232,7 +232,10 @@ impl FrameCache {
         let root = std::env::temp_dir();
         self.swept_stale.call_once(|| sweep_stale(&root));
         let nanos = OffsetDateTime::now_utc().unix_timestamp_nanos();
-        let dir = root.join(format!("{DIR_PREFIX}{}-{nanos:x}", std::process::id()));
+        // The counter keeps two daemons of one process (tests) from meeting on one clock tick.
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let dir = root.join(format!("{DIR_PREFIX}{}-{nanos:x}-{n}", std::process::id()));
         create_private_dir(&dir)
             .map_err(|e| CmError::internal(format!("cannot create `{}`: {e}", dir.display())))?;
         Ok(dir)
