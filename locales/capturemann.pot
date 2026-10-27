@@ -1607,7 +1607,7 @@ msgid "Everything CaptureMann can use is allowed."
 msgstr ""
 
 #. FACT: owner review required (privacy statement)
-msgid "Everything here runs on this Mac. Nothing is downloaded unless you press Download, and nothing is sent anywhere unless you choose a remote text model."
+msgid "Everything here runs on this Mac. Nothing is downloaded unless you press Download, and nothing is sent anywhere."
 msgstr ""
 
 msgid "Excluded windows"

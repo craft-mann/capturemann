@@ -108,7 +108,7 @@ Delete the test library afterwards.
 
 ## Not covered here
 
-AC6 (YouTube caption tracks, PUB-2) and AC7 (Confirm with a remote provider) are not built; text
+AC6 (YouTube caption tracks, PUB-2) and AC7 (Confirm with a remote provider) is withdrawn; text
 models are local only (maintainer decision, Oct 26, 2026).
 
 ## Report

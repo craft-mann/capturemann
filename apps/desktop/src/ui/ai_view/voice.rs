@@ -1,7 +1,7 @@
 //! The voice sections of the AI page (board V8): speaker labels and the text model. A child of
 //! `ai_view` so it can use the page's fields; the rules are in `crate::ai::voice` and the
 //! buttons' work in `ui::ai_voice`. The built-in text model only (maintainer decision Oct 27,
-//! 2026): no other server, no Remote, no API key or first-send notice. Board V8 has no design for
+//! 2026): no other server and no API key. Board V8 has no design for
 //! the built-in engine, so its list is plain rows in the same card, with the page's own buttons and
 //! progress bar.
 

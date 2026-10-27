@@ -6,14 +6,11 @@
 //!   a second miss is `job_failed` with `reason: "invalid_model_output"` ([`TextModelError`]).
 //! * Providers ([`Provider`]): `none` (no network, callers get `invalid_input` with
 //!   `data.reason = "no_text_model"`) and `embedded` (CaptureMann's own `llama-server` helper on a
-//!   loopback port, see [`engine`]; the models are [`store`]). These are the only two settings can
-//!   select. `local` is the internal loopback client the engine talks to its helper with;
-//!   `openai_compatible` and `anthropic` are dormant and unreachable (settings cannot select them).
-//! * **Local versus remote is decided by the URL host** ([`TextModelConfig::is_local`]): loopback
-//!   is local, everything else, LAN included, is remote. A `local` provider only ever talks to
-//!   loopback: with any other host every request is refused before it is sent.
-//! * Keys are never in settings (only `ai.text.key_name`); the caller reads the key from the
-//!   keychain and passes it in. Nothing here logs or returns it.
+//!   loopback port, see [`engine`]; the models are [`store`]). There is no other provider: no
+//!   user-chosen server, no remote service and no API key (maintainer decision, Oct 26-27, 2026).
+//! * The helper is reached with [`HttpTextModel`], an OpenAI-compatible client that **only ever
+//!   connects to loopback**: every request starts with [`check_loopback`], which refuses any other
+//!   host (and anything that is not `http://`) before a byte is sent.
 //! * [`chunk`] is the shared map-reduce helper for transcripts longer than the context.
 //!
 //! The settings (`ai.text.*`, app-only) are read with [`TextModelConfig::from_settings`].
@@ -38,16 +35,10 @@ pub const KEY_MODEL: &str = "ai.text.model";
 /// The built-in model (a `text_models.json` id) the `embedded` provider runs; empty: the
 /// text-model store's active one.
 pub const KEY_EMBEDDED_MODEL: &str = "ai.text.embedded_model";
-pub const KEY_KEY_NAME: &str = "ai.text.key_name";
 pub const KEY_CONTEXT_TOKENS: &str = "ai.text.context_tokens";
 pub const KEY_TIMEOUT_S: &str = "ai.text.timeout_s";
-/// The host the user has been told text is sent to ("Text from your recordings will be sent to
-/// <host>"); a different host shows the notice again.
-pub const KEY_NOTICE_HOST: &str = "ai.text.remote_notice_host";
-
 pub const DEFAULT_CONTEXT_TOKENS: u32 = 8192;
 pub const DEFAULT_TIMEOUT_S: u64 = 300;
-pub const ANTHROPIC_URL: &str = "https://api.anthropic.com";
 
 /// The message of an unreachable server (AI-7).
 pub const UNREACHABLE_HINT: &str = "Open the AI page and check the built-in text model";
@@ -57,31 +48,22 @@ pub const UNREACHABLE_HINT: &str = "Open the AI page and check the built-in text
 #[serde(rename_all = "snake_case")]
 pub enum Provider {
     None,
-    Local,
     /// The helper process CaptureMann ships ([`engine`]).
     Embedded,
-    OpenAiCompatible,
-    Anthropic,
 }
 
 impl Provider {
     pub fn as_str(self) -> &'static str {
         match self {
             Provider::None => "none",
-            Provider::Local => "local",
             Provider::Embedded => "embedded",
-            Provider::OpenAiCompatible => "openai_compatible",
-            Provider::Anthropic => "anthropic",
         }
     }
 
     pub fn parse(s: &str) -> Option<Provider> {
         Some(match s {
             "none" => Provider::None,
-            "local" => Provider::Local,
             "embedded" => Provider::Embedded,
-            "openai_compatible" => Provider::OpenAiCompatible,
-            "anthropic" => Provider::Anthropic,
             _ => return None,
         })
     }
@@ -91,12 +73,9 @@ impl Provider {
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextModelConfig {
     pub provider: Provider,
-    pub base_url: String,
     pub model: String,
     /// `embedded` only: the built-in model id (empty: the store's active model).
     pub embedded_model: String,
-    /// The keychain entry name of the API key (never the key).
-    pub key_name: Option<String>,
     pub context_tokens: u32,
     pub timeout_s: u64,
 }
@@ -105,14 +84,22 @@ impl Default for TextModelConfig {
     fn default() -> Self {
         TextModelConfig {
             provider: Provider::None,
-            base_url: String::new(),
             model: String::new(),
             embedded_model: String::new(),
-            key_name: None,
             context_tokens: DEFAULT_CONTEXT_TOKENS,
             timeout_s: DEFAULT_TIMEOUT_S,
         }
     }
+}
+
+/// Whether `host` is this machine: `localhost`, `127.0.0.0/8` or `::1`.
+pub fn is_loopback_host(host: &str) -> bool {
+    let h = host.trim_end_matches('.');
+    if h == "localhost" {
+        return true;
+    }
+    h.parse::<std::net::IpAddr>()
+        .is_ok_and(|ip| ip.to_canonical().is_loopback())
 }
 
 /// The host of a URL, lowercase, without brackets, port or credentials.
@@ -128,20 +115,33 @@ pub fn url_host(url: &str) -> Option<String> {
     (!host.is_empty()).then(|| host.to_ascii_lowercase())
 }
 
-/// Whether `host` is this machine: `localhost`, `127.0.0.0/8` or `::1`.
-pub fn is_loopback_host(host: &str) -> bool {
-    let h = host.trim_end_matches('.');
-    if h == "localhost" {
-        return true;
+/// The check every request of [`HttpTextModel`] starts with: `base_url` must be plain `http://`
+/// to this computer (`localhost`, `127.0.0.0/8` or `::1`). Anything else is refused before a
+/// request is sent, so recording text can never leave the machine through this client.
+pub fn check_loopback(base_url: &str) -> Result<(), TextModelError> {
+    let Some(host) = url_host(base_url) else {
+        return Err(TextModelError::invalid_input(
+            "The text model needs a server address",
+        ));
+    };
+    if !base_url.trim().starts_with("http://") {
+        return Err(TextModelError::invalid_input(
+            "The text model address must start with http://",
+        ));
     }
-    h.parse::<std::net::IpAddr>()
-        .is_ok_and(|ip| ip.to_canonical().is_loopback())
+    if !is_loopback_host(&host) {
+        return Err(TextModelError::invalid_input(format!(
+            "The text model must run on this computer (127.0.0.1 or localhost), not on {host}."
+        )));
+    }
+    Ok(())
 }
 
 impl TextModelConfig {
-    /// Reads `ai.text.*` from the settings map. Unknown, malformed or unavailable (`local`, `openai_compatible`,
-    /// `anthropic`) values fall back to the defaults (provider `none`), so a hand-edited file can never turn the
-    /// network on. There is no server address setting: the built-in engine's address is chosen when it starts.
+    /// Reads `ai.text.*` from the settings map. Unknown or malformed values fall back to the
+    /// defaults (provider `none`), so a hand-edited file can never turn the engine on by accident
+    /// or name another server: there is no address setting, the built-in engine's address is
+    /// chosen when it starts.
     pub fn from_settings(s: &Map<String, Value>) -> TextModelConfig {
         let text = |k: &str| {
             s.get(k)
@@ -151,16 +151,11 @@ impl TextModelConfig {
         };
         let provider = text(KEY_PROVIDER)
             .and_then(|p| Provider::parse(&p))
-            // The built-in engine only in 0.2.0 (maintainer, Oct 27, 2026): the other providers
-            // stay in the code but a settings file can not select them.
-            .filter(|p| matches!(p, Provider::None | Provider::Embedded))
             .unwrap_or(Provider::None);
         TextModelConfig {
             provider,
-            base_url: String::new(),
             model: text(KEY_MODEL).unwrap_or_default(),
             embedded_model: text(KEY_EMBEDDED_MODEL).unwrap_or_default(),
-            key_name: text(KEY_KEY_NAME),
             context_tokens: s
                 .get(KEY_CONTEXT_TOKENS)
                 .and_then(Value::as_u64)
@@ -174,131 +169,14 @@ impl TextModelConfig {
         }
     }
 
-    /// The URL requests go to: the setting, else the provider's default.
-    pub fn effective_base_url(&self) -> String {
-        let url = self.base_url.trim().trim_end_matches('/');
-        if !url.is_empty() {
-            return url.to_owned();
-        }
-        match self.provider {
-            Provider::Anthropic => ANTHROPIC_URL.to_owned(),
-            // The embedded helper's address is chosen when it starts ([`engine`]); a setting
-            // never names it.
-            Provider::None | Provider::Local | Provider::OpenAiCompatible | Provider::Embedded => {
-                String::new()
-            }
-        }
-    }
-
-    /// The host requests go to (`None` for provider `none` or an unusable URL).
-    pub fn host(&self) -> Option<String> {
-        match self.provider {
-            Provider::None => None,
-            Provider::Embedded => Some("127.0.0.1".to_owned()),
-            _ => url_host(&self.effective_base_url()),
-        }
-    }
-
-    /// Whether the model runs on this machine. Decided by the URL host alone: a `local`
-    /// provider with a LAN address is remote (and refused, see [`check_endpoint`](Self::check_endpoint)).
-    /// Provider `none` is not remote either: it sends nothing, so it counts as local.
-    pub fn is_local(&self) -> bool {
-        match self.provider {
-            Provider::None | Provider::Embedded => true,
-            _ => self.host().is_some_and(|h| is_loopback_host(&h)),
-        }
-    }
-
-    /// Whether text would leave this machine.
-    pub fn is_remote(&self) -> bool {
-        self.provider != Provider::None && !self.is_local()
-    }
-
-    /// The checks every request starts with: a usable URL and, for a `local` provider, loopback.
+    /// The check every use starts with: provider `none` is `no_text_model`. The built-in
+    /// helper listens on 127.0.0.1 only and the client built for it runs [`check_loopback`] on
+    /// its address again.
     pub fn check_endpoint(&self) -> Result<(), TextModelError> {
-        if self.provider == Provider::None {
-            return Err(TextModelError::no_text_model());
+        match self.provider {
+            Provider::None => Err(TextModelError::no_text_model()),
+            Provider::Embedded => Ok(()),
         }
-        if self.provider == Provider::Embedded {
-            // The helper listens on 127.0.0.1 only; the client built for it is a `local`
-            // provider, so this check runs again on its address.
-            return Ok(());
-        }
-        let url = self.effective_base_url();
-        let Some(host) = url_host(&url) else {
-            return Err(TextModelError::invalid_input(
-                "The text model needs a server address",
-            ));
-        };
-        if !(url.starts_with("http://") || url.starts_with("https://")) {
-            return Err(TextModelError::invalid_input(
-                "The text model address must start with http:// or https://",
-            ));
-        }
-        if self.provider == Provider::Local && !is_loopback_host(&host) {
-            return Err(TextModelError::invalid_input(format!(
-                "A local text model must run on this computer (127.0.0.1 or localhost), not on {host}."
-            )));
-        }
-        // Plain http is only for this machine: a key or recording text never crosses a network
-        // unencrypted.
-        if url.starts_with("http://") && !is_loopback_host(&host) {
-            return Err(TextModelError::invalid_input(format!(
-                "{host} must be reached over https://"
-            )));
-        }
-        Ok(())
-    }
-
-    /// The text the first-use notice shows.
-    pub fn notice_text(&self) -> Option<String> {
-        self.is_remote()
-            .then(|| self.host())
-            .flatten()
-            .map(|h| format!("Text from your recordings will be sent to {h}"))
-    }
-
-    /// The Confirm-tier plan of an agent call that would send `chars` characters of text to
-    /// this provider (AI-7.AC3). `None` for `none` and for a local provider: those are Free.
-    /// The daemon shows `text` in the dialog; callers (AI-2, AI-5, AI-9) add it to their own plan.
-    pub fn send_plan(&self, chars: usize) -> Option<SendPlan> {
-        if !self.is_remote() {
-            return None;
-        }
-        let host = self.host()?;
-        Some(SendPlan {
-            text: format!(
-                "Send {chars} characters of text from your recordings to {host} \
-                 (model {})",
-                if self.model.is_empty() {
-                    "not chosen"
-                } else {
-                    &self.model
-                }
-            ),
-            host,
-            chars,
-            provider: self.provider,
-            model: self.model.clone(),
-        })
-    }
-}
-
-/// What a Confirm dialog says about text leaving the machine.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct SendPlan {
-    /// The dialog line.
-    pub text: String,
-    pub host: String,
-    pub chars: usize,
-    pub provider: Provider,
-    pub model: String,
-}
-
-impl SendPlan {
-    pub fn details(&self) -> Value {
-        json!({ "host": self.host, "characters": self.chars, "provider": self.provider,
-                "model": self.model, "network": self.text })
     }
 }
 
@@ -455,7 +333,7 @@ impl JsonRequest {
         }
     }
 
-    /// The characters the request sends (what the Confirm dialog counts).
+    /// The characters the request sends (the size tests check against the context).
     pub fn chars(&self) -> usize {
         self.system.as_deref().map_or(0, |s| s.chars().count())
             + self
@@ -505,14 +383,13 @@ impl TextModel for NoTextModel {
     }
 }
 
-/// The model for `config` (`key` is the API key read from the keychain by name, if any).
-pub fn build(config: &TextModelConfig, key: Option<String>) -> Box<dyn TextModel> {
+/// The model for `config`.
+pub fn build(config: &TextModelConfig) -> Box<dyn TextModel> {
     match config.provider {
         Provider::None => Box::new(NoTextModel),
         // The engine is the daemon's to wire ([`engine::EmbeddedTextModel`]); without one the
         // provider cannot answer.
         Provider::Embedded => Box::new(engine::Unwired),
-        _ => Box::new(HttpTextModel::new(config.clone(), key)),
     }
 }
 
@@ -565,20 +442,8 @@ pub fn test_model(model: &dyn TextModel, name: &str) -> TestOutcome {
 mod tests {
     use super::*;
 
-    fn cfg(provider: &str, url: &str) -> TextModelConfig {
-        let mut m = Map::new();
-        m.insert(KEY_PROVIDER.into(), json!(provider));
-        let mut c = TextModelConfig::from_settings(&m);
-        // The dormant providers can not come from settings; set them directly.
-        if let Some(p) = Provider::parse(provider) {
-            c.provider = p;
-        }
-        c.base_url = url.to_owned();
-        c
-    }
-
     #[test]
-    fn settings_can_not_select_a_remote_provider() {
+    fn settings_choose_only_none_or_embedded() {
         for p in ["local", "openai_compatible", "anthropic", "bogus"] {
             let mut m = Map::new();
             m.insert(KEY_PROVIDER.into(), json!(p));
@@ -586,10 +451,10 @@ mod tests {
         }
         let mut m = Map::new();
         m.insert(KEY_PROVIDER.into(), json!("embedded"));
-        m.insert("ai.text.base_url".into(), json!("https://evil.example/v1"));
-        let c = TextModelConfig::from_settings(&m);
-        assert_eq!(c.provider, Provider::Embedded);
-        assert_eq!(c.base_url, "");
+        assert_eq!(
+            TextModelConfig::from_settings(&m).provider,
+            Provider::Embedded
+        );
     }
 
     #[test]
@@ -624,51 +489,35 @@ mod tests {
         assert_eq!(c.provider, Provider::None);
         assert_eq!(c.context_tokens, 8192);
         assert_eq!(c.timeout_s, 300);
-        assert!(c.send_plan(10).is_none());
         assert_eq!(c.check_endpoint().unwrap_err().kind, ErrorKind::NoTextModel);
-        // An unknown provider never turns the network on.
-        assert_eq!(cfg("skynet", "http://x").provider, Provider::None);
     }
 
     #[test]
-    fn a_local_provider_with_a_lan_address_is_remote_and_refused() {
-        let c = cfg("local", "http://192.168.1.20:8080/v1");
-        assert!(!c.is_local());
-        assert!(c.is_remote());
-        let e = c.check_endpoint().unwrap_err();
-        assert_eq!(e.kind, ErrorKind::InvalidInput);
-        assert!(e.message.contains("192.168.1.20"));
-        // The same address through the OpenAI-compatible provider (over https) is a valid remote.
-        let c = cfg("openai_compatible", "https://192.168.1.20/v1");
-        assert!(c.is_remote());
-        assert!(c.check_endpoint().is_ok());
-        assert!(cfg("openai_compatible", "http://192.168.1.20:8080/v1")
-            .check_endpoint()
-            .is_err());
-    }
-
-    #[test]
-    fn loopback_providers_are_local_with_no_plan() {
-        let c = cfg("local", "http://127.0.0.1:8080/v1");
-        assert!(c.is_local() && c.check_endpoint().is_ok());
-        assert!(c.send_plan(100).is_none());
-        let c = cfg("openai_compatible", "http://localhost:8081/v1");
-        assert!(c.is_local());
-        assert!(c.notice_text().is_none());
-    }
-
-    #[test]
-    fn remote_plan_names_host_and_characters() {
-        let mut c = cfg("anthropic", "");
-        c.model = "claude-x".into();
-        assert_eq!(c.host().as_deref(), Some("api.anthropic.com"));
-        let p = c.send_plan(1234).unwrap();
-        assert_eq!(p.host, "api.anthropic.com");
-        assert!(p.text.contains("1234 characters") && p.text.contains("api.anthropic.com"));
-        assert_eq!(
-            c.notice_text().unwrap(),
-            "Text from your recordings will be sent to api.anthropic.com"
-        );
+    fn only_plain_http_to_this_computer_passes_the_loopback_check() {
+        for ok in [
+            "http://127.0.0.1:8080/v1",
+            "http://localhost:8081/v1",
+            "http://[::1]:9/v1",
+        ] {
+            assert!(check_loopback(ok).is_ok(), "{ok}");
+        }
+        for bad in [
+            "http://192.168.1.20:8080/v1",
+            "https://192.168.1.20/v1",
+            "https://api.example.com/v1",
+            "http://localhost.evil.com/v1",
+            "http://0.0.0.0:8080/v1",
+            "ftp://127.0.0.1/",
+            "",
+            "nonsense",
+        ] {
+            let e = check_loopback(bad).unwrap_err();
+            assert_eq!(e.kind, ErrorKind::InvalidInput, "{bad}");
+        }
+        assert!(check_loopback("http://192.168.1.20:8080/v1")
+            .unwrap_err()
+            .message
+            .contains("192.168.1.20"));
     }
 
     #[test]

@@ -1,26 +1,21 @@
-//! The HTTP providers of AI-7: the OpenAI-compatible client (used over loopback for the built-in
-//! engine's helper; the remote paths are dormant) and Anthropic (dormant). Blocking, on `ureq` with the system TLS stack like the rest of the workspace.
+//! The OpenAI-compatible client of AI-7, used over loopback for the built-in engine's helper.
+//! Blocking, on `ureq` like the rest of the workspace.
 //!
 //! Safety rules enforced here, not by the callers:
-//! * every request starts with [`TextModelConfig::check_endpoint`] (a `local` provider only talks
-//!   to loopback; plain `http://` only to loopback);
-//! * redirects are never followed (a local server cannot bounce text to another host);
-//! * the API key is only ever put in a request header, and is masked in any message that is
-//!   returned or logged.
+//! * every request starts with [`check_loopback`]: only plain `http://` to this computer;
+//! * redirects are never followed (the helper cannot bounce text to another host).
 
 use std::io::{BufRead as _, BufReader, Read as _};
 use std::time::Duration;
 
 use serde_json::{json, Value};
-use ureq::tls::{RootCerts, TlsConfig, TlsProvider};
 
 use super::schema::validate;
 use super::{
-    ErrorKind, JsonReply, JsonRequest, Message, Provider, TextModel, TextModelConfig,
+    check_loopback, url_host, ErrorKind, JsonReply, JsonRequest, Message, TextModel,
     TextModelError, UNREACHABLE_HINT,
 };
 
-const ANTHROPIC_VERSION: &str = "2023-06-01";
 /// Longest reply body read (a text reply, not a download).
 const MAX_BODY: u64 = 16 * 1024 * 1024;
 
@@ -31,12 +26,6 @@ fn agent(timeout: Duration) -> ureq::Agent {
         .max_redirects_will_error(false)
         .timeout_connect(Some(Duration::from_secs(10).min(timeout)))
         .timeout_global(Some(timeout))
-        .tls_config(
-            TlsConfig::builder()
-                .provider(TlsProvider::NativeTls)
-                .root_certs(RootCerts::PlatformVerifier)
-                .build(),
-        )
         .build()
         .into()
 }
@@ -48,7 +37,7 @@ struct Reply {
 
 enum Fail {
     Timeout,
-    Unreachable(String),
+    Unreachable,
     /// The progress hook asked to stop.
     Cancelled,
     /// The server sent an error event inside a stream.
@@ -74,13 +63,13 @@ fn classify(e: &ureq::Error) -> Fail {
     match e {
         ureq::Error::Timeout(t) => {
             if matches!(t, ureq::Timeout::Resolve | ureq::Timeout::Connect) {
-                Fail::Unreachable(e.to_string())
+                Fail::Unreachable
             } else {
                 Fail::Timeout
             }
         }
         ureq::Error::Io(io) if io.kind() == std::io::ErrorKind::TimedOut => Fail::Timeout,
-        other => Fail::Unreachable(other.to_string()),
+        _ => Fail::Unreachable,
     }
 }
 
@@ -88,7 +77,7 @@ fn io_fail(e: &std::io::Error) -> Fail {
     if e.kind() == std::io::ErrorKind::TimedOut || e.to_string().contains("timeout") {
         Fail::Timeout
     } else {
-        Fail::Unreachable(e.to_string())
+        Fail::Unreachable
     }
 }
 
@@ -183,18 +172,6 @@ fn get(url: &str, headers: &[(String, String)], timeout: Duration) -> Result<Rep
     read_body(req.call().map_err(|e| classify(&e))?)
 }
 
-fn post(
-    url: &str,
-    headers: &[(String, String)],
-    body: &Value,
-    timeout: Duration,
-) -> Result<Reply, Fail> {
-    match post_outcome(url, headers, body, timeout, None)? {
-        Outcome::Reply(r) => Ok(r),
-        Outcome::Streamed(_) => Err(Fail::Unreachable("unexpected stream".to_owned())),
-    }
-}
-
 fn post_outcome(
     url: &str,
     headers: &[(String, String)],
@@ -202,7 +179,7 @@ fn post_outcome(
     timeout: Duration,
     progress: Option<&mut Progress<'_>>,
 ) -> Result<Outcome, Fail> {
-    let bytes = serde_json::to_vec(body).map_err(|e| Fail::Unreachable(e.to_string()))?;
+    let bytes = serde_json::to_vec(body).map_err(|_| Fail::Unreachable)?;
     let mut req = agent(timeout)
         .post(url)
         .header("content-type", "application/json");
@@ -227,42 +204,40 @@ pub(super) fn probe_health(port: u16) -> super::engine::Health {
     }
 }
 
-/// The `ai.text` provider over HTTP.
+/// The OpenAI-compatible client of the built-in engine: `POST {base_url}/chat/completions` on
+/// this computer.
 pub struct HttpTextModel {
-    config: TextModelConfig,
-    key: Option<String>,
+    base_url: String,
+    model: String,
+    timeout_s: u64,
 }
 
 impl HttpTextModel {
-    pub fn new(config: TextModelConfig, key: Option<String>) -> Self {
+    /// `base_url` is the helper's `http://127.0.0.1:<port>/v1`; any other host is refused when a
+    /// request is made ([`check_loopback`]).
+    pub fn new(base_url: impl Into<String>, model: impl Into<String>, timeout_s: u64) -> Self {
         HttpTextModel {
-            config,
-            key: key.filter(|k| !k.is_empty()),
+            base_url: base_url.into().trim().trim_end_matches('/').to_owned(),
+            model: model.into(),
+            timeout_s,
         }
     }
 
     fn timeout(&self) -> Duration {
-        Duration::from_secs(self.config.timeout_s.max(1))
+        Duration::from_secs(self.timeout_s.max(1))
     }
 
-    /// Hides the key if a server echoed it back.
-    fn mask(&self, text: &str) -> String {
-        match &self.key {
-            Some(k) if text.contains(k.as_str()) => text.replace(k.as_str(), "***"),
-            _ => text.to_owned(),
-        }
+    fn host(&self) -> String {
+        url_host(&self.base_url).unwrap_or_default()
     }
 
-    fn unreachable(&self, detail: &str) -> TextModelError {
-        let host = self.config.host().unwrap_or_default();
-        let message = if self.config.is_local() {
-            format!("The text model server at {host} did not answer. {UNREACHABLE_HINT}.")
-        } else {
-            format!("Cannot reach {host} ({}).", self.mask(detail))
-        };
+    fn unreachable(&self) -> TextModelError {
         TextModelError {
             kind: ErrorKind::Unreachable,
-            message,
+            message: format!(
+                "The text model server at {} did not answer. {UNREACHABLE_HINT}.",
+                self.host()
+            ),
         }
     }
 
@@ -272,10 +247,10 @@ impl HttpTextModel {
                 kind: ErrorKind::Timeout,
                 message: format!(
                     "The text model did not answer within {} seconds",
-                    self.config.timeout_s
+                    self.timeout_s
                 ),
             },
-            Fail::Unreachable(d) => self.unreachable(&d),
+            Fail::Unreachable => self.unreachable(),
             Fail::Cancelled => TextModelError {
                 kind: ErrorKind::Cancelled,
                 message: "The request was cancelled".to_owned(),
@@ -284,27 +259,11 @@ impl HttpTextModel {
                 kind: ErrorKind::Server,
                 message: format!(
                     "{} sent an error: {}",
-                    self.config.host().unwrap_or_default(),
-                    self.mask(&d).chars().take(400).collect::<String>()
+                    self.host(),
+                    d.chars().take(400).collect::<String>()
                 ),
             },
         }
-    }
-
-    fn headers(&self) -> Vec<(String, String)> {
-        let mut h = Vec::new();
-        match (self.config.provider, &self.key) {
-            (Provider::Anthropic, Some(k)) => {
-                h.push(("x-api-key".to_owned(), k.clone()));
-                h.push(("anthropic-version".to_owned(), ANTHROPIC_VERSION.to_owned()));
-            }
-            (Provider::Anthropic, None) => {
-                h.push(("anthropic-version".to_owned(), ANTHROPIC_VERSION.to_owned()));
-            }
-            (_, Some(k)) => h.push(("authorization".to_owned(), format!("Bearer {k}"))),
-            _ => {}
-        }
-        h
     }
 
     /// The server's own words for a failed request.
@@ -319,10 +278,9 @@ impl HttpTextModel {
                     .or_else(|| v["message"].as_str())
             })
             .map_or_else(|| r.body.trim().to_owned(), str::to_owned);
-        let detail: String = self.mask(&detail).chars().take(400).collect();
-        let host = self.config.host().unwrap_or_default();
+        let detail: String = detail.chars().take(400).collect();
+        let host = self.host();
         let message = match r.status {
-            401 | 403 => format!("{host} refused the API key (HTTP {}). {detail}", r.status),
             404 => format!("The text model was not found on {host} (HTTP 404). {detail}"),
             _ => format!("{host} answered HTTP {}: {detail}", r.status),
         };
@@ -339,16 +297,13 @@ impl HttpTextModel {
         messages: &[Message],
         progress: Option<&mut Progress<'_>>,
     ) -> Result<String, TextModelError> {
-        self.config.check_endpoint()?;
-        if self.config.model.is_empty() {
+        check_loopback(&self.base_url)?;
+        if self.model.is_empty() {
             return Err(TextModelError::invalid_input(
                 "Choose a text model on the AI page first",
             ));
         }
-        match self.config.provider {
-            Provider::Anthropic => self.anthropic_once(req, messages),
-            _ => self.openai_once(req, messages, progress),
-        }
+        self.openai_once(req, messages, progress)
     }
 
     fn system_text(req: &JsonRequest) -> String {
@@ -369,7 +324,7 @@ impl HttpTextModel {
         messages: &[Message],
         mut progress: Option<&mut Progress<'_>>,
     ) -> Result<String, TextModelError> {
-        let url = format!("{}/chat/completions", self.config.effective_base_url());
+        let url = format!("{}/chat/completions", self.base_url);
         let mut msgs = vec![json!({ "role": "system", "content": Self::system_text(req) })];
         msgs.extend(
             messages
@@ -377,7 +332,7 @@ impl HttpTextModel {
                 .map(|m| json!({ "role": m.role, "content": m.content })),
         );
         let mut body = json!({
-            "model": self.config.model,
+            "model": self.model,
             "messages": msgs,
             "stream": progress.is_some(),
             "temperature": 0,
@@ -385,7 +340,7 @@ impl HttpTextModel {
             "response_format": { "type": "json_schema", "json_schema": {
                 "name": req.schema_name, "strict": true, "schema": req.schema } },
         });
-        let headers = self.headers();
+        let headers: [(String, String); 0] = [];
         let mut out = post_outcome(
             &url,
             &headers,
@@ -432,52 +387,6 @@ impl HttpTextModel {
                 kind: ErrorKind::Server,
                 message: "The text model server's reply has no message".to_owned(),
             })
-    }
-
-    fn anthropic_once(
-        &self,
-        req: &JsonRequest,
-        messages: &[Message],
-    ) -> Result<String, TextModelError> {
-        if self.key.is_none() {
-            return Err(TextModelError::invalid_input(
-                "Add the Anthropic API key in Settings > AI first",
-            ));
-        }
-        let url = format!("{}/v1/messages", self.config.effective_base_url());
-        let tool = req.schema_name.clone();
-        let body = json!({
-            "model": self.config.model,
-            "max_tokens": req.max_tokens,
-            "system": req.system.clone().unwrap_or_default(),
-            "messages": messages.iter().map(|m| json!({ "role": m.role, "content": m.content }))
-                .collect::<Vec<_>>(),
-            "tools": [{ "name": tool, "description": "Return the answer as structured data.",
-                        "input_schema": req.schema }],
-            "tool_choice": { "type": "tool", "name": tool },
-        });
-        let reply = post(&url, &self.headers(), &body, self.timeout()).map_err(|f| self.fail(f))?;
-        if !(200..300).contains(&reply.status) {
-            return Err(self.server_error(&reply));
-        }
-        let v: Value = serde_json::from_str(&reply.body).map_err(|_| TextModelError {
-            kind: ErrorKind::Server,
-            message: "The Anthropic reply is not JSON".to_owned(),
-        })?;
-        let blocks = v["content"].as_array().cloned().unwrap_or_default();
-        if let Some(input) = blocks
-            .iter()
-            .find(|b| b["type"] == "tool_use")
-            .map(|b| &b["input"])
-        {
-            return Ok(input.to_string());
-        }
-        // No tool call: take the text and let the validation retry deal with it.
-        Ok(blocks
-            .iter()
-            .filter_map(|b| b["text"].as_str())
-            .collect::<Vec<_>>()
-            .join(""))
     }
 }
 

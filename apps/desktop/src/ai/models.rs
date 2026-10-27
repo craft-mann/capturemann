@@ -39,7 +39,7 @@ pub fn transcribe_hint() -> String {
 
 // TRANSLATORS: FACT: owner review required (privacy statement)
 pub fn privacy_copy() -> String {
-    tr!("Everything here runs on this Mac. Nothing is downloaded unless you press Download, and nothing is sent anywhere unless you choose a remote text model.")
+    tr!("Everything here runs on this Mac. Nothing is downloaded unless you press Download, and nothing is sent anywhere.")
 }
 
 /// One download in flight or interrupted.

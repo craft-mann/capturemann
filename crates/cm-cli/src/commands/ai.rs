@@ -181,13 +181,8 @@ async fn text_model_show(cx: &mut Ctx<'_>) -> Result<(), CliError> {
                 .to_owned();
         }
         format!(
-            "Text model: {} ({}), model {}\n  context {} tokens, timeout {} s, structured output {}\n",
+            "Text model: {}, model {}\n  context {} tokens, timeout {} s, structured output {}\n",
             plain(&r["provider"]),
-            if r["local"] == json!(true) {
-                "on this computer"
-            } else {
-                "remote: text is sent to the host"
-            },
             plain(&r["model"]),
             plain(&r["context_tokens"]),
             plain(&r["timeout_s"]),

@@ -1,11 +1,9 @@
 //! Summaries and reports (AI-9): `list_report_templates`, `generate_report` (a `report` job),
 //! `get_report`, `export_report`, `delete_report` and `edit_report`.
 //!
-//! The text model is the AI-7 provider and **only a local one** (loopback) is allowed for now: with
-//! provider `none` or any non-local provider every report call that would send text fails with
-//! `invalid_input` and `data.reason = "no_text_model"` (remote providers are deferred by
-//! maintainer decision, Oct 26, 2026). So `generate_report` is Free for agents and nothing
-//! leaves the machine.
+//! The text model is the AI-7 built-in engine: with provider `none` every report call that would
+//! send text fails with `invalid_input` and `data.reason = "no_text_model"`. So `generate_report`
+//! is Free for agents and nothing leaves the machine.
 //!
 //! Storage and undo: [`cm_ai::report::store`]. Each create, regenerate, edit and delete is one
 //! revision (`rec_edit::apply_extra` on the manifest key `reports`, the index), so `undo` and
@@ -194,10 +192,10 @@ fn revision_json(capture_id: &str, report_id: &str, out: &rec_edit::EditOutcome)
 }
 
 impl Inner {
-    /// Local text model only: provider `none` and every non-local provider answer `no_text_model`.
+    /// Provider `none` answers `no_text_model`.
     fn report_gate(&self) -> Result<cm_ai::text_model::TextModelConfig, DaemonError> {
         let config = self.text_model_config()?;
-        if config.provider == cm_ai::text_model::Provider::None || !config.is_local() {
+        if config.provider == cm_ai::text_model::Provider::None {
             return Err(setup_error(TextModelError::no_text_model()));
         }
         self.check_text_model(&config)?;

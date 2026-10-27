@@ -148,7 +148,7 @@ impl AiClient {
         AiClient { transport }
     }
 
-    /// `get_text_model` (AI-7): provider, model, host, limits, `has_key`, `remote_notice_pending`.
+    /// `get_text_model` (AI-7): provider, model, the built-in engine's state and limits.
     /// Never the key.
     pub async fn get_text_model(&self) -> Result<Value, AiError> {
         self.transport.call("get_text_model", json!({})).await
