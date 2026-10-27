@@ -9,8 +9,7 @@ stored translation are covered by `cargo test -p cm-ai translate` and `cargo tes
 was written:** the Whisper engine is built and tested with fakes only; no real `large-v3` run has
 happened. Steps marked **[text model]** need the text-model translator wired to the AI-7 provider
 (check `capturemann ai translate --help` and the spec's "AI-5 as built": until then they fail with
-`no_text_model`), the built-in text model downloaded (see `AI-7.md`); the default model is
-undecided (spike S8), so use the largest your Mac runs and write down which.
+`no_text_model`), the built-in text model downloaded (see `AI-7.md`); use Qwen3.5 4B (the model meant for translation into other languages) and write down which model you used.
 
 **Privacy:** nothing is recorded by this script beyond the test clip. Use a clip you own; the audio
 stays on this Mac. The model download in step 1 is the only network use (it happens only when you
@@ -75,7 +74,7 @@ Delete the test library afterwards.
 
 ## 5. English to Vietnamese with a text model (AC3, AC4) **[text model]**
 
-1. Choose Built in and download a model on the AI page (Test passes, `AI-7.md`).
+1. Download a model on the AI page and press Use this model (Qwen3.5 4B is the one meant for translation; Test passes, `AI-7.md`).
    Add the glossary term `CaptureMann` and make sure the English recording says it at least twice.
 2. `capturemann ai translate ID2 --to vi --engine text-model --wait` (or Translate... in the
    Transcript tab, Vietnamese).

@@ -386,22 +386,6 @@ fn cases() -> Vec<Case> {
     // ---- HUD: the window is exactly the 506 px bar --------------------------------------------
     // Stop is `hud_button` (44 px) widened to STOP_W 88, no padding, 1 px border: room beside the
     // 16 px icon and its 8 px gap.
-    // The AI page's provider control (V8): two segments in the narrowest column (440 - 2*16 card
-    // padding - 2*3 track padding - 2 border), 2*14 segment padding each.
-    v.push(
-        Case::new(
-            "AI text model provider segment",
-            "(440 - 32 - 6 - 2) / 2 - 2*14 padding",
-            (440. - 32. - 6. - 2.) / 2. - 28.,
-            ui,
-            500,
-            one,
-        )
-        .text("None", || crate::ai::voice::ProviderChoice::None.label())
-        .text("Built in", || {
-            crate::ai::voice::ProviderChoice::BuiltIn.label()
-        }),
-    );
     v.push(
         Case::new(
             "HUD Stop label",

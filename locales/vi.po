@@ -494,10 +494,6 @@ msgid "Bubble size"
 msgstr "Kích thước bong bóng"
 
 #, fuzzy
-msgid "Built in"
-msgstr "Có sẵn"
-
-#, fuzzy
 msgid "Bundle id, e.g. com.tinyspeck.slackmacgap"
 msgstr "Bundle id, ví dụ com.tinyspeck.slackmacgap"
 
@@ -9944,10 +9940,6 @@ msgid "Best accuracy and translation to English"
 msgstr "Chính xác nhất và dịch sang tiếng Anh"
 
 #, fuzzy
-msgid "Choose a text model provider first."
-msgstr "Hãy chọn nơi chạy mô hình văn bản trước."
-
-#, fuzzy
 msgid "Everything here runs on this Mac. Nothing is downloaded unless you press Download, and nothing is sent anywhere unless you choose a remote text model."
 msgstr "Mọi thứ ở đây chạy ngay trên máy Mac này. Không có gì được tải xuống trừ khi bạn nhấn Tải xuống, và không có gì được gửi đi đâu cả."
 
@@ -9966,10 +9958,6 @@ msgstr "Đã cài: {name}"
 #, fuzzy
 msgid "Needs a speaker model"
 msgstr "Cần một mô hình nhận diện người nói"
-
-#, fuzzy
-msgid "No text model. Reports and translation to other languages are off."
-msgstr "Chưa có mô hình văn bản. Báo cáo và dịch sang ngôn ngữ khác đang tắt."
 
 #, fuzzy
 msgid "Off by default"
@@ -10012,10 +10000,6 @@ msgid "Text model"
 msgstr "Mô hình văn bản"
 
 #, fuzzy
-msgid "Text model provider"
-msgstr "Nơi chạy mô hình văn bản"
-
-#, fuzzy
 msgid "The test failed"
 msgstr "Kiểm thử không thành công"
 
@@ -10055,11 +10039,6 @@ msgstr "{name} · {licence} · {size}, hiển thị trước khi bạn tải"
 msgctxt "text model"
 msgid "Test"
 msgstr "Kiểm thử"
-
-#, fuzzy
-msgctxt "text model provider"
-msgid "None"
-msgstr "Không"
 
 #, fuzzy
 msgid "About {gb} GB per hour"
@@ -11077,10 +11056,6 @@ msgid "Couldn’t change the text model"
 msgstr "Không thể đổi mô hình văn bản"
 
 #, fuzzy
-msgid "Download a built-in model first."
-msgstr "Hãy tải một mô hình tích hợp trước."
-
-#, fuzzy
 msgid "Download the recommended model ({size})"
 msgstr "Tải mô hình được đề xuất ({size})"
 
@@ -11101,10 +11076,6 @@ msgid "Looking for the built-in models…"
 msgstr "Đang tìm các mô hình tích hợp…"
 
 #, fuzzy
-msgid "Recommended for this Mac"
-msgstr "Đề xuất cho máy Mac này"
-
-#, fuzzy
 msgid "The engine could not start."
 msgstr "Bộ máy không khởi động được."
 
@@ -11119,21 +11090,6 @@ msgstr "Bản CaptureMann này thiếu bộ máy văn bản. Hãy cài lại Cap
 #, fuzzy
 msgid "This Mac has {memory} GB of memory. The model runs inside CaptureMann and nothing leaves this Mac."
 msgstr "Máy Mac này có {memory} GB bộ nhớ. Mô hình chạy ngay trong CaptureMann và không có gì rời khỏi máy."
-
-#, fuzzy
-msgctxt "memory tier"
-msgid "{gb} GB Macs"
-msgstr "Mac {gb} GB"
-
-#, fuzzy
-msgctxt "memory tier"
-msgid "{gb} GB Macs and up"
-msgstr "Mac từ {gb} GB trở lên"
-
-#, fuzzy
-msgctxt "text model provider"
-msgid "Built in"
-msgstr "Tích hợp sẵn"
 
 #, fuzzy
 msgid "List built-in text models"
@@ -11189,3 +11145,19 @@ msgstr "Báo cáo được viết bởi mô hình văn bản tích hợp trong C
 #, fuzzy
 msgid "The built-in text engine is not part of this copy of CaptureMann. Reinstall CaptureMann, or use a build that includes the engine."
 msgstr "Bản CaptureMann này không có công cụ văn bản tích hợp. Hãy cài lại CaptureMann hoặc dùng bản có kèm công cụ này."
+
+#, fuzzy
+msgid "Recommended"
+msgstr "Đề xuất"
+
+#, fuzzy
+msgid "This Mac may not have enough free memory for this model."
+msgstr "Máy Mac này có thể không đủ bộ nhớ trống cho mô hình này."
+
+#, fuzzy
+msgid "Don’t use a model"
+msgstr "Không dùng mô hình"
+
+#, fuzzy
+msgid "Download a model and press Use this model first."
+msgstr "Hãy tải một mô hình và bấm Dùng mô hình này trước."

@@ -1220,7 +1220,7 @@ pub fn all() -> Vec<ToolSpec> {
 
 fn text_model_id_schema() -> Value {
     json!({ "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,39}$",
-            "description": "A built-in text model id from list_text_models, e.g. `text-8gb`." })
+            "description": "A built-in text model id from list_text_models, e.g. `gemma-4-e2b`." })
 }
 
 fn model_id_schema() -> Value {
@@ -1363,7 +1363,7 @@ fn ai_tools() -> Vec<ToolSpec> {
             Tier::Free,
             false,
             "AI-7",
-            "List the text models of the engine built into CaptureMann (provider `embedded`): which are downloaded, which one runs by default (`active`), the download size, the memory each needs (`ram_mb`), the Mac memory tier it is meant for (`tier_gb`: 8, 16 or 32), its licence and the folder they are kept in. Models whose checksum is not pinned yet are not listed. Nothing is downloaded by listing.",
+            "List the text models of the engine built into CaptureMann (provider `embedded`): which are downloaded, which one runs by default (`active`), the download size, the memory each needs (`ram_mb`), whether it is the recommended default (`recommended`), its licence and the folder they are kept in. Models whose checksum is not pinned yet are not listed. Nothing is downloaded by listing.",
             json!({}),
             &[],
             json!({ "type": "object", "properties": {
@@ -1371,13 +1371,13 @@ fn ai_tools() -> Vec<ToolSpec> {
                     "id": { "type": "string" }, "label": { "type": "string" },
                     "size_mb": { "type": "integer", "description": "Download size in MB (10^6 bytes)." },
                     "ram_mb": { "type": "integer", "description": "Memory it needs while it runs, in MB." },
-                    "tier_gb": { "type": "integer", "enum": [8, 16, 32] },
+                    "recommended": { "type": "boolean", "description": "The default model, recommended on every Mac." },
                     "license": { "type": "string", "description": "Apache-2.0 or MIT." },
                     "context_tokens": { "type": "integer" },
                     "hint": { "type": "string" },
                     "installed": { "type": "boolean" }, "active": { "type": "boolean" },
                     "path": { "type": ["string", "null"] } },
-                    "required": ["id", "label", "size_mb", "tier_gb", "license", "installed", "active"] } },
+                    "required": ["id", "label", "size_mb", "recommended", "license", "installed", "active"] } },
                 "active": { "type": ["string", "null"] },
                 "dir": { "type": "string" } },
                 "required": ["models", "active", "dir"] }),
@@ -1397,10 +1397,10 @@ fn ai_tools() -> Vec<ToolSpec> {
             Tier::Free,
             true,
             "AI-7",
-            "Choose the downloaded text model the built-in engine runs. It does not switch the text-model provider (that is an app-only setting) and loads nothing: the engine starts on the first request.",
+            "Choose the downloaded text model the built-in engine runs, the same as the Use button on the AI page: it turns the built-in engine on (provider `embedded`, with this model) and loads nothing: the engine starts on the first request.",
             json!({ "model": text_model_id_schema() }),
             &["model"],
-            json!({ "type": "object", "properties": { "active": { "type": "string" } },
+            json!({ "type": "object", "properties": { "active": { "type": "string" }, "provider": { "type": "string" } },
                     "required": ["active"] }),
         ),
         ai_tool(

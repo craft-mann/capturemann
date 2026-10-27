@@ -10,7 +10,7 @@ use serde_json::Value;
 use cm_i18n::tr;
 
 use crate::ai::models::{Effect, RowAction};
-use crate::ai::voice::{self, ProviderChoice, TestGate, TestState};
+use crate::ai::voice::{self, TestGate, TestState};
 use crate::backend::Backend;
 use crate::daemon_text::ErrorNote;
 use crate::flows;
@@ -46,14 +46,19 @@ pub fn refresh_text_models(app: &Entity<AppModel>, cx: &mut App) {
     cx.spawn(async move |cx| {
         let res = client.list_text_models().await;
         cx.update(|cx| {
-            app2.update(cx, |m, cx| {
+            let ready = app2.update(cx, |m, cx| {
                 // An older daemon without the actions: the list stays empty and the page says
                 // plainly that no built-in model is available.
                 if let Ok(l) = res {
                     m.builtin.set_list(l);
                 }
                 cx.notify();
-            })
+                m.builtin.take_ready_to_use()
+            });
+            // The download that was waiting for "nothing in use" is there: use it.
+            if let Some(id) = ready {
+                builtin_call(&app2, &id, BuiltInCall::Select, cx);
+            }
         });
     })
     .detach();
@@ -69,27 +74,37 @@ pub fn builtin_row_action(app: &Entity<AppModel>, model: &str, action: RowAction
     });
     match effect {
         None | Some(Effect::Import) => {}
-        Some(Effect::StartDownload) => builtin_start_download(app, model, cx),
+        Some(Effect::StartDownload) => {
+            // Nothing in use: the model that arrives is used at once.
+            app.update(cx, |m, _| {
+                if m.ai.voice.text.in_use().is_none() {
+                    m.builtin.use_when_ready = Some(model.to_owned());
+                }
+            });
+            builtin_start_download(app, model, cx)
+        }
         Some(Effect::CancelJob(job)) => builtin_cancel_download(app, job, cx),
         Some(Effect::Select) => builtin_call(app, model, BuiltInCall::Select, cx),
+        Some(Effect::StopUsing) => builtin_stop_using(app, cx),
         Some(Effect::Remove) => builtin_call(app, model, BuiltInCall::Remove, cx),
     }
 }
 
 /// The report card's "Download the recommended model (size)": the button names the size, so the
-/// press is the user's confirmation. Also switches the provider to Built in, so the report works
-/// as soon as the file is there.
+/// press is the user's confirmation. The model is selected (and the engine turned on) when the
+/// file is there, so the report works without another press.
 pub fn builtin_download_recommended(app: &Entity<AppModel>, cx: &mut App) {
-    let id = {
-        let m = app.read(cx);
-        m.builtin.offer(m.ai.voice.memory_gb()).map(|(id, _, _)| id)
-    };
+    let id = app.read(cx).builtin.offer().map(|(id, _, _)| id);
     let Some(id) = id else {
         return;
     };
-    text_choose_provider(app, ProviderChoice::BuiltIn, cx);
     builtin_row_action(app, &id, RowAction::Download, cx);
     builtin_row_action(app, &id, RowAction::ConfirmDownload, cx);
+}
+
+/// "Don't use a model": the built-in engine is turned off (`ai.text.provider` = none).
+pub fn builtin_stop_using(app: &Entity<AppModel>, cx: &mut App) {
+    change(app, cx, |v| v.text.stop_using());
 }
 
 enum BuiltInCall {
@@ -245,11 +260,6 @@ fn change(
         w
     });
     write_settings(app, writes, cx);
-}
-
-/// A press on None / Built in.
-pub fn text_choose_provider(app: &Entity<AppModel>, c: ProviderChoice, cx: &mut App) {
-    change(app, cx, |v| v.text.choose_provider(c));
 }
 
 /// The Test button.

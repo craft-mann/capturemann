@@ -73,6 +73,8 @@ pub enum RowAction {
     Resume,
     Import,
     Select,
+    /// Built-in text models: turn the engine off ("Don't use a model").
+    StopUsing,
     /// Opens the "Remove?" confirmation.
     Remove,
     ConfirmRemove,
@@ -92,6 +94,7 @@ impl RowAction {
             RowAction::Resume => tr_ctx!("speech model", "Resume"),
             RowAction::Import => tr!("Import from file"),
             RowAction::Select => tr!("Use this model"),
+            RowAction::StopUsing => tr!("Don\u{2019}t use a model"),
             RowAction::Remove => tr_ctx!("speech model", "Remove"),
             RowAction::ConfirmRemove => tr!("Remove model"),
         }
@@ -116,6 +119,8 @@ pub enum Effect {
     CancelJob(String),
     Import,
     Select,
+    /// Built-in text models: set the provider to none.
+    StopUsing,
     Remove,
 }
 
@@ -485,6 +490,7 @@ impl ModelsVm {
             }
             RowAction::Import => Some(Effect::Import),
             RowAction::Select => Some(Effect::Select),
+            RowAction::StopUsing => Some(Effect::StopUsing),
             RowAction::Remove => {
                 self.begin_remove(id);
                 None

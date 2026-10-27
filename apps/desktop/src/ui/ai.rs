@@ -119,6 +119,8 @@ pub fn row_action(app: &Entity<AppModel>, model: &str, action: RowAction, cx: &m
         Some(Effect::Import) => import_model(app, model, cx),
         Some(Effect::Select) => select_model(app, model, cx),
         Some(Effect::Remove) => remove_model(app, model, cx),
+        // Only the built-in text models have it (their own row handler).
+        Some(Effect::StopUsing) => {}
     }
 }
 

@@ -12,7 +12,7 @@ use cm_i18n::{tr, tr_ctx};
 use super::{action_icon, progress_bar, status_glyph, AiPage};
 use crate::ai::builtin::{self, BuiltInRow};
 use crate::ai::models::{size_label, RowStatus};
-use crate::ai::voice::{ProviderChoice, SpeakerCard, TestState, TextVm, VoiceVm};
+use crate::ai::voice::{SpeakerCard, TestState, TextVm, VoiceVm};
 use crate::theme::{scale, type_scale, Theme};
 use crate::ui::ai_voice as ops;
 use crate::ui::components::{
@@ -21,8 +21,7 @@ use crate::ui::components::{
 use crate::ui::kit;
 use crate::ui::paint::rgba_of;
 use crate::ui::settings::widgets::{
-    caption, disabled_button, list_card, segment, segmented, settings_row, small_button,
-    small_button_with_icon,
+    caption, disabled_button, list_card, settings_row, small_button, small_button_with_icon,
 };
 use crate::ui::text_field::TextFieldEvent;
 
@@ -280,16 +279,8 @@ impl AiPage {
         let v: VoiceVm = self.app.read(cx).ai.voice.clone();
         let tm = &v.text;
         let mut body = div().flex().flex_col().gap(px(14.));
-        body = body.child(self.provider_control(t, tm, cx));
-        body = body.child(match tm.provider {
-            ProviderChoice::None => caption(
-                t,
-                tr!("No text model. Reports and translation to other languages are off."),
-            )
-            .into_any_element(),
-            ProviderChoice::BuiltIn => self.builtin_models(t, tm, v.memory_gb(), cx),
-        });
-        if tm.provider != ProviderChoice::None {
+        body = body.child(self.builtin_models(t, tm, v.memory_gb(), cx));
+        if tm.ready() {
             body = body.child(self.test_row(t, tm, cx));
         }
         div()
@@ -312,8 +303,8 @@ impl AiPage {
             .into_any_element()
     }
 
-    /// The Built in choice: the models by memory tier (download, use, remove, progress, licence,
-    /// "recommended for this Mac") and the engine's state.
+    /// The model list (download, use, remove, progress, licence, the recommended one) and the
+    /// engine's state. With no model in use, reports and translation to other languages are off.
     fn builtin_models(
         &self,
         t: &Theme,
@@ -322,7 +313,7 @@ impl AiPage {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let b = self.app.read(cx).builtin.clone();
-        let rows = b.rows(mem_gb);
+        let rows = b.rows(mem_gb, tm.in_use());
         let mut col = div()
             .flex()
             .flex_col()
@@ -364,7 +355,7 @@ impl AiPage {
         .into_any_element()
     }
 
-    /// One built-in model: name and tier, size and memory, licence, state, progress, buttons.
+    /// One built-in model: name, size and memory, licence, state, progress, buttons.
     fn builtin_row(
         &self,
         t: &Theme,
@@ -411,7 +402,7 @@ impl AiPage {
                 .child(progress_bar(t, &tr!("Download progress"), f))
                 .child(caption(t, p.clone()))
         });
-        let facts = [r.tier_label(), row.size.clone(), row.memory.clone()]
+        let facts = [row.size.clone(), row.memory.clone()]
             .into_iter()
             .filter(|s| !s.is_empty())
             .collect::<Vec<_>>()
@@ -433,7 +424,7 @@ impl AiPage {
             .when(divider, |d| {
                 d.border_b_1().border_color(rgba_of(t.row_divider()))
             })
-            .when(r.recommended, |d| d.bg(rgba_of(t.raised)))
+            .when(r.in_use, |d| d.bg(rgba_of(t.raised)))
             .child(
                 div()
                     .flex()
@@ -471,7 +462,13 @@ impl AiPage {
                                     ),
                             )
                             .child(caption(t, facts))
-                            .children((!row.hint.is_empty()).then(|| caption(t, row.hint.clone()))),
+                            .children((!row.hint.is_empty()).then(|| caption(t, row.hint.clone())))
+                            .children(r.memory_warning().map(|w| {
+                                div()
+                                    .text_size(px(12.))
+                                    .text_color(rgba_of(t.warning))
+                                    .child(SharedString::from(w))
+                            })),
                     )
                     .child(
                         div()
@@ -494,24 +491,6 @@ impl AiPage {
                     .children(actions),
             )
             .into_any_element()
-    }
-
-    fn provider_control(&self, t: &Theme, tm: &TextVm, cx: &mut Context<Self>) -> AnyElement {
-        let mut seg = segmented(t, "ai-text-provider", &tr!("Text model provider"));
-        for c in ProviderChoice::ALL {
-            let app = self.app.clone();
-            seg = seg.child(
-                segment(
-                    t,
-                    SharedString::from(format!("ai-text-provider-{c:?}")),
-                    &c.label(),
-                    tm.provider == c,
-                )
-                .flex_1()
-                .on_click(cx.listener(move |_, _, _, cx| ops::text_choose_provider(&app, c, cx))),
-            );
-        }
-        seg.into_any_element()
     }
 
     /// The Test button and its result (time, structured output).

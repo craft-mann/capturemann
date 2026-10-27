@@ -118,6 +118,20 @@ impl Inner {
     pub(crate) fn text_model_config(&self) -> Result<TextModelConfig, DaemonError> {
         let mut c = TextModelConfig::from_settings(&self.settings.all()?);
         if c.provider == Provider::Embedded {
+            // A model id the catalogue no longer has (an earlier version's `text-8gb`, a hand
+            // edit) reads as "no model selected": the engine is off, nothing crashes.
+            if !c.embedded_model.is_empty()
+                && !self
+                    .ai
+                    .text_models
+                    .list()
+                    .is_ok_and(|l| l.models.iter().any(|m| m.info.id == c.embedded_model))
+            {
+                c.provider = Provider::None;
+                c.embedded_model.clear();
+            }
+        }
+        if c.provider == Provider::Embedded {
             if let Ok(r) = self.ai.text_models.resolve(embedded_wanted(&c)) {
                 c.model = r.id;
                 c.context_tokens = r.context_tokens.max(512);

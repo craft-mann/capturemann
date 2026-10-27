@@ -508,6 +508,7 @@ pub fn action_icon(a: &RowAction) -> Option<&'static str> {
         RowAction::Download | RowAction::ConfirmDownload => Some("download"),
         RowAction::Import => Some("file-input"),
         RowAction::Select => Some("check"),
+        RowAction::StopUsing => Some("x"),
         RowAction::Remove | RowAction::ConfirmRemove => Some("trash-2"),
         RowAction::Resume => Some("rotate-cw"),
         RowAction::Cancel | RowAction::CancelConfirm | RowAction::CancelRemove => None,

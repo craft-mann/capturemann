@@ -28,7 +28,8 @@ treat it as a preview of the release notes, not a promise.
   built-in text model; one translation per language, edited and exported like the original.
   `capturemann ai translate`.
 - Text model setup (AI page): a text model built into CaptureMann (downloaded on request, runs on
-  this Mac), with a Test button. There is no remote or cloud option and no other server.
+  this Mac): Gemma 4 E2B is recommended on every Mac, Qwen3.5 4B is optional (best for translation
+  into other languages) and Qwen3.5 2B is the smallest. Press Use to turn it on; there is a Test button. There is no remote or cloud option and no other server.
 - Reports from a transcript with the built-in text model: meeting minutes, interview notes, one-on-one
   notes, lecture notes, product recap and summary, with times on every item that jump to that
   moment, editing, regenerating and export as Markdown or text. `capturemann ai report`.
@@ -45,8 +46,8 @@ treat it as a preview of the release notes, not a promise.
 
 ### Known limitations (0.2.0)
 
-- Speaker labels have no model yet (S7). The default text model is not decided (S8): you choose one
-  of the built-in models.
+- Speaker labels have no model yet (S7). Gemma 4 E2B is the recommended text model; its quality on
+  your own recordings is still being checked (S8).
 - Live transcript while recording (VOC-3) is not included; it comes in a later 0.2.x.
 - The bundled FFmpeg needs a rebuild with the `wav` muxer and `pcm_s24le` before WAV export works
   in the shipped app.

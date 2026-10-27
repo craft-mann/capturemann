@@ -46,7 +46,7 @@ pub(super) enum TextState {
     Missing,
 }
 
-/// A built-in model's label ("Qwen3.5 4B") for its catalogue id ("text-8gb"); another name stays as it is.
+/// A built-in model's label ("Gemma 4 E2B") for its catalogue id ("gemma-4-e2b"); another name stays as it is.
 fn text_model_label(id: &str) -> String {
     cm_ai::text_model::store::TextCatalog::builtin()
         .models
@@ -355,7 +355,7 @@ impl RecordingEditor {
         .into_any_element();
         let offer = {
             let m = self.app.read(cx);
-            m.builtin.offer(m.ai.voice.memory_gb())
+            m.builtin.offer()
         };
         let action = match offer {
             Some((_, _, size_mb)) => {

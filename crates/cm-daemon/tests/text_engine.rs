@@ -148,7 +148,7 @@ async fn job_done(r: &Rig, id: &str) -> Value {
 #[tokio::test]
 async fn embedded_with_a_downloaded_model_runs_through_the_engine() {
     let r = rig(
-        FakeTextModels::new().with_installed(&["text-16gb"]),
+        FakeTextModels::new().with_installed(&["qwen3.5-4b"]),
         Decision::Approve,
     )
     .await;
@@ -156,7 +156,7 @@ async fn embedded_with_a_downloaded_model_runs_through_the_engine() {
     let g = user(&r, "get_text_model", json!({})).await.unwrap();
     assert_eq!(g["provider"], "embedded");
     assert_eq!(g["local"], true);
-    assert_eq!(g["model"], "text-16gb", "the store's active model");
+    assert_eq!(g["model"], "qwen3.5-4b", "the store's active model");
     assert_eq!(g["host"], "127.0.0.1");
     assert_eq!(g["engine"]["state"], "stopped", "nothing started by itself");
     assert!(r.engine.specs().is_empty());
@@ -165,10 +165,10 @@ async fn embedded_with_a_downloaded_model_runs_through_the_engine() {
 
     let t = user(&r, "test_text_model", json!({})).await.unwrap();
     assert_eq!(t["ok"], true, "{t}");
-    assert_eq!(t["model"], "text-16gb");
+    assert_eq!(t["model"], "qwen3.5-4b");
     let specs = r.engine.specs();
     assert_eq!(specs.len(), 1);
-    assert_eq!(specs[0].model_id, "text-16gb");
+    assert_eq!(specs[0].model_id, "qwen3.5-4b");
     assert_eq!(specs[0].ram_mb, 8000);
     assert_eq!(specs[0].context_tokens, 8192);
     let g = user(&r, "get_text_model", json!({})).await.unwrap();
@@ -177,7 +177,7 @@ async fn embedded_with_a_downloaded_model_runs_through_the_engine() {
 
     // A named built-in model wins over the active one.
     let r2 = rig(
-        FakeTextModels::new().with_installed(&["text-8gb", "text-32gb"]),
+        FakeTextModels::new().with_installed(&["gemma-4-e2b", "qwen3.5-2b"]),
         Decision::Approve,
     )
     .await;
@@ -185,12 +185,12 @@ async fn embedded_with_a_downloaded_model_runs_through_the_engine() {
     user(
         &r2,
         "set_settings",
-        json!({ "values": { "ai.text.embedded_model": "text-32gb" } }),
+        json!({ "values": { "ai.text.embedded_model": "qwen3.5-2b" } }),
     )
     .await
     .unwrap();
     let t = user(&r2, "test_text_model", json!({})).await.unwrap();
-    assert_eq!(t["model"], "text-32gb");
+    assert_eq!(t["model"], "qwen3.5-2b");
 }
 
 #[tokio::test]
@@ -210,7 +210,7 @@ async fn embedded_without_a_downloaded_model_is_no_text_model() {
 #[tokio::test]
 async fn a_missing_helper_and_a_full_memory_are_answers_with_their_reasons() {
     let r = rig(
-        FakeTextModels::new().with_installed(&["text-8gb"]),
+        FakeTextModels::new().with_installed(&["gemma-4-e2b"]),
         Decision::Approve,
     )
     .await;
@@ -259,21 +259,21 @@ async fn text_model_actions_list_download_select_and_remove() {
     let l = user(&r, "list_text_models", json!({})).await.unwrap();
     let models = l["models"].as_array().unwrap();
     assert_eq!(models.len(), 3);
-    assert_eq!(models[0]["id"], "text-8gb");
-    assert_eq!(models[0]["tier_gb"], 8);
+    assert_eq!(models[0]["id"], "gemma-4-e2b");
+    assert_eq!(models[0]["recommended"], true);
     assert_eq!(models[0]["license"], "Apache-2.0");
     assert_eq!(models[0]["installed"], false);
 
-    let s = user(&r, "download_text_model", json!({ "model": "text-8gb" }))
+    let s = user(&r, "download_text_model", json!({ "model": "gemma-4-e2b" }))
         .await
         .unwrap();
     assert_eq!(
         job_done(&r, s["job_id"].as_str().unwrap()).await["state"],
         "done"
     );
-    assert_eq!(r.models.installed(), vec!["text-8gb"]);
+    assert_eq!(r.models.installed(), vec!["gemma-4-e2b"]);
     let l = user(&r, "list_text_models", json!({})).await.unwrap();
-    assert_eq!(l["active"], "text-8gb");
+    assert_eq!(l["active"], "gemma-4-e2b");
     let mut seen = Vec::new();
     while let Ok(e) = rx.try_recv() {
         seen.push(e);
@@ -286,7 +286,7 @@ async fn text_model_actions_list_download_select_and_remove() {
         && e.data["kind"] == "text"));
 
     // Already installed, unknown id, not installed.
-    let e = user(&r, "download_text_model", json!({ "model": "text-8gb" }))
+    let e = user(&r, "download_text_model", json!({ "model": "gemma-4-e2b" }))
         .await
         .unwrap_err();
     assert!(e.to_string().contains("already installed"), "{e}");
@@ -294,15 +294,15 @@ async fn text_model_actions_list_download_select_and_remove() {
         .await
         .unwrap_err();
     assert_eq!(code(&e), ErrorCode::InvalidInput);
-    let e = user(&r, "select_text_model", json!({ "model": "text-32gb" }))
+    let e = user(&r, "select_text_model", json!({ "model": "qwen3.5-2b" }))
         .await
         .unwrap_err();
     assert!(e.to_string().contains("not installed"), "{e}");
 
-    user(&r, "select_text_model", json!({ "model": "text-8gb" }))
+    user(&r, "select_text_model", json!({ "model": "gemma-4-e2b" }))
         .await
         .unwrap();
-    let removed = user(&r, "remove_text_model", json!({ "model": "text-8gb" }))
+    let removed = user(&r, "remove_text_model", json!({ "model": "gemma-4-e2b" }))
         .await
         .unwrap();
     assert_eq!(removed["removed"], true);
@@ -312,7 +312,7 @@ async fn text_model_actions_list_download_select_and_remove() {
 #[tokio::test]
 async fn agents_are_asked_before_a_download_or_a_removal_and_see_the_plan() {
     let r = rig(FakeTextModels::new(), Decision::Decline).await;
-    let e = agent(&r, "download_text_model", json!({ "model": "text-16gb" }))
+    let e = agent(&r, "download_text_model", json!({ "model": "qwen3.5-4b" }))
         .await
         .unwrap_err();
     assert_eq!(code(&e), ErrorCode::UserDeclined);
@@ -330,11 +330,11 @@ async fn agents_are_asked_before_a_download_or_a_removal_and_see_the_plan() {
     assert_eq!(shown[0].details["destination"], "/text-models");
 
     let ok = rig(
-        FakeTextModels::new().with_installed(&["text-8gb"]),
+        FakeTextModels::new().with_installed(&["gemma-4-e2b"]),
         Decision::Approve,
     )
     .await;
-    agent(&ok, "remove_text_model", json!({ "model": "text-8gb" }))
+    agent(&ok, "remove_text_model", json!({ "model": "gemma-4-e2b" }))
         .await
         .unwrap();
     assert!(ok.models.installed().is_empty());
@@ -346,21 +346,91 @@ async fn agents_are_asked_before_a_download_or_a_removal_and_see_the_plan() {
 #[tokio::test]
 async fn removing_the_model_a_job_is_using_is_busy_and_an_idle_one_is_unloaded() {
     let r = rig(
-        FakeTextModels::new().with_installed(&["text-8gb"]),
+        FakeTextModels::new().with_installed(&["gemma-4-e2b"]),
         Decision::Approve,
     )
     .await;
     use_embedded(&r).await;
     user(&r, "test_text_model", json!({})).await.unwrap();
     r.engine.set_in_flight(1);
-    let e = user(&r, "remove_text_model", json!({ "model": "text-8gb" }))
+    let e = user(&r, "remove_text_model", json!({ "model": "gemma-4-e2b" }))
         .await
         .unwrap_err();
     assert_eq!(code(&e), ErrorCode::Busy);
-    assert_eq!(r.models.installed(), vec!["text-8gb"]);
+    assert_eq!(r.models.installed(), vec!["gemma-4-e2b"]);
     r.engine.set_in_flight(0);
-    user(&r, "remove_text_model", json!({ "model": "text-8gb" }))
+    user(&r, "remove_text_model", json!({ "model": "gemma-4-e2b" }))
         .await
         .unwrap();
     assert_eq!(r.engine.stops(), 1, "the engine let go of the file first");
+}
+
+#[tokio::test]
+async fn using_a_model_turns_the_engine_on_and_removing_it_turns_it_off() {
+    let r = rig(
+        FakeTextModels::new().with_installed(&["gemma-4-e2b", "qwen3.5-4b"]),
+        Decision::Approve,
+    )
+    .await;
+    // Nothing chosen yet: provider none.
+    let g = user(&r, "get_text_model", json!({})).await.unwrap();
+    assert_eq!(g["provider"], "none");
+
+    // The CLI and agents get the button's behaviour: select sets provider and model.
+    let s = agent(&r, "select_text_model", json!({ "model": "qwen3.5-4b" }))
+        .await
+        .unwrap();
+    assert_eq!(s["active"], "qwen3.5-4b");
+    let g = user(&r, "get_text_model", json!({})).await.unwrap();
+    assert_eq!(g["provider"], "embedded");
+    assert_eq!(g["embedded_model"], "qwen3.5-4b");
+    assert_eq!(g["model"], "qwen3.5-4b");
+
+    // Removing a model that is not the one in use leaves the engine on.
+    user(&r, "remove_text_model", json!({ "model": "gemma-4-e2b" }))
+        .await
+        .unwrap();
+    let g = user(&r, "get_text_model", json!({})).await.unwrap();
+    assert_eq!(g["provider"], "embedded");
+
+    // Removing the one in use turns it off.
+    user(&r, "remove_text_model", json!({ "model": "qwen3.5-4b" }))
+        .await
+        .unwrap();
+    let g = user(&r, "get_text_model", json!({})).await.unwrap();
+    assert_eq!(g["provider"], "none");
+    assert_eq!(g["embedded_model"], "");
+    assert_eq!(
+        reason(&r.daemon.text_model_gate(10).unwrap_err()),
+        "no_text_model"
+    );
+}
+
+#[tokio::test]
+async fn a_model_id_the_catalogue_no_longer_has_reads_as_no_model_selected() {
+    // An earlier version wrote `text-8gb`; the file is still there under a new id.
+    let r = rig(
+        FakeTextModels::new().with_installed(&["gemma-4-e2b"]),
+        Decision::Approve,
+    )
+    .await;
+    use_embedded(&r).await;
+    user(
+        &r,
+        "set_settings",
+        json!({ "values": { "ai.text.embedded_model": "text-8gb" } }),
+    )
+    .await
+    .unwrap();
+    let g = user(&r, "get_text_model", json!({})).await.unwrap();
+    assert_eq!(g["provider"], "none", "{g}");
+    assert_eq!(g["model"], "");
+    assert_eq!(g["embedded_model"], "");
+    let e = user(&r, "test_text_model", json!({})).await.unwrap_err();
+    assert_eq!(reason(&e), "no_text_model");
+    assert_eq!(
+        reason(&r.daemon.text_model_gate(10).unwrap_err()),
+        "no_text_model"
+    );
+    assert!(r.engine.specs().is_empty());
 }

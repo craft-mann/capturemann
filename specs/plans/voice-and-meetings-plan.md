@@ -37,16 +37,15 @@ Pin both new files (URL at a Hugging Face commit, SHA-256, size, `ram_mb` from t
 
 ### Text model (AI-7: through a local server, not shipped)
 
-Shown on the AI page as guidance, by the Mac's memory. Only Apache-2.0 or MIT licences, so recommending them never conflicts with the project's licence rules. Figures are from the model makers' cards as summarised on Oct 16, 2026; re-check before release.
+The built-in model list is three models for every Mac (maintainer decision Oct 27, 2026: reports only extract and rephrase what the transcript says, so they need no reasoning and no big models). Only Apache-2.0 or MIT licences. Pins: `docs/research/text-model-pins-2026-10-27.md`; test results: `docs/research/local-model-and-licence-check-2026-10-27.md`.
 
-| Mac memory | Recommendation | Licence | Notes |
+| Model | Role | Licence | Notes |
 | --- | --- | --- | --- |
-| 8 GB | Phi-4-mini-instruct (3.8B) | MIT | 128K context; fine for short English summaries, weak for Vietnamese and long meetings |
-| **16 GB (default candidate)** | **Qwen3.5-9B** | Apache-2.0 | 262K native context; strong multilingual (Vietnamese to be confirmed in S8) |
-| 16–24 GB | Gemma 4 12B | Apache-2.0 | ~6.7 GB at Q4 to load; Google suggests 16 GB unified memory |
-| 32 GB+ | Qwen3.6-35B-A3B (MoE, 3B active) | Apache-2.0 | Highest quality; fast for its size |
+| **Gemma 4 E2B** | **Default, recommended on every Mac** | Apache-2.0 | Best score in the small-model test, English and Vietnamese |
+| Qwen3.5 4B | Optional: best for translation into other languages | Apache-2.0 | Needs about 4 GB of memory |
+| Qwen3.5 2B | Smallest, for Macs with little free memory | Apache-2.0 | Notes can miss items |
 
-The **default recommendation is decided by S8**, not by this table.
+The default is the one marked `recommended` in the catalogue; S8's remaining runs (Vietnamese quality on real recordings) can still change it.
 
 ### Speaker diarization (AI-8: decided by S7)
 
