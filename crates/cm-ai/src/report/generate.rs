@@ -58,36 +58,10 @@ impl From<TextModelError> for Error {
     }
 }
 
-/// How much text a run will send, for the Confirm dialog of a remote provider.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Plan {
-    pub chars: usize,
-    pub chunks: usize,
-}
-
 fn names(input: &Input<'_>) -> Vec<String> {
     let mut v: Vec<String> = input.context.attendees.clone();
     v.extend(input.speakers.iter().cloned());
     v
-}
-
-/// The characters a run sends: the transcript once, plus the instructions with every call. A
-/// long recording adds the merge passes (about one per two pieces).
-pub fn plan(input: &Input<'_>) -> Plan {
-    let text = prompt::transcript_text(input.lines);
-    let chunks = split_chunks(&text, input.context_tokens).len().max(1);
-    let fixed = prompt::system_prompt(input.template, input.language, input.source_language)
-        .chars()
-        .count()
-        + prompt::preamble(input.template, input.context, input.speakers, input.markers)
-            .chars()
-            .count();
-    let merges = if chunks > 1 { chunks / 2 + 1 } else { 0 };
-    let notes = merges * (input.context_tokens as f64 * 0.4 * CHARS_PER_TOKEN) as usize / 2;
-    Plan {
-        chars: text.chars().count() + fixed * (chunks + merges) + notes,
-        chunks,
-    }
 }
 
 /// About how many tokens one call writes (a meeting's notes are about 1,000): inside a call the

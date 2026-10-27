@@ -9940,7 +9940,7 @@ msgid "Best accuracy and translation to English"
 msgstr "Chính xác nhất và dịch sang tiếng Anh"
 
 #, fuzzy
-msgid "Everything here runs on this Mac. Nothing is downloaded unless you press Download, and nothing is sent anywhere unless you choose a remote text model."
+msgid "Everything here runs on this Mac. Nothing is downloaded unless you press Download, and nothing is sent anywhere."
 msgstr "Mọi thứ ở đây chạy ngay trên máy Mac này. Không có gì được tải xuống trừ khi bạn nhấn Tải xuống, và không có gì được gửi đi đâu cả."
 
 #, fuzzy

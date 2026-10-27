@@ -11,7 +11,7 @@ use std::net::TcpListener;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
-use cm_ai::text_model::{build, JsonRequest, Provider, TextModelConfig};
+use cm_ai::text_model::{HttpTextModel, JsonRequest, TextModel as _};
 use serde_json::json;
 
 struct Helper(Child);
@@ -75,15 +75,7 @@ fn streams_a_small_json_answer_from_a_real_llama_server() {
     }
     println!("loaded in {:?}", t0.elapsed());
 
-    let config = TextModelConfig {
-        provider: Provider::Local,
-        base_url: format!("http://127.0.0.1:{port}/v1"),
-        model: "gemma".into(),
-        embedded_model: String::new(),
-        key_name: None,
-        context_tokens: 16384,
-        timeout_s: 120,
-    };
+    let model = HttpTextModel::new(format!("http://127.0.0.1:{port}/v1"), "gemma", 120);
     let mut req = JsonRequest::new(
         "Write a title (three to five words) and four short bullet points about why people \
          keep meeting notes.",
@@ -96,7 +88,7 @@ fn streams_a_small_json_answer_from_a_real_llama_server() {
     req.max_tokens = 400;
     let mut ticks: Vec<(usize, Duration)> = Vec::new();
     let t1 = Instant::now();
-    let reply = build(&config, None)
+    let reply = model
         .complete_json_streaming(&req, &mut |n| {
             ticks.push((n, t1.elapsed()));
             true

@@ -9,7 +9,7 @@
 //!   ([`TextEngine::reap_idle`], called by a small thread) it is stopped to give the memory back.
 //!   A helper that died is restarted once for the request that found it dead.
 //! * The helper only ever listens on `127.0.0.1`. The client that talks to it is the ordinary
-//!   OpenAI-compatible [`HttpTextModel`] as a `local` provider, so the loopback check of AI-7 still
+//!   OpenAI-compatible [`HttpTextModel`], so the loopback check of AI-7 still
 //!   guards every request. The helper makes no network request of its own: it is given a local
 //!   GGUF file and no URL, and `llama-server` has no telemetry.
 //! * The helper dies with the app: it is stopped on drop and on [`TextEngine::stop`], and a
@@ -29,9 +29,7 @@ use std::sync::{Arc, Mutex, PoisonError, Weak};
 use cm_media::tools::in_app_bundle;
 use serde::Serialize;
 
-use super::{
-    ErrorKind, JsonReply, JsonRequest, Provider, TextModel, TextModelConfig, TextModelError,
-};
+use super::{ErrorKind, JsonReply, JsonRequest, TextModel, TextModelConfig, TextModelError};
 
 /// Environment variable naming the helper executable.
 pub const ENV_LLAMA_SERVER: &str = "CM_LLAMA_SERVER";
@@ -455,15 +453,7 @@ impl EmbeddedTextModel {
         on_progress: &mut dyn FnMut(usize) -> bool,
     ) -> Result<JsonReply, TextModelError> {
         let base = self.engine.acquire(&self.spec)?;
-        let cfg = TextModelConfig {
-            provider: Provider::Local,
-            base_url: base,
-            model: self.spec.model_id.clone(),
-            context_tokens: self.spec.context_tokens,
-            timeout_s: self.timeout_s,
-            ..TextModelConfig::default()
-        };
-        let http = super::HttpTextModel::new(cfg, None);
+        let http = super::HttpTextModel::new(base, self.spec.model_id.clone(), self.timeout_s);
         let r = if streaming {
             http.complete_json_streaming(req, on_progress)
         } else {

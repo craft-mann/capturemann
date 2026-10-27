@@ -280,11 +280,8 @@ impl TextVm {
         let changed = self.provider != provider || self.model != s("model");
         self.provider = provider;
         self.model = s("model");
-        self.host = v
-            .get("host")
-            .and_then(Value::as_str)
-            .map(str::to_owned)
-            .filter(|h| !h.is_empty());
+        // The built-in engine listens on this computer only.
+        self.host = (provider == Provider::Embedded).then(|| "127.0.0.1".to_owned());
         self.context_tokens = v
             .get("context_tokens")
             .and_then(Value::as_u64)
@@ -414,7 +411,7 @@ mod tests {
     fn text_with(provider: &str, model: &str) -> TextVm {
         let mut t = TextVm::default();
         t.set_from_daemon(&json!({
-            "provider": provider, "model": model, "host": "127.0.0.1", "context_tokens": 8192,
+            "provider": provider, "model": model, "context_tokens": 8192,
         }));
         t
     }
@@ -521,9 +518,7 @@ mod tests {
         t.set_from_daemon(&json!({"provider": "embedded", "model": ""}));
         assert!(!t.ready());
         assert!(matches!(t.begin_test(), TestGate::Blocked(m) if m.contains("Download")));
-        t.set_from_daemon(
-            &json!({"provider": "embedded", "model": "qwen3.5-4b", "host": "127.0.0.1"}),
-        );
+        t.set_from_daemon(&json!({"provider": "embedded", "model": "qwen3.5-4b"}));
         assert!(t.ready());
         assert_eq!(t.in_use(), Some("qwen3.5-4b"));
         // Turned off (Don't use a model, or the model in use was removed).

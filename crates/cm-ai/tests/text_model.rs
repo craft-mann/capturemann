@@ -6,7 +6,9 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use cm_ai::text_model::{build, test_model, ErrorKind, JsonRequest, Provider, TextModelConfig};
+use cm_ai::text_model::{
+    build, test_model, ErrorKind, HttpTextModel, JsonRequest, Provider, TextModelConfig,
+};
 use serde_json::{json, Value};
 
 #[derive(Clone, Debug)]
@@ -92,16 +94,8 @@ fn chat(content: &str) -> String {
     json!({ "choices": [{ "message": { "role": "assistant", "content": content } }] }).to_string()
 }
 
-fn config(port: u16, provider: Provider) -> TextModelConfig {
-    TextModelConfig {
-        provider,
-        base_url: format!("http://127.0.0.1:{port}/v1"),
-        model: "test-model".into(),
-        embedded_model: String::new(),
-        key_name: None,
-        context_tokens: 8192,
-        timeout_s: 5,
-    }
+fn client(port: u16) -> HttpTextModel {
+    HttpTextModel::new(format!("http://127.0.0.1:{port}/v1"), "test-model", 5)
 }
 
 fn request() -> JsonRequest {
@@ -113,12 +107,9 @@ fn request() -> JsonRequest {
 }
 
 #[test]
-fn schema_success_first_try_with_json_schema_and_key() {
+fn schema_success_first_try_with_json_schema() {
     let s = serve(|_, _| (200, chat("{\"title\": \"Hello\"}")));
-    let m = build(
-        &config(s.port, Provider::OpenAiCompatible),
-        Some("sk-secret".into()),
-    );
+    let m = client(s.port);
     let r = m.complete_json(&request()).unwrap();
     assert_eq!((r.value, r.attempts), (json!({"title": "Hello"}), 1));
     let seen = s.seen.lock().unwrap();
@@ -130,7 +121,10 @@ fn schema_success_first_try_with_json_schema_and_key() {
         "title"
     );
     assert_eq!(seen[0].body["model"], "test-model");
-    assert!(seen[0].headers.contains("authorization: bearer sk-secret"));
+    assert!(
+        !seen[0].headers.contains("authorization"),
+        "no key is ever sent"
+    );
 }
 
 #[test]
@@ -142,7 +136,7 @@ fn one_retry_carries_the_validation_error() {
             (200, chat("```json\n{\"title\": \"Fixed\"}\n```"))
         }
     });
-    let m = build(&config(s.port, Provider::Local), None);
+    let m = client(s.port);
     let r = m.complete_json(&request()).unwrap();
     assert_eq!((r.value, r.attempts), (json!({"title": "Fixed"}), 2));
     let seen = s.seen.lock().unwrap();
@@ -155,7 +149,7 @@ fn one_retry_carries_the_validation_error() {
 #[test]
 fn schema_failure_twice_is_invalid_model_output() {
     let s = serve(|_, _| (200, chat("{\"nope\": 1}")));
-    let m = build(&config(s.port, Provider::Local), None);
+    let m = client(s.port);
     let e = m.complete_json(&request()).unwrap_err();
     assert_eq!(e.kind, ErrorKind::InvalidOutput);
     assert_eq!(e.reason(), "invalid_model_output");
@@ -170,9 +164,8 @@ fn a_slow_server_times_out() {
         std::thread::sleep(Duration::from_secs(3));
         (200, chat("{\"title\": \"late\"}"))
     });
-    let mut c = config(s.port, Provider::Local);
-    c.timeout_s = 1;
-    let e = build(&c, None).complete_json(&request()).unwrap_err();
+    let c = HttpTextModel::new(format!("http://127.0.0.1:{}/v1", s.port), "test-model", 1);
+    let e = c.complete_json(&request()).unwrap_err();
     assert_eq!(e.kind, ErrorKind::Timeout);
     assert_eq!(e.reason(), "timeout");
 }
@@ -183,9 +176,7 @@ fn nothing_listening_is_unreachable_with_the_hint() {
         let l = TcpListener::bind("127.0.0.1:0").unwrap();
         l.local_addr().unwrap().port()
     };
-    let e = build(&config(port, Provider::Local), None)
-        .complete_json(&request())
-        .unwrap_err();
+    let e = client(port).complete_json(&request()).unwrap_err();
     assert_eq!(e.kind, ErrorKind::Unreachable);
     assert_eq!(e.reason(), "text_model_unreachable");
     assert!(e
@@ -194,22 +185,16 @@ fn nothing_listening_is_unreachable_with_the_hint() {
 }
 
 #[test]
-fn the_server_message_is_passed_through_and_the_key_is_masked() {
+fn the_server_message_is_passed_through() {
     let s = serve(|_, _| {
         (
             500,
-            json!({ "error": { "message": "model failed to load; key sk-secret rejected" } })
-                .to_string(),
+            json!({ "error": { "message": "model failed to load" } }).to_string(),
         )
     });
-    let m = build(
-        &config(s.port, Provider::OpenAiCompatible),
-        Some("sk-secret".into()),
-    );
-    let e = m.complete_json(&request()).unwrap_err();
+    let e = client(s.port).complete_json(&request()).unwrap_err();
     assert_eq!(e.kind, ErrorKind::Server);
     assert!(e.message.contains("model failed to load"));
-    assert!(!e.message.contains("sk-secret"), "{}", e.message);
 }
 
 #[test]
@@ -225,9 +210,7 @@ fn a_server_without_json_schema_support_gets_one_plain_retry() {
             (200, chat("{\"title\": \"ok\"}"))
         }
     });
-    let r = build(&config(s.port, Provider::Local), None)
-        .complete_json(&request())
-        .unwrap();
+    let r = client(s.port).complete_json(&request()).unwrap();
     assert_eq!(r.attempts, 1);
     let seen = s.seen.lock().unwrap();
     assert!(seen[1].body.get("response_format").is_none());
@@ -239,19 +222,29 @@ fn a_server_without_json_schema_support_gets_one_plain_retry() {
 }
 
 #[test]
-fn provider_none_makes_no_call_and_a_lan_local_provider_is_refused() {
+fn provider_none_makes_no_call_and_a_non_loopback_address_is_refused() {
     let s = serve(|_, _| (200, chat("{\"title\": \"x\"}")));
-    let mut none = config(s.port, Provider::None);
-    none.provider = Provider::None;
-    let e = build(&none, None).complete_json(&request()).unwrap_err();
+    let none = TextModelConfig::default();
+    let e = build(&none).complete_json(&request()).unwrap_err();
     assert_eq!(e.kind, ErrorKind::NoTextModel);
     assert_eq!(e.error_data()["reason"], "no_text_model");
     assert_eq!(e.into_cm_error("j").code().as_str(), "invalid_input");
 
-    let mut lan = config(s.port, Provider::Local);
-    lan.base_url = format!("http://192.168.1.50:{}/v1", s.port);
-    assert!(!lan.is_local());
-    let e = build(&lan, None).complete_json(&request()).unwrap_err();
+    // A LAN address, a public https address and a look-alike name never get a request.
+    for url in [
+        format!("http://192.168.1.50:{}/v1", s.port),
+        format!("https://192.168.1.50:{}/v1", s.port),
+        format!("http://localhost.evil.example:{}/v1", s.port),
+        "https://api.example.com/v1".to_owned(),
+    ] {
+        let e = HttpTextModel::new(url.clone(), "m", 5)
+            .complete_json(&request())
+            .unwrap_err();
+        assert_eq!(e.kind, ErrorKind::InvalidInput, "{url}");
+    }
+    let e = HttpTextModel::new(format!("http://192.168.1.50:{}/v1", s.port), "m", 5)
+        .complete_json_streaming(&request(), &mut |_| true)
+        .unwrap_err();
     assert_eq!(e.kind, ErrorKind::InvalidInput);
     assert!(
         s.seen.lock().unwrap().is_empty(),
@@ -260,43 +253,16 @@ fn provider_none_makes_no_call_and_a_lan_local_provider_is_refused() {
 }
 
 #[test]
-fn anthropic_uses_tool_input_and_needs_a_key() {
-    let s = serve(|_, _| {
-        (
-            200,
-            json!({ "content": [{ "type": "tool_use", "name": "reply", "input": { "title": "Hi" } }] })
-                .to_string(),
-        )
-    });
-    let mut c = config(s.port, Provider::Anthropic);
-    c.base_url = format!("http://127.0.0.1:{}", s.port);
-    let e = build(&c, None).complete_json(&request()).unwrap_err();
-    assert_eq!(e.kind, ErrorKind::InvalidInput);
-    let r = build(&c, Some("ak-1".into()))
-        .complete_json(&request())
-        .unwrap();
-    assert_eq!(r.value, json!({"title": "Hi"}));
-    let seen = s.seen.lock().unwrap();
-    assert_eq!(seen[0].path, "/v1/messages");
-    assert!(seen[0].headers.contains("x-api-key: ak-1"));
-    assert_eq!(seen[0].body["tool_choice"]["name"], "reply");
-    assert_eq!(
-        seen[0].body["tools"][0]["input_schema"]["required"][0],
-        "title"
-    );
-}
-
-#[test]
 fn the_test_button_reports_latency_model_and_structured_output() {
     let s = serve(|_, _| (200, chat("{\"ok\": true}")));
-    let m = build(&config(s.port, Provider::Local), None);
-    let t = test_model(m.as_ref(), "test-model");
+    let m = client(s.port);
+    let t = test_model(&m, "test-model");
     assert!(t.ok && t.structured_output);
     assert_eq!(t.model, "test-model");
 
     let bad = serve(|_, _| (200, chat("not json")));
-    let m = build(&config(bad.port, Provider::Local), None);
-    let t = test_model(m.as_ref(), "test-model");
+    let m = client(bad.port);
+    let t = test_model(&m, "test-model");
     assert!(!t.ok);
     assert_eq!(t.reason.as_deref(), Some("invalid_model_output"));
 }
@@ -403,20 +369,16 @@ fn embedded_retries_once_when_the_helper_died_and_gives_up_clearly() {
 }
 
 #[test]
-fn embedded_is_local_with_no_remote_plan_and_settings_can_choose_it() {
+fn settings_can_choose_the_embedded_provider() {
     let mut m = serde_json::Map::new();
     m.insert("ai.text.provider".into(), json!("embedded"));
     m.insert("ai.text.embedded_model".into(), json!("qwen3.5-4b"));
-    m.insert("ai.text.base_url".into(), json!("https://evil.example/v1"));
     let c = TextModelConfig::from_settings(&m);
     assert_eq!(c.provider, Provider::Embedded);
     assert_eq!(c.embedded_model, "qwen3.5-4b");
-    assert!(c.is_local() && !c.is_remote());
-    assert!(c.send_plan(100).is_none());
     assert!(c.check_endpoint().is_ok());
-    assert_eq!(c.host().as_deref(), Some("127.0.0.1"));
     // Without an engine wired in, `build` cannot answer and says why.
-    let err = build(&c, None).complete_json(&request()).unwrap_err();
+    let err = build(&c).complete_json(&request()).unwrap_err();
     assert_eq!(err.reason(), "engine_missing");
 }
 
@@ -544,7 +506,7 @@ const PIECES: [&str; 6] = ["{\"ti", "tle\"", ": \"He", "llo ", "wor", "ld\"}"];
 #[test]
 fn a_streamed_answer_reports_growing_progress_and_assembles_the_same_json() {
     let s = serve_sse(|_| Sse::new(&PIECES));
-    let m = build(&config(s.port, Provider::OpenAiCompatible), None);
+    let m = client(s.port);
     let mut ticks = Vec::new();
     let streamed = m
         .complete_json_streaming(&request(), &mut |n| {
@@ -574,7 +536,7 @@ fn the_progress_count_keeps_growing_over_the_validation_retry() {
             Sse::new(&PIECES)
         }
     });
-    let m = build(&config(s.port, Provider::Local), None);
+    let m = client(s.port);
     let mut ticks = Vec::new();
     let r = m
         .complete_json_streaming(&request(), &mut |n| {
@@ -590,7 +552,7 @@ fn the_progress_count_keeps_growing_over_the_validation_retry() {
 fn a_server_that_ignores_stream_still_works_without_progress() {
     // Answers a streaming request with a plain JSON body.
     let s = serve(|_, _| (200, chat("{\"title\": \"Plain\"}")));
-    let m = build(&config(s.port, Provider::Local), None);
+    let m = client(s.port);
     let mut ticks = 0;
     let r = m
         .complete_json_streaming(&request(), &mut |_| {
@@ -615,7 +577,7 @@ fn a_streaming_request_refused_for_response_format_is_asked_again_without_it() {
             (200, chat("{\"title\": \"Second\"}"))
         }
     });
-    let m = build(&config(s.port, Provider::Local), None);
+    let m = client(s.port);
     let r = m
         .complete_json_streaming(&request(), &mut |_| true)
         .unwrap();
@@ -632,7 +594,7 @@ fn an_error_status_to_a_streaming_request_is_mapped_like_before() {
             json!({"error": {"message": "model exploded"}}).to_string(),
         )
     });
-    let m = build(&config(s.port, Provider::Local), None);
+    let m = client(s.port);
     let e = m
         .complete_json_streaming(&request(), &mut |_| true)
         .unwrap_err();
@@ -647,11 +609,10 @@ fn a_stalled_stream_hits_the_timeout() {
         sse.stall_at = Some((2, Duration::from_secs(6)));
         sse
     });
-    let mut c = config(s.port, Provider::Local);
-    c.timeout_s = 1;
+    let c = HttpTextModel::new(format!("http://127.0.0.1:{}/v1", s.port), "test-model", 1);
     let mut ticks = 0;
     let t0 = std::time::Instant::now();
-    let e = build(&c, None)
+    let e = c
         .complete_json_streaming(&request(), &mut |_| {
             ticks += 1;
             true
@@ -671,7 +632,7 @@ fn a_cancel_in_the_middle_of_a_stream_stops_the_call() {
     });
     let mut ticks = 0;
     let t0 = std::time::Instant::now();
-    let e = build(&config(s.port, Provider::Local), None)
+    let e = client(s.port)
         .complete_json_streaming(&request(), &mut |n| {
             ticks = n;
             n < 2
@@ -710,7 +671,7 @@ fn an_error_event_inside_the_stream_is_a_server_error() {
             });
         }
     });
-    let e = build(&config(port, Provider::Local), None)
+    let e = client(port)
         .complete_json_streaming(&request(), &mut |_| true)
         .unwrap_err();
     assert_eq!(e.kind, ErrorKind::Server);

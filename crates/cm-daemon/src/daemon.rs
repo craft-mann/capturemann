@@ -233,7 +233,6 @@ pub struct DaemonBuilder {
     cloud: crate::storage_cloud::CloudBackend,
     publish_accounts: Option<cm_publish::PublishAccountStore>,
     youtube: cm_publish::YouTubeConfig,
-    text_secrets: Option<Arc<dyn cm_auth::SecretStore>>,
     confirmer: Arc<dyn Confirmer>,
     confirm_timeout: Duration,
     clock: Arc<dyn Clock>,
@@ -264,7 +263,6 @@ impl DaemonBuilder {
             cloud: crate::storage_cloud::CloudBackend::default(),
             publish_accounts: None,
             youtube: cm_publish::YouTubeConfig::default(),
-            text_secrets: None,
             confirmer: Arc::new(DenyAll),
             confirm_timeout: DEFAULT_CONFIRM_TIMEOUT,
             clock: Arc::new(SystemClock),
@@ -363,13 +361,6 @@ impl DaemonBuilder {
     /// token sources and HTTP client are the ones of [`DaemonBuilder::cloud_backend`].
     pub fn publish_accounts(mut self, store: cm_publish::PublishAccountStore) -> Self {
         self.publish_accounts = Some(store);
-        self
-    }
-
-    /// Where the text model's API key is read from, by the name in `ai.text.key_name` (the
-    /// system keychain when not set; tests pass a memory store).
-    pub fn text_model_secrets(mut self, store: Arc<dyn cm_auth::SecretStore>) -> Self {
-        self.text_secrets = Some(store);
         self
     }
 
@@ -511,7 +502,7 @@ impl DaemonBuilder {
                 cloud: self.cloud,
                 publish_accounts: self.publish_accounts,
                 youtube: self.youtube,
-                text_model: crate::text_model_ops::TextModelState::new(self.text_secrets),
+                text_model: crate::text_model_ops::TextModelState::new(),
                 gate: ConfirmationGate::new(self.confirmer, self.confirm_timeout, events.clone()),
                 events,
                 policies: ClientPolicies::default(),

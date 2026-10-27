@@ -126,8 +126,8 @@ pub const ACTIONS: &[ActionSpec] = &[
     // AI-6a: find and replace over the caption lines, one undo step. The transcript is untouched.
     spec("replace_in_captions", Tier::Free, true),
     spec("export_captions", Tier::Free, true),
-    // AI-5: a `translate` job writing `translations/<lang>.json`. Free with Whisper or a local
-    // text model; a remote text model will make it Confirm (AI-7, not built).
+    // AI-5: a `translate` job writing `translations/<lang>.json`. Free with Whisper or the
+    // built-in text model.
     spec("translate_captions", Tier::Free, true),
     spec("suggest_zooms", Tier::Free, false),
     spec("suggest_cuts", Tier::Free, false),
@@ -135,8 +135,8 @@ pub const ACTIONS: &[ActionSpec] = &[
     // `set_speakers` renames, merges or reassigns as one undoable revision.
     spec("diarize", Tier::Free, true),
     spec("set_speakers", Tier::Free, true),
-    // AI-9 reports. `generate_report` is a `report` job on the local text model (a non-local
-    // provider is refused as `no_text_model`: remote providers are deferred); create, edit and
+    // AI-9 reports. `generate_report` is a `report` job on the built-in text model (provider
+    // `none` is refused as `no_text_model`); create, edit and
     // delete are one undoable revision each.
     spec("list_report_templates", Tier::Free, false),
     spec("generate_report", Tier::Free, true),

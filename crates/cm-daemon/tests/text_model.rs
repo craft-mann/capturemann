@@ -1,23 +1,18 @@
-//! `get_text_model`, `test_text_model` and the caller gate (AI-7) through the daemon: provider
-//! `none` by default, app-only settings, unavailable providers. The built-in engine against a fake helper is in `text_engine.rs`. No network, no model.
+//! `get_text_model`, `test_text_model` and the caller check (AI-7) through the daemon: provider
+//! `none` by default, app-only settings, providers that no longer exist. The built-in engine against a fake helper is in `text_engine.rs`. No network, no model.
 
 #![allow(clippy::unwrap_used)]
 
 mod common;
 
-use std::sync::Arc;
-
-use cm_auth::{MemoryStore, SecretStore};
 use cm_core::Actor;
 use cm_daemon::{Daemon, DaemonError};
 use common::{builder, desktop};
 use serde_json::{json, Value};
 
 fn rig() -> (Daemon, tempfile::TempDir) {
-    let store = Arc::new(MemoryStore::default());
-    store.set("anthropic-key", "sk-ant-TOPSECRET").unwrap();
     let (b, dir) = builder(desktop());
-    (b.text_model_secrets(store).build(), dir)
+    (b.build(), dir)
 }
 
 async fn user(d: &Daemon, method: &str, p: Value) -> Result<Value, DaemonError> {
@@ -43,7 +38,6 @@ async fn provider_none_by_default_and_no_text_model_for_callers() {
     let (d, _dir) = rig();
     let g = user(&d, "get_text_model", json!({})).await.unwrap();
     assert_eq!(g["provider"], "none");
-    assert_eq!(g["local"], true);
     assert_eq!(g["context_tokens"], 8192);
     assert_eq!(g["timeout_s"], 300);
     assert_eq!(g["structured_output"], Value::Null);
@@ -53,10 +47,7 @@ async fn provider_none_by_default_and_no_text_model_for_callers() {
         matches!(&e, DaemonError::WithData { error, .. } if error.code().as_str() == "invalid_input")
     );
     // AI-7.AC2: a caller is told the same.
-    assert_eq!(
-        reason(&d.text_model_gate(100).unwrap_err()),
-        "no_text_model"
-    );
+    assert_eq!(reason(&d.text_model_check().unwrap_err()), "no_text_model");
 }
 
 #[tokio::test]
@@ -75,7 +66,6 @@ async fn settings_are_app_only() {
         "ai.text.provider",
         "ai.text.base_url",
         "ai.text.model",
-        "ai.text.key_name",
         "ai.text.context_tokens",
         "ai.text.timeout_s",
     ] {
@@ -95,19 +85,18 @@ async fn settings_are_app_only() {
 /// The built-in engine only in 0.2.0 (maintainer, Oct 27, 2026): any other provider in the
 /// settings file (`local` included) is treated as `none`, so nothing is ever sent to it.
 #[tokio::test]
-async fn a_remote_provider_in_the_settings_is_unavailable() {
+async fn a_provider_that_no_longer_exists_in_the_settings_reads_as_none() {
     let (d, _dir) = rig();
     for provider in ["anthropic", "openai_compatible", "local"] {
         settings(
             &d,
             json!({ "ai.text.provider": provider, "ai.text.model": "claude-x",
-                    "ai.text.base_url": "https://llm.example.com/v1",
-                    "ai.text.key_name": "k" }),
+                    "ai.text.base_url": "https://llm.example.com/v1" }),
         )
         .await;
         let g = user(&d, "get_text_model", json!({})).await.unwrap();
         assert_eq!(g["provider"], "none", "{g}");
-        assert!(d.text_model_gate(10).is_err());
+        assert!(d.text_model_check().is_err());
         assert!(user(&d, "test_text_model", json!({})).await.is_err());
     }
 }

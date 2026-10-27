@@ -155,13 +155,11 @@ async fn embedded_with_a_downloaded_model_runs_through_the_engine() {
     use_embedded(&r).await;
     let g = user(&r, "get_text_model", json!({})).await.unwrap();
     assert_eq!(g["provider"], "embedded");
-    assert_eq!(g["local"], true);
     assert_eq!(g["model"], "qwen3.5-4b", "the store's active model");
-    assert_eq!(g["host"], "127.0.0.1");
     assert_eq!(g["engine"]["state"], "stopped", "nothing started by itself");
     assert!(r.engine.specs().is_empty());
-    // Local: a caller needs no Confirm plan.
-    assert!(r.daemon.text_model_gate(5000).unwrap().is_none());
+    // A caller needs no Confirm plan: the text stays on this computer.
+    assert!(r.daemon.text_model_check().is_ok());
 
     let t = user(&r, "test_text_model", json!({})).await.unwrap();
     assert_eq!(t["ok"], true, "{t}");
@@ -201,7 +199,7 @@ async fn embedded_without_a_downloaded_model_is_no_text_model() {
     assert_eq!(code(&e), ErrorCode::InvalidInput);
     assert_eq!(reason(&e), "no_text_model");
     assert_eq!(
-        reason(&r.daemon.text_model_gate(10).unwrap_err()),
+        reason(&r.daemon.text_model_check().unwrap_err()),
         "no_text_model"
     );
     assert!(r.engine.specs().is_empty(), "the engine is never started");
@@ -401,7 +399,7 @@ async fn using_a_model_turns_the_engine_on_and_removing_it_turns_it_off() {
     assert_eq!(g["provider"], "none");
     assert_eq!(g["embedded_model"], "");
     assert_eq!(
-        reason(&r.daemon.text_model_gate(10).unwrap_err()),
+        reason(&r.daemon.text_model_check().unwrap_err()),
         "no_text_model"
     );
 }
@@ -429,7 +427,7 @@ async fn a_model_id_the_catalogue_no_longer_has_reads_as_no_model_selected() {
     let e = user(&r, "test_text_model", json!({})).await.unwrap_err();
     assert_eq!(reason(&e), "no_text_model");
     assert_eq!(
-        reason(&r.daemon.text_model_gate(10).unwrap_err()),
+        reason(&r.daemon.text_model_check().unwrap_err()),
         "no_text_model"
     );
     assert!(r.engine.specs().is_empty());
