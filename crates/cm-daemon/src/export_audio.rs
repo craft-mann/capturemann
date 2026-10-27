@@ -386,7 +386,15 @@ pub(crate) async fn run_job(h: &ExportHandler, ctx: JobContext) -> Result<Value,
         Ok(Err(cm_media::ExportError::Cancelled)) => {
             return Err(CmError::internal("The export was interrupted"))
         }
-        Ok(Err(cm_media::ExportError::Failed(e))) => return Err(e),
+        Ok(Err(cm_media::ExportError::Failed(e))) => {
+            // A missing FFmpeg component arrives as a `job_failed` without the job id.
+            return Err(match e {
+                CmError::JobFailed { reason, job_id, .. } if job_id.is_empty() => {
+                    CmError::job_failed(ctx.job.id.clone(), reason)
+                }
+                other => other,
+            });
+        }
         Err(e) => return Err(CmError::internal(format!("export worker failed: {e}"))),
     };
 

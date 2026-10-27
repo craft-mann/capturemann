@@ -564,8 +564,20 @@ pub fn audio_output_name(title: &str, tracks: TrackChoice, ext: &str) -> String 
     format!("{} - {tag}.{ext}", file_stem(title))
 }
 
-/// Does `ffmpeg` have what this format needs? An error naming the missing component, so a build
-/// without the `wav` muxer or `pcm_s24le` says so instead of failing in the middle of the run.
+/// A missing FFmpeg component is a failed job (`job_failed`), not an internal error: the reason
+/// names the component. The job id is filled in by the daemon, which knows it.
+fn missing_component(reason: impl Into<String>) -> CmError {
+    let reason = reason.into();
+    CmError::JobFailed {
+        message: reason.clone(),
+        job_id: String::new(),
+        reason,
+    }
+}
+
+/// Does `ffmpeg` have what this format needs? A `job_failed` error naming the missing component,
+/// so a build without the `wav` muxer or `pcm_s24le` says so instead of failing in the middle of
+/// the run.
 pub fn check_components(tools: &Tools, opts: &AudioOptions) -> Result<(), CmError> {
     let run = |args: &[&str]| -> String {
         Command::new(&tools.ffmpeg)
@@ -582,19 +594,19 @@ pub fn check_components(tools: &Tools, opts: &AudioOptions) -> Result<(), CmErro
     };
     let encoders = run(&["-encoders"]);
     if !has(&encoders, opts.format.encoder()) {
-        return Err(CmError::internal(format!(
+        return Err(missing_component(format!(
             "This FFmpeg has no `{}` encoder, needed for {} audio.",
             opts.format.encoder(),
             opts.format.as_str().to_uppercase()
         )));
     }
     if opts.format == AudioFormat::Wav && !has(&run(&["-muxers"]), "wav") {
-        return Err(CmError::internal(
+        return Err(missing_component(
             "This FFmpeg has no `wav` muxer, needed for WAV audio.",
         ));
     }
     if opts.loudness_lufs.is_some() && !has(&run(&["-filters"]), "loudnorm") {
-        return Err(CmError::internal(
+        return Err(missing_component(
             "This FFmpeg has no `loudnorm` filter, needed for loudness normalisation.",
         ));
     }
@@ -761,6 +773,39 @@ mod tests {
     use super::*;
 
     const TPS: i64 = 120_000;
+
+    /// A missing FFmpeg component is `job_failed` with a reason naming it, never `internal`.
+    #[cfg(unix)]
+    #[test]
+    fn missing_component_is_job_failed() {
+        use std::os::unix::fs::PermissionsExt;
+        let d = tempfile::tempdir().unwrap();
+        let fake = d.path().join("ffmpeg");
+        // Lists no encoders, muxers or filters.
+        fs::write(&fake, "#!/bin/sh\nexit 0\n").unwrap();
+        fs::set_permissions(&fake, fs::Permissions::from_mode(0o755)).unwrap();
+        let tools = Tools {
+            ffmpeg: fake,
+            ffprobe: None,
+        };
+        for opts in [
+            AudioOptions::default(),
+            AudioOptions {
+                format: AudioFormat::Wav,
+                loudness_lufs: None,
+                ..AudioOptions::default()
+            },
+        ] {
+            let e = check_components(&tools, &opts).unwrap_err();
+            assert_eq!(e.code().as_str(), "job_failed", "{e}");
+            match e {
+                CmError::JobFailed { reason, .. } => {
+                    assert!(reason.contains("This FFmpeg has no"), "{reason}");
+                }
+                other => panic!("{other:?}"),
+            }
+        }
+    }
 
     fn bundle_with(files: &[&str]) -> tempfile::TempDir {
         let d = tempfile::tempdir().unwrap();

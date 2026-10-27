@@ -17,7 +17,7 @@ No release dates (maintainer, Oct 26, 2026). Work in the order below; each stage
 **P0.2 Markers.** `manifest.markers: [{ at, label? }]` in session time (pauses removed), a revision-tagged edit, `add_marker` action, MCP tool and CLI `record marker`; also callable after stop with `capture_id` + `at`.
 **P0.3 Audio-only session.** `RecordingSession` with no screen, camera or cursor track; `mode: "audio"` on `start_recording` with the `invalid_input` rule for screen-only fields (VOC-1.AC9); `preset`, `title`, `max_duration_s`; Confirm dialog text. Idle-sleep assertion and `reason: "system_sleep"` stop. Microphone-only must not request Screen Recording.
 **P0.4 Settings.** `recording.consent_notice` (default on), `recording.audio_max_duration_s`, shortcut entries ⌥⇧V and ⌥⇧M (also fixes the CAP-2 table).
-Tests: VOC-1.AC1, AC4, AC5, AC7 to AC9 with scripted devices; kill -9 recovery with the existing e2e example (`--tracks mic`).
+Tests: VOC-1.AC1, AC4, AC5, AC7 to AC9 with scripted devices; kill -9 recovery with the existing e2e example (`--tracks mic`). *Correction Oct 27, 2026:* `record_e2e` always adds the screen track and caps `--secs` at 30, so it cannot cover AC5 (5 minutes of audio only); AC5 is run by hand, see `tests/manual/VOC-1.md` section 10.
 
 ## Stage 1: audio recording (VOC-1)
 

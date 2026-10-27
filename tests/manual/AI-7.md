@@ -51,6 +51,12 @@ sends data to another host; the page only talks to loopback. Record the result i
 ## 7. Agents cannot change these settings
 - `capturemann settings set ai.text.provider none` over the socket is refused (`app_only_setting`).
 
+## 8. Both servers, one real use each
+- Run step 3 (Test) once with Ollama and once with LM Studio, each with a model you name in the
+  report. Then, with the one that passed, run one report (`AI-9.md` step 2) and, once the
+  text-model translator is wired, one translation (`AI-5.md` step 5). Write down the model, its
+  context size and the reply time; the default model is decided by spike S8, not here.
+
 ## Layout
 - Check English, Vietnamese and `CAPTUREMANN_PSEUDO_LOCALE=1`: the provider control, the server rows
   and the Recommended table do not overlap or cut text at the narrowest window width.

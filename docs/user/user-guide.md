@@ -71,6 +71,52 @@ replace, a glossary for names and terms), SRT, VTT and TXT downloads, captions s
 and optionally burned into the exported video, plus suggestions for zoom regions and for cutting
 silences and filler words.
 
+## Recording audio (0.2.0, preview)
+
+Open the Record sheet and switch to **Audio** (or press ⌥⇧V). Pick a preset (In the room, Online
+meeting, Lecture or talk, Product demo, Voice note), then the microphone, system audio or both. The
+microphone alone does not need the Screen Recording permission; system audio does. The sheet shows
+how much disk the recording will use. **Tell everyone they are being recorded**: the sheet reminds
+you, and you can switch the reminder off.
+
+The recording bar has Stop, the timer, a level meter, Pause, Mute mic, **Marker** and Discard. Press
+**M** (or ⌥⇧M from any app) to mark a moment; type a label if you want one. Markers show in the
+editor and in reports. A laptop with the lid closed goes to sleep and the recording stops with what
+it had, so keep the lid open. Audio recordings stop by themselves after 4 hours (a setting).
+Recordings appear under **Audio** in the library, and a transcript makes them searchable.
+
+## The audio editor and Export audio (0.2.0, preview)
+
+An audio recording opens in its own editor: a card showing who is speaking and the line being said,
+lanes for markers, speakers and one waveform per track, and an inspector on the right. Space plays,
+**J** and **L** jump back and forward 5 seconds, **K** pauses and **M** adds a marker. Select a range
+and press Delete to cut it (R restores); **Suggest cuts** proposes silences and filler words.
+
+**Export audio…** makes an M4A (the default) or a WAV of the recording with your cuts applied: the mix
+or one track, loudness evened out for M4A, and an optional copy in a folder you choose. The same
+sheet is available as **Export audio only** for screen recordings.
+
+## Translation, speakers and reports (0.2.0, preview)
+
+- **Translate.** In the Transcript tab press **Translate…** and choose a language. English comes from
+  Whisper's translate mode and needs the **large-v3** model (download it on the AI page; the fast
+  `large-v3-turbo` model cannot translate). Other languages need a text model (below). The original
+  stays; switch languages with the language switcher, edit a translation like the original and export
+  captions per language.
+- **Text model.** On the AI page, choose **On this Mac**, start **Ollama** or **LM Studio**, pick a
+  model and press **Test**. Your text goes only to your own computer (127.0.0.1). CaptureMann does not
+  ship or download a text model and has no cloud option. Which model works best is still being
+  tested; a 7 to 9 billion parameter model is a reasonable start on a Mac with 16 GB.
+- **Reports.** The Report tab writes meeting minutes, interview notes, one-on-one notes, lecture
+  notes, a product recap or a plain summary from the transcript. Every item has a time that jumps to
+  that moment, so you can check it. Edit the Markdown, regenerate, and export as Markdown or text.
+  Interview notes are notes only: CaptureMann does not score people.
+- **Speakers.** The Speakers tab will show who spoke when, with names you can change. **This part is not
+  available yet:** it needs a speaker model that has not been chosen, and the tab says so.
+
+These features are tested with scripted stand-ins, not yet on real recordings by a reviewer, so
+expect rough edges and report them.
+
 ## Library, storage and publishing
 
 The library is a folder of capture bundles you can browse, search and filter (Uploaded,

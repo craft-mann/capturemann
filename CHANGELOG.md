@@ -5,6 +5,55 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
+Planned for 0.2.0 (voice and meetings). Not released and not dated. Everything below is built and
+tested with scripted fakes; none of it has been run on hardware or seen on screen by a reviewer, so
+treat it as a preview of the release notes, not a promise.
+
+### Added
+
+- Audio-only recording: a third capture mode next to screenshots and screen recordings. The Record
+  sheet has a Screen / Audio switch with five presets (In the room, Online meeting, Lecture or
+  talk, Product demo, Voice note), the microphone, system audio or both, a compact HUD with a mic
+  meter, Pause, Mute, Marker and Discard, ⌥⇧V to start or stop and ⌥⇧M to add a marker. The
+  microphone alone never asks for Screen Recording. A consent line ("Let everyone know they're
+  being recorded.") shows before recording. Recordings appear under a new Audio item in the library.
+- Markers: add a moment while recording (or later with a time) and see it in the editor and in
+  reports. `add_marker` and `capturemann record marker`.
+- An editor for audio recordings: a "now speaking" card, lanes for markers, speakers and one
+  waveform per track, cuts and suggested cuts, and a Transcript tab with speaker turns and languages.
+- Export audio: M4A or WAV, the mix or one track, loudness evened out to -16 LUFS for M4A, tags,
+  an optional copy to a folder; also "Export audio only" for screen recordings.
+  `capturemann export <id> --audio`.
+- Translation: captions to English with Whisper (`large-v3`, offline) and to other languages with a
+  local text model; one translation per language, edited and exported like the original.
+  `capturemann ai translate`.
+- Text model setup (AI page): Ollama or LM Studio on this Mac, with a Test button. Only models on
+  this computer are supported; there is no remote or cloud option.
+- Reports from a transcript with a local text model: meeting minutes, interview notes, one-on-one
+  notes, lecture notes, product recap and summary, with times on every item that jump to that
+  moment, editing, regenerating and export as Markdown or text. `capturemann ai report`.
+- Speaker labels (who spoke when), renaming, merging and reassigning speakers, and speaker names
+  in exports and reports. **Not usable yet:** the speaker model is not chosen (spike S7), so the AI
+  page says "Speaker model not available yet" and finding speakers fails with `no_speaker_model`.
+- Whisper models `large-v3` (translation to English) and `large-v3-turbo` (fast transcription, not
+  for translation).
+
+### Fixed
+
+- A missing FFmpeg component during audio export is reported as `job_failed` with a reason that
+  names the component (it was an `internal` error).
+
+### Known limitations (0.2.0)
+
+- Speaker labels have no model yet (S7). The default text model is not decided (S8): you choose one
+  in Ollama or LM Studio.
+- Live transcript while recording (VOC-3) is not included; it comes in a later 0.2.x.
+- The bundled FFmpeg needs a rebuild with the `wav` muxer and `pcm_s24le` before WAV export works
+  in the shipped app.
+- Not run on hardware: the 10-minute call sync, the kill -9 recovery and the 3-hour soak for audio
+  recording, real `large-v3` translation quality, and real local-model reports. Manual scripts are in
+  `tests/manual/` (`VOC-1.md`, `VOC-2.md`, `AI-5.md`, `AI-7.md`, `AI-8.md`, `AI-9.md`).
+
 ## [0.1.0] - 2026-10-26
 
 First public release. macOS 13+ on Apple Silicon only; Intel Macs follow after 0.1.0, then Windows and Linux.

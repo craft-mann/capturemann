@@ -136,6 +136,49 @@ Open it from the tray with Microphone already allowed to the dev bundle.
   a label (it is only for markers set at the keyboard). `capturemann record stop`.
 - Pass when the dialog, the chip and the marker behave this way.
 
+## 10. Killed process, recovery (VOC-1.AC5, REC-8)
+
+Use your own instance (own `CAPTUREMANN_LIBRARY`, `CAPTUREMANN_CONFIG_DIR`, `CAPTUREMANN_SOCKET`), the
+dev bundle, microphone only. Nothing private: say a number every ten seconds ("ten, twenty, ...").
+
+1. Start with `capturemann record start --audio --preset note --countdown 0` (approve the dialog)
+   or ⌥⇧V. Let it run **5 minutes** by the HUD timer.
+2. `kill -9` the process that holds the recording: `pgrep -f cm-desktop` (the app) or `cm-daemon`
+   if you run the headless daemon. A plain Quit does not count.
+3. Start the app (or daemon) again. Expected: a toast or log line says an unfinished recording was
+   recovered; `capturemann library list --kind audio` shows it; the `recording.lock` file is gone
+   from the `.cmrec` folder.
+4. Check the length: `ffprobe -v error -show_entries format=duration -of csv=p=0 <bundle>/mic.wav`.
+- Pass when the recovered `mic.wav` is at least **299 s** long, plays to the end, and the numbers you
+  spoke are all there.
+- Harness check without a person (also records the screen, 30 s at most, so it needs Screen
+  Recording): `cargo run -p cm-daemon --example record_e2e -- --kill9-test`. **Note:**
+  `record_e2e --tracks mic` cannot replace this step: it always adds the screen track and caps
+  `--secs` at 30, and AC5 asks for 5 minutes of audio only. Use it only for a short mic-only
+  smoke test of the track timing: `-- --tracks mic --secs 20 --pause-at 8 --pause-for 3` (it never
+  prompts; a missing permission is reported, not asked for).
+
+## 11. Three-hour soak (VOC-1.AC6, hardware, long)
+
+Needs a Mac on power, display allowed to sleep, Screen Recording and Microphone granted to the dev
+bundle, about 6 GB free, and something that plays continuously through the speakers (a lecture, a
+radio stream, a long playlist) so the system track has content. Set `recording.audio_max_duration_s`
+to 12600 (3 h 30 min) first, or the 4 h default is fine.
+
+1. Choose "Online meeting" (mic + system audio), Start. Note the time. Leave the room quiet except
+   for the playback; speak a sentence every 30 minutes.
+2. Every 30 minutes write down the app's memory: `ps -o rss= -p $(pgrep -f cm-desktop)` (KB) or
+   Activity Monitor's Memory column. Watch the HUD timer against a clock.
+3. After exactly 3 hours press Stop. Open the `.cmrec`.
+4. Drift: read both tracks' `start` and `end` in `manifest.json` (ticks, 120,000 per second) and
+   compare `ffprobe` durations of `mic.wav` and `system.wav`.
+- Pass when the highest memory reading is under **200 MB**, the two tracks' start and end differ
+  by less than **50 ms**, both play to the end without gaps or clicks at the hourly spots you
+  spot-check, and the Mac did not sleep (the recording has no `system_sleep` stop).
+- Fail and report if: a track is shorter than the timer by more than 50 ms, memory grows
+  steadily (write the readings down), or the HUD froze.
+- This is the only way to close AC6. Until a report exists, say "not run".
+
 ## Report
 
 Store the run in `verification/` (template in its README). Until a report exists, the screens and
