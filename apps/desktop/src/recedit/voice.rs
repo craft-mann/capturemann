@@ -445,6 +445,13 @@ pub fn centered_scroll(g: &Geom, t: MediaTime) -> MediaTime {
     MediaTime::from_ticks((t.ticks() - visible / 2).clamp(0, max))
 }
 
+/// A click at `frac` (0..1) of the overview strip: the time under it and the timeline scroll that
+/// centres the view there.
+pub fn overview_click(g: &Geom, frac: f32) -> (MediaTime, MediaTime) {
+    let at = MediaTime::from_ticks((g.end.ticks() as f64 * f64::from(frac.clamp(0.0, 1.0))) as i64);
+    (at, centered_scroll(g, at))
+}
+
 /// Vertical layout of the audio lanes under the ruler, px from the top of the lanes' area.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LaneTops {
@@ -1180,6 +1187,18 @@ mod tests {
         assert_eq!(centered_scroll(&g, t(99_000)), t(75_000));
         g.zoom = 1.0;
         assert_eq!(centered_scroll(&g, t(50_000)), t(0));
+    }
+
+    /// The overview click gives the time to seek to and the centring scroll.
+    #[test]
+    fn overview_click_seeks_and_centres() {
+        let mut g = Geom::new(800.0, t(100_000));
+        g.zoom = 4.0;
+        let (at, scroll) = overview_click(&g, 0.5);
+        assert_eq!(at, t(50_000));
+        assert_eq!(scroll, t(37_500));
+        assert_eq!(overview_click(&g, 0.0), (t(0), t(0)));
+        assert_eq!(overview_click(&g, 1.5).0, t(100_000));
     }
 
     /// VOC-2: Space, J, K, L and M.

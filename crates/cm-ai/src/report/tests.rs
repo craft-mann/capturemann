@@ -476,7 +476,7 @@ Pricing plan. [00:05]
 
 ## Action items
 
-- Send sheet — Owner: Linh · Due: Friday [01:05] [1:02:05]
+- [ ] Send sheet — Owner: Linh · Due: Friday [01:05] [1:02:05]
 
 ## Open questions
 
@@ -490,6 +490,27 @@ Pricing plan. [00:05]
     let txt = render::plain_text(&md);
     assert!(txt.starts_with("WEEKLY\n"));
     assert!(!txt.contains("**") && !txt.contains("## "));
+}
+
+#[test]
+fn ticked_tasks_render_as_checkboxes_in_markdown_and_text() {
+    let t = find_template("minutes").unwrap();
+    let mut r = sample_report(t);
+    assert!(r.set_checked("action_items", 0, true));
+    let md = render::markdown(t, &r);
+    assert!(md.contains("- [x] Send sheet"), "{md}");
+    // Only the task sections take boxes.
+    assert!(
+        md.contains("- Linh\n") && md.contains("- Marker [00:55]"),
+        "{md}"
+    );
+    assert!(md.contains("- **Topic:** Pricing"), "{md}");
+    let txt = render::plain_text(&md);
+    assert!(txt.contains("[x] Send sheet"), "{txt}");
+    r.set_checked("action_items", 0, false);
+    let md = render::markdown(t, &r);
+    assert!(md.contains("- [ ] Send sheet"), "{md}");
+    assert!(render::plain_text(&md).contains("[ ] Send sheet"));
 }
 
 #[test]

@@ -57,7 +57,13 @@ fn field_text(item: &Value, f: &super::Field) -> String {
     }
 }
 
-fn render_item(section: &Section, item: &Value, out: &mut String) {
+fn render_item(section: &Section, item: &Value, tick: Option<bool>, out: &mut String) {
+    // A task item of a section that takes ticks starts with its box.
+    let bullet = match tick {
+        Some(true) => "- [x] ",
+        Some(false) => "- [ ] ",
+        None => "- ",
+    };
     let Some(first) = section.fields.first() else {
         return;
     };
@@ -82,7 +88,7 @@ fn render_item(section: &Section, item: &Value, out: &mut String) {
             } else {
                 format!(" \u{2014} {}", parts.join(" \u{b7} "))
             };
-            out.push_str(&format!("- {head}{tail}{}\n", cites(item)));
+            out.push_str(&format!("{bullet}{head}{tail}{}\n", cites(item)));
         }
         Layout::Block => {
             let head = if first.kind == FieldKind::List {
@@ -90,7 +96,11 @@ fn render_item(section: &Section, item: &Value, out: &mut String) {
             } else {
                 head
             };
-            out.push_str(&format!("- **{}:** {head}{}\n", first.label, cites(item)));
+            out.push_str(&format!(
+                "{bullet}**{}:** {head}{}\n",
+                first.label,
+                cites(item)
+            ));
             for f in rest {
                 match f.kind {
                     FieldKind::Text => {
@@ -114,7 +124,8 @@ fn render_item(section: &Section, item: &Value, out: &mut String) {
     }
 }
 
-/// The Markdown of the stored content. The edited text of a report the user changed is
+/// The Markdown of the stored content. Items of the task sections print as `- [ ]` / `- [x]`
+/// (from [`Report::checked`]). The edited text of a report the user changed is
 /// [`Report::markdown`], not this.
 pub fn markdown(template: &Template, report: &Report) -> String {
     let title = report
@@ -145,8 +156,10 @@ pub fn markdown(template: &Template, report: &Report) -> String {
             out.push_str(&format!("*{NOTHING_FOUND}*\n\n"));
             continue;
         }
-        for item in items {
-            render_item(section, item, &mut out);
+        let ticks = super::is_checkable(&section.id);
+        for (i, item) in items.iter().enumerate() {
+            let tick = ticks.then(|| report.is_checked(&section.id, i));
+            render_item(section, item, tick, &mut out);
         }
         if !out.ends_with("\n\n") {
             out.push('\n');

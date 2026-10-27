@@ -1310,6 +1310,7 @@ impl RecordingEditor {
                     .fold(0.0_f32, f32::max)
             })
             .collect();
+        let seek = !padded;
         let color = hsla(t.mist.with_alpha(70));
         let cell = self.voice_ui.overview.clone();
         let bars = canvas(
@@ -1361,15 +1362,19 @@ impl RecordingEditor {
             .cursor_pointer()
             .on_mouse_down(
                 MouseButton::Left,
-                cx.listener(|this, ev: &MouseDownEvent, _, cx| {
+                cx.listener(move |this, ev: &MouseDownEvent, _, cx| {
                     let b = this.voice_ui.overview.get();
                     let w = f32::from(b.size.width).max(1.0);
                     let frac = (f32::from(ev.position.x - b.origin.x) / w).clamp(0.0, 1.0);
                     if let Some(s) = this.session() {
-                        let at = MediaTime::from_ticks(
-                            (s.geom.end.ticks() as f64 * f64::from(frac)) as i64,
-                        );
-                        s.geom.scroll = voice::centered_scroll(&s.geom, at);
+                        let (at, scroll) = voice::overview_click(&s.geom, frac);
+                        // The Report view's strip also moves the playhead; the editor's only
+                        // moves the view.
+                        if seek {
+                            s.model.seek(at);
+                            s.pacer.stop();
+                        }
+                        s.geom.scroll = scroll;
                     }
                     cx.notify();
                 }),
