@@ -92,7 +92,7 @@ impl Inspector {
     pub fn is_wide(self) -> bool {
         matches!(
             self,
-            Inspector::Captions | Inspector::Transcript | Inspector::Report
+            Inspector::Captions | Inspector::Transcript | Inspector::Speakers | Inspector::Report
         )
     }
 
@@ -708,7 +708,7 @@ mod tests {
             .all(|t| Inspector::VIDEO.contains(t) || Inspector::AUDIO.contains(t)));
     }
 
-    /// V4: the wide tabs are the text editors: captions, transcript and report.
+    /// V4: the wide tabs are the text editors: captions, transcript, speakers and report.
     #[test]
     fn captions_and_transcript_are_the_wide_tabs() {
         let wide: Vec<_> = Inspector::ALL.iter().filter(|t| t.is_wide()).collect();
@@ -717,6 +717,7 @@ mod tests {
             [
                 &Inspector::Captions,
                 &Inspector::Transcript,
+                &Inspector::Speakers,
                 &Inspector::Report
             ]
         );
