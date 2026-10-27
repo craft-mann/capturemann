@@ -1,9 +1,10 @@
 # AI-8 manual script: speaker labels (who spoke when)
 
-**BLOCKED on spike S7.** No speaker model is chosen or shipped: production uses `NoSpeakerModel`,
-so `capturemann ai speakers ID` fails with `no_speaker_model` today and the AI page says "Speaker
-model not available yet". This script is written for the day S7 picks a model and a runtime and
-the download is wired. Steps marked **[S7]** need the model; the others can run now. The logic
+The two speaker models (pyannote segmentation-3.0 and CAM++) **ship inside the app**
+(`Contents/Resources/Models/speaker/`, made by `make sherpa` and `make bundle`), so there is no
+setup step. Run this script with the bundle (`make run-bundle-dev`), not a bare `cargo run`, which
+has no models unless `CM_SPEAKER_MODELS_DIR` points at `packaging/sherpa/out/models`. Steps marked
+**[S7]** need real recordings and a person's ear; accuracy is not measured yet. The logic
 (numbering, word assignment, overlap, headset mode, rename, merge, assign, undo, the exports, the
 voiceprint check) is tested with a scripted diarizer: `cargo test -p cm-ai speakers` and `cargo
 test -p cm-daemon --test ai_speakers`. Spec: `specs/features/07-ai.md`, AI-8 (AC1 to AC7). Boards:
@@ -16,8 +17,9 @@ the disk: step 9 checks it. Turn the network off from step 2 on.
 
 ## Setup **[S7]**
 
-1. Install the speaker model S7 chose from the AI page (press Download; licence and size are shown
-   first; a CC-BY model shows its attribution) or import the file. Write the model name down.
+1. Check the app has them: `ls "$(dirname "$(which cm-desktop)")/../Resources/Models/speaker"` (or the
+   bundle path) shows the two `.onnx` files and `LICENSES/`; `capturemann ai models` lists
+   `speaker-segmentation` and `speaker-embedding` as installed (bundled). Nothing to download.
 2. Fixtures (hand-write the turns as who, start, end):
    - **A**: a 10-minute two-person interview on the Mac's built-in microphone, quiet room.
    - **B**: a 30-minute four-person meeting around the laptop, one microphone.
@@ -25,11 +27,11 @@ the disk: step 9 checks it. Turn the network off from step 2 on.
      the speakers (Online meeting preset, mic + system audio).
    Transcribe each: `capturemann ai transcribe ID --wait`.
 
-## 1. Without a model (runs now)
+## 1. Without the models (a developer build made without `make sherpa`; runs now)
 
-- `capturemann ai speakers ID --wait` exits 2 with `no_speaker_model` and says where to get a
-  model. The AI page, Speaker labels: "Speaker model not available yet"; the switch "Find speakers
-  after each transcript" is off and does not move; "Your name in transcripts" keeps what you type
+- `capturemann ai speakers ID --wait` exits 2 with `no_speaker_model`. The AI page, Speaker labels:
+  one row "Speaker model: Not available in this build", no Download or Import button; the switch
+  "Find speakers after each transcript" is off and does not move; "Your name in transcripts" keeps what you type
   and `capturemann settings get profile.display_name` agrees; an empty box returns to Me.
 - The editor's Speakers tab and lane are empty with a hint; nothing errors.
 

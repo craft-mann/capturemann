@@ -35,3 +35,15 @@ in `NOTICE` and `THIRD_PARTY_LICENSES.md`); ONNX Runtime is MIT (`licenses/onnxr
 `THIRD_PARTY_LICENSES.md`). **Maintainer to-do:** add ONNX Runtime's `ThirdPartyNotices.txt` for the
 version inside sherpa-onnx v2.0.1 (from https://github.com/microsoft/onnxruntime, matching tag) to
 `licenses/` and to the generated licence file; it was not available offline when this was written.
+
+## Speaker models (shipped inside the app)
+
+`make sherpa` also runs `fetch-models.sh`: it fetches (curl, cached in `.downloads/`, SHA-256 and size
+checked, offline when the files are cached) the pyannote segmentation-3.0 archive and the CAM++ English
+model, unpacks the archive with the system `tar` (build time only), and writes
+`out/models/{pyannote-segmentation-3-0.onnx,campplus-sv-en-voxceleb-16k.onnx,BUILD-INFO.txt,LICENSES/}`.
+`packaging/macos/bundle.sh` copies the two files into `Contents/Resources/Models/speaker/`
+(`CM_NO_SPEAKER_MODELS=1` skips; `make bundle-release` requires them). For a dev run of `cargo run`
+set `CM_SPEAKER_MODELS_DIR=packaging/sherpa/out/models`. The licence texts also live in
+`models-licenses/` (read by `make licenses`). Changing a model: update the pins in `fetch-models.sh`
+and `crates/cm-ai/data/speaker_models.json` together.

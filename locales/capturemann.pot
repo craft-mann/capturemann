@@ -1901,9 +1901,6 @@ msgstr ""
 msgid "Import from file"
 msgstr ""
 
-msgid "Imported from a file: unpack sherpa-onnx-pyannote-segmentation-3-0.tar.bz2 and choose model.onnx"
-msgstr ""
-
 msgid "In (I)"
 msgstr ""
 
@@ -1958,9 +1955,6 @@ msgstr ""
 msgid "Install a speech model from a file"
 msgstr ""
 
-msgid "Installed: {name}"
-msgstr ""
-
 msgid "Interview, 1:1, meeting around a laptop"
 msgstr ""
 
@@ -1977,9 +1971,6 @@ msgid "It is removed from your library and moved to the Trash. Its copies online
 msgstr ""
 
 msgid "Its own windows, toolbars and the webcam bubble preview"
-msgstr ""
-
-msgid "It’s a separate download on the AI page ({label}, {licence}, {size} MB); the size is shown first and nothing is fetched until you ask."
 msgstr ""
 
 msgid "JPG or PNG up to 2 MB; 1280 × 720 is best. A custom thumbnail needs a verified YouTube account; if YouTube refuses it, the video is still published."
@@ -2448,9 +2439,6 @@ msgstr ""
 msgid "Needs a model above"
 msgstr ""
 
-msgid "Needs a speaker model"
-msgstr ""
-
 msgid "Needs about {memory} of memory"
 msgstr ""
 
@@ -2647,6 +2635,9 @@ msgid "Normalise to {lufs} LUFS, the level podcasts and players expect"
 msgstr ""
 
 msgid "Not available for this recording"
+msgstr ""
+
+msgid "Not available in this build"
 msgstr ""
 
 msgid "Not available yet"
@@ -3937,22 +3928,13 @@ msgstr ""
 msgid "Speaker labels"
 msgstr ""
 
-msgid "Speaker labels aren’t available yet"
+msgid "Speaker labels aren’t available in this build"
 msgstr ""
 
 msgid "Speaker labels, if turned on"
 msgstr ""
 
 msgid "Speaker model"
-msgstr ""
-
-msgid "Speaker model not available yet"
-msgstr ""
-
-msgid "Speaker models"
-msgstr ""
-
-msgid "Speaker models (pyannote segmentation and CAM++)"
 msgstr ""
 
 msgid "Speaker name"
@@ -4564,9 +4546,6 @@ msgstr ""
 msgid "The sign-in was refused."
 msgstr ""
 
-msgid "The speaker model isn’t installed"
-msgstr ""
-
 msgid "The take is deleted and cannot be recovered"
 msgstr ""
 
@@ -4645,9 +4624,6 @@ msgstr ""
 msgid "These are the defaults for every recording, including ones an agent starts. A request can override them for one recording."
 msgstr ""
 
-msgid "They need a separate speaker model, and this version doesn’t include one. Nothing is downloaded until you ask."
-msgstr ""
-
 msgid "This Mac has no usable hardware H.264 encoder for this recording. Try a lower resolution, update to macOS 13 or later, or use a Mac from about 2016 or later."
 msgstr ""
 
@@ -4664,6 +4640,9 @@ msgid "This action isn’t built into CaptureMann yet."
 msgstr ""
 
 msgid "This app is not serving a socket, so the snippet has no --socket."
+msgstr ""
+
+msgid "This build doesn’t include the speaker models that tell voices apart. CaptureMann releases include them."
 msgstr ""
 
 msgid "This cannot be undone"
@@ -5696,9 +5675,6 @@ msgid "{name} was not found next to the app ({dir}) or on PATH. Build or install
 msgstr ""
 
 msgid "{name} {pos} of {total}, selected"
-msgstr ""
-
-msgid "{name} · {licence} · {size}, shown before you download"
 msgstr ""
 
 msgid "{name} · {size}"

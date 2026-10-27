@@ -34,8 +34,8 @@ treat it as a preview of the release notes, not a promise.
   notes, lecture notes, product recap and summary, with times on every item that jump to that
   moment, editing, regenerating and export as Markdown or text. `capturemann ai report`.
 - Speaker labels (who spoke when), renaming, merging and reassigning speakers, and speaker names
-  in exports and reports. **Not usable yet:** the speaker model is not chosen (spike S7), so the AI
-  page says "Speaker model not available yet" and finding speakers fails with `no_speaker_model`.
+  in exports and reports. The two speaker models (about 36 MB) are included in the app, so there is nothing to download or
+  set up and it works offline; accuracy has not been measured yet.
 - Whisper models `large-v3` (translation to English) and `large-v3-turbo` (fast transcription, not
   for translation).
 

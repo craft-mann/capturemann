@@ -112,8 +112,10 @@ sheet is available as **Export audio only** for screen recordings.
   notes, a product recap or a plain summary from the transcript. Every item has a time that jumps to
   that moment, so you can check it. Edit the Markdown, regenerate, and export as Markdown or text.
   Interview notes are notes only: CaptureMann does not score people.
-- **Speakers.** The Speakers tab will show who spoke when, with names you can change. **This part is not
-  available yet:** it needs a speaker model that has not been chosen, and the tab says so.
+- **Speakers.** The Speakers tab shows who spoke when, with names you can change. Press Find speakers;
+  there is nothing to download or set up, because the two small models it needs (about 36 MB) are part of
+  CaptureMann, and it works without a network. It runs on your computer, and no voiceprint is saved. How
+  accurate it is has not been measured yet.
 
 These features are tested with scripted stand-ins, not yet on real recordings by a reviewer, so
 expect rough edges and report them.

@@ -40,7 +40,7 @@ are backlog items (later). Nothing here sends data to another host; the engine l
 
 ## 4. Speaker labels (AI-8)
 - Expected: the card names the speaker models and the switch "Find speakers after each transcript"
-  works only when they are installed; "Your name in transcripts" shows Me, Save keeps a new name and
+  works (the models ship inside the app; a build without them says "Not available in this build"); "Your name in transcripts" shows Me, Save keeps a new name and
   `capturemann settings get profile.display_name` agrees; an empty box returns to Me.
 
 ## 5. Agents cannot change these settings

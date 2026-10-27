@@ -124,13 +124,13 @@ jobs:
           rustc --version
           xcodebuild -version
 
-      - name: Cache the sherpa-onnx archive
+      - name: Cache the sherpa-onnx archive and the speaker models
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: packaging/sherpa/.downloads
-          key: sherpa-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packaging/sherpa/fetch-macos.sh') }}
+          key: sherpa-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packaging/sherpa/fetch-macos.sh', 'packaging/sherpa/fetch-models.sh') }}
 
-      - name: Fetch the sherpa-onnx libraries (pinned, SHA-256 checked)
+      - name: Fetch the sherpa-onnx libraries and speaker models (pinned, SHA-256 checked)
         run: make sherpa
 
       - name: Cache the FFmpeg build

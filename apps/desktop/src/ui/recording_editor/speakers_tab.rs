@@ -1,12 +1,11 @@
 //! The Speakers tab (redesign V5, AI-8). Labelled state: one row per speaker (colour, name,
 //! share of the talk time with a bar, Play sample, Rename and Merge into...), the "My microphone
 //! only hears me" switch and the privacy line. Not-run state: an empty card, "How many people?",
-//! the notice when there is no speaker model and Open AI page, with Find speakers dimmed until a
-//! model is installed.
+//! the notice when this build has no speaker models, with Find speakers dimmed.
 //!
 //! Renaming and merging go through `set_speakers`, Find speakers through `diarize`; nothing here
-//! calls an engine. Find speakers needs the two speaker model files (AI page); until both are
-//! installed the tab says what is missing and the daemon answers `no_speaker_model`. "How many
+//! calls an engine. Find speakers needs the two speaker model files, which ship inside the
+//! app (nothing to set up); a build without them says so and the daemon answers `no_speaker_model`. "How many
 //! people?" starts on the recording preset's count (`rules::default_people`), not on "Not sure".
 //! Not seen by eye yet (`tests/manual/VOC-2.md`).
 
@@ -120,47 +119,26 @@ impl RecordingEditor {
                     callout(
                         t,
                         Tone::Brass,
-                        "download",
-                        tr!("Speaker labels aren\u{2019}t available yet"),
+                        "circle-alert",
+                        tr!("Speaker labels aren\u{2019}t available in this build"),
                         Some(
                             tr!(
-                            "They need a separate speaker model, and this version doesn\u{2019}t \
-                             include one. Nothing is downloaded until you ask."
-                        )
+                                "This build doesn\u{2019}t include the speaker models that tell \
+                                 voices apart. CaptureMann releases include them."
+                            )
                             .into(),
                         ),
                         None,
                     )
                     .into_any_element(),
                 ),
-            (None, SpeakerCard::Offer(m), false) => body.push(
-                callout(
-                    t,
-                    Tone::Brass,
-                    "download",
-                    tr!("The speaker model isn\u{2019}t installed"),
-                    Some(
-                        tr!(
-                            "It\u{2019}s a separate download on the AI page ({label}, {licence}, \
-                             {size} MB); the size is shown first and nothing is fetched until you \
-                             ask.",
-                            label = m.label.clone(),
-                            licence = m.licence.clone(),
-                            size = m.size_mb
-                        )
-                        .into(),
-                    ),
-                    None,
-                )
-                .into_any_element(),
-            ),
             _ => {}
         }
         body.push(self.headset_row(t, s, cx));
         body.push(privacy_line(t));
 
-        // The foot: Open AI page and Find speakers (dimmed without a model), or the progress.
-        let ready = matches!(card_state, SpeakerCard::Installed(_));
+        // The foot: Find speakers (dimmed without a model), or the progress.
+        let ready = matches!(card_state, SpeakerCard::Ready);
         let mut foot: Vec<AnyElement> = Vec::new();
         if let Some(job) = &running {
             let label = match job.progress {
@@ -183,25 +161,6 @@ impl RecordingEditor {
                 .into_any_element(),
             );
         } else {
-            if !ready {
-                let app = self.app.clone();
-                foot.push(
-                    button_with_icon(
-                        t,
-                        "re-open-ai",
-                        tr!("Open AI page"),
-                        ButtonKind::Secondary,
-                        Some("sparkles"),
-                    )
-                    .on_click(move |_, _, cx| {
-                        let app = app.clone();
-                        cx.defer(move |cx| {
-                            crate::ui::app::set_route(&app, crate::ui::app::Route::Ai, cx)
-                        });
-                    })
-                    .into_any_element(),
-                );
-            }
             let label = if has_speakers {
                 tr!("Find again")
             } else {

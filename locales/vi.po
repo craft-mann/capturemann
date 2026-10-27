@@ -9952,14 +9952,6 @@ msgid "Find speakers after each transcript"
 msgstr "Tìm người nói sau mỗi bản chép lời"
 
 #, fuzzy
-msgid "Installed: {name}"
-msgstr "Đã cài: {name}"
-
-#, fuzzy
-msgid "Needs a speaker model"
-msgstr "Cần một mô hình nhận diện người nói"
-
-#, fuzzy
 msgid "Off by default"
 msgstr "Mặc định tắt"
 
@@ -9978,10 +9970,6 @@ msgstr "Nhãn người nói"
 #, fuzzy
 msgid "Speaker model"
 msgstr "Mô hình người nói"
-
-#, fuzzy
-msgid "Speaker model not available yet"
-msgstr "Chưa có mô hình người nói"
 
 #, fuzzy
 msgid "Speech to text"
@@ -10030,10 +10018,6 @@ msgstr "Tên của bạn trong bản chép lời"
 #, fuzzy
 msgid "only talks to {host}"
 msgstr "chỉ kết nối tới {host}"
-
-#, fuzzy
-msgid "{name} · {licence} · {size}, shown before you download"
-msgstr "{name} · {licence} · {size}, hiển thị trước khi bạn tải"
 
 #, fuzzy
 msgctxt "text model"
@@ -10471,10 +10455,6 @@ msgid "Fully offline, no text model needed. It uses Large v3 or Medium; Large v3
 msgstr "Hoàn toàn ngoại tuyến, không cần mô hình văn bản. Dùng Large v3 hoặc Medium; Large v3 Turbo không dịch được."
 
 #, fuzzy
-msgid "It’s a separate download on the AI page ({label}, {licence}, {size} MB); the size is shown first and nothing is fetched until you ask."
-msgstr "Đây là bản tải riêng trên trang AI ({label}, {licence}, {size} MB); dung lượng được hiện trước và không có gì được tải cho đến khi bạn yêu cầu."
-
-#, fuzzy
 msgid "List report templates"
 msgstr "Liệt kê mẫu báo cáo"
 
@@ -10571,10 +10551,6 @@ msgid "Same as the transcript ({language})"
 msgstr "Giống bản ghi lời ({language})"
 
 #, fuzzy
-msgid "Speaker labels aren’t available yet"
-msgstr "Chưa có nhãn người nói"
-
-#, fuzzy
 msgid "Speaker name"
 msgstr "Tên người nói"
 
@@ -10601,14 +10577,6 @@ msgstr "Mô hình văn bản, từng dòng một"
 #, fuzzy
 msgid "The role the interview is for"
 msgstr "Vai trò mà buổi phỏng vấn dành cho"
-
-#, fuzzy
-msgid "The speaker model isn’t installed"
-msgstr "Chưa cài mô hình nhận diện người nói"
-
-#, fuzzy
-msgid "They need a separate speaker model, and this version doesn’t include one. Nothing is downloaded until you ask."
-msgstr "Cần một mô hình nhận diện người nói riêng, và phiên bản này chưa kèm theo. Không có gì được tải cho đến khi bạn yêu cầu."
 
 #, fuzzy
 msgid "This report was made with a template this version doesn’t know."
@@ -11115,13 +11083,6 @@ msgstr "CaptureMann đang chạy"
 msgid "Another copy ({name}) is running and uses the same library and settings. Quit it from its menu bar icon, then open this one."
 msgstr "Một bản khác ({name}) đang chạy và dùng chung thư viện và cài đặt. Hãy thoát nó từ biểu tượng trên thanh menu, rồi mở bản này."
 
-msgid "Speaker models"
-msgstr "Mô hình nhận diện người nói"
-
-#, fuzzy
-msgid "Speaker models (pyannote segmentation and CAM++)"
-msgstr "Mô hình nhận diện người nói (pyannote segmentation và CAM++)"
-
 #, fuzzy
 msgid "Finds where speech happens and who overlaps. First of the two files that tell speakers apart."
 msgstr "Tìm chỗ có tiếng nói và chỗ nhiều người nói cùng lúc. Tệp thứ nhất trong hai tệp để phân biệt người nói."
@@ -11129,10 +11090,6 @@ msgstr "Tìm chỗ có tiếng nói và chỗ nhiều người nói cùng lúc. 
 #, fuzzy
 msgid "Compares voices so the same person gets the same label. Second of the two files that tell speakers apart."
 msgstr "So sánh giọng nói để cùng một người luôn có cùng một nhãn. Tệp thứ hai trong hai tệp để phân biệt người nói."
-
-#, fuzzy
-msgid "Imported from a file: unpack sherpa-onnx-pyannote-segmentation-3-0.tar.bz2 and choose model.onnx"
-msgstr "Nhập từ tệp: giải nén sherpa-onnx-pyannote-segmentation-3-0.tar.bz2 rồi chọn model.onnx"
 
 #, fuzzy
 msgid "No built-in model is available in this version yet. Check for an update."
@@ -11161,3 +11118,15 @@ msgstr "Không dùng mô hình"
 #, fuzzy
 msgid "Download a model and press Use this model first."
 msgstr "Hãy tải một mô hình và bấm Dùng mô hình này trước."
+
+#, fuzzy
+msgid "Not available in this build"
+msgstr "Không có trong bản dựng này"
+
+#, fuzzy
+msgid "Speaker labels aren’t available in this build"
+msgstr "Nhãn người nói không có trong bản dựng này"
+
+#, fuzzy
+msgid "This build doesn’t include the speaker models that tell voices apart. CaptureMann releases include them."
+msgstr "Bản dựng này không kèm các mô hình phân biệt giọng nói. Các bản phát hành của CaptureMann đều có sẵn."

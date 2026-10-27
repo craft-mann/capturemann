@@ -76,3 +76,5 @@ VOC-3 live transcript (needs its own board), custom report templates (embedded l
 ## Docs to update as each stage lands
 
 `docs/project/status.md`, `docs/project/plan.md`, `docs/user/user-guide.md`, `CHANGELOG.md`, `locales/`, `specs/plans/design-implementation.md` (traceability for V0 to V8), and the "planned, not built" markers in `specs/02-agent-interface.md`.
+
+**Update, Oct 27, 2026 (maintainer decision): the two speaker models ship inside the app.** `make sherpa` also fetches the pinned pyannote segmentation-3.0 and CAM++ files (`packaging/sherpa/fetch-models.sh`), `make bundle` puts them in `Contents/Resources/Models/speaker/` and `make bundle-release` requires them, so speaker labels need no download or import step; the model download and licence display of the stage above are replaced by the bundled files (licences in `NOTICE`, `THIRD_PARTY_LICENSES.md` and `Resources/Models/speaker/LICENSES/`). See `specs/features/07-ai.md`, AI-8, "Bundled models".

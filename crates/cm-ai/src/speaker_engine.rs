@@ -2,9 +2,9 @@
 //! segmentation-3.0, then CAM++ voice embeddings, then clustering) behind the [`Diarizer`] trait.
 //!
 //! * [`SherpaDiarizer`] finds the two model files in the model store ([`SEGMENTATION_ID`] and
-//!   [`EMBEDDING_ID`] rows of `data/speaker_models.json`) every time it runs, so a model installed
-//!   while the app is open works at once and a missing one answers [`no_speaker_model`]. It never
-//!   downloads anything.
+//!   [`EMBEDDING_ID`] rows of `data/speaker_models.json`) every time it runs: a copy in the user's
+//!   models folder, else the pair that ships inside the app (SHA-256 checked once per process). A
+//!   missing pair answers [`no_speaker_model`]. It never downloads anything.
 //! * The engine itself sits behind [`TurnEngine`]. [`SherpaEngine`] (feature `sherpa`) is the real
 //!   one; tests use a scripted engine, so everything around it (the hint rules, folding tiny
 //!   clusters, flicker clean-up) is tested without the libraries or the models.
@@ -63,12 +63,28 @@ pub struct SpeakerModels {
     pub embedding: PathBuf,
 }
 
-/// The paths of the installed speaker models, `None` unless both are installed.
+/// The paths of the installed speaker models, `None` unless both are installed. "Installed" means
+/// a copy in the user's models folder or the one that ships with the app (the user's copy wins;
+/// a bundled file that fails its SHA-256 check does not count, see [`resolve_models`]).
 pub fn speaker_models(store: &ModelStore) -> Option<SpeakerModels> {
     Some(SpeakerModels {
         segmentation: store.path_of(SEGMENTATION_ID)?,
         embedding: store.path_of(EMBEDDING_ID)?,
     })
+}
+
+/// Like [`speaker_models`], but says why when they cannot be used: a damaged bundled file gives
+/// its own error (`internal`), anything else missing gives [`no_speaker_model`].
+pub fn resolve_models(store: &ModelStore) -> Result<SpeakerModels, CmError> {
+    if let Some(m) = speaker_models(store) {
+        return Ok(m);
+    }
+    for id in [SEGMENTATION_ID, EMBEDDING_ID] {
+        if let Some(problem) = store.bundled_problem(id) {
+            return Err(CmError::internal(problem));
+        }
+    }
+    Err(no_speaker_model())
 }
 
 /// One turn as the engine reports it (seconds from the start of the audio; the speaker is a
@@ -124,9 +140,7 @@ impl Diarizer for SherpaDiarizer {
     }
 
     fn ready(&self) -> Result<(), CmError> {
-        speaker_models(&self.store)
-            .map(|_| ())
-            .ok_or_else(no_speaker_model)
+        resolve_models(&self.store).map(|_| ())
     }
 
     fn diarize(
@@ -135,7 +149,7 @@ impl Diarizer for SherpaDiarizer {
         hints: &DiarizeHints,
         progress: &mut dyn FnMut(f32) -> bool,
     ) -> Result<Vec<Segment>, CmError> {
-        let models = speaker_models(&self.store).ok_or_else(no_speaker_model)?;
+        let models = resolve_models(&self.store)?;
         if !progress(0.0) {
             return Err(cancelled());
         }
@@ -393,7 +407,7 @@ impl TurnEngine for SherpaEngine {
         };
         let engine = OfflineSpeakerDiarization::create(&config).ok_or_else(|| {
             CmError::invalid_input(
-                "The speaker models could not be loaded. Remove them on the AI page and add them again.",
+                "The speaker models could not be loaded. Reinstall CaptureMann; if you imported a copy of a model, remove it with `remove_model`.",
             )
         })?;
         if engine.sample_rate() != 16_000 {
@@ -419,3 +433,6 @@ impl TurnEngine for SherpaEngine {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod bundled_tests;

@@ -221,7 +221,9 @@ pub trait Diarizer: Send + Sync {
 
 /// The marker text of the error [`NoSpeakerModel`] returns.
 const NO_SPEAKER_MODEL: &str = "No speaker model is installed, so speakers cannot be told apart. \
-Open the AI page in CaptureMann to download or import one. Nothing is downloaded automatically.";
+CaptureMann releases include the two speaker models; this build does not (a developer build needs \
+`make sherpa` before `make bundle`, or the files can be added with `import_model`). Nothing is \
+downloaded automatically.";
 
 /// `invalid_input`; the daemon attaches `data.reason = "no_speaker_model"` ([`error_data`]).
 pub fn no_speaker_model() -> CmError {

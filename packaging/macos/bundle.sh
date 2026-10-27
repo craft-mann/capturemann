@@ -38,6 +38,12 @@
 #                     model then answers "engine missing").
 #   CM_REQUIRE_LLAMA=1  fail unless llama-server with its licence files is bundled
 #                     (`make bundle-release` sets it).
+#   CM_SPEAKER_MODELS_BUNDLE  folder with the two speaker-label models (AI-8) and LICENSES/ to copy
+#                     into Contents/Resources/Models/speaker/. Without it packaging/sherpa/out/models
+#                     (made by `make sherpa`) is bundled when it exists. Data files, nothing to sign.
+#   CM_NO_SPEAKER_MODELS=1  bundle no speaker models (Find speakers then says the build has none).
+#   CM_REQUIRE_SPEAKER_MODELS=1  fail unless both models and their licence files are bundled
+#                     (`make bundle-release` sets it).
 # Output: $CM_BUNDLE_OUT/CaptureMann.app. It is assembled and verified in a hidden temp folder next
 # to it and swapped in with renames only after verification, so a failed build leaves the previous
 # app intact. Entitlements: packaging/macos/CaptureMann.entitlements (camera, microphone).
@@ -209,6 +215,36 @@ if [ -n "$llama_src" ]; then
     echo "bundle.sh: warning: no LICENSES next to $llama_src; this bundle must not be distributed" >&2
   fi
   llama_bundled=1
+fi
+
+# The speaker-label models (AI-8): pyannote segmentation-3.0 (MIT) and CAM++ English (Apache-2.0),
+# plain data files read by the engine linked into cm-desktop. Nothing is downloaded here:
+# CM_SPEAKER_MODELS_BUNDLE, or the output of `make sherpa` (packaging/sherpa/fetch-models.sh).
+spk_files=(pyannote-segmentation-3-0.onnx campplus-sv-en-voxceleb-16k.onnx)
+spk_licences=(pyannote-segmentation-3.0-LICENSE.txt campplus-3D-Speaker-NOTICE.txt)
+if [ "${CM_REQUIRE_SPEAKER_MODELS:-0}" = "1" ] && [ "${CM_NO_SPEAKER_MODELS:-0}" = "1" ]; then
+  die "CM_REQUIRE_SPEAKER_MODELS=1 and CM_NO_SPEAKER_MODELS=1 contradict each other"
+fi
+spk_src="${CM_SPEAKER_MODELS_BUNDLE:-}"
+if [ -z "$spk_src" ] && [ "${CM_NO_SPEAKER_MODELS:-0}" != "1" ] && [ -d "$root/packaging/sherpa/out/models" ]; then
+  spk_src="$root/packaging/sherpa/out/models"
+  echo "==> bundling the speaker models made by make sherpa ($spk_src)"
+fi
+if [ -z "$spk_src" ] && [ "${CM_REQUIRE_SPEAKER_MODELS:-0}" = "1" ]; then
+  die "CM_REQUIRE_SPEAKER_MODELS=1 but there are no speaker models to bundle: run \`make sherpa\` (or set CM_SPEAKER_MODELS_BUNDLE)"
+fi
+if [ -n "$spk_src" ]; then
+  for f in "${spk_files[@]}"; do
+    [ -f "$spk_src/$f" ] || die "the speaker models folder has no $f: $spk_src"
+  done
+  for f in "${spk_licences[@]}"; do
+    [ -f "$spk_src/LICENSES/$f" ] || die "the speaker models folder has no LICENSES/$f: a release must ship the licence notices"
+  done
+  spk_dst="$app/Contents/Resources/Models/speaker"
+  mkdir -p "$spk_dst/LICENSES"
+  for f in "${spk_files[@]}"; do cp "$spk_src/$f" "$spk_dst/$f"; done
+  for f in "${spk_licences[@]}"; do cp "$spk_src/LICENSES/$f" "$spk_dst/LICENSES/$f"; done
+  [ ! -f "$spk_src/BUILD-INFO.txt" ] || cp "$spk_src/BUILD-INFO.txt" "$spk_dst/"
 fi
 sed -e "s|@BUNDLE_ID@|$bundle_id|g" -e "s|@VERSION@|$version|g" -e "s|@BUILD@|$build_number|g" -e "s|@APP_NAME@|$app_name|g" \
   "$plist_tpl" > "$app/Contents/Info.plist"

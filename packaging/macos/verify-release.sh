@@ -250,6 +250,26 @@ else
   soft "no llama-server in Contents/MacOS (a release needs it: make llama, make bundle-release)"
 fi
 
+# --- speaker-label models (AI-8): data files inside the app, hashes pinned ---
+section "speaker models"
+spk="$contents/Resources/Models/speaker"
+if [ -d "$spk" ]; then
+  for pair in "pyannote-segmentation-3-0.onnx:220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079" \
+              "campplus-sv-en-voxceleb-16k.onnx:357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b"; do
+    f="${pair%%:*}"; want="${pair##*:}"
+    if [ -f "$spk/$f" ] && [ "$(shasum -a 256 "$spk/$f" | awk '{print $1}')" = "$want" ]; then
+      ok "$f matches its pinned SHA-256"
+    else
+      err "Resources/Models/speaker/$f is missing or does not match its pinned SHA-256"
+    fi
+  done
+  for l in pyannote-segmentation-3.0-LICENSE.txt campplus-3D-Speaker-NOTICE.txt; do
+    [ -s "$spk/LICENSES/$l" ] && ok "speaker model notice $l" || err "Resources/Models/speaker/LICENSES/$l is missing"
+  done
+else
+  soft "no speaker models in Resources/Models/speaker (a release needs them: make sherpa, make bundle-release)"
+fi
+
 # --- licences, version, platform ---
 section "licences, version, platform"
 for f in LICENSE NOTICE THIRD_PARTY_LICENSES.md; do

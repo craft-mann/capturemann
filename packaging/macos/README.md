@@ -18,6 +18,10 @@ CaptureMann.app/Contents/
   MacOS/cm-mcp          MCP server; Settings > Agents & CLI finds it next to cm-desktop
   MacOS/capturemann     the CLI (cm-cli's binary name)
   MacOS/ffmpeg, ffprobe   only with CM_FFMPEG_BUNDLE (LGPL build, signed with the app's identity)
+  Resources/Models/speaker/   the two speaker-label models (AI-8, about 36 MB, data files, nothing to
+                          sign) and LICENSES/; from `make sherpa` (CM_SPEAKER_MODELS_BUNDLE,
+                          CM_NO_SPEAKER_MODELS=1, CM_REQUIRE_SPEAKER_MODELS=1 as for llama-server;
+                          `make bundle-release` requires them, verify-release.sh checks their SHA-256)
   Resources/AppIcon.icns  design/brand/app-icon/AppIcon.icns (kit icon, not duplicated)
   Resources/LICENSE, NOTICE, THIRD_PARTY_LICENSES.md
 ```

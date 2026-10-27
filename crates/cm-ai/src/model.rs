@@ -10,6 +10,11 @@
 //!   `list_models`, `download_model`, `import_model` and `remove_model` actions (and their MCP tools
 //!   and CLI commands) cover them. They never become the active speech model and `transcribe`
 //!   refuses them. A row marked `import_only` has no download URL yet: the file is imported.
+//! * The two speaker models **ship inside the app** (`Contents/Resources/Models/speaker/`, or the
+//!   folder in `CM_SPEAKER_MODELS_DIR`): [`ModelStore`] treats those files as installed
+//!   ([`ModelInfo::bundled`]). A copy in the user's models folder (imported or downloaded) wins; a
+//!   bundled file is checked against the catalogue size and SHA-256 once per process and refused
+//!   when it does not match ([`ModelStore::bundled_problem`]); it cannot be removed.
 //! * The **store** lives in `<config dir>/ai` (`CAPTUREMANN_CONFIG_DIR` moves it, like the
 //!   settings file): `models/<file>` for installed models, `state.json` for the active one.
 //! * [`ModelStore::download`] runs only when a user or agent action calls it. It resumes a
@@ -33,6 +38,8 @@ use ureq::tls::{RootCerts, TlsConfig, TlsProvider};
 
 /// Environment variable naming a catalog file that replaces the built-in list.
 pub const ENV_CATALOG: &str = "CAPTUREMANN_AI_CATALOG";
+/// Environment variable naming the folder that holds the bundled speaker models (tests, development).
+pub const ENV_SPEAKER_MODELS_DIR: &str = "CM_SPEAKER_MODELS_DIR";
 
 const BUILTIN_CATALOG: &str = include_str!("../data/models.json");
 const BUILTIN_SPEAKER_CATALOG: &str = include_str!("../data/speaker_models.json");
@@ -87,6 +94,10 @@ pub struct ModelInfo {
     /// The file cannot be downloaded in this build; the user imports it (`import_model`).
     #[serde(default, skip_serializing_if = "is_false")]
     pub import_only: bool,
+    /// The file ships inside the app ("Included with CaptureMann"): it is installed without a
+    /// download or an import and cannot be removed.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub bundled: bool,
 }
 
 fn is_false(b: &bool) -> bool {
@@ -323,7 +334,25 @@ pub fn config_dir() -> PathBuf {
 pub struct ModelStore {
     root: PathBuf,
     catalog: Catalog,
+    /// Folder of the speaker models that ship with the app, when this build has one.
+    bundled_dir: Option<PathBuf>,
 }
+
+/// Where the speaker models shipped with the app are: `CM_SPEAKER_MODELS_DIR`, else
+/// `<executable dir>/../Resources/Models/speaker` (`Contents/Resources/...` in the app bundle).
+/// `None` when neither exists.
+pub fn bundled_speaker_dir() -> Option<PathBuf> {
+    if let Some(v) = std::env::var_os(ENV_SPEAKER_MODELS_DIR).filter(|v| !v.is_empty()) {
+        return Some(PathBuf::from(v));
+    }
+    let exe = std::env::current_exe().ok()?;
+    let dir = exe.parent()?.parent()?.join("Resources/Models/speaker");
+    dir.is_dir().then_some(dir)
+}
+
+/// Bundled files already checked in this process: path -> `Ok` or what was wrong.
+type BundledChecks = Vec<(PathBuf, Result<(), String>)>;
+static BUNDLED_CHECKS: std::sync::Mutex<BundledChecks> = std::sync::Mutex::new(Vec::new());
 
 impl ModelStore {
     /// `<config dir>/ai`.
@@ -341,7 +370,15 @@ impl ModelStore {
     pub fn open(root: impl Into<PathBuf>) -> (ModelStore, Option<String>) {
         let root = root.into();
         let (catalog, warning) = Catalog::load(&root);
-        (ModelStore { root, catalog }, warning)
+        let bundled_dir = bundled_speaker_dir();
+        (
+            ModelStore {
+                root,
+                catalog,
+                bundled_dir,
+            },
+            warning,
+        )
     }
 
     /// A store with an explicit catalog (tests, tools).
@@ -349,7 +386,70 @@ impl ModelStore {
         ModelStore {
             root: root.into(),
             catalog,
+            bundled_dir: None,
         }
+    }
+
+    /// The same store with another folder for the bundled speaker models (tests, tools).
+    pub fn with_bundled_dir(mut self, dir: Option<PathBuf>) -> ModelStore {
+        self.bundled_dir = dir;
+        self
+    }
+
+    /// The bundled file of a speaker model: `Ok(None)` when this build has none, `Err` with what
+    /// is wrong when it does not match the catalogue (size, SHA-256; checked once per process).
+    fn bundled_file(&self, e: &CatalogEntry) -> Result<Option<PathBuf>, String> {
+        if e.kind != ModelKind::Speaker {
+            return Ok(None);
+        }
+        let Some(dir) = &self.bundled_dir else {
+            return Ok(None);
+        };
+        let path = dir.join(&e.file);
+        if !path.is_file() {
+            return Ok(None);
+        }
+        let mut checks = BUNDLED_CHECKS.lock().unwrap_or_else(|p| p.into_inner());
+        if let Some((_, r)) = checks.iter().find(|(p, _)| *p == path) {
+            return r.clone().map(|()| Some(path));
+        }
+        let result = (|| {
+            let len = fs::metadata(&path).map_err(|err| err.to_string())?.len();
+            if len != e.bytes || sha256_hex(&path).map_err(|err| err.to_string())? != e.sha256 {
+                return Err(format!(
+                    "the copy of `{}` that ships with CaptureMann ({}) does not match the expected \
+                     file (size or SHA-256), so the app is damaged. Reinstall CaptureMann.",
+                    e.id,
+                    path.display()
+                ));
+            }
+            Ok(())
+        })();
+        checks.push((path.clone(), result.clone()));
+        result.map(|()| Some(path))
+    }
+
+    /// Why a bundled speaker model cannot be used (it fails its check), `None` when it is fine or
+    /// absent.
+    pub fn bundled_problem(&self, id: &str) -> Option<String> {
+        let e = self.catalog.get(id)?;
+        self.bundled_file(e).err()
+    }
+
+    /// Whether a good bundled copy of the model ships with the app.
+    pub fn is_bundled(&self, id: &str) -> bool {
+        self.catalog
+            .get(id)
+            .is_some_and(|e| matches!(self.bundled_file(e), Ok(Some(_))))
+    }
+
+    /// The file to use: a copy in the user's models folder, else the bundled one.
+    fn locate(&self, e: &CatalogEntry) -> Option<PathBuf> {
+        let user = self.file_of(e);
+        if user.is_file() {
+            return Some(user);
+        }
+        self.bundled_file(e).ok().flatten()
     }
 
     pub fn catalog(&self) -> &Catalog {
@@ -404,14 +504,12 @@ impl ModelStore {
     pub fn is_installed(&self, id: &str) -> bool {
         self.catalog
             .get(id)
-            .is_some_and(|e| self.file_of(e).is_file())
+            .is_some_and(|e| self.locate(e).is_some())
     }
 
     /// Path of an installed model.
     pub fn path_of(&self, id: &str) -> Option<PathBuf> {
-        let e = self.catalog.get(id)?;
-        let p = self.file_of(e);
-        p.is_file().then_some(p)
+        self.locate(self.catalog.get(id)?)
     }
 
     /// The active model id, when it is still installed.
@@ -463,8 +561,9 @@ impl ModelStore {
             .iter()
             .filter(|e| !e.pending_pin)
             .map(|e| {
-                let path = self.file_of(e);
-                let installed = path.is_file();
+                let located = self.locate(e);
+                let installed = located.is_some();
+                let path = located.unwrap_or_else(|| self.file_of(e));
                 ModelInfo {
                     id: e.id.clone(),
                     label: e.label.clone(),
@@ -477,6 +576,7 @@ impl ModelStore {
                     kind: e.kind,
                     license: e.license.clone(),
                     import_only: e.import_only,
+                    bundled: matches!(self.bundled_file(e), Ok(Some(_))),
                 }
             })
             .collect();
@@ -523,6 +623,15 @@ impl ModelStore {
         let e = self.entry(id)?.clone();
         let was_active = self.active().as_deref() == Some(e.id.as_str());
         let mut removed = false;
+        if matches!(self.bundled_file(&e), Ok(Some(_))) && !self.file_of(&e).is_file() {
+            return Err(CmError::invalid_field(
+                "model",
+                format!(
+                    "`{}` is bundled with CaptureMann and cannot be removed (reason: bundled)",
+                    e.id
+                ),
+            ));
+        }
         for p in [self.file_of(&e), self.part_of(&e)] {
             match fs::remove_file(&p) {
                 Ok(()) => removed = true,

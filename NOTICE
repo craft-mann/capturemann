@@ -30,7 +30,10 @@ Speaker labels use sherpa-onnx (https://github.com/k2-fsa/sherpa-onnx, Apache Li
 bindings vendored unchanged in vendor/sherpa-onnx and vendor/sherpa-onnx-sys with a build script that
 only links, each with its LICENSE) and the ONNX Runtime inside its prebuilt static libraries (MIT
 License, Copyright (c) Microsoft Corporation; text in THIRD_PARTY_LICENSES.md), linked statically
-into the app. The libraries are fetched, SHA-256 checked, by packaging/sherpa/fetch-macos.sh. The
-speaker models CaptureMann downloads or imports on request are separate files under their own open
-licences (pyannote segmentation 3.0: MIT, Copyright (c) 2022 CNRS; CAM++ English: Apache-2.0), shown
-on the AI page before the download.
+into the app. The libraries are fetched, SHA-256 checked, by packaging/sherpa/fetch-macos.sh. Two
+speaker models ship inside the app as separate, unmodified data files in
+Contents/Resources/Models/speaker/ (fetched, SHA-256 checked, by packaging/sherpa/fetch-models.sh),
+under their own open licences: pyannote segmentation 3.0 (MIT License, Copyright (c) 2022 CNRS, from
+https://github.com/pyannote/pyannote-audio via the sherpa-onnx conversion) and the CAM++ English
+VoxCeleb speaker embedding model of 3D-Speaker (Apache License 2.0, https://github.com/modelscope/3D-Speaker).
+Their notices are in Contents/Resources/Models/speaker/LICENSES/ and in THIRD_PARTY_LICENSES.md.
