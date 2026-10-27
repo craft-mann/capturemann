@@ -350,7 +350,7 @@ impl RecordingEditor {
         let crumb = crumb_link(
             t,
             "re-crumb",
-            tr_ctx!("breadcrumb", "Audio"),
+            tr_ctx!("breadcrumb", "Audio /"),
             tr!("Back to the library"),
         )
         .on_click(move |_, _, cx| {

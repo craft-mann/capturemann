@@ -9831,8 +9831,8 @@ msgstr "{title} · đã áp dụng xoá đoạn và tốc độ"
 
 #, fuzzy
 msgctxt "breadcrumb"
-msgid "Audio"
-msgstr "Âm thanh"
+msgid "Audio /"
+msgstr "Âm thanh /"
 
 #, fuzzy
 msgctxt "button"

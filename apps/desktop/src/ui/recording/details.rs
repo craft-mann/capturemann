@@ -493,17 +493,16 @@ impl Render for RecordingDetails {
         let t = cx.global::<ThemeGlobal>().0;
         let clock = self.app.read(cx).clock;
         let app = self.app.clone();
-        let crumb = crumb_link(&t, "rec-back", "", tr!("Back to recordings"))
-            .flex()
-            .items_center()
-            .gap(px(4.))
-            .text_size(px(12.5))
-            .child(icon("chevron-left", 14., t.mist))
-            .child(tr_ctx!("navigation", "Recordings"))
-            .on_click(move |_, _, cx| {
-                let app = app.clone();
-                cx.defer(move |cx| app::set_route(&app, Route::Recordings, cx));
-            });
+        let crumb = crumb_link(
+            &t,
+            "rec-back",
+            tr_ctx!("breadcrumb", "Recordings /"),
+            tr!("Back to recordings"),
+        )
+        .on_click(move |_, _, cx| {
+            let app = app.clone();
+            cx.defer(move |cx| app::set_route(&app, Route::Recordings, cx));
+        });
         let mut actions: Vec<gpui::AnyElement> = Vec::new();
         let body = match &self.load {
             Load::Idle | Load::Loading => div()
