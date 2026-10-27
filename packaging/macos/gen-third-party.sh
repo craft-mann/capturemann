@@ -98,6 +98,11 @@ w.append("The speaker engine (Find speakers) links the prebuilt static libraries
          "ONNX Runtime (MIT, below). They are fetched by `packaging/sherpa/fetch-macos.sh`.\n")
 t = open(os.path.join(root, "packaging/sherpa/licenses/onnxruntime-MIT.txt"), encoding="utf-8").read().strip()
 w.append("### ONNX Runtime\n\n```text\n" + t + "\n```\n")
+n = open(os.path.join(root, "packaging/sherpa/licenses/ThirdPartyNotices-onnxruntime.txt"), encoding="utf-8").read().strip()
+w.append("### ONNX Runtime, third-party components\n\n"
+         "The notices file of ONNX Runtime v1.28.2 (the version string inside the static library), as published at "
+         "https://github.com/microsoft/onnxruntime/blob/v1.28.2/ThirdPartyNotices.txt on 2026-10-27, for the components "
+         "ONNX Runtime itself bundles.\n\n````text\n" + n + "\n````\n")
 w.append("## Models shipped inside the app\n")
 w.append("Speaker labels (Find speakers) use two model files that ship inside the app, unmodified, in "
          "`Contents/Resources/Models/speaker/` (fetched by `packaging/sherpa/fetch-models.sh`, SHA-256 pinned): pyannote "

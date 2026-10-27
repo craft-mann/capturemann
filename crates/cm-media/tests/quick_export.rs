@@ -1335,6 +1335,8 @@ fn exp4_cancelling_an_edited_export_cleans_up() {
     let f = fixture(&t, 3, "1280x720", false, true);
     let m = with_edits(&f, json!({"cuts": [[2000 * MS, 2500 * MS]]}));
     let flag = AtomicBool::new(false);
+    let started = std::time::Instant::now();
+    let stalled = AtomicBool::new(false);
     let r = export_quick(
         &t,
         &QuickRequest {
@@ -1351,7 +1353,22 @@ fn exp4_cancelling_an_edited_export_cleans_up() {
                 flag.store(true, Ordering::SeqCst);
             }
         },
-        &|| flag.load(Ordering::SeqCst),
+        &|| {
+            // The cancel is only asked for after 5 % progress. Once, in a busy full run, no frame
+            // ever reached FFmpeg (it sat idle for an hour while the compositor produced nothing),
+            // so this test waited forever: give up after two minutes and say why instead.
+            if !flag.load(Ordering::SeqCst)
+                && started.elapsed() > std::time::Duration::from_secs(120)
+            {
+                stalled.store(true, Ordering::SeqCst);
+                return true;
+            }
+            flag.load(Ordering::SeqCst)
+        },
+    );
+    assert!(
+        !stalled.load(Ordering::SeqCst),
+        "the export made no progress for two minutes (a stalled compositor?): {r:?}"
     );
     assert!(matches!(r, Err(ExportError::Cancelled)), "{r:?}");
     let left: Vec<_> = std::fs::read_dir(f.path().join("exports"))
