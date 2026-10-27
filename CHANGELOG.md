@@ -80,8 +80,8 @@ no hardware run is stored in `verification/` yet. See Known limitations.
 - Live transcript while recording (VOC-3) is not included; it comes in a later 0.2.x.
 - Intel Macs are not supported yet (Apple Silicon and macOS 13+ only); Windows and Linux follow later.
 - Ollama and LM Studio (a text model from a server of your own) are not offered; they are a later item.
-- Whether the bundled LGPL FFmpeg of the release build includes the `wav` muxer and `pcm_s24le`
-  (needed for WAV export) is to be confirmed on that build.
+- The bundled LGPL FFmpeg (built with `make ffmpeg` on Oct 27, 2026) has the `wav` muxer and the
+  `pcm_s24le` encoder that WAV export needs; the export itself still awaits its hardware check.
 - Hardware reports are pending: the audio recording checks (10-minute call sync, kill -9 recovery,
   3-hour soak, sleep and lid, consent line, markers), the audio export checks (WAV, M4A, loudness)
   and the review of reports on real recordings. What is known so far is the maintainer's own use on one

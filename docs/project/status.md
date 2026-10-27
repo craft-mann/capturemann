@@ -65,7 +65,7 @@ Pending:
 | Item | Owner | Notes |
 | --- | --- | --- |
 | VOC-1 hardware checks: 3-hour soak, kill -9 recovery, lid and sleep, consent, markers; report in `verification/` | maintainer | `tests/manual/VOC-1.md`; AC2, AC5, AC6 |
-| VOC-2 export checks: WAV, M4A, loudness; report in `verification/` | maintainer | `tests/manual/VOC-2.md`; confirm the `wav` muxer and `pcm_s24le` in the release FFmpeg |
+| VOC-2 export checks: WAV, M4A, loudness; report in `verification/` | maintainer | `tests/manual/VOC-2.md`; the `wav` muxer and `pcm_s24le` are in the bundled FFmpeg (read Oct 27, 2026) |
 | Upgrade test on a copy of a real pre-0.2 library | maintainer | `tests/manual/UPGRADE-0.2.md`; only a synthetic 0.1.0 library was tried |
 | ONNX Runtime `ThirdPartyNotices.txt` text for `THIRD_PARTY_LICENSES.md` | maintainer (needs network) | Take it from the `microsoft/onnxruntime` tag matching the ONNX Runtime inside sherpa-onnx v2.0.1, save it as `packaging/sherpa/licenses/ThirdPartyNotices-onnxruntime.txt`, make `packaging/macos/gen-third-party.sh` append it to the "ONNX Runtime" section, run `make licenses`, mention it in `NOTICE` (`packaging/sherpa/README.md`) |
 | `cargo deny check advisories` | maintainer (needs network) | Licences, bans and sources already pass |
