@@ -25,3 +25,12 @@ vendors, the exact version, the SHA-256 of the source archive and the configure 
 Contents/Resources/Llama/ (LICENSES/ and BUILD-INFO.txt), and the build script is
 packaging/llama/build-macos.sh. The text models CaptureMann downloads on request are separate files
 under their own open licences (Apache-2.0 or MIT), shown on the AI page before the download.
+
+Speaker labels use sherpa-onnx (https://github.com/k2-fsa/sherpa-onnx, Apache License 2.0; Rust
+bindings vendored unchanged in vendor/sherpa-onnx and vendor/sherpa-onnx-sys with a build script that
+only links, each with its LICENSE) and the ONNX Runtime inside its prebuilt static libraries (MIT
+License, Copyright (c) Microsoft Corporation; text in THIRD_PARTY_LICENSES.md), linked statically
+into the app. The libraries are fetched, SHA-256 checked, by packaging/sherpa/fetch-macos.sh. The
+speaker models CaptureMann downloads or imports on request are separate files under their own open
+licences (pyannote segmentation 3.0: MIT, Copyright (c) 2022 CNRS; CAM++ English: Apache-2.0), shown
+on the AI page before the download.

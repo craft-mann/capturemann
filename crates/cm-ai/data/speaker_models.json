@@ -1,0 +1,29 @@
+{
+  "_comment": "Speaker models (AI-8, spike S7, Oct 27 2026): the two ONNX files the sherpa-onnx speaker engine needs. Same catalogue rules as models.json (sha256 and bytes are the pins; the store checks them after a download and on an import). pyannote segmentation-3.0 (converted by the sherpa-onnx project, MIT, Copyright (c) 2022 CNRS) and the 3D-Speaker CAM++ English VoxCeleb embedding model (Apache-2.0, from the 3D-Speaker repository and ModelScope record; the download comes without a licence file). Hashes and sizes were computed on the files downloaded for the spike (docs/project/spikes.md, S7). The segmentation model is published only inside a .tar.bz2 archive and the app does not unpack archives, so its row is import_only: the maintainer either hosts the extracted model.onnx at a fixed URL (then put it in url and remove import_only) or users import the file; the pins below are those of model.onnx inside the archive. To use another mirror put a catalog.json in the models folder: speaker rows are kept unless it names speaker models itself.",
+  "models": [
+    {
+      "id": "speaker-segmentation",
+      "kind": "speaker",
+      "label": "Speaker segmentation (pyannote 3.0)",
+      "hint": "Finds where speech happens and who overlaps. First of the two files that tell speakers apart.",
+      "file": "pyannote-segmentation-3-0.onnx",
+      "url": "",
+      "import_only": true,
+      "source": "model.onnx inside https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2 (6,958,444 bytes, SHA-256 24615ee884c897d9d2ba09bb4d30da6bb1b15e685065962db5b02e76e4996488): unpack the archive and import model.onnx",
+      "license": "MIT",
+      "sha256": "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079",
+      "bytes": 5992913
+    },
+    {
+      "id": "speaker-embedding",
+      "kind": "speaker",
+      "label": "Speaker voices (CAM++ English)",
+      "hint": "Compares voices so the same person gets the same label. Second of the two files that tell speakers apart.",
+      "file": "campplus-sv-en-voxceleb-16k.onnx",
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx",
+      "license": "Apache-2.0",
+      "sha256": "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b",
+      "bytes": 29596978
+    }
+  ]
+}

@@ -121,6 +121,7 @@ impl TextModelService for FakeTextModels {
                         installed: m.installed,
                         active: m.installed && s.active.as_deref() == Some(m.id),
                         path: m.installed.then(|| format!("/text-models/{}.gguf", m.id)),
+                        ..Default::default()
                     },
                     tier_gb: m.tier_gb,
                     license: "Apache-2.0".to_owned(),

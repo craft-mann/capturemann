@@ -40,6 +40,7 @@ mod flow_tests {
                 installed,
                 active: installed,
                 path: None,
+                ..Default::default()
             }],
             active: installed.then(|| "small".to_owned()),
             dir: "/models".into(),

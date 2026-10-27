@@ -91,6 +91,30 @@ pub fn merge_targets(speakers: &[Speaker], from: u32) -> Vec<&Speaker> {
 /// "How many people?" answers: `None` is "Not sure".
 pub const PEOPLE_CHOICES: [Option<u32>; 5] = [None, Some(2), Some(3), Some(4), Some(5)];
 
+/// The answer "How many people?" starts on when the user has not chosen (AI-8, spike S7: the
+/// engine tells voices apart far better with the count than without it, so "Not sure" is never
+/// the default). A recording made with the in-the-room preset (a conversation across a table) is
+/// two people, a voice note is one, and everything else (online calls, lectures, product demos,
+/// a recording with no preset) is three: close enough for the engine, and merging two speakers is
+/// one click while a third voice hiding inside another is not.
+pub fn default_people(preset: Option<&str>) -> Option<u32> {
+    match preset {
+        Some("room") => Some(2),
+        Some("note") => Some(1),
+        _ => Some(3),
+    }
+}
+
+/// The count `diarize` is asked for: the user's choice (`None` = "Not sure" is a choice), else
+/// [`default_people`].
+pub fn effective_people(chosen: bool, people: Option<u32>, preset: Option<&str>) -> Option<u32> {
+    if chosen {
+        people
+    } else {
+        default_people(preset)
+    }
+}
+
 // ---- report templates ---------------------------------------------------------------------
 
 /// The template a recording preset suggests (the board marks it "suggested"). The preset keys are
@@ -390,6 +414,26 @@ pub fn cite_number(index: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn people_default_from_the_preset_and_never_to_not_sure() {
+        use super::{default_people, effective_people};
+        assert_eq!(default_people(Some("room")), Some(2));
+        assert_eq!(default_people(Some("note")), Some(1));
+        for p in [
+            Some("online"),
+            Some("lecture"),
+            Some("product"),
+            Some("x"),
+            None,
+        ] {
+            assert_eq!(default_people(p), Some(3), "{p:?}");
+        }
+        // The user's answer wins, "Not sure" included.
+        assert_eq!(effective_people(true, None, Some("room")), None);
+        assert_eq!(effective_people(true, Some(4), Some("room")), Some(4));
+        assert_eq!(effective_people(false, None, Some("room")), Some(2));
+    }
+
     use super::*;
     use cm_ai::report::ReportContext;
 

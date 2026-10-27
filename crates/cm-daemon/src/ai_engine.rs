@@ -58,11 +58,15 @@ fn services(root: Option<PathBuf>, engine: Option<Arc<dyn Transcriber>>) -> AiSe
         }),
         captions: Arc::new(RealCaptions),
         suggest: Arc::new(RealSuggest),
-        translate: Arc::new(RealTranslate { root, engine }),
-        // Until spike S7 picks a speaker model, speakers answer `no_speaker_model` (AI-8). The
-        // real ONNX diarizer replaces `NoSpeakerModel` here and nowhere else.
+        translate: Arc::new(RealTranslate {
+            root: root.clone(),
+            engine,
+        }),
+        // AI-8 (spike S7): sherpa-onnx with the two speaker models from the model store. The
+        // models are looked up on every run, so one installed while the app is open works at
+        // once; without them `diarize` answers `no_speaker_model`.
         speakers: Arc::new(RealSpeakers {
-            diarizer: Arc::new(cm_ai::speakers::NoSpeakerModel),
+            diarizer: Arc::new(cm_ai::speaker_engine::SherpaDiarizer::new(store(&root))),
         }),
     }
 }

@@ -5,8 +5,9 @@
 //! model is installed.
 //!
 //! Renaming and merging go through `set_speakers`, Find speakers through `diarize`; nothing here
-//! calls an engine. This version ships no speaker model (spike S7 has not picked one), so the
-//! daemon answers `no_speaker_model` and the tab says "not available yet" instead of pretending.
+//! calls an engine. Find speakers needs the two speaker model files (AI page); until both are
+//! installed the tab says what is missing and the daemon answers `no_speaker_model`. "How many
+//! people?" starts on the recording preset's count (`rules::default_people`), not on "Not sure".
 //! Not seen by eye yet (`tests/manual/VOC-2.md`).
 
 use cm_ai::speakers::Speaker;
@@ -95,9 +96,11 @@ impl RecordingEditor {
         let mut body: Vec<AnyElement> = Vec::new();
         if has_speakers {
             body.push(self.speaker_list(t, s, cx));
+            // Find again can use another count.
+            body.push(self.people_row(t, s, cx));
         } else {
             body.push(empty_card(t));
-            body.push(self.people_row(t, cx));
+            body.push(self.people_row(t, s, cx));
         }
         // The notice: what Find speakers needs, or why a run failed.
         match (&self.vp.speaker_note, &card_state, has_speakers) {
@@ -227,7 +230,12 @@ impl RecordingEditor {
     }
 
     /// "How many people?": Not sure, 2, 3, 4, 5+.
-    fn people_row(&self, t: &Theme, cx: &mut Context<Self>) -> AnyElement {
+    fn people_row(&self, t: &Theme, s: &Session, cx: &mut Context<Self>) -> AnyElement {
+        let people_now = rules::effective_people(
+            self.vp.people_chosen,
+            self.vp.people,
+            s.voice.preset.as_deref(),
+        );
         let mut seg = segmented(t, "re-people", &tr!("How many people?"));
         for choice in PEOPLE_CHOICES {
             let label = match choice {
@@ -235,7 +243,7 @@ impl RecordingEditor {
                 Some(n) if n >= 5 => format!("{n}+"),
                 Some(n) => n.to_string(),
             };
-            let on = self.vp.people == choice;
+            let on = people_now == choice;
             seg = seg.child(
                 segment(
                     t,
@@ -247,6 +255,7 @@ impl RecordingEditor {
                 .px(px(10.))
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.vp.people = choice;
+                    this.vp.people_chosen = true;
                     cx.notify();
                 })),
             );

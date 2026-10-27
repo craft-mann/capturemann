@@ -176,6 +176,7 @@ mod tests {
                 installed,
                 active: installed,
                 path: installed.then(|| format!("/t/{id}.gguf")),
+                ..Default::default()
             },
             tier_gb: tier,
             license: "Apache-2.0".into(),

@@ -57,6 +57,9 @@ pub(super) struct VoicePanels {
     pub merging: Option<(u32, Option<u32>)>,
     /// "How many people?" (`None`: not sure).
     pub people: Option<u32>,
+    /// The user picked an answer (even "Not sure"); until then the preset's default applies
+    /// (`rules::default_people`).
+    pub people_chosen: bool,
     /// "My microphone only hears me".
     pub headset: bool,
     pub speaker_note: Option<SpeakerNote>,
@@ -139,6 +142,7 @@ impl VoicePanels {
             rename_error: None,
             merging: None,
             people: None,
+            people_chosen: false,
             headset: false,
             speaker_note: None,
             template: None,
@@ -175,6 +179,7 @@ impl VoicePanels {
         self.rename_error = None;
         self.merging = None;
         self.people = None;
+        self.people_chosen = false;
         self.headset = false;
         self.speaker_note = None;
         self.template = None;
@@ -338,7 +343,10 @@ impl RecordingEditor {
             return;
         }
         self.vp.speaker_note = None;
-        let (people, headset) = (self.vp.people, self.vp.headset);
+        let preset = self.session().and_then(|s| s.voice.preset.clone());
+        let people =
+            rules::effective_people(self.vp.people_chosen, self.vp.people, preset.as_deref());
+        let headset = self.vp.headset;
         let app = self.app.clone();
         cx.notify();
         cx.spawn(async move |this, cx| {

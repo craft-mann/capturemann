@@ -499,6 +499,7 @@ fn find_speakers_without_a_model_says_not_available_and_fakes_nothing(cx: &mut T
     open_tab(&e, vcx, Inspector::Speakers);
     e.update(vcx, |e, cx| {
         e.vp.people = Some(3);
+        e.vp.people_chosen = true;
         e.speakers_find(cx)
     });
     assert!(wait_for(vcx, |vcx| e
@@ -773,6 +774,7 @@ fn the_translate_panel_knows_when_whisper_cannot_translate(cx: &mut TestAppConte
         installed,
         active,
         path: None,
+        ..Default::default()
     };
     let set = |vcx: &mut VisualTestContext, models: Vec<cm_ai::model::ModelInfo>| {
         let active = models.iter().find(|m| m.active).map(|m| m.id.clone());

@@ -13,6 +13,11 @@ rust-version.workspace = true
 [lints]
 workspace = true
 
+[features]
+# `sherpa`: the speaker engine (needs the libraries of `make sherpa`); `--no-default-features` builds without.
+default = ["sherpa"]
+sherpa = ["cm-daemon/sherpa", "cm-ai/sherpa"]
+
 [dependencies]
 log.workspace = true
 cm-core.workspace = true

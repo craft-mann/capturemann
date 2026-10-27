@@ -48,31 +48,27 @@ pub fn memory_gb(bytes: u64) -> u32 {
 
 // ---- speaker labels (AI-8) ---------------------------------------------------------------------
 
-/// One speaker model the catalogue offers. Not a real model: S7 has not decided, so the shipped
-/// catalogue is empty ([`speaker_catalogue`]) and the card says so.
+/// What the speaker engine needs, as one offer: the model files the daemon lists with kind
+/// `speaker` (AI-8: pyannote segmentation, MIT, and the CAM++ voice model, Apache-2.0), added up.
+/// The files themselves are rows of the page ([`crate::ai::models::ModelsVm::speaker_rows`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SpeakerModelEntry {
     pub id: String,
     pub label: String,
-    /// SPDX name shown before the download (MIT, Apache-2.0, CC-BY-4.0, ...).
+    /// SPDX names shown before the download, `MIT, Apache-2.0`.
     pub licence: String,
+    /// What is still missing, MB.
     pub size_mb: u32,
-}
-
-/// The speaker models this build knows. Empty until S7 picks one (do not add a model or a URL
-/// before that decision).
-pub fn speaker_catalogue() -> Vec<SpeakerModelEntry> {
-    Vec::new()
 }
 
 /// What the speaker model card shows.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SpeakerCard {
-    /// No model in the catalogue yet.
+    /// The daemon lists no speaker model (an older daemon, or the list has not arrived).
     Unavailable,
-    /// A model to download: its licence and size are on the card first.
+    /// Files to download or import: their licences and size are on the card first.
     Offer(SpeakerModelEntry),
-    /// Installed, by name.
+    /// Everything is installed, by name.
     Installed(String),
 }
 
@@ -80,8 +76,10 @@ pub enum SpeakerCard {
 pub struct SpeakerVm {
     pub auto_speakers: bool,
     pub display_name: String,
-    pub catalogue: Vec<SpeakerModelEntry>,
-    /// The id of the installed speaker model (no daemon action reports it yet).
+    /// The offer, while some file is missing; `None` before the list arrives or when it lists no
+    /// speaker model.
+    pub offer: Option<SpeakerModelEntry>,
+    /// The name of the installed speaker models, when all of them are.
     pub installed: Option<String>,
 }
 
@@ -90,7 +88,7 @@ impl Default for SpeakerVm {
         SpeakerVm {
             auto_speakers: false,
             display_name: DEFAULT_DISPLAY_NAME.to_owned(),
-            catalogue: speaker_catalogue(),
+            offer: None,
             installed: None,
         }
     }
@@ -108,16 +106,40 @@ impl SpeakerVm {
         }
     }
 
-    pub fn card(&self) -> SpeakerCard {
-        if let Some(id) = &self.installed {
-            let label = self
-                .catalogue
-                .iter()
-                .find(|m| &m.id == id)
-                .map_or_else(|| id.clone(), |m| m.label.clone());
-            return SpeakerCard::Installed(label);
+    /// Takes the speaker models of a `list_models` answer (the rows with kind `speaker`).
+    pub fn set_models(&mut self, models: &[cm_ai::model::ModelInfo]) {
+        if models.is_empty() {
+            self.offer = None;
+            self.installed = None;
+            return;
         }
-        match self.catalogue.first() {
+        let missing: Vec<&cm_ai::model::ModelInfo> =
+            models.iter().filter(|m| !m.installed).collect();
+        if missing.is_empty() {
+            self.offer = None;
+            self.installed = Some(tr!("Speaker models (pyannote segmentation and CAM++)"));
+            return;
+        }
+        self.installed = None;
+        let mut licences: Vec<&str> = Vec::new();
+        for m in models.iter().filter(|m| !m.license.is_empty()) {
+            if !licences.contains(&m.license.as_str()) {
+                licences.push(m.license.as_str());
+            }
+        }
+        self.offer = Some(SpeakerModelEntry {
+            id: "speaker".to_owned(),
+            label: tr!("Speaker models"),
+            licence: licences.join(", "),
+            size_mb: missing.iter().map(|m| m.size_mb).sum(),
+        });
+    }
+
+    pub fn card(&self) -> SpeakerCard {
+        if let Some(name) = &self.installed {
+            return SpeakerCard::Installed(name.clone());
+        }
+        match &self.offer {
             Some(m) => SpeakerCard::Offer(m.clone()),
             None => SpeakerCard::Unavailable,
         }
@@ -853,33 +875,71 @@ mod tests {
         assert_eq!(RECOMMENDED.iter().filter(|r| r.candidate).count(), 1);
     }
 
-    #[test]
-    fn the_speaker_card_is_unavailable_until_a_model_is_decided() {
-        let vm = SpeakerVm::default();
-        assert!(vm.catalogue.is_empty(), "do not invent a speaker model");
-        assert_eq!(vm.card(), SpeakerCard::Unavailable);
-        assert!(!vm.auto_enabled());
+    fn speaker_file(id: &str, license: &str, mb: u32, installed: bool) -> cm_ai::model::ModelInfo {
+        cm_ai::model::ModelInfo {
+            id: id.into(),
+            label: id.into(),
+            size_mb: mb,
+            installed,
+            license: license.into(),
+            kind: cm_ai::model::ModelKind::Speaker,
+            ..Default::default()
+        }
     }
 
     #[test]
-    fn the_speaker_switch_needs_an_installed_model() {
+    fn the_speaker_card_is_unavailable_until_the_daemon_lists_speaker_models() {
+        let mut vm = SpeakerVm::default();
+        assert_eq!(vm.card(), SpeakerCard::Unavailable);
+        assert!(!vm.auto_enabled());
+        vm.set_models(&[]);
+        assert_eq!(vm.card(), SpeakerCard::Unavailable, "do not invent a model");
+    }
+
+    #[test]
+    fn the_speaker_card_offers_what_is_missing_with_licences_and_size() {
+        let mut vm = SpeakerVm::default();
+        vm.set_models(&[
+            speaker_file("a", "MIT", 6, false),
+            speaker_file("b", "Apache-2.0", 30, false),
+        ]);
+        let SpeakerCard::Offer(m) = vm.card() else {
+            panic!("an offer")
+        };
+        assert_eq!((m.licence.as_str(), m.size_mb), ("MIT, Apache-2.0", 36));
+        // One file installed: only the other one is counted.
+        vm.set_models(&[
+            speaker_file("a", "MIT", 6, true),
+            speaker_file("b", "Apache-2.0", 30, false),
+        ]);
+        let SpeakerCard::Offer(m) = vm.card() else {
+            panic!("an offer")
+        };
+        assert_eq!(m.size_mb, 30);
+        assert!(!vm.auto_enabled(), "one of two files is not enough");
+    }
+
+    #[test]
+    fn the_speaker_switch_needs_all_the_speaker_files() {
         let mut vm = SpeakerVm::default();
         assert!(vm.set_auto(true).is_empty());
         assert!(!vm.auto_on());
-        vm.catalogue = vec![SpeakerModelEntry {
-            id: "m".into(),
-            label: "Test model".into(),
-            licence: "MIT".into(),
-            size_mb: 40,
-        }];
-        assert!(matches!(vm.card(), SpeakerCard::Offer(ref m) if m.licence == "MIT"));
-        vm.installed = Some("m".into());
-        assert_eq!(vm.card(), SpeakerCard::Installed("Test model".into()));
+        vm.set_models(&[
+            speaker_file("a", "MIT", 6, true),
+            speaker_file("b", "Apache-2.0", 30, true),
+        ]);
+        assert!(matches!(vm.card(), SpeakerCard::Installed(_)));
         assert_eq!(
             vm.set_auto(true),
             vec![(KEY_AUTO_SPEAKERS, Value::Bool(true))]
         );
         assert!(vm.auto_on());
+        // Removing one file turns the switch off again.
+        vm.set_models(&[
+            speaker_file("a", "MIT", 6, true),
+            speaker_file("b", "Apache-2.0", 30, false),
+        ]);
+        assert!(!vm.auto_on());
     }
 
     #[test]

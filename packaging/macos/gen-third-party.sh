@@ -35,8 +35,8 @@ for triple in ("aarch64-apple-darwin", "x86_64-apple-darwin"):
                 seen.add(d["pkg"]); todo.append(d["pkg"])
     for i in seen:
         p = byid[i]
-        if p["source"] is None:
-            continue  # workspace crates: Apache-2.0, covered by LICENSE
+        if p["source"] is None and "/vendor/" not in p["manifest_path"]:
+            continue  # workspace crates: Apache-2.0, covered by LICENSE (vendor/ crates are third-party: listed)
         pkgs[(p["name"], p["version"])] = p
         shipped.add((p["name"], p["version"]))
 texts = {}      # sha -> (text, [crate ids])
@@ -53,7 +53,7 @@ for (name, ver), p in sorted(pkgs.items()):
         files = sorted(f for sub in sorted(glob.glob(d + "/*/")) for f in lic_files(sub.rstrip("/")))
     up = d
     for _ in range(3):  # monorepo crates (git dependencies) keep the license at the repository root
-        if files or p["source"].startswith("registry"):
+        if files or (p["source"] or "registry").startswith("registry"):
             break
         up = os.path.dirname(up)
         files = lic_files(up)
@@ -92,6 +92,12 @@ w.append("The other brand marks (YouTube, TikTok, Facebook, Google Drive) are si
 for label, rel in icons:
     t = open(os.path.join(root, rel), encoding="utf-8", errors="replace").read().strip()
     w.append("### " + label + "\n\n```text\n" + t + "\n```\n")
+w.append("## Native libraries linked statically\n")
+w.append("The speaker engine (Find speakers) links the prebuilt static libraries of sherpa-onnx v2.0.1 (Apache-2.0, "
+         "licence text below under the vendored `sherpa-onnx` crates; https://github.com/k2-fsa/sherpa-onnx), which contain "
+         "ONNX Runtime (MIT, below). They are fetched by `packaging/sherpa/fetch-macos.sh`.\n")
+t = open(os.path.join(root, "packaging/sherpa/licenses/onnxruntime-MIT.txt"), encoding="utf-8").read().strip()
+w.append("### ONNX Runtime\n\n```text\n" + t + "\n```\n")
 w.append("## Rust crates by license expression\n")
 for lic, crates in sorted(spdx.items()):
     w.append(f"- **{lic}**: {len(crates)} crates")

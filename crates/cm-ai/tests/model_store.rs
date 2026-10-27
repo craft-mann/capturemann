@@ -168,6 +168,7 @@ fn entry(port: u16, path: &str, data: &[u8], sha256: String) -> CatalogEntry {
         ram_mb: 0,
         aliases: Vec::new(),
         pending_pin: false,
+        ..Default::default()
     }
 }
 
@@ -440,6 +441,7 @@ fn select_remove_and_the_active_choice() {
                 ram_mb: 0,
                 aliases: Vec::new(),
                 pending_pin: false,
+                ..Default::default()
             })
             .collect(),
     };

@@ -133,20 +133,12 @@ impl AiPage {
                     licence = m.licence,
                     size = size_label(m.size_mb)
                 ),
-                // The download action arrives with the model (spike S7).
-                Some(
-                    disabled_button(
-                        t,
-                        "ai-speaker-download",
-                        &tr_ctx!("speaker model", "Download"),
-                        &tr!("Downloading speaker models is not available yet."),
-                        false,
-                    )
-                    .into_any_element(),
-                ),
+                // The files are the rows below: each has its own Download, Import or Remove.
+                None,
             ),
             SpeakerCard::Installed(name) => (tr!("Installed: {name}", name = name), None),
         };
+        let file_rows = self.speaker_file_rows(t, cx);
         let app = self.app.clone();
         let enabled = sp.auto_enabled();
         let on = sp.auto_on();
@@ -199,6 +191,7 @@ impl AiPage {
                         control,
                         false,
                     ))
+                    .children(file_rows)
                     .child(settings_row(
                         t,
                         Some("zap"),
@@ -223,6 +216,87 @@ impl AiPage {
                     )),
             )
             .into_any_element()
+    }
+
+    /// One row per speaker-engine file (AI-8): name, licence, size and state, the progress of a
+    /// running download, and the same buttons as the speech models (Download, Import from file,
+    /// Resume, Cancel, Remove). A file that is only imported says where it comes from. Nothing is
+    /// downloaded before the second press (confirm) of a row.
+    fn speaker_file_rows(&self, t: &Theme, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let rows = self.app.read(cx).ai.speaker_rows();
+        rows.iter()
+            .map(|row| {
+                let mut actions: Vec<AnyElement> = Vec::new();
+                for a in &row.actions {
+                    let (app, id, action) = (self.app.clone(), row.id.clone(), a.clone());
+                    let label = a.label(row.size_mb);
+                    let element_id = SharedString::from(format!("ai-speaker-{}-{:?}", row.id, a));
+                    let handler = cx.listener(move |_, _, _, cx| {
+                        crate::ui::ai::row_action(&app, &id, action.clone(), cx)
+                    });
+                    let glyph = action_icon(a);
+                    actions.push(if a.is_primary() {
+                        button_with_icon(t, element_id, label, ButtonKind::Primary, glyph)
+                            .on_click(handler)
+                            .into_any_element()
+                    } else {
+                        small_button_with_icon(t, element_id, &label, glyph)
+                            .on_click(handler)
+                            .into_any_element()
+                    });
+                }
+                let facts = [row.license.clone(), row.size.clone()]
+                    .into_iter()
+                    .filter(|s| !s.is_empty())
+                    .collect::<Vec<_>>()
+                    .join(" \u{00b7} ");
+                let mut hint = format!("{facts} \u{00b7} {}", row.status.text());
+                if row.import_only && !matches!(row.status, RowStatus::Installed) {
+                    hint.push_str(" \u{00b7} ");
+                    hint.push_str(&tr!(
+                        "Imported from a file: unpack sherpa-onnx-pyannote-segmentation-3-0.tar.bz2 and choose model.onnx"
+                    ));
+                }
+                let progress = row.progress.as_ref().map(|p| {
+                    let f = match row.status {
+                        RowStatus::Downloading(f) | RowStatus::Paused(f) => f,
+                        _ => 0.0,
+                    };
+                    div()
+                        .w_full()
+                        .flex()
+                        .flex_col()
+                        .gap(px(6.))
+                        .child(progress_bar(t, &tr!("Download progress"), f))
+                        .child(caption(t, p.clone()))
+                });
+                let controls = div()
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .gap(px(8.))
+                    .children(actions)
+                    .into_any_element();
+                settings_row(
+                    t,
+                    Some("audio-lines"),
+                    row.label.clone(),
+                    Some(SharedString::from(hint)),
+                    Some(controls),
+                    false,
+                )
+                .id(SharedString::from(format!("ai-speaker-row-{}", row.id)))
+                .role(Role::ListItem)
+                .aria_label(SharedString::from(tr!(
+                    "{name}, {size}, {status}",
+                    name = row.label,
+                    size = row.size,
+                    status = row.status.text()
+                )))
+                .children(progress)
+                .into_any_element()
+            })
+            .collect()
     }
 
     // ---- the text model (AI-7) -----------------------------------------------------------

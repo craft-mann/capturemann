@@ -163,10 +163,21 @@ impl Inner {
         if !download && !info.installed {
             return Err(CmError::not_found(format!("`{model}` is not installed")).into());
         }
+        if download && info.import_only {
+            return Err(import_only_error(&info.id).into());
+        }
+        let kind = if info.kind == cm_ai::model::ModelKind::Speaker {
+            "speaker"
+        } else {
+            "speech"
+        };
         let mut details = Map::new();
         details.insert("model".into(), json!(info.id));
         details.insert("name".into(), json!(info.label));
         details.insert("size_mb".into(), json!(info.size_mb));
+        if !info.license.is_empty() {
+            details.insert("license".into(), json!(info.license));
+        }
         if download {
             details.insert("destination".into(), json!(list.dir));
             details.insert(
@@ -177,7 +188,7 @@ impl Inner {
                                  "destination": list.dir });
             Ok((
                 format!(
-                    "Download the speech model \"{}\" (about {} MB) from the internet",
+                    "Download the {kind} model \"{}\" (about {} MB) from the internet",
                     info.label, info.size_mb
                 ),
                 Value::Object(details),
@@ -191,7 +202,7 @@ impl Inner {
                                  "file": info.path });
             Ok((
                 format!(
-                    "Delete the speech model \"{}\" ({} MB) from this computer",
+                    "Delete the {kind} model \"{}\" ({} MB) from this computer",
                     info.label, info.size_mb
                 ),
                 Value::Object(details),
@@ -366,4 +377,16 @@ impl Inner {
             AiOp::SuggestCuts { capture_id } => self.suggest(&capture_id, false).await,
         }
     }
+}
+
+/// `download_model` for a file that is only imported (a speaker model whose archive the app does
+/// not unpack): `invalid_input` that names `import_model`.
+pub(crate) fn import_only_error(model: &str) -> CmError {
+    CmError::invalid_field(
+        "model",
+        format!(
+            "`{model}` cannot be downloaded in this version: import the file with `import_model` \
+             (list_models says where it comes from)"
+        ),
+    )
 }
