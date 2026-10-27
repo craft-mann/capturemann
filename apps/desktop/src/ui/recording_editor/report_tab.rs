@@ -47,6 +47,15 @@ pub(super) enum TextState {
     Missing,
 }
 
+/// A built-in model's label ("Qwen3.5 4B") for its catalogue id ("text-8gb"); another name stays as it is.
+fn text_model_label(id: &str) -> String {
+    cm_ai::text_model::store::TextCatalog::builtin()
+        .models
+        .iter()
+        .find(|m| m.base.id == id)
+        .map_or_else(|| id.to_owned(), |m| m.base.label.clone())
+}
+
 /// The template's name in the current language.
 pub(crate) fn template_name(id: &str, fallback: &str) -> String {
     match id {
@@ -142,7 +151,7 @@ impl RecordingEditor {
         if !t.loaded {
             TextState::Unknown
         } else if t.ready() {
-            TextState::Ready(t.model.clone())
+            TextState::Ready(text_model_label(&t.model))
         } else {
             TextState::Missing
         }

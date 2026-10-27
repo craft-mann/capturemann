@@ -375,6 +375,9 @@ msgstr ""
 msgid "Another app owns the socket"
 msgstr ""
 
+msgid "Another copy ({name}) is running and uses the same library and settings. Quit it from its menu bar icon, then open this one."
+msgstr ""
+
 msgid "Another server on this Mac (address)"
 msgstr ""
 
@@ -665,6 +668,9 @@ msgid "CaptureMann couldn’t open the camera. Try again, or pick another camera
 msgstr ""
 
 msgid "CaptureMann couldn’t open the microphone. Pick another one, or try again."
+msgstr ""
+
+msgid "CaptureMann is already running"
 msgstr ""
 
 msgid "CaptureMann isn’t allowed to use the camera yet."
@@ -4312,6 +4318,9 @@ msgid "The audio couldn’t be exported"
 msgstr ""
 
 msgid "The audio file could not be written ({detail}); the track ends here and the recording continues"
+msgstr ""
+
+msgid "The built-in text engine is not part of this copy of CaptureMann. Choose Ollama or LM Studio on the AI page, or use a build that includes the engine."
 msgstr ""
 
 msgid "The camera chosen in Settings isn’t connected. Using the system default."

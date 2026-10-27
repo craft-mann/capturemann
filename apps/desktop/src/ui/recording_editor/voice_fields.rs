@@ -228,6 +228,10 @@ pub(super) fn speaker_note_of(reason: &str, message: &str) -> SpeakerNote {
 pub(super) fn report_note_of(reason: &str, message: &str) -> ReportNote {
     if reason == "no_text_model" {
         ReportNote::NoTextModel
+    } else if reason == "engine_missing" {
+        ReportNote::Failed(tr!(
+            "The built-in text engine is not part of this copy of CaptureMann. Choose Ollama or LM Studio on the AI page, or use a build that includes the engine."
+        ))
     } else {
         ReportNote::Failed(message.to_owned())
     }

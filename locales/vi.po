@@ -11280,3 +11280,15 @@ msgstr "Chọn mô hình văn bản tích hợp"
 #, fuzzy
 msgid "Delete a built-in text model"
 msgstr "Xóa một mô hình văn bản tích hợp"
+
+#, fuzzy
+msgid "The built-in text engine is not part of this copy of CaptureMann. Choose Ollama or LM Studio on the AI page, or use a build that includes the engine."
+msgstr "Bản CaptureMann này không có sẵn công cụ văn bản tích hợp. Hãy chọn Ollama hoặc LM Studio ở trang AI, hoặc dùng bản có kèm công cụ này."
+
+#, fuzzy
+msgid "CaptureMann is already running"
+msgstr "CaptureMann đang chạy"
+
+#, fuzzy
+msgid "Another copy ({name}) is running and uses the same library and settings. Quit it from its menu bar icon, then open this one."
+msgstr "Một bản khác ({name}) đang chạy và dùng chung thư viện và cài đặt. Hãy thoát nó từ biểu tượng trên thanh menu, rồi mở bản này."
