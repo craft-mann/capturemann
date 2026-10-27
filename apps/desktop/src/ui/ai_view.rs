@@ -674,14 +674,19 @@ impl Render for AiPage {
                                     Some(auto_switch.into_any_element()),
                                     true,
                                 )))
-                                .child(speakers)
-                                .child(glossary),
+                                .child(speakers),
                         )
+                        // The right column holds the text model and the glossary: the glossary
+                        // can grow long, and the column no longer ends in empty space.
                         .child(
                             div()
                                 .flex_1()
                                 .min_w(px(voice::COLUMN_MIN_W))
-                                .child(text_model),
+                                .flex()
+                                .flex_col()
+                                .gap(px(24.))
+                                .child(text_model)
+                                .child(glossary),
                         ),
                 )
         )

@@ -154,7 +154,7 @@ impl AiPage {
                         Some("zap"),
                         tr!("Find speakers after each transcript"),
                         Some(SharedString::from(if enabled {
-                            tr!("Off by default")
+                            tr!("Starts when a transcript is ready")
                         } else {
                             tr!("Not available in this build")
                         })),

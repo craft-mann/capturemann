@@ -9952,8 +9952,8 @@ msgid "Find speakers after each transcript"
 msgstr "Tìm người nói sau mỗi bản chép lời"
 
 #, fuzzy
-msgid "Off by default"
-msgstr "Mặc định tắt"
+msgid "Starts when a transcript is ready"
+msgstr "Bắt đầu khi bản chép lời sẵn sàng"
 
 #, fuzzy
 msgid "Replied in {seconds} s"

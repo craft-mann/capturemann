@@ -2731,9 +2731,6 @@ msgstr ""
 msgid "Off"
 msgstr ""
 
-msgid "Off by default"
-msgstr ""
-
 msgid "Off: every recording starts bottom-left."
 msgstr ""
 
@@ -4029,6 +4026,9 @@ msgid "Starts before the previous caption ends"
 msgstr ""
 
 msgid "Starts immediately"
+msgstr ""
+
+msgid "Starts when a transcript is ready"
 msgstr ""
 
 msgid "States are read without asking the system. Granting only happens when you press “Grant access…”."
