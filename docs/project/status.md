@@ -52,6 +52,8 @@ Everything of the voice work ships in 0.2.0: audio-only recording (VOC-1), the a
 
 ### Release checklist for 0.2.0
 
+Signed and notarized DMG built and installed by the maintainer on Oct 27, 2026: `verification/RELEASE-0.2.0-2026-10-27-maintainer.md` (PASS, hands-on as reported; draft release, not yet public).
+
 Done (Oct 27, 2026):
 
 - [x] VOC-1, VOC-2, AI-5, AI-7, AI-8, AI-9 built; full workspace tests (also with the bundled FFmpeg), clippy, fmt, `cargo deny` licences, bans and sources pass (tested with fakes).
