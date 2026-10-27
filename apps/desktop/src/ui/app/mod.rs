@@ -146,6 +146,8 @@ pub struct AppModel {
     pub library_move: crate::library_move::Phase,
     /// The AI page: speech models, downloads the user started, the notice and the switches.
     pub ai: crate::ai::models::ModelsVm,
+    /// The built-in text models of the AI page (AI-7): the list by memory tier and its downloads.
+    pub builtin: crate::ai::builtin::BuiltInVm,
     /// Transcriptions in flight (the details card and the recording editor read them).
     pub transcribe: crate::ai::jobs::TranscribeVm,
     /// How many agent activity entries were already handled (toasts, sidebar card).
@@ -244,6 +246,7 @@ impl AppModel {
                 voice: crate::ai::voice::VoiceVm::from_settings(&settings),
                 ..Default::default()
             },
+            builtin: crate::ai::builtin::BuiltInVm::default(),
             transcribe: crate::ai::jobs::TranscribeVm::default(),
             agent_seen: 0,
             recents: Vec::new(),

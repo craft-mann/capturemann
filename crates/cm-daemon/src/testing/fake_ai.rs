@@ -226,6 +226,10 @@ impl FakeAi {
     pub fn services(&self) -> AiServices {
         AiServices {
             models: Arc::new(self.clone()),
+            text_models: Arc::new(super::fake_text::FakeTextModels::new()),
+            text_engine: Arc::new(super::fake_text::FakeTextEngine::new(
+                "http://127.0.0.1:9/v1",
+            )),
             transcribe: Arc::new(self.clone()),
             captions: Arc::new(self.clone()),
             suggest: Arc::new(self.clone()),

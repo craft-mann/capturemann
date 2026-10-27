@@ -19,6 +19,17 @@ pub enum AiOp {
     RemoveModel {
         model: String,
     },
+    /// AI-7: the built-in text models.
+    ListTextModels,
+    DownloadTextModel {
+        model: String,
+    },
+    SelectTextModel {
+        model: String,
+    },
+    RemoveTextModel {
+        model: String,
+    },
     Transcribe {
         capture_id: String,
         /// `None`: detect.
@@ -124,6 +135,10 @@ impl AiOp {
             AiOp::ImportModel { .. } => "import_model",
             AiOp::SelectModel { .. } => "select_model",
             AiOp::RemoveModel { .. } => "remove_model",
+            AiOp::ListTextModels => "list_text_models",
+            AiOp::DownloadTextModel { .. } => "download_text_model",
+            AiOp::SelectTextModel { .. } => "select_text_model",
+            AiOp::RemoveTextModel { .. } => "remove_text_model",
             AiOp::Transcribe { .. } => "transcribe",
             AiOp::GetTranscript { .. } => "get_transcript",
             AiOp::GetCaptions { .. } => "get_captions",
@@ -197,10 +212,13 @@ impl AiParams {
     pub fn to_json(&self) -> Value {
         let mut o = Map::new();
         match &self.op {
-            AiOp::ListModels => {}
+            AiOp::ListModels | AiOp::ListTextModels => {}
             AiOp::DownloadModel { model }
             | AiOp::SelectModel { model }
-            | AiOp::RemoveModel { model } => {
+            | AiOp::RemoveModel { model }
+            | AiOp::DownloadTextModel { model }
+            | AiOp::SelectTextModel { model }
+            | AiOp::RemoveTextModel { model } => {
                 o.insert("model".into(), json!(model));
             }
             AiOp::ImportModel { model, path } => {
@@ -410,6 +428,13 @@ pub(crate) fn summary(p: &AiParams) -> String {
             format!("Install the speech model `{model}` from a file")
         }
         AiOp::SelectModel { model } => format!("Use the speech model `{model}`"),
+        AiOp::DownloadTextModel { model } => {
+            format!("Download the text model `{model}` from the internet")
+        }
+        AiOp::RemoveTextModel { model } => {
+            format!("Delete the text model `{model}` from this computer")
+        }
+        AiOp::SelectTextModel { model } => format!("Use the text model `{model}`"),
         AiOp::Transcribe { capture_id, .. } => format!("Transcribe {capture_id}"),
         AiOp::SetCaptions {
             capture_id, lines, ..
@@ -469,7 +494,10 @@ pub(crate) fn confirm_params(p: &AiParams) -> Value {
         AiOp::DownloadModel { model }
         | AiOp::RemoveModel { model }
         | AiOp::ImportModel { model, .. }
-        | AiOp::SelectModel { model } => json!({ "model": model }),
+        | AiOp::SelectModel { model }
+        | AiOp::DownloadTextModel { model }
+        | AiOp::RemoveTextModel { model }
+        | AiOp::SelectTextModel { model } => json!({ "model": model }),
         AiOp::Transcribe { capture_id, .. } => json!({ "capture_id": capture_id }),
         AiOp::SetCaptions {
             capture_id, lines, ..
@@ -856,6 +884,19 @@ pub(crate) fn parse(method: &str, f: &Fields<'_>) -> Result<Action, CmError> {
                 "download_model" => AiOp::DownloadModel { model },
                 "select_model" => AiOp::SelectModel { model },
                 _ => AiOp::RemoveModel { model },
+            }
+        }
+        "list_text_models" => {
+            f.only(&[])?;
+            AiOp::ListTextModels
+        }
+        "download_text_model" | "select_text_model" | "remove_text_model" => {
+            f.only(&["model", "request_id"])?;
+            let model = model_id(f, "model")?;
+            match method {
+                "download_text_model" => AiOp::DownloadTextModel { model },
+                "select_text_model" => AiOp::SelectTextModel { model },
+                _ => AiOp::RemoveTextModel { model },
             }
         }
         "import_model" => {

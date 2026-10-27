@@ -15,6 +15,8 @@ use cm_ai::recording::{transcribe_recording, TranscribeOptions};
 use cm_ai::suggest::silence::{decode_mono_f32, silence_cuts, SilenceOptions, ANALYSIS_RATE};
 use cm_ai::suggest::zoom::{suggest_zooms, ZoomOptions};
 use cm_ai::suggest::{filler::filler_cuts, merge_cuts, CutSuggestion, ZoomSuggestion};
+use cm_ai::text_model::engine::EngineManager;
+use cm_ai::text_model::store::{ResolvedTextModel, TextModelList, TextModelStore};
 use cm_ai::transcribe::{is_cancelled, Transcriber, Transcript};
 use cm_ai::whisper::WhisperTranscriber;
 use cm_core::{CmError, EditList, MediaTime};
@@ -25,8 +27,8 @@ use serde_json::Value;
 
 use crate::ai::{
     AiServices, CaptionFormat, CaptionService, DiarizeRequest, ModelService, SpeakerService,
-    SuggestService, TranscribeRequest, TranscribeService, TranslateOutput, TranslateRequest,
-    TranslateService,
+    SuggestService, TextModelService, TranscribeRequest, TranscribeService, TranslateOutput,
+    TranslateRequest, TranslateService,
 };
 
 /// The services backed by `cm-ai`. Plug into [`crate::DaemonBuilder::ai`].
@@ -42,8 +44,14 @@ pub fn services_with(root: PathBuf, engine: Option<Arc<dyn Transcriber>>) -> AiS
 }
 
 fn services(root: Option<PathBuf>, engine: Option<Arc<dyn Transcriber>>) -> AiServices {
+    let text_root = text_root(&root);
     AiServices {
         models: Arc::new(RealModels { root: root.clone() }),
+        text_models: Arc::new(RealTextModels {
+            root: text_root.clone(),
+        }),
+        // The helper (`llama-server`) starts on the first text request, not now.
+        text_engine: EngineManager::system(text_root.join("engine.log")),
         transcribe: Arc::new(RealTranscribe {
             root: root.clone(),
             engine: engine.clone(),
@@ -105,6 +113,57 @@ fn store(root: &Option<PathBuf>) -> ModelStore {
         log::warn!("{w}");
     }
     store
+}
+
+/// The text-model store's folder: `<root>/text` for a fixed root, else `<config dir>/ai/text`.
+fn text_root(root: &Option<PathBuf>) -> PathBuf {
+    match root {
+        Some(r) => r.join("text"),
+        None => TextModelStore::default_root(),
+    }
+}
+
+struct RealTextModels {
+    root: PathBuf,
+}
+
+impl RealTextModels {
+    fn store(&self) -> TextModelStore {
+        let (store, warning) = TextModelStore::open(self.root.clone());
+        if let Some(w) = warning {
+            log::warn!("{w}");
+        }
+        store
+    }
+}
+
+impl TextModelService for RealTextModels {
+    fn list(&self) -> Result<TextModelList, CmError> {
+        Ok(self.store().list())
+    }
+
+    fn download(
+        &self,
+        model: &str,
+        progress: &mut dyn FnMut(DownloadProgress) -> bool,
+    ) -> Result<bool, CmError> {
+        match self.store().download(model, progress)? {
+            DownloadOutcome::Done(_) => Ok(true),
+            DownloadOutcome::Cancelled => Ok(false),
+        }
+    }
+
+    fn select(&self, model: &str) -> Result<(), CmError> {
+        self.store().select(model)
+    }
+
+    fn remove(&self, model: &str) -> Result<(), CmError> {
+        self.store().remove(model).map(|_| ())
+    }
+
+    fn resolve(&self, requested: Option<&str>) -> Result<ResolvedTextModel, CmError> {
+        self.store().resolve(requested)
+    }
 }
 
 struct RealModels {

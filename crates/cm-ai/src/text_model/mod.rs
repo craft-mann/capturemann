@@ -6,7 +6,9 @@
 //!   a second miss is `job_failed` with `reason: "invalid_model_output"` ([`TextModelError`]).
 //! * Providers ([`Provider`]): `none` (no network, callers get `invalid_input` with
 //!   `data.reason = "no_text_model"`), `local` (an OpenAI-compatible server on this machine:
-//!   Ollama or LM Studio), `openai_compatible` (any URL, usually with a key) and `anthropic`.
+//!   Ollama or LM Studio), `embedded` (CaptureMann's own `llama-server` helper on a loopback port,
+//!   see [`engine`]; the models are [`store`]), `openai_compatible` (any URL, usually with a key)
+//!   and `anthropic` (the last two are dormant: settings cannot select them).
 //! * **Local versus remote is decided by the URL host** ([`TextModelConfig::is_local`]): loopback
 //!   is local, everything else, LAN included, is remote. A `local` provider only ever talks to
 //!   loopback: with any other host every request is refused before it is sent.
@@ -17,8 +19,10 @@
 //! The settings (`ai.text.*`, app-only) are read with [`TextModelConfig::from_settings`].
 
 pub mod chunk;
+pub mod engine;
 mod http;
 pub mod schema;
+pub mod store;
 
 use std::fmt;
 
@@ -32,6 +36,9 @@ pub use self::http::{detect_presets, list_models, HttpTextModel, ModelEntry, Pre
 pub const KEY_PROVIDER: &str = "ai.text.provider";
 pub const KEY_BASE_URL: &str = "ai.text.base_url";
 pub const KEY_MODEL: &str = "ai.text.model";
+/// The built-in model (a `text_models.json` id) the `embedded` provider runs; empty: the
+/// text-model store's active one.
+pub const KEY_EMBEDDED_MODEL: &str = "ai.text.embedded_model";
 pub const KEY_KEY_NAME: &str = "ai.text.key_name";
 pub const KEY_CONTEXT_TOKENS: &str = "ai.text.context_tokens";
 pub const KEY_TIMEOUT_S: &str = "ai.text.timeout_s";
@@ -54,6 +61,8 @@ pub const UNREACHABLE_HINT: &str = "Start Ollama or LM Studio, or choose another
 pub enum Provider {
     None,
     Local,
+    /// The helper process CaptureMann ships ([`engine`]).
+    Embedded,
     OpenAiCompatible,
     Anthropic,
 }
@@ -63,6 +72,7 @@ impl Provider {
         match self {
             Provider::None => "none",
             Provider::Local => "local",
+            Provider::Embedded => "embedded",
             Provider::OpenAiCompatible => "openai_compatible",
             Provider::Anthropic => "anthropic",
         }
@@ -72,6 +82,7 @@ impl Provider {
         Some(match s {
             "none" => Provider::None,
             "local" => Provider::Local,
+            "embedded" => Provider::Embedded,
             "openai_compatible" => Provider::OpenAiCompatible,
             "anthropic" => Provider::Anthropic,
             _ => return None,
@@ -85,6 +96,8 @@ pub struct TextModelConfig {
     pub provider: Provider,
     pub base_url: String,
     pub model: String,
+    /// `embedded` only: the built-in model id (empty: the store's active model).
+    pub embedded_model: String,
     /// The keychain entry name of the API key (never the key).
     pub key_name: Option<String>,
     pub context_tokens: u32,
@@ -97,6 +110,7 @@ impl Default for TextModelConfig {
             provider: Provider::None,
             base_url: String::new(),
             model: String::new(),
+            embedded_model: String::new(),
             key_name: None,
             context_tokens: DEFAULT_CONTEXT_TOKENS,
             timeout_s: DEFAULT_TIMEOUT_S,
@@ -141,12 +155,13 @@ impl TextModelConfig {
             .and_then(|p| Provider::parse(&p))
             // Local models only for now (maintainer, Oct 26, 2026): the remote providers stay
             // in the code but a settings file can not select them.
-            .filter(|p| matches!(p, Provider::None | Provider::Local))
+            .filter(|p| matches!(p, Provider::None | Provider::Local | Provider::Embedded))
             .unwrap_or(Provider::None);
         TextModelConfig {
             provider,
             base_url: text(KEY_BASE_URL).unwrap_or_default(),
             model: text(KEY_MODEL).unwrap_or_default(),
+            embedded_model: text(KEY_EMBEDDED_MODEL).unwrap_or_default(),
             key_name: text(KEY_KEY_NAME),
             context_tokens: s
                 .get(KEY_CONTEXT_TOKENS)
@@ -170,16 +185,19 @@ impl TextModelConfig {
         match self.provider {
             Provider::Local => OLLAMA_URL.to_owned(),
             Provider::Anthropic => ANTHROPIC_URL.to_owned(),
-            Provider::None | Provider::OpenAiCompatible => String::new(),
+            // The embedded helper's address is chosen when it starts ([`engine`]); a setting
+            // never names it.
+            Provider::None | Provider::OpenAiCompatible | Provider::Embedded => String::new(),
         }
     }
 
     /// The host requests go to (`None` for provider `none` or an unusable URL).
     pub fn host(&self) -> Option<String> {
-        if self.provider == Provider::None {
-            return None;
+        match self.provider {
+            Provider::None => None,
+            Provider::Embedded => Some("127.0.0.1".to_owned()),
+            _ => url_host(&self.effective_base_url()),
         }
-        url_host(&self.effective_base_url())
     }
 
     /// Whether the model runs on this machine. Decided by the URL host alone: a `local`
@@ -187,7 +205,7 @@ impl TextModelConfig {
     /// Provider `none` is not remote either: it sends nothing, so it counts as local.
     pub fn is_local(&self) -> bool {
         match self.provider {
-            Provider::None => true,
+            Provider::None | Provider::Embedded => true,
             _ => self.host().is_some_and(|h| is_loopback_host(&h)),
         }
     }
@@ -201,6 +219,11 @@ impl TextModelConfig {
     pub fn check_endpoint(&self) -> Result<(), TextModelError> {
         if self.provider == Provider::None {
             return Err(TextModelError::no_text_model());
+        }
+        if self.provider == Provider::Embedded {
+            // The helper listens on 127.0.0.1 only; the client built for it is a `local`
+            // provider, so this check runs again on its address.
+            return Ok(());
         }
         let url = self.effective_base_url();
         let Some(host) = url_host(&url) else {
@@ -303,14 +326,34 @@ pub enum ErrorKind {
     /// The server answered with an error (model not loaded, out of memory, bad key): its message
     /// is passed through. `job_failed`, `reason: "text_model_error"`.
     Server,
+    /// The built-in engine's helper (`llama-server`) is not in the app. `job_failed`,
+    /// `reason: "engine_missing"`.
+    EngineMissing,
+    /// The helper would not start, stopped while loading or died again. `job_failed`,
+    /// `reason: "engine_failed"`.
+    EngineFailed,
+    /// The model needs more memory than is free. `job_failed`, `reason: "not_enough_memory"`.
+    NotEnoughMemory,
 }
 
 impl TextModelError {
     pub fn no_text_model() -> Self {
         TextModelError {
             kind: ErrorKind::NoTextModel,
-            message: "No text model is set up. Open the AI page and choose Ollama, LM Studio or a provider."
+            message: "No text model is set up. Open the AI page, download the built-in text model or choose Ollama or LM Studio."
                 .to_owned(),
+        }
+    }
+
+    /// The built-in provider is chosen but the model file is not on this computer.
+    pub fn no_text_model_named(id: &str) -> Self {
+        TextModelError {
+            kind: ErrorKind::NoTextModel,
+            message: if id.is_empty() {
+                "No text model is downloaded yet. Open the AI page to download one.".to_owned()
+            } else {
+                format!("The text model `{id}` is not downloaded. Open the AI page to download it.")
+            },
         }
     }
 
@@ -330,6 +373,9 @@ impl TextModelError {
             ErrorKind::Timeout => "timeout",
             ErrorKind::InvalidOutput => "invalid_model_output",
             ErrorKind::Server => "text_model_error",
+            ErrorKind::EngineMissing => "engine_missing",
+            ErrorKind::EngineFailed => "engine_failed",
+            ErrorKind::NotEnoughMemory => "not_enough_memory",
         }
     }
 
@@ -447,6 +493,9 @@ impl TextModel for NoTextModel {
 pub fn build(config: &TextModelConfig, key: Option<String>) -> Box<dyn TextModel> {
     match config.provider {
         Provider::None => Box::new(NoTextModel),
+        // The engine is the daemon's to wire ([`engine::EmbeddedTextModel`]); without one the
+        // provider cannot answer.
+        Provider::Embedded => Box::new(engine::Unwired),
         _ => Box::new(HttpTextModel::new(config.clone(), key)),
     }
 }

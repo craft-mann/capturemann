@@ -6,8 +6,9 @@
 //! model, language, "N items left out"), the sections with a time chip on every cited item that
 //! seeks, and the foot (Markdown, TXT, Copy).
 //!
-//! Only local text models are offered (Ollama or LM Studio on this Mac). Without one the tab says
-//! so and points to the AI page; the daemon's `no_text_model` answer is handled the same way.
+//! Only local text models are offered (the engine built into CaptureMann, or Ollama or LM Studio
+//! on this Mac). Without one the tab says a text model is needed, points to the AI page and, when
+//! a built-in model fits this Mac, offers to download it; the daemon's `no_text_model` answer is handled the same way.
 //! Reports are written by `generate_report`, saved by `export_report`, changed by `edit_report`
 //! and `delete_report`; this file sends none of them itself (see `voice_fields.rs`). Not seen by
 //! eye yet (`tests/manual/VOC-2.md`).
@@ -27,7 +28,6 @@ use super::tabs::{micro, panel, Inspector};
 use super::voice_fields::ReportNote;
 use super::{RecordingEditor, Session};
 use crate::ai::jobs::VoiceJobKind;
-use crate::ai::voice::ProviderChoice;
 use crate::recedit::voice::{language_name, speaker_colour, TRANSLATE_TARGETS};
 use crate::recedit::voice_panels::{self as rules, ItemView, SectionView};
 use crate::theme::{scale, type_scale, Color, Theme};
@@ -141,7 +141,7 @@ impl RecordingEditor {
         let t = &self.app.read(cx).ai.voice.text;
         if !t.loaded {
             TextState::Unknown
-        } else if t.provider == ProviderChoice::OnThisMac && !t.model.trim().is_empty() {
+        } else if t.ready() {
             TextState::Ready(t.model.clone())
         } else {
             TextState::Missing
@@ -263,7 +263,7 @@ impl RecordingEditor {
                 .into_any_element(),
             ),
             (Some(ReportNote::NoTextModel), _) | (None, TextState::Missing) => {
-                body.push(self.no_text_model_card(t))
+                body.push(self.no_text_model_card(t, cx))
             }
             _ => {}
         }
@@ -329,10 +329,12 @@ impl RecordingEditor {
         )
     }
 
-    /// "No local text model": points to the AI page.
-    fn no_text_model_card(&self, t: &Theme) -> AnyElement {
+    /// "No text model": a text model is needed. Opens the AI page and, when the catalogue has a
+    /// built-in model that fits this Mac and is not downloaded, offers to download it (the button
+    /// names the size, so the press is the confirmation).
+    fn no_text_model_card(&self, t: &Theme, cx: &gpui::App) -> AnyElement {
         let app = self.app.clone();
-        let action = small_button_with_icon(
+        let open = small_button_with_icon(
             t,
             "re-report-open-ai",
             &tr!("Open AI page"),
@@ -343,16 +345,45 @@ impl RecordingEditor {
             cx.defer(move |cx| crate::ui::app::set_route(&app, crate::ui::app::Route::Ai, cx));
         })
         .into_any_element();
+        let offer = {
+            let m = self.app.read(cx);
+            m.builtin.offer(m.ai.voice.memory_gb())
+        };
+        let action = match offer {
+            Some((_, _, size_mb)) => {
+                let app = self.app.clone();
+                let download = small_button_with_icon(
+                    t,
+                    "re-report-download-model",
+                    &crate::ai::builtin::download_button_label(size_mb),
+                    Some("download"),
+                )
+                .on_click(move |_, _, cx| {
+                    let app = app.clone();
+                    cx.defer(move |cx| crate::ui::ai_voice::builtin_download_recommended(&app, cx));
+                })
+                .into_any_element();
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .gap(px(8.))
+                    .child(download)
+                    .child(open)
+                    .into_any_element()
+            }
+            None => open,
+        };
         callout(
             t,
             Tone::Brass,
             "triangle-alert",
-            tr!("No text model is set up"),
+            tr!("A text model is needed"),
             Some(
                 tr!(
-                "Reports are written by a text model on this Mac (Ollama or LM Studio). Choose \
-                 one on the AI page; nothing is sent anywhere else."
-            )
+                    "Reports are written by a text model that runs on this Mac: the one built \
+                     into CaptureMann, or Ollama or LM Studio. Choose one on the AI page; \
+                     nothing is sent anywhere else."
+                )
                 .into(),
             ),
             Some(action),

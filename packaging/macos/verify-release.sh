@@ -232,6 +232,24 @@ else
   soft "no ffmpeg in Contents/MacOS (a release needs the LGPL build: make ffmpeg, make bundle-release)"
 fi
 
+# --- llama-server (MIT), the helper of the built-in text engine ---
+section "llama-server"
+ll="$contents/MacOS/llama-server"
+if [ -x "$ll" ]; then
+  if otool -L "$ll" 2>/dev/null | grep -q -i -E 'curl|ssl|crypto'; then
+    err "bundled llama-server links curl or OpenSSL (it must not reach the network by itself)"
+  else
+    ok "bundled llama-server links no curl or OpenSSL"
+  fi
+  if [ -f "$contents/Resources/Llama/LICENSES/llama.cpp-LICENSE.txt" ]; then
+    ok "llama.cpp licence present"
+  else
+    err "Resources/Llama has no LICENSES/llama.cpp-LICENSE.txt (the MIT notice must travel with the binary)"
+  fi
+else
+  soft "no llama-server in Contents/MacOS (a release needs it: make llama, make bundle-release)"
+fi
+
 # --- licences, version, platform ---
 section "licences, version, platform"
 for f in LICENSE NOTICE THIRD_PARTY_LICENSES.md; do

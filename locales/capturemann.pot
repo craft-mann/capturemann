@@ -86,6 +86,9 @@ msgstr ""
 msgid "A report is written from the transcript. Transcribe the recording first."
 msgstr ""
 
+msgid "A text model is needed"
+msgstr ""
+
 msgid "A zoom eases in over {secs} seconds, holds, and eases out"
 msgstr ""
 
@@ -504,6 +507,9 @@ msgstr ""
 msgid "Built in"
 msgstr ""
 
+msgid "Built-in text models"
+msgstr ""
+
 msgid "Bundle id, e.g. com.tinyspeck.slackmacgap"
 msgstr ""
 
@@ -839,6 +845,9 @@ msgstr ""
 msgid "Choose mic"
 msgstr ""
 
+msgid "Choose the built-in text model"
+msgstr ""
+
 msgid "Choose the folder for the copy"
 msgstr ""
 
@@ -1094,6 +1103,9 @@ msgstr ""
 msgid "Couldn’t change the speakers"
 msgstr ""
 
+msgid "Couldn’t change the text model"
+msgstr ""
+
 msgid "Couldn’t choose what to record"
 msgstr ""
 
@@ -1318,6 +1330,9 @@ msgid_plural "Delete \"{title}\" ({size}) and permanently delete {n} remote copi
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "Delete a built-in text model"
+msgstr ""
+
 msgid "Delete a capture"
 msgstr ""
 
@@ -1453,6 +1468,12 @@ msgstr ""
 msgid "Download TXT"
 msgstr ""
 
+msgid "Download a built-in model first."
+msgstr ""
+
+msgid "Download a built-in text model"
+msgstr ""
+
 msgid "Download a speech model"
 msgstr ""
 
@@ -1460,6 +1481,9 @@ msgid "Download failed: {reason}"
 msgstr ""
 
 msgid "Download progress"
+msgstr ""
+
+msgid "Download the recommended model ({size})"
 msgstr ""
 
 msgid "Download the speech model \"{name}\" (about {mb} MB) from the internet"
@@ -1547,6 +1571,15 @@ msgid "Editor toolbar"
 msgstr ""
 
 msgid "Edits are saved with the recording and never change the original tracks."
+msgstr ""
+
+msgid "Engine loading the model…"
+msgstr ""
+
+msgid "Engine running {model}. It stops after {minutes} min without use."
+msgstr ""
+
+msgid "Engine stopped. It starts by itself when a report or a translation needs it."
 msgstr ""
 
 msgid "Engine · chosen for you"
@@ -1928,9 +1961,6 @@ msgstr ""
 msgid "Install Large v3 or Medium on the AI page to translate to English."
 msgstr ""
 
-msgid "Install a model in Ollama or LM Studio, then pick it above. CaptureMann never downloads text models itself. Default decided by S8."
-msgstr ""
-
 msgid "Install a speech model from a file"
 msgstr ""
 
@@ -2082,6 +2112,9 @@ msgstr ""
 msgid "List"
 msgstr ""
 
+msgid "List built-in text models"
+msgstr ""
+
 msgid "List cameras and microphones"
 msgstr ""
 
@@ -2138,6 +2171,9 @@ msgid "Looking for displays…"
 msgstr ""
 
 msgid "Looking for emails and keys…"
+msgstr ""
+
+msgid "Looking for the built-in models…"
 msgstr ""
 
 msgid "Looking for windows…"
@@ -2481,6 +2517,9 @@ msgstr ""
 msgid "No audio recordings yet"
 msgstr ""
 
+msgid "No built-in model is available in this version yet. Use Ollama or LM Studio, or check for an update."
+msgstr ""
+
 msgid "No camera found"
 msgstr ""
 
@@ -2587,9 +2626,6 @@ msgid "No telemetry. No network traffic unless you connect a destination."
 msgstr ""
 
 msgid "No terms yet. Add a name or a word you want spelled your way."
-msgstr ""
-
-msgid "No text model is set up"
 msgstr ""
 
 msgid "No text model. Reports and translation to other languages are off."
@@ -3198,6 +3234,9 @@ msgstr ""
 msgid "Recent captures"
 msgstr ""
 
+msgid "Recommended for this Mac"
+msgstr ""
+
 msgid "Recommended for your Mac"
 msgstr ""
 
@@ -3495,7 +3534,7 @@ msgstr ""
 msgid "Reports and translation to any language"
 msgstr ""
 
-msgid "Reports are written by a text model on this Mac (Ollama or LM Studio). Choose one on the AI page; nothing is sent anywhere else."
+msgid "Reports are written by a text model that runs on this Mac: the one built into CaptureMann, or Ollama or LM Studio. Choose one on the AI page; nothing is sent anywhere else."
 msgstr ""
 
 msgid "Reports of this recording"
@@ -4362,6 +4401,9 @@ msgstr ""
 msgid "The displays could not be listed."
 msgstr ""
 
+msgid "The engine could not start."
+msgstr ""
+
 msgid "The export applies trims, cuts and speed, and can even out the loudness. M4A or WAV; the title and date are written into the file."
 msgstr ""
 
@@ -4433,6 +4475,9 @@ msgstr ""
 
 #. FACT: owner review required (what happens when the microphone is silent)
 msgid "The microphone has delivered only silence for 15 s (muted, or its access was revoked); the recording continues"
+msgstr ""
+
+msgid "The model runs inside CaptureMann and nothing leaves this Mac."
 msgstr ""
 
 msgid "The move stopped"
@@ -4567,6 +4612,9 @@ msgstr ""
 msgid "The test sound didn’t play"
 msgstr ""
 
+msgid "The text engine is missing from this copy of CaptureMann. Reinstall CaptureMann."
+msgstr ""
+
 msgid "The text model did not answer."
 msgstr ""
 
@@ -4637,6 +4685,9 @@ msgid "They need a separate speaker model, and this version doesn’t include on
 msgstr ""
 
 msgid "This Mac has no usable hardware H.264 encoder for this recording. Try a lower resolution, update to macOS 13 or later, or use a Mac from about 2016 or later."
+msgstr ""
+
+msgid "This Mac has {memory} GB of memory. The model runs inside CaptureMann and nothing leaves this Mac."
 msgstr ""
 
 msgid "This account is not connected. Connect it again in Settings → Destinations."
@@ -4732,6 +4783,9 @@ msgid "Title and date are written into the file"
 msgstr ""
 
 msgid "To"
+msgstr ""
+
+msgid "To use Ollama or LM Studio, install a model there, then pick it above. Default decided by S8."
 msgstr ""
 
 msgid "Today {time}"
@@ -7359,6 +7413,14 @@ msgctxt "marker"
 msgid "Marker"
 msgstr ""
 
+msgctxt "memory tier"
+msgid "{gb} GB Macs"
+msgstr ""
+
+msgctxt "memory tier"
+msgid "{gb} GB Macs and up"
+msgstr ""
+
 msgctxt "menu"
 msgid "Library"
 msgstr ""
@@ -8112,11 +8174,15 @@ msgid "Test"
 msgstr ""
 
 msgctxt "text model provider"
+msgid "Built in"
+msgstr ""
+
+msgctxt "text model provider"
 msgid "None"
 msgstr ""
 
 msgctxt "text model provider"
-msgid "On this Mac"
+msgid "Ollama or LM Studio"
 msgstr ""
 
 msgctxt "theme"

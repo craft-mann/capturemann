@@ -99,6 +99,7 @@ fn config(port: u16, provider: Provider) -> TextModelConfig {
         provider,
         base_url: format!("http://127.0.0.1:{port}/v1"),
         model: "test-model".into(),
+        embedded_model: String::new(),
         key_name: None,
         context_tokens: 8192,
         timeout_s: 5,
@@ -317,4 +318,123 @@ fn the_test_button_reports_latency_model_and_structured_output() {
     let t = test_model(m.as_ref(), "test-model");
     assert!(!t.ok);
     assert_eq!(t.reason.as_deref(), Some("invalid_model_output"));
+}
+
+// ---- the built-in provider (AI-7, `embedded`) ----------------------------------------------
+
+use cm_ai::text_model::engine::{EmbeddedTextModel, EngineSpec, EngineStatus, TextEngine};
+use cm_ai::text_model::TextModel;
+
+/// An engine that hands out fixed loopback addresses, counting acquire and release.
+struct FakeEngine {
+    urls: Mutex<Vec<String>>,
+    acquired: Mutex<u32>,
+    released: Mutex<u32>,
+}
+
+impl FakeEngine {
+    fn new(urls: Vec<String>) -> Arc<FakeEngine> {
+        Arc::new(FakeEngine {
+            urls: Mutex::new(urls),
+            acquired: Mutex::new(0),
+            released: Mutex::new(0),
+        })
+    }
+
+    fn counts(&self) -> (u32, u32) {
+        (
+            *self.acquired.lock().unwrap(),
+            *self.released.lock().unwrap(),
+        )
+    }
+}
+
+impl TextEngine for FakeEngine {
+    fn acquire(&self, _: &EngineSpec) -> Result<String, cm_ai::text_model::TextModelError> {
+        *self.acquired.lock().unwrap() += 1;
+        let mut urls = self.urls.lock().unwrap();
+        Ok(if urls.len() > 1 {
+            urls.remove(0)
+        } else {
+            urls[0].clone()
+        })
+    }
+    fn release(&self) {
+        *self.released.lock().unwrap() += 1;
+    }
+    fn status(&self) -> EngineStatus {
+        unreachable!()
+    }
+    fn stop(&self) {}
+    fn reap_idle(&self) -> bool {
+        false
+    }
+}
+
+fn embedded(engine: Arc<FakeEngine>) -> EmbeddedTextModel {
+    EmbeddedTextModel::new(
+        engine,
+        EngineSpec {
+            model_id: "built-in".into(),
+            model_path: "/models/built-in.gguf".into(),
+            ram_mb: 0,
+            context_tokens: 8192,
+        },
+        &TextModelConfig {
+            timeout_s: 5,
+            ..TextModelConfig::default()
+        },
+    )
+}
+
+#[test]
+fn embedded_asks_the_engine_for_the_address_and_talks_openai() {
+    let s = serve(|_, _| (200, chat("{\"title\": \"Hi\"}")));
+    let e = FakeEngine::new(vec![format!("http://127.0.0.1:{}/v1", s.port)]);
+    let r = embedded(e.clone()).complete_json(&request()).unwrap();
+    assert_eq!(r.value["title"], "Hi");
+    let seen = s.seen.lock().unwrap();
+    assert_eq!(seen[0].path, "/v1/chat/completions");
+    assert_eq!(seen[0].body["model"], "built-in");
+    assert_eq!(e.counts(), (1, 1));
+}
+
+#[test]
+fn embedded_retries_once_when_the_helper_died_and_gives_up_clearly() {
+    let s = serve(|_, _| (200, chat("{\"title\": \"Back\"}")));
+    // The first address is dead; the engine hands out a live one on the second acquire.
+    let dead = TcpListener::bind("127.0.0.1:0").unwrap();
+    let dead_port = dead.local_addr().unwrap().port();
+    drop(dead);
+    let e = FakeEngine::new(vec![
+        format!("http://127.0.0.1:{dead_port}/v1"),
+        format!("http://127.0.0.1:{}/v1", s.port),
+    ]);
+    let r = embedded(e.clone()).complete_json(&request()).unwrap();
+    assert_eq!(r.value["title"], "Back");
+    assert_eq!(e.counts(), (2, 2));
+
+    // Dead both times: engine_failed, not the Ollama hint.
+    let e = FakeEngine::new(vec![format!("http://127.0.0.1:{dead_port}/v1")]);
+    let err = embedded(e).complete_json(&request()).unwrap_err();
+    assert_eq!(err.reason(), "engine_failed");
+    assert!(!err.message.contains("Ollama"), "{err}");
+}
+
+#[test]
+fn embedded_is_local_with_no_remote_plan_and_settings_can_choose_it() {
+    let mut m = serde_json::Map::new();
+    m.insert("ai.text.provider".into(), json!("embedded"));
+    m.insert("ai.text.embedded_model".into(), json!("text-16gb"));
+    m.insert("ai.text.base_url".into(), json!("https://evil.example/v1"));
+    let c = TextModelConfig::from_settings(&m);
+    assert_eq!(c.provider, Provider::Embedded);
+    assert_eq!(c.embedded_model, "text-16gb");
+    assert!(c.is_local() && !c.is_remote());
+    assert!(c.send_plan(100).is_none());
+    assert!(c.check_endpoint().is_ok());
+    assert_eq!(c.host().as_deref(), Some("127.0.0.1"));
+    // Without an engine wired in, `build` cannot answer and says why.
+    let err = build(&c, None).complete_json(&request()).unwrap_err();
+    assert_eq!(err.reason(), "engine_missing");
 }

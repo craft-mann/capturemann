@@ -17,3 +17,11 @@ or nonfree components, no libx264 and no libx265; it statically includes libvpx 
 configure line and the replacement instructions are in Contents/Resources/FFmpeg/ (SOURCE-OFFER.txt,
 BUILD-INFO.txt and LICENSES/); the sources are at https://ffmpeg.org, https://github.com/webmproject/libvpx
 and https://downloads.xiph.org/releases/opus/, and the build script is packaging/ffmpeg/build-macos.sh.
+
+llama-server (the text engine built into the app, run as a separate program on 127.0.0.1) is an
+unmodified build of llama.cpp (https://github.com/ggml-org/llama.cpp), licensed under the MIT
+License, Copyright the ggml authors; the licence texts of llama.cpp and of the small libraries it
+vendors, the exact version, the SHA-256 of the source archive and the configure line are in
+Contents/Resources/Llama/ (LICENSES/ and BUILD-INFO.txt), and the build script is
+packaging/llama/build-macos.sh. The text models CaptureMann downloads on request are separate files
+under their own open licences (Apache-2.0 or MIT), shown on the AI page before the download.

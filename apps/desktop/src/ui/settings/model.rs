@@ -307,7 +307,9 @@ fn lock_reason(spec: &ActionSpec) -> Option<LockReason> {
         ToolControl::LockedRead => Some(LockReason::Reading),
         ToolControl::LockedAsk => Some(match spec.name {
             "run_fps_selftest" => LockReason::SelfTest,
-            "download_model" | "remove_model" => LockReason::Models,
+            "download_model" | "remove_model" | "download_text_model" | "remove_text_model" => {
+                LockReason::Models
+            }
             _ => LockReason::PublishDelete,
         }),
         _ => None,
@@ -362,6 +364,10 @@ pub(crate) fn tool_title(name: &str) -> String {
         "import_model" => tr!("Install a speech model from a file"),
         "select_model" => tr!("Choose the speech model"),
         "remove_model" => tr!("Delete a speech model"),
+        "list_text_models" => tr!("List built-in text models"),
+        "download_text_model" => tr!("Download a built-in text model"),
+        "select_text_model" => tr!("Choose the built-in text model"),
+        "remove_text_model" => tr!("Delete a built-in text model"),
         "transcribe" => tr!("Transcribe a recording"),
         "get_transcript" => tr!("Read a transcript"),
         "get_captions" => tr!("Read caption lines"),
@@ -896,6 +902,8 @@ mod tests {
             "run_fps_selftest",
             "download_model",
             "remove_model",
+            "download_text_model",
+            "remove_text_model",
             "move_library",
         ] {
             let r = rows.iter().find(|r| r.tool == t).unwrap();

@@ -69,7 +69,7 @@ The **default recommendation is decided by S8**, not by this table.
 
 ## Open questions
 
-- **Embedded llama.cpp** (no separate server) once AI-7 proves the features: shares ggml with whisper.cpp, but adds multi-GB downloads and model-licence handling in the app.
+- **Embedded llama.cpp** (no separate server) once AI-7 proves the features: shares ggml with whisper.cpp, but adds multi-GB downloads and model-licence handling in the app. **Decided Oct 27, 2026:** it ships as AI-7's `embedded` provider, as a helper program (`llama-server`, MIT) in the bundle rather than a library linked into the app, so the two ggml copies never meet; see AI-7 "Built-in engine".
 - **Display name** for "Me" (AI-8.AC7): a new `profile.display_name` setting, or the macOS account name.
 
 ## Sources (checked Oct 26, 2026)

@@ -5,14 +5,18 @@
 //!
 //! Two engines (`engine`: `auto`, `whisper`, `text_model`): Whisper re-runs the audio with the
 //! translate task (English only, offline; the `large-v3-turbo` model is never used for it), and a
-//! text model translates the caption lines (AI-7; not plugged in yet, so a non-English target
-//! fails with `invalid_input` and `data.reason = "no_text_model"`). Nothing is ever downloaded
-//! here: a missing Whisper model fails with `data.reason = "translation_model_missing"`.
+//! text model translates the caption lines (AI-7: the local text model, the built-in engine or
+//! Ollama and LM Studio, through [`cm_ai::translate::ModelTranslator`]; with provider `none` a
+//! non-English target fails with `invalid_input` and `data.reason = "no_text_model"`). Nothing is
+//! ever downloaded here: a missing Whisper model fails with
+//! `data.reason = "translation_model_missing"`.
 //!
 //! Edits to a translation are one manifest revision and one undo step each (`set_captions` or
 //! `replace_in_captions` with a `language`; the step keeps the file as it was and as it became),
 //! and survive a re-translate where the source caption line is unchanged (AI-5.AC5). A
 //! re-translate replaces the file without a step and drops the older steps of that language.
+
+use std::sync::Weak;
 
 use cm_ai::translate::{self as tr, Engine, EngineChoice, Translation, TranslationLine};
 
@@ -163,6 +167,13 @@ fn translation_json(id: &str, t: &Translation) -> Value {
     })
 }
 
+fn into_cm_error(e: DaemonError) -> CmError {
+    match e {
+        DaemonError::Cm(c) | DaemonError::WithData { error: c, .. } => c,
+        other => CmError::internal(other.to_string()),
+    }
+}
+
 impl Inner {
     /// `translate_captions`: checks everything that can be checked now, then enqueues the job.
     pub(super) async fn translate_captions(
@@ -202,7 +213,7 @@ impl Inner {
             choice,
             &target,
             &source_language,
-            self.ai.translate.has_text_model(),
+            self.ai.translate.has_text_model() || self.text_model_ready(),
         )
         .map_err(reasoned)?;
         let model = match engine {
@@ -513,6 +524,7 @@ pub(super) struct TranslateHandler {
     pub(super) service: Arc<dyn TranslateService>,
     pub(super) captions: Arc<dyn CaptionService>,
     pub(super) settings: Arc<dyn crate::engines::SettingsStore>,
+    pub(super) inner: Weak<Inner>,
 }
 
 #[async_trait]
@@ -576,6 +588,29 @@ impl JobHandler for TranslateHandler {
             source_lines,
             keep_as_written,
         };
+        // The text model of the settings, built now (the engine starts on the first batch).
+        let text_model = match engine {
+            Engine::TextModel => {
+                let me = self
+                    .inner
+                    .upgrade()
+                    .ok_or_else(|| CmError::internal("the daemon is shutting down"))?;
+                let config = me.text_model_config().map_err(into_cm_error)?;
+                me.check_text_model(&config).map_err(into_cm_error)?;
+                let name = if config.model.is_empty() {
+                    config.provider.as_str().to_owned()
+                } else {
+                    config.model.clone()
+                };
+                let cfg = config.clone();
+                let client = blocking(move || me.text_model_client(&cfg))
+                    .await
+                    .map_err(into_cm_error)?;
+                Some((client, name))
+            }
+            Engine::Whisper => None,
+        };
+        let job_id = ctx.job.id.clone();
         let (flag, watcher) = interrupt_flag(&ctx);
         let (service, reporter) = (self.service.clone(), ctx.reporter.clone());
         let joined = tokio::task::spawn_blocking(move || {
@@ -590,9 +625,28 @@ impl JobHandler for TranslateHandler {
                 }
                 !flag.load(Ordering::SeqCst)
             };
-            match engine {
-                Engine::Whisper => service.whisper(&req, &mut progress),
-                Engine::TextModel => service.text_model(&req, &mut progress),
+            match (engine, text_model) {
+                (Engine::TextModel, Some((model, name))) => {
+                    let translator = tr::ModelTranslator::new(model.as_ref(), name, job_id);
+                    match tr::translate_with_text_model(
+                        &translator,
+                        &req.source_lines,
+                        &req.source_language,
+                        &req.target_language,
+                        &req.keep_as_written,
+                        &mut progress,
+                    ) {
+                        Ok(t) => Ok(Some(TranslateOutput {
+                            lines: t.lines,
+                            model: cm_ai::translate::TextTranslator::model_name(&translator),
+                            untranslated: t.untranslated,
+                        })),
+                        Err(e) if cm_ai::transcribe::is_cancelled(&e) => Ok(None),
+                        Err(e) => Err(e),
+                    }
+                }
+                (Engine::TextModel, None) => service.text_model(&req, &mut progress),
+                (Engine::Whisper, _) => service.whisper(&req, &mut progress),
             }
         })
         .await;

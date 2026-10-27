@@ -503,3 +503,74 @@ fn a_damaged_state_file_means_no_active_model() {
         .unwrap();
     assert_eq!(buf, "{ nope", "reading never rewrites it");
 }
+
+// ---- the text-model store shares the Whisper downloader -------------------------------------
+
+use cm_ai::text_model::store::{TextCatalog, TextModelStore};
+
+fn text_catalog(port: u16, data: &[u8], sha256: &str) -> TextCatalog {
+    TextCatalog::parse(&format!(
+        r#"{{ "models": [{{ "id": "text-8gb", "label": "Small", "file": "small.gguf",
+            "url": "http://127.0.0.1:{port}/small.gguf", "sha256": "{sha256}", "bytes": {},
+            "ram_mb": 5000, "tier_gb": 8, "license": "Apache-2.0", "context_tokens": 8192 }}] }}"#,
+        data.len()
+    ))
+    .unwrap()
+}
+
+#[test]
+fn text_models_resume_verify_and_become_active() {
+    let data = Arc::new(body(2_000_000));
+    let server = serve(
+        data.clone(),
+        Behavior {
+            cut_first_at: Some(700_000),
+            ..Behavior::default()
+        },
+    );
+    let dir = tempfile::tempdir().unwrap();
+    let store = TextModelStore::with_catalog(
+        dir.path().join("text"),
+        text_catalog(server.port, &data, &sha(&data)),
+    );
+    let e = store.download("text-8gb", &mut never).unwrap_err();
+    assert_eq!(e.code().as_str(), "network");
+    assert!(!store.is_installed("text-8gb"));
+    assert!(matches!(
+        store.download("text-8gb", &mut never).unwrap(),
+        DownloadOutcome::Done(_)
+    ));
+    assert_eq!(
+        server.ranges.lock().unwrap().len(),
+        2,
+        "the second call resumed"
+    );
+    let list = store.list();
+    assert!(list.models[0].info.installed && list.models[0].info.active);
+    assert_eq!(list.models[0].license, "Apache-2.0");
+    let r = store.resolve(None).unwrap();
+    assert_eq!(
+        (r.id.as_str(), r.ram_mb, r.context_tokens),
+        ("text-8gb", 5000, 8192)
+    );
+    assert!(dir.path().join("text/models/small.gguf").is_file());
+    // Removing the active model clears the choice.
+    assert!(store.remove("text-8gb").unwrap());
+    assert!(store.resolve(None).is_err());
+}
+
+#[test]
+fn a_text_model_with_the_wrong_checksum_is_deleted_not_installed() {
+    let data = Arc::new(body(500_000));
+    let server = serve(data.clone(), Behavior::default());
+    let dir = tempfile::tempdir().unwrap();
+    let wrong = sha(b"something else");
+    let store = TextModelStore::with_catalog(
+        dir.path().join("text"),
+        text_catalog(server.port, &data, &wrong),
+    );
+    let e = store.download("text-8gb", &mut never).unwrap_err();
+    assert!(e.to_string().contains("checksum"), "{e}");
+    assert!(!store.is_installed("text-8gb"));
+    assert!(!dir.path().join("text/models/small.gguf.part").exists());
+}

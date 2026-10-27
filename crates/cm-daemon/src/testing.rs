@@ -3,10 +3,12 @@
 
 pub mod fake_ai;
 pub mod fake_sources;
+pub mod fake_text;
 
 pub use cm_render::ocr::{ScriptedRecognizer, TextLine};
 pub use fake_ai::FakeAi;
 pub use fake_sources::{FakeSources, FakeTrackHandle, LastDevices};
+pub use fake_text::{FakeTextEngine, FakeTextModels};
 
 use async_trait::async_trait;
 use cm_core::{Actor, CmError};

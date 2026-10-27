@@ -9,11 +9,22 @@ impl Daemon {
     /// owns a daemon. Errors with `not_implemented` without a job queue.
     pub fn register_ai_handlers(&self) -> Result<(), DaemonError> {
         let inner = &self.inner;
+        let speech = inner.ai.models.clone();
         self.register_job_handler(
             JOB_MODEL_DOWNLOAD,
             Arc::new(ModelDownloadHandler {
                 events: inner.events.clone(),
-                service: inner.ai.models.clone(),
+                download: Arc::new(move |m, p| speech.download(m, p)),
+                text: false,
+            }),
+        )?;
+        let text_models = inner.ai.text_models.clone();
+        self.register_job_handler(
+            JOB_TEXT_MODEL_DOWNLOAD,
+            Arc::new(ModelDownloadHandler {
+                events: inner.events.clone(),
+                download: Arc::new(move |m, p| text_models.download(m, p)),
+                text: true,
             }),
         )?;
         self.register_job_handler(
@@ -34,6 +45,7 @@ impl Daemon {
                 service: inner.ai.translate.clone(),
                 captions: inner.ai.captions.clone(),
                 settings: inner.settings.clone(),
+                inner: Arc::downgrade(&self.inner),
             }),
         )?;
         self.register_job_handler(
@@ -118,6 +130,12 @@ impl Inner {
         &self,
         p: &AiParams,
     ) -> Result<(String, Value, Value), DaemonError> {
+        if matches!(
+            p.op,
+            AiOp::DownloadTextModel { .. } | AiOp::RemoveTextModel { .. }
+        ) {
+            return self.plan_text_model(p).await;
+        }
         let list = self.model_list().await?;
         let (model, download) = match &p.op {
             AiOp::DownloadModel { model } => (model, true),
@@ -229,6 +247,11 @@ impl Inner {
                 Ok(json!({ "active": model }))
             }
             AiOp::RemoveModel { model } => self.remove_model(model).await,
+            AiOp::ListTextModels => Ok(serde_json::to_value(self.text_model_list().await?)
+                .map_err(|e| DaemonError::Internal(e.to_string()))?),
+            AiOp::DownloadTextModel { model } => self.download_text_model(actor, model).await,
+            AiOp::SelectTextModel { model } => self.select_text_model(model).await,
+            AiOp::RemoveTextModel { model } => self.remove_text_model(model).await,
             AiOp::Transcribe {
                 capture_id,
                 language,

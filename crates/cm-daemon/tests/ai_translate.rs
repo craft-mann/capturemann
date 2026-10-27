@@ -97,13 +97,19 @@ fn recording(tmp: &std::path::Path) -> (String, std::path::PathBuf) {
 /// A recording whose transcript is in `source` (written straight into the bundle): six words,
 /// which the fake caption service cuts into two lines of three.
 async fn rig(ai: FakeAi, source: &str) -> Rig {
+    let services = ai.services();
+    rig_with(ai, services, source).await
+}
+
+/// [`rig`] with other services (a text engine and text-model store of the AI-7 built-in provider).
+async fn rig_with(ai: FakeAi, services: cm_daemon::AiServices, source: &str) -> Rig {
     let (b, tmp) = builder(desktop());
     let queue = cm_daemon::library_job_queue(tmp.path()).unwrap();
     let confirmer = Arc::new(FixedConfirmer::new(Decision::Decline));
     let daemon = b
         .jobs(queue)
         .confirmer(confirmer.clone())
-        .ai(ai.services())
+        .ai(services)
         .build();
     daemon.register_ai_handlers().unwrap();
     daemon.start_jobs().unwrap();
@@ -630,4 +636,112 @@ async fn ai_5_an_equal_running_translation_is_reused_and_agents_need_no_confirma
     assert_eq!(b["reused"], true);
     assert!(r.confirmer.shown().is_empty());
     job_done(&r, a["job_id"].as_str().unwrap()).await;
+}
+
+/// A scripted OpenAI-compatible server on loopback that "translates" the batch in the prompt by
+/// putting `vi: ` in front of every line.
+fn serve_translations() -> u16 {
+    use std::io::{Read, Write};
+    let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = l.local_addr().unwrap().port();
+    std::thread::spawn(move || {
+        for s in l.incoming() {
+            let Ok(mut s) = s else { break };
+            std::thread::spawn(move || {
+                let mut buf = Vec::new();
+                let mut chunk = [0u8; 8192];
+                let body = loop {
+                    let Ok(k) = s.read(&mut chunk) else { return };
+                    if k == 0 {
+                        return;
+                    }
+                    buf.extend_from_slice(&chunk[..k]);
+                    let text = String::from_utf8_lossy(&buf).to_string();
+                    if let Some(h) = text.find("\r\n\r\n") {
+                        let len: usize = text[..h]
+                            .to_ascii_lowercase()
+                            .lines()
+                            .find_map(|l| {
+                                l.strip_prefix("content-length:")
+                                    .map(|v| v.trim().parse().unwrap())
+                            })
+                            .unwrap_or(0);
+                        if buf.len() >= h + 4 + len {
+                            break text[h + 4..].to_owned();
+                        }
+                    }
+                };
+                let request: Value = serde_json::from_str(&body).unwrap();
+                let prompt = request["messages"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .filter_map(|m| m["content"].as_str())
+                    .find(|c| c.contains("Lines to translate: "))
+                    .unwrap()
+                    .to_owned();
+                let from =
+                    prompt.find("Lines to translate: ").unwrap() + "Lines to translate: ".len();
+                let list: Vec<String> = serde_json::Deserializer::from_str(&prompt[from..])
+                    .into_iter::<Vec<String>>()
+                    .next()
+                    .unwrap()
+                    .unwrap();
+                let lines: Vec<String> = list.iter().map(|l| format!("vi: {l}")).collect();
+                let content = json!({ "lines": lines }).to_string();
+                let reply =
+                    json!({ "choices": [{ "message": { "content": content } }] }).to_string();
+                let _ = write!(
+                    s,
+                    "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{reply}",
+                    reply.len()
+                );
+            });
+        }
+    });
+    port
+}
+
+/// AI-7 and AI-5: with the built-in text model chosen and downloaded, `auto` into Vietnamese uses
+/// it (batches through the engine, the lines keep the source times); with the provider `none`, or
+/// the provider set but no model downloaded, it is still `no_text_model`.
+#[tokio::test]
+async fn ai_7_the_built_in_text_model_translates_into_any_language() {
+    use cm_daemon::testing::{FakeTextEngine, FakeTextModels};
+    let port = serve_translations();
+    let engine = FakeTextEngine::new(format!("http://127.0.0.1:{port}/v1"));
+    let ai = FakeAi::new().with_installed(&["small", "large"], Some("large"));
+    let services = cm_daemon::AiServices {
+        text_models: Arc::new(FakeTextModels::new().with_installed(&["text-16gb"])),
+        text_engine: Arc::new(engine.clone()),
+        ..ai.services()
+    };
+    let r = rig_with(ai.clone(), services, "en").await;
+    // Provider none: the old answer.
+    let e = user(&r, "translate_captions", json!({"target_language": "vi"}))
+        .await
+        .unwrap_err();
+    assert_eq!(reason(&e), "no_text_model");
+
+    user(
+        &r,
+        "set_settings",
+        json!({ "values": { "ai.text.provider": "embedded" } }),
+    )
+    .await
+    .unwrap();
+    let job = translate(&r, json!({"target_language": "vi"})).await;
+    assert_eq!(job["result"]["engine"], "text_model");
+    assert_eq!(job["result"]["model"], "text-16gb");
+    assert_eq!(job["result"]["untranslated"], 0);
+    assert!(r.ai.translate_calls().is_empty(), "Whisper was not used");
+    let got = user(&r, "get_captions", json!({"language": "vi"}))
+        .await
+        .unwrap();
+    let lines = texts(&got);
+    assert_eq!(lines.len(), 2);
+    assert!(lines.iter().all(|l| l.starts_with("vi: ")), "{lines:?}");
+    let specs = engine.specs();
+    assert!(!specs.is_empty());
+    assert!(specs.iter().all(|s| s.model_id == "text-16gb"));
 }

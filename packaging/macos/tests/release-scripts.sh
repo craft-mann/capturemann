@@ -5,7 +5,7 @@
 #
 # Usage:  packaging/macos/tests/release-scripts.sh
 # Needs the release binaries in target/release (cargo build --release for cm-desktop, cm-overlay,
-# cm-cli, cm-mcp; bundle.sh is run with CM_SKIP_BUILD=1 and CM_NO_FFMPEG=1). Never touches the login
+# cm-cli, cm-mcp; bundle.sh is run with CM_SKIP_BUILD=1, CM_NO_FFMPEG=1 and CM_NO_LLAMA=1). Never touches the login
 # keychain, except that the throwaway keychain is put in the user search list for a moment and the
 # list is restored (and compared) at the end. Set CM_TEST_KEEP=1 to keep the temp folder.
 set -uo pipefail
@@ -54,9 +54,25 @@ echo "== work dir $work"
 # --- 1. an ad hoc bundle from the already built release binaries ---
 export CM_BUNDLE_OUT="$work/bundle"
 check "bundle.sh builds an ad hoc app from target/release" \
-  env CM_SKIP_BUILD=1 CM_NO_FFMPEG=1 CM_SIGN_IDENTITY=- bash "$mac/bundle.sh"
+  env CM_SKIP_BUILD=1 CM_NO_FFMPEG=1 CM_NO_LLAMA=1 CM_SIGN_IDENTITY=- bash "$mac/bundle.sh"
 app="$work/bundle/CaptureMann.app"
 unset CM_BUNDLE_OUT
+
+# --- 1b. llama-server (the built-in text engine's helper): bundled, signed, licence travels ---
+fake_llama="$work/fake-llama"
+mkdir -p "$fake_llama/LICENSES"
+printf '#!/bin/sh\necho llama-server fake\n' > "$fake_llama/llama-server"
+chmod +x "$fake_llama/llama-server"
+printf 'MIT License\n' > "$fake_llama/LICENSES/llama.cpp-LICENSE.txt"
+llama_app="$work/llama-bundle/CaptureMann.app"
+check "bundle.sh bundles a llama-server with its licence" \
+  env CM_BUNDLE_OUT="$work/llama-bundle" CM_SKIP_BUILD=1 CM_NO_FFMPEG=1 CM_LLAMA_BUNDLE="$fake_llama/llama-server" CM_SIGN_IDENTITY=- bash "$mac/bundle.sh"
+check "  ... llama-server is in Contents/MacOS and signed" \
+  bash -c "[ -x '$llama_app/Contents/MacOS/llama-server' ] && codesign --verify '$llama_app/Contents/MacOS/llama-server'"
+check "  ... the MIT licence is in Resources/Llama" test -f "$llama_app/Contents/Resources/Llama/LICENSES/llama.cpp-LICENSE.txt"
+check_fail "bundle.sh CM_REQUIRE_LLAMA fails when there is none" \
+  env CM_BUNDLE_OUT="$work/llama-none" CM_SKIP_BUILD=1 CM_NO_FFMPEG=1 CM_REQUIRE_LLAMA=1 CM_SIGN_IDENTITY=- bash "$mac/bundle.sh"
+check "  ... and says what to run" out_has "make llama"
 
 # --- 2. dmg.sh ---
 dmg="$work/out/CaptureMann-test.dmg"
@@ -151,7 +167,7 @@ check "  ... codesign --verify on the DMG" codesign --verify --strict "$signed_d
 check "  ... the signature is not ad hoc" bash -c "! codesign -dvv '$signed_dmg' 2>&1 | grep -q 'Signature=adhoc'"
 
 hard="$work/hard"
-check "bundle.sh CM_HARDENED with the throwaway identity" env CM_BUNDLE_OUT="$hard" CM_SKIP_BUILD=1 CM_NO_FFMPEG=1 CM_HARDENED=1 CM_SIGN_IDENTITY="$sign_id" bash "$mac/bundle.sh"
+check "bundle.sh CM_HARDENED with the throwaway identity" env CM_BUNDLE_OUT="$hard" CM_SKIP_BUILD=1 CM_NO_FFMPEG=1 CM_NO_LLAMA=1 CM_HARDENED=1 CM_SIGN_IDENTITY="$sign_id" bash "$mac/bundle.sh"
 if [ -d "$hard/CaptureMann.app" ]; then
   check "verify-release --allow-unsigned on the hardened app" bash "$mac/verify-release.sh" --allow-unsigned "$hard/CaptureMann.app"
   check "  ... hardened runtime and timestamp are recognised on every binary" bash -c "grep -c 'hardened runtime' '$work/prev.out' | grep -qv '^0$' && grep -q 'secure timestamp' '$work/prev.out'"

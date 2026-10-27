@@ -129,8 +129,16 @@ impl Catalog {
     pub fn parse(text: &str) -> Result<Catalog, CmError> {
         let c: Catalog = serde_json::from_str(text)
             .map_err(|e| CmError::invalid_input(format!("model catalog: {e}")))?;
+        c.check()?;
+        Ok(c)
+    }
+
+    /// The rules every catalog follows (the Whisper list and the text-model list share them):
+    /// unique ids, plain file names, http(s) URLs and, unless the entry is `pending_pin`, a
+    /// 64-hex SHA-256 and a size.
+    pub fn check(&self) -> Result<(), CmError> {
         let mut seen = Vec::new();
-        for m in &c.models {
+        for m in &self.models {
             let ok_id = !m.id.is_empty()
                 && m.id
                     .chars()
@@ -177,21 +185,14 @@ impl Catalog {
                 )));
             }
         }
-        Ok(c)
+        Ok(())
     }
 
     /// The catalog for a store root: `CAPTUREMANN_AI_CATALOG`, then `<root>/catalog.json`, else
     /// the built-in list. A broken override is not used; the second value says why, so the
     /// caller can show it (the app keeps working with the built-in list).
     pub fn load(root: &Path) -> (Catalog, Option<String>) {
-        let from_env = std::env::var_os(ENV_CATALOG)
-            .filter(|v| !v.is_empty())
-            .map(PathBuf::from);
-        let path = from_env.or_else(|| {
-            let p = root.join("catalog.json");
-            p.is_file().then_some(p)
-        });
-        let Some(path) = path else {
+        let Some(path) = override_path(root, ENV_CATALOG) else {
             return (Catalog::builtin(), None);
         };
         let loaded = fs::read_to_string(&path)
@@ -199,14 +200,7 @@ impl Catalog {
             .and_then(|t| Catalog::parse(&t));
         match loaded {
             Ok(c) => (c, None),
-            Err(e) => (
-                Catalog::builtin(),
-                Some(format!(
-                    "The model list at {} was ignored: {}",
-                    path.display(),
-                    e
-                )),
-            ),
+            Err(e) => (Catalog::builtin(), Some(ignored_override(&path, &e))),
         }
     }
 
@@ -217,6 +211,23 @@ impl Catalog {
                 .find(|m| m.aliases.iter().any(|a| a == id))
         })
     }
+}
+
+/// The file that replaces a built-in list: the path in the environment variable `env`, else
+/// `<root>/catalog.json` when it exists. Shared by the Whisper and the text-model catalogues.
+pub(crate) fn override_path(root: &Path, env: &str) -> Option<PathBuf> {
+    let from_env = std::env::var_os(env)
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from);
+    from_env.or_else(|| {
+        let p = root.join("catalog.json");
+        p.is_file().then_some(p)
+    })
+}
+
+/// The warning shown when a catalogue override is not used.
+pub(crate) fn ignored_override(path: &Path, e: &CmError) -> String {
+    format!("The model list at {} was ignored: {}", path.display(), e)
 }
 
 /// The app's config folder: `CAPTUREMANN_CONFIG_DIR`, else `<platform config dir>/CaptureMann`

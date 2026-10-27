@@ -9988,10 +9988,6 @@ msgid "Highest quality, fast for its size"
 msgstr "Chất lượng cao nhất, nhanh so với kích thước"
 
 #, fuzzy
-msgid "Install a model in Ollama or LM Studio, then pick it above. CaptureMann never downloads text models itself. Default decided by S8."
-msgstr "Hãy cài một mô hình trong Ollama hoặc LM Studio rồi chọn ở trên. CaptureMann không bao giờ tự tải mô hình văn bản. Mặc định do S8 quyết định."
-
-#, fuzzy
 msgid "Installed: {name}"
 msgstr "Đã cài: {name}"
 
@@ -10177,11 +10173,6 @@ msgstr "Kiểm thử"
 msgctxt "text model provider"
 msgid "None"
 msgstr "Không"
-
-#, fuzzy
-msgctxt "text model provider"
-msgid "On this Mac"
-msgstr "Trên máy Mac này"
 
 #, fuzzy
 msgid "About {gb} GB per hour"
@@ -10654,10 +10645,6 @@ msgid "New report"
 msgstr "Báo cáo mới"
 
 #, fuzzy
-msgid "No text model is set up"
-msgstr "Chưa thiết lập mô hình văn bản"
-
-#, fuzzy
 msgid "Notes only — CaptureMann doesn’t score candidates. Using AI to assess candidates is regulated in some places."
 msgstr "Chỉ ghi chú — CaptureMann không chấm điểm ứng viên. Dùng AI để đánh giá ứng viên bị quản lý ở một số nơi."
 
@@ -10700,10 +10687,6 @@ msgstr "Đã lưu báo cáo"
 #, fuzzy
 msgid "Report template"
 msgstr "Mẫu báo cáo"
-
-#, fuzzy
-msgid "Reports are written by a text model on this Mac (Ollama or LM Studio). Choose one on the AI page; nothing is sent anywhere else."
-msgstr "Báo cáo được viết bởi một mô hình văn bản trên máy Mac này (Ollama hoặc LM Studio). Hãy chọn một mô hình trên trang AI; không có gì được gửi đi nơi khác."
 
 #, fuzzy
 msgid "Reports of this recording"
@@ -11193,3 +11176,107 @@ msgstr "Mô hình đang dùng, {model}, chỉ chép lời. Hãy cài Large v3 ho
 #, fuzzy
 msgid "Lines you edit in a translation are kept when you translate again."
 msgstr "Những dòng bạn sửa trong bản dịch được giữ lại khi bạn dịch lại."
+
+#, fuzzy
+msgid "A text model is needed"
+msgstr "Cần một mô hình văn bản"
+
+#, fuzzy
+msgid "Built-in text models"
+msgstr "Các mô hình văn bản tích hợp"
+
+#, fuzzy
+msgid "Couldn’t change the text model"
+msgstr "Không thể đổi mô hình văn bản"
+
+#, fuzzy
+msgid "Download a built-in model first."
+msgstr "Hãy tải một mô hình tích hợp trước."
+
+#, fuzzy
+msgid "Download the recommended model ({size})"
+msgstr "Tải mô hình được đề xuất ({size})"
+
+#, fuzzy
+msgid "Engine loading the model…"
+msgstr "Bộ máy đang nạp mô hình…"
+
+#, fuzzy
+msgid "Engine running {model}. It stops after {minutes} min without use."
+msgstr "Bộ máy đang chạy {model}. Nó sẽ dừng sau {minutes} phút không dùng."
+
+#, fuzzy
+msgid "Engine stopped. It starts by itself when a report or a translation needs it."
+msgstr "Bộ máy đang tắt. Nó tự khởi động khi cần viết báo cáo hoặc dịch."
+
+#, fuzzy
+msgid "Looking for the built-in models…"
+msgstr "Đang tìm các mô hình tích hợp…"
+
+#, fuzzy
+msgid "No built-in model is available in this version yet. Use Ollama or LM Studio, or check for an update."
+msgstr "Phiên bản này chưa có mô hình tích hợp nào. Hãy dùng Ollama hoặc LM Studio, hoặc kiểm tra bản cập nhật."
+
+#, fuzzy
+msgid "Recommended for this Mac"
+msgstr "Đề xuất cho máy Mac này"
+
+#, fuzzy
+msgid "Reports are written by a text model that runs on this Mac: the one built into CaptureMann, or Ollama or LM Studio. Choose one on the AI page; nothing is sent anywhere else."
+msgstr "Báo cáo được viết bởi một mô hình văn bản chạy trên máy Mac này: mô hình tích hợp sẵn trong CaptureMann, hoặc Ollama hay LM Studio. Hãy chọn một mô hình trên trang AI; không có gì được gửi đi nơi khác."
+
+#, fuzzy
+msgid "The engine could not start."
+msgstr "Bộ máy không khởi động được."
+
+#, fuzzy
+msgid "The model runs inside CaptureMann and nothing leaves this Mac."
+msgstr "Mô hình chạy ngay trong CaptureMann và không có gì rời khỏi máy Mac này."
+
+#, fuzzy
+msgid "The text engine is missing from this copy of CaptureMann. Reinstall CaptureMann."
+msgstr "Bản CaptureMann này thiếu bộ máy văn bản. Hãy cài lại CaptureMann."
+
+#, fuzzy
+msgid "This Mac has {memory} GB of memory. The model runs inside CaptureMann and nothing leaves this Mac."
+msgstr "Máy Mac này có {memory} GB bộ nhớ. Mô hình chạy ngay trong CaptureMann và không có gì rời khỏi máy."
+
+#, fuzzy
+msgid "To use Ollama or LM Studio, install a model there, then pick it above. Default decided by S8."
+msgstr "Để dùng Ollama hoặc LM Studio, hãy cài một mô hình ở đó rồi chọn ở trên. Mặc định do S8 quyết định."
+
+#, fuzzy
+msgctxt "memory tier"
+msgid "{gb} GB Macs"
+msgstr "Mac {gb} GB"
+
+#, fuzzy
+msgctxt "memory tier"
+msgid "{gb} GB Macs and up"
+msgstr "Mac từ {gb} GB trở lên"
+
+#, fuzzy
+msgctxt "text model provider"
+msgid "Built in"
+msgstr "Tích hợp sẵn"
+
+#, fuzzy
+msgctxt "text model provider"
+msgid "Ollama or LM Studio"
+msgstr "Ollama hoặc LM Studio"
+
+#, fuzzy
+msgid "List built-in text models"
+msgstr "Liệt kê các mô hình văn bản tích hợp"
+
+#, fuzzy
+msgid "Download a built-in text model"
+msgstr "Tải một mô hình văn bản tích hợp"
+
+#, fuzzy
+msgid "Choose the built-in text model"
+msgstr "Chọn mô hình văn bản tích hợp"
+
+#, fuzzy
+msgid "Delete a built-in text model"
+msgstr "Xóa một mô hình văn bản tích hợp"

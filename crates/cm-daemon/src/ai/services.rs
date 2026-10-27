@@ -70,6 +70,27 @@ pub trait ModelService: Send + Sync {
     fn remove(&self, model: &str) -> Result<(), CmError>;
 }
 
+/// The text-model store of the built-in engine (`cm_ai::text_model::store`, AI-7). The same shape as
+/// [`ModelService`]; the models are GGUF files for the bundled `llama-server`. Blocking.
+pub trait TextModelService: Send + Sync {
+    /// Whether this build can manage text models at all.
+    fn available(&self) -> bool {
+        true
+    }
+    fn list(&self) -> Result<TextModelList, CmError>;
+    /// Downloads a model, resuming a partial file (see [`ModelService::download`]).
+    fn download(
+        &self,
+        model: &str,
+        progress: &mut dyn FnMut(DownloadProgress) -> bool,
+    ) -> Result<bool, CmError>;
+    fn select(&self, model: &str) -> Result<(), CmError>;
+    fn remove(&self, model: &str) -> Result<(), CmError>;
+    /// The installed model to run: the named one, else the active one. `invalid_input` when
+    /// nothing is downloaded.
+    fn resolve(&self, requested: Option<&str>) -> Result<ResolvedTextModel, CmError>;
+}
+
 /// Runs a transcription (`cm_ai::transcribe`): decodes the audio of the bundle and calls the
 /// model. Blocking.
 pub trait TranscribeService: Send + Sync {
@@ -186,6 +207,59 @@ impl ModelService for Unavailable {
     }
 }
 
+impl TextModelService for Unavailable {
+    fn available(&self) -> bool {
+        false
+    }
+    fn list(&self) -> Result<TextModelList, CmError> {
+        Err(not_built())
+    }
+    fn download(
+        &self,
+        _: &str,
+        _: &mut dyn FnMut(DownloadProgress) -> bool,
+    ) -> Result<bool, CmError> {
+        Err(not_built())
+    }
+    fn select(&self, _: &str) -> Result<(), CmError> {
+        Err(not_built())
+    }
+    fn remove(&self, _: &str) -> Result<(), CmError> {
+        Err(not_built())
+    }
+    fn resolve(&self, _: Option<&str>) -> Result<ResolvedTextModel, CmError> {
+        Err(cm_ai::text_model::store::no_text_model(None))
+    }
+}
+
+/// The text engine of a build that has none: the built-in provider answers `engine_missing`.
+impl TextEngine for Unavailable {
+    fn acquire(&self, _: &EngineSpec) -> Result<String, TextModelError> {
+        Err(TextModelError {
+            kind: cm_ai::text_model::ErrorKind::EngineMissing,
+            message: "The built-in text engine is not available in this program.".to_owned(),
+        })
+    }
+    fn release(&self) {}
+    fn status(&self) -> EngineStatus {
+        EngineStatus {
+            state: EngineState::Stopped,
+            model: None,
+            port: None,
+            in_flight: 0,
+            restarts: 0,
+            helper: None,
+            reason: None,
+            error: None,
+            idle_stop_s: 0,
+        }
+    }
+    fn stop(&self) {}
+    fn reap_idle(&self) -> bool {
+        false
+    }
+}
+
 impl TranscribeService for Unavailable {
     fn available(&self) -> bool {
         false
@@ -243,6 +317,10 @@ impl SuggestService for Unavailable {
 #[derive(Clone)]
 pub struct AiServices {
     pub models: Arc<dyn ModelService>,
+    /// The built-in text models (AI-7, provider `embedded`).
+    pub text_models: Arc<dyn TextModelService>,
+    /// The helper process that runs them.
+    pub text_engine: Arc<dyn TextEngine>,
     pub transcribe: Arc<dyn TranscribeService>,
     pub captions: Arc<dyn CaptionService>,
     pub suggest: Arc<dyn SuggestService>,
@@ -256,6 +334,8 @@ impl Default for AiServices {
     fn default() -> Self {
         AiServices {
             models: Arc::new(Unavailable),
+            text_models: Arc::new(Unavailable),
+            text_engine: Arc::new(Unavailable),
             transcribe: Arc::new(Unavailable),
             captions: Arc::new(Unavailable),
             suggest: Arc::new(Unavailable),
@@ -272,6 +352,10 @@ impl AiServices {
             "list_models" | "download_model" | "import_model" | "select_model" | "remove_model" => {
                 self.models.available()
             }
+            "list_text_models"
+            | "download_text_model"
+            | "select_text_model"
+            | "remove_text_model" => self.text_models.available(),
             "diarize" => self.speakers.available(),
             _ => true,
         }

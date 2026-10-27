@@ -5,6 +5,7 @@
 //! Nothing here downloads anything by itself: the only way a model download starts is the user
 //! pressing Download (and confirming) on the AI page, which sends `download_model`.
 
+pub mod builtin;
 pub mod caption_find;
 pub mod caption_view;
 pub mod captions;

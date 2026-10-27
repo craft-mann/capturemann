@@ -10,8 +10,10 @@ use serde_json::Value;
 
 use cm_i18n::tr;
 
+use crate::ai::models::{Effect, RowAction};
 use crate::ai::voice::{self, ProviderChoice, TestGate, TestState};
 use crate::backend::Backend;
+use crate::daemon_text::ErrorNote;
 use crate::flows;
 use crate::ui::ai::client_of;
 use crate::ui::app::{self, AppModel};
@@ -31,6 +33,141 @@ pub fn ensure_voice_loaded(app: &Entity<AppModel>, cx: &mut App) {
         cx.notify();
     });
     refresh_text_model(app, true, cx);
+    refresh_text_models(app, cx);
+}
+
+// ---- the built-in text models (AI-7, provider `embedded`) -------------------------------------
+
+/// Reads `list_text_models` (the AI page opening, a finished download, a change by the CLI).
+pub fn refresh_text_models(app: &Entity<AppModel>, cx: &mut App) {
+    let Some(client) = client_of(app, cx) else {
+        return;
+    };
+    let app2 = app.clone();
+    cx.spawn(async move |cx| {
+        let res = client.list_text_models().await;
+        cx.update(|cx| {
+            app2.update(cx, |m, cx| {
+                // An older daemon without the actions: the list stays empty and the page says
+                // plainly that no built-in model is available.
+                if let Ok(l) = res {
+                    m.builtin.set_list(l);
+                }
+                cx.notify();
+            })
+        });
+    })
+    .detach();
+}
+
+/// A button of a built-in model row. Only the confirm and resume presses send
+/// `download_text_model`; nothing is downloaded before.
+pub fn builtin_row_action(app: &Entity<AppModel>, model: &str, action: RowAction, cx: &mut App) {
+    let effect = app.update(cx, |m, cx| {
+        let e = m.builtin.models.apply(model, &action);
+        cx.notify();
+        e
+    });
+    match effect {
+        None | Some(Effect::Import) => {}
+        Some(Effect::StartDownload) => builtin_start_download(app, model, cx),
+        Some(Effect::CancelJob(job)) => builtin_cancel_download(app, job, cx),
+        Some(Effect::Select) => builtin_call(app, model, BuiltInCall::Select, cx),
+        Some(Effect::Remove) => builtin_call(app, model, BuiltInCall::Remove, cx),
+    }
+}
+
+/// The report card's "Download the recommended model (size)": the button names the size, so the
+/// press is the user's confirmation. Also switches the provider to Built in, so the report works
+/// as soon as the file is there.
+pub fn builtin_download_recommended(app: &Entity<AppModel>, cx: &mut App) {
+    let id = {
+        let m = app.read(cx);
+        m.builtin.offer(m.ai.voice.memory_gb()).map(|(id, _, _)| id)
+    };
+    let Some(id) = id else {
+        return;
+    };
+    text_choose_provider(app, ProviderChoice::BuiltIn, cx);
+    builtin_row_action(app, &id, RowAction::Download, cx);
+    builtin_row_action(app, &id, RowAction::ConfirmDownload, cx);
+}
+
+enum BuiltInCall {
+    Select,
+    Remove,
+}
+
+fn builtin_start_download(app: &Entity<AppModel>, model: &str, cx: &mut App) {
+    let Some(client) = client_of(app, cx) else {
+        return;
+    };
+    let (app2, id) = (app.clone(), model.to_owned());
+    cx.spawn(async move |cx| {
+        let res = client.download_text_model(&id).await;
+        cx.update(|cx| {
+            app2.update(cx, |m, cx| {
+                match res {
+                    Ok(job) => m.builtin.models.download_started(&id, job),
+                    Err(e) => m.builtin.models.failed(&id, ErrorNote::from_ai(&e)),
+                }
+                cx.notify();
+            })
+        });
+    })
+    .detach();
+}
+
+fn builtin_cancel_download(app: &Entity<AppModel>, job: String, cx: &mut App) {
+    let Some(client) = client_of(app, cx) else {
+        return;
+    };
+    let app2 = app.clone();
+    cx.spawn(async move |cx| {
+        if let Err(e) = client.cancel_job(&job).await {
+            cx.update(|cx| {
+                app::push_toast(
+                    &app2,
+                    flows::error_toast_live(
+                        || tr!("Couldn\u{2019}t stop the download"),
+                        e.message.clone(),
+                    ),
+                    cx,
+                );
+            });
+        }
+        cx.update(|cx| refresh_text_models(&app2, cx));
+    })
+    .detach();
+}
+
+fn builtin_call(app: &Entity<AppModel>, model: &str, what: BuiltInCall, cx: &mut App) {
+    let Some(client) = client_of(app, cx) else {
+        return;
+    };
+    let (app2, id) = (app.clone(), model.to_owned());
+    cx.spawn(async move |cx| {
+        let res = match what {
+            BuiltInCall::Select => client.select_text_model(&id).await,
+            BuiltInCall::Remove => client.remove_text_model(&id).await,
+        };
+        cx.update(|cx| {
+            if let Err(e) = res {
+                app::push_toast(
+                    &app2,
+                    flows::error_toast_live(
+                        || tr!("Couldn\u{2019}t change the text model"),
+                        e.message.clone(),
+                    ),
+                    cx,
+                );
+            }
+            refresh_text_models(&app2, cx);
+            // The model the daemon names (and the engine's state) changed with it.
+            refresh_text_model(&app2, false, cx);
+        });
+    })
+    .detach();
 }
 
 /// Reads `get_text_model`; `detect` also looks for Ollama and LM Studio afterwards when the

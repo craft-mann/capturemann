@@ -27,6 +27,10 @@ fn ai_methods_parse_to_themselves() {
         ),
         ("select_model", json!({"model": "base"})),
         ("remove_model", json!({"model": "base"})),
+        ("list_text_models", json!({})),
+        ("download_text_model", json!({"model": "text-8gb"})),
+        ("select_text_model", json!({"model": "text-8gb"})),
+        ("remove_text_model", json!({"model": "text-8gb"})),
         (
             "transcribe",
             json!({"capture_id": "rec_1", "language": "auto"}),
@@ -88,7 +92,7 @@ fn ai_methods_parse_to_themselves() {
     ] {
         assert_eq!(parse_ok(m, p).op.method(), m);
     }
-    assert_eq!(AI_METHODS.len(), 23);
+    assert_eq!(AI_METHODS.len(), 27);
 }
 
 #[test]

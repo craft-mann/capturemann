@@ -50,6 +50,8 @@ Manual: `tests/manual/VOC-2.md`.
 
 Run **spike S8** first (it picks the default model). Then: OpenAI-compatible client with Ollama and LM Studio presets and loopback detection; Anthropic and remote keys through `keyring`; `ai.text.*` settings (app-only); schema-validated output with one retry; map-reduce chunking helper; Test button; AI page text-model section (V8); `get_text_model`, `test_text_model`. Then text-model translation to any language (AI-5.AC3 to AC7). Test server is scripted; loopback-only check.
 
+**Built-in engine (maintainer decision Oct 27, 2026; built, tested with fakes).** The text model no longer depends on Ollama or LM Studio: provider `embedded` runs llama.cpp's `llama-server` (MIT) as a helper program in the app bundle (not linked: ggml clashes with whisper.cpp), on `127.0.0.1`, started on the first text request, stopped when idle and at exit, with GGUF models downloaded on request like the Whisper ones (`text_models.json`, tiers 8, 16 and 32 GB, `pending_pin` placeholders until spike S8's research is pinned). New: `ai.text.embedded_model`, tools `list_text_models`, `download_text_model`, `select_text_model`, `remove_text_model` (CLI `ai text-models ...`), engine status in `get_text_model`, failure reasons `engine_missing`, `engine_failed`, `not_enough_memory`, `make llama`. Spec: AI-7 "Built-in engine" in `specs/features/07-ai.md`. Open: pins, `make llama`, real runs, the V8 board has no design for the Built in choice.
+
 ## Stage 5: reports (AI-9)
 
 Templates as data in `crates/cm-ai/data/reports/` with `additionalProperties: false` schemas; citation check and `dropped_uncited`; interview schema with no score field; storage `reports/<id>.json` and `.md`; Report tab setup, report view and exports (V5, V6); tools `list_report_templates`, `generate_report`, `get_report`, `export_report`, `delete_report`; events. Review set scored by hand in `verification/`.
@@ -62,7 +64,7 @@ Run **spike S7** first (model, licence, `ort` versus `sherpa-onnx`). Then: model
 
 ## Later (P2)
 
-VOC-3 live transcript (needs its own board), embedded llama.cpp, custom report templates, per-app audio, FLAC or "Compact this recording".
+VOC-3 live transcript (needs its own board), custom report templates (embedded llama.cpp moved into AI-7 on Oct 27, 2026, as a helper program), per-app audio, FLAC or "Compact this recording".
 
 ## Decisions still open
 

@@ -8,6 +8,8 @@
 //! | `import_model { model, path }` | Free | copies a model file the user already has |
 //! | `select_model { model }` | Free | the model `transcribe` uses by default |
 //! | `remove_model { model }` | **Confirm** | deletes a model file |
+//! | `list_text_models`, `select_text_model { model }` | Free | the built-in text models (AI-7) and which one runs |
+//! | `download_text_model { model }`, `remove_text_model { model }` | **Confirm** | the same as `download_model` / `remove_model`, for the GGUF files of the built-in text engine; job type `text_model_download` |
 //! | `transcribe { capture_id, language?, model? }` | Free | a `transcribe` job; `transcript.json` in the bundle |
 //! | `get_transcript { capture_id }` | Free | the transcript and the caption lines |
 //! | `set_captions { capture_id, lines }` | Free | edited caption lines: one revision, one undo step |
@@ -51,6 +53,9 @@ use async_trait::async_trait;
 use cm_ai::caption::CaptionLine;
 use cm_ai::model::{DownloadProgress, ModelInfo, ModelList};
 use cm_ai::suggest::{CutSuggestion, ZoomSuggestion};
+use cm_ai::text_model::engine::{EngineSpec, EngineState, EngineStatus, TextEngine};
+use cm_ai::text_model::store::{ResolvedTextModel, TextModelList};
+use cm_ai::text_model::TextModelError;
 use cm_ai::transcribe::Transcript;
 use cm_core::edit::{parse_time, secs};
 use cm_core::{Actor, CmError, EditList};
@@ -65,6 +70,8 @@ use crate::events::{self, EventBus};
 
 /// Job type of a user-started model download.
 pub const JOB_MODEL_DOWNLOAD: &str = "model_download";
+/// Job type of a user-started text-model download (AI-7, the built-in engine).
+pub const JOB_TEXT_MODEL_DOWNLOAD: &str = "text_model_download";
 /// The transcript in the bundle folder.
 pub const TRANSCRIPT_FILE: &str = "transcript.json";
 /// Setting: transcribe after every recording (default on only with at least [`AUTO_MIN_RAM_GB`]).
@@ -96,6 +103,10 @@ pub const AI_METHODS: &[&str] = &[
     "import_model",
     "select_model",
     "remove_model",
+    "list_text_models",
+    "download_text_model",
+    "select_text_model",
+    "remove_text_model",
     "transcribe",
     "get_transcript",
     "get_captions",
@@ -158,6 +169,7 @@ mod speakers;
 mod suggest;
 #[cfg(test)]
 mod tests;
+mod text_models;
 mod transcripts;
 mod translation;
 
