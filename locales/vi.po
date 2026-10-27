@@ -7888,8 +7888,8 @@ msgid_plural "{n} lines · click text to edit, a time to jump"
 msgstr[0] "{n} dòng · nhấn chữ để sửa, nhấn giờ để chuyển tới"
 
 #, fuzzy
-msgid "Balanced accuracy and speed. The best choice for most recordings."
-msgstr "Cân bằng giữa độ chính xác và tốc độ. Lựa chọn tốt nhất cho hầu hết bản ghi."
+msgid "Balanced accuracy and speed. A good choice on 8 GB Macs."
+msgstr "Cân bằng giữa độ chính xác và tốc độ. Lựa chọn tốt cho máy Mac 8 GB."
 
 #, fuzzy
 msgid "Fast, fine for clear speech in a quiet room."
@@ -9972,8 +9972,8 @@ msgid "Everything here runs on this Mac. Nothing is downloaded unless you press 
 msgstr "Mọi thứ ở đây chạy ngay trên máy Mac này. Không có gì được tải xuống trừ khi bạn nhấn Tải xuống, và không có gì được gửi đi đâu cả."
 
 #, fuzzy
-msgid "Fast, accurate — not for translation"
-msgstr "Nhanh, chính xác — không dùng để dịch"
+msgid "Recommended: fast and accurate for most recordings. Not for translation."
+msgstr "Khuyên dùng: nhanh và chính xác cho hầu hết bản ghi. Không dùng để dịch."
 
 #, fuzzy
 msgid "Find speakers after each transcript"

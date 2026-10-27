@@ -477,7 +477,7 @@ msgstr ""
 msgid "Background preset"
 msgstr ""
 
-msgid "Balanced accuracy and speed. The best choice for most recordings."
+msgid "Balanced accuracy and speed. A good choice on 8 GB Macs."
 msgstr ""
 
 msgid "Before a screenshot"
@@ -1680,9 +1680,6 @@ msgid "FFmpeg was not found: the copy that ships inside CaptureMann is missing, 
 msgstr ""
 
 msgid "FFmpeg: {error}"
-msgstr ""
-
-msgid "Fast, accurate — not for translation"
 msgstr ""
 
 msgid "Fast, fine for clear speech in a quiet room."
@@ -3202,6 +3199,9 @@ msgid "Recent captures"
 msgstr ""
 
 msgid "Recommended for your Mac"
+msgstr ""
+
+msgid "Recommended: fast and accurate for most recordings. Not for translation."
 msgstr ""
 
 msgid "Reconnect YouTube"

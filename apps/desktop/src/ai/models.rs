@@ -154,10 +154,12 @@ fn model_hint(id: &str, catalogue: &str) -> String {
     match id {
         "tiny" => tr!("Fastest, lowest accuracy. Good for quick drafts on any machine."),
         "base" => tr!("Fast, fine for clear speech in a quiet room."),
-        "small" => tr!("Balanced accuracy and speed. The best choice for most recordings."),
+        "small" => tr!("Balanced accuracy and speed. A good choice on 8 GB Macs."),
         "medium" => tr!("Most accurate, slow. Best for accents and noisy audio."),
         "large" => tr!("Best accuracy and translation to English"),
-        "large-v3-turbo" => tr!("Fast, accurate \u{2014} not for translation"),
+        "large-v3-turbo" => {
+            tr!("Recommended: fast and accurate for most recordings. Not for translation.")
+        }
         _ => catalogue.to_owned(),
     }
 }
