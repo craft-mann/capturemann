@@ -9,8 +9,10 @@
 //! fails with `invalid_input` and `data.reason = "no_text_model"`). Nothing is ever downloaded
 //! here: a missing Whisper model fails with `data.reason = "translation_model_missing"`.
 //!
-//! Edits to a translation are written to its file (no manifest revision, so no undo step yet) and
-//! survive a re-translate where the source caption line is unchanged (AI-5.AC5).
+//! Edits to a translation are one manifest revision and one undo step each (`set_captions` or
+//! `replace_in_captions` with a `language`; the step keeps the file as it was and as it became),
+//! and survive a re-translate where the source caption line is unchanged (AI-5.AC5). A
+//! re-translate replaces the file without a step and drops the older steps of that language.
 
 use cm_ai::translate::{self as tr, Engine, EngineChoice, Translation, TranslationLine};
 
@@ -270,6 +272,7 @@ impl Inner {
     /// start and text keeps its record; a changed or new line is marked edited.
     pub(super) async fn set_translation_lines(
         &self,
+        actor: &Actor,
         capture_id: String,
         language: String,
         lines: Vec<CaptionLine>,
@@ -281,8 +284,10 @@ impl Inner {
             self.ai.captions.clone(),
             capture_id.clone(),
         );
+        let (now, by) = (self.clock.now(), actor.clone());
+        let events = self.events.clone();
         blocking(move || {
-            let lib = lock_library(&library);
+            let mut lib = lock_library(&library);
             let rec = lib.get(&id)?;
             if !rec.kind.is_recording() {
                 return Err(CmError::invalid_input(format!(
@@ -296,13 +301,18 @@ impl Inner {
                 .map(|(_, l)| l)
                 .unwrap_or_default();
             let new = tr::with_edited_lines(&old, &lines, &source);
-            tr::write_translation(&dir, &new)?;
+            let out = commit_translation(&mut lib, &dir, &old, &new, "set_captions", by, now)?;
+            publish_revised(&events, &id, &out);
             Ok(json!({
                 "capture_id": id,
                 "language": language,
                 "lines": new.lines.len(),
                 "edited": new.edited,
-                "revision": null,
+                "revision": out.revision.rev,
+                "action": out.revision.action,
+                "by": out.revision.by,
+                "can_undo": out.can_undo,
+                "can_redo": out.can_redo,
             }))
         })
         .await
@@ -311,6 +321,7 @@ impl Inner {
     /// `replace_in_captions { language }`: find and replace over a translation's lines.
     pub(super) async fn replace_in_translation(
         &self,
+        actor: &Actor,
         capture_id: String,
         language: String,
         pairs: Vec<Replacement>,
@@ -321,8 +332,10 @@ impl Inner {
             self.library_view(),
             capture_id.clone(),
         );
+        let (now, by) = (self.clock.now(), actor.clone());
+        let events = self.events.clone();
         blocking(move || {
-            let lib = lock_library(&library);
+            let mut lib = lock_library(&library);
             let rec = lib.get(&id)?;
             if !rec.kind.is_recording() {
                 return Err(CmError::invalid_input(format!(
@@ -366,11 +379,14 @@ impl Inner {
                 )));
             }
             let new = tr::with_edited_lines(&old, &lines, &[]);
-            tr::write_translation(&dir, &new)?;
+            let out =
+                commit_translation(&mut lib, &dir, &old, &new, "replace_in_captions", by, now)?;
+            publish_revised(&events, &id, &out);
             Ok(json!({
                 "capture_id": id, "language": language, "replacements": total,
                 "lines_touched": touched.iter().filter(|t| **t).count(),
-                "revision": null, "changed": true,
+                "revision": out.revision.rev, "changed": true,
+                "can_undo": out.can_undo, "can_redo": out.can_redo,
             }))
         })
         .await
@@ -427,6 +443,41 @@ impl Inner {
         })
         .await
     }
+}
+
+/// Stores an edited translation as one revision and one undo step, and re-indexes the bundle.
+fn commit_translation(
+    lib: &mut cm_library::Library,
+    dir: &Path,
+    old: &Translation,
+    new: &Translation,
+    action: &str,
+    by: Actor,
+    at: time::OffsetDateTime,
+) -> Result<cm_library::rec_edit::EditOutcome, CmError> {
+    let json = |t: &Translation| {
+        serde_json::to_value(t).map_err(|e| CmError::internal(format!("translation: {e}")))
+    };
+    let rel = translation_rel(&new.language);
+    let out = cm_library::rec_edit::apply_file(dir, action, &rel, json(old)?, json(new)?, by, at)?;
+    lib.index_dir(dir)?;
+    Ok(out)
+}
+
+fn translation_rel(language: &str) -> String {
+    format!("{}/{language}.json", tr::TRANSLATIONS_DIR)
+}
+
+fn publish_revised(events: &EventBus, id: &str, out: &cm_library::rec_edit::EditOutcome) {
+    events.publish(
+        events::CAPTURE_REVISED,
+        json!({
+            "capture_id": id,
+            "revision": out.revision.rev,
+            "action": out.revision.action,
+            "by": out.revision.by,
+        }),
+    );
 }
 
 /// Enqueues a translation unless an equal one (same capture and language) is queued, running or
@@ -567,6 +618,9 @@ impl JobHandler for TranslateHandler {
                 old.as_ref(),
             );
             let path = tr::write_translation(&write_dir, &t)?;
+            // The file was replaced by a job: older undo steps of this language must not bring
+            // back lines of the previous run.
+            cm_library::rec_edit::forget_file_steps(&write_dir, &translation_rel(&language))?;
             lock_library(&library).index_dir(&write_dir)?;
             Ok((t, carried, path))
         })

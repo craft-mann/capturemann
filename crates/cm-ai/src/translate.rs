@@ -644,18 +644,27 @@ pub fn translate_with_text_model(
             after: &texts[to..(to + CONTEXT_LINES).min(source.len())],
             keep_as_written,
         };
+        // One try, and one retry when the count is wrong or a glossary term is lost (AI-5.AC4).
         let mut answer = translator.translate(&req)?;
-        if answer.len() != req.lines.len() {
+        let mut checked = enforce_batch(req.lines, answer, keep_as_written);
+        if checked.is_none()
+            || checked
+                .as_ref()
+                .is_some_and(|c| c.iter().any(Option::is_none))
+        {
             answer = translator.translate(&req)?;
+            checked = enforce_batch(req.lines, answer, keep_as_written);
         }
-        let ok = answer.len() == req.lines.len();
+        let ok = checked.is_some();
+        let answer: Vec<Option<String>> = checked.unwrap_or_default();
         for (k, line) in source[from..to].iter().enumerate() {
-            let text = if ok {
-                answer[k].as_str()
-            } else {
-                texts[from + k].as_str()
+            // A line that lost a glossary term for the second time keeps the source text
+            // (which has the term), flagged like a dropped line.
+            let text = match answer.get(k) {
+                Some(Some(t)) if ok => t.as_str(),
+                _ => texts[from + k].as_str(),
             };
-            let missing = !ok || text.trim().is_empty();
+            let missing = !ok || answer[k].is_none() || text.trim().is_empty();
             let text = if missing {
                 texts[from + k].as_str()
             } else {
@@ -680,6 +689,78 @@ pub fn translate_with_text_model(
         lines,
         untranslated,
     })
+}
+
+// ---- glossary terms (AI-5.AC4) ---------------------------------------------------------------
+
+/// Whether `text` holds `term`, ignoring case.
+fn has_term_ci(text: &str, term: &str) -> bool {
+    replace_term_ci(text, term).is_some()
+}
+
+fn same_char_ci(a: char, b: char) -> bool {
+    a == b || a.to_lowercase().eq(b.to_lowercase())
+}
+
+/// `text` with every case-insensitive occurrence of `term` written exactly as `term`; `None` when
+/// there is none. (Also the test for "contains", so both use the same matching.)
+fn replace_term_ci(text: &str, term: &str) -> Option<String> {
+    let t: Vec<char> = term.chars().collect();
+    if t.is_empty() {
+        return None;
+    }
+    let c: Vec<char> = text.chars().collect();
+    let mut out = String::with_capacity(text.len());
+    let (mut i, mut found) = (0, false);
+    while i < c.len() {
+        if i + t.len() <= c.len()
+            && c[i..i + t.len()]
+                .iter()
+                .zip(&t)
+                .all(|(a, b)| same_char_ci(*a, *b))
+        {
+            out.push_str(term);
+            i += t.len();
+            found = true;
+        } else {
+            out.push(c[i]);
+            i += 1;
+        }
+    }
+    found.then_some(out)
+}
+
+/// The glossary check for one translated line: every term that the source line holds must be in
+/// the translation exactly as the glossary writes it. A term that came back in another case is
+/// put right; a term that is gone gives `None`.
+pub fn keep_terms(source: &str, translated: &str, terms: &[String]) -> Option<String> {
+    let mut text = translated.to_owned();
+    for term in terms.iter().map(|t| t.trim()).filter(|t| !t.is_empty()) {
+        if !has_term_ci(source, term) || text.contains(term) {
+            continue;
+        }
+        text = replace_term_ci(&text, term)?;
+    }
+    Some(text)
+}
+
+/// A batch answer checked against the glossary: `None` when the line count is wrong; else one
+/// entry per line, `None` for a line that lost a term.
+fn enforce_batch(
+    sources: &[String],
+    answer: Vec<String>,
+    terms: &[String],
+) -> Option<Vec<Option<String>>> {
+    if answer.len() != sources.len() {
+        return None;
+    }
+    Some(
+        sources
+            .iter()
+            .zip(answer)
+            .map(|(s, a)| keep_terms(s, &a, terms))
+            .collect(),
+    )
 }
 
 #[cfg(test)]
@@ -1213,6 +1294,99 @@ mod tests {
         let e = translate_with_text_model(&Scripted::new(), &src, "en", "vi", &[], &mut |_| false)
             .unwrap_err();
         assert!(crate::transcribe::is_cancelled(&e));
+    }
+
+    #[test]
+    fn ai_5_ac4_glossary_terms_stay_as_written() {
+        // AI-5.AC4: a glossary term in a source line is in the translated line exactly as
+        // written. A term that came back in another case is put right; a term that is gone gets
+        // one retry, then the line keeps its source text, flagged.
+        let terms = vec!["CaptureMann".to_owned()];
+        assert_eq!(
+            keep_terms("Open CaptureMann now", "Mở CaptureMann ngay", &terms).as_deref(),
+            Some("Mở CaptureMann ngay")
+        );
+        assert_eq!(
+            keep_terms("Open CaptureMann now", "Mở capturemann ngay", &terms).as_deref(),
+            Some("Mở CaptureMann ngay")
+        );
+        assert_eq!(
+            keep_terms("Open CaptureMann now", "Mở ứng dụng", &terms),
+            None
+        );
+        // A line without the term is not checked.
+        assert_eq!(
+            keep_terms("Hello", "Xin chào", &terms).as_deref(),
+            Some("Xin chào")
+        );
+
+        struct Terms {
+            calls: Mutex<usize>,
+            /// Calls on which the term is translated away.
+            lose_on: Vec<usize>,
+            /// Calls on which the term comes back in lower case.
+            lower_on: Vec<usize>,
+        }
+        impl TextTranslator for Terms {
+            fn model_name(&self) -> String {
+                "scripted".into()
+            }
+            fn translate(&self, req: &TextTranslateRequest<'_>) -> Result<Vec<String>, CmError> {
+                let mut n = self.calls.lock().unwrap();
+                *n += 1;
+                Ok(req
+                    .lines
+                    .iter()
+                    .map(|l| {
+                        if self.lose_on.contains(&n) {
+                            l.replace("CaptureMann", "the app")
+                        } else if self.lower_on.contains(&n) {
+                            l.replace("CaptureMann", "capturemann")
+                        } else {
+                            l.clone()
+                        }
+                    })
+                    .collect())
+            }
+        }
+        let src = [
+            cap(0.0, 2.0, "Open CaptureMann now"),
+            cap(2.0, 4.0, "Then record"),
+        ];
+        let make = |lose_on: Vec<usize>, lower_on: Vec<usize>| Terms {
+            calls: Mutex::new(0),
+            lose_on,
+            lower_on,
+        };
+        let run = |m: &Terms| {
+            translate_with_text_model(m, &src, "en", "vi", &terms, &mut |_| true).unwrap()
+        };
+        // Fine on the first try: one call.
+        let ok = make(vec![], vec![]);
+        let out = run(&ok);
+        assert_eq!(*ok.calls.lock().unwrap(), 1);
+        assert_eq!(out.untranslated, 0);
+        // Case drift is repaired without a retry.
+        let lower = make(vec![], vec![1]);
+        let out = run(&lower);
+        assert_eq!(*lower.calls.lock().unwrap(), 1);
+        assert_eq!(out.lines[0].text, "Open CaptureMann now");
+        // Lost once: the retry brings it back.
+        let once = make(vec![1], vec![]);
+        let out = run(&once);
+        assert_eq!(*once.calls.lock().unwrap(), 2);
+        assert_eq!(out.untranslated, 0);
+        assert!(out.lines[0].text.contains("CaptureMann"));
+        // Lost twice: that line keeps its source text (with the term) and is flagged; the other
+        // line of the batch keeps its translation.
+        let twice = make(vec![1, 2], vec![]);
+        let out = run(&twice);
+        assert_eq!(out.untranslated, 1);
+        assert!(out.lines[0].untranslated && out.lines[0].text.contains("CaptureMann"));
+        assert!(!out.lines[1].untranslated);
+        for (o, s) in out.lines.iter().zip(&src) {
+            assert_eq!((o.start, o.end), (s.start, s.end));
+        }
     }
 
     #[test]

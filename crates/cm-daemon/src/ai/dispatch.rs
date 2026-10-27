@@ -249,7 +249,7 @@ impl Inner {
                 lines,
                 language: Some(language),
             } => {
-                self.set_translation_lines(capture_id, language, lines)
+                self.set_translation_lines(actor, capture_id, language, lines)
                     .await
             }
             AiOp::ReplaceInCaptions {
@@ -265,7 +265,7 @@ impl Inner {
                 replacements,
                 language: Some(language),
             } => {
-                self.replace_in_translation(capture_id, language, replacements)
+                self.replace_in_translation(actor, capture_id, language, replacements)
                     .await
             }
             AiOp::ExportCaptions {

@@ -1913,6 +1913,12 @@ msgstr ""
 msgid "Inspector tabs"
 msgstr ""
 
+msgid "Install Large v3 ({size}) or Medium on the AI page to translate to English."
+msgstr ""
+
+msgid "Install Large v3 or Medium on the AI page to translate to English."
+msgstr ""
+
 msgid "Install a model in Ollama or LM Studio, then pick it above. CaptureMann never downloads text models itself. Default decided by S8."
 msgstr ""
 
@@ -1982,6 +1988,9 @@ msgstr ""
 msgid "Language"
 msgstr ""
 
+msgid "Large v3 isn’t installed"
+msgstr ""
+
 msgid "Last call: {tool}"
 msgstr ""
 
@@ -2047,6 +2056,9 @@ msgstr ""
 
 #. the line that is selected or under the playhead, and how many lines there are; short, in the panel header.
 msgid "Line {i} of {n}"
+msgstr ""
+
+msgid "Lines you edit in a translation are kept when you translate again."
 msgstr ""
 
 msgid "Link after upload"
@@ -5145,6 +5157,12 @@ msgid "YouTube · {name}"
 msgstr ""
 
 msgid "YouTube: the video \"{title}\" {url} (channel \"{channel}\")"
+msgstr ""
+
+msgid "Your active model, {model}, only transcribes. Install Large v3 ({size}) or Medium on the AI page to translate to English."
+msgstr ""
+
+msgid "Your active model, {model}, only transcribes. Install Large v3 or Medium on the AI page to translate to English."
 msgstr ""
 
 msgid "Your agent permissions were kept."

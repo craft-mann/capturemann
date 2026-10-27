@@ -354,6 +354,92 @@ pub fn apply_extra(
     Ok(outcome(&m, revision))
 }
 
+/// A bundle file an undo step may restore (AI-5: `translations/<lang>.json`). Relative, under
+/// `translations/`, no `..`.
+fn step_file_ok(rel: &str) -> bool {
+    rel.starts_with("translations/")
+        && rel.ends_with(".json")
+        && !rel.contains("..")
+        && !rel.contains('\\')
+}
+
+fn write_step_file(dir: &Path, rel: &str, content: &Value) -> Result<(), CmError> {
+    if !step_file_ok(rel) {
+        return Err(CmError::internal(format!(
+            "history step names a file outside the bundle: `{rel}`"
+        )));
+    }
+    let path = dir.join(rel);
+    if content.is_null() {
+        return match std::fs::remove_file(&path) {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(CmError::internal(format!("{}: {e}", path.display()))),
+        };
+    }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| CmError::internal(format!("{}: {e}", parent.display())))?;
+    }
+    let tmp = path.with_extension("json.tmp");
+    let body = serde_json::to_vec_pretty(content)
+        .map_err(|e| CmError::internal(format!("history file: {e}")))?;
+    std::fs::write(&tmp, body).map_err(|e| CmError::internal(format!("{}: {e}", tmp.display())))?;
+    std::fs::rename(&tmp, &path).map_err(|e| CmError::internal(format!("{}: {e}", path.display())))
+}
+
+/// Changes one bundle file (a translation, AI-5) as ONE revision named `action` and one undo
+/// step. `rel` is `translations/<lang>.json`; `before` and `after` are its JSON (`Null` = no
+/// file). The file is written (or removed) here; undo and redo put `before` / `after` back. The
+/// edit list is unchanged.
+pub fn apply_file(
+    dir: &Path,
+    action: &str,
+    rel: &str,
+    before: Value,
+    after: Value,
+    by: Actor,
+    at: OffsetDateTime,
+) -> Result<EditOutcome, CmError> {
+    let mut m = read_manifest(dir)?;
+    write_step_file(dir, rel, &after)?;
+    let edits_now = load_edits(&m).to_json();
+    let (cursor, mut steps) = history_mut(&mut m)?;
+    steps.truncate(cursor);
+    let revision = push_revision(&mut m, action, by.clone(), at);
+    steps.push(json!({
+        "rev": revision.rev,
+        "action": action,
+        "by": by.to_string(),
+        "before": edits_now,
+        "after": edits_now,
+        "file": rel,
+        "file_before": before,
+        "file_after": after,
+    }));
+    let over = steps.len().saturating_sub(DEFAULT_REVISION_LIMIT);
+    steps.drain(..over);
+    let cursor = steps.len();
+    store_history(&mut m, cursor, steps);
+    write_manifest(dir, &m)?;
+    Ok(outcome(&m, revision))
+}
+
+/// Drops the undo steps that restore `rel`, for when a job replaced the file (a re-translate):
+/// undo must never bring back the lines of an older run.
+pub fn forget_file_steps(dir: &Path, rel: &str) -> Result<(), CmError> {
+    let mut m = read_manifest(dir)?;
+    let (cursor, steps) = history_mut(&mut m)?;
+    let touches = |s: &Value| s.get("file").and_then(Value::as_str) == Some(rel);
+    if steps.iter().any(touches) {
+        let kept_before_cursor = steps.iter().take(cursor).filter(|s| !touches(s)).count();
+        let kept: Vec<Value> = steps.into_iter().filter(|s| !touches(s)).collect();
+        store_history(&mut m, kept_before_cursor, kept);
+        write_manifest(dir, &m)?;
+    }
+    Ok(())
+}
+
 /// Sets top-level manifest keys WITHOUT a revision or an undo step (`None` removes a key): for
 /// data a job produced, like the speakers of a new diarization (AI-8), where nothing was edited
 /// by the user. A previous undo step that touched the same keys is dropped from the history so
@@ -547,6 +633,15 @@ pub fn step_history(
             } else {
                 m.extra.insert(k.clone(), v.clone());
             }
+        }
+    }
+    // A translation step carries the file on both sides (null = no file).
+    if let Some(step_v) = steps.get(step) {
+        if let (Some(rel), Some(content)) = (
+            step_v.get("file").and_then(Value::as_str),
+            step_v.get(if undo { "file_before" } else { "file_after" }),
+        ) {
+            write_step_file(dir, rel, content)?;
         }
     }
     let revision = push_revision(&mut m, if undo { "undo" } else { "redo" }, by, at);

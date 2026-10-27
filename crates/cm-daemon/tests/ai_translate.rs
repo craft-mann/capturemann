@@ -465,6 +465,78 @@ async fn ai_5_ac5_edits_survive_a_retranslate() {
     assert_eq!(got["edited"], false);
 }
 
+/// AI-5: an edit of a translation (set_captions or replace_in_captions with a language) is a
+/// manifest revision and an undo step; undo and redo put the file back; a re-translate drops the
+/// older steps so undo cannot bring back lines of the previous run.
+#[tokio::test]
+async fn ai_5_translation_edits_are_undo_steps() {
+    let ai = FakeAi::new().with_installed(&["large"], Some("large"));
+    let r = rig(ai, "vi").await;
+    r.ai.set_translation(english("Hello everyone.", "Today we learn."));
+    translate(&r, json!({"target_language": "en"})).await;
+    let mut rx = r.daemon.subscribe();
+    let id = json!({"capture_id": r.id});
+
+    let got = user(&r, "get_captions", json!({"language": "en"}))
+        .await
+        .unwrap();
+    let mut lines = settable(&got);
+    lines[0]["text"] = json!("Hello, dear friends.");
+    let set = user(
+        &r,
+        "set_captions",
+        json!({"language": "en", "lines": lines}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(set["action"], "set_captions");
+    assert!(set["revision"].as_u64().unwrap() > 0, "{set}");
+    assert_eq!(set["can_undo"], true);
+    assert!(drain(&mut rx).iter().any(|e| e.name == "capture.revised"));
+
+    let rep = user(
+        &r,
+        "replace_in_captions",
+        json!({"language": "en", "replacements": [{"find": "learn", "replace": "study"}]}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(rep["can_undo"], true);
+    let now = user(&r, "get_captions", json!({"language": "en"}))
+        .await
+        .unwrap();
+    assert_eq!(texts(&now), ["Hello, dear friends.", "Today we study."]);
+
+    // Undo the replace, then the edit; redo both.
+    user(&r, "undo", id.clone()).await.unwrap();
+    let g = user(&r, "get_captions", json!({"language": "en"}))
+        .await
+        .unwrap();
+    assert_eq!(texts(&g), ["Hello, dear friends.", "Today we learn."]);
+    user(&r, "undo", id.clone()).await.unwrap();
+    let g = user(&r, "get_captions", json!({"language": "en"}))
+        .await
+        .unwrap();
+    assert_eq!(texts(&g), ["Hello everyone.", "Today we learn."]);
+    assert_eq!(g["edited"], false);
+    user(&r, "redo", id.clone()).await.unwrap();
+    user(&r, "redo", id.clone()).await.unwrap();
+    let g = user(&r, "get_captions", json!({"language": "en"}))
+        .await
+        .unwrap();
+    assert_eq!(texts(&g), ["Hello, dear friends.", "Today we study."]);
+
+    // A re-translate replaces the file: the older steps are gone.
+    r.ai.set_translation(english("Hi all.", "We study today."));
+    translate(&r, json!({"target_language": "en"})).await;
+    let u = user(&r, "undo", id.clone()).await.unwrap();
+    assert_eq!(u["changed"], false, "{u}");
+    let g = user(&r, "get_captions", json!({"language": "en"}))
+        .await
+        .unwrap();
+    assert_eq!(texts(&g), ["Hello, dear friends.", "Today we study."]);
+}
+
 /// Per-language files: SRT, VTT and TXT of a translation, next to the original's, and find and
 /// replace on a translation.
 #[tokio::test]
