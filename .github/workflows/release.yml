@@ -150,6 +150,25 @@ jobs:
         run: |
           test -x packaging/ffmpeg/out/ffmpeg && test -x packaging/ffmpeg/out/ffprobe || { echo "::error::packaging/ffmpeg/out is incomplete"; exit 1; }
 
+      # The built-in text engine (AI-7): llama-server from the pinned llama.cpp release (SHA-256 checked
+      # by the script), built static with Metal. `make bundle-release` refuses to build without it.
+      - name: Cache the llama-server build
+        id: llamacache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            packaging/llama/.downloads
+            packaging/llama/out
+          key: llama-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packaging/llama/build-macos.sh') }}
+
+      - name: Build llama-server (pinned source)
+        if: steps.llamacache.outputs.cache-hit != 'true'
+        run: make llama
+
+      - name: Check llama-server is present
+        run: |
+          test -x packaging/llama/out/llama-server || { echo "::error::packaging/llama/out/llama-server is missing"; exit 1; }
+
       - name: Third-party licences
         run: |
           make licenses
