@@ -90,6 +90,33 @@ impl Daemon {
             }
         })
     }
+
+    /// Starts the automatic speaker step after a transcript (setting `ai.auto_speakers`, on by
+    /// default, AI-8). On every `transcript.ready` (manual or automatic) it queues the same
+    /// `diarize` job the action does, as the user, with the count from the recording's own
+    /// `people` answer or its preset. It does nothing, silently, when the setting is off, no
+    /// speaker model is usable, the recording is still being recorded, has no microphone or
+    /// system track, was already diarized (an existing result, edited or not, is never
+    /// overwritten; a regenerated transcript is matched to it by time at read) or the count is
+    /// one person (a voice note). One transcript starts at most one run. Needs a tokio runtime.
+    pub fn start_ai_auto_speakers(&self) -> tokio::task::JoinHandle<()> {
+        let mut rx = self.subscribe();
+        let weak = Arc::downgrade(&self.inner);
+        tokio::spawn(async move {
+            let mut tried: std::collections::HashMap<String, String> = Default::default();
+            while let Ok(ev) = rx.recv().await {
+                if ev.name != events::TRANSCRIPT_READY {
+                    continue;
+                }
+                let Some(capture_id) = ev.data.get("capture_id").and_then(Value::as_str) else {
+                    continue;
+                };
+                let Some(inner) = weak.upgrade() else { break };
+                let capture_id = capture_id.to_owned();
+                let _ = inner.auto_diarize(&capture_id, &mut tried).await;
+            }
+        })
+    }
 }
 
 impl Inner {

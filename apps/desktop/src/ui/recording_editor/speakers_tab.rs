@@ -193,6 +193,7 @@ impl RecordingEditor {
         let people_now = rules::effective_people(
             self.vp.people_chosen,
             self.vp.people,
+            s.voice.people,
             s.voice.preset.as_deref(),
         );
         let mut seg = segmented(t, "re-people", &tr!("How many people?"));

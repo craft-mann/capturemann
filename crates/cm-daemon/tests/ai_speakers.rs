@@ -45,6 +45,11 @@ struct Rig {
 
 /// A finished 60 s recording with a mic track.
 fn recording(tmp: &std::path::Path) -> (String, std::path::PathBuf) {
+    recording_with(tmp, json!({}))
+}
+
+/// The same, with the manifest `settings` (`preset`, `people` of an audio recording).
+fn recording_with(tmp: &std::path::Path, settings: Value) -> (String, std::path::PathBuf) {
     use cm_library::rec::{RecBundle, SessionInfo};
     let now = datetime!(2026-10-22 10:00:00 UTC);
     let session = SessionInfo {
@@ -55,7 +60,7 @@ fn recording(tmp: &std::path::Path) -> (String, std::path::PathBuf) {
         app_version: "0.0.1".into(),
         extra: Map::new(),
     };
-    let rec = RecBundle::create(tmp, "Interview", now, json!({}), &session).unwrap();
+    let rec = RecBundle::create(tmp, "Interview", now, settings, &session).unwrap();
     std::fs::write(rec.dir().join("screen.mp4"), b"master bytes").unwrap();
     std::fs::write(rec.dir().join("mic.wav"), b"audio").unwrap();
     let track = |kind, file: &str| TrackInfo {
@@ -80,12 +85,16 @@ fn recording(tmp: &std::path::Path) -> (String, std::path::PathBuf) {
 const SCRIPT: [(f64, f64, u32, f32); 2] = [(0.0, 2.0, 5, 0.2), (2.0, 30.0, 9, 0.2)];
 
 async fn rig(ai: FakeAi) -> Rig {
+    rig_with(ai, json!({})).await
+}
+
+async fn rig_with(ai: FakeAi, settings: Value) -> Rig {
     let (b, tmp) = builder(desktop());
     let queue = cm_daemon::library_job_queue(tmp.path()).unwrap();
     let daemon = b.jobs(queue).ai(ai.services()).build();
     daemon.register_ai_handlers().unwrap();
     daemon.start_jobs().unwrap();
-    let (id, dir) = recording(tmp.path());
+    let (id, dir) = recording_with(tmp.path(), settings);
     daemon
         .execute_method(Actor::User, 0, "rescan_library", &json!({}))
         .await
@@ -581,4 +590,233 @@ async fn ai_8_diarize_refuses_what_it_cannot_do() {
         .await
         .unwrap_err();
     assert_eq!(code(&e), ErrorCode::NotFound);
+}
+
+// ---- the automatic speaker step (ai.auto_speakers, on by default) -----------------------------
+
+async fn diarize_jobs(r: &Rig) -> usize {
+    user(r, "list_jobs", json!({"type": "diarize"}))
+        .await
+        .unwrap()["jobs"]
+        .as_array()
+        .unwrap()
+        .len()
+}
+
+async fn transcribe_now(r: &Rig) {
+    let s = user(r, "transcribe", json!({})).await.unwrap();
+    let j = job_done(r, s["job_id"].as_str().unwrap()).await;
+    assert_eq!(j["state"], "done", "{j}");
+}
+
+async fn settle() {
+    tokio::time::sleep(Duration::from_millis(250)).await;
+}
+
+async fn until_jobs_done(r: &Rig, n: usize) {
+    for _ in 0..300 {
+        let jobs = user(r, "list_jobs", json!({"type": "diarize"}))
+            .await
+            .unwrap();
+        let jobs = jobs["jobs"].as_array().unwrap();
+        if jobs.len() == n
+            && jobs
+                .iter()
+                .all(|j| matches!(j["state"].as_str(), Some("done" | "failed")))
+        {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    panic!("the automatic speaker run did not finish");
+}
+
+fn ready_event(r: &Rig) {
+    r.daemon
+        .event_bus()
+        .publish("transcript.ready", json!({"capture_id": r.id}));
+}
+
+/// AI-8: with the setting absent (default on), a finished transcript starts one `diarize` job
+/// as the user with the preset's count; a repeated `transcript.ready` for the same transcript
+/// does not start a second one, and the result is shown on the words like a manual run.
+#[tokio::test]
+async fn ai_8_auto_speakers_run_after_a_transcript_with_the_presets_count() {
+    let r = rig_with(
+        FakeAi::new()
+            .with_small_installed()
+            .with_speaker_script(&SCRIPT),
+        json!({"mode": "audio", "preset": "room"}),
+    )
+    .await;
+    let mut rx = r.daemon.subscribe();
+    r.daemon.start_ai_auto_speakers();
+    tokio::task::yield_now().await;
+    transcribe_now(&r).await;
+    until_jobs_done(&r, 1).await;
+    let calls = r.ai.diarize_calls();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0].hints.num_speakers, Some(2));
+    assert!(!calls[0].headset);
+    // The app learns of the run (job id) so the Speakers tab shows its progress.
+    let mut started = vec![];
+    while let Ok(e) = rx.try_recv() {
+        if e.name == "speakers.started" {
+            started.push(e);
+        }
+    }
+    assert_eq!(started.len(), 1);
+    assert_eq!(started[0].data["capture_id"], json!(r.id));
+    assert_eq!(started[0].data["automatic"], json!(true));
+    assert_eq!(started[0].data["num_speakers"], json!(2));
+    ready_event(&r);
+    ready_event(&r);
+    settle().await;
+    assert_eq!(diarize_jobs(&r).await, 1);
+    let t = user(&r, "get_transcript", json!({})).await.unwrap();
+    assert_eq!(names(&t["speakers"]), vec!["Speaker 1", "Speaker 2"]);
+    let jobs = user(&r, "list_jobs", json!({"type": "diarize"}))
+        .await
+        .unwrap();
+    assert_eq!(jobs["jobs"][0]["inputs"]["by"], "user");
+}
+
+/// The recording's own `people` answer beats the preset; no preset and no answer is three.
+#[tokio::test]
+async fn ai_8_auto_speakers_use_the_stored_people_answer() {
+    for (settings, want) in [
+        (json!({"mode": "audio", "preset": "room", "people": 4}), 4),
+        (json!({"mode": "audio", "preset": "lecture"}), 3),
+        (json!({}), 3),
+        (
+            json!({"mode": "audio", "preset": "room", "people": null}),
+            2,
+        ),
+    ] {
+        let r = rig_with(
+            FakeAi::new()
+                .with_small_installed()
+                .with_speaker_script(&SCRIPT),
+            settings.clone(),
+        )
+        .await;
+        r.daemon.start_ai_auto_speakers();
+        tokio::task::yield_now().await;
+        transcribe_now(&r).await;
+        until_jobs_done(&r, 1).await;
+        assert_eq!(
+            r.ai.diarize_calls()[0].hints.num_speakers,
+            Some(want),
+            "{settings}"
+        );
+    }
+}
+
+/// Nothing starts: the setting is off, no speaker model, a voice note, one person, a recording
+/// that is still being recorded.
+#[tokio::test]
+async fn ai_8_auto_speakers_skip_cases() {
+    // Setting off.
+    let r = speaker_rig().await;
+    user(
+        &r,
+        "set_settings",
+        json!({"values": {"ai.auto_speakers": false}}),
+    )
+    .await
+    .unwrap();
+    r.daemon.start_ai_auto_speakers();
+    tokio::task::yield_now().await;
+    transcribe_now(&r).await;
+    settle().await;
+    assert_eq!(diarize_jobs(&r).await, 0);
+
+    // No speaker model: quiet, no job, no failed job.
+    let r = rig(FakeAi::new().with_small_installed()).await;
+    r.daemon.start_ai_auto_speakers();
+    tokio::task::yield_now().await;
+    transcribe_now(&r).await;
+    settle().await;
+    assert_eq!(diarize_jobs(&r).await, 0);
+
+    // A voice note, and a recording with one person.
+    for settings in [
+        json!({"mode": "audio", "preset": "note"}),
+        json!({"mode": "audio", "preset": "room", "people": 1}),
+    ] {
+        let r = rig_with(
+            FakeAi::new()
+                .with_small_installed()
+                .with_speaker_script(&SCRIPT),
+            settings,
+        )
+        .await;
+        r.daemon.start_ai_auto_speakers();
+        tokio::task::yield_now().await;
+        transcribe_now(&r).await;
+        settle().await;
+        assert_eq!(diarize_jobs(&r).await, 0);
+        assert!(r.ai.diarize_calls().is_empty());
+    }
+
+    // Still being recorded.
+    let r = speaker_rig().await;
+    r.daemon.start_ai_auto_speakers();
+    tokio::task::yield_now().await;
+    std::fs::write(r.dir.join("recording.lock"), b"{}").unwrap();
+    ready_event(&r);
+    settle().await;
+    assert_eq!(diarize_jobs(&r).await, 0);
+}
+
+/// A recording that already has speakers (here renamed by the user) keeps them when its
+/// transcript is made again; the names still reach the new words.
+#[tokio::test]
+async fn ai_8_auto_speakers_never_overwrite_an_existing_result() {
+    let r = speaker_rig().await;
+    transcribe_and_diarize(&r, json!({})).await;
+    user(&r, "set_speakers", json!({"rename": {"2": "Linh"}}))
+        .await
+        .unwrap();
+    r.daemon.start_ai_auto_speakers();
+    tokio::task::yield_now().await;
+    transcribe_now(&r).await;
+    ready_event(&r);
+    settle().await;
+    assert_eq!(diarize_jobs(&r).await, 1, "only the manual run");
+    assert_eq!(r.ai.diarize_calls().len(), 1);
+    let t = user(&r, "get_transcript", json!({})).await.unwrap();
+    assert_eq!(names(&t["speakers"]), vec!["Speaker 1", "Linh"]);
+    assert_eq!(word_speakers(&t).len(), 6);
+}
+
+/// A failed automatic run is one failed job; the same transcript is not retried.
+#[tokio::test]
+async fn ai_8_a_failed_auto_run_is_not_repeated_for_the_same_transcript() {
+    let r = speaker_rig().await;
+    r.ai.fail_diarize_with(cm_core::CmError::internal("model crashed"));
+    r.daemon.start_ai_auto_speakers();
+    tokio::task::yield_now().await;
+    transcribe_now(&r).await;
+    until_jobs_done(&r, 1).await;
+    ready_event(&r);
+    settle().await;
+    assert_eq!(diarize_jobs(&r).await, 1);
+    assert_eq!(r.ai.diarize_calls().len(), 1);
+}
+
+/// The default and the count rules, without a daemon.
+#[test]
+fn ai_8_auto_speakers_defaults() {
+    use cm_daemon::ai::{auto_speaker_count, auto_speakers_enabled};
+    let mut s = Map::new();
+    assert!(auto_speakers_enabled(&s));
+    s.insert("ai.auto_speakers".into(), json!(false));
+    assert!(!auto_speakers_enabled(&s));
+    assert_eq!(auto_speaker_count(None, Some("room")), 2);
+    assert_eq!(auto_speaker_count(None, Some("note")), 1);
+    assert_eq!(auto_speaker_count(None, Some("online")), 3);
+    assert_eq!(auto_speaker_count(None, None), 3);
+    assert_eq!(auto_speaker_count(Some(5), Some("note")), 5);
+    assert_eq!(auto_speaker_count(Some(9), Some("room")), 2);
 }

@@ -105,13 +105,22 @@ pub fn default_people(preset: Option<&str>) -> Option<u32> {
     }
 }
 
-/// The count `diarize` is asked for: the user's choice (`None` = "Not sure" is a choice), else
-/// [`default_people`].
-pub fn effective_people(chosen: bool, people: Option<u32>, preset: Option<&str>) -> Option<u32> {
+/// The count `diarize` is asked for: the user's choice on this tab (`None` = "Not sure" is a
+/// choice), else the answer stored with the recording (`settings.people`, from the Record sheet
+/// or `start_recording`; 5 to 8 show as "5+"), else [`default_people`].
+pub fn effective_people(
+    chosen: bool,
+    people: Option<u32>,
+    stored: Option<u32>,
+    preset: Option<&str>,
+) -> Option<u32> {
     if chosen {
         people
     } else {
-        default_people(preset)
+        stored
+            .filter(|n| (1..=8).contains(n))
+            .map(|n| n.min(5))
+            .or_else(|| default_people(preset))
     }
 }
 
@@ -429,9 +438,19 @@ mod tests {
             assert_eq!(default_people(p), Some(3), "{p:?}");
         }
         // The user's answer wins, "Not sure" included.
-        assert_eq!(effective_people(true, None, Some("room")), None);
-        assert_eq!(effective_people(true, Some(4), Some("room")), Some(4));
-        assert_eq!(effective_people(false, None, Some("room")), Some(2));
+        assert_eq!(effective_people(true, None, Some(3), Some("room")), None);
+        assert_eq!(
+            effective_people(true, Some(4), Some(3), Some("room")),
+            Some(4)
+        );
+        assert_eq!(effective_people(false, None, None, Some("room")), Some(2));
+        // The recording's own answer beats the preset's guess; 5 to 8 are "5+".
+        assert_eq!(
+            effective_people(false, None, Some(4), Some("room")),
+            Some(4)
+        );
+        assert_eq!(effective_people(false, None, Some(7), None), Some(5));
+        assert_eq!(effective_people(false, None, Some(0), None), Some(3));
     }
 
     use super::*;

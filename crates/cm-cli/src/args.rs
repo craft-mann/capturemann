@@ -1229,6 +1229,10 @@ pub struct RecordStartArgs {
     /// `note` (voice note).
     #[arg(long, requires = "audio", value_parser = ["room", "online", "lecture", "product", "note"])]
     pub preset: Option<String>,
+    /// How many people speak (1 to 8), for an audio recording: stored with it and used by the
+    /// automatic speaker step. Leave it out when you do not know.
+    #[arg(long, requires = "audio", value_name = "N", value_parser = clap::value_parser!(u32).range(1..=8))]
+    pub people: Option<u32>,
     /// Display id to record (see `targets`; default: the primary display).
     #[arg(long, value_name = "ID", conflicts_with = "window")]
     pub display: Option<u32>,

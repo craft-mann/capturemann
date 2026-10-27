@@ -3934,6 +3934,9 @@ msgstr ""
 msgid "Speaker labels, if turned on"
 msgstr ""
 
+msgid "Speaker labels, not needed for one voice"
+msgstr ""
+
 msgid "Speaker model"
 msgstr ""
 

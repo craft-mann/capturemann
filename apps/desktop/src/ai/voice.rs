@@ -13,7 +13,8 @@ use cm_ai::text_model::{Provider, KEY_EMBEDDED_MODEL, KEY_PROVIDER};
 use cm_i18n::{fmt, tr};
 use serde_json::{json, Map, Value};
 
-/// `ai.auto_speakers`: find speakers after each transcript (app-only, default off).
+/// `ai.auto_speakers`: find speakers after each transcript (app-only, default ON; the daemon
+/// runs it, and only when the speaker models are usable).
 pub const KEY_AUTO_SPEAKERS: &str = "ai.auto_speakers";
 /// `profile.display_name`: the name of the user's own words (headset mode), default "Me".
 pub const KEY_DISPLAY_NAME: &str = "profile.display_name";
@@ -69,7 +70,7 @@ pub struct SpeakerVm {
 impl Default for SpeakerVm {
     fn default() -> Self {
         SpeakerVm {
-            auto_speakers: false,
+            auto_speakers: true,
             display_name: DEFAULT_DISPLAY_NAME.to_owned(),
             installed: false,
         }
@@ -82,7 +83,7 @@ impl SpeakerVm {
             auto_speakers: s
                 .get(KEY_AUTO_SPEAKERS)
                 .and_then(Value::as_bool)
-                .unwrap_or(false),
+                .unwrap_or(true),
             display_name: display_name_of(s.get(KEY_DISPLAY_NAME)),
             ..SpeakerVm::default()
         }
@@ -489,7 +490,11 @@ mod tests {
     fn the_name_defaults_to_me_and_empty_means_me() {
         let mut vm = SpeakerVm::from_settings(&Map::new());
         assert_eq!(vm.display_name, "Me");
-        assert!(!vm.auto_speakers);
+        // On by default (maintainer decision, Oct 27, 2026); the user's "off" is kept.
+        assert!(vm.auto_speakers);
+        let mut off = Map::new();
+        off.insert(KEY_AUTO_SPEAKERS.into(), json!(false));
+        assert!(!SpeakerVm::from_settings(&off).auto_speakers);
         assert!(vm.name_dirty("Trung"));
         assert_eq!(
             vm.set_display_name("  Trung "),

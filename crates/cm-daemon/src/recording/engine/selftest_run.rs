@@ -150,6 +150,7 @@ impl RecordingEngine {
         let start = StartParams {
             mode: RecordMode::Screen,
             preset: None,
+            people: None,
             target: Some(target),
             size: parsed.size,
             fps: Some(60),

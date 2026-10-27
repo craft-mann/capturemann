@@ -394,6 +394,9 @@ pub(super) fn describe_audio(
     if let Some(p) = r.preset {
         details.insert("preset".into(), json!(p.as_str()));
     }
+    if let Some(n) = r.people {
+        details.insert("people".into(), json!(n));
+    }
     details.insert("microphone".into(), json!(mic));
     details.insert(
         "system_audio".into(),
@@ -434,6 +437,7 @@ pub(super) fn describe_audio(
         "mode": "audio",
         "restart": restart,
         "preset": r.preset,
+        "people": r.people,
         "microphone": r.mic.as_ref().map(|_| json!({
             "device": names.mic,
             "denoise": r.mic_denoise(),

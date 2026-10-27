@@ -818,3 +818,46 @@ async fn voc1_an_audio_recording_has_no_video_to_export_but_can_be_edited() {
     .unwrap();
     assert_eq!(t["revision"], 2, "{t}");
 }
+
+/// VOC-1: `people` (1 to 8) is the answer to "How many people?"; it is stored in the manifest
+/// settings next to the preset (no migration), shown in the agent's dialog, and refused outside
+/// audio mode or out of range.
+#[tokio::test]
+async fn voc1_people_is_stored_in_the_manifest_settings_and_validated() {
+    let r = rig();
+    for bad in [
+        audio(json!({ "people": 0 })),
+        audio(json!({ "people": 9 })),
+        audio(json!({ "people": "four" })),
+        audio(json!({ "people": 2.5 })),
+        json!({ "target": { "display_id": 1 }, "people": 2 }),
+    ] {
+        let e = user(&r.daemon, "start_recording", bad.clone())
+            .await
+            .unwrap_err();
+        assert_eq!(code(&e), ErrorCode::InvalidInput, "{bad}");
+    }
+    let started = as_agent(
+        &r.daemon,
+        "start_recording",
+        audio(json!({ "preset": "room", "people": 4 })),
+    )
+    .await
+    .unwrap();
+    assert_eq!(started["tracks"], json!(["mic"]));
+    let shown = r.confirmer.shown();
+    assert_eq!(shown.last().unwrap().details["people"], 4);
+    assert_eq!(shown.last().unwrap().params["people"], 4);
+    let stopped = user(&r.daemon, "stop_recording", json!({})).await.unwrap();
+    let m = manifest(&r, &path_of(&stopped));
+    assert_eq!(m["settings"]["people"], 4, "{m}");
+    assert_eq!(m["settings"]["preset"], "room");
+
+    // Absent stays absent (unknown).
+    user(&r.daemon, "start_recording", audio(json!({})))
+        .await
+        .unwrap();
+    let stopped = user(&r.daemon, "stop_recording", json!({})).await.unwrap();
+    let m = manifest(&r, &path_of(&stopped));
+    assert!(m["settings"]["people"].is_null(), "{m}");
+}

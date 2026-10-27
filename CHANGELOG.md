@@ -35,7 +35,10 @@ treat it as a preview of the release notes, not a promise.
   moment, editing, regenerating and export as Markdown or text. `capturemann ai report`.
 - Speaker labels (who spoke when), renaming, merging and reassigning speakers, and speaker names
   in exports and reports. The two speaker models (about 36 MB) are included in the app, so there is nothing to download or
-  set up and it works offline; accuracy has not been measured yet.
+  set up and it works offline; accuracy has not been measured yet. They are found automatically after each
+  transcript (Settings > AI > "Find speakers after each transcript", on by default), using "How many
+  people?" from the Record sheet (`start_recording` `people`, `capturemann record start --audio --people N`)
+  or the preset's guess; a recording that already has speakers is left alone.
 - Whisper models `large-v3` (translation to English) and `large-v3-turbo` (fast transcription, not
   for translation).
 

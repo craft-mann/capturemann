@@ -11130,3 +11130,7 @@ msgstr "Nhãn người nói không có trong bản dựng này"
 #, fuzzy
 msgid "This build doesn’t include the speaker models that tell voices apart. CaptureMann releases include them."
 msgstr "Bản dựng này không kèm các mô hình phân biệt giọng nói. Các bản phát hành của CaptureMann đều có sẵn."
+
+#, fuzzy
+msgid "Speaker labels, not needed for one voice"
+msgstr "Nhãn người nói, không cần cho một giọng"

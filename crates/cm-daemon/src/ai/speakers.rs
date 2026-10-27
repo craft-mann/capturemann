@@ -211,6 +211,103 @@ impl Inner {
         }))
     }
 
+    /// The automatic speaker step for one finished transcript (see
+    /// [`Daemon::start_ai_auto_speakers`]). Quietly does nothing unless everything is in place;
+    /// `tried` remembers the transcript version (file size and time) a run was queued for.
+    pub(super) async fn auto_diarize(
+        &self,
+        capture_id: &str,
+        tried: &mut std::collections::HashMap<String, String>,
+    ) -> Result<(), DaemonError> {
+        let Some(rt) = &self.jobs else { return Ok(()) };
+        if !rt.queue.has_handler(JOB_DIARIZE) {
+            return Ok(());
+        }
+        let settings = self.settings.all().unwrap_or_default();
+        if !auto_speakers_enabled(&settings) {
+            return Ok(());
+        }
+        let service = self.ai.speakers.clone();
+        if !service.available() || blocking(move || service.ready()).await.is_err() {
+            return Ok(());
+        }
+        let (library, id) = (self.library.clone(), capture_id.to_owned());
+        let plan = blocking(move || {
+            let lib = lock_library(&library);
+            let rec = lib.get(&id)?;
+            if !rec.kind.is_recording() {
+                return Ok(None);
+            }
+            let dir = lib.bundle_path(&rec);
+            // Still being recorded (or exported, uploaded ...): not now.
+            if dir.join(cm_library::rec::LOCK_FILE).exists()
+                || dir.join(cm_library::rec::OWNER_FILE).exists()
+            {
+                return Ok(None);
+            }
+            let manifest = cm_library::read_manifest(&dir)?;
+            if !has_speech_track(&manifest) {
+                return Ok(None);
+            }
+            // Any earlier result stays: the user may have renamed, merged or reassigned. A new
+            // transcript is matched to the segments by time when it is read.
+            if spk::SpeakerState::from_manifest(&manifest).is_some()
+                || spk::diarization_path(&dir).exists()
+            {
+                return Ok(None);
+            }
+            let preset = manifest
+                .settings
+                .get("preset")
+                .and_then(Value::as_str)
+                .map(str::to_owned);
+            let people = manifest
+                .settings
+                .get("people")
+                .and_then(Value::as_u64)
+                .and_then(|n| u32::try_from(n).ok());
+            let count = auto_speaker_count(people, preset.as_deref());
+            let version = std::fs::metadata(dir.join(TRANSCRIPT_FILE))
+                .ok()
+                .map(|m| {
+                    let t = m
+                        .modified()
+                        .ok()
+                        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                        .map_or(0, |d| d.as_nanos());
+                    format!("{}:{t}", m.len())
+                })
+                .unwrap_or_default();
+            Ok(Some((count, version)))
+        })
+        .await;
+        let Ok(Some((count, version))) = plan else {
+            return Ok(());
+        };
+        if count <= 1 || tried.get(capture_id) == Some(&version) {
+            return Ok(());
+        }
+        let hints = spk::DiarizeHints {
+            num_speakers: Some(count),
+            ..spk::DiarizeHints::default()
+        };
+        // The same checks and the same job as the `diarize` action; a refusal is not reported.
+        if let Ok(started) = self
+            .diarize(&Actor::User, capture_id.to_owned(), hints, false)
+            .await
+        {
+            tried.insert(capture_id.to_owned(), version);
+            if started["reused"] != json!(true) {
+                self.events.publish(
+                    events::SPEAKERS_STARTED,
+                    json!({ "capture_id": capture_id, "job_id": started["job_id"],
+                            "num_speakers": count, "automatic": true }),
+                );
+            }
+        }
+        Ok(())
+    }
+
     /// `set_speakers`: rename, merge and reassign as ONE revision (AI-8.AC4, AC5).
     pub(super) async fn set_speakers(
         &self,

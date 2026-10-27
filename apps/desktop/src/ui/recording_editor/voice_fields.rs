@@ -347,9 +347,16 @@ impl RecordingEditor {
             return;
         }
         self.vp.speaker_note = None;
-        let preset = self.session().and_then(|s| s.voice.preset.clone());
-        let people =
-            rules::effective_people(self.vp.people_chosen, self.vp.people, preset.as_deref());
+        let (preset, stored) = self
+            .session()
+            .map(|s| (s.voice.preset.clone(), s.voice.people))
+            .unwrap_or_default();
+        let people = rules::effective_people(
+            self.vp.people_chosen,
+            self.vp.people,
+            stored,
+            preset.as_deref(),
+        );
         let headset = self.vp.headset;
         let app = self.app.clone();
         cx.notify();

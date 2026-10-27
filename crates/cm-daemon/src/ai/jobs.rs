@@ -43,6 +43,27 @@ pub fn auto_transcribe_enabled(settings: &Map<String, Value>, ram_gb: Option<u64
     }
 }
 
+/// Whether the settings ask for the automatic speaker step: the user's choice, else on.
+pub fn auto_speakers_enabled(settings: &Map<String, Value>) -> bool {
+    settings
+        .get(SETTING_AUTO_SPEAKERS)
+        .and_then(Value::as_bool)
+        .unwrap_or(true)
+}
+
+/// The speaker count the automatic step asks for: the recording's own `people` answer, else the
+/// preset's guess (`room` 2, `note` 1, anything else 3). 1 means: skip, one voice has nothing to
+/// tell apart.
+pub fn auto_speaker_count(people: Option<u32>, preset: Option<&str>) -> u32 {
+    people
+        .filter(|n| (1..=8).contains(n))
+        .unwrap_or(match preset {
+            Some("room") => 2,
+            Some("note") => 1,
+            _ => 3,
+        })
+}
+
 // ---- jobs ----------------------------------------------------------------------------------
 
 pub(super) fn no_model_error() -> DaemonError {
