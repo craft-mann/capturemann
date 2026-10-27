@@ -210,6 +210,14 @@ impl Capturer {
                 windows: Vec::new(),
             });
         }
+        // The kept window (the library/editor window) is in every display screenshot, so it is a
+        // target too: the picker's frozen frame shows it, and without it a click on it would
+        // pick the window behind it.
+        let kept = self
+            .kept_windows
+            .as_ref()
+            .map(crate::record::WindowProvider::ids)
+            .unwrap_or_default();
         let windows = self
             .backend
             .windows()?
@@ -217,7 +225,7 @@ impl Capturer {
             .filter(|w| {
                 w.bounds.size.width > 0
                     && w.bounds.size.height > 0
-                    && self.own_pid.is_none_or(|p| p != w.pid)
+                    && (self.own_pid.is_none_or(|p| p != w.pid) || kept.contains(&w.id))
                     && !(self.hide_shell_windows && is_shell_window(w))
             })
             .collect();
@@ -456,6 +464,46 @@ mod tests {
 
     fn take(c: &Capturer, t: CaptureTarget) -> Capture {
         c.capture(CaptureRequest::new(t), None).unwrap().unwrap()
+    }
+
+    /// The library window is in screenshots, so it can be picked as a window: with the
+    /// provider's id it is listed (a click on it must not land on the window behind), while the
+    /// toast and the other own windows stay out. Without an id it is out like the rest.
+    #[test]
+    fn the_kept_library_window_is_a_target_and_other_own_windows_are_not() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        let studio = std::sync::Arc::new(AtomicU32::new(11));
+        let s2 = studio.clone();
+        let backend = desktop().with_window(
+            13,
+            "Toast",
+            "CaptureMann",
+            OWN_PID,
+            1,
+            (0, 0, 200, 50),
+            false,
+        );
+        let c = Capturer::new(backend)
+            .with_own_pid(Some(OWN_PID))
+            .with_kept_windows(crate::WindowProvider::new(move || {
+                match s2.load(Ordering::SeqCst) {
+                    0 => vec![],
+                    id => vec![id],
+                }
+            }));
+        let ids = |c: &Capturer| -> Vec<u32> {
+            c.list_targets()
+                .unwrap()
+                .windows
+                .iter()
+                .map(|w| w.id)
+                .collect()
+        };
+        let listed = ids(&c);
+        assert!(listed.contains(&11), "{listed:?}");
+        assert!(!listed.contains(&13), "{listed:?}");
+        studio.store(0, Ordering::SeqCst);
+        assert!(!ids(&c).contains(&11));
     }
 
     /// CAP-3: the menu bar, Dock, Control Center and friends are not window targets.
