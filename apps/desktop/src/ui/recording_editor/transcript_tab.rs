@@ -348,9 +348,9 @@ impl RecordingEditor {
     /// The Translate panel (V5): the target language, the engine the daemon will pick (Whisper from
     /// the audio into English, else the text model line by line), the glossary note, then Cancel
     /// and Translate. Without a text model a language other than English cannot be translated
-    /// (`translate_captions` would answer `no_text_model`), so the panel says so and points to the
-    /// AI page instead of sending the call. Whether Whisper has a model that can translate is not
-    /// known here; the daemon's answer arrives as a toast.
+    /// (`translate_captions` would answer `no_text_model`), and into English Whisper needs Large v3
+    /// or Medium (`translation_model_missing`); in both cases the panel says so, with a link to the
+    /// AI page, and Translate is off instead of failing into a toast.
     fn translate_chooser(
         &self,
         t: &Theme,
@@ -369,7 +369,31 @@ impl RecordingEditor {
         };
         let english = pick == "en";
         let text = self.text_state(cx);
-        let blocked = !english && text == super::report_tab::TextState::Missing;
+        // Known before the click, so a missing model is drawn here and not met as a toast.
+        let whisper = self.app.read(cx).ai.whisper_translate();
+        let missing = if english {
+            match whisper {
+                crate::ai::models::WhisperTranslate::Missing { active, large_mb } => Some((
+                    tr!("Large v3 isn\u{2019}t installed"),
+                    translation_model_note(active, large_mb),
+                )),
+                _ => None,
+            }
+        } else if text == super::report_tab::TextState::Missing {
+            Some((
+                tr!(
+                    "{language} needs a text model",
+                    language = language_name(pick)
+                ),
+                tr!(
+                    "Whisper only translates into English. Choose a text model on this Mac \
+                     on the AI page."
+                ),
+            ))
+        } else {
+            None
+        };
+        let blocked = missing.is_some();
         let from = if own.is_empty() {
             tr!("Times are kept")
         } else {
@@ -444,22 +468,13 @@ impl RecordingEditor {
                     ),
             );
         let app = self.app.clone();
-        let warn = blocked.then(|| {
+        let warn = missing.map(|(title, body)| {
             callout(
                 t,
                 Tone::Brass,
                 "triangle-alert",
-                tr!(
-                    "{language} needs a text model",
-                    language = language_name(pick)
-                ),
-                Some(
-                    tr!(
-                        "Whisper only translates into English. Choose a text model on this Mac \
-                         on the AI page."
-                    )
-                    .into(),
-                ),
+                title,
+                Some(body.into()),
                 Some(
                     small_button_with_icon(
                         t,
@@ -553,6 +568,20 @@ impl RecordingEditor {
                     .child(div().pt(px(2.)).child(icon("type", 16., t.mist)))
                     .child(label_fill(tr!("Terms in your glossary stay as written.")))
             }))
+            .child(
+                // True since edits to a translation are undo steps and survive a re-translate
+                // (AI-5.AC5).
+                div()
+                    .flex()
+                    .items_start()
+                    .gap(px(10.))
+                    .text_size(px(13.))
+                    .text_color(rgba_of(t.text_3))
+                    .child(div().pt(px(2.)).child(icon("pencil", 16., t.mist)))
+                    .child(label_fill(tr!(
+                        "Lines you edit in a translation are kept when you translate again."
+                    ))),
+            )
             .child(
                 div()
                     .flex()
@@ -730,6 +759,30 @@ impl RecordingEditor {
 }
 
 /// A marker between turns: a bookmark glyph, the label, the time and a hairline.
+/// What to do when Whisper has no model that can translate (V5): says which active model only
+/// transcribes, and what to install; nothing is downloaded from here.
+fn translation_model_note(active: Option<String>, large_mb: Option<u32>) -> String {
+    let size = large_mb.map(crate::ai::models::size_label);
+    match (active, size) {
+        (Some(model), Some(size)) => tr!(
+            "Your active model, {model}, only transcribes. Install Large v3 ({size}) or Medium \
+             on the AI page to translate to English.",
+            model = model,
+            size = size
+        ),
+        (Some(model), None) => tr!(
+            "Your active model, {model}, only transcribes. Install Large v3 or Medium on the AI \
+             page to translate to English.",
+            model = model
+        ),
+        (None, Some(size)) => tr!(
+            "Install Large v3 ({size}) or Medium on the AI page to translate to English.",
+            size = size
+        ),
+        (None, None) => tr!("Install Large v3 or Medium on the AI page to translate to English."),
+    }
+}
+
 fn marker_row(t: &Theme, row: usize, label: &str, at: cm_core::MediaTime) -> AnyElement {
     div()
         .id(SharedString::from(format!("re-marker-row-{row}")))

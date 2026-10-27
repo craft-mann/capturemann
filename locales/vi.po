@@ -11170,3 +11170,26 @@ msgstr "{template} phù hợp với bản ghi này. Sẽ không viết gì cho �
 msgctxt "button"
 msgid "Set up report"
 msgstr "Thiết lập báo cáo"
+
+msgid "Large v3 isn’t installed"
+msgstr "Large v3 chưa được cài đặt"
+
+#, fuzzy
+msgid "Install Large v3 ({size}) or Medium on the AI page to translate to English."
+msgstr "Hãy cài Large v3 ({size}) hoặc Medium trên trang AI để dịch sang tiếng Anh."
+
+#, fuzzy
+msgid "Install Large v3 or Medium on the AI page to translate to English."
+msgstr "Hãy cài Large v3 hoặc Medium trên trang AI để dịch sang tiếng Anh."
+
+#, fuzzy
+msgid "Your active model, {model}, only transcribes. Install Large v3 ({size}) or Medium on the AI page to translate to English."
+msgstr "Mô hình đang dùng, {model}, chỉ chép lời. Hãy cài Large v3 ({size}) hoặc Medium trên trang AI để dịch sang tiếng Anh."
+
+#, fuzzy
+msgid "Your active model, {model}, only transcribes. Install Large v3 or Medium on the AI page to translate to English."
+msgstr "Mô hình đang dùng, {model}, chỉ chép lời. Hãy cài Large v3 hoặc Medium trên trang AI để dịch sang tiếng Anh."
+
+#, fuzzy
+msgid "Lines you edit in a translation are kept when you translate again."
+msgstr "Những dòng bạn sửa trong bản dịch được giữ lại khi bạn dịch lại."

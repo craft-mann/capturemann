@@ -260,6 +260,10 @@ impl RecordingEditor {
             self.voice_ui.stale = true;
         }
         // The Report tab and the Translate panel need to know whether a text model is set up.
+        if self.voice_ui.translate_open {
+            // Whether Whisper has a model that can translate (read once, if nobody has yet).
+            crate::ui::ai::ensure_loaded(&self.app, cx);
+        }
         let needs_text = self.tab == super::tabs::Inspector::Report || self.voice_ui.translate_open;
         if needs_text && !self.vp.text_asked {
             self.vp.text_asked = true;

@@ -234,7 +234,46 @@ pub struct ModelsVm {
     pub action_error: Option<ErrorNote>,
 }
 
+/// Whether Whisper can translate into English with what is installed (AI-5), by the daemon's own
+/// rule ([`cm_ai::translate::choose_translation_model`]): the active model when it can translate,
+/// else `large` (large-v3), else `medium`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WhisperTranslate {
+    /// The model list has not arrived.
+    Unknown,
+    /// The model id the job would use.
+    Ready(String),
+    /// None can; `active` is the label of the active model when that one only transcribes
+    /// (Large v3 Turbo), `large_mb` the download size of Large v3 when the catalogue has it.
+    Missing {
+        active: Option<String>,
+        large_mb: Option<u32>,
+    },
+}
+
 impl ModelsVm {
+    pub fn whisper_translate(&self) -> WhisperTranslate {
+        let Some(l) = self.list.as_ref() else {
+            return WhisperTranslate::Unknown;
+        };
+        let installed: Vec<String> = l
+            .models
+            .iter()
+            .filter(|m| m.installed)
+            .map(|m| m.id.clone())
+            .collect();
+        match cm_ai::translate::choose_translation_model(&installed, l.active.as_deref(), None) {
+            Ok(id) => WhisperTranslate::Ready(id),
+            Err(_) => WhisperTranslate::Missing {
+                active: self
+                    .active()
+                    .filter(|m| !cm_ai::translate::model_can_translate(&m.id))
+                    .map(|m| m.label.clone()),
+                large_mb: l.models.iter().find(|m| m.id == "large").map(|m| m.size_mb),
+            },
+        }
+    }
+
     pub fn installed_any(&self) -> bool {
         self.list
             .as_ref()
@@ -551,6 +590,55 @@ mod tests {
         let mut vm = ModelsVm::default();
         vm.set_list(list(models));
         vm
+    }
+
+    /// AI-5: the Translate panel knows in advance whether Whisper can translate.
+    #[test]
+    fn whisper_translation_follows_the_daemons_model_rule() {
+        let none = ModelsVm::default();
+        assert_eq!(none.whisper_translate(), WhisperTranslate::Unknown);
+        // Turbo only: missing, and the panel names the active model.
+        let vm = vm_with(vec![
+            info("large-v3-turbo", 1600, true, true),
+            info("large", 3100, false, false),
+        ]);
+        assert_eq!(
+            vm.whisper_translate(),
+            WhisperTranslate::Missing {
+                active: Some("LARGE-V3-TURBO".into()),
+                large_mb: Some(3100)
+            }
+        );
+        // Nothing installed.
+        let vm = vm_with(vec![info("large", 3100, false, false)]);
+        assert!(matches!(
+            vm.whisper_translate(),
+            WhisperTranslate::Missing { active: None, .. }
+        ));
+        // Medium is enough; large wins over it when turbo is the active one.
+        let vm = vm_with(vec![
+            info("large-v3-turbo", 1600, true, true),
+            info("medium", 1500, true, false),
+        ]);
+        assert_eq!(
+            vm.whisper_translate(),
+            WhisperTranslate::Ready("medium".into())
+        );
+        let vm = vm_with(vec![
+            info("large-v3-turbo", 1600, true, true),
+            info("medium", 1500, true, false),
+            info("large", 3100, true, false),
+        ]);
+        assert_eq!(
+            vm.whisper_translate(),
+            WhisperTranslate::Ready("large".into())
+        );
+        // The active model can translate: it is used.
+        let vm = vm_with(vec![info("small", 466, true, true)]);
+        assert_eq!(
+            vm.whisper_translate(),
+            WhisperTranslate::Ready("small".into())
+        );
     }
 
     fn actions(vm: &ModelsVm, id: &str) -> Vec<RowAction> {

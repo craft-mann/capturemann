@@ -755,3 +755,64 @@ fn the_translate_panel_blocks_a_language_the_text_model_must_do(cx: &mut TestApp
         assert_eq!(e.text_state(cx), super::report_tab::TextState::Missing);
     });
 }
+
+/// AI-5: with only the turbo model the Translate panel to English draws the model-missing state
+/// (known from the model list, before any click); with Large v3 installed it does not.
+#[gpui::test]
+fn the_translate_panel_knows_when_whisper_cannot_translate(cx: &mut TestAppContext) {
+    use crate::ai::models::WhisperTranslate;
+    let (_w, e, vcx) = editor(cx);
+    open_tab(&e, vcx, Inspector::Transcript);
+    let app = e.read_with(vcx, |e, _| e.app.clone());
+    let model = |id: &str, installed: bool, active: bool| cm_ai::model::ModelInfo {
+        id: id.into(),
+        label: id.into(),
+        size_mb: 1000,
+        ram_mb: 0,
+        hint: String::new(),
+        installed,
+        active,
+        path: None,
+    };
+    let set = |vcx: &mut VisualTestContext, models: Vec<cm_ai::model::ModelInfo>| {
+        let active = models.iter().find(|m| m.active).map(|m| m.id.clone());
+        app.update(vcx, |m, _| {
+            m.ai.set_list(cm_ai::model::ModelList {
+                models,
+                active,
+                dir: "/m".into(),
+            })
+        });
+    };
+    set(
+        vcx,
+        vec![
+            model("large-v3-turbo", true, true),
+            model("large", false, false),
+        ],
+    );
+    e.update(vcx, |e, cx| {
+        e.voice_ui.translate_open = true;
+        e.vp.translate_pick = Some("en");
+        cx.notify();
+    });
+    vcx.update(|window, _| window.refresh());
+    vcx.run_until_parked();
+    assert!(matches!(
+        app.read_with(vcx, |m, _| m.ai.whisper_translate()),
+        WhisperTranslate::Missing { .. }
+    ));
+    set(
+        vcx,
+        vec![
+            model("large-v3-turbo", true, true),
+            model("large", true, false),
+        ],
+    );
+    vcx.update(|window, _| window.refresh());
+    vcx.run_until_parked();
+    assert_eq!(
+        app.read_with(vcx, |m, _| m.ai.whisper_translate()),
+        WhisperTranslate::Ready("large".into())
+    );
+}
