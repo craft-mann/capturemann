@@ -1,0 +1,11 @@
+[package]
+name = "spike-diarize"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+serde_json = "1"
+sherpa-onnx = "=2.0.1"
