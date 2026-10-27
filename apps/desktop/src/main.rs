@@ -59,16 +59,63 @@ fn capturer() -> Capturer {
     std::process::exit(1)
 }
 
-/// Asks the running instance to show itself: opening its bundle again sends the reopen event the app
-/// handles by showing the library. A bare dev binary has no bundle to open.
-fn show_running_instance() {
+/// A second launch: asks the running instance to show itself. When the lock is held by another
+/// copy of the app (a notarized release next to a development build share one library, one
+/// socket and one lock), that copy is brought to the front and a dialog says why this one is
+/// not starting; before, the second copy quit without a word.
+fn show_running_instance(config_dir: &std::path::Path) {
     #[cfg(target_os = "macos")]
-    if let Some(bundle) = std::env::current_exe()
-        .ok()
-        .and_then(|e| cm_desktop::ui::app::bundle_of(&e))
     {
-        let _ = std::process::Command::new("open").arg(bundle).status();
+        use cm_desktop::instance::{running_pid, second_launch, SecondLaunch};
+        let own = std::env::current_exe()
+            .ok()
+            .and_then(|e| cm_desktop::ui::app::bundle_of(&e));
+        let running = running_pid(config_dir).and_then(|pid| {
+            let out = std::process::Command::new("ps")
+                .args(["-p", &pid.to_string(), "-o", "comm="])
+                .output()
+                .ok()?;
+            let exe = String::from_utf8_lossy(&out.stdout).trim().to_owned();
+            cm_desktop::ui::app::bundle_of(std::path::Path::new(&exe))
+        });
+        match second_launch(own.as_deref(), running.as_deref()) {
+            SecondLaunch::ShowIt => {
+                if let Some(bundle) = own {
+                    let _ = std::process::Command::new("open").arg(bundle).status();
+                }
+            }
+            SecondLaunch::OtherCopy { bundle } => {
+                let _ = std::process::Command::new("open").arg(&bundle).status();
+                let name = bundle
+                    .file_stem()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                let title = tr!("CaptureMann is already running");
+                let message = tr!(
+                    "Another copy ({name}) is running and uses the same library and settings. Quit it from its menu bar icon, then open this one.",
+                    name = name
+                );
+                // Arguments, never interpolated into the script.
+                let _ = std::process::Command::new("osascript")
+                    .args([
+                        "-e",
+                        "on run argv",
+                        "-e",
+                        "display alert (item 1 of argv) message (item 2 of argv) giving up after 60",
+                        "-e",
+                        "end run",
+                        &title,
+                        &message,
+                    ])
+                    .status();
+            }
+            SecondLaunch::Unknown => {
+                log::info!("CaptureMann is already running; could not identify which copy");
+            }
+        }
     }
+    #[cfg(not(target_os = "macos"))]
+    let _ = config_dir;
 }
 
 fn main() {
@@ -143,7 +190,7 @@ fn main() {
             cm_desktop::instance::Acquired::First(lock) => Some(lock),
             cm_desktop::instance::Acquired::AlreadyRunning => {
                 log::info!("CaptureMann is already running; showing it");
-                show_running_instance();
+                show_running_instance(&config_dir);
                 std::process::exit(0);
             }
             cm_desktop::instance::Acquired::Unavailable(e) => {

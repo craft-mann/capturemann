@@ -57,6 +57,41 @@ pub fn acquire(dir: &Path) -> Acquired {
     }
 }
 
+/// The pid the running instance wrote into `instance.lock` (informational: the lock itself is the
+/// source of truth, so a missing or stale number only means "unknown").
+pub fn running_pid(dir: &Path) -> Option<u32> {
+    std::fs::read_to_string(dir.join(LOCK_FILE))
+        .ok()?
+        .trim()
+        .parse()
+        .ok()
+}
+
+/// What a second launch does about the instance that holds the lock.
+#[derive(Debug, PartialEq, Eq)]
+pub enum SecondLaunch {
+    /// The running instance is this same app: ask it to show itself (`open` on the bundle sends
+    /// the reopen event the app already handles).
+    ShowIt,
+    /// Another copy (a release next to a development build) holds the lock and the library:
+    /// bring it to the front and say why this one is not starting.
+    OtherCopy { bundle: PathBuf },
+    /// The running instance could not be identified. Opening our own bundle could start a third
+    /// process that finds the same lock, so do nothing.
+    Unknown,
+}
+
+/// Decides [`SecondLaunch`] from the bundle this process runs from and the running instance's.
+pub fn second_launch(own: Option<&Path>, running: Option<&Path>) -> SecondLaunch {
+    match (own, running) {
+        (Some(o), Some(r)) if o == r => SecondLaunch::ShowIt,
+        (_, Some(r)) => SecondLaunch::OtherCopy {
+            bundle: r.to_path_buf(),
+        },
+        _ => SecondLaunch::Unknown,
+    }
+}
+
 /// The shell script that relaunches `bundle` once the process `pid` is gone: waits for the old
 /// instance to exit (it may be saving a recording for up to 10 s) so the two never overlap, then
 /// opens a fresh copy. The bundle path is `$0`, never interpolated.
@@ -98,6 +133,36 @@ mod tests {
             acquire(&file.join("sub")),
             Acquired::Unavailable(_)
         ));
+    }
+
+    /// A second launch shows the same app, or names the other copy that holds the lock; an
+    /// unidentified holder is left alone (no `open` that could chain more launches).
+    #[test]
+    fn a_second_launch_tells_the_same_app_from_another_copy() {
+        let rel = Path::new("/Applications/CaptureMann.app");
+        let dev = Path::new("/Users/x/Applications/CaptureMann-dev.app");
+        assert_eq!(second_launch(Some(rel), Some(rel)), SecondLaunch::ShowIt);
+        assert_eq!(
+            second_launch(Some(dev), Some(rel)),
+            SecondLaunch::OtherCopy {
+                bundle: rel.to_path_buf()
+            }
+        );
+        assert_eq!(
+            second_launch(None, Some(rel)),
+            SecondLaunch::OtherCopy {
+                bundle: rel.to_path_buf()
+            }
+        );
+        assert_eq!(second_launch(Some(rel), None), SecondLaunch::Unknown);
+    }
+
+    #[test]
+    fn the_running_pid_is_read_from_the_lock_file() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(running_pid(dir.path()), None);
+        let _first = acquire(dir.path());
+        assert_eq!(running_pid(dir.path()), Some(std::process::id()));
     }
 
     /// R4-10: the restart helper waits for the old pid before opening the new copy.
