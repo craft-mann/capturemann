@@ -56,6 +56,14 @@ impl TextModel for SharedModel {
     ) -> Result<text_model::JsonReply, TextModelError> {
         self.0.complete_json(req)
     }
+
+    fn complete_json_streaming(
+        &self,
+        req: &text_model::JsonRequest,
+        on_progress: &mut dyn FnMut(usize) -> bool,
+    ) -> Result<text_model::JsonReply, TextModelError> {
+        self.0.complete_json_streaming(req, on_progress)
+    }
 }
 
 impl TextModelState {

@@ -8,7 +8,7 @@
 //! * the API key is only ever put in a request header, and is masked in any message that is
 //!   returned or logged.
 
-use std::io::Read as _;
+use std::io::{BufRead as _, BufReader, Read as _};
 use std::time::Duration;
 
 use serde_json::{json, Value};
@@ -49,6 +49,25 @@ struct Reply {
 enum Fail {
     Timeout,
     Unreachable(String),
+    /// The progress hook asked to stop.
+    Cancelled,
+    /// The server sent an error event inside a stream.
+    Server(String),
+}
+
+/// The caller's progress hook of a streaming call, and the pieces counted so far (kept over the
+/// validation retry, so the count only grows).
+struct Progress<'a> {
+    f: &'a mut dyn FnMut(usize) -> bool,
+    pieces: usize,
+}
+
+impl Progress<'_> {
+    /// One more piece arrived; `false` when the caller wants to stop.
+    fn tick(&mut self) -> bool {
+        self.pieces += 1;
+        (self.f)(self.pieces)
+    }
 }
 
 fn classify(e: &ureq::Error) -> Fail {
@@ -65,6 +84,14 @@ fn classify(e: &ureq::Error) -> Fail {
     }
 }
 
+fn io_fail(e: &std::io::Error) -> Fail {
+    if e.kind() == std::io::ErrorKind::TimedOut || e.to_string().contains("timeout") {
+        Fail::Timeout
+    } else {
+        Fail::Unreachable(e.to_string())
+    }
+}
+
 fn read_body(mut resp: ureq::http::Response<ureq::Body>) -> Result<Reply, Fail> {
     let status = resp.status().as_u16();
     let mut body = String::new();
@@ -72,14 +99,80 @@ fn read_body(mut resp: ureq::http::Response<ureq::Body>) -> Result<Reply, Fail> 
         .as_reader()
         .take(MAX_BODY)
         .read_to_string(&mut body)
-        .map_err(|e| {
-            if e.kind() == std::io::ErrorKind::TimedOut || e.to_string().contains("timeout") {
-                Fail::Timeout
-            } else {
-                Fail::Unreachable(e.to_string())
-            }
-        })?;
+        .map_err(|e| io_fail(&e))?;
     Ok(Reply { status, body })
+}
+
+/// What a chat request came back with.
+enum Outcome {
+    /// A whole HTTP body (an error status, or a server that ignored `stream`).
+    Reply(Reply),
+    /// The assembled text of a streamed answer.
+    Streamed(String),
+}
+
+fn is_event_stream(resp: &ureq::http::Response<ureq::Body>) -> bool {
+    resp.headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.to_ascii_lowercase().contains("text/event-stream"))
+}
+
+/// Reads an OpenAI server-sent-events answer to the end, ticking `progress` for every piece of
+/// text. The global timeout of the agent still bounds a stalled stream (the read fails with a
+/// timeout), and a `false` from the hook stops between two events.
+fn read_stream(
+    resp: &mut ureq::http::Response<ureq::Body>,
+    progress: &mut Progress<'_>,
+) -> Result<String, Fail> {
+    let mut reader = BufReader::new(resp.body_mut().as_reader().take(MAX_BODY));
+    let mut text = String::new();
+    let mut line = String::new();
+    loop {
+        line.clear();
+        if reader.read_line(&mut line).map_err(|e| io_fail(&e))? == 0 {
+            break;
+        }
+        let Some(data) = line.trim().strip_prefix("data:") else {
+            continue;
+        };
+        let data = data.trim();
+        if data == "[DONE]" {
+            break;
+        }
+        let Ok(v) = serde_json::from_str::<Value>(data) else {
+            continue;
+        };
+        if let Some(err) = v.get("error") {
+            let msg = err["message"]
+                .as_str()
+                .or_else(|| err.as_str())
+                .unwrap_or("the stream ended with an error");
+            return Err(Fail::Server(msg.to_owned()));
+        }
+        let piece = v["choices"][0]["delta"]["content"]
+            .as_str()
+            .or_else(|| v["choices"][0]["message"]["content"].as_str())
+            .unwrap_or_default();
+        if !piece.is_empty() {
+            text.push_str(piece);
+            if !progress.tick() {
+                return Err(Fail::Cancelled);
+            }
+        }
+    }
+    Ok(text)
+}
+
+fn outcome(
+    mut resp: ureq::http::Response<ureq::Body>,
+    progress: Option<&mut Progress<'_>>,
+) -> Result<Outcome, Fail> {
+    let ok = (200..300).contains(&resp.status().as_u16());
+    match progress {
+        Some(p) if ok && is_event_stream(&resp) => read_stream(&mut resp, p).map(Outcome::Streamed),
+        _ => read_body(resp).map(Outcome::Reply),
+    }
 }
 
 fn get(url: &str, headers: &[(String, String)], timeout: Duration) -> Result<Reply, Fail> {
@@ -96,6 +189,19 @@ fn post(
     body: &Value,
     timeout: Duration,
 ) -> Result<Reply, Fail> {
+    match post_outcome(url, headers, body, timeout, None)? {
+        Outcome::Reply(r) => Ok(r),
+        Outcome::Streamed(_) => Err(Fail::Unreachable("unexpected stream".to_owned())),
+    }
+}
+
+fn post_outcome(
+    url: &str,
+    headers: &[(String, String)],
+    body: &Value,
+    timeout: Duration,
+    progress: Option<&mut Progress<'_>>,
+) -> Result<Outcome, Fail> {
     let bytes = serde_json::to_vec(body).map_err(|e| Fail::Unreachable(e.to_string()))?;
     let mut req = agent(timeout)
         .post(url)
@@ -103,7 +209,7 @@ fn post(
     for (k, v) in headers {
         req = req.header(k.as_str(), v.as_str());
     }
-    read_body(req.send(&bytes[..]).map_err(|e| classify(&e))?)
+    outcome(req.send(&bytes[..]).map_err(|e| classify(&e))?, progress)
 }
 
 /// `GET http://127.0.0.1:<port>/health` of the built-in helper: 200 is ready, 503 is still
@@ -170,6 +276,18 @@ impl HttpTextModel {
                 ),
             },
             Fail::Unreachable(d) => self.unreachable(&d),
+            Fail::Cancelled => TextModelError {
+                kind: ErrorKind::Cancelled,
+                message: "The request was cancelled".to_owned(),
+            },
+            Fail::Server(d) => TextModelError {
+                kind: ErrorKind::Server,
+                message: format!(
+                    "{} sent an error: {}",
+                    self.config.host().unwrap_or_default(),
+                    self.mask(&d).chars().take(400).collect::<String>()
+                ),
+            },
         }
     }
 
@@ -215,7 +333,12 @@ impl HttpTextModel {
     }
 
     /// One round trip: the model's raw text for `messages`.
-    fn chat_once(&self, req: &JsonRequest, messages: &[Message]) -> Result<String, TextModelError> {
+    fn chat_once(
+        &self,
+        req: &JsonRequest,
+        messages: &[Message],
+        progress: Option<&mut Progress<'_>>,
+    ) -> Result<String, TextModelError> {
         self.config.check_endpoint()?;
         if self.config.model.is_empty() {
             return Err(TextModelError::invalid_input(
@@ -224,7 +347,7 @@ impl HttpTextModel {
         }
         match self.config.provider {
             Provider::Anthropic => self.anthropic_once(req, messages),
-            _ => self.openai_once(req, messages),
+            _ => self.openai_once(req, messages, progress),
         }
     }
 
@@ -244,6 +367,7 @@ impl HttpTextModel {
         &self,
         req: &JsonRequest,
         messages: &[Message],
+        mut progress: Option<&mut Progress<'_>>,
     ) -> Result<String, TextModelError> {
         let url = format!("{}/chat/completions", self.config.effective_base_url());
         let mut msgs = vec![json!({ "role": "system", "content": Self::system_text(req) })];
@@ -255,24 +379,44 @@ impl HttpTextModel {
         let mut body = json!({
             "model": self.config.model,
             "messages": msgs,
-            "stream": false,
+            "stream": progress.is_some(),
             "temperature": 0,
             "max_tokens": req.max_tokens,
             "response_format": { "type": "json_schema", "json_schema": {
                 "name": req.schema_name, "strict": true, "schema": req.schema } },
         });
         let headers = self.headers();
-        let mut reply = post(&url, &headers, &body, self.timeout()).map_err(|f| self.fail(f))?;
+        let mut out = post_outcome(
+            &url,
+            &headers,
+            &body,
+            self.timeout(),
+            progress.as_deref_mut(),
+        )
+        .map_err(|f| self.fail(f))?;
         // A server that knows only `json_object` (or nothing) refuses `json_schema`: the schema
         // is already in the system prompt, so ask again without the field.
-        if matches!(reply.status, 400 | 422)
-            && (reply.body.contains("response_format") || reply.body.contains("json_schema"))
-        {
-            if let Some(o) = body.as_object_mut() {
-                o.remove("response_format");
+        if let Outcome::Reply(r) = &out {
+            if matches!(r.status, 400 | 422)
+                && (r.body.contains("response_format") || r.body.contains("json_schema"))
+            {
+                if let Some(o) = body.as_object_mut() {
+                    o.remove("response_format");
+                }
+                out = post_outcome(&url, &headers, &body, self.timeout(), progress)
+                    .map_err(|f| self.fail(f))?;
             }
-            reply = post(&url, &headers, &body, self.timeout()).map_err(|f| self.fail(f))?;
         }
+        let reply = match out {
+            Outcome::Streamed(text) if !text.is_empty() => return Ok(text),
+            Outcome::Streamed(_) => {
+                return Err(TextModelError {
+                    kind: ErrorKind::Server,
+                    message: "The text model server's reply has no message".to_owned(),
+                })
+            }
+            Outcome::Reply(r) => r,
+        };
         if !(200..300).contains(&reply.status) {
             return Err(self.server_error(&reply));
         }
@@ -365,12 +509,31 @@ fn extract_json(text: &str) -> Result<Value, String> {
 
 impl TextModel for HttpTextModel {
     fn complete_json(&self, req: &JsonRequest) -> Result<JsonReply, TextModelError> {
+        self.run(req, None)
+    }
+
+    fn complete_json_streaming(
+        &self,
+        req: &JsonRequest,
+        on_progress: &mut dyn FnMut(usize) -> bool,
+    ) -> Result<JsonReply, TextModelError> {
+        self.run(req, Some(on_progress))
+    }
+}
+
+impl HttpTextModel {
+    fn run(
+        &self,
+        req: &JsonRequest,
+        on_progress: Option<&mut dyn FnMut(usize) -> bool>,
+    ) -> Result<JsonReply, TextModelError> {
         let check = |text: &str| -> Result<Value, String> {
             let v = extract_json(text)?;
             validate(&req.schema, &v)?;
             Ok(v)
         };
-        let first = self.chat_once(req, &req.messages)?;
+        let mut progress = on_progress.map(|f| Progress { f, pieces: 0 });
+        let first = self.chat_once(req, &req.messages, progress.as_mut())?;
         let err = match check(&first) {
             Ok(value) => return Ok(JsonReply { value, attempts: 1 }),
             Err(e) => e,
@@ -384,7 +547,7 @@ impl TextModel for HttpTextModel {
         again.push(Message::user(format!(
             "That reply does not match the schema: {err}. Reply again with only the corrected JSON."
         )));
-        let second = self.chat_once(req, &again)?;
+        let second = self.chat_once(req, &again, progress.as_mut())?;
         match check(&second) {
             Ok(value) => Ok(JsonReply { value, attempts: 2 }),
             Err(e) => Err(TextModelError {

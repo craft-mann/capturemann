@@ -44,6 +44,7 @@ treat it as a preview of the release notes, not a promise.
 
 ### Fixed
 
+- The progress bar of a report (and of a long translation batch) moved only between model calls, so a normal meeting sat at 0 % and then jumped to done. The text model's answer is now streamed and the bar follows the tokens as they arrive; it still never goes back and reaches 100 % only at the end, and cancelling stops the stream.
 - A missing FFmpeg component during audio export is reported as `job_failed` with a reason that
   names the component (it was an `internal` error).
 

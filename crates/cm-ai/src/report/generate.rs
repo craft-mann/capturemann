@@ -90,6 +90,27 @@ pub fn plan(input: &Input<'_>) -> Plan {
     }
 }
 
+/// About how many tokens one call writes (a meeting's notes are about 1,000): inside a call the
+/// bar is at `n / (n + EXPECTED_TOKENS)` of the call's share after `n` streamed tokens, so half
+/// of it is passed at about this many and it never stops or overruns.
+pub const EXPECTED_TOKENS: f32 = 700.0;
+
+/// The caller's progress hook, made monotonic: whatever the calls report, the bar never goes
+/// back, and it stays under 1.0 until [`generate`] ends.
+struct Reporter<'a> {
+    f: &'a mut dyn FnMut(f32) -> bool,
+    high: f32,
+}
+
+impl Reporter<'_> {
+    fn report(&mut self, p: f32) -> bool {
+        self.high = self.high.max(p.clamp(0.0, 0.999));
+        (self.f)(self.high)
+    }
+}
+
+type Progress<'a, 'b> = &'a RefCell<Reporter<'b>>;
+
 #[derive(Default)]
 struct Totals {
     dropped_uncited: usize,
@@ -98,6 +119,9 @@ struct Totals {
     calls: usize,
 }
 
+/// One call. `slice` is the part of the whole bar this call may use; the tokens streamed from the
+/// model move the bar inside it.
+#[allow(clippy::too_many_arguments)]
 fn ask(
     model: &dyn TextModel,
     input: &Input<'_>,
@@ -105,6 +129,8 @@ fn ask(
     user: String,
     checker: &Checker,
     totals: &RefCell<Totals>,
+    progress: Progress<'_, '_>,
+    slice: (f32, f32),
 ) -> Result<Value, Error> {
     let max_tokens = (input.context_tokens / 3).clamp(1024, 4096) as u32;
     let req = JsonRequest {
@@ -114,7 +140,21 @@ fn ask(
         schema_name: format!("report_{}", input.template.id),
         max_tokens,
     };
-    let reply = model.complete_json(&req)?;
+    let reply = model
+        .complete_json_streaming(&req, &mut |n| {
+            let n = n as f32;
+            let frac = n / (n + EXPECTED_TOKENS);
+            progress
+                .borrow_mut()
+                .report(slice.0 + (slice.1 - slice.0) * frac)
+        })
+        .map_err(|e| {
+            if e.kind == ErrorKind::Cancelled {
+                Error::Cancelled
+            } else {
+                Error::Model(e)
+            }
+        })?;
     if let Err(e) = schema::validate(&input.template.schema, &reply.value) {
         return Err(Error::Model(TextModelError {
             kind: ErrorKind::InvalidOutput,
@@ -141,7 +181,7 @@ fn merge_all(
     mut level: Vec<Value>,
     checker: &Checker,
     totals: &RefCell<Totals>,
-    progress: &mut dyn FnMut(f32) -> bool,
+    progress: Progress<'_, '_>,
     base: f32,
 ) -> Result<Value, Error> {
     let budget_chars = (input.context_tokens as f64 * 0.4 * CHARS_PER_TOKEN) as usize;
@@ -171,8 +211,11 @@ fn merge_all(
             // Each round halves what is left, so the bar only moves forward.
             let before = 0.5f32.powi(round as i32 - 1);
             let after = 0.5f32.powi(round as i32);
-            let done = 1.0 - before + (before - after) * (i as f32 / total as f32);
-            if !progress(base + (0.99 - base) * done) {
+            let at = |k: usize| {
+                let done = 1.0 - before + (before - after) * (k as f32 / total as f32);
+                base + (0.99 - base) * done
+            };
+            if !progress.borrow_mut().report(at(i)) {
                 return Err(Error::Cancelled);
             }
             if g.len() == 1 {
@@ -180,7 +223,10 @@ fn merge_all(
                 continue;
             }
             let user = prompt::merge_prompt(preamble, &g);
-            next.push(ask(model, input, system, user, checker, totals)?);
+            let slice = (at(i), at(i + 1));
+            next.push(ask(
+                model, input, system, user, checker, totals, progress, slice,
+            )?);
         }
         level = next;
     }
@@ -200,34 +246,43 @@ pub fn generate(
     let checker = Checker::new(input.lines, &names(input));
     let n_chunks = split_chunks(&text, input.context_tokens).len().max(1);
     let totals = RefCell::new(Totals::default());
-    let progress = RefCell::new(progress);
+    let progress = RefCell::new(Reporter {
+        f: progress,
+        high: 0.0,
+    });
+    let progress = &progress;
     let map_share = if n_chunks > 1 { 0.7 } else { 0.95 };
 
     let notes = map_reduce(
         &text,
         input.context_tokens,
         |i, chunk| {
-            if !(progress.borrow_mut())(map_share * i as f32 / n_chunks as f32) {
+            let slice = (
+                map_share * i as f32 / n_chunks as f32,
+                map_share * (i + 1) as f32 / n_chunks as f32,
+            );
+            if !progress.borrow_mut().report(slice.0) {
                 return Err(Error::Cancelled);
             }
             let part = (n_chunks > 1).then_some((i + 1, n_chunks));
             let user = prompt::notes_prompt(&preamble, chunk, part);
-            ask(model, input, &system, user, &checker, &totals)
+            ask(
+                model, input, &system, user, &checker, &totals, progress, slice,
+            )
         },
         |parts| {
             if parts.len() <= 1 {
                 return Ok(parts.into_iter().next().unwrap_or_else(|| json!({})));
             }
-            let mut p = progress.borrow_mut();
             merge_all(
-                model, input, &system, &preamble, parts, &checker, &totals, &mut **p, map_share,
+                model, input, &system, &preamble, parts, &checker, &totals, progress, map_share,
             )
         },
     )?;
     let model_notes = if notes.is_object() { notes } else { json!({}) };
     let content = assemble(input, &model_notes);
     let t = totals.into_inner();
-    let _ = (progress.borrow_mut())(1.0);
+    let _ = (progress.borrow_mut().f)(1.0);
     Ok(Generated {
         content,
         dropped_uncited: t.dropped_uncited,

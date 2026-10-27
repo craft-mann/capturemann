@@ -332,6 +332,8 @@ pub enum ErrorKind {
     EngineFailed,
     /// The model needs more memory than is free. `job_failed`, `reason: "not_enough_memory"`.
     NotEnoughMemory,
+    /// The progress hook of a streaming call asked to stop (the job was cancelled).
+    Cancelled,
 }
 
 impl TextModelError {
@@ -374,6 +376,7 @@ impl TextModelError {
             ErrorKind::EngineMissing => "engine_missing",
             ErrorKind::EngineFailed => "engine_failed",
             ErrorKind::NotEnoughMemory => "not_enough_memory",
+            ErrorKind::Cancelled => "cancelled",
         }
     }
 
@@ -476,6 +479,21 @@ pub trait TextModel: Send + Sync {
     /// Blocking. Validates against `req.schema`, retries once with the validation error, then
     /// fails with `invalid_model_output`.
     fn complete_json(&self, req: &JsonRequest) -> Result<JsonReply, TextModelError>;
+
+    /// Like [`complete_json`](Self::complete_json), and a provider that can stream the answer
+    /// calls `on_progress` with the pieces (about one token each) received so far, counted over
+    /// the retry too, so a caller can show a bar that moves while one long answer is written.
+    /// `on_progress` returns `false` to stop: the call ends with [`ErrorKind::Cancelled`]. A
+    /// provider that cannot stream (and the default) answers like `complete_json` and never
+    /// calls the hook.
+    fn complete_json_streaming(
+        &self,
+        req: &JsonRequest,
+        on_progress: &mut dyn FnMut(usize) -> bool,
+    ) -> Result<JsonReply, TextModelError> {
+        let _ = on_progress;
+        self.complete_json(req)
+    }
 }
 
 /// The provider `none`: no network call is ever made.
