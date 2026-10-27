@@ -129,6 +129,7 @@ impl RecordingEditor {
                 m.transcribe.export_audio_focus.clone(),
             )
         };
+        self.voice_jobs_sync(cx);
         let Load::Ready(s) = &self.load else { return };
         let audio = s.voice.audio;
         // The first time a recording opens: an audio recording starts on its transcript, and a

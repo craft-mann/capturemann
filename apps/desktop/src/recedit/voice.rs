@@ -522,6 +522,10 @@ pub struct VoiceData {
     pub segments: Vec<Segment>,
     /// The translations by language code, with their lines.
     pub translations: Vec<(String, Vec<CaptionLine>)>,
+    /// The reports of the recording (AI-9), oldest first. Filled by [`VoiceData::read`].
+    pub reports: Vec<cm_ai::report::store::Report>,
+    /// The use-case preset the recording was made with (`room`, `online`, ...), when it has one.
+    pub preset: Option<String>,
     pub has_mic: bool,
     pub has_system: bool,
     /// When the recording was made (the date in the file tags).
@@ -545,6 +549,13 @@ impl VoiceData {
             speakers: state.speakers,
             segments: state.segments,
             translations,
+            reports: Vec::new(),
+            preset: m
+                .extra
+                .get("preset")
+                .or_else(|| m.settings.get("preset"))
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned),
             has_mic: present("mic"),
             has_system: present("system"),
             created: Some(m.created),
@@ -561,7 +572,14 @@ impl VoiceData {
                 Some((code, t.captions()))
             })
             .collect();
-        VoiceData::from_parts(m, translations)
+        let mut data = VoiceData::from_parts(m, translations);
+        // A report that cannot be read is skipped (the next read tries again).
+        let index = cm_ai::report::store::index_of(m);
+        data.reports = index
+            .iter()
+            .filter_map(|e| cm_ai::report::store::read(dir, &index, &e.id).ok())
+            .collect();
+        data
     }
 
     /// The lines of a translation.

@@ -20,6 +20,7 @@ pub mod snap;
 pub mod source;
 pub mod viewedit;
 pub mod voice;
+pub mod voice_panels;
 
 pub use geom::{Geom, Hit, Seg, SegKind};
 pub use inspector::{BgSpec, Preset};

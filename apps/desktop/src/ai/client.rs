@@ -36,6 +36,16 @@ impl AiError {
     pub fn is_no_model(&self) -> bool {
         self.reason.as_deref() == Some("no_model")
     }
+
+    /// `diarize` without a speaker model (`data.reason == "no_speaker_model"`).
+    pub fn is_no_speaker_model(&self) -> bool {
+        self.reason.as_deref() == Some("no_speaker_model")
+    }
+
+    /// A report without a local text model (`data.reason == "no_text_model"`).
+    pub fn is_no_text_model(&self) -> bool {
+        self.reason.as_deref() == Some("no_text_model")
+    }
 }
 
 impl std::fmt::Display for AiError {
@@ -397,6 +407,130 @@ impl AiClient {
             )
             .await?;
         job_id("translate_captions", &v)
+    }
+
+    /// `diarize` (AI-8): starts the speaker job. `num_speakers` is the "How many people?" answer
+    /// (`None`: not sure); `headset` is "My microphone only hears me". The result arrives as
+    /// `speakers.ready`. Without a speaker model the daemon answers `no_speaker_model`.
+    pub async fn diarize(
+        &self,
+        capture_id: &str,
+        num_speakers: Option<u32>,
+        min_speakers: Option<u32>,
+        headset: bool,
+    ) -> Result<String, AiError> {
+        let mut p = json!({ "capture_id": capture_id });
+        if let Some(n) = num_speakers {
+            p["num_speakers"] = json!(n);
+        }
+        if let Some(n) = min_speakers {
+            p["min_speakers"] = json!(n);
+        }
+        if headset {
+            p["headset"] = json!(true);
+        }
+        let v = self.transport.call("diarize", p).await?;
+        job_id("diarize", &v)
+    }
+
+    /// `set_speakers` (AI-8): renames (`id` to name), merges (`from` into `into`) and reassigns
+    /// time ranges, all as one undo step. Returns whether anything changed.
+    pub async fn set_speakers(
+        &self,
+        capture_id: &str,
+        rename: &[(u32, String)],
+        merge: &[(u32, u32)],
+    ) -> Result<bool, AiError> {
+        let mut p = json!({ "capture_id": capture_id });
+        if !rename.is_empty() {
+            let mut m = serde_json::Map::new();
+            for (id, name) in rename {
+                m.insert(id.to_string(), json!(name));
+            }
+            p["rename"] = Value::Object(m);
+        }
+        if !merge.is_empty() {
+            p["merge"] = Value::Array(
+                merge
+                    .iter()
+                    .map(|(from, into)| json!({ "from": from, "into": into }))
+                    .collect(),
+            );
+        }
+        let v = self.transport.call("set_speakers", p).await?;
+        Ok(v.get("changed").and_then(Value::as_bool).unwrap_or(true))
+    }
+
+    /// `generate_report` (AI-9): starts the `report` job; the result arrives as `report.ready`.
+    /// `context` holds only the fields the template lists. `report_id` regenerates that report.
+    pub async fn generate_report(
+        &self,
+        capture_id: &str,
+        template: &str,
+        language: Option<&str>,
+        context: Value,
+        report_id: Option<&str>,
+    ) -> Result<String, AiError> {
+        let mut p = json!({ "capture_id": capture_id, "template": template });
+        if let Some(l) = language {
+            p["language"] = json!(l);
+        }
+        if context.as_object().is_some_and(|o| !o.is_empty()) {
+            p["context"] = context;
+        }
+        if let Some(r) = report_id {
+            p["report_id"] = json!(r);
+        }
+        let v = self.transport.call("generate_report", p).await?;
+        job_id("generate_report", &v)
+    }
+
+    /// `export_report` (AI-9): a Markdown (`md`) or text (`txt`) file in the recording's
+    /// `exports/` folder.
+    pub async fn export_report(
+        &self,
+        capture_id: &str,
+        report_id: &str,
+        format: &str,
+    ) -> Result<PathBuf, AiError> {
+        let v = self
+            .transport
+            .call(
+                "export_report",
+                json!({ "capture_id": capture_id, "report_id": report_id, "format": format }),
+            )
+            .await?;
+        v.get("path")
+            .and_then(Value::as_str)
+            .map(PathBuf::from)
+            .ok_or_else(|| AiError::message("export_report: the answer has no path"))
+    }
+
+    /// `delete_report` (AI-9): one undo step.
+    pub async fn delete_report(&self, capture_id: &str, report_id: &str) -> Result<(), AiError> {
+        self.transport
+            .call(
+                "delete_report",
+                json!({ "capture_id": capture_id, "report_id": report_id }),
+            )
+            .await
+            .map(|_| ())
+    }
+
+    /// `edit_report` (AI-9): replaces the report's Markdown; one undo step.
+    pub async fn edit_report(
+        &self,
+        capture_id: &str,
+        report_id: &str,
+        markdown: &str,
+    ) -> Result<(), AiError> {
+        self.transport
+            .call(
+                "edit_report",
+                json!({ "capture_id": capture_id, "report_id": report_id, "markdown": markdown }),
+            )
+            .await
+            .map(|_| ())
     }
 
     /// `export_audio` (VOC-2): starts the audio export job; the result arrives as `export.done`.
@@ -859,5 +993,65 @@ mod tests {
         let p = json!({"capture_id": "cap_1", "format": "wav"});
         assert_eq!(run(c.export_audio(p.clone())).unwrap(), "job_8");
         assert_eq!(t.calls_of("export_audio"), vec![p]);
+    }
+    /// AI-8 and AI-9: the speaker and report calls send only what was chosen, and the typed
+    /// "not available" reasons are told apart.
+    #[test]
+    fn speaker_and_report_calls_send_only_what_was_chosen() {
+        let t = ScriptedTransport::new();
+        t.answer("diarize", Ok(json!({"job_id": "job_1"})));
+        t.answer(
+            "set_speakers",
+            Ok(json!({"changed": false, "speakers": []})),
+        );
+        t.answer("generate_report", Ok(json!({"job_id": "job_2"})));
+        t.answer("export_report", Ok(json!({"path": "/x/r.md"})));
+        let c = AiClient::new(t.clone());
+        assert_eq!(run(c.diarize("cap_1", None, None, false)).unwrap(), "job_1");
+        assert_eq!(
+            run(c.diarize("cap_1", Some(3), None, true)).unwrap(),
+            "job_1"
+        );
+        assert_eq!(
+            t.calls_of("diarize"),
+            vec![
+                json!({"capture_id": "cap_1"}),
+                json!({"capture_id": "cap_1", "num_speakers": 3, "headset": true})
+            ]
+        );
+        let changed = run(c.set_speakers("cap_1", &[(2, "Linh".into())], &[(4, 3)])).unwrap();
+        assert!(!changed);
+        assert_eq!(
+            t.calls_of("set_speakers"),
+            vec![json!({"capture_id": "cap_1", "rename": {"2": "Linh"},
+                "merge": [{"from": 4, "into": 3}]})]
+        );
+        run(c.generate_report(
+            "cap_1",
+            "minutes",
+            None,
+            json!({"title": "Sync"}),
+            Some("rpt_00000001"),
+        ))
+        .unwrap();
+        run(c.generate_report("cap_1", "summary", Some("vi"), json!({}), None)).unwrap();
+        assert_eq!(
+            t.calls_of("generate_report"),
+            vec![
+                json!({"capture_id": "cap_1", "template": "minutes",
+                    "context": {"title": "Sync"}, "report_id": "rpt_00000001"}),
+                json!({"capture_id": "cap_1", "template": "summary", "language": "vi"})
+            ]
+        );
+        assert_eq!(
+            run(c.export_report("cap_1", "rpt_00000001", "md")).unwrap(),
+            PathBuf::from("/x/r.md")
+        );
+        let no_model = AiError {
+            code: Some("invalid_input".into()),
+            reason: Some("no_speaker_model".into()),
+            message: String::new(),
+        };
+        assert!(no_model.is_no_speaker_model() && !no_model.is_no_text_model());
     }
 }

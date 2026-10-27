@@ -402,18 +402,6 @@ pub fn tile_keys(keys: &[String]) -> Vec<String> {
     }
 }
 
-/// Which mode the Record sheet opens in. The sidebar's mic button asks for `Audio`.
-///
-/// TODO(voice P1.1/P1.3, Record sheet owner): the sheet has no Audio mode yet, so
-/// `ui::sidebar::open_record_audio` opens it as it is; wire this hint into `open_sheet_with` when
-/// the mode switch lands, and add a `ShortcutAction::RecordAudio` for the chord below.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum RecordSheetMode {
-    #[default]
-    Screen,
-    Audio,
-}
-
 /// Element id of the mic button (the dock and the rail).
 pub const RECORD_AUDIO_ID: &str = "rec-audio";
 
@@ -921,7 +909,6 @@ mod tests {
             record_audio_aria(&record_audio_keys(&mac, Platform::Mac)),
             "Record audio, shortcut \u{2325}\u{21E7}V"
         );
-        assert_eq!(RecordSheetMode::default(), RecordSheetMode::Screen);
         assert_eq!(NavItem::Audio.route(), Route::Audio);
         assert_eq!(library_filter(&Route::Audio), Some(Filter::Audio));
         assert_eq!(Filter::Audio.daemon_kind(), Some("audio"));
