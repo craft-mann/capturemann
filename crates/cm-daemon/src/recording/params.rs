@@ -22,11 +22,11 @@
 //! ```
 //!
 //! `mode: "audio"` (VOC-1) records the microphone and/or system audio only: `{ "mode": "audio",
-//! "mic"?, "system_audio"?, "preset"?: "room|online|lecture|product|note", "title"?,
+//! "mic"?, "system_audio"?, "preset"?: "room|online|lecture|product|note", "people"?: 1..=8, "title"?,
 //! "max_duration_s"?, "countdown_s"? }`. Combined with `target`, `size`, `fps`, `codec`,
 //! `quality`, `camera`, `cursor`, `cursor_separate` or `exclude` it is `invalid_input` naming the
 //! field (VOC-1.AC9). The microphone is on unless `mic: false`; the presets `online` and `product`
-//! add system audio; `max_duration_s` defaults to `recording.audio_max_duration_s` (4 h).
+//! add system audio; `people` (how many people speak, whole number 1 to 8, only with `mode: "audio"`) is stored in the manifest settings and read by the automatic speaker step (AI-8); `max_duration_s` defaults to `recording.audio_max_duration_s` (4 h).
 //!
 //! `rect` is `[x, y, w, h]` in **physical px relative to the display**, exactly like
 //! `capture_screenshot`. `countdown` is accepted as an alias of `countdown_s` (the spec's
@@ -51,6 +51,8 @@ pub const DEFAULT_COUNTDOWN_S: u32 = 3;
 /// Default countdown before a resume (REC-4: 1 s).
 pub const DEFAULT_RESUME_COUNTDOWN_S: u32 = 1;
 
+/// Most people "How many people?" can hold (VOC-1, `start_recording.people`).
+pub const MAX_PEOPLE: u32 = 8;
 /// Longest `max_duration_s` of an audio recording (12 h, VOC-1).
 pub const AUDIO_MAX_DURATION_S: f64 = 12.0 * 3600.0;
 /// Default longest audio recording (4 h, VOC-1): the `recording.audio_max_duration_s` default.
@@ -208,6 +210,8 @@ pub struct ExcludeParams {
 pub struct StartParams {
     pub mode: RecordMode,
     pub preset: Option<AudioPreset>,
+    /// "How many people?" (VOC-1, audio mode only): 1 to 8, `None` = not known.
+    pub people: Option<u32>,
     /// `None` only in audio mode.
     pub target: Option<ScreenshotTarget>,
     pub size: Option<OutputSize>,
@@ -231,6 +235,8 @@ pub struct StartParams {
 pub struct ResolvedStart {
     pub mode: RecordMode,
     pub preset: Option<AudioPreset>,
+    /// "How many people?" (VOC-1, audio mode only): 1 to 8, `None` = not known.
+    pub people: Option<u32>,
     /// `None` only in audio mode.
     pub target: Option<ScreenshotTarget>,
     pub size: OutputSize,
@@ -321,6 +327,7 @@ impl ResolvedStart {
             return json!({
                 "mode": "audio",
                 "preset": self.preset,
+                "people": self.people,
                 "mic": self.mic,
                 "system_audio": self.system_audio,
                 "max_duration_s": self.max_duration_s,
@@ -615,6 +622,7 @@ impl StartParams {
         f.only(&[
             "mode",
             "preset",
+            "people",
             "target",
             "size",
             "fps",
@@ -665,6 +673,23 @@ impl StartParams {
                     "must be one of room, online, lecture, product, note",
                 )
             })?),
+        };
+        let people = match f.obj.get("people") {
+            None | Some(Value::Null) => None,
+            Some(_) if !audio => {
+                return Err(CmError::invalid_field("people", "needs mode \"audio\""))
+            }
+            Some(v) => Some(
+                v.as_u64()
+                    .and_then(|n| u32::try_from(n).ok())
+                    .filter(|n| (1..=MAX_PEOPLE).contains(n))
+                    .ok_or_else(|| {
+                        CmError::invalid_field(
+                            "people",
+                            format!("must be a whole number from 1 to {MAX_PEOPLE}"),
+                        )
+                    })?,
+            ),
         };
         let target = if audio {
             None
@@ -769,6 +794,7 @@ impl StartParams {
         Ok(StartParams {
             mode,
             preset,
+            people,
             target,
             size: enum_field(&f, "size", "source, 2160p, 1440p, 1080p, 720p")?,
             fps,
@@ -818,6 +844,7 @@ impl StartParams {
         ResolvedStart {
             mode: self.mode,
             preset: self.preset,
+            people: self.people,
             target: self.target,
             size: self
                 .size

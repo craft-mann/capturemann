@@ -48,7 +48,8 @@ pub const TOPICS: &[&str] = &[
     "model.changed",
     "transcript.ready",
     "translation.ready",
-    // AI-8: the speakers of a recording were found.
+    // AI-8: the speakers of a recording were found (and the automatic step queued a run).
+    "speakers.started",
     "speakers.ready",
     // AI-9: a report was written, or its run failed.
     "report.ready",

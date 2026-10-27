@@ -137,6 +137,7 @@ const PASS_THROUGH: &[&str] = &[];
 const ALIASES: &[(&str, &str)] = &[
     ("start_recording", "countdown"),
     ("start_recording", "preset"),
+    ("start_recording", "people"),
     // The running recording or a finished one, not both.
     ("add_marker", "recording_id"),
     ("upload", "file"),

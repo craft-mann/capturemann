@@ -288,6 +288,7 @@ impl Backend {
                     log::warn!("cannot start the job worker: {e}");
                 }
                 daemon.start_ai_auto_transcribe();
+                daemon.start_ai_auto_speakers();
                 // LIB-1: bundles copied in, restored or deleted outside the app appear on
                 // their own (`capture.created` / `capture.revised` / `capture.deleted`).
                 if let Err(e) = daemon.start_library_watcher() {

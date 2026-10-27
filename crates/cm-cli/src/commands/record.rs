@@ -215,6 +215,9 @@ async fn record_start_audio(
     if let Some(v) = &a.preset {
         p.insert("preset".into(), json!(v));
     }
+    if let Some(n) = a.people {
+        p.insert("people".into(), json!(n));
+    }
     if a.system_audio {
         p.insert("system_audio".into(), json!(true));
     }

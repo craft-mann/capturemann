@@ -115,7 +115,11 @@ sheet is available as **Export audio only** for screen recordings.
 - **Speakers.** The Speakers tab shows who spoke when, with names you can change. Press Find speakers;
   there is nothing to download or set up, because the two small models it needs (about 36 MB) are part of
   CaptureMann, and it works without a network. It runs on your computer, and no voiceprint is saved. How
-  accurate it is has not been measured yet.
+  accurate it is has not been measured yet. Speakers are also found by themselves after each transcript
+  (Settings > AI > "Find speakers after each transcript", on by default; turn it off there). It uses the
+  answer to "How many people?" from the Record sheet (or `capturemann record start --audio --people 3`),
+  or a guess from the preset (2 for In the room, 3 otherwise); a voice note is one person and is skipped.
+  A recording that already has speakers is never changed by it, so your renames stay.
 
 These features are tested with scripted stand-ins, not yet on real recordings by a reviewer, so
 expect rough edges and report them.

@@ -2817,3 +2817,39 @@ async fn record_start_audio_records_an_audio_bundle() {
     assert_eq!(bad.code, 2, "--preset needs --audio");
     assert_eq!(r.confirmer.shown().len(), before);
 }
+
+/// VOC-1: `record start --audio --people N` sends `people` (1 to 8); it needs `--audio`.
+#[tokio::test]
+async fn record_start_people_is_sent_and_checked() {
+    let r = recording::rec_rig(
+        cm_daemon::Decision::Approve,
+        cm_daemon::testing::FakeSources::new(),
+    );
+    for args in [
+        vec!["record", "start", "--people", "3"],
+        vec!["record", "start", "--audio", "--people", "0"],
+        vec!["record", "start", "--audio", "--people", "9"],
+    ] {
+        let bad = cli(&r.rig, &args).await;
+        assert_eq!(bad.code, 2, "{args:?}: {}{}", bad.out, bad.err);
+    }
+    let o = cli(
+        &r.rig,
+        &[
+            "record",
+            "start",
+            "--audio",
+            "--countdown",
+            "0",
+            "--preset",
+            "room",
+            "--people",
+            "3",
+        ],
+    )
+    .await;
+    assert_eq!(o.code, 0, "{}", o.err);
+    let shown = r.confirmer.shown();
+    assert_eq!(shown.last().unwrap().params["people"], 3);
+    cli(&r.rig, &["record", "stop"]).await;
+}

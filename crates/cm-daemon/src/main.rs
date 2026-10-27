@@ -211,6 +211,7 @@ async fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
     daemon.start_ai_auto_transcribe();
+    daemon.start_ai_auto_speakers();
     // Bundles copied in, restored or deleted from outside appear without a rescan (LIB-1).
     if let Err(e) = daemon.start_library_watcher() {
         log::warn!("library watcher is unavailable: {e}");

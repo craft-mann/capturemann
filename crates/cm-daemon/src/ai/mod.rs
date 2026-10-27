@@ -26,7 +26,9 @@
 //! `data.reason = "no_model"`, whose message points to the AI page and `capturemann ai models`.
 //! The automatic transcription after a recording ([`Daemon::start_ai_auto_transcribe`], setting
 //! `ai.auto_transcribe`, default on only with 16 GB of RAM or more) never starts without an
-//! installed model, and never touches the network.
+//! installed model, and never touches the network. The automatic speaker step after a transcript
+//! ([`Daemon::start_ai_auto_speakers`], setting `ai.auto_speakers`, default ON) queues the
+//! `diarize` job with the bundled speaker models and never overwrites an existing result.
 //!
 //! # The engine behind it
 //!
@@ -76,6 +78,9 @@ pub const JOB_TEXT_MODEL_DOWNLOAD: &str = "text_model_download";
 pub const TRANSCRIPT_FILE: &str = "transcript.json";
 /// Setting: transcribe after every recording (default on only with at least [`AUTO_MIN_RAM_GB`]).
 pub const SETTING_AUTO_TRANSCRIBE: &str = "ai.auto_transcribe";
+/// Setting: find the speakers after each transcript (AI-8). Default ON (maintainer decision,
+/// Oct 27, 2026); the daemon only starts it when the speaker models are usable.
+pub const SETTING_AUTO_SPEAKERS: &str = "ai.auto_speakers";
 /// RAM the automatic transcription needs by default (AI-1).
 pub const AUTO_MIN_RAM_GB: u64 = 16;
 

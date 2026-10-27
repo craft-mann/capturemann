@@ -97,6 +97,10 @@ pub const TRANSCRIPT_READY: &str = "transcript.ready";
 /// A caption translation was written (AI-5): `{ capture_id, language, engine, model, lines,
 /// untranslated, path, kept_edits, dropped_edits }`.
 pub const TRANSLATION_READY: &str = "translation.ready";
+/// The automatic speaker step queued a run after a transcript (AI-8, `ai.auto_speakers`):
+/// `{ capture_id, job_id, num_speakers, automatic: true }`. The app shows the run on the
+/// Speakers tab like one it started itself.
+pub const SPEAKERS_STARTED: &str = "speakers.started";
 /// A diarization finished (AI-8): `{ capture_id, model, speakers, segments, note, headset }`.
 pub const SPEAKERS_READY: &str = "speakers.ready";
 /// A report was written (AI-9): `{ capture_id, report_id, template, dropped_uncited, chunks }`.

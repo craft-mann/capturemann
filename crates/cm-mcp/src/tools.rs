@@ -792,6 +792,7 @@ pub fn all() -> Vec<ToolSpec> {
             input: json!({ "type": "object", "properties": {
                 "mode": { "type": "string", "enum": ["screen", "audio"], "default": "screen", "description": "`audio`: microphone and/or system audio only (see above)." },
                 "preset": { "type": "string", "enum": ["room", "online", "lecture", "product", "note"], "description": "Only with `mode: \"audio\"`: the use case. `room` (interview, 1:1, meeting around a laptop), `lecture` and `note` record the microphone; `online` (call) and `product` (demo call) add system audio. Every source can still be set." },
+                "people": { "type": "integer", "minimum": 1, "maximum": 8, "description": "Only with `mode: \"audio\"`: how many people speak, when known. Stored with the recording; the automatic speaker step (setting `ai.auto_speakers`, on by default) uses it as the speaker count. Absent = not known (the preset decides: 2 for `room`, 3 otherwise; `note` skips the speaker step)." },
                 "target": { "description": "Required for a screen recording; refused with `mode: \"audio\"`.", "oneOf": [
                     { "type": "object", "properties": { "display_id": { "type": "integer", "minimum": 0 } },
                       "required": ["display_id"], "additionalProperties": false },

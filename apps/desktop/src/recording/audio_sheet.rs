@@ -192,6 +192,12 @@ impl People {
     pub fn at_least(self) -> Option<u32> {
         (self == People::FivePlus).then_some(5)
     }
+
+    /// The `people` the recording stores (`start_recording.people`, 1 to 8): the count, or 5 for
+    /// "5+". "Not sure" stores nothing (unknown).
+    pub fn stored(self) -> Option<u32> {
+        self.count().or(self.at_least())
+    }
 }
 
 /// What the sheet knows when it opens (settings and the AI page's state).
@@ -231,7 +237,7 @@ impl AudioDefaults {
                 .unwrap_or(DEFAULT_MAX_DURATION_S),
             consent_notice: setting(s, KEY_CONSENT).unwrap_or(true),
             seen: setting(s, KEY_SEEN).unwrap_or(false),
-            auto_speakers: setting(s, KEY_AUTO_SPEAKERS).unwrap_or(false),
+            auto_speakers: setting(s, KEY_AUTO_SPEAKERS).unwrap_or(true),
         }
     }
 
@@ -244,6 +250,7 @@ impl AudioDefaults {
             self.mic,
             self.mic_device.as_deref(),
             self.system_audio,
+            None,
         );
         if !self.mic && !self.system_audio {
             // Nothing was left on: record the microphone, the one source every preset has.
@@ -253,25 +260,31 @@ impl AudioDefaults {
     }
 }
 
-/// `start_recording { mode: "audio", ... }`: sources and preset only. Title, countdown and the
-/// length limit come from the daemon's settings, the same for the sheet, the shortcut and agents.
+/// `start_recording { mode: "audio", ... }`: sources, preset and the "How many people?" answer
+/// (`people`, left out when unknown). Title, countdown and the length limit come from the
+/// daemon's settings, the same for the sheet, the shortcut and agents.
 pub fn start_params(
     preset: Preset,
     mic: bool,
     mic_device: Option<&str>,
     system_audio: bool,
+    people: Option<u32>,
 ) -> Value {
     let mic = match (mic, mic_device) {
         (false, _) => json!(false),
         (true, Some(d)) => json!({ "device_id": d }),
         (true, None) => json!(true),
     };
-    json!({
+    let mut p = json!({
         "mode": "audio",
         "preset": preset.key(),
         "mic": mic,
         "system_audio": system_audio,
-    })
+    });
+    if let Some(n) = people {
+        p["people"] = json!(n);
+    }
+    p
 }
 
 /// What the Audio mode of the sheet holds.
@@ -294,7 +307,11 @@ pub struct AudioSheetModel {
     pub seen: bool,
     /// `ai.auto_transcribe` is on and a model is installed: its label (for "Transcribe · Medium").
     pub transcribe_model: Option<String>,
+    /// `ai.auto_speakers` (default on).
     pub auto_speakers: bool,
+    /// Both speaker model files are usable (they ship inside the app); read from the AI page's
+    /// state as the sheet draws.
+    pub speakers_ready: bool,
     /// Free bytes on the library's volume, when known.
     pub free_bytes: Option<u64>,
 }
@@ -316,6 +333,7 @@ impl AudioSheetModel {
             seen: d.seen,
             transcribe_model: None,
             auto_speakers: d.auto_speakers,
+            speakers_ready: true,
             free_bytes: None,
         }
     }
@@ -458,6 +476,9 @@ impl AudioSheetModel {
             mic,
             self.mic_device.as_deref(),
             system,
+            self.people_visible()
+                .then(|| self.people.stored())
+                .flatten(),
         ))
     }
 
@@ -497,7 +518,10 @@ impl AudioSheetModel {
             Some(m) => (tr!("Transcribe \u{00B7} {model}", model = m), true),
             None => (tr!("Transcribe, if turned on"), false),
         };
-        let speakers = if self.auto_speakers {
+        let speakers = if self.preset == Preset::Note {
+            // One voice: there is nobody to tell apart.
+            (tr!("Speaker labels, not needed for one voice"), false)
+        } else if self.auto_speakers && self.speakers_ready {
             (tr!("Speaker labels"), true)
         } else {
             (tr!("Speaker labels, if turned on"), false)
@@ -731,7 +755,8 @@ mod tests {
         let p = m.params().unwrap();
         assert_eq!(
             p,
-            json!({"mode": "audio", "preset": "room", "mic": true, "system_audio": false})
+            json!({"mode": "audio", "preset": "room", "mic": true, "system_audio": false,
+                   "people": 2})
         );
         for banned in [
             "target", "camera", "fps", "size", "codec", "quality", "cursor",
@@ -881,7 +906,10 @@ mod tests {
             (Preset::Room, true, false)
         );
         assert_eq!(d.max_duration_s, 4.0 * 3600.0);
-        assert!(d.consent_notice && !d.seen && !d.auto_speakers);
+        assert!(
+            d.consent_notice && !d.seen && d.auto_speakers,
+            "speaker step on by default"
+        );
         // A bad stored value falls back to the default.
         let bad = AudioDefaults::from_settings(
             json!({ KEY_PRESET: "banana", KEY_MAX_DURATION: -3 })
@@ -900,10 +928,23 @@ mod tests {
         let mut m = model();
         let [t, s, r] = m.after_stop();
         assert_eq!(t, ("Transcribe, if turned on".to_owned(), false));
-        assert_eq!(s, ("Speaker labels, if turned on".to_owned(), false));
+        // The speaker step is part of the default plan.
+        assert_eq!(s, ("Speaker labels".to_owned(), true));
         assert_eq!(r, ("Suggest: Meeting minutes".to_owned(), true));
-        m.transcribe_model = Some("Medium".into());
+        // Turned off by the user, or the models are missing: "if turned on".
+        m.auto_speakers = false;
+        assert_eq!(
+            m.after_stop()[1],
+            ("Speaker labels, if turned on".to_owned(), false)
+        );
         m.auto_speakers = true;
+        m.speakers_ready = false;
+        assert!(!m.after_stop()[1].1);
+        m.speakers_ready = true;
+        // A voice note has one voice.
+        m.choose(Preset::Note);
+        assert!(!m.after_stop()[1].1);
+        m.transcribe_model = Some("Medium".into());
         m.choose(Preset::Lecture);
         let [t, s, r] = m.after_stop();
         assert_eq!(t, ("Transcribe \u{00B7} Medium".to_owned(), true));
@@ -939,6 +980,35 @@ mod tests {
         assert!(m.disk_short());
         m.free_bytes = Some(6_000_000_000);
         assert!(!m.disk_short());
+    }
+
+    /// "How many people?" is sent as `people` (1 to 8) when the sheet knows it; "Not sure" and a
+    /// voice note send nothing; the shortcut never sends it.
+    #[test]
+    fn voc1_the_people_answer_is_sent_with_the_start() {
+        let mut m = model();
+        for (p, want) in [
+            (People::NotSure, None),
+            (People::Two, Some(2)),
+            (People::Three, Some(3)),
+            (People::Four, Some(4)),
+            (People::FivePlus, Some(5)),
+        ] {
+            m.people = p;
+            assert_eq!(p.stored(), want);
+            let params = m.params().unwrap();
+            assert_eq!(
+                params.get("people").and_then(Value::as_u64),
+                want.map(u64::from)
+            );
+        }
+        m.choose(Preset::Note);
+        m.people = People::Four;
+        assert!(
+            m.params().unwrap().get("people").is_none(),
+            "a voice note asks nobody"
+        );
+        assert!(defaults().quick_params().get("people").is_none());
     }
 
     #[test]

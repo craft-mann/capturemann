@@ -614,6 +614,7 @@ impl StartSheet {
                 a.ai.auto_transcribe
                     .then(|| a.ai.active().map(|m| m.label.clone()))
                     .flatten();
+            self.audio.speakers_ready = a.ai.voice.speakers.installed;
             let root = a.backend.library_root.clone();
             if self.audio.free_bytes.is_none() {
                 use cm_capture::disk::{FreeSpace, SystemFreeSpace};

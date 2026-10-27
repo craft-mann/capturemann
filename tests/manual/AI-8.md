@@ -52,8 +52,9 @@ the disk: step 9 checks it. Turn the network off from step 2 on.
 ## 4. A hint (AC3) **[S7]**
 
 - `capturemann ai speakers ID --num 2 --wait` on fixture B gives exactly two speakers; `--num 4`
-  exactly four. The Record sheet's "How many people?" is shown but not sent yet (known gap): note
-  whether that is still so.
+  exactly four. The Record sheet's "How many people?" is sent as `start_recording.people` and stored
+  in the manifest `settings`: record a short audio take with 3 selected, then check
+  `manifest.json` has `"people": 3` and that the Speakers tab starts on 3.
 
 ## 5. Rename, merge, reassign, undo (AC4, AC5) **[S7]**
 
@@ -90,9 +91,14 @@ the disk: step 9 checks it. Turn the network off from step 2 on.
 
 ## 10. After stop, automatically **[S7]**
 
-- Turn on "Find speakers after each transcript" (`ai.auto_speakers`, default off) with automatic
-  transcription on, record 1 minute with two voices: after stop the transcript and then the
-  speakers appear without a click. Turn the switch off again.
+- "Find speakers after each transcript" (`ai.auto_speakers`) is ON by default: with automatic
+  transcription on, record 1 minute with two voices (preset In the room, "How many people?" 2):
+  after stop the transcript and then the speakers appear without a click, the Speakers tab shows the
+  run's progress, and the job list shows one `diarize` job started by the user.
+- Rename a speaker, then press Generate transcript again: the names stay and no second run starts.
+- Record a Voice note: no speaker run starts. Turn the switch off, record and transcribe again
+  (In the room): no run. With the speaker models removed from the app folder and the models folder:
+  nothing starts and nothing is reported.
 
 ## Report
 

@@ -637,6 +637,17 @@ pub fn on_event(app: &Entity<AppModel>, ev: &cm_daemon::events::Event, cx: &mut 
                 cx,
             );
         }
+        // AI-8, the automatic run after a transcript: the Speakers tab shows it like a click.
+        "speakers.started" => {
+            if let (Some(id), Some(job)) = (str_of("capture_id"), str_of("job_id")) {
+                app.update(cx, |m, cx| {
+                    use crate::ai::jobs::VoiceJobKind::Speakers;
+                    m.transcribe.voice_job_begin(&id, Speakers);
+                    m.transcribe.voice_job_adopt(&id, Speakers, &job);
+                    cx.notify();
+                });
+            }
+        }
         // AI-8 and AI-9 run by an agent or the CLI: the open editor reads the bundle again.
         "speakers.ready" | "report.ready" => {
             let kind = if ev.name == "speakers.ready" {

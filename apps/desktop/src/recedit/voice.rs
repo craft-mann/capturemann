@@ -526,6 +526,8 @@ pub struct VoiceData {
     pub reports: Vec<cm_ai::report::store::Report>,
     /// The use-case preset the recording was made with (`room`, `online`, ...), when it has one.
     pub preset: Option<String>,
+    /// "How many people?" as answered when recording (`settings.people`, 1 to 8), when known.
+    pub people: Option<u32>,
     pub has_mic: bool,
     pub has_system: bool,
     /// When the recording was made (the date in the file tags).
@@ -556,6 +558,12 @@ impl VoiceData {
                 .or_else(|| m.settings.get("preset"))
                 .and_then(serde_json::Value::as_str)
                 .map(str::to_owned),
+            people: m
+                .settings
+                .get("people")
+                .and_then(serde_json::Value::as_u64)
+                .and_then(|n| u32::try_from(n).ok())
+                .filter(|n| (1..=8).contains(n)),
             has_mic: present("mic"),
             has_system: present("system"),
             created: Some(m.created),
