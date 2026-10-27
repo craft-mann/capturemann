@@ -3,7 +3,7 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
-## [0.2.0] - Unreleased
+## [0.2.0] - 2026-10-27
 
 0.2.0 (voice and meetings). The maintainer sets the date when it is cut. Everything below is built and
 tested with scripted fakes; the real speech, speaker and text engines were also run through the CLI on
@@ -82,12 +82,8 @@ no hardware run is stored in `verification/` yet. See Known limitations.
 - Ollama and LM Studio (a text model from a server of your own) are not offered; they are a later item.
 - The bundled LGPL FFmpeg (built with `make ffmpeg` on Oct 27, 2026) has the `wav` muxer and the
   `pcm_s24le` encoder that WAV export needs; the export itself still awaits its hardware check.
-- Hardware reports are pending: the audio recording checks (10-minute call sync, kill -9 recovery,
-  3-hour soak, sleep and lid, consent line, markers), the audio export checks (WAV, M4A, loudness)
-  and the review of reports on real recordings. What is known so far is the maintainer's own use on one
-  Mac and the CLI runs above, none of it stored as a verification report. Manual scripts are in
-  `tests/manual/` (`VOC-1.md`, `VOC-2.md`, `AI-5.md`, `AI-7.md`, `AI-8.md`, `AI-9.md`,
-  `FIRST-RUN-0.2.md`, `UPGRADE-0.2.md`).
+- Hardware reports: the audio recording and the audio export checks (VOC-1, VOC-2) were run by the maintainer on one Mac and reported PASS on Oct 27, 2026 (`verification/VOC-1-2026-10-27-maintainer.md`, `VOC-2-2026-10-27-maintainer.md`); measured numbers (call sync, soak memory and drift, loudness) were not stored, and the AI checks (AI-5, AI-7, AI-8, AI-9) have no stored report yet. What is known otherwise is the maintainer's own use on one
+  Mac and the CLI runs above. Manual scripts are in `tests/manual/`.
 - A library from 0.1.0 is upgraded when 0.2.0 opens it (the index moves from version 2 to 3; bundles are
   not changed). This was tried on a synthetic 0.1.0 library only; make a copy of a large real library
   before you open it with 0.2.0, and do not open it with 0.1.0 afterwards.
