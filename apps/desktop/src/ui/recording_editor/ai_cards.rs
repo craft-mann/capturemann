@@ -680,8 +680,9 @@ impl RecordingEditor {
                 .min_w(px(0.))
                 .p(px(14.))
                 .flex()
-                .flex_col()
-                .gap(px(10.))
+                // The one tile of an audio recording fills the row: icon and label side by side.
+                .when(audio, |d| d.flex_row().items_center().gap(px(12.)))
+                .when(!audio, |d| d.flex_col().gap(px(10.)))
                 .rounded(px(scale::RADIUS_LG))
                 .border_1()
                 .border_color(rgba_of(t.border))
