@@ -52,7 +52,7 @@ Everything of the voice work ships in 0.2.0: audio-only recording (VOC-1), the a
 
 ### Release checklist for 0.2.0
 
-Signed and notarized DMG built and installed by the maintainer on Oct 27, 2026: `verification/RELEASE-0.2.0-2026-10-27-maintainer.md` (PASS, hands-on as reported; draft release, not yet public).
+Signed and notarized DMG built and installed by the maintainer on Oct 27, 2026: `verification/RELEASE-0.2.0-2026-10-27-maintainer.md` (PASS, hands-on as reported; published as GitHub release v0.2.0 on Oct 27, 2026; Homebrew cask OK as reported).
 
 Done (Oct 27, 2026):
 

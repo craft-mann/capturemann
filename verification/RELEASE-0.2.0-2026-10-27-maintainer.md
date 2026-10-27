@@ -16,8 +16,8 @@ are **as reported**: nothing else is stored, no screenshots, no recordings.
 - **Artifacts:** `CaptureMann-0.2.0-arm64.dmg`, 86,563,107 bytes, copied as
   `CaptureMann-v0.2.0-macos-arm64.dmg`, SHA-256
   `8344dbf22eab44c95e375acb2c2ecc3d3711d5a058876ac5cf37f062b100e150`; the app inside is about 181 MB
-- **Published as:** a GitHub draft pre-release `v0.2.0` with the DMG and its `.sha256` file (the maintainer
-  creates and publishes it; this report does not say it is public)
+- **Published as:** GitHub release `v0.2.0`, published 2026-10-27 13:52 UTC (read with `gh release view`), tag
+  on `f4497b3`, assets `CaptureMann-v0.2.0-macos-arm64.dmg` (86,563,107 bytes) and its `.sha256` file
 
 ## Steps
 
@@ -35,7 +35,7 @@ are **as reported**: nothing else is stored, no screenshots, no recordings.
 | Generating a report | PASS (as reported) | works as expected with the built-in text engine |
 | A second Mac, or a second macOS user (first install with no Keychain items) | not run | |
 | Opening a real 0.1.0 library with 0.2.0 | not reported | the synthetic 0.1.0 library migrated (index 2 to 3, all bundle files unchanged) on Oct 27, 2026 |
-| Homebrew cask update and `brew install` | not run | after the release is public |
+| Homebrew cask update and `brew install` | PASS (as reported) | the maintainer reported the Homebrew cask is OK; nothing stored |
 
 ## Acceptance criteria
 
@@ -44,10 +44,12 @@ Updates stay manual.
 
 ## Problems found
 
-None reported.
+- Pushing the tag also started `release.yml` on GitHub (run 40512349260). Its build job passed (20 minutes, an
+  unsigned build, because no signing secrets exist in the repository) and its last job refused to create a
+  release because the hand-made one existed. The release was not changed. For manual releases, disable the
+  workflow first (`gh workflow disable release.yml`) or limit it to manual runs.
 
 ## Verdict
 
 PASS for signing, notarization, Gatekeeper on the DMG and the first install on the build machine; the
-hands-on checks are as reported. A first install on a second Mac or user, a run of the release
-workflow (it has never run on GitHub), and the Homebrew cask are not done.
+hands-on checks are as reported. A first install on a second Mac or user is not done. The release workflow ran once on GitHub (unsigned build, passed; see Problems found).
