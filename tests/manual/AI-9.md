@@ -13,7 +13,7 @@ Setup:
 
 1. In the app: AI page, text model: a model downloaded and in use (`AI-7.md`; Gemma 4 E2B is the recommended one).
    `capturemann ai text-model test` must print `answered`.
-3. A recording with a transcript of at least 30 words and, for steps 3 and 4, speaker names
+2. A recording with a transcript of at least 30 words and, for steps 3 and 4, speaker names
    (`capturemann ai speakers ID`, then `rename`). The M4 fixture has no speech; use a short real
    meeting you recorded with consent, or any `.cmrec` with a transcript.
 
@@ -66,6 +66,34 @@ Steps:
     Vietnamese and `CAPTUREMANN_PSEUDO_LOCALE=1`. (The tab is built by another change; if it is not
     in your build, mark this step "not present".)
 
+15. **The report view.** Open a finished report in the Report tab. Check, one by one:
+    - **Citations.** Every item ends with time chips; pressing one moves the playhead to that time
+      (and plays the cited moment in the left column, step below).
+    - **Owners.** Action items show an owner chip (a speaker or attendee name, or "Unassigned"); a
+      renamed speaker shows the new name after regenerating.
+    - **Chips under the text.** The chips (times, owners, markers) sit under the text of each item, not
+      inside it, and wrap at the narrowest window without being cut off.
+    - **Task checkboxes.** Action items have a checkbox; ticking it is remembered after you leave the
+      recording and come back, and ticked items show as `- [x]` in the Markdown export.
+    - **Left column.** Pressing a citation shows the cited moment (the transcript lines around it) and a
+      player for it. It plays from that time and does not move the editor's own playhead by surprise.
+    - **Copy.** Copy puts the report on the clipboard as text; paste it into a note and read it.
+    - **Export.** Choose Markdown or TXT, tick or untick the parts offered (for example the
+      attendees, the marked moments, the times), export, open the file: only the ticked parts are
+      in it. Running it again writes `... (2)`, the first is untouched.
+    If the left column, the checkboxes or the ticks are not in your build, mark that line "not
+    present" (the status page says which are built).
+16. **The offer after a transcript.** Transcribe a recording that has none (AI page model installed,
+    text model in use). When the transcript is ready a toast asks "Write a report?". Press its
+    button: the Report tab opens and the job starts. Dismiss it on another recording: no job runs and
+    nothing is asked again for that recording until a new transcript is made. With no text model in
+    use the toast, if shown, leads to the setup, never to a request (check with a network monitor).
+17. **Progress while it writes.** Start a report on a 20 to 30 minute meeting and watch the bar. Pass:
+    it moves steadily with the model's words (no long wait at 0 % followed by a jump to done), never
+    goes backwards, reaches 100 % only when the report appears, and Cancel stops it within a few
+    seconds, leaving the previous report (if any) untouched. Write down how long the job took and
+    which Mac and model.
+
 ## Review set
 
 AC1 and the quality bar need a set of recordings read by a person. Gather, with consent, and keep
@@ -88,7 +116,7 @@ score on this card and keep it in `verification/`:
 Write the model, the context size, the time each job took and which Mac. These runs also answer
 spike S8 (is Gemma 4 E2B the right default): do not change the default here, report the scores.
 
-Pass: steps 1 to 12 behave as written, step 13 meets its bar and step 14 passes or is marked "not
-present". Quality review (3 meetings, 2 interviews, 1 lecture, in
+Pass: steps 1 to 12 behave as written, step 13 meets its bar and steps 14 to 17 pass or are marked
+"not present" (a line of step 15 may be marked on its own). Quality review (3 meetings, 2 interviews, 1 lecture, in
 English and Vietnamese, scored by hand) goes in `verification/` using its template; say "verified"
 only with that report.

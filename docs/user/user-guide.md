@@ -73,6 +73,10 @@ silences and filler words.
 
 ## Recording audio (0.2.0, preview)
 
+The first time you use the voice features, download the models you want on the **AI page**: a
+speech model (Large v3 Turbo) and a text model (Gemma 4 E2B). Nothing downloads until you press
+Download. The speaker models are already part of the app.
+
 Open the Record sheet and switch to **Audio** (or press ⌥⇧V). Pick a preset (In the room, Online
 meeting, Lecture or talk, Product demo, Voice note), then the microphone, system audio or both. The
 microphone alone does not need the Screen Recording permission; system audio does. The sheet shows
@@ -103,26 +107,39 @@ sheet is available as **Export audio only** for screen recordings.
   `large-v3-turbo` model cannot translate). Other languages need a text model (below). The original
   stays; switch languages with the language switcher, edit a translation like the original and export
   captions per language.
-- **Text model.** On the AI page, download a model (the size and licence are shown first; **Gemma 4 E2B** is
-  recommended on every Mac), press **Use this model** and then **Test**. **Qwen3.5 4B** is optional
-  and best for translation into other languages; **Qwen3.5 2B** is the smallest, for Macs with
-  little free memory. **Don’t use a model** turns it off. The model runs inside CaptureMann and your text stays
-  on your own computer. There is no cloud option and no other server.
+- **Text model.** CaptureMann has its own text engine built in; you only download a model. On the AI
+  page, download a model (the size and licence are shown first; **Gemma 4 E2B** is the default and
+  recommended on every Mac), press **Use this model** and then **Test**. **Gemma 4 26B-A4B** (about 15
+  GB) writes better notes and translations but is shown only on Macs with 32 GB of memory or more.
+  **Qwen3.5 4B** is optional and best for translation into other languages; **Qwen3.5 2B** is the
+  smallest, for Macs with little free memory. A model that needs more memory than your Mac has free
+  shows a warning. **Remove** deletes the file; **Don’t use a model** turns the model off. The
+  model runs inside CaptureMann and your text stays on your own computer. There is no cloud option,
+  and Ollama or LM Studio are not supported (maybe later). The glossary of names and terms is on the
+  same AI page.
+- **Speech model.** **Large v3 Turbo** is the recommended speech model (fast). Use **Large v3**
+  when you want a translation to English.
 - **Reports.** The Report tab writes meeting minutes, interview notes, one-on-one notes, lecture
-  notes, a product recap or a plain summary from the transcript. Every item has a time that jumps to
-  that moment, so you can check it. Edit the Markdown, regenerate, and export as Markdown or text.
+  notes, a product recap or a plain summary from the transcript. After a transcript CaptureMann asks
+  "Write a report?". Every item has a time that jumps to that moment, with the owner of an action
+  item beside it and a checkbox to tick it off; the left column shows the cited moment with a player.
+  While a report is written the progress bar moves with the model. Edit the Markdown, regenerate, **Copy**, and
+  export as Markdown or text (you choose what goes in).
   Interview notes are notes only: CaptureMann does not score people.
 - **Speakers.** The Speakers tab shows who spoke when, with names you can change. Press Find speakers;
   there is nothing to download or set up, because the two small models it needs (about 36 MB) are part of
   CaptureMann, and it works without a network. It runs on your computer, and no voiceprint is saved. How
-  accurate it is has not been measured yet. Speakers are also found by themselves after each transcript
+  accurate it is has not been measured; it has worked on one meeting so far, so check the names. Speakers are also found by themselves after each transcript
   (Settings > AI > "Find speakers after each transcript", on by default; turn it off there). It uses the
   answer to "How many people?" from the Record sheet (or `capturemann record start --audio --people 3`),
   or a guess from the preset (2 for In the room, 3 otherwise); a voice note is one person and is skipped.
   A recording that already has speakers is never changed by it, so your renames stay.
 
-These features are tested with scripted stand-ins, not yet on real recordings by a reviewer, so
-expect rough edges and report them.
+An audio recording opens its editor straight away; it has no details page (the editor has **Reveal in
+Finder** instead). These features are tested with scripted stand-ins and have been tried by the
+maintainer on a few recordings (speakers on one meeting), but not yet on a wide set of real
+recordings, so expect rough edges and report them. A library from 0.1.0 is upgraded when you open
+it with 0.2.0; copy a large library first, and do not open it with 0.1.0 afterwards.
 
 ## Library, storage and publishing
 

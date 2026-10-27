@@ -13,8 +13,9 @@ are backlog items (later). Nothing here sends data to another host; the engine l
 - Free disk space for one built-in model (the page shows its size before the download).
 
 ## 1. The model list (AC1)
-1. Open the AI page, Text model. Expected: no None / Built in control; three models are listed
-   (Gemma 4 E2B tagged Recommended, Qwen3.5 4B, Qwen3.5 2B) with size, memory and licence; a model
+1. Open the AI page, Text model. Expected: no None / Built in control; the models are listed
+   (Gemma 4 E2B tagged Recommended, Qwen3.5 4B, Qwen3.5 2B, and Gemma 4 26B-A4B only on a Mac with
+   32 GB of memory or more: on a smaller Mac it is not listed) with size, memory and licence; a model
    that needs more memory than this Mac has free shows a warning. With none downloaded there is no
    Test row and `capturemann ai text-model` shows provider `none`.
 2. Download a model (step 2). Expected: when no model was in use, the download is selected by itself

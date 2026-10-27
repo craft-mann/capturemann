@@ -16,13 +16,18 @@ synthetic fixture for a recording with a mic and a system track, a pause and a c
 (`cargo run -p cm-daemon --example make_fixture -- --library <dir> --secs 60`), or any audio
 recording of yours. Point a second instance at it (`CAPTUREMANN_LIBRARY=<dir>`
 `CAPTUREMANN_CONFIG_DIR=<dir2>`; never your own library). For the transcript steps transcribe it
-from the AI page with a downloaded model; for the speaker steps run `capturemann ai diarize
-<id>` (needs the speaker model) or use a recording that already has speakers. Open a recording of
+from the AI page with a downloaded model; for the speaker steps wait for the automatic Find speakers after the transcript (Settings > AI,
+on by default; the two speaker models are inside the app, nothing to download), or press Find
+speakers in the Speakers tab, or run `capturemann ai speakers <id>`; a recording made with "How many
+people?" answered on the Record sheet uses that number. Open a recording of
 `kind: "audio"` (a recording made with the Audio mode of the Record sheet, ⌥⇧V). Report in
 `verification/` (template in its README). Delete anything you exported.
 
 1. **The page.** Open the recording. Expected: header with "Audio" over the title, a chip with
-   the length, Details, Upload and **Export audio...** (the primary, light button), no Publish.
+   the length, **Reveal in Finder** (it replaced Recording details: an audio recording has no details
+   page), Upload and **Export audio...** (the primary, light button), no Publish. Press Reveal in
+   Finder: Finder shows the `.cmrec` folder. Opening a recording from the Audio view of the library
+   goes straight to this editor, never to a details page.
    Under it the "now speaking" card, the timeline card, and the inspector on the **Transcript**
    tab about 560 to 600 px wide. The inspector rail has six tabs in this order: Speed,
    Transcript, Speakers, Report, Suggestions, Output.

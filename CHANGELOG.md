@@ -6,8 +6,9 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 ## [Unreleased]
 
 Planned for 0.2.0 (voice and meetings). Not released and not dated. Everything below is built and
-tested with scripted fakes; none of it has been run on hardware or seen on screen by a reviewer, so
-treat it as a preview of the release notes, not a promise.
+tested with scripted fakes. The maintainer has tried parts of it on a Mac (as reported; speaker labels
+on one meeting), but no run is stored in `verification/` yet, so treat this as a preview of the release
+notes, not a promise.
 
 ### Added
 
@@ -27,20 +28,32 @@ treat it as a preview of the release notes, not a promise.
 - Translation: captions to English with Whisper (`large-v3`, offline) and to other languages with the
   built-in text model; one translation per language, edited and exported like the original.
   `capturemann ai translate`.
-- Text model setup (AI page): a text model built into CaptureMann (downloaded on request, runs on
-  this Mac): Gemma 4 E2B is recommended on every Mac, Qwen3.5 4B is optional (best for translation
-  into other languages) and Qwen3.5 2B is the smallest. Press Use to turn it on; there is a Test button. There is no remote or cloud option and no other server.
+- A text engine built into CaptureMann (`llama-server`, MIT, bundled in the app) and a model list on
+  the AI page, downloaded on request and run on this Mac: Gemma 4 E2B is the default and recommended
+  on every Mac, Gemma 4 26B-A4B (about 15 GB) is a higher-quality option shown only on Macs with 32 GB
+  of memory or more, Qwen3.5 4B is optional (best for translation into other languages) and Qwen3.5 2B
+  is the smallest. A model that needs more memory than this Mac has free shows a warning. Press Use to
+  turn it on; there is a Test button and a Remove that deletes the file. There is no remote or cloud
+  option, and no Ollama or LM Studio (a server of your own is a later item). The glossary now lives on
+  the AI page.
 - Reports from a transcript with the built-in text model: meeting minutes, interview notes, one-on-one
   notes, lecture notes, product recap and summary, with times on every item that jump to that
   moment, editing, regenerating and export as Markdown or text. `capturemann ai report`.
 - Speaker labels (who spoke when), renaming, merging and reassigning speakers, and speaker names
   in exports and reports. The two speaker models (about 36 MB) are included in the app, so there is nothing to download or
-  set up and it works offline; accuracy has not been measured yet. They are found automatically after each
+  set up and it works offline. Accuracy has not been measured; the maintainer found it working on one
+  meeting and more testing with other people is planned. They are found automatically after each
   transcript (Settings > AI > "Find speakers after each transcript", on by default), using "How many
   people?" from the Record sheet (`start_recording` `people`, `capturemann record start --audio --people N`)
   or the preset's guess; a recording that already has speakers is left alone.
 - Whisper models `large-v3` (translation to English) and `large-v3-turbo` (fast transcription, not
-  for translation).
+  for translation). Large v3 Turbo is the recommended speech model on the AI page.
+- The Report view: every item has time chips that jump to the moment, owners, action-item checkboxes,
+  a column with the cited moment and a player, Copy, and export to Markdown or TXT with choices to tick.
+  After a transcript a toast asks "Write a report?". While a report is written the progress bar follows
+  the model (see Fixed).
+- An audio recording opens its editor straight away and has no details page; the editor's top bar has
+  Reveal in Finder where screen recordings have Recording details.
 
 ### Fixed
 
@@ -50,14 +63,22 @@ treat it as a preview of the release notes, not a promise.
 
 ### Known limitations (0.2.0)
 
-- Speaker labels have no model yet (S7). Gemma 4 E2B is the recommended text model; its quality on
-  your own recordings is still being checked (S8).
+- Speaker accuracy has not been measured against labelled recordings (spike S7); it worked on one
+  meeting for the maintainer. Gemma 4 E2B is the default text model; its quality on your own
+  recordings is still being checked (spike S8).
+- No first-use setup sheet yet (one place to download the speech and text models when you first
+  record); it comes in 0.2.1. Until then the AI page is where models are downloaded.
 - Live transcript while recording (VOC-3) is not included; it comes in a later 0.2.x.
 - The bundled FFmpeg needs a rebuild with the `wav` muxer and `pcm_s24le` before WAV export works
   in the shipped app.
-- Not run on hardware: the 10-minute call sync, the kill -9 recovery and the 3-hour soak for audio
-  recording, real `large-v3` translation quality, and real local-model reports. Manual scripts are in
-  `tests/manual/` (`VOC-1.md`, `VOC-2.md`, `AI-5.md`, `AI-7.md`, `AI-8.md`, `AI-9.md`).
+- Tested with scripted fakes and, in a few places, a real engine, but not yet checked by a person on
+  hardware: the 10-minute call sync, the kill -9 recovery and the 3-hour soak for audio recording,
+  real `large-v3` translation quality, and real local-model reports. Manual scripts are in
+  `tests/manual/` (`VOC-1.md`, `VOC-2.md`, `AI-5.md`, `AI-7.md`, `AI-8.md`, `AI-9.md`,
+  `FIRST-RUN-0.2.md`, `UPGRADE-0.2.md`).
+- A library from 0.1.0 is upgraded when 0.2.0 opens it (the index moves from version 2 to 3; bundles are
+  not changed). This was tried on a synthetic 0.1.0 library only; make a copy of a large real library
+  before you open it with 0.2.0, and do not open it with 0.1.0 afterwards.
 
 ## [0.1.0] - 2026-10-26
 

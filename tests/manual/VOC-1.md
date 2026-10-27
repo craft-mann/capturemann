@@ -38,8 +38,13 @@ Open it from the tray with Microphone already allowed to the dev bundle.
   speak and stays dark when the switch is off. Open the picker, choose another microphone: the
   meter follows it. The macOS orange microphone dot is on while the sheet is open in Audio mode
   and goes out when you close the sheet or switch to Screen.
-- "How many people?" shows Not sure, 2, 3, 4, 5+ (not for Voice note). It changes nothing in the
-  recording yet (the speaker step is a later stage).
+- "How many people?" shows Not sure, 2, 3, 4, 5+ (not for Voice note). The answer is stored with
+  the recording (`capturemann record start --audio --people N` does the same) and the automatic
+  Find speakers step uses it after the transcript; without an answer the preset's guess is used (2 for
+  In the room, 3 otherwise). Check it after a short recording: `capturemann capture get ID` shows
+  the stored number, and, with a speech model installed and Settings > AI > "Find speakers after each
+  transcript" on (the default), the Speakers lane fills in without pressing anything. A Voice note
+  skips the step.
 - "After you stop": Transcribe (with the model name when a model is installed and automatic
   transcription is on, else "if turned on"), Speaker labels, Suggest: the report of the preset.
 - Footer line: "About ... GB per hour · ... GB free", "Keep the lid open: closing it stops the

@@ -75,6 +75,19 @@ are run by hand, see [`CLAUDE.md`](../../CLAUDE.md).
 | [`AI-UI`](AI-UI.md) | AI-UI: the AI page, the notice and the caption editor (by eye) |
 | [`I18N-IME`](I18N-IME.md) | I18N-IME: input-method composition in the text fields |
 
+## Voice and meetings (0.2.0)
+
+| Script | What it checks |
+|---|---|
+| [`VOC-1`](VOC-1.md) | Audio recording: sheet, HUD, markers, consent line, kill -9, 3-hour soak |
+| [`VOC-2`](VOC-2.md) | The audio editor and Export audio |
+| [`AI-5`](AI-5.md) | Translation |
+| [`AI-7`](AI-7.md) | The built-in text model on the AI page |
+| [`AI-8`](AI-8.md) | Speaker labels |
+| [`AI-9`](AI-9.md) | Reports, the report view and the review set |
+| [`FIRST-RUN-0.2`](FIRST-RUN-0.2.md) | A clean Mac, no models: install, record, download, report, speakers, translate, remove |
+| [`UPGRADE-0.2`](UPGRADE-0.2.md) | A 0.1.0 library opened by 0.2.0 (index version 2 to 3, bundles untouched) |
+
 ## Agents, permissions and settings
 
 | Script | What it checks |

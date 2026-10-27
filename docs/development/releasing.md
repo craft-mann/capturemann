@@ -14,8 +14,11 @@ On a pushed tag `v*` (or a manual run with a tag that exists) on a `macos-14` (A
 1. Checks the tag has the form `vX.Y.Z[-suffix]` and equals the workspace version in `Cargo.toml`.
 2. Extracts the `## [X.Y.Z]` section of `CHANGELOG.md` for the release notes. It fails if the
    section is missing or empty.
-3. Builds the LGPL FFmpeg with `make ffmpeg` (cached by the hash of `packaging/ffmpeg/build-macos.sh`)
-   and runs `make licenses`.
+3. Builds the LGPL FFmpeg with `make ffmpeg` (cached by the hash of `packaging/ffmpeg/build-macos.sh`),
+   fetches the sherpa-onnx libraries and the two speaker models with `make sherpa` (cached, SHA-256
+   checked), builds `llama-server` (pinned llama.cpp v0.7.0, cmake, cached; a step checks it is there
+   before the bundle) and runs `make licenses`. `make bundle-release` fails if FFmpeg,
+   `llama-server` or the speaker models are missing. The 0.2.0 app is about 181 MB.
 4. If all signing secrets exist, it builds a signed release: `ci-keychain.sh setup`,
    `CM_HARDENED=1 make bundle-release`, `dmg.sh`, `notarize.sh`, `verify-release.sh`, and always
    `ci-keychain.sh teardown`. If none exist, it builds ad hoc, makes the DMG and runs
@@ -123,11 +126,17 @@ your keychain and the notarization credentials in the environment.
 
 ```sh
 make ffmpeg                       # once; builds packaging/ffmpeg/out
+make llama                        # once; llama-server from llama.cpp v0.7.0 (needs cmake) into packaging/llama/out
+make sherpa                       # once; sherpa-onnx static libraries (cargo needs them) and the two speaker models
 make licenses
 export CM_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"
 export APPLE_API_KEY_ID=...  APPLE_API_ISSUER=...  APPLE_API_KEY_PATH=/path/to/AuthKey_ID.p8
 make release                      # bundle-release, dmg, notarize, verify-release
 ```
+
+Since 0.2.0 the release machine needs all three of `make ffmpeg`, `make llama` and `make sherpa`
+before `make bundle-release` (CI runs them: the `release.yml` workflow builds `llama-server` and has
+the sherpa step, `ci.yml` has the sherpa step too). The app comes to about 181 MB.
 
 `make release` is the chain `bundle-release`, `dmg`, `notarize`, `verify-release`; run the steps
 one by one (`make dmg`, `make notarize`, ...) to debug. Use `bash packaging/macos/notarize.sh <dmg> --dry-run`

@@ -152,10 +152,17 @@ Make targets: `make dmg` (needs `target/bundle/CaptureMann.app`), `make notarize
 is missing from the environment. The DMG is `target/bundle/CaptureMann-<version>-arm64.dmg`
 (`DMG=...` and `APP=...` override).
 
+Since 0.2.0 `make release` (`bundle-release`) also needs `llama-server` (`make llama`) and the speaker
+models (`make sherpa`, which also gives cargo the sherpa-onnx libraries); it refuses to bundle without
+them. CI runs `make ffmpeg`, `make llama` and `make sherpa` (`release.yml`; `ci.yml` has the sherpa
+step). The release app is about 181 MB.
+
 By hand, once the certificate is in your keychain:
 
 ```
 make ffmpeg                                         # once; make release needs the LGPL FFmpeg
+make llama                                          # once; llama-server (llama.cpp v0.7.0, needs cmake) for the text engine
+make sherpa                                         # once; sherpa-onnx libraries and the two speaker models
 export CM_SIGN_IDENTITY="Developer ID Application: NAME (TEAMID)"
 export APPLE_API_KEY_ID=... APPLE_API_ISSUER=... APPLE_API_KEY_PATH=/path/AuthKey_XXXX.p8
 make release
