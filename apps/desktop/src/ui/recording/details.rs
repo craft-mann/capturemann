@@ -108,6 +108,20 @@ impl RecordingDetails {
                 .await;
             this.update(cx, |this, cx| {
                 match loaded {
+                    // An audio recording has no details page: its editor opens instead.
+                    Ok((id, (details, _, _)))
+                        if details.audio && this.id.as_deref() == Some(id.as_str()) =>
+                    {
+                        let (app, to) = (this.app.clone(), id);
+                        this.id = None;
+                        cx.defer(move |cx| {
+                            crate::ui::app::set_route(
+                                &app,
+                                crate::ui::app::Route::RecordingEditor(to),
+                                cx,
+                            )
+                        });
+                    }
                     Ok((id, (details, poster, note)))
                         if this.id.as_deref() == Some(id.as_str()) =>
                     {

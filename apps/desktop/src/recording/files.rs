@@ -191,6 +191,8 @@ pub struct Details {
     /// The recording has captions (lines in the manifest, or a transcript to make them from);
     /// the publish sheet offers to upload them.
     pub has_captions: bool,
+    /// An audio recording (`kind: "audio"`): it has no details page, it opens its editor.
+    pub audio: bool,
     pub dir: PathBuf,
 }
 
@@ -284,6 +286,15 @@ pub fn read_details(dir: &Path) -> Result<Details, FileError> {
             .and_then(serde_json::Value::as_array)
             .is_some_and(|lines| !lines.is_empty())
             || dir.join("transcript.json").is_file(),
+        audio: serde_json::from_str::<serde_json::Value>(&text)
+            .ok()
+            .and_then(|v| {
+                v.get("kind")
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_owned)
+            })
+            .as_deref()
+            == Some("audio"),
         dir: dir.to_owned(),
     })
 }
@@ -639,6 +650,20 @@ mod tests {
         });
         std::fs::write(dir.join("manifest.json"), manifest.to_string()).unwrap();
         dir
+    }
+
+    /// An audio recording says so, so it opens its editor and not the details page.
+    #[test]
+    fn an_audio_recording_is_flagged_in_its_details() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = write_bundle(tmp.path(), "Take.cmrec", "rec_a", "Take");
+        assert!(!read_details(&dir).unwrap().audio);
+        let mut m: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(dir.join("manifest.json")).unwrap())
+                .unwrap();
+        m["kind"] = json!("audio");
+        std::fs::write(dir.join("manifest.json"), m.to_string()).unwrap();
+        assert!(read_details(&dir).unwrap().audio);
     }
 
     /// LIB-1: a recording's bundle is found by its id, whatever the folder is called.

@@ -341,7 +341,7 @@ impl RecordingEditor {
             .into_any_element()
     }
 
-    /// The header (V4): "Audio" crumb, the title, a chip with the length, Details, Upload and
+    /// The header (V4): "Audio" crumb, the title, a chip with the length, Reveal in Finder, Upload and
     /// Export audio... (the primary button). No Publish for audio.
     fn audio_title_row(&self, t: &Theme, s: &Session, cx: &mut Context<Self>) -> AnyElement {
         let app = self.app.clone();
@@ -382,12 +382,48 @@ impl RecordingEditor {
             SharedString::from(s.title.clone()),
             vec![
                 length.into_any_element(),
-                self.back_button(t, cx).into_any_element(),
+                self.audio_reveal_button(t, s, cx),
                 upload.into_any_element(),
                 export.into_any_element(),
             ],
         )
         .into_any_element()
+    }
+
+    /// The icon button that shows the recording's folder in Finder (the same control as the
+    /// screenshot editor's). It replaces "Recording details": an audio recording has no details
+    /// page.
+    fn audio_reveal_button(&self, t: &Theme, s: &Session, cx: &mut Context<Self>) -> AnyElement {
+        let label = if cfg!(target_os = "macos") {
+            tr!("Reveal in Finder")
+        } else {
+            tr!("Show in folder")
+        };
+        let c = ButtonKind::Secondary.colors(t);
+        let (hover, focus) = (rgba_of(c.hover), rgba_of(t.text));
+        let dir = s.bundle.clone();
+        div()
+            .id("re-reveal")
+            .role(Role::Button)
+            .aria_label(label.clone())
+            .focusable()
+            .tab_stop(true)
+            .size(px(scale::CONTROL_H))
+            .flex()
+            .flex_none()
+            .items_center()
+            .justify_center()
+            .rounded(px(scale::RADIUS_MD))
+            .border_1()
+            .border_color(rgba_of(c.border))
+            .bg(rgba_of(c.bg))
+            .cursor_pointer()
+            .hover(move |s| s.bg(hover))
+            .focus_visible(move |s| s.border_color(focus))
+            .tooltip(crate::ui::tooltip::tip(label, Vec::new()))
+            .on_click(cx.listener(move |_, _, _, cx| cx.reveal_path(&dir)))
+            .child(icon("folder-open", 16., c.fg))
+            .into_any_element()
     }
 
     /// Opens the Export audio sheet with the choices of the last export.
