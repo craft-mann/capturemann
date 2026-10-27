@@ -146,6 +146,10 @@ pub struct ModelRow {
     /// The progress line under a running or paused row, `120 MB of 466 MB`.
     pub progress: Option<String>,
     pub actions: Vec<RowAction>,
+    /// SPDX licence name (speaker models; empty for speech models).
+    pub license: String,
+    /// The file is imported, not downloaded (speaker models).
+    pub import_only: bool,
 }
 
 /// The one-line hint of a catalogue model in the current language; a model this build does not
@@ -159,6 +163,12 @@ fn model_hint(id: &str, catalogue: &str) -> String {
         "large" => tr!("Best accuracy and translation to English"),
         "large-v3-turbo" => {
             tr!("Recommended: fast and accurate for most recordings. Not for translation.")
+        }
+        "speaker-segmentation" => {
+            tr!("Finds where speech happens and who overlaps. First of the two files that tell speakers apart.")
+        }
+        "speaker-embedding" => {
+            tr!("Compares voices so the same person gets the same label. Second of the two files that tell speakers apart.")
         }
         _ => catalogue.to_owned(),
     }
@@ -217,7 +227,11 @@ pub fn fraction(done: u64, total: u64) -> f32 {
 
 #[derive(Debug, Clone, Default)]
 pub struct ModelsVm {
+    /// The speech (Whisper) models. The speaker models (AI-8) are kept apart in
+    /// [`ModelsVm::speaker_models`], so nothing about speech counts them.
     pub list: Option<ModelList>,
+    /// The speaker-engine model files of the last list (kind `speaker`).
+    pub speaker_models: Vec<ModelInfo>,
     /// Why the list could not be read (the AI actions are missing, or the daemon is down).
     pub load_error: Option<ErrorNote>,
     pub downloads: HashMap<String, DownloadState>,
@@ -295,11 +309,30 @@ impl ModelsVm {
         l.models.iter().find(|m| m.active && m.installed)
     }
 
-    pub fn set_list(&mut self, list: ModelList) {
-        self.downloads
-            .retain(|id, _| !list.models.iter().any(|m| &m.id == id && m.installed));
-        if let Some(id) = &self.confirm_remove {
-            if !list.models.iter().any(|m| &m.id == id && m.installed) {
+    pub fn set_list(&mut self, mut list: ModelList) {
+        let (speaker, speech): (Vec<ModelInfo>, Vec<ModelInfo>) = std::mem::take(&mut list.models)
+            .into_iter()
+            .partition(|m| m.kind == cm_ai::model::ModelKind::Speaker);
+        list.models = speech;
+        self.speaker_models = speaker;
+        self.voice.speakers.set_models(&self.speaker_models);
+        let installed = |id: &String, me: &ModelsVm| {
+            list.models
+                .iter()
+                .chain(me.speaker_models.iter())
+                .any(|m| &m.id == id && m.installed)
+        };
+        let done: Vec<String> = self
+            .downloads
+            .keys()
+            .filter(|id| installed(id, self))
+            .cloned()
+            .collect();
+        for id in done {
+            self.downloads.remove(&id);
+        }
+        if let Some(id) = self.confirm_remove.clone() {
+            if !installed(&id, self) {
                 self.confirm_remove = None;
             }
         }
@@ -476,6 +509,29 @@ impl ModelsVm {
         list.models.iter().map(|m| self.row(m)).collect()
     }
 
+    /// The speaker-engine model files as rows (AI-8): the same download, import and remove
+    /// buttons as the speech models, but never "Use this model" (there is nothing to choose), and
+    /// a file that is only imported has no Download button.
+    pub fn speaker_rows(&self) -> Vec<ModelRow> {
+        self.speaker_models
+            .iter()
+            .map(|m| {
+                let mut row = self.row(m);
+                row.license = m.license.clone();
+                row.import_only = m.import_only;
+                row.actions.retain(|a| *a != RowAction::Select);
+                if m.import_only {
+                    row.actions
+                        .retain(|a| !matches!(a, RowAction::Download | RowAction::Resume));
+                    if row.actions.is_empty() {
+                        row.actions.push(RowAction::Import);
+                    }
+                }
+                row
+            })
+            .collect()
+    }
+
     fn row(&self, m: &ModelInfo) -> ModelRow {
         let dl = self.downloads.get(&m.id);
         let (status, progress, actions) = if m.installed {
@@ -533,6 +589,8 @@ impl ModelsVm {
             status,
             progress,
             actions,
+            license: String::new(),
+            import_only: false,
         }
     }
 }
@@ -576,6 +634,7 @@ mod tests {
             installed,
             active,
             path: installed.then(|| format!("/m/{id}.bin")),
+            ..Default::default()
         }
     }
 
@@ -592,6 +651,74 @@ mod tests {
         let mut vm = ModelsVm::default();
         vm.set_list(list(models));
         vm
+    }
+
+    fn speaker(id: &str, mb: u32, installed: bool, import_only: bool) -> ModelInfo {
+        ModelInfo {
+            kind: cm_ai::model::ModelKind::Speaker,
+            license: "MIT".into(),
+            import_only,
+            ..info(id, mb, installed, false)
+        }
+    }
+
+    /// AI-8: the speaker files are kept apart, so they never count as a speech model.
+    #[test]
+    fn speaker_files_are_not_speech_models() {
+        let vm = vm_with(vec![
+            info("small", 466, false, false),
+            speaker("speaker-segmentation", 6, true, true),
+            speaker("speaker-embedding", 30, true, false),
+        ]);
+        assert_eq!(vm.list.as_ref().unwrap().models.len(), 1);
+        assert_eq!(vm.rows().len(), 1);
+        assert_eq!(vm.speaker_rows().len(), 2);
+        assert!(!vm.installed_any(), "two speaker files are no speech model");
+        assert!(!vm.can_transcribe());
+        assert!(matches!(
+            vm.voice.speakers.card(),
+            crate::ai::voice::SpeakerCard::Installed(_)
+        ));
+    }
+
+    #[test]
+    fn a_speaker_file_has_no_use_button_and_an_import_only_file_no_download() {
+        let vm = vm_with(vec![
+            speaker("speaker-segmentation", 6, false, true),
+            speaker("speaker-embedding", 30, false, false),
+        ]);
+        let rows = vm.speaker_rows();
+        assert_eq!(rows[0].actions, vec![RowAction::Import]);
+        assert_eq!(
+            rows[1].actions,
+            vec![RowAction::Download, RowAction::Import]
+        );
+        assert_eq!(
+            (rows[0].license.as_str(), rows[0].import_only),
+            ("MIT", true)
+        );
+        // Installed: only Remove, never "Use this model".
+        let vm = vm_with(vec![speaker("speaker-embedding", 30, true, false)]);
+        assert_eq!(vm.speaker_rows()[0].actions, vec![RowAction::Remove]);
+    }
+
+    /// A speaker download goes through the same confirm step and ends when the file is listed.
+    #[test]
+    fn a_speaker_download_needs_the_second_press_and_ends_when_installed() {
+        let mut vm = vm_with(vec![speaker("speaker-embedding", 30, false, false)]);
+        assert_eq!(vm.apply("speaker-embedding", &RowAction::Download), None);
+        assert_eq!(
+            vm.speaker_rows()[0].status,
+            RowStatus::Confirming,
+            "nothing is sent before the confirm"
+        );
+        assert_eq!(
+            vm.apply("speaker-embedding", &RowAction::ConfirmDownload),
+            Some(Effect::StartDownload)
+        );
+        vm.set_list(list(vec![speaker("speaker-embedding", 30, true, false)]));
+        assert!(vm.downloads.is_empty());
+        assert_eq!(vm.speaker_rows()[0].status, RowStatus::Installed);
     }
 
     /// AI-5: the Translate panel knows in advance whether Whisper can translate.

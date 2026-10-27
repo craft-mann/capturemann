@@ -1,9 +1,10 @@
 # Small convenience entry points. Run `make help`.
-.PHONY: report help bundle bundle-dev bundle-release run-bundle run-bundle-dev licenses report ffmpeg llama dmg notarize verify-release release
+.PHONY: report help bundle bundle-dev bundle-release run-bundle run-bundle-dev licenses report ffmpeg llama sherpa dmg notarize verify-release release
 
 help:
 	@echo "make ffmpeg      build the LGPL FFmpeg (ffmpeg, ffprobe, libvpx, libopus) into packaging/ffmpeg/out (macOS arm64)"
 	@echo "make llama       build llama-server (MIT, Metal, static) into packaging/llama/out (macOS arm64); pin LLAMA_TAG and LLAMA_SHA256 in packaging/llama/build-macos.sh first"
+	@echo "make sherpa      fetch the pinned sherpa-onnx static libraries into packaging/sherpa/out (macOS arm64; run once, cargo needs them)"
 	@echo "make bundle      build release binaries and assemble target/bundle/CaptureMann.app (macOS); bundles packaging/ffmpeg/out and packaging/llama/out when they exist (CM_NO_FFMPEG=1, CM_NO_LLAMA=1 skip)"
 	@echo "make bundle-release  like bundle, but fails unless the LGPL FFmpeg, llama-server and their licence files are bundled"
 	@echo "make run-bundle  bundle, then open the app (permissions attach to CaptureMann)"
@@ -27,6 +28,9 @@ ffmpeg:
 
 llama:
 	bash packaging/llama/build-macos.sh
+
+sherpa:
+	bash packaging/sherpa/fetch-macos.sh
 
 bundle:
 	bash packaging/macos/bundle.sh

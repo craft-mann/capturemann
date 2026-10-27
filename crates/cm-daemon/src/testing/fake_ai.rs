@@ -279,6 +279,7 @@ impl ModelService for FakeAi {
                     installed: m.installed,
                     active: s.active.as_deref() == Some(m.id),
                     path: m.installed.then(|| format!("/models/ggml-{}.bin", m.id)),
+                    ..Default::default()
                 })
                 .collect(),
             active: s.active.clone(),

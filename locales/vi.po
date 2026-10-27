@@ -9964,10 +9964,6 @@ msgid "Choose a text model provider first."
 msgstr "Hãy chọn nơi chạy mô hình văn bản trước."
 
 #, fuzzy
-msgid "Downloading speaker models is not available yet."
-msgstr "Chưa thể tải mô hình nhận diện người nói."
-
-#, fuzzy
 msgid "Everything here runs on this Mac. Nothing is downloaded unless you press Download, and nothing is sent anywhere unless you choose a remote text model."
 msgstr "Mọi thứ ở đây chạy ngay trên máy Mac này. Không có gì được tải xuống trừ khi bạn nhấn Tải xuống, và không có gì được gửi đi đâu cả."
 
@@ -10158,11 +10154,6 @@ msgstr "{name} · {licence} · {size}, hiển thị trước khi bạn tải"
 #, fuzzy
 msgid "{name}, {state}"
 msgstr "{name}, {state}"
-
-#, fuzzy
-msgctxt "speaker model"
-msgid "Download"
-msgstr "Tải xuống"
 
 #, fuzzy
 msgctxt "text model"
@@ -11292,3 +11283,22 @@ msgstr "CaptureMann đang chạy"
 #, fuzzy
 msgid "Another copy ({name}) is running and uses the same library and settings. Quit it from its menu bar icon, then open this one."
 msgstr "Một bản khác ({name}) đang chạy và dùng chung thư viện và cài đặt. Hãy thoát nó từ biểu tượng trên thanh menu, rồi mở bản này."
+
+msgid "Speaker models"
+msgstr "Mô hình nhận diện người nói"
+
+#, fuzzy
+msgid "Speaker models (pyannote segmentation and CAM++)"
+msgstr "Mô hình nhận diện người nói (pyannote segmentation và CAM++)"
+
+#, fuzzy
+msgid "Finds where speech happens and who overlaps. First of the two files that tell speakers apart."
+msgstr "Tìm chỗ có tiếng nói và chỗ nhiều người nói cùng lúc. Tệp thứ nhất trong hai tệp để phân biệt người nói."
+
+#, fuzzy
+msgid "Compares voices so the same person gets the same label. Second of the two files that tell speakers apart."
+msgstr "So sánh giọng nói để cùng một người luôn có cùng một nhãn. Tệp thứ hai trong hai tệp để phân biệt người nói."
+
+#, fuzzy
+msgid "Imported from a file: unpack sherpa-onnx-pyannote-segmentation-3-0.tar.bz2 and choose model.onnx"
+msgstr "Nhập từ tệp: giải nén sherpa-onnx-pyannote-segmentation-3-0.tar.bz2 rồi chọn model.onnx"

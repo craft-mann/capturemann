@@ -13,6 +13,14 @@ rust-version.workspace = true
 [lints]
 workspace = true
 
+[features]
+# The speaker engine (AI-8): sherpa-onnx, linked statically from the prebuilt libraries that
+# `make sherpa` fetches (packaging/sherpa). On by default so CI and `make bundle` have it; build a
+# machine that has not run `make sherpa` with `--no-default-features` (no speaker engine: `diarize`
+# then answers `no_speaker_model`).
+default = ["sherpa"]
+sherpa = ["dep:sherpa-onnx"]
+
 [dependencies]
 cm-core.workspace = true
 cm-cursor.workspace = true
@@ -33,8 +41,12 @@ ureq = { workspace = true, features = ["native-tls-no-default"] }
 # needs `cmake` and a C++ toolchain at build time. See `[[licenses.exceptions]]` in deny.toml.
 whisper-rs = "0.16"
 
+# Apache-2.0, vendored in vendor/ (build.rs trimmed: no download, no unpack). Optional: feature `sherpa`.
+sherpa-onnx = { workspace = true, optional = true }
+
 [target.'cfg(target_os = "macos")'.dependencies]
 whisper-rs = { version = "0.16", features = ["metal"] }
 
 [dev-dependencies]
 tempfile.workspace = true
+hound.workspace = true

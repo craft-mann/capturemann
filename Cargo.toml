@@ -1,7 +1,9 @@
 [workspace]
 resolver = "2"
 members = ["crates/*", "apps/*"]
-exclude = ["spikes"]
+# `spikes` is a separate workspace; `vendor` holds the trimmed sherpa-onnx crates (path dependencies of
+# cm-ai) that are built as dependencies only, so fmt, clippy and test do not run on them.
+exclude = ["spikes", "vendor"]
 
 [workspace.package]
 version = "0.1.0"
@@ -21,7 +23,8 @@ thiserror = "2"
 time = { version = "0.3", default-features = false, features = ["std", "serde-well-known"] }
 
 # Internal crates: members depend on them with `cm-x.workspace = true`.
-cm-ai = { path = "crates/cm-ai" }
+# Speaker engine (sherpa-onnx): off by default here; a member turns it on through its `sherpa` feature.
+cm-ai = { path = "crates/cm-ai", default-features = false }
 cm-audio = { path = "crates/cm-audio" }
 cm-auth = { path = "crates/cm-auth" }
 cm-camera = { path = "crates/cm-camera" }
@@ -29,7 +32,7 @@ cm-capture = { path = "crates/cm-capture" }
 cm-cli = { path = "crates/cm-cli" }
 cm-core = { path = "crates/cm-core" }
 cm-cursor = { path = "crates/cm-cursor" }
-cm-daemon = { path = "crates/cm-daemon" }
+cm-daemon = { path = "crates/cm-daemon", default-features = false }
 cm-encode = { path = "crates/cm-encode" }
 cm-i18n = { path = "crates/cm-i18n" }
 cm-ipc = { path = "crates/cm-ipc" }
@@ -69,6 +72,7 @@ rusqlite = "0.37"
 sha2 = "0.10"
 tempfile = "3"
 tokio = "1"
+sherpa-onnx = { path = "vendor/sherpa-onnx" }
 unicode-segmentation = "1"
 ureq = { version = "3.5", default-features = false }
 

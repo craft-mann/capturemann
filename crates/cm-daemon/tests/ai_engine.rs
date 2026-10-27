@@ -144,6 +144,80 @@ fn fake_model(dir: &std::path::Path) -> std::path::PathBuf {
     p
 }
 
+/// AI-8: the speaker models are rows of `list_models` (kind, licence, import-only flag) managed by
+/// the same actions as the speech models; the import checks the pinned file, a download of the
+/// import-only row is refused, they are never the speech model, and `diarize` without them says
+/// `no_speaker_model`.
+#[tokio::test]
+async fn ai_8_speaker_models_are_listed_pinned_on_import_and_needed_by_diarize() {
+    let Some(r) = rig().await else { return };
+    let list = call(&r, "list_models", json!({})).await.unwrap();
+    let rows = list["models"].as_array().unwrap();
+    let speaker: Vec<&Value> = rows.iter().filter(|m| m["kind"] == "speaker").collect();
+    let ids: Vec<&str> = speaker.iter().map(|m| m["id"].as_str().unwrap()).collect();
+    assert_eq!(ids, ["speaker-segmentation", "speaker-embedding"]);
+    assert_eq!(speaker[0]["license"], "MIT");
+    assert_eq!(speaker[0]["import_only"], true);
+    assert_eq!(speaker[1]["license"], "Apache-2.0");
+    assert!(speaker[1].get("import_only").is_none());
+    assert!(
+        rows.iter()
+            .filter(|m| m["kind"] != "speaker")
+            .all(|m| m.get("license").is_none()),
+        "speech rows are unchanged"
+    );
+
+    // An import-only row cannot be downloaded; the error names import_model.
+    let e = call(
+        &r,
+        "download_model",
+        json!({"model": "speaker-segmentation"}),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(code(&e), ErrorCode::InvalidInput);
+    assert!(format!("{e:?}").contains("import_model"), "{e:?}");
+
+    // A file that is not the pinned one is refused and nothing is installed.
+    let wrong = r.models.path().join("model.onnx");
+    std::fs::write(&wrong, vec![1u8; 5_992_913]).unwrap();
+    let e = call(
+        &r,
+        "import_model",
+        json!({"model": "speaker-segmentation", "path": wrong.to_str().unwrap()}),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(code(&e), ErrorCode::InvalidInput);
+    let list = call(&r, "list_models", json!({})).await.unwrap();
+    assert!(list["models"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|m| m["installed"] == false));
+
+    // A speaker model is not a speech model.
+    let e = call(&r, "transcribe", json!({"model": "speaker-embedding"}))
+        .await
+        .unwrap_err();
+    assert_eq!(code(&e), ErrorCode::InvalidInput);
+    let e = call(&r, "select_model", json!({"model": "speaker-embedding"}))
+        .await
+        .unwrap_err();
+    assert_eq!(code(&e), ErrorCode::InvalidInput);
+
+    // Without the models `diarize` says so, and nothing is queued.
+    let e = call(
+        &r,
+        "diarize",
+        json!({"capture_id": r.id, "num_speakers": 2}),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(code(&e), ErrorCode::InvalidInput);
+    assert_eq!(reason(&e), "no_speaker_model");
+}
+
 /// AI-1, AI-3, AI-4 end to end: no model, import one, transcribe a fixture recording, read the
 /// transcript and caption lines, export SRT through a cut (AC4), and list suggestions.
 #[tokio::test]

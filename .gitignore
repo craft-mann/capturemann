@@ -42,6 +42,8 @@ packaging/ffmpeg/out/
 packaging/ffmpeg/.downloads/
 packaging/llama/out/
 packaging/llama/.downloads/
+packaging/sherpa/out/
+packaging/sherpa/.downloads/
 
 # Local-only: agent settings and worktrees
 .claude/

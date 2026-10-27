@@ -1,0 +1,25 @@
+# Vendored from sherpa-onnx-sys 2.0.1 (crates.io; Apache-2.0), trimmed for CaptureMann:
+#  * build.rs no longer downloads or unpacks anything: it only links the static libraries found in
+#    SHERPA_ONNX_LIB_DIR (packaging/sherpa/fetch-macos.sh puts them there; `make sherpa`);
+#  * the four build-dependencies (ureq, zip, bzip2, tar) are gone, and with them the build-time
+#    licences bzip2-1.0.6 and CDLA-Permissive-2.0;
+#  * the `shared` feature, the Android/iOS/Tauri helpers and docs.rs handling are removed.
+# The FFI source in src/ is unchanged. See vendor/README-CaptureMann.md.
+
+[package]
+edition = "2021"
+name = "sherpa-onnx-sys"
+version = "2.0.1"
+build = "build.rs"
+links = "sherpa-onnx"
+description = "Raw FFI bindings to the sherpa-onnx C API (vendored, static link only)"
+license = "Apache-2.0"
+publish = false
+
+[lib]
+name = "sherpa_onnx_sys"
+path = "src/lib.rs"
+
+# Not a member of the CaptureMann workspace (see vendor/README-CaptureMann.md); this empty table also
+# stops cargo from looking for a workspace further up the tree.
+[workspace]

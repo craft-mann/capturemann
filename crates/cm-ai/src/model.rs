@@ -5,6 +5,11 @@
 //!   the checksums and sizes were read from the repository's LFS pointer files. A file at
 //!   `<root>/catalog.json`, or the path in `CAPTUREMANN_AI_CATALOG`, replaces the list, so a
 //!   mirror, a new revision or a corrected checksum needs no rebuild.
+//! * The **speaker models** (AI-8) are catalogue rows of kind [`ModelKind::Speaker`] from
+//!   `data/speaker_models.json`: the same store, downloads, checksums, import and removal, so the
+//!   `list_models`, `download_model`, `import_model` and `remove_model` actions (and their MCP tools
+//!   and CLI commands) cover them. They never become the active speech model and `transcribe`
+//!   refuses them. A row marked `import_only` has no download URL yet: the file is imported.
 //! * The **store** lives in `<config dir>/ai` (`CAPTUREMANN_CONFIG_DIR` moves it, like the
 //!   settings file): `models/<file>` for installed models, `state.json` for the active one.
 //! * [`ModelStore::download`] runs only when a user or agent action calls it. It resumes a
@@ -30,6 +35,7 @@ use ureq::tls::{RootCerts, TlsConfig, TlsProvider};
 pub const ENV_CATALOG: &str = "CAPTUREMANN_AI_CATALOG";
 
 const BUILTIN_CATALOG: &str = include_str!("../data/models.json");
+const BUILTIN_SPEAKER_CATALOG: &str = include_str!("../data/speaker_models.json");
 /// First four bytes of a whisper.cpp ggml model: the little-endian magic `0x67676d6c`.
 const GGML_MAGIC: [u8; 4] = [0x6c, 0x6d, 0x67, 0x67];
 /// Imported files outside this range are not Whisper models (the smallest quantized `tiny` is
@@ -37,8 +43,24 @@ const GGML_MAGIC: [u8; 4] = [0x6c, 0x6d, 0x67, 0x67];
 const IMPORT_MIN_BYTES: u64 = 20_000_000;
 const IMPORT_MAX_BYTES: u64 = 4_000_000_000;
 
-/// One Whisper model as the UI and the actions show it.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// What a model is for. Speech models are Whisper ggml files; speaker models are the ONNX files of
+/// the speaker engine (AI-8).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ModelKind {
+    #[default]
+    Speech,
+    Speaker,
+}
+
+impl ModelKind {
+    fn is_speech(&self) -> bool {
+        *self == ModelKind::Speech
+    }
+}
+
+/// One model as the UI and the actions show it.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ModelInfo {
     /// Stable id: `tiny`, `base`, `small`, `medium` (multilingual ggml models).
     pub id: String,
@@ -56,6 +78,19 @@ pub struct ModelInfo {
     pub active: bool,
     /// Where the file is when installed.
     pub path: Option<String>,
+    /// Speech (Whisper) or speaker (AI-8). Older answers have no `kind`: speech.
+    #[serde(default, skip_serializing_if = "ModelKind::is_speech")]
+    pub kind: ModelKind,
+    /// SPDX name of the model's licence, shown before a download (empty when not stated).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub license: String,
+    /// The file cannot be downloaded in this build; the user imports it (`import_model`).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub import_only: bool,
+}
+
+fn is_false(b: &bool) -> bool {
+    !*b
 }
 
 /// The state `list_models` returns.
@@ -85,7 +120,7 @@ pub enum DownloadOutcome {
 }
 
 /// One catalog row.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
 pub struct CatalogEntry {
     pub id: String,
     pub label: String,
@@ -110,6 +145,20 @@ pub struct CatalogEntry {
     /// `ram_mb`, confirms the URL and removes this flag.
     #[serde(default)]
     pub pending_pin: bool,
+    /// Speech (default) or speaker model.
+    #[serde(default)]
+    pub kind: ModelKind,
+    /// SPDX licence name shown before a download.
+    #[serde(default)]
+    pub license: String,
+    /// No download URL is pinned (the file is only inside an archive the app does not unpack): the
+    /// file is imported, and `sha256` and `bytes` still pin what an import must be. `url` may be
+    /// empty; `source` says where the file comes from.
+    #[serde(default)]
+    pub import_only: bool,
+    /// Where an `import_only` file comes from, for the error message and the AI page.
+    #[serde(default)]
+    pub source: String,
 }
 
 /// The list of models the app offers.
@@ -121,8 +170,21 @@ pub struct Catalog {
 impl Catalog {
     /// The embedded list.
     pub fn builtin() -> Catalog {
-        // The embedded file is checked by a unit test, so a parse failure cannot ship.
-        Catalog::parse(BUILTIN_CATALOG).unwrap_or(Catalog { models: Vec::new() })
+        // The embedded files are checked by a unit test, so a parse failure cannot ship.
+        Catalog::parse(BUILTIN_CATALOG)
+            .unwrap_or(Catalog { models: Vec::new() })
+            .with_builtin_speakers()
+    }
+
+    /// Adds the built-in speaker models (AI-8) unless this list names speaker models itself. A
+    /// catalogue override replaces the Whisper list and keeps the speaker rows.
+    pub fn with_builtin_speakers(mut self) -> Catalog {
+        if !self.models.iter().any(|m| m.kind == ModelKind::Speaker) {
+            if let Ok(s) = Catalog::parse(BUILTIN_SPEAKER_CATALOG) {
+                self.models.extend(s.models);
+            }
+        }
+        self
     }
 
     /// Parses and checks a catalog file: unique ids, plain file names, 64-hex checksums.
@@ -162,7 +224,8 @@ impl Catalog {
                     m.id
                 )));
             }
-            if !(m.url.starts_with("https://") || m.url.starts_with("http://")) {
+            let url_ok = m.url.starts_with("https://") || m.url.starts_with("http://");
+            if !url_ok && !(m.import_only && m.url.is_empty()) {
                 return Err(CmError::invalid_input(format!(
                     "model catalog: `{}` has a bad URL",
                     m.id
@@ -199,7 +262,7 @@ impl Catalog {
             .map_err(|e| CmError::invalid_input(format!("{}: {e}", path.display())))
             .and_then(|t| Catalog::parse(&t));
         match loaded {
-            Ok(c) => (c, None),
+            Ok(c) => (c.with_builtin_speakers(), None),
             Err(e) => (Catalog::builtin(), Some(ignored_override(&path, &e))),
         }
     }
@@ -356,7 +419,8 @@ impl ModelStore {
         let text = fs::read_to_string(self.state_path()).ok()?;
         let v: Value = serde_json::from_str(&text).ok()?;
         let id = v.get("active")?.as_str()?.to_owned();
-        self.is_installed(&id).then_some(id)
+        let speech = self.catalog.get(&id).is_some_and(|e| e.kind.is_speech());
+        (speech && self.is_installed(&id)).then_some(id)
     }
 
     /// The model to use: the named one, else the active one, else the only installed one.
@@ -364,6 +428,12 @@ impl ModelStore {
     pub fn resolve(&self, requested: Option<&str>) -> Result<(String, PathBuf), CmError> {
         if let Some(id) = requested.filter(|s| !s.is_empty()) {
             let e = self.entry(id)?;
+            if !e.kind.is_speech() {
+                return Err(CmError::invalid_field(
+                    "model",
+                    format!("`{}` is a speaker model, not a speech model", e.id),
+                ));
+            }
             let p = self.path_of(&e.id).ok_or_else(|| no_model(Some(id)))?;
             return Ok((e.id.clone(), p));
         }
@@ -376,7 +446,7 @@ impl ModelStore {
             .catalog
             .models
             .iter()
-            .filter(|m| !m.pending_pin && self.file_of(m).is_file())
+            .filter(|m| !m.pending_pin && m.kind.is_speech() && self.file_of(m).is_file())
             .collect();
         if let [only] = installed.as_slice() {
             return Ok((only.id.clone(), self.file_of(only)));
@@ -404,6 +474,9 @@ impl ModelStore {
                     installed,
                     active: installed && active.as_deref() == Some(e.id.as_str()),
                     path: installed.then(|| path.display().to_string()),
+                    kind: e.kind,
+                    license: e.license.clone(),
+                    import_only: e.import_only,
                 }
             })
             .collect();
@@ -416,7 +489,17 @@ impl ModelStore {
 
     /// Makes an installed model the default one.
     pub fn select(&self, id: &str) -> Result<(), CmError> {
-        let id = self.entry(id)?.id.clone();
+        let entry = self.entry(id)?;
+        if !entry.kind.is_speech() {
+            return Err(CmError::invalid_field(
+                "model",
+                format!(
+                    "`{}` is a speaker model; only speech models can be selected",
+                    entry.id
+                ),
+            ));
+        }
+        let id = entry.id.clone();
         if !self.is_installed(&id) {
             return Err(CmError::invalid_field(
                 "model",
@@ -463,6 +546,9 @@ impl ModelStore {
         if !meta.is_file() {
             return Err(CmError::invalid_field("path", "not a file"));
         }
+        if !e.kind.is_speech() {
+            return self.import_exact(&e, src, meta.len());
+        }
         if !(IMPORT_MIN_BYTES..=IMPORT_MAX_BYTES).contains(&meta.len()) {
             return Err(CmError::invalid_field(
                 "path",
@@ -491,7 +577,36 @@ impl ModelStore {
         Ok(dest)
     }
 
+    /// Import of a speaker model: the file must be exactly the pinned one (size and SHA-256), so a
+    /// wrong or damaged file is refused before it is copied.
+    fn import_exact(&self, e: &CatalogEntry, src: &Path, len: u64) -> Result<PathBuf, CmError> {
+        if len != e.bytes || sha256_hex(src).map_err(io_error)? != e.sha256 {
+            let from = if e.source.is_empty() {
+                String::new()
+            } else {
+                format!(" It is {}.", e.source)
+            };
+            return Err(CmError::invalid_field(
+                "path",
+                format!(
+                    "this is not the `{}` file this version of CaptureMann expects \
+                     (expected {} bytes, SHA-256 {}).{from}",
+                    e.id, e.bytes, e.sha256
+                ),
+            ));
+        }
+        fs::create_dir_all(self.models_dir()).map_err(io_error)?;
+        let dest = self.file_of(e);
+        let tmp = self.part_of(e);
+        fs::copy(src, &tmp).map_err(io_error)?;
+        fs::rename(&tmp, &dest).map_err(io_error)?;
+        Ok(dest)
+    }
+
     fn activate_if_first(&self, id: &str) -> Result<(), CmError> {
+        if self.catalog.get(id).is_some_and(|e| !e.kind.is_speech()) {
+            return Ok(());
+        }
         if self.active().is_none() {
             self.write_state(Some(id))?;
         }
@@ -514,6 +629,21 @@ impl ModelStore {
         let e = self.entry(id)?.clone();
         if self.file_of(&e).is_file() {
             return Ok(DownloadOutcome::Done(self.file_of(&e)));
+        }
+        if e.import_only {
+            return Err(CmError::invalid_field(
+                "model",
+                format!(
+                    "`{}` cannot be downloaded in this version: import the file instead \
+                     (`import_model`). It is {}.",
+                    e.id,
+                    if e.source.is_empty() {
+                        "a file you already have"
+                    } else {
+                        e.source.as_str()
+                    }
+                ),
+            ));
         }
         fs::create_dir_all(self.models_dir()).map_err(io_error)?;
         let part = self.part_of(&e);
@@ -698,7 +828,7 @@ mod tests {
             ["tiny", "base", "small", "medium", "large", "large-v3-turbo"]
         );
         assert!(c.models.iter().all(|m| m.url.contains("/resolve/")));
-        assert_eq!(Catalog::builtin(), c);
+        assert_eq!(Catalog::builtin(), c.clone().with_builtin_speakers());
         // Every entry except the ones waiting for the maintainer's pin has a real checksum.
         for m in c.models.iter().filter(|m| !m.pending_pin) {
             assert_eq!(m.sha256.len(), 64, "{}", m.id);
@@ -721,7 +851,13 @@ mod tests {
         assert_eq!(turbo.bytes, 1_624_555_275);
         let dir = tempfile::tempdir().unwrap();
         let store = ModelStore::with_catalog(dir.path(), c);
-        let listed: Vec<String> = store.list().models.into_iter().map(|m| m.id).collect();
+        let listed: Vec<String> = store
+            .list()
+            .models
+            .into_iter()
+            .filter(|m| m.kind == ModelKind::Speech)
+            .map(|m| m.id)
+            .collect();
         assert_eq!(
             listed,
             ["tiny", "base", "small", "medium", "large", "large-v3-turbo"]
@@ -813,7 +949,11 @@ mod tests {
         .unwrap();
         let (store, warning) = ModelStore::open(dir.path());
         assert!(warning.is_none());
-        assert_eq!(store.list().models.len(), 1);
+        // The override replaces the speech list; the two speaker rows stay.
+        let speech: Vec<_> = (store.list().models.into_iter())
+            .filter(|m| m.kind == ModelKind::Speech)
+            .collect();
+        assert_eq!(speech.len(), 1);
     }
 
     #[test]

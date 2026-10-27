@@ -1,0 +1,27 @@
+# Vendored from sherpa-onnx 2.0.1 (crates.io; Apache-2.0). Only the manifest is changed: the
+# `static` and `shared` features are gone (the sys crate always links statically here) and the
+# sys crate is a path dependency. The Rust source in src/ is unchanged.
+# See vendor/README-CaptureMann.md.
+
+[package]
+edition = "2021"
+name = "sherpa-onnx"
+version = "2.0.1"
+build = false
+description = "Safe Rust wrapper for sherpa-onnx speech recognition toolkit (vendored)"
+documentation = "https://docs.rs/sherpa-onnx"
+license = "Apache-2.0"
+publish = false
+
+[lib]
+name = "sherpa_onnx"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sherpa-onnx-sys = { path = "../sherpa-onnx-sys" }
+
+# Not a member of the CaptureMann workspace (see vendor/README-CaptureMann.md); this empty table also
+# stops cargo from looking for a workspace further up the tree.
+[workspace]

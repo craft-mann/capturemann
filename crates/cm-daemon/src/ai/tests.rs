@@ -187,6 +187,7 @@ fn list(models: &[(&str, bool, bool)]) -> ModelList {
                 installed: *installed,
                 active: *active,
                 path: None,
+                ..Default::default()
             })
             .collect(),
         active: None,

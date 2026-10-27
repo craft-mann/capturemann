@@ -947,6 +947,9 @@ msgstr ""
 msgid "Commands"
 msgstr ""
 
+msgid "Compares voices so the same person gets the same label. Second of the two files that tell speakers apart."
+msgstr ""
+
 msgid "Competencies"
 msgstr ""
 
@@ -1501,9 +1504,6 @@ msgstr ""
 msgid "Downloading and deleting speech models always ask first."
 msgstr ""
 
-msgid "Downloading speaker models is not available yet."
-msgstr ""
-
 msgid "Downloading {percent}%"
 msgstr ""
 
@@ -1769,6 +1769,9 @@ msgstr ""
 msgid "Finding speakers… {percent}%"
 msgstr ""
 
+msgid "Finds where speech happens and who overlaps. First of the two files that tell speakers apart."
+msgstr ""
+
 msgid "Fit shows the whole screen on the background. Choose Fixed to crop a window, or Follow to keep the window on the cursor."
 msgstr ""
 
@@ -1914,6 +1917,9 @@ msgid "Image {iw} by {ih} pixels. Pointer {pointer}"
 msgstr ""
 
 msgid "Import from file"
+msgstr ""
+
+msgid "Imported from a file: unpack sherpa-onnx-pyannote-segmentation-3-0.tar.bz2 and choose model.onnx"
 msgstr ""
 
 msgid "In (I)"
@@ -3992,6 +3998,12 @@ msgid "Speaker model"
 msgstr ""
 
 msgid "Speaker model not available yet"
+msgstr ""
+
+msgid "Speaker models"
+msgstr ""
+
+msgid "Speaker models (pyannote segmentation and CAM++)"
 msgstr ""
 
 msgid "Speaker name"
@@ -8104,10 +8116,6 @@ msgstr ""
 
 msgctxt "sort key"
 msgid "Title"
-msgstr ""
-
-msgctxt "speaker model"
-msgid "Download"
 msgstr ""
 
 msgctxt "speech model"

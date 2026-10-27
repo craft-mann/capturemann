@@ -1,0 +1,5 @@
+# Where the sherpa-onnx static libraries are (made by `make sherpa`, packaging/sherpa). The vendored
+# sherpa-onnx-sys build script links them from here and never downloads anything. A variable that is
+# already set in the environment wins (`force` is off), for example SHERPA_ONNX_LIB_DIR=/path/to/lib.
+[env]
+SHERPA_ONNX_LIB_DIR = { value = "packaging/sherpa/out/lib", relative = true }

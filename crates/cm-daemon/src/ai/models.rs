@@ -20,6 +20,9 @@ impl Inner {
                 )
                 .into())
             }
+            Some(m) if m.import_only => {
+                return Err(super::dispatch::import_only_error(&model).into());
+            }
             Some(_) => {}
         }
         let queue = self.job_queue()?.queue.clone();
