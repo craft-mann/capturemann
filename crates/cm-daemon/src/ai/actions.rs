@@ -106,6 +106,14 @@ pub enum AiOp {
         report_id: String,
         markdown: String,
     },
+    /// Tick or untick one task item of a report.
+    CheckReportItem {
+        capture_id: String,
+        report_id: String,
+        section: String,
+        index: usize,
+        checked: bool,
+    },
 }
 
 impl AiOp {
@@ -133,6 +141,7 @@ impl AiOp {
             AiOp::ExportReport { .. } => "export_report",
             AiOp::DeleteReport { .. } => "delete_report",
             AiOp::EditReport { .. } => "edit_report",
+            AiOp::CheckReportItem { .. } => "check_report_item",
         }
     }
 
@@ -153,6 +162,7 @@ impl AiOp {
             | AiOp::ExportReport { capture_id, .. }
             | AiOp::DeleteReport { capture_id, .. }
             | AiOp::EditReport { capture_id, .. }
+            | AiOp::CheckReportItem { capture_id, .. }
             | AiOp::SuggestZooms { capture_id }
             | AiOp::SuggestCuts { capture_id } => Some(capture_id),
             _ => None,
@@ -337,6 +347,19 @@ impl AiParams {
                 o.insert("report_id".into(), json!(report_id));
                 o.insert("characters".into(), json!(markdown.chars().count()));
             }
+            AiOp::CheckReportItem {
+                capture_id,
+                report_id,
+                section,
+                index,
+                checked,
+            } => {
+                o.insert("capture_id".into(), json!(capture_id));
+                o.insert("report_id".into(), json!(report_id));
+                o.insert("section".into(), json!(section));
+                o.insert("index".into(), json!(index));
+                o.insert("checked".into(), json!(checked));
+            }
             AiOp::SetSpeakers { capture_id, edit } => {
                 o.insert("capture_id".into(), json!(capture_id));
                 if !edit.rename.is_empty() {
@@ -430,6 +453,11 @@ pub(crate) fn summary(p: &AiParams) -> String {
             report_id,
             ..
         } => format!("Edit the report {report_id} of {capture_id}"),
+        AiOp::CheckReportItem {
+            capture_id,
+            report_id,
+            ..
+        } => format!("Tick an item of the report {report_id} of {capture_id}"),
         other => format!("Run {}", other.method()),
     }
 }
@@ -1051,6 +1079,34 @@ pub(crate) fn parse(method: &str, f: &Fields<'_>) -> Result<Action, CmError> {
                 report_id: report_id_opt(f)?
                     .ok_or_else(|| CmError::invalid_field("report_id", "is required"))?,
                 markdown,
+            }
+        }
+        "check_report_item" => {
+            f.only(&[
+                "capture_id",
+                "report_id",
+                "section",
+                "index",
+                "checked",
+                "request_id",
+            ])?;
+            let index = match f.obj.get("index") {
+                Some(v) => v
+                    .as_u64()
+                    .and_then(|n| usize::try_from(n).ok())
+                    .filter(|n| *n < 1000)
+                    .ok_or_else(|| {
+                        CmError::invalid_field("index", "must be a whole number from 0 to 999")
+                    })?,
+                None => return Err(CmError::invalid_field("index", "is required")),
+            };
+            AiOp::CheckReportItem {
+                capture_id: f.str_req("capture_id")?,
+                report_id: report_id_opt(f)?
+                    .ok_or_else(|| CmError::invalid_field("report_id", "is required"))?,
+                section: f.str_req("section")?,
+                index,
+                checked: f.bool_or("checked", true)?,
             }
         }
         other => {

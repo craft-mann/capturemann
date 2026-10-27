@@ -380,6 +380,7 @@ pub(crate) fn tool_title(name: &str) -> String {
         "export_report" => tr!("Export a report"),
         "delete_report" => tr!("Delete a report"),
         "edit_report" => tr!("Edit a report"),
+        "check_report_item" => tr!("Tick a task in a report"),
         "list_destinations" => tr!("List save destinations"),
         "upload" => tr!("Copy a capture to a destination"),
         "list_publish_accounts" => tr!("List publish accounts"),

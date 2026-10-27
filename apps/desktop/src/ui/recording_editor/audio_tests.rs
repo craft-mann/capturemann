@@ -87,6 +87,7 @@ fn write_report(bundle: &std::path::Path) {
         reassigned_names: 0,
         chunks: 1,
         edited: false,
+        checked: Vec::new(),
         markdown: None,
     };
     store::write(bundle, &r).unwrap();
@@ -613,6 +614,77 @@ fn deleting_a_report_goes_through_delete_report_and_undo_brings_it_back(cx: &mut
         };
         assert!(!e.report_view_open(s, cx));
     });
+}
+
+#[gpui::test]
+fn ticking_a_task_goes_through_check_report_item_and_the_view_reads_it_back(
+    cx: &mut TestAppContext,
+) {
+    let (w, e, vcx) = editor(cx);
+    open_tab(&e, vcx, Inspector::Report);
+    e.update(vcx, |e, cx| {
+        e.report_check("rpt_00000001".into(), "action_items".into(), 0, true, cx)
+    });
+    let ticked = |b: &std::path::Path| {
+        let m = cm_library::read_manifest(b).unwrap();
+        let idx = cm_ai::report::store::index_of(&m);
+        cm_ai::report::store::read(b, &idx, "rpt_00000001")
+            .map(|r| r.is_checked("action_items", 0))
+            .unwrap_or(false)
+    };
+    assert!(wait_for(vcx, |_| ticked(&w.bundle)));
+    assert!(wait_for(vcx, |vcx| {
+        e.read_with(vcx, |e, _| {
+        matches!(&e.load, Load::Ready(s) if s.voice.reports.first().is_some_and(|r| r.is_checked("action_items", 0)))
+    })
+    }));
+    // A section with no tasks is refused by the daemon and nothing is stored.
+    e.update(vcx, |e, cx| {
+        e.report_check("rpt_00000001".into(), "decisions".into(), 0, true, cx)
+    });
+    vcx.run_until_parked();
+    assert!(!cm_ai::report::store::read(
+        &w.bundle,
+        &cm_ai::report::store::index_of(&cm_library::read_manifest(&w.bundle).unwrap()),
+        "rpt_00000001"
+    )
+    .unwrap()
+    .is_checked("decisions", 0));
+}
+
+#[gpui::test]
+fn a_time_chip_remembers_its_item_for_the_left_column_and_the_offer_opens_the_setup(
+    cx: &mut TestAppContext,
+) {
+    let (_w, e, vcx) = editor(cx);
+    open_tab(&e, vcx, Inspector::Report);
+    e.update(vcx, |e, cx| {
+        e.report_cite("decisions", "Decisions", 0, 2.0, cx)
+    });
+    vcx.update(|window, _| window.refresh());
+    e.read_with(vcx, |e, cx| {
+        let c = e.rleft.cite.as_ref().expect("cited");
+        assert_eq!((c.section.as_str(), c.index, c.at), ("decisions", 0, 2.0));
+        let Load::Ready(s) = &e.load else {
+            panic!("not ready")
+        };
+        assert!(e.report_left_open(s, cx));
+    });
+    // "Set up report" from the toast: the Report tab on its setup, and the request is used up.
+    let app = e.read_with(vcx, |e, _| e.app.clone());
+    app.update(vcx, |m, _| {
+        m.transcribe.report_focus = Some("rec_audio".to_owned());
+    });
+    vcx.update(|window, _| window.refresh());
+    vcx.run_until_parked();
+    e.read_with(vcx, |e, cx| {
+        let Load::Ready(s) = &e.load else {
+            panic!("not ready")
+        };
+        assert!(e.vp.setup && e.tab == Inspector::Report);
+        assert!(!e.report_view_open(s, cx));
+    });
+    assert!(app.read_with(vcx, |m, _| m.transcribe.report_focus.is_none()));
 }
 
 #[gpui::test]

@@ -324,6 +324,35 @@ async fn report(cx: &mut Ctx<'_>, a: ReportArgs) -> Result<(), CliError> {
             });
             Ok(())
         }
+        Some(ReportCmd::Check {
+            id,
+            report,
+            section,
+            item,
+            uncheck,
+        }) => {
+            let p = json!({ "capture_id": id, "report_id": report, "section": section,
+                            "index": item, "checked": !uncheck });
+            let params = cx.mutating(p, "");
+            let mut c = cx.client().await?;
+            let r = c.call("check_report_item", params).await?;
+            cx.emit(&r, |r| {
+                let word = if r["checked"] == json!(true) {
+                    "Ticked"
+                } else {
+                    "Unticked"
+                };
+                format!(
+                    "{word} item {} of {} in the report {} of {}\n  undo with `capturemann undo {}`",
+                    plain(&r["index"]),
+                    plain(&r["section"]),
+                    plain(&r["report_id"]),
+                    plain(&r["capture_id"]),
+                    plain(&r["capture_id"]),
+                )
+            });
+            Ok(())
+        }
         None => generate_report(cx, a).await,
     }
 }

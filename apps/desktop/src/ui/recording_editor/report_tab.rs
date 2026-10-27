@@ -12,9 +12,9 @@
 //! and `delete_report`; this file sends none of them itself (see `voice_fields.rs`). Not seen by
 //! eye yet (`tests/manual/VOC-2.md`).
 //!
-//! Not built: the left column of V6 (the cited moment with its context lines and a player, the
-//! overview strip with citation ticks) and the action-item checkboxes (a ticked item has nowhere
-//! to be stored).
+//! The left column of V6 (the cited moment, the overview strip with citation ticks) is in
+//! `report_left.rs`, with the task checkboxes' send (`check_report_item`, stored in the report,
+//! one undo step).
 
 use cm_ai::report::store::Report;
 use cm_i18n::{tr, tr_ctx, trn};
@@ -48,7 +48,7 @@ pub(super) enum TextState {
 }
 
 /// The template's name in the current language.
-fn template_name(id: &str, fallback: &str) -> String {
+pub(crate) fn template_name(id: &str, fallback: &str) -> String {
     match id {
         "summary" => tr_ctx!("report template", "Summary"),
         "minutes" => tr_ctx!("report template", "Meeting minutes"),
@@ -149,7 +149,7 @@ impl RecordingEditor {
     }
 
     /// The report the view shows: the chosen one, else the newest.
-    fn shown_report<'a>(&self, s: &'a Session) -> Option<&'a Report> {
+    pub(super) fn shown_report<'a>(&self, s: &'a Session) -> Option<&'a Report> {
         let reports = &s.voice.reports;
         self.vp
             .shown
@@ -1043,7 +1043,11 @@ impl RecordingEditor {
             sec.items
                 .iter()
                 .enumerate()
-                .map(|(i, it)| self.item_row(t, s, &sec.id, i, it, owner, cx))
+                .map(|(i, it)| {
+                    let tick =
+                        cm_ai::report::is_checkable(&sec.id).then(|| r.is_checked(&sec.id, i));
+                    self.item_row(t, s, &r.id, &sec.id, i, it, owner, tick, cx)
+                })
                 .collect()
         };
         div()
@@ -1093,7 +1097,10 @@ impl RecordingEditor {
             }));
         match at {
             Some(a) => chip
-                .on_click(cx.listener(move |this, _, _, cx| this.voice_seek(rules::at_time(a), cx)))
+                .on_click({
+                    let (sec, title) = (sec.to_owned(), section_title(sec, sec));
+                    cx.listener(move |this, _, _, cx| this.report_cite(&sec, &title, i, a, cx))
+                })
                 .into_any_element(),
             None => chip.into_any_element(),
         }
@@ -1105,10 +1112,12 @@ impl RecordingEditor {
         &self,
         t: &Theme,
         s: &Session,
+        rid: &str,
         sec: &str,
         i: usize,
         it: &ItemView,
         owner: bool,
+        ticked: Option<bool>,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let person = it.person.as_ref().map(|name| {
@@ -1170,14 +1179,46 @@ impl RecordingEditor {
                         .text_color(rgba_of(t.text_2))
                         .child(SharedString::from(rules::at_label(a))),
                 )
-                .on_click(cx.listener(move |this, _, _, cx| this.voice_seek(rules::at_time(a), cx)))
+                .on_click({
+                    let (sec, title) = (sec.to_owned(), section_title(sec, sec));
+                    cx.listener(move |this, _, _, cx| this.report_cite(&sec, &title, i, a, cx))
+                })
         });
+        let checkbox = ticked.map(|on| {
+            let (rid, sec) = (rid.to_owned(), sec.to_owned());
+            div()
+                .id(SharedString::from(format!("re-check-{sec}-{i}")))
+                .role(Role::CheckBox)
+                .aria_label(SharedString::from(it.head.clone()))
+                .aria_toggled(if on {
+                    gpui::Toggled::True
+                } else {
+                    gpui::Toggled::False
+                })
+                .flex_none()
+                .mt(px(2.))
+                .size(px(20.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded(px(5.))
+                .border_1()
+                .border_color(rgba_of(if on { t.text } else { t.line }))
+                .bg(rgba_of(if on { t.text } else { t.ground }))
+                .cursor_pointer()
+                .children(on.then(|| icon("check", 14., t.ground)))
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.report_check(rid.clone(), sec.clone(), i, !on, cx)
+                }))
+        });
+        let done = ticked == Some(true);
         div()
             .id(SharedString::from(format!("re-item-{sec}-{i}")))
             .role(Role::ListItem)
             .flex()
             .items_start()
             .gap(px(10.))
+            .children(checkbox)
             .child(
                 div()
                     .flex_1()
@@ -1189,6 +1230,7 @@ impl RecordingEditor {
                         div()
                             .text_size(px(15.))
                             .line_height(px(22.))
+                            .text_color(rgba_of(if done { t.mist } else { t.text }))
                             .child(SharedString::from(it.head.clone())),
                     )
                     .children(extra.into_iter().map(|e| {

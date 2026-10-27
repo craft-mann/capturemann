@@ -11121,3 +11121,52 @@ msgstr "Tóm tắt"
 msgctxt "report template"
 msgid "suggested"
 msgstr "gợi ý"
+
+#, fuzzy
+msgid "Cited by “{section} · {n}”, playing from {time}"
+msgstr "Trích dẫn bởi “{section} · {n}”, đang phát từ {time}"
+
+#, fuzzy
+msgid "Cited moment"
+msgstr "Thời điểm được trích dẫn"
+
+#, fuzzy
+msgid "Click a time in the report to see the moment it comes from."
+msgstr "Bấm vào một mốc thời gian trong báo cáo để xem thời điểm nó bắt nguồn."
+
+#, fuzzy
+msgid "Couldn’t tick the item"
+msgstr "Không thể đánh dấu mục này"
+
+#, fuzzy
+msgid "Markers you added while recording appear as “Marked moments”."
+msgstr "Các dấu bạn thêm khi ghi âm hiện thành “Thời điểm đã đánh dấu”."
+
+#, fuzzy
+msgid "Open in transcript"
+msgstr "Mở trong bản chép lời"
+
+#, fuzzy
+msgid "Owners can only be attendees or speakers; anyone else becomes “Unassigned”."
+msgstr "Người phụ trách chỉ có thể là người tham dự hoặc người nói; người khác sẽ thành “Chưa giao”."
+
+#, fuzzy
+msgid "Tick a task in a report"
+msgstr "Đánh dấu một việc trong báo cáo"
+
+#, fuzzy
+msgid "Where the report’s items come from"
+msgstr "Các mục của báo cáo đến từ đâu"
+
+#, fuzzy
+msgid "Write a report?"
+msgstr "Viết báo cáo?"
+
+#, fuzzy
+msgid "{template} suits this recording. Nothing is written until you ask."
+msgstr "{template} phù hợp với bản ghi này. Sẽ không viết gì cho đến khi bạn yêu cầu."
+
+#, fuzzy
+msgctxt "button"
+msgid "Set up report"
+msgstr "Thiết lập báo cáo"

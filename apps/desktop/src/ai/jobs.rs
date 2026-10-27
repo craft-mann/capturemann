@@ -64,6 +64,9 @@ pub struct TranscribeVm {
     pub export_audio_focus: Option<String>,
     /// "Open captions": the recording whose editor should scroll to the Captions card.
     pub captions_focus: Option<String>,
+    /// "Set up report" from the toast after a transcript: the recording whose editor opens on the
+    /// Report tab's setup (V1, AI-9).
+    pub report_focus: Option<String>,
     /// The "Burn in captions" choice made for the next export of a recording, until it is
     /// exported or the recording's own setting is changed.
     export_burn: HashMap<String, bool>,

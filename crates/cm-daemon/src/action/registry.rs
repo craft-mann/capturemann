@@ -137,6 +137,7 @@ pub const ACTIONS: &[ActionSpec] = &[
     spec("export_report", Tier::Free, true),
     spec("delete_report", Tier::Free, true),
     spec("edit_report", Tier::Free, true),
+    spec("check_report_item", Tier::Free, true),
     // The caption switches (show in the preview, burn into exports): one revision, one undo step.
     spec("set_caption_options", Tier::Free, true),
     // Storage (M6, STO-1 to STO-5): copies go only to destinations the user set up in the app;

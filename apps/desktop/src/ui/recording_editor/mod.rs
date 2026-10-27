@@ -15,6 +15,8 @@ mod audio_view;
 mod caption_panel;
 mod export_sheet;
 mod panels;
+mod report_left;
+pub(crate) use report_tab::template_name as report_template_name;
 mod report_tab;
 mod speakers_tab;
 pub(crate) mod tabs;
@@ -215,6 +217,8 @@ pub struct RecordingEditor {
     voice_ui: audio_view::VoiceUi,
     /// The Speakers and Report tabs' fields and choices (V5, V6).
     vp: voice_fields::VoicePanels,
+    /// The Report view's left column: the moment a time chip cited (V6).
+    rleft: report_left::ReportLeft,
 }
 
 /// Buckets per second of a waveform (50 ms each: a pixel at the widest zoom out of an hour).
@@ -369,6 +373,7 @@ impl RecordingEditor {
             last_zoom: None,
             voice_ui: audio_view::VoiceUi::new(),
             vp: voice_fields::VoicePanels::new(cx),
+            rleft: report_left::ReportLeft::default(),
         }
     }
 
@@ -388,6 +393,7 @@ impl RecordingEditor {
         self.last_zoom = None;
         self.voice_ui = audio_view::VoiceUi::new();
         self.vp.reset(cx);
+        self.rleft = report_left::ReportLeft::default();
         self.load = Load::Loading;
         let root = self.app.read(cx).backend.library_root.clone();
         let id = id.to_owned();

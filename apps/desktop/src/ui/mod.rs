@@ -24,6 +24,7 @@ pub mod publish_sheet;
 pub mod published_view;
 pub mod recording;
 pub mod recording_editor;
+pub mod report_offer;
 pub mod scroll;
 pub mod settings;
 pub mod settings_view;

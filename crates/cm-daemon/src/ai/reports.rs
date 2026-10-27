@@ -406,6 +406,75 @@ impl Inner {
         Ok(out)
     }
 
+    /// `check_report_item`: ticks or unticks one task item (`section` + `index`). One revision,
+    /// so undo and redo restore the tick. Ticking an item that is already ticked changes
+    /// nothing and makes no revision.
+    pub(super) async fn check_report_item(
+        &self,
+        actor: &Actor,
+        capture_id: String,
+        report_id: String,
+        section: String,
+        index: usize,
+        checked: bool,
+    ) -> Result<Value, DaemonError> {
+        let _serial = self.capture_locks.lock(&capture_id).await;
+        let (library, this, now, by) = (
+            self.library.clone(),
+            self.library_view(),
+            self.clock.now(),
+            actor.clone(),
+        );
+        let out = blocking(move || {
+            let mut lib = lock_library(&library);
+            let rec = lib.get(&capture_id)?;
+            let dir = lib.bundle_path(&rec);
+            this.ensure_idle(&rec, &dir, "tick an item of a report of")?;
+            let manifest = cm_library::read_manifest(&dir)?;
+            let mut entries = store::index_of(&manifest);
+            let mut r = store::read(&dir, &entries, &report_id)?;
+            if !report::is_checkable(&section) {
+                return Err(CmError::invalid_field(
+                    "section",
+                    format!(
+                        "`{section}` has no items to tick; use one of {}",
+                        report::CHECKABLE_SECTIONS.join(", ")
+                    ),
+                ));
+            }
+            let len = r.item_len(&section);
+            if index >= len {
+                return Err(CmError::invalid_field(
+                    "index",
+                    format!("`{section}` has {len} item(s); the index counts from 0"),
+                ));
+            }
+            if !r.set_checked(&section, index, checked) {
+                return Ok(json!({
+                    "capture_id": capture_id, "report_id": r.id, "section": section,
+                    "index": index, "checked": checked, "changed": false,
+                }));
+            }
+            r.v = next_version(&dir, &r.id, r.v);
+            store::write(&dir, &r)?;
+            for e in entries.iter_mut().filter(|e| e.id == r.id) {
+                *e = store::entry_of(&r);
+            }
+            let out = commit_index(&mut lib, &dir, "check_report_item", &entries, by, now)?;
+            let mut v = revision_json(&capture_id, &r.id, &out);
+            v["section"] = json!(section);
+            v["index"] = json!(index);
+            v["checked"] = json!(checked);
+            v["changed"] = json!(true);
+            Ok(v)
+        })
+        .await?;
+        if out["changed"] == json!(true) {
+            self.publish_revision(&out);
+        }
+        Ok(out)
+    }
+
     async fn change_index(
         &self,
         actor: &Actor,

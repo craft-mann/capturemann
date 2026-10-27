@@ -80,10 +80,15 @@ fn ai_methods_parse_to_themselves() {
             "edit_report",
             json!({"capture_id": "rec_1", "report_id": "rpt_00000001", "markdown": "# Mine"}),
         ),
+        (
+            "check_report_item",
+            json!({"capture_id": "rec_1", "report_id": "rpt_00000001",
+                   "section": "action_items", "index": 0, "checked": true}),
+        ),
     ] {
         assert_eq!(parse_ok(m, p).op.method(), m);
     }
-    assert_eq!(AI_METHODS.len(), 22);
+    assert_eq!(AI_METHODS.len(), 23);
 }
 
 #[test]

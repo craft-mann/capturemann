@@ -226,6 +226,7 @@ pub(crate) fn sync_toasts(app: &Entity<AppModel>, cx: &mut App) {
 pub(super) fn toast_action(app: &Entity<AppModel>, action: ToastAction, cx: &mut App) {
     match action {
         ToastAction::OpenLibrary => navigate(app, Route::Library, cx),
+        ToastAction::SuggestReport(id) => crate::ui::ai::open_report_setup(app, &id, cx),
         ToastAction::OpenCapture(id) => navigate(app, open_route(&id), cx),
         ToastAction::CopyCapture(id) => {
             let backend = app.read(cx).backend.clone();
