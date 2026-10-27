@@ -712,7 +712,7 @@ async fn ai_7_the_built_in_text_model_translates_into_any_language() {
     let engine = FakeTextEngine::new(format!("http://127.0.0.1:{port}/v1"));
     let ai = FakeAi::new().with_installed(&["small", "large"], Some("large"));
     let services = cm_daemon::AiServices {
-        text_models: Arc::new(FakeTextModels::new().with_installed(&["text-16gb"])),
+        text_models: Arc::new(FakeTextModels::new().with_installed(&["qwen3.5-4b"])),
         text_engine: Arc::new(engine.clone()),
         ..ai.services()
     };
@@ -732,7 +732,7 @@ async fn ai_7_the_built_in_text_model_translates_into_any_language() {
     .unwrap();
     let job = translate(&r, json!({"target_language": "vi"})).await;
     assert_eq!(job["result"]["engine"], "text_model");
-    assert_eq!(job["result"]["model"], "text-16gb");
+    assert_eq!(job["result"]["model"], "qwen3.5-4b");
     assert_eq!(job["result"]["untranslated"], 0);
     assert!(r.ai.translate_calls().is_empty(), "Whisper was not used");
     let got = user(&r, "get_captions", json!({"language": "vi"}))
@@ -743,5 +743,5 @@ async fn ai_7_the_built_in_text_model_translates_into_any_language() {
     assert!(lines.iter().all(|l| l.starts_with("vi: ")), "{lines:?}");
     let specs = engine.specs();
     assert!(!specs.is_empty());
-    assert!(specs.iter().all(|s| s.model_id == "text-16gb"));
+    assert!(specs.iter().all(|s| s.model_id == "qwen3.5-4b"));
 }

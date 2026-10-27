@@ -65,7 +65,7 @@ mod tests {
     #[test]
     fn only_the_built_in_model_with_a_name_counts() {
         assert!(text_model_ready(
-            &json!({ "provider": "embedded", "model": "text-16gb" })
+            &json!({ "provider": "embedded", "model": "qwen3.5-4b" })
         ));
         assert!(!text_model_ready(
             &json!({ "provider": "none", "model": "" })

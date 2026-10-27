@@ -130,7 +130,7 @@ async fn rig(words: usize, provider: Option<&str>) -> Rig {
     // model replaces the engine.
     let services = cm_daemon::AiServices {
         text_models: Arc::new(
-            cm_daemon::testing::FakeTextModels::new().with_installed(&["text-16gb"]),
+            cm_daemon::testing::FakeTextModels::new().with_installed(&["qwen3.5-4b"]),
         ),
         ..ai.services()
     };
@@ -337,7 +337,7 @@ async fn generate_get_export_and_drop_the_uncited() {
     assert_eq!(got["report"]["dropped_uncited"], 1);
     assert_eq!(got["report"]["language"], "vi");
     assert_eq!(got["report"]["provider"], "embedded");
-    assert_eq!(got["report"]["model"], "text-16gb");
+    assert_eq!(got["report"]["model"], "qwen3.5-4b");
     let items = got["report"]["content"]["action_items"].as_array().unwrap();
     assert_eq!(items.len(), 1);
     assert_eq!(items[0]["owner"], "Linh");

@@ -143,11 +143,14 @@ impl Inner {
             svc.select(&id)
         })
         .await?;
+        // Use means use: the built-in engine is turned on for this model, the same as the
+        // button on the AI page (the CLI and agents get the same behaviour).
+        self.write_text_choice(Some(&model)).await?;
         self.events.publish(
             events::MODEL_CHANGED,
             json!({ "model": model, "change": "selected", "kind": "text" }),
         );
-        Ok(json!({ "active": model }))
+        Ok(json!({ "active": model, "provider": "embedded" }))
     }
 
     pub(super) async fn remove_text_model(&self, model: String) -> Result<Value, DaemonError> {
@@ -184,14 +187,40 @@ impl Inner {
             // Idle but loaded: unload it first so the file is not in use.
             self.ai.text_engine.stop();
         }
+        // Removing the model that is in use turns the built-in engine off.
+        let in_use = self
+            .text_model_config()
+            .is_ok_and(|c| c.provider == cm_ai::text_model::Provider::Embedded && c.model == model);
         let svc = self.ai.text_models.clone();
         let id = model.clone();
         blocking(move || svc.remove(&id)).await?;
+        if in_use {
+            self.write_text_choice(None).await?;
+        }
         self.events.publish(
             events::MODEL_CHANGED,
             json!({ "model": model, "change": "removed", "kind": "text" }),
         );
         Ok(json!({ "model": model, "removed": true }))
+    }
+}
+
+impl Inner {
+    /// Writes the text-model choice: `Some(id)` is provider `embedded` with that model, `None`
+    /// is provider `none` with no model. Settings are the app's own, so this does not go through
+    /// the app-only check that refuses an agent's `set_settings`.
+    async fn write_text_choice(&self, model: Option<&str>) -> Result<(), DaemonError> {
+        let mut values = Map::new();
+        values.insert(
+            cm_ai::text_model::KEY_PROVIDER.to_owned(),
+            json!(if model.is_some() { "embedded" } else { "none" }),
+        );
+        values.insert(
+            cm_ai::text_model::KEY_EMBEDDED_MODEL.to_owned(),
+            json!(model.unwrap_or("")),
+        );
+        self.settings.set(&values)?;
+        Ok(())
     }
 }
 

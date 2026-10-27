@@ -11,7 +11,7 @@ step 7.
 
 Setup:
 
-1. In the app: AI page, text model: Built in, with a model downloaded (`AI-7.md`).
+1. In the app: AI page, text model: a model downloaded and in use (`AI-7.md`; Gemma 4 E2B is the recommended one).
    `capturemann ai text-model test` must print `answered`.
 3. A recording with a transcript of at least 30 words and, for steps 3 and 4, speaker names
    (`capturemann ai speakers ID`, then `rename`). The M4 fixture has no speech; use a short real
@@ -86,7 +86,7 @@ score on this card and keep it in `verification/`:
 | Reads as a usable set of notes in 5 minutes | 0, 1, 2 |
 
 Write the model, the context size, the time each job took and which Mac. These runs also answer
-spike S8 (which text model is the default): do not pick a default here, report the scores.
+spike S8 (is Gemma 4 E2B the right default): do not change the default here, report the scores.
 
 Pass: steps 1 to 12 behave as written, step 13 meets its bar and step 14 passes or is marked "not
 present". Quality review (3 meetings, 2 interviews, 1 lecture, in

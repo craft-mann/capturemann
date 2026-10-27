@@ -809,9 +809,6 @@ msgstr ""
 msgid "Choose a region…"
 msgstr ""
 
-msgid "Choose a text model provider first."
-msgstr ""
-
 msgid "Choose a thumbnail"
 msgstr ""
 
@@ -1462,13 +1459,16 @@ msgstr ""
 msgid "Don’t show again"
 msgstr ""
 
+msgid "Don’t use a model"
+msgstr ""
+
 msgid "Download TXT"
 msgstr ""
 
-msgid "Download a built-in model first."
+msgid "Download a built-in text model"
 msgstr ""
 
-msgid "Download a built-in text model"
+msgid "Download a model and press Use this model first."
 msgstr ""
 
 msgid "Download a speech model"
@@ -2613,9 +2613,6 @@ msgstr ""
 msgid "No terms yet. Add a name or a word you want spelled your way."
 msgstr ""
 
-msgid "No text model. Reports and translation to other languages are off."
-msgstr ""
-
 msgid "No transcript yet. Transcribe the microphone to get captions; it runs on this Mac."
 msgstr ""
 
@@ -3213,7 +3210,7 @@ msgstr ""
 msgid "Recent captures"
 msgstr ""
 
-msgid "Recommended for this Mac"
+msgid "Recommended"
 msgstr ""
 
 msgid "Recommended: fast and accurate for most recordings. Not for translation."
@@ -4181,9 +4178,6 @@ msgstr ""
 msgid "Text model"
 msgstr ""
 
-msgid "Text model provider"
-msgstr ""
-
 msgid "Text model, line by line"
 msgstr ""
 
@@ -4658,6 +4652,9 @@ msgid "This Mac has no usable hardware H.264 encoder for this recording. Try a l
 msgstr ""
 
 msgid "This Mac has {memory} GB of memory. The model runs inside CaptureMann and nothing leaves this Mac."
+msgstr ""
+
+msgid "This Mac may not have enough free memory for this model."
 msgstr ""
 
 msgid "This account is not connected. Connect it again in Settings → Destinations."
@@ -7353,14 +7350,6 @@ msgctxt "marker"
 msgid "Marker"
 msgstr ""
 
-msgctxt "memory tier"
-msgid "{gb} GB Macs"
-msgstr ""
-
-msgctxt "memory tier"
-msgid "{gb} GB Macs and up"
-msgstr ""
-
 msgctxt "menu"
 msgid "Library"
 msgstr ""
@@ -8107,14 +8096,6 @@ msgstr ""
 
 msgctxt "text model"
 msgid "Test"
-msgstr ""
-
-msgctxt "text model provider"
-msgid "Built in"
-msgstr ""
-
-msgctxt "text model provider"
-msgid "None"
 msgstr ""
 
 msgctxt "theme"

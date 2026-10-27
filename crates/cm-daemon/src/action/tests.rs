@@ -121,9 +121,9 @@ fn samples() -> Vec<(&'static str, Value)> {
         ("select_model", json!({"model": "small"})),
         ("remove_model", json!({"model": "small"})),
         ("list_text_models", json!({})),
-        ("download_text_model", json!({"model": "text-8gb"})),
-        ("select_text_model", json!({"model": "text-8gb"})),
-        ("remove_text_model", json!({"model": "text-8gb"})),
+        ("download_text_model", json!({"model": "gemma-4-e2b"})),
+        ("select_text_model", json!({"model": "gemma-4-e2b"})),
+        ("remove_text_model", json!({"model": "gemma-4-e2b"})),
         (
             "transcribe",
             json!({"capture_id": "rec_1", "language": "en", "model": "small"}),

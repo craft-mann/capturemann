@@ -1,14 +1,16 @@
 //! The voice part of the AI page, display-free (board V8, AI-7, AI-8): the speaker-label
 //! settings, the text-model provider section and this Mac's memory.
 //!
-//! The built-in text model only (maintainer decision Oct 27, 2026): None or Built in (the text
-//! engine CaptureMann ships).
+//! The built-in text model only (maintainer decisions Oct 27, 2026): the model list is shown
+//! directly, with no None / Built in choice. Use on a downloaded model turns the built-in engine
+//! on (the daemon sets `ai.text.provider` and `ai.text.embedded_model`); "Don't use a model"
+//! and removing the model in use turn it off.
 //! Nothing here touches the network or the screen by itself. Every change returns
 //! the settings to write (`Vec<(key, value)>`), which `ui::ai` sends through the same app-only
 //! path as `ai.glossary`; an agent cannot write them (`ai.*` is app-only).
 
-use cm_ai::text_model::{Provider, KEY_PROVIDER};
-use cm_i18n::{fmt, tr, tr_ctx};
+use cm_ai::text_model::{Provider, KEY_EMBEDDED_MODEL, KEY_PROVIDER};
+use cm_i18n::{fmt, tr};
 use serde_json::{json, Map, Value};
 
 /// `ai.auto_speakers`: find speakers after each transcript (app-only, default off).
@@ -192,41 +194,6 @@ fn display_name_of(v: Option<&Value>) -> String {
 
 // ---- the text model (AI-7) ---------------------------------------------------------------------
 
-/// The segmented control: None / Built in.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum ProviderChoice {
-    #[default]
-    None,
-    /// The engine inside CaptureMann (provider `embedded`).
-    BuiltIn,
-}
-
-impl ProviderChoice {
-    pub const ALL: [ProviderChoice; 2] = [ProviderChoice::None, ProviderChoice::BuiltIn];
-
-    pub fn provider(self) -> Provider {
-        match self {
-            ProviderChoice::None => Provider::None,
-            ProviderChoice::BuiltIn => Provider::Embedded,
-        }
-    }
-
-    /// Any other provider (a hand-edited file) shows as None: the daemon treats it as none too.
-    pub fn from_provider(p: Provider) -> ProviderChoice {
-        match p {
-            Provider::Embedded => ProviderChoice::BuiltIn,
-            _ => ProviderChoice::None,
-        }
-    }
-
-    pub fn label(self) -> String {
-        match self {
-            ProviderChoice::None => tr_ctx!("text model provider", "None"),
-            ProviderChoice::BuiltIn => tr_ctx!("text model provider", "Built in"),
-        }
-    }
-}
-
 /// The built-in engine as `get_text_model` reports it (`engine`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EngineLine {
@@ -315,7 +282,8 @@ pub enum TestGate {
 pub struct TextVm {
     /// `get_text_model` has answered at least once.
     pub loaded: bool,
-    pub provider: ProviderChoice,
+    /// `none` or `embedded`; anything else reads as `none` (the daemon does the same).
+    pub provider: Provider,
     pub model: String,
     pub context_tokens: u32,
     pub host: Option<String>,
@@ -330,7 +298,7 @@ impl Default for TextVm {
     fn default() -> Self {
         TextVm {
             loaded: false,
-            provider: ProviderChoice::None,
+            provider: Provider::None,
             model: String::new(),
             context_tokens: cm_ai::text_model::DEFAULT_CONTEXT_TOKENS,
             host: None,
@@ -348,10 +316,11 @@ impl TextVm {
     /// with, so it is cleared when they changed.
     pub fn set_from_daemon(&mut self, v: &Value) {
         let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_owned();
-        let provider = Provider::parse(&s("provider")).unwrap_or(Provider::None);
-        let changed =
-            self.provider != ProviderChoice::from_provider(provider) || self.model != s("model");
-        self.provider = ProviderChoice::from_provider(provider);
+        let provider = Provider::parse(&s("provider"))
+            .filter(|p| *p == Provider::Embedded)
+            .unwrap_or(Provider::None);
+        let changed = self.provider != provider || self.model != s("model");
+        self.provider = provider;
         self.model = s("model");
         self.host = v
             .get("host")
@@ -369,36 +338,34 @@ impl TextVm {
         self.loaded = true;
     }
 
-    /// A text model is set up and usable: a provider is chosen and it names a model (for the
-    /// built-in one the daemon names the downloaded model, and nothing while none is).
+    /// A text model is set up and usable: the built-in engine is on and the daemon names the
+    /// downloaded model it runs (and nothing while none is).
     pub fn ready(&self) -> bool {
-        self.provider != ProviderChoice::None && !self.model.trim().is_empty()
+        self.provider == Provider::Embedded && !self.model.trim().is_empty()
     }
 
-    /// A press on the segmented control: the settings to write. Choosing Built in clears the
-    /// shown model (the daemon names the downloaded one) and the Test result.
-    pub fn choose_provider(&mut self, c: ProviderChoice) -> Writes {
-        if c == self.provider {
-            return Vec::new();
-        }
-        let w: Writes = vec![(KEY_PROVIDER, json!(c.provider().as_str()))];
-        if c == ProviderChoice::BuiltIn {
-            // The built-in model is picked in its list, not here.
-            self.model.clear();
-        }
-        self.provider = c;
+    /// The model the built-in engine is set to use, when there is one.
+    pub fn in_use(&self) -> Option<&str> {
+        self.ready().then_some(self.model.as_str())
+    }
+
+    /// "Don't use a model": the settings that turn the built-in engine off. The downloaded files
+    /// stay.
+    pub fn stop_using(&mut self) -> Writes {
+        self.provider = Provider::None;
+        self.model.clear();
         self.test = TestState::Idle;
         self.error = None;
-        w
+        vec![
+            (KEY_PROVIDER, json!(Provider::None.as_str())),
+            (KEY_EMBEDDED_MODEL, json!("")),
+        ]
     }
 
     /// Pressing Test: what has to happen first.
     pub fn begin_test(&mut self) -> TestGate {
-        if self.provider == ProviderChoice::None {
-            return TestGate::Blocked(tr!("Choose a text model provider first."));
-        }
-        if self.model.is_empty() {
-            return TestGate::Blocked(tr!("Download a built-in model first."));
+        if !self.ready() {
+            return TestGate::Blocked(tr!("Download a model and press Use this model first."));
         }
         self.test = TestState::Running;
         TestGate::Run
@@ -592,32 +559,21 @@ mod tests {
     }
 
     #[test]
-    fn built_in_is_the_embedded_provider_and_comes_back_from_the_daemon() {
-        assert_eq!(ProviderChoice::BuiltIn.provider(), Provider::Embedded);
-        assert_eq!(
-            ProviderChoice::from_provider(Provider::Embedded),
-            ProviderChoice::BuiltIn
-        );
+    fn the_embedded_provider_comes_back_from_the_daemon() {
         let mut t = TextVm::default();
-        let w = t.choose_provider(ProviderChoice::BuiltIn);
-        assert_eq!(w, vec![(KEY_PROVIDER, json!("embedded"))]);
-        assert_eq!(t.provider, ProviderChoice::BuiltIn);
-        // Choosing the same segment again writes nothing; None writes the provider only.
-        assert!(t.choose_provider(ProviderChoice::BuiltIn).is_empty());
-        assert_eq!(
-            t.choose_provider(ProviderChoice::None),
-            vec![(KEY_PROVIDER, json!("none"))]
-        );
-        t.choose_provider(ProviderChoice::BuiltIn);
+        assert!(!t.ready() && t.in_use().is_none());
         // Not ready until the daemon names a downloaded model.
-        assert!(!t.ready());
-        t.set_from_daemon(
-            &json!({"provider": "embedded", "model": "text-16gb", "host": "127.0.0.1"}),
-        );
-        assert!(t.ready());
         t.set_from_daemon(&json!({"provider": "embedded", "model": ""}));
         assert!(!t.ready());
         assert!(matches!(t.begin_test(), TestGate::Blocked(m) if m.contains("Download")));
+        t.set_from_daemon(
+            &json!({"provider": "embedded", "model": "qwen3.5-4b", "host": "127.0.0.1"}),
+        );
+        assert!(t.ready());
+        assert_eq!(t.in_use(), Some("qwen3.5-4b"));
+        // Turned off (Don't use a model, or the model in use was removed).
+        t.set_from_daemon(&json!({"provider": "none", "model": ""}));
+        assert!(!t.ready() && t.in_use().is_none());
     }
 
     #[test]
@@ -627,9 +583,9 @@ mod tests {
         assert_eq!(line(json!({"state": "stopped"})), EngineLine::Stopped);
         assert_eq!(line(json!({"state": "starting"})), EngineLine::Starting);
         assert_eq!(
-            line(json!({"state": "running", "model": "text-8gb", "idle_stop_s": 600})),
+            line(json!({"state": "running", "model": "gemma-4-e2b", "idle_stop_s": 600})),
             EngineLine::Running {
-                model: "text-8gb".into(),
+                model: "gemma-4-e2b".into(),
                 idle_stop_s: 600
             }
         );
@@ -648,13 +604,27 @@ mod tests {
     }
 
     #[test]
-    fn only_none_and_built_in_are_offered() {
-        assert_eq!(ProviderChoice::ALL.len(), 2);
-        // Any other provider from a hand-edited file shows as None.
-        for p in ["local", "openai_compatible", "anthropic"] {
-            assert_eq!(text_with(p, "m").provider, ProviderChoice::None, "{p}");
+    fn dont_use_a_model_writes_provider_none() {
+        let mut t = text_with("embedded", "gemma-4-e2b");
+        assert_eq!(
+            t.stop_using(),
+            vec![
+                (KEY_PROVIDER, json!("none")),
+                (KEY_EMBEDDED_MODEL, json!(""))
+            ]
+        );
+        assert!(!t.ready());
+    }
+
+    #[test]
+    fn only_the_embedded_provider_counts() {
+        // Any other provider from a hand-edited file reads as none.
+        for p in ["local", "openai_compatible", "anthropic", "none", "bogus"] {
+            let t = text_with(p, "m");
+            assert_eq!(t.provider, Provider::None, "{p}");
+            assert!(!t.ready(), "{p}");
         }
-        assert_eq!(text_with("embedded", "m").provider, ProviderChoice::BuiltIn);
+        assert_eq!(text_with("embedded", "m").provider, Provider::Embedded);
     }
 
     #[test]
@@ -663,18 +633,18 @@ mod tests {
         assert!(matches!(t.begin_test(), TestGate::Blocked(_)));
         let mut t = text_with("embedded", "");
         assert!(matches!(t.begin_test(), TestGate::Blocked(_)));
-        let mut t = text_with("embedded", "text-8gb");
+        let mut t = text_with("embedded", "gemma-4-e2b");
         assert_eq!(t.begin_test(), TestGate::Run);
         assert_eq!(t.test, TestState::Running);
     }
 
     #[test]
     fn the_test_result_says_time_structure_and_loopback() {
-        let mut t = text_with("embedded", "text-8gb");
+        let mut t = text_with("embedded", "gemma-4-e2b");
         assert!(t.test_lines().is_none());
         t.begin_test();
         t.test_answer(Ok(
-            json!({"ok": true, "latency_ms": 1400, "model": "text-8gb", "structured_output": true}),
+            json!({"ok": true, "latency_ms": 1400, "model": "gemma-4-e2b", "structured_output": true}),
         ));
         let (head, detail) = t.test_lines().unwrap();
         assert_eq!(head, "Replied in 1.4 s");

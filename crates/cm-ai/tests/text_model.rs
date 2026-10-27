@@ -406,11 +406,11 @@ fn embedded_retries_once_when_the_helper_died_and_gives_up_clearly() {
 fn embedded_is_local_with_no_remote_plan_and_settings_can_choose_it() {
     let mut m = serde_json::Map::new();
     m.insert("ai.text.provider".into(), json!("embedded"));
-    m.insert("ai.text.embedded_model".into(), json!("text-16gb"));
+    m.insert("ai.text.embedded_model".into(), json!("qwen3.5-4b"));
     m.insert("ai.text.base_url".into(), json!("https://evil.example/v1"));
     let c = TextModelConfig::from_settings(&m);
     assert_eq!(c.provider, Provider::Embedded);
-    assert_eq!(c.embedded_model, "text-16gb");
+    assert_eq!(c.embedded_model, "qwen3.5-4b");
     assert!(c.is_local() && !c.is_remote());
     assert!(c.send_plan(100).is_none());
     assert!(c.check_endpoint().is_ok());

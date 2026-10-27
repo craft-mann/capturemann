@@ -127,8 +127,8 @@ pub enum AiCmd {
     },
     /// List the text models of the engine built into CaptureMann, or manage them:
     /// `text-models download|use|rm` (`list_text_models`, `download_text_model`,
-    /// `select_text_model`, `remove_text_model`). Choosing the built-in engine as the text model
-    /// is done on the AI page of the app.
+    /// `select_text_model`, `remove_text_model`). `use` also turns the built-in engine on; turning it off
+    /// ("Don't use a model") is done on the AI page of the app.
     TextModels {
         #[command(subcommand)]
         cmd: Option<TextModelsCmd>,

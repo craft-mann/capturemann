@@ -2,8 +2,8 @@
 //!
 //! The catalogue (`data/text_models.json`) has the shape and the rules of the Whisper one
 //! (`data/models.json`): pinned URL, SHA-256, size, memory, `pending_pin` entries that are hidden
-//! and refused. This module adds only what a text model needs on top: the memory tier it is meant
-//! for, its licence and the context the engine starts it with. Everything else is the Whisper
+//! and refused. This module adds only what a text model needs on top: the whether it is the recommended
+//! default, its licence and the context the engine starts it with. Everything else is the Whisper
 //! [`ModelStore`]: this store wraps one rooted at `<config dir>/ai/text`, so listing, the
 //! resumable download with its progress callback, the checksum check, the active choice and
 //! removal are the same code, not a copy.
@@ -27,16 +27,14 @@ pub const ENV_TEXT_CATALOG: &str = "CAPTUREMANN_TEXT_CATALOG";
 
 const BUILTIN: &str = include_str!("../../data/text_models.json");
 
-/// The memory tiers a catalogue entry may name, in GB.
-pub const TIERS_GB: [u32; 3] = [8, 16, 32];
-
 /// One catalogue row: the shared fields plus the text-model ones.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct TextCatalogEntry {
     #[serde(flatten)]
     pub base: CatalogEntry,
-    /// The smallest Mac memory this entry is meant for: 8, 16 or 32.
-    pub tier_gb: u32,
+    /// The default entry, recommended on every Mac. Exactly one entry has it.
+    #[serde(default)]
+    pub recommended: bool,
     /// SPDX id of the model's licence. Only Apache-2.0 and MIT ship.
     #[serde(default)]
     pub license: String,
@@ -67,7 +65,7 @@ impl TextCatalog {
     }
 
     /// Parses and checks a catalogue: the Whisper rules (ids, file names, URLs, checksums) and,
-    /// for an entry that is not `pending_pin`, a tier of 8, 16 or 32, an allowed licence, a memory
+    /// for an entry that is not `pending_pin`, an allowed licence, a memory
     /// figure and a context size.
     pub fn parse(text: &str) -> Result<TextCatalog, CmError> {
         let f: CatalogFile = serde_json::from_str(text)
@@ -80,12 +78,6 @@ impl TextCatalog {
     fn check(&self) -> Result<(), CmError> {
         self.base().check()?;
         for m in &self.models {
-            if !TIERS_GB.contains(&m.tier_gb) {
-                return Err(CmError::invalid_input(format!(
-                    "text model catalog: `{}` has tier_gb {} (use 8, 16 or 32)",
-                    m.base.id, m.tier_gb
-                )));
-            }
             if m.base.pending_pin {
                 continue;
             }
@@ -101,6 +93,12 @@ impl TextCatalog {
                     m.base.id
                 )));
             }
+        }
+        let offered = self.models.iter().filter(|m| !m.base.pending_pin);
+        if offered.clone().next().is_some() && offered.filter(|m| m.recommended).count() != 1 {
+            return Err(CmError::invalid_input(
+                "text model catalog: exactly one offered entry must have `recommended: true`",
+            ));
         }
         Ok(())
     }
@@ -127,13 +125,14 @@ impl TextCatalog {
     }
 }
 
-/// A text model as the UI and the actions show it: the shared fields plus tier, licence and
-/// context.
+/// A text model as the UI and the actions show it: the shared fields plus the recommended flag,
+/// licence and context.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TextModelInfo {
     #[serde(flatten)]
     pub info: ModelInfo,
-    pub tier_gb: u32,
+    /// The default entry (`recommended` in the catalogue).
+    pub recommended: bool,
     pub license: String,
     pub context_tokens: u32,
 }
@@ -160,7 +159,7 @@ pub struct ResolvedTextModel {
 #[derive(Debug, Clone)]
 pub struct TextModelStore {
     store: ModelStore,
-    meta: HashMap<String, (u32, String, u32)>,
+    meta: HashMap<String, (bool, String, u32)>,
 }
 
 impl TextModelStore {
@@ -190,7 +189,7 @@ impl TextModelStore {
             .map(|m| {
                 (
                     m.base.id.clone(),
-                    (m.tier_gb, m.license.clone(), m.context_tokens),
+                    (m.recommended, m.license.clone(), m.context_tokens),
                 )
             })
             .collect();
@@ -208,11 +207,11 @@ impl TextModelStore {
                 .models
                 .into_iter()
                 .map(|info| {
-                    let (tier_gb, license, context_tokens) =
+                    let (recommended, license, context_tokens) =
                         self.meta.get(&info.id).cloned().unwrap_or_default();
                     TextModelInfo {
                         info,
-                        tier_gb,
+                        recommended,
                         license,
                         context_tokens,
                     }
@@ -283,23 +282,20 @@ pub fn no_text_model(requested: Option<&str>) -> CmError {
     }
 }
 
-/// The model to suggest for a Mac with `ram_gb` of memory: the largest tier that fits, among the
-/// models on offer. `None` when the Mac is below the smallest tier or nothing is on offer.
-pub fn recommended(list: &TextModelList, ram_gb: u64) -> Option<&TextModelInfo> {
-    list.models
-        .iter()
-        .filter(|m| u64::from(m.tier_gb) <= ram_gb)
-        .max_by_key(|m| m.tier_gb)
+/// The model to suggest: the catalogue's `recommended` entry, whatever the Mac's memory (the AI
+/// page warns separately when its `ram_mb` exceeds the free memory).
+pub fn recommended(list: &TextModelList) -> Option<&TextModelInfo> {
+    list.models.iter().find(|m| m.recommended)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn entry(id: &str, tier: u32, pending: bool) -> String {
+    fn entry(id: &str, recommended: bool, pending: bool) -> String {
         format!(
             r#"{{ "id": "{id}", "label": "L", "file": "{id}.gguf", "url": "https://example.test/{id}.gguf",
-                 "sha256": "{}", "bytes": 5, "ram_mb": 100, "tier_gb": {tier}, "license": "Apache-2.0",
+                 "sha256": "{}", "bytes": 5, "ram_mb": 100, "recommended": {recommended}, "license": "Apache-2.0",
                  "context_tokens": 4096, "pending_pin": {pending} }}"#,
             "a".repeat(64)
         )
@@ -309,9 +305,25 @@ mod tests {
     fn the_builtin_catalogue_is_pinned_and_open_licensed() {
         let c = TextCatalog::parse(BUILTIN).unwrap();
         assert_eq!(
-            c.models.iter().map(|m| m.tier_gb).collect::<Vec<_>>(),
-            [8, 16, 32]
+            c.models
+                .iter()
+                .map(|m| (m.base.id.as_str(), m.recommended))
+                .collect::<Vec<_>>(),
+            [
+                ("gemma-4-e2b", true),
+                ("qwen3.5-4b", false),
+                ("qwen3.5-2b", false)
+            ]
         );
+        // The file a user already downloaded keeps its name under the new id.
+        assert_eq!(
+            c.models
+                .iter()
+                .find(|m| m.base.id == "qwen3.5-4b")
+                .map(|m| m.base.file.as_str()),
+            Some("Qwen3.5-4B-Q4_K_M.gguf")
+        );
+        assert!(c.models.iter().all(|m| m.context_tokens == 16384));
         assert!(c.models.iter().all(|m| !m.base.pending_pin));
         assert!(c.models.iter().all(|m| m.base.sha256.len() == 64));
         assert!(c
@@ -325,7 +337,7 @@ mod tests {
 
     #[test]
     fn an_unpinned_entry_is_hidden_and_refused() {
-        let pending = format!(r#"{{ "models": [{}] }}"#, entry("p", 8, true));
+        let pending = format!(r#"{{ "models": [{}] }}"#, entry("p", true, true));
         let c = TextCatalog::parse(&pending).unwrap();
         let dir = tempfile::tempdir().unwrap();
         let s = TextModelStore::with_catalog(dir.path(), c);
@@ -337,56 +349,59 @@ mod tests {
     }
 
     #[test]
-    fn rules_are_the_whisper_rules_plus_tier_and_licence() {
-        let ok = format!(r#"{{ "models": [{}] }}"#, entry("a", 8, false));
+    fn rules_are_the_whisper_rules_plus_recommended_and_licence() {
+        let ok = format!(r#"{{ "models": [{}] }}"#, entry("a", true, false));
         assert!(TextCatalog::parse(&ok).is_ok());
         // Whisper rules: duplicate ids, bad checksum.
         let dup = format!(
             r#"{{ "models": [{}, {}] }}"#,
-            entry("a", 8, false),
-            entry("a", 16, false)
+            entry("a", true, false),
+            entry("a", false, false)
         );
         assert!(TextCatalog::parse(&dup).is_err());
         let bad = ok.replace(&"a".repeat(64), "abc");
         assert!(TextCatalog::parse(&bad).is_err());
-        // Tier and licence.
-        let tier = format!(r#"{{ "models": [{}] }}"#, entry("a", 12, false));
-        assert!(TextCatalog::parse(&tier).is_err());
+        // Exactly one recommended entry, and the licence.
+        let none = format!(r#"{{ "models": [{}] }}"#, entry("a", false, false));
+        assert!(TextCatalog::parse(&none).is_err());
+        let two = format!(
+            r#"{{ "models": [{}, {}] }}"#,
+            entry("a", true, false),
+            entry("b", true, false)
+        );
+        assert!(TextCatalog::parse(&two).is_err());
         let lic = ok.replace("Apache-2.0", "Llama-3");
         assert!(TextCatalog::parse(&lic).is_err());
-        // A pending entry skips the pin checks but still needs a valid tier.
+        // A pending entry skips the pin checks but needs no recommended flag.
         let pending = ok.replace("\"sha256\": \"", "\"sha256\": \"zz");
         assert!(TextCatalog::parse(&pending).is_err());
-        let pending = format!(r#"{{ "models": [{}] }}"#, entry("a", 8, true))
+        let pending = format!(r#"{{ "models": [{}] }}"#, entry("a", false, true))
             .replace(&"a".repeat(64), "")
             .replace("Apache-2.0", "");
         assert!(TextCatalog::parse(&pending).is_ok());
     }
 
     #[test]
-    fn recommends_the_largest_tier_that_fits() {
+    fn recommends_the_flagged_entry() {
         let c = TextCatalog::parse(&format!(
             r#"{{ "models": [{}, {}, {}] }}"#,
-            entry("s", 8, false),
-            entry("m", 16, false),
-            entry("l", 32, false)
+            entry("s", false, false),
+            entry("m", true, false),
+            entry("l", false, false)
         ))
         .unwrap();
         let dir = tempfile::tempdir().unwrap();
         let list = TextModelStore::with_catalog(dir.path(), c).list();
-        let pick = |gb| recommended(&list, gb).map(|m| m.info.id.as_str());
-        assert_eq!(pick(4), None);
-        assert_eq!(pick(8), Some("s"));
-        assert_eq!(pick(17), Some("m"));
-        assert_eq!(pick(64), Some("l"));
+        assert_eq!(recommended(&list).map(|m| m.info.id.as_str()), Some("m"));
+        assert!(list.models[1].recommended && !list.models[0].recommended);
         assert_eq!(list.models[1].license, "Apache-2.0");
         assert_eq!(list.models[1].context_tokens, 4096);
     }
 
     #[test]
     fn resolve_needs_an_installed_model() {
-        let c =
-            TextCatalog::parse(&format!(r#"{{ "models": [{}] }}"#, entry("s", 8, false))).unwrap();
+        let c = TextCatalog::parse(&format!(r#"{{ "models": [{}] }}"#, entry("s", true, false)))
+            .unwrap();
         let dir = tempfile::tempdir().unwrap();
         let s = TextModelStore::with_catalog(dir.path(), c);
         let e = s.resolve(None).unwrap_err();

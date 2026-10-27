@@ -19,7 +19,7 @@ struct Entry {
     label: &'static str,
     size_mb: u32,
     ram_mb: u32,
-    tier_gb: u32,
+    recommended: bool,
     installed: bool,
 }
 
@@ -31,7 +31,7 @@ struct State {
     downloads_started: Vec<String>,
 }
 
-/// The fake text-model store: three entries for the 8, 16 and 32 GB tiers, none installed.
+/// The fake text-model store: three entries (the first recommended), none installed.
 #[derive(Clone)]
 pub struct FakeTextModels(Arc<Mutex<State>>);
 
@@ -43,19 +43,19 @@ impl Default for FakeTextModels {
 
 impl FakeTextModels {
     pub fn new() -> FakeTextModels {
-        let e = |id, label, size_mb, ram_mb, tier_gb| Entry {
+        let e = |id, label, size_mb, ram_mb, recommended| Entry {
             id,
             label,
             size_mb,
             ram_mb,
-            tier_gb,
+            recommended,
             installed: false,
         };
         FakeTextModels(Arc::new(Mutex::new(State {
             models: vec![
-                e("text-8gb", "Small test model", 2500, 4000, 8),
-                e("text-16gb", "Medium test model", 5000, 8000, 16),
-                e("text-32gb", "Large test model", 9000, 16000, 32),
+                e("gemma-4-e2b", "Recommended test model", 2500, 4000, true),
+                e("qwen3.5-4b", "Medium test model", 5000, 8000, false),
+                e("qwen3.5-2b", "Large test model", 9000, 16000, false),
             ],
             active: None,
             download_steps: 0,
@@ -123,7 +123,7 @@ impl TextModelService for FakeTextModels {
                         path: m.installed.then(|| format!("/text-models/{}.gguf", m.id)),
                         ..Default::default()
                     },
-                    tier_gb: m.tier_gb,
+                    recommended: m.recommended,
                     license: "Apache-2.0".to_owned(),
                     context_tokens: 8192,
                 })

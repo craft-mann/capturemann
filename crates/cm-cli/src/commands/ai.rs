@@ -659,12 +659,16 @@ fn text_model_table(r: &Value) -> String {
         };
         let _ = writeln!(
             s,
-            "{} {:<width$}  {:>5} MB  needs {} MB, for {} GB Macs  {}  {state}",
+            "{} {:<width$}  {:>5} MB  needs {} MB{}  {}  {state}",
             if m["active"] == json!(true) { "*" } else { " " },
             plain(&m["id"]),
             plain(&m["size_mb"]),
             plain(&m["ram_mb"]),
-            plain(&m["tier_gb"]),
+            if m["recommended"] == json!(true) {
+                ", recommended"
+            } else {
+                ""
+            },
             plain(&m["license"]),
         );
     }
