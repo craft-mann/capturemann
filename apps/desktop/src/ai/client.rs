@@ -533,6 +533,25 @@ impl AiClient {
             .map(|_| ())
     }
 
+    /// `check_report_item` (AI-9): ticks or unticks a task of a report; one undo step.
+    pub async fn check_report_item(
+        &self,
+        capture_id: &str,
+        report_id: &str,
+        section: &str,
+        index: usize,
+        checked: bool,
+    ) -> Result<(), AiError> {
+        self.transport
+            .call(
+                "check_report_item",
+                json!({ "capture_id": capture_id, "report_id": report_id,
+                        "section": section, "index": index, "checked": checked }),
+            )
+            .await
+            .map(|_| ())
+    }
+
     /// `export_audio` (VOC-2): starts the audio export job; the result arrives as `export.done`.
     pub async fn export_audio(&self, params: Value) -> Result<String, AiError> {
         let v = self.transport.call("export_audio", params).await?;

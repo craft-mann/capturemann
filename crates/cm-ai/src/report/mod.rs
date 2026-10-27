@@ -51,6 +51,15 @@ pub const CITE_TOLERANCE_S: f64 = 1.0;
 /// The job type of a report run.
 pub const JOB_REPORT: &str = "report";
 
+/// Sections whose items can be ticked off (the tasks). `check_report_item` refuses any other.
+pub const CHECKABLE_SECTIONS: [&str; 4] =
+    ["action_items", "agreed_actions", "follow_ups", "next_steps"];
+
+/// Whether the items of section `id` can be ticked.
+pub fn is_checkable(id: &str) -> bool {
+    CHECKABLE_SECTIONS.contains(&id)
+}
+
 /// Where a section's content comes from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]

@@ -429,6 +429,15 @@ pub fn open_captions(app: &Entity<AppModel>, capture_id: &str, cx: &mut App) {
     app::set_route(app, app::Route::RecordingEditor(capture_id.to_owned()), cx);
 }
 
+/// "Set up report" (the toast after a transcript): the recording editor on the Report tab's
+/// setup.
+pub fn open_report_setup(app: &Entity<AppModel>, capture_id: &str, cx: &mut App) {
+    app.update(cx, |m, _| {
+        m.transcribe.report_focus = Some(capture_id.to_owned());
+    });
+    app::set_route(app, app::Route::RecordingEditor(capture_id.to_owned()), cx);
+}
+
 /// "Export audio only" (the details page, the Output tab): the recording editor with the Export
 /// audio sheet open (VOC-2).
 pub fn open_export_audio(app: &Entity<AppModel>, capture_id: &str, cx: &mut App) {
@@ -591,6 +600,7 @@ pub fn on_event(app: &Entity<AppModel>, ev: &cm_daemon::events::Event, cx: &mut 
                     ),
                     cx,
                 );
+                crate::ui::report_offer::offer(app, &id, cx);
             }
         }
         // AI-5: a translation was written (the audio editor's language switcher reads it again).

@@ -854,10 +854,19 @@ msgstr ""
 msgid "Choose “Scoped access”, then the access type: “App folder” (Dropbox gives CaptureMann its own folder under Apps) or “Full Dropbox”. Name the app and create it."
 msgstr ""
 
+msgid "Cited by “{section} · {n}”, playing from {time}"
+msgstr ""
+
+msgid "Cited moment"
+msgstr ""
+
 msgid "Clear search"
 msgstr ""
 
 msgid "Click a display"
+msgstr ""
+
+msgid "Click a time in the report to see the moment it comes from."
 msgstr ""
 
 msgid "Click a window"
@@ -1203,6 +1212,9 @@ msgid "Couldn’t stop the download"
 msgstr ""
 
 msgid "Couldn’t stop the recording"
+msgstr ""
+
+msgid "Couldn’t tick the item"
 msgstr ""
 
 msgid "Couldn’t translate the transcript"
@@ -2185,6 +2197,9 @@ msgstr ""
 msgid "Marker {label} at {time}"
 msgstr ""
 
+msgid "Markers you added while recording appear as “Marked moments”."
+msgstr ""
+
 msgid "Match case"
 msgstr ""
 
@@ -2791,6 +2806,9 @@ msgstr ""
 msgid "Open captions"
 msgstr ""
 
+msgid "Open in transcript"
+msgstr ""
+
 msgid "Open launcher"
 msgstr ""
 
@@ -2856,6 +2874,9 @@ msgid "Out (O)"
 msgstr ""
 
 msgid "Output"
+msgstr ""
+
+msgid "Owners can only be attendees or speakers; anyone else becomes “Unassigned”."
 msgstr ""
 
 msgid "PLxxxxxxxxxxxxxxxx or a playlist address"
@@ -4668,6 +4689,9 @@ msgstr ""
 msgid "Thumbnail frame"
 msgstr ""
 
+msgid "Tick a task in a report"
+msgstr ""
+
 msgid "Timeline"
 msgstr ""
 
@@ -5020,6 +5044,9 @@ msgstr ""
 msgid "Where finished captures are saved, and the accounts you publish to."
 msgstr ""
 
+msgid "Where the report’s items come from"
+msgstr ""
+
 msgid "Whisper only translates into English. Choose a text model on this Mac on the AI page."
 msgstr ""
 
@@ -5090,6 +5117,9 @@ msgid "Works: signed in as {channel}."
 msgstr ""
 
 msgid "Write a report from a transcript"
+msgstr ""
+
+msgid "Write a report?"
 msgstr ""
 
 msgid "Write in"
@@ -5956,6 +5986,9 @@ msgstr ""
 msgid "{start} · {secs} s · {what}"
 msgstr ""
 
+msgid "{template} suits this recording. Nothing is written until you ask."
+msgstr ""
+
 msgid "{time} after cuts · about {size}"
 msgstr ""
 
@@ -6470,6 +6503,10 @@ msgstr ""
 
 msgctxt "button"
 msgid "Save"
+msgstr ""
+
+msgctxt "button"
+msgid "Set up report"
 msgstr ""
 
 msgctxt "button"

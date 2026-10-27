@@ -142,6 +142,18 @@ impl RecordingEditor {
                 self.tab = Inspector::Transcript;
             }
         }
+        // "Set up report" from the toast after a transcript: the Report tab on its setup.
+        let report_focus = self.app.read(cx).transcribe.report_focus.clone();
+        if report_focus.as_deref() == Some(id.as_str()) {
+            self.tab = Inspector::Report;
+            self.vp.setup = true;
+            self.vp.template = None;
+            self.vp.regenerating = None;
+            let app = self.app.clone();
+            cx.defer(move |cx| {
+                app.update(cx, |m, _| m.transcribe.report_focus = None);
+            });
+        }
         if !Inspector::set(audio).contains(&self.tab) {
             self.tab = if audio && self.tab == Inspector::Captions {
                 Inspector::Transcript
@@ -290,6 +302,23 @@ impl RecordingEditor {
 
     /// Everything under the header of an audio recording.
     pub(super) fn audio_ready(&self, t: &Theme, s: &Session, cx: &mut Context<Self>) -> AnyElement {
+        let left: AnyElement = match self
+            .report_left_open(s, cx)
+            .then(|| self.shown_report(s))
+            .flatten()
+        {
+            Some(r) => self.report_left_column(t, s, r, cx),
+            None => div()
+                .flex_1()
+                .min_w(px(0.))
+                .min_h(px(0.))
+                .flex()
+                .flex_col()
+                .gap(px(16.))
+                .child(self.now_speaking_card(t, s, cx))
+                .child(self.audio_timeline_card(t, s, cx))
+                .into_any_element(),
+        };
         div()
             .size_full()
             .flex()
@@ -303,17 +332,7 @@ impl RecordingEditor {
                     .gap(px(16.))
                     .px(px(24.))
                     .py(px(16.))
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w(px(0.))
-                            .min_h(px(0.))
-                            .flex()
-                            .flex_col()
-                            .gap(px(16.))
-                            .child(self.now_speaking_card(t, s, cx))
-                            .child(self.audio_timeline_card(t, s, cx)),
-                    )
+                    .child(left)
                     .child(self.inspector(t, s, cx)),
             )
             .into_any_element()
@@ -1224,6 +1243,19 @@ impl RecordingEditor {
     // ---- the overview --------------------------------------------------------------------
 
     fn overview_strip(&self, t: &Theme, s: &Session, cx: &mut Context<Self>) -> AnyElement {
+        self.overview_strip_with(t, s, Vec::new(), true, cx)
+    }
+
+    /// The strip with extra ticks (position as a fraction, colour); `padded` aligns it with the
+    /// lanes (the label column), the Report view's left column does not.
+    pub(super) fn overview_strip_with(
+        &self,
+        t: &Theme,
+        s: &Session,
+        extra: Vec<(f32, Color)>,
+        padded: bool,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let g = s.geom;
         let end = s.model.basis.end;
         let (v0, v1) = voice::viewport_fractions(&g);
@@ -1310,6 +1342,7 @@ impl RecordingEditor {
                     .iter()
                     .map(|m| tick(voice::fraction_of(m.at, end), 1.5, t.text)),
             )
+            .children(extra.into_iter().map(|(f, c)| tick(f, 2.0, c)))
             .child(
                 div()
                     .absolute()
@@ -1325,7 +1358,7 @@ impl RecordingEditor {
             .child(tick(voice::fraction_of(s.model.playhead, end), 2.0, t.text));
         div()
             .flex_none()
-            .pl(px(LABEL_W + BODY_GAP))
+            .pl(px(if padded { LABEL_W + BODY_GAP } else { 0. }))
             .flex()
             .flex_col()
             .gap(px(4.))
@@ -1335,7 +1368,11 @@ impl RecordingEditor {
                     .justify_between()
                     .text_size(px(type_scale::CAPTION))
                     .text_color(rgba_of(t.mist))
-                    .child(shrink_text(tr!("Whole recording")))
+                    .child(shrink_text(if padded {
+                        tr!("Whole recording")
+                    } else {
+                        tr!("Where the report\u{2019}s items come from")
+                    }))
                     .child(
                         div()
                             .mono()

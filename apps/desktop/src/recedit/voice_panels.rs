@@ -310,6 +310,84 @@ pub fn item_count(sections: &[SectionView]) -> usize {
     sections.iter().map(|s| s.items.len()).sum()
 }
 
+// ---- the left column of the report view (V6) ----------------------------------------------
+
+/// What kind of item a citation tick belongs to (the colour of the tick and its legend entry).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TickKind {
+    Decision,
+    Action,
+    Question,
+    Marked,
+    Other,
+}
+
+/// The kind of a section by its id.
+pub fn tick_kind(section_id: &str) -> TickKind {
+    match section_id {
+        "decisions" => TickKind::Decision,
+        s if cm_ai::report::is_checkable(s) => TickKind::Action,
+        "open_questions" | "questions_asked" | "review_questions" => TickKind::Question,
+        "marked_moments" => TickKind::Marked,
+        _ => TickKind::Other,
+    }
+}
+
+/// Every citation of a report as (seconds, kind), by time. Marked moments are included: they are
+/// the recording's own markers.
+pub fn citation_ticks(sections: &[SectionView]) -> Vec<(f64, TickKind)> {
+    let mut v: Vec<(f64, TickKind)> = sections
+        .iter()
+        .flat_map(|s| {
+            let k = tick_kind(&s.id);
+            s.items
+                .iter()
+                .flat_map(move |i| i.at.iter().map(move |a| (*a, k)))
+        })
+        .collect();
+    v.sort_by(|a, b| a.0.total_cmp(&b.0));
+    v
+}
+
+/// The caption lines around a cited moment: the line that holds it (or the one that starts
+/// nearest after it, within a second of tolerance either way) and its neighbours.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CitedContext {
+    pub before: Option<usize>,
+    pub hit: usize,
+    pub after: Option<usize>,
+}
+
+/// Finds [`CitedContext`] of `at` seconds in `lines` (`(start, end)` in seconds, by time).
+/// `None` when there are no lines or the moment is more than a second outside all of them.
+pub fn cited_context(lines: &[(f64, f64)], at: f64) -> Option<CitedContext> {
+    const TOL: f64 = cm_ai::report::CITE_TOLERANCE_S;
+    let hit = lines
+        .iter()
+        .position(|(a, b)| at >= *a && at < *b)
+        .or_else(|| {
+            lines
+                .iter()
+                .enumerate()
+                .filter(|(_, (a, b))| at >= a - TOL && at <= b + TOL)
+                .min_by(|x, y| {
+                    let d = |l: &(f64, f64)| (l.0 - at).abs().min((l.1 - at).abs());
+                    d(x.1).total_cmp(&d(y.1))
+                })
+                .map(|(i, _)| i)
+        })?;
+    Some(CitedContext {
+        before: hit.checked_sub(1),
+        hit,
+        after: (hit + 1 < lines.len()).then_some(hit + 1),
+    })
+}
+
+/// The 1-based place of item `index` in its section, for "Decisions \u{b7} 1".
+pub fn cite_number(index: usize) -> usize {
+    index + 1
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -422,6 +500,7 @@ mod tests {
             reassigned_names: 0,
             chunks: 1,
             edited: false,
+            checked: Vec::new(),
             markdown: None,
         }
     }
@@ -478,5 +557,38 @@ mod tests {
         let mut r = report(json!({}));
         r.template = "nope".into();
         assert!(sections(&r).is_empty());
+    }
+
+    #[test]
+    fn ticks_are_sorted_and_coloured_by_section() {
+        let r = report(json!({
+            "decisions": [{"text": "Go.", "at": [1200.0]}],
+            "action_items": [{"task": "Draft", "owner": "Linh", "at": [1117.0]}],
+        }));
+        let t = citation_ticks(&sections(&r));
+        assert_eq!(
+            t,
+            [(1117.0, TickKind::Action), (1200.0, TickKind::Decision)]
+        );
+        assert_eq!(tick_kind("open_questions"), TickKind::Question);
+        assert_eq!(tick_kind("marked_moments"), TickKind::Marked);
+        assert_eq!(tick_kind("topics"), TickKind::Other);
+    }
+
+    #[test]
+    fn a_cited_moment_finds_its_line_and_neighbours() {
+        let lines = [(0.0, 5.0), (5.0, 10.0), (10.0, 15.0)];
+        let c = cited_context(&lines, 7.0).unwrap();
+        assert_eq!((c.before, c.hit, c.after), (Some(0), 1, Some(2)));
+        let c = cited_context(&lines, 0.5).unwrap();
+        assert_eq!((c.before, c.hit, c.after), (None, 0, Some(1)));
+        let c = cited_context(&lines, 15.5).unwrap();
+        assert_eq!((c.before, c.hit, c.after), (Some(1), 2, None));
+        assert_eq!(cited_context(&lines, 20.0), None);
+        assert_eq!(cited_context(&[], 1.0), None);
+        // A gap: the nearer line within a second wins.
+        let gap = [(0.0, 5.0), (5.8, 10.0)];
+        assert_eq!(cited_context(&gap, 5.5).unwrap().hit, 1);
+        assert_eq!(cited_context(&gap, 5.1).unwrap().hit, 0);
     }
 }

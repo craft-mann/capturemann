@@ -182,6 +182,11 @@ fn samples() -> Vec<(&'static str, Value)> {
             json!({"capture_id": "rec_1", "report_id": "rpt_00000001", "markdown": "# Mine"}),
         ),
         (
+            "check_report_item",
+            json!({"capture_id": "rec_1", "report_id": "rpt_00000001",
+                   "section": "action_items", "index": 0}),
+        ),
+        (
             "upload",
             json!({"capture_id": "rec_1", "destination_id": "nas", "what": "both",
                    "folder": "Lessons", "request_id": "r"}),

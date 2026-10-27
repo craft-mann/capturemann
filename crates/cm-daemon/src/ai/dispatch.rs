@@ -329,6 +329,16 @@ impl Inner {
                 self.edit_report(actor, capture_id, report_id, markdown)
                     .await
             }
+            AiOp::CheckReportItem {
+                capture_id,
+                report_id,
+                section,
+                index,
+                checked,
+            } => {
+                self.check_report_item(actor, capture_id, report_id, section, index, checked)
+                    .await
+            }
             AiOp::SuggestZooms { capture_id } => self.suggest(&capture_id, true).await,
             AiOp::SuggestCuts { capture_id } => self.suggest(&capture_id, false).await,
         }

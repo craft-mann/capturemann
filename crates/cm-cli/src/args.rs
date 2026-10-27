@@ -248,6 +248,21 @@ pub enum ReportCmd {
         #[arg(long, value_name = "FILE")]
         file: PathBuf,
     },
+    /// Tick (or with `--uncheck`, untick) a task of a report (`check_report_item`). One undo step.
+    Check {
+        /// Capture id of a recording.
+        id: String,
+        report: String,
+        /// The section: `action_items`, `agreed_actions`, `follow_ups` or `next_steps`.
+        #[arg(long)]
+        section: String,
+        /// The item's place in the section, counting from 0.
+        #[arg(long)]
+        item: u32,
+        /// Untick instead of tick.
+        #[arg(long)]
+        uncheck: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]

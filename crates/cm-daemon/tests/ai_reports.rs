@@ -513,3 +513,111 @@ async fn edit_undo_failed_regenerate_and_delete() {
         .is_ok());
     assert!(r.dir.join("reports").join(format!("{rid2}.json")).is_file());
 }
+
+/// AI-9: a ticked task is stored in the report as one revision; undo and redo restore it; only
+/// task sections and existing items can be ticked; a regenerate starts with none ticked.
+#[tokio::test]
+async fn check_report_item_is_stored_and_undoable() {
+    let r = rig(60, Some("local")).await;
+    let job = generate(&r, json!({"template": "minutes"})).await;
+    let rid = job["result"]["report_id"].as_str().unwrap().to_owned();
+    let n = user(&r, "get_report", json!({"report_id": rid}))
+        .await
+        .unwrap()["report"]["content"]["action_items"]
+        .as_array()
+        .unwrap()
+        .len();
+    assert!(n >= 1);
+
+    let c = user(
+        &r,
+        "check_report_item",
+        json!({"report_id": rid, "section": "action_items", "index": 0}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(c["action"], "check_report_item");
+    assert_eq!(c["changed"], true);
+    let got = user(&r, "get_report", json!({"report_id": rid}))
+        .await
+        .unwrap();
+    assert_eq!(got["report"]["checked"], json!(["action_items:0"]));
+    // The live file other tools read has it too.
+    let live: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(r.dir.join("reports").join(format!("{rid}.json"))).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(live["checked"], json!(["action_items:0"]));
+    assert_eq!(got["report"]["edited"], false);
+
+    // The same tick again is not a revision.
+    let again = user(
+        &r,
+        "check_report_item",
+        json!({"report_id": rid, "section": "action_items", "index": 0, "checked": true}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(again["changed"], false);
+
+    // Undo, redo, untick.
+    user(&r, "undo", json!({})).await.unwrap();
+    let back = user(&r, "get_report", json!({"report_id": rid}))
+        .await
+        .unwrap();
+    assert!(back["report"].get("checked").is_none());
+    user(&r, "redo", json!({})).await.unwrap();
+    assert_eq!(
+        user(&r, "get_report", json!({"report_id": rid}))
+            .await
+            .unwrap()["report"]["checked"],
+        json!(["action_items:0"])
+    );
+    user(
+        &r,
+        "check_report_item",
+        json!({"report_id": rid, "section": "action_items", "index": 0, "checked": false}),
+    )
+    .await
+    .unwrap();
+    assert!(user(&r, "get_report", json!({"report_id": rid}))
+        .await
+        .unwrap()["report"]
+        .get("checked")
+        .is_none());
+
+    // Refusals: a section that has no tasks, an item that is not there, an unknown report.
+    for (params, want) in [
+        (
+            json!({"report_id": rid, "section": "decisions", "index": 0}),
+            ErrorCode::InvalidInput,
+        ),
+        (
+            json!({"report_id": rid, "section": "action_items", "index": n}),
+            ErrorCode::InvalidInput,
+        ),
+        (
+            json!({"report_id": "rpt_00000000", "section": "action_items", "index": 0}),
+            ErrorCode::NotFound,
+        ),
+    ] {
+        let e = user(&r, "check_report_item", params).await.unwrap_err();
+        assert_eq!(code(&e), want);
+    }
+
+    // A regenerate starts with nothing ticked.
+    user(
+        &r,
+        "check_report_item",
+        json!({"report_id": rid, "section": "action_items", "index": 0}),
+    )
+    .await
+    .unwrap();
+    let ok = generate(&r, json!({"template": "minutes", "report_id": rid})).await;
+    assert_eq!(ok["state"], "done", "{ok}");
+    assert!(user(&r, "get_report", json!({"report_id": rid}))
+        .await
+        .unwrap()["report"]
+        .get("checked")
+        .is_none());
+}

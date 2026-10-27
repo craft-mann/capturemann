@@ -59,12 +59,52 @@ pub struct Report {
     /// The user edited the Markdown.
     #[serde(default)]
     pub edited: bool,
+    /// Ticked task items as `<section id>:<index>` (the index counts the items of that section in
+    /// `content`). Changed by `check_report_item`; a regenerate starts with none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub checked: Vec<String>,
     /// The edited Markdown. Absent for a report nobody edited.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub markdown: Option<String>,
 }
 
+/// The key of item `index` of `section` in [`Report::checked`].
+pub fn item_key(section: &str, index: usize) -> String {
+    format!("{section}:{index}")
+}
+
 impl Report {
+    /// Whether item `index` of `section` is ticked.
+    pub fn is_checked(&self, section: &str, index: usize) -> bool {
+        let key = item_key(section, index);
+        self.checked.contains(&key)
+    }
+
+    /// Number of items in `section` of the stored content.
+    pub fn item_len(&self, section: &str) -> usize {
+        self.content
+            .get(section)
+            .and_then(Value::as_array)
+            .map_or(0, Vec::len)
+    }
+
+    /// Ticks or unticks an item. Returns whether anything changed. The caller checks the section
+    /// and index first ([`is_checkable`](super::is_checkable), [`Report::item_len`]).
+    pub fn set_checked(&mut self, section: &str, index: usize, on: bool) -> bool {
+        let key = item_key(section, index);
+        let was = self.checked.contains(&key);
+        if on == was {
+            return false;
+        }
+        if on {
+            self.checked.push(key);
+            self.checked.sort();
+        } else {
+            self.checked.retain(|k| *k != key);
+        }
+        true
+    }
+
     /// The Markdown a reader sees.
     pub fn markdown_text(&self) -> String {
         report_markdown(self)
@@ -303,6 +343,7 @@ pub fn new_report(
         reassigned_names: generated.reassigned_names,
         chunks: generated.chunks,
         edited: false,
+        checked: Vec::new(),
         markdown: None,
     }
 }

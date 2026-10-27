@@ -1641,6 +1641,26 @@ fn ai_tools() -> Vec<ToolSpec> {
             report_revision_output(),
         ),
         ai_tool(
+            "check_report_item",
+            Tier::Free,
+            true,
+            "AI-9",
+            "Tick or untick one task of a report (an item of `action_items`, `agreed_actions`, `follow_ups` or `next_steps`; `index` counts from 0 in the section of `get_report`'s `report.content`). Ticks are in `report.checked` as `<section>:<index>`. One revision; `undo` brings the earlier state back. Ticking an item that is already ticked changes nothing (`changed: false`).",
+            json!({ "report_id": { "type": "string", "pattern": "^rpt_[0-9a-f]{8}$" },
+                    "section": { "type": "string", "enum": ["action_items", "agreed_actions", "follow_ups", "next_steps"] },
+                    "index": { "type": "integer", "minimum": 0, "maximum": 999 },
+                    "checked": { "type": "boolean", "default": true } }),
+            &["capture_id", "report_id", "section", "index"],
+            json!({ "type": "object", "properties": {
+                "capture_id": { "type": "string" }, "report_id": { "type": "string" },
+                "section": { "type": "string" }, "index": { "type": "integer" },
+                "checked": { "type": "boolean" }, "changed": { "type": "boolean" },
+                "revision": { "type": "integer" }, "action": { "type": "string" },
+                "by": { "type": "string" },
+                "can_undo": { "type": "boolean" }, "can_redo": { "type": "boolean" } },
+                "required": ["capture_id", "report_id", "section", "index", "checked", "changed"] }),
+        ),
+        ai_tool(
             "suggest_zooms",
             Tier::Free,
             false,
@@ -1697,6 +1717,7 @@ fn with_capture_input(mut t: ToolSpec) -> ToolSpec {
             | "export_report"
             | "delete_report"
             | "edit_report"
+            | "check_report_item"
     );
     if on_capture {
         if let Some(p) = t.input["properties"].as_object_mut() {

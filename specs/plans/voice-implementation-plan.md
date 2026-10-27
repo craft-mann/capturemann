@@ -54,7 +54,7 @@ Run **spike S8** first (it picks the default model). Then: OpenAI-compatible cli
 
 Templates as data in `crates/cm-ai/data/reports/` with `additionalProperties: false` schemas; citation check and `dropped_uncited`; interview schema with no score field; storage `reports/<id>.json` and `.md`; Report tab setup, report view and exports (V5, V6); tools `list_report_templates`, `generate_report`, `get_report`, `export_report`, `delete_report`; events. Review set scored by hand in `verification/`.
 
-**Built (Oct 26, 2026, backend only, tested with fakes):** everything above except the Report tab, the report view and Copy (V5, V6) and the review set; plus `edit_report`. Local text model only (remote deferred by maintainer decision). See "As built, AI-9" in `specs/features/07-ai.md`.
+**Built (Oct 26, 2026, backend only, tested with fakes):** everything above except the Report tab, the report view and Copy (V5, V6) and the review set; plus `edit_report`. Oct 27, 2026 (tested with fakes): `check_report_item` (ticked tasks stored in the report, one undo step), the Report view's left column (V6) and the offer toast after a transcript (V1); see 07-ai.md, "As built, AI-9". Local text model only (remote deferred by maintainer decision). See "As built, AI-9" in `specs/features/07-ai.md`.
 
 ## Stage 6: speaker labels (AI-8)
 
