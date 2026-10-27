@@ -130,11 +130,18 @@ cmake_args=(
   -DLLAMA_BUILD_EXAMPLES=OFF
   -DLLAMA_BUILD_TOOLS=ON
   -DLLAMA_BUILD_SERVER=ON
+  # v0.7.0 downloads a prebuilt Web UI from Hugging Face at build time (network, unpinned) and fails
+  # to embed it from a path under /var (a symlink). The app starts the server with --no-webui.
+  -DLLAMA_USE_PREBUILT_UI=OFF
 )
 cmake "${cmake_args[@]}" >"$work/cmake-configure.log" 2>&1 \
   || { tail -30 "$work/cmake-configure.log" >&2; die "cmake configure failed (log: $work/cmake-configure.log)"; }
 cmake --build "$work/build" --config Release --target llama-server -j "$jobs" >"$work/cmake-build.log" 2>&1 \
-  || { tail -30 "$work/cmake-build.log" >&2; die "llama-server build failed (log: $work/cmake-build.log)"; }
+  || { grep -n -E -B2 -A6 'error:|CMake Error|fatal error|FAILED:|No such file|undefined' "$work/cmake-build.log" | head -60 >&2
+       tail -15 "$work/cmake-build.log" >&2
+       cp "$work/cmake-build.log" "${TMPDIR:-/tmp}/cm-llama-build-failed.log" 2>/dev/null \
+         && echo "the full log was kept in ${TMPDIR:-/tmp}/cm-llama-build-failed.log" >&2
+       die "llama-server build failed (log: $work/cmake-build.log)"; }
 
 bin="$(find "$work/build" -type f -name llama-server -perm -u+x | head -1)"
 [ -n "$bin" ] && [ -x "$bin" ] || die "the build did not produce llama-server"
