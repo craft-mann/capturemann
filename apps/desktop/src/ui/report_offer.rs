@@ -35,25 +35,55 @@ pub fn offer(app: &Entity<AppModel>, capture_id: &str, cx: &mut App) {
             })
             .await;
         let Some(template) = template else { return };
+        cx.update(|cx| {
+            app::push_toast(&app2, offer_toast(id, template), cx);
+        });
+    })
+    .detach();
+}
+
+/// The offer toast for recording `id` and template `template`. Live: the title, the body and the
+/// template's name are worded again when the UI language changes while it is on screen.
+pub fn offer_toast(id: String, template: &'static str) -> ToastSpec {
+    ToastSpec::live(move || {
         let name = cm_ai::report::find_template(template)
             .map(|t| t.name.clone())
             .unwrap_or_default();
         let name = crate::ui::recording_editor::report_template_name(template, &name);
-        cx.update(|cx| {
-            app::push_toast(
-                &app2,
-                ToastSpec::new(ToastKind::Info, tr!("Write a report?"))
-                    .body(tr!(
-                        "{template} suits this recording. Nothing is written until you ask.",
-                        template = name
-                    ))
-                    .button(
-                        tr_ctx!("button", "Set up report"),
-                        ToastAction::SuggestReport(id),
-                    ),
-                cx,
-            );
-        });
+        ToastSpec::new(ToastKind::Info, tr!("Write a report?"))
+            .body(tr!(
+                "{template} suits this recording. Nothing is written until you ask.",
+                template = name
+            ))
+            .button(
+                tr_ctx!("button", "Set up report"),
+                ToastAction::SuggestReport(id.clone()),
+            )
     })
-    .detach();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::toast::ToastQueue;
+    use cm_i18n::{with_language, Lang};
+    use std::time::Instant;
+
+    /// I18N: the offer follows a language switch like the other toasts.
+    #[test]
+    fn the_offer_toast_follows_the_language() {
+        let mut q = ToastQueue::default();
+        let id = with_language(Lang::En, || {
+            q.push(offer_toast("rec1".into(), "minutes"), Instant::now())
+        });
+        assert!(!q.relabel());
+        assert!(with_language(Lang::EnXa, || q.relabel()));
+        let t = q.toasts().iter().find(|x| x.id == id).unwrap();
+        assert!(t.title.starts_with('['), "{}", t.title);
+        assert!(t.buttons[0].label.starts_with('['));
+        assert_eq!(
+            t.buttons[0].action,
+            ToastAction::SuggestReport("rec1".into())
+        );
+    }
 }
