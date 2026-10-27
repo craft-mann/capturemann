@@ -78,6 +78,11 @@ pub fn engine_args(spec: &EngineSpec, port: u16) -> Vec<String> {
         "--parallel".into(),
         "1".into(),
         "--no-webui".into(),
+        // No thinking: a reasoning model (Qwen3.5) otherwise reasons without end at temperature 0
+        // and spends the whole token budget before the JSON starts (seen on Oct 27, 2026: two
+        // 4096-token requests, no report). Notes need the answer, not the reasoning.
+        "--reasoning".into(),
+        "off".into(),
     ]
 }
 
