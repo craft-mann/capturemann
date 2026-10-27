@@ -3,7 +3,7 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
-## [Unreleased]
+## [0.2.0] - Unreleased
 
 Planned for 0.2.0 (voice and meetings). Not released and not dated. Everything below is built and
 tested with scripted fakes. The maintainer has tried parts of it on a Mac (as reported; speaker labels
