@@ -10,14 +10,19 @@
 </p>
 
 <p align="center">
-Free, open-source screenshots and screen recording with a webcam bubble, local AI captions,<br>
-and every feature available to AI agents through MCP and a CLI.
+Free, open-source screenshots, screen recording and audio recording, with local AI captions,<br>
+transcripts, meeting minutes and speaker labels, and every feature available to AI agents<br>
+through MCP and a CLI.
 </p>
 
 <p align="center">
 <a href="https://github.com/craft-mann/capturemann/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/craft-mann/capturemann/actions/workflows/ci.yml/badge.svg"></a>
 <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue"></a>
 <img alt="Platform: macOS 13+" src="https://img.shields.io/badge/platform-macOS%2013%2B-lightgrey">
+</p>
+
+<p align="center">
+  <img alt="The CaptureMann library: recordings, audio and screenshots in one place, with a record button, region, window and display capture, and the AI and agent pages in the sidebar" src="docs/images/library.webp" width="900">
 </p>
 
 > **Status: 0.1.0, first release (macOS 13+, Apple Silicon only).** After this release: Intel Macs, then Windows, then Linux. Most
@@ -34,11 +39,23 @@ and every feature available to AI agents through MCP and a CLI.
   crash recovery that loses at most two seconds.
 - **Editor**: trim, cut, split, speed, backgrounds, zoom regions, restylable cursor, 9:16 and 1:1
   reframe. Export to MP4, platform presets, GIF or WebM.
-- **Local AI**: Whisper transcripts and captions (SRT, VTT, TXT, or burned in), a caption editor, and
-  zoom and silence-cut suggestions. Models download only when you press Download.
+- **Audio recording** (0.2): meetings, interviews, lectures and voice notes from the microphone and,
+  optionally, system audio. A compact recording bar with a level meter, markers (press `M`), a consent
+  reminder, and a WAV master that survives a crash. An audio editor with a waveform, a transcript,
+  trim and cut, and export to M4A or WAV with loudness levelling.
+- **Local AI**, all on your Mac: Whisper transcripts and captions (SRT, VTT, TXT, or burned in) with
+  Large v3 Turbo as the recommended model, a caption editor, translation to English with Whisper and to
+  other languages with the built-in text model, and zoom and silence-cut suggestions. Models download
+  only when you press Download.
+- **Speaker labels** (0.2): who spoke when, from the voices, with rename and merge. The two small
+  models ship inside the app; nothing is sent anywhere.
+- **Meeting minutes and reports** (0.2): summary, minutes, one-on-one notes, interview notes, product
+  recap and lecture notes written by a built-in text model (Gemma 4 E2B by default). Every item links
+  to the moment it was said; export as Markdown or text. The model runs through a bundled
+  `llama-server`; no cloud and no account.
 - **Library** of self-contained capture bundles, stored in a folder you choose.
 - **Share**: save to local folders or Google Drive, publish to YouTube (private by default).
-- **For agents**: 55 MCP tools plus resources and prompts, and an identical `capturemann` CLI. Risky
+- **For agents**: more than 70 MCP tools plus resources and prompts, and an identical `capturemann` CLI. Risky
   actions (start recording, publish, delete) need an on-screen confirmation.
 - **Private by design**: no telemetry, and no network traffic unless you connect a destination or
   download a model. You bring your own Google credentials; secrets live in the macOS Keychain.
