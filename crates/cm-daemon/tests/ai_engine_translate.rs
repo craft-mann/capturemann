@@ -107,21 +107,13 @@ async fn ai_5_translate_through_the_real_adapters() {
         }
     };
 
-    // Only an unpinned turbo model is catalogued: it cannot be imported, listed or downloaded.
+    // The turbo model is pinned and listed.
     let list = run("list_models", json!({})).await.unwrap();
     assert!(list["models"]
         .as_array()
         .unwrap()
         .iter()
-        .all(|m| m["id"] != "large-v3-turbo"));
-    let turbo = fake_model(models.path(), "ggml-large-v3-turbo.bin");
-    let e = run(
-        "import_model",
-        json!({"model": "large-v3-turbo", "path": turbo.to_str().unwrap()}),
-    )
-    .await
-    .unwrap_err();
-    assert_eq!(code(&e), ErrorCode::InvalidInput);
+        .any(|m| m["id"] == "large-v3-turbo"));
 
     // No model: translation into English cannot start, and says why.
     let e = run("translate_captions", json!({"target_language": "en"}))
