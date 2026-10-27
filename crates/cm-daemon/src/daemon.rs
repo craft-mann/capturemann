@@ -711,6 +711,14 @@ impl Daemon {
         if let Some(j) = &self.inner.jobs {
             j.shutdown(limit).await;
         }
+        // The built-in text engine's helper ends with the app (it also ends by itself when this
+        // process is gone, see `cm_ai::text_model::engine`).
+        let engine = self.inner.ai.text_engine.clone();
+        let _ = blocking(move || {
+            engine.stop();
+            Ok(())
+        })
+        .await;
     }
 
     /// Holds a job type: running jobs of it pause at a checkpoint and queued ones wait

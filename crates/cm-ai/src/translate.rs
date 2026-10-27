@@ -607,6 +607,96 @@ pub trait TextTranslator: Send + Sync {
     fn translate(&self, req: &TextTranslateRequest<'_>) -> Result<Vec<String>, CmError>;
 }
 
+/// The [`TextTranslator`] over a [`TextModel`](crate::text_model::TextModel) (AI-7): one request
+/// per batch, the reply a JSON object `{ "lines": [..] }` checked against the schema by the model
+/// itself; the caller checks the count and the glossary terms and retries once.
+pub struct ModelTranslator<'a> {
+    model: &'a dyn crate::text_model::TextModel,
+    name: String,
+    job_id: String,
+}
+
+impl<'a> ModelTranslator<'a> {
+    /// `name` is stored in the translation; `job_id` goes into a provider failure.
+    pub fn new(
+        model: &'a dyn crate::text_model::TextModel,
+        name: impl Into<String>,
+        job_id: impl Into<String>,
+    ) -> Self {
+        ModelTranslator {
+            model,
+            name: name.into(),
+            job_id: job_id.into(),
+        }
+    }
+
+    /// The prompt of one batch.
+    pub fn prompt(req: &TextTranslateRequest<'_>) -> String {
+        let list = |lines: &[String]| serde_json::to_string(lines).unwrap_or_default();
+        let mut p = format!(
+            "Translate the subtitle lines below from {} to {}.\n\
+             Rules: return exactly {} translated lines, in the same order, one per input line; \
+             keep each translation short enough to read as a subtitle; do not merge or split \
+             lines; do not add notes.",
+            req.source_language,
+            req.target_language,
+            req.lines.len()
+        );
+        if !req.keep_as_written.is_empty() {
+            p.push_str(&format!(
+                "\nKeep these terms exactly as written, untranslated: {}.",
+                list(req.keep_as_written)
+            ));
+        }
+        if !req.before.is_empty() {
+            p.push_str(&format!(
+                "\nContext before (do not translate): {}",
+                list(req.before)
+            ));
+        }
+        p.push_str(&format!("\nLines to translate: {}", list(req.lines)));
+        if !req.after.is_empty() {
+            p.push_str(&format!(
+                "\nContext after (do not translate): {}",
+                list(req.after)
+            ));
+        }
+        p.push_str("\nReply with the JSON object {\"lines\": [...]}.");
+        p
+    }
+}
+
+impl TextTranslator for ModelTranslator<'_> {
+    fn model_name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn translate(&self, req: &TextTranslateRequest<'_>) -> Result<Vec<String>, CmError> {
+        let schema = json!({
+            "type": "object",
+            "properties": { "lines": { "type": "array", "items": { "type": "string" } } },
+            "required": ["lines"],
+            "additionalProperties": false
+        });
+        let mut jr = crate::text_model::JsonRequest::new(Self::prompt(req), schema);
+        jr.system =
+            Some("You are a careful subtitle translator. You answer with JSON only.".to_owned());
+        jr.schema_name = "translation".to_owned();
+        let reply = self
+            .model
+            .complete_json(&jr)
+            .map_err(|e| e.into_cm_error(&self.job_id))?;
+        reply.value["lines"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .map(|v| v.as_str().unwrap_or_default().to_owned())
+                    .collect()
+            })
+            .ok_or_else(|| CmError::internal("the text model reply has no `lines`"))
+    }
+}
+
 /// What a text-model run produced.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextTranslation {
@@ -1228,6 +1318,69 @@ mod tests {
             }
             Ok(out)
         }
+    }
+
+    #[test]
+    fn the_model_translator_asks_for_json_lines_and_passes_context_and_terms() {
+        use crate::text_model::{JsonReply, JsonRequest, TextModel, TextModelError};
+        struct Echo(Mutex<Vec<String>>);
+        impl TextModel for Echo {
+            fn complete_json(&self, req: &JsonRequest) -> Result<JsonReply, TextModelError> {
+                self.0.lock().unwrap().push(req.messages[0].content.clone());
+                Ok(JsonReply {
+                    value: json!({ "lines": ["m\u{1ed9}t", "hai"] }),
+                    attempts: 1,
+                })
+            }
+        }
+        let m = Echo(Mutex::new(Vec::new()));
+        let t = ModelTranslator::new(&m, "built-in", "job_1");
+        let lines = vec!["one".to_owned(), "two".to_owned()];
+        let before = vec!["zero".to_owned()];
+        let terms = vec!["CaptureMann".to_owned()];
+        let out = t
+            .translate(&TextTranslateRequest {
+                source_language: "en",
+                target_language: "vi",
+                lines: &lines,
+                before: &before,
+                after: &[],
+                keep_as_written: &terms,
+            })
+            .unwrap();
+        assert_eq!(out, ["m\u{1ed9}t", "hai"]);
+        assert_eq!(t.model_name(), "built-in");
+        let prompt = m.0.lock().unwrap()[0].clone();
+        assert!(
+            prompt.contains("from en to vi") && prompt.contains("exactly 2"),
+            "{prompt}"
+        );
+        assert!(prompt.contains("[\"one\",\"two\"]") && prompt.contains("[\"zero\"]"));
+        assert!(prompt.contains("CaptureMann"));
+        // A provider failure is a job failure with its reason.
+        struct Down;
+        impl TextModel for Down {
+            fn complete_json(&self, _: &JsonRequest) -> Result<JsonReply, TextModelError> {
+                Err(TextModelError {
+                    kind: crate::text_model::ErrorKind::EngineMissing,
+                    message: "no engine".into(),
+                })
+            }
+        }
+        let e = ModelTranslator::new(&Down, "x", "job_9")
+            .translate(&TextTranslateRequest {
+                source_language: "en",
+                target_language: "vi",
+                lines: &lines,
+                before: &[],
+                after: &[],
+                keep_as_written: &[],
+            })
+            .unwrap_err();
+        assert!(
+            matches!(e, CmError::JobFailed { ref reason, .. } if reason == "engine_missing"),
+            "{e:?}"
+        );
     }
 
     fn many(n: usize) -> Vec<CaptionLine> {

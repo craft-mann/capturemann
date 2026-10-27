@@ -88,7 +88,7 @@ async fn agt_1_ac1_stdio_binary_lists_tools_and_calls_list_targets() {
     // tools), the eleven recording edit tools and the eleven local-AI tools and list_destinations and upload, and suggest_redactions, and replace_in_captions (AI-6a),
     // and get_text_model, test_text_model (AI-7), export_audio (VOC-2), diarize, set_speakers (AI-8),
     // and translate_captions (AI-5), and add_marker (VOC-1), and the six report tools (AI-9), and check_report_item.
-    assert_eq!(list.len(), 69);
+    assert_eq!(list.len(), 73);
     assert!(list
         .iter()
         .all(|t| t["inputSchema"].is_object() && t["outputSchema"].is_object()));

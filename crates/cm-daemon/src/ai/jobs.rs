@@ -104,10 +104,29 @@ pub(super) fn interrupt_flag(ctx: &JobContext) -> (Arc<AtomicBool>, tokio::task:
     (flag, watcher)
 }
 
-/// Runs `model_download` jobs.
+/// The download of one model store: `(model, progress) -> installed`, see
+/// [`ModelService::download`].
+pub(super) type DownloadFn = Arc<
+    dyn Fn(&str, &mut dyn FnMut(DownloadProgress) -> bool) -> Result<bool, CmError> + Send + Sync,
+>;
+
+/// Runs `model_download` jobs (speech models) and `text_model_download` jobs (the built-in text
+/// models): the same handler, a different store. Events of a text model carry `"kind": "text"`.
 pub(super) struct ModelDownloadHandler {
     pub(super) events: EventBus,
-    pub(super) service: Arc<dyn ModelService>,
+    pub(super) download: DownloadFn,
+    pub(super) text: bool,
+}
+
+impl ModelDownloadHandler {
+    fn tag(&self, mut v: Value) -> Value {
+        if self.text {
+            if let Some(o) = v.as_object_mut() {
+                o.insert("kind".into(), json!("text"));
+            }
+        }
+        v
+    }
 }
 
 #[async_trait]
@@ -121,16 +140,17 @@ impl JobHandler for ModelDownloadHandler {
             .ok_or_else(|| CmError::invalid_field("model", "is required"))?
             .to_owned();
         let (flag, watcher) = interrupt_flag(&ctx);
-        let (service, events, reporter, run_flag, id) = (
-            self.service.clone(),
+        let (download, events, reporter, run_flag, id, text) = (
+            self.download.clone(),
             self.events.clone(),
             ctx.reporter.clone(),
             flag.clone(),
             model.clone(),
+            self.text,
         );
         let joined = tokio::task::spawn_blocking(move || {
             let mut last = -1.0_f64;
-            service.download(&id, &mut |p: DownloadProgress| {
+            download(&id, &mut |p: DownloadProgress| {
                 let fraction = if p.bytes_total == 0 {
                     0.0
                 } else {
@@ -146,11 +166,12 @@ impl JobHandler for ModelDownloadHandler {
                             (fraction * 100.0) as u32
                         )),
                     );
-                    events.publish(
-                        events::MODEL_DOWNLOAD_PROGRESS,
-                        json!({ "model": p.model, "bytes_done": p.bytes_done,
-                                "bytes_total": p.bytes_total, "fraction": fraction }),
-                    );
+                    let mut ev = json!({ "model": p.model, "bytes_done": p.bytes_done,
+                                "bytes_total": p.bytes_total, "fraction": fraction });
+                    if text {
+                        ev["kind"] = json!("text");
+                    }
+                    events.publish(events::MODEL_DOWNLOAD_PROGRESS, ev);
                 }
                 !run_flag.load(Ordering::SeqCst)
             })
@@ -161,7 +182,7 @@ impl JobHandler for ModelDownloadHandler {
             Ok(Ok(true)) => {
                 self.events.publish(
                     events::MODEL_CHANGED,
-                    json!({ "model": model, "change": "downloaded" }),
+                    self.tag(json!({ "model": model, "change": "downloaded" })),
                 );
                 Ok(json!({ "model": model }))
             }

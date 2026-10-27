@@ -20,6 +20,7 @@
 
 use std::sync::{Arc, Mutex, PoisonError};
 
+use cm_ai::text_model::engine::{EmbeddedTextModel, EngineSpec};
 use cm_ai::text_model::{
     self, ErrorKind, Provider, SendPlan, TextModel, TextModelConfig, TextModelError,
     KEY_NOTICE_HOST,
@@ -73,6 +74,23 @@ impl TextModelState {
     }
 }
 
+/// The built-in model the settings ask for (`None`: the store's active one).
+fn embedded_wanted(c: &TextModelConfig) -> Option<&str> {
+    (!c.embedded_model.is_empty()).then_some(c.embedded_model.as_str())
+}
+
+/// A model that only fails: what the built-in provider answers when its model is not there.
+struct FailingModel(TextModelError);
+
+impl TextModel for FailingModel {
+    fn complete_json(
+        &self,
+        _req: &text_model::JsonRequest,
+    ) -> Result<text_model::JsonReply, TextModelError> {
+        Err(self.0.clone())
+    }
+}
+
 /// What identifies the settings a test result belongs to (no key).
 fn fingerprint(c: &TextModelConfig) -> String {
     format!(
@@ -106,9 +124,59 @@ pub fn setup_error(e: TextModelError) -> DaemonError {
 }
 
 impl Inner {
-    /// The `ai.text.*` settings.
+    /// The `ai.text.*` settings. With the built-in provider the model and the context are the
+    /// resolved model's (the engine really runs with the catalogue's context), when one is
+    /// downloaded.
     pub(crate) fn text_model_config(&self) -> Result<TextModelConfig, DaemonError> {
-        Ok(TextModelConfig::from_settings(&self.settings.all()?))
+        let mut c = TextModelConfig::from_settings(&self.settings.all()?);
+        if c.provider == Provider::Embedded {
+            if let Ok(r) = self.ai.text_models.resolve(embedded_wanted(&c)) {
+                c.model = r.id;
+                c.context_tokens = r.context_tokens.max(512);
+            }
+        }
+        Ok(c)
+    }
+
+    /// The checks every use of the text model starts with: a usable provider and, for the
+    /// built-in one, a downloaded model (`no_text_model` otherwise).
+    pub(crate) fn check_text_model(&self, c: &TextModelConfig) -> Result<(), DaemonError> {
+        c.check_endpoint().map_err(setup_error)?;
+        if c.provider == Provider::Embedded {
+            self.ai
+                .text_models
+                .resolve(embedded_wanted(c))
+                .map_err(|_| setup_error(TextModelError::no_text_model_named(&c.embedded_model)))?;
+        }
+        Ok(())
+    }
+
+    /// Whether a local text model is set up and usable right now (a provider is chosen, its
+    /// address is loopback and, for the built-in one, a model is downloaded). What decides
+    /// `auto` for a translation into a language Whisper cannot write.
+    pub(crate) fn text_model_ready(&self) -> bool {
+        self.text_model_config().is_ok_and(|c| {
+            c.provider != Provider::None && c.is_local() && self.check_text_model(&c).is_ok()
+        })
+    }
+
+    /// The model that talks to the built-in engine for `config`.
+    fn embedded_client(&self, config: &TextModelConfig) -> Box<dyn TextModel> {
+        match self.ai.text_models.resolve(embedded_wanted(config)) {
+            Ok(r) => Box::new(EmbeddedTextModel::new(
+                self.ai.text_engine.clone(),
+                EngineSpec {
+                    model_id: r.id,
+                    model_path: r.path,
+                    ram_mb: r.ram_mb,
+                    context_tokens: r.context_tokens.max(512),
+                },
+                config,
+            )),
+            Err(_) => Box::new(FailingModel(TextModelError::no_text_model_named(
+                &config.embedded_model,
+            ))),
+        }
     }
 
     /// The API key by the name in the settings; `None` without a name. Blocking (keychain).
@@ -133,6 +201,9 @@ impl Inner {
         {
             return Ok(Box::new(SharedModel(m)));
         }
+        if config.provider == Provider::Embedded {
+            return Ok(self.embedded_client(config));
+        }
         let key = self.text_model_key(config)?;
         Ok(text_model::build(config, key))
     }
@@ -142,7 +213,7 @@ impl Inner {
     /// caller makes its action Confirm tier and shows the plan), `None` when it can run at once.
     pub(crate) fn text_model_gate(&self, chars: usize) -> Result<Option<SendPlan>, DaemonError> {
         let config = self.text_model_config()?;
-        config.check_endpoint().map_err(setup_error)?;
+        self.check_text_model(&config)?;
         Ok(config.send_plan(chars))
     }
 
@@ -190,6 +261,8 @@ impl Inner {
         Ok(json!({
             "provider": c.provider.as_str(),
             "model": c.model,
+            "embedded_model": c.embedded_model,
+            "engine": self.ai.text_engine.status(),
             "local": c.is_local(),
             "host": c.host(),
             "base_url": display_url(&c.effective_base_url()),
@@ -206,19 +279,26 @@ impl Inner {
     /// can show it; provider `none` and unusable settings are `invalid_input`.
     pub(crate) async fn test_text_model(&self) -> Result<Value, DaemonError> {
         let c = self.text_model_config()?;
-        c.check_endpoint().map_err(setup_error)?;
+        self.check_text_model(&c)?;
         if c.model.is_empty() {
             return Err(setup_error(TextModelError::invalid_input(
                 "Choose a text model on the AI page first",
             )));
         }
         let (cfg, secrets) = (c.clone(), self.text_model.store());
+        // The built-in provider needs no key; its client is built here (no keychain, no wait).
+        let embedded = (c.provider == Provider::Embedded).then(|| self.embedded_client(&c));
         let outcome = blocking(move || {
-            let key = match &cfg.key_name {
-                Some(n) => secrets.get(n)?,
-                None => None,
+            let model = match embedded {
+                Some(m) => m,
+                None => {
+                    let key = match &cfg.key_name {
+                        Some(n) => secrets.get(n)?,
+                        None => None,
+                    };
+                    text_model::build(&cfg, key)
+                }
             };
-            let model = text_model::build(&cfg, key);
             Ok(text_model::test_model(model.as_ref(), &cfg.model))
         })
         .await?;

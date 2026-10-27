@@ -1092,12 +1092,14 @@ pub fn all() -> Vec<ToolSpec> {
             Tier::Free,
             false,
             "AI-7",
-            "Read how the text model (summaries, translation to any language, reports) is set up: `provider` (`none`, `local` for Ollama or LM Studio on this computer, `openai_compatible`, `anthropic`), `model`, `local` (true when the server is on this computer; a server on the network or the internet is remote), `host`, `base_url`, `context_tokens`, `timeout_s`, `structured_output` (the last Test's result, null if untested), `has_key` (whether a key is stored; the key itself is never returned) and `remote_notice_pending`. With a remote provider, tools that send recording text to it ask the user to confirm and name the host and the number of characters. These settings (`ai.text.*`) can only be changed in the app.",
+            "Read how the text model (summaries, translation to any language, reports) is set up: `provider` (`none`, `local` for Ollama or LM Studio on this computer, `embedded` for the text engine built into CaptureMann, `openai_compatible`, `anthropic`), `model`, `embedded_model`, `engine` (the built-in engine's state), `local` (true when the server is on this computer; a server on the network or the internet is remote), `host`, `base_url`, `context_tokens`, `timeout_s`, `structured_output` (the last Test's result, null if untested), `has_key` (whether a key is stored; the key itself is never returned) and `remote_notice_pending`. With a remote provider, tools that send recording text to it ask the user to confirm and name the host and the number of characters. These settings (`ai.text.*`) can only be changed in the app.",
             json!({}),
             &[],
             json!({ "type": "object", "properties": {
-                "provider": { "type": "string", "enum": ["none", "local", "openai_compatible", "anthropic"] },
+                "provider": { "type": "string", "enum": ["none", "local", "embedded", "openai_compatible", "anthropic"] },
                 "model": { "type": "string" },
+                "embedded_model": { "type": "string", "description": "The built-in model chosen in the settings (empty: the active one)." },
+                "engine": { "type": "object", "description": "The built-in engine: `state` (`stopped`, `starting`, `running`, `failed`), `model`, `port`, `in_flight`, `restarts`, `helper`, `reason`, `error`, `idle_stop_s`." },
                 "local": { "type": "boolean" },
                 "host": { "type": ["string", "null"] },
                 "base_url": { "type": "string" },
@@ -1113,7 +1115,7 @@ pub fn all() -> Vec<ToolSpec> {
             Tier::Free,
             false,
             "AI-7",
-            "Send one short fixed prompt to the configured text model and report `ok`, `latency_ms`, `model` and whether structured output worked on the first try (`structured_output`). It sends no recording text and talks only to the configured provider. A server that is not running or a model that fails is an answer with `ok: false`, a `reason` (`text_model_unreachable`, `timeout`, `invalid_model_output`, `text_model_error`) and a `message`. With provider `none` it fails with `invalid_input` and `data.reason = \"no_text_model\"`.",
+            "Send one short fixed prompt to the configured text model and report `ok`, `latency_ms`, `model` and whether structured output worked on the first try (`structured_output`). It sends no recording text and talks only to the configured provider. A server that is not running or a model that fails is an answer with `ok: false`, a `reason` (`text_model_unreachable`, `timeout`, `invalid_model_output`, `text_model_error`, and for the built-in engine `engine_missing`, `engine_failed`, `not_enough_memory`) and a `message`. With provider `none` it fails with `invalid_input` and `data.reason = \"no_text_model\"`.",
             json!({}),
             &[],
             json!({ "type": "object", "properties": {
@@ -1217,6 +1219,11 @@ pub fn all() -> Vec<ToolSpec> {
     tools
 }
 
+fn text_model_id_schema() -> Value {
+    json!({ "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,39}$",
+            "description": "A built-in text model id from list_text_models, e.g. `text-8gb`." })
+}
+
 fn model_id_schema() -> Value {
     json!({ "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,39}$",
             "description": "A speech model id from list_models, e.g. `base`, `small` or `medium`." })
@@ -1243,7 +1250,7 @@ fn ai_tool(
         name,
         tier,
         mutating,
-        destructive: name == "remove_model",
+        destructive: matches!(name, "remove_model" | "remove_text_model"),
         spec,
         summary,
         input: json!({ "type": "object", "properties": props, "required": required,
@@ -1347,6 +1354,63 @@ fn ai_tools() -> Vec<ToolSpec> {
             "AI-1",
             "Delete an installed speech model from this computer. The user sees a confirmation with the model and its size. Refused with `busy` while a transcription or download uses it.",
             json!({ "model": model_id_schema() }),
+            &["model"],
+            json!({ "type": "object", "properties": {
+                "model": { "type": "string" }, "removed": { "type": "boolean" } },
+                "required": ["model", "removed"] }),
+        ),
+        ai_tool(
+            "list_text_models",
+            Tier::Free,
+            false,
+            "AI-7",
+            "List the text models of the engine built into CaptureMann (provider `embedded`): which are downloaded, which one runs by default (`active`), the download size, the memory each needs (`ram_mb`), the Mac memory tier it is meant for (`tier_gb`: 8, 16 or 32), its licence and the folder they are kept in. Models whose checksum is not pinned yet are not listed. Nothing is downloaded by listing.",
+            json!({}),
+            &[],
+            json!({ "type": "object", "properties": {
+                "models": { "type": "array", "items": { "type": "object", "properties": {
+                    "id": { "type": "string" }, "label": { "type": "string" },
+                    "size_mb": { "type": "integer", "description": "Download size in MB (10^6 bytes)." },
+                    "ram_mb": { "type": "integer", "description": "Memory it needs while it runs, in MB." },
+                    "tier_gb": { "type": "integer", "enum": [8, 16, 32] },
+                    "license": { "type": "string", "description": "Apache-2.0 or MIT." },
+                    "context_tokens": { "type": "integer" },
+                    "hint": { "type": "string" },
+                    "installed": { "type": "boolean" }, "active": { "type": "boolean" },
+                    "path": { "type": ["string", "null"] } },
+                    "required": ["id", "label", "size_mb", "tier_gb", "license", "installed", "active"] } },
+                "active": { "type": ["string", "null"] },
+                "dir": { "type": "string" } },
+                "required": ["models", "active", "dir"] }),
+        ),
+        ai_tool(
+            "download_text_model",
+            Tier::Confirm,
+            true,
+            "AI-7",
+            "Download a text model for the built-in engine from the internet, in the background. Like `download_model` it only runs when asked: the user sees a confirmation with the model, its size, its licence and where it is saved. Returns a `job_id`; progress arrives as `job.progress` and `model.download.progress` events (with `kind: \"text\"`), an interrupted download resumes, the file is checked against its pinned SHA-256, and `cancel_job` stops it. Fails with `invalid_input` for an unknown or already downloaded model.",
+            json!({ "model": text_model_id_schema() }),
+            &["model"],
+            job_started_output(json!({ "model": { "type": "string" } })),
+        ),
+        ai_tool(
+            "select_text_model",
+            Tier::Free,
+            true,
+            "AI-7",
+            "Choose the downloaded text model the built-in engine runs. It does not switch the text-model provider (that is an app-only setting) and loads nothing: the engine starts on the first request.",
+            json!({ "model": text_model_id_schema() }),
+            &["model"],
+            json!({ "type": "object", "properties": { "active": { "type": "string" } },
+                    "required": ["active"] }),
+        ),
+        ai_tool(
+            "remove_text_model",
+            Tier::Confirm,
+            true,
+            "AI-7",
+            "Delete a downloaded text model from this computer. The user sees a confirmation with the model and its size. Refused with `busy` while it is being downloaded or a job is using it; an idle engine is stopped first.",
+            json!({ "model": text_model_id_schema() }),
             &["model"],
             json!({ "type": "object", "properties": {
                 "model": { "type": "string" }, "removed": { "type": "boolean" } },

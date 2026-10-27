@@ -112,6 +112,13 @@ pub const ACTIONS: &[ActionSpec] = &[
     spec("import_model", Tier::Free, true),
     spec("select_model", Tier::Free, true),
     spec("remove_model", Tier::Confirm, true),
+    // AI-7, the built-in text engine: the same rules for its models. `download_text_model` is
+    // network traffic and `remove_text_model` deletes a file, so both are Confirm; listing and
+    // choosing the model that runs are Free.
+    spec("list_text_models", Tier::Free, false),
+    spec("download_text_model", Tier::Confirm, true),
+    spec("select_text_model", Tier::Free, true),
+    spec("remove_text_model", Tier::Confirm, true),
     spec("transcribe", Tier::Free, true),
     spec("get_transcript", Tier::Free, false),
     spec("get_captions", Tier::Free, false),

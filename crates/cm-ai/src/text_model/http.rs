@@ -107,6 +107,21 @@ fn post(
     read_body(req.send(&bytes[..]).map_err(|e| classify(&e))?)
 }
 
+/// `GET http://127.0.0.1:<port>/health` of the built-in helper: 200 is ready, 503 is still
+/// loading the model, anything else (or no answer) is down. Loopback only by construction.
+pub(super) fn probe_health(port: u16) -> super::engine::Health {
+    use super::engine::Health;
+    match get(
+        &format!("http://127.0.0.1:{port}/health"),
+        &[],
+        Duration::from_secs(2),
+    ) {
+        Ok(r) if r.status == 200 => Health::Ready,
+        Ok(r) if r.status == 503 => Health::Loading,
+        _ => Health::Down,
+    }
+}
+
 /// A model the server offers.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ModelEntry {

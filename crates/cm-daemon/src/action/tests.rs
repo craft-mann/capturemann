@@ -120,6 +120,10 @@ fn samples() -> Vec<(&'static str, Value)> {
         ),
         ("select_model", json!({"model": "small"})),
         ("remove_model", json!({"model": "small"})),
+        ("list_text_models", json!({})),
+        ("download_text_model", json!({"model": "text-8gb"})),
+        ("select_text_model", json!({"model": "text-8gb"})),
+        ("remove_text_model", json!({"model": "text-8gb"})),
         (
             "transcribe",
             json!({"capture_id": "rec_1", "language": "en", "model": "small"}),
@@ -240,6 +244,8 @@ fn agt_2_tier_table() {
                 | "restart_recording"
                 | "download_model"
                 | "remove_model"
+                | "download_text_model"
+                | "remove_text_model"
         );
         assert_eq!(s.tier == Tier::Confirm, confirm, "{}", s.name);
         assert_ne!(s.tier, Tier::Never, "{} must not be exposed", s.name);

@@ -200,7 +200,7 @@ impl Inner {
         if config.provider == cm_ai::text_model::Provider::None || !config.is_local() {
             return Err(setup_error(TextModelError::no_text_model()));
         }
-        config.check_endpoint().map_err(setup_error)?;
+        self.check_text_model(&config)?;
         Ok(config)
     }
 

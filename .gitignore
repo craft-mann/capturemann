@@ -40,6 +40,8 @@ spike-out/**/*.wav
 **/.DS_Store
 packaging/ffmpeg/out/
 packaging/ffmpeg/.downloads/
+packaging/llama/out/
+packaging/llama/.downloads/
 
 # Local-only: agent settings and worktrees
 .claude/

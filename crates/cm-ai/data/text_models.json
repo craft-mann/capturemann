@@ -1,0 +1,47 @@
+{
+  "_comment": "Text models for the built-in engine (AI-7, provider `embedded`): GGUF files run by the bundled llama-server. Same rules as models.json: an entry with pending_pin true has no pinned checksum yet, so it is hidden from the AI page and every action on it is refused until the maintainer fills in url (pinned to a commit), file, sha256, bytes, ram_mb, license and context_tokens and removes the flag. The three entries below are PLACEHOLDERS for the 8 GB, 16 GB and 32 GB memory tiers; the model choice is made by the maintainer's research (spike S8), nothing here names a real model or a real file. tier_gb is the smallest Mac memory the entry is meant for; ram_mb is the memory the model needs while it runs (file plus context cache), in MB; context_tokens is the context the engine starts it with; license must be Apache-2.0 or MIT. To use another mirror or revision, put a file of this shape at <config dir>/ai/text/catalog.json or point CAPTUREMANN_TEXT_CATALOG at one: it replaces this list.",
+  "models": [
+    {
+      "id": "text-8gb",
+      "label": "Built-in model for 8 GB Macs",
+      "hint": "Placeholder: smallest tier.",
+      "file": "pending-8gb.gguf",
+      "url": "https://example.invalid/pending-8gb.gguf",
+      "sha256": "",
+      "bytes": 0,
+      "ram_mb": 0,
+      "tier_gb": 8,
+      "license": "",
+      "context_tokens": 8192,
+      "pending_pin": true
+    },
+    {
+      "id": "text-16gb",
+      "label": "Built-in model for 16 GB Macs",
+      "hint": "Placeholder: middle tier.",
+      "file": "pending-16gb.gguf",
+      "url": "https://example.invalid/pending-16gb.gguf",
+      "sha256": "",
+      "bytes": 0,
+      "ram_mb": 0,
+      "tier_gb": 16,
+      "license": "",
+      "context_tokens": 16384,
+      "pending_pin": true
+    },
+    {
+      "id": "text-32gb",
+      "label": "Built-in model for 32 GB Macs and more",
+      "hint": "Placeholder: largest tier.",
+      "file": "pending-32gb.gguf",
+      "url": "https://example.invalid/pending-32gb.gguf",
+      "sha256": "",
+      "bytes": 0,
+      "ram_mb": 0,
+      "tier_gb": 32,
+      "license": "",
+      "context_tokens": 32768,
+      "pending_pin": true
+    }
+  ]
+}

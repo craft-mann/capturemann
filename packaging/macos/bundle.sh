@@ -30,6 +30,14 @@
 #   CM_NO_FFMPEG=1    bundle no FFmpeg even when packaging/ffmpeg/out exists (a recording-only app).
 #   CM_REQUIRE_FFMPEG=1  fail unless an LGPL FFmpeg with its licence files is bundled
 #                     (`make bundle-release` sets it).
+#   CM_LLAMA_BUNDLE   path to a llama-server binary (MIT; the helper of the built-in text engine) to
+#                     copy into Contents/MacOS and sign. Without it, packaging/llama/out/llama-server
+#                     (made by `make llama`) is bundled when it exists, with its licence files and
+#                     build record in Contents/Resources/Llama/. Refused if it links curl or OpenSSL.
+#   CM_NO_LLAMA=1     bundle no llama-server even when packaging/llama/out exists (the built-in text
+#                     model then answers "engine missing"; Ollama and LM Studio still work).
+#   CM_REQUIRE_LLAMA=1  fail unless llama-server with its licence files is bundled
+#                     (`make bundle-release` sets it).
 # Output: $CM_BUNDLE_OUT/CaptureMann.app. It is assembled and verified in a hidden temp folder next
 # to it and swapped in with renames only after verification, so a failed build leaves the previous
 # app intact. Entitlements: packaging/macos/CaptureMann.entitlements (camera, microphone).
@@ -169,6 +177,39 @@ $ff_conf"; then
   fi
   ffmpeg_bundled=1
 fi
+# llama-server (MIT), the helper process of the built-in text engine (AI-7). It is a separate
+# program next to the app's executables, never linked into the app. Nothing is downloaded here:
+# CM_LLAMA_BUNDLE, or the output of `make llama` (packaging/llama/build-macos.sh), is copied in.
+llama_bundled=0
+llama_src="${CM_LLAMA_BUNDLE:-}"
+if [ "${CM_REQUIRE_LLAMA:-0}" = "1" ] && [ "${CM_NO_LLAMA:-0}" = "1" ]; then
+  die "CM_REQUIRE_LLAMA=1 and CM_NO_LLAMA=1 contradict each other"
+fi
+if [ -z "$llama_src" ] && [ "${CM_NO_LLAMA:-0}" != "1" ] && [ -x "$root/packaging/llama/out/llama-server" ]; then
+  llama_src="$root/packaging/llama/out/llama-server"
+  echo "==> bundling the llama-server built by make llama ($llama_src)"
+fi
+if [ -z "$llama_src" ] && [ "${CM_REQUIRE_LLAMA:-0}" = "1" ]; then
+  die "CM_REQUIRE_LLAMA=1 but there is no llama-server to bundle: run \`make llama\` (or set CM_LLAMA_BUNDLE)"
+fi
+if [ -n "$llama_src" ]; then
+  [ -x "$llama_src" ] && [ -f "$llama_src" ] || die "the llama-server to bundle is not an executable file: $llama_src"
+  if otool -L "$llama_src" 2>/dev/null | grep -q -i -E 'curl|ssl|crypto'; then
+    die "$llama_src links curl or OpenSSL: the text engine must not be able to reach the network by itself"
+  fi
+  cp "$llama_src" "$app/Contents/MacOS/llama-server"
+  llama_dir="$(dirname "$llama_src")"
+  if [ -d "$llama_dir/LICENSES" ] && [ -f "$llama_dir/LICENSES/llama.cpp-LICENSE.txt" ]; then
+    mkdir -p "$app/Contents/Resources/Llama"
+    [ ! -f "$llama_dir/BUILD-INFO.txt" ] || cp "$llama_dir/BUILD-INFO.txt" "$app/Contents/Resources/Llama/"
+    cp -R "$llama_dir/LICENSES" "$app/Contents/Resources/Llama/LICENSES"
+  elif [ "${CM_REQUIRE_LLAMA:-0}" = "1" ]; then
+    die "$llama_dir has no LICENSES/llama.cpp-LICENSE.txt: a release must ship the MIT notice (build it with \`make llama\`)"
+  else
+    echo "bundle.sh: warning: no LICENSES next to $llama_src; this bundle must not be distributed" >&2
+  fi
+  llama_bundled=1
+fi
 sed -e "s|@BUNDLE_ID@|$bundle_id|g" -e "s|@VERSION@|$version|g" -e "s|@BUILD@|$build_number|g" -e "s|@APP_NAME@|$app_name|g" \
   "$plist_tpl" > "$app/Contents/Info.plist"
 grep -q -E '@(BUNDLE_ID|VERSION|BUILD|APP_NAME)@' "$app/Contents/Info.plist" && die "unfilled @TOKEN@ left in Info.plist"
@@ -202,6 +243,9 @@ sign "$app/Contents/MacOS/cm-mcp" "$bundle_id.mcp"
 if [ "$ffmpeg_bundled" = "1" ]; then
   sign "$app/Contents/MacOS/ffmpeg" "$bundle_id.ffmpeg"
   [ ! -f "$app/Contents/MacOS/ffprobe" ] || sign "$app/Contents/MacOS/ffprobe" "$bundle_id.ffprobe"
+fi
+if [ "$llama_bundled" = "1" ]; then
+  sign "$app/Contents/MacOS/llama-server" "$bundle_id.llama"
 fi
 # Entitlements go on the main executable and again on the bundle (signing the bundle re-signs the
 # main executable, and would otherwise drop them). Also applied without the hardened runtime so

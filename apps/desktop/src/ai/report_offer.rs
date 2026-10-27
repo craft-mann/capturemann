@@ -11,7 +11,7 @@
 use cm_library::manifest::{CaptureKind, RecManifest};
 use serde_json::Value;
 
-use crate::ai::voice::{ProviderChoice, TextVm};
+use crate::ai::voice::TextVm;
 use crate::recedit::voice_panels::suggested_template;
 
 /// Whether `get_text_model`'s answer names a local model that can write (the same test the
@@ -19,7 +19,7 @@ use crate::recedit::voice_panels::suggested_template;
 pub fn text_model_ready(answer: &Value) -> bool {
     let mut t = TextVm::default();
     t.set_from_daemon(answer);
-    t.provider == ProviderChoice::OnThisMac && !t.model.trim().is_empty()
+    t.ready()
 }
 
 /// The template to offer for a recording, or `None` to stay silent.

@@ -159,6 +159,38 @@ impl AiClient {
         self.transport.call("test_text_model", json!({})).await
     }
 
+    /// `list_text_models` (AI-7): the built-in text models by memory tier.
+    pub async fn list_text_models(
+        &self,
+    ) -> Result<cm_ai::text_model::store::TextModelList, AiError> {
+        let v = self.transport.call("list_text_models", json!({})).await?;
+        parse("list_text_models", v)
+    }
+
+    /// Starts a user-requested text-model download; returns the job id (progress arrives as
+    /// `model.download.progress` events with `kind: "text"`).
+    pub async fn download_text_model(&self, model: &str) -> Result<String, AiError> {
+        let v = self
+            .transport
+            .call("download_text_model", json!({ "model": model }))
+            .await?;
+        job_id("download_text_model", &v)
+    }
+
+    pub async fn select_text_model(&self, model: &str) -> Result<(), AiError> {
+        self.transport
+            .call("select_text_model", json!({ "model": model }))
+            .await
+            .map(|_| ())
+    }
+
+    pub async fn remove_text_model(&self, model: &str) -> Result<(), AiError> {
+        self.transport
+            .call("remove_text_model", json!({ "model": model }))
+            .await
+            .map(|_| ())
+    }
+
     pub async fn list_models(&self) -> Result<ModelList, AiError> {
         let v = self.transport.call("list_models", json!({})).await?;
         parse("list_models", v)

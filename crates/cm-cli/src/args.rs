@@ -125,6 +125,14 @@ pub enum AiCmd {
         #[command(subcommand)]
         cmd: Option<ModelsCmd>,
     },
+    /// List the text models of the engine built into CaptureMann, or manage them:
+    /// `text-models download|use|rm` (`list_text_models`, `download_text_model`,
+    /// `select_text_model`, `remove_text_model`). Choosing the built-in engine as the text model
+    /// is done on the AI page of the app.
+    TextModels {
+        #[command(subcommand)]
+        cmd: Option<TextModelsCmd>,
+    },
     /// Transcribe a recording with an installed model (`transcribe`); without a model it tells you
     /// how to get one (exit 2, `no_model`).
     Transcribe(TranscribeArgs),
@@ -337,6 +345,26 @@ pub enum SpeakersCmd {
         /// Capture id of a recording.
         id: String,
     },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum TextModelsCmd {
+    /// Download a text model from the internet (asks you to confirm in the app). Resumes if it
+    /// was interrupted; the file is checked against its pinned checksum.
+    Download {
+        /// Model id (see `capturemann ai text-models`).
+        model: String,
+        /// Wait for the download to finish (exit 6 if it fails).
+        #[arg(long)]
+        wait: bool,
+        /// With `--wait`: give up after this many seconds (the download keeps running).
+        #[arg(long, value_name = "SECS", requires = "wait", value_parser = positive_secs)]
+        timeout: Option<f64>,
+    },
+    /// Use this downloaded text model for the built-in engine.
+    Use { model: String },
+    /// Delete a downloaded text model (asks you to confirm in the app).
+    Rm { model: String },
 }
 
 #[derive(Debug, Subcommand)]

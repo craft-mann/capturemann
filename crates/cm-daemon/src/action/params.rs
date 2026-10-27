@@ -353,6 +353,7 @@ pub enum Action {
     /// `set_audio_mix`, `set_camera_layout`, `set_zooms`, `set_cursor_style`, `set_reframe`.
     Edit(crate::edit_ops::EditParams),
     /// `list_models`, `download_model`, `import_model`, `select_model`, `remove_model`,
+    /// `list_text_models`, `download_text_model`, `select_text_model`, `remove_text_model`,
     /// `transcribe`, `get_transcript`, `set_captions`, `replace_in_captions`, `export_captions`,
     /// `suggest_zooms`, `suggest_cuts` (see [`crate::ai`]).
     Ai(crate::ai::AiParams),

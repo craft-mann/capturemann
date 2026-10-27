@@ -10,8 +10,8 @@
 //! * **Loosen** exactly one tool, `start_recording`, to `"allow"`.
 //!
 //! Everything else is locked: reading tools stay Allow (an ask-first on a polling read would be
-//! unusable), and `publish_video`, `delete_capture`, `run_fps_selftest`, `download_model` and
-//! `remove_model` stay Ask first (NFR-11). Internal plumbing actions are not tools and have no
+//! unusable), and `publish_video`, `delete_capture`, `run_fps_selftest`, `download_model`,
+//! `remove_model`, `download_text_model` and `remove_text_model` stay Ask first (NFR-11). Internal plumbing actions are not tools and have no
 //! entry. The locked rules are enforced **twice**: a write of a bad shape, an unknown or
 //! internal tool, a value for a locked tool or a loosening of anything but `start_recording` is
 //! refused ([`parse_strict`]), and a file that was edited by hand is read with [`parse_lenient`],
@@ -299,6 +299,8 @@ mod tests {
             "run_fps_selftest",
             "download_model",
             "remove_model",
+            "download_text_model",
+            "remove_text_model",
         ] {
             assert_eq!(
                 effective_tier(&ss(locked), &allow(locked)),

@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 use super::{plain, Ctx};
 use crate::args::{
     AiCmd, CaptionsCmd, ModelsCmd, ReportArgs, ReportCmd, SpeakersArgs, SpeakersCmd, SuggestCmd,
-    TextModelCmd, TranscribeArgs, TranslateArgs,
+    TextModelCmd, TextModelsCmd, TranscribeArgs, TranslateArgs,
 };
 use crate::client::Client;
 use crate::error::CliError;
@@ -79,6 +79,42 @@ pub(super) async fn ai(cx: &mut Ctx<'_>, cmd: AiCmd) -> Result<(), CliError> {
             });
             Ok(())
         }
+        AiCmd::TextModels { cmd: None } => {
+            let mut c = cx.client().await?;
+            let r = c.call("list_text_models", json!({})).await?;
+            cx.emit(&r, text_model_table);
+            Ok(())
+        }
+        AiCmd::TextModels {
+            cmd:
+                Some(TextModelsCmd::Download {
+                    model,
+                    wait,
+                    timeout,
+                }),
+        } => text_model_download(cx, model, wait, timeout).await,
+        AiCmd::TextModels {
+            cmd: Some(TextModelsCmd::Use { model }),
+        } => {
+            let params = cx.mutating(json!({ "model": model }), "");
+            let mut c = cx.client().await?;
+            let r = c.call("select_text_model", params).await?;
+            cx.emit(&r, |r| {
+                format!("`{}` is now the built-in text model", plain(&r["active"]))
+            });
+            Ok(())
+        }
+        AiCmd::TextModels {
+            cmd: Some(TextModelsCmd::Rm { model }),
+        } => {
+            let params = cx.mutating(json!({ "model": model }), "");
+            let mut c = cx.client().await?;
+            let r = c.call("remove_text_model", params).await?;
+            cx.emit(&r, |r| {
+                format!("Deleted the text model `{}`", plain(&r["model"]))
+            });
+            Ok(())
+        }
         AiCmd::Report(a) => report(cx, a).await,
         AiCmd::Transcribe(a) => transcribe(cx, a).await,
         AiCmd::Transcript { id, words } => transcript(cx, id, words).await,
@@ -141,7 +177,7 @@ async fn text_model_show(cx: &mut Ctx<'_>) -> Result<(), CliError> {
     let r = c.call("get_text_model", json!({})).await?;
     cx.emit(&r, |r| {
         if r["provider"] == json!("none") {
-            return "No text model is set up. Choose Ollama, LM Studio or a provider on the AI page of the app.\n"
+            return "No text model is set up. Choose the built-in model, Ollama or LM Studio on the AI page of the app.\n"
                 .to_owned();
         }
         format!(
@@ -602,6 +638,80 @@ fn model_table(r: &Value) -> String {
         );
     }
     s
+}
+
+fn text_model_table(r: &Value) -> String {
+    let models = r["models"].as_array().cloned().unwrap_or_default();
+    let mut s = format!("Built-in text models (folder: {})\n", plain(&r["dir"]));
+    if models.is_empty() {
+        s.push_str("No text model is available in this build yet.\n");
+        return s;
+    }
+    let width = models
+        .iter()
+        .map(|m| plain(&m["id"]).len())
+        .max()
+        .unwrap_or(0);
+    for m in &models {
+        let state = match (m["installed"] == json!(true), m["active"] == json!(true)) {
+            (true, true) => "downloaded, used by default",
+            (true, false) => "downloaded",
+            _ => "not downloaded",
+        };
+        let _ = writeln!(
+            s,
+            "{} {:<width$}  {:>5} MB  needs {} MB, for {} GB Macs  {}  {state}",
+            if m["active"] == json!(true) { "*" } else { " " },
+            plain(&m["id"]),
+            plain(&m["size_mb"]),
+            plain(&m["ram_mb"]),
+            plain(&m["tier_gb"]),
+            plain(&m["license"]),
+        );
+    }
+    s
+}
+
+async fn text_model_download(
+    cx: &mut Ctx<'_>,
+    model: String,
+    wait: bool,
+    timeout: Option<f64>,
+) -> Result<(), CliError> {
+    let params = cx.mutating(json!({ "model": model }), "");
+    let mut c = cx.client().await?;
+    let started = c.call("download_text_model", params).await?;
+    if !wait {
+        cx.emit(&started, |r| {
+            format!(
+                "Downloading the text model `{}`: job {}{}\n  watch it with `capturemann jobs get {}`",
+                plain(&r["model"]),
+                plain(&r["job_id"]),
+                if r["reused"] == json!(true) {
+                    " (already running)"
+                } else {
+                    ""
+                },
+                plain(&r["job_id"]),
+            )
+        });
+        return Ok(());
+    }
+    let job = wait_job(
+        cx,
+        &mut c,
+        &plain(&started["job_id"]),
+        "downloading",
+        timeout,
+    )
+    .await?;
+    cx.emit(&job, |j| {
+        format!(
+            "Downloaded the text model `{}`",
+            plain(&j["result"]["model"])
+        )
+    });
+    Ok(())
 }
 
 async fn models_list(cx: &mut Ctx<'_>) -> Result<(), CliError> {

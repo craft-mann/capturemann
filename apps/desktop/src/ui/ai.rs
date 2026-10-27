@@ -569,12 +569,25 @@ pub fn on_event(app: &Entity<AppModel>, ev: &cm_daemon::events::Event, cx: &mut 
             ) else {
                 return;
             };
+            let text = str_of("kind").as_deref() == Some("text");
             app.update(cx, |m, cx| {
-                m.ai.progress(&model, done, total);
+                // A built-in text model (AI-7) has its own list; the ids never mix.
+                if text {
+                    m.builtin.models.progress(&model, done, total);
+                } else {
+                    m.ai.progress(&model, done, total);
+                }
                 cx.notify();
             });
         }
-        "model.changed" => refresh(app, cx),
+        "model.changed" => {
+            if str_of("kind").as_deref() == Some("text") {
+                crate::ui::ai_voice::refresh_text_models(app, cx);
+                crate::ui::ai_voice::refresh_text_model(app, false, cx);
+            } else {
+                refresh(app, cx);
+            }
+        }
         // Edited captions, an undo, a re-generate that cleared edits: the details page's summary
         // ("edited" or not) is read again.
         "capture.revised" => {
@@ -662,6 +675,8 @@ pub fn on_event(app: &Entity<AppModel>, ev: &cm_daemon::events::Event, cx: &mut 
                 });
                 // A finished download turns into an installed model.
                 refresh(app, cx);
+                crate::ui::ai_voice::refresh_text_models(app, cx);
+                crate::ui::ai_voice::refresh_text_model(app, false, cx);
             }
         }
         "job.failed" => {
@@ -694,6 +709,18 @@ pub fn on_event(app: &Entity<AppModel>, ev: &cm_daemon::events::Event, cx: &mut 
                         .map(|(id, _)| id.clone());
                     if let Some(id) = model {
                         m.ai.failed(&id, message.clone());
+                    }
+                    let text_model = m
+                        .builtin
+                        .models
+                        .downloads
+                        .iter()
+                        .find(|(_, d)| {
+                            matches!(d, crate::ai::models::DownloadState::Running { job_id: Some(j), .. } if *j == job)
+                        })
+                        .map(|(id, _)| id.clone());
+                    if let Some(id) = text_model {
+                        m.builtin.models.failed(&id, message.clone());
                     }
                     cx.notify();
                 });

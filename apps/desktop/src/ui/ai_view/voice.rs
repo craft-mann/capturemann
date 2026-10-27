@@ -1,20 +1,24 @@
 //! The voice sections of the AI page (board V8): speaker labels and the text model. A child of
 //! `ai_view` so it can use the page's fields; the rules are in `crate::ai::voice` and the
 //! buttons' work in `ui::ai_voice`. Local text models only for now (maintainer decision
-//! Oct 26, 2026): no Remote, Anthropic, API key or first-send notice.
+//! Oct 26, 2026): no Remote, Anthropic, API key or first-send notice. The text model can be the
+//! engine built into CaptureMann (Oct 27, 2026): board V8 has no design for it, so its list is
+//! plain rows in the same card, with the page's own buttons and progress bar.
 
 use gpui::{div, prelude::*, px, AnyElement, Context, FontWeight, Role, SharedString, Window};
 
 use cm_i18n::{tr, tr_ctx};
 
-use super::AiPage;
-use crate::ai::models::size_label;
+use super::{action_icon, progress_bar, status_glyph, AiPage};
+use crate::ai::builtin::{self, BuiltInRow};
+use crate::ai::models::{size_label, RowStatus};
 use crate::ai::voice::{self, PresetVm, ProviderChoice, SpeakerCard, TestState, TextVm, VoiceVm};
 use crate::theme::{scale, type_scale, Theme};
 use crate::ui::ai_voice as ops;
 use crate::ui::components::{
-    badge, button_with_icon, card, dot, icon, shrink_text, switch, ButtonKind,
+    badge, button_with_icon, card, dot, icon, label_fill, shrink_text, switch, ButtonKind,
 };
+use crate::ui::kit;
 use crate::ui::paint::{rgba_of, TextExt};
 use crate::ui::settings::widgets::{
     caption, disabled_button, list_card, segment, segmented, settings_row, small_button,
@@ -239,14 +243,17 @@ impl AiPage {
                 tr!("No text model. Reports and translation to other languages are off."),
             )
             .into_any_element(),
+            ProviderChoice::BuiltIn => self.builtin_models(t, tm, v.memory_gb(), cx),
             ProviderChoice::OnThisMac => self.local_servers(t, tm, cx),
         });
         if tm.provider != ProviderChoice::None {
             body = body.child(self.test_row(t, tm, cx));
         }
-        body = body
-            .child(div().h(px(1.)).bg(rgba_of(t.row_divider())))
-            .child(self.recommended(t, v.memory_gb()));
+        if tm.provider == ProviderChoice::OnThisMac {
+            body = body
+                .child(div().h(px(1.)).bg(rgba_of(t.row_divider())))
+                .child(self.recommended(t, v.memory_gb()));
+        }
         div()
             .flex()
             .flex_col()
@@ -263,6 +270,190 @@ impl AiPage {
                     .aria_label(SharedString::from(tr!("Text model")))
                     .p(px(16.))
                     .child(body),
+            )
+            .into_any_element()
+    }
+
+    /// The Built in choice: the models by memory tier (download, use, remove, progress, licence,
+    /// "recommended for this Mac") and the engine's state.
+    fn builtin_models(
+        &self,
+        t: &Theme,
+        tm: &TextVm,
+        mem_gb: Option<u32>,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let b = self.app.read(cx).builtin.clone();
+        let rows = b.rows(mem_gb);
+        let mut col = div()
+            .flex()
+            .flex_col()
+            .gap(px(10.))
+            .child(caption(t, builtin::list_caption(mem_gb)));
+        if rows.is_empty() {
+            col = col.child(caption(
+                t,
+                if b.loaded {
+                    tr!("No built-in model is available in this version yet. Use Ollama or LM Studio, or check for an update.")
+                } else {
+                    tr!("Looking for the built-in models\u{2026}")
+                },
+            ));
+        } else {
+            let mut list = list_card(t)
+                .id("ai-builtin-models")
+                .role(Role::List)
+                .aria_label(SharedString::from(tr!("Built-in text models")));
+            let last = rows.len() - 1;
+            for (i, r) in rows.iter().enumerate() {
+                list = list.child(self.builtin_row(t, r, i != last, cx));
+            }
+            col = col.child(list);
+        }
+        let problem = tm.engine.is_problem();
+        col.child(
+            div()
+                .id("ai-builtin-engine")
+                .role(Role::Status)
+                .flex()
+                .items_center()
+                .gap(px(8.))
+                .text_size(px(13.))
+                .text_color(rgba_of(if problem { t.warning } else { t.mist }))
+                .child(dot(if problem { t.warning } else { t.mist }, 6.))
+                .child(label_fill(tm.engine.text())),
+        )
+        .into_any_element()
+    }
+
+    /// One built-in model: name and tier, size and memory, licence, state, progress, buttons.
+    fn builtin_row(
+        &self,
+        t: &Theme,
+        r: &BuiltInRow,
+        divider: bool,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let row = &r.row;
+        let (glyph, tone) = status_glyph(&row.status);
+        let tc = kit::tone_colors(t, tone);
+        let status_color = match row.status {
+            RowStatus::Active | RowStatus::Failed(_) => tc.fg,
+            _ => t.mist,
+        };
+        let mut actions: Vec<AnyElement> = Vec::new();
+        for a in &row.actions {
+            let (app, id, action) = (self.app.clone(), row.id.clone(), a.clone());
+            let label = a.label(row.size_mb);
+            let element_id = SharedString::from(format!("ai-builtin-{}-{:?}", row.id, a));
+            let handler = cx.listener(move |_, _, _, cx| {
+                ops::builtin_row_action(&app, &id, action.clone(), cx)
+            });
+            let glyph = action_icon(a);
+            actions.push(if a.is_primary() {
+                button_with_icon(t, element_id, label, ButtonKind::Primary, glyph)
+                    .on_click(handler)
+                    .into_any_element()
+            } else {
+                small_button_with_icon(t, element_id, &label, glyph)
+                    .on_click(handler)
+                    .into_any_element()
+            });
+        }
+        let progress = row.progress.as_ref().map(|p| {
+            let f = match row.status {
+                RowStatus::Downloading(f) | RowStatus::Paused(f) => f,
+                _ => 0.0,
+            };
+            div()
+                .w_full()
+                .flex()
+                .flex_col()
+                .gap(px(6.))
+                .child(progress_bar(t, &tr!("Download progress"), f))
+                .child(caption(t, p.clone()))
+        });
+        let facts = [r.tier_label(), row.size.clone(), row.memory.clone()]
+            .into_iter()
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join(" \u{00b7} ");
+        div()
+            .id(SharedString::from(format!("ai-builtin-row-{}", row.id)))
+            .role(Role::ListItem)
+            .aria_label(SharedString::from(tr!(
+                "{name}, {size}, {status}",
+                name = row.label,
+                size = row.size,
+                status = row.status.text()
+            )))
+            .px(px(14.))
+            .py(px(12.))
+            .flex()
+            .flex_col()
+            .gap(px(10.))
+            .when(divider, |d| {
+                d.border_b_1().border_color(rgba_of(t.row_divider()))
+            })
+            .when(r.recommended, |d| d.bg(rgba_of(t.raised)))
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .gap(px(10.))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w(px(180.))
+                            .flex()
+                            .flex_col()
+                            .gap(px(2.))
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_wrap()
+                                    .items_center()
+                                    .gap(px(8.))
+                                    .child(
+                                        div()
+                                            .text_size(px(type_scale::UI))
+                                            .font_weight(FontWeight::MEDIUM)
+                                            .child(SharedString::from(row.label.clone())),
+                                    )
+                                    .children(r.recommended.then(|| {
+                                        div()
+                                            .text_size(px(12.))
+                                            .text_color(rgba_of(t.success))
+                                            .child(builtin::recommended_tag())
+                                    }))
+                                    .children(
+                                        (!r.license.is_empty())
+                                            .then(|| badge(t, r.license.clone())),
+                                    ),
+                            )
+                            .child(caption(t, facts))
+                            .children((!row.hint.is_empty()).then(|| caption(t, row.hint.clone()))),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(6.))
+                            .text_size(px(13.))
+                            .text_color(rgba_of(status_color))
+                            .child(icon(glyph, 14., tc.icon))
+                            .child(shrink_text(row.status.text())),
+                    ),
+            )
+            .children(progress)
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .gap(px(8.))
+                    .children(actions),
             )
             .into_any_element()
     }
@@ -707,7 +898,7 @@ impl AiPage {
             .child(list)
             .child(caption(
                 t,
-                tr!("Install a model in Ollama or LM Studio, then pick it above. CaptureMann never downloads text models itself. Default decided by S8."),
+                tr!("To use Ollama or LM Studio, install a model there, then pick it above. Default decided by S8."),
             ))
             .into_any_element()
     }

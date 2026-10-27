@@ -2,7 +2,8 @@
 //! settings, the text-model provider section, the "Recommended for your Mac" table and this
 //! Mac's memory.
 //!
-//! Local text models only for now (maintainer decision Oct 26, 2026): None or On this Mac.
+//! Local text models only for now (maintainer decision Oct 26, 2026): None, Built in (the text
+//! engine CaptureMann ships, Oct 27, 2026) or Ollama or LM Studio.
 //! Nothing here touches the network or the screen by itself. Every change returns
 //! the settings to write (`Vec<(key, value)>`), which `ui::ai` sends through the same app-only
 //! path as `ai.glossary`; an agent cannot write them (`ai.*` is app-only).
@@ -172,29 +173,39 @@ fn display_name_of(v: Option<&Value>) -> String {
 
 // ---- the text model (AI-7) ---------------------------------------------------------------------
 
-/// The segmented control: None / On this Mac (Remote and Anthropic are deferred).
+/// The segmented control: None / Built in / Ollama or LM Studio (Remote and Anthropic are
+/// deferred).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ProviderChoice {
     #[default]
     None,
+    /// The engine inside CaptureMann (provider `embedded`).
+    BuiltIn,
+    /// A server on this Mac: Ollama or LM Studio (provider `local`).
     OnThisMac,
 }
 
 impl ProviderChoice {
-    pub const ALL: [ProviderChoice; 2] = [ProviderChoice::None, ProviderChoice::OnThisMac];
+    pub const ALL: [ProviderChoice; 3] = [
+        ProviderChoice::None,
+        ProviderChoice::BuiltIn,
+        ProviderChoice::OnThisMac,
+    ];
 
     pub fn provider(self) -> Provider {
         match self {
             ProviderChoice::None => Provider::None,
+            ProviderChoice::BuiltIn => Provider::Embedded,
             ProviderChoice::OnThisMac => Provider::Local,
         }
     }
 
     /// A remote provider (a hand-edited file) shows as None: this page offers no remote option
-    /// and choosing On this Mac replaces it.
+    /// and choosing a local one replaces it.
     pub fn from_provider(p: Provider) -> ProviderChoice {
         match p {
             Provider::Local => ProviderChoice::OnThisMac,
+            Provider::Embedded => ProviderChoice::BuiltIn,
             _ => ProviderChoice::None,
         }
     }
@@ -202,8 +213,69 @@ impl ProviderChoice {
     pub fn label(self) -> String {
         match self {
             ProviderChoice::None => tr_ctx!("text model provider", "None"),
-            ProviderChoice::OnThisMac => tr_ctx!("text model provider", "On this Mac"),
+            ProviderChoice::BuiltIn => tr_ctx!("text model provider", "Built in"),
+            ProviderChoice::OnThisMac => tr_ctx!("text model provider", "Ollama or LM Studio"),
         }
+    }
+}
+
+/// The built-in engine as `get_text_model` reports it (`engine`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EngineLine {
+    /// Not running; it starts when a report or a translation needs it.
+    Stopped,
+    Starting,
+    /// Running this model; it stops after this many seconds without a request.
+    Running {
+        model: String,
+        idle_stop_s: u64,
+    },
+    /// The helper is not in this app (`engine_missing`).
+    Missing,
+    /// It could not start or stopped (`engine_failed`, `not_enough_memory`): the daemon's message.
+    Failed(String),
+}
+
+impl EngineLine {
+    pub fn from_json(v: Option<&Value>) -> EngineLine {
+        let Some(v) = v else {
+            return EngineLine::Stopped;
+        };
+        let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_owned();
+        match s("state").as_str() {
+            "starting" => EngineLine::Starting,
+            "running" => EngineLine::Running {
+                model: s("model"),
+                idle_stop_s: v.get("idle_stop_s").and_then(Value::as_u64).unwrap_or(0),
+            },
+            "failed" if s("reason") == "engine_missing" => EngineLine::Missing,
+            "failed" => EngineLine::Failed(s("error")),
+            _ => EngineLine::Stopped,
+        }
+    }
+
+    /// The status line under the Built in choice.
+    pub fn text(&self) -> String {
+        match self {
+            EngineLine::Stopped => {
+                tr!("Engine stopped. It starts by itself when a report or a translation needs it.")
+            }
+            EngineLine::Starting => tr!("Engine loading the model\u{2026}"),
+            EngineLine::Running { model, idle_stop_s } => tr!(
+                "Engine running {model}. It stops after {minutes} min without use.",
+                model = model,
+                minutes = (*idle_stop_s / 60).max(1)
+            ),
+            EngineLine::Missing => tr!(
+                "The text engine is missing from this copy of CaptureMann. Reinstall CaptureMann."
+            ),
+            EngineLine::Failed(m) if m.is_empty() => tr!("The engine could not start."),
+            EngineLine::Failed(m) => m.clone(),
+        }
+    }
+
+    pub fn is_problem(&self) -> bool {
+        matches!(self, EngineLine::Missing | EngineLine::Failed(_))
     }
 }
 
@@ -309,6 +381,8 @@ pub struct TextVm {
     pub model: String,
     pub context_tokens: u32,
     pub host: Option<String>,
+    /// The built-in engine's state (`get_text_model.engine`).
+    pub engine: EngineLine,
     pub presets: Vec<PresetVm>,
     pub detecting: bool,
     /// The model list below the picker is open.
@@ -327,6 +401,7 @@ impl Default for TextVm {
             model: String::new(),
             context_tokens: cm_ai::text_model::DEFAULT_CONTEXT_TOKENS,
             host: None,
+            engine: EngineLine::Stopped,
             presets: default_presets(),
             detecting: false,
             picker_open: false,
@@ -359,10 +434,17 @@ impl TextVm {
             .get("context_tokens")
             .and_then(Value::as_u64)
             .map_or(cm_ai::text_model::DEFAULT_CONTEXT_TOKENS, |n| n as u32);
+        self.engine = EngineLine::from_json(v.get("engine"));
         if changed && !matches!(self.test, TestState::Running) {
             self.test = TestState::Idle;
         }
         self.loaded = true;
+    }
+
+    /// A text model is set up and usable: a provider is chosen and it names a model (for the
+    /// built-in one the daemon names the downloaded model, and nothing while none is).
+    pub fn ready(&self) -> bool {
+        self.provider != ProviderChoice::None && !self.model.trim().is_empty()
     }
 
     pub fn set_presets(&mut self, presets: Vec<PresetVm>) {
@@ -401,6 +483,11 @@ impl TextVm {
             return Vec::new();
         }
         let mut w: Writes = vec![(KEY_PROVIDER, json!(c.provider().as_str()))];
+        if c == ProviderChoice::BuiltIn {
+            // The built-in model is picked in its list, not here; the address of another
+            // server plays no part.
+            self.model.clear();
+        }
         if c == ProviderChoice::OnThisMac {
             let keep = cm_ai::text_model::url_host(&self.base_url)
                 .is_some_and(|h| cm_ai::text_model::is_loopback_host(&h));
@@ -486,7 +573,11 @@ impl TextVm {
             return TestGate::Blocked(tr!("Choose a text model provider first."));
         }
         if self.model.is_empty() {
-            return TestGate::Blocked(tr!("Choose a model first."));
+            return TestGate::Blocked(if self.provider == ProviderChoice::BuiltIn {
+                tr!("Download a built-in model first.")
+            } else {
+                tr!("Choose a model first.")
+            });
         }
         self.test = TestState::Running;
         TestGate::Run
@@ -829,8 +920,59 @@ mod tests {
     }
 
     #[test]
-    fn only_none_and_on_this_mac_are_offered() {
-        assert_eq!(ProviderChoice::ALL.len(), 2);
+    fn built_in_is_the_embedded_provider_and_comes_back_from_the_daemon() {
+        assert_eq!(ProviderChoice::BuiltIn.provider(), Provider::Embedded);
+        assert_eq!(
+            ProviderChoice::from_provider(Provider::Embedded),
+            ProviderChoice::BuiltIn
+        );
+        let mut t = TextVm::default();
+        let w = t.choose_provider(ProviderChoice::BuiltIn);
+        assert_eq!(w, vec![(KEY_PROVIDER, json!("embedded"))]);
+        assert_eq!(t.provider, ProviderChoice::BuiltIn);
+        // It never touches the address of another server.
+        assert!(w.iter().all(|(k, _)| *k != KEY_BASE_URL));
+        // Not ready until the daemon names a downloaded model.
+        assert!(!t.ready());
+        t.set_from_daemon(
+            &json!({"provider": "embedded", "model": "text-16gb", "host": "127.0.0.1"}),
+        );
+        assert!(t.ready());
+        t.set_from_daemon(&json!({"provider": "embedded", "model": ""}));
+        assert!(!t.ready());
+        assert!(matches!(t.begin_test(), TestGate::Blocked(m) if m.contains("Download")));
+    }
+
+    #[test]
+    fn the_engine_line_follows_the_daemons_state() {
+        assert_eq!(EngineLine::from_json(None), EngineLine::Stopped);
+        let line = |v: Value| EngineLine::from_json(Some(&v));
+        assert_eq!(line(json!({"state": "stopped"})), EngineLine::Stopped);
+        assert_eq!(line(json!({"state": "starting"})), EngineLine::Starting);
+        assert_eq!(
+            line(json!({"state": "running", "model": "text-8gb", "idle_stop_s": 600})),
+            EngineLine::Running {
+                model: "text-8gb".into(),
+                idle_stop_s: 600
+            }
+        );
+        let missing = line(json!({"state": "failed", "reason": "engine_missing", "error": "x"}));
+        assert_eq!(missing, EngineLine::Missing);
+        assert!(missing.is_problem());
+        assert!(missing.text().contains("Reinstall"));
+        let failed = line(
+            json!({"state": "failed", "reason": "not_enough_memory", "error": "Close other apps"}),
+        );
+        assert_eq!(failed.text(), "Close other apps");
+        assert!(!EngineLine::Stopped.is_problem());
+        let mut t = TextVm::default();
+        t.set_from_daemon(&json!({"provider": "embedded", "engine": {"state": "starting"}}));
+        assert_eq!(t.engine, EngineLine::Starting);
+    }
+
+    #[test]
+    fn only_none_built_in_and_a_local_server_are_offered() {
+        assert_eq!(ProviderChoice::ALL.len(), 3);
         // A remote provider from a hand-edited file shows as None; choosing On this Mac
         // replaces its address with a loopback one.
         let mut t = text_with("anthropic", "https://api.anthropic.com", "m");
