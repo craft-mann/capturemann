@@ -136,7 +136,7 @@ The camera is recorded as its own track (`camera.mp4`). During recording the use
 ---
 
 ### CAM-5 Camera background blur
-**Priority** P2 · **Status** Draft (detail before v0.2) · **Crates** cm-camera, cm-ai
+**Priority** P2 · **Status** Draft (not in 0.2.0; detail before work starts) · **Crates** cm-camera, cm-ai
 
 **User story** — As a teacher at home, I want my background blurred in the bubble, so that my room stays private.
 

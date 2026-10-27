@@ -144,7 +144,7 @@ Publishing uses the creator's own API apps (bring your own, BYO) in v0.1; offici
 ---
 
 ### PUB-6 Scheduled publishing
-**Priority** P2 · **Status** Draft (detail before v0.2) · **Crates** cm-publish
+**Priority** P2 · **Status** Draft (not in 0.2.0; detail before work starts) · **Crates** cm-publish
 
 **User story** — As a creator, I want to schedule a release time, so that videos go live when my audience is online.
 
@@ -155,7 +155,7 @@ Publishing uses the creator's own API apps (bring your own, BYO) in v0.1; offici
 ---
 
 ### PUB-7 Instagram Reels, LinkedIn and X
-**Priority** P2 · **Status** Draft (detail before v0.2) · **Crates** cm-publish
+**Priority** P2 · **Status** Draft (not in 0.2.0; detail before work starts) · **Crates** cm-publish
 
 **User story** — As a creator, I want to post to Instagram Reels, LinkedIn and X too, so that one tool covers all my channels.
 

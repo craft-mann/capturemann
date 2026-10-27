@@ -139,7 +139,10 @@ failing test prints. A line that matches nothing fails the test, so the list can
 5. Run `cargo run -p cm-i18n -- check` and `-- coverage`, then open a pull request. A native speaker reviews it.
 
 A language is shipped when the owner or a native reviewer has gone through the app in it. Until then the file
-carries the header comment `DRAFT: owner review pending`.
+carries a header comment saying which entries are still drafts. `vi.po` (Oct 27, 2026): the strings added for
+0.2.0 (386 messages not in v0.1.0's catalogue) were reviewed by the maintainer, a native reader, and passed,
+so their `#, fuzzy` flag was removed (385 flags; one of them was not flagged); the older entries keep `#, fuzzy`
+until the full catalogue is reviewed (`cargo run -p cm-i18n -- coverage`: 2575 of 2576 translated, 2183 draft).
 
 ## Plural rules
 

@@ -1,5 +1,6 @@
 # Vietnamese (Tiếng Việt) catalogue of the CaptureMann UI.
-# DRAFT: owner review pending. Every entry marked `#, fuzzy` is a draft; the app shows it anyway.
+# Entries marked `#, fuzzy` are drafts (the strings of v0.1.0 that the full review has not covered); the app shows them anyway.
+# The strings added for 0.2.0 were reviewed by the maintainer (native reading, passed, Oct 27, 2026) and carry no `fuzzy` flag.
 # Entries with `# FACT: owner review required` state what the app really does (privacy, permissions,
 # deletion, confirmations): read each one. Terms follow locales/vi-glossary.md.
 msgid ""
@@ -7883,7 +7884,6 @@ msgid "{n} line · click text to edit, a time to jump"
 msgid_plural "{n} lines · click text to edit, a time to jump"
 msgstr[0] "{n} dòng · nhấn chữ để sửa, nhấn giờ để chuyển tới"
 
-#, fuzzy
 msgid "Balanced accuracy and speed. A good choice on 8 GB Macs."
 msgstr "Cân bằng giữa độ chính xác và tốc độ. Lựa chọn tốt cho máy Mac 8 GB."
 
@@ -9496,1494 +9496,1146 @@ msgctxt "system audio status"
 msgid "Listening…"
 msgstr "Đang nghe…"
 
-#, fuzzy
 msgid "No audio recordings yet"
 msgstr "Chưa có bản ghi âm nào"
 
-#, fuzzy
 msgid "Record a meeting, a lecture or a voice note and it will show up here."
 msgstr "Ghi âm cuộc họp, bài giảng hoặc ghi chú giọng nói, chúng sẽ hiện ở đây."
 
-#, fuzzy
 msgid "Record audio, shortcut {chord}"
 msgstr "Ghi âm, phím tắt {chord}"
 
-#, fuzzy
 msgid "Search titles and what was said"
 msgstr "Tìm theo tiêu đề và nội dung đã nói"
 
-#, fuzzy
 msgctxt "audio badge"
 msgid "Report"
 msgstr "Báo cáo"
 
-#, fuzzy
 msgctxt "audio badge"
 msgid "Speakers"
 msgstr "Người nói"
 
-#, fuzzy
 msgctxt "audio preset"
 msgid "Audio"
 msgstr "Âm thanh"
 
-#, fuzzy
 msgctxt "audio preset"
 msgid "In the room"
 msgstr "Trong phòng"
 
-#, fuzzy
 msgctxt "audio preset"
 msgid "Lecture"
 msgstr "Bài giảng"
 
-#, fuzzy
 msgctxt "audio preset"
 msgid "Online meeting"
 msgstr "Họp trực tuyến"
 
-#, fuzzy
 msgctxt "audio preset"
 msgid "Product demo"
 msgstr "Demo sản phẩm"
 
-#, fuzzy
 msgctxt "audio preset"
 msgid "Voice note"
 msgstr "Ghi chú giọng nói"
 
-#, fuzzy
 msgctxt "capture dock"
 msgid "Record audio"
 msgstr "Ghi âm"
 
-#, fuzzy
 msgctxt "capture kind"
 msgid "Audio"
 msgstr "Âm thanh"
 
-#, fuzzy
 msgctxt "card badge"
 msgid "AUDIO"
 msgstr "ÂM THANH"
 
-#, fuzzy
 msgctxt "navigation"
 msgid "Audio"
 msgstr "Âm thanh"
 
-#, fuzzy
 msgid "{n} speaker"
 msgid_plural "{n} speakers"
 msgstr[0] "{n} người nói"
 
-#, fuzzy
 msgid "Transcript"
 msgstr "Bản chép lời"
 
-#, fuzzy
 msgid "48 kHz · 24-bit. Lossless, about 10× larger."
 msgstr "48 kHz · 24-bit. Không suy hao, lớn hơn khoảng 10 lần."
 
-#, fuzzy
 msgid "AAC, 48 kHz · 128 kbps mono or 192 kbps stereo. Plays everywhere."
 msgstr "AAC, 48 kHz · 128 kbps mono hoặc 192 kbps stereo. Phát được ở mọi nơi."
 
-#, fuzzy
 msgid "Add a marker at the playhead"
 msgstr "Thêm điểm đánh dấu tại đầu phát"
 
-#, fuzzy
 msgid "Also save a copy to"
 msgstr "Lưu thêm một bản sao vào"
 
-#, fuzzy
 msgid "Always kept in the recording’s exports folder too"
 msgstr "Luôn được giữ cả trong thư mục xuất của bản ghi"
 
-#, fuzzy
 msgid "Audio exported"
 msgstr "Đã xuất âm thanh"
 
-#, fuzzy
 msgid "Back to the library"
 msgstr "Quay lại thư viện"
 
-#, fuzzy
 msgid "Choose a folder…"
 msgstr "Chọn thư mục…"
 
-#, fuzzy
 msgid "Choose the folder for the copy"
 msgstr "Chọn thư mục cho bản sao"
 
-#, fuzzy
 msgid "Couldn’t translate the transcript"
 msgstr "Không thể dịch bản chép lời"
 
-#, fuzzy
 msgid "Don’t save a copy"
 msgstr "Không lưu bản sao"
 
-#, fuzzy
 msgid "Even out the loudness"
 msgstr "Cân bằng độ lớn âm thanh"
 
-#, fuzzy
 msgid "Export audio"
 msgstr "Xuất âm thanh"
 
-#, fuzzy
 msgid "Export audio only"
 msgstr "Chỉ xuất âm thanh"
 
-#, fuzzy
 msgid "Export audio…"
 msgstr "Xuất âm thanh…"
 
-#, fuzzy
 msgid "Export the audio of a capture"
 msgstr "Xuất âm thanh của một bản chụp"
 
-#, fuzzy
 msgid "Export {format}"
 msgstr "Xuất {format}"
 
-#, fuzzy
 msgid "Exporting audio…"
 msgstr "Đang xuất âm thanh…"
 
-#, fuzzy
 msgid "Exporting the audio: {pct}%"
 msgstr "Đang xuất âm thanh: {pct}%"
 
-#, fuzzy
 msgid "FFmpeg is needed to export audio and was not found."
 msgstr "Cần FFmpeg để xuất âm thanh nhưng không tìm thấy."
 
-#, fuzzy
 msgid "Find who speaks when"
 msgstr "Tìm ai nói khi nào"
 
-#, fuzzy
 msgid "Format"
 msgstr "Định dạng"
 
-#, fuzzy
 msgid "Just the call or app sound"
 msgstr "Chỉ âm thanh của cuộc gọi hoặc ứng dụng"
 
-#, fuzzy
 msgid "Just your microphone"
 msgstr "Chỉ micrô của bạn"
 
-#, fuzzy
 msgid "Mark a moment in a recording"
 msgstr "Đánh dấu một thời điểm trong bản ghi"
 
-#, fuzzy
 msgid "Marker (M)"
 msgstr "Điểm đánh dấu (M)"
 
-#, fuzzy
 msgid "Marker {label} at {time}"
 msgstr "Điểm đánh dấu {label} lúc {time}"
 
-#, fuzzy
 msgid "Microphone and system audio together"
 msgstr "Micrô và âm thanh hệ thống cùng nhau"
 
-#, fuzzy
 msgid "No transcript yet. Transcribe the recording to read it here; it runs on this Mac."
 msgstr "Chưa có bản chép lời. Hãy chép lời bản ghi để đọc ở đây; việc này chạy ngay trên máy Mac này."
 
-#, fuzzy
 msgid "Normalise to {lufs} LUFS, the level podcasts and players expect"
 msgstr "Chuẩn hoá về {lufs} LUFS, mức mà podcast và trình phát mong đợi"
 
-#, fuzzy
 msgid "Now speaking"
 msgstr "Đang nói"
 
-#, fuzzy
 msgid "Play to follow the words here."
 msgstr "Hãy phát để theo dõi lời nói ở đây."
 
-#, fuzzy
 msgid "Put the speakers’ names in the SRT file"
 msgstr "Ghi tên người nói vào tệp SRT"
 
-#, fuzzy
 msgid "Read the text model settings"
 msgstr "Đọc cài đặt mô hình văn bản"
 
-#, fuzzy
 msgid "Rename or fix speakers"
 msgstr "Đổi tên hoặc sửa người nói"
 
-#, fuzzy
 msgid "Runs in the background; you can keep working"
 msgstr "Chạy nền; bạn có thể tiếp tục làm việc"
 
-#, fuzzy
 msgid "Speaker names"
 msgstr "Tên người nói"
 
-#, fuzzy
 msgid "Suggested cut: {detail} at {time}"
 msgstr "Gợi ý xoá đoạn: {detail} lúc {time}"
 
-#, fuzzy
 msgid "Suggested cut: {detail} at {time} (and {more} more)"
 msgstr "Gợi ý xoá đoạn: {detail} lúc {time} (và {more} đoạn nữa)"
 
-#, fuzzy
 msgid "Test the text model"
 msgstr "Thử mô hình văn bản"
 
-#, fuzzy
 msgid "The audio couldn’t be exported"
 msgstr "Không thể xuất âm thanh"
 
-#, fuzzy
 msgid "The export applies trims, cuts and speed, and can even out the loudness. M4A or WAV; the title and date are written into the file."
 msgstr "Bản xuất áp dụng cắt đầu cuối, xoá đoạn và tốc độ, và có thể cân bằng độ lớn âm thanh. M4A hoặc WAV; tiêu đề và ngày được ghi vào tệp."
 
-#, fuzzy
 msgid "The upload couldn’t start"
 msgstr "Không thể bắt đầu tải lên"
 
-#, fuzzy
 msgid "The words appear here once the recording has a transcript."
 msgstr "Lời nói sẽ hiện ở đây khi bản ghi có bản chép lời."
 
-#, fuzzy
 msgid "There are no lines in this language yet."
 msgstr "Chưa có dòng nào bằng ngôn ngữ này."
 
-#, fuzzy
 msgid "Title and date are written into the file"
 msgstr "Tiêu đề và ngày được ghi vào tệp"
 
-#, fuzzy
 msgid "Tracks"
 msgstr "Rãnh"
 
-#, fuzzy
 msgid "Transcript language"
 msgstr "Ngôn ngữ bản chép lời"
 
-#, fuzzy
 msgid "Translate captions"
 msgstr "Dịch phụ đề"
 
-#, fuzzy
 msgid "Translate to"
 msgstr "Dịch sang"
 
-#, fuzzy
 msgid "Translate…"
 msgstr "Dịch…"
 
-#, fuzzy
 msgid "Translation ready: {language}"
 msgstr "Bản dịch đã sẵn sàng: {language}"
 
-#, fuzzy
 msgid "What Export audio will produce"
 msgstr "Xuất âm thanh sẽ tạo ra gì"
 
-#, fuzzy
 msgid "click a time to jump there"
 msgstr "nhấp vào thời gian để nhảy tới đó"
 
-#, fuzzy
 msgid "{from} – {to} of {total}"
 msgstr "{from} – {to} trên {total}"
 
-#, fuzzy
 msgid "{language} …"
 msgstr "{language} …"
 
-#, fuzzy
 msgid "{name} · {size}"
 msgstr "{name} · {size}"
 
-#, fuzzy
 msgid "{name} · {size} · {lufs} LUFS"
 msgstr "{name} · {size} · {lufs} LUFS"
 
-#, fuzzy
 msgid "{time} after cuts · about {size}"
 msgstr "{time} sau khi xoá đoạn · khoảng {size}"
 
-#, fuzzy
 msgid "{title} · Exporting the audio: {pct}%"
 msgstr "{title} · Đang xuất âm thanh: {pct}%"
 
-#, fuzzy
 msgid "{title} · cuts and speed applied"
 msgstr "{title} · đã áp dụng xoá đoạn và tốc độ"
 
-#, fuzzy
 msgctxt "breadcrumb"
 msgid "Audio /"
 msgstr "Âm thanh /"
 
-#, fuzzy
 msgctxt "button"
 msgid "Show in Finder"
 msgstr "Hiện trong Finder"
 
-#, fuzzy
 msgctxt "button"
 msgid "Upload"
 msgstr "Tải lên"
 
-#, fuzzy
 msgctxt "editor shortcut"
 msgid "Marker"
 msgstr "Đánh dấu"
 
-#, fuzzy
 msgctxt "editor shortcut"
 msgid "Shuttle"
 msgstr "Tua"
 
-#, fuzzy
 msgctxt "export tracks"
 msgid "Mic only"
 msgstr "Chỉ micrô"
 
-#, fuzzy
 msgctxt "export tracks"
 msgid "Mix"
 msgstr "Hòa trộn"
 
-#, fuzzy
 msgctxt "export tracks"
 msgid "System only"
 msgstr "Chỉ hệ thống"
 
-#, fuzzy
 msgctxt "inspector tab"
 msgid "Report"
 msgstr "Báo cáo"
 
-#, fuzzy
 msgctxt "inspector tab"
 msgid "Speakers"
 msgstr "Người nói"
 
-#, fuzzy
 msgctxt "inspector tab"
 msgid "Transcript"
 msgstr "Bản chép lời"
 
-#, fuzzy
 msgctxt "lane"
 msgid "Markers"
 msgstr "Đánh dấu"
 
-#, fuzzy
 msgctxt "lane"
 msgid "Speakers"
 msgstr "Người nói"
 
-#, fuzzy
 msgctxt "lane"
 msgid "call audio"
 msgstr "cuộc gọi"
 
-#, fuzzy
 msgctxt "lane"
 msgid "microphone"
 msgstr "micrô"
 
-#, fuzzy
 msgctxt "language"
 msgid "Original"
 msgstr "Bản gốc"
 
-#, fuzzy
 msgctxt "marker"
 msgid "Marker"
 msgstr "Điểm đánh dấu"
 
-#, fuzzy
 msgctxt "timeline"
 msgid "Marker"
 msgstr "Đánh dấu"
 
-#, fuzzy
 msgctxt "track"
 msgid "System"
 msgstr "Hệ thống"
 
-#, fuzzy
 msgctxt "transcript language"
 msgid "original"
 msgstr "gốc"
 
-#, fuzzy
 msgctxt "transcript language"
 msgid "translated"
 msgstr "đã dịch"
 
-#, fuzzy
 msgctxt "transcript turn"
 msgid "overlap"
 msgstr "nói chồng"
 
-#, fuzzy
 msgid "Best accuracy and translation to English"
 msgstr "Chính xác nhất và dịch sang tiếng Anh"
 
-#, fuzzy
 msgid "Everything here runs on this Mac. Nothing is downloaded unless you press Download, and nothing is sent anywhere."
 msgstr "Mọi thứ ở đây chạy ngay trên máy Mac này. Không có gì được tải xuống trừ khi bạn nhấn Tải xuống, và không có gì được gửi đi đâu cả."
 
-#, fuzzy
 msgid "Recommended: fast and accurate for most recordings. Not for translation."
 msgstr "Khuyên dùng: nhanh và chính xác cho hầu hết bản ghi. Không dùng để dịch."
 
-#, fuzzy
 msgid "Find speakers after each transcript"
 msgstr "Tìm người nói sau mỗi bản chép lời"
 
-#, fuzzy
 msgid "Starts when a transcript is ready"
 msgstr "Bắt đầu khi bản chép lời sẵn sàng"
 
-#, fuzzy
 msgid "Replied in {seconds} s"
 msgstr "Phản hồi sau {seconds} giây"
 
-#, fuzzy
 msgid "Reports and translation to any language"
 msgstr "Báo cáo và dịch sang mọi ngôn ngữ"
 
-#, fuzzy
 msgid "Speaker labels"
 msgstr "Nhãn người nói"
 
-#, fuzzy
 msgid "Speaker model"
 msgstr "Mô hình người nói"
 
-#, fuzzy
 msgid "Speech to text"
 msgstr "Giọng nói thành văn bản"
 
-#, fuzzy
 msgid "Structured output did not work; replies are checked and retried"
 msgstr "Đầu ra có cấu trúc chưa hoạt động; các phản hồi được kiểm tra và thử lại"
 
-#, fuzzy
 msgid "Structured output works"
 msgstr "Đầu ra có cấu trúc hoạt động"
 
-#, fuzzy
 msgid "Text model"
 msgstr "Mô hình văn bản"
 
-#, fuzzy
 msgid "The test failed"
 msgstr "Kiểm thử không thành công"
 
-#, fuzzy
 msgid "The text model did not answer."
 msgstr "Mô hình văn bản không phản hồi."
 
-#, fuzzy
 msgid "Transcripts, speakers, translations and reports, made on this Mac."
 msgstr "Bản chép lời, người nói, bản dịch và báo cáo, tạo ngay trên máy Mac này."
 
-#, fuzzy
 msgid "Used for “My microphone only hears me”"
 msgstr "Dùng cho tùy chọn “Micrô của tôi chỉ nghe thấy tôi”"
 
-#, fuzzy
 msgid "Whisper · transcripts, captions, translation to English"
 msgstr "Whisper · chép lời, phụ đề, dịch sang tiếng Anh"
 
-#, fuzzy
 msgid "Who spoke when, from the voices"
 msgstr "Ai nói khi nào, nhận từ giọng nói"
 
-#, fuzzy
 msgid "Your name in transcripts"
 msgstr "Tên của bạn trong bản chép lời"
 
-#, fuzzy
 msgid "only talks to {host}"
 msgstr "chỉ kết nối tới {host}"
 
-#, fuzzy
 msgctxt "text model"
 msgid "Test"
 msgstr "Kiểm thử"
 
-#, fuzzy
 msgid "About {gb} GB per hour"
 msgstr "Khoảng {gb} GB mỗi giờ"
 
-#, fuzzy
 msgid "About {gb} GB per hour · {free} GB free"
 msgstr "Khoảng {gb} GB mỗi giờ · còn trống {free} GB"
 
-#, fuzzy
 msgid "Add a label (optional)"
 msgstr "Thêm nhãn (không bắt buộc)"
 
-#, fuzzy
 msgid "Add a marker"
 msgstr "Thêm dấu mốc"
 
-#, fuzzy
 msgid "After you stop"
 msgstr "Sau khi dừng"
 
-#, fuzzy
 msgid "Audio only: no screen, camera or cursor."
 msgstr "Chỉ âm thanh: không có màn hình, camera hay con trỏ."
 
-#, fuzzy
 msgid "Couldn’t add the marker"
 msgstr "Không thể thêm dấu mốc"
 
-#, fuzzy
 msgid "Couldn’t label the marker"
 msgstr "Không thể đặt nhãn cho dấu mốc"
 
-#, fuzzy
 msgid "Default microphone"
 msgstr "Micrô mặc định"
 
-#, fuzzy
 msgid "Don’t show again"
 msgstr "Đừng hiện lại"
 
-#, fuzzy
 msgid "For online calls: the other people’s voices."
 msgstr "Cho cuộc gọi trực tuyến: giọng của những người khác."
 
-#, fuzzy
 msgid "For online calls: the other people’s voices. Needs Screen Recording permission on macOS; microphone-only recordings never ask for it."
 msgstr "Cho cuộc gọi trực tuyến: giọng của những người khác. Cần quyền Ghi màn hình trên macOS; bản ghi chỉ có micrô không bao giờ yêu cầu quyền này."
 
-#, fuzzy
 msgid "Helps tell the voices apart for speaker labels."
 msgstr "Giúp phân biệt các giọng nói để gắn nhãn người nói."
 
-#, fuzzy
 msgid "How many people"
 msgstr "Có bao nhiêu người"
 
-#, fuzzy
 msgid "How many people?"
 msgstr "Có bao nhiêu người?"
 
-#, fuzzy
 msgid "In the room"
 msgstr "Trong phòng"
 
-#, fuzzy
 msgid "Interview, 1:1, meeting around a laptop"
 msgstr "Phỏng vấn, 1:1, họp quanh một máy tính"
 
-#, fuzzy
 msgid "Introduction or demo call"
 msgstr "Giới thiệu hoặc cuộc gọi demo"
 
-#, fuzzy
 msgid "Just you"
 msgstr "Chỉ mình bạn"
 
-#, fuzzy
 msgid "Keep the lid open: closing it stops the recording"
 msgstr "Giữ nắp máy mở: đóng nắp sẽ dừng bản ghi"
 
-#, fuzzy
 msgid "Lecture notes"
 msgstr "Ghi chú bài giảng"
 
-#, fuzzy
 msgid "Lecture or talk"
 msgstr "Bài giảng hoặc buổi nói chuyện"
 
-#, fuzzy
 msgid "Let everyone know they’re being recorded."
 msgstr "Hãy cho mọi người biết họ đang được ghi âm."
 
-#, fuzzy
 msgid "Mark a moment while recording"
 msgstr "Đánh dấu một thời điểm khi đang ghi"
 
-#, fuzzy
 msgid "Mark this moment"
 msgstr "Đánh dấu thời điểm này"
 
-#, fuzzy
 msgid "Marker at"
 msgstr "Dấu mốc tại"
 
-#, fuzzy
 msgid "Marker label"
 msgstr "Nhãn dấu mốc"
 
-#, fuzzy
 msgid "Meeting minutes"
 msgstr "Biên bản cuộc họp"
 
-#, fuzzy
 msgid "Microphone access is off for CaptureMann."
 msgstr "CaptureMann chưa được phép dùng micrô."
 
-#, fuzzy
 msgid "Microphone access is off. Turn it on in System Settings to record your voice."
 msgstr "Quyền truy cập micrô đang tắt. Hãy bật trong Cài đặt Hệ thống để ghi giọng của bạn."
 
-#, fuzzy
 msgid "Microphone level"
 msgstr "Mức micrô"
 
-#, fuzzy
 msgid "Microphone: {name}"
 msgstr "Micrô: {name}"
 
-#, fuzzy
 msgid "Microphones"
 msgstr "Các micrô"
 
-#, fuzzy
 msgid "Mode"
 msgstr "Chế độ"
 
-#, fuzzy
 msgid "No recording to mark"
 msgstr "Không có bản ghi để đánh dấu"
 
-#, fuzzy
 msgid "No screen, microphone and calls"
 msgstr "Không quay màn hình, chỉ micrô và cuộc gọi"
 
-#, fuzzy
 msgid "Not sure"
 msgstr "Chưa chắc"
 
-#, fuzzy
 msgid "One speaker, a room"
 msgstr "Một người nói, một căn phòng"
 
-#, fuzzy
 msgid "Online meeting"
 msgstr "Họp trực tuyến"
 
-#, fuzzy
 msgid "Open the sheet"
 msgstr "Mở bảng ghi"
 
-#, fuzzy
 msgid "Product demo"
 msgstr "Demo sản phẩm"
 
-#, fuzzy
 msgid "Product presentation recap"
 msgstr "Tóm tắt buổi giới thiệu sản phẩm"
 
-#, fuzzy
 msgid "Record audio"
 msgstr "Ghi âm"
 
-#, fuzzy
 msgid "Recording audio"
 msgstr "Đang ghi âm"
 
-#, fuzzy
 msgid "Speaker labels, if turned on"
 msgstr "Nhãn người nói, nếu đã bật"
 
-#, fuzzy
 msgid "Start a recording first, then add markers while it runs."
 msgstr "Hãy bắt đầu một bản ghi trước, rồi thêm dấu mốc khi đang ghi."
 
-#, fuzzy
 msgid "Start or stop audio recording"
 msgstr "Bắt đầu hoặc dừng ghi âm"
 
-#, fuzzy
 msgid "Stops by itself after {duration}"
 msgstr "Tự dừng sau {duration}"
 
-#, fuzzy
 msgid "Suggest: {report}"
 msgstr "Gợi ý: {report}"
 
-#, fuzzy
 msgid "Summary"
 msgstr "Tóm tắt"
 
-#, fuzzy
 msgid "System audio needs Screen Recording permission on macOS."
 msgstr "Âm thanh hệ thống cần quyền Ghi màn hình trên macOS."
 
-#, fuzzy
 msgid "System audio needs Screen Recording permission. Turn it on in System Settings, or record the microphone only."
 msgstr "Âm thanh hệ thống cần quyền Ghi màn hình. Hãy bật trong Cài đặt Hệ thống, hoặc chỉ ghi micrô."
 
-#, fuzzy
 msgid "The selected sources are not available."
 msgstr "Các nguồn đã chọn không khả dụng."
 
-#, fuzzy
 msgid "Transcribe · {model}"
 msgstr "Chép lời · {model}"
 
-#, fuzzy
 msgid "Transcribe, if turned on"
 msgstr "Chép lời, nếu đã bật"
 
-#, fuzzy
 msgid "Turn on the microphone or system audio to record."
 msgstr "Hãy bật micrô hoặc âm thanh hệ thống để ghi."
 
-#, fuzzy
 msgid "Voice note"
 msgstr "Ghi chú giọng nói"
 
-#, fuzzy
 msgid "What are you recording?"
 msgstr "Bạn đang ghi gì?"
 
-#, fuzzy
 msgid "Zoom, Meet, Teams, a browser call"
 msgstr "Zoom, Meet, Teams, cuộc gọi trên trình duyệt"
 
-#, fuzzy
 msgid "{h} h"
 msgstr "{h} giờ"
 
-#, fuzzy
 msgid "{h} h {m} min"
 msgstr "{h} giờ {m} phút"
 
-#, fuzzy
 msgid "{m} min"
 msgstr "{m} phút"
 
-#, fuzzy
 msgctxt "launcher keyword"
 msgid "audio"
 msgstr "âm thanh"
 
-#, fuzzy
 msgctxt "launcher keyword"
 msgid "interview"
 msgstr "phỏng vấn"
 
-#, fuzzy
 msgctxt "launcher keyword"
 msgid "meeting"
 msgstr "họp"
 
-#, fuzzy
 msgctxt "launcher keyword"
 msgid "voice"
 msgstr "giọng nói"
 
-#, fuzzy
 msgctxt "people hint"
 msgid "optional"
 msgstr "không bắt buộc"
 
-#, fuzzy
 msgctxt "record sheet mode"
 msgid "Audio"
 msgstr "Âm thanh"
 
-#, fuzzy
 msgctxt "record sheet mode"
 msgid "Screen"
 msgstr "Màn hình"
 
-#, fuzzy
 msgctxt "recording hud"
 msgid "Marker"
 msgstr "Dấu mốc"
 
-#, fuzzy
 msgctxt "shortcut"
 msgid "Add a marker"
 msgstr "Thêm dấu mốc"
 
-#, fuzzy
 msgctxt "shortcut"
 msgid "Start or stop audio recording"
 msgstr "Bắt đầu hoặc dừng ghi âm"
 
-#, fuzzy
 msgid "A report is written from the transcript. Transcribe the recording first."
 msgstr "Báo cáo được viết từ bản ghi lời. Hãy chuyển bản ghi thành văn bản trước."
 
-#, fuzzy
 msgid "Add a competency"
 msgstr "Thêm một năng lực"
 
-#, fuzzy
 msgid "Add a competency and press Enter"
 msgstr "Nhập một năng lực rồi nhấn Enter"
 
-#, fuzzy
 msgid "Add a name and press Enter"
 msgstr "Nhập một tên rồi nhấn Enter"
 
-#, fuzzy
 msgid "Add an attendee"
 msgstr "Thêm người tham dự"
 
-#, fuzzy
 msgid "Agenda"
 msgstr "Chương trình họp"
 
-#, fuzzy
 msgid "Another speaker already has that name."
 msgstr "Người nói khác đã có tên này."
 
-#, fuzzy
 msgid "Any language; each line keeps its start and end."
 msgstr "Mọi ngôn ngữ; mỗi dòng giữ nguyên thời điểm bắt đầu và kết thúc."
 
-#, fuzzy
 msgid "Attendees"
 msgstr "Người tham dự"
 
-#, fuzzy
 msgid "Back to the report"
 msgstr "Quay lại báo cáo"
 
-#, fuzzy
 msgid "Competencies"
 msgstr "Năng lực"
 
-#, fuzzy
 msgid "Context (optional, makes owners and names right)"
 msgstr "Ngữ cảnh (không bắt buộc, giúp ghi đúng người phụ trách và tên)"
 
-#, fuzzy
 msgid "Copy"
 msgstr "Sao chép"
 
-#, fuzzy
 msgid "Couldn’t change the speakers"
 msgstr "Không thể thay đổi người nói"
 
-#, fuzzy
 msgid "Couldn’t delete the report"
 msgstr "Không thể xoá báo cáo"
 
-#, fuzzy
 msgid "Couldn’t find the speakers"
 msgstr "Không thể tìm người nói"
 
-#, fuzzy
 msgid "Couldn’t save the report"
 msgstr "Không thể lưu báo cáo"
 
-#, fuzzy
 msgid "Couldn’t write the report"
 msgstr "Không thể viết báo cáo"
 
-#, fuzzy
 msgid "Delete a report"
 msgstr "Xoá một báo cáo"
 
-#, fuzzy
 msgid "Delete the report"
 msgstr "Xoá báo cáo"
 
-#, fuzzy
 msgid "Delete this report?"
 msgstr "Xoá báo cáo này?"
 
-#, fuzzy
 msgid "Edit a report"
 msgstr "Sửa một báo cáo"
 
-#, fuzzy
 msgid "Edit as Markdown"
 msgstr "Sửa dưới dạng Markdown"
 
-#, fuzzy
 msgid "Engine · chosen for you"
 msgstr "Công cụ · chọn sẵn cho bạn"
 
-#, fuzzy
 msgid "Every item links to the moment it was said"
 msgstr "Mỗi mục liên kết đến thời điểm được nói"
 
-#, fuzzy
 msgid "Export a report"
 msgstr "Xuất một báo cáo"
 
-#, fuzzy
 msgid "Find again"
 msgstr "Tìm lại"
 
-#, fuzzy
 msgid "Find speakers"
 msgstr "Tìm người nói"
 
-#, fuzzy
 msgid "Finding speakers…"
 msgstr "Đang tìm người nói…"
 
-#, fuzzy
 msgid "Finding speakers… {percent}%"
 msgstr "Đang tìm người nói… {percent}%"
 
-#, fuzzy
 msgid "For headset calls: the mic track is you, only the call is split into voices."
 msgstr "Cho cuộc gọi dùng tai nghe: kênh micrô là bạn, chỉ phần cuộc gọi được tách theo giọng."
 
-#, fuzzy
 msgid "From {language} · times are kept"
 msgstr "Từ {language} · giữ nguyên mốc thời gian"
 
-#, fuzzy
 msgid "Fully offline, no text model needed. It uses Large v3 or Medium; Large v3 Turbo can’t translate."
 msgstr "Hoàn toàn ngoại tuyến, không cần mô hình văn bản. Dùng Large v3 hoặc Medium; Large v3 Turbo không dịch được."
 
-#, fuzzy
 msgid "List report templates"
 msgstr "Liệt kê mẫu báo cáo"
 
-#, fuzzy
 msgid "Long recordings are read in parts, then merged. You can keep editing."
 msgstr "Bản ghi dài được đọc theo từng phần rồi ghép lại. Bạn vẫn có thể tiếp tục chỉnh sửa."
 
-#, fuzzy
 msgid "Markdown"
 msgstr "Markdown"
 
-#, fuzzy
 msgid "Merge"
 msgstr "Gộp"
 
-#, fuzzy
 msgid "Merge into"
 msgstr "Gộp vào"
 
-#, fuzzy
 msgid "Merge {name} into another speaker"
 msgstr "Gộp {name} vào người nói khác"
 
-#, fuzzy
 msgid "My microphone only hears me"
 msgstr "Micrô của tôi chỉ thu giọng tôi"
 
-#, fuzzy
 msgid "Needs a microphone track and a system audio track."
 msgstr "Cần một kênh micrô và một kênh âm thanh hệ thống."
 
-#, fuzzy
 msgid "New report"
 msgstr "Báo cáo mới"
 
-#, fuzzy
 msgid "Notes only — CaptureMann doesn’t score candidates. Using AI to assess candidates is regulated in some places."
 msgstr "Chỉ ghi chú — CaptureMann không chấm điểm ứng viên. Dùng AI để đánh giá ứng viên bị quản lý ở một số nơi."
 
-#, fuzzy
 msgid "Nothing found"
 msgstr "Không tìm thấy gì"
 
-#, fuzzy
 msgid "Open AI page"
 msgstr "Mở trang AI"
 
-#, fuzzy
 msgid "Play a sample of {name}"
 msgstr "Phát đoạn mẫu của {name}"
 
-#, fuzzy
 msgid "Read a report"
 msgstr "Đọc một báo cáo"
 
-#, fuzzy
 msgid "Regenerate"
 msgstr "Viết lại"
 
-#, fuzzy
 msgid "Rename {name}"
 msgstr "Đổi tên {name}"
 
-#, fuzzy
 msgid "Report Markdown"
 msgstr "Markdown của báo cáo"
 
-#, fuzzy
 msgid "Report language"
 msgstr "Ngôn ngữ báo cáo"
 
-#, fuzzy
 msgid "Report saved"
 msgstr "Đã lưu báo cáo"
 
-#, fuzzy
 msgid "Report template"
 msgstr "Mẫu báo cáo"
 
-#, fuzzy
 msgid "Reports of this recording"
 msgstr "Các báo cáo của bản ghi này"
 
-#, fuzzy
 msgid "Role"
 msgstr "Vai trò"
 
-#, fuzzy
 msgid "Same as the transcript"
 msgstr "Giống bản ghi lời"
 
-#, fuzzy
 msgid "Same as the transcript ({language})"
 msgstr "Giống bản ghi lời ({language})"
 
-#, fuzzy
 msgid "Speaker name"
 msgstr "Tên người nói"
 
-#, fuzzy
 msgid "Speakers"
 msgstr "Người nói"
 
-#, fuzzy
 msgid "Speakers are told apart by their voices, not by device."
 msgstr "Người nói được phân biệt theo giọng, không theo thiết bị."
 
-#, fuzzy
 msgid "TXT"
 msgstr "TXT"
 
-#, fuzzy
 msgid "Terms in your glossary stay as written."
 msgstr "Các thuật ngữ trong bảng thuật ngữ của bạn được giữ nguyên."
 
-#, fuzzy
 msgid "Text model, line by line"
 msgstr "Mô hình văn bản, từng dòng một"
 
-#, fuzzy
 msgid "The role the interview is for"
 msgstr "Vai trò mà buổi phỏng vấn dành cho"
 
-#, fuzzy
 msgid "This report was made with a template this version doesn’t know."
 msgstr "Báo cáo này được tạo bằng một mẫu mà phiên bản này không biết."
 
-#, fuzzy
 msgid "Times are kept"
 msgstr "Giữ nguyên mốc thời gian"
 
-#, fuzzy
 msgid "To"
 msgstr "Sang"
 
-#, fuzzy
 msgid "Topics, one per line"
 msgstr "Các chủ đề, mỗi dòng một chủ đề"
 
-#, fuzzy
 msgid "Translate"
 msgstr "Dịch"
 
-#, fuzzy
 msgid "Translate transcript"
 msgstr "Dịch bản ghi lời"
 
-#, fuzzy
 msgid "Type a name."
 msgstr "Hãy nhập một tên."
 
-#, fuzzy
 msgid "Undo brings it back."
 msgstr "Hoàn tác sẽ khôi phục lại."
 
-#, fuzzy
 msgid "Use 60 characters or fewer."
 msgstr "Dùng tối đa 60 ký tự."
 
-#, fuzzy
 msgid "Voices are compared in memory only. No voiceprint is saved, and people are never recognised across recordings."
 msgstr "Giọng nói chỉ được so sánh trong bộ nhớ. Không lưu dấu giọng nói, và không bao giờ nhận ra một người giữa các bản ghi."
 
-#, fuzzy
 msgid "Name of the meeting"
 msgstr "Tên cuộc họp"
 
-#, fuzzy
 msgid "Whisper only translates into English. Choose a text model on this Mac on the AI page."
 msgstr "Whisper chỉ dịch sang tiếng Anh. Hãy chọn một mô hình văn bản trên máy Mac này ở trang AI."
 
-#, fuzzy
 msgid "Whisper, from the audio"
 msgstr "Whisper, từ âm thanh"
 
-#, fuzzy
 msgid "Works with one microphone on the table"
 msgstr "Dùng được với một micrô đặt trên bàn"
 
-#, fuzzy
 msgid "Write a report from a transcript"
 msgstr "Viết báo cáo từ bản ghi lời"
 
-#, fuzzy
 msgid "Write in"
 msgstr "Viết bằng"
 
-#, fuzzy
 msgid "Write {name}"
 msgstr "Viết {name}"
 
-#, fuzzy
 msgid "Writing the report…"
 msgstr "Đang viết báo cáo…"
 
-#, fuzzy
 msgid "Writing the report… {percent}%"
 msgstr "Đang viết báo cáo… {percent}%"
 
-#, fuzzy
 msgid "{language} needs a text model"
 msgstr "{language} cần một mô hình văn bản"
 
-#, fuzzy
 msgid "{model} on this Mac. Any language; each line keeps its start and end."
 msgstr "{model} trên máy Mac này. Mọi ngôn ngữ; mỗi dòng giữ nguyên thời điểm bắt đầu và kết thúc."
 
-#, fuzzy
 msgid "{model} · on this Mac"
 msgstr "{model} · trên máy Mac này"
 
-#, fuzzy
 msgid "{model} · runs on this Mac"
 msgstr "{model} · chạy trên máy Mac này"
 
-#, fuzzy
 msgid "{n} found from the voices · whole recording"
 msgstr "Tìm thấy {n} từ giọng nói · toàn bộ bản ghi"
 
-#, fuzzy
 msgid "{n} item left out: no matching moment"
 msgid_plural "{n} items left out: no matching moment"
 msgstr[0] "Đã bỏ {n} mục: không có thời điểm khớp"
 
-#, fuzzy
 msgid "{n} report"
 msgid_plural "{n} reports"
 msgstr[0] "{n} báo cáo"
 
-#, fuzzy
 msgctxt "button"
 msgid "Save"
 msgstr "Lưu"
 
-#, fuzzy
 msgctxt "report"
 msgid "edited"
 msgstr "đã sửa"
 
-#, fuzzy
 msgctxt "report badge"
 msgid "Local"
 msgstr "Trên máy"
 
-#, fuzzy
 msgctxt "report field"
 msgid "Answer"
 msgstr "Trả lời"
 
-#, fuzzy
 msgctxt "report field"
 msgid "Audience"
 msgstr "Đối tượng"
 
-#, fuzzy
 msgctxt "report field"
 msgid "Competency"
 msgstr "Năng lực"
 
-#, fuzzy
 msgctxt "report field"
 msgid "Definition"
 msgstr "Định nghĩa"
 
-#, fuzzy
 msgctxt "report field"
 msgid "Due"
 msgstr "Hạn"
 
-#, fuzzy
 msgctxt "report field"
 msgid "Key points"
 msgstr "Ý chính"
 
-#, fuzzy
 msgctxt "report field"
 msgid "People"
 msgstr "Những người"
 
-#, fuzzy
 msgctxt "report field"
 msgid "Product"
 msgstr "Sản phẩm"
 
-#, fuzzy
 msgctxt "report field"
 msgid "Question"
 msgstr "Câu hỏi"
 
-#, fuzzy
 msgctxt "report field"
 msgid "Quote"
 msgstr "Trích dẫn"
 
-#, fuzzy
 msgctxt "report field"
 msgid "Role"
 msgstr "Vai trò"
 
-#, fuzzy
 msgctxt "report field"
 msgid "Topic"
 msgstr "Chủ đề"
 
-#, fuzzy
 msgctxt "report field"
 msgid "What it shows"
 msgstr "Điều nó cho thấy"
 
-#, fuzzy
 msgctxt "report owner"
 msgid "Unassigned"
 msgstr "Chưa giao"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Action items"
 msgstr "Việc cần làm"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Agreed actions"
 msgstr "Việc đã thống nhất"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Attendees"
 msgstr "Người tham dự"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Candidate’s questions"
 msgstr "Câu hỏi của ứng viên"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Concerns"
 msgstr "Mối lo ngại"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Concerns raised"
 msgstr "Mối lo ngại được nêu"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Decisions"
 msgstr "Quyết định"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Definitions"
 msgstr "Định nghĩa"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Evidence per competency"
 msgstr "Bằng chứng theo năng lực"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Examples"
 msgstr "Ví dụ"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Features shown"
 msgstr "Tính năng đã giới thiệu"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Feedback given"
 msgstr "Phản hồi đã đưa ra"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Feedback received"
 msgstr "Phản hồi đã nhận"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Follow-ups"
 msgstr "Việc theo dõi tiếp"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Key points"
 msgstr "Ý chính"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Marked moments"
 msgstr "Thời điểm đã đánh dấu"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Next steps"
 msgstr "Bước tiếp theo"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Open questions"
 msgstr "Câu hỏi còn mở"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Product and audience"
 msgstr "Sản phẩm và đối tượng"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Questions and answers"
 msgstr "Hỏi và đáp"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Questions asked"
 msgstr "Câu hỏi đã được hỏi"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Review questions"
 msgstr "Câu hỏi ôn tập"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Role and candidate"
 msgstr "Vai trò và ứng viên"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Summary"
 msgstr "Tóm tắt"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Topics"
 msgstr "Chủ đề"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Updates"
 msgstr "Cập nhật"
 
-#, fuzzy
 msgctxt "report section"
 msgid "Wins"
 msgstr "Thành tựu"
 
-#, fuzzy
 msgctxt "report template"
 msgid "Interview notes"
 msgstr "Ghi chú phỏng vấn"
 
-#, fuzzy
 msgctxt "report template"
 msgid "Lecture notes"
 msgstr "Ghi chú bài giảng"
 
-#, fuzzy
 msgctxt "report template"
 msgid "Meeting minutes"
 msgstr "Biên bản họp"
 
-#, fuzzy
 msgctxt "report template"
 msgid "One-on-one notes"
 msgstr "Ghi chú họp 1-1"
 
-#, fuzzy
 msgctxt "report template"
 msgid "Product recap"
 msgstr "Tóm lược sản phẩm"
 
-#, fuzzy
 msgctxt "report template"
 msgid "Summary"
 msgstr "Tóm tắt"
 
-#, fuzzy
 msgctxt "report template"
 msgid "suggested"
 msgstr "gợi ý"
 
-#, fuzzy
 msgid "Cited by “{section} · {n}”, playing from {time}"
 msgstr "Trích dẫn bởi “{section} · {n}”, đang phát từ {time}"
 
-#, fuzzy
 msgid "Cited moment"
 msgstr "Thời điểm được trích dẫn"
 
-#, fuzzy
 msgid "Click a time in the report to see the moment it comes from."
 msgstr "Bấm vào một mốc thời gian trong báo cáo để xem thời điểm nó bắt nguồn."
 
-#, fuzzy
 msgid "Couldn’t tick the item"
 msgstr "Không thể đánh dấu mục này"
 
-#, fuzzy
 msgid "Markers you added while recording appear as “Marked moments”."
 msgstr "Các dấu bạn thêm khi ghi âm hiện thành “Thời điểm đã đánh dấu”."
 
-#, fuzzy
 msgid "Open in transcript"
 msgstr "Mở trong bản chép lời"
 
-#, fuzzy
 msgid "Owners can only be attendees or speakers; anyone else becomes “Unassigned”."
 msgstr "Người phụ trách chỉ có thể là người tham dự hoặc người nói; người khác sẽ thành “Chưa giao”."
 
-#, fuzzy
 msgid "Tick a task in a report"
 msgstr "Đánh dấu một việc trong báo cáo"
 
-#, fuzzy
 msgid "Where the report’s items come from"
 msgstr "Các mục của báo cáo đến từ đâu"
 
-#, fuzzy
 msgid "Write a report?"
 msgstr "Viết báo cáo?"
 
-#, fuzzy
 msgid "{template} suits this recording. Nothing is written until you ask."
 msgstr "{template} phù hợp với bản ghi này. Sẽ không viết gì cho đến khi bạn yêu cầu."
 
-#, fuzzy
 msgctxt "button"
 msgid "Set up report"
 msgstr "Thiết lập báo cáo"
@@ -10991,146 +10643,110 @@ msgstr "Thiết lập báo cáo"
 msgid "Large v3 isn’t installed"
 msgstr "Large v3 chưa được cài đặt"
 
-#, fuzzy
 msgid "Install Large v3 ({size}) or Medium on the AI page to translate to English."
 msgstr "Hãy cài Large v3 ({size}) hoặc Medium trên trang AI để dịch sang tiếng Anh."
 
-#, fuzzy
 msgid "Install Large v3 or Medium on the AI page to translate to English."
 msgstr "Hãy cài Large v3 hoặc Medium trên trang AI để dịch sang tiếng Anh."
 
-#, fuzzy
 msgid "Your active model, {model}, only transcribes. Install Large v3 ({size}) or Medium on the AI page to translate to English."
 msgstr "Mô hình đang dùng, {model}, chỉ chép lời. Hãy cài Large v3 ({size}) hoặc Medium trên trang AI để dịch sang tiếng Anh."
 
-#, fuzzy
 msgid "Your active model, {model}, only transcribes. Install Large v3 or Medium on the AI page to translate to English."
 msgstr "Mô hình đang dùng, {model}, chỉ chép lời. Hãy cài Large v3 hoặc Medium trên trang AI để dịch sang tiếng Anh."
 
-#, fuzzy
 msgid "Lines you edit in a translation are kept when you translate again."
 msgstr "Những dòng bạn sửa trong bản dịch được giữ lại khi bạn dịch lại."
 
-#, fuzzy
 msgid "A text model is needed"
 msgstr "Cần một mô hình văn bản"
 
-#, fuzzy
 msgid "Built-in text models"
 msgstr "Các mô hình văn bản tích hợp"
 
-#, fuzzy
 msgid "Couldn’t change the text model"
 msgstr "Không thể đổi mô hình văn bản"
 
-#, fuzzy
 msgid "Download the recommended model ({size})"
 msgstr "Tải mô hình được đề xuất ({size})"
 
-#, fuzzy
 msgid "Engine loading the model…"
 msgstr "Bộ máy đang nạp mô hình…"
 
-#, fuzzy
 msgid "Engine running {model}. It stops after {minutes} min without use."
 msgstr "Bộ máy đang chạy {model}. Nó sẽ dừng sau {minutes} phút không dùng."
 
-#, fuzzy
 msgid "Engine stopped. It starts by itself when a report or a translation needs it."
 msgstr "Bộ máy đang tắt. Nó tự khởi động khi cần viết báo cáo hoặc dịch."
 
-#, fuzzy
 msgid "Looking for the built-in models…"
 msgstr "Đang tìm các mô hình tích hợp…"
 
-#, fuzzy
 msgid "The engine could not start."
 msgstr "Bộ máy không khởi động được."
 
-#, fuzzy
 msgid "The model runs inside CaptureMann and nothing leaves this Mac."
 msgstr "Mô hình chạy ngay trong CaptureMann và không có gì rời khỏi máy Mac này."
 
-#, fuzzy
 msgid "The text engine is missing from this copy of CaptureMann. Reinstall CaptureMann."
 msgstr "Bản CaptureMann này thiếu bộ máy văn bản. Hãy cài lại CaptureMann."
 
-#, fuzzy
 msgid "This Mac has {memory} GB of memory. The model runs inside CaptureMann and nothing leaves this Mac."
 msgstr "Máy Mac này có {memory} GB bộ nhớ. Mô hình chạy ngay trong CaptureMann và không có gì rời khỏi máy."
 
-#, fuzzy
 msgid "List built-in text models"
 msgstr "Liệt kê các mô hình văn bản tích hợp"
 
-#, fuzzy
 msgid "Download a built-in text model"
 msgstr "Tải một mô hình văn bản tích hợp"
 
-#, fuzzy
 msgid "Choose the built-in text model"
 msgstr "Chọn mô hình văn bản tích hợp"
 
-#, fuzzy
 msgid "Delete a built-in text model"
 msgstr "Xóa một mô hình văn bản tích hợp"
 
-#, fuzzy
 msgid "CaptureMann is already running"
 msgstr "CaptureMann đang chạy"
 
-#, fuzzy
 msgid "Another copy ({name}) is running and uses the same library and settings. Quit it from its menu bar icon, then open this one."
 msgstr "Một bản khác ({name}) đang chạy và dùng chung thư viện và cài đặt. Hãy thoát nó từ biểu tượng trên thanh menu, rồi mở bản này."
 
-#, fuzzy
 msgid "Finds where speech happens and who overlaps. First of the two files that tell speakers apart."
 msgstr "Tìm chỗ có tiếng nói và chỗ nhiều người nói cùng lúc. Tệp thứ nhất trong hai tệp để phân biệt người nói."
 
-#, fuzzy
 msgid "Compares voices so the same person gets the same label. Second of the two files that tell speakers apart."
 msgstr "So sánh giọng nói để cùng một người luôn có cùng một nhãn. Tệp thứ hai trong hai tệp để phân biệt người nói."
 
-#, fuzzy
 msgid "No built-in model is available in this version yet. Check for an update."
 msgstr "Phiên bản này chưa có mô hình tích hợp nào. Hãy kiểm tra bản cập nhật."
 
-#, fuzzy
 msgid "Reports are written by the text model built into CaptureMann, which runs on this Mac. Download it on the AI page; nothing is sent anywhere else."
 msgstr "Báo cáo được viết bởi mô hình văn bản tích hợp trong CaptureMann, chạy ngay trên máy Mac này. Hãy tải nó trong trang AI; không có gì được gửi đi nơi khác."
 
-#, fuzzy
 msgid "The built-in text engine is not part of this copy of CaptureMann. Reinstall CaptureMann, or use a build that includes the engine."
 msgstr "Bản CaptureMann này không có công cụ văn bản tích hợp. Hãy cài lại CaptureMann hoặc dùng bản có kèm công cụ này."
 
-#, fuzzy
 msgid "Recommended"
 msgstr "Đề xuất"
 
-#, fuzzy
 msgid "This Mac may not have enough free memory for this model."
 msgstr "Máy Mac này có thể không đủ bộ nhớ trống cho mô hình này."
 
-#, fuzzy
 msgid "Don’t use a model"
 msgstr "Không dùng mô hình"
 
-#, fuzzy
 msgid "Download a model and press Use this model first."
 msgstr "Hãy tải một mô hình và bấm Dùng mô hình này trước."
 
-#, fuzzy
 msgid "Not available in this build"
 msgstr "Không có trong bản dựng này"
 
-#, fuzzy
 msgid "Speaker labels aren’t available in this build"
 msgstr "Nhãn người nói không có trong bản dựng này"
 
-#, fuzzy
 msgid "This build doesn’t include the speaker models that tell voices apart. CaptureMann releases include them."
 msgstr "Bản dựng này không kèm các mô hình phân biệt giọng nói. Các bản phát hành của CaptureMann đều có sẵn."
 
-#, fuzzy
 msgid "Speaker labels, not needed for one voice"
 msgstr "Nhãn người nói, không cần cho một giọng"

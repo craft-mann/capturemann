@@ -1,6 +1,6 @@
 # Voice and meetings: implementation plan
 
-Status: **Planned Oct 26, 2026.** Nothing built. Behaviour: `../features/15-voice.md` (VOC-1 to VOC-3), `../features/07-ai.md` (AI-5, AI-7, AI-8, AI-9). Approach, models and spikes: `voice-and-meetings-plan.md`. Screens: the redesign kit boards V0 to V8 (`design/redesign/`, kit copy `capturemann-redesign 5/`); the kit's `CLAUDE.md` says which board builds which part.
+Status (Oct 27, 2026): **Stages 0 to 6 are built for release 0.2.0** (audio recording, audio editor and export, Whisper models and translation, the built-in text engine, reports, speaker labels), tested with fakes, with real engines run through the CLI on one 11-minute meeting; the maintainer used the latest dev bundle's recording, screenshot and audio on one Mac and reported them working (no stored report). **What remains** (details in `docs/project/status.md`, "Release checklist for 0.2.0"): the hardware checks of VOC-1 (3-hour soak, kill -9 recovery, lid and sleep, consent, markers) and VOC-2 (WAV, M4A, loudness) with reports in `verification/`; the upgrade test on a copy of a real pre-0.2 library; the ONNX Runtime notices text in `THIRD_PARTY_LICENSES.md`; `cargo deny check advisories` (needs network); speaker accuracy at scale (spike S7 quality, tested with users over the coming weeks). **Deferred:** the first-use setup sheet to 0.2.1, VOC-3 to a later 0.2.x, Ollama and LM Studio (backlog), Windows and Intel Macs. Planned Oct 26, 2026. Behaviour: `../features/15-voice.md` (VOC-1 to VOC-3), `../features/07-ai.md` (AI-5, AI-7, AI-8, AI-9). Approach, models and spikes: `voice-and-meetings-plan.md`. Screens: the redesign kit boards V0 to V8 (`design/redesign/`, kit copy `capturemann-redesign 5/`); the kit's `CLAUDE.md` says which board builds which part.
 
 No release dates (maintainer, Oct 26, 2026). Work in the order below; each stage leaves the app working and is merged when fmt, clippy, tests and `cm-i18n check` pass. Masters stay WAV.
 
@@ -30,7 +30,7 @@ Manual: `tests/manual/VOC-1.md` (permissions, consent, HUD, lid hint) and a 3-ho
 
 ## Stage 2: audio editor and export (VOC-2)
 
-**Status Oct 26, 2026:** P2.1 and the UI of P2.3 built (tested with fakes, not checked by eye; see VOC-2 "As built, UI" in `../features/15-voice.md`); the Speakers and Report tabs are stubs for Stages 5 and 6; P2.2 (FFmpeg rebuild) is the maintainer's.
+**Status Oct 27, 2026:** P2.1 and P2.3 built (tested with fakes and FFmpeg golden tests; see VOC-2 "As built, UI" in `../features/15-voice.md`); the Speakers and Report tabs are built (Stages 5 and 6); P2.2 (the `wav` muxer and `pcm_s24le` in the LGPL FFmpeg) is the release machine's step to confirm; the export hardware checks are the maintainer's.
 
 **P2.1 Editor shell for `kind: "audio"`** (V4): "now speaking" card, lanes (Markers, one waveform per track, suggested cuts), overview strip, Transcript tab in wide mode, tab set `audio`. Reuses the caption editor and the R3c wide mode.
 **P2.2 FFmpeg:** add the `wav` muxer and `pcm_s24le` encoder to `packaging/ffmpeg/build-macos.sh` (lists and self-check), rebuild with `make ffmpeg`.
@@ -39,7 +39,7 @@ Manual: `tests/manual/VOC-2.md`.
 
 ## Stage 3: Whisper models and translation to English (AI-1, AI-5)
 
-**Status Oct 26, 2026:** P3.2 backend built (tested with fakes); P3.1 entry added but unpinned (checksum, size, memory and URL check are the maintainer's), no UI. Details: AI-5 "as built" in `../features/07-ai.md`.
+**Status Oct 27, 2026:** P3.1 and P3.2 built; Large v3 Turbo (the recommended model) and Large v3 are pinned, Turbo confirmed by a download in the app (`ram_mb` is an estimate). Translation to English with Whisper and to other languages with the built-in text model (Vietnamese: 84 s for the 11-minute meeting, 0 lines left untranslated, through the CLI). Details: AI-5 "as built" in `../features/07-ai.md`.
 
 **P3.1** Pin `large-v3-turbo` and `large-v3` in `crates/cm-ai/data/models.json` (commit-pinned URL, SHA-256, size, `ram_mb`); AI page rows and labels (V8 speech section).
 **P3.2** Whisper translate task in `cm-ai/src/whisper.rs`; the turbo rule (large-v3, else medium, else `translation_model_missing`); `translations/<lang>.json`; language switcher in the transcript; per-language exports; `translate_captions` tool and CLI. The text-model engine arrives in Stage 4.
@@ -60,7 +60,7 @@ Templates as data in `crates/cm-ai/data/reports/` with `additionalProperties: fa
 
 ## Stage 6: speaker labels (AI-8)
 
-Run **spike S7** first (model, licence, `ort` versus `sherpa-onnx`). Then: model download and licence display, diarization job, word assignment, `diarization.json`, rename, merge and reassign revisions, the Speakers lane and tab, `Speaker names` export switch, headset shortcut, `profile.display_name`; `diarize` and `set_speakers`. `ai.auto_speakers` stays off until S7 passes. No voiceprints on disk (AC6 check).
+Run **spike S7** first (model, licence, `ort` versus `sherpa-onnx`). Then: model download and licence display, diarization job, word assignment, `diarization.json`, rename, merge and reassign revisions, the Speakers lane and tab, `Speaker names` export switch, headset shortcut, `profile.display_name`; `diarize` and `set_speakers`. `ai.auto_speakers` was kept off until the engine ran; it is **on by default since Oct 27, 2026** (maintainer decision) and accuracy is still to be tested with users. No voiceprints on disk (AC6 check).
 
 ## Later (P2)
 

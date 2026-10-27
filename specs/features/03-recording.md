@@ -295,7 +295,7 @@ Recording writes each source as its own track on one session clock (Technical de
 ---
 
 ### REC-9 Draw on screen while recording
-**Priority** P2 · **Status** Draft (detail before v0.2) · **Crates** apps/overlay, cm-capture, cm-render
+**Priority** P2 · **Status** Draft (not in 0.2.0; detail before work starts) · **Crates** apps/overlay, cm-capture, cm-render
 
 **User story** — As a teacher, I want to draw arrows and circles on my screen while I record, so that viewers can follow what I'm pointing at without me editing it in afterwards.
 

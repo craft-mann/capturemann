@@ -25,10 +25,11 @@ through MCP and a CLI.
   <img alt="The CaptureMann library: recordings, audio and screenshots in one place, with a record button, region, window and display capture, and the AI and agent pages in the sidebar" src="docs/images/library.webp" width="900">
 </p>
 
-> **Status: 0.1.0, first release (macOS 13+, Apple Silicon only).** After this release: Intel Macs, then Windows, then Linux. Most
-> results are tested with scripted fakes, plus checks on real devices by the maintainer on one Mac; there
-> are few stored hardware reports. What is still unverified is tracked in
-> [`specs/04-delivery-plan.md`](specs/04-delivery-plan.md) under "Verification debt".
+> **Status: 0.2.0 (macOS 13+, Apple Silicon only).** Intel Macs, then Windows, then Linux follow. Most
+> results are tested with scripted fakes, plus the maintainer's own use on one Mac; there are few stored
+> hardware reports, and speaker labels have been tried on one meeting only. What is still unverified is
+> tracked in [`specs/04-delivery-plan.md`](specs/04-delivery-plan.md) under "Verification debt" and in
+> [`docs/project/status.md`](docs/project/status.md).
 
 ## Features
 
@@ -39,7 +40,7 @@ through MCP and a CLI.
   crash recovery that loses at most two seconds.
 - **Editor**: trim, cut, split, speed, backgrounds, zoom regions, restylable cursor, 9:16 and 1:1
   reframe. Export to MP4, platform presets, GIF or WebM.
-- **Audio recording** (0.2): meetings, interviews, lectures and voice notes from the microphone and,
+- **Audio recording**: meetings, interviews, lectures and voice notes from the microphone and,
   optionally, system audio. A compact recording bar with a level meter, markers (press `M`), a consent
   reminder, and a WAV master that survives a crash. An audio editor with a waveform, a transcript,
   trim and cut, and export to M4A or WAV with loudness levelling.
@@ -47,15 +48,15 @@ through MCP and a CLI.
   Large v3 Turbo as the recommended model, a caption editor, translation to English with Whisper and to
   other languages with the built-in text model, and zoom and silence-cut suggestions. Models download
   only when you press Download.
-- **Speaker labels** (0.2): who spoke when, from the voices, with rename and merge. The two small
+- **Speaker labels**: who spoke when, from the voices, with rename and merge. The two small
   models ship inside the app; nothing is sent anywhere.
-- **Meeting minutes and reports** (0.2): summary, minutes, one-on-one notes, interview notes, product
+- **Meeting minutes and reports**: summary, minutes, one-on-one notes, interview notes, product
   recap and lecture notes written by a built-in text model (Gemma 4 E2B by default). Every item links
   to the moment it was said; export as Markdown or text. The model runs through a bundled
   `llama-server`; no cloud and no account.
 - **Library** of self-contained capture bundles, stored in a folder you choose.
 - **Share**: save to local folders or Google Drive, publish to YouTube (private by default).
-- **For agents**: more than 70 MCP tools plus resources and prompts, and an identical `capturemann` CLI. Risky
+- **For agents**: 73 MCP tools plus resources and prompts, and an identical `capturemann` CLI. Risky
   actions (start recording, publish, delete) need an on-screen confirmation.
 - **Private by design**: no telemetry, and no network traffic unless you connect a destination or
   download a model. You bring your own Google credentials; secrets live in the macOS Keychain.
@@ -63,7 +64,7 @@ through MCP and a CLI.
 
 ## Install
 
-Requires a Mac with Apple Silicon and macOS 13 or later. Intel Macs are not supported in 0.1.0; they follow in the next release.
+Requires a Mac with Apple Silicon and macOS 13 or later. Intel Macs are not supported yet; they follow in a later release. The app is about 180 MB. The AI models are not in it: they download only when you press Download (about 4.4 GB for the recommended speech model, Large v3 Turbo, plus the recommended text model, Gemma 4 E2B). The two small speaker models are inside the app.
 
 **With Homebrew:**
 

@@ -36,7 +36,7 @@ All four new capabilities are in v0.1 by choice (storage and publishing each sta
 - A multi-track timeline editor (OpenCut and FilmCraft territory); editing stays trim, cut, speed and layout.
 - Live streaming (OBS territory).
 - A CaptureMann cloud service, accounts or hosting; users bring their own storage and platform accounts.
-- Linux (v0.2), mobile, browser extension.
+- Linux (after Intel Macs and Windows), mobile, browser extension.
 - Official audited platform apps (after v0.1, see Integrations).
 
 **Principles**
@@ -120,15 +120,15 @@ P0 items block the v0.1 release; P1 items ship in v0.1 unless they threaten the 
 | AI-2 | Title, description, chapters and tags from the transcript (a text model: a local server or the user's API key) | P1 | **No: after v0.1** (maintainer decision, Oct 24, 2026) |
 | AI-3 | Auto-zoom suggestions from cursor dwell | P1 | Yes |
 | AI-4 | Silence and filler-word removal suggestions | P1 | Yes |
-| AI-5 | Transcript and caption translation: Whisper to English, the text model to any language (raised to P1 on Oct 26, 2026, next release) | P1 | Yes |
+| AI-5 | Transcript and caption translation: Whisper to English, the text model to any language (raised to P1 on Oct 26, 2026; ships in 0.2.0, tested with fakes and real engines on one meeting) | P1 | Yes |
 | AI-6 | Transcript editor: correct words, names and grammar | P1 | Yes |
-| AI-7 | Text model provider: the engine built into CaptureMann (0.2.0); a user-chosen local server and a provider with the user's key are backlog (*later*) | P1 | Read-only |
-| AI-8 | Speaker labels from voices (diarization), rename and merge speakers | P1 | Yes |
-| AI-9 | Reports from a recording: summary, meeting minutes, 1:1, interview, product presentation and lecture notes, each item cited with a time | P1 | Yes |
-| **Voice and meetings** (added Oct 26, 2026; next release) |  |  |  |
+| AI-7 | Text model provider: the engine built into CaptureMann (0.2.0: bundled `llama-server`, Gemma 4 E2B recommended, no Ollama, LM Studio or Remote provider); a user-chosen local server and a provider with the user's key are backlog (*later*) | P1 | Read-only |
+| AI-8 | Speaker labels from voices (diarization), rename and merge speakers (0.2.0; models inside the app, automatic by default; accuracy not yet measured) | P1 | Yes |
+| AI-9 | Reports from a recording: summary, meeting minutes, 1:1, interview, product presentation and lecture notes, each item cited with a time (0.2.0; review set pending) | P1 | Yes |
+| **Voice and meetings** (added Oct 26, 2026; VOC-1 and VOC-2 ship in 0.2.0, built and tested with fakes, hardware checks pending; VOC-3 is deferred) |  |  |  |
 | VOC-1 | Audio-only recording: microphone, system audio or both, markers, consent notice, presets for meetings, interviews and lectures | P1 | Yes |
 | VOC-2 | Audio editor view (waveforms, transcript with speakers) and audio export (M4A, WAV) | P1 | Yes |
-| VOC-3 | Live transcript while recording | P2 | Yes |
+| VOC-3 | Live transcript while recording (deferred to a later 0.2.x, Draft) | P2 | Yes |
 | **Export** |  |  |  |
 | EXP-1 | Export MP4 (H.264 or HEVC + AAC) at source resolution or a preset | P0 | Yes |
 | EXP-2 | Platform presets: YouTube 16:9, YouTube Shorts / TikTok / Reels 9:16, square | P0 | Yes |

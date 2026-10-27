@@ -68,7 +68,7 @@
 ---
 
 ### LIB-3 Tags and folders
-**Priority** P2 · **Status** Draft (detail before v0.2) · **Crates** cm-library
+**Priority** P2 · **Status** Draft (not in 0.2.0; detail before work starts) · **Crates** cm-library
 
 **User story** — As a teacher, I want to tag recordings by course and lesson, so that I can organize a semester's worth of videos.
 

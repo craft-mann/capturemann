@@ -1,6 +1,6 @@
 # Voice recording, speaker labels and AI reports
 
-Status: **Planned Oct 26, 2026** (maintainer request). Nothing is built. Behaviour and acceptance criteria live in `../features/15-voice.md` (VOC-1 to VOC-3) and `../features/07-ai.md` (AI-5, AI-7, AI-8, AI-9); this plan records the approach, the model choices and the spikes.
+Status (Oct 27, 2026): planned Oct 26, 2026 (maintainer request); **Stages 0 to 6 are built for release 0.2.0** (tested with fakes and real engines through the CLI on one meeting; hardware checks pending, see `../../docs/project/status.md`). Spike S7: technical Go, accuracy open. Spike S8: resolved by the research and tests (Gemma 4 E2B), with Vietnamese and long-recording quality to keep checking. Behaviour and acceptance criteria live in `../features/15-voice.md` (VOC-1 to VOC-3) and `../features/07-ai.md` (AI-5, AI-7, AI-8, AI-9); this plan records the approach, the model choices and the spikes.
 
 ## Why
 
@@ -56,9 +56,9 @@ The default is the one marked `recommended` in the catalogue; S8's remaining run
 
 ## Spikes
 
-**S7 — Speaker diarization on a Mac (Rust, offline).** Run candidates A and B on: a 10-minute two-person interview on the MacBook's built-in mic, a 30-minute four-person meeting around a laptop, and one public meeting set with a CC-BY licence. Measure word attribution, DER, time and peak memory on the M4 Pro and on a 16 GB machine. **Pass:** AI-8.AC1 and AC2 targets, ≤ 600 MB peak memory, a licence that allows mirroring. Record the result in `docs/project/spikes.md`.
+**S7 — Speaker diarization on a Mac (Rust, offline). Status Oct 27, 2026: technical Go (sherpa-onnx with pyannote segmentation-3.0 and CAM++, shipped inside the app); accuracy not measured, to be tested with users and the team over the coming weeks. `docs/project/spikes.md`.** Run candidates A and B on: a 10-minute two-person interview on the MacBook's built-in mic, a 30-minute four-person meeting around a laptop, and one public meeting set with a CC-BY licence. Measure word attribution, DER, time and peak memory on the M4 Pro and on a 16 GB machine. **Pass:** AI-8.AC1 and AC2 targets, ≤ 600 MB peak memory, a licence that allows mirroring. Record the result in `docs/project/spikes.md`.
 
-**S8 — Text model for reports and translation.** With the built-in engine (`llama-server`), run the AI-9 templates and AI-5 EN↔VI translation on 3 meetings, 2 interviews and 1 lecture (English and Vietnamese) with the four models above at Q4. Score by hand: citation accuracy, invented items, Vietnamese quality, structured-output success, time. **Pass:** ≥ 95% schema success, no invented action items in the review set, report ≤ 5 minutes for 30 minutes of speech on 16 GB. The winner becomes the AI page's default recommendation.
+**S8 — Text model for reports and translation. Status Oct 27, 2026: resolved by the Cowork research (`docs/research/`) and the tests: Gemma 4 E2B is the default; Qwen3.5 4B and 2B and Gemma 4 26B-A4B are the other choices; Vietnamese and long-recording quality are to keep checking.** With the built-in engine (`llama-server`), run the AI-9 templates and AI-5 EN↔VI translation on 3 meetings, 2 interviews and 1 lecture (English and Vietnamese) with the four models above at Q4. Score by hand: citation accuracy, invented items, Vietnamese quality, structured-output success, time. **Pass:** ≥ 95% schema success, no invented action items in the review set, report ≤ 5 minutes for 30 minutes of speech on 16 GB. The winner becomes the AI page's default recommendation.
 
 ## Decisions made after the plan
 

@@ -106,7 +106,7 @@ Annotations are vector operations stored in `manifest.json` (`ops` list) and ren
 ---
 
 ### ANN-4 Callouts, stamps and image overlays
-**Priority** P2 · **Status** Draft (detail before v0.2) · **Crates** cm-render
+**Priority** P2 · **Status** Draft (not in 0.2.0; detail before work starts) · **Crates** cm-render
 
 **User story** — As a creator, I want speech-bubble callouts, stamps (✓, ✗, !) and pasted images, so that my screenshots look polished.
 

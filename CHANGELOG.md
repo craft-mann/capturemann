@@ -5,10 +5,11 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [0.2.0] - Unreleased
 
-Planned for 0.2.0 (voice and meetings). Not released and not dated. Everything below is built and
-tested with scripted fakes. The maintainer has tried parts of it on a Mac (as reported; speaker labels
-on one meeting), but no run is stored in `verification/` yet, so treat this as a preview of the release
-notes, not a promise.
+0.2.0 (voice and meetings). The maintainer sets the date when it is cut. Everything below is built and
+tested with scripted fakes; the real speech, speaker and text engines were also run through the CLI on
+one 11-minute meeting (Oct 27, 2026). The maintainer used the latest build on one Mac and reported that
+recording, screenshots and audio work, and accepted the speaker split on one meeting as working, but
+no hardware run is stored in `verification/` yet. See Known limitations.
 
 ### Added
 
@@ -54,6 +55,13 @@ notes, not a promise.
   the model (see Fixed).
 - An audio recording opens its editor straight away and has no details page; the editor's top bar has
   Reveal in Finder where screen recordings have Recording details.
+- The Vietnamese strings added for this release were read through by the maintainer.
+
+### Changed
+
+- The sidebar version badge follows the build (it shows v0.2), instead of a fixed v0.1.
+- Release size: the app is about 180 MB. The AI models are not in it and download only when you press
+  Download (about 4.4 GB for Large v3 Turbo plus Gemma 4 E2B); only the two small speaker models are inside.
 
 ### Fixed
 
@@ -63,17 +71,21 @@ notes, not a promise.
 
 ### Known limitations (0.2.0)
 
-- Speaker accuracy has not been measured against labelled recordings (spike S7); it worked on one
-  meeting for the maintainer. Gemma 4 E2B is the default text model; its quality on your own
+- Speaker accuracy has not been measured against labelled recordings (spike S7 is a technical Go
+  only); it worked on one 11-minute English meeting for the maintainer, and testing with users and the
+  team is planned over the coming weeks. Gemma 4 E2B is the default text model; its quality on your own
   recordings is still being checked (spike S8).
 - No first-use setup sheet yet (one place to download the speech and text models when you first
   record); it comes in 0.2.1. Until then the AI page is where models are downloaded.
 - Live transcript while recording (VOC-3) is not included; it comes in a later 0.2.x.
-- The bundled FFmpeg needs a rebuild with the `wav` muxer and `pcm_s24le` before WAV export works
-  in the shipped app.
-- Tested with scripted fakes and, in a few places, a real engine, but not yet checked by a person on
-  hardware: the 10-minute call sync, the kill -9 recovery and the 3-hour soak for audio recording,
-  real `large-v3` translation quality, and real local-model reports. Manual scripts are in
+- Intel Macs are not supported yet (Apple Silicon and macOS 13+ only); Windows and Linux follow later.
+- Ollama and LM Studio (a text model from a server of your own) are not offered; they are a later item.
+- Whether the bundled LGPL FFmpeg of the release build includes the `wav` muxer and `pcm_s24le`
+  (needed for WAV export) is to be confirmed on that build.
+- Hardware reports are pending: the audio recording checks (10-minute call sync, kill -9 recovery,
+  3-hour soak, sleep and lid, consent line, markers), the audio export checks (WAV, M4A, loudness)
+  and the review of reports on real recordings. What is known so far is the maintainer's own use on one
+  Mac and the CLI runs above, none of it stored as a verification report. Manual scripts are in
   `tests/manual/` (`VOC-1.md`, `VOC-2.md`, `AI-5.md`, `AI-7.md`, `AI-8.md`, `AI-9.md`,
   `FIRST-RUN-0.2.md`, `UPGRADE-0.2.md`).
 - A library from 0.1.0 is upgraded when 0.2.0 opens it (the index moves from version 2 to 3; bundles are
