@@ -193,35 +193,24 @@ async fn an_unreachable_server_is_an_answer_not_an_error() {
         .contains("Start Ollama or LM Studio"));
 }
 
+/// Local text models only for now (maintainer, Oct 26, 2026): a remote provider in the
+/// settings file is treated as `none`, so nothing is ever sent to it.
 #[tokio::test]
-async fn a_remote_provider_is_gated_with_host_and_characters_and_the_key_stays_hidden() {
+async fn a_remote_provider_in_the_settings_is_unavailable() {
     let (d, _dir) = rig();
-    settings(
-        &d,
-        json!({ "ai.text.provider": "anthropic", "ai.text.model": "claude-x",
-                "ai.text.key_name": "anthropic-key" }),
-    )
-    .await;
-    let g = user(&d, "get_text_model", json!({})).await.unwrap();
-    assert_eq!(g["local"], false);
-    assert_eq!(g["host"], "api.anthropic.com");
-    assert_eq!(g["has_key"], true);
-    assert_eq!(g["remote_notice_pending"], true);
-    assert!(!g.to_string().contains("TOPSECRET"));
-    let plan = d.text_model_gate(4321).unwrap().unwrap();
-    assert_eq!(plan.host, "api.anthropic.com");
-    assert_eq!(plan.chars, 4321);
-    assert!(plan.text.contains("4321 characters") && plan.text.contains("api.anthropic.com"));
-    // Once the user has seen the notice for this host it is not shown again.
-    settings(
-        &d,
-        json!({ "ai.text.remote_notice_host": "api.anthropic.com" }),
-    )
-    .await;
-    assert!(!d.text_model_notice_pending().unwrap());
-    // A different host asks again.
-    settings(&d, json!({ "ai.text.provider": "openai_compatible", "ai.text.base_url": "https://llm.example.com/v1" })).await;
-    assert!(d.text_model_notice_pending().unwrap());
+    for provider in ["anthropic", "openai_compatible"] {
+        settings(
+            &d,
+            json!({ "ai.text.provider": provider, "ai.text.model": "claude-x",
+                    "ai.text.base_url": "https://llm.example.com/v1",
+                    "ai.text.key_name": "k" }),
+        )
+        .await;
+        let g = user(&d, "get_text_model", json!({})).await.unwrap();
+        assert_eq!(g["provider"], "none", "{g}");
+        assert!(d.text_model_gate(10).is_err());
+        assert!(user(&d, "test_text_model", json!({})).await.is_err());
+    }
 }
 
 #[tokio::test]

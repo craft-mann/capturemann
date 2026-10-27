@@ -1,5 +1,5 @@
 {
-  "_comment": "Whisper ggml models. An entry with pending_pin true has no verified checksum yet: it is not offered and cannot be downloaded until the maintainer fills in sha256, bytes and ram_mb from the repository LFS pointer file, confirms the file exists at the pinned commit (or moves url to a newer commit) and removes the flag. `large` is large-v3 (alias large-v3). url is pinned to a Hugging Face commit; sha256 and bytes come from the repository's LFS pointer files (read Oct 22, 2026). To use another mirror or revision, put a file of this shape at <config dir>/ai/catalog.json or point CAPTUREMANN_AI_CATALOG at one: it replaces this list. ram_mb is the memory the model needs while it runs, in MB, from the model table of the whisper.cpp README (https://github.com/ggml-org/whisper.cpp, read Oct 24, 2026: tiny ~273 MB, base ~388 MB, small ~852 MB, medium ~2.1 GB); its disk column is in MiB, bytes here come from the files.",
+  "_comment": "Whisper ggml models. An entry with pending_pin true has no pinned checksum yet: it is not offered and cannot be downloaded until sha256, bytes and ram_mb are filled in and the flag is removed. large-v3-turbo: sha256 and bytes from the LFS pointer file at the pinned commit (read Oct 27, 2026); ram_mb 2600 is an estimate (file size plus working memory), not taken from the whisper.cpp table. `large` is large-v3 (alias large-v3). url is pinned to a Hugging Face commit; sha256 and bytes come from the repository's LFS pointer files (read Oct 22, 2026). To use another mirror or revision, put a file of this shape at <config dir>/ai/catalog.json or point CAPTUREMANN_AI_CATALOG at one: it replaces this list. ram_mb is the memory the model needs while it runs, in MB, from the model table of the whisper.cpp README (https://github.com/ggml-org/whisper.cpp, read Oct 24, 2026: tiny ~273 MB, base ~388 MB, small ~852 MB, medium ~2.1 GB); its disk column is in MiB, bytes here come from the files.",
   "models": [
     {
       "id": "tiny",
@@ -58,10 +58,9 @@
       "hint": "Fast, accurate \u2014 not for translation",
       "file": "ggml-large-v3-turbo.bin",
       "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo.bin",
-      "sha256": "",
-      "bytes": 0,
-      "ram_mb": 0,
-      "pending_pin": true
+      "sha256": "1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69",
+      "bytes": 1624555275,
+      "ram_mb": 2600
     }
   ]
 }

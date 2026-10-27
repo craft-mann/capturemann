@@ -128,8 +128,8 @@ pub fn is_loopback_host(host: &str) -> bool {
 }
 
 impl TextModelConfig {
-    /// Reads `ai.text.*` from the settings map. Unknown or malformed values fall back to the
-    /// defaults (provider `none`), so a hand-edited file can never turn the network on.
+    /// Reads `ai.text.*` from the settings map. Unknown, malformed or remote (`openai_compatible`, `anthropic`)
+    /// values fall back to the defaults (provider `none`), so a hand-edited file can never turn the network on.
     pub fn from_settings(s: &Map<String, Value>) -> TextModelConfig {
         let text = |k: &str| {
             s.get(k)
@@ -139,6 +139,9 @@ impl TextModelConfig {
         };
         let provider = text(KEY_PROVIDER)
             .and_then(|p| Provider::parse(&p))
+            // Local models only for now (maintainer, Oct 26, 2026): the remote providers stay
+            // in the code but a settings file can not select them.
+            .filter(|p| matches!(p, Provider::None | Provider::Local))
             .unwrap_or(Provider::None);
         TextModelConfig {
             provider,
@@ -501,7 +504,24 @@ mod tests {
         let mut m = Map::new();
         m.insert(KEY_PROVIDER.into(), json!(provider));
         m.insert(KEY_BASE_URL.into(), json!(url));
-        TextModelConfig::from_settings(&m)
+        let mut c = TextModelConfig::from_settings(&m);
+        // The dormant remote providers can not come from settings; set them directly.
+        if let Some(p) = Provider::parse(provider) {
+            c.provider = p;
+        }
+        c
+    }
+
+    #[test]
+    fn settings_can_not_select_a_remote_provider() {
+        for p in ["openai_compatible", "anthropic", "bogus"] {
+            let mut m = Map::new();
+            m.insert(KEY_PROVIDER.into(), json!(p));
+            assert_eq!(TextModelConfig::from_settings(&m).provider, Provider::None);
+        }
+        let mut m = Map::new();
+        m.insert(KEY_PROVIDER.into(), json!("local"));
+        assert_eq!(TextModelConfig::from_settings(&m).provider, Provider::Local);
     }
 
     #[test]

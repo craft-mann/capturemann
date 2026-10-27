@@ -698,30 +698,36 @@ mod tests {
         assert_eq!(c.get("large").unwrap().file, "ggml-large-v3.bin");
     }
 
-    /// The turbo model is catalogued but unpinned: it is not listed, and the store refuses every
-    /// action on it (the downloader never sees an entry without a checksum).
+    /// The turbo model is pinned (checksum and size from the LFS pointer file) and listed. An
+    /// entry flagged `pending_pin` is hidden and the store refuses every action on it (the
+    /// downloader never sees an entry without a checksum).
     #[test]
     fn an_unpinned_entry_is_hidden_and_refused() {
         let c = Catalog::builtin();
         let turbo = c.get("large-v3-turbo").unwrap();
-        assert!(
-            turbo.pending_pin,
-            "fill in sha256/bytes/ram_mb, then clear pending_pin"
-        );
+        assert!(!turbo.pending_pin);
+        assert_eq!(turbo.sha256.len(), 64);
+        assert_eq!(turbo.bytes, 1_624_555_275);
         let dir = tempfile::tempdir().unwrap();
         let store = ModelStore::with_catalog(dir.path(), c);
         let listed: Vec<String> = store.list().models.into_iter().map(|m| m.id).collect();
-        assert_eq!(listed, ["tiny", "base", "small", "medium", "large"]);
+        assert_eq!(
+            listed,
+            ["tiny", "base", "small", "medium", "large", "large-v3-turbo"]
+        );
+        let pending = r#"{"models":[{"id":"p","label":"P","file":"p.bin","url":"https://x/p","sha256":"","bytes":0,"pending_pin":true}]}"#;
+        let store = ModelStore::with_catalog(dir.path(), Catalog::parse(pending).unwrap());
+        assert!(store.list().models.is_empty());
         let mut never =
             |_p: DownloadProgress| -> bool { panic!("no network for an unpinned model") };
-        let e = store.download("large-v3-turbo", &mut never).unwrap_err();
+        let e = store.download("p", &mut never).unwrap_err();
         assert!(
             e.to_string().contains("checksum has not been pinned"),
             "{e}"
         );
-        assert!(store.select("large-v3-turbo").is_err());
-        assert!(store.resolve(Some("large-v3-turbo")).is_err());
-        assert!(store.remove("large-v3-turbo").is_err());
+        assert!(store.select("p").is_err());
+        assert!(store.resolve(Some("p")).is_err());
+        assert!(store.remove("p").is_err());
         // A pinned catalogue row still needs a valid checksum.
         let bad = r#"{"models":[{"id":"a","label":"A","file":"a.bin","url":"https://x/a","sha256":"","bytes":0}]}"#;
         assert!(Catalog::parse(bad).is_err());
