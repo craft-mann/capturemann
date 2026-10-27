@@ -5,8 +5,7 @@
 //!
 //! Two engines (`engine`: `auto`, `whisper`, `text_model`): Whisper re-runs the audio with the
 //! translate task (English only, offline; the `large-v3-turbo` model is never used for it), and a
-//! text model translates the caption lines (AI-7: the local text model, the built-in engine or
-//! Ollama and LM Studio, through [`cm_ai::translate::ModelTranslator`]; with provider `none` a
+//! text model translates the caption lines (AI-7: the built-in text engine, through [`cm_ai::translate::ModelTranslator`]; with provider `none` a
 //! non-English target fails with `invalid_input` and `data.reason = "no_text_model"`). Nothing is
 //! ever downloaded here: a missing Whisper model fails with
 //! `data.reason = "translation_model_missing"`.

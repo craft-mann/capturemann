@@ -138,6 +138,10 @@ A five-reviewer review produced the fix wave (R1-n to R5-n), then a follow-up wa
 
 **Still to be exercised by the maintainer** with the REC-5, EXP-1 and PRM-1 manual scripts (and the new `tests/manual/LIB-1.md`): the recording sections, the HUD, the countdown and the bubble, the tray, and the agent confirmation dialog. By script, that is REC-5 sections 0b to 10 (start sheet, HUD, pause and resume, area indicator, webcam bubble, discard and restart, agent-started recording, tray and hotkeys, full-screen apps, the real recording smoke test, window lifecycle), EXP-1 steps 1 to 7, PRM-1 (startup rule, first launch, no popup, optional permissions, revoking, re-sign symptom, hotkey start) and LIB-1 (rename and delete from the card menu).
 
+## Backlog (later)
+
+- **AI-7, user-chosen local server (later; maintainer decision Oct 27, 2026).** A text model from a server the user runs, through an OpenAI-compatible URL: Ollama, LM Studio (presets, detection, a model picker). Release 0.2.0 ships the built-in engine as the only text-model provider; the settings, tools and CLI for a server were removed. A provider with the user's own key is in the same backlog item.
+
 ## Decisions
 
 Decided Oct 23, 2026 (maintainer): the app keeps all its secrets in one keychain item (`cm_auth::VaultStore`) so macOS asks for the login password once, not once per secret; old per-secret items migrate on first read (tested with fakes; verified on hardware (as reported, Oct 23, 2026): the migration asked for the password twice on the Destinations page, then only the `vault` item remained, and after quitting and reopening there was no prompt and Google Drive and YouTube stayed connected; whether "Always Allow" survives a rebuild and a release update is not yet observed).

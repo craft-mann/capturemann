@@ -63,15 +63,15 @@ mod tests {
     }
 
     #[test]
-    fn only_a_local_model_with_a_name_counts() {
+    fn only_the_built_in_model_with_a_name_counts() {
         assert!(text_model_ready(
-            &json!({ "provider": "local", "model": "qwen3.5:9b", "base_url": "http://127.0.0.1:11434/v1" })
+            &json!({ "provider": "embedded", "model": "text-16gb" })
         ));
         assert!(!text_model_ready(
             &json!({ "provider": "none", "model": "" })
         ));
         assert!(!text_model_ready(
-            &json!({ "provider": "local", "model": " " })
+            &json!({ "provider": "embedded", "model": " " })
         ));
         assert!(!text_model_ready(&json!({})));
     }

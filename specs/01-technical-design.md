@@ -197,7 +197,7 @@ The workspace grows from 9 to 17 crates; every crate under `crates/` is headless
 | `cm-encode` | Hardware recording encoders, fragmented MP4 writer, export encoders | VideoToolbox / Media Foundation (no software encoder) |
 | `cm-media` | Decode, mux, re-mux, audio mix via pinned LGPL FFmpeg | `ffmpeg-next` (LGPL dynamic) or the FFmpeg sidecar |
 | `cm-render` | GPU compositor (preview + export), annotations, captions | `wgpu`, `tiny-skia`, `cosmic-text` |
-| `cm-ai` | Transcription, metadata generation, zoom and silence suggestions; provider trait for local and BYO-key models | `whisper-rs` (whisper.cpp built from source, needs `cmake`; Unlicense binding over MIT code), `ureq` with the system TLS stack for model downloads, HTTP client for Ollama / Anthropic / OpenAI |
+| `cm-ai` | Transcription, metadata generation, zoom and silence suggestions; provider trait for text models (the built-in engine in 0.2.0) | `whisper-rs` (whisper.cpp built from source, needs `cmake`; Unlicense binding over MIT code), `ureq` with the system TLS stack for model downloads, OpenAI-compatible HTTP client for the built-in engine's loopback helper |
 | `cm-auth` | OAuth (PKCE + loopback), token refresh, keychain storage. In progress: built and tested with fakes; no daemon wiring, no provider run | `keyring`, `ureq` (system TLS), `open`; the flow is hand-written (no `oauth2` crate) |
 | `cm-storage` | `StorageProvider` trait + local, Google Drive, OneDrive, Dropbox | `reqwest` |
 | `cm-publish` | `PublishProvider` trait + YouTube (built, first slice), TikTok, Facebook Pages | `cm-storage`'s HTTP seam (`ureq`, system TLS) |

@@ -583,7 +583,7 @@ pub fn on_event(app: &Entity<AppModel>, ev: &cm_daemon::events::Event, cx: &mut 
         "model.changed" => {
             if str_of("kind").as_deref() == Some("text") {
                 crate::ui::ai_voice::refresh_text_models(app, cx);
-                crate::ui::ai_voice::refresh_text_model(app, false, cx);
+                crate::ui::ai_voice::refresh_text_model(app, cx);
             } else {
                 refresh(app, cx);
             }
@@ -676,7 +676,7 @@ pub fn on_event(app: &Entity<AppModel>, ev: &cm_daemon::events::Event, cx: &mut 
                 // A finished download turns into an installed model.
                 refresh(app, cx);
                 crate::ui::ai_voice::refresh_text_models(app, cx);
-                crate::ui::ai_voice::refresh_text_model(app, false, cx);
+                crate::ui::ai_voice::refresh_text_model(app, cx);
             }
         }
         "job.failed" => {

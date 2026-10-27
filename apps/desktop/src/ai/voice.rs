@@ -1,16 +1,13 @@
 //! The voice part of the AI page, display-free (board V8, AI-7, AI-8): the speaker-label
-//! settings, the text-model provider section, the "Recommended for your Mac" table and this
-//! Mac's memory.
+//! settings, the text-model provider section and this Mac's memory.
 //!
-//! Local text models only for now (maintainer decision Oct 26, 2026): None, Built in (the text
-//! engine CaptureMann ships, Oct 27, 2026) or Ollama or LM Studio.
+//! The built-in text model only (maintainer decision Oct 27, 2026): None or Built in (the text
+//! engine CaptureMann ships).
 //! Nothing here touches the network or the screen by itself. Every change returns
 //! the settings to write (`Vec<(key, value)>`), which `ui::ai` sends through the same app-only
 //! path as `ai.glossary`; an agent cannot write them (`ai.*` is app-only).
 
-use cm_ai::text_model::{
-    Provider, KEY_BASE_URL, KEY_CONTEXT_TOKENS, KEY_MODEL, KEY_PROVIDER, LM_STUDIO_URL, OLLAMA_URL,
-};
+use cm_ai::text_model::{Provider, KEY_PROVIDER};
 use cm_i18n::{fmt, tr, tr_ctx};
 use serde_json::{json, Map, Value};
 
@@ -195,38 +192,28 @@ fn display_name_of(v: Option<&Value>) -> String {
 
 // ---- the text model (AI-7) ---------------------------------------------------------------------
 
-/// The segmented control: None / Built in / Ollama or LM Studio (Remote and Anthropic are
-/// deferred).
+/// The segmented control: None / Built in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ProviderChoice {
     #[default]
     None,
     /// The engine inside CaptureMann (provider `embedded`).
     BuiltIn,
-    /// A server on this Mac: Ollama or LM Studio (provider `local`).
-    OnThisMac,
 }
 
 impl ProviderChoice {
-    pub const ALL: [ProviderChoice; 3] = [
-        ProviderChoice::None,
-        ProviderChoice::BuiltIn,
-        ProviderChoice::OnThisMac,
-    ];
+    pub const ALL: [ProviderChoice; 2] = [ProviderChoice::None, ProviderChoice::BuiltIn];
 
     pub fn provider(self) -> Provider {
         match self {
             ProviderChoice::None => Provider::None,
             ProviderChoice::BuiltIn => Provider::Embedded,
-            ProviderChoice::OnThisMac => Provider::Local,
         }
     }
 
-    /// A remote provider (a hand-edited file) shows as None: this page offers no remote option
-    /// and choosing a local one replaces it.
+    /// Any other provider (a hand-edited file) shows as None: the daemon treats it as none too.
     pub fn from_provider(p: Provider) -> ProviderChoice {
         match p {
-            Provider::Local => ProviderChoice::OnThisMac,
             Provider::Embedded => ProviderChoice::BuiltIn,
             _ => ProviderChoice::None,
         }
@@ -236,7 +223,6 @@ impl ProviderChoice {
         match self {
             ProviderChoice::None => tr_ctx!("text model provider", "None"),
             ProviderChoice::BuiltIn => tr_ctx!("text model provider", "Built in"),
-            ProviderChoice::OnThisMac => tr_ctx!("text model provider", "Ollama or LM Studio"),
         }
     }
 }
@@ -301,75 +287,6 @@ impl EngineLine {
     }
 }
 
-/// A model a server lists.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ServerModel {
-    pub id: String,
-    pub context_tokens: Option<u64>,
-}
-
-/// A detected preset server (`cm_ai::text_model::detect_presets`, loopback only).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PresetVm {
-    /// `ollama` or `lm_studio`.
-    pub preset: String,
-    pub base_url: String,
-    pub running: bool,
-    pub models: Vec<ServerModel>,
-}
-
-impl PresetVm {
-    pub fn name(&self) -> String {
-        match self.preset.as_str() {
-            "ollama" => "Ollama".to_owned(),
-            "lm_studio" => "LM Studio".to_owned(),
-            other => other.to_owned(),
-        }
-    }
-
-    /// `127.0.0.1:11434`.
-    pub fn address(&self) -> String {
-        self.base_url
-            .split_once("://")
-            .map_or(self.base_url.as_str(), |(_, r)| r)
-            .split('/')
-            .next()
-            .unwrap_or("")
-            .to_owned()
-    }
-}
-
-impl From<&cm_ai::text_model::PresetStatus> for PresetVm {
-    fn from(p: &cm_ai::text_model::PresetStatus) -> Self {
-        PresetVm {
-            preset: p.preset.to_owned(),
-            base_url: p.base_url.to_owned(),
-            running: p.running,
-            models: p
-                .models
-                .iter()
-                .map(|m| ServerModel {
-                    id: m.id.clone(),
-                    context_tokens: m.context_tokens,
-                })
-                .collect(),
-        }
-    }
-}
-
-/// The two presets as "not looked at yet" (shown as Not running until the check answers).
-pub fn default_presets() -> Vec<PresetVm> {
-    [("ollama", OLLAMA_URL), ("lm_studio", LM_STUDIO_URL)]
-        .into_iter()
-        .map(|(p, u)| PresetVm {
-            preset: p.to_owned(),
-            base_url: u.to_owned(),
-            running: false,
-            models: Vec::new(),
-        })
-        .collect()
-}
-
 /// The last Test.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum TestState {
@@ -399,16 +316,11 @@ pub struct TextVm {
     /// `get_text_model` has answered at least once.
     pub loaded: bool,
     pub provider: ProviderChoice,
-    pub base_url: String,
     pub model: String,
     pub context_tokens: u32,
     pub host: Option<String>,
     /// The built-in engine's state (`get_text_model.engine`).
     pub engine: EngineLine,
-    pub presets: Vec<PresetVm>,
-    pub detecting: bool,
-    /// The model list below the picker is open.
-    pub picker_open: bool,
     pub test: TestState,
     /// The last error of a settings write or a keychain write, worded.
     pub error: Option<String>,
@@ -419,14 +331,10 @@ impl Default for TextVm {
         TextVm {
             loaded: false,
             provider: ProviderChoice::None,
-            base_url: String::new(),
             model: String::new(),
             context_tokens: cm_ai::text_model::DEFAULT_CONTEXT_TOKENS,
             host: None,
             engine: EngineLine::Stopped,
-            presets: default_presets(),
-            detecting: false,
-            picker_open: false,
             test: TestState::Idle,
             error: None,
         }
@@ -441,12 +349,10 @@ impl TextVm {
     pub fn set_from_daemon(&mut self, v: &Value) {
         let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_owned();
         let provider = Provider::parse(&s("provider")).unwrap_or(Provider::None);
-        let changed = self.provider != ProviderChoice::from_provider(provider)
-            || self.model != s("model")
-            || self.base_url != s("base_url");
+        let changed =
+            self.provider != ProviderChoice::from_provider(provider) || self.model != s("model");
         self.provider = ProviderChoice::from_provider(provider);
         self.model = s("model");
-        self.base_url = s("base_url");
         self.host = v
             .get("host")
             .and_then(Value::as_str)
@@ -469,124 +375,21 @@ impl TextVm {
         self.provider != ProviderChoice::None && !self.model.trim().is_empty()
     }
 
-    pub fn set_presets(&mut self, presets: Vec<PresetVm>) {
-        self.presets = presets;
-        self.detecting = false;
-    }
-
-    /// The preset whose address is the current base URL.
-    pub fn current_preset(&self) -> Option<&PresetVm> {
-        self.presets
-            .iter()
-            .find(|p| same_url(&p.base_url, &self.base_url))
-    }
-
-    /// The models offered by the selected server.
-    pub fn server_models(&self) -> Vec<ServerModel> {
-        self.current_preset()
-            .map(|p| p.models.clone())
-            .unwrap_or_default()
-    }
-
-    /// The context window the picker shows for the chosen model.
-    pub fn model_context(&self) -> Option<u64> {
-        self.server_models()
-            .iter()
-            .find(|m| m.id == self.model)
-            .and_then(|m| m.context_tokens)
-    }
-
-    /// A press on the segmented control: the settings to write. Switching clears the model (a
-    /// model of another server does not exist on this one) and the Test result. On this Mac
-    /// points at the running server (Ollama when none answers) unless the address is already a
-    /// loopback one.
+    /// A press on the segmented control: the settings to write. Choosing Built in clears the
+    /// shown model (the daemon names the downloaded one) and the Test result.
     pub fn choose_provider(&mut self, c: ProviderChoice) -> Writes {
         if c == self.provider {
             return Vec::new();
         }
-        let mut w: Writes = vec![(KEY_PROVIDER, json!(c.provider().as_str()))];
+        let w: Writes = vec![(KEY_PROVIDER, json!(c.provider().as_str()))];
         if c == ProviderChoice::BuiltIn {
-            // The built-in model is picked in its list, not here; the address of another
-            // server plays no part.
-            self.model.clear();
-        }
-        if c == ProviderChoice::OnThisMac {
-            let keep = cm_ai::text_model::url_host(&self.base_url)
-                .is_some_and(|h| cm_ai::text_model::is_loopback_host(&h));
-            if !keep {
-                let b = self
-                    .presets
-                    .iter()
-                    .find(|p| p.running)
-                    .map_or(OLLAMA_URL, |p| p.base_url.as_str())
-                    .to_owned();
-                w.push((KEY_BASE_URL, json!(b)));
-                self.base_url = b;
-            }
-            w.push((KEY_MODEL, json!("")));
+            // The built-in model is picked in its list, not here.
             self.model.clear();
         }
         self.provider = c;
         self.test = TestState::Idle;
-        self.picker_open = false;
         self.error = None;
         w
-    }
-
-    /// A press on a server row (Ollama or LM Studio).
-    pub fn choose_preset(&mut self, preset: &str) -> Writes {
-        let Some(p) = self.presets.iter().find(|p| p.preset == preset).cloned() else {
-            return Vec::new();
-        };
-        if same_url(&p.base_url, &self.base_url) {
-            return Vec::new();
-        }
-        self.base_url = p.base_url.clone();
-        self.model.clear();
-        self.test = TestState::Idle;
-        vec![(KEY_BASE_URL, json!(p.base_url)), (KEY_MODEL, json!(""))]
-    }
-
-    /// A press on a model of the picker (the context window is saved when the server told it).
-    pub fn choose_model(&mut self, id: &str) -> Writes {
-        let ctx = self
-            .server_models()
-            .iter()
-            .find(|m| m.id == id)
-            .and_then(|m| m.context_tokens);
-        self.model = id.to_owned();
-        self.picker_open = false;
-        self.test = TestState::Idle;
-        let mut w: Writes = vec![(KEY_MODEL, json!(id))];
-        if let Some(n) = ctx.filter(|n| (512..=4_000_000).contains(n)) {
-            self.context_tokens = n as u32;
-            w.push((KEY_CONTEXT_TOKENS, json!(n)));
-        }
-        w
-    }
-
-    /// A model typed in the Remote or Anthropic box.
-    pub fn set_typed_model(&mut self, text: &str) -> Writes {
-        let m = text.trim();
-        self.model = m.to_owned();
-        self.test = TestState::Idle;
-        vec![(KEY_MODEL, json!(m))]
-    }
-
-    /// A custom address typed in the box: only addresses on this Mac are accepted (127.0.0.1,
-    /// ::1 or localhost); the daemon refuses any other host as well.
-    pub fn set_typed_url(&mut self, text: &str) -> Result<Writes, String> {
-        let url = text.trim();
-        let host = cm_ai::text_model::url_host(url)
-            .filter(|h| cm_ai::text_model::is_loopback_host(h))
-            .ok_or_else(|| {
-                tr!("Only addresses on this Mac work here, like http://127.0.0.1:1234/v1.")
-            })?;
-        self.base_url = url.to_owned();
-        self.host = Some(host);
-        self.model.clear();
-        self.test = TestState::Idle;
-        Ok(vec![(KEY_BASE_URL, json!(url)), (KEY_MODEL, json!(""))])
     }
 
     /// Pressing Test: what has to happen first.
@@ -595,11 +398,7 @@ impl TextVm {
             return TestGate::Blocked(tr!("Choose a text model provider first."));
         }
         if self.model.is_empty() {
-            return TestGate::Blocked(if self.provider == ProviderChoice::BuiltIn {
-                tr!("Download a built-in model first.")
-            } else {
-                tr!("Choose a model first.")
-            });
+            return TestGate::Blocked(tr!("Download a built-in model first."));
         }
         self.test = TestState::Running;
         TestGate::Run
@@ -656,127 +455,6 @@ impl TextVm {
             }
         }
     }
-
-    /// "Model · 4 on Ollama".
-    pub fn picker_caption(&self) -> String {
-        match self.current_preset() {
-            Some(p) if p.running => tr!(
-                "Model \u{00b7} {count} on {server}",
-                count = p.models.len(),
-                server = p.name()
-            ),
-            _ => tr!("Model"),
-        }
-    }
-
-    /// `262K context`, from the server's answer or the setting.
-    pub fn context_label(tokens: u64) -> String {
-        if tokens >= 1_000_000 {
-            tr!(
-                "{count}M context",
-                count = fmt::decimal(tokens as f64 / 1_000_000.0, 1)
-            )
-        } else if tokens >= 1000 {
-            tr!("{count}K context", count = tokens / 1000)
-        } else {
-            tr!("{count} context", count = tokens)
-        }
-    }
-}
-
-fn same_url(a: &str, b: &str) -> bool {
-    a.trim_end_matches('/') == b.trim_end_matches('/')
-}
-
-// ---- recommended models ------------------------------------------------------------------------
-
-/// One row of "Recommended for your Mac" (the plan's table, Oct 16, 2026 figures; licences are
-/// Apache-2.0 or MIT only).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Recommendation {
-    pub id: &'static str,
-    pub name: &'static str,
-    pub licence: &'static str,
-    /// The memory tier is `min_gb..=max_gb` of installed memory.
-    pub min_gb: u32,
-    pub max_gb: u32,
-    /// The default candidate (S8 decides).
-    pub candidate: bool,
-}
-
-pub const RECOMMENDED: [Recommendation; 4] = [
-    Recommendation {
-        id: "phi-4-mini",
-        name: "Phi-4-mini-instruct",
-        licence: "MIT",
-        min_gb: 8,
-        max_gb: 15,
-        candidate: false,
-    },
-    Recommendation {
-        id: "qwen3.5-9b",
-        name: "Qwen3.5-9B",
-        licence: "Apache-2.0",
-        min_gb: 16,
-        max_gb: 31,
-        candidate: true,
-    },
-    Recommendation {
-        id: "gemma-4-12b",
-        name: "Gemma 4 12B",
-        licence: "Apache-2.0",
-        min_gb: 16,
-        max_gb: 24,
-        candidate: false,
-    },
-    Recommendation {
-        id: "qwen3.6-35b-a3b",
-        name: "Qwen3.6-35B-A3B",
-        licence: "Apache-2.0",
-        min_gb: 32,
-        max_gb: u32::MAX,
-        candidate: false,
-    },
-];
-
-impl Recommendation {
-    /// `8 GB`, `16 GB`, `16-24 GB`, `32 GB+`.
-    pub fn tier_label(&self) -> String {
-        match self.id {
-            "gemma-4-12b" => "16\u{2013}24 GB".to_owned(),
-            "qwen3.6-35b-a3b" => "32 GB+".to_owned(),
-            _ => format!("{} GB", self.min_gb),
-        }
-    }
-
-    pub fn note(&self) -> String {
-        match self.id {
-            "phi-4-mini" => tr!("Short English summaries; weak for Vietnamese and long meetings"),
-            "qwen3.5-9b" => tr!("Good default candidate \u{00b7} strong multilingual"),
-            "gemma-4-12b" => tr!("About 6.7 GB to load"),
-            _ => tr!("Highest quality, fast for its size"),
-        }
-    }
-
-    pub fn fits(&self, mem_gb: Option<u32>) -> bool {
-        mem_gb.is_some_and(|g| (self.min_gb..=self.max_gb).contains(&g))
-    }
-}
-
-/// The table's rows for a Mac with `mem_gb` of memory, with whether each fits.
-pub fn recommendations(mem_gb: Option<u32>) -> Vec<(Recommendation, bool)> {
-    RECOMMENDED.iter().map(|r| (*r, r.fits(mem_gb))).collect()
-}
-
-/// "this Mac has 24 GB · open licences only".
-pub fn recommended_caption(mem_gb: Option<u32>) -> String {
-    match mem_gb {
-        Some(g) => tr!(
-            "this Mac has {memory} GB \u{00b7} open licences only",
-            memory = g
-        ),
-        None => tr!("open licences only"),
-    }
 }
 
 // ---- the page's whole voice state --------------------------------------------------------------
@@ -787,7 +465,7 @@ pub struct VoiceVm {
     pub text: TextVm,
     /// This Mac's memory, read once.
     pub memory_bytes: Option<u64>,
-    /// The page asked for the first reads (memory, text model, servers).
+    /// The page asked for the first reads (memory, text model).
     pub requested: bool,
 }
 
@@ -808,39 +486,12 @@ impl VoiceVm {
 mod tests {
     use super::*;
 
-    fn text_with(provider: &str, base: &str, model: &str) -> TextVm {
+    fn text_with(provider: &str, model: &str) -> TextVm {
         let mut t = TextVm::default();
         t.set_from_daemon(&json!({
-            "provider": provider, "base_url": base, "model": model,
-            "host": cm_ai::text_model::url_host(base), "context_tokens": 8192,
+            "provider": provider, "model": model, "host": "127.0.0.1", "context_tokens": 8192,
         }));
         t
-    }
-
-    fn running_ollama() -> Vec<PresetVm> {
-        vec![
-            PresetVm {
-                preset: "ollama".into(),
-                base_url: OLLAMA_URL.into(),
-                running: true,
-                models: vec![
-                    ServerModel {
-                        id: "qwen3.5:9b".into(),
-                        context_tokens: Some(262_144),
-                    },
-                    ServerModel {
-                        id: "phi4-mini".into(),
-                        context_tokens: None,
-                    },
-                ],
-            },
-            PresetVm {
-                preset: "lm_studio".into(),
-                base_url: LM_STUDIO_URL.into(),
-                running: false,
-                models: vec![],
-            },
-        ]
     }
 
     #[test]
@@ -848,31 +499,6 @@ mod tests {
         assert_eq!(memory_gb(24 * 1024 * 1024 * 1024), 24);
         assert_eq!(memory_gb(17_179_869_184), 16);
         assert_eq!(memory_gb(0), 0);
-    }
-
-    #[test]
-    fn the_recommended_rows_follow_the_memory() {
-        let fits = |gb| {
-            recommendations(gb)
-                .into_iter()
-                .filter(|(_, f)| *f)
-                .map(|(r, _)| r.id)
-                .collect::<Vec<_>>()
-        };
-        assert_eq!(fits(Some(8)), ["phi-4-mini"]);
-        assert_eq!(fits(Some(16)), ["qwen3.5-9b", "gemma-4-12b"]);
-        assert_eq!(fits(Some(24)), ["qwen3.5-9b", "gemma-4-12b"]);
-        assert_eq!(fits(Some(32)), ["qwen3.6-35b-a3b"]);
-        assert!(fits(Some(4)).is_empty());
-        assert!(fits(None).is_empty());
-    }
-
-    #[test]
-    fn only_open_licences_are_recommended() {
-        assert!(RECOMMENDED
-            .iter()
-            .all(|r| r.licence == "MIT" || r.licence == "Apache-2.0"));
-        assert_eq!(RECOMMENDED.iter().filter(|r| r.candidate).count(), 1);
     }
 
     fn speaker_file(id: &str, license: &str, mb: u32, installed: bool) -> cm_ai::model::ModelInfo {
@@ -966,20 +592,6 @@ mod tests {
     }
 
     #[test]
-    fn choosing_on_this_mac_points_at_the_running_server() {
-        let mut t = TextVm::default();
-        t.set_presets(running_ollama());
-        let w = t.choose_provider(ProviderChoice::OnThisMac);
-        assert_eq!(w[0], (KEY_PROVIDER, json!("local")));
-        assert_eq!(w[1], (KEY_BASE_URL, json!(OLLAMA_URL)));
-        assert_eq!(t.provider, ProviderChoice::OnThisMac);
-        // Choosing the same segment again writes nothing.
-        assert!(t.choose_provider(ProviderChoice::OnThisMac).is_empty());
-        let w = t.choose_provider(ProviderChoice::None);
-        assert_eq!(w, vec![(KEY_PROVIDER, json!("none"))]);
-    }
-
-    #[test]
     fn built_in_is_the_embedded_provider_and_comes_back_from_the_daemon() {
         assert_eq!(ProviderChoice::BuiltIn.provider(), Provider::Embedded);
         assert_eq!(
@@ -990,8 +602,13 @@ mod tests {
         let w = t.choose_provider(ProviderChoice::BuiltIn);
         assert_eq!(w, vec![(KEY_PROVIDER, json!("embedded"))]);
         assert_eq!(t.provider, ProviderChoice::BuiltIn);
-        // It never touches the address of another server.
-        assert!(w.iter().all(|(k, _)| *k != KEY_BASE_URL));
+        // Choosing the same segment again writes nothing; None writes the provider only.
+        assert!(t.choose_provider(ProviderChoice::BuiltIn).is_empty());
+        assert_eq!(
+            t.choose_provider(ProviderChoice::None),
+            vec![(KEY_PROVIDER, json!("none"))]
+        );
+        t.choose_provider(ProviderChoice::BuiltIn);
         // Not ready until the daemon names a downloaded model.
         assert!(!t.ready());
         t.set_from_daemon(
@@ -1031,72 +648,33 @@ mod tests {
     }
 
     #[test]
-    fn only_none_built_in_and_a_local_server_are_offered() {
-        assert_eq!(ProviderChoice::ALL.len(), 3);
-        // A remote provider from a hand-edited file shows as None; choosing On this Mac
-        // replaces its address with a loopback one.
-        let mut t = text_with("anthropic", "https://api.anthropic.com", "m");
-        assert_eq!(t.provider, ProviderChoice::None);
-        let w = t.choose_provider(ProviderChoice::OnThisMac);
-        assert!(w.contains(&(KEY_BASE_URL, json!(OLLAMA_URL))));
-    }
-
-    #[test]
-    fn a_model_choice_saves_the_context_the_server_reports() {
-        let mut t = text_with("local", OLLAMA_URL, "");
-        t.set_presets(running_ollama());
-        assert_eq!(t.picker_caption(), "Model \u{00b7} 2 on Ollama");
-        let w = t.choose_model("qwen3.5:9b");
-        assert_eq!(
-            w,
-            vec![
-                (KEY_MODEL, json!("qwen3.5:9b")),
-                (KEY_CONTEXT_TOKENS, json!(262_144u64))
-            ]
-        );
-        assert_eq!(t.model_context(), Some(262_144));
-        assert_eq!(TextVm::context_label(262_144), "262K context");
-        let w = t.choose_model("phi4-mini");
-        assert_eq!(w, vec![(KEY_MODEL, json!("phi4-mini"))]);
-    }
-
-    #[test]
-    fn a_custom_address_must_be_on_this_mac() {
-        let mut t = TextVm::default();
-        assert!(t.set_typed_url("https://api.example.com/v1").is_err());
-        assert!(t.set_typed_url("http://192.168.1.20:11434/v1").is_err());
-        assert!(t.set_typed_url("").is_err());
-        assert!(t.set_typed_url("api.example.com").is_err());
-        assert!(t.base_url.is_empty(), "a refused address changes nothing");
-        let w = t.set_typed_url(" http://localhost:8080/v1 ").unwrap();
-        assert_eq!(
-            w,
-            vec![
-                (KEY_BASE_URL, json!("http://localhost:8080/v1")),
-                (KEY_MODEL, json!(""))
-            ]
-        );
-        assert_eq!(t.host.as_deref(), Some("localhost"));
+    fn only_none_and_built_in_are_offered() {
+        assert_eq!(ProviderChoice::ALL.len(), 2);
+        // Any other provider from a hand-edited file shows as None.
+        for p in ["local", "openai_compatible", "anthropic"] {
+            assert_eq!(text_with(p, "m").provider, ProviderChoice::None, "{p}");
+        }
+        assert_eq!(text_with("embedded", "m").provider, ProviderChoice::BuiltIn);
     }
 
     #[test]
     fn test_is_blocked_until_the_setup_is_complete() {
         let mut t = TextVm::default();
         assert!(matches!(t.begin_test(), TestGate::Blocked(_)));
-        let mut t = text_with("local", OLLAMA_URL, "");
+        let mut t = text_with("embedded", "");
         assert!(matches!(t.begin_test(), TestGate::Blocked(_)));
-        let mut t = text_with("local", OLLAMA_URL, "phi4-mini");
+        let mut t = text_with("embedded", "text-8gb");
         assert_eq!(t.begin_test(), TestGate::Run);
         assert_eq!(t.test, TestState::Running);
     }
 
     #[test]
     fn the_test_result_says_time_structure_and_loopback() {
-        let mut t = text_with("local", OLLAMA_URL, "phi4-mini");
+        let mut t = text_with("embedded", "text-8gb");
         assert!(t.test_lines().is_none());
         t.begin_test();
         t.test_answer(Ok(
-            json!({"ok": true, "latency_ms": 1400, "model": "phi4-mini", "structured_output": true}),
+            json!({"ok": true, "latency_ms": 1400, "model": "text-8gb", "structured_output": true}),
         ));
         let (head, detail) = t.test_lines().unwrap();
         assert_eq!(head, "Replied in 1.4 s");
@@ -1105,11 +683,11 @@ mod tests {
             "Structured output works \u{00b7} only talks to 127.0.0.1"
         );
         t.test_answer(Ok(
-            json!({"ok": false, "reason": "text_model_unreachable", "message": "Start Ollama or LM Studio, or choose another provider"}),
+            json!({"ok": false, "reason": "text_model_unreachable", "message": "Open the AI page and check the built-in text model"}),
         ));
         assert_eq!(
             t.test_lines().unwrap().1,
-            "Start Ollama or LM Studio, or choose another provider"
+            "Open the AI page and check the built-in text model"
         );
         t.test_answer(Err("No text model".into()));
         assert!(matches!(t.test, TestState::Failed(_)));
@@ -1117,19 +695,11 @@ mod tests {
 
     #[test]
     fn changed_settings_clear_the_old_test_result() {
-        let mut t = text_with("local", OLLAMA_URL, "a");
+        let mut t = text_with("embedded", "a");
         t.test_answer(Ok(json!({"ok": true, "latency_ms": 10})));
-        t.set_from_daemon(&json!({"provider": "local", "base_url": OLLAMA_URL, "model": "a"}));
+        t.set_from_daemon(&json!({"provider": "embedded", "model": "a"}));
         assert!(matches!(t.test, TestState::Passed { .. }));
-        t.set_from_daemon(&json!({"provider": "local", "base_url": OLLAMA_URL, "model": "b"}));
+        t.set_from_daemon(&json!({"provider": "embedded", "model": "b"}));
         assert_eq!(t.test, TestState::Idle);
-    }
-
-    #[test]
-    fn presets_show_their_loopback_address() {
-        let p = &default_presets()[0];
-        assert_eq!(p.name(), "Ollama");
-        assert_eq!(p.address(), "127.0.0.1:11434");
-        assert_eq!(default_presets()[1].address(), "127.0.0.1:1234");
     }
 }

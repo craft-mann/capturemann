@@ -1,7 +1,7 @@
 # The text engine that ships inside CaptureMann
 
 `make llama` (`packaging/llama/build-macos.sh`) builds `llama-server` from llama.cpp (MIT) so that
-the built-in text model (AI-7, provider `embedded`) needs no Ollama or LM Studio. `make bundle`
+the built-in text model (AI-7, provider `embedded`) needs no other program. `make bundle`
 copies it into `CaptureMann.app/Contents/MacOS`, signs it with the app's identity and puts its
 licence files and build record in `Contents/Resources/Llama/`.
 

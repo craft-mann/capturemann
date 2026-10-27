@@ -177,11 +177,11 @@ async fn text_model_show(cx: &mut Ctx<'_>) -> Result<(), CliError> {
     let r = c.call("get_text_model", json!({})).await?;
     cx.emit(&r, |r| {
         if r["provider"] == json!("none") {
-            return "No text model is set up. Choose the built-in model, Ollama or LM Studio on the AI page of the app.\n"
+            return "No text model is set up. Download the built-in model on the AI page of the app.\n"
                 .to_owned();
         }
         format!(
-            "Text model: {} ({}), model {}\n  address {}\n  context {} tokens, timeout {} s, structured output {}\n",
+            "Text model: {} ({}), model {}\n  context {} tokens, timeout {} s, structured output {}\n",
             plain(&r["provider"]),
             if r["local"] == json!(true) {
                 "on this computer"
@@ -189,7 +189,6 @@ async fn text_model_show(cx: &mut Ctx<'_>) -> Result<(), CliError> {
                 "remote: text is sent to the host"
             },
             plain(&r["model"]),
-            plain(&r["base_url"]),
             plain(&r["context_tokens"]),
             plain(&r["timeout_s"]),
             match &r["structured_output"] {

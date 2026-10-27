@@ -235,7 +235,7 @@ pub(super) fn report_note_of(reason: &str, message: &str) -> ReportNote {
         ReportNote::NoTextModel
     } else if reason == "engine_missing" {
         ReportNote::Failed(tr!(
-            "The built-in text engine is not part of this copy of CaptureMann. Choose Ollama or LM Studio on the AI page, or use a build that includes the engine."
+            "The built-in text engine is not part of this copy of CaptureMann. Reinstall CaptureMann, or use a build that includes the engine."
         ))
     } else {
         ReportNote::Failed(message.to_owned())
@@ -277,7 +277,7 @@ impl RecordingEditor {
         if needs_text && !self.vp.text_asked {
             self.vp.text_asked = true;
             if !self.app.read(cx).ai.voice.text.loaded {
-                crate::ui::ai_voice::refresh_text_model(&self.app, false, cx);
+                crate::ui::ai_voice::refresh_text_model(&self.app, cx);
             }
         }
     }

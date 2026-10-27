@@ -6,9 +6,7 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use cm_ai::text_model::{
-    build, list_models, test_model, ErrorKind, JsonRequest, Provider, TextModelConfig,
-};
+use cm_ai::text_model::{build, test_model, ErrorKind, JsonRequest, Provider, TextModelConfig};
 use serde_json::{json, Value};
 
 #[derive(Clone, Debug)]
@@ -192,7 +190,7 @@ fn nothing_listening_is_unreachable_with_the_hint() {
     assert_eq!(e.reason(), "text_model_unreachable");
     assert!(e
         .message
-        .contains("Start Ollama or LM Studio, or choose another provider"));
+        .contains("Open the AI page and check the built-in text model"));
 }
 
 #[test]
@@ -241,22 +239,6 @@ fn a_server_without_json_schema_support_gets_one_plain_retry() {
 }
 
 #[test]
-fn lists_models_with_the_context_size_when_reported() {
-    let s = serve(|_, _| {
-        (
-            200,
-            json!({ "data": [{ "id": "qwen3:8b" }, { "id": "gemma", "max_context_length": 32768 }] })
-                .to_string(),
-        )
-    });
-    let models = list_models(&config(s.port, Provider::Local), None).unwrap();
-    assert_eq!(models.len(), 2);
-    assert_eq!(models[0].id, "qwen3:8b");
-    assert_eq!(models[1].context_tokens, Some(32768));
-    assert_eq!(s.seen.lock().unwrap()[0].path, "/v1/models");
-}
-
-#[test]
 fn provider_none_makes_no_call_and_a_lan_local_provider_is_refused() {
     let s = serve(|_, _| (200, chat("{\"title\": \"x\"}")));
     let mut none = config(s.port, Provider::None);
@@ -271,7 +253,6 @@ fn provider_none_makes_no_call_and_a_lan_local_provider_is_refused() {
     assert!(!lan.is_local());
     let e = build(&lan, None).complete_json(&request()).unwrap_err();
     assert_eq!(e.kind, ErrorKind::InvalidInput);
-    assert!(list_models(&lan, None).is_err());
     assert!(
         s.seen.lock().unwrap().is_empty(),
         "nothing reached the server"
@@ -414,11 +395,11 @@ fn embedded_retries_once_when_the_helper_died_and_gives_up_clearly() {
     assert_eq!(r.value["title"], "Back");
     assert_eq!(e.counts(), (2, 2));
 
-    // Dead both times: engine_failed, not the Ollama hint.
+    // Dead both times: engine_failed, not the unreachable hint.
     let e = FakeEngine::new(vec![format!("http://127.0.0.1:{dead_port}/v1")]);
     let err = embedded(e).complete_json(&request()).unwrap_err();
     assert_eq!(err.reason(), "engine_failed");
-    assert!(!err.message.contains("Ollama"), "{err}");
+    assert!(!err.message.contains("AI page and check"), "{err}");
 }
 
 #[test]

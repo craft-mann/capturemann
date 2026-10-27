@@ -391,8 +391,8 @@ fn cases() -> Vec<Case> {
     v.push(
         Case::new(
             "AI text model provider segment",
-            "(440 - 32 - 6 - 2) / 3 - 2*14 padding",
-            (440. - 32. - 6. - 2.) / 3. - 28.,
+            "(440 - 32 - 6 - 2) / 2 - 2*14 padding",
+            (440. - 32. - 6. - 2.) / 2. - 28.,
             ui,
             500,
             one,
@@ -400,21 +400,6 @@ fn cases() -> Vec<Case> {
         .text("None", || crate::ai::voice::ProviderChoice::None.label())
         .text("Built in", || {
             crate::ai::voice::ProviderChoice::BuiltIn.label()
-        }),
-    );
-    // The third segment keeps what the two short ones leave: the segments are as wide as their
-    // labels (nowrap), so it gets the control less 3 paddings and 2 short labels of up to 62 px.
-    v.push(
-        Case::new(
-            "AI text model provider segment (Ollama or LM Studio)",
-            "(440 - 32 - 6 - 2) - 3*28 padding - 2*62 for the short labels",
-            (440. - 32. - 6. - 2.) - 3. * 28. - 2. * 62.,
-            ui,
-            500,
-            one,
-        )
-        .text("Ollama or LM Studio", || {
-            crate::ai::voice::ProviderChoice::OnThisMac.label()
         }),
     );
     v.push(

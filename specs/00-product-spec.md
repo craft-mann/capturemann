@@ -122,7 +122,7 @@ P0 items block the v0.1 release; P1 items ship in v0.1 unless they threaten the 
 | AI-4 | Silence and filler-word removal suggestions | P1 | Yes |
 | AI-5 | Transcript and caption translation: Whisper to English, the text model to any language (raised to P1 on Oct 26, 2026, next release) | P1 | Yes |
 | AI-6 | Transcript editor: correct words, names and grammar | P1 | Yes |
-| AI-7 | Text model provider: a local OpenAI-compatible server (Ollama, LM Studio) or a remote provider with the user's key | P1 | Read-only |
+| AI-7 | Text model provider: the engine built into CaptureMann (0.2.0); a user-chosen local server and a provider with the user's key are backlog (*later*) | P1 | Read-only |
 | AI-8 | Speaker labels from voices (diarization), rename and merge speakers | P1 | Yes |
 | AI-9 | Reports from a recording: summary, meeting minutes, 1:1, interview, product presentation and lecture notes, each item cited with a time | P1 | Yes |
 | **Voice and meetings** (added Oct 26, 2026; next release) |  |  |  |

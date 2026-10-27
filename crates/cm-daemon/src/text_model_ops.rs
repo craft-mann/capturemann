@@ -101,18 +101,6 @@ fn fingerprint(c: &TextModelConfig) -> String {
     )
 }
 
-/// The URL without any `user:password@` part.
-fn display_url(url: &str) -> String {
-    match url.split_once("://") {
-        Some((scheme, rest)) => {
-            let (authority, tail) = rest.split_at(rest.find(['/', '?', '#']).unwrap_or(rest.len()));
-            let host = authority.rsplit('@').next().unwrap_or(authority);
-            format!("{scheme}://{host}{tail}")
-        }
-        None => String::new(),
-    }
-}
-
 /// A setup problem (no provider, bad address) as the shared `invalid_input` error with the
 /// `data.reason` clients branch on.
 pub fn setup_error(e: TextModelError) -> DaemonError {
@@ -265,7 +253,6 @@ impl Inner {
             "engine": self.ai.text_engine.status(),
             "local": c.is_local(),
             "host": c.host(),
-            "base_url": display_url(&c.effective_base_url()),
             "context_tokens": c.context_tokens,
             "timeout_s": c.timeout_s,
             "structured_output": structured,
@@ -352,22 +339,4 @@ impl crate::daemon::Daemon {
 /// Whether `e` is the error of provider `none`.
 pub fn is_no_text_model(e: &TextModelError) -> bool {
     e.kind == ErrorKind::NoTextModel
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn urls_are_shown_without_credentials() {
-        assert_eq!(
-            display_url("https://me:pw@host.example/v1"),
-            "https://host.example/v1"
-        );
-        assert_eq!(
-            display_url("http://127.0.0.1:11434/v1"),
-            "http://127.0.0.1:11434/v1"
-        );
-        assert_eq!(display_url(""), "");
-    }
 }

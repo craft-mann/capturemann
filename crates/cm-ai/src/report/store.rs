@@ -40,7 +40,7 @@ pub struct Report {
     pub template_version: u32,
     /// The text model that wrote it.
     pub model: String,
-    /// `local`, `openai_compatible` or `anthropic`.
+    /// `embedded` (older reports may say `local`).
     pub provider: String,
     /// RFC 3339.
     pub created: String,

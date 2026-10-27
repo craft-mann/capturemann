@@ -1,5 +1,5 @@
-//! The HTTP providers of AI-7: OpenAI-compatible servers (Ollama, LM Studio, remote) and
-//! Anthropic. Blocking, on `ureq` with the system TLS stack like the rest of the workspace.
+//! The HTTP providers of AI-7: the OpenAI-compatible client (used over loopback for the built-in
+//! engine's helper; the remote paths are dormant) and Anthropic (dormant). Blocking, on `ureq` with the system TLS stack like the rest of the workspace.
 //!
 //! Safety rules enforced here, not by the callers:
 //! * every request starts with [`TextModelConfig::check_endpoint`] (a `local` provider only talks
@@ -11,14 +11,13 @@
 use std::io::Read as _;
 use std::time::Duration;
 
-use serde::Serialize;
 use serde_json::{json, Value};
 use ureq::tls::{RootCerts, TlsConfig, TlsProvider};
 
 use super::schema::validate;
 use super::{
     ErrorKind, JsonReply, JsonRequest, Message, Provider, TextModel, TextModelConfig,
-    TextModelError, LM_STUDIO_URL, OLLAMA_URL, UNREACHABLE_HINT,
+    TextModelError, UNREACHABLE_HINT,
 };
 
 const ANTHROPIC_VERSION: &str = "2023-06-01";
@@ -120,15 +119,6 @@ pub(super) fn probe_health(port: u16) -> super::engine::Health {
         Ok(r) if r.status == 503 => Health::Loading,
         _ => Health::Down,
     }
-}
-
-/// A model the server offers.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ModelEntry {
-    pub id: String,
-    /// The context window, when the server reports it.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub context_tokens: Option<u64>,
 }
 
 /// The `ai.text` provider over HTTP.
@@ -271,12 +261,6 @@ impl HttpTextModel {
             "response_format": { "type": "json_schema", "json_schema": {
                 "name": req.schema_name, "strict": true, "schema": req.schema } },
         });
-        // Ollama's own structured-output field (its OpenAI endpoint also reads response_format).
-        if self.config.effective_base_url() == OLLAMA_URL
-            || self.config.effective_base_url().contains(":11434")
-        {
-            body["format"] = req.schema.clone();
-        }
         let headers = self.headers();
         let mut reply = post(&url, &headers, &body, self.timeout()).map_err(|f| self.fail(f))?;
         // A server that knows only `json_object` (or nothing) refuses `json_schema`: the schema
@@ -286,7 +270,6 @@ impl HttpTextModel {
         {
             if let Some(o) = body.as_object_mut() {
                 o.remove("response_format");
-                o.remove("format");
             }
             reply = post(&url, &headers, &body, self.timeout()).map_err(|f| self.fail(f))?;
         }
@@ -295,7 +278,7 @@ impl HttpTextModel {
         }
         let v: Value = serde_json::from_str(&reply.body).map_err(|_| TextModelError {
             kind: ErrorKind::Server,
-            message: "The text model server sent a reply that is not JSON. Is the address an OpenAI-compatible /v1 URL?"
+            message: "The text model server sent a reply that is not JSON. Is it an OpenAI-compatible /v1 server?"
                 .to_owned(),
         })?;
         v["choices"][0]["message"]["content"]
@@ -414,89 +397,6 @@ impl TextModel for HttpTextModel {
     }
 }
 
-fn parse_models(body: &str) -> Vec<ModelEntry> {
-    let Ok(v) = serde_json::from_str::<Value>(body) else {
-        return Vec::new();
-    };
-    let list = v["data"].as_array().or_else(|| v["models"].as_array());
-    list.map(|items| {
-        items
-            .iter()
-            .filter_map(|m| {
-                let id = m["id"].as_str().or_else(|| m["name"].as_str())?.to_owned();
-                let ctx = [
-                    "context_length",
-                    "max_context_length",
-                    "context_window",
-                    "n_ctx",
-                ]
-                .iter()
-                .find_map(|k| m[*k].as_u64())
-                .or_else(|| m["meta"]["n_ctx_train"].as_u64());
-                Some(ModelEntry {
-                    id,
-                    context_tokens: ctx,
-                })
-            })
-            .collect()
-    })
-    .unwrap_or_default()
-}
-
-/// `GET {base_url}/models`: the models the server offers (and their context size when it says).
-pub fn list_models(
-    config: &TextModelConfig,
-    key: Option<String>,
-) -> Result<Vec<ModelEntry>, TextModelError> {
-    config.check_endpoint()?;
-    let m = HttpTextModel::new(config.clone(), key);
-    let base = config.effective_base_url();
-    let url = if config.provider == Provider::Anthropic {
-        format!("{base}/v1/models")
-    } else {
-        format!("{base}/models")
-    };
-    let timeout = m.timeout().min(Duration::from_secs(10));
-    let reply = get(&url, &m.headers(), timeout).map_err(|f| m.fail(f))?;
-    if !(200..300).contains(&reply.status) {
-        return Err(m.server_error(&reply));
-    }
-    Ok(parse_models(&reply.body))
-}
-
-/// A preset server and whether it answers.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct PresetStatus {
-    /// `ollama` or `lm_studio`.
-    pub preset: &'static str,
-    pub base_url: &'static str,
-    pub running: bool,
-    pub models: Vec<ModelEntry>,
-}
-
-/// Looks for Ollama and LM Studio on this machine (loopback only, 2 s each). The AI page uses it
-/// to list their models (AI-7.AC1).
-pub fn detect_presets() -> Vec<PresetStatus> {
-    [("ollama", OLLAMA_URL), ("lm_studio", LM_STUDIO_URL)]
-        .into_iter()
-        .map(|(preset, base_url)| {
-            let cfg = TextModelConfig {
-                provider: Provider::Local,
-                base_url: base_url.to_owned(),
-                timeout_s: 2,
-                ..TextModelConfig::default()
-            };
-            let models = list_models(&cfg, None);
-            PresetStatus {
-                preset,
-                base_url,
-                running: models.is_ok(),
-                models: models.unwrap_or_default(),
-            }
-        })
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -513,17 +413,5 @@ mod tests {
             json!({"a": 3})
         );
         assert!(extract_json("no json").is_err());
-    }
-
-    #[test]
-    fn parses_model_lists() {
-        let m = parse_models(
-            r#"{"data":[{"id":"qwen3:8b"},{"id":"llama","max_context_length":32768}]}"#,
-        );
-        assert_eq!(m[0].id, "qwen3:8b");
-        assert_eq!(m[0].context_tokens, None);
-        assert_eq!(m[1].context_tokens, Some(32768));
-        assert_eq!(parse_models(r#"{"models":[{"name":"x"}]}"#)[0].id, "x");
-        assert!(parse_models("garbage").is_empty());
     }
 }

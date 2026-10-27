@@ -119,9 +119,6 @@ msgstr ""
 msgid "APIs & Services → OAuth consent screen: choose External, give the app a name, and add your own Google address as a test user. Add the YouTube scopes “youtube.upload” and “youtube” if the console asks which ones the app uses."
 msgstr ""
 
-msgid "About 6.7 GB to load"
-msgstr ""
-
 msgid "About {gb} GB per hour"
 msgstr ""
 
@@ -376,9 +373,6 @@ msgid "Another app owns the socket"
 msgstr ""
 
 msgid "Another copy ({name}) is running and uses the same library and settings. Quit it from its menu bar icon, then open this one."
-msgstr ""
-
-msgid "Another server on this Mac (address)"
 msgstr ""
 
 msgid "Another speaker already has that name."
@@ -803,13 +797,7 @@ msgstr ""
 msgid "Choose a folder…"
 msgstr ""
 
-msgid "Choose a model"
-msgstr ""
-
 msgid "Choose a model file"
-msgstr ""
-
-msgid "Choose a model first."
 msgstr ""
 
 msgid "Choose a region"
@@ -1847,9 +1835,6 @@ msgstr ""
 msgid "Glossary term"
 msgstr ""
 
-msgid "Good default candidate · strong multilingual"
-msgstr ""
-
 msgid "Google Drive"
 msgstr ""
 
@@ -1884,9 +1869,6 @@ msgid "Hide when idle"
 msgstr ""
 
 msgid "Higher quality makes bigger files."
-msgstr ""
-
-msgid "Highest quality, fast for its size"
 msgstr ""
 
 msgid "Hold a modifier key (Control, Option or Shift, Command or Windows) too."
@@ -2356,16 +2338,7 @@ msgstr ""
 msgid "Model for this run"
 msgstr ""
 
-msgid "Model name"
-msgstr ""
-
-msgid "Model · {count} on {server}"
-msgstr ""
-
 msgid "Models are not available"
-msgstr ""
-
-msgid "Models on this server"
 msgstr ""
 
 msgid "More"
@@ -2529,7 +2502,7 @@ msgstr ""
 msgid "No audio recordings yet"
 msgstr ""
 
-msgid "No built-in model is available in this version yet. Use Ollama or LM Studio, or check for an update."
+msgid "No built-in model is available in this version yet. Check for an update."
 msgstr ""
 
 msgid "No camera found"
@@ -2703,9 +2676,6 @@ msgstr ""
 msgid "Not right now"
 msgstr ""
 
-msgid "Not running"
-msgstr ""
-
 msgid "Not serving"
 msgstr ""
 
@@ -2822,9 +2792,6 @@ msgid "One speaker, a room"
 msgstr ""
 
 msgid "Online meeting"
-msgstr ""
-
-msgid "Only addresses on this Mac work here, like http://127.0.0.1:1234/v1."
 msgstr ""
 
 msgid "Only helps the model spell it"
@@ -3249,9 +3216,6 @@ msgstr ""
 msgid "Recommended for this Mac"
 msgstr ""
 
-msgid "Recommended for your Mac"
-msgstr ""
-
 msgid "Recommended: fast and accurate for most recordings. Not for translation."
 msgstr ""
 
@@ -3546,7 +3510,7 @@ msgstr ""
 msgid "Reports and translation to any language"
 msgstr ""
 
-msgid "Reports are written by a text model that runs on this Mac: the one built into CaptureMann, or Ollama or LM Studio. Choose one on the AI page; nothing is sent anywhere else."
+msgid "Reports are written by the text model built into CaptureMann, which runs on this Mac. Download it on the AI page; nothing is sent anywhere else."
 msgstr ""
 
 msgid "Reports of this recording"
@@ -3657,9 +3621,6 @@ msgid "Run the 60 fps self-test: record {target} at {w} x {h}, 60 fps, for {dura
 msgstr ""
 
 msgid "Run the 60 fps test in Settings first"
-msgstr ""
-
-msgid "Running"
 msgstr ""
 
 msgid "Runs as the permissions above say."
@@ -3870,12 +3831,6 @@ msgstr ""
 msgid "Separated by commas."
 msgstr ""
 
-msgid "Server address"
-msgstr ""
-
-msgid "Servers on this Mac"
-msgstr ""
-
 msgid "Set In point"
 msgstr ""
 
@@ -3895,9 +3850,6 @@ msgid "Settings sections"
 msgstr ""
 
 msgid "Shadow"
-msgstr ""
-
-msgid "Short English summaries; weak for Vietnamese and long meetings"
 msgstr ""
 
 msgid "Shortcut {key}"
@@ -4038,9 +3990,6 @@ msgid "Split at the text cursor · {key} done"
 msgstr ""
 
 msgid "Split the timeline {key} to set a different layout for each part."
-msgstr ""
-
-msgid "Start Ollama or LM Studio, then press Check again."
 msgstr ""
 
 msgid "Start a new empty library at {to}; the captures in {from} stay where they are"
@@ -4332,7 +4281,7 @@ msgstr ""
 msgid "The audio file could not be written ({detail}); the track ends here and the recording continues"
 msgstr ""
 
-msgid "The built-in text engine is not part of this copy of CaptureMann. Choose Ollama or LM Studio on the AI page, or use a build that includes the engine."
+msgid "The built-in text engine is not part of this copy of CaptureMann. Reinstall CaptureMann, or use a build that includes the engine."
 msgstr ""
 
 msgid "The camera chosen in Settings isn’t connected. Using the system default."
@@ -4767,9 +4716,6 @@ msgstr ""
 msgid "This report was made with a template this version doesn’t know."
 msgstr ""
 
-msgid "This server lists no models. Pull or load one first."
-msgstr ""
-
 msgid "Thumbnail"
 msgstr ""
 
@@ -4804,9 +4750,6 @@ msgid "Title and date are written into the file"
 msgstr ""
 
 msgid "To"
-msgstr ""
-
-msgid "To use Ollama or LM Studio, install a model there, then pick it above. Default decided by S8."
 msgstr ""
 
 msgid "Today {time}"
@@ -5371,9 +5314,6 @@ msgstr ""
 msgid "an earlier session"
 msgstr ""
 
-msgid "candidate"
-msgstr ""
-
 msgid "cannot decode poster: {error}"
 msgstr ""
 
@@ -5437,9 +5377,6 @@ msgstr ""
 msgid "ffmpeg: {error}"
 msgstr ""
 
-msgid "fits this Mac"
-msgstr ""
-
 msgid "folder \"{path}\""
 msgstr ""
 
@@ -5492,9 +5429,6 @@ msgid "not supported on this OS"
 msgstr ""
 
 msgid "only talks to {host}"
-msgstr ""
-
-msgid "open licences only"
 msgstr ""
 
 msgid "original bundle {path} at \"{name}\""
@@ -5575,9 +5509,6 @@ msgstr ""
 msgid "the window \"{title}\""
 msgstr ""
 
-msgid "this Mac has {memory} GB · open licences only"
-msgstr ""
-
 msgid "this capture"
 msgstr ""
 
@@ -5642,16 +5573,7 @@ msgstr ""
 msgid "{count} / {max} bytes"
 msgstr ""
 
-msgid "{count} context"
-msgstr ""
-
 msgid "{count} of {max} characters"
-msgstr ""
-
-msgid "{count}K context"
-msgstr ""
-
-msgid "{count}M context"
 msgstr ""
 
 msgid "{device_kind}: {device}"
@@ -5840,9 +5762,6 @@ msgid "{name}, {policy}. {hint}"
 msgstr ""
 
 msgid "{name}, {size}, {status}"
-msgstr ""
-
-msgid "{name}, {state}"
 msgstr ""
 
 msgid "{name}, {status}."
@@ -8196,10 +8115,6 @@ msgstr ""
 
 msgctxt "text model provider"
 msgid "None"
-msgstr ""
-
-msgctxt "text model provider"
-msgid "Ollama or LM Studio"
 msgstr ""
 
 msgctxt "theme"

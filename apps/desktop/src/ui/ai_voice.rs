@@ -1,8 +1,7 @@
 //! The voice part of the AI page (V8, AI-7, AI-8): what the buttons do.
 //!
 //! Every change goes through `set_settings` as the user, the way `ai.glossary` does: `ai.*` is
-//! app-only, so an agent cannot write these keys. The API key goes to the keychain only and is
-//! never put in a setting, a toast, the log or the page state. The rules and the state are in
+//! app-only, so an agent cannot write these keys. The rules and the state are in
 //! `crate::ai::voice`.
 
 use gpui::{App, Entity};
@@ -18,8 +17,8 @@ use crate::flows;
 use crate::ui::ai::client_of;
 use crate::ui::app::{self, AppModel};
 
-/// The first reads of the voice section, once per run: this Mac's memory, the text-model
-/// settings and (when the provider is On this Mac) the servers on loopback.
+/// The first reads of the voice section, once per run: this Mac's memory and the text-model
+/// settings.
 pub fn ensure_voice_loaded(app: &Entity<AppModel>, cx: &mut App) {
     let first = app.update(cx, |m, _| {
         !std::mem::replace(&mut m.ai.voice.requested, true)
@@ -32,7 +31,7 @@ pub fn ensure_voice_loaded(app: &Entity<AppModel>, cx: &mut App) {
         m.ai.voice.memory_bytes = bytes;
         cx.notify();
     });
-    refresh_text_model(app, true, cx);
+    refresh_text_model(app, cx);
     refresh_text_models(app, cx);
 }
 
@@ -164,15 +163,14 @@ fn builtin_call(app: &Entity<AppModel>, model: &str, what: BuiltInCall, cx: &mut
             }
             refresh_text_models(&app2, cx);
             // The model the daemon names (and the engine's state) changed with it.
-            refresh_text_model(&app2, false, cx);
+            refresh_text_model(&app2, cx);
         });
     })
     .detach();
 }
 
-/// Reads `get_text_model`; `detect` also looks for Ollama and LM Studio afterwards when the
-/// provider is On this Mac.
-pub fn refresh_text_model(app: &Entity<AppModel>, detect: bool, cx: &mut App) {
+/// Reads `get_text_model`.
+pub fn refresh_text_model(app: &Entity<AppModel>, cx: &mut App) {
     let Some(client) = client_of(app, cx) else {
         return;
     };
@@ -180,41 +178,9 @@ pub fn refresh_text_model(app: &Entity<AppModel>, detect: bool, cx: &mut App) {
     cx.spawn(async move |cx| {
         let res = client.get_text_model().await;
         cx.update(|cx| {
-            let local = app2.update(cx, |m, cx| {
+            app2.update(cx, |m, cx| {
                 if let Ok(v) = &res {
                     m.ai.voice.text.set_from_daemon(v);
-                }
-                cx.notify();
-                m.ai.voice.text.provider == ProviderChoice::OnThisMac
-            });
-            if detect && local {
-                detect_servers(&app2, cx);
-            }
-        });
-    })
-    .detach();
-}
-
-/// Looks for Ollama (11434) and LM Studio (1234) on loopback only (2 s each) and lists their
-/// models. Runs only when the page asks for it; never touches another host.
-pub fn detect_servers(app: &Entity<AppModel>, cx: &mut App) {
-    let backend = app.read(cx).backend.clone();
-    app.update(cx, |m, cx| {
-        m.ai.voice.text.detecting = true;
-        cx.notify();
-    });
-    let app2 = app.clone();
-    cx.spawn(async move |cx| {
-        let found = backend
-            .rt
-            .spawn_blocking(cm_ai::text_model::detect_presets)
-            .await
-            .map(|v| v.iter().map(voice::PresetVm::from).collect::<Vec<_>>());
-        cx.update(|cx| {
-            app2.update(cx, |m, cx| {
-                match found {
-                    Ok(p) => m.ai.voice.text.set_presets(p),
-                    Err(_) => m.ai.voice.text.detecting = false,
                 }
                 cx.notify();
             })
@@ -261,7 +227,7 @@ fn write_settings(app: &Entity<AppModel>, writes: Vec<(&'static str, Value)>, cx
                     cx,
                 );
             }
-            refresh_text_model(&app2, false, cx);
+            refresh_text_model(&app2, cx);
         });
     })
     .detach();
@@ -281,50 +247,12 @@ fn change(
     write_settings(app, writes, cx);
 }
 
-/// A press on None / On this Mac / Remote / Anthropic.
+/// A press on None / Built in.
 pub fn text_choose_provider(app: &Entity<AppModel>, c: ProviderChoice, cx: &mut App) {
     change(app, cx, |v| v.text.choose_provider(c));
-    if c == ProviderChoice::OnThisMac {
-        detect_servers(app, cx);
-    }
 }
 
-pub fn text_choose_preset(app: &Entity<AppModel>, preset: &str, cx: &mut App) {
-    change(app, cx, |v| v.text.choose_preset(preset));
-}
-
-pub fn text_choose_model(app: &Entity<AppModel>, id: &str, cx: &mut App) {
-    change(app, cx, |v| v.text.choose_model(id));
-}
-
-pub fn text_toggle_picker(app: &Entity<AppModel>, cx: &mut App) {
-    app.update(cx, |m, cx| {
-        let t = &mut m.ai.voice.text;
-        t.picker_open = !t.picker_open;
-        cx.notify();
-    });
-}
-
-/// The model typed in the Remote or Anthropic box.
-pub fn text_set_model(app: &Entity<AppModel>, text: &str, cx: &mut App) {
-    change(app, cx, |v| v.text.set_typed_model(text));
-}
-
-/// The address typed in the Remote box; a refused address is shown under the box.
-pub fn text_set_url(app: &Entity<AppModel>, text: &str, cx: &mut App) {
-    change(app, cx, |v| match v.text.set_typed_url(text) {
-        Ok(w) => {
-            v.text.error = None;
-            w
-        }
-        Err(e) => {
-            v.text.error = Some(e);
-            Vec::new()
-        }
-    });
-}
-
-/// The Test button: the first-use notice comes first for a new remote host.
+/// The Test button.
 pub fn text_test(app: &Entity<AppModel>, cx: &mut App) {
     let gate = app.update(cx, |m, cx| {
         let g = m.ai.voice.text.begin_test();

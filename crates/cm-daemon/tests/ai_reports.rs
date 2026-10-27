@@ -48,7 +48,7 @@ impl TextModel for Scripted {
         if *self.fail.lock().unwrap() {
             return Err(TextModelError {
                 kind: cm_ai::text_model::ErrorKind::Unreachable,
-                message: "Start Ollama or LM Studio, or choose another provider".into(),
+                message: "Open the AI page and check the built-in text model".into(),
             });
         }
         Ok(JsonReply {
@@ -126,7 +126,15 @@ async fn rig(words: usize, provider: Option<&str>) -> Rig {
     let queue = cm_daemon::library_job_queue(tmp.path()).unwrap();
     let confirmer = Arc::new(FixedConfirmer::new(Decision::Decline));
     let ai = FakeAi::new();
-    let daemon = b.jobs(queue).confirmer(confirmer).ai(ai.services()).build();
+    // The built-in provider needs a downloaded model to pass the setup check; the scripted
+    // model replaces the engine.
+    let services = cm_daemon::AiServices {
+        text_models: Arc::new(
+            cm_daemon::testing::FakeTextModels::new().with_installed(&["text-16gb"]),
+        ),
+        ..ai.services()
+    };
+    let daemon = b.jobs(queue).confirmer(confirmer).ai(services).build();
     daemon.register_ai_handlers().unwrap();
     daemon.start_jobs().unwrap();
     let (id, dir) = recording(tmp.path());
@@ -169,17 +177,17 @@ async fn rig(words: usize, provider: Option<&str>) -> Rig {
         _tmp: tmp,
     };
     if let Some(p) = provider {
-        set_provider(&r, p, "http://127.0.0.1:11434/v1").await;
+        set_provider(&r, p).await;
     }
     r
 }
 
-async fn set_provider(r: &Rig, provider: &str, url: &str) {
+async fn set_provider(r: &Rig, provider: &str) {
     call(
         r,
         Actor::User,
         "set_settings",
-        json!({ "values": { "ai.text.provider": provider, "ai.text.base_url": url,
+        json!({ "values": { "ai.text.provider": provider,
                             "ai.text.model": "qwen3:8b" } }),
     )
     .await
@@ -254,13 +262,13 @@ async fn templates_are_listed_and_the_edge_cases_are_refused() {
     .unwrap_err();
     assert!(e.to_string().contains("context.role"), "{e}");
     // No transcript.
-    let none = rig(0, Some("local")).await;
+    let none = rig(0, Some("embedded")).await;
     let e = user(&none, "generate_report", json!({"template": "minutes"}))
         .await
         .unwrap_err();
     assert_eq!(code(&e), ErrorCode::NotFound);
     // Too little speech.
-    let short = rig(12, Some("local")).await;
+    let short = rig(12, Some("embedded")).await;
     let e = user(&short, "generate_report", json!({"template": "summary"}))
         .await
         .unwrap_err();
@@ -271,17 +279,13 @@ async fn templates_are_listed_and_the_edge_cases_are_refused() {
     );
 }
 
-/// Scope decision (Oct 26, 2026): only a local text model. Remote, Anthropic and a "local" provider
-/// on a LAN address all fail as `no_text_model`, with no dialog and no request.
+/// Scope decision (Oct 27, 2026): only the built-in text model. Any other provider (`local`,
+/// `openai_compatible`, `anthropic`) fails as `no_text_model`, with no dialog and no request.
 #[tokio::test]
-async fn only_a_local_text_model_is_allowed() {
+async fn only_the_built_in_text_model_is_allowed() {
     let r = rig(60, None).await;
-    for (provider, url) in [
-        ("openai_compatible", "https://api.example.com/v1"),
-        ("anthropic", ""),
-        ("local", "http://192.168.1.20:11434/v1"),
-    ] {
-        set_provider(&r, provider, url).await;
+    for provider in ["openai_compatible", "anthropic", "local"] {
+        set_provider(&r, provider).await;
         for who in [Actor::User, Actor::agent("claude").unwrap()] {
             let e = call(&r, who, "generate_report", json!({"template": "summary"}))
                 .await
@@ -295,7 +299,7 @@ async fn only_a_local_text_model_is_allowed() {
 
 #[tokio::test]
 async fn generate_get_export_and_drop_the_uncited() {
-    let r = rig(60, Some("local")).await;
+    let r = rig(60, Some("embedded")).await;
     let mut rx = r.daemon.subscribe();
     // A marker 20 s in, and the agent path (Free for a local model).
     user(&r, "add_marker", json!({"at": 20, "label": "pricing"}))
@@ -332,8 +336,8 @@ async fn generate_get_export_and_drop_the_uncited() {
         .unwrap();
     assert_eq!(got["report"]["dropped_uncited"], 1);
     assert_eq!(got["report"]["language"], "vi");
-    assert_eq!(got["report"]["provider"], "local");
-    assert_eq!(got["report"]["model"], "qwen3:8b");
+    assert_eq!(got["report"]["provider"], "embedded");
+    assert_eq!(got["report"]["model"], "text-16gb");
     let items = got["report"]["content"]["action_items"].as_array().unwrap();
     assert_eq!(items.len(), 1);
     assert_eq!(items[0]["owner"], "Linh");
@@ -385,7 +389,7 @@ async fn generate_get_export_and_drop_the_uncited() {
 /// AI-9.AC4 through the daemon: the stored Interview report has no judging field.
 #[tokio::test]
 async fn interview_report_has_no_score_field() {
-    let r = rig(60, Some("local")).await;
+    let r = rig(60, Some("embedded")).await;
     *r.model.answer.lock().unwrap() = json!({
         "questions_answers": [{"question": "Why us?", "answer": "The mission.", "at": [3.0]}],
         "evidence": [{"competency": "Ownership", "quote": "word4 word5", "note": "", "at": [4.0]}],
@@ -420,7 +424,7 @@ async fn interview_report_has_no_score_field() {
 /// delete is undoable.
 #[tokio::test]
 async fn edit_undo_failed_regenerate_and_delete() {
-    let r = rig(60, Some("local")).await;
+    let r = rig(60, Some("embedded")).await;
     let job = generate(&r, json!({"template": "minutes"})).await;
     let rid = job["result"]["report_id"].as_str().unwrap().to_owned();
     let original = user(&r, "get_report", json!({"report_id": rid}))
@@ -518,7 +522,7 @@ async fn edit_undo_failed_regenerate_and_delete() {
 /// task sections and existing items can be ticked; a regenerate starts with none ticked.
 #[tokio::test]
 async fn check_report_item_is_stored_and_undoable() {
-    let r = rig(60, Some("local")).await;
+    let r = rig(60, Some("embedded")).await;
     let job = generate(&r, json!({"template": "minutes"})).await;
     let rid = job["result"]["report_id"].as_str().unwrap().to_owned();
     let n = user(&r, "get_report", json!({"report_id": rid}))

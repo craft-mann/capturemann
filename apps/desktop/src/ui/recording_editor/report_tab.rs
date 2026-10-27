@@ -6,8 +6,7 @@
 //! model, language, "N items left out"), the sections with a time chip on every cited item that
 //! seeks, and the foot (Markdown, TXT, Copy).
 //!
-//! Only local text models are offered (the engine built into CaptureMann, or Ollama or LM Studio
-//! on this Mac). Without one the tab says a text model is needed, points to the AI page and, when
+//! Only the text model built into CaptureMann is offered. Without one the tab says a text model is needed, points to the AI page and, when
 //! a built-in model fits this Mac, offers to download it; the daemon's `no_text_model` answer is handled the same way.
 //! Reports are written by `generate_report`, saved by `export_report`, changed by `edit_report`
 //! and `delete_report`; this file sends none of them itself (see `voice_fields.rs`). Not seen by
@@ -389,9 +388,8 @@ impl RecordingEditor {
             tr!("A text model is needed"),
             Some(
                 tr!(
-                    "Reports are written by a text model that runs on this Mac: the one built \
-                     into CaptureMann, or Ollama or LM Studio. Choose one on the AI page; \
-                     nothing is sent anywhere else."
+                    "Reports are written by the text model built into CaptureMann, which runs on \
+                     this Mac. Download it on the AI page; nothing is sent anywhere else."
                 )
                 .into(),
             ),

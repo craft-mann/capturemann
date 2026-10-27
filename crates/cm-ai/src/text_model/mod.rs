@@ -5,10 +5,10 @@
 //!   matches the schema. A reply that does not match is sent back once with the validation error;
 //!   a second miss is `job_failed` with `reason: "invalid_model_output"` ([`TextModelError`]).
 //! * Providers ([`Provider`]): `none` (no network, callers get `invalid_input` with
-//!   `data.reason = "no_text_model"`), `local` (an OpenAI-compatible server on this machine:
-//!   Ollama or LM Studio), `embedded` (CaptureMann's own `llama-server` helper on a loopback port,
-//!   see [`engine`]; the models are [`store`]), `openai_compatible` (any URL, usually with a key)
-//!   and `anthropic` (the last two are dormant: settings cannot select them).
+//!   `data.reason = "no_text_model"`) and `embedded` (CaptureMann's own `llama-server` helper on a
+//!   loopback port, see [`engine`]; the models are [`store`]). These are the only two settings can
+//!   select. `local` is the internal loopback client the engine talks to its helper with;
+//!   `openai_compatible` and `anthropic` are dormant and unreachable (settings cannot select them).
 //! * **Local versus remote is decided by the URL host** ([`TextModelConfig::is_local`]): loopback
 //!   is local, everything else, LAN included, is remote. A `local` provider only ever talks to
 //!   loopback: with any other host every request is refused before it is sent.
@@ -30,11 +30,10 @@ use cm_core::CmError;
 use serde::Serialize;
 use serde_json::{json, Map, Value};
 
-pub use self::http::{detect_presets, list_models, HttpTextModel, ModelEntry, PresetStatus};
+pub use self::http::HttpTextModel;
 
 /// Settings keys.
 pub const KEY_PROVIDER: &str = "ai.text.provider";
-pub const KEY_BASE_URL: &str = "ai.text.base_url";
 pub const KEY_MODEL: &str = "ai.text.model";
 /// The built-in model (a `text_models.json` id) the `embedded` provider runs; empty: the
 /// text-model store's active one.
@@ -48,12 +47,10 @@ pub const KEY_NOTICE_HOST: &str = "ai.text.remote_notice_host";
 
 pub const DEFAULT_CONTEXT_TOKENS: u32 = 8192;
 pub const DEFAULT_TIMEOUT_S: u64 = 300;
-pub const OLLAMA_URL: &str = "http://127.0.0.1:11434/v1";
-pub const LM_STUDIO_URL: &str = "http://127.0.0.1:1234/v1";
 pub const ANTHROPIC_URL: &str = "https://api.anthropic.com";
 
 /// The message of an unreachable server (AI-7).
-pub const UNREACHABLE_HINT: &str = "Start Ollama or LM Studio, or choose another provider";
+pub const UNREACHABLE_HINT: &str = "Open the AI page and check the built-in text model";
 
 /// Where the text model runs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -142,8 +139,9 @@ pub fn is_loopback_host(host: &str) -> bool {
 }
 
 impl TextModelConfig {
-    /// Reads `ai.text.*` from the settings map. Unknown, malformed or remote (`openai_compatible`, `anthropic`)
-    /// values fall back to the defaults (provider `none`), so a hand-edited file can never turn the network on.
+    /// Reads `ai.text.*` from the settings map. Unknown, malformed or unavailable (`local`, `openai_compatible`,
+    /// `anthropic`) values fall back to the defaults (provider `none`), so a hand-edited file can never turn the
+    /// network on. There is no server address setting: the built-in engine's address is chosen when it starts.
     pub fn from_settings(s: &Map<String, Value>) -> TextModelConfig {
         let text = |k: &str| {
             s.get(k)
@@ -153,13 +151,13 @@ impl TextModelConfig {
         };
         let provider = text(KEY_PROVIDER)
             .and_then(|p| Provider::parse(&p))
-            // Local models only for now (maintainer, Oct 26, 2026): the remote providers stay
-            // in the code but a settings file can not select them.
-            .filter(|p| matches!(p, Provider::None | Provider::Local | Provider::Embedded))
+            // The built-in engine only in 0.2.0 (maintainer, Oct 27, 2026): the other providers
+            // stay in the code but a settings file can not select them.
+            .filter(|p| matches!(p, Provider::None | Provider::Embedded))
             .unwrap_or(Provider::None);
         TextModelConfig {
             provider,
-            base_url: text(KEY_BASE_URL).unwrap_or_default(),
+            base_url: String::new(),
             model: text(KEY_MODEL).unwrap_or_default(),
             embedded_model: text(KEY_EMBEDDED_MODEL).unwrap_or_default(),
             key_name: text(KEY_KEY_NAME),
@@ -183,11 +181,12 @@ impl TextModelConfig {
             return url.to_owned();
         }
         match self.provider {
-            Provider::Local => OLLAMA_URL.to_owned(),
             Provider::Anthropic => ANTHROPIC_URL.to_owned(),
             // The embedded helper's address is chosen when it starts ([`engine`]); a setting
             // never names it.
-            Provider::None | Provider::OpenAiCompatible | Provider::Embedded => String::new(),
+            Provider::None | Provider::Local | Provider::OpenAiCompatible | Provider::Embedded => {
+                String::new()
+            }
         }
     }
 
@@ -228,7 +227,7 @@ impl TextModelConfig {
         let url = self.effective_base_url();
         let Some(host) = url_host(&url) else {
             return Err(TextModelError::invalid_input(
-                "The text model needs a server address like http://127.0.0.1:11434/v1",
+                "The text model needs a server address",
             ));
         };
         if !(url.starts_with("http://") || url.starts_with("https://")) {
@@ -238,8 +237,7 @@ impl TextModelConfig {
         }
         if self.provider == Provider::Local && !is_loopback_host(&host) {
             return Err(TextModelError::invalid_input(format!(
-                "A local text model must run on this computer (127.0.0.1 or localhost), not on {host}. \
-                 Choose the OpenAI-compatible provider for a server on your network."
+                "A local text model must run on this computer (127.0.0.1 or localhost), not on {host}."
             )));
         }
         // Plain http is only for this machine: a key or recording text never crosses a network
@@ -340,7 +338,7 @@ impl TextModelError {
     pub fn no_text_model() -> Self {
         TextModelError {
             kind: ErrorKind::NoTextModel,
-            message: "No text model is set up. Open the AI page, download the built-in text model or choose Ollama or LM Studio."
+            message: "No text model is set up. Open the AI page, download the built-in text model."
                 .to_owned(),
         }
     }
@@ -552,34 +550,37 @@ mod tests {
     fn cfg(provider: &str, url: &str) -> TextModelConfig {
         let mut m = Map::new();
         m.insert(KEY_PROVIDER.into(), json!(provider));
-        m.insert(KEY_BASE_URL.into(), json!(url));
         let mut c = TextModelConfig::from_settings(&m);
-        // The dormant remote providers can not come from settings; set them directly.
+        // The dormant providers can not come from settings; set them directly.
         if let Some(p) = Provider::parse(provider) {
             c.provider = p;
         }
+        c.base_url = url.to_owned();
         c
     }
 
     #[test]
     fn settings_can_not_select_a_remote_provider() {
-        for p in ["openai_compatible", "anthropic", "bogus"] {
+        for p in ["local", "openai_compatible", "anthropic", "bogus"] {
             let mut m = Map::new();
             m.insert(KEY_PROVIDER.into(), json!(p));
             assert_eq!(TextModelConfig::from_settings(&m).provider, Provider::None);
         }
         let mut m = Map::new();
-        m.insert(KEY_PROVIDER.into(), json!("local"));
-        assert_eq!(TextModelConfig::from_settings(&m).provider, Provider::Local);
+        m.insert(KEY_PROVIDER.into(), json!("embedded"));
+        m.insert("ai.text.base_url".into(), json!("https://evil.example/v1"));
+        let c = TextModelConfig::from_settings(&m);
+        assert_eq!(c.provider, Provider::Embedded);
+        assert_eq!(c.base_url, "");
     }
 
     #[test]
     fn hosts_and_loopback() {
         assert_eq!(
-            url_host("http://127.0.0.1:11434/v1").as_deref(),
+            url_host("http://127.0.0.1:8080/v1").as_deref(),
             Some("127.0.0.1")
         );
-        assert_eq!(url_host("http://[::1]:1234/v1").as_deref(), Some("::1"));
+        assert_eq!(url_host("http://[::1]:8081/v1").as_deref(), Some("::1"));
         assert_eq!(
             url_host("https://user:pw@API.Example.com/x").as_deref(),
             Some("api.example.com")
@@ -613,7 +614,7 @@ mod tests {
 
     #[test]
     fn a_local_provider_with_a_lan_address_is_remote_and_refused() {
-        let c = cfg("local", "http://192.168.1.20:11434/v1");
+        let c = cfg("local", "http://192.168.1.20:8080/v1");
         assert!(!c.is_local());
         assert!(c.is_remote());
         let e = c.check_endpoint().unwrap_err();
@@ -630,11 +631,10 @@ mod tests {
 
     #[test]
     fn loopback_providers_are_local_with_no_plan() {
-        let c = cfg("local", "");
-        assert_eq!(c.effective_base_url(), OLLAMA_URL);
+        let c = cfg("local", "http://127.0.0.1:8080/v1");
         assert!(c.is_local() && c.check_endpoint().is_ok());
         assert!(c.send_plan(100).is_none());
-        let c = cfg("openai_compatible", "http://localhost:1234/v1");
+        let c = cfg("openai_compatible", "http://localhost:8081/v1");
         assert!(c.is_local());
         assert!(c.notice_text().is_none());
     }

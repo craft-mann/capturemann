@@ -1,20 +1,18 @@
 # AI-9 manual script: summaries and reports with a real local text model
 
-Covers what the scripted tests cannot: a real local model (Ollama or LM Studio) writing real
+Covers what the scripted tests cannot: the built-in text model writing real
 reports. The schema, citation, chunking, undo and local-only rules are covered by `cargo test -p
-cm-ai report` and `cargo test -p cm-daemon --test ai_reports`. Remote and Anthropic providers are
-not supported yet (maintainer decision, Oct 26, 2026): this script uses a model on this computer.
+cm-ai report` and `cargo test -p cm-daemon --test ai_reports`. The built-in text model is the only
+provider in 0.2.0 (maintainer decision, Oct 27, 2026).
 
 Privacy: nothing is recorded. Use the fixture or a recording you already have; the transcript text
-goes only to `127.0.0.1`. Watch it with a network monitor (Little Snitch, `nettop -p ollama`) for
+goes only to `127.0.0.1`. Watch it with a network monitor (Little Snitch, `nettop -p llama-server`) for
 step 7.
 
 Setup:
 
-1. Start Ollama (`ollama serve`, a 7B to 9B model pulled, for example `qwen3:8b`) or LM Studio.
-2. In the app: AI page, text model: provider Local, the model, context 8192 or more. (Until the AI
-   page section exists, put `ai.text.*` in the settings file; `capturemann ai text-model test`
-   must print `answered`.)
+1. In the app: AI page, text model: Built in, with a model downloaded (`AI-7.md`).
+   `capturemann ai text-model test` must print `answered`.
 3. A recording with a transcript of at least 30 words and, for steps 3 and 4, speaker names
    (`capturemann ai speakers ID`, then `rename`). The M4 fixture has no speech; use a short real
    meeting you recorded with consent, or any `.cmrec` with a transcript.
@@ -44,9 +42,8 @@ Steps:
    provider to a remote one and run step 2 again. Expected: exit 2, `no_text_model`; nothing sent.
 8. **Edit and undo (AC6).** `ai report edit ID RPT --file notes.md`, `ai report get ID RPT`
    (edited), `capturemann undo ID`, `ai report get ID RPT`: the generated text is back.
-9. **Failed regenerate (AC6).** Stop Ollama, `ai report ID --template minutes --report RPT
-   --wait`. Expected: exit 6 (`text_model_unreachable`, "Start Ollama or LM Studio, or choose
-   another provider"), and `ai report get ID RPT` still returns the previous report.
+9. **Failed regenerate (AC6).** Stop the engine (quit `llama-server`) and make it unable to start (for example a copy of the bundle without it), `ai report ID --template minutes --report RPT
+   --wait`. Expected: exit 6 (`engine_missing` or `engine_failed`, with the message the AI page shows), and `ai report get ID RPT` still returns the previous report.
 10. **Long recording (AC5).** On a 2 to 3 hour recording with a transcript and context 8192:
     the job reports progress, finishes, and the report has citations from the first and last
     tenth of the recording.

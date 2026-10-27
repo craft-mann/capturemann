@@ -41,12 +41,10 @@ pub struct AiPage {
     glossary_error: Option<GlossaryError>,
     term_field: Entity<TextField>,
     heard_field: Entity<TextField>,
-    /// The voice sections' boxes (V8): your name, a custom loopback address, the typed model.
+    /// The voice sections' box (V8): your name.
     name_field: Entity<TextField>,
-    url_field: Entity<TextField>,
-    model_field: Entity<TextField>,
-    /// What the name, address and model boxes were last loaded with (`None`: never).
-    synced: (Option<String>, Option<String>, Option<String>),
+    /// What the name box was last loaded with (`None`: never).
+    synced: Option<String>,
     _subs: Vec<Subscription>,
 }
 
@@ -60,21 +58,12 @@ impl AiPage {
         let me = voice_default_name();
         let name_field =
             cx.new(|cx| TextField::new(tr!("Your name in transcripts"), me, cx).without_icon());
-        let url_field = cx.new(|cx| {
-            TextField::new(tr!("Server address"), "http://127.0.0.1:1234/v1", cx).without_icon()
-        });
-        let model_field =
-            cx.new(|cx| TextField::new(tr!("Text model"), tr!("Model name"), cx).without_icon());
-        let mut voice_subs = Vec::new();
-        for (f, which) in [
-            (&name_field, VoiceField::Name),
-            (&url_field, VoiceField::Url),
-            (&model_field, VoiceField::Model),
-        ] {
-            voice_subs.push(cx.subscribe(f, move |this, _f, ev: &TextFieldEvent, cx| {
-                this.voice_field_event(which, ev, cx)
-            }));
-        }
+        let voice_subs =
+            vec![
+                cx.subscribe(&name_field, move |this, _f, ev: &TextFieldEvent, cx| {
+                    this.voice_field_event(VoiceField::Name, ev, cx)
+                }),
+            ];
         let mut subs = vec![
             cx.observe(&app, |_, _, cx| cx.notify()),
             cx.subscribe(&term_field, |this, _f, ev: &TextFieldEvent, cx| {
@@ -88,9 +77,7 @@ impl AiPage {
         AiPage {
             app,
             name_field,
-            url_field,
-            model_field,
-            synced: (None, None, None),
+            synced: None,
             glossary_edit: None,
             glossary_error: None,
             term_field,

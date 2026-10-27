@@ -1,62 +1,53 @@
-# AI-7 manual script: the text model on the AI page (local models)
+# AI-7 manual script: the text model on the AI page (built-in model)
 
-Needs a person at a Mac with Ollama and/or LM Studio installed. Remote and Anthropic providers are
-deferred (maintainer decision Oct 26, 2026): the page offers None and On this Mac only. Nothing here
-sends data to another host; the page only talks to loopback. Record the result in `verification/`.
+Needs a person at a Mac and a bundle that includes `llama-server` (`make llama`, then `make
+bundle-dev`). Release 0.2.0 offers one text-model provider, the model built into CaptureMann
+(maintainer decision Oct 27, 2026): the page offers None and Built in only. Ollama and LM Studio
+are backlog items (later). Nothing here sends data to another host; the engine listens on
+127.0.0.1 only. Record the result in `verification/`.
 
 ## Setup
 - Own instance: separate `CAPTUREMANN_SOCKET`, `CAPTUREMANN_LIBRARY`, `CAPTUREMANN_CONFIG_DIR`
   (do not use your daily copy). Use `make bundle-dev` / `make run-bundle-dev` only if you want the
   bundle; never `make bundle` over a running copy.
-- Pull one small model in Ollama (for example `ollama pull phi4-mini`) and, optionally, load one in
-  LM Studio and start its local server (port 1234).
+- Free disk space for one built-in model (the page shows its size before the download).
 
-## 1. Detection (AC1)
-1. Stop Ollama and LM Studio. Open the AI page, Text model, choose On this Mac.
-   Expected: both rows say Not running; the page says "Start Ollama or LM Studio, then press Check again."
-2. Start Ollama, press Check again. Expected: Ollama says Running (127.0.0.1:11434), the model
-   picker shows "Model - N on Ollama".
-3. Start LM Studio's server, Check again. Expected: LM Studio says Running (127.0.0.1:1234).
+## 1. Choosing the provider (AC1)
+1. Open the AI page, Text model. Expected: two choices, None and Built in; with None the page says
+   "No text model. Reports and translation to other languages are off." and there is no Test row.
+2. Choose Built in. Expected: the models for each memory tier are listed with size, memory, licence
+   and the tag for this Mac's tier; `capturemann ai text-model` shows provider `embedded`.
 
-## 2. Model and context
-1. Open the picker, choose a model. Expected: its context size shows beside it when the server reports
-   it (for example "262K context"); `capturemann ai text-model` shows the same model and
-   `context_tokens`.
-2. Switch to the other server. Expected: the model is cleared and must be chosen again.
+## 2. Download, select, remove
+1. Press Download on the model for this Mac. Expected: the size and licence are shown first; nothing
+   is downloaded before you confirm; progress, then "Active".
+2. `capturemann ai text-models` lists the same state. Select another downloaded model: the engine
+   status line changes after the next request. Remove a model that is not in use: it disappears.
 
 ## 3. Test
 1. Press Test. Expected: "Replied in N s", "Structured output works" (or the retry note) and
-   "only talks to 127.0.0.1". `capturemann ai text-model test` agrees.
-2. Quit the server, press Test. Expected: the test fails with "Start Ollama or LM Studio, or choose
-   another provider".
-3. Choose None, press nothing: the Test row is gone. With provider None no request is made
-   (check with a network monitor or Little Snitch: only loopback traffic, and none with None).
+   "only talks to 127.0.0.1". `capturemann ai text-model test` agrees. The first Test starts the
+   engine ("Engine loading the model..." then "Engine running ...").
+2. Remove the `llama-server` helper from a copy of the bundle (or use a build without it), press
+   Test. Expected: a plain "engine missing" message, nothing hangs.
+3. Choose None: the Test row is gone. With provider None no request is made (check with a network
+   monitor or Little Snitch: only loopback traffic, and none with None).
 
-## 4. A custom address
-1. Type `https://api.example.com/v1`, Save. Expected: refused in the page with "Only addresses on this
-   Mac work here..." and nothing is saved (`capturemann ai text-model` unchanged).
-2. Type `http://127.0.0.1:1234/v1`, Save, then type the model name and Save. Expected: Test works
-   against that server.
+## 4. Speaker labels (AI-8)
+- Expected: the card names the speaker models and the switch "Find speakers after each transcript"
+  works only when they are installed; "Your name in transcripts" shows Me, Save keeps a new name and
+  `capturemann settings get profile.display_name` agrees; an empty box returns to Me.
 
-## 5. Recommended for your Mac
-- Expected: the header says "this Mac has N GB" with this Mac's real memory (check About This Mac),
-  the rows that fit are marked "fits this Mac", every licence chip is MIT or Apache-2.0, and the note
-  says the default is decided by S8.
-
-## 6. Speaker labels (AI-8, no model yet)
-- Expected: the card says "Speaker model not available yet"; the switch "Find speakers after each
-  transcript" is off and does not move; "Your name in transcripts" shows Me, Save keeps a new name
-  and `capturemann settings get profile.display_name` agrees; an empty box returns to Me.
-
-## 7. Agents cannot change these settings
+## 5. Agents cannot change these settings
 - `capturemann settings set ai.text.provider none` over the socket is refused (`app_only_setting`).
+- Put `"ai.text.provider": "local"` (or `openai_compatible`, `anthropic`) in the settings file by hand
+  and restart: the page shows None and `capturemann ai text-model` says provider `none`.
 
-## 8. Both servers, one real use each
-- Run step 3 (Test) once with Ollama and once with LM Studio, each with a model you name in the
-  report. Then, with the one that passed, run one report (`AI-9.md` step 2) and, once the
-  text-model translator is wired, one translation (`AI-5.md` step 5). Write down the model, its
-  context size and the reply time; the default model is decided by spike S8, not here.
+## 6. One real use
+- With the built-in model active, run one report (`AI-9.md` step 2) and one translation (`AI-5.md`
+  step 5). Write down the model, its context size and the reply time; the default model is decided
+  by spike S8, not here.
 
 ## Layout
-- Check English, Vietnamese and `CAPTUREMANN_PSEUDO_LOCALE=1`: the provider control, the server rows
-  and the Recommended table do not overlap or cut text at the narrowest window width.
+- Check English, Vietnamese and `CAPTUREMANN_PSEUDO_LOCALE=1`: the provider control and the model
+  rows do not overlap or cut text at the narrowest window width.

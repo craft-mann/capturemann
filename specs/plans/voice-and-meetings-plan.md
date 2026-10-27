@@ -19,7 +19,7 @@ The maintainer decided on Oct 26, 2026 that there is no release pressure: featur
 | Stage | Ships | Needs |
 | --- | --- | --- |
 | 1 | VOC-1 audio recording, VOC-2 audio editor and M4A/WAV export, AI-5 translation **to English via Whisper**, `large-v3-turbo` and `large-v3` in the model catalogue | No new runtime |
-| 2 | AI-7 text model provider (Ollama / LM Studio / remote), AI-9 reports, AI-5 translation to any language | Spike S8 |
+| 2 | AI-7 text model provider (the built-in engine; Ollama / LM Studio and remote are later), AI-9 reports, AI-5 translation to any language | Spike S8 |
 | 3 | AI-8 speaker labels | Spike S7 (model and licence), `ort` runtime |
 | Later (P2) | VOC-3 live transcript, embedded llama.cpp, custom report templates, per-app audio capture | — |
 
@@ -59,7 +59,7 @@ The **default recommendation is decided by S8**, not by this table.
 
 **S7 — Speaker diarization on a Mac (Rust, offline).** Run candidates A and B on: a 10-minute two-person interview on the MacBook's built-in mic, a 30-minute four-person meeting around a laptop, and one public meeting set with a CC-BY licence. Measure word attribution, DER, time and peak memory on the M4 Pro and on a 16 GB machine. **Pass:** AI-8.AC1 and AC2 targets, ≤ 600 MB peak memory, a licence that allows mirroring. Record the result in `docs/project/spikes.md`.
 
-**S8 — Text model for reports and translation.** With Ollama and LM Studio, run the AI-9 templates and AI-5 EN↔VI translation on 3 meetings, 2 interviews and 1 lecture (English and Vietnamese) with the four models above at Q4. Score by hand: citation accuracy, invented items, Vietnamese quality, structured-output success, time. **Pass:** ≥ 95% schema success, no invented action items in the review set, report ≤ 5 minutes for 30 minutes of speech on 16 GB. The winner becomes the AI page's default recommendation.
+**S8 — Text model for reports and translation.** With the built-in engine (`llama-server`), run the AI-9 templates and AI-5 EN↔VI translation on 3 meetings, 2 interviews and 1 lecture (English and Vietnamese) with the four models above at Q4. Score by hand: citation accuracy, invented items, Vietnamese quality, structured-output success, time. **Pass:** ≥ 95% schema success, no invented action items in the review set, report ≤ 5 minutes for 30 minutes of speech on 16 GB. The winner becomes the AI page's default recommendation.
 
 ## Decisions made after the plan
 

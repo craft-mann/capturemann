@@ -24,12 +24,12 @@ treat it as a preview of the release notes, not a promise.
 - Export audio: M4A or WAV, the mix or one track, loudness evened out to -16 LUFS for M4A, tags,
   an optional copy to a folder; also "Export audio only" for screen recordings.
   `capturemann export <id> --audio`.
-- Translation: captions to English with Whisper (`large-v3`, offline) and to other languages with a
-  local text model; one translation per language, edited and exported like the original.
+- Translation: captions to English with Whisper (`large-v3`, offline) and to other languages with the
+  built-in text model; one translation per language, edited and exported like the original.
   `capturemann ai translate`.
-- Text model setup (AI page): Ollama or LM Studio on this Mac, with a Test button. Only models on
-  this computer are supported; there is no remote or cloud option.
-- Reports from a transcript with a local text model: meeting minutes, interview notes, one-on-one
+- Text model setup (AI page): a text model built into CaptureMann (downloaded on request, runs on
+  this Mac), with a Test button. There is no remote or cloud option and no other server.
+- Reports from a transcript with the built-in text model: meeting minutes, interview notes, one-on-one
   notes, lecture notes, product recap and summary, with times on every item that jump to that
   moment, editing, regenerating and export as Markdown or text. `capturemann ai report`.
 - Speaker labels (who spoke when), renaming, merging and reassigning speakers, and speaker names
@@ -46,7 +46,7 @@ treat it as a preview of the release notes, not a promise.
 ### Known limitations (0.2.0)
 
 - Speaker labels have no model yet (S7). The default text model is not decided (S8): you choose one
-  in Ollama or LM Studio.
+  of the built-in models.
 - Live transcript while recording (VOC-3) is not included; it comes in a later 0.2.x.
 - The bundled FFmpeg needs a rebuild with the `wav` muxer and `pcm_s24le` before WAV export works
   in the shipped app.

@@ -35,7 +35,7 @@
 #                     (made by `make llama`) is bundled when it exists, with its licence files and
 #                     build record in Contents/Resources/Llama/. Refused if it links curl or OpenSSL.
 #   CM_NO_LLAMA=1     bundle no llama-server even when packaging/llama/out exists (the built-in text
-#                     model then answers "engine missing"; Ollama and LM Studio still work).
+#                     model then answers "engine missing").
 #   CM_REQUIRE_LLAMA=1  fail unless llama-server with its licence files is bundled
 #                     (`make bundle-release` sets it).
 # Output: $CM_BUNDLE_OUT/CaptureMann.app. It is assembled and verified in a hidden temp folder next

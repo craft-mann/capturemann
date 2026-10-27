@@ -103,10 +103,10 @@ sheet is available as **Export audio only** for screen recordings.
   `large-v3-turbo` model cannot translate). Other languages need a text model (below). The original
   stays; switch languages with the language switcher, edit a translation like the original and export
   captions per language.
-- **Text model.** On the AI page, choose **On this Mac**, start **Ollama** or **LM Studio**, pick a
-  model and press **Test**. Your text goes only to your own computer (127.0.0.1). CaptureMann does not
-  ship or download a text model and has no cloud option. Which model works best is still being
-  tested; a 7 to 9 billion parameter model is a reasonable start on a Mac with 16 GB.
+- **Text model.** On the AI page, choose **Built in**, download the model for your Mac (the size and
+  licence are shown first) and press **Test**. The model runs inside CaptureMann and your text stays
+  on your own computer. There is no cloud option and no other server. Which model works best is
+  still being tested.
 - **Reports.** The Report tab writes meeting minutes, interview notes, one-on-one notes, lecture
   notes, a product recap or a plain summary from the transcript. Every item has a time that jumps to
   that moment, so you can check it. Edit the Markdown, regenerate, and export as Markdown or text.
