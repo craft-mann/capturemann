@@ -404,14 +404,22 @@ impl RecordingEditor {
                     .cursor_pointer()
                     .focus_visible(move |s| s.border_color(focus))
                     .child(icon(template_glyph(&tpl.id), 16., t.text_2))
-                    .child(label_fill(name))
-                    .children(hint.then(|| {
+                    // The "suggested" tag sits under the name: beside it the name had no room
+                    // and broke inside words.
+                    .child(
                         div()
-                            .flex_none()
-                            .text_size(px(11.))
-                            .text_color(rgba_of(t.agent_text))
-                            .child(tr_ctx!("report template", "suggested"))
-                    }))
+                            .flex_1()
+                            .min_w(px(0.))
+                            .flex()
+                            .flex_col()
+                            .child(div().min_w(px(0.)).child(name))
+                            .children(hint.then(|| {
+                                div()
+                                    .text_size(px(11.))
+                                    .text_color(rgba_of(t.agent_text))
+                                    .child(tr_ctx!("report template", "suggested"))
+                            })),
+                    )
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.vp.template = Some(tid.clone());
                         cx.notify();
