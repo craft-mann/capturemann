@@ -1276,10 +1276,22 @@ impl RecordingEditor {
                             .text_size(px(13.))
                             .text_color(rgba_of(t.text_3))
                             .child(e)
-                    })),
+                    }))
+                    // The person and the time chips sit under the text and wrap there: beside it
+                    // the chips took the whole row and squeezed the text to one letter per line
+                    // (seen Oct 27, 2026).
+                    .child(
+                        div()
+                            .min_w(px(0.))
+                            .mt(px(4.))
+                            .flex()
+                            .flex_wrap()
+                            .items_center()
+                            .gap(px(6.))
+                            .children(person)
+                            .children(chips),
+                    ),
             )
-            .children(person)
-            .child(div().flex().flex_wrap().gap(px(4.)).children(chips))
             .into_any_element()
     }
 }
