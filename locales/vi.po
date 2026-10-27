@@ -10802,8 +10802,8 @@ msgid "Voices are compared in memory only. No voiceprint is saved, and people ar
 msgstr "Giọng nói chỉ được so sánh trong bộ nhớ. Không lưu dấu giọng nói, và không bao giờ nhận ra một người giữa các bản ghi."
 
 #, fuzzy
-msgid "Weekly product sync"
-msgstr "Họp sản phẩm hằng tuần"
+msgid "Name of the meeting"
+msgstr "Tên cuộc họp"
 
 #, fuzzy
 msgid "Whisper only translates into English. Choose a text model on this Mac on the AI page."

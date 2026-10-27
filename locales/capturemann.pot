@@ -2406,6 +2406,9 @@ msgstr ""
 msgid "Name"
 msgstr ""
 
+msgid "Name of the meeting"
+msgstr ""
+
 msgid "Named like {pattern}. A name already taken gets (2), (3)…"
 msgstr ""
 
@@ -5014,9 +5017,6 @@ msgid "Webcam off for this recording"
 msgstr ""
 
 msgid "Webcam on, your saved audio choices"
-msgstr ""
-
-msgid "Weekly product sync"
 msgstr ""
 
 msgid "What CaptureMann can use"

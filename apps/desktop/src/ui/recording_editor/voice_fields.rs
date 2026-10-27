@@ -95,7 +95,7 @@ impl VoicePanels {
                 .without_icon()
                 .height(32.)
         });
-        let title = line(tr!("Title"), tr!("Weekly product sync"), cx);
+        let title = line(tr!("Title"), tr!("Name of the meeting"), cx);
         let attendee = line(
             tr!("Add an attendee"),
             tr!("Add a name and press Enter"),

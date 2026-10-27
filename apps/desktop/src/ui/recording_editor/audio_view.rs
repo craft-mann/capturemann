@@ -141,6 +141,9 @@ impl RecordingEditor {
             if audio {
                 self.tab = Inspector::Transcript;
             }
+            // The report's title starts as the recording's own name.
+            let title = s.title.clone();
+            self.vp.title.update(cx, |f, cx| f.set_text(&title, cx));
         }
         // "Set up report" from the toast after a transcript: the Report tab on its setup.
         let report_focus = self.app.read(cx).transcribe.report_focus.clone();
