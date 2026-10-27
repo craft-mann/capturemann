@@ -745,6 +745,27 @@ pub fn translate_with_text_model(
             answer = translator.translate(&req)?;
             checked = enforce_batch(req.lines, answer, keep_as_written);
         }
+        // A model that keeps merging or splitting lines gets the batch one line at a time
+        // (with its neighbours as context) instead of leaving the whole batch in the source
+        // language: in a 168-line test two such batches left 40 lines untranslated.
+        if checked.is_none() && to - from > 1 {
+            let mut singles: Vec<Option<String>> = Vec::with_capacity(to - from);
+            for i in from..to {
+                let one = TextTranslateRequest {
+                    source_language,
+                    target_language,
+                    lines: &texts[i..=i],
+                    before: &texts[i.saturating_sub(CONTEXT_LINES)..i],
+                    after: &texts[i + 1..(i + 1 + CONTEXT_LINES).min(source.len())],
+                    keep_as_written,
+                };
+                let got = translator.translate(&one)?;
+                singles.push(
+                    enforce_batch(one.lines, got, keep_as_written).and_then(|mut v| v.remove(0)),
+                );
+            }
+            checked = Some(singles);
+        }
         let ok = checked.is_some();
         let answer: Vec<Option<String>> = checked.unwrap_or_default();
         for (k, line) in source[from..to].iter().enumerate() {
@@ -1283,6 +1304,8 @@ mod tests {
         calls: Mutex<Vec<(usize, usize, usize)>>,
         drop_on_call: Vec<usize>,
         always_drop: bool,
+        /// Drops a line from every request with more than one line, never from a single one.
+        drop_multi: bool,
         fail: bool,
     }
 
@@ -1292,6 +1315,7 @@ mod tests {
                 calls: Mutex::new(Vec::new()),
                 drop_on_call: vec![],
                 always_drop: false,
+                drop_multi: false,
                 fail: false,
             }
         }
@@ -1313,7 +1337,10 @@ mod tests {
                 .iter()
                 .map(|l| format!("[{}] {l}", req.target_language))
                 .collect();
-            if self.always_drop || self.drop_on_call.contains(&n) {
+            if self.always_drop
+                || self.drop_on_call.contains(&n)
+                || (self.drop_multi && req.lines.len() > 1)
+            {
                 out.pop();
             }
             Ok(out)
@@ -1413,6 +1440,22 @@ mod tests {
             tr.calls.lock().unwrap().as_slice(),
             [(20, 0, 3), (20, 3, 3), (5, 3, 0)]
         );
+    }
+
+    #[test]
+    fn a_batch_the_model_keeps_miscounting_is_translated_line_by_line() {
+        let src = many(4);
+        let tr = Scripted {
+            drop_multi: true,
+            ..Scripted::new()
+        };
+        let out = translate_with_text_model(&tr, &src, "en", "vi", &[], &mut |_| true).unwrap();
+        assert_eq!(out.untranslated, 0);
+        assert!(out.lines.iter().all(|l| l.text.starts_with("[vi] ")));
+        // The batch, its retry, then one request per line.
+        let calls = tr.calls.lock().unwrap();
+        assert_eq!(calls.len(), 2 + 4);
+        assert!(calls[2..].iter().all(|c| c.0 == 1));
     }
 
     #[test]
