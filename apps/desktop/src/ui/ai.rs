@@ -612,13 +612,31 @@ pub fn on_event(app: &Entity<AppModel>, ev: &cm_daemon::events::Event, cx: &mut 
                 cx,
             );
         }
+        // AI-8 and AI-9 run by an agent or the CLI: the open editor reads the bundle again.
+        "speakers.ready" | "report.ready" => {
+            let kind = if ev.name == "speakers.ready" {
+                crate::ai::jobs::VoiceJobKind::Speakers
+            } else {
+                crate::ai::jobs::VoiceJobKind::Report
+            };
+            let id = str_of("capture_id");
+            app.update(cx, |m, cx| {
+                match &id {
+                    Some(id) => m.transcribe.voice_ready(id, kind),
+                    None => m.transcribe.voice_epoch += 1,
+                }
+                cx.notify();
+            });
+        }
         "job.progress" => {
             if let (Some(job), Some(p)) = (
                 str_of("job_id"),
                 data.get("progress").and_then(Value::as_f64),
             ) {
                 app.update(cx, |m, cx| {
-                    if m.transcribe.progress_by_job(&job, p) {
+                    if m.transcribe.voice_progress_by_job(&job, p)
+                        || m.transcribe.progress_by_job(&job, p)
+                    {
                         cx.notify();
                     }
                 });
@@ -627,7 +645,9 @@ pub fn on_event(app: &Entity<AppModel>, ev: &cm_daemon::events::Event, cx: &mut 
         "job.done" => {
             if let Some(job) = str_of("job_id") {
                 app.update(cx, |m, cx| {
-                    m.transcribe.done_by_job(&job);
+                    if !m.transcribe.voice_ended_by_job(&job, Ok(())) {
+                        m.transcribe.done_by_job(&job);
+                    }
                     cx.notify();
                 });
                 // A finished download turns into an installed model.
@@ -642,7 +662,17 @@ pub fn on_event(app: &Entity<AppModel>, ev: &cm_daemon::events::Event, cx: &mut 
                     .and_then(|e| e.get("reason").or_else(|| e.get("message")))
                     .and_then(Value::as_str)
                     .map_or_else(|| tr!("The job failed"), str::to_owned);
+                let reason = data
+                    .get("error")
+                    .and_then(|e| e.get("reason"))
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+                    .unwrap_or_else(|| message.clone());
                 app.update(cx, |m, cx| {
+                    if m.transcribe.voice_ended_by_job(&job, Err(reason)) {
+                        cx.notify();
+                        return;
+                    }
                     m.transcribe.failed_by_job(&job, &message);
                     let model = m
                         .ai

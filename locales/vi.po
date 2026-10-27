@@ -9694,10 +9694,6 @@ msgid "Marker {label} at {time}"
 msgstr "Điểm đánh dấu {label} lúc {time}"
 
 #, fuzzy
-msgid "Meeting minutes and notes"
-msgstr "Biên bản họp và ghi chú"
-
-#, fuzzy
 msgid "Microphone and system audio together"
 msgstr "Micrô và âm thanh hệ thống cùng nhau"
 
@@ -9730,16 +9726,8 @@ msgid "Rename or fix speakers"
 msgstr "Đổi tên hoặc sửa người nói"
 
 #, fuzzy
-msgid "Reports are coming here: minutes, decisions and action items."
-msgstr "Báo cáo sẽ có ở đây: biên bản, quyết định và việc cần làm."
-
-#, fuzzy
 msgid "Runs in the background; you can keep working"
 msgstr "Chạy nền; bạn có thể tiếp tục làm việc"
-
-#, fuzzy
-msgid "Speaker labels are coming here: names, talk time and merging."
-msgstr "Nhãn người nói sẽ có ở đây: tên, thời lượng nói và gộp."
 
 #, fuzzy
 msgid "Speaker names"
@@ -9794,10 +9782,6 @@ msgid "Translate captions"
 msgstr "Dịch phụ đề"
 
 #, fuzzy
-msgid "Translate the transcript to"
-msgstr "Dịch bản chép lời sang"
-
-#, fuzzy
 msgid "Translate to"
 msgstr "Dịch sang"
 
@@ -9812,10 +9796,6 @@ msgstr "Bản dịch đã sẵn sàng: {language}"
 #, fuzzy
 msgid "What Export audio will produce"
 msgstr "Xuất âm thanh sẽ tạo ra gì"
-
-#, fuzzy
-msgid "Who said what"
-msgstr "Ai nói gì"
 
 #, fuzzy
 msgid "click a time to jump there"
@@ -10500,3 +10480,644 @@ msgstr "Thêm dấu mốc"
 msgctxt "shortcut"
 msgid "Start or stop audio recording"
 msgstr "Bắt đầu hoặc dừng ghi âm"
+
+#, fuzzy
+msgid "A report is written from the transcript. Transcribe the recording first."
+msgstr "Báo cáo được viết từ bản ghi lời. Hãy chuyển bản ghi thành văn bản trước."
+
+#, fuzzy
+msgid "Add a competency"
+msgstr "Thêm một năng lực"
+
+#, fuzzy
+msgid "Add a competency and press Enter"
+msgstr "Nhập một năng lực rồi nhấn Enter"
+
+#, fuzzy
+msgid "Add a name and press Enter"
+msgstr "Nhập một tên rồi nhấn Enter"
+
+#, fuzzy
+msgid "Add an attendee"
+msgstr "Thêm người tham dự"
+
+#, fuzzy
+msgid "Agenda"
+msgstr "Chương trình họp"
+
+#, fuzzy
+msgid "Another speaker already has that name."
+msgstr "Người nói khác đã có tên này."
+
+#, fuzzy
+msgid "Any language; each line keeps its start and end."
+msgstr "Mọi ngôn ngữ; mỗi dòng giữ nguyên thời điểm bắt đầu và kết thúc."
+
+#, fuzzy
+msgid "Attendees"
+msgstr "Người tham dự"
+
+#, fuzzy
+msgid "Back to the report"
+msgstr "Quay lại báo cáo"
+
+#, fuzzy
+msgid "Competencies"
+msgstr "Năng lực"
+
+#, fuzzy
+msgid "Context (optional, makes owners and names right)"
+msgstr "Ngữ cảnh (không bắt buộc, giúp ghi đúng người phụ trách và tên)"
+
+#, fuzzy
+msgid "Copy"
+msgstr "Sao chép"
+
+#, fuzzy
+msgid "Couldn’t change the speakers"
+msgstr "Không thể thay đổi người nói"
+
+#, fuzzy
+msgid "Couldn’t delete the report"
+msgstr "Không thể xoá báo cáo"
+
+#, fuzzy
+msgid "Couldn’t find the speakers"
+msgstr "Không thể tìm người nói"
+
+#, fuzzy
+msgid "Couldn’t save the report"
+msgstr "Không thể lưu báo cáo"
+
+#, fuzzy
+msgid "Couldn’t write the report"
+msgstr "Không thể viết báo cáo"
+
+#, fuzzy
+msgid "Delete a report"
+msgstr "Xoá một báo cáo"
+
+#, fuzzy
+msgid "Delete the report"
+msgstr "Xoá báo cáo"
+
+#, fuzzy
+msgid "Delete this report?"
+msgstr "Xoá báo cáo này?"
+
+#, fuzzy
+msgid "Edit a report"
+msgstr "Sửa một báo cáo"
+
+#, fuzzy
+msgid "Edit as Markdown"
+msgstr "Sửa dưới dạng Markdown"
+
+#, fuzzy
+msgid "Engine · chosen for you"
+msgstr "Công cụ · chọn sẵn cho bạn"
+
+#, fuzzy
+msgid "Every item links to the moment it was said"
+msgstr "Mỗi mục liên kết đến thời điểm được nói"
+
+#, fuzzy
+msgid "Export a report"
+msgstr "Xuất một báo cáo"
+
+#, fuzzy
+msgid "Find again"
+msgstr "Tìm lại"
+
+#, fuzzy
+msgid "Find speakers"
+msgstr "Tìm người nói"
+
+#, fuzzy
+msgid "Finding speakers…"
+msgstr "Đang tìm người nói…"
+
+#, fuzzy
+msgid "Finding speakers… {percent}%"
+msgstr "Đang tìm người nói… {percent}%"
+
+#, fuzzy
+msgid "For headset calls: the mic track is you, only the call is split into voices."
+msgstr "Cho cuộc gọi dùng tai nghe: kênh micrô là bạn, chỉ phần cuộc gọi được tách theo giọng."
+
+#, fuzzy
+msgid "From {language} · times are kept"
+msgstr "Từ {language} · giữ nguyên mốc thời gian"
+
+#, fuzzy
+msgid "Fully offline, no text model needed. It uses Large v3 or Medium; Large v3 Turbo can’t translate."
+msgstr "Hoàn toàn ngoại tuyến, không cần mô hình văn bản. Dùng Large v3 hoặc Medium; Large v3 Turbo không dịch được."
+
+#, fuzzy
+msgid "It’s a separate download on the AI page ({label}, {licence}, {size} MB); the size is shown first and nothing is fetched until you ask."
+msgstr "Đây là bản tải riêng trên trang AI ({label}, {licence}, {size} MB); dung lượng được hiện trước và không có gì được tải cho đến khi bạn yêu cầu."
+
+#, fuzzy
+msgid "List report templates"
+msgstr "Liệt kê mẫu báo cáo"
+
+#, fuzzy
+msgid "Long recordings are read in parts, then merged. You can keep editing."
+msgstr "Bản ghi dài được đọc theo từng phần rồi ghép lại. Bạn vẫn có thể tiếp tục chỉnh sửa."
+
+#, fuzzy
+msgid "Markdown"
+msgstr "Markdown"
+
+#, fuzzy
+msgid "Merge"
+msgstr "Gộp"
+
+#, fuzzy
+msgid "Merge into"
+msgstr "Gộp vào"
+
+#, fuzzy
+msgid "Merge {name} into another speaker"
+msgstr "Gộp {name} vào người nói khác"
+
+#, fuzzy
+msgid "My microphone only hears me"
+msgstr "Micrô của tôi chỉ thu giọng tôi"
+
+#, fuzzy
+msgid "Needs a microphone track and a system audio track."
+msgstr "Cần một kênh micrô và một kênh âm thanh hệ thống."
+
+#, fuzzy
+msgid "New report"
+msgstr "Báo cáo mới"
+
+#, fuzzy
+msgid "No text model is set up"
+msgstr "Chưa thiết lập mô hình văn bản"
+
+#, fuzzy
+msgid "Notes only — CaptureMann doesn’t score candidates. Using AI to assess candidates is regulated in some places."
+msgstr "Chỉ ghi chú — CaptureMann không chấm điểm ứng viên. Dùng AI để đánh giá ứng viên bị quản lý ở một số nơi."
+
+#, fuzzy
+msgid "Nothing found"
+msgstr "Không tìm thấy gì"
+
+#, fuzzy
+msgid "Open AI page"
+msgstr "Mở trang AI"
+
+#, fuzzy
+msgid "Play a sample of {name}"
+msgstr "Phát đoạn mẫu của {name}"
+
+#, fuzzy
+msgid "Read a report"
+msgstr "Đọc một báo cáo"
+
+#, fuzzy
+msgid "Regenerate"
+msgstr "Viết lại"
+
+#, fuzzy
+msgid "Rename {name}"
+msgstr "Đổi tên {name}"
+
+#, fuzzy
+msgid "Report Markdown"
+msgstr "Markdown của báo cáo"
+
+#, fuzzy
+msgid "Report language"
+msgstr "Ngôn ngữ báo cáo"
+
+#, fuzzy
+msgid "Report saved"
+msgstr "Đã lưu báo cáo"
+
+#, fuzzy
+msgid "Report template"
+msgstr "Mẫu báo cáo"
+
+#, fuzzy
+msgid "Reports are written by a text model on this Mac (Ollama or LM Studio). Choose one on the AI page; nothing is sent anywhere else."
+msgstr "Báo cáo được viết bởi một mô hình văn bản trên máy Mac này (Ollama hoặc LM Studio). Hãy chọn một mô hình trên trang AI; không có gì được gửi đi nơi khác."
+
+#, fuzzy
+msgid "Reports of this recording"
+msgstr "Các báo cáo của bản ghi này"
+
+#, fuzzy
+msgid "Role"
+msgstr "Vai trò"
+
+#, fuzzy
+msgid "Same as the transcript"
+msgstr "Giống bản ghi lời"
+
+#, fuzzy
+msgid "Same as the transcript ({language})"
+msgstr "Giống bản ghi lời ({language})"
+
+#, fuzzy
+msgid "Speaker labels aren’t available yet"
+msgstr "Chưa có nhãn người nói"
+
+#, fuzzy
+msgid "Speaker name"
+msgstr "Tên người nói"
+
+#, fuzzy
+msgid "Speakers"
+msgstr "Người nói"
+
+#, fuzzy
+msgid "Speakers are told apart by their voices, not by device."
+msgstr "Người nói được phân biệt theo giọng, không theo thiết bị."
+
+#, fuzzy
+msgid "TXT"
+msgstr "TXT"
+
+#, fuzzy
+msgid "Terms in your glossary stay as written."
+msgstr "Các thuật ngữ trong bảng thuật ngữ của bạn được giữ nguyên."
+
+#, fuzzy
+msgid "Text model, line by line"
+msgstr "Mô hình văn bản, từng dòng một"
+
+#, fuzzy
+msgid "The role the interview is for"
+msgstr "Vai trò mà buổi phỏng vấn dành cho"
+
+#, fuzzy
+msgid "The speaker model isn’t installed"
+msgstr "Chưa cài mô hình nhận diện người nói"
+
+#, fuzzy
+msgid "They need a separate speaker model, and this version doesn’t include one. Nothing is downloaded until you ask."
+msgstr "Cần một mô hình nhận diện người nói riêng, và phiên bản này chưa kèm theo. Không có gì được tải cho đến khi bạn yêu cầu."
+
+#, fuzzy
+msgid "This report was made with a template this version doesn’t know."
+msgstr "Báo cáo này được tạo bằng một mẫu mà phiên bản này không biết."
+
+#, fuzzy
+msgid "Times are kept"
+msgstr "Giữ nguyên mốc thời gian"
+
+#, fuzzy
+msgid "To"
+msgstr "Sang"
+
+#, fuzzy
+msgid "Topics, one per line"
+msgstr "Các chủ đề, mỗi dòng một chủ đề"
+
+#, fuzzy
+msgid "Translate"
+msgstr "Dịch"
+
+#, fuzzy
+msgid "Translate transcript"
+msgstr "Dịch bản ghi lời"
+
+#, fuzzy
+msgid "Type a name."
+msgstr "Hãy nhập một tên."
+
+#, fuzzy
+msgid "Undo brings it back."
+msgstr "Hoàn tác sẽ khôi phục lại."
+
+#, fuzzy
+msgid "Use 60 characters or fewer."
+msgstr "Dùng tối đa 60 ký tự."
+
+#, fuzzy
+msgid "Voices are compared in memory only. No voiceprint is saved, and people are never recognised across recordings."
+msgstr "Giọng nói chỉ được so sánh trong bộ nhớ. Không lưu dấu giọng nói, và không bao giờ nhận ra một người giữa các bản ghi."
+
+#, fuzzy
+msgid "Weekly product sync"
+msgstr "Họp sản phẩm hằng tuần"
+
+#, fuzzy
+msgid "Whisper only translates into English. Choose a text model on this Mac on the AI page."
+msgstr "Whisper chỉ dịch sang tiếng Anh. Hãy chọn một mô hình văn bản trên máy Mac này ở trang AI."
+
+#, fuzzy
+msgid "Whisper, from the audio"
+msgstr "Whisper, từ âm thanh"
+
+#, fuzzy
+msgid "Works with one microphone on the table"
+msgstr "Dùng được với một micrô đặt trên bàn"
+
+#, fuzzy
+msgid "Write a report from a transcript"
+msgstr "Viết báo cáo từ bản ghi lời"
+
+#, fuzzy
+msgid "Write in"
+msgstr "Viết bằng"
+
+#, fuzzy
+msgid "Write {name}"
+msgstr "Viết {name}"
+
+#, fuzzy
+msgid "Writing the report…"
+msgstr "Đang viết báo cáo…"
+
+#, fuzzy
+msgid "Writing the report… {percent}%"
+msgstr "Đang viết báo cáo… {percent}%"
+
+#, fuzzy
+msgid "{language} needs a text model"
+msgstr "{language} cần một mô hình văn bản"
+
+#, fuzzy
+msgid "{model} on this Mac. Any language; each line keeps its start and end."
+msgstr "{model} trên máy Mac này. Mọi ngôn ngữ; mỗi dòng giữ nguyên thời điểm bắt đầu và kết thúc."
+
+#, fuzzy
+msgid "{model} · on this Mac"
+msgstr "{model} · trên máy Mac này"
+
+#, fuzzy
+msgid "{model} · runs on this Mac"
+msgstr "{model} · chạy trên máy Mac này"
+
+#, fuzzy
+msgid "{n} found from the voices · whole recording"
+msgstr "Tìm thấy {n} từ giọng nói · toàn bộ bản ghi"
+
+#, fuzzy
+msgid "{n} item left out: no matching moment"
+msgid_plural "{n} items left out: no matching moment"
+msgstr[0] "Đã bỏ {n} mục: không có thời điểm khớp"
+
+#, fuzzy
+msgid "{n} report"
+msgid_plural "{n} reports"
+msgstr[0] "{n} báo cáo"
+
+#, fuzzy
+msgctxt "button"
+msgid "Save"
+msgstr "Lưu"
+
+#, fuzzy
+msgctxt "report"
+msgid "edited"
+msgstr "đã sửa"
+
+#, fuzzy
+msgctxt "report badge"
+msgid "Local"
+msgstr "Trên máy"
+
+#, fuzzy
+msgctxt "report field"
+msgid "Answer"
+msgstr "Trả lời"
+
+#, fuzzy
+msgctxt "report field"
+msgid "Audience"
+msgstr "Đối tượng"
+
+#, fuzzy
+msgctxt "report field"
+msgid "Competency"
+msgstr "Năng lực"
+
+#, fuzzy
+msgctxt "report field"
+msgid "Definition"
+msgstr "Định nghĩa"
+
+#, fuzzy
+msgctxt "report field"
+msgid "Due"
+msgstr "Hạn"
+
+#, fuzzy
+msgctxt "report field"
+msgid "Key points"
+msgstr "Ý chính"
+
+#, fuzzy
+msgctxt "report field"
+msgid "People"
+msgstr "Những người"
+
+#, fuzzy
+msgctxt "report field"
+msgid "Product"
+msgstr "Sản phẩm"
+
+#, fuzzy
+msgctxt "report field"
+msgid "Question"
+msgstr "Câu hỏi"
+
+#, fuzzy
+msgctxt "report field"
+msgid "Quote"
+msgstr "Trích dẫn"
+
+#, fuzzy
+msgctxt "report field"
+msgid "Role"
+msgstr "Vai trò"
+
+#, fuzzy
+msgctxt "report field"
+msgid "Topic"
+msgstr "Chủ đề"
+
+#, fuzzy
+msgctxt "report field"
+msgid "What it shows"
+msgstr "Điều nó cho thấy"
+
+#, fuzzy
+msgctxt "report owner"
+msgid "Unassigned"
+msgstr "Chưa giao"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Action items"
+msgstr "Việc cần làm"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Agreed actions"
+msgstr "Việc đã thống nhất"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Attendees"
+msgstr "Người tham dự"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Candidate’s questions"
+msgstr "Câu hỏi của ứng viên"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Concerns"
+msgstr "Mối lo ngại"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Concerns raised"
+msgstr "Mối lo ngại được nêu"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Decisions"
+msgstr "Quyết định"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Definitions"
+msgstr "Định nghĩa"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Evidence per competency"
+msgstr "Bằng chứng theo năng lực"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Examples"
+msgstr "Ví dụ"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Features shown"
+msgstr "Tính năng đã giới thiệu"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Feedback given"
+msgstr "Phản hồi đã đưa ra"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Feedback received"
+msgstr "Phản hồi đã nhận"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Follow-ups"
+msgstr "Việc theo dõi tiếp"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Key points"
+msgstr "Ý chính"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Marked moments"
+msgstr "Thời điểm đã đánh dấu"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Next steps"
+msgstr "Bước tiếp theo"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Open questions"
+msgstr "Câu hỏi còn mở"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Product and audience"
+msgstr "Sản phẩm và đối tượng"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Questions and answers"
+msgstr "Hỏi và đáp"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Questions asked"
+msgstr "Câu hỏi đã được hỏi"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Review questions"
+msgstr "Câu hỏi ôn tập"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Role and candidate"
+msgstr "Vai trò và ứng viên"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Summary"
+msgstr "Tóm tắt"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Topics"
+msgstr "Chủ đề"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Updates"
+msgstr "Cập nhật"
+
+#, fuzzy
+msgctxt "report section"
+msgid "Wins"
+msgstr "Thành tựu"
+
+#, fuzzy
+msgctxt "report template"
+msgid "Interview notes"
+msgstr "Ghi chú phỏng vấn"
+
+#, fuzzy
+msgctxt "report template"
+msgid "Lecture notes"
+msgstr "Ghi chú bài giảng"
+
+#, fuzzy
+msgctxt "report template"
+msgid "Meeting minutes"
+msgstr "Biên bản họp"
+
+#, fuzzy
+msgctxt "report template"
+msgid "One-on-one notes"
+msgstr "Ghi chú họp 1-1"
+
+#, fuzzy
+msgctxt "report template"
+msgid "Product recap"
+msgstr "Tóm lược sản phẩm"
+
+#, fuzzy
+msgctxt "report template"
+msgid "Summary"
+msgstr "Tóm tắt"
+
+#, fuzzy
+msgctxt "report template"
+msgid "suggested"
+msgstr "gợi ý"

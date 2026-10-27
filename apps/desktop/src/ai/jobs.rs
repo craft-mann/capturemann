@@ -16,8 +16,33 @@ struct Run {
     progress: Option<f32>,
 }
 
+/// The background jobs of the Speakers and Report tabs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VoiceJobKind {
+    /// `diarize`.
+    Speakers,
+    /// `generate_report`.
+    Report,
+}
+
+/// A speaker or report job this window started.
+#[derive(Debug, Clone, PartialEq)]
+pub struct VoiceJob {
+    pub capture_id: String,
+    pub kind: VoiceJobKind,
+    /// 0.0 to 1.0 when the job reports it.
+    pub progress: Option<f32>,
+}
+
+/// How a speaker or report job ended: `Err` holds the daemon's reason or message.
+pub type VoiceEnd = (VoiceJobKind, Result<(), String>);
+
 #[derive(Debug, Clone, Default)]
 pub struct TranscribeVm {
+    /// Speaker and report jobs in flight, by job id.
+    voice_jobs: HashMap<String, VoiceJob>,
+    /// Finished ones the editor has not read yet, by recording.
+    voice_ended: Vec<(String, VoiceEnd)>,
     running: HashMap<String, Run>,
     errors: HashMap<String, ErrorNote>,
     /// Bumped whenever a transcript was written (or a run ended): readers reload.
@@ -61,6 +86,97 @@ impl TranscribeVm {
     /// The recording's own setting changed: it is the default again.
     pub fn clear_export_burn(&mut self, capture_id: &str) {
         self.export_burn.remove(capture_id);
+    }
+
+    /// A `diarize` or `generate_report` call is on its way: the tab shows it running at once.
+    /// `false` when one of that kind is already running for the recording.
+    pub fn voice_job_begin(&mut self, capture_id: &str, kind: VoiceJobKind) -> bool {
+        if self.voice_job(capture_id, kind).is_some() {
+            return false;
+        }
+        self.voice_jobs.insert(
+            format!("pending:{capture_id}:{kind:?}"),
+            VoiceJob {
+                capture_id: capture_id.to_owned(),
+                kind,
+                progress: None,
+            },
+        );
+        true
+    }
+
+    /// The call was accepted: the job has an id now (when it already ended, nothing is left to
+    /// rename).
+    pub fn voice_job_adopt(&mut self, capture_id: &str, kind: VoiceJobKind, job_id: &str) {
+        if let Some(j) = self
+            .voice_jobs
+            .remove(&format!("pending:{capture_id}:{kind:?}"))
+        {
+            self.voice_jobs.insert(job_id.to_owned(), j);
+        }
+    }
+
+    /// The call failed: it is not running.
+    pub fn voice_job_abort(&mut self, capture_id: &str, kind: VoiceJobKind) {
+        self.voice_jobs
+            .retain(|_, j| !(j.capture_id == capture_id && j.kind == kind));
+    }
+
+    /// `speakers.ready` or `report.ready`: that job is over, whoever started it.
+    pub fn voice_ready(&mut self, capture_id: &str, kind: VoiceJobKind) {
+        self.voice_job_abort(capture_id, kind);
+        self.voice_epoch += 1;
+    }
+
+    /// The running job of `kind` for a recording, if any.
+    pub fn voice_job(&self, capture_id: &str, kind: VoiceJobKind) -> Option<&VoiceJob> {
+        self.voice_jobs
+            .values()
+            .find(|j| j.capture_id == capture_id && j.kind == kind)
+    }
+
+    /// The job id of the running job of `kind` for a recording.
+    pub fn voice_job_id(&self, capture_id: &str, kind: VoiceJobKind) -> Option<String> {
+        self.voice_jobs
+            .iter()
+            .find(|(_, j)| j.capture_id == capture_id && j.kind == kind)
+            .map(|(id, _)| id.clone())
+    }
+
+    /// `job.progress` for a speaker or report job.
+    pub fn voice_progress_by_job(&mut self, job_id: &str, progress: f64) -> bool {
+        let p = if progress > 1.0 {
+            progress / 100.0
+        } else {
+            progress
+        };
+        match self.voice_jobs.get_mut(job_id) {
+            Some(j) => {
+                j.progress = Some(p.clamp(0.0, 1.0) as f32);
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// `job.done` or `job.failed` for a speaker or report job: it is no longer running, and the
+    /// editor reads the end (and the bundle again) on its next frame.
+    pub fn voice_ended_by_job(&mut self, job_id: &str, result: Result<(), String>) -> bool {
+        let Some(j) = self.voice_jobs.remove(job_id) else {
+            return false;
+        };
+        self.voice_ended.push((j.capture_id, (j.kind, result)));
+        self.voice_epoch += 1;
+        true
+    }
+
+    /// The ends of this recording's jobs, once.
+    pub fn take_voice_ended(&mut self, capture_id: &str) -> Vec<VoiceEnd> {
+        let (mine, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut self.voice_ended)
+            .into_iter()
+            .partition(|(id, _)| id == capture_id);
+        self.voice_ended = rest;
+        mine.into_iter().map(|(_, e)| e).collect()
     }
 
     pub fn is_running(&self, capture_id: &str) -> bool {
@@ -187,6 +303,46 @@ impl TranscribeVm {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// AI-8 and AI-9: a speaker or report job is "running" from the click, takes its id when the
+    /// daemon accepts it, and its end (or failure reason) is read once by the editor.
+    #[test]
+    fn a_voice_job_runs_from_the_click_and_ends_once() {
+        let mut v = TranscribeVm::default();
+        assert!(v.voice_job_begin("rec_1", VoiceJobKind::Report));
+        assert!(
+            !v.voice_job_begin("rec_1", VoiceJobKind::Report),
+            "one at a time"
+        );
+        assert!(
+            v.voice_job_begin("rec_1", VoiceJobKind::Speakers),
+            "another kind runs"
+        );
+        assert!(v.voice_job("rec_2", VoiceJobKind::Report).is_none());
+        v.voice_job_adopt("rec_1", VoiceJobKind::Report, "job_9");
+        assert!(v.voice_progress_by_job("job_9", 40.0));
+        assert_eq!(
+            v.voice_job("rec_1", VoiceJobKind::Report).unwrap().progress,
+            Some(0.4)
+        );
+        assert!(!v.voice_progress_by_job("job_x", 0.5));
+        let before = v.voice_epoch;
+        assert!(v.voice_ended_by_job("job_9", Err("no_text_model".into())));
+        assert!(v.voice_epoch > before, "the editor reads the bundle again");
+        assert!(v.voice_job("rec_1", VoiceJobKind::Report).is_none());
+        assert!(v.take_voice_ended("rec_2").is_empty());
+        assert_eq!(
+            v.take_voice_ended("rec_1"),
+            vec![(VoiceJobKind::Report, Err("no_text_model".to_owned()))]
+        );
+        assert!(v.take_voice_ended("rec_1").is_empty(), "read once");
+        // `speakers.ready` ends a job whoever started it, and a failed call clears the click.
+        v.voice_ready("rec_1", VoiceJobKind::Speakers);
+        assert!(v.voice_job("rec_1", VoiceJobKind::Speakers).is_none());
+        assert!(v.voice_job_begin("rec_1", VoiceJobKind::Speakers));
+        v.voice_job_abort("rec_1", VoiceJobKind::Speakers);
+        assert!(v.voice_job("rec_1", VoiceJobKind::Speakers).is_none());
+    }
 
     #[test]
     fn a_run_starts_once_and_reports_progress_by_job() {

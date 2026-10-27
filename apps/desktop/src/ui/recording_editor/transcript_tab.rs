@@ -24,7 +24,10 @@ use crate::recedit::voice::{
     translate_choices, Row,
 };
 use crate::theme::{scale, type_scale, Theme};
-use crate::ui::components::{ellipsis_text, icon, shrink_text, switch};
+use crate::ui::components::{
+    button_with_icon, ellipsis_text, icon, label_fill, shrink_text, switch, ButtonKind,
+};
+use crate::ui::kit::{callout, Tone};
 use crate::ui::paint::{rgba_of, TextExt};
 use crate::ui::scroll::fill_scroll;
 use crate::ui::settings::widgets::{segment, segmented, small_button_with_icon};
@@ -250,7 +253,7 @@ impl RecordingEditor {
     }
 
     /// The language the recording was transcribed in (empty when the daemon did not say).
-    fn transcript_language(&self) -> String {
+    pub(super) fn transcript_language(&self) -> String {
         self.ai.transcript_language.clone().unwrap_or_default()
     }
 
@@ -342,9 +345,12 @@ impl RecordingEditor {
             .into_any_element()
     }
 
-    /// The languages Translate... offers, as chips; the choice starts `translate_captions`.
-    /// TODO(design): the board's Translate panel (V5: target language, engine line, glossary and
-    /// kept-edits notes, the model-missing state) replaces this row of chips.
+    /// The Translate panel (V5): the target language, the engine the daemon will pick (Whisper from
+    /// the audio into English, else the text model line by line), the glossary note, then Cancel
+    /// and Translate. Without a text model a language other than English cannot be translated
+    /// (`translate_captions` would answer `no_text_model`), so the panel says so and points to the
+    /// AI page instead of sending the call. Whether Whisper has a model that can translate is not
+    /// known here; the daemon's answer arrives as a toast.
     fn translate_chooser(
         &self,
         t: &Theme,
@@ -353,38 +359,219 @@ impl RecordingEditor {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let choices = translate_choices(own, &s.voice);
+        let Some(pick) = self
+            .vp
+            .translate_pick
+            .filter(|p| choices.contains(p))
+            .or_else(|| choices.first().copied())
+        else {
+            return div().into_any_element();
+        };
+        let english = pick == "en";
+        let text = self.text_state(cx);
+        let blocked = !english && text == super::report_tab::TextState::Missing;
+        let from = if own.is_empty() {
+            tr!("Times are kept")
+        } else {
+            tr!(
+                "From {language} \u{00B7} times are kept",
+                language = language_name(own)
+            )
+        };
+        let chips = choices.iter().map(|&code| {
+            segment(
+                t,
+                SharedString::from(format!("re-translate-{code}")),
+                &language_name(code),
+                code == pick,
+            )
+            .on_click(cx.listener(move |this, _, _, cx| {
+                this.vp.translate_pick = Some(code);
+                cx.notify();
+            }))
+        });
+        let engine = if english {
+            (
+                "audio-lines",
+                tr!("Whisper, from the audio"),
+                tr!(
+                    "Fully offline, no text model needed. It uses Large v3 or Medium; Large v3 \
+                     Turbo can\u{2019}t translate."
+                ),
+            )
+        } else {
+            (
+                "languages",
+                tr!("Text model, line by line"),
+                match &text {
+                    super::report_tab::TextState::Ready(model) => tr!(
+                        "{model} on this Mac. Any language; each line keeps its start and end.",
+                        model = model.clone()
+                    ),
+                    _ => tr!("Any language; each line keeps its start and end."),
+                },
+            )
+        };
+        let engine_card = div()
+            .id("re-translate-engine")
+            .p(px(12.))
+            .flex()
+            .items_start()
+            .gap(px(10.))
+            .rounded(px(scale::RADIUS_MD))
+            .border_1()
+            .border_color(rgba_of(t.line))
+            .bg(rgba_of(t.ground))
+            .child(div().pt(px(2.)).child(icon(engine.0, 16., t.text_2)))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w(px(0.))
+                    .flex()
+                    .flex_col()
+                    .gap(px(2.))
+                    .child(
+                        div()
+                            .text_size(px(type_scale::UI))
+                            .font_weight(FontWeight::MEDIUM)
+                            .child(engine.1),
+                    )
+                    .child(
+                        div()
+                            .text_size(px(type_scale::CAPTION))
+                            .text_color(rgba_of(t.mist))
+                            .child(engine.2),
+                    ),
+            );
+        let app = self.app.clone();
+        let warn = blocked.then(|| {
+            callout(
+                t,
+                Tone::Brass,
+                "triangle-alert",
+                tr!(
+                    "{language} needs a text model",
+                    language = language_name(pick)
+                ),
+                Some(
+                    tr!(
+                        "Whisper only translates into English. Choose a text model on this Mac \
+                         on the AI page."
+                    )
+                    .into(),
+                ),
+                Some(
+                    small_button_with_icon(
+                        t,
+                        "re-translate-open-ai",
+                        &tr!("Open AI page"),
+                        Some("sparkles"),
+                    )
+                    .on_click(move |_, _, cx| {
+                        let app = app.clone();
+                        cx.defer(move |cx| {
+                            crate::ui::app::set_route(&app, crate::ui::app::Route::Ai, cx)
+                        });
+                    })
+                    .into_any_element(),
+                ),
+            )
+        });
+        let go = button_with_icon(
+            t,
+            "re-translate-go",
+            tr!("Translate"),
+            ButtonKind::Primary,
+            Some("languages"),
+        );
+        let go = if blocked {
+            go.opacity(0.45).cursor_default().into_any_element()
+        } else {
+            go.on_click(cx.listener(move |this, _, _, cx| this.voice_translate(pick, cx)))
+                .into_any_element()
+        };
         div()
             .id("re-translate-choices")
             .role(Role::Group)
-            .aria_label(tr!("Translate to"))
+            .aria_label(tr!("Translate transcript"))
             .flex()
             .flex_col()
-            .gap(px(8.))
-            .p(px(12.))
+            .gap(px(12.))
+            .p(px(14.))
             .rounded(px(scale::RADIUS_MD))
             .border_1()
             .border_color(rgba_of(t.border))
-            .bg(rgba_of(t.ground))
+            .bg(rgba_of(t.surface))
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(10.))
+                    .child(icon("languages", 18., t.text_2))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w(px(0.))
+                            .flex()
+                            .flex_col()
+                            .child(
+                                div()
+                                    .text_size(px(16.))
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .child(tr!("Translate transcript")),
+                            )
+                            .child(
+                                div()
+                                    .text_size(px(type_scale::CAPTION))
+                                    .text_color(rgba_of(t.mist))
+                                    .child(from),
+                            ),
+                    ),
+            )
             .child(
                 div()
                     .text_size(px(type_scale::CAPTION))
                     .text_color(rgba_of(t.mist))
-                    .child(tr!("Translate the transcript to")),
+                    .child(tr!("To")),
             )
+            .child(segmented(t, "re-translate-to", &tr!("Translate to")).children(chips))
+            .child(
+                div()
+                    .text_size(px(type_scale::CAPTION))
+                    .text_color(rgba_of(t.mist))
+                    .child(tr!("Engine \u{00B7} chosen for you")),
+            )
+            .child(engine_card)
+            .children(warn)
+            .children((!english).then(|| {
+                div()
+                    .flex()
+                    .items_start()
+                    .gap(px(10.))
+                    .text_size(px(13.))
+                    .text_color(rgba_of(t.text_3))
+                    .child(div().pt(px(2.)).child(icon("type", 16., t.mist)))
+                    .child(label_fill(tr!("Terms in your glossary stay as written.")))
+            }))
             .child(
                 div()
                     .flex()
-                    .flex_wrap()
-                    .gap(px(6.))
-                    .children(choices.into_iter().map(|code| {
-                        small_button_with_icon(
+                    .justify_end()
+                    .gap(px(8.))
+                    .child(
+                        button_with_icon(
                             t,
-                            SharedString::from(format!("re-translate-{code}")),
-                            &language_name(code),
+                            "re-translate-cancel",
+                            tr_ctx!("button", "Cancel"),
+                            ButtonKind::Secondary,
                             None,
                         )
-                        .on_click(cx.listener(move |this, _, _, cx| this.voice_translate(code, cx)))
-                    })),
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.voice_ui.translate_open = false;
+                            cx.notify();
+                        })),
+                    )
+                    .child(go),
             )
             .into_any_element()
     }

@@ -450,7 +450,14 @@ impl LibraryView {
         }
         if let Some(item) = self.items.get(ix) {
             self.state.selected = Some(ix);
-            app::set_route(&self.app, app::open_route(&item.id), cx);
+            // An audio recording opens in the audio editor (VOC-2); Details is one click away
+            // from its header.
+            let route = if item.kind == Kind::Audio {
+                Route::RecordingEditor(item.id.clone())
+            } else {
+                app::open_route(&item.id)
+            };
+            app::set_route(&self.app, route, cx);
         }
     }
 

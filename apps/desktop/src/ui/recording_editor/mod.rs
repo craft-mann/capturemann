@@ -21,6 +21,7 @@ pub(crate) mod tabs;
 mod timeline;
 mod transcript_tab;
 mod view_cards;
+mod voice_fields;
 
 use std::cell::Cell;
 use std::collections::VecDeque;
@@ -212,6 +213,8 @@ pub struct RecordingEditor {
     last_zoom: Option<MediaTime>,
     /// The audio editor's own state (VOC-2): language, translate chooser, scroll, the sheet.
     voice_ui: audio_view::VoiceUi,
+    /// The Speakers and Report tabs' fields and choices (V5, V6).
+    vp: voice_fields::VoicePanels,
 }
 
 /// Buckets per second of a waveform (50 ms each: a pixel at the widest zoom out of an hour).
@@ -365,6 +368,7 @@ impl RecordingEditor {
             last_selection: None,
             last_zoom: None,
             voice_ui: audio_view::VoiceUi::new(),
+            vp: voice_fields::VoicePanels::new(cx),
         }
     }
 
@@ -383,6 +387,7 @@ impl RecordingEditor {
         self.last_selection = None;
         self.last_zoom = None;
         self.voice_ui = audio_view::VoiceUi::new();
+        self.vp.reset(cx);
         self.load = Load::Loading;
         let root = self.app.read(cx).backend.library_root.clone();
         let id = id.to_owned();
@@ -707,7 +712,7 @@ impl RecordingEditor {
             cx.stop_propagation();
             return;
         }
-        if self.ai.field_focused(window, cx) {
+        if self.ai.field_focused(window, cx) || self.vp.field_focused(window, cx) {
             return;
         }
         // Esc stops "play this line" (Space already pauses, and that forgets the line).
@@ -937,7 +942,10 @@ impl Render for RecordingEditor {
         self.sync_tab(cx);
         // The caption list: what has the keyboard, how wide the window is, and any move that
         // waited for a window (Enter to the next line, back from the find bar).
-        self.ai.view.typing.set(self.ai.field_focused(window, cx));
+        self.ai
+            .view
+            .typing
+            .set(self.ai.field_focused(window, cx) || self.vp.field_focused(window, cx));
         self.ai
             .view
             .window_w

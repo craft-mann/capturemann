@@ -93,17 +93,10 @@ fn open_capture(app: &Entity<AppModel>, action: DockAction, cx: &mut App) {
     }
 }
 
-/// The mic button's click: the Record sheet for audio (VOC-1, `RecordSheetMode::Audio`).
-///
-/// TODO(voice P1.1/P1.3): the Record sheet has no Audio mode yet. Until its owner wires
-/// `nav::RecordSheetMode::Audio` into `open_sheet_with`, this opens the sheet as it is.
+/// The mic button's click: the Record sheet in Audio mode (VOC-1, `RecordSheetMode::Audio`).
 pub(crate) fn open_record_audio(app: &Entity<AppModel>, cx: &mut App) {
-    let mode = nav::RecordSheetMode::Audio;
     let app = app.clone();
-    cx.defer(move |cx| {
-        let _ = mode;
-        crate::ui::recording::open_sheet(&app, None, None, cx)
-    });
+    cx.defer(move |cx| crate::ui::recording::open_audio_sheet(&app, cx));
 }
 
 /// The mic button of the dock and the rail: a rec-tinted square beside Record (board

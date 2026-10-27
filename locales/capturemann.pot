@@ -83,6 +83,9 @@ msgstr ""
 msgid "A recording is running. Stop it, then change the library folder."
 msgstr ""
 
+msgid "A report is written from the transcript. Transcribe the recording first."
+msgstr ""
+
 msgid "A zoom eases in over {secs} seconds, holds, and eases out"
 msgstr ""
 
@@ -161,6 +164,12 @@ msgstr ""
 msgid "Add a client by name"
 msgstr ""
 
+msgid "Add a competency"
+msgstr ""
+
+msgid "Add a competency and press Enter"
+msgstr ""
+
 msgid "Add a label (optional)"
 msgstr ""
 
@@ -177,6 +186,9 @@ msgstr ""
 msgid "Add a model on the AI page to transcribe with AI. Nothing is downloaded unless you press Download there."
 msgstr ""
 
+msgid "Add a name and press Enter"
+msgstr ""
+
 msgid "Add a speech model on the AI page to transcribe your recordings."
 msgstr ""
 
@@ -184,6 +196,9 @@ msgid "Add a term"
 msgstr ""
 
 msgid "Add a zoom at the playhead"
+msgstr ""
+
+msgid "Add an attendee"
 msgstr ""
 
 msgid "Add another channel"
@@ -238,6 +253,9 @@ msgid "After recording"
 msgstr ""
 
 msgid "After you stop"
+msgstr ""
+
+msgid "Agenda"
 msgstr ""
 
 msgid "Agent clients"
@@ -357,7 +375,13 @@ msgstr ""
 msgid "Another server on this Mac (address)"
 msgstr ""
 
+msgid "Another speaker already has that name."
+msgstr ""
+
 msgid "Answer “Is this video made for kids?” to publish."
+msgstr ""
+
+msgid "Any language; each line keeps its start and end."
 msgstr ""
 
 msgid "Anyone can find and watch it."
@@ -391,6 +415,9 @@ msgid "Apps excluded from recordings"
 msgstr ""
 
 msgid "Apps that never appear in recordings"
+msgstr ""
+
+msgid "Attendees"
 msgstr ""
 
 msgid "Audio device changed from {from} to {to}"
@@ -439,6 +466,9 @@ msgid "Back to the library"
 msgstr ""
 
 msgid "Back to the recording"
+msgstr ""
+
+msgid "Back to the report"
 msgstr ""
 
 msgid "Background color {hex}"
@@ -893,6 +923,9 @@ msgstr ""
 msgid "Commands"
 msgstr ""
 
+msgid "Competencies"
+msgstr ""
+
 msgid "Confirm that everyone can see this video"
 msgstr ""
 
@@ -929,6 +962,9 @@ msgstr ""
 msgid "Constrain angle or shape"
 msgstr ""
 
+msgid "Context (optional, makes owners and names right)"
+msgstr ""
+
 msgid "Continue in browser"
 msgstr ""
 
@@ -963,6 +999,9 @@ msgid "Copies the exported video or image."
 msgstr ""
 
 msgid "Copies the whole capture folder with its tracks, so it can be edited later."
+msgstr ""
+
+msgid "Copy"
 msgstr ""
 
 msgid "Copy + save"
@@ -1043,6 +1082,9 @@ msgstr ""
 msgid "Couldn’t change the recording"
 msgstr ""
 
+msgid "Couldn’t change the speakers"
+msgstr ""
+
 msgid "Couldn’t choose what to record"
 msgstr ""
 
@@ -1058,7 +1100,13 @@ msgstr ""
 msgid "Couldn’t delete the capture"
 msgstr ""
 
+msgid "Couldn’t delete the report"
+msgstr ""
+
 msgid "Couldn’t discard the take"
+msgstr ""
+
+msgid "Couldn’t find the speakers"
 msgstr ""
 
 msgid "Couldn’t label the marker"
@@ -1124,6 +1172,9 @@ msgstr ""
 msgid "Couldn’t save the image"
 msgstr ""
 
+msgid "Couldn’t save the report"
+msgstr ""
+
 msgid "Couldn’t save the setting"
 msgstr ""
 
@@ -1155,6 +1206,9 @@ msgid "Couldn’t stop the recording"
 msgstr ""
 
 msgid "Couldn’t translate the transcript"
+msgstr ""
+
+msgid "Couldn’t write the report"
 msgstr ""
 
 msgid "Countdown"
@@ -1270,10 +1324,16 @@ msgstr ""
 msgid "Delete capture?"
 msgstr ""
 
+msgid "Delete the report"
+msgstr ""
+
 msgid "Delete the speech model \"{name}\" ({mb} MB) from this computer"
 msgstr ""
 
 msgid "Delete this capture?"
+msgstr ""
+
+msgid "Delete this report?"
 msgstr ""
 
 msgid "Deleted online: {items}."
@@ -1456,6 +1516,9 @@ msgstr ""
 msgid "Edit and try again"
 msgstr ""
 
+msgid "Edit as Markdown"
+msgstr ""
+
 msgid "Edit captions"
 msgstr ""
 
@@ -1474,6 +1537,9 @@ msgstr ""
 msgid "Edits are saved with the recording and never change the original tracks."
 msgstr ""
 
+msgid "Engine · chosen for you"
+msgstr ""
+
 msgid "Enter an app’s bundle id, for example com.tinyspeck.slackmacgap."
 msgstr ""
 
@@ -1484,6 +1550,9 @@ msgid "Even out the loudness"
 msgstr ""
 
 msgid "Every CaptureMann feature is available as an MCP tool and a CLI command."
+msgstr ""
+
+msgid "Every item links to the moment it was said"
 msgstr ""
 
 msgid "Every request is refused."
@@ -1628,16 +1697,28 @@ msgstr ""
 msgid "Find"
 msgstr ""
 
+msgid "Find again"
+msgstr ""
+
 msgid "Find and replace"
 msgstr ""
 
 msgid "Find in the captions"
 msgstr ""
 
+msgid "Find speakers"
+msgstr ""
+
 msgid "Find speakers after each transcript"
 msgstr ""
 
 msgid "Find who speaks when"
+msgstr ""
+
+msgid "Finding speakers…"
+msgstr ""
+
+msgid "Finding speakers… {percent}%"
 msgstr ""
 
 msgid "Fit shows the whole screen on the background. Choose Fixed to crop a window, or Follow to keep the window on the cursor."
@@ -1664,6 +1745,9 @@ msgstr ""
 msgid "Follow cursor"
 msgstr ""
 
+msgid "For headset calls: the mic track is you, only the call is split into voices."
+msgstr ""
+
 msgid "For online calls: the other people’s voices."
 msgstr ""
 
@@ -1682,7 +1766,13 @@ msgstr ""
 msgid "Free and open source under Apache-2.0."
 msgstr ""
 
+msgid "From {language} · times are kept"
+msgstr ""
+
 msgid "Front to back, most recently used first"
+msgstr ""
+
+msgid "Fully offline, no text model needed. It uses Large v3 or Medium; Large v3 Turbo can’t translate."
 msgstr ""
 
 msgid "Getting the picture…"
@@ -1850,6 +1940,9 @@ msgstr ""
 msgid "Its own windows, toolbars and the webcam bubble preview"
 msgstr ""
 
+msgid "It’s a separate download on the AI page ({label}, {licence}, {size} MB); the size is shown first and nothing is fetched until you ask."
+msgstr ""
+
 msgid "JPG or PNG up to 2 MB; 1280 × 720 is best. A custom thumbnail needs a verified YouTube account; if YouTube refuses it, the video is still published."
 msgstr ""
 
@@ -2014,6 +2107,9 @@ msgstr ""
 msgid "Logo Drive, Gu gồ Drai"
 msgstr ""
 
+msgid "Long recordings are read in parts, then merged. You can keep editing."
+msgstr ""
+
 msgid "Look again"
 msgstr ""
 
@@ -2074,6 +2170,9 @@ msgstr ""
 msgid "Mark this moment"
 msgstr ""
 
+msgid "Markdown"
+msgstr ""
+
 msgid "Marker (M)"
 msgstr ""
 
@@ -2101,13 +2200,19 @@ msgstr ""
 msgid "Meeting minutes"
 msgstr ""
 
-msgid "Meeting minutes and notes"
-msgstr ""
-
 msgid "Menu bar icon unavailable"
 msgstr ""
 
+msgid "Merge"
+msgstr ""
+
+msgid "Merge into"
+msgstr ""
+
 msgid "Merge with next"
+msgstr ""
+
+msgid "Merge {name} into another speaker"
 msgstr ""
 
 msgid "Microphone"
@@ -2268,6 +2373,9 @@ msgstr ""
 msgid "Mute or unmute the microphone"
 msgstr ""
 
+msgid "My microphone only hears me"
+msgstr ""
+
 msgid "Name"
 msgstr ""
 
@@ -2286,6 +2394,9 @@ msgstr ""
 msgid "Needed for: {features}"
 msgstr ""
 
+msgid "Needs a microphone track and a system audio track."
+msgstr ""
+
 msgid "Needs a model above"
 msgstr ""
 
@@ -2302,6 +2413,9 @@ msgid "New captures are saved to a folder on this computer until it is back. {pa
 msgstr ""
 
 msgid "New glossary entry"
+msgstr ""
+
+msgid "New report"
 msgstr ""
 
 msgid "New title"
@@ -2448,6 +2562,9 @@ msgstr ""
 msgid "No terms yet. Add a name or a word you want spelled your way."
 msgstr ""
 
+msgid "No text model is set up"
+msgstr ""
+
 msgid "No text model. Reports and translation to other languages are off."
 msgstr ""
 
@@ -2529,6 +2646,9 @@ msgstr ""
 msgid "Note"
 msgstr ""
 
+msgid "Notes only — CaptureMann doesn’t score candidates. Using AI to assess candidates is regulated in some places."
+msgstr ""
+
 msgid "Nothing can be saved or shown. {path} ({reason})"
 msgstr ""
 
@@ -2536,6 +2656,9 @@ msgid "Nothing captured yet"
 msgstr ""
 
 msgid "Nothing changes until you accept one, and an accepted change is one undo step."
+msgstr ""
+
+msgid "Nothing found"
 msgstr ""
 
 msgid "Nothing in this filter yet."
@@ -2639,6 +2762,9 @@ msgid "Only {mb} MB free; recording needs more than 1 GB free to start"
 msgstr ""
 
 msgid "Open AI"
+msgstr ""
+
+msgid "Open AI page"
 msgstr ""
 
 msgid "Open API permissions → Add a permission → Microsoft Graph → Delegated permissions, and add Files.ReadWrite and offline_access. No admin consent is needed."
@@ -2814,6 +2940,9 @@ msgid "Plain text; a pasted description keeps its line breaks."
 msgstr ""
 
 msgid "Platform"
+msgstr ""
+
+msgid "Play a sample of {name}"
 msgstr ""
 
 msgid "Play export"
@@ -3229,6 +3358,9 @@ msgstr ""
 msgid "Reframe mode"
 msgstr ""
 
+msgid "Regenerate"
+msgstr ""
+
 msgid "Region with the bubble"
 msgstr ""
 
@@ -3286,6 +3418,9 @@ msgstr ""
 msgid "Rename or fix speakers"
 msgstr ""
 
+msgid "Rename {name}"
+msgstr ""
+
 msgid "Renders one video with the screen, the camera bubble and your audio into the recording’s exports folder. The original tracks are never changed. Needs FFmpeg (brew install ffmpeg)."
 msgstr ""
 
@@ -3309,10 +3444,25 @@ msgstr[1] ""
 msgid "Replied in {seconds} s"
 msgstr ""
 
+msgid "Report Markdown"
+msgstr ""
+
+msgid "Report language"
+msgstr ""
+
+msgid "Report saved"
+msgstr ""
+
+msgid "Report template"
+msgstr ""
+
 msgid "Reports and translation to any language"
 msgstr ""
 
-msgid "Reports are coming here: minutes, decisions and action items."
+msgid "Reports are written by a text model on this Mac (Ollama or LM Studio). Choose one on the AI page; nothing is sent anywhere else."
+msgstr ""
+
+msgid "Reports of this recording"
 msgstr ""
 
 msgid "Requested by {name}"
@@ -3405,6 +3555,9 @@ msgstr ""
 msgid "Revert to original"
 msgstr ""
 
+msgid "Role"
+msgstr ""
+
 msgid "Row {row} has {n} character (the limit is {limit})"
 msgid_plural "Row {row} has {n} characters (the limit is {limit})"
 msgstr[0] ""
@@ -3426,6 +3579,12 @@ msgid "Runs as the permissions above say."
 msgstr ""
 
 msgid "Runs in the background; you can keep working"
+msgstr ""
+
+msgid "Same as the transcript"
+msgstr ""
+
+msgid "Same as the transcript ({language})"
 msgstr ""
 
 msgid "Save"
@@ -3742,7 +3901,7 @@ msgstr ""
 msgid "Speaker labels"
 msgstr ""
 
-msgid "Speaker labels are coming here: names, talk time and merging."
+msgid "Speaker labels aren’t available yet"
 msgstr ""
 
 msgid "Speaker labels, if turned on"
@@ -3754,7 +3913,16 @@ msgstr ""
 msgid "Speaker model not available yet"
 msgstr ""
 
+msgid "Speaker name"
+msgstr ""
+
 msgid "Speaker names"
+msgstr ""
+
+msgid "Speakers"
+msgstr ""
+
+msgid "Speakers are told apart by their voices, not by device."
 msgstr ""
 
 msgid "Speech models"
@@ -3923,6 +4091,9 @@ msgstr ""
 msgid "System follows the OS: dark by default, light when the OS is light."
 msgstr ""
 
+msgid "TXT"
+msgstr ""
+
 msgid "Tags"
 msgstr ""
 
@@ -3939,6 +4110,9 @@ msgid "Target"
 msgstr ""
 
 msgid "Term, spelled the way you want it"
+msgstr ""
+
+msgid "Terms in your glossary stay as written."
 msgstr ""
 
 msgid "Test connection"
@@ -3966,6 +4140,9 @@ msgid "Text model"
 msgstr ""
 
 msgid "Text model provider"
+msgstr ""
+
+msgid "Text model, line by line"
 msgstr ""
 
 msgid "That account no longer exists."
@@ -4324,6 +4501,9 @@ msgstr ""
 msgid "The ring is always the record color."
 msgstr ""
 
+msgid "The role the interview is for"
+msgstr ""
+
 msgid "The selected sources are not available."
 msgstr ""
 
@@ -4337,6 +4517,9 @@ msgid "The sign-in expired; uploads are waiting."
 msgstr ""
 
 msgid "The sign-in was refused."
+msgstr ""
+
+msgid "The speaker model isn’t installed"
 msgstr ""
 
 msgid "The take is deleted and cannot be recovered"
@@ -4414,6 +4597,9 @@ msgstr ""
 msgid "These are the defaults for every recording, including ones an agent starts. A request can override them for one recording."
 msgstr ""
 
+msgid "They need a separate speaker model, and this version doesn’t include one. Nothing is downloaded until you ask."
+msgstr ""
+
 msgid "This Mac has no usable hardware H.264 encoder for this recording. Try a lower resolution, update to macOS 13 or later, or use a Mac from about 2016 or later."
 msgstr ""
 
@@ -4470,6 +4656,9 @@ msgstr ""
 msgid "This recording’s folder couldn’t be found in the library."
 msgstr ""
 
+msgid "This report was made with a template this version doesn’t know."
+msgstr ""
+
 msgid "This server lists no models. Pull or load one first."
 msgstr ""
 
@@ -4488,6 +4677,9 @@ msgstr ""
 msgid "Timeline zoomed to {from}-{to}"
 msgstr ""
 
+msgid "Times are kept"
+msgstr ""
+
 msgid "Timestamps in TXT"
 msgstr ""
 
@@ -4498,6 +4690,9 @@ msgid "Title"
 msgstr ""
 
 msgid "Title and date are written into the file"
+msgstr ""
+
+msgid "To"
 msgstr ""
 
 msgid "Today {time}"
@@ -4516,6 +4711,9 @@ msgid "Tool"
 msgstr ""
 
 msgid "Tool permissions"
+msgstr ""
+
+msgid "Topics, one per line"
 msgstr ""
 
 msgid "Tracks"
@@ -4554,13 +4752,16 @@ msgstr ""
 msgid "Transcripts, speakers, translations and reports, made on this Mac."
 msgstr ""
 
+msgid "Translate"
+msgstr ""
+
 msgid "Translate captions"
 msgstr ""
 
-msgid "Translate the transcript to"
+msgid "Translate to"
 msgstr ""
 
-msgid "Translate to"
+msgid "Translate transcript"
 msgstr ""
 
 msgid "Translate…"
@@ -4593,6 +4794,9 @@ msgstr ""
 msgid "Two actions share a shortcut; only the first one is registered."
 msgstr ""
 
+msgid "Type a name."
+msgstr ""
+
 msgid "Type the caption"
 msgstr ""
 
@@ -4618,6 +4822,9 @@ msgid "Undo"
 msgstr ""
 
 msgid "Undo and zoom"
+msgstr ""
+
+msgid "Undo brings it back."
 msgstr ""
 
 msgid "Unknown clients are blocked"
@@ -4689,6 +4896,9 @@ msgstr ""
 msgid "Uploads today"
 msgstr ""
 
+msgid "Use 60 characters or fewer."
+msgstr ""
+
 msgid "Use a different client ID…"
 msgstr ""
 
@@ -4731,6 +4941,9 @@ msgstr ""
 msgid "Voice note"
 msgstr ""
 
+msgid "Voices are compared in memory only. No voiceprint is saved, and people are never recognised across recordings."
+msgstr ""
+
 msgid "Waiting for the system…"
 msgstr ""
 
@@ -4765,6 +4978,9 @@ msgid "Webcam off for this recording"
 msgstr ""
 
 msgid "Webcam on, your saved audio choices"
+msgstr ""
+
+msgid "Weekly product sync"
 msgstr ""
 
 msgid "What CaptureMann can use"
@@ -4804,10 +5020,13 @@ msgstr ""
 msgid "Where finished captures are saved, and the accounts you publish to."
 msgstr ""
 
+msgid "Whisper only translates into English. Choose a text model on this Mac on the AI page."
+msgstr ""
+
 msgid "Whisper · transcripts, captions, translation to English"
 msgstr ""
 
-msgid "Who said what"
+msgid "Whisper, from the audio"
 msgstr ""
 
 msgid "Who spoke when, from the voices"
@@ -4861,6 +5080,9 @@ msgstr ""
 msgid "Working…"
 msgstr ""
 
+msgid "Works with one microphone on the table"
+msgstr ""
+
 msgid "Works: a small test file was uploaded and deleted."
 msgstr ""
 
@@ -4868,6 +5090,18 @@ msgid "Works: signed in as {channel}."
 msgstr ""
 
 msgid "Write a report from a transcript"
+msgstr ""
+
+msgid "Write in"
+msgstr ""
+
+msgid "Write {name}"
+msgstr ""
+
+msgid "Writing the report…"
+msgstr ""
+
+msgid "Writing the report… {percent}%"
 msgstr ""
 
 msgid "Yes"
@@ -5380,7 +5614,19 @@ msgstr ""
 msgid "{label}, {hint}"
 msgstr ""
 
+msgid "{language} needs a text model"
+msgstr ""
+
 msgid "{language} …"
+msgstr ""
+
+msgid "{model} on this Mac. Any language; each line keeps its start and end."
+msgstr ""
+
+msgid "{model} · on this Mac"
+msgstr ""
+
+msgid "{model} · runs on this Mac"
 msgstr ""
 
 msgid "{month} {day}, {year}"
@@ -5530,11 +5776,19 @@ msgstr[1] ""
 msgid "{n} doubtful"
 msgstr ""
 
+msgid "{n} found from the voices · whole recording"
+msgstr ""
+
 msgid "{n} h ago"
 msgstr ""
 
 msgid "{n} item"
 msgid_plural "{n} items"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{n} item left out: no matching moment"
+msgid_plural "{n} items left out: no matching moment"
 msgstr[0] ""
 msgstr[1] ""
 
@@ -5560,6 +5814,11 @@ msgstr ""
 
 msgid "{n} pixel"
 msgid_plural "{n} pixels"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{n} report"
+msgid_plural "{n} reports"
 msgstr[0] ""
 msgstr[1] ""
 
@@ -6207,6 +6466,10 @@ msgstr ""
 
 msgctxt "button"
 msgid "Reveal"
+msgstr ""
+
+msgctxt "button"
+msgid "Save"
 msgstr ""
 
 msgctxt "button"
@@ -7339,6 +7602,206 @@ msgstr ""
 
 msgctxt "reframe mode"
 msgid "Follow"
+msgstr ""
+
+msgctxt "report"
+msgid "edited"
+msgstr ""
+
+msgctxt "report badge"
+msgid "Local"
+msgstr ""
+
+msgctxt "report field"
+msgid "Answer"
+msgstr ""
+
+msgctxt "report field"
+msgid "Audience"
+msgstr ""
+
+msgctxt "report field"
+msgid "Competency"
+msgstr ""
+
+msgctxt "report field"
+msgid "Definition"
+msgstr ""
+
+msgctxt "report field"
+msgid "Due"
+msgstr ""
+
+msgctxt "report field"
+msgid "Key points"
+msgstr ""
+
+msgctxt "report field"
+msgid "People"
+msgstr ""
+
+msgctxt "report field"
+msgid "Product"
+msgstr ""
+
+msgctxt "report field"
+msgid "Question"
+msgstr ""
+
+msgctxt "report field"
+msgid "Quote"
+msgstr ""
+
+msgctxt "report field"
+msgid "Role"
+msgstr ""
+
+msgctxt "report field"
+msgid "Topic"
+msgstr ""
+
+msgctxt "report field"
+msgid "What it shows"
+msgstr ""
+
+msgctxt "report owner"
+msgid "Unassigned"
+msgstr ""
+
+msgctxt "report section"
+msgid "Action items"
+msgstr ""
+
+msgctxt "report section"
+msgid "Agreed actions"
+msgstr ""
+
+msgctxt "report section"
+msgid "Attendees"
+msgstr ""
+
+msgctxt "report section"
+msgid "Candidate’s questions"
+msgstr ""
+
+msgctxt "report section"
+msgid "Concerns"
+msgstr ""
+
+msgctxt "report section"
+msgid "Concerns raised"
+msgstr ""
+
+msgctxt "report section"
+msgid "Decisions"
+msgstr ""
+
+msgctxt "report section"
+msgid "Definitions"
+msgstr ""
+
+msgctxt "report section"
+msgid "Evidence per competency"
+msgstr ""
+
+msgctxt "report section"
+msgid "Examples"
+msgstr ""
+
+msgctxt "report section"
+msgid "Features shown"
+msgstr ""
+
+msgctxt "report section"
+msgid "Feedback given"
+msgstr ""
+
+msgctxt "report section"
+msgid "Feedback received"
+msgstr ""
+
+msgctxt "report section"
+msgid "Follow-ups"
+msgstr ""
+
+msgctxt "report section"
+msgid "Key points"
+msgstr ""
+
+msgctxt "report section"
+msgid "Marked moments"
+msgstr ""
+
+msgctxt "report section"
+msgid "Next steps"
+msgstr ""
+
+msgctxt "report section"
+msgid "Open questions"
+msgstr ""
+
+msgctxt "report section"
+msgid "Product and audience"
+msgstr ""
+
+msgctxt "report section"
+msgid "Questions and answers"
+msgstr ""
+
+msgctxt "report section"
+msgid "Questions asked"
+msgstr ""
+
+msgctxt "report section"
+msgid "Review questions"
+msgstr ""
+
+msgctxt "report section"
+msgid "Role and candidate"
+msgstr ""
+
+msgctxt "report section"
+msgid "Summary"
+msgstr ""
+
+msgctxt "report section"
+msgid "Topics"
+msgstr ""
+
+msgctxt "report section"
+msgid "Updates"
+msgstr ""
+
+msgctxt "report section"
+msgid "Wins"
+msgstr ""
+
+msgctxt "report template"
+msgid "Interview notes"
+msgstr ""
+
+msgctxt "report template"
+msgid "Lecture notes"
+msgstr ""
+
+msgctxt "report template"
+msgid "Meeting minutes"
+msgstr ""
+
+msgctxt "report template"
+msgid "One-on-one notes"
+msgstr ""
+
+msgctxt "report template"
+msgid "Product recap"
+msgstr ""
+
+msgctxt "report template"
+msgid "Summary"
+msgstr ""
+
+msgctxt "report template"
+msgid "suggested"
 msgstr ""
 
 msgctxt "section"

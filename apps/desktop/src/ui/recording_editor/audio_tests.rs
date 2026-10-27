@@ -61,6 +61,58 @@ fn wav() -> Vec<u8> {
     out
 }
 
+/// One stored report (meeting minutes) and its entry in the manifest's index.
+fn write_report(bundle: &std::path::Path) {
+    use cm_ai::report::store;
+    let r = store::Report {
+        version: 1,
+        id: "rpt_00000001".into(),
+        v: 1,
+        template: "minutes".into(),
+        template_name: "Meeting minutes".into(),
+        template_version: 1,
+        model: "test-model".into(),
+        provider: "local".into(),
+        created: "2026-10-26T10:51:00Z".into(),
+        language: "en".into(),
+        context: Default::default(),
+        content: serde_json::json!({
+            "summary": [{"text": "Pricing goes live after the beta.", "at": [1.0]}],
+            "decisions": [{"text": "Launch after the beta", "at": [2.0, 4.5]}],
+            "action_items": [
+                {"task": "Draft the post", "owner": "Linh", "due": "Thu", "at": [4.0]}
+            ]
+        }),
+        dropped_uncited: 2,
+        reassigned_names: 0,
+        chunks: 1,
+        edited: false,
+        markdown: None,
+    };
+    store::write(bundle, &r).unwrap();
+    let path = bundle.join("manifest.json");
+    let mut m: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    m["reports"] = store::index_value(&[store::entry_of(&r)]);
+    std::fs::write(&path, m.to_string()).unwrap();
+}
+
+/// Waits (the daemon runs on its own runtime) until `done` is true, drawing frames meanwhile.
+fn wait_for(
+    vcx: &mut VisualTestContext,
+    mut done: impl FnMut(&mut VisualTestContext) -> bool,
+) -> bool {
+    for _ in 0..150 {
+        vcx.run_until_parked();
+        vcx.update(|window, _| window.refresh());
+        if done(vcx) {
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    false
+}
+
 fn word(text: &str, a: i64, b: i64) -> serde_json::Value {
     serde_json::json!({"text": text, "start": a * 120, "end": b * 120, "confidence": 0.9})
 }
@@ -94,6 +146,7 @@ fn editor(cx: &mut TestAppContext) -> (World, Entity<RecordingEditor>, &mut Visu
         .to_string(),
     )
     .unwrap();
+    write_report(&bundle);
     std::fs::write(bundle.join("mic.wav"), wav()).unwrap();
     std::fs::write(bundle.join("system.wav"), wav()).unwrap();
     // Words every half second: the first three seconds are Trung's, the rest Linh's.
@@ -359,4 +412,274 @@ fn export_audio_only_from_another_page_opens_the_sheet(cx: &mut TestAppContext) 
     // The request is used up: it does not reopen the sheet later.
     vcx.run_until_parked();
     assert!(app.read_with(vcx, |m, _| m.transcribe.export_audio_focus.is_none()));
+}
+
+// ---- the Speakers and Report tabs (V5, V6) ---------------------------------------------------
+
+fn open_tab(e: &Entity<RecordingEditor>, vcx: &mut VisualTestContext, tab: Inspector) {
+    e.update(vcx, |e, cx| {
+        e.tab = tab;
+        cx.notify();
+    });
+    vcx.update(|window, _| window.refresh());
+    vcx.run_until_parked();
+}
+
+fn speaker_names(bundle: &std::path::Path) -> Vec<String> {
+    let m = cm_library::read_manifest(bundle).unwrap();
+    cm_ai::speakers::SpeakerState::from_manifest(&m)
+        .map(|s| s.speakers.into_iter().map(|x| x.name).collect())
+        .unwrap_or_default()
+}
+
+#[gpui::test]
+fn the_speakers_tab_draws_and_renames_through_set_speakers(cx: &mut TestAppContext) {
+    let (w, e, vcx) = editor(cx);
+    open_tab(&e, vcx, Inspector::Speakers);
+    e.read_with(vcx, |e, _| {
+        let Load::Ready(s) = &e.load else {
+            panic!("not ready")
+        };
+        let shares =
+            crate::recedit::voice_panels::talk_shares(&s.voice.speakers, &s.voice.segments);
+        assert_eq!(shares, vec![(1, 0.5), (2, 0.5)]);
+    });
+    // The pencil turns the row into a field holding the name; a name another speaker has is
+    // refused without a call.
+    e.update(vcx, |e, cx| {
+        e.speaker_start_rename(2, cx);
+        e.vp.rename.update(cx, |f, cx| f.set_text("trung (me)", cx));
+    });
+    // (The field's change event is delivered first, as when a person types and then presses Enter.)
+    vcx.run_until_parked();
+    e.update(vcx, |e, cx| e.speaker_commit_rename(2, cx));
+    e.read_with(vcx, |e, _| {
+        assert_eq!(
+            e.vp.rename_error,
+            Some(crate::recedit::voice_panels::NameError::Taken)
+        );
+        assert_eq!(e.vp.renaming, Some(2));
+    });
+    assert_eq!(speaker_names(&w.bundle), ["Trung (me)", "Linh"]);
+    e.update(vcx, |e, cx| {
+        e.vp.rename.update(cx, |f, cx| f.set_text("Minh", cx));
+    });
+    vcx.run_until_parked();
+    e.update(vcx, |e, cx| e.speaker_commit_rename(2, cx));
+    assert!(wait_for(vcx, |_| speaker_names(&w.bundle) == ["Trung (me)", "Minh"]));
+    // The tab reads the new name from the bundle.
+    assert!(wait_for(vcx, |vcx| e.read_with(vcx, |e, _| {
+        matches!(&e.load, Load::Ready(s) if s.voice.name_of(2) == "Minh")
+    })));
+    e.read_with(vcx, |e, _| assert_eq!(e.vp.renaming, None));
+}
+
+#[gpui::test]
+fn merging_a_speaker_goes_through_set_speakers(cx: &mut TestAppContext) {
+    let (w, e, vcx) = editor(cx);
+    open_tab(&e, vcx, Inspector::Speakers);
+    e.update(vcx, |e, cx| {
+        e.vp.merging = Some((2, None));
+        // No target chosen: nothing happens.
+        e.speaker_commit_merge(cx);
+    });
+    assert_eq!(speaker_names(&w.bundle).len(), 2);
+    e.update(vcx, |e, cx| {
+        e.vp.merging = Some((2, Some(1)));
+        e.speaker_commit_merge(cx);
+    });
+    assert!(wait_for(vcx, |_| speaker_names(&w.bundle) == ["Trung (me)"]));
+    e.read_with(vcx, |e, _| assert_eq!(e.vp.merging, None));
+}
+
+#[gpui::test]
+fn find_speakers_without_a_model_says_not_available_and_fakes_nothing(cx: &mut TestAppContext) {
+    let (w, e, vcx) = editor(cx);
+    open_tab(&e, vcx, Inspector::Speakers);
+    e.update(vcx, |e, cx| {
+        e.vp.people = Some(3);
+        e.speakers_find(cx)
+    });
+    assert!(wait_for(vcx, |vcx| e
+        .read_with(vcx, |e, _| e.vp.speaker_note.is_some())));
+    e.read_with(vcx, |e, cx| {
+        assert_eq!(
+            e.vp.speaker_note,
+            Some(super::voice_fields::SpeakerNote::NoModel)
+        );
+        let id = e.id.clone().unwrap();
+        assert!(
+            e.app
+                .read(cx)
+                .transcribe
+                .voice_job(&id, crate::ai::jobs::VoiceJobKind::Speakers)
+                .is_none(),
+            "a refused call is not running"
+        );
+        // The speaker model card of the AI page says there is none to install.
+        assert_eq!(
+            e.app.read(cx).ai.voice.speakers.card(),
+            crate::ai::voice::SpeakerCard::Unavailable
+        );
+    });
+    // Nothing changed in the bundle.
+    assert_eq!(speaker_names(&w.bundle), ["Trung (me)", "Linh"]);
+    vcx.update(|window, _| window.refresh());
+}
+
+#[gpui::test]
+fn play_sample_plays_the_speakers_longest_turn_and_stops_at_its_end(cx: &mut TestAppContext) {
+    let (_w, e, vcx) = editor(cx);
+    e.update(vcx, |e, cx| e.speaker_play_sample(2, cx));
+    e.read_with(vcx, |e, _| {
+        let Load::Ready(s) = &e.load else {
+            panic!("not ready")
+        };
+        assert_eq!(s.model.playhead, MediaTime::from_secs(3));
+        assert!(s.model.playing);
+        let lp = e.ai.line_play.expect("it stops by itself");
+        assert_eq!(lp.end, MediaTime::from_secs(SECS));
+    });
+    // A speaker with no turn plays nothing.
+    e.update(vcx, |e, cx| {
+        e.ai.line_play = None;
+        e.speaker_play_sample(9, cx)
+    });
+    e.read_with(vcx, |e, _| assert!(e.ai.line_play.is_none()));
+}
+
+#[gpui::test]
+fn the_report_tab_shows_the_stored_report_and_its_times_seek(cx: &mut TestAppContext) {
+    let (_w, e, vcx) = editor(cx);
+    open_tab(&e, vcx, Inspector::Report);
+    e.read_with(vcx, |e, cx| {
+        let Load::Ready(s) = &e.load else {
+            panic!("not ready")
+        };
+        assert_eq!(
+            s.voice.reports.len(),
+            1,
+            "the report is read from the bundle"
+        );
+        assert_eq!(s.voice.preset, None);
+        assert!(
+            e.report_view_open(s, cx),
+            "a report shows in the wide inspector"
+        );
+        let sections = crate::recedit::voice_panels::sections(&s.voice.reports[0]);
+        let decisions = sections.iter().find(|x| x.id == "decisions").unwrap();
+        assert_eq!(decisions.items[0].at, [2.0, 4.5]);
+    });
+    // A time chip seeks.
+    e.update(vcx, |e, cx| {
+        e.voice_seek(crate::recedit::voice_panels::at_time(4.5), cx)
+    });
+    e.read_with(vcx, |e, _| {
+        let Load::Ready(s) = &e.load else {
+            panic!("not ready")
+        };
+        assert_eq!(s.model.playhead.as_secs_f64(), 4.5);
+    });
+    // "New" opens the setup (the narrow inspector); "Back to the report" returns.
+    e.update(vcx, |e, cx| {
+        e.vp.setup = true;
+        cx.notify();
+    });
+    vcx.update(|window, _| window.refresh());
+    e.read_with(vcx, |e, cx| {
+        let Load::Ready(s) = &e.load else {
+            panic!("not ready")
+        };
+        assert!(!e.report_view_open(s, cx));
+    });
+}
+
+#[gpui::test]
+fn deleting_a_report_goes_through_delete_report_and_undo_brings_it_back(cx: &mut TestAppContext) {
+    let (w, e, vcx) = editor(cx);
+    open_tab(&e, vcx, Inspector::Report);
+    e.update(vcx, |e, cx| e.report_delete("rpt_00000001".into(), cx));
+    let reports = |b: &std::path::Path| {
+        cm_ai::report::store::index_of(&cm_library::read_manifest(b).unwrap()).len()
+    };
+    assert!(wait_for(vcx, |_| reports(&w.bundle) == 0));
+    assert!(wait_for(vcx, |vcx| e.read_with(vcx, |e, _| {
+        matches!(&e.load, Load::Ready(s) if s.voice.reports.is_empty())
+    })));
+    // With no report the tab is the setup form.
+    e.read_with(vcx, |e, cx| {
+        let Load::Ready(s) = &e.load else {
+            panic!("not ready")
+        };
+        assert!(!e.report_view_open(s, cx));
+    });
+}
+
+#[gpui::test]
+fn writing_a_report_that_the_daemon_refuses_says_why_and_is_not_left_running(
+    cx: &mut TestAppContext,
+) {
+    let (_w, e, vcx) = editor(cx);
+    open_tab(&e, vcx, Inspector::Report);
+    e.update(vcx, |e, cx| {
+        e.vp.setup = true;
+        e.vp.template = Some("summary".into());
+        e.report_generate(cx)
+    });
+    assert!(wait_for(vcx, |vcx| e
+        .read_with(vcx, |e, _| e.vp.report_note.is_some())));
+    e.read_with(vcx, |e, cx| {
+        // The fixture's transcript is far shorter than the 30 words a report needs, so the daemon
+        // refuses before it looks at the text model.
+        assert!(
+            matches!(
+                e.vp.report_note,
+                Some(super::voice_fields::ReportNote::Failed(_))
+            ),
+            "{:?}",
+            e.vp.report_note
+        );
+        let id = e.id.clone().unwrap();
+        assert!(e
+            .app
+            .read(cx)
+            .transcribe
+            .voice_job(&id, crate::ai::jobs::VoiceJobKind::Report)
+            .is_none());
+    });
+}
+
+#[gpui::test]
+fn a_report_tab_without_a_text_model_says_so(cx: &mut TestAppContext) {
+    let (_w, e, vcx) = editor(cx);
+    open_tab(&e, vcx, Inspector::Report);
+    // The tab asked the daemon for the text model setting; the default provider is None.
+    assert!(wait_for(vcx, |vcx| e
+        .read_with(vcx, |e, cx| e.text_state(cx)
+            == super::report_tab::TextState::Missing)));
+    e.update(vcx, |e, cx| {
+        e.vp.setup = true;
+        cx.notify();
+    });
+    vcx.update(|window, _| window.refresh());
+    vcx.run_until_parked();
+}
+
+#[gpui::test]
+fn the_translate_panel_blocks_a_language_the_text_model_must_do(cx: &mut TestAppContext) {
+    let (_w, e, vcx) = editor(cx);
+    open_tab(&e, vcx, Inspector::Transcript);
+    e.update(vcx, |e, cx| {
+        e.voice_ui.translate_open = true;
+        e.vp.translate_pick = Some("fr");
+        cx.notify();
+    });
+    assert!(wait_for(vcx, |vcx| e
+        .read_with(vcx, |e, cx| e.text_state(cx)
+            != super::report_tab::TextState::Unknown)));
+    vcx.update(|window, _| window.refresh());
+    vcx.run_until_parked();
+    e.read_with(vcx, |e, cx| {
+        assert_eq!(e.text_state(cx), super::report_tab::TextState::Missing);
+    });
 }
