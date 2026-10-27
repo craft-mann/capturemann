@@ -1,6 +1,6 @@
 # Dependency checks
 
-- **commit**: aa6e975
+- **commit**: e861074
 
 ## cargo deny (licences, bans, sources, advisories)
 

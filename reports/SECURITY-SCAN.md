@@ -1,7 +1,7 @@
 # Security scan (Trivy)
 
-- **commit**: aa6e975
-- **date**: 2026-10-26 06:25 UTC
+- **commit**: e861074
+- **date**: 2026-10-27 14:08 UTC
 - **tool**: 0.38.3
 - **scanners**: vuln,secret
 - **dependency vulnerabilities**: 0 (none)
