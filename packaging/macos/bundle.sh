@@ -5,6 +5,7 @@
 #
 # Usage (any directory):   packaging/macos/bundle.sh        or   make bundle
 # Environment:
+#   CM_APP_NAME       name of the .app and of the app in macOS (default CaptureMann; bundle-dev: CaptureMann-dev)
 #   CM_BUNDLE_ID      bundle identifier (default dev.capturemann.app). The owner may change it
 #                     before the first public release; it is part of the TCC identity, so changing
 #                     it later makes users re-grant permissions.
@@ -43,6 +44,7 @@ done
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 bundle_id="${CM_BUNDLE_ID:-dev.capturemann.app}"
+app_name="${CM_APP_NAME:-CaptureMann}" # file and display name; make bundle-dev sets CaptureMann-dev
 dev_identity="CaptureMann Local Dev"
 if [ -n "${CM_SIGN_IDENTITY:-}" ]; then
   identity="$CM_SIGN_IDENTITY"
@@ -67,9 +69,9 @@ target_dir="$(cd "$root" && cargo metadata --format-version 1 --no-deps --locked
 out="${CM_BUNDLE_OUT:-$root/target/bundle}"
 mkdir -p "$out" || die "cannot create $out"
 out="$(cd "$out" && pwd)"
-app="$out/CaptureMann.app"
-stage="$out/.CaptureMann.app.tmp.$$"
-old="$out/.CaptureMann.app.old.$$"
+app="$out/$app_name.app"
+stage="$out/.$app_name.app.tmp.$$"
+old="$out/.$app_name.app.old.$$"
 entitlements="$root/packaging/macos/CaptureMann.entitlements"
 cleanup() { rm -rf "$stage" "$old"; }
 trap cleanup EXIT
@@ -79,6 +81,10 @@ plist_tpl="$root/packaging/macos/Info.plist"
 case "$bundle_id" in
   *[!A-Za-z0-9.-]* | "") die "CM_BUNDLE_ID may only contain letters, digits, '.' and '-': '$bundle_id'" ;;
 esac
+case "$app_name" in
+  *[!A-Za-z0-9.-]* | "") die "CM_APP_NAME may only contain letters, digits, '.' and '-': '$app_name'" ;;
+esac
+
 [ -f "$icon" ] || die "icon not found: $icon"
 [ -f "$plist_tpl" ] || die "Info.plist template not found: $plist_tpl"
 [ -f "$entitlements" ] || die "entitlements not found: $entitlements"
@@ -163,9 +169,9 @@ $ff_conf"; then
   fi
   ffmpeg_bundled=1
 fi
-sed -e "s|@BUNDLE_ID@|$bundle_id|g" -e "s|@VERSION@|$version|g" -e "s|@BUILD@|$build_number|g" \
+sed -e "s|@BUNDLE_ID@|$bundle_id|g" -e "s|@VERSION@|$version|g" -e "s|@BUILD@|$build_number|g" -e "s|@APP_NAME@|$app_name|g" \
   "$plist_tpl" > "$app/Contents/Info.plist"
-grep -q -E '@(BUNDLE_ID|VERSION|BUILD)@' "$app/Contents/Info.plist" && die "unfilled @TOKEN@ left in Info.plist"
+grep -q -E '@(BUNDLE_ID|VERSION|BUILD|APP_NAME)@' "$app/Contents/Info.plist" && die "unfilled @TOKEN@ left in Info.plist"
 plutil -lint "$app/Contents/Info.plist" >/dev/null || die "generated Info.plist is invalid"
 cp "$icon" "$app/Contents/Resources/AppIcon.icns"
 printf 'APPL????' > "$app/Contents/PkgInfo"
