@@ -13,3 +13,5 @@ and the SHA-256 matches.
 
 URL shape: `https://huggingface.co/<repo>/resolve/<commit>/<file>`. The earlier 9B (16 GB) and Gemma 4 26B-A4B (32 GB)
 pins were dropped on Oct 27, 2026: reports only extract and rephrase what the transcript says, so they do not need them.
+
+Added Oct 27, 2026 (maintainer): `ggml-org/gemma-4-26B-A4B-it-GGUF` @ `9cf8c8db0f83fb4582f15381f8fb1a7c1b0b9ca2`, `gemma-4-26B-A4B-it-Q4_0.gguf`, SHA-256 `d208665ab1cd3a69f7a9a4bc59430e8448c8093d9b06334f566ac59d6d504a03`, 14618145824 bytes, ram_mb 16800 (estimate), shown only on Macs with 32 GB or more.

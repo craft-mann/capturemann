@@ -15,6 +15,19 @@
       "context_tokens": 16384
     },
     {
+      "id": "gemma-4-26b-a4b",
+      "label": "Gemma 4 26B-A4B",
+      "hint": "Higher quality for Macs with plenty of memory: better at decisions, owners and translation. About 15 GB to download.",
+      "file": "gemma-4-26B-A4B-it-Q4_0.gguf",
+      "url": "https://huggingface.co/ggml-org/gemma-4-26B-A4B-it-GGUF/resolve/9cf8c8db0f83fb4582f15381f8fb1a7c1b0b9ca2/gemma-4-26B-A4B-it-Q4_0.gguf",
+      "sha256": "d208665ab1cd3a69f7a9a4bc59430e8448c8093d9b06334f566ac59d6d504a03",
+      "bytes": 14618145824,
+      "ram_mb": 16800,
+      "min_memory_gb": 32,
+      "license": "Apache-2.0",
+      "context_tokens": 16384
+    },
+    {
       "id": "qwen3.5-4b",
       "label": "Qwen3.5 4B",
       "hint": "Optional: best for translation into other languages. Needs about 4 GB of memory.",

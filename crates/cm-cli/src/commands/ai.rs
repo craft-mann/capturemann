@@ -665,9 +665,11 @@ fn text_model_table(r: &Value) -> String {
             plain(&m["size_mb"]),
             plain(&m["ram_mb"]),
             if m["recommended"] == json!(true) {
-                ", recommended"
+                ", recommended".to_owned()
+            } else if let Some(gb) = m["min_memory_gb"].as_u64().filter(|g| *g > 0) {
+                format!(", for Macs with {gb} GB or more")
             } else {
-                ""
+                String::new()
             },
             plain(&m["license"]),
         );

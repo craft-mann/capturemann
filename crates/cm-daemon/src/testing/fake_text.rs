@@ -124,6 +124,7 @@ impl TextModelService for FakeTextModels {
                         ..Default::default()
                     },
                     recommended: m.recommended,
+                    min_memory_gb: 0,
                     license: "Apache-2.0".to_owned(),
                     context_tokens: 8192,
                 })

@@ -35,6 +35,10 @@ pub struct TextCatalogEntry {
     /// The default entry, recommended on every Mac. Exactly one entry has it.
     #[serde(default)]
     pub recommended: bool,
+    /// The model is offered only on a Mac with at least this much memory, in GB (0: every Mac).
+    /// The list still reports it; the app hides it below that memory unless it is installed.
+    #[serde(default)]
+    pub min_memory_gb: u32,
     /// SPDX id of the model's licence. Only Apache-2.0 and MIT ship.
     #[serde(default)]
     pub license: String,
@@ -133,6 +137,9 @@ pub struct TextModelInfo {
     pub info: ModelInfo,
     /// The default entry (`recommended` in the catalogue).
     pub recommended: bool,
+    /// Offered only on a Mac with at least this much memory, in GB (0: every Mac).
+    #[serde(default)]
+    pub min_memory_gb: u32,
     pub license: String,
     pub context_tokens: u32,
 }
@@ -159,7 +166,7 @@ pub struct ResolvedTextModel {
 #[derive(Debug, Clone)]
 pub struct TextModelStore {
     store: ModelStore,
-    meta: HashMap<String, (bool, String, u32)>,
+    meta: HashMap<String, (bool, String, u32, u32)>,
 }
 
 impl TextModelStore {
@@ -189,7 +196,12 @@ impl TextModelStore {
             .map(|m| {
                 (
                     m.base.id.clone(),
-                    (m.recommended, m.license.clone(), m.context_tokens),
+                    (
+                        m.recommended,
+                        m.license.clone(),
+                        m.context_tokens,
+                        m.min_memory_gb,
+                    ),
                 )
             })
             .collect();
@@ -207,11 +219,12 @@ impl TextModelStore {
                 .models
                 .into_iter()
                 .map(|info| {
-                    let (recommended, license, context_tokens) =
+                    let (recommended, license, context_tokens, min_memory_gb) =
                         self.meta.get(&info.id).cloned().unwrap_or_default();
                     TextModelInfo {
                         info,
                         recommended,
+                        min_memory_gb,
                         license,
                         context_tokens,
                     }
@@ -311,9 +324,19 @@ mod tests {
                 .collect::<Vec<_>>(),
             [
                 ("gemma-4-e2b", true),
+                ("gemma-4-26b-a4b", false),
                 ("qwen3.5-4b", false),
                 ("qwen3.5-2b", false)
             ]
+        );
+        // Only the big Gemma is limited by memory (a Mac with 32 GB or more).
+        assert_eq!(
+            c.models
+                .iter()
+                .map(|m| (m.base.id.as_str(), m.min_memory_gb))
+                .filter(|(_, g)| *g > 0)
+                .collect::<Vec<_>>(),
+            [("gemma-4-26b-a4b", 32)]
         );
         // The file a user already downloaded keeps its name under the new id.
         assert_eq!(
@@ -332,7 +355,7 @@ mod tests {
             .all(|m| m.base.url.contains("/resolve/") && m.license == "Apache-2.0"));
         let dir = tempfile::tempdir().unwrap();
         let s = TextModelStore::with_catalog(dir.path(), c);
-        assert_eq!(s.list().models.len(), 3);
+        assert_eq!(s.list().models.len(), 4);
     }
 
     #[test]

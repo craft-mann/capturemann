@@ -29,6 +29,8 @@ pub struct BuiltInVm {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct Meta {
     ram_mb: u32,
+    /// Offered only on a Mac with at least this much memory, in GB (0: every Mac).
+    min_memory_gb: u32,
     recommended: bool,
     license: String,
     context_tokens: u32,
@@ -68,6 +70,7 @@ impl BuiltInVm {
                     m.info.id.clone(),
                     Meta {
                         recommended: m.recommended,
+                        min_memory_gb: m.min_memory_gb,
                         ram_mb: m.info.ram_mb,
                         license: m.license.clone(),
                         context_tokens: m.context_tokens,
@@ -120,6 +123,16 @@ impl BuiltInVm {
         self.models
             .rows()
             .into_iter()
+            // A higher-quality model for big Macs is hidden on a smaller one, unless it is
+            // already downloaded (then it can still be used or removed).
+            .filter(|row| {
+                let min = self.meta.get(&row.id).map_or(0, |m| m.min_memory_gb);
+                let there = matches!(
+                    row.status,
+                    crate::ai::models::RowStatus::Installed | crate::ai::models::RowStatus::Active
+                );
+                there || min == 0 || mem_gb.is_some_and(|g| g >= min)
+            })
             .map(|mut row| {
                 row.actions.retain(|a| *a != RowAction::Import);
                 let meta = self.meta.get(&row.id).cloned().unwrap_or_default();
@@ -213,6 +226,7 @@ mod tests {
                 ..Default::default()
             },
             recommended,
+            min_memory_gb: 0,
             license: "Apache-2.0".into(),
             context_tokens: 8192,
         }
@@ -266,6 +280,24 @@ mod tests {
         // The recommendation does not depend on the Mac's memory.
         assert!(vm.rows(None, None)[0].recommended);
         assert!(vm.rows(Some(4), None)[0].recommended);
+    }
+
+    #[test]
+    fn a_model_for_big_macs_is_hidden_on_a_smaller_one() {
+        let mut big = entry("big", false, 14_000, false);
+        big.min_memory_gb = 32;
+        let mut vm = BuiltInVm::default();
+        vm.set_list(list(vec![entry("a", true, 2_000, false), big]));
+        let ids = |gb| {
+            vm.rows(gb, None)
+                .iter()
+                .map(|r| r.row.id.clone())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(ids(Some(16)), ["a"]);
+        assert_eq!(ids(None), ["a"], "unknown memory hides it too");
+        assert_eq!(ids(Some(32)), ["a", "big"]);
+        assert_eq!(ids(Some(64)), ["a", "big"]);
     }
 
     #[test]

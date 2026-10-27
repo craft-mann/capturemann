@@ -1373,6 +1373,7 @@ fn ai_tools() -> Vec<ToolSpec> {
                     "size_mb": { "type": "integer", "description": "Download size in MB (10^6 bytes)." },
                     "ram_mb": { "type": "integer", "description": "Memory it needs while it runs, in MB." },
                     "recommended": { "type": "boolean", "description": "The default model, recommended on every Mac." },
+                    "min_memory_gb": { "type": "integer", "description": "The app offers this model only on a Mac with at least this much memory, in GB (0: every Mac)." },
                     "license": { "type": "string", "description": "Apache-2.0 or MIT." },
                     "context_tokens": { "type": "integer" },
                     "hint": { "type": "string" },
