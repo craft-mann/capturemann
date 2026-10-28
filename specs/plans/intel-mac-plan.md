@@ -23,7 +23,7 @@ The app code is already macOS-only and uses the same APIs on both chips: ScreenC
 ## Decisions needed from the maintainer
 
 1. **Decided: two DMGs** (`CaptureMann-vX.Y.Z-macos-arm64.dmg` unchanged, new `CaptureMann-vX.Y.Z-macos-x86_64.dmg`). No universal build, no `lipo` of the app. Consequences: the website must send each user to the right file (a browser cannot tell Apple Silicon from Intel reliably, so show both buttons with a one-line "Apple menu > About This Mac: Chip" hint); the Homebrew cask picks by architecture (`on_arm` and `on_intel`); each release has two `.sha256` files and two notarizations; the release notes list both.
-2. **Is the first-use setup sheet part of 0.2.1?** It is already planned for 0.2.1, and it matters more on Intel because those users need to be steered to lighter models. **Recommendation:** include it, but as the last stage so Intel does not wait for it.
+2. **Is the first-use setup sheet part of 0.2.1?** **Decided: no (Oct 28, 2026).** It was planned for 0.2.1, and it matters more on Intel because those users need to be steered to lighter models. **Recommendation:** include it, but as the last stage so Intel does not wait for it.
 3. **Oldest supported Mac.** macOS 13 requires roughly 2017 and later Intel Macs. Macs without a hardware H.264 encoder (before about 2016) are already unsupported. Say in the docs which year range was tested, based on the Mac you have.
 
 ## Stage 0: spike on the Intel Mac (needs the real Mac; blocks Stage 3 and acceptance)
@@ -83,7 +83,9 @@ This is where Intel Macs differ most from Apple Silicon: no unified memory, olde
 **I3.4 Encoders and presets:** check which H.264 and HEVC presets the Intel hardware encoder accepts, and that the 60 fps self-test gives an honest result on slower GPUs.
 Any new UI string goes through `cm_i18n` with Vietnamese; errors use the shared codes.
 
-## Stage 4: first-use setup sheet (decision 2)
+## Stage 4: first-use setup sheet (decision 2) — NOT part of 0.2.1
+
+Maintainer, Oct 28, 2026: 0.2.1 is about the build architecture only. The setup sheet is a separate feature (deferred from 0.2.0 in `docs/project/status.md`), needs its own spec and design, and is not started. The text below is the earlier proposal, kept for when it is picked up.
 
 One place to get the speech and text models the first time a feature needs them, with the architecture-aware recommendation from I3.2. Follows the existing spec and `design/CLAUDE.md`. Keep it behind its own stage so an Intel release does not wait on it.
 
