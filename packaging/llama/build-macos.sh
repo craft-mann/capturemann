@@ -6,7 +6,8 @@
 #
 # Usage (any directory):   packaging/llama/build-macos.sh      or   make llama
 # Output: packaging/llama/out/{llama-server,BUILD-INFO.txt,LICENSES/}
-#         (git-ignored; `make bundle` picks it up).
+#         (git-ignored; `make bundle` picks it up). With CM_ARCH=x86_64 the output is
+#         packaging/llama/out-x86_64/ instead, beside the arm64 one.
 #
 # THE MAINTAINER MUST PIN THE RELEASE BEFORE THE FIRST RUN: LLAMA_TAG and LLAMA_SHA256 below are
 # placeholders and the script refuses to run while they are. Pick a release of
@@ -22,7 +23,12 @@
 #                       SHA-256 pinned below; a mismatch stops the build.
 #   CM_LLAMA_BUILD_DIR  scratch build directory (default: a new folder under $TMPDIR, removed at
 #                       the end; set it to keep the build tree).
-#   CM_LLAMA_OUT        output directory (default packaging/llama/out).
+#   CM_LLAMA_OUT        output directory (default packaging/llama/out, or out-x86_64 for x86_64).
+#   CM_ARCH             arm64 (default on Apple Silicon) or x86_64 (the Intel build, cross-built on an
+#                       Apple Silicon Mac; the self-check runs it under Rosetta).
+#   CM_LLAMA_METAL      ON or OFF. Default ON for arm64, OFF for x86_64: until the Intel Mac has run
+#                       the measurements (specs/plans/intel-mac-plan.md, I3.1) the Intel build is CPU
+#                       only, because Metal on old Intel and AMD GPUs can be slower than the CPU or fail.
 #   CM_LLAMA_JOBS       parallel jobs (default: the number of CPUs).
 #   CM_SOURCE_REPO      the project URL written into BUILD-INFO.txt (default
 #                       https://github.com/craft-mann/capturemann).
@@ -32,7 +38,9 @@
 # server's web page is a prebuilt file in the source tree and the app starts the server with it
 # switched off. No network is needed after the tarball is cached.
 #
-# Architecture: arm64 only (the build host must be an Apple Silicon Mac), like `make ffmpeg`.
+# Architecture: one per run, never universal. The x86_64 CPU code is built for a fixed baseline
+# (AVX2, FMA, F16C, BMI2: every Mac that runs macOS 13 has them), never `-march=native`, so the result
+# does not depend on the Mac that built it.
 #
 # Licence: llama.cpp is MIT. Its source tree vendors a few small MIT/BSD libraries (cpp-httplib,
 # nlohmann/json, stb_image, miniaudio); their licence files are copied from the tree's `licenses/`
@@ -49,6 +57,15 @@ LLAMA_SHA256="55d67acf3ad2ad747a9bbeb75f9f0e173dbcc0d1753a471038a90c819421c5e1" 
 LLAMA_URL="https://github.com/ggml-org/llama.cpp/archive/refs/tags/${LLAMA_TAG}.tar.gz"
 
 MIN_MACOS="13.0"
+ARCH="${CM_ARCH:-$(uname -m)}"
+case "$ARCH" in
+  arm64)  default_out="out";        metal_default="ON" ;;
+  x86_64) default_out="out-x86_64"; metal_default="OFF" ;;
+  *) die "CM_ARCH must be arm64 or x86_64 (got $ARCH)" ;;
+esac
+METAL="${CM_LLAMA_METAL:-$metal_default}"
+case "$METAL" in ON|OFF) ;; *) die "CM_LLAMA_METAL must be ON or OFF" ;; esac
+if [ "$ARCH" = "$(uname -m)" ]; then run_target=(); else run_target=(arch "-$ARCH"); fi
 SOURCE_REPO="${CM_SOURCE_REPO:-https://github.com/craft-mann/capturemann}"
 
 if [ "$LLAMA_TAG" = "PENDING_PIN" ] || [ "$LLAMA_SHA256" = "PENDING_PIN" ]; then
@@ -63,14 +80,17 @@ case "$LLAMA_TAG" in
 esac
 
 [ "$(uname -s)" = "Darwin" ] || die "this script only runs on macOS"
-[ "$(uname -m)" = "arm64" ] || die "arm64 only (see the header)"
+if [ "${#run_target[@]}" -gt 0 ]; then
+  [ "$(uname -m)" = "arm64" ] || die "cross-building is only supported from an Apple Silicon Mac"
+  "${run_target[@]}" /usr/bin/true 2>/dev/null || die "cannot run $ARCH programs here (the self-check needs Rosetta: softwareupdate --install-rosetta)"
+fi
 for tool in curl shasum tar make clang cmake otool strip codesign; do
   command -v "$tool" >/dev/null 2>&1 || die "required tool not found: $tool (install the Xcode command line tools; cmake: brew install cmake)"
 done
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 src_cache="${CM_LLAMA_SRC_DIR:-$root/packaging/llama/.downloads}"
-out="${CM_LLAMA_OUT:-$root/packaging/llama/out}"
+out="${CM_LLAMA_OUT:-$root/packaging/llama/$default_out}"
 jobs="${CM_LLAMA_JOBS:-$(sysctl -n hw.ncpu)}"
 keep_work=1
 if [ -n "${CM_LLAMA_BUILD_DIR:-}" ]; then
@@ -113,15 +133,15 @@ export MACOSX_DEPLOYMENT_TARGET="$MIN_MACOS"
 export PATH="/usr/bin:/bin:/usr/sbin:/sbin:/Library/Developer/CommandLineTools/usr/bin:$(dirname "$(command -v cmake)")"
 unset CPATH LIBRARY_PATH PKG_CONFIG_PATH DYLD_LIBRARY_PATH
 
-echo "==> llama-server $LLAMA_TAG (static, Metal)"
+echo "==> llama-server $LLAMA_TAG ($ARCH, static, Metal $METAL)"
 cmake_args=(
   -S "$srcdir" -B "$work/build"
   -DCMAKE_BUILD_TYPE=Release
-  -DCMAKE_OSX_ARCHITECTURES=arm64
+  -DCMAKE_OSX_ARCHITECTURES="$ARCH"
   -DCMAKE_OSX_DEPLOYMENT_TARGET="$MIN_MACOS"
   -DBUILD_SHARED_LIBS=OFF
-  -DGGML_METAL=ON
-  -DGGML_METAL_EMBED_LIBRARY=ON
+  -DGGML_METAL="$METAL"
+  -DGGML_METAL_EMBED_LIBRARY="$METAL"
   -DGGML_ACCELERATE=ON
   -DGGML_NATIVE=OFF
   -DLLAMA_CURL=OFF
@@ -134,6 +154,10 @@ cmake_args=(
   # to embed it from a path under /var (a symlink). The app starts the server with --no-webui.
   -DLLAMA_USE_PREBUILT_UI=OFF
 )
+if [ "$ARCH" = "x86_64" ]; then
+  cmake_args+=(-DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON -DGGML_BMI2=ON
+               -DGGML_AVX512=OFF -DGGML_AVX_VNNI=OFF)
+fi
 cmake "${cmake_args[@]}" >"$work/cmake-configure.log" 2>&1 \
   || { tail -30 "$work/cmake-configure.log" >&2; die "cmake configure failed (log: $work/cmake-configure.log)"; }
 cmake --build "$work/build" --config Release --target llama-server -j "$jobs" >"$work/cmake-build.log" 2>&1 \
@@ -157,19 +181,24 @@ grep -q -i "MIT License" "$srcdir/LICENSE" || die "$srcdir/LICENSE is not the MI
 bad="$(otool -L "$bin" | tail -n +2 | awk '{print $1}' | grep -v -E '^(/usr/lib/|/System/Library/)' || true)"
 [ -z "$bad" ] || die "llama-server links a non-system library: $bad"
 if otool -L "$bin" | grep -q -i -E 'curl|ssl|crypto'; then die "llama-server links curl or OpenSSL: it must not be able to reach the network by itself"; fi
-# 3. Metal is in (the shader library is embedded) and the binary starts.
-otool -L "$bin" | grep -q "Metal.framework" || die "llama-server does not link Metal"
-ver="$("$bin" --version 2>&1 | head -3 || true)"
+# 3. Metal is in when asked for (the shader library is embedded), and the binary starts.
+if [ "$METAL" = "ON" ]; then
+  otool -L "$bin" | grep -q "Metal.framework" || die "llama-server does not link Metal"
+elif otool -L "$bin" | grep -q "Metal.framework"; then
+  die "llama-server links Metal although CM_LLAMA_METAL=OFF"
+fi
+lipo -info "$bin" | grep -q -E "architecture: $ARCH\$" || die "llama-server is not $ARCH only: $(lipo -info "$bin")"
+ver="$(${run_target[@]+"${run_target[@]}"} "$bin" --version 2>&1 | head -3 || true)"
 [ -n "$ver" ] || die "llama-server did not print a version (cannot start?)"
 echo "$ver" | sed 's/^/    /'
 # 4. The options the app passes exist in this release.
-help="$("$bin" --help 2>&1 || true)"
+help="$(${run_target[@]+"${run_target[@]}"} "$bin" --help 2>&1 || true)"
 missing=""
 for opt in --host --port --model --alias --ctx-size --n-gpu-layers --parallel --no-webui; do
   grep -q -e "$opt" <<<"$help" || missing="$missing $opt"
 done
 [ -z "$missing" ] || die "this release of llama-server lacks the option(s):$missing (update engine_args in crates/cm-ai/src/text_model/engine/mod.rs and this check together)"
-echo "    MIT licence, system libraries only, Metal linked, options present"
+echo "    MIT licence, system libraries only, $ARCH only, Metal $METAL, options present"
 
 echo "==> installing into $out"
 rm -rf "$out"
@@ -188,7 +217,7 @@ cat >"$out/BUILD-INFO.txt" <<EOF
 CaptureMann bundled llama-server: build record
 Built by packaging/llama/build-macos.sh on $(date -u +%Y-%m-%dT%H:%M:%SZ)
 Host: $(uname -srm), $(sw_vers -productName) $(sw_vers -productVersion), $(clang --version | head -1)
-Minimum macOS: $MIN_MACOS, architecture: arm64 only
+Minimum macOS: $MIN_MACOS, architecture: $ARCH only, Metal $METAL
 
 Source (official site, SHA-256 checked by the script before use):
   llama.cpp  $LLAMA_TAG  $LLAMA_URL

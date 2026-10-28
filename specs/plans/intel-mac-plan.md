@@ -1,6 +1,6 @@
 # Intel Macs: implementation plan (release 0.2.1)
 
-Status (Oct 28, 2026): **draft, not started.** Written after 0.2.0 shipped (Apple Silicon only). **Decided (maintainer, Oct 28, 2026): two DMGs, one per chip, not a universal app (install size matters); the project website offers the exact download for each Mac. The maintainer has no Intel Mac at hand yet and will find one later**, so the build work (Stages 1 and 2) can start first and be checked under Rosetta, while everything that needs the real Mac (Stage 0 hardware checks, Stage 3, acceptance) waits. Platform order is unchanged (maintainer, Oct 25, 2026): Intel Macs, then Windows, then Linux. No release dates (maintainer rule).
+Status (Oct 28, 2026): **Stage 1 built and checked under Rosetta (see "Stage 1 result"); Stages 0, 3, 4, 5 not started.** Written after 0.2.0 shipped (Apple Silicon only). **Decided (maintainer, Oct 28, 2026): two DMGs, one per chip, not a universal app (install size matters); the project website offers the exact download for each Mac. The maintainer has no Intel Mac at hand yet and will find one later**, so the build work (Stages 1 and 2) can start first and be checked under Rosetta, while everything that needs the real Mac (Stage 0 hardware checks, Stage 3, acceptance) waits. Platform order is unchanged (maintainer, Oct 25, 2026): Intel Macs, then Windows, then Linux. No release dates (maintainer rule).
 
 Goal: a release with a separate DMG for Intel Macs (macOS 13+) next to the unchanged Apple Silicon DMG, with every 0.2.0 feature working on Intel and defaults that suit slower hardware. Each DMG holds a single architecture, so the Apple Silicon download stays about 181 MB or smaller.
 
@@ -10,9 +10,9 @@ The app code is already macOS-only and uses the same APIs on both chips: ScreenC
 
 | Part | Today | Needed |
 |---|---|---|
-| `packaging/ffmpeg/build-macos.sh` | refuses to run unless `uname -m` is arm64; `-arch arm64`, libvpx `--target=arm64-darwin22-gcc` | an x86_64 build (needs `nasm`) in its own output folder |
+| `packaging/ffmpeg/build-macos.sh` | refuses to run unless `uname -m` is arm64; `-arch arm64`, libvpx `--target=arm64-darwin22-gcc` | an x86_64 build (`nasm` is built from a pinned tarball by the script) in its own output folder |
 | `packaging/llama/build-macos.sh` | arm64 check, `CMAKE_OSX_ARCHITECTURES=arm64`, Metal | an x86_64 build in its own folder; decide Metal or CPU on Intel |
-| `packaging/sherpa/fetch-macos.sh` | arm64 check, `osx-arm64-static-lib` archive | the x86_64 static libraries with their own pinned SHA-256 (check the release has `osx-x86_64`; if not, build ONNX Runtime and sherpa-onnx) |
+| `packaging/sherpa/fetch-macos.sh` | arm64 check, `osx-arm64-static-lib` archive | the x86_64 static libraries with their own pinned SHA-256 (the release has `osx-x64-static-lib`, so no source build) |
 | `cm-ai` (`whisper-rs` with `metal`) | arm64 Metal | portable x86 CPU flags (no host-only `-march=native`), Metal fallback to CPU |
 | Rust workspace | built for the host | a separate build for `x86_64-apple-darwin` (cross-compiled on the Apple Silicon Mac) |
 | `packaging/macos/bundle.sh`, `verify-release.sh` | verify-release fails any Mach-O that is not `arm64` only | assemble one app per architecture; check that every Mach-O matches the architecture of the DMG being checked (`arm64` or `x86_64`) |
@@ -40,11 +40,20 @@ Also try running the x86_64 build under Rosetta on the Apple Silicon Mac for qui
 
 Each script gets an architecture switch (`CM_ARCH=arm64|x86_64`, default the host) instead of a hard refusal. Cross-building on the Apple Silicon Mac is the plan; the Intel Mac is for testing, not for building.
 
-**I1.1 FFmpeg** (`make ffmpeg`): `brew install nasm`; `-arch x86_64`, `--arch=x86_64 --enable-cross-compile`, libvpx `--target=x86_64-darwin22-gcc`, libopus; same component list and the same LGPL self-checks (no GPL, no nonfree, no libx264). Output goes to `out/x86_64/` next to the existing arm64 output; no `lipo`. Keep the 0.2.0 licence, `BUILD-INFO` and `SOURCE-OFFER` files accurate for both.
-**I1.2 llama-server** (`make llama`): `CMAKE_OSX_ARCHITECTURES=x86_64`, `GGML_NATIVE=OFF` with an explicit portable x86 baseline (AVX2 and FMA if the oldest supported Mac has them; otherwise a lower baseline), Metal on or off per the I0 result and I3.1. Keep it static with no libcurl or OpenSSL. Output goes to `out/x86_64/`.
-**I1.3 sherpa-onnx** (`make sherpa`): fetch the x86_64 static libraries, pin their SHA-256 in the script, keep the ONNX Runtime notice. Libraries are kept per architecture (`out/lib` for arm64 as today, `out/x86_64/lib` for Intel) and the Cargo build picks the folder from the target.
+**I1.1 FFmpeg** (`make ffmpeg`): `CM_ARCH=x86_64 make ffmpeg`: nasm 2.16.03 built from a pinned tarball (no Homebrew), `-arch x86_64`, `--arch=x86_64 --enable-cross-compile`, libvpx `--target=x86_64-darwin22-gcc`, libopus; same component list and the same LGPL self-checks (no GPL, no nonfree, no libx264), run under Rosetta. Output goes to `out-x86_64/` (a sibling of `out/`, because each run replaces its own folder); no `lipo`. Keep the 0.2.0 licence, `BUILD-INFO` and `SOURCE-OFFER` files accurate for both.
+**I1.2 llama-server** (`make llama`): `CMAKE_OSX_ARCHITECTURES=x86_64`, `GGML_NATIVE=OFF` with an explicit portable x86 baseline (AVX2 and FMA if the oldest supported Mac has them; otherwise a lower baseline), Metal on or off per the I0 result and I3.1. Keep it static with no libcurl or OpenSSL. Output goes to `out-x86_64/`.
+**I1.3 sherpa-onnx** (`make sherpa`): fetch the x86_64 static libraries, pin their SHA-256 in the script, keep the ONNX Runtime notice. Libraries are kept per architecture (`out/lib` for arm64 as today, `out-x86_64/lib` for Intel); `.cargo/config.toml` still points at the arm64 folder, so the Intel build sets `SHERPA_ONNX_LIB_DIR` (Stage 2, `bundle.sh`).
 **I1.4 whisper.cpp** (via `whisper-rs`): confirm the x86_64 build uses portable flags and that Metal initialisation failure falls back to CPU instead of aborting.
 Tests: the engine tests already use scripted platforms, so they run unchanged on x86_64 under Rosetta. Real-engine checks (`real_model`, `real_diarize`, the text engine) run on the Intel Mac by the maintainer, with the commands in CLAUDE.md. No test downloads a model.
+
+### Stage 1 result (Oct 28, 2026, Apple Silicon Mac, Rosetta, tested with the build self-checks only)
+
+- `CM_ARCH=x86_64 make ffmpeg|llama|sherpa` work; each output is one architecture (`lipo -info`), the FFmpeg and llama-server self-checks ran under `arch -x86_64` (LGPL, system libraries only, options present). arm64 builds are unchanged (same configure line; `ffmpeg` and `llama-server` byte-for-byte the same size as the 0.2.0 ones).
+- sherpa-onnx: `sherpa-onnx-v2.0.1-osx-x64-static-lib.tar.bz2` pinned (sha256 `6a3cb3c1...8938`, 20,415,061 bytes), same 11 libraries.
+- llama-server on x86_64 is **CPU only** for now (`CM_LLAMA_METAL=OFF` by default for Intel, `ON` for arm64) with an AVX2/FMA/F16C/BMI2 baseline and no AVX-512; I3.1 decides whether Metal helps on the Intel Mac.
+- whisper.cpp (`cm-ai`) cross-builds for `x86_64-apple-darwin`. Cargo's cross build leaves ggml at its SSE-only baseline, so **`bundle.sh` must export `GGML_NATIVE=OFF GGML_AVX=ON GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON GGML_BMI2=ON GGML_AVX512=OFF` for x86_64** (`whisper-rs-sys` passes `GGML_*` variables to CMake; its build script does not re-run when they change, so clean `whisper-rs-sys` first). Checked in the CMake cache only, not on an Intel CPU. The GPU-to-CPU fallback in `WhisperTranscriber::load` already exists (I1.4).
+- **`bundle.sh` must also set `MACOSX_DEPLOYMENT_TARGET=13.0` for the Cargo build.** With Rust's default for x86_64 (10.12) the macOS 27 SDK links `@rpath/libswiftCoreMedia.dylib`, which no Intel Mac has: the test binary aborts at launch. With 13.0 the SDK redirects to the system copy and the 206 `cm-ai` unit tests pass as an x86_64 binary under Rosetta.
+- Not done: the rest of the workspace for x86_64, and anything on a real Intel CPU.
 
 ## Stage 2: bundle, signing and release scripts
 

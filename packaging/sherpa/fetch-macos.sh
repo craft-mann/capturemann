@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Fetches the prebuilt static libraries of the speaker engine (AI-8, spike S7): sherpa-onnx v2.0.1
-# with its ONNX Runtime, for macOS arm64. cm-ai links them statically (feature `sherpa`), so the
+# with its ONNX Runtime, for macOS arm64 or x86_64. cm-ai links them statically (feature `sherpa`), so the
 # app has no extra dylib to sign or notarize.
 #
 # Usage (any directory):   packaging/sherpa/fetch-macos.sh      or   make sherpa
@@ -19,11 +19,13 @@
 #                      git-ignored). A missing archive is downloaded with curl and checked against
 #                      the SHA-256 pinned below; a mismatch stops the script and deletes the file.
 #                      Put the archive there by hand to work offline.
-#   CM_SHERPA_OUT      output directory (default packaging/sherpa/out).
+#   CM_SHERPA_OUT      output directory (default packaging/sherpa/out for arm64, out-x86_64 for x86_64).
+#   CM_ARCH            arm64 (default on Apple Silicon) or x86_64 (the Intel build; nothing is run, so
+#                      it works on an Apple Silicon Mac). The two outputs sit side by side.
 #   CM_SOURCE_REPO     the project URL written into BUILD-INFO.txt.
 #
 # What it needs: curl, shasum, tar (the system tar unpacks .tar.bz2; nothing is added to the app
-# for it). Apple Silicon only, like `make ffmpeg`.
+# for it).
 #
 # Licence: sherpa-onnx is Apache-2.0 and ONNX Runtime is MIT. The release archive carries no
 # licence files (only lib/*.a), so the notes written to LICENSES/ say where the texts are; the
@@ -34,13 +36,26 @@ set -euo pipefail
 
 die() { echo "fetch-macos.sh: $*" >&2; exit 1; }
 
-# ---- pinned archive (read and hashed on Oct 27, 2026; docs/project/spikes.md, S7) ----
+# ---- pinned archives (arm64 read and hashed on Oct 27, 2026, docs/project/spikes.md S7; x86_64 on Oct 28, 2026) ----
 SHERPA_VERSION="2.0.1"
-SHERPA_ARCHIVE="sherpa-onnx-v${SHERPA_VERSION}-osx-arm64-static-lib.tar.bz2"
+# CM_ARCH picks the archive: arm64 (default: the host) or x86_64 (upstream calls it "x64").
+ARCH="${CM_ARCH:-$(uname -m)}"
+case "$ARCH" in
+  arm64)
+    SHERPA_PLATFORM="osx-arm64"
+    SHERPA_SHA256="d7a9b14f337958e7373c8c650f046df33d210bbaff2f33cb8322dda663ee5e1c"
+    SHERPA_BYTES="20829454"
+    default_out="out" ;;
+  x86_64)
+    SHERPA_PLATFORM="osx-x64"
+    SHERPA_SHA256="6a3cb3c14104d3a02e7b2a6cd5621f590b14892cce7d0bc0935f7655ef518938"
+    SHERPA_BYTES="20415061"
+    default_out="out-x86_64" ;;
+  *) die "CM_ARCH must be arm64 or x86_64 (got $ARCH)" ;;
+esac
+SHERPA_ARCHIVE="sherpa-onnx-v${SHERPA_VERSION}-${SHERPA_PLATFORM}-static-lib.tar.bz2"
 SHERPA_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/v${SHERPA_VERSION}/${SHERPA_ARCHIVE}"
-SHERPA_SHA256="d7a9b14f337958e7373c8c650f046df33d210bbaff2f33cb8322dda663ee5e1c"
-SHERPA_BYTES="20829454"
-SHERPA_DIR="sherpa-onnx-v${SHERPA_VERSION}-osx-arm64-static-lib"
+SHERPA_DIR="sherpa-onnx-v${SHERPA_VERSION}-${SHERPA_PLATFORM}-static-lib"
 
 # The libraries vendor/sherpa-onnx-sys/build.rs links (STATIC_LIBS there must match).
 LIBS=(sherpa-onnx-c-api sherpa-onnx-core kaldi-decoder-core sherpa-onnx-kaldifst-core
@@ -50,7 +65,6 @@ LIBS=(sherpa-onnx-c-api sherpa-onnx-core kaldi-decoder-core sherpa-onnx-kaldifst
 SOURCE_REPO="${CM_SOURCE_REPO:-https://github.com/craft-mann/capturemann}"
 
 [ "$(uname -s)" = "Darwin" ] || die "this script only runs on macOS"
-[ "$(uname -m)" = "arm64" ] || die "arm64 only (see the header)"
 for tool in curl shasum tar; do
   command -v "$tool" >/dev/null 2>&1 || die "required tool not found: $tool"
 done
@@ -61,7 +75,7 @@ esac
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 src_cache="${CM_SHERPA_SRC_DIR:-$root/packaging/sherpa/.downloads}"
-out="${CM_SHERPA_OUT:-$root/packaging/sherpa/out}"
+out="${CM_SHERPA_OUT:-$root/packaging/sherpa/$default_out}"
 archive="$src_cache/$SHERPA_ARCHIVE"
 
 sha_of() { shasum -a 256 "$1" | awk '{print $1}'; }
@@ -138,6 +152,7 @@ EOF
 cat >"$new/BUILD-INFO.txt" <<EOF
 CaptureMann sherpa-onnx libraries: fetch record
 Fetched by packaging/sherpa/fetch-macos.sh on $(date -u +%Y-%m-%dT%H:%M:%SZ)
+Architecture: $ARCH
 Host: $(uname -srm), $(sw_vers -productName) $(sw_vers -productVersion)
 Project: $SOURCE_REPO
 
@@ -155,4 +170,8 @@ EOF
 rm -rf "$out"
 mv "$new" "$out"
 echo "Done: $out/lib ($(ls "$out/lib" | wc -l | tr -d ' ') libraries)."
-echo "cargo finds it through .cargo/config.toml (SHERPA_ONNX_LIB_DIR=packaging/sherpa/out/lib)."
+if [ "$ARCH" = "arm64" ]; then
+  echo "cargo finds it through .cargo/config.toml (SHERPA_ONNX_LIB_DIR=packaging/sherpa/out/lib)."
+else
+  echo "for the Intel build set SHERPA_ONNX_LIB_DIR=$out/lib (bundle.sh does it with CM_ARCH=x86_64)."
+fi

@@ -5,7 +5,8 @@
 #
 # Usage (any directory):   packaging/ffmpeg/build-macos.sh      or   make ffmpeg
 # Output: packaging/ffmpeg/out/{ffmpeg,ffprobe,BUILD-INFO.txt,SOURCE-OFFER.txt,LICENSES/}
-#         (git-ignored; `make bundle` picks it up).
+#         (git-ignored; `make bundle` picks it up). With CM_ARCH=x86_64 the output is
+#         packaging/ffmpeg/out-x86_64/ instead, beside the arm64 one.
 #
 # Environment:
 #   CM_FFMPEG_SRC_DIR    where the source tarballs are cached (default packaging/ffmpeg/.downloads,
@@ -13,19 +14,22 @@
 #                        checked against the SHA-256 values pinned below; a mismatch stops the build.
 #   CM_FFMPEG_BUILD_DIR  scratch build directory (default: a new folder under $TMPDIR, removed at
 #                        the end; set it to keep the build tree).
-#   CM_FFMPEG_OUT        output directory (default packaging/ffmpeg/out).
+#   CM_FFMPEG_OUT        output directory (default packaging/ffmpeg/out, or out-x86_64 for x86_64).
+#   CM_ARCH              arm64 (default on Apple Silicon) or x86_64 (the Intel build). The x86_64
+#                        build is a cross-build on an Apple Silicon Mac: the binaries are Intel
+#                        code and the self-check runs them under Rosetta (`arch -x86_64`).
 #   CM_FFMPEG_JOBS       parallel jobs (default: the number of CPUs).
 #   CM_SOURCE_REPO       the project URL written into SOURCE-OFFER.txt (default
 #                        https://github.com/craft-mann/capturemann).
 #
 # What it needs on the build machine: Xcode command line tools (clang, make, perl), curl, xz,
-# shasum. Nothing else: the one extra build tool FFmpeg's configure wants (pkgconf) is built from a
-# pinned tarball in the scratch directory and is not shipped. No network is needed after the
+# shasum. Nothing else: the extra build tools (pkgconf for FFmpeg's configure, and nasm for the x86
+# assembly of libvpx and FFmpeg when CM_ARCH=x86_64) are built from pinned tarballs in the scratch
+# directory and are not shipped. No network is needed after the
 # tarballs are cached.
 #
-# Architecture: arm64 only (the build host must be an Apple Silicon Mac). A universal binary needs
-# a second x86_64 build (FFmpeg and libvpx use nasm/yasm for x86 assembly, which is not installed
-# here) and `lipo -create` of the two ffmpeg and the two ffprobe; the script does not do that yet.
+# Architecture: one per run, never universal (separate DMGs per chip, specs/plans/intel-mac-plan.md).
+# Each output holds a single architecture; there is no `lipo`.
 #
 # Licence: configured with --disable-gpl --disable-nonfree --disable-version3, so the result is
 # LGPL v2.1 or later. libvpx (BSD-3-Clause + patent grant) and libopus (BSD-3-Clause) are linked
@@ -53,7 +57,20 @@ PKGCONF_VERSION="2.5.1"
 PKGCONF_URL="https://distfiles.ariadne.space/pkgconf/pkgconf-${PKGCONF_VERSION}.tar.xz"
 PKGCONF_SHA256="cd05c9589b9f86ecf044c10a2269822bc9eb001eced2582cfffd658b0a50c243"
 
+# Build-time only, never shipped: the x86 assembler for libvpx and FFmpeg (x86_64 builds only).
+NASM_VERSION="2.16.03"
+NASM_URL="https://www.nasm.us/pub/nasm/releasebuilds/${NASM_VERSION}/nasm-${NASM_VERSION}.tar.xz"
+NASM_SHA256="1412a1c760bbd05db026b6c0d1657affd6631cd0a63cddb6f73cc6d4aa616148"
+
 MIN_MACOS="13.0"
+ARCH="${CM_ARCH:-$(uname -m)}"
+case "$ARCH" in
+  arm64)  VPX_TARGET="arm64-darwin22-gcc";  default_out="out" ;;
+  x86_64) VPX_TARGET="x86_64-darwin22-gcc"; default_out="out-x86_64" ;;
+  *) die "CM_ARCH must be arm64 or x86_64 (got $ARCH)" ;;
+esac
+# Running a binary of the target architecture: directly when it is the host's, else under Rosetta.
+if [ "$ARCH" = "$(uname -m)" ]; then run_target=(); else run_target=(arch "-$ARCH"); fi
 SOURCE_REPO="${CM_SOURCE_REPO:-https://github.com/craft-mann/capturemann}"
 
 # ---- the components the product uses (everything else is disabled) ----
@@ -81,14 +98,17 @@ REQUIRED_DEMUXERS="mov matroska wav image2 rawvideo f32le gif"
 REQUIRED_FILTERS="alphamerge aformat aresample atempo atrim adelay amix apad alimiter asetpts crop format fps hflip overlay paletteuse palettegen scale setpts setsar split tpad trim loudnorm ebur128 concat anullsrc anullsink"
 
 [ "$(uname -s)" = "Darwin" ] || die "this script only runs on macOS"
-[ "$(uname -m)" = "arm64" ] || die "arm64 only (see the header for what a universal build needs)"
+if [ "${#run_target[@]}" -gt 0 ]; then
+  [ "$(uname -m)" = "arm64" ] || die "cross-building is only supported from an Apple Silicon Mac"
+  "${run_target[@]}" /usr/bin/true 2>/dev/null || die "cannot run $ARCH programs here (the self-check needs Rosetta: softwareupdate --install-rosetta)"
+fi
 for tool in curl shasum tar xz make clang perl otool strip install_name_tool; do
   command -v "$tool" >/dev/null 2>&1 || die "required tool not found: $tool (install the Xcode command line tools)"
 done
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 src_cache="${CM_FFMPEG_SRC_DIR:-$root/packaging/ffmpeg/.downloads}"
-out="${CM_FFMPEG_OUT:-$root/packaging/ffmpeg/out}"
+out="${CM_FFMPEG_OUT:-$root/packaging/ffmpeg/$default_out}"
 jobs="${CM_FFMPEG_JOBS:-$(sysctl -n hw.ncpu)}"
 keep_work=1
 if [ -n "${CM_FFMPEG_BUILD_DIR:-}" ]; then
@@ -138,13 +158,15 @@ fetch "ffmpeg-${FFMPEG_VERSION}.tar.xz" "$FFMPEG_URL" "$FFMPEG_SHA256"
 fetch "libvpx-${LIBVPX_VERSION}.tar.gz" "$LIBVPX_URL" "$LIBVPX_SHA256"
 fetch "opus-${OPUS_VERSION}.tar.gz" "$OPUS_URL" "$OPUS_SHA256"
 fetch "pkgconf-${PKGCONF_VERSION}.tar.xz" "$PKGCONF_URL" "$PKGCONF_SHA256"
+[ "$ARCH" != "x86_64" ] || fetch "nasm-${NASM_VERSION}.tar.xz" "$NASM_URL" "$NASM_SHA256"
 unpack "ffmpeg-${FFMPEG_VERSION}.tar.xz"
 unpack "libvpx-${LIBVPX_VERSION}.tar.gz"
 unpack "opus-${OPUS_VERSION}.tar.gz"
 unpack "pkgconf-${PKGCONF_VERSION}.tar.xz"
+[ "$ARCH" != "x86_64" ] || unpack "nasm-${NASM_VERSION}.tar.xz"
 
 export MACOSX_DEPLOYMENT_TARGET="$MIN_MACOS"
-cflags="-O2 -arch arm64 -mmacosx-version-min=$MIN_MACOS"
+cflags="-O2 -arch $ARCH -mmacosx-version-min=$MIN_MACOS"
 # A reproducible-ish environment: nothing from Homebrew or /usr/local is searched.
 export PATH="$tools/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Library/Developer/CommandLineTools/usr/bin"
 unset CPATH LIBRARY_PATH PKG_CONFIG_PATH DYLD_LIBRARY_PATH
@@ -156,6 +178,14 @@ echo "==> pkgconf $PKGCONF_VERSION (build tool, not shipped)"
   || { tail -20 "$work/pkgconf.log" >&2; die "pkgconf build failed (log: $work/pkgconf.log)"; }
 ln -sf pkgconf "$tools/bin/pkg-config"
 
+if [ "$ARCH" = "x86_64" ]; then
+  echo "==> nasm $NASM_VERSION (build tool for the x86 assembly, not shipped; runs on this Mac)"
+  (cd "$work/src/nasm-${NASM_VERSION}" \
+    && ./configure --prefix="$tools" >"$work/nasm.log" 2>&1 \
+    && make -j"$jobs" >>"$work/nasm.log" 2>&1 && make install >>"$work/nasm.log" 2>&1) \
+    || { tail -20 "$work/nasm.log" >&2; die "nasm build failed (log: $work/nasm.log)"; }
+fi
+
 echo "==> libopus $OPUS_VERSION (static)"
 (cd "$work/src/opus-${OPUS_VERSION}" \
   && CFLAGS="$cflags" ./configure --prefix="$prefix" --disable-shared --enable-static \
@@ -164,10 +194,10 @@ echo "==> libopus $OPUS_VERSION (static)"
   || { tail -20 "$work/opus.log" >&2; die "libopus build failed (log: $work/opus.log)"; }
 
 echo "==> libvpx $LIBVPX_VERSION (static, VP9 only)"
-# `arm64-darwin22-gcc` = macOS 13 (Darwin 22), built with clang. VP8 is not used (WebM export is
+# `<arch>-darwin22-gcc` = macOS 13 (Darwin 22), built with clang. VP8 is not used (WebM export is
 # VP9 + Opus), so it is left out.
 (cd "$work/src/libvpx-${LIBVPX_VERSION}" \
-  && ./configure --prefix="$prefix" --target=arm64-darwin22-gcc \
+  && ./configure --prefix="$prefix" --target="$VPX_TARGET" \
        --disable-shared --enable-static --enable-pic \
        --enable-vp9 --disable-vp8 \
        --disable-examples --disable-tools --disable-docs --disable-unit-tests \
@@ -181,12 +211,12 @@ export PKG_CONFIG_PATH="$prefix/lib/pkgconfig"
 configure_args=(
   --prefix="$stage"
   --cc=clang
-  --arch=arm64
+  --arch="$ARCH"
   --target-os=darwin
   --pkg-config="$tools/bin/pkgconf"
   --pkg-config-flags=--static
-  --extra-cflags="-arch arm64 -mmacosx-version-min=$MIN_MACOS -I$prefix/include"
-  --extra-ldflags="-arch arm64 -mmacosx-version-min=$MIN_MACOS -L$prefix/lib"
+  --extra-cflags="-arch $ARCH -mmacosx-version-min=$MIN_MACOS -I$prefix/include"
+  --extra-ldflags="-arch $ARCH -mmacosx-version-min=$MIN_MACOS -L$prefix/lib"
   --enable-static --disable-shared
   --disable-gpl --disable-nonfree --disable-version3
   --disable-autodetect
@@ -208,6 +238,10 @@ configure_args=(
   --enable-filter="$FILTERS"
 )
 # `configure` silently ignores a component name it does not know, so check every name first.
+if [ "${#run_target[@]}" -gt 0 ]; then
+  # Cross-compiling: configure must be told (it then does not try to run what it builds).
+  configure_args+=(--enable-cross-compile)
+fi
 check_components() { # check_components <kind> <comma list>   (kind: encoder decoder hwaccel muxer demuxer parser bsf protocol filter)
   local kind="$1" list="$2" known name bad=""
   known="$(cd "$work/src/ffmpeg-${FFMPEG_VERSION}" && ./configure --list-${kind}s 2>/dev/null | tr -s ' \t' '\n')"
@@ -238,18 +272,19 @@ fp="$stage/bin/ffprobe"
 strip -x "$ff" "$fp"
 
 echo "==> self-check"
-conf="$("$ff" -hide_banner -buildconf 2>&1)"
-head="$("$ff" -hide_banner -version 2>&1 | head -3)"
+ffx() { ${run_target[@]+"${run_target[@]}"} "$ff" "$@"; }
+conf="$(ffx -hide_banner -buildconf 2>&1)"
+head="$(ffx -hide_banner -version 2>&1 | head -3)"
 if grep -q -E -e '--enable-(gpl|nonfree|version3|libx264|libx265|libfdk-aac)' <<<"$conf"; then
   die "the finished build is not LGPL v2.1: $(grep -E -e '--enable-(gpl|nonfree|version3|libx264|libx265|libfdk-aac)' <<<"$conf" | tr -d ' ' | tr '\n' ' ')"
 fi
-if "$ff" -hide_banner -L 2>&1 | grep -q -i "GNU General Public"; then die "ffmpeg -L reports the GPL"; fi
-"$ff" -hide_banner -L 2>&1 | head -3 | sed 's/^/    /'
-encoders="$("$ff" -hide_banner -encoders 2>&1)"
-decoders="$("$ff" -hide_banner -decoders 2>&1)"
-filters="$("$ff" -hide_banner -filters 2>&1)"
-muxers="$("$ff" -hide_banner -muxers 2>&1)"
-demuxers="$("$ff" -hide_banner -demuxers 2>&1)"
+if ffx -hide_banner -L 2>&1 | grep -q -i "GNU General Public"; then die "ffmpeg -L reports the GPL"; fi
+ffx -hide_banner -L 2>&1 | head -3 | sed 's/^/    /'
+encoders="$(ffx -hide_banner -encoders 2>&1)"
+decoders="$(ffx -hide_banner -decoders 2>&1)"
+filters="$(ffx -hide_banner -filters 2>&1)"
+muxers="$(ffx -hide_banner -muxers 2>&1)"
+demuxers="$(ffx -hide_banner -demuxers 2>&1)"
 missing=""
 for e in $REQUIRED_ENCODERS; do grep -q -E " $e( |$)" <<<"$encoders" || missing="$missing encoder:$e"; done
 for d in $REQUIRED_DECODERS; do grep -q -E " $d( |$)" <<<"$decoders" || missing="$missing decoder:$d"; done
@@ -262,7 +297,8 @@ for bin in "$ff" "$fp"; do
   bad="$(otool -L "$bin" | tail -n +2 | awk '{print $1}' | grep -v -E '^(/usr/lib/|/System/Library/)' || true)"
   [ -z "$bad" ] || die "$(basename "$bin") links a non-system library: $bad"
 done
-echo "    LGPL configuration, required components present, system libraries only"
+lipo -info "$ff" "$fp" | grep -v -q -E "architecture: $ARCH\$" && die "ffmpeg or ffprobe is not $ARCH only: $(lipo -info "$ff" "$fp")"
+echo "    LGPL configuration, required components present, system libraries only, $ARCH only"
 
 echo "==> installing into $out"
 rm -rf "$out"
@@ -282,7 +318,7 @@ cat >"$out/BUILD-INFO.txt" <<EOF
 CaptureMann bundled FFmpeg: build record
 Built by packaging/ffmpeg/build-macos.sh on $(date -u +%Y-%m-%dT%H:%M:%SZ)
 Host: $(uname -srm), $(sw_vers -productName) $(sw_vers -productVersion), $(clang --version | head -1)
-Minimum macOS: $MIN_MACOS, architecture: arm64 only
+Minimum macOS: $MIN_MACOS, architecture: $ARCH only
 
 Sources (official sites, SHA-256 checked by the script before use):
   FFmpeg   $FFMPEG_VERSION  $FFMPEG_URL
@@ -294,12 +330,13 @@ Sources (official sites, SHA-256 checked by the script before use):
 Build-time only, not shipped:
   pkgconf  $PKGCONF_VERSION  $PKGCONF_URL
            sha256 $PKGCONF_SHA256
+$([ "$ARCH" = "x86_64" ] && printf '  nasm     %s  %s\n           sha256 %s\n' "$NASM_VERSION" "$NASM_URL" "$NASM_SHA256")
 
 FFmpeg configure line:
   $cmd_line
 
 libopus: ./configure --prefix=<scratch> --disable-shared --enable-static --disable-doc --disable-extra-programs
-libvpx:  ./configure --prefix=<scratch> --target=arm64-darwin22-gcc --disable-shared --enable-static --enable-pic --enable-vp9 --disable-vp8 --disable-examples --disable-tools --disable-docs --disable-unit-tests
+libvpx:  ./configure --prefix=<scratch> --target=$VPX_TARGET --disable-shared --enable-static --enable-pic --enable-vp9 --disable-vp8 --disable-examples --disable-tools --disable-docs --disable-unit-tests
 
 ffmpeg -version:
 $head
