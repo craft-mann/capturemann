@@ -199,6 +199,10 @@ pub enum ErrorKind {
     Timeout,
     /// `job_failed`, `reason: "invalid_model_output"`.
     InvalidOutput,
+    /// The model ran into the reply limit (`finish_reason: "length"`) before its JSON was
+    /// complete. Asking again with the same prompt cannot help; a caller that can ask for less
+    /// does (a report splits the transcript piece). `job_failed`, `reason: "output_too_long"`.
+    OutputTooLong,
     /// The server answered with an error (model not loaded, out of memory, bad key): its message
     /// is passed through. `job_failed`, `reason: "text_model_error"`.
     Server,
@@ -250,6 +254,7 @@ impl TextModelError {
             ErrorKind::Unreachable => "text_model_unreachable",
             ErrorKind::Timeout => "timeout",
             ErrorKind::InvalidOutput => "invalid_model_output",
+            ErrorKind::OutputTooLong => "output_too_long",
             ErrorKind::Server => "text_model_error",
             ErrorKind::EngineMissing => "engine_missing",
             ErrorKind::EngineFailed => "engine_failed",

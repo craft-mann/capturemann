@@ -144,6 +144,103 @@ fn ask(
     Ok(checked.content)
 }
 
+/// A call whose notes did not fit in one reply (`output_too_long`).
+fn too_long(e: &Error) -> bool {
+    matches!(e, Error::Model(m) if m.kind == ErrorKind::OutputTooLong)
+}
+
+/// Puts checked notes side by side: every section is a list of items, so the union of the lists is
+/// a valid set of notes (without the merge pass's de-duplication). Used when the model cannot write
+/// the merged notes in one reply, so no call is needed and nothing can run over.
+fn concat_notes(parts: &[Value]) -> Value {
+    let mut out = Map::new();
+    for p in parts {
+        let Some(o) = p.as_object() else { continue };
+        for (k, v) in o {
+            match (out.get_mut(k), v) {
+                (Some(Value::Array(a)), Value::Array(b)) => a.extend(b.iter().cloned()),
+                (None, _) => {
+                    out.insert(k.clone(), v.clone());
+                }
+                _ => {}
+            }
+        }
+    }
+    Value::Object(out)
+}
+
+/// Cuts `text` in two at the line break nearest its middle (or at a character if it has none).
+fn halve(text: &str) -> (&str, &str) {
+    let mid = text.len() / 2;
+    let at = text[..mid]
+        .rfind('\n')
+        .or_else(|| text[mid..].find('\n').map(|i| mid + i))
+        .map(|i| i + 1)
+        .filter(|&i| i > 0 && i < text.len())
+        .unwrap_or_else(|| {
+            let mut i = mid;
+            while !text.is_char_boundary(i) {
+                i += 1;
+            }
+            i
+        });
+    text.split_at(at)
+}
+
+/// The notes of one piece of the transcript. When the model cannot write them in one reply, the
+/// piece is cut in two and each half is done on its own (up to three levels, an eighth of the
+/// piece), and the two sets of notes are put side by side.
+#[allow(clippy::too_many_arguments)]
+fn notes_for(
+    model: &dyn TextModel,
+    input: &Input<'_>,
+    system: &str,
+    preamble: &str,
+    chunk: &str,
+    part: Option<(usize, usize)>,
+    checker: &Checker,
+    totals: &RefCell<Totals>,
+    progress: Progress<'_, '_>,
+    slice: (f32, f32),
+    depth: usize,
+) -> Result<Value, Error> {
+    let user = prompt::notes_prompt(preamble, chunk, part);
+    match ask(model, input, system, user, checker, totals, progress, slice) {
+        Err(e) if too_long(&e) && depth < 3 && chunk.chars().count() > 400 => {
+            let (a, b) = halve(chunk);
+            let mid = (slice.0 + slice.1) / 2.0;
+            let first = notes_for(
+                model,
+                input,
+                system,
+                preamble,
+                a,
+                part,
+                checker,
+                totals,
+                progress,
+                (slice.0, mid),
+                depth + 1,
+            )?;
+            let second = notes_for(
+                model,
+                input,
+                system,
+                preamble,
+                b,
+                part,
+                checker,
+                totals,
+                progress,
+                (mid, slice.1),
+                depth + 1,
+            )?;
+            Ok(concat_notes(&[first, second]))
+        }
+        r => r,
+    }
+}
+
 /// Merges `notes` (each already checked) into one set, in groups that fit a chunk of the context,
 /// level by level, until one is left.
 #[allow(clippy::too_many_arguments)]
@@ -198,9 +295,12 @@ fn merge_all(
             }
             let user = prompt::merge_prompt(preamble, &g);
             let slice = (at(i), at(i + 1));
-            next.push(ask(
-                model, input, system, user, checker, totals, progress, slice,
-            )?);
+            match ask(model, input, system, user, checker, totals, progress, slice) {
+                Ok(v) => next.push(v),
+                // The merged notes do not fit in one reply: keep all of them side by side.
+                Err(e) if too_long(&e) => next.push(concat_notes(&g)),
+                Err(e) => return Err(e),
+            }
         }
         level = next;
     }
@@ -239,9 +339,9 @@ pub fn generate(
                 return Err(Error::Cancelled);
             }
             let part = (n_chunks > 1).then_some((i + 1, n_chunks));
-            let user = prompt::notes_prompt(&preamble, chunk, part);
-            ask(
-                model, input, &system, user, &checker, &totals, progress, slice,
+            notes_for(
+                model, input, &system, &preamble, chunk, part, &checker, &totals, progress, slice,
+                0,
             )
         },
         |parts| {

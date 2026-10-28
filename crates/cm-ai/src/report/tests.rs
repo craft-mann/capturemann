@@ -324,6 +324,137 @@ fn three_hour_transcript_is_chunked_and_covers_the_timeline() {
     assert_eq!(g.dropped_uncited, 0);
 }
 
+type FallibleAnswer = Box<dyn Fn(&JsonRequest) -> Result<Value, TextModelError> + Send + Sync>;
+
+/// A model that may refuse with an error, like a reply that ran into the token limit.
+struct Fallible {
+    calls: Mutex<Vec<JsonRequest>>,
+    answer: FallibleAnswer,
+}
+
+impl TextModel for Fallible {
+    fn complete_json(&self, req: &JsonRequest) -> Result<JsonReply, TextModelError> {
+        self.calls.lock().unwrap().push(req.clone());
+        (self.answer)(req).map(|value| JsonReply { value, attempts: 1 })
+    }
+}
+
+fn too_long_error() -> TextModelError {
+    TextModelError {
+        kind: crate::text_model::ErrorKind::OutputTooLong,
+        message: "cut off at the reply limit".into(),
+    }
+}
+
+/// The times of the transcript lines in a notes prompt (`[12] text`).
+fn line_times(user: &str, needle: &str) -> Vec<f64> {
+    user.lines()
+        .filter_map(|l| l.strip_prefix('['))
+        .filter_map(|l| l.split_once(']'))
+        .filter(|(_, rest)| rest.contains(needle))
+        .filter_map(|(n, _)| n.parse().ok())
+        .collect()
+}
+
+fn decisions_reply(at: &[f64]) -> Value {
+    let d: Vec<Value> = at
+        .iter()
+        .map(|t| json!({"text": "decided", "at": [t]}))
+        .collect();
+    json!({"summary": [], "attendees": [], "topics": [], "decisions": d,
+           "action_items": [], "open_questions": []})
+}
+
+/// A reply that stops at the token limit cannot be fixed by asking again: the piece is cut in two,
+/// each half gets its own notes, and nothing of either half is lost (seen on Oct 28, 2026: a
+/// 2.5-hour Vietnamese recording failed with `invalid_model_output`).
+#[test]
+fn notes_that_do_not_fit_in_one_reply_are_written_for_each_half() {
+    let t = find_template("minutes").unwrap();
+    let lines = meeting(); // 12 lines at 0, 10, ... 110 s
+    let ctx = ReportContext::default();
+    let model = Fallible {
+        calls: Mutex::new(vec![]),
+        answer: Box::new(|req| {
+            let times = line_times(&req.messages[0].content, "pricing sheet");
+            if times.len() > 6 {
+                return Err(too_long_error());
+            }
+            Ok(decisions_reply(&times))
+        }),
+    };
+    let g = generate(&model, &input(t, &lines, &ctx, &[]), &mut no_progress()).unwrap();
+    let calls = model.calls.lock().unwrap();
+    assert_eq!(calls.len(), 3, "the whole piece, then each half");
+    assert_eq!(g.model_calls, 2, "only answered calls are counted");
+    let mut ats: Vec<f64> = g.content["decisions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|d| d["at"][0].as_f64().unwrap())
+        .collect();
+    ats.sort_by(f64::total_cmp);
+    let all: Vec<f64> = (0..12).map(|i| f64::from(i) * 10.0).collect();
+    assert_eq!(ats, all, "every line of both halves is cited once");
+}
+
+/// When the merged notes would not fit in one reply either, the notes are kept side by side.
+#[test]
+fn merged_notes_that_do_not_fit_in_one_reply_are_kept_side_by_side() {
+    let t = find_template("minutes").unwrap();
+    let lines: Vec<Line> = (0..200)
+        .map(|i| {
+            let s = f64::from(i) * 10.0;
+            line(
+                s,
+                s + 9.0,
+                None,
+                "this is a rather long sentence about the quarterly plan and the budget for the next \
+                 team to review together",
+            )
+        })
+        .collect();
+    let ctx = ReportContext::default();
+    let model = Fallible {
+        calls: Mutex::new(vec![]),
+        answer: Box::new(|req| {
+            let user = &req.messages[0].content;
+            if user.contains("Notes of part") {
+                return Err(too_long_error());
+            }
+            let times = line_times(user, "quarterly");
+            Ok(decisions_reply(&times[..1]))
+        }),
+    };
+    let g = generate(&model, &input(t, &lines, &ctx, &[]), &mut no_progress()).unwrap();
+    assert!(g.chunks > 2, "{}", g.chunks);
+    assert_eq!(
+        g.content["decisions"].as_array().unwrap().len(),
+        g.chunks,
+        "one decision per part, none lost"
+    );
+}
+
+/// Other failures are still failures: only the reply limit splits a piece.
+#[test]
+fn other_model_errors_are_not_turned_into_splits() {
+    let t = find_template("minutes").unwrap();
+    let lines = meeting();
+    let ctx = ReportContext::default();
+    let model = Fallible {
+        calls: Mutex::new(vec![]),
+        answer: Box::new(|_| {
+            Err(TextModelError {
+                kind: crate::text_model::ErrorKind::InvalidOutput,
+                message: "bad".into(),
+            })
+        }),
+    };
+    let e = generate(&model, &input(t, &lines, &ctx, &[]), &mut no_progress()).unwrap_err();
+    assert!(matches!(e, generate::Error::Model(m) if m.reason() == "invalid_model_output"));
+    assert_eq!(model.calls.lock().unwrap().len(), 1);
+}
+
 #[test]
 fn cancel_stops_the_run() {
     let t = find_template("summary").unwrap();

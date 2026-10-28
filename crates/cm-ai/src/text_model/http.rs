@@ -92,12 +92,19 @@ fn read_body(mut resp: ureq::http::Response<ureq::Body>) -> Result<Reply, Fail> 
     Ok(Reply { status, body })
 }
 
+/// The model's raw text for one request, and whether it stopped at the reply limit.
+struct Chat {
+    text: String,
+    hit_limit: bool,
+}
+
 /// What a chat request came back with.
 enum Outcome {
     /// A whole HTTP body (an error status, or a server that ignored `stream`).
     Reply(Reply),
-    /// The assembled text of a streamed answer.
-    Streamed(String),
+    /// The assembled text of a streamed answer, and whether the model stopped at the reply limit
+    /// (`finish_reason: "length"`) instead of finishing.
+    Streamed(String, bool),
 }
 
 fn is_event_stream(resp: &ureq::http::Response<ureq::Body>) -> bool {
@@ -113,9 +120,10 @@ fn is_event_stream(resp: &ureq::http::Response<ureq::Body>) -> bool {
 fn read_stream(
     resp: &mut ureq::http::Response<ureq::Body>,
     progress: &mut Progress<'_>,
-) -> Result<String, Fail> {
+) -> Result<(String, bool), Fail> {
     let mut reader = BufReader::new(resp.body_mut().as_reader().take(MAX_BODY));
     let mut text = String::new();
+    let mut hit_limit = false;
     let mut line = String::new();
     loop {
         line.clear();
@@ -139,6 +147,9 @@ fn read_stream(
                 .unwrap_or("the stream ended with an error");
             return Err(Fail::Server(msg.to_owned()));
         }
+        if v["choices"][0]["finish_reason"].as_str() == Some("length") {
+            hit_limit = true;
+        }
         let piece = v["choices"][0]["delta"]["content"]
             .as_str()
             .or_else(|| v["choices"][0]["message"]["content"].as_str())
@@ -150,7 +161,7 @@ fn read_stream(
             }
         }
     }
-    Ok(text)
+    Ok((text, hit_limit))
 }
 
 fn outcome(
@@ -159,7 +170,9 @@ fn outcome(
 ) -> Result<Outcome, Fail> {
     let ok = (200..300).contains(&resp.status().as_u16());
     match progress {
-        Some(p) if ok && is_event_stream(&resp) => read_stream(&mut resp, p).map(Outcome::Streamed),
+        Some(p) if ok && is_event_stream(&resp) => {
+            read_stream(&mut resp, p).map(|(t, limit)| Outcome::Streamed(t, limit))
+        }
         _ => read_body(resp).map(Outcome::Reply),
     }
 }
@@ -296,7 +309,7 @@ impl HttpTextModel {
         req: &JsonRequest,
         messages: &[Message],
         progress: Option<&mut Progress<'_>>,
-    ) -> Result<String, TextModelError> {
+    ) -> Result<Chat, TextModelError> {
         check_loopback(&self.base_url)?;
         if self.model.is_empty() {
             return Err(TextModelError::invalid_input(
@@ -323,7 +336,7 @@ impl HttpTextModel {
         req: &JsonRequest,
         messages: &[Message],
         mut progress: Option<&mut Progress<'_>>,
-    ) -> Result<String, TextModelError> {
+    ) -> Result<Chat, TextModelError> {
         let url = format!("{}/chat/completions", self.base_url);
         let mut msgs = vec![json!({ "role": "system", "content": Self::system_text(req) })];
         msgs.extend(
@@ -363,8 +376,10 @@ impl HttpTextModel {
             }
         }
         let reply = match out {
-            Outcome::Streamed(text) if !text.is_empty() => return Ok(text),
-            Outcome::Streamed(_) => {
+            Outcome::Streamed(text, hit_limit) if !text.is_empty() => {
+                return Ok(Chat { text, hit_limit })
+            }
+            Outcome::Streamed(..) => {
                 return Err(TextModelError {
                     kind: ErrorKind::Server,
                     message: "The text model server's reply has no message".to_owned(),
@@ -380,9 +395,13 @@ impl HttpTextModel {
             message: "The text model server sent a reply that is not JSON. Is it an OpenAI-compatible /v1 server?"
                 .to_owned(),
         })?;
+        let hit_limit = v["choices"][0]["finish_reason"].as_str() == Some("length");
         v["choices"][0]["message"]["content"]
             .as_str()
-            .map(str::to_owned)
+            .map(|text| Chat {
+                text: text.to_owned(),
+                hit_limit,
+            })
             .ok_or_else(|| TextModelError {
                 kind: ErrorKind::Server,
                 message: "The text model server's reply has no message".to_owned(),
@@ -431,6 +450,18 @@ impl TextModel for HttpTextModel {
 }
 
 impl HttpTextModel {
+    /// The reply stopped at the limit: its JSON is cut off, and a retry that carries the cut-off
+    /// reply would have even less room, so the caller gets a kind of its own.
+    fn too_long(req: &JsonRequest) -> TextModelError {
+        TextModelError {
+            kind: ErrorKind::OutputTooLong,
+            message: format!(
+                "The text model's answer was longer than the {} tokens allowed for one reply and was cut off",
+                req.max_tokens
+            ),
+        }
+    }
+
     fn run(
         &self,
         req: &JsonRequest,
@@ -443,6 +474,10 @@ impl HttpTextModel {
         };
         let mut progress = on_progress.map(|f| Progress { f, pieces: 0 });
         let first = self.chat_once(req, &req.messages, progress.as_mut())?;
+        if first.hit_limit {
+            return Err(Self::too_long(req));
+        }
+        let first = first.text;
         let err = match check(&first) {
             Ok(value) => return Ok(JsonReply { value, attempts: 1 }),
             Err(e) => e,
@@ -457,7 +492,10 @@ impl HttpTextModel {
             "That reply does not match the schema: {err}. Reply again with only the corrected JSON."
         )));
         let second = self.chat_once(req, &again, progress.as_mut())?;
-        match check(&second) {
+        if second.hit_limit {
+            return Err(Self::too_long(req));
+        }
+        match check(&second.text) {
             Ok(value) => Ok(JsonReply { value, attempts: 2 }),
             Err(e) => Err(TextModelError {
                 kind: ErrorKind::InvalidOutput,

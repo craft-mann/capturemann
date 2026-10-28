@@ -158,6 +158,23 @@ fn schema_failure_twice_is_invalid_model_output() {
     assert_eq!(cm.code().as_str(), "job_failed");
 }
 
+/// A reply that stopped at the token limit is cut-off JSON. Asking again with that reply in the
+/// prompt cannot work (there is even less room), so there is no retry and the error says why.
+#[test]
+fn a_reply_cut_off_at_the_token_limit_is_output_too_long_without_a_retry() {
+    let s = serve(|_, _| {
+        let body = json!({"choices": [{"finish_reason": "length",
+                                       "message": {"content": "{\"title\": \"Cut o"}}]});
+        (200, body.to_string())
+    });
+    let m = client(s.port);
+    let e = m.complete_json(&request()).unwrap_err();
+    assert_eq!(e.kind, ErrorKind::OutputTooLong);
+    assert_eq!(e.reason(), "output_too_long");
+    assert_eq!(s.seen.lock().unwrap().len(), 1, "no corrective retry");
+    assert_eq!(e.into_cm_error("job_1").code().as_str(), "job_failed");
+}
+
 #[test]
 fn a_slow_server_times_out() {
     let s = serve(|_, _| {
@@ -393,6 +410,8 @@ struct Sse {
     gap: Duration,
     /// Before this event, stay silent for the duration.
     stall_at: Option<(usize, Duration)>,
+    /// The `finish_reason` of the last event (`"length"`: the reply stopped at the token limit).
+    finish: Option<&'static str>,
 }
 
 impl Sse {
@@ -401,6 +420,7 @@ impl Sse {
             pieces: pieces.iter().map(|p| (*p).to_owned()).collect(),
             gap: Duration::from_millis(5),
             stall_at: None,
+            finish: None,
         }
     }
 }
@@ -426,6 +446,10 @@ fn send_events(s: &mut TcpStream, sse: &Sse) {
             return;
         }
         std::thread::sleep(sse.gap);
+    }
+    if let Some(f) = sse.finish {
+        let ev = json!({"choices":[{"delta":{}, "finish_reason": f}]});
+        let _ = write!(s, "data: {ev}\n\n");
     }
     let _ = write!(s, "data: [DONE]\n\n");
 }
@@ -524,6 +548,22 @@ fn a_streamed_answer_reports_growing_progress_and_assembles_the_same_json() {
     assert_eq!(seen[0].body["stream"], json!(true));
     assert_eq!(seen[0].body["response_format"]["type"], "json_schema");
     assert_eq!(seen[1].body["stream"], json!(false));
+}
+
+/// The same on the streaming path the app uses: the last event says `finish_reason: "length"`.
+#[test]
+fn a_streamed_reply_cut_off_at_the_token_limit_is_output_too_long_without_a_retry() {
+    let s = serve_sse(|_| {
+        let mut sse = Sse::new(&["{\"ti", "tle\": \"He"]);
+        sse.finish = Some("length");
+        sse
+    });
+    let m = client(s.port);
+    let e = m
+        .complete_json_streaming(&request(), &mut |_| true)
+        .unwrap_err();
+    assert_eq!(e.kind, ErrorKind::OutputTooLong);
+    assert_eq!(s.seen.lock().unwrap().len(), 1, "no corrective retry");
 }
 
 #[test]
