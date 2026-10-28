@@ -47,6 +47,7 @@ pub mod audio;
 pub mod caption;
 pub mod doubtful;
 pub mod glossary;
+pub mod measure;
 pub mod model;
 pub mod pieces;
 pub mod reapply;
