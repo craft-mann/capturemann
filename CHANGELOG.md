@@ -3,7 +3,7 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
-## [0.2.1] - Unreleased
+## [0.2.1] - 2026-10-28
 
 0.2.1 adds Intel Mac support and nothing else: no new feature and no redesign.
 
@@ -20,6 +20,14 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 - The built-in text engine runs on the CPU on Intel Macs (Metal is used on Apple Silicon).
 - The release workflow builds both downloads and is started by hand; pushing a tag no longer starts it.
+
+### Known limitations
+
+- The Intel build has not been tested on a real Intel Mac (see above). It is built on Apple Silicon,
+  so the first reports from Intel hardware may find problems that this release does not know about.
+- The built-in text engine and the speech models run on the CPU on Intel Macs; the default model
+  choices were made for Apple Silicon and have not been measured on Intel.
+- Everything in the 0.2.0 list below still applies.
 
 ## [0.2.0] - 2026-10-27
 
