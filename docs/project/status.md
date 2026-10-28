@@ -77,6 +77,22 @@ Pending:
 
 Deferred (not in 0.2.0): the first-use setup sheet (one place to get the speech and text models when you first need them; **not in 0.2.1 either**, which is Intel support only, maintainer decision Oct 28, 2026); VOC-3 live transcript to a later 0.2.x; Ollama and LM Studio (backlog); Intel Macs, Windows and Linux. Windows is untouched by this work.
 
+## Release 0.2.2 (transcripts of long recordings)
+
+Scope (maintainer, Oct 28, 2026): transcript accuracy for long recordings and the fixes found while testing 0.2.1. Translation and speaker detection are a later build. **Built Oct 28, 2026; not yet released** (the table below is updated when it is).
+
+| Part | State | How it was checked |
+|---|---|---|
+| Long recordings transcribed piece by piece (5 minutes, cut at quiet spots, over 10 minutes only), glossary and language on every piece | built | tested with scripted engines; one real run on an 88-minute Vietnamese recording, Large v3, as reported (`verification/TRANSCRIPT-PIECES-2026-10-28-maintainer.md`) |
+| Repetition check (exact and soft loops), second reading from the other audio, split in half, repeats dropped | built | tested with scripted engines and FFmpeg-made files; same real run: repeating 8-word groups 10.8% and 2.5% down to 0.6%, no dense-repetition region; no accuracy measured |
+| Checkpoint per finished piece, a held job resumes | built | tested through the real job queue with a fake engine; observed once on the real run |
+| Jobs the daemon already has are shown on the Transcript and Speakers tabs | built | tested (list parsing, app model); not looked at by eye on every screen |
+| Audio choice (original microphone) in Re-generate, MCP and CLI | built | tested; A/B on the real recording, the maintainer's own judgement of the passages was not reported yet |
+| Report on long recordings (`output_too_long`), citation times opt-in, audio preview mix, sidebar highlight and version, one-line fields follow the caret, Re-generate in the audio editor | built | tested with fakes; the maintainer confirmed the report, citation times, sidebar, silence and one-line field fixes in the app (as reported) |
+| Anything on an Intel Mac | not tested | no Intel Mac yet |
+
+One run of the `cm_daemon` tests failed once (3644 passed, 1 failed) while a bundle build used the CPU; it passed in the full run before, in three reruns of that crate and in the clean `make report` run (3645 passed, 0 failed, `reports/`). The test was not identified (the report lists no names): treat it as a possible timing-sensitive test and name it if it fails again.
+
 ## Release 0.2.1 (Intel Macs only)
 
 **Released Oct 28, 2026** (published on GitHub by the maintainer: `CaptureMann-v0.2.1-macos-arm64.dmg` and `-x86_64.dmg`, each notarized and stapled, each `.sha256` checked after download; the Homebrew cask is per chip and was installed from a throwaway tap on Apple Silicon, arm64 build, 0.2.1, notarized; the Intel download URL resolves, an install on Intel was not tried). Scope (maintainer, Oct 28, 2026): Intel Mac support and nothing else, no new feature and no redesign. Plan: `specs/plans/intel-mac-plan.md`. The Intel DMG was released before it has run on a real Intel Mac, marked as untested there; `tests/manual/INTEL-0.2.1.md` is the checklist for when a device exists.

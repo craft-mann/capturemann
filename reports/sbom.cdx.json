@@ -1,10 +1,10 @@
 {
   "bomFormat": "CycloneDX",
   "specVersion": "1.4",
-  "serialNumber": "urn:uuid:1e09c4db-7b2d-486e-ad8d-1100346295e5",
+  "serialNumber": "urn:uuid:9369a112-bfdd-406a-85a6-c68e9eda9a57",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-10-28T04:14:57+00:00",
+    "timestamp": "2026-10-28T11:34:34+00:00",
     "tools": [
       {
         "vendor": "aquasecurity",
@@ -13,7 +13,7 @@
       }
     ],
     "component": {
-      "bom-ref": "a6a7d1f7-86de-4286-8cbc-3015615e73ae",
+      "bom-ref": "9cc65819-a7f1-477c-8fcc-6bc0c79528cb",
       "type": "application",
       "name": ".",
       "properties": [
@@ -2015,15 +2015,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/cm-ai@0.2.1",
+      "bom-ref": "pkg:cargo/cm-ai@0.2.2",
       "type": "library",
       "name": "cm-ai",
-      "version": "0.2.1",
-      "purl": "pkg:cargo/cm-ai@0.2.1",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/cm-ai@0.2.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "cm-ai@0.2.1"
+          "value": "cm-ai@0.2.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -2032,15 +2032,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/cm-audio@0.2.1",
+      "bom-ref": "pkg:cargo/cm-audio@0.2.2",
       "type": "library",
       "name": "cm-audio",
-      "version": "0.2.1",
-      "purl": "pkg:cargo/cm-audio@0.2.1",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/cm-audio@0.2.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "cm-audio@0.2.1"
+          "value": "cm-audio@0.2.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -2049,15 +2049,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/cm-auth@0.2.1",
+      "bom-ref": "pkg:cargo/cm-auth@0.2.2",
       "type": "library",
       "name": "cm-auth",
-      "version": "0.2.1",
-      "purl": "pkg:cargo/cm-auth@0.2.1",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/cm-auth@0.2.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "cm-auth@0.2.1"
+          "value": "cm-auth@0.2.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -2066,15 +2066,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/cm-camera@0.2.1",
+      "bom-ref": "pkg:cargo/cm-camera@0.2.2",
       "type": "library",
       "name": "cm-camera",
-      "version": "0.2.1",
-      "purl": "pkg:cargo/cm-camera@0.2.1",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/cm-camera@0.2.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "cm-camera@0.2.1"
+          "value": "cm-camera@0.2.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -2083,15 +2083,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/cm-capture@0.2.1",
+      "bom-ref": "pkg:cargo/cm-capture@0.2.2",
       "type": "library",
       "name": "cm-capture",
-      "version": "0.2.1",
-      "purl": "pkg:cargo/cm-capture@0.2.1",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/cm-capture@0.2.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "cm-capture@0.2.1"
+          "value": "cm-capture@0.2.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -2100,15 +2100,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/cm-cli@0.2.1",
+      "bom-ref": "pkg:cargo/cm-cli@0.2.2",
       "type": "library",
       "name": "cm-cli",
-      "version": "0.2.1",
-      "purl": "pkg:cargo/cm-cli@0.2.1",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/cm-cli@0.2.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "cm-cli@0.2.1"
+          "value": "cm-cli@0.2.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -2117,15 +2117,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/cm-core@0.2.1",
+      "bom-ref": "pkg:cargo/cm-core@0.2.2",
       "type": "library",
       "name": "cm-core",
-      "version": "0.2.1",
-      "purl": "pkg:cargo/cm-core@0.2.1",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/cm-core@0.2.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "cm-core@0.2.1"
+          "value": "cm-core@0.2.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -2134,15 +2134,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/cm-cursor@0.2.1",
+      "bom-ref": "pkg:cargo/cm-cursor@0.2.2",
       "type": "library",
       "name": "cm-cursor",
-      "version": "0.2.1",
-      "purl": "pkg:cargo/cm-cursor@0.2.1",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/cm-cursor@0.2.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "cm-cursor@0.2.1"
+          "value": "cm-cursor@0.2.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -2151,15 +2151,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/cm-daemon@0.2.1",
+      "bom-ref": "pkg:cargo/cm-daemon@0.2.2",
       "type": "library",
       "name": "cm-daemon",
-      "version": "0.2.1",
-      "purl": "pkg:cargo/cm-daemon@0.2.1",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/cm-daemon@0.2.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "cm-daemon@0.2.1"
+          "value": "cm-daemon@0.2.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -2168,15 +2168,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/cm-desktop@0.2.1",
+      "bom-ref": "pkg:cargo/cm-desktop@0.2.2",
       "type": "library",
       "name": "cm-desktop",
-      "version": "0.2.1",
-      "purl": "pkg:cargo/cm-desktop@0.2.1",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/cm-desktop@0.2.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "cm-desktop@0.2.1"
+          "value": "cm-desktop@0.2.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -2185,15 +2185,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/cm-encode@0.2.1",
+      "bom-ref": "pkg:cargo/cm-encode@0.2.2",
       "type": "library",
       "name": "cm-encode",
-      "version": "0.2.1",
-      "purl": "pkg:cargo/cm-encode@0.2.1",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/cm-encode@0.2.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "cm-encode@0.2.1"
+          "value": "cm-encode@0.2.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -2202,15 +2202,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/cm-i18n@0.2.1",
+      "bom-ref": "pkg:cargo/cm-i18n@0.2.2",
       "type": "library",
       "name": "cm-i18n",
-      "version": "0.2.1",
-      "purl": "pkg:cargo/cm-i18n@0.2.1",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/cm-i18n@0.2.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "cm-i18n@0.2.1"
+          "value": "cm-i18n@0.2.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -2219,15 +2219,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/cm-ipc@0.2.1",
+      "bom-ref": "pkg:cargo/cm-ipc@0.2.2",
       "type": "library",
       "name": "cm-ipc",
-      "version": "0.2.1",
-      "purl": "pkg:cargo/cm-ipc@0.2.1",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/cm-ipc@0.2.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "cm-ipc@0.2.1"
+          "value": "cm-ipc@0.2.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -2236,15 +2236,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/cm-jobs@0.2.1",
+      "bom-ref": "pkg:cargo/cm-jobs@0.2.2",
       "type": "library",
       "name": "cm-jobs",
-      "version": "0.2.1",
-      "purl": "pkg:cargo/cm-jobs@0.2.1",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/cm-jobs@0.2.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "cm-jobs@0.2.1"
+          "value": "cm-jobs@0.2.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -2253,15 +2253,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/cm-library@0.2.1",
+      "bom-ref": "pkg:cargo/cm-library@0.2.2",
       "type": "library",
       "name": "cm-library",
-      "version": "0.2.1",
-      "purl": "pkg:cargo/cm-library@0.2.1",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/cm-library@0.2.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "cm-library@0.2.1"
+          "value": "cm-library@0.2.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -2270,15 +2270,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/cm-mcp@0.2.1",
+      "bom-ref": "pkg:cargo/cm-mcp@0.2.2",
       "type": "library",
       "name": "cm-mcp",
-      "version": "0.2.1",
-      "purl": "pkg:cargo/cm-mcp@0.2.1",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/cm-mcp@0.2.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "cm-mcp@0.2.1"
+          "value": "cm-mcp@0.2.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -2287,15 +2287,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/cm-media@0.2.1",
+      "bom-ref": "pkg:cargo/cm-media@0.2.2",
       "type": "library",
       "name": "cm-media",
-      "version": "0.2.1",
-      "purl": "pkg:cargo/cm-media@0.2.1",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/cm-media@0.2.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "cm-media@0.2.1"
+          "value": "cm-media@0.2.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -2304,15 +2304,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/cm-overlay@0.2.1",
+      "bom-ref": "pkg:cargo/cm-overlay@0.2.2",
       "type": "library",
       "name": "cm-overlay",
-      "version": "0.2.1",
-      "purl": "pkg:cargo/cm-overlay@0.2.1",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/cm-overlay@0.2.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "cm-overlay@0.2.1"
+          "value": "cm-overlay@0.2.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -2321,15 +2321,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/cm-publish@0.2.1",
+      "bom-ref": "pkg:cargo/cm-publish@0.2.2",
       "type": "library",
       "name": "cm-publish",
-      "version": "0.2.1",
-      "purl": "pkg:cargo/cm-publish@0.2.1",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/cm-publish@0.2.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "cm-publish@0.2.1"
+          "value": "cm-publish@0.2.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -2338,15 +2338,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/cm-render@0.2.1",
+      "bom-ref": "pkg:cargo/cm-render@0.2.2",
       "type": "library",
       "name": "cm-render",
-      "version": "0.2.1",
-      "purl": "pkg:cargo/cm-render@0.2.1",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/cm-render@0.2.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "cm-render@0.2.1"
+          "value": "cm-render@0.2.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -2355,15 +2355,15 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/cm-storage@0.2.1",
+      "bom-ref": "pkg:cargo/cm-storage@0.2.2",
       "type": "library",
       "name": "cm-storage",
-      "version": "0.2.1",
-      "purl": "pkg:cargo/cm-storage@0.2.1",
+      "version": "0.2.2",
+      "purl": "pkg:cargo/cm-storage@0.2.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "cm-storage@0.2.1"
+          "value": "cm-storage@0.2.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -15564,7 +15564,7 @@
       ]
     },
     {
-      "bom-ref": "505912f9-b74e-4070-b9c0-a529d14a83a8",
+      "bom-ref": "fe10c689-9cf1-4815-ba0a-8d23b8335e83",
       "type": "application",
       "name": "Cargo.lock",
       "properties": [
@@ -17466,7 +17466,7 @@
       ]
     },
     {
-      "bom-ref": "a358a1cf-cc2d-4174-82c5-77eb73e4c0e8",
+      "bom-ref": "91ca3305-6b3f-4ebc-9afc-8799f655df1f",
       "type": "application",
       "name": "spikes/Cargo.lock",
       "properties": [
@@ -17483,7 +17483,7 @@
   ],
   "dependencies": [
     {
-      "ref": "505912f9-b74e-4070-b9c0-a529d14a83a8",
+      "ref": "fe10c689-9cf1-4815-ba0a-8d23b8335e83",
       "dependsOn": [
         "pkg:cargo/ab_glyph@0.2.32",
         "pkg:cargo/ab_glyph_rasterizer@0.1.10",
@@ -17602,27 +17602,27 @@
         "pkg:cargo/clap_derive@4.6.7",
         "pkg:cargo/clap_lex@1.1.1",
         "pkg:cargo/clipboard-win@5.4.1",
-        "pkg:cargo/cm-ai@0.2.1",
-        "pkg:cargo/cm-audio@0.2.1",
-        "pkg:cargo/cm-auth@0.2.1",
-        "pkg:cargo/cm-camera@0.2.1",
-        "pkg:cargo/cm-capture@0.2.1",
-        "pkg:cargo/cm-cli@0.2.1",
-        "pkg:cargo/cm-core@0.2.1",
-        "pkg:cargo/cm-cursor@0.2.1",
-        "pkg:cargo/cm-daemon@0.2.1",
-        "pkg:cargo/cm-desktop@0.2.1",
-        "pkg:cargo/cm-encode@0.2.1",
-        "pkg:cargo/cm-i18n@0.2.1",
-        "pkg:cargo/cm-ipc@0.2.1",
-        "pkg:cargo/cm-jobs@0.2.1",
-        "pkg:cargo/cm-library@0.2.1",
-        "pkg:cargo/cm-mcp@0.2.1",
-        "pkg:cargo/cm-media@0.2.1",
-        "pkg:cargo/cm-overlay@0.2.1",
-        "pkg:cargo/cm-publish@0.2.1",
-        "pkg:cargo/cm-render@0.2.1",
-        "pkg:cargo/cm-storage@0.2.1",
+        "pkg:cargo/cm-ai@0.2.2",
+        "pkg:cargo/cm-audio@0.2.2",
+        "pkg:cargo/cm-auth@0.2.2",
+        "pkg:cargo/cm-camera@0.2.2",
+        "pkg:cargo/cm-capture@0.2.2",
+        "pkg:cargo/cm-cli@0.2.2",
+        "pkg:cargo/cm-core@0.2.2",
+        "pkg:cargo/cm-cursor@0.2.2",
+        "pkg:cargo/cm-daemon@0.2.2",
+        "pkg:cargo/cm-desktop@0.2.2",
+        "pkg:cargo/cm-encode@0.2.2",
+        "pkg:cargo/cm-i18n@0.2.2",
+        "pkg:cargo/cm-ipc@0.2.2",
+        "pkg:cargo/cm-jobs@0.2.2",
+        "pkg:cargo/cm-library@0.2.2",
+        "pkg:cargo/cm-mcp@0.2.2",
+        "pkg:cargo/cm-media@0.2.2",
+        "pkg:cargo/cm-overlay@0.2.2",
+        "pkg:cargo/cm-publish@0.2.2",
+        "pkg:cargo/cm-render@0.2.2",
+        "pkg:cargo/cm-storage@0.2.2",
         "pkg:cargo/cmake@0.1.58",
         "pkg:cargo/cmov@0.5.4",
         "pkg:cargo/cocoa@0.25.0",
@@ -18402,7 +18402,7 @@
       ]
     },
     {
-      "ref": "a358a1cf-cc2d-4174-82c5-77eb73e4c0e8",
+      "ref": "91ca3305-6b3f-4ebc-9afc-8799f655df1f",
       "dependsOn": [
         "pkg:cargo/ab_glyph@0.2.32",
         "pkg:cargo/ab_glyph_rasterizer@0.1.10",
@@ -19248,10 +19248,10 @@
       ]
     },
     {
-      "ref": "a6a7d1f7-86de-4286-8cbc-3015615e73ae",
+      "ref": "9cc65819-a7f1-477c-8fcc-6bc0c79528cb",
       "dependsOn": [
-        "505912f9-b74e-4070-b9c0-a529d14a83a8",
-        "a358a1cf-cc2d-4174-82c5-77eb73e4c0e8"
+        "fe10c689-9cf1-4815-ba0a-8d23b8335e83",
+        "91ca3305-6b3f-4ebc-9afc-8799f655df1f"
       ]
     }
   ],

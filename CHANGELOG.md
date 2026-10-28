@@ -5,17 +5,20 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-28
+
+0.2.2 is about transcripts of long recordings, plus the fixes found while testing 0.2.1. Translation and speaker detection are unchanged and get their own release.
+
 ### Fixed
 
 - A long recording no longer fails its report with `invalid_model_output`. When one piece's notes did not fit in the model's reply limit, the JSON was cut off and the retry had no room left; the piece is now split in half (or, for the merge, the notes are kept side by side). Seen on a 2.5-hour Vietnamese recording. 0.2.0 and 0.2.1 have the problem.
-
 - A long recording is no longer transcribed as one phrase repeated thousands of times, and its transcript is checked for the other ways Whisper goes wrong. A Large v3 run on an 88-minute Vietnamese recording came back with one sentence 2,480 times from 5:35 to the end: Whisper writes each 30-second window on the text of the one before, and one bad window carried through the rest. A recording over 10 minutes is now transcribed piece by piece (cut at the quietest spot near every 5 minutes), so a loop cannot pass from one piece to the next, the glossary applies to every piece instead of fading out after the first minutes, and the language found in the first piece is used for the others. Every piece is checked for exact loops and for soft loops (the same sentences coming round with small changes, which an exact-repeat check misses: the noise-reduced reading of that recording had about 8 minutes of them). A bad piece is read again from the other audio of the recording (the original microphone or the noise-reduced copy, whichever was not read) and the better reading is kept; one that is still bad is split in half and done again, and what survives has its repeats taken out. Recordings under 10 minutes are one piece and get the same checks. 0.2.0 and 0.2.1 have the problem.
 - A transcription, speaker or report run that the daemon already has is now shown in the window. After a restart the daemon picks up queued and interrupted jobs by itself, and nothing told the window, so the Transcript and Speakers tabs showed nothing while a long transcription was running. The app now reads the daemon's job list at start and whenever an editor opens, and shows those runs with their progress.
 - A long transcription no longer starts over from 0% when a recording interrupts it. While you record, the daemon holds background jobs; the transcription had no saved progress, so when the hold ended it began again (seen at 7x% on an 88-minute recording). It now saves its progress after every finished piece and goes on from the last one.
 - A one-line field (the rename box, search fields) now scrolls to follow the caret: a long text is no longer cut at the right edge, and the arrow keys reach the whole text.
 - The audio editor of a long recording plays again right away. Mixing the preview of an 88-minute recording took about 45 seconds and 12 GB of memory (the exporter's loudness measurement and true-peak limiter ran over the whole mix), and Play was silent until it finished; it now takes under a second and about half the memory. Exports are unchanged.
 - The sidebar highlights Audio, not Recordings, while an audio recording is open in the editor.
-- The sidebar shows the exact version (`v0.2.1`), the same as Settings > About, instead of only major.minor.
+- The sidebar shows the exact version (for example `v0.2.2`), the same as Settings > About, instead of only major.minor.
 - After a long recording the Transcript and Speakers tabs now say that the transcript and the speaker labels are being made, with the progress, and that nothing needs pressing. The automatic transcription was invisible to the editor (the new `transcript.started` event tells it), so the tabs looked idle for minutes.
 
 ### Added
@@ -26,6 +29,15 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 ### Changed
 
 - Report exports leave out the citation times by default: Markdown, TXT and Copy no longer print `[mm:ss]` after every item. A new box "Include citation times" under the report (and `include_times` / `capturemann ai report export --times`) adds them. The marked moments keep their times; the report view still shows every citation and seeks.
+
+### Known limitations
+
+- The transcript checks look at repetition, not at accuracy: no word error rate was measured, and the improvement is shown on one 88-minute Vietnamese recording read with Large v3. Other languages, models and recordings are untested.
+- The second reading only happens when a piece loops. Speech that one reading simply misses (the noise-reduced copy can drop quiet or distant speakers) is not recovered; "Original microphone" in Re-generate is the way to get it.
+- Transcribing a long recording takes longer when pieces are read twice (about 17 minutes for the 88-minute test on an M4 Pro with Large v3), and longer still on slower Macs. Interrupted runs resume from the last finished piece.
+- The Whisper translate task and speaker detection are not checked or split into pieces yet.
+- The Intel build is still not tested on a real Intel Mac (see 0.2.1).
+- The known limitations of 0.2.0 still apply.
 
 ## [0.2.1] - 2026-10-28
 

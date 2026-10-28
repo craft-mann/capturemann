@@ -1,7 +1,7 @@
 # Security scan (Trivy)
 
-- **commit**: a913277
-- **date**: 2026-10-28 04:10 UTC
+- **commit**: 18792d9 (working tree has uncommitted changes)
+- **date**: 2026-10-28 11:30 UTC
 - **tool**: 0.38.3
 - **scanners**: vuln,secret
 - **dependency vulnerabilities**: 0 (none)
