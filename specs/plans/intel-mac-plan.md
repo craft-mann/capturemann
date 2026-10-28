@@ -1,8 +1,8 @@
 # Intel Macs: implementation plan (release 0.2.1)
 
-Status (Oct 28, 2026): **draft, not started.** Written after 0.2.0 shipped (Apple Silicon only). The maintainer has an Intel Mac for testing. Platform order is unchanged (maintainer, Oct 25, 2026): Intel Macs, then Windows, then Linux. No release dates (maintainer rule).
+Status (Oct 28, 2026): **draft, not started.** Written after 0.2.0 shipped (Apple Silicon only). **Decided (maintainer, Oct 28, 2026): two DMGs, one per chip, not a universal app (install size matters); the project website offers the exact download for each Mac. The maintainer has no Intel Mac at hand yet and will find one later**, so the build work (Stages 1 and 2) can start first and be checked under Rosetta, while everything that needs the real Mac (Stage 0 hardware checks, Stage 3, acceptance) waits. Platform order is unchanged (maintainer, Oct 25, 2026): Intel Macs, then Windows, then Linux. No release dates (maintainer rule).
 
-Goal: one CaptureMann release that runs on both Apple Silicon and Intel Macs (macOS 13+), with every 0.2.0 feature working on Intel, and with defaults that suit slower hardware.
+Goal: a release with a separate DMG for Intel Macs (macOS 13+) next to the unchanged Apple Silicon DMG, with every 0.2.0 feature working on Intel and defaults that suit slower hardware. Each DMG holds a single architecture, so the Apple Silicon download stays about 181 MB or smaller.
 
 ## Why this is small
 
@@ -10,23 +10,23 @@ The app code is already macOS-only and uses the same APIs on both chips: ScreenC
 
 | Part | Today | Needed |
 |---|---|---|
-| `packaging/ffmpeg/build-macos.sh` | refuses to run unless `uname -m` is arm64; `-arch arm64`, libvpx `--target=arm64-darwin22-gcc` | an x86_64 build (needs `nasm`), then `lipo` |
-| `packaging/llama/build-macos.sh` | arm64 check, `CMAKE_OSX_ARCHITECTURES=arm64`, Metal | an x86_64 build; decide Metal or CPU on Intel |
+| `packaging/ffmpeg/build-macos.sh` | refuses to run unless `uname -m` is arm64; `-arch arm64`, libvpx `--target=arm64-darwin22-gcc` | an x86_64 build (needs `nasm`) in its own output folder |
+| `packaging/llama/build-macos.sh` | arm64 check, `CMAKE_OSX_ARCHITECTURES=arm64`, Metal | an x86_64 build in its own folder; decide Metal or CPU on Intel |
 | `packaging/sherpa/fetch-macos.sh` | arm64 check, `osx-arm64-static-lib` archive | the x86_64 static libraries with their own pinned SHA-256 (check the release has `osx-x86_64`; if not, build ONNX Runtime and sherpa-onnx) |
 | `cm-ai` (`whisper-rs` with `metal`) | arm64 Metal | portable x86 CPU flags (no host-only `-march=native`), Metal fallback to CPU |
-| Rust workspace | built for the host | `aarch64-apple-darwin` and `x86_64-apple-darwin`, joined with `lipo` |
-| `packaging/macos/bundle.sh`, `verify-release.sh` | verify-release fails any Mach-O that is not `arm64` only | assemble a universal app; accept `arm64 x86_64` |
-| `release.yml`, `Makefile` | `macos-14` arm64 runner, DMG named `...-macos-arm64.dmg` | universal build, new DMG name, Homebrew cask |
+| Rust workspace | built for the host | a separate build for `x86_64-apple-darwin` (cross-compiled on the Apple Silicon Mac) |
+| `packaging/macos/bundle.sh`, `verify-release.sh` | verify-release fails any Mach-O that is not `arm64` only | assemble one app per architecture; check that every Mach-O matches the architecture of the DMG being checked (`arm64` or `x86_64`) |
+| `release.yml`, `Makefile` | `macos-14` arm64 runner, DMG named `...-macos-arm64.dmg` | a second job or step for `...-macos-x86_64.dmg`, the Homebrew cask per architecture, the website download buttons |
 
 ## Decisions needed from the maintainer
 
-1. **One universal DMG or two DMGs?** Universal was the earlier decision. It makes one download and one cask, but the app grows. The 0.2.0 app is about 181 MB, and the executables are roughly half of it (ONNX Runtime alone is 75 MB of static library). Models are data and are not duplicated. Expect somewhere around 280 to 350 MB, to be measured in Stage 2. Fallback: two DMGs (`-arm64`, `-x86_64`), each as small as today, and the cask picks by architecture. **Recommendation:** build universal in Stage 2, measure, and fall back to two DMGs only if the size hurts.
+1. **Decided: two DMGs** (`CaptureMann-vX.Y.Z-macos-arm64.dmg` unchanged, new `CaptureMann-vX.Y.Z-macos-x86_64.dmg`). No universal build, no `lipo` of the app. Consequences: the website must send each user to the right file (a browser cannot tell Apple Silicon from Intel reliably, so show both buttons with a one-line "Apple menu > About This Mac: Chip" hint); the Homebrew cask picks by architecture (`on_arm` and `on_intel`); each release has two `.sha256` files and two notarizations; the release notes list both.
 2. **Is the first-use setup sheet part of 0.2.1?** It is already planned for 0.2.1, and it matters more on Intel because those users need to be steered to lighter models. **Recommendation:** include it, but as the last stage so Intel does not wait for it.
 3. **Oldest supported Mac.** macOS 13 requires roughly 2017 and later Intel Macs. Macs without a hardware H.264 encoder (before about 2016) are already unsupported. Say in the docs which year range was tested, based on the Mac you have.
 
-## Stage 0: spike on the Intel Mac (blocks the rest)
+## Stage 0: spike on the Intel Mac (needs the real Mac; blocks Stage 3 and acceptance)
 
-Do this first and cheaply. It tells us what is broken before any packaging work.
+The maintainer has no Intel Mac yet. **Until one is available, do Stages 1 and 2 (they only need the Apple Silicon Mac and Rosetta), and keep Stage 0 hardware checks, Stage 3 and acceptance for later.** The cheap fixture run in I0.1 and I0.2 can happen as soon as any Intel Mac is available, and tells us what is broken before the rest of the testing.
 
 **I0.1** Cross-compile the workspace for `x86_64-apple-darwin` on the Apple Silicon Mac (`rustup target add x86_64-apple-darwin`, `--no-default-features` so `sherpa` and the text engine are not needed yet). Copy the dev-signed app to the Intel Mac.
 **I0.2** On the Intel Mac, run with fakes and the synthetic fixture only (`make_fixture`). Check that the app starts, `wgpu` picks a GPU, the editor preview and export (headless compositor) work, and note the Mac model, year, GPU and macOS version in the report.
@@ -40,19 +40,19 @@ Also try running the x86_64 build under Rosetta on the Apple Silicon Mac for qui
 
 Each script gets an architecture switch (`CM_ARCH=arm64|x86_64`, default the host) instead of a hard refusal. Cross-building on the Apple Silicon Mac is the plan; the Intel Mac is for testing, not for building.
 
-**I1.1 FFmpeg** (`make ffmpeg`): `brew install nasm`; `-arch x86_64`, `--arch=x86_64 --enable-cross-compile`, libvpx `--target=x86_64-darwin22-gcc`, libopus; same component list and the same LGPL self-checks (no GPL, no nonfree, no libx264). Output goes to `out/x86_64/` and a `lipo -create` step produces the universal `ffmpeg` and `ffprobe`. Keep the 0.2.0 licence, `BUILD-INFO` and `SOURCE-OFFER` files accurate for both.
-**I1.2 llama-server** (`make llama`): `CMAKE_OSX_ARCHITECTURES=x86_64`, `GGML_NATIVE=OFF` with an explicit portable x86 baseline (AVX2 and FMA if the oldest supported Mac has them; otherwise a lower baseline), Metal on or off per the I0 result and I3.1. Keep it static with no libcurl or OpenSSL. `lipo` into one universal `llama-server`.
-**I1.3 sherpa-onnx** (`make sherpa`): fetch the x86_64 static libraries, pin their SHA-256 in the script, keep the ONNX Runtime notice. Link per architecture; a universal `cm-desktop` is built as two Cargo builds joined by `lipo`.
+**I1.1 FFmpeg** (`make ffmpeg`): `brew install nasm`; `-arch x86_64`, `--arch=x86_64 --enable-cross-compile`, libvpx `--target=x86_64-darwin22-gcc`, libopus; same component list and the same LGPL self-checks (no GPL, no nonfree, no libx264). Output goes to `out/x86_64/` next to the existing arm64 output; no `lipo`. Keep the 0.2.0 licence, `BUILD-INFO` and `SOURCE-OFFER` files accurate for both.
+**I1.2 llama-server** (`make llama`): `CMAKE_OSX_ARCHITECTURES=x86_64`, `GGML_NATIVE=OFF` with an explicit portable x86 baseline (AVX2 and FMA if the oldest supported Mac has them; otherwise a lower baseline), Metal on or off per the I0 result and I3.1. Keep it static with no libcurl or OpenSSL. Output goes to `out/x86_64/`.
+**I1.3 sherpa-onnx** (`make sherpa`): fetch the x86_64 static libraries, pin their SHA-256 in the script, keep the ONNX Runtime notice. Libraries are kept per architecture (`out/lib` for arm64 as today, `out/x86_64/lib` for Intel) and the Cargo build picks the folder from the target.
 **I1.4 whisper.cpp** (via `whisper-rs`): confirm the x86_64 build uses portable flags and that Metal initialisation failure falls back to CPU instead of aborting.
 Tests: the engine tests already use scripted platforms, so they run unchanged on x86_64 under Rosetta. Real-engine checks (`real_model`, `real_diarize`, the text engine) run on the Intel Mac by the maintainer, with the commands in CLAUDE.md. No test downloads a model.
 
 ## Stage 2: bundle, signing and release scripts
 
-**I2.1 `bundle.sh`:** build both Rust targets, `lipo` every Mach-O (`cm-desktop`, `cm-overlay`, `capturemann`, `cm-mcp`, `cm-daemon` and the helper programs), sign, harden. `make bundle-dev` keeps working on the host architecture only so the dev loop stays fast; `CM_UNIVERSAL=1` (set by `make bundle-release`) builds both.
-**I2.2 `verify-release.sh`:** accept `arm64 x86_64` for every Mach-O and fail if any file is single-architecture in a universal release. Keep the signature, entitlements, licence and minimum-macOS checks.
-**I2.3 DMG and cask:** name `CaptureMann-vX.Y.Z-macos-universal.dmg` (or two names under decision 1); update `Makefile`, `dmg.sh`, the README download line, `docs/development/releasing.md`, `packaging/macos/README.md` and the Homebrew cask (`craft-mann/homebrew-tap`).
-**I2.4 Size:** record the app and DMG size in `BUILD-INFO` and in the release notes. If over the budget chosen in decision 1, switch to two DMGs.
-**I2.5 `release.yml`:** build both architectures. Cross-build on the arm64 runner; use an Intel runner only to run the smoke tests if one is available (check which hosted Intel runner images still exist when this is built). The workflow stays unsigned without secrets, as today. Also make it manual-only for releases made by hand (the open item from 0.2.0).
+**I2.1 `bundle.sh`:** `CM_ARCH=arm64|x86_64` (default the host) selects the Rust target, the FFmpeg, `llama-server` and sherpa folders, and the output name; the app is assembled, signed and hardened as today with only that architecture. `make bundle-dev` keeps working on the host architecture so the dev loop stays fast. Cross-building the Intel app on the Apple Silicon Mac is the release path.
+**I2.2 `verify-release.sh`:** take the expected architecture as an argument (default arm64, so 0.2.0 behaviour is unchanged) and fail on any other. Keep the signature, entitlements, licence and minimum-macOS checks.
+**I2.3 DMG, cask and website:** the Intel DMG is `CaptureMann-vX.Y.Z-macos-x86_64.dmg` with its own `.sha256`; update `Makefile` (`DMG` per architecture, `make release` takes `CM_ARCH`), `dmg.sh`, the README download lines, `docs/development/releasing.md`, `packaging/macos/README.md` and the Homebrew cask (`craft-mann/homebrew-tap`, one `url` and `sha256` per architecture). The site (`capturemann-site`) gets two download buttons, the "About This Mac" hint and system requirements; that repo is handled separately.
+**I2.4 Size:** record the app and DMG size of each architecture in `BUILD-INFO` and the release notes. The arm64 DMG must not grow beyond what the 0.2.0 content requires (nothing from the x86_64 build may leak into it); `verify-release.sh` already checks the architecture, add a check that the arm64 app contains no `x86_64` folder.
+**I2.5 `release.yml`:** build both DMGs as two jobs (matrix on `CM_ARCH`). Cross-build the Intel app on the arm64 runner; use an Intel runner only to run smoke tests if one still exists (check which hosted Intel runner images are available when this is built). The workflow stays unsigned without secrets, as today. Also make it manual-only for releases made by hand (the open item from 0.2.0).
 
 ## Stage 3: performance and defaults on Intel
 
@@ -77,7 +77,7 @@ One place to get the speech and text models the first time a feature needs them,
 
 ## Acceptance (the release is ready when)
 
-- Every Mach-O in the app has both architectures, signed, hardened, notarized and stapled; `verify-release.sh` passes.
+- Two DMGs: every Mach-O in each app matches that DMG's architecture, signed, hardened, notarized and stapled; `verify-release.sh` passes for both. The arm64 DMG is no larger than it needs to be (compare with 0.2.0's 86.6 MB).
 - On the Intel Mac, as reported: install from the DMG, record screen, camera, microphone and system audio, edit, export, transcribe, label speakers, write a report, translate.
 - Defaults on Intel are chosen from I3.1 measurements, and the numbers are stored in the report.
 - Apple Silicon behaviour is unchanged: the 0.2.0 checks still pass on the Apple Silicon Mac.
@@ -88,8 +88,9 @@ One place to get the speech and text models the first time a feature needs them,
 - **Slow inference on older Intel Macs.** Mitigation: Stage 3 defaults and time estimates; the app still works, only slower.
 - **Metal on old Intel or AMD GPUs** can misbehave in ggml. Mitigation: CPU fallback (I1.2, I1.4) tested on the actual GPU.
 - **No x86_64 sherpa-onnx static library** published. Mitigation: build it ourselves; adds a few days.
-- **Only one Intel Mac** means one GPU and one CPU generation tested. State exactly which Mac in the report and in the system requirements.
-- **App size** with universal binaries. Mitigation: decision 1.
+- **Only one Intel Mac** (once found) means one GPU and one CPU generation tested. State exactly which Mac in the report and in the system requirements.
+- **Wrong download.** An Intel user installing the arm64 DMG gets a clear macOS error, and the reverse may run slowly under Rosetta. Mitigation: the website hint, the README, and the file names.
+- **No Intel Mac yet.** Stages 1 and 2 can be built and smoke-tested under Rosetta, but nothing is called working on Intel until the real Mac has run Stage 0 and the acceptance list. The release waits for it.
 - **Rosetta hides real problems.** Mitigation: acceptance only on the real Mac.
 
 ## Not in 0.2.1
