@@ -17,8 +17,8 @@ Setup:
 2. `CaptureMann-v0.2.1-macos-x86_64.dmg` and its `.sha256` file (or `brew install --cask
    craft-mann/tap/capturemann`, which must pick the Intel build: check with
    `lipo -archs /Applications/CaptureMann.app/Contents/MacOS/cm-desktop`, expected `x86_64`).
-3. Part A needs nothing but the app. Part B downloads models (about 4.4 GB for the speech and text
-   models in step 12 of `FIRST-RUN-0.2.md`; use the smaller ones here).
+3. Part A needs nothing but the app. Part B downloads models (about 4.4 GB for the recommended speech and text
+   models; start with the smaller ones listed below).
 
 ## Part A: the app and the capture hardware
 
