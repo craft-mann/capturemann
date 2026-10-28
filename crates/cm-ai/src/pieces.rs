@@ -17,6 +17,11 @@
 
 use std::ops::Range;
 
+mod checks;
+pub use checks::{
+    drop_soft_repeats, fold, repeat_regions, soft_loop_words, Badness, SOFT_LOOP_WORDS,
+};
+
 use cm_core::CmError;
 use serde::{Deserialize, Serialize};
 
@@ -214,6 +219,10 @@ pub struct Checkpoint {
     pub first: Option<(String, String, Option<String>)>,
     pub split: usize,
     pub repeats_dropped: usize,
+    #[serde(default)]
+    pub other_audio: usize,
+    #[serde(default)]
+    pub other_audio_kept: usize,
 }
 
 /// What a run over all the pieces did, beyond the words.
@@ -225,11 +234,23 @@ pub struct PiecesReport {
     pub split: usize,
     /// Words dropped from loops that survived the splitting.
     pub repeats_dropped: usize,
+    /// Pieces that were bad (a loop or a soft loop) and read again from the other
+    /// audio.
+    pub other_audio: usize,
+    /// Of those, the ones where the other reading was better and was kept.
+    pub other_audio_kept: usize,
 }
+
+/// The same audio from the other source (the original microphone when the noise-reduced copy is
+/// read, and the reverse), made only when a piece needs it.
+pub type OtherAudio<'p> = Option<&'p mut dyn FnMut() -> Option<Vec<f32>>>;
 
 struct Job<'a, 'p> {
     transcriber: &'a dyn Transcriber,
     samples: &'a [f32],
+    other: OtherAudio<'p>,
+    /// `None`: not made yet; `Some(None)`: there is none (or it does not fit).
+    other_samples: Option<Option<Vec<f32>>>,
     base: cm_core::MediaTime,
     prompt: Option<&'a str>,
     /// The language of every piece after the first: the user's, else what the first piece heard.
@@ -249,12 +270,28 @@ impl Job<'_, '_> {
         (self.progress)(self.high)
     }
 
-    /// The words of one piece, split in half and done again while it loops.
-    fn piece(&mut self, range: Range<usize>, depth: usize) -> Result<Vec<Word>, CmError> {
+    /// The other audio, made the first time it is asked for. It must be as long as the main audio
+    /// (within a second) to be the same timeline; otherwise there is none.
+    fn other_audio(&mut self) -> bool {
+        if self.other_samples.is_none() {
+            let made = self.other.as_mut().and_then(|f| f());
+            let fits = made.filter(|o| o.len().abs_diff(self.samples.len()) <= samples_of(1.0));
+            self.other_samples = Some(fits);
+        }
+        matches!(self.other_samples, Some(Some(_)))
+    }
+
+    /// One reading of `range`, from the main audio or (`other`) from the other source.
+    fn read(&mut self, range: Range<usize>, other: bool) -> Result<Transcript, CmError> {
         let (from, len) = (range.start, range.len());
-        let samples = self.samples;
+        let main = self.samples;
+        let other_samples = self.other_samples.take();
+        let source: &[f32] = match (&other_samples, other) {
+            (Some(Some(o)), true) => &o[range.start.min(o.len())..range.end.min(o.len())],
+            _ => &main[range],
+        };
         let audio = Pcm16k {
-            samples: &samples[range],
+            samples: source,
             start: self.base + media_secs(from as f64 / f64::from(SAMPLE_RATE)),
         };
         let language = self.language.clone();
@@ -263,6 +300,7 @@ impl Job<'_, '_> {
             transcriber.transcribe_prompted(audio, language.as_deref(), prompt, &mut |p| {
                 self.tick(from, p, len)
             });
+        self.other_samples = other_samples;
         // A cancel arrives as the engine's own `cancelled` error and is passed on as it is.
         let t = result?;
         if self.first.is_none() {
@@ -271,18 +309,43 @@ impl Job<'_, '_> {
         if self.language.is_none() && !t.words.is_empty() && !t.language.is_empty() {
             self.language = Some(t.language.clone());
         }
-        if !is_degenerate(&t.words) {
-            return Ok(t.words);
+        Ok(t)
+    }
+
+    /// The words of one piece. A piece that is bad ([`Badness::is_bad`]: an exact loop or a soft
+    /// loop) is read again from the other audio and the better reading is kept; one that is still
+    /// bad is cut in half and each half is done the same way (up to [`MAX_SPLIT_DEPTH`] levels);
+    /// what survives all that has its repeats taken out.
+    fn piece(&mut self, range: Range<usize>, depth: usize) -> Result<Vec<Word>, CmError> {
+        let (from, len) = (range.start, range.len());
+        let mut words = self.read(range.clone(), false)?.words;
+        let mut bad = Badness::of(&words);
+        if !bad.is_bad() {
+            return Ok(words);
+        }
+        if self.other_audio() {
+            self.report.other_audio += 1;
+            let second = self.read(range, true)?.words;
+            let second_bad = Badness::of(&second);
+            if second_bad.score() < bad.score() {
+                self.report.other_audio_kept += 1;
+                words = second;
+                bad = second_bad;
+            }
+        }
+        if !bad.is_bad() {
+            return Ok(words);
         }
         if depth < MAX_SPLIT_DEPTH && len as f64 > samples_of(MIN_SPLIT_SECS * 2.0) as f64 {
             self.report.split += 1;
             let mid = quietest(self.samples, from + len * 2 / 5, from + len * 3 / 5);
-            let mut words = self.piece(from..mid, depth + 1)?;
-            words.extend(self.piece(mid..from + len, depth + 1)?);
-            return Ok(words);
+            let mut halves = self.piece(from..mid, depth + 1)?;
+            halves.extend(self.piece(mid..from + len, depth + 1)?);
+            return Ok(halves);
         }
-        let (words, dropped) = collapse_repeats(t.words);
-        self.report.repeats_dropped += dropped;
+        let (words, exact) = collapse_repeats(words);
+        let (words, soft) = drop_soft_repeats(words);
+        self.report.repeats_dropped += exact + soft;
         Ok(words)
     }
 }
@@ -306,6 +369,7 @@ pub fn transcribe_pieces(
         prompt,
         None,
         &mut |_| {},
+        None,
         progress,
     )
 }
@@ -313,14 +377,16 @@ pub fn transcribe_pieces(
 /// [`transcribe_pieces`] that can go on from a [`Checkpoint`] and hands out a new one after every
 /// finished piece (not after the last: the transcript is the result then). A checkpoint that does
 /// not fit this audio (another length or another cut) is ignored and the run starts over.
-pub fn transcribe_pieces_resumable(
+#[allow(clippy::too_many_arguments)]
+pub fn transcribe_pieces_resumable<'p>(
     transcriber: &dyn Transcriber,
     audio: Pcm16k<'_>,
     language: Option<&str>,
     prompt: Option<&str>,
     resume: Option<Checkpoint>,
     on_checkpoint: &mut dyn FnMut(&Checkpoint),
-    progress: &mut dyn FnMut(f32) -> bool,
+    other: OtherAudio<'p>,
+    progress: &'p mut dyn FnMut(f32) -> bool,
 ) -> Result<(Transcript, PiecesReport), CmError> {
     let pieces = plan(audio.samples);
     let asked = language
@@ -330,6 +396,8 @@ pub fn transcribe_pieces_resumable(
     let mut job = Job {
         transcriber,
         samples: audio.samples,
+        other,
+        other_samples: None,
         base: audio.start,
         prompt,
         language: asked,
@@ -354,6 +422,8 @@ pub fn transcribe_pieces_resumable(
         }
         job.report.split = c.split;
         job.report.repeats_dropped = c.repeats_dropped;
+        job.report.other_audio = c.other_audio;
+        job.report.other_audio_kept = c.other_audio_kept;
         // The bar starts where the finished pieces end.
         if let Some(next) = pieces.get(start) {
             job.high = next.start as f32 / audio.samples.len().max(1) as f32;
@@ -372,6 +442,8 @@ pub fn transcribe_pieces_resumable(
                 first: job.first.clone(),
                 split: job.report.split,
                 repeats_dropped: job.report.repeats_dropped,
+                other_audio: job.report.other_audio,
+                other_audio_kept: job.report.other_audio_kept,
             });
         }
     }

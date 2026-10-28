@@ -406,6 +406,7 @@ fn a_run_goes_on_from_its_checkpoint_and_gives_the_same_transcript() {
         Some("glossary: Linh, Minh"),
         None,
         &mut |c| checkpoints.push(c.clone()),
+        None,
         &mut |p| {
             // Every piece reports 4 steps; stop in the third piece.
             started += 1;
@@ -432,6 +433,7 @@ fn a_run_goes_on_from_its_checkpoint_and_gives_the_same_transcript() {
         Some("glossary: Linh, Minh"),
         Some(stored),
         &mut |c| later.push(c.done),
+        None,
         &mut |p| {
             seen.push(p);
             true
@@ -468,17 +470,25 @@ fn a_checkpoint_that_does_not_fit_is_ignored() {
         first: None,
         split: 0,
         repeats_dropped: 0,
+        other_audio: 0,
+        other_audio_kept: 0,
     };
     let e = Engine::new(1e9);
     let audio = Pcm16k {
         samples: &x,
         start: MediaTime::from_ticks(1200),
     };
-    let (t, _) =
-        transcribe_pieces_resumable(&e, audio, None, None, Some(stale), &mut |_| {}, &mut |_| {
-            true
-        })
-        .unwrap();
+    let (t, _) = transcribe_pieces_resumable(
+        &e,
+        audio,
+        None,
+        None,
+        Some(stale),
+        &mut |_| {},
+        None,
+        &mut |_| true,
+    )
+    .unwrap();
     assert_eq!(e.calls.lock().unwrap().len(), pieces, "every piece was run");
     assert!(t.words.iter().all(|w| w.text != "stale"));
     assert_eq!(t.words.len(), expected.words.len());
@@ -494,7 +504,258 @@ fn one_piece_makes_no_checkpoint() {
         samples: &x,
         start: MediaTime::ZERO,
     };
-    transcribe_pieces_resumable(&e, audio, None, None, None, &mut |_| n += 1, &mut |_| true)
-        .unwrap();
+    transcribe_pieces_resumable(
+        &e,
+        audio,
+        None,
+        None,
+        None,
+        &mut |_| n += 1,
+        None,
+        &mut |_| true,
+    )
+    .unwrap();
     assert_eq!(n, 0);
+}
+
+// ---- the checks: soft loops, and the second reading from the other audio ------
+
+/// A sentence of 14 words said over and over with one word changed each time: not an exact loop,
+/// the way the noise-reduced reading of the long recording looped.
+fn soft_loop(times: usize, from: f64) -> Vec<Word> {
+    let variants = ["data", "quality", "model"];
+    let mut out = Vec::new();
+    for i in 0..times {
+        // The number is where the loop is, so two loops in a transcript are not each other's repeat.
+        let sentence = format!(
+            "thì nó sẽ là cái {} của nó {} và mình sẽ nói chuyện với bên business",
+            variants[i % 3],
+            from as usize
+        );
+        for w in sentence.split_whitespace() {
+            // Every word carries where the loop is: no group of words repeats across two loops.
+            let tagged = format!("{w}{}", from as usize);
+            out.push(word(&tagged, from + out.len() as f64 * 0.4));
+        }
+    }
+    out
+}
+
+fn real_talk(n: usize, from: f64) -> Vec<Word> {
+    // Every word is its own (the number says where), as real talk is: no group repeats.
+    let at = (from * 100.0) as usize;
+    (0..n)
+        .map(|i| word(&format!("lời{}", at + i), from + i as f64 * 0.4))
+        .collect()
+}
+
+#[test]
+fn words_are_folded_to_letters_without_marks() {
+    assert_eq!(fold("Ghiền"), "ghien");
+    assert_eq!(fold("Đã,"), "da");
+    assert_eq!(fold("Mì"), fold("mi"));
+    assert_eq!(fold("Gõ?"), "go");
+    assert_eq!(fold("1.5"), "15");
+}
+
+/// The soft loop of Oct 28, 2026: the exact check sees nothing, the repetition check does.
+#[test]
+fn a_soft_loop_is_found_where_the_exact_check_sees_none() {
+    let looped = soft_loop(40, 0.0); // 40 x 14 = 560 words
+    assert!(find_runs(&looped).is_empty(), "no exact loop in it");
+    assert!(
+        soft_loop_words(&looped) >= 300,
+        "{}",
+        soft_loop_words(&looped)
+    );
+    let b = Badness::of(&looped);
+    assert!(b.is_bad() && !b.degenerate, "{b:?}");
+
+    // Real talk with a few sentences said twice is not a loop (the original microphone had
+    // stretches of 64 to 94 words like that).
+    let mut talk = real_talk(300, 0.0);
+    talk.extend(soft_loop(2, 200.0));
+    talk.extend(real_talk(300, 300.0));
+    assert!(
+        soft_loop_words(&talk) < SOFT_LOOP_WORDS,
+        "{}",
+        soft_loop_words(&talk)
+    );
+    assert!(!Badness::of(&talk).is_bad());
+
+    // A loop inside a longer piece is a region of its own.
+    let mut piece = real_talk(500, 0.0);
+    piece.extend(soft_loop(30, 250.0));
+    piece.extend(real_talk(500, 500.0));
+    let regions = repeat_regions(&piece);
+    assert_eq!(regions.len(), 1, "{regions:?}");
+    // The loop is words 500 to 1010 (30 sentences of 17 words).
+    assert!(
+        regions[0].start >= 500 && regions[0].end <= 1030,
+        "{regions:?}"
+    );
+}
+
+#[test]
+fn dropping_soft_repeats_keeps_each_group_once() {
+    let mut w = real_talk(200, 0.0);
+    w.extend(soft_loop(30, 100.0));
+    w.extend(real_talk(200, 300.0));
+    let before = w.len();
+    let (kept, dropped) = drop_soft_repeats(w);
+    assert!(dropped > 200, "dropped {dropped}");
+    assert_eq!(kept.len(), before - dropped);
+    assert!(soft_loop_words(&kept) < SOFT_LOOP_WORDS);
+    // The real talk before and after is all still there.
+    assert_eq!(
+        kept.iter().filter(|w| w.text.starts_with("lời")).count(),
+        400
+    );
+}
+
+/// What the scripted engine writes for a piece.
+#[derive(Clone, Copy, PartialEq)]
+enum Reading {
+    Clean,
+    SoftLoop,
+}
+
+/// An engine that tells the two audios apart: the main one is a loud tone, the other a quiet one.
+struct TwoAudios {
+    main: Reading,
+    other: Reading,
+    /// `(from the main audio, seconds)` of every call.
+    calls: Mutex<Vec<(bool, f64)>>,
+}
+
+impl TwoAudios {
+    fn new(main: Reading, other: Reading) -> TwoAudios {
+        TwoAudios {
+            main,
+            other,
+            calls: Mutex::new(Vec::new()),
+        }
+    }
+}
+
+impl Transcriber for TwoAudios {
+    fn transcribe(
+        &self,
+        audio: Pcm16k<'_>,
+        _: Option<&str>,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Transcript, CmError> {
+        let secs = audio.samples.len() as f64 / RATE as f64;
+        let is_main = audio.samples.iter().take(4000).any(|s| s.abs() > 0.2);
+        self.calls.lock().unwrap().push((is_main, secs));
+        if !progress(1.0) {
+            return Err(cancelled());
+        }
+        let start = audio.start.as_secs_f64();
+        let mut words = real_talk((secs / 4.0) as usize, start);
+        match if is_main { self.main } else { self.other } {
+            Reading::Clean => {}
+            Reading::SoftLoop => words = soft_loop((secs / 5.0) as usize, start),
+        }
+        Ok(Transcript {
+            version: TRANSCRIPT_VERSION,
+            language: "vi".into(),
+            model: "scripted".into(),
+            words,
+            note: None,
+        })
+    }
+}
+
+fn quiet_copy(x: &[f32]) -> Vec<f32> {
+    x.iter().map(|s| s * 0.3).collect()
+}
+
+fn run_two(e: &TwoAudios, x: &[f32], other: Option<Vec<f32>>) -> (Transcript, PiecesReport, usize) {
+    let mut asked = 0;
+    let mut provider = || {
+        asked += 1;
+        other.clone()
+    };
+    let audio = Pcm16k {
+        samples: x,
+        start: MediaTime::ZERO,
+    };
+    let (t, report) = transcribe_pieces_resumable(
+        e,
+        audio,
+        None,
+        None,
+        None,
+        &mut |_| {},
+        Some(&mut provider),
+        &mut |_| true,
+    )
+    .unwrap();
+    (t, report, asked)
+}
+
+/// The noise-reduced reading loops in a piece, the original does not: the piece is read again from
+/// the other audio and the clean reading is kept, without cutting the piece up.
+#[test]
+fn a_looping_piece_is_read_again_from_the_other_audio() {
+    let x = audio(900.0, &[]); // 3 pieces of 5 minutes
+    let e = TwoAudios::new(Reading::SoftLoop, Reading::Clean);
+    let (t, report, asked) = run_two(&e, &x, Some(quiet_copy(&x)));
+    assert_eq!(asked, 1, "the other audio is made once, when first needed");
+    assert!(
+        report.other_audio >= 3 && report.other_audio_kept == report.other_audio,
+        "{report:?}"
+    );
+    assert_eq!(report.split, 0, "no cut was needed");
+    assert!(soft_loop_words(&t.words) < SOFT_LOOP_WORDS);
+    assert!(
+        t.words.iter().all(|w| w.text.starts_with("lời")),
+        "only the clean reading"
+    );
+    let calls = e.calls.lock().unwrap();
+    assert_eq!(
+        calls.iter().filter(|c| c.0).count(),
+        calls.iter().filter(|c| !c.0).count()
+    );
+}
+
+/// A clean piece never makes the other audio: nothing is decoded or read twice.
+#[test]
+fn a_clean_recording_does_not_touch_the_other_audio() {
+    let x = audio(900.0, &[]);
+    let e = TwoAudios::new(Reading::Clean, Reading::SoftLoop);
+    let (_, report, asked) = run_two(&e, &x, Some(quiet_copy(&x)));
+    assert_eq!(asked, 0);
+    assert_eq!(report.other_audio, 0);
+    assert!(e.calls.lock().unwrap().iter().all(|c| c.0));
+}
+
+/// Bad in both: the piece is cut in half, and the repeats that survive are taken out.
+#[test]
+fn what_both_readings_get_wrong_is_cut_up_and_cleaned() {
+    let x = audio(400.0, &[]);
+    let e = TwoAudios::new(Reading::SoftLoop, Reading::SoftLoop);
+    let (t, report, _) = run_two(&e, &x, Some(quiet_copy(&x)));
+    assert!(report.split > 0 && report.other_audio > 0, "{report:?}");
+    // 400 s of loop is about 1,300 words a reading; what is left is the first sentences of each
+    // loop, not the loops.
+    assert!(t.words.len() < 400, "{} words", t.words.len());
+    assert!(report.repeats_dropped > 800, "{report:?}");
+}
+
+/// Another audio that is not the same length is not the same timeline: it is not used.
+#[test]
+fn another_audio_of_a_different_length_is_ignored() {
+    let x = audio(400.0, &[]);
+    let e = TwoAudios::new(Reading::SoftLoop, Reading::Clean);
+    let short = quiet_copy(&x[..x.len() - 20 * RATE]);
+    let (_, report, asked) = run_two(&e, &x, Some(short));
+    assert_eq!(asked, 1);
+    assert_eq!(report.other_audio, 0, "nothing was read from it");
+    assert!(e.calls.lock().unwrap().iter().all(|c| c.0));
+    // No other audio at all: the same, and no crash.
+    let e = TwoAudios::new(Reading::SoftLoop, Reading::Clean);
+    let (_, report, _) = run_two(&e, &x, None);
+    assert_eq!(report.other_audio, 0);
 }

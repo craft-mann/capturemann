@@ -355,3 +355,127 @@ fn the_original_microphone_is_read_only_when_asked_for() {
         assert!((s - 3.0).abs() < 0.1, "one file either way: {s}");
     }
 }
+
+/// A piece that comes out as a loop from the noise-reduced file is read again from the original
+/// microphone (and the reverse): both files of the recording are used, the clean reading is kept.
+#[test]
+fn a_bad_reading_is_read_again_from_the_other_file_of_the_recording() {
+    let Some(ff) = ffmpeg() else {
+        println!("SKIPPED: FFmpeg not found");
+        return;
+    };
+    let dir = tempfile::tempdir().unwrap();
+    tone(&ff, &dir.path().join("mic.denoised.wav"), 2.0);
+    tone(&ff, &dir.path().join("mic.wav"), 2.0);
+    // Make the two files tell apart: the original is quieter.
+    let quiet = dir.path().join("mic.quiet.wav");
+    let ok = Command::new(&ff)
+        .args(["-v", "error", "-i"])
+        .arg(dir.path().join("mic.wav"))
+        .args(["-af", "volume=0.1", "-y"])
+        .arg(&quiet)
+        .status()
+        .unwrap()
+        .success();
+    assert!(ok);
+    std::fs::rename(&quiet, dir.path().join("mic.wav")).unwrap();
+    std::fs::write(
+        dir.path().join("manifest.json"),
+        manifest(
+            serde_json::json!({"mic": {
+                "file": "mic.denoised.wav", "raw_file": "mic.wav",
+                "denoised_file": "mic.denoised.wav", "denoise": true,
+                "start": 0, "end": ticks(2.0)}}),
+            serde_json::json!([]),
+        ),
+    )
+    .unwrap();
+
+    /// Loops on the louder file (the noise-reduced one), reads the quiet one cleanly.
+    struct LoopsOnLoud {
+        loud_calls: Mutex<usize>,
+        quiet_calls: Mutex<usize>,
+    }
+    impl Transcriber for LoopsOnLoud {
+        fn transcribe(
+            &self,
+            audio: Pcm16k<'_>,
+            _: Option<&str>,
+            _: &mut dyn FnMut(f32) -> bool,
+        ) -> Result<Transcript, CmError> {
+            let loud = audio.samples.iter().any(|s| s.abs() > 0.05);
+            let words: Vec<cm_ai::transcribe::Word> = if loud {
+                *self.loud_calls.lock().unwrap() += 1;
+                (0..60)
+                    .map(|i| word_at(["da", "tra", "lai", "cho", "minh"][i % 5], i as f64 * 0.03))
+                    .collect()
+            } else {
+                *self.quiet_calls.lock().unwrap() += 1;
+                vec![word_at("hello", 0.5), word_at("there", 0.9)]
+            };
+            Ok(Transcript {
+                version: cm_ai::transcribe::TRANSCRIPT_VERSION,
+                language: "en".into(),
+                model: "scripted".into(),
+                words,
+                note: None,
+            })
+        }
+    }
+    fn word_at(text: &str, at: f64) -> cm_ai::transcribe::Word {
+        cm_ai::transcribe::Word {
+            text: text.into(),
+            start: media_secs(at),
+            end: media_secs(at + 0.02),
+            confidence: 0.9,
+        }
+    }
+    let engine = LoopsOnLoud {
+        loud_calls: Mutex::new(0),
+        quiet_calls: Mutex::new(0),
+    };
+    let out = transcribe_recording(
+        dir.path(),
+        &engine,
+        &TranscribeOptions::default(),
+        &mut |_| true,
+    )
+    .unwrap();
+    let text: Vec<&str> = out.words.iter().map(|w| w.text.as_str()).collect();
+    assert_eq!(
+        text,
+        ["hello", "there"],
+        "the clean reading of the other file"
+    );
+    assert_eq!(
+        (
+            *engine.loud_calls.lock().unwrap(),
+            *engine.quiet_calls.lock().unwrap()
+        ),
+        (1, 1)
+    );
+
+    // A recording with one file has nothing to read again from: the loop is cut down instead.
+    let one = tempfile::tempdir().unwrap();
+    tone(&ff, &one.path().join("mic.wav"), 2.0);
+    std::fs::write(
+        one.path().join("manifest.json"),
+        manifest(
+            serde_json::json!({"mic": {"file": "mic.wav", "start": 0, "end": ticks(2.0)}}),
+            serde_json::json!([]),
+        ),
+    )
+    .unwrap();
+    let engine = LoopsOnLoud {
+        loud_calls: Mutex::new(0),
+        quiet_calls: Mutex::new(0),
+    };
+    let out = transcribe_recording(
+        one.path(),
+        &engine,
+        &TranscribeOptions::default(),
+        &mut |_| true,
+    )
+    .unwrap();
+    assert!(out.words.len() < 20, "{} words", out.words.len());
+}

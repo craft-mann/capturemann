@@ -103,6 +103,7 @@ pub fn file_to_session(gaps: &[PauseGap], file: MediaTime, is_end: bool) -> Medi
     MediaTime::from_ticks(file.ticks() + shift)
 }
 
+#[derive(Clone)]
 struct AudioTrack {
     file: PathBuf,
     start: MediaTime,
@@ -201,18 +202,26 @@ fn run_recording(
     progress: &mut dyn FnMut(f32) -> bool,
 ) -> Result<Transcript, CmError> {
     let manifest = cm_library::rec::read_manifest(bundle)?;
-    let mic = audio_track(bundle, &manifest.tracks, "mic", opts.original_audio);
-    let system = audio_track(bundle, &manifest.tracks, "system", opts.original_audio);
-    let chosen: Vec<AudioTrack> = match (mic, system) {
-        (Some(m), Some(s)) if opts.include_system => vec![m, s],
-        (Some(m), _) => vec![m],
-        (None, Some(s)) => vec![s],
-        (None, None) => {
-            return Err(CmError::invalid_input(
-                "This recording has no microphone or system-audio track to transcribe",
-            ))
+    let pick = |original: bool| -> Option<Vec<AudioTrack>> {
+        let mic = audio_track(bundle, &manifest.tracks, "mic", original);
+        let system = audio_track(bundle, &manifest.tracks, "system", original);
+        match (mic, system) {
+            (Some(m), Some(s)) if opts.include_system => Some(vec![m, s]),
+            (Some(m), _) => Some(vec![m]),
+            (None, Some(s)) => Some(vec![s]),
+            (None, None) => None,
         }
     };
+    let Some(chosen) = pick(opts.original_audio) else {
+        return Err(CmError::invalid_input(
+            "This recording has no microphone or system-audio track to transcribe",
+        ));
+    };
+    // The same recording read from the other file (the original microphone when the noise-reduced
+    // copy is read, and the reverse), when there is one: a piece that comes out as a repetition
+    // loop from one is read again from the other (`crate::pieces`).
+    let other_tracks =
+        pick(!opts.original_audio).filter(|o| o.iter().zip(&chosen).any(|(a, b)| a.file != b.file));
     if !progress(0.0) {
         return Err(crate::transcribe::cancelled());
     }
@@ -223,12 +232,23 @@ fn run_recording(
         .map(|t| session_to_file(gaps, t.start))
         .collect();
     let base = file_starts.iter().copied().min().unwrap_or(MediaTime::ZERO);
-    let mut mixed: Vec<f32> = Vec::new();
-    for (track, file_start) in chosen.iter().zip(&file_starts) {
-        let samples = decode_16k_mono(&track.file)?;
-        let offset = ((*file_start - base).as_secs_f64() * f64::from(SAMPLE_RATE)).round() as usize;
-        mix_at(&mut mixed, &samples, offset);
-    }
+    // The tracks on one timeline: each starts at its file time, from `base`.
+    let mix_of = |tracks: &[AudioTrack]| -> Result<(Vec<f32>, MediaTime), CmError> {
+        let starts: Vec<MediaTime> = tracks
+            .iter()
+            .map(|t| session_to_file(gaps, t.start))
+            .collect();
+        let base = starts.iter().copied().min().unwrap_or(MediaTime::ZERO);
+        let mut mixed: Vec<f32> = Vec::new();
+        for (track, file_start) in tracks.iter().zip(&starts) {
+            let samples = decode_16k_mono(&track.file)?;
+            let offset =
+                ((*file_start - base).as_secs_f64() * f64::from(SAMPLE_RATE)).round() as usize;
+            mix_at(&mut mixed, &samples, offset);
+        }
+        Ok((mixed, base))
+    };
+    let (mixed, _) = mix_of(&chosen)?;
     let audio = Pcm16k {
         samples: &mixed,
         start: base,
@@ -239,6 +259,11 @@ fn run_recording(
         // Piece by piece, each piece checked for a repetition loop (long recordings used to come
         // back as one phrase repeated thousands of times; see `crate::pieces`).
         let resume = resume.and_then(|v| serde_json::from_value(v.clone()).ok());
+        let mut other = |/* made when a piece needs it */| -> Option<Vec<f32>> {
+            let (samples, other_base) = mix_of(other_tracks.as_deref()?).ok()?;
+            // Only the same timeline can stand in for it.
+            (other_base == base).then_some(samples)
+        };
         crate::pieces::transcribe_pieces_resumable(
             transcriber,
             audio,
@@ -250,6 +275,9 @@ fn run_recording(
                     on_checkpoint(v);
                 }
             },
+            other_tracks
+                .is_some()
+                .then_some(&mut other as &mut dyn FnMut() -> Option<Vec<f32>>),
             progress,
         )?
         .0

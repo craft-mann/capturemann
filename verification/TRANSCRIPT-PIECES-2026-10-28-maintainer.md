@@ -36,3 +36,19 @@ No script in `tests/manual/` covers this yet; this report is the record of one r
 ## Verdict
 
 PASS as reported for one recording on Large v3. Not covered: screen recordings (same code path, not run), Turbo and the smaller models with pieces, Intel, recordings between 10 and 20 minutes, and any measured accuracy.
+
+## Addendum: original microphone, repetition check and the second reading (same recording, same day)
+
+Run by Claude on a clone of the recording in a throwaway library with its own daemon (the maintainer's transcript was not touched), Large v3, language auto. Numbers are from the stored transcripts; "better" is judged by the maintainer, not by these numbers.
+
+| Reading | Words | 8-word groups repeating an earlier one | Dense-repetition regions | Words under 0.5 confidence | Mean confidence |
+|---|---|---|---|---|---|
+| A: noise-reduced, one run per piece set (build `ae06db6`) | 16,727 | 10.8% | 5 (7.9 min: 9:08, 18:01, 30:00, 34:56, 78:52) | 18.8% | 0.763 |
+| B: original microphone (`--original-audio`) | 18,373 | 2.5% | 7 (0.7 min, each 64 to 94 words) | 18.6% | 0.760 |
+| Default after the repetition check and the second reading, first version (it still had a phrase list, since removed) | 16,689 | 0.7% | 0 | 20.7% | 0.742 |
+| Default, final generic code (commit after `ecf0d14`) | 16,788 | 0.6% | 0 | 19.9% | 0.747 |
+
+- A and B disagree on 2,286 passages (63.3% of words agree). B has 66 passages of 8 or more words that A lacks (1,709 words in all) and A has 16 that B lacks (291 words). The two failure sets do not overlap: A loops softly at 9:08 to 10:39, 18:01 to 21:13, 34:56 to 35:54 and 78:52 to 80:56 (about 8 minutes); B wrote a stock YouTube outro three times at 53:30 to 54:26 over quiet speech (about −33 dB) where A read real words.
+- The exact-loop check saw none of A's soft loops. The new repetition check flags the same 5-minute windows by the text alone (A: 8 of 18 windows, B: 3 of 18).
+- The final run has no dense-repetition region and no outro phrase, without any list of phrases: a piece that fails the repetition check is read again from the other audio and the reading with fewer repeats is kept.
+- Not measured: accuracy (no reference text), how many pieces were read twice (the run does not report it), the cost on an Intel Mac, and content that one reading simply lacks without looping (B's 66 extra passages are still missing from the default reading where A did not loop).
