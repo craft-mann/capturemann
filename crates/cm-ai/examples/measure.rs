@@ -22,7 +22,7 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use cm_ai::measure::{diarization_errors, parse_turns, word_errors, Turn};
-use cm_ai::speakers::{assign_words, turns, DiarizationFile};
+use cm_ai::speakers::{assign_words, turns, DiarizationFile, Segment};
 use cm_ai::transcribe::{Transcript, Word};
 
 fn read(path: &str) -> Result<String, String> {
@@ -63,6 +63,27 @@ fn json_bundle_file(path: &str, name: &str) -> String {
     }
 }
 
+/// The speaker segments of a bundle as the app shows them (the manifest's, after tidy-up and
+/// edits), else the raw `diarization.json`.
+fn segments_of(path: &str) -> Result<Vec<Segment>, String> {
+    let p = Path::new(path);
+    if p.is_dir() {
+        let manifest = p.join("manifest.json");
+        if let Ok(text) = std::fs::read_to_string(&manifest) {
+            let m: serde_json::Value =
+                serde_json::from_str(&text).map_err(|e| format!("{}: {e}", manifest.display()))?;
+            if let Some(v) = m.get("speaker_segments").filter(|v| v.is_array()) {
+                return serde_json::from_value(v.clone())
+                    .map_err(|e| format!("{}: speaker_segments: {e}", manifest.display()));
+            }
+        }
+    }
+    let path = json_bundle_file(path, "diarization.json");
+    let file: DiarizationFile =
+        serde_json::from_str(&read(&path)?).map_err(|e| format!("{path}: {e}"))?;
+    Ok(file.segments)
+}
+
 fn transcript_of(path: &str) -> Result<Transcript, String> {
     let path = json_bundle_file(path, "transcript.json");
     serde_json::from_str(&read(&path)?).map_err(|e| format!("{path}: {e}"))
@@ -95,10 +116,7 @@ fn text_of(path: &str, range: Option<(f64, f64)>) -> Result<String, String> {
 fn turns_of(path: &str, range: Option<(f64, f64)>) -> Result<Vec<Turn>, String> {
     let is_json = Path::new(path).extension().is_some_and(|e| e == "json");
     let mut turns: Vec<Turn> = if is_json || Path::new(path).is_dir() {
-        let path = json_bundle_file(path, "diarization.json");
-        let file: DiarizationFile =
-            serde_json::from_str(&read(&path)?).map_err(|e| format!("{path}: {e}"))?;
-        file.segments
+        segments_of(path)?
             .iter()
             .map(|s| Turn {
                 start: s.start.as_secs_f64(),
@@ -126,26 +144,30 @@ fn turns_of(path: &str, range: Option<(f64, f64)>) -> Result<Vec<Turn>, String> 
 /// A draft reference from a bundle: one turn per run of words of one speaker.
 fn draft(bundle: &str, range: (f64, f64), out: &str, name: &str) -> Result<(), String> {
     let transcript = transcript_of(bundle)?;
-    let file: DiarizationFile = {
-        let path = json_bundle_file(bundle, "diarization.json");
-        serde_json::from_str(&read(&path)?).map_err(|e| format!("{path}: {e}"))?
-    };
+    let segments = segments_of(bundle)?;
     let words = words_in(&transcript, Some(range));
-    let labels = assign_words(&words, &file.segments);
-    let (mut rttm, mut text) = (String::new(), String::new());
+    let labels = assign_words(&words, &segments);
+    let (mut rttm, mut text, mut review) = (String::new(), String::new(), String::new());
     for t in turns(&words, &labels) {
         let who = t.speaker.map_or("?".to_owned(), |s| format!("S{s}"));
         let (a, b) = (t.start.as_secs_f64(), t.end.as_secs_f64());
         rttm.push_str(&format!("{a:.3} {:.3} {who}\n", b - a));
+        review.push_str(&format!(
+            "{}:{:02} {who}: {}\n",
+            a as u64 / 60,
+            a as u64 % 60,
+            t.text
+        ));
         text.push_str(&t.text);
         text.push('\n');
     }
     std::fs::create_dir_all(out).map_err(|e| format!("{out}: {e}"))?;
     let base = Path::new(out).join(name);
     std::fs::write(base.with_extension("rttm.txt"), rttm).map_err(|e| e.to_string())?;
+    std::fs::write(base.with_extension("review.txt"), review).map_err(|e| e.to_string())?;
     std::fs::write(base.with_extension("txt"), text).map_err(|e| e.to_string())?;
     println!(
-        "wrote {name}.rttm.txt and {name}.txt in {out}: {} words, {} s ({}:{}). Correct speakers and times in the first, words in the second; line n of each is one turn (lines may be added or removed together).",
+        "wrote {name}.rttm.txt, {name}.txt and {name}.review.txt (times, speakers and text together, to read along; not used by the measures) in {out}: {} words, {} s ({}:{}). Correct speakers and times in the first, words in the second; line n of each is one turn (lines may be added or removed together).",
         words.len(),
         range.1 - range.0,
         range.0,
