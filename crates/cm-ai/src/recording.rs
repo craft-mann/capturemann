@@ -194,7 +194,10 @@ fn run_recording(
     let mut t = if translate {
         transcriber.translate_to_english(audio, opts.language, progress)?
     } else {
-        transcriber.transcribe_prompted(audio, opts.language, opts.prompt, progress)?
+        // Piece by piece, each piece checked for a repetition loop (long recordings used to come
+        // back as one phrase repeated thousands of times; see `crate::pieces`).
+        crate::pieces::transcribe_pieces(transcriber, audio, opts.language, opts.prompt, progress)?
+            .0
     };
     t.words = t
         .words

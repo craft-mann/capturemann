@@ -48,6 +48,7 @@ pub mod caption;
 pub mod doubtful;
 pub mod glossary;
 pub mod model;
+pub mod pieces;
 pub mod reapply;
 pub mod recording;
 pub mod report;
