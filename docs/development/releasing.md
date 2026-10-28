@@ -61,6 +61,15 @@ Only the last job has `contents: write`.
    `scripts/update-homebrew-cask.sh X.Y.Z <path to the tap checkout>`, then commit and push the tap.
    The script reads the checksum from the release's `.sha256` asset, so the release must be public
    first. Test with `brew install --cask --appdir=/tmp/cm-brew-test craft-mann/tap/capturemann`.
+   From 0.2.1 the cask is per chip; change it once to this shape (the script then keeps both
+   checksums current, and refuses to touch a single-checksum cask for a release that has an Intel DMG):
+   ```ruby
+   arch arm: "arm64", intel: "x86_64"
+   version "X.Y.Z"
+   sha256 arm:   "<arm64 sha256>",
+          intel: "<x86_64 sha256>"
+   url "https://github.com/craft-mann/capturemann/releases/download/v#{version}/CaptureMann-v#{version}-macos-#{arch}.dmg"
+   ```
 
 ## GitHub secrets
 

@@ -3,6 +3,24 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
+## [0.2.1] - Unreleased
+
+0.2.1 adds Intel Mac support and nothing else: no new feature and no redesign.
+
+### Added
+
+- A separate download for Intel Macs, `CaptureMann-v0.2.1-macos-x86_64.dmg` (macOS 13 or later), next
+  to the unchanged Apple Silicon one. Each download holds one chip only, so the Apple Silicon app does
+  not grow. Homebrew picks the right one for your chip. **The Intel build has not been tested on a real
+  Intel Mac yet**: it was built and checked on an Apple Silicon Mac (including running it under
+  Rosetta). Recording sources, the hardware encoder, permissions and the speed of the speech and text
+  models on Intel hardware are untested; expect the models to be slow on older Intel Macs.
+
+### Changed
+
+- The built-in text engine runs on the CPU on Intel Macs (Metal is used on Apple Silicon).
+- The release workflow builds both downloads and is started by hand; pushing a tag no longer starts it.
+
 ## [0.2.0] - 2026-10-27
 
 0.2.0 (voice and meetings). The maintainer sets the date when it is cut. Everything below is built and

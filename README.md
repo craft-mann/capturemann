@@ -25,7 +25,7 @@ through MCP and a CLI.
   <img alt="The CaptureMann library: recordings, audio and screenshots in one place, with a record button, region, window and display capture, and the AI and agent pages in the sidebar" src="docs/images/library.webp" width="900">
 </p>
 
-> **Status: 0.2.0 (macOS 13+, Apple Silicon only).** Intel Macs, then Windows, then Linux follow. Most
+> **Status: 0.2.x (macOS 13+, Apple Silicon and Intel; the Intel build is not yet tested on a real Intel Mac).** Windows, then Linux follow. Most
 > results are tested with scripted fakes, plus the maintainer's own use on one Mac; there are few stored
 > hardware reports, and speaker labels have been tried on one meeting only. What is still unverified is
 > tracked in [`specs/04-delivery-plan.md`](specs/04-delivery-plan.md) under "Verification debt" and in
@@ -64,7 +64,7 @@ through MCP and a CLI.
 
 ## Install
 
-Requires a Mac with Apple Silicon and macOS 13 or later. Intel Macs are not supported yet; they follow in a later release. The app is about 180 MB. The AI models are not in it: they download only when you press Download (about 4.4 GB for the recommended speech model, Large v3 Turbo, plus the recommended text model, Gemma 4 E2B). The two small speaker models are inside the app.
+Requires a Mac with macOS 13 or later, Apple Silicon or Intel (Apple menu > About This Mac shows the chip). There is one download per chip. **The Intel build (0.2.1 and later) has not been tested on a real Intel Mac yet**: it is built and checked on Apple Silicon only, and the speech and text models may be slow on older Intel Macs. Please report problems. The app is about 180 MB (Apple Silicon) or 190 MB (Intel).  The AI models are not in it: they download only when you press Download (about 4.4 GB for the recommended speech model, Large v3 Turbo, plus the recommended text model, Gemma 4 E2B). The two small speaker models are inside the app.
 
 **With Homebrew:**
 
@@ -72,15 +72,16 @@ Requires a Mac with Apple Silicon and macOS 13 or later. Intel Macs are not supp
 brew install --cask craft-mann/tap/capturemann
 ```
 
-This also links the `capturemann` command line into Homebrew's `bin`. Update with
+Homebrew picks the right build for your chip. This also links the `capturemann` command line into Homebrew's `bin`. Update with
 `brew upgrade --cask capturemann`.
 
 **From the release page:**
 
-1. Download `CaptureMann-v<version>-macos-arm64.dmg` and its `.sha256` file from
+1. Download `CaptureMann-v<version>-macos-arm64.dmg` (Apple Silicon) or
+   `CaptureMann-v<version>-macos-x86_64.dmg` (Intel) and its `.sha256` file from
    [Releases](https://github.com/craft-mann/capturemann/releases).
 2. Check the download (in the folder with both files):
-   `shasum -a 256 -c CaptureMann-v<version>-macos-arm64.dmg.sha256` must print `OK`.
+   `shasum -a 256 -c <the DMG's name>.sha256` must print `OK`.
 3. Open the DMG and drag CaptureMann to Applications.
 
 The release DMG is signed with a Developer ID certificate and notarized by Apple, so it opens

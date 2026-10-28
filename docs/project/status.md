@@ -75,7 +75,19 @@ Pending:
 | Speaker accuracy at scale; AI-9 review set; Vietnamese and long-recording quality of the text model | users and team, then the maintainer | Over the coming weeks; no accuracy figure is claimed until then |
 | `tests/manual/FIRST-RUN-0.2.md` on a clean Mac and the packaged app run once from the DMG | maintainer | |
 
-Deferred (not in 0.2.0): the first-use setup sheet (one place to get the speech and text models when you first need them) to 0.2.1; VOC-3 live transcript to a later 0.2.x; Ollama and LM Studio (backlog); Intel Macs, Windows and Linux. Windows is untouched by this work.
+Deferred (not in 0.2.0): the first-use setup sheet (one place to get the speech and text models when you first need them; **not in 0.2.1 either**, which is Intel support only, maintainer decision Oct 28, 2026); VOC-3 live transcript to a later 0.2.x; Ollama and LM Studio (backlog); Intel Macs, Windows and Linux. Windows is untouched by this work.
+
+## Release 0.2.1 (Intel Macs only)
+
+Scope (maintainer, Oct 28, 2026): Intel Mac support and nothing else, no new feature and no redesign. Plan: `specs/plans/intel-mac-plan.md`. The Intel DMG may be released before it has run on a real Intel Mac, marked as untested there.
+
+| Part | State | How it was checked |
+|---|---|---|
+| `CM_ARCH=x86_64` builds of FFmpeg, llama-server (CPU only) and the sherpa-onnx libraries | built Oct 28, 2026 | the scripts' own self-checks (LGPL, system libraries only, one architecture), run under Rosetta; arm64 output unchanged |
+| `bundle.sh`, `verify-release.sh --arch`, Makefile, `release.yml` (two jobs, manual-only) | built Oct 28, 2026 | an Intel app built and its DMG verified on an Apple Silicon Mac (7 Mach-O files x86_64 only, minos 13.0, CLI starts under Rosetta); `release.yml` has never run on GitHub |
+| Signing, notarization, stapling of the Intel app | not run | needs the Developer ID identity (maintainer) |
+| Anything on a real Intel CPU: `tests/manual/INTEL-0.2.1.md` | not run | needs an Intel Mac; the release notes say so |
+| Model defaults and speed on Intel (plan Stage 3) | not started | needs measurements on an Intel Mac |
 
 ## Design follow-ups
 
