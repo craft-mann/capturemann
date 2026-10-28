@@ -50,3 +50,8 @@ whisper-rs = { version = "0.16", features = ["metal"] }
 [dev-dependencies]
 tempfile.workspace = true
 hound.workspace = true
+
+# Accuracy baseline for the 0.2.3 work (not shipped): needs the speaker engine.
+[[example]]
+name = "baseline"
+required-features = ["sherpa"]
