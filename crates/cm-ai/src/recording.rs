@@ -31,6 +31,11 @@ pub struct TranscribeOptions<'a> {
     pub model_id: Option<&'a str>,
     /// Whisper's `initial_prompt` (the glossary's terms, see [`crate::glossary::initial_prompt`]).
     pub prompt: Option<&'a str>,
+    /// Read the microphone as it was recorded (`raw_file`) instead of the noise-reduced copy a
+    /// recording stores by default. Noise reduction can remove soft consonants that Whisper
+    /// needs, so the original sometimes reads better; it makes no difference to a recording
+    /// made without noise reduction.
+    pub original_audio: bool,
 }
 
 /// Path of `transcript.json` in a bundle folder.
@@ -107,16 +112,20 @@ fn audio_track(
     bundle: &Path,
     tracks: &serde_json::Map<String, Value>,
     name: &str,
+    original: bool,
 ) -> Option<AudioTrack> {
     let t = tracks.get(name)?;
     if t.get("missing").and_then(Value::as_bool) == Some(true) {
         return None;
     }
-    // A denoised copy, when a recording stores one, reads better than the raw microphone.
-    let file = t
-        .get("denoised_file")
-        .and_then(Value::as_str)
-        .or_else(|| t.get("file").and_then(Value::as_str))?;
+    let key = |k: &str| t.get(k).and_then(Value::as_str);
+    // By default the noise-reduced copy, when a recording stores one; with `original`, the
+    // microphone as recorded (`raw_file`, or the track's own file when it has no copy).
+    let file = if original {
+        key("raw_file").or_else(|| key("file"))?
+    } else {
+        key("denoised_file").or_else(|| key("file"))?
+    };
     let path = bundle.join(file);
     path.is_file().then(|| AudioTrack {
         file: path,
@@ -192,8 +201,8 @@ fn run_recording(
     progress: &mut dyn FnMut(f32) -> bool,
 ) -> Result<Transcript, CmError> {
     let manifest = cm_library::rec::read_manifest(bundle)?;
-    let mic = audio_track(bundle, &manifest.tracks, "mic");
-    let system = audio_track(bundle, &manifest.tracks, "system");
+    let mic = audio_track(bundle, &manifest.tracks, "mic", opts.original_audio);
+    let system = audio_track(bundle, &manifest.tracks, "system", opts.original_audio);
     let chosen: Vec<AudioTrack> = match (mic, system) {
         (Some(m), Some(s)) if opts.include_system => vec![m, s],
         (Some(m), _) => vec![m],

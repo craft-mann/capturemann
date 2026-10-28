@@ -406,6 +406,10 @@ pub struct TranscribeArgs {
     /// Installed model id (default: the active one).
     #[arg(long, value_name = "MODEL")]
     pub model: Option<String>,
+    /// Read the microphone as it was recorded instead of the noise-reduced copy (it makes no
+    /// difference to a recording made without noise reduction).
+    #[arg(long)]
+    pub original_audio: bool,
     /// Wait for the transcription to finish (exit 6 if it fails).
     #[arg(long)]
     pub wait: bool,

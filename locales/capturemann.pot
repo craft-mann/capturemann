@@ -2631,7 +2631,13 @@ msgstr ""
 msgid "No zoom spots found in this recording."
 msgstr ""
 
+msgid "Noise reduction can remove soft sounds. If a transcript misses words, try the original microphone. It makes no difference to a recording made without noise reduction."
+msgstr ""
+
 msgid "Noise suppression"
+msgstr ""
+
+msgid "Noise-reduced"
 msgstr ""
 
 msgid "Normalise to {lufs} LUFS, the level podcasts and players expect"
@@ -2877,6 +2883,9 @@ msgid "Order"
 msgstr ""
 
 msgid "Original bundle"
+msgstr ""
+
+msgid "Original microphone"
 msgstr ""
 
 msgid "Original recording"
@@ -6942,6 +6951,10 @@ msgstr ""
 
 msgctxt "field"
 msgid "App bundle id"
+msgstr ""
+
+msgctxt "field"
+msgid "Audio"
 msgstr ""
 
 msgctxt "field"

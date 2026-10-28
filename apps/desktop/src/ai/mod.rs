@@ -114,7 +114,7 @@ mod flow_tests {
         vm.set_list(list(false));
         assert!(vm.notice_visible(NoticeSite::AiPage));
         assert!(!vm.can_transcribe());
-        let e = run(client.transcribe("rec_1", None, None)).unwrap_err();
+        let e = run(client.transcribe("rec_1", None, None, false)).unwrap_err();
         assert!(e.is_no_model());
         // Installing a model clears the notice everywhere.
         vm.set_list(list(true));

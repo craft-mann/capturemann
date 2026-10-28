@@ -241,6 +241,7 @@ impl TranscribeService for RealTranscribe {
             include_system: false,
             model_id: Some(&id),
             prompt: prompt.as_deref(),
+            original_audio: req.original_audio,
         };
         match cm_ai::recording::transcribe_recording_resumable(
             &req.bundle_dir,

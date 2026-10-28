@@ -772,6 +772,9 @@ async fn transcribe(cx: &mut Ctx<'_>, a: TranscribeArgs) -> Result<(), CliError>
     if let Some(m) = &a.model {
         p["model"] = json!(m);
     }
+    if a.original_audio {
+        p["original_audio"] = json!(true);
+    }
     let params = cx.mutating(p, "");
     let mut c = cx.client().await?;
     let started = c.call("transcribe", params).await?;

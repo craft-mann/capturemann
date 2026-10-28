@@ -352,8 +352,24 @@ pub fn start_regen(app: &Entity<AppModel>, capture_id: &str, cx: &mut App) {
         capture_id,
         draft.language_arg(),
         draft.model.as_deref(),
+        draft.original_audio,
         cx,
     );
+}
+
+/// The Audio choice of the Re-generate panel: the noise-reduced copy or the original microphone.
+pub fn set_regen_original_audio(
+    app: &Entity<AppModel>,
+    capture_id: &str,
+    original_audio: bool,
+    cx: &mut App,
+) {
+    app.update(cx, |m, cx| {
+        if let Some(d) = m.transcribe.regen_mut(capture_id) {
+            d.original_audio = original_audio;
+        }
+        cx.notify();
+    });
 }
 
 /// Download the transcript (TXT, SRT or VTT): the daemon writes the file into the recording's
@@ -533,7 +549,7 @@ pub fn dismiss_notice(app: &Entity<AppModel>, cx: &mut App) {
 
 /// Transcribe pressed (the details card, the recording editor).
 pub fn transcribe(app: &Entity<AppModel>, capture_id: &str, cx: &mut App) {
-    transcribe_with(app, capture_id, None, None, cx);
+    transcribe_with(app, capture_id, None, None, false, cx);
 }
 
 /// Transcribe with a language (`None` = auto-detect) and a model (`None` = the active one). Also
@@ -543,6 +559,7 @@ pub fn transcribe_with(
     capture_id: &str,
     language: Option<&str>,
     model: Option<&str>,
+    original_audio: bool,
     cx: &mut App,
 ) {
     let (language, model) = (language.map(str::to_owned), model.map(str::to_owned));
@@ -557,7 +574,7 @@ pub fn transcribe_with(
     let (app2, id) = (app.clone(), capture_id.to_owned());
     cx.spawn(async move |cx| {
         let res = client
-            .transcribe(&id, language.as_deref(), model.as_deref())
+            .transcribe(&id, language.as_deref(), model.as_deref(), original_audio)
             .await;
         cx.update(|cx| match res {
             Ok(job) => app2.update(cx, |m, cx| {

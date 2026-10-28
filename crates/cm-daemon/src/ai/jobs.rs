@@ -241,6 +241,10 @@ impl JobHandler for TranscribeHandler {
             .get("language")
             .and_then(Value::as_str)
             .map(str::to_owned);
+        let original_audio = inputs
+            .get("original_audio")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
         let dir = {
             let (library, id) = (self.library.clone(), capture_id.clone());
             blocking(move || {
@@ -278,6 +282,7 @@ impl JobHandler for TranscribeHandler {
             glossary: glossary.clone(),
             // Held (a recording started) or interrupted: go on from the last finished piece.
             resume: ctx.job.checkpoint.clone(),
+            original_audio,
         };
         let (service, reporter, run_flag) = (self.service.clone(), ctx.reporter.clone(), flag);
         let saver = reporter.clone();
@@ -433,6 +438,7 @@ pub(super) fn enqueue_transcribe(
     language: Option<&str>,
     by: &str,
     auto: bool,
+    original_audio: bool,
 ) -> Result<(Job, bool), CmError> {
     static ENQUEUE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
     let _one_at_a_time = ENQUEUE_LOCK
@@ -447,13 +453,19 @@ pub(super) fn enqueue_transcribe(
         j.inputs.get("capture_id").and_then(Value::as_str) == Some(capture_id)
             && j.inputs.get("model").and_then(Value::as_str) == Some(model)
             && j.inputs.get("language").and_then(Value::as_str) == language
+            // The same run is reused, not one on the other audio (a missing key is "no").
+            && j.inputs
+                .get("original_audio")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+                == original_audio
     }) {
         return Ok((j, true));
     }
     let job = queue.enqueue(NewJob::new(
         JOB_TRANSCRIBE,
         json!({ "capture_id": capture_id, "model": model, "language": language,
-                "by": by, "auto": auto }),
+                "by": by, "auto": auto, "original_audio": original_audio }),
     ))?;
     Ok((job, false))
 }

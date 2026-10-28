@@ -297,6 +297,7 @@ impl AiClient {
         capture_id: &str,
         language: Option<&str>,
         model: Option<&str>,
+        original_audio: bool,
     ) -> Result<String, AiError> {
         let mut p = json!({ "capture_id": capture_id });
         if let Some(l) = language {
@@ -304,6 +305,10 @@ impl AiClient {
         }
         if let Some(m) = model {
             p["model"] = json!(m);
+        }
+        if original_audio {
+            // The microphone as recorded, not the noise-reduced copy.
+            p["original_audio"] = json!(true);
         }
         let v = self.transport.call("transcribe", p).await?;
         job_id("transcribe", &v)
@@ -826,7 +831,7 @@ mod tests {
             }),
         );
         let c = AiClient::new(t.clone());
-        let e = run(c.transcribe("cap_1", None, None)).unwrap_err();
+        let e = run(c.transcribe("cap_1", None, None, false)).unwrap_err();
         assert!(e.is_no_model());
         assert_eq!(
             t.calls_of("transcribe"),
@@ -839,7 +844,7 @@ mod tests {
         let t = ScriptedTransport::new();
         t.answer("transcribe", Ok(json!({"job_id": "j"})));
         let c = AiClient::new(t.clone());
-        run(c.transcribe("cap_1", Some("vi"), Some("small"))).unwrap();
+        run(c.transcribe("cap_1", Some("vi"), Some("small"), false)).unwrap();
         assert_eq!(
             t.calls_of("transcribe"),
             vec![json!({"capture_id": "cap_1", "language": "vi", "model": "small"})]
@@ -1129,6 +1134,26 @@ mod tests {
         let asked = t.calls_of("list_jobs");
         assert_eq!(asked.len(), 3);
         assert_eq!(asked[0], json!({"type": "transcribe", "limit": 20}));
+    }
+
+    /// The original microphone is sent only when it is asked for, so the call of an older daemon
+    /// (and every other caller) is unchanged.
+    #[test]
+    fn transcribe_sends_original_audio_only_when_asked() {
+        let t = ScriptedTransport::new();
+        t.answer("transcribe", Ok(json!({"job_id": "job_1"})));
+        t.answer("transcribe", Ok(json!({"job_id": "job_2"})));
+        let c = AiClient::new(t.clone());
+        run(c.transcribe("cap_1", None, None, false)).unwrap();
+        run(c.transcribe("cap_1", Some("vi"), Some("large"), true)).unwrap();
+        assert_eq!(
+            t.calls_of("transcribe"),
+            vec![
+                json!({"capture_id": "cap_1"}),
+                json!({"capture_id": "cap_1", "language": "vi", "model": "large",
+                       "original_audio": true}),
+            ]
+        );
     }
 
     /// VOC-2: Translate sends the target language; Export audio sends its parameters and returns

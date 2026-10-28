@@ -7,6 +7,7 @@ impl Inner {
         capture_id: String,
         language: Option<String>,
         model: Option<String>,
+        original_audio: bool,
     ) -> Result<Value, DaemonError> {
         let _serial = self.capture_locks.lock(&capture_id).await;
         let list = self.model_list().await?;
@@ -43,13 +44,16 @@ impl Inner {
         .await?;
         let by = actor.to_string();
         let (id, m, l) = (capture_id.clone(), model.clone(), language.clone());
-        let (job, reused) =
-            blocking(move || enqueue_transcribe(&queue, &id, &m, l.as_deref(), &by, false)).await?;
+        let (job, reused) = blocking(move || {
+            enqueue_transcribe(&queue, &id, &m, l.as_deref(), &by, false, original_audio)
+        })
+        .await?;
         Ok(json!({
             "job_id": job.id,
             "capture_id": capture_id,
             "model": model,
             "language": language,
+            "original_audio": original_audio,
             "state": job.state.as_str(),
             "reused": reused,
         }))
@@ -83,7 +87,8 @@ impl Inner {
         };
         let (queue, id, picked) = (rt.queue.clone(), capture_id.to_owned(), model.clone());
         let (job, reused) =
-            blocking(move || enqueue_transcribe(&queue, &id, &picked, None, "user", true)).await?;
+            blocking(move || enqueue_transcribe(&queue, &id, &picked, None, "user", true, false))
+                .await?;
         if !reused {
             self.events.publish(
                 events::TRANSCRIPT_STARTED,

@@ -49,6 +49,8 @@ pub struct TranscribeRequest {
     /// The checkpoint the job saved before it was held or interrupted (`cm_ai::pieces::Checkpoint`
     /// as JSON): the run goes on from the last finished piece. `None`: from the start.
     pub resume: Option<serde_json::Value>,
+    /// Read the microphone as it was recorded, not the noise-reduced copy.
+    pub original_audio: bool,
 }
 
 /// The speech-model store (`cm_ai::model`). Blocking: the daemon calls it off the async threads.

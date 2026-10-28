@@ -180,6 +180,28 @@ pub fn regen_panel(
             }),
         );
     }
+    // Which audio is read: the noise-reduced copy a recording stores, or the microphone as recorded.
+    // Noise reduction can remove soft sounds Whisper needs, so the original is worth trying.
+    let mut source = segmented(t, id_of("regen-audio"), &tr_ctx!("field", "Audio"));
+    for (original, text) in [
+        (false, tr!("Noise-reduced")),
+        (true, tr!("Original microphone")),
+    ] {
+        let (app, cap) = (app.clone(), cap.clone());
+        let id = if original {
+            "regen-audio-original"
+        } else {
+            "regen-audio-reduced"
+        };
+        source = source.child(
+            segment(t, id_of(id), &text, d.original_audio == original)
+                .px(px(10.))
+                .on_click(move |_, _, cx| {
+                    let (app, cap) = (app.clone(), cap.clone());
+                    cx.defer(move |cx| ai::set_regen_original_audio(&app, &cap, original, cx));
+                }),
+        );
+    }
     let (start_app, start_cap) = (app.clone(), cap.clone());
     let (cancel_app, cancel_cap) = (app.clone(), cap.clone());
     let warning: AnyElement = if edited {
@@ -220,6 +242,13 @@ pub fn regen_panel(
         .child(models)
         .child(label(tr_ctx!("field", "Language")))
         .child(langs)
+        .child(label(tr_ctx!("field", "Audio")))
+        .child(source)
+        .child(label(tr!(
+            "Noise reduction can remove soft sounds. If a transcript misses words, try the \
+             original microphone. It makes no difference to a recording made without noise \
+             reduction."
+        )))
         .child(
             div()
                 .flex()

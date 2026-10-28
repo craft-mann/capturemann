@@ -1159,6 +1159,39 @@ async fn ai_1_a_held_transcription_goes_on_from_its_checkpoint() {
     );
 }
 
+/// "Original microphone": the choice reaches the job and the engine, an equal run is reused and
+/// one on the other audio is not, and a wrong type is refused.
+#[tokio::test]
+async fn ai_1_the_original_microphone_is_a_choice_of_the_run() {
+    let r = rig(FakeAi::new().with_small_installed(), Decision::Approve).await;
+    r.ai.set_slow(60, 10); // slow enough that the runs overlap in the queue
+    let a = user(&r, "transcribe", json!({})).await.unwrap();
+    assert_eq!(a["original_audio"], json!(false));
+    // The same request again is the same job; the original microphone is a different run.
+    let same = user(&r, "transcribe", json!({})).await.unwrap();
+    assert_eq!(same["reused"], json!(true));
+    assert_eq!(same["job_id"], a["job_id"]);
+    let other = user(&r, "transcribe", json!({"original_audio": true}))
+        .await
+        .unwrap();
+    assert_eq!(other["original_audio"], json!(true));
+    assert_eq!(other["reused"], json!(false));
+    assert_ne!(other["job_id"], a["job_id"]);
+    let again = user(&r, "transcribe", json!({"original_audio": true}))
+        .await
+        .unwrap();
+    assert_eq!(again["job_id"], other["job_id"]);
+    assert!(user(&r, "transcribe", json!({"original_audio": "yes"}))
+        .await
+        .is_err());
+    job_done(&r, a["job_id"].as_str().unwrap()).await;
+    job_done(&r, other["job_id"].as_str().unwrap()).await;
+    let calls = r.ai.transcribe_calls();
+    let mut asked: Vec<bool> = calls.iter().map(|c| c.original_audio).collect();
+    asked.sort();
+    assert_eq!(asked, vec![false, true], "each run reached the engine once");
+}
+
 fn word(text: &str, a: f64, b: f64, conf: f32) -> cm_ai::transcribe::Word {
     cm_ai::transcribe::Word {
         text: text.into(),

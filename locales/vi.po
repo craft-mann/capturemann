@@ -10624,6 +10624,19 @@ msgstr "Việc này chạy trên máy Mac này và mất vài phút với bản 
 msgid "Waiting for the transcript"
 msgstr "Đang chờ bản chép lời"
 
+msgid "Noise reduction can remove soft sounds. If a transcript misses words, try the original microphone. It makes no difference to a recording made without noise reduction."
+msgstr "Khử nhiễu có thể làm mất những âm nhẹ. Nếu bản chép lời thiếu chữ, hãy thử micrô gốc. Với bản ghi không dùng khử nhiễu thì không có khác biệt."
+
+msgid "Noise-reduced"
+msgstr "Đã khử nhiễu"
+
+msgid "Original microphone"
+msgstr "Micrô gốc"
+
+msgctxt "field"
+msgid "Audio"
+msgstr "Âm thanh"
+
 msgid "Click a time in the report to see the moment it comes from."
 msgstr "Bấm vào một mốc thời gian trong báo cáo để xem thời điểm nó bắt nguồn."
 

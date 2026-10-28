@@ -294,7 +294,11 @@ impl Inner {
                 capture_id,
                 language,
                 model,
-            } => self.transcribe(actor, capture_id, language, model).await,
+                original_audio,
+            } => {
+                self.transcribe(actor, capture_id, language, model, original_audio)
+                    .await
+            }
             AiOp::GetTranscript { capture_id } => self.get_transcript(&capture_id).await,
             AiOp::GetCaptions {
                 capture_id,

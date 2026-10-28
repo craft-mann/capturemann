@@ -1422,11 +1422,14 @@ fn ai_tools() -> Vec<ToolSpec> {
             json!({ "capture_id": capture_id(),
                     "language": { "type": "string", "default": "auto",
                                   "description": "`auto` to detect, or a language code such as `en`, `vi` or `es`." },
-                    "model": model_id_schema() }),
+                    "model": model_id_schema(),
+                    "original_audio": { "type": "boolean", "default": false,
+                                        "description": "Read the microphone as it was recorded instead of the noise-reduced copy a recording stores by default. Noise reduction can remove soft sounds that speech recognition needs, so try this when words are missing; it makes no difference to a recording made without noise reduction." } }),
             &["capture_id"],
             job_started_output(json!({
                 "capture_id": { "type": "string" }, "model": { "type": "string" },
-                "language": { "type": ["string", "null"] } })),
+                "language": { "type": ["string", "null"] },
+                "original_audio": { "type": "boolean" } })),
         ),
         ai_tool(
             "get_transcript",

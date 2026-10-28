@@ -271,3 +271,87 @@ fn no_word_starts_before_the_speech_does() {
         secs(out.words[1].start)
     );
 }
+
+/// A recording stores the noise-reduced microphone as the track's file and the original as
+/// `raw_file`. Transcription reads the reduced copy unless the original is asked for (noise
+/// reduction can take out soft sounds Whisper needs); a recording without a copy has only one.
+#[test]
+fn the_original_microphone_is_read_only_when_asked_for() {
+    let Some(ff) = ffmpeg() else {
+        println!("SKIPPED: FFmpeg not found");
+        return;
+    };
+    let dir = tempfile::tempdir().unwrap();
+    // Different lengths tell the two files apart: 2 s reduced, 4 s original.
+    tone(&ff, &dir.path().join("mic.denoised.wav"), 2.0);
+    tone(&ff, &dir.path().join("mic.wav"), 4.0);
+    std::fs::write(
+        dir.path().join("manifest.json"),
+        manifest(
+            serde_json::json!({"mic": {
+                "file": "mic.denoised.wav", "raw_file": "mic.wav",
+                "denoised_file": "mic.denoised.wav", "denoise": true,
+                "start": 0, "end": ticks(4.0)}}),
+            serde_json::json!([]),
+        ),
+    )
+    .unwrap();
+    let seconds_read = |original_audio: bool| {
+        let probe = Probe {
+            seen: Mutex::new(None),
+            inner: ScriptedTranscriber::from_secs(&[("hello", 0.5, 0.9)]),
+        };
+        transcribe_recording(
+            dir.path(),
+            &probe,
+            &TranscribeOptions {
+                model_id: Some("scripted"),
+                original_audio,
+                ..Default::default()
+            },
+            &mut |_| true,
+        )
+        .unwrap();
+        let samples = probe.seen.lock().unwrap().unwrap().0;
+        samples as f64 / 16_000.0
+    };
+    assert!(
+        (seconds_read(false) - 2.0).abs() < 0.1,
+        "default: the reduced copy"
+    );
+    assert!(
+        (seconds_read(true) - 4.0).abs() < 0.1,
+        "asked for: the original"
+    );
+
+    // A recording made without noise reduction has one file: the choice changes nothing.
+    let plain = tempfile::tempdir().unwrap();
+    tone(&ff, &plain.path().join("mic.wav"), 3.0);
+    std::fs::write(
+        plain.path().join("manifest.json"),
+        manifest(
+            serde_json::json!({"mic": {"file": "mic.wav", "start": 0, "end": ticks(3.0)}}),
+            serde_json::json!([]),
+        ),
+    )
+    .unwrap();
+    for original_audio in [false, true] {
+        let probe = Probe {
+            seen: Mutex::new(None),
+            inner: ScriptedTranscriber::from_secs(&[("hello", 0.5, 0.9)]),
+        };
+        transcribe_recording(
+            plain.path(),
+            &probe,
+            &TranscribeOptions {
+                model_id: Some("scripted"),
+                original_audio,
+                ..Default::default()
+            },
+            &mut |_| true,
+        )
+        .unwrap();
+        let s = probe.seen.lock().unwrap().unwrap().0 as f64 / 16_000.0;
+        assert!((s - 3.0).abs() < 0.1, "one file either way: {s}");
+    }
+}

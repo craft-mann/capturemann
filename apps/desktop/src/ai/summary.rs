@@ -178,6 +178,8 @@ pub struct RegenDraft {
     pub model: Option<String>,
     /// A code from [`LANGUAGES`].
     pub language: String,
+    /// Read the microphone as recorded instead of the noise-reduced copy.
+    pub original_audio: bool,
 }
 
 impl Default for RegenDraft {
@@ -185,6 +187,7 @@ impl Default for RegenDraft {
         RegenDraft {
             model: None,
             language: "auto".to_owned(),
+            original_audio: false,
         }
     }
 }
@@ -354,6 +357,7 @@ mod tests {
         let d = RegenDraft {
             model: Some("medium".into()),
             language: "vi".into(),
+            original_audio: false,
         };
         assert_eq!(d.language_arg(), Some("vi"));
         assert_eq!(LANGUAGES[0].0, "auto");

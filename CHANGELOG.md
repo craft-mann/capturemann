@@ -20,6 +20,7 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ### Added
 
+- **Original microphone** for transcription: the Re-generate panel has an Audio choice, Noise-reduced (the default) or Original microphone. Noise reduction can remove soft sounds that Whisper needs, so a transcript that misses words may read better from the original. Also `original_audio` on the MCP `transcribe` tool and `capturemann ai transcribe --original-audio`. A recording made without noise reduction is not affected.
 - A **Re-generate** button in the Transcript tab of the audio editor: pick another installed speech model and the language, and make the transcript again (the same panel as the recording details page, including what happens to your caption edits). A different model can give a better transcript.
 
 ### Changed
