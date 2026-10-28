@@ -70,6 +70,10 @@ Only the last job has `contents: write`.
           intel: "<x86_64 sha256>"
    url "https://github.com/craft-mann/capturemann/releases/download/v#{version}/CaptureMann-v#{version}-macos-#{arch}.dmg"
    ```
+   Also delete the cask's `depends_on arch: :arm64` line, or Intel Macs cannot install it. Test with
+   `brew install --cask` from a throwaway tap (`brew tap-new --no-git local/cmtest`, copy the cask into it;
+   Homebrew refuses a cask file outside a tap) and set `HOMEBREW_NO_INSTALL_CLEANUP=1`, because every
+   `brew install` otherwise deletes old versions of your other formulae.
 
 ## GitHub secrets
 

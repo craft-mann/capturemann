@@ -79,7 +79,9 @@ Deferred (not in 0.2.0): the first-use setup sheet (one place to get the speech 
 
 ## Release 0.2.1 (Intel Macs only)
 
-Scope (maintainer, Oct 28, 2026): Intel Mac support and nothing else, no new feature and no redesign. Plan: `specs/plans/intel-mac-plan.md`. The Intel DMG may be released before it has run on a real Intel Mac, marked as untested there.
+**Released Oct 28, 2026** (published on GitHub by the maintainer: `CaptureMann-v0.2.1-macos-arm64.dmg` and `-x86_64.dmg`, each notarized and stapled, each `.sha256` checked after download; the Homebrew cask is per chip and was installed from a throwaway tap on Apple Silicon, arm64 build, 0.2.1, notarized; the Intel download URL resolves, an install on Intel was not tried). Scope (maintainer, Oct 28, 2026): Intel Mac support and nothing else, no new feature and no redesign. Plan: `specs/plans/intel-mac-plan.md`. The Intel DMG was released before it has run on a real Intel Mac, marked as untested there; `tests/manual/INTEL-0.2.1.md` is the checklist for when a device exists.
+
+**Found after the release, fixed in the next one (0.2.2, not released):** a long recording could fail its report with `invalid_model_output` (a 2.5-hour Vietnamese recording on Gemma 4 E2B: one piece's notes hit the 4096-token reply limit, and the retry had no room left). The fix (commit `8925d1f`, `output_too_long`: the piece is split in half, or the notes are kept side by side) is tested with scripted models; it has not yet been confirmed on that recording. 0.2.0 and 0.2.1 have the bug.
 
 | Part | State | How it was checked |
 |---|---|---|
