@@ -7,6 +7,13 @@ use std::collections::BTreeSet;
 
 use crate::pieces::fold;
 
+/// Hesitation sounds that transcribers of conversations write down and a captioning transcript
+/// leaves out; [`word_errors_without`] can score with them removed from both texts (the usual
+/// way to score speech that includes disfluencies). Used only for scoring.
+pub const DISFLUENCIES: &[&str] = &[
+    "um", "uh", "uhm", "umm", "er", "erm", "mm", "mmm", "hmm", "hm", "mhm", "uhhuh",
+];
+
 /// Substitutions, insertions and deletions between a reference text and a transcript.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct WordErrors {
@@ -41,8 +48,15 @@ pub fn words_of(text: &str) -> Vec<String> {
 
 /// Word-level edit distance of `hypothesis` against `reference`, split into the three kinds.
 pub fn word_errors(reference: &str, hypothesis: &str) -> WordErrors {
-    let r = words_of(reference);
-    let h = words_of(hypothesis);
+    word_errors_without(reference, hypothesis, &[])
+}
+
+/// [`word_errors`] with the words in `skip` (already folded, like [`DISFLUENCIES`]) removed from
+/// both texts first.
+pub fn word_errors_without(reference: &str, hypothesis: &str, skip: &[&str]) -> WordErrors {
+    let keep = |w: &String| !skip.contains(&w.as_str());
+    let r: Vec<String> = words_of(reference).into_iter().filter(keep).collect();
+    let h: Vec<String> = words_of(hypothesis).into_iter().filter(keep).collect();
     let (n, m) = (r.len(), h.len());
     // cost[i][j]: edits to turn r[..i] into h[..j].
     let mut cost = vec![vec![0usize; m + 1]; n + 1];
@@ -291,6 +305,13 @@ mod tests {
         assert_eq!((e.substitutions, e.insertions, e.deletions), (0, 0, 2));
         assert_eq!(word_errors("", "").wer(), 0.0);
         assert_eq!(word_errors("", "a").wer(), 1.0);
+    }
+
+    #[test]
+    fn skipped_words_count_in_neither_text() {
+        let e = word_errors_without("so um we uh go", "so we go yeah", DISFLUENCIES);
+        assert_eq!((e.reference_words, e.errors()), (3, 1));
+        assert_eq!(word_errors("so um we", "so we").deletions, 1);
     }
 
     #[test]

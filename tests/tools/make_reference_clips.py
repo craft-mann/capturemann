@@ -92,38 +92,43 @@ def write_clip(out: Path, name: str, wav_cmd, turns, start: float, end: float):
     print(f"{name}: {end - start:.0f} s, {len(inside)} turns, speakers {speakers}")
 
 
+def primock_ids():
+    """Consultations spread over the five days (the same doctors recur within a day)."""
+    for n in range(1, 16):
+        for day in (1, 2, 3, 4, 5):
+            yield f"day{day}_consultation{n:02d}"
+
+
 def primock(out: Path, count: int):
     cache = out / "cache"
     done = 0
-    for day in (1, 2, 3, 4, 5):
-        for n in range(1, 16):
-            if done >= count:
-                return
-            base = f"day{day}_consultation{n:02d}"
-            try:
-                turns = []
-                for who in ("doctor", "patient"):
-                    tg = fetch(PRIMOCK_RAW + f"{base}_{who}.TextGrid", cache / f"{base}_{who}.TextGrid")
-                    turns += textgrid_turns(tg, who)
-            except subprocess.CalledProcessError:
-                continue  # that consultation does not exist
-            w = window(turns)
-            if not w:
-                continue
-            doctor = fetch(PRIMOCK_LFS + f"{base}_doctor.wav", cache / f"{base}_doctor.wav")
-            patient = fetch(PRIMOCK_LFS + f"{base}_patient.wav", cache / f"{base}_patient.wav")
+    for base in primock_ids():
+        if done >= count:
+            return
+        try:
+            turns = []
+            for who in ("doctor", "patient"):
+                tg = fetch(PRIMOCK_RAW + f"{base}_{who}.TextGrid", cache / f"{base}_{who}.TextGrid")
+                turns += textgrid_turns(tg, who)
+        except subprocess.CalledProcessError:
+            continue  # that consultation does not exist
+        w = window(turns)
+        if not w:
+            continue
+        doctor = fetch(PRIMOCK_LFS + f"{base}_doctor.wav", cache / f"{base}_doctor.wav")
+        patient = fetch(PRIMOCK_LFS + f"{base}_patient.wav", cache / f"{base}_patient.wav")
 
-            def cmd(start, dur, wav, doctor=doctor, patient=patient):
-                return [
-                    "ffmpeg", "-y",
-                    "-ss", f"{start:.3f}", "-t", f"{dur:.3f}", "-i", str(doctor),
-                    "-ss", f"{start:.3f}", "-t", f"{dur:.3f}", "-i", str(patient),
-                    "-filter_complex", "amix=inputs=2:normalize=0,aformat=sample_rates=16000:channel_layouts=mono",
-                    "-c:a", "pcm_s16le", str(wav),
-                ]  # fmt: skip
+        def cmd(start, dur, wav, doctor=doctor, patient=patient):
+            return [
+                "ffmpeg", "-y",
+                "-ss", f"{start:.3f}", "-t", f"{dur:.3f}", "-i", str(doctor),
+                "-ss", f"{start:.3f}", "-t", f"{dur:.3f}", "-i", str(patient),
+                "-filter_complex", "amix=inputs=2:normalize=0,aformat=sample_rates=16000:channel_layouts=mono",
+                "-c:a", "pcm_s16le", str(wav),
+            ]  # fmt: skip
 
-            write_clip(out, f"primock_{base}", cmd, turns, *w)
-            done += 1
+        write_clip(out, f"primock_{base}", cmd, turns, *w)
+        done += 1
 
 
 def ami(out: Path, count: int):
