@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
-use super::render::report_markdown;
+use super::render::{report_markdown, report_markdown_with};
 use super::{ReportContext, REPORTS_DIR, REPORT_VERSION};
 
 /// The manifest key of the index.
@@ -105,9 +105,15 @@ impl Report {
         true
     }
 
-    /// The Markdown a reader sees.
+    /// The Markdown a reader sees (no citation times).
     pub fn markdown_text(&self) -> String {
         report_markdown(self)
+    }
+
+    /// The Markdown with the citation times of the rendering when `include_times` (an edited
+    /// report's text is returned as it is).
+    pub fn markdown_text_with(&self, include_times: bool) -> String {
+        report_markdown_with(self, include_times)
     }
 
     /// The entry in a list.

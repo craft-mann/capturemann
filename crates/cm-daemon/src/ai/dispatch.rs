@@ -374,8 +374,9 @@ impl Inner {
                 report_id,
                 format,
                 out_dir,
+                include_times,
             } => {
-                self.export_report(capture_id, report_id, format, out_dir)
+                self.export_report(capture_id, report_id, format, out_dir, include_times)
                     .await
             }
             AiOp::DeleteReport {

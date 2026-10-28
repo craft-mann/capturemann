@@ -240,6 +240,9 @@ pub enum ReportCmd {
         /// An existing absolute folder; default the recording's `exports/`.
         #[arg(long, value_name = "DIR")]
         out_dir: Option<PathBuf>,
+        /// Print the citation times (`[mm:ss]`) after each item (default: left out).
+        #[arg(long)]
+        times: bool,
     },
     /// Delete a report. One undo step.
     Delete {

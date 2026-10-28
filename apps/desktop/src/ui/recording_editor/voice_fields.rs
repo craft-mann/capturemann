@@ -85,6 +85,9 @@ pub(super) struct VoicePanels {
     pub regenerating: Option<String>,
     /// The Translate panel's chosen language.
     pub translate_pick: Option<&'static str>,
+    /// "Include citation times" under the report: Markdown, TXT and Copy print `[mm:ss]` after
+    /// the items. Off by default (the report view always shows them as chips).
+    pub include_times: bool,
     _subs: Vec<Subscription>,
 }
 
@@ -149,6 +152,7 @@ impl VoicePanels {
             draft: Draft::default(),
             language: None,
             language_open: false,
+            include_times: false,
             setup: false,
             shown: None,
             editing: false,
@@ -584,8 +588,11 @@ impl RecordingEditor {
             return;
         };
         let app = self.app.clone();
+        let include_times = self.vp.include_times;
         cx.spawn(async move |_this, cx| {
-            let res = client.export_report(&id, &report_id, format).await;
+            let res = client
+                .export_report(&id, &report_id, format, include_times)
+                .await;
             cx.update(|cx| {
                 let spec = match res {
                     Ok(path) => crate::toast::ToastSpec::new(

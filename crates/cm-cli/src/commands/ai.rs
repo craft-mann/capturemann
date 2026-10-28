@@ -301,8 +301,12 @@ async fn report(cx: &mut Ctx<'_>, a: ReportArgs) -> Result<(), CliError> {
             report,
             format,
             out_dir,
+            times,
         }) => {
             let mut p = json!({ "capture_id": id, "report_id": report, "format": format });
+            if times {
+                p["include_times"] = json!(true);
+            }
             if let Some(d) = out_dir {
                 p["out_dir"] = json!(d.to_string_lossy());
             }

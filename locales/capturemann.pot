@@ -1910,6 +1910,9 @@ msgstr ""
 msgid "Include captions in the exported video"
 msgstr ""
 
+msgid "Include citation times"
+msgstr ""
+
 msgid "Include in export"
 msgstr ""
 

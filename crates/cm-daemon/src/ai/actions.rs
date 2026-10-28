@@ -106,6 +106,8 @@ pub enum AiOp {
         report_id: String,
         format: ReportFormat,
         out_dir: Option<String>,
+        /// Print the citation times (`[mm:ss]`) after the items; off by default.
+        include_times: bool,
     },
     DeleteReport {
         capture_id: String,
@@ -341,12 +343,16 @@ impl AiParams {
                 report_id,
                 format,
                 out_dir,
+                include_times,
             } => {
                 o.insert("capture_id".into(), json!(capture_id));
                 o.insert("report_id".into(), json!(report_id));
                 o.insert("format".into(), json!(format.ext()));
                 if let Some(d) = out_dir {
                     o.insert("out_dir".into(), json!(d));
+                }
+                if *include_times {
+                    o.insert("include_times".into(), json!(true));
                 }
             }
             AiOp::DeleteReport {
@@ -1084,7 +1090,14 @@ pub(crate) fn parse(method: &str, f: &Fields<'_>) -> Result<Action, CmError> {
             }
         }
         "export_report" => {
-            f.only(&["capture_id", "report_id", "format", "out_dir", "request_id"])?;
+            f.only(&[
+                "capture_id",
+                "report_id",
+                "format",
+                "out_dir",
+                "include_times",
+                "request_id",
+            ])?;
             let format = match f.str_req("format")?.as_str() {
                 "md" => ReportFormat::Md,
                 "txt" => ReportFormat::Txt,
@@ -1096,6 +1109,7 @@ pub(crate) fn parse(method: &str, f: &Fields<'_>) -> Result<Action, CmError> {
                     .ok_or_else(|| CmError::invalid_field("report_id", "is required"))?,
                 format,
                 out_dir: f.str_opt("out_dir")?,
+                include_times: f.bool_or("include_times", false)?,
             }
         }
         "delete_report" => {

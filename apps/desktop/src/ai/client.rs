@@ -524,14 +524,14 @@ impl AiClient {
         capture_id: &str,
         report_id: &str,
         format: &str,
+        include_times: bool,
     ) -> Result<PathBuf, AiError> {
-        let v = self
-            .transport
-            .call(
-                "export_report",
-                json!({ "capture_id": capture_id, "report_id": report_id, "format": format }),
-            )
-            .await?;
+        let mut params =
+            json!({ "capture_id": capture_id, "report_id": report_id, "format": format });
+        if include_times {
+            params["include_times"] = json!(true);
+        }
+        let v = self.transport.call("export_report", params).await?;
         v.get("path")
             .and_then(Value::as_str)
             .map(PathBuf::from)
@@ -1095,7 +1095,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            run(c.export_report("cap_1", "rpt_00000001", "md")).unwrap(),
+            run(c.export_report("cap_1", "rpt_00000001", "md", false)).unwrap(),
             PathBuf::from("/x/r.md")
         );
         let no_model = AiError {

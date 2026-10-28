@@ -1,10 +1,15 @@
-//! The Markdown and plain text of a report (AI-9). Citations print as `[mm:ss]` (`[h:mm:ss]` past
-//! an hour); the stored JSON keeps the exact seconds for the editor to seek to.
+//! The Markdown and plain text of a report (AI-9). By default the text carries no citation times:
+//! an item can cite a dozen moments and a run of `[mm:ss]` after every item made the exports noisy
+//! (seen on a long meeting, Oct 28, 2026). The exports and Copy add them when the reader ticks
+//! "Include citation times" (`include_times`, `[mm:ss]`, `[h:mm:ss]` past an hour). The stored JSON
+//! always keeps the exact seconds, and the report view in the editor shows them as chips that
+//! seek. The section made from the markers prints its times either way: the time is what the
+//! item says.
 
 use serde_json::Value;
 
 use super::store::Report;
-use super::{find_template, FieldKind, Layout, Section, Template, NOTHING_FOUND};
+use super::{find_template, FieldKind, Layout, Section, Source, Template, NOTHING_FOUND};
 
 /// `mm:ss`, or `h:mm:ss` from an hour on.
 pub fn stamp(seconds: f64) -> String {
@@ -57,7 +62,21 @@ fn field_text(item: &Value, f: &super::Field) -> String {
     }
 }
 
-fn render_item(section: &Section, item: &Value, tick: Option<bool>, out: &mut String) {
+fn render_item(
+    section: &Section,
+    item: &Value,
+    tick: Option<bool>,
+    include_times: bool,
+    out: &mut String,
+) {
+    // Times print when asked for, and always in the marked moments, where they are the content.
+    let cites = |item: &Value| {
+        if include_times || section.source == Source::Markers {
+            cites(item)
+        } else {
+            String::new()
+        }
+    };
     // A task item of a section that takes ticks starts with its box.
     let bullet = match tick {
         Some(true) => "- [x] ",
@@ -124,10 +143,15 @@ fn render_item(section: &Section, item: &Value, tick: Option<bool>, out: &mut St
     }
 }
 
-/// The Markdown of the stored content. Items of the task sections print as `- [ ]` / `- [x]`
-/// (from [`Report::checked`]). The edited text of a report the user changed is
-/// [`Report::markdown`], not this.
+/// The Markdown of the stored content, without citation times.
 pub fn markdown(template: &Template, report: &Report) -> String {
+    markdown_with(template, report, false)
+}
+
+/// The Markdown of the stored content. Items of the task sections print as `- [ ]` / `- [x]`
+/// (from [`Report::checked`]); citation times follow each item when `include_times`. The edited
+/// text of a report the user changed is [`Report::markdown`], not this.
+pub fn markdown_with(template: &Template, report: &Report, include_times: bool) -> String {
     let title = report
         .context
         .title
@@ -159,7 +183,7 @@ pub fn markdown(template: &Template, report: &Report) -> String {
         let ticks = super::is_checkable(&section.id);
         for (i, item) in items.iter().enumerate() {
             let tick = ticks.then(|| report.is_checked(&section.id, i));
-            render_item(section, item, tick, &mut out);
+            render_item(section, item, tick, include_times, &mut out);
         }
         if !out.ends_with("\n\n") {
             out.push('\n');
@@ -171,13 +195,20 @@ pub fn markdown(template: &Template, report: &Report) -> String {
     out
 }
 
-/// The Markdown of any report: the edited text, else the rendering of its content.
+/// The Markdown of any report: the edited text, else the rendering of its content (without
+/// citation times).
 pub fn report_markdown(report: &Report) -> String {
+    report_markdown_with(report, false)
+}
+
+/// [`report_markdown`], with the citation times of the rendering when `include_times`. The edited
+/// text is the user's own words and is returned as it is.
+pub fn report_markdown_with(report: &Report, include_times: bool) -> String {
     if let Some(m) = &report.markdown {
         return m.clone();
     }
     match find_template(&report.template) {
-        Some(t) => markdown(t, report),
+        Some(t) => markdown_with(t, report, include_times),
         None => format!("# {}\n", report.template_name),
     }
 }

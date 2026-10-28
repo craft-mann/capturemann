@@ -370,6 +370,28 @@ async fn generate_get_export_and_drop_the_uncited() {
     .await
     .unwrap();
     assert_ne!(md["path"], md2["path"]);
+    // Citation times are left out unless asked for (the marked moments keep theirs: the time is
+    // the content there), and the stored report keeps them either way.
+    let plain_md = std::fs::read_to_string(md["path"].as_str().unwrap()).unwrap();
+    let notes = |t: &str| t.split("## Marked moments").next().unwrap().to_owned();
+    assert!(!notes(&plain_md).contains("[00:"), "{plain_md}");
+    assert!(plain_md.contains("pricing [00:20]"), "{plain_md}");
+    let timed = user(
+        &r,
+        "export_report",
+        json!({"report_id": rid, "format": "md", "include_times": true}),
+    )
+    .await
+    .unwrap();
+    let timed_md = std::fs::read_to_string(timed["path"].as_str().unwrap()).unwrap();
+    assert!(notes(&timed_md).contains("[00:"), "{timed_md}");
+    let bad = user(
+        &r,
+        "export_report",
+        json!({"report_id": rid, "format": "md", "include_times": "yes"}),
+    )
+    .await;
+    assert!(bad.is_err(), "include_times must be a boolean");
     let txt = user(
         &r,
         "export_report",

@@ -3,6 +3,16 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
+## [Unreleased]
+
+### Fixed
+
+- A long recording no longer fails its report with `invalid_model_output`. When one piece's notes did not fit in the model's reply limit, the JSON was cut off and the retry had no room left; the piece is now split in half (or, for the merge, the notes are kept side by side). Seen on a 2.5-hour Vietnamese recording. 0.2.0 and 0.2.1 have the problem.
+
+### Changed
+
+- Report exports leave out the citation times by default: Markdown, TXT and Copy no longer print `[mm:ss]` after every item. A new box "Include citation times" under the report (and `include_times` / `capturemann ai report export --times`) adds them. The marked moments keep their times; the report view still shows every citation and seeks.
+
 ## [0.2.1] - 2026-10-28
 
 0.2.1 adds Intel Mac support and nothing else: no new feature and no redesign.

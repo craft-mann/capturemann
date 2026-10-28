@@ -895,7 +895,8 @@ impl RecordingEditor {
         };
 
         // ---- the foot
-        let markdown = r.markdown_text();
+        let include_times = self.vp.include_times;
+        let markdown = r.markdown_text_with(include_times);
         let shown_md = r.markdown.clone().unwrap_or(markdown);
         let foot = div()
             .flex_none()
@@ -929,6 +930,43 @@ impl RecordingEditor {
                             this.report_export(rid.clone(), "txt", cx)
                         })
                     }),
+            )
+            .child(
+                div()
+                    .id("re-report-times")
+                    .role(Role::CheckBox)
+                    .aria_label(tr!("Include citation times"))
+                    .aria_toggled(if include_times {
+                        gpui::Toggled::True
+                    } else {
+                        gpui::Toggled::False
+                    })
+                    .flex()
+                    .items_center()
+                    .gap(px(8.))
+                    .cursor_pointer()
+                    .child(
+                        div()
+                            .flex_none()
+                            .size(px(18.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .rounded(px(5.))
+                            .border_1()
+                            .border_color(rgba_of(if include_times { t.text } else { t.line }))
+                            .bg(rgba_of(if include_times { t.text } else { t.ground }))
+                            .children(include_times.then(|| icon("check", 12., t.ground))),
+                    )
+                    .child(
+                        shrink_text(tr!("Include citation times"))
+                            .text_size(px(type_scale::CAPTION))
+                            .text_color(rgba_of(t.mist)),
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.vp.include_times = !this.vp.include_times;
+                        cx.notify();
+                    })),
             )
             .child(div().flex_1())
             .child(

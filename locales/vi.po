@@ -10609,6 +10609,9 @@ msgstr "Trích dẫn bởi “{section} · {n}”, đang phát từ {time}"
 msgid "Cited moment"
 msgstr "Thời điểm được trích dẫn"
 
+msgid "Include citation times"
+msgstr "Kèm thời điểm trích dẫn"
+
 msgid "Click a time in the report to see the moment it comes from."
 msgstr "Bấm vào một mốc thời gian trong báo cáo để xem thời điểm nó bắt nguồn."
 

@@ -293,6 +293,7 @@ impl Inner {
         report_id: String,
         format: ReportFormat,
         out_dir: Option<String>,
+        include_times: bool,
     ) -> Result<Value, DaemonError> {
         let _serial = self.capture_locks.lock(&capture_id).await;
         let library = self.library.clone();
@@ -320,7 +321,7 @@ impl Inner {
                     p
                 }
             };
-            let md = r.markdown_text();
+            let md = r.markdown_text_with(include_times);
             let body = match format {
                 ReportFormat::Md => md,
                 ReportFormat::Txt => report::render::plain_text(&md),

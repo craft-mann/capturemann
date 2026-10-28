@@ -1673,7 +1673,8 @@ fn ai_tools() -> Vec<ToolSpec> {
             "Write a report as a Markdown (`md`) or plain text (`txt`) file, into `out_dir` (an existing absolute folder) or the recording's `exports/` folder. Never overwrites a file.",
             json!({ "report_id": { "type": "string", "pattern": "^rpt_[0-9a-f]{8}$" },
                     "format": { "type": "string", "enum": ["md", "txt"] },
-                    "out_dir": { "type": "string", "description": "An existing absolute folder." } }),
+                    "out_dir": { "type": "string", "description": "An existing absolute folder." },
+                    "include_times": { "type": "boolean", "description": "Print the citation times ([mm:ss]) after each item. Default false: the text is cleaner without them; the stored report keeps them." } }),
             &["capture_id", "report_id", "format"],
             json!({ "type": "object", "properties": {
                 "capture_id": { "type": "string" }, "report_id": { "type": "string" },

@@ -588,7 +588,7 @@ fn golden_markdown() {
 
 ## Summary
 
-Pricing plan. [00:05]
+Pricing plan.
 
 ## Attendees
 
@@ -596,7 +596,7 @@ Pricing plan. [00:05]
 
 ## Topics
 
-- **Topic:** Pricing [00:10]
+- **Topic:** Pricing
   - **Key points:**
     - sheet
     - deadline
@@ -607,7 +607,7 @@ Pricing plan. [00:05]
 
 ## Action items
 
-- [ ] Send sheet — Owner: Linh · Due: Friday [01:05] [1:02:05]
+- [ ] Send sheet — Owner: Linh · Due: Friday
 
 ## Open questions
 
@@ -618,9 +618,38 @@ Pricing plan. [00:05]
 - Marker [00:55]
 ";
     assert_eq!(md, expected);
+    // The citations are only left out of the text: the stored content keeps them for the editor.
+    let r = sample_report(t);
+    assert_eq!(r.content["action_items"][0]["at"], json!([65.0, 3725.0]));
     let txt = render::plain_text(&md);
     assert!(txt.starts_with("WEEKLY\n"));
     assert!(!txt.contains("**") && !txt.contains("## "));
+}
+
+/// "Include citation times": the same report with the times after the items (and `h:mm:ss` past an
+/// hour); an edited report's own text is never touched.
+#[test]
+fn citation_times_are_printed_only_when_asked_for() {
+    let t = find_template("minutes").unwrap();
+    let r = sample_report(t);
+    let with = render::markdown_with(t, &r, true);
+    assert!(with.contains("Pricing plan. [00:05]"), "{with}");
+    assert!(with.contains("- **Topic:** Pricing [00:10]"), "{with}");
+    assert!(with.contains("Due: Friday [01:05] [1:02:05]"), "{with}");
+    assert!(with.contains("- Marker [00:55]"), "{with}");
+    let without = render::markdown_with(t, &r, false);
+    assert_eq!(without, render::markdown(t, &r));
+    assert_eq!(without, r.markdown_text());
+    assert_eq!(with, r.markdown_text_with(true));
+    assert!(
+        without.contains("- Marker [00:55]"),
+        "the marked moments keep their times"
+    );
+    assert!(!without.contains("[00:05]") && !without.contains("[1:02:05]"));
+    let mut edited = sample_report(t);
+    edited.markdown = Some("# My own words".into());
+    assert_eq!(edited.markdown_text_with(true), "# My own words");
+    assert_eq!(edited.markdown_text_with(false), "# My own words");
 }
 
 #[test]
