@@ -270,6 +270,9 @@ jobs:
             else
               printf 'This build is **ad hoc signed and not notarized**, so Gatekeeper blocks the first launch. Drag CaptureMann to Applications, then either right-click the app and choose Open (and confirm), or run `xattr -dr com.apple.quarantine /Applications/CaptureMann.app`. Because the signature changes with every build, macOS asks for the Screen Recording permission again after an update.\n\n'
             fi
+            if [ "$CM_ARCH" = "x86_64" ]; then
+              printf '**Not yet tested on a real Intel Mac.** This build is made on Apple Silicon and has only been checked there (including under Rosetta). Everything is expected to work, but screen, camera, microphone and system-audio recording, the hardware encoder, speed with the speech and text models, and the permission prompts have not been tried on Intel hardware. Please report problems at https://github.com/craft-mann/capturemann/issues. Speech and report features can be slow on older Intel Macs.\n\n'
+            fi
           } > "dist/footer-$CM_ARCH.md"
 
       - name: Keep the release files

@@ -2,6 +2,8 @@
 
 Status (Oct 28, 2026): **Stages 1 and 2 built and checked on the Apple Silicon Mac (Rosetta only; see the two result sections); Stages 0, 3, 4, 5 not started.** Written after 0.2.0 shipped (Apple Silicon only). **Decided (maintainer, Oct 28, 2026): two DMGs, one per chip, not a universal app (install size matters); the project website offers the exact download for each Mac. The maintainer has no Intel Mac at hand yet and will find one later**, so the build work (Stages 1 and 2) can start first and be checked under Rosetta, while everything that needs the real Mac (Stage 0 hardware checks, Stage 3, acceptance) waits. Platform order is unchanged (maintainer, Oct 25, 2026): Intel Macs, then Windows, then Linux. No release dates (maintainer rule).
 
+**Maintainer decision (Oct 28, 2026): the Intel DMG may be released before it has run on a real Intel Mac, clearly marked "not yet tested on a real Intel Mac" in the release notes, README and site; the hardware tests (Stage 0, I3.1, acceptance) follow when a device is available, and a later release fixes what they find.** Wherever this plan says the release waits for the Intel Mac, read it as: the claim "works on Intel" waits, the download does not.
+
 Goal: a release with a separate DMG for Intel Macs (macOS 13+) next to the unchanged Apple Silicon DMG, with every 0.2.0 feature working on Intel and defaults that suit slower hardware. Each DMG holds a single architecture, so the Apple Silicon download stays about 181 MB or smaller.
 
 ## Why this is small
