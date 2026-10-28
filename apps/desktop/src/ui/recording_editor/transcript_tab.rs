@@ -76,6 +76,33 @@ impl RecordingEditor {
                 crate::ui::ai_view::transcribe_row(t, &self.app, &id, "re", cx),
             ]);
         }
+        // Re-generate: another model or language can give a better transcript, so the tab offers
+        // the details page's panel (model, language, what it replaces). The summary of the stored
+        // transcript says whether the user edited the captions.
+        crate::ui::ai_view::prime_transcript_info(&self.app, &id, cx);
+        let (running, draft, installed, edited) = {
+            let m = self.app.read(cx);
+            (
+                m.transcribe.status_text(&id),
+                m.transcribe.regen_of(&id).cloned(),
+                m.ai.installed_models()
+                    .into_iter()
+                    .map(|i| (i.id.clone(), i.label.clone(), i.active))
+                    .collect::<Vec<_>>(),
+                matches!(
+                    m.transcribe.transcripts.state(&id),
+                    Some(crate::ai::summary::TranscriptState::Present(i)) if i.edited
+                ),
+            )
+        };
+        let regen_panel = draft.filter(|_| running.is_none()).map(|d| {
+            div()
+                .px(px(20.))
+                .py(px(12.))
+                .child(crate::ui::recording::transcript_card::regen_panel(
+                    t, &self.app, &id, "re-tr", &d, &installed, edited,
+                ))
+        });
         let ui = &self.voice_ui;
         let (lines, turns, rows) = self.voice_turns(s);
         let playhead = s.model.playhead;
@@ -143,6 +170,12 @@ impl RecordingEditor {
             .children(
                 ui.translate_open
                     .then(|| self.translate_chooser(t, s, &own_language, cx)),
+            )
+            // A new transcript is being written (Re-generate, or an automatic run).
+            .children(
+                running
+                    .clone()
+                    .map(|text| hint(t, "loader-circle", text).into_any_element()),
             );
 
         // ---- the rows
@@ -211,6 +244,20 @@ impl RecordingEditor {
             .child(export("re-tr-txt", tr!("Save TXT"), CaptionFormat::Txt))
             .child(export("re-tr-srt", tr!("Save SRT"), CaptionFormat::Srt))
             .child(export("re-tr-vtt", tr!("Save VTT"), CaptionFormat::Vtt))
+            .child(
+                small_button_with_icon(t, "re-tr-regen", &tr!("Re-generate"), Some("refresh-cw"))
+                    .opacity(if running.is_some() { 0.45 } else { 1.0 })
+                    .on_click({
+                        let (app, cap, busy) = (self.app.clone(), id.clone(), running.is_some());
+                        move |_, _, cx| {
+                            if busy {
+                                return;
+                            }
+                            let (app, cap) = (app.clone(), cap.clone());
+                            cx.defer(move |cx| crate::ui::ai::open_regen(&app, &cap, cx));
+                        }
+                    }),
+            )
             .child(div().flex_1())
             .child(
                 div()
@@ -254,6 +301,7 @@ impl RecordingEditor {
             .bg(rgba_of(t.surface))
             .overflow_hidden()
             .child(header)
+            .children(regen_panel)
             .child(list)
             .child(footer)
             .into_any_element()

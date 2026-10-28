@@ -125,6 +125,133 @@ fn download_button(
         .child(label)
 }
 
+/// The Re-generate panel: which model and language, and what it replaces. Shared by the
+/// details page and the audio editor's Transcript tab. `edited`: the user changed the captions
+/// (the panel then says what happens to those edits). `installed`: `(id, label, active)`.
+pub fn regen_panel(
+    t: &Theme,
+    app: &Entity<AppModel>,
+    capture_id: &str,
+    prefix: &'static str,
+    d: &crate::ai::summary::RegenDraft,
+    installed: &[(String, String, bool)],
+    edited: bool,
+) -> AnyElement {
+    use crate::ai::summary::regen_warning;
+    let id_of = |what: &str| SharedString::from(format!("{prefix}-{what}"));
+    let cap = capture_id.to_owned();
+    let mut models = segmented(t, id_of("regen-models"), &tr!("Model for this run"));
+    if installed.is_empty() {
+        models = models.child(
+            div()
+                .px(px(8.))
+                .text_size(px(type_scale::CAPTION))
+                .text_color(rgba_of(t.mist))
+                .child(tr!("No model installed")),
+        );
+    }
+    for (mid, label, active) in installed {
+        let picked = d.model.as_deref().map_or(*active, |m| m == mid);
+        let (app, cap, mid2) = (app.clone(), cap.clone(), mid.clone());
+        models = models.child(
+            segment(t, id_of(&format!("regen-model-{mid}")), label, picked)
+                .px(px(10.))
+                .on_click(move |_, _, cx| {
+                    let (app, cap, m) = (app.clone(), cap.clone(), mid2.clone());
+                    cx.defer(move |cx| ai::set_regen_model(&app, &cap, Some(m), cx));
+                }),
+        );
+    }
+    let mut langs = segmented(t, id_of("regen-langs"), &tr_ctx!("field", "Language"));
+    for (code, english) in crate::ai::summary::LANGUAGES {
+        let label = crate::ai::summary::language_name(code).unwrap_or_else(|| english.to_string());
+        let (app, cap) = (app.clone(), cap.clone());
+        langs = langs.child(
+            segment(
+                t,
+                id_of(&format!("regen-lang-{code}")),
+                &label,
+                d.language == *code,
+            )
+            .px(px(10.))
+            .on_click(move |_, _, cx| {
+                let (app, cap) = (app.clone(), cap.clone());
+                cx.defer(move |cx| ai::set_regen_language(&app, &cap, code, cx));
+            }),
+        );
+    }
+    let (start_app, start_cap) = (app.clone(), cap.clone());
+    let (cancel_app, cancel_cap) = (app.clone(), cap.clone());
+    let warning: AnyElement = if edited {
+        // Discarding the user's caption edits: a brass callout.
+        callout(
+            t,
+            Tone::Brass,
+            "triangle-alert",
+            regen_warning(true),
+            None,
+            None,
+        )
+        .into_any_element()
+    } else {
+        div()
+            .text_size(px(type_scale::CAPTION))
+            .text_color(rgba_of(t.mist))
+            .child(regen_warning(false))
+            .into_any_element()
+    };
+    let label = |text: String| {
+        div()
+            .text_size(px(type_scale::CAPTION))
+            .text_color(rgba_of(t.mist))
+            .child(SharedString::from(text))
+    };
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(10.))
+        .p(px(12.))
+        .rounded(px(12.))
+        .border_1()
+        .border_color(rgba_of(t.border))
+        .bg(rgba_of(t.field))
+        .child(warning)
+        .child(label(tr_ctx!("field", "Model")))
+        .child(models)
+        .child(label(tr_ctx!("field", "Language")))
+        .child(langs)
+        .child(
+            div()
+                .flex()
+                .gap(px(8.))
+                .child(
+                    button(
+                        t,
+                        id_of("regen-start"),
+                        tr!("Re-generate"),
+                        ButtonKind::Primary,
+                    )
+                    .on_click(move |_, _, cx| {
+                        let (app, cap) = (start_app.clone(), start_cap.clone());
+                        cx.defer(move |cx| ai::start_regen(&app, &cap, cx));
+                    }),
+                )
+                .child(
+                    small_button_with_icon(
+                        t,
+                        id_of("regen-cancel"),
+                        &tr_ctx!("button", "Cancel"),
+                        None,
+                    )
+                    .on_click(move |_, _, cx| {
+                        let (app, cap) = (cancel_app.clone(), cancel_cap.clone());
+                        cx.defer(move |cx| ai::close_regen(&app, &cap, cx));
+                    }),
+                ),
+        )
+        .into_any_element()
+}
+
 /// The Transcript card's content (the caller wraps it in a card): the stored transcript with its
 /// actions and switches; or Transcribe and the no-model hint when there is none.
 pub fn transcript_section(
@@ -134,7 +261,7 @@ pub fn transcript_section(
     prefix: &'static str,
     cx: &gpui::App,
 ) -> AnyElement {
-    use crate::ai::summary::{regen_warning, summary_line, TranscriptState};
+    use crate::ai::summary::{summary_line, TranscriptState};
     let id_of = |what: &str| SharedString::from(format!("{prefix}-{what}"));
     let (state, running, error, draft, installed, txt_stamps) = {
         let m = app.read(cx);
@@ -255,118 +382,9 @@ pub fn transcript_section(
     };
 
     // The Re-generate panel: which model and language, and what it replaces.
-    let panel = draft.filter(|_| running.is_none()).map(|d| {
-        let mut models = segmented(t, id_of("regen-models"), &tr!("Model for this run"));
-        if installed.is_empty() {
-            models = models.child(
-                div()
-                    .px(px(8.))
-                    .text_size(px(type_scale::CAPTION))
-                    .text_color(rgba_of(t.mist))
-                    .child(tr!("No model installed")),
-            );
-        }
-        for (mid, label, active) in &installed {
-            let picked = d.model.as_deref().map_or(*active, |m| m == mid);
-            let (app, cap, mid2) = (app.clone(), cap.clone(), mid.clone());
-            models = models.child(
-                segment(t, id_of(&format!("regen-model-{mid}")), label, picked)
-                    .px(px(10.))
-                    .on_click(move |_, _, cx| {
-                        let (app, cap, m) = (app.clone(), cap.clone(), mid2.clone());
-                        cx.defer(move |cx| ai::set_regen_model(&app, &cap, Some(m), cx));
-                    }),
-            );
-        }
-        let mut langs = segmented(t, id_of("regen-langs"), &tr_ctx!("field", "Language"));
-        for (code, english) in crate::ai::summary::LANGUAGES {
-            let label =
-                crate::ai::summary::language_name(code).unwrap_or_else(|| english.to_string());
-            let (app, cap) = (app.clone(), cap.clone());
-            langs = langs.child(
-                segment(
-                    t,
-                    id_of(&format!("regen-lang-{code}")),
-                    &label,
-                    d.language == *code,
-                )
-                .px(px(10.))
-                .on_click(move |_, _, cx| {
-                    let (app, cap) = (app.clone(), cap.clone());
-                    cx.defer(move |cx| ai::set_regen_language(&app, &cap, code, cx));
-                }),
-            );
-        }
-        let (start_app, start_cap) = (app.clone(), cap.clone());
-        let (cancel_app, cancel_cap) = (app.clone(), cap.clone());
-        let warning: AnyElement = if info.edited {
-            // Discarding the user's caption edits: a brass callout.
-            callout(
-                t,
-                Tone::Brass,
-                "triangle-alert",
-                regen_warning(true),
-                None,
-                None,
-            )
-            .into_any_element()
-        } else {
-            div()
-                .text_size(px(type_scale::CAPTION))
-                .text_color(rgba_of(t.mist))
-                .child(regen_warning(false))
-                .into_any_element()
-        };
-        let label = |text: String| {
-            div()
-                .text_size(px(type_scale::CAPTION))
-                .text_color(rgba_of(t.mist))
-                .child(SharedString::from(text))
-        };
-        div()
-            .flex()
-            .flex_col()
-            .gap(px(10.))
-            .p(px(12.))
-            .rounded(px(12.))
-            .border_1()
-            .border_color(rgba_of(t.border))
-            .bg(rgba_of(t.field))
-            .child(warning)
-            .child(label(tr_ctx!("field", "Model")))
-            .child(models)
-            .child(label(tr_ctx!("field", "Language")))
-            .child(langs)
-            .child(
-                div()
-                    .flex()
-                    .gap(px(8.))
-                    .child(
-                        button(
-                            t,
-                            id_of("regen-start"),
-                            tr!("Re-generate"),
-                            ButtonKind::Primary,
-                        )
-                        .on_click(move |_, _, cx| {
-                            let (app, cap) = (start_app.clone(), start_cap.clone());
-                            cx.defer(move |cx| ai::start_regen(&app, &cap, cx));
-                        }),
-                    )
-                    .child(
-                        small_button_with_icon(
-                            t,
-                            id_of("regen-cancel"),
-                            &tr_ctx!("button", "Cancel"),
-                            None,
-                        )
-                        .on_click(move |_, _, cx| {
-                            let (app, cap) = (cancel_app.clone(), cancel_cap.clone());
-                            cx.defer(move |cx| ai::close_regen(&app, &cap, cx));
-                        }),
-                    ),
-            )
-    });
+    let panel = draft
+        .filter(|_| running.is_none())
+        .map(|d| regen_panel(t, app, capture_id, prefix, &d, &installed, info.edited));
 
     let stamps_app = app.clone();
     let (show_app, show_cap) = (app.clone(), cap.clone());

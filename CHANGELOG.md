@@ -11,7 +11,12 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 - The audio editor of a long recording plays again right away. Mixing the preview of an 88-minute recording took about 45 seconds and 12 GB of memory (the exporter's loudness measurement and true-peak limiter ran over the whole mix), and Play was silent until it finished; it now takes under a second and about half the memory. Exports are unchanged.
 - The sidebar highlights Audio, not Recordings, while an audio recording is open in the editor.
+- The sidebar shows the exact version (`v0.2.1`), the same as Settings > About, instead of only major.minor.
 - After a long recording the Transcript and Speakers tabs now say that the transcript and the speaker labels are being made, with the progress, and that nothing needs pressing. The automatic transcription was invisible to the editor (the new `transcript.started` event tells it), so the tabs looked idle for minutes.
+
+### Added
+
+- A **Re-generate** button in the Transcript tab of the audio editor: pick another installed speech model and the language, and make the transcript again (the same panel as the recording details page, including what happens to your caption edits). A different model can give a better transcript.
 
 ### Changed
 

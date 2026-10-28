@@ -189,15 +189,9 @@ fn brand_row(t: &Theme) -> AnyElement {
                 .font_weight(FontWeight::SEMIBOLD)
                 .child("CaptureMann"),
         )
-        // "v0.2": the version of this build (major.minor), not a fixed text.
-        .child(badge(
-            t,
-            format!(
-                "v{}.{}",
-                env!("CARGO_PKG_VERSION_MAJOR"),
-                env!("CARGO_PKG_VERSION_MINOR")
-            ),
-        ))
+        // "v0.2.1": the exact version of this build, the same text as Settings > About (it showed
+        // only major.minor until Oct 28, 2026, and a patch release looked like no release).
+        .child(badge(t, format!("v{}", env!("CARGO_PKG_VERSION"))))
         .into_any_element()
 }
 
