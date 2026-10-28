@@ -46,6 +46,9 @@ pub struct TranscribeRequest {
     /// The user's glossary (setting `ai.glossary`): the service primes the model with its terms
     /// ([`cm_ai::glossary::initial_prompt`]). The job replaces the heard-as spellings afterwards.
     pub glossary: Vec<cm_ai::glossary::GlossaryEntry>,
+    /// The checkpoint the job saved before it was held or interrupted (`cm_ai::pieces::Checkpoint`
+    /// as JSON): the run goes on from the last finished piece. `None`: from the start.
+    pub resume: Option<serde_json::Value>,
 }
 
 /// The speech-model store (`cm_ai::model`). Blocking: the daemon calls it off the async threads.
@@ -103,6 +106,19 @@ pub trait TranscribeService: Send + Sync {
         req: &TranscribeRequest,
         progress: &mut dyn FnMut(f32) -> bool,
     ) -> Result<Option<Transcript>, CmError>;
+
+    /// [`transcribe`](Self::transcribe) that goes on from `req.resume` and hands `on_checkpoint`
+    /// a new checkpoint after every finished piece (the job saves it). A service that cannot
+    /// resume ignores both and runs from the start.
+    fn transcribe_resumable(
+        &self,
+        req: &TranscribeRequest,
+        on_checkpoint: &mut dyn FnMut(serde_json::Value),
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Option<Transcript>, CmError> {
+        let _ = on_checkpoint;
+        self.transcribe(req, progress)
+    }
 }
 
 /// What a diarization needs: the bundle (the service decodes the audio) and the choices.

@@ -357,6 +357,17 @@ impl TranscribeService for FakeAi {
         req: &TranscribeRequest,
         progress: &mut dyn FnMut(f32) -> bool,
     ) -> Result<Option<Transcript>, CmError> {
+        self.transcribe_resumable(req, &mut |_| {}, progress)
+    }
+
+    /// Hands out `{"fake_step": i}` after every step, and goes on after the step of a `resume`
+    /// (a test of holding and resuming the job).
+    fn transcribe_resumable(
+        &self,
+        req: &TranscribeRequest,
+        on_checkpoint: &mut dyn FnMut(serde_json::Value),
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Option<Transcript>, CmError> {
         let (steps, step_ms, fail, words) = {
             let mut s = self.state();
             s.transcribe_calls.push(req.clone());
@@ -367,13 +378,20 @@ impl TranscribeService for FakeAi {
                 s.words.clone(),
             )
         };
-        for i in 1..=steps {
+        let from = req
+            .resume
+            .as_ref()
+            .and_then(|r| r.get("fake_step"))
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(0) as u32;
+        for i in (from + 1)..=steps {
             if step_ms > 0 {
                 std::thread::sleep(Duration::from_millis(step_ms));
             }
             if !progress(i as f32 / steps as f32) {
                 return Ok(None);
             }
+            on_checkpoint(serde_json::json!({ "fake_step": i }));
         }
         if let Some(e) = fail {
             return Err(e);

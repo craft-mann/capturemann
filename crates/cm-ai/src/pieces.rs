@@ -18,6 +18,7 @@
 use std::ops::Range;
 
 use cm_core::CmError;
+use serde::{Deserialize, Serialize};
 
 use crate::audio::SAMPLE_RATE;
 use crate::transcribe::{media_secs, Pcm16k, Transcriber, Transcript, Word, TRANSCRIPT_VERSION};
@@ -193,6 +194,28 @@ pub fn collapse_repeats(words: Vec<Word>) -> (Vec<Word>, usize) {
     (kept, dropped)
 }
 
+/// Where a run over the pieces stood after finishing a piece, so a job that was held (a recording
+/// started) or interrupted can go on from there instead of from the first piece (seen on Oct 28,
+/// 2026: a transcription of an 88 minute recording at 7x% started over from 0% when the user began
+/// a new recording). The words are in file time, as the run returns them.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Checkpoint {
+    /// Length of the audio, in samples, and how many pieces it is cut into: a checkpoint of other
+    /// audio (the track changed) is not used.
+    pub total_samples: usize,
+    pub pieces: usize,
+    /// Pieces finished, in order.
+    pub done: usize,
+    /// The words of the finished pieces.
+    pub words: Vec<Word>,
+    /// The language fixed so far (asked for, or heard in the first piece).
+    pub language: Option<String>,
+    /// Language, model and note of the first piece.
+    pub first: Option<(String, String, Option<String>)>,
+    pub split: usize,
+    pub repeats_dropped: usize,
+}
+
 /// What a run over all the pieces did, beyond the words.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct PiecesReport {
@@ -276,6 +299,29 @@ pub fn transcribe_pieces(
     prompt: Option<&str>,
     progress: &mut dyn FnMut(f32) -> bool,
 ) -> Result<(Transcript, PiecesReport), CmError> {
+    transcribe_pieces_resumable(
+        transcriber,
+        audio,
+        language,
+        prompt,
+        None,
+        &mut |_| {},
+        progress,
+    )
+}
+
+/// [`transcribe_pieces`] that can go on from a [`Checkpoint`] and hands out a new one after every
+/// finished piece (not after the last: the transcript is the result then). A checkpoint that does
+/// not fit this audio (another length or another cut) is ignored and the run starts over.
+pub fn transcribe_pieces_resumable(
+    transcriber: &dyn Transcriber,
+    audio: Pcm16k<'_>,
+    language: Option<&str>,
+    prompt: Option<&str>,
+    resume: Option<Checkpoint>,
+    on_checkpoint: &mut dyn FnMut(&Checkpoint),
+    progress: &mut dyn FnMut(f32) -> bool,
+) -> Result<(Transcript, PiecesReport), CmError> {
     let pieces = plan(audio.samples);
     let asked = language
         .map(str::trim)
@@ -296,8 +342,38 @@ pub fn transcribe_pieces(
         },
     };
     let mut words = Vec::new();
-    for range in pieces {
+    let mut start = 0;
+    if let Some(c) = resume.filter(|c| {
+        c.total_samples == audio.samples.len() && c.pieces == pieces.len() && c.done <= c.pieces
+    }) {
+        start = c.done;
+        words = c.words;
+        job.first = c.first;
+        if job.language.is_none() {
+            job.language = c.language;
+        }
+        job.report.split = c.split;
+        job.report.repeats_dropped = c.repeats_dropped;
+        // The bar starts where the finished pieces end.
+        if let Some(next) = pieces.get(start) {
+            job.high = next.start as f32 / audio.samples.len().max(1) as f32;
+        }
+    }
+    let total_pieces = pieces.len();
+    for (i, range) in pieces.into_iter().enumerate().skip(start) {
         words.extend(job.piece(range, 0)?);
+        if i + 1 < total_pieces {
+            on_checkpoint(&Checkpoint {
+                total_samples: audio.samples.len(),
+                pieces: total_pieces,
+                done: i + 1,
+                words: words.clone(),
+                language: job.language.clone(),
+                first: job.first.clone(),
+                split: job.report.split,
+                repeats_dropped: job.report.repeats_dropped,
+            });
+        }
     }
     // Every piece is done: the bar was held under 1.0 until now.
     let _ = (job.progress)(1.0);

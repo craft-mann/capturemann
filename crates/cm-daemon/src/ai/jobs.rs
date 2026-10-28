@@ -276,20 +276,30 @@ impl JobHandler for TranscribeHandler {
             language,
             model: model.clone(),
             glossary: glossary.clone(),
+            // Held (a recording started) or interrupted: go on from the last finished piece.
+            resume: ctx.job.checkpoint.clone(),
         };
         let (service, reporter, run_flag) = (self.service.clone(), ctx.reporter.clone(), flag);
+        let saver = reporter.clone();
         let joined = tokio::task::spawn_blocking(move || {
             let mut last = -1.0_f32;
-            service.transcribe(&req, &mut |p| {
-                if p >= 1.0 || p - last >= 0.01 {
-                    last = p;
-                    reporter.report(
-                        f64::from(p),
-                        Some(format!("Transcribing {}%", (p * 100.0) as u32)),
-                    );
-                }
-                !run_flag.load(Ordering::SeqCst)
-            })
+            service.transcribe_resumable(
+                &req,
+                // A failed save only costs the resume, never the run.
+                &mut |checkpoint| {
+                    let _ = saver.save_checkpoint(&checkpoint);
+                },
+                &mut |p| {
+                    if p >= 1.0 || p - last >= 0.01 {
+                        last = p;
+                        reporter.report(
+                            f64::from(p),
+                            Some(format!("Transcribing {}%", (p * 100.0) as u32)),
+                        );
+                    }
+                    !run_flag.load(Ordering::SeqCst)
+                },
+            )
         })
         .await;
         watcher.abort();

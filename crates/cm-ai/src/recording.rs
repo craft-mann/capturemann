@@ -136,7 +136,38 @@ pub fn transcribe_recording(
     opts: &TranscribeOptions<'_>,
     progress: &mut dyn FnMut(f32) -> bool,
 ) -> Result<Transcript, CmError> {
-    run_recording(bundle, transcriber, opts, false, progress)
+    run_recording(
+        bundle,
+        transcriber,
+        opts,
+        false,
+        None,
+        &mut |_| {},
+        progress,
+    )
+}
+
+/// [`transcribe_recording`] that goes on from `resume` (the last value `on_checkpoint` got, see
+/// [`crate::pieces::Checkpoint`]) and calls `on_checkpoint` with a new one after every finished
+/// piece, so a held or interrupted job does not start over. A `resume` that does not fit (or
+/// cannot be read) is ignored.
+pub fn transcribe_recording_resumable(
+    bundle: &Path,
+    transcriber: &dyn Transcriber,
+    opts: &TranscribeOptions<'_>,
+    resume: Option<&Value>,
+    on_checkpoint: &mut dyn FnMut(Value),
+    progress: &mut dyn FnMut(f32) -> bool,
+) -> Result<Transcript, CmError> {
+    run_recording(
+        bundle,
+        transcriber,
+        opts,
+        false,
+        resume,
+        on_checkpoint,
+        progress,
+    )
 }
 
 /// The same audio and the same time mapping as [`transcribe_recording`], but with the Whisper
@@ -148,7 +179,7 @@ pub fn translate_recording(
     opts: &TranscribeOptions<'_>,
     progress: &mut dyn FnMut(f32) -> bool,
 ) -> Result<Transcript, CmError> {
-    run_recording(bundle, transcriber, opts, true, progress)
+    run_recording(bundle, transcriber, opts, true, None, &mut |_| {}, progress)
 }
 
 fn run_recording(
@@ -156,6 +187,8 @@ fn run_recording(
     transcriber: &dyn Transcriber,
     opts: &TranscribeOptions<'_>,
     translate: bool,
+    resume: Option<&Value>,
+    on_checkpoint: &mut dyn FnMut(Value),
     progress: &mut dyn FnMut(f32) -> bool,
 ) -> Result<Transcript, CmError> {
     let manifest = cm_library::rec::read_manifest(bundle)?;
@@ -196,8 +229,21 @@ fn run_recording(
     } else {
         // Piece by piece, each piece checked for a repetition loop (long recordings used to come
         // back as one phrase repeated thousands of times; see `crate::pieces`).
-        crate::pieces::transcribe_pieces(transcriber, audio, opts.language, opts.prompt, progress)?
-            .0
+        let resume = resume.and_then(|v| serde_json::from_value(v.clone()).ok());
+        crate::pieces::transcribe_pieces_resumable(
+            transcriber,
+            audio,
+            opts.language,
+            opts.prompt,
+            resume,
+            &mut |c| {
+                if let Ok(v) = serde_json::to_value(c) {
+                    on_checkpoint(v);
+                }
+            },
+            progress,
+        )?
+        .0
     };
     t.words = t
         .words

@@ -378,3 +378,123 @@ fn a_silent_recording_keeps_the_engines_note() {
     assert!(t.words.is_empty());
     assert_eq!(t.note.as_deref(), Some("No speech detected"));
 }
+
+/// Seen on Oct 28, 2026: an 88 minute transcription at 7x% started over from 0% when a recording
+/// held the job queue. A checkpoint after every finished piece lets it go on instead.
+#[test]
+fn a_run_goes_on_from_its_checkpoint_and_gives_the_same_transcript() {
+    let x = audio(1500.0, &[]);
+    let whole = Engine::new(1e9);
+    let (expected, _) = run(&whole, &x, None, &mut |_| true).unwrap();
+    let pieces = whole.calls.lock().unwrap().len();
+    assert!(pieces >= 4);
+
+    // Run until the third piece has started, keeping the checkpoints, then stop (the hold).
+    let first = Engine::new(1e9);
+    let mut checkpoints: Vec<Checkpoint> = Vec::new();
+    let mut started = 0;
+    fn audio_of(x: &[f32]) -> Pcm16k<'_> {
+        Pcm16k {
+            samples: x,
+            start: MediaTime::from_ticks(1200),
+        }
+    }
+    let err = transcribe_pieces_resumable(
+        &first,
+        audio_of(&x),
+        None,
+        Some("glossary: Linh, Minh"),
+        None,
+        &mut |c| checkpoints.push(c.clone()),
+        &mut |p| {
+            // Every piece reports 4 steps; stop in the third piece.
+            started += 1;
+            let _ = p;
+            started < 10
+        },
+    )
+    .unwrap_err();
+    assert!(crate::transcribe::is_cancelled(&err));
+    assert_eq!(checkpoints.len(), 2, "one checkpoint per finished piece");
+    let last = checkpoints.last().unwrap().clone();
+    assert_eq!((last.done, last.pieces), (2, pieces));
+    assert_eq!(last.language.as_deref(), Some("vi"));
+
+    // The checkpoint goes through JSON, as the job stores it.
+    let stored: Checkpoint = serde_json::from_value(serde_json::to_value(&last).unwrap()).unwrap();
+    let second = Engine::new(1e9);
+    let mut seen = Vec::new();
+    let mut later = Vec::new();
+    let (t, _) = transcribe_pieces_resumable(
+        &second,
+        audio_of(&x),
+        None,
+        Some("glossary: Linh, Minh"),
+        Some(stored),
+        &mut |c| later.push(c.done),
+        &mut |p| {
+            seen.push(p);
+            true
+        },
+    )
+    .unwrap();
+    // Only the pieces after the checkpoint were run, with the language already known.
+    let calls = second.calls.lock().unwrap();
+    assert_eq!(calls.len(), pieces - 2);
+    assert!(calls.iter().all(|c| c.1.as_deref() == Some("vi")));
+    assert_eq!(later, (3..pieces).collect::<Vec<_>>());
+    // The transcript is the one an uninterrupted run gives.
+    assert_eq!(t.words, expected.words);
+    assert_eq!(t.language, expected.language);
+    // The bar starts where the finished pieces end, not at 0.
+    assert!(seen[0] > 0.3, "{seen:?}");
+    assert!(seen.windows(2).all(|w| w[0] <= w[1]));
+    assert_eq!(seen.last(), Some(&1.0));
+}
+
+/// A checkpoint of other audio is not used: the run starts over, and the words are right.
+#[test]
+fn a_checkpoint_that_does_not_fit_is_ignored() {
+    let x = audio(1500.0, &[]);
+    let whole = Engine::new(1e9);
+    let (expected, _) = run(&whole, &x, None, &mut |_| true).unwrap();
+    let pieces = whole.calls.lock().unwrap().len();
+    let stale = Checkpoint {
+        total_samples: x.len() + 1,
+        pieces,
+        done: 2,
+        words: vec![word("stale", 1.0)],
+        language: Some("en".into()),
+        first: None,
+        split: 0,
+        repeats_dropped: 0,
+    };
+    let e = Engine::new(1e9);
+    let audio = Pcm16k {
+        samples: &x,
+        start: MediaTime::from_ticks(1200),
+    };
+    let (t, _) =
+        transcribe_pieces_resumable(&e, audio, None, None, Some(stale), &mut |_| {}, &mut |_| {
+            true
+        })
+        .unwrap();
+    assert_eq!(e.calls.lock().unwrap().len(), pieces, "every piece was run");
+    assert!(t.words.iter().all(|w| w.text != "stale"));
+    assert_eq!(t.words.len(), expected.words.len());
+}
+
+/// Short audio is one piece: nothing is checkpointed (there is nothing to go on from).
+#[test]
+fn one_piece_makes_no_checkpoint() {
+    let x = audio(300.0, &[]);
+    let e = Engine::new(1e9);
+    let mut n = 0;
+    let audio = Pcm16k {
+        samples: &x,
+        start: MediaTime::ZERO,
+    };
+    transcribe_pieces_resumable(&e, audio, None, None, None, &mut |_| n += 1, &mut |_| true)
+        .unwrap();
+    assert_eq!(n, 0);
+}

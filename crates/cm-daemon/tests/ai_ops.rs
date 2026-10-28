@@ -1120,6 +1120,45 @@ async fn ai_1_a_cancelled_regenerate_keeps_the_previous_transcript() {
     );
 }
 
+/// Seen on Oct 28, 2026: a long transcription at 7x% started over from 0% when the user began a
+/// recording (the queue holds jobs while one runs). The job saves a checkpoint as it goes and the
+/// resumed run is handed it, so it goes on instead.
+#[tokio::test]
+async fn ai_1_a_held_transcription_goes_on_from_its_checkpoint() {
+    let r = rig(FakeAi::new().with_small_installed(), Decision::Approve).await;
+    r.ai.set_slow(80, 10);
+    let started = user(&r, "transcribe", json!({})).await.unwrap();
+    let id = started["job_id"].as_str().unwrap().to_owned();
+    until(async || {
+        let j = user(&r, "get_job", json!({"job_id": id})).await.unwrap();
+        (j["progress"].as_f64().unwrap_or(0.0) > 0.25).then_some(())
+    })
+    .await;
+    // A recording starts: the job is held.
+    assert!(r.daemon.hold_job_type(cm_jobs::JOB_TRANSCRIBE));
+    until(async || {
+        let j = user(&r, "get_job", json!({"job_id": id})).await.unwrap();
+        (j["state"] == "paused").then_some(())
+    })
+    .await;
+    // The recording ends: the job is released and finishes.
+    assert!(r.daemon.resume_job_type(cm_jobs::JOB_TRANSCRIBE));
+    let done = job_done(&r, &id).await;
+    assert_eq!(done["state"], "done", "{done}");
+    let calls = r.ai.transcribe_calls();
+    assert_eq!(calls.len(), 2, "run, then run again after the hold");
+    assert_eq!(calls[0].resume, None);
+    let step = calls[1]
+        .resume
+        .as_ref()
+        .and_then(|c| c["fake_step"].as_u64());
+    assert!(
+        step.is_some_and(|s| s >= 20),
+        "resumed from {:?}",
+        calls[1].resume
+    );
+}
+
 fn word(text: &str, a: f64, b: f64, conf: f32) -> cm_ai::transcribe::Word {
     cm_ai::transcribe::Word {
         text: text.into(),

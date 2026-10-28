@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use cm_ai::caption::{build_captions, map_lines_to_timeline, to_srt, to_txt, to_vtt, CaptionLine};
 use cm_ai::model::{DownloadOutcome, DownloadProgress, ModelList, ModelStore};
-use cm_ai::recording::{transcribe_recording, TranscribeOptions};
+use cm_ai::recording::TranscribeOptions;
 use cm_ai::suggest::silence::{decode_mono_f32, silence_cuts, SilenceOptions, ANALYSIS_RATE};
 use cm_ai::suggest::zoom::{suggest_zooms, ZoomOptions};
 use cm_ai::suggest::{filler::filler_cuts, merge_cuts, CutSuggestion, ZoomSuggestion};
@@ -214,6 +214,15 @@ impl TranscribeService for RealTranscribe {
         req: &TranscribeRequest,
         progress: &mut dyn FnMut(f32) -> bool,
     ) -> Result<Option<Transcript>, CmError> {
+        self.transcribe_resumable(req, &mut |_| {}, progress)
+    }
+
+    fn transcribe_resumable(
+        &self,
+        req: &TranscribeRequest,
+        on_checkpoint: &mut dyn FnMut(serde_json::Value),
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Option<Transcript>, CmError> {
         // The model is resolved and loaded for this job only.
         let (id, path) = store(&self.root).resolve(Some(&req.model))?;
         let whisper;
@@ -233,7 +242,14 @@ impl TranscribeService for RealTranscribe {
             model_id: Some(&id),
             prompt: prompt.as_deref(),
         };
-        match transcribe_recording(&req.bundle_dir, engine, &opts, progress) {
+        match cm_ai::recording::transcribe_recording_resumable(
+            &req.bundle_dir,
+            engine,
+            &opts,
+            req.resume.as_ref(),
+            on_checkpoint,
+            progress,
+        ) {
             Ok(t) => Ok(Some(t)),
             Err(e) if is_cancelled(&e) => Ok(None),
             Err(e) => Err(e),
