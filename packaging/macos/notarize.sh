@@ -138,6 +138,12 @@ if [ "$kind" = "dmg" ]; then
   xcrun stapler staple "$file" || die "stapler staple failed (the ticket may not be published yet: retry in a minute)"
   xcrun stapler validate "$file" || die "stapler validate failed"
   echo "notarized and stapled: $file"
+  # Stapling changes the file, so a .sha256 written by dmg.sh before notarization is now wrong:
+  # write it again from the stapled DMG (the checksum people verify must be of what they download).
+  if [ -f "$file.sha256" ]; then
+    printf '%s  %s\n' "$(shasum -a 256 "$file" | awk '{print $1}')" "$(basename "$file")" > "$file.sha256"
+    echo "updated $file.sha256 (the DMG changed when it was stapled)"
+  fi
 else
   echo "notarized (zip: not stapled): $file"
 fi
