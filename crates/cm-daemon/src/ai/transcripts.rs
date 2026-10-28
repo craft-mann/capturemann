@@ -81,12 +81,17 @@ impl Inner {
         let Ok(model) = Self::pick_model(&list, None) else {
             return Ok(());
         };
-        let (queue, id) = (rt.queue.clone(), capture_id.to_owned());
-        blocking(move || {
-            enqueue_transcribe(&queue, &id, &model, None, "user", true)?;
-            Ok(())
-        })
-        .await
+        let (queue, id, picked) = (rt.queue.clone(), capture_id.to_owned(), model.clone());
+        let (job, reused) =
+            blocking(move || enqueue_transcribe(&queue, &id, &picked, None, "user", true)).await?;
+        if !reused {
+            self.events.publish(
+                events::TRANSCRIPT_STARTED,
+                json!({ "capture_id": capture_id, "job_id": job.id, "model": model,
+                        "automatic": true }),
+            );
+        }
+        Ok(())
     }
 
     pub(super) async fn get_transcript(&self, capture_id: &str) -> Result<Value, DaemonError> {

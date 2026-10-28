@@ -598,6 +598,17 @@ pub fn on_event(app: &Entity<AppModel>, ev: &cm_daemon::events::Event, cx: &mut 
                 cx.notify();
             });
         }
+        // The automatic transcription after a recording: the Transcript and Speakers tabs show it
+        // running like one started by a click (a long recording takes minutes).
+        "transcript.started" => {
+            if let (Some(id), Some(job)) = (str_of("capture_id"), str_of("job_id")) {
+                app.update(cx, |m, cx| {
+                    m.transcribe.start(&id);
+                    m.transcribe.started(&id, job);
+                    cx.notify();
+                });
+            }
+        }
         "transcript.ready" => {
             if let Some(id) = str_of("capture_id") {
                 app.update(cx, |m, cx| {

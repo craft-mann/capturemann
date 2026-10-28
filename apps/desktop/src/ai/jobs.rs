@@ -307,6 +307,37 @@ impl TranscribeVm {
 mod tests {
     use super::*;
 
+    /// The automatic transcription after a recording (`transcript.started`) shows as running on
+    /// the tabs, with its progress, and ends with the transcript like a run started by a click.
+    /// Seen on Oct 28, 2026: an 88 minute recording looked idle for minutes.
+    #[test]
+    fn an_automatic_transcription_shows_as_running_until_the_transcript_is_ready() {
+        let mut v = TranscribeVm::default();
+        assert_eq!(v.status_text("rec_1"), None, "idle before the event");
+        // What the `transcript.started` event does.
+        v.start("rec_1");
+        v.started("rec_1", "job_7".into());
+        assert!(v.is_running("rec_1"));
+        assert_eq!(
+            v.status_text("rec_1").as_deref(),
+            Some("Transcribing\u{2026}")
+        );
+        assert!(v.progress_by_job("job_7", 0.4));
+        assert_eq!(
+            v.status_text("rec_1").as_deref(),
+            Some("Transcribing\u{2026} 40%")
+        );
+        // A second event for the same run (or a click on top of it) changes nothing.
+        assert!(!v.start("rec_1"));
+        v.started("rec_1", "job_7".into());
+        assert_eq!(v.fraction("rec_1"), Some(0.4));
+        // The transcript arrives: not running any more, readers reload.
+        let epoch = v.epoch;
+        assert_eq!(v.done_by_job("job_7").as_deref(), Some("rec_1"));
+        assert_eq!(v.status_text("rec_1"), None);
+        assert!(v.epoch > epoch);
+    }
+
     /// AI-8 and AI-9: a speaker or report job is "running" from the click, takes its id when the
     /// daemon accepts it, and its end (or failure reason) is read once by the editor.
     #[test]

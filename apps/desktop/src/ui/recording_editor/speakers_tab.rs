@@ -85,6 +85,7 @@ impl RecordingEditor {
             .transcribe
             .voice_job(&id, VoiceJobKind::Speakers)
             .cloned();
+        let transcribing = self.app.read(cx).transcribe.is_running(&id);
         let card_state = self.app.read(cx).ai.voice.speakers.card();
         let has_speakers = !s.voice.speakers.is_empty();
         let scope = if has_speakers {
@@ -93,6 +94,53 @@ impl RecordingEditor {
             tr!("Who spoke when, from the voices")
         };
         let mut body: Vec<AnyElement> = Vec::new();
+        // What is going on, first: a run in progress (often the automatic one after the
+        // transcript) or the transcript it waits for. Nothing needs pressing.
+        if let Some(job) = &running {
+            let title = match job.progress {
+                Some(p) => tr!(
+                    "Finding speakers\u{2026} {percent}%",
+                    percent = (p * 100.0).round() as u32
+                ),
+                None => tr!("Finding speakers\u{2026}"),
+            };
+            body.push(
+                callout(
+                    t,
+                    Tone::Neutral,
+                    "loader-circle",
+                    title,
+                    Some(
+                        tr!(
+                            "This runs on this Mac and takes a few minutes for a long recording. \
+                             You don\u{2019}t need to press anything: the speakers appear here \
+                             when it\u{2019}s done."
+                        )
+                        .into(),
+                    ),
+                    None,
+                )
+                .into_any_element(),
+            );
+        } else if transcribing && !has_speakers {
+            body.push(
+                callout(
+                    t,
+                    Tone::Neutral,
+                    "loader-circle",
+                    tr!("Waiting for the transcript"),
+                    Some(
+                        tr!(
+                            "Speakers are found after the transcript is written, and this \
+                             starts by itself unless you turned it off in Settings."
+                        )
+                        .into(),
+                    ),
+                    None,
+                )
+                .into_any_element(),
+            );
+        }
         if has_speakers {
             body.push(self.speaker_list(t, s, cx));
             // Find again can use another count.

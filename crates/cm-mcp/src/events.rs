@@ -46,6 +46,7 @@ pub const TOPICS: &[&str] = &[
     // Local AI: a model was installed, selected or removed; a transcript is ready. The download
     // progress of `model.download.progress` is left out (`job.progress` carries it).
     "model.changed",
+    "transcript.started",
     "transcript.ready",
     "translation.ready",
     // AI-8: the speakers of a recording were found (and the automatic step queued a run).

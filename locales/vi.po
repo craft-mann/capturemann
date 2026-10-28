@@ -10612,6 +10612,18 @@ msgstr "Thời điểm được trích dẫn"
 msgid "Include citation times"
 msgstr "Kèm thời điểm trích dẫn"
 
+msgid "Speakers are found after the transcript is written, and this starts by itself unless you turned it off in Settings."
+msgstr "Người nói được nhận diện sau khi bản chép lời xong, và việc này tự chạy trừ khi bạn đã tắt trong Cài đặt."
+
+msgid "The transcript is being written on this Mac. A long recording takes several minutes. You don’t need to press anything: it appears here when it’s done, and speaker labels follow."
+msgstr "Bản chép lời đang được tạo trên máy Mac này. Bản ghi dài có thể mất vài phút. Bạn không cần bấm gì cả: nó sẽ hiện ở đây khi xong, rồi đến phần nhãn người nói."
+
+msgid "This runs on this Mac and takes a few minutes for a long recording. You don’t need to press anything: the speakers appear here when it’s done."
+msgstr "Việc này chạy trên máy Mac này và mất vài phút với bản ghi dài. Bạn không cần bấm gì cả: người nói sẽ hiện ở đây khi xong."
+
+msgid "Waiting for the transcript"
+msgstr "Đang chờ bản chép lời"
+
 msgid "Click a time in the report to see the moment it comes from."
 msgstr "Bấm vào một mốc thời gian trong báo cáo để xem thời điểm nó bắt nguồn."
 

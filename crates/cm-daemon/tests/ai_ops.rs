@@ -856,6 +856,7 @@ async fn ai_1_auto_transcribe_needs_the_setting_a_model_and_audio() {
     )
     .await;
     user(&r, "set_settings", on.clone()).await.unwrap();
+    let mut rx = r.daemon.subscribe();
     r.daemon.start_ai_auto_transcribe();
     tokio::task::yield_now().await;
     stopped(&r, &r.id, json!(["screen", "mic"]));
@@ -863,6 +864,19 @@ async fn ai_1_auto_transcribe_needs_the_setting_a_model_and_audio() {
     until(async || (jobs(&r).await == 1).then_some(())).await;
     settle().await;
     assert_eq!(jobs(&r).await, 1);
+    // The app is told, once, so the editor's tabs show the run (a long recording takes minutes).
+    let mut started = Vec::new();
+    while let Ok(e) = rx.try_recv() {
+        if e.name == "transcript.started" {
+            started.push(e);
+        }
+    }
+    assert_eq!(started.len(), 1, "one event for the one job: {started:?}");
+    assert_eq!(started[0].data["capture_id"], json!(r.id));
+    assert_eq!(started[0].data["automatic"], json!(true));
+    assert!(started[0].data["job_id"]
+        .as_str()
+        .is_some_and(|j| !j.is_empty()));
 
     // No audio track in the event: nothing.
     let r = rig(FakeAi::new().with_small_installed(), Decision::Approve).await;

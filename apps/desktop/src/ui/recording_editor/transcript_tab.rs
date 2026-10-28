@@ -56,16 +56,23 @@ impl RecordingEditor {
             ]);
         }
         if !ai.has_transcript {
-            return shell(vec![
-                hint(
-                    t,
-                    "captions",
-                    tr!(
-                        "No transcript yet. Transcribe the recording to read it here; it runs on \
-                         this Mac."
-                    ),
+            // A run is on its way (the automatic one after a recording, or a click): say so, and
+            // that nothing needs pressing, instead of the "No transcript yet" of an idle tab.
+            let running = self.app.read(cx).transcribe.status_text(&id).is_some();
+            let message = if running {
+                tr!(
+                    "The transcript is being written on this Mac. A long recording takes several \
+                     minutes. You don\u{2019}t need to press anything: it appears here when it\u{2019}s \
+                     done, and speaker labels follow."
                 )
-                .into_any_element(),
+            } else {
+                tr!(
+                    "No transcript yet. Transcribe the recording to read it here; it runs on \
+                     this Mac."
+                )
+            };
+            return shell(vec![
+                hint(t, "captions", message).into_any_element(),
                 crate::ui::ai_view::transcribe_row(t, &self.app, &id, "re", cx),
             ]);
         }

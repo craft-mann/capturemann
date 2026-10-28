@@ -3949,6 +3949,9 @@ msgstr ""
 msgid "Speakers"
 msgstr ""
 
+msgid "Speakers are found after the transcript is written, and this starts by itself unless you turned it off in Settings."
+msgstr ""
+
 msgid "Speakers are told apart by their voices, not by device."
 msgstr ""
 
@@ -4567,6 +4570,9 @@ msgstr ""
 msgid "The text model did not answer."
 msgstr ""
 
+msgid "The transcript is being written on this Mac. A long recording takes several minutes. You don’t need to press anything: it appears here when it’s done, and speaker labels follow."
+msgstr ""
+
 msgid "The upload couldn’t start"
 msgstr ""
 
@@ -4696,6 +4702,9 @@ msgid "This recording’s folder couldn’t be found in the library."
 msgstr ""
 
 msgid "This report was made with a template this version doesn’t know."
+msgstr ""
+
+msgid "This runs on this Mac and takes a few minutes for a long recording. You don’t need to press anything: the speakers appear here when it’s done."
 msgstr ""
 
 msgid "Thumbnail"
@@ -4984,6 +4993,9 @@ msgid "Voices are compared in memory only. No voiceprint is saved, and people ar
 msgstr ""
 
 msgid "Waiting for the system…"
+msgstr ""
+
+msgid "Waiting for the transcript"
 msgstr ""
 
 msgid "Waiting for you to reconnect {destination}"

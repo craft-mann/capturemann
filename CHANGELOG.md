@@ -11,6 +11,7 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 - The audio editor of a long recording plays again right away. Mixing the preview of an 88-minute recording took about 45 seconds and 12 GB of memory (the exporter's loudness measurement and true-peak limiter ran over the whole mix), and Play was silent until it finished; it now takes under a second and about half the memory. Exports are unchanged.
 - The sidebar highlights Audio, not Recordings, while an audio recording is open in the editor.
+- After a long recording the Transcript and Speakers tabs now say that the transcript and the speaker labels are being made, with the progress, and that nothing needs pressing. The automatic transcription was invisible to the editor (the new `transcript.started` event tells it), so the tabs looked idle for minutes.
 
 ### Changed
 

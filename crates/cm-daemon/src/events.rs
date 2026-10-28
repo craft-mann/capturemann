@@ -92,6 +92,11 @@ pub const MODEL_DOWNLOAD_PROGRESS: &str = "model.download.progress";
 /// The set of speech models changed: `{ model, change }`, `change` one of `downloaded`,
 /// `imported`, `selected`, `removed`.
 pub const MODEL_CHANGED: &str = "model.changed";
+/// The automatic transcription after a recording (`ai.auto_transcribe`) queued a run:
+/// `{ capture_id, job_id, model, automatic: true }`. The app shows it as running on the
+/// recording's Transcript and Speakers tabs like one it started itself (a long recording takes
+/// minutes, and without this the tabs looked idle).
+pub const TRANSCRIPT_STARTED: &str = "transcript.started";
 /// A transcript was written: `{ capture_id, model, language, words }`.
 pub const TRANSCRIPT_READY: &str = "transcript.ready";
 /// A caption translation was written (AI-5): `{ capture_id, language, engine, model, lines,
