@@ -61,6 +61,30 @@ struct Multi {
 struct LineGeometry {
     caret: Option<Bounds<Pixels>>,
     marked: Option<Bounds<Pixels>>,
+    /// The visible text area (the field inside its padding and icon).
+    view: Option<Bounds<Pixels>>,
+    /// The whole line of text, which can be wider than `view` and is then shifted left.
+    row: Option<Bounds<Pixels>>,
+}
+
+/// How far the one-line text has to move so the caret stays inside the visible area: `offset` is
+/// how far it is shifted left now. Moves right when the caret is past the right edge, back when it
+/// is before the left edge, and back when the text ends before the right edge (it was deleted).
+/// Never negative.
+fn follow_caret(offset: f32, view: (f32, f32), row_right: f32, caret: Option<(f32, f32)>) -> f32 {
+    const MARGIN: f32 = 12.;
+    let mut next = offset;
+    if let Some((left, right)) = caret {
+        if right > view.1 - 2. {
+            next += right - view.1 + MARGIN;
+        } else if left < view.0 {
+            next -= view.0 - left + MARGIN;
+        }
+    }
+    if row_right < view.1 && next > 0. {
+        next -= view.1 - row_right;
+    }
+    next.max(0.)
 }
 
 pub enum TextFieldEvent {
@@ -106,6 +130,8 @@ pub struct TextField {
     secret: bool,
     multi: Option<Multi>,
     geometry: Rc<Cell<LineGeometry>>,
+    /// The one-line text is shifted left by this much (px) so a long text follows the caret.
+    h_off: Rc<Cell<f32>>,
     /// Height of a one-line field, px.
     height: f32,
     /// Byte ranges drawn with a wavy warning underline (the multi-line field only): the words
@@ -137,6 +163,7 @@ impl TextField {
             secret: false,
             multi: None,
             geometry: Rc::default(),
+            h_off: Rc::default(),
             height: scale::CONTROL_H,
             doubtful: Vec::new(),
         }
@@ -564,6 +591,10 @@ impl Render for TextField {
             return self.render_multi(window, cx);
         }
         self.geometry.set(LineGeometry::default());
+        if !focused {
+            // A field that is not being typed in shows the start of its text.
+            self.h_off.set(0.);
+        }
         let focus = self.focus.clone();
         let empty = self.buffer.is_empty();
         let selected = self.buffer.all_selected();
@@ -575,7 +606,52 @@ impl Render for TextField {
         } else {
             self.line_body(&t, focused, selected)
         };
-        let input_focus = self.focus.clone();
+        // The text sits in a clipped area and is shifted left when it is longer than the area,
+        // so the caret (and the end of the text) can be reached with the keys.
+        let (view_geometry, row_geometry) = (self.geometry.clone(), self.geometry.clone());
+        let body = div()
+            .relative()
+            .flex_1()
+            .min_w(px(0.))
+            .overflow_hidden()
+            .flex()
+            .items_center()
+            .child(
+                div()
+                    .relative()
+                    .flex_none()
+                    .ml(px(-self.h_off.get()))
+                    .child(body)
+                    .child(
+                        canvas(
+                            |_, _, _| (),
+                            move |b: Bounds<Pixels>, _, _, _| {
+                                let mut g = row_geometry.get();
+                                g.row = Some(b);
+                                row_geometry.set(g);
+                            },
+                        )
+                        .absolute()
+                        .size_full(),
+                    ),
+            )
+            .child(
+                canvas(
+                    |_, _, _| (),
+                    move |b: Bounds<Pixels>, _, _, _| {
+                        let mut g = view_geometry.get();
+                        g.view = Some(b);
+                        view_geometry.set(g);
+                    },
+                )
+                .absolute()
+                .size_full(),
+            );
+        let (input_focus, geometry, h_off) = (
+            self.focus.clone(),
+            self.geometry.clone(),
+            self.h_off.clone(),
+        );
         let entity = cx.entity();
         div()
             .id("text-field")
@@ -614,7 +690,8 @@ impl Render for TextField {
             .children(self.icon.map(|name| icon(name, 16., t.mist)))
             .child(body)
             .child(
-                // Hands the platform this field as the text input (typing, composing).
+                // Hands the platform this field as the text input (typing, composing), and, once
+                // the text and the caret are painted, moves the text if the caret left the view.
                 canvas(
                     |_, _, _| (),
                     move |bounds: Bounds<Pixels>, _, window, cx| {
@@ -623,6 +700,20 @@ impl Render for TextField {
                             ElementInputHandler::new(bounds, entity),
                             cx,
                         );
+                        let g = geometry.get();
+                        if let (Some(view), Some(row)) = (g.view, g.row) {
+                            let now = h_off.get();
+                            let next = follow_caret(
+                                now,
+                                (f32::from(view.left()), f32::from(view.right())),
+                                f32::from(row.right()),
+                                g.caret.map(|c| (f32::from(c.left()), f32::from(c.right()))),
+                            );
+                            if (next - now).abs() > 0.5 {
+                                h_off.set(next);
+                                window.refresh();
+                            }
+                        }
                     },
                 )
                 .absolute()
@@ -933,5 +1024,54 @@ impl TextField {
                 .size_full(),
             )
             .into_any_element()
+    }
+}
+
+#[cfg(test)]
+mod follow_tests {
+    use super::follow_caret;
+
+    /// The visible area is x 100..300.
+    const VIEW: (f32, f32) = (100., 300.);
+
+    /// Seen on Oct 28, 2026: in the rename box a long title was cut at the right edge and the right
+    /// arrow could not reach the rest of it.
+    #[test]
+    fn a_caret_past_the_right_edge_moves_the_text_left() {
+        // The caret (1 px wide) ends at x 341, 41 px past the edge: the text moves 41 + 12 px.
+        let next = follow_caret(0., VIEW, 340., Some((340., 341.)));
+        assert_eq!(next, 53.);
+        // Moving the text left by that puts the caret 12 px inside the edge.
+        assert_eq!(341. - next, 288.);
+    }
+
+    #[test]
+    fn a_caret_inside_the_view_changes_nothing() {
+        assert_eq!(follow_caret(30., VIEW, 400., Some((150., 151.))), 30.);
+        // Right at the edge still counts as inside (2 px of room).
+        assert_eq!(follow_caret(30., VIEW, 400., Some((297., 298.))), 30.);
+    }
+
+    #[test]
+    fn a_caret_before_the_left_edge_moves_the_text_back_but_never_below_zero() {
+        // The text is shifted 80 px and the caret is 30 px left of the view.
+        assert_eq!(follow_caret(80., VIEW, 500., Some((70., 71.))), 38.);
+        assert_eq!(follow_caret(10., VIEW, 500., Some((70., 71.))), 0.);
+    }
+
+    /// After deleting text, the end of it comes back from under the edge.
+    #[test]
+    fn a_text_that_now_ends_before_the_edge_comes_back() {
+        // Shifted 60 px, the text ends at x 250: 50 px short of the edge.
+        assert_eq!(follow_caret(60., VIEW, 250., Some((250., 251.))), 10.);
+        // Short enough to fit: back to the start.
+        assert_eq!(follow_caret(20., VIEW, 150., Some((150., 151.))), 0.);
+        // Nothing is shifted and nothing is wrong: it stays.
+        assert_eq!(follow_caret(0., VIEW, 150., None), 0.);
+    }
+
+    #[test]
+    fn without_a_caret_only_the_end_of_the_text_matters() {
+        assert_eq!(follow_caret(40., VIEW, 500., None), 40.);
     }
 }
