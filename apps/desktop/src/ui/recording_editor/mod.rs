@@ -405,6 +405,9 @@ impl RecordingEditor {
         self.vp.reset(cx);
         self.rleft = report_left::ReportLeft::default();
         self.load = Load::Loading;
+        // The daemon may be working on this recording already (an automatic or resumed run).
+        let app = self.app.clone();
+        cx.defer(move |cx| crate::ui::ai::sync_running_jobs(&app, cx));
         let root = self.app.read(cx).backend.library_root.clone();
         let id = id.to_owned();
         cx.spawn(async move |this, cx| {

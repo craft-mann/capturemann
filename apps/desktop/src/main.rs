@@ -344,6 +344,9 @@ fn main() {
         // M5: read the speech models once, so the "no model yet" notice is right from the start.
         // This only reads the list; it never downloads anything.
         cm_desktop::ui::ai::refresh(&model, cx);
+        // Jobs the daemon picked up from its queue at start (a held or interrupted transcription
+        // goes on by itself): show them on the tabs.
+        cm_desktop::ui::ai::sync_running_jobs(&model, cx);
 
         // Hotkeys and tray feed one command channel; no polling.
         let (cmd_tx, mut cmd_rx) = tokio::sync::mpsc::unbounded_channel::<Command>();

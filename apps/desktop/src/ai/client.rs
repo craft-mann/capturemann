@@ -126,6 +126,48 @@ pub struct TranscriptInfo {
     pub options: CaptionOptionsInfo,
 }
 
+/// A transcription, speaker or report job that is waiting or running in the daemon.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ActiveJob {
+    pub job_id: String,
+    pub kind: crate::ai::jobs::ActiveKind,
+    pub capture_id: String,
+    /// 0.0 to 1.0.
+    pub progress: f32,
+}
+
+/// Which job `type` in `list_jobs` is which kind of run on the editor's tabs.
+fn active_kind(job_type: &str) -> Option<crate::ai::jobs::ActiveKind> {
+    use crate::ai::jobs::ActiveKind;
+    match job_type {
+        "transcribe" => Some(ActiveKind::Transcribe),
+        "diarize" => Some(ActiveKind::Speakers),
+        "report" => Some(ActiveKind::Report),
+        _ => None,
+    }
+}
+
+/// The active ones among the jobs of a `list_jobs` answer (queued, running or paused), those of a
+/// recording.
+pub fn active_jobs_of(answer: &Value) -> Vec<ActiveJob> {
+    answer["jobs"]
+        .as_array()
+        .map(|jobs| {
+            jobs.iter()
+                .filter(|j| matches!(j["state"].as_str(), Some("queued" | "running" | "paused")))
+                .filter_map(|j| {
+                    Some(ActiveJob {
+                        job_id: j["job_id"].as_str()?.to_owned(),
+                        kind: active_kind(j["type"].as_str()?)?,
+                        capture_id: j["inputs"]["capture_id"].as_str()?.to_owned(),
+                        progress: j["progress"].as_f64().unwrap_or(0.0) as f32,
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 #[derive(Clone)]
 pub struct AiClient {
     transport: Arc<dyn AiTransport>,
@@ -204,6 +246,22 @@ impl AiClient {
             .call("download_model", json!({ "model": model }))
             .await?;
         job_id("download_model", &v)
+    }
+
+    /// The transcription, speaker and report jobs that are waiting or running (the daemon picks
+    /// up the ones a restart left in its queue, and nothing tells the window about those).
+    pub async fn active_voice_jobs(&self) -> Vec<ActiveJob> {
+        let mut out = Vec::new();
+        for job_type in ["transcribe", "diarize", "report"] {
+            if let Ok(v) = self
+                .transport
+                .call("list_jobs", json!({ "type": job_type, "limit": 20 }))
+                .await
+            {
+                out.extend(active_jobs_of(&v));
+            }
+        }
+        out
     }
 
     pub async fn cancel_job(&self, job_id: &str) -> Result<(), AiError> {
@@ -1023,6 +1081,54 @@ mod tests {
             json!({"capture_id": "cap_1", "format": "srt", "language": "vi", "speaker_names": true})
         );
         assert_eq!(calls[2], json!({"capture_id": "cap_1", "format": "vtt"}));
+    }
+
+    /// Seen on Oct 28, 2026: a long transcription the daemon picked up again after a restart was
+    /// invisible in the editor. The window asks the daemon which AI jobs are active, and takes
+    /// only the transcription, speaker and report jobs that are waiting, running or paused.
+    #[test]
+    fn the_active_voice_jobs_come_from_the_daemons_list() {
+        let job = |id: &str, ty: &str, state: &str, cap: Option<&str>, p: f64| {
+            json!({"job_id": id, "type": ty, "state": state, "progress": p,
+                   "inputs": cap.map_or(json!({}), |c| json!({"capture_id": c}))})
+        };
+        let list = |ty: &str| match ty {
+            "transcribe" => json!({"jobs": [
+                job("job_1", "transcribe", "running", Some("rec_a"), 0.4),
+                job("job_2", "transcribe", "queued", Some("rec_b"), 0.0),
+                job("job_3", "transcribe", "done", Some("rec_a"), 1.0),
+                job("job_4", "transcribe", "failed", Some("rec_c"), 0.2),
+                job("job_5", "transcribe", "running", None, 0.1),
+            ]}),
+            "diarize" => json!({"jobs": [job("job_6", "diarize", "paused", Some("rec_a"), 0.7)]}),
+            _ => json!({"jobs": [job("job_7", "report", "running", Some("rec_a"), 0.3),
+                                  job("job_8", "export", "running", Some("rec_a"), 0.5)]}),
+        };
+        let t = ScriptedTransport::new();
+        for ty in ["transcribe", "diarize", "report"] {
+            t.answer("list_jobs", Ok(list(ty)));
+        }
+        let c = AiClient::new(t.clone());
+        let jobs = run(c.active_voice_jobs());
+        let summary: Vec<(String, crate::ai::jobs::ActiveKind, String)> = jobs
+            .iter()
+            .map(|j| (j.job_id.clone(), j.kind, j.capture_id.clone()))
+            .collect();
+        use crate::ai::jobs::ActiveKind::{Report, Speakers, Transcribe};
+        assert_eq!(
+            summary,
+            vec![
+                ("job_1".into(), Transcribe, "rec_a".into()),
+                ("job_2".into(), Transcribe, "rec_b".into()),
+                ("job_6".into(), Speakers, "rec_a".into()),
+                ("job_7".into(), Report, "rec_a".into()),
+            ],
+            "only active jobs of the three kinds that name a recording"
+        );
+        assert_eq!(jobs[0].progress, 0.4);
+        let asked = t.calls_of("list_jobs");
+        assert_eq!(asked.len(), 3);
+        assert_eq!(asked[0], json!({"type": "transcribe", "limit": 20}));
     }
 
     /// VOC-2: Translate sends the target language; Export audio sends its parameters and returns

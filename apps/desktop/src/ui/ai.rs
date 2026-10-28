@@ -269,6 +269,40 @@ pub fn ensure_transcript_info(app: &Entity<AppModel>, capture_id: &str, cx: &mut
     .detach();
 }
 
+/// Shows the AI jobs the daemon already has (the queue survives a restart: a long transcription
+/// that was held or interrupted is picked up again by itself, and the window was never told, so
+/// the Transcript and Speakers tabs looked idle). Reads the job list and registers every waiting
+/// or running transcription, speaker and report job like one this window started. Safe to call
+/// often: a job that is already shown is left as it is.
+pub fn sync_running_jobs(app: &Entity<AppModel>, cx: &mut App) {
+    let Some(client) = client_of(app, cx) else {
+        return;
+    };
+    let epoch = app.read(cx).transcribe.epoch;
+    let app2 = app.clone();
+    cx.spawn(async move |cx| {
+        let jobs = client.active_voice_jobs().await;
+        if jobs.is_empty() {
+            return;
+        }
+        cx.update(|cx| {
+            app2.update(cx, |m, cx| {
+                // A transcript was written (or a run failed) while the list was being read: that
+                // job is over, and showing it as running would never end.
+                if m.transcribe.epoch != epoch {
+                    return;
+                }
+                for j in &jobs {
+                    m.transcribe
+                        .adopt_active(j.kind, &j.capture_id, &j.job_id, j.progress);
+                }
+                cx.notify();
+            })
+        });
+    })
+    .detach();
+}
+
 /// Re-generate pressed: opens the panel (model and language for this run) under the transcript.
 pub fn open_regen(app: &Entity<AppModel>, capture_id: &str, cx: &mut App) {
     app.update(cx, |m, cx| {

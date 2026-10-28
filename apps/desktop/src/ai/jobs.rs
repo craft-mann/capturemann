@@ -25,6 +25,14 @@ pub enum VoiceJobKind {
     Report,
 }
 
+/// The kinds of AI run the editor's tabs show, from the daemon's job list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActiveKind {
+    Transcribe,
+    Speakers,
+    Report,
+}
+
 /// A speaker or report job this window started.
 #[derive(Debug, Clone, PartialEq)]
 pub struct VoiceJob {
@@ -173,6 +181,39 @@ impl TranscribeVm {
         true
     }
 
+    /// A job the daemon has in its queue that this window did not start (picked up again after a
+    /// restart, or started by the CLI, an agent or the automatic steps): it shows like a click.
+    /// `progress` is 0.0 to 1.0.
+    pub fn adopt_active(
+        &mut self,
+        kind: ActiveKind,
+        capture_id: &str,
+        job_id: &str,
+        progress: f32,
+    ) {
+        match kind {
+            ActiveKind::Transcribe => {
+                self.start(capture_id);
+                self.started(capture_id, job_id.to_owned());
+                if progress > 0.0 {
+                    self.progress_by_job(job_id, f64::from(progress));
+                }
+            }
+            ActiveKind::Speakers | ActiveKind::Report => {
+                let kind = if kind == ActiveKind::Speakers {
+                    VoiceJobKind::Speakers
+                } else {
+                    VoiceJobKind::Report
+                };
+                self.voice_job_begin(capture_id, kind);
+                self.voice_job_adopt(capture_id, kind, job_id);
+                if progress > 0.0 {
+                    self.voice_progress_by_job(job_id, f64::from(progress));
+                }
+            }
+        }
+    }
+
     /// The ends of this recording's jobs, once.
     pub fn take_voice_ended(&mut self, capture_id: &str) -> Vec<VoiceEnd> {
         let (mine, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut self.voice_ended)
@@ -306,6 +347,41 @@ impl TranscribeVm {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Jobs the daemon already had (picked up after a restart) are shown like a click, with their
+    /// progress, and asking again changes nothing.
+    #[test]
+    fn jobs_the_daemon_already_has_are_shown_as_running() {
+        let mut v = TranscribeVm::default();
+        v.adopt_active(ActiveKind::Transcribe, "rec_1", "job_1", 0.4);
+        assert_eq!(
+            v.status_text("rec_1").as_deref(),
+            Some("Transcribing\u{2026} 40%")
+        );
+        v.adopt_active(ActiveKind::Speakers, "rec_1", "job_2", 0.7);
+        v.adopt_active(ActiveKind::Report, "rec_2", "job_3", 0.0);
+        assert_eq!(
+            v.voice_job("rec_1", VoiceJobKind::Speakers)
+                .unwrap()
+                .progress,
+            Some(0.7)
+        );
+        assert!(v.voice_job("rec_2", VoiceJobKind::Report).is_some());
+        assert!(v.voice_job("rec_2", VoiceJobKind::Speakers).is_none());
+        // Again (every editor that opens asks): nothing is duplicated and the progress carries on.
+        v.adopt_active(ActiveKind::Transcribe, "rec_1", "job_1", 0.5);
+        v.adopt_active(ActiveKind::Speakers, "rec_1", "job_2", 0.8);
+        assert_eq!(v.fraction("rec_1"), Some(0.5));
+        assert_eq!(
+            v.voice_job_id("rec_1", VoiceJobKind::Speakers).as_deref(),
+            Some("job_2")
+        );
+        // Its end clears it like any other.
+        assert_eq!(v.done_by_job("job_1").as_deref(), Some("rec_1"));
+        assert_eq!(v.status_text("rec_1"), None);
+        assert!(v.voice_ended_by_job("job_2", Ok(())));
+        assert!(v.voice_job("rec_1", VoiceJobKind::Speakers).is_none());
+    }
 
     /// The automatic transcription after a recording (`transcript.started`) shows as running on
     /// the tabs, with its progress, and ends with the transcript like a run started by a click.
