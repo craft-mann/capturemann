@@ -1,8 +1,10 @@
 name: Release
 
-# Push a tag such as `v0.1.0` (or run this workflow by hand with a tag that already exists) to build
-# the macOS app and open a DRAFT GitHub release with the DMG and its SHA-256 file. Nothing is
-# published until you review the draft and press Publish. Steps: docs/development/releasing.md.
+# Run this workflow by hand (Actions > Release > Run workflow) with a tag that already exists, such as
+# `v0.2.1`, to build the macOS apps and open a DRAFT GitHub release with one DMG per chip (Apple
+# Silicon arm64 and Intel x86_64) and their SHA-256 files. Pushing a tag does NOT start it (maintainer
+# decision, Oct 28, 2026: releases are made by hand). Nothing is published until you review the draft
+# and press Publish. Steps: docs/development/releasing.md.
 #
 # Two modes, chosen by which repository secrets exist (see "Detect signing" below):
 #   * signed:  Developer ID certificate + one notarization credential set -> signed, notarized and
@@ -11,8 +13,10 @@ name: Release
 #
 # Runner: `macos-14` is the GitHub-documented Apple Silicon (arm64, M1) image
 # (https://docs.github.com/actions/using-github-hosted-runners/about-github-hosted-runners). It is
-# named explicitly instead of `macos-latest` so the architecture of the release cannot change under
-# us; the job also fails if `uname -m` is not arm64.
+# named explicitly instead of `macos-latest` so the architecture of the build cannot change under
+# us; the job also fails if `uname -m` is not arm64. BOTH DMGs are built on it: the Intel app is
+# cross-built (CM_ARCH=x86_64) and its self-checks run under Rosetta. Nothing here runs the Intel
+# app on Intel hardware; that is the maintainer's acceptance test (specs/plans/intel-mac-plan.md).
 #
 # Pinned actions (commit SHA, tag it was looked up from):
 #   actions/checkout          11d5960a326750d5838078e36cf38b85af677262  v4
@@ -24,8 +28,6 @@ name: Release
 #   actions/upload-artifact   ea165f8d65b6e75b540449e92b4886f43607fa02  v4.6.2
 #   actions/download-artifact d3f86a106a0bac45b974a628896c90dbdf5c8093  v4.3.0
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:
@@ -36,19 +38,32 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  group: release-${{ github.event.inputs.tag }}
   cancel-in-progress: false
 
 env:
-  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+  TAG: ${{ github.event.inputs.tag }}
 
 jobs:
   build:
-    name: Build DMG (Apple Silicon)
+    name: Build DMG (${{ matrix.arch }})
     runs-on: macos-14
     timeout-minutes: 120
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            suffix: ""
+            bundle: bundle
+          - arch: x86_64
+            suffix: "-x86_64"
+            bundle: bundle-x86_64
+    env:
+      CM_ARCH: ${{ matrix.arch }}
+      DMG: CaptureMann-${{ github.event.inputs.tag }}-macos-${{ matrix.arch }}.dmg
     steps:
       - name: Check the tag and the runner
         run: |
@@ -56,8 +71,13 @@ jobs:
             echo "::error::tag '$TAG' is not of the form vMAJOR.MINOR.PATCH[-suffix]"; exit 1
           fi
           arch=$(uname -m)
-          if [ "$arch" != "arm64" ]; then echo "::error::runner is $arch, the release is Apple Silicon only"; exit 1; fi
+          if [ "$arch" != "arm64" ]; then echo "::error::runner is $arch, both DMGs are built on Apple Silicon"; exit 1; fi
           sw_vers
+          if [ "$CM_ARCH" = "x86_64" ]; then
+            # The Intel build checks the programs it made by running them under Rosetta.
+            arch -x86_64 /usr/bin/true 2>/dev/null || softwareupdate --install-rosetta --agree-to-license
+            arch -x86_64 /usr/bin/true || { echo "::error::Rosetta is not available on this runner"; exit 1; }
+          fi
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -66,6 +86,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable (branch tip)
         with:
           toolchain: stable
+          targets: ${{ matrix.arch == 'x86_64' && 'x86_64-apple-darwin' || '' }}
       - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
 
       - name: Check the tag matches the workspace version
@@ -128,7 +149,7 @@ jobs:
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: packaging/sherpa/.downloads
-          key: sherpa-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packaging/sherpa/fetch-macos.sh', 'packaging/sherpa/fetch-models.sh') }}
+          key: sherpa-${{ matrix.arch }}-${{ hashFiles('packaging/sherpa/fetch-macos.sh', 'packaging/sherpa/fetch-models.sh') }}
 
       - name: Fetch the sherpa-onnx libraries and speaker models (pinned, SHA-256 checked)
         run: make sherpa
@@ -139,8 +160,8 @@ jobs:
         with:
           path: |
             packaging/ffmpeg/.downloads
-            packaging/ffmpeg/out
-          key: ffmpeg-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packaging/ffmpeg/build-macos.sh') }}
+            packaging/ffmpeg/out${{ matrix.suffix }}
+          key: ffmpeg-${{ matrix.arch }}-${{ hashFiles('packaging/ffmpeg/build-macos.sh') }}
 
       - name: Build the LGPL FFmpeg (pinned sources)
         if: steps.ffcache.outputs.cache-hit != 'true'
@@ -148,18 +169,19 @@ jobs:
 
       - name: Check the FFmpeg build is present
         run: |
-          test -x packaging/ffmpeg/out/ffmpeg && test -x packaging/ffmpeg/out/ffprobe || { echo "::error::packaging/ffmpeg/out is incomplete"; exit 1; }
+          out="packaging/ffmpeg/out${{ matrix.suffix }}"
+          test -x "$out/ffmpeg" && test -x "$out/ffprobe" || { echo "::error::$out is incomplete"; exit 1; }
 
       # The built-in text engine (AI-7): llama-server from the pinned llama.cpp release (SHA-256 checked
-      # by the script), built static with Metal. `make bundle-release` refuses to build without it.
+      # by the script), built static (Metal on arm64; CPU only on Intel until measured). `make bundle-release` refuses to build without it.
       - name: Cache the llama-server build
         id: llamacache
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: |
             packaging/llama/.downloads
-            packaging/llama/out
-          key: llama-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packaging/llama/build-macos.sh') }}
+            packaging/llama/out${{ matrix.suffix }}
+          key: llama-${{ matrix.arch }}-${{ hashFiles('packaging/llama/build-macos.sh') }}
 
       - name: Build llama-server (pinned source)
         if: steps.llamacache.outputs.cache-hit != 'true'
@@ -167,7 +189,8 @@ jobs:
 
       - name: Check llama-server is present
         run: |
-          test -x packaging/llama/out/llama-server || { echo "::error::packaging/llama/out/llama-server is missing"; exit 1; }
+          out="packaging/llama/out${{ matrix.suffix }}"
+          test -x "$out/llama-server" || { echo "::error::$out/llama-server is missing"; exit 1; }
 
       - name: Third-party licences
         run: |
@@ -201,7 +224,7 @@ jobs:
         if: env.SIGNED == 'true'
         env:
           CM_DMG_VOLNAME: CaptureMann ${{ env.VERSION }}
-        run: bash packaging/macos/dmg.sh target/bundle/CaptureMann.app "target/bundle/CaptureMann-${TAG}-macos-arm64.dmg"
+        run: bash packaging/macos/dmg.sh target/${{ matrix.bundle }}/CaptureMann.app "target/${{ matrix.bundle }}/$DMG"
 
       - name: Notarize and staple
         if: env.SIGNED == 'true'
@@ -211,11 +234,11 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-        run: bash packaging/macos/notarize.sh "target/bundle/CaptureMann-${TAG}-macos-arm64.dmg"
+        run: bash packaging/macos/notarize.sh "target/${{ matrix.bundle }}/$DMG"
 
       - name: Verify the release (signature, notarization, Gatekeeper)
         if: env.SIGNED == 'true'
-        run: bash packaging/macos/verify-release.sh "target/bundle/CaptureMann-${TAG}-macos-arm64.dmg"
+        run: bash packaging/macos/verify-release.sh --arch "$CM_ARCH" "target/${{ matrix.bundle }}/$DMG"
 
       # ---------------------------------------------------------------- ad hoc path
       - name: Bundle (ad hoc)
@@ -226,38 +249,34 @@ jobs:
         if: env.SIGNED != 'true'
         env:
           CM_DMG_VOLNAME: CaptureMann ${{ env.VERSION }}
-        run: bash packaging/macos/dmg.sh target/bundle/CaptureMann.app "target/bundle/CaptureMann-${TAG}-macos-arm64.dmg"
+        run: bash packaging/macos/dmg.sh target/${{ matrix.bundle }}/CaptureMann.app "target/${{ matrix.bundle }}/$DMG"
 
       - name: Verify the DMG (ad hoc, not notarized)
         if: env.SIGNED != 'true'
-        run: bash packaging/macos/verify-release.sh "target/bundle/CaptureMann-${TAG}-macos-arm64.dmg" --allow-unsigned
+        run: bash packaging/macos/verify-release.sh --arch "$CM_ARCH" "target/${{ matrix.bundle }}/$DMG" --allow-unsigned
 
       # ---------------------------------------------------------------- common
       - name: Checksum and release notes
         run: |
-          cd target/bundle
-          shasum -a 256 "CaptureMann-${TAG}-macos-arm64.dmg" > "CaptureMann-${TAG}-macos-arm64.dmg.sha256"
-          cat "CaptureMann-${TAG}-macos-arm64.dmg.sha256"
-          cd "$GITHUB_WORKSPACE"
+          mkdir dist
+          cp "target/${{ matrix.bundle }}/$DMG" dist/
+          (cd dist && shasum -a 256 "$DMG" > "$DMG.sha256" && cat "$DMG.sha256")
+          cp notes-body.md dist/body.md
+          if [ "$CM_ARCH" = "arm64" ]; then chip="Apple Silicon (M1 and later, arm64)"; else chip="Intel (x86_64)"; fi
           {
-            cat notes-body.md
-            printf '\n---\n\n'
-            printf 'Apple Silicon (arm64) only, macOS 13 or later. Verify the download: `shasum -a 256 -c CaptureMann-%s-macos-arm64.dmg.sha256` in the folder with both files.\n\n' "$TAG"
+            printf '**%s**, macOS 13 or later: `%s`. Verify the download: `shasum -a 256 -c %s.sha256` in the folder with both files.\n\n' "$chip" "$DMG" "$DMG"
             if [ "$SIGNED" = "true" ]; then
-              printf 'This DMG is signed with a Developer ID certificate, notarized by Apple and stapled.\n'
+              printf 'This DMG is signed with a Developer ID certificate, notarized by Apple and stapled.\n\n'
             else
-              printf 'This build is **ad hoc signed and not notarized**, so Gatekeeper blocks the first launch. Drag CaptureMann to Applications, then either right-click the app and choose Open (and confirm), or run `xattr -dr com.apple.quarantine /Applications/CaptureMann.app`. Because the signature changes with every build, macOS asks for the Screen Recording permission again after an update.\n'
+              printf 'This build is **ad hoc signed and not notarized**, so Gatekeeper blocks the first launch. Drag CaptureMann to Applications, then either right-click the app and choose Open (and confirm), or run `xattr -dr com.apple.quarantine /Applications/CaptureMann.app`. Because the signature changes with every build, macOS asks for the Screen Recording permission again after an update.\n\n'
             fi
-          } > notes.md
+          } > "dist/footer-$CM_ARCH.md"
 
       - name: Keep the release files
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: release-files
-          path: |
-            target/bundle/CaptureMann-${{ env.TAG }}-macos-arm64.dmg
-            target/bundle/CaptureMann-${{ env.TAG }}-macos-arm64.dmg.sha256
-            notes.md
+          name: release-files-${{ matrix.arch }}
+          path: dist/
           if-no-files-found: error
           retention-days: 14
 
@@ -277,8 +296,21 @@ jobs:
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: release-files
+          pattern: release-files-*
+          merge-multiple: true
           path: release-files
+
+      - name: Put the release notes together
+        run: |
+          set -euo pipefail
+          for a in arm64 x86_64; do
+            test -f "release-files/CaptureMann-${TAG}-macos-$a.dmg" || { echo "::error::the $a DMG is missing"; exit 1; }
+          done
+          {
+            cat release-files/body.md
+            printf '\n---\n\nTwo downloads, one per chip (Apple menu > About This Mac shows which one you have).\n\n'
+            cat release-files/footer-arm64.md release-files/footer-x86_64.md
+          } > release-files/notes.md
 
       - name: Create the draft release
         env:
@@ -296,5 +328,7 @@ jobs:
           # shellcheck disable=SC2086
           gh release create "$TAG" $flags --verify-tag \
             --title "CaptureMann ${TAG}" --notes-file release-files/notes.md \
-            "release-files/target/bundle/CaptureMann-${TAG}-macos-arm64.dmg" \
-            "release-files/target/bundle/CaptureMann-${TAG}-macos-arm64.dmg.sha256"
+            "release-files/CaptureMann-${TAG}-macos-arm64.dmg" \
+            "release-files/CaptureMann-${TAG}-macos-arm64.dmg.sha256" \
+            "release-files/CaptureMann-${TAG}-macos-x86_64.dmg" \
+            "release-files/CaptureMann-${TAG}-macos-x86_64.dmg.sha256"

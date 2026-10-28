@@ -129,13 +129,15 @@ into `Contents/Resources/FFmpeg/`.
 * `cm-media` looks next to its own executable before `PATH`, so a Homebrew FFmpeg never changes how
   an installed app behaves; `CM_FFMPEG` still overrides it. If the copy inside the app is missing or
   cannot start, the error says the app is damaged and to reinstall it (not "brew install").
-* arm64 only, macOS 13 or later. A universal (arm64 + x86_64) binary needs a second build with
-  `nasm` and `lipo`; Windows needs its own build (see `packaging/ffmpeg/README.md`).
+* One architecture per build, macOS 13 or later, never universal: `CM_ARCH=arm64` (default) or
+  `CM_ARCH=x86_64`, which builds into `out-x86_64/` beside `out/` (nasm is built from a pinned tarball);
+  Windows needs its own build (see `packaging/ffmpeg/README.md`).
 
 ## Releasing (Developer ID, notarization, DMG)
 
-Release scope: Apple Silicon (arm64), macOS 13+, manual updates, one signed + notarized + stapled
-DMG. Written and tested before the Developer ID certificate existed: the scripts were run with
+Release scope: macOS 13+, manual updates, one signed + notarized + stapled DMG per chip (Apple
+Silicon arm64 and Intel x86_64; the Intel one is cross-built here and checked under Rosetta only until it
+has run on a real Intel Mac). Written and tested before the Developer ID certificate existed: the scripts were run with
 fakes (`--dry-run`, a fake bundle) and with a throwaway self-signed identity in a throwaway
 keychain; **no real Developer ID signature, notarization or stapling has ever been run**.
 
@@ -143,14 +145,18 @@ keychain; **no real Developer ID signature, notarization or stapling has ever be
 | --- | --- |
 | `dmg.sh <CaptureMann.app> <out.dmg>` | UDZO read-only DMG with the app and an `/Applications` symlink (hdiutil + ditto only, no Finder scripting, plain window). Signs the DMG when `CM_SIGN_IDENTITY` is set and not `-` (`--timestamp`; `CM_KEYCHAIN` optional). `CM_DMG_VOLNAME` (default `CaptureMann`). Prints the path and SHA-256 and writes `<out>.sha256`. |
 | `notarize.sh [--dry-run] [--check-env] <file.dmg\|file.zip>` | `notarytool submit --wait`, on a non-Accepted verdict prints `notarytool log` and exits 1, on success `stapler staple` + `stapler validate` (DMG only). Credentials: API key (`APPLE_API_KEY_ID`, `APPLE_API_ISSUER`, `APPLE_API_KEY_PATH` = the .p8) or Apple ID (`APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_PASSWORD`) or `CM_NOTARY_PROFILE`. `--dry-run` checks the environment and prints the commands with secrets masked. |
-| `verify-release.sh [--allow-unsigned] <file.dmg\|App.app>` | Mounts a DMG read-only (always unmounted). Checks: `codesign --verify --deep --strict`, designated requirement, hardened runtime + secure timestamp on the bundle and every Mach-O, one identity everywhere, no `get-task-allow`, entitlements equal to `CaptureMann.entitlements`, `spctl`, `stapler validate`, LGPL FFmpeg (no gpl/nonfree/libx264/libx265/libfdk-aac) with its notices, LICENSE/NOTICE/THIRD_PARTY_LICENSES.md, Info.plist version = workspace version, arm64 only, minimum macOS 13. Gatekeeper rejecting a non-Developer-ID signature is a labelled WARNING, a Developer ID signature that is rejected is an ERROR. `--allow-unsigned` turns Gatekeeper, ticket, hardened runtime, timestamp, missing DMG signature and missing FFmpeg into warnings (local builds). Exit 1 on any ERROR. |
+| `verify-release.sh [--allow-unsigned] [--arch arm64\|x86_64] <file.dmg\|App.app>` | Mounts a DMG read-only (always unmounted). Checks: `codesign --verify --deep --strict`, designated requirement, hardened runtime + secure timestamp on the bundle and every Mach-O, one identity everywhere, no `get-task-allow`, entitlements equal to `CaptureMann.entitlements`, `spctl`, `stapler validate`, LGPL FFmpeg (no gpl/nonfree/libx264/libx265/libfdk-aac) with its notices, LICENSE/NOTICE/THIRD_PARTY_LICENSES.md, Info.plist version = workspace version, only the chosen architecture (`--arch`, default arm64; also no file named for the other one), minimum macOS 13. Gatekeeper rejecting a non-Developer-ID signature is a labelled WARNING, a Developer ID signature that is rejected is an ERROR. `--allow-unsigned` turns Gatekeeper, ticket, hardened runtime, timestamp, missing DMG signature and missing FFmpeg into warnings (local builds). Exit 1 on any ERROR. |
 | `ci-keychain.sh setup\|teardown` | GitHub Actions: temporary keychain with a random password, imports `APPLE_CERT_P12_BASE64` (password `APPLE_CERT_PASSWORD`), `set-key-partition-list`, puts it first in the search list (the old list is saved), appends `CM_SIGN_IDENTITY=<SHA-1>` and `CM_KEYCHAIN=<path>` to `$GITHUB_ENV`, masks secrets. `teardown` deletes the keychain and restores the list. |
 
 Make targets: `make dmg` (needs `target/bundle/CaptureMann.app`), `make notarize`,
 `make verify-release` (`ARGS=--allow-unsigned` for a local build), and `make release` =
 `CM_HARDENED=1 make bundle-release`, then `dmg`, `notarize`, `verify-release`; it first lists what
 is missing from the environment. The DMG is `target/bundle/CaptureMann-<version>-arm64.dmg`
-(`DMG=...` and `APP=...` override).
+(`DMG=...` and `APP=...` override). For Intel: `CM_ARCH=x86_64 make ffmpeg llama sherpa` once, then
+`make release CM_ARCH=x86_64` (app and DMG in `target/bundle-x86_64/`, `CaptureMann-<version>-x86_64.dmg`).
+`bundle.sh` cross-builds with `--target x86_64-apple-darwin`, macOS deployment target 13.0 (without it the
+SDK links a Swift overlay that no Mac has) and an AVX2/FMA baseline for whisper.cpp, and stops if any
+Mach-O in the app is not x86_64 only.
 
 Since 0.2.0 `make release` (`bundle-release`) also needs `llama-server` (`make llama`) and the speaker
 models (`make sherpa`, which also gives cargo the sherpa-onnx libraries); it refuses to bundle without

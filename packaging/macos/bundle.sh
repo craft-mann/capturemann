@@ -5,6 +5,13 @@
 #
 # Usage (any directory):   packaging/macos/bundle.sh        or   make bundle
 # Environment:
+#   CM_ARCH           arm64 (default on Apple Silicon) or x86_64: the chip the app is built for. One
+#                     architecture per app, never universal. x86_64 is a cross-build (cargo
+#                     --target x86_64-apple-darwin, macOS deployment target 13.0, ggml AVX2/FMA
+#                     baseline, the sherpa-onnx libraries of packaging/sherpa/out-x86_64) and takes
+#                     FFmpeg and llama-server from packaging/*/out-x86_64 (`CM_ARCH=x86_64 make
+#                     ffmpeg llama sherpa`). Its default output is target/bundle-x86_64. Every
+#                     Mach-O in the app must be of that architecture or the script stops.
 #   CM_APP_NAME       name of the .app and of the app in macOS (default CaptureMann; bundle-dev: CaptureMann-dev)
 #   CM_BUNDLE_ID      bundle identifier (default dev.capturemann.app). The owner may change it
 #                     before the first public release; it is part of the TCC identity, so changing
@@ -57,6 +64,19 @@ for tool in codesign plutil sed; do
 done
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ARCH="${CM_ARCH:-$(uname -m)}"
+case "$ARCH" in
+  arm64)  rust_target="aarch64-apple-darwin"; comp_suffix="";        bundle_default="bundle" ;;
+  x86_64) rust_target="x86_64-apple-darwin";  comp_suffix="-x86_64"; bundle_default="bundle-x86_64" ;;
+  *) die "CM_ARCH must be arm64 or x86_64 (got $ARCH)" ;;
+esac
+# Where cargo puts the binaries: the host's own architecture keeps the plain target/release.
+if [ "$ARCH" = "$(uname -m)" ]; then
+  cargo_target_args=(); rel_sub="release"; run_target=()
+else
+  [ "$(uname -m)" = "arm64" ] || die "cross-building is only supported from an Apple Silicon Mac"
+  cargo_target_args=(--target "$rust_target"); rel_sub="$rust_target/release"; run_target=(arch "-$ARCH")
+fi
 bundle_id="${CM_BUNDLE_ID:-dev.capturemann.app}"
 app_name="${CM_APP_NAME:-CaptureMann}" # file and display name; make bundle-dev sets CaptureMann-dev
 dev_identity="CaptureMann Local Dev"
@@ -80,7 +100,7 @@ target_dir="$(cd "$root" && cargo metadata --format-version 1 --no-deps --locked
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')" \
   || die "could not resolve the cargo target directory"
 [ -d "$target_dir" ] || mkdir -p "$target_dir"
-out="${CM_BUNDLE_OUT:-$root/target/bundle}"
+out="${CM_BUNDLE_OUT:-$root/target/$bundle_default}"
 mkdir -p "$out" || die "cannot create $out"
 out="$(cd "$out" && pwd)"
 app="$out/$app_name.app"
@@ -117,13 +137,29 @@ case "$build_number" in *[!0-9.]* | "") die "CM_BUILD_NUMBER must be digits and 
 
 if [ "${CM_SKIP_BUILD:-0}" != "1" ]; then
   echo "==> cargo build --release (target dir $target_dir)"
-  (cd "$root" && cargo build --release --locked --target-dir "$target_dir" -p cm-desktop -p cm-overlay -p cm-cli -p cm-mcp)
+  if [ "$ARCH" = "x86_64" ]; then
+    # Cross-build for Intel (specs/plans/intel-mac-plan.md, Stage 1):
+    #  * macOS 13 deployment target: with Rust's default (10.12) the SDK links a Swift overlay
+    #    (@rpath/libswiftCoreMedia.dylib) that no Mac has and the app aborts at launch;
+    #  * ggml (whisper.cpp) gets a fixed AVX2/FMA baseline instead of the SSE-only default of a
+    #    cross-build (no -march=native: the result must not depend on the build machine);
+    #  * the x86_64 sherpa-onnx libraries (an exported SHERPA_ONNX_LIB_DIR wins).
+    export MACOSX_DEPLOYMENT_TARGET="13.0"
+    export GGML_NATIVE=OFF GGML_AVX=ON GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON GGML_BMI2=ON GGML_AVX512=OFF
+    if [ -z "${SHERPA_ONNX_LIB_DIR:-}" ]; then
+      export SHERPA_ONNX_LIB_DIR="$root/packaging/sherpa/out-x86_64/lib"
+    fi
+    [ -d "$SHERPA_ONNX_LIB_DIR" ] || die "no sherpa-onnx libraries for x86_64 at $SHERPA_ONNX_LIB_DIR (run: CM_ARCH=x86_64 make sherpa)"
+    # whisper-rs-sys does not re-run when GGML_* change, so make it build with them now.
+    (cd "$root" && cargo clean --release --target-dir "$target_dir" -p whisper-rs-sys "${cargo_target_args[@]}" >/dev/null 2>&1) || true
+  fi
+  (cd "$root" && cargo build --release --locked --target-dir "$target_dir" ${cargo_target_args[@]+"${cargo_target_args[@]}"} -p cm-desktop -p cm-overlay -p cm-cli -p cm-mcp)
 fi
 
 # source binary in target/release -> name inside Contents/MacOS
 bins="cm-desktop:cm-desktop cm-overlay:cm-overlay capturemann:capturemann cm-mcp:cm-mcp"
 for pair in $bins; do
-  [ -x "$target_dir/release/${pair%%:*}" ] || die "missing $target_dir/release/${pair%%:*} (run without CM_SKIP_BUILD)"
+  [ -x "$target_dir/$rel_sub/${pair%%:*}" ] || die "missing $target_dir/$rel_sub/${pair%%:*} (run without CM_SKIP_BUILD)"
 done
 
 # Everything below happens in $stage; $app is only replaced at the very end.
@@ -134,7 +170,7 @@ rm -rf "$stage"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 for pair in $bins; do
   # Binaries keep their symbols (no `strip`) so backtraces stay readable.
-  cp "$target_dir/release/${pair%%:*}" "$app/Contents/MacOS/${pair##*:}"
+  cp "$target_dir/$rel_sub/${pair%%:*}" "$app/Contents/MacOS/${pair##*:}"
 done
 cp "$root/LICENSE" "$root/NOTICE" "$root/THIRD_PARTY_LICENSES.md" "$app/Contents/Resources/"
 
@@ -142,8 +178,8 @@ cp "$root/LICENSE" "$root/NOTICE" "$root/THIRD_PARTY_LICENSES.md" "$app/Contents
 # `make ffmpeg` (packaging/ffmpeg/build-macos.sh), is copied in.
 ffmpeg_bundled=0
 ffmpeg_src="${CM_FFMPEG_BUNDLE:-}"
-if [ -z "$ffmpeg_src" ] && [ "${CM_NO_FFMPEG:-0}" != "1" ] && [ -x "$root/packaging/ffmpeg/out/ffmpeg" ]; then
-  ffmpeg_src="$root/packaging/ffmpeg/out/ffmpeg"
+if [ -z "$ffmpeg_src" ] && [ "${CM_NO_FFMPEG:-0}" != "1" ] && [ -x "$root/packaging/ffmpeg/out$comp_suffix/ffmpeg" ]; then
+  ffmpeg_src="$root/packaging/ffmpeg/out$comp_suffix/ffmpeg"
   echo "==> bundling the FFmpeg built by make ffmpeg ($ffmpeg_src)"
 fi
 if [ -z "$ffmpeg_src" ] && [ "${CM_REQUIRE_FFMPEG:-0}" = "1" ]; then
@@ -152,8 +188,8 @@ fi
 if [ -n "$ffmpeg_src" ]; then
   ff="$ffmpeg_src"
   [ -x "$ff" ] && [ -f "$ff" ] || die "the FFmpeg to bundle is not an executable file: $ff"
-  ff_info="$("$ff" -hide_banner -version 2>&1 || true)"
-  ff_conf="$("$ff" -hide_banner -buildconf 2>&1 || true)"
+  ff_info="$(${run_target[@]+"${run_target[@]}"} "$ff" -hide_banner -version 2>&1 || true)"
+  ff_conf="$(${run_target[@]+"${run_target[@]}"} "$ff" -hide_banner -buildconf 2>&1 || true)"
   if grep -q -E -e '--enable-(gpl|nonfree|libx264|libx265|libfdk-aac)' <<<"$ff_info
 $ff_conf"; then
     if [ "${CM_ALLOW_GPL_FFMPEG:-0}" = "1" ]; then
@@ -191,8 +227,8 @@ llama_src="${CM_LLAMA_BUNDLE:-}"
 if [ "${CM_REQUIRE_LLAMA:-0}" = "1" ] && [ "${CM_NO_LLAMA:-0}" = "1" ]; then
   die "CM_REQUIRE_LLAMA=1 and CM_NO_LLAMA=1 contradict each other"
 fi
-if [ -z "$llama_src" ] && [ "${CM_NO_LLAMA:-0}" != "1" ] && [ -x "$root/packaging/llama/out/llama-server" ]; then
-  llama_src="$root/packaging/llama/out/llama-server"
+if [ -z "$llama_src" ] && [ "${CM_NO_LLAMA:-0}" != "1" ] && [ -x "$root/packaging/llama/out$comp_suffix/llama-server" ]; then
+  llama_src="$root/packaging/llama/out$comp_suffix/llama-server"
   echo "==> bundling the llama-server built by make llama ($llama_src)"
 fi
 if [ -z "$llama_src" ] && [ "${CM_REQUIRE_LLAMA:-0}" = "1" ]; then
@@ -246,6 +282,12 @@ if [ -n "$spk_src" ]; then
   for f in "${spk_licences[@]}"; do cp "$spk_src/LICENSES/$f" "$spk_dst/LICENSES/$f"; done
   [ ! -f "$spk_src/BUILD-INFO.txt" ] || cp "$spk_src/BUILD-INFO.txt" "$spk_dst/"
 fi
+# Single architecture: every Mach-O in the app (ours, FFmpeg, llama-server) is $ARCH only.
+while IFS= read -r f; do
+  case "$(file -b "$f")" in *Mach-O*) ;; *) continue ;; esac
+  [ "$(lipo -archs "$f" 2>/dev/null)" = "$ARCH" ] \
+    || die "${f#"$app"/} is '$(lipo -archs "$f" 2>/dev/null)', expected $ARCH only (build the components with CM_ARCH=$ARCH)"
+done < <(find "$app/Contents" -type f)
 sed -e "s|@BUNDLE_ID@|$bundle_id|g" -e "s|@VERSION@|$version|g" -e "s|@BUILD@|$build_number|g" -e "s|@APP_NAME@|$app_name|g" \
   "$plist_tpl" > "$app/Contents/Info.plist"
 grep -q -E '@(BUNDLE_ID|VERSION|BUILD|APP_NAME)@' "$app/Contents/Info.plist" && die "unfilled @TOKEN@ left in Info.plist"

@@ -1,7 +1,7 @@
 # Releasing CaptureMann
 
-A release is a signed, notarized and stapled DMG plus a SHA-256 file, attached to a GitHub release.
-The release is Apple Silicon (arm64) and macOS 13+ only. Updates are manual: users download the new
+A release is two signed, notarized and stapled DMGs (Apple Silicon `arm64` and Intel `x86_64`, one per chip, never universal) plus a SHA-256 file for each, attached to a GitHub release.
+macOS 13+. The Intel DMG is cross-built on the Apple Silicon runner and has only been checked under Rosetta until it has run on a real Intel Mac (specs/plans/intel-mac-plan.md). Updates are manual: users download the new
 DMG, the app has no update code.
 
 The workflow is [`.github/workflows/release.yml`](../../.github/workflows/release.yml). It was written
@@ -9,7 +9,7 @@ without being run on GitHub; test it on a fork first (see [Testing the workflow]
 
 ## What the workflow does
 
-On a pushed tag `v*` (or a manual run with a tag that exists) on a `macos-14` (Apple Silicon) runner:
+On a manual run with a tag that exists (pushing a tag does not start it), as two matrix jobs (`arm64`, `x86_64`) on a `macos-14` (Apple Silicon) runner:
 
 1. Checks the tag has the form `vX.Y.Z[-suffix]` and equals the workspace version in `Cargo.toml`.
 2. Extracts the `## [X.Y.Z]` section of `CHANGELOG.md` for the release notes. It fails if the
@@ -46,14 +46,14 @@ Only the last job has `contents: write`.
    cargo deny check
    ```
 5. **Commit and merge** to `main`, and wait for CI to pass.
-6. **Tag and push:**
+6. **Tag and push** the tag, then start the workflow by hand (Actions, "Release", Run workflow, the tag):
    ```sh
    git tag -a vX.Y.Z -m "CaptureMann X.Y.Z"
    git push origin vX.Y.Z
    ```
 7. **Watch the workflow** (Actions, "Release"). A cold run builds FFmpeg and whisper.cpp from
    source and takes a long time; later runs reuse the FFmpeg cache.
-8. **Review the draft** under Releases: the notes, the two assets, and the line saying whether the
+8. **Review the draft** under Releases: the notes, the four assets (two DMGs, two `.sha256`), and the line saying whether the
    build is notarized. Download the DMG and run the checks below on a Mac that is not your build
    machine.
 9. **Publish** the draft. Then update the website download link (manual, see below) and the
@@ -148,7 +148,7 @@ running from it. Upload by hand with `gh release create vX.Y.Z --draft ...` if y
 1. Fork the repository and enable Actions on the fork.
 2. On a branch of the fork, set the version to a throwaway one, for example `0.0.1-test.1` in
    `Cargo.toml` (`cargo update -w`) and add a `## [0.0.1-test.1]` section to `CHANGELOG.md`.
-3. Without secrets this exercises the ad hoc path. Push `git tag v0.0.1-test.1` to the fork. To test
+3. Without secrets this exercises the ad hoc path. Push `git tag v0.0.1-test.1` to the fork and run the workflow by hand with that tag. To test
    the signed path, add the secrets to the fork (a real certificate is needed; notarization of a
    throwaway build is fine).
 4. Check the draft release, download the assets, run `verify-release.sh` and the checks below.

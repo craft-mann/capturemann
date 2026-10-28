@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Checks a release candidate: a DMG (mounted read-only, always unmounted) or a CaptureMann.app.
 #
-# Usage:   packaging/macos/verify-release.sh [--allow-unsigned] <file.dmg|CaptureMann.app>
+# Usage:   packaging/macos/verify-release.sh [--allow-unsigned] [--arch arm64|x86_64] <file.dmg|CaptureMann.app>
+#   --arch            the architecture the app must have (default arm64, or CM_ARCH when set): every
+#                     Mach-O must be exactly that one, and nothing named for the other one may be
+#                     inside the app (one chip per DMG, never universal).
 #   --allow-unsigned  the build is not release-signed (ad hoc / local identity / not notarized):
 #                     Gatekeeper, stapler, hardened runtime, timestamp, a missing FFmpeg and a
 #                     missing DMG signature become WARNINGs instead of ERRORs. Everything else
@@ -14,17 +17,19 @@
 set -uo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-allow=0; target=""
+allow=0; target=""; want_arch="${CM_ARCH:-arm64}"
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --allow-unsigned) allow=1 ;;
-    -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
+    --arch) shift; want_arch="${1:-}" ;;
+    -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
     -*) echo "verify-release.sh: unknown option: $1" >&2; exit 2 ;;
     *) [ -z "$target" ] || { echo "verify-release.sh: only one target" >&2; exit 2; }; target="$1" ;;
   esac
   shift
 done
-[ -n "$target" ] || { echo "usage: verify-release.sh [--allow-unsigned] <file.dmg|CaptureMann.app>" >&2; exit 2; }
+case "$want_arch" in arm64|x86_64) ;; *) echo "verify-release.sh: --arch must be arm64 or x86_64 (got '$want_arch')" >&2; exit 2 ;; esac
+[ -n "$target" ] || { echo "usage: verify-release.sh [--allow-unsigned] [--arch arm64|x86_64] <file.dmg|CaptureMann.app>" >&2; exit 2; }
 [ "$(uname -s)" = "Darwin" ] || { echo "verify-release.sh: macOS only" >&2; exit 2; }
 
 errors=0; warnings=0
@@ -185,9 +190,14 @@ while IFS= read -r f; do
   hardened_timestamp "$f" "$rel"
   if grep -q 'get-task-allow' <<<"$(ent_keys "$f")"; then err "$rel: get-task-allow"; fi
   archs="$(lipo -archs "$f" 2>/dev/null || true)"
-  if [ "$archs" = "arm64" ]; then :; else err "$rel: architectures '$archs' (expected arm64 only)"; fi
+  if [ "$archs" = "$want_arch" ]; then :; else err "$rel: architectures '$archs' (expected $want_arch only)"; fi
 done < <(find "$contents" -type f -not -name '*.plist' -not -name '*.md' -not -name '*.txt' -not -name '*.icns' 2>/dev/null)
-if [ "$count" -ge 4 ]; then ok "$count Mach-O files checked (identity, hardened runtime, timestamp, arm64)"; else err "only $count Mach-O files found under Contents (expected cm-desktop, cm-overlay, cm-mcp, capturemann at least)"; fi
+if [ "$count" -ge 4 ]; then ok "$count Mach-O files checked (identity, hardened runtime, timestamp, $want_arch only)"; else err "only $count Mach-O files found under Contents (expected cm-desktop, cm-overlay, cm-mcp, capturemann at least)"; fi
+
+# Nothing of the other chip may travel in this app (an x86_64 build must not leak into the arm64 DMG).
+if [ "$want_arch" = "arm64" ]; then other="x86_64"; else other="arm64"; fi
+stray="$(find "$contents" -iname "*$other*" 2>/dev/null | head -n 3)"
+if [ -z "$stray" ]; then ok "no file or folder named for $other inside the app"; else err "files named for $other inside the $want_arch app: $(echo $stray)"; fi
 
 # --- Gatekeeper and ticket ---
 section "Gatekeeper and notarization ticket"
