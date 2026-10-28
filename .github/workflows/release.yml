@@ -79,7 +79,7 @@ jobs:
             arch -x86_64 /usr/bin/true || { echo "::error::Rosetta is not available on this runner"; exit 1; }
           fi
 
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.TAG }}
 
@@ -87,7 +87,7 @@ jobs:
         with:
           toolchain: stable
           targets: ${{ matrix.arch == 'x86_64' && 'x86_64-apple-darwin' || '' }}
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
       - name: Check the tag matches the workspace version
         run: |
@@ -146,7 +146,7 @@ jobs:
           xcodebuild -version
 
       - name: Cache the sherpa-onnx archive and the speaker models
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: packaging/sherpa/.downloads
           key: sherpa-${{ matrix.arch }}-${{ hashFiles('packaging/sherpa/fetch-macos.sh', 'packaging/sherpa/fetch-models.sh') }}
@@ -156,7 +156,7 @@ jobs:
 
       - name: Cache the FFmpeg build
         id: ffcache
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             packaging/ffmpeg/.downloads
@@ -176,7 +176,7 @@ jobs:
       # by the script), built static (Metal on arm64; CPU only on Intel until measured). `make bundle-release` refuses to build without it.
       - name: Cache the llama-server build
         id: llamacache
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             packaging/llama/.downloads
@@ -276,7 +276,7 @@ jobs:
           } > "dist/footer-$CM_ARCH.md"
 
       - name: Keep the release files
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-files-${{ matrix.arch }}
           path: dist/
@@ -297,7 +297,7 @@ jobs:
     permissions:
       contents: write # create the draft release; no other job has this
     steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: release-files-*
           merge-multiple: true

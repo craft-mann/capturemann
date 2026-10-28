@@ -29,12 +29,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable (branch tip)
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       # The FFmpeg-gated tests (export: EXP AC3, AC6-AC8) print SKIPPED and pass when no ffmpeg is
       # on PATH, so install one; otherwise CI would not cover the export path at all.
       - name: Install FFmpeg (macOS)
@@ -47,7 +47,7 @@ jobs:
       # The speaker engine (AI-8) links the pinned sherpa-onnx static libraries; `.cargo/config.toml`
       # points SHERPA_ONNX_LIB_DIR at packaging/sherpa/out/lib. The build never downloads them.
       - name: Cache the sherpa-onnx archive and the speaker models
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: packaging/sherpa/.downloads
           key: sherpa-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packaging/sherpa/fetch-macos.sh', 'packaging/sherpa/fetch-models.sh') }}
@@ -65,15 +65,15 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable (branch tip)
         with:
           toolchain: "1.95"
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       # The speaker engine (AI-8) links the pinned sherpa-onnx static libraries; `.cargo/config.toml`
       # points SHERPA_ONNX_LIB_DIR at packaging/sherpa/out/lib. The build never downloads them.
       - name: Cache the sherpa-onnx archive and the speaker models
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: packaging/sherpa/.downloads
           key: sherpa-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packaging/sherpa/fetch-macos.sh', 'packaging/sherpa/fetch-models.sh') }}
@@ -86,15 +86,15 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable (branch tip)
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       # The speaker engine (AI-8) links the pinned sherpa-onnx static libraries; `.cargo/config.toml`
       # points SHERPA_ONNX_LIB_DIR at packaging/sherpa/out/lib. The build never downloads them.
       - name: Cache the sherpa-onnx archive and the speaker models
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: packaging/sherpa/.downloads
           key: sherpa-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packaging/sherpa/fetch-macos.sh', 'packaging/sherpa/fetch-models.sh') }}
@@ -106,7 +106,7 @@ jobs:
       - name: Show entitlements
         run: codesign -d --entitlements - target/bundle/CaptureMann.app
       - run: ditto -c -k --keepParent target/bundle/CaptureMann.app target/bundle/CaptureMann.zip
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: CaptureMann-macos-adhoc
           path: target/bundle/CaptureMann.zip
@@ -116,7 +116,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Every relative link in a Markdown file must point at a tracked file.
       - run: python3 scripts/check_md_links.py
 
@@ -124,7 +124,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
         with:
           # `command` is the whole subcommand line: `arguments` goes after it and would be read as
