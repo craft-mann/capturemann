@@ -231,6 +231,11 @@ impl Render for Studio {
             self.settings.update(cx, |s, cx| s.sync_request(cx));
         }
         let section = self.settings.read(cx).current_section(&route);
+        let audio_open = matches!(route, Route::RecordingEditor(_))
+            && self
+                .rec_editor
+                .read(cx)
+                .audio_open(&self.app.read(cx).library_route);
         let status = agent_status_of(&self.app.read(cx).backend);
         let sidebar = sidebar(
             &t,
@@ -242,6 +247,7 @@ impl Render for Studio {
                 status,
                 library_route,
                 section,
+                audio_open,
             },
             &self.app,
             &self.settings,

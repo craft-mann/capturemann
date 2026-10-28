@@ -551,6 +551,8 @@ impl AudioBank {
                 sample_rate: AUDIO_RATE,
                 out_channels: 2,
                 loudness_lufs: None,
+                // Only listened to: no measurements, no limiter unless a sample is over.
+                preview: true,
                 ..MixParams::default()
             },
         )

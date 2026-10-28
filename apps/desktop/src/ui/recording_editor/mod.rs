@@ -381,6 +381,16 @@ impl RecordingEditor {
         self.id.is_some()
     }
 
+    /// The open recording is an audio recording (the sidebar then highlights Audio, not
+    /// Recordings). While it still loads the page the user came from decides.
+    pub fn audio_open(&self, came_from: &crate::ui::app::Route) -> bool {
+        match &self.load {
+            Load::Ready(s) => s.voice.audio,
+            Load::Loading => *came_from == crate::ui::app::Route::Audio,
+            Load::Idle | Load::Failed(_) => false,
+        }
+    }
+
     /// Opens recording `id` (a no-op while it is open).
     pub fn set_capture(&mut self, id: &str, cx: &mut Context<Self>) {
         if self.id.as_deref() == Some(id) {

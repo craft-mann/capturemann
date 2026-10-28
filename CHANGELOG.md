@@ -9,6 +9,9 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 - A long recording no longer fails its report with `invalid_model_output`. When one piece's notes did not fit in the model's reply limit, the JSON was cut off and the retry had no room left; the piece is now split in half (or, for the merge, the notes are kept side by side). Seen on a 2.5-hour Vietnamese recording. 0.2.0 and 0.2.1 have the problem.
 
+- The audio editor of a long recording plays again right away. Mixing the preview of an 88-minute recording took about 45 seconds and 12 GB of memory (the exporter's loudness measurement and true-peak limiter ran over the whole mix), and Play was silent until it finished; it now takes under a second and about half the memory. Exports are unchanged.
+- The sidebar highlights Audio, not Recordings, while an audio recording is open in the editor.
+
 ### Changed
 
 - Report exports leave out the citation times by default: Markdown, TXT and Copy no longer print `[mm:ss]` after every item. A new box "Include citation times" under the report (and `include_times` / `capturemann ai report export --times`) adds them. The marked moments keep their times; the report view still shows every citation and seeks.

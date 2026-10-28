@@ -169,6 +169,15 @@ pub fn entries(route: &Route, counts: &NavCounts) -> Vec<NavEntry> {
     entries_of(&NavItem::ALL, route, counts)
 }
 
+/// The route the sidebar highlight follows: the page's own, except that the editor of an audio
+/// recording belongs under Audio, not Recordings.
+pub fn highlight_route(route: &Route, audio_open: bool) -> Route {
+    match (route, audio_open) {
+        (Route::RecordingEditor(_), true) => Route::Audio,
+        (r, _) => r.clone(),
+    }
+}
+
 /// The LIBRARY group.
 pub fn library_entries(route: &Route, counts: &NavCounts) -> Vec<NavEntry> {
     entries_of(&NavItem::LIBRARY, route, counts)
@@ -581,6 +590,32 @@ mod tests {
         assert_eq!(of(Route::Agents), N::Agents);
         assert_eq!(of(Route::Permissions), N::Settings);
         assert_eq!(of(Route::Destinations), N::Settings);
+    }
+
+    /// The editor of an audio recording highlights Audio; a screen recording's editor keeps
+    /// Recordings (seen on Oct 28, 2026: audio recordings lit up Recordings).
+    #[test]
+    fn an_audio_recordings_editor_highlights_audio() {
+        let editor = Route::RecordingEditor("rec_1".into());
+        let counts = NavCounts::default();
+        let active = |route: &Route| {
+            library_entries(route, &counts)
+                .into_iter()
+                .filter(|e| e.active)
+                .map(|e| e.item)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            active(&highlight_route(&editor, true)),
+            vec![NavItem::Audio]
+        );
+        assert_eq!(
+            active(&highlight_route(&editor, false)),
+            vec![NavItem::Recordings]
+        );
+        // Other pages are not touched by the flag.
+        assert_eq!(highlight_route(&Route::Ai, true), Route::Ai);
+        assert_eq!(highlight_route(&Route::Recordings, true), Route::Recordings);
     }
 
     /// PUB-2 and the board: the publish page highlights Published (it used to say Recordings).

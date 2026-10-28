@@ -267,3 +267,77 @@ fn silence_mixes_to_silence() {
     assert!(out.samples.iter().all(|v| *v == 0.0));
     assert_eq!(out.integrated_lufs, None);
 }
+
+/// The preview mix (seen on Oct 28, 2026: an 88 minute recording took 45 s and 12 GB to mix, and
+/// Play was silent until it was ready): a quiet mix is the exporter's mix, bit for bit, without
+/// the measurements.
+#[test]
+fn a_quiet_preview_mix_equals_the_exported_mix() {
+    let mic = sine(440.0, 0.3, 3.0);
+    let sys = sine(1500.0, 0.2, 3.0);
+    let tl = list(3, &[]).timeline();
+    let export = mix_tracks(&[track(&mic, 1), track(&sys, 1)], &[], &tl, &mono_params()).unwrap();
+    let preview = MixParams {
+        preview: true,
+        ..mono_params()
+    };
+    let p = mix_tracks(&[track(&mic, 1), track(&sys, 1)], &[], &tl, &preview).unwrap();
+    assert_eq!(p.samples, export.samples);
+    assert_eq!(p.integrated_lufs, None, "not measured");
+    assert!(export.integrated_lufs.is_some());
+    // The sample peak in dBFS stands in for the true peak.
+    let peak = p.samples.iter().fold(0f32, |m, v| m.max(v.abs()));
+    assert!((p.true_peak_dbtp - 20.0 * f64::from(peak).log10()).abs() < 1e-6);
+}
+
+/// A loud preview mix is bent under the ceiling, and what is below the knee is not touched.
+#[test]
+fn a_loud_preview_mix_is_soft_clipped_under_the_ceiling() {
+    let mut x = sine(250.0, 0.05, 4.0);
+    for i in (0..x.len()).step_by(RATE as usize / 2) {
+        x[i] = 1.4;
+        x[i + 1] = -1.4;
+    }
+    let tl = list(4, &[]).timeline();
+    let params = MixParams {
+        preview: true,
+        ..mono_params()
+    };
+    let out = mix_tracks(&[track(&x, 1)], &[], &tl, &params).unwrap();
+    let ceiling = 10f32.powf(TRUE_PEAK_CEILING_DBTP as f32 / 20.0);
+    assert!(
+        out.samples.iter().all(|v| v.abs() <= ceiling + 1e-6),
+        "over the ceiling"
+    );
+    // (Away from the 2 ms fades every render puts on its first and last samples.)
+    let edge = 500;
+    let inner = edge..x.len() - edge;
+    for (i, (a, b)) in x.iter().zip(&out.samples).enumerate() {
+        if inner.contains(&i) && a.abs() <= SOFT_KNEE {
+            assert_eq!(a, b, "a sample below the knee changed at {i}");
+        }
+    }
+    let mid = RATE as usize / 2;
+    assert!(
+        out.samples[mid] > SOFT_KNEE,
+        "the peak is bent, not removed"
+    );
+}
+
+/// The first track is the mix and the others are added: the sum of two tracks is still the sum.
+#[test]
+fn tracks_still_add_up() {
+    let a = sine(440.0, 0.2, 2.0);
+    let b = sine(880.0, 0.1, 2.0);
+    let tl = list(2, &[]).timeline();
+    let both = mix_tracks(&[track(&a, 1), track(&b, 1)], &[], &tl, &mono_params()).unwrap();
+    let only_a = mix_tracks(&[track(&a, 1)], &[], &tl, &mono_params()).unwrap();
+    let only_b = mix_tracks(&[track(&b, 1)], &[], &tl, &mono_params()).unwrap();
+    for i in 0..both.samples.len() {
+        assert!((both.samples[i] - only_a.samples[i] - only_b.samples[i]).abs() < 1e-6);
+    }
+    // No tracks at all is silence of the timeline's length.
+    let none = mix_tracks(&[], &[], &tl, &mono_params()).unwrap();
+    assert_eq!(none.samples.len(), 2 * RATE as usize);
+    assert!(none.samples.iter().all(|v| *v == 0.0));
+}

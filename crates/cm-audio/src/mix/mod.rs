@@ -58,6 +58,14 @@ pub struct MixParams {
     /// (the "Source" preset). The limiter always runs.
     pub loudness_lufs: Option<f64>,
     pub true_peak_dbtp: f64,
+    /// A mix that is only listened to (the editor's preview) and never measured or written: the
+    /// loudness and true-peak measurements are skipped (`integrated_lufs` is `None` and
+    /// `true_peak_dbtp` is the sample peak in dBFS) and the true-peak limiter is replaced by a
+    /// soft clip that only touches samples above [`SOFT_KNEE`] and never passes the ceiling.
+    /// On a long recording the limiter's oversampling and the measurements took 45 s and 12 GB
+    /// for 88 minutes of speech, and until the mix was ready Play was silent. The exporter leaves
+    /// this off.
+    pub preview: bool,
 }
 
 impl Default for MixParams {
@@ -67,6 +75,28 @@ impl Default for MixParams {
             out_channels: 2,
             loudness_lufs: None,
             true_peak_dbtp: TRUE_PEAK_CEILING_DBTP,
+            preview: false,
+        }
+    }
+}
+
+/// Linear level above which a preview mix is soft-clipped (about -2 dBFS).
+pub const SOFT_KNEE: f32 = 0.8;
+
+/// Keeps `samples` under `ceiling` (linear) without a true-peak limiter: levels up to
+/// [`SOFT_KNEE`] pass unchanged, louder ones bend smoothly towards the ceiling.
+fn soft_clip(samples: &mut [f32], ceiling: f32) {
+    if ceiling <= SOFT_KNEE {
+        samples
+            .iter_mut()
+            .for_each(|v| *v = v.clamp(-ceiling, ceiling));
+        return;
+    }
+    let room = ceiling - SOFT_KNEE;
+    for v in samples.iter_mut() {
+        let a = v.abs();
+        if a > SOFT_KNEE {
+            *v = v.signum() * (SOFT_KNEE + room * ((a - SOFT_KNEE) / room).tanh());
         }
     }
 }
@@ -184,6 +214,10 @@ fn render_range(
         channels,
         out_channels,
     );
+    // Same length in and out is speed 1, where `stretch` only copies: keep the buffer.
+    if src.len() == out_frames * out_channels {
+        return src;
+    }
     stretch(
         &src,
         out_channels,
@@ -292,17 +326,28 @@ pub fn mix_tracks(
 ) -> Result<MixedAudio, CmError> {
     let channels = usize::from(params.out_channels);
     let total = frames_at(timeline.duration().ticks(), params.sample_rate).max(0) as usize;
-    let mut mix = vec![0f32; total * channels];
+    // The first track's render is the mix (no second buffer of the whole recording); the others
+    // are added to it.
+    let mut mix: Option<Vec<f32>> = None;
     for t in tracks {
         let rendered = render_track(t, gaps, timeline, params)?;
-        for (m, v) in mix.iter_mut().zip(&rendered) {
-            *m += v;
+        match mix.as_mut() {
+            None => mix = Some(rendered),
+            Some(m) => {
+                for (m, v) in m.iter_mut().zip(&rendered) {
+                    *m += v;
+                }
+            }
         }
     }
+    let mut mix = mix.unwrap_or_else(|| vec![0f32; total * channels]);
     let rate = params.sample_rate;
     let mut applied = 0.0;
-    if let (Some(target), Some(now)) = (params.loudness_lufs, integrated_lufs(&mix, channels, rate))
-    {
+    // Measure only when there is a target (the measurement is a full pass over the mix).
+    let measured = params
+        .loudness_lufs
+        .and_then(|target| integrated_lufs(&mix, channels, rate).map(|now| (target, now)));
+    if let Some((target, now)) = measured {
         // Limiting lowers the level a little, so close the gap in up to three rounds.
         let mut current = now;
         for _ in 0..3 {
@@ -319,6 +364,26 @@ pub fn mix_tracks(
                 None => break,
             }
         }
+    }
+    if params.preview {
+        let peak = mix.iter().fold(0f32, |p, v| p.max(v.abs()));
+        let ceiling = 10f64.powf(params.true_peak_dbtp / 20.0) as f32;
+        if peak > SOFT_KNEE {
+            soft_clip(&mut mix, ceiling);
+        }
+        let peak = mix.iter().fold(0f32, |p, v| p.max(v.abs()));
+        return Ok(MixedAudio {
+            integrated_lufs: None,
+            true_peak_dbtp: if peak > 0.0 {
+                20.0 * f64::from(peak).log10()
+            } else {
+                SILENCE_DB
+            },
+            samples: mix,
+            channels: params.out_channels,
+            sample_rate: rate,
+            normalise_gain_db: applied,
+        });
     }
     limit_true_peak(&mut mix, channels, rate, params.true_peak_dbtp);
     Ok(MixedAudio {

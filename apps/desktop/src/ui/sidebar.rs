@@ -36,6 +36,16 @@ pub struct SidebarProps {
     pub library_route: Route,
     /// The settings section the page shows (highlighted in settings mode).
     pub section: SettingsSection,
+    /// The recording editor shows an audio recording: Audio is the highlighted item, not Recordings.
+    pub audio_open: bool,
+}
+
+impl SidebarProps {
+    /// The route the highlight follows: the page's own, except that an audio recording's editor
+    /// belongs under Audio.
+    fn highlight(&self) -> Route {
+        nav::highlight_route(&self.route, self.audio_open)
+    }
 }
 
 /// Draws the sidebar for the route's mode. On the setup screen the sidebar is dimmed: still there,
@@ -365,18 +375,18 @@ fn app_body(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> Vec<AnyEleme
         group_label(t, tr_ctx!("sidebar group", "LIBRARY")),
     ];
     out.extend(
-        nav::library_entries(&p.route, &p.counts)
+        nav::library_entries(&p.highlight(), &p.counts)
             .iter()
             .map(|e| nav_button(t, app, e, None).into_any_element()),
     );
     out.push(group_label(t, tr_ctx!("sidebar group", "INTELLIGENCE")));
     out.extend(
-        nav::intelligence_entries(&p.route, &p.counts)
+        nav::intelligence_entries(&p.highlight(), &p.counts)
             .iter()
             .map(|e| nav_button(t, app, e, None).into_any_element()),
     );
     out.push(div().flex_1().into_any_element());
-    let settings = nav::entries(&p.route, &p.counts)
+    let settings = nav::entries(&p.highlight(), &p.counts)
         .into_iter()
         .find(|e| e.item == nav::NavItem::Settings)
         .expect("Settings is a nav item");
@@ -457,7 +467,7 @@ fn rail_body(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> Vec<AnyElem
             RailEntry::Nav(item) => {
                 let route = item.route();
                 let app = app.clone();
-                let active = nav::NavItem::of_route(&p.route) == item;
+                let active = nav::NavItem::of_route(&p.highlight()) == item;
                 let label = match item.count(counts) {
                     Some(n) => tr!("{name}, {n}", name = item.label(), n = n),
                     None => item.label(),
