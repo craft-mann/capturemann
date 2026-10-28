@@ -79,7 +79,7 @@ Deferred (not in 0.2.0): the first-use setup sheet (one place to get the speech 
 
 ## Release 0.2.2 (transcripts of long recordings)
 
-Scope (maintainer, Oct 28, 2026): transcript accuracy for long recordings and the fixes found while testing 0.2.1. Translation and speaker detection are a later build. **Built Oct 28, 2026; not yet released** (the table below is updated when it is).
+Scope (maintainer, Oct 28, 2026): transcript accuracy for long recordings and the fixes found while testing 0.2.1. Translation and speaker detection are a later build. **Released Oct 28, 2026** (published on GitHub by the maintainer from commit `a211785`: `CaptureMann-v0.2.2-macos-arm64.dmg` and `-x86_64.dmg`, each notarized and stapled, each `.sha256` checked after download; the Homebrew cask is at 0.2.2 and was installed from a throwaway tap on Apple Silicon: arm64 build, version 0.2.2, "Notarized Developer ID"; the Intel download URL resolves, an install on Intel was not tried). CI and the Security scan were green on that commit. The table below says how each part was checked.
 
 | Part | State | How it was checked |
 |---|---|---|
