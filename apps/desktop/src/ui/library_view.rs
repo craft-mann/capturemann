@@ -382,10 +382,20 @@ impl LibraryView {
                 let app = self.app.clone();
                 cx.spawn(async move |_, cx| {
                     let id = item.id.clone();
-                    let dir = backend
-                        .rt
-                        .spawn(async move { Backend::capture_dir(&daemon, &id).await })
-                        .await;
+                    // `get_capture` only opens screenshots: a recording or an audio capture
+                    // (`rec_` ids) is found in the library folder, as the thumbnails do.
+                    let dir = if id.starts_with("rec_") {
+                        let root = backend.library_root.clone();
+                        let found = root
+                            .and_then(|root| crate::recording::files::find_bundle(&root, &id))
+                            .ok_or_else(|| "the capture folder was not found".to_owned());
+                        Ok(found)
+                    } else {
+                        backend
+                            .rt
+                            .spawn(async move { Backend::capture_dir(&daemon, &id).await })
+                            .await
+                    };
                     cx.update(|cx| match dir {
                         Ok(Ok(dir)) => cx.reveal_path(&dir),
                         Ok(Err(e)) => {
