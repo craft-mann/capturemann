@@ -2,7 +2,7 @@
 """Cut 3 to 5 minute reference clips for the speaker and transcript accuracy measures (release 0.2.3).
 
     python3 -I tests/tools/make_reference_clips.py primock --out <dir> [--count 4]
-    <venv>/bin/python tests/tools/make_reference_clips.py ami --out <dir> [--count 3]   # needs pyarrow
+    <venv>/bin/python tests/tools/make_reference_clips.py ami --out <dir> [--count 3] [--balanced]   # needs pyarrow
 
 Each clip becomes `<name>.wav` (16 kHz mono 16-bit), `<name>.rttm.txt` (`start duration speaker`
 per line, read by `cargo run -p cm-ai --example measure -- der`) and `<name>.txt` (the reference
@@ -73,6 +73,29 @@ def window(turns, lo=MIN_SECS, hi=MAX_SECS):
     return None
 
 
+def balanced_window(turns, lo=MIN_SECS, hi=MAX_SECS, min_speakers=3):
+    """The window of `lo` to `hi` seconds (turn start to turn end) in which the quietest speaker has
+    the largest share of the speech, or None when fewer than `min_speakers` talk. Clips where one
+    person talks nearly all the time say little about telling speakers apart."""
+    turns = sorted(turns)
+    best = None
+    for first in turns[:: max(1, len(turns) // 200)]:
+        ends = [t[1] for t in turns if lo <= t[1] - first[0] <= hi]
+        if not ends:
+            continue
+        end = max(ends)
+        talk = {}
+        for a, b, who, _ in turns:
+            if a >= first[0] and b <= end:
+                talk[who] = talk.get(who, 0.0) + (b - a)
+        if len(talk) < min_speakers:
+            continue
+        share = min(talk.values()) / sum(talk.values())
+        if best is None or share > best[0]:
+            best = (share, first[0], end)
+    return best and (best[1], best[2]) if best and best[0] >= 0.08 else None
+
+
 def write_clip(out: Path, name: str, wav_cmd, turns, start: float, end: float):
     out.mkdir(parents=True, exist_ok=True)
     wav = out / f"{name}.wav"
@@ -131,7 +154,7 @@ def primock(out: Path, count: int):
         done += 1
 
 
-def ami(out: Path, count: int):
+def ami(out: Path, count: int, balanced: bool = False):
     try:
         import pyarrow.parquet as pq
     except ImportError:
@@ -150,7 +173,7 @@ def ami(out: Path, count: int):
                 )
             ]
             turns = [t for t in turns if t[3]]
-            w = window(turns)
+            w = balanced_window(turns) if balanced else window(turns)
             if not w:
                 continue
             src = cache / f"{row['file_name']}.wav"
@@ -172,8 +195,12 @@ def main():
     p.add_argument("source", choices=["primock", "ami"])
     p.add_argument("--out", required=True, type=Path)
     p.add_argument("--count", type=int, default=3)
+    p.add_argument("--balanced", action="store_true", help="ami: only windows where every speaker has a real share")
     a = p.parse_args()
-    (primock if a.source == "primock" else ami)(a.out, a.count)
+    if a.source == "primock":
+        primock(a.out, a.count)
+    else:
+        ami(a.out, a.count, a.balanced)
 
 
 if __name__ == "__main__":
