@@ -68,3 +68,22 @@ Finding speakers (CPU, one blocking call):
 - Whisper (370 s) and the speaker run (532 s) run one after the other today, so 88 minutes cost about 15 minutes in total.
 
 Not measured yet: reports and translation (need the built-in text model), export, app start, library and editor open.
+
+## The two fixes (PERF-1), before and after
+
+Same machine and clips. "Before" is the build at `7785e9e`; "after" has speaker finding on up to 8 threads and the speaker run started with the transcription. The speaker count is given (`--people`), which is the path the app takes after every recording. Unknown-count runs are in the table above.
+
+| What | Before | After | Change |
+|---|---|---|---|
+| Speaker finding, 11 min English, 4 threads, then 8 | 33.9 s | 28.0 s | 17 % faster; the turns are identical (checked file against file) |
+| Speaker finding, 88 min Vietnamese, count given | 274.6 s | 216.8 s | 21 % faster |
+| Transcript + speakers, 11 min, one after the other | 24.6 + 28.0 = 52.6 s | 37 to 38 s together | about 28 % sooner |
+| Transcript + speakers, 88 min, one after the other | 370 + 217 = 587 s | 483 s together | 18 % sooner |
+| Transcript text, 11 min (1581 words), alone against with the speaker run beside it | | | identical, compared word for word |
+
+Side effects, measured: when both run together the transcript itself is ready later (24.6 s to 29 to 30 s for 11 minutes; 370 s to 458 s for 88 minutes) and the speaker run takes longer than it does alone (217 s to 483 s for 88 minutes), because the two share the machine. The whole job is done sooner, the transcript alone is not. Whisper threads (1, 2, 4) and speaker threads (2 to 8) did not change this much.
+
+Tried and not shipped:
+
+- **A smaller window overlap** (`window_shift_ratio` 0.1 to 0.2, 0.25, 0.34, 0.5): 2x to 6x faster, but the answers move. On the 8 tuning clips mean DER was 22.1 % at 0.1, 29.1 % at 0.2, 20.8 % at 0.25, 27.6 % at 0.34, 28.7 % at 0.5, and the right count came out 5, 3, 6, 4, 5 of 8. The threshold (1.0) was tuned at 0.1, so the change needs its own tuning and a bigger test set than 14 English clips.
+- **14 threads for speaker finding:** slower (56 s against 28 s), because the others wait for the slower efficiency cores.

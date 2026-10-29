@@ -414,7 +414,10 @@ impl ProgressBar {
 #[cfg(feature = "sherpa")]
 #[derive(Debug, Clone, Default)]
 pub struct SherpaEngine {
-    /// Threads for each model; 0 picks `min(4, cores)`.
+    /// Threads for each model; 0 picks the number of performance cores of an Apple Silicon Mac
+    /// (4 to 8), else `min(4, cores)`. PERF-1: 8 threads finished an 11 minute file in 28 s
+    /// against 34 s with 4 on a Mac with 10 performance cores, with identical turns; 14
+    /// threads, which reach the efficiency cores, took 56 s.
     pub threads: i32,
 }
 
@@ -435,8 +438,11 @@ impl TurnEngine for SherpaEngine {
         let threads = if self.threads > 0 {
             self.threads
         } else {
-            std::thread::available_parallelism()
-                .map_or(2, |n| n.get().min(4))
+            cm_core::perf::performance_cores()
+                .map(|p| p.clamp(4, 8))
+                .unwrap_or_else(|| {
+                    std::thread::available_parallelism().map_or(2, |n| n.get().min(4))
+                })
                 .try_into()
                 .unwrap_or(2)
         };
@@ -483,12 +489,14 @@ impl TurnEngine for SherpaEngine {
         }
         let mut stopped = false;
         let mut bar = ProgressBar::default();
+        let pass = cm_core::perf::span("speakers", "pass");
         let result = engine.process_with_progress(samples, &mut |done, total| {
             if !progress(bar.fraction(done, total)) {
                 stopped = true;
             }
             !stopped
         });
+        drop(pass);
         if stopped {
             return Err(cancelled());
         }

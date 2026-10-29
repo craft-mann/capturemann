@@ -164,11 +164,43 @@ pub fn peak_rss_bytes() -> Option<u64> {
     }
 }
 
+/// How many performance cores an Apple Silicon Mac has (its efficiency cores slow a run that
+/// waits for its slowest thread). `None` on any other computer, where nothing is known about the
+/// cores beyond their count.
+pub fn performance_cores() -> Option<usize> {
+    #[cfg(target_os = "macos")]
+    {
+        let mut n: libc::c_int = 0;
+        let mut len = std::mem::size_of::<libc::c_int>();
+        // SAFETY: the name is a NUL-terminated literal and `n`/`len` are valid for `len` bytes.
+        let ok = unsafe {
+            libc::sysctlbyname(
+                c"hw.perflevel0.logicalcpu".as_ptr(),
+                (&raw mut n).cast(),
+                &raw mut len,
+                std::ptr::null_mut(),
+                0,
+            ) == 0
+        };
+        if ok && n > 0 {
+            return usize::try_from(n).ok();
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     // The records are process-wide, so each test uses run names of its own.
+    #[test]
+    fn performance_cores_never_exceeds_the_logical_cores() {
+        if let Some(n) = performance_cores() {
+            assert!(n >= 1 && n <= std::thread::available_parallelism().unwrap().get());
+        }
+    }
+
     #[test]
     fn spans_add_up_per_phase_and_count_entries() {
         begin("t_spans");

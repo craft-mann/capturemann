@@ -4,7 +4,7 @@
 //! ```text
 //! cargo run --release -p cm-ai --example perf -- <task> <audio file> [--secs N] [--tile-to-secs N]
 //!     [--model <ggml file> --model-id <id>] [--gpu on|off] [--threads N] [--language vi]
-//!     [--sherpa <dir with the two speaker .onnx files>] [--label <short id for the report>]
+//!     [--sherpa <dir with the two speaker .onnx files>] [--people N] [--speaker-threads N] [--label <short id for the report>]
 //! ```
 //!
 //! Tasks: `decode` (FFmpeg to 16 kHz mono), `transcribe` (decode, load, then the app's piece-by-piece
@@ -128,7 +128,15 @@ fn main() {
         "speakers" => {
             let models = PathBuf::from(option(&args, "--sherpa").expect("--sherpa <dir>"));
             let dir = tempfile::tempdir().unwrap();
-            let d = SherpaDiarizer::new(speaker_store(dir.path(), &models));
+            let store = speaker_store(dir.path(), &models);
+            // --speaker-threads N pins the thread count (the app picks its own when absent).
+            let d = match option(&args, "--speaker-threads").and_then(|s| s.parse().ok()) {
+                Some(threads) => SherpaDiarizer::with_engine(
+                    store,
+                    std::sync::Arc::new(cm_ai::speaker_engine::SherpaEngine { threads }),
+                ),
+                None => SherpaDiarizer::new(store),
+            };
             let input = DiarizeInput {
                 mix: &samples,
                 mic: None,
@@ -137,7 +145,11 @@ fn main() {
                 gaps: &[],
             };
             let opts = DiarizeOptions {
-                hints: DiarizeHints::default(),
+                // --people N is the automatic path of the app (the count is known, one pass).
+                hints: DiarizeHints {
+                    num_speakers: option(&args, "--people").and_then(|s| s.parse().ok()),
+                    ..DiarizeHints::default()
+                },
                 headset: false,
                 display_name: "Me",
                 created: "2026-10-29T00:00:00Z",

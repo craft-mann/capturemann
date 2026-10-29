@@ -211,25 +211,28 @@ impl Inner {
         }))
     }
 
-    /// The automatic speaker step for one finished transcript (see
-    /// [`Daemon::start_ai_auto_speakers`]). Quietly does nothing unless everything is in place;
-    /// `tried` remembers the transcript version (file size and time) a run was queued for.
+    /// The automatic speaker step for one transcript (see [`Daemon::start_ai_auto_speakers`]).
+    /// Quietly does nothing unless everything is in place; `tried` remembers the transcript
+    /// version (file size and time) a run was queued for. Answers whether a run is queued (or
+    /// was already running) for the recording.
     pub(super) async fn auto_diarize(
         &self,
         capture_id: &str,
         tried: &mut std::collections::HashMap<String, String>,
-    ) -> Result<(), DaemonError> {
-        let Some(rt) = &self.jobs else { return Ok(()) };
+    ) -> Result<bool, DaemonError> {
+        let Some(rt) = &self.jobs else {
+            return Ok(false);
+        };
         if !rt.queue.has_handler(JOB_DIARIZE) {
-            return Ok(());
+            return Ok(false);
         }
         let settings = self.settings.all().unwrap_or_default();
         if !auto_speakers_enabled(&settings) {
-            return Ok(());
+            return Ok(false);
         }
         let service = self.ai.speakers.clone();
         if !service.available() || blocking(move || service.ready()).await.is_err() {
-            return Ok(());
+            return Ok(false);
         }
         let (library, id) = (self.library.clone(), capture_id.to_owned());
         let plan = blocking(move || {
@@ -282,10 +285,10 @@ impl Inner {
         })
         .await;
         let Ok(Some((count, version))) = plan else {
-            return Ok(());
+            return Ok(false);
         };
         if count <= 1 || tried.get(capture_id) == Some(&version) {
-            return Ok(());
+            return Ok(false);
         }
         let hints = spk::DiarizeHints {
             num_speakers: Some(count),
@@ -304,8 +307,9 @@ impl Inner {
                             "num_speakers": count, "automatic": true }),
                 );
             }
+            return Ok(true);
         }
-        Ok(())
+        Ok(false)
     }
 
     /// `set_speakers`: rename, merge and reassign as ONE revision (AI-8.AC4, AC5).

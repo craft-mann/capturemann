@@ -805,6 +805,69 @@ async fn ai_8_a_failed_auto_run_is_not_repeated_for_the_same_transcript() {
     assert_eq!(r.ai.diarize_calls().len(), 1);
 }
 
+fn started_event(r: &Rig) {
+    r.daemon.event_bus().publish(
+        "transcript.started",
+        json!({"capture_id": r.id, "automatic": true}),
+    );
+}
+
+/// PERF-1: the speaker run does not wait for the transcript. An automatic transcription starts
+/// it at once (the two run side by side), and the transcript that follows starts no second run.
+#[tokio::test]
+async fn perf_1_auto_speakers_start_with_the_transcription() {
+    let r = speaker_rig().await;
+    r.daemon.start_ai_auto_speakers();
+    tokio::task::yield_now().await;
+    started_event(&r);
+    until_jobs_done(&r, 1).await;
+    assert_eq!(r.ai.diarize_calls().len(), 1);
+    // No transcript exists yet, and the run was queued as the same job as before.
+    let jobs = user(&r, "list_jobs", json!({"type": "transcribe"}))
+        .await
+        .unwrap();
+    assert!(jobs["jobs"].as_array().unwrap().is_empty());
+    transcribe_now(&r).await;
+    ready_event(&r);
+    settle().await;
+    assert_eq!(diarize_jobs(&r).await, 1);
+    assert_eq!(r.ai.diarize_calls().len(), 1);
+    let t = user(&r, "get_transcript", json!({})).await.unwrap();
+    assert!(!names(&t["speakers"]).is_empty());
+}
+
+/// PERF-1: a run that failed after starting early is not retried when the transcript is ready.
+#[tokio::test]
+async fn perf_1_a_failed_early_run_is_not_repeated_at_transcript_ready() {
+    let r = speaker_rig().await;
+    r.ai.fail_diarize_with(cm_core::CmError::internal("model crashed"));
+    r.daemon.start_ai_auto_speakers();
+    tokio::task::yield_now().await;
+    started_event(&r);
+    until_jobs_done(&r, 1).await;
+    ready_event(&r);
+    settle().await;
+    assert_eq!(diarize_jobs(&r).await, 1);
+    assert_eq!(r.ai.diarize_calls().len(), 1);
+}
+
+/// PERF-1: when nothing could be queued at `transcript.started` (here: the recording is not
+/// ready), `transcript.ready` still starts the run.
+#[tokio::test]
+async fn perf_1_ready_starts_the_run_when_started_could_not() {
+    let r = speaker_rig().await;
+    r.daemon.start_ai_auto_speakers();
+    tokio::task::yield_now().await;
+    r.daemon
+        .event_bus()
+        .publish("transcript.started", json!({"capture_id": "rec_missing"}));
+    settle().await;
+    assert_eq!(diarize_jobs(&r).await, 0);
+    transcribe_now(&r).await;
+    until_jobs_done(&r, 1).await;
+    assert_eq!(r.ai.diarize_calls().len(), 1);
+}
+
 /// The default and the count rules, without a daemon.
 #[test]
 fn ai_8_auto_speakers_defaults() {

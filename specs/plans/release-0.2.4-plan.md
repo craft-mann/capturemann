@@ -154,6 +154,8 @@ it can be pasted into an issue). A result from another machine is labelled with 
 
 ### 2.3 Choosing the top two
 
+*Status (Oct 29, 2026): chosen and done from the first table: speaker finding beside the transcription, and 8 speaker threads on Apple Silicon (`docs/project/performance.md`). Report and translation rows are still to be measured and may change the ranking.*
+
 After the table exists, rank findings by **user-visible cost = (time or memory over what the user would
 accept) x (how often the action happens)**, and take the two highest that have a general, low-risk fix.
 The plan does not guess them, but these are the candidates the code already hints at, in the order I would
