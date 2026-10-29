@@ -6,12 +6,13 @@ process high-water mark, so configurations must not share a process). Results ar
 JSONL file, so an interrupted run resumes and a finished one is not repeated.
 
     python3 -I tests/tools/perf_matrix.py --clips clips.json --models <models dir> --sherpa <dir> \\
-        --out <dir> --suite models|threads|speakers|decode|all [--runs 3] [--max-load 2.0]
+        --out <dir> --suite models|threads|speakers|decode|all [--runs 3] [--max-busy 25]
 
 `clips.json` (kept outside the repository, it names private recordings):
     {"s1": {"path": "/abs/file.wav", "lang": "vi", "note": "short, real"}, ...}
-The report names clips by their id, length and language only. Needs a quiet machine: it refuses to
-start when the 1-minute load average is above --max-load, and records power state and memory.
+The report names clips by their id, length and language only. Needs a quiet machine: it waits
+until the CPU is less than --max-busy percent in use by other work (the load average is not used: it
+stays high on a Mac that runs a virtual machine) and records the busy percentage of every run.
 """
 import argparse
 import json
@@ -32,6 +33,14 @@ def sh(*cmd):
         return ""
 
 
+def cpu_busy():
+    """Percent of the CPU in use by everything else (two `top` samples, the second counts)."""
+    out = sh("top", "-l", "2", "-n", "0", "-s", "1")
+    line = [l for l in out.splitlines() if l.startswith("CPU usage")][-1]
+    idle = float(line.split("sys,")[1].split("% idle")[0])
+    return round(100 - idle, 1)
+
+
 def machine():
     return {
         "chip": sh("sysctl", "-n", "machdep.cpu.brand_string"),
@@ -41,7 +50,7 @@ def machine():
         "macos": sh("sysctl", "-n", "kern.osproductversion"),
         "power": sh("pmset", "-g", "batt").splitlines()[0] if sh("pmset", "-g", "batt") else "",
         "commit": sh("git", "-C", REPO, "rev-parse", "--short", "HEAD"),
-        "load_at_start": os.getloadavg()[0],
+        "busy_at_start": cpu_busy(),
     }
 
 
@@ -163,7 +172,7 @@ def main():
     ap.add_argument("--suite", default="all")
     ap.add_argument("--runs", type=int, default=3)
     ap.add_argument("--long-runs", type=int, default=1, help="runs for inputs over 30 minutes")
-    ap.add_argument("--max-load", type=float, default=2.0)
+    ap.add_argument("--max-busy", type=float, default=25.0, help="refuse to start above this percent CPU busy")
     ap.add_argument("--report-only", action="store_true")
     a = ap.parse_args()
     clips = json.load(open(a.clips))
@@ -172,18 +181,19 @@ def main():
     rows = [json.loads(l) for l in open(jl)] if os.path.exists(jl) else []
     mach = machine()
     if not a.report_only:
-        if mach["load_at_start"] > a.max_load:
-            sys.exit("load average %.1f is above %.1f: close other work and try again" % (mach["load_at_start"], a.max_load))
+        while cpu_busy() > a.max_busy:
+            print("waiting for a quiet machine (CPU busy above %.0f%%)" % a.max_busy, flush=True)
+            time.sleep(30)
         for c in configs(a.suite, clips, a.models, a.sherpa):
             n_have = sum(1 for r in rows if r["key"] == key(c))
             secs = clips[c["clip"]].get("secs", 0) * (150 / (clips[c["clip"]].get("secs", 1) / 60) if "tiled" in c["tag"] else 1)
             want = a.long_runs if (secs > 1800 or "tiled" in c["tag"]) else a.runs
             for i in range(n_have, want):
-                load = os.getloadavg()[0]
-                print("run", key(c), i + 1, "of", want, "load %.1f" % load, flush=True)
+                load = cpu_busy()
+                print("run", key(c), i + 1, "of", want, "busy %.0f%%" % load, flush=True)
                 r = run_once(c, clips)
                 r["key"] = key(c)
-                r["load_before"] = load
+                r["busy_before"] = load
                 rows.append(r)
                 with open(jl, "a") as f:
                     f.write(json.dumps(r) + "\n")
