@@ -5,7 +5,9 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
-0.2.3 is about speaker detection, plus the Intel Mac recording crash and two fixes found while testing 0.2.2.
+## [0.2.3] - 2026-10-29
+
+0.2.3 is about speaker detection, plus the Intel Mac recording crash and the fixes found while testing 0.2.2.
 
 ### Fixed
 
@@ -18,6 +20,19 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 - **Speaker detection uses a better voice model.** The English-only CAM++ model is replaced by the 3D-Speaker CAM++ Chinese-English model (Apache-2.0, 28 MB), and the clustering threshold for an unknown number of people is 1.0 instead of 1.2. On 6 public English conversation clips held back while choosing, the diarization error rate fell from 54 % to 17 % (51 % for calling everyone one speaker) and the speaker count was right in 5 of 6 clips, against 0 of 6. English only: Vietnamese is not measured yet. Details and caveats: `verification/benchmarks/speaker-detection-2026-10-29.md`. Speakers found by 0.2.2 stay as they are until you run Find speakers again.
 - Finding speakers shows real progress instead of 0 % until it ends. Cancel still takes effect when the run ends (the speaker library ignores a request to stop).
+
+### Added
+
+- **Languages you speak** (AI page, setting `ai.languages`): see the transcript fix above. The `transcribe` tool and `capturemann ai transcribe` take a list such as `vi,en`.
+- A benchmark folder, `verification/benchmarks/`, with the speaker-detection benchmark (setup, public data, results, what it does not show) and the tools behind it: word and diarization error rates (`cm-ai` `measure`), the baseline runner (`baseline`), a draft-reference maker for your own recordings, `tests/tools/make_reference_clips.py` for PriMock57 and AMI clips, and `lang_probe`, which prints Whisper's language probabilities. None of it ships in the app.
+
+### Known limitations
+
+- Speaker accuracy is measured on 14 English conversation clips only. Vietnamese and other languages are not measured, so the accuracy criteria of speaker labels stay open. The speaker count is still a suggestion: 3 of 8 tuning clips and 1 of 6 held-out clips got it wrong, usually one speaker too many.
+- Finding speakers on a very long recording uses a lot of memory (about 4.4 GB for 88 minutes) and Cancel takes effect only when the run ends: the speaker library ignores a request to stop. Running it in windows would fix both and is not done.
+- The Intel recording fix is untested on a real Intel Mac. If every retry is rejected, recording still fails (with an error instead of a crash); the reason is in the system log.
+- The language list only helps once it is filled in; with the field empty a short clip can still be heard as a related language.
+- The known limitations of 0.2.2 still apply (no transcript word error rate for Vietnamese, the second reading only on loops, longer runs for long recordings).
 
 ## [0.2.2] - 2026-10-28
 

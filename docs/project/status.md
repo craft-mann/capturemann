@@ -77,9 +77,20 @@ Pending:
 
 Deferred (not in 0.2.0): the first-use setup sheet (one place to get the speech and text models when you first need them; **not in 0.2.1 either**, which is Intel support only, maintainer decision Oct 28, 2026); VOC-3 live transcript to a later 0.2.x; Ollama and LM Studio (backlog); Intel Macs, Windows and Linux. Windows is untouched by this work.
 
-## Release 0.2.3 (speaker detection and transcript improvement; planned, nothing built)
+## Release 0.2.3 (speaker detection, the Intel recording crash, language choice)
 
-Scope (maintainer, Oct 28, 2026, after 0.2.2 was published, pushed and on the website): speaker detection improvement and transcript improvement. Translation is not in it. Plan: [`specs/plans/release-0.2.3-plan.md`](../../specs/plans/release-0.2.3-plan.md). Stage 0 comes first: a word error rate tool and a speaker error rate tool, and a hand-corrected, hand-labelled reference set from the maintainer, so that nothing is tuned or claimed without a number. Until a stored report exists, speaker accuracy and transcript accuracy stay unmeasured (AI-8.AC1 to AC3 open). Carried over: the Intel Mac test, the first run of `release.yml`, the unidentified flaky `cm_daemon` test, the Dependabot Actions-pin PR.
+Scope (maintainer, Oct 28, 2026): speaker detection improvement and transcript improvement; the Intel recording crash of issue 16 and a wrong-language transcript were added on Oct 29, 2026. Translation is not in it. Plan: [`specs/plans/release-0.2.3-plan.md`](../../specs/plans/release-0.2.3-plan.md). **Not yet released** (version bumped to 0.2.3, changelog dated Oct 29, 2026; the signed builds, the draft release and the publish are the maintainer's).
+
+| Part | State | How it was checked |
+|---|---|---|
+| Speaker voice model: 3D-Speaker CAM++ Chinese-English (Apache-2.0 on its ModelScope card) instead of the English-only one, clustering threshold 1.0 instead of 1.2 | built, bundled, pinned by SHA-256 | measured: mean diarization error 17 % on 6 held-out English clips against 54 % before (51 % for one speaker), the right count in 5 of 6 against 0 of 6; report `verification/benchmarks/speaker-detection-2026-10-29.md`. **English only; Vietnamese not measured** |
+| Real progress while finding speakers | built | unit tests with a scripted engine; one real run (524 progress reports on a 5-minute clip); the maintainer saw it move on an 88-minute recording. Cancel is answered when the run ends (the library ignores a stop) |
+| Intel Mac: an encoder set-up AVFoundation rejects is an error with retries, not an abort (issue 16) | built | a width AVFoundation rejects on Apple Silicon returns the error instead of aborting (test); the order of the retries (test). **Not confirmed on an Intel Mac** |
+| Languages you speak (`ai.languages`, `language: "vi,en"`): detection chooses among them | built | unit tests, a daemon test for the setting and the request; a real run on the 8-second clip that was heard as Indonesian now reads Vietnamese |
+| Reveal in Finder for recordings and audio; report Cancel clears the card | built | checked by eye by the maintainer (Reveal); report cancel built, not seen by eye |
+| Accuracy tools: word and diarization error rates, baseline runner, reference-clip script, `verification/benchmarks/` | built, not shipped | unit tests for the rates; the benchmark report |
+
+Pending: Vietnamese speaker and word accuracy (needs corrected references), the count rule, windowed speaker runs (progress, cancel, memory), the Stage 2 transcript options of the plan (voice-activity detection, higher-accuracy option, proofreading), a real Intel Mac test of the recording fix.
 
 ## Release 0.2.2 (transcripts of long recordings)
 
