@@ -163,9 +163,11 @@ impl Diarizer for SherpaDiarizer {
             return Err(cancelled());
         }
         let seconds = audio.samples.len() as f64 / 16_000.0;
+        cm_core::perf::begin("speakers");
         let turns = if seconds < MIN_AUDIO_SECS {
             Vec::new()
         } else {
+            let _t = cm_core::perf::span("speakers", "engine");
             run_with_hints(
                 self.engine.as_ref(),
                 &models,
@@ -174,6 +176,7 @@ impl Diarizer for SherpaDiarizer {
                 progress,
             )?
         };
+        cm_core::perf::finish("speakers");
         if !progress(1.0) {
             return Err(cancelled());
         }

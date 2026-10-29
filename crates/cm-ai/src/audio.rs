@@ -13,6 +13,7 @@ pub const SAMPLE_RATE: u32 = 16_000;
 /// Decodes the first audio stream of `file` to mono 16 kHz `f32` samples. Memory is 4 bytes per
 /// sample (about 230 MB for a one-hour recording).
 pub fn decode_16k_mono(file: &Path) -> Result<Vec<f32>, CmError> {
+    let _t = cm_core::perf::span("audio", "decode");
     let tools = cm_media::tools::locate()?;
     let mut child = Command::new(&tools.ffmpeg)
         .args(["-nostdin", "-v", "error", "-i"])

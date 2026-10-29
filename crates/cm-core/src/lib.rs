@@ -19,6 +19,7 @@ pub mod logfile;
 pub mod logging;
 pub mod media_time;
 pub mod message;
+pub mod perf;
 pub mod record;
 pub mod undo;
 pub mod wav;

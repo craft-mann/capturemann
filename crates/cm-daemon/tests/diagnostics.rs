@@ -47,6 +47,7 @@ async fn the_report_has_every_section_and_the_text_matches_them() {
             "Settings",
             "Library",
             "Last recording",
+            "Last runs",
             "Warnings and errors (newest last)",
         ]
     );
@@ -64,7 +65,7 @@ async fn the_report_has_every_section_and_the_text_matches_them() {
 #[tokio::test]
 async fn an_agent_may_read_it_and_gets_the_same_sections() {
     let v = diagnostics(Actor::agent("claude").unwrap()).await;
-    assert_eq!(titles(&v).len(), 8);
+    assert_eq!(titles(&v).len(), 9);
 }
 
 #[tokio::test]

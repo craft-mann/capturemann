@@ -114,6 +114,16 @@ pub fn last_recording_lines(manifest: &cm_library::manifest::RecManifest) -> Vec
     out
 }
 
+/// The last run of each kind in this session (`transcribe`, `speakers`, ...): wall time, peak memory
+/// and the time per phase. Nothing about the content of the audio.
+pub fn run_lines() -> Vec<String> {
+    cm_core::perf::records()
+        .iter()
+        .filter(|r| r.wall_secs.is_some())
+        .map(cm_core::perf::summary_line)
+        .collect()
+}
+
 /// Log lines as report lines.
 pub fn log_report_lines(lines: &[LogLine]) -> Vec<String> {
     lines
@@ -292,6 +302,9 @@ impl Inner {
             None => vec!["no recording yet".to_owned()],
         };
         sections.push(Section::new("Last recording", last_lines));
+
+        // Where the time of the last runs of this session went (PERF-1); empty after a restart.
+        sections.push(Section::new("Last runs", run_lines()));
 
         // The log.
         let dir = crate::logs::log_dir();

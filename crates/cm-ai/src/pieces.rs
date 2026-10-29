@@ -395,7 +395,11 @@ pub fn transcribe_pieces_resumable<'p>(
     other: OtherAudio<'p>,
     progress: &'p mut dyn FnMut(f32) -> bool,
 ) -> Result<(Transcript, PiecesReport), CmError> {
-    let pieces = plan(audio.samples);
+    cm_core::perf::begin("transcribe");
+    let pieces = {
+        let _t = cm_core::perf::span("transcribe", "plan");
+        plan(audio.samples)
+    };
     let asked = language
         .map(str::trim)
         .filter(|l| !l.is_empty() && !l.eq_ignore_ascii_case("auto"))
@@ -456,6 +460,7 @@ pub fn transcribe_pieces_resumable<'p>(
     }
     // Every piece is done: the bar was held under 1.0 until now.
     let _ = (job.progress)(1.0);
+    cm_core::perf::finish("transcribe");
     let mut report = job.report;
     // A loop can also run across piece boundaries (every piece repeating the same words): if the
     // whole is still mostly a loop, keep each run once.

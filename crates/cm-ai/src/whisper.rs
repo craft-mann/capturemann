@@ -162,6 +162,7 @@ impl WhisperTranscriber {
     /// Loads the model file. `model_id` is recorded in the transcript. With `use_gpu` the GPU
     /// backend is tried first and the CPU is used if it cannot start.
     pub fn load(model_path: &Path, model_id: &str, use_gpu: bool) -> Result<Self, CmError> {
+        let _t = cm_core::perf::span("model", "load");
         whisper_rs::install_logging_hooks();
         // DTW token times need the model's alignment heads, known for the stock models only; any
         // other id (or a context that cannot start with DTW) runs without and uses the default
@@ -191,6 +192,19 @@ impl WhisperTranscriber {
             model: model_id.to_owned(),
             threads,
         })
+    }
+
+    /// The number of CPU threads a run uses (the benchmark harness tries several; the app keeps the
+    /// default of [`WhisperTranscriber::load`]).
+    #[must_use]
+    pub fn with_threads(mut self, threads: i32) -> Self {
+        self.threads = threads.max(1);
+        self
+    }
+
+    /// The thread count in use.
+    pub fn threads(&self) -> i32 {
+        self.threads
     }
 }
 
@@ -272,10 +286,14 @@ fn run(
         params.set_abort_callback(Some(abort_requested));
         params.set_abort_callback_user_data(Arc::as_ptr(&cancel) as *mut std::ffi::c_void);
     }
-    let full = state.full(params, samples);
+    let full = {
+        let _t = cm_core::perf::span("transcribe", "whisper");
+        state.full(params, samples)
+    };
     drop(cancel);
     full.map_err(|e| internal("failed", &e))?;
 
+    let _t = cm_core::perf::span("transcribe", "tokens");
     let mut segments = Vec::new();
     for seg in state.as_iter() {
         let mut pieces = Vec::new();
