@@ -15,6 +15,10 @@ use crate::ai::jobs::VoiceJobKind;
 use crate::recedit::voice_panels::{self as rules, Draft, NameError};
 use crate::ui::text_field::{CaretAt, TextField, TextFieldEvent};
 
+/// How long "Cancel" on a report waits for the job to stop before the card is cleared anyway.
+const CANCEL_WAIT_TRIES: u32 = 40;
+const CANCEL_WAIT_STEP: std::time::Duration = std::time::Duration::from_millis(250);
+
 /// Which field an event came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum FieldId {
@@ -570,8 +574,26 @@ impl RecordingEditor {
         if job.starts_with("pending:") {
             return;
         }
-        cx.spawn(async move |_this, _cx| {
+        // The daemon sends no event for a cancelled job (a running handler stops a moment after
+        // `cancel_job` answers), so the card would stay at "Writing the report" for ever: wait until
+        // the job has stopped, then drop it from the running set.
+        let (app, capture) = (self.app.clone(), id);
+        cx.spawn(async move |_this, cx| {
             let _ = client.cancel_job(&job).await;
+            for _ in 0..CANCEL_WAIT_TRIES {
+                match client.job_state(&job).await.as_deref() {
+                    Some("queued" | "running") => {
+                        cx.background_executor().timer(CANCEL_WAIT_STEP).await;
+                    }
+                    _ => break,
+                }
+            }
+            cx.update(|cx| {
+                app.update(cx, |m, cx| {
+                    m.transcribe.voice_ready(&capture, VoiceJobKind::Report);
+                    cx.notify();
+                })
+            });
         })
         .detach();
     }

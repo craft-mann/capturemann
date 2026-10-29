@@ -271,6 +271,17 @@ impl AiClient {
             .map(|_| ())
     }
 
+    /// The state of a job (`get_job`): `queued`, `running`, `done`, `failed`, `cancelled`, ...
+    /// `None` when the call fails.
+    pub async fn job_state(&self, job_id: &str) -> Option<String> {
+        let v = self
+            .transport
+            .call("get_job", json!({ "job_id": job_id }))
+            .await
+            .ok()?;
+        v.get("state").and_then(Value::as_str).map(str::to_owned)
+    }
+
     pub async fn import_model(&self, model: &str, path: &str) -> Result<(), AiError> {
         self.transport
             .call("import_model", json!({ "model": model, "path": path }))
@@ -816,6 +827,22 @@ mod tests {
         assert_eq!(
             t.calls_of("download_model"),
             vec![json!({"model": "small"})]
+        );
+    }
+
+    /// The report card waits for a cancelled job to stop: `job_state` reads `state` of `get_job`.
+    #[test]
+    fn job_state_reads_the_state_of_get_job() {
+        let t = ScriptedTransport::new();
+        t.answer("get_job", Ok(json!({"job_id": "j1", "state": "running"})));
+        t.answer("get_job", Ok(json!({"job_id": "j1", "state": "cancelled"})));
+        let c = AiClient::new(t.clone());
+        assert_eq!(run(c.job_state("j1")).as_deref(), Some("running"));
+        assert_eq!(run(c.job_state("j1")).as_deref(), Some("cancelled"));
+        assert_eq!(t.calls_of("get_job")[0], json!({"job_id": "j1"}));
+        assert_eq!(
+            run(AiClient::new(ScriptedTransport::new()).job_state("x")),
+            None
         );
     }
 
