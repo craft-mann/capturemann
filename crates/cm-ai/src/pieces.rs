@@ -261,6 +261,11 @@ struct Job<'a, 'p> {
     report: PiecesReport,
 }
 
+/// No language fixed yet: none, or a list to choose from (`vi,en`, see `whisper::LanguageRequest`).
+fn is_unsettled(language: Option<&str>) -> bool {
+    language.is_none_or(|l| l.contains(','))
+}
+
 impl Job<'_, '_> {
     /// Progress over the whole audio, never going back (a piece run again starts from its start).
     fn tick(&mut self, at_sample: usize, within: f32, len: usize) -> bool {
@@ -306,7 +311,9 @@ impl Job<'_, '_> {
         if self.first.is_none() {
             self.first = Some((t.language.clone(), t.model.clone(), t.note.clone()));
         }
-        if self.language.is_none() && !t.words.is_empty() && !t.language.is_empty() {
+        // Fixed once a piece has words: the first piece's language, which also settles a list of
+        // languages to choose from (`vi,en`).
+        if is_unsettled(self.language.as_deref()) && !t.words.is_empty() && !t.language.is_empty() {
             self.language = Some(t.language.clone());
         }
         Ok(t)
@@ -417,7 +424,7 @@ pub fn transcribe_pieces_resumable<'p>(
         start = c.done;
         words = c.words;
         job.first = c.first;
-        if job.language.is_none() {
+        if is_unsettled(job.language.as_deref()) {
             job.language = c.language;
         }
         job.report.split = c.split;

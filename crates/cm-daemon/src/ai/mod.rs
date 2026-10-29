@@ -81,6 +81,10 @@ pub const SETTING_AUTO_TRANSCRIBE: &str = "ai.auto_transcribe";
 /// Setting: find the speakers after each transcript (AI-8). Default ON (maintainer decision,
 /// Oct 27, 2026); the daemon only starts it when the speaker models are usable.
 pub const SETTING_AUTO_SPEAKERS: &str = "ai.auto_speakers";
+/// Setting: the languages the user speaks (an array of codes, or `vi,en`). A transcript made
+/// without a `language` chooses among them instead of among all of Whisper's languages: a short
+/// or noisy recording is otherwise sometimes heard as a relative (Vietnamese as Indonesian).
+pub const SETTING_LANGUAGES: &str = "ai.languages";
 /// RAM the automatic transcription needs by default (AI-1).
 pub const AUTO_MIN_RAM_GB: u64 = 16;
 

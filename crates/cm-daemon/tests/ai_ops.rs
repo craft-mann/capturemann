@@ -1423,3 +1423,26 @@ async fn ai_6a_replace_in_captions() {
         "the original transcript is not modified"
     );
 }
+
+/// A recording whose language was not asked for is transcribed among the languages the user said
+/// they speak (`ai.languages`); a language in the request wins.
+#[tokio::test]
+async fn transcribe_chooses_among_the_languages_the_user_speaks() {
+    let r = rig(FakeAi::new().with_small_installed(), Decision::Approve).await;
+    user(
+        &r,
+        "set_settings",
+        json!({"values": {"ai.languages": ["vi", "en"]}}),
+    )
+    .await
+    .unwrap();
+    let started = user(&r, "transcribe", json!({})).await.unwrap();
+    job_done(&r, started["job_id"].as_str().unwrap()).await;
+    let again = user(&r, "transcribe", json!({"language": "en"}))
+        .await
+        .unwrap();
+    job_done(&r, again["job_id"].as_str().unwrap()).await;
+    let calls = r.ai.transcribe_calls();
+    assert_eq!(calls[0].language.as_deref(), Some("vi,en"));
+    assert_eq!(calls[1].language.as_deref(), Some("en"));
+}

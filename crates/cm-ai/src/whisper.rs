@@ -374,6 +374,109 @@ pub(crate) fn join_split_characters(pieces: Vec<TokenBytes>) -> Vec<RawToken> {
     out
 }
 
+/// What the caller asked for as the language of a transcript.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LanguageRequest {
+    /// Let Whisper detect it among all its languages.
+    Auto,
+    /// This language.
+    One(String),
+    /// Choose among these (two or more codes, in the order given): the language the user speaks,
+    /// written `vi,en`.
+    Among(Vec<String>),
+}
+
+impl LanguageRequest {
+    /// `None`, empty and `auto` are [`LanguageRequest::Auto`]; a code is [`LanguageRequest::One`];
+    /// codes separated by commas are [`LanguageRequest::Among`] (a list of one is that code).
+    /// `invalid_input` for a code Whisper does not know.
+    pub fn parse(text: Option<&str>) -> Result<LanguageRequest, CmError> {
+        let Some(text) = text.map(str::trim).filter(|l| !l.is_empty()) else {
+            return Ok(LanguageRequest::Auto);
+        };
+        let mut list: Vec<String> = Vec::new();
+        for part in text.split(',').map(|p| p.trim().to_ascii_lowercase()) {
+            if part.is_empty() || part == "auto" {
+                continue;
+            }
+            if whisper_rs::get_lang_id(&part).is_none() {
+                return Err(CmError::invalid_field(
+                    "language",
+                    format!("`{part}` is not a language Whisper knows (use `auto`, a code such as `en`, `vi`, `es`, or codes separated by commas such as `vi,en`)"),
+                ));
+            }
+            if !list.contains(&part) {
+                list.push(part);
+            }
+        }
+        Ok(match list.len() {
+            0 => LanguageRequest::Auto,
+            1 => LanguageRequest::One(list.remove(0)),
+            _ => LanguageRequest::Among(list),
+        })
+    }
+}
+
+/// The part of `samples` that language detection listens to: up to 30 s (what Whisper uses),
+/// starting just before the first sound, so a recording that opens with silence is judged on its
+/// speech.
+pub fn detection_window(samples: &[f32]) -> &[f32] {
+    const FRAME: usize = 1600; // 100 ms
+    const MAX: usize = 30 * 16_000;
+    let rms: Vec<f32> = samples
+        .chunks(FRAME)
+        .map(|c| (c.iter().map(|s| s * s).sum::<f32>() / c.len() as f32).sqrt())
+        .collect();
+    let peak = rms.iter().copied().fold(0.0_f32, f32::max);
+    // A tenth of the loudest frame, never below a very quiet floor.
+    let gate = (peak * 0.1).max(0.003);
+    let first = rms.iter().position(|r| *r >= gate).unwrap_or(0);
+    let start = first.saturating_sub(5) * FRAME;
+    &samples[start..samples.len().min(start + MAX)]
+}
+
+/// The language among `candidates` that Whisper finds most likely in the start of `samples`
+/// (its own detector, its probabilities of the candidates compared with each other).
+fn detect_among(
+    ctx: &WhisperContext,
+    samples: &[f32],
+    candidates: &[String],
+    threads: i32,
+) -> Result<String, CmError> {
+    let internal = |what: &str, e: &dyn std::fmt::Display| {
+        CmError::internal(format!("speech recognition {what}: {e}"))
+    };
+    let threads = usize::try_from(threads.max(1)).unwrap_or(1);
+    let mut state = ctx
+        .create_state()
+        .map_err(|e| internal("could not start", &e))?;
+    state
+        .pcm_to_mel(detection_window(samples), threads)
+        .map_err(|e| internal("could not read the audio", &e))?;
+    let (_, probs) = state
+        .lang_detect(0, threads)
+        .map_err(|e| internal("could not detect the language", &e))?;
+    Ok(best_of(candidates, &probs))
+}
+
+/// The candidate with the highest probability in `probs` (indexed by Whisper's language id); the
+/// first candidate when none has any.
+pub fn best_of(candidates: &[String], probs: &[f32]) -> String {
+    candidates
+        .iter()
+        .max_by(|a, b| {
+            let p = |l: &String| {
+                whisper_rs::get_lang_id(l)
+                    .and_then(|id| probs.get(usize::try_from(id).ok()?).copied())
+                    .unwrap_or(0.0)
+            };
+            // `max_by` keeps the last of equal items; the earlier candidate must win a tie.
+            p(a).total_cmp(&p(b)).then(std::cmp::Ordering::Greater)
+        })
+        .cloned()
+        .unwrap_or_default()
+}
+
 impl Transcriber for WhisperTranscriber {
     fn transcribe(
         &self,
@@ -421,18 +524,17 @@ impl WhisperTranscriber {
         let prompt = prompt
             .map(|p| p.replace('\0', ""))
             .filter(|p| !p.trim().is_empty());
-        let requested = match language.map(str::trim).filter(|l| !l.is_empty()) {
-            None => "auto".to_owned(),
-            Some(l) if l.eq_ignore_ascii_case("auto") => "auto".to_owned(),
-            Some(l) => {
-                let l = l.to_ascii_lowercase();
-                if whisper_rs::get_lang_id(&l).is_none() {
-                    return Err(CmError::invalid_field(
-                        "language",
-                        format!("`{l}` is not a language Whisper knows (use `auto` or a code such as `en`, `vi`, `es`)"),
-                    ));
+        let requested = match LanguageRequest::parse(language)? {
+            LanguageRequest::Auto => "auto".to_owned(),
+            LanguageRequest::One(l) => l,
+            // Whisper's own detector picks among all its languages and a short or noisy clip can
+            // land on a relative (Vietnamese heard as Indonesian); the user's list rules those out.
+            LanguageRequest::Among(list) => {
+                if audio.samples.len() < 1600 {
+                    list[0].clone()
+                } else {
+                    detect_among(&self.ctx, audio.samples, &list, self.threads)?
                 }
-                l
             }
         };
         // Whisper needs a little audio; shorter input has no speech worth reporting.
@@ -502,6 +604,59 @@ impl WhisperTranscriber {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_language_request_is_auto_one_code_or_a_list_to_choose_from() {
+        use LanguageRequest::*;
+        assert_eq!(LanguageRequest::parse(None).unwrap(), Auto);
+        assert_eq!(LanguageRequest::parse(Some(" auto ")).unwrap(), Auto);
+        assert_eq!(
+            LanguageRequest::parse(Some("VI")).unwrap(),
+            One("vi".into())
+        );
+        assert_eq!(
+            LanguageRequest::parse(Some("vi, en,vi")).unwrap(),
+            Among(vec!["vi".into(), "en".into()])
+        );
+        assert_eq!(
+            LanguageRequest::parse(Some("vi,")).unwrap(),
+            One("vi".into())
+        );
+        assert!(LanguageRequest::parse(Some("vi,zz")).is_err());
+    }
+
+    #[test]
+    fn the_most_likely_candidate_wins_and_the_first_wins_a_tie() {
+        let mut probs = vec![0.0; whisper_rs::get_lang_max_id() as usize + 1];
+        let id = |l: &str| whisper_rs::get_lang_id(l).unwrap() as usize;
+        probs[id("id")] = 0.55;
+        probs[id("vi")] = 0.24;
+        probs[id("en")] = 0.01;
+        let list = |l: &[&str]| l.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        // Indonesian is the most likely language overall, but it is not one the user speaks.
+        assert_eq!(best_of(&list(&["en", "vi"]), &probs), "vi");
+        assert_eq!(best_of(&list(&["en", "vi", "id"]), &probs), "id");
+        assert_eq!(best_of(&list(&["en", "fr"]), &vec![0.0; probs.len()]), "en");
+    }
+
+    #[test]
+    fn detection_listens_to_the_speech_not_to_the_silence_before_it() {
+        let mut samples = vec![0.0_f32; 16_000 * 60];
+        for (i, s) in samples.iter_mut().enumerate().skip(16_000 * 20) {
+            *s = if i % 2 == 0 { 0.3 } else { -0.3 };
+        }
+        let w = detection_window(&samples);
+        // Starts half a second before the sound at 20 s, and is at most 30 s.
+        assert_eq!(w.len(), 30 * 16_000);
+        assert_eq!(
+            w.as_ptr() as usize - samples.as_ptr() as usize,
+            4 * (19 * 16_000 + 8_000)
+        );
+        // All silence: the start of the audio.
+        assert_eq!(detection_window(&vec![0.0; 16_000 * 40]).len(), 30 * 16_000);
+        // Short audio is passed whole.
+        assert_eq!(detection_window(&[0.2; 800]).len(), 800);
+    }
 
     fn piece(bytes: &[u8], t0: i64, t1: i64, p: f32) -> TokenBytes {
         TokenBytes {

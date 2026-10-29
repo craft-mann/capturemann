@@ -223,6 +223,24 @@ pub(super) struct TranscribeHandler {
     pub(super) settings: Arc<dyn crate::engines::SettingsStore>,
 }
 
+/// `ai.languages` as the `language` of a run: codes joined by commas (`vi,en`), or `None` when it
+/// is unset, empty or unusable (the codes are checked when the run starts).
+fn languages_setting(settings: Option<&serde_json::Map<String, Value>>) -> Option<String> {
+    let v = settings?.get(super::SETTING_LANGUAGES)?;
+    let text = match v {
+        Value::Array(a) => a
+            .iter()
+            .filter_map(Value::as_str)
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .collect::<Vec<_>>()
+            .join(","),
+        Value::String(s) => s.trim().to_owned(),
+        _ => return None,
+    };
+    (!text.is_empty()).then_some(text)
+}
+
 #[async_trait]
 impl JobHandler for TranscribeHandler {
     async fn run(&self, ctx: JobContext) -> Result<Value, CmError> {
@@ -237,10 +255,12 @@ impl JobHandler for TranscribeHandler {
             .and_then(Value::as_str)
             .ok_or_else(|| CmError::invalid_field("model", "is required"))?
             .to_owned();
+        // No language asked for: the languages the user says they speak, else Whisper decides.
         let language = inputs
             .get("language")
             .and_then(Value::as_str)
-            .map(str::to_owned);
+            .map(str::to_owned)
+            .or_else(|| languages_setting(self.settings.all().ok().as_ref()));
         let original_audio = inputs
             .get("original_audio")
             .and_then(Value::as_bool)

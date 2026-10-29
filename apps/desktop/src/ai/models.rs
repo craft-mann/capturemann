@@ -243,6 +243,9 @@ pub struct ModelsVm {
     pub auto_transcribe: bool,
     /// `ai.glossary` (AI-6a): names and terms spelled the user's way in new transcripts.
     pub glossary: Vec<cm_ai::glossary::GlossaryEntry>,
+    /// `ai.languages`: the languages the user speaks, as codes joined by commas (`vi,en`); empty
+    /// means Whisper chooses among all of them.
+    pub languages: String,
     /// The voice part of the page: speaker labels and the text model (V8).
     pub voice: crate::ai::voice::VoiceVm,
     /// An import or select or remove call is running.
@@ -900,5 +903,55 @@ mod tests {
         assert!(RowAction::Resume.is_primary());
         assert!(!RowAction::Download.is_primary());
         assert!(!RowAction::Import.is_primary());
+    }
+}
+
+/// The `ai.languages` setting as the page keeps it: an array of codes (`["vi","en"]`) or a text
+/// (`vi, en`), cleaned to codes joined by commas; anything unusable is empty.
+pub fn languages_from_value(v: Option<&serde_json::Value>) -> String {
+    let text = match v {
+        Some(serde_json::Value::Array(a)) => a
+            .iter()
+            .filter_map(serde_json::Value::as_str)
+            .collect::<Vec<_>>()
+            .join(","),
+        Some(serde_json::Value::String(s)) => s.clone(),
+        _ => return String::new(),
+    };
+    canonical_languages(&text).unwrap_or_default()
+}
+
+/// What the user typed as the languages they speak, as codes joined by commas (`vi, EN` becomes
+/// `vi,en`). Empty and `auto` mean "any". `Err` is the message for a code Whisper does not know.
+pub fn canonical_languages(text: &str) -> Result<String, String> {
+    use cm_ai::whisper::LanguageRequest;
+    match LanguageRequest::parse(Some(text)).map_err(|e| e.to_string())? {
+        LanguageRequest::Auto => Ok(String::new()),
+        LanguageRequest::One(l) => Ok(l),
+        LanguageRequest::Among(list) => Ok(list.join(",")),
+    }
+}
+
+#[cfg(test)]
+mod language_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn languages_are_cleaned_to_codes_joined_by_commas() {
+        assert_eq!(canonical_languages(" vi, EN ,vi").unwrap(), "vi,en");
+        assert_eq!(canonical_languages("auto").unwrap(), "");
+        assert_eq!(canonical_languages("").unwrap(), "");
+        assert_eq!(canonical_languages("vi").unwrap(), "vi");
+        assert!(canonical_languages("vi,zz").is_err());
+    }
+
+    #[test]
+    fn the_setting_reads_an_array_or_a_text_and_ignores_the_rest() {
+        assert_eq!(languages_from_value(Some(&json!(["vi", "en"]))), "vi,en");
+        assert_eq!(languages_from_value(Some(&json!("vi, en"))), "vi,en");
+        assert_eq!(languages_from_value(Some(&json!(["zz"]))), "");
+        assert_eq!(languages_from_value(Some(&json!(7))), "");
+        assert_eq!(languages_from_value(None), "");
     }
 }

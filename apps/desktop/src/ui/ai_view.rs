@@ -45,6 +45,11 @@ pub struct AiPage {
     name_field: Entity<TextField>,
     /// What the name box was last loaded with (`None`: never).
     synced: Option<String>,
+    /// The "Languages you speak" box (`ai.languages`), what it was last loaded with, and the
+    /// message for a code that is not a language.
+    lang_field: Entity<TextField>,
+    lang_synced: Option<String>,
+    lang_error: Option<String>,
     _subs: Vec<Subscription>,
 }
 
@@ -55,6 +60,8 @@ impl AiPage {
         let heard_field = cx.new(|cx| {
             TextField::new(tr!("Often heard as"), tr!("Logo Drive, Gu gồ Drai"), cx).without_icon()
         });
+        let lang_field = cx
+            .new(|cx| TextField::new(tr!("Languages you speak"), tr!("vi, en"), cx).without_icon());
         let me = voice_default_name();
         let name_field =
             cx.new(|cx| TextField::new(tr!("Your name in transcripts"), me, cx).without_icon());
@@ -66,6 +73,11 @@ impl AiPage {
             ];
         let mut subs = vec![
             cx.observe(&app, |_, _, cx| cx.notify()),
+            cx.subscribe(&lang_field, |this, _f, ev: &TextFieldEvent, cx| {
+                if matches!(ev, TextFieldEvent::Submitted) {
+                    this.languages_save(cx);
+                }
+            }),
             cx.subscribe(&term_field, |this, _f, ev: &TextFieldEvent, cx| {
                 this.glossary_field_event(ev, cx)
             }),
@@ -78,12 +90,70 @@ impl AiPage {
             app,
             name_field,
             synced: None,
+            lang_field,
+            lang_synced: None,
+            lang_error: None,
             glossary_edit: None,
             glossary_error: None,
             term_field,
             heard_field,
             _subs: subs,
         }
+    }
+
+    // ---- the languages you speak (`ai.languages`) -----------------------------------------
+
+    /// Puts the saved languages into the box the first time and whenever they change from
+    /// outside; typing alone never moves it.
+    fn languages_sync(&mut self, cx: &mut Context<Self>) {
+        let saved = self.app.read(cx).ai.languages.clone();
+        if self.lang_synced.as_deref() != Some(saved.as_str()) {
+            let shown = saved.replace(',', ", ");
+            self.lang_field
+                .update(cx, |f, cx| f.load(&shown, CaretAt::End, cx));
+            self.lang_synced = Some(saved);
+        }
+    }
+
+    /// Enter or Save: cleans the codes, saves them, or says which one is not a language.
+    fn languages_save(&mut self, cx: &mut Context<Self>) {
+        let text = self.lang_field.read(cx).text().to_owned();
+        match ai::set_languages(&self.app, &text, cx) {
+            Ok(_) => self.lang_error = None,
+            Err(e) => self.lang_error = Some(e),
+        }
+        cx.notify();
+    }
+
+    /// The row under "Transcribe after each recording".
+    fn languages_row(&self, t: &Theme, cx: &mut Context<Self>) -> AnyElement {
+        let saved = self.app.read(cx).ai.languages.clone();
+        let typed = self.lang_field.read(cx).text().to_owned();
+        let dirty = crate::ai::models::canonical_languages(&typed).map_or(true, |c| c != saved);
+        let mut control = div()
+            .flex()
+            .items_center()
+            .gap(px(8.))
+            .child(div().w(px(180.)).min_w_0().child(self.lang_field.clone()));
+        if dirty {
+            control = control.child(
+                small_button(t, "ai-languages-save", &tr!("Save"))
+                    .on_click(cx.listener(|this, _, _, cx| this.languages_save(cx))),
+            );
+        }
+        let hint = match &self.lang_error {
+            Some(e) => e.clone(),
+            None => tr!("Helps pick the right language for short recordings, for example vi, en"),
+        };
+        settings_row(
+            t,
+            Some("languages"),
+            tr!("Languages you speak"),
+            Some(SharedString::from(hint)),
+            Some(control.into_any_element()),
+            true,
+        )
+        .into_any_element()
     }
 
     // ---- the glossary (AI-6a) --------------------------------------------------------------
@@ -521,6 +591,7 @@ impl Render for AiPage {
         ai::ensure_loaded(&self.app, cx);
         crate::ui::ai_voice::ensure_voice_loaded(&self.app, cx);
         self.voice_sync_fields(cx);
+        self.languages_sync(cx);
         let (rows, show_banner, load_error, action_error, busy, auto, active) = {
             let m = self.app.read(cx);
             (
@@ -663,17 +734,21 @@ impl Render for AiPage {
                                         .children(action_error.map(|e| caption(&t, e.text())))
                                         .children(busy.then(|| caption(&t, tr!("Working\u{2026}")))),
                                 )
-                                .child(list_card(&t).child(settings_row(
-                                    &t,
-                                    Some("captions"),
-                                    tr!("Transcribe after each recording"),
-                                    Some(SharedString::from(match active {
-                                        Some(a) => tr!("Uses {model}", model = a),
-                                        None => tr!("Needs a model above"),
-                                    })),
-                                    Some(auto_switch.into_any_element()),
-                                    true,
-                                )))
+                                .child(
+                                    list_card(&t)
+                                        .child(settings_row(
+                                            &t,
+                                            Some("captions"),
+                                            tr!("Transcribe after each recording"),
+                                            Some(SharedString::from(match active {
+                                                Some(a) => tr!("Uses {model}", model = a),
+                                                None => tr!("Needs a model above"),
+                                            })),
+                                            Some(auto_switch.into_any_element()),
+                                            false,
+                                        ))
+                                        .child(self.languages_row(&t, cx)),
+                                )
                                 .child(speakers),
                         )
                         // The right column holds the text model and the glossary: the glossary

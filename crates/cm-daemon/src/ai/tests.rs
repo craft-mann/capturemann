@@ -106,6 +106,22 @@ fn language_and_model_ids_are_checked() {
         json!({"capture_id": "r", "language": "english!"})
     )
     .starts_with("language"));
+    // A list to choose among: `vi,en` (spaces and case are cleaned), at most 8, each a code.
+    let p = parse_ok(
+        "transcribe",
+        json!({"capture_id": "r", "language": "VI, en"}),
+    );
+    assert!(matches!(p.op, AiOp::Transcribe { language: Some(l), .. } if l == "vi,en"));
+    assert!(parse_err(
+        "transcribe",
+        json!({"capture_id": "r", "language": "vi,english!"})
+    )
+    .starts_with("language"));
+    assert!(parse_err(
+        "transcribe",
+        json!({"capture_id": "r", "language": "aa,bb,cc,dd,ee,ff,gg,hh,ii"})
+    )
+    .starts_with("language"));
     assert!(parse_err("download_model", json!({"model": "../x"})).starts_with("model"));
     assert!(parse_err("download_model", json!({})).starts_with("model"));
     assert!(parse_err("list_models", json!({"x": 1})).starts_with('x'));

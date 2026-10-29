@@ -10778,3 +10778,12 @@ msgstr "Bản dựng này không kèm các mô hình phân biệt giọng nói. 
 
 msgid "Speaker labels, not needed for one voice"
 msgstr "Nhãn người nói, không cần cho một giọng"
+
+msgid "Helps pick the right language for short recordings, for example vi, en"
+msgstr "Giúp chọn đúng ngôn ngữ cho các bản ghi ngắn, ví dụ vi, en"
+
+msgid "Languages you speak"
+msgstr "Ngôn ngữ bạn nói"
+
+msgid "vi, en"
+msgstr "vi, en"

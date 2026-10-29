@@ -1856,6 +1856,9 @@ msgstr ""
 msgid "Grid"
 msgstr ""
 
+msgid "Helps pick the right language for short recordings, for example vi, en"
+msgstr ""
+
 msgid "Helps tell the voices apart for speaker labels."
 msgstr ""
 
@@ -2013,6 +2016,9 @@ msgid "Kind"
 msgstr ""
 
 msgid "Language"
+msgstr ""
+
+msgid "Languages you speak"
 msgstr ""
 
 msgid "Large v3 isn’t installed"
@@ -5534,6 +5540,9 @@ msgid "unreadable"
 msgstr ""
 
 msgid "unsupported key `{key}`"
+msgstr ""
+
+msgid "vi, en"
 msgstr ""
 
 msgid "window {id}"

@@ -21,6 +21,9 @@ use crate::ui::app::{self, AppModel};
 pub const KEY_AUTO_TRANSCRIBE: &str = "ai.auto_transcribe";
 /// `ai.glossary`: the user's names and terms (app-only: agents can read it, not write it).
 pub const KEY_GLOSSARY: &str = "ai.glossary";
+/// `ai.languages`: the languages the user speaks, chosen among when a transcript's language is
+/// auto-detected (read by the daemon).
+pub const KEY_LANGUAGES: &str = "ai.languages";
 /// A per-viewer choice, kept in this app's own settings file (agents cannot read or write it).
 pub const KEY_NOTICE_DISMISSED: &str = "ai.notice_dismissed";
 
@@ -529,6 +532,24 @@ pub fn set_glossary(
     });
     let value = serde_json::to_value(&entries).unwrap_or(Value::Array(Vec::new()));
     app::set_setting(app, KEY_GLOSSARY, value, cx);
+}
+
+/// Saves the languages the user speaks (`vi, en`): the page shows the cleaned list at once and the
+/// daemon's settings follow, so the next transcript chooses among them. `Err` is a message for the
+/// page when a code is not one Whisper knows; nothing is saved then.
+pub fn set_languages(app: &Entity<AppModel>, text: &str, cx: &mut App) -> Result<String, String> {
+    let clean = crate::ai::models::canonical_languages(text)?;
+    app.update(cx, |m, cx| {
+        m.ai.languages = clean.clone();
+        cx.notify();
+    });
+    let list: Vec<Value> = clean
+        .split(',')
+        .filter(|l| !l.is_empty())
+        .map(Value::from)
+        .collect();
+    app::set_setting(app, KEY_LANGUAGES, Value::Array(list), cx);
+    Ok(clean)
 }
 
 /// "Dismiss" on a notice: hidden here and in the library, remembered in this app's settings. The

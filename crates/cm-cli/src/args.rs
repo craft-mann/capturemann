@@ -400,7 +400,8 @@ pub enum ModelsCmd {
 pub struct TranscribeArgs {
     /// Capture id of a recording with a microphone or system-audio track.
     pub id: String,
-    /// `auto` (detect, the default) or a language code such as `en`, `vi` or `es`.
+    /// `auto` (detect), a language code such as `en`, `vi` or `es`, or codes separated by commas to
+    /// choose among, such as `vi,en`. Default: the `ai.languages` setting, else detect among all.
     #[arg(long, value_name = "LANG")]
     pub language: Option<String>,
     /// Installed model id (default: the active one).

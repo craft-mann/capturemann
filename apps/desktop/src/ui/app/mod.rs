@@ -243,6 +243,9 @@ impl AppModel {
                     .and_then(|v| v.as_bool())
                     .unwrap_or_else(crate::ui::ai::default_auto_transcribe),
                 glossary: cm_ai::glossary::from_value(settings.get(crate::ui::ai::KEY_GLOSSARY)),
+                languages: crate::ai::models::languages_from_value(
+                    settings.get(crate::ui::ai::KEY_LANGUAGES),
+                ),
                 voice: crate::ai::voice::VoiceVm::from_settings(&settings),
                 ..Default::default()
             },

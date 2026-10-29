@@ -1421,7 +1421,7 @@ fn ai_tools() -> Vec<ToolSpec> {
             "Transcribe a recording on this computer with an installed speech model (no network). Runs in the background and returns a `job_id`; the result is `transcript.json` in the capture, read with get_transcript; `transcript.ready` is published when it is done. Without an installed model it fails with `invalid_input` and `data.reason = \"no_model\"`: tell the user to open the AI page in CaptureMann or run `capturemann ai models` to download or import one (nothing is downloaded automatically). A named model that is not installed fails with `data.reason = \"model_not_installed\"`. The recording needs a microphone or system-audio track.",
             json!({ "capture_id": capture_id(),
                     "language": { "type": "string", "default": "auto",
-                                  "description": "`auto` to detect, or a language code such as `en`, `vi` or `es`." },
+                                  "description": "`auto` to detect, a language code such as `en`, `vi` or `es`, or codes separated by commas to choose among, such as `vi,en` (default: the languages in the `ai.languages` setting, else detect among all)." },
                     "model": model_id_schema(),
                     "original_audio": { "type": "boolean", "default": false,
                                         "description": "Read the microphone as it was recorded instead of the noise-reduced copy a recording stores by default. Noise reduction can remove soft sounds that speech recognition needs, so try this when words are missing; it makes no difference to a recording made without noise reduction." } }),

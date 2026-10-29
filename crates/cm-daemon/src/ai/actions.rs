@@ -545,25 +545,34 @@ fn language(f: &Fields<'_>) -> Result<Option<String>, CmError> {
     match f.str_opt("language")? {
         None => Ok(None),
         Some(l) if l.eq_ignore_ascii_case("auto") => Ok(None),
+        // `vi,en`: choose among these (see `cm_ai::whisper::LanguageRequest`); each part is a code.
         Some(l) => {
             let l = l.to_ascii_lowercase();
-            let mut parts = l.split('-');
-            let head_ok = parts.next().is_some_and(|h| {
-                (2..=3).contains(&h.len()) && h.chars().all(|c| c.is_ascii_lowercase())
-            });
-            let tail_ok = parts.all(|t| {
-                (2..=4).contains(&t.len()) && t.chars().all(|c| c.is_ascii_alphanumeric())
-            });
-            if head_ok && tail_ok && l.len() <= 12 {
-                Ok(Some(l))
+            let parts: Vec<&str> = l.split(',').map(str::trim).collect();
+            let all_ok = !parts.is_empty() && parts.len() <= MAX_LANGUAGE_CHOICES;
+            if all_ok && parts.iter().all(|p| language_code_ok(p)) {
+                Ok(Some(parts.join(",")))
             } else {
                 Err(CmError::invalid_field(
                     "language",
-                    "must be `auto` or a language code such as `en`, `vi` or `es`",
+                    "must be `auto`, a language code such as `en`, `vi` or `es`, or codes separated by commas to choose among, such as `vi,en`",
                 ))
             }
         }
     }
+}
+
+/// Most languages a list to choose among may hold.
+const MAX_LANGUAGE_CHOICES: usize = 8;
+
+fn language_code_ok(code: &str) -> bool {
+    let mut parts = code.split('-');
+    let head_ok = parts
+        .next()
+        .is_some_and(|h| (2..=3).contains(&h.len()) && h.chars().all(|c| c.is_ascii_lowercase()));
+    let tail_ok =
+        parts.all(|t| (2..=4).contains(&t.len()) && t.chars().all(|c| c.is_ascii_alphanumeric()));
+    head_ok && tail_ok && code.len() <= 12
 }
 
 /// The optional `language` of the caption actions: a translation's code (`vi`, `pt-br`). Absent
