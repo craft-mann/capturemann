@@ -1,5 +1,5 @@
 {
-  "_comment": "Speaker models (AI-8, spike S7, Oct 27 2026; since the maintainer decision of Oct 27 2026 both files SHIP INSIDE THE APP in Contents/Resources/Models/speaker, packaging/sherpa/fetch-models.sh, and these rows are the pins the bundled files are checked against; the url / import_only fields only serve a developer build without them and the CLI/MCP import): the two ONNX files the sherpa-onnx speaker engine needs. Same catalogue rules as models.json (sha256 and bytes are the pins; the store checks them after a download and on an import). pyannote segmentation-3.0 (converted by the sherpa-onnx project, MIT, Copyright (c) 2022 CNRS) and the 3D-Speaker CAM++ English VoxCeleb embedding model (Apache-2.0, from the 3D-Speaker repository and ModelScope record; the download comes without a licence file). Hashes and sizes were computed on the files downloaded for the spike (docs/project/spikes.md, S7). The segmentation model is published only inside a .tar.bz2 archive and the app does not unpack archives, so its row is import_only: the maintainer either hosts the extracted model.onnx at a fixed URL (then put it in url and remove import_only) or users import the file; the pins below are those of model.onnx inside the archive. To use another mirror put a catalog.json in the models folder: speaker rows are kept unless it names speaker models itself.",
+  "_comment": "Speaker models (AI-8, spike S7, Oct 27 2026; since the maintainer decision of Oct 27 2026 both files SHIP INSIDE THE APP in Contents/Resources/Models/speaker, packaging/sherpa/fetch-models.sh, and these rows are the pins the bundled files are checked against; the url / import_only fields only serve a developer build without them and the CLI/MCP import): the two ONNX files the sherpa-onnx speaker engine needs. Same catalogue rules as models.json (sha256 and bytes are the pins; the store checks them after a download and on an import). pyannote segmentation-3.0 (converted by the sherpa-onnx project, MIT, Copyright (c) 2022 CNRS) and the 3D-Speaker CAM++ Chinese-English \"advanced\" embedding model (Apache-2.0 on its ModelScope card, iic/speech_campplus_sv_zh_en_16k-common_advanced; the download comes without a licence file). Replaced the English-only CAM++ VoxCeleb on Oct 29, 2026 after verification/benchmarks/speaker-detection-2026-10-29.md (mean DER 17 % against 54 % on held-out English clips). Hashes and sizes were computed on the files downloaded for the spike (docs/project/spikes.md, S7). The segmentation model is published only inside a .tar.bz2 archive and the app does not unpack archives, so its row is import_only: the maintainer either hosts the extracted model.onnx at a fixed URL (then put it in url and remove import_only) or users import the file; the pins below are those of model.onnx inside the archive. To use another mirror put a catalog.json in the models folder: speaker rows are kept unless it names speaker models itself.",
   "models": [
     {
       "id": "speaker-segmentation",
@@ -17,13 +17,13 @@
     {
       "id": "speaker-embedding",
       "kind": "speaker",
-      "label": "Speaker voices (CAM++ English)",
+      "label": "Speaker voices (CAM++ Chinese-English)",
       "hint": "Compares voices so the same person gets the same label. Second of the two files that tell speakers apart.",
-      "file": "campplus-sv-en-voxceleb-16k.onnx",
-      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx",
+      "file": "campplus-sv-zh-en-16k-advanced.onnx",
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx",
       "license": "Apache-2.0",
-      "sha256": "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b",
-      "bytes": 29596978
+      "sha256": "aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2",
+      "bytes": 28281164
     }
   ]
 }

@@ -7,8 +7,8 @@
 //! ```
 //!
 //! The model folder holds the segmentation model as `pyannote-segmentation-3-0.onnx` (or the
-//! archive's own name `model.onnx`) and the embedding model as `campplus-sv-en-voxceleb-16k.onnx`
-//! (or `3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx`). Convert audio with
+//! archive's own name `model.onnx`) and the embedding model as `campplus-sv-zh-en-16k-advanced.onnx`
+//! (or `3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx`). Convert audio with
 //! `ffmpeg -i in.m4a -ac 1 -ar 16000 -c:a pcm_s16le out.wav`. The test prints the number of
 //! turns and speakers, the speech per speaker and the time; it checks that the output is
 //! well-formed (sorted, numbered by first speech, no negative spans), never accuracy: there is no
@@ -60,8 +60,8 @@ fn real_models_tell_speakers_apart() {
     let emb = find(
         &models,
         &[
-            "campplus-sv-en-voxceleb-16k.onnx",
-            "3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx",
+            "campplus-sv-zh-en-16k-advanced.onnx",
+            "3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx",
         ],
     );
     // A store whose files are links to the given ones (nothing is copied).

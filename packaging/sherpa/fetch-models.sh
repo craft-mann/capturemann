@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Fetches the two speaker-label models (AI-8) that ship INSIDE the app, so "Find speakers" needs
-# no setup: pyannote segmentation-3.0 (MIT) and the 3D-Speaker CAM++ English VoxCeleb embedding
+# no setup: pyannote segmentation-3.0 (MIT) and the 3D-Speaker CAM++ Chinese-English embedding
 # model (Apache-2.0). Run by `make sherpa` after fetch-macos.sh (that script replaces packaging/
 # sherpa/out, so this one must run second). Pins and sources: docs/project/spikes.md (S7).
 #
 # Output: packaging/sherpa/out/models/{pyannote-segmentation-3-0.onnx,
-#         campplus-sv-en-voxceleb-16k.onnx,BUILD-INFO.txt,LICENSES/}
+#         campplus-sv-zh-en-16k-advanced.onnx,BUILD-INFO.txt,LICENSES/}
 #         (git-ignored; packaging/macos/bundle.sh copies them to Contents/Resources/Models/speaker/).
 #
 # Environment: CM_SHERPA_SRC_DIR (download cache, default packaging/sherpa/.downloads; put the two
@@ -27,11 +27,11 @@ SEG_FILE="pyannote-segmentation-3-0.onnx"
 SEG_SHA256="220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079"
 SEG_BYTES="5992913"
 
-EMB_DOWNLOAD="3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx"
+EMB_DOWNLOAD="3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx"
 EMB_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/${EMB_DOWNLOAD}"
-EMB_FILE="campplus-sv-en-voxceleb-16k.onnx"
-EMB_SHA256="357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b"
-EMB_BYTES="29596978"
+EMB_FILE="campplus-sv-zh-en-16k-advanced.onnx"
+EMB_SHA256="aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2"
+EMB_BYTES="28281164"
 
 [ "$(uname -s)" = "Darwin" ] || die "this script only runs on macOS"
 for tool in curl shasum tar; do
@@ -103,9 +103,11 @@ cat >"$new/LICENSES/campplus-3D-Speaker-NOTICE.txt" <<NOTICE
 CAM++ speaker embedding model (CaptureMann, speaker labels, AI-8)
 
 File: $EMB_FILE (published as $EMB_DOWNLOAD)
-Model: CAM++ English VoxCeleb 16 kHz, from the 3D-Speaker project of Alibaba / ModelScope
+Model: CAM++ Chinese-English 16 kHz ("advanced", trained on large-scale Chinese and English speaker data;
+       the model card does not list the data), from the 3D-Speaker project of Alibaba / ModelScope
        (https://github.com/modelscope/3D-Speaker), licensed under the Apache License, Version 2.0
-       (https://www.apache.org/licenses/LICENSE-2.0).
+       (https://www.apache.org/licenses/LICENSE-2.0; licence field of the ModelScope card
+       iic/speech_campplus_sv_zh_en_16k-common_advanced: "Apache License 2.0").
 Obtained from: $EMB_URL
 Converted/hosted by the sherpa-onnx project (https://github.com/k2-fsa/sherpa-onnx).
 The file is shipped unmodified. The download carries no licence file of its own; the Apache-2.0

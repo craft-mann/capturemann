@@ -51,8 +51,8 @@ fn model_store(dir: &Path, models: &Path, embedding: Option<&Path>) -> ModelStor
         (
             cm_ai::speaker_engine::EMBEDDING_ID,
             &[
-                "campplus-sv-en-voxceleb-16k.onnx",
-                "3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx",
+                "campplus-sv-zh-en-16k-advanced.onnx",
+                "3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx",
             ][..],
         ),
     ] {

@@ -265,7 +265,7 @@ section "speaker models"
 spk="$contents/Resources/Models/speaker"
 if [ -d "$spk" ]; then
   for pair in "pyannote-segmentation-3-0.onnx:220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079" \
-              "campplus-sv-en-voxceleb-16k.onnx:357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b"; do
+              "campplus-sv-zh-en-16k-advanced.onnx:aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2"; do
     f="${pair%%:*}"; want="${pair##*:}"
     if [ -f "$spk/$f" ] && [ "$(shasum -a 256 "$spk/$f" | awk '{print $1}')" = "$want" ]; then
       ok "$f matches its pinned SHA-256"

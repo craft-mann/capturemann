@@ -1,10 +1,12 @@
 CAM++ speaker embedding model (CaptureMann, speaker labels, AI-8)
 
-File: campplus-sv-en-voxceleb-16k.onnx (published as 3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx)
-Model: CAM++ English VoxCeleb 16 kHz, from the 3D-Speaker project of Alibaba / ModelScope
+File: campplus-sv-zh-en-16k-advanced.onnx (published as 3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx)
+Model: CAM++ Chinese-English 16 kHz ("advanced", trained on large-scale Chinese and English speaker data;
+       the model card does not list the data), from the 3D-Speaker project of Alibaba / ModelScope
        (https://github.com/modelscope/3D-Speaker), licensed under the Apache License, Version 2.0
-       (https://www.apache.org/licenses/LICENSE-2.0).
-Obtained from: https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx
+       (https://www.apache.org/licenses/LICENSE-2.0; licence field of the ModelScope card
+       iic/speech_campplus_sv_zh_en_16k-common_advanced: "Apache License 2.0").
+Obtained from: https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx
 Converted/hosted by the sherpa-onnx project (https://github.com/k2-fsa/sherpa-onnx).
 The file is shipped unmodified. The download carries no licence file of its own; the Apache-2.0
 text is in the LICENSE file of the 3D-Speaker repository and in vendor/sherpa-onnx/LICENSE.

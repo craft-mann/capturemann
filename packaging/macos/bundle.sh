@@ -253,10 +253,10 @@ if [ -n "$llama_src" ]; then
   llama_bundled=1
 fi
 
-# The speaker-label models (AI-8): pyannote segmentation-3.0 (MIT) and CAM++ English (Apache-2.0),
+# The speaker-label models (AI-8): pyannote segmentation-3.0 (MIT) and CAM++ Chinese-English (Apache-2.0),
 # plain data files read by the engine linked into cm-desktop. Nothing is downloaded here:
 # CM_SPEAKER_MODELS_BUNDLE, or the output of `make sherpa` (packaging/sherpa/fetch-models.sh).
-spk_files=(pyannote-segmentation-3-0.onnx campplus-sv-en-voxceleb-16k.onnx)
+spk_files=(pyannote-segmentation-3-0.onnx campplus-sv-zh-en-16k-advanced.onnx)
 spk_licences=(pyannote-segmentation-3.0-LICENSE.txt campplus-3D-Speaker-NOTICE.txt)
 if [ "${CM_REQUIRE_SPEAKER_MODELS:-0}" = "1" ] && [ "${CM_NO_SPEAKER_MODELS:-0}" = "1" ]; then
   die "CM_REQUIRE_SPEAKER_MODELS=1 and CM_NO_SPEAKER_MODELS=1 contradict each other"

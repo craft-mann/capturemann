@@ -280,14 +280,14 @@ fn the_built_in_catalogue_has_both_speaker_rows_pinned() {
     assert_eq!(seg.license, "MIT");
     assert_eq!(emb.license, "Apache-2.0");
     assert_eq!(seg.bytes, 5_992_913);
-    assert_eq!(emb.bytes, 29_596_978);
+    assert_eq!(emb.bytes, 28_281_164);
     assert_eq!(
         seg.sha256,
         "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079"
     );
     assert_eq!(
         emb.sha256,
-        "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b"
+        "aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2"
     );
 }
 

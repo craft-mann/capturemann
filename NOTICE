@@ -34,6 +34,6 @@ into the app. The libraries are fetched, SHA-256 checked, by packaging/sherpa/fe
 speaker models ship inside the app as separate, unmodified data files in
 Contents/Resources/Models/speaker/ (fetched, SHA-256 checked, by packaging/sherpa/fetch-models.sh),
 under their own open licences: pyannote segmentation 3.0 (MIT License, Copyright (c) 2022 CNRS, from
-https://github.com/pyannote/pyannote-audio via the sherpa-onnx conversion) and the CAM++ English
-VoxCeleb speaker embedding model of 3D-Speaker (Apache License 2.0, https://github.com/modelscope/3D-Speaker).
+https://github.com/pyannote/pyannote-audio via the sherpa-onnx conversion) and the CAM++ Chinese-English
+speaker embedding model of 3D-Speaker (Apache License 2.0, https://github.com/modelscope/3D-Speaker).
 Their notices are in Contents/Resources/Models/speaker/LICENSES/ and in THIRD_PARTY_LICENSES.md.

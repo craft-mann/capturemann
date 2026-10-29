@@ -78,14 +78,14 @@ check "  ... and says what to run" out_has "make llama"
 fake_spk="$work/fake-spk"
 mkdir -p "$fake_spk/LICENSES"
 printf 'fake segmentation\n' > "$fake_spk/pyannote-segmentation-3-0.onnx"
-printf 'fake embedding\n' > "$fake_spk/campplus-sv-en-voxceleb-16k.onnx"
+printf 'fake embedding\n' > "$fake_spk/campplus-sv-zh-en-16k-advanced.onnx"
 printf 'MIT License\n' > "$fake_spk/LICENSES/pyannote-segmentation-3.0-LICENSE.txt"
 printf 'Apache-2.0\n' > "$fake_spk/LICENSES/campplus-3D-Speaker-NOTICE.txt"
 spk_app="$work/spk-bundle/CaptureMann.app"
 check "bundle.sh bundles the speaker models with their notices" \
   env CM_BUNDLE_OUT="$work/spk-bundle" CM_SKIP_BUILD=1 CM_NO_FFMPEG=1 CM_NO_LLAMA=1 CM_SPEAKER_MODELS_BUNDLE="$fake_spk" CM_SIGN_IDENTITY=- bash "$mac/bundle.sh"
 check "  ... both models are in Resources/Models/speaker" \
-  bash -c "[ -f '$spk_app/Contents/Resources/Models/speaker/pyannote-segmentation-3-0.onnx' ] && [ -f '$spk_app/Contents/Resources/Models/speaker/campplus-sv-en-voxceleb-16k.onnx' ]"
+  bash -c "[ -f '$spk_app/Contents/Resources/Models/speaker/pyannote-segmentation-3-0.onnx' ] && [ -f '$spk_app/Contents/Resources/Models/speaker/campplus-sv-zh-en-16k-advanced.onnx' ]"
 check "  ... and their notices are in Models/speaker/LICENSES" \
   bash -c "[ -f '$spk_app/Contents/Resources/Models/speaker/LICENSES/pyannote-segmentation-3.0-LICENSE.txt' ] && [ -f '$spk_app/Contents/Resources/Models/speaker/LICENSES/campplus-3D-Speaker-NOTICE.txt' ]"
 check_fail "bundle.sh CM_REQUIRE_SPEAKER_MODELS fails when there are none" \

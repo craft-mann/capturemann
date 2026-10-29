@@ -1,5 +1,5 @@
 //! The real speaker engine (AI-8, spike S7): sherpa-onnx's offline diarization (pyannote
-//! segmentation-3.0, then CAM++ voice embeddings, then clustering) behind the [`Diarizer`] trait.
+//! segmentation-3.0, then CAM++ Chinese-English voice embeddings, then clustering) behind the [`Diarizer`] trait.
 //!
 //! * [`SherpaDiarizer`] finds the two model files in the model store ([`SEGMENTATION_ID`] and
 //!   [`EMBEDDING_ID`] rows of `data/speaker_models.json`) every time it runs: a copy in the user's
@@ -36,12 +36,16 @@ pub const SEGMENTATION_ID: &str = "speaker-segmentation";
 /// Catalogue id of the voice-embedding model file.
 pub const EMBEDDING_ID: &str = "speaker-embedding";
 /// The model id written to `diarization.json`.
-pub const MODEL_ID: &str = "sherpa-onnx-2.0.1+pyannote-segmentation-3.0+campplus-en-voxceleb";
+pub const MODEL_ID: &str = "sherpa-onnx-2.0.1+pyannote-segmentation-3.0+campplus-zh-en-advanced";
 
 /// Clustering threshold when the number of people is not given. The library default (0.5) found 29
-/// speakers on a 2 to 3 person file and 1.0 still found 6 (S7), so this is deliberately high and
-/// the tiny clusters it leaves are folded ([`fold_small_speakers`]). A suggestion, not a promise.
-pub const AUTO_THRESHOLD: f32 = 1.2;
+/// speakers on a 2 to 3 person file with the English-only voice model (S7), so this is deliberately
+/// high and the tiny clusters it leaves are folded ([`fold_small_speakers`]). With the Chinese-English
+/// CAM++ model the best value on 8 English clips was 1.0, and 1.2 already merged everybody into one
+/// or two speakers (`verification/benchmarks/speaker-detection-2026-10-29.md`: mean DER 22 % at 1.0
+/// against 49 % at 1.2; 17 % on 6 clips held back). The edge is close, so do not raise it without
+/// measuring. A suggestion, not a promise.
+pub const AUTO_THRESHOLD: f32 = 1.0;
 /// A speaker with less speech than this (seconds) or [`FOLD_FRACTION`] of all speech is folded
 /// into the nearest other voice when the count is automatic.
 pub const FOLD_MIN_SECS: f64 = 8.0;

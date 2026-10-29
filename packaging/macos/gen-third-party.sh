@@ -106,10 +106,10 @@ w.append("### ONNX Runtime, third-party components\n\n"
 w.append("## Models shipped inside the app\n")
 w.append("Speaker labels (Find speakers) use two model files that ship inside the app, unmodified, in "
          "`Contents/Resources/Models/speaker/` (fetched by `packaging/sherpa/fetch-models.sh`, SHA-256 pinned): pyannote "
-         "segmentation-3.0 (MIT) and the 3D-Speaker CAM++ English VoxCeleb model (Apache-2.0; the Apache-2.0 text is the "
+         "segmentation-3.0 (MIT) and the 3D-Speaker CAM++ Chinese-English model (Apache-2.0; the Apache-2.0 text is the "
          "one given for the vendored `sherpa-onnx` crates below).\n")
 for label, rel in [("pyannote segmentation 3.0 (MIT)", "packaging/sherpa/models-licenses/pyannote-segmentation-3.0-LICENSE.txt"),
-                   ("CAM++ English, 3D-Speaker (Apache-2.0)", "packaging/sherpa/models-licenses/campplus-3D-Speaker-NOTICE.txt")]:
+                   ("CAM++ Chinese-English, 3D-Speaker (Apache-2.0)", "packaging/sherpa/models-licenses/campplus-3D-Speaker-NOTICE.txt")]:
     t = open(os.path.join(root, rel), encoding="utf-8").read().strip()
     w.append("### " + label + "\n\n```text\n" + t + "\n```\n")
 w.append("## Rust crates by license expression\n")

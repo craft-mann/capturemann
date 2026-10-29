@@ -1,6 +1,6 @@
 # AI-8 manual script: speaker labels (who spoke when)
 
-The two speaker models (pyannote segmentation-3.0 and CAM++) **ship inside the app**
+The two speaker models (pyannote segmentation-3.0 and CAM++ Chinese-English) **ship inside the app**
 (`Contents/Resources/Models/speaker/`, made by `make sherpa` and `make bundle`), so there is no
 setup step. Run this script with the bundle (`make run-bundle-dev`), not a bare `cargo run`, which
 has no models unless `CM_SPEAKER_MODELS_DIR` points at `packaging/sherpa/out/models`. Steps marked
