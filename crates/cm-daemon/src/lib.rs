@@ -44,6 +44,7 @@ pub mod caption_options;
 pub mod clock;
 pub mod config;
 mod daemon;
+pub mod diagnostics;
 pub mod edit_ops;
 pub mod engines;
 pub mod error;

@@ -158,6 +158,9 @@ pub const ACTIONS: &[ActionSpec] = &[
     // returned. `test_text_model` sends one fixed short prompt to the configured provider only.
     spec("get_text_model", Tier::Free, false),
     spec("test_text_model", Tier::Free, false),
+    // DIAG-1: the text a user pastes into an issue. Read-only; it never contains tokens, titles,
+    // transcripts or file names of recordings.
+    spec("get_diagnostics", Tier::Free, false),
 ];
 
 /// Actions that are plumbing for first-party GUI clients and are deliberately **not** exposed

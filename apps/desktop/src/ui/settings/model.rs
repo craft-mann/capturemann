@@ -391,6 +391,7 @@ pub(crate) fn tool_title(name: &str) -> String {
         "upload" => tr!("Copy a capture to a destination"),
         "list_publish_accounts" => tr!("List publish accounts"),
         "get_text_model" => tr!("Read the text model settings"),
+        "get_diagnostics" => tr!("Read the diagnostics"),
         "test_text_model" => tr!("Test the text model"),
         _ => tr!("Other action"),
     }

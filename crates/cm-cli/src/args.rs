@@ -73,6 +73,9 @@ pub enum Command {
     },
     /// List cameras, microphones and system-audio support (`list_devices`).
     Devices,
+    /// Print the diagnostics report to paste into an issue (`get_diagnostics`): versions, system,
+    /// permissions, models, a few settings, library counts and the last warnings. Nothing is sent.
+    Diagnostics,
     /// List the destinations set up in Settings (`list_destinations`).
     Destinations,
     /// Copy a capture or a file to a destination in the background (`upload`). Prints the job id.

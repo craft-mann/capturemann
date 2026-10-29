@@ -32,7 +32,9 @@ use record::{
     record_control, record_marker, record_mic, record_selftest, record_start, record_status,
     record_watch,
 };
-use settings::{daemon_start, daemon_status, devices, mcp, settings_get, settings_set};
+use settings::{
+    daemon_start, daemon_status, devices, diagnostics, mcp, settings_get, settings_set,
+};
 
 struct Ctx<'a> {
     json: bool,
@@ -99,6 +101,7 @@ pub async fn execute(cli: Cli, env: &mut Env) -> Result<(), CliError> {
             }
         },
         Command::Devices => devices(&mut cx).await,
+        Command::Diagnostics => diagnostics(&mut cx).await,
         Command::Destinations => destinations(&mut cx).await,
         Command::Upload(a) => upload(&mut cx, a).await,
         Command::Publish(a) => publish(&mut cx, a).await,

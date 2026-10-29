@@ -1089,6 +1089,22 @@ pub fn all() -> Vec<ToolSpec> {
                 "required": ["accounts"] }),
         },
         ai_tool(
+            "get_diagnostics",
+            Tier::Free,
+            false,
+            "DIAG-1",
+            "Read the diagnostics report of this CaptureMann: the text a user pastes into an issue. Sections: App (version, how it was started), System (OS, chip, memory), Permissions (microphone, screen recording, camera; read without asking), Models and engines (installed speech models, the text model, FFmpeg and the text engine's helper), Settings (the few that change behaviour; never a key or token), Library (counts and sizes, never titles), Last recording (how it was really encoded) and the last warnings and errors from the log file. Home folders are shown as `~` and secrets are removed. Nothing is sent anywhere; it contains no audio, transcript text or file names of recordings.",
+            json!({}),
+            &[],
+            json!({ "type": "object", "properties": {
+                "text": { "type": "string", "description": "The whole report, ready to paste." },
+                "sections": { "type": "array", "items": { "type": "object", "properties": {
+                    "title": { "type": "string" },
+                    "lines": { "type": "array", "items": { "type": "string" } } },
+                    "required": ["title", "lines"] } } },
+                "required": ["text", "sections"] }),
+        ),
+        ai_tool(
             "get_text_model",
             Tier::Free,
             false,

@@ -77,6 +77,10 @@ Pending:
 
 Deferred (not in 0.2.0): the first-use setup sheet (one place to get the speech and text models when you first need them; **not in 0.2.1 either**, which is Intel support only, maintainer decision Oct 28, 2026); VOC-3 live transcript to a later 0.2.x; Ollama and LM Studio (backlog); Intel Macs, Windows and Linux. Windows is untouched by this work.
 
+## Release 0.2.4 (performance and diagnostics) — in progress
+
+Plan: [`specs/plans/release-0.2.4-plan.md`](../../specs/plans/release-0.2.4-plan.md). **Built so far (Oct 29, 2026, tested headless and with fakes, not verified by hand):** DIAG-1 log file per process in `<config>/logs` (3 x 2 MB, redacted, panics with a backtrace, unclean-exit marker), `get_diagnostics` (MCP tool 74, `capturemann diagnostics`) and the Settings, About Diagnostics card (`specs/features/16-diagnostics.md`, `tests/manual/DIAG-1.md` not yet run). **Not built:** the performance harness and its fixes (PERF-1), phase timers and the performance line in the report. Release 0.2.5 (US PII coverage for Auto-redact, with a benchmark) is planned in `specs/plans/release-0.2.5-plan.md`.
+
 ## Release 0.2.3 (speaker detection, the Intel recording crash, language choice)
 
 Scope (maintainer, Oct 28, 2026): speaker detection improvement and transcript improvement; the Intel recording crash of issue 16 and a wrong-language transcript were added on Oct 29, 2026. Translation is not in it. Plan: [`specs/plans/release-0.2.3-plan.md`](../../specs/plans/release-0.2.3-plan.md). **Not yet released** (version bumped to 0.2.3, changelog dated Oct 29, 2026; the signed builds, the draft release and the publish are the maintainer's).

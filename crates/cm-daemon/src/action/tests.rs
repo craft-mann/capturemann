@@ -161,6 +161,7 @@ fn samples() -> Vec<(&'static str, Value)> {
         ("list_destinations", json!({})),
         ("list_publish_accounts", json!({})),
         ("get_text_model", json!({})),
+        ("get_diagnostics", json!({})),
         ("test_text_model", json!({})),
         ("list_report_templates", json!({})),
         (
@@ -482,6 +483,7 @@ fn bad_inputs_name_the_field() {
         ("rescan_library", json!({"x": 1}), "x"),
         ("list_destinations", json!({"x": 1}), "x"),
         ("list_publish_accounts", json!({"x": 1}), "x"),
+        ("get_diagnostics", json!({"x": 1}), "x"),
         ("upload", json!({}), "capture_id"),
         (
             "upload",

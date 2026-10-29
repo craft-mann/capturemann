@@ -199,3 +199,11 @@ pub(super) async fn devices(cx: &mut Ctx<'_>) -> Result<(), CliError> {
     });
     Ok(())
 }
+
+/// `diagnostics`: the report text, or the whole answer with `--json`.
+pub(super) async fn diagnostics(cx: &mut Ctx<'_>) -> Result<(), CliError> {
+    let mut c = cx.client().await?;
+    let r = c.call("get_diagnostics", json!({})).await?;
+    cx.emit(&r, |r| plain(&r["text"]));
+    Ok(())
+}

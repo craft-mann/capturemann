@@ -367,6 +367,8 @@ pub enum Action {
     ListPublishAccounts,
     /// `get_text_model` (see [`crate::text_model_ops`]).
     GetTextModel,
+    /// `get_diagnostics` (see [`crate::diagnostics`]).
+    GetDiagnostics,
     /// `test_text_model` (see [`crate::text_model_ops`]).
     TestTextModel,
     /// Internal: rebuild the index from the bundle folders.

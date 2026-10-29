@@ -20,6 +20,7 @@ mod audio_check;
 pub(crate) mod audio_check_model;
 mod check_widgets;
 pub mod destinations;
+mod diagnostics;
 mod general;
 mod library_folder;
 pub mod model;
@@ -96,6 +97,9 @@ pub struct SettingsView {
     pub(super) webcam: webcam_view::WebcamState,
     /// Webcam & audio page: the microphone and system audio checks (R13b).
     pub(super) audio: audio_check::AudioCheckState,
+    /// About page: the Diagnostics card (DIAG-1) and the task that reads it.
+    pub(super) diag: diagnostics::DiagState,
+    _diag_task: Option<Task<()>>,
 }
 
 impl SettingsView {
@@ -171,6 +175,8 @@ impl SettingsView {
             yt,
             webcam: webcam_view::WebcamState::new(),
             audio: audio_check::AudioCheckState::new(),
+            diag: diagnostics::DiagState::default(),
+            _diag_task: None,
             rebinding: None,
             login_error: None,
             lib_size: Default::default(),

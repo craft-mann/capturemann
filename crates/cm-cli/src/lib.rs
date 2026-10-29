@@ -101,6 +101,7 @@ pub const CLI_COMMANDS: &[(&str, Option<&str>)] = &[
     ("translate_captions", Some("ai translate")),
     ("suggest_zooms", Some("ai suggest zooms")),
     ("suggest_cuts", Some("ai suggest cuts")),
+    ("get_diagnostics", Some("diagnostics")),
     ("get_text_model", Some("ai text-model")),
     ("test_text_model", Some("ai text-model test")),
     ("diarize", Some("ai speakers")),

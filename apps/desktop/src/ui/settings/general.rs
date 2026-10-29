@@ -332,7 +332,13 @@ impl SettingsView {
                 GITHUB_URL,
                 cx,
             ));
-        about_card(t, links.into_any_element())
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(12.))
+            .child(about_card(t, links.into_any_element()))
+            .child(self.diagnostics_card(t, cx))
+            .into_any_element()
     }
 }
 

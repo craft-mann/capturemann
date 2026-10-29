@@ -1154,6 +1154,9 @@ msgstr ""
 msgid "Couldn’t open this capture"
 msgstr ""
 
+msgid "Couldn’t read the diagnostics: {e}"
+msgstr ""
+
 msgid "Couldn’t read the transcript: {m}"
 msgstr ""
 
@@ -1370,6 +1373,9 @@ msgid "Destination"
 msgstr ""
 
 msgid "Destination name"
+msgstr ""
+
+msgid "Diagnostics"
 msgstr ""
 
 msgid "Discard and restart"
@@ -3198,6 +3204,9 @@ msgstr ""
 msgid "Read settings"
 msgstr ""
 
+msgid "Read the diagnostics"
+msgstr ""
+
 msgid "Read the text model settings"
 msgstr ""
 
@@ -3205,6 +3214,9 @@ msgid "Reading never needs asking."
 msgstr ""
 
 msgid "Reading the model list…"
+msgstr ""
+
+msgid "Reading…"
 msgstr ""
 
 msgid "Ready to download"
@@ -4260,6 +4272,9 @@ msgstr ""
 msgid "The CLI and the MCP bridge connect to this app over a local socket. Requests that need your confirmation, and refused ones, are listed below for 30 days."
 msgstr ""
 
+msgid "The CaptureMann engine is not running."
+msgstr ""
+
 msgid "The MP4 export applies trims, cuts, speed, the background and, if you choose, the captions."
 msgstr ""
 
@@ -5075,6 +5090,10 @@ msgid "What to record"
 msgstr ""
 
 msgid "What was recorded up to that moment is saved in your library."
+msgstr ""
+
+#. FACT: owner review required (privacy)
+msgid "When something goes wrong, copy this and paste it into a bug report. It has the version, your Mac, permissions, models, a few settings and the last warnings. It has no audio, no transcripts and no file names. Nothing is sent: check it, then paste it yourself."
 msgstr ""
 
 msgid "When you press Publish, CaptureMann asks you to confirm in a separate dialog. Nothing is sent to YouTube before you do. Chapters are not added yet."
@@ -6503,6 +6522,10 @@ msgid "Reconnect…"
 msgstr ""
 
 msgctxt "button"
+msgid "Refresh"
+msgstr ""
+
+msgctxt "button"
 msgid "Remove"
 msgstr ""
 
@@ -6523,11 +6546,19 @@ msgid "Reveal"
 msgstr ""
 
 msgctxt "button"
+msgid "Reveal log folder"
+msgstr ""
+
+msgctxt "button"
 msgid "Save"
 msgstr ""
 
 msgctxt "button"
 msgid "Set up report"
+msgstr ""
+
+msgctxt "button"
+msgid "Show diagnostics"
 msgstr ""
 
 msgctxt "button"
