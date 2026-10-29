@@ -190,6 +190,53 @@ impl OfflineSpeakerDiarization {
     }
 }
 
+/// What the progress callback of [`OfflineSpeakerDiarization::process_with_progress`] holds.
+struct ProgressState<'a> {
+    callback: &'a mut dyn FnMut(i32, i32) -> bool,
+}
+
+unsafe extern "C" fn progress_trampoline(
+    processed: i32,
+    total: i32,
+    arg: *mut std::os::raw::c_void,
+) -> i32 {
+    // SAFETY: `arg` is the `ProgressState` that `process_with_progress` put there and keeps alive
+    // for the whole call; the library calls this on the thread that called `process`.
+    let state = unsafe { &mut *arg.cast::<ProgressState<'_>>() };
+    // The C API stops when the callback returns a non-zero value.
+    i32::from(!(state.callback)(processed, total))
+}
+
+impl OfflineSpeakerDiarization {
+    /// [`OfflineSpeakerDiarization::process`] that reports progress: `callback` gets the chunks
+    /// done and the chunks in total (the segmentation and the voice-embedding steps; the final
+    /// clustering reports nothing). Returning `false` asks the library to stop (the C API passes a
+    /// non-zero value back), but **sherpa-onnx 2.0.1 ignores it**: measured on a 5-minute file, the
+    /// run went on to the end and kept reporting. Added by CaptureMann: the crates.io crate has no
+    /// binding for it.
+    pub fn process_with_progress(
+        &self,
+        samples: &[f32],
+        callback: &mut dyn FnMut(i32, i32) -> bool,
+    ) -> Option<OfflineSpeakerDiarizationResult> {
+        let mut state = ProgressState { callback };
+        let ptr = unsafe {
+            sys::SherpaOnnxOfflineSpeakerDiarizationProcessWithCallback(
+                self.ptr,
+                samples.as_ptr(),
+                samples.len() as i32,
+                Some(progress_trampoline),
+                (&mut state as *mut ProgressState<'_>).cast(),
+            )
+        };
+        if ptr.is_null() {
+            None
+        } else {
+            Some(OfflineSpeakerDiarizationResult { ptr })
+        }
+    }
+}
+
 impl Drop for OfflineSpeakerDiarization {
     fn drop(&mut self) {
         unsafe {

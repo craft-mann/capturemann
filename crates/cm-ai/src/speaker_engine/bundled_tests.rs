@@ -11,7 +11,13 @@ use crate::model::{sha256_hex, Catalog, ModelStore};
 struct NoEngine;
 
 impl TurnEngine for NoEngine {
-    fn run(&self, _: &SpeakerModels, _: &[f32], _: ClusterParams) -> Result<Vec<Turn>, CmError> {
+    fn run(
+        &self,
+        _: &SpeakerModels,
+        _: &[f32],
+        _: ClusterParams,
+        _: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Vec<Turn>, CmError> {
         Ok(Vec::new())
     }
 }

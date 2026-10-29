@@ -108,12 +108,17 @@ pub struct ClusterParams {
 }
 
 /// The engine seam under [`SherpaDiarizer`]: 16 kHz mono samples in, turns out.
+///
+/// `progress` gets 0.0 to 1.0 for this run and returns `false` to stop it; a stopped run answers
+/// [`cancelled`]. The real engine passes the stop to sherpa-onnx, which (2.0.1) ignores it and
+/// finishes the run first, so the cancelled answer comes when the run would have ended anyway.
 pub trait TurnEngine: Send + Sync {
     fn run(
         &self,
         models: &SpeakerModels,
         samples: &[f32],
         params: ClusterParams,
+        progress: &mut dyn FnMut(f32) -> bool,
     ) -> Result<Vec<Turn>, CmError>;
 }
 
@@ -161,7 +166,13 @@ impl Diarizer for SherpaDiarizer {
         let turns = if seconds < MIN_AUDIO_SECS {
             Vec::new()
         } else {
-            run_with_hints(self.engine.as_ref(), &models, audio.samples, hints)?
+            run_with_hints(
+                self.engine.as_ref(),
+                &models,
+                audio.samples,
+                hints,
+                progress,
+            )?
         };
         if !progress(1.0) {
             return Err(cancelled());
@@ -187,32 +198,41 @@ pub fn run_with_hints(
     models: &SpeakerModels,
     samples: &[f32],
     hints: &DiarizeHints,
+    progress: &mut dyn FnMut(f32) -> bool,
 ) -> Result<Vec<Turn>, CmError> {
     let exact = |n: u32| ClusterParams {
         num_clusters: Some(n),
         threshold: AUTO_THRESHOLD,
     };
     let turns = if let Some(n) = hints.num_speakers {
-        engine.run(models, samples, exact(n))?
+        engine.run(models, samples, exact(n), progress)?
     } else {
         let auto = ClusterParams {
             num_clusters: None,
             threshold: AUTO_THRESHOLD,
         };
-        let first = fold_small_speakers(engine.run(models, samples, auto)?);
+        // Most runs end with this pass, so it takes nearly all of the bar; the rare second pass
+        // below keeps the bar where it is (progress never goes back) and can still be stopped.
+        let first = fold_small_speakers(engine.run(models, samples, auto, &mut |f| {
+            progress(f * FIRST_PASS_SHARE)
+        })?);
         let count = speaker_count(&first);
         let max = hints.max_speakers.unwrap_or(AUTO_MAX_SPEAKERS);
         let min = hints.min_speakers.unwrap_or(1);
+        let mut hold = |_: f32| progress(FIRST_PASS_SHARE);
         if count > max {
-            engine.run(models, samples, exact(max))?
+            engine.run(models, samples, exact(max), &mut hold)?
         } else if count < min {
-            engine.run(models, samples, exact(min))?
+            engine.run(models, samples, exact(min), &mut hold)?
         } else {
             first
         }
     };
     Ok(tidy_turns(turns))
 }
+
+/// The share of the progress bar the first pass of an automatic run takes (see [`run_with_hints`]).
+const FIRST_PASS_SHARE: f32 = 0.95;
 
 fn speaker_count(turns: &[Turn]) -> u32 {
     let mut ids: Vec<i32> = turns.iter().map(|t| t.speaker).collect();
@@ -343,10 +363,47 @@ struct MissingEngine;
 
 #[cfg(not(feature = "sherpa"))]
 impl TurnEngine for MissingEngine {
-    fn run(&self, _: &SpeakerModels, _: &[f32], _: ClusterParams) -> Result<Vec<Turn>, CmError> {
+    fn run(
+        &self,
+        _: &SpeakerModels,
+        _: &[f32],
+        _: ClusterParams,
+        _: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Vec<Turn>, CmError> {
         Err(CmError::invalid_input(
             "This build of CaptureMann has no speaker engine, so speakers cannot be told apart.",
         ))
+    }
+}
+
+/// Turns the engine's chunk counts into one rising fraction. The engine counts chunks twice, once
+/// while it finds speech (segmentation) and once while it computes the voice prints (embeddings),
+/// and starts again from 0 for the second step; the clustering at the end reports nothing, so the
+/// bar stops short of 1.0 (the caller sets 1.0 when the run returns).
+#[derive(Debug, Default)]
+#[cfg_attr(not(feature = "sherpa"), allow(dead_code))]
+struct ProgressBar {
+    steps_done: u32,
+    last_done: i32,
+    best: f32,
+}
+
+#[cfg_attr(not(feature = "sherpa"), allow(dead_code))]
+impl ProgressBar {
+    /// The two counted steps, each half of the bar, with the last 2 % left for the clustering.
+    fn fraction(&mut self, done: i32, total: i32) -> f32 {
+        if done < self.last_done {
+            self.steps_done += 1;
+        }
+        self.last_done = done;
+        let within = if total > 0 {
+            (done as f32 / total as f32).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        let f = ((self.steps_done as f32 + within) / 2.0).min(1.0) * 0.98;
+        self.best = self.best.max(f);
+        self.best
     }
 }
 
@@ -365,6 +422,7 @@ impl TurnEngine for SherpaEngine {
         models: &SpeakerModels,
         samples: &[f32],
         params: ClusterParams,
+        progress: &mut dyn FnMut(f32) -> bool,
     ) -> Result<Vec<Turn>, CmError> {
         use sherpa_onnx::{
             FastClusteringConfig, OfflineSpeakerDiarization, OfflineSpeakerDiarizationConfig,
@@ -420,9 +478,19 @@ impl TurnEngine for SherpaEngine {
                 engine.sample_rate()
             )));
         }
-        let result = engine
-            .process(samples)
-            .ok_or_else(|| CmError::internal("the speaker engine failed on this audio"))?;
+        let mut stopped = false;
+        let mut bar = ProgressBar::default();
+        let result = engine.process_with_progress(samples, &mut |done, total| {
+            if !progress(bar.fraction(done, total)) {
+                stopped = true;
+            }
+            !stopped
+        });
+        if stopped {
+            return Err(cancelled());
+        }
+        let result =
+            result.ok_or_else(|| CmError::internal("the speaker engine failed on this audio"))?;
         Ok(result
             .sort_by_start_time()
             .into_iter()

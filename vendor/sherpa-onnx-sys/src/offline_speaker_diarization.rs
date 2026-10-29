@@ -2,7 +2,7 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 
-use std::os::raw::{c_char, c_float};
+use std::os::raw::{c_char, c_float, c_void};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -57,6 +57,13 @@ pub struct OfflineSpeakerDiarizationSegment {
     pub confidence: c_float,
 }
 
+/// `SherpaOnnxOfflineSpeakerDiarizationProgressCallback` of the C API: chunks processed, chunks in
+/// total, the `arg` given to the call. Added by CaptureMann (the crates.io file has no binding for
+/// `SherpaOnnxOfflineSpeakerDiarizationProcessWithCallback`).
+pub type OfflineSpeakerDiarizationProgressCallback = Option<
+    unsafe extern "C" fn(num_processed_chunks: i32, num_total_chunks: i32, arg: *mut c_void) -> i32,
+>;
+
 extern "C" {
     pub fn SherpaOnnxCreateOfflineSpeakerDiarization(
         config: *const OfflineSpeakerDiarizationConfig,
@@ -93,6 +100,14 @@ extern "C" {
         sd: *const OfflineSpeakerDiarization,
         samples: *const c_float,
         n: i32,
+    ) -> *const OfflineSpeakerDiarizationResult;
+
+    pub fn SherpaOnnxOfflineSpeakerDiarizationProcessWithCallback(
+        sd: *const OfflineSpeakerDiarization,
+        samples: *const c_float,
+        n: i32,
+        callback: OfflineSpeakerDiarizationProgressCallback,
+        arg: *mut c_void,
     ) -> *const OfflineSpeakerDiarizationResult;
 
     pub fn SherpaOnnxOfflineSpeakerDiarizationDestroyResult(

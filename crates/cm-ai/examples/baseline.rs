@@ -80,6 +80,7 @@ impl TurnEngine for Tuned {
         models: &SpeakerModels,
         samples: &[f32],
         params: ClusterParams,
+        progress: &mut dyn FnMut(f32) -> bool,
     ) -> Result<Vec<cm_ai::speaker_engine::Turn>, cm_core::CmError> {
         let threshold = self.0.unwrap_or(params.threshold);
         SherpaEngine::default().run(
@@ -89,6 +90,7 @@ impl TurnEngine for Tuned {
                 threshold,
                 ..params
             },
+            progress,
         )
     }
 }

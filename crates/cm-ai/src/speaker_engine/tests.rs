@@ -35,7 +35,17 @@ impl Scripted {
 }
 
 impl TurnEngine for Scripted {
-    fn run(&self, _: &SpeakerModels, _: &[f32], p: ClusterParams) -> Result<Vec<Turn>, CmError> {
+    fn run(
+        &self,
+        _: &SpeakerModels,
+        _: &[f32],
+        p: ClusterParams,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Vec<Turn>, CmError> {
+        // The scripted engine reports the start and the end of every run, like a real one.
+        if !progress(0.0) || !progress(1.0) {
+            return Err(crate::transcribe::cancelled());
+        }
         self.calls.lock().unwrap().push(p);
         Ok(if p.num_clusters.is_some() {
             self.exact.clone()
@@ -59,7 +69,7 @@ fn an_exact_number_of_speakers_is_passed_to_the_engine_once() {
         num_speakers: Some(2),
         ..Default::default()
     };
-    let out = run_with_hints(&e, &models(), &[0.0; 16], &hints).unwrap();
+    let out = run_with_hints(&e, &models(), &[0.0; 16], &hints, &mut |_| true).unwrap();
     assert_eq!(out.len(), 2);
     let calls = e.calls();
     assert_eq!(calls.len(), 1);
@@ -78,7 +88,14 @@ fn an_automatic_run_uses_the_high_threshold_and_folds_tiny_clusters() {
         turn(91.0, 100.0, 1),
     ];
     let e = Scripted::new(auto, vec![]);
-    let out = run_with_hints(&e, &models(), &[0.0; 16], &DiarizeHints::default()).unwrap();
+    let out = run_with_hints(
+        &e,
+        &models(),
+        &[0.0; 16],
+        &DiarizeHints::default(),
+        &mut |_| true,
+    )
+    .unwrap();
     let calls = e.calls();
     assert_eq!(calls.len(), 1, "no second pass inside the allowed range");
     assert_eq!(calls[0].num_clusters, None);
@@ -100,7 +117,7 @@ fn too_many_automatic_speakers_cause_one_more_pass_with_the_maximum() {
         max_speakers: Some(2),
         ..Default::default()
     };
-    let out = run_with_hints(&e, &models(), &[0.0; 16], &hints).unwrap();
+    let out = run_with_hints(&e, &models(), &[0.0; 16], &hints, &mut |_| true).unwrap();
     let calls = e.calls();
     assert_eq!(calls.len(), 2);
     assert_eq!(calls[1].num_clusters, Some(2));
@@ -117,7 +134,7 @@ fn fewer_automatic_speakers_than_the_minimum_cause_one_more_pass() {
         min_speakers: Some(2),
         ..Default::default()
     };
-    let out = run_with_hints(&e, &models(), &[0.0; 16], &hints).unwrap();
+    let out = run_with_hints(&e, &models(), &[0.0; 16], &hints, &mut |_| true).unwrap();
     assert_eq!(e.calls().len(), 2);
     assert_eq!(out.len(), 2);
 }
@@ -231,7 +248,9 @@ fn with_both_files_it_runs_and_shifts_the_times_by_the_audio_start() {
             true
         })
         .unwrap();
-    assert_eq!(seen, vec![0.0, 1.0]);
+    // The run itself reports through the engine, and the diarizer adds the first and last value.
+    assert_eq!((seen.first(), seen.last()), (Some(&0.0), Some(&1.0)));
+    assert!(seen.windows(2).all(|w| w[0] <= w[1]), "{seen:?}");
     assert_eq!(out.len(), 2);
     assert_eq!(out[0].start, MediaTime::from_secs(10));
     assert_eq!(out[1].end, MediaTime::from_secs(14));
@@ -319,4 +338,70 @@ fn a_speaker_model_is_imported_only_when_it_is_the_pinned_file() {
     // A download of an import-only row is refused with the way out.
     let e = store.download(SEGMENTATION_ID, &mut |_| true).unwrap_err();
     assert!(e.to_string().contains("import"), "{e}");
+}
+
+/// An automatic run reports the engine's progress scaled to the first pass, and stays within 0 to 1.
+#[test]
+fn an_automatic_run_reports_progress_and_never_passes_one() {
+    let e = Scripted::new(vec![turn(0.0, 5.0, 0), turn(5.0, 10.0, 1)], vec![]);
+    let mut seen = Vec::new();
+    run_with_hints(
+        &e,
+        &models(),
+        &[0.0; 16],
+        &DiarizeHints::default(),
+        &mut |f| {
+            seen.push(f);
+            true
+        },
+    )
+    .unwrap();
+    assert!(seen.len() >= 2);
+    assert!(seen.windows(2).all(|w| w[0] <= w[1]), "{seen:?}");
+    assert!(seen.iter().all(|f| (0.0..=1.0).contains(f)), "{seen:?}");
+    assert!(seen.last().is_some_and(|f| *f < 1.0), "{seen:?}");
+}
+
+/// Returning `false` from the progress callback stops the run with the shared cancelled error.
+#[test]
+fn stopping_from_the_progress_callback_cancels_the_run() {
+    let e = Scripted::new(vec![turn(0.0, 5.0, 0)], vec![]);
+    let err = run_with_hints(
+        &e,
+        &models(),
+        &[0.0; 16],
+        &DiarizeHints::default(),
+        &mut |_| false,
+    )
+    .unwrap_err();
+    assert!(crate::transcribe::is_cancelled(&err));
+    let err = run_with_hints(
+        &e,
+        &models(),
+        &[0.0; 16],
+        &DiarizeHints {
+            num_speakers: Some(2),
+            ..DiarizeHints::default()
+        },
+        &mut |_| false,
+    )
+    .unwrap_err();
+    assert!(crate::transcribe::is_cancelled(&err));
+}
+
+/// The chunk counts of the two steps (speech, then voice prints) make one rising bar that stops
+/// short of 1.0.
+#[test]
+fn the_chunk_counts_of_both_steps_make_one_rising_bar() {
+    let mut bar = ProgressBar::default();
+    let steps = [(0, 10), (5, 10), (10, 10), (0, 8), (4, 8), (8, 8)];
+    let fractions: Vec<f32> = steps.iter().map(|(d, t)| bar.fraction(*d, *t)).collect();
+    assert!(fractions.windows(2).all(|w| w[0] <= w[1]), "{fractions:?}");
+    assert!(fractions[2] > 0.45 && fractions[2] < 0.5, "{fractions:?}");
+    assert!(fractions[5] > 0.9 && fractions[5] < 1.0, "{fractions:?}");
+    assert_eq!(
+        bar.fraction(3, 0),
+        fractions[5],
+        "an unknown total never goes back"
+    );
 }

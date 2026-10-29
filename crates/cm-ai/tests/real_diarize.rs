@@ -104,7 +104,22 @@ fn real_models_tell_speakers_apart() {
             created: "2026-10-27T00:00:00Z",
         };
         let t = Instant::now();
-        let out = diarize_audio(&d, &input, &opts, &mut |_| true).unwrap();
+        let mut seen: Vec<f32> = Vec::new();
+        let out = diarize_audio(&d, &input, &opts, &mut |f| {
+            seen.push(f);
+            true
+        })
+        .unwrap();
+        // The progress the engine reports: rising, within 0 to 1, many steps for real audio.
+        println!(
+            "  progress: {} reports, first {:.3}, last {:.3}",
+            seen.len(),
+            seen.first().copied().unwrap_or(-1.0),
+            seen.last().copied().unwrap_or(-1.0)
+        );
+        assert!(seen.windows(2).all(|w| w[0] <= w[1]), "progress went back");
+        assert!(seen.iter().all(|f| (0.0..=1.0).contains(f)));
+        assert!(seen.len() > 10, "too few progress reports: {}", seen.len());
         let took = t.elapsed().as_secs_f64();
         let segs = &out.file.segments;
         println!(
@@ -143,4 +158,70 @@ fn real_models_tell_speakers_apart() {
         sorted.sort_unstable();
         assert_eq!(first_seen, sorted, "numbered by first speech");
     }
+}
+
+/// Stopping from the progress callback ends a real run with the cancelled error. sherpa-onnx 2.0.1
+/// ignores the stop and finishes the run first (the printed times show it), so this only checks the
+/// answer, not that the run ends early; if a newer library honours it, assert the time here.
+#[test]
+#[ignore = "needs CM_SHERPA_MODELS and CM_DIARIZE_AUDIO"]
+fn a_real_run_can_be_stopped_from_the_progress_callback() {
+    let (Some(models), Some(audio)) = (
+        std::env::var_os("CM_SHERPA_MODELS"),
+        std::env::var_os("CM_DIARIZE_AUDIO"),
+    ) else {
+        println!("SKIPPED: set CM_SHERPA_MODELS and CM_DIARIZE_AUDIO");
+        return;
+    };
+    let models = PathBuf::from(models);
+    let seg = find(&models, &["pyannote-segmentation-3-0.onnx", "model.onnx"]);
+    let emb = find(
+        &models,
+        &[
+            "campplus-sv-zh-en-16k-advanced.onnx",
+            "3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx",
+        ],
+    );
+    let dir = tempfile::tempdir().unwrap();
+    let store = ModelStore::with_catalog(dir.path(), Catalog::builtin());
+    std::fs::create_dir_all(store.models_dir()).unwrap();
+    for (id, from) in [
+        (cm_ai::speaker_engine::SEGMENTATION_ID, &seg),
+        (cm_ai::speaker_engine::EMBEDDING_ID, &emb),
+    ] {
+        let file = &store.catalog().get(id).unwrap().file;
+        std::os::unix::fs::symlink(from, store.models_dir().join(file)).unwrap();
+    }
+    let samples = read_wav(Path::new(&audio));
+    let d = SherpaDiarizer::new(store);
+    let input = DiarizeInput {
+        mix: &samples,
+        mic: None,
+        system: None,
+        start: MediaTime::ZERO,
+        gaps: &[],
+    };
+    let opts = DiarizeOptions {
+        hints: DiarizeHints::default(),
+        headset: false,
+        display_name: "Me",
+        created: "2026-10-29T00:00:00Z",
+    };
+    let began = Instant::now();
+    let (mut asked_at, mut reports_after) = (None::<f64>, 0usize);
+    let err = diarize_audio(&d, &input, &opts, &mut |f| {
+        if f >= 0.2 {
+            reports_after += usize::from(asked_at.is_some());
+            asked_at.get_or_insert(began.elapsed().as_secs_f64());
+            return false;
+        }
+        true
+    })
+    .unwrap_err();
+    println!(
+        "stop asked at {:.1} s, {reports_after} more reports, returned after {:.1} s",
+        asked_at.unwrap_or(-1.0),
+        began.elapsed().as_secs_f64()
+    );
+    assert!(cm_ai::transcribe::is_cancelled(&err), "{err:?}");
 }

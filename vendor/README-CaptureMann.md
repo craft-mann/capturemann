@@ -6,8 +6,8 @@ on them, while `cargo fmt --all`, `cargo deny` and `make licenses` still read th
 
 | Directory | Upstream | What changed |
 | --- | --- | --- |
-| `sherpa-onnx-sys` | `sherpa-onnx-sys` 2.0.1 on crates.io (Apache-2.0, https://github.com/k2-fsa/sherpa-onnx) | `build.rs` is new: it only links the static libraries in `SHERPA_ONNX_LIB_DIR` and fails with a clear message when they are missing; no download, no unpacking. The four build-dependencies (`ureq`, `zip`, `bzip2`, `tar`) and the `shared` feature are removed. `src/` (the FFI declarations) is unchanged apart from rustfmt layout. |
-| `sherpa-onnx` | `sherpa-onnx` 2.0.1 on crates.io (Apache-2.0) | `Cargo.toml` only: the `static`/`shared` features are gone and the sys crate is a path dependency. `src/` is unchanged apart from rustfmt layout. |
+| `sherpa-onnx-sys` | `sherpa-onnx-sys` 2.0.1 on crates.io (Apache-2.0, https://github.com/k2-fsa/sherpa-onnx) | `build.rs` is new: it only links the static libraries in `SHERPA_ONNX_LIB_DIR` and fails with a clear message when they are missing; no download, no unpacking. The four build-dependencies (`ureq`, `zip`, `bzip2`, `tar`) and the `shared` feature are removed. `src/` (the FFI declarations) is unchanged apart from rustfmt layout and one addition in `offline_speaker_diarization.rs`: the declaration of `SherpaOnnxOfflineSpeakerDiarizationProcessWithCallback` (already in the static library, Oct 29, 2026). |
+| `sherpa-onnx` | `sherpa-onnx` 2.0.1 on crates.io (Apache-2.0) | `Cargo.toml`: the `static`/`shared` features are gone and the sys crate is a path dependency. `src/` is unchanged apart from rustfmt layout and `OfflineSpeakerDiarization::process_with_progress` in `offline_speaker_diarization.rs` (progress callback of the diarization run, Oct 29, 2026; the library ignores a request to stop, see the doc comment). |
 
 Why: the upstream build script downloaded a prebuilt archive during `cargo build` (no checksum) and
 unpacked it with crates whose licences (CDLA-Permissive-2.0, bzip2-1.0.6) the project did not want in
