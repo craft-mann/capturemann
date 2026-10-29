@@ -1,236 +1,214 @@
-# Release 0.2.5 plan: automatic PII redaction, measured and published
+# Release 0.2.5 plan: US PII coverage for Auto-redact, measured and published
 
-Status: **draft** (Oct 29, 2026), nothing built. Requested by the maintainer after 0.2.4 was scoped: the
-Auto-redact feature of the screenshot editor is liked, and it should become a headline feature: more kinds
-of personal and secret data found, redaction that can run on its own, a public benchmark on a sample data
-set, and promotion on GitHub and the website. Rules that apply: general techniques only, no one-image
-fixes (open source); **nothing is called "verified" or "accurate" without a stored report**; all data in the
-benchmark is synthetic (no real person's data, ever); on-device only, no network, no telemetry; no GPL;
-every option has an MCP parameter and a CLI flag; UI text through `cm_i18n`. Builds on ANN-1 and ANN-2
+Status: **draft, revision 2** (Oct 29, 2026), nothing built. Scope set by the maintainer: Auto-redact keeps
+working as it does today (the user reviews proposals and accepts them; **no automatic apply, no agent-side
+redaction in this release**). What changes is *what it finds*: extend the target information so the kinds of
+personal data named by the main US standards are covered as far as they can be seen on a screenshot, prove
+it with a benchmark on a sample data set, and then promote the feature. Rules: general techniques only, no
+one-image fixes (open source); **nothing is called "verified", "accurate" or "compliant" without a stored
+report**; all benchmark data is synthetic; on-device only, no network, no telemetry; no GPL; every option
+has an MCP parameter and a CLI flag; UI text through `cm_i18n`. Builds on ANN-1 and ANN-2
 (`specs/features/02-annotation.md`).
 
-## What the app redacts today (0.2.3, checked in `crates/cm-render/src/ocr/detect.rs`)
+## What the app redacts today (0.2.3, `crates/cm-render/src/ocr/detect.rs`)
 
 Auto-redact (editor button, MCP `suggest_redactions`, CLI `capturemann annotate <id> --suggest-redactions`)
-reads the text in a screenshot with the system's text recognizer (Apple Vision on macOS; nothing on
-Windows yet), looks for the following in each recognized line, and **proposes** blur rectangles. Nothing is
-applied until the user accepts; accepted proposals become blur ops (strength at least 16) in one undo step.
+reads the text in a screenshot with the system recognizer (Apple Vision on macOS only), finds the kinds
+below, and **proposes** blur rectangles. Nothing is applied until the user accepts; accepted proposals
+become blur ops (strength at least 16) in one undo step.
 
-| Kind | What is found | Confidence |
+| Kind | Found today | Confidence |
 |---|---|---|
-| `email` | `local@domain.tld`, tld 2+ letters, with trailing punctuation and brackets handled | 0.95 |
-| `token` | JWTs (`eyJ...`, three segments); well-known key shapes: `sk-`, `sk_live_`/`pk_live_`/`rk_live_`, `ghp_`/`gho_`/`ghu_`/`ghs_`/`ghr_`/`github_pat_`, `AIza`, `AKIA`/`ASIA` + 16, Slack `xox[baprs]`; any other 24+ character run of letters and digits mixed (at least 3 of each and 7 % digits), e.g. hex and base64 secrets | 0.95 known shapes, 0.6 generic |
-| `ip_address` | dotted IPv4 (each part 0 to 255) | 0.5 |
-| `phone` | 10 to 15 digits with at least two separators or a leading `+`; ISO dates and longer numbers are skipped | 0.5 |
+| `email` | `local@domain.tld`, tld 2+ letters, punctuation and brackets handled | 0.95 |
+| `token` | JWTs; key shapes `sk-`, `sk_live_`/`pk_live_`/`rk_live_`, `ghp_` and the other GitHub prefixes, `github_pat_`, `AIza`, `AKIA`/`ASIA`, Slack `xox*`; any other 24+ character mix of letters and digits | 0.95 known shapes, 0.6 generic |
+| `ip_address` | dotted IPv4 | 0.5 |
+| `phone` | 10 to 15 digits with at least two separators or a leading `+` | 0.5 |
 
-How it works: a hit inside a line gets a rectangle for just that span (the word box split in proportion to
-characters), padded and clipped; overlapping hits merge; the preview text is masked to the first and last
-two characters. The detector is pure Rust over recognized lines, so it is tested with a scripted
-recognizer; the real Vision recognizer ran once on one synthetic image.
+A hit inside a line gets a rectangle for just that span, padded and clipped; overlapping hits merge; the
+preview is masked to the first and last two characters. It has **no accuracy number** (no data set, no
+recall or false-alarm rate, no test of the whole chain from picture to exported file).
 
-**What it does not do (the gaps this release is about):**
+## The target: US standards, mapped to what can appear on a screen
 
-- It has **no accuracy number**. No data set, no recall, no false-positive rate, no test of the whole chain
-  (picture to OCR to detector to blur to exported file).
-- Kinds that are common on screens but missing: payment card numbers, IBANs, national and tax ID numbers,
-  street addresses, dates of birth, person names, private-key blocks, passwords and secrets written as
-  `NAME=value`, URLs that carry credentials or tokens, IPv6, MAC addresses, user names inside file paths,
-  faces, QR codes and barcodes.
-- Phone and ID shapes are tuned for ASCII digits and a few formats; other scripts and local formats are
-  untested (the users are partly Vietnamese speakers).
-- It always waits for the user: there is no way to have it run on its own, and an agent that asks for a
-  screenshot gets the unredacted picture.
-- Images only; recorded video is not covered (a separate future feature).
-- One recognizer (Apple Vision); a line split across two lines, or text too small or too low in contrast
-  for the recognizer, is not found.
+"The US PII standard" is not one list, so the plan names the ones it follows and the mapping is published:
 
-## The claim we want to be able to make, and the one we must not
+1. **NIST SP 800-122** (the federal definition of PII: name, SSN, date and place of birth, mother's maiden
+   name, biometric records, and linked information such as financial, medical, educational, employment).
+2. **HIPAA Safe Harbor** (45 CFR 164.514(b)(2)): the 18 identifiers. It is the most concrete list, and
+   healthcare, support and compliance teams use it for screenshots.
+3. **PCI DSS**: primary account numbers, and sensitive authentication data shown beside them.
+4. **GLBA / state breach-notification laws** (e.g. California, New York): name with SSN, driver's licence
+   or state ID, account or card number with its access code, medical and health insurance data, biometric
+   data, and credentials (user name or email with password).
+5. **Secrets and credentials** (what the app already covers, extended): not PII in law, but the second
+   thing people blur.
 
-Wanted, once the numbers exist: "CaptureMann finds and blurs the personal and secret data on a screenshot
-on your own computer, without a cloud service, and here is how well it does on a public data set, and how
-you can re-run the test." **Not allowed:** "removes all PII", "GDPR/HIPAA compliant", "100 %". The
-interface and the website say that detection is automatic assistance, that the user is responsible for
-checking, and that the numbers are for the data set described. Every number on the website links to the
-stored report.
+| Identifier (source) | Visible on a screenshot as | Plan |
+|---|---|---|
+| Names (HIPAA 1, NIST) | any text | Stage 2 (platform tagger), plus label context in Stage 1 |
+| Street address, city, county, ZIP (HIPAA 2) | address lines, forms | Stage 1: address block shapes; ZIP and ZIP+4 in context |
+| Dates tied to a person: birth, admission, discharge, death (HIPAA 3) | `DOB: 01/02/1980` | Stage 1: dates in context of a label |
+| Phone, fax (HIPAA 4, 5) | numbers | have phone; add US NANP rules (area code and exchange cannot start 0 or 1), `1-800`, extensions, labels `fax` |
+| Email (HIPAA 6) | text | have |
+| **SSN** (HIPAA 7, NIST, GLBA) | `123-45-6789`, `123 45 6789`, nine digits in context | Stage 1: structural rules (no 000, 666, 900-999 area; no 00 group; no 0000 serial), masked forms (`***-**-6789` is not a leak), ITIN (9xx-7x/8x) |
+| Medical record number, health plan beneficiary number (HIPAA 8, 9) | labelled IDs; Medicare Beneficiary Identifier | Stage 1: MBI format (11 characters with the CMS position rules), NPI (10 digits, Luhn with the 80840 prefix), DEA number (checksum), labelled MRN or member IDs by context |
+| Account numbers (HIPAA 10, GLBA, PCI) | bank, card, loan | Stage 1: **payment card (Luhn, issuer prefixes, 13 to 19 digits)**, **ABA routing (checksum)**, IBAN (mod 97), account numbers in context |
+| Certificate and licence numbers (HIPAA 11, GLBA) | driver's licence, state ID, passport, professional licence | Stage 1: US passport (9 digits, or the letter-and-8-digits form), EIN (`NN-NNNNNNN` with valid prefixes), driver's licence only in context of a label because state formats overlap ordinary text (a table of the state shapes as data, used with a label) |
+| Vehicle identifiers and plates (HIPAA 12) | VIN, licence plate | Stage 1: **VIN (17 characters, check digit)**; plates only in context |
+| Device identifiers and serial numbers (HIPAA 13) | IMEI, serials | Stage 1: IMEI (Luhn), MAC addresses, labelled serials |
+| URLs (HIPAA 14) | links | Stage 1: URLs with credentials or tokens in the query; personal-profile URLs are left to the user |
+| IP addresses (HIPAA 15) | v4 and v6 | have v4; add IPv6 |
+| Biometric identifiers, full-face photographs (HIPAA 16, 17) | fingerprints, photos | Stage 2: faces (Vision), off by default |
+| Any other unique number or code (HIPAA 18) | QR codes, barcodes, ticket numbers | Stage 2: QR and barcodes |
+| Credentials (GLBA, state laws) | `password: ...`, `NAME=value`, private keys | Stage 1: `NAME=value` and `"name": "value"` secrets, PEM private-key blocks, URLs with credentials |
+| Names inside file paths (home folders) | `/Users/jane`, `C:\Users\Jane` | Stage 1: the name part |
+
+**Honest limits written into the docs:** this follows the *kinds* of data the standards name. It does not
+make a screenshot "HIPAA Safe Harbor compliant" (that is a legal determination about a whole data set and
+what else is known), it does not remove text the recognizer cannot read, and it does not know that a name is
+sensitive unless a tagger or a label says so. The interface and the website call it assistance that needs a
+review. No compliance claims, and every number links to its stored report.
 
 ## Stage 0: the benchmark (first; every later stage is judged by it)
 
-1. **A synthetic screenshot set** with exact ground truth, made by a general generator, not by hand:
-   - Fake PII from rule-based generators that cannot hit real people: reserved or documented ranges only
-     (`example.com`/`.org`/`.net` and test domains for emails, `192.0.2.0/24`, `198.51.100.0/24`,
-     `203.0.113.0/24` and `2001:db8::/32` for addresses, fictional phone ranges such as the 555-01xx
-     block, payment-card numbers from public test numbers and Luhn-valid random ones with test prefixes,
-     IBANs with valid checksums on fictional bank codes, key shapes built from random characters with the
-     real prefixes, documented example keys, names from a small fictional list).
-   - Rendered into many **screen layouts** by the generator (a mail client, a chat, a terminal with
-     environment variables, a code editor with a `.env` file, a browser developer panel, a spreadsheet, a
-     web form, a settings page, a log viewer, a PDF-like document, a table of records), in **light and dark**
-     themes, at 1x and 2x, at several font sizes (down to 10 px), with several fonts, in **English and
-     Vietnamese** (with diacritics) and a few other scripts the OCR supports, with some text on
-     patterned and photographic backgrounds.
-   - **Negative screenshots** with no PII but lookalikes: build hashes, UUIDs, version strings, timestamps,
-     long identifiers, code, ISBNs, order numbers, coordinates, tables of numbers. They measure false alarms.
-   - Output: PNG plus a JSON of ground truth (kind, exact text, box). Size target: about 600 images
-     (about 400 with PII, 200 without) and under 150 MB so it can be downloaded; generator, seed and
-     licence (CC0 for the data, Apache-2.0 for the code) in `tests/data/redaction/` (data fetched by a
-     script or kept in a release asset, not in git history, to keep the repository small).
-2. **The harness** (`cm-render` example `redaction_bench`, headless, takes a recognizer, so Windows can
-   plug in later): for each image runs recognize, detect, blur and export, and reports
-   - **detection recall per kind**: share of ground-truth boxes covered by a proposal (at least 90 % of
-     the box);
+1. **A synthetic US screenshot set** with exact ground truth, from a general generator:
+   - Fake data from rule-based generators that cannot point at real people: random numbers that satisfy the
+     published *format* and *checksum* rules and are unlinked to any person (SSN shapes within the issuable
+     ranges, Luhn card numbers and the public test numbers, ABA numbers with a valid checksum, NPI, DEA,
+     VIN, IMEI, EIN, MBI), phone numbers in the fictional 555-01xx block and other ranges set aside for
+     fiction, emails on `example.*` and reserved test domains, addresses built from invented street names
+     with real ZIP code *shapes*, names from a fictional list, IPs in the documentation ranges
+     (`192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`, `2001:db8::/32`), key shapes from random characters.
+     The generator and its documentation say that it does not draw on any real record.
+   - Rendered into many **screen layouts**: a patient portal and an intake form, a bank statement, an
+     insurance card page, a mail client, a chat, a CRM record table, an HR spreadsheet, a terminal with
+     environment variables, a `.env` file in an editor, a browser developer panel, a log viewer, a
+     scanned-document look, a settings page; **light and dark**, 1x and 2x, font sizes down to 10 px,
+     several fonts and some patterned backgrounds. English only for the US target, plus a small Vietnamese
+     set for the diacritics and phone-format checks that the app's own users need.
+   - **Negative screenshots** with lookalikes: nine-digit order numbers and part numbers, tracking numbers,
+     UUIDs, git hashes, version strings, timestamps, ISBNs, 16-digit identifiers that fail Luhn,
+     coordinates, dollar amounts, tables of numbers, dates without a label. They measure false alarms.
+   - Output: PNG plus ground-truth JSON (kind, standard and identifier it maps to, exact text, box). About
+     700 images (about 500 with PII, 200 negatives), under 200 MB. Generator, seed and licence (CC0 data,
+     Apache-2.0 code) in `tests/data/redaction/`; the images are a release asset or built on demand, not
+     committed.
+2. **The harness** (`cm-render` example `redaction_bench`, headless, recognizer passed in so Windows can plug in):
+   - **recall per identifier** (a ground-truth box counts when a proposal covers at least 90 % of it) and
+     a roll-up **per standard** (NIST list, the 18 HIPAA identifiers, PCI, GLBA/state), so the website can
+     show which identifiers are covered and how well;
    - **precision per kind** and **false alarms per negative image**;
-   - **end-to-end leak rate**: after applying all proposals, OCR the exported image again; a ground-truth
-     string that can still be read is a leak (this is the number that matters for privacy; it also catches
-     blur strength that is too weak);
-   - the split by layout, theme, scale, font size and language, so weak places are visible;
-   - time per image (the cost of running it automatically).
-   Fixed seed, so a run on the same machine gives the same table. A **held-out half** of the layouts is
-   never used while tuning; its numbers are read once per release.
+   - **end-to-end leak rate**: apply every proposal, export, OCR the result again; a ground-truth string that
+     is still readable is a leak (this is the number that matters for privacy; it also tests blur strength);
+   - splits by layout, theme, scale, font size and language; time per image;
+   - a **detector-only** run with perfect text, so rule errors and OCR errors can be told apart.
+   Fixed seed; a **held-out half of the layouts** is read once per release.
 3. **Baseline report** `verification/benchmarks/redaction-0.2.3-<date>.md`: today's detector on the whole
-   set, including the kinds it does not know (they show as misses, which is the honest starting point).
-   Also a **detector-only** table with perfect text (no OCR) so detector errors and OCR errors can be told
-   apart.
+   set. Identifiers it does not know show as misses; that is the honest starting point.
 
-Done when: the harness runs from a clean checkout with one command, and the baseline is stored.
+Done when: one command builds the set and runs the harness from a clean checkout, and the baseline is stored.
 
-## Stage 1: more kinds, with checks that make them reliable (AI-free, general)
+## Stage 1: new kinds (AI-free, general techniques)
 
-Each kind is added only with its benchmark rows (recall, precision, leak rate), and kept if precision on the
-negative images stays acceptable (a target fixed after the baseline, for example below one false alarm per
-five screenshots for the default kinds). Techniques, not lists of cases:
+Each kind arrives with its benchmark rows and is kept as a default only if the false-alarm rate on the
+negatives stays low (target set after the baseline, for example below one false alarm per five screenshots
+for the default set). Kinds that rely on context are proposed with lower confidence and labelled so the
+user can see why. Techniques:
 
-1. **Checksummed identifiers:** payment cards (13 to 19 digits, Luhn, with spaces or dashes), IBAN (mod 97),
-   other numbers that carry a check digit. A checksum makes precision high without any list.
-2. **Secrets by structure:** more provider key shapes as *data* (a versioned file of prefix and length
-   rules, with a test per rule; each rule cites its source), private-key blocks (`-----BEGIN ... KEY-----`
-   through `END`, including the body lines), `NAME=value` and `"name": "value"` pairs where the name looks
-   secret (the key rules of the job store's `scrub_secrets` are the model), URLs with credentials or
-   query tokens, and an **entropy measure** for generic secrets that replaces the digits-ratio rule if the
-   benchmark shows it is better.
-3. **Network and device identifiers:** IPv6 (compressed forms), MAC addresses, with documented-range and
-   private-range handling as an option.
-4. **Contextual detection:** a value that follows a label ("Password", "SSN", "Date of birth", "Phone",
-   "Địa chỉ", ...) is likely sensitive even without a recognisable shape. Labels live in the locale data
-   (one list per language, translators can extend it, same mechanism as UI strings), and the match is
-   by position (the value to the right of or below the label), not by a fixed screen. **Maintainer
-   decision needed:** this is the one place where word lists are part of the design; it follows the rule
-   "options and techniques, not one-case fixes" because the lists are per language and general, but say so
-   if you disagree.
-5. **Formats from other countries**, as data with tests: phone numbers by country (E.164 shapes and the
-   national forms of the languages the app ships in, Vietnamese first), national ID shapes where a public
-   format exists, postal codes only in context (a bare number is too ambiguous).
-6. **User paths and names in text:** `/Users/<name>`, `C:\Users\<name>`, email-like display names. Only the
-   name part is covered.
-7. **Layout handling:** values broken across two lines; label and value in a table cell; text with letter
-   spacing. Judged by the layout split of the benchmark.
+1. **Structure and checksum rules**, which give high precision without lists: payment cards (Luhn plus
+   issuer prefixes and lengths; masked forms are skipped), ABA routing numbers, IBAN, NPI, DEA, VIN (check
+   digit), IMEI (Luhn), EIN prefixes, ITIN ranges, SSN issuable ranges, MBI position rules, NANP phone rules.
+   Rules are data with a test each, and each cites its public source in a comment.
+2. **Secrets by structure:** more provider key shapes as versioned data, private-key blocks through their
+   end line, `NAME=value` and `"name": "value"` pairs with a secret-looking name (the key rules of the job
+   store's `scrub_secrets` are the model), URLs with credentials or token query strings, an **entropy**
+   measure for generic secrets if the benchmark shows it beats the digits-ratio rule, IPv6, MAC addresses.
+3. **Contextual detection:** a value that follows or sits under a label ("SSN", "Date of birth", "Member
+   ID", "MRN", "Driver's license", "Account number", "Password", "Address", "ZIP"...) is likely sensitive.
+   The label list is **data, per language** (English first, in the locale files so translators can extend
+   it) and the match is by position (right of or below the label), not by a fixed screen. Used for dates of
+   birth, medical and member numbers, driver's licence, account numbers, and address lines.
+   **Maintainer decision needed:** this is the one place where word lists are part of the design. It fits the
+   rule "techniques and options, not one-case fixes" because the lists are general and per language, but
+   confirm.
+4. **Address blocks:** street line (number, street name, suffix such as St, Ave, Blvd, Apt, Suite),
+   city, two-letter state, ZIP or ZIP+4, found as a pattern across one or two lines.
+5. **Dates in context:** only dates next to a label that ties them to a person (birth, admission, discharge,
+   death); a bare date is never proposed.
+6. **File-path names:** the user-name part of home-folder paths.
+7. **Layout handling:** values broken across two lines, label and value in table cells, text with letter
+   spacing; judged by the layout split of the benchmark.
 
-Done when: each new kind has recall and precision stored, default kinds are chosen by the numbers, and the
-README table of kinds is generated from the same rule data (so docs cannot drift from the code).
+Done when: recall, precision and leak rate are stored for each new kind, the default kinds are chosen by the
+numbers, the kind names exist in MCP `suggest_redactions { kinds }` and the CLI `--kinds`, the Auto-redact
+panel can switch kinds on and off, and the README table of kinds is **generated from the same rule data**
+(so documentation cannot drift from the code).
 
-## Stage 2: platform recognizers for what rules cannot find (optional, decided by the numbers)
+## Stage 2: names, faces and codes through the operating system (optional, decided by the numbers)
 
-Only if Stage 1 leaves large gaps, and each behind the same trait as the text recognizer, on-device, with
-its own benchmark rows:
+Only where Stage 1 leaves a large gap, each behind the recognizer trait, on-device, with benchmark rows:
 
-1. **Person names and places** with the operating system's language tagging (macOS NaturalLanguage name
-   tagger: nothing to ship; coverage per language is checked, not assumed). A model we ship would need a
-   permissive licence, a SHA-256 pin and a size budget, and is a candidate only if the tagger is too weak.
-2. **Faces** (Vision face rectangles) and **QR codes and barcodes** (Vision barcode request): kinds `face`,
-   `code`, off by default, so a screenshot with a profile photo or a boarding pass is covered.
-3. **Better text finding** for small or low-contrast text: run the recognizer on a 2x upscaled crop when the
-   first pass finds little text in a busy area (measured against the font-size rows of the benchmark).
+1. **Person names** with the operating system's language tagging (macOS NaturalLanguage name tagger: nothing
+   to ship; its quality is measured, not assumed). A shipped model needs a permissive licence, a SHA-256 pin
+   and a size budget, and is considered only if the tagger is too weak. Names are the biggest gap in
+   HIPAA identifier 1; if they cannot be done well the docs say "names are found only next to a label".
+2. **Faces** (Vision face rectangles; HIPAA 17) and **QR codes and barcodes** (Vision barcode request; HIPAA
+   18): kinds `face` and `code`, off by default.
+3. **Small or low-contrast text:** run the recognizer again on an upscaled crop where the first pass finds
+   little text in a busy area; judged on the font-size rows.
 
-Rejected ideas are written down with their numbers. If no option is good enough, the release says "names
-are not detected" in the documentation.
+Rejected ideas are written down with their numbers.
 
-## Stage 3: running on its own (the "auto" part)
+## Stage 3: publish and promote (after the numbers are stored)
 
-Off by default; a setting in Settings, Privacy (app-only keys, like the other `privacy.*` settings, which
-`set_settings` cannot write):
+1. **README:** a section "Find personal data before you share a screenshot": the generated table of
+   identifiers and which US standard names each, the benchmark table with date and link to the report and
+   data set, a before-and-after image from the synthetic set, the command to reproduce, and the limits.
+2. **Website:** a feature page with the same table and a short screen recording of Auto-redact, and a "How we
+   measured" page (data set, metrics, what a leak means, what is not covered, and "not a compliance tool").
+   Wording check: every claim has a stored report; no "all", no "compliant", no "guaranteed".
+3. **The data set as a public asset:** generator, seed and licence, so anyone can test other tools too, and an
+   issue template "redaction miss" that asks for a synthetic reproduction and never a real screenshot.
+4. **Docs:** user guide chapter, `docs/development/redaction.md` (how a rule is added, how the benchmark runs),
+   release notes. Optional comparison with other tools only if they run offline on the same set and their
+   licences allow it; otherwise none.
 
-1. **`privacy.auto_redact`** with three levels:
-   - **Off** (today).
-   - **Suggest:** when a screenshot is taken, detection runs in the background and the capture gets a badge
-     ("3 items found") that opens the editor with the proposals shown; nothing changes in the image.
-   - **Apply:** the proposals above a confidence threshold become blur ops automatically, recorded as one
-     revision tagged `auto-redact` (so history shows what the app did), undoable in one step; the bundle
-     keeps the original, as today, and the editor says so.
-   A choice of **kinds** (a checklist), the threshold, and a **blur strength** (not below 16, with a
-   pixelate option, because the benchmark leak rate decides which is safer).
-2. **Gate before sharing:** with auto-redact on, Copy to clipboard, Save as, upload and publish of a
-   screenshot use the redacted render; if detection has not finished, the action waits (up to a few
-   seconds) and then asks. A confirmation line states "N items covered" with a link to the editor. Sharing
-   the bundle folder itself shares the original; the share sheet warns about it.
-3. **For AI agents:** an agent that calls `capture_screenshot` or any tool that returns an image gets the
-   redacted render when `agents.redact_images` is on (an app-only key; default on once Apply works, and
-   the first-run notice says so), so a language model never sees the secrets on the screen. Tools take an
-   optional `redact` parameter that can only *tighten* the policy, never switch it off. This is the
-   feature to promote to people who use agents.
-4. **Same behaviour everywhere:** MCP `suggest_redactions` and a new `redact` mode on `annotate`, CLI
-   `capturemann annotate <id> --redact [--kinds ...]`, and `capturemann capture screenshot --redact`;
-   identical results, identical undo and confirmations. A redaction run reports the counts per kind and the
-   time.
-5. **Safety rules:** detection never uploads anything; it runs off the UI thread; a failure of the
-   recognizer leaves the original unchanged and says so (it must never look as if a picture was checked
-   when it was not: the badge shows "not checked"); the log (Part 1 of 0.2.4) records counts and kinds,
-   never the text found.
-
-Acceptance (new IDs `RED-1` to `RED-4` in a new feature file; ANN-2 keeps its IDs):
-- **RED-1.AC1** Given the benchmark set, then the harness reports recall, precision and end-to-end leak rate
-  per kind, stored in a report.
-- **RED-2.AC1** Given a screenshot with a Luhn-valid card number and a PEM key block, then both are
-  proposed (Stage 1), and an unchecked 16-digit order number is not.
-- **RED-3.AC1** Given `privacy.auto_redact = apply`, when a screenshot is taken that contains an email,
-  then the saved edits contain a blur over it tagged `auto-redact`, the original is unchanged and one undo
-  removes it.
-- **RED-3.AC2** Given the recognizer fails, then no blur is added, the capture shows "not checked", and
-  Copy to clipboard asks before sharing.
-- **RED-4.AC1** Given `agents.redact_images` on, when an agent calls `capture_screenshot`, then the
-  returned image has the proposals blurred, and a call with `redact: false` does not change that.
-
-## Stage 4: publish and promote (after the numbers are stored)
-
-1. **README:** a "Private by design: automatic redaction" section: what is found (the generated table of
-   kinds), a before and after image made from the synthetic set, the benchmark table with its date and the
-   link to the report and to the data set, the one-line command to reproduce, and the honest limits.
-2. **Website** (`craftmann.app`): a feature page with the same table, a short screen recording of Apply and
-   of an agent receiving a redacted screenshot, and a "How we measured" page (data set, metrics, what a leak
-   means, what is not covered). The wording check: every claim has a stored report; no "all", no
-   compliance claims.
-3. **The data set as a public asset:** a release asset or a data-hosting page with the generator, seed and
-   licence, so others can test other tools too; an invitation to send new layouts and kinds (an issue
-   template "redaction miss" that asks for a synthetic reproduction, never a real screenshot).
-4. **Docs:** user guide chapter, `docs/development/redaction.md` (how a rule is added, how the benchmark is
-   run), and the release notes.
-5. **Comparison is optional:** a table against other tools is published only if they can be run offline on
-   the same set with their licences allowing it; otherwise none. No claim about other products without
-   numbers.
+Acceptance (new IDs `RED-1` to `RED-3` in a feature file; ANN-2 keeps its IDs):
+- **RED-1.AC1** Given the benchmark set, then the harness reports recall, precision, false alarms and
+  end-to-end leak rate per identifier and per standard, and the report is stored.
+- **RED-2.AC1** Given a screenshot with a Luhn-valid card number, an SSN with its label and a PEM key block,
+  then three proposals are made; given a 16-digit order number that fails Luhn and a nine-digit part
+  number, then none is.
+- **RED-2.AC2** Given a masked SSN (`***-**-6789`) or a card shown as `**** 1111`, then nothing is proposed
+  for the masked part.
+- **RED-2.AC3** Given `kinds: ["ssn"]`, then only SSN proposals are returned (MCP and CLI the same).
+- **RED-3.AC1** The README table and the rule data list the same kinds (a test compares them).
 
 ## Order and size (rough)
 
-Stage 0 is about a week (the generator is the work). Stage 1 about a week, in the order of the numbers
-(checksums and structured secrets first: high value, high precision). Stage 2 only if needed, about 3 days
-per recognizer. Stage 3 about a week (settings, the background run, the gate, the agent policy, MCP and CLI).
-Stage 4 about 3 days, after Stage 3. Core: Stages 0, 1 (items 1, 2, 3), 3 (items 1, 3, 4, 5) and 4;
-everything else is stretch. Anything that does not meet its "done when" is dropped and written down.
+Stage 0 about a week (the generator is the work). Stage 1 about a week, in the order of value and precision:
+checksummed identifiers (cards, SSN, ABA, NPI, VIN), structured secrets, then context and addresses. Stage 2
+only if needed, about 3 days per recognizer. Stage 3 about 3 days. Core: Stage 0, Stage 1 items 1 to 5, and
+Stage 3; everything else is stretch. Anything that does not meet its "done when" is dropped and written down.
 
-Decisions needed from the maintainer: the contextual labels (Stage 1.4); whether Apply is allowed to be the
-default for agents (Stage 3.3); the target for false alarms; whether faces and codes are in this release;
-where the data set is hosted.
+Decisions needed from the maintainer: the contextual labels (Stage 1.3); the false-alarm target; whether
+faces and codes are in this release; where the data set is hosted; whether the website may say "built around
+the identifiers named by NIST SP 800-122, HIPAA Safe Harbor and PCI DSS" (my proposal, with the
+no-compliance line next to it).
 
 ## Risks
 
-- OCR quality is the ceiling: small text, low contrast, unusual fonts. The leak rate says it plainly, and the
-  documentation does too.
-- False alarms annoy users and teach them to turn it off; the default kinds are chosen by precision, and
-  the generic-secret rule stays low-confidence unless the numbers say otherwise.
-- A synthetic set can flatter the detector (it is made by us). The held-out layouts, the negatives and a
-  small **manual run on screenshots of real apps made by the maintainer, never stored** (numbers only, in
+- OCR quality is the ceiling (small text, low contrast, unusual fonts). The leak rate says so plainly.
+- False alarms teach users to ignore the feature; defaults are chosen by precision, context kinds carry
+  lower confidence, and the user stays in control of kinds.
+- A synthetic set made by us can flatter the detector. The held-out layouts, the negatives, and a small
+  **manual run on real app screenshots made by the maintainer, never stored** (numbers only, in
   `tests/manual/`) are the cross-checks; the report says which numbers are synthetic.
-- Privacy wording: a screenshot that was blurred by the app is not proof that nothing sensitive remains.
+- Legal wording: a blurred screenshot is not proof that nothing sensitive remains.
 - Windows: the harness takes any recognizer, so Windows OCR can be benchmarked the day it exists.
 
 ## Not in 0.2.5
 
-Video redaction, redaction of audio and transcripts (a related but separate feature: the transcript could
-use the same text rules, noted for later), cloud OCR or AI models that send data away, and Windows.
+Automatic apply, redaction of screenshots returned to agents, video, audio and transcript redaction, cloud
+OCR or AI models that send data away, other countries' standards (EU/GDPR, Vietnam, and so on; the rule data
+is built so they can be added), and Windows.
