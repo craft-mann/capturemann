@@ -151,3 +151,30 @@ fn hevc_fragments_are_2s_and_survive_truncation() {
 fn h264_fragments_are_2s_and_survive_truncation() {
     check(CodecChoice::H264, "avc1", "h264", 1280, 720);
 }
+
+/// GitHub issue 16: on an Intel Mac AVFoundation threw an `NSException` for settings it rejected,
+/// and the exception unwound into Rust and aborted the app. A width of 0 makes AVFoundation throw
+/// on every Mac without touching the encoder hardware, so the set-up must come back as an error
+/// (here `hardware_encoder_unavailable`) instead of ending this test process.
+#[test]
+fn settings_that_avfoundation_rejects_are_an_error_not_an_abort() {
+    let dir = tempfile::tempdir().unwrap();
+    for codec in [cm_encode::Codec::H264, cm_encode::Codec::Hevc] {
+        let plan = cm_encode::VideoPlan {
+            width: 0,
+            height: 0,
+            fps: 30,
+            codec,
+            bitrate_bps: 1_000_000,
+            quality: Quality::High,
+        };
+        let cfg = EncoderConfig {
+            path: dir.path().join(format!("rejected-{codec:?}.mp4")),
+            plan,
+        };
+        let e = HardwareEncoder::create(&cfg)
+            .err()
+            .expect("must be refused");
+        assert!(cm_encode::is_hardware_encoder_unavailable(&e), "{e:?}");
+    }
+}

@@ -47,7 +47,7 @@ use objc2_foundation::{NSData, NSDictionary, NSNumber, NSObject, NSObjectProtoco
 use objc2_uniform_type_identifiers::UTTypeMPEG4Movie;
 
 use crate::encoder::{AppendOutcome, EncoderConfig, VideoEncoder};
-use crate::settings::{Codec, FRAGMENT_SECS};
+use crate::settings::{bitrate_bps, Codec, VideoPlan, FRAGMENT_SECS, MAX_H264_WIDTH};
 use crate::writer::{FragmentedMp4Writer, WriterSummary};
 
 const TIMESCALE: i32 = 120_000;
@@ -267,6 +267,8 @@ pub struct HardwareEncoder {
     file: FragmentedMp4Writer,
     appended: u64,
     finished: Option<WriterSummary>,
+    /// The plan the writer was set up with (the one asked for, or a simpler one).
+    used: VideoPlan,
 }
 
 // SAFETY: the Objective-C objects are only used through `&mut self` methods, i.e. from one thread
@@ -284,91 +286,172 @@ fn writer_error(w: &AVAssetWriter) -> String {
     }
 }
 
-impl HardwareEncoder {
-    /// Creates the file and the writer; frames can be appended right away.
-    pub fn create(cfg: &EncoderConfig) -> Result<Self, CmError> {
-        let plan = &cfg.plan;
-        let file = FragmentedMp4Writer::create(&cfg.path)?;
-        // SAFETY: standard AVAssetWriter set-up with correctly typed arguments, on objects this
-        // function owns. The delegate is held by `_sink` for the writer's whole life.
-        let (writer, sink, input) = unsafe {
-            let writer =
-                AVAssetWriter::initWithContentType(AVAssetWriter::alloc(), UTTypeMPEG4Movie);
-            let sink = SegmentSink::new(file.clone());
-            writer.setOutputFileTypeProfile(AVFileTypeProfileMPEG4CMAFCompliant);
-            writer.setPreferredOutputSegmentInterval(cm(i64::from(FRAGMENT_SECS), 1));
-            writer.setInitialSegmentStartTime(cm(0, TIMESCALE));
-            writer.setDelegate(Some(ProtocolObject::from_ref(&*sink)));
+/// The Objective-C objects of one writer set-up.
+type Setup = (
+    Retained<AVAssetWriter>,
+    Retained<SegmentSink>,
+    Retained<AVAssetWriterInput>,
+);
 
-            let (codec, profile) = match plan.codec {
-                Codec::Hevc => ("hvc1", "HEVC_Main_AutoLevel"),
-                Codec::H264 => ("avc1", "H264_High_AutoLevel"),
-            };
-            let keys = [
-                nsstr("AverageBitRate"),
-                nsstr("ExpectedFrameRate"),
-                nsstr("MaxKeyFrameIntervalDuration"),
-                nsstr("ProfileLevel"),
-                nsstr("AllowFrameReordering"),
-            ];
-            let bitrate = NSNumber::new_i64(i64::try_from(plan.bitrate_bps).unwrap_or(i64::MAX));
-            let fps = NSNumber::new_i64(i64::from(plan.fps));
-            let key_interval = NSNumber::new_f64(f64::from(FRAGMENT_SECS));
-            let profile = nsstr(profile);
-            let reorder = NSNumber::new_bool(false);
-            let props: Retained<NSDictionary<NSString, AnyObject>> = NSDictionary::from_slices(
-                &[&*keys[0], &*keys[1], &*keys[2], &*keys[3], &*keys[4]],
-                &[&**bitrate, &**fps, &**key_interval, &**profile, &**reorder],
-            );
-            let (k_c, k_w, k_h, k_p) = (
-                nsstr("AVVideoCodecKey"),
-                nsstr("AVVideoWidthKey"),
-                nsstr("AVVideoHeightKey"),
-                nsstr("AVVideoCompressionPropertiesKey"),
-            );
-            let (v_c, v_w, v_h) = (
-                nsstr(codec),
-                NSNumber::new_i64(i64::from(plan.width)),
-                NSNumber::new_i64(i64::from(plan.height)),
-            );
-            let settings: Retained<NSDictionary<NSString, AnyObject>> = NSDictionary::from_slices(
-                &[&*k_c, &*k_w, &*k_h, &*k_p],
-                &[&**v_c, &**v_w, &**v_h, &**props],
-            );
-            let Some(video) = AVMediaTypeVideo else {
-                return Err(CmError::internal("AVMediaTypeVideo is unavailable"));
-            };
-            let input = AVAssetWriterInput::assetWriterInputWithMediaType_outputSettings(
-                video,
-                Some(&settings),
-            );
-            input.setExpectsMediaDataInRealTime(true);
-            input.setMediaTimeScale(TIMESCALE);
-            (writer, sink, input)
+/// How an exception that AVFoundation threw reads in a message.
+fn exception_text(e: Option<Retained<objc2::exception::Exception>>) -> String {
+    e.map_or_else(
+        || "an Objective-C exception without details".to_owned(),
+        |e| format!("{e:?}"),
+    )
+}
+
+/// One try at creating the writer, its delegate and the video input for `plan`. `full` sends the
+/// optional compression properties (profile level, key-frame interval, no frame reordering); a
+/// plain try sends only the codec, size, bit rate and frame rate.
+///
+/// AVFoundation reports output settings it rejects by **throwing an `NSException`** (on an Intel
+/// MacBook Pro 16" 2019 `+[AVAssetWriterInput assetWriterInputWithMediaType:outputSettings:]`
+/// threw from `VTCompressionSessionCreate`, GitHub issue 16). An Objective-C exception that
+/// unwinds into Rust aborts the process, so the whole set-up runs inside `objc2::exception::catch`
+/// and a throw becomes an `Err` with the exception's text.
+fn try_setup(file: &FragmentedMp4Writer, plan: &VideoPlan, full: bool) -> Result<Setup, String> {
+    // The delegate is held by the returned sink for the writer's whole life.
+    objc2::exception::catch(std::panic::AssertUnwindSafe(|| setup(file, plan, full)))
+        .map_err(exception_text)?
+}
+
+/// The body of [`try_setup`] (it may throw; see there).
+fn setup(file: &FragmentedMp4Writer, plan: &VideoPlan, full: bool) -> Result<Setup, String> {
+    // SAFETY: every Objective-C call below is made on objects this function creates, with arguments
+    // of the types the bindings declare; none depends on state outside it.
+    unsafe {
+        let writer = AVAssetWriter::initWithContentType(AVAssetWriter::alloc(), UTTypeMPEG4Movie);
+        let sink = SegmentSink::new(file.clone());
+        writer.setOutputFileTypeProfile(AVFileTypeProfileMPEG4CMAFCompliant);
+        writer.setPreferredOutputSegmentInterval(cm(i64::from(FRAGMENT_SECS), 1));
+        writer.setInitialSegmentStartTime(cm(0, TIMESCALE));
+        writer.setDelegate(Some(ProtocolObject::from_ref(&*sink)));
+
+        let (codec, profile) = match plan.codec {
+            Codec::Hevc => ("hvc1", "HEVC_Main_AutoLevel"),
+            Codec::H264 => ("avc1", "H264_High_AutoLevel"),
         };
-        // SAFETY: plain AVAssetWriter state transitions on the objects created above.
-        unsafe {
-            if !writer.canAddInput(&input) {
-                let _ = file.finish();
-                // No software fallback in v0.1 (REC-2): the recording fails before it starts.
-                return Err(crate::encoder::hardware_encoder_unavailable());
-            }
-            writer.addInput(&input);
-            if !writer.startWriting() {
-                let _ = writer_error(&writer);
-                let _ = file.finish();
-                return Err(crate::encoder::hardware_encoder_unavailable());
-            }
-            writer.startSessionAtSourceTime(cm(0, TIMESCALE));
+        let bitrate = NSNumber::new_i64(i64::try_from(plan.bitrate_bps).unwrap_or(i64::MAX));
+        let fps = NSNumber::new_i64(i64::from(plan.fps));
+        let key_interval = NSNumber::new_f64(f64::from(FRAGMENT_SECS));
+        let profile = nsstr(profile);
+        let reorder = NSNumber::new_bool(false);
+        let (k_bitrate, k_fps, k_interval, k_profile, k_reorder) = (
+            nsstr("AverageBitRate"),
+            nsstr("ExpectedFrameRate"),
+            nsstr("MaxKeyFrameIntervalDuration"),
+            nsstr("ProfileLevel"),
+            nsstr("AllowFrameReordering"),
+        );
+        let props: Retained<NSDictionary<NSString, AnyObject>> = if full {
+            NSDictionary::from_slices(
+                &[&*k_bitrate, &*k_fps, &*k_interval, &*k_profile, &*k_reorder],
+                &[&**bitrate, &**fps, &**key_interval, &**profile, &**reorder],
+            )
+        } else {
+            NSDictionary::from_slices(&[&*k_bitrate, &*k_fps], &[&**bitrate, &**fps])
+        };
+        let (k_c, k_w, k_h, k_p) = (
+            nsstr("AVVideoCodecKey"),
+            nsstr("AVVideoWidthKey"),
+            nsstr("AVVideoHeightKey"),
+            nsstr("AVVideoCompressionPropertiesKey"),
+        );
+        let (v_c, v_w, v_h) = (
+            nsstr(codec),
+            NSNumber::new_i64(i64::from(plan.width)),
+            NSNumber::new_i64(i64::from(plan.height)),
+        );
+        let settings: Retained<NSDictionary<NSString, AnyObject>> = NSDictionary::from_slices(
+            &[&*k_c, &*k_w, &*k_h, &*k_p],
+            &[&**v_c, &**v_w, &**v_h, &**props],
+        );
+        let Some(video) = AVMediaTypeVideo else {
+            return Err("AVMediaTypeVideo is unavailable".to_owned());
+        };
+        let input = AVAssetWriterInput::assetWriterInputWithMediaType_outputSettings(
+            video,
+            Some(&settings),
+        );
+        input.setExpectsMediaDataInRealTime(true);
+        input.setMediaTimeScale(TIMESCALE);
+        if !writer.canAddInput(&input) {
+            return Err("the writer cannot take this video input".to_owned());
         }
-        Ok(HardwareEncoder {
-            writer,
-            input,
-            _sink: sink,
-            file,
-            appended: 0,
-            finished: None,
-        })
+        writer.addInput(&input);
+        if !writer.startWriting() {
+            let reason = writer_error(&writer);
+            return Err(format!("the writer did not start: {reason}"));
+        }
+        writer.startSessionAtSourceTime(cm(0, TIMESCALE));
+        Ok((writer, sink, input))
+    }
+}
+
+/// The plans to try, in order: the one asked for, the same without the optional compression
+/// properties, then (HEVC only, when H.264 can hold the width) H.264 with its own bit rate. The
+/// size never changes: the capture delivers frames of exactly that size.
+fn attempts(plan: &VideoPlan) -> Vec<(VideoPlan, bool)> {
+    let mut out = vec![(*plan, true), (*plan, false)];
+    if plan.codec == Codec::Hevc && plan.width <= MAX_H264_WIDTH {
+        let h264 = VideoPlan {
+            codec: Codec::H264,
+            bitrate_bps: bitrate_bps(Codec::H264, plan.fps, plan.quality, plan.width, plan.height),
+            ..*plan
+        };
+        out.push((h264, false));
+    }
+    out
+}
+
+impl HardwareEncoder {
+    /// Creates the file and the writer; frames can be appended right away. A Mac that rejects
+    /// the first plan (some Intel Macs do, see [`try_setup`]) gets simpler ones ([`attempts`]);
+    /// the plan that worked is [`VideoEncoder::used_plan`]. When none works the answer is
+    /// `hardware_encoder_unavailable`, and the reasons go to stderr (the system log).
+    pub fn create(cfg: &EncoderConfig) -> Result<Self, CmError> {
+        let file = FragmentedMp4Writer::create(&cfg.path)?;
+        let mut reasons: Vec<String> = Vec::new();
+        for (plan, full) in attempts(&cfg.plan) {
+            match try_setup(&file, &plan, full) {
+                Ok((writer, sink, input)) => {
+                    if !reasons.is_empty() {
+                        eprintln!(
+                            "cm-encode: the first encoder settings were rejected ({}); recording with {:?} {}x{} (full properties: {full})",
+                            reasons.join("; "),
+                            plan.codec,
+                            plan.width,
+                            plan.height
+                        );
+                    }
+                    return Ok(HardwareEncoder {
+                        writer,
+                        input,
+                        _sink: sink,
+                        file,
+                        appended: 0,
+                        finished: None,
+                        used: plan,
+                    });
+                }
+                Err(reason) => reasons.push(format!(
+                    "{:?} {}x{} {} fps{}: {reason}",
+                    plan.codec,
+                    plan.width,
+                    plan.height,
+                    plan.fps,
+                    if full { "" } else { " (plain)" }
+                )),
+            }
+        }
+        let _ = file.finish();
+        // No software fallback in v0.1 (REC-2): the recording fails before it starts.
+        eprintln!(
+            "cm-encode: no hardware encoder setup worked: {}",
+            reasons.join("; ")
+        );
+        Err(crate::encoder::hardware_encoder_unavailable())
     }
 }
 
@@ -382,15 +465,25 @@ impl VideoEncoder for HardwareEncoder {
         duration: MediaTime,
     ) -> Result<AppendOutcome, CmError> {
         self.file.check()?;
+        // AVFoundation throws (an `NSException`) when the writer is no longer writing; an exception
+        // that unwinds into Rust aborts the app, so the two calls run inside `catch`.
         // SAFETY: getter on a live input.
-        if !unsafe { self.input.isReadyForMoreMediaData() } {
+        let ready = objc2::exception::catch(std::panic::AssertUnwindSafe(|| unsafe {
+            self.input.isReadyForMoreMediaData()
+        }))
+        .map_err(|e| CmError::internal(format!("The encoder failed: {}", exception_text(e))))?;
+        if !ready {
             return Ok(AppendOutcome::NotReady);
         }
         let retimed = frame
             .retimed(pts.ticks(), duration.ticks())
             .ok_or_else(|| CmError::internal("could not retime a screen frame"))?;
         // SAFETY: appending a valid sample buffer to an input that reported ready.
-        if unsafe { self.input.appendSampleBuffer(&retimed) } {
+        let appended = objc2::exception::catch(std::panic::AssertUnwindSafe(|| unsafe {
+            self.input.appendSampleBuffer(&retimed)
+        }))
+        .map_err(|e| CmError::internal(format!("The encoder failed: {}", exception_text(e))))?;
+        if appended {
             self.appended += 1;
             return Ok(AppendOutcome::Written);
         }
@@ -401,6 +494,10 @@ impl VideoEncoder for HardwareEncoder {
             self.appended,
             writer_error(&self.writer)
         )))
+    }
+
+    fn used_plan(&self) -> Option<VideoPlan> {
+        Some(self.used)
     }
 
     fn check(&self) -> Result<(), CmError> {
@@ -473,5 +570,49 @@ impl VideoEncoder for HardwareEncoder {
         let summary = summary?;
         self.finished = Some(summary.clone());
         Ok(summary)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::settings::Quality;
+
+    fn plan(codec: Codec, width: u32) -> VideoPlan {
+        VideoPlan {
+            width,
+            height: 1920,
+            fps: 60,
+            codec,
+            bitrate_bps: 40_000_000,
+            quality: Quality::High,
+        }
+    }
+
+    /// The tries after a rejection keep the size (the capture delivers frames of exactly that
+    /// size) and only change what AVFoundation may refuse: the optional properties, then HEVC.
+    #[test]
+    fn the_fallbacks_keep_the_size_and_only_hevc_gets_an_h264_try() {
+        let a = attempts(&plan(Codec::Hevc, 3072));
+        let summary: Vec<_> = a.iter().map(|(p, full)| (p.codec, *full)).collect();
+        assert_eq!(
+            summary,
+            [
+                (Codec::Hevc, true),
+                (Codec::Hevc, false),
+                (Codec::H264, false)
+            ]
+        );
+        assert!(a.iter().all(|(p, _)| (p.width, p.height) == (3072, 1920)));
+        assert_eq!(
+            a[2].0.bitrate_bps,
+            bitrate_bps(Codec::H264, 60, Quality::High, 3072, 1920)
+        );
+        // Wider than H.264 holds: no H.264 try.
+        assert_eq!(attempts(&plan(Codec::Hevc, MAX_H264_WIDTH + 2)).len(), 2);
+        // An H.264 plan is not changed to anything else.
+        assert!(attempts(&plan(Codec::H264, 1920))
+            .iter()
+            .all(|(p, _)| p.codec == Codec::H264));
     }
 }

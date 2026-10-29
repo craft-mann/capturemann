@@ -428,6 +428,9 @@ impl<S: ScreenSource, E: VideoEncoder<Frame = S::Frame>> TrackRecorder for Scree
             })
         });
         let late_pct = p.late_pct();
+        // A Mac that rejected the asked-for settings may have recorded with simpler ones (another
+        // codec): the manifest says what the file really holds.
+        let used_plan = p.encoder().used_plan();
         drop(p);
         self.latency.first_frame_ms = *lock(&shared.first_frame_ms);
         self.latency.stop_ms = Some(call.elapsed().as_secs_f64() * 1e3);
@@ -438,7 +441,7 @@ impl<S: ScreenSource, E: VideoEncoder<Frame = S::Frame>> TrackRecorder for Scree
             .iter()
             .map(|f| f.duration.ticks() as f64 / TICKS_PER_SECOND as f64)
             .collect();
-        let used = plan.video;
+        let used = used_plan.unwrap_or(plan.video);
         let details = json!({
             "size": [used.width, used.height],
             "fps": plan.video.fps,

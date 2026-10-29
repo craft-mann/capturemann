@@ -6735,7 +6735,7 @@ text is in the LICENSE file of the 3D-Speaker repository and in vendor/sherpa-on
 - **Unlicense OR MIT**: 5 crates
 - **Unlicense/MIT**: 2 crates
 - **Zlib**: 4 crates
-- **Zlib OR Apache-2.0 OR MIT**: 27 crates
+- **Zlib OR Apache-2.0 OR MIT**: 28 crates
 - **Zlib OR MIT OR Apache-2.0**: 1 crates
 
 Full crate list:
@@ -7043,6 +7043,7 @@ Full crate list:
 - objc2-core-text 0.3.2: Zlib OR Apache-2.0 OR MIT
 - objc2-core-video 0.3.2: Zlib OR Apache-2.0 OR MIT
 - objc2-encode 4.1.0: MIT
+- objc2-exception-helper 0.1.1: Zlib OR Apache-2.0 OR MIT
 - objc2-foundation 0.2.2: MIT
 - objc2-foundation 0.3.2: MIT
 - objc2-image-io 0.3.2: Zlib OR Apache-2.0 OR MIT
@@ -23771,5 +23772,5 @@ freely, subject to the following restrictions:
 
 ## Crates without a license file in their package
 
-These declare their license in Cargo.toml (see the list above) but ship no separate text: accesskit 0.24.1, accesskit_consumer 0.38.0, accesskit_macos 0.26.3, block 0.1.6, block2 0.5.1, block2 0.6.2, dasp_sample 0.11.0, dispatch 0.2.0, dispatch2 0.3.1, gpu-descriptor 0.3.2, gpu-descriptor-types 0.2.0, harfrust 0.5.2, hexf-parse 0.2.1, lyon 1.0.19, lyon_algorithms 1.0.21, lyon_geom 1.0.19, lyon_path 1.0.19, lyon_tessellation 1.0.22, malloc_buf 0.0.6, objc-sys 0.3.5, objc2 0.5.3, objc2 0.6.5, objc2-app-kit 0.2.2, objc2-app-kit 0.3.2, objc2-audio-toolbox 0.3.2, objc2-av-foundation 0.3.2, objc2-avf-audio 0.3.2, objc2-cloud-kit 0.3.2, objc2-core-audio 0.3.2, objc2-core-audio-types 0.3.2, objc2-core-data 0.2.2, objc2-core-data 0.3.2, objc2-core-foundation 0.3.2, objc2-core-graphics 0.3.2, objc2-core-image 0.2.2, objc2-core-image 0.3.2, objc2-core-media 0.3.2, objc2-core-text 0.3.2, objc2-core-video 0.3.2, objc2-encode 4.1.0, objc2-image-io 0.3.2, objc2-io-surface 0.3.2, objc2-media-toolbox 0.3.2, objc2-metal 0.2.2, objc2-metal 0.3.2, objc2-quartz-core 0.2.2, objc2-quartz-core 0.3.2, objc2-screen-capture-kit 0.3.2, objc2-security 0.3.2, objc2-uniform-type-identifiers 0.3.2, objc2-user-notifications 0.3.2, objc_exception 0.1.2, pathfinder_geometry 0.5.1, pathfinder_simd 0.5.6, profiling 1.0.18, profiling-procmacros 1.0.18, pulp-wasm-simd-flag 0.1.1, realfft 3.5.0, rmcp 3.5.1, rmcp-macros 3.5.1, seahash 4.1.0, simd_helpers 0.1.0, spirv 0.4.0+sdk-1.4.341.0, svg_fmt 0.4.5, taffy 0.13.0, zune-inflate 0.2.54
+These declare their license in Cargo.toml (see the list above) but ship no separate text: accesskit 0.24.1, accesskit_consumer 0.38.0, accesskit_macos 0.26.3, block 0.1.6, block2 0.5.1, block2 0.6.2, dasp_sample 0.11.0, dispatch 0.2.0, dispatch2 0.3.1, gpu-descriptor 0.3.2, gpu-descriptor-types 0.2.0, harfrust 0.5.2, hexf-parse 0.2.1, lyon 1.0.19, lyon_algorithms 1.0.21, lyon_geom 1.0.19, lyon_path 1.0.19, lyon_tessellation 1.0.22, malloc_buf 0.0.6, objc-sys 0.3.5, objc2 0.5.3, objc2 0.6.5, objc2-app-kit 0.2.2, objc2-app-kit 0.3.2, objc2-audio-toolbox 0.3.2, objc2-av-foundation 0.3.2, objc2-avf-audio 0.3.2, objc2-cloud-kit 0.3.2, objc2-core-audio 0.3.2, objc2-core-audio-types 0.3.2, objc2-core-data 0.2.2, objc2-core-data 0.3.2, objc2-core-foundation 0.3.2, objc2-core-graphics 0.3.2, objc2-core-image 0.2.2, objc2-core-image 0.3.2, objc2-core-media 0.3.2, objc2-core-text 0.3.2, objc2-core-video 0.3.2, objc2-encode 4.1.0, objc2-exception-helper 0.1.1, objc2-image-io 0.3.2, objc2-io-surface 0.3.2, objc2-media-toolbox 0.3.2, objc2-metal 0.2.2, objc2-metal 0.3.2, objc2-quartz-core 0.2.2, objc2-quartz-core 0.3.2, objc2-screen-capture-kit 0.3.2, objc2-security 0.3.2, objc2-uniform-type-identifiers 0.3.2, objc2-user-notifications 0.3.2, objc_exception 0.1.2, pathfinder_geometry 0.5.1, pathfinder_simd 0.5.6, profiling 1.0.18, profiling-procmacros 1.0.18, pulp-wasm-simd-flag 0.1.1, realfft 3.5.0, rmcp 3.5.1, rmcp-macros 3.5.1, seahash 4.1.0, simd_helpers 0.1.0, spirv 0.4.0+sdk-1.4.341.0, svg_fmt 0.4.5, taffy 0.13.0, zune-inflate 0.2.54
 

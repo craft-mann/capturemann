@@ -5,6 +5,19 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
+0.2.3 is about speaker detection, plus the Intel Mac recording crash and two fixes found while testing 0.2.2.
+
+### Fixed
+
+- **Intel Macs: starting a screen recording no longer aborts the app** (GitHub issue 16, MacBookPro16,1 with an Intel UHD 630). AVFoundation rejected the encoder settings by throwing an Objective-C exception, which unwound into Rust and killed the process, leaving the "Currently Sharing" indicator up. The encoder set-up (and every frame append) now runs inside an exception catch. A rejected plan is tried again without the optional compression properties, then (for HEVC up to 4096 px wide) as H.264; the manifest records the codec the file really holds. When nothing works the recording says the Mac has no usable hardware encoder instead of crashing, and the reason AVFoundation gave is written to the system log. Not yet confirmed on the reporter's Mac.
+- Reveal in Finder on a recording or an audio capture failed with "not a screenshot".
+- Cancel on a report left "Writing the report 0%" on screen for ever; the card now clears once the job has stopped.
+
+### Changed
+
+- **Speaker detection uses a better voice model.** The English-only CAM++ model is replaced by the 3D-Speaker CAM++ Chinese-English model (Apache-2.0, 28 MB), and the clustering threshold for an unknown number of people is 1.0 instead of 1.2. On 6 public English conversation clips held back while choosing, the diarization error rate fell from 54 % to 17 % (51 % for calling everyone one speaker) and the speaker count was right in 5 of 6 clips, against 0 of 6. English only: Vietnamese is not measured yet. Details and caveats: `verification/benchmarks/speaker-detection-2026-10-29.md`. Speakers found by 0.2.2 stay as they are until you run Find speakers again.
+- Finding speakers shows real progress instead of 0 % until it ends. Cancel still takes effect when the run ends (the speaker library ignores a request to stop).
+
 ## [0.2.2] - 2026-10-28
 
 0.2.2 is about transcripts of long recordings, plus the fixes found while testing 0.2.1. Translation and speaker detection are unchanged and get their own release.

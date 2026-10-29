@@ -78,6 +78,12 @@ pub trait VideoEncoder: Send + 'static {
         duration: MediaTime,
     ) -> Result<AppendOutcome, CmError>;
 
+    /// The plan the encoder really runs with when it had to use a simpler one than asked for
+    /// (another codec, say); `None` when it is the plan it was given.
+    fn used_plan(&self) -> Option<crate::settings::VideoPlan> {
+        None
+    }
+
     /// First disk error seen by the file writer (`disk_full`), if any.
     fn check(&self) -> Result<(), CmError>;
 
