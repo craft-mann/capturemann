@@ -146,10 +146,10 @@ def report(rows, clips, mach):
             if not ok:
                 lines.append("| %s | %s | %s | | failed: %s |" % (clip, model or "", tag, v[0].get("error", "")[:80].replace("|", "/")))
                 continue
-            secs = [r["work_secs"] for r in ok]
+            secs = [r["decode_secs"] if task == "decode" else r["work_secs"] for r in ok]
             w = med(secs)
             audio = ok[0]["audio_secs"]
-            rtf = audio / (med([r.get("transcribe_secs", r.get("speakers_secs", r["work_secs"])) for r in ok]) or 1)
+            rtf = audio / (med([r.get("transcribe_secs", r.get("speakers_secs", r.get("decode_secs"))) for r in ok]) or 1)
             common = [clip] + ([model] if task == "transcribe" else []) + [tag, fmt(audio / 60), str(len(ok)),
                       "%s (%s-%s)" % (fmt(w), fmt(min(secs)), fmt(max(secs)))]
             if task == "transcribe":
