@@ -119,7 +119,7 @@ fn show_running_instance(config_dir: &std::path::Path) {
 }
 
 fn main() {
-    cm_core::logging::init();
+    cm_daemon::logs::init_logging("desktop");
     cm_desktop::trace::init();
     let args: Vec<String> = std::env::args().skip(1).collect();
     let flag = |f: &str| args.iter().any(|a| a == f);

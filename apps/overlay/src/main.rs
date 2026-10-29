@@ -19,9 +19,22 @@ fn fail(e: &OverlayError) -> ExitCode {
 /// share the app's global; without the variable (a CLI run) the hints are English.
 const LANG_ENV: &str = "CAPTUREMANN_LANG";
 
+/// The folder for the overlay's log file (DIAG-1), set by the desktop app; without it the overlay
+/// logs to stderr only.
+const LOG_DIR_ENV: &str = "CAPTUREMANN_LOG_DIR";
+
 fn main() -> ExitCode {
     let started = Instant::now();
-    cm_core::logging::init();
+    // The app tells the overlay where its log files go (the overlay does not link the daemon).
+    match std::env::var_os(LOG_DIR_ENV).filter(|v| !v.is_empty()) {
+        Some(dir) => cm_core::logging::init_with_file(cm_core::logfile::FileLogConfig {
+            process: "overlay",
+            dir: dir.into(),
+            version: env!("CARGO_PKG_VERSION"),
+            scrub: None,
+        }),
+        None => cm_core::logging::init(),
+    }
     cm_i18n::set_language(cm_i18n::Lang::from_setting(
         std::env::var(LANG_ENV).ok().as_deref(),
     ));

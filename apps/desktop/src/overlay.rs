@@ -329,6 +329,7 @@ impl OverlayLauncher {
             .kill_on_drop(true);
         // The overlay is its own process: hand it the UI language (its hint labels are translated).
         cmd.env(LANG_ENV, child_language_code());
+        cmd.env("CAPTUREMANN_LOG_DIR", cm_daemon::logs::log_dir());
         let tracing = crate::trace::enabled();
         if tracing {
             cmd.env("CM_OVERLAY_TRACE", "1");

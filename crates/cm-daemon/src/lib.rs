@@ -59,6 +59,7 @@ pub mod ipc;
 mod jobs;
 pub mod library_move;
 mod library_ops;
+pub mod logs;
 pub mod markers;
 pub mod publish_ops;
 mod publish_records;

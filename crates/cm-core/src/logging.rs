@@ -5,8 +5,11 @@
 //! Without it, the `cm_*` crates log at `info` and everything else (GPUI, wgpu, ...) at `warn`.
 
 use std::io::Write;
+use std::sync::{Arc, OnceLock};
 
 use log::{LevelFilter, Log, Metadata, Record};
+
+use crate::logfile::{one_line_backtrace, FileLogConfig, FileSink};
 
 struct Logger {
     /// Level for crates that are not ours.
@@ -15,6 +18,8 @@ struct Logger {
     ours: LevelFilter,
     /// `(target, level)` pairs from `RUST_LOG`.
     targets: Vec<(String, LevelFilter)>,
+    /// The log file (DIAG-1), when the process opened one.
+    file: Option<Arc<FileSink>>,
 }
 
 impl Logger {
@@ -23,6 +28,7 @@ impl Logger {
             default: LevelFilter::Warn,
             ours: LevelFilter::Info,
             targets: Vec::new(),
+            file: None,
         };
         for part in spec.unwrap_or("").split(',').map(str::trim) {
             match part.split_once('=') {
@@ -85,6 +91,9 @@ impl Log for Logger {
                 r.target(),
                 r.args()
             );
+            if let Some(f) = &self.file {
+                f.write(r.level().as_str(), r.target(), &r.args().to_string());
+            }
         }
     }
 
@@ -93,12 +102,85 @@ impl Log for Logger {
 
 /// Installs the stderr logger (`RUST_LOG` overrides the defaults). Later calls do nothing.
 pub fn init() {
-    let logger = Logger::parse(std::env::var("RUST_LOG").ok().as_deref());
+    install(Logger::parse(std::env::var("RUST_LOG").ok().as_deref()));
+}
+
+fn install(logger: Logger) -> bool {
     let max = logger.max_level();
-    if log::set_boxed_logger(Box::new(logger)).is_ok() {
+    let ok = log::set_boxed_logger(Box::new(logger)).is_ok();
+    if ok {
         log::set_max_level(max);
     }
+    ok
 }
+
+/// The sink the exit handler closes (`atexit` takes no argument).
+static EXIT_SINK: OnceLock<Arc<FileSink>> = OnceLock::new();
+
+/// [`init`] plus a log file: the same records go to `cfg.dir` (DIAG-1). Also records panics, writes
+/// the start line, reports a previous run that did not end normally and removes the run marker on a
+/// normal exit. A file that cannot be opened leaves the process logging to stderr only.
+pub fn init_with_file(cfg: FileLogConfig) {
+    let mut logger = Logger::parse(std::env::var("RUST_LOG").ok().as_deref());
+    let sink = FileSink::open(&cfg).map(Arc::new);
+    logger.file.clone_from(&sink);
+    if !install(logger) {
+        return;
+    }
+    let Some(sink) = sink else {
+        log::warn!("the log file could not be opened; logging to stderr only");
+        return;
+    };
+    let unclean = sink.begin_run();
+    log::info!("{} {} started", cfg.process, cfg.version);
+    if unclean {
+        log::warn!(
+            "the previous run of {} did not end normally (a crash, a force quit or a power loss)",
+            cfg.process
+        );
+    }
+    install_panic_hook(Arc::clone(&sink));
+    if EXIT_SINK.set(sink).is_ok() {
+        register_exit_handler();
+    }
+}
+
+/// Writes every panic to the log file, then runs the hook that was there before.
+pub fn install_panic_hook(sink: Arc<FileSink>) {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let location = info
+            .location()
+            .map_or_else(|| "unknown".to_owned(), ToString::to_string);
+        let payload = info
+            .payload()
+            .downcast_ref::<&str>()
+            .map(|s| (*s).to_owned())
+            .or_else(|| info.payload().downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "(not a text)".to_owned());
+        let backtrace = std::backtrace::Backtrace::force_capture().to_string();
+        sink.write_panic(&location, &payload, &one_line_backtrace(&backtrace, 3000));
+        previous(info);
+    }));
+}
+
+#[cfg(unix)]
+fn register_exit_handler() {
+    extern "C" fn at_exit() {
+        if let Some(sink) = EXIT_SINK.get() {
+            sink.end_run();
+        }
+    }
+    // SAFETY: `at_exit` is a plain function that touches only a static; registering it is sound.
+    unsafe {
+        libc::atexit(at_exit);
+    }
+}
+
+// No exit handler on other systems yet: the marker stays and the next start reports it, so a
+// normal exit would be reported as unclean. Windows gets its own handler with the Windows port.
+#[cfg(not(unix))]
+fn register_exit_handler() {}
 
 #[cfg(test)]
 mod tests {
@@ -132,5 +214,30 @@ mod tests {
     fn junk_is_ignored() {
         let l = Logger::parse(Some("loud,cm_core=loud"));
         assert_eq!(l.level_for("cm_core"), LevelFilter::Info);
+    }
+
+    // DIAG-1.AC3: a real panic on a thread reaches the file.
+    #[test]
+    fn a_panic_on_a_thread_is_written_to_the_log_file() {
+        let d = tempfile::tempdir().unwrap();
+        let sink = Arc::new(
+            FileSink::open(&FileLogConfig {
+                process: "desktop",
+                dir: d.path().to_path_buf(),
+                version: "0.0.0",
+                scrub: None,
+            })
+            .unwrap(),
+        );
+        let before = std::panic::take_hook();
+        install_panic_hook(sink);
+        let r = std::thread::spawn(|| panic!("native callback failed")).join();
+        drop(std::panic::take_hook());
+        std::panic::set_hook(before);
+        assert!(r.is_err());
+        let text = std::fs::read_to_string(d.path().join("desktop.log")).unwrap();
+        assert!(text.contains("ERROR panic: panic at"), "{text}");
+        assert!(text.contains("native callback failed"), "{text}");
+        assert!(text.contains("backtrace:"), "{text}");
     }
 }

@@ -32,8 +32,10 @@ into an issue. It contains no audio, no transcript text, no file names of record
   `capturemann.log` in a `logs/` folder of the config directory (`cm_daemon::config::config_dir()` already
   honours `CAPTUREMANN_CONFIG_DIR`, so a second instance logs to its own folder). One function builds the
   path from the config dir, never a hard-coded `~/Library` path.
-- **Rotation:** keep the current file plus the previous two, each capped at 2 MB (about 6 MB total, fixed;
-  no setting). Rotate at start and when the cap is reached. Writes are line-buffered and flushed on `warn`
+- **Rotation:** one file per process (`desktop.log`, `daemon.log`, `overlay.log`, so two processes never
+  rotate the same file), each keeping the current file plus the previous two at 2 MB (at most 6 MB per
+  process, fixed; no setting). The overlay does not link the daemon, so the app passes the folder in
+  `CAPTUREMANN_LOG_DIR`. Rotate at start and when the cap is reached. Writes are line-buffered and flushed on `warn`
   and `error`, so the last lines before a crash are on disk.
 - **Level:** the file records `cm_*` at `info` and everything else at `warn` (today's defaults); `RUST_LOG`
   still overrides. Add a timestamp (UTC, ISO 8601) and the process name (`desktop`, `daemon`, `overlay`)
