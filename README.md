@@ -25,11 +25,14 @@ through MCP and a CLI.
   <img alt="The CaptureMann library: recordings, audio and screenshots in one place, with a record button, region, window and display capture, and the AI and agent pages in the sidebar" src="docs/images/library.webp" width="900">
 </p>
 
-> **Status: 0.2.x (macOS 13+, Apple Silicon and Intel; the Intel build is not yet tested on a real Intel Mac).** Windows, then Linux follow. Most
-> results are tested with scripted fakes, plus the maintainer's own use on one Mac; there are few stored
-> hardware reports, and speaker labels have been tried on one meeting only. What is still unverified is
-> tracked in [`specs/04-delivery-plan.md`](specs/04-delivery-plan.md) under "Verification debt" and in
-> [`docs/project/status.md`](docs/project/status.md).
+> **Status: 0.2.3 (macOS 13+, Apple Silicon and Intel).** Windows, then Linux follow. Most results are
+> tested with scripted fakes, plus the maintainer's own use on one Mac; there are few stored hardware
+> reports. **Speaker labels** are measured on public English conversation clips only (diarization error
+> 17 % on clips held back, [report](verification/benchmarks/speaker-detection-2026-10-29.md)); Vietnamese
+> is not measured yet. **Intel:** the build installs, opens and asks for permissions on a real Intel Mac, but
+> starting a recording crashed one (issue 16); 0.2.3 has a fix that is not confirmed yet. What is still
+> unverified is tracked in [`specs/04-delivery-plan.md`](specs/04-delivery-plan.md) under "Verification
+> debt" and in [`docs/project/status.md`](docs/project/status.md).
 
 ## Features
 
@@ -48,12 +51,13 @@ through MCP and a CLI.
   Large v3 Turbo as the recommended model, a caption editor, translation to English with Whisper and to
   other languages with the built-in text model, and zoom and silence-cut suggestions. Models download
   only when you press Download.
-- **Speaker labels**: who spoke when, from the voices, with rename and merge. The two small
-  models ship inside the app; nothing is sent anywhere.
+- **Speaker labels**: who spoke when, from the voices, with rename and merge and a progress bar on long
+  recordings. The two small models ship inside the app; nothing is sent anywhere. Tell the app which
+  languages you speak (for example `vi, en`) so a short recording is not heard as a related language.
 - **Meeting minutes and reports**: summary, minutes, one-on-one notes, interview notes, product
   recap and lecture notes written by a built-in text model (Gemma 4 E2B by default). Every item links
   to the moment it was said; export as Markdown or text. The model runs through a bundled
-  `llama-server`; no cloud and no account.
+  `llama-server`; no cloud and no account. The picture below shows a report with sample data.
 - **Library** of self-contained capture bundles, stored in a folder you choose.
 - **Share**: save to local folders or Google Drive, publish to YouTube (private by default).
 - **For agents**: 73 MCP tools plus resources and prompts, and an identical `capturemann` CLI. Risky
@@ -62,9 +66,13 @@ through MCP and a CLI.
   download a model. You bring your own Google credentials; secrets live in the macOS Keychain.
 - English and Vietnamese interface.
 
+<p align="center">
+  <img alt="A meeting-minutes report beside the transcript: summary, attendees, decisions and action items, each with a button that plays the moment it was said, and a waveform that marks where the items come from (sample data)" src="docs/images/meeting-report.webp" width="900">
+</p>
+
 ## Install
 
-Requires a Mac with macOS 13 or later, Apple Silicon or Intel (Apple menu > About This Mac shows the chip). There is one download per chip. **The Intel build (0.2.1 and later) has not been tested on a real Intel Mac yet**: it is built and checked on Apple Silicon only, and the speech and text models may be slow on older Intel Macs. Please report problems. The app is about 180 MB (Apple Silicon) or 190 MB (Intel).  The AI models are not in it: they download only when you press Download (about 4.4 GB for the recommended speech model, Large v3 Turbo, plus the recommended text model, Gemma 4 E2B). The two small speaker models are inside the app.
+Requires a Mac with macOS 13 or later, Apple Silicon or Intel (Apple menu > About This Mac shows the chip). There is one download per chip. **The Intel build (0.2.1 and later) is built and checked on Apple Silicon.** It installs and opens on a real Intel Mac, but starting a screen recording crashed a MacBook Pro 16" 2019 in 0.2.2 ([issue 16](https://github.com/craft-mann/capturemann/issues/16)); 0.2.3 catches the error and retries with simpler settings, which is not confirmed on that Mac yet. The speech and text models may be slow on older Intel Macs. Please report problems. The app is about 180 MB (Apple Silicon) or 190 MB (Intel).  The AI models are not in it: they download only when you press Download (about 4.4 GB for the recommended speech model, Large v3 Turbo, plus the recommended text model, Gemma 4 E2B). The two small speaker models are inside the app.
 
 **With Homebrew:**
 
