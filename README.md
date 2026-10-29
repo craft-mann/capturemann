@@ -18,7 +18,7 @@ through MCP and a CLI.
 <p align="center">
 <a href="https://github.com/craft-mann/capturemann/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/craft-mann/capturemann/actions/workflows/ci.yml/badge.svg"></a>
 <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue"></a>
-<img alt="Platform: macOS 13+" src="https://img.shields.io/badge/platform-macOS%2013%2B-lightgrey">
+<img alt="Platform: macOS 13+" src="https://img.shields.io/badge/platform-macOS%2013%2B-lightgrey"> <img alt="Chips: Apple Silicon and Intel" src="https://img.shields.io/badge/chip-Apple%20Silicon%20%7C%20Intel-lightgrey">
 </p>
 
 <p align="center">
