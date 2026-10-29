@@ -1,6 +1,6 @@
 # Dependency checks
 
-- **commit**: 18792d9 (working tree has uncommitted changes)
+- **commit**: eb05939
 
 ## cargo deny (licences, bans, sources, advisories)
 
