@@ -31,6 +31,10 @@ pub struct ImageEntry {
     pub degraded: bool,
     /// `dev` or `held_out`. Thresholds are tuned on `dev` only; `held_out` is read once per release.
     pub split: String,
+    /// Every line of text drawn, with word boxes: what a perfect recognizer would return. The
+    /// harness feeds these to the detector for the detector-only run (rule errors apart from
+    /// recognizer errors).
+    pub lines: Vec<DrawnLine>,
     /// What is in the picture that should be found. Empty for a negative image.
     pub truths: Vec<Truth>,
     /// Lookalikes that must NOT be found (negative images and the decoys inside positive ones).
@@ -54,6 +58,22 @@ pub struct Truth {
 pub struct Decoy {
     /// For example `order_number`, `uuid`, `git_hash`, `luhn_fail_16_digits`, `masked_ssn`.
     pub what: String,
+    pub text: String,
+    pub rect: [f64; 4],
+}
+
+/// One drawn line of text (also used by the detector-only run).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DrawnLine {
+    pub text: String,
+    /// `[x, y, w, h]` in physical px of the PNG.
+    pub rect: [f64; 4],
+    /// Whitespace-delimited words with their boxes.
+    pub words: Vec<DrawnWord>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DrawnWord {
     pub text: String,
     pub rect: [f64; 4],
 }
