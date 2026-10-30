@@ -702,25 +702,12 @@ const MAX_BLOCK_LINES: usize = 60;
 /// the whole line; where a line rule already found something on a line, the spans cover the
 /// rest of the line so the block has no gap (the page keeps the first span on overlapping
 /// characters). Confidence 0.95.
-pub fn find_private_keys(lines: &[Flat], found: &[Located]) -> Vec<Located> {
+pub fn find_private_keys(lines: &[Flat], _found: &[Located]) -> Vec<Located> {
     let mut out: Vec<(usize, usize, usize)> = Vec::new();
+    // Whole lines: the page-rule merge in `detect.rs` replaces the token spans the line rules
+    // found inside a block, so a key is one kind of rectangle from BEGIN to END.
     let emit = |out: &mut Vec<(usize, usize, usize)>, line: usize, len: usize| {
-        let mut covered: Vec<(usize, usize)> = found
-            .iter()
-            .filter(|l| l.line == line)
-            .map(|l| (l.span.start, l.span.end.min(len)))
-            .collect();
-        covered.sort_unstable();
-        let mut at = 0;
-        for (s, e) in covered {
-            if s > at {
-                out.push((line, at, s));
-            }
-            at = at.max(e);
-        }
-        if at < len {
-            out.push((line, at, len));
-        }
+        out.push((line, 0, len));
     };
     let mut i = 0;
     while i < lines.len() {
@@ -1127,7 +1114,7 @@ mod tests {
     }
 
     #[test]
-    fn private_key_spans_fill_around_line_rule_hits() {
+    fn private_key_spans_cover_whole_lines_even_over_line_rule_hits() {
         let body = rnd(64, ALNUM);
         let f = flats(&["-----BEGIN PRIVATE KEY-----", &body]);
         let hit = Located {
@@ -1144,7 +1131,7 @@ mod tests {
             .iter()
             .map(|l| (l.line, l.span.start, l.span.end))
             .collect();
-        assert_eq!(ranges, [(0, 0, 27), (1, 0, 10), (1, 30, 64)]);
+        assert_eq!(ranges, [(0, 0, 27), (1, 0, 64)]);
     }
 
     #[test]

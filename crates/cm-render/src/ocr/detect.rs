@@ -318,7 +318,21 @@ fn scan_page(lines: &[TextLine], opts: &SuggestOptions) -> Vec<RedactionSuggesti
         for cell in flat.cells[s.start..s.end].iter().flatten() {
             rect = Some(rect.map_or(*cell, |r| union(r, *cell)));
         }
-        let Some(rect) = rect else { continue };
+        let Some(mut rect) = rect else { continue };
+        // A span that starts or ends inside a word (a password inside a URL) is placed by the
+        // character-proportional estimate, which drifts in long words in a proportional font;
+        // widen the cut sides by half a line height to absorb it.
+        let slack = rect.h * 0.5;
+        if s.start > 0
+            && flat.cells[s.start - 1].is_some()
+            && !flat.chars[s.start - 1].is_whitespace()
+        {
+            rect = Rc::new(rect.x - slack, rect.y, rect.w + slack, rect.h);
+        }
+        if flat.cells.get(s.end).is_some_and(Option::is_some) && !flat.chars[s.end].is_whitespace()
+        {
+            rect = Rc::new(rect.x, rect.y, rect.w + slack, rect.h);
+        }
         let text: String = flat.chars[s.start..s.end].iter().collect();
         out.push(RedactionSuggestion {
             rect,
