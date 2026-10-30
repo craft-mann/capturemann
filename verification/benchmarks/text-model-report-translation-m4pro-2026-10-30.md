@@ -13,12 +13,14 @@ long recording, how much memory does the helper program use, and where does it b
   dropped an item or failed (0 items dropped for missing a citation, 6 of 6 runs finished).
 - **Memory of `llama-server` rises with length**, from 3.2 GB (11 min) to 5.0 GB (2.5 h), because the
   model gets one prompt per piece and the reports are written in 1, 4 and 9 pieces.
-- **Translation to Vietnamese works at 11 minutes** (202 lines in 72 s, 4.6 GB) **and failed on both long
-  inputs**: the job stopped with `output_too_long` at 79 % (1 h, after 431 s) and at 31 % (2.5 h, after
-  422 s), with no partial result kept. One model reply ran to the 4,096-token output limit after a 562-token
-  prompt, which looks like the model repeating itself. The long inputs are a stand-in (section 3), so
-  whether real long transcripts do the same is **open**. Reports handle this exact error by splitting the
-  piece; translation does not.
+- **Translation works on a real 88-minute recording** (Vietnamese to English with the text model): 1,271
+  lines in 691 s (7.9 s of work per minute of audio), `llama-server` peak 6.5 GB, 5 lines left untranslated.
+  Whisper's own translate task (Large v3) took 719 s for the same recording.
+- **It failed on two stand-in transcripts** (the 11-minute text repeated to 1 h and 2.5 h, English to
+  Vietnamese): `output_too_long` at 79 % and 31 %, no partial result kept. One reply ran to the 4,096-token
+  output limit after a 562-token prompt, which looks like the model repeating itself. Because the real
+  recording of 88 minutes did not fail, the repeated text is the likely cause; it is not proven, and the
+  handling gap (reports split on this error, translation does not) remains.
 
 ## 2. Setup
 
@@ -63,8 +65,9 @@ CAPTUREMANN_LIBRARY=<lib> CAPTUREMANN_CONFIG_DIR=<cfg> CAPTUREMANN_SOCKET=/tmp/c
   gives realistic length, piece counts and prompt sizes, but **not** realistic content: the same sentences
   recur every 11 minutes. It cannot say anything about summary quality, and it may change how the model
   behaves (section 5).
-- Real long transcripts exist (a 88-minute Vietnamese meeting) but were not used here, to keep the text
-  of private recordings out of the model logs and out of this repository.
+- **The real long recording** (section 4.2b) is a private 88.0-minute Vietnamese meeting with several
+  speakers, transcribed on the same day with Whisper large-v3-turbo (language `vi`, 14,381 words). Its text
+  went through the local model only; none of it is stored here.
 
 ## 4. Results
 
@@ -90,6 +93,16 @@ grows slowly with length because each added piece also adds a merge step.
 | 60 min (stand-in) | **failed**, `output_too_long` | 431.5 s | 6.00 GB | 79 % |
 | 150 min (stand-in) | **failed**, `output_too_long` | 421.9 s | 6.08 GB | 31 % |
 
+### 4.2b Translation of the real 88-minute recording (Vietnamese to English)
+
+| Step | Result | Time | Notes |
+|---|---|---|---|
+| Transcribe (Whisper large-v3-turbo, `vi`) | 14,381 words | 346 s | 15.3x real time; the earlier benchmark run of the same audio gave 14,360 words in 370 s |
+| Translate with the text model (Gemma 4 E2B) | done, 1,271 lines, 5 untranslated | 691 s | `llama-server` peak 6.54 GB; 7.9 s per minute of audio |
+| Translate with Whisper's translate task (Large v3) | done, 4,052 lines, 0 untranslated | 719 s | 7.3x real time; lines are Whisper's own segments, so the count differs |
+
+The two engines write the same file, so the second run replaced the first; quality was not compared.
+
 For the 11-minute run the rate is 6.4 s of work per minute of audio: about 3 times `minutes` and 8 times
 `summary` of the same recording, because the whole text is written out again in another language.
 
@@ -105,13 +118,14 @@ about twice `summary` for the same input.
 
 ## 5. What this does not show
 
+- **Real recording: one language pair and one recording.** Vietnamese to English with the text model
+  worked; English to Vietnamese on a real long transcript was not run.
 - **One run per cell, one machine.** The first plan asked for the median of 3 with a spread; these cells
   have no spread, so differences under about 10 % mean nothing. Re-run before using any single number.
-- **Stand-in long inputs.** Repeated text can make a model more likely to repeat itself, so the two
-  translation failures may come from the input, not from length. They were not repeated, and no real long
-  transcript was translated, so "translation fails on long recordings" is **not established**; what is
-  established is that one model reply can reach the output limit and the job then fails without keeping the
-  finished batches.
+- **Stand-in long inputs.** Repeated text can make a model repeat itself, so the two translation failures
+  probably come from the input. They were not repeated, and no real long transcript failed, so "translation
+  fails on long recordings" is **not** shown; what is shown is that one reply can reach the output limit and
+  that the job then fails without keeping the finished batches.
 - **One model and one language pair** (Gemma 4 E2B, English to Vietnamese). The larger text models in the
   catalogue (Qwen3.5 4B) were not measured; they will be slower and use more memory.
 - Memory is sampled once a second and covers `llama-server` only. The daemon, the app and Whisper add to it
@@ -125,10 +139,10 @@ about twice `summary` for the same input.
 - Reports need no performance fix: 1 hour waits about 1 to 2 minutes, and memory stays under the 5 GB the
   model entry in `text_models.json` should be checked against (`ram_mb` is an estimate; these runs are
   the first measurement of it: 3.2 to 5.0 GB for reports, up to 6.1 GB for translation).
-- **Translation robustness is the open finding, ranked first in `docs/project/performance.md`.** Next
-  steps, in order: (1) translate a real long transcript (the 88-minute recording, with the maintainer's
-  consent for the model log) to see whether the failure is real; (2) if it is, split a batch when a reply
-  reaches the output limit, as reports already do, and keep the batches already done so a failure does not
-  lose 79 % of the work; (3) add a counted-work test with a scripted model that returns an over-long
-  reply.
+- **Translation robustness stays open but is lower priority.** The real 88-minute recording translated, so
+  the failure needs a repeating input to show up so far. Still worth doing, cheaply: split a batch when a
+  reply reaches the output limit (as reports do), keep finished batches, and add a counted-work test with a
+  scripted model that returns an over-long reply.
+- Translation to Vietnamese of a real long English transcript, and a second run of the 88-minute
+  translation, would show how stable the result is.
 - Repeat the table three times per cell, and add the 8 GB and 16 GB Macs, before using it as a budget.
