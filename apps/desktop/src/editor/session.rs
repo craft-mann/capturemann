@@ -48,10 +48,15 @@ pub async fn fetch_snapshot(daemon: &Daemon, id: &str) -> Result<Snapshot, Error
 pub async fn fetch_proposals(
     daemon: &Daemon,
     id: &str,
+    kinds: &super::redact::KindChoice,
 ) -> Result<Vec<super::redact::Proposal>, ErrorNote> {
-    let v = Backend::call(daemon, "suggest_redactions", super::redact::request(id))
-        .await
-        .map_err(ErrorNote::plain)?;
+    let v = Backend::call(
+        daemon,
+        "suggest_redactions",
+        super::redact::request(id, kinds),
+    )
+    .await
+    .map_err(ErrorNote::plain)?;
     super::redact::parse_proposals(&v).map_err(ErrorNote::plain)
 }
 
@@ -327,7 +332,7 @@ mod tests {
             .unwrap();
         rt.block_on(async {
             let id = capture(&d).await;
-            let proposals = fetch_proposals(&d, &id).await.unwrap();
+            let proposals = fetch_proposals(&d, &id, &Default::default()).await.unwrap();
             assert_eq!(proposals.len(), 2, "{proposals:?}");
             assert!(proposals.iter().all(|p| p.kind == "email"));
             assert!(fetch_snapshot(&d, &id).await.unwrap().ops.is_empty());
@@ -368,7 +373,9 @@ mod tests {
             .unwrap();
         rt.block_on(async {
             let id = capture(&d).await;
-            let e = fetch_proposals(&d, &id).await.unwrap_err();
+            let e = fetch_proposals(&d, &id, &Default::default())
+                .await
+                .unwrap_err();
             assert!(e.message().contains("text recognition"), "{}", e.message());
         });
     }

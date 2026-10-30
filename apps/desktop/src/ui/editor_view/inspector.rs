@@ -581,6 +581,7 @@ impl EditorView {
                     .child(SharedString::from(note)),
             )
             .children(rows)
+            .when(s.kinds_open, |d| d.child(self.redact_kinds(t, s)))
             .child(
                 div()
                     .flex()
@@ -600,6 +601,20 @@ impl EditorView {
                     .child(
                         button(
                             t,
+                            "redact-kinds-toggle",
+                            if s.kinds_open {
+                                tr_ctx!("button", "Hide options")
+                            } else {
+                                tr_ctx!("button", "What to look for")
+                            },
+                            ButtonKind::Secondary,
+                        )
+                        .aria_expanded(s.kinds_open)
+                        .on_click(self.doc_action(|d, cx| d.toggle_kinds_open(cx))),
+                    )
+                    .child(
+                        button(
+                            t,
                             "redact-dismiss",
                             if has {
                                 tr_ctx!("button", "Dismiss")
@@ -609,6 +624,120 @@ impl EditorView {
                             ButtonKind::Secondary,
                         )
                         .on_click(self.doc_action(|d, cx| d.dismiss_redactions(cx))),
+                    ),
+            )
+            .into_any_element()
+    }
+
+    /// The kinds Auto-redact looks for, in groups: a switch per group and a chip per kind, a
+    /// reset to the defaults and a new search. The choice is remembered for this session.
+    fn redact_kinds(&self, t: &Theme, s: &Snap) -> AnyElement {
+        use crate::editor::redact::{group_kinds, group_title, kind_label, GROUP_COUNT};
+        let groups: Vec<AnyElement> = (0..GROUP_COUNT)
+            .map(|g| {
+                let title = group_title(g);
+                let chips: Vec<AnyElement> = group_kinds(g)
+                    .iter()
+                    .map(|k| {
+                        let k = *k;
+                        let on = s.kinds.is_on(k);
+                        let label = kind_label(k.as_str());
+                        let hover = rgba_of(t.raised);
+                        div()
+                            .id(ElementId::from(("redact-kind", g * 16 + chips_index(g, k))))
+                            .role(Role::Button)
+                            .aria_label(SharedString::from(label.clone()))
+                            .aria_toggled(toggled(on))
+                            .focusable()
+                            .tab_stop(true)
+                            .min_w(px(0.))
+                            .px(px(8.))
+                            .py(px(4.))
+                            .rounded(px(scale::RADIUS_SM))
+                            .border_1()
+                            .border_color(rgba_of(if on { accent(t) } else { t.line }))
+                            .cursor_pointer()
+                            .text_size(px(type_scale::CAPTION))
+                            .when(on, |d| d.bg(rgba_of(t.raised)).text_color(rgba_of(t.text)))
+                            .when(!on, |d| {
+                                d.text_color(rgba_of(t.text_3)).hover(move |s| s.bg(hover))
+                            })
+                            .focus_visible(|s| s.border_color(rgba_of(t.text)))
+                            .on_click(self.doc_action(move |d, cx| {
+                                d.edit_redact_kinds(
+                                    |c| {
+                                        c.toggle(k);
+                                    },
+                                    cx,
+                                )
+                            }))
+                            .child(shrink_text(SharedString::from(label)))
+                            .into_any_element()
+                    })
+                    .collect();
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(6.))
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .justify_between()
+                            .gap(px(8.))
+                            .child(
+                                shrink_text(SharedString::from(title.clone()))
+                                    .text_size(px(13.))
+                                    .text_color(rgba_of(t.text)),
+                            )
+                            .child(
+                                switch(t, ("redact-group", g), title, s.kinds.group_on(g), true)
+                                    .on_click(self.doc_action(move |d, cx| {
+                                        d.edit_redact_kinds(
+                                            |c| {
+                                                c.toggle_group(g);
+                                            },
+                                            cx,
+                                        )
+                                    })),
+                            ),
+                    )
+                    .child(div().flex().flex_wrap().gap(px(6.)).children(chips))
+                    .into_any_element()
+            })
+            .collect();
+        let is_default = s.kinds.is_default();
+        div()
+            .flex()
+            .flex_col()
+            .id("redact-kinds")
+            .role(Role::Group)
+            .aria_label(tr!("Kinds to look for"))
+            .gap(px(12.))
+            .children(groups)
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .gap(px(8.))
+                    .child(
+                        button(
+                            t,
+                            "redact-kinds-defaults",
+                            tr_ctx!("button", "Defaults"),
+                            ButtonKind::Secondary,
+                        )
+                        .when(is_default, |b| b.opacity(0.5))
+                        .on_click(self.doc_action(|d, cx| d.edit_redact_kinds(|c| c.reset(), cx))),
+                    )
+                    .child(
+                        button(
+                            t,
+                            "redact-search-again",
+                            tr_ctx!("button", "Search again"),
+                            ButtonKind::Primary,
+                        )
+                        .on_click(self.doc_action(|d, cx| d.auto_redact(cx))),
                     ),
             )
             .into_any_element()
@@ -646,4 +775,12 @@ impl EditorView {
             )
             .into_any_element()
     }
+}
+
+/// A stable element index for a kind inside its group.
+fn chips_index(g: usize, k: cm_render::ocr::RedactionKind) -> usize {
+    crate::editor::redact::group_kinds(g)
+        .iter()
+        .position(|x| *x == k)
+        .unwrap_or_default()
 }

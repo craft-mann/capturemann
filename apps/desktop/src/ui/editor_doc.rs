@@ -99,6 +99,8 @@ pub struct EditorDoc {
     history_pending: usize,
     pub status: Status,
     pub redact: RedactPhase,
+    /// Whether the Auto-redact kind chooser is open (the choice is `redact::session_kinds`).
+    pub kinds_open: bool,
     /// Edits were made since the editor opened.
     edited: bool,
     closing: bool,
@@ -144,6 +146,7 @@ impl EditorDoc {
             history_pending: 0,
             status: Status::Saved,
             redact: RedactPhase::Idle,
+            kinds_open: false,
             edited: false,
             closing: false,
         };
@@ -664,9 +667,10 @@ impl EditorDoc {
         cx.notify();
         let rt = self.backend.rt.clone();
         let id = self.capture_id.clone();
+        let kinds = crate::editor::redact::session_kinds();
         cx.spawn(async move |this, cx| {
             let found = rt
-                .spawn(async move { session::fetch_proposals(&daemon, &id).await })
+                .spawn(async move { session::fetch_proposals(&daemon, &id, &kinds).await })
                 .await
                 .map_err(|e| ErrorNote::plain(e.to_string()))
                 .and_then(|r| r);
@@ -687,6 +691,24 @@ impl EditorDoc {
             .ok();
         })
         .detach();
+    }
+
+    /// Opens or closes the kind chooser of the Auto-redact card.
+    pub fn toggle_kinds_open(&mut self, cx: &mut Context<Self>) {
+        self.kinds_open = !self.kinds_open;
+        cx.notify();
+    }
+
+    /// Edits the remembered choice of Auto-redact kinds.
+    pub fn edit_redact_kinds(
+        &mut self,
+        f: impl FnOnce(&mut crate::editor::redact::KindChoice),
+        cx: &mut Context<Self>,
+    ) {
+        let mut c = crate::editor::redact::session_kinds();
+        f(&mut c);
+        crate::editor::redact::set_session_kinds(c);
+        cx.notify();
     }
 
     /// Accepts one proposal (`Some(i)`) or all (`None`): blur ops in one undo step.
