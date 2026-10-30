@@ -408,6 +408,11 @@ async fn undo_with_nothing_to_undo_is_not_an_error() {
     assert!(o.out.starts_with("Nothing to undo"), "{}", o.out);
 }
 
+/// Exit code of `invalid_input`.
+fn none_code() -> i32 {
+    2
+}
+
 /// ANN-2.AC4: `annotate --suggest-redactions` / `--redact-emails` propose and apply nothing.
 #[tokio::test]
 async fn ann_2_ac4_annotate_suggest_redactions_is_read_only() {
@@ -457,6 +462,73 @@ async fn ann_2_ac4_annotate_suggest_redactions_is_read_only() {
     );
     assert!(human.out.contains("nothing applied"), "{}", human.out);
     assert!(!human.out.contains("jane.doe"), "{}", human.out);
+
+    // `--kinds`: comma and repeated forms reach the daemon as `kinds`.
+    let one = cli(
+        &r,
+        &[
+            "annotate",
+            &id,
+            "--suggest-redactions",
+            "--kinds",
+            "email",
+            "--json",
+        ],
+    )
+    .await;
+    assert_eq!(one.code, 0, "{}", one.err);
+    assert_eq!(one.json()["rects"].as_array().unwrap().len(), 2);
+    let comma = cli(
+        &r,
+        &[
+            "annotate",
+            &id,
+            "--suggest-redactions",
+            "--kinds",
+            "email,token",
+            "--json",
+        ],
+    )
+    .await;
+    assert_eq!(comma.code, 0, "{}", comma.err);
+    assert_eq!(comma.json()["rects"].as_array().unwrap().len(), 3);
+    let repeated = cli(
+        &r,
+        &[
+            "annotate",
+            &id,
+            "--suggest-redactions",
+            "--kinds",
+            "email",
+            "--kinds",
+            "token",
+            "--json",
+        ],
+    )
+    .await;
+    assert_eq!(repeated.code, 0, "{}", repeated.err);
+    assert_eq!(repeated.json()["rects"].as_array().unwrap().len(), 3);
+    // Unknown kind: the daemon's message, invalid_input.
+    let bad = cli(
+        &r,
+        &[
+            "annotate",
+            &id,
+            "--suggest-redactions",
+            "--kinds",
+            "email,nope",
+        ],
+    )
+    .await;
+    assert_ne!(bad.code, 0);
+    assert!(bad.err.contains("invalid_input"), "{}", bad.err);
+    assert!(bad.err.contains("kinds[1]: must be one of"), "{}", bad.err);
+    // `--kinds` alone is invalid input.
+    let alone = cli(&r, &["annotate", &id, "--kinds", "email"]).await;
+    assert_eq!(alone.code, none_code(), "{}", alone.err);
+    assert!(alone.err.contains("--suggest-redactions"), "{}", alone.err);
+    let with_ops = cli(&r, &["annotate", &id, "--ops", OPS, "--kinds", "email"]).await;
+    assert_eq!(with_ops.code, none_code(), "{}", with_ops.err);
 
     // Nothing was applied.
     let got = cli(&r, &["capture", "get", &id, "--json"]).await;

@@ -597,7 +597,7 @@ pub struct AnnotateArgs {
     #[arg(
         long,
         value_name = "JSON|FILE|-",
-        required_unless_present_any = ["suggest_redactions", "redact_emails"],
+        required_unless_present_any = ["suggest_redactions", "redact_emails", "kinds"],
         conflicts_with_all = ["suggest_redactions", "redact_emails"]
     )]
     pub ops: Option<String>,
@@ -621,6 +621,11 @@ pub struct AnnotateArgs {
     /// Like `--suggest-redactions`, but email addresses only.
     #[arg(long, conflicts_with = "suggest_redactions")]
     pub redact_emails: bool,
+    /// With `--suggest-redactions`: which kinds to look for, comma separated or repeated
+    /// (`--kinds email,token --kinds phone`). Default: every kind except `npi`, which is
+    /// off unless named. The daemon rejects unknown names.
+    #[arg(long, value_name = "KIND[,KIND...]", value_delimiter = ',')]
+    pub kinds: Vec<String>,
 }
 
 #[derive(Debug, Args)]

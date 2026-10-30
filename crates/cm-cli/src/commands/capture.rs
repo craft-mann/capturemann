@@ -293,8 +293,15 @@ pub(super) async fn get_capture(cx: &mut Ctx<'_>, a: GetArgs) -> Result<(), CliE
 
 /// `annotate <id> --suggest-redactions` / `--redact-emails` (ANN-2.AC4): read-only.
 async fn suggest_redactions(cx: &mut Ctx<'_>, a: AnnotateArgs) -> Result<(), CliError> {
+    if !a.kinds.is_empty() && !a.suggest_redactions {
+        return Err(CliError::invalid_input(
+            "--kinds needs --suggest-redactions (--redact-emails already means kinds=email)",
+        ));
+    }
     let params = if a.redact_emails {
         json!({ "capture_id": a.id, "kinds": ["email"] })
+    } else if !a.kinds.is_empty() {
+        json!({ "capture_id": a.id, "kinds": a.kinds })
     } else {
         json!({ "capture_id": a.id })
     };
@@ -332,7 +339,7 @@ async fn suggest_redactions(cx: &mut Ctx<'_>, a: AnnotateArgs) -> Result<(), Cli
 }
 
 pub(super) async fn annotate(cx: &mut Ctx<'_>, a: AnnotateArgs) -> Result<(), CliError> {
-    if a.suggest_redactions || a.redact_emails {
+    if a.suggest_redactions || a.redact_emails || !a.kinds.is_empty() {
         return suggest_redactions(cx, a).await;
     }
     let ops_arg = a.ops.as_deref().unwrap_or_default();
