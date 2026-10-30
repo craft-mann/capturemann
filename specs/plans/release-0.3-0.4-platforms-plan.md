@@ -99,11 +99,9 @@ matrix is published.
 ## Decisions needed from the maintainer
 
 Windows: **D-W1** hardware: **decided Oct 30, 2026**: the maintainer's ThinkPad (Windows 10 22H2, Intel Core i7-8665U 1.9 GHz, 32 GB RAM, Intel UHD 620 integrated graphics, built-in webcam and microphone) is the primary machine; no dedicated GPU is required (Media Foundation picks Quick Sync, AMD or NVENC itself). Before 0.3.0 is called stable add a second GPU vendor (AMD or NVIDIA, through beta testers or a rented cloud machine) and a Windows 11 check (VM or another PC); a self-hosted runner stays open;
-**D-W2** x64 only for 0.3.0 and ARM64 later?; **D-W3** installer format (NSIS, MSI, MSIX; per-user; portable zip);
-**D-W4** code-signing route and who holds the identity (Azure Artifact Signing, OV/EV certificate, SignPath
-Foundation, Microsoft Store, or unsigned beta with SHA-256 files; eligibility and costs to be checked);
-**D-W5** does 0.3.0 wait for Windows OCR, speakers and llama, or ship them in 0.3.x (lowest risk: capture,
-record, edit, export first); **D-W6** ship the CLI and MCP server for Windows and Linux ahead of the recorder?
+**D-W2** decided Oct 30, 2026: x64 only for 0.3.0, ARM64 later; **D-W3** decided Oct 30, 2026: per-user NSIS installer (no administrator rights, `asInvoker`) plus a portable zip; MSI and MSIX are not used;
+**D-W4** decided Oct 30, 2026: check SignPath Foundation eligibility early (in W0; it needs a public build pipeline and acceptance by the programme, to be confirmed), keep Azure Artifact Signing and an unsigned beta with SHA-256 files as fallbacks; who holds the identity is still open;
+**D-W5** decided Oct 30, 2026: 0.3.0 is capture, record, edit and export; Windows OCR, speaker finding and llama move to 0.3.x; **D-W6** decided Oct 30, 2026 for Windows: ship `capturemann` and `cm-mcp` early (about W0 plus W4), since they are headless; Linux to be decided in 0.4;
 Linux: **D-L1** primary channel (Flatpak first?) and who maintains AUR/Nix; **D-L2** Linux without a hardware
 H.264 encoder: refuse, or allow a royalty-free codec path (needs a patent read and a change to the constraint in
 `CLAUDE.md`); **D-L3** HUD visible in capture on Linux or only in the tray; **D-L4** Wayland-first and the
