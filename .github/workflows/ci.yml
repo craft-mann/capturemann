@@ -27,7 +27,7 @@ jobs:
         # Windows and Linux jobs start before any backend exists (platform plan, Step 0): they keep the
         # shared crates building and their fake-based tests passing on every OS. Hosted runners have no
         # screen permission, camera or microphone, so the hardware tests stay manual (verification/).
-        os: [macos-latest, windows-latest, ubuntu-22.04]
+        os: [macos-latest, windows-latest, ubuntu-24.04]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -45,6 +45,8 @@ jobs:
       - name: Install FFmpeg (Windows)
         if: runner.os == 'Windows'
         run: choco install ffmpeg --no-progress -y
+      # Ubuntu 24.04, not 22.04: the exporter needs FFmpeg 5.1+ (`-fps_mode`) and 22.04 ships 4.4. The shipped
+      # build bundles its own FFmpeg, so this only concerns the tests.
       # System libraries the GPUI shell and the capture crates link on Linux (assumed list: trim or extend
       # it from the first runs).
       - name: Install system libraries (Linux)
@@ -80,7 +82,7 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked --no-default-features -- -D warnings
       - name: Test (no sherpa)
         if: runner.os != 'macOS'
-        run: cargo test --workspace --locked --no-default-features
+        run: cargo test --workspace --locked --no-default-features --no-fail-fast
 
   # `rust-version` in Cargo.toml is a promise; this job keeps it. 1.95 is the oldest compiler the
   # GPUI dependency builds with (it uses `std::hint::cold_path`); 1.93 and older fail. `cargo +1.95`
