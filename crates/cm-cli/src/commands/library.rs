@@ -86,10 +86,10 @@ pub(super) async fn library_rename(
 
 /// `~`, `~/x` and relative paths made absolute (the daemon wants an absolute path).
 fn absolute_path(p: &str) -> Result<String, CliError> {
-    let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" });
+    let home = cm_platform::dirs::home_dir();
     let expanded = match (p, &home) {
-        ("~", Some(h)) => PathBuf::from(h),
-        (p, Some(h)) if p.starts_with("~/") => PathBuf::from(h).join(&p[2..]),
+        ("~", Some(h)) => h.clone(),
+        (p, Some(h)) if p.starts_with("~/") => h.join(&p[2..]),
         _ => PathBuf::from(p),
     };
     std::path::absolute(&expanded)

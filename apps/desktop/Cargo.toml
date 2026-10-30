@@ -21,6 +21,7 @@ sherpa = ["cm-daemon/sherpa", "cm-ai/sherpa"]
 [dependencies]
 log.workspace = true
 cm-core.workspace = true
+cm-platform.workspace = true
 cm-library.workspace = true
 # UI languages: tr!, the catalogues in locales/, locale-aware sizes and dates.
 cm-i18n.workspace = true

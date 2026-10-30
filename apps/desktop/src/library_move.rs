@@ -116,8 +116,7 @@ pub fn size_text(bytes: u64) -> String {
 
 /// The path as the row shows it: the home folder shortened to `~`.
 pub fn shown_path(path: &Path) -> String {
-    let home =
-        std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from);
+    let home = cm_platform::dirs::home_dir();
     display_path(path, home.as_deref())
 }
 

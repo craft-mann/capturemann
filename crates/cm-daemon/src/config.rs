@@ -28,48 +28,14 @@ pub const APP_DIR: &str = "CaptureMann";
 /// [`crate::engines::APP_ONLY_SETTINGS`]).
 pub const KEY_LIBRARY_PATH: &str = "library.path";
 
-fn home() -> Option<PathBuf> {
-    let var = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
-    std::env::var_os(var)
-        .filter(|v| !v.is_empty())
-        .map(PathBuf::from)
-}
-
-fn platform_config_dir() -> Option<PathBuf> {
-    #[cfg(target_os = "macos")]
-    {
-        home().map(|h| h.join("Library/Application Support"))
-    }
-    #[cfg(windows)]
-    {
-        std::env::var_os("APPDATA").map(PathBuf::from)
-    }
-    #[cfg(all(not(target_os = "macos"), not(windows)))]
-    {
-        std::env::var_os("XDG_CONFIG_HOME")
-            .filter(|v| !v.is_empty())
-            .map(PathBuf::from)
-            .or_else(|| home().map(|h| h.join(".config")))
-    }
-}
-
-fn platform_video_dir() -> Option<PathBuf> {
-    #[cfg(target_os = "macos")]
-    {
-        home().map(|h| h.join("Movies"))
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        home().map(|h| h.join("Videos"))
-    }
-}
+use cm_platform::dirs::{config_base_dir, home_dir, video_dir};
 
 /// The app's config folder (see the module docs).
 pub fn config_dir() -> PathBuf {
     std::env::var_os("CAPTUREMANN_CONFIG_DIR")
         .filter(|v| !v.is_empty())
         .map(PathBuf::from)
-        .or_else(|| platform_config_dir().map(|d| d.join(APP_DIR)))
+        .or_else(|| config_base_dir().map(|d| d.join(APP_DIR)))
         .unwrap_or_else(|| std::env::temp_dir().join(APP_DIR))
 }
 
@@ -111,7 +77,7 @@ pub fn default_library_path() -> Option<PathBuf> {
     resolve_library_path(
         std::env::var_os("CAPTUREMANN_LIBRARY").map(PathBuf::from),
         &settings,
-        default_library_dir(platform_video_dir(), home()),
+        default_library_dir(video_dir(), home_dir()),
     )
 }
 

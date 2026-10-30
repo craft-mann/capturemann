@@ -340,8 +340,8 @@ fn last_recording_of(dir: &Path) -> Vec<String> {
 
 /// The last redaction pass over finished text.
 fn final_pass(s: &str) -> String {
-    let home = std::env::var(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-        .ok()
+    let home = cm_platform::dirs::home_dir()
+        .and_then(|h| h.to_str().map(str::to_owned))
         .filter(|h| h.len() > 1);
     redact_home(&cm_jobs::scrub_secrets(s), home.as_deref())
 }

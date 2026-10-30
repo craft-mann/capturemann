@@ -21,6 +21,7 @@ sherpa = ["cm-ai/sherpa"]
 [dependencies]
 log.workspace = true
 cm-core.workspace = true
+cm-platform.workspace = true
 cm-ipc.workspace = true
 cm-library.workspace = true
 cm-capture.workspace = true
