@@ -1,0 +1,21 @@
+[package]
+name = "cm-platform"
+description = "The few OS-specific primitives the headless crates share (host clock, memory probes, folders, sleep inhibitor); every other crate stays free of target_os"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+# The version cm-cursor and cm-capture use.
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Performance"] }

@@ -40,6 +40,7 @@ cm-jobs = { path = "crates/cm-jobs" }
 cm-library = { path = "crates/cm-library" }
 cm-mcp = { path = "crates/cm-mcp" }
 cm-media = { path = "crates/cm-media" }
+cm-platform = { path = "crates/cm-platform" }
 cm-publish = { path = "crates/cm-publish" }
 cm-render = { path = "crates/cm-render" }
 cm-storage = { path = "crates/cm-storage" }

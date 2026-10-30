@@ -1304,6 +1304,7 @@ dependencies = [
 name = "cm-core"
 version = "0.2.5"
 dependencies = [
+ "cm-platform",
  "hound",
  "libc",
  "log",
@@ -1536,6 +1537,14 @@ dependencies = [
  "tokio",
  "windows-sys 0.59.0",
  "winit",
+]
+
+[[package]]
+name = "cm-platform"
+version = "0.2.5"
+dependencies = [
+ "libc",
+ "windows 0.61.3",
 ]
 
 [[package]]
