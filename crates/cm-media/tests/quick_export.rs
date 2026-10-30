@@ -389,7 +389,19 @@ fn exp1_ac3_output_passes_ffprobe_checks() {
     // Entry fields and the encoder used.
     let e = o.to_entry("2026-10-21T10:00:00Z");
     assert_eq!(e["preset"], "quick");
-    assert!(e["encoder"] == "h264_videotoolbox" || e["encoder"] == "libx264");
+    assert!(
+        [
+            "h264_videotoolbox",
+            "libx264",
+            "h264_mf",
+            "h264_nvenc",
+            "h264_qsv",
+            "h264_amf"
+        ]
+        .contains(&e["encoder"].as_str().unwrap_or_default()),
+        "{}",
+        e["encoder"]
+    );
     assert_eq!(e["settings"]["video"]["profile"], "high");
     assert_eq!(e["settings"]["audio"]["channels"], 2);
     assert_eq!(e["settings"]["audio"]["loudness_normalization"], false);
@@ -608,6 +620,7 @@ fn exp4_ac4_cancel_deletes_partial_output() {
     m["tracks"]["screen"]["source_size"] = json!([1920, 1080]);
     let started = std::time::Instant::now();
     let flag = AtomicBool::new(false);
+    let first_poll = std::sync::OnceLock::new();
     let r = export_quick(
         &t,
         &QuickRequest {
@@ -621,6 +634,7 @@ fn exp4_ac4_cancel_deletes_partial_output() {
         },
         &mut |_| {},
         &|| {
+            first_poll.get_or_init(|| started.elapsed());
             if started.elapsed() > std::time::Duration::from_millis(700) {
                 flag.store(true, Ordering::SeqCst);
             }
@@ -632,7 +646,12 @@ fn exp4_ac4_cancel_deletes_partial_output() {
         "{:?}",
         r.map(|o| o.file)
     );
-    assert!(started.elapsed() < std::time::Duration::from_secs(20));
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(20),
+        "cancel took {:?} in all; the first cancel poll came after {:?}",
+        started.elapsed(),
+        first_poll.get()
+    );
     let left: Vec<PathBuf> = std::fs::read_dir(f.path().join("exports"))
         .map(|d| d.filter_map(Result::ok).map(|e| e.path()).collect())
         .unwrap_or_default();

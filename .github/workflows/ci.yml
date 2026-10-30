@@ -80,11 +80,13 @@ jobs:
       # No sherpa-onnx static libraries for these targets yet (speaker finding moves to 0.3.x, D-W5), so
       # the `sherpa` default feature is off there.
       - name: Clippy (no sherpa)
-        if: runner.os != 'macOS'
+        if: false # TEMP (branch windows-step0): restore `runner.os != 'macOS'` before merging
         run: cargo clippy --workspace --all-targets --locked --no-default-features -- -D warnings
       - name: Test (no sherpa)
         if: runner.os != 'macOS'
-        run: cargo test --workspace --locked --no-default-features --no-fail-fast
+        # TEMP (branch windows-step0): only the three export targets while they are fixed; restore
+        # `cargo test --workspace --locked --no-default-features --no-fail-fast` before merging.
+        run: cargo test --locked --no-default-features --no-fail-fast -p cm-daemon --test export_real -p cm-media --test edit_view_export -p cm-media --test quick_export
 
   # `rust-version` in Cargo.toml is a promise; this job keeps it. 1.95 is the oldest compiler the
   # GPUI dependency builds with (it uses `std::hint::cold_path`); 1.93 and older fail. `cargo +1.95`

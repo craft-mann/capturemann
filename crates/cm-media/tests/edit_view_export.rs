@@ -192,13 +192,15 @@ fn edt4_ac2_a_zoom_region_crops_the_export_and_ends_with_the_ease() {
     let blue_at = (0..1280).find(|&x| near(zoomed.get_pixel(x, 360), BLUE, 40));
     assert!(
         blue_at.is_none(),
-        "the blue third is out of view; blue-ish pixel at x={blue_at:?}: {:?}; encoder {}; row: {:?}",
+        "the blue third is out of view; blue-ish pixel at x={blue_at:?}: {:?}; encoder {}; row: {:?}; left edge (x 0..12) at rows 100, 360, 600: {:?}",
         blue_at.map(|x| zoomed.get_pixel(x, 360).0),
         o.encoder,
         (0..1280)
             .step_by(80)
             .map(|x| (x, zoomed.get_pixel(x, 360).0))
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>(),
+        [100u32, 360, 600]
+            .map(|y| (0..12).map(|x| zoomed.get_pixel(x, y).0).collect::<Vec<_>>())
     );
 
     let after = at(2.8);
