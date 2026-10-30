@@ -16,6 +16,8 @@ The app also records these timings for the last run of each kind: Settings, Abou
 | Find speakers, count known | about 20x real time, 88 min in 217 s (was 275 s with 4 threads); 1.1 GB |
 | Find speakers, count unknown | 540 s for 88 min (see below) |
 
+Reports (measured, no fix needed): `summary` 9 s (11 min), 67 s (1 h), 178 s (2.5 h); `minutes` 22 s, 128 s, 362 s; `llama-server` peak 3.2 to 5.0 GB; 1, 4 and 9 pieces.
+
 ## Done in 0.2.4
 
 1. **Speaker finding starts with the automatic transcription** instead of after it. They run side by side: 11 min 52.6 s to 37 s, 88 min 587 s to 483 s, same transcript text. The transcript itself arrives 20 % later in that case.
@@ -29,7 +31,8 @@ Ranked by what a user would notice.
 2. **Memory of speaker finding grows with length**: 0.6 GB at 10 min, 1.2 GB at 60, 3.5 GB at 150. Windowed runs would cap it and let Cancel work (the library ignores a stop until the run ends).
 3. **Repeat re-runs**: the 88 min Turbo run made 29 Whisper calls for 17 pieces because looping pieces are split and run again. The cost of those second runs is not measured.
 4. **Speed of the window overlap**: `window_shift_ratio` 0.1 is the main cost of speaker finding; larger values are 2x to 6x faster but changed the answers (see the stored report). Needs the threshold retuned on more than 14 clips.
-5. Reports, translation, export, app start, library and editor open: not measured yet.
+5. **Translation can fail on a long input, and loses what it did.** With the built-in text model (Gemma 4 E2B, English to Vietnamese) an 11-minute recording translated in 72 s, but two longer stand-in transcripts (1 h and 2.5 h, the 11-minute text repeated) stopped with `output_too_long` at 79 % and 31 %, after about 7 minutes, with no partial result kept. One reply hit the 4,096-token limit after a 562-token prompt, likely the model repeating itself; the stand-in text may have caused it, so it is **not established** for real long transcripts. Reports meet the same error and split the piece; translation does not. Next: translate a real long transcript, then split on that error and keep finished batches. Numbers: [`text-model-report-translation-m4pro-2026-10-30.md`](../../verification/benchmarks/text-model-report-translation-m4pro-2026-10-30.md).
+6. Export, app start, library and editor open: not measured yet.
 
 ## Rejected
 
