@@ -168,7 +168,8 @@ mod tests {
     /// Takes the real OS assertion for a moment: nothing is recorded, nothing is shown.
     #[test]
     fn the_guard_is_taken_and_released() {
-        let g = prevent_idle_sleep("CaptureMann test").expect("a power request");
-        drop(g);
+        {
+            let _guard = prevent_idle_sleep("CaptureMann test").expect("a power request");
+        }
     }
 }
