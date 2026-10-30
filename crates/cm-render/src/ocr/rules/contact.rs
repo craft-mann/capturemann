@@ -119,8 +119,11 @@ pub fn find_phones(c: &[char]) -> Vec<Span> {
     while i < c.len() {
         let starts = c[i].is_ascii_digit() || c[i] == '+' || c[i] == '(';
         // Not the tail of a longer number or date ("2026-10-23 1415 5550").
-        let before_ok =
-            i == 0 || !(c[i - 1].is_ascii_alphanumeric() || matches!(c[i - 1], '-' | '.' | '/'));
+        // Nor the tail of a longer run of digit groups ("9400 0064 5377 9579 8607 53").
+        let continues_groups = i >= 2 && c[i - 1] == ' ' && c[i - 2].is_ascii_digit();
+        let before_ok = !continues_groups
+            && (i == 0
+                || !(c[i - 1].is_ascii_alphanumeric() || matches!(c[i - 1], '-' | '.' | '/')));
         if !(starts && before_ok) {
             i += 1;
             continue;

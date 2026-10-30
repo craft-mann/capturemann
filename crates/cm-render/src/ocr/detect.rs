@@ -287,16 +287,22 @@ fn scan_page(lines: &[TextLine], opts: &SuggestOptions) -> Vec<RedactionSuggesti
         if !entry.kinds.iter().any(|&k| opts.wants(k)) {
             continue;
         }
-        // A page rule sees more than a line rule does (a whole key block, a card beside its
-        // expiry), so its spans replace the line-rule spans they overlap.
+        // A page rule sees more than a line rule does (a whole key block), so a page span that
+        // fully covers line-rule spans replaces them; one that only partly overlaps a kept span
+        // is dropped (an expiry-like number inside an IBAN must not cut the IBAN short).
         for l in (entry.run)(&flats, &located.clone()) {
-            if opts.wants(l.span.kind) && l.line < flats.len() {
-                located.retain(|t| {
-                    !(t.line == l.line
-                        && t.span.kind != l.span.kind
-                        && l.span.start < t.span.end
-                        && t.span.start < l.span.end)
-                });
+            if !opts.wants(l.span.kind) || l.line >= flats.len() {
+                continue;
+            }
+            let overlaps = |t: &Located| {
+                t.line == l.line && l.span.start < t.span.end && t.span.start < l.span.end
+            };
+            let covers_all = located
+                .iter()
+                .filter(|t| overlaps(t))
+                .all(|t| l.span.start <= t.span.start && t.span.end <= l.span.end);
+            if covers_all {
+                located.retain(|t| !overlaps(t));
                 keep(l, &mut located);
             }
         }
@@ -507,5 +513,35 @@ mod tests {
             assert_eq!(RedactionKind::parse(k.as_str()), Some(k));
         }
         assert_eq!(RedactionKind::parse("face"), None);
+    }
+
+    /// Lessons of the first benchmark run (see verification/benchmarks).
+    #[test]
+    fn long_digit_groups_masks_placeholders_and_compound_names() {
+        // A 22-digit tracking number is neither a phone nor a card.
+        assert!(run(&["9400 0064 5377 9579 8607 53"]).is_empty());
+        assert!(run(&["9400 4799 9287 2044 1624 10"]).is_empty());
+        // Broadcast and null MAC addresses name no device.
+        assert!(run(&["ff:ff:ff:ff:ff:ff", "00:00:00:00:00:00"]).is_empty());
+        // Words are placeholders, a compound name still marks a secret value.
+        assert!(run(&[
+            "DB_PASSWORD=changeme",
+            "token: REPLACE_ME",
+            "key=your_api_key_here"
+        ])
+        .is_empty());
+        let r = run(&["PGPASSWORD=NI0Mnndj9QqlRZBasR3XUn"]);
+        assert_eq!(r.len(), 1, "{r:?}");
+        assert_eq!(r[0].kind, RedactionKind::SecretAssignment);
+        // A page span that only partly overlaps a kept span does not cut it short.
+        let r = run(&[
+            "4111 1111 1111 1111",
+            "IBAN: FR80 0221 9537 5129 4596 1444 211",
+        ]);
+        assert!(
+            r.iter()
+                .any(|s| s.kind == RedactionKind::Iban && s.rect.w > 300.0),
+            "{r:?}"
+        );
     }
 }

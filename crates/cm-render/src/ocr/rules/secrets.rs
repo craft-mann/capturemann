@@ -377,6 +377,23 @@ fn name_parts(name: &[char]) -> Vec<String> {
     parts
 }
 
+/// Words a compound name may end with without a separator (`PGPASSWORD`, `dbpassword`,
+/// `clientsecret`). Short or ambiguous words (`auth`, `pwd`) are left out on purpose.
+const COMPOUND_SUFFIXES: &[&str] = &[
+    "password",
+    "passwd",
+    "passphrase",
+    "secret",
+    "token",
+    "apikey",
+];
+
+fn ends_with_secret_word(part: &str) -> bool {
+    COMPOUND_SUFFIXES
+        .iter()
+        .any(|w| part.len() > w.len() && part.ends_with(w))
+}
+
 fn is_secret_name(name: &[char]) -> bool {
     let parts = name_parts(name);
     if parts
@@ -387,7 +404,7 @@ fn is_secret_name(name: &[char]) -> bool {
     }
     parts
         .iter()
-        .any(|p| SECRET_NAME_PARTS.contains(&p.as_str()))
+        .any(|p| SECRET_NAME_PARTS.contains(&p.as_str()) || ends_with_secret_word(p))
         || parts
             .windows(2)
             .any(|w| SECRET_NAME_PARTS.contains(&format!("{}{}", w[0], w[1]).as_str()))
@@ -401,6 +418,7 @@ fn is_name_char(ch: char) -> bool {
 fn is_placeholder(v: &[char]) -> bool {
     let s: String = v.iter().collect();
     s.chars().all(|c| "*xX.•·#_-?".contains(c))
+        || is_word_like(&s)
         || (s.starts_with('<') && s.ends_with('>'))
         || s.starts_with("${")
         || s.starts_with("{{")
@@ -408,6 +426,27 @@ fn is_placeholder(v: &[char]) -> bool {
         || (s.starts_with('%') && s.ends_with('%'))
         || ["null", "none", "nil", "true", "false", "undefined"]
             .contains(&s.to_ascii_lowercase().as_str())
+}
+
+/// Letters only, in words (split at `_ - .`), each word all lower case, all upper case or
+/// Capitalized: a phrase such as `changeme`, `REPLACE_ME` or `your_api_key_here`, not a random
+/// secret (those have digits or irregular case). A structural test, not a list of words.
+fn is_word_like(s: &str) -> bool {
+    let mut any = false;
+    for seg in s.split(['_', '-', '.']).filter(|g| !g.is_empty()) {
+        any = true;
+        if !seg.chars().all(|c| c.is_ascii_alphabetic()) {
+            return false;
+        }
+        let upper = seg.chars().filter(char::is_ascii_uppercase).count();
+        let regular = upper == 0
+            || upper == seg.len()
+            || (upper == 1 && seg.chars().next().is_some_and(|c| c.is_ascii_uppercase()));
+        if !regular {
+            return false;
+        }
+    }
+    any
 }
 
 const MIN_VALUE: usize = 4;
@@ -869,7 +908,7 @@ mod tests {
             (r#"apiKey = "abc 123 def""#, "abc 123 def"),
             ("config.auth.token = 'zz99yy88'", "zz99yy88"),
             ("secretKey: 'qwe123rty'", "qwe123rty"),
-            ("MY_APP_PASSWD=letmein", "letmein"),
+            ("MY_APP_PASSWD=letmein7", "letmein7"),
             (
                 "Authorization: Basic dXNlcjpwYXNzd29yZA==",
                 "dXNlcjpwYXNzd29yZA==",

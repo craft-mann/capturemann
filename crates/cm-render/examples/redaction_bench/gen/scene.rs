@@ -417,36 +417,30 @@ impl<'f> Ctx<'f> {
         kind: &'static str,
     ) -> f32 {
         let lh = px * 1.45;
-        let mut union: Option<[f64; 4]> = None;
+        let mut rects: Vec<[f64; 4]> = Vec::new();
         let mut yy = y;
         for l in lines {
             if let Some(pl) = self.line(x, yy, px, color, &[p(l.as_str())]) {
-                union = Some(match union {
-                    None => pl.rect,
-                    Some(u) => {
-                        let x0 = u[0].min(pl.rect[0]);
-                        let y0 = u[1].min(pl.rect[1]);
-                        let x1 = (u[0] + u[2]).max(pl.rect[0] + pl.rect[2]);
-                        let y1 = (u[1] + u[3]).max(pl.rect[1] + pl.rect[3]);
-                        [x0, y0, x1 - x0, y1 - y0]
-                    }
-                });
+                rects.push(pl.rect);
             }
             yy += lh;
         }
-        // Only a block that was drawn completely counts.
+        // Only a block that was drawn completely counts. Each line is its own truth: the
+        // detector proposes one rectangle per line, and the lines are what gets blurred.
         let drawn = self.lines.len() >= lines.len()
             && self.lines[self.lines.len() - lines.len()..]
                 .iter()
                 .zip(lines)
                 .all(|(a, b)| &a.text == b);
-        if let (Some(r), true) = (union, drawn) {
-            self.truths.push(Truth {
-                kind: kind.to_string(),
-                text: lines.join("\n"),
-                rect: r,
-                standards: data::standards(kind),
-            });
+        if drawn && rects.len() == lines.len() {
+            for (r, l) in rects.into_iter().zip(lines) {
+                self.truths.push(Truth {
+                    kind: kind.to_string(),
+                    text: l.clone(),
+                    rect: r,
+                    standards: data::standards(kind),
+                });
+            }
         }
         yy
     }
@@ -493,7 +487,6 @@ impl<'f> Ctx<'f> {
             "phone" => data::phone(r, vi),
             "email" => data::email(r),
             "token" => data::token(r),
-            "url_secret" => data::url_secret(r),
             _ => data::ssn(r),
         }
     }
@@ -516,6 +509,13 @@ impl<'f> Ctx<'f> {
             self.rng.pick(&usable)
         };
         if self.positive && usable.contains(&kind) && self.rng.chance(0.75) {
+            if kind == "url_secret" {
+                let (pre, secret, post) = data::url_secret(&mut self.rng);
+                if pre.chars().count() + secret.chars().count() + post.chars().count() <= max_chars
+                {
+                    return vec![p(pre), t(kind, secret), p(post)];
+                }
+            }
             for _ in 0..8 {
                 let s = self.truth_text(kind);
                 if s.chars().count() <= max_chars {

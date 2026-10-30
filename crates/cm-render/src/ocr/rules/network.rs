@@ -181,7 +181,11 @@ pub fn find_macs(c: &[char]) -> Vec<Span> {
             let more = c.get(i + len).is_some_and(|n| {
                 n.is_ascii_alphanumeric() || (matches!(n, ':' | '-' | '.') && hex_at(i + len + 1))
             });
-            if !more {
+            // All pairs the same (ff:ff:ff:ff:ff:ff broadcast, 00:00:... null) names no device.
+            let mut digits = c[i..i + len].iter().filter(|x| x.is_ascii_hexdigit());
+            let first = digits.next().map(char::to_ascii_lowercase);
+            let uniform = digits.all(|x| Some(x.to_ascii_lowercase()) == first);
+            if !more && !uniform {
                 out.push(Span {
                     start: i,
                     end: i + len,

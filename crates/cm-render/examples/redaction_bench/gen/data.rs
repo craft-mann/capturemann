@@ -751,27 +751,36 @@ pub fn secret_pair(rng: &mut Rng, json: bool) -> (String, String) {
     (name, rng.chars(n, alpha))
 }
 
-pub fn url_secret(rng: &mut Rng) -> String {
+/// A URL that carries a secret, in three pieces: before the secret, the secret itself (the
+/// password or token value: what the detector must cover) and after it.
+pub fn url_secret(rng: &mut Rng) -> (String, String, String) {
     let sub = rng.pick(&["api", "db", "files", "git", "cdn"]);
     match rng.below(4) {
-        0 => format!(
-            "https://{}:{}@{sub}.example.com/{}",
-            rng.pick(&["deploy", "admin", "svc", "ci"]),
+        0 => (
+            format!("https://{}:", rng.pick(&["deploy", "admin", "svc", "ci"])),
             rng.chars(12, ALNUM),
-            rng.pick(&["repo.git", "v2/export", "backup"])
+            format!(
+                "@{sub}.example.com/{}",
+                rng.pick(&["repo.git", "v2/export", "backup"])
+            ),
         ),
-        1 => format!(
-            "https://{sub}.example.com/v1/export?access_token={}",
-            rng.chars(24, ALNUM)
+        1 => (
+            format!("https://{sub}.example.com/v1/export?access_token="),
+            rng.chars(24, ALNUM),
+            String::new(),
         ),
-        2 => format!(
-            "https://{sub}.example.org/hook?api_key={}&format=json",
-            rng.chars(20, LOWNUM)
+        2 => (
+            format!("https://{sub}.example.org/hook?api_key="),
+            rng.chars(20, LOWNUM),
+            "&format=json".to_string(),
         ),
-        _ => format!(
-            "postgres://{}:{}@db.example.com:5432/app",
-            rng.pick(&["app", "postgres", "reporting"]),
-            rng.chars(14, ALNUM)
+        _ => (
+            format!(
+                "postgres://{}:",
+                rng.pick(&["app", "postgres", "reporting"])
+            ),
+            rng.chars(14, ALNUM),
+            "@db.example.com:5432/app".to_string(),
         ),
     }
 }

@@ -147,6 +147,13 @@ pub fn find_cards(c: &[char]) -> Vec<Span> {
                     continue;
                 }
                 let d = digits_of(c, &groups[a..=b]);
+                // Inside a longer chain of digit groups (a 22-digit tracking number) only a
+                // card at the start followed by at most four short groups (expiry and code) counts.
+                let left: usize = groups[i..a].iter().map(|g| g.1 - g.0).sum();
+                let right = j - b;
+                if left > 0 || right > 4 {
+                    continue;
+                }
                 if known_issuer(&d) && luhn_ok(&d) {
                     found = Some((b, s, e));
                     break;
