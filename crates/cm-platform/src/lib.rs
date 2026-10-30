@@ -4,6 +4,7 @@
 //! platform module (a CI check enforces it); everything else is written once for all systems.
 //! This crate has no dependency on another CaptureMann crate, so `cm-core` can use it.
 
+pub mod autostart;
 pub mod clock;
 pub mod dirs;
 pub mod memory;
