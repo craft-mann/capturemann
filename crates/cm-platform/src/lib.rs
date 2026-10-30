@@ -7,3 +7,4 @@
 pub mod clock;
 pub mod dirs;
 pub mod memory;
+pub mod sleep;
