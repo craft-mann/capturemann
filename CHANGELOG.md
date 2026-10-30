@@ -5,6 +5,31 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-10-30
+
+0.2.4 is about finding out where time goes and making problems easier to report. Two speed changes, a log file with a Copy diagnostics button, and measured numbers for the speech, speaker and text models.
+
+### Fixed
+
+- **Intel Macs: a track that throws no longer aborts the app** (GitHub issue 16, second report: 0.2.3 still crashed). The 0.2.3 catch covered the encoder set-up only; the crash report shows the abort in another thread that `RecordingSession` starts, with a macOS exception unwinding out of it. Every call into a track (start, pause, resume, stop) now runs inside an Objective-C exception catch: an optional track that throws is dropped with a warning and the recording goes on, a required one fails the start cleanly. The track that threw is named in the log.
+- **Encoder rejects the display size: record smaller instead of failing.** When the hardware encoder rejects the full size with every codec and setting, the recorder now tries 2160p, 1440p and 1080p heights of the same shape (at most three) and the capture is configured for the size that works. The manifest keeps the size asked for in `downscaled_from`. The reasons the encoder gave go to the log file (they went only to standard error, which nobody sees when the app starts from Finder).
+
+### Added
+
+- **Diagnostics.** Each process (the app, the daemon, the overlay) writes a log file in `<config>/logs` (3 files of 2 MB, oldest dropped). Bearer tokens, recording names, transcript text and the home folder are left out (paths start with `~`), a panic is written with its backtrace, and a start that follows a crash logs "did not exit cleanly" once. **Settings, About, Diagnostics, Copy diagnostics** puts a text report on the clipboard: versions, system, permissions, models, a few settings, library counts, the last warnings and the last runs with their time and peak memory. The same text comes from the new MCP tool `get_diagnostics` (tool 74, read-only) and `capturemann diagnostics`. Nothing is sent anywhere. Not yet checked by hand (`tests/manual/DIAG-1.md`).
+- **A benchmark harness**: phase timers and peak memory in the app's own work, the `cm-ai` `perf` example and `tests/tools/perf_matrix.py` (one process per configuration, waits for a quiet machine). Two reports in `verification/benchmarks/`: speech and speaker finding on an Apple M4 Pro (three models, thread counts, 1 to 88 minutes), and reports and translation with the built-in text model (11 minutes to 2.5 hours). The notes, the ranked list of what was not done and what was rejected are in `docs/project/performance.md`. None of it ships in the app.
+
+### Changed
+
+- **Speaker finding starts with the automatic transcription** instead of after it, and the two run side by side. An 11-minute recording takes 37 s for both instead of 52.6 s, an 88-minute one 483 s instead of 587 s, with the same transcript text. The transcript itself arrives about 20 % later while both run (11 min: 24.6 s to about 30 s; 88 min: 370 s to 458 s). Turn Auto speakers off to get the old timing.
+- **Speaker finding uses up to 8 threads on Apple Silicon** (the number of performance cores) instead of 4: 17 to 21 % faster, identical speaker turns (11 minutes: 33.9 s to 28.0 s). Other computers keep `min(4, cores)`.
+
+### Known limitations
+
+- Translation with the built-in text model stopped with `output_too_long` on two repeated-text stand-ins of 1 and 2.5 hours and kept nothing; a real 88-minute recording translated fine. Reports split a piece on that error, translation does not yet. See `docs/project/performance.md`.
+- Export, app start and library timings, and a repeat of every row three times, are not measured yet. The numbers come from one Mac.
+- The speaker count with an unknown number of people can run the engine twice on very long recordings (88 minutes: 265 s plus 263 s). Memory of speaker finding grows with length (1.2 GB at 1 hour, 3.5 GB at 2.5 hours).
+
 ## [0.2.3] - 2026-10-29
 
 0.2.3 is about speaker detection, plus the Intel Mac recording crash and the fixes found while testing 0.2.2.

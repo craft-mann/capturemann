@@ -34,8 +34,9 @@ pub use encoder::{
 };
 pub use fmp4::{scan_bytes, scan_file, truncate_to_last_fragment, Fragment, Mp4Scan};
 pub use settings::{
-    bitrate_bps, disk_mb_per_minute, output_dimensions, plan_video, resolve_codec, Codec,
-    CodecChoice, OutputSize, Quality, VideoPlan, VideoSettings, FRAGMENT_SECS, MAX_H264_WIDTH,
+    bitrate_bps, disk_mb_per_minute, output_dimensions, plan_video, resolve_codec, smaller_plans,
+    Codec, CodecChoice, OutputSize, Quality, VideoPlan, VideoSettings, FRAGMENT_SECS,
+    MAX_H264_WIDTH,
 };
 pub use writer::{
     FragmentRecord, FragmentedMp4Writer, WriterHalt, WriterOptions, WriterSummary, QUEUE_SEGMENTS,

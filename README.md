@@ -25,12 +25,12 @@ through MCP and a CLI.
   <img alt="The CaptureMann library: recordings, audio and screenshots in one place, with a record button, region, window and display capture, and the AI and agent pages in the sidebar" src="docs/images/library.webp" width="900">
 </p>
 
-> **Status: 0.2.3 (macOS 13+, Apple Silicon and Intel).** Windows, then Linux follow. Most results are
+> **Status: 0.2.4 (macOS 13+, Apple Silicon and Intel).** Windows, then Linux follow. Most results are
 > tested with scripted fakes, plus the maintainer's own use on one Mac; there are few stored hardware
 > reports. **Speaker labels** are measured on public English conversation clips only (diarization error
 > 17 % on clips held back, [report](verification/benchmarks/speaker-detection-2026-10-29.md)); Vietnamese
 > is not measured yet. **Intel:** the build installs, opens and asks for permissions on a real Intel Mac, but
-> starting a recording crashed one (issue 16); 0.2.3 has a fix that is not confirmed yet. What is still
+> starting a recording crashed one (issue 16); 0.2.3 and later have a fix that is not confirmed yet. What is still
 > unverified is tracked in [`specs/04-delivery-plan.md`](specs/04-delivery-plan.md) under "Verification
 > debt" and in [`docs/project/status.md`](docs/project/status.md).
 
@@ -60,7 +60,7 @@ through MCP and a CLI.
   `llama-server`; no cloud and no account. The picture below shows a report with sample data.
 - **Library** of self-contained capture bundles, stored in a folder you choose.
 - **Share**: save to local folders or Google Drive, publish to YouTube (private by default).
-- **For agents**: 73 MCP tools plus resources and prompts, and an identical `capturemann` CLI. Risky
+- **For agents**: 74 MCP tools plus resources and prompts, and an identical `capturemann` CLI. Risky
   actions (start recording, publish, delete) need an on-screen confirmation.
 - **Private by design**: no telemetry, and no network traffic unless you connect a destination or
   download a model. You bring your own Google credentials; secrets live in the macOS Keychain.

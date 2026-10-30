@@ -17,6 +17,7 @@ workspace = true
 cm-core.workspace = true
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+log.workspace = true
 
 # macOS: AVAssetWriter (VideoToolbox) fed with IOSurface-backed CMSampleBuffers, plain objc2
 # bindings, no Swift bridge. The versions spike S6 proved. All MIT (dispatch2: Zlib OR Apache-2.0

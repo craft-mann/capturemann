@@ -81,6 +81,7 @@ use serde::Serialize;
 use serde_json::{json, Map, Value};
 use time::OffsetDateTime;
 
+use super::guard;
 use super::tracks::{NoteLevel, SessionTrack, TrackNote};
 
 /// Where and how a session records.
@@ -431,7 +432,8 @@ impl RecordingSession {
                     let ctx = ctx.clone();
                     s.spawn(move || {
                         let t0 = Instant::now();
-                        let r = slot.track.start(ctx);
+                        let kind = slot.track.kind();
+                        let r = guard::call(&format!("{kind:?} start"), || slot.track.start(ctx));
                         (r, t0.elapsed().as_secs_f64() * 1e3)
                     })
                 })
@@ -467,7 +469,7 @@ impl RecordingSession {
         if let Some(pos) = failed_required {
             for (i, slot) in slots.iter_mut().enumerate() {
                 if results[i].0.is_ok() {
-                    let _ = slot.track.stop(live_at);
+                    let _ = guard::call("stop", || slot.track.stop(live_at));
                 }
             }
             drop(bundle);
@@ -545,7 +547,7 @@ impl RecordingSession {
         if let Err(e) = meta {
             let at = clock.now();
             for slot in slots.iter_mut().filter(|s| s.state == TrackState::Running) {
-                let _ = slot.track.stop(at);
+                let _ = guard::call("stop", || slot.track.stop(at));
             }
             drop(bundle);
             let _ = fs::remove_dir_all(&dir);
@@ -936,7 +938,7 @@ impl RecordingSession {
             .iter_mut()
             .filter(|s| s.state == TrackState::Running)
         {
-            if let Err(e) = slot.track.pause(at) {
+            if let Err(e) = guard::call("pause", || slot.track.pause(at)) {
                 let kind = slot.track.kind();
                 if slot.track.required() {
                     fatal.get_or_insert(e);
@@ -976,7 +978,7 @@ impl RecordingSession {
             .iter_mut()
             .filter(|s| s.state == TrackState::Running)
         {
-            if let Err(e) = slot.track.resume(at) {
+            if let Err(e) = guard::call("resume", || slot.track.resume(at)) {
                 let kind = slot.track.kind();
                 if slot.track.required() {
                     fatal.get_or_insert(e);
@@ -1037,7 +1039,7 @@ impl RecordingSession {
                 .iter_mut()
                 .map(|slot| {
                     let running = slot.state == TrackState::Running;
-                    s.spawn(move || running.then(|| slot.track.stop(at)))
+                    s.spawn(move || running.then(|| guard::call("stop", || slot.track.stop(at))))
                 })
                 .collect();
             handles
@@ -1207,7 +1209,7 @@ impl RecordingSession {
         let at = self.clock.now();
         for slot in &mut self.slots {
             if slot.state == TrackState::Running {
-                let _ = slot.track.stop(at);
+                let _ = guard::call("stop", || slot.track.stop(at));
             }
         }
         self.state = SessionState::Stopped;

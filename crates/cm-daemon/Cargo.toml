@@ -52,7 +52,8 @@ image = { workspace = true, features = ["png", "jpeg"] }
 # macOS: `delete_capture` moves a bundle to the Trash with NSFileManager. Same objc2 family and
 # versions the capture and camera crates already use (MIT / Zlib / Apache-2.0).
 [target.'cfg(target_os = "macos")'.dependencies]
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSFileManager", "NSURL", "NSString", "NSError"] }
+objc2 = { workspace = true, features = ["exception"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSFileManager", "NSURL", "NSString", "NSError", "NSException"] }
 
 [dev-dependencies]
 # The fake Drive server for the cloud upload tests.

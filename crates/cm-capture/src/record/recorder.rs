@@ -14,7 +14,7 @@ use cm_core::{
     CmError, MediaTime, SessionClock, TrackContext, TrackInfo, TrackKind, TrackRecorder,
     TrackStats, TICKS_PER_SECOND,
 };
-use cm_encode::{EncoderConfig, VideoEncoder};
+use cm_encode::{is_hardware_encoder_unavailable, smaller_plans, EncoderConfig, VideoEncoder};
 use serde::Serialize;
 use serde_json::json;
 
@@ -226,6 +226,8 @@ pub struct ScreenRecorder<S: ScreenSource, E: VideoEncoder<Frame = S::Frame>> {
     running: Option<Running<E>>,
     latency: Latency,
     last_stats: TrackStats,
+    /// The size asked for, when the encoder only accepted a smaller one.
+    downscaled_from: Option<(u32, u32)>,
 }
 
 impl<S: ScreenSource, E: VideoEncoder<Frame = S::Frame>> ScreenRecorder<S, E> {
@@ -242,6 +244,7 @@ impl<S: ScreenSource, E: VideoEncoder<Frame = S::Frame>> ScreenRecorder<S, E> {
             running: None,
             latency: Latency::default(),
             last_stats: TrackStats::default(),
+            downscaled_from: None,
         }
     }
 
@@ -315,10 +318,45 @@ impl<S: ScreenSource, E: VideoEncoder<Frame = S::Frame>> TrackRecorder for Scree
             }
         }
         let path = ctx.dir.join(&self.opts.file_name);
-        let enc = (self.make_encoder)(&EncoderConfig {
-            path: path.clone(),
-            plan: self.plan.video,
-        })?;
+        // A Mac whose encoder rejects the asked-for size at every setting (an Intel MacBook Pro
+        // with a scaled display, GitHub issue 16) records at a smaller one rather than not at
+        // all. The capture is configured after this, so it delivers frames of the size that worked.
+        let asked = self.plan.video;
+        let mut tries = std::iter::once(asked).chain(smaller_plans(&asked));
+        let enc = loop {
+            let Some(candidate) = tries.next() else {
+                return Err(cm_encode::hardware_encoder_unavailable());
+            };
+            match (self.make_encoder)(&EncoderConfig {
+                path: path.clone(),
+                plan: candidate,
+            }) {
+                Ok(enc) => {
+                    if candidate != asked {
+                        log::warn!(
+                            "the encoder rejected {}x{}; recording at {}x{} instead",
+                            asked.width,
+                            asked.height,
+                            candidate.width,
+                            candidate.height
+                        );
+                        self.plan.video = candidate;
+                        self.downscaled_from = Some((asked.width, asked.height));
+                    }
+                    break enc;
+                }
+                Err(e) if is_hardware_encoder_unavailable(&e) => {
+                    log::warn!(
+                        "no encoder setup worked at {}x{}",
+                        candidate.width,
+                        candidate.height
+                    );
+                    continue;
+                }
+                Err(e) => return Err(e),
+            }
+        };
+        let bitrate = self.plan.video.bitrate_bps;
         let shared = Arc::new(Shared {
             pipeline: Mutex::new(Pipeline::new(enc, self.plan.video.fps)),
             clock: ctx.clock.clone(),
@@ -444,6 +482,7 @@ impl<S: ScreenSource, E: VideoEncoder<Frame = S::Frame>> TrackRecorder for Scree
         let used = used_plan.unwrap_or(plan.video);
         let details = json!({
             "size": [used.width, used.height],
+            "downscaled_from": self.downscaled_from,
             "fps": plan.video.fps,
             "codec": used.codec.as_str(),
             "bitrate_bps": used.bitrate_bps,
@@ -601,6 +640,44 @@ mod tests {
 
     fn mt(ms: i64) -> MediaTime {
         MediaTime::from_millis(ms)
+    }
+
+    #[test]
+    fn issue16_an_encoder_that_rejects_the_size_gets_a_smaller_one() {
+        let r = rig(30);
+        let plan = r.rec.plan().clone();
+        let asked = plan.video.width;
+        let tries = Arc::new(Mutex::new(Vec::new()));
+        let seen = Arc::clone(&tries);
+        let (src, _h) = FakeScreenSource::new();
+        let mut rec: Rec = ScreenRecorder::new(plan, src, move |cfg: &EncoderConfig| {
+            seen.lock().unwrap().push(cfg.plan.width);
+            if cfg.plan.width >= asked {
+                Err(cm_encode::hardware_encoder_unavailable())
+            } else {
+                SyntheticEncoder::create(cfg)
+            }
+        });
+        rec.start(r.ctx.clone()).unwrap();
+        let used = rec.plan().video;
+        assert!(used.width < asked, "{} < {asked}", used.width);
+        assert!(used.bitrate_bps > 0);
+        let tries = tries.lock().unwrap().clone();
+        assert_eq!(tries, vec![asked, used.width]);
+        let info = rec.stop(mt(1000)).unwrap();
+        assert_eq!(info.details["downscaled_from"][0], serde_json::json!(asked));
+    }
+
+    #[test]
+    fn issue16_when_every_size_is_rejected_the_error_is_the_encoder_one() {
+        let r = rig(30);
+        let plan = r.rec.plan().clone();
+        let (src, _h) = FakeScreenSource::new();
+        let mut rec: Rec = ScreenRecorder::new(plan, src, |_: &EncoderConfig| {
+            Err::<SyntheticEncoder, _>(cm_encode::hardware_encoder_unavailable())
+        });
+        let e = rec.start(r.ctx.clone()).unwrap_err();
+        assert!(cm_encode::is_hardware_encoder_unavailable(&e));
     }
 
     #[test]

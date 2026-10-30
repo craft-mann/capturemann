@@ -5,6 +5,7 @@
 //! * [`tracks`]: [`SessionTrack`] and one wrapper per recorder crate.
 
 pub mod engine;
+pub mod guard;
 pub mod params;
 pub mod selftest;
 pub mod session;

@@ -417,7 +417,7 @@ impl HardwareEncoder {
             match try_setup(&file, &plan, full) {
                 Ok((writer, sink, input)) => {
                     if !reasons.is_empty() {
-                        eprintln!(
+                        log::warn!(
                             "cm-encode: the first encoder settings were rejected ({}); recording with {:?} {}x{} (full properties: {full})",
                             reasons.join("; "),
                             plan.codec,
@@ -447,7 +447,7 @@ impl HardwareEncoder {
         }
         let _ = file.finish();
         // No software fallback in v0.1 (REC-2): the recording fails before it starts.
-        eprintln!(
+        log::error!(
             "cm-encode: no hardware encoder setup worked: {}",
             reasons.join("; ")
         );

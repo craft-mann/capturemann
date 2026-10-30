@@ -180,6 +180,31 @@ pub fn output_dimensions(
     Ok((w, target_h))
 }
 
+/// Smaller plans to fall back on when the platform encoder rejects `plan` at every codec and
+/// property set (GitHub issue 16: an Intel MacBook Pro). Same aspect ratio, even sizes, the heights
+/// 2160, 1440, 1080 and 720 that are below the plan's own, at most three of them, each with the
+/// bit rate its size and codec get from the table.
+pub fn smaller_plans(plan: &VideoPlan) -> Vec<VideoPlan> {
+    [
+        OutputSize::P2160,
+        OutputSize::P1440,
+        OutputSize::P1080,
+        OutputSize::P720,
+    ]
+    .into_iter()
+    .filter_map(|size| {
+        let (w, h) = output_dimensions(plan.width, plan.height, size).ok()?;
+        (h < plan.height).then(|| VideoPlan {
+            width: w,
+            height: h,
+            bitrate_bps: bitrate_bps(plan.codec, plan.fps, plan.quality, w, h),
+            ..*plan
+        })
+    })
+    .take(3)
+    .collect()
+}
+
 /// Codec for an output width (REC-2): Auto is HEVC above 1920 px; H.264 is refused above 4096 px.
 pub fn resolve_codec(choice: CodecChoice, output_width: u32) -> Result<Codec, CmError> {
     match choice {
@@ -258,6 +283,24 @@ mod tests {
             },
         )
         .unwrap()
+    }
+
+    #[test]
+    fn smaller_plans_keep_the_aspect_and_only_go_down() {
+        let p = plan(7168, 4480, OutputSize::Source, 30, CodecChoice::Auto);
+        let small = smaller_plans(&p);
+        assert_eq!(small.len(), 3);
+        assert_eq!((small[0].width, small[0].height), (3456, 2160));
+        assert_eq!((small[1].width, small[1].height), (2304, 1440));
+        assert_eq!((small[2].width, small[2].height), (1728, 1080));
+        assert!(small
+            .windows(2)
+            .all(|w| w[1].bitrate_bps < w[0].bitrate_bps));
+        assert!(small.iter().all(|s| s.codec == p.codec && s.fps == p.fps));
+        let hd = plan(1920, 1080, OutputSize::Source, 30, CodecChoice::Auto);
+        assert_eq!(smaller_plans(&hd).len(), 1);
+        let tiny = plan(1280, 720, OutputSize::Source, 30, CodecChoice::Auto);
+        assert!(smaller_plans(&tiny).is_empty());
     }
 
     #[test]

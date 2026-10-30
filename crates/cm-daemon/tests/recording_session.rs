@@ -671,6 +671,53 @@ fn rec7_ac4_degraded_cursor_is_a_warning_and_session_json_says_so() {
     drop(s.stop().unwrap().finalize().unwrap());
 }
 
+/// Issue 16: a track whose start throws an Objective-C exception (AVFoundation does this for bad
+/// states) is an ordinary failed optional track, not an abort of the whole app.
+#[cfg(target_os = "macos")]
+#[test]
+fn an_objective_c_exception_in_an_optional_track_start_is_a_warning() {
+    use objc2_foundation::{NSException, NSString};
+    struct Throws;
+    impl TrackRecorder for Throws {
+        fn kind(&self) -> TrackKind {
+            TrackKind::System
+        }
+        fn start(&mut self, _: cm_core::TrackContext) -> Result<(), CmError> {
+            let (name, reason) = (NSString::from_str("Test"), NSString::from_str("bad state"));
+            // SAFETY: raising a freshly made exception; the session's guard catches it.
+            unsafe {
+                NSException::exceptionWithName_reason_userInfo(&name, Some(&reason), None).raise()
+            }
+        }
+        fn pause(&mut self, _: MediaTime) -> Result<(), CmError> {
+            Ok(())
+        }
+        fn resume(&mut self, _: MediaTime) -> Result<(), CmError> {
+            Ok(())
+        }
+        fn stop(&mut self, _: MediaTime) -> Result<cm_core::TrackInfo, CmError> {
+            Err(CmError::internal("never started"))
+        }
+        fn stats(&self) -> cm_core::TrackStats {
+            Default::default()
+        }
+    }
+    let (mut rig, mut tracks) = build(Options {
+        ..Default::default()
+    });
+    tracks.push(Box::new(PlainTrack::new(Box::new(Throws), false)));
+    let mut s = RecordingSession::begin(rig.config(), tracks).unwrap();
+    assert!(
+        s.warnings()
+            .iter()
+            .any(|w| w.message.contains("macOS threw an exception")),
+        "{:?}",
+        s.warnings()
+    );
+    rig.run_until(300);
+    drop(s.stop().unwrap().finalize().unwrap());
+}
+
 #[test]
 fn tracks_start_concurrently_and_live_at_is_when_the_last_one_returned() {
     struct Slow(TrackKind, u64);
