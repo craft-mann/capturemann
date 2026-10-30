@@ -73,7 +73,29 @@ impl RedactionKind {
 
     /// The kinds looked for when the caller names none. Chosen by the benchmark (RED-1): a kind
     /// whose false-alarm rate is above the gate leaves this list.
-    pub const DEFAULT: [RedactionKind; 21] = RedactionKind::ALL;
+    pub const DEFAULT: [RedactionKind; 20] = [
+        RedactionKind::Email,
+        RedactionKind::Token,
+        RedactionKind::PrivateKey,
+        RedactionKind::SecretAssignment,
+        RedactionKind::UrlSecret,
+        RedactionKind::Card,
+        RedactionKind::CardExtra,
+        RedactionKind::Ssn,
+        RedactionKind::Itin,
+        RedactionKind::Ein,
+        RedactionKind::Aba,
+        RedactionKind::Iban,
+        // RedactionKind::Npi is off by default: precision 30 % on the dev split (RED-1 report).
+        RedactionKind::Dea,
+        RedactionKind::Mbi,
+        RedactionKind::Passport,
+        RedactionKind::Vin,
+        RedactionKind::Imei,
+        RedactionKind::IpAddress,
+        RedactionKind::MacAddress,
+        RedactionKind::Phone,
+    ];
 
     /// The name used in results, MCP and the CLI.
     pub fn as_str(self) -> &'static str {

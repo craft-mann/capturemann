@@ -544,7 +544,7 @@ pub fn all() -> Vec<ToolSpec> {
                 "capture_id": capture_id(),
                 "kinds": { "type": "array", "uniqueItems": true,
                     "items": { "type": "string", "enum": ["email", "token", "private_key", "secret_assignment", "url_secret", "card", "card_extra", "ssn", "itin", "ein", "aba", "iban", "npi", "dea", "mbi", "passport", "vin", "imei", "ip_address", "mac_address", "phone"] },
-                    "description": "Only look for these kinds. Default: the default kinds (all of them until the benchmark sets the list)." } },
+                    "description": "Only look for these kinds. Default: every kind except `npi`, which is off by default because its false-alarm rate is high (name it to turn it on)." } },
                 "required": ["capture_id"], "additionalProperties": false }),
             output: json!({ "type": "object", "properties": {
                 "capture_id": { "type": "string" },
