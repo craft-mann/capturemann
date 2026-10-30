@@ -29,7 +29,7 @@ use crate::theme::{scale, type_scale, Color, Mode, Theme};
 use crate::ui::app::{self, AppModel, Route};
 use crate::ui::components::{
     button, button_with_icon, card, crumb_link, icon, icon_button, keycaps, page_toolbar_actions,
-    section_label, shrink_text, ButtonKind,
+    section_label, shrink_text, switch, ButtonKind,
 };
 use crate::ui::editor_doc::{EditorDoc, Outcome, OverlayData, Phase, RedactPhase, Status};
 use crate::ui::kit::{status, StatusKind};
@@ -273,6 +273,8 @@ struct Snap {
     /// Auto-redact (ANN-2.AC4): shown only when the OS has a text recognizer.
     redact_available: bool,
     redact: RedactPhase,
+    kinds_open: bool,
+    kinds: crate::editor::redact::KindChoice,
     /// Kind label, masked preview, confidence of each proposal.
     proposals: Vec<(String, String, f64)>,
 }
@@ -312,6 +314,8 @@ impl Snap {
             warning: doc.warnings.first().cloned(),
             redact_available: crate::editor::redact::available(),
             redact: doc.redact.clone(),
+            kinds_open: doc.kinds_open,
+            kinds: crate::editor::redact::session_kinds(),
             proposals: st
                 .proposals
                 .iter()
