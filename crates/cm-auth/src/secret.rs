@@ -91,6 +91,10 @@ pub struct VaultStore {
     slot: String,
     state: VaultState,
     miss_window: Duration,
+    /// The most characters one stored item may hold (`None`: no limit). Windows Credential
+    /// Manager stops at 2560 bytes per entry, which is 1280 UTF-16 characters, so a vault with a
+    /// few accounts is stored in numbered parts there (see [`PART_CHARS`]).
+    item_limit: Option<usize>,
 }
 
 /// What a process knows about the vault.
@@ -112,6 +116,20 @@ pub const MISS_WINDOW: Duration = Duration::from_secs(30);
 
 /// The slot name inside the keychain service.
 pub const VAULT_SLOT: &str = "vault";
+
+/// Characters per part where the store caps an item (Windows): well under 1280, leaving room for
+/// characters outside the Basic Multilingual Plane.
+pub const PART_CHARS: usize = 1000;
+
+/// What the `vault` item holds when the secrets did not fit in it: where the parts are. The parts
+/// are `<slot>.<generation>.<n>`; a write stores the new generation first and switches this
+/// header last, so a crash leaves the old secrets readable and only orphan parts behind.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct VaultParts {
+    version: u32,
+    generation: String,
+    parts: usize,
+}
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct VaultBody {
@@ -137,6 +155,7 @@ impl VaultStore {
             slot: VAULT_SLOT.to_owned(),
             state,
             miss_window: MISS_WINDOW,
+            item_limit: cfg!(windows).then_some(PART_CHARS),
         }
     }
 
@@ -147,7 +166,15 @@ impl VaultStore {
             slot: VAULT_SLOT.to_owned(),
             state: Arc::default(),
             miss_window: MISS_WINDOW,
+            item_limit: None,
         }
+    }
+
+    /// The same vault storing at most `chars` characters per item (tests; the system vault sets
+    /// it by itself where the OS needs it).
+    pub fn with_item_limit(mut self, chars: usize) -> Self {
+        self.item_limit = Some(chars.max(1));
+        self
     }
 
     /// The same vault with another miss window (tests that need a second instance's write seen at
@@ -162,7 +189,7 @@ impl VaultStore {
     }
 
     fn check_key(&self, key: &str) -> Result<(), CmError> {
-        if key == self.slot {
+        if key == self.slot || key.starts_with(&format!("{}.", self.slot)) {
             return Err(CmError::invalid_input(format!(
                 "`{key}` is reserved for the secret vault"
             )));
@@ -170,33 +197,98 @@ impl VaultStore {
         Ok(())
     }
 
+    fn part_slot(&self, generation: &str, n: usize) -> String {
+        format!("{}.{generation}.{n}", self.slot)
+    }
+
+    /// The stored text of the vault: the item itself, or its parts joined.
+    fn read_text(&self) -> Result<Option<String>, CmError> {
+        let Some(text) = self.inner.get(&self.slot)? else {
+            return Ok(None);
+        };
+        let Ok(header) = serde_json::from_str::<VaultParts>(&text) else {
+            return Ok(Some(text));
+        };
+        let mut joined = String::new();
+        for n in 0..header.parts {
+            let part = self
+                .inner
+                .get(&self.part_slot(&header.generation, n))?
+                .ok_or_else(|| CmError::internal(DAMAGED))?;
+            joined.push_str(&part);
+        }
+        Ok(Some(joined))
+    }
+
     /// Reads the blob from the inner store (no cache).
     fn read(&self) -> Result<BTreeMap<String, String>, CmError> {
-        let Some(text) = self.inner.get(&self.slot)? else {
+        let Some(text) = self.read_text()? else {
             return Ok(BTreeMap::new());
         };
         serde_json::from_str::<VaultBody>(&text)
             .map(|b| b.secrets)
-            .map_err(|_| {
-                CmError::internal(
-                    "the stored secrets could not be read (the keychain item is damaged); \
-                     remove the \"vault\" item of this app in Keychain Access and connect again",
-                )
-            })
+            .map_err(|_| CmError::internal(DAMAGED))
+    }
+
+    /// Deletes the parts a header points at (best effort: a leftover part is only wasted space).
+    fn drop_parts(&self, header_text: Option<String>) {
+        let Some(h) = header_text.and_then(|t| serde_json::from_str::<VaultParts>(&t).ok()) else {
+            return;
+        };
+        for n in 0..h.parts {
+            let _ = self.inner.delete(&self.part_slot(&h.generation, n));
+        }
     }
 
     fn write(&self, map: &BTreeMap<String, String>) -> Result<(), CmError> {
+        let old_header = self.inner.get(&self.slot)?;
         if map.is_empty() {
-            return self.inner.delete(&self.slot);
+            self.inner.delete(&self.slot)?;
+            self.drop_parts(old_header);
+            return Ok(());
         }
         let body = serde_json::to_string(&VaultBody {
             version: 1,
             secrets: map.clone(),
         })
         .map_err(|e| CmError::internal(format!("credential store: {e}")))?;
-        self.inner.set(&self.slot, &body)
+        match self.item_limit {
+            Some(limit) if body.chars().count() > limit => {
+                let generation = new_generation();
+                let chars: Vec<char> = body.chars().collect();
+                let parts: Vec<String> = chars.chunks(limit).map(|c| c.iter().collect()).collect();
+                for (n, part) in parts.iter().enumerate() {
+                    self.inner.set(&self.part_slot(&generation, n), part)?;
+                }
+                let header = serde_json::to_string(&VaultParts {
+                    version: 2,
+                    generation,
+                    parts: parts.len(),
+                })
+                .map_err(|e| CmError::internal(format!("credential store: {e}")))?;
+                self.inner.set(&self.slot, &header)?;
+            }
+            _ => self.inner.set(&self.slot, &body)?,
+        }
+        self.drop_parts(old_header);
+        Ok(())
     }
 }
+
+/// A new name for a set of parts.
+fn new_generation() -> String {
+    let mut buf = [0u8; 6];
+    if getrandom::fill(&mut buf).is_err() {
+        let t = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_nanos());
+        buf.copy_from_slice(&t.to_le_bytes()[..6]);
+    }
+    buf.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+const DAMAGED: &str = "the stored secrets could not be read (the keychain item is damaged); \
+     remove the \"vault\" item of this app in Keychain Access and connect again";
 
 impl fmt::Debug for VaultStore {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -556,5 +648,101 @@ mod vault_tests {
                 Some(format!("value{i}"))
             );
         }
+    }
+
+    /// The parts of a vault that did not fit one item, by walking the header.
+    fn part_keys(inner: &MemoryStore) -> Vec<String> {
+        let Some(text) = inner.get("vault").unwrap() else {
+            return Vec::new();
+        };
+        let Ok(h) = serde_json::from_str::<VaultParts>(&text) else {
+            return Vec::new();
+        };
+        (0..h.parts)
+            .map(|n| format!("vault.{}.{n}", h.generation))
+            .collect()
+    }
+
+    #[test]
+    fn a_vault_over_an_item_limit_is_stored_in_parts_and_read_back() {
+        let inner = Arc::new(MemoryStore::new());
+        let v = VaultStore::over(inner.clone()).with_item_limit(40);
+        for i in 0..5 {
+            v.set(
+                &format!("oauth.google.{i}"),
+                &format!("token-{i}-ünï-{}", "x".repeat(30)),
+            )
+            .unwrap();
+        }
+        let parts = part_keys(&inner);
+        assert!(parts.len() > 2, "{parts:?}");
+        for p in &parts {
+            assert!(inner.get(p).unwrap().unwrap().chars().count() <= 40);
+        }
+        // Another process: nothing cached.
+        let fresh = VaultStore::over(inner.clone()).with_item_limit(40);
+        for i in 0..5 {
+            assert_eq!(
+                fresh.get(&format!("oauth.google.{i}")).unwrap().unwrap(),
+                format!("token-{i}-ünï-{}", "x".repeat(30))
+            );
+        }
+    }
+
+    #[test]
+    fn shrinking_or_emptying_a_split_vault_removes_the_old_parts() {
+        let inner = Arc::new(MemoryStore::new());
+        let v = VaultStore::over(inner.clone()).with_item_limit(40);
+        for i in 0..4 {
+            v.set(&format!("k{i}"), &"v".repeat(30)).unwrap();
+        }
+        let before = part_keys(&inner);
+        assert!(!before.is_empty());
+        v.delete("k0").unwrap();
+        for p in &before {
+            assert_eq!(inner.get(p).unwrap(), None, "old generation is gone: {p}");
+        }
+        for i in 1..4 {
+            v.delete(&format!("k{i}")).unwrap();
+        }
+        assert_eq!(inner.get("vault").unwrap(), None);
+        assert!(part_keys(&inner).is_empty());
+    }
+
+    #[test]
+    fn a_vault_that_fits_stays_one_item_and_an_old_one_is_still_read() {
+        let inner = Arc::new(MemoryStore::new());
+        VaultStore::over(inner.clone()).set("a", "b").unwrap();
+        // The same item read by a vault that would split larger content.
+        let v = VaultStore::over(inner.clone()).with_item_limit(1000);
+        assert_eq!(v.get("a").unwrap().as_deref(), Some("b"));
+        v.set("c", "d").unwrap();
+        assert!(
+            part_keys(&inner).is_empty(),
+            "small content stays in `vault`"
+        );
+    }
+
+    #[test]
+    fn a_missing_part_is_reported_not_silently_dropped() {
+        let inner = Arc::new(MemoryStore::new());
+        let v = VaultStore::over(inner.clone()).with_item_limit(40);
+        for i in 0..4 {
+            v.set(&format!("k{i}"), &"v".repeat(30)).unwrap();
+        }
+        let first = part_keys(&inner).remove(0);
+        inner.delete(&first).unwrap();
+        let fresh = VaultStore::over(inner.clone()).with_item_limit(40);
+        assert!(fresh.get("k0").is_err());
+        assert!(
+            fresh.set("k9", "x").is_err(),
+            "a damaged vault is never replaced"
+        );
+    }
+
+    #[test]
+    fn the_part_names_are_reserved() {
+        let v = VaultStore::over(Arc::new(MemoryStore::new()));
+        assert!(v.set("vault.abc.0", "x").is_err());
     }
 }
