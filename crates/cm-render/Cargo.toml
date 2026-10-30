@@ -28,6 +28,8 @@ pollster = "0.4"
 
 [dev-dependencies]
 serde.workspace = true
+# JPEG re-encoding for the degraded pictures of the redaction benchmark generator.
+image = { workspace = true, features = ["png", "jpeg"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Apple Vision text recognition (ANN-2 Auto-redact) through plain objc2 messages, as in the
