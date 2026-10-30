@@ -47,8 +47,10 @@ fn ff(t: &Tools, args: &[&str]) {
     );
 }
 
-/// Left third red, middle third green, right third blue.
-const TRICOLOR: &str = "color=c=0xdc1e1e:s=427x720[a];color=c=0x1ec81e:s=426x720[b];color=c=0x1e1edc:s=427x720[c];[a][b][c]hstack=inputs=3";
+/// Left third red, middle third green, right third blue. The widths are even: with odd ones the
+/// three pieces of a 4:2:0 picture do not share chroma columns and the stack leaks the last
+/// bar's chroma into the first two pixels of every row.
+const TRICOLOR: &str = "color=c=0xdc1e1e:s=428x720[a];color=c=0x1ec81e:s=424x720[b];color=c=0x1e1edc:s=428x720[c];[a][b][c]hstack=inputs=3";
 
 struct Fixture {
     dir: tempfile::TempDir,
@@ -104,15 +106,6 @@ fn fixture(t: &Tools, source: &str, cursor_events: Option<&[&str]>, edits: Value
 }
 
 fn export(t: &Tools, f: &Fixture, preset: Option<&str>) -> cm_media::QuickOutcome {
-    export_with(t, f, preset, None).unwrap_or_else(|e| panic!("export failed: {}", e.into_cm()))
-}
-
-fn export_with(
-    t: &Tools,
-    f: &Fixture,
-    preset: Option<&str>,
-    prefer_encoder: Option<cm_media::Encoder>,
-) -> Result<cm_media::QuickOutcome, ExportError> {
     let presets = Presets::builtin();
     export_quick(
         t,
@@ -120,7 +113,7 @@ fn export_with(
             captions: None,
             bundle_dir: f.dir.path(),
             manifest: &f.manifest,
-            prefer_encoder,
+            prefer_encoder: None,
             path: ExportPath::Auto,
             loudness_lufs: None,
             preset: preset.map(|id| PresetRequest {
@@ -132,6 +125,7 @@ fn export_with(
         &mut |_| {},
         &|| false,
     )
+    .unwrap_or_else(|e: ExportError| panic!("export failed: {}", e.into_cm()))
 }
 
 fn frame_at(t: &Tools, video: &Path, at_s: f64, tmp: &Path) -> image::RgbImage {
@@ -198,31 +192,15 @@ fn edt4_ac2_a_zoom_region_crops_the_export_and_ends_with_the_ease() {
         "the right edge is the green third"
     );
     let blue_at = (0..1280).find(|&x| near(zoomed.get_pixel(x, 360), BLUE, 40));
-    // Diagnostic for a failure: the same scene through libx264 says whether the encoder or the
-    // compositor put the colour there.
-    let with_x264 = blue_at.map(|_| {
-        export_with(&t, &f, None, Some(cm_media::Encoder::Libx264)).map(|o| {
-            let frame = frame_at(&t, &o.path, 1.5, tmp.path());
-            (
-                (0..1280).find(|&x| near(frame.get_pixel(x, 360), BLUE, 40)),
-                (0..12)
-                    .map(|x| frame.get_pixel(x, 360).0)
-                    .collect::<Vec<_>>(),
-            )
-        })
-    });
     assert!(
         blue_at.is_none(),
-        "the blue third is out of view; blue-ish pixel at x={blue_at:?}: {:?}; encoder {}; row: {:?}; left edge (x 0..12) at rows 100, 360, 600: {:?}; the same scene with libx264 (first blue x, left edge): {:?}",
+        "the blue third is out of view; blue-ish pixel at x={blue_at:?}: {:?}; encoder {}; row: {:?}",
         blue_at.map(|x| zoomed.get_pixel(x, 360).0),
         o.encoder,
         (0..1280)
             .step_by(80)
             .map(|x| (x, zoomed.get_pixel(x, 360).0))
-            .collect::<Vec<_>>(),
-        [100u32, 360, 600]
-            .map(|y| (0..12).map(|x| zoomed.get_pixel(x, y).0).collect::<Vec<_>>()),
-        with_x264.map(|r| r.map_err(|e| e.into_cm().to_string()))
+            .collect::<Vec<_>>()
     );
 
     let after = at(2.8);
