@@ -700,7 +700,7 @@ fn progress_is_reported() {
     let Some(t) = tools() else { return };
     let f = fixture(&t, 4, "1280x720", true, true);
     let mut seen: Vec<f64> = Vec::new();
-    export_quick(
+    let out = export_quick(
         &t,
         &QuickRequest {
             captions: None,
@@ -716,7 +716,10 @@ fn progress_is_reported() {
     )
     .unwrap();
     assert_eq!(seen.last().copied(), Some(1.0));
-    assert!(seen.windows(2).all(|w| w[1] >= w[0] - 1e-9), "{seen:?}");
+    // A fallback to another encoder restarts the bar from 0 on purpose (R5-4); within one attempt it only grows.
+    if out.settings.get("encoder_fallback").is_none() {
+        assert!(seen.windows(2).all(|w| w[1] >= w[0] - 1e-9), "{seen:?}");
+    }
 }
 
 /// Timing of a 30 s 1080p export (the report's number). `cargo test -p cm-media --test
