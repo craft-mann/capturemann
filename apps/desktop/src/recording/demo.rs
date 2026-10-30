@@ -71,7 +71,11 @@ pub fn fake_capturer() -> Capturer {
         return c;
     }
     let mut backend = FakeBackend::new();
+    // No capture backend on Linux yet (platform plan L2): the fake display below stands in.
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     let real = Capturer::system().list_targets_with(false).ok();
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let real: Option<cm_capture::Targets> = None;
     let mut any = false;
     for d in real.iter().flat_map(|t| t.displays.iter()) {
         backend = backend.with_display(

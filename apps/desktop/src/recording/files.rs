@@ -11,6 +11,7 @@
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+#[cfg(any(target_os = "macos", test))]
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Condvar, Mutex, PoisonError};
 use std::time::{Duration, Instant};

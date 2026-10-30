@@ -80,7 +80,7 @@ pub fn plan(enabled: bool, bundled_exe: Option<&Path>, current: Option<&str>) ->
 }
 
 /// The executable when it lives in a `.app` bundle.
-#[cfg(any(target_os = "macos", test))]
+#[cfg(target_os = "macos")]
 fn bundled_exe() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
     crate::ui::app::bundle_of(&exe).map(|_| exe)
