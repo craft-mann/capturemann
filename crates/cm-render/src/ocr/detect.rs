@@ -287,8 +287,16 @@ fn scan_page(lines: &[TextLine], opts: &SuggestOptions) -> Vec<RedactionSuggesti
         if !entry.kinds.iter().any(|&k| opts.wants(k)) {
             continue;
         }
+        // A page rule sees more than a line rule does (a whole key block, a card beside its
+        // expiry), so its spans replace the line-rule spans they overlap.
         for l in (entry.run)(&flats, &located.clone()) {
             if opts.wants(l.span.kind) && l.line < flats.len() {
+                located.retain(|t| {
+                    !(t.line == l.line
+                        && t.span.kind != l.span.kind
+                        && l.span.start < t.span.end
+                        && t.span.start < l.span.end)
+                });
                 keep(l, &mut located);
             }
         }
