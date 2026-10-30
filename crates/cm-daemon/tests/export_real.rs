@@ -208,7 +208,9 @@ async fn export_video_renders_records_and_announces() {
     assert_eq!(res["file"], "exports/Real export - quick.mp4");
     let out = root
         .path()
-        .join("Real export.cmrec/exports/Real export - quick.mp4");
+        .join("Real export.cmrec")
+        .join("exports")
+        .join("Real export - quick.mp4");
     assert!(out.is_file());
     assert_eq!(res["path"], out.to_string_lossy().as_ref());
     assert!(

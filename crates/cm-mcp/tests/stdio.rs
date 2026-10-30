@@ -44,13 +44,12 @@ async fn agt_1_ac1_stdio_binary_lists_tools_and_calls_list_targets() {
     let lib = Library::open_or_create(dir.path()).unwrap();
     let backend = FakeBackend::new().with_display(1, 0, 0, 400, 300, 2.0);
     let daemon = Daemon::builder(Capturer::new(backend).with_own_pid(None), lib).build();
-    let sock = dir.path().join("d.sock");
-    let endpoint = Endpoint::Path(sock.clone());
+    let endpoint = Endpoint::scratch(dir.path(), "d");
     tokio::spawn(IpcServer::bind(&endpoint).unwrap().run(daemon));
 
     let mut child = Command::new(env!("CARGO_BIN_EXE_cm-mcp"))
         .arg("--socket")
-        .arg(&sock)
+        .arg(endpoint.describe())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())

@@ -35,7 +35,7 @@ async fn cap1_freeze_leaves_no_bundles_and_region_is_the_frozen_crop() {
         .with_display(1, 0, 0, 400, 300, 2.0)
         .with_display(2, 400, 0, 200, 100, 1.0);
     let daemon = Daemon::builder(Capturer::new(backend).with_own_pid(None), lib).build();
-    let endpoint = Endpoint::Path(dir.path().join("d.sock"));
+    let endpoint = Endpoint::scratch(dir.path(), "d");
     let server = IpcServer::bind(&endpoint).unwrap();
     let d2 = daemon.clone();
     tokio::spawn(async move { server.run(d2).await });
@@ -135,7 +135,7 @@ async fn cap1_ac1_stream_reports_displays_first_then_frames_then_windows() {
         .with_display(2, 400, 0, 200, 100, 1.0)
         .with_window(10, "Editor", "Code", 77, 1, (20, 10, 100, 80), false);
     let daemon = Daemon::builder(Capturer::new(backend).with_own_pid(None), lib).build();
-    let endpoint = Endpoint::Path(dir.path().join("d.sock"));
+    let endpoint = Endpoint::scratch(dir.path(), "d");
     let server = IpcServer::bind(&endpoint).unwrap();
     tokio::spawn(async move { server.run(daemon).await });
 
@@ -184,7 +184,7 @@ async fn cap1_ac1_stream_reports_displays_first_then_frames_then_windows() {
 #[tokio::test]
 async fn cap1_ac1_stream_without_a_reachable_daemon_is_daemon_unavailable() {
     let dir = tempfile::tempdir().unwrap();
-    let endpoint = Endpoint::Path(dir.path().join("nobody.sock"));
+    let endpoint = Endpoint::scratch(dir.path(), "nobody");
     let emit: Emit = Arc::new(|_| {});
     let tracer = Tracer::new(std::time::Instant::now(), false);
     let Err(e) = stream(&endpoint, &tracer, &emit).await else {

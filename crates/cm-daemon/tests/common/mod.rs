@@ -123,3 +123,48 @@ impl Client {
         }
     }
 }
+
+/// Makes a library folder unreadable, as an unplugged drive is, and returns what [`replug`]
+/// needs. Unix moves the folder away. Windows cannot move a folder that holds open files (the
+/// library's SQLite index lives inside it), so it denies listing the folder to everyone: the
+/// handles already open keep working and `read_dir` fails, as the watcher sees an unplugged drive.
+#[allow(dead_code)]
+pub fn unplug(root: &std::path::Path) -> std::path::PathBuf {
+    #[cfg(windows)]
+    {
+        let ok = std::process::Command::new("icacls")
+            .arg(root)
+            .args(["/deny", "*S-1-1-0:(RD)"])
+            .output()
+            .unwrap()
+            .status
+            .success();
+        assert!(ok, "icacls /deny failed");
+        root.to_owned()
+    }
+    #[cfg(not(windows))]
+    {
+        let away = root.with_extension("unplugged");
+        std::fs::rename(root, &away).unwrap();
+        away
+    }
+}
+
+/// Undoes [`unplug`].
+#[allow(dead_code)]
+pub fn replug(root: &std::path::Path, token: &std::path::Path) {
+    #[cfg(windows)]
+    {
+        let _ = token;
+        let ok = std::process::Command::new("icacls")
+            .arg(root)
+            .args(["/remove:d", "*S-1-1-0"])
+            .output()
+            .unwrap()
+            .status
+            .success();
+        assert!(ok, "icacls /remove:d failed");
+    }
+    #[cfg(not(windows))]
+    std::fs::rename(token, root).unwrap();
+}

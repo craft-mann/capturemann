@@ -11,6 +11,9 @@ use std::path::{Path, PathBuf};
 
 /// The lock file's name inside the config directory.
 pub const LOCK_FILE: &str = "instance.lock";
+/// The running instance's pid. Not the lock file: on Windows a held lock is mandatory, so no other
+/// handle can read the locked file.
+pub const PID_FILE: &str = "instance.pid";
 
 /// Held for as long as this process is the running instance.
 #[derive(Debug)]
@@ -47,9 +50,8 @@ pub fn acquire(dir: &Path) -> Acquired {
     };
     match file.try_lock() {
         Ok(()) => {
-            // Informational only (`cat instance.lock`); the lock is the source of truth.
-            let _ =
-                io::Write::write_all(&mut &file, format!("{}\n", std::process::id()).as_bytes());
+            // Informational only; the lock is the source of truth.
+            let _ = std::fs::write(dir.join(PID_FILE), format!("{}\n", std::process::id()));
             Acquired::First(InstanceLock { _file: file })
         }
         Err(TryLockError::WouldBlock) => Acquired::AlreadyRunning,
@@ -57,10 +59,10 @@ pub fn acquire(dir: &Path) -> Acquired {
     }
 }
 
-/// The pid the running instance wrote into `instance.lock` (informational: the lock itself is the
+/// The pid the running instance wrote into `instance.pid` (informational: the lock itself is the
 /// source of truth, so a missing or stale number only means "unknown").
 pub fn running_pid(dir: &Path) -> Option<u32> {
-    std::fs::read_to_string(dir.join(LOCK_FILE))
+    std::fs::read_to_string(dir.join(PID_FILE))
         .ok()?
         .trim()
         .parse()

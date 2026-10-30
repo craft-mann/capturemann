@@ -354,7 +354,16 @@ fn exp1_ac3_output_passes_ffprobe_checks() {
     let v = streams.iter().find(|s| s["codec_type"] == "video").unwrap();
     let a = streams.iter().find(|s| s["codec_type"] == "audio").unwrap();
     assert_eq!(v["codec_name"], "h264");
-    assert_eq!(v["profile"], "High");
+    // The Media Foundation encoder (Windows) picks its own profile; the others write High.
+    if o.encoder == "h264_mf" {
+        let profile = v["profile"].as_str().unwrap_or_default();
+        assert!(
+            ["Constrained Baseline", "Baseline", "Main", "High"].contains(&profile),
+            "{profile}"
+        );
+    } else {
+        assert_eq!(v["profile"], "High");
+    }
     assert_eq!(v["pix_fmt"], "yuv420p");
     assert_eq!(
         (v["width"].as_u64(), v["height"].as_u64()),

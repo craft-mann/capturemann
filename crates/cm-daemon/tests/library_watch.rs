@@ -328,14 +328,13 @@ fn an_unavailable_folder_pauses_without_forgetting_and_resumes() {
     r.baseline();
     r.lib.lock().unwrap().rescan().unwrap();
     // Unplug: the folder is gone. Many ticks, no changes, no removals, no errors.
-    let away = r.root().with_extension("unplugged");
-    std::fs::rename(r.root(), &away).unwrap();
+    let away = common::unplug(r.root());
     for t in [100, 1500, 3000, 20_000, 40_000] {
         let tick = r.st.tick(&r.lib, t);
         assert!(!tick.available && tick.changes.is_empty() && tick.error.is_none());
     }
     // Re-plug with one more bundle and one gone.
-    std::fs::rename(&away, r.root()).unwrap();
+    common::replug(r.root(), &away);
     let extra = r.copy_in("Added while away");
     std::fs::remove_dir_all(r.root().join(&name)).unwrap();
     let tick = r.st.tick(&r.lib, 41_000);
@@ -485,15 +484,14 @@ async fn the_task_announces_an_offline_library_once_and_its_return() {
         })
         .unwrap();
     tokio::time::sleep(Duration::from_millis(500)).await;
-    let away = dir.path().with_extension("unplugged");
-    std::fs::rename(dir.path(), &away).unwrap();
+    let away = common::unplug(dir.path());
     let mut seen = Vec::new();
     let ev = next_library_event(&mut rx).await.expect("library.offline");
     seen.push(ev.name.clone());
     assert!(ev.data["path"].is_string());
     // Several more polls while it is away: no second event.
     tokio::time::sleep(Duration::from_secs(2)).await;
-    std::fs::rename(&away, dir.path()).unwrap();
+    common::replug(dir.path(), &away);
     let ev = next_library_event(&mut rx).await.expect("library.online");
     seen.push(ev.name);
     assert_eq!(seen, ["library.offline", "library.online"]);

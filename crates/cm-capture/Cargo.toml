@@ -25,6 +25,10 @@ libc.workspace = true
 [target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
 xcap = "0.9"
 
+[target.'cfg(windows)'.dependencies]
+# Free space of a volume (the recording disk guard); the version cm-cursor uses.
+windows = { version = "0.61", features = ["Win32_Storage_FileSystem"] }
+
 [target.'cfg(target_os = "macos")'.dependencies]
 # Zlib OR Apache-2.0 OR MIT. The versions xcap already uses, so nothing extra is compiled.
 # `kCGWindowLayer` is how list_targets tells document windows from menu bar, Dock and

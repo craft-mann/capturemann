@@ -332,10 +332,7 @@ impl Backend {
             settings: cfg.settings,
             overlay: OverlayLauncher::new(
                 cfg.overlay_binary,
-                match &cfg.endpoint {
-                    Some(Endpoint::Path(p)) => Some(p.clone()),
-                    _ => None,
-                },
+                cfg.endpoint.as_ref().map(|e| e.describe().into()),
             ),
             ipc_warning,
             endpoint: cfg.endpoint,
@@ -723,7 +720,7 @@ mod tests {
                 library_path: Some(dir.path().join("lib")),
                 fallback_path: dir.path().join("fallback"),
                 settings: Arc::new(FileSettings::load(dir.path().join("settings.json"))),
-                endpoint: Some(Endpoint::Path(dir.path().join("d.sock"))),
+                endpoint: Some(Endpoint::scratch(dir.path(), "d")),
                 overlay_binary: None,
                 recording,
             },

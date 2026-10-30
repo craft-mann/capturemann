@@ -685,15 +685,22 @@ mod tests {
             .filter(|w| w[0] == "-i")
             .map(|w| w[1].as_str())
             .collect();
+        // Files inside the bundle are joined with the platform separator.
+        let in_bundle = |f: &str| {
+            std::path::Path::new("/b/Lesson 1.cmrec")
+                .join(f)
+                .to_string_lossy()
+                .into_owned()
+        };
         assert_eq!(
             ins,
             [
-                "/b/Lesson 1.cmrec/screen.mp4",
-                "/b/Lesson 1.cmrec/camera.mp4",
+                in_bundle("screen.mp4").as_str(),
+                in_bundle("camera.mp4").as_str(),
                 "/w/mask.png",
                 "/w/ring.png",
-                "/b/Lesson 1.cmrec/mic.denoised.wav",
-                "/b/Lesson 1.cmrec/system.wav"
+                in_bundle("mic.denoised.wav").as_str(),
+                in_bundle("system.wav").as_str()
             ]
         );
         let joined = p.args.join(" ");

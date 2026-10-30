@@ -26,7 +26,7 @@ struct Rig {
 
 fn rig(ai: FakeAi, decision: Decision) -> Rig {
     let dir = tempfile::tempdir().unwrap();
-    let endpoint = Endpoint::Path(dir.path().join("d.sock"));
+    let endpoint = Endpoint::scratch(dir.path(), "d");
     let lib_dir = dir.path().join("lib");
     let lib = Library::open_or_create(&lib_dir).unwrap();
     let queue = cm_daemon::library_job_queue(&lib_dir).unwrap();

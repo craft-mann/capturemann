@@ -93,8 +93,10 @@ mod tests {
             &mut hits,
         );
         assert!(
-            hits.iter()
-                .all(|h| h.ends_with("ui/app/watch.rs") || h.ends_with("studio_window.rs")),
+            hits.iter().all(|h| {
+                let h = Path::new(h);
+                h.ends_with("ui/app/watch.rs") || h.ends_with("studio_window.rs")
+            }),
             "only ui/app/watch.rs may publish: {hits:?}"
         );
     }

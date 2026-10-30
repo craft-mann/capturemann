@@ -243,8 +243,8 @@ pub fn parse_result(
 #[derive(Debug, Clone)]
 pub struct OverlayLauncher {
     binary: Option<PathBuf>,
-    /// Daemon endpoint the overlay should talk to (the socket this app serves).
-    socket: Option<PathBuf>,
+    /// Daemon endpoint the overlay should talk to (the socket path or pipe name this app serves).
+    socket: Option<OsString>,
     /// How long a picker may stay open before it is killed (R4-20).
     watchdog: Duration,
 }
@@ -255,7 +255,7 @@ pub struct OverlayLauncher {
 pub const OVERLAY_WATCHDOG: Duration = Duration::from_secs(120);
 
 impl OverlayLauncher {
-    pub fn new(binary: Option<PathBuf>, socket: Option<PathBuf>) -> Self {
+    pub fn new(binary: Option<PathBuf>, socket: Option<OsString>) -> Self {
         OverlayLauncher {
             binary,
             socket,
@@ -281,7 +281,7 @@ impl OverlayLauncher {
         }
         if let Some(s) = &self.socket {
             a.push("--socket".into());
-            a.push(s.clone().into_os_string());
+            a.push(s.clone());
         }
         a
     }
@@ -573,7 +573,7 @@ mod tests {
 
     #[test]
     fn pick_adds_the_flag() {
-        let l = OverlayLauncher::new(None, Some(PathBuf::from("/tmp/d.sock")));
+        let l = OverlayLauncher::new(None, Some("/tmp/d.sock".into()));
         assert_eq!(
             l.args_with(CaptureMode::Region, true),
             ["region", "--pick", "--socket", "/tmp/d.sock"]
@@ -582,7 +582,7 @@ mod tests {
 
     #[test]
     fn args_pass_mode_and_socket() {
-        let l = OverlayLauncher::new(None, Some(PathBuf::from("/tmp/d.sock")));
+        let l = OverlayLauncher::new(None, Some("/tmp/d.sock".into()));
         let a = l.args(CaptureMode::Window);
         assert_eq!(a, ["window", "--socket", "/tmp/d.sock"]);
     }

@@ -80,6 +80,23 @@ fn measure(
         "compose {label}: {ms:.2} ms/frame ({out:?} out, {screen:?} {format:?} screen + 1280x720 camera, adapter {})",
         c.adapter_name()
     );
+    // The bound is for a real GPU. A software renderer (the Windows "Basic Render Driver"/WARP of a
+    // hosted runner, llvmpipe, SwiftShader) is slow by nature, so only its number is printed.
+    let name = c.adapter_name().to_lowercase();
+    let software = [
+        "basic render",
+        "warp",
+        "llvmpipe",
+        "lavapipe",
+        "swiftshader",
+        "software",
+    ]
+    .iter()
+    .any(|k| name.contains(k));
+    if software {
+        println!("(software renderer: the {label} bound is not checked)");
+        return;
+    }
     assert!(
         ms < 500.0,
         "{label}: {ms} ms/frame is far outside any healthy GPU"

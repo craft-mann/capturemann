@@ -27,7 +27,9 @@ jobs:
         # Windows and Linux jobs start before any backend exists (platform plan, Step 0): they keep the
         # shared crates building and their fake-based tests passing on every OS. Hosted runners have no
         # screen permission, camera or microphone, so the hardware tests stay manual (verification/).
-        os: [macos-latest, windows-latest, ubuntu-24.04]
+        # TEMP (branch windows-step0): Windows only while its tests are fixed; restore macos-latest and
+        # ubuntu-24.04 (and the msrv/bundle jobs) before merging.
+        os: [windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -88,6 +90,7 @@ jobs:
   # GPUI dependency builds with (it uses `std::hint::cold_path`); 1.93 and older fail. `cargo +1.95`
   # bypasses rust-toolchain.toml, which selects stable.
   msrv:
+    if: false # TEMP (branch windows-step0), restore before merging
     runs-on: macos-latest
     timeout-minutes: 60
     steps:

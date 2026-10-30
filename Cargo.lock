@@ -1276,6 +1276,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "time",
+ "windows 0.61.3",
  "xcap",
 ]
 

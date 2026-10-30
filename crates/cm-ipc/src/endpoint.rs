@@ -70,6 +70,27 @@ impl Endpoint {
         }
     }
 
+    /// An endpoint for tests and throwaway tools, unique to `dir` and `name`: a socket file
+    /// `<dir>/<name>.sock` on Unix, a pipe named from the process, the directory and `name` on
+    /// Windows (pipe names live in one machine-wide namespace, so they cannot live in `dir`).
+    pub fn scratch(dir: &Path, name: &str) -> Endpoint {
+        #[cfg(windows)]
+        {
+            use std::hash::{Hash, Hasher};
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+            dir.hash(&mut h);
+            Endpoint::Pipe(format!(
+                r"\\.\pipe\cm-scratch-{}-{:016x}-{name}",
+                std::process::id(),
+                h.finish()
+            ))
+        }
+        #[cfg(not(windows))]
+        {
+            Endpoint::Path(dir.join(format!("{name}.sock")))
+        }
+    }
+
     /// `self` when it fits a Unix socket address, else the short per-user fallback.
     pub fn or_short_fallback(self) -> Endpoint {
         match &self {
