@@ -16,7 +16,7 @@ It works from **formats and checksums** (a number that passes the Luhn check and
 4. **Accept** one proposal, **Accept all**, or **Dismiss** to forget the proposals. Accepting adds blur operations (strength at least 16), all in one undo step, so Undo takes them back together.
 5. Look at the result before you export or share. A box can be a little too wide or too narrow on proportional fonts, and text the recognizer could not read gets no box at all.
 
-The editor looks for the default kinds (below). To choose kinds, use an agent or the MCP tool.
+The editor looks for the default kinds (below). To choose kinds, open **What to look for** in the Auto-redact card: switches per group, one chip per kind, **Defaults** to reset and **Search again** to run with your choice. The choice is kept until the app closes.
 
 ## From the command line
 
@@ -27,7 +27,7 @@ capturemann annotate <id> --redact-emails               # email addresses only
 
 Both only print the proposals (rectangles in pixels of the original image, kind, confidence, masked preview). Accepting is a separate call: pass the rectangles you accept to `capturemann annotate <id> --ops` as `blur` ops.
 
-A `--kinds` flag is not built in the command line yet (the plan names it; see the specification, RED-2.AC3). The MCP tool takes `kinds` today.
+Choose kinds with `--kinds` (comma separated or repeated), for example `capturemann annotate <id> --suggest-redactions --kinds ssn,card`. A `kinds` list replaces the default list, it does not add to it. `--kinds` without `--suggest-redactions` is an error.
 
 ## From an agent (MCP)
 
@@ -69,7 +69,7 @@ These are all the kinds. The table is generated from the rule data and a test fa
 
 The "Standards that name it" column maps each kind to public lists that mention that kind of data (NIST SP 800-122, HIPAA Safe Harbor identifiers, PCI DSS, GLBA and state breach-notification laws). **It is a mapping of kinds, not a compliance claim. CaptureMann is not a compliance tool, and using it does not make a screenshot compliant with any of them.**
 
-**`npi` is off by default.** A ten-digit number passes its check digit about one time in ten, and timestamps look like it: on the synthetic dev split only 30 % of its proposals were real (see the 0.2.5 report below). Name it to turn it on, for example with the MCP tool: `"kinds": ["npi"]`, or `"kinds"` with the other kinds you want beside it (a `kinds` list replaces the default list, it does not add to it). The editor button does not offer a kind switch yet.
+**`npi` is off by default.** A ten-digit number passes its check digit about one time in ten, and timestamps look like it: on the synthetic dev split only 30 % of its proposals were real (see the 0.2.5 report below). Turn it on with its chip in **What to look for**, with `--kinds npi,...` on the command line or `"kinds": ["npi", ...]` in the MCP tool (a `kinds` list replaces the default list, it does not add to it).
 
 ## Reading the preview and the confidence
 

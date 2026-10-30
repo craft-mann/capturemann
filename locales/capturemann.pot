@@ -2021,6 +2021,9 @@ msgstr ""
 msgid "Kind"
 msgstr ""
 
+msgid "Kinds to look for"
+msgstr ""
+
 msgid "Language"
 msgstr ""
 
@@ -6466,6 +6469,10 @@ msgid "Copy"
 msgstr ""
 
 msgctxt "button"
+msgid "Defaults"
+msgstr ""
+
+msgctxt "button"
 msgid "Delete"
 msgstr ""
 
@@ -6487,6 +6494,10 @@ msgstr ""
 
 msgctxt "button"
 msgid "Edit"
+msgstr ""
+
+msgctxt "button"
+msgid "Hide options"
 msgstr ""
 
 msgctxt "button"
@@ -6554,6 +6565,10 @@ msgid "Save"
 msgstr ""
 
 msgctxt "button"
+msgid "Search again"
+msgstr ""
+
+msgctxt "button"
 msgid "Set up report"
 msgstr ""
 
@@ -6579,6 +6594,10 @@ msgstr ""
 
 msgctxt "button"
 msgid "Upload"
+msgstr ""
+
+msgctxt "button"
+msgid "What to look for"
 msgstr ""
 
 msgctxt "button"
@@ -7659,6 +7678,22 @@ msgstr ""
 
 msgctxt "recording status"
 msgid "Starting"
+msgstr ""
+
+msgctxt "redaction group"
+msgid "Contact and network"
+msgstr ""
+
+msgctxt "redaction group"
+msgid "Identity and health"
+msgstr ""
+
+msgctxt "redaction group"
+msgid "Payment"
+msgstr ""
+
+msgctxt "redaction group"
+msgid "Secrets"
 msgstr ""
 
 msgctxt "redaction kind"
