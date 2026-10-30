@@ -8,6 +8,7 @@ SUPPORT, CHANGELOG, LICENSE, NOTICE) are the standard project files; everything 
 | Document | What it is |
 |---|---|
 | [User guide](user/user-guide.md) | Screenshots, recording, editing, captions, publishing, agents |
+| [Auto-redact](user/redaction.md) | Find personal data and secrets in a screenshot, kinds, limits |
 | [Connect Google Drive and YouTube](user/google-setup.md) | Create your own Google client and connect |
 | [macOS permissions](user/macos-permissions.md) | Screen Recording, signing identity, keychain prompts |
 
@@ -18,6 +19,7 @@ SUPPORT, CHANGELOG, LICENSE, NOTICE) are the standard project files; everything 
 | [Contributing](../CONTRIBUTING.md) | Ground rules and what a good PR contains |
 | [Architecture overview](development/architecture.md) | The crates, how the clients reach the action bus, where to look |
 | [Building from source](development/building.md) | Toolchain, tests, the macOS bundle, FFmpeg |
+| [Auto-redact rules and benchmark](development/redaction.md) | Add a rule or a recognizer, run the benchmark, the generated tables |
 | [Releasing](development/releasing.md) | Cut a release: tag, workflow, signing secrets, notarization, rollback |
 | [Design surfaces](development/design-surfaces.md) | Product surfaces mapped to the design kit in [`design/`](../design/CLAUDE.md) (cited in specs as "DESIGN §n") |
 | [Writing documentation](development/documentation.md) | Where a new document goes, naming, links |

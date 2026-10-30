@@ -11,6 +11,7 @@ are run by hand, see [`CLAUDE.md`](../../CLAUDE.md).
 | Script | What it checks |
 |---|---|
 | [`ANN-2`](ANN-2.md) | Auto-redact (emails and keys) in the annotation editor |
+| [`RED-1`](RED-1.md) | Auto-redact on real app screenshots: counts only (found, missed, false alarms) |
 | [`CAP-1-overlay`](CAP-1-overlay.md) | CAP-1 / CAP-3 manual script: the overlay picker (`apps/overlay`, `cm-overlay`) |
 | [`CAP-1`](CAP-1.md) | Capture display, window, region (`cm-capture` library side) |
 | [`CAP-4`](CAP-4.md) | The clipboard (PNG and TIFF) and "Also save a PNG to a folder" |

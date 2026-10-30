@@ -77,6 +77,10 @@ Pending:
 
 Deferred (not in 0.2.0): the first-use setup sheet (one place to get the speech and text models when you first need them; **not in 0.2.1 either**, which is Intel support only, maintainer decision Oct 28, 2026); VOC-3 live transcript to a later 0.2.x; Ollama and LM Studio (backlog); Intel Macs, Windows and Linux. Windows is untouched by this work.
 
+## Release 0.2.5 (Auto-redact for US personal data and secrets; in progress, not released)
+
+Plan: [`specs/plans/release-0.2.5-plan.md`](../../specs/plans/release-0.2.5-plan.md); spec: [`specs/features/17-redaction.md`](../../specs/features/17-redaction.md) (RED-1 to RED-3). **Auto-redact:** 21 kinds (cards with expiry and code, SSN, ITIN, EIN, routing, IBAN, NPI, DEA, MBI, passport, VIN, IMEI, IPv6, MAC, private-key blocks, secret assignments, URLs with secrets, plus the old four) are tested with fakes in `cm-render` (scripted text lines, no OCR engine) and through the daemon, MCP and CLI; `npi` is off by default. The benchmark (`redaction_bench`: synthetic set, recall, precision, false alarms, leak rate) ran on macOS with Apple Vision on the `dev` split only and its two reports are stored in `verification/benchmarks/` (`redaction-0.2.3-baseline-2026-10-30.md`, `redaction-0.2.5-dev-2026-10-30.md`); the `held_out` split has not been read, and all figures are synthetic. The README table of kinds is generated from the rule data and checked by a test (RED-3.AC1). **Not done:** the editor has no kind switch (it asks for the default kinds), the CLI has no `--kinds` flag (RED-2.AC3 is open for the CLI), the editor button and boxes are untested by eye, `tests/manual/RED-1.md` (real screenshots, counts only) has not been run, the generic `token` rule is above the false-alarm gate on screenshots with nothing to find and stays on pending the maintainer's decision, and Windows and Linux have no recognizer. Not a compliance tool.
+
 ## Release 0.2.4 (performance and diagnostics)
 
 **Released Oct 30, 2026** (tag `v0.2.4`, both chips, notarized, published by the maintainer; Intel fix for issue 16 not confirmed on a real Intel Mac, retest requested from the reporter).

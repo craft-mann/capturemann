@@ -30,8 +30,9 @@ CaptureMann" button).
 | ⌥⇧L | Open the library |
 
 Every screenshot is saved to your library. Open it to annotate: arrows, rectangles, ellipses, text,
-pen, highlight and blur, plus **Auto-redact**, which finds emails, keys and tokens, phone numbers
-and IP addresses and offers to blur them (you accept or dismiss each one). You can also copy to
+pen, highlight and blur, plus **Auto-redact**, which finds emails, keys and tokens, payment cards,
+ID, bank and health numbers, phone numbers and IP addresses and offers to blur them (you accept or
+dismiss each one; see [Auto-redact](redaction.md) for what it finds and its limits). You can also copy to
 the clipboard, or save a PNG to a folder you choose (Settings → Capture).
 
 ## Recording
