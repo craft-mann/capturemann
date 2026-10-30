@@ -18,4 +18,4 @@ libc.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 # The version cm-cursor and cm-capture use.
-windows = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Performance"] }
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Performance", "Win32_System_ProcessStatus", "Win32_System_Threading"] }

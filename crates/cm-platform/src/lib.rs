@@ -5,3 +5,4 @@
 //! This crate has no dependency on another CaptureMann crate, so `cm-core` can use it.
 
 pub mod clock;
+pub mod memory;
