@@ -195,7 +195,11 @@ pub fn scan(root: &Path) -> std::io::Result<BTreeMap<String, Sig>> {
         out.insert(
             name,
             Sig {
-                dir_mtime: entry.metadata().ok().and_then(|m| m.modified().ok()),
+                // Not `entry.metadata()`: on Windows that is the copy cached in the parent's directory
+                // entry, which NTFS refreshes late, so a quiet folder seemed to change seconds later.
+                dir_mtime: std::fs::metadata(&path)
+                    .ok()
+                    .and_then(|m| m.modified().ok()),
                 manifest,
                 locked: path.join(LOCK_FILE).exists(),
             },

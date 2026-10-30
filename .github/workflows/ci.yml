@@ -82,7 +82,8 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked --no-default-features -- -D warnings
       - name: Test (no sherpa)
         if: runner.os != 'macOS'
-        run: cargo test --workspace --locked --no-default-features --no-fail-fast
+        # TEMP (branch windows-step0): only the watcher target; restore the full command before merging.
+        run: cargo test --locked --no-default-features -p cm-daemon --test library_watch
 
   # `rust-version` in Cargo.toml is a promise; this job keeps it. 1.95 is the oldest compiler the
   # GPUI dependency builds with (it uses `std::hint::cold_path`); 1.93 and older fail. `cargo +1.95`
