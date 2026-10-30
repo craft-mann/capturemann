@@ -18,6 +18,10 @@ Hardware tests are `#[ignore]`d. They record your screen, camera or microphone, 
 purpose and one at a time (commands in [`CLAUDE.md`](../../CLAUDE.md)). Manual test scripts are in
 [`tests/manual/`](../../tests/manual); reports of runs go in [`verification/`](../../verification/README.md).
 
+### GPU tests time out after many debug builds (macOS)
+
+If tests that use the GPU (`recedit::render::tests::worker_is_latest_wins_and_stops`, `source_errors_keep_the_last_picture`, and the `cm-render` compose tests) start failing with "timed out" or take minutes, count the files in `target/debug/deps`. On macOS the debug profile leaves one `.o` object file per codegen unit next to every test binary (`split-debuginfo` defaults to `unpacked`), and after a day of builds the folder holds 800,000 files. The first time a test initializes Metal, macOS reads the whole folder that contains the test executable (CoreFoundation looks for the "main bundle" there), which took more than 20 seconds with 845,000 entries (found Oct 30, 2026 by sampling the stuck process; the same binary run from a small folder passed in 0.5 s). Fix without a rebuild: `find target/debug/deps -maxdepth 1 -name '*.o' -delete` (the objects only carry debug information; `cargo` does not need them to decide what to rebuild, and they also take about 80 GB). Cleaning `target/debug/incremental` now and then keeps the disk in check too.
+
 ## Build and run the app (macOS)
 
 ```sh
