@@ -12,6 +12,7 @@ Implementation-ready specs for CaptureMann v0.1 and the next release: 70 require
 | `03-integrations.md` | Integrations | BYO auth model, storage and publishing API details, sources |
 | `04-delivery-plan.md` | Delivery plan | Milestones M0–M7 with build status, v0.1 acceptance checklist, risks, open questions |
 | `plans/design-implementation.md` | — | Traceability from design-kit screens and components to spec IDs and build status; decided design questions (OD-1 to OD-11) and the open ones (OD-12, OD-13) |
+| `platform-acceptance.md` | — | Per requirement: what changes on Windows and Linux, the plan stage that builds it, how it is checked (IDs and ACs unchanged) |
 | `../docs/development/design-surfaces.md` | — | Product-side design contract (surfaces mapped to the kit in `../design/`), referenced as "DESIGN §n" |
 
 ## Plans
