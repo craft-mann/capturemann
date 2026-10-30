@@ -503,11 +503,14 @@ impl<'f> Ctx<'f> {
             .copied()
             .filter(|k| *k != "card" || self.card_world)
             .collect();
-        let kind: &'static str = if usable.is_empty() || (!self.positive && !kinds.is_empty()) {
+        // `pick` gives `&&'static str`; copy the inner reference out in its own statement (the
+        // MSRV compiler infers it wrongly when the pick sits under a type annotation).
+        let picked = if usable.is_empty() || (!self.positive && !kinds.is_empty()) {
             self.rng.pick(kinds)
         } else {
             self.rng.pick(&usable)
         };
+        let kind: &'static str = picked;
         if self.positive && usable.contains(&kind) && self.rng.chance(0.75) {
             if kind == "url_secret" {
                 let (pre, secret, post) = data::url_secret(&mut self.rng);
