@@ -3,7 +3,7 @@
 //! independent of the detector (`crate::ocr::rules`): a bug in one does not hide a bug in the
 //! other.
 
-use super::rng::{Rng, ALNUM, B64, B64URL, HEX, LOWER, LOWNUM, UPNUM, UPPER};
+use super::rng::{Rng, ALNUM, B64, B64URL, HEX, LOWNUM, UPNUM, UPPER};
 
 // ---------------------------------------------------------------------------------------------
 // Checksums (also used by the tests as validators)
@@ -53,6 +53,7 @@ pub fn npi_valid(s: &str) -> bool {
     s.len() == 10 && s.bytes().all(|b| b.is_ascii_digit()) && luhn_valid(&format!("80840{s}"))
 }
 
+#[cfg(test)]
 pub fn dea_valid(s: &str) -> bool {
     let b = s.as_bytes();
     if b.len() != 9 || !b[0].is_ascii_uppercase() || !b[1].is_ascii_uppercase() {
@@ -79,6 +80,7 @@ fn mod97(s: &str) -> u32 {
     rem
 }
 
+#[cfg(test)]
 pub fn iban_valid(s: &str) -> bool {
     let c: String = s.chars().filter(|c| !c.is_whitespace()).collect();
     if c.len() < 15 {
@@ -115,6 +117,7 @@ fn vin_check_char(v: &[char]) -> char {
     }
 }
 
+#[cfg(test)]
 pub fn vin_valid(s: &str) -> bool {
     let v: Vec<char> = s.chars().collect();
     v.len() == 17
@@ -125,6 +128,7 @@ pub fn vin_valid(s: &str) -> bool {
 
 const MBI_ALPHA: &str = "ACDEFGHJKMNPQRTUVWXY";
 
+#[cfg(test)]
 pub fn mbi_valid(s: &str) -> bool {
     let c: Vec<char> = s.chars().filter(|c| *c != '-').collect();
     if c.len() != 11 {
@@ -306,8 +310,9 @@ pub fn city_line(rng: &mut Rng, vi: bool) -> String {
 // Sensitive values
 // ---------------------------------------------------------------------------------------------
 
-/// A payment card: digits and the displayed form.
+/// A payment card: the displayed form.
 pub struct Card {
+    #[cfg(test)]
     pub digits: String,
     pub shown: String,
     pub amex: bool,
@@ -386,6 +391,7 @@ pub fn card(rng: &mut Rng) -> Card {
     let amex = digits.len() == 15;
     let shown = group_card(&digits, amex, rng);
     Card {
+        #[cfg(test)]
         digits,
         shown,
         amex,
@@ -799,42 +805,6 @@ pub fn pem_block(rng: &mut Rng, body_lines: usize) -> Vec<String> {
 // Decoys
 // ---------------------------------------------------------------------------------------------
 
-pub const DECOY_KINDS: [&str; 33] = [
-    "order_number",
-    "part_number",
-    "tracking_number",
-    "uuid",
-    "git_hash",
-    "version_string",
-    "timestamp",
-    "isbn",
-    "luhn_fail_16_digits",
-    "coordinates",
-    "dollar_amount",
-    "table_number",
-    "bare_date",
-    "masked_ssn",
-    "masked_card",
-    "placeholder_secret",
-    "vin_fail",
-    "imei_fail",
-    "npi_fail",
-    "iban_fail",
-    "plain_url",
-    "invoice_number",
-    "ten_digit_id",
-    "masked_account",
-    "lone_expiry",
-    "lone_code",
-    "epoch_ms",
-    "build_number",
-    "hex_color",
-    "file_size",
-    "percentage",
-    "short_hash",
-    "semver_range",
-];
-
 /// Decoys that look like `kind` (so the negatives are hard ones).
 pub fn related_decoys(kind: &str) -> &'static [&'static str] {
     match kind {
@@ -1120,16 +1090,6 @@ pub fn standards(kind: &str) -> Vec<String> {
         _ => &[],
     };
     v.iter().map(|s| (*s).to_string()).collect()
-}
-
-/// Lower-case letters and digits, used by layouts for harmless filler identifiers.
-pub fn slug(rng: &mut Rng, n: usize) -> String {
-    rng.chars(n, LOWNUM)
-}
-
-pub fn lower_word(rng: &mut Rng) -> String {
-    let n = rng.range(4, 8) as usize;
-    rng.chars(n, LOWER)
 }
 
 #[cfg(test)]

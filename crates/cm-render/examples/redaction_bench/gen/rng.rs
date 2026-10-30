@@ -5,6 +5,7 @@
 pub struct Rng(u64);
 
 impl Rng {
+    #[cfg(test)]
     pub fn new(seed: u64) -> Self {
         Rng(seed)
     }
@@ -56,17 +57,9 @@ impl Rng {
         let a: Vec<char> = alphabet.chars().collect();
         (0..n).map(|_| a[self.below(a.len())]).collect()
     }
-
-    pub fn shuffle<T>(&mut self, v: &mut [T]) {
-        for i in (1..v.len()).rev() {
-            let j = self.below(i + 1);
-            v.swap(i, j);
-        }
-    }
 }
 
 pub const UPPER: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-pub const LOWER: &str = "abcdefghijklmnopqrstuvwxyz";
 pub const ALNUM: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 pub const UPNUM: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 pub const LOWNUM: &str = "abcdefghijklmnopqrstuvwxyz0123456789";

@@ -390,11 +390,6 @@ impl<'f> Ctx<'f> {
         })
     }
 
-    /// Plain text line (no ground truth).
-    pub fn plain(&mut self, x: f32, y: f32, px: f32, color: Color, s: &str) -> Option<Placed> {
-        self.line(x, y, px, color, &[p(s)])
-    }
-
     /// Width in logical px of `s` at `px` (no drawing, nothing recorded).
     pub fn measure(&mut self, px: f32, s: &str) -> f32 {
         let ppx = px * self.scale as f32;
@@ -534,17 +529,6 @@ impl<'f> Ctx<'f> {
     pub fn decoy_for(&mut self, kind: &str) -> Vec<Seg> {
         let what = *self.rng.pick(data::related_decoys(kind));
         vec![d(what, data::decoy(what, &mut self.rng))]
-    }
-
-    /// Any decoy at all (never a lone expiry or code: those only come with `card_inline`).
-    pub fn any_decoy(&mut self) -> Seg {
-        loop {
-            let what = *self.rng.pick(&data::DECOY_KINDS);
-            if what == "lone_expiry" || what == "lone_code" {
-                continue;
-            }
-            return d(what, data::decoy(what, &mut self.rng));
-        }
     }
 
     /// `NAME=value` (or `"name": "value",` for JSON) with the value as the truth in a positive

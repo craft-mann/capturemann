@@ -9,8 +9,6 @@
 //! `gen/` writes a set (see `schema.rs`), `harness/` reads one. All data is synthetic.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
-// The stubs do not use the schema yet; the generator and harness work removes this.
-#![allow(dead_code)]
 
 mod gen;
 mod harness;
