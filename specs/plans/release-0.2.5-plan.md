@@ -1,6 +1,6 @@
 # Release 0.2.5 plan: US PII coverage for Auto-redact, measured and published
 
-Status: **draft, revision 2** (Oct 29, 2026), nothing built. Scope set by the maintainer: Auto-redact keeps
+Status: **draft, revision 3** (Oct 30, 2026), nothing built. **Revision 3 narrows the scope to structure and checksum rules (group A) and secrets (group B); see "Scope of 0.2.5".** Scope set by the maintainer: Auto-redact keeps
 working as it does today (the user reviews proposals and accepts them; **no automatic apply, no agent-side
 redaction in this release**). What changes is *what it finds*: extend the target information so the kinds of
 personal data named by the main US standards are covered as far as they can be seen on a screenshot, prove
@@ -9,6 +9,33 @@ one-image fixes (open source); **nothing is called "verified", "accurate" or "co
 report**; all benchmark data is synthetic; on-device only, no network, no telemetry; no GPL; every option
 has an MCP parameter and a CLI flag; UI text through `cm_i18n`. Builds on ANN-1 and ANN-2
 (`specs/features/02-annotation.md`).
+
+## Scope of 0.2.5 (revision 3, Oct 30, 2026)
+
+The maintainer limited this release to two groups. Everything else in this document that is not in them is
+**deferred** (kept below as the longer-term map, marked where it matters).
+
+**In 0.2.5: group A, structure and checksum rules** (no label or word list needed):
+payment card (Luhn, issuer prefix, length 13 to 19) and **card security data beside it (expiry date and CVV/CVC, found by position next to a detected card number, no label list; see Stage 1 item 1)**, SSN (`NNN-NN-NNNN` or spaced, issuable ranges), ITIN, EIN,
+ABA routing number, IBAN, NPI, DEA number, Medicare Beneficiary Identifier, VIN, IMEI, US passport number, phone
+and fax (NANP rules, `1-800`, extensions), email (have), IPv4 (have), IPv6, MAC address.
+
+**In 0.2.5: group B, secrets and credentials:** the token rules we have; more provider key shapes as versioned
+data; PEM private-key blocks; `NAME=value` and `"name": "value"` pairs with a secret-looking name; URLs with
+credentials or token query strings; an entropy measure for generic secrets only if the benchmark shows it beats
+the digits-ratio rule.
+
+**Deferred (not built, not benchmarked, not promoted in 0.2.5):** every kind that needs a label or a word list
+(dates of birth and other dates, medical record and member numbers, driver's licence and state ID, account
+numbers, licence plates, stand-alone CVV and expiry fields with no card number on screen (label-based, agreed Oct 30), labelled serials, names next to a label), street address blocks and ZIP, home-folder
+user names, person names by the language tagger, faces, QR codes and barcodes, small-text re-reading, and
+layout handling for values split across lines. Consequences:
+- The open decision on **label lists is moot** for this release (no label data is added).
+- A bare nine-digit number is **not** proposed as an SSN; only the dashed or spaced form is (it has no label to
+  confirm it). Same for cards: Luhn alone is not enough, the issuer prefix and length are required.
+- Public wording must not claim coverage of HIPAA identifiers 1, 2, 3, 8 (MRN), 9 (member ID), 11 (licences),
+  12 (plates), 16, 17 or 18; the mapping table says "not in 0.2.5" for them.
+- The benchmark set needs ground truth and layouts only for A and B kinds; the negatives still matter most.
 
 ## What the app redacts today (0.2.3, `crates/cm-render/src/ocr/detect.rs`)
 
@@ -108,7 +135,7 @@ review. No compliance claims, and every number links to its stored report.
 
 Done when: one command builds the set and runs the harness from a clean checkout, and the baseline is stored.
 
-## Stage 1: new kinds (AI-free, general techniques)
+## Stage 1: new kinds (AI-free, general techniques; revision 3: items 1 and 2 only)
 
 Each kind arrives with its benchmark rows and is kept as a default only if the false-alarm rate on the
 negatives stays low (target set after the baseline, for example below one false alarm per five screenshots
@@ -116,14 +143,14 @@ for the default set). Kinds that rely on context are proposed with lower confide
 user can see why. Techniques:
 
 1. **Structure and checksum rules**, which give high precision without lists: payment cards (Luhn plus
-   issuer prefixes and lengths; masked forms are skipped), ABA routing numbers, IBAN, NPI, DEA, VIN (check
+   issuer prefixes and lengths; masked forms are skipped; **kind `card_extra`: an expiry (`MM/YY`, `MM/YYYY`, valid month) or a 3 or 4 digit code (4 for American Express) on the same line as, or the line directly after or before, a detected card number, or in the same card-shaped group, so no label word is needed; a lone `MM/YY` or 3-digit number elsewhere is never proposed; a CVV or expiry with no card number on the screen is a known miss and is written in the limits**), ABA routing numbers, IBAN, NPI, DEA, VIN (check
    digit), IMEI (Luhn), EIN prefixes, ITIN ranges, SSN issuable ranges, MBI position rules, NANP phone rules.
    Rules are data with a test each, and each cites its public source in a comment.
 2. **Secrets by structure:** more provider key shapes as versioned data, private-key blocks through their
    end line, `NAME=value` and `"name": "value"` pairs with a secret-looking name (the key rules of the job
    store's `scrub_secrets` are the model), URLs with credentials or token query strings, an **entropy**
    measure for generic secrets if the benchmark shows it beats the digits-ratio rule, IPv6, MAC addresses.
-3. **Contextual detection:** a value that follows or sits under a label ("SSN", "Date of birth", "Member
+3. **[Deferred, not in 0.2.5]** **Contextual detection:** a value that follows or sits under a label ("SSN", "Date of birth", "Member
    ID", "MRN", "Driver's license", "Account number", "Password", "Address", "ZIP"...) is likely sensitive.
    The label list is **data, per language** (English first, in the locale files so translators can extend
    it) and the match is by position (right of or below the label), not by a fixed screen. Used for dates of
@@ -131,12 +158,12 @@ user can see why. Techniques:
    **Maintainer decision needed:** this is the one place where word lists are part of the design. It fits the
    rule "techniques and options, not one-case fixes" because the lists are general and per language, but
    confirm.
-4. **Address blocks:** street line (number, street name, suffix such as St, Ave, Blvd, Apt, Suite),
+4. **[Deferred, not in 0.2.5]** **Address blocks:** street line (number, street name, suffix such as St, Ave, Blvd, Apt, Suite),
    city, two-letter state, ZIP or ZIP+4, found as a pattern across one or two lines.
-5. **Dates in context:** only dates next to a label that ties them to a person (birth, admission, discharge,
+5. **[Deferred, not in 0.2.5]** **Dates in context:** only dates next to a label that ties them to a person (birth, admission, discharge,
    death); a bare date is never proposed.
-6. **File-path names:** the user-name part of home-folder paths.
-7. **Layout handling:** values broken across two lines, label and value in table cells, text with letter
+6. **[Deferred, not in 0.2.5]** **File-path names:** the user-name part of home-folder paths.
+7. **[Deferred, not in 0.2.5]** **Layout handling:** values broken across two lines, label and value in table cells, text with letter
    spacing; judged by the layout split of the benchmark.
 
 Done when: recall, precision and leak rate are stored for each new kind, the default kinds are chosen by the
@@ -144,9 +171,9 @@ numbers, the kind names exist in MCP `suggest_redactions { kinds }` and the CLI 
 panel can switch kinds on and off, and the README table of kinds is **generated from the same rule data**
 (so documentation cannot drift from the code).
 
-## Stage 2: names, faces and codes through the operating system (optional, decided by the numbers)
+## Stage 2: names, faces and codes through the operating system (deferred out of 0.2.5)
 
-Only where Stage 1 leaves a large gap, each behind the recognizer trait, on-device, with benchmark rows:
+Not built in 0.2.5. Kept as the map for a later release; only where Stage 1 leaves a large gap, each behind the recognizer trait, on-device, with benchmark rows:
 
 1. **Person names** with the operating system's language tagging (macOS NaturalLanguage name tagger: nothing
    to ship; its quality is measured, not assumed). A shipped model needs a permissive licence, a SHA-256 pin
@@ -176,9 +203,10 @@ Rejected ideas are written down with their numbers.
 Acceptance (new IDs `RED-1` to `RED-3` in a feature file; ANN-2 keeps its IDs):
 - **RED-1.AC1** Given the benchmark set, then the harness reports recall, precision, false alarms and
   end-to-end leak rate per identifier and per standard, and the report is stored.
-- **RED-2.AC1** Given a screenshot with a Luhn-valid card number, an SSN with its label and a PEM key block,
-  then three proposals are made; given a 16-digit order number that fails Luhn and a nine-digit part
+- **RED-2.AC1** Given a screenshot with a Luhn-valid card number, a dashed SSN (no label needed) and a PEM key block,
+  then three proposals are made; given a 16-digit order number that fails Luhn and a bare nine-digit part
   number, then none is.
+- **RED-2.AC4** Given a Luhn-valid card number with `12/27` and `123` on the same line, then expiry and code are proposed as `card_extra`; given `12/27` and `123` with no card number on the screen, then nothing is.
 - **RED-2.AC2** Given a masked SSN (`***-**-6789`) or a card shown as `**** 1111`, then nothing is proposed
   for the masked part.
 - **RED-2.AC3** Given `kinds: ["ssn"]`, then only SSN proposals are returned (MCP and CLI the same).
@@ -188,13 +216,24 @@ Acceptance (new IDs `RED-1` to `RED-3` in a feature file; ANN-2 keeps its IDs):
 
 Stage 0 about a week (the generator is the work). Stage 1 about a week, in the order of value and precision:
 checksummed identifiers (cards, SSN, ABA, NPI, VIN), structured secrets, then context and addresses. Stage 2
-only if needed, about 3 days per recognizer. Stage 3 about 3 days. Core: Stage 0, Stage 1 items 1 to 5, and
-Stage 3; everything else is stretch. Anything that does not meet its "done when" is dropped and written down.
+only if needed, about 3 days per recognizer. Stage 3 about 3 days. Revision 3 core: Stage 0, Stage 1 items 1 and 2, and
+Stage 3 (so Stage 1 shrinks to a few days); everything else is deferred. Anything that does not meet its "done when" is dropped and written down.
 
-Decisions needed from the maintainer: the contextual labels (Stage 1.3); the false-alarm target; whether
-faces and codes are in this release; where the data set is hosted; whether the website may say "built around
-the identifiers named by NIST SP 800-122, HIPAA Safe Harbor and PCI DSS" (my proposal, with the
-no-compliance line next to it).
+Decisions (maintainer, Oct 30, 2026):
+- **Release focus:** 0.2.5 is redaction only. Nothing else (including the issue 16 follow-up) is scheduled into it; if
+  a 0.2.4 problem needs a fix it ships as its own 0.2.4.x.
+- **False-alarm gate:** default-on kinds must stay below one false alarm per five negative screenshots; the
+  number is re-checked against the baseline and any change is recorded here. Kinds above it ship off by default.
+- **Data set:** built on demand from a seeded generator; no images are published or committed.
+- **Website wording:** lead with the formats found (payment card and security data, SSN and tax IDs, health and
+  bank identifiers, credentials); name NIST SP 800-122, HIPAA Safe Harbor and PCI DSS only in the mapping table,
+  with the no-compliance line beside it.
+- **Manual cross-check:** the maintainer runs Auto-redact on real app screenshots near the end; numbers only
+  in `tests/manual/`, images never stored.
+- **Benchmark design (adopted on my recommendation, say if you object):** degraded images (JPEG, rescaling,
+  blur) with the leak rate reported for clean and degraded separately; a Rust-only renderer so one command
+  works from a clean checkout; numeric recall and leak gates per default-on kind, set after the baseline;
+  thresholds tuned on the dev half of the layouts only; a first set of about 300 images, grown later.
 
 ## Risks
 
@@ -209,6 +248,6 @@ no-compliance line next to it).
 
 ## Not in 0.2.5
 
-Automatic apply, redaction of screenshots returned to agents, video, audio and transcript redaction, cloud
+Everything listed as deferred in "Scope of 0.2.5", automatic apply, redaction of screenshots returned to agents, video, audio and transcript redaction, cloud
 OCR or AI models that send data away, other countries' standards (EU/GDPR, Vietnam, and so on; the rule data
 is built so they can be added), and Windows.
