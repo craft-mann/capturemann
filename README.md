@@ -25,7 +25,7 @@ through MCP and a CLI.
   <img alt="The CaptureMann library: recordings, audio and screenshots in one place, with a record button, region, window and display capture, and the AI and agent pages in the sidebar" src="docs/images/library.webp" width="900">
 </p>
 
-> **Status: 0.2.4 (macOS 13+, Apple Silicon and Intel).** Windows, then Linux follow. Most results are
+> **Status: 0.2.5 (macOS 13+, Apple Silicon and Intel).** Windows, then Linux follow. Most results are
 > tested with scripted fakes, plus the maintainer's own use on one Mac; there are few stored hardware
 > reports. **Speaker labels** are measured on public English conversation clips only (diarization error
 > 17 % on clips held back, [report](verification/benchmarks/speaker-detection-2026-10-29.md)); Vietnamese

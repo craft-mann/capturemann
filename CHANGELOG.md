@@ -5,6 +5,10 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-10-30
+
+0.2.5 is about what Auto-redact finds: 21 kinds of sensitive text instead of 4, chosen from the editor, the command line or an agent, with a benchmark that measures it. Benchmark results comparing 0.2.3 and 0.2.5 are added to the release notes from the stored reports in `verification/benchmarks/`.
+
 ### Added
 
 - **Auto-redact finds 21 kinds instead of 4.** Besides emails, tokens, phone numbers and IPv4 addresses it now proposes payment cards (Luhn, issuer prefix, length) with the expiry date or security code beside them (`card_extra`, found by position, no label needed), Social Security numbers (issuable ranges, masked forms skipped), ITINs, EINs, ABA routing numbers, IBANs, NPIs, DEA numbers, Medicare Beneficiary Identifiers, US passport numbers, VINs, IMEIs, IPv6 and MAC addresses, PEM private-key blocks, `NAME=value` and `"name": "value"` secrets, and URLs that carry a password or a secret in the query. Still only proposals: nothing is applied until you accept, and it runs on your Mac with no network. The MCP tool `suggest_redactions` takes the new kind names in `kinds` (the command line has no `--kinds` flag yet). Details: [`docs/user/redaction.md`](docs/user/redaction.md), spec `specs/features/17-redaction.md` (RED-1 to RED-3).
