@@ -44,9 +44,9 @@ Scope: everything in 0.2.x that works on macOS and has an OS API on Windows; ite
 
 | Stage | Content | Done when |
 |---|---|---|
-| W0 | Windows machines; spikes S1 to S6 on Windows; QPC clock; named-pipe IPC tests; Credential Manager smoke test | each spike has a stored report and Go / conditional Go / No-go in `docs/project/spikes.md`; GPUI on Windows judged (S5), iced is the recorded fallback |
+| W0 | the primary Windows machine (D-W1); spikes S1 to S6 on Windows (S6 also checks, as assumptions to confirm, whether Windows 10 22H2 shows the yellow capture border and whether it appears in the recording, and the CPU load of a 1080p30 recording on this machine); QPC clock; named-pipe IPC tests; Credential Manager smoke test | each spike has a stored report and Go / conditional Go / No-go in `docs/project/spikes.md`; GPUI on Windows judged (S5), iced is the recorded fallback |
 | W1 | Screenshots, overlay (DPI 100/150/mixed), library, tray, hotkeys, `WDA_EXCLUDEFROMCAPTURE`, clipboard, login item, permission links | `CAP-1`, `CAP-1-overlay`, `ANN-2`, `PRM-1` Windows runs stored |
-| W2 | Windows.Graphics.Capture source, Media Foundation H.264 hardware encoder into the shared fragmented-MP4 writer, pause and crash recovery | hardware tests pass on two machines; 10-minute soak; 4K30 for 30 minutes on an NVIDIA machine; no hardware encoder gives `hardware_encoder_unavailable` |
+| W2 | Windows.Graphics.Capture source, Media Foundation H.264 hardware encoder into the shared fragmented-MP4 writer, pause and crash recovery | hardware tests pass on the primary machine; 10-minute soak; **30 minutes of 1080p30 with screen, microphone, system audio, webcam bubble and cursor on the primary machine** (a 15 W integrated-graphics laptop); 1080p60, 1440p and 4K are measured and reported, not gated; no hardware encoder gives `hardware_encoder_unavailable` (checked in a VM without a GPU) |
 | W3 | WASAPI loopback with own-process exclusion, microphone, Media Foundation camera and live bubble, cursor hook | `REC-1`, `REC-5`, `REC-7`, `CAM-1`, `CAM-2`, `AUD-1`, `VOC-1`, `I18N-IME` Windows runs stored; 50 ms sync budget measured |
 | W4 | DX12 compositor, preview upload path measured, Windows LGPL FFmpeg build with a self-check like macOS | `parity` test passes on Windows hardware; `EXP-1/2`, `EDT-1..5`, `PLAY-1`, `CAM-3` runs stored; no GPL in any shipped binary |
 | W5 | `Windows.Media.Ocr` recognizer, whisper CPU, sherpa-onnx and llama Windows builds, publishing with the Windows credential store | `AI-5/7/8/9`, `PUB-1/2`, clean-VM first run stored |
@@ -59,7 +59,7 @@ Small releases (about every 1 to 2 weeks while reports arrive, time-boxed). Orde
 antivirus and SmartScreen on a new binary that hooks the mouse, OneDrive-redirected folders and long paths,
 sleep and lid close, windows of elevated apps, Narrator, Vietnamese IME edge cases, installer upgrades. The
 0.2.4 diagnostics export gains GPU, driver and OS build. "Stable" bar (proposal): two consecutive point releases
-without a lost or unplayable recording, the 30-minute 4K30 gate re-run on two GPU vendors with reports, signing
+without a lost or unplayable recording, the 30-minute 1080p30 gate re-run on a second GPU vendor and on Windows 11 with reports, signing
 state documented, winget package accepted.
 
 ## 0.4.0: Linux (x64; Wayland first on GNOME and KDE, X11 where the same code works)
@@ -98,7 +98,7 @@ matrix is published.
 
 ## Decisions needed from the maintainer
 
-Windows: **D-W1** hardware (which machines and GPUs; a cloud GPU VM for the NVENC path; a self-hosted runner);
+Windows: **D-W1** hardware: **decided Oct 30, 2026**: the maintainer's ThinkPad (Windows 10 22H2, Intel Core i7-8665U 1.9 GHz, 32 GB RAM, Intel UHD 620 integrated graphics, built-in webcam and microphone) is the primary machine; no dedicated GPU is required (Media Foundation picks Quick Sync, AMD or NVENC itself). Before 0.3.0 is called stable add a second GPU vendor (AMD or NVIDIA, through beta testers or a rented cloud machine) and a Windows 11 check (VM or another PC); a self-hosted runner stays open;
 **D-W2** x64 only for 0.3.0 and ARM64 later?; **D-W3** installer format (NSIS, MSI, MSIX; per-user; portable zip);
 **D-W4** code-signing route and who holds the identity (Azure Artifact Signing, OV/EV certificate, SignPath
 Foundation, Microsoft Store, or unsigned beta with SHA-256 files; eligibility and costs to be checked);
