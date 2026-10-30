@@ -1,6 +1,6 @@
 # RED-1 manual script: Auto-redact on real app screenshots (counts only)
 
-The benchmark ([`verification/benchmarks/redaction-0.2.5-dev-2026-10-30.md`](../../verification/benchmarks/redaction-0.2.5-dev-2026-10-30.md)) is measured on synthetic screenshots made by this project, so it can flatter the detector. This script is the cross-check on **real** screenshots of real apps. It records **numbers only**. The screenshots are never stored, committed, attached to an issue or sent anywhere.
+The benchmark ([`verification/benchmarks/redaction-0.2.5-final-2026-10-30.md`](../../verification/benchmarks/redaction-0.2.5-final-2026-10-30.md)) is measured on synthetic screenshots made by this project, so it can flatter the detector. This script is the cross-check on **real** screenshots of real apps. It records **numbers only**. The screenshots are never stored, committed, attached to an issue or sent anywhere.
 
 Needs: a Mac with the Apple Vision recognizer (macOS 13 or later), the app built from the commit under test (`make bundle-dev`), and 20 or more real screenshots of apps you actually use (a mail client, a bank or billing page, a CRM, a terminal or `.env` file, a settings page, a chat, a log viewer; screenshots from your own work, in the sizes and themes you use).
 

@@ -9,11 +9,30 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 0.2.5 is about what Auto-redact finds: 21 kinds of sensitive text instead of 4, chosen from the editor, the command line or an agent, with a benchmark that measures it. Benchmark results comparing 0.2.3 and 0.2.5 are added to the release notes from the stored reports in `verification/benchmarks/`.
 
+### Benchmark results (Auto-redact, 0.2.3 to 0.2.5)
+
+Measured with Apple Vision on an Apple M4 Pro (macOS 26.6.2), on 300 synthetic screenshots made by the project from a fixed seed: 211 images in the `dev` layouts and 89 in four `held_out` layouts that were read once after everything was fixed. Report: [`redaction-0.2.5-final-2026-10-30.md`](https://github.com/craft-mann/capturemann/blob/v0.2.5/verification/benchmarks/redaction-0.2.5-final-2026-10-30.md).
+
+| | dev: 0.2.3 | dev: 0.2.5 | held-out: 0.2.3 | held-out: 0.2.5 |
+|---|---|---|---|---|
+| Kinds looked for | 4 | 20 | 4 | 20 |
+| Items scored | 1,367 | 2,275 | 436 | 1,410 |
+| Found | 92.2 % | 95.3 % | 94.5 % | 98.6 % |
+| Precision | 68.8 % | 92.0 % | 69.2 % | 94.4 % |
+| False alarms per image | 2.725 | 0.417 | 2.056 | 0.831 |
+| Still readable after the blur | 4.2 % | 2.1 % | 3.4 % | 0.5 % |
+
+- The two versions score different sets of items: 0.2.3 cannot find the 16 kinds it did not know, so "found" is not like for like.
+- The images are synthetic and the rules were written for their formats, so these are upper bounds, not real-world accuracy, and a blurred screenshot is not proof that nothing sensitive remains.
+- False alarms on screenshots with nothing to find are 0.746 (`dev`) and 0.889 (`held_out`) per image, above our 0.2 target. The generic long-token rule (unchanged) is the main cause, for example full git hashes.
+- Private-key blocks are the weakest default kind with Apple Vision (65.5 % of key lines covered on `dev`; the held-out layouts have none). Bare ten-digit numbers without separators and letters-only passwords are not found.
+- Windows and Linux have no recognizer yet.
+
 ### Added
 
 - **Auto-redact finds 21 kinds instead of 4.** Besides emails, tokens, phone numbers and IPv4 addresses it now proposes payment cards (Luhn, issuer prefix, length) with the expiry date or security code beside them (`card_extra`, found by position, no label needed), Social Security numbers (issuable ranges, masked forms skipped), ITINs, EINs, ABA routing numbers, IBANs, NPIs, DEA numbers, Medicare Beneficiary Identifiers, US passport numbers, VINs, IMEIs, IPv6 and MAC addresses, PEM private-key blocks, `NAME=value` and `"name": "value"` secrets, and URLs that carry a password or a secret in the query. Still only proposals: nothing is applied until you accept, and it runs on your Mac with no network. The MCP tool `suggest_redactions` takes the new kind names in `kinds` (the command line has no `--kinds` flag yet). Details: [`docs/user/redaction.md`](docs/user/redaction.md), spec `specs/features/17-redaction.md` (RED-1 to RED-3).
 - **Choose which kinds Auto-redact looks for.** The editor's Auto-redact card has **What to look for** (a switch per group, a chip per kind, Defaults, Search again), the command line has `capturemann annotate <id> --suggest-redactions --kinds ssn,card`, and the MCP tool has `kinds`. The editor chooser is tested with fakes and has not been seen by eye.
-- **A benchmark for Auto-redact**: `cargo run -p cm-render --example redaction_bench` builds a synthetic set of 300 screenshots with exact ground truth from a seed and scores recall, precision, false alarms and the end-to-end leak rate (blur, render, read again), per kind and per standard. Two stored reports, both on the synthetic dev split with Apple Vision (the held-out layouts have not been read): the [0.2.3 baseline](verification/benchmarks/redaction-0.2.3-baseline-2026-10-30.md) and the [0.2.5 rules](verification/benchmarks/redaction-0.2.5-dev-2026-10-30.md). Synthetic numbers are an upper bound, not real-world accuracy. A manual cross-check on real screenshots (counts only) is `tests/manual/RED-1.md`, not run yet.
+- **A benchmark for Auto-redact**: `cargo run -p cm-render --example redaction_bench` builds a synthetic set of 300 screenshots with exact ground truth from a seed and scores recall, precision, false alarms and the end-to-end leak rate (blur, render, read again), per kind and per standard. Reports (Apple Vision, Apple M4 Pro, 2026-10-30): the [final run](https://github.com/craft-mann/capturemann/blob/v0.2.5/verification/benchmarks/redaction-0.2.5-final-2026-10-30.md) with the `dev` and `held_out` layouts (read once), the [0.2.3 baseline](https://github.com/craft-mann/capturemann/blob/v0.2.5/verification/benchmarks/redaction-0.2.3-baseline-2026-10-30.md) and an interim run. Synthetic numbers are an upper bound, not real-world accuracy. A manual cross-check on real screenshots (counts only) is `tests/manual/RED-1.md`, not run yet.
 - **The README and the user guide list the kinds from the rule data.** The table between the `redaction-kinds` markers is generated, and a test (`crates/cm-render/tests/redaction_docs.rs`) fails when it differs from the code. New: the README section "Find personal data before you share a screenshot", `docs/user/redaction.md` and `docs/development/redaction.md`.
 
 ### Changed
@@ -21,6 +40,14 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 - **`npi` is off by default** (30 % of its proposals were real on the synthetic dev split: a ten-digit number passes its check digit one time in ten); name it in `kinds` to turn it on.
 - **Phones, IP addresses and tokens.** US (NANP) phone numbers with two or more separators get higher confidence (0.7), an extension is part of the span, and dates, times, addresses, versions and long digit runs are tested not to be read as phone numbers. IPv6 is found beside IPv4 and loopback and unspecified addresses are no longer proposed. The token rule knows more provider key shapes and bearer credentials; the generic mixed letter-and-digit rule stays at confidence 0.6. On the synthetic dev split with Apple Vision, precision went from 68.8 % to 90.9 % and false alarms per image from 2.725 to 0.550, while the set scored grew from 1,367 to 2,288 items (the two figures score different sets).
 - Known limits, stated in the README: formats and checksums only (no names, addresses or dates), text the recognizer cannot read stays, bare ten-digit Vietnamese mobile numbers and letters-only passwords are not found, private-key blocks are partly missed with Apple Vision, and there is no Windows or Linux recognizer. Not a compliance tool.
+
+### Known limitations
+
+- Auto-redact finds formats and check digits, not names, addresses, dates of birth or text next to a label (a CVV or expiry with no card number on screen is missed). Bare ten-digit numbers without separators (for example Vietnamese mobile numbers) and passwords made only of plain letters are not proposed.
+- Text the recognizer cannot read cannot be found. Auto-redact needs a recognizer, so it works on macOS only (Apple Vision); Windows and Linux have none yet.
+- The false-alarm target (below 0.2 per screenshot with nothing to find) is not met: 0.746 and 0.889 on the synthetic dev and held-out layouts. `npi` is off by default.
+- The benchmark is synthetic; the check on real screenshots (`tests/manual/RED-1.md`) has not been recorded. The editor's kind chooser was tried by hand but not recorded in a report.
+- The Intel fix for issue 16 (0.2.3, 0.2.4) is still not confirmed on a real Intel Mac.
 
 ## [0.2.4] - 2026-10-30
 

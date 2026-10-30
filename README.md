@@ -118,33 +118,38 @@ make a screenshot compliant with any of them.**
 
 ### How well it works (measured, synthetic data)
 
-All numbers below come from stored reports and are measured on **synthetic screenshots made by this project**
-(300 images, fixed seed 20261030, 13 screen layouts, light and dark, 1x and 2x, some degraded), with the
-**dev split only** (211 images; the held-out layouts have not been read). The images contain made-up data
-whose formats the rules know, so these figures are an upper bound for real screenshots, not a measure of
-real-world accuracy. Recognizer: Apple Vision, on an Apple M4 Pro, macOS 26.6.2. Date: 2026-10-30.
+All numbers below come from a stored report and are measured on **synthetic screenshots made by this project**
+(300 images, fixed seed 20261030, 13 screen layouts, light and dark, 1x and 2x, some degraded): 211 images from
+9 layouts (`dev`, where the rules were tuned) and 89 images from 4 other layouts (`held_out`, read once after
+everything was fixed). The images contain made-up data whose formats the rules know, so these figures are an
+upper bound for real screenshots, not a measure of real-world accuracy. Recognizer: Apple Vision, on an Apple
+M4 Pro, macOS 26.6.2. Date: 2026-10-30.
 
-| Apple Vision, dev split, synthetic | 0.2.3 detector (4 kinds) | 0.2.5 rules (21 kinds) |
-|---|---|---|
-| Items scored | 1,367 | 2,288 |
-| Found (any kind) | 92.2 % | 95.3 % |
-| Precision (proposals that were real items) | 68.8 % | 90.9 % |
-| False alarms per image / per image with nothing to find | 2.725 / 2.000 | 0.550 / 0.841 |
-| Leak rate (still readable after the blur) | 4.2 % (58 of 1,367) | 2.0 % (46 of 2,288) |
+| Apple Vision, synthetic | dev: 0.2.3 (4 kinds) | dev: 0.2.5 | held-out: 0.2.3 | held-out: 0.2.5 |
+|---|---|---|---|---|
+| Items scored | 1,367 | 2,275 | 436 | 1,410 |
+| Found (any kind) | 92.2 % | 95.3 % | 94.5 % | 98.6 % |
+| Precision (proposals that were real items) | 68.8 % | 92.0 % | 69.2 % | 94.4 % |
+| False alarms per image | 2.725 | 0.417 | 2.056 | 0.831 |
+| False alarms per image with nothing to find | 2.000 | 0.746 | 2.074 | 0.889 |
+| Leak rate (still readable after the blur) | 4.2 % (58 of 1,367) | 2.1 % (47 of 2,275) | 3.4 % (15 of 436) | 0.5 % (7 of 1,410) |
 
-The two columns score different sets of items (the old detector knew 4 of the 21 kinds), so the "found" rows
-are not like for like. With perfect text instead of Apple Vision (this separates rule errors from recognizer
-errors) the 0.2.5 rules find 99.2 % at 97.2 % precision, with 0.199 false alarms per image and 0.206 per
-image with nothing to find; the 0.2.3 detector on the same kind of run finds 96.2 % at 69.6 %. Reports:
+The old and new columns score different sets of items (the old detector knew 4 of the 20 default kinds), so the
+"found" rows are not like for like. With perfect text instead of Apple Vision (this separates rule errors from
+recognizer errors) the 0.2.5 rules find 99.2 % at 98.5 % precision on `dev` and 100 % at 95.9 % on `held_out`.
+Report: [0.2.5 final run](verification/benchmarks/redaction-0.2.5-final-2026-10-30.md) (it includes the 0.2.3
+detector on the same held-out layouts), with the earlier
 [0.2.3 baseline](verification/benchmarks/redaction-0.2.3-baseline-2026-10-30.md) and
-[0.2.5 rules](verification/benchmarks/redaction-0.2.5-dev-2026-10-30.md), with per-kind, per-layout,
-per-font-size and per-language tables and the lookalikes that raised false alarms.
+[interim 0.2.5 run](verification/benchmarks/redaction-0.2.5-dev-2026-10-30.md); per-kind, per-layout,
+per-font-size and per-language tables and the lookalikes that raised false alarms are in them.
 
-Two things the numbers say plainly. The generic long-token rule causes the largest share of false alarms on
-screenshots with nothing to find (0.492 of the 0.841 per such image; the report leaves the decision to the maintainer), and `npi` is **off by default** because only
-30 % of its proposals were real. Private-key blocks are the weakest default kind with Apple Vision (65.5 % of
-key lines covered, 15.5 % still readable after the blur). Nothing here has been checked on real screenshots
-yet (that is the maintainer's manual cross-check, [`tests/manual/RED-1.md`](tests/manual/RED-1.md)).
+What the numbers say plainly. The **false-alarm target is not met**: the goal was below 0.2 false alarms per
+image with nothing to find and 0.2.5 shows 0.746 (`dev`) and 0.889 (`held_out`). The generic long-token rule
+(unchanged from 0.2.3 and kept on) is the main cause, for example by proposing full git hashes. `npi` is **off by
+default** because only 30 % of its proposals were real. Private-key blocks are the weakest default kind with
+Apple Vision (65.5 % of key lines covered, 15.5 % still readable after the blur, `dev` only: the held-out layouts
+contain no keys or secret URLs). Nothing here has been checked on real screenshots yet (that is the
+maintainer's manual cross-check, [`tests/manual/RED-1.md`](tests/manual/RED-1.md)).
 
 To reproduce on your own Mac (builds the synthetic set from the seed, no network; `run` uses the system
 recognizer):
