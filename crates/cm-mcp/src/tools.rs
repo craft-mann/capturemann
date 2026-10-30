@@ -539,12 +539,12 @@ pub fn all() -> Vec<ToolSpec> {
             mutating: false,
             destructive: false,
             spec: "ANN-2",
-            summary: "Find emails, API keys and other long tokens (and, with lower confidence, phone numbers and IPv4 addresses) in a screenshot with on-device text recognition and propose blur rectangles. Nothing is applied and nothing is sent anywhere: pass the rectangles you accept to `annotate` as `blur` ops (one call, one undo step). Rectangles are physical px of the original image, padded around the text. `text_preview` is masked (first and last two characters) so the secret is not repeated. Fails with `not_implemented` when this computer has no text recognizer.",
+            summary: "Find emails, API keys and other secrets, payment cards, SSNs and other US identifiers, and (with lower confidence) phone numbers and IP addresses in a screenshot with on-device text recognition and propose blur rectangles. Nothing is applied and nothing is sent anywhere: pass the rectangles you accept to `annotate` as `blur` ops (one call, one undo step). Rectangles are physical px of the original image, padded around the text. `text_preview` is masked (first and last two characters) so the secret is not repeated. Fails with `not_implemented` when this computer has no text recognizer.",
             input: json!({ "type": "object", "properties": {
                 "capture_id": capture_id(),
                 "kinds": { "type": "array", "uniqueItems": true,
-                    "items": { "type": "string", "enum": ["email", "token", "ip_address", "phone"] },
-                    "description": "Only look for these kinds. Default: all." } },
+                    "items": { "type": "string", "enum": ["email", "token", "private_key", "secret_assignment", "url_secret", "card", "card_extra", "ssn", "itin", "ein", "aba", "iban", "npi", "dea", "mbi", "passport", "vin", "imei", "ip_address", "mac_address", "phone"] },
+                    "description": "Only look for these kinds. Default: the default kinds (all of them until the benchmark sets the list)." } },
                 "required": ["capture_id"], "additionalProperties": false }),
             output: json!({ "type": "object", "properties": {
                 "capture_id": { "type": "string" },
@@ -553,7 +553,7 @@ pub fn all() -> Vec<ToolSpec> {
                 "rects": { "type": "array", "items": { "type": "object", "properties": {
                     "rect": { "type": "array", "items": { "type": "number" }, "minItems": 4, "maxItems": 4,
                               "description": "[x, y, w, h] in physical px of the original image." },
-                    "kind": { "type": "string", "enum": ["email", "token", "ip_address", "phone"] },
+                    "kind": { "type": "string", "enum": ["email", "token", "private_key", "secret_assignment", "url_secret", "card", "card_extra", "ssn", "itin", "ein", "aba", "iban", "npi", "dea", "mbi", "passport", "vin", "imei", "ip_address", "mac_address", "phone"] },
                     "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
                     "text_preview": { "type": "string" } },
                     "required": ["rect", "kind", "confidence"] } },

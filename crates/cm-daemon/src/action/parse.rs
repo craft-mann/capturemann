@@ -337,7 +337,10 @@ impl Action {
                             if cm_render::ocr::RedactionKind::parse(name).is_none() {
                                 return Err(CmError::invalid_field(
                                     &key,
-                                    "must be one of email, token, ip_address, phone",
+                                    format!(
+                                        "must be one of {}",
+                                        cm_render::ocr::RedactionKind::names().join(", ")
+                                    ),
                                 ));
                             }
                             if !out.iter().any(|k| k == name) {

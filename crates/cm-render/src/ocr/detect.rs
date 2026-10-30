@@ -7,7 +7,8 @@
 //! proportional fonts, and the padding absorbs the error. Nothing here applies anything; the
 //! caller turns accepted suggestions into blur ops.
 
-use super::{TextLine, TextWord};
+use super::rules::{self, flatten, Located, Span};
+use super::TextLine;
 use cm_core::Rc;
 
 /// What a suggestion is about. Ordered by priority when two suggestions overlap.
@@ -16,25 +17,117 @@ pub enum RedactionKind {
     Email,
     /// API keys, JWTs and other long random-looking strings.
     Token,
+    /// PEM private-key blocks.
+    PrivateKey,
+    /// The value of a `NAME=value` or `"name": "value"` pair with a secret-looking name.
+    SecretAssignment,
+    /// A URL that carries credentials or a token in its query.
+    UrlSecret,
+    /// Payment card number (PCI DSS primary account number).
+    Card,
+    /// Expiry date or security code beside a detected card number (PCI DSS).
+    CardExtra,
+    Ssn,
+    Itin,
+    Ein,
+    /// ABA routing number.
+    Aba,
+    Iban,
+    /// National Provider Identifier.
+    Npi,
+    Dea,
+    /// Medicare Beneficiary Identifier.
+    Mbi,
+    Passport,
+    Vin,
+    Imei,
     IpAddress,
+    MacAddress,
     Phone,
 }
 
 impl RedactionKind {
-    pub const ALL: [RedactionKind; 4] = [
+    pub const ALL: [RedactionKind; 21] = [
         RedactionKind::Email,
         RedactionKind::Token,
+        RedactionKind::PrivateKey,
+        RedactionKind::SecretAssignment,
+        RedactionKind::UrlSecret,
+        RedactionKind::Card,
+        RedactionKind::CardExtra,
+        RedactionKind::Ssn,
+        RedactionKind::Itin,
+        RedactionKind::Ein,
+        RedactionKind::Aba,
+        RedactionKind::Iban,
+        RedactionKind::Npi,
+        RedactionKind::Dea,
+        RedactionKind::Mbi,
+        RedactionKind::Passport,
+        RedactionKind::Vin,
+        RedactionKind::Imei,
         RedactionKind::IpAddress,
+        RedactionKind::MacAddress,
         RedactionKind::Phone,
     ];
+
+    /// The kinds looked for when the caller names none. Chosen by the benchmark (RED-1): a kind
+    /// whose false-alarm rate is above the gate leaves this list.
+    pub const DEFAULT: [RedactionKind; 21] = RedactionKind::ALL;
 
     /// The name used in results, MCP and the CLI.
     pub fn as_str(self) -> &'static str {
         match self {
             RedactionKind::Email => "email",
             RedactionKind::Token => "token",
+            RedactionKind::PrivateKey => "private_key",
+            RedactionKind::SecretAssignment => "secret_assignment",
+            RedactionKind::UrlSecret => "url_secret",
+            RedactionKind::Card => "card",
+            RedactionKind::CardExtra => "card_extra",
+            RedactionKind::Ssn => "ssn",
+            RedactionKind::Itin => "itin",
+            RedactionKind::Ein => "ein",
+            RedactionKind::Aba => "aba",
+            RedactionKind::Iban => "iban",
+            RedactionKind::Npi => "npi",
+            RedactionKind::Dea => "dea",
+            RedactionKind::Mbi => "mbi",
+            RedactionKind::Passport => "passport",
+            RedactionKind::Vin => "vin",
+            RedactionKind::Imei => "imei",
             RedactionKind::IpAddress => "ip_address",
+            RedactionKind::MacAddress => "mac_address",
             RedactionKind::Phone => "phone",
+        }
+    }
+
+    /// The names of all kinds, for error messages and tool schemas.
+    pub fn names() -> Vec<&'static str> {
+        RedactionKind::ALL.iter().map(|k| k.as_str()).collect()
+    }
+
+    /// The public standards that name this kind of data (README table, RED-3). Empty for kinds
+    /// that no standard names.
+    pub fn standards(self) -> &'static [&'static str] {
+        match self {
+            RedactionKind::Email => &["HIPAA 6"],
+            RedactionKind::Token | RedactionKind::PrivateKey | RedactionKind::SecretAssignment => {
+                &["GLBA / state breach laws (credentials)"]
+            }
+            RedactionKind::UrlSecret => &["HIPAA 14", "GLBA / state breach laws (credentials)"],
+            RedactionKind::Card => &["PCI DSS", "HIPAA 10", "GLBA"],
+            RedactionKind::CardExtra => &["PCI DSS (sensitive authentication data)"],
+            RedactionKind::Ssn | RedactionKind::Itin => &["NIST SP 800-122", "HIPAA 7", "GLBA"],
+            RedactionKind::Ein => &["NIST SP 800-122"],
+            RedactionKind::Aba | RedactionKind::Iban => &["HIPAA 10", "GLBA"],
+            RedactionKind::Npi | RedactionKind::Dea => &["HIPAA 11"],
+            RedactionKind::Mbi => &["HIPAA 9"],
+            RedactionKind::Passport => &["HIPAA 11", "GLBA"],
+            RedactionKind::Vin => &["HIPAA 12"],
+            RedactionKind::Imei | RedactionKind::MacAddress => &["HIPAA 13"],
+            RedactionKind::IpAddress => &["HIPAA 15"],
+            RedactionKind::Phone => &["HIPAA 4, 5"],
         }
     }
 
@@ -56,13 +149,17 @@ pub struct RedactionSuggestion {
 
 #[derive(Debug, Clone, Default)]
 pub struct SuggestOptions {
-    /// Kinds to look for; empty means all.
+    /// Kinds to look for; empty means [`RedactionKind::DEFAULT`].
     pub kinds: Vec<RedactionKind>,
 }
 
 impl SuggestOptions {
-    fn wants(&self, k: RedactionKind) -> bool {
-        self.kinds.is_empty() || self.kinds.contains(&k)
+    pub(crate) fn wants(&self, k: RedactionKind) -> bool {
+        if self.kinds.is_empty() {
+            RedactionKind::DEFAULT.contains(&k)
+        } else {
+            self.kinds.contains(&k)
+        }
     }
 }
 
@@ -85,10 +182,7 @@ pub fn suggest_redactions(
     image: (u32, u32),
     opts: &SuggestOptions,
 ) -> Vec<RedactionSuggestion> {
-    let mut found = Vec::new();
-    for line in lines {
-        scan_line(line, opts, &mut found);
-    }
+    let found = scan_page(lines, opts);
     let bounds = Rc::new(0.0, 0.0, f64::from(image.0), f64::from(image.1));
     let mut padded: Vec<RedactionSuggestion> = found
         .into_iter()
@@ -161,344 +255,63 @@ fn merge(mut v: Vec<RedactionSuggestion>) -> Vec<RedactionSuggestion> {
     }
 }
 
-/// A line flattened to characters, each with the box it occupies (None for the separator
-/// between words).
-struct Flat {
-    chars: Vec<char>,
-    cells: Vec<Option<Rc>>,
-}
-
-fn flatten(line: &TextLine) -> Flat {
-    let mut chars = Vec::new();
-    let mut cells = Vec::new();
-    let spread = |text: &str, rect: Rc, chars: &mut Vec<char>, cells: &mut Vec<Option<Rc>>| {
-        let n = text.chars().count().max(1);
-        let w = rect.w / n as f64;
-        for (i, c) in text.chars().enumerate() {
-            chars.push(c);
-            cells.push(Some(Rc::new(rect.x + w * i as f64, rect.y, w, rect.h)));
+/// Runs the line rules over every line, then the page rules over the whole page, and turns the
+/// surviving spans into suggestions (rectangles not yet padded).
+fn scan_page(lines: &[TextLine], opts: &SuggestOptions) -> Vec<RedactionSuggestion> {
+    let flats: Vec<rules::Flat> = lines.iter().map(flatten).collect();
+    let mut located: Vec<Located> = Vec::new();
+    // First come, first kept: a span that overlaps one already kept on its line is dropped.
+    let keep = |l: Located, located: &mut Vec<Located>| {
+        let s = l.span;
+        if s.end > s.start
+            && !located
+                .iter()
+                .any(|t| t.line == l.line && s.start < t.span.end && t.span.start < s.end)
+        {
+            located.push(l);
         }
     };
-    let words: Vec<&TextWord> = line
-        .words
-        .iter()
-        .filter(|w| !w.text.trim().is_empty())
-        .collect();
-    if words.is_empty() {
-        spread(&line.text, line.rect, &mut chars, &mut cells);
-    } else {
-        for (i, w) in words.iter().enumerate() {
-            if i > 0 {
-                chars.push(' ');
-                cells.push(None);
+    for entry in rules::LINE_RULES {
+        if !entry.kinds.iter().any(|&k| opts.wants(k)) {
+            continue;
+        }
+        for (line, flat) in flats.iter().enumerate() {
+            for span in (entry.run)(&flat.chars) {
+                if opts.wants(span.kind) {
+                    keep(Located { line, span }, &mut located);
+                }
             }
-            spread(w.text.trim(), w.rect, &mut chars, &mut cells);
         }
     }
-    Flat { chars, cells }
-}
-
-struct Span {
-    start: usize,
-    end: usize,
-    kind: RedactionKind,
-    confidence: f32,
-}
-
-fn scan_line(line: &TextLine, opts: &SuggestOptions, out: &mut Vec<RedactionSuggestion>) {
-    let flat = flatten(line);
-    let c = &flat.chars;
-    let mut spans: Vec<Span> = Vec::new();
-    let push = |s: Span, spans: &mut Vec<Span>| {
-        if s.end > s.start && !spans.iter().any(|t| s.start < t.end && t.start < s.end) {
-            spans.push(s);
+    for entry in rules::PAGE_RULES {
+        if !entry.kinds.iter().any(|&k| opts.wants(k)) {
+            continue;
         }
-    };
-    if opts.wants(RedactionKind::Email) {
-        for s in find_emails(c) {
-            push(s, &mut spans);
+        for l in (entry.run)(&flats, &located.clone()) {
+            if opts.wants(l.span.kind) && l.line < flats.len() {
+                keep(l, &mut located);
+            }
         }
     }
-    if opts.wants(RedactionKind::Token) {
-        for s in find_tokens(c) {
-            push(s, &mut spans);
+    let mut out = Vec::new();
+    for l in located {
+        let flat = &flats[l.line];
+        let s: Span = l.span;
+        if s.end > flat.chars.len() {
+            continue;
         }
-    }
-    if opts.wants(RedactionKind::IpAddress) {
-        for s in find_ips(c) {
-            push(s, &mut spans);
-        }
-    }
-    if opts.wants(RedactionKind::Phone) {
-        for s in find_phones(c) {
-            push(s, &mut spans);
-        }
-    }
-    let line_conf = line.confidence.clamp(0.0, 1.0);
-    for s in spans {
         let mut rect: Option<Rc> = None;
         for cell in flat.cells[s.start..s.end].iter().flatten() {
             rect = Some(rect.map_or(*cell, |r| union(r, *cell)));
         }
         let Some(rect) = rect else { continue };
-        let text: String = c[s.start..s.end].iter().collect();
+        let text: String = flat.chars[s.start..s.end].iter().collect();
         out.push(RedactionSuggestion {
             rect,
             kind: s.kind,
-            confidence: s.confidence * line_conf,
+            confidence: s.confidence * lines[l.line].confidence.clamp(0.0, 1.0),
             text_preview: mask_preview(&text),
         });
-    }
-}
-
-fn is_local(ch: char) -> bool {
-    ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '%' | '+' | '-')
-}
-
-fn is_domain(ch: char) -> bool {
-    ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-')
-}
-
-fn find_emails(c: &[char]) -> Vec<Span> {
-    let mut out: Vec<Span> = Vec::new();
-    for (i, &ch) in c.iter().enumerate() {
-        if ch != '@' {
-            continue;
-        }
-        let mut start = i;
-        while start > 0 && is_local(c[start - 1]) {
-            start -= 1;
-        }
-        while start < i && c[start] == '.' {
-            start += 1;
-        }
-        let mut end = i + 1;
-        while end < c.len() && is_domain(c[end]) {
-            end += 1;
-        }
-        // Cut at an empty label and drop trailing dots and hyphens.
-        let domain_start = i + 1;
-        let mut e = domain_start;
-        while e < end {
-            if c[e] == '.' && (e == domain_start || e + 1 >= end || c[e + 1] == '.') {
-                break;
-            }
-            e += 1;
-        }
-        let mut end = e;
-        while end > domain_start && matches!(c[end - 1], '.' | '-') {
-            end -= 1;
-        }
-        if start >= i || end <= domain_start {
-            continue;
-        }
-        let domain: String = c[domain_start..end].iter().collect();
-        let Some((_, tld)) = domain.rsplit_once('.') else {
-            continue;
-        };
-        if tld.len() < 2 || !tld.chars().all(|x| x.is_ascii_alphabetic()) {
-            continue;
-        }
-        if out.last().is_some_and(|s| s.end > start) {
-            continue;
-        }
-        out.push(Span {
-            start,
-            end,
-            kind: RedactionKind::Email,
-            confidence: 0.95,
-        });
-    }
-    out
-}
-
-fn is_token_char(ch: char) -> bool {
-    ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '+' | '/')
-}
-
-fn find_tokens(c: &[char]) -> Vec<Span> {
-    let mut out = Vec::new();
-    // JWTs first: three base64url segments with dots between them.
-    let mut i = 0;
-    while i < c.len() {
-        let run_end = (i..c.len())
-            .find(|&j| !(is_token_char(c[j]) || c[j] == '.'))
-            .unwrap_or(c.len());
-        let run: String = c[i..run_end].iter().collect();
-        if run.starts_with("eyJ") {
-            let trimmed = run.trim_end_matches('.');
-            let parts: Vec<&str> = trimmed.split('.').collect();
-            if parts.len() == 3 && parts.iter().all(|p| p.len() >= 8) {
-                out.push(Span {
-                    start: i,
-                    end: i + trimmed.chars().count(),
-                    kind: RedactionKind::Token,
-                    confidence: 0.9,
-                });
-                i = run_end.max(i + 1);
-                continue;
-            }
-        }
-        i = run_end.max(i + 1);
-    }
-    // Everything else: runs of token characters (a '.' or '=' ends one; trailing '=' padding
-    // belongs to it).
-    let mut i = 0;
-    while i < c.len() {
-        if !is_token_char(c[i]) {
-            i += 1;
-            continue;
-        }
-        let mut j = i;
-        while j < c.len() && is_token_char(c[j]) {
-            j += 1;
-        }
-        let mut end = j;
-        while end < c.len() && end < j + 2 && c[end] == '=' {
-            end += 1;
-        }
-        let word: String = c[i..j].iter().collect();
-        if let Some(conf) = classify_token(&word) {
-            if !out.iter().any(|s: &Span| i < s.end && s.start < end) {
-                out.push(Span {
-                    start: i,
-                    end,
-                    kind: RedactionKind::Token,
-                    confidence: conf,
-                });
-            }
-        }
-        i = j.max(i + 1);
-    }
-    out
-}
-
-fn classify_token(w: &str) -> Option<f32> {
-    let n = w.chars().count();
-    let alnum_upper = |s: &str| {
-        s.chars()
-            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
-    };
-    // Well-known key shapes.
-    let prefixed: &[(&str, usize)] = &[
-        ("sk-", 20),
-        ("ghp_", 30),
-        ("gho_", 30),
-        ("ghu_", 30),
-        ("ghs_", 30),
-        ("ghr_", 30),
-        ("github_pat_", 30),
-        ("sk_live_", 20),
-        ("pk_live_", 20),
-        ("rk_live_", 20),
-        ("AIza", 35),
-    ];
-    if prefixed
-        .iter()
-        .any(|(p, min)| w.starts_with(p) && n >= *min)
-    {
-        return Some(0.95);
-    }
-    if (w.starts_with("AKIA") || w.starts_with("ASIA")) && n == 20 && alnum_upper(w) {
-        return Some(0.95);
-    }
-    if w.starts_with("xox") && w.as_bytes().get(3).is_some_and(|b| b"baprs".contains(b)) && n >= 15
-    {
-        return Some(0.95);
-    }
-    // Long, random-looking: letters and digits mixed (hex, base64).
-    if n >= 24 {
-        let digits = w.chars().filter(char::is_ascii_digit).count();
-        let letters = w.chars().filter(char::is_ascii_alphabetic).count();
-        if digits >= 3 && letters >= 3 && digits * 100 >= n * 7 && !w.starts_with('/') {
-            return Some(0.6);
-        }
-    }
-    None
-}
-
-fn find_ips(c: &[char]) -> Vec<Span> {
-    let mut out = Vec::new();
-    let mut i = 0;
-    while i < c.len() {
-        if !c[i].is_ascii_digit() {
-            i += 1;
-            continue;
-        }
-        let mut j = i;
-        while j < c.len() && (c[j].is_ascii_digit() || c[j] == '.') {
-            j += 1;
-        }
-        let run: String = c[i..j].iter().collect();
-        let run = run.trim_end_matches('.');
-        let parts: Vec<&str> = run.split('.').collect();
-        let ok = parts.len() == 4
-            && parts
-                .iter()
-                .all(|p| !p.is_empty() && p.len() <= 3 && p.parse::<u16>().is_ok_and(|v| v <= 255));
-        let before_ok = i == 0 || !c[i - 1].is_ascii_alphanumeric();
-        if ok && before_ok {
-            out.push(Span {
-                start: i,
-                end: i + run.chars().count(),
-                kind: RedactionKind::IpAddress,
-                confidence: 0.5,
-            });
-        }
-        i = j.max(i + 1);
-    }
-    out
-}
-
-fn find_phones(c: &[char]) -> Vec<Span> {
-    let mut out = Vec::new();
-    let mut i = 0;
-    while i < c.len() {
-        let starts = c[i].is_ascii_digit() || c[i] == '+' || c[i] == '(';
-        // Not the tail of a longer number or date ("2026-10-23 1415 5550").
-        let before_ok =
-            i == 0 || !(c[i - 1].is_ascii_alphanumeric() || matches!(c[i - 1], '-' | '.' | '/'));
-        if !(starts && before_ok) {
-            i += 1;
-            continue;
-        }
-        let mut j = i;
-        while j < c.len()
-            && (c[j].is_ascii_digit() || matches!(c[j], ' ' | '(' | ')' | '+' | '.' | '-'))
-        {
-            j += 1;
-        }
-        // Trim to the last digit or closing parenthesis.
-        let mut end = j;
-        while end > i && !(c[end - 1].is_ascii_digit() || c[end - 1] == ')') {
-            end -= 1;
-        }
-        let after_ok = end >= c.len() || !c[end].is_ascii_alphanumeric();
-        let text: String = c[i..end].iter().collect();
-        let digits = text.chars().filter(char::is_ascii_digit).count();
-        let seps = text
-            .chars()
-            .filter(|ch| matches!(ch, ' ' | '(' | ')' | '.' | '-'))
-            .count();
-        let iso_date = text.len() >= 10
-            && text.as_bytes()[4] == b'-'
-            && text[..4].chars().all(|d| d.is_ascii_digit());
-        if after_ok
-            && (10..=15).contains(&digits)
-            && (seps >= 2 || text.starts_with('+'))
-            && !iso_date
-            && !text.contains("  ")
-        {
-            out.push(Span {
-                start: i,
-                end,
-                kind: RedactionKind::Phone,
-                confidence: 0.5,
-            });
-            i = end.max(i + 1);
-        } else {
-            i += 1;
-        }
     }
     out
 }

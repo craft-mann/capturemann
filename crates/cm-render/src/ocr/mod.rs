@@ -19,6 +19,7 @@ use std::sync::Arc;
 #[cfg(target_os = "macos")]
 mod apple;
 pub mod detect;
+pub mod rules;
 
 pub use detect::{
     mask_preview, suggest_redactions, RedactionKind, RedactionSuggestion, SuggestOptions,

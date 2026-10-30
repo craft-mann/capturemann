@@ -178,7 +178,7 @@ pub struct RenameCaptureParams {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SuggestRedactionsParams {
     pub capture_id: String,
-    /// Kind names to look for (`email`, `token`, `ip_address`, `phone`); empty means all.
+    /// Kind names to look for (see `RedactionKind::names`); empty means the default kinds.
     pub kinds: Vec<String>,
 }
 

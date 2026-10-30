@@ -19,7 +19,7 @@ pub const MIN_STRENGTH: u32 = 16;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Proposal {
     pub rect: Rc,
-    /// `email`, `token`, `ip_address` or `phone`.
+    /// A `RedactionKind` name such as `email`, `card` or `ssn`.
     pub kind: String,
     pub confidence: f64,
     /// The text, masked by the daemon (first and last two characters only).
@@ -34,6 +34,23 @@ impl Proposal {
             "token" => tr_ctx!("redaction kind", "Key or token"),
             "ip_address" => tr_ctx!("redaction kind", "IP address"),
             "phone" => tr_ctx!("redaction kind", "Phone number"),
+            "private_key" => tr_ctx!("redaction kind", "Private key"),
+            "secret_assignment" => tr_ctx!("redaction kind", "Secret value"),
+            "url_secret" => tr_ctx!("redaction kind", "Link with a secret"),
+            "card" => tr_ctx!("redaction kind", "Card number"),
+            "card_extra" => tr_ctx!("redaction kind", "Card expiry or code"),
+            "ssn" => tr_ctx!("redaction kind", "Social Security number"),
+            "itin" => tr_ctx!("redaction kind", "Taxpayer ID (ITIN)"),
+            "ein" => tr_ctx!("redaction kind", "Employer ID (EIN)"),
+            "aba" => tr_ctx!("redaction kind", "Bank routing number"),
+            "iban" => tr_ctx!("redaction kind", "IBAN"),
+            "npi" => tr_ctx!("redaction kind", "Provider ID (NPI)"),
+            "dea" => tr_ctx!("redaction kind", "DEA number"),
+            "mbi" => tr_ctx!("redaction kind", "Medicare ID"),
+            "passport" => tr_ctx!("redaction kind", "Passport number"),
+            "vin" => tr_ctx!("redaction kind", "Vehicle ID (VIN)"),
+            "imei" => tr_ctx!("redaction kind", "Device ID (IMEI)"),
+            "mac_address" => tr_ctx!("redaction kind", "MAC address"),
             _ => tr_ctx!("redaction kind", "Text"),
         }
     }

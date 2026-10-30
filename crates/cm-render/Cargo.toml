@@ -26,6 +26,9 @@ bytemuck = { version = "1", features = ["derive"] }
 # Apache-2.0 OR MIT
 pollster = "0.4"
 
+[dev-dependencies]
+serde.workspace = true
+
 [target.'cfg(target_os = "macos")'.dependencies]
 # Apple Vision text recognition (ANN-2 Auto-redact) through plain objc2 messages, as in the
 # capture crates: Zlib OR Apache-2.0 OR MIT. Vision itself is loaded with dlopen at run time.

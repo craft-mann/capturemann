@@ -7662,7 +7662,35 @@ msgid "Starting"
 msgstr ""
 
 msgctxt "redaction kind"
+msgid "Bank routing number"
+msgstr ""
+
+msgctxt "redaction kind"
+msgid "Card expiry or code"
+msgstr ""
+
+msgctxt "redaction kind"
+msgid "Card number"
+msgstr ""
+
+msgctxt "redaction kind"
+msgid "DEA number"
+msgstr ""
+
+msgctxt "redaction kind"
+msgid "Device ID (IMEI)"
+msgstr ""
+
+msgctxt "redaction kind"
 msgid "Email"
+msgstr ""
+
+msgctxt "redaction kind"
+msgid "Employer ID (EIN)"
+msgstr ""
+
+msgctxt "redaction kind"
+msgid "IBAN"
 msgstr ""
 
 msgctxt "redaction kind"
@@ -7674,11 +7702,51 @@ msgid "Key or token"
 msgstr ""
 
 msgctxt "redaction kind"
+msgid "Link with a secret"
+msgstr ""
+
+msgctxt "redaction kind"
+msgid "MAC address"
+msgstr ""
+
+msgctxt "redaction kind"
+msgid "Medicare ID"
+msgstr ""
+
+msgctxt "redaction kind"
+msgid "Passport number"
+msgstr ""
+
+msgctxt "redaction kind"
 msgid "Phone number"
 msgstr ""
 
 msgctxt "redaction kind"
+msgid "Private key"
+msgstr ""
+
+msgctxt "redaction kind"
+msgid "Provider ID (NPI)"
+msgstr ""
+
+msgctxt "redaction kind"
+msgid "Secret value"
+msgstr ""
+
+msgctxt "redaction kind"
+msgid "Social Security number"
+msgstr ""
+
+msgctxt "redaction kind"
+msgid "Taxpayer ID (ITIN)"
+msgstr ""
+
+msgctxt "redaction kind"
 msgid "Text"
+msgstr ""
+
+msgctxt "redaction kind"
+msgid "Vehicle ID (VIN)"
 msgstr ""
 
 msgctxt "reframe"
