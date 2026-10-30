@@ -8,6 +8,7 @@
 #![cfg(windows)]
 #![allow(clippy::unwrap_used)]
 
+use cm_auth::secret::PART_CHARS;
 use cm_auth::{KeyringStore, SecretStore, VaultStore};
 use std::sync::Arc;
 
@@ -63,7 +64,7 @@ fn the_vault_keeps_several_accounts_in_the_real_store() {
             .set(&format!("oauth.google.acct{i}.client"), &"c".repeat(100))
             .unwrap();
     }
-    let fresh = VaultStore::over(Arc::new(KeyringStore::new(service)));
+    let fresh = VaultStore::over(Arc::new(KeyringStore::new(service))).with_item_limit(PART_CHARS);
     for i in 0..6 {
         assert_eq!(
             fresh
