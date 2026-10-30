@@ -45,6 +45,7 @@ Plans for larger features and the design-kit traceability table live in `plans/`
 | `features/13-launcher.md` | Launcher | LNC-1 |
 | `features/14-permissions.md` | Permissions | PRM-1 |
 | `features/15-voice.md` | Voice and meetings | VOC-1 … VOC-3 |
+| `features/17-redaction.md` | Redaction (Auto-redact kinds, benchmark, generated docs) | RED-1 … RED-3 |
 
 Related: `../design/` (brand and UI kit, source of truth for visuals; start at `../design/CLAUDE.md`), `../docs/development/design-surfaces.md` (surfaces mapped to the kit), `plans/design-implementation.md` (kit traceability and build status), `../docs/project/spikes.md` (feasibility results).
 

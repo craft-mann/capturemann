@@ -37,7 +37,7 @@ through MCP and a CLI.
 ## Features
 
 - **Screenshots** of a display, a window or a region, with an annotation editor and Auto-redact for
-  emails, keys, phone numbers and IPs.
+  personal data and secrets (see below).
 - **Screen recording** up to the display's native resolution (4K/5K) at 30 or 60 fps, with a webcam
   bubble, microphone (noise suppression), system audio and cursor telemetry. Pause, resume, and
   crash recovery that loses at most two seconds.
@@ -69,6 +69,107 @@ through MCP and a CLI.
 <p align="center">
   <img alt="A meeting-minutes report beside the transcript: summary, attendees, decisions and action items, each with a button that plays the moment it was said, and a waveform that marks where the items come from (sample data)" src="docs/images/meeting-report.webp" width="900">
 </p>
+
+## Find personal data before you share a screenshot
+
+**Auto-redact** reads the text in a screenshot with the recognizer built into your Mac (Apple Vision) and
+**proposes** blur rectangles over the personal data and secrets it finds. You review the proposals
+(masked previews, dashed boxes) and accept them one by one or all at once; **nothing is applied
+automatically**. It runs on your computer and uses no network. The same function is available to agents
+(MCP `suggest_redactions`, which only proposes) and to the command line
+(`capturemann annotate <id> --suggest-redactions`). The user guide has the details:
+[Auto-redact](docs/user/redaction.md).
+
+It finds **formats and checksums**, not meaning: a payment card number (Luhn check and issuer prefix), a
+Social Security number in an issuable range, a routing number with a valid checksum, a private-key block, a
+`PASSWORD=...` line. It does not find names, addresses or dates. The kinds, generated from the rule data
+(a test fails when this table and the code differ):
+
+<!-- redaction-kinds:start -->
+| Kind | Group | What it finds | Standards that name it | On by default | Check used |
+|---|---|---|---|---|---|
+| `email` | Contact | Email addresses (`local@domain.tld`). | HIPAA 6 | yes | Shape only |
+| `token` | Credentials and secrets | API keys, JWTs and other long random-looking strings: known provider shapes, or a mix of 24 or more letters and digits (lower confidence). | GLBA / state breach laws (credentials) | yes | Known prefix and length, or letter-and-digit mix |
+| `private_key` | Credentials and secrets | PEM private-key blocks, every line from the BEGIN line to the END line. | GLBA / state breach laws (credentials) | yes | BEGIN and END lines |
+| `secret_assignment` | Credentials and secrets | The value in `NAME=value` or `"name": "value"` pairs whose name looks secret (password, token, key and similar). | GLBA / state breach laws (credentials) | yes | Secret-looking name, value is not a placeholder |
+| `url_secret` | Credentials and secrets | A password inside a URL, or a secret value in a URL query string. | HIPAA 14; GLBA / state breach laws (credentials) | yes | Userinfo password or secret-looking parameter name |
+| `card` | Payment cards | Payment card numbers of 13 to 19 digits; masked numbers are skipped. | PCI DSS; HIPAA 10; GLBA | yes | Luhn + issuer prefix + length |
+| `card_extra` | Payment cards | An expiry date or security code beside a detected card number (found by position, no label needed). | PCI DSS (sensitive authentication data) | yes | Valid month, or 3 or 4 digits, beside a detected card |
+| `ssn` | Identity and tax numbers | US Social Security numbers written `NNN-NN-NNNN` or with spaces; masked forms and bare nine-digit numbers are skipped. | NIST SP 800-122; HIPAA 7; GLBA | yes | Issuable ranges (no 000, 666 or 9xx area, no 00 group, no 0000 serial) |
+| `itin` | Identity and tax numbers | US Individual Taxpayer Identification Numbers (`9NN-NN-NNNN` with an ITIN group). | NIST SP 800-122; HIPAA 7; GLBA | yes | ITIN group ranges |
+| `ein` | Identity and tax numbers | US Employer Identification Numbers (`NN-NNNNNNN`). | NIST SP 800-122 | yes | Valid prefix |
+| `aba` | Bank accounts | US bank routing numbers (nine digits). | HIPAA 10; GLBA | yes | Checksum + prefix range |
+| `iban` | Bank accounts | International bank account numbers, solid or in groups of four. | HIPAA 10; GLBA | yes | Mod 97 |
+| `npi` | Health identifiers | US National Provider Identifiers (ten digits). | HIPAA 11 | no | Luhn with the 80840 prefix |
+| `dea` | Health identifiers | US DEA registration numbers (two letters, seven digits). | HIPAA 11 | yes | Check digit |
+| `mbi` | Health identifiers | US Medicare Beneficiary Identifiers (11 characters). | HIPAA 9 | yes | Position rules for each character |
+| `passport` | Identity and tax numbers | US passport book numbers written as a letter and eight digits. | HIPAA 11; GLBA | yes | Letter + eight digits |
+| `vin` | Devices and networks | Vehicle identification numbers (17 characters). | HIPAA 12 | yes | Check digit at position 9 |
+| `imei` | Devices and networks | Mobile device IMEI numbers (15 digits). | HIPAA 13 | yes | Luhn |
+| `ip_address` | Devices and networks | IPv4 and IPv6 addresses; loopback and unspecified addresses are skipped. | HIPAA 15 | yes | Valid address syntax |
+| `mac_address` | Devices and networks | MAC addresses (six hex pairs). | HIPAA 13 | yes | Six hex pairs, one separator style |
+| `phone` | Contact | Phone and fax numbers of 10 to 15 digits with separators or a leading `+`, extensions included. | HIPAA 4, 5 | yes | NANP rules for US numbers; separators or `+` required |
+<!-- redaction-kinds:end -->
+
+The "Standards that name it" column maps each kind to the public lists that mention that kind of data
+(NIST SP 800-122, HIPAA Safe Harbor identifiers, PCI DSS, GLBA and state breach-notification laws). **This
+is a mapping of kinds, not a compliance claim: CaptureMann is not a compliance tool, and using it does not
+make a screenshot compliant with any of them.**
+
+### How well it works (measured, synthetic data)
+
+All numbers below come from stored reports and are measured on **synthetic screenshots made by this project**
+(300 images, fixed seed 20261030, 13 screen layouts, light and dark, 1x and 2x, some degraded), with the
+**dev split only** (211 images; the held-out layouts have not been read). The images contain made-up data
+whose formats the rules know, so these figures are an upper bound for real screenshots, not a measure of
+real-world accuracy. Recognizer: Apple Vision, on an Apple M4 Pro, macOS 26.6.2. Date: 2026-10-30.
+
+| Apple Vision, dev split, synthetic | 0.2.3 detector (4 kinds) | 0.2.5 rules (21 kinds) |
+|---|---|---|
+| Items scored | 1,367 | 2,288 |
+| Found (any kind) | 92.2 % | 95.3 % |
+| Precision (proposals that were real items) | 68.8 % | 90.9 % |
+| False alarms per image / per image with nothing to find | 2.725 / 2.000 | 0.550 / 0.841 |
+| Leak rate (still readable after the blur) | 4.2 % (58 of 1,367) | 2.0 % (46 of 2,288) |
+
+The two columns score different sets of items (the old detector knew 4 of the 21 kinds), so the "found" rows
+are not like for like. With perfect text instead of Apple Vision (this separates rule errors from recognizer
+errors) the 0.2.5 rules find 99.2 % at 97.2 % precision, with 0.199 false alarms per image and 0.206 per
+image with nothing to find; the 0.2.3 detector on the same kind of run finds 96.2 % at 69.6 %. Reports:
+[0.2.3 baseline](verification/benchmarks/redaction-0.2.3-baseline-2026-10-30.md) and
+[0.2.5 rules](verification/benchmarks/redaction-0.2.5-dev-2026-10-30.md), with per-kind, per-layout,
+per-font-size and per-language tables and the lookalikes that raised false alarms.
+
+Two things the numbers say plainly. The generic long-token rule causes the largest share of false alarms on
+screenshots with nothing to find (0.492 of the 0.841 per such image; the report leaves the decision to the maintainer), and `npi` is **off by default** because only
+30 % of its proposals were real. Private-key blocks are the weakest default kind with Apple Vision (65.5 % of
+key lines covered, 15.5 % still readable after the blur). Nothing here has been checked on real screenshots
+yet (that is the maintainer's manual cross-check, [`tests/manual/RED-1.md`](tests/manual/RED-1.md)).
+
+To reproduce on your own Mac (builds the synthetic set from the seed, no network; `run` uses the system
+recognizer):
+
+```sh
+cargo run -p cm-render --example redaction_bench --release --locked -- gen --out /tmp/redaction-set
+cargo run -p cm-render --example redaction_bench --release --locked -- run --set /tmp/redaction-set --detector-only --split dev
+cargo run -p cm-render --example redaction_bench --release --locked -- run --set /tmp/redaction-set --recognizer system --split dev
+```
+
+### What it does not do
+
+- It finds **formats and checksums only**. Names, street addresses and dates are not found, and there are no
+  label-based kinds: a CVV or an expiry date with no card number on the screen is not proposed, and a bare
+  value under a "Password" or "SSN" label is not found by the label (a `NAME=value` pair with a
+  secret-looking name is).
+- **Text the recognizer cannot read stays.** Small, low-contrast or unusual text can be missed, which is what
+  the leak rate measures. Private-key blocks are the weakest default kind with Apple Vision.
+- Bare ten-digit Vietnamese mobile numbers (`0934851497`) are not found, and passwords made only of letters
+  (`letmein`) are not proposed.
+- Some lookalikes are proposed anyway (in the dev split: hash strings, timestamps, ten-digit ids, tracking
+  numbers); that is why you review.
+- There is **no Windows or Linux recognizer yet**; the Auto-redact button is hidden there.
+- It is not a compliance tool. **A blurred screenshot is not proof that nothing sensitive remains**: look at
+  the result before you share it.
 
 ## Install
 

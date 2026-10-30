@@ -366,6 +366,93 @@ fn scan_page(lines: &[TextLine], opts: &SuggestOptions) -> Vec<RedactionSuggesti
     out
 }
 
+/// Documentation data for each kind (README and user guide tables, RED-3). The generated tables
+/// come from these methods, so the documents cannot list a kind the code does not have.
+impl RedactionKind {
+    /// One line in English: what the kind finds.
+    pub fn summary(self) -> &'static str {
+        match self {
+            RedactionKind::Email => "Email addresses (`local@domain.tld`).",
+            RedactionKind::Token => "API keys, JWTs and other long random-looking strings: known provider shapes, or a mix of 24 or more letters and digits (lower confidence).",
+            RedactionKind::PrivateKey => "PEM private-key blocks, every line from the BEGIN line to the END line.",
+            RedactionKind::SecretAssignment => "The value in `NAME=value` or `\"name\": \"value\"` pairs whose name looks secret (password, token, key and similar).",
+            RedactionKind::UrlSecret => "A password inside a URL, or a secret value in a URL query string.",
+            RedactionKind::Card => "Payment card numbers of 13 to 19 digits; masked numbers are skipped.",
+            RedactionKind::CardExtra => "An expiry date or security code beside a detected card number (found by position, no label needed).",
+            RedactionKind::Ssn => "US Social Security numbers written `NNN-NN-NNNN` or with spaces; masked forms and bare nine-digit numbers are skipped.",
+            RedactionKind::Itin => "US Individual Taxpayer Identification Numbers (`9NN-NN-NNNN` with an ITIN group).",
+            RedactionKind::Ein => "US Employer Identification Numbers (`NN-NNNNNNN`).",
+            RedactionKind::Aba => "US bank routing numbers (nine digits).",
+            RedactionKind::Iban => "International bank account numbers, solid or in groups of four.",
+            RedactionKind::Npi => "US National Provider Identifiers (ten digits).",
+            RedactionKind::Dea => "US DEA registration numbers (two letters, seven digits).",
+            RedactionKind::Mbi => "US Medicare Beneficiary Identifiers (11 characters).",
+            RedactionKind::Passport => "US passport book numbers written as a letter and eight digits.",
+            RedactionKind::Vin => "Vehicle identification numbers (17 characters).",
+            RedactionKind::Imei => "Mobile device IMEI numbers (15 digits).",
+            RedactionKind::IpAddress => "IPv4 and IPv6 addresses; loopback and unspecified addresses are skipped.",
+            RedactionKind::MacAddress => "MAC addresses (six hex pairs).",
+            RedactionKind::Phone => "Phone and fax numbers of 10 to 15 digits with separators or a leading `+`, extensions included.",
+        }
+    }
+
+    /// The test the rule applies besides the shape of the text, in a few words.
+    pub fn check(self) -> &'static str {
+        match self {
+            RedactionKind::Email => "Shape only",
+            RedactionKind::Token => "Known prefix and length, or letter-and-digit mix",
+            RedactionKind::PrivateKey => "BEGIN and END lines",
+            RedactionKind::SecretAssignment => "Secret-looking name, value is not a placeholder",
+            RedactionKind::UrlSecret => "Userinfo password or secret-looking parameter name",
+            RedactionKind::Card => "Luhn + issuer prefix + length",
+            RedactionKind::CardExtra => "Valid month, or 3 or 4 digits, beside a detected card",
+            RedactionKind::Ssn => {
+                "Issuable ranges (no 000, 666 or 9xx area, no 00 group, no 0000 serial)"
+            }
+            RedactionKind::Itin => "ITIN group ranges",
+            RedactionKind::Ein => "Valid prefix",
+            RedactionKind::Aba => "Checksum + prefix range",
+            RedactionKind::Iban => "Mod 97",
+            RedactionKind::Npi => "Luhn with the 80840 prefix",
+            RedactionKind::Dea => "Check digit",
+            RedactionKind::Mbi => "Position rules for each character",
+            RedactionKind::Passport => "Letter + eight digits",
+            RedactionKind::Vin => "Check digit at position 9",
+            RedactionKind::Imei => "Luhn",
+            RedactionKind::IpAddress => "Valid address syntax",
+            RedactionKind::MacAddress => "Six hex pairs, one separator style",
+            RedactionKind::Phone => "NANP rules for US numbers; separators or `+` required",
+        }
+    }
+
+    /// The group the kind belongs to in the documentation tables.
+    pub fn group(self) -> &'static str {
+        match self {
+            RedactionKind::Email | RedactionKind::Phone => "Contact",
+            RedactionKind::Token
+            | RedactionKind::PrivateKey
+            | RedactionKind::SecretAssignment
+            | RedactionKind::UrlSecret => "Credentials and secrets",
+            RedactionKind::Card | RedactionKind::CardExtra => "Payment cards",
+            RedactionKind::Ssn
+            | RedactionKind::Itin
+            | RedactionKind::Ein
+            | RedactionKind::Passport => "Identity and tax numbers",
+            RedactionKind::Aba | RedactionKind::Iban => "Bank accounts",
+            RedactionKind::Npi | RedactionKind::Dea | RedactionKind::Mbi => "Health identifiers",
+            RedactionKind::Vin
+            | RedactionKind::Imei
+            | RedactionKind::IpAddress
+            | RedactionKind::MacAddress => "Devices and networks",
+        }
+    }
+
+    /// Whether the kind is looked for when the caller names none (see [`RedactionKind::DEFAULT`]).
+    pub fn default_on(self) -> bool {
+        RedactionKind::DEFAULT.contains(&self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

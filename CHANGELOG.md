@@ -5,6 +5,18 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
+### Added
+
+- **Auto-redact finds 21 kinds instead of 4.** Besides emails, tokens, phone numbers and IPv4 addresses it now proposes payment cards (Luhn, issuer prefix, length) with the expiry date or security code beside them (`card_extra`, found by position, no label needed), Social Security numbers (issuable ranges, masked forms skipped), ITINs, EINs, ABA routing numbers, IBANs, NPIs, DEA numbers, Medicare Beneficiary Identifiers, US passport numbers, VINs, IMEIs, IPv6 and MAC addresses, PEM private-key blocks, `NAME=value` and `"name": "value"` secrets, and URLs that carry a password or a secret in the query. Still only proposals: nothing is applied until you accept, and it runs on your Mac with no network. The MCP tool `suggest_redactions` takes the new kind names in `kinds` (the command line has no `--kinds` flag yet). Details: [`docs/user/redaction.md`](docs/user/redaction.md), spec `specs/features/17-redaction.md` (RED-1 to RED-3).
+- **A benchmark for Auto-redact**: `cargo run -p cm-render --example redaction_bench` builds a synthetic set of 300 screenshots with exact ground truth from a seed and scores recall, precision, false alarms and the end-to-end leak rate (blur, render, read again), per kind and per standard. Two stored reports, both on the synthetic dev split with Apple Vision (the held-out layouts have not been read): the [0.2.3 baseline](verification/benchmarks/redaction-0.2.3-baseline-2026-10-30.md) and the [0.2.5 rules](verification/benchmarks/redaction-0.2.5-dev-2026-10-30.md). Synthetic numbers are an upper bound, not real-world accuracy. A manual cross-check on real screenshots (counts only) is `tests/manual/RED-1.md`, not run yet.
+- **The README and the user guide list the kinds from the rule data.** The table between the `redaction-kinds` markers is generated, and a test (`crates/cm-render/tests/redaction_docs.rs`) fails when it differs from the code. New: the README section "Find personal data before you share a screenshot", `docs/user/redaction.md` and `docs/development/redaction.md`.
+
+### Changed
+
+- **`npi` is off by default** (30 % of its proposals were real on the synthetic dev split: a ten-digit number passes its check digit one time in ten); name it in `kinds` to turn it on.
+- **Phones, IP addresses and tokens.** US (NANP) phone numbers with two or more separators get higher confidence (0.7), an extension is part of the span, and dates, times, addresses, versions and long digit runs are tested not to be read as phone numbers. IPv6 is found beside IPv4 and loopback and unspecified addresses are no longer proposed. The token rule knows more provider key shapes and bearer credentials; the generic mixed letter-and-digit rule stays at confidence 0.6. On the synthetic dev split with Apple Vision, precision went from 68.8 % to 90.9 % and false alarms per image from 2.725 to 0.550, while the set scored grew from 1,367 to 2,288 items (the two figures score different sets).
+- Known limits, stated in the README: formats and checksums only (no names, addresses or dates), text the recognizer cannot read stays, bare ten-digit Vietnamese mobile numbers and letters-only passwords are not found, private-key blocks are partly missed with Apple Vision, and there is no Windows or Linux recognizer. Not a compliance tool.
+
 ## [0.2.4] - 2026-10-30
 
 0.2.4 is about finding out where time goes and making problems easier to report. Two speed changes, a log file with a Copy diagnostics button, and measured numbers for the speech, speaker and text models.
