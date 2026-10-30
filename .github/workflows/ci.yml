@@ -53,7 +53,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ffmpeg cmake pkg-config libasound2-dev \
             libxkbcommon-x11-dev libxkbcommon-dev libwayland-dev libxcb1-dev libx11-xcb-dev libvulkan-dev \
-            libfontconfig-dev libssl-dev libpipewire-0.3-dev libclang-dev
+            libfontconfig-dev libssl-dev libpipewire-0.3-dev libclang-dev \
+            libgtk-3-dev libayatana-appindicator3-dev libxdo-dev
       - run: ffmpeg -hide_banner -version
       # The speaker engine (AI-8) links the pinned sherpa-onnx static libraries; `.cargo/config.toml`
       # points SHERPA_ONNX_LIB_DIR at packaging/sherpa/out/lib. The build never downloads them.

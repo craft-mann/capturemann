@@ -48,11 +48,12 @@ fn speaker_store(dir: &Path, models: &Path) -> ModelStore {
         ),
     ] {
         let file = &store.catalog().get(id).unwrap().file;
-        std::os::unix::fs::symlink(
-            models.join(name).canonicalize().unwrap(),
-            store.models_dir().join(file),
-        )
-        .unwrap();
+        let from = models.join(name).canonicalize().unwrap();
+        let to = store.models_dir().join(file);
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(from, to).unwrap();
+        #[cfg(not(unix))]
+        std::fs::copy(from, to).unwrap();
     }
     store
 }
@@ -130,11 +131,14 @@ fn main() {
             let dir = tempfile::tempdir().unwrap();
             let store = speaker_store(dir.path(), &models);
             // --speaker-threads N pins the thread count (the app picks its own when absent).
-            let d = match option(&args, "--speaker-threads").and_then(|s| s.parse().ok()) {
+            let d = match option(&args, "--speaker-threads").and_then(|s| s.parse::<i32>().ok()) {
+                #[cfg(feature = "sherpa")]
                 Some(threads) => SherpaDiarizer::with_engine(
                     store,
                     std::sync::Arc::new(cm_ai::speaker_engine::SherpaEngine { threads }),
                 ),
+                #[cfg(not(feature = "sherpa"))]
+                Some(_threads) => SherpaDiarizer::new(store),
                 None => SherpaDiarizer::new(store),
             };
             let input = DiarizeInput {
