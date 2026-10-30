@@ -145,6 +145,8 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       # Every relative link in a Markdown file must point at a tracked file.
       - run: python3 scripts/check_md_links.py
+      # target_os only in platform code (the older files are a shrinking baseline).
+      - run: python3 scripts/check_target_os.py
 
   licenses:
     runs-on: ubuntu-latest

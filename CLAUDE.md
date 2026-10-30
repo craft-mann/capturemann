@@ -61,6 +61,7 @@ Spec rules:
 ## Constraints to respect
 
 - **No GPL/AGPL code in shipped binaries** (Apache-2.0): LGPL FFmpeg only (built by `make ffmpeg`, bundled by `make bundle`; `bundle.sh` refuses a GPL, nonfree or libx264 build), native hardware encoders only (no software H.264 encoder ships: the OpenH264 fallback was removed on Oct 24, 2026 to avoid the H.264 patent exposure of a source build; Macs without a hardware H.264 encoder, before about 2016, are not supported in v0.1). CI runs `cargo deny`. The interim exporter may use a developer's GPL `libx264` build from `PATH`; it is flagged `lgpl_safe: false` and must not ship.
+- **`target_os` only in platform code:** `cm-platform`, a crate's `sys/` folder or an app's `platform*.rs` (tests and examples are free). `python3 scripts/check_target_os.py` (CI, job `docs`) fails on new lines elsewhere; older files are a baseline that only shrinks (`--update` after a clean-up).
 - Every user-facing action needs an MCP tool and CLI command with identical behavior (including undo and confirmations).
 - Errors use the shared codes in `specs/README.md` (`invalid_input`, `permission_missing`, `job_failed`, etc.), which map to CLI exit codes.
 - Definition of Done includes `cargo clippy -D warnings`, `cargo fmt`, tests, and manual scripts at `tests/manual/<ID>.md` where automation is impossible.
