@@ -161,6 +161,11 @@ pub(super) async fn targets(cx: &mut Ctx<'_>, displays_only: bool) -> Result<(),
             );
         }
         s.push_str("Windows\n");
+        if r["capabilities"]["list_windows"] == json!(false) {
+            s.push_str(
+                "  (this desktop does not list windows; `capture screenshot --pick` opens its own picker)\n",
+            );
+        }
         for w in r["windows"].as_array().into_iter().flatten() {
             let _ = writeln!(
                 s,
@@ -189,8 +194,17 @@ pub(super) async fn screenshot(cx: &mut Ctx<'_>, a: ScreenshotArgs) -> Result<()
         None => None,
     };
     let mut c = cx.client().await?;
-    let target = if let Some(w) = &a.window {
+    let target = if a.pick {
+        json!({ "pick": true })
+    } else if let Some(w) = &a.window {
         let t = c.call("list_targets", json!({})).await?;
+        if t["capabilities"]["list_windows"] == json!(false) {
+            return Err(CliError::new(
+                cm_core::ErrorCode::NotImplemented,
+                "this desktop (a Wayland session) cannot list or capture windows by name or id; \
+                 use `capture screenshot --pick` to choose a window in the desktop's own picker",
+            ));
+        }
         json!({ "window_id": resolve_window(&t, w)? })
     } else {
         let display = match a.display {

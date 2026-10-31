@@ -9,8 +9,8 @@ use std::{
 use cm_core::{CmError, PhysicalPoint, PhysicalRect, ScaleFactor};
 
 use crate::{
-    region::resolve_region, CaptureBackend, CaptureKind, CaptureTarget, DisplayInfo, Frame,
-    Targets, WindowInfo,
+    region::resolve_region, Capabilities, CaptureBackend, CaptureKind, CaptureTarget, DisplayInfo,
+    Frame, Targets, WindowInfo,
 };
 
 /// Longest accepted delay (CAP-5: `delay_s: 0..30`).
@@ -185,6 +185,40 @@ impl Capturer {
         }
     }
 
+    /// What this desktop can capture by id and whether it has its own picker (see
+    /// [`Capabilities`]); `list_targets` reports it.
+    pub fn capabilities(&self) -> Capabilities {
+        self.backend.capabilities()
+    }
+
+    /// A screenshot of what the person chooses in the desktop's own picker (window, region or
+    /// screen; Wayland sessions, where windows have no ids). Blocks until they choose.
+    ///
+    /// `not_implemented` when the desktop has no such picker, `user_declined` when the person
+    /// cancels, `confirmation_timeout` when nobody answers. The result has kind `region` (the
+    /// picker does not say what was chosen), no display or window id and scale 1.
+    pub fn capture_picked(&self) -> Result<Capture, CmError> {
+        if !self.backend.capabilities().pick {
+            return Err(CmError::not_implemented(
+                "This desktop has no system picker. Name a display, a window or a region instead.",
+            ));
+        }
+        self.backend.check_permission()?;
+        let frame = self.backend.pick_interactive()?;
+        Ok(Capture {
+            source: PhysicalRect {
+                origin: PhysicalPoint { x: 0, y: 0 },
+                size: frame.size(),
+            },
+            frame,
+            kind: CaptureKind::Region,
+            display_id: None,
+            window_id: None,
+            scale: ScaleFactor::ONE,
+            waited: Duration::ZERO,
+        })
+    }
+
     /// Overrides which process counts as "CaptureMann itself"; `None` keeps every window.
     pub fn with_own_pid(mut self, pid: Option<u32>) -> Self {
         self.own_pid = pid;
@@ -351,6 +385,15 @@ impl Capturer {
                 Ok(Resolved::Region(d, r))
             }
             CaptureTarget::Window { window_id } => {
+                // A desktop without window ids (Wayland) says how to pick one instead of
+                // pretending the id is merely unknown.
+                if !self.backend.capabilities().capture_window {
+                    return Err(CmError::not_implemented(format!(
+                        "window {window_id}: this desktop has no window ids. Use the desktop's \
+                         own picker instead (capture_screenshot with target {{\"pick\": true}}, \
+                         `capturemann capture screenshot --pick`)."
+                    )));
+                }
                 let w = self
                     .backend
                     .windows()?
@@ -982,5 +1025,63 @@ mod tests {
         assert!(backend.calls().is_empty());
         let _ = c.capture(req, None).unwrap();
         assert_eq!(backend.calls(), vec!["capture_display:2"]);
+    }
+
+    /// A desktop with ids for everything has no system picker: `pick` is `not_implemented`
+    /// and nothing is shown.
+    #[test]
+    fn pick_is_not_implemented_where_targets_have_ids() {
+        let c = capturer();
+        assert!(!c.capabilities().pick && c.capabilities().list_windows);
+        let e = c.capture_picked().unwrap_err();
+        assert_eq!(e.code(), ErrorCode::NotImplemented);
+    }
+
+    /// A Wayland-like desktop: the picker's pixels come back as a region capture without ids,
+    /// Esc is `user_declined`, and the capabilities say there are no windows.
+    #[test]
+    fn pick_returns_the_pickers_pixels() {
+        let chosen = Frame::new(2, 1, vec![9, 9, 9, 255, 8, 8, 8, 255]).unwrap();
+        let c = Capturer::new(
+            FakeBackend::new()
+                .with_display(1, 0, 0, 100, 100, 1.0)
+                .with_picker(Ok(chosen.clone())),
+        );
+        let caps = c.capabilities();
+        assert!(caps.pick && !caps.list_windows && !caps.capture_window && caps.capture_region);
+        let cap = c.capture_picked().unwrap();
+        assert_eq!(cap.frame, chosen);
+        assert_eq!(cap.kind, CaptureKind::Region);
+        assert_eq!((cap.display_id, cap.window_id), (None, None));
+        assert_eq!(
+            cap.source.size,
+            PhysicalSize {
+                width: 2,
+                height: 1
+            }
+        );
+        // The scripted answer was used up: the person closed the picker the second time.
+        assert_eq!(
+            c.capture_picked().unwrap_err().code(),
+            ErrorCode::UserDeclined
+        );
+    }
+
+    /// A window id on a desktop without window ids says how to pick one (CAP-1).
+    #[test]
+    fn a_window_id_without_window_ids_points_at_the_picker() {
+        let c = Capturer::new(
+            FakeBackend::new()
+                .with_display(1, 0, 0, 10, 10, 1.0)
+                .with_picker(Err(CmError::user_declined("x"))),
+        );
+        let e = c
+            .capture(
+                CaptureRequest::new(CaptureTarget::Window { window_id: 4 }),
+                None,
+            )
+            .unwrap_err();
+        assert_eq!(e.code(), ErrorCode::NotImplemented);
+        assert!(e.to_string().contains("pick"), "{e}");
     }
 }

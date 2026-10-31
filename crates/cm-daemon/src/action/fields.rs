@@ -181,6 +181,33 @@ pub(super) fn parse_from_frame(
     })
 }
 
+/// `target: { pick: true }`: only `pick` is allowed in the target, and no `delay_s`.
+pub(super) fn parse_pick(f: &Fields<'_>, target: &Value) -> Result<CapturePickParams, CmError> {
+    let obj = target
+        .as_object()
+        .ok_or_else(|| CmError::invalid_field("target", "must be an object"))?;
+    if obj.len() != 1 {
+        return Err(CmError::invalid_field(
+            "target",
+            "with `pick` no other key is allowed",
+        ));
+    }
+    if obj.get("pick") != Some(&Value::Bool(true)) {
+        return Err(CmError::invalid_field("target.pick", "must be `true`"));
+    }
+    if f.obj.get("delay_s").is_some_and(|v| !v.is_null()) {
+        return Err(CmError::invalid_field(
+            "delay_s",
+            "is not allowed with `pick` (the person chooses when)",
+        ));
+    }
+    Ok(CapturePickParams {
+        copy_to_clipboard: f.bool_or("copy_to_clipboard", false)?,
+        title: f.str_opt("title")?,
+        request_id: f.request_id()?,
+    })
+}
+
 /// `[x, y, w, h]`, whole physical px relative to the display, positive size.
 pub(super) fn parse_rect(r: &Value) -> Result<[i64; 4], CmError> {
     let bad = || {

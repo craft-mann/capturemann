@@ -8,7 +8,7 @@ use std::sync::{Mutex, PoisonError};
 
 use cm_core::{CmError, Permission, PhysicalPoint, PhysicalRect, PhysicalSize, ScaleFactor};
 
-use crate::{CaptureBackend, DisplayInfo, Frame, WindowInfo};
+use crate::{Capabilities, CaptureBackend, DisplayInfo, Frame, WindowInfo};
 
 /// The golden pattern: red = x, green = y (low bytes), blue = high bits of both, opaque.
 pub fn pattern_pixel(x: u32, y: u32) -> [u8; 4] {
@@ -38,6 +38,9 @@ pub struct FakeBackend {
     windows: Vec<WindowInfo>,
     permission: bool,
     supports_exclusion: bool,
+    /// A Wayland-like desktop: no window ids, a system picker with a scripted answer.
+    picker: bool,
+    pick_result: Mutex<Option<Result<Frame, CmError>>>,
     calls: Mutex<Vec<String>>,
 }
 
@@ -120,6 +123,15 @@ impl FakeBackend {
     /// `capture_display_excluding:<display>:<pid>`.
     pub fn with_process_exclusion(mut self) -> Self {
         self.supports_exclusion = true;
+        self
+    }
+
+    /// Makes this a desktop with a system picker and no window ids (a Wayland session):
+    /// `capabilities()` says so and `pick_interactive` returns `answer` once (afterwards
+    /// `user_declined`).
+    pub fn with_picker(mut self, answer: Result<Frame, CmError>) -> Self {
+        self.picker = true;
+        self.pick_result = Mutex::new(Some(answer));
         self
     }
 
@@ -245,5 +257,30 @@ impl CaptureBackend for FakeBackend {
             w.bounds.size.width,
             w.bounds.size.height,
         ))
+    }
+
+    fn capabilities(&self) -> Capabilities {
+        if self.picker {
+            Capabilities {
+                list_windows: false,
+                capture_window: false,
+                capture_region: true,
+                pick: true,
+            }
+        } else {
+            Capabilities::default()
+        }
+    }
+
+    fn pick_interactive(&self) -> Result<Frame, CmError> {
+        if !self.picker {
+            return Err(CmError::not_implemented("no system picker"));
+        }
+        self.log("pick_interactive".to_owned());
+        self.pick_result
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take()
+            .unwrap_or_else(|| Err(CmError::user_declined("the picker was closed")))
     }
 }

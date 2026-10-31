@@ -109,6 +109,18 @@ pub struct CaptureFromFrameParams {
     pub request_id: Option<String>,
 }
 
+/// `capture_screenshot` with `target: { pick: true }`: the desktop's own picker (a Wayland
+/// session, where windows have no ids) shows its window / region / screen chooser and the
+/// person's choice is stored. Needs a person at the screen: the call waits for them (the
+/// picker is closed after two minutes, `confirmation_timeout`) and Esc is `user_declined`.
+/// `not_implemented` on a desktop without such a picker. `delay_s` is refused.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct CapturePickParams {
+    pub copy_to_clipboard: bool,
+    pub title: Option<String>,
+    pub request_id: Option<String>,
+}
+
 /// How `freeze_display` returns the pixels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -331,6 +343,8 @@ pub enum Action {
     CaptureScreenshot(CaptureScreenshotParams),
     /// `capture_screenshot` with `target: { frame_id }` (same method name and tier).
     CaptureFromFrame(CaptureFromFrameParams),
+    /// `capture_screenshot` with `target: { pick: true }` (same method name and tier).
+    CapturePick(CapturePickParams),
     FreezeDisplay(FreezeDisplayParams),
     ReleaseFrame(ReleaseFrameParams),
     WindowThumbnail(WindowThumbnailParams),
