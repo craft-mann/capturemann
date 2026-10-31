@@ -18,6 +18,22 @@ use std::collections::HashMap;
 /// page shows a translated note instead of "used by another app").
 pub const UNSUPPORTED: &str = "unsupported-session";
 
+/// What the desktop says each bound shortcut is set to (`Ctrl+Alt+S`), when the portal reports it.
+pub type PortalTriggers = Vec<(ShortcutAction, String)>;
+
+/// The triggers the portal reported for the actions it bound: `reported` is `(shortcut id,
+/// trigger description)`; an empty description (the user has not assigned a key) is left out.
+pub fn bound_triggers(reported: &[(String, String)]) -> PortalTriggers {
+    reported
+        .iter()
+        .filter(|(_, d)| !d.trim().is_empty())
+        .filter_map(|(id, d)| {
+            let action = ShortcutAction::ALL.iter().find(|a| a.key() == id)?;
+            Some((*action, d.trim().to_owned()))
+        })
+        .collect()
+}
+
 /// How this session registers global shortcuts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Backend {
@@ -96,11 +112,12 @@ pub fn unsupported(map: &ShortcutMap) -> Registration {
 
 /// Asks the GlobalShortcuts portal for every shortcut and keeps listening for presses.
 /// Runs on its own thread: the first bind may wait for the user to answer the desktop's dialog.
-/// `on_bound` gets the outcome once (the Shortcuts page status); `on_activated` gets the hotkey
+/// `on_bound` gets the outcome once (the Shortcuts page status, and the triggers the desktop
+/// chose); `on_activated` gets the hotkey
 /// id of each press. The thread lives as long as the session does.
 pub fn start_portal(
     map: &ShortcutMap,
-    on_bound: impl FnOnce(Registration) + Send + 'static,
+    on_bound: impl FnOnce(Registration, PortalTriggers) + Send + 'static,
     on_activated: impl Fn(u32) + Send + 'static,
 ) {
     #[cfg(target_os = "linux")]
@@ -128,7 +145,7 @@ pub fn start_portal(
     #[cfg(not(target_os = "linux"))]
     {
         let _ = on_activated;
-        on_bound(unsupported(map));
+        on_bound(unsupported(map), Vec::new());
     }
 }
 
@@ -142,14 +159,14 @@ struct Bind {
 
 #[cfg(target_os = "linux")]
 mod linux {
-    use super::{Bind, Registration, UNSUPPORTED};
+    use super::{bound_triggers, Bind, PortalTriggers, Registration, UNSUPPORTED};
     use ashpd::desktop::global_shortcuts::{BindShortcutsOptions, GlobalShortcuts, NewShortcut};
     use ashpd::desktop::CreateSessionOptions;
     use futures_lite::StreamExt;
 
     pub(super) async fn run(
         binds: Vec<Bind>,
-        on_bound: impl FnOnce(Registration),
+        on_bound: impl FnOnce(Registration, PortalTriggers),
         on_activated: impl Fn(u32),
     ) {
         let all_failed = |why: &str| -> Registration {
@@ -163,7 +180,7 @@ mod linux {
             Ok(p) => p,
             Err(e) => {
                 log::info!("no GlobalShortcuts portal: {e}");
-                on_bound(all_failed(UNSUPPORTED));
+                on_bound(all_failed(UNSUPPORTED), Vec::new());
                 return;
             }
         };
@@ -171,7 +188,7 @@ mod linux {
             Ok(s) => s,
             Err(e) => {
                 log::warn!("GlobalShortcuts session refused: {e}");
-                on_bound(all_failed(UNSUPPORTED));
+                on_bound(all_failed(UNSUPPORTED), Vec::new());
                 return;
             }
         };
@@ -180,7 +197,7 @@ mod linux {
             Ok(s) => s,
             Err(e) => {
                 log::warn!("cannot listen for GlobalShortcuts presses: {e}");
-                on_bound(all_failed(&e.to_string()));
+                on_bound(all_failed(&e.to_string()), Vec::new());
                 return;
             }
         };
@@ -209,6 +226,11 @@ mod linux {
                         .collect::<Vec<_>>()
                         .join(", ")
                 );
+                let reported: Vec<(String, String)> = done
+                    .shortcuts()
+                    .iter()
+                    .map(|s| (s.id().to_owned(), s.trigger_description().to_owned()))
+                    .collect();
                 on_bound(
                     binds
                         .iter()
@@ -221,11 +243,12 @@ mod linux {
                             (b.action, res)
                         })
                         .collect(),
+                    bound_triggers(&reported),
                 );
             }
             Err(e) => {
                 log::warn!("GlobalShortcuts bind failed: {e}");
-                on_bound(all_failed(&e.to_string()));
+                on_bound(all_failed(&e.to_string()), Vec::new());
                 return;
             }
         }
@@ -259,6 +282,19 @@ mod tests {
         assert_eq!(portal_trigger(&c("alt+shift+r")), "ALT+SHIFT+r");
         assert_eq!(portal_trigger(&c("super+space")), "LOGO+space");
         assert_eq!(portal_trigger(&c("ctrl+f5")), "CTRL+F5");
+    }
+
+    #[test]
+    fn portal_triggers_are_kept_per_action_and_blanks_dropped() {
+        let t = bound_triggers(&[
+            ("shortcuts.capture_region".into(), " Ctrl+Alt+S ".into()),
+            ("shortcuts.open_library".into(), "".into()),
+            ("not.ours".into(), "F1".into()),
+        ]);
+        assert_eq!(
+            t,
+            vec![(ShortcutAction::CaptureRegion, "Ctrl+Alt+S".to_owned())]
+        );
     }
 
     #[test]

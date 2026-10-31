@@ -41,6 +41,7 @@ pub mod magnifier;
 pub mod paint;
 pub mod picker;
 pub mod platform;
+pub mod platform_clipboard;
 pub mod selection;
 pub mod session;
 pub mod targets;

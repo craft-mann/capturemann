@@ -102,6 +102,8 @@ pub struct AppModel {
     pub shortcuts: ShortcutMap,
     /// Result of registering each shortcut with the OS (CAP-2.AC3).
     pub registration: Vec<(ShortcutAction, Result<(), String>)>,
+    /// Wayland: the keys the desktop's GlobalShortcuts portal chose, as it describes them.
+    pub portal_triggers: crate::platform_hotkeys::PortalTriggers,
     pub platform: Platform,
     pub clock: LocalClock,
     pub toasts: ToastQueue,
@@ -224,6 +226,7 @@ impl AppModel {
             backend,
             shortcuts,
             registration: Vec::new(),
+            portal_triggers: Vec::new(),
             platform,
             clock,
             toasts: ToastQueue::default(),

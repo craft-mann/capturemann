@@ -1316,7 +1316,6 @@ dependencies = [
  "cm-platform",
  "getrandom 0.4.3",
  "keyring",
- "open",
  "percent-encoding",
  "serde",
  "serde_json",

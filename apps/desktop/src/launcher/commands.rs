@@ -288,7 +288,7 @@ impl Command {
 pub fn shortcut_text(labels: &[String], platform: Platform) -> String {
     match platform {
         Platform::Mac => labels.concat(),
-        Platform::Windows => labels.join("+"),
+        Platform::Windows | Platform::Linux => labels.join("+"),
     }
 }
 
@@ -296,7 +296,7 @@ pub fn shortcut_text(labels: &[String], platform: Platform) -> String {
 pub fn actions_shortcut(platform: Platform) -> &'static str {
     match platform {
         Platform::Mac => "\u{2318}K",
-        Platform::Windows => "Ctrl+K",
+        Platform::Windows | Platform::Linux => "Ctrl+K",
     }
 }
 

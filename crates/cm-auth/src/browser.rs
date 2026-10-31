@@ -12,9 +12,12 @@ pub struct SystemBrowser;
 
 impl BrowserOpener for SystemBrowser {
     fn open(&self, url: &str) -> Result<(), CmError> {
-        // The URL carries `state` and the code challenge: keep it out of the message.
-        open::that(url).map_err(|e| {
-            CmError::internal(format!("could not open the system browser: {}", e.kind()))
+        // The URL carries `state` and the code challenge: the message never includes it.
+        cm_platform::opener::open_target(std::ffi::OsStr::new(url)).map_err(|e| {
+            CmError::internal(format!(
+                "could not open the system browser: {}",
+                e.message()
+            ))
         })
     }
 }

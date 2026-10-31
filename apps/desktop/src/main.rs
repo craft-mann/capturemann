@@ -237,7 +237,7 @@ fn main() {
     let library_path = settings::resolve_library_path(
         std::env::var_os("CAPTUREMANN_LIBRARY").map(PathBuf::from),
         &snapshot,
-        settings::default_library_dir(dirs::video_dir(), dirs::home_dir()),
+        settings::default_library_dir(cm_platform::dirs::video_dir(), dirs::home_dir()),
     );
     let endpoint = Endpoint::from_env_or_default();
 
@@ -405,8 +405,8 @@ fn main() {
             let tx = cmd_tx.clone();
             platform_hotkeys::start_portal(
                 &shortcuts,
-                move |registration| {
-                    let _ = bound_tx.send(registration);
+                move |registration, triggers| {
+                    let _ = bound_tx.send((registration, triggers));
                 },
                 move |id| {
                     let _ = tx.send(Command::Hotkey(id));
@@ -414,7 +414,7 @@ fn main() {
             );
             let app2 = model.clone();
             cx.spawn(async move |cx| {
-                if let Some(registration) = bound_rx.recv().await {
+                if let Some((registration, triggers)) = bound_rx.recv().await {
                     cx.update(|cx| {
                         let none = registration.iter().all(|(_, r)| {
                             r.as_ref()
@@ -423,6 +423,7 @@ fn main() {
                         });
                         app2.update(cx, |m, cx| {
                             m.registration = registration;
+                            m.portal_triggers = triggers;
                             cx.notify();
                         });
                         if none {

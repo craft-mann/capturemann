@@ -40,10 +40,16 @@ has run on a real Linux desktop yet. Test lab for that: `scripts/testlab/` (Thin
 
 - Wayland: no always-on-top (toasts are in-window cards), no window list, no GlobalShortcuts on GNOME 46; the capture
   cloak (hide own toasts for a capture) was inconclusive on Wayland in the shared VM session.
-- `cm_platform::dirs::video_dir()` ignores xdg-user-dirs; `cm-overlay`'s picked-colour copy can be lost on X11
-  without a clipboard manager; keycaps say "Win" for Super; portal-chosen shortcut triggers are not shown in Settings;
-  light panels get the dark tray icon; XDG autostart from an AppImage would point at a temporary mount.
+- Light panels get the dark tray icon; XDG autostart from an AppImage would point at a temporary mount.
+- Fixed since the first list (tested with fakes and, for the audio stamps, in the VM, see
+  `verification/L1-audio-drift-linux-2026-10-31-claude.md`): `video_dir()` reads `XDG_VIDEOS_DIR` from
+  `user-dirs.dirs` and the desktop app asks it too; one opener helper (`cm_platform::opener`) names `xdg-utils` when
+  `xdg-open` is missing; the overlay copies a picked colour through `wl-copy`/`xclip` first (they outlive the overlay)
+  and logs a failure; keycaps say "Super"; Settings -> Shortcuts shows "Set by your desktop: ..." from the portal's
+  answer (the portal path itself still needs a desktop that has the GlobalShortcuts portal to be seen working).
 - xcap's `current_monitor` compares `y` with the monitor's `x` (upstream bug, not changed).
 - ONNX Runtime's `ThirdPartyNotices.txt` is still missing from the licence notes (sherpa README).
-- The system-audio track showed a 21 ms resync and a -2229 ppm figure in the product run; not investigated.
+- The 21 ms resync and -2229 ppm in the system-audio track came from stamping at a graph quantum change; fixed
+  (graph time instead of callback time). Real-device clock drift, a microphone that reports a delay and the picture/sound
+  offset with the new stamps are not measured.
 - Windows: two branches are parked (`parked/windows-packaging`, `parked/windows-ci-real`), never run on Windows.
