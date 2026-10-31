@@ -479,8 +479,17 @@ pub fn generate_poster(bundle: &Path, out: &Path) -> Result<(), PosterError> {
     };
     match first {
         Ok(()) => Ok(()),
-        Err(e) => poster_with_quicklook(&video, out)
-            .map_err(|q| PosterError::Both(Box::new(e), Box::new(q))),
+        Err(e) => poster_with_quicklook(&video, out).map_err(|q| combine_poster_errors(e, q)),
+    }
+}
+
+/// FFmpeg failed and the second tool did too. Where there is no second tool (every system but
+/// macOS) the FFmpeg error is the whole story: "ffmpeg is not installed; no thumbnail tool on
+/// this OS" would only confuse.
+pub fn combine_poster_errors(first: PosterError, second: PosterError) -> PosterError {
+    match second {
+        PosterError::NoThumbnailTool => first,
+        second => PosterError::Both(Box::new(first), Box::new(second)),
     }
 }
 
@@ -650,6 +659,22 @@ mod tests {
         std::fs::write(&file, "x").unwrap();
         assert_eq!(folder_to_show(&file), dir.path());
         assert_eq!(folder_to_show(dir.path()), dir.path());
+    }
+
+    /// Without Quick Look the poster error is FFmpeg's alone.
+    #[test]
+    fn a_missing_second_tool_does_not_hide_the_ffmpeg_error() {
+        assert_eq!(
+            combine_poster_errors(PosterError::FfmpegMissing, PosterError::NoThumbnailTool),
+            PosterError::FfmpegMissing
+        );
+        assert!(matches!(
+            combine_poster_errors(
+                PosterError::FfmpegNoFrame,
+                PosterError::QuickLookNoThumbnail
+            ),
+            PosterError::Both(..)
+        ));
     }
 
     #[test]
