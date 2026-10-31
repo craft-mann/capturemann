@@ -178,6 +178,10 @@ pub fn system_lines() -> Vec<String> {
 }
 
 fn permission_lines() -> Vec<String> {
+    // Linux has no permission prompts to report: the portal, PipeWire and the encoder are.
+    if let Some(lines) = crate::recording::sys::linux::diagnostic_permission_lines() {
+        return lines;
+    }
     vec![
         format!("microphone {:?}", cm_audio::microphone_permission()),
         format!(

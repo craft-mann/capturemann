@@ -457,6 +457,25 @@ async fn list_devices_tells_the_truth_on_linux() {
         .contains("not available"));
     assert_eq!(v["cursor"]["mode"], "embedded");
 
+    // The diagnostics report says the same in its Permissions section.
+    let lines = LinuxSources::new(FakeEnv::healthy())
+        .permission_lines()
+        .join(
+            "
+",
+        );
+    assert!(
+        lines.contains("desktop portal ScreenCast offers monitors yes"),
+        "{lines}"
+    );
+    assert!(lines.contains("consent not asked yet"), "{lines}");
+    assert!(lines.contains("PipeWire running"), "{lines}");
+    assert!(
+        lines.contains("camera: not available on Linux yet"),
+        "{lines}"
+    );
+    assert!(lines.contains("software VP9"), "{lines}");
+
     let mut env = FakeEnv::healthy();
     env.pipewire = false;
     env.ffmpeg = None;
@@ -467,4 +486,16 @@ async fn list_devices_tells_the_truth_on_linux() {
     assert!(problems.contains("PipeWire is not running"), "{problems}");
     assert!(problems.contains("FFmpeg was not found"), "{problems}");
     assert_eq!(v["mic_backend"], "none");
+    let lines = LinuxSources::new(FakeEnv {
+        pipewire: false,
+        ffmpeg: None,
+        ..FakeEnv::healthy()
+    })
+    .permission_lines()
+    .join(
+        "
+",
+    );
+    assert!(lines.contains("PipeWire not running"), "{lines}");
+    assert!(lines.contains("ffmpeg not found"), "{lines}");
 }
