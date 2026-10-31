@@ -766,7 +766,9 @@ fn open_recording_windows(app: &Entity<AppModel>, cx: &mut App) {
     let old = rec.update(cx, |r, _| r.indicator_win.take());
     close(cx, old);
     // An audio recording has no area to outline (VOC-1): the HUD and the tray are its indicator.
-    if !rec.read(cx).hud.is_audio() {
+    if !rec.read(cx).hud.is_audio()
+        && crate::recording::surface::shows_area_indicator(crate::permissions::Os::current())
+    {
         let (app2, rec2) = (app.clone(), rec.clone());
         let opened = cx.open_window(
             panel_options(display, display.1, false, false),

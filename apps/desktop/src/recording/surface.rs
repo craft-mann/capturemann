@@ -50,6 +50,15 @@ pub fn surface() -> Surface {
     surface_for(Os::current(), wayland, opt_in)
 }
 
+/// Whether the full-display indicator (the dimmed scrim, the corner brackets and the `rec`
+/// outline) is drawn with the floating windows. Not on Linux: its window covers the whole screen
+/// and is transparent, which an X11 session without a compositing manager draws as a black
+/// rectangle over everything, and the size it marks is the plan's hint, not the screen the
+/// desktop's dialog picked.
+pub fn shows_area_indicator(os: Os) -> bool {
+    os != Os::Linux
+}
+
 /// What the banner offers in one phase.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Banner {
@@ -174,6 +183,12 @@ mod tests {
             InWindow,
             "Wayland cannot"
         );
+    }
+
+    #[test]
+    fn only_linux_leaves_out_the_full_display_indicator() {
+        assert!(shows_area_indicator(Os::Mac) && shows_area_indicator(Os::Windows));
+        assert!(!shows_area_indicator(Os::Linux));
     }
 
     #[test]
