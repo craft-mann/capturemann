@@ -107,9 +107,9 @@ no software one may ship (x264 is GPL; OpenH264 was removed from the product for
 source build). The Linux build therefore enables **VAAPI** (`h264_vaapi`, `hevc_vaapi`; Intel and AMD GPUs,
 through the system's `libva` and driver, `sudo apt install libva2 intel-media-va-driver` or `mesa-va-drivers`)
 when `libva-dev` is installed at build time, and nothing else. On a machine without a VAAPI device MP4 (H.264)
-export fails, while WebM (VP9 + Opus), GIF and audio export work. Whether the exporter in `cm-media` chooses
-`h264_vaapi` and uploads frames with `hwupload` is not implemented there yet (it names `h264_videotoolbox` and
-`libx264`); that is exporter work, not packaging. NVIDIA (NVENC) needs `nonfree` headers and is not shipped.
+export fails, while WebM (VP9 + Opus), GIF and audio export work. The bundled FFmpeg also has the native `vp9` decoder, so VP9-in-MP4 recordings (the software fallback of the Linux
+recorder) can be edited and exported. The `cm-media` exporter probes the FFmpeg it finds and picks `h264_vaapi`
+(when a VAAPI device exists) or VP9 (`libvpx-vp9`); it never uses `libx264`. NVIDIA (NVENC) needs `nonfree` headers and is not shipped.
 
 ## Known problems of the first Linux builds
 
