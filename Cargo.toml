@@ -92,6 +92,11 @@ result_large_err = "allow"
 # Debug builds filled the disk (80+ GB of target/debug). Our own crates keep file and line
 # numbers in backtraces; third-party crates (gpui, objc2, wgpu) carry no debug info. Release is
 # unchanged. Use `debug = true` locally if you need lldb to inspect variables.
+# xim-ctext: `compound_text_to_utf8` never fails (see vendor/README-CaptureMann.md). Upstream returned an
+# error for the Latin-1 text IBus sends while composing Vietnamese on X11 and `zed-xim` panicked on it.
+[patch.crates-io]
+xim-ctext = { path = "vendor/xim-ctext" }
+
 [profile.dev]
 debug = "line-tables-only"
 

@@ -1,6 +1,6 @@
 # vendor/
 
-Trimmed copies of two crates, used as path dependencies of `cm-ai` (feature `sherpa`). They are not
+Trimmed copies of two crates (and a patched third, `xim-ctext`, below), used as path dependencies of `cm-ai` (feature `sherpa`). They are not
 workspace members (`exclude = ["vendor"]` in the root `Cargo.toml`), so `clippy` and `test` do not run
 on them, while `cargo fmt --all`, `cargo deny` and `make licenses` still read them.
 
@@ -25,3 +25,14 @@ To update: copy the new version of both crates from the cargo registry, re-apply
 (the diff against the crates.io files is the table), update the archive pin in
 `packaging/sherpa/fetch-macos.sh`, run `make sherpa` and
 `cargo test -p cm-ai --test real_diarize -- --ignored --nocapture` (see the test's header).
+
+## xim-ctext (patched copy, Oct 31, 2026)
+
+`xim-ctext` 0.3.0 on crates.io (MIT, https://github.com/Riey/xim-rs), used by `zed-xim` (GPUI's X11 input method
+client), wired in with `[patch.crates-io]` in the root `Cargo.toml`. What changed: `compound_text_to_utf8` no
+longer returns an error; the strict decoder runs first and, when it fails, escape sequences it cannot read are
+dropped and the rest is read as UTF-8 or else ISO 8859-1; `src/main.rs` (a dump demo) is removed; four tests
+added. Why: with `XMODIFIERS=@im=ibus` (the Ubuntu X11 default) and a Vietnamese engine, IBus sends the draft
+"Viê" as the bytes `56 69 EA` (Latin-1, no escape), upstream said "not valid UTF-8" and `zed-xim` called
+`expect("Encoding Error")`: CaptureMann quit on the first accented letter (VM, ibus-unikey, Oct 31, 2026).
+Drop this copy when GPUI's `zed-xim` handles Latin-1 compound text. `make licenses` lists the crate as before.

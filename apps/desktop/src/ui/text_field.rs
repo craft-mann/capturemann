@@ -426,6 +426,17 @@ impl TextField {
             }
             "tab" => return,
             "a" if cmd => self.buffer.select_all(),
+            "c" if cmd => {
+                if let Some(text) = self.buffer.selected_text() {
+                    cx.write_to_clipboard(gpui::ClipboardItem::new_string(text.to_owned()));
+                }
+            }
+            "x" if cmd => {
+                if let Some(text) = self.buffer.selected_text() {
+                    cx.write_to_clipboard(gpui::ClipboardItem::new_string(text.to_owned()));
+                    changed = self.buffer.clear();
+                }
+            }
             "v" if cmd => {
                 if let Some(text) = cx.read_from_clipboard().and_then(|c| c.text()) {
                     changed = self.put(&text);
