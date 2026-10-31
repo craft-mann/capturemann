@@ -5393,6 +5393,9 @@ msgstr ""
 msgid "Your desktop manages these shortcuts and may have chosen other keys; change them in its keyboard settings."
 msgstr ""
 
+msgid "Your desktop may ask which screen to share. Choose the screen and press Share."
+msgstr ""
+
 msgid "Your desktop remembers the screen you shared before, so recording starts without asking."
 msgstr ""
 

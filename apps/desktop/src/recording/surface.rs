@@ -69,6 +69,9 @@ pub struct Banner {
     pub countdown: bool,
     /// Discard this take is offered.
     pub discard: bool,
+    /// The line under the controls: what else shows the recording, or (while it starts) what the
+    /// desktop may ask.
+    pub hint: String,
 }
 
 /// The banner for a model state, or `None` when nothing is running (the banner is not drawn).
@@ -105,6 +108,11 @@ pub fn banner(hud: &HudState, now: Instant) -> Option<Banner> {
         ),
         countdown: matches!(phase, Phase::Countdown | Phase::Resuming) && digit.is_some(),
         discard: running,
+        hint: if phase == Phase::Starting {
+            tr!("Your desktop may ask which screen to share. Choose the screen and press Share.")
+        } else {
+            tr!("Your desktop and the tray icon also show that the screen is being recorded. Stop from either one if this window is hidden.")
+        },
     })
 }
 
@@ -194,9 +202,17 @@ mod tests {
         let starting = banner(&state("starting"), now).unwrap();
         assert_eq!(starting.label, "Starting");
         assert!(starting.pause.is_none() && starting.timer.is_none() && !starting.stop);
+        assert!(starting.hint.contains("may ask which screen to share"));
+        assert!(rec_hint_is_the_indicator_line(
+            &banner(&state("recording"), now).unwrap()
+        ));
         let saving = banner(&state("stopping"), now).unwrap();
         assert_eq!(saving.label, "Saving");
         assert!(!saving.stop && !saving.discard);
+    }
+
+    fn rec_hint_is_the_indicator_line(b: &Banner) -> bool {
+        b.hint.contains("tray icon also show")
     }
 
     #[test]

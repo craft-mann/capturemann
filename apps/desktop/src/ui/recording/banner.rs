@@ -198,8 +198,6 @@ fn view(t: &Theme, b: &Banner, app: &Entity<AppModel>) -> impl IntoElement {
                 .text_size(px(type_scale::CAPTION))
                 .text_color(rgba_of(t.mist))
                 .child(icon("monitor", 13., t.mist))
-                .child(label_fill(tr!(
-                    "Your desktop and the tray icon also show that the screen is being recorded. Stop from either one if this window is hidden."
-                ))),
+                .child(label_fill(b.hint.clone())),
         )
 }
