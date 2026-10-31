@@ -580,25 +580,13 @@ pub fn open_link(url: &str) -> Result<(), FileError> {
 /// the error says what to install instead of failing silently.
 #[allow(dead_code)]
 fn xdg_open(target: &std::ffi::OsStr) -> Result<(), FileError> {
-    match Command::new("xdg-open")
-        .arg(target)
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-    {
-        Ok(mut child) => {
-            // Reap it so no zombie stays behind; xdg-open itself returns quickly.
-            std::thread::spawn(move || {
-                let _ = child.wait();
-            });
-            Ok(())
-        }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(FileError::Detail(tr!(
+    use cm_platform::opener::OpenError;
+    cm_platform::opener::open_target(target).map_err(|e| match e {
+        OpenError::OpenerMissing(_) => FileError::Detail(tr!(
             "xdg-open is not installed; install xdg-utils to open links and folders"
-        ))),
-        Err(e) => Err(e.into()),
-    }
+        )),
+        OpenError::Failed(kind) => std::io::Error::from(kind).into(),
+    })
 }
 
 /// The path `xdg-open` is given to "show" `path` in the file manager: the folder that holds it

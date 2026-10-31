@@ -32,8 +32,6 @@ getrandom.workspace = true
 percent-encoding.workspace = true
 # MIT OR Apache-2.0. Default features (`v1`): Keychain on macOS, Credential Manager on Windows.
 keyring = "4.2"
-# MIT. Opens the system browser.
-open = "5.4"
 # MIT OR Apache-2.0. The system TLS stack, as in cm-ai (see `UreqClient`).
 ureq = { workspace = true, features = ["native-tls-no-default"] }
 tokio = { workspace = true, features = ["rt", "net", "io-util", "time", "sync", "macros"] }
