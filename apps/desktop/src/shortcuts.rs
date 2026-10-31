@@ -11,14 +11,18 @@ use std::fmt;
 pub enum Platform {
     Mac,
     Windows,
+    /// Same defaults as Windows; the meta key is called Super.
+    Linux,
 }
 
 impl Platform {
     pub const fn current() -> Platform {
         if cfg!(target_os = "macos") {
             Platform::Mac
-        } else {
+        } else if cfg!(windows) {
             Platform::Windows
+        } else {
+            Platform::Linux
         }
     }
 }
@@ -29,7 +33,7 @@ pub struct Chord {
     pub ctrl: bool,
     pub alt: bool,
     pub shift: bool,
-    /// Command on macOS, the Windows key on Windows.
+    /// Command on macOS, the Windows key on Windows, Super on Linux.
     pub meta: bool,
     /// Lowercase key name: `a`..`z`, `0`..`9`, `f1`..`f24`, `space`.
     pub key: String,
@@ -179,7 +183,7 @@ impl Chord {
                     out.push("\u{2318}".to_owned());
                 }
             }
-            Platform::Windows => {
+            Platform::Windows | Platform::Linux => {
                 if self.ctrl {
                     out.push("Ctrl".to_owned());
                 }
@@ -190,12 +194,21 @@ impl Chord {
                     out.push("Shift".to_owned());
                 }
                 if self.meta {
-                    out.push("Win".to_owned());
+                    out.push(meta_word(platform).to_owned());
                 }
             }
         }
         out.push(key_label(&self.key));
         out
+    }
+}
+
+/// The word on the meta keycap where keycaps are words: the Windows key, or Super on Linux.
+fn meta_word(platform: Platform) -> &'static str {
+    if platform == Platform::Linux {
+        "Super"
+    } else {
+        "Win"
     }
 }
 
@@ -308,7 +321,7 @@ impl ShortcutAction {
     /// CAP-2 defaults: macOS Option+Shift+key, Windows Ctrl+Alt+Shift+key.
     pub fn default_chord(self, platform: Platform) -> Chord {
         Chord {
-            ctrl: platform == Platform::Windows,
+            ctrl: platform != Platform::Mac,
             alt: true,
             shift: true,
             meta: false,
@@ -484,6 +497,15 @@ mod tests {
         assert_eq!(c.keycaps(Platform::Windows), ["Alt", "Shift", "1"]);
         let w = Chord::parse("ctrl+alt+shift+r").unwrap();
         assert_eq!(w.keycaps(Platform::Windows), ["Ctrl", "Alt", "Shift", "R"]);
+        assert_eq!(w.keycaps(Platform::Linux), ["Ctrl", "Alt", "Shift", "R"]);
+        let meta = Chord::parse("meta+space").unwrap();
+        assert_eq!(meta.keycaps(Platform::Windows), ["Win", "Space"]);
+        assert_eq!(meta.keycaps(Platform::Linux), ["Super", "Space"]);
+        assert_eq!(meta.keycaps(Platform::Mac), ["\u{2318}", "Space"]);
+        assert_eq!(
+            ShortcutAction::CaptureRegion.default_chord(Platform::Linux),
+            ShortcutAction::CaptureRegion.default_chord(Platform::Windows)
+        );
     }
 
     /// CAP-2.AC2: rebinding to a combination in use is refused with "Already used by ...".
