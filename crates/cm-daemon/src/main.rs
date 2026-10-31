@@ -69,14 +69,14 @@ impl Stop {
     }
 }
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 fn capturer() -> Result<cm_capture::Capturer, String> {
     Ok(cm_capture::Capturer::system())
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 fn capturer() -> Result<cm_capture::Capturer, String> {
-    Err("this platform has no screen capture backend (macOS and Windows only)".to_owned())
+    Err("this platform has no screen capture backend (macOS, Windows and Linux only)".to_owned())
 }
 
 #[tokio::main]
