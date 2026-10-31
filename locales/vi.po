@@ -4391,6 +4391,9 @@ msgstr "Người dùng đã từ chối yêu cầu"
 msgid "The video couldn’t be exported"
 msgstr "Không thể xuất video"
 
+msgid "The video is encoded by the processor (VP9), so it uses more of it than a hardware encoder would. Its size is that of the screen you chose in your desktop’s dialog."
+msgstr "Video được bộ xử lý mã hoá (VP9), nên tốn nhiều tài nguyên hơn bộ mã hoá phần cứng. Kích thước video là kích thước màn hình bạn đã chọn trong hộp thoại của máy tính."
+
 msgid "The video is encoded by the processor (VP9), so long recordings use more of it."
 msgstr "Video được bộ xử lý mã hoá (VP9), nên bản ghi dài tốn nhiều tài nguyên xử lý hơn."
 
@@ -10751,6 +10754,9 @@ msgstr "Bộ máy không khởi động được."
 
 msgid "The model runs inside CaptureMann and nothing leaves this Mac."
 msgstr "Mô hình chạy ngay trong CaptureMann và không có gì rời khỏi máy Mac này."
+
+msgid "The mouse pointer is part of the video; it is not recorded as a separate track yet."
+msgstr "Con trỏ chuột nằm trong video; chưa được ghi thành một rãnh riêng."
 
 msgid "The text engine is missing from this copy of CaptureMann. Reinstall CaptureMann."
 msgstr "Bản CaptureMann này thiếu bộ máy văn bản. Hãy cài lại CaptureMann."

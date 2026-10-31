@@ -4556,6 +4556,9 @@ msgstr ""
 msgid "The model runs inside CaptureMann and nothing leaves this Mac."
 msgstr ""
 
+msgid "The mouse pointer is part of the video; it is not recorded as a separate track yet."
+msgstr ""
+
 msgid "The move stopped"
 msgstr ""
 
@@ -4716,6 +4719,9 @@ msgid "The user declined the request"
 msgstr ""
 
 msgid "The video couldn’t be exported"
+msgstr ""
+
+msgid "The video is encoded by the processor (VP9), so it uses more of it than a hardware encoder would. Its size is that of the screen you chose in your desktop’s dialog."
 msgstr ""
 
 msgid "The video is encoded by the processor (VP9), so long recordings use more of it."
