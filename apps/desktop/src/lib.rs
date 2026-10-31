@@ -36,6 +36,8 @@ pub mod permissions;
 pub mod platform;
 pub mod platform_linux;
 pub mod platform_linux_menu;
+pub mod platform_clipboard;
+pub mod platform_hotkeys;
 pub mod platform_window;
 pub mod poster;
 pub mod preview;

@@ -17,6 +17,7 @@ use cm_desktop::confirm::UiConfirmer;
 use cm_desktop::library::LocalClock;
 use cm_desktop::overlay;
 use cm_desktop::platform;
+use cm_desktop::platform_hotkeys;
 use cm_desktop::recording::preview::PreviewSource;
 use cm_desktop::settings::{self, FileSettings};
 use cm_desktop::shortcuts::{Platform, ShortcutMap};
@@ -107,7 +108,37 @@ fn show_running_instance(config_dir: &std::path::Path) {
         }
     }
     #[cfg(not(target_os = "macos"))]
+    forward_request(config_dir);
+}
+
+/// Linux and Windows: asks the running instance for what this launch's flags say
+/// (`--launcher`, `--capture region`, ...; nothing: show itself). This is how a desktop's own
+/// keyboard shortcut reaches the app where global shortcuts are not available.
+#[allow(dead_code)]
+fn forward_request(config_dir: &std::path::Path) {
+    #[cfg(unix)]
+    {
+        let args: Vec<String> = std::env::args().skip(1).collect();
+        let request = cm_desktop::instance::Request::from_args(&args);
+        if let Err(e) = cm_desktop::instance::send(config_dir, request) {
+            log::warn!("could not reach the running CaptureMann: {e}");
+        }
+    }
+    #[cfg(not(unix))]
     let _ = config_dir;
+}
+
+/// The command a request from a second launch stands for.
+fn command_for(request: cm_desktop::instance::Request) -> Command {
+    use cm_desktop::instance::{CaptureKind, Request};
+    match request {
+        Request::Show | Request::Library => Command::ShowLibrary,
+        Request::Settings => Command::ShowSettings,
+        Request::Launcher => Command::TrayMenu(platform::ids::OPEN_LAUNCHER.to_owned()),
+        Request::Capture(CaptureKind::Region) => Command::Capture(overlay::CaptureMode::Region),
+        Request::Capture(CaptureKind::Window) => Command::Capture(overlay::CaptureMode::Window),
+        Request::Capture(CaptureKind::Display) => Command::Capture(overlay::CaptureMode::Display),
+    }
 }
 
 fn main() {
@@ -135,12 +166,16 @@ fn main() {
     };
     // Debug: `--trigger-capture region|window|display` runs the hotkey's capture path two
     // seconds after startup (benchmarks; pair with `CM_TRACE=1`).
-    let trigger = value_of("--trigger-capture").and_then(|v| match v.as_str() {
-        "region" => Some(overlay::CaptureMode::Region),
-        "window" => Some(overlay::CaptureMode::Window),
-        "display" => Some(overlay::CaptureMode::Display),
-        _ => None,
-    });
+    // `--capture region|window|display` is the same for a first launch; a second launch sends it
+    // to the running app (see `forward_request`).
+    let trigger = value_of("--trigger-capture")
+        .or_else(|| value_of("--capture"))
+        .and_then(|v| match v.as_str() {
+            "region" => Some(overlay::CaptureMode::Region),
+            "window" => Some(overlay::CaptureMode::Window),
+            "display" => Some(overlay::CaptureMode::Display),
+            _ => None,
+        });
     let demo_plan = cm_desktop::recording::demo::DemoPlan::parse(&args);
     let demo_query = value_of("--demo-launcher-query").unwrap_or_default();
     let theme_override = value_of("--theme").and_then(|v| ThemePreference::parse(&v));
@@ -286,6 +321,12 @@ fn main() {
             app::handle_command(&app, Command::ShowLibrary, cx);
         }
     });
+    // The instance lock stays in `main`; the closure only needs to know that this is the instance.
+    let instance_held = _instance.is_some();
+    let serve_dir = config_dir.clone();
+    let launcher_on_start = flag("--launcher");
+    #[cfg(not(unix))]
+    let _ = (&serve_dir, instance_held);
     application.run(move |cx: &mut App| {
         paint::load_fonts(cx);
         platform::set_dock_icon();
@@ -355,7 +396,54 @@ fn main() {
         if let Some(spec) = settings::load_report_toast(file_settings.load_report()) {
             startup_problems.push(spec);
         }
-        match GlobalHotKeyManager::new() {
+        // Wayland: keys cannot be grabbed; ask the GlobalShortcuts portal (CAP-2), which the
+        // desktop may not have. The result comes back later (the desktop may ask the user).
+        let wayland = platform_hotkeys::backend() == platform_hotkeys::Backend::WaylandPortal;
+        if wayland {
+            model.update(cx, |m, _| m.hotkey_ids = platform_hotkeys::hotkey_ids(&shortcuts));
+            let (bound_tx, mut bound_rx) = tokio::sync::mpsc::unbounded_channel();
+            let tx = cmd_tx.clone();
+            platform_hotkeys::start_portal(
+                &shortcuts,
+                move |registration| {
+                    let _ = bound_tx.send(registration);
+                },
+                move |id| {
+                    let _ = tx.send(Command::Hotkey(id));
+                },
+            );
+            let app2 = model.clone();
+            cx.spawn(async move |cx| {
+                if let Some(registration) = bound_rx.recv().await {
+                    cx.update(|cx| {
+                        let none = registration.iter().all(|(_, r)| {
+                            r.as_ref()
+                                .err()
+                                .is_some_and(|e| e == platform_hotkeys::UNSUPPORTED)
+                        });
+                        app2.update(cx, |m, cx| {
+                            m.registration = registration;
+                            cx.notify();
+                        });
+                        if none {
+                            app::push_toast(
+                                &app2,
+                                ToastSpec::new(
+                                    ToastKind::Info,
+                                    tr!("Global shortcuts are not available here"),
+                                )
+                                .body(tr!(
+                                    "Global shortcuts need X11 or a desktop with the GlobalShortcuts portal; use the launcher or the CLI"
+                                )),
+                                cx,
+                            );
+                        }
+                    });
+                }
+            })
+            .detach();
+        } else {
+            match GlobalHotKeyManager::new() {
             Ok(manager) => {
                 let (ids, status) = platform::register_shortcuts(&manager, &shortcuts);
                 for (action, res) in &status {
@@ -375,6 +463,20 @@ fn main() {
                 ToastSpec::new(ToastKind::Error, tr!("Global shortcuts are unavailable"))
                     .body(e.to_string()),
             ),
+            }
+        }
+        // A second launch (a desktop shortcut running `cm-desktop --launcher`) reaches this app.
+        #[cfg(unix)]
+        if instance_held {
+            let tx = cmd_tx.clone();
+            if let Err(e) = cm_desktop::instance::serve(&serve_dir, move |request| {
+                let _ = tx.send(command_for(request));
+            }) {
+                log::warn!("cannot listen for second launches: {e}");
+            }
+        }
+        if launcher_on_start {
+            let _ = cmd_tx.send(Command::TrayMenu(platform::ids::OPEN_LAUNCHER.to_owned()));
         }
         match platform::build_tray() {
             Ok(tray) => model.update(cx, |m, _| {
@@ -513,6 +615,10 @@ fn main() {
         let explicit = start_route
             .clone()
             .or_else(|| open_capture.clone().map(app::Route::Editor));
+        // `--background` (Launch at login) hides the window because the tray icon is there to
+        // bring it back; with no tray (a desktop without one) the window opens instead of
+        // leaving a running app nobody can see.
+        let background = background && model.read(cx).tray.is_some();
         if let Some(route) = app::startup_route(show_setup, background, explicit) {
             app::navigate(&model, route, cx);
         }

@@ -572,7 +572,43 @@ pub fn open_link(url: &str) -> Result<(), FileError> {
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
-        Err(FileError::Unsupported)
+        xdg_open(std::ffi::OsStr::new(url))
+    }
+}
+
+/// Linux: hands a link or a path to the desktop's opener (`xdg-open`, from xdg-utils). Without it
+/// the error says what to install instead of failing silently.
+#[allow(dead_code)]
+fn xdg_open(target: &std::ffi::OsStr) -> Result<(), FileError> {
+    match Command::new("xdg-open")
+        .arg(target)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+    {
+        Ok(mut child) => {
+            // Reap it so no zombie stays behind; xdg-open itself returns quickly.
+            std::thread::spawn(move || {
+                let _ = child.wait();
+            });
+            Ok(())
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(FileError::Detail(tr!(
+            "xdg-open is not installed; install xdg-utils to open links and folders"
+        ))),
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// The path `xdg-open` is given to "show" `path` in the file manager: the folder that holds it
+/// (the desktop's opener cannot select a file), or the folder itself.
+#[allow(dead_code)]
+fn folder_to_show(path: &Path) -> PathBuf {
+    if path.is_dir() {
+        path.to_path_buf()
+    } else {
+        path.parent().unwrap_or(path).to_path_buf()
     }
 }
 
@@ -605,8 +641,11 @@ fn open_path(path: &Path, reveal: bool) -> Result<(), FileError> {
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
-        let _ = (path, reveal);
-        Err(FileError::Unsupported)
+        if reveal {
+            xdg_open(folder_to_show(path).as_os_str())
+        } else {
+            xdg_open(path.as_os_str())
+        }
     }
 }
 
@@ -614,6 +653,16 @@ fn open_path(path: &Path, reveal: bool) -> Result<(), FileError> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// Linux "Show in folder": a file shows its folder, a bundle folder shows itself.
+    #[test]
+    fn the_folder_to_show_is_the_file_s_parent_or_the_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("a.png");
+        std::fs::write(&file, "x").unwrap();
+        assert_eq!(folder_to_show(&file), dir.path());
+        assert_eq!(folder_to_show(dir.path()), dir.path());
+    }
 
     #[test]
     fn only_web_links_are_opened() {

@@ -10971,3 +10971,27 @@ msgstr "Mã số thuế cá nhân (ITIN)"
 msgctxt "redaction kind"
 msgid "Vehicle ID (VIN)"
 msgstr "Số khung xe (VIN)"
+
+#, fuzzy
+msgid "Global shortcuts are not available here"
+msgstr "Phím tắt toàn cục không khả dụng ở đây"
+
+#, fuzzy
+msgid "Global shortcuts need X11 or a desktop with the GlobalShortcuts portal. Here, give your desktop its own keyboard shortcut (in its keyboard settings, custom shortcuts) that runs `cm-desktop --launcher` to open the launcher or `cm-desktop --capture region` to capture a region."
+msgstr "Phím tắt toàn cục cần X11 hoặc một môi trường desktop có cổng GlobalShortcuts. Ở đây, hãy tạo phím tắt riêng của desktop (trong phần cài đặt bàn phím, phím tắt tùy chỉnh) chạy `cm-desktop --launcher` để mở trình khởi chạy hoặc `cm-desktop --capture region` để chụp một vùng."
+
+#, fuzzy
+msgid "Global shortcuts need X11 or a desktop with the GlobalShortcuts portal; use the launcher or the CLI"
+msgstr "Phím tắt toàn cục cần X11 hoặc một môi trường desktop có cổng GlobalShortcuts; hãy dùng trình khởi chạy hoặc dòng lệnh"
+
+#, fuzzy
+msgid "Not available on this desktop"
+msgstr "Không khả dụng trên desktop này"
+
+#, fuzzy
+msgid "Your desktop manages these shortcuts and may have chosen other keys; change them in its keyboard settings."
+msgstr "Desktop của bạn quản lý các phím tắt này và có thể đã chọn phím khác; hãy đổi trong cài đặt bàn phím của desktop."
+
+#, fuzzy
+msgid "xdg-open is not installed; install xdg-utils to open links and folders"
+msgstr "Chưa cài xdg-open; hãy cài xdg-utils để mở liên kết và thư mục"

@@ -71,7 +71,27 @@ Write down: distribution and version, desktop and version, `echo $XDG_SESSION_TY
 14b. **X11:** open `xclock` and `xterm`; `capturemann targets` lists them **with titles**; `capture screenshot
     --window xclock` saves the window.
 15. Open the screenshot in the editor, add an arrow and a blur, copy to clipboard (X11: paste into another app;
-    Wayland: paste into another app too). **Pass:** the pasted image is the edited one.
+    Wayland: paste into another app too). **Pass:** the pasted image is the edited one. The toast says "Copied to
+    clipboard" only if the paste works: on a session where no clipboard can be reached (no X11 or XWayland, no
+    `wl-copy`) it must say "Copied to library only" or "Couldn't copy" instead. Also from a terminal:
+    `capturemann capture screenshot --display <id> --copy`, then `xclip -o -selection clipboard -t image/png | file -`
+    (X11) or `wl-paste --type image/png | file -` (Wayland) shows a PNG of the screen's size while the app runs.
+    The copy lives as long as the app does; after quitting it, X11 pastes nothing (a clipboard manager may keep it).
+
+## 5b. Global shortcuts and desktop shortcuts
+15a. **X11:** with the app running, press Ctrl+Alt+Shift+Space. **Pass:** the launcher opens; press again, it closes.
+    Ctrl+Alt+Shift+1 starts a region capture. Settings -> Shortcuts shows no "Couldn't register" row, and a
+    combination another app owns (try one the desktop uses) shows "Couldn't register - used by another app".
+15b. **Wayland on KDE or a GNOME with the GlobalShortcuts portal:** at start the desktop asks to allow the
+    shortcuts (or shows them in its keyboard settings). **Pass:** pressing the combination the desktop lists opens the
+    launcher; Settings -> Shortcuts says the desktop manages the keys.
+15c. **Wayland without the portal (GNOME 46):** **Pass:** a toast "Global shortcuts are not available here" at
+    start; every row of Settings -> Shortcuts says "Not available on this desktop" and a note explains the fallback.
+    Then in the desktop's keyboard settings add a custom shortcut with the command `cm-desktop --launcher` (and
+    one with `cm-desktop --capture region`). **Pass:** the shortcut opens the launcher in the running app (a second
+    press closes it) and starts the region capture; no second app window or tray icon appears.
+15d. Run `cm-desktop --library` and plain `cm-desktop` while the app is running. **Pass:** both exit at once and the
+    running app shows its library window.
 
 ## 6. The portal permission dialog and its memory
 16. **Wayland:** repeat 13 twice. **Pass:** note whether the second capture asks again (GNOME asks every time for
@@ -84,7 +104,12 @@ Write down: distribution and version, desktop and version, `echo $XDG_SESSION_TY
     - Microphone and audio recording (the mic button in the dock): the same toast.
     - Tray icon on GNOME without the AppIndicator extension: the toast "Menu bar icon unavailable" explains how to
       turn the extension on; no crash; the launcher window stays reachable.
-    - Global hotkeys on GNOME 46 (no GlobalShortcuts portal): not registered; in-app shortcuts work.
+    - Global hotkeys on GNOME 46 (no GlobalShortcuts portal): not registered; in-app shortcuts work; a toast and
+      the Shortcuts page say so (step 15c).
+    - "Show in folder" and "Open" of a capture or recording, and a share link: open through `xdg-open`; without
+      xdg-utils the error says to install it.
+    - Launch at login: with no tray the app started by autostart (`--background`) opens its window instead of
+      running unseen.
 18. With the app running, `capturemann record start` (CLI) and the `start_recording` MCP tool. **Pass:** each answers
     with a clear error (not a crash, not a half-created bundle in the library). Record what the headless
     `cm-daemon` answers too; its gate is separate from the app's and is not changed by the early-build work.
