@@ -19,7 +19,7 @@
 #   CM_SKIP_LICENSES=1 use the checked-in THIRD_PARTY_LICENSES.md (macOS crate set) instead of
 #                      generating the Linux one with packaging/macos/gen-third-party.sh.
 #
-# The speaker engine (sherpa-onnx) has only macOS libraries, so this builds with
+# The speaker engine (sherpa-onnx) has no Linux libraries yet, so this builds with
 # --no-default-features: "Find speakers" answers that the build has no speaker engine.
 set -euo pipefail
 die() { echo "build-linux.sh: $*" >&2; exit 1; }
@@ -43,8 +43,15 @@ version="$(cd "$root" && cargo metadata --no-deps --format-version 1 --locked \
   | python3 -c 'import json,sys; print(sorted({p["version"] for p in json.load(sys.stdin)["packages"]})[-1])')"
 [ -n "$version" ] || die "cannot read the workspace version"
 
+# whisper.cpp (cm-ai) is compiled by cargo. ggml defaults to -march=native, which would tie the
+# binary to the CPU of the build machine (SIGILL elsewhere); build a fixed baseline instead.
+export GGML_NATIVE=OFF
+if [ "$arch" = "x86_64" ]; then
+  export GGML_AVX=ON GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON GGML_BMI2=ON GGML_AVX512=OFF
+fi
 if [ "${CM_SKIP_BUILD:-0}" != "1" ]; then
   echo "==> cargo build --release --no-default-features"
+  # whisper-rs-sys does not re-run when GGML_* change: after changing them, cargo clean -p whisper-rs-sys.
   (cd "$root" && cargo build --release --locked --no-default-features ${jobs[@]+"${jobs[@]}"} \
     -p cm-desktop -p cm-overlay -p cm-cli -p cm-mcp)
 fi
