@@ -781,7 +781,17 @@ impl ApplicationHandler<()> for App {
                 };
                 self.submit_pointer(i, ev, el);
             }
+            WindowEvent::Focused(focused) => {
+                // Wayland compositors may refuse keyboard focus to a window nobody activated;
+                // the trace shows whether this one got it (the pointer works either way).
+                self.tracer.note(
+                    &serde_json::json!({"trace": "focus", "display_id": i, "focused": focused}),
+                );
+            }
             WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => {
+                self.tracer.note(
+                    &serde_json::json!({"trace": "key", "key": format!("{:?}", event.logical_key)}),
+                );
                 if is_tab_to_list(self.opts.tab_to_list, &event) {
                     self.finish = Some(Finish::SwitchToList);
                     el.exit();

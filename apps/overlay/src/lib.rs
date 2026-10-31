@@ -81,6 +81,23 @@ pub fn run(args: &Args, started: Instant) -> Result<Value, OverlayError> {
         .build()
         .map_err(|e| OverlayError::internal(format!("cannot start the async runtime: {e}")))?;
     tracer.mark("runtime_ready", Value::Null);
+    // Wayland window mode: no window list exists, the desktop's own picker chooses (CAP-1).
+    if args.mode == picker::Mode::Window
+        && !args.pick
+        && !args.exit_after_first_frame
+        && session::is_wayland_session(
+            std::env::var("XDG_SESSION_TYPE").ok().as_deref(),
+            std::env::var("WAYLAND_DISPLAY").ok().as_deref(),
+        )
+    {
+        match runtime.block_on(session::pick_with_system_picker(&args.endpoint, args.mode)) {
+            Ok(v) => return Ok(v),
+            // A daemon whose desktop has no picker: fall through to the overlay (it lists no
+            // windows there, but a display or the region mode still work).
+            Err(e) if e.code == cm_core::ErrorCode::NotImplemented.as_str() => {}
+            Err(e) => return Err(e),
+        }
+    }
     let inbox = Inbox::new();
     let emit: Emit = {
         let inbox = inbox.clone();

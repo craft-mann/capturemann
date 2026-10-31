@@ -143,6 +143,19 @@ pub fn match_monitors(
             taken[mi] = true;
         }
     }
+    // A compositor that shoots the desktop at its sharpest scale (a Wayland session) makes the
+    // pictures of its other monitors larger than the monitors, so no size matches. With as many
+    // monitors as displays nobody was unplugged: the rest pair by their order along the desktop
+    // (top to bottom, left to right), since the two sides count pixels in different units.
+    if displays.len() == monitors.len() {
+        let mut free_d: Vec<usize> = (0..displays.len()).filter(|&i| out[i].is_none()).collect();
+        let mut free_m: Vec<usize> = (0..monitors.len()).filter(|&i| !taken[i]).collect();
+        free_d.sort_by_key(|&i| (displays[i].bounds.origin.y, displays[i].bounds.origin.x));
+        free_m.sort_by_key(|&i| (monitors[i].position.y, monitors[i].position.x));
+        for (di, mi) in free_d.into_iter().zip(free_m) {
+            out[di] = Some(mi);
+        }
+    }
     out
 }
 
@@ -343,5 +356,22 @@ mod tests {
         let ms = vec![mon(0, 0, 3024, 1964)];
         assert_eq!(lost_displays(&ds, &ms), vec![2]);
         assert!(lost_displays(&ds, &[ms[0], mon(3024, 0, 1920, 1080)]).is_empty());
+    }
+
+    /// CAP-1 on a Wayland desktop shot at the sharpest scale: the 1x monitor's picture is twice
+    /// its size, so no size matches; with as many monitors as displays they pair by order.
+    #[test]
+    fn mixed_dpi_pictures_pair_by_order_along_the_desktop() {
+        // Pictures at 2x: the laptop panel (2880x1800) and the 1x monitor enlarged to 3840x2160.
+        let ds = vec![
+            display(1, 0, 0, 2880, 1800),
+            display(2, 2880, 0, 3840, 2160),
+        ];
+        // The OS reports physical sizes and lists them in the opposite order.
+        let ms = vec![mon(1440, 0, 1920, 1080), mon(0, 0, 2880, 1800)];
+        assert_eq!(match_monitors(&ds, &ms), vec![Some(1), Some(0)]);
+        assert!(lost_displays(&ds, &ms).is_empty());
+        // A monitor missing is still a lost display, not a guess.
+        assert_eq!(lost_displays(&ds, &ms[1..]), vec![2]);
     }
 }
