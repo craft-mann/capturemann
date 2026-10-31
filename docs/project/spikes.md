@@ -267,6 +267,14 @@ The segmentation archive's `README.md` only says the models are converted from `
 
 **Result:** resolved by the Cowork research (`docs/research/local-model-and-licence-check-2026-10-27.md`, `docs/research/text-model-pins-2026-10-27.md`) and the tests of Oct 27, 2026: **Gemma 4 E2B** is the default (best score in the small-model test, English and Vietnamese); Gemma 4 26B-A4B (Macs with 32 GB or more), Qwen3.5 4B (best for translation into other languages) and Qwen3.5 2B are the other choices, all Apache-2.0, run by a bundled `llama-server`. Tested through the CLI on one 11-minute meeting: report with Gemma 24 s, translation to Vietnamese 84 s with 0 lines left untranslated; a 45-minute transcript (the meeting chained four times) went through the report in 3 chunks in 164 s with 0 items dropped. **Still to keep checking:** Vietnamese quality and long-recording quality on other recordings (the 45-minute run repeats content, so it checks chunking and time, not new topics), the review set of `tests/manual/AI-9.md`, and the `ram_mb` figures on a Mac with little memory.
 
+## L0 Linux spikes (platform plan 0.4)
+
+Run on Oct 31, 2026 in a virtual machine (aarch64 Ubuntu 24.04, GNOME Shell 46 headless, software rendering); real hardware, other desktops and 4K are still open. Results are partial and are not a Go for any Linux decision.
+
+| Spike | Result | Report |
+| --- | --- | --- |
+| `spike-portal-capture`: ScreenCast portal through PipeWire (`spikes/spike-portal-capture`) | Works on GNOME 46 Wayland: consent dialog, restore token (no dialog the second time), 57.6 fps on a 60 Hz virtual monitor with p99 frame gap 18.8 ms, presentation timestamps on every frame, cursor metadata on every frame. The consumer must ask for the header and cursor metas after the format is set, with the cursor size as a range. No GlobalShortcuts portal at GNOME 46. | [`verification/L0-portal-screencast-2026-10-31-claude.md`](../../verification/L0-portal-screencast-2026-10-31-claude.md) |
+
 ## Decision
 
 | Spike | Go / fallback | Notes |
