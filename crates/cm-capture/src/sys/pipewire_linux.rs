@@ -474,6 +474,25 @@ mod imp {
                 }
             })
             .register();
+        // The registry tells when the node we read from is removed (the compositor stopped the
+        // share, the shared output or window went away); a removed producer does not always move
+        // the consumer's stream out of "streaming".
+        let registry = core
+            .get_registry_rc()
+            .map_err(|e| pw_err("PipeWire registry", &e))?;
+        let (lost_reg, ml_reg, stop_reg) = (Arc::clone(&lost), mainloop.clone(), Arc::clone(&stop));
+        let _registry_listener = registry
+            .add_listener_local()
+            .global_remove(move |id| {
+                if id == node && !stop_reg.load(Ordering::Relaxed) {
+                    set_lost(
+                        &lost_reg,
+                        Lost::Stream("the shared screen's PipeWire node was removed".into()),
+                    );
+                    ml_reg.quit();
+                }
+            })
+            .register();
         let stop_state = Arc::clone(&stop);
         let _listener = stream
             .add_local_listener_with_user_data(Fmt {
@@ -481,6 +500,7 @@ mod imp {
                 mapper: PtsMapper::default(),
             })
             .state_changed(move |_, _, old, new| {
+                log::info!("PipeWire screen stream: {old:?} -> {new:?}");
                 match new {
                     pw::stream::StreamState::Error(m) => {
                         set_lost(&lost_state, Lost::Stream(m));
@@ -586,6 +606,7 @@ mod imp {
         mainloop.run();
         drop(_listener);
         drop(_core_listener);
+        drop(_registry_listener);
         let failure = lost.lock().ok().and_then(|mut g| g.take());
         match failure {
             Some(why) => Err(why),

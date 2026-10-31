@@ -41,6 +41,8 @@ pub const HINT_SIZE: (u32, u32) = (1920, 1080);
 
 /// Message of the error for a camera request.
 pub const CAMERA_MESSAGE: &str = "Camera recording is not available on Linux yet.";
+/// What the screen track really is on Linux, shown as a preflight warning.
+pub const SOFTWARE_NOTE: &str = "On Linux the video is encoded in software as VP9 (expect more CPU use than a hardware encoder), at the size of the screen you pick in the desktop's share dialog; the size and codec shown above are the plan, the recording's details say what was written.";
 /// The cursor sentence shown as a preflight warning and in `list_devices`.
 pub const CURSOR_NOTE: &str = "On Linux the pointer is part of the video; there is no separate cursor track (positions and clicks are not recorded) yet.";
 
@@ -348,6 +350,15 @@ impl<E: LinuxEnv> SourceFactory for LinuxSources<E> {
         }
         if req.camera {
             out.errors.push(CmError::not_implemented(CAMERA_MESSAGE));
+        }
+        if !req.audio_only {
+            // The start answer still describes the plan (a hint size and the plan's codec); the
+            // truth is only known once the desktop's stream is connected.
+            out.warnings.push(PreflightWarning {
+                track: Some("screen".to_owned()),
+                code: "software_vp9_encoder".to_owned(),
+                message: SOFTWARE_NOTE.to_owned(),
+            });
         }
         if req.cursor {
             out.warnings.push(PreflightWarning {
