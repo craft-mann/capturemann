@@ -42,3 +42,20 @@ None of the specs has an acceptance criterion for packaging yet (see `specs/plat
 ## Verdict
 
 PARTIAL. Packaging scripts, install and uninstall, LGPL FFmpeg build and licence checks work on aarch64 in a VM. Waiting on: a release `cm-desktop` (step 3), x86_64 (step 14), the CI workflow (13), a run on a real X11 and Wayland desktop (15).
+
+## Follow-up run (Oct 31, 2026, commit f662986's parent tree, aarch64 VM)
+
+`packaging/linux/build-linux.sh` (no bundled FFmpeg, `--no-default-features`, release) built
+`capturemann-0.2.5-linux-aarch64.tar.gz`, 164 MB, now **with `cm-desktop`** (the `ashpd` runtime conflict is fixed).
+
+| Step | Result | Notes |
+| --- | --- | --- |
+| `sha256sum -c` | PASS | |
+| Unpack and `install.sh --prefix /tmp/pk/inst` | PASS | the notes about PATH and a missing FFmpeg print |
+| `capturemann --version` | PASS | `capturemann 0.2.5` |
+| `ldd cm-desktop`: unresolved libraries | PASS | none (the VM has the build libraries installed, so this does not prove the runtime package list) |
+| `cm-desktop` starts on Xvfb (X11) from the installed copy | PASS | window process alive after 8 s; log: no xinput pointers (Xvfb), no DRI3 (software rendering) |
+| `capturemann capture screenshot --no-start --region` against the running app | PASS | 300x200 PNG saved to the library |
+| `.minisig` signing and verification with `sign-linux.sh` (throwaway key) | PASS | a changed file fails verification |
+
+Not run: x86_64, a clean machine with only the runtime packages, a real desktop, Wayland from the installed copy.
