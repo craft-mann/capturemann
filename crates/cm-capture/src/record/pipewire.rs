@@ -785,7 +785,8 @@ mod tests {
         let mut src = PipeWireScreenSource::new(backend, MemoryTokenStore::default());
         let size = src.prepare(&plan()).unwrap().unwrap();
         assert_eq!((size.width, size.height), (1921, 1081));
-        std::thread::sleep(Duration::from_millis(150));
+        // The scripted frames are due ~5 ms after the open; leave a loaded runner plenty of time.
+        std::thread::sleep(Duration::from_millis(1000));
         let (sink, log) = collect();
         src.start(&plan(), sink).unwrap();
         // Preparing twice does not open a second session.
@@ -812,7 +813,7 @@ mod tests {
         );
         let mut src = PipeWireScreenSource::new(backend, MemoryTokenStore::default());
         src.prepare(&plan()).unwrap();
-        std::thread::sleep(Duration::from_millis(100));
+        std::thread::sleep(Duration::from_millis(1000));
         let (sink, log) = collect();
         src.start(&plan(), sink).unwrap();
         src.stop();
