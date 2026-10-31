@@ -69,7 +69,8 @@ pub fn engine_args(spec: &EngineSpec, port: u16) -> Vec<String> {
         spec.model_id.clone(),
         "--ctx-size".into(),
         spec.context_tokens.to_string(),
-        // Metal: all layers on the GPU (unified memory).
+        // Metal (macOS) or Vulkan (Linux, when built with it): all layers on the GPU. A CPU-only
+        // build (the Linux default) ignores it.
         "--n-gpu-layers".into(),
         "999".into(),
         // One request at a time: the whole context belongs to it.
