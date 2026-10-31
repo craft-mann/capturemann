@@ -27,12 +27,14 @@ libc.workspace = true
 xcap = "0.9"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-# MIT. The desktop portal client (Wayland screenshots). zbus underneath; no C libraries. The
-# `async-io` runtime, because gpui's Linux dependencies (oo7) already enable ashpd's `async-io`
-# and ashpd refuses both runtimes at once.
-ashpd = { version = "0.13", default-features = false, features = ["async-io", "screenshot"] }
+# MIT. The desktop portal client (Wayland screenshots, the ScreenCast stream). zbus underneath; no C
+# libraries. The `async-io` runtime, because gpui's Linux dependencies (oo7) already enable ashpd's
+# `async-io` and ashpd refuses both runtimes at once.
+ashpd = { version = "0.13", default-features = false, features = ["async-io", "screenshot", "screencast"] }
 # MIT OR Apache-2.0. `block_on` for the portal calls.
 futures-lite = "2"
+# MIT. PipeWire client for the portal ScreenCast stream (needs libpipewire-0.3-dev and libclang to build).
+pipewire = "0.10"
 
 [target.'cfg(windows)'.dependencies]
 # Free space of a volume (the recording disk guard); the version cm-cursor uses.
@@ -54,6 +56,7 @@ objc2-core-media = { workspace = true, features = ["objc2-core-video", "block2",
 objc2-screen-capture-kit = { workspace = true, features = ["objc2-core-media", "objc2-core-graphics", "objc2-core-foundation", "block2", "dispatch2", "libc"] }
 
 [dev-dependencies]
+cm-audio.workspace = true
 tempfile.workspace = true
 # REC-8 end-to-end test: record, kill -9, recover (cm-library does not depend on cm-capture).
 cm-library.workspace = true

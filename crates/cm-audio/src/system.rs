@@ -9,6 +9,7 @@ use cm_core::{CmError, MediaTime, TrackContext, TrackInfo, TrackKind, TrackRecor
 use crate::level::LevelHandle;
 use crate::pipeline::DEFAULT_RESYNC_MS;
 use crate::recorder::{AudioEvent, AudioRecorder, RecorderSettings};
+#[allow(unused_imports)] // unused on Linux, where the PipeWire factory builds the source
 use crate::source::{AudioSource, DeviceSelector, SourceFactory, SourceFormat};
 
 /// System audio file name in the bundle.
@@ -57,12 +58,10 @@ pub fn system_audio_factory(exclude_bundle_ids: Vec<String>) -> SourceFactory {
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
+        // Linux: the monitor of the default sink through PipeWire (answers `not_implemented` on
+        // any other system). Our own audio cannot be excluded.
         let _ = &exclude_bundle_ids;
-        Box::new(|_sel: &DeviceSelector| {
-            Err::<Box<dyn AudioSource>, _>(CmError::not_implemented(
-                "System audio capture is not implemented on this platform.",
-            ))
-        })
+        crate::sys::linux_pipewire::monitor_factory()
     }
 }
 

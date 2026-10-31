@@ -16,7 +16,9 @@
 
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
+pub mod cpu;
 pub mod encoder;
+pub mod ffmpeg_vp9;
 pub mod fmp4;
 pub mod settings;
 pub mod synthetic;
@@ -27,11 +29,13 @@ pub mod mac;
 #[cfg(windows)]
 pub mod windows;
 
+pub use cpu::{CpuFrame, PixelFormat};
 pub use encoder::{
     hardware_encoder_unavailable, is_hardware_encoder_unavailable, is_no_frames, no_frames_error,
     AppendOutcome, EncoderConfig, VideoEncoder, HARDWARE_ENCODER_UNAVAILABLE,
     HARDWARE_ENCODER_UNAVAILABLE_MESSAGE, NO_FRAMES_MESSAGE,
 };
+pub use ffmpeg_vp9::FfmpegVp9Encoder;
 pub use fmp4::{scan_bytes, scan_file, truncate_to_last_fragment, Fragment, Mp4Scan};
 pub use settings::{
     bitrate_bps, disk_mb_per_minute, output_dimensions, plan_video, resolve_codec, smaller_plans,

@@ -32,6 +32,10 @@ mod recorder;
 pub mod resample;
 mod source;
 mod sys;
+pub use sys::linux_pipewire::{
+    available as pipewire_available, mic_factory as pipewire_mic_factory,
+    monitor_factory as pipewire_monitor_factory, STREAM_RATE as PIPEWIRE_RATE,
+};
 mod system;
 pub mod wav;
 

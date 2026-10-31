@@ -24,6 +24,10 @@ nnnoiseless = { version = "0.5", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+[target.'cfg(target_os = "linux")'.dependencies]
+# MIT. PipeWire client: microphone and the sink monitor (system audio). Needs libpipewire-0.3-dev and libclang.
+pipewire = "0.10"
+
 [target.'cfg(target_os = "macos")'.dependencies]
 # Zlib OR Apache-2.0 OR MIT (objc2 family) and MIT (block2, libc).
 objc2.workspace = true
