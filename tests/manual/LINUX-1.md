@@ -56,6 +56,15 @@ Run on **GNOME Wayland** (no server-side decorations), **KDE Plasma** (server-si
 - 5f. With a toast on screen, take a display screenshot (`capturemann capture screenshot --display <id>`). **Pass:**
   the toast is not in the image and comes back afterwards; `desktop.log` has no "could not hide" warning.
 
+## 3c. Editor, library and settings (added Oct 31, 2026)
+Run on X11 and on Wayland. Make three screenshots with `capturemann capture screenshot`, then:
+- 6a. Open one, draw an arrow, rectangle, text, highlight, blur and a crop; Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y. **Pass:** each works within a second, the status says "All changes saved" (it must never stay on "Saving..." on Wayland), shortcut hints say Ctrl.
+- 6b. Copy image, Save as (portal dialog), paste the clipboard into another app. **Pass:** the PNG is the cropped result; on GNOME Wayland a failed copy shows a toast and the editor keeps working.
+- 6c. Library: Ctrl+F search, copy and cut text in the box (Ctrl+C, Ctrl+X, Ctrl+V), context menu Show in folder, Delete (item in the Trash).
+- 6d. With IBus and a Vietnamese engine (`ibus-unikey` or `ibus-bamboo`) type `Vieejt Nam` in the search box and in a text annotation. **Pass:** `Việt Nam`, no crash, the draft is replaced while typing.
+- 6e. Settings > Destinations at 1180 px wide: the YouTube card reads "YouTube" on one line. Switch the desktop to dark and back: the app follows.
+- 6f. Mouse wheel and touchpad: content moves the way other apps do.
+
 ## 4. Secrets: keyring present and absent
 7. With a keyring running (GNOME Keyring or KWallet): `capturemann diagnostics` shows `Secret Service yes` and
    "secrets in the system credential store". **Pass:** no unlock prompt appears just from running diagnostics or
