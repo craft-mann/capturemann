@@ -94,3 +94,8 @@ gpui_platform = { package = "gpui-pre-platform", version = "=0.3.9", features = 
 # The wlr/ext data-control protocol for wlroots and KDE (wl-clipboard-rs, MIT OR Apache-2.0).
 # GNOME has none, so arboard falls back to X11 through XWayland there.
 arboard = { workspace = true, features = ["image-data", "wayland-data-control"] }
+# MIT. The GlobalShortcuts portal (Wayland global hotkeys). The `async-io` runtime, as in
+# cm-capture: gpui's Linux dependencies already enable it and ashpd refuses two runtimes.
+ashpd = { version = "0.13", default-features = false, features = ["async-io", "global_shortcuts"] }
+# MIT OR Apache-2.0. `block_on` for the portal calls.
+futures-lite = "2"

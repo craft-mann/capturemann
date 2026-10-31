@@ -1467,6 +1467,7 @@ version = "0.2.5"
 dependencies = [
  "anyhow",
  "arboard",
+ "ashpd",
  "async-trait",
  "base64 0.22.1",
  "cm-ai",
@@ -1485,6 +1486,7 @@ dependencies = [
  "cm-render",
  "cm-storage",
  "dirs 7.0.0",
+ "futures-lite",
  "global-hotkey",
  "gpui-pre",
  "gpui-pre-platform",

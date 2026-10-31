@@ -1829,7 +1829,16 @@ msgstr ""
 msgid "Give the destination a name."
 msgstr ""
 
+msgid "Global shortcuts are not available here"
+msgstr ""
+
 msgid "Global shortcuts are unavailable"
+msgstr ""
+
+msgid "Global shortcuts need X11 or a desktop with the GlobalShortcuts portal. Here, give your desktop its own keyboard shortcut (in its keyboard settings, custom shortcuts) that runs `cm-desktop --launcher` to open the launcher or `cm-desktop --capture region` to capture a region."
+msgstr ""
+
+msgid "Global shortcuts need X11 or a desktop with the GlobalShortcuts portal; use the launcher or the CLI"
 msgstr ""
 
 msgid "Global shortcuts that work from any app."
@@ -2675,6 +2684,9 @@ msgid "Not available for this recording"
 msgstr ""
 
 msgid "Not available in this build"
+msgstr ""
+
+msgid "Not available on this desktop"
 msgstr ""
 
 msgid "Not available yet"
@@ -5295,6 +5307,9 @@ msgid "Your agent permissions were kept."
 msgstr ""
 
 msgid "Your captures need {needed} free and the new folder has {free}. You can start with an empty library there instead. The captures in the old folder stay where they are."
+msgstr ""
+
+msgid "Your desktop manages these shortcuts and may have chosen other keys; change them in its keyboard settings."
 msgstr ""
 
 msgid "Your name in transcripts"

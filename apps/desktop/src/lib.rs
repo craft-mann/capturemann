@@ -35,6 +35,7 @@ pub mod overlay;
 pub mod permissions;
 pub mod platform;
 pub mod platform_clipboard;
+pub mod platform_hotkeys;
 pub mod platform_window;
 pub mod poster;
 pub mod preview;

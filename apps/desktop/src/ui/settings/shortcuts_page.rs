@@ -65,6 +65,9 @@ impl SettingsView {
                             Some(e) if e == "Not available yet" => {
                                 Some((tr!("Not available yet"), t.text_3))
                             }
+                            Some(e) if e == crate::platform_hotkeys::UNSUPPORTED => {
+                                Some((tr!("Not available on this desktop"), t.text_3))
+                            }
                             Some(_) => Some((
                                 tr!("Couldn\u{2019}t register \u{2014} used by another app"),
                                 t.warning,
@@ -165,6 +168,15 @@ impl SettingsView {
                             .children(items),
                     )
                 });
+        let none_registered = !reg.is_empty()
+            && reg.iter().all(|(_, r)| {
+                r.as_ref()
+                    .err()
+                    .is_some_and(|e| e == crate::platform_hotkeys::UNSUPPORTED)
+            });
+        let portal_managed = crate::platform_hotkeys::backend()
+            == crate::platform_hotkeys::Backend::WaylandPortal
+            && reg.iter().any(|(_, r)| r.is_ok());
         let conflicts = map.conflicts();
         let rebind_error = self
             .rebind_error
@@ -178,6 +190,18 @@ impl SettingsView {
             .flex_col()
             .gap(px(24.))
             .children(groups)
+            .when(none_registered, |d| {
+                d.child(warning_caption(
+                    t,
+                    tr!("Global shortcuts need X11 or a desktop with the GlobalShortcuts portal. Here, give your desktop its own keyboard shortcut (in its keyboard settings, custom shortcuts) that runs `cm-desktop --launcher` to open the launcher or `cm-desktop --capture region` to capture a region."),
+                ))
+            })
+            .when(portal_managed, |d| {
+                d.child(caption(
+                    t,
+                    tr!("Your desktop manages these shortcuts and may have chosen other keys; change them in its keyboard settings."),
+                ))
+            })
             .when(!conflicts.is_empty(), |d| {
                 d.child(warning_caption(
                     t,
