@@ -4606,6 +4606,9 @@ msgstr ""
 msgid "The transcript is being written on this Mac. A long recording takes several minutes. You don’t need to press anything: it appears here when it’s done, and speaker labels follow."
 msgstr ""
 
+msgid "The tray icon is not available on Linux yet. Use the launcher window."
+msgstr ""
+
 msgid "The upload couldn’t start"
 msgstr ""
 

@@ -57,7 +57,7 @@ impl Os {
     pub fn current() -> Os {
         if cfg!(windows) {
             Os::Windows
-        } else if cfg!(target_os = "linux") {
+        } else if std::env::consts::OS == "linux" {
             Os::Linux
         } else {
             Os::Mac

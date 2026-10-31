@@ -4,7 +4,7 @@
   "apps/desktop/src/clipboard.rs": 6,
   "apps/desktop/src/launcher/focus.rs": 4,
   "apps/desktop/src/login_item.rs": 3,
-  "apps/desktop/src/main.rs": 5,
+  "apps/desktop/src/main.rs": 3,
   "apps/desktop/src/overlay.rs": 1,
   "apps/desktop/src/permissions.rs": 7,
   "apps/desktop/src/preview/mod.rs": 1,
