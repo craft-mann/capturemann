@@ -3343,6 +3343,9 @@ msgstr ""
 msgid "Recording is dropping frames"
 msgstr ""
 
+msgid "Recording is not available yet"
+msgstr ""
+
 msgid "Recording is unavailable"
 msgstr ""
 
@@ -3771,6 +3774,9 @@ msgid "Screen Recording was granted — restart CaptureMann to use it"
 msgstr ""
 
 msgid "Screen Recording was granted. Restart CaptureMann to start using it."
+msgstr ""
+
+msgid "Screen and audio recording is not built for this system yet. Screenshots, the library and the editor work."
 msgstr ""
 
 msgid "Screen and your saved audio"

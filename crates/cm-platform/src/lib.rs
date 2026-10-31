@@ -5,6 +5,7 @@
 //! This crate has no dependency on another CaptureMann crate, so `cm-core` can use it.
 
 pub mod autostart;
+pub mod capability;
 pub mod clock;
 pub mod dirs;
 pub mod memory;

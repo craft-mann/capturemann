@@ -28,7 +28,7 @@ use gpui::{
 };
 use serde_json::{json, Map, Value};
 
-use crate::backend::Backend;
+use crate::backend::{Backend, RecordingBlocker};
 use crate::confirm::{discard_dialog, ConfirmUiMsg};
 use crate::platform_window::{self, Tweaks};
 use crate::recording::countdown;
@@ -994,6 +994,36 @@ fn start_failed(app: &Entity<AppModel>, e: crate::backend::CallError, cx: &mut A
     sync_tray(app, cx);
 }
 
+/// The title and body telling why recording is off (the toast, the launcher row).
+pub fn blocker_text(blocker: RecordingBlocker) -> (String, String) {
+    match blocker {
+        RecordingBlocker::NotAvailableYet => (
+            tr!("Recording is not available yet"),
+            tr!("Screen and audio recording is not built for this system yet. Screenshots, the library and the editor work."),
+        ),
+        RecordingBlocker::NoLibrary => (
+            tr!("Recording is unavailable"),
+            tr!("The library couldn\u{2019}t be opened, so there is nowhere to save recordings."),
+        ),
+    }
+}
+
+/// Shows why and returns true when recording cannot start now. Every Record entry point (the
+/// sheet, the hotkeys, the tray, the launcher) asks this one function.
+fn refuse_recording(app: &Entity<AppModel>, backend: &Backend, cx: &mut App) -> bool {
+    let Some(blocker) = backend.recording_blocker() else {
+        return false;
+    };
+    let (title, body) = blocker_text(blocker);
+    let kind = if blocker == RecordingBlocker::NotAvailableYet {
+        ToastKind::Info
+    } else {
+        ToastKind::Error
+    };
+    app::push_toast(app, ToastSpec::new(kind, title).body(body), cx);
+    true
+}
+
 /// Starts a recording with the sheet's (or the remembered) choices.
 pub fn start(app: &Entity<AppModel>, opts: StartOptions, cx: &mut App) {
     start_with(app, opts, Map::new(), cx);
@@ -1368,14 +1398,7 @@ pub fn add_marker_hotkey(app: &Entity<AppModel>, cx: &mut App) {
 /// toast while `recording.consent_notice` is on.
 pub fn quick_start_audio(app: &Entity<AppModel>, cx: &mut App) {
     let backend = app.read(cx).backend.clone();
-    if !backend.recording_enabled || backend.daemon.is_none() {
-        app::push_toast(
-            app,
-            ToastSpec::new(ToastKind::Error, tr!("Recording is unavailable")).body(tr!(
-                "The library couldn\u{2019}t be opened, so there is nowhere to save recordings."
-            )),
-            cx,
-        );
+    if refuse_recording(app, &backend, cx) {
         return;
     }
     let defaults =
@@ -1441,14 +1464,7 @@ pub fn pause_hotkey(app: &Entity<AppModel>, cx: &mut App) {
 /// Starts straight away with the remembered options on the primary display (the hotkey path).
 pub fn quick_start(app: &Entity<AppModel>, cx: &mut App) {
     let backend = app.read(cx).backend.clone();
-    if !backend.recording_enabled || backend.daemon.is_none() {
-        app::push_toast(
-            app,
-            ToastSpec::new(ToastKind::Error, tr!("Recording is unavailable")).body(tr!(
-                "The library couldn\u{2019}t be opened, so there is nowhere to save recordings."
-            )),
-            cx,
-        );
+    if refuse_recording(app, &backend, cx) {
         return;
     }
     let (daemon, rt) = (backend.daemon.clone(), backend.rt.clone());
@@ -1598,14 +1614,7 @@ pub fn open_sheet_mode(
         }
     }
     let backend = app.read(cx).backend.clone();
-    if !backend.recording_enabled || backend.daemon.is_none() {
-        app::push_toast(
-            app,
-            ToastSpec::new(ToastKind::Error, tr!("Recording is unavailable")).body(tr!(
-                "The library couldn\u{2019}t be opened, so there is nowhere to save recordings."
-            )),
-            cx,
-        );
+    if refuse_recording(app, &backend, cx) {
         return;
     }
     let defaults = SheetDefaults::from_settings(&backend.settings.snapshot());
