@@ -1,6 +1,7 @@
 # Linux packaging (early build)
 
-`packaging/linux/build-linux.sh` builds `capturemann-<version>-linux-<arch>.tar.gz` (and a `.sha256`) for
+`packaging/linux/build-linux.sh` builds `capturemann-<version>-linux-<arch>.tar.gz` (and a `.sha256`), and
+`packaging/linux/build-deb.sh` turns that tarball into `capturemann_<version>_<amd64|arm64>.deb` (see "The .deb"), for
 `x86_64` and `aarch64`, from `cargo build --release` (with the speaker engine when `make sherpa` has run, else `--no-default-features`). The workflow
 `.github/workflows/linux-package.yml` runs it by hand on both architectures. Status of what was run and where:
 `verification/L1-packaging-linux-2026-10-31-claude.md`.
@@ -10,7 +11,7 @@
 | Option | For | Against | Verdict |
 | --- | --- | --- | --- |
 | **tar.gz + `install.sh` + `.desktop` + icons** | One file for every distribution and both CPUs; no root (`~/.local`); trivial to build in CI and to inspect; same shape as the Intel Mac "early build"; the app finds `ffmpeg` next to its own executable | The user installs the system libraries; no automatic updates; no menu entry until `install.sh` ran | **Primary for v0** |
-| `.deb` | Declares dependencies, `apt install ./file.deb` pulls them; removable | Ubuntu/Debian only, one build per release of the distribution (t64 library names differ between 22.04 and 24.04), root needed, signing and a repository later | Second step, built from the same staged tree (`dpkg-deb`), once the dependency list has survived real machines |
+| `.deb` | Declares dependencies, `apt install ./file.deb` pulls them; removable | Ubuntu/Debian only, one build per release of the distribution (t64 library names differ between 22.04 and 24.04), root needed, signing and a repository later | **Built** (`build-deb.sh`, from the tarball, with `dpkg-deb`); the dependency list is the one proved on a clean container, not yet on real machines |
 | AppImage | One file, runs anywhere | Bundling GTK, Mesa, Vulkan, PipeWire and portal libraries is fragile for a GPU app that talks to the desktop portal and the Secret Service; needs FUSE 2 (not on Ubuntu 24.04 by default); a bundled FFmpeg and libva clash with the host drivers | Not for v0 |
 | Flatpak | Sandbox with portals, store | Recording, global shortcuts, the CLI/MCP binaries on the host `PATH` and the Unix socket all need holes in the sandbox; manifest, runtime and review work | Later (the portal code paths are already the right ones for it) |
 
@@ -18,13 +19,42 @@ Reasons in short: the product is a desktop app plus a CLI and an MCP server that
 so unpacking into a normal prefix with symlinks in `bin/` suits it better than a sandbox; and there are no
 users yet who would be hurt by installing five apt packages by hand.
 
+## The .deb
+
+```sh
+packaging/linux/build-linux.sh                         # first: the .deb is made from this tarball
+packaging/linux/build-deb.sh                           # newest capturemann-*-linux-$(uname -m).tar.gz in packaging/linux/out
+sudo apt install ./capturemann_<version>_<amd64|arm64>.deb      # pulls the libraries; remove: sudo apt remove capturemann
+```
+
+* Layout: the programs and everything next to them (`ffmpeg`, `llama-server`, the licence folders, the speaker models
+  under `lib/Resources/Models/speaker`) are in `/opt/capturemann/lib/...`, exactly as in the tarball, because the
+  app finds FFmpeg, `llama-server` and the models relative to its own real path (symlinks are resolved). `/usr/bin/{cm-desktop,cm-overlay,capturemann,cm-mcp}`
+  are symlinks to them; the `.desktop` file (with `Exec=/usr/bin/cm-desktop`) and the icons are in `/usr/share`;
+  documents and the `copyright` file (DEP-5; Apache-2.0 plus the bundled components) in `/usr/share/doc/capturemann`.
+* `Depends:` is the verified list under "What the user needs" (`libc6 (>= 2.39)` read from the build, GTK 3, ALSA,
+  xkbcommon, Wayland, EGL/gbm/drm, X11/xcb, fontconfig/freetype, OpenSSL 3, D-Bus, PipeWire, Vulkan loader and
+  `mesa-vulkan-drivers | vulkan-icd`, plus `libva2 libva-drm2` when FFmpeg is bundled). `Recommends:` gnome-keyring or
+  kwalletmanager (a Secret Service), xdg-desktop-portal, pipewire, and `ffmpeg` when none is bundled.
+* Maintainer scripts: `postinst` and `postrm` only refresh the desktop-entry and icon caches when the tools exist.
+  The user's library and settings are never touched, also not by `purge`.
+* Architecture comes from `uname -m` of the tarball (`x86_64` -> `amd64`, `aarch64` -> `arm64`); the package names are
+  those of Ubuntu 24.04 and Debian 13, so build and use it there. `CM_DEB_COMPRESS` (xz, gzip, zstd), `CM_DEB_LEVEL`,
+  `CM_DEB_MAINTAINER` and `CM_DEB_STRIP=1` (strip the debug info of the four programs: the tarball's `cm-desktop` is
+  about 700 MB because the release profile keeps it) are the knobs; see the script header.
+* `lintian` on it reports `dir-or-file-in-opt` (by design: an add-on under `/opt`), `unstripped-binary-or-object`
+  (see `CM_DEB_STRIP`), `embedded-library` for the bundled LGPL FFmpeg and `no-manual-page`. It is not meant for the
+  Debian archive.
+* Proof: `verification/L1-packaging-complete-linux-2026-10-31-claude.md` (clean `ubuntu:24.04` arm64 container:
+  `apt install ./file.deb`, run, `apt remove`, `apt purge`; x86_64 not run).
+
 ## Verifying a download
 
-Each release file has a `.minisig` signature made with the project's minisign key
+Each release file (tarball or `.deb`) has a `.minisig` signature made with the project's minisign key
 (`packaging/linux/minisign.pub`; the same public key is on the release page). Check both the checksum and the signature:
 
 ```sh
-sha256sum -c capturemann-<version>-linux-<arch>.tar.gz.sha256
+sha256sum -c capturemann-<version>-linux-<arch>.tar.gz.sha256      # or capturemann_<version>_<arch>.deb.sha256
 minisign -Vm capturemann-<version>-linux-<arch>.tar.gz -p minisign.pub
 ```
 

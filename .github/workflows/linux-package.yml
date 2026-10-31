@@ -1,7 +1,7 @@
 name: Linux package
 
 # Run by hand (Actions > Linux package > Run workflow) to build the early-build tarball
-# capturemann-<version>-linux-<arch>.tar.gz (+ .sha256) on x86_64 (ubuntu-24.04) and aarch64
+# capturemann-<version>-linux-<arch>.tar.gz and capturemann_<version>_<amd64|arm64>.deb (+ .sha256 each) on x86_64 (ubuntu-24.04) and aarch64
 # (ubuntu-24.04-arm), with an LGPL FFmpeg built from source. The files are kept as WORKFLOW ARTIFACTS
 # only: this workflow creates no tag and no GitHub release (a release is a maintainer step, see
 # docs/development/releasing.md, "Linux early build"). It does not run on pull requests: a full
@@ -116,6 +116,22 @@ jobs:
           fi
           desktop-file-validate "$work/prefix/share/applications/dev.capturemann.app.desktop"
           ./install.sh --uninstall --prefix "$work/prefix"
+      # The .deb is made from the tarball just built (packaging/linux/build-deb.sh), so it holds the same files.
+      # It is installed on the runner with apt (which pulls the Depends: libraries), run once, and removed.
+      - name: Build the .deb
+        run: packaging/linux/build-deb.sh
+      - name: Check the .deb (install with apt, run, remove)
+        run: |
+          cd packaging/linux/out
+          sha256sum -c ./*.deb.sha256
+          dpkg-deb -I ./*.deb | sed -n '/Depends:/,/Section:/p'
+          sudo apt-get install -y --no-install-recommends ./*.deb
+          capturemann --version
+          cm-mcp --version || true
+          desktop-file-validate /usr/share/applications/dev.capturemann.app.desktop
+          test -f /opt/capturemann/lib/Resources/Models/speaker/pyannote-segmentation-3-0.onnx
+          sudo apt-get remove -y capturemann
+          test ! -e /opt/capturemann && test ! -e /usr/bin/capturemann && test ! -e /usr/share/applications/dev.capturemann.app.desktop
       - name: Keep the files
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -123,5 +139,6 @@ jobs:
           path: |
             packaging/linux/out/*.tar.gz
             packaging/linux/out/*.sha256
+            packaging/linux/out/*.deb
           if-no-files-found: error
           retention-days: 14
