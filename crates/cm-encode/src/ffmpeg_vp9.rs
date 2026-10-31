@@ -433,7 +433,10 @@ mod tests {
         assert!(a.contains("libvpx-vp9") && a.contains("frag_keyframe+empty_moov"));
         let b = ffmpeg_args(&cfg(d, 1281, 721, 30), 1920, 1080, "bgra", 2).join(" ");
         assert!(b.contains("scale=1280:720"), "{b}");
-        assert!(b.ends_with("/x/screen.mp4"), "{b}");
+        assert!(
+            b.ends_with(&d.join("screen.mp4").display().to_string()),
+            "{b}"
+        );
     }
 
     fn ffmpeg_with_vp9() -> Option<PathBuf> {
