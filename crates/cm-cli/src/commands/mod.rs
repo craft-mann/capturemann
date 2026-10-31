@@ -47,8 +47,7 @@ struct Ctx<'a> {
 pub async fn execute(cli: Cli, env: &mut Env) -> Result<(), CliError> {
     let endpoint = match &cli.socket {
         None => env.endpoint.clone(),
-        Some(s) if cfg!(windows) => Endpoint::Pipe(s.clone()),
-        Some(s) => Endpoint::Path(s.into()),
+        Some(s) => Endpoint::from_arg(s),
     };
     let mut cx = Ctx {
         json: cli.json,

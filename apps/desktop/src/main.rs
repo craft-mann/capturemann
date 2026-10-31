@@ -212,11 +212,7 @@ fn main() {
         &snapshot,
         settings::default_library_dir(dirs::video_dir(), dirs::home_dir()),
     );
-    let endpoint = match std::env::var_os("CAPTUREMANN_SOCKET") {
-        Some(p) if cfg!(windows) => Endpoint::Pipe(p.to_string_lossy().into_owned()),
-        Some(p) => Endpoint::Path(PathBuf::from(p)),
-        None => Endpoint::default_for_platform(),
-    };
+    let endpoint = Endpoint::from_env_or_default();
 
     let rt = match tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)

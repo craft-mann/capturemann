@@ -92,13 +92,7 @@ async fn main() -> ExitCode {
                 None => return usage(),
             },
             "--socket" => match args.next() {
-                Some(v) => {
-                    endpoint = if cfg!(windows) {
-                        Endpoint::Pipe(v)
-                    } else {
-                        Endpoint::Path(PathBuf::from(v))
-                    }
-                }
+                Some(v) => endpoint = Endpoint::from_arg(&v),
                 None => return usage(),
             },
             _ => return usage(),

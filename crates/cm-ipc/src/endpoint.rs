@@ -29,19 +29,33 @@ fn too_long(path: &Path) -> io::Error {
     )
 }
 
+/// A pipe name as the user typed it, made a full pipe path: `work` becomes `\\.\pipe\work`, a
+/// name that already starts with `\\` (such as `\\.\pipe\work`) is kept.
+pub fn pipe_name(typed: &str) -> String {
+    if typed.starts_with(r"\\") {
+        typed.to_owned()
+    } else {
+        format!(r"\\.\pipe\{typed}")
+    }
+}
+
 impl Endpoint {
+    /// The endpoint a user typed (`--socket`, `CAPTUREMANN_SOCKET`): a socket path on Unix, a
+    /// pipe name on Windows (a bare name gets the `\\.\pipe\` prefix).
+    pub fn from_arg(typed: &str) -> Endpoint {
+        if cfg!(windows) {
+            Endpoint::Pipe(pipe_name(typed))
+        } else {
+            Endpoint::Path(PathBuf::from(typed))
+        }
+    }
+
     /// `CAPTUREMANN_SOCKET` when it is set and not empty (a socket path on Unix, a pipe name on
     /// Windows), else [`Endpoint::default_for_platform`]. Every client and the daemon read the
     /// same variable, so a second instance can be pointed at its own endpoint.
     pub fn from_env_or_default() -> Endpoint {
         match std::env::var("CAPTUREMANN_SOCKET") {
-            Ok(v) if !v.is_empty() => {
-                if cfg!(windows) {
-                    Endpoint::Pipe(v)
-                } else {
-                    Endpoint::Path(PathBuf::from(v))
-                }
-            }
+            Ok(v) if !v.is_empty() => Endpoint::from_arg(&v),
             _ => Endpoint::default_for_platform(),
         }
     }
@@ -246,6 +260,18 @@ pub use imp::ClientStream;
 pub async fn connect(endpoint: &Endpoint) -> io::Result<ClientStream> {
     endpoint.validate()?;
     imp::connect(endpoint).await
+}
+
+#[cfg(test)]
+mod pipe_name_tests {
+    use super::*;
+
+    #[test]
+    fn a_bare_name_becomes_a_pipe_path_and_a_full_path_is_kept() {
+        assert_eq!(pipe_name("work"), r"\\.\pipe\work");
+        assert_eq!(pipe_name(r"\\.\pipe\work"), r"\\.\pipe\work");
+        assert_eq!(pipe_name(r"\\server\pipe\x"), r"\\server\pipe\x");
+    }
 }
 
 #[cfg(all(test, unix))]
