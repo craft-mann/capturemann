@@ -208,7 +208,9 @@ async fn export_video_renders_records_and_announces() {
     assert_eq!(res["file"], "exports/Real export - quick.mp4");
     let out = root
         .path()
-        .join("Real export.cmrec/exports/Real export - quick.mp4");
+        .join("Real export.cmrec")
+        .join("exports")
+        .join("Real export - quick.mp4");
     assert!(out.is_file());
     assert_eq!(res["path"], out.to_string_lossy().as_ref());
     assert!(
@@ -226,7 +228,19 @@ async fn export_video_renders_records_and_announces() {
     let e = &m["exports"][0];
     assert_eq!(e["file"], "exports/Real export - quick.mp4");
     assert_eq!(e["preset"], "quick");
-    assert!(e["encoder"] == "h264_videotoolbox" || e["encoder"] == "libx264");
+    assert!(
+        [
+            "h264_videotoolbox",
+            "libx264",
+            "h264_mf",
+            "h264_nvenc",
+            "h264_qsv",
+            "h264_amf"
+        ]
+        .contains(&e["encoder"].as_str().unwrap_or_default()),
+        "{}",
+        e["encoder"]
+    );
     assert!(e["created"].as_str().unwrap().contains('T'));
     assert_eq!(e["settings"]["size"], json!([640, 360]));
     assert_eq!(

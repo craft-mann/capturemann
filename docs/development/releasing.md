@@ -188,6 +188,38 @@ For the DMG itself: `spctl --assess --type open --context context:primary-signat
 An ad hoc build is rejected by `spctl`; that is expected, see the release notes for the first launch.
 The checksum only proves the download matches what was uploaded; it does not replace the signature.
 
+## Linux early build (tarball)
+
+Linux is not part of the `Release` workflow. The first Linux build is an "early build" like the first
+Intel one: a `tar.gz` and a `.deb` per CPU, attached by hand to a pre-release. Format decision and contents:
+`packaging/linux/README.md`.
+
+1. Run **Actions > Linux package** (`linux-package.yml`, manual) on the commit to ship. It builds on `ubuntu-24.04`
+   (x86_64) and `ubuntu-24.04-arm` (aarch64), builds the LGPL FFmpeg with `packaging/ffmpeg/build-linux.sh`
+   (`with_ffmpeg`, on by default; the job passes `CM_REQUIRE_FFMPEG=1`, so it fails without the licence files),
+   fetches the speaker engine (`make sherpa`: the sherpa-onnx libraries and the two speaker models; the job passes
+   `CM_REQUIRE_SHERPA=1` and `CM_REQUIRE_SPEAKER_MODELS=1`), builds `llama-server`, the text engine
+   (`packaging/llama/build-linux.sh`; `with_llama`, on by default, `CM_REQUIRE_LLAMA=1`), packs
+   `capturemann-<version>-linux-<arch>.tar.gz` and its `.sha256`, installs and removes it once, then builds
+   `capturemann_<version>_<amd64|arm64>.deb` from that tarball (`packaging/linux/build-deb.sh`), installs it with
+   `apt-get install ./file.deb` on the runner, runs `capturemann --version` and removes it. It creates no tag and no
+   release; the files are workflow artifacts for 14 days.
+2. Download both artifacts, check `sha256sum -c`, and try one on a real desktop (X11 and Wayland) before
+   publishing. Record the run in `verification/`; until a report exists the notes say "tested with fakes" or
+   "built on CI", never "verified".
+3. Sign on your own machine with minisign (the secret key never goes to CI): put the downloaded tarballs, `.deb`
+   packages and `.sha256` files in one folder and run `packaging/linux/sign-linux.sh <folder>`. It writes a `.minisig` next to
+   each file and verifies it with the public key `packaging/linux/minisign.pub`. One-time setup (the key pair,
+   committing the public key, publishing its fingerprint) is in the script's header.
+4. Create the draft pre-release by hand (`gh release create vX.Y.Z --draft --prerelease ...` with the tarballs, the `.deb` packages, the
+   `.sha256` files and the `.minisig` files) and say in the notes: early build, no recording in the app, MP4 export
+   needs a VAAPI GPU or your own FFmpeg, glibc 2.39 or newer (Ubuntu 24.04, Debian 13), the `.deb` for Ubuntu/Debian
+   (`sudo apt install ./capturemann_<version>_<arch>.deb`, which installs the libraries it needs) or the tarball plus
+   the apt packages from `packaging/linux/README.md`, the local text model needs a model file the user downloads, and
+   how to verify (`minisign -Vm <file> -P <public key>`, the key is on the release page).
+5. Not done for Linux: Flatpak, an AppImage, a package repository (apt/dnf), an RPM, and a Linux item in the website
+   and Homebrew steps. Windows has no speaker engine yet.
+
 ## Rollback and yank
 
 - **Draft not published yet:** delete the draft and the tag, fix, tag again.

@@ -40,3 +40,8 @@ wgpu = { version = "29", default-features = false, features = ["std", "parking_l
 
 [target.'cfg(windows)'.dependencies]
 wgpu = { version = "29", default-features = false, features = ["std", "parking_lot", "wgsl", "dx12"] }
+
+# No GPU on the hosted Linux runners: the GPU tests print SKIPPED there (lavapipe comes with the Linux
+# compositor work, platform plan L3).
+[target.'cfg(target_os = "linux")'.dependencies]
+wgpu = { version = "29", default-features = false, features = ["std", "parking_lot", "wgsl", "vulkan"] }

@@ -1,5 +1,5 @@
 //! System clipboard for CAP-4, implementing the daemon's `Clipboard` hook: the macOS pasteboard
-//! (PNG and TIFF flavors) or `arboard` elsewhere.
+//! (PNG and TIFF flavors) or `arboard` elsewhere (`platform_clipboard`).
 
 use cm_core::CmError;
 use cm_daemon::Clipboard;
@@ -131,7 +131,7 @@ impl Pasteboard for NativePasteboard {
     }
 }
 
-/// Windows and others: `arboard` (the clipboard keeps a bitmap).
+/// Windows and Linux: `arboard` (and on Linux a helper program), see `platform_clipboard`.
 #[cfg(not(target_os = "macos"))]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NativePasteboard;
@@ -139,24 +139,11 @@ pub struct NativePasteboard;
 #[cfg(not(target_os = "macos"))]
 impl Pasteboard for NativePasteboard {
     fn set_image(&self, png: &[u8], _tiff: Option<&[u8]>) -> Result<(), CmError> {
-        let (width, height, bytes) = png_to_rgba(png)?;
-        let mut cb = arboard::Clipboard::new()
-            .map_err(|e| CmError::internal(format!("clipboard unavailable: {e}")))?;
-        cb.set_image(arboard::ImageData {
-            width,
-            height,
-            bytes: bytes.into(),
-        })
-        .map_err(|e| CmError::internal(format!("cannot copy to the clipboard: {e}")))
+        crate::platform_clipboard::set_image(png)
     }
 
     fn set_text(&self, text: &str) -> Result<(), CmError> {
-        arboard::Clipboard::new()
-            .map_err(|e| CmError::internal(format!("clipboard unavailable: {e}")))
-            .and_then(|mut c| {
-                c.set_text(text.to_owned())
-                    .map_err(|e| CmError::internal(format!("cannot copy to the clipboard: {e}")))
-            })
+        crate::platform_clipboard::set_text(text)
     }
 }
 

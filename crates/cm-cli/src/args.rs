@@ -549,17 +549,26 @@ pub enum CaptureCmd {
 }
 
 #[derive(Debug, Args)]
-#[command(group(ArgGroup::new("what").required(true).multiple(true).args(["display", "window", "region"])))]
+#[command(group(ArgGroup::new("what").required(true).multiple(true).args(["display", "window", "region", "pick"])))]
 pub struct ScreenshotArgs {
     /// Display id (see `targets`).
-    #[arg(long, value_name = "ID", conflicts_with = "window")]
+    #[arg(long, value_name = "ID", conflicts_with_all = ["window", "pick"])]
     pub display: Option<u32>,
     /// Window id, or a case-insensitive substring of its title or app name.
-    #[arg(long, value_name = "ID|TITLE", conflicts_with_all = ["display", "region"])]
+    #[arg(long, value_name = "ID|TITLE", conflicts_with_all = ["display", "region", "pick"])]
     pub window: Option<String>,
     /// Region `x,y,w,h` in physical px, relative to the display (default: primary display).
-    #[arg(long, value_name = "X,Y,W,H", allow_hyphen_values = true)]
+    #[arg(
+        long,
+        value_name = "X,Y,W,H",
+        allow_hyphen_values = true,
+        conflicts_with = "pick"
+    )]
     pub region: Option<String>,
+    /// Let the desktop's own picker choose a window, a region or a screen (Wayland sessions,
+    /// where windows have no ids). A person at the screen must choose; Esc cancels (exit 3).
+    #[arg(long, conflicts_with = "delay")]
+    pub pick: bool,
     /// Wait this many seconds (0 to 30) before capturing.
     #[arg(long, value_name = "SECONDS")]
     pub delay: Option<f64>,

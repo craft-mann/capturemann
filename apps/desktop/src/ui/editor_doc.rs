@@ -63,7 +63,6 @@ enum Step {
 
 enum StepOut {
     Job(Box<Result<JobResult, String>>),
-    Copy(bool, Result<(), String>),
     Folder(Result<crate::save_folder::FolderResult, String>),
     Save(Result<PathBuf, String>),
 }
@@ -396,6 +395,26 @@ impl EditorDoc {
         let Some(daemon) = self.backend.daemon.clone() else {
             return;
         };
+        if let Step::Copy(confirm) = step {
+            // The clipboard can be slow or out of reach (GNOME Wayland has no data-control
+            // protocol, so the helpers time out): the copy runs beside the queue, never in front
+            // of the next edit, undo or save (seen on Linux, Oct 31, 2026: Undo sat in "Saving...").
+            let backend = self.backend.clone();
+            let id = self.capture_id.clone();
+            let rt = backend.rt.clone();
+            let keep = cx.entity();
+            cx.spawn(async move |this, cx| {
+                let _keep = keep;
+                let res = rt
+                    .spawn(async move { backend_copy(&backend, &id).await })
+                    .await
+                    .unwrap_or_else(|e| Err(e.to_string()));
+                this.update(cx, |d, cx| d.copy_done(confirm, res, cx)).ok();
+            })
+            .detach();
+            self.pump(cx);
+            return;
+        }
         self.running = true;
         if matches!(step, Step::Job(_)) {
             self.status = Status::Saving;
@@ -415,9 +434,10 @@ impl EditorDoc {
                         Step::Job(job) => StepOut::Job(Box::new(
                             session::run_job(&daemon, &id, &job, remap).await,
                         )),
-                        Step::Copy(confirm) => {
-                            StepOut::Copy(confirm, backend_copy(&backend, &id).await)
-                        }
+                        // Handled above, beside the queue; not reachable.
+                        Step::Copy(_) => StepOut::Job(Box::new(Err(String::from(
+                            "internal: a clipboard copy reached the job runner",
+                        )))),
                         Step::Folder => StepOut::Folder(backend.save_capture_to_folder(&id).await),
                         Step::Save(path) => StepOut::Save(save_png(&daemon, &id, path).await),
                     }
@@ -464,24 +484,6 @@ impl EditorDoc {
                     self.resync(cx);
                 }
             },
-            StepOut::Copy(confirm, res) => {
-                if confirm {
-                    match res {
-                        Ok(()) => app::push_toast(
-                            &self.app,
-                            ToastSpec::new(ToastKind::Success, tr!("Copied to clipboard")),
-                            cx,
-                        ),
-                        Err(e) => app::push_toast(
-                            &self.app,
-                            flows::error_toast_live(|| tr!("Couldn\u{2019}t copy"), e),
-                            cx,
-                        ),
-                    }
-                } else if let Err(e) = res {
-                    log::warn!("clipboard copy after editing failed: {e}");
-                }
-            }
             StepOut::Folder(res) => match res {
                 Ok(r) => {
                     if let Some(toast) = flows::folder_warning_toast(&r) {
@@ -506,6 +508,27 @@ impl EditorDoc {
         }
         cx.notify();
         self.pump(cx);
+    }
+
+    /// The clipboard copy finished: a toast for the explicit Copy image, a log line for the
+    /// automatic copy after an edit.
+    fn copy_done(&mut self, confirm: bool, res: Result<(), String>, cx: &mut Context<Self>) {
+        if confirm {
+            match res {
+                Ok(()) => app::push_toast(
+                    &self.app,
+                    ToastSpec::new(ToastKind::Success, tr!("Copied to clipboard")),
+                    cx,
+                ),
+                Err(e) => app::push_toast(
+                    &self.app,
+                    flows::error_toast_live(|| tr!("Couldn\u{2019}t copy"), e),
+                    cx,
+                ),
+            }
+        } else if let Err(e) = res {
+            log::warn!("clipboard copy after editing failed: {e}");
+        }
     }
 
     fn drained(&mut self, cx: &mut Context<Self>) {
@@ -845,6 +868,30 @@ impl EditorDoc {
             cx.notify();
         }
         used
+    }
+
+    /// An input method committed (`mark` false) or is composing (`mark` true) text in the text
+    /// being typed; the range is in UTF-16 units.
+    pub fn text_ime(
+        &mut self,
+        range: Option<std::ops::Range<usize>>,
+        s: &str,
+        mark: bool,
+        cx: &mut Context<Self>,
+    ) {
+        if self.state.text.is_none() {
+            return;
+        }
+        self.state.text_ime(range, s, mark);
+        self.sync_preview(cx);
+        cx.notify();
+    }
+
+    pub fn text_unmark(&mut self, cx: &mut Context<Self>) {
+        if let Some(t) = self.state.text.as_mut() {
+            t.marked = None;
+            cx.notify();
+        }
     }
 
     pub fn text_paste(&mut self, s: &str, cx: &mut Context<Self>) {

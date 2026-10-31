@@ -96,7 +96,7 @@ fn ended_toast_now(e: &Ended) -> Option<ToastSpec> {
                     ToastKind::Warning,
                 ),
                 "screen_halted" => (
-                    tr!("Recording stopped: the screen or window went away"),
+                    screen_halted_title(crate::permissions::Os::current()),
                     ToastKind::Warning,
                 ),
                 "screen_encoder_failed" | "engine_failed" => {
@@ -161,6 +161,18 @@ fn ended_toast_now(e: &Ended) -> Option<ToastSpec> {
     }
 }
 
+/// The title when the screen under the recording went away. On Linux the thing that ends is the
+/// desktop's screen share (the user stopped sharing, or the stream broke); the data so far is
+/// kept either way.
+pub fn screen_halted_title(os: crate::permissions::Os) -> String {
+    match os {
+        crate::permissions::Os::Linux => {
+            tr!("Recording stopped: the screen share ended")
+        }
+        _ => tr!("Recording stopped: the screen or window went away"),
+    }
+}
+
 /// PRM-1: the OS removed a permission mid-recording and the take was stopped (only Screen
 /// Recording does that). The take is in the library; the button leads to Permissions.
 pub fn permission_revoked_toast(
@@ -218,6 +230,18 @@ pub fn start_error_toast(
     ToastSpec::live(move || start_error_toast_now(code, permission, &message))
 }
 
+/// The Linux recorder's refusals worded in the UI language: what the daemon answers for a
+/// window, a region or a camera (`not_implemented`). Text it does not know stays as it came.
+pub fn not_implemented_text(message: &str) -> String {
+    if message.contains("window or a region") {
+        tr!("Recording a window or a region is not available on Linux yet. Record the whole screen; the desktop asks which one the first time.")
+    } else if message.contains("Camera recording") {
+        tr!("Recording with a webcam bubble is not available on Linux yet.")
+    } else {
+        message.to_owned()
+    }
+}
+
 /// A start that failed. A missing permission offers Permissions and the System Settings pane of
 /// the permission the error names (screen when it names none); everything else shows the
 /// engine's message.
@@ -226,9 +250,33 @@ fn start_error_toast_now(
     permission: Option<Permission>,
     message: &str,
 ) -> ToastSpec {
-    let mut spec = ToastSpec::new(ToastKind::Error, tr!("Recording didn\u{2019}t start"))
-        .body(crate::daemon_text::error_text(code, message));
-    if code == Some(ErrorCode::PermissionMissing) {
+    start_error_spec(crate::permissions::Os::current(), code, permission, message)
+}
+
+/// [`start_error_toast_now`] for a given system. On Linux a missing screen permission means the
+/// desktop's share dialog was cancelled (there is no System Settings pane to open), and the
+/// recorder's `not_implemented` answers are worded here.
+pub fn start_error_spec(
+    os: crate::permissions::Os,
+    code: Option<ErrorCode>,
+    permission: Option<Permission>,
+    message: &str,
+) -> ToastSpec {
+    use crate::permissions::Os;
+    let linux = os == Os::Linux;
+    let screen_dialog = linux
+        && code == Some(ErrorCode::PermissionMissing)
+        && permission.unwrap_or(Permission::Screen) == Permission::Screen;
+    let body = if screen_dialog {
+        tr!("The screen share was cancelled in your desktop\u{2019}s dialog, so nothing was recorded. Start again and choose the screen to share.")
+    } else if linux && code == Some(ErrorCode::NotImplemented) {
+        not_implemented_text(message)
+    } else {
+        crate::daemon_text::error_text(code, message)
+    };
+    let mut spec =
+        ToastSpec::new(ToastKind::Error, tr!("Recording didn\u{2019}t start")).body(body);
+    if code == Some(ErrorCode::PermissionMissing) && !linux {
         let pane = match permission.unwrap_or(Permission::Screen) {
             Permission::Screen => ToastAction::OpenScreenRecordingSettings,
             other => ToastAction::OpenPrivacyPane(privacy_pane(other)),
@@ -239,6 +287,9 @@ fn start_error_toast_now(
                 ToastAction::OpenPermissions,
             )
             .button(tr!("Open System Settings"), pane);
+    }
+    if linux && code == Some(ErrorCode::NotImplemented) {
+        spec.kind = ToastKind::Info;
     }
     if code == Some(ErrorCode::Busy) {
         spec = ToastSpec::new(ToastKind::Info, tr!("A recording is already running"));
@@ -349,7 +400,14 @@ mod tests {
         for (reason, expect) in [
             ("max_duration", "length limit"),
             ("disk_full", "disk is almost full"),
-            ("screen_halted", "went away"),
+            (
+                "screen_halted",
+                if crate::permissions::Os::current() == crate::permissions::Os::Linux {
+                    "screen share ended"
+                } else {
+                    "went away"
+                },
+            ),
         ] {
             let t = ended_toast(&Ended::Stopped {
                 capture_id: Some("rec_9".into()),
@@ -418,7 +476,8 @@ mod tests {
 
     #[test]
     fn start_errors() {
-        let p = start_error_toast(
+        let p = start_error_spec(
+            crate::permissions::Os::Mac,
             Some(ErrorCode::PermissionMissing),
             None,
             "Screen Recording is off",
@@ -428,11 +487,67 @@ mod tests {
             p.buttons[1].action,
             ToastAction::OpenScreenRecordingSettings
         );
-        let b = start_error_toast(Some(ErrorCode::Busy), None, "x");
+        let b = start_error_spec(
+            crate::permissions::Os::Mac,
+            Some(ErrorCode::Busy),
+            None,
+            "x",
+        );
         assert_eq!(b.kind, ToastKind::Info);
-        let o = start_error_toast(None, None, "boom");
+        let o = start_error_spec(crate::permissions::Os::Mac, None, None, "boom");
         assert_eq!(o.kind, ToastKind::Error);
         assert!(o.buttons.is_empty());
+    }
+
+    /// Linux: a cancelled share dialog is not a System Settings problem; the recorder's
+    /// "not implemented" answers read as plain sentences.
+    #[test]
+    fn linux_start_errors_are_readable() {
+        use crate::permissions::Os;
+        let cancelled = start_error_spec(
+            Os::Linux,
+            Some(ErrorCode::PermissionMissing),
+            Some(Permission::Screen),
+            "Screen sharing was cancelled in the desktop's dialog.",
+        );
+        assert!(
+            cancelled.buttons.is_empty(),
+            "no System Settings pane on Linux"
+        );
+        assert!(cancelled
+            .body
+            .unwrap()
+            .contains("cancelled in your desktop"));
+        let window = start_error_spec(
+            Os::Linux,
+            Some(ErrorCode::NotImplemented),
+            None,
+            "Recording a window or a region is not available on Linux yet. Record the whole screen; the desktop asks which one the first time.",
+        );
+        assert_eq!(window.kind, ToastKind::Info);
+        assert!(window
+            .body
+            .unwrap()
+            .starts_with("Recording a window or a region"));
+        let cam = start_error_spec(
+            Os::Linux,
+            Some(ErrorCode::NotImplemented),
+            None,
+            "Camera recording is not available on Linux yet.",
+        );
+        assert!(cam.body.unwrap().contains("webcam bubble"));
+        // Unknown text stays as the daemon wrote it; the Mac keeps its buttons.
+        assert_eq!(not_implemented_text("Something new."), "Something new.");
+        let mac = start_error_spec(Os::Mac, Some(ErrorCode::PermissionMissing), None, "m");
+        assert_eq!(mac.buttons.len(), 2);
+        assert_eq!(
+            screen_halted_title(Os::Linux),
+            "Recording stopped: the screen share ended"
+        );
+        assert_eq!(
+            screen_halted_title(Os::Mac),
+            "Recording stopped: the screen or window went away"
+        );
     }
 
     /// R4-5: the Settings pane follows the permission the error names.
@@ -443,10 +558,16 @@ mod tests {
             (Permission::Camera, "Privacy_Camera"),
             (Permission::InputMonitoring, "Privacy_ListenEvent"),
         ] {
-            let t = start_error_toast(Some(ErrorCode::PermissionMissing), Some(perm), "m");
+            let t = start_error_spec(
+                crate::permissions::Os::Mac,
+                Some(ErrorCode::PermissionMissing),
+                Some(perm),
+                "m",
+            );
             assert_eq!(t.buttons[1].action, ToastAction::OpenPrivacyPane(pane));
         }
-        let screen = start_error_toast(
+        let screen = start_error_spec(
+            crate::permissions::Os::Mac,
             Some(ErrorCode::PermissionMissing),
             Some(Permission::Screen),
             "m",
@@ -466,7 +587,9 @@ mod tests {
         })
         .unwrap();
         assert_eq!(t.title, "Recording didn\u{2019}t start");
-        assert_eq!(t.buttons.len(), 2);
+        // The Permissions and System Settings buttons are the Mac's and Windows' answer; Linux has no pane.
+        let linux = crate::permissions::Os::current() == crate::permissions::Os::Linux;
+        assert_eq!(t.buttons.len(), if linux { 0 } else { 2 });
         assert!(ended_toast(&Ended::Lost).is_some());
         let passed = ended_toast(&Ended::SelfTest {
             state: "passed".into(),

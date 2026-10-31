@@ -7,8 +7,8 @@
 
 use cm_i18n::{tr, tr_ctx};
 use gpui::{
-    point, px, size, App, AppContext as _, Bounds, Entity, Global, Task, TitlebarOptions,
-    WindowBounds, WindowHandle, WindowKind, WindowOptions,
+    point, px, size, App, AppContext as _, Bounds, Entity, Global, Task, WindowBounds,
+    WindowHandle, WindowKind, WindowOptions,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -102,6 +102,8 @@ pub struct AppModel {
     pub shortcuts: ShortcutMap,
     /// Result of registering each shortcut with the OS (CAP-2.AC3).
     pub registration: Vec<(ShortcutAction, Result<(), String>)>,
+    /// Wayland: the keys the desktop's GlobalShortcuts portal chose, as it describes them.
+    pub portal_triggers: crate::platform_hotkeys::PortalTriggers,
     pub platform: Platform,
     pub clock: LocalClock,
     pub toasts: ToastQueue,
@@ -171,6 +173,8 @@ pub struct AppModel {
     /// Set by "Open Permissions…": the Settings view switches to that page and clears it.
     pub settings_page_request: Option<SettingsSection>,
     studio: Option<WindowHandle<Studio>>,
+    /// The Studio window exists (Wayland: toasts are banners in it then).
+    pub studio_open: bool,
     toast_window: Option<WindowHandle<ToastHost>>,
     /// The stack height the toast window was last fitted to (measured from the painted cards), so
     /// a measurement that cannot be honoured (a pile taller than the display) does not loop.
@@ -188,6 +192,17 @@ impl AppModel {
     /// How many confirmation dialogs are open (the main window is dimmed while any is).
     pub fn confirms_open(&self) -> usize {
         self.confirm_windows.len()
+    }
+
+    /// Whether the toasts are drawn inside the Studio window instead of their own window
+    /// (`toasts::toasts_in_window`).
+    pub fn toasts_in_studio(&self) -> bool {
+        toasts::toasts_in_window(
+            crate::platform_window::toasts_belong_in_window(),
+            self.studio_open,
+            !self.toasts.is_empty(),
+            crate::capture_cloak::is_hidden(),
+        )
     }
 
     pub fn new(
@@ -211,6 +226,7 @@ impl AppModel {
             backend,
             shortcuts,
             registration: Vec::new(),
+            portal_triggers: Vec::new(),
             platform,
             clock,
             toasts: ToastQueue::default(),
@@ -263,6 +279,7 @@ impl AppModel {
             perm_tried: Default::default(),
             settings_page_request: None,
             studio: None,
+            studio_open: false,
             toast_window: None,
             toast_fit: 0.,
             confirm_windows: Vec::new(),

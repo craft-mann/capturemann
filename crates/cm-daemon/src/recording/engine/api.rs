@@ -356,8 +356,13 @@ impl RecordingEngine {
                 .target
                 .ok_or_else(|| CmError::internal("a screen recording has no target"))?;
             let want_windows = matches!(target, ScreenshotTarget::Window { .. });
-            let targets = eng.deps.capturer.list_targets_with(want_windows)?;
-            let mut screen = ScreenSettings::new(target.to_capture_target());
+            let capture_target = eng.factory.adapt_target(target.to_capture_target());
+            eng.factory.check_target(&capture_target)?;
+            let targets = match eng.factory.targets() {
+                Some(t) => t?,
+                None => eng.deps.capturer.list_targets_with(want_windows)?,
+            };
+            let mut screen = ScreenSettings::new(capture_target);
             screen.video = VideoSettings {
                 size: r2.size,
                 fps: r2.fps,

@@ -1,0 +1,198 @@
+# LINUX-1 — The early Linux build on a real X11 and a real Wayland desktop (manual)
+
+Covers the early Linux build (screenshots, library, editor; recording is hidden unless `CM_LINUX_RECORDING=1`, see
+section 9). Run it twice, once on a
+real **X11** session and once on a real **Wayland** session (GNOME 46 or newer, and KDE Plasma 6 if you have it).
+A VM is fine for a first pass; say so in the report. Platform rows: `specs/platform-acceptance.md` (CAP-1, CAP-2,
+CAP-4, LIB-2, REC-1 to AUD-4, PRM-1). The expected-unavailable list at the end is part of the pass criteria.
+
+Privacy: step 7 puts a fake token in a test keyring or file; use only the fake value. Delete the test library
+and `CAPTUREMANN_CONFIG_DIR` folder afterwards.
+
+Setup. Use throw-away folders so your real data is untouched:
+`export CAPTUREMANN_CONFIG_DIR=$HOME/cm-linux1/config CAPTUREMANN_LIBRARY=$HOME/cm-linux1/library`.
+Write down: distribution and version, desktop and version, `echo $XDG_SESSION_TYPE`, GPU.
+
+## 1. Install the tarball
+1. Unpack `capturemann-<version>-linux-<arch>.tar.gz` (check the `.sha256` with `sha256sum -c`). Run
+   `./install.sh` from the unpacked folder (default prefix `~/.local`; add `~/.local/bin` to `PATH` if needed).
+   **Pass:** the script lists what it installed; `capturemann --version` prints the version; the app appears in the
+   launcher grid with its icon.
+2. `./install.sh --uninstall`, then install again. **Pass:** uninstall removes only the installed files; your
+   library and settings folders are untouched.
+
+## 2. What the system offers (before anything else)
+3. Run `capturemann diagnostics`. **Pass:** the System section lists `session X11` or `session Wayland (<desktop>)`,
+   the portal line with ScreenCast and Screenshot versions (`v4` or newer expected), `PipeWire yes/no`,
+   `Secret Service yes/no`, the VAAPI device line; a "Missing on this system" section appears only if
+   something is missing and each line is one plain sentence. No line talks about macOS or Screen Recording grants.
+4. To see a gap on purpose: `systemctl --user stop pipewire pipewire-pulse wireplumber` (restore with `start`),
+   run `capturemann diagnostics` again. **Pass:** a line says recording needs PipeWire (and "only has PulseAudio"
+   when `pulse/native` still exists).
+
+## 3. First launch
+5. Start `cm-desktop` (launcher or terminal). **Pass:** the window opens in under 5 s; the library shows an empty
+   state; the log `$CAPTUREMANN_CONFIG_DIR/logs/desktop.log` has `desktop <version> started`.
+6. Open the permissions page (first run shows it; otherwise Settings -> Permissions). **Pass:** the heading text
+   says Linux does not ask per app (no "macOS keeps these under your control"); there are no Screen Recording or
+   Input Monitoring cards; a block "What this system is missing" lists the same gaps as step 3, or says nothing
+   is missing for screenshots.
+
+## 3b. Windows: frame, controls, pop-ups (added Oct 31, 2026)
+Run on **GNOME Wayland** (no server-side decorations), **KDE Plasma** (server-side) and **X11** with a window manager.
+- 5a. Look at the main window. **Pass:** exactly one title bar. GNOME Wayland: CaptureMann draws its own 36 px bar
+  (logo, "CaptureMann", minimise, maximise, close). KDE, X11 and other compositors that draw a frame: only the system
+  title bar, no second bar from the app.
+- 5b. GNOME Wayland: drag the bar (moves the window), double-click it (maximise, again restores), right-click it (the
+  window menu), click minimise, maximise/restore and close. **Pass:** each works; the maximise button shows the
+  restore glyph while maximised; close ends the app (there is no tray on Linux yet).
+- 5c. GNOME Wayland: drag each edge and each corner of the un-maximised window. **Pass:** the pointer changes and the
+  window resizes, never below 720 by 480; no resize while maximised or tiled on that side.
+- 5d. Open the launcher (hotkey or `capturemann` command), a confirmation dialog and trigger a toast. **Pass (X11):**
+  they stay above the main window, take no taskbar entry, and the toast does not take the keyboard focus. **Pass
+  (Wayland):** toasts are cards in the corner of the main window while it is open, not a separate window.
+- 5e. In the launcher grid or dock, check the window's icon and name. **Pass:** the window is grouped with the
+  CaptureMann launcher entry and shows its icon (needs the installed `dev.capturemann.app.desktop`; X11 also shows
+  the icon without it). `xprop WM_CLASS` on X11 says `dev.capturemann.app`.
+- 5f. With a toast on screen, take a display screenshot (`capturemann capture screenshot --display <id>`). **Pass:**
+  the toast is not in the image and comes back afterwards; `desktop.log` has no "could not hide" warning.
+
+## 3c. Editor, library and settings (added Oct 31, 2026)
+Run on X11 and on Wayland. Make three screenshots with `capturemann capture screenshot`, then:
+- 6a. Open one, draw an arrow, rectangle, text, highlight, blur and a crop; Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y. **Pass:** each works within a second, the status says "All changes saved" (it must never stay on "Saving..." on Wayland), shortcut hints say Ctrl.
+- 6b. Copy image, Save as (portal dialog), paste the clipboard into another app. **Pass:** the PNG is the cropped result; on GNOME Wayland a failed copy shows a toast and the editor keeps working.
+- 6c. Library: Ctrl+F search, copy and cut text in the box (Ctrl+C, Ctrl+X, Ctrl+V), context menu Show in folder, Delete (item in the Trash).
+- 6d. With IBus and a Vietnamese engine (`ibus-unikey` or `ibus-bamboo`) type `Vieejt Nam` in the search box and in a text annotation. **Pass:** `Việt Nam`, no crash, the draft is replaced while typing.
+- 6e. Settings > Destinations at 1180 px wide: the YouTube card reads "YouTube" on one line. Switch the desktop to dark and back: the app follows.
+- 6f. Mouse wheel and touchpad: content moves the way other apps do.
+
+## 4. Secrets: keyring present and absent
+7. With a keyring running (GNOME Keyring or KWallet): `capturemann diagnostics` shows `Secret Service yes` and
+   "secrets in the system credential store". **Pass:** no unlock prompt appears just from running diagnostics or
+   opening the permissions page. Then store a fake key in Settings -> AI (any provider field, fake value
+   `fake-key-1`). **Pass:** the keyring may ask to unlock (that is its own dialog); afterwards the key persists
+   across an app restart.
+8. Without a Secret Service (log in to a bare session, or `systemctl --user stop gnome-keyring-daemon.socket
+   gnome-keyring-daemon.service` and kill the daemon): **Pass:** the permissions page lists the missing Secret
+   Service with the `CAPTUREMANN_SECRETS=file` hint; storing a key without the variable fails with a clear
+   message (error code `no_keyring`), not a crash.
+9. Restart with `CAPTUREMANN_SECRETS=file`. **Pass:** diagnostics says "secrets in a file (owner-only, not
+   encrypted)"; the key is stored; `ls -l` shows the secrets file readable by you only (mode 600).
+
+## 5. Screenshots
+10. **X11:** take a display screenshot (or use the tray menu, see step 19; or `capturemann capture
+    screenshot --display 1`). **Pass:** a PNG lands in the library at the physical pixel size of the screen.
+11. **X11:** region screenshot with the overlay picker; Esc cancels. **Pass:** the saved image shows exactly the
+    selected region; Esc saves nothing.
+12. **X11:** window screenshot of a terminal. **Pass:** the window's contents, titled in the library.
+13. **Wayland:** display screenshot. **Pass:** the desktop's own portal dialog (or an unprompted capture, if
+    you chose "allow" before) appears; after accepting, one image per monitor is listed by `capturemann targets`
+    (name, position, scale as in the desktop's Displays settings) and `capture screenshot --display N` saves
+    exactly that monitor. Declining gives a clear "permission denied" style message and saves nothing.
+14. **Wayland:** region screenshot from the launcher (the region shortcut). **Pass:** a dimmed, frozen picture of
+    each monitor fills the screen (a fullscreen CaptureMann window per monitor); dragging selects a region, Enter
+    saves it, Esc saves nothing; the saved image is the chosen region. With two monitors of different scale, note
+    whether the overlay matches each monitor (record it; mixed DPI is untested).
+14a. **Wayland:** window screenshot from the launcher, and `capturemann capture screenshot --pick`. **Pass:** the
+    desktop's own picker (on GNOME the screenshot chooser with Selection / Screen / Window) appears; choosing
+    a window saves that window; Esc saves nothing and the command exits 3. `capturemann capture screenshot --window
+    x` answers `not_implemented` and names `--pick`; `capturemann targets` says the desktop does not list windows.
+14b. **X11:** open `xclock` and `xterm`; `capturemann targets` lists them **with titles**; `capture screenshot
+    --window xclock` saves the window.
+15. Open the screenshot in the editor, add an arrow and a blur, copy to clipboard (X11: paste into another app;
+    Wayland: paste into another app too). **Pass:** the pasted image is the edited one. The toast says "Copied to
+    clipboard" only if the paste works: on a session where no clipboard can be reached (no X11 or XWayland, no
+    `wl-copy`) it must say "Copied to library only" or "Couldn't copy" instead. Also from a terminal:
+    `capturemann capture screenshot --display <id> --copy`, then `xclip -o -selection clipboard -t image/png | file -`
+    (X11) or `wl-paste --type image/png | file -` (Wayland) shows a PNG of the screen's size while the app runs.
+    The copy lives as long as the app does; after quitting it, X11 pastes nothing (a clipboard manager may keep it).
+
+## 5b. Global shortcuts and desktop shortcuts
+15a. **X11:** with the app running, press Ctrl+Alt+Shift+Space. **Pass:** the launcher opens; press again, it closes.
+    Ctrl+Alt+Shift+1 starts a region capture. Settings -> Shortcuts shows no "Couldn't register" row, and a
+    combination another app owns (try one the desktop uses) shows "Couldn't register - used by another app".
+15b. **Wayland on KDE or a GNOME with the GlobalShortcuts portal:** at start the desktop asks to allow the
+    shortcuts (or shows them in its keyboard settings). **Pass:** pressing the combination the desktop lists opens the
+    launcher; Settings -> Shortcuts says the desktop manages the keys.
+15c. **Wayland without the portal (GNOME 46):** **Pass:** a toast "Global shortcuts are not available here" at
+    start; every row of Settings -> Shortcuts says "Not available on this desktop" and a note explains the fallback.
+    Then in the desktop's keyboard settings add a custom shortcut with the command `cm-desktop --launcher` (and
+    one with `cm-desktop --capture region`). **Pass:** the shortcut opens the launcher in the running app (a second
+    press closes it) and starts the region capture; no second app window or tray icon appears.
+15d. Run `cm-desktop --library` and plain `cm-desktop` while the app is running. **Pass:** both exit at once and the
+    running app shows its library window.
+
+## 6. The portal permission dialog and its memory
+16. **Wayland:** repeat 13 twice. **Pass:** note whether the second capture asks again (GNOME asks every time for
+    screenshots unless the app has a saved permission; KDE may remember). Record the behavior; neither is a failure.
+
+## 7. Must show as unavailable (all sessions)
+17. **Pass** when each of these says plainly that it is not available, instead of failing after a Start button:
+    - Without `CM_LINUX_RECORDING=1`: Record in the dock, the Record shortcut and the launcher command: toast "Recording is not available yet"
+      (the launcher row says "Not available yet"). No recording sheet, countdown or HUD opens.
+    - Microphone and audio recording (the mic button in the dock): the same toast.
+    - Tray icon on GNOME without the AppIndicator extension: the toast "Menu bar icon unavailable" explains how to
+      turn the extension on; no crash; the launcher window stays reachable.
+    - Global hotkeys on GNOME 46 (no GlobalShortcuts portal): not registered; in-app shortcuts work; a toast and
+      the Shortcuts page say so (step 15c).
+    - "Show in folder" and "Open" of a capture or recording, and a share link: open through `xdg-open`; without
+      xdg-utils the error says to install it.
+    - Launch at login: with no tray the app started by autostart (`--background`) opens its window instead of
+      running unseen.
+    - Pop-up windows on Wayland: no always-on-top, no "do not focus" and no placement (GNOME has no layer-shell);
+      toasts are in-window cards there, and the launcher, dialogs and picker are ordinary windows the compositor places.
+    - Tray icon: absent on GNOME without an extension; the launcher window stays reachable.
+    - Global hotkeys on GNOME 46 (no GlobalShortcuts portal): not registered; in-app shortcuts work.
+18. With the app running, `capturemann record start` (CLI) and the `start_recording` MCP tool. **Pass:** each answers
+    with a clear error (not a crash, not a half-created bundle in the library). Record what the headless
+    `cm-daemon` answers too; its gate is separate from the app's and is not changed by the early-build work.
+
+## 8. Tray icon (StatusNotifierItem)
+19. **KDE, or GNOME with "AppIndicator and KStatusNotifierItem Support" enabled (Ubuntu: `gnome-extensions enable
+    ubuntu-appindicators@ubuntu.com`, log out and in), or XFCE/Cinnamon/MATE:** start the app. **Pass:** the CaptureMann
+    icon appears in the panel; right click (GNOME: click) opens the menu: Capture region / window / display,
+    Capture delay (None, 3, 5, 10 s with one check mark), Record\u2026 / Record audio / Pause / Stop (Record\u2026 and
+    Record audio say "not available yet" unless `CM_LINUX_RECORDING=1`; Pause and Stop are greyed while nothing records), Open library, Open launcher, Recent
+    captures, Settings, Permissions\u2026, Quit CaptureMann. Hover shows the tooltip "CaptureMann".
+20. Click "Capture region" in the menu, then "Capture delay > 5 s" and look at the menu again. **Pass:** the region
+    picker opens; the check mark moved to 5 s; take a screenshot and open the menu: "Recent captures" lists it, and
+    clicking it opens the editor. "Open launcher" opens the launcher; "Quit CaptureMann" quits and the icon goes away.
+21. Left click on KDE (Activate). **Pass:** the launcher opens.
+22. Change the UI language in Settings. **Pass:** the menu texts change without a restart.
+23. Restart the shell's tray host while the app runs (`gnome-extensions disable` then `enable` the extension, or
+    `kquitapp6 plasmashell && plasmashell`). **Pass:** the icon returns by itself.
+
+## 9. Recording in the app (`CM_LINUX_RECORDING=1`; hidden by default in the early build)
+Start the app as `CM_LINUX_RECORDING=1 cm-desktop` (steps 17 and 18 above are what the default build shows). Use a
+test config and library folder; delete `<config>/screencast-token` before step 24 to see the first-start dialog.
+This section needs a real session with a PipeWire desktop; say in the report which desktop and session it was.
+24. Press Record in the dock. **Pass:** the Record sheet opens. Display is selected; Window and Region are dimmed and
+    a line says that recording a window or a region is not available on Linux yet. The webcam row is off with the
+    reason "not available on Linux yet". Under the target there is one line saying who chooses the screen (your desktop's
+    share dialog), the first-time explanation (no token) or "remembers the screen" (token), and a line about the VP9
+    video. With PipeWire stopped (`systemctl --user stop pipewire pipewire-pulse wireplumber`; restore it after) the
+    footer says "Recording needs PipeWire, and it is not running." and Start is dimmed.
+25. No token: press Start. **Pass:** the Studio window shows the banner "Starting" with the line telling you that your
+    desktop may ask which screen to share; the desktop's own dialog appears; choose the screen, keep "Remember this
+    selection" and share. A countdown banner ("Starting in 3", Start now, Cancel) runs, then the banner shows the red
+    dot, "Recording" and the timer. **Pass also:** the desktop's own indicator shows (GNOME: the screen-sharing and
+    microphone icons in the top bar). Note whether a tray icon (red) shows too, and whether the desktop's indicator
+    has a Stop item.
+26. Pause and Resume in the banner, mute the microphone, then Stop. **Pass:** the timer stops while paused; Stop
+    saves, a toast says "Recording saved", the library shows the recording with a picture of the screen, and the
+    details page offers Play export, Play original, Reveal. Play opens your default video player (if none is set, a
+    plain sentence says so instead of nothing happening).
+27. Press Cancel in the countdown. **Pass:** nothing is recorded, no half-created bundle.
+28. Start again (a token exists now). **Pass:** no dialog; during the recording end the share from the desktop (GNOME:
+    the top-bar screen-sharing menu, Stop). **Pass:** the recording stops, a warning toast says the screen share
+    ended and that the recording was saved, the file plays up to that moment, and a new recording can start at once.
+29. Start with the Studio window closed (tray menu, or `capturemann record start`). **Pass:** the Studio window
+    opens by itself with the banner (the recording is never without its indicator); Stop in the banner ends it.
+30. **X11 only:** run with `CM_LINUX_FLOATING_HUD=1`. **Pass:** the floating HUD and the countdown disc appear
+    over the desktop (they are in the video of a recording of that screen); without the variable they do not.
+31. Try `capturemann record start --region 0,0,100,100` and `--camera`. **Pass:** a plain error
+    (`not_implemented`), nothing recorded.
+
+## Result
+Store the report in `verification/` (template in its README): list the distribution, desktop, session type, real or
+VM, and pass/fail per step. Do not call anything "verified" without it.

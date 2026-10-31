@@ -51,7 +51,8 @@ use crate::quick::{
 use crate::run::{run_ffmpeg, run_ffmpeg_fed, Feeder, RunError, BROKEN_PIPE};
 use crate::spec::QuickSpec;
 use crate::tools::{
-    encoder_candidates, is_encoder_init_failure, probe_caps, probe_file, Encoder, Tools,
+    encoder_candidates_for, is_encoder_init_failure, probe_caps, probe_file, Encoder,
+    EncoderPolicy, Tools,
 };
 
 /// Which renderer an export uses.
@@ -84,6 +85,16 @@ pub struct Resolved {
 /// Reads `manifest.edits[0]` (migrating the recorder's original entry) and decides whether the
 /// FFmpeg graph can render it unchanged.
 pub fn resolve_edits(manifest: &Value, spec: &QuickSpec) -> Resolved {
+    resolve_edits_as(manifest, spec, false)
+}
+
+/// [`resolve_edits`] for a caller that sends an untouched recording through the compositor only
+/// because of its encoder (VAAPI, VP9 in MP4): a trivial list is then the whole recording.
+pub fn resolve_untouched(manifest: &Value, spec: &QuickSpec) -> Resolved {
+    resolve_edits_as(manifest, spec, true)
+}
+
+fn resolve_edits_as(manifest: &Value, spec: &QuickSpec, full_if_trivial: bool) -> Resolved {
     let gaps: Vec<PauseGap> = spec
         .gaps
         .iter()
@@ -128,7 +139,11 @@ pub fn resolve_edits(manifest: &Value, spec: &QuickSpec) -> Resolved {
                 && list.camera_segments().is_empty()
                 && list.view.is_default()));
     Resolved {
-        list,
+        list: if full_if_trivial && trivial {
+            full
+        } else {
+            list
+        },
         gaps,
         trivial,
     }
@@ -465,7 +480,7 @@ pub fn export_edited(
     check_sidecar(&caps, kind)?;
     // GIF and WebM are made by software encoders FFmpeg offers (NFR-12: BSD or LGPL code).
     let candidates = if kind == Kind::Mp4 {
-        encoder_candidates(&caps, req.prefer_encoder, false)?
+        encoder_candidates_for(&caps, req.prefer_encoder, EncoderPolicy::host())?
     } else {
         Vec::new()
     };
@@ -747,7 +762,7 @@ pub fn export_edited(
             (Kind::Mp4, Some(enc)) => {
                 let codec = video_codec_at(enc, out_size, fps, target.and_then(|t| t.video_bps));
                 bitrate = codec.bitrate;
-                OutFormat::h264(enc, &codec.args)
+                OutFormat::mp4(enc, &codec.args, caps.vaapi_device.as_deref())
             }
             (Kind::WebM, _) => OutFormat::vp9(webm_bps, fps, audio_bps),
             _ => OutFormat::lossless_stage(),
@@ -986,7 +1001,7 @@ pub fn export_edited(
         .and_then(|p| p.duration_s)
         .unwrap_or(duration_s);
     let (codec_name, encoder_name, lgpl_safe) = match (kind, encoder) {
-        (Kind::Mp4, Some(enc)) => ("h264", enc.name(), enc.lgpl_safe()),
+        (Kind::Mp4, Some(enc)) => (enc.codec_name(), enc.name(), enc.lgpl_safe()),
         (Kind::WebM, _) => ("vp9", "libvpx-vp9", true),
         _ => ("gif", "gif", true),
     };
@@ -996,7 +1011,17 @@ pub fn export_edited(
     match kind {
         Kind::Mp4 => {
             let enc = encoder.unwrap_or(Encoder::Libx264);
-            video["profile"] = json!("high");
+            if enc == Encoder::Vp9Mp4 {
+                video["crf"] = json!(if bitrate.is_some() {
+                    None
+                } else {
+                    Some(crate::graph::VP9_CRF)
+                });
+            } else {
+                video["profile"] = json!("high");
+            }
+            video["software"] = json!(!enc.is_hardware());
+            video["container"] = json!("mp4");
             video["bitrate_bps"] = json!(bitrate);
             video["gop"] = json!(video_codec_at(enc, out_size, fps, None).gop);
         }
@@ -1155,6 +1180,9 @@ struct OutFormat {
     audio: Option<AudioFmt>,
     container: &'static str,
     faststart: bool,
+    /// VAAPI render node: frames are converted to NV12 and uploaded to the GPU, and the encoder
+    /// writes hardware surfaces (no `-pix_fmt`).
+    hw_device: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1173,6 +1201,23 @@ impl OutFormat {
             audio: Some(AudioFmt::Aac),
             container: "mp4",
             faststart: true,
+            hw_device: None,
+        }
+    }
+
+    /// The MP4 of any MP4 encoder: H.264 (software or hardware), VAAPI H.264 or VP9, all with AAC.
+    fn mp4(encoder: Encoder, codec: &[String], vaapi_device: Option<&str>) -> OutFormat {
+        match encoder {
+            Encoder::Vp9Mp4 => OutFormat {
+                tag_avc1: false,
+                ..OutFormat::h264(encoder, codec)
+            },
+            Encoder::Vaapi => OutFormat {
+                pix_fmt: "nv12",
+                hw_device: Some(vaapi_device.unwrap_or("/dev/dri/renderD128").to_owned()),
+                ..OutFormat::h264(encoder, codec)
+            },
+            _ => OutFormat::h264(encoder, codec),
         }
     }
 
@@ -1207,6 +1252,7 @@ impl OutFormat {
             audio: Some(AudioFmt::Opus),
             container: "webm",
             faststart: false,
+            hw_device: None,
         }
     }
 
@@ -1221,6 +1267,7 @@ impl OutFormat {
             audio: None,
             container: "matroska",
             faststart: false,
+            hw_device: None,
         }
     }
 }
@@ -1304,6 +1351,10 @@ fn encode_args(
     ]
     .map(String::from)
     .to_vec();
+    if let Some(dev) = &fmt.hw_device {
+        // A global option: it names the render node the `hwupload` filter and the encoder share.
+        args.splice(1..1, ["-vaapi_device".to_owned(), dev.clone()]);
+    }
     args.extend([
         "-s".into(),
         format!("{}x{}", out_size.0, out_size.1),
@@ -1338,8 +1389,13 @@ fn encode_args(
     // RGBA to YUV with the BT.709 matrix and limited range, and say so in the stream: FFmpeg's
     // default is BT.601, and players take an untagged HD stream as BT.709, which shifts every
     // colour (found by the M4 preview/export parity test).
-    let yuv = fmt.pix_fmt.starts_with("yuv");
-    let convert = if yuv {
+    let yuv = fmt.pix_fmt.starts_with("yuv") || fmt.hw_device.is_some();
+    let convert = if fmt.hw_device.is_some() {
+        format!(
+            "scale=out_color_matrix=bt709:out_range=tv,format={},hwupload",
+            fmt.pix_fmt
+        )
+    } else if yuv {
         format!(
             "scale=out_color_matrix=bt709:out_range=tv,format={}",
             fmt.pix_fmt
@@ -1360,7 +1416,9 @@ fn encode_args(
     }
     args.extend(["-map_metadata".into(), "-1".into()]);
     args.extend(fmt.video.iter().cloned());
-    args.extend(["-pix_fmt".into(), fmt.pix_fmt.into()]);
+    if fmt.hw_device.is_none() {
+        args.extend(["-pix_fmt".into(), fmt.pix_fmt.into()]);
+    }
     if yuv {
         args.extend(
             [
@@ -1499,6 +1557,60 @@ mod tests {
         assert!(j.contains("-map [outv] -map [outa]"));
         assert!(j.contains("-c:v h264_videotoolbox"));
         assert!(j.ends_with("-t 10 /b/o.part"), "{j}");
+    }
+
+    fn linux_args(enc: Encoder) -> String {
+        let caps = crate::tools::caps_from_output("ffmpeg version 7.1", "V....D libvpx-vp9");
+        let codec = video_codec_at(enc, (1280, 720), 30.0, None);
+        encode_args(
+            &OutFormat::mp4(enc, &codec.args, Some("/dev/dri/renderD128")),
+            &caps,
+            (1280, 720),
+            30.0,
+            &[],
+            None,
+            None,
+            None,
+            AUDIO_BPS_MONO,
+            4.0,
+            Path::new("/b/o.part"),
+        )
+        .join(" ")
+    }
+
+    #[test]
+    fn vaapi_args_upload_nv12_frames_and_name_the_render_node() {
+        let j = linux_args(Encoder::Vaapi);
+        assert!(
+            j.starts_with("-hide_banner -vaapi_device /dev/dri/renderD128 -nostdin"),
+            "{j}"
+        );
+        assert!(
+            j.contains("[0:v]scale=out_color_matrix=bt709:out_range=tv,format=nv12,hwupload[outv]"),
+            "{j}"
+        );
+        assert!(j.contains("-c:v h264_vaapi"), "{j}");
+        assert!(
+            !j.contains("-pix_fmt nv12") && !j.contains("libx264"),
+            "{j}"
+        );
+        assert!(j.contains("-tag:v avc1") && j.contains("-f mp4"), "{j}");
+    }
+
+    #[test]
+    fn vp9_in_mp4_args_use_libvpx_without_the_avc1_tag() {
+        let j = linux_args(Encoder::Vp9Mp4);
+        assert!(
+            j.contains("-c:v libvpx-vp9 -row-mt 1 -deadline good"),
+            "{j}"
+        );
+        assert!(j.contains("-b:v 0 -crf 32"), "{j}");
+        assert!(
+            j.contains("-pix_fmt yuv420p") && !j.contains("-tag:v avc1"),
+            "{j}"
+        );
+        assert!(j.contains("-movflags +faststart -f mp4"), "{j}");
+        assert!(!j.contains("vaapi"), "{j}");
     }
 
     /// AUD-4: the finished mix is a raw f32 input on the output timeline and is mapped as audio.

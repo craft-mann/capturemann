@@ -84,6 +84,14 @@ pub trait VideoEncoder: Send + 'static {
         None
     }
 
+    /// The codec the file really holds when it is not the one in the plan (software VP9 on
+    /// Linux), as the manifest's codec string; `None` means the plan's codec.
+    // The recorder writes this string into the track details (and, for "vp9", describes the track
+    // with `cm_core::describe_video_track`).
+    fn codec_name(&self) -> Option<&'static str> {
+        None
+    }
+
     /// First disk error seen by the file writer (`disk_full`), if any.
     fn check(&self) -> Result<(), CmError>;
 

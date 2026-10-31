@@ -37,6 +37,8 @@ pub struct TextEdit {
     pub color: Color,
     pub outline: Option<Color>,
     pub bg: Option<Color>,
+    /// The draft an input method is composing (Telex, Pinyin, ...), as char indexes into `text`.
+    pub marked: Option<std::ops::Range<usize>>,
 }
 
 impl TextEdit {
@@ -51,7 +53,75 @@ impl TextEdit {
         self.text.chars().count()
     }
 
+    /// UTF-16 length of the first `chars` characters (the platform addresses text in UTF-16).
+    fn utf16_of(&self, chars: usize) -> usize {
+        self.text.chars().take(chars).map(char::len_utf16).sum()
+    }
+
+    /// The char index at a UTF-16 offset (rounded up when it falls inside a surrogate pair).
+    fn chars_of(&self, utf16: usize) -> usize {
+        let mut units = 0;
+        for (i, c) in self.text.chars().enumerate() {
+            if units >= utf16 {
+                return i;
+            }
+            units += c.len_utf16();
+        }
+        self.len()
+    }
+
+    /// The draft as a UTF-16 range, for the platform.
+    pub fn marked_utf16(&self) -> Option<std::ops::Range<usize>> {
+        let m = self.marked.as_ref()?;
+        Some(self.utf16_of(m.start)..self.utf16_of(m.end))
+    }
+
+    /// The caret as a UTF-16 range (collapsed), for the platform.
+    pub fn selection_utf16(&self) -> std::ops::Range<usize> {
+        let c = self.utf16_of(self.cursor);
+        c..c
+    }
+
+    /// The text in a UTF-16 range, and the range actually used.
+    pub fn text_utf16(&self, range: std::ops::Range<usize>) -> (String, std::ops::Range<usize>) {
+        let a = self.chars_of(range.start);
+        let b = self.chars_of(range.end).max(a);
+        let text: String = self.text.chars().skip(a).take(b - a).collect();
+        (text, self.utf16_of(a)..self.utf16_of(b))
+    }
+
+    /// An input method put `new_text` in place of `range` (UTF-16; default: the draft, else the
+    /// caret). With `mark` the new text is a draft the method will replace again; without, it is
+    /// final. Returns whether the text changed.
+    pub fn ime_replace(
+        &mut self,
+        range: Option<std::ops::Range<usize>>,
+        new_text: &str,
+        mark: bool,
+    ) -> bool {
+        let clean: String = new_text
+            .chars()
+            .filter(|c| !c.is_control() || *c == '\n')
+            .collect();
+        let (a, b) = match range {
+            Some(r) => (self.chars_of(r.start), self.chars_of(r.end)),
+            None => match &self.marked {
+                Some(m) => (m.start.min(self.len()), m.end.min(self.len())),
+                None => (self.cursor, self.cursor),
+            },
+        };
+        let b = b.max(a);
+        let (ba, bb) = (self.byte(a), self.byte(b));
+        let changed = self.text[ba..bb] != clean;
+        self.text.replace_range(ba..bb, &clean);
+        let n = clean.chars().count();
+        self.cursor = a + n;
+        self.marked = (mark && n > 0).then_some(a..a + n);
+        changed
+    }
+
     pub fn insert(&mut self, s: &str) {
+        self.marked = None;
         let clean: String = s
             .chars()
             .filter(|c| !c.is_control() || *c == '\n')
@@ -65,6 +135,7 @@ impl TextEdit {
     }
 
     pub fn backspace(&mut self) {
+        self.marked = None;
         if self.cursor > 0 {
             self.cursor -= 1;
             let b = self.byte(self.cursor);
@@ -73,6 +144,7 @@ impl TextEdit {
     }
 
     pub fn delete(&mut self) {
+        self.marked = None;
         if self.cursor < self.len() {
             let b = self.byte(self.cursor);
             self.text.remove(b);
@@ -80,20 +152,24 @@ impl TextEdit {
     }
 
     pub fn left(&mut self) {
+        self.marked = None;
         self.cursor = self.cursor.saturating_sub(1);
     }
 
     pub fn right(&mut self) {
+        self.marked = None;
         self.cursor = (self.cursor + 1).min(self.len());
     }
 
     pub fn home(&mut self) {
+        self.marked = None;
         while self.cursor > 0 && self.text.chars().nth(self.cursor - 1) != Some('\n') {
             self.cursor -= 1;
         }
     }
 
     pub fn end(&mut self) {
+        self.marked = None;
         while self.cursor < self.len() && self.text.chars().nth(self.cursor) != Some('\n') {
             self.cursor += 1;
         }
@@ -624,6 +700,7 @@ impl EditorState {
             color: s.color,
             outline: Some(Color::BLACK),
             bg: None,
+            marked: None,
         });
     }
 
@@ -647,6 +724,7 @@ impl EditorState {
                 color,
                 outline,
                 bg,
+                marked: None,
             });
         }
     }
@@ -880,6 +958,13 @@ impl EditorState {
             }
         }
         true
+    }
+
+    /// An input method committed or is composing text in the text being typed.
+    pub fn text_ime(&mut self, range: Option<std::ops::Range<usize>>, s: &str, mark: bool) -> bool {
+        self.text
+            .as_mut()
+            .is_some_and(|t| t.ime_replace(range, s, mark))
     }
 
     pub fn text_insert(&mut self, s: &str) {
@@ -1375,6 +1460,7 @@ mod tests {
             color: Color::WHITE,
             outline: None,
             bg: None,
+            marked: None,
         };
         t.insert("a\u{4F60}\u{597D}");
         t.left();
@@ -1571,5 +1657,67 @@ mod tests {
         drag(&mut s, (10.0, 10.0), (60.0, 60.0), NONE);
         s.adopt_ops(Vec::new());
         assert!(s.selected.is_none());
+    }
+
+    fn blank_text() -> TextEdit {
+        TextEdit {
+            existing: None,
+            at: Pt::new(0.0, 0.0),
+            text: String::new(),
+            cursor: 0,
+            size: 24.0,
+            color: Color::WHITE,
+            outline: None,
+            bg: None,
+            marked: None,
+        }
+    }
+
+    #[test]
+    fn a_telex_draft_is_replaced_until_it_is_committed() {
+        // "Vieejt": the engine commits "Vi", then drafts "e", "ê", "ệ" and commits "ệt".
+        let mut t = blank_text();
+        t.ime_replace(None, "Vi", false);
+        t.ime_replace(None, "e", true);
+        assert_eq!((t.text.as_str(), t.marked_utf16()), ("Vie", Some(2..3)));
+        t.ime_replace(None, "\u{ea}", true);
+        t.ime_replace(None, "\u{1ec7}", true);
+        assert_eq!(t.text, "Vi\u{1ec7}");
+        t.ime_replace(None, "\u{1ec7}t", false);
+        assert_eq!(t.text, "Vi\u{1ec7}t");
+        assert_eq!((t.cursor, t.marked_utf16()), (4, None));
+    }
+
+    #[test]
+    fn a_draft_goes_where_the_caret_is_and_utf16_offsets_follow_emoji() {
+        let mut t = blank_text();
+        t.insert("a\u{1F600}b");
+        t.left();
+        // Caret between the emoji (2 UTF-16 units) and b.
+        assert_eq!(t.selection_utf16(), 3..3);
+        t.ime_replace(None, "x", true);
+        assert_eq!(t.text, "a\u{1F600}xb");
+        assert_eq!(t.marked_utf16(), Some(3..4));
+        assert_eq!(t.text_utf16(1..3), ("\u{1F600}".to_owned(), 1..3));
+        // An explicit range replaces what is there.
+        t.ime_replace(Some(3..4), "yz", false);
+        assert_eq!(t.text, "a\u{1F600}yzb");
+        assert_eq!(t.marked_utf16(), None);
+    }
+
+    #[test]
+    fn typing_keys_or_moving_ends_a_draft() {
+        let mut t = blank_text();
+        t.ime_replace(None, "ab", true);
+        t.left();
+        assert_eq!(t.marked_utf16(), None);
+        t.ime_replace(None, "c", true);
+        t.insert("d");
+        assert_eq!(t.marked_utf16(), None);
+        // An empty draft is no draft; control characters are dropped.
+        t.ime_replace(None, "", true);
+        assert_eq!(t.marked_utf16(), None);
+        t.ime_replace(None, "\u{1b}q", false);
+        assert!(t.text.contains('q') && !t.text.contains('\u{1b}'));
     }
 }

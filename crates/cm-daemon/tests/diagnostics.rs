@@ -31,6 +31,8 @@ fn titles(v: &Value) -> Vec<String> {
         .unwrap()
         .iter()
         .map(|s| s["title"].as_str().unwrap().to_owned())
+        // Only a Linux machine with a gap (no portal, no PipeWire) has this section.
+        .filter(|t| t != "Missing on this system")
         .collect()
 }
 

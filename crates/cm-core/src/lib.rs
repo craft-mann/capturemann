@@ -22,6 +22,7 @@ pub mod message;
 pub mod perf;
 pub mod record;
 pub mod undo;
+pub mod video_codec;
 pub mod wav;
 
 #[cfg(any(test, feature = "testing"))]
@@ -54,3 +55,4 @@ pub use idempotency::IdempotencyCache;
 pub use media_time::{Fps, MediaTime, TICKS_PER_SECOND};
 pub use record::{PauseGap, TrackContext, TrackInfo, TrackKind, TrackRecorder, TrackStats};
 pub use undo::{Action, Command, UndoStack, DEFAULT_REVISION_LIMIT};
+pub use video_codec::{describe_video_track, CursorSource, VideoCodec};

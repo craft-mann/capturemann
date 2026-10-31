@@ -229,3 +229,111 @@ impl EditorView {
         }
     }
 }
+
+/// The text annotation as a platform text input, so an input method (Telex, VNI, Pinyin, an
+/// IBus engine on X11) can compose in it. Typed keys still arrive through `on_key_down`; this
+/// receives only what the input method commits or drafts.
+impl gpui::EntityInputHandler for EditorView {
+    fn text_for_range(
+        &mut self,
+        range: std::ops::Range<usize>,
+        adjusted_range: &mut Option<std::ops::Range<usize>>,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<String> {
+        let doc = self.doc.clone()?;
+        let d = doc.read(cx);
+        let t = d.state.text.as_ref()?;
+        let (text, used) = t.text_utf16(range);
+        *adjusted_range = Some(used);
+        Some(text)
+    }
+
+    fn selected_text_range(
+        &mut self,
+        _ignore_disabled_input: bool,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<gpui::UTF16Selection> {
+        let doc = self.doc.clone()?;
+        let d = doc.read(cx);
+        let t = d.state.text.as_ref()?;
+        Some(gpui::UTF16Selection {
+            range: t.selection_utf16(),
+            reversed: false,
+        })
+    }
+
+    fn marked_text_range(
+        &self,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<std::ops::Range<usize>> {
+        let doc = self.doc.as_ref()?;
+        doc.read(cx).state.text.as_ref()?.marked_utf16()
+    }
+
+    fn unmark_text(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(doc) = self.doc.clone() {
+            doc.update(cx, |d, cx| d.text_unmark(cx));
+        }
+    }
+
+    fn replace_text_in_range(
+        &mut self,
+        range: Option<std::ops::Range<usize>>,
+        text: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(doc) = self.doc.clone() {
+            doc.update(cx, |d, cx| d.text_ime(range, text, false, cx));
+        }
+        window.invalidate_character_coordinates();
+        cx.notify();
+    }
+
+    fn replace_and_mark_text_in_range(
+        &mut self,
+        range: Option<std::ops::Range<usize>>,
+        new_text: &str,
+        _new_selected_range: Option<std::ops::Range<usize>>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(doc) = self.doc.clone() {
+            doc.update(cx, |d, cx| d.text_ime(range, new_text, true, cx));
+        }
+        window.invalidate_character_coordinates();
+        cx.notify();
+    }
+
+    fn bounds_for_range(
+        &mut self,
+        _range: std::ops::Range<usize>,
+        element_bounds: Bounds<Pixels>,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<Bounds<Pixels>> {
+        // The candidate window sits at the caret.
+        let doc = self.doc.clone()?;
+        let geom = doc.update(cx, |d, _| d.overlay_data().text)?;
+        let (x, y) = self.viewport.to_screen(geom.caret);
+        let b = self.canvas_bounds.get();
+        let z = self.viewport.zoom();
+        Some(Bounds::new(
+            point(b.origin.x + px(x as f32), b.origin.y + px(y as f32)),
+            size(px(1.), px((geom.caret_h * z) as f32)),
+        ))
+        .or(Some(element_bounds))
+    }
+
+    fn character_index_for_point(
+        &mut self,
+        _point: gpui::Point<Pixels>,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) -> Option<usize> {
+        None
+    }
+}

@@ -45,7 +45,7 @@ fn serve(daemon: &Daemon, endpoint: &Endpoint) {
 /// A daemon already listening.
 fn rig_with(backend: FakeBackend) -> Rig {
     let dir = tempfile::tempdir().unwrap();
-    let endpoint = Endpoint::Path(dir.path().join("d.sock"));
+    let endpoint = Endpoint::scratch(dir.path(), "d");
     let daemon = make_daemon(backend, dir.path());
     serve(&daemon, &endpoint);
     Rig {
@@ -418,7 +418,7 @@ fn none_code() -> i32 {
 async fn ann_2_ac4_annotate_suggest_redactions_is_read_only() {
     use cm_daemon::testing::{ScriptedRecognizer, TextLine};
     let dir = tempfile::tempdir().unwrap();
-    let endpoint = Endpoint::Path(dir.path().join("d.sock"));
+    let endpoint = Endpoint::scratch(dir.path(), "d");
     let lib = Library::open_or_create(&dir.path().join("lib")).unwrap();
     let rec = ScriptedRecognizer::new(vec![
         TextLine::laid_out("Owner: jane.doe@example.com", 50.0, 60.0, 10.0, 20.0),
@@ -734,7 +734,7 @@ async fn settings_set_and_get() {
 #[tokio::test]
 async fn starts_a_daemon_when_none_is_running() {
     let dir = tempfile::tempdir().unwrap();
-    let endpoint = Endpoint::Path(dir.path().join("late.sock"));
+    let endpoint = Endpoint::scratch(dir.path(), "late");
     let starts = Arc::new(AtomicUsize::new(0));
     let launcher: Launcher = {
         let (starts, endpoint, base) = (starts.clone(), endpoint.clone(), dir.path().to_owned());
@@ -776,7 +776,7 @@ async fn starts_a_daemon_when_none_is_running() {
 #[tokio::test]
 async fn no_daemon_gives_a_clear_error() {
     let dir = tempfile::tempdir().unwrap();
-    let endpoint = Endpoint::Path(dir.path().join("none.sock"));
+    let endpoint = Endpoint::scratch(dir.path(), "none");
     // No launcher.
     let (mut env, o, e) = env_for(&endpoint, None, "");
     assert_eq!(run(["capturemann", "targets"], &mut env).await, 5);
@@ -819,7 +819,7 @@ async fn daemon_status_and_start() {
 
     let dir = tempfile::tempdir().unwrap();
     let down = Rig {
-        endpoint: Endpoint::Path(dir.path().join("x.sock")),
+        endpoint: Endpoint::scratch(dir.path(), "x"),
         daemon: r.daemon.clone(),
         dir,
     };
@@ -832,18 +832,12 @@ async fn socket_flag_overrides_endpoint() {
     let r = rig();
     let dir = tempfile::tempdir().unwrap();
     let wrong = Rig {
-        endpoint: Endpoint::Path(dir.path().join("wrong.sock")),
+        endpoint: Endpoint::scratch(dir.path(), "wrong"),
         daemon: r.daemon.clone(),
         dir,
     };
-    let Endpoint::Path(p) = &r.endpoint else {
-        unreachable!()
-    };
-    let o = cli(
-        &wrong,
-        &["--socket", p.to_str().unwrap(), "targets", "--json"],
-    )
-    .await;
+    let target = r.endpoint.describe();
+    let o = cli(&wrong, &["--socket", &target, "targets", "--json"]).await;
     assert_eq!(o.code, 0, "{}", o.err);
 }
 
@@ -888,7 +882,7 @@ async fn jobs_watch_streams_events() {
 /// waits to be cancelled; `quick` reports 50% and finishes.
 fn jobs_rig() -> Rig {
     let dir = tempfile::tempdir().unwrap();
-    let endpoint = Endpoint::Path(dir.path().join("d.sock"));
+    let endpoint = Endpoint::scratch(dir.path(), "d");
     let lib = Library::open_or_create(&dir.path().join("lib")).unwrap();
     let queue = cm_daemon::library_job_queue(lib.root()).unwrap();
     let daemon = Daemon::builder(Capturer::new(desktop()).with_own_pid(None), lib)
@@ -1067,7 +1061,7 @@ async fn jobs_watch_snapshot_then_job_events() {
 async fn exp1_export_command() {
     use std::sync::atomic::AtomicBool;
     let dir = tempfile::tempdir().unwrap();
-    let endpoint = Endpoint::Path(dir.path().join("d.sock"));
+    let endpoint = Endpoint::scratch(dir.path(), "d");
     let lib = Library::open_or_create(&dir.path().join("lib")).unwrap();
     let queue = cm_daemon::library_job_queue(lib.root()).unwrap();
     let daemon = Daemon::builder(Capturer::new(desktop()).with_own_pid(None), lib)
@@ -1225,7 +1219,7 @@ async fn exp1_export_command() {
 #[tokio::test]
 async fn r2_14_export_wait_timeout_reports_a_held_job() {
     let dir = tempfile::tempdir().unwrap();
-    let endpoint = Endpoint::Path(dir.path().join("d.sock"));
+    let endpoint = Endpoint::scratch(dir.path(), "d");
     let lib = Library::open_or_create(&dir.path().join("lib")).unwrap();
     let queue = cm_daemon::library_job_queue(lib.root()).unwrap();
     let daemon = Daemon::builder(Capturer::new(desktop()).with_own_pid(None), lib)
@@ -1304,7 +1298,7 @@ async fn r2_14_export_wait_timeout_reports_a_held_job() {
 async fn r1_1_screenshot_copy_with_annotate_copies_the_rendered_image() {
     use cm_daemon::testing::RecordingClipboard;
     let dir = tempfile::tempdir().unwrap();
-    let endpoint = Endpoint::Path(dir.path().join("d.sock"));
+    let endpoint = Endpoint::scratch(dir.path(), "d");
     let lib = Library::open_or_create(&dir.path().join("lib")).unwrap();
     let clip = Arc::new(RecordingClipboard::default());
     let daemon = Daemon::builder(Capturer::new(desktop()).with_own_pid(None), lib)
@@ -1381,7 +1375,7 @@ async fn library_rename_rm_and_annotate_no_image() {
     use cm_daemon::testing::{FakeTrasher, FixedConfirmer};
     use cm_daemon::Decision;
     let dir = tempfile::tempdir().unwrap();
-    let endpoint = Endpoint::Path(dir.path().join("d.sock"));
+    let endpoint = Endpoint::scratch(dir.path(), "d");
     let lib = Library::open_or_create(&dir.path().join("lib")).unwrap();
     let confirmer = Arc::new(FixedConfirmer::new(Decision::Approve));
     let trasher = Arc::new(FakeTrasher::new());
@@ -1472,7 +1466,7 @@ async fn library_move_asks_copies_and_waits() {
     use cm_daemon::testing::FixedConfirmer;
     use cm_daemon::Decision;
     let dir = tempfile::tempdir().unwrap();
-    let endpoint = Endpoint::Path(dir.path().join("d.sock"));
+    let endpoint = Endpoint::scratch(dir.path(), "d");
     let lib_dir = dir.path().join("lib");
     let lib = Library::open_or_create(&lib_dir).unwrap();
     let confirmer = Arc::new(FixedConfirmer::new(Decision::Approve));
@@ -1601,7 +1595,7 @@ mod recording {
 
     pub fn rec_rig(decision: Decision, sources: FakeSources) -> RecRig {
         let dir = tempfile::tempdir().unwrap();
-        let endpoint = Endpoint::Path(dir.path().join("d.sock"));
+        let endpoint = Endpoint::scratch(dir.path(), "d");
         let lib = Library::open_or_create(&dir.path().join("lib")).unwrap();
         let confirmer = Arc::new(FixedConfirmer::new(decision));
         let daemon = Daemon::builder(Capturer::new(desktop()).with_own_pid(None), lib)
@@ -1622,7 +1616,7 @@ mod recording {
 
     pub fn timeout_rig(sources: FakeSources) -> Rig {
         let dir = tempfile::tempdir().unwrap();
-        let endpoint = Endpoint::Path(dir.path().join("d.sock"));
+        let endpoint = Endpoint::scratch(dir.path(), "d");
         let lib = Library::open_or_create(&dir.path().join("lib")).unwrap();
         let daemon = Daemon::builder(Capturer::new(desktop()).with_own_pid(None), lib)
             .recording_sources(sources)
@@ -1741,7 +1735,7 @@ async fn record_stop_cancels_a_running_selftest() {
     let mut opts = recording::options();
     opts.selftest_duration = Duration::from_secs(30);
     let dir = tempfile::tempdir().unwrap();
-    let endpoint = Endpoint::Path(dir.path().join("d.sock"));
+    let endpoint = Endpoint::scratch(dir.path(), "d");
     let lib = Library::open_or_create(&dir.path().join("lib")).unwrap();
     let daemon = Daemon::builder(Capturer::new(desktop()).with_own_pid(None), lib)
         .recording_sources(cm_daemon::testing::FakeSources::new())
@@ -2592,7 +2586,7 @@ async fn edit_zoom_cursor_and_reframe_commands() {
 async fn sto_1_destinations_and_upload_commands() {
     use cm_storage::{Destination, DestinationStore, Kind, What};
     let dir = tempfile::tempdir().unwrap();
-    let endpoint = Endpoint::Path(dir.path().join("d.sock"));
+    let endpoint = Endpoint::scratch(dir.path(), "d");
     let nas = dir.path().join("nas");
     std::fs::create_dir(&nas).unwrap();
     let store = DestinationStore::new(dir.path().join("config"));
@@ -2666,7 +2660,7 @@ async fn sto_1_destinations_and_upload_commands() {
 async fn pub_publish_accounts_and_publish_commands() {
     use cm_publish::{Privacy, PublishAccount, PublishAccountStore};
     let dir = tempfile::tempdir().unwrap();
-    let endpoint = Endpoint::Path(dir.path().join("d.sock"));
+    let endpoint = Endpoint::scratch(dir.path(), "d");
     let store = PublishAccountStore::new(dir.path().join("config"));
     store
         .save(&[PublishAccount {

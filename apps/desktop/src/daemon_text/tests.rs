@@ -715,3 +715,18 @@ fn move_library_confirmation_is_worded_from_its_parameters() {
         "Later words"
     );
 }
+
+/// The Linux recorder's two start notes are worded from their opening words; other text is kept.
+#[test]
+fn linux_recorder_notes_are_worded() {
+    let software = "On Linux the video is encoded in software as VP9 (expect more CPU use than a hardware encoder), at the size of the screen you pick in the desktop's share dialog; the size and codec shown above are the plan, the recording's details say what was written.";
+    let pointer = "On Linux the pointer is part of the video; there is no separate cursor track (positions and clicks are not recorded) yet.";
+    assert!(warning_text(software).starts_with("The video is encoded by the processor (VP9)"));
+    assert!(warning_text(pointer).starts_with("The mouse pointer is part of the video"));
+    with_language(Lang::Vi, || {
+        assert_ne!(warning_text(software), software);
+        assert_ne!(warning_text(pointer), pointer);
+        assert!(!warning_text(software).starts_with("The video"));
+    });
+    assert_eq!(warning_text("something new"), "something new");
+}

@@ -145,7 +145,7 @@ fn sysctl(name: &str) -> Option<String> {
 }
 
 /// The machine: OS, chip, memory, cores.
-pub fn system_lines() -> Vec<String> {
+pub fn system_lines(stack: Option<&cm_platform::stack::Report>) -> Vec<String> {
     let mut out = Vec::new();
     out.push(format!(
         "{} {}",
@@ -170,10 +170,22 @@ pub fn system_lines() -> Vec<String> {
     if let Ok(n) = std::thread::available_parallelism() {
         out.push(format!("threads available {n}"));
     }
+    // Linux only (None elsewhere): the desktop stack the screenshot and recording paths depend on.
+    if let Some(stack) = stack {
+        out.extend(stack.fact_lines());
+    }
+    out.push(match cm_auth::backend_from_env() {
+        cm_auth::Backend::Keyring => "secrets in the system credential store".to_owned(),
+        cm_auth::Backend::File(_) => "secrets in a file (owner-only, not encrypted)".to_owned(),
+    });
     out
 }
 
 fn permission_lines() -> Vec<String> {
+    // Linux has no permission prompts to report: the portal, PipeWire and the encoder are.
+    if let Some(lines) = crate::recording::sys::linux::diagnostic_permission_lines() {
+        return lines;
+    }
     vec![
         format!("microphone {:?}", cm_audio::microphone_permission()),
         format!(
@@ -219,6 +231,7 @@ fn engine_lines() -> Vec<String> {
         Ok(p) => out.push(format!("llama-server at {}", p.display())),
         Err(e) => out.push(format!("llama-server not found: {e}")),
     }
+    out.push(cm_render::ocr::describe_system());
     out.push(format!(
         "speaker engine built in: {}",
         cfg!(feature = "sherpa")
@@ -229,11 +242,20 @@ fn engine_lines() -> Vec<String> {
 impl Inner {
     /// `get_diagnostics`: `{ text, sections: [{ title, lines }] }`.
     pub(crate) async fn get_diagnostics(&self) -> Result<Value, DaemonError> {
+        // Linux only; asks the session bus a few read-only questions, so off the async threads.
+        let stack = tokio::task::spawn_blocking(cm_platform::stack::probe)
+            .await
+            .ok()
+            .flatten();
         let mut sections = vec![
             Section::new("App", app_lines()),
-            Section::new("System", system_lines()),
+            Section::new("System", system_lines(stack.as_ref())),
             Section::new("Permissions", permission_lines()),
         ];
+        let gaps = stack.map(|r| r.gap_lines()).unwrap_or_default();
+        if !gaps.is_empty() {
+            sections.push(Section::new("Missing on this system", gaps));
+        }
 
         // Models and engines.
         let svc = self.ai.models.clone();
@@ -340,8 +362,8 @@ fn last_recording_of(dir: &Path) -> Vec<String> {
 
 /// The last redaction pass over finished text.
 fn final_pass(s: &str) -> String {
-    let home = std::env::var(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-        .ok()
+    let home = cm_platform::dirs::home_dir()
+        .and_then(|h| h.to_str().map(str::to_owned))
         .filter(|h| h.len() > 1);
     redact_home(&cm_jobs::scrub_secrets(s), home.as_deref())
 }

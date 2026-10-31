@@ -488,7 +488,9 @@ mod tests {
             )
             .await
             .unwrap();
-        let dest = root.join("CaptureMann/2026/10/Lesson/Lesson.mp4");
+        let dest = ["CaptureMann", "2026", "10", "Lesson", "Lesson.mp4"]
+            .iter()
+            .fold(root.clone(), |p, c| p.join(c));
         assert_eq!(up.remote_id, dest.display().to_string());
         assert_eq!(hash_file(&dest).unwrap(), hash_file(&src).unwrap());
         assert_eq!(up.bytes, 3 * CHUNK as u64 + 17);

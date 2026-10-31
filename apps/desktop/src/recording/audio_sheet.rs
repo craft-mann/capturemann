@@ -431,7 +431,7 @@ impl AudioSheetModel {
             Platform::Mac => tr!(
                 "For online calls: the other people\u{2019}s voices. Needs Screen Recording permission on macOS; microphone-only recordings never ask for it."
             ),
-            Platform::Windows => tr!("For online calls: the other people\u{2019}s voices."),
+            Platform::Windows | Platform::Linux => tr!("For online calls: the other people\u{2019}s voices."),
         }
     }
 

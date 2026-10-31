@@ -68,8 +68,7 @@ pub trait FreeSpace: Send + Sync {
     fn free_bytes(&self, path: &Path) -> Option<u64>;
 }
 
-/// The real volume, through `statvfs` (Unix). On Windows this returns `None` until the
-/// `GetDiskFreeSpaceEx` path lands with the Windows capture backend.
+/// The real volume, through `statvfs` (Unix) or `GetDiskFreeSpaceExW` (Windows).
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SystemFreeSpace;
 
@@ -91,7 +90,25 @@ impl FreeSpace for SystemFreeSpace {
     }
 }
 
-#[cfg(not(unix))]
+#[cfg(windows)]
+impl FreeSpace for SystemFreeSpace {
+    fn free_bytes(&self, path: &Path) -> Option<u64> {
+        use std::os::windows::ffi::OsStrExt;
+        use windows::core::PCWSTR;
+        use windows::Win32::Storage::FileSystem::GetDiskFreeSpaceExW;
+        let wide: Vec<u16> = path.as_os_str().encode_wide().chain([0]).collect();
+        let mut available = 0u64;
+        // SAFETY: `wide` is a NUL-terminated UTF-16 path that outlives the call, and
+        // `available` is a valid out-pointer for the one value requested (the bytes free for
+        // this user, which honours quotas, like `f_bavail` above).
+        unsafe {
+            GetDiskFreeSpaceExW(PCWSTR(wide.as_ptr()), Some(&mut available), None, None).ok()?;
+        }
+        Some(available)
+    }
+}
+
+#[cfg(not(any(unix, windows)))]
 impl FreeSpace for SystemFreeSpace {
     fn free_bytes(&self, _path: &Path) -> Option<u64> {
         None

@@ -3,13 +3,15 @@
 //!
 //! * macOS: Apple Vision (`VNRecognizeTextRequest`, accurate level) in `apple`, the only
 //!   place with `unsafe` code.
-//! * Windows: `Windows.Media.Ocr` is a later milestone; [`system_recognizer`] returns a stub
-//!   that reports itself unavailable and answers `not_implemented`.
-//! * Anything else: the same stub.
+//! * Everywhere else (Linux first): the system `tesseract` program as a helper process, in
+//!   `tesseract` (Apache-2.0, never linked; found through `CM_TESSERACT`, next to the
+//!   executable or on `PATH`). With no `tesseract` installed [`system_recognizer`] reports
+//!   itself unavailable and answers `not_implemented` saying what to install.
+//!   (Windows will get `Windows.Media.Ocr` later; until then it uses `tesseract` if present.)
 //!
 //! Recognition never leaves the machine and never needs a network or an AI key. When no
-//! recognizer is available the editor hides its Auto-redact button and `suggest_redactions`
-//! answers `not_implemented`.
+//! recognizer is available `suggest_redactions` answers `not_implemented`; the editor hides its
+//! Auto-redact button, except where [`install_hint`] has something to offer.
 
 use cm_core::{CmError, Rc};
 use image::RgbaImage;
@@ -20,6 +22,7 @@ use std::sync::Arc;
 mod apple;
 pub mod detect;
 pub mod rules;
+pub mod tesseract;
 
 pub use detect::{
     mask_preview, suggest_redactions, RedactionKind, RedactionSuggestion, SuggestOptions,
@@ -53,6 +56,12 @@ pub trait TextRecognizer: Send + Sync {
     /// Whether [`TextRecognizer::recognize`] can work on this machine right now.
     fn is_available(&self) -> bool;
 
+    /// When [`TextRecognizer::is_available`] is false and the user can fix that (install a
+    /// program), a sentence saying how. The default is `None`.
+    fn install_hint(&self) -> Option<String> {
+        None
+    }
+
     /// Lines of text in reading order with boxes in the image's own pixels.
     ///
     /// # Errors
@@ -60,7 +69,7 @@ pub trait TextRecognizer: Send + Sync {
     fn recognize(&self, image: &RgbaImage) -> Result<Vec<TextLine>, CmError>;
 }
 
-/// The recognizer of this OS: Apple Vision on macOS, an unavailable stub elsewhere.
+/// The recognizer of this OS: Apple Vision on macOS, the system `tesseract` elsewhere.
 pub fn system_recognizer() -> Arc<dyn TextRecognizer> {
     #[cfg(target_os = "macos")]
     {
@@ -68,13 +77,49 @@ pub fn system_recognizer() -> Arc<dyn TextRecognizer> {
     }
     #[cfg(not(target_os = "macos"))]
     {
-        Arc::new(Unavailable)
+        Arc::new(tesseract::TesseractRecognizer::system())
     }
+}
+
+/// When the OS recognizer is not usable and the user can fix that, what to do (a sentence
+/// for logs, the CLI and diagnostics). `None` when it is usable or nothing can be installed.
+pub fn install_hint() -> Option<String> {
+    let r = system_recognizer();
+    if r.is_available() {
+        return None;
+    }
+    r.install_hint()
 }
 
 /// True when the OS recognizer can run (the editor shows Auto-redact only then).
 pub fn system_available() -> bool {
     system_recognizer().is_available()
+}
+
+/// One line for diagnostics: which recognizer this machine uses and whether it works, with
+/// what to install when it does not.
+pub fn describe_system() -> String {
+    let r = system_recognizer();
+    if r.name() != "tesseract" {
+        return format!(
+            "text recognizer: {} ({})",
+            r.name(),
+            if r.is_available() {
+                "available"
+            } else {
+                "not available"
+            }
+        );
+    }
+    let t = tesseract::TesseractRecognizer::system();
+    match t.engine() {
+        Ok(p) => format!(
+            "text recognizer: tesseract at {} ({})",
+            p.display(),
+            tesseract::version(&p).unwrap_or_else(|| "version unknown".to_owned())
+        ),
+        Err(e) => format!("text recognizer: not available: {e}"),
+    }
 }
 
 /// The stub for platforms without a recognizer yet (Windows until Windows.Media.Ocr lands).

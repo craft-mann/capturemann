@@ -28,7 +28,7 @@ fn capture_done_toast_now(
 ) -> ToastSpec {
     let paste: Vec<String> = match platform {
         Platform::Mac => vec!["\u{2318}".into(), "V".into()],
-        Platform::Windows => vec!["Ctrl".into(), "V".into()],
+        Platform::Windows | Platform::Linux => vec!["Ctrl".into(), "V".into()],
     };
     let library_keys = shortcuts.get(ShortcutAction::OpenLibrary).keycaps(platform);
     let id = done.capture_id.clone();

@@ -21,12 +21,14 @@ mod capturer;
 pub mod disk;
 pub mod fake;
 mod frame;
+pub mod layout;
 pub mod record;
 mod region;
 #[cfg(target_os = "macos")]
 pub mod sck_shot;
+mod sys;
 mod types;
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 mod xcap_backend;
 
 pub use backend::CaptureBackend;
@@ -37,6 +39,13 @@ pub use capturer::{
 pub use frame::Frame;
 pub use record::WindowProvider;
 pub use region::resolve_region;
-pub use types::{CaptureKind, CaptureTarget, DisplayInfo, RegionRect, Targets, WindowInfo};
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+pub use sys::linux_recorder::{linux_screen_recorder, LinuxScreenRecorder};
+pub use sys::pipewire_linux::{portal_status, PortalPipeWire, PortalStatus};
+pub use sys::portal::{
+    MonitorSource, PortalBackend, ScreenshotPortal, PICK_TIMEOUT as PORTAL_PICK_TIMEOUT,
+};
+pub use types::{
+    Capabilities, CaptureKind, CaptureTarget, DisplayInfo, RegionRect, Targets, WindowInfo,
+};
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 pub use xcap_backend::XcapBackend;

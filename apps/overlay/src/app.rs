@@ -162,7 +162,6 @@ struct App {
     shift: bool,
     finish: Option<Finish>,
     error: Option<OverlayError>,
-    clipboard: Option<arboard::Clipboard>,
     next_monitor_check: Instant,
 }
 
@@ -194,7 +193,6 @@ pub fn run(inbox: &Arc<Inbox>, opts: Options, tracer: &Tracer) -> Result<Finishe
         shift: false,
         finish: None,
         error: None,
-        clipboard: None,
         next_monitor_check: Instant::now() + MONITOR_POLL,
     };
     event_loop
@@ -667,13 +665,10 @@ impl App {
             return;
         };
         let hex = crate::magnifier::hex_color(rgb);
-        if self.clipboard.is_none() {
-            self.clipboard = arboard::Clipboard::new().ok();
-        }
-        if let Some(cb) = self.clipboard.as_mut() {
-            if let Err(e) = cb.set_text(hex) {
-                log::warn!("could not copy the color: {e}");
-            }
+        // Not claimed as copied unless it was: the picker has no toast, so a failure goes to the log.
+        match crate::platform_clipboard::copy_text(&hex) {
+            Ok(()) => log::info!("copied {hex} to the clipboard"),
+            Err(e) => log::warn!("could not copy the color {hex}: {e}"),
         }
     }
 
@@ -781,7 +776,17 @@ impl ApplicationHandler<()> for App {
                 };
                 self.submit_pointer(i, ev, el);
             }
+            WindowEvent::Focused(focused) => {
+                // Wayland compositors may refuse keyboard focus to a window nobody activated;
+                // the trace shows whether this one got it (the pointer works either way).
+                self.tracer.note(
+                    &serde_json::json!({"trace": "focus", "display_id": i, "focused": focused}),
+                );
+            }
             WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => {
+                self.tracer.note(
+                    &serde_json::json!({"trace": "key", "key": format!("{:?}", event.logical_key)}),
+                );
                 if is_tab_to_list(self.opts.tab_to_list, &event) {
                     self.finish = Some(Finish::SwitchToList);
                     el.exit();

@@ -155,6 +155,25 @@ async fn no_recognizer_is_not_implemented_with_a_clear_message() {
         .contains("text recognition"));
 }
 
+/// A recognizer that can be installed (Linux: tesseract) says how in the error.
+#[tokio::test]
+async fn a_missing_helper_program_names_what_to_install() {
+    use cm_render::ocr::tesseract::{SearchPaths, TesseractRecognizer};
+    let (b, _dir) = builder(desktop());
+    let d = b
+        .text_recognizer(TesseractRecognizer::with_paths(SearchPaths::default()))
+        .build();
+    let mut c = Client::connect(&d, "agent");
+    let id = shot(&mut c).await;
+    let r = c
+        .call("suggest_redactions", json!({"capture_id": id}))
+        .await;
+    assert_eq!(code(&r), "not_implemented", "{r}");
+    let m = r["error"]["data"]["message"].as_str().unwrap();
+    assert!(m.contains("apt install tesseract-ocr"), "{m}");
+    assert!(m.contains("annotate"), "{m}");
+}
+
 #[tokio::test]
 async fn failures_and_bad_input_are_reported() {
     let (b, _dir) = builder(desktop());

@@ -38,6 +38,16 @@ pub trait ScreenSource: Send + 'static {
     /// `Err(permission_missing(screen))` when the OS denies screen capture. Must not prompt.
     fn check_permission(&self) -> Result<(), CmError>;
 
+    /// Called once before the encoder is created. A source that only learns the real size of what
+    /// it captures after it connects (the Linux portal: the compositor's dialog picks the monitor)
+    /// connects here and returns that size in physical px; the recorder then plans the video for
+    /// it. Frames that arrive before `start` are held (the newest one) and delivered by `start`.
+    /// Most sources return `None` and do nothing.
+    fn prepare(&mut self, plan: &CapturePlan) -> Result<Option<cm_core::PhysicalSize>, CmError> {
+        let _ = plan;
+        Ok(None)
+    }
+
     /// Starts delivering frames for `plan` to `sink`. Returns once the stream is running.
     fn start(&mut self, plan: &CapturePlan, sink: EventSink<Self::Frame>) -> Result<(), CmError>;
 

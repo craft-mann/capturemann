@@ -156,3 +156,54 @@ impl VideoEncoder for SyntheticEncoder {
         Ok(s)
     }
 }
+
+/// [`SyntheticEncoder`] for sources that deliver [`crate::CpuFrame`]s (the Linux PipeWire source):
+/// the pixels are ignored, the timing and the file structure are the same. It reports `vp9` as
+/// its codec like the real Linux encoder, so tests see the manifest string of that path.
+pub struct CpuSyntheticEncoder {
+    inner: SyntheticEncoder,
+    /// The sizes of the first frames appended (what the real encoder sizes its input by).
+    pub sizes: Vec<(u32, u32)>,
+}
+
+impl CpuSyntheticEncoder {
+    pub fn create(cfg: &EncoderConfig) -> Result<Self, CmError> {
+        Ok(CpuSyntheticEncoder {
+            inner: SyntheticEncoder::create(cfg)?,
+            sizes: Vec::new(),
+        })
+    }
+}
+
+impl VideoEncoder for CpuSyntheticEncoder {
+    type Frame = crate::CpuFrame;
+
+    fn append(
+        &mut self,
+        frame: &crate::CpuFrame,
+        pts: MediaTime,
+        duration: MediaTime,
+    ) -> Result<AppendOutcome, CmError> {
+        if self.sizes.len() < 4 {
+            self.sizes.push((frame.width, frame.height));
+        }
+        self.inner
+            .append(&SyntheticFrame(u64::from(frame.width)), pts, duration)
+    }
+
+    fn codec_name(&self) -> Option<&'static str> {
+        Some("vp9")
+    }
+
+    fn check(&self) -> Result<(), CmError> {
+        self.inner.check()
+    }
+
+    fn fragments_written(&self) -> usize {
+        self.inner.fragments_written()
+    }
+
+    fn finish(&mut self) -> Result<WriterSummary, CmError> {
+        self.inner.finish()
+    }
+}

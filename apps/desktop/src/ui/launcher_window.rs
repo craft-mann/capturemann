@@ -222,7 +222,7 @@ pub fn open_launcher_with(app: &Entity<AppModel>, cx: &mut App, query: &str) {
             is_minimizable: false,
             display_id: display.map(|(id, _)| id),
             window_background: WindowBackgroundAppearance::Transparent,
-            ..Default::default()
+            ..crate::platform_window::popup_base()
         },
         {
             let query = query.to_owned();
@@ -439,8 +439,14 @@ impl LauncherView {
 /// Why the recording commands are off right now, or `None`.
 fn recording_off(app: &Entity<AppModel>, cx: &App) -> Option<String> {
     let backend = app.read(cx).backend.clone();
-    if !backend.recording_enabled || backend.daemon.is_none() {
-        return Some(tr!("Library unavailable"));
+    match backend.recording_blocker() {
+        Some(crate::backend::RecordingBlocker::NotAvailableYet) => {
+            return Some(tr!("Not available yet"));
+        }
+        Some(crate::backend::RecordingBlocker::NoLibrary) => {
+            return Some(tr!("Library unavailable"));
+        }
+        None => {}
     }
     crate::ui::recording::is_active(app, cx).then(|| tr!("A recording is running"))
 }

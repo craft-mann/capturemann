@@ -6,6 +6,7 @@ script; the Cargo build never downloads anything.
 
 ```text
 make sherpa        # = bash packaging/sherpa/fetch-macos.sh   (macOS arm64; curl, shasum, tar)
+                   # on Linux: bash packaging/sherpa/fetch-linux.sh   (aarch64 or x86_64; curl, sha256sum, tar)
 cargo build        # .cargo/config.toml points SHERPA_ONNX_LIB_DIR at packaging/sherpa/out/lib
 ```
 
@@ -23,7 +24,10 @@ cargo build        # .cargo/config.toml points SHERPA_ONNX_LIB_DIR at packaging/
 - **Upgrading:** change the version, URL, SHA-256 and size at the top of `fetch-macos.sh`, vendor the
   matching `sherpa-onnx` and `sherpa-onnx-sys` crates again (see `vendor/README-CaptureMann.md`), run
   `make sherpa` and the real-model test (`cargo test -p cm-ai --test real_diarize -- --ignored`).
-- **Intel Mac, Windows, Linux:** not done. Each needs its own archive name, SHA-256 and a `LIBS` check
+- **Linux:** `fetch-linux.sh` pins `sherpa-onnx-v2.0.1-linux-aarch64-static-lib.tar.bz2` and
+  `-linux-x64-static-lib.tar.bz2` (same libraries as macOS; `build.rs` adds `stdc++ m pthread dl`).
+  See `verification/L1-local-ai-linux-2026-10-31-claude.md`.
+- **Windows:** not done. Each needs its own archive name, SHA-256 and a `LIBS` check
   (the archives differ: Windows uses `.lib` files, and the dynamic C++ runtime changes).
 - **Signing:** nothing new. The libraries are static; the executable that contains them is signed as
   before (no extra dylib, framework or helper).
@@ -32,9 +36,11 @@ cargo build        # .cargo/config.toml points SHERPA_ONNX_LIB_DIR at packaging/
 
 The archive holds only `lib/*.a`. sherpa-onnx is Apache-2.0 (text in `vendor/sherpa-onnx/LICENSE`, listed
 in `NOTICE` and `THIRD_PARTY_LICENSES.md`); ONNX Runtime is MIT (`licenses/onnxruntime-MIT.txt`, also in
-`THIRD_PARTY_LICENSES.md`). **Maintainer to-do:** add ONNX Runtime's `ThirdPartyNotices.txt` for the
-version inside sherpa-onnx v2.0.1 (from https://github.com/microsoft/onnxruntime, matching tag) to
-`licenses/` and to the generated licence file; it was not available offline when this was written.
+`THIRD_PARTY_LICENSES.md`). ONNX Runtime's `ThirdPartyNotices.txt` (v1.28.2, the version string inside both
+the macOS and the Linux aarch64 `libonnxruntime.a`) is `licenses/ThirdPartyNotices-onnxruntime.txt`; the
+generator (`packaging/macos/gen-third-party.sh`, also used for the Linux tarball) adds it to the generated
+licence file. The Linux tarball and `.deb` also carry `share/doc/capturemann/SHERPA-ONNX/` (the notes, the two
+ONNX Runtime texts and the fetch record). The x86_64 archive's ONNX Runtime version was not inspected.
 
 ## Speaker models (shipped inside the app)
 

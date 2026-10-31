@@ -358,7 +358,7 @@ fn the_helper_is_looked_for_in_the_documented_order() {
     let env_dir = dir.path().join("env");
     for d in [&exe_dir, &path_dir, &env_dir] {
         std::fs::create_dir_all(d).unwrap();
-        std::fs::write(d.join(HELPER_NAME), b"x").unwrap();
+        std::fs::write(d.join(exe_name()), b"x").unwrap();
     }
     let paths = |env: Option<&Path>| SearchPaths {
         env: env.map(|p| p.as_os_str().to_owned()),
@@ -368,22 +368,22 @@ fn the_helper_is_looked_for_in_the_documented_order() {
     // CM_LLAMA_SERVER wins (a folder or the file), then next to the executable, then PATH.
     assert_eq!(
         locate_helper(&paths(Some(&env_dir))).unwrap(),
-        env_dir.join(HELPER_NAME)
+        env_dir.join(exe_name())
     );
     assert_eq!(
-        locate_helper(&paths(Some(&env_dir.join(HELPER_NAME)))).unwrap(),
-        env_dir.join(HELPER_NAME)
+        locate_helper(&paths(Some(&env_dir.join(exe_name())))).unwrap(),
+        env_dir.join(exe_name())
     );
-    assert_eq!(
-        locate_helper(&paths(None)).unwrap(),
-        exe_dir.join(HELPER_NAME)
-    );
-    std::fs::remove_file(exe_dir.join(HELPER_NAME)).unwrap();
     assert_eq!(
         locate_helper(&paths(None)).unwrap(),
-        path_dir.join(HELPER_NAME)
+        exe_dir.join(exe_name())
     );
-    std::fs::remove_file(path_dir.join(HELPER_NAME)).unwrap();
+    std::fs::remove_file(exe_dir.join(exe_name())).unwrap();
+    assert_eq!(
+        locate_helper(&paths(None)).unwrap(),
+        path_dir.join(exe_name())
+    );
+    std::fs::remove_file(path_dir.join(exe_name())).unwrap();
     let e = locate_helper(&paths(None)).unwrap_err();
     assert_eq!(e.kind, ErrorKind::EngineMissing);
     assert!(e.message.contains("make llama"), "{e}");

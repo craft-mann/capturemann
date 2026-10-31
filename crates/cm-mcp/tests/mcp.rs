@@ -164,8 +164,7 @@ async fn agt_1_ac1_lists_all_tools_with_schemas_and_tiers() {
 async fn agt_1_ac1_list_targets_over_a_real_unix_socket() {
     let (b, dir) = builder();
     let d = b.build();
-    let sock = dir.path().join("daemon.sock");
-    let endpoint = Endpoint::Path(sock);
+    let endpoint = Endpoint::scratch(dir.path(), "daemon");
     let server = IpcServer::bind(&endpoint).unwrap();
     tokio::spawn(server.run(d));
     let c = mcp_client(cm_mcp::endpoint_connector(endpoint), "cursor").await;

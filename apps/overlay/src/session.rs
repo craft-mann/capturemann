@@ -346,6 +346,35 @@ pub fn png_matches_crop(frame: &Frame, rect: PhysicalRect, b64: &str) -> bool {
     }
 }
 
+/// `capture_screenshot` params for the desktop's own picker (`target: { pick: true }`).
+pub fn pick_params() -> Value {
+    json!({ "target": { "pick": true } })
+}
+
+/// True on a Wayland session, where this program may not draw above other programs nor read
+/// their geometry: `XDG_SESSION_TYPE` decides when it names a server, otherwise
+/// `WAYLAND_DISPLAY` (the same rule as `cm-capture`'s session detection; the overlay does not
+/// link that crate).
+pub fn is_wayland_session(xdg_session_type: Option<&str>, wayland_display: Option<&str>) -> bool {
+    match xdg_session_type {
+        Some("wayland") => true,
+        Some("x11") => false,
+        _ => wayland_display.is_some_and(|d| !d.is_empty()),
+    }
+}
+
+/// Window mode on a Wayland session: the compositor has no window list to highlight, so the
+/// desktop's own picker (through the daemon's `pick` target) chooses the window and the
+/// capture is stored by the daemon. Esc in that picker is `user_declined` (exit 3).
+pub async fn pick_with_system_picker(
+    endpoint: &Endpoint,
+    mode: Mode,
+) -> Result<Value, OverlayError> {
+    let mut client = Client::connect(endpoint).await?;
+    let r = client.call("capture_screenshot", pick_params()).await?;
+    Ok(summarize(mode, 0, &r, None, None))
+}
+
 /// The JSON printed on stdout: the daemon's capture fields without image bytes.
 pub fn summarize(
     mode: Mode,
@@ -453,6 +482,19 @@ pub async fn commit(
 mod tests {
     use super::*;
     use cm_core::{PhysicalPoint, PhysicalSize};
+
+    /// CAP-1 on Linux: Wayland is recognised by the session type, then by the display variable.
+    #[test]
+    fn wayland_is_told_by_the_session_type_then_the_display() {
+        assert!(is_wayland_session(Some("wayland"), None));
+        assert!(is_wayland_session(None, Some("wayland-0")));
+        assert!(is_wayland_session(Some("tty"), Some("wayland-0")));
+        // An X11 session with a leftover WAYLAND_DISPLAY is X11.
+        assert!(!is_wayland_session(Some("x11"), Some("wayland-0")));
+        assert!(!is_wayland_session(None, None));
+        assert!(!is_wayland_session(None, Some("")));
+        assert_eq!(pick_params()["target"]["pick"], true);
+    }
 
     /// R4-20: a frame whose freeze was still decoding when the overlay ended is released too:
     /// the issued ids are what counts, the loaded ones only add nothing new.

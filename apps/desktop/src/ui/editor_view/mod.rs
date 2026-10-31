@@ -272,6 +272,8 @@ struct Snap {
     warning: Option<String>,
     /// Auto-redact (ANN-2.AC4): shown only when the OS has a text recognizer.
     redact_available: bool,
+    /// Why Auto-redact is dimmed (the recognizer can be installed), else `None`.
+    redact_hint: Option<&'static str>,
     redact: RedactPhase,
     kinds_open: bool,
     kinds: crate::editor::redact::KindChoice,
@@ -313,6 +315,7 @@ impl Snap {
                 .collect(),
             warning: doc.warnings.first().cloned(),
             redact_available: crate::editor::redact::available(),
+            redact_hint: crate::editor::redact::unavailable_hint(),
             redact: doc.redact.clone(),
             kinds_open: doc.kinds_open,
             kinds: crate::editor::redact::session_kinds(),

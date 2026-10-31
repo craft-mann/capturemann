@@ -12,7 +12,78 @@
 //!
 //! Coordinates are GPUI's: global points, origin top-left of the primary display, y down.
 
-use gpui::Window;
+use gpui::{px, size, App, Bounds, TitlebarOptions, Window, WindowBounds, WindowOptions};
+
+/// The application id of every window: the Wayland `app_id` and the X11 `WM_CLASS`. It must be
+/// the name of the installed `.desktop` file (`dev.capturemann.app.desktop`) so GNOME and KDE
+/// match a window to its launcher entry and icon. Ignored by macOS and Windows.
+pub const APP_ID: &str = "dev.capturemann.app";
+
+/// The ONE place a normal (decorated, movable, resizable) application window gets its options:
+/// the Studio window. Sizes are logical px. On X11 and Wayland the window carries [`APP_ID`] and
+/// the app icon; whether the title bar is drawn by the compositor or by the app is decided at
+/// render time (`ui::csd`), because only the compositor's answer to the first configure says
+/// (GNOME has no server-side decorations, KDE and most X11 window managers do).
+pub fn normal_window_options(
+    title: &str,
+    size_px: (f32, f32),
+    min_px: (f32, f32),
+    cx: &App,
+) -> WindowOptions {
+    let bounds = Bounds::centered(None, size(px(size_px.0), px(size_px.1)), cx);
+    WindowOptions {
+        window_bounds: Some(WindowBounds::Windowed(bounds)),
+        titlebar: Some(TitlebarOptions {
+            title: Some(title.to_owned().into()),
+            appears_transparent: false,
+            traffic_light_position: None,
+        }),
+        window_min_size: Some(size(px(min_px.0), px(min_px.1))),
+        app_id: Some(APP_ID.into()),
+        icon: imp::window_icon(),
+        ..Default::default()
+    }
+}
+
+/// The base of every pop-up window's options (`..popup_base()` in place of
+/// `..Default::default()`): the same [`APP_ID`], so GNOME groups the pop-ups under the app's
+/// launcher entry instead of listing unknown windows.
+pub fn popup_base() -> WindowOptions {
+    WindowOptions {
+        app_id: Some(APP_ID.into()),
+        icon: imp::window_icon(),
+        ..Default::default()
+    }
+}
+
+/// Whether the desktop cannot show a separate toast window without taking focus: a Wayland
+/// session. The compositor places a new top-level window where it likes and there is no
+/// always-on-top or "do not focus" request, so toasts become banners inside the library
+/// window while it is the active window (`ui::app::toasts`).
+pub fn toasts_belong_in_window() -> bool {
+    imp::toasts_belong_in_window()
+}
+
+/// Whether this platform has no way to exclude a window from capture, so the app hides its
+/// own pop-ups around a capture instead (`capture_cloak`): Linux.
+pub fn needs_capture_cloak() -> bool {
+    imp::needs_capture_cloak()
+}
+
+/// Whether the session is Wayland, from the environment GPUI itself reads: `XDG_SESSION_TYPE`
+/// says so, or `WAYLAND_DISPLAY` is set and there is no X11 `DISPLAY` to prefer.
+pub fn is_wayland_session(
+    xdg_session_type: Option<&str>,
+    wayland_display: Option<&str>,
+    display: Option<&str>,
+) -> bool {
+    let set = |v: Option<&str>| v.is_some_and(|s| !s.is_empty());
+    match xdg_session_type {
+        Some("wayland") => set(wayland_display),
+        Some("x11") => false,
+        _ => set(wayland_display) && !set(display),
+    }
+}
 
 /// What was applied (for logging and the manual test).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -191,6 +262,20 @@ mod imp {
             .ok_or_else(|| "the view has no NSWindow".to_owned())
     }
 
+    /// macOS takes the icon from the bundle.
+    pub fn window_icon() -> Option<std::sync::Arc<image::RgbaImage>> {
+        None
+    }
+
+    pub fn toasts_belong_in_window() -> bool {
+        false
+    }
+
+    /// `NSWindow.sharingType` hides the pop-ups; nothing to cloak.
+    pub fn needs_capture_cloak() -> bool {
+        false
+    }
+
     fn primary_height() -> Option<f64> {
         let mtm = MainThreadMarker::new()?;
         NSScreen::screens(mtm)
@@ -359,8 +444,51 @@ mod imp {
     use super::{Applied, Tweaks};
     use gpui::Window;
 
+    /// Linux has no per-window "exclude from capture" (X11 and Wayland offer none): the app
+    /// hides its own pop-ups around a capture instead (`capture_cloak`), so the request counts
+    /// as handled by that fallback and is not logged as a failure.
+    #[cfg(target_os = "linux")]
+    pub fn apply(_window: &Window, _tweaks: Tweaks) -> Result<Applied, String> {
+        Ok(Applied::default())
+    }
+
+    /// Windows would use `WDA_EXCLUDEFROMCAPTURE`; that path is not built yet.
+    #[cfg(not(target_os = "linux"))]
     pub fn apply(_window: &Window, _tweaks: Tweaks) -> Result<Applied, String> {
         Err("hiding windows from capture is only built for macOS so far".to_owned())
+    }
+
+    /// The 128 px app icon for the X11 `_NET_WM_ICON` (Wayland takes the icon from the
+    /// `.desktop` file that the app id names).
+    #[cfg(target_os = "linux")]
+    pub fn window_icon() -> Option<std::sync::Arc<image::RgbaImage>> {
+        static ICON: &[u8] = include_bytes!("../assets/brand/app-icon-128.png");
+        image::load_from_memory_with_format(ICON, image::ImageFormat::Png)
+            .ok()
+            .map(|i| std::sync::Arc::new(i.to_rgba8()))
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    pub fn window_icon() -> Option<std::sync::Arc<image::RgbaImage>> {
+        None
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn toasts_belong_in_window() -> bool {
+        super::is_wayland_session(
+            std::env::var("XDG_SESSION_TYPE").ok().as_deref(),
+            std::env::var("WAYLAND_DISPLAY").ok().as_deref(),
+            std::env::var("DISPLAY").ok().as_deref(),
+        )
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    pub fn toasts_belong_in_window() -> bool {
+        false
+    }
+
+    pub fn needs_capture_cloak() -> bool {
+        cfg!(target_os = "linux")
     }
 
     pub fn display_frame(_id: u32) -> Option<(f64, f64, f64, f64)> {
@@ -413,7 +541,28 @@ mod imp {
 
 #[cfg(test)]
 mod tests {
-    use super::centered_frame;
+    use super::{centered_frame, is_wayland_session};
+
+    #[test]
+    fn the_session_type_decides_wayland() {
+        assert!(is_wayland_session(Some("wayland"), Some("wayland-0"), None));
+        assert!(is_wayland_session(
+            Some("wayland"),
+            Some("wayland-0"),
+            Some(":0")
+        ));
+        assert!(!is_wayland_session(Some("wayland"), None, None));
+        assert!(!is_wayland_session(
+            Some("x11"),
+            Some("wayland-0"),
+            Some(":0")
+        ));
+        // No session type: a Wayland display without an X11 one.
+        assert!(is_wayland_session(None, Some("wayland-0"), None));
+        assert!(!is_wayland_session(None, Some("wayland-0"), Some(":0")));
+        assert!(!is_wayland_session(None, None, Some(":0")));
+        assert!(!is_wayland_session(None, Some(""), None));
+    }
 
     #[test]
     fn centers_in_the_visible_frame() {

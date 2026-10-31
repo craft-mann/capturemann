@@ -1970,7 +1970,10 @@ async fn r3_10_a_slow_stop_keeps_the_engine_busy_and_publishes_the_late_result()
     until(|| (!r.daemon.recording_active()).then_some(())).await;
     assert_eq!(library_recordings(&r.daemon).await.len(), 1);
     start(&r, json!({})).await;
-    user(&r.daemon, "stop_recording", json!({})).await.unwrap();
+    // This rig's stop timeout is 0.4 s; closing a bundle can take longer on a slow disk (the
+    // Windows runner), which is the same "keeps finishing" outcome. Wait for idle either way.
+    let _ = user(&r.daemon, "stop_recording", json!({})).await;
+    until(|| (!r.daemon.recording_active()).then_some(())).await;
 }
 
 /// R3-10: a restart holds the slot from the discard to the new start: nothing can slip in

@@ -35,6 +35,25 @@ ID, bank and health numbers, phone numbers and IP addresses and offers to blur t
 dismiss each one; see [Auto-redact](redaction.md) for what it finds and its limits). You can also copy to
 the clipboard, or save a PNG to a folder you choose (Settings → Capture).
 
+### On Linux (early build)
+
+The shortcuts above are Ctrl+Alt+Shift+key on Linux. How they work depends on your session:
+
+- **X11:** the app registers them itself.
+- **Wayland on KDE or a recent GNOME:** the app asks the desktop's GlobalShortcuts portal; your desktop may show
+  a dialog and may pick other keys (change them in its keyboard settings).
+- **Wayland without that portal (GNOME 46 and older):** no program may register global keys. A message in
+  Settings → Shortcuts says so. Add your own shortcut in your desktop's keyboard settings (custom shortcuts)
+  that runs one of these commands; they reach the running app:
+  `cm-desktop --launcher` (open or close the launcher), `cm-desktop --capture region` (or `window`,
+  `display`), `cm-desktop --library`, `cm-desktop --settings`. Or use `capturemann capture screenshot` from
+  any script.
+
+Copying to the clipboard needs the app to stay running (a screenshot copied and then quitting the app is
+gone on X11 unless a clipboard manager keeps it). If a copy fails, the message names what to install:
+`xclip` (X11) or `wl-clipboard` (Wayland), or run the app where X11/XWayland is available.
+"Show in folder" and links use `xdg-open` (package `xdg-utils`).
+
 ## Recording
 
 | Shortcut | Action |

@@ -21,6 +21,7 @@ sherpa = ["cm-daemon/sherpa", "cm-ai/sherpa"]
 [dependencies]
 log.workspace = true
 cm-core.workspace = true
+cm-platform.workspace = true
 cm-library.workspace = true
 # UI languages: tr!, the catalogues in locales/, locale-aware sizes and dates.
 cm-i18n.workspace = true
@@ -86,3 +87,17 @@ objc2-core-video.workspace = true
 objc2-core-foundation.workspace = true
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSEvent", "NSImage", "NSResponder", "NSRunningApplication", "NSWorkspace", "NSAccessibility", "NSWindow", "NSView", "NSScreen", "NSColor", "NSPasteboard"] }
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSData", "NSArray", "NSGeometry", "NSString"] }
+
+# Linux windowing backends: without `wayland` or `x11` GPUI starts but opens no window.
+[target.'cfg(target_os = "linux")'.dependencies]
+# The tray icon (StatusNotifierItem + dbusmenu, src/platform_linux.rs); the version GPUI and ashpd already use.
+zbus = "5"
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.9", features = ["wayland", "x11"] }
+# The wlr/ext data-control protocol for wlroots and KDE (wl-clipboard-rs, MIT OR Apache-2.0).
+# GNOME has none, so arboard falls back to X11 through XWayland there.
+arboard = { workspace = true, features = ["image-data", "wayland-data-control"] }
+# MIT. The GlobalShortcuts portal (Wayland global hotkeys). The `async-io` runtime, as in
+# cm-capture: gpui's Linux dependencies already enable it and ashpd refuses two runtimes.
+ashpd = { version = "0.13", default-features = false, features = ["async-io", "global_shortcuts"] }
+# MIT OR Apache-2.0. `block_on` for the portal calls.
+futures-lite = "2"

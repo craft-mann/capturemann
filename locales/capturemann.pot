@@ -450,6 +450,9 @@ msgstr ""
 msgid "Auto-redact"
 msgstr ""
 
+msgid "Auto-redact needs the tesseract program with English data. Install it (Debian and Ubuntu: sudo apt install tesseract-ocr), then restart CaptureMann."
+msgstr ""
+
 msgid "Auto-redact suggestions"
 msgstr ""
 
@@ -906,6 +909,9 @@ msgid "Close"
 msgstr ""
 
 msgid "Close find"
+msgstr ""
+
+msgid "Close window"
 msgstr ""
 
 msgid "Close {name}"
@@ -1378,6 +1384,9 @@ msgstr ""
 msgid "Diagnostics"
 msgstr ""
 
+msgid "Discard"
+msgstr ""
+
 msgid "Discard and restart"
 msgstr ""
 
@@ -1829,7 +1838,16 @@ msgstr ""
 msgid "Give the destination a name."
 msgstr ""
 
+msgid "Global shortcuts are not available here"
+msgstr ""
+
 msgid "Global shortcuts are unavailable"
+msgstr ""
+
+msgid "Global shortcuts need X11 or a desktop with the GlobalShortcuts portal. Here, give your desktop its own keyboard shortcut (in its keyboard settings, custom shortcuts) that runs `cm-desktop --launcher` to open the launcher or `cm-desktop --capture region` to capture a region."
+msgstr ""
+
+msgid "Global shortcuts need X11 or a desktop with the GlobalShortcuts portal; use the launcher or the CLI"
 msgstr ""
 
 msgid "Global shortcuts that work from any app."
@@ -2112,6 +2130,10 @@ msgstr ""
 msgid "Link copied to the clipboard"
 msgstr ""
 
+#. FACT: owner review required (the desktop portal asks, not CaptureMann)
+msgid "Linux does not ask per app. Your desktop asks when CaptureMann captures the screen, and the microphone and camera are not gated by the system. Below is what this system can and cannot do for CaptureMann."
+msgstr ""
+
 msgid "List"
 msgstr ""
 
@@ -2257,6 +2279,9 @@ msgstr ""
 msgid "Max duration"
 msgstr ""
 
+msgid "Maximize"
+msgstr ""
+
 msgid "Measures late and dropped frames at 60 fps; only the result (pass or fail) is kept"
 msgstr ""
 
@@ -2321,6 +2346,9 @@ msgid "Microphone: {name}"
 msgstr ""
 
 msgid "Microphones"
+msgstr ""
+
+msgid "Minimize"
 msgstr ""
 
 msgid "Mirror camera"
@@ -2490,6 +2518,9 @@ msgstr ""
 msgid "No IPC endpoint"
 msgstr ""
 
+msgid "No Secret Service (GNOME Keyring or KWallet) was found, so sign-ins and API keys cannot be kept in the system keyring. Start one, or set CAPTUREMANN_SECRETS=file to keep them in a file only you can read."
+msgstr ""
+
 msgid "No YouTube channel is connected. Connect one with your own Google Cloud client; it takes a few minutes, once."
 msgstr ""
 
@@ -2532,6 +2563,9 @@ msgstr ""
 msgid "No delay"
 msgstr ""
 
+msgid "No desktop session was found. CaptureMann has to run inside a graphical session."
+msgstr ""
+
 msgid "No display found"
 msgstr ""
 
@@ -2547,7 +2581,13 @@ msgstr ""
 msgid "No export yet"
 msgstr ""
 
+msgid "No file manager is set to open folders on this desktop."
+msgstr ""
+
 msgid "No folder chosen"
+msgstr ""
+
+msgid "No hardware video encoder was found; recording will use a slower software encoder."
 msgstr ""
 
 msgid "No limit"
@@ -2576,6 +2616,9 @@ msgid "No preview"
 msgstr ""
 
 msgid "No preview image yet: CaptureMann has no video decoder of its own until the editor ships. Play the recording to see it."
+msgstr ""
+
+msgid "No program is set to open this file. Install a video player or choose one in your desktop’s settings."
 msgstr ""
 
 msgid "No recording is running"
@@ -2625,6 +2668,9 @@ msgstr ""
 msgid "No transcript yet. Transcribe the recording to read it here; it runs on this Mac."
 msgstr ""
 
+msgid "No web browser is set on this desktop; choose one in your desktop’s settings."
+msgstr ""
+
 msgid "No webcam, no sound"
 msgstr ""
 
@@ -2662,6 +2708,9 @@ msgid "Not available for this recording"
 msgstr ""
 
 msgid "Not available in this build"
+msgstr ""
+
+msgid "Not available on this desktop"
 msgstr ""
 
 msgid "Not available yet"
@@ -2728,6 +2777,9 @@ msgid "Nothing is copied; the old files stay where they are"
 msgstr ""
 
 msgid "Nothing is heard until you ask. The orange microphone dot stays off."
+msgstr ""
+
+msgid "Nothing is missing on this system for screenshots."
 msgstr ""
 
 msgid "Nothing is saved: the test video is deleted when the test ends"
@@ -3291,6 +3343,15 @@ msgstr ""
 msgid "Recording `{id}` is not running"
 msgstr ""
 
+msgid "Recording a window or a region is not available on Linux yet. Record the whole screen."
+msgstr ""
+
+msgid "Recording a window or a region is not available on Linux yet. Record the whole screen; the desktop asks which one the first time."
+msgstr ""
+
+msgid "Recording a window or a region is not available on this system yet."
+msgstr ""
+
 msgid "Recording at 30 fps. {detail}"
 msgstr ""
 
@@ -3327,7 +3388,22 @@ msgstr ""
 msgid "Recording is dropping frames"
 msgstr ""
 
+msgid "Recording is not available yet"
+msgstr ""
+
 msgid "Recording is unavailable"
+msgstr ""
+
+msgid "Recording needs FFmpeg to encode the video, and it was not found."
+msgstr ""
+
+msgid "Recording needs PipeWire, and it is not running."
+msgstr ""
+
+msgid "Recording needs PipeWire, and no sound server was found. Install and start PipeWire."
+msgstr ""
+
+msgid "Recording needs PipeWire; this system only has PulseAudio. Install and start PipeWire."
 msgstr ""
 
 msgid "Recording quality, frame rate and what gets captured."
@@ -3363,6 +3439,9 @@ msgstr ""
 msgid "Recording stopped: the screen or window went away"
 msgstr ""
 
+msgid "Recording stopped: the screen share ended"
+msgstr ""
+
 msgid "Recording stopped: {what} permission was removed"
 msgstr ""
 
@@ -3373,6 +3452,9 @@ msgid "Recording toolbar"
 msgstr ""
 
 msgid "Recording window, {size}"
+msgstr ""
+
+msgid "Recording with a webcam bubble is not available on Linux yet."
 msgstr ""
 
 msgid "Recording without the camera"
@@ -3582,6 +3664,9 @@ msgstr ""
 msgid "Restarting"
 msgstr ""
 
+msgid "Restore"
+msgstr ""
+
 msgid "Restore (R)"
 msgstr ""
 
@@ -3751,6 +3836,9 @@ msgstr ""
 msgid "Screen Recording was granted. Restart CaptureMann to start using it."
 msgstr ""
 
+msgid "Screen and audio recording is not built for this system yet. Screenshots, the library and the editor work."
+msgstr ""
+
 msgid "Screen and your saved audio"
 msgstr ""
 
@@ -3770,6 +3858,9 @@ msgid "Screen encoder failed: {detail}"
 msgstr ""
 
 msgid "Screen only (no audio)"
+msgstr ""
+
+msgid "Screen recording needs ScreenCast portal version {need} or newer; this system has an older one. Update xdg-desktop-portal."
 msgstr ""
 
 msgid "Screenshot canvas. {summary}"
@@ -3853,6 +3944,9 @@ msgid "Set In point"
 msgstr ""
 
 msgid "Set Out point"
+msgstr ""
+
+msgid "Set by your desktop: {keys}"
 msgstr ""
 
 msgid "Set the background frame"
@@ -4019,6 +4113,9 @@ msgstr ""
 msgid "Start in 5 s"
 msgstr ""
 
+msgid "Start now"
+msgstr ""
+
 msgid "Start or stop audio recording"
 msgstr ""
 
@@ -4047,6 +4144,9 @@ msgid "Started by agent {client}"
 msgstr ""
 
 msgid "Started by {client}"
+msgstr ""
+
+msgid "Starting in {n}"
 msgstr ""
 
 msgid "Starting soon"
@@ -4383,6 +4483,12 @@ msgstr ""
 msgid "The daemon accepted the publish but sent no job."
 msgstr ""
 
+msgid "The desktop portal has no Screenshot interface, so screenshots are not possible on Wayland. Install the portal for your desktop."
+msgstr ""
+
+msgid "The desktop portal service does not answer, so Wayland screenshots and screen recording are not possible. Install xdg-desktop-portal and the portal for your desktop."
+msgstr ""
+
 msgid "The destinations file could not be read, so none are listed: {error}"
 msgstr ""
 
@@ -4396,6 +4502,9 @@ msgid "The export applies trims, cuts and speed, and can even out the loudness. 
 msgstr ""
 
 msgid "The export failed."
+msgstr ""
+
+msgid "The first time, your desktop asks which screen to share. Choose the screen to record and confirm; CaptureMann remembers it for the next recordings."
 msgstr ""
 
 msgid "The folder pattern can’t be empty."
@@ -4466,6 +4575,9 @@ msgid "The microphone has delivered only silence for 15 s (muted, or its access 
 msgstr ""
 
 msgid "The model runs inside CaptureMann and nothing leaves this Mac."
+msgstr ""
+
+msgid "The mouse pointer is part of the video; it is not recorded as a separate track yet."
 msgstr ""
 
 msgid "The move stopped"
@@ -4573,6 +4685,12 @@ msgstr ""
 msgid "The role the interview is for"
 msgstr ""
 
+msgid "The screen share was cancelled in your desktop’s dialog, so nothing was recorded. Start again and choose the screen to share."
+msgstr ""
+
+msgid "The screen you choose in your desktop’s share dialog"
+msgstr ""
+
 msgid "The selected sources are not available."
 msgstr ""
 
@@ -4586,6 +4704,9 @@ msgid "The sign-in expired; uploads are waiting."
 msgstr ""
 
 msgid "The sign-in was refused."
+msgstr ""
+
+msgid "The system opener failed (code {code})."
 msgstr ""
 
 msgid "The take is deleted and cannot be recovered"
@@ -4627,6 +4748,12 @@ msgstr ""
 msgid "The video couldn’t be exported"
 msgstr ""
 
+msgid "The video is encoded by the processor (VP9), so it uses more of it than a hardware encoder would. Its size is that of the screen you chose in your desktop’s dialog."
+msgstr ""
+
+msgid "The video is encoded by the processor (VP9), so long recordings use more of it."
+msgstr ""
+
 msgid "The video is on YouTube, but it refused the thumbnail: a custom thumbnail needs a verified YouTube account (verify your phone number in YouTube Studio)."
 msgstr ""
 
@@ -4661,6 +4788,12 @@ msgid "There is already a destination named “{name}”."
 msgstr ""
 
 msgid "There is less than a second before the next caption"
+msgstr ""
+
+msgid "There is no StatusNotifier host on this desktop. On GNOME turn on the “AppIndicator and KStatusNotifierItem Support” extension; KDE, XFCE, Cinnamon and MATE need nothing. Use the launcher window meanwhile."
+msgstr ""
+
+msgid "There is no desktop session to record."
 msgstr ""
 
 msgid "There isn’t enough room: the move needs {needed} free and the new folder has {free}."
@@ -5086,6 +5219,9 @@ msgstr ""
 msgid "What is this video about?"
 msgstr ""
 
+msgid "What this system is missing"
+msgstr ""
+
 msgid "What to copy"
 msgstr ""
 
@@ -5151,6 +5287,10 @@ msgid "Window {window_id}"
 msgstr ""
 
 msgid "Windows"
+msgstr ""
+
+#. FACT: owner review required (nothing is requested until a button is pressed)
+msgid "Windows keeps these under your control. Nothing is requested until you press a button; you can change any of them later in Settings → Permissions."
 msgstr ""
 
 msgid "With 5 s delay"
@@ -5248,6 +5388,24 @@ msgid "Your agent permissions were kept."
 msgstr ""
 
 msgid "Your captures need {needed} free and the new folder has {free}. You can start with an empty library there instead. The captures in the old folder stay where they are."
+msgstr ""
+
+msgid "Your desktop and the tray icon also show that the screen is being recorded. Stop from either one if this window is hidden."
+msgstr ""
+
+msgid "Your desktop cannot share a whole screen."
+msgstr ""
+
+msgid "Your desktop manages these shortcuts and may have chosen other keys; change them in its keyboard settings."
+msgstr ""
+
+msgid "Your desktop may ask which screen to share. Choose the screen and press Share."
+msgstr ""
+
+msgid "Your desktop remembers the screen you shared before, so recording starts without asking."
+msgstr ""
+
+msgid "Your desktop’s screen-sharing service (xdg-desktop-portal) is missing."
 msgstr ""
 
 msgid "Your name in transcripts"
@@ -5571,6 +5729,9 @@ msgid "window {id}"
 msgstr ""
 
 msgid "x"
+msgstr ""
+
+msgid "xdg-open is not installed; install xdg-utils to open links and folders"
 msgstr ""
 
 msgid "yesterday"
@@ -7634,6 +7795,14 @@ msgstr ""
 
 msgctxt "record target"
 msgid "Window"
+msgstr ""
+
+msgctxt "recording banner"
+msgid "Paused"
+msgstr ""
+
+msgctxt "recording banner"
+msgid "Recording"
 msgstr ""
 
 msgctxt "recording codec"

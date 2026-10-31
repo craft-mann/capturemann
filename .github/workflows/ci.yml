@@ -3,6 +3,9 @@ on:
   push:
     branches: [main]
   pull_request:
+    # `ready_for_review` and `labeled` so that un-drafting, or adding the label `ci:windows`, starts the Windows job.
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
+  workflow_dispatch:
   schedule:
     - cron: "41 4 * * 1" # Mondays 04:41 UTC: catches a new stable Rust or a yanked dependency without a commit
 
@@ -19,15 +22,42 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Windows is the slowest job (about an hour). A DRAFT pull request runs the others on every push and
+  # Windows only when it carries the label `ci:windows`; a pull request that is ready for review, main,
+  # the weekly schedule and a manual run always include it. Nothing merges until the final commit of a
+  # ready pull request has a green Windows job.
+  plan:
+    name: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      os: ${{ steps.pick.outputs.os }}
+    steps:
+      - id: pick
+        env:
+          EVENT: ${{ github.event_name }}
+          DRAFT: ${{ github.event.pull_request.draft }}
+          LABELLED: ${{ contains(github.event.pull_request.labels.*.name, 'ci:windows') }}
+        run: |
+          os='["macos-latest","ubuntu-24.04"]'
+          if [ "$EVENT" != pull_request ] || [ "$DRAFT" != true ] || [ "$LABELLED" = true ]; then
+            os='["macos-latest","windows-latest","ubuntu-24.04"]'
+          fi
+          echo "os=$os" >> "$GITHUB_OUTPUT"
+          echo "jobs: $os"
+
   check:
+    name: check (${{ matrix.os }})
+    needs: plan
     strategy:
       fail-fast: false
       matrix:
-        # v0.1 ships on macOS only (maintainer decision, Oct 24, 2026). Add `windows-latest` back when the
-        # Windows milestone starts; the Windows steps below are kept for that day.
-        os: [macos-latest]
+        # Windows and Linux jobs start before any backend exists (platform plan, Step 0): they keep the
+        # shared crates building and their fake-based tests passing on every OS. Hosted runners have no
+        # screen permission, camera or microphone, so the hardware tests stay manual (verification/).
+        os: ${{ fromJSON(needs.plan.outputs.os) }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable (branch tip)
@@ -43,6 +73,19 @@ jobs:
       - name: Install FFmpeg (Windows)
         if: runner.os == 'Windows'
         run: choco install ffmpeg --no-progress -y
+      # Ubuntu 24.04, not 22.04: the exporter needs FFmpeg 5.1+ (`-fps_mode`) and 22.04 ships 4.4. The shipped
+      # build bundles its own FFmpeg, so this only concerns the tests.
+      # System libraries the GPUI shell and the capture crates link on Linux (assumed list: trim or extend
+      # it from the first runs).
+      - name: Install system libraries (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg cmake pkg-config libasound2-dev \
+            libxkbcommon-x11-dev libxkbcommon-dev libwayland-dev libxcb1-dev libx11-xcb-dev libvulkan-dev \
+            libfontconfig-dev libssl-dev libpipewire-0.3-dev libclang-dev \
+            libgtk-3-dev libayatana-appindicator3-dev libxdo-dev \
+            libgbm-dev libegl-dev libdbus-1-dev libdrm-dev xvfb openbox gnome-keyring
       - run: ffmpeg -hide_banner -version
       # The speaker engine (AI-8) links the pinned sherpa-onnx static libraries; `.cargo/config.toml`
       # points SHERPA_ONNX_LIB_DIR at packaging/sherpa/out/lib. The build never downloads them.
@@ -50,13 +93,46 @@ jobs:
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: packaging/sherpa/.downloads
-          key: sherpa-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packaging/sherpa/fetch-macos.sh', 'packaging/sherpa/fetch-models.sh') }}
+          key: sherpa-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packaging/sherpa/fetch-macos.sh', 'packaging/sherpa/fetch-linux.sh', 'packaging/sherpa/fetch-models.sh') }}
       - name: Fetch the sherpa-onnx libraries and speaker models (pinned, SHA-256 checked)
-        if: runner.os == 'macOS'
+        if: runner.os != 'Windows'
         run: make sherpa
       - run: cargo fmt --all -- --check
-      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - run: cargo test --workspace --locked
+      - name: Clippy
+        if: runner.os != 'Windows'
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      # Linux: the product never exports with libx264 (GPL); these tests run on the runner's own GPL
+      # FFmpeg and expect H.264, so they ask for the developer-only list (CM_EXPORT_ALLOW_GPL, never set
+      # in a shipped build).
+      - name: Test
+        if: runner.os != 'Windows'
+        env:
+          CM_EXPORT_ALLOW_GPL: ${{ runner.os == 'Linux' && '1' || '' }}
+        run: cargo test --workspace --locked --no-fail-fast
+      # No sherpa-onnx static libraries for Windows yet (speaker finding moves to 0.3.x, D-W5), so the
+      # `sherpa` default feature is off there.
+      - name: Clippy (no sherpa, Windows)
+        if: runner.os == 'Windows'
+        run: cargo clippy --workspace --all-targets --locked --no-default-features -- -D warnings
+      - name: Test (no sherpa, Windows)
+        if: runner.os == 'Windows'
+        run: cargo test --workspace --locked --no-default-features --no-fail-fast
+      # The real Trash (Recycle Bin, freedesktop Trash) of the runner: a scratch folder is moved there. Not run
+      # on macOS, where it would use the developer's own Trash.
+      - name: Trash test (Windows and Linux)
+        if: runner.os != 'macOS'
+        run: cargo test -p cm-platform --lib --locked --no-default-features -- --ignored
+      # L1 on Linux: the Secret Service for real, an unlocked gnome-keyring in a private D-Bus session.
+      - name: Secret Service tests (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          dbus-run-session -- sh -c 'echo "" | gnome-keyring-daemon --unlock --components=secrets >/dev/null; cargo test -p cm-auth --test credential_store --locked --no-default-features -- --ignored'
+      # CAP-1 on Linux: the real-display tests against a virtual X server (Xvfb with a window manager, so
+      # the window list works). Never a real screen. A Wayland session is not covered here (portal path).
+      - name: Real display tests on Xvfb (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          xvfb-run -a -s "-screen 0 1920x1080x24" sh -c 'openbox & sleep 2; XDG_SESSION_TYPE=x11 cargo test -p cm-capture --test real_display --locked --no-default-features -- --ignored --test-threads=1'
 
   # `rust-version` in Cargo.toml is a promise; this job keeps it. 1.95 is the oldest compiler the
   # GPUI dependency builds with (it uses `std::hint::cold_path`); 1.93 and older fail. `cargo +1.95`
@@ -119,6 +195,8 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       # Every relative link in a Markdown file must point at a tracked file.
       - run: python3 scripts/check_md_links.py
+      # target_os only in platform code (the older files are a shrinking baseline).
+      - run: python3 scripts/check_target_os.py
 
   licenses:
     runs-on: ubuntu-latest

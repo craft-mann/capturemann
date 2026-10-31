@@ -6,7 +6,7 @@
 //! pipeline (`annotate`) and is one undo step. Nothing is applied until then.
 
 use cm_core::{AnnotationOp, OpKind, Pt, Rc};
-use cm_i18n::tr_ctx;
+use cm_i18n::{tr, tr_ctx};
 use cm_render::ocr::RedactionKind;
 use serde_json::{json, Value};
 
@@ -102,6 +102,22 @@ pub fn parse_proposals(v: &Value) -> Result<Vec<Proposal>, String> {
 pub fn available() -> bool {
     static AVAILABLE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *AVAILABLE.get_or_init(cm_render::ocr::system_available)
+}
+
+/// When the recognizer is missing but can be installed (Linux: the `tesseract` program), the
+/// sentence that says what to do; the editor shows Auto-redact dimmed with it as its tooltip.
+/// `None` when the button works or nothing can be installed. Checked once, like [`available`].
+pub fn unavailable_hint() -> Option<&'static str> {
+    static HINT: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    HINT.get_or_init(|| {
+        if available() || cm_render::ocr::install_hint().is_none() {
+            return None;
+        }
+        Some(tr!(
+            "Auto-redact needs the tesseract program with English data. Install it (Debian and Ubuntu: sudo apt install tesseract-ocr), then restart CaptureMann."
+        ))
+    })
+    .as_deref()
 }
 
 /// The number of kind groups in the Auto-redact panel.

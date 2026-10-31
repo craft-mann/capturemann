@@ -58,8 +58,8 @@ struct State {
 }
 
 fn home_dir() -> Option<String> {
-    let var = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
-    std::env::var(var).ok().filter(|h| h.len() > 1)
+    let home = cm_platform::dirs::home_dir()?.to_str()?.to_owned();
+    (home.len() > 1).then_some(home)
 }
 
 /// `~` for the home folder inside `s` (also the form with the other path separator).

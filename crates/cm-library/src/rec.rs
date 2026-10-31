@@ -142,47 +142,37 @@ fn read_lock(dir: &Path) -> Result<LockFile, CmError> {
 /// that may have been reused (R3-17).
 pub const OWNER_FILE: &str = "recording.owner";
 
-/// Holds the `flock` on [`OWNER_FILE`] (Unix); a no-op elsewhere (pid check only).
+/// Holds the exclusive lock on [`OWNER_FILE`] (`flock` on Unix, `LockFileEx` on Windows, both
+/// through `File::try_lock`).
 #[derive(Debug)]
 struct OwnerGuard {
     _file: fs::File,
 }
 
 fn take_owner(dir: &Path) -> Option<OwnerGuard> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::io::AsRawFd;
-        let f = fs::OpenOptions::new()
-            .create(true)
-            .truncate(false)
-            .write(true)
-            .open(dir.join(OWNER_FILE))
-            .ok()?;
-        // SAFETY: `flock` on a file descriptor this function owns; it has no memory effects.
-        let rc = unsafe { libc::flock(f.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
-        (rc == 0).then_some(OwnerGuard { _file: f })
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = dir;
-        None
-    }
+    let f = fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(dir.join(OWNER_FILE))
+        .ok()?;
+    f.try_lock().ok()?;
+    Some(OwnerGuard { _file: f })
 }
 
 /// Is the process that owns the recording in `dir` still running? Uses the owner file's lock
 /// when the bundle has one (immune to pid reuse), else the pid in the lock file.
 pub(crate) fn owner_alive(dir: &Path) -> bool {
-    #[cfg(unix)]
     if let Ok(f) = fs::File::open(dir.join(OWNER_FILE)) {
-        use std::os::unix::io::AsRawFd;
-        // SAFETY: as in `take_owner`; the lock is released again at once when we got it.
-        unsafe {
-            if libc::flock(f.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) == 0 {
-                libc::flock(f.as_raw_fd(), libc::LOCK_UN);
-                return false;
+        return match f.try_lock() {
+            // We got it, so nobody holds it: the owner is gone. Released again at once.
+            Ok(()) => {
+                let _ = f.unlock();
+                false
             }
-        }
-        return std::io::Error::last_os_error().raw_os_error() == Some(libc::EWOULDBLOCK);
+            Err(fs::TryLockError::WouldBlock) => true,
+            Err(fs::TryLockError::Error(_)) => false,
+        };
     }
     lock_pid(dir).is_some_and(pid_alive)
 }

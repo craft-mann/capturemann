@@ -54,6 +54,10 @@ impl EditorView {
                 )
         });
 
+        // While a text annotation is open the canvas is the platform's text input (composition).
+        let editing_text = overlay.text.is_some();
+        let input_focus = self.canvas_focus.clone();
+        let input_entity = entity.clone();
         let measure = canvas(
             move |bounds, window, cx| {
                 cell.set(bounds);
@@ -64,7 +68,16 @@ impl EditorView {
                     window.defer(cx, move |_w, cx| e.update(cx, |_, cx| cx.notify()));
                 }
             },
-            move |bounds, (), window, _cx| paint_overlay(bounds, &overlay, vp, &theme, window),
+            move |bounds, (), window, cx| {
+                if editing_text {
+                    window.handle_input(
+                        &input_focus,
+                        gpui::ElementInputHandler::new(bounds, input_entity.clone()),
+                        cx,
+                    );
+                }
+                paint_overlay(bounds, &overlay, vp, &theme, window)
+            },
         )
         .absolute()
         .size_full();

@@ -32,6 +32,10 @@ mod recorder;
 pub mod resample;
 mod source;
 mod sys;
+pub use sys::linux_pipewire::{
+    available as pipewire_available, mic_factory as pipewire_mic_factory,
+    monitor_factory as pipewire_monitor_factory, STREAM_RATE as PIPEWIRE_RATE,
+};
 mod system;
 pub mod wav;
 
@@ -47,7 +51,8 @@ pub use devices::{
 pub use fake::{FakeAudioSource, FakeConfig, FakeHandle, FakeSignal};
 pub use level::{to_dbfs, Level, LevelHandle, LevelMeter, FLOOR_DBFS};
 pub use mic::{
-    cpal_mic_factory, MicConfig, MicMonitor, MicRecorder, MIC_DENOISED_FILE, MIC_RAW_FILE,
+    cpal_mic_factory, default_mic_factory, MicConfig, MicMonitor, MicRecorder, MIC_DENOISED_FILE,
+    MIC_RAW_FILE,
 };
 pub use mute::{MuteChange, MuteControl, MuteSpan};
 pub use permission::{

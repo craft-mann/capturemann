@@ -17,9 +17,10 @@ use std::sync::{Arc, Mutex};
 use time::format_description::well_known::Rfc3339;
 
 use crate::action::{
-    AnnotateParams, CaptureFromFrameParams, CaptureRefParams, CaptureScreenshotParams,
-    FrameTransport, FreezeDisplayParams, GetCaptureParams, GetSettingsParams, ListLibraryParams,
-    ReleaseFrameParams, SetSettingsParams, SuggestRedactionsParams, WindowThumbnailParams,
+    AnnotateParams, CaptureFromFrameParams, CapturePickParams, CaptureRefParams,
+    CaptureScreenshotParams, FrameTransport, FreezeDisplayParams, GetCaptureParams,
+    GetSettingsParams, ListLibraryParams, ReleaseFrameParams, SetSettingsParams,
+    SuggestRedactionsParams, WindowThumbnailParams,
 };
 use crate::daemon::{blocking, lock_library, settings_result, Inner};
 use crate::engines::{check_setting_writes, validate_setting_key};
@@ -92,8 +93,34 @@ fn write_poster_unlocked(
 impl Inner {
     pub(crate) async fn list_targets(&self, windows: bool) -> Result<Value, DaemonError> {
         let capturer = self.capturer.clone();
-        let targets = blocking(move || capturer.list_targets_with(windows)).await?;
-        serde_json::to_value(targets).map_err(|e| DaemonError::Internal(e.to_string()))
+        let (targets, caps) = blocking(move || {
+            Ok((
+                capturer.list_targets_with(windows)?,
+                capturer.capabilities(),
+            ))
+        })
+        .await?;
+        let mut out =
+            serde_json::to_value(targets).map_err(|e| DaemonError::Internal(e.to_string()))?;
+        // What this desktop can capture by id and whether it has its own picker (a Wayland
+        // session lists no windows; `capture_screenshot` then takes `target: { pick: true }`).
+        out["capabilities"] =
+            serde_json::to_value(caps).map_err(|e| DaemonError::Internal(e.to_string()))?;
+        Ok(out)
+    }
+
+    /// `capture_screenshot { target: { pick: true } }`: the desktop's own picker chooses, the
+    /// call waits for a person (see [`CapturePickParams`]).
+    pub(crate) async fn capture_pick(
+        &self,
+        actor: &Actor,
+        p: CapturePickParams,
+    ) -> Result<Value, DaemonError> {
+        let capturer = self.capturer.clone();
+        self.store_capture(actor, p.copy_to_clipboard, p.title, None, move || {
+            capturer.capture_picked()
+        })
+        .await
     }
 
     pub(crate) async fn capture_screenshot(
@@ -483,10 +510,17 @@ impl Inner {
         use cm_render::ocr::{RedactionKind, SuggestOptions};
         let recognizer = self.recognizer.clone();
         if !recognizer.is_available() {
-            return Err(CmError::not_implemented(
+            // Where an installable engine exists (Linux: `tesseract`) say how to get it.
+            let how = recognizer.install_hint().unwrap_or_default();
+            return Err(CmError::not_implemented(format!(
                 "text recognition is not available on this machine, so redactions cannot be \
-                 suggested; blur regions yourself with `annotate`",
-            )
+                 suggested{}; or blur regions yourself with `annotate`",
+                if how.is_empty() {
+                    String::new()
+                } else {
+                    format!(" ({how})")
+                }
+            ))
             .into());
         }
         let library = self.library.clone();

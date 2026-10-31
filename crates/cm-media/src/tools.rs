@@ -188,6 +188,11 @@ pub struct Caps {
     pub qsv: bool,
     pub amf: bool,
     pub libx264: bool,
+    /// `h264_vaapi` is in the build (Linux; the encoder needs a render node too, see
+    /// `vaapi_device`).
+    pub vaapi_h264: bool,
+    /// The VAAPI render node found on this machine (`/dev/dri/renderD128`), if any.
+    pub vaapi_device: Option<String>,
     pub aac: bool,
     /// VP9 (`libvpx-vp9`, BSD) and Opus (`libopus`, BSD) for WebM (EXP-3).
     pub libvpx_vp9: bool,
@@ -247,6 +252,8 @@ pub fn caps_from_output(version_out: &str, encoders_out: &str) -> Caps {
         qsv: has("h264_qsv"),
         amf: has("h264_amf"),
         libx264: has("libx264"),
+        vaapi_h264: has("h264_vaapi"),
+        vaapi_device: None,
         aac: has("aac"),
         libvpx_vp9: has("libvpx-vp9"),
         libopus: has("libopus"),
@@ -298,7 +305,27 @@ pub fn probe_caps(tools: &Tools) -> Result<Caps, CmError> {
         )));
     }
     let encoders = run_capture(&tools.ffmpeg, &["-hide_banner", "-encoders"])?;
-    Ok(caps_from_output(&version, &encoders))
+    let mut caps = caps_from_output(&version, &encoders);
+    if caps.vaapi_h264 {
+        caps.vaapi_device = find_vaapi_device(Path::new("/dev/dri"));
+    }
+    Ok(caps)
+}
+
+/// The first DRM render node (`renderD128`, ...) in `dir`: what `-vaapi_device` needs. `None` when
+/// the folder is missing or has none (a VM, a machine without a GPU driver). A node that exists can
+/// still refuse to encode; the exporter then falls back (see [`is_encoder_init_failure`]).
+pub fn find_vaapi_device(dir: &Path) -> Option<String> {
+    let mut nodes: Vec<String> = std::fs::read_dir(dir)
+        .ok()?
+        .filter_map(Result::ok)
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|n| n.starts_with("renderD"))
+        .collect();
+    nodes.sort();
+    nodes
+        .first()
+        .map(|n| dir.join(n).to_string_lossy().into_owned())
 }
 
 /// The H.264 encoder used for the quick export.
@@ -319,6 +346,12 @@ pub enum Encoder {
     Amf,
     /// Software; developer machines with a GPL FFmpeg only (see the crate docs).
     Libx264,
+    /// VAAPI (Linux; Intel and AMD GPUs through the system's libva): H.264 from frames uploaded
+    /// to the GPU (`format=nv12,hwupload`, `-vaapi_device`).
+    Vaapi,
+    /// Software VP9 (`libvpx-vp9`, BSD) in an MP4 with AAC: the Linux fallback when there is no
+    /// VAAPI device (D-R2). Not H.264; the job says so (`settings.video.codec`).
+    Vp9Mp4,
 }
 
 impl Encoder {
@@ -334,6 +367,9 @@ impl Encoder {
         Encoder::Libx264,
     ];
 
+    /// The Linux order (see [`EncoderPolicy::linux_set`]): VAAPI H.264, then software VP9 in MP4.
+    pub const LINUX: [Encoder; 2] = [Encoder::Vaapi, Encoder::Vp9Mp4];
+
     pub fn name(self) -> &'static str {
         match self {
             Encoder::VideoToolbox => "h264_videotoolbox",
@@ -343,7 +379,23 @@ impl Encoder {
             Encoder::Qsv => "h264_qsv",
             Encoder::Amf => "h264_amf",
             Encoder::Libx264 => "libx264",
+            Encoder::Vaapi => "h264_vaapi",
+            Encoder::Vp9Mp4 => "libvpx-vp9",
         }
+    }
+
+    /// The codec the encoder writes: `h264` or `vp9`.
+    pub fn codec_name(self) -> &'static str {
+        match self {
+            Encoder::Vp9Mp4 => "vp9",
+            _ => "h264",
+        }
+    }
+
+    /// Needs the compositor path (`export_edited`): its frames are uploaded to the GPU or the
+    /// codec differs, which the FFmpeg-graph path of the quick export does not do.
+    pub fn compositor_only(self) -> bool {
+        matches!(self, Encoder::Vaapi | Encoder::Vp9Mp4)
     }
 
     /// False for encoders that pull GPL code into the FFmpeg build (`libx264`): a shipped
@@ -354,7 +406,10 @@ impl Encoder {
 
     /// Uses a GPU or the OS media stack rather than the CPU.
     pub fn is_hardware(self) -> bool {
-        !matches!(self, Encoder::LibOpenH264 | Encoder::Libx264)
+        !matches!(
+            self,
+            Encoder::LibOpenH264 | Encoder::Libx264 | Encoder::Vp9Mp4
+        )
     }
 
     /// The `-pix_fmt` the encoder takes (Quick Sync wants NV12; the rest take yuv420p).
@@ -377,32 +432,99 @@ impl Caps {
             Encoder::Qsv => self.qsv,
             Encoder::Amf => self.amf,
             Encoder::Libx264 => self.libx264,
+            Encoder::Vaapi => self.vaapi_h264 && self.vaapi_device.is_some(),
+            Encoder::Vp9Mp4 => self.libvpx_vp9,
         }
+    }
+}
+
+/// Which encoders an MP4 export may use on a platform.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EncoderPolicy {
+    /// Leave out GPL encoders (`libx264`).
+    pub lgpl_only: bool,
+    /// Linux: the automatic list is only VAAPI H.264, then software VP9 in MP4 (no `libx264`, no
+    /// OpenH264, no NVENC or QSV that a distribution's FFmpeg lists without a device).
+    pub linux_set: bool,
+}
+
+impl EncoderPolicy {
+    /// The policy for an OS name as `std::env::consts::OS` spells it.
+    pub fn for_os(os: &str) -> EncoderPolicy {
+        let linux = os == "linux";
+        EncoderPolicy {
+            lgpl_only: linux,
+            linux_set: linux,
+        }
+    }
+
+    /// The policy of the machine this runs on. A developer who sets `CM_EXPORT_ALLOW_GPL=1` gets
+    /// the usual H.264 list (GPL `libx264` last, flagged `lgpl_safe: false`) on Linux too, for the
+    /// tests that need a GPL FFmpeg anyway; the app and its packages never set it.
+    pub fn host() -> EncoderPolicy {
+        if std::env::var_os("CM_EXPORT_ALLOW_GPL").is_some_and(|v| v == "1") {
+            return EncoderPolicy::for_os("developer");
+        }
+        EncoderPolicy::for_os(std::env::consts::OS)
     }
 }
 
 /// The encoders to try, best first: `prefer` (when the build has it), then the rest in
 /// [`Encoder::PREFERENCE`] order. `lgpl_only` leaves out GPL encoders. Errors when the build
-/// has no AAC encoder or no usable H.264 encoder.
+/// has no AAC encoder or no usable H.264 encoder. (VAAPI and VP9-in-MP4 are only offered by
+/// [`encoder_candidates_for`] with the Linux policy.)
 pub fn encoder_candidates(
     caps: &Caps,
     prefer: Option<Encoder>,
     lgpl_only: bool,
 ) -> Result<Vec<Encoder>, CmError> {
+    encoder_candidates_for(
+        caps,
+        prefer,
+        EncoderPolicy {
+            lgpl_only,
+            linux_set: false,
+        },
+    )
+}
+
+/// [`encoder_candidates`] under a platform policy.
+pub fn encoder_candidates_for(
+    caps: &Caps,
+    prefer: Option<Encoder>,
+    policy: EncoderPolicy,
+) -> Result<Vec<Encoder>, CmError> {
+    let lgpl_only = policy.lgpl_only;
     if !caps.aac {
         return Err(CmError::internal(
             "This FFmpeg has no AAC encoder, so the MP4 cannot be written. Install a full FFmpeg (brew install ffmpeg).",
         ));
     }
-    let ok = |e: &Encoder| caps.has(*e) && (!lgpl_only || e.lgpl_safe());
+    let ok = |e: &Encoder| {
+        caps.has(*e)
+            && (!lgpl_only || e.lgpl_safe())
+            && if policy.linux_set {
+                // `prefer` can force any encoder; the automatic list is the Linux set only.
+                matches!(e, Encoder::Vaapi | Encoder::Vp9Mp4) || prefer == Some(*e)
+            } else {
+                !matches!(e, Encoder::Vaapi | Encoder::Vp9Mp4) || prefer == Some(*e)
+            }
+    };
     let mut out: Vec<Encoder> = prefer.into_iter().filter(|e| ok(e)).collect();
-    for e in Encoder::PREFERENCE {
+    let order: &[Encoder] = if policy.linux_set {
+        &Encoder::LINUX
+    } else {
+        &Encoder::PREFERENCE
+    };
+    for &e in order {
         if ok(&e) && !out.contains(&e) {
             out.push(e);
         }
     }
     if out.is_empty() {
-        return Err(CmError::internal(if lgpl_only {
+        return Err(CmError::internal(if policy.linux_set {
+            "This FFmpeg has neither a usable VAAPI device (h264_vaapi and a /dev/dri render node) nor libvpx-vp9, so MP4 cannot be written. Use the FFmpeg that comes with CaptureMann, or export WebM."
+        } else if lgpl_only {
             "This FFmpeg has no LGPL-compatible H.264 encoder (h264_videotoolbox, h264_mf, libopenh264, h264_nvenc, h264_qsv or h264_amf)."
         } else {
             "This FFmpeg has no H.264 encoder (none of h264_videotoolbox, h264_mf, libopenh264, h264_nvenc, h264_qsv, h264_amf or libx264). Install one with Homebrew (brew install ffmpeg)."
@@ -425,7 +547,7 @@ pub fn is_encoder_init_failure(stderr: &str, encoder: Encoder) -> bool {
     if lower.contains("no space left on device") || lower.contains("disk full") {
         return false;
     }
-    const PHRASES: [&str; 12] = [
+    const PHRASES: [&str; 15] = [
         "error while opening encoder",
         "could not open encoder",
         "error initializing output stream",
@@ -438,6 +560,9 @@ pub fn is_encoder_init_failure(stderr: &str, encoder: Encoder) -> bool {
         "hardware device setup failed",
         "error creating a mfx session",
         "function not implemented",
+        "failed to initialise vaapi",
+        "device creation failed",
+        "no usable encoding profile",
     ];
     if PHRASES.iter().any(|p| lower.contains(p)) {
         return true;
@@ -618,6 +743,80 @@ mod tests {
         );
         assert!(lgpl.videotoolbox && !lgpl.libx264 && !lgpl.gpl);
         assert!(!lgpl.amix_normalize() && !lgpl.fps_mode());
+    }
+
+    /// A scripted probe of a Linux FFmpeg: the distribution's GPL build lists everything.
+    fn linux_caps(encoders: &str, device: Option<&str>) -> Caps {
+        let mut c = caps_from_output("ffmpeg version 6.1.1", encoders);
+        c.vaapi_device = device.map(str::to_owned);
+        c
+    }
+
+    const DISTRO: &str =
+        " V libx264 x\n V h264_nvenc x\n V h264_vaapi x\n V libvpx-vp9 x\n A aac z\n";
+    const BUNDLED: &str = " V libvpx-vp9 x\n V h264_vaapi x\n A aac z\n";
+
+    #[test]
+    fn linux_policy_picks_vaapi_with_a_device_else_vp9_and_never_libx264() {
+        let linux = EncoderPolicy::for_os("linux");
+        let with_dev = linux_caps(DISTRO, Some("/dev/dri/renderD128"));
+        assert_eq!(
+            encoder_candidates_for(&with_dev, None, linux).unwrap(),
+            vec![Encoder::Vaapi, Encoder::Vp9Mp4]
+        );
+        // The same build in a VM without a render node: VP9 only (h264_vaapi is listed, unusable).
+        let no_dev = linux_caps(DISTRO, None);
+        assert_eq!(
+            encoder_candidates_for(&no_dev, None, linux).unwrap(),
+            vec![Encoder::Vp9Mp4]
+        );
+        // The bundled build has no libx264 or NVENC at all.
+        let bundled = linux_caps(BUNDLED, None);
+        assert_eq!(
+            encoder_candidates_for(&bundled, None, linux).unwrap(),
+            vec![Encoder::Vp9Mp4]
+        );
+        // Neither VAAPI nor libvpx: a message that names both, never libx264.
+        let none = linux_caps(" V libx264 x\n A aac z\n", None);
+        let e = encoder_candidates_for(&none, None, linux).unwrap_err();
+        assert!(e.to_string().contains("VAAPI"), "{e}");
+        assert!(!Encoder::Vp9Mp4.is_hardware() && Encoder::Vaapi.is_hardware());
+        assert_eq!(Encoder::Vp9Mp4.codec_name(), "vp9");
+        assert!(Encoder::Vaapi.compositor_only() && !Encoder::VideoToolbox.compositor_only());
+    }
+
+    #[test]
+    fn other_systems_keep_their_h264_choice() {
+        let mac = EncoderPolicy::for_os("macos");
+        let c = linux_caps(
+            " V h264_videotoolbox x\n V libx264 x\n V libvpx-vp9 x\n A aac z\n",
+            None,
+        );
+        assert_eq!(
+            encoder_candidates_for(&c, None, mac).unwrap(),
+            vec![Encoder::VideoToolbox, Encoder::Libx264]
+        );
+        // VAAPI/VP9-in-MP4 only when forced.
+        assert_eq!(
+            encoder_candidates_for(&c, Some(Encoder::Vp9Mp4), mac).unwrap()[0],
+            Encoder::Vp9Mp4
+        );
+    }
+
+    #[test]
+    fn vaapi_device_is_the_first_render_node() {
+        let dir = std::env::temp_dir().join(format!("cm-dri-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        assert_eq!(find_vaapi_device(&dir), None);
+        for n in ["card0", "renderD129", "renderD128"] {
+            std::fs::write(dir.join(n), b"").unwrap();
+        }
+        assert_eq!(
+            find_vaapi_device(&dir).unwrap(),
+            dir.join("renderD128").to_string_lossy()
+        );
+        assert_eq!(find_vaapi_device(&dir.join("missing")), None);
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

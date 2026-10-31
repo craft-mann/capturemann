@@ -1,40 +1,95 @@
-//! The client against a fake in-process JSON-RPC server on a Unix socket in a temp dir (never
-//! a real daemon socket). Wire format per `cm-daemon/src/rpc.rs` and specs/02-agent-interface.md:
+//! The client against a fake in-process JSON-RPC server on a Unix socket in a temp dir or a
+//! uniquely named pipe on Windows (never a real daemon endpoint). Wire format per `cm-daemon/src/rpc.rs` and specs/02-agent-interface.md:
 //! one JSON message per line, errors carry the shared code in `error.data.code`.
-#![cfg(unix)]
 #![allow(clippy::unwrap_used)]
 
 use std::io;
 use std::path::Path;
+use std::pin::Pin;
 use std::time::Duration;
 
 use cm_ipc::{connect, Endpoint, RpcClient, RpcError};
 use serde_json::{json, Value};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::net::{UnixListener, UnixStream};
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWriteExt, BufReader, ReadHalf};
 use tokio::time::timeout;
 
 const T: Duration = Duration::from_secs(5);
 
 fn sock(dir: &Path) -> Endpoint {
-    Endpoint::Path(dir.join("d.sock"))
+    Endpoint::scratch(dir, "d")
+}
+
+trait Duplex: AsyncRead + tokio::io::AsyncWrite + Send {}
+impl<T: AsyncRead + tokio::io::AsyncWrite + Send> Duplex for T {}
+
+/// One accepted connection, whatever the system's transport.
+type Conn = Pin<Box<dyn Duplex>>;
+
+/// The server end: a Unix listener, or named pipe instances created one ahead so a client never
+/// finds the pipe missing between two connections.
+struct Listener {
+    #[cfg(unix)]
+    inner: tokio::net::UnixListener,
+    #[cfg(windows)]
+    name: String,
+    #[cfg(windows)]
+    next: Option<tokio::net::windows::named_pipe::NamedPipeServer>,
+}
+
+impl Listener {
+    fn bind(ep: &Endpoint) -> Listener {
+        #[cfg(unix)]
+        {
+            let Endpoint::Path(p) = ep else { panic!() };
+            Listener {
+                inner: tokio::net::UnixListener::bind(p).unwrap(),
+            }
+        }
+        #[cfg(windows)]
+        {
+            use tokio::net::windows::named_pipe::ServerOptions;
+            let Endpoint::Pipe(name) = ep else { panic!() };
+            let first = ServerOptions::new()
+                .first_pipe_instance(true)
+                .create(name)
+                .unwrap();
+            Listener {
+                name: name.clone(),
+                next: Some(first),
+            }
+        }
+    }
+
+    async fn accept(&mut self) -> Conn {
+        #[cfg(unix)]
+        {
+            Box::pin(self.inner.accept().await.unwrap().0)
+        }
+        #[cfg(windows)]
+        {
+            use tokio::net::windows::named_pipe::ServerOptions;
+            let server = self.next.take().unwrap();
+            self.next = Some(ServerOptions::new().create(&self.name).unwrap());
+            server.connect().await.unwrap();
+            Box::pin(server)
+        }
+    }
 }
 
 /// Accepts one connection and runs `script` over the raw stream.
 fn serve_once<F, Fut>(ep: &Endpoint, script: F) -> tokio::task::JoinHandle<()>
 where
-    F: FnOnce(UnixStream) -> Fut + Send + 'static,
+    F: FnOnce(Conn) -> Fut + Send + 'static,
     Fut: std::future::Future<Output = ()> + Send,
 {
-    let Endpoint::Path(p) = ep else { panic!() };
-    let l = UnixListener::bind(p).unwrap();
+    let mut l = Listener::bind(ep);
     tokio::spawn(async move {
-        let (s, _) = l.accept().await.unwrap();
+        let s = l.accept().await;
         script(s).await;
     })
 }
 
-async fn read_req(r: &mut BufReader<tokio::net::unix::OwnedReadHalf>) -> Value {
+async fn read_req(r: &mut BufReader<ReadHalf<Conn>>) -> Value {
     let mut line = String::new();
     r.read_line(&mut line).await.unwrap();
     serde_json::from_str(&line).unwrap()
@@ -51,17 +106,24 @@ async fn connect_without_a_daemon_fails_fast() {
         .unwrap_err();
     assert_eq!(e.kind(), io::ErrorKind::NotFound, "{e}");
 
-    // A stale socket file with no listener: connection refused.
-    let Endpoint::Path(p) = &ep else { panic!() };
-    drop(UnixListener::bind(p).unwrap());
-    let e = timeout(T, connect(&ep))
-        .await
-        .expect("no hang")
-        .unwrap_err();
-    assert_eq!(e.kind(), io::ErrorKind::ConnectionRefused, "{e}");
+    // A stale socket file with no listener: connection refused (a pipe leaves no such file).
+    #[cfg(unix)]
+    {
+        let Endpoint::Path(p) = &ep else { panic!() };
+        drop(tokio::net::UnixListener::bind(p).unwrap());
+        let e = timeout(T, connect(&ep))
+            .await
+            .expect("no hang")
+            .unwrap_err();
+        assert_eq!(e.kind(), io::ErrorKind::ConnectionRefused, "{e}");
+    }
 
-    // A pipe endpoint is not usable on Unix.
-    let e = connect(&Endpoint::Pipe("x".into())).await.unwrap_err();
+    // An endpoint of the other kind is not usable here.
+    #[cfg(unix)]
+    let other = Endpoint::Pipe("x".into());
+    #[cfg(windows)]
+    let other = Endpoint::Path(t.path().join("x.sock"));
+    let e = connect(&other).await.unwrap_err();
     assert_eq!(e.kind(), io::ErrorKind::InvalidInput);
 }
 
@@ -71,7 +133,7 @@ async fn requests_are_one_line_jsonrpc_with_increasing_ids() {
     let t = tempfile::tempdir().unwrap();
     let ep = sock(t.path());
     let server = serve_once(&ep, |s| async move {
-        let (r, mut w) = s.into_split();
+        let (r, mut w) = tokio::io::split(s);
         let mut r = BufReader::new(r);
         for expect_id in 1..=3u64 {
             let mut raw = String::new();
@@ -176,7 +238,7 @@ async fn reply_table() {
         let t = tempfile::tempdir().unwrap();
         let ep = sock(t.path());
         let server = serve_once(&ep, move |s| async move {
-            let (r, mut w) = s.into_split();
+            let (r, mut w) = tokio::io::split(s);
             let mut r = BufReader::new(r);
             read_req(&mut r).await;
             for l in lines {
@@ -208,7 +270,7 @@ async fn closed_and_partial_streams_end_the_call() {
         let ep = sock(t.path());
         let tail = tail.to_owned();
         let server = serve_once(&ep, move |s| async move {
-            let (r, mut w) = s.into_split();
+            let (r, mut w) = tokio::io::split(s);
             let mut r = BufReader::new(r);
             read_req(&mut r).await;
             w.write_all(tail.as_bytes()).await.unwrap();
@@ -247,7 +309,7 @@ async fn event_stream_order_and_end() {
     let t = tempfile::tempdir().unwrap();
     let ep = sock(t.path());
     let server = serve_once(&ep, |s| async move {
-        let (r, mut w) = s.into_split();
+        let (r, mut w) = tokio::io::split(s);
         let mut r = BufReader::new(r);
         let req = read_req(&mut r).await;
         assert_eq!(req["method"], "events.subscribe");
@@ -290,7 +352,7 @@ async fn long_response_lines_are_read_whole() {
     let big = "x".repeat(1 << 20);
     let big2 = big.clone();
     let server = serve_once(&ep, move |s| async move {
-        let (r, mut w) = s.into_split();
+        let (r, mut w) = tokio::io::split(s);
         let mut r = BufReader::new(r);
         read_req(&mut r).await;
         let resp = json!({"jsonrpc":"2.0","id":1,"result":big2});
@@ -309,7 +371,7 @@ async fn an_over_long_response_line_is_an_error() {
     let t = tempfile::tempdir().unwrap();
     let ep = sock(t.path());
     let server = serve_once(&ep, |s| async move {
-        let (r, mut w) = s.into_split();
+        let (r, mut w) = tokio::io::split(s);
         let mut r = BufReader::new(r);
         read_req(&mut r).await;
         let chunk = vec![b'x'; 1 << 20];
@@ -336,15 +398,17 @@ async fn an_over_long_response_line_is_an_error() {
 async fn reconnect_after_daemon_restart() {
     let t = tempfile::tempdir().unwrap();
     let ep = sock(t.path());
-    let Endpoint::Path(p) = ep.clone() else {
-        panic!()
-    };
     let first = serve_once(&ep, |s| async move { drop(s) });
     let mut old = RpcClient::new(connect(&ep).await.unwrap());
     first.await.unwrap();
-    std::fs::remove_file(&p).unwrap();
+    // A socket file outlives its listener; a pipe is gone with its last instance.
+    #[cfg(unix)]
+    {
+        let Endpoint::Path(p) = &ep else { panic!() };
+        std::fs::remove_file(p).unwrap();
+    }
     let second = serve_once(&ep, |s| async move {
-        let (r, mut w) = s.into_split();
+        let (r, mut w) = tokio::io::split(s);
         let mut r = BufReader::new(r);
         let req = read_req(&mut r).await;
         assert_eq!(req["id"], 1);
@@ -370,13 +434,12 @@ async fn reconnect_after_daemon_restart() {
 async fn concurrent_connections_get_their_own_answers() {
     let t = tempfile::tempdir().unwrap();
     let ep = sock(t.path());
-    let Endpoint::Path(p) = &ep else { panic!() };
-    let l = UnixListener::bind(p).unwrap();
+    let mut l = Listener::bind(&ep);
     let server = tokio::spawn(async move {
         for _ in 0..16 {
-            let (s, _) = l.accept().await.unwrap();
+            let s = l.accept().await;
             tokio::spawn(async move {
-                let (r, mut w) = s.into_split();
+                let (r, mut w) = tokio::io::split(s);
                 let mut r = BufReader::new(r);
                 loop {
                     let mut line = String::new();

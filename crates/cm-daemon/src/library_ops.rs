@@ -39,34 +39,20 @@ pub trait Trasher: Send + Sync {
     fn trash(&self, path: &Path) -> Result<(), CmError>;
 }
 
-/// The operating system's Trash: `NSFileManager trashItemAtURL` on macOS. Other platforms have no
-/// implementation yet and fail with `not_implemented` (nothing is deleted).
+/// The operating system's Trash (`cm_platform::trash`): macOS, Windows and Linux; nothing is
+/// deleted when it fails.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SystemTrasher;
 
 impl Trasher for SystemTrasher {
-    #[cfg(target_os = "macos")]
     fn trash(&self, path: &Path) -> Result<(), CmError> {
-        use objc2_foundation::{NSFileManager, NSString, NSURL};
-        let path = path.to_str().ok_or_else(|| {
-            CmError::invalid_input("the bundle path is not valid UTF-8; it was not deleted")
-        })?;
-        let url = NSURL::fileURLWithPath(&NSString::from_str(path));
-        NSFileManager::defaultManager()
-            .trashItemAtURL_resultingItemURL_error(&url, None)
-            .map_err(|e| {
-                CmError::internal(format!(
-                    "cannot move to the Trash: {}",
-                    e.localizedDescription()
-                ))
-            })
-    }
-
-    #[cfg(not(target_os = "macos"))]
-    fn trash(&self, _path: &Path) -> Result<(), CmError> {
-        Err(CmError::not_implemented(
-            "moving a capture to the Trash is not available on this platform yet",
-        ))
+        if path.to_str().is_none() {
+            return Err(CmError::invalid_input(
+                "the bundle path is not valid UTF-8; it was not deleted",
+            ));
+        }
+        cm_platform::trash::move_to_trash(path)
+            .map_err(|e| CmError::internal(format!("cannot move to the Trash: {e}")))
     }
 }
 

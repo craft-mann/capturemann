@@ -131,9 +131,11 @@ impl RecordingEngine {
             Some(t) => t,
             None => {
                 let eng = self.inner.clone();
-                let targets =
-                    crate::daemon::blocking(move || eng.deps.capturer.list_targets_with(false))
-                        .await?;
+                let targets = crate::daemon::blocking(move || match eng.factory.targets() {
+                    Some(t) => t,
+                    None => eng.deps.capturer.list_targets_with(false),
+                })
+                .await?;
                 let d = targets
                     .displays
                     .iter()

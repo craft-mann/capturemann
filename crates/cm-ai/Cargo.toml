@@ -23,6 +23,7 @@ sherpa = ["dep:sherpa-onnx"]
 
 [dependencies]
 cm-core.workspace = true
+cm-platform.workspace = true
 cm-cursor.workspace = true
 cm-library.workspace = true
 # FFmpeg lookup only (`tools::locate`): one set of rules for CM_FFMPEG, next to the exe, PATH.

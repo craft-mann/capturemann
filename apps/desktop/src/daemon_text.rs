@@ -965,9 +965,28 @@ fn model_summary(p: &Value, download: bool) -> Option<String> {
 /// a message without an id (a new daemon, the cursor's own text, a tick error) is shown as sent,
 /// and the OS or tool detail inside a sentence stays as it came.
 pub fn warning_text(message: &str) -> String {
+    if let Some(t) = linux_recorder_warning(message) {
+        return t;
+    }
     message::describe_warning(message)
         .and_then(|p| warning_translated(&p))
         .unwrap_or_else(|| message.to_owned())
+}
+
+/// The two notes the Linux recorder adds to a start (they have no stable id in `cm_core`): the
+/// software VP9 encoder and the pointer in the picture. Matched by their opening words.
+fn linux_recorder_warning(message: &str) -> Option<String> {
+    if message.starts_with("On Linux the video is encoded in software as VP9") {
+        Some(tr!(
+            "The video is encoded by the processor (VP9), so it uses more of it than a hardware encoder would. Its size is that of the screen you chose in your desktop\u{2019}s dialog."
+        ))
+    } else if message.starts_with("On Linux the pointer is part of the video") {
+        Some(tr!(
+            "The mouse pointer is part of the video; it is not recorded as a separate track yet."
+        ))
+    } else {
+        None
+    }
 }
 
 /// The name of a track kind (`screen`, `mic`, ...) as it reads inside a sentence; an unknown

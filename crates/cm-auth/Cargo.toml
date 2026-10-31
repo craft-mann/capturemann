@@ -15,6 +15,7 @@ workspace = true
 
 [dependencies]
 cm-core.workspace = true
+cm-platform.workspace = true
 # `scrub_secrets` only: one scrubber convention for text that may come from a server.
 cm-jobs.workspace = true
 serde = { version = "1", features = ["derive"] }
@@ -31,8 +32,9 @@ getrandom.workspace = true
 percent-encoding.workspace = true
 # MIT OR Apache-2.0. Default features (`v1`): Keychain on macOS, Credential Manager on Windows.
 keyring = "4.2"
-# MIT. Opens the system browser.
-open = "5.4"
 # MIT OR Apache-2.0. The system TLS stack, as in cm-ai (see `UreqClient`).
 ureq = { workspace = true, features = ["native-tls-no-default"] }
 tokio = { workspace = true, features = ["rt", "net", "io-util", "time", "sync", "macros"] }
+
+[dev-dependencies]
+tempfile.workspace = true

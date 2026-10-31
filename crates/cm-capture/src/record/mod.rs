@@ -10,6 +10,7 @@
 pub mod exclude;
 pub mod fake;
 pub mod pipeline;
+pub mod pipewire;
 pub mod plan;
 pub mod recorder;
 #[cfg(target_os = "macos")]

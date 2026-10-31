@@ -1,10 +1,12 @@
-//! "Launch at login" (CAP-2.AC5): a LaunchAgent that starts the bundled app in the tray
-//! (`--background`, no window) when the user logs in. Default OFF until the user turns it on in Settings: a
+//! "Launch at login" (CAP-2.AC5): a LaunchAgent (macOS), a per-user `Run` registry value
+//! (Windows) or an XDG autostart `.desktop` file (Linux) that starts the installed app in the tray (`--background`, no window) when the user
+//! logs in. Default OFF until the user turns it on in Settings: a
 //! login item is persistence on the user's machine, so it needs an explicit opt-in (CAP-2.AC5 says "default on"
 //! for an installed release; revisit when there is an installer).
 //!
-//! Only a copy running from a `CaptureMann.app` registers (a dev binary in `target/` must never
-//! install a login item that points at it). The choice is kept in a file beside the settings
+//! Only a copy running from a `CaptureMann.app` (macOS) or from outside a cargo `target` folder
+//! (Windows) registers (a dev binary in `target/` must never install a login item that points at
+//! it). The choice is kept in a file beside the settings
 //! (`launch_at_login`: `on` or `off`; absent means off), not in `settings.json`, so it is
 //! not a setting an agent can change through `set_settings`: starting at login is persistence.
 
@@ -58,10 +60,44 @@ pub fn plist_path(home: &Path) -> PathBuf {
         .join(format!("{LABEL}.plist"))
 }
 
+/// The XDG autostart entry (Linux): the desktop environment runs `Exec` at login. Spaces and
+/// quotes in the path are quoted as the Desktop Entry spec asks.
+pub fn desktop_entry(exe: &Path) -> String {
+    let exe = exe
+        .to_string_lossy()
+        .replace('\\', "\\\\\\\\")
+        .replace('"', "\\\\\"")
+        .replace('`', "\\\\`")
+        .replace('$', "\\\\$")
+        .replace('%', "%%");
+    format!(
+        "[Desktop Entry]\nType=Application\nName=CaptureMann\nExec=\"{exe}\" --background\n\
+Terminal=false\nX-GNOME-Autostart-enabled=true\n"
+    )
+}
+
+/// `<config base>/autostart/<label>.desktop` (the config base is `$XDG_CONFIG_HOME` or `~/.config`).
+pub fn desktop_entry_path(config_base: &Path) -> PathBuf {
+    config_base
+        .join("autostart")
+        .join(format!("{LABEL}.desktop"))
+}
+
+/// The command line the Windows `Run` value holds: the quoted executable and `--background`.
+pub fn command_line(exe: &Path) -> String {
+    format!("\"{}\" --background", exe.display())
+}
+
 /// What to do, given the choice, the app's executable when it runs from a bundle (`None`: a bare
 /// binary, which never registers and never removes someone else's entry) and the current file.
 pub fn plan(enabled: bool, bundled_exe: Option<&Path>, current: Option<&str>) -> Plan {
-    let Some(exe) = bundled_exe else {
+    plan_entry(enabled, bundled_exe.map(plist), current)
+}
+
+/// [`plan`] for any kind of entry: `want` is the entry's text for the installed app (`None`: a
+/// bare binary) and `current` what is stored now.
+pub fn plan_entry(enabled: bool, want: Option<String>, current: Option<&str>) -> Plan {
+    let Some(want) = want else {
         return Plan::Nothing;
     };
     if !enabled {
@@ -71,7 +107,6 @@ pub fn plan(enabled: bool, bundled_exe: Option<&Path>, current: Option<&str>) ->
             Plan::Nothing
         };
     }
-    let want = plist(exe);
     if current == Some(want.as_str()) {
         Plan::Nothing
     } else {
@@ -80,11 +115,27 @@ pub fn plan(enabled: bool, bundled_exe: Option<&Path>, current: Option<&str>) ->
 }
 
 /// The executable when it lives in a `.app` bundle.
-#[cfg(any(target_os = "macos", test))]
+#[cfg(target_os = "macos")]
 fn bundled_exe() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
     crate::ui::app::bundle_of(&exe).map(|_| exe)
 }
+
+/// The executable when it is an installed copy rather than a cargo build (a `target` folder in its
+/// path).
+// macOS registers the app bundle instead, so nothing calls this there.
+#[allow(dead_code)]
+fn installed_exe() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let in_target = exe
+        .components()
+        .any(|c| c.as_os_str().eq_ignore_ascii_case("target"));
+    (!in_target).then_some(exe)
+}
+
+/// The `Run` value's name.
+#[cfg(windows)]
+const RUN_VALUE: &str = "CaptureMann";
 
 /// Reads the preference from `config_dir`.
 pub fn read_enabled(config_dir: &Path) -> bool {
@@ -98,10 +149,41 @@ pub fn read_enabled(config_dir: &Path) -> bool {
 /// Brings the LaunchAgent in line with the preference (at startup, and after the toggle). A
 /// failure is returned as text for the log or the toggle's note; it never stops the app.
 pub fn sync(config_dir: &Path) -> Result<(), String> {
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", windows)))]
     {
-        let _ = config_dir;
-        Ok(())
+        let Some(base) = cm_platform::dirs::config_base_dir() else {
+            return Ok(());
+        };
+        let path = desktop_entry_path(&base);
+        let current = std::fs::read_to_string(&path).ok();
+        match plan_entry(
+            read_enabled(config_dir),
+            installed_exe().as_deref().map(desktop_entry),
+            current.as_deref(),
+        ) {
+            Plan::Nothing => Ok(()),
+            Plan::Remove => std::fs::remove_file(&path).map_err(|e| e.to_string()),
+            Plan::Install(text) => {
+                if let Some(dir) = path.parent() {
+                    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+                }
+                std::fs::write(&path, text).map_err(|e| e.to_string())
+            }
+        }
+    }
+    #[cfg(windows)]
+    {
+        use cm_platform::autostart::{self, RUN_KEY};
+        let current = autostart::get(RUN_KEY, RUN_VALUE);
+        match plan_entry(
+            read_enabled(config_dir),
+            installed_exe().as_deref().map(command_line),
+            current.as_deref(),
+        ) {
+            Plan::Nothing => Ok(()),
+            Plan::Remove => autostart::remove(RUN_KEY, RUN_VALUE),
+            Plan::Install(command) => autostart::set(RUN_KEY, RUN_VALUE, &command),
+        }
     }
     #[cfg(target_os = "macos")]
     {
@@ -158,6 +240,26 @@ mod tests {
             .ends_with("Library/LaunchAgents/dev.capturemann.app.plist"));
     }
 
+    /// Linux: the autostart entry starts the app in the tray, quotes the path as the Desktop Entry
+    /// spec asks, and plans like the other entries.
+    #[test]
+    fn desktop_entry_starts_in_background_and_quotes_the_path() {
+        let e = desktop_entry(Path::new("/opt/Capture Mann/cm-desktop"));
+        assert!(e.starts_with("[Desktop Entry]\nType=Application\n"));
+        assert!(e.contains("Exec=\"/opt/Capture Mann/cm-desktop\" --background\n"));
+        let odd = desktop_entry(Path::new("/o/a\"b$c`d%e"));
+        assert!(odd.contains("Exec=\"/o/a\\\\\"b\\\\$c\\\\`d%%e\" --background"));
+        assert!(desktop_entry_path(Path::new("/h/.config"))
+            .ends_with("autostart/dev.capturemann.app.desktop"));
+        let want = Some(e.clone());
+        assert_eq!(
+            plan_entry(true, want.clone(), None),
+            Plan::Install(e.clone())
+        );
+        assert_eq!(plan_entry(true, want, Some(&e)), Plan::Nothing);
+        assert_eq!(plan_entry(false, Some(e.clone()), Some(&e)), Plan::Remove);
+    }
+
     #[test]
     fn plan_installs_updates_and_removes() {
         let e = exe();
@@ -178,6 +280,22 @@ mod tests {
     fn a_bare_binary_never_touches_the_login_item() {
         assert_eq!(plan(true, None, None), Plan::Nothing);
         assert_eq!(plan(false, None, Some("x")), Plan::Nothing);
+    }
+
+    #[test]
+    fn the_windows_command_quotes_the_path_and_starts_in_the_tray() {
+        let c = command_line(Path::new(r"C:\Program Files\CaptureMann\cm-desktop.exe"));
+        assert_eq!(
+            c,
+            r#""C:\Program Files\CaptureMann\cm-desktop.exe" --background"#
+        );
+        assert_eq!(
+            plan_entry(true, Some(c.clone()), None),
+            Plan::Install(c.clone())
+        );
+        assert_eq!(plan_entry(true, Some(c.clone()), Some(&c)), Plan::Nothing);
+        assert_eq!(plan_entry(false, Some(c), Some("x")), Plan::Remove);
+        assert_eq!(plan_entry(true, None, None), Plan::Nothing);
     }
 
     #[test]

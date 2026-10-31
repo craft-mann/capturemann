@@ -48,12 +48,17 @@ impl Id {
 pub enum Os {
     Mac,
     Windows,
+    /// No per-app prompts here: the screen portal asks at capture time, and the microphone and
+    /// camera are not gated by the OS (outside sandboxed packages).
+    Linux,
 }
 
 impl Os {
     pub fn current() -> Os {
         if cfg!(windows) {
             Os::Windows
+        } else if std::env::consts::OS == "linux" {
+            Os::Linux
         } else {
             Os::Mac
         }
@@ -116,7 +121,7 @@ impl Action {
         match (self, os) {
             (Action::Grant, _) => tr!("Grant access\u{2026}"),
             (Action::OpenSettings, Os::Mac) => tr!("Open System Settings"),
-            (Action::OpenSettings, Os::Windows) => tr!("Open Settings"),
+            (Action::OpenSettings, Os::Windows | Os::Linux) => tr!("Open Settings"),
             (Action::Restart, _) => tr!("Restart CaptureMann"),
         }
     }
@@ -183,6 +188,75 @@ pub fn windows_screen_note() -> String {
     tr!("Screen capture needs no permission on Windows. Microphone and camera can be switched off under Settings \u{2192} Privacy & security.")
 }
 
+/// The sentence under the setup screen's heading: what the OS does with these permissions.
+pub fn intro_note(os: Os) -> String {
+    match os {
+        // TRANSLATORS: FACT: owner review required (nothing is requested until a button is pressed)
+        Os::Mac => tr!("macOS keeps these under your control. Nothing is requested until you press a button; you can change any of them later in Settings \u{2192} Permissions."),
+        // TRANSLATORS: FACT: owner review required (nothing is requested until a button is pressed)
+        Os::Windows => tr!("Windows keeps these under your control. Nothing is requested until you press a button; you can change any of them later in Settings \u{2192} Permissions."),
+        // TRANSLATORS: FACT: owner review required (the desktop portal asks, not CaptureMann)
+        Os::Linux => tr!("Linux does not ask per app. Your desktop asks when CaptureMann captures the screen, and the microphone and camera are not gated by the system. Below is what this system can and cannot do for CaptureMann."),
+    }
+}
+
+/// How long a Linux stack answer is reused.
+const STACK_TTL: Duration = Duration::from_secs(20);
+
+type StackCache = Option<(std::time::Instant, Option<cm_platform::stack::Report>)>;
+
+static LINUX_STACK: Mutex<StackCache> = Mutex::new(None);
+
+/// The last Linux stack report (`None` on other systems or before the first probe finished).
+/// Never blocks: when the answer is older than 20 s a thread asks again. Call it from a render;
+/// the probe itself runs `busctl` or `gdbus` and takes a moment.
+pub fn linux_stack() -> Option<cm_platform::stack::Report> {
+    if Os::current() != Os::Linux {
+        return None;
+    }
+    let mut g = LINUX_STACK.lock().ok()?;
+    let stale = g.as_ref().is_none_or(|(at, _)| at.elapsed() > STACK_TTL);
+    let current = g.as_ref().and_then(|(_, r)| r.clone());
+    if stale {
+        // Marked fresh now, so only one probe thread runs at a time.
+        *g = Some((std::time::Instant::now(), current.clone()));
+        std::thread::spawn(|| {
+            let report = cm_platform::stack::probe();
+            if let Ok(mut g) = LINUX_STACK.lock() {
+                *g = Some((std::time::Instant::now(), report));
+            }
+        });
+    }
+    current
+}
+
+/// One translated sentence per gap of the Linux stack, blockers first.
+pub fn stack_gap_texts(report: &cm_platform::stack::Report) -> Vec<String> {
+    use cm_platform::stack::{Gap, GapKind, Severity};
+    let mut gaps: Vec<&Gap> = report.gaps.iter().collect();
+    gaps.sort_by_key(|g| g.severity == Severity::Note);
+    gaps.iter()
+        .map(|g| match g.kind {
+            GapKind::NoSession => tr!("No desktop session was found. CaptureMann has to run inside a graphical session."),
+            GapKind::NoPortal => tr!("The desktop portal service does not answer, so Wayland screenshots and screen recording are not possible. Install xdg-desktop-portal and the portal for your desktop."),
+            GapKind::ScreenCastTooOld => tr!(
+                "Screen recording needs ScreenCast portal version {need} or newer; this system has an older one. Update xdg-desktop-portal.",
+                need = cm_platform::stack::MIN_SCREENCAST_VERSION
+            ),
+            GapKind::NoScreenshotPortal => tr!("The desktop portal has no Screenshot interface, so screenshots are not possible on Wayland. Install the portal for your desktop."),
+            GapKind::NoPipeWire => {
+                if report.inputs.pulseaudio {
+                    tr!("Recording needs PipeWire; this system only has PulseAudio. Install and start PipeWire.")
+                } else {
+                    tr!("Recording needs PipeWire, and no sound server was found. Install and start PipeWire.")
+                }
+            }
+            GapKind::NoSecretService => tr!("No Secret Service (GNOME Keyring or KWallet) was found, so sign-ins and API keys cannot be kept in the system keyring. Start one, or set CAPTUREMANN_SECRETS=file to keep them in a file only you can read."),
+            GapKind::NoHardwareEncoder => tr!("No hardware video encoder was found; recording will use a slower software encoder."),
+        })
+        .collect()
+}
+
 /// The deep link to the pane of `id`, or `None` when there is none on `os`.
 pub fn settings_link(os: Os, id: Id) -> Option<&'static str> {
     match (os, id) {
@@ -200,7 +274,7 @@ pub fn settings_link(os: Os, id: Id) -> Option<&'static str> {
         }
         (Os::Windows, Id::Microphone) => Some("ms-settings:privacy-microphone"),
         (Os::Windows, Id::Camera) => Some("ms-settings:privacy-webcam"),
-        (Os::Windows, _) => None,
+        (Os::Windows, _) | (Os::Linux, _) => None,
     }
 }
 
@@ -770,6 +844,29 @@ mod tests {
             true
         ));
         assert!(!on(Os::Mac, Id::ScreenRecording, State::NotGranted, true));
+    }
+
+    /// Linux has no per-app prompts: no Screen Recording or Input Monitoring card, no deep links,
+    /// nothing to grant, and the Windows-only note is not shown there.
+    #[test]
+    fn linux_lists_only_microphone_and_camera_without_links() {
+        let ids: Vec<Id> = specs(Os::Linux).iter().map(|s| s.id).collect();
+        assert_eq!(ids, vec![Id::Microphone, Id::Camera]);
+        for id in [
+            Id::ScreenRecording,
+            Id::Microphone,
+            Id::Camera,
+            Id::InputMonitoring,
+        ] {
+            assert_eq!(settings_link(Os::Linux, id), None);
+            assert!(!actions(Os::Linux, id, State::Denied).contains(&Action::OpenSettings));
+        }
+        assert!(!stale_grant_hint(
+            Os::Linux,
+            Id::InputMonitoring,
+            State::NotGranted,
+            true
+        ));
     }
 
     #[test]

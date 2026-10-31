@@ -447,6 +447,10 @@ msgid "Auto-redact"
 msgstr "Tự động che"
 
 #, fuzzy
+msgid "Auto-redact needs the tesseract program with English data. Install it (Debian and Ubuntu: sudo apt install tesseract-ocr), then restart CaptureMann."
+msgstr "Tự động che cần chương trình tesseract kèm dữ liệu tiếng Anh. Hãy cài đặt (Debian và Ubuntu: sudo apt install tesseract-ocr), rồi khởi động lại CaptureMann."
+
+#, fuzzy
 msgid "Auto-redact suggestions"
 msgstr "Gợi ý tự động che"
 
@@ -2400,6 +2404,9 @@ msgstr "Không tìm thấy email hay khoá nào trong ảnh này."
 msgid "No export yet"
 msgstr "Chưa xuất"
 
+msgid "No file manager is set to open folders on this desktop."
+msgstr "Máy tính này chưa đặt trình quản lý tệp để mở thư mục."
+
 #, fuzzy
 msgid "No folder chosen"
 msgstr "Chưa chọn thư mục"
@@ -2441,6 +2448,9 @@ msgstr "Không có bản xem trước"
 #, fuzzy
 msgid "No preview image yet: CaptureMann has no video decoder of its own until the editor ships. Play the recording to see it."
 msgstr "Chưa có ảnh xem trước: CaptureMann chưa có bộ giải mã video riêng cho đến khi trình chỉnh sửa ra mắt. Hãy phát bản ghi để xem."
+
+msgid "No program is set to open this file. Install a video player or choose one in your desktop’s settings."
+msgstr "Chưa có chương trình nào được đặt để mở tệp này. Hãy cài một trình phát video hoặc chọn một trình phát trong phần cài đặt của máy tính."
 
 #, fuzzy
 msgid "No recording is running"
@@ -3136,6 +3146,15 @@ msgstr "Bản ghi `{id}` không tồn tại"
 msgid "Recording `{id}` is not running"
 msgstr "Bản ghi `{id}` không đang quay"
 
+msgid "Recording a window or a region is not available on Linux yet. Record the whole screen."
+msgstr "Chưa thể quay một cửa sổ hay một vùng trên Linux. Hãy quay toàn màn hình."
+
+msgid "Recording a window or a region is not available on Linux yet. Record the whole screen; the desktop asks which one the first time."
+msgstr "Chưa thể quay một cửa sổ hay một vùng trên Linux. Hãy quay toàn màn hình; lần đầu máy tính sẽ hỏi chọn màn hình nào."
+
+msgid "Recording a window or a region is not available on this system yet."
+msgstr "Chưa thể quay một cửa sổ hay một vùng trên hệ thống này."
+
 #, fuzzy
 msgid "Recording behavior"
 msgstr "Hành vi quay"
@@ -3171,6 +3190,12 @@ msgstr "Bản ghi đang bị rớt khung hình"
 #, fuzzy
 msgid "Recording is unavailable"
 msgstr "Quay không khả dụng"
+
+msgid "Recording needs FFmpeg to encode the video, and it was not found."
+msgstr "Quay cần FFmpeg để mã hoá video, nhưng không tìm thấy FFmpeg."
+
+msgid "Recording needs PipeWire, and it is not running."
+msgstr "Quay cần PipeWire, nhưng PipeWire chưa chạy."
 
 #, fuzzy
 msgid "Recording quality, frame rate and what gets captured."
@@ -3228,6 +3253,9 @@ msgstr "Thanh công cụ quay"
 #, fuzzy
 msgid "Recording window, {size}"
 msgstr "Cửa sổ đang quay, {size}"
+
+msgid "Recording with a webcam bubble is not available on Linux yet."
+msgstr "Chưa thể quay kèm bong bóng camera trên Linux."
 
 #, fuzzy
 msgid "Recording without the camera"
@@ -3872,6 +3900,9 @@ msgstr "Tách dòng thời gian bằng {key} để đặt bố cục khác cho t
 msgid "Start in 5 s"
 msgstr "Bắt đầu sau 5 giây"
 
+msgid "Start now"
+msgstr "Bắt đầu ngay"
+
 #, fuzzy
 msgid "Start or stop from anywhere"
 msgstr "Bắt đầu hoặc dừng từ bất cứ đâu"
@@ -3899,6 +3930,9 @@ msgstr "Do tác nhân {client} bắt đầu"
 #, fuzzy
 msgid "Started by {client}"
 msgstr "Do {client} bắt đầu"
+
+msgid "Starting in {n}"
+msgstr "Bắt đầu sau {n}"
 
 #, fuzzy
 msgid "Starting soon"
@@ -4188,6 +4222,9 @@ msgstr "Không thể liệt kê các màn hình."
 msgid "The export failed."
 msgstr "Xuất thất bại."
 
+msgid "The first time, your desktop asks which screen to share. Choose the screen to record and confirm; CaptureMann remembers it for the next recordings."
+msgstr "Lần đầu, máy tính hỏi bạn muốn chia sẻ màn hình nào. Hãy chọn màn hình cần quay rồi xác nhận; CaptureMann sẽ nhớ lựa chọn cho các lần quay sau."
+
 #, fuzzy
 msgid "The folder pattern can’t be empty."
 msgstr "Mẫu thư mục không được để trống."
@@ -4344,6 +4381,9 @@ msgstr "Phiên đăng nhập đã hết hạn; các lượt tải lên đang ch�
 msgid "The sign-in was refused."
 msgstr "Đăng nhập bị từ chối."
 
+msgid "The system opener failed (code {code})."
+msgstr "Trình mở của hệ thống đã lỗi (mã {code})."
+
 # FACT: owner review required
 #, fuzzy
 msgid "The take is deleted and cannot be recovered"
@@ -4370,6 +4410,12 @@ msgstr "Người dùng đã từ chối yêu cầu"
 msgid "The video couldn’t be exported"
 msgstr "Không thể xuất video"
 
+msgid "The video is encoded by the processor (VP9), so it uses more of it than a hardware encoder would. Its size is that of the screen you chose in your desktop’s dialog."
+msgstr "Video được bộ xử lý mã hoá (VP9), nên tốn nhiều tài nguyên hơn bộ mã hoá phần cứng. Kích thước video là kích thước màn hình bạn đã chọn trong hộp thoại của máy tính."
+
+msgid "The video is encoded by the processor (VP9), so long recordings use more of it."
+msgstr "Video được bộ xử lý mã hoá (VP9), nên bản ghi dài tốn nhiều tài nguyên xử lý hơn."
+
 #, fuzzy
 msgid "The video is on YouTube, but it refused the thumbnail: a custom thumbnail needs a verified YouTube account (verify your phone number in YouTube Studio)."
 msgstr "Video đã lên YouTube nhưng YouTube từ chối ảnh bìa: ảnh bìa tùy chỉnh cần tài khoản YouTube đã xác minh (hãy xác minh số điện thoại trong YouTube Studio)."
@@ -4393,6 +4439,9 @@ msgstr "Đã có điểm lưu tên “{name}”."
 #, fuzzy
 msgid "There is less than a second before the next caption"
 msgstr "Chưa đến một giây nữa là tới phụ đề kế tiếp"
+
+msgid "There is no desktop session to record."
+msgstr "Không có phiên làm việc màn hình nào để quay."
 
 #, fuzzy
 msgid "These are the defaults for every recording, including ones an agent starts. A request can override them for one recording."
@@ -7107,6 +7156,14 @@ msgctxt "record target"
 msgid "Window"
 msgstr "Cửa sổ"
 
+msgctxt "recording banner"
+msgid "Paused"
+msgstr "Tạm dừng"
+
+msgctxt "recording banner"
+msgid "Recording"
+msgstr "Đang quay"
+
 #, fuzzy
 msgctxt "recording codec"
 msgid "Auto"
@@ -8256,6 +8313,9 @@ msgstr "Đang quay ở 30 fps. {detail}"
 msgid "Recording stopped: only {mb} MB free"
 msgstr "Đã dừng quay: chỉ còn trống {mb} MB"
 
+msgid "Recording stopped: the screen share ended"
+msgstr "Đã dừng quay: việc chia sẻ màn hình đã kết thúc"
+
 #, fuzzy
 msgid "Screen capture delivered no frames for {secs} s (display asleep or capture stuck); the video repeats the last frame until it resumes"
 msgstr "Việc ghi màn hình không nhận được khung hình nào trong {secs} giây (màn hình đang ngủ hoặc việc ghi bị kẹt); video lặp lại khung hình cuối cho đến khi việc ghi tiếp tục"
@@ -9098,6 +9158,12 @@ msgstr "Dùng thư mục mới"
 msgid "Your captures need {needed} free and the new folder has {free}. You can start with an empty library there instead. The captures in the old folder stay where they are."
 msgstr "Các bản chụp cần trống {needed} nhưng thư mục mới chỉ có {free}. Bạn có thể bắt đầu với thư viện trống ở đó. Các bản chụp trong thư mục cũ vẫn ở nguyên chỗ."
 
+msgid "Your desktop and the tray icon also show that the screen is being recorded. Stop from either one if this window is hidden."
+msgstr "Máy tính và biểu tượng khay hệ thống cũng cho thấy màn hình đang được quay. Nếu cửa sổ này bị ẩn, bạn có thể dừng quay từ một trong hai nơi đó."
+
+msgid "Your desktop cannot share a whole screen."
+msgstr "Máy tính này không thể chia sẻ toàn màn hình."
+
 #, fuzzy
 msgid "Your {n} capture ({size}) is copied to the new folder and checked. Nothing is deleted from the old folder. CaptureMann uses the new folder after it restarts."
 msgid_plural "Your {n} captures ({size}) are copied to the new folder and checked. Nothing is deleted from the old folder. CaptureMann uses the new folder after it restarts."
@@ -9649,6 +9715,9 @@ msgstr "Micrô và âm thanh hệ thống cùng nhau"
 
 msgid "No transcript yet. Transcribe the recording to read it here; it runs on this Mac."
 msgstr "Chưa có bản chép lời. Hãy chép lời bản ghi để đọc ở đây; việc này chạy ngay trên máy Mac này."
+
+msgid "No web browser is set on this desktop; choose one in your desktop’s settings."
+msgstr "Máy tính này chưa đặt trình duyệt web; hãy chọn một trình duyệt trong phần cài đặt của máy tính."
 
 msgid "Normalise to {lufs} LUFS, the level podcasts and players expect"
 msgstr "Chuẩn hoá về {lufs} LUFS, mức mà podcast và trình phát mong đợi"
@@ -10319,6 +10388,12 @@ msgstr "Mô hình văn bản, từng dòng một"
 msgid "The role the interview is for"
 msgstr "Vai trò mà buổi phỏng vấn dành cho"
 
+msgid "The screen share was cancelled in your desktop’s dialog, so nothing was recorded. Start again and choose the screen to share."
+msgstr "Việc chia sẻ màn hình đã bị huỷ trong hộp thoại của máy tính, nên chưa quay gì cả. Hãy bắt đầu lại và chọn màn hình để chia sẻ."
+
+msgid "The screen you choose in your desktop’s share dialog"
+msgstr "Màn hình bạn chọn trong hộp thoại chia sẻ của máy tính"
+
 msgid "This report was made with a template this version doesn’t know."
 msgstr "Báo cáo này được tạo bằng một mẫu mà phiên bản này không biết."
 
@@ -10716,6 +10791,9 @@ msgstr "Bộ máy không khởi động được."
 msgid "The model runs inside CaptureMann and nothing leaves this Mac."
 msgstr "Mô hình chạy ngay trong CaptureMann và không có gì rời khỏi máy Mac này."
 
+msgid "The mouse pointer is part of the video; it is not recorded as a separate track yet."
+msgstr "Con trỏ chuột nằm trong video; chưa được ghi thành một rãnh riêng."
+
 msgid "The text engine is missing from this copy of CaptureMann. Reinstall CaptureMann."
 msgstr "Bản CaptureMann này thiếu bộ máy văn bản. Hãy cài lại CaptureMann."
 
@@ -10787,3 +10865,235 @@ msgstr "Ngôn ngữ bạn nói"
 
 msgid "vi, en"
 msgstr "vi, en"
+
+msgid "Built in"
+msgstr "Tích hợp sẵn"
+
+msgid "Couldn’t read the diagnostics: {e}"
+msgstr "Không thể đọc thông tin chẩn đoán: {e}"
+
+msgid "Diagnostics"
+msgstr "Chẩn đoán"
+
+msgid "Discard"
+msgstr "Bỏ bản ghi"
+
+msgid "Kinds to look for"
+msgstr "Loại cần tìm"
+
+#. FACT: owner review required (the desktop portal asks, not CaptureMann)
+msgid "Linux does not ask per app. Your desktop asks when CaptureMann captures the screen, and the microphone and camera are not gated by the system. Below is what this system can and cannot do for CaptureMann."
+msgstr "Linux không hỏi quyền theo từng ứng dụng. Môi trường desktop của bạn sẽ hỏi khi CaptureMann ghi màn hình, còn micrô và camera không bị hệ thống chặn bằng quyền. Bên dưới là những gì hệ thống này làm được và không làm được cho CaptureMann."
+
+msgid "No Secret Service (GNOME Keyring or KWallet) was found, so sign-ins and API keys cannot be kept in the system keyring. Start one, or set CAPTUREMANN_SECRETS=file to keep them in a file only you can read."
+msgstr "Không tìm thấy Secret Service (GNOME Keyring hoặc KWallet), nên thông tin đăng nhập và khoá API không thể lưu trong chuỗi khoá của hệ thống. Hãy khởi động một dịch vụ như vậy, hoặc đặt CAPTUREMANN_SECRETS=file để lưu chúng trong một tệp chỉ mình bạn đọc được."
+
+msgid "No desktop session was found. CaptureMann has to run inside a graphical session."
+msgstr "Không tìm thấy phiên desktop. CaptureMann phải chạy trong một phiên đồ hoạ."
+
+msgid "No hardware video encoder was found; recording will use a slower software encoder."
+msgstr "Không tìm thấy bộ mã hoá video phần cứng; bản ghi sẽ dùng bộ mã hoá phần mềm chậm hơn."
+
+msgid "Nothing is missing on this system for screenshots."
+msgstr "Hệ thống này không thiếu gì để chụp ảnh màn hình."
+
+msgid "Read the diagnostics"
+msgstr "Đọc thông tin chẩn đoán"
+
+msgid "Reading…"
+msgstr "Đang đọc…"
+
+msgid "Recording is not available yet"
+msgstr "Chưa thể quay"
+
+msgid "Recording needs PipeWire, and no sound server was found. Install and start PipeWire."
+msgstr "Quay cần PipeWire, nhưng không tìm thấy máy chủ âm thanh nào. Hãy cài đặt và khởi động PipeWire."
+
+msgid "Recording needs PipeWire; this system only has PulseAudio. Install and start PipeWire."
+msgstr "Quay cần PipeWire; hệ thống này chỉ có PulseAudio. Hãy cài đặt và khởi động PipeWire."
+
+msgid "Screen and audio recording is not built for this system yet. Screenshots, the library and the editor work."
+msgstr "Chức năng quay màn hình và âm thanh chưa được xây dựng cho hệ thống này. Chụp ảnh màn hình, thư viện và trình chỉnh sửa vẫn dùng được."
+
+msgid "Screen recording needs ScreenCast portal version {need} or newer; this system has an older one. Update xdg-desktop-portal."
+msgstr "Quay màn hình cần ScreenCast portal phiên bản {need} trở lên; hệ thống này có phiên bản cũ hơn. Hãy cập nhật xdg-desktop-portal."
+
+msgid "The CaptureMann engine is not running."
+msgstr "Bộ máy của CaptureMann chưa chạy."
+
+msgid "The desktop portal has no Screenshot interface, so screenshots are not possible on Wayland. Install the portal for your desktop."
+msgstr "Desktop portal không có giao diện Screenshot, nên không thể chụp ảnh màn hình trên Wayland. Hãy cài đặt portal cho môi trường desktop của bạn."
+
+msgid "The desktop portal service does not answer, so Wayland screenshots and screen recording are not possible. Install xdg-desktop-portal and the portal for your desktop."
+msgstr "Dịch vụ desktop portal không phản hồi, nên không thể chụp ảnh màn hình hay quay màn hình trên Wayland. Hãy cài đặt xdg-desktop-portal và portal cho môi trường desktop của bạn."
+
+msgid "What this system is missing"
+msgstr "Hệ thống này còn thiếu gì"
+
+#. FACT: owner review required (privacy)
+msgid "When something goes wrong, copy this and paste it into a bug report. It has the version, your Mac, permissions, models, a few settings and the last warnings. It has no audio, no transcripts and no file names. Nothing is sent: check it, then paste it yourself."
+msgstr "Khi có sự cố, hãy sao chép nội dung này và dán vào báo cáo lỗi. Nội dung gồm phiên bản, máy Mac của bạn, quyền truy cập, các mô hình, vài cài đặt và những cảnh báo gần nhất. Không có âm thanh, bản chép lời hay tên tệp. Không có gì được gửi đi: hãy kiểm tra rồi tự dán."
+
+#. FACT: owner review required (nothing is requested until a button is pressed)
+msgid "Windows keeps these under your control. Nothing is requested until you press a button; you can change any of them later in Settings → Permissions."
+msgstr "Windows để các quyền này do bạn kiểm soát. Không có gì được yêu cầu cho đến khi bạn nhấn một nút; bạn có thể thay đổi bất kỳ quyền nào sau này trong Cài đặt → Quyền truy cập."
+
+msgctxt "button"
+msgid "Defaults"
+msgstr "Mặc định"
+
+msgctxt "button"
+msgid "Hide options"
+msgstr "Ẩn tuỳ chọn"
+
+msgctxt "button"
+msgid "Refresh"
+msgstr "Làm mới"
+
+msgctxt "button"
+msgid "Reveal log folder"
+msgstr "Hiện thư mục nhật ký"
+
+msgctxt "button"
+msgid "Search again"
+msgstr "Tìm lại"
+
+msgctxt "button"
+msgid "Show diagnostics"
+msgstr "Hiện thông tin chẩn đoán"
+
+msgctxt "button"
+msgid "What to look for"
+msgstr "Cần tìm gì"
+
+msgctxt "redaction group"
+msgid "Contact and network"
+msgstr "Liên hệ và mạng"
+
+msgctxt "redaction group"
+msgid "Identity and health"
+msgstr "Danh tính và sức khoẻ"
+
+msgctxt "redaction group"
+msgid "Payment"
+msgstr "Thanh toán"
+
+msgctxt "redaction group"
+msgid "Secrets"
+msgstr "Bí mật"
+
+msgctxt "redaction kind"
+msgid "Bank routing number"
+msgstr "Mã định tuyến ngân hàng"
+
+msgctxt "redaction kind"
+msgid "Card expiry or code"
+msgstr "Ngày hết hạn hoặc mã thẻ"
+
+msgctxt "redaction kind"
+msgid "Card number"
+msgstr "Số thẻ"
+
+msgctxt "redaction kind"
+msgid "DEA number"
+msgstr "Số DEA"
+
+msgctxt "redaction kind"
+msgid "Device ID (IMEI)"
+msgstr "Mã thiết bị (IMEI)"
+
+msgctxt "redaction kind"
+msgid "Employer ID (EIN)"
+msgstr "Mã số nhà tuyển dụng (EIN)"
+
+msgctxt "redaction kind"
+msgid "IBAN"
+msgstr "IBAN"
+
+msgctxt "redaction kind"
+msgid "Link with a secret"
+msgstr "Liên kết chứa mã bí mật"
+
+msgctxt "redaction kind"
+msgid "MAC address"
+msgstr "Địa chỉ MAC"
+
+msgctxt "redaction kind"
+msgid "Medicare ID"
+msgstr "Mã Medicare"
+
+msgctxt "redaction kind"
+msgid "Passport number"
+msgstr "Số hộ chiếu"
+
+msgctxt "redaction kind"
+msgid "Private key"
+msgstr "Khoá riêng tư"
+
+msgctxt "redaction kind"
+msgid "Provider ID (NPI)"
+msgstr "Mã nhà cung cấp dịch vụ y tế (NPI)"
+
+msgctxt "redaction kind"
+msgid "Secret value"
+msgstr "Giá trị bí mật"
+
+msgctxt "redaction kind"
+msgid "Social Security number"
+msgstr "Số An sinh Xã hội"
+
+msgctxt "redaction kind"
+msgid "Taxpayer ID (ITIN)"
+msgstr "Mã số thuế cá nhân (ITIN)"
+
+msgctxt "redaction kind"
+msgid "Vehicle ID (VIN)"
+msgstr "Số khung xe (VIN)"
+
+#, fuzzy
+msgid "Global shortcuts are not available here"
+msgstr "Phím tắt toàn cục không khả dụng ở đây"
+
+#, fuzzy
+msgid "Global shortcuts need X11 or a desktop with the GlobalShortcuts portal. Here, give your desktop its own keyboard shortcut (in its keyboard settings, custom shortcuts) that runs `cm-desktop --launcher` to open the launcher or `cm-desktop --capture region` to capture a region."
+msgstr "Phím tắt toàn cục cần X11 hoặc một môi trường desktop có cổng GlobalShortcuts. Ở đây, hãy tạo phím tắt riêng của desktop (trong phần cài đặt bàn phím, phím tắt tùy chỉnh) chạy `cm-desktop --launcher` để mở trình khởi chạy hoặc `cm-desktop --capture region` để chụp một vùng."
+
+#, fuzzy
+msgid "Global shortcuts need X11 or a desktop with the GlobalShortcuts portal; use the launcher or the CLI"
+msgstr "Phím tắt toàn cục cần X11 hoặc một môi trường desktop có cổng GlobalShortcuts; hãy dùng trình khởi chạy hoặc dòng lệnh"
+
+#, fuzzy
+msgid "Not available on this desktop"
+msgstr "Không khả dụng trên desktop này"
+
+#, fuzzy
+msgid "Your desktop manages these shortcuts and may have chosen other keys; change them in its keyboard settings."
+msgstr "Desktop của bạn quản lý các phím tắt này và có thể đã chọn phím khác; hãy đổi trong cài đặt bàn phím của desktop."
+
+msgid "Your desktop may ask which screen to share. Choose the screen and press Share."
+msgstr "Máy tính có thể hỏi bạn chia sẻ màn hình nào. Hãy chọn màn hình rồi nhấn Share."
+
+msgid "Your desktop remembers the screen you shared before, so recording starts without asking."
+msgstr "Máy tính nhớ màn hình bạn đã chia sẻ trước đó, nên việc quay bắt đầu mà không hỏi lại."
+
+msgid "Your desktop’s screen-sharing service (xdg-desktop-portal) is missing."
+msgstr "Thiếu dịch vụ chia sẻ màn hình của máy tính (xdg-desktop-portal)."
+
+#, fuzzy
+msgid "xdg-open is not installed; install xdg-utils to open links and folders"
+msgstr "Chưa cài xdg-open; hãy cài xdg-utils để mở liên kết và thư mục"
+
+msgid "Close window"
+msgstr "Đóng cửa sổ"
+
+msgid "Maximize"
+msgstr "Phóng to"
+
+msgid "Minimize"
+msgstr "Thu nhỏ"
+
+msgid "Restore"
+msgstr "Khôi phục"
+
+msgid "Set by your desktop: {keys}"
+msgstr "Do môi trường desktop đặt: {keys}"

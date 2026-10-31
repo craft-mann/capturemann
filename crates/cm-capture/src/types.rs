@@ -69,3 +69,32 @@ pub enum CaptureKind {
     Window,
     Region,
 }
+
+/// What the capture backend of this desktop can do, reported by `list_targets` as
+/// `capabilities` so a CLI, an MCP client or an agent knows which targets exist before it asks.
+/// All true except `pick` on a desktop where every target can be named by id (macOS, Windows,
+/// X11). On a Wayland session the compositor does not list windows and shows its own picker:
+/// `list_windows` and `capture_window` are false and `pick` is true.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Capabilities {
+    /// `list_targets` returns the windows (`windows` is empty when false).
+    pub list_windows: bool,
+    /// A window can be captured by its id.
+    pub capture_window: bool,
+    /// A region of a display can be captured by a rectangle.
+    pub capture_region: bool,
+    /// The desktop has its own interactive picker for a window, a region or a screen (the
+    /// `pick` target of `capture_screenshot`). It needs a person at the screen to choose.
+    pub pick: bool,
+}
+
+impl Default for Capabilities {
+    fn default() -> Self {
+        Capabilities {
+            list_windows: true,
+            capture_window: true,
+            capture_region: true,
+            pick: false,
+        }
+    }
+}

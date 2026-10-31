@@ -25,7 +25,7 @@ struct Rig {
 
 fn rig(ai: FakeAi, decision: Decision) -> Rig {
     let dir = tempfile::tempdir().unwrap();
-    let endpoint = Endpoint::Path(dir.path().join("d.sock"));
+    let endpoint = Endpoint::scratch(dir.path(), "d");
     let lib_dir = dir.path().join("lib");
     let lib = Library::open_or_create(&lib_dir).unwrap();
     let queue = cm_daemon::library_job_queue(&lib_dir).unwrap();
@@ -410,7 +410,7 @@ async fn ai_3_and_4_suggest_zooms_and_cuts_apply_nothing() {
 #[tokio::test]
 async fn without_an_engine_the_ai_commands_say_not_implemented() {
     let dir = tempfile::tempdir().unwrap();
-    let endpoint = Endpoint::Path(dir.path().join("d.sock"));
+    let endpoint = Endpoint::scratch(dir.path(), "d");
     let lib = Library::open_or_create(&dir.path().join("lib")).unwrap();
     let backend = FakeBackend::new().with_display(1, 0, 0, 400, 300, 2.0);
     let daemon = Daemon::builder(Capturer::new(backend).with_own_pid(None), lib).build();

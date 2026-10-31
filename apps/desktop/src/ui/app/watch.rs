@@ -55,6 +55,38 @@ pub fn start_studio_window_watch(app: &Entity<AppModel>, cx: &mut App) {
     .detach();
 }
 
+/// Where the OS cannot exclude a window from capture (Linux), hides the toast stack while a
+/// capture runs and brings it back after (`capture_cloak`). Does nothing elsewhere.
+pub fn start_capture_cloak_watch(app: &Entity<AppModel>, cx: &mut App) {
+    if !crate::platform_window::needs_capture_cloak() {
+        return;
+    }
+    crate::capture_cloak::enable();
+    let app2 = app.clone();
+    cx.spawn(async move |cx| loop {
+        cx.update(|cx| {
+            use crate::capture_cloak::{self as cloak, Step};
+            match cloak::poll(Instant::now()) {
+                Step::Hide => {
+                    log::debug!("capture cloak: hiding the toasts");
+                    cloak::mark_hidden(Instant::now());
+                    sync_toasts(&app2, cx);
+                }
+                Step::Restore => {
+                    log::debug!("capture cloak: showing the toasts again");
+                    cloak::mark_restored();
+                    sync_toasts(&app2, cx);
+                }
+                Step::Idle => {}
+            }
+        });
+        cx.background_executor()
+            .timer(Duration::from_millis(40))
+            .await;
+    })
+    .detach();
+}
+
 /// One refresh of the published Studio window id.
 pub fn sync_studio_window(app: &Entity<AppModel>, cx: &mut App) {
     let id = match app.read(cx).studio {
@@ -67,6 +99,16 @@ pub fn sync_studio_window(app: &Entity<AppModel>, cx: &mut App) {
         None => None,
     };
     crate::studio_window::publish(id);
+    // Wayland: toasts are banners in the Studio window for as long as it exists (see
+    // `toasts_in_window`); a window the user closed is noticed here.
+    let open = app
+        .read(cx)
+        .studio
+        .is_some_and(|h| h.update(cx, |_, _, _| ()).is_ok());
+    if open != app.read(cx).studio_open {
+        app.update(cx, |m, _| m.studio_open = open);
+        sync_toasts(app, cx);
+    }
 }
 
 /// How often the app looks at the bundle folders when it comes to the front (R1-6).

@@ -169,6 +169,33 @@ pub fn plan_capture(settings: &ScreenSettings, targets: &Targets) -> Result<Capt
     })
 }
 
+impl CapturePlan {
+    /// Re-plans the video for a source whose real size differs from the one planned for (the
+    /// Linux portal picks the monitor itself). Keeps what the user asked for: a plan that was
+    /// scaled down to a height keeps that height (width follows the aspect ratio), a native plan
+    /// stays native. Frame rate, codec and quality are unchanged; the bit rate follows the size.
+    pub fn adopt_source_size(&mut self, size: PhysicalSize) {
+        if size == self.source_size || size.width < 2 || size.height < 2 {
+            return;
+        }
+        let was_scaled = self.video.height < self.source_size.height & !1;
+        let (sw, sh) = (size.width & !1, size.height & !1);
+        let (w, h) = if was_scaled && self.video.height < sh {
+            let h = self.video.height;
+            let w =
+                ((f64::from(sw) * f64::from(h) / f64::from(sh) / 2.0).round() as u32 * 2).max(2);
+            (w, h)
+        } else {
+            (sw, sh)
+        };
+        self.source_size = size;
+        self.video.width = w;
+        self.video.height = h;
+        self.video.bitrate_bps =
+            cm_encode::bitrate_bps(self.video.codec, self.video.fps, self.video.quality, w, h);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -274,5 +301,35 @@ mod tests {
         ));
         let s = ScreenSettings::new(CaptureTarget::Window { window_id: 9 });
         assert!(plan_capture(&s, &targets()).is_err());
+    }
+
+    #[test]
+    fn adopting_a_new_source_size_keeps_the_scaling_the_user_chose() {
+        let mut native = plan_capture(
+            &ScreenSettings::new(CaptureTarget::Display { display_id: 1 }),
+            &targets(),
+        )
+        .unwrap();
+        native.adopt_source_size(PhysicalSize {
+            width: 1281,
+            height: 721,
+        });
+        assert_eq!((native.video.width, native.video.height), (1280, 720));
+        assert_eq!(native.source_size.width, 1281);
+
+        let mut s = ScreenSettings::new(CaptureTarget::Display { display_id: 1 });
+        s.video.size = OutputSize::P1080;
+        let mut scaled = plan_capture(&s, &targets()).unwrap();
+        scaled.adopt_source_size(PhysicalSize {
+            width: 3840,
+            height: 2160,
+        });
+        assert_eq!((scaled.video.width, scaled.video.height), (1920, 1080));
+        // Never upscaled: a source smaller than the asked-for height stays native.
+        scaled.adopt_source_size(PhysicalSize {
+            width: 1280,
+            height: 720,
+        });
+        assert_eq!((scaled.video.width, scaled.video.height), (1280, 720));
     }
 }

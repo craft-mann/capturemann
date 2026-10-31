@@ -45,6 +45,8 @@ pub const MAX_H264_AREA: u64 = 4096 * 2304;
 pub const MAX_H264_SIDE: u64 = 4096;
 /// Software encoder quality.
 pub const X264_CRF: u32 = 20;
+/// Constant quality of `libvpx-vp9` (the Linux MP4 fallback; WebM has its own constant in `edited`).
+pub const VP9_CRF: u32 = 32;
 /// Hardware encoder bitrate at 1080p30; scaled by area and fps.
 pub const VT_BITRATE_1080P30: f64 = 12_000_000.0;
 pub const AUDIO_RATE: u32 = 48_000;
@@ -232,6 +234,7 @@ pub fn video_codec_at(
     let mut bitrate = None;
     let bps = target_bps.unwrap_or_else(|| videotoolbox_bitrate(out_size, fps));
     let (g, b, crf) = (gop.to_string(), bps.to_string(), X264_CRF.to_string());
+    let vp9_crf = VP9_CRF.to_string();
     let codec_args: Vec<&str> = match encoder {
         Encoder::VideoToolbox => vec![
             "-c:v",
@@ -281,6 +284,41 @@ pub fn video_codec_at(
             "-g",
             &g,
         ],
+        Encoder::Vaapi => vec![
+            "-c:v",
+            "h264_vaapi",
+            "-profile:v",
+            "high",
+            "-b:v",
+            &b,
+            "-g",
+            &g,
+        ],
+        Encoder::Vp9Mp4 => {
+            let vp9_gop = (((fps * 4.0).round() as u32).max(1)).to_string();
+            let mut v = vec![
+                "-c:v",
+                "libvpx-vp9",
+                "-row-mt",
+                "1",
+                "-deadline",
+                "good",
+                "-cpu-used",
+                "4",
+                "-g",
+                &vp9_gop,
+            ];
+            if target_bps.is_some() {
+                v.extend(["-b:v", &b]);
+            } else {
+                v.extend(["-b:v", "0", "-crf", &vp9_crf]);
+            }
+            return VideoCodec {
+                args: v.into_iter().map(String::from).collect(),
+                bitrate: target_bps,
+                gop: ((fps * 4.0).round() as u32).max(1),
+            };
+        }
         Encoder::Libx264 if target_bps.is_some() => vec![
             "-c:v",
             "libx264",
@@ -685,15 +723,22 @@ mod tests {
             .filter(|w| w[0] == "-i")
             .map(|w| w[1].as_str())
             .collect();
+        // Files inside the bundle are joined with the platform separator.
+        let in_bundle = |f: &str| {
+            std::path::Path::new("/b/Lesson 1.cmrec")
+                .join(f)
+                .to_string_lossy()
+                .into_owned()
+        };
         assert_eq!(
             ins,
             [
-                "/b/Lesson 1.cmrec/screen.mp4",
-                "/b/Lesson 1.cmrec/camera.mp4",
+                in_bundle("screen.mp4").as_str(),
+                in_bundle("camera.mp4").as_str(),
                 "/w/mask.png",
                 "/w/ring.png",
-                "/b/Lesson 1.cmrec/mic.denoised.wav",
-                "/b/Lesson 1.cmrec/system.wav"
+                in_bundle("mic.denoised.wav").as_str(),
+                in_bundle("system.wav").as_str()
             ]
         );
         let joined = p.args.join(" ");

@@ -126,7 +126,7 @@ pub fn all_windows() -> String {
 pub fn app_keys(platform: Platform) -> String {
     match platform {
         Platform::Mac => "\u{2318}1\u{2013}9".to_owned(),
-        Platform::Windows => "Ctrl+1\u{2013}9".to_owned(),
+        Platform::Windows | Platform::Linux => "Ctrl+1\u{2013}9".to_owned(),
     }
 }
 
@@ -266,7 +266,7 @@ fn present(app: &Entity<AppModel>, targets: &serde_json::Value, cx: &mut App) {
                 is_resizable: false,
                 is_minimizable: false,
                 window_background: gpui::WindowBackgroundAppearance::Transparent,
-                ..Default::default()
+                ..crate::platform_window::popup_base()
             },
             view_builder(app.clone(), state, listing.outlines, platform),
         ),

@@ -664,17 +664,30 @@ impl SettingsView {
             [one] => one.name.clone(),
             list => trn!("{n} channel", "{n} channels", list.len()),
         };
-        let state_mark: AnyElement = match state {
-            CardState::NotConnected => status(
-                t,
-                StatusKind::Neutral,
-                tr_ctx!("drive status", "Not connected"),
-            )
-            .into_any_element(),
-            CardState::Connected(_) => icon("circle-check", 20., t.success).into_any_element(),
-            CardState::Reconnect { .. } => {
-                icon("triangle-alert", 20., t.warning).into_any_element()
-            }
+        // The wide "Not connected" pill sits under the text, not beside it: beside it the text
+        // column of a 240 px card shrank to a few letters per line (seen on Linux, Oct 31, 2026).
+        let (state_mark, not_connected): (Option<AnyElement>, Option<AnyElement>) = match state {
+            CardState::NotConnected => (
+                None,
+                Some(
+                    div()
+                        .flex()
+                        .child(status(
+                            t,
+                            StatusKind::Neutral,
+                            tr_ctx!("drive status", "Not connected"),
+                        ))
+                        .into_any_element(),
+                ),
+            ),
+            CardState::Connected(_) => (
+                Some(icon("circle-check", 20., t.success).into_any_element()),
+                None,
+            ),
+            CardState::Reconnect { .. } => (
+                Some(icon("triangle-alert", 20., t.warning).into_any_element()),
+                None,
+            ),
         };
         let rows = self.yt.accounts.iter().enumerate().map(|(i, a)| {
             let needs_reconnect =
@@ -823,9 +836,10 @@ impl SettingsView {
                                     .text_size(px(type_scale::UI))
                                     .text_color(rgba_of(t.text_3))
                                     .child(SharedString::from(subtitle)),
-                            ),
+                            )
+                            .children(not_connected),
                     )
-                    .child(state_mark),
+                    .children(state_mark),
             )
             .children(rows)
             .children(

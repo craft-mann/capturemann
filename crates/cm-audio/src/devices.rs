@@ -97,6 +97,11 @@ pub fn list_audio_devices() -> AudioDevices {
             });
         }
     }
+    // Where PipeWire serves the audio (Linux) the recording uses it, not ALSA: list what it will
+    // record, not what the ALSA plug-in happens to expose.
+    if crate::sys::linux_pipewire::available() {
+        mics = vec![crate::sys::linux_pipewire::default_mic_device()];
+    }
     // Default first, then by name, so the list is stable.
     mics.sort_by(|a, b| b.default.cmp(&a.default).then_with(|| a.name.cmp(&b.name)));
     let permission = microphone_permission();
@@ -139,10 +144,11 @@ pub fn system_audio_support() -> SystemAudioSupport {
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
+        let pw = crate::sys::linux_pipewire::available();
         SystemAudioSupport {
-            supported: false,
-            backend: "none".into(),
-            reason: Some("System audio is not supported on this OS.".into()),
+            supported: pw,
+            backend: if pw { "pipewire_monitor" } else { "none" }.into(),
+            reason: (!pw).then(|| "System audio needs PipeWire (not running here).".to_string()),
             permission: screen_recording_permission(),
             excludes_own_audio: false,
         }

@@ -35,6 +35,9 @@ impl Action {
                         target_value,
                     )?));
                 }
+                if target_value.get("pick").is_some() {
+                    return Ok(Action::CapturePick(parse_pick(&f, target_value)?));
+                }
                 let target = ScreenshotTarget::parse(target_value)?;
                 let delay_s = match f.obj.get("delay_s") {
                     None | Some(Value::Null) => None,

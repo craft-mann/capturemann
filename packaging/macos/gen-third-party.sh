@@ -6,6 +6,8 @@
 # the crate sources already in the cargo registry (run `cargo fetch` first on a clean machine).
 #
 # Usage: packaging/macos/gen-third-party.sh [output-file]   (default: THIRD_PARTY_LICENSES.md)
+# CM_LICENSE_TRIPLES="x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu" lists the Linux crates instead
+# (packaging/linux/build-linux.sh does this); the default is the two macOS targets.
 set -euo pipefail
 die() { echo "gen-third-party.sh: $*" >&2; exit 1; }
 command -v cargo >/dev/null 2>&1 || die "cargo not found"
@@ -14,7 +16,9 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 out="${1:-$root/THIRD_PARTY_LICENSES.md}"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/cm-licenses.XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT
-for triple in aarch64-apple-darwin x86_64-apple-darwin; do
+triples="${CM_LICENSE_TRIPLES:-aarch64-apple-darwin x86_64-apple-darwin}"
+export CM_LICENSE_TRIPLES="$triples"
+for triple in $triples; do
   (cd "$root" && cargo metadata --format-version 1 --locked --filter-platform "$triple" > "$tmp/$triple.json")
 done
 python3 - "$root" "$out" "$tmp" <<'PY'
@@ -22,7 +26,7 @@ import glob, hashlib, json, os, sys
 root, out, tmp = sys.argv[1:4]
 roots = {"cm-desktop", "cm-overlay", "cm-cli", "cm-mcp"}
 pkgs, shipped = {}, set()
-for triple in ("aarch64-apple-darwin", "x86_64-apple-darwin"):
+for triple in os.environ["CM_LICENSE_TRIPLES"].split():
     m = json.load(open(f"{tmp}/{triple}.json"))
     byid = {p["id"]: p for p in m["packages"]}
     nodes = {n["id"]: n for n in m["resolve"]["nodes"]}

@@ -75,8 +75,7 @@ fn finish(
     confirmer: Arc<FixedConfirmer>,
     dir: tempfile::TempDir,
 ) -> Rig {
-    let sock = dir.path().join("d.sock");
-    let ep = Endpoint::Path(sock);
+    let ep = Endpoint::scratch(dir.path(), "d");
     let server = IpcServer::bind(&ep).unwrap();
     let d = daemon.clone();
     let task = tokio::spawn(async move {
