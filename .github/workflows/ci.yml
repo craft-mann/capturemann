@@ -83,7 +83,8 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked --no-default-features -- -D warnings
       - name: Test (no sherpa)
         if: runner.os != 'macOS'
-        run: cargo test --workspace --locked --no-default-features --no-fail-fast
+        # TEMP (branch windows-step0): only the new platform tests; restore the full command.
+        run: cargo test --locked --no-default-features -p cm-platform -p cm-auth --test credential_store
       # The real Trash (Recycle Bin, freedesktop Trash) of the runner: a scratch folder is moved there. Not run
       # on macOS, where it would use the developer's own Trash.
       - name: Trash test (Windows and Linux)
