@@ -4685,6 +4685,9 @@ msgstr ""
 msgid "The screen share was cancelled in your desktop’s dialog, so nothing was recorded. Start again and choose the screen to share."
 msgstr ""
 
+msgid "The screen you choose in your desktop’s share dialog"
+msgstr ""
+
 msgid "The selected sources are not available."
 msgstr ""
 

@@ -359,6 +359,12 @@ impl SheetModel {
         }
     }
 
+    /// One chip per display, to pick which one is recorded. Not on Linux: the desktop's own
+    /// dialog picks the screen there, so the sheet's list could only mislead.
+    pub fn display_chips_shown(&self) -> bool {
+        self.kind == TargetKind::Display && self.displays.len() > 1 && !self.is_linux()
+    }
+
     /// Whether this is the Linux recorder (the desktop's portal picks the screen).
     pub fn is_linux(&self) -> bool {
         self.devices.platform.as_deref() == Some("linux")
@@ -426,6 +432,9 @@ impl SheetModel {
     }
 
     pub fn target_summary(&self) -> String {
+        if self.is_linux() && self.kind == TargetKind::Display && self.target().is_some() {
+            return tr!("The screen you choose in your desktop\u{2019}s share dialog");
+        }
         match self.target() {
             Some(Target::Display { display_id }) => self
                 .displays
@@ -700,7 +709,7 @@ impl SheetModel {
         }
         body += SECTION_GAP
             + match self.kind {
-                TargetKind::Display if self.displays.len() > 1 => CHIPS,
+                TargetKind::Display if self.display_chips_shown() => CHIPS,
                 TargetKind::Display => SUMMARY,
                 _ => BUTTON,
             };
@@ -1672,6 +1681,24 @@ mod tests {
             "Recording needs FFmpeg to encode the video, and it was not found."
         );
         assert_eq!(screen_problem_text("Something else."), "Something else.");
+    }
+
+    /// Linux has one entry in the sheet however many displays the system lists: no chips, and the
+    /// summary says who chooses.
+    #[test]
+    fn rec1_linux_does_not_pretend_to_choose_a_display() {
+        let mut m = linux_sheet("authorized", json!([]));
+        m.set_displays(parse_displays(&displays_json()));
+        assert_eq!(m.displays.len(), 2);
+        assert!(!m.display_chips_shown());
+        assert_eq!(
+            m.target_summary(),
+            "The screen you choose in your desktop\u{2019}s share dialog"
+        );
+        let mut mac = sheet();
+        assert!(mac.display_chips_shown());
+        assert!(mac.target_summary().starts_with("Built-in"));
+        mac.set_kind(TargetKind::Display);
     }
 
     /// The extra lines are part of the computed height, so the footer never gets cut.

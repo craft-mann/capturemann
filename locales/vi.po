@@ -10387,6 +10387,9 @@ msgstr "Vai trò mà buổi phỏng vấn dành cho"
 msgid "The screen share was cancelled in your desktop’s dialog, so nothing was recorded. Start again and choose the screen to share."
 msgstr "Việc chia sẻ màn hình đã bị huỷ trong hộp thoại của máy tính, nên chưa quay gì cả. Hãy bắt đầu lại và chọn màn hình để chia sẻ."
 
+msgid "The screen you choose in your desktop’s share dialog"
+msgstr "Màn hình bạn chọn trong hộp thoại chia sẻ của máy tính"
+
 msgid "This report was made with a template this version doesn’t know."
 msgstr "Báo cáo này được tạo bằng một mẫu mà phiên bản này không biết."
 

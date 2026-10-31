@@ -697,8 +697,7 @@ impl StartSheet {
             .collect::<Vec<_>>();
         // With several displays the chips carry the name and size, so the summary line only
         // shows for one display, a window or a region (M32).
-        let show_summary = !(m.kind == TargetKind::Display && m.displays.len() > 1)
-            && m.kind != TargetKind::Window;
+        let show_summary = !m.display_chips_shown() && m.kind != TargetKind::Window;
         let target_row = show_summary.then(|| {
             let summary = m.target_summary();
             let chosen = m.target().is_some();
@@ -861,7 +860,7 @@ impl StartSheet {
                     ),
             }
         });
-        let display_choices = (m.kind == TargetKind::Display && m.displays.len() > 1).then(|| {
+        let display_choices = m.display_chips_shown().then(|| {
             div()
                 .flex_none()
                 .flex()
