@@ -72,3 +72,5 @@ capturemann-icons*/
 
 # Website copy review notes (owner reads it, not published)
 website-copy-review.md
+packaging/linux/out/
+packaging/ffmpeg/out-linux-*/
