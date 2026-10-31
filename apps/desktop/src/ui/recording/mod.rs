@@ -44,6 +44,7 @@ use crate::recording::tray::{self, PauseAction, ToggleAction, TrayPlan};
 use crate::toast::{ToastKind, ToastSpec};
 use crate::ui::app::{self, AppModel};
 
+pub mod banner;
 pub mod bubble;
 pub mod countdown_view;
 pub mod details;
@@ -593,6 +594,11 @@ fn show_countdown(app: &Entity<AppModel>, cx: &mut App) {
     if !rec.read(cx).hud.countdown_wanted() {
         return;
     }
+    // Linux: the countdown is part of the banner in the Studio window (a disc over the screen
+    // would be in the video, and Wayland cannot place it).
+    if banner_instead_of_windows(app, cx) {
+        return;
+    }
     // The window already shows the digit from the model; open it once.
     if rec.read(cx).countdown_win.is_some() {
         rec.update(cx, |_, cx| cx.notify());
@@ -690,9 +696,34 @@ pub fn remember_hud(app: &Entity<AppModel>, display: &Rect, hud: &Rect, cx: &mut
     app::set_setting(app, start::KEY_HUD_POSITIONS, Value::Object(all), cx);
 }
 
+/// Whether the HUD, the countdown disc and the area brackets are left out because the controls
+/// are the banner in the Studio window (`recording::surface`). Makes sure that window exists, so
+/// a recording started from the tray, a hotkey, the CLI or an agent still has its indicator.
+fn banner_instead_of_windows(app: &Entity<AppModel>, cx: &mut App) -> bool {
+    if crate::recording::surface::surface() != crate::recording::surface::Surface::InWindow {
+        return false;
+    }
+    if !app.read(cx).studio_open {
+        app::open_studio(app, cx);
+    }
+    true
+}
+
 fn open_recording_windows(app: &Entity<AppModel>, cx: &mut App) {
     let rec = rec_of(app, cx);
-    let Some((area, display)) = indicator_area(rec.read(cx), cx) else {
+    let area = indicator_area(rec.read(cx), cx);
+    if banner_instead_of_windows(app, cx) {
+        rec.update(cx, |r, _| {
+            r.reduced_motion = platform_window::reduce_motion();
+            if let Some((area, display)) = area {
+                r.area = Some(area);
+                r.display = Some(display);
+            }
+        });
+        sync_tray(app, cx);
+        return;
+    }
+    let Some((area, display)) = area else {
         return;
     };
     // Facts first: bubble preferences from the recording, then the windows.
@@ -735,7 +766,9 @@ fn open_recording_windows(app: &Entity<AppModel>, cx: &mut App) {
     let old = rec.update(cx, |r, _| r.indicator_win.take());
     close(cx, old);
     // An audio recording has no area to outline (VOC-1): the HUD and the tray are its indicator.
-    if !rec.read(cx).hud.is_audio() {
+    if !rec.read(cx).hud.is_audio()
+        && crate::recording::surface::shows_area_indicator(crate::permissions::Os::current())
+    {
         let (app2, rec2) = (app.clone(), rec.clone());
         let opened = cx.open_window(
             panel_options(display, display.1, false, false),

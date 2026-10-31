@@ -1,6 +1,7 @@
 # LINUX-1 — The early Linux build on a real X11 and a real Wayland desktop (manual)
 
-Covers the early Linux build (screenshots, library, editor; recording is not built in yet). Run it twice, once on a
+Covers the early Linux build (screenshots, library, editor; recording is hidden unless `CM_LINUX_RECORDING=1`, see
+section 9). Run it twice, once on a
 real **X11** session and once on a real **Wayland** session (GNOME 46 or newer, and KDE Plasma 6 if you have it).
 A VM is fine for a first pass; say so in the report. Platform rows: `specs/platform-acceptance.md` (CAP-1, CAP-2,
 CAP-4, LIB-2, REC-1 to AUD-4, PRM-1). The expected-unavailable list at the end is part of the pass criteria.
@@ -127,7 +128,7 @@ Run on X11 and on Wayland. Make three screenshots with `capturemann capture scre
 
 ## 7. Must show as unavailable (all sessions)
 17. **Pass** when each of these says plainly that it is not available, instead of failing after a Start button:
-    - Record in the dock, the Record shortcut and the launcher command: toast "Recording is not available yet"
+    - Without `CM_LINUX_RECORDING=1`: Record in the dock, the Record shortcut and the launcher command: toast "Recording is not available yet"
       (the launcher row says "Not available yet"). No recording sheet, countdown or HUD opens.
     - Microphone and audio recording (the mic button in the dock): the same toast.
     - Tray icon on GNOME without the AppIndicator extension: the toast "Menu bar icon unavailable" explains how to
@@ -151,7 +152,7 @@ Run on X11 and on Wayland. Make three screenshots with `capturemann capture scre
     ubuntu-appindicators@ubuntu.com`, log out and in), or XFCE/Cinnamon/MATE:** start the app. **Pass:** the CaptureMann
     icon appears in the panel; right click (GNOME: click) opens the menu: Capture region / window / display,
     Capture delay (None, 3, 5, 10 s with one check mark), Record\u2026 / Record audio / Pause / Stop (Record\u2026 and
-    Record audio say "not available yet" on Linux for now; Pause and Stop are greyed), Open library, Open launcher, Recent
+    Record audio say "not available yet" unless `CM_LINUX_RECORDING=1`; Pause and Stop are greyed while nothing records), Open library, Open launcher, Recent
     captures, Settings, Permissions\u2026, Quit CaptureMann. Hover shows the tooltip "CaptureMann".
 20. Click "Capture region" in the menu, then "Capture delay > 5 s" and look at the menu again. **Pass:** the region
     picker opens; the check mark moved to 5 s; take a screenshot and open the menu: "Recent captures" lists it, and
@@ -160,6 +161,37 @@ Run on X11 and on Wayland. Make three screenshots with `capturemann capture scre
 22. Change the UI language in Settings. **Pass:** the menu texts change without a restart.
 23. Restart the shell's tray host while the app runs (`gnome-extensions disable` then `enable` the extension, or
     `kquitapp6 plasmashell && plasmashell`). **Pass:** the icon returns by itself.
+
+## 9. Recording in the app (`CM_LINUX_RECORDING=1`; hidden by default in the early build)
+Start the app as `CM_LINUX_RECORDING=1 cm-desktop` (steps 17 and 18 above are what the default build shows). Use a
+test config and library folder; delete `<config>/screencast-token` before step 24 to see the first-start dialog.
+This section needs a real session with a PipeWire desktop; say in the report which desktop and session it was.
+24. Press Record in the dock. **Pass:** the Record sheet opens. Display is selected; Window and Region are dimmed and
+    a line says that recording a window or a region is not available on Linux yet. The webcam row is off with the
+    reason "not available on Linux yet". Under the target there is one line saying who chooses the screen (your desktop's
+    share dialog), the first-time explanation (no token) or "remembers the screen" (token), and a line about the VP9
+    video. With PipeWire stopped (`systemctl --user stop pipewire pipewire-pulse wireplumber`; restore it after) the
+    footer says "Recording needs PipeWire, and it is not running." and Start is dimmed.
+25. No token: press Start. **Pass:** the Studio window shows the banner "Starting" with the line telling you that your
+    desktop may ask which screen to share; the desktop's own dialog appears; choose the screen, keep "Remember this
+    selection" and share. A countdown banner ("Starting in 3", Start now, Cancel) runs, then the banner shows the red
+    dot, "Recording" and the timer. **Pass also:** the desktop's own indicator shows (GNOME: the screen-sharing and
+    microphone icons in the top bar). Note whether a tray icon (red) shows too, and whether the desktop's indicator
+    has a Stop item.
+26. Pause and Resume in the banner, mute the microphone, then Stop. **Pass:** the timer stops while paused; Stop
+    saves, a toast says "Recording saved", the library shows the recording with a picture of the screen, and the
+    details page offers Play export, Play original, Reveal. Play opens your default video player (if none is set, a
+    plain sentence says so instead of nothing happening).
+27. Press Cancel in the countdown. **Pass:** nothing is recorded, no half-created bundle.
+28. Start again (a token exists now). **Pass:** no dialog; during the recording end the share from the desktop (GNOME:
+    the top-bar screen-sharing menu, Stop). **Pass:** the recording stops, a warning toast says the screen share
+    ended and that the recording was saved, the file plays up to that moment, and a new recording can start at once.
+29. Start with the Studio window closed (tray menu, or `capturemann record start`). **Pass:** the Studio window
+    opens by itself with the banner (the recording is never without its indicator); Stop in the banner ends it.
+30. **X11 only:** run with `CM_LINUX_FLOATING_HUD=1`. **Pass:** the floating HUD and the countdown disc appear
+    over the desktop (they are in the video of a recording of that screen); without the variable they do not.
+31. Try `capturemann record start --region 0,0,100,100` and `--camera`. **Pass:** a plain error
+    (`not_implemented`), nothing recorded.
 
 ## Result
 Store the report in `verification/` (template in its README): list the distribution, desktop, session type, real or

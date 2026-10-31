@@ -377,6 +377,15 @@ impl<E: LinuxEnv> SourceFactory for LinuxSources<E> {
         }
     }
 
+    fn adapt_target(&self, target: CaptureTarget) -> CaptureTarget {
+        match target {
+            CaptureTarget::Display { .. } => CaptureTarget::Display {
+                display_id: DESKTOP_DISPLAY_ID,
+            },
+            other => other,
+        }
+    }
+
     fn targets(&self) -> Option<Result<Targets, CmError>> {
         let scale = match ScaleFactor::new(1.0) {
             Ok(s) => s,

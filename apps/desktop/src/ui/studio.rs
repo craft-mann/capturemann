@@ -111,6 +111,8 @@ pub struct Studio {
     published: Entity<PublishedView>,
     /// The toast cards drawn inside this window (Wayland banners, `AppModel::toasts_in_studio`).
     toast_host: Entity<crate::ui::toast_window::ToastHost>,
+    /// The recording controls where a floating HUD would end up in the video (Linux).
+    rec_banner: Entity<crate::ui::recording::banner::RecordingBanner>,
     /// The kind the library view was last set for (All, Recordings or Screenshots).
     shown: Option<crate::library::Filter>,
     focus: FocusHandle,
@@ -131,6 +133,8 @@ impl Studio {
         let published = cx.new(|cx| PublishedView::new(app.clone(), cx));
         let focus = cx.focus_handle();
         let toast_host = cx.new(|cx| crate::ui::toast_window::ToastHost::new(app.clone(), cx));
+        let rec_banner =
+            cx.new(|cx| crate::ui::recording::banner::RecordingBanner::new(app.clone(), cx));
         let app2 = app.clone();
         let app3 = app.clone();
         let rec_for_scrim = app.read(cx).rec.clone();
@@ -161,6 +165,7 @@ impl Studio {
             ai,
             published,
             toast_host,
+            rec_banner,
             shown: None,
             focus,
             _subs: subs,
@@ -366,6 +371,7 @@ impl Render for Studio {
                     .h_full()
                     .flex()
                     .flex_col()
+                    .child(self.rec_banner.clone())
                     .children(title)
                     .child(div().flex_1().min_h(px(0.)).child(main)),
             )

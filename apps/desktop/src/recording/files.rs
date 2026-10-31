@@ -103,6 +103,10 @@ pub enum FileError {
     /// The manifest could not be read (the OS reason).
     ManifestUnreadable(String),
     ManifestDamaged,
+    /// The desktop has no program set for this kind of file (`xdg-open` answered "no method").
+    NoProgramForFile,
+    /// The desktop has no file manager set for folders.
+    NoProgramForFolder,
     Detail(String),
 }
 
@@ -122,6 +126,12 @@ impl std::fmt::Display for FileError {
             FileError::NoLength => tr!("This recording has no length to edit."),
             FileError::ManifestUnreadable(e) => tr!("cannot read the manifest: {error}", error = e),
             FileError::ManifestDamaged => tr!("the manifest is damaged"),
+            FileError::NoProgramForFile => tr!(
+                "No program is set to open this file. Install a video player or choose one in your desktop\u{2019}s settings."
+            ),
+            FileError::NoProgramForFolder => {
+                tr!("No file manager is set to open folders on this desktop.")
+            }
             FileError::Detail(e) => e.clone(),
         })
     }
@@ -479,8 +489,17 @@ pub fn generate_poster(bundle: &Path, out: &Path) -> Result<(), PosterError> {
     };
     match first {
         Ok(()) => Ok(()),
-        Err(e) => poster_with_quicklook(&video, out)
-            .map_err(|q| PosterError::Both(Box::new(e), Box::new(q))),
+        Err(e) => poster_with_quicklook(&video, out).map_err(|q| combine_poster_errors(e, q)),
+    }
+}
+
+/// FFmpeg failed and the second tool did too. Where there is no second tool (every system but
+/// macOS) the FFmpeg error is the whole story: "ffmpeg is not installed; no thumbnail tool on
+/// this OS" would only confuse.
+pub fn combine_poster_errors(first: PosterError, second: PosterError) -> PosterError {
+    match second {
+        PosterError::NoThumbnailTool => first,
+        second => PosterError::Both(Box::new(first), Box::new(second)),
     }
 }
 
@@ -572,21 +591,105 @@ pub fn open_link(url: &str) -> Result<(), FileError> {
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
-        xdg_open(std::ffi::OsStr::new(url))
+        xdg_open(std::ffi::OsStr::new(url), Opens::Link)
+    }
+}
+
+/// What an opener program did within the short wait of [`run_opener`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpenerOutcome {
+    /// It exited with success, or is still running (a program it started keeps it alive).
+    Launched,
+    /// `xdg-open` found nothing to open the target with (exit code 3 or 4).
+    NoHandler,
+    /// It exited with another failure code.
+    Failed(i32),
+}
+
+/// Starts `program args target`, waits up to `wait` for it to end and says what happened. One that
+/// is still running after `wait` is taken as launched and reaped in the background. `xdg-open`
+/// answers at once when nothing is set to open the target, and the older detached call lost that
+/// answer: the button did nothing and said nothing.
+pub fn run_opener(
+    program: &std::ffi::OsStr,
+    args: &[&std::ffi::OsStr],
+    target: &std::ffi::OsStr,
+    wait: Duration,
+) -> std::io::Result<OpenerOutcome> {
+    let mut child = Command::new(program)
+        .args(args)
+        .arg(target)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()?;
+    let start = Instant::now();
+    loop {
+        match child.try_wait()? {
+            Some(status) => {
+                return Ok(match status.code() {
+                    Some(0) => OpenerOutcome::Launched,
+                    Some(3 | 4) => OpenerOutcome::NoHandler,
+                    Some(c) => OpenerOutcome::Failed(c),
+                    None => OpenerOutcome::Failed(-1),
+                })
+            }
+            None if start.elapsed() >= wait => {
+                std::thread::spawn(move || {
+                    let _ = child.wait();
+                });
+                return Ok(OpenerOutcome::Launched);
+            }
+            None => std::thread::sleep(Duration::from_millis(20)),
+        }
+    }
+}
+
+/// What is handed to the opener, for the words of a failure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
+enum Opens {
+    Link,
+    File,
+    Folder,
+}
+
+/// The error for an opener outcome that is not a launch.
+#[allow(dead_code)]
+fn opener_error(outcome: OpenerOutcome, what: Opens) -> Option<FileError> {
+    match outcome {
+        OpenerOutcome::Launched => None,
+        OpenerOutcome::NoHandler => Some(match what {
+            Opens::Folder => FileError::NoProgramForFolder,
+            Opens::File => FileError::NoProgramForFile,
+            Opens::Link => FileError::Detail(tr!(
+                "No web browser is set on this desktop; choose one in your desktop\u{2019}s settings."
+            )),
+        }),
+        OpenerOutcome::Failed(code) => Some(FileError::Detail(tr!(
+            "The system opener failed (code {code}).",
+            code = code
+        ))),
     }
 }
 
 /// Linux: hands a link or a path to the desktop's opener (`xdg-open`, from xdg-utils). Without it
-/// the error says what to install instead of failing silently.
+/// the error says what to install; with it but nothing to open the target with, the error says
+/// that, instead of failing silently.
 #[allow(dead_code)]
-fn xdg_open(target: &std::ffi::OsStr) -> Result<(), FileError> {
-    use cm_platform::opener::OpenError;
-    cm_platform::opener::open_target(target).map_err(|e| match e {
-        OpenError::OpenerMissing(_) => FileError::Detail(tr!(
+fn xdg_open(target: &std::ffi::OsStr, what: Opens) -> Result<(), FileError> {
+    match run_opener(
+        std::ffi::OsStr::new("xdg-open"),
+        &[],
+        target,
+        Duration::from_millis(1500),
+    ) {
+        Ok(outcome) => opener_error(outcome, what).map_or(Ok(()), Err),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(FileError::Detail(tr!(
             "xdg-open is not installed; install xdg-utils to open links and folders"
-        )),
-        OpenError::Failed(kind) => std::io::Error::from(kind).into(),
-    })
+        ))),
+        Err(e) => Err(e.into()),
+    }
 }
 
 /// The path `xdg-open` is given to "show" `path` in the file manager: the folder that holds it
@@ -630,9 +733,9 @@ fn open_path(path: &Path, reveal: bool) -> Result<(), FileError> {
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         if reveal {
-            xdg_open(folder_to_show(path).as_os_str())
+            xdg_open(folder_to_show(path).as_os_str(), Opens::Folder)
         } else {
-            xdg_open(path.as_os_str())
+            xdg_open(path.as_os_str(), Opens::File)
         }
     }
 }
@@ -650,6 +753,71 @@ mod tests {
         std::fs::write(&file, "x").unwrap();
         assert_eq!(folder_to_show(&file), dir.path());
         assert_eq!(folder_to_show(dir.path()), dir.path());
+    }
+
+    /// The opener's answer is not lost: "nothing to open it with" and other failures are reported,
+    /// a program that keeps running counts as launched.
+    #[cfg(unix)]
+    #[test]
+    fn run_opener_reports_what_the_opener_said() {
+        use std::ffi::OsStr;
+        let sh = |script: &str, wait_ms: u64| {
+            run_opener(
+                OsStr::new("sh"),
+                &[OsStr::new("-c"), OsStr::new(script), OsStr::new("opener")],
+                OsStr::new("target"),
+                Duration::from_millis(wait_ms),
+            )
+            .unwrap()
+        };
+        assert_eq!(sh("exit 0", 2000), OpenerOutcome::Launched);
+        assert_eq!(sh("exit 3", 2000), OpenerOutcome::NoHandler);
+        assert_eq!(sh("exit 4", 2000), OpenerOutcome::NoHandler);
+        assert_eq!(sh("exit 2", 2000), OpenerOutcome::Failed(2));
+        assert_eq!(sh("sleep 5", 100), OpenerOutcome::Launched, "still running");
+        let missing = run_opener(
+            OsStr::new("cm-no-such-opener-7f3a"),
+            &[],
+            OsStr::new("x"),
+            Duration::from_millis(10),
+        );
+        assert_eq!(missing.unwrap_err().kind(), std::io::ErrorKind::NotFound);
+    }
+
+    #[test]
+    fn an_opener_that_found_nothing_says_what_is_missing() {
+        assert_eq!(opener_error(OpenerOutcome::Launched, Opens::File), None);
+        assert_eq!(
+            opener_error(OpenerOutcome::NoHandler, Opens::File),
+            Some(FileError::NoProgramForFile)
+        );
+        assert_eq!(
+            opener_error(OpenerOutcome::NoHandler, Opens::Folder),
+            Some(FileError::NoProgramForFolder)
+        );
+        assert!(opener_error(OpenerOutcome::Failed(1), Opens::Link)
+            .unwrap()
+            .to_string()
+            .contains("code 1"));
+        assert!(FileError::NoProgramForFile
+            .to_string()
+            .contains("Install a video player"));
+    }
+
+    /// Without Quick Look the poster error is FFmpeg's alone.
+    #[test]
+    fn a_missing_second_tool_does_not_hide_the_ffmpeg_error() {
+        assert_eq!(
+            combine_poster_errors(PosterError::FfmpegMissing, PosterError::NoThumbnailTool),
+            PosterError::FfmpegMissing
+        );
+        assert!(matches!(
+            combine_poster_errors(
+                PosterError::FfmpegNoFrame,
+                PosterError::QuickLookNoThumbnail
+            ),
+            PosterError::Both(..)
+        ));
     }
 
     #[test]
