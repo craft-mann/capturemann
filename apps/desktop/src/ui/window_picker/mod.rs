@@ -266,7 +266,7 @@ fn present(app: &Entity<AppModel>, targets: &serde_json::Value, cx: &mut App) {
                 is_resizable: false,
                 is_minimizable: false,
                 window_background: gpui::WindowBackgroundAppearance::Transparent,
-                ..Default::default()
+                ..crate::platform_window::popup_base()
             },
             view_builder(app.clone(), state, listing.outlines, platform),
         ),
