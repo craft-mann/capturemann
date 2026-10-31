@@ -40,6 +40,34 @@ pub fn monitor_factory() -> SourceFactory {
     Box::new(|sel: &DeviceSelector| open(sel, true))
 }
 
+/// The microphone factory the app uses by default: PipeWire when its daemon is reachable (Linux),
+/// else `fallback` (the cpal factory on macOS and Windows, and on a Linux without PipeWire).
+pub fn prefer_pipewire_mic(fallback: SourceFactory) -> SourceFactory {
+    if available() {
+        mic_factory()
+    } else {
+        fallback
+    }
+}
+
+/// The one microphone entry `list_devices` shows when PipeWire serves the audio: the default
+/// source. Picking another input is done in the desktop's sound settings (PipeWire's own default),
+/// the same way the recording follows it.
+pub fn default_mic_device() -> crate::MicDevice {
+    crate::MicDevice {
+        id: "default".into(),
+        name: "Default microphone (PipeWire)".into(),
+        default: true,
+        channels: 1,
+        sample_rate: STREAM_RATE,
+        max_channels: 2,
+        sample_rate_ranges: vec![crate::RateRange {
+            min: STREAM_RATE,
+            max: STREAM_RATE,
+        }],
+    }
+}
+
 /// Is PipeWire usable here? (Linux with a reachable daemon.)
 pub fn available() -> bool {
     imp::available()

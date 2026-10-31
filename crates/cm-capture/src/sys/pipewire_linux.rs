@@ -12,6 +12,47 @@ pub use imp::PortalPipeWire;
 pub struct PortalPipeWire;
 
 #[cfg(not(target_os = "linux"))]
+impl PortalPipeWire {
+    pub fn new() -> Self {
+        PortalPipeWire
+    }
+}
+
+/// What the desktop portal says about screen casting (for `list_devices` and the diagnostics).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct PortalStatus {
+    /// The ScreenCast interface answered.
+    pub available: bool,
+    /// It offers whole monitors (the only source type recording uses today).
+    pub monitor: bool,
+    /// It offers windows.
+    pub window: bool,
+    /// Why it is not available, or a note.
+    pub detail: Option<String>,
+}
+
+/// Asks the portal which source types it offers (a D-Bus property read; never opens a session or
+/// a dialog). Gives up after 3 s so a stuck portal cannot hang a device listing.
+pub fn portal_status() -> PortalStatus {
+    imp_status()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn imp_status() -> PortalStatus {
+    PortalStatus {
+        available: false,
+        monitor: false,
+        window: false,
+        detail: Some("The desktop portal exists on Linux only.".into()),
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn imp_status() -> PortalStatus {
+    imp::status()
+}
+
+#[cfg(not(target_os = "linux"))]
 use {
     crate::record::pipewire::{PwBackend, StreamInfo},
     crate::record::source::EventSink,
@@ -70,6 +111,40 @@ mod imp {
     impl PortalPipeWire {
         pub fn new() -> Self {
             Self::default()
+        }
+    }
+
+    pub fn status() -> super::PortalStatus {
+        let (tx, rx) = channel();
+        let spawned = std::thread::Builder::new()
+            .name("cm-portal-probe".into())
+            .spawn(move || {
+                let r = futures_lite::future::block_on(async {
+                    let proxy = Screencast::new().await?;
+                    proxy.available_source_types().await
+                });
+                let _ = tx.send(r.map_err(|e| e.to_string()));
+            });
+        let failed = |detail: String| super::PortalStatus {
+            available: false,
+            monitor: false,
+            window: false,
+            detail: Some(detail),
+        };
+        if spawned.is_err() {
+            return failed("cannot start the portal probe".into());
+        }
+        match rx.recv_timeout(Duration::from_secs(3)) {
+            Ok(Ok(types)) => super::PortalStatus {
+                available: true,
+                monitor: types.contains(SourceType::Monitor),
+                window: types.contains(SourceType::Window),
+                detail: None,
+            },
+            Ok(Err(e)) => failed(format!(
+                "The desktop portal has no ScreenCast service (install xdg-desktop-portal and your desktop's portal backend): {e}"
+            )),
+            Err(_) => failed("The desktop portal did not answer within 3 s.".into()),
         }
     }
 
@@ -304,6 +379,39 @@ mod imp {
         }
     }
 
+    /// Why the screen stream ended without being asked to. Each case is a stop the recorder keeps
+    /// the data of and tells the user about; none of them may leave the recording hanging.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(super) enum Lost {
+        /// The portal ended the sharing session (the user stopped sharing in the desktop's own
+        /// indicator, the compositor closed it, or the session's owner went away).
+        PortalClosed,
+        /// The connection to the PipeWire daemon broke (the daemon or the compositor restarted).
+        Connection(String),
+        /// The stream failed or was disconnected (the shared output or window disappeared).
+        Stream(String),
+        /// PipeWire could not be set up.
+        Setup(String),
+    }
+
+    impl Lost {
+        pub(super) fn into_stop(self) -> StopReason {
+            match self {
+                Lost::PortalClosed => StopReason::TargetClosed(
+                    "The desktop ended the screen share (the sharing session was closed).".into(),
+                ),
+                Lost::Connection(m) => StopReason::Error(format!(
+                    "The connection to PipeWire was lost (the desktop or the sound and video \
+                     server restarted): {m}"
+                )),
+                Lost::Stream(m) => StopReason::TargetClosed(format!(
+                    "The shared screen went away or its stream failed: {m}"
+                )),
+                Lost::Setup(m) => StopReason::Error(m),
+            }
+        }
+    }
+
     struct Fmt {
         info: spa::param::video::VideoInfoRaw,
         mapper: PtsMapper,
@@ -315,9 +423,9 @@ mod imp {
         fd: OwnedFd,
         sink: SharedSink,
         stop: Arc<AtomicBool>,
-    ) -> Result<(), CmError> {
-        let pw_err =
-            |what: &str, e: &dyn std::fmt::Display| CmError::internal(format!("{what}: {e}"));
+        closed: Arc<AtomicBool>,
+    ) -> Result<(), Lost> {
+        let pw_err = |what: &str, e: &dyn std::fmt::Display| Lost::Setup(format!("{what}: {e}"));
         pw::init();
         let mainloop =
             pw::main_loop::MainLoopRc::new(None).map_err(|e| pw_err("PipeWire loop", &e))?;
@@ -336,24 +444,81 @@ mod imp {
             },
         )
         .map_err(|e| pw_err("PipeWire stream", &e))?;
-        let params = param_pods()?;
+        let params = param_pods().map_err(|e| Lost::Setup(e.to_string()))?;
         let clock = SystemHostClock;
         let ml_state = mainloop.clone();
         let ml_proc = mainloop.clone();
         let stop_proc = Arc::clone(&stop);
-        let sink_state = Arc::new(std::sync::Mutex::new(None::<String>));
-        let sink_state2 = Arc::clone(&sink_state);
+        let lost = Arc::new(std::sync::Mutex::new(None::<Lost>));
+        let (lost_state, lost_core) = (Arc::clone(&lost), Arc::clone(&lost));
+        // The first reason wins; the loop ends on any of them.
+        fn set_lost(cell: &std::sync::Mutex<Option<Lost>>, why: Lost) {
+            if let Ok(mut g) = cell.lock() {
+                g.get_or_insert(why);
+            }
+        }
+        let ml_core = mainloop.clone();
+        let stop_core = Arc::clone(&stop);
+        // Errors on the core object itself (id 0) with EPIPE mean the daemon went away.
+        let _core_listener = core
+            .add_listener_local()
+            .error(move |id, _seq, res, message| {
+                if stop_core.load(Ordering::Relaxed) {
+                    return;
+                }
+                if id == pw::core::PW_ID_CORE && res == -libc::EPIPE {
+                    set_lost(&lost_core, Lost::Connection(message.to_owned()));
+                    ml_core.quit();
+                } else {
+                    log::warn!("PipeWire core error {res} on object {id}: {message}");
+                }
+            })
+            .register();
+        // The registry tells when the node we read from is removed (the compositor stopped the
+        // share, the shared output or window went away); a removed producer does not always move
+        // the consumer's stream out of "streaming".
+        let registry = core
+            .get_registry_rc()
+            .map_err(|e| pw_err("PipeWire registry", &e))?;
+        let (lost_reg, ml_reg, stop_reg) = (Arc::clone(&lost), mainloop.clone(), Arc::clone(&stop));
+        let _registry_listener = registry
+            .add_listener_local()
+            .global_remove(move |id| {
+                if id == node && !stop_reg.load(Ordering::Relaxed) {
+                    set_lost(
+                        &lost_reg,
+                        Lost::Stream("the shared screen's PipeWire node was removed".into()),
+                    );
+                    ml_reg.quit();
+                }
+            })
+            .register();
+        let stop_state = Arc::clone(&stop);
         let _listener = stream
             .add_local_listener_with_user_data(Fmt {
                 info: Default::default(),
                 mapper: PtsMapper::default(),
             })
-            .state_changed(move |_, _, _old, new| {
-                if let pw::stream::StreamState::Error(m) = new {
-                    if let Ok(mut g) = sink_state2.lock() {
-                        *g = Some(m);
+            .state_changed(move |_, _, old, new| {
+                log::info!("PipeWire screen stream: {old:?} -> {new:?}");
+                match new {
+                    pw::stream::StreamState::Error(m) => {
+                        set_lost(&lost_state, Lost::Stream(m));
+                        ml_state.quit();
                     }
-                    ml_state.quit();
+                    // Back to unconnected after having been connected: the node we were reading
+                    // is gone. (We only disconnect ourselves after the loop has ended.)
+                    pw::stream::StreamState::Unconnected
+                        if !matches!(old, pw::stream::StreamState::Unconnected)
+                            && !stop_state.load(Ordering::Relaxed) =>
+                    {
+                        set_lost(
+                            &lost_state,
+                            Lost::Stream("the stream was disconnected".into()),
+                        );
+                        ml_state.quit();
+                    }
+                    _ => {}
                 }
             })
             .param_changed(move |stream, fmt, id, param| {
@@ -409,9 +574,9 @@ mod imp {
             })
             .register()
             .map_err(|e| pw_err("PipeWire listener", &e))?;
-        let fmt = format_pod()?;
+        let fmt = format_pod().map_err(|e| Lost::Setup(e.to_string()))?;
         let mut pods: Vec<&spa::pod::Pod> =
-            vec![spa::pod::Pod::from_bytes(&fmt).ok_or_else(|| CmError::internal("format pod"))?];
+            vec![spa::pod::Pod::from_bytes(&fmt).ok_or_else(|| Lost::Setup("format pod".into()))?];
         stream
             .connect(
                 spa::utils::Direction::Input,
@@ -421,9 +586,16 @@ mod imp {
             )
             .map_err(|e| pw_err("PipeWire stream connect", &e))?;
         // The stop flag is also checked here: a still screen sends no buffers to `process`.
-        let (ml_t, stop_t) = (mainloop.clone(), Arc::clone(&stop));
+        // It also looks at the flag the portal watcher sets when the session's `Closed` signal
+        // arrives: when the desktop ends the share nothing on the PipeWire side says so for sure.
+        let (ml_t, stop_t, lost_t) = (mainloop.clone(), Arc::clone(&stop), Arc::clone(&lost));
         let timer = mainloop.loop_().add_timer(move |_| {
             if stop_t.load(Ordering::Relaxed) {
+                ml_t.quit();
+                return;
+            }
+            if closed.load(Ordering::Relaxed) {
+                set_lost(&lost_t, Lost::PortalClosed);
                 ml_t.quit();
             }
         });
@@ -433,10 +605,40 @@ mod imp {
         );
         mainloop.run();
         drop(_listener);
-        let failure = sink_state.lock().ok().and_then(|mut g| g.take());
+        drop(_core_listener);
+        drop(_registry_listener);
+        let failure = lost.lock().ok().and_then(|mut g| g.take());
         match failure {
-            Some(m) => Err(CmError::internal(m)),
+            Some(why) => Err(why),
             None => Ok(()),
+        }
+    }
+
+    /// Sets `closed` when the portal reports that it closed `session`; returns when that happened
+    /// or `done` is set.
+    fn watch_closed(
+        session: &ashpd::desktop::Session<Screencast>,
+        closed: &AtomicBool,
+        done: &AtomicBool,
+    ) {
+        use futures_lite::future::{block_on, poll_once};
+        use futures_lite::StreamExt;
+        let Ok(mut signal) = block_on(session.receive_closed()) else {
+            return;
+        };
+        while !done.load(Ordering::Relaxed) {
+            match block_on(poll_once(signal.next())) {
+                Some(Some(_)) => {
+                    closed.store(true, Ordering::Relaxed);
+                    return;
+                }
+                // The signal stream ended: the connection to the portal is gone with it.
+                Some(None) => {
+                    closed.store(true, Ordering::Relaxed);
+                    return;
+                }
+                None => std::thread::sleep(Duration::from_millis(50)),
+            }
         }
     }
 
@@ -472,20 +674,39 @@ mod imp {
                         height: o.size.1,
                         restore_token: o.token.clone(),
                     }));
-                    let result = stream_loop(o.node, o.fd, Arc::clone(&sink), Arc::clone(&stop));
+                    // The portal tells when it ends the session (the share indicator's "stop",
+                    // the compositor restarting). A watcher thread turns the signal into a flag
+                    // the PipeWire loop looks at; it ends with the loop.
+                    let session = Arc::new(session);
+                    let closed = Arc::new(AtomicBool::new(false));
+                    let done = Arc::new(AtomicBool::new(false));
+                    let watcher = {
+                        let (session, closed, done) =
+                            (Arc::clone(&session), Arc::clone(&closed), Arc::clone(&done));
+                        std::thread::Builder::new()
+                            .name("cm-portal-closed".into())
+                            .spawn(move || watch_closed(&session, &closed, &done))
+                            .ok()
+                    };
+                    let result = stream_loop(
+                        o.node,
+                        o.fd,
+                        Arc::clone(&sink),
+                        Arc::clone(&stop),
+                        Arc::clone(&closed),
+                    );
+                    done.store(true, Ordering::Relaxed);
+                    if let Some(w) = watcher {
+                        let _ = w.join();
+                    }
                     // A failure nobody asked for ends the recording's screen track.
-                    if let Err(e) = &result {
+                    if let Err(why) = &result {
+                        log::warn!("PipeWire screen stream ended: {why:?}");
                         if !stop.load(Ordering::Relaxed) {
-                            emit(
-                                &sink,
-                                SourceEvent::Stopped(StopReason::Error(e.to_string())),
-                            );
+                            emit(&sink, SourceEvent::Stopped(why.clone().into_stop()));
                         }
                     }
                     let _ = futures_lite::future::block_on(session.close());
-                    if let Err(e) = result {
-                        log::warn!("PipeWire screen stream ended: {e}");
-                    }
                 })
                 .map_err(|e| CmError::internal(format!("cannot start the capture thread: {e}")))?;
             self.thread = Some(thread);

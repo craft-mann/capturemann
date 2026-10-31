@@ -181,14 +181,10 @@ pub fn system_lines(stack: Option<&cm_platform::stack::Report>) -> Vec<String> {
     out
 }
 
-fn permission_lines(stack: Option<&cm_platform::stack::Report>) -> Vec<String> {
-    // Linux has no per-app permission switches to report: the screen portal asks at capture time
-    // and the microphone and camera are not gated by the system (the stack facts are in System).
-    if stack.is_some() {
-        return vec![
-            "screen capture asked by the desktop portal at capture time".to_owned(),
-            "microphone and camera not gated by the system".to_owned(),
-        ];
+fn permission_lines() -> Vec<String> {
+    // Linux has no permission prompts to report: the portal, PipeWire and the encoder are.
+    if let Some(lines) = crate::recording::sys::linux::diagnostic_permission_lines() {
+        return lines;
     }
     vec![
         format!("microphone {:?}", cm_audio::microphone_permission()),
@@ -253,7 +249,7 @@ impl Inner {
         let mut sections = vec![
             Section::new("App", app_lines()),
             Section::new("System", system_lines(stack.as_ref())),
-            Section::new("Permissions", permission_lines(stack.as_ref())),
+            Section::new("Permissions", permission_lines()),
         ];
         let gaps = stack.map(|r| r.gap_lines()).unwrap_or_default();
         if !gaps.is_empty() {

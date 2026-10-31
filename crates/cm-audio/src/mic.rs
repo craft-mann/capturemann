@@ -55,6 +55,11 @@ pub fn cpal_mic_factory() -> SourceFactory {
     })
 }
 
+/// The microphone factory of this system: PipeWire where it runs (Linux), else cpal.
+pub fn default_mic_factory() -> SourceFactory {
+    crate::sys::linux_pipewire::prefer_pipewire_mic(cpal_mic_factory())
+}
+
 /// Records the microphone on the session clock.
 pub struct MicRecorder {
     inner: AudioRecorder,
@@ -63,7 +68,7 @@ pub struct MicRecorder {
 impl MicRecorder {
     /// A recorder on the real microphone.
     pub fn new(cfg: MicConfig) -> Self {
-        Self::with_factory(cfg, cpal_mic_factory())
+        Self::with_factory(cfg, default_mic_factory())
     }
 
     /// A recorder over any source factory (tests use [`crate::FakeAudioSource`]).
@@ -170,7 +175,7 @@ pub struct MicMonitor {
 
 impl MicMonitor {
     pub fn start(device: &DeviceSelector) -> Result<Self, CmError> {
-        Self::start_with(device.clone(), cpal_mic_factory())
+        Self::start_with(device.clone(), default_mic_factory())
     }
 
     pub fn start_with(device: DeviceSelector, mut factory: SourceFactory) -> Result<Self, CmError> {

@@ -1,7 +1,7 @@
 //! Where the engine gets its tracks, permissions and device lists: the [`SourceFactory`] seam.
 //!
 //! [`SystemSources`] is the real thing (ScreenCaptureKit and VideoToolbox, `cpal`, AVFoundation,
-//! the cursor event tap). Tests and embedders without hardware inject a fake factory (see
+//! the cursor event tap; on Linux the portal, PipeWire and an FFmpeg VP9 encoder). Tests and embedders without hardware inject a fake factory (see
 //! `cm_daemon::testing::FakeSources`). Every method is synchronous and may block: the engine
 //! calls them from `spawn_blocking`.
 //!
@@ -93,6 +93,22 @@ pub trait SourceFactory: Send + Sync {
     /// Permission and device checks for the requested sensors (screen is checked unless
     /// `req.needs_screen_permission()` says no).
     fn preflight(&self, req: &SensorRequest) -> Preflight;
+
+    /// Whether this system can record `target` at all; checked before the targets are listed.
+    /// The default accepts everything. Linux answers `not_implemented` for windows and regions
+    /// (the portal's dialog picks the screen; see `specs/plans/linux-recording-plan.md`).
+    fn check_target(&self, target: &cm_capture::CaptureTarget) -> Result<(), CmError> {
+        let _ = target;
+        Ok(())
+    }
+
+    /// The displays and windows to plan against when the OS cannot list them without user
+    /// interaction. `None` (the default) means ask the capturer. Linux/Wayland returns one
+    /// "Desktop" display: listing it through the screenshot portal would take a screenshot (and
+    /// maybe show a dialog) just to learn a size the screen stream reports itself.
+    fn targets(&self) -> Option<Result<Targets, CmError>> {
+        None
+    }
 
     /// Names of the microphone and camera that would be used.
     fn device_names(&self, req: &SensorRequest) -> DeviceNames;
@@ -430,37 +446,40 @@ mod real {
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 pub use real::SystemSources;
 
-/// The real sources are only built for macOS and Windows.
+/// The real sources of a Linux desktop (and any other system without its own): the portal and
+/// PipeWire, see [`super::sys::linux`].
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SystemSources;
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 impl SourceFactory for SystemSources {
-    fn preflight(&self, _req: &SensorRequest) -> Preflight {
-        Preflight {
-            errors: vec![CmError::invalid_input(
-                "Recording is supported on macOS and Windows only",
-            )],
-            warnings: Vec::new(),
-        }
+    fn preflight(&self, req: &SensorRequest) -> Preflight {
+        super::sys::linux::LinuxSources::real().preflight(req)
     }
 
-    fn device_names(&self, _req: &SensorRequest) -> DeviceNames {
-        DeviceNames::default()
+    fn check_target(&self, target: &cm_capture::CaptureTarget) -> Result<(), CmError> {
+        super::sys::linux::LinuxSources::real().check_target(target)
     }
 
-    fn build(&self, _cx: &BuildContext<'_>) -> Result<Vec<Box<dyn SessionTrack>>, CmError> {
-        Err(CmError::invalid_input(
-            "Recording is supported on macOS and Windows only",
-        ))
+    fn targets(&self) -> Option<Result<Targets, CmError>> {
+        super::sys::linux::LinuxSources::real().targets()
+    }
+
+    fn device_names(&self, req: &SensorRequest) -> DeviceNames {
+        super::sys::linux::LinuxSources::real().device_names(req)
+    }
+
+    fn build(&self, cx: &BuildContext<'_>) -> Result<Vec<Box<dyn SessionTrack>>, CmError> {
+        super::sys::linux::LinuxSources::real().build(cx)
+    }
+
+    fn build_audio(&self, params: &ResolvedStart) -> Result<Vec<Box<dyn SessionTrack>>, CmError> {
+        super::sys::linux::LinuxSources::real().build_audio(params)
     }
 
     fn devices(&self) -> Value {
-        serde_json::json!({
-            "cameras": [], "cameras_error": "not supported on this OS", "mics": [],
-            "system_audio": { "supported": false, "backend": "none" },
-        })
+        super::sys::linux::LinuxSources::real().devices()
     }
 }
 
