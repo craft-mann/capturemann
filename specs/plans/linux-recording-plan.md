@@ -100,8 +100,9 @@ and write fMP4 with the existing `FragmentedMp4Writer` (needs a `vp09` init segm
   filling, stride repacking, and tests (skipped without an FFmpeg that has libvpx-vp9).
 * `cm-capture` `record::pipewire`: `PtsMapper`, `frame_from_buffer` (stride/format checks), `TokenStore` +
   `MemoryTokenStore`/`FileTokenStore`, `PwBackend` trait, `PipeWireScreenSource` implementing `ScreenSource`,
-  and a scripted backend. All pure Rust and tested on macOS. Linux only: `record::pipewire_sys` (portal via
-  ashpd + PipeWire stream, adapted from `spikes/spike-portal-capture`).
+  and a scripted backend. All pure Rust and tested on macOS. The Linux part is `sys/pipewire_linux.rs`
+  (`PortalPipeWire`: portal via ashpd + PipeWire stream, adapted from `spikes/spike-portal-capture`; a
+  stub that answers `not_implemented` on other systems, so callers compile everywhere).
 * `cm-audio` `sys/linux_pipewire.rs`: `PipeWireAudioSource` (mic, sink monitor); pure helpers (sample
   conversion, timestamp, device naming) tested everywhere.
 * Dependencies (Linux only, `[target.'cfg(target_os = "linux")'.dependencies]`): `pipewire` 0.10 (MIT), its
@@ -155,3 +156,15 @@ Disjoint files per task; all behind the traits above.
 * **D-R3** FFmpeg child process for Linux encoding (fast to ship) vs in-process libvpx and hand-written VA-API.
 * **D-R4** Add the VP9 decoder to the bundled FFmpeg (needed if D-R2 is yes).
 * **D-R5** Minimum supported stack: PipeWire only (no PulseAudio/JACK/ALSA-only), portal v4+ with persist.
+
+## 8. Result of the VM run and what it did not settle
+
+`verification/L1-recording-linux-2026-10-31-claude.md`: 10 s at 30 fps, 1280x720, headless GNOME 46, restore
+token (no dialog): 301 frames in `screen.mp4` (VP9, fragmented MP4), every gap exactly 33.33 ms, no late
+or dropped frames, 0.30 core of CPU in total (ffmpeg included); at 60 fps 600 frames, 0.57 core, 27 repeated frames
+(the virtual monitor delivers 57 fps). System audio through the sink monitor: five 1 kHz beeps 2.000 s apart
+in the file. Mic: PipeWire null source (silence), 2.8 ppm drift. Not settled: A/V sync by eye or by a flash
+and a beep (no flash source in the VM), anything on a real GPU, 1080p and above, DMA-BUF, and windows/regions.
+Known wrinkles to fix when wiring the product: the track details say `codec: h264` (the plan's codec) while the file
+is VP9 (`Codec` has no VP9 variant yet, `used_plan()` cannot say so); `cursor: true` is reported but the cursor is
+only in the pixels.
