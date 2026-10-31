@@ -61,6 +61,12 @@ impl TextBuffer {
         self.text.is_empty()
     }
 
+    /// The selected text: the whole text after "select all", otherwise nothing (a field has no
+    /// partial selection). What Copy and Cut put on the clipboard.
+    pub fn selected_text(&self) -> Option<&str> {
+        (self.all_selected && !self.text.is_empty()).then_some(self.text.as_str())
+    }
+
     /// Text before and after the caret.
     pub fn split(&self) -> (&str, &str) {
         self.text.split_at(self.cursor)
@@ -509,6 +515,20 @@ mod tests {
         c.insert("Chào bạn");
         c.set_cursor_column(true, 4);
         assert_eq!(c.split().0, "Chào");
+    }
+
+    #[test]
+    fn only_a_select_all_has_text_to_copy() {
+        let mut b = TextBuffer::default();
+        b.insert("Việt Nam");
+        assert_eq!(b.selected_text(), None);
+        b.select_all();
+        assert_eq!(b.selected_text(), Some("Việt Nam"));
+        b.left();
+        assert_eq!(b.selected_text(), None);
+        let mut e = TextBuffer::default();
+        e.select_all();
+        assert_eq!(e.selected_text(), None);
     }
 
     #[test]
