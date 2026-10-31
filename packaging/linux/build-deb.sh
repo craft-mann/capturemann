@@ -188,7 +188,8 @@ deps=("libc6 (>= $glibc)" "libgcc-s1" "libstdc++6" "libgtk-3-0t64" "libasound2t6
       "libfontconfig1" "libfreetype6" "libssl3t64" "libdbus-1-3" "libpipewire-0.3-0t64" "libvulkan1"
       "mesa-vulkan-drivers | vulkan-icd")
 [ "$has_ffmpeg" = 0 ] || deps+=("libva2" "libva-drm2")
-recommends=("gnome-keyring | kwalletmanager" "xdg-desktop-portal" "pipewire")
+# tesseract-ocr: the text recognizer behind Auto-redact (run as a helper program, nothing is linked).
+recommends=("gnome-keyring | kwalletmanager" "xdg-desktop-portal" "pipewire" "tesseract-ocr")
 [ "$has_ffmpeg" = 1 ] || recommends+=("ffmpeg")
 join() { local IFS=,; echo "$*" | sed 's/,/, /g'; }
 maintainer="${CM_DEB_MAINTAINER:-The CaptureMann contributors <noreply@users.noreply.github.com>}"

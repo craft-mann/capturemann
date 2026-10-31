@@ -139,7 +139,7 @@ sudo apt install libgtk-3-0t64 libasound2t64 libxkbcommon0 libxkbcommon-x11-0 li
 # only for the bundled FFmpeg (it links libva, which Mesa desktops already have):
 sudo apt install libva2 libva-drm2
 # optional: secrets, screen capture on Wayland, export without a bundled FFmpeg
-sudo apt install gnome-keyring xdg-desktop-portal ffmpeg
+sudo apt install gnome-keyring xdg-desktop-portal ffmpeg tesseract-ocr   # tesseract-ocr: Auto-redact (a helper program; without it the button is dimmed)
 ```
 
 `./check-runtime.sh` (in the tarball; `packaging/linux/check-runtime.sh` in the repository) runs `ldd` on every
