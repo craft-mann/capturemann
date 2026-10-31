@@ -378,6 +378,8 @@ dependencies = [
  "futures-util",
  "getrandom 0.4.3",
  "serde",
+ "serde_repr",
+ "tokio",
  "zbus",
 ]
 
@@ -1259,6 +1261,7 @@ dependencies = [
 name = "cm-capture"
 version = "0.2.5"
 dependencies = [
+ "ashpd",
  "block2 0.6.2",
  "cm-core",
  "cm-encode",
@@ -1277,6 +1280,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "time",
+ "tokio",
  "windows 0.61.3",
  "xcap",
 ]
@@ -7868,6 +7872,7 @@ dependencies = [
  "signal-hook-registry",
  "socket2",
  "tokio-macros",
+ "tracing",
  "windows-sys 0.61.2",
 ]
 
@@ -9634,6 +9639,7 @@ dependencies = [
  "rustix 1.1.5",
  "serde",
  "serde_repr",
+ "tokio",
  "tracing",
  "uds_windows",
  "uuid",

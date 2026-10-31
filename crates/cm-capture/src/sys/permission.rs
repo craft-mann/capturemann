@@ -3,8 +3,7 @@
 use cm_core::CmError;
 
 /// `Ok` when screen capture can work; otherwise the error a client shows: `permission_missing`
-/// where the OS has a grant (macOS), `not_implemented` on a Wayland session (it needs the desktop
-/// portal), `internal` when there is no display at all.
+/// where the OS has a grant (macOS), `internal` when there is no display at all.
 pub fn check() -> Result<(), CmError> {
     imp::check()
 }
@@ -50,10 +49,8 @@ mod imp {
     pub fn check() -> Result<(), CmError> {
         match session::from_env() {
             DisplayServer::X11 => Ok(()),
-            DisplayServer::Wayland => Err(CmError::not_implemented(
-                "screen capture on a Wayland session needs the desktop portal, which is not \
-                 built yet; log in to an X11 session to capture for now",
-            )),
+            // The desktop portal asks the user on the first capture.
+            DisplayServer::Wayland => Ok(()),
             DisplayServer::None => Err(CmError::internal(
                 "no display: neither DISPLAY nor WAYLAND_DISPLAY is set",
             )),

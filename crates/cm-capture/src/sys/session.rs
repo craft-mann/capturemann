@@ -55,6 +55,18 @@ pub fn from_env() -> DisplayServer {
     )
 }
 
+/// True on a Linux Wayland session, where capture goes through the desktop portal.
+pub fn is_wayland() -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        from_env() == DisplayServer::Wayland
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        false
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

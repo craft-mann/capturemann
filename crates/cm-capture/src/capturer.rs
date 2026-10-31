@@ -178,7 +178,11 @@ impl Capturer {
     /// Capturer on the real OS backend.
     #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn system() -> Self {
-        Self::new(crate::XcapBackend::new())
+        if crate::sys::session::is_wayland() {
+            Self::new(crate::sys::portal::PortalBackend::new())
+        } else {
+            Self::new(crate::XcapBackend::new())
+        }
     }
 
     /// Overrides which process counts as "CaptureMann itself"; `None` keeps every window.
