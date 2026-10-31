@@ -40,7 +40,7 @@ const MAX_SCALED_PIXELS: u64 = 40_000_000;
 pub struct TesseractOptions {
     /// Up-scaling factor (1 = none). Reduced automatically to stay under the pixel bound.
     pub scale: u32,
-    /// Tesseract page segmentation mode (11 = sparse text, 3 = automatic, 6 = one block).
+    /// Tesseract page segmentation mode (6 = one block of text, 11 = sparse text, 3 = automatic).
     pub psm: u32,
     /// Invert pictures whose mean brightness is below this (0..=255); 0 never inverts.
     pub invert_below: u8,
@@ -49,8 +49,8 @@ pub struct TesseractOptions {
 impl Default for TesseractOptions {
     fn default() -> Self {
         TesseractOptions {
-            scale: 2,
-            psm: 11,
+            scale: 3,
+            psm: 6,
             invert_below: 110,
         }
     }
@@ -620,9 +620,9 @@ mod tests {
     fn dark_pictures_are_inverted_and_scaled() {
         let dark = RgbaImage::from_pixel(10, 6, image::Rgba([10, 10, 10, 255]));
         let (png, s) = prepare(&dark, &TesseractOptions::default()).unwrap();
-        assert_eq!(s, 2);
+        assert_eq!(s, 3);
         let back = image::load_from_memory(&png).unwrap().to_luma8();
-        assert_eq!(back.dimensions(), (20, 12));
+        assert_eq!(back.dimensions(), (30, 18));
         assert!(back.as_raw().iter().all(|&v| v > 200));
         let light = RgbaImage::from_pixel(10, 6, image::Rgba([240, 240, 240, 255]));
         let (png, _) = prepare(&light, &TesseractOptions::default()).unwrap();

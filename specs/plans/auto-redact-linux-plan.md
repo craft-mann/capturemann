@@ -24,14 +24,14 @@ only "pixels to text lines with boxes" was missing.
 
 ## 2. The choice: the system `tesseract` program as a helper process
 
-`crates/cm-render/src/ocr/tesseract.rs` runs `tesseract stdin stdout -l eng --psm 11 tsv`, feeds it a grayscale PNG
+`crates/cm-render/src/ocr/tesseract.rs` runs `tesseract stdin stdout -l eng --psm 6 tsv`, feeds it a grayscale PNG
 on stdin and reads word boxes from the TSV. It is found like the other helper programs: `CM_TESSERACT` (file or
 folder), next to the executable (so a package may ship its own copy), then `PATH`. `CM_TESSDATA` points at a folder
 with `eng.traineddata`. Nothing is linked into CaptureMann.
 
 | Option | Licence | Accuracy on small UI text | Weight and build | Models and consent | Verdict |
 |---|---|---|---|---|---|
-| **`tesseract` binary as helper** | Tesseract Apache-2.0, Leptonica BSD-2-clause, `eng` data Apache-2.0. An external program is not part of our binary: nothing to audit in `cargo deny`, nothing linked. | Good on 14 px and above, usable at 9 to 12 px after the 2x up-scaling step (numbers in the verification report). Weaker than Apple Vision on dark themes and on mixed-theme pictures. | 0 bytes in the app; the distro package is about 30 MB with `eng` data. No build step; works on aarch64 and x86_64 as the distro ships it. | The data comes with the package the user installs (`sudo apt install tesseract-ocr`), so the app **downloads nothing**; the consent rule is met because the user installs it. | **Chosen.** Simplest, safest licence story, testable in the VM, same pattern as `ffmpeg` and `llama-server`. |
+| **`tesseract` binary as helper** | Tesseract Apache-2.0, Leptonica BSD-2-clause, `eng` data Apache-2.0. An external program is not part of our binary: nothing to audit in `cargo deny`, nothing linked. | Measured on the synthetic set (text 9 to 18 px, light and dark): 84.5 % of the items found and 92.7 % precision with the defaults, against 95.3 % and 92.0 % for Apple Vision on the same set; weakest on private-key blocks, MBI, VIN and IBAN (see the benchmark report). | 0 bytes in the app; the distro package is about 30 MB with `eng` data. No build step; works on aarch64 and x86_64 as the distro ships it. | The data comes with the package the user installs (`sudo apt install tesseract-ocr`), so the app **downloads nothing**; the consent rule is met because the user installs it. | **Chosen.** Simplest, safest licence story, testable in the VM, same pattern as `ffmpeg` and `llama-server`. |
 | `tesseract-rs` / `leptess` (bindings) | The binding crates are MIT (as recalled, not re-checked); they link `libtesseract` and `libleptonica`. | Same engine. | Needs the C++ libraries and headers at build time on every platform, or a source build of both (cmake, long). CI and the cross builds get heavier; a bundled copy adds about 5 to 10 MB plus data. | `eng.traineddata` still has to be found or downloaded. | Rejected for now: all the cost of a native dependency for the same accuracy as the helper. Revisit if we want to ship OCR inside the Linux tarball. |
 | `ocrs` (pure Rust, `rten`) | Code MIT/Apache-2.0 (as recalled, not re-checked). The two model files' licence has to be read before shipping. | Made for screenshots and scans; unmeasured here. Its recognition models are Latin-script, with no per-word confidence of the kind we use. | Small binary, but a new inference runtime next to ONNX Runtime (inside sherpa-onnx) and ggml (whisper.cpp, llama-server). | Two model files (about 10 MB) would need the model store, a consent step and pinned hashes; not built. | The best candidate for a later "ships inside the app" version. Not chosen now because it needs a model store entry, a pinned download and a licence review that we cannot do offline, and the helper already works. |
 | PaddleOCR through `ort` | Models Apache-2.0; `ort` is MIT/Apache-2.0 but pulls the ONNX Runtime shared library (tens of MB). | Best of the open options on small text, in general. | A second ONNX Runtime next to the one sherpa-onnx already links statically: duplicate-symbol and size risk. Detection, direction and recognition models, about 15 to 20 MB. | Same model store and consent work as `ocrs`, more of it. | Rejected for 0.2.x: weight and the runtime clash. |
@@ -53,18 +53,21 @@ with `eng.traineddata`. Nothing is linked into CaptureMann.
 - The 100% local rule holds: the helper reads the picture from stdin, writes to stdout, and has no network code. The
   picture is never written to disk by us.
 
-### Preparation steps (general, measured on the dev split of the synthetic set)
+### Preparation steps (general, compared on the dev split of the synthetic set)
 
-- grayscale, 2x Catmull-Rom up-scaling (tesseract is trained for text about 30 px high; UI text is 9 to 14 px),
-  bounded to 40 megapixels after scaling;
+- grayscale, 3x Catmull-Rom up-scaling (tesseract is trained for text about 30 px high; UI text is 9 to 14 px),
+  reduced automatically so the scaled picture stays under 40 megapixels (a 4K screenshot is read at 2x);
 - invert when the mean brightness is below 110/255 (mostly dark pictures), because the LSTM engine reads
-  dark-on-light best;
-- page segmentation mode 11 (sparse text) rather than 3 (automatic), then join words into lines by geometry in our
-  code (tesseract's own line numbers split phone numbers and keys at spaces and column edges);
+  dark-on-light best (the dev results are the same for dark and light pictures);
+- page segmentation mode 6 (one block of text), then join words into lines by geometry in our code (tesseract's own
+  line numbers split phone numbers and keys at spaces and column edges);
 - `OMP_THREAD_LIMIT=1` (threads make it slower on screenshots) and a 180 s timeout that kills the helper.
 
-The choices of scale and mode are compared in the verification report; they were fixed on the `dev` split only. The
-`held_out` split was not read.
+Eight combinations of scale and mode were run on the `dev` split (211 images, recall any kind / precision):
+scale 1: 64.1 % / 86.4 %; scale 2 (modes 11, 3, 6): 78.5 / 90.9, 78.8 / 91.4, 80.9 / 92.3; scale 3 (modes 11, 3, 6):
+83.4 / 90.9, 82.5 / 91.5, **84.5 / 92.7**; scale 4 mode 6: 83.8 / 91.3. Scale 3 with mode 6 is the default; it also
+costs about 1 s per image (mean 958 ms, p95 1.9 s at about 1000 x 700 px, on a shared 4-CPU VM). The `held_out` split
+was not read. `CM_TESSERACT_SCALE` and `CM_TESSERACT_PSM` exist to repeat such a comparison.
 
 ## 3. What the maintainer decides or supplies
 
