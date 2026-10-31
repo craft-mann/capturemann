@@ -57,11 +57,19 @@ Write down: distribution and version, desktop and version, `echo $XDG_SESSION_TY
     selected region; Esc saves nothing.
 12. **X11:** window screenshot of a terminal. **Pass:** the window's contents, titled in the library.
 13. **Wayland:** display screenshot. **Pass:** the desktop's own portal dialog (or an unprompted capture, if
-    you chose "allow" before) appears; after accepting, one "Desktop" display image is saved. Declining gives a
-    clear "permission denied" style message and saves nothing.
-14. **Wayland:** region screenshot. **Pass:** the portal's own picker appears (no custom overlay on GNOME); the saved
-    image is the chosen region. Window lists are not available on Wayland: **Pass:** the window picker says so,
-    it does not show an empty list as if windows were absent.
+    you chose "allow" before) appears; after accepting, one image per monitor is listed by `capturemann targets`
+    (name, position, scale as in the desktop's Displays settings) and `capture screenshot --display N` saves
+    exactly that monitor. Declining gives a clear "permission denied" style message and saves nothing.
+14. **Wayland:** region screenshot from the launcher (the region shortcut). **Pass:** a dimmed, frozen picture of
+    each monitor fills the screen (a fullscreen CaptureMann window per monitor); dragging selects a region, Enter
+    saves it, Esc saves nothing; the saved image is the chosen region. With two monitors of different scale, note
+    whether the overlay matches each monitor (record it; mixed DPI is untested).
+14a. **Wayland:** window screenshot from the launcher, and `capturemann capture screenshot --pick`. **Pass:** the
+    desktop's own picker (on GNOME the screenshot chooser with Selection / Screen / Window) appears; choosing
+    a window saves that window; Esc saves nothing and the command exits 3. `capturemann capture screenshot --window
+    x` answers `not_implemented` and names `--pick`; `capturemann targets` says the desktop does not list windows.
+14b. **X11:** open `xclock` and `xterm`; `capturemann targets` lists them **with titles**; `capture screenshot
+    --window xclock` saves the window.
 15. Open the screenshot in the editor, add an arrow and a blur, copy to clipboard (X11: paste into another app;
     Wayland: paste into another app too). **Pass:** the pasted image is the edited one.
 
