@@ -202,10 +202,15 @@ Intel one: a `tar.gz` per CPU, attached by hand to a pre-release. Format decisio
 2. Download both artifacts, check `sha256sum -c`, and try one on a real desktop (X11 and Wayland) before
    publishing. Record the run in `verification/`; until a report exists the notes say "tested with fakes" or
    "built on CI", never "verified".
-3. Create the draft pre-release by hand (`gh release create vX.Y.Z --draft --prerelease ...` with the four files) and
-   say in the notes: early build, no speaker engine, MP4 export needs a VAAPI GPU or your own FFmpeg, glibc 2.39
-   or newer, the apt packages from `packaging/linux/README.md`, not signed (only the SHA-256 file).
-4. Not done for Linux: signing of the tarball, a `.deb`, Flatpak, an AppImage, a package repository,
+3. Sign on your own machine with minisign (the secret key never goes to CI): put the downloaded tarballs and
+   `.sha256` files in one folder and run `packaging/linux/sign-linux.sh <folder>`. It writes a `.minisig` next to
+   each file and verifies it with the public key `packaging/linux/minisign.pub`. One-time setup (the key pair,
+   committing the public key, publishing its fingerprint) is in the script's header.
+4. Create the draft pre-release by hand (`gh release create vX.Y.Z --draft --prerelease ...` with the tarballs, the
+   `.sha256` files and the `.minisig` files) and say in the notes: early build, no speaker engine, MP4 export needs
+   a VAAPI GPU or your own FFmpeg, glibc 2.39 or newer, the apt packages from `packaging/linux/README.md`, and how
+   to verify (`minisign -Vm <file> -P <public key>`, the key is on the release page).
+5. Not done for Linux: a `.deb`, Flatpak, an AppImage, a package repository,
    a sherpa-onnx build (speaker labels), and a Linux item in the website and Homebrew steps.
 
 ## Rollback and yank

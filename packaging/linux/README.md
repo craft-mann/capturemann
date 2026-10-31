@@ -18,6 +18,18 @@ Reasons in short: the product is a desktop app plus a CLI and an MCP server that
 so unpacking into a normal prefix with symlinks in `bin/` suits it better than a sandbox; and there are no
 users yet who would be hurt by installing five apt packages by hand.
 
+## Verifying a download
+
+Each release file has a `.minisig` signature made with the project's minisign key
+(`packaging/linux/minisign.pub`; the same public key is on the release page). Check both the checksum and the signature:
+
+```sh
+sha256sum -c capturemann-<version>-linux-<arch>.tar.gz.sha256
+minisign -Vm capturemann-<version>-linux-<arch>.tar.gz -p minisign.pub
+```
+
+The maintainer signs with `packaging/linux/sign-linux.sh` (see its header for the key setup).
+
 ## What is in the tarball
 
 ```
