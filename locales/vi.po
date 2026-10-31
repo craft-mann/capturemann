@@ -10846,9 +10846,6 @@ msgstr "Desktop portal không có giao diện Screenshot, nên không thể ch�
 msgid "The desktop portal service does not answer, so Wayland screenshots and screen recording are not possible. Install xdg-desktop-portal and the portal for your desktop."
 msgstr "Dịch vụ desktop portal không phản hồi, nên không thể chụp ảnh màn hình hay quay màn hình trên Wayland. Hãy cài đặt xdg-desktop-portal và portal cho môi trường desktop của bạn."
 
-msgid "The tray icon is not available on Linux yet. Use the launcher window."
-msgstr "Biểu tượng khay hệ thống chưa khả dụng trên Linux. Hãy dùng cửa sổ khởi chạy."
-
 msgid "What this system is missing"
 msgstr "Hệ thống này còn thiếu gì"
 
