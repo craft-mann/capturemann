@@ -274,6 +274,7 @@ Run on Oct 31, 2026 in a virtual machine (aarch64 Ubuntu 24.04, GNOME Shell 46 h
 | Spike | Result | Report |
 | --- | --- | --- |
 | `spike-portal-capture`: ScreenCast portal through PipeWire (`spikes/spike-portal-capture`) | Works on GNOME 46 Wayland: consent dialog, restore token (no dialog the second time), 57.6 fps on a 60 Hz virtual monitor with p99 frame gap 18.8 ms, presentation timestamps on every frame, cursor metadata on every frame. The consumer must ask for the header and cursor metas after the format is set, with the cursor size as a range. No GlobalShortcuts portal at GNOME 46. | [`verification/L0-portal-screencast-2026-10-31-claude.md`](../../verification/L0-portal-screencast-2026-10-31-claude.md) |
+| `spike-shot` (S1) on Linux with `xcap` | X11: display and region capture fine (1920x1080 in 7 to 11 ms); window capture not shown (spike limitation); GNOME Wayland: `xcap` does not work there, the portal is needed | [`verification/L0-xcap-linux-2026-10-31-claude.md`](../../verification/L0-xcap-linux-2026-10-31-claude.md) |
 
 ## Decision
 
