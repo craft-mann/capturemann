@@ -1,5 +1,5 @@
-//! "Launch at login" (CAP-2.AC5): a LaunchAgent (macOS) or a per-user `Run` registry value
-//! (Windows) that starts the installed app in the tray (`--background`, no window) when the user
+//! "Launch at login" (CAP-2.AC5): a LaunchAgent (macOS), a per-user `Run` registry value
+//! (Windows) or an XDG autostart `.desktop` file (Linux) that starts the installed app in the tray (`--background`, no window) when the user
 //! logs in. Default OFF until the user turns it on in Settings: a
 //! login item is persistence on the user's machine, so it needs an explicit opt-in (CAP-2.AC5 says "default on"
 //! for an installed release; revisit when there is an installer).
@@ -60,6 +60,29 @@ pub fn plist_path(home: &Path) -> PathBuf {
         .join(format!("{LABEL}.plist"))
 }
 
+/// The XDG autostart entry (Linux): the desktop environment runs `Exec` at login. Spaces and
+/// quotes in the path are quoted as the Desktop Entry spec asks.
+pub fn desktop_entry(exe: &Path) -> String {
+    let exe = exe
+        .to_string_lossy()
+        .replace('\\', "\\\\\\\\")
+        .replace('"', "\\\\\"")
+        .replace('`', "\\\\`")
+        .replace('$', "\\\\$")
+        .replace('%', "%%");
+    format!(
+        "[Desktop Entry]\nType=Application\nName=CaptureMann\nExec=\"{exe}\" --background\n\
+Terminal=false\nX-GNOME-Autostart-enabled=true\n"
+    )
+}
+
+/// `<config base>/autostart/<label>.desktop` (the config base is `$XDG_CONFIG_HOME` or `~/.config`).
+pub fn desktop_entry_path(config_base: &Path) -> PathBuf {
+    config_base
+        .join("autostart")
+        .join(format!("{LABEL}.desktop"))
+}
+
 /// The command line the Windows `Run` value holds: the quoted executable and `--background`.
 pub fn command_line(exe: &Path) -> String {
     format!("\"{}\" --background", exe.display())
@@ -100,7 +123,8 @@ fn bundled_exe() -> Option<PathBuf> {
 
 /// The executable when it is an installed copy rather than a cargo build (a `target` folder in its
 /// path).
-#[cfg(windows)]
+// macOS registers the app bundle instead, so nothing calls this there.
+#[allow(dead_code)]
 fn installed_exe() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
     let in_target = exe
@@ -127,8 +151,25 @@ pub fn read_enabled(config_dir: &Path) -> bool {
 pub fn sync(config_dir: &Path) -> Result<(), String> {
     #[cfg(not(any(target_os = "macos", windows)))]
     {
-        let _ = config_dir;
-        Ok(())
+        let Some(base) = cm_platform::dirs::config_base_dir() else {
+            return Ok(());
+        };
+        let path = desktop_entry_path(&base);
+        let current = std::fs::read_to_string(&path).ok();
+        match plan_entry(
+            read_enabled(config_dir),
+            installed_exe().as_deref().map(desktop_entry),
+            current.as_deref(),
+        ) {
+            Plan::Nothing => Ok(()),
+            Plan::Remove => std::fs::remove_file(&path).map_err(|e| e.to_string()),
+            Plan::Install(text) => {
+                if let Some(dir) = path.parent() {
+                    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+                }
+                std::fs::write(&path, text).map_err(|e| e.to_string())
+            }
+        }
     }
     #[cfg(windows)]
     {
@@ -197,6 +238,26 @@ mod tests {
         assert!(p.contains("/Applications/CaptureMann.app/Contents/MacOS/cm-desktop"));
         assert!(plist_path(Path::new("/Users/a"))
             .ends_with("Library/LaunchAgents/dev.capturemann.app.plist"));
+    }
+
+    /// Linux: the autostart entry starts the app in the tray, quotes the path as the Desktop Entry
+    /// spec asks, and plans like the other entries.
+    #[test]
+    fn desktop_entry_starts_in_background_and_quotes_the_path() {
+        let e = desktop_entry(Path::new("/opt/Capture Mann/cm-desktop"));
+        assert!(e.starts_with("[Desktop Entry]\nType=Application\n"));
+        assert!(e.contains("Exec=\"/opt/Capture Mann/cm-desktop\" --background\n"));
+        let odd = desktop_entry(Path::new("/o/a\"b$c`d%e"));
+        assert!(odd.contains("Exec=\"/o/a\\\\\"b\\\\$c\\\\`d%%e\" --background"));
+        assert!(desktop_entry_path(Path::new("/h/.config"))
+            .ends_with("autostart/dev.capturemann.app.desktop"));
+        let want = Some(e.clone());
+        assert_eq!(
+            plan_entry(true, want.clone(), None),
+            Plan::Install(e.clone())
+        );
+        assert_eq!(plan_entry(true, want, Some(&e)), Plan::Nothing);
+        assert_eq!(plan_entry(false, Some(e.clone()), Some(&e)), Plan::Remove);
     }
 
     #[test]
