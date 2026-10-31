@@ -431,6 +431,13 @@ impl TrayHandle {
 /// Builds the tray icon and its native menu. Must run on the main thread after the
 /// application started.
 pub fn build_tray() -> Result<TrayHandle, String> {
+    // The Linux tray needs GTK's main loop and a StatusNotifier host; GNOME ships neither by
+    // default. Until that is built, say so instead of letting GTK panic on an uninitialised menu.
+    if cfg!(target_os = "linux") {
+        return Err(tr!(
+            "The tray icon is not available on Linux yet. Use the launcher window."
+        ));
+    }
     let menu = Menu::new();
     let item =
         |id: &str, enabled: bool| MenuItem::with_id(MenuId::new(id), menu_text(id), enabled, None);
