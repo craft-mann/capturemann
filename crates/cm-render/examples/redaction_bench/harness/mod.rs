@@ -339,8 +339,9 @@ pub fn main(args: &[String]) -> i32 {
     let sys = system_recognizer();
     if !use_truth && !sys.is_available() {
         eprintln!(
-            "redaction_bench run: the system text recognizer is not available on this platform \
-             (Apple Vision exists on macOS only). Use --detector-only to test the rules with the \
+            "redaction_bench run: the system text recognizer is not available on this machine \
+             (Apple Vision on macOS; elsewhere the `tesseract` program, see CM_TESSERACT, or \
+             `sudo apt install tesseract-ocr`). Use --detector-only to test the rules with the \
              manifest's text, or plug in a recognizer."
         );
         return 1;
