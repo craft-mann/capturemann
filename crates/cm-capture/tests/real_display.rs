@@ -1,7 +1,7 @@
 //! Real-display tests: need a desktop session and (macOS) Screen Recording permission.
 //! Run manually: `cargo test -p cm-capture --test real_display -- --ignored --nocapture`.
 //! Script: tests/manual/CAP-1.md.
-#![cfg(any(target_os = "macos", target_os = "windows"))]
+#![cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 #![allow(clippy::unwrap_used)]
 
 use cm_capture::{CaptureRequest, CaptureTarget, Capturer, RegionRect};

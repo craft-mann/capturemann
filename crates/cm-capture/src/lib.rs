@@ -25,8 +25,9 @@ pub mod record;
 mod region;
 #[cfg(target_os = "macos")]
 pub mod sck_shot;
+mod sys;
 mod types;
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 mod xcap_backend;
 
 pub use backend::CaptureBackend;
@@ -38,5 +39,5 @@ pub use frame::Frame;
 pub use record::WindowProvider;
 pub use region::resolve_region;
 pub use types::{CaptureKind, CaptureTarget, DisplayInfo, RegionRect, Targets, WindowInfo};
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 pub use xcap_backend::XcapBackend;

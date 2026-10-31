@@ -25,28 +25,6 @@ impl XcapBackend {
     }
 }
 
-#[cfg(target_os = "macos")]
-mod permission {
-    #[link(name = "CoreGraphics", kind = "framework")]
-    extern "C" {
-        fn CGPreflightScreenCaptureAccess() -> bool;
-    }
-
-    /// Does not prompt; false when the process lacks Screen Recording permission.
-    pub fn granted() -> bool {
-        // SAFETY: argument-less CoreGraphics query with no preconditions.
-        unsafe { CGPreflightScreenCaptureAccess() }
-    }
-}
-
-#[cfg(not(target_os = "macos"))]
-mod permission {
-    /// Windows has no screen-capture permission prompt.
-    pub fn granted() -> bool {
-        true
-    }
-}
-
 /// One pass over the Window Server's on-screen window list.
 ///
 /// xcap answers every property of a window (`x`, `title`, `pid`, `current_monitor`, ...) with a
@@ -394,15 +372,7 @@ fn window_info(w: &Window) -> Result<WindowInfo, XCapError> {
 
 impl CaptureBackend for XcapBackend {
     fn check_permission(&self) -> Result<(), CmError> {
-        if permission::granted() {
-            Ok(())
-        } else {
-            Err(CmError::permission_missing(
-                cm_core::Permission::Screen,
-                "Screen Recording permission is not granted. Enable it in System Settings > \
-                 Privacy & Security > Screen Recording, then restart CaptureMann.",
-            ))
-        }
+        crate::sys::permission::check()
     }
 
     fn displays(&self) -> Result<Vec<DisplayInfo>, CmError> {

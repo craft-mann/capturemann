@@ -176,7 +176,7 @@ impl Capturer {
     }
 
     /// Capturer on the real OS backend.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn system() -> Self {
         Self::new(crate::XcapBackend::new())
     }
