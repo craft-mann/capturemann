@@ -16,7 +16,7 @@ has run on a real Linux desktop yet. Test lab for that: `scripts/testlab/` (Thin
 | Clipboard, hotkeys | X11 clipboard and XGrabKey hotkeys work; Wayland clipboard unproven; no GlobalShortcuts portal on GNOME 46 (toast + `cm-desktop --launcher` fallback) | `L1-clipboard-hotkeys-linux` |
 | Secrets | `no_keyring` error; `CAPTUREMANN_SECRETS=file` opt-in | acceptance row STO-2..5 |
 | Local AI | whisper (CPU), speaker engine (sherpa Linux libs, pinned; in the package with its models), llama-server (built and in the package); no text model run | `L1-local-ai-linux`, `L1-packaging-complete-linux` |
-| Recording (hidden) | PipeWire + software VP9 through the daemon/CLI; stream-loss handling | `L1-recording-linux`, `L1-recording-product-linux`, `L1-vp9-export-linux` |
+| Recording (hidden) | PipeWire + software VP9 through the daemon/CLI; stream-loss handling; **in the app behind `CM_LINUX_RECORDING=1`**: Record sheet (display only), banner in the Studio window instead of a floating HUD, the desktop's share dialog explained, readable errors, library picture, Play and Reveal with a message when nothing opens the file (VM only) | `L1-recording-linux`, `L1-recording-product-linux`, `L1-vp9-export-linux`, `L1-recording-ui-linux` |
 | Packaging | tarball (speaker engine, models, `llama-server`, FFmpeg, licences) + `install.sh` + `check-runtime.sh` + minisign signing; `.deb` from the tarball; clean Ubuntu container proof of tarball and `.deb` (apt install, run, remove, purge) | `L1-packaging-linux`, `L1-packaging-clean-linux`, `L1-packaging-complete-linux` |
 
 ## Before calling it releasable
@@ -35,7 +35,7 @@ has run on a real Linux desktop yet. Test lab for that: `scripts/testlab/` (Thin
    VA-API (`vainfo`) and the VP9 recorder's CPU use on a UHD 620.
 4. **Sign** the tarballs: `packaging/linux/sign-linux.sh` (needs the maintainer's minisign key and `minisign.pub`
    committed, see its header). Publish as a GitHub pre-release by hand.
-5. Release notes: early build, no recording in the app, MP4 export needs a VA-API GPU or falls back to VP9, glibc 2.39+,
+5. Release notes: early build, recording hidden in the app (`CM_LINUX_RECORDING=1`; see the recording UI report), MP4 export needs a VA-API GPU or falls back to VP9, glibc 2.39+,
    `sudo apt install ./capturemann_<version>_<arch>.deb` (or the tarball and the apt packages), the text model is a
    download on the AI page (no model file ships), how to verify the download.
 6. **Decide on the size**: `cm-desktop` is about 700 MB because the release profile keeps debug info, so the tarball is
@@ -47,6 +47,12 @@ has run on a real Linux desktop yet. Test lab for that: `scripts/testlab/` (Thin
 
 ## Known gaps and open items (none block the early build)
 
+- Recording UI (with `CM_LINUX_RECORDING=1`, default still off): the controls are a banner in the Studio window (no
+  floating HUD, countdown disc or brackets: they would be in the video, and Wayland cannot place them); the tray icon
+  and the desktop's own screen-share indicator also show it. A real desktop (GNOME with the AppIndicator extension, KDE)
+  has not been seen yet. The Start sheet keycaps ("Ctrl Alt Shift R") overflow the footer and the line "Start or stop
+  from anywhere" is wrong on GNOME 46 Wayland (no GlobalShortcuts portal). Settings -> Capture & recording still offers
+  H.264/HEVC and quality choices that mean nothing for the software VP9 recorder. The permissions page lists the Camera.
 - Wayland: no always-on-top (toasts are in-window cards), no window list, no GlobalShortcuts on GNOME 46; the capture
   cloak (hide own toasts for a capture) was inconclusive on Wayland in the shared VM session.
 - Light panels get the dark tray icon; XDG autostart from an AppImage would point at a temporary mount.

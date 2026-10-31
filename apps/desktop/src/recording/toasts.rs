@@ -400,7 +400,14 @@ mod tests {
         for (reason, expect) in [
             ("max_duration", "length limit"),
             ("disk_full", "disk is almost full"),
-            ("screen_halted", "went away"),
+            (
+                "screen_halted",
+                if crate::permissions::Os::current() == crate::permissions::Os::Linux {
+                    "screen share ended"
+                } else {
+                    "went away"
+                },
+            ),
         ] {
             let t = ended_toast(&Ended::Stopped {
                 capture_id: Some("rec_9".into()),
@@ -469,7 +476,8 @@ mod tests {
 
     #[test]
     fn start_errors() {
-        let p = start_error_toast(
+        let p = start_error_spec(
+            crate::permissions::Os::Mac,
             Some(ErrorCode::PermissionMissing),
             None,
             "Screen Recording is off",
@@ -479,9 +487,14 @@ mod tests {
             p.buttons[1].action,
             ToastAction::OpenScreenRecordingSettings
         );
-        let b = start_error_toast(Some(ErrorCode::Busy), None, "x");
+        let b = start_error_spec(
+            crate::permissions::Os::Mac,
+            Some(ErrorCode::Busy),
+            None,
+            "x",
+        );
         assert_eq!(b.kind, ToastKind::Info);
-        let o = start_error_toast(None, None, "boom");
+        let o = start_error_spec(crate::permissions::Os::Mac, None, None, "boom");
         assert_eq!(o.kind, ToastKind::Error);
         assert!(o.buttons.is_empty());
     }
@@ -545,10 +558,16 @@ mod tests {
             (Permission::Camera, "Privacy_Camera"),
             (Permission::InputMonitoring, "Privacy_ListenEvent"),
         ] {
-            let t = start_error_toast(Some(ErrorCode::PermissionMissing), Some(perm), "m");
+            let t = start_error_spec(
+                crate::permissions::Os::Mac,
+                Some(ErrorCode::PermissionMissing),
+                Some(perm),
+                "m",
+            );
             assert_eq!(t.buttons[1].action, ToastAction::OpenPrivacyPane(pane));
         }
-        let screen = start_error_toast(
+        let screen = start_error_spec(
+            crate::permissions::Os::Mac,
             Some(ErrorCode::PermissionMissing),
             Some(Permission::Screen),
             "m",
@@ -568,7 +587,9 @@ mod tests {
         })
         .unwrap();
         assert_eq!(t.title, "Recording didn\u{2019}t start");
-        assert_eq!(t.buttons.len(), 2);
+        // The Permissions and System Settings buttons are the Mac's and Windows' answer; Linux has no pane.
+        let linux = crate::permissions::Os::current() == crate::permissions::Os::Linux;
+        assert_eq!(t.buttons.len(), if linux { 0 } else { 2 });
         assert!(ended_toast(&Ended::Lost).is_some());
         let passed = ended_toast(&Ended::SelfTest {
             state: "passed".into(),
