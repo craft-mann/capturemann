@@ -169,8 +169,8 @@ pub fn windows_tray_ico_name(light_taskbar: bool, state: TrayState) -> &'static 
     }
 }
 
-#[cfg(target_os = "windows")]
-fn windows_tray_ico(light_taskbar: bool, state: TrayState) -> &'static [u8] {
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+pub(crate) fn windows_tray_ico(light_taskbar: bool, state: TrayState) -> &'static [u8] {
     match windows_tray_ico_name(light_taskbar, state) {
         "tray-light.ico" => include_bytes!("../assets/tray/tray-light.ico"),
         "tray-recording-on-dark.ico" => include_bytes!("../assets/tray/tray-recording-on-dark.ico"),
@@ -281,8 +281,8 @@ pub fn recording_group_start(recording: bool) -> usize {
 }
 
 /// The text of a tray menu item in the current UI language. One place for the strings, so
-/// building the menu and [`TrayHandle::relabel`] (a live language switch) cannot disagree.
-/// `Pause recording` is set by [`TrayHandle::apply_plan`] (it becomes `Resume recording`).
+/// building the menu and [`NativeTray::relabel`] (a live language switch) cannot disagree.
+/// `Pause recording` is set by [`NativeTray::apply_plan`] (it becomes `Resume recording`).
 pub fn menu_text(id: &str) -> String {
     match id {
         ids::CAPTURE_REGION => tr!("Capture region"),
@@ -303,7 +303,8 @@ pub fn menu_text(id: &str) -> String {
     }
 }
 
-pub struct TrayHandle {
+/// The tray built on `tray-icon` (macOS and Windows).
+pub struct NativeTray {
     menu: Menu,
     tray: TrayIcon,
     recent: Submenu,
@@ -319,7 +320,7 @@ pub struct TrayHandle {
     state: std::cell::Cell<TrayState>,
 }
 
-impl TrayHandle {
+impl NativeTray {
     /// Switches the icon between idle (template on macOS) and recording (red, non-template).
     pub fn set_state(&self, state: TrayState) {
         match tray_icon_for(state) {
@@ -394,7 +395,7 @@ impl TrayHandle {
 
     /// Rewrites every menu text in the current UI language (a live language switch): the plain
     /// items, the submenu titles, the delay choices and the Record / Stop labels. The Pause label
-    /// and the tooltip come from the next [`TrayHandle::apply_plan`].
+    /// and the tooltip come from the next [`NativeTray::apply_plan`].
     pub fn relabel(&self, recents: &[(String, String)]) {
         for (id, item) in &self.plain {
             item.set_text(menu_text(id));
@@ -428,16 +429,37 @@ impl TrayHandle {
     }
 }
 
-/// Builds the tray icon and its native menu. Must run on the main thread after the
-/// application started.
+/// The tray the app holds: `tray-icon` on macOS and Windows, a StatusNotifierItem on Linux
+/// (`platform_linux`; GTK's main loop is not running there).
+#[cfg(not(target_os = "linux"))]
+pub type TrayHandle = NativeTray;
+#[cfg(target_os = "linux")]
+pub use crate::platform_linux::TrayHandle;
+
+/// Sets the function that receives a tray menu click (the action id, as in [`ids`]).
+pub fn set_menu_handler(f: impl Fn(String) + Send + Sync + 'static) {
+    #[cfg(target_os = "linux")]
+    crate::platform_linux::set_menu_handler(f);
+    #[cfg(not(target_os = "linux"))]
+    tray_icon::menu::MenuEvent::set_event_handler(Some(move |ev: tray_icon::menu::MenuEvent| {
+        f(ev.id.0.clone())
+    }));
+}
+
+/// Builds the tray icon and its menu. Must run on the main thread after the application started.
 pub fn build_tray() -> Result<TrayHandle, String> {
-    // The Linux tray needs GTK's main loop and a StatusNotifier host; GNOME ships neither by
-    // default. Until that is built, say so instead of letting GTK panic on an uninitialised menu.
-    if cfg!(target_os = "linux") {
-        return Err(tr!(
-            "The tray icon is not available on Linux yet. Use the launcher window."
-        ));
+    #[cfg(target_os = "linux")]
+    {
+        crate::platform_linux::build_tray()
     }
+    #[cfg(not(target_os = "linux"))]
+    {
+        build_native_tray()
+    }
+}
+
+/// Builds the `tray-icon` tray and its native menu.
+pub fn build_native_tray() -> Result<NativeTray, String> {
     let menu = Menu::new();
     let item =
         |id: &str, enabled: bool| MenuItem::with_id(MenuId::new(id), menu_text(id), enabled, None);
@@ -517,7 +539,7 @@ pub fn build_tray() -> Result<TrayHandle, String> {
         builder.with_icon(icon)
     };
     let tray = builder.build().map_err(|e| e.to_string())?;
-    Ok(TrayHandle {
+    Ok(NativeTray {
         menu,
         tray,
         recent,

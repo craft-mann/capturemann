@@ -30,7 +30,6 @@ use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
 use gpui::{App, AppContext as _};
 use std::path::PathBuf;
 use std::sync::Arc;
-use tray_icon::menu::MenuEvent;
 
 #[cfg(target_os = "macos")]
 #[global_allocator]
@@ -347,9 +346,9 @@ fn main() {
             }
         }));
         let tx = cmd_tx.clone();
-        MenuEvent::set_event_handler(Some(move |ev: MenuEvent| {
-            let _ = tx.send(Command::TrayMenu(ev.id.0.clone()));
-        }));
+        platform::set_menu_handler(move |id| {
+            let _ = tx.send(Command::TrayMenu(id));
+        });
 
         let mut startup_problems: Vec<ToastSpec> = Vec::new();
         // R4-16: an unreadable settings file is never reset silently.

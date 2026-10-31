@@ -4643,9 +4643,6 @@ msgstr ""
 msgid "The transcript is being written on this Mac. A long recording takes several minutes. You don’t need to press anything: it appears here when it’s done, and speaker labels follow."
 msgstr ""
 
-msgid "The tray icon is not available on Linux yet. Use the launcher window."
-msgstr ""
-
 msgid "The upload couldn’t start"
 msgstr ""
 
@@ -4701,6 +4698,9 @@ msgid "There is already a destination named “{name}”."
 msgstr ""
 
 msgid "There is less than a second before the next caption"
+msgstr ""
+
+msgid "There is no StatusNotifier host on this desktop. On GNOME turn on the “AppIndicator and KStatusNotifierItem Support” extension; KDE, XFCE, Cinnamon and MATE need nothing. Use the launcher window meanwhile."
 msgstr ""
 
 msgid "There isn’t enough room: the move needs {needed} free and the new folder has {free}."
