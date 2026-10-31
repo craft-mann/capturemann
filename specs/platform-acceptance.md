@@ -34,7 +34,7 @@ itself from capture; the tray needs an extension on GNOME).
 
 | ID | Windows | Linux |
 | --- | --- | --- |
-| REC-1 | W2. Windows.Graphics.Capture source; Media Foundation H.264 hardware encoder into the shared fragmented-MP4 writer. Hardware tests on the primary machine; no hardware encoder gives `hardware_encoder_unavailable` (checked in a VM without a GPU). | L2. Portal ScreenCast through PipeWire (**stream, timestamps and cursor metadata checked on GNOME 46 in a VM**, see `verification/L0-portal-screencast-2026-10-31-claude.md`); VA-API or NVENC. |
+| REC-1 | W2. Windows.Graphics.Capture source; Media Foundation H.264 hardware encoder into the shared fragmented-MP4 writer. Hardware tests on the primary machine; no hardware encoder gives `hardware_encoder_unavailable` (checked in a VM without a GPU). | L2. Portal ScreenCast through PipeWire (**stream, timestamps and cursor metadata checked on GNOME 46 in a VM**, see `verification/L0-portal-screencast-2026-10-31-claude.md`); VA-API or NVENC. **Early build (Oct 31, 2026):** until the recorder lands, Record, the hotkeys, the launcher command and audio recording answer "not available yet" on Linux and Windows through `cm_platform::capability::recording_supported()` (macOS only returns true); the recorder work flips it. `tests/manual/LINUX-1.md` step 17. |
 | REC-2, REC-3 | W2. 1080p30 is the gate (30 minutes with all tracks on the primary machine); 1080p60, 1440p and 4K are measured and reported, not gated. | L2. 30-minute 4K30 gate on one machine. |
 | REC-4 | Shared (the session removes the pause gap); W2 run. | Shared; L2 run. |
 | REC-5 | W1. The HUD and stop control are excluded from capture with `WDA_EXCLUDEFROMCAPTURE`. Whether Windows 10 22H2 shows a capture border, and whether it lands in the recording, is an open question for spike S6. | L2. The HUD cannot hide itself from capture on Wayland; the recording indicator stays visible to the user. |
@@ -88,7 +88,7 @@ itself from capture; the tray needs an extension on GNOME).
 
 | ID | Windows | Linux |
 | --- | --- | --- |
-| PRM-1 | W1. No screen-recording permission exists; microphone and camera privacy switches are Settings pages the app links to; there is no input-monitoring grant. Rows that do not apply are not shown. | L1. Portal prompts (screen, camera), no global grant. |
+| PRM-1 | W1. No screen-recording permission exists; microphone and camera privacy switches are Settings pages the app links to; there is no input-monitoring grant. Rows that do not apply are not shown. | L1. Portal prompts (screen, camera), no global grant. **Built (Oct 31, 2026, tested with fakes and in the VM, not on real hardware):** the setup screen has an OS-correct intro for Linux (no per-app prompts) and lists what the system lacks (session, desktop portal with ScreenCast v4+ and Screenshot, PipeWire, Secret Service, VAAPI) from `cm_platform::stack`; the same facts are in Copy diagnostics and `capturemann diagnostics`. Manual script: `tests/manual/LINUX-1.md`. |
 | AGT-1 | W0. Named-pipe endpoint (`\\.\pipe\capturemann`) behind the same `Endpoint` type; the CLI and `cm-mcp` run on Windows early (D-W6). The Windows CI job runs the pipe tests. | W0-equivalent: Unix socket under `$XDG_RUNTIME_DIR`. |
 | AGT-2 | W1. The confirmation dialog is a desktop window; shared logic. | L1. |
 | AGT-3 | Shared. | Shared. |
