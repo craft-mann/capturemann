@@ -3136,6 +3136,12 @@ msgstr "Bản ghi `{id}` không tồn tại"
 msgid "Recording `{id}` is not running"
 msgstr "Bản ghi `{id}` không đang quay"
 
+msgid "Recording a window or a region is not available on Linux yet. Record the whole screen."
+msgstr "Chưa thể quay một cửa sổ hay một vùng trên Linux. Hãy quay toàn màn hình."
+
+msgid "Recording a window or a region is not available on this system yet."
+msgstr "Chưa thể quay một cửa sổ hay một vùng trên hệ thống này."
+
 #, fuzzy
 msgid "Recording behavior"
 msgstr "Hành vi quay"
@@ -3171,6 +3177,12 @@ msgstr "Bản ghi đang bị rớt khung hình"
 #, fuzzy
 msgid "Recording is unavailable"
 msgstr "Quay không khả dụng"
+
+msgid "Recording needs FFmpeg to encode the video, and it was not found."
+msgstr "Quay cần FFmpeg để mã hoá video, nhưng không tìm thấy FFmpeg."
+
+msgid "Recording needs PipeWire, and it is not running."
+msgstr "Quay cần PipeWire, nhưng PipeWire chưa chạy."
 
 #, fuzzy
 msgid "Recording quality, frame rate and what gets captured."
@@ -3228,6 +3240,9 @@ msgstr "Thanh công cụ quay"
 #, fuzzy
 msgid "Recording window, {size}"
 msgstr "Cửa sổ đang quay, {size}"
+
+msgid "Recording with a webcam bubble is not available on Linux yet."
+msgstr "Chưa thể quay kèm bong bóng camera trên Linux."
 
 #, fuzzy
 msgid "Recording without the camera"
@@ -4188,6 +4203,9 @@ msgstr "Không thể liệt kê các màn hình."
 msgid "The export failed."
 msgstr "Xuất thất bại."
 
+msgid "The first time, your desktop asks which screen to share. Choose the screen to record and confirm; CaptureMann remembers it for the next recordings."
+msgstr "Lần đầu, máy tính hỏi bạn muốn chia sẻ màn hình nào. Hãy chọn màn hình cần quay rồi xác nhận; CaptureMann sẽ nhớ lựa chọn cho các lần quay sau."
+
 #, fuzzy
 msgid "The folder pattern can’t be empty."
 msgstr "Mẫu thư mục không được để trống."
@@ -4370,6 +4388,9 @@ msgstr "Người dùng đã từ chối yêu cầu"
 msgid "The video couldn’t be exported"
 msgstr "Không thể xuất video"
 
+msgid "The video is encoded by the processor (VP9), so long recordings use more of it."
+msgstr "Video được bộ xử lý mã hoá (VP9), nên bản ghi dài tốn nhiều tài nguyên xử lý hơn."
+
 #, fuzzy
 msgid "The video is on YouTube, but it refused the thumbnail: a custom thumbnail needs a verified YouTube account (verify your phone number in YouTube Studio)."
 msgstr "Video đã lên YouTube nhưng YouTube từ chối ảnh bìa: ảnh bìa tùy chỉnh cần tài khoản YouTube đã xác minh (hãy xác minh số điện thoại trong YouTube Studio)."
@@ -4393,6 +4414,9 @@ msgstr "Đã có điểm lưu tên “{name}”."
 #, fuzzy
 msgid "There is less than a second before the next caption"
 msgstr "Chưa đến một giây nữa là tới phụ đề kế tiếp"
+
+msgid "There is no desktop session to record."
+msgstr "Không có phiên làm việc màn hình nào để quay."
 
 #, fuzzy
 msgid "These are the defaults for every recording, including ones an agent starts. A request can override them for one recording."
@@ -9098,6 +9122,9 @@ msgstr "Dùng thư mục mới"
 msgid "Your captures need {needed} free and the new folder has {free}. You can start with an empty library there instead. The captures in the old folder stay where they are."
 msgstr "Các bản chụp cần trống {needed} nhưng thư mục mới chỉ có {free}. Bạn có thể bắt đầu với thư viện trống ở đó. Các bản chụp trong thư mục cũ vẫn ở nguyên chỗ."
 
+msgid "Your desktop cannot share a whole screen."
+msgstr "Máy tính này không thể chia sẻ toàn màn hình."
+
 #, fuzzy
 msgid "Your {n} capture ({size}) is copied to the new folder and checked. Nothing is deleted from the old folder. CaptureMann uses the new folder after it restarts."
 msgid_plural "Your {n} captures ({size}) are copied to the new folder and checked. Nothing is deleted from the old folder. CaptureMann uses the new folder after it restarts."
@@ -10988,6 +11015,12 @@ msgstr "Không khả dụng trên desktop này"
 #, fuzzy
 msgid "Your desktop manages these shortcuts and may have chosen other keys; change them in its keyboard settings."
 msgstr "Desktop của bạn quản lý các phím tắt này và có thể đã chọn phím khác; hãy đổi trong cài đặt bàn phím của desktop."
+
+msgid "Your desktop remembers the screen you shared before, so recording starts without asking."
+msgstr "Máy tính nhớ màn hình bạn đã chia sẻ trước đó, nên việc quay bắt đầu mà không hỏi lại."
+
+msgid "Your desktop’s screen-sharing service (xdg-desktop-portal) is missing."
+msgstr "Thiếu dịch vụ chia sẻ màn hình của máy tính (xdg-desktop-portal)."
 
 #, fuzzy
 msgid "xdg-open is not installed; install xdg-utils to open links and folders"

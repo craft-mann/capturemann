@@ -70,8 +70,36 @@ pub struct Devices {
     pub system_audio_supported: bool,
     pub system_audio_reason: Option<String>,
     pub screen_permission: Perm,
+    /// `list_devices.platform` (`"linux"`; the macOS reply has none).
+    pub platform: Option<String>,
+    /// What the recorder can capture (`screen.targets`: `display`, `window`, `region`); `None`
+    /// when the reply does not say, which means everything.
+    pub screen_targets: Option<Vec<String>>,
+    /// Why the recorder cannot start (`screen.problems`: PipeWire not running, FFmpeg missing).
+    pub screen_problems: Vec<String>,
+    /// The video is encoded in software (`screen.encoder.kind == "software"`).
+    pub software_encoder: bool,
     /// The device list has been loaded.
     pub loaded: bool,
+}
+
+/// The Linux recorder's wording of the problems `screen.problems` lists, in the UI language.
+/// Text it does not know stays as the daemon wrote it.
+pub fn screen_problem_text(daemon_text: &str) -> String {
+    let t = daemon_text.trim();
+    if t.starts_with("PipeWire is not running") {
+        tr!("Recording needs PipeWire, and it is not running.")
+    } else if t.starts_with("FFmpeg was not found") {
+        tr!("Recording needs FFmpeg to encode the video, and it was not found.")
+    } else if t.starts_with("No desktop session") {
+        tr!("There is no desktop session to record.")
+    } else if t.starts_with("The desktop portal cannot share a whole screen") {
+        tr!("Your desktop cannot share a whole screen.")
+    } else if t.contains("ScreenCast") {
+        tr!("Your desktop\u{2019}s screen-sharing service (xdg-desktop-portal) is missing.")
+    } else {
+        t.to_owned()
+    }
 }
 
 impl Devices {
@@ -109,6 +137,32 @@ impl Devices {
                 .and_then(Value::as_str)
                 .map(str::to_owned),
             screen_permission: Perm::parse(v.get("screen_recording_permission")),
+            platform: v.get("platform").and_then(Value::as_str).map(str::to_owned),
+            screen_targets: v
+                .get("screen")
+                .and_then(|s| s.get("targets"))
+                .and_then(Value::as_array)
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|t| t.as_str().map(str::to_owned))
+                        .collect()
+                }),
+            screen_problems: v
+                .get("screen")
+                .and_then(|s| s.get("problems"))
+                .and_then(Value::as_array)
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|t| t.as_str().map(str::to_owned))
+                        .collect()
+                })
+                .unwrap_or_default(),
+            software_encoder: v
+                .get("screen")
+                .and_then(|s| s.get("encoder"))
+                .and_then(|e| e.get("kind"))
+                .and_then(Value::as_str)
+                == Some("software"),
             loaded: true,
         }
     }
@@ -290,10 +344,66 @@ impl SheetModel {
             self.camera = false;
         }
         self.devices = devices;
+        // A remembered Window or Region the recorder cannot do (Linux) goes back to the display.
+        if !self.kind_available(self.kind) {
+            self.set_kind(TargetKind::Display);
+        }
     }
 
-    /// Changing the target kind clears a picked window or region of another kind.
+    /// Whether the recorder on this system can capture `kind`. Until the devices arrive, or when
+    /// the reply does not say, every kind is offered.
+    pub fn kind_available(&self, kind: TargetKind) -> bool {
+        match &self.devices.screen_targets {
+            Some(t) if self.devices.loaded => t.iter().any(|k| k == kind.key()),
+            _ => true,
+        }
+    }
+
+    /// Whether this is the Linux recorder (the desktop's portal picks the screen).
+    pub fn is_linux(&self) -> bool {
+        self.devices.platform.as_deref() == Some("linux")
+    }
+
+    /// The line under the kind tiles when some are switched off, saying why.
+    pub fn kinds_note(&self) -> Option<String> {
+        let window = self.kind_available(TargetKind::Window);
+        let region = self.kind_available(TargetKind::Region);
+        if window && region {
+            return None;
+        }
+        Some(if self.is_linux() {
+            tr!("Recording a window or a region is not available on Linux yet. Record the whole screen.")
+        } else {
+            tr!("Recording a window or a region is not available on this system yet.")
+        })
+    }
+
+    /// What the user should know about the screen before pressing Start (Linux): the first
+    /// recording opens the desktop's own share dialog; later ones reuse its answer. A second line
+    /// says the video is encoded in software. One sentence per line (they are separate messages).
+    pub fn screen_notes(&self) -> Vec<String> {
+        if !self.is_linux() || !self.devices.loaded || !self.devices.screen_problems.is_empty() {
+            return Vec::new();
+        }
+        let mut out = vec![if self.devices.screen_permission == Perm::Authorized {
+            tr!("Your desktop remembers the screen you shared before, so recording starts without asking.")
+        } else {
+            tr!("The first time, your desktop asks which screen to share. Choose the screen to record and confirm; CaptureMann remembers it for the next recordings.")
+        }];
+        if self.devices.software_encoder {
+            out.push(tr!(
+                "The video is encoded by the processor (VP9), so long recordings use more of it."
+            ));
+        }
+        out
+    }
+
+    /// Changing the target kind clears a picked window or region of another kind. A kind the
+    /// recorder cannot do is ignored.
     pub fn set_kind(&mut self, kind: TargetKind) {
+        if !self.kind_available(kind) {
+            return;
+        }
         self.kind = kind;
         if self.picked.is_some_and(|p| p.kind() != kind) {
             self.picked = None;
@@ -357,6 +467,9 @@ impl SheetModel {
         if self.devices.screen_permission.blocked() {
             return Some(tr!("Screen Recording is turned off for CaptureMann."));
         }
+        if let Some(p) = self.devices.screen_problems.first() {
+            return Some(screen_problem_text(p));
+        }
         self.target().is_none().then(|| match self.kind {
             TargetKind::Window => tr!("Choose a window to record."),
             TargetKind::Region => tr!("Choose a region to record."),
@@ -375,7 +488,11 @@ impl SheetModel {
     /// (CAM-4.AC2).
     pub fn camera_note(&self) -> Option<Note> {
         if self.devices.loaded && self.devices.cameras.is_empty() {
-            return Some(Note::Info(tr!("No camera found")));
+            return Some(Note::Info(if self.is_linux() {
+                tr!("Recording with a webcam bubble is not available on Linux yet.")
+            } else {
+                tr!("No camera found")
+            }));
         }
         if self.camera && self.devices.camera_permission.blocked() {
             return Some(Note::Problem {
@@ -575,6 +692,9 @@ impl SheetModel {
                 SECTION_GAP + PROBLEM_PAD + CAPTION_LINE * lines(&message) + 6.0 + BUTTON
             }
         };
+        if let Some(n) = self.kinds_note() {
+            body += SECTION_GAP + CAPTION_LINE * lines(&n);
+        }
         if self.kind == TargetKind::Window {
             return self.window_heights(body);
         }
@@ -584,6 +704,9 @@ impl SheetModel {
                 TargetKind::Display => SUMMARY,
                 _ => BUTTON,
             };
+        for n in self.screen_notes() {
+            body += SECTION_GAP + CAPTION_LINE * lines(&n);
+        }
         let note = |n: Option<Note>| match n {
             None => 0.0,
             Some(Note::Info(t)) => NOTE_GAP + CAPTION_LINE * lines(&t),
@@ -1437,5 +1560,128 @@ mod tests {
             summary.contains("3024") && summary.contains("1964"),
             "{summary}"
         );
+    }
+
+    // ---- the Linux recorder (REC-1 on Linux) ------------------------------------------------
+
+    fn linux_devices_json(consent: &str, problems: Value) -> Value {
+        json!({
+            "platform": "linux",
+            "cameras": [],
+            "cameras_error": "Camera recording is not available on Linux yet.",
+            "mics": [{"id": "default", "name": "Default microphone (PipeWire)", "default": true}],
+            "microphone_permission": "authorized",
+            "system_audio": {"supported": true, "backend": "pipewire_monitor", "reason": null},
+            "screen": {
+                "targets": ["display"],
+                "encoder": {"kind": "software", "codec": "vp9", "program": "/usr/bin/ffmpeg"},
+                "problems": problems,
+                "ready": true,
+            },
+            "screen_recording_permission": consent,
+        })
+    }
+
+    fn linux_sheet(consent: &str, problems: Value) -> SheetModel {
+        let mut m = SheetModel::new(&SheetDefaults::from_settings(&serde_json::Map::new()));
+        m.set_displays(parse_displays(&json!({"displays": [
+            {"id": 1, "name": "Screen chosen in the desktop's share dialog",
+             "bounds": {"origin": {"x": 0, "y": 0}, "size": [1920, 1080]}, "scale": 1.0, "is_primary": true}
+        ]})));
+        m.set_devices(Devices::parse(&linux_devices_json(consent, problems)));
+        m
+    }
+
+    /// REC-1 on Linux: window and region are switched off with a reason, and a remembered
+    /// Window kind falls back to the display.
+    #[test]
+    fn rec1_linux_offers_only_the_display() {
+        let mut m = SheetModel::new(&SheetDefaults::from_settings(&serde_json::Map::new()));
+        m.set_displays(parse_displays(&displays_json()));
+        m.set_kind(TargetKind::Window);
+        m.set_devices(Devices::parse(&linux_devices_json(
+            "not_determined",
+            json!([]),
+        )));
+        assert_eq!(
+            m.kind,
+            TargetKind::Display,
+            "a remembered window kind is dropped"
+        );
+        assert!(m.kind_available(TargetKind::Display));
+        assert!(!m.kind_available(TargetKind::Window) && !m.kind_available(TargetKind::Region));
+        m.set_kind(TargetKind::Region);
+        assert_eq!(
+            m.kind,
+            TargetKind::Display,
+            "an unavailable kind cannot be chosen"
+        );
+        assert!(m.kinds_note().unwrap().contains("not available on Linux"));
+        assert_eq!(
+            m.camera_note(),
+            Some(Note::Info(
+                "Recording with a webcam bubble is not available on Linux yet.".into()
+            ))
+        );
+        // Start stays possible with the display, the microphone and the system audio.
+        assert!(m.blocker().is_none());
+        let o = m.options().unwrap();
+        assert!(o.camera.is_none() && o.mic && !o.system_audio);
+    }
+
+    /// macOS replies carry no `platform` and no `screen.targets`: everything is offered.
+    #[test]
+    fn rec1_a_reply_without_targets_offers_every_kind() {
+        let m = sheet();
+        assert!(TargetKind::ALL.into_iter().all(|k| m.kind_available(k)));
+        assert!(m.kinds_note().is_none() && m.screen_notes().is_empty());
+        // Before the devices arrive nothing is switched off either.
+        let fresh = SheetModel::new(&SheetDefaults::from_settings(&serde_json::Map::new()));
+        assert!(TargetKind::ALL.into_iter().all(|k| fresh.kind_available(k)));
+    }
+
+    /// The first recording opens the desktop's own share dialog: the sheet says so before Start,
+    /// and says the answer is remembered afterwards.
+    #[test]
+    fn rec1_linux_explains_the_share_dialog() {
+        let first = linux_sheet("not_determined", json!([]));
+        let notes = first.screen_notes();
+        assert!(notes[0].contains("asks which screen to share"), "{notes:?}");
+        assert!(notes[1].contains("VP9"));
+        let later = linux_sheet("authorized", json!([]));
+        assert!(later.screen_notes()[0].contains("remembers the screen"));
+    }
+
+    /// PipeWire or FFmpeg missing: Start says why instead of failing after the click.
+    #[test]
+    fn rec1_linux_problems_block_start_with_a_readable_reason() {
+        let m = linux_sheet(
+            "not_determined",
+            json!([
+                "PipeWire is not running.",
+                "FFmpeg was not found (it encodes the video: set CM_FFMPEG or install ffmpeg)."
+            ]),
+        );
+        assert_eq!(
+            m.blocker().as_deref(),
+            Some("Recording needs PipeWire, and it is not running.")
+        );
+        assert!(m.screen_notes().is_empty(), "the problem replaces the hint");
+        assert_eq!(
+            screen_problem_text("FFmpeg was not found (it encodes the video: set CM_FFMPEG)."),
+            "Recording needs FFmpeg to encode the video, and it was not found."
+        );
+        assert_eq!(screen_problem_text("Something else."), "Something else.");
+    }
+
+    /// The extra lines are part of the computed height, so the footer never gets cut.
+    #[test]
+    fn rec1_linux_notes_are_counted_in_the_sheet_height() {
+        let linux = linux_sheet("not_determined", json!([]));
+        let mut plain = linux.clone();
+        plain.devices.screen_targets = None;
+        plain.devices.platform = None;
+        plain.devices.software_encoder = false;
+        assert!(linux.heights().body > plain.heights().body);
     }
 }

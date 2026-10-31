@@ -683,11 +683,16 @@ impl StartSheet {
         let kinds = TargetKind::ALL
             .into_iter()
             .map(|k| {
-                kind_tile(&t, k, m.kind == k).on_click(cx.listener(move |this, _, _, cx| {
-                    this.model.set_kind(k);
-                    this.load_windows(cx);
-                    cx.notify();
-                }))
+                let tile = kind_tile(&t, k, m.kind == k, m.kind_available(k));
+                if m.kind_available(k) {
+                    tile.on_click(cx.listener(move |this, _, _, cx| {
+                        this.model.set_kind(k);
+                        this.load_windows(cx);
+                        cx.notify();
+                    }))
+                } else {
+                    tile
+                }
             })
             .collect::<Vec<_>>();
         // With several displays the chips carry the name and size, so the summary line only
@@ -1176,9 +1181,18 @@ impl StartSheet {
                     .gap(px(8.))
                     .children(kinds),
             )
+            .children(
+                m.kinds_note()
+                    .map(|n| note_view(&t, &Note::Info(n), "").flex_none()),
+            )
             .children(problem.map(|p| problem_card(&t, p)))
             .children(display_choices)
             .children(target_row)
+            .children(
+                m.screen_notes()
+                    .into_iter()
+                    .map(|n| note_view(&t, &Note::Info(n), "").flex_none()),
+            )
             .children(window_blocks)
             .children((m.kind != TargetKind::Window).then_some(sources));
         let footer = div()
@@ -1342,7 +1356,7 @@ const CHIP_H: f32 = 32.;
 
 /// One kind tile of the target radiogroup (R9): 84 px tall, the kind's icon over its label; the
 /// selected tile has the rec tint (the Record flow's own colour).
-fn kind_tile(t: &Theme, k: TargetKind, on: bool) -> gpui::Stateful<gpui::Div> {
+fn kind_tile(t: &Theme, k: TargetKind, on: bool, available: bool) -> gpui::Stateful<gpui::Div> {
     let (hover, focus) = (rgba_of(t.raised), rgba_of(t.text));
     let fg = if on { t.text } else { t.text_2 };
     div()
@@ -1375,8 +1389,9 @@ fn kind_tile(t: &Theme, k: TargetKind, on: bool) -> gpui::Stateful<gpui::Div> {
         .text_size(px(13.5))
         .font_weight(FontWeight::MEDIUM)
         .text_color(rgba_of(fg))
-        .cursor_pointer()
-        .when(!on, |d| d.hover(move |s| s.bg(hover)))
+        .when(available, |d| d.cursor_pointer())
+        .when(!available, |d| d.opacity(0.4).cursor_default())
+        .when(available && !on, |d| d.hover(move |s| s.bg(hover)))
         .focus_visible(move |s| s.border_color(focus))
         .child(icon(kind_icon(k), 24., fg))
         .child(k.label())

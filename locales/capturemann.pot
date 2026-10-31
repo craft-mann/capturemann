@@ -3328,6 +3328,12 @@ msgstr ""
 msgid "Recording `{id}` is not running"
 msgstr ""
 
+msgid "Recording a window or a region is not available on Linux yet. Record the whole screen."
+msgstr ""
+
+msgid "Recording a window or a region is not available on this system yet."
+msgstr ""
+
 msgid "Recording at 30 fps. {detail}"
 msgstr ""
 
@@ -3368,6 +3374,12 @@ msgid "Recording is not available yet"
 msgstr ""
 
 msgid "Recording is unavailable"
+msgstr ""
+
+msgid "Recording needs FFmpeg to encode the video, and it was not found."
+msgstr ""
+
+msgid "Recording needs PipeWire, and it is not running."
 msgstr ""
 
 msgid "Recording needs PipeWire, and no sound server was found. Install and start PipeWire."
@@ -3419,6 +3431,9 @@ msgid "Recording toolbar"
 msgstr ""
 
 msgid "Recording window, {size}"
+msgstr ""
+
+msgid "Recording with a webcam bubble is not available on Linux yet."
 msgstr ""
 
 msgid "Recording without the camera"
@@ -4462,6 +4477,9 @@ msgstr ""
 msgid "The export failed."
 msgstr ""
 
+msgid "The first time, your desktop asks which screen to share. Choose the screen to record and confirm; CaptureMann remembers it for the next recordings."
+msgstr ""
+
 msgid "The folder pattern can’t be empty."
 msgstr ""
 
@@ -4691,6 +4709,9 @@ msgstr ""
 msgid "The video couldn’t be exported"
 msgstr ""
 
+msgid "The video is encoded by the processor (VP9), so long recordings use more of it."
+msgstr ""
+
 msgid "The video is on YouTube, but it refused the thumbnail: a custom thumbnail needs a verified YouTube account (verify your phone number in YouTube Studio)."
 msgstr ""
 
@@ -4728,6 +4749,9 @@ msgid "There is less than a second before the next caption"
 msgstr ""
 
 msgid "There is no StatusNotifier host on this desktop. On GNOME turn on the “AppIndicator and KStatusNotifierItem Support” extension; KDE, XFCE, Cinnamon and MATE need nothing. Use the launcher window meanwhile."
+msgstr ""
+
+msgid "There is no desktop session to record."
 msgstr ""
 
 msgid "There isn’t enough room: the move needs {needed} free and the new folder has {free}."
@@ -5324,7 +5348,16 @@ msgstr ""
 msgid "Your captures need {needed} free and the new folder has {free}. You can start with an empty library there instead. The captures in the old folder stay where they are."
 msgstr ""
 
+msgid "Your desktop cannot share a whole screen."
+msgstr ""
+
 msgid "Your desktop manages these shortcuts and may have chosen other keys; change them in its keyboard settings."
+msgstr ""
+
+msgid "Your desktop remembers the screen you shared before, so recording starts without asking."
+msgstr ""
+
+msgid "Your desktop’s screen-sharing service (xdg-desktop-portal) is missing."
 msgstr ""
 
 msgid "Your name in transcripts"
