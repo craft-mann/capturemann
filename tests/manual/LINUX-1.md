@@ -37,6 +37,25 @@ Write down: distribution and version, desktop and version, `echo $XDG_SESSION_TY
    Input Monitoring cards; a block "What this system is missing" lists the same gaps as step 3, or says nothing
    is missing for screenshots.
 
+## 3b. Windows: frame, controls, pop-ups (added Oct 31, 2026)
+Run on **GNOME Wayland** (no server-side decorations), **KDE Plasma** (server-side) and **X11** with a window manager.
+- 5a. Look at the main window. **Pass:** exactly one title bar. GNOME Wayland: CaptureMann draws its own 36 px bar
+  (logo, "CaptureMann", minimise, maximise, close). KDE, X11 and other compositors that draw a frame: only the system
+  title bar, no second bar from the app.
+- 5b. GNOME Wayland: drag the bar (moves the window), double-click it (maximise, again restores), right-click it (the
+  window menu), click minimise, maximise/restore and close. **Pass:** each works; the maximise button shows the
+  restore glyph while maximised; close ends the app (there is no tray on Linux yet).
+- 5c. GNOME Wayland: drag each edge and each corner of the un-maximised window. **Pass:** the pointer changes and the
+  window resizes, never below 720 by 480; no resize while maximised or tiled on that side.
+- 5d. Open the launcher (hotkey or `capturemann` command), a confirmation dialog and trigger a toast. **Pass (X11):**
+  they stay above the main window, take no taskbar entry, and the toast does not take the keyboard focus. **Pass
+  (Wayland):** toasts are cards in the corner of the main window while it is open, not a separate window.
+- 5e. In the launcher grid or dock, check the window's icon and name. **Pass:** the window is grouped with the
+  CaptureMann launcher entry and shows its icon (needs the installed `dev.capturemann.app.desktop`; X11 also shows
+  the icon without it). `xprop WM_CLASS` on X11 says `dev.capturemann.app`.
+- 5f. With a toast on screen, take a display screenshot (`capturemann capture screenshot --display <id>`). **Pass:**
+  the toast is not in the image and comes back afterwards; `desktop.log` has no "could not hide" warning.
+
 ## 4. Secrets: keyring present and absent
 7. With a keyring running (GNOME Keyring or KWallet): `capturemann diagnostics` shows `Secret Service yes` and
    "secrets in the system credential store". **Pass:** no unlock prompt appears just from running diagnostics or
@@ -74,6 +93,8 @@ Write down: distribution and version, desktop and version, `echo $XDG_SESSION_TY
     - Record in the dock, the Record shortcut and the launcher command: toast "Recording is not available yet"
       (the launcher row says "Not available yet"). No recording sheet, countdown or HUD opens.
     - Microphone and audio recording (the mic button in the dock): the same toast.
+    - Pop-up windows on Wayland: no always-on-top, no "do not focus" and no placement (GNOME has no layer-shell);
+      toasts are in-window cards there, and the launcher, dialogs and picker are ordinary windows the compositor places.
     - Tray icon: absent on GNOME without an extension; the launcher window stays reachable.
     - Global hotkeys on GNOME 46 (no GlobalShortcuts portal): not registered; in-app shortcuts work.
 18. With the app running, `capturemann record start` (CLI) and the `start_recording` MCP tool. **Pass:** each answers
