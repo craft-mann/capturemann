@@ -3139,6 +3139,9 @@ msgstr "Bản ghi `{id}` không đang quay"
 msgid "Recording a window or a region is not available on Linux yet. Record the whole screen."
 msgstr "Chưa thể quay một cửa sổ hay một vùng trên Linux. Hãy quay toàn màn hình."
 
+msgid "Recording a window or a region is not available on Linux yet. Record the whole screen; the desktop asks which one the first time."
+msgstr "Chưa thể quay một cửa sổ hay một vùng trên Linux. Hãy quay toàn màn hình; lần đầu máy tính sẽ hỏi chọn màn hình nào."
+
 msgid "Recording a window or a region is not available on this system yet."
 msgstr "Chưa thể quay một cửa sổ hay một vùng trên hệ thống này."
 
@@ -8280,6 +8283,9 @@ msgstr "Đang quay ở 30 fps. {detail}"
 msgid "Recording stopped: only {mb} MB free"
 msgstr "Đã dừng quay: chỉ còn trống {mb} MB"
 
+msgid "Recording stopped: the desktop ended the screen share"
+msgstr "Đã dừng quay: máy tính đã kết thúc việc chia sẻ màn hình"
+
 #, fuzzy
 msgid "Screen capture delivered no frames for {secs} s (display asleep or capture stuck); the video repeats the last frame until it resumes"
 msgstr "Việc ghi màn hình không nhận được khung hình nào trong {secs} giây (màn hình đang ngủ hoặc việc ghi bị kẹt); video lặp lại khung hình cuối cho đến khi việc ghi tiếp tục"
@@ -10345,6 +10351,9 @@ msgstr "Mô hình văn bản, từng dòng một"
 
 msgid "The role the interview is for"
 msgstr "Vai trò mà buổi phỏng vấn dành cho"
+
+msgid "The screen share was cancelled in your desktop’s dialog, so nothing was recorded. Start again and choose the screen to share."
+msgstr "Việc chia sẻ màn hình đã bị huỷ trong hộp thoại của máy tính, nên chưa quay gì cả. Hãy bắt đầu lại và chọn màn hình để chia sẻ."
 
 msgid "This report was made with a template this version doesn’t know."
 msgstr "Báo cáo này được tạo bằng một mẫu mà phiên bản này không biết."

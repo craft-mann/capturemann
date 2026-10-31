@@ -3331,6 +3331,9 @@ msgstr ""
 msgid "Recording a window or a region is not available on Linux yet. Record the whole screen."
 msgstr ""
 
+msgid "Recording a window or a region is not available on Linux yet. Record the whole screen; the desktop asks which one the first time."
+msgstr ""
+
 msgid "Recording a window or a region is not available on this system yet."
 msgstr ""
 
@@ -3413,6 +3416,9 @@ msgid "Recording stopped unexpectedly"
 msgstr ""
 
 msgid "Recording stopped: only {mb} MB free"
+msgstr ""
+
+msgid "Recording stopped: the desktop ended the screen share"
 msgstr ""
 
 msgid "Recording stopped: the disk is almost full"
@@ -4653,6 +4659,9 @@ msgid "The ring is always the record color."
 msgstr ""
 
 msgid "The role the interview is for"
+msgstr ""
+
+msgid "The screen share was cancelled in your desktop’s dialog, so nothing was recorded. Start again and choose the screen to share."
 msgstr ""
 
 msgid "The selected sources are not available."
