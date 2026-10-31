@@ -167,7 +167,7 @@ fn ended_toast_now(e: &Ended) -> Option<ToastSpec> {
 pub fn screen_halted_title(os: crate::permissions::Os) -> String {
     match os {
         crate::permissions::Os::Linux => {
-            tr!("Recording stopped: the desktop ended the screen share")
+            tr!("Recording stopped: the screen share ended")
         }
         _ => tr!("Recording stopped: the screen or window went away"),
     }
@@ -529,7 +529,7 @@ mod tests {
         assert_eq!(mac.buttons.len(), 2);
         assert_eq!(
             screen_halted_title(Os::Linux),
-            "Recording stopped: the desktop ended the screen share"
+            "Recording stopped: the screen share ended"
         );
         assert_eq!(
             screen_halted_title(Os::Mac),

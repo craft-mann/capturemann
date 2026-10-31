@@ -8309,8 +8309,8 @@ msgstr "Đang quay ở 30 fps. {detail}"
 msgid "Recording stopped: only {mb} MB free"
 msgstr "Đã dừng quay: chỉ còn trống {mb} MB"
 
-msgid "Recording stopped: the desktop ended the screen share"
-msgstr "Đã dừng quay: máy tính đã kết thúc việc chia sẻ màn hình"
+msgid "Recording stopped: the screen share ended"
+msgstr "Đã dừng quay: việc chia sẻ màn hình đã kết thúc"
 
 #, fuzzy
 msgid "Screen capture delivered no frames for {secs} s (display asleep or capture stuck); the video repeats the last frame until it resumes"

@@ -3430,13 +3430,13 @@ msgstr ""
 msgid "Recording stopped: only {mb} MB free"
 msgstr ""
 
-msgid "Recording stopped: the desktop ended the screen share"
-msgstr ""
-
 msgid "Recording stopped: the disk is almost full"
 msgstr ""
 
 msgid "Recording stopped: the screen or window went away"
+msgstr ""
+
+msgid "Recording stopped: the screen share ended"
 msgstr ""
 
 msgid "Recording stopped: {what} permission was removed"
