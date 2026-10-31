@@ -38,6 +38,7 @@ pub use capturer::{
 pub use frame::Frame;
 pub use record::WindowProvider;
 pub use region::resolve_region;
+pub use sys::pipewire_linux::PortalPipeWire;
 pub use types::{CaptureKind, CaptureTarget, DisplayInfo, RegionRect, Targets, WindowInfo};
 #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 pub use xcap_backend::XcapBackend;

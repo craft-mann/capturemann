@@ -139,10 +139,11 @@ pub fn system_audio_support() -> SystemAudioSupport {
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
+        let pw = crate::sys::linux_pipewire::available();
         SystemAudioSupport {
-            supported: false,
-            backend: "none".into(),
-            reason: Some("System audio is not supported on this OS.".into()),
+            supported: pw,
+            backend: if pw { "pipewire_monitor" } else { "none" }.into(),
+            reason: (!pw).then(|| "System audio needs PipeWire (not running here).".to_string()),
             permission: screen_recording_permission(),
             excludes_own_audio: false,
         }
