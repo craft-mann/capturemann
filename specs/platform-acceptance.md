@@ -25,7 +25,7 @@ itself from capture; the tray needs an extension on GNOME).
 | CAP-5 | Shared. | Shared. |
 | CAP-6 | Not scheduled (P2); decide per OS when CAP-6 starts. | Same. |
 | ANN-1, ANN-3, ANN-4 | Shared (the annotation model and renderer have no OS part). W1 run of `tests/manual/ANN-2.md` covers the editor on Windows. | Shared; L1 run. |
-| ANN-2 | Shared. Blur and pixelate are checked against golden pixels in CI; W1 manual run. | Shared; L1 run. |
+| ANN-2 | Shared. Blur and pixelate are checked against golden pixels in CI; W1 manual run. | Shared; L1 run. Auto-redact (AC4) works through `tesseract` when it is installed (see RED-1 below); not seen in the editor. |
 | LIB-1 | Shared. The watcher polls folder signatures; the Windows CI run exercises it (added Oct 30, 2026: fresh folder time, no cached directory entry). | Shared. |
 | LIB-2 | W1. Default folder is `Videos\CaptureMann`; check a OneDrive-redirected Videos folder and long paths (0.3.x). Free space comes from `GetDiskFreeSpaceExW`. | L1. XDG video dir, `statvfs` free space. Delete goes to the freedesktop.org Trash (`cm_platform::trash`, checked on Linux). |
 | LIB-3 | Shared. | Shared. |
@@ -73,7 +73,7 @@ itself from capture; the tray needs an extension on GNOME).
 | AI-7 | W5. `llama-server` Windows build as a helper program, found as on macOS. | L3. `packaging/llama/build-linux.sh` builds it (CPU, static, optional Vulkan) and the engine finds it next to the executable or on `PATH`; built in the VM, not yet run with a model, not yet in the tarball. |
 | AI-8 | W5. sherpa-onnx Windows build; also depends on spike S7. | L3. `packaging/sherpa/fetch-linux.sh` pins the v2.0.1 static libraries for aarch64 and x86_64; speaker finding ran on aarch64 in the VM with the real models (2 speakers in a two-voice clip); x86_64 libraries are pinned but never linked or run. |
 | AI-9 | W5. | L3. |
-| RED-1 | W5. `Windows.Media.Ocr` recognizer; the rules and the benchmark stay recognizer-agnostic. | L3. OCR choice; the button is hidden with a documented reason if none ships. |
+| RED-1 | W5. `Windows.Media.Ocr` recognizer; the rules and the benchmark stay recognizer-agnostic. (`tesseract.exe` on `PATH` or `CM_TESSERACT` is already used if present.) | L3. Built (Oct 31, 2026): the system `tesseract` program as a helper process (Apache-2.0, not linked; `specs/plans/auto-redact-linux-plan.md`), found through `CM_TESSERACT`, next to the executable or on `PATH`; the editor button is dimmed with the install command when it is missing, the CLI and MCP answer `not_implemented` with it, `get_diagnostics` has a "text recognizer" line. Ran on aarch64 Ubuntu 24.04 in the VM with the synthetic benchmark (dev split only), lower recall than Apple Vision (`verification/L1-auto-redact-linux-2026-10-31-claude.md`); the editor on a real Linux desktop and `tests/manual/ANN-2.md` are not run; x86_64 untested. |
 | RED-2, RED-3 | Shared (rule data). | Shared. |
 
 ## Storage, publishing

@@ -10,6 +10,7 @@ use cm_render::ocr::{suggest_redactions, system_recognizer, SuggestOptions};
 
 fn main() {
     let rec = system_recognizer();
+    println!("{}", cm_render::ocr::describe_system());
     if !rec.is_available() {
         eprintln!(
             "no text recognizer here: {}",
@@ -28,7 +29,12 @@ fn main() {
             }
         };
         let lines = rec.recognize(&img).unwrap();
-        println!("== {path} ({}x{}), {} lines", img.width(), img.height(), lines.len());
+        println!(
+            "== {path} ({}x{}), {} lines",
+            img.width(),
+            img.height(),
+            lines.len()
+        );
         for l in &lines {
             println!("  line {:?} conf={:.2}", l.text, l.confidence);
         }
@@ -41,7 +47,12 @@ fn main() {
             println!(
                 "  -> {} {:?} conf={:.2} preview={}",
                 s.kind.as_str(),
-                [s.rect.x.round(), s.rect.y.round(), s.rect.w.round(), s.rect.h.round()],
+                [
+                    s.rect.x.round(),
+                    s.rect.y.round(),
+                    s.rect.w.round(),
+                    s.rect.h.round()
+                ],
                 s.confidence,
                 s.text_preview
             );
