@@ -2400,6 +2400,9 @@ msgstr "Không tìm thấy email hay khoá nào trong ảnh này."
 msgid "No export yet"
 msgstr "Chưa xuất"
 
+msgid "No file manager is set to open folders on this desktop."
+msgstr "Máy tính này chưa đặt trình quản lý tệp để mở thư mục."
+
 #, fuzzy
 msgid "No folder chosen"
 msgstr "Chưa chọn thư mục"
@@ -2441,6 +2444,9 @@ msgstr "Không có bản xem trước"
 #, fuzzy
 msgid "No preview image yet: CaptureMann has no video decoder of its own until the editor ships. Play the recording to see it."
 msgstr "Chưa có ảnh xem trước: CaptureMann chưa có bộ giải mã video riêng cho đến khi trình chỉnh sửa ra mắt. Hãy phát bản ghi để xem."
+
+msgid "No program is set to open this file. Install a video player or choose one in your desktop’s settings."
+msgstr "Chưa có chương trình nào được đặt để mở tệp này. Hãy cài một trình phát video hoặc chọn một trình phát trong phần cài đặt của máy tính."
 
 #, fuzzy
 msgid "No recording is running"
@@ -4370,6 +4376,9 @@ msgstr "Phiên đăng nhập đã hết hạn; các lượt tải lên đang ch�
 #, fuzzy
 msgid "The sign-in was refused."
 msgstr "Đăng nhập bị từ chối."
+
+msgid "The system opener failed (code {code})."
+msgstr "Trình mở của hệ thống đã lỗi (mã {code})."
 
 # FACT: owner review required
 #, fuzzy
@@ -9702,6 +9711,9 @@ msgstr "Micrô và âm thanh hệ thống cùng nhau"
 
 msgid "No transcript yet. Transcribe the recording to read it here; it runs on this Mac."
 msgstr "Chưa có bản chép lời. Hãy chép lời bản ghi để đọc ở đây; việc này chạy ngay trên máy Mac này."
+
+msgid "No web browser is set on this desktop; choose one in your desktop’s settings."
+msgstr "Máy tính này chưa đặt trình duyệt web; hãy chọn một trình duyệt trong phần cài đặt của máy tính."
 
 msgid "Normalise to {lufs} LUFS, the level podcasts and players expect"
 msgstr "Chuẩn hoá về {lufs} LUFS, mức mà podcast và trình phát mong đợi"

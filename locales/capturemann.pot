@@ -2578,6 +2578,9 @@ msgstr ""
 msgid "No export yet"
 msgstr ""
 
+msgid "No file manager is set to open folders on this desktop."
+msgstr ""
+
 msgid "No folder chosen"
 msgstr ""
 
@@ -2610,6 +2613,9 @@ msgid "No preview"
 msgstr ""
 
 msgid "No preview image yet: CaptureMann has no video decoder of its own until the editor ships. Play the recording to see it."
+msgstr ""
+
+msgid "No program is set to open this file. Install a video player or choose one in your desktop’s settings."
 msgstr ""
 
 msgid "No recording is running"
@@ -2657,6 +2663,9 @@ msgid "No transcript yet. Transcribe the microphone to get captions; it runs on 
 msgstr ""
 
 msgid "No transcript yet. Transcribe the recording to read it here; it runs on this Mac."
+msgstr ""
+
+msgid "No web browser is set on this desktop; choose one in your desktop’s settings."
 msgstr ""
 
 msgid "No webcam, no sound"
@@ -4689,6 +4698,9 @@ msgid "The sign-in expired; uploads are waiting."
 msgstr ""
 
 msgid "The sign-in was refused."
+msgstr ""
+
+msgid "The system opener failed (code {code})."
 msgstr ""
 
 msgid "The take is deleted and cannot be recovered"
