@@ -870,6 +870,30 @@ impl EditorDoc {
         used
     }
 
+    /// An input method committed (`mark` false) or is composing (`mark` true) text in the text
+    /// being typed; the range is in UTF-16 units.
+    pub fn text_ime(
+        &mut self,
+        range: Option<std::ops::Range<usize>>,
+        s: &str,
+        mark: bool,
+        cx: &mut Context<Self>,
+    ) {
+        if self.state.text.is_none() {
+            return;
+        }
+        self.state.text_ime(range, s, mark);
+        self.sync_preview(cx);
+        cx.notify();
+    }
+
+    pub fn text_unmark(&mut self, cx: &mut Context<Self>) {
+        if let Some(t) = self.state.text.as_mut() {
+            t.marked = None;
+            cx.notify();
+        }
+    }
+
     pub fn text_paste(&mut self, s: &str, cx: &mut Context<Self>) {
         self.state.text_insert(s);
         self.sync_preview(cx);
