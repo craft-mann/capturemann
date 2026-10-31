@@ -30,7 +30,7 @@ llama:
 	bash packaging/llama/build-macos.sh
 
 sherpa:
-	bash packaging/sherpa/fetch-macos.sh
+	bash packaging/sherpa/fetch-$(if $(filter Linux,$(shell uname -s)),linux,macos).sh
 	bash packaging/sherpa/fetch-models.sh
 
 bundle:
