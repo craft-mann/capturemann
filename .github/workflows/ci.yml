@@ -84,6 +84,11 @@ jobs:
       - name: Test (no sherpa)
         if: runner.os != 'macOS'
         run: cargo test --workspace --locked --no-default-features --no-fail-fast
+      # The real Trash (Recycle Bin, freedesktop Trash) of the runner: a scratch folder is moved there. Not run
+      # on macOS, where it would use the developer's own Trash.
+      - name: Trash test (Windows and Linux)
+        if: runner.os != 'macOS'
+        run: cargo test -p cm-platform --lib --locked --no-default-features -- --ignored
       # L1 on Linux: the Secret Service for real, an unlocked gnome-keyring in a private D-Bus session.
       - name: Secret Service tests (Linux)
         if: runner.os == 'Linux'

@@ -19,3 +19,15 @@ libc.workspace = true
 [target.'cfg(windows)'.dependencies]
 # The version cm-cursor and cm-capture use.
 windows = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Performance", "Win32_System_Power", "Win32_System_ProcessStatus", "Win32_System_Registry", "Win32_System_Threading"] }
+
+[target.'cfg(any(windows, target_os = "linux"))'.dependencies]
+# MIT. Recycle Bin on Windows, the freedesktop.org Trash on Linux. (macOS moves files to the Trash with
+# NSFileManager in cm-daemon.)
+trash = { version = "5.2", default-features = false }
+
+# macOS: NSFileManager, the same objc2 family the capture and daemon crates use (MIT / Zlib / Apache-2.0).
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSFileManager", "NSURL", "NSString", "NSError"] }
+
+[dev-dependencies]
+tempfile.workspace = true
