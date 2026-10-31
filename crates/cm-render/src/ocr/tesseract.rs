@@ -266,6 +266,10 @@ impl TextRecognizer for TesseractRecognizer {
         self.engine().is_ok()
     }
 
+    fn install_hint(&self) -> Option<String> {
+        self.engine().err().map(|e| e.to_string())
+    }
+
     fn recognize(&self, image: &RgbaImage) -> Result<Vec<TextLine>, CmError> {
         let exe = self.engine()?;
         let (png, scale) = prepare(image, &self.options)?;
@@ -572,6 +576,10 @@ mod tests {
     fn missing_engine_is_unavailable_and_not_implemented() {
         let r = TesseractRecognizer::with_paths(SearchPaths::default());
         assert!(!r.is_available());
+        assert!(r
+            .install_hint()
+            .unwrap()
+            .contains("apt install tesseract-ocr"));
         let img = RgbaImage::from_pixel(8, 8, image::Rgba([255, 255, 255, 255]));
         let e = r.recognize(&img).unwrap_err();
         assert!(e.to_string().contains("tesseract"), "{e}");

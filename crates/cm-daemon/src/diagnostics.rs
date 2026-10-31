@@ -231,6 +231,7 @@ fn engine_lines() -> Vec<String> {
         Ok(p) => out.push(format!("llama-server at {}", p.display())),
         Err(e) => out.push(format!("llama-server not found: {e}")),
     }
+    out.push(cm_render::ocr::describe_system());
     out.push(format!(
         "speaker engine built in: {}",
         cfg!(feature = "sherpa")

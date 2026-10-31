@@ -56,6 +56,12 @@ pub trait TextRecognizer: Send + Sync {
     /// Whether [`TextRecognizer::recognize`] can work on this machine right now.
     fn is_available(&self) -> bool;
 
+    /// When [`TextRecognizer::is_available`] is false and the user can fix that (install a
+    /// program), a sentence saying how. The default is `None`.
+    fn install_hint(&self) -> Option<String> {
+        None
+    }
+
     /// Lines of text in reading order with boxes in the image's own pixels.
     ///
     /// # Errors
@@ -79,15 +85,10 @@ pub fn system_recognizer() -> Arc<dyn TextRecognizer> {
 /// for logs, the CLI and diagnostics). `None` when it is usable or nothing can be installed.
 pub fn install_hint() -> Option<String> {
     let r = system_recognizer();
-    if r.is_available() || r.name() != "tesseract" {
+    if r.is_available() {
         return None;
     }
-    Some(
-        tesseract::TesseractRecognizer::system()
-            .engine()
-            .err()
-            .map_or_else(tesseract::install_hint, |e| e.to_string()),
-    )
+    r.install_hint()
 }
 
 /// True when the OS recognizer can run (the editor shows Auto-redact only then).
