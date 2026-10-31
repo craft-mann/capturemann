@@ -10787,3 +10787,187 @@ msgstr "Ngôn ngữ bạn nói"
 
 msgid "vi, en"
 msgstr "vi, en"
+
+msgid "Built in"
+msgstr "Tích hợp sẵn"
+
+msgid "Couldn’t read the diagnostics: {e}"
+msgstr "Không thể đọc thông tin chẩn đoán: {e}"
+
+msgid "Diagnostics"
+msgstr "Chẩn đoán"
+
+msgid "Kinds to look for"
+msgstr "Loại cần tìm"
+
+#. FACT: owner review required (the desktop portal asks, not CaptureMann)
+msgid "Linux does not ask per app. Your desktop asks when CaptureMann captures the screen, and the microphone and camera are not gated by the system. Below is what this system can and cannot do for CaptureMann."
+msgstr "Linux không hỏi quyền theo từng ứng dụng. Môi trường desktop của bạn sẽ hỏi khi CaptureMann ghi màn hình, còn micrô và camera không bị hệ thống chặn bằng quyền. Bên dưới là những gì hệ thống này làm được và không làm được cho CaptureMann."
+
+msgid "No Secret Service (GNOME Keyring or KWallet) was found, so sign-ins and API keys cannot be kept in the system keyring. Start one, or set CAPTUREMANN_SECRETS=file to keep them in a file only you can read."
+msgstr "Không tìm thấy Secret Service (GNOME Keyring hoặc KWallet), nên thông tin đăng nhập và khoá API không thể lưu trong chuỗi khoá của hệ thống. Hãy khởi động một dịch vụ như vậy, hoặc đặt CAPTUREMANN_SECRETS=file để lưu chúng trong một tệp chỉ mình bạn đọc được."
+
+msgid "No desktop session was found. CaptureMann has to run inside a graphical session."
+msgstr "Không tìm thấy phiên desktop. CaptureMann phải chạy trong một phiên đồ hoạ."
+
+msgid "No hardware video encoder was found; recording will use a slower software encoder."
+msgstr "Không tìm thấy bộ mã hoá video phần cứng; bản ghi sẽ dùng bộ mã hoá phần mềm chậm hơn."
+
+msgid "Nothing is missing on this system for screenshots."
+msgstr "Hệ thống này không thiếu gì để chụp ảnh màn hình."
+
+msgid "Read the diagnostics"
+msgstr "Đọc thông tin chẩn đoán"
+
+msgid "Reading…"
+msgstr "Đang đọc…"
+
+msgid "Recording is not available yet"
+msgstr "Chưa thể quay"
+
+msgid "Recording needs PipeWire, and no sound server was found. Install and start PipeWire."
+msgstr "Quay cần PipeWire, nhưng không tìm thấy máy chủ âm thanh nào. Hãy cài đặt và khởi động PipeWire."
+
+msgid "Recording needs PipeWire; this system only has PulseAudio. Install and start PipeWire."
+msgstr "Quay cần PipeWire; hệ thống này chỉ có PulseAudio. Hãy cài đặt và khởi động PipeWire."
+
+msgid "Screen and audio recording is not built for this system yet. Screenshots, the library and the editor work."
+msgstr "Chức năng quay màn hình và âm thanh chưa được xây dựng cho hệ thống này. Chụp ảnh màn hình, thư viện và trình chỉnh sửa vẫn dùng được."
+
+msgid "Screen recording needs ScreenCast portal version {need} or newer; this system has an older one. Update xdg-desktop-portal."
+msgstr "Quay màn hình cần ScreenCast portal phiên bản {need} trở lên; hệ thống này có phiên bản cũ hơn. Hãy cập nhật xdg-desktop-portal."
+
+msgid "The CaptureMann engine is not running."
+msgstr "Bộ máy của CaptureMann chưa chạy."
+
+msgid "The desktop portal has no Screenshot interface, so screenshots are not possible on Wayland. Install the portal for your desktop."
+msgstr "Desktop portal không có giao diện Screenshot, nên không thể chụp ảnh màn hình trên Wayland. Hãy cài đặt portal cho môi trường desktop của bạn."
+
+msgid "The desktop portal service does not answer, so Wayland screenshots and screen recording are not possible. Install xdg-desktop-portal and the portal for your desktop."
+msgstr "Dịch vụ desktop portal không phản hồi, nên không thể chụp ảnh màn hình hay quay màn hình trên Wayland. Hãy cài đặt xdg-desktop-portal và portal cho môi trường desktop của bạn."
+
+msgid "The tray icon is not available on Linux yet. Use the launcher window."
+msgstr "Biểu tượng khay hệ thống chưa khả dụng trên Linux. Hãy dùng cửa sổ khởi chạy."
+
+msgid "What this system is missing"
+msgstr "Hệ thống này còn thiếu gì"
+
+#. FACT: owner review required (privacy)
+msgid "When something goes wrong, copy this and paste it into a bug report. It has the version, your Mac, permissions, models, a few settings and the last warnings. It has no audio, no transcripts and no file names. Nothing is sent: check it, then paste it yourself."
+msgstr "Khi có sự cố, hãy sao chép nội dung này và dán vào báo cáo lỗi. Nội dung gồm phiên bản, máy Mac của bạn, quyền truy cập, các mô hình, vài cài đặt và những cảnh báo gần nhất. Không có âm thanh, bản chép lời hay tên tệp. Không có gì được gửi đi: hãy kiểm tra rồi tự dán."
+
+#. FACT: owner review required (nothing is requested until a button is pressed)
+msgid "Windows keeps these under your control. Nothing is requested until you press a button; you can change any of them later in Settings → Permissions."
+msgstr "Windows để các quyền này do bạn kiểm soát. Không có gì được yêu cầu cho đến khi bạn nhấn một nút; bạn có thể thay đổi bất kỳ quyền nào sau này trong Cài đặt → Quyền truy cập."
+
+msgctxt "button"
+msgid "Defaults"
+msgstr "Mặc định"
+
+msgctxt "button"
+msgid "Hide options"
+msgstr "Ẩn tuỳ chọn"
+
+msgctxt "button"
+msgid "Refresh"
+msgstr "Làm mới"
+
+msgctxt "button"
+msgid "Reveal log folder"
+msgstr "Hiện thư mục nhật ký"
+
+msgctxt "button"
+msgid "Search again"
+msgstr "Tìm lại"
+
+msgctxt "button"
+msgid "Show diagnostics"
+msgstr "Hiện thông tin chẩn đoán"
+
+msgctxt "button"
+msgid "What to look for"
+msgstr "Cần tìm gì"
+
+msgctxt "redaction group"
+msgid "Contact and network"
+msgstr "Liên hệ và mạng"
+
+msgctxt "redaction group"
+msgid "Identity and health"
+msgstr "Danh tính và sức khoẻ"
+
+msgctxt "redaction group"
+msgid "Payment"
+msgstr "Thanh toán"
+
+msgctxt "redaction group"
+msgid "Secrets"
+msgstr "Bí mật"
+
+msgctxt "redaction kind"
+msgid "Bank routing number"
+msgstr "Mã định tuyến ngân hàng"
+
+msgctxt "redaction kind"
+msgid "Card expiry or code"
+msgstr "Ngày hết hạn hoặc mã thẻ"
+
+msgctxt "redaction kind"
+msgid "Card number"
+msgstr "Số thẻ"
+
+msgctxt "redaction kind"
+msgid "DEA number"
+msgstr "Số DEA"
+
+msgctxt "redaction kind"
+msgid "Device ID (IMEI)"
+msgstr "Mã thiết bị (IMEI)"
+
+msgctxt "redaction kind"
+msgid "Employer ID (EIN)"
+msgstr "Mã số nhà tuyển dụng (EIN)"
+
+msgctxt "redaction kind"
+msgid "IBAN"
+msgstr "IBAN"
+
+msgctxt "redaction kind"
+msgid "Link with a secret"
+msgstr "Liên kết chứa mã bí mật"
+
+msgctxt "redaction kind"
+msgid "MAC address"
+msgstr "Địa chỉ MAC"
+
+msgctxt "redaction kind"
+msgid "Medicare ID"
+msgstr "Mã Medicare"
+
+msgctxt "redaction kind"
+msgid "Passport number"
+msgstr "Số hộ chiếu"
+
+msgctxt "redaction kind"
+msgid "Private key"
+msgstr "Khoá riêng tư"
+
+msgctxt "redaction kind"
+msgid "Provider ID (NPI)"
+msgstr "Mã nhà cung cấp dịch vụ y tế (NPI)"
+
+msgctxt "redaction kind"
+msgid "Secret value"
+msgstr "Giá trị bí mật"
+
+msgctxt "redaction kind"
+msgid "Social Security number"
+msgstr "Số An sinh Xã hội"
+
+msgctxt "redaction kind"
+msgid "Taxpayer ID (ITIN)"
+msgstr "Mã số thuế cá nhân (ITIN)"
+
+msgctxt "redaction kind"
+msgid "Vehicle ID (VIN)"
+msgstr "Số khung xe (VIN)"
