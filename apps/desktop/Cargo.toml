@@ -87,3 +87,7 @@ objc2-core-video.workspace = true
 objc2-core-foundation.workspace = true
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSEvent", "NSImage", "NSResponder", "NSRunningApplication", "NSWorkspace", "NSAccessibility", "NSWindow", "NSView", "NSScreen", "NSColor", "NSPasteboard"] }
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSData", "NSArray", "NSGeometry", "NSString"] }
+
+# Linux windowing backends: without `wayland` or `x11` GPUI starts but opens no window.
+[target.'cfg(target_os = "linux")'.dependencies]
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.9", features = ["wayland", "x11"] }
