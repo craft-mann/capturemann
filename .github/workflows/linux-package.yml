@@ -15,6 +15,10 @@ on:
         description: "Build and bundle the LGPL FFmpeg (packaging/ffmpeg/build-linux.sh; adds about 10 minutes)"
         type: boolean
         default: true
+      with_llama:
+        description: "Build and bundle llama-server, the built-in text engine (packaging/llama/build-linux.sh; adds about 5 minutes)"
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -77,10 +81,23 @@ jobs:
       - name: Build the LGPL FFmpeg
         if: ${{ inputs.with_ffmpeg }}
         run: packaging/ffmpeg/build-linux.sh
+      - name: Cache the llama.cpp source
+        if: ${{ inputs.with_llama }}
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: packaging/llama/.downloads
+          key: llama-src-${{ hashFiles('packaging/llama/build-macos.sh') }}
+      # MIT, static, CPU only; the pinned tag and SHA-256 are read from build-macos.sh. A helper program
+      # next to the app, never linked into it. The tarball step refuses it if it needs more than libc/libm.
+      - name: Build llama-server (text engine)
+        if: ${{ inputs.with_llama }}
+        run: packaging/llama/build-linux.sh
       - name: Build the tarball
         env:
           CM_REQUIRE_SHERPA: "1"
           CM_REQUIRE_SPEAKER_MODELS: "1"
+          CM_REQUIRE_LLAMA: ${{ inputs.with_llama && '1' || '0' }}
+          CM_LLAMA_BUNDLE: ${{ inputs.with_llama && format('{0}/packaging/llama/out', github.workspace) || '' }}
           CM_REQUIRE_FFMPEG: ${{ inputs.with_ffmpeg && '1' || '0' }}
           CM_FFMPEG_BUNDLE: ${{ inputs.with_ffmpeg && format('{0}/packaging/ffmpeg/out-linux-{1}', github.workspace, matrix.arch) || '' }}
         run: packaging/linux/build-linux.sh
@@ -93,6 +110,10 @@ jobs:
           "$work/prefix/bin/capturemann" --version
           test -f "$work/prefix/lib/Resources/Models/speaker/pyannote-segmentation-3-0.onnx"
           test -f "$work/prefix/share/doc/capturemann/SHERPA-ONNX/ThirdPartyNotices-onnxruntime.txt"
+          if [ "${{ inputs.with_llama }}" = true ]; then
+            "$work/prefix/lib/capturemann/llama-server" --version
+            test -f "$work/prefix/lib/capturemann/Llama/LICENSES/llama.cpp-LICENSE.txt"
+          fi
           desktop-file-validate "$work/prefix/share/applications/dev.capturemann.app.desktop"
           ./install.sh --uninstall --prefix "$work/prefix"
       - name: Keep the files

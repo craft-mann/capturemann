@@ -13,6 +13,11 @@
 #                      packaging/ffmpeg/build-linux.sh) to ship. Without it the tarball has no FFmpeg
 #                      and says so (install.sh prints a note). Refused when its build line says GPL.
 #   CM_REQUIRE_FFMPEG=1  fail unless an LGPL FFmpeg with its licence files is bundled.
+#   CM_LLAMA_BUNDLE    the folder written by packaging/llama/build-linux.sh (llama-server, LICENSES/,
+#                      BUILD-INFO.txt) or the llama-server file itself: the built-in text engine (AI-7)
+#                      is shipped as lib/capturemann/llama-server (+ Llama/ with the MIT licence files).
+#                      Refused unless it needs only libc, libm and the loader (static, CPU, no curl/OpenSSL).
+#   CM_REQUIRE_LLAMA=1 fail unless llama-server with its MIT licence files is bundled.
 #   CM_LINUX_OUT       output folder.
 #   CM_LINUX_ALLOW_MISSING  space-separated program names that may be absent (testing the packaging only).
 #   CM_CARGO_JOBS      cargo -j value (default: cargo's own).
@@ -128,6 +133,34 @@ elif [ "${CM_REQUIRE_FFMPEG:-0}" = "1" ]; then
   die "CM_REQUIRE_FFMPEG=1 but CM_FFMPEG_BUNDLE is not set (build one with packaging/ffmpeg/build-linux.sh)"
 fi
 
+# ---- llama-server (MIT): the helper program of the built-in text engine (AI-7) ----
+# A separate program next to the others, never linked into the app. The engine search order is
+# CM_LLAMA_SERVER, the folder of the executable, PATH, so this is all it needs.
+llama_bin=""; llama_dir=""; llama_lic=0
+if [ -n "${CM_LLAMA_BUNDLE:-}" ]; then
+  if [ -d "$CM_LLAMA_BUNDLE" ]; then llama_dir="$CM_LLAMA_BUNDLE"; llama_bin="$llama_dir/llama-server"
+  else llama_bin="$CM_LLAMA_BUNDLE"; llama_dir="$(dirname "$llama_bin")"; fi
+  [ -f "$llama_bin" ] && [ -x "$llama_bin" ] || die "no executable llama-server in CM_LLAMA_BUNDLE=$CM_LLAMA_BUNDLE"
+  # Same policy as the programs above, and stricter: this one is built static (packaging/llama/build-linux.sh),
+  # so only the C library, the maths library and the loader may be needed (no libcurl or OpenSSL: it must not
+  # be able to reach the network by itself; no libgomp: GPL-3.0 with a runtime exception, avoided on purpose).
+  llama_needed="$(objdump -p "$llama_bin" | awk '/NEEDED/ {print $2}' | sort -u)"
+  llama_bad="$(grep -v -E '^(libc\.so\.6|libm\.so\.6|libdl\.so\.2|libpthread\.so\.0|librt\.so\.1|ld-linux-[a-z0-9_-]+\.so\.[0-9]+|libvulkan\.so\.1)$' <<<"$llama_needed" || true)"
+  [ -z "$llama_bad" ] || die "$llama_bin needs a library outside the allowed list: $(echo $llama_bad)"
+  llama_bad="$(grep -E -i 'x264|x265|fdk|readline|libgmp|libgsl|libfftw|libav|libsherpa|libonnxruntime|curl|ssl|crypto|gomp' <<<"$llama_needed" || true)"
+  [ -z "$llama_bad" ] || die "$llama_bin links a library that is not allowed in a shipped build: $llama_bad"
+  case "$arch:$(objdump -f "$llama_bin" | sed -n 's/.*file format //p' | head -1)" in
+    x86_64:elf64-x86-64 | aarch64:elf64-littleaarch64) ;;
+    *) die "$llama_bin is not an $arch program" ;;
+  esac
+  if [ -f "$llama_dir/LICENSES/llama.cpp-LICENSE.txt" ]; then llama_lic=1
+  elif [ "${CM_REQUIRE_LLAMA:-0}" = "1" ]; then die "$llama_dir has no LICENSES/llama.cpp-LICENSE.txt: a release must ship the MIT notice (build it with packaging/llama/build-linux.sh)"
+  else echo "    warning: no LICENSES/llama.cpp-LICENSE.txt next to llama-server; this tarball must not be distributed" >&2; fi
+  echo "    llama-server: libraries $(echo $llama_needed), licence files $([ "$llama_lic" = 1 ] && echo present || echo MISSING)"
+elif [ "${CM_REQUIRE_LLAMA:-0}" = "1" ]; then
+  die "CM_REQUIRE_LLAMA=1 but CM_LLAMA_BUNDLE is not set (build one with packaging/llama/build-linux.sh)"
+fi
+
 # ---- licences ----
 licenses="$root/THIRD_PARTY_LICENSES.md"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/cm-linux-pack.XXXXXX")"
@@ -158,9 +191,22 @@ if [ -n "$ffdir" ]; then
     cp -R "$ffdir/LICENSES" "$stage/lib/capturemann/FFmpeg/LICENSES"
   fi
 fi
+if [ -n "$llama_bin" ]; then
+  install -m 755 "$llama_bin" "$stage/lib/capturemann/llama-server"
+  if [ "$llama_lic" = 1 ]; then
+    mkdir -p "$stage/lib/capturemann/Llama"
+    [ ! -f "$llama_dir/BUILD-INFO.txt" ] || cp "$llama_dir/BUILD-INFO.txt" "$stage/lib/capturemann/Llama/"
+    cp -R "$llama_dir/LICENSES" "$stage/lib/capturemann/Llama/LICENSES"
+  fi
+fi
 cp "$root/LICENSE" "$root/NOTICE" "$stage/share/doc/capturemann/"
 cp "$licenses" "$stage/share/doc/capturemann/THIRD_PARTY_LICENSES.md"
 cp "$root/CHANGELOG.md" "$stage/share/doc/capturemann/" 2>/dev/null || true
+if [ -n "$llama_bin" ]; then
+  text_note='Text engine (built-in text model): lib/capturemann/llama-server is included (MIT; licence files in lib/capturemann/Llama/). The user downloads a model file on the AI page.'
+else
+  text_note='Text engine (built-in text model): llama-server is not in this tarball; set CM_LLAMA_SERVER or put it on PATH.'
+fi
 speaker_note='This build has no speaker engine ("Find speakers" is off).'
 if [ "$sherpa_on" = 1 ]; then
   # The static libraries are inside cm-desktop, so their licence texts must travel with it: the
@@ -231,6 +277,7 @@ Check libraries:        ./check-runtime.sh          (names the apt package for e
 Needs a desktop session and the libraries listed in share/doc/capturemann/LIBRARIES.txt;
 see https://github.com/craft-mann/capturemann (packaging/linux/README.md) for the apt packages.
 Licences: share/doc/capturemann/. $speaker_note
+$text_note
 EOF
 
 mkdir -p "$out"
