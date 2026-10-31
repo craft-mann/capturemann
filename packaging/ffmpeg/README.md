@@ -119,3 +119,14 @@ FFmpeg is a separate executable. Users can build their own and either replace
 `Contents/MacOS/ffmpeg` and `ffprobe` in the app or set `CM_FFMPEG` to their executable (or to the
 folder that holds it); `CM_FFMPEG` wins over the bundled copy. `SOURCE-OFFER.txt` in the bundle
 names the exact sources and the configure line.
+
+## VP9 decoder (Linux build only)
+
+The Linux build (`build-linux.sh`) also enables FFmpeg's own `vp9` decoder (native C, LGPL, no extra library;
+decision D-R4 in specs/plans/linux-recording-plan.md), because the Linux recorder writes VP9 in a fragmented
+MP4 when no hardware encoder is usable. `vp9` is in `DECODERS` and in `REQUIRED_DECODERS`, so the self-check fails
+if it is missing. The `mov` demuxer, the `vp9` parser and the `vp9_superframe` filters were already there.
+libvpx itself stays an encoder-only dependency (`--disable-vp8`, no libvpx decoder is enabled).
+`build-macos.sh` is unchanged: macOS recordings are HEVC or H.264 (VideoToolbox), so it needs no VP9 decoder; add
+`vp9` to its `DECODERS` and `REQUIRED_DECODERS` only if a VP9 recording ever has to be opened on a Mac (for example a
+bundle copied from Linux).

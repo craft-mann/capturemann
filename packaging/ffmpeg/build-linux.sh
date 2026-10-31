@@ -52,7 +52,7 @@ if [ "$vaapi" = "1" ]; then pkg-config --exists libva libva-drm || die "CM_FFMPE
 
 # Same lists as build-macos.sh, with VAAPI in place of VideoToolbox.
 ENCODERS="aac,libvpx_vp9,libopus,gif,ffv1,mjpeg,png,pcm_f32le,pcm_s16le,pcm_s24le,rawvideo,wrapped_avframe"
-DECODERS="h264,hevc,aac,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_u8,png,mjpeg,ffv1,gif,rawvideo"
+DECODERS="h264,hevc,vp9,aac,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_u8,png,mjpeg,ffv1,gif,rawvideo"
 HWACCELS=""
 if [ "$vaapi" = "1" ]; then
   ENCODERS="$ENCODERS,h264_vaapi,hevc_vaapi"
@@ -69,7 +69,7 @@ FILTERS="alphamerge,aformat,aresample,atempo,atrim,adelay,amix,anull,apad,alimit
 
 REQUIRED_ENCODERS="aac libvpx-vp9 libopus gif ffv1 mjpeg pcm_f32le pcm_s24le rawvideo"
 [ "$vaapi" != "1" ] || REQUIRED_ENCODERS="$REQUIRED_ENCODERS h264_vaapi"
-REQUIRED_DECODERS="h264 hevc aac pcm_s16le pcm_f32le png mjpeg ffv1 rawvideo"
+REQUIRED_DECODERS="h264 hevc vp9 aac pcm_s16le pcm_f32le png mjpeg ffv1 rawvideo"
 REQUIRED_MUXERS="mp4 webm matroska gif image2 rawvideo wav f32le null"
 REQUIRED_DEMUXERS="mov matroska wav image2 rawvideo f32le gif"
 REQUIRED_FILTERS="alphamerge aformat aresample atempo atrim adelay amix apad alimiter asetpts crop format fps hflip overlay paletteuse palettegen scale setpts setsar split tpad trim loudnorm ebur128 concat anullsrc anullsink"
