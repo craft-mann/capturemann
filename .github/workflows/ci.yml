@@ -57,7 +57,7 @@ jobs:
         # screen permission, camera or microphone, so the hardware tests stay manual (verification/).
         os: ${{ fromJSON(needs.plan.outputs.os) }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable (branch tip)
@@ -93,29 +93,29 @@ jobs:
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: packaging/sherpa/.downloads
-          key: sherpa-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packaging/sherpa/fetch-macos.sh', 'packaging/sherpa/fetch-models.sh') }}
+          key: sherpa-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packaging/sherpa/fetch-macos.sh', 'packaging/sherpa/fetch-linux.sh', 'packaging/sherpa/fetch-models.sh') }}
       - name: Fetch the sherpa-onnx libraries and speaker models (pinned, SHA-256 checked)
-        if: runner.os == 'macOS'
+        if: runner.os != 'Windows'
         run: make sherpa
       - run: cargo fmt --all -- --check
       - name: Clippy
-        if: runner.os == 'macOS'
+        if: runner.os != 'Windows'
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - name: Test
-        if: runner.os == 'macOS'
-        run: cargo test --workspace --locked
-      # No sherpa-onnx static libraries for these targets yet (speaker finding moves to 0.3.x, D-W5), so
-      # the `sherpa` default feature is off there.
-      - name: Clippy (no sherpa)
-        if: runner.os != 'macOS'
-        run: cargo clippy --workspace --all-targets --locked --no-default-features -- -D warnings
       # Linux: the product never exports with libx264 (GPL); these tests run on the runner's own GPL
       # FFmpeg and expect H.264, so they ask for the developer-only list (CM_EXPORT_ALLOW_GPL, never set
       # in a shipped build).
-      - name: Test (no sherpa)
-        if: runner.os != 'macOS'
+      - name: Test
+        if: runner.os != 'Windows'
         env:
           CM_EXPORT_ALLOW_GPL: ${{ runner.os == 'Linux' && '1' || '' }}
+        run: cargo test --workspace --locked --no-fail-fast
+      # No sherpa-onnx static libraries for Windows yet (speaker finding moves to 0.3.x, D-W5), so the
+      # `sherpa` default feature is off there.
+      - name: Clippy (no sherpa, Windows)
+        if: runner.os == 'Windows'
+        run: cargo clippy --workspace --all-targets --locked --no-default-features -- -D warnings
+      - name: Test (no sherpa, Windows)
+        if: runner.os == 'Windows'
         run: cargo test --workspace --locked --no-default-features --no-fail-fast
       # The real Trash (Recycle Bin, freedesktop Trash) of the runner: a scratch folder is moved there. Not run
       # on macOS, where it would use the developer's own Trash.
