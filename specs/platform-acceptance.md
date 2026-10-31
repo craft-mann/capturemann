@@ -17,8 +17,8 @@ itself from capture; the tray needs an extension on GNOME).
 
 | ID | Windows | Linux |
 | --- | --- | --- |
-| CAP-1 | W1. Display, window and region capture through `xcap`; the picker overlay is a borderless topmost window per display; physical-pixel output checked at 100 %, 150 % and mixed DPI. Own windows are hidden with `WDA_EXCLUDEFROMCAPTURE`. Checked by `tests/manual/CAP-1.md` and `CAP-1-overlay.md` on the primary machine. | L1. Portal Screenshot and an X11 path; the region picker differs per desktop (no custom overlay on GNOME: the portal's own picker). Run on GNOME Wayland, KDE Wayland and one X11 session. |
-| CAP-2 | W1. `global-hotkey` (RegisterHotKey) with the Ctrl+Alt+Shift defaults in the feature file; `tray-icon`; Launch at login is a per-user Run entry written only by an installed copy (the macOS rule: a dev binary never registers). | L1. GlobalShortcuts portal; tray through StatusNotifier (needs an extension on GNOME, the launcher window is the fallback); autostart `.desktop` file. |
+| CAP-1 | W1. Display, window and region capture through `xcap`; the picker overlay is a borderless topmost window per display; physical-pixel output checked at 100 %, 150 % and mixed DPI. Own windows are hidden with `WDA_EXCLUDEFROMCAPTURE`. Checked by `tests/manual/CAP-1.md` and `CAP-1-overlay.md` on the primary machine. | L1. **X11 path built** (`xcap`; display, region and titled-window capture checked on Xvfb in a VM, CI runs them; a Wayland session answers `not_implemented` and says it needs the portal). Wayland: portal Screenshot or ScreenCast (`xcap` does not work on GNOME); the region picker differs per desktop (no custom overlay on GNOME: the portal's own picker). Run on GNOME Wayland, KDE Wayland and one X11 session. |
+| CAP-2 | W1. `global-hotkey` (RegisterHotKey) with the Ctrl+Alt+Shift defaults in the feature file; `tray-icon`; Launch at login is a per-user Run entry written only by an installed copy (the macOS rule: a dev binary never registers). | L1. GlobalShortcuts portal (**not offered by GNOME 46's portal 1.18**, so global hotkeys there need another route; re-check on newer GNOME and KDE); tray through StatusNotifier (needs an extension on GNOME, the launcher window is the fallback); autostart `.desktop` file. |
 | CAP-3 | W1. Shared drawing code; checked with the picker at mixed DPI. | L1. Where a custom overlay exists. |
 | CAP-4 | W1. Clipboard gets the image as PNG and DIB; default destination is shared. | L1. `wl-clipboard` protocol or X11 selections. |
 | CAP-5 | Shared. | Shared. |
@@ -26,7 +26,7 @@ itself from capture; the tray needs an extension on GNOME).
 | ANN-1, ANN-3, ANN-4 | Shared (the annotation model and renderer have no OS part). W1 run of `tests/manual/ANN-2.md` covers the editor on Windows. | Shared; L1 run. |
 | ANN-2 | Shared. Blur and pixelate are checked against golden pixels in CI; W1 manual run. | Shared; L1 run. |
 | LIB-1 | Shared. The watcher polls folder signatures; the Windows CI run exercises it (added Oct 30, 2026: fresh folder time, no cached directory entry). | Shared. |
-| LIB-2 | W1. Default folder is `Videos\CaptureMann`; check a OneDrive-redirected Videos folder and long paths (0.3.x). Free space comes from `GetDiskFreeSpaceExW`. | L1. XDG video dir, `statvfs` free space. |
+| LIB-2 | W1. Default folder is `Videos\CaptureMann`; check a OneDrive-redirected Videos folder and long paths (0.3.x). Free space comes from `GetDiskFreeSpaceExW`. | L1. XDG video dir, `statvfs` free space. Delete goes to the freedesktop.org Trash (`cm_platform::trash`, checked on Linux). |
 | LIB-3 | Shared. | Shared. |
 | LNC-1 | W1. Hotkey opens the launcher window; focus returns to the previous app. | L1. Focus return is limited on Wayland. |
 
@@ -34,12 +34,12 @@ itself from capture; the tray needs an extension on GNOME).
 
 | ID | Windows | Linux |
 | --- | --- | --- |
-| REC-1 | W2. Windows.Graphics.Capture source; Media Foundation H.264 hardware encoder into the shared fragmented-MP4 writer. Hardware tests on the primary machine; no hardware encoder gives `hardware_encoder_unavailable` (checked in a VM without a GPU). | L2. Portal ScreenCast through PipeWire; VA-API or NVENC. |
+| REC-1 | W2. Windows.Graphics.Capture source; Media Foundation H.264 hardware encoder into the shared fragmented-MP4 writer. Hardware tests on the primary machine; no hardware encoder gives `hardware_encoder_unavailable` (checked in a VM without a GPU). | L2. Portal ScreenCast through PipeWire (**stream, timestamps and cursor metadata checked on GNOME 46 in a VM**, see `verification/L0-portal-screencast-2026-10-31-claude.md`); VA-API or NVENC. |
 | REC-2, REC-3 | W2. 1080p30 is the gate (30 minutes with all tracks on the primary machine); 1080p60, 1440p and 4K are measured and reported, not gated. | L2. 30-minute 4K30 gate on one machine. |
 | REC-4 | Shared (the session removes the pause gap); W2 run. | Shared; L2 run. |
 | REC-5 | W1. The HUD and stop control are excluded from capture with `WDA_EXCLUDEFROMCAPTURE`. Whether Windows 10 22H2 shows a capture border, and whether it lands in the recording, is an open question for spike S6. | L2. The HUD cannot hide itself from capture on Wayland; the recording indicator stays visible to the user. |
 | REC-6 | W2. Own windows via `WDA_EXCLUDEFROMCAPTURE`; excluding another app's window is to be confirmed by the S6 run before the criterion is promised. | L2. Not possible on Wayland for other apps; document per desktop. |
-| REC-7 | W3. Low-level mouse hook for clicks and position, stamped by QPC; check against SmartScreen and antivirus behavior (0.3.x). | L2. Portal cursor metadata; reduced click effects. |
+| REC-7 | W3. Low-level mouse hook for clicks and position, stamped by QPC; check against SmartScreen and antivirus behavior (0.3.x). | L2. Portal cursor metadata (**delivered on every frame in the GNOME 46 VM test** once the consumer asks for it with a size range); reduced click effects. |
 | REC-8 | W2. `recording.lock` owner lock uses `File::try_lock` (works on Windows, tested in CI); a kill test on the primary machine. | L2. Same lock. |
 | REC-9 | W3 (after the overlay). Topmost transparent window per display. | L2. Limited on Wayland. |
 | CAM-1, CAM-2 | W3. Media Foundation camera; live bubble excluded from capture; camera is its own track. | L2. V4L2 camera. |
@@ -80,7 +80,7 @@ itself from capture; the tray needs an extension on GNOME).
 | ID | Windows | Linux |
 | --- | --- | --- |
 | STO-1 | W1. Drive letters, UNC paths and removable drives; the unplug case is covered by an `icacls` stand-in in CI. | L1. XDG paths, mounts. |
-| STO-2 … STO-5 | Shared; tokens go to Windows Credential Manager through `keyring` (W0 smoke test). | Shared; Secret Service with a fallback (L1). |
+| STO-2 … STO-5 | Shared; tokens go to Windows Credential Manager through `keyring` (W0 smoke test, passes on the CI runner; the vault is stored in parts there). | Shared; Secret Service through `keyring` works with an unlocked keyring (CI runs it against `gnome-keyring`); with none running it reports "No default store has been set", and the fallback is not decided (L1). |
 | PUB-1 | W5. Credentials in Windows Credential Manager; `tests/manual/PUB-1.md` on Windows. | L3. |
 | PUB-2 … PUB-7 | Shared provider code; one Windows run of `PUB-2.md`. | Shared. |
 
