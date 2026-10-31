@@ -148,14 +148,17 @@ Disjoint files per task; all behind the traits above.
 8. **Recovery/soak**: `recording.lock` and `kill -9` on Linux (REC-8), a 30 min software-VP9 soak, disk-full.
 9. **Docs/acceptance**: update `specs/platform-acceptance.md` rows REC-1..REC-8 for Linux, `docs/project/spikes.md`.
 
-## 7. Decisions for the maintainer
+## 7. Decisions for the maintainer (decided Oct 31, 2026)
 
-* **D-R1** A software H.264 fallback on Linux: still no (default), or Cisco's binary after consent?
-* **D-R2** Software VP9 (in MP4) as the Linux fallback when no hardware encoder is usable: yes/no. (Changes "no
-  software fallback" for Linux only.)
-* **D-R3** FFmpeg child process for Linux encoding (fast to ship) vs in-process libvpx and hand-written VA-API.
-* **D-R4** Add the VP9 decoder to the bundled FFmpeg (needed if D-R2 is yes).
-* **D-R5** Minimum supported stack: PipeWire only (no PulseAudio/JACK/ALSA-only), portal v4+ with persist.
+* **D-R1** Software H.264 fallback on Linux: **no.** (Cisco's binary after consent stays a later option.)
+* **D-R2** Software VP9 (in MP4) as the Linux fallback when no hardware encoder is usable: **yes**, labelled
+  as a software encoder. Changes "no software fallback" for Linux only; macOS is unchanged.
+* **D-R3** Linux encoding through an FFmpeg child process behind `VideoEncoder`: **yes** for the early build, as a
+  deliberate exception to "FFmpeg only after recording" that applies to Linux only. An in-process libvpx and
+  VA-API encoder can replace it later without touching callers. The macOS recorder does not use any of the new
+  types (`CpuFrame`, `FfmpegVp9Encoder`, the PipeWire source); they compile there for their tests only.
+* **D-R4** Add the VP9 decoder to the bundled LGPL FFmpeg (with D-R2): **yes.**
+* **D-R5** Minimum stack for the early build: **PipeWire only**, portal v4+ with persist. Extend later.
 
 ## 8. Result of the VM run and what it did not settle
 
