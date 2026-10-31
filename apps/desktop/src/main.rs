@@ -237,7 +237,7 @@ fn main() {
     let library_path = settings::resolve_library_path(
         std::env::var_os("CAPTUREMANN_LIBRARY").map(PathBuf::from),
         &snapshot,
-        settings::default_library_dir(dirs::video_dir(), dirs::home_dir()),
+        settings::default_library_dir(cm_platform::dirs::video_dir(), dirs::home_dir()),
     );
     let endpoint = Endpoint::from_env_or_default();
 
