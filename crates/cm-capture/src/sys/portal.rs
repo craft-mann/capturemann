@@ -89,6 +89,26 @@ pub fn frame_from_png(bytes: &[u8]) -> Result<Frame, CmError> {
 /// capture must not take two.
 const REUSE: Duration = Duration::from_secs(3);
 
+/// The runtime every portal call runs on. It must outlive the call: ashpd shares one D-Bus
+/// connection between calls, and that connection's tasks live on the runtime that created it, so a
+/// runtime built and dropped per call left the second request waiting for ever.
+#[cfg(target_os = "linux")]
+fn runtime() -> Result<&'static tokio::runtime::Runtime, CmError> {
+    use std::sync::OnceLock;
+    static RUNTIME: OnceLock<Result<tokio::runtime::Runtime, String>> = OnceLock::new();
+    RUNTIME
+        .get_or_init(|| {
+            tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(1)
+                .thread_name("cm-portal")
+                .enable_all()
+                .build()
+                .map_err(|e| e.to_string())
+        })
+        .as_ref()
+        .map_err(|e| CmError::internal(format!("cannot start the portal client: {e}")))
+}
+
 /// Captures through `org.freedesktop.portal.Screenshot`.
 #[derive(Debug, Default)]
 pub struct PortalBackend {
@@ -122,10 +142,10 @@ impl PortalBackend {
     fn screenshot(&self) -> Result<Frame, CmError> {
         use ashpd::desktop::screenshot::Screenshot;
 
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|e| CmError::internal(format!("cannot start the portal client: {e}")))?;
+        // One request at a time: the desktop's screenshot service does not answer two at once.
+        static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
+        let _turn = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
+        let runtime = runtime()?;
         let uri = runtime.block_on(async {
             let response = Screenshot::request()
                 .interactive(false)

@@ -41,3 +41,23 @@ fn the_portal_returns_a_desktop_sized_picture() {
         "the picture is blank"
     );
 }
+
+#[test]
+#[ignore = "needs a Wayland desktop with the screenshot portal"]
+fn two_captures_in_a_row_both_finish() {
+    if !on_wayland() {
+        println!("SKIPPED: no WAYLAND_DISPLAY");
+        return;
+    }
+    let capturer = Capturer::system();
+    for _ in 0..3 {
+        let shot = capturer
+            .capture(
+                CaptureRequest::new(CaptureTarget::Display { display_id: 1 }),
+                None,
+            )
+            .unwrap()
+            .unwrap();
+        assert!(shot.frame.width() > 0);
+    }
+}
