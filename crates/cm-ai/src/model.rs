@@ -307,12 +307,7 @@ pub(crate) fn ignored_override(path: &Path, e: &CmError) -> String {
 /// The app's config folder: `CAPTUREMANN_CONFIG_DIR`, else `<platform config dir>/CaptureMann`
 /// (the same rule as the settings file).
 pub fn config_dir() -> PathBuf {
-    if let Some(d) = std::env::var_os("CAPTUREMANN_CONFIG_DIR").filter(|v| !v.is_empty()) {
-        return PathBuf::from(d);
-    }
-    let base = cm_platform::dirs::config_base_dir();
-    base.map(|b| b.join("CaptureMann"))
-        .unwrap_or_else(|| std::env::temp_dir().join("CaptureMann"))
+    cm_platform::dirs::app_config_dir()
 }
 
 /// Installed models and the active choice, in one folder.

@@ -19,6 +19,17 @@ pub fn config_base_dir() -> Option<PathBuf> {
     sys::config_base_dir()
 }
 
+/// The app's config folder: `CAPTUREMANN_CONFIG_DIR`, else `<config base>/CaptureMann` (the rule the
+/// settings file follows); the temp folder when the system names no config base.
+pub fn app_config_dir() -> PathBuf {
+    if let Some(d) = non_empty("CAPTUREMANN_CONFIG_DIR") {
+        return PathBuf::from(d);
+    }
+    config_base_dir()
+        .map(|b| b.join("CaptureMann"))
+        .unwrap_or_else(|| std::env::temp_dir().join("CaptureMann"))
+}
+
 /// Where recordings go by default: `~/Movies` on macOS, `~/Videos` elsewhere.
 pub fn video_dir() -> Option<PathBuf> {
     home_dir().map(|h| {
