@@ -66,11 +66,11 @@ itself from capture; the tray needs an extension on GNOME).
 
 | ID | Windows | Linux |
 | --- | --- | --- |
-| AI-1 | W5. whisper CPU build; GPU paths are not promised. | L3. |
+| AI-1 | W5. whisper CPU build; GPU paths are not promised. | L3. Early build (Oct 31, 2026): whisper.cpp builds from source with the default `whisper-rs` features (CPU, no OpenMP, no libgomp) and transcribes on aarch64 Ubuntu 24.04 in the VM (`verification/L1-local-ai-linux-2026-10-31-claude.md`); x86_64 untested; `build-linux.sh` pins a fixed CPU baseline (`GGML_NATIVE=OFF`). |
 | AI-2, AI-3, AI-4, AI-6 | Shared (text logic). | Shared. |
 | AI-5 | W5, with the translation model. | L3. |
-| AI-7 | W5. `llama-server` Windows build as a helper program, found as on macOS. | L3. |
-| AI-8 | W5. sherpa-onnx Windows build; also depends on spike S7. | L3. |
+| AI-7 | W5. `llama-server` Windows build as a helper program, found as on macOS. | L3. `packaging/llama/build-linux.sh` builds it (CPU, static, optional Vulkan) and the engine finds it next to the executable or on `PATH`; built in the VM, not yet run with a model, not yet in the tarball. |
+| AI-8 | W5. sherpa-onnx Windows build; also depends on spike S7. | L3. `packaging/sherpa/fetch-linux.sh` pins the v2.0.1 static libraries for aarch64 and x86_64; speaker finding ran on aarch64 in the VM with the real models (2 speakers in a two-voice clip); x86_64 libraries are pinned but never linked or run. |
 | AI-9 | W5. | L3. |
 | RED-1 | W5. `Windows.Media.Ocr` recognizer; the rules and the benchmark stay recognizer-agnostic. | L3. OCR choice; the button is hidden with a documented reason if none ships. |
 | RED-2, RED-3 | Shared (rule data). | Shared. |

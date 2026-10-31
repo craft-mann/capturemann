@@ -19,8 +19,11 @@
 #   CM_SKIP_LICENSES=1 use the checked-in THIRD_PARTY_LICENSES.md (macOS crate set) instead of
 #                      generating the Linux one with packaging/macos/gen-third-party.sh.
 #
-# The speaker engine (sherpa-onnx) has only macOS libraries, so this builds with
-# --no-default-features: "Find speakers" answers that the build has no speaker engine.
+# The speaker engine (sherpa-onnx, feature `sherpa`) is built in when its static libraries are there:
+# run `make sherpa` (packaging/sherpa/fetch-linux.sh) first, or point SHERPA_ONNX_LIB_DIR at a `lib`
+# folder. Without them this builds with --no-default-features and "Find speakers" answers that the
+# build has no speaker engine (CM_REQUIRE_SHERPA=1 makes that an error). CM_LLAMA_BUNDLE is not used
+# yet: the text engine (packaging/llama/build-linux.sh) is not part of this tarball.
 set -euo pipefail
 die() { echo "build-linux.sh: $*" >&2; exit 1; }
 
@@ -43,9 +46,26 @@ version="$(cd "$root" && cargo metadata --no-deps --format-version 1 --locked \
   | python3 -c 'import json,sys; print(sorted({p["version"] for p in json.load(sys.stdin)["packages"]})[-1])')"
 [ -n "$version" ] || die "cannot read the workspace version"
 
+# whisper.cpp (cm-ai) is compiled by cargo. ggml defaults to -march=native, which would tie the
+# binary to the CPU of the build machine (SIGILL elsewhere); build a fixed baseline instead.
+export GGML_NATIVE=OFF
+if [ "$arch" = "x86_64" ]; then
+  export GGML_AVX=ON GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON GGML_BMI2=ON GGML_AVX512=OFF
+fi
+sherpa_lib="${SHERPA_ONNX_LIB_DIR:-$root/packaging/sherpa/out/lib}"
+if [ -f "$sherpa_lib/libsherpa-onnx-c-api.a" ] && [ -f "$sherpa_lib/libonnxruntime.a" ]; then
+  features=()
+  sherpa_note="with the speaker engine (sherpa-onnx from $sherpa_lib)"
+elif [ "${CM_REQUIRE_SHERPA:-0}" = "1" ]; then
+  die "CM_REQUIRE_SHERPA=1 but there are no sherpa-onnx libraries in $sherpa_lib (run: make sherpa)"
+else
+  features=(--no-default-features)
+  sherpa_note="WITHOUT the speaker engine (no sherpa-onnx libraries in $sherpa_lib; run: make sherpa)"
+fi
 if [ "${CM_SKIP_BUILD:-0}" != "1" ]; then
-  echo "==> cargo build --release --no-default-features"
-  (cd "$root" && cargo build --release --locked --no-default-features ${jobs[@]+"${jobs[@]}"} \
+  echo "==> cargo build --release, $sherpa_note"
+  # whisper-rs-sys does not re-run when GGML_* change: after changing them, cargo clean -p whisper-rs-sys.
+  (cd "$root" && SHERPA_ONNX_LIB_DIR="$sherpa_lib" cargo build --release --locked ${features[@]+"${features[@]}"} ${jobs[@]+"${jobs[@]}"} \
     -p cm-desktop -p cm-overlay -p cm-cli -p cm-mcp)
 fi
 target="$(cd "$root" && cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')/release"
