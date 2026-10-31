@@ -699,7 +699,17 @@ mod tests {
         assert_eq!(seen.lock().unwrap().clone(), Some(Some("old".to_string())));
         assert_eq!(tokens.load().as_deref(), Some("new"));
         assert_eq!(src.stream_info().unwrap().width, 1280);
-        std::thread::sleep(Duration::from_millis(1100));
+        // The scripted stop is due ~900 ms after the frame; wait for it instead of assuming a
+        // loaded machine has delivered it by a fixed time.
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        while !log.lock().unwrap().iter().any(|s| s == "stopped") {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "no stop in 10 s: {:?}",
+                log.lock().unwrap()
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
         src.stop();
         let n = log.lock().unwrap().len();
         let got = log.lock().unwrap().clone();
