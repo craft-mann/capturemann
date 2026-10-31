@@ -3910,6 +3910,9 @@ msgstr ""
 msgid "Set Out point"
 msgstr ""
 
+msgid "Set by your desktop: {keys}"
+msgstr ""
+
 msgid "Set the background frame"
 msgstr ""
 

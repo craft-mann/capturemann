@@ -11004,3 +11004,6 @@ msgstr "Thu nhỏ"
 
 msgid "Restore"
 msgstr "Khôi phục"
+
+msgid "Set by your desktop: {keys}"
+msgstr "Do môi trường desktop đặt: {keys}"

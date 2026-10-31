@@ -36,9 +36,14 @@ impl SettingsView {
     }
 
     pub(super) fn shortcuts(&self, t: &Theme, cx: &mut Context<Self>) -> AnyElement {
-        let (platform, map, reg) = {
+        let (platform, map, reg, portal) = {
             let m = self.app.read(cx);
-            (m.platform, m.shortcuts.clone(), m.registration.clone())
+            (
+                m.platform,
+                m.shortcuts.clone(),
+                m.registration.clone(),
+                m.portal_triggers.clone(),
+            )
         };
         let rows = model::shortcut_rows(&map, platform);
         // Design gap: the board's rows "Skip the countdown", "Draw
@@ -78,6 +83,10 @@ impl SettingsView {
                         let change_id = SharedString::from(format!("rebind-{}", r.key));
                         let action_for_click = r.action;
                         let label = r.label.clone();
+                        // Wayland: the keys the desktop chose, read-only, under the row's name.
+                        let chosen = portal.iter().find(|(x, _)| *x == a).map(|(_, d)| {
+                            SharedString::from(tr!("Set by your desktop: {keys}", keys = d))
+                        });
                         let control = div()
                             .flex()
                             .flex_wrap()
@@ -141,7 +150,7 @@ impl SettingsView {
                                 t,
                                 Some(shortcut_tile(r.key)),
                                 label.clone(),
-                                None,
+                                chosen,
                                 Some(control.into_any_element()),
                                 i == last,
                             )

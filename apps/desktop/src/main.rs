@@ -405,8 +405,8 @@ fn main() {
             let tx = cmd_tx.clone();
             platform_hotkeys::start_portal(
                 &shortcuts,
-                move |registration| {
-                    let _ = bound_tx.send(registration);
+                move |registration, triggers| {
+                    let _ = bound_tx.send((registration, triggers));
                 },
                 move |id| {
                     let _ = tx.send(Command::Hotkey(id));
@@ -414,7 +414,7 @@ fn main() {
             );
             let app2 = model.clone();
             cx.spawn(async move |cx| {
-                if let Some(registration) = bound_rx.recv().await {
+                if let Some((registration, triggers)) = bound_rx.recv().await {
                     cx.update(|cx| {
                         let none = registration.iter().all(|(_, r)| {
                             r.as_ref()
@@ -423,6 +423,7 @@ fn main() {
                         });
                         app2.update(cx, |m, cx| {
                             m.registration = registration;
+                            m.portal_triggers = triggers;
                             cx.notify();
                         });
                         if none {
