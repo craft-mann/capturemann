@@ -80,7 +80,7 @@ itself from capture; the tray needs an extension on GNOME).
 | ID | Windows | Linux |
 | --- | --- | --- |
 | STO-1 | W1. Drive letters, UNC paths and removable drives; the unplug case is covered by an `icacls` stand-in in CI. | L1. XDG paths, mounts. |
-| STO-2 … STO-5 | Shared; tokens go to Windows Credential Manager through `keyring` (W0 smoke test, passes on the CI runner; the vault is stored in parts there). | Shared; Secret Service through `keyring` works with an unlocked keyring (CI runs it against `gnome-keyring`); with none running it reports "No default store has been set", and the fallback is not decided (L1). |
+| STO-2 … STO-5 | Shared; tokens go to Windows Credential Manager through `keyring` (W0 smoke test, passes on the CI runner; the vault is stored in parts there). | Shared; Secret Service through `keyring` works with an unlocked keyring (CI runs it against `gnome-keyring`); with none running it answers `platform_rejected` (`no_keyring`) saying what to start; the opt-in `CAPTUREMANN_SECRETS=file` (or a `secrets_backend` file holding `file` in the config folder) keeps the secrets in an owner-only, unencrypted `secrets.json` (decided Oct 31, 2026). Tested with fakes and temp files; the real no-keyring path is not run on a Linux desktop yet. |
 | PUB-1 | W5. Credentials in Windows Credential Manager; `tests/manual/PUB-1.md` on Windows. | L3. |
 | PUB-2 … PUB-7 | Shared provider code; one Windows run of `PUB-2.md`. | Shared. |
 

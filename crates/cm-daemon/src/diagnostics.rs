@@ -170,6 +170,10 @@ pub fn system_lines() -> Vec<String> {
     if let Ok(n) = std::thread::available_parallelism() {
         out.push(format!("threads available {n}"));
     }
+    out.push(match cm_auth::backend_from_env() {
+        cm_auth::Backend::Keyring => "secrets in the system credential store".to_owned(),
+        cm_auth::Backend::File(_) => "secrets in a file (owner-only, not encrypted)".to_owned(),
+    });
     out
 }
 
