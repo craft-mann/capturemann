@@ -71,4 +71,9 @@ refresh_caches
 echo "CaptureMann installed in $prefix."
 case ":$PATH:" in *":$bin:"*) ;; *) echo "Note: $bin is not on your PATH; add it to use the capturemann and cm-mcp commands." ;; esac
 [ -x "$lib/ffmpeg" ] || echo "Note: this build has no FFmpeg of its own. Export needs ffmpeg 5.1 or newer on PATH (sudo apt install ffmpeg) or CM_FFMPEG=/path/to/ffmpeg."
+if [ -x "$here/check-runtime.sh" ] && ! "$here/check-runtime.sh" "$lib" >/tmp/cm-runtime-check.$$ 2>&1; then
+  echo "Some system libraries are missing:"; cat /tmp/cm-runtime-check.$$
+  echo "(packaging/linux/README.md, \"What the user needs\", has the full list.)"
+fi
+rm -f /tmp/cm-runtime-check.$$
 echo "Start it from your application menu (CaptureMann) or run: $bin/cm-desktop"

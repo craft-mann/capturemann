@@ -51,7 +51,7 @@ Write down: distribution and version, desktop and version, `echo $XDG_SESSION_TY
    encrypted)"; the key is stored; `ls -l` shows the secrets file readable by you only (mode 600).
 
 ## 5. Screenshots
-10. **X11:** take a display screenshot (tray is absent; use the Capture button in the dock or `capturemann capture
+10. **X11:** take a display screenshot (or use the tray menu, see step 19; or `capturemann capture
     screenshot --display 1`). **Pass:** a PNG lands in the library at the physical pixel size of the screen.
 11. **X11:** region screenshot with the overlay picker; Esc cancels. **Pass:** the saved image shows exactly the
     selected region; Esc saves nothing.
@@ -74,11 +74,27 @@ Write down: distribution and version, desktop and version, `echo $XDG_SESSION_TY
     - Record in the dock, the Record shortcut and the launcher command: toast "Recording is not available yet"
       (the launcher row says "Not available yet"). No recording sheet, countdown or HUD opens.
     - Microphone and audio recording (the mic button in the dock): the same toast.
-    - Tray icon: absent on GNOME without an extension; the launcher window stays reachable.
+    - Tray icon on GNOME without the AppIndicator extension: the toast "Menu bar icon unavailable" explains how to
+      turn the extension on; no crash; the launcher window stays reachable.
     - Global hotkeys on GNOME 46 (no GlobalShortcuts portal): not registered; in-app shortcuts work.
 18. With the app running, `capturemann record start` (CLI) and the `start_recording` MCP tool. **Pass:** each answers
     with a clear error (not a crash, not a half-created bundle in the library). Record what the headless
     `cm-daemon` answers too; its gate is separate from the app's and is not changed by the early-build work.
+
+## 8. Tray icon (StatusNotifierItem)
+19. **KDE, or GNOME with "AppIndicator and KStatusNotifierItem Support" enabled (Ubuntu: `gnome-extensions enable
+    ubuntu-appindicators@ubuntu.com`, log out and in), or XFCE/Cinnamon/MATE:** start the app. **Pass:** the CaptureMann
+    icon appears in the panel; right click (GNOME: click) opens the menu: Capture region / window / display,
+    Capture delay (None, 3, 5, 10 s with one check mark), Record\u2026 / Record audio / Pause / Stop (Record\u2026 and
+    Record audio say "not available yet" on Linux for now; Pause and Stop are greyed), Open library, Open launcher, Recent
+    captures, Settings, Permissions\u2026, Quit CaptureMann. Hover shows the tooltip "CaptureMann".
+20. Click "Capture region" in the menu, then "Capture delay > 5 s" and look at the menu again. **Pass:** the region
+    picker opens; the check mark moved to 5 s; take a screenshot and open the menu: "Recent captures" lists it, and
+    clicking it opens the editor. "Open launcher" opens the launcher; "Quit CaptureMann" quits and the icon goes away.
+21. Left click on KDE (Activate). **Pass:** the launcher opens.
+22. Change the UI language in Settings. **Pass:** the menu texts change without a restart.
+23. Restart the shell's tray host while the app runs (`gnome-extensions disable` then `enable` the extension, or
+    `kquitapp6 plasmashell && plasmashell`). **Pass:** the icon returns by itself.
 
 ## Result
 Store the report in `verification/` (template in its README): list the distribution, desktop, session type, real or

@@ -76,10 +76,10 @@ gmp, libav*, ...), and prints the exact libraries and the glibc version the prog
 
 Built on Ubuntu 24.04, so the programs need **glibc 2.39 or newer**: Ubuntu 24.04 and later, Debian 13,
 Fedora 40 and later. Ubuntu 22.04 and Debian 12 are too old. Only the C library, `libgcc_s` and `libm` are linked by
-`capturemann`, `cm-mcp` and `cm-overlay`. `cm-desktop` (GPUI, GTK for the tray and dialogs, PipeWire for the
-portal capture, ALSA for audio) links the libraries below. This list comes from `ldd` on a debug build of
-`cm-desktop` from another branch in the QEMU VM (Ubuntu 24.04 arm64); see "Known problems" for why a release
-`cm-desktop` was not available in this tree.
+`capturemann`, `cm-mcp` and `cm-overlay`. `cm-desktop` (GPUI, GTK for dialogs, PipeWire for the portal capture,
+ALSA for audio) links the libraries below. The list was proved on a clean `ubuntu:24.04` arm64 container with
+only these packages (`--no-install-recommends`): every program resolves all its libraries and `cm-desktop` ran
+under Xvfb and served a CLI screenshot (`verification/L1-packaging-clean-linux-2026-10-31-claude.md`).
 
 On Ubuntu 24.04 (apt pulls the transitive ones):
 
@@ -89,9 +89,14 @@ sudo apt install libgtk-3-0t64 libasound2t64 libxkbcommon0 libxkbcommon-x11-0 li
   libssl3t64 libdbus-1-3 libpipewire-0.3-0t64 libvulkan1 mesa-vulkan-drivers
 # only for the bundled FFmpeg (it links libva, which Mesa desktops already have):
 sudo apt install libva2 libva-drm2
-# loaded when present (tray icon, input automation, secrets, screen capture on Wayland, export):
-sudo apt install libayatana-appindicator3-1 libxdo3 gnome-keyring xdg-desktop-portal ffmpeg
+# optional: secrets, screen capture on Wayland, export without a bundled FFmpeg
+sudo apt install gnome-keyring xdg-desktop-portal ffmpeg
 ```
+
+`./check-runtime.sh` (in the tarball; `packaging/linux/check-runtime.sh` in the repository) runs `ldd` on every
+program, prints each missing library with the apt package that provides it and the `apt install` line, and
+`install.sh` runs it at the end. `libayatana-appindicator3` and `libxdo3` are **not** needed: the build neither links
+nor loads them (the Linux tray icon is a StatusNotifierItem over D-Bus).
 
 `libvulkan1` and a Vulkan driver (`mesa-vulkan-drivers`, or the vendor's) are for the GPU compositor and the
 UI (software rendering through lavapipe works but is slow). A Secret Service provider (gnome-keyring or KWallet)

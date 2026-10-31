@@ -149,6 +149,7 @@ cp "$root/CHANGELOG.md" "$stage/share/doc/capturemann/" 2>/dev/null || true
 } > "$stage/share/doc/capturemann/LIBRARIES.txt"
 cp "$root/packaging/linux/dev.capturemann.app.desktop" "$stage/share/applications/"
 install -m 755 "$root/packaging/linux/install.sh" "$stage/install.sh"
+install -m 755 "$root/packaging/linux/check-runtime.sh" "$stage/check-runtime.sh"
 # Icons: the full-bleed app icon (design/CLAUDE.md: "Windows, Linux, web, stores"), copied as is.
 icons="$root/design/brand/app-icon"
 for s in 16 24 32 48 64 128 256 512; do
@@ -165,6 +166,7 @@ CaptureMann $version for Linux ($arch), early build.
 Install for yourself:   ./install.sh                 (into ~/.local, no root)
 Install for everyone:   sudo ./install.sh --prefix /usr/local
 Remove:                 ./install.sh --uninstall [--prefix ...]
+Check libraries:        ./check-runtime.sh          (names the apt package for each missing library)
 
 Needs a desktop session and the libraries listed in share/doc/capturemann/LIBRARIES.txt;
 see https://github.com/craft-mann/capturemann (packaging/linux/README.md) for the apt packages.
