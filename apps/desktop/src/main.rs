@@ -616,6 +616,10 @@ fn main() {
         let explicit = start_route
             .clone()
             .or_else(|| open_capture.clone().map(app::Route::Editor));
+        // `--background` (Launch at login) hides the window because the tray icon is there to
+        // bring it back; with no tray (a desktop without one) the window opens instead of
+        // leaving a running app nobody can see.
+        let background = background && model.read(cx).tray.is_some();
         if let Some(route) = app::startup_route(show_setup, background, explicit) {
             app::navigate(&model, route, cx);
         }

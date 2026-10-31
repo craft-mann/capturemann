@@ -5635,6 +5635,9 @@ msgstr ""
 msgid "x"
 msgstr ""
 
+msgid "xdg-open is not installed; install xdg-utils to open links and folders"
+msgstr ""
+
 msgid "yesterday"
 msgstr ""
 

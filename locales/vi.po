@@ -10991,3 +10991,7 @@ msgstr "Không khả dụng trên desktop này"
 #, fuzzy
 msgid "Your desktop manages these shortcuts and may have chosen other keys; change them in its keyboard settings."
 msgstr "Desktop của bạn quản lý các phím tắt này và có thể đã chọn phím khác; hãy đổi trong cài đặt bàn phím của desktop."
+
+#, fuzzy
+msgid "xdg-open is not installed; install xdg-utils to open links and folders"
+msgstr "Chưa cài xdg-open; hãy cài xdg-utils để mở liên kết và thư mục"
