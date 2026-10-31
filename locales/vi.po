@@ -10971,3 +10971,15 @@ msgstr "Mã số thuế cá nhân (ITIN)"
 msgctxt "redaction kind"
 msgid "Vehicle ID (VIN)"
 msgstr "Số khung xe (VIN)"
+
+msgid "Close window"
+msgstr "Đóng cửa sổ"
+
+msgid "Maximize"
+msgstr "Phóng to"
+
+msgid "Minimize"
+msgstr "Thu nhỏ"
+
+msgid "Restore"
+msgstr "Khôi phục"
