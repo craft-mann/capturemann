@@ -48,12 +48,17 @@ impl Id {
 pub enum Os {
     Mac,
     Windows,
+    /// No per-app prompts here: the screen portal asks at capture time, and the microphone and
+    /// camera are not gated by the OS (outside sandboxed packages).
+    Linux,
 }
 
 impl Os {
     pub fn current() -> Os {
         if cfg!(windows) {
             Os::Windows
+        } else if cfg!(target_os = "linux") {
+            Os::Linux
         } else {
             Os::Mac
         }
@@ -116,7 +121,7 @@ impl Action {
         match (self, os) {
             (Action::Grant, _) => tr!("Grant access\u{2026}"),
             (Action::OpenSettings, Os::Mac) => tr!("Open System Settings"),
-            (Action::OpenSettings, Os::Windows) => tr!("Open Settings"),
+            (Action::OpenSettings, Os::Windows | Os::Linux) => tr!("Open Settings"),
             (Action::Restart, _) => tr!("Restart CaptureMann"),
         }
     }
@@ -200,7 +205,7 @@ pub fn settings_link(os: Os, id: Id) -> Option<&'static str> {
         }
         (Os::Windows, Id::Microphone) => Some("ms-settings:privacy-microphone"),
         (Os::Windows, Id::Camera) => Some("ms-settings:privacy-webcam"),
-        (Os::Windows, _) => None,
+        (Os::Windows, _) | (Os::Linux, _) => None,
     }
 }
 
@@ -770,6 +775,29 @@ mod tests {
             true
         ));
         assert!(!on(Os::Mac, Id::ScreenRecording, State::NotGranted, true));
+    }
+
+    /// Linux has no per-app prompts: no Screen Recording or Input Monitoring card, no deep links,
+    /// nothing to grant, and the Windows-only note is not shown there.
+    #[test]
+    fn linux_lists_only_microphone_and_camera_without_links() {
+        let ids: Vec<Id> = specs(Os::Linux).iter().map(|s| s.id).collect();
+        assert_eq!(ids, vec![Id::Microphone, Id::Camera]);
+        for id in [
+            Id::ScreenRecording,
+            Id::Microphone,
+            Id::Camera,
+            Id::InputMonitoring,
+        ] {
+            assert_eq!(settings_link(Os::Linux, id), None);
+            assert!(!actions(Os::Linux, id, State::Denied).contains(&Action::OpenSettings));
+        }
+        assert!(!stale_grant_hint(
+            Os::Linux,
+            Id::InputMonitoring,
+            State::NotGranted,
+            true
+        ));
     }
 
     #[test]
