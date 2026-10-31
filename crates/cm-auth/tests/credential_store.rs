@@ -1,11 +1,14 @@
-//! The OS credential store for real (platform plan W0, "Credential Manager smoke test"): writes one
-//! entry named after the process under a test service, reads it back and deletes it. Windows only
-//! (macOS would prompt for the Keychain; its round trip is the `--ignored` test in `secret.rs`).
-//! Windows Credential Manager limits one entry to 2560 bytes (the keyring crate stores UTF-16), and
-//! `VaultStore` keeps every secret of the app in one entry, so the test also prints how large an
-//! entry can get here.
+//! The OS credential store for real (platform plan W0, "Credential Manager smoke test", and L1,
+//! "Secret Service"): writes one entry named after the process under a test service, reads it back
+//! and deletes it. Windows and Linux only (macOS would prompt for the Keychain; its round trip is the
+//! `--ignored` test in `secret.rs`). On Linux the tests are `#[ignore]` because they need an unlocked
+//! Secret Service (CI starts `gnome-keyring` in a private D-Bus session):
+//! `dbus-run-session -- sh -c 'echo | gnome-keyring-daemon --unlock --components=secrets; cargo test
+//! -p cm-auth --test credential_store -- --ignored'`.
+//! Windows Credential Manager limits one entry to 1280 UTF-16 characters, and `VaultStore` keeps
+//! every secret of the app in one entry, so a Windows-only test prints how large an entry can get.
 
-#![cfg(windows)]
+#![cfg(any(windows, target_os = "linux"))]
 #![allow(clippy::unwrap_used)]
 
 use cm_auth::secret::PART_CHARS;
@@ -19,7 +22,8 @@ fn key(tag: &str) -> String {
 }
 
 #[test]
-fn a_secret_round_trips_through_credential_manager() {
+#[cfg_attr(target_os = "linux", ignore = "needs an unlocked Secret Service")]
+fn a_secret_round_trips_through_the_credential_store() {
     let s = KeyringStore::new(SERVICE);
     let k = key("one");
     assert_eq!(s.get(&k).unwrap(), None);
@@ -32,6 +36,7 @@ fn a_secret_round_trips_through_credential_manager() {
     assert_eq!(s.get(&k).unwrap(), None);
 }
 
+#[cfg(windows)]
 #[test]
 fn how_large_one_entry_can_be() {
     let s = KeyringStore::new(SERVICE);
@@ -53,6 +58,7 @@ fn how_large_one_entry_can_be() {
 }
 
 #[test]
+#[cfg_attr(target_os = "linux", ignore = "needs an unlocked Secret Service")]
 fn the_vault_keeps_several_accounts_in_the_real_store() {
     let service = format!("{SERVICE}.vault.{}", std::process::id());
     let vault = VaultStore::system(service.clone());
