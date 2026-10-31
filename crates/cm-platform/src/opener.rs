@@ -78,6 +78,7 @@ pub fn open_target(target: &OsStr) -> Result<(), OpenError> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
