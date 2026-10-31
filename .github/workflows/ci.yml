@@ -81,8 +81,13 @@ jobs:
       - name: Clippy (no sherpa)
         if: runner.os != 'macOS'
         run: cargo clippy --workspace --all-targets --locked --no-default-features -- -D warnings
+      # Linux: the product never exports with libx264 (GPL); these tests run on the runner's own GPL
+      # FFmpeg and expect H.264, so they ask for the developer-only list (CM_EXPORT_ALLOW_GPL, never set
+      # in a shipped build).
       - name: Test (no sherpa)
         if: runner.os != 'macOS'
+        env:
+          CM_EXPORT_ALLOW_GPL: ${{ runner.os == 'Linux' && '1' || '' }}
         run: cargo test --workspace --locked --no-default-features --no-fail-fast
       # The real Trash (Recycle Bin, freedesktop Trash) of the runner: a scratch folder is moved there. Not run
       # on macOS, where it would use the developer's own Trash.
