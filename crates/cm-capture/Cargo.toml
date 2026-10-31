@@ -28,7 +28,8 @@ xcap = "0.9"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # MIT. The desktop portal client (Wayland screenshots). zbus underneath; no C libraries.
-ashpd = { version = "0.13", default-features = false, features = ["tokio", "screenshot"] }
+# `async-io`, not `tokio`: GPUI (cm-desktop) enables ashpd with async-io and the two cannot be combined.
+ashpd = { version = "0.13", default-features = false, features = ["async-io", "screenshot"] }
 tokio = { version = "1", features = ["rt", "time"] }
 
 [target.'cfg(windows)'.dependencies]
