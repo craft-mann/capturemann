@@ -11,6 +11,7 @@ pub mod selftest;
 pub mod session;
 pub mod sleep;
 pub mod sources;
+pub mod sys;
 pub mod tracks;
 
 pub use engine::{

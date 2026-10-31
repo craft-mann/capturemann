@@ -12,6 +12,47 @@ pub use imp::PortalPipeWire;
 pub struct PortalPipeWire;
 
 #[cfg(not(target_os = "linux"))]
+impl PortalPipeWire {
+    pub fn new() -> Self {
+        PortalPipeWire
+    }
+}
+
+/// What the desktop portal says about screen casting (for `list_devices` and the diagnostics).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct PortalStatus {
+    /// The ScreenCast interface answered.
+    pub available: bool,
+    /// It offers whole monitors (the only source type recording uses today).
+    pub monitor: bool,
+    /// It offers windows.
+    pub window: bool,
+    /// Why it is not available, or a note.
+    pub detail: Option<String>,
+}
+
+/// Asks the portal which source types it offers (a D-Bus property read; never opens a session or
+/// a dialog). Gives up after 3 s so a stuck portal cannot hang a device listing.
+pub fn portal_status() -> PortalStatus {
+    imp_status()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn imp_status() -> PortalStatus {
+    PortalStatus {
+        available: false,
+        monitor: false,
+        window: false,
+        detail: Some("The desktop portal exists on Linux only.".into()),
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn imp_status() -> PortalStatus {
+    imp::status()
+}
+
+#[cfg(not(target_os = "linux"))]
 use {
     crate::record::pipewire::{PwBackend, StreamInfo},
     crate::record::source::EventSink,
@@ -70,6 +111,40 @@ mod imp {
     impl PortalPipeWire {
         pub fn new() -> Self {
             Self::default()
+        }
+    }
+
+    pub fn status() -> super::PortalStatus {
+        let (tx, rx) = channel();
+        let spawned = std::thread::Builder::new()
+            .name("cm-portal-probe".into())
+            .spawn(move || {
+                let r = futures_lite::future::block_on(async {
+                    let proxy = Screencast::new().await?;
+                    proxy.available_source_types().await
+                });
+                let _ = tx.send(r.map_err(|e| e.to_string()));
+            });
+        let failed = |detail: String| super::PortalStatus {
+            available: false,
+            monitor: false,
+            window: false,
+            detail: Some(detail),
+        };
+        if spawned.is_err() {
+            return failed("cannot start the portal probe".into());
+        }
+        match rx.recv_timeout(Duration::from_secs(3)) {
+            Ok(Ok(types)) => super::PortalStatus {
+                available: true,
+                monitor: types.contains(SourceType::Monitor),
+                window: types.contains(SourceType::Window),
+                detail: None,
+            },
+            Ok(Err(e)) => failed(format!(
+                "The desktop portal has no ScreenCast service (install xdg-desktop-portal and your desktop's portal backend): {e}"
+            )),
+            Err(_) => failed("The desktop portal did not answer within 3 s.".into()),
         }
     }
 

@@ -299,6 +299,10 @@ impl VideoEncoder for FfmpegVp9Encoder {
         Ok(AppendOutcome::Written)
     }
 
+    fn codec_name(&self) -> Option<&'static str> {
+        Some("vp9")
+    }
+
     fn check(&self) -> Result<(), CmError> {
         match self.shared.error.lock() {
             Ok(g) => g.clone().map_or(Ok(()), Err),

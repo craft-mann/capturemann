@@ -317,6 +317,11 @@ impl<S: ScreenSource, E: VideoEncoder<Frame = S::Frame>> TrackRecorder for Scree
                 )));
             }
         }
+        // A source that connects first (the Linux portal) tells the real size before the encoder
+        // is made, so the encoder and the plan agree with the frames that will arrive.
+        if let Some(size) = self.source.prepare(&self.plan)? {
+            self.plan.adopt_source_size(size);
+        }
         let path = ctx.dir.join(&self.opts.file_name);
         // A Mac whose encoder rejects the asked-for size at every setting (an Intel MacBook Pro
         // with a scaled display, GitHub issue 16) records at a smaller one rather than not at
@@ -325,6 +330,7 @@ impl<S: ScreenSource, E: VideoEncoder<Frame = S::Frame>> TrackRecorder for Scree
         let mut tries = std::iter::once(asked).chain(smaller_plans(&asked));
         let enc = loop {
             let Some(candidate) = tries.next() else {
+                self.source.stop();
                 return Err(cm_encode::hardware_encoder_unavailable());
             };
             match (self.make_encoder)(&EncoderConfig {
@@ -353,7 +359,10 @@ impl<S: ScreenSource, E: VideoEncoder<Frame = S::Frame>> TrackRecorder for Scree
                     );
                     continue;
                 }
-                Err(e) => return Err(e),
+                Err(e) => {
+                    self.source.stop();
+                    return Err(e);
+                }
             }
         };
         let bitrate = self.plan.video.bitrate_bps;
@@ -469,6 +478,8 @@ impl<S: ScreenSource, E: VideoEncoder<Frame = S::Frame>> TrackRecorder for Scree
         // A Mac that rejected the asked-for settings may have recorded with simpler ones (another
         // codec): the manifest says what the file really holds.
         let used_plan = p.encoder().used_plan();
+        // An encoder that writes another codec than the plan names (software VP9 on Linux) says so.
+        let codec_name = p.encoder().codec_name();
         drop(p);
         self.latency.first_frame_ms = *lock(&shared.first_frame_ms);
         self.latency.stop_ms = Some(call.elapsed().as_secs_f64() * 1e3);
@@ -484,7 +495,7 @@ impl<S: ScreenSource, E: VideoEncoder<Frame = S::Frame>> TrackRecorder for Scree
             "size": [used.width, used.height],
             "downscaled_from": self.downscaled_from,
             "fps": plan.video.fps,
-            "codec": used.codec.as_str(),
+            "codec": codec_name.unwrap_or(used.codec.as_str()),
             "bitrate_bps": used.bitrate_bps,
             "quality": plan.video.quality,
             "source_size": [plan.source_size.width, plan.source_size.height],

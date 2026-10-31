@@ -17,11 +17,11 @@ use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use cm_core::{CmError, HostClock, Permission, SystemHostClock};
+use cm_core::{CmError, HostClock, Permission, PhysicalSize, SystemHostClock};
 use cm_encode::{CpuFrame, PixelFormat};
 
 use super::plan::CapturePlan;
-use super::source::{EventSink, ScreenSource, SourceEvent};
+use super::source::{EventSink, ScreenSource, SourceEvent, StopReason};
 
 /// A PTS further than this from the arrival time is not trusted.
 pub const MAX_PTS_SKEW_NS: u64 = 500_000_000;
@@ -150,10 +150,31 @@ impl TokenStore for FileTokenStore {
         if let Some(dir) = self.0.parent() {
             let _ = std::fs::create_dir_all(dir);
         }
-        if let Err(e) = std::fs::write(&self.0, token) {
+        if let Err(e) = write_private(&self.0, token) {
             log::warn!("cannot store the screen-cast token: {e}");
         }
     }
+}
+
+/// Writes `text` to `path` readable by the owner only (the token lets a program share the screen
+/// without a dialog, so it is a secret). An existing file keeps being rewritten in place with its
+/// mode forced to 0600 on systems that have modes.
+fn write_private(path: &std::path::Path, text: &str) -> std::io::Result<()> {
+    use std::io::Write;
+    let mut opts = std::fs::OpenOptions::new();
+    opts.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(0o600);
+    }
+    let mut f = opts.open(path)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        f.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+    }
+    f.write_all(text.as_bytes())
 }
 
 /// What a backend reports once the stream is negotiated.
@@ -180,9 +201,21 @@ pub trait PwBackend: Send + 'static {
     fn close(&mut self);
 }
 
+/// Why a window or region recording is refused on Linux for now.
+pub const NOT_A_DISPLAY_MESSAGE: &str = "Recording a window or a region is not available on Linux yet. Record the whole screen; the desktop asks which one the first time.";
+
+/// What the source holds between the backend's events and the recorder's sink. Before `start`
+/// attaches the sink (the recorder asks for the size first, see `ScreenSource::prepare`), the
+/// newest frame and a stop notice are kept instead of being delivered.
+struct Inner {
+    sink: Option<EventSink<CpuFrame>>,
+    held_frame: Option<CpuFrame>,
+    held_stop: Option<StopReason>,
+}
+
 /// Shared by the backend's callback and the idle ticker so only one at a time calls the sink.
 struct Shared {
-    sink: Mutex<Option<EventSink<CpuFrame>>>,
+    inner: Mutex<Inner>,
     last_event_ns: AtomicU64,
     stop: AtomicBool,
 }
@@ -195,6 +228,7 @@ pub struct PipeWireScreenSource<B: PwBackend, T: TokenStore> {
     shared: Option<Arc<Shared>>,
     ticker: Option<JoinHandle<()>>,
     info: Option<StreamInfo>,
+    attached: bool,
 }
 
 impl<B: PwBackend, T: TokenStore> PipeWireScreenSource<B, T> {
@@ -210,50 +244,61 @@ impl<B: PwBackend, T: TokenStore> PipeWireScreenSource<B, T> {
             shared: None,
             ticker: None,
             info: None,
+            attached: false,
         }
     }
 
-    /// The negotiated size after `start` (the plan's size is only a hint on Wayland: the
-    /// compositor's dialog picks the monitor).
+    /// The negotiated size after `prepare` or `start` (the plan's size is only a hint on
+    /// Wayland: the compositor's dialog picks the monitor).
     pub fn stream_info(&self) -> Option<&StreamInfo> {
         self.info.as_ref()
     }
-}
 
-impl<B: PwBackend, T: TokenStore> ScreenSource for PipeWireScreenSource<B, T> {
-    type Frame = CpuFrame;
-
-    fn check_permission(&self) -> Result<(), CmError> {
-        // There is no query: the portal's dialog is the permission flow and a refusal comes back
-        // from `start`.
-        Ok(())
-    }
-
-    fn start(&mut self, plan: &CapturePlan, sink: EventSink<CpuFrame>) -> Result<(), CmError> {
+    /// Opens the portal session and the stream; frames are held until a sink is attached.
+    fn connect(&mut self, plan: &CapturePlan) -> Result<(), CmError> {
         if self.shared.is_some() {
-            return Err(CmError::internal("the screen source is already running"));
+            return Ok(());
+        }
+        // The portal's dialog picks the monitor; a window or a region would need its other source
+        // types and a crop (plan, task 7), so they are refused here rather than recorded wrongly.
+        if !matches!(plan.target, crate::CaptureTarget::Display { .. }) {
+            return Err(CmError::not_implemented(NOT_A_DISPLAY_MESSAGE));
         }
         let shared = Arc::new(Shared {
-            sink: Mutex::new(Some(sink)),
+            inner: Mutex::new(Inner {
+                sink: None,
+                held_frame: None,
+                held_stop: None,
+            }),
             last_event_ns: AtomicU64::new(self.clock.now_ns()),
             stop: AtomicBool::new(false),
         });
-        // The backend gets a sink that records "an event happened" for the idle ticker.
+        // The backend gets a sink that records "a frame happened" for the idle ticker.
         let s2 = Arc::clone(&shared);
         let clock = Arc::clone(&self.clock);
         let wrapped: EventSink<CpuFrame> = Box::new(move |ev| {
             if matches!(ev, SourceEvent::Frame { .. }) {
                 s2.last_event_ns.store(clock.now_ns(), Ordering::Relaxed);
             }
-            // The source ended: no more "unchanged" samples after the stop notice.
-            let ended = matches!(ev, SourceEvent::Stopped(_));
-            if let Ok(mut g) = s2.sink.lock() {
-                if ended {
-                    s2.stop.store(true, Ordering::Relaxed);
-                }
-                if let Some(sink) = g.as_mut() {
+            let Ok(mut g) = s2.inner.lock() else { return };
+            let Inner {
+                sink,
+                held_frame,
+                held_stop,
+            } = &mut *g;
+            match sink {
+                Some(sink) => {
+                    // The source ended: no more "unchanged" samples after the stop notice.
+                    if matches!(ev, SourceEvent::Stopped(_)) {
+                        s2.stop.store(true, Ordering::Relaxed);
+                    }
                     sink(ev);
                 }
+                None => match ev {
+                    SourceEvent::Frame { frame, .. } => *held_frame = Some(frame),
+                    SourceEvent::Idle { .. } => {}
+                    SourceEvent::Stopped(r) => *held_stop = Some(r),
+                },
             }
         });
         let token = self.tokens.load();
@@ -268,14 +313,71 @@ impl<B: PwBackend, T: TokenStore> ScreenSource for PipeWireScreenSource<B, T> {
                     }
                 }
                 self.info = Some(info);
+                self.shared = Some(shared);
+                Ok(())
             }
             Err(e) => {
-                if let Ok(mut g) = shared.sink.lock() {
-                    *g = None;
+                if let Ok(mut g) = shared.inner.lock() {
+                    g.sink = None;
                 }
-                return Err(e);
+                Err(e)
             }
         }
+    }
+}
+
+impl<B: PwBackend, T: TokenStore> ScreenSource for PipeWireScreenSource<B, T> {
+    type Frame = CpuFrame;
+
+    fn check_permission(&self) -> Result<(), CmError> {
+        // There is no query: the portal's dialog is the permission flow and a refusal comes back
+        // from `prepare` or `start`.
+        Ok(())
+    }
+
+    fn prepare(&mut self, plan: &CapturePlan) -> Result<Option<PhysicalSize>, CmError> {
+        self.connect(plan)?;
+        Ok(self
+            .info
+            .as_ref()
+            .filter(|i| i.width > 0 && i.height > 0)
+            .map(|i| PhysicalSize {
+                width: i.width,
+                height: i.height,
+            }))
+    }
+
+    fn start(&mut self, plan: &CapturePlan, sink: EventSink<CpuFrame>) -> Result<(), CmError> {
+        if self.attached {
+            return Err(CmError::internal("the screen source is already running"));
+        }
+        self.connect(plan)?;
+        let Some(shared) = self.shared.clone() else {
+            return Err(CmError::internal("the screen source is not connected"));
+        };
+        {
+            let Ok(mut g) = shared.inner.lock() else {
+                return Err(CmError::internal("the screen source is broken"));
+            };
+            let mut sink = sink;
+            // What arrived while the recorder was setting up its encoder: the newest frame (so a
+            // still screen still has a first picture) and a stop that already happened.
+            let now = self.clock.now_ns();
+            if let Some(frame) = g.held_frame.take() {
+                sink(SourceEvent::Frame {
+                    host_ns: now,
+                    frame,
+                });
+            }
+            if let Some(reason) = g.held_stop.take() {
+                shared.stop.store(true, Ordering::Relaxed);
+                sink(SourceEvent::Stopped(reason));
+            }
+            g.sink = Some(sink);
+        }
+        shared
+            .last_event_ns
+            .store(self.clock.now_ns(), Ordering::Relaxed);
         let (s3, clock) = (Arc::clone(&shared), Arc::clone(&self.clock));
         self.ticker = std::thread::Builder::new()
             .name("cm-pw-idle".into())
@@ -286,11 +388,11 @@ impl<B: PwBackend, T: TokenStore> ScreenSource for PipeWireScreenSource<B, T> {
                     let last = s3.last_event_ns.load(Ordering::Relaxed);
                     if now.saturating_sub(last) >= IDLE_INTERVAL.as_nanos() as u64 {
                         s3.last_event_ns.store(now, Ordering::Relaxed);
-                        if let Ok(mut g) = s3.sink.lock() {
+                        if let Ok(mut g) = s3.inner.lock() {
                             if s3.stop.load(Ordering::Relaxed) {
                                 break;
                             }
-                            if let Some(sink) = g.as_mut() {
+                            if let Some(sink) = g.sink.as_mut() {
                                 sink(SourceEvent::Idle { host_ns: now });
                             }
                         }
@@ -298,11 +400,12 @@ impl<B: PwBackend, T: TokenStore> ScreenSource for PipeWireScreenSource<B, T> {
                 }
             })
             .ok();
-        self.shared = Some(shared);
+        self.attached = true;
         Ok(())
     }
 
     fn stop(&mut self) {
+        self.attached = false;
         if let Some(s) = self.shared.take() {
             s.stop.store(true, Ordering::Relaxed);
             self.backend.close();
@@ -310,8 +413,10 @@ impl<B: PwBackend, T: TokenStore> ScreenSource for PipeWireScreenSource<B, T> {
                 let _ = t.join();
             }
             // After this no event reaches the sink.
-            if let Ok(mut g) = s.sink.lock() {
-                *g = None;
+            if let Ok(mut g) = s.inner.lock() {
+                g.sink = None;
+                g.held_frame = None;
+                g.held_stop = None;
             }
         }
     }
@@ -334,18 +439,36 @@ pub struct ScriptedPw {
     /// Events delivered right after `open`, with the delay before each.
     pub script: Vec<(Duration, SourceEvent<CpuFrame>)>,
     pub fail_with: Option<CmError>,
+    /// Instead of `script`: a desktop that delivers `fps` frames a second stamped with the host
+    /// clock at delivery, and loses the stream (`Stopped`) after `lose_after` when set.
+    pub live: Option<LiveScript>,
     /// The token `open` was called with (shared so a test can read it after the move).
     pub seen_token: Arc<Mutex<Option<Option<String>>>>,
     stop: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
 }
 
+/// A scripted desktop that keeps delivering frames (see [`ScriptedPw::live`]).
+#[derive(Debug, Clone, Copy)]
+pub struct LiveScript {
+    pub fps: u32,
+    pub lose_after: Option<Duration>,
+}
+
 impl ScriptedPw {
+    /// A backend that streams `fps` frames a second of the size in `info` until stopped or lost.
+    pub fn live(info: StreamInfo, fps: u32, lose_after: Option<Duration>) -> Self {
+        let mut s = Self::new(info, Vec::new());
+        s.live = Some(LiveScript { fps, lose_after });
+        s
+    }
+
     pub fn new(info: StreamInfo, script: Vec<(Duration, SourceEvent<CpuFrame>)>) -> Self {
         ScriptedPw {
             info,
             script,
             fail_with: None,
+            live: None,
             seen_token: Arc::default(),
             stop: Arc::default(),
             thread: None,
@@ -368,6 +491,41 @@ impl PwBackend for ScriptedPw {
         }
         let script = std::mem::take(&mut self.script);
         let stop = Arc::clone(&self.stop);
+        if let Some(live) = self.live {
+            let (w, h) = (self.info.width, self.info.height);
+            self.thread = Some(std::thread::spawn(move || {
+                let clock = SystemHostClock;
+                let started = std::time::Instant::now();
+                let every = Duration::from_micros(1_000_000 / u64::from(live.fps.max(1)));
+                let mut n: u8 = 0;
+                while !stop.load(Ordering::Relaxed) {
+                    std::thread::sleep(every);
+                    if stop.load(Ordering::Relaxed) {
+                        return;
+                    }
+                    if live.lose_after.is_some_and(|d| started.elapsed() >= d) {
+                        sink(SourceEvent::Stopped(StopReason::TargetClosed(
+                            "The desktop ended the screen share.".into(),
+                        )));
+                        return;
+                    }
+                    n = n.wrapping_add(1);
+                    if let Ok(frame) = CpuFrame::new(
+                        w,
+                        h,
+                        w as usize * 4,
+                        PixelFormat::Bgrx,
+                        vec![n; w as usize * h as usize * 4],
+                    ) {
+                        sink(SourceEvent::Frame {
+                            host_ns: clock.now_ns(),
+                            frame,
+                        });
+                    }
+                }
+            }));
+            return Ok(self.info.clone());
+        }
         self.thread = Some(std::thread::spawn(move || {
             for (delay, ev) in script {
                 std::thread::sleep(delay);
@@ -456,6 +614,12 @@ mod tests {
         assert_eq!(f.load(), None);
         f.save("xyz");
         assert_eq!(f.load().as_deref(), Some("xyz"));
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&f.0).unwrap().permissions().mode();
+            assert_eq!(mode & 0o777, 0o600, "the token is a secret");
+        }
     }
 
     fn plan() -> CapturePlan {
@@ -565,5 +729,86 @@ mod tests {
         assert_eq!(tokens.load().as_deref(), Some("keep"));
         // And the source can be started again later.
         src.stop();
+    }
+
+    fn collect() -> (EventSink<CpuFrame>, Arc<Mutex<Vec<String>>>) {
+        let log: Arc<Mutex<Vec<String>>> = Arc::default();
+        let l2 = Arc::clone(&log);
+        let sink: EventSink<CpuFrame> = Box::new(move |ev| {
+            let s = match ev {
+                SourceEvent::Frame { frame, .. } => format!("frame {}", frame.packed()[0]),
+                SourceEvent::Idle { .. } => "idle".to_string(),
+                SourceEvent::Stopped(StopReason::TargetClosed(m)) => format!("closed {m}"),
+                SourceEvent::Stopped(_) => "stopped".to_string(),
+            };
+            l2.lock().unwrap().push(s);
+        });
+        (sink, log)
+    }
+
+    #[test]
+    fn prepare_reports_the_size_and_start_gets_the_newest_held_frame() {
+        let script = vec![
+            (
+                Duration::from_millis(5),
+                SourceEvent::Frame {
+                    host_ns: 1,
+                    frame: frame(1),
+                },
+            ),
+            (
+                Duration::from_millis(5),
+                SourceEvent::Frame {
+                    host_ns: 2,
+                    frame: frame(2),
+                },
+            ),
+        ];
+        let backend = ScriptedPw::new(
+            StreamInfo {
+                width: 1921,
+                height: 1081,
+                restore_token: None,
+            },
+            script,
+        );
+        let mut src = PipeWireScreenSource::new(backend, MemoryTokenStore::default());
+        let size = src.prepare(&plan()).unwrap().unwrap();
+        assert_eq!((size.width, size.height), (1921, 1081));
+        std::thread::sleep(Duration::from_millis(150));
+        let (sink, log) = collect();
+        src.start(&plan(), sink).unwrap();
+        // Preparing twice does not open a second session.
+        assert!(src.prepare(&plan()).unwrap().is_some());
+        src.stop();
+        let got = log.lock().unwrap().clone();
+        assert_eq!(got.first().map(String::as_str), Some("frame 2"), "{got:?}");
+        assert_eq!(got.iter().filter(|s| s.starts_with("frame")).count(), 1);
+    }
+
+    #[test]
+    fn a_stream_lost_before_start_is_reported_by_start() {
+        let script = vec![(
+            Duration::from_millis(5),
+            SourceEvent::Stopped(StopReason::TargetClosed("closed by the desktop".into())),
+        )];
+        let backend = ScriptedPw::new(
+            StreamInfo {
+                width: 8,
+                height: 8,
+                restore_token: None,
+            },
+            script,
+        );
+        let mut src = PipeWireScreenSource::new(backend, MemoryTokenStore::default());
+        src.prepare(&plan()).unwrap();
+        std::thread::sleep(Duration::from_millis(100));
+        let (sink, log) = collect();
+        src.start(&plan(), sink).unwrap();
+        src.stop();
+        assert_eq!(
+            log.lock().unwrap().clone(),
+            vec!["closed closed by the desktop".to_string()]
+        );
     }
 }
