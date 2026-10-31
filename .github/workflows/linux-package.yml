@@ -1,7 +1,7 @@
 name: Linux package
 
 # Run by hand (Actions > Linux package > Run workflow) to build the early-build tarball
-# capturemann-<version>-linux-<arch>.tar.gz (+ .sha256) on x86_64 (ubuntu-24.04) and aarch64
+# capturemann-<version>-linux-<arch>.tar.gz and capturemann_<version>_<amd64|arm64>.deb (+ .sha256 each) on x86_64 (ubuntu-24.04) and aarch64
 # (ubuntu-24.04-arm), with an LGPL FFmpeg built from source. The files are kept as WORKFLOW ARTIFACTS
 # only: this workflow creates no tag and no GitHub release (a release is a maintainer step, see
 # docs/development/releasing.md, "Linux early build"). It does not run on pull requests: a full
@@ -13,6 +13,10 @@ on:
     inputs:
       with_ffmpeg:
         description: "Build and bundle the LGPL FFmpeg (packaging/ffmpeg/build-linux.sh; adds about 10 minutes)"
+        type: boolean
+        default: true
+      with_llama:
+        description: "Build and bundle llama-server, the built-in text engine (packaging/llama/build-linux.sh; adds about 5 minutes)"
         type: boolean
         default: true
 
@@ -59,6 +63,15 @@ jobs:
             libvulkan-dev libfontconfig-dev libssl-dev libpipewire-0.3-dev libclang-dev \
             libgtk-3-dev libayatana-appindicator3-dev libxdo-dev libgbm-dev libegl-dev libdbus-1-dev \
             libdrm-dev libva-dev desktop-file-utils
+      # The speaker engine: the pinned sherpa-onnx static libraries (linked into cm-desktop) and the two
+      # speaker models (shipped in the tarball). SHA-256 checked by the scripts; the cargo build downloads nothing.
+      - name: Cache the sherpa-onnx archive and the speaker models
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: packaging/sherpa/.downloads
+          key: sherpa-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packaging/sherpa/fetch-linux.sh', 'packaging/sherpa/fetch-models.sh') }}
+      - name: Fetch the sherpa-onnx libraries and speaker models (pinned, SHA-256 checked)
+        run: make sherpa
       - name: Cache the FFmpeg sources
         if: ${{ inputs.with_ffmpeg }}
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
@@ -68,8 +81,23 @@ jobs:
       - name: Build the LGPL FFmpeg
         if: ${{ inputs.with_ffmpeg }}
         run: packaging/ffmpeg/build-linux.sh
+      - name: Cache the llama.cpp source
+        if: ${{ inputs.with_llama }}
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: packaging/llama/.downloads
+          key: llama-src-${{ hashFiles('packaging/llama/build-macos.sh') }}
+      # MIT, static, CPU only; the pinned tag and SHA-256 are read from build-macos.sh. A helper program
+      # next to the app, never linked into it. The tarball step refuses it if it needs more than libc/libm.
+      - name: Build llama-server (text engine)
+        if: ${{ inputs.with_llama }}
+        run: packaging/llama/build-linux.sh
       - name: Build the tarball
         env:
+          CM_REQUIRE_SHERPA: "1"
+          CM_REQUIRE_SPEAKER_MODELS: "1"
+          CM_REQUIRE_LLAMA: ${{ inputs.with_llama && '1' || '0' }}
+          CM_LLAMA_BUNDLE: ${{ inputs.with_llama && format('{0}/packaging/llama/out', github.workspace) || '' }}
           CM_REQUIRE_FFMPEG: ${{ inputs.with_ffmpeg && '1' || '0' }}
           CM_FFMPEG_BUNDLE: ${{ inputs.with_ffmpeg && format('{0}/packaging/ffmpeg/out-linux-{1}', github.workspace, matrix.arch) || '' }}
         run: packaging/linux/build-linux.sh
@@ -80,8 +108,30 @@ jobs:
           work=$(mktemp -d); tar -xzf ./*.tar.gz -C "$work"; cd "$work"/capturemann-*
           ./install.sh --prefix "$work/prefix"
           "$work/prefix/bin/capturemann" --version
+          test -f "$work/prefix/lib/Resources/Models/speaker/pyannote-segmentation-3-0.onnx"
+          test -f "$work/prefix/share/doc/capturemann/SHERPA-ONNX/ThirdPartyNotices-onnxruntime.txt"
+          if [ "${{ inputs.with_llama }}" = true ]; then
+            "$work/prefix/lib/capturemann/llama-server" --version
+            test -f "$work/prefix/lib/capturemann/Llama/LICENSES/llama.cpp-LICENSE.txt"
+          fi
           desktop-file-validate "$work/prefix/share/applications/dev.capturemann.app.desktop"
           ./install.sh --uninstall --prefix "$work/prefix"
+      # The .deb is made from the tarball just built (packaging/linux/build-deb.sh), so it holds the same files.
+      # It is installed on the runner with apt (which pulls the Depends: libraries), run once, and removed.
+      - name: Build the .deb
+        run: packaging/linux/build-deb.sh
+      - name: Check the .deb (install with apt, run, remove)
+        run: |
+          cd packaging/linux/out
+          sha256sum -c ./*.deb.sha256
+          dpkg-deb -I ./*.deb | sed -n '/Depends:/,/Section:/p'
+          sudo apt-get install -y --no-install-recommends ./*.deb
+          capturemann --version
+          cm-mcp --version || true
+          desktop-file-validate /usr/share/applications/dev.capturemann.app.desktop
+          test -f /opt/capturemann/lib/Resources/Models/speaker/pyannote-segmentation-3-0.onnx
+          sudo apt-get remove -y capturemann
+          test ! -e /opt/capturemann && test ! -e /usr/bin/capturemann && test ! -e /usr/share/applications/dev.capturemann.app.desktop
       - name: Keep the files
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -89,5 +139,6 @@ jobs:
           path: |
             packaging/linux/out/*.tar.gz
             packaging/linux/out/*.sha256
+            packaging/linux/out/*.deb
           if-no-files-found: error
           retention-days: 14

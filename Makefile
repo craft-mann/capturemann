@@ -31,7 +31,7 @@ llama:
 
 sherpa:
 	bash packaging/sherpa/fetch-$(if $(filter Linux,$(shell uname -s)),linux,macos).sh
-	$(if $(filter Darwin,$(shell uname -s)),bash packaging/sherpa/fetch-models.sh,@echo "speaker models: fetch-models.sh runs on macOS only; set CM_SHERPA_MODELS for the real-model tests")
+	bash packaging/sherpa/fetch-models.sh
 
 bundle:
 	bash packaging/macos/bundle.sh

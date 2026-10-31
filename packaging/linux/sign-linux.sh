@@ -3,7 +3,7 @@
 # maintainer's machine. The secret key never goes to CI.
 #
 # Usage:  packaging/linux/sign-linux.sh [folder]      (default: packaging/linux/out)
-# Signs every capturemann-*-linux-*.tar.gz and .sha256 in the folder, writing <file>.minisig, then
+# Signs every capturemann-*-linux-*.tar.gz and capturemann_*_*.deb and their .sha256 files in the folder, writing <file>.minisig, then
 # verifies each signature against the PUBLIC key committed as packaging/linux/minisign.pub.
 #
 # Environment:
@@ -27,8 +27,9 @@ command -v minisign >/dev/null || die "minisign is not installed (brew install m
 [ -f "$pub" ] || die "public key not found: $pub; commit the key made with 'minisign -G' so signatures can be checked"
 
 shopt -s nullglob
-files=("$dir"/capturemann-*-linux-*.tar.gz "$dir"/capturemann-*-linux-*.tar.gz.sha256)
-[ "${#files[@]}" -gt 0 ] || die "no capturemann-*-linux-* files in $dir"
+files=("$dir"/capturemann-*-linux-*.tar.gz "$dir"/capturemann-*-linux-*.tar.gz.sha256
+       "$dir"/capturemann_*_*.deb "$dir"/capturemann_*_*.deb.sha256)
+[ "${#files[@]}" -gt 0 ] || die "no capturemann-*-linux-* tarballs or capturemann_*_*.deb packages in $dir"
 
 for f in "${files[@]}"; do
   name="$(basename "$f")"

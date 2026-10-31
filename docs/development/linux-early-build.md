@@ -15,26 +15,35 @@ has run on a real Linux desktop yet. Test lab for that: `scripts/testlab/` (Thin
 | Tray | StatusNotifierItem over D-Bus (no GTK); tested against a stand-in watcher only | `L1-tray-linux` |
 | Clipboard, hotkeys | X11 clipboard and XGrabKey hotkeys work; Wayland clipboard unproven; no GlobalShortcuts portal on GNOME 46 (toast + `cm-desktop --launcher` fallback) | `L1-clipboard-hotkeys-linux` |
 | Secrets | `no_keyring` error; `CAPTUREMANN_SECRETS=file` opt-in | acceptance row STO-2..5 |
-| Local AI | whisper (CPU), speaker engine (sherpa Linux libs, pinned), llama-server build script; no text model run | `L1-local-ai-linux` |
+| Local AI | whisper (CPU), speaker engine (sherpa Linux libs, pinned; in the package with its models), llama-server (built and in the package); no text model run | `L1-local-ai-linux`, `L1-packaging-complete-linux` |
 | Recording (hidden) | PipeWire + software VP9 through the daemon/CLI; stream-loss handling | `L1-recording-linux`, `L1-recording-product-linux`, `L1-vp9-export-linux` |
-| Packaging | tarball + `install.sh` + `check-runtime.sh` + minisign signing; clean Ubuntu container proof | `L1-packaging-linux`, `L1-packaging-clean-linux` |
+| Packaging | tarball (speaker engine, models, `llama-server`, FFmpeg, licences) + `install.sh` + `check-runtime.sh` + minisign signing; `.deb` from the tarball; clean Ubuntu container proof of tarball and `.deb` (apt install, run, remove, purge) | `L1-packaging-linux`, `L1-packaging-clean-linux`, `L1-packaging-complete-linux` |
 
 ## Before calling it releasable
 
 1. **CI green on the final commit** (macOS, Ubuntu, Windows; the PR must not be a draft for the Windows job). The
    Ubuntu job now builds with the speaker engine (`make sherpa`); that change has not run on GitHub yet.
-2. **Package workflow run on GitHub** (Actions > Linux package) for x86_64 and aarch64, with FFmpeg bundled
-   (`packaging/ffmpeg/build-linux.sh`, not built on x86_64 yet). The sherpa libraries and `llama-server` are not in the
-   tarball yet (`build-linux.sh` uses sherpa when `packaging/sherpa/out/lib` exists; `CM_REQUIRE_SHERPA=1` makes
-   that an error when missing; no `llama-server` bundle step).
+2. **Package workflow run on GitHub** (Actions > Linux package) for x86_64 and aarch64, with FFmpeg, the speaker
+   engine and `llama-server` bundled and the `.deb` built from the tarball (done in the aarch64 VM by hand, see
+   `L1-packaging-complete-linux`; the workflow steps for `make sherpa`, `llama-server` and the `.deb` have not run on
+   GitHub, and `packaging/ffmpeg/build-linux.sh`, `build-linux.sh` and `build-deb.sh` have not run on x86_64).
+   The workflow passes `CM_REQUIRE_SHERPA=1`, `CM_REQUIRE_SPEAKER_MODELS=1`, `CM_REQUIRE_LLAMA=1`, `CM_REQUIRE_FFMPEG=1`,
+   so a missing piece fails the job instead of producing a smaller package.
 3. **Real-machine run of `tests/manual/LINUX-1.md`** on the T490: Ubuntu 24.04, X11 and Wayland, with a report in
    `verification/`. Things only a real session can show: the `--pick` picker, the Wayland clipboard, the tray in a
    panel (GNOME AppIndicator extension, KDE), the title bar on a real GNOME, HiDPI/fractional scale, multi-monitor,
    VA-API (`vainfo`) and the VP9 recorder's CPU use on a UHD 620.
 4. **Sign** the tarballs: `packaging/linux/sign-linux.sh` (needs the maintainer's minisign key and `minisign.pub`
    committed, see its header). Publish as a GitHub pre-release by hand.
-5. Release notes: early build, no recording in the app, speaker finding only if the sherpa libraries are bundled,
-   MP4 export needs a VA-API GPU or falls back to VP9, glibc 2.39+, the apt packages, how to verify the download.
+5. Release notes: early build, no recording in the app, MP4 export needs a VA-API GPU or falls back to VP9, glibc 2.39+,
+   `sudo apt install ./capturemann_<version>_<arch>.deb` (or the tarball and the apt packages), the text model is a
+   download on the AI page (no model file ships), how to verify the download.
+6. **Decide on the size**: `cm-desktop` is about 700 MB because the release profile keeps debug info, so the tarball is
+   about 230 MB and the `.deb` about 155 MB (900 MB installed). `build-deb.sh` has `CM_DEB_STRIP=1` (`strip --strip-debug`
+   on the four programs); stripping in the release profile (`[profile.release] debug`/`strip`) is a `Cargo.toml`
+   decision for the maintainer (crash reports and backtraces keep function names with `strip = "debuginfo"`).
+7. **Maintainer address** for the `.deb`: `CM_DEB_MAINTAINER` defaults to "The CaptureMann contributors
+   <noreply@users.noreply.github.com>"; set a real one for a release.
 
 ## Known gaps and open items (none block the early build)
 
@@ -48,7 +57,16 @@ has run on a real Linux desktop yet. Test lab for that: `scripts/testlab/` (Thin
   and logs a failure; keycaps say "Super"; Settings -> Shortcuts shows "Set by your desktop: ..." from the portal's
   answer (the portal path itself still needs a desktop that has the GlobalShortcuts portal to be seen working).
 - xcap's `current_monitor` compares `y` with the monitor's `x` (upstream bug, not changed).
-- ONNX Runtime's `ThirdPartyNotices.txt` is still missing from the licence notes (sherpa README).
+- ONNX Runtime's `ThirdPartyNotices.txt` is not missing any more: it was already in `packaging/sherpa/licenses/` and in
+  the generated `THIRD_PARTY_LICENSES.md` (v1.28.2, the version inside the macOS and the Linux aarch64 libraries; the
+  x86_64 library was not inspected). The tarball and the `.deb` also carry it in `share/doc/capturemann/SHERPA-ONNX/`.
+- `cm-ai` looks for the speaker models in `<executable dir>/../Resources/Models/speaker` (a macOS bundle path), so on
+  Linux the packages put them in `lib/Resources/Models/speaker` next to `lib/capturemann`. A Linux-specific lookup
+  (for example `share/capturemann/models/speaker`, or `$XDG_DATA_DIRS`) would be tidier but is a `crates/cm-ai` change.
+- The `.deb` installs under `/opt/capturemann` (symlinks in `/usr/bin`) for that reason; `lintian` reports
+  `dir-or-file-in-opt` (not an archive package), `unstripped-binary-or-object`, `embedded-library` (the bundled LGPL
+  FFmpeg) and `no-manual-page`. No apt repository, no RPM, no signature inside the `.deb` (minisign signs the file).
+- The system-audio track showed a 21 ms resync and a -2229 ppm figure in the product run; not investigated.
 - The 21 ms resync and -2229 ppm in the system-audio track came from stamping at a graph quantum change; fixed
   (graph time instead of callback time). Real-device clock drift, a microphone that reports a delay and the picture/sound
   offset with the new stamps are not measured.

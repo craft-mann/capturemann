@@ -62,7 +62,7 @@ pkg_for() {
 pkgs=""
 total=0
 bad=0
-for p in "$dir"/cm-desktop "$dir"/cm-overlay "$dir"/capturemann "$dir"/cm-mcp "$dir"/ffmpeg "$dir"/ffprobe; do
+for p in "$dir"/cm-desktop "$dir"/cm-overlay "$dir"/capturemann "$dir"/cm-mcp "$dir"/ffmpeg "$dir"/ffprobe "$dir"/llama-server; do
   [ -x "$p" ] || continue
   total=$((total + 1))
   for lib in $(ldd "$p" 2>/dev/null | awk '/not found/ {print $1}'); do
