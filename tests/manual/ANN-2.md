@@ -25,8 +25,8 @@ Plain sentence with no secrets in it.
 Show it at a normal size (14 pt or larger) and take a screenshot of that window or region.
 
 1. **Button.** Open the screenshot in the editor. Expected: an "Auto-redact" button in the row under
-   the canvas, next to Revert. (On a machine without a recognizer, for example Windows today, the
-   button is not there at all: see step 9.)
+   the canvas, next to Revert. (On Linux the button needs the `tesseract` program: without it the
+   button is dimmed and its tooltip says how to install it; on Windows today it is not there at all: see step 9.)
 2. **Propose.** Press Auto-redact. Expected: a moment of "Looking for emails and keys...", then
    dashed boxes with a light tint over the two email addresses, the API key and, at lower
    confidence, the IP address and the phone number. The inspector shows an "Auto-redact" card:
@@ -57,6 +57,12 @@ Show it at a normal size (14 pt or larger) and take a screenshot of that window 
 9. **No recognizer.** On Windows (stub) or after hiding Vision, the Auto-redact button is not
    shown, and `capturemann annotate <id> --suggest-redactions` exits 1 with a `not_implemented`
    message saying text recognition is not available. Annotating by hand still works.
+   **Linux:** with `tesseract` not installed (`sudo apt remove tesseract-ocr`, then restart the app) the
+   button is shown dimmed and hovering it says to install `tesseract-ocr`; the same command exits 1
+   with `not_implemented` and the same instruction. After `sudo apt install tesseract-ocr` and a restart,
+   steps 1 to 8 apply. `capturemann diagnostics` has a "text recognizer: tesseract at ... (tesseract
+   5.x)" line (or "not available: ..." with the instruction). Expect more misses than on a Mac with Apple
+   Vision, especially on small text and light-on-dark pictures: say which of the sample lines were found.
 10. **Agents.** `capturemann annotate <id> --redact-emails --json` prints two rects and applies
     nothing (`capturemann capture get <id>` shows no ops). In an MCP client, `suggest_redactions`
     is listed as a Free, read-only tool and its result has masked `text_preview` values only.

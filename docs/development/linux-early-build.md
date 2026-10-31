@@ -16,6 +16,7 @@ has run on a real Linux desktop yet. Test lab for that: `scripts/testlab/` (Thin
 | Clipboard, hotkeys | X11 clipboard and XGrabKey hotkeys work; Wayland clipboard unproven; no GlobalShortcuts portal on GNOME 46 (toast + `cm-desktop --launcher` fallback) | `L1-clipboard-hotkeys-linux` |
 | Secrets | `no_keyring` error; `CAPTUREMANN_SECRETS=file` opt-in | acceptance row STO-2..5 |
 | Local AI | whisper (CPU), speaker engine (sherpa Linux libs, pinned; in the package with its models), llama-server (built and in the package); no text model run | `L1-local-ai-linux`, `L1-packaging-complete-linux` |
+| Auto-redact | Text recognizer = the system `tesseract` program as a helper (not linked, not bundled); button dimmed with the install command when missing; synthetic benchmark on aarch64, dev split; editor not seen on a desktop | `L1-auto-redact-linux` |
 | Recording (hidden) | PipeWire + software VP9 through the daemon/CLI; stream-loss handling | `L1-recording-linux`, `L1-recording-product-linux`, `L1-vp9-export-linux` |
 | Packaging | tarball (speaker engine, models, `llama-server`, FFmpeg, licences) + `install.sh` + `check-runtime.sh` + minisign signing; `.deb` from the tarball; clean Ubuntu container proof of tarball and `.deb` (apt install, run, remove, purge) | `L1-packaging-linux`, `L1-packaging-clean-linux`, `L1-packaging-complete-linux` |
 
@@ -47,6 +48,7 @@ has run on a real Linux desktop yet. Test lab for that: `scripts/testlab/` (Thin
 
 ## Known gaps and open items (none block the early build)
 
+- Auto-redact needs `sudo apt install tesseract-ocr` (not in the tarball, not a package dependency yet); recall is clearly below Apple Vision's on the synthetic set; x86_64 and a real desktop are untested; Windows will use `Windows.Media.Ocr` later.
 - Wayland: no always-on-top (toasts are in-window cards), no window list, no GlobalShortcuts on GNOME 46; the capture
   cloak (hide own toasts for a capture) was inconclusive on Wayland in the shared VM session.
 - Light panels get the dark tray icon; XDG autostart from an AppImage would point at a temporary mount.

@@ -447,6 +447,10 @@ msgid "Auto-redact"
 msgstr "Tự động che"
 
 #, fuzzy
+msgid "Auto-redact needs the tesseract program with English data. Install it (Debian and Ubuntu: sudo apt install tesseract-ocr), then restart CaptureMann."
+msgstr "Tự động che cần chương trình tesseract kèm dữ liệu tiếng Anh. Hãy cài đặt (Debian và Ubuntu: sudo apt install tesseract-ocr), rồi khởi động lại CaptureMann."
+
+#, fuzzy
 msgid "Auto-redact suggestions"
 msgstr "Gợi ý tự động che"
 

@@ -510,10 +510,17 @@ impl Inner {
         use cm_render::ocr::{RedactionKind, SuggestOptions};
         let recognizer = self.recognizer.clone();
         if !recognizer.is_available() {
-            return Err(CmError::not_implemented(
+            // Where an installable engine exists (Linux: `tesseract`) say how to get it.
+            let how = recognizer.install_hint().unwrap_or_default();
+            return Err(CmError::not_implemented(format!(
                 "text recognition is not available on this machine, so redactions cannot be \
-                 suggested; blur regions yourself with `annotate`",
-            )
+                 suggested{}; or blur regions yourself with `annotate`",
+                if how.is_empty() {
+                    String::new()
+                } else {
+                    format!(" ({how})")
+                }
+            ))
             .into());
         }
         let library = self.library.clone();

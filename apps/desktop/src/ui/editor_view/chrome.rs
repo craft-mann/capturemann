@@ -427,6 +427,26 @@ impl EditorView {
                     ),
                 )
             })
+            .when_some(s.redact_hint.filter(|_| !s.redact_available), |d, hint| {
+                d.child(
+                    self.ibtn(
+                        t,
+                        "editor-auto-redact-unavailable",
+                        hint.to_owned(),
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(6.))
+                            .child(icon("eye-off", 16., c))
+                            .child(tr!("Auto-redact"))
+                            .into_any_element(),
+                        &[],
+                        false,
+                        |_, _, _| {},
+                        cx,
+                    ),
+                )
+            })
             .child(self.ibtn(
                 t,
                 "editor-revert",
