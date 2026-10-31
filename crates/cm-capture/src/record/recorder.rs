@@ -491,7 +491,7 @@ impl<S: ScreenSource, E: VideoEncoder<Frame = S::Frame>> TrackRecorder for Scree
             .map(|f| f.duration.ticks() as f64 / TICKS_PER_SECOND as f64)
             .collect();
         let used = used_plan.unwrap_or(plan.video);
-        let details = json!({
+        let mut details = json!({
             "size": [used.width, used.height],
             "downscaled_from": self.downscaled_from,
             "fps": plan.video.fps,
@@ -522,6 +522,20 @@ impl<S: ScreenSource, E: VideoEncoder<Frame = S::Frame>> TrackRecorder for Scree
                 "reason": h.reason, "message": h.message,
             })),
         });
+        // Software VP9 (Linux): say which encoder wrote the file and that the pointer is in the pixels.
+        if codec_name == Some("vp9") {
+            cm_core::describe_video_track(
+                &mut details,
+                cm_core::VideoCodec::Vp9,
+                "libvpx-vp9",
+                true,
+                if plan.show_cursor {
+                    cm_core::CursorSource::Pixels
+                } else {
+                    cm_core::CursorSource::None
+                },
+            );
+        }
         Ok(TrackInfo {
             kind: TrackKind::Screen,
             file: self.opts.file_name.clone(),

@@ -86,8 +86,8 @@ pub trait VideoEncoder: Send + 'static {
 
     /// The codec the file really holds when it is not the one in the plan (software VP9 on
     /// Linux), as the manifest's codec string; `None` means the plan's codec.
-    // TODO(Codec::Vp9): once `Codec` has a Vp9 variant, `used_plan` can say this and this method
-    // goes away; until then the recorder writes this string into the track details.
+    // The recorder writes this string into the track details (and, for "vp9", describes the track
+    // with `cm_core::describe_video_track`).
     fn codec_name(&self) -> Option<&'static str> {
         None
     }
