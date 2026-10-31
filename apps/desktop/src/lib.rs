@@ -10,6 +10,7 @@ pub mod agent_status;
 pub mod ai;
 pub mod alloc;
 pub mod backend;
+pub mod capture_cloak;
 pub mod clipboard;
 pub mod cloud_connect;
 pub mod confirm;

@@ -23,6 +23,9 @@ pub fn publish(id: Option<u32>) {
 /// The kept-window provider handed to the daemon: the Studio window when it is visible, nothing
 /// else.
 pub fn kept_windows() -> Vec<u32> {
+    // Linux: the engine asks before every display capture and target listing, which is the
+    // moment to take the pop-ups off the screen (a no-op where the OS can exclude them).
+    crate::capture_cloak::before_capture();
     match STUDIO_WINDOW_ID.load(Ordering::SeqCst) {
         0 => Vec::new(),
         id => vec![id],

@@ -908,6 +908,9 @@ msgstr ""
 msgid "Close find"
 msgstr ""
 
+msgid "Close window"
+msgstr ""
+
 msgid "Close {name}"
 msgstr ""
 
@@ -2270,6 +2273,9 @@ msgstr ""
 msgid "Max duration"
 msgstr ""
 
+msgid "Maximize"
+msgstr ""
+
 msgid "Measures late and dropped frames at 60 fps; only the result (pass or fail) is kept"
 msgstr ""
 
@@ -2334,6 +2340,9 @@ msgid "Microphone: {name}"
 msgstr ""
 
 msgid "Microphones"
+msgstr ""
+
+msgid "Minimize"
 msgstr ""
 
 msgid "Mirror camera"
@@ -3617,6 +3626,9 @@ msgid "Restart — discard this take and start over"
 msgstr ""
 
 msgid "Restarting"
+msgstr ""
+
+msgid "Restore"
 msgstr ""
 
 msgid "Restore (R)"

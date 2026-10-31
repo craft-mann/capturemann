@@ -1,5 +1,16 @@
 use super::*;
 
+/// Where the toasts are drawn: inside the Studio window (`true`) or in a window of their own.
+/// A separate toast window cannot be always-on-top or unfocused on Wayland, so there the stack
+/// is a banner in the library window for as long as that window exists; once it is closed the
+/// toasts get their own window again. (An "only while active" rule was tried: Wayland reports
+/// the window active and inactive within moments as the toast window comes and goes, so the
+/// stack flapped.) `cloaked`: a capture is
+/// in progress (`capture_cloak`) and no toast may be on screen at all.
+pub fn toasts_in_window(wayland: bool, studio_open: bool, has_toasts: bool, cloaked: bool) -> bool {
+    wayland && studio_open && has_toasts && !cloaked
+}
+
 pub fn push_toast(app: &Entity<AppModel>, spec: ToastSpec, cx: &mut App) {
     app.update(cx, |m, cx| {
         m.toasts.push(spec, Instant::now());
@@ -108,7 +119,17 @@ pub(crate) fn sync_toasts(app: &Entity<AppModel>, cx: &mut App) {
         let (empty, height) = {
             let m = app.read(cx);
             let stack = m.toasts.toasts();
-            (stack.is_empty(), crate::toast::stack_height(stack))
+            log::debug!(
+                "sync_toasts: {} toasts, studio_open {}, in_studio {}",
+                stack.len(),
+                m.studio_open,
+                m.toasts_in_studio()
+            );
+            // No window of their own while they are banners in Studio or a capture hides them.
+            (
+                stack.is_empty() || m.toasts_in_studio() || crate::capture_cloak::is_hidden(),
+                crate::toast::stack_height(stack),
+            )
         };
         let existing = app.read(cx).toast_window;
         if empty {
@@ -174,7 +195,7 @@ pub(crate) fn sync_toasts(app: &Entity<AppModel>, cx: &mut App) {
                         is_minimizable: false,
                         // Only the cards are drawn: no panel behind the stack.
                         window_background: gpui::WindowBackgroundAppearance::Transparent,
-                        ..Default::default()
+                        ..crate::platform_window::popup_base()
                     },
                     move |window, cx| {
                         // R4-6: a sticky toast must not end up in the next screenshot or recording.
@@ -197,7 +218,8 @@ pub(crate) fn sync_toasts(app: &Entity<AppModel>, cx: &mut App) {
         app.update(cx, |m, _| m.toast_timer = None);
         return;
     }
-    // One timer for the next expiry.
+    app.update(cx, |_, cx| cx.notify()); // the Studio banners follow the queue
+                                         // One timer for the next expiry.
     let next = app.read(cx).toasts.next_expiry(Instant::now());
     let app3 = app.clone();
     let timer = next.map(|d| {
@@ -284,5 +306,31 @@ pub(super) fn toast_action(app: &Entity<AppModel>, action: ToastAction, cx: &mut
         ToastAction::UploadFile(id, file) => {
             crate::ui::upload_ui::upload(app, Some(&id), Some(&file), cx)
         }
+    }
+}
+
+#[cfg(test)]
+mod placement_tests {
+    use super::toasts_in_window;
+
+    #[test]
+    fn banners_only_on_wayland_while_studio_is_active_and_nothing_is_cloaked() {
+        assert!(toasts_in_window(true, true, true, false));
+        assert!(
+            !toasts_in_window(false, true, true, false),
+            "X11, macOS, Windows"
+        );
+        assert!(
+            !toasts_in_window(true, false, true, false),
+            "no Studio window"
+        );
+        assert!(
+            !toasts_in_window(true, true, false, false),
+            "nothing to show"
+        );
+        assert!(
+            !toasts_in_window(true, true, true, true),
+            "a capture is running"
+        );
     }
 }

@@ -125,25 +125,22 @@ pub fn open_studio(app: &Entity<AppModel>, cx: &mut App) {
             return;
         }
     }
-    let bounds = Bounds::centered(None, size(px(1180.), px(760.)), cx);
     let app2 = app.clone();
     let opened = cx.open_window(
-        WindowOptions {
-            window_bounds: Some(WindowBounds::Windowed(bounds)),
-            titlebar: Some(TitlebarOptions {
-                title: Some("CaptureMann".into()),
-                appears_transparent: false,
-                traffic_light_position: None,
-            }),
-            window_min_size: Some(size(px(720.), px(480.))),
-            app_id: Some("app.capturemann.desktop".into()),
-            ..Default::default()
-        },
+        crate::platform_window::normal_window_options(
+            "CaptureMann",
+            (1180., 760.),
+            (720., 480.),
+            cx,
+        ),
         move |window, cx| cx.new(|cx| Studio::new(app2, window, cx)),
     );
     match opened {
         Ok(handle) => {
-            app.update(cx, |m, _| m.studio = Some(handle));
+            app.update(cx, |m, _| {
+                m.studio = Some(handle);
+                m.studio_open = true;
+            });
             sync_studio_window(app, cx);
             cx.activate(true);
         }

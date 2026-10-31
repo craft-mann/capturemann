@@ -9,6 +9,7 @@ pub mod audio_cache;
 pub mod brand;
 pub mod components;
 pub mod confirm_window;
+pub mod csd;
 pub mod delay_pill;
 pub mod editor_doc;
 pub mod editor_view;

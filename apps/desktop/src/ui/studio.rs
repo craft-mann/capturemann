@@ -109,6 +109,8 @@ pub struct Studio {
     publish: Entity<PublishPage>,
     ai: Entity<AiPage>,
     published: Entity<PublishedView>,
+    /// The toast cards drawn inside this window (Wayland banners, `AppModel::toasts_in_studio`).
+    toast_host: Entity<crate::ui::toast_window::ToastHost>,
     /// The kind the library view was last set for (All, Recordings or Screenshots).
     shown: Option<crate::library::Filter>,
     focus: FocusHandle,
@@ -128,6 +130,7 @@ impl Studio {
         // Loads at once, so the sidebar number is real before the page is opened.
         let published = cx.new(|cx| PublishedView::new(app.clone(), cx));
         let focus = cx.focus_handle();
+        let toast_host = cx.new(|cx| crate::ui::toast_window::ToastHost::new(app.clone(), cx));
         let app2 = app.clone();
         let app3 = app.clone();
         let rec_for_scrim = app.read(cx).rec.clone();
@@ -157,6 +160,7 @@ impl Studio {
             publish,
             ai,
             published,
+            toast_host,
             shown: None,
             focus,
             _subs: subs,
@@ -213,7 +217,7 @@ pub fn agent_status_of(backend: &Backend) -> McpStatus {
 }
 
 impl Render for Studio {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = cx.global::<ThemeGlobal>().0;
         let (route, counts, platform, shortcuts, library_route) = {
             let m = self.app.read(cx);
@@ -312,7 +316,8 @@ impl Render for Studio {
             let m = self.app.read(cx);
             modal_dim_wanted(m.rec.read(cx).sheet_win.is_some(), m.confirms_open())
         };
-        div()
+        let banners = self.app.read(cx).toasts_in_studio();
+        let root = div()
             .id("studio")
             .role(Role::Application)
             .aria_label(tr!("CaptureMann Studio"))
@@ -378,6 +383,20 @@ impl Render for Studio {
                         .occlude(),
                 )
             })
+            // Wayland: toasts are banners in this window while it exists (a separate
+            // toast window would take focus there). The host draws only the cards.
+            .when(banners, |d| {
+                d.child(
+                    div()
+                        .absolute()
+                        .right_0()
+                        .bottom(px(16.))
+                        .w(px(crate::toast::TOAST_WIDTH))
+                        .child(self.toast_host.clone()),
+                )
+            });
+        // Client-side title bar, edges and corners where the compositor draws none (GNOME).
+        crate::ui::csd::frame(window, &t, root.into_any_element())
     }
 }
 

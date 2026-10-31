@@ -222,7 +222,7 @@ pub fn open_launcher_with(app: &Entity<AppModel>, cx: &mut App, query: &str) {
             is_minimizable: false,
             display_id: display.map(|(id, _)| id),
             window_background: WindowBackgroundAppearance::Transparent,
-            ..Default::default()
+            ..crate::platform_window::popup_base()
         },
         {
             let query = query.to_owned();

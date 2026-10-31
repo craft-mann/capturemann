@@ -296,7 +296,7 @@ pub(crate) fn open_confirm(
             is_resizable: false,
             is_minimizable: false,
             display_id: display.map(|(id, _)| id),
-            ..Default::default()
+            ..crate::platform_window::popup_base()
         },
         move |window, cx| {
             crate::platform_window::exclude_from_capture(window);

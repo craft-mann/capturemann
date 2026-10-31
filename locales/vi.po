@@ -10992,3 +10992,15 @@ msgstr "Desktop của bạn quản lý các phím tắt này và có thể đã 
 #, fuzzy
 msgid "xdg-open is not installed; install xdg-utils to open links and folders"
 msgstr "Chưa cài xdg-open; hãy cài xdg-utils để mở liên kết và thư mục"
+
+msgid "Close window"
+msgstr "Đóng cửa sổ"
+
+msgid "Maximize"
+msgstr "Phóng to"
+
+msgid "Minimize"
+msgstr "Thu nhỏ"
+
+msgid "Restore"
+msgstr "Khôi phục"

@@ -285,7 +285,7 @@ pub fn panel_options(
         is_minimizable: false,
         display_id: Some(display.0),
         window_background: WindowBackgroundAppearance::Transparent,
-        ..Default::default()
+        ..crate::platform_window::popup_base()
     }
 }
 
