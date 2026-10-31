@@ -2112,6 +2112,10 @@ msgstr ""
 msgid "Link copied to the clipboard"
 msgstr ""
 
+#. FACT: owner review required (the desktop portal asks, not CaptureMann)
+msgid "Linux does not ask per app. Your desktop asks when CaptureMann captures the screen, and the microphone and camera are not gated by the system. Below is what this system can and cannot do for CaptureMann."
+msgstr ""
+
 msgid "List"
 msgstr ""
 
@@ -2490,6 +2494,9 @@ msgstr ""
 msgid "No IPC endpoint"
 msgstr ""
 
+msgid "No Secret Service (GNOME Keyring or KWallet) was found, so sign-ins and API keys cannot be kept in the system keyring. Start one, or set CAPTUREMANN_SECRETS=file to keep them in a file only you can read."
+msgstr ""
+
 msgid "No YouTube channel is connected. Connect one with your own Google Cloud client; it takes a few minutes, once."
 msgstr ""
 
@@ -2532,6 +2539,9 @@ msgstr ""
 msgid "No delay"
 msgstr ""
 
+msgid "No desktop session was found. CaptureMann has to run inside a graphical session."
+msgstr ""
+
 msgid "No display found"
 msgstr ""
 
@@ -2548,6 +2558,9 @@ msgid "No export yet"
 msgstr ""
 
 msgid "No folder chosen"
+msgstr ""
+
+msgid "No hardware video encoder was found; recording will use a slower software encoder."
 msgstr ""
 
 msgid "No limit"
@@ -2728,6 +2741,9 @@ msgid "Nothing is copied; the old files stay where they are"
 msgstr ""
 
 msgid "Nothing is heard until you ask. The orange microphone dot stays off."
+msgstr ""
+
+msgid "Nothing is missing on this system for screenshots."
 msgstr ""
 
 msgid "Nothing is saved: the test video is deleted when the test ends"
@@ -3327,7 +3343,16 @@ msgstr ""
 msgid "Recording is dropping frames"
 msgstr ""
 
+msgid "Recording is not available yet"
+msgstr ""
+
 msgid "Recording is unavailable"
+msgstr ""
+
+msgid "Recording needs PipeWire, and no sound server was found. Install and start PipeWire."
+msgstr ""
+
+msgid "Recording needs PipeWire; this system only has PulseAudio. Install and start PipeWire."
 msgstr ""
 
 msgid "Recording quality, frame rate and what gets captured."
@@ -3751,6 +3776,9 @@ msgstr ""
 msgid "Screen Recording was granted. Restart CaptureMann to start using it."
 msgstr ""
 
+msgid "Screen and audio recording is not built for this system yet. Screenshots, the library and the editor work."
+msgstr ""
+
 msgid "Screen and your saved audio"
 msgstr ""
 
@@ -3770,6 +3798,9 @@ msgid "Screen encoder failed: {detail}"
 msgstr ""
 
 msgid "Screen only (no audio)"
+msgstr ""
+
+msgid "Screen recording needs ScreenCast portal version {need} or newer; this system has an older one. Update xdg-desktop-portal."
 msgstr ""
 
 msgid "Screenshot canvas. {summary}"
@@ -4381,6 +4412,12 @@ msgid "The cursor is drawn from its recorded path, so it can be bigger and smoot
 msgstr ""
 
 msgid "The daemon accepted the publish but sent no job."
+msgstr ""
+
+msgid "The desktop portal has no Screenshot interface, so screenshots are not possible on Wayland. Install the portal for your desktop."
+msgstr ""
+
+msgid "The desktop portal service does not answer, so Wayland screenshots and screen recording are not possible. Install xdg-desktop-portal and the portal for your desktop."
 msgstr ""
 
 msgid "The destinations file could not be read, so none are listed: {error}"
@@ -5089,6 +5126,9 @@ msgstr ""
 msgid "What is this video about?"
 msgstr ""
 
+msgid "What this system is missing"
+msgstr ""
+
 msgid "What to copy"
 msgstr ""
 
@@ -5154,6 +5194,10 @@ msgid "Window {window_id}"
 msgstr ""
 
 msgid "Windows"
+msgstr ""
+
+#. FACT: owner review required (nothing is requested until a button is pressed)
+msgid "Windows keeps these under your control. Nothing is requested until you press a button; you can change any of them later in Settings → Permissions."
 msgstr ""
 
 msgid "With 5 s delay"

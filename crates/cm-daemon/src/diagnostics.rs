@@ -145,7 +145,7 @@ fn sysctl(name: &str) -> Option<String> {
 }
 
 /// The machine: OS, chip, memory, cores.
-pub fn system_lines() -> Vec<String> {
+pub fn system_lines(stack: Option<&cm_platform::stack::Report>) -> Vec<String> {
     let mut out = Vec::new();
     out.push(format!(
         "{} {}",
@@ -170,6 +170,10 @@ pub fn system_lines() -> Vec<String> {
     if let Ok(n) = std::thread::available_parallelism() {
         out.push(format!("threads available {n}"));
     }
+    // Linux only (None elsewhere): the desktop stack the screenshot and recording paths depend on.
+    if let Some(stack) = stack {
+        out.extend(stack.fact_lines());
+    }
     out.push(match cm_auth::backend_from_env() {
         cm_auth::Backend::Keyring => "secrets in the system credential store".to_owned(),
         cm_auth::Backend::File(_) => "secrets in a file (owner-only, not encrypted)".to_owned(),
@@ -177,7 +181,15 @@ pub fn system_lines() -> Vec<String> {
     out
 }
 
-fn permission_lines() -> Vec<String> {
+fn permission_lines(stack: Option<&cm_platform::stack::Report>) -> Vec<String> {
+    // Linux has no per-app permission switches to report: the screen portal asks at capture time
+    // and the microphone and camera are not gated by the system (the stack facts are in System).
+    if stack.is_some() {
+        return vec![
+            "screen capture asked by the desktop portal at capture time".to_owned(),
+            "microphone and camera not gated by the system".to_owned(),
+        ];
+    }
     vec![
         format!("microphone {:?}", cm_audio::microphone_permission()),
         format!(
@@ -233,11 +245,20 @@ fn engine_lines() -> Vec<String> {
 impl Inner {
     /// `get_diagnostics`: `{ text, sections: [{ title, lines }] }`.
     pub(crate) async fn get_diagnostics(&self) -> Result<Value, DaemonError> {
+        // Linux only; asks the session bus a few read-only questions, so off the async threads.
+        let stack = tokio::task::spawn_blocking(cm_platform::stack::probe)
+            .await
+            .ok()
+            .flatten();
         let mut sections = vec![
             Section::new("App", app_lines()),
-            Section::new("System", system_lines()),
-            Section::new("Permissions", permission_lines()),
+            Section::new("System", system_lines(stack.as_ref())),
+            Section::new("Permissions", permission_lines(stack.as_ref())),
         ];
+        let gaps = stack.map(|r| r.gap_lines()).unwrap_or_default();
+        if !gaps.is_empty() {
+            sections.push(Section::new("Missing on this system", gaps));
+        }
 
         // Models and engines.
         let svc = self.ai.models.clone();

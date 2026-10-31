@@ -95,4 +95,5 @@ are run by hand, see [`CLAUDE.md`](../../CLAUDE.md).
 |---|---|
 | [`AGT-POLICY`](AGT-POLICY.md) | Per-tool permissions (Allow / Ask first) |
 | [`PRM-1`](PRM-1.md) | Permissions |
+| [`LINUX-1`](LINUX-1.md) | The early Linux build on a real X11 and a real Wayland desktop: install, stack facts, keyring, screenshots, what is unavailable |
 | [`SET-RESET`](SET-RESET.md) | Settings -> Shortcuts "Reset to defaults" (board R16) |

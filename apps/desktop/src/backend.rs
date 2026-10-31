@@ -71,6 +71,31 @@ pub enum RecordingMode {
     Fake(cm_daemon::testing::FakeSources),
 }
 
+/// Whether this system records at all. The single switch is `cm_platform::capability`; every
+/// entry point (Record sheet, hotkeys, tray, launcher) goes through [`Backend::recording_blocker`].
+pub fn recording_supported() -> bool {
+    cm_platform::capability::recording_supported()
+}
+
+/// Whether the recording engine runs: scripted fake tracks always do (demo, tests); the real
+/// sources only where the platform records.
+pub fn recording_enabled_for(mode: &RecordingMode, supported: bool) -> bool {
+    match mode {
+        RecordingMode::Off => false,
+        RecordingMode::Fake(_) => true,
+        RecordingMode::System => supported,
+    }
+}
+
+/// Why recording cannot start now.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecordingBlocker {
+    /// This system has no recorder yet (early Linux and Windows builds).
+    NotAvailableYet,
+    /// The library could not be opened, so there is nowhere to save.
+    NoLibrary,
+}
+
 pub struct StartConfig {
     /// Configured library folder (LIB-2); `None` when it could not be determined.
     pub library_path: Option<PathBuf>,
@@ -213,6 +238,17 @@ pub struct Backend {
 }
 
 impl Backend {
+    /// `None` when a recording can start, else the reason (shown by every Record entry point).
+    pub fn recording_blocker(&self) -> Option<RecordingBlocker> {
+        if !self.recording_enabled && !recording_supported() {
+            Some(RecordingBlocker::NotAvailableYet)
+        } else if !self.recording_enabled || self.daemon.is_none() {
+            Some(RecordingBlocker::NoLibrary)
+        } else {
+            None
+        }
+    }
+
     /// Builds the daemon on `rt` and starts serving IPC. `capturer` and `clipboard` are
     /// injected so tests run without a display.
     pub fn start(
@@ -227,7 +263,7 @@ impl Backend {
         });
         let mut ipc_warning = None;
         let mut recovered = Vec::new();
-        let recording_enabled = !matches!(cfg.recording, RecordingMode::Off);
+        let recording_enabled = recording_enabled_for(&cfg.recording, recording_supported());
         let daemon = opened.library.map(|lib| {
             // Persistent jobs (EXP-4, STO-3): `<library>/.capturemann/jobs.sqlite`.
             let jobs = cm_daemon::library_job_queue(lib.root());
@@ -255,6 +291,8 @@ impl Backend {
             builder = builder.kept_windows(crate::studio_window::kept_windows);
             builder = match &cfg.recording {
                 RecordingMode::Off => builder,
+                // Where recording is not built yet the engine stays off, as the UI says.
+                RecordingMode::System if !recording_enabled => builder,
                 RecordingMode::System => builder.recording_system(),
                 RecordingMode::Fake(sources) => builder.recording_sources(sources.clone()),
             };
@@ -901,6 +939,19 @@ mod tests {
             let (_, rendered) = Backend::capture_png(&daemon, &id).await.unwrap();
             assert_eq!(decode(&copied).as_raw(), decode(&rendered).as_raw());
         });
+    }
+
+    /// The real sources run only where the platform records; scripted fakes always run.
+    #[test]
+    fn recording_is_enabled_only_where_supported() {
+        use cm_daemon::testing::FakeSources;
+        assert!(recording_enabled_for(&RecordingMode::System, true));
+        assert!(!recording_enabled_for(&RecordingMode::System, false));
+        assert!(!recording_enabled_for(&RecordingMode::Off, true));
+        assert!(recording_enabled_for(
+            &RecordingMode::Fake(FakeSources::new()),
+            false
+        ));
     }
 
     /// REC-5, AGT-2, NFR-11: the user starts a recording from the app without a dialog (in
