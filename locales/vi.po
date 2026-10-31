@@ -3890,6 +3890,9 @@ msgstr "Tách dòng thời gian bằng {key} để đặt bố cục khác cho t
 msgid "Start in 5 s"
 msgstr "Bắt đầu sau 5 giây"
 
+msgid "Start now"
+msgstr "Bắt đầu ngay"
+
 #, fuzzy
 msgid "Start or stop from anywhere"
 msgstr "Bắt đầu hoặc dừng từ bất cứ đâu"
@@ -3917,6 +3920,9 @@ msgstr "Do tác nhân {client} bắt đầu"
 #, fuzzy
 msgid "Started by {client}"
 msgstr "Do {client} bắt đầu"
+
+msgid "Starting in {n}"
+msgstr "Bắt đầu sau {n}"
 
 #, fuzzy
 msgid "Starting soon"
@@ -7137,6 +7143,14 @@ msgctxt "record target"
 msgid "Window"
 msgstr "Cửa sổ"
 
+msgctxt "recording banner"
+msgid "Paused"
+msgstr "Tạm dừng"
+
+msgctxt "recording banner"
+msgid "Recording"
+msgstr "Đang quay"
+
 #, fuzzy
 msgctxt "recording codec"
 msgid "Auto"
@@ -9131,6 +9145,9 @@ msgstr "Dùng thư mục mới"
 msgid "Your captures need {needed} free and the new folder has {free}. You can start with an empty library there instead. The captures in the old folder stay where they are."
 msgstr "Các bản chụp cần trống {needed} nhưng thư mục mới chỉ có {free}. Bạn có thể bắt đầu với thư viện trống ở đó. Các bản chụp trong thư mục cũ vẫn ở nguyên chỗ."
 
+msgid "Your desktop and the tray icon also show that the screen is being recorded. Stop from either one if this window is hidden."
+msgstr "Máy tính và biểu tượng khay hệ thống cũng cho thấy màn hình đang được quay. Nếu cửa sổ này bị ẩn, bạn có thể dừng quay từ một trong hai nơi đó."
+
 msgid "Your desktop cannot share a whole screen."
 msgstr "Máy tính này không thể chia sẻ toàn màn hình."
 
@@ -10838,6 +10855,9 @@ msgstr "Không thể đọc thông tin chẩn đoán: {e}"
 
 msgid "Diagnostics"
 msgstr "Chẩn đoán"
+
+msgid "Discard"
+msgstr "Bỏ bản ghi"
 
 msgid "Kinds to look for"
 msgstr "Loại cần tìm"

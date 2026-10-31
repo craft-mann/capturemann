@@ -16,6 +16,7 @@
 //! * [`attention`]: the tray's Attention rule for failed publishes and an offline library.
 //! * [`tray`]: the tray state machine and the hotkey decisions.
 //! * [`preview`]: live camera frames for the bubble (shared session with the recorder).
+//! * [`surface`]: floating HUD windows, or a banner in the Studio window (Linux).
 //! * [`sheet`]: the start sheet's model (displays, devices, permissions, choices).
 //! * [`files`]: finding a `.cmrec` bundle on disk, its details card and its poster.
 //! * [`exports`]: the quick export's jobs and toasts ("Recording saved - exporting...").
@@ -33,6 +34,7 @@ pub mod model;
 pub mod preview;
 pub mod sheet;
 pub mod start;
+pub mod surface;
 pub mod toasts;
 pub mod tray;
 pub mod upload_progress;

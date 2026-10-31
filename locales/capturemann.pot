@@ -1381,6 +1381,9 @@ msgstr ""
 msgid "Diagnostics"
 msgstr ""
 
+msgid "Discard"
+msgstr ""
+
 msgid "Discard and restart"
 msgstr ""
 
@@ -4098,6 +4101,9 @@ msgstr ""
 msgid "Start in 5 s"
 msgstr ""
 
+msgid "Start now"
+msgstr ""
+
 msgid "Start or stop audio recording"
 msgstr ""
 
@@ -4126,6 +4132,9 @@ msgid "Started by agent {client}"
 msgstr ""
 
 msgid "Started by {client}"
+msgstr ""
+
+msgid "Starting in {n}"
 msgstr ""
 
 msgid "Starting soon"
@@ -5361,6 +5370,9 @@ msgid "Your agent permissions were kept."
 msgstr ""
 
 msgid "Your captures need {needed} free and the new folder has {free}. You can start with an empty library there instead. The captures in the old folder stay where they are."
+msgstr ""
+
+msgid "Your desktop and the tray icon also show that the screen is being recorded. Stop from either one if this window is hidden."
 msgstr ""
 
 msgid "Your desktop cannot share a whole screen."
@@ -7762,6 +7774,14 @@ msgstr ""
 
 msgctxt "record target"
 msgid "Window"
+msgstr ""
+
+msgctxt "recording banner"
+msgid "Paused"
+msgstr ""
+
+msgctxt "recording banner"
+msgid "Recording"
 msgstr ""
 
 msgctxt "recording codec"
