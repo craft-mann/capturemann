@@ -16,7 +16,7 @@ mechanisms, it does not commit the product to Linux. Evidence so far: `verificat
 | `mach_absolute_time` stamp | `host_ns` on `cm_platform::clock::monotonic_ns` | That is `CLOCK_MONOTONIC` on Linux, and PipeWire's `SPA_META_Header.pts` is on the same clock (the L0 spike saw a constant offset to local arrival). `PtsMapper` uses the PTS when it is within 500 ms of arrival, else the arrival time (and counts it), and never goes backwards. |
 | `AVAssetWriter` + VideoToolbox | `cm_encode::VideoEncoder` (`append`, `finish`, `check`, `fragments_written`) | See section 3. Built and tested: `FfmpegVp9Encoder` (rawvideo on stdin, libvpx VP9, fragmented MP4 out). Hardware: VA-API / NVENC later, behind the same trait. |
 | `MicRecorder`, `SystemAudioRecorder` | `cm_audio::AudioSource` (`format`, `start(sink)`, `stop`, `needs_reopen`) and `SourceFactory` | `PipeWireAudioSource` in `cm-audio` (`sys/linux_pipewire.rs`): mic = default source, system audio = monitor of the default sink (`stream.capture.sink = true`). Same `SourceSink::push(host_ns, f32 interleaved)` contract as `CpalSource`. `system_audio_support()` reports `pipewire_monitor`. |
-| `SystemScreenRecorder::system(plan)` | alias in `record/mod.rs` | Not wired yet (that file also hosts the Windows stub; the app wiring is outside this task). The alias will be `ScreenRecorder<PipeWireScreenSource<PortalPipeWire, FileTokenStore>, <chosen encoder>>`. |
+| `SystemScreenRecorder::system(plan)` | alias in `record/mod.rs` | Wired on Oct 31, 2026 as `cm_capture::linux_screen_recorder` (`sys/linux_recorder.rs`, used by the daemon's `recording/sys/linux.rs`); the app's Record entry points stay hidden on Linux unless `CM_LINUX_RECORDING=1`. It is `ScreenRecorder<PipeWireScreenSource<PortalPipeWire, FileTokenStore>, <chosen encoder>>`. |
 
 Things the macOS code assumes that Linux changes:
 
@@ -171,3 +171,7 @@ and a beep (no flash source in the VM), anything on a real GPU, 1080p and above,
 Known wrinkles to fix when wiring the product: the track details say `codec: h264` (the plan's codec) while the file
 is VP9 (`Codec` has no VP9 variant yet, `used_plan()` cannot say so); `cursor: true` is reported but the cursor is
 only in the pixels.
+
+**Update (Oct 31, 2026, product path):** the wrinkles above are fixed: the recorder describes a VP9 track with
+`cm_core::describe_video_track` (codec `vp9`, encoder, `software`, `cursor_source`). The daemon, CLI and MCP record on
+Linux (`verification/L1-recording-product-linux-2026-10-31-claude.md`, partial).
