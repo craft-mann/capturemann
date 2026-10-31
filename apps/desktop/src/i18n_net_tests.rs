@@ -230,6 +230,7 @@ fn corpus() -> Vec<(String, String)> {
 
     // ---- permissions --------------------------------------------------------------------------
     for os in [Os::Mac, Os::Windows, Os::Linux] {
+        c.add(format!("intro_note({os:?})"), permissions::intro_note(os));
         for s in permissions::specs(os) {
             c.add(format!("Spec({os:?}, {:?}): name", s.id), s.name.clone());
             c.add(format!("Spec({os:?}, {:?}): why", s.id), s.why.clone());

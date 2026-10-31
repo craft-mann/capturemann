@@ -380,6 +380,27 @@ pub fn cards(
                 tried.contains(&s.id),
             )
         }))
+        .when_some(
+            permissions::linux_stack().filter(|_| snap.os == permissions::Os::Linux),
+            |d, report| {
+                let texts = permissions::stack_gap_texts(&report);
+                d.child(
+                    div()
+                        .id("permissions-linux-stack")
+                        .flex()
+                        .flex_col()
+                        .gap(px(6.))
+                        .text_size(px(type_scale::CAPTION))
+                        .text_color(rgba_of(t.text_2))
+                        .child(if texts.is_empty() {
+                            tr!("Nothing is missing on this system for screenshots.")
+                        } else {
+                            tr!("What this system is missing")
+                        })
+                        .children(texts.into_iter().map(|x| div().child(x))),
+                )
+            },
+        )
         .when(snap.os == permissions::Os::Windows, |d| {
             d.child(
                 div()
@@ -573,10 +594,7 @@ impl Render for PermissionsScreen {
                                 div()
                                     .text_size(px(type_scale::UI))
                                     .text_color(rgba_of(t.text_2))
-                                    .child(
-                                        // TRANSLATORS: FACT: owner review required (nothing is requested until a button is pressed)
-                                        tr!("macOS keeps these under your control. Nothing is requested until you press a button; you can change any of them later in Settings \u{2192} Permissions."),
-                                    ),
+                                    .child(permissions::intro_note(snap.os)),
                             ),
                     )
                     .child(cards(&t, &self.app, &snap, busy, &tried)),
