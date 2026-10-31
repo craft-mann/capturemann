@@ -41,9 +41,25 @@ impl fmt::Debug for KeyringStore {
     }
 }
 
+/// The platform code of the error a missing or locked system keyring gives.
+pub const NO_KEYRING_CODE: &str = "no_keyring";
+
 fn map_err(e: keyring::Error) -> CmError {
     // The keyring error text names the store and the platform, never the secret.
-    CmError::internal(format!("credential store: {e}"))
+    match e {
+        keyring::Error::NoDefaultStore | keyring::Error::NoStorageAccess(_) => {
+            CmError::platform_rejected(
+                format!(
+                    "The system credential store is not available ({e}). Start and unlock it \
+                     (on Linux: GNOME Keyring, KWallet or KeePassXC), or choose to keep secrets in \
+                     a file only you can read by setting {}=file (the values are not encrypted).",
+                    crate::file_store::BACKEND_ENV
+                ),
+                Some(NO_KEYRING_CODE.to_owned()),
+            )
+        }
+        other => CmError::internal(format!("credential store: {other}")),
+    }
 }
 
 impl SecretStore for KeyringStore {
@@ -141,6 +157,11 @@ impl VaultStore {
     /// The OS keychain, one item called `vault` in `service` (for example `dev.capturemann.app`).
     /// Instances for the same service share their cache and lock inside this process.
     pub fn system(service: impl Into<String>) -> Self {
+        Self::with_backend(service, crate::file_store::backend_from_env())
+    }
+
+    /// [`VaultStore::system`] with the backend already chosen.
+    pub fn with_backend(service: impl Into<String>, backend: crate::file_store::Backend) -> Self {
         static STATES: OnceLock<Mutex<HashMap<String, VaultState>>> = OnceLock::new();
         let service = service.into();
         let state = {
@@ -150,12 +171,19 @@ impl VaultStore {
                 .unwrap_or_else(|e| e.into_inner());
             all.entry(service.clone()).or_default().clone()
         };
+        let item_limit =
+            (cfg!(windows) && backend == crate::file_store::Backend::Keyring).then_some(PART_CHARS);
         VaultStore {
-            inner: Arc::new(KeyringStore::new(service)),
+            inner: match backend {
+                crate::file_store::Backend::Keyring => Arc::new(KeyringStore::new(service)),
+                crate::file_store::Backend::File(path) => {
+                    Arc::new(crate::file_store::FileStore::new(path))
+                }
+            },
             slot: VAULT_SLOT.to_owned(),
             state,
             miss_window: MISS_WINDOW,
-            item_limit: cfg!(windows).then_some(PART_CHARS),
+            item_limit,
         }
     }
 
@@ -447,6 +475,28 @@ mod tests {
         s.delete("k").unwrap();
         s.delete("k").unwrap();
         assert_eq!(s.get("k").unwrap(), None);
+    }
+
+    /// A computer with no keyring gets a message that says what to start or how to opt in, and a
+    /// code a client can recognise; other keyring failures stay plain internal errors.
+    #[test]
+    fn a_missing_keyring_is_a_clear_error() {
+        let e = map_err(keyring::Error::NoDefaultStore);
+        match &e {
+            CmError::PlatformRejected {
+                message,
+                platform_code,
+            } => {
+                assert_eq!(platform_code.as_deref(), Some(NO_KEYRING_CODE));
+                assert!(message.contains("CAPTUREMANN_SECRETS=file"));
+                assert!(message.contains("GNOME Keyring"));
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+        assert!(matches!(
+            map_err(keyring::Error::NoEntry),
+            CmError::Internal { .. }
+        ));
     }
 
     /// Touches the real keychain (may prompt): only with `-- --ignored`.

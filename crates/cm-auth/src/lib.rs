@@ -18,6 +18,7 @@
 
 pub mod browser;
 pub mod credentials;
+pub mod file_store;
 pub mod flow;
 pub mod http;
 pub mod loopback;
@@ -28,6 +29,7 @@ pub mod secret;
 pub mod token;
 
 pub use browser::{BrowserOpener, SystemBrowser};
+pub use file_store::{backend_from_env, choose_backend, Backend, FileStore};
 pub use flow::{build_authorization_url, AuthFlow};
 pub use http::{HttpClient, HttpError, HttpResponse, UreqClient};
 pub use loopback::LoopbackListener;
