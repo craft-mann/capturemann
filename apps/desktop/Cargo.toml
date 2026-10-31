@@ -91,3 +91,6 @@ objc2-foundation = { version = "0.3", default-features = false, features = ["std
 # Linux windowing backends: without `wayland` or `x11` GPUI starts but opens no window.
 [target.'cfg(target_os = "linux")'.dependencies]
 gpui_platform = { package = "gpui-pre-platform", version = "=0.3.9", features = ["wayland", "x11"] }
+# The wlr/ext data-control protocol for wlroots and KDE (wl-clipboard-rs, MIT OR Apache-2.0).
+# GNOME has none, so arboard falls back to X11 through XWayland there.
+arboard = { workspace = true, features = ["image-data", "wayland-data-control"] }
