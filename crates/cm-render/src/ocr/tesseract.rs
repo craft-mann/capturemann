@@ -445,18 +445,35 @@ pub(crate) fn group_words(mut words: Vec<Word>) -> Vec<TextLine> {
             None => lines.push(vec![w]),
         }
     }
-    let mut out: Vec<TextLine> = lines.into_iter().map(line_of).collect();
-    out.sort_by(|a, b| {
-        let key = |l: &TextLine| (l.rect.y + l.rect.h / 2.0, l.rect.x);
-        let (ka, kb) = (key(a), key(b));
-        // Rows within half a line height count as the same row, left to right.
-        if (ka.0 - kb.0).abs() < 0.5 * a.rect.h.min(b.rect.h) {
-            ka.1.total_cmp(&kb.1)
-        } else {
-            ka.0.total_cmp(&kb.0)
+    reading_order(lines.into_iter().map(line_of).collect())
+}
+
+/// Reading order without a non-transitive comparison (which can make `sort_by` panic): sort by
+/// vertical centre, cut into rows where the centre moves by more than half the smaller line
+/// height from the row's first line, then sort each row left to right.
+fn reading_order(mut lines: Vec<TextLine>) -> Vec<TextLine> {
+    lines.sort_by(|a, b| (a.rect.y + a.rect.h / 2.0).total_cmp(&(b.rect.y + b.rect.h / 2.0)));
+    let mut rows: Vec<Vec<TextLine>> = Vec::new();
+    for l in lines {
+        let cy = l.rect.y + l.rect.h / 2.0;
+        match rows.last_mut() {
+            Some(row)
+                if {
+                    let f = &row[0];
+                    (cy - (f.rect.y + f.rect.h / 2.0)).abs() < 0.5 * f.rect.h.min(l.rect.h)
+                } =>
+            {
+                row.push(l);
+            }
+            _ => rows.push(vec![l]),
         }
-    });
-    out
+    }
+    rows.into_iter()
+        .flat_map(|mut r| {
+            r.sort_by(|a, b| a.rect.x.total_cmp(&b.rect.x));
+            r
+        })
+        .collect()
 }
 
 fn line_of(words: Vec<Word>) -> TextLine {
@@ -532,6 +549,20 @@ mod tests {
         let texts: Vec<_> = lines.iter().map(|l| l.text.as_str()).collect();
         assert_eq!(texts, ["Call 415 555 0132", "Right", "Second"]);
         assert_eq!(lines[0].words.len(), 4);
+    }
+
+    #[test]
+    fn reading_order_survives_staggered_lines() {
+        // Lines whose centres drift by a little each time used to break the comparison (not a
+        // total order); any input must sort without a panic and keep every line.
+        let lines: Vec<TextLine> = (0..300)
+            .map(|i| {
+                let f = f64::from(i);
+                TextLine::laid_out("x", (f * 37.0) % 500.0, (f * 3.0) % 40.0, 8.0, 10.0)
+            })
+            .collect();
+        let out = reading_order(lines);
+        assert_eq!(out.len(), 300);
     }
 
     #[test]
