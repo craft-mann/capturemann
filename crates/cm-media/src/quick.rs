@@ -14,14 +14,15 @@ use cm_core::CmError;
 use serde_json::{json, Value};
 
 use crate::bubble::write_assets;
-use crate::edited::{default_audio, export_edited, resolve_edits, ExportPath};
+use crate::edited::{default_audio, export_edited, resolve_edits, resolve_untouched, ExportPath};
 use crate::graph::{build, prepare, BubbleAssets, BuildInput, Plan};
 use crate::preset::{self, ExportOptions, Kind, Presets, Target};
 use crate::run::{run_ffmpeg, RunError};
 use crate::spec::QuickSpec;
 use crate::timeline::file_duration_seconds;
 use crate::tools::{
-    encoder_candidates, is_encoder_init_failure, probe_caps, probe_file, Encoder, Tools,
+    encoder_candidates_for, is_encoder_init_failure, probe_caps, probe_file, Encoder,
+    EncoderPolicy, Tools,
 };
 
 /// The interim preset id.
@@ -373,7 +374,23 @@ pub fn export_quick(
     }
     let preset_id = target.as_ref().map_or(PRESET_QUICK, |t| t.id.as_str());
     let caps = probe_caps(tools)?;
-    let candidates = encoder_candidates(&caps, req.prefer_encoder, false)?;
+    let mut candidates = encoder_candidates_for(&caps, req.prefer_encoder, EncoderPolicy::host())?;
+    if candidates[0].compositor_only() {
+        // VAAPI (frames are uploaded to the GPU) and VP9-in-MP4 are written by the compositor
+        // path only; it picks its encoder the same way.
+        let resolved = resolve_untouched(req.manifest, &spec);
+        return export_edited(
+            tools,
+            req,
+            spec,
+            resolved,
+            target.as_ref(),
+            &default_audio(),
+            progress,
+            cancel,
+        );
+    }
+    candidates.retain(|e| !e.compositor_only());
     let mut tried = 0;
     let mut encoder = candidates[tried];
 
