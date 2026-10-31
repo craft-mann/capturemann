@@ -46,17 +46,10 @@ impl Confirmer for BoxedConfirmer {
     }
 }
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
 fn capturer() -> Capturer {
     // Debug builds: CM_DEBUG_SCREEN_PERMISSION=missing / CM_DEBUG_TARGETS_ERROR=... simulate a
     // failing listing (see `permissions`).
     cm_desktop::permissions::debug_capturer().unwrap_or_else(Capturer::system)
-}
-
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
-fn capturer() -> Capturer {
-    eprintln!("cm-desktop supports macOS and Windows only");
-    std::process::exit(1)
 }
 
 /// A second launch: asks the running instance to show itself. When the lock is held by another
