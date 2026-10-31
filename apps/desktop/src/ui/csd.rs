@@ -21,7 +21,7 @@ use gpui::{
 use cm_i18n::tr;
 
 use crate::theme::{type_scale, Theme};
-use crate::ui::components::{icon, logo};
+use crate::ui::components::{icon, logo, shrink_text};
 use crate::ui::paint::rgba_of;
 
 /// Height of the title bar in logical px.
@@ -151,7 +151,7 @@ fn titlebar(t: &Theme, can_min: bool, can_max: bool, maximized: bool) -> Statefu
                 .gap(px(8.))
                 .pl(px(12.))
                 .child(logo(t, 16.))
-                .child("CaptureMann"),
+                .child(shrink_text("CaptureMann")),
         )
         .child(
             div()
