@@ -3,6 +3,9 @@ on:
   push:
     branches: [main]
   pull_request:
+    # `ready_for_review` and `labeled` so that un-drafting, or adding the label `ci:windows`, starts the Windows job.
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
+  workflow_dispatch:
   schedule:
     - cron: "41 4 * * 1" # Mondays 04:41 UTC: catches a new stable Rust or a yanked dependency without a commit
 
@@ -19,15 +22,40 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Windows is the slowest job (about an hour). A DRAFT pull request runs the others on every push and
+  # Windows only when it carries the label `ci:windows`; a pull request that is ready for review, main,
+  # the weekly schedule and a manual run always include it. Nothing merges until the final commit of a
+  # ready pull request has a green Windows job.
+  plan:
+    name: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      os: ${{ steps.pick.outputs.os }}
+    steps:
+      - id: pick
+        env:
+          EVENT: ${{ github.event_name }}
+          DRAFT: ${{ github.event.pull_request.draft }}
+          LABELLED: ${{ contains(github.event.pull_request.labels.*.name, 'ci:windows') }}
+        run: |
+          os='["macos-latest","ubuntu-24.04"]'
+          if [ "$EVENT" != pull_request ] || [ "$DRAFT" != true ] || [ "$LABELLED" = true ]; then
+            os='["macos-latest","windows-latest","ubuntu-24.04"]'
+          fi
+          echo "os=$os" >> "$GITHUB_OUTPUT"
+          echo "jobs: $os"
+
   check:
     name: check (${{ matrix.os }})
+    needs: plan
     strategy:
       fail-fast: false
       matrix:
         # Windows and Linux jobs start before any backend exists (platform plan, Step 0): they keep the
         # shared crates building and their fake-based tests passing on every OS. Hosted runners have no
         # screen permission, camera or microphone, so the hardware tests stay manual (verification/).
-        os: [macos-latest, windows-latest, ubuntu-24.04]
+        os: ${{ fromJSON(needs.plan.outputs.os) }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
