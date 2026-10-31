@@ -37,6 +37,8 @@ futures-lite = "2"
 async-io = "2"
 # MIT. PipeWire client for the portal ScreenCast stream (needs libpipewire-0.3-dev and libclang to build).
 pipewire = "0.10"
+# MIT OR Apache-2.0. Reads the WM_NAME that xcap misses (already in the tree through GPUI).
+x11rb = "0.13"
 
 [target.'cfg(windows)'.dependencies]
 # Free space of a volume (the recording disk guard); the version cm-cursor uses.

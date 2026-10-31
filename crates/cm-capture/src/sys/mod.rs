@@ -7,3 +7,4 @@ pub mod permission;
 pub mod pipewire_linux;
 pub mod portal;
 pub mod session;
+pub mod x11_names;
