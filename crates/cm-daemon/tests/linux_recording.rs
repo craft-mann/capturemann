@@ -349,6 +349,26 @@ async fn the_second_recording_reuses_the_portal_token() {
     );
 }
 
+/// The Record sheet lists the displays the screenshot code sees: an X11 session has ids such as
+/// 60, and the recorder (one display, picked in the desktop's dialog) must not answer "Display 60
+/// not found" (found in the VM on X11, Oct 31, 2026).
+#[tokio::test(flavor = "multi_thread")]
+async fn any_listed_display_id_starts_the_one_screen_the_desktop_shares() {
+    let r = rig(FakeEnv::healthy());
+    let started = user(
+        &r.daemon,
+        "start_recording",
+        json!({ "target": { "display_id": 60 }, "countdown_s": 0, "title": "X11 id" }),
+    )
+    .await
+    .unwrap();
+    assert_eq!(started["state"], "recording", "{started}");
+    tokio::time::sleep(Duration::from_millis(400)).await;
+    user(&r.daemon, "stop_recording", json!({})).await.unwrap();
+    let plan_target = format!("{:?}", r.env.plans.lock().unwrap()[0].target);
+    assert!(plan_target.contains("display_id: 1"), "{plan_target}");
+}
+
 /// The desktop ends the share mid-recording (the portal session closed, the compositor went away):
 /// the recording stops by itself with what was written, says why, and nothing hangs.
 #[tokio::test(flavor = "multi_thread")]

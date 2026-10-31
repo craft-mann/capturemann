@@ -102,6 +102,14 @@ pub trait SourceFactory: Send + Sync {
         Ok(())
     }
 
+    /// The target to plan with, for a request for `target`. The default keeps it. Linux answers
+    /// the one display the desktop's share dialog will pick whatever display id was asked for:
+    /// the Record sheet lists the displays the screenshot code sees (an X11 id such as 60), while
+    /// the recorder only knows "the screen the user shares".
+    fn adapt_target(&self, target: cm_capture::CaptureTarget) -> cm_capture::CaptureTarget {
+        target
+    }
+
     /// The displays and windows to plan against when the OS cannot list them without user
     /// interaction. `None` (the default) means ask the capturer. Linux/Wayland returns one
     /// "Desktop" display: listing it through the screenshot portal would take a screenshot (and
@@ -460,6 +468,10 @@ impl SourceFactory for SystemSources {
 
     fn check_target(&self, target: &cm_capture::CaptureTarget) -> Result<(), CmError> {
         super::sys::linux::LinuxSources::real().check_target(target)
+    }
+
+    fn adapt_target(&self, target: cm_capture::CaptureTarget) -> cm_capture::CaptureTarget {
+        super::sys::linux::LinuxSources::real().adapt_target(target)
     }
 
     fn targets(&self) -> Option<Result<Targets, CmError>> {
