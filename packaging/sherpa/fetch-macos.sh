@@ -30,8 +30,8 @@
 # Licence: sherpa-onnx is Apache-2.0 and ONNX Runtime is MIT. The release archive carries no
 # licence files (only lib/*.a), so the notes written to LICENSES/ say where the texts are; the
 # Apache-2.0 text is also in vendor/sherpa-onnx/LICENSE and ONNX Runtime's MIT text in
-# packaging/sherpa/licenses/. See packaging/sherpa/README.md for what the maintainer still has to
-# add (ONNX Runtime's ThirdPartyNotices).
+# packaging/sherpa/licenses/. ONNX Runtime's ThirdPartyNotices.txt (v1.28.2, the version inside
+# the libraries) is packaging/sherpa/licenses/ThirdPartyNotices-onnxruntime.txt.
 set -euo pipefail
 
 die() { echo "fetch-macos.sh: $*" >&2; exit 1; }
@@ -140,9 +140,9 @@ The release archive $SHERPA_ARCHIVE contains only lib/*.a and no licence files. 
       (kaldi-native-fbank and kaldi-decoder: Apache-2.0; kissfft: BSD-3-Clause; utf8proc: MIT).
   ONNX Runtime (libonnxruntime.a)
       MIT License, Copyright (c) Microsoft Corporation. https://github.com/microsoft/onnxruntime
-      (the MIT text is packaging/sherpa/licenses/onnxruntime-MIT.txt of the repository; the
-      ThirdPartyNotices.txt of the ONNX Runtime version inside sherpa-onnx v$SHERPA_VERSION is the
-      maintainer's to add, see packaging/sherpa/README.md).
+      (the MIT text is packaging/sherpa/licenses/onnxruntime-MIT.txt of the repository, and the
+      ThirdPartyNotices.txt of ONNX Runtime 1.28.2, the version inside sherpa-onnx v$SHERPA_VERSION,
+      is packaging/sherpa/licenses/ThirdPartyNotices-onnxruntime.txt; both are in THIRD_PARTY_LICENSES.md).
 
 The libraries are linked statically into cm-desktop; nothing here is shipped as a separate file.
 The speaker MODEL files (pyannote segmentation 3.0, MIT; CAM++ English, Apache-2.0) are not part of

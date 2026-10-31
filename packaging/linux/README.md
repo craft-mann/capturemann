@@ -1,7 +1,7 @@
 # Linux packaging (early build)
 
 `packaging/linux/build-linux.sh` builds `capturemann-<version>-linux-<arch>.tar.gz` (and a `.sha256`) for
-`x86_64` and `aarch64`, from `cargo build --release --no-default-features`. The workflow
+`x86_64` and `aarch64`, from `cargo build --release` (with the speaker engine when `make sherpa` has run, else `--no-default-features`). The workflow
 `.github/workflows/linux-package.yml` runs it by hand on both architectures. Status of what was run and where:
 `verification/L1-packaging-linux-2026-10-31-claude.md`.
 
@@ -37,9 +37,11 @@ capturemann-<version>-linux-<arch>/
   install.sh                          --prefix P (default ~/.local), --uninstall
   README.txt
   lib/capturemann/{cm-desktop,cm-overlay,capturemann,cm-mcp[,ffmpeg,ffprobe,FFmpeg/]}
+  lib/Resources/Models/speaker/       the two speaker models + LICENSES/ (cm-ai reads <executable dir>/../Resources/Models/speaker)
   share/applications/dev.capturemann.app.desktop
   share/icons/hicolor/{16..512}x.../apps/dev.capturemann.app.png, scalable/apps/dev.capturemann.app.svg
   share/doc/capturemann/{LICENSE,NOTICE,THIRD_PARTY_LICENSES.md,CHANGELOG.md,LIBRARIES.txt}
+  share/doc/capturemann/SHERPA-ONNX/  notes, fetch record, ONNX Runtime MIT text and ThirdPartyNotices (speaker engine builds)
 ```
 
 `install.sh` copies `lib/capturemann/` to `<prefix>/lib/capturemann/`, links `cm-desktop`, `cm-overlay`,
@@ -59,15 +61,22 @@ sudo apt install build-essential cmake pkg-config nasm curl xz-utils libva-dev \
   libasound2-dev libxkbcommon-x11-dev libxkbcommon-dev libwayland-dev libxcb1-dev libx11-xcb-dev libvulkan-dev \
   libfontconfig-dev libssl-dev libpipewire-0.3-dev libclang-dev libgtk-3-dev libayatana-appindicator3-dev \
   libxdo-dev libgbm-dev libegl-dev libdbus-1-dev libdrm-dev desktop-file-utils      # nasm: x86_64 only
+make sherpa                                           # the speaker engine: sherpa-onnx static libraries + the two models (SHA-256 pinned)
 packaging/ffmpeg/build-linux.sh                       # optional, ~10 min: LGPL FFmpeg into packaging/ffmpeg/out-linux-<arch>
+CM_REQUIRE_SHERPA=1 CM_REQUIRE_SPEAKER_MODELS=1 \
 CM_FFMPEG_BUNDLE=packaging/ffmpeg/out-linux-$(uname -m) CM_REQUIRE_FFMPEG=1 packaging/linux/build-linux.sh
 ```
 
 Output: `packaging/linux/out/` (git-ignored). Environment: `CM_SKIP_BUILD=1`, `CM_FFMPEG_BUNDLE`,
-`CM_REQUIRE_FFMPEG=1`, `CM_LINUX_OUT`, `CM_CARGO_JOBS`, `CM_SKIP_LICENSES=1`, `CM_LINUX_ALLOW_MISSING`
+`CM_REQUIRE_FFMPEG=1`, `CM_REQUIRE_SHERPA=1`, `CM_REQUIRE_SPEAKER_MODELS=1`, `CM_SPEAKER_MODELS_BUNDLE`, `CM_LINUX_OUT`, `CM_CARGO_JOBS`, `CM_SKIP_LICENSES=1`, `CM_LINUX_ALLOW_MISSING`
 (testing only). Build each architecture on its own machine (the hosted `ubuntu-24.04` and
-`ubuntu-24.04-arm` runners); there is no cross-build. The speaker engine has no Linux libraries, so the
-build uses `--no-default-features` and "Find speakers" answers that the build has no speaker engine.
+`ubuntu-24.04-arm` runners); there is no cross-build. The speaker engine (sherpa-onnx with
+ONNX Runtime, static, so no extra `.so`) is built in when `packaging/sherpa/out/lib` exists (`make sherpa`); without it
+the build uses `--no-default-features` and "Find speakers" answers that the build has no speaker engine
+(`CM_REQUIRE_SHERPA=1` turns that into an error; the workflow sets it). After the build the script checks that
+`cm-desktop` really contains the sherpa-onnx C API (or really does not), so a stale binary cannot slip in.
+Licences: the sherpa-onnx (Apache-2.0) and ONNX Runtime (MIT, plus its `ThirdPartyNotices.txt`) texts are in
+`THIRD_PARTY_LICENSES.md` and again, with the fetch record, in `share/doc/capturemann/SHERPA-ONNX/`.
 
 The script refuses to package a program that links a library on a deny list (x264, x265, fdk-aac, readline,
 gmp, libav*, ...), and prints the exact libraries and the glibc version the programs need.

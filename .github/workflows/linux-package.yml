@@ -59,6 +59,15 @@ jobs:
             libvulkan-dev libfontconfig-dev libssl-dev libpipewire-0.3-dev libclang-dev \
             libgtk-3-dev libayatana-appindicator3-dev libxdo-dev libgbm-dev libegl-dev libdbus-1-dev \
             libdrm-dev libva-dev desktop-file-utils
+      # The speaker engine: the pinned sherpa-onnx static libraries (linked into cm-desktop) and the two
+      # speaker models (shipped in the tarball). SHA-256 checked by the scripts; the cargo build downloads nothing.
+      - name: Cache the sherpa-onnx archive and the speaker models
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: packaging/sherpa/.downloads
+          key: sherpa-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packaging/sherpa/fetch-linux.sh', 'packaging/sherpa/fetch-models.sh') }}
+      - name: Fetch the sherpa-onnx libraries and speaker models (pinned, SHA-256 checked)
+        run: make sherpa
       - name: Cache the FFmpeg sources
         if: ${{ inputs.with_ffmpeg }}
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
@@ -70,6 +79,8 @@ jobs:
         run: packaging/ffmpeg/build-linux.sh
       - name: Build the tarball
         env:
+          CM_REQUIRE_SHERPA: "1"
+          CM_REQUIRE_SPEAKER_MODELS: "1"
           CM_REQUIRE_FFMPEG: ${{ inputs.with_ffmpeg && '1' || '0' }}
           CM_FFMPEG_BUNDLE: ${{ inputs.with_ffmpeg && format('{0}/packaging/ffmpeg/out-linux-{1}', github.workspace, matrix.arch) || '' }}
         run: packaging/linux/build-linux.sh
@@ -80,6 +91,8 @@ jobs:
           work=$(mktemp -d); tar -xzf ./*.tar.gz -C "$work"; cd "$work"/capturemann-*
           ./install.sh --prefix "$work/prefix"
           "$work/prefix/bin/capturemann" --version
+          test -f "$work/prefix/lib/Resources/Models/speaker/pyannote-segmentation-3-0.onnx"
+          test -f "$work/prefix/share/doc/capturemann/SHERPA-ONNX/ThirdPartyNotices-onnxruntime.txt"
           desktop-file-validate "$work/prefix/share/applications/dev.capturemann.app.desktop"
           ./install.sh --uninstall --prefix "$work/prefix"
       - name: Keep the files

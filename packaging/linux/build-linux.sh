@@ -20,11 +20,15 @@
 #                      generating the Linux one with packaging/macos/gen-third-party.sh.
 #
 # The speaker engine (sherpa-onnx, feature `sherpa`) is built in when its static libraries are there:
-# run `make sherpa` (packaging/sherpa/fetch-linux.sh) first, or point SHERPA_ONNX_LIB_DIR at a `lib`
-# folder. Without them this builds with --no-default-features and "Find speakers" answers that the
-# build has no speaker engine (CM_REQUIRE_SHERPA=1 makes that an error). CM_LLAMA_BUNDLE is not used
-# yet: the text engine (packaging/llama/build-linux.sh) is not part of this tarball.
-set -euo pipefail
+# run `make sherpa` (packaging/sherpa/fetch-linux.sh and fetch-models.sh) first, or point
+# SHERPA_ONNX_LIB_DIR at a `lib` folder. Without them this builds with --no-default-features and
+# "Find speakers" answers that the build has no speaker engine (CM_REQUIRE_SHERPA=1 makes that an
+# error). With them the tarball also carries the two speaker models (lib/Resources/Models/speaker/, where
+# cm-ai looks: <executable dir>/../Resources/Models/speaker) and the sherpa-onnx / ONNX Runtime licence
+# texts (share/doc/capturemann/SHERPA-ONNX/).
+#   CM_SPEAKER_MODELS_BUNDLE  folder with the two models and LICENSES/ (default packaging/sherpa/out/models
+#                      when it exists, made by `make sherpa`).
+#   CM_REQUIRE_SPEAKER_MODELS=1  fail unless both models and their licence files are bundled.set -euo pipefail
 die() { echo "build-linux.sh: $*" >&2; exit 1; }
 
 [ "$(uname -s)" = "Linux" ] || die "this script only runs on Linux"
@@ -55,11 +59,13 @@ fi
 sherpa_lib="${SHERPA_ONNX_LIB_DIR:-$root/packaging/sherpa/out/lib}"
 if [ -f "$sherpa_lib/libsherpa-onnx-c-api.a" ] && [ -f "$sherpa_lib/libonnxruntime.a" ]; then
   features=()
+  sherpa_on=1
   sherpa_note="with the speaker engine (sherpa-onnx from $sherpa_lib)"
 elif [ "${CM_REQUIRE_SHERPA:-0}" = "1" ]; then
   die "CM_REQUIRE_SHERPA=1 but there are no sherpa-onnx libraries in $sherpa_lib (run: make sherpa)"
 else
   features=(--no-default-features)
+  sherpa_on=0
   sherpa_note="WITHOUT the speaker engine (no sherpa-onnx libraries in $sherpa_lib; run: make sherpa)"
 fi
 if [ "${CM_SKIP_BUILD:-0}" != "1" ]; then
@@ -83,12 +89,26 @@ echo "==> checking the linked libraries"
 needed="$(for b in $bins; do objdump -p "$target/$b" | awk '/NEEDED/ {print $2}'; done | sort -u)"
 # Nothing GPL, LGPL-with-static-restrictions or nonfree may be linked in. cargo deny covers the
 # Rust crates; this covers the C libraries the dynamic linker will load.
-bad="$(grep -E -i 'x264|x265|fdk|libcdio|readline|libgmp|libgsl|libfftw|libsmbclient|libpostproc|libavcodec|libavformat|libswscale|libswresample|libavutil' <<<"$needed" || true)"
+bad="$(grep -E -i 'x264|x265|fdk|libcdio|readline|libgmp|libgsl|libfftw|libsmbclient|libpostproc|libavcodec|libavformat|libswscale|libswresample|libavutil|libsherpa|libonnxruntime' <<<"$needed" || true)"
 [ -z "$bad" ] || die "a program links a library that is not allowed in a shipped build: $bad"
 unresolved="$(for b in $bins; do ldd "$target/$b" 2>&1 | grep 'not found' || true; done | sort -u)"
 [ -z "$unresolved" ] || echo "    warning: not found on this machine:$(printf '\n      %s' "$unresolved")"
 glibc="$(for b in $bins; do objdump -T "$target/$b" | grep -o 'GLIBC_[0-9.]*' ; done | sort -V -u | tail -1)"
 echo "    needs $glibc or newer; libraries:"; sed 's/^/      /' <<<"$needed"
+# Is the speaker engine really in cm-desktop? sherpa-onnx and ONNX Runtime are static, so there is no
+# NEEDED entry to look for (the deny list above rejects one); look for the C API the engine calls and for
+# the "no speaker engine" answer of the build without it. This also catches CM_SKIP_BUILD with a stale binary.
+if [ -x "$target/cm-desktop" ]; then
+  has_api=0; has_stub=0
+  grep -a -q 'SherpaOnnxCreateOfflineSpeakerDiarization' "$target/cm-desktop" && has_api=1
+  grep -a -q 'has no speaker engine' "$target/cm-desktop" && has_stub=1
+  if [ "$sherpa_on" = 1 ] && { [ "$has_api" != 1 ] || [ "$has_stub" = 1 ]; }; then
+    die "$target/cm-desktop was built without the speaker engine but the sherpa-onnx libraries are present (rebuild: unset CM_SKIP_BUILD)"
+  elif [ "$sherpa_on" = 0 ] && [ "$has_api" = 1 ]; then
+    die "$target/cm-desktop contains the speaker engine but this run has no sherpa-onnx libraries (stale binary?)"
+  fi
+  echo "    speaker engine: $([ "$sherpa_on" = 1 ] && echo 'compiled in (sherpa-onnx C API present, static)' || echo 'not compiled in')"
+fi
 
 # ---- the FFmpeg ----
 ffdir=""
@@ -141,6 +161,46 @@ fi
 cp "$root/LICENSE" "$root/NOTICE" "$stage/share/doc/capturemann/"
 cp "$licenses" "$stage/share/doc/capturemann/THIRD_PARTY_LICENSES.md"
 cp "$root/CHANGELOG.md" "$stage/share/doc/capturemann/" 2>/dev/null || true
+speaker_note='This build has no speaker engine ("Find speakers" is off).'
+if [ "$sherpa_on" = 1 ]; then
+  # The static libraries are inside cm-desktop, so their licence texts must travel with it: the
+  # generated THIRD_PARTY_LICENSES.md (sherpa-onnx Apache-2.0, ONNX Runtime MIT and its third-party
+  # notices) plus the same texts and the fetch record as separate files.
+  grep -q 'ONNX Runtime, third-party components' "$licenses" \
+    || die "$licenses lacks the ONNX Runtime third-party notices; a build with sherpa-onnx must ship them (packaging/macos/gen-third-party.sh adds them)"
+  sherpa_dir="$stage/share/doc/capturemann/SHERPA-ONNX"; mkdir -p "$sherpa_dir"
+  sherpa_out="$(dirname "$sherpa_lib")"
+  for f in "$sherpa_out/LICENSES/NOTICE.txt" "$sherpa_out/BUILD-INFO.txt"; do
+    [ ! -f "$f" ] || cp "$f" "$sherpa_dir/"
+  done
+  [ -f "$sherpa_dir/NOTICE.txt" ] \
+    || printf '%s\n' "sherpa-onnx (Apache-2.0, https://github.com/k2-fsa/sherpa-onnx, v2.0.1) and ONNX Runtime (MIT) are linked statically into cm-desktop; see THIRD_PARTY_LICENSES.md." > "$sherpa_dir/NOTICE.txt"
+  cp "$root/packaging/sherpa/licenses/onnxruntime-MIT.txt" "$root/packaging/sherpa/licenses/ThirdPartyNotices-onnxruntime.txt" "$sherpa_dir/"
+  # The speaker models: plain data files cm-ai reads from <executable dir>/../Resources/Models/speaker.
+  spk_src="${CM_SPEAKER_MODELS_BUNDLE:-}"
+  [ -n "$spk_src" ] || { [ ! -d "$root/packaging/sherpa/out/models" ] || spk_src="$root/packaging/sherpa/out/models"; }
+  spk_files=(pyannote-segmentation-3-0.onnx campplus-sv-zh-en-16k-advanced.onnx)
+  spk_licences=(pyannote-segmentation-3.0-LICENSE.txt campplus-3D-Speaker-NOTICE.txt)
+  spk_ok=1
+  if [ -z "$spk_src" ]; then spk_ok=0; else
+    for f in "${spk_files[@]}"; do [ -f "$spk_src/$f" ] || spk_ok=0; done
+    for f in "${spk_licences[@]}"; do [ -f "$spk_src/LICENSES/$f" ] || spk_ok=0; done
+  fi
+  if [ "$spk_ok" = 1 ]; then
+    spk_dst="$stage/lib/Resources/Models/speaker"; mkdir -p "$spk_dst/LICENSES"
+    for f in "${spk_files[@]}"; do cp "$spk_src/$f" "$spk_dst/"; done
+    cp "$spk_src"/LICENSES/* "$spk_dst/LICENSES/"
+    [ ! -f "$spk_src/BUILD-INFO.txt" ] || cp "$spk_src/BUILD-INFO.txt" "$spk_dst/"
+    speaker_note='Speaker engine ("Find speakers"): built in, with its two models in lib/Resources/Models/speaker/.'
+  elif [ "${CM_REQUIRE_SPEAKER_MODELS:-0}" = "1" ]; then
+    die "CM_REQUIRE_SPEAKER_MODELS=1 but the two speaker models and their licence files are not in ${spk_src:-packaging/sherpa/out/models} (run: make sherpa)"
+  else
+    echo "    warning: no speaker models bundled; \"Find speakers\" will ask the user to import them" >&2
+    speaker_note='Speaker engine: built in; its two models are not in this tarball (import them on the AI page).'
+  fi
+elif [ "${CM_REQUIRE_SPEAKER_MODELS:-0}" = "1" ]; then
+  die "CM_REQUIRE_SPEAKER_MODELS=1 but this build has no speaker engine"
+fi
 {
   echo "Runtime libraries (DT_NEEDED) of the programs in this build, $arch, needs $glibc or newer:"
   sed 's/^/  /' <<<"$needed"
@@ -170,7 +230,7 @@ Check libraries:        ./check-runtime.sh          (names the apt package for e
 
 Needs a desktop session and the libraries listed in share/doc/capturemann/LIBRARIES.txt;
 see https://github.com/craft-mann/capturemann (packaging/linux/README.md) for the apt packages.
-Licences: share/doc/capturemann/. This build has no speaker engine ("Find speakers" is off).
+Licences: share/doc/capturemann/. $speaker_note
 EOF
 
 mkdir -p "$out"

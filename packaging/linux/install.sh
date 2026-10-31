@@ -41,7 +41,8 @@ if [ "$uninstall" = 1 ]; then
   for l in cm-desktop cm-overlay capturemann cm-mcp; do
     if [ -L "$bin/$l" ] && [ "$(readlink "$bin/$l")" = "$lib/$l" ]; then rm -f "$bin/$l"; fi
   done
-  rm -rf "$lib" "$share/doc/capturemann" "$share/applications/$app_id.desktop"
+  rm -rf "$lib" "$prefix/lib/Resources/Models/speaker" "$share/doc/capturemann" "$share/applications/$app_id.desktop"
+  rmdir "$prefix/lib/Resources/Models" "$prefix/lib/Resources" 2>/dev/null || true
   if [ -d "$share/icons/hicolor" ]; then
     find "$share/icons/hicolor" -name "$app_id.*" -exec rm -f {} + 2>/dev/null || true
   fi
@@ -57,7 +58,13 @@ for f in "$here"/lib/capturemann/*; do
   [ -f "$f" ] || continue
   cp "$f" "$lib/.new.$$" && chmod 755 "$lib/.new.$$" && mv -f "$lib/.new.$$" "$lib/$(basename "$f")"
 done
-if [ -d "$here/lib/capturemann/FFmpeg" ]; then rm -rf "$lib/FFmpeg"; cp -R "$here/lib/capturemann/FFmpeg" "$lib/FFmpeg"; fi
+# Licence folders (FFmpeg/, Llama/) next to the programs, and the data cm-ai reads from <lib>/../Resources
+# (the speaker models) when the tarball has them.
+for d in "$here"/lib/capturemann/*/; do
+  [ -d "$d" ] || continue
+  rm -rf "$lib/$(basename "$d")"; cp -R "$d" "$lib/$(basename "$d")"
+done
+if [ -d "$here/lib/Resources" ]; then rm -rf "$prefix/lib/Resources"; cp -R "$here/lib/Resources" "$prefix/lib/Resources"; fi
 for l in cm-desktop cm-overlay capturemann cm-mcp; do [ ! -x "$lib/$l" ] || ln -sf "$lib/$l" "$bin/$l"; done
 cp -R "$here"/share/doc/capturemann/. "$share/doc/capturemann/"
 (cd "$here/share/icons" && find hicolor -type f) | while read -r f; do

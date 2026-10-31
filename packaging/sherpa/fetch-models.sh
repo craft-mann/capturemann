@@ -6,11 +6,12 @@
 #
 # Output: packaging/sherpa/out/models/{pyannote-segmentation-3-0.onnx,
 #         campplus-sv-zh-en-16k-advanced.onnx,BUILD-INFO.txt,LICENSES/}
-#         (git-ignored; packaging/macos/bundle.sh copies them to Contents/Resources/Models/speaker/).
+#         (git-ignored; packaging/macos/bundle.sh copies them to Contents/Resources/Models/speaker/,
+#         packaging/linux/build-linux.sh to lib/Resources/Models/speaker/ of the tarball).
 #
 # Environment: CM_SHERPA_SRC_DIR (download cache, default packaging/sherpa/.downloads; put the two
 # files there to work offline), CM_SHERPA_OUT (default packaging/sherpa/out).
-# Needs: curl, shasum, tar (the system tar unpacks the .tar.bz2 here at BUILD time; nothing in the
+# Needs: curl, tar, and shasum (macOS) or sha256sum (Linux) (the system tar unpacks the .tar.bz2 here at BUILD time; nothing in the
 # app unpacks archives). A download is checked against the pinned SHA-256 and size; a mismatch
 # stops the script and deletes the file.
 set -euo pipefail
@@ -33,16 +34,22 @@ EMB_FILE="campplus-sv-zh-en-16k-advanced.onnx"
 EMB_SHA256="aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2"
 EMB_BYTES="28281164"
 
-[ "$(uname -s)" = "Darwin" ] || die "this script only runs on macOS"
-for tool in curl shasum tar; do
+# macOS and Linux (the speaker models are the same files on both).
+for tool in curl tar; do
   command -v "$tool" >/dev/null 2>&1 || die "required tool not found: $tool"
 done
+if command -v sha256sum >/dev/null 2>&1; then
+  sha_of() { sha256sum "$1" | awk '{print $1}'; }
+elif command -v shasum >/dev/null 2>&1; then
+  sha_of() { shasum -a 256 "$1" | awk '{print $1}'; }
+else
+  die "required tool not found: sha256sum or shasum"
+fi
+size_of() { wc -c <"$1" | tr -d ' '; }
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 src_cache="${CM_SHERPA_SRC_DIR:-$root/packaging/sherpa/.downloads}"
 out="${CM_SHERPA_OUT:-$root/packaging/sherpa/out}"
-sha_of() { shasum -a 256 "$1" | awk '{print $1}'; }
-size_of() { stat -f %z "$1"; }
 
 # fetch <file in cache> <url> <sha256> <bytes>
 fetch() {
