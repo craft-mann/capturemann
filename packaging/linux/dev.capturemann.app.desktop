@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=CaptureMann
+GenericName=Screen Recorder
+Comment=Screenshots and screen recording, for people and for AI agents
+Exec=@BINDIR@/cm-desktop
+TryExec=@BINDIR@/cm-desktop
+Icon=dev.capturemann.app
+Terminal=false
+Categories=AudioVideo;Video;Recorder;
+Keywords=screenshot;screen recording;screencast;capture;webcam;
+StartupNotify=false
+StartupWMClass=app.capturemann.desktop

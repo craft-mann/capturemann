@@ -188,6 +188,26 @@ For the DMG itself: `spctl --assess --type open --context context:primary-signat
 An ad hoc build is rejected by `spctl`; that is expected, see the release notes for the first launch.
 The checksum only proves the download matches what was uploaded; it does not replace the signature.
 
+## Linux early build (tarball)
+
+Linux is not part of the `Release` workflow. The first Linux build is an "early build" like the first
+Intel one: a `tar.gz` per CPU, attached by hand to a pre-release. Format decision and contents:
+`packaging/linux/README.md`.
+
+1. Run **Actions > Linux package** (`linux-package.yml`, manual) on the commit to ship. It builds on `ubuntu-24.04`
+   (x86_64) and `ubuntu-24.04-arm` (aarch64), builds the LGPL FFmpeg with `packaging/ffmpeg/build-linux.sh`
+   (`with_ffmpeg`, on by default; the job passes `CM_REQUIRE_FFMPEG=1`, so it fails without the licence files),
+   packs `capturemann-<version>-linux-<arch>.tar.gz` and its `.sha256`, and installs and removes it once. It
+   creates no tag and no release; the files are workflow artifacts for 14 days.
+2. Download both artifacts, check `sha256sum -c`, and try one on a real desktop (X11 and Wayland) before
+   publishing. Record the run in `verification/`; until a report exists the notes say "tested with fakes" or
+   "built on CI", never "verified".
+3. Create the draft pre-release by hand (`gh release create vX.Y.Z --draft --prerelease ...` with the four files) and
+   say in the notes: early build, no speaker engine, MP4 export needs a VAAPI GPU or your own FFmpeg, glibc 2.39
+   or newer, the apt packages from `packaging/linux/README.md`, not signed (only the SHA-256 file).
+4. Not done for Linux: signing of the tarball, a `.deb`, Flatpak, an AppImage, a package repository,
+   a sherpa-onnx build (speaker labels), and a Linux item in the website and Homebrew steps.
+
 ## Rollback and yank
 
 - **Draft not published yet:** delete the draft and the tag, fix, tag again.

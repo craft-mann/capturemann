@@ -1,0 +1,93 @@
+name: Linux package
+
+# Run by hand (Actions > Linux package > Run workflow) to build the early-build tarball
+# capturemann-<version>-linux-<arch>.tar.gz (+ .sha256) on x86_64 (ubuntu-24.04) and aarch64
+# (ubuntu-24.04-arm), with an LGPL FFmpeg built from source. The files are kept as WORKFLOW ARTIFACTS
+# only: this workflow creates no tag and no GitHub release (a release is a maintainer step, see
+# docs/development/releasing.md, "Linux early build"). It does not run on pull requests: a full
+# release build takes too long for that; the packaging scripts are tried in the VM and by hand.
+#
+# Pinned actions: the same commits as ci.yml and release.yml.
+on:
+  workflow_dispatch:
+    inputs:
+      with_ffmpeg:
+        description: "Build and bundle the LGPL FFmpeg (packaging/ffmpeg/build-linux.sh; adds about 10 minutes)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-package-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  package:
+    name: Tarball (${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: x86_64
+          - os: ubuntu-24.04-arm
+            arch: aarch64
+    steps:
+      - name: Check the runner
+        run: |
+          if [ "$(uname -m)" != "${{ matrix.arch }}" ]; then echo "::error::runner is $(uname -m), expected ${{ matrix.arch }}"; exit 1; fi
+          . /etc/os-release; echo "$PRETTY_NAME"; ldd --version | head -1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable (branch tip)
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+      # Build dependencies: the list ci.yml uses, plus what FFmpeg's configure needs (nasm on x86_64, libva
+      # for VAAPI). No ffmpeg package: the tests are not run here, and the shipped FFmpeg is built below.
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential cmake pkg-config nasm curl xz-utils \
+            libasound2-dev libxkbcommon-x11-dev libxkbcommon-dev libwayland-dev libxcb1-dev libx11-xcb-dev \
+            libvulkan-dev libfontconfig-dev libssl-dev libpipewire-0.3-dev libclang-dev \
+            libgtk-3-dev libayatana-appindicator3-dev libxdo-dev libgbm-dev libegl-dev libdbus-1-dev \
+            libdrm-dev libva-dev desktop-file-utils
+      - name: Cache the FFmpeg sources
+        if: ${{ inputs.with_ffmpeg }}
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: packaging/ffmpeg/.downloads
+          key: ffmpeg-src-${{ hashFiles('packaging/ffmpeg/build-linux.sh') }}
+      - name: Build the LGPL FFmpeg
+        if: ${{ inputs.with_ffmpeg }}
+        run: packaging/ffmpeg/build-linux.sh
+      - name: Build the tarball
+        env:
+          CM_REQUIRE_FFMPEG: ${{ inputs.with_ffmpeg && '1' || '0' }}
+          CM_FFMPEG_BUNDLE: ${{ inputs.with_ffmpeg && format('{0}/packaging/ffmpeg/out-linux-{1}', github.workspace, matrix.arch) || '' }}
+        run: packaging/linux/build-linux.sh
+      - name: Check the tarball (checksum, install, uninstall, desktop entry)
+        run: |
+          cd packaging/linux/out
+          sha256sum -c ./*.sha256
+          work=$(mktemp -d); tar -xzf ./*.tar.gz -C "$work"; cd "$work"/capturemann-*
+          ./install.sh --prefix "$work/prefix"
+          "$work/prefix/bin/capturemann" --version
+          desktop-file-validate "$work/prefix/share/applications/dev.capturemann.app.desktop"
+          ./install.sh --uninstall --prefix "$work/prefix"
+      - name: Keep the files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: capturemann-linux-${{ matrix.arch }}
+          path: |
+            packaging/linux/out/*.tar.gz
+            packaging/linux/out/*.sha256
+          if-no-files-found: error
+          retention-days: 14
