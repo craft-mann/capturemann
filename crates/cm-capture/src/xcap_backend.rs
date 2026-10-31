@@ -407,11 +407,14 @@ impl CaptureBackend for XcapBackend {
         self.check_permission()?;
         // A window can vanish between enumeration and inspection; skip those. On Windows xcap
         // already skips invisible, cloaked and tool windows (`WS_EX_TOOLWINDOW`).
-        Ok(Window::all()
+        let mut windows: Vec<WindowInfo> = Window::all()
             .map_err(map_err)?
             .iter()
             .filter_map(|w| window_info(w).ok())
-            .collect())
+            .collect();
+        // xcap leaves the title of a classic X11 client (WM_NAME as STRING) empty.
+        crate::sys::x11_names::fill_missing_titles(&mut windows);
+        Ok(windows)
     }
 
     fn capture_display(&self, display_id: u32) -> Result<Frame, CmError> {

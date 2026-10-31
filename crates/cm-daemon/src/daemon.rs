@@ -1174,6 +1174,7 @@ impl Daemon {
             Action::ListDisplays => inner.list_targets(false).await,
             Action::CaptureScreenshot(p) => inner.capture_screenshot(actor, p).await,
             Action::CaptureFromFrame(p) => inner.capture_from_frame(actor, p).await,
+            Action::CapturePick(p) => inner.capture_pick(actor, p).await,
             Action::FreezeDisplay(p) => inner.freeze_display(actor, p).await,
             Action::ReleaseFrame(p) => inner.release_frame(&p),
             Action::WindowThumbnail(p) => inner.window_thumbnail(p).await,

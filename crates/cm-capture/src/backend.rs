@@ -1,4 +1,4 @@
-use crate::{DisplayInfo, Frame, WindowInfo};
+use crate::{Capabilities, DisplayInfo, Frame, WindowInfo};
 use cm_core::{CmError, PhysicalSize};
 
 /// The OS layer. Implementations must be cheap to call repeatedly.
@@ -14,6 +14,22 @@ pub trait CaptureBackend: Send + Sync {
     fn windows(&self) -> Result<Vec<WindowInfo>, CmError>;
     fn capture_display(&self, display_id: u32) -> Result<Frame, CmError>;
     fn capture_window(&self, window_id: u32) -> Result<Frame, CmError>;
+
+    /// What this desktop can do (see [`Capabilities`]). The default is the full set of an
+    /// id-based desktop without a system picker.
+    fn capabilities(&self) -> Capabilities {
+        Capabilities::default()
+    }
+
+    /// Shows the desktop's own picker and returns the pixels the person chose (a window, a
+    /// region or a screen). Blocks until they choose or give up: `user_declined` when they
+    /// cancel, `confirmation_timeout` when nobody answers. `not_implemented` without a system
+    /// picker (see [`Capabilities::pick`]).
+    fn pick_interactive(&self) -> Result<Frame, CmError> {
+        Err(CmError::not_implemented(
+            "this desktop has no system picker for screenshots",
+        ))
+    }
 
     /// A display frame (same contract as `capture_display`) with the windows of process
     /// `exclude_pid` left out (R4-6: CaptureMann's own toast, dialogs and Studio must not be in

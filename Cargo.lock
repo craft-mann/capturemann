@@ -1350,6 +1350,7 @@ name = "cm-capture"
 version = "0.2.5"
 dependencies = [
  "ashpd",
+ "async-io",
  "block2 0.6.2",
  "cm-audio",
  "cm-core",
@@ -1372,6 +1373,7 @@ dependencies = [
  "tempfile",
  "time",
  "windows 0.61.3",
+ "x11rb",
  "xcap",
 ]
 

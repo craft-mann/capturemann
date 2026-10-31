@@ -5,7 +5,9 @@ impl Action {
     pub fn method(&self) -> &'static str {
         match self {
             Action::ListTargets | Action::ListDisplays => "list_targets",
-            Action::CaptureScreenshot(_) | Action::CaptureFromFrame(_) => "capture_screenshot",
+            Action::CaptureScreenshot(_) | Action::CaptureFromFrame(_) | Action::CapturePick(_) => {
+                "capture_screenshot"
+            }
             Action::FreezeDisplay(_) => "freeze_display",
             Action::ReleaseFrame(_) => "release_frame",
             Action::WindowThumbnail(_) => "window_thumbnail",
@@ -65,6 +67,7 @@ impl Action {
         match self {
             Action::CaptureScreenshot(p) => p.request_id.as_deref(),
             Action::CaptureFromFrame(p) => p.request_id.as_deref(),
+            Action::CapturePick(p) => p.request_id.as_deref(),
             Action::Annotate(p) => p.request_id.as_deref(),
             Action::SetSettings(p) => p.request_id.as_deref(),
             Action::Undo(p) | Action::Redo(p) => p.request_id.as_deref(),

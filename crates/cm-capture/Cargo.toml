@@ -33,8 +33,12 @@ xcap = "0.9"
 ashpd = { version = "0.13", default-features = false, features = ["async-io", "screenshot", "screencast"] }
 # MIT OR Apache-2.0. `block_on` for the portal calls.
 futures-lite = "2"
+# Apache-2.0 OR MIT. The timer that ends a picker nobody answers (already in the tree through zbus).
+async-io = "2"
 # MIT. PipeWire client for the portal ScreenCast stream (needs libpipewire-0.3-dev and libclang to build).
 pipewire = "0.10"
+# MIT OR Apache-2.0. Reads the WM_NAME that xcap misses (already in the tree through GPUI).
+x11rb = "0.13"
 
 [target.'cfg(windows)'.dependencies]
 # Free space of a volume (the recording disk guard); the version cm-cursor uses.

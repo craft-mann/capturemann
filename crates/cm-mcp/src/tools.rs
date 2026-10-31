@@ -409,6 +409,15 @@ pub fn all() -> Vec<ToolSpec> {
         },
         "required": ["displays", "windows"]
     });
+    let displays_windows = {
+        let mut v = displays_windows;
+        v["properties"]["capabilities"] = json!({ "type": "object",
+            "description": "What this desktop can do. On a Wayland session `list_windows` and `capture_window` are false (windows have no ids) and `pick` is true: capture_screenshot with target {pick: true} shows the desktop's own picker.",
+            "properties": {
+                "list_windows": { "type": "boolean" }, "capture_window": { "type": "boolean" },
+                "capture_region": { "type": "boolean" }, "pick": { "type": "boolean" } } });
+        v
+    };
     let settings_out = json!({
         "type": "object",
         "properties": { "settings": { "type": "object", "description": "Effective settings by dotted key." } },
@@ -461,7 +470,7 @@ pub fn all() -> Vec<ToolSpec> {
             mutating: true,
             destructive: false,
             spec: "CAP-1, CAP-4, CAP-5",
-            summary: "Take a screenshot of a display, a window, or a region of a display and store it in the library. Returns the capture id, file path and the image. A region `rect` is [x, y, w, h] in physical px relative to the display. No overlay is shown.",
+            summary: "Take a screenshot of a display, a window, or a region of a display and store it in the library. Returns the capture id, file path and the image. A region `rect` is [x, y, w, h] in physical px relative to the display. No overlay is shown. On a desktop whose `list_targets` says `capabilities.pick` (a Wayland session: windows have no ids), `target: {pick: true}` shows the desktop's own window/region/screen picker and stores what the person chooses; it waits for a person at the screen (`user_declined` on Esc, `confirmation_timeout` after two minutes, `not_implemented` elsewhere) and takes no `delay_s`.",
             input: json!({ "type": "object", "properties": {
                 "target": { "oneOf": [
                     { "type": "object", "properties": { "display_id": { "type": "integer", "minimum": 0 } },
@@ -471,7 +480,9 @@ pub fn all() -> Vec<ToolSpec> {
                     { "type": "object", "properties": { "display_id": { "type": "integer", "minimum": 0 },
                         "rect": { "type": "array", "items": { "type": "integer" }, "minItems": 4, "maxItems": 4,
                                   "description": "[x, y, w, h] physical px relative to the display" } },
-                      "required": ["display_id", "rect"], "additionalProperties": false } ] },
+                      "required": ["display_id", "rect"], "additionalProperties": false },
+                    { "type": "object", "properties": { "pick": { "const": true } },
+                      "required": ["pick"], "additionalProperties": false } ] },
                 "delay_s": { "type": "number", "minimum": 0, "maximum": 30, "description": "Seconds to wait first." },
                 "copy_to_clipboard": { "type": "boolean", "default": false },
                 "title": { "type": "string", "description": "Library title; defaults to `Screenshot <date> <time>`." },
