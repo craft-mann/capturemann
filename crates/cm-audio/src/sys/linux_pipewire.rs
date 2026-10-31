@@ -22,6 +22,34 @@ pub fn chunk_start_ns(now_ns: u64, frames: usize, rate: u32) -> u64 {
     now_ns.saturating_sub(dur)
 }
 
+/// Capture time of the first frame of a buffer from PipeWire's own timing for the cycle
+/// (`pw_time`): `now` is the graph cycle's start on the monotonic clock, `delay` (in `num/denom`
+/// second ticks) is how long ago the device captured the cycle's first sample (0 for the monitor
+/// of a sink, whose data is the mix of this very cycle). `None` when the report is unusable.
+///
+/// Unlike "callback time minus buffer length" this does not move when the graph changes its
+/// quantum (another program starts playing and the cycle grows from 1024 to 2048 frames: that
+/// made the old stamp jump back by one quantum, and the pipeline trimmed 21 ms of good audio as
+/// an overlap) and it has none of the callback's scheduling jitter.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+pub fn graph_start_ns(
+    now_ns: i64,
+    delay_ticks: i64,
+    rate_num: u32,
+    rate_denom: u32,
+) -> Option<u64> {
+    if now_ns <= 0 || rate_num == 0 || rate_denom == 0 {
+        return None;
+    }
+    let delay_ns =
+        i128::from(delay_ticks) * i128::from(rate_num) * 1_000_000_000 / i128::from(rate_denom);
+    // A delay beyond a second is not a device latency but a bogus report.
+    if delay_ns.abs() > 1_000_000_000 {
+        return None;
+    }
+    u64::try_from((i128::from(now_ns) - delay_ns).max(0)).ok()
+}
+
 /// Little-endian f32 bytes to samples (PipeWire hands over the mapped buffer as bytes).
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub fn decode_f32le(bytes: &[u8], out: &mut Vec<f32>) {
@@ -104,7 +132,7 @@ mod imp {
     use pipewire as pw;
     use pw::spa;
 
-    use super::{chunk_start_ns, decode_f32le, STREAM_RATE};
+    use super::{chunk_start_ns, decode_f32le, graph_start_ns, STREAM_RATE};
     use crate::source::{AudioSource, DeviceSelector, SourceFormat, SourceSink};
 
     pub fn available() -> bool {
@@ -231,7 +259,17 @@ mod imp {
                 decode_f32le(&bytes[..size.min(bytes.len())], &mut scratch);
                 let frames = scratch.len() / usize::from(channels.max(1));
                 if frames > 0 {
-                    sink.push(chunk_start_ns(now, frames, STREAM_RATE), &scratch);
+                    // The graph's own cycle time first (see `graph_start_ns`); the callback's wall
+                    // time, which jitters by several ms, only when PipeWire gives none.
+                    let start = stream
+                        .time()
+                        .ok()
+                        .and_then(|t| {
+                            let r = t.rate();
+                            graph_start_ns(t.now(), t.delay(), r.num, r.denom)
+                        })
+                        .unwrap_or_else(|| chunk_start_ns(now, frames, STREAM_RATE));
+                    sink.push(start, &scratch);
                 }
             })
             .register();
@@ -350,6 +388,34 @@ mod tests {
         assert_eq!(chunk_start_ns(1_000_000_000, 480, 48_000), 990_000_000);
         assert_eq!(chunk_start_ns(5, 480, 48_000), 0);
         assert_eq!(chunk_start_ns(10, 0, 0), 10);
+    }
+
+    #[test]
+    fn graph_time_does_not_depend_on_the_buffer_length() {
+        // The same cycle start gives the same stamp for a 1024 and a 2048 frame buffer.
+        let a = graph_start_ns(25_000_000_000, 0, 1, 48_000);
+        assert_eq!(a, Some(25_000_000_000));
+        // A device that captured the first sample 1024 ticks ago.
+        assert_eq!(
+            graph_start_ns(25_000_000_000, 1024, 1, 48_000),
+            Some(25_000_000_000 - 21_333_333)
+        );
+        // A negative delay (data ahead of the cycle) moves the stamp later.
+        assert_eq!(
+            graph_start_ns(25_000_000_000, -480, 1, 48_000),
+            Some(25_010_000_000)
+        );
+    }
+
+    #[test]
+    fn an_unusable_graph_report_is_ignored() {
+        assert_eq!(graph_start_ns(0, 0, 1, 48_000), None);
+        assert_eq!(graph_start_ns(-5, 0, 1, 48_000), None);
+        assert_eq!(graph_start_ns(1_000, 0, 0, 0), None);
+        assert_eq!(graph_start_ns(1_000, 0, 1, 0), None);
+        assert_eq!(graph_start_ns(5_000_000_000, 96_000, 1, 48_000), None);
+        // Early in the clock the stamp cannot go below zero.
+        assert_eq!(graph_start_ns(1_000, 480, 1, 48_000), Some(0));
     }
 
     #[test]
