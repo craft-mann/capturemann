@@ -133,6 +133,19 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           xvfb-run -a -s "-screen 0 1920x1080x24" sh -c 'openbox & sleep 2; XDG_SESSION_TYPE=x11 cargo test -p cm-capture --test real_display --locked --no-default-features -- --ignored --test-threads=1'
+      # CAP-1 on Windows: the real-display tests against the runner's interactive desktop session (a virtual
+      # display, no GPU). Display list, physical sizes, region crop, and a started Notepad window; content is
+      # only reported. No permission prompt exists on Windows.
+      - name: Real display tests (Windows)
+        if: runner.os == 'Windows'
+        run: cargo test -p cm-capture --test real_display --locked --no-default-features -- --ignored --test-threads=1 --nocapture
+      # Product binaries on Windows: cm-daemon on a named pipe, then the CLI (targets, screenshot, diagnostics).
+      - name: Smoke test of the product binaries (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cargo build --locked --no-default-features -p cm-daemon -p cm-cli
+          pwsh -File scripts/ci/windows-smoke.ps1
 
   # `rust-version` in Cargo.toml is a promise; this job keeps it. 1.95 is the oldest compiler the
   # GPUI dependency builds with (it uses `std::hint::cold_path`); 1.93 and older fail. `cargo +1.95`
