@@ -7,7 +7,7 @@
     capturemann-<version>-windows-x64.zip
     capturemann-<version>-windows-x64-setup.exe      (unless -NoInstaller)
     <each file>.sha256
-  The tree holds cm-desktop.exe, cm-overlay.exe, capturemann.exe, cm-mcp.exe, app.ico, the licence
+  The tree holds cm-desktop.exe, cm-overlay.exe, capturemann.exe, cm-mcp.exe, cm-daemon.exe, app.ico, the licence
   files and, when given, an LGPL FFmpeg (ffmpeg.exe and ffprobe.exe NEXT TO the programs: cm-media
   looks beside the running executable first).
 
@@ -91,19 +91,21 @@ if ($env:CM_SKIP_BUILD -ne '1') {
   try {
     Write-Host '==> cargo build --release --no-default-features (capturemann, cm-mcp)'
     Invoke-Native cargo (@('build', '--release', '--locked', '--no-default-features') + $jobs + @('-p', 'cm-cli', '-p', 'cm-mcp'))
-    # The two window programs get the GUI subsystem, so Explorer or the Start Menu opens no console
+    # The window programs and the daemon get the GUI subsystem, so Explorer or the Start Menu opens no console
     # window with them. The crates have no `windows_subsystem` attribute (they are shared with the
     # other systems), so the linker is told here. `cargo rustc` passes the flags to the last crate only.
     $sub = @()
     if ($env:CM_WINDOWS_CONSOLE -ne '1') { $sub = @('-C', 'link-arg=/SUBSYSTEM:WINDOWS', '-C', 'link-arg=/ENTRY:mainCRTStartup') }
-    foreach ($p in @(@('cm-desktop', 'cm-desktop'), @('cm-overlay', 'cm-overlay'))) {
+    # cm-daemon is started by the CLI and by cm-mcp when the app is not running; as a GUI-subsystem program it
+    # opens no console window of its own.
+    foreach ($p in @(@('cm-desktop', 'cm-desktop'), @('cm-overlay', 'cm-overlay'), @('cm-daemon', 'cm-daemon'))) {
       Write-Host "==> cargo rustc --release -p $($p[0])"
       Invoke-Native cargo (@('rustc', '--release', '--locked', '--no-default-features') + $jobs + @('-p', $p[0], '--bin', $p[1], '--') + $sub)
     }
   } finally { Pop-Location }
 }
 $release = Join-Path $targetDir 'release'
-$allBins = 'cm-desktop', 'cm-overlay', 'capturemann', 'cm-mcp'
+$allBins = 'cm-desktop', 'cm-overlay', 'capturemann', 'cm-mcp', 'cm-daemon'
 $allowMissing = @(); if ($env:CM_WINDOWS_ALLOW_MISSING) { $allowMissing = $env:CM_WINDOWS_ALLOW_MISSING -split ',' }
 $bins = @()
 foreach ($b in $allBins) {
@@ -227,6 +229,7 @@ CaptureMann $fullVersion for Windows (x64), early build.
 Portable:  unzip anywhere and run cm-desktop.exe. Nothing is written outside this folder and your
            settings and library (%APPDATA%\CaptureMann and your Videos folder).
 Command line:  capturemann.exe --help      MCP server for agents:  cm-mcp.exe
+               (both start cm-daemon.exe, next to them, when the app is not running)
 Add this folder to your PATH:  powershell -ExecutionPolicy Bypass -File path.ps1 -Action add -Dir "<this folder>"
 
 Not available yet on Windows: screen, camera and audio RECORDING (screenshots, annotation, the library, local AI,
