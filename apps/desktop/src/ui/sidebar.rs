@@ -287,6 +287,13 @@ fn dock(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> AnyElement {
         .gap(px(6.))
         .child(record_btn)
         .child(record_audio_button(t, p, app, 42.));
+    // Without a recorder (Linux and Windows early builds) the buttons stay, so the shortcut and the "not
+    // available yet" answer are still there, but they read as unavailable.
+    let record_row = if crate::backend::recording_supported() {
+        record_row
+    } else {
+        record_row.opacity(0.45)
+    };
 
     let tiles = entries.iter().skip(1).map(|e| {
         let action = e.action;
@@ -433,6 +440,11 @@ fn rail_body(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> Vec<AnyElem
                     ))
                     .on_click(move |_, _, cx| open_capture(&app, DockAction::Record, cx))
                     .child(icon(e.action.icon(), 18., t.on_rec))
+                    .opacity(if crate::backend::recording_supported() {
+                        1.0
+                    } else {
+                        0.45
+                    })
                     .into_any_element()
             }
             RailEntry::Region => {
@@ -449,9 +461,13 @@ fn rail_body(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> Vec<AnyElem
                 .on_click(move |_, _, cx| open_capture(&app, DockAction::Region, cx))
                 .into_any_element()
             }
-            RailEntry::RecordAudio => {
-                record_audio_button(t, p, app, scale::TARGET).into_any_element()
-            }
+            RailEntry::RecordAudio => record_audio_button(t, p, app, scale::TARGET)
+                .opacity(if crate::backend::recording_supported() {
+                    1.0
+                } else {
+                    0.45
+                })
+                .into_any_element(),
             RailEntry::Divider => div()
                 .w(px(32.))
                 .h(px(1.))
@@ -565,10 +581,12 @@ fn settings_body(
         .child(tr_ctx!("navigation", "Settings"));
     let rows = SettingsSection::visible().into_iter().map(|s| {
         let (app, settings) = (app.clone(), settings.clone());
-        nav_row(t, s.id(), s.icon(), s.label(), None, s == p.section).on_click(move |_, _, cx| {
-            settings.update(cx, |v, cx| v.select(s, cx));
-            app::set_route(&app, s.route(), cx);
-        })
+        nav_row(t, s.id(), s.icon(), s.nav_label(), None, s == p.section).on_click(
+            move |_, _, cx| {
+                settings.update(cx, |v, cx| v.select(s, cx));
+                app::set_route(&app, s.route(), cx);
+            },
+        )
     });
     let mut out = vec![
         back.into_any_element(),

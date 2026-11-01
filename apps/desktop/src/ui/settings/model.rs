@@ -71,17 +71,31 @@ impl SettingsSection {
         }
     }
 
+    /// The label the sidebar shows: without a recorder (Linux and Windows early builds) the Capture page
+    /// only holds the screenshot delay, so it is not called "recording".
+    pub fn nav_label(self) -> String {
+        match self {
+            Self::Capture if !crate::backend::recording_supported() => {
+                tr_ctx!("settings page", "Capture")
+            }
+            s => s.label(),
+        }
+    }
+
     /// Page title (the nav label without the licence suffix).
     pub fn title(self) -> String {
         match self {
             Self::About => tr_ctx!("settings page", "About"),
-            s => s.label(),
+            s => s.nav_label(),
         }
     }
 
     pub fn subtitle(self) -> String {
         match self {
             Self::General => tr!("Appearance, after-capture behavior and your library folder."),
+            Self::Capture if !crate::backend::recording_supported() => {
+                tr!("What happens before a screenshot is taken.")
+            }
             Self::Capture => tr!("Recording quality, frame rate and what gets captured."),
             Self::Webcam => tr!("Check your camera and microphone, then set how the bubble looks."),
             Self::Destinations => {

@@ -5009,6 +5009,9 @@ msgstr ""
 msgid "Translation ready: {language}"
 msgstr ""
 
+msgid "Tray icon unavailable"
+msgstr ""
+
 msgid "Trim a recording"
 msgstr ""
 
@@ -5239,6 +5242,9 @@ msgid "What Export audio will produce"
 msgstr ""
 
 msgid "What are you recording?"
+msgstr ""
+
+msgid "What happens before a screenshot is taken."
 msgstr ""
 
 msgid "What is this video about?"
@@ -8235,6 +8241,10 @@ msgstr ""
 
 msgctxt "settings page"
 msgid "Agents & CLI"
+msgstr ""
+
+msgctxt "settings page"
+msgid "Capture"
 msgstr ""
 
 msgctxt "settings page"
