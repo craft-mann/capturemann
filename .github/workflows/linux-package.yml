@@ -9,10 +9,6 @@ name: Linux package
 #
 # Pinned actions: the same commits as ci.yml and release.yml.
 on:
-  # TEMPORARY: runs this workflow once from the branch (a dispatch needs the file on the default branch). Removed next commit.
-  push:
-    branches: [windows-step0]
-    paths: [.github/workflows/linux-package.yml]
   workflow_dispatch:
     inputs:
       with_ffmpeg:
@@ -77,16 +73,16 @@ jobs:
       - name: Fetch the sherpa-onnx libraries and speaker models (pinned, SHA-256 checked)
         run: make sherpa
       - name: Cache the FFmpeg sources
-        if: ${{ (github.event_name == 'push' || inputs.with_ffmpeg) }}
+        if: ${{ inputs.with_ffmpeg }}
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: packaging/ffmpeg/.downloads
           key: ffmpeg-src-${{ hashFiles('packaging/ffmpeg/build-linux.sh') }}
       - name: Build the LGPL FFmpeg
-        if: ${{ (github.event_name == 'push' || inputs.with_ffmpeg) }}
+        if: ${{ inputs.with_ffmpeg }}
         run: packaging/ffmpeg/build-linux.sh
       - name: Cache the llama.cpp source
-        if: ${{ (github.event_name == 'push' || inputs.with_llama) }}
+        if: ${{ inputs.with_llama }}
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: packaging/llama/.downloads
@@ -94,16 +90,16 @@ jobs:
       # MIT, static, CPU only; the pinned tag and SHA-256 are read from build-macos.sh. A helper program
       # next to the app, never linked into it. The tarball step refuses it if it needs more than libc/libm.
       - name: Build llama-server (text engine)
-        if: ${{ (github.event_name == 'push' || inputs.with_llama) }}
+        if: ${{ inputs.with_llama }}
         run: packaging/llama/build-linux.sh
       - name: Build the tarball
         env:
           CM_REQUIRE_SHERPA: "1"
           CM_REQUIRE_SPEAKER_MODELS: "1"
-          CM_REQUIRE_LLAMA: ${{ (github.event_name == 'push' || inputs.with_llama) && '1' || '0' }}
-          CM_LLAMA_BUNDLE: ${{ (github.event_name == 'push' || inputs.with_llama) && format('{0}/packaging/llama/out', github.workspace) || '' }}
-          CM_REQUIRE_FFMPEG: ${{ (github.event_name == 'push' || inputs.with_ffmpeg) && '1' || '0' }}
-          CM_FFMPEG_BUNDLE: ${{ (github.event_name == 'push' || inputs.with_ffmpeg) && format('{0}/packaging/ffmpeg/out-linux-{1}', github.workspace, matrix.arch) || '' }}
+          CM_REQUIRE_LLAMA: ${{ inputs.with_llama && '1' || '0' }}
+          CM_LLAMA_BUNDLE: ${{ inputs.with_llama && format('{0}/packaging/llama/out', github.workspace) || '' }}
+          CM_REQUIRE_FFMPEG: ${{ inputs.with_ffmpeg && '1' || '0' }}
+          CM_FFMPEG_BUNDLE: ${{ inputs.with_ffmpeg && format('{0}/packaging/ffmpeg/out-linux-{1}', github.workspace, matrix.arch) || '' }}
         run: packaging/linux/build-linux.sh
       - name: Check the tarball (checksum, install, uninstall, desktop entry)
         run: |
@@ -114,7 +110,7 @@ jobs:
           "$work/prefix/bin/capturemann" --version
           test -f "$work/prefix/lib/Resources/Models/speaker/pyannote-segmentation-3-0.onnx"
           test -f "$work/prefix/share/doc/capturemann/SHERPA-ONNX/ThirdPartyNotices-onnxruntime.txt"
-          if [ "${{ (github.event_name == 'push' || inputs.with_llama) }}" = true ]; then
+          if [ "${{ inputs.with_llama }}" = true ]; then
             "$work/prefix/lib/capturemann/llama-server" --version
             test -f "$work/prefix/lib/capturemann/Llama/LICENSES/llama.cpp-LICENSE.txt"
           fi
