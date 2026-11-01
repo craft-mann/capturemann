@@ -212,6 +212,18 @@ fn display_is_builtin(_id: u32) -> bool {
     false
 }
 
+/// X11 and some Windows setups report no primary display (no `xrandr --primary`): the display at the
+/// origin, else the first one, stands in, so "the primary display" always exists when there is a display.
+fn ensure_primary(displays: &mut [DisplayInfo]) {
+    if displays.is_empty() || displays.iter().any(|d| d.is_primary) {
+        return;
+    }
+    let at_origin = displays
+        .iter()
+        .position(|d| d.bounds.origin.x == 0 && d.bounds.origin.y == 0);
+    displays[at_origin.unwrap_or(0)].is_primary = true;
+}
+
 fn display_info(m: &Monitor) -> Result<DisplayInfo, XCapError> {
     let scale = monitor_scale(m);
     let name = m
@@ -378,10 +390,12 @@ impl CaptureBackend for XcapBackend {
     fn displays(&self) -> Result<Vec<DisplayInfo>, CmError> {
         self.check_permission()?;
         let monitors = Monitor::all().map_err(map_err)?;
-        monitors
+        let mut displays = monitors
             .iter()
             .map(|m| display_info(m).map_err(map_err))
-            .collect()
+            .collect::<Result<Vec<_>, _>>()?;
+        ensure_primary(&mut displays);
+        Ok(displays)
     }
 
     #[cfg(target_os = "macos")]
@@ -554,5 +568,59 @@ mod tests {
         let w = window_from_raw(&raw(100.0, 1600.0), &monitors);
         assert_eq!(w.display_id, Some(1));
         assert_eq!(w.bounds.origin.x, 200);
+    }
+}
+
+#[cfg(test)]
+mod primary_tests {
+    use super::*;
+    use cm_core::{PhysicalPoint, PhysicalRect, PhysicalSize, ScaleFactor};
+
+    fn d(id: u32, x: i32, primary: bool) -> DisplayInfo {
+        DisplayInfo {
+            id,
+            name: String::new(),
+            bounds: PhysicalRect {
+                origin: PhysicalPoint { x, y: 0 },
+                size: PhysicalSize {
+                    width: 1920,
+                    height: 1080,
+                },
+            },
+            scale: ScaleFactor::new(1.0).expect("scale"),
+            is_primary: primary,
+            is_builtin: false,
+        }
+    }
+
+    #[test]
+    fn a_reported_primary_is_kept() {
+        let mut v = vec![d(1, 0, false), d(2, 1920, true)];
+        ensure_primary(&mut v);
+        assert_eq!(
+            v.iter().map(|d| d.is_primary).collect::<Vec<_>>(),
+            [false, true]
+        );
+    }
+
+    #[test]
+    fn without_a_primary_the_display_at_the_origin_is_chosen() {
+        let mut v = vec![d(1, 1920, false), d(2, 0, false)];
+        ensure_primary(&mut v);
+        assert_eq!(
+            v.iter().map(|d| d.is_primary).collect::<Vec<_>>(),
+            [false, true]
+        );
+    }
+
+    #[test]
+    fn without_a_primary_or_an_origin_the_first_is_chosen_and_none_is_fine() {
+        let mut v = vec![d(1, 100, false), d(2, 2020, false)];
+        ensure_primary(&mut v);
+        assert_eq!(
+            v.iter().map(|d| d.is_primary).collect::<Vec<_>>(),
+            [true, false]
+        );
+        ensure_primary(&mut []);
     }
 }
