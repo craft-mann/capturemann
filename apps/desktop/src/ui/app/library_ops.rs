@@ -45,8 +45,23 @@ pub fn save_capture_as(app: &Entity<AppModel>, id: &str, cx: &mut App) {
             .or_else(dirs::home_dir)
             .unwrap_or_else(std::env::temp_dir);
         let rx = cx.update(|cx| cx.prompt_for_new_path(&dir, Some(&name)));
-        let Ok(Ok(Some(path))) = rx.await else {
-            return;
+        let path = match rx.await {
+            Ok(Ok(Some(path))) => path,
+            // The file dialog itself failed (on Linux: no desktop portal running).
+            Ok(Err(e)) => {
+                cx.update(|cx| {
+                    push_toast(
+                        &app2,
+                        flows::error_toast_live(
+                            || tr!("Couldn\u{2019}t open the save dialog"),
+                            e.to_string(),
+                        ),
+                        cx,
+                    )
+                });
+                return;
+            }
+            _ => return,
         };
         let p = path.clone();
         let written = backend

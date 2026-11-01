@@ -1151,6 +1151,9 @@ msgstr ""
 msgid "Couldn’t open the link"
 msgstr ""
 
+msgid "Couldn’t open the save dialog"
+msgstr ""
+
 msgid "Couldn’t open the video"
 msgstr ""
 

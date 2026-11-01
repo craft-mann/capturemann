@@ -206,10 +206,25 @@ impl EditorView {
             .or_else(dirs::home_dir)
             .unwrap_or_else(std::env::temp_dir);
         let rx = cx.prompt_for_new_path(&dir, Some(&name));
-        cx.spawn(async move |_, cx| {
-            if let Ok(Ok(Some(path))) = rx.await {
+        let app = self.app.clone();
+        cx.spawn(async move |_, cx| match rx.await {
+            Ok(Ok(Some(path))) => {
                 doc.update(cx, |d, cx| d.save_to(path, cx));
             }
+            // The file dialog itself failed (on Linux: no desktop portal running).
+            Ok(Err(e)) => {
+                cx.update(|cx| {
+                    app::push_toast(
+                        &app,
+                        crate::flows::error_toast_live(
+                            || tr!("Couldn\u{2019}t open the save dialog"),
+                            e.to_string(),
+                        ),
+                        cx,
+                    )
+                });
+            }
+            _ => {}
         })
         .detach();
     }
