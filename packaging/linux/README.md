@@ -29,7 +29,7 @@ sudo apt install ./capturemann_<version>_<amd64|arm64>.deb      # pulls the libr
 
 * Layout: the programs and everything next to them (`ffmpeg`, `llama-server`, the licence folders, the speaker models
   under `lib/Resources/Models/speaker`) are in `/opt/capturemann/lib/...`, exactly as in the tarball, because the
-  app finds FFmpeg, `llama-server` and the models relative to its own real path (symlinks are resolved). `/usr/bin/{cm-desktop,cm-overlay,capturemann,cm-mcp}`
+  app finds FFmpeg, `llama-server` and the models relative to its own real path (symlinks are resolved). `/usr/bin/{cm-desktop,cm-overlay,capturemann,cm-mcp,cm-daemon}`
   are symlinks to them; the `.desktop` file (with `Exec=/usr/bin/cm-desktop`) and the icons are in `/usr/share`;
   documents and the `copyright` file (DEP-5; Apache-2.0 plus the bundled components) in `/usr/share/doc/capturemann`.
 * `Depends:` is the verified list under "What the user needs" (`libc6 (>= 2.39)` read from the build, GTK 3, ALSA,
@@ -65,7 +65,7 @@ The maintainer signs with `packaging/linux/sign-linux.sh` (see its header for th
 capturemann-<version>-linux-<arch>/
   install.sh                          --prefix P (default ~/.local), --uninstall
   README.txt
-  lib/capturemann/{cm-desktop,cm-overlay,capturemann,cm-mcp[,ffmpeg,ffprobe,FFmpeg/]}
+  lib/capturemann/{cm-desktop,cm-overlay,capturemann,cm-mcp,cm-daemon[,ffmpeg,ffprobe,FFmpeg/]}
   lib/capturemann/llama-server        [+ Llama/{BUILD-INFO.txt,LICENSES/}] the built-in text engine (MIT), with CM_LLAMA_BUNDLE
   lib/Resources/Models/speaker/       the two speaker models + LICENSES/ (cm-ai reads <executable dir>/../Resources/Models/speaker)
   share/applications/dev.capturemann.app.desktop
@@ -124,7 +124,7 @@ gmp, libav*, ...), and prints the exact libraries and the glibc version the prog
 
 Built on Ubuntu 24.04, so the programs need **glibc 2.39 or newer**: Ubuntu 24.04 and later, Debian 13,
 Fedora 40 and later. Ubuntu 22.04 and Debian 12 are too old. Only the C library, `libgcc_s` and `libm` are linked by
-`capturemann`, `cm-mcp` and `cm-overlay`. `cm-desktop` (GPUI, GTK for dialogs, PipeWire for the portal capture,
+`capturemann`, `cm-mcp` and `cm-overlay`; `cm-daemon` (the headless daemon the CLI and `cm-mcp` start when the app is not running) is checked by `check-runtime.sh` like the others. `cm-desktop` (GPUI, GTK for dialogs, PipeWire for the portal capture,
 ALSA for audio) links the libraries below. The list was proved on a clean `ubuntu:24.04` arm64 container with
 only these packages (`--no-install-recommends`): every program resolves all its libraries and `cm-desktop` ran
 under Xvfb and served a CLI screenshot (`verification/L1-packaging-clean-linux-2026-10-31-claude.md`).

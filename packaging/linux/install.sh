@@ -6,7 +6,7 @@
 #   ./install.sh --uninstall [--prefix P]     remove what this script installed
 #
 # Layout under the prefix: lib/capturemann/ holds every program (cm-desktop, cm-overlay,
-# capturemann, cm-mcp and, when present, ffmpeg and ffprobe: the app finds FFmpeg next to its own
+# capturemann, cm-mcp, cm-daemon and, when present, ffmpeg and ffprobe: the app finds FFmpeg next to its own
 # executable), bin/ holds symlinks to them, share/ the .desktop entry, icons and documents.
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
@@ -38,7 +38,7 @@ refresh_caches() {
 }
 
 if [ "$uninstall" = 1 ]; then
-  for l in cm-desktop cm-overlay capturemann cm-mcp; do
+  for l in cm-desktop cm-overlay capturemann cm-mcp cm-daemon; do
     if [ -L "$bin/$l" ] && [ "$(readlink "$bin/$l")" = "$lib/$l" ]; then rm -f "$bin/$l"; fi
   done
   rm -rf "$lib" "$prefix/lib/Resources/Models/speaker" "$share/doc/capturemann" "$share/applications/$app_id.desktop"
@@ -65,7 +65,7 @@ for d in "$here"/lib/capturemann/*/; do
   rm -rf "$lib/$(basename "$d")"; cp -R "$d" "$lib/$(basename "$d")"
 done
 if [ -d "$here/lib/Resources" ]; then rm -rf "$prefix/lib/Resources"; cp -R "$here/lib/Resources" "$prefix/lib/Resources"; fi
-for l in cm-desktop cm-overlay capturemann cm-mcp; do [ ! -x "$lib/$l" ] || ln -sf "$lib/$l" "$bin/$l"; done
+for l in cm-desktop cm-overlay capturemann cm-mcp cm-daemon; do [ ! -x "$lib/$l" ] || ln -sf "$lib/$l" "$bin/$l"; done
 cp -R "$here"/share/doc/capturemann/. "$share/doc/capturemann/"
 (cd "$here/share/icons" && find hicolor -type f) | while read -r f; do
   mkdir -p "$share/icons/$(dirname "$f")"

@@ -7,7 +7,7 @@
 # Output: packaging/linux/out/capturemann_<version>_<amd64|arm64>.deb and .deb.sha256 (or $CM_LINUX_OUT).
 #
 # Layout of the package:
-#   /opt/capturemann/lib/capturemann/{cm-desktop,cm-overlay,capturemann,cm-mcp[,ffmpeg,ffprobe,llama-server,FFmpeg/,Llama/]}
+#   /opt/capturemann/lib/capturemann/{cm-desktop,cm-overlay,capturemann,cm-mcp,cm-daemon[,ffmpeg,ffprobe,llama-server,FFmpeg/,Llama/]}
 #   /opt/capturemann/lib/Resources/Models/speaker/   (the speaker models; cm-ai reads <executable dir>/../Resources/Models/speaker,
 #                                                     and the programs find ffmpeg and llama-server next to their own
 #                                                     real path, so all of it stays under one prefix)
@@ -75,7 +75,7 @@ mkdir -p "$pkg/$opt/lib" "$pkg/usr/bin" "$pkg/usr/share/applications" "$pkg/usr/
 # ---- the programs and everything that must sit next to them ----
 cp -R "$src/lib/capturemann" "$pkg/$opt/lib/capturemann"
 [ ! -d "$src/lib/Resources" ] || cp -R "$src/lib/Resources" "$pkg/$opt/lib/Resources"
-for p in cm-desktop cm-overlay capturemann cm-mcp; do
+for p in cm-desktop cm-overlay capturemann cm-mcp cm-daemon; do
   [ -x "$pkg/$opt/lib/capturemann/$p" ] && ln -s "/$opt/lib/capturemann/$p" "$pkg/usr/bin/$p"
 done
 has_ffmpeg=0; [ -x "$pkg/$opt/lib/capturemann/ffmpeg" ] && has_ffmpeg=1
@@ -85,11 +85,11 @@ has_models=0; [ -d "$pkg/$opt/lib/Resources/Models/speaker" ] && has_models=1
 find "$pkg" -type d -exec chmod 755 {} +
 find "$pkg/$opt" -type f -exec chmod 644 {} +
 find "$pkg/$opt/lib/capturemann" -maxdepth 1 -type f \( -name cm-desktop -o -name cm-overlay -o -name capturemann \
-  -o -name cm-mcp -o -name ffmpeg -o -name ffprobe -o -name llama-server \) -exec chmod 755 {} +
+  -o -name cm-mcp -o -name cm-daemon -o -name ffmpeg -o -name ffprobe -o -name llama-server \) -exec chmod 755 {} +
 
 if [ "${CM_DEB_STRIP:-0}" = "1" ]; then
   command -v strip >/dev/null 2>&1 || die "CM_DEB_STRIP=1 needs strip (sudo apt install binutils)"
-  for p in cm-desktop cm-overlay capturemann cm-mcp; do strip --strip-debug "$pkg/$opt/lib/capturemann/$p"; done
+  for p in cm-desktop cm-overlay capturemann cm-mcp cm-daemon; do strip --strip-debug "$pkg/$opt/lib/capturemann/$p"; done
 fi
 
 # ---- desktop entry, icons, documents ----

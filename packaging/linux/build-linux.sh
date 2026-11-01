@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds the Linux "early build" tarball:
 #   capturemann-<version>-linux-<arch>.tar.gz   (+ .sha256)
-# holding cm-desktop, cm-overlay, capturemann, cm-mcp, the licence files, the .desktop entry, the
+# holding cm-desktop, cm-overlay, capturemann, cm-mcp, cm-daemon, the licence files, the .desktop entry, the
 # icons from design/brand/app-icon, install.sh and, when given, an LGPL FFmpeg.
 #
 # Usage (on Linux, from any directory):   packaging/linux/build-linux.sh
@@ -78,10 +78,10 @@ if [ "${CM_SKIP_BUILD:-0}" != "1" ]; then
   echo "==> cargo build --release, $sherpa_note"
   # whisper-rs-sys does not re-run when GGML_* change: after changing them, cargo clean -p whisper-rs-sys.
   (cd "$root" && SHERPA_ONNX_LIB_DIR="$sherpa_lib" cargo build --release --locked ${features[@]+"${features[@]}"} ${jobs[@]+"${jobs[@]}"} \
-    -p cm-desktop -p cm-overlay -p cm-cli -p cm-mcp)
+    -p cm-desktop -p cm-overlay -p cm-cli -p cm-mcp -p cm-daemon)
 fi
 target="$(cd "$root" && cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')/release"
-all_bins="cm-desktop cm-overlay capturemann cm-mcp"
+all_bins="cm-desktop cm-overlay capturemann cm-mcp cm-daemon"
 bins=""
 for b in $all_bins; do
   if [ -x "$target/$b" ]; then bins="$bins $b"
