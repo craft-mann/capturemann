@@ -54,7 +54,9 @@ function Invoke-Cli {
   $exe = Join-Path $BinDir 'capturemann.exe'
   $o = Join-Path $root ('cli-' + [Guid]::NewGuid().ToString('N') + '.out')
   $e = $o + '.err'
-  $p = Start-Process -FilePath $exe -ArgumentList $CliArgs -NoNewWindow -PassThru `
+  # Start-Process joins the list with spaces and does not quote: an argument with a space must carry its quotes.
+  $quoted = $CliArgs | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }
+  $p = Start-Process -FilePath $exe -ArgumentList $quoted -NoNewWindow -PassThru `
     -RedirectStandardOutput $o -RedirectStandardError $e
   if (-not $p.WaitForExit($TimeoutSec * 1000)) {
     try { $p.Kill() } catch {}
