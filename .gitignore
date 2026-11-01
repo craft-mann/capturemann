@@ -74,3 +74,5 @@ capturemann-icons*/
 website-copy-review.md
 packaging/linux/out/
 packaging/ffmpeg/out-linux-*/
+packaging/windows/out/
+packaging/ffmpeg/out-windows-*/
