@@ -10,7 +10,7 @@ name: Windows package
 # The Windows early build has no FFmpeg (no recording or MP4 export yet) and no speaker engine.
 # Pinned actions: the same commits as ci.yml.
 on:
-  # TEMPORARY: runs this workflow once from the branch (a dispatch needs the file on the default branch). Removed next commit.
+  # TEMPORARY: runs this workflow once from the branch (a dispatch needs the file on the default branch). Removed once the smoke step passes.
   push:
     branches: [windows-step0]
     paths: [.github/workflows/windows-package.yml]
@@ -93,8 +93,8 @@ jobs:
         run: |
           $dir = Join-Path $env:RUNNER_TEMP 'zip-test'
           $app = (Get-ChildItem $dir -Directory | Select-Object -First 1).FullName
-          scripts\ci\windows-smoke.ps1 -BinDir $app
-          if ($LASTEXITCODE -ne 0) { throw 'windows-smoke.ps1 failed' }
+          & scripts\ci\windows-smoke.ps1 -BinDir $app
+          if (-not $?) { throw 'windows-smoke.ps1 failed' }
       - name: The app window (start, wait, screenshot of the desktop)
         shell: pwsh
         run: |
