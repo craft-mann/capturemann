@@ -61,6 +61,9 @@ msgstr ""
 msgid "A folder on this Mac, an external drive or a mounted network folder."
 msgstr ""
 
+msgid "A folder on this computer, an external drive or a mounted network folder."
+msgstr ""
+
 #. FACT: owner review required
 msgid "A listed app’s windows are left out of the recording (the desktop shows through). Screenshots leave out only CaptureMann’s own windows. CaptureMann’s own windows are always left out and can’t be removed. Changes apply to the next recording."
 msgstr ""
@@ -1623,6 +1626,10 @@ msgstr ""
 
 #. FACT: owner review required (privacy statement)
 msgid "Everything here runs on this Mac. Nothing is downloaded unless you press Download, and nothing is sent anywhere."
+msgstr ""
+
+#. FACT: owner review required (privacy statement)
+msgid "Everything here runs on this computer. Nothing is downloaded unless you press Download, and nothing is sent anywhere."
 msgstr ""
 
 msgid "Excluded windows"
@@ -4586,6 +4593,9 @@ msgstr ""
 msgid "The model runs inside CaptureMann and nothing leaves this Mac."
 msgstr ""
 
+msgid "The model runs inside CaptureMann and nothing leaves this computer."
+msgstr ""
+
 msgid "The mouse pointer is part of the video; it is not recorded as a separate track yet."
 msgstr ""
 
@@ -4836,6 +4846,9 @@ msgid "This cannot be undone"
 msgstr ""
 
 msgid "This caption is empty"
+msgstr ""
+
+msgid "This computer has {memory} GB of memory. The model runs inside CaptureMann and nothing leaves this computer."
 msgstr ""
 
 msgid "This copy is not running from a CaptureMann.app, so it can’t relaunch itself."
@@ -5876,6 +5889,9 @@ msgid "{model} on this Mac. Any language; each line keeps its start and end."
 msgstr ""
 
 msgid "{model} · on this Mac"
+msgstr ""
+
+msgid "{model} · on this computer"
 msgstr ""
 
 msgid "{model} · runs on this Mac"

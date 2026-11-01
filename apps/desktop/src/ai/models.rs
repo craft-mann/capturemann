@@ -39,7 +39,11 @@ pub fn transcribe_hint() -> String {
 
 // TRANSLATORS: FACT: owner review required (privacy statement)
 pub fn privacy_copy() -> String {
-    tr!("Everything here runs on this Mac. Nothing is downloaded unless you press Download, and nothing is sent anywhere.")
+    if crate::permissions::Os::current() == crate::permissions::Os::Mac {
+        tr!("Everything here runs on this Mac. Nothing is downloaded unless you press Download, and nothing is sent anywhere.")
+    } else {
+        tr!("Everything here runs on this computer. Nothing is downloaded unless you press Download, and nothing is sent anywhere.")
+    }
 }
 
 /// One download in flight or interrupted.

@@ -1011,7 +1011,11 @@ impl RecordingEditor {
         let mut parts: Vec<String> = vec![rules::created_day(&r.created)];
         if !r.model.is_empty() {
             parts.push(if r.provider == "local" {
-                tr!("{model} \u{00B7} on this Mac", model = r.model.clone())
+                if crate::permissions::Os::current() == crate::permissions::Os::Mac {
+                    tr!("{model} \u{00B7} on this Mac", model = r.model.clone())
+                } else {
+                    tr!("{model} \u{00B7} on this computer", model = r.model.clone())
+                }
             } else {
                 r.model.clone()
             });

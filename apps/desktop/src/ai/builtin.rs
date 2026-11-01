@@ -189,12 +189,18 @@ pub fn recommended_tag() -> String {
 
 /// The caption under the list.
 pub fn list_caption(mem_gb: Option<u32>) -> String {
-    match mem_gb {
-        Some(g) => tr!(
+    let mac = crate::permissions::Os::current() == crate::permissions::Os::Mac;
+    match (mem_gb, mac) {
+        (Some(g), true) => tr!(
             "This Mac has {memory} GB of memory. The model runs inside CaptureMann and nothing leaves this Mac.",
             memory = g
         ),
-        None => tr!("The model runs inside CaptureMann and nothing leaves this Mac."),
+        (Some(g), false) => tr!(
+            "This computer has {memory} GB of memory. The model runs inside CaptureMann and nothing leaves this computer.",
+            memory = g
+        ),
+        (None, true) => tr!("The model runs inside CaptureMann and nothing leaves this Mac."),
+        (None, false) => tr!("The model runs inside CaptureMann and nothing leaves this computer."),
     }
 }
 
