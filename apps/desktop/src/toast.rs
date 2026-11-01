@@ -156,6 +156,8 @@ pub struct Toast {
     /// A progress bar under the text, 0..=100 percent (a running upload).
     pub progress: Option<u8>,
     pub created: Instant,
+    /// An error toast that still goes away by itself after this long (a notice, not a failure).
+    pub dismiss_after: Option<Duration>,
     /// Since when the pointer has been over the toast (its clock is paused).
     pub hovered_since: Option<Instant>,
 }
@@ -163,12 +165,13 @@ pub struct Toast {
 impl Toast {
     /// Errors and toasts that carry buttons stay until dismissed (C7).
     pub fn sticky(&self) -> bool {
-        self.kind == ToastKind::Error || !self.buttons.is_empty()
+        self.dismiss_after.is_none() && (self.kind == ToastKind::Error || !self.buttons.is_empty())
     }
 
     /// When the toast goes away by itself; `None` for a sticky toast and while it is hovered.
     pub fn expires_at(&self) -> Option<Instant> {
-        (!self.sticky() && self.hovered_since.is_none()).then(|| self.created + AUTO_DISMISS)
+        (!self.sticky() && self.hovered_since.is_none())
+            .then(|| self.created + self.dismiss_after.unwrap_or(AUTO_DISMISS))
     }
 }
 
@@ -183,6 +186,7 @@ pub struct ToastSpec {
     pub agent: Option<AgentCall>,
     pub rebuild: Option<Rebuild>,
     pub progress: Option<u8>,
+    pub dismiss_after: Option<Duration>,
 }
 
 impl ToastSpec {
@@ -196,7 +200,15 @@ impl ToastSpec {
             agent: None,
             rebuild: None,
             progress: None,
+            dismiss_after: None,
         }
+    }
+
+    /// A toast that goes away by itself after `after` even though it is an error (a notice about a
+    /// missing extra, such as the tray icon, rather than a failed action).
+    pub fn dismiss_after(mut self, after: Duration) -> Self {
+        self.dismiss_after = Some(after);
+        self
     }
 
     /// A toast that can be worded again: `make` builds the whole spec from data it owns (ids,
@@ -321,6 +333,7 @@ impl ToastQueue {
             rebuild: spec.rebuild,
             progress: spec.progress,
             created: now,
+            dismiss_after: spec.dismiss_after,
             hovered_since: None,
         });
         // Oldest goes first when more than three are stacked.
@@ -347,6 +360,7 @@ impl ToastQueue {
                     rebuild: spec.rebuild,
                     progress: spec.progress,
                     created: now,
+                    dismiss_after: spec.dismiss_after,
                     hovered_since: None,
                 };
                 true
@@ -472,6 +486,25 @@ mod tests {
         }
         assert_eq!(q.toasts().len(), 3);
         assert!(q.toasts().iter().all(|x| x.id != first));
+    }
+
+    /// An error toast built with `dismiss_after` is a notice: it goes away by itself after that long
+    /// (and still waits while hovered); other errors stay.
+    #[test]
+    fn an_error_with_dismiss_after_expires_and_other_errors_stay() {
+        let mut q = ToastQueue::default();
+        let t = Instant::now();
+        q.push(spec(ToastKind::Error), t);
+        q.push(
+            spec(ToastKind::Error).dismiss_after(Duration::from_secs(10)),
+            t,
+        );
+        assert_eq!(q.next_expiry(t), Some(Duration::from_secs(10)));
+        assert!(!q.expire(t + Duration::from_millis(9999)));
+        assert!(q.expire(t + Duration::from_secs(10)));
+        assert_eq!(q.toasts().len(), 1);
+        assert!(q.toasts()[0].sticky());
+        assert_eq!(q.next_expiry(t + Duration::from_secs(10)), None);
     }
 
     /// DESIGN toasts: auto-dismiss 6 s except failures and anything with an action.

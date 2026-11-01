@@ -490,7 +490,10 @@ fn main() {
                     tr!("Menu bar icon unavailable")
                 } else {
                     tr!("Tray icon unavailable")
-                }).body(e)),
+                })
+                .body(e)
+                // A notice about a missing extra, not a failed action: it must not cover the editor for good.
+                .dismiss_after(std::time::Duration::from_secs(10))),
         }
 
         let app2 = model.clone();
