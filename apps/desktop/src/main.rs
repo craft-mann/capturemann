@@ -486,7 +486,11 @@ fn main() {
                 m.tray = Some(tray);
             }),
             Err(e) => startup_problems
-                .push(ToastSpec::new(ToastKind::Error, tr!("Menu bar icon unavailable")).body(e)),
+                .push(ToastSpec::new(ToastKind::Error, if std::env::consts::OS == "macos" {
+                    tr!("Menu bar icon unavailable")
+                } else {
+                    tr!("Tray icon unavailable")
+                }).body(e)),
         }
 
         let app2 = model.clone();
