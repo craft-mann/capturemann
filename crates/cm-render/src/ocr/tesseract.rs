@@ -91,9 +91,27 @@ impl SearchPaths {
             exe_dir: std::env::current_exe()
                 .ok()
                 .and_then(|p| p.parent().map(Path::to_path_buf)),
-            path_var: std::env::var_os("PATH"),
+            path_var: with_default_dirs(std::env::var_os("PATH")),
         }
     }
+}
+
+/// `PATH`, and on Windows the folders the usual installers (UB-Mannheim, winget, Chocolatey) put
+/// `tesseract.exe` in, which they do not add to `PATH` by themselves.
+fn with_default_dirs(path: Option<OsString>) -> Option<OsString> {
+    if !cfg!(windows) {
+        return path;
+    }
+    let mut dirs: Vec<PathBuf> = path
+        .as_deref()
+        .map(|p| std::env::split_paths(p).collect())
+        .unwrap_or_default();
+    for var in ["ProgramFiles", "ProgramFiles(x86)"] {
+        if let Some(pf) = std::env::var_os(var) {
+            dirs.push(PathBuf::from(pf).join("Tesseract-OCR"));
+        }
+    }
+    std::env::join_paths(dirs).ok().or(path)
 }
 
 fn exe_name() -> &'static str {
@@ -139,7 +157,8 @@ pub fn install_hint() -> String {
     format!(
         "text recognition needs the `tesseract` program (Apache-2.0) with English data: install \
          it (Debian and Ubuntu: `sudo apt install tesseract-ocr`; Fedora: `sudo dnf install \
-         tesseract`; Arch: `sudo pacman -S tesseract tesseract-data-eng`) or point {ENV_TESSERACT} \
+         tesseract`; Arch: `sudo pacman -S tesseract tesseract-data-eng`; Windows: `winget install \
+         UB-Mannheim.TesseractOCR`) or point {ENV_TESSERACT} \
          to the executable"
     )
 }
