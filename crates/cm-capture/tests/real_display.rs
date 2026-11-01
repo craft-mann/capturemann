@@ -316,6 +316,7 @@ fn cap1_windows_lists_and_captures_a_started_window() {
         let (mut outer, mut frame, mut client) =
             (RECT::default(), RECT::default(), RECT::default());
         let mut origin = POINT::default();
+        // SAFETY: the calls only write into the RECT and POINT above; a stale handle makes them fail, which is ignored.
         unsafe {
             let _ = GetWindowRect(hwnd, &mut outer);
             let _ = DwmGetWindowAttribute(
