@@ -167,6 +167,8 @@ mod tests {
         assert_eq!(video_dir_in(home, Some(cfg.path())), home.join("Videos"));
     }
 
+    // The file is a freedesktop (Linux) one with Unix paths; a path like /data/x is not absolute on Windows.
+    #[cfg(unix)]
     #[test]
     fn user_dirs_file_rules() {
         let home = std::path::Path::new("/home/a");

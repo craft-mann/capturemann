@@ -57,7 +57,8 @@ jobs:
         # screen permission, camera or microphone, so the hardware tests stay manual (verification/).
         os: ${{ fromJSON(needs.plan.outputs.os) }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
+    # Windows is the slowest (the test step alone took 58 minutes on Nov 1, 2026).
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 150 || 90 }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable (branch tip)
