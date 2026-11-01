@@ -50,13 +50,13 @@ has run on a real Linux desktop yet. Test lab for that: `scripts/testlab/` (Thin
 
 ## Known gaps and open items (none block the early build)
 
-- Auto-redact needs `sudo apt install tesseract-ocr` (not in the tarball, not a package dependency yet); recall is clearly below Apple Vision's on the synthetic set; x86_64 and a real desktop are untested; Windows will use `Windows.Media.Ocr` later.
+- Auto-redact needs `sudo apt install tesseract-ocr` (not in the tarball; the `.deb` recommends it, decided Nov 1, 2026); recall is clearly below Apple Vision's on the synthetic set; x86_64 and a real desktop are untested; Windows will use `Windows.Media.Ocr` later.
 - Recording UI (with `CM_LINUX_RECORDING=1`, default still off): the controls are a banner in the Studio window (no
   floating HUD, countdown disc or brackets: they would be in the video, and Wayland cannot place them); the tray icon
   and the desktop's own screen-share indicator also show it. A real desktop (GNOME with the AppIndicator extension, KDE)
   has not been seen yet. The Start sheet keycaps ("Ctrl Alt Shift R") overflow the footer and the line "Start or stop
   from anywhere" is wrong on GNOME 46 Wayland (no GlobalShortcuts portal). Settings -> Capture & recording still offers
-  H.264/HEVC and quality choices that mean nothing for the software VP9 recorder. The permissions page lists the Camera.
+  H.264/HEVC and quality choices that mean nothing for the software VP9 recorder. (Without the recorder the Capture page shows only the screenshot delay and the Webcam & audio page is left out of the sidebar; the Permissions page has no Camera row on Linux. Not yet seen in the running app.)
 - Wayland: no always-on-top (toasts are in-window cards), no window list, no GlobalShortcuts on GNOME 46; the capture
   cloak (hide own toasts for a capture) was inconclusive on Wayland in the shared VM session.
 - Light panels get the dark tray icon; XDG autostart from an AppImage would point at a temporary mount.
