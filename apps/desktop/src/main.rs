@@ -129,6 +129,7 @@ fn forward_request(config_dir: &std::path::Path) {
 }
 
 /// The command a request from a second launch stands for.
+#[cfg(unix)]
 fn command_for(request: cm_desktop::instance::Request) -> Command {
     use cm_desktop::instance::{CaptureKind, Request};
     match request {
