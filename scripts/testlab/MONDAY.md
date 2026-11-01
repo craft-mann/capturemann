@@ -22,7 +22,10 @@ script's output the first time.
    then `lab.sh push linux <file>`.
 2. Check the tarball: `sha256sum -c`, extract, `./check-runtime.sh`, then `./install.sh`. Then try the `.deb`
    on a restored clean image: `sudo apt install ./capturemann_*.deb` (note which packages it pulls).
-3. `capturemann diagnostics` and `vainfo` (H.264 encode entries mean VA-API export works). Keep the output.
+3. In the logged-in desktop, run `scripts/testlab/smoke-linux.sh` (push it with `lab.sh`; over ssh set the session
+   variables from the README). It writes a report with the session type, GPU, `vainfo`, portals, keyring, the
+   programs, the CLI and the MCP server, and takes no screenshot and records nothing. Run it once on Xorg and once on
+   Wayland and keep the files.
 
 ## Part 3: run LINUX-1 twice
 
