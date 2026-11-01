@@ -1,0 +1,115 @@
+name: Windows package
+
+# Run by hand (Actions > Windows package > Run workflow) to build the early-build files on windows-latest:
+# capturemann-<version>-windows-x64.zip and capturemann-<version>-windows-x64-setup.exe (+ .sha256 each),
+# with packaging/windows/build-windows.ps1. The files are kept as WORKFLOW ARTIFACTS only: this workflow
+# creates no tag and no GitHub release (a release is a maintainer step, see docs/development/releasing.md).
+# It then tries what it built on the runner: the portable CLI, the daemon the CLI starts, the app window (a
+# screenshot of the runner's desktop is kept), and a silent install and uninstall.
+#
+# The Windows early build has no FFmpeg (no recording or MP4 export yet) and no speaker engine.
+# Pinned actions: the same commits as ci.yml.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-package-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  package:
+    name: Zip and installer (x64)
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable (branch tip)
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+      - name: Install NSIS
+        shell: pwsh
+        run: |
+          choco install nsis --no-progress -y
+          "C:\Program Files (x86)\NSIS" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+      - name: Build the zip and the installer
+        shell: pwsh
+        run: packaging\windows\build-windows.ps1
+      - name: List the files
+        shell: pwsh
+        run: |
+          Get-ChildItem packaging\windows\out | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
+          Get-Content packaging\windows\out\*.sha256
+
+      # ---- what the files do on a real Windows ----
+      - name: Portable zip, CLI and the daemon it starts
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem packaging\windows\out\*.zip | Select-Object -First 1
+          $dir = Join-Path $env:RUNNER_TEMP 'zip-test'
+          Expand-Archive $zip.FullName -DestinationPath $dir
+          $app = (Get-ChildItem $dir -Directory | Select-Object -First 1).FullName
+          Get-ChildItem $app | Select-Object Name, Length
+          $env:CAPTUREMANN_LIBRARY = Join-Path $env:RUNNER_TEMP 'zip-lib'
+          $env:CAPTUREMANN_CONFIG_DIR = Join-Path $env:RUNNER_TEMP 'zip-cfg'
+          $env:CAPTUREMANN_SOCKET = "\\.\pipe\cm-pkg-$PID"
+          & "$app\capturemann.exe" --version; if ($LASTEXITCODE -ne 0) { throw 'capturemann --version failed' }
+          & "$app\capturemann.exe" targets; if ($LASTEXITCODE -ne 0) { throw 'capturemann targets failed' }
+          & "$app\capturemann.exe" diagnostics; if ($LASTEXITCODE -ne 0) { throw 'capturemann diagnostics failed' }
+          & "$app\capturemann.exe" --json library list; if ($LASTEXITCODE -ne 0) { throw 'capturemann library list failed' }
+          Stop-Process -Name cm-daemon -Force -ErrorAction SilentlyContinue
+      - name: The app window (start, wait, screenshot of the desktop)
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'zip-test'
+          $app = (Get-ChildItem $dir -Directory | Select-Object -First 1).FullName
+          $env:CAPTUREMANN_LIBRARY = Join-Path $env:RUNNER_TEMP 'gui-lib'
+          $env:CAPTUREMANN_CONFIG_DIR = Join-Path $env:RUNNER_TEMP 'gui-cfg'
+          $env:CAPTUREMANN_SECRETS = 'file'
+          $p = Start-Process -FilePath "$app\cm-desktop.exe" -PassThru
+          Start-Sleep -Seconds 25
+          $alive = -not $p.HasExited
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          $g = [System.Drawing.Graphics]::FromImage($bmp)
+          $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          New-Item -ItemType Directory -Force -Path shots | Out-Null
+          $bmp.Save((Join-Path $PWD 'shots\desktop-with-app.png'))
+          "app alive after 25 s: $alive; main window title: '$($p.MainWindowTitle)'; screen $($b.Width)x$($b.Height)"
+          Get-ChildItem (Join-Path $env:CAPTUREMANN_CONFIG_DIR 'logs') -ErrorAction SilentlyContinue | ForEach-Object { "--- $($_.Name)"; Get-Content $_.FullName -Tail 30 }
+          if ($alive) { Stop-Process -Id $p.Id -Force }
+          Stop-Process -Name cm-daemon, cm-overlay -Force -ErrorAction SilentlyContinue
+          if (-not $alive) { throw 'cm-desktop.exe exited within 25 seconds' }
+      - name: Silent install, run, silent uninstall
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem packaging\windows\out\*-setup.exe | Select-Object -First 1
+          $dest = Join-Path $env:RUNNER_TEMP 'installed'
+          $i = Start-Process -FilePath $setup.FullName -ArgumentList '/S', "/D=$dest" -Wait -PassThru
+          "installer exit code: $($i.ExitCode)"
+          Get-ChildItem $dest | Select-Object Name, Length
+          & "$dest\capturemann.exe" --version; if ($LASTEXITCODE -ne 0) { throw 'installed capturemann --version failed' }
+          $u = Start-Process -FilePath "$dest\uninstall.exe" -ArgumentList '/S', "_?=$dest" -Wait -PassThru
+          "uninstaller exit code: $($u.ExitCode)"
+          Remove-Item -Recurse -Force $dest -ErrorAction SilentlyContinue
+          if ($i.ExitCode -ne 0 -or $u.ExitCode -ne 0) { throw 'installer or uninstaller returned an error' }
+
+      - name: Keep the files
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: capturemann-windows-x64
+          path: |
+            packaging/windows/out/*.zip
+            packaging/windows/out/*.exe
+            packaging/windows/out/*.sha256
+            shots/*.png
+          if-no-files-found: warn
+          retention-days: 14
