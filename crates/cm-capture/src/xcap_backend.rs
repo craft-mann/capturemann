@@ -371,12 +371,7 @@ fn window_info(w: &Window) -> Result<WindowInfo, XCapError> {
     let monitor = w.current_monitor().ok();
     let scale = monitor.as_ref().map_or(ScaleFactor::ONE, monitor_scale);
     let id = w.id()?;
-    let (x, y, mut width, mut height) = (w.x()?, w.y()?, w.width()?, w.height()?);
-    // Windows: the picture is the capture item, which is smaller than the frame xcap lists.
-    #[cfg(windows)]
-    if let Some((iw, ih)) = crate::sys::wgc_size::item_size(id) {
-        (width, height) = (iw, ih);
-    }
+    let (x, y, width, height) = (w.x()?, w.y()?, w.width()?, w.height()?);
     Ok(WindowInfo {
         id,
         title: w.title().unwrap_or_default(),
@@ -486,6 +481,11 @@ impl CaptureBackend for XcapBackend {
             .into_iter()
             .find(|w| w.id().is_ok_and(|id| id == window_id))
             .ok_or_else(|| CmError::not_found(format!("Window {window_id} not found")))?;
+        // Windows: xcap's picture is scaled and shifted against the bounds it lists; see sys/win_window.rs.
+        #[cfg(windows)]
+        if let Ok((width, height, rgba)) = crate::sys::win_window::capture(window_id) {
+            return Frame::new(width, height, rgba);
+        }
         frame_from(window.capture_image().map_err(map_err)?)
     }
 }
