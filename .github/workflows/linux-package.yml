@@ -119,6 +119,8 @@ jobs:
       # The .deb is made from the tarball just built (packaging/linux/build-deb.sh), so it holds the same files.
       # It is installed on the runner with apt (which pulls the Depends: libraries), run once, and removed.
       - name: Build the .deb
+        env:
+          CM_DEB_MAINTAINER: "CraftMann <trungtlt@outlook.com>"
         run: packaging/linux/build-deb.sh
       - name: Check the .deb (install with apt, run, remove)
         run: |

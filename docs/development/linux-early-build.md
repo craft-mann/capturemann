@@ -45,8 +45,9 @@ has run on a real Linux desktop yet. Test lab for that: `scripts/testlab/` (Thin
    77 MB (was 155 MB). Backtraces from a shipped build show addresses only; read them against the `debug/` copies
    of the same build (keep them as a CI artifact). Changing `[profile.release]` is a separate decision, because the
    macOS release shares it. Revisit after the early build.
-7. **Maintainer address** for the `.deb`: `CM_DEB_MAINTAINER` defaults to "The CaptureMann contributors
-   <noreply@users.noreply.github.com>"; set a real one for a release.
+7. **Maintainer address** for the `.deb`: set to "CraftMann <trungtlt@outlook.com>" (maintainer's choice, Nov 1,
+   2026) in `linux-package.yml`; a local `build-deb.sh` run without `CM_DEB_MAINTAINER` still defaults to "The
+   CaptureMann contributors <noreply@users.noreply.github.com>". The address is public inside the `.deb`.
 
 ## Known gaps and open items (none block the early build)
 
