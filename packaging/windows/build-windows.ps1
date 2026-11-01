@@ -273,7 +273,8 @@ Source: https://github.com/craft-mann/capturemann
   foreach ($f in $made) {
     $h = (Get-FileHash -Algorithm SHA256 $f).Hash.ToLowerInvariant()
     # "<hash> *<file>" is the format `sha256sum -c` reads on any system.
-    Set-Content -Path "$f.sha256" -Value ("{0} *{1}" -f $h, (Split-Path $f -Leaf)) -Encoding ASCII -NoNewline:$false
+    # LF line ending and no BOM: `sha256sum -c` on Linux and macOS reads it as written (Set-Content adds CRLF).
+    [IO.File]::WriteAllText("$f.sha256", ("{0} *{1}`n" -f $h, (Split-Path $f -Leaf)), (New-Object Text.UTF8Encoding($false)))
     Get-Item $f | ForEach-Object { Write-Host ("==> {0}  ({1:N1} MB)" -f $_.FullName, ($_.Length / 1MB)) }
     Get-Content "$f.sha256"
   }
