@@ -39,10 +39,12 @@ has run on a real Linux desktop yet. Test lab for that: `scripts/testlab/` (Thin
 5. Release notes: early build, recording hidden in the app (`CM_LINUX_RECORDING=1`; see the recording UI report), MP4 export needs a VA-API GPU or falls back to VP9, glibc 2.39+,
    `sudo apt install ./capturemann_<version>_<arch>.deb` (or the tarball and the apt packages), the text model is a
    download on the AI page (no model file ships), how to verify the download.
-6. **Decide on the size**: `cm-desktop` is about 700 MB because the release profile keeps debug info, so the tarball is
-   about 230 MB and the `.deb` about 155 MB (900 MB installed). `build-deb.sh` has `CM_DEB_STRIP=1` (`strip --strip-debug`
-   on the four programs); stripping in the release profile (`[profile.release] debug`/`strip`) is a `Cargo.toml`
-   decision for the maintainer (crash reports and backtraces keep function names with `strip = "debuginfo"`).
+6. **Size** (decided Nov 1, 2026): the release profile keeps debug info (`cm-desktop` is about 700 MB), so
+   `build-linux.sh` strips the debug info of the four programs by default and keeps the full copies in
+   `packaging/linux/out/debug/` (`CM_LINUX_STRIP=0` ships them unstripped). aarch64: tarball 104 MB (was 228 MB), `.deb`
+   77 MB (was 155 MB). Backtraces from a shipped build show addresses only; read them against the `debug/` copies
+   of the same build (keep them as a CI artifact). Changing `[profile.release]` is a separate decision, because the
+   macOS release shares it. Revisit after the early build.
 7. **Maintainer address** for the `.deb`: `CM_DEB_MAINTAINER` defaults to "The CaptureMann contributors
    <noreply@users.noreply.github.com>"; set a real one for a release.
 

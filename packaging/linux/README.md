@@ -40,10 +40,9 @@ sudo apt install ./capturemann_<version>_<amd64|arm64>.deb      # pulls the libr
   The user's library and settings are never touched, also not by `purge`.
 * Architecture comes from `uname -m` of the tarball (`x86_64` -> `amd64`, `aarch64` -> `arm64`); the package names are
   those of Ubuntu 24.04 and Debian 13, so build and use it there. `CM_DEB_COMPRESS` (xz, gzip, zstd), `CM_DEB_LEVEL`,
-  `CM_DEB_MAINTAINER` and `CM_DEB_STRIP=1` (strip the debug info of the four programs: the tarball's `cm-desktop` is
-  about 700 MB because the release profile keeps it) are the knobs; see the script header.
-* `lintian` on it reports `dir-or-file-in-opt` (by design: an add-on under `/opt`), `unstripped-binary-or-object`
-  (see `CM_DEB_STRIP`), `embedded-library` for the bundled LGPL FFmpeg and `no-manual-page`. It is not meant for the
+  `CM_DEB_MAINTAINER` are the knobs (`build-linux.sh` already strips the programs: `CM_LINUX_STRIP=0` keeps the debug
+  info, and the full copies of a stripped build land in `out/debug/`); see the script header.
+* `lintian` on it reports `dir-or-file-in-opt` (by design: an add-on under `/opt`), `embedded-library` for the bundled LGPL FFmpeg and `no-manual-page`. It is not meant for the
   Debian archive.
 * Proof: `verification/L1-packaging-complete-linux-2026-10-31-claude.md` (clean `ubuntu:24.04` arm64 container:
   `apt install ./file.deb`, run, `apt remove`, `apt purge`; x86_64 not run).
