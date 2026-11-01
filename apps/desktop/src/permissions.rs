@@ -162,14 +162,17 @@ pub fn specs(os: Os) -> Vec<Spec> {
         features: tr!("Recording: microphone track"),
         required: false,
     });
-    v.push(Spec {
-        id: Id::Camera,
-        name: tr_ctx!("permission", "Camera"),
-        // TRANSLATORS: FACT: owner review required (what the permission is for)
-        why: tr!("Shows your webcam in the bubble and records it as its own track."),
-        features: tr!("Recording: webcam bubble and camera track"),
-        required: false,
-    });
+    // The Linux build has no camera support yet (webcam bubble and camera track), so no row.
+    if os != Os::Linux {
+        v.push(Spec {
+            id: Id::Camera,
+            name: tr_ctx!("permission", "Camera"),
+            // TRANSLATORS: FACT: owner review required (what the permission is for)
+            why: tr!("Shows your webcam in the bubble and records it as its own track."),
+            features: tr!("Recording: webcam bubble and camera track"),
+            required: false,
+        });
+    }
     if os == Os::Mac {
         v.push(Spec {
             id: Id::InputMonitoring,
@@ -196,7 +199,7 @@ pub fn intro_note(os: Os) -> String {
         // TRANSLATORS: FACT: owner review required (nothing is requested until a button is pressed)
         Os::Windows => tr!("Windows keeps these under your control. Nothing is requested until you press a button; you can change any of them later in Settings \u{2192} Permissions."),
         // TRANSLATORS: FACT: owner review required (the desktop portal asks, not CaptureMann)
-        Os::Linux => tr!("Linux does not ask per app. Your desktop asks when CaptureMann captures the screen, and the microphone and camera are not gated by the system. Below is what this system can and cannot do for CaptureMann."),
+        Os::Linux => tr!("Linux does not ask per app. Your desktop asks when CaptureMann captures the screen, and the microphone is not gated by the system. Below is what this system can and cannot do for CaptureMann."),
     }
 }
 
@@ -847,11 +850,11 @@ mod tests {
     }
 
     /// Linux has no per-app prompts: no Screen Recording or Input Monitoring card, no deep links,
-    /// nothing to grant, and the Windows-only note is not shown there.
+    /// nothing to grant, no Camera row (no camera support yet), and the Windows-only note is not shown there.
     #[test]
-    fn linux_lists_only_microphone_and_camera_without_links() {
+    fn linux_lists_only_the_microphone_without_links() {
         let ids: Vec<Id> = specs(Os::Linux).iter().map(|s| s.id).collect();
-        assert_eq!(ids, vec![Id::Microphone, Id::Camera]);
+        assert_eq!(ids, vec![Id::Microphone]);
         for id in [
             Id::ScreenRecording,
             Id::Microphone,

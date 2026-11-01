@@ -10882,8 +10882,8 @@ msgid "Kinds to look for"
 msgstr "Loại cần tìm"
 
 #. FACT: owner review required (the desktop portal asks, not CaptureMann)
-msgid "Linux does not ask per app. Your desktop asks when CaptureMann captures the screen, and the microphone and camera are not gated by the system. Below is what this system can and cannot do for CaptureMann."
-msgstr "Linux không hỏi quyền theo từng ứng dụng. Môi trường desktop của bạn sẽ hỏi khi CaptureMann ghi màn hình, còn micrô và camera không bị hệ thống chặn bằng quyền. Bên dưới là những gì hệ thống này làm được và không làm được cho CaptureMann."
+msgid "Linux does not ask per app. Your desktop asks when CaptureMann captures the screen, and the microphone is not gated by the system. Below is what this system can and cannot do for CaptureMann."
+msgstr "Linux không hỏi quyền theo từng ứng dụng. Môi trường desktop của bạn sẽ hỏi khi CaptureMann ghi màn hình, còn micrô không bị hệ thống chặn bằng quyền. Bên dưới là những gì hệ thống này làm được và không làm được cho CaptureMann."
 
 msgid "No Secret Service (GNOME Keyring or KWallet) was found, so sign-ins and API keys cannot be kept in the system keyring. Start one, or set CAPTUREMANN_SECRETS=file to keep them in a file only you can read."
 msgstr "Không tìm thấy Secret Service (GNOME Keyring hoặc KWallet), nên thông tin đăng nhập và khoá API không thể lưu trong chuỗi khoá của hệ thống. Hãy khởi động một dịch vụ như vậy, hoặc đặt CAPTUREMANN_SECRETS=file để lưu chúng trong một tệp chỉ mình bạn đọc được."
