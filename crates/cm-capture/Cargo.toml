@@ -65,3 +65,7 @@ tempfile.workspace = true
 # REC-8 end-to-end test: record, kill -9, recover (cm-library does not depend on cm-capture).
 cm-library.workspace = true
 time = { version = "0.3", default-features = false, features = ["std"] }
+
+[target.'cfg(windows)'.dev-dependencies]
+# The Windows window-geometry report in tests/real_display.rs reads the window and frame rectangles.
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi"] }

@@ -305,6 +305,55 @@ fn cap1_windows_lists_and_captures_a_started_window() {
         )
         .unwrap()
         .unwrap();
+    {
+        // Geometry report: how the listed bounds, the window rectangle, the DWM frame and the client area
+        // relate to the image (the first and last rows and columns that are not fully transparent).
+        use windows::Win32::Foundation::{HWND, POINT, RECT};
+        use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS};
+        use windows::Win32::Graphics::Gdi::ClientToScreen;
+        use windows::Win32::UI::WindowsAndMessaging::{GetClientRect, GetWindowRect};
+        let hwnd = HWND(w.id as usize as *mut std::ffi::c_void);
+        let (mut outer, mut frame, mut client) =
+            (RECT::default(), RECT::default(), RECT::default());
+        let mut origin = POINT::default();
+        unsafe {
+            let _ = GetWindowRect(hwnd, &mut outer);
+            let _ = DwmGetWindowAttribute(
+                hwnd,
+                DWMWA_EXTENDED_FRAME_BOUNDS,
+                &mut frame as *mut RECT as *mut std::ffi::c_void,
+                std::mem::size_of::<RECT>() as u32,
+            );
+            let _ = GetClientRect(hwnd, &mut client);
+            let _ = ClientToScreen(hwnd, &mut origin);
+        }
+        let (iw, ih) = (cap.frame.width(), cap.frame.height());
+        let opaque = |x: u32, y: u32| cap.frame.pixel(x, y).is_some_and(|p| p[3] > 0);
+        let cols: Vec<u32> = (0..iw).filter(|&x| (0..ih).any(|y| opaque(x, y))).collect();
+        let rows: Vec<u32> = (0..ih).filter(|&y| (0..iw).any(|x| opaque(x, y))).collect();
+        println!(
+            "GEOMETRY window rect {:?}-{:?} ({}x{}); dwm frame {:?}-{:?} ({}x{}); client origin ({}, {}) size {}x{}; listed bounds {:?}; image {}x{}; non-transparent cols {:?}..{:?} rows {:?}..{:?}",
+            (outer.left, outer.top),
+            (outer.right, outer.bottom),
+            outer.right - outer.left,
+            outer.bottom - outer.top,
+            (frame.left, frame.top),
+            (frame.right, frame.bottom),
+            frame.right - frame.left,
+            frame.bottom - frame.top,
+            origin.x,
+            origin.y,
+            client.right,
+            client.bottom,
+            w.bounds,
+            iw,
+            ih,
+            cols.first(),
+            cols.last(),
+            rows.first(),
+            rows.last()
+        );
+    }
     println!(
         "window image {}x{} vs bounds {}x{}",
         cap.frame.width(),
