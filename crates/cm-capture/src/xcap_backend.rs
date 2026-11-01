@@ -370,12 +370,19 @@ fn window_from_raw(w: &listing::RawWindow, monitors: &[MonitorPoints]) -> Window
 fn window_info(w: &Window) -> Result<WindowInfo, XCapError> {
     let monitor = w.current_monitor().ok();
     let scale = monitor.as_ref().map_or(ScaleFactor::ONE, monitor_scale);
+    let id = w.id()?;
+    // On Windows the window rectangle includes an invisible resize border the picture does not have.
+    let (x, y, width, height) = (w.x()?, w.y()?, w.width()?, w.height()?);
+    let (x, y, width, height) = match crate::sys::dwm_frame::of_window(id) {
+        Some(i) => crate::sys::dwm_frame::apply(i, x, y, width, height),
+        None => (x, y, width, height),
+    };
     Ok(WindowInfo {
-        id: w.id()?,
+        id,
         title: w.title().unwrap_or_default(),
         app: w.app_name().unwrap_or_default(),
         pid: w.pid().unwrap_or(0),
-        bounds: to_physical(w.x()?, w.y()?, w.width()?, w.height()?, scale.get()),
+        bounds: to_physical(x, y, width, height, scale.get()),
         scale,
         display_id: monitor.and_then(|m| m.id().ok()),
         minimized: w.is_minimized().unwrap_or(false),
