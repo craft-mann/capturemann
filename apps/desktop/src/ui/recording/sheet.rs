@@ -1238,14 +1238,21 @@ impl StartSheet {
                                     .child(icon("timer", 13., t.mist))
                                     .child(shrink_text(countdown_text)),
                             )
-                            .children((m.kind != TargetKind::Window).then(|| {
-                                div()
-                                    .flex()
-                                    .items_center()
-                                    .gap(px(6.))
-                                    .child(caption(&t, tr!("Start or stop from anywhere")))
-                                    .child(keycaps(&t, &toggle_keys))
-                            })),
+                            // Not on Linux: the keycaps overflow the footer there and GNOME on Wayland has no
+                            // global shortcut to promise (the tray and the banner start and stop).
+                            .children(
+                                (m.kind != TargetKind::Window
+                                    && crate::permissions::Os::current()
+                                        != crate::permissions::Os::Linux)
+                                    .then(|| {
+                                        div()
+                                            .flex()
+                                            .items_center()
+                                            .gap(px(6.))
+                                            .child(caption(&t, tr!("Start or stop from anywhere")))
+                                            .child(keycaps(&t, &toggle_keys))
+                                    }),
+                            ),
                     )
                     .child(
                         div()
