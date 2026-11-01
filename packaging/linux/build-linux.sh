@@ -19,6 +19,7 @@
 #                      Refused unless it needs only libc, libm and the loader (static, CPU, no curl/OpenSSL).
 #   CM_REQUIRE_LLAMA=1 fail unless llama-server with its MIT licence files is bundled.
 #   CM_LINUX_OUT       output folder.
+#   CM_LINUX_STRIP=0   ship the programs with their debug info (default: stripped; the full copies go to <out>/debug/).
 #   CM_LINUX_ALLOW_MISSING  space-separated program names that may be absent (testing the packaging only).
 #   CM_CARGO_JOBS      cargo -j value (default: cargo's own).
 #   CM_SKIP_LICENSES=1 use the checked-in THIRD_PARTY_LICENSES.md (macOS crate set) instead of
@@ -181,6 +182,16 @@ name="capturemann-${version}-linux-${arch}"
 stage="$tmp/$name"
 mkdir -p "$stage/lib/capturemann" "$stage/share/applications" "$stage/share/doc/capturemann"
 for b in $bins; do install -m 755 "$target/$b" "$stage/lib/capturemann/$b"; done
+# The release profile keeps debug info (cm-desktop is about 700 MB with it). Ship the stripped programs and
+# keep the full ones in $out/debug/ for reading crash backtraces. CM_LINUX_STRIP=0 ships them unstripped.
+if [ "${CM_LINUX_STRIP:-1}" = "1" ]; then
+  command -v strip >/dev/null 2>&1 || die "strip is missing (sudo apt install binutils), or set CM_LINUX_STRIP=0"
+  mkdir -p "$out/debug"
+  for b in $bins; do
+    install -m 755 "$target/$b" "$out/debug/$b"
+    strip --strip-debug "$stage/lib/capturemann/$b"
+  done
+fi
 if [ -n "$ffdir" ]; then
   install -m 755 "$ffdir/ffmpeg" "$stage/lib/capturemann/ffmpeg"
   [ ! -x "$ffdir/ffprobe" ] || install -m 755 "$ffdir/ffprobe" "$stage/lib/capturemann/ffprobe"
