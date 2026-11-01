@@ -183,6 +183,8 @@ try {
     $ok = $false
     if ($bash) {
       $env:CM_LICENSE_TRIPLES = $triple
+      # Python on Windows reads files in the ANSI code page by default; the crate licence texts are UTF-8.
+      $env:PYTHONUTF8 = '1'
       $genScript = (Join-Path $root 'packaging/macos/gen-third-party.sh') -replace '\\', '/'
       $genOut = $gen -replace '\\', '/'
       & $bash.Source $genScript $genOut *> (Join-Path $tmp 'gen.log')
