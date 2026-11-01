@@ -70,8 +70,23 @@ jobs:
           & "$app\capturemann.exe" --version; if ($LASTEXITCODE -ne 0) { throw 'capturemann --version failed' }
           & "$app\capturemann.exe" targets; if ($LASTEXITCODE -ne 0) { throw 'capturemann targets failed' }
           & "$app\capturemann.exe" diagnostics; if ($LASTEXITCODE -ne 0) { throw 'capturemann diagnostics failed' }
+          # One screenshot of the runner's own desktop, through the CLI and the daemon it started.
+          $t = (& "$app\capturemann.exe" --json targets) | ConvertFrom-Json
+          $id = $t.displays[0].id
+          $png = Join-Path $env:RUNNER_TEMP 'cli-shot.png'
+          & "$app\capturemann.exe" --json capture screenshot --display $id --out $png; if ($LASTEXITCODE -ne 0) { throw 'capturemann capture screenshot failed' }
+          Add-Type -AssemblyName System.Drawing
+          $img = [System.Drawing.Image]::FromFile($png)
+          "screenshot: $($img.Width)x$($img.Height) px, display $id is $($t.displays[0].bounds.size -join 'x')"
+          $img.Dispose()
+          Copy-Item $png (Join-Path $PWD 'cli-shot.png')
           & "$app\capturemann.exe" --json library list; if ($LASTEXITCODE -ne 0) { throw 'capturemann library list failed' }
           Stop-Process -Name cm-daemon -Force -ErrorAction SilentlyContinue
+      # The same real-display tests CI runs, here so a package run shows them early. A failure is reported, not fatal.
+      - name: Real display tests (reported)
+        continue-on-error: true
+        shell: pwsh
+        run: cargo test -p cm-capture --test real_display --locked --no-default-features -- --ignored --test-threads=1 --nocapture
       - name: The app window (start, wait, screenshot of the desktop)
         shell: pwsh
         run: |
@@ -119,5 +134,6 @@ jobs:
             packaging/windows/out/*.exe
             packaging/windows/out/*.sha256
             shots/*.png
+            cli-shot.png
           if-no-files-found: warn
           retention-days: 14
