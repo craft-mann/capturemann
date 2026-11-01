@@ -526,7 +526,18 @@ mod tests {
         )
         .unwrap();
         std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
-        let mut e = FfmpegVp9Encoder::with_ffmpeg(&cfg(dir.path(), 640, 480, 30), fake).unwrap();
+        // Another test thread may fork while the script is still open for writing, which makes the
+        // first exec fail with "text file busy"; the probe then reports a missing encoder. Retry.
+        let mut e = (0..20)
+            .find_map(|_| {
+                FfmpegVp9Encoder::with_ffmpeg(&cfg(dir.path(), 640, 480, 30), fake.clone())
+                    .ok()
+                    .or_else(|| {
+                        std::thread::sleep(std::time::Duration::from_millis(50));
+                        None
+                    })
+            })
+            .expect("the fake ffmpeg starts");
         let f = frame(640, 480, 1);
         let mut not_ready = 0;
         for slot in 0..200 {
