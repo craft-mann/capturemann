@@ -41,8 +41,8 @@ pipewire = "0.10"
 x11rb = "0.13"
 
 [target.'cfg(windows)'.dependencies]
-# Free space of a volume (the recording disk guard); the version cm-cursor uses.
-windows = { version = "0.61", features = ["Win32_Storage_FileSystem"] }
+# Free space of a volume (the recording disk guard) and the capture size of a window (sys/wgc_size.rs); the version cm-cursor uses.
+windows = { version = "0.61", features = ["Win32_Storage_FileSystem", "Win32_Foundation", "Graphics_Capture", "Win32_System_WinRT", "Win32_System_WinRT_Graphics_Capture"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Zlib OR Apache-2.0 OR MIT. The versions xcap already uses, so nothing extra is compiled.

@@ -354,6 +354,64 @@ fn cap1_windows_lists_and_captures_a_started_window() {
             rows.last()
         );
     }
+    {
+        // Does the window image sit at the listed origin? Compare it with the display capture taken right
+        // after, cropped at the origin shifted by up to 8 px each way; the shift with the fewest differing
+        // pixels is printed, and the listed origin must be that shift (Notepad is idle and on top).
+        let d = t_display_for(&c, w.display_id);
+        let shot = c
+            .capture(
+                CaptureRequest::new(CaptureTarget::Display { display_id: d.0 }),
+                None,
+            )
+            .unwrap()
+            .unwrap();
+        let (ox, oy) = (w.bounds.origin.x as i64, w.bounds.origin.y as i64);
+        let differing = |dx: i64, dy: i64| -> Option<(usize, usize)> {
+            let (mut bad, mut total) = (0usize, 0usize);
+            for y in (0..cap.frame.height() as i64).step_by(2) {
+                for x in (0..cap.frame.width() as i64).step_by(2) {
+                    let a = cap.frame.pixel(x as u32, y as u32)?;
+                    let (sx, sy) = (ox - d.1 + x + dx, oy - d.2 + y + dy);
+                    let Some(b) = u32::try_from(sx)
+                        .ok()
+                        .zip(u32::try_from(sy).ok())
+                        .and_then(|(sx, sy)| shot.frame.pixel(sx, sy))
+                    else {
+                        continue;
+                    };
+                    total += 1;
+                    if a[0].abs_diff(b[0]) > 8 || a[1].abs_diff(b[1]) > 8 || a[2].abs_diff(b[2]) > 8
+                    {
+                        bad += 1;
+                    }
+                }
+            }
+            (total > 0).then_some((bad, total))
+        };
+        let mut best = (i64::MAX, 0i64, 0i64, 0usize);
+        for dy in -8..=8i64 {
+            for dx in -8..=8i64 {
+                if let Some((bad, total)) = differing(dx, dy) {
+                    let permille = (bad * 1000 / total) as i64;
+                    if permille < best.0 {
+                        best = (permille, dx, dy, total);
+                    }
+                }
+            }
+        }
+        let at_origin = differing(0, 0).map(|(b, t)| (b * 1000 / t) as i64);
+        println!(
+            "ALIGNMENT best shift ({}, {}) differs in {} per mille of {} samples; at the listed origin: {:?} per mille",
+            best.1, best.2, best.0, best.3, at_origin
+        );
+        assert!(
+            at_origin.is_some_and(|p| p <= best.0 + 20),
+            "the window image is not at the listed origin: best shift ({}, {})",
+            best.1,
+            best.2
+        );
+    }
     println!(
         "window image {}x{} vs bounds {}x{}",
         cap.frame.width(),
@@ -367,4 +425,16 @@ fn cap1_windows_lists_and_captures_a_started_window() {
         "the window image deviates from the listed bounds (invisible resize borders or DWM shadow?)"
     );
     report_content("window", &cap.frame);
+}
+
+/// The id and physical origin of the display a window is on (or the first display).
+#[cfg(target_os = "windows")]
+fn t_display_for(c: &Capturer, id: Option<u32>) -> (u32, i64, i64) {
+    let t = c.list_targets().unwrap();
+    let d = t
+        .displays
+        .iter()
+        .find(|d| Some(d.id) == id)
+        .unwrap_or(&t.displays[0]);
+    (d.id, d.bounds.origin.x as i64, d.bounds.origin.y as i64)
 }

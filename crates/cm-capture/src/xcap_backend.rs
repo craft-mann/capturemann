@@ -370,12 +370,19 @@ fn window_from_raw(w: &listing::RawWindow, monitors: &[MonitorPoints]) -> Window
 fn window_info(w: &Window) -> Result<WindowInfo, XCapError> {
     let monitor = w.current_monitor().ok();
     let scale = monitor.as_ref().map_or(ScaleFactor::ONE, monitor_scale);
+    let id = w.id()?;
+    let (x, y, mut width, mut height) = (w.x()?, w.y()?, w.width()?, w.height()?);
+    // Windows: the picture is the capture item, which is smaller than the frame xcap lists.
+    #[cfg(windows)]
+    if let Some((iw, ih)) = crate::sys::wgc_size::item_size(id) {
+        (width, height) = (iw, ih);
+    }
     Ok(WindowInfo {
-        id: w.id()?,
+        id,
         title: w.title().unwrap_or_default(),
         app: w.app_name().unwrap_or_default(),
         pid: w.pid().unwrap_or(0),
-        bounds: to_physical(w.x()?, w.y()?, w.width()?, w.height()?, scale.get()),
+        bounds: to_physical(x, y, width, height, scale.get()),
         scale,
         display_id: monitor.and_then(|m| m.id().ok()),
         minimized: w.is_minimized().unwrap_or(false),

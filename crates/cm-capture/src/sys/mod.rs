@@ -7,4 +7,6 @@ pub mod permission;
 pub mod pipewire_linux;
 pub mod portal;
 pub mod session;
+#[cfg(windows)]
+pub mod wgc_size;
 pub mod x11_names;
