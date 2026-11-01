@@ -162,8 +162,8 @@ pub fn specs(os: Os) -> Vec<Spec> {
         features: tr!("Recording: microphone track"),
         required: false,
     });
-    // The Linux build has no camera support yet (webcam bubble and camera track), so no row.
-    if os != Os::Linux {
+    // Only the Mac build records with a camera (webcam bubble and camera track): no row on Windows and Linux.
+    if os == Os::Mac {
         v.push(Spec {
             id: Id::Camera,
             name: tr_ctx!("permission", "Camera"),
@@ -820,7 +820,7 @@ mod tests {
         let win = specs(Os::Windows);
         assert_eq!(
             win.iter().map(|s| s.id).collect::<Vec<_>>(),
-            [Id::Microphone, Id::Camera]
+            [Id::Microphone]
         );
     }
 
