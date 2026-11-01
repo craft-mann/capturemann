@@ -63,6 +63,10 @@ jobs:
           $env:CAPTUREMANN_LIBRARY = Join-Path $env:RUNNER_TEMP 'zip-lib'
           $env:CAPTUREMANN_CONFIG_DIR = Join-Path $env:RUNNER_TEMP 'zip-cfg'
           $env:CAPTUREMANN_SOCKET = "\\.\pipe\cm-pkg-$PID"
+          # The licence list must be the Windows crate set (windows-sys in, the Apple crates out), not the checked-in macOS one.
+          $lic = Get-Content (Join-Path $app 'doc\THIRD_PARTY_LICENSES.md') -Raw
+          "licence list: $($lic.Length) characters; windows-sys: $($lic -match 'windows-sys'); objc2: $($lic -match 'objc2')"
+          if ($lic -notmatch 'windows-sys' -or $lic -match 'objc2') { throw 'THIRD_PARTY_LICENSES.md is not the Windows list' }
           & "$app\capturemann.exe" --version; if ($LASTEXITCODE -ne 0) { throw 'capturemann --version failed' }
           & "$app\capturemann.exe" targets; if ($LASTEXITCODE -ne 0) { throw 'capturemann targets failed' }
           & "$app\capturemann.exe" diagnostics; if ($LASTEXITCODE -ne 0) { throw 'capturemann diagnostics failed' }
