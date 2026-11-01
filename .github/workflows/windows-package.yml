@@ -10,10 +10,6 @@ name: Windows package
 # The Windows early build has no FFmpeg (no recording or MP4 export yet) and no speaker engine.
 # Pinned actions: the same commits as ci.yml.
 on:
-  # TEMPORARY: runs this workflow once from the branch (a dispatch needs the file on the default branch). Removed next commit.
-  push:
-    branches: [windows-step0]
-    paths: [.github/workflows/windows-package.yml]
   workflow_dispatch:
 
 permissions:
