@@ -16,10 +16,12 @@
 | `cm-desktop.exe` start, 25 s, screenshot of the desktop | PASS | stays up, window title "CaptureMann", the app draws its UI (first-run permissions page, then the library) |
 | Silent install (`/S /D=`), run, silent uninstall | PASS | exit codes 0 |
 | Real-display tests (`cm-capture`, Windows): display size, region equals crop | PASS | |
-| Real-display tests: window capture size equals listed bounds | FAIL | Notepad bounds 754x512, image 747x510; a console window 1030x628 vs 1023x628: the listing includes the invisible resize borders, the picture is the visible frame (about 7 px less in width) |
+| Real-display tests: window capture size equals listed bounds | FAIL then fixed | Notepad bounds 754x512, image 747x510 (console window 1030x628 vs 1023x628). Cause: xcap's GDI window capture scales the whole window rectangle to the frame size and crops at the border offset, so its picture was shrunk and shifted 7 px. `sys/win_window.rs` now paints the window (`PrintWindow`) and cuts out the DWM frame; on a runner image 754x512 = bounds, and an alignment check against a display capture found the best shift (0, 0) (6 per mille of sampled pixels differ, an idle Notepad). An attempt using the capture item size was wrong and reverted. |
 | Full `cargo test --no-default-features` on Windows (CI) | FAIL then fixed | one test used a Unix path (`user_dirs_file_rules`), now Unix-only; a clippy dead-code error on Windows (`command_for`) fixed |
 | A physical Windows PC (clean install, SmartScreen, real GPU, high-DPI, uninstall leaves nothing) | NOT RUN | the ThinkPad |
 
-Open items found: window bounds vs picture (above); the app window's title bar sits partly above the screen on the 1024x768
+Open items found: the app window's title bar sits partly above the screen on the 1024x768
 runner (seen in `shots/desktop-with-app.png`); no Windows text recogniser (Auto-redact needs `tesseract`, the hint now names
 `winget install UB-Mannheim.TesseractOCR`); "FFmpeg not found ... Homebrew" in diagnostics; no code signing (SmartScreen).
+
+Update, same day: CI run 41322201474 on `fbd33d4` was green on all jobs including Windows (clippy, full tests, real-display tests, `windows-smoke.ps1`, trash test). `windows-smoke.ps1` also passed on the packaged binaries (package run 41321049994). Still PARTIAL: no physical PC yet.
