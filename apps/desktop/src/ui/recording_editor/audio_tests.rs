@@ -537,7 +537,9 @@ fn play_sample_plays_the_speakers_longest_turn_and_stops_at_its_end(cx: &mut Tes
         let Load::Ready(s) = &e.load else {
             panic!("not ready")
         };
-        assert_eq!(s.model.playhead, MediaTime::from_secs(3));
+        // Playback has already started, so on a busy machine the playhead is a few ms past the turn's start.
+        assert!(s.model.playhead >= MediaTime::from_secs(3));
+        assert!(s.model.playhead < MediaTime::from_secs(4));
         assert!(s.model.playing);
         let lp = e.ai.line_play.expect("it stops by itself");
         assert_eq!(lp.end, MediaTime::from_secs(SECS));
