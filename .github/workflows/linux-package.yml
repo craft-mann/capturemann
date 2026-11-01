@@ -142,3 +142,11 @@ jobs:
             packaging/linux/out/*.deb
           if-no-files-found: error
           retention-days: 14
+      # The shipped programs are stripped; these are the same builds with debug info, for reading backtraces.
+      - name: Keep the unstripped programs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: capturemann-linux-${{ matrix.arch }}-debug
+          path: packaging/linux/out/debug/
+          if-no-files-found: error
+          retention-days: 14
