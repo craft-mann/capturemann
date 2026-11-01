@@ -563,7 +563,7 @@ fn settings_body(
         .text_size(px(type_scale::H2))
         .font_weight(FontWeight::SEMIBOLD)
         .child(tr_ctx!("navigation", "Settings"));
-    let rows = SettingsSection::ALL.iter().map(|&s| {
+    let rows = SettingsSection::visible().into_iter().map(|s| {
         let (app, settings) = (app.clone(), settings.clone());
         nav_row(t, s.id(), s.icon(), s.label(), None, s == p.section).on_click(move |_, _, cx| {
             settings.update(cx, |v, cx| v.select(s, cx));

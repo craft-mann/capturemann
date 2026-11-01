@@ -46,6 +46,16 @@ impl SettingsSection {
         SettingsSection::About,
     ];
 
+    /// The sections the sidebar lists: without a recorder (Linux and Windows early builds) the
+    /// Webcam & audio page has nothing to configure, so it is left out.
+    pub fn visible() -> Vec<SettingsSection> {
+        let recording = crate::backend::recording_supported();
+        Self::ALL
+            .into_iter()
+            .filter(|s| recording || *s != SettingsSection::Webcam)
+            .collect()
+    }
+
     /// Nav label (the kit's wording).
     pub fn label(self) -> String {
         match self {

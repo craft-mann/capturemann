@@ -2144,7 +2144,7 @@ msgid "Link copied to the clipboard"
 msgstr ""
 
 #. FACT: owner review required (the desktop portal asks, not CaptureMann)
-msgid "Linux does not ask per app. Your desktop asks when CaptureMann captures the screen, and the microphone and camera are not gated by the system. Below is what this system can and cannot do for CaptureMann."
+msgid "Linux does not ask per app. Your desktop asks when CaptureMann captures the screen, and the microphone is not gated by the system. Below is what this system can and cannot do for CaptureMann."
 msgstr ""
 
 msgid "List"
@@ -3886,6 +3886,9 @@ msgid "Screenshot display"
 msgstr ""
 
 msgid "Screenshot region"
+msgstr ""
+
+msgid "Screenshot settings"
 msgstr ""
 
 msgid "Screenshot window"
@@ -8211,6 +8214,10 @@ msgstr ""
 
 msgctxt "settings group"
 msgid "Recording"
+msgstr ""
+
+msgctxt "settings group"
+msgid "Screenshots"
 msgstr ""
 
 msgctxt "settings group"

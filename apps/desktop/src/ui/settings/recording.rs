@@ -93,6 +93,33 @@ impl SettingsView {
         let sizes = options_of(&SIZES, size_label);
         let codecs = options_of(&CODECS, codec_label);
         let qualities = options_of(&QUALITIES, quality_label);
+        let delay_row = plain_row(
+                        t,
+                        tile::SCREENSHOT_DELAY,
+                        &tr!("Before a screenshot"),
+                        &tr!("Waits this long before a screenshot starts, from the dock, a shortcut, the launcher or the tray. Esc cancels the wait."),
+                        Some(
+                            segmented(t, "cap-delay-choices", &tr!("Before a screenshot"))
+                                .children(delay_choices)
+                                .into_any_element(),
+                        ),
+                        true,
+                    );
+        // Without a recorder (Linux and Windows early builds) only the screenshot delay applies.
+        if !crate::backend::recording_supported() {
+            return div()
+                .flex()
+                .flex_col()
+                .gap(px(24.))
+                .child(group_with_card(
+                    t,
+                    &tr_ctx!("settings group", "Screenshots"),
+                    None,
+                    card_group(t, "screenshot-settings", &tr!("Screenshot settings"))
+                        .child(delay_row),
+                ))
+                .into_any_element();
+        }
         // Design gap: the board's banner ("Native on your display is W x H. At these settings a
         // 10-minute recording is about N GB.") needs a display lookup and a size model; not built.
         div()
@@ -211,18 +238,7 @@ impl SettingsView {
                         s.resume_countdown_s,
                         false,
                     ))
-                    .child(plain_row(
-                        t,
-                        tile::SCREENSHOT_DELAY,
-                        &tr!("Before a screenshot"),
-                        &tr!("Waits this long before a screenshot starts, from the dock, a shortcut, the launcher or the tray. Esc cancels the wait."),
-                        Some(
-                            segmented(t, "cap-delay-choices", &tr!("Before a screenshot"))
-                                .children(delay_choices)
-                                .into_any_element(),
-                        ),
-                        true,
-                    )),
+                    .child(delay_row),
             ))
             .child(caption(
                 t,
