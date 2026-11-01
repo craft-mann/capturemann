@@ -781,7 +781,13 @@ impl ReconnectWhy {
     pub fn text(&self) -> String {
         match self {
             ReconnectWhy::NoAccount => tr!("No account is set for this destination."),
-            ReconnectWhy::NotSignedIn => tr!("Not signed in on this Mac."),
+            ReconnectWhy::NotSignedIn => {
+                if crate::permissions::Os::current() == crate::permissions::Os::Mac {
+                    tr!("Not signed in on this Mac.")
+                } else {
+                    tr!("Not signed in on this computer.")
+                }
+            }
             ReconnectWhy::UploadsWaiting => tr!("The sign-in expired; uploads are waiting."),
             ReconnectWhy::Refused => tr!("The sign-in was refused."),
             ReconnectWhy::Os(e) => e.clone(),

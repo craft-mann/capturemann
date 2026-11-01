@@ -694,7 +694,11 @@ impl Render for AiPage {
                                     div()
                                         .text_size(px(type_scale::UI))
                                         .text_color(rgba_of(t.text_3))
-                                        .child(tr!("Transcripts, speakers, translations and reports, made on this Mac.")),
+                                        .child(if crate::permissions::Os::current() == crate::permissions::Os::Mac {
+                                            tr!("Transcripts, speakers, translations and reports, made on this Mac.")
+                                        } else {
+                                            tr!("Transcripts, speakers, translations and reports, made on this computer.")
+                                        }),
                                 ),
                         ),
                 )

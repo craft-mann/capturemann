@@ -236,6 +236,9 @@ fn translated(p: &MessageParts) -> Option<String> {
         "hardware_encoder_unavailable" => tr!(
             "This Mac has no usable hardware H.264 encoder for this recording. Try a lower resolution, update to macOS 13 or later, or use a Mac from about 2016 or later."
         ),
+        "ffmpeg_not_found" if !on_mac() => tr!(
+            "FFmpeg was not found: install it with your package manager (for example sudo apt install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."
+        ),
         "ffmpeg_not_found" => tr!(
             "FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."
         ),
@@ -250,6 +253,10 @@ fn translated(p: &MessageParts) -> Option<String> {
             "FFmpeg was not found: the copy inside CaptureMann (`{path}`) cannot be run ({error}). The app is damaged or macOS blocked it. Reinstall CaptureMann. (Advanced: set CM_FFMPEG to an ffmpeg executable.)",
             path = g("path"),
             error = g("error")
+        ),
+        "ffmpeg_permission_denied" if !on_mac() => tr!(
+            "FFmpeg at `{path}` cannot be run (permission denied). Check that the file is executable, install FFmpeg with your package manager (for example sudo apt install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy.",
+            path = g("path")
         ),
         "ffmpeg_permission_denied" => tr!(
             "FFmpeg at `{path}` cannot be run (permission denied). FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy.",
@@ -1122,3 +1129,8 @@ pub fn params_of(v: &Value) -> Value {
 
 #[cfg(test)]
 mod tests;
+
+/// The macOS wording of a message is wrong on the other systems (Homebrew, "this Mac").
+fn on_mac() -> bool {
+    crate::permissions::Os::current() == crate::permissions::Os::Mac
+}

@@ -1688,6 +1688,9 @@ msgstr ""
 msgid "Exports go to the default first"
 msgstr ""
 
+msgid "FFmpeg at `{path}` cannot be run (permission denied). Check that the file is executable, install FFmpeg with your package manager (for example sudo apt install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."
+msgstr ""
+
 msgid "FFmpeg at `{path}` cannot be run (permission denied). FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."
 msgstr ""
 
@@ -1713,6 +1716,9 @@ msgid "FFmpeg was not found: CM_FFMPEG points to `{path}`, which is not a file. 
 msgstr ""
 
 msgid "FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."
+msgstr ""
+
+msgid "FFmpeg was not found: install it with your package manager (for example sudo apt install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."
 msgstr ""
 
 msgid "FFmpeg was not found: the copy inside CaptureMann (`{path}`) cannot be run ({error}). The app is damaged or macOS blocked it. Reinstall CaptureMann. (Advanced: set CM_FFMPEG to an ffmpeg executable.)"
@@ -2744,6 +2750,9 @@ msgid "Not set"
 msgstr ""
 
 msgid "Not signed in on this Mac."
+msgstr ""
+
+msgid "Not signed in on this computer."
 msgstr ""
 
 msgid "Not sure"
@@ -4964,6 +4973,9 @@ msgid "Transcript ready"
 msgstr ""
 
 msgid "Transcripts, speakers, translations and reports, made on this Mac."
+msgstr ""
+
+msgid "Transcripts, speakers, translations and reports, made on this computer."
 msgstr ""
 
 msgid "Translate"
