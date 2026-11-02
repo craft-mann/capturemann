@@ -16,11 +16,13 @@
 | 14a `capture screenshot --window x` | PASS | `not_implemented`, names `--pick`; `targets` says the desktop does not list windows |
 | 14a `capture screenshot --pick`, choosing a window | **FAIL (desktop)** | GNOME's chooser took the picture (two files in `~/Pictures/Screenshots`) but the portal answered with response code 2 and logged `xdg-desktop-portal: InteractiveScreenshot didn't return a file`; the CLI reports `user_declined` and exits 3. Nothing is saved in the library. The picture the desktop took is not handed to the app |
 | 15 clipboard | PASS | `--copy`: `wl-paste --type image/png` shows a 1920x1080 PNG; pasted with Ctrl+V into a text box in Firefox the picture appeared (maintainer, a later Wayland session with the build of CI run 41422283917). The app logs `Tried to initialize the wayland data control protocol clipboard, but failed. Falling back to the X11 clipboard protocol`: GNOME has no data-control protocol, so the copy goes through XWayland |
-| 15c no GlobalShortcuts portal | PARTIAL | the log says `no GlobalShortcuts portal`; `cm-desktop --launcher` shows the launcher in the running app. The start toast and the Shortcuts page wording: NOT RUN (seen by eye only) |
+| 15c no GlobalShortcuts portal | PASS | the log says `no GlobalShortcuts portal`; Settings -> Shortcuts (seen in a display capture): every row says "Not available on this desktop" and a note says global shortcuts need X11 or the GlobalShortcuts portal and tells to add a custom shortcut in the desktop's keyboard settings that runs `cm-desktop --launcher` or `cm-desktop --capture region`; `cm-desktop --launcher` shows the launcher in the running app. The start-up toast: NOT SEEN. Odd: the Recording rows and the Change buttons are shown although recording is off in this build |
 | 15d second instance | PASS | exits at once, shows the running app |
 | 17/18 recording is off | PASS | `record start` answers `not_implemented`, nothing created |
 | 16 portal memory (asks again?) | NOT RUN | no dialog appeared because permission existed |
-| 3b/3c editor, 6, 7 to 9 keyring, tray on Wayland | NOT RUN | |
+| 5b/5c window controls on GNOME Wayland (move by the bar, double-click maximise, resize by an edge) | PASS (as reported by the maintainer) | |
+| 19 tray menu on Wayland | PASS (as reported by the maintainer) | the menu opens and Open launcher works |
+| 6 editor, 7 to 9 keyring | see the X11 report | session independent |
 
 ## Problems found
 
