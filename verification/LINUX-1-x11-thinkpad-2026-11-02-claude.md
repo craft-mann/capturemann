@@ -10,7 +10,7 @@
 | Step | Result | Notes |
 | --- | --- | --- |
 | 3 diagnostics | PASS | `session X11`, portal ScreenCast v5 and Screenshot v2, PipeWire yes, Secret Service yes, VAAPI `/dev/dri/renderD128`, secrets in the system credential store, tesseract found; no macOS wording |
-| 4 PipeWire stopped | INCONCLUSIVE | diagnostics still said PipeWire running after `systemctl --user stop ...` (socket activation restarted it); the "needs PipeWire" line was not seen |
+| 4 PipeWire stopped | INCONCLUSIVE | with the PipeWire processes and its sockets units stopped (`systemctl --user stop`, then masked for the test, restored afterwards) diagnostics still said `PipeWire running`: the app decides by the `pipewire-0` socket file in `XDG_RUNTIME_DIR` (`cm-audio` `linux_pipewire.rs`), and that file was still there; PipeWire starts on demand through it on Ubuntu, so "available" is a fair answer. The "needs PipeWire" line was not seen; it needs the socket file removed |
 | 5 first launch, one title bar | PASS | the window opened within the 6 s wait, system title bar only, `WM_CLASS dev.capturemann.app`, log has `desktop 0.2.5 started` |
 | 10 display screenshot | PASS | 1920x1080 PNG in the library |
 | 11 region screenshot | PASS | `Ctrl+Alt+Shift+1`, drag, Enter: saved 400x250, picker shows size, "1x native" and the magnifier |
@@ -28,7 +28,7 @@
 | 6 editor (6a to 6f) | PARTIAL | the maintainer used the editor on X11 and said it worked; the single steps (draw, undo, copy, Save as, IBus typing) were not listed one by one |
 | 13, 14, 14a, 15b, 15c, 16 Wayland | NOT RUN | |
 | 21 to 23 tray activation, language, host restart | NOT RUN | |
-| 1, 2 tarball install and uninstall | NOT RUN | |
+| 1, 2 tarball install and uninstall | PASS | tarball of CI run 41422283917: `sha256sum -c` OK, `check-runtime.sh` ("All libraries the programs link are present (8 programs checked)"), `install.sh --prefix ~/tbprefix`, `capturemann --version` 0.2.6 from the prefix, `install.sh --uninstall`: the programs, links, icons, `.desktop` entry and documents were removed and the library and settings were untouched. Left behind in the prefix: `share/applications/mimeinfo.cache` (13 bytes, written by `update-desktop-database`) and empty folders. Tested with a prefix because the `.deb` was installed; the default `~/.local` prefix and the launcher icon were not looked at |
 
 ## Problems found
 
