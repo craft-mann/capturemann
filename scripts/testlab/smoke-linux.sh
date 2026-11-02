@@ -111,7 +111,12 @@ if [ -x "$bin/cm-mcp" ]; then
 fi
 
 sec "Stop the throw-away daemon"
-"$cm" daemon stop >/dev/null 2>&1 && pass "daemon stopped" || info "no daemon to stop"
+# The CLI has no `daemon stop`: the daemons the checks started are found by their own temp folder.
+stopped=0
+for pid in $(pgrep -x cm-daemon || true); do
+  if tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -qF "$work"; then kill "$pid" 2>/dev/null && stopped=$((stopped + 1)); fi
+done
+if [ "$stopped" -gt 0 ]; then pass "stopped $stopped throw-away daemon(s)"; else info "no throw-away daemon was running"; fi
 
 say ""
 if [ "$fails" -eq 0 ]; then say "Result: no FAIL lines. Report: $out"; else say "Result: $fails FAIL line(s). Report: $out"; fi
