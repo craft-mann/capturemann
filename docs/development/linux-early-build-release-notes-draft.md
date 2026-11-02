@@ -13,8 +13,8 @@ and the MCP server work; **recording is not available yet** (it is switched off 
 
 ## What works
 
-- **Screenshots** of a region, a window or a whole display. On X11 and on GNOME with Wayland (through the desktop's
-  screenshot portal).
+- **Screenshots** of a region, a window or a whole display on X11, and of a region or a display on GNOME with Wayland
+  (through the desktop's screenshot portal).
 - **Editor and annotations**, copy and save, the library with search and bundles, in English and Vietnamese
   (Telex and VNI typing work in the editor).
 - **Local AI**: transcription with Whisper (CPU), speaker labels, translation and reports with the built-in text
@@ -28,7 +28,9 @@ and the MCP server work; **recording is not available yet** (it is switched off 
 ## What does not work yet
 
 - Screen and audio recording, the webcam, and MP4 export of recordings.
-- The window list on Wayland (use region or display, or `capturemann capture screenshot --pick`).
+- Window screenshots on Wayland: there is no window list, and on GNOME 46 (Ubuntu 24.04) the desktop's own window
+  chooser (`capturemann capture screenshot --pick`) takes the picture but does not hand it to the app. Use region or
+  display.
 - Global shortcuts on GNOME 46 Wayland (no portal); use the tray menu or the launcher.
 - Copy image to the clipboard on GNOME 46 Wayland may fail.
 - Tray icon on GNOME needs the AppIndicator extension, otherwise the app shows a notice instead.
