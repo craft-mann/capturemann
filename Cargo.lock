@@ -1509,6 +1509,7 @@ dependencies = [
  "tokio",
  "tray-icon",
  "unicode-segmentation",
+ "x11rb",
  "zbus",
 ]
 

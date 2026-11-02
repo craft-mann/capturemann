@@ -152,6 +152,36 @@ pub fn exclude_from_capture(window: &Window) {
     }
 }
 
+/// X11 only: sets the input focus on `window` itself. GPUI asks the window manager to activate a
+/// new pop-up (`_NET_ACTIVE_WINDOW`) without a timestamp, and GNOME's focus-stealing rules then
+/// keep the keyboard on the old window when the pop-up opens a moment after the click or key
+/// (the window picker: typing, Enter and Esc went to the library window). Setting the focus
+/// directly is what `xdotool windowfocus` did in the same situation. Wayland, macOS and Windows:
+/// nothing to do. Call it once the window is mapped.
+pub fn focus_x11(window: &Window) {
+    #[cfg(target_os = "linux")]
+    {
+        use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+        use x11rb::connection::Connection;
+        use x11rb::protocol::xproto::{ConnectionExt, InputFocus};
+        let Ok(handle) = HasWindowHandle::window_handle(window) else {
+            return;
+        };
+        let id = match handle.as_raw() {
+            RawWindowHandle::Xcb(h) => h.window.get(),
+            RawWindowHandle::Xlib(h) => h.window as u32,
+            _ => return,
+        };
+        let Ok((conn, _)) = x11rb::connect(None) else {
+            return;
+        };
+        let _ = conn.set_input_focus(InputFocus::PARENT, id, x11rb::CURRENT_TIME);
+        let _ = conn.flush();
+    }
+    #[cfg(not(target_os = "linux"))]
+    let _ = window;
+}
+
 /// The CGWindowID of `window` when it is on screen (visible and not minimized), `None`
 /// otherwise and where the platform has no such id. Only for the library window, which
 /// recordings and screenshots include (see `studio_window`).
