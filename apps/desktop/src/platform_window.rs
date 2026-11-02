@@ -30,7 +30,14 @@ pub fn normal_window_options(
     min_px: (f32, f32),
     cx: &App,
 ) -> WindowOptions {
-    let bounds = Bounds::centered(None, size(px(size_px.0), px(size_px.1)), cx);
+    // Never larger than the display: a 1920x1080 screen at 150 % is 1280x720 logical px, and the
+    // 1180x760 Studio window centred on it had its title bar above the top of the screen.
+    let display = cx.primary_display().map(|d| {
+        let b = d.bounds().size;
+        (f32::from(b.width), f32::from(b.height))
+    });
+    let (w, h) = fit_to_display(size_px, min_px, display);
+    let bounds = Bounds::centered(None, size(px(w), px(h)), cx);
     WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(bounds)),
         titlebar: Some(TitlebarOptions {
@@ -43,6 +50,27 @@ pub fn normal_window_options(
         icon: imp::window_icon(),
         ..Default::default()
     }
+}
+
+/// Room kept free around a window on its display, in logical px: the taskbar, dock or top bar
+/// and the window's own title bar (height), and a margin on both sides (width).
+const DISPLAY_MARGIN: (f32, f32) = (32., 96.);
+
+/// The size a window opens at: `wanted`, but not larger than the display minus [`DISPLAY_MARGIN`]
+/// and never below `min` (a display smaller than the minimum size cannot help it). `None`: no
+/// display known, `wanted` stands.
+pub fn fit_to_display(
+    wanted: (f32, f32),
+    min: (f32, f32),
+    display: Option<(f32, f32)>,
+) -> (f32, f32) {
+    let Some((dw, dh)) = display else {
+        return wanted;
+    };
+    (
+        wanted.0.min(dw - DISPLAY_MARGIN.0).max(min.0),
+        wanted.1.min(dh - DISPLAY_MARGIN.1).max(min.1),
+    )
 }
 
 /// The base of every pop-up window's options (`..popup_base()` in place of
@@ -586,7 +614,7 @@ mod imp {
 
 #[cfg(test)]
 mod tests {
-    use super::{centered_frame, is_wayland_session};
+    use super::{centered_frame, fit_to_display, is_wayland_session};
 
     #[test]
     fn the_session_type_decides_wayland() {
@@ -635,5 +663,30 @@ mod tests {
             centered_frame(v, 2000.0, 100.0),
             (0.0, 275.0, 1280.0, 100.0)
         );
+    }
+
+    /// A 1920x1080 display at 150 % is 1280x720 logical px: the 1180x760 Studio window must fit
+    /// (title bar above the screen on the Windows test laptop), and a big display leaves it alone.
+    #[test]
+    fn a_window_fits_its_display() {
+        let (wanted, min) = ((1180., 760.), (720., 480.));
+        assert_eq!(
+            fit_to_display(wanted, min, Some((1280., 720.))),
+            (1180., 624.)
+        );
+        assert_eq!(
+            fit_to_display(wanted, min, Some((1440., 900.))),
+            (1180., 760.)
+        );
+        assert_eq!(fit_to_display(wanted, min, Some((2560., 1440.))), wanted);
+        // A narrow display: the width follows.
+        assert_eq!(
+            fit_to_display(wanted, min, Some((1024., 768.))),
+            (992., 672.)
+        );
+        // Smaller than the minimum size: the minimum wins, nothing smaller is asked for.
+        assert_eq!(fit_to_display(wanted, min, Some((640., 480.))), min);
+        // No display known: unchanged.
+        assert_eq!(fit_to_display(wanted, min, None), wanted);
     }
 }
