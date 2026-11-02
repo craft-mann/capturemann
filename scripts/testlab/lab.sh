@@ -19,7 +19,10 @@ die() { echo "lab.sh: $*" >&2; exit 1; }
 conf="$HOME/.config/capturemann-lab"
 [ -f "$conf" ] && set -a && . "$conf" && set +a
 LAB_SSH_KEY="${LAB_SSH_KEY:-$HOME/.ssh/id_ed25519}"
-ssh_opts=(-i "$LAB_SSH_KEY" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 -o BatchMode=yes -o LogLevel=ERROR)
+# Ubuntu and Windows share one address but have different host keys, so one known_hosts entry would
+# fail after every switch ("host key has changed"). This is a lab laptop on a private network:
+# the host key is not checked and not stored; the Mac's key is what protects the login.
+ssh_opts=(-i "$LAB_SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -o BatchMode=yes -o LogLevel=ERROR)
 
 target() { case "$1" in
   linux|ubuntu) echo "${LAB_LINUX:?set LAB_LINUX=user@host}" ;;
