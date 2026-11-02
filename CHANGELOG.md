@@ -17,6 +17,7 @@ Draft for 0.2.6 (not released; the maintainer moves it under a version and a dat
 ### Fixed
 
 - Windows: a window screenshot was shrunk and shifted by the invisible border; it is now cut to the window's visible frame.
+- Windows: the app window opened with its title bar above the top of a 1920x1080 screen at 150 % scaling; the window picker listed the taskbar as a window; the program and the taskbar entry had the generic icon; the tray icon was a white glyph on a light taskbar.
 - Linux (X11): the window picker took no keyboard input under GNOME, offered GNOME's full-screen "Desktop Icons" window (captured black), and the saved-capture toast was cut off so that its close button could not be reached.
 
 ### Known issues

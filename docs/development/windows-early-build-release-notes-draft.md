@@ -27,7 +27,7 @@ before it runs them (more info, run anyway).
   (`winget install UB-Mannheim.TesseractOCR`); the app says so when it is missing.
 - Speaker labels and the bundled FFmpeg are not in this build (the speaker engine is built for macOS and Linux only).
 - No code signing yet: SmartScreen warns.
-- The tray icon, global shortcuts and the other Windows-specific parts have only been looked at on a CI runner.
+- The app names the window picker shows for packaged apps (Notepad, Settings) are the program's path or host name.
 
 ## Install
 
@@ -44,8 +44,10 @@ Windows 11, x64 (the runner and the test laptop). Windows 10 is not tested.
   real-display tests (display and region sizes, window capture equals its bounds), a smoke script on the packaged
   files, silent install and uninstall of the installer: all passed. Report:
   `verification/L1-windows-package-ci-2026-11-01-claude.md` (PARTIAL: a CI runner is not a physical PC).
-- **[after the laptop test]** A Lenovo ThinkPad T490 (Intel UHD 620) with Windows 11 Pro: list what passed and what
-  did not, with the report names.
+- A Lenovo ThinkPad T490 (Intel UHD 620, 1920x1080 at 150 %) with Windows 11 Pro: the zip and the installer install,
+  start and uninstall cleanly; display and window screenshots, the window picker, the result toast and the tray icon
+  work; the smoke script passes. Not run: SmartScreen on a real download, two monitors, Windows 10, region capture and
+  the editor on this machine. Report: `verification/L1-windows-thinkpad-2026-11-02-claude.md` (PARTIAL).
 - Not tested: Windows 10, ARM, high-DPI mixes of displays, a second monitor.
 
 ## Known issues

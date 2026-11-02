@@ -84,9 +84,11 @@ them (More info, then Run anyway). Check the download with the `.sha256` file be
 - Automated tests on GitHub's Ubuntu 24.04 (x86_64 and aarch64) and Windows Server 2025 runners; the packages
   install and start there. Reports: `verification/L1-package-workflow-linux-2026-11-01-claude.md`,
   `verification/L1-windows-package-ci-2026-11-01-claude.md`.
-- **[after the final tests]** A Lenovo ThinkPad T490 (Intel UHD 620), Ubuntu 24.04 on Xorg and on Wayland, and Windows
-  11: what passed and what did not, with the report names (`verification/LINUX-1-*-thinkpad-2026-11-02-claude.md`,
-  **[the Windows report]**).
+- A Lenovo ThinkPad T490 (Intel UHD 620), Ubuntu 24.04 on Xorg and on Wayland, and Windows 11: the installs,
+  screenshots, the window picker and the tray work on both; what did not (Wayland window capture on GNOME 46) is
+  listed above. Reports: `verification/LINUX-1-x11-thinkpad-2026-11-02-claude.md`,
+  `verification/LINUX-1-wayland-thinkpad-2026-11-02-claude.md`, `verification/L1-windows-thinkpad-2026-11-02-claude.md`
+  (all PARTIAL). **[confirm after the final rebuild]**
 - Not tested: KDE, GNOME versions other than 46, NVIDIA and AMD graphics, two monitors or mixed scaling, Fedora,
   Debian, Windows 10, ARM.
 
