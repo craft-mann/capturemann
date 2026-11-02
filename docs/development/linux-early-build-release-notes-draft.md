@@ -48,7 +48,8 @@ Needs **glibc 2.39 or newer**: Ubuntu 24.04 and later, Debian 13, Fedora 40 and 
 ## Check the download
 
 Each file has a `.sha256` and a `.minisig`. `sha256sum -c <file>.sha256`, and
-`minisign -Vm <file> -P <public key>` (the key is on this page). **[after the maintainer creates the key]**
+`minisign -Vm <file> -P RWTeQv8ogB2CCuZ7j0rr3MovdHod4QATmVn+I329YC8pomOC6R9Rxc2k` (key ID `0A821D8028FF42DE`; the same
+public key is in the repository as `packaging/linux/minisign.pub`).
 
 ## Tested on
 
