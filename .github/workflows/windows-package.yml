@@ -11,6 +11,7 @@ name: Windows package
 # Pinned actions: the same commits as ci.yml.
 on:
   # TEMPORARY: runs this workflow once from the branch (a dispatch needs the file on the default branch). Removed in the next commit.
+  # Rerun marker: 2
   push:
     branches: [windows-step0]
     paths: [.github/workflows/windows-package.yml]
