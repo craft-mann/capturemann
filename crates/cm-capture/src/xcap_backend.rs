@@ -430,6 +430,8 @@ impl CaptureBackend for XcapBackend {
             .collect();
         // xcap leaves the title of a classic X11 client (WM_NAME as STRING) empty.
         crate::sys::x11_names::fill_missing_titles(&mut windows);
+        // The desktop-icons and panel windows are not windows to pick; a capture of one is black.
+        crate::sys::x11_kind::drop_background_windows(&mut windows);
         Ok(windows)
     }
 
