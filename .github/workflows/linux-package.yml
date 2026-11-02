@@ -11,7 +11,7 @@ name: Linux package
 on:
   # TEMPORARY: a workflow can only be dispatched once it is on the default branch, which this branch is not
   # allowed to reach before the review. A push that touches this file runs it. Remove with the next commit.
-  # Rerun marker: 2
+  # Rerun marker: 3
   push:
     branches: [windows-step0]
     paths: [.github/workflows/linux-package.yml]
