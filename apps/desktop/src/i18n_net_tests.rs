@@ -540,7 +540,12 @@ fn corpus() -> Vec<(String, String)> {
         );
         c.toast(
             "exports: exported",
-            &exports::exported_toast("rec_1", "My take", Some("burned")),
+            &exports::exported_toast(
+                "rec_1",
+                "My take",
+                Some("burned"),
+                exports::ExportContents::default(),
+            ),
             false,
         );
         c.toast(

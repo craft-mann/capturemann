@@ -73,11 +73,12 @@ pub fn on_event(app: &Entity<AppModel>, ev: &Event, cx: &mut App) {
                 capture_id,
                 title,
                 captions,
+                contents,
             } => {
                 upsert(
                     app,
                     &capture_id,
-                    exported_toast(&capture_id, &title, captions.as_deref()),
+                    exported_toast(&capture_id, &title, captions.as_deref(), contents),
                     false,
                     cx,
                 );

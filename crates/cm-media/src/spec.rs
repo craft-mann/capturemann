@@ -115,6 +115,16 @@ fn audio(t: &Value, default_channels: u32) -> AudioTrack {
 }
 
 impl QuickSpec {
+    /// What the exported MP4 holds besides the screen: `(camera bubble, audio)`. The bubble counts
+    /// only when it is drawn (a camera track that is there and visible); audio counts when the
+    /// microphone or the system sound is there. For the result message of an export.
+    pub fn contents(&self) -> (bool, bool) {
+        (
+            self.layout.is_some(),
+            self.mic.is_some() || self.system.is_some(),
+        )
+    }
+
     /// Parses a manifest.
     pub fn from_manifest(m: &Value) -> Result<QuickSpec, CmError> {
         let mut notes = Vec::new();
@@ -425,6 +435,28 @@ mod tests {
         assert_eq!(
             QuickSpec::from_manifest(&m).unwrap().layout.unwrap().mirror,
             Some(true)
+        );
+    }
+
+    #[test]
+    fn contents_say_what_the_mp4_holds_besides_the_screen() {
+        let mut m = manifest();
+        assert_eq!(
+            QuickSpec::from_manifest(&m).unwrap().contents(),
+            (true, true)
+        );
+        // The camera track dropped (the frame-rate exception of issue 16): no bubble.
+        m["tracks"].as_object_mut().unwrap().remove("camera");
+        assert_eq!(
+            QuickSpec::from_manifest(&m).unwrap().contents(),
+            (false, true)
+        );
+        // Neither the microphone nor the system sound: a silent picture.
+        m["tracks"].as_object_mut().unwrap().remove("mic");
+        m["tracks"].as_object_mut().unwrap().remove("system");
+        assert_eq!(
+            QuickSpec::from_manifest(&m).unwrap().contents(),
+            (false, false)
         );
     }
 }

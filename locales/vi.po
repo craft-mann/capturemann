@@ -2641,6 +2641,30 @@ msgstr "Một MP4 gồm màn hình, bong bóng camera và âm thanh. Các track 
 msgid "One MP4 with the screen, camera bubble and audio. The original tracks are untouched. {captions}"
 msgstr "Một MP4 gồm màn hình, bong bóng camera và âm thanh. Các track gốc không bị đụng đến. {captions}"
 
+#, fuzzy
+msgid "One MP4 with the screen and camera bubble. The original tracks are untouched."
+msgstr "Một MP4 gồm màn hình và bong bóng camera. Các track gốc không bị đụng đến."
+
+#, fuzzy
+msgid "One MP4 with the screen and camera bubble. The original tracks are untouched. {captions}"
+msgstr "Một MP4 gồm màn hình và bong bóng camera. Các track gốc không bị đụng đến. {captions}"
+
+#, fuzzy
+msgid "One MP4 with the screen and audio. The original tracks are untouched."
+msgstr "Một MP4 gồm màn hình và âm thanh. Các track gốc không bị đụng đến."
+
+#, fuzzy
+msgid "One MP4 with the screen and audio. The original tracks are untouched. {captions}"
+msgstr "Một MP4 gồm màn hình và âm thanh. Các track gốc không bị đụng đến. {captions}"
+
+#, fuzzy
+msgid "One MP4 with the screen. The original tracks are untouched."
+msgstr "Một MP4 chỉ gồm màn hình. Các track gốc không bị đụng đến."
+
+#, fuzzy
+msgid "One MP4 with the screen. The original tracks are untouched. {captions}"
+msgstr "Một MP4 chỉ gồm màn hình. Các track gốc không bị đụng đến. {captions}"
+
 # FACT: owner review required
 #, fuzzy
 msgid "Only you can watch it."

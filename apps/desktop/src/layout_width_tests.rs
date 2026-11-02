@@ -304,7 +304,12 @@ fn toast_specs() -> Vec<(&'static str, crate::toast::ToastSpec)> {
         ),
         (
             "exports: exported",
-            exports::exported_toast("rec_1", "My take", Some("burned")),
+            exports::exported_toast(
+                "rec_1",
+                "My take",
+                Some("burned"),
+                exports::ExportContents::default(),
+            ),
         ),
         ("uploads: reconnect", uploads::reconnect_toast("My Drive")),
         (

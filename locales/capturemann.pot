@@ -2856,10 +2856,28 @@ msgstr ""
 msgid "On: {device}, {resolution} (the camera light turns on)"
 msgstr ""
 
+msgid "One MP4 with the screen and audio. The original tracks are untouched."
+msgstr ""
+
+msgid "One MP4 with the screen and audio. The original tracks are untouched. {captions}"
+msgstr ""
+
+msgid "One MP4 with the screen and camera bubble. The original tracks are untouched."
+msgstr ""
+
+msgid "One MP4 with the screen and camera bubble. The original tracks are untouched. {captions}"
+msgstr ""
+
 msgid "One MP4 with the screen, camera bubble and audio. The original tracks are untouched."
 msgstr ""
 
 msgid "One MP4 with the screen, camera bubble and audio. The original tracks are untouched. {captions}"
+msgstr ""
+
+msgid "One MP4 with the screen. The original tracks are untouched."
+msgstr ""
+
+msgid "One MP4 with the screen. The original tracks are untouched. {captions}"
 msgstr ""
 
 msgid "One speaker, a room"

@@ -218,6 +218,10 @@ async fn export_video_renders_records_and_announces() {
         "{res}"
     );
     assert!(res["size_bytes"].as_u64().unwrap() > 1000);
+    // The fixture has a camera track and a microphone track: the result says so (issue 21: the
+    // desktop words its "Exported" toast from these two fields).
+    assert_eq!(res["has_camera"], true, "{res}");
+    assert_eq!(res["has_audio"], true, "{res}");
 
     // Masters untouched; manifest entry; revision; index size.
     assert_eq!(std::fs::read(&screen).unwrap(), before);

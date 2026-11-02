@@ -61,6 +61,34 @@ pub struct ExportStatus {
     pub audio: bool,
 }
 
+/// What the exported MP4 holds besides the screen (`has_camera` and `has_audio` of `export.done`).
+/// A recording can lack either: the camera track is dropped when the frame rate does not allow
+/// it, and a take can have no microphone and no system sound. An older result without the fields
+/// counts as holding both.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ExportContents {
+    pub camera: bool,
+    pub audio: bool,
+}
+
+impl Default for ExportContents {
+    fn default() -> Self {
+        ExportContents {
+            camera: true,
+            audio: true,
+        }
+    }
+}
+
+impl ExportContents {
+    fn of(data: &serde_json::Value) -> Self {
+        ExportContents {
+            camera: data["has_camera"].as_bool().unwrap_or(true),
+            audio: data["has_audio"].as_bool().unwrap_or(true),
+        }
+    }
+}
+
 /// What a finished audio export tells (`export.done` with `kind: "audio"`).
 #[derive(Debug, Clone, PartialEq)]
 pub struct AudioDone {
@@ -89,6 +117,8 @@ pub enum Effect {
         title: String,
         /// What the export did with the captions (`burned`, `off`, `skipped_no_transcript`).
         captions: Option<String>,
+        /// What the MP4 holds besides the screen.
+        contents: ExportContents,
     },
     Failed {
         capture_id: String,
@@ -252,6 +282,7 @@ impl ExportTracker {
                     title,
                     capture_id,
                     captions: data["captions"].as_str().map(str::to_owned),
+                    contents: ExportContents::of(data),
                 }]
             }
             "export.skipped" => {
@@ -425,26 +456,61 @@ pub fn audio_export_failed_toast(reason: &str, ffmpeg_missing: bool) -> ToastSpe
 }
 
 /// [`exported_toast`] as a live toast: it is worded again when the language changes.
-pub fn exported_toast(capture_id: &str, title: &str, captions: Option<&str>) -> ToastSpec {
+pub fn exported_toast(
+    capture_id: &str,
+    title: &str,
+    captions: Option<&str>,
+    contents: ExportContents,
+) -> ToastSpec {
     let (capture_id, title, captions) = (
         capture_id.to_owned(),
         title.to_owned(),
         captions.map(str::to_owned),
     );
-    ToastSpec::live(move || exported_toast_now(&capture_id, &title, captions.as_deref()))
+    ToastSpec::live(move || exported_toast_now(&capture_id, &title, captions.as_deref(), contents))
 }
 
-/// "Exported <title>" with Play and Reveal.
-fn exported_toast_now(capture_id: &str, title: &str, captions: Option<&str>) -> ToastSpec {
-    let body = match captions_note(captions) {
-        Some(note) => tr!(
+/// The body of the "Exported" toast: what the one MP4 holds (the sentence follows the tracks that
+/// are in it), that the original tracks are untouched, and what happened to the captions.
+fn exported_body(contents: ExportContents, captions: Option<String>) -> String {
+    match (contents.camera, contents.audio, captions) {
+        (true, true, Some(note)) => tr!(
             "One MP4 with the screen, camera bubble and audio. The original tracks are untouched. {captions}",
             captions = note
         ),
-        None => tr!(
+        (true, true, None) => tr!(
             "One MP4 with the screen, camera bubble and audio. The original tracks are untouched."
         ),
-    };
+        (true, false, Some(note)) => tr!(
+            "One MP4 with the screen and camera bubble. The original tracks are untouched. {captions}",
+            captions = note
+        ),
+        (true, false, None) => {
+            tr!("One MP4 with the screen and camera bubble. The original tracks are untouched.")
+        }
+        (false, true, Some(note)) => tr!(
+            "One MP4 with the screen and audio. The original tracks are untouched. {captions}",
+            captions = note
+        ),
+        (false, true, None) => {
+            tr!("One MP4 with the screen and audio. The original tracks are untouched.")
+        }
+        (false, false, Some(note)) => tr!(
+            "One MP4 with the screen. The original tracks are untouched. {captions}",
+            captions = note
+        ),
+        (false, false, None) => tr!("One MP4 with the screen. The original tracks are untouched."),
+    }
+}
+
+/// "Exported <title>" with Play and Reveal.
+fn exported_toast_now(
+    capture_id: &str,
+    title: &str,
+    captions: Option<&str>,
+    contents: ExportContents,
+) -> ToastSpec {
+    let body = exported_body(contents, captions_note(captions));
     ToastSpec::new(ToastKind::Success, tr!("Exported {title}", title = title))
         .body(body)
         .button(
@@ -624,6 +690,7 @@ mod tests {
                 capture_id: "rec_1".into(),
                 title: "Lesson".into(),
                 captions: None,
+                contents: ExportContents::default(),
             }]
         );
         assert!(!t.is_running("rec_1"));
@@ -734,7 +801,7 @@ mod tests {
             exporting_toast("rec_1", None, 0, false).title,
             "Exporting\u{2026}"
         );
-        let done = exported_toast("rec_1", "Lesson", None);
+        let done = exported_toast("rec_1", "Lesson", None, ExportContents::default());
         assert_eq!(done.title, "Exported Lesson");
         assert_eq!(done.kind, ToastKind::Success);
         assert_eq!(done.buttons[0].label, "Play");
@@ -748,11 +815,60 @@ mod tests {
         );
     }
 
+    /// Issue 21: the toast said "camera bubble and audio" for a recording whose camera track had
+    /// been dropped. The sentence follows what the export result says the MP4 holds.
+    #[test]
+    fn the_result_toast_names_only_what_the_mp4_holds() {
+        let body = |camera: bool, audio: bool, c: Option<&str>| {
+            exported_toast("rec_1", "Lesson", c, ExportContents { camera, audio })
+                .body
+                .unwrap_or_default()
+        };
+        assert!(
+            body(true, true, None).starts_with("One MP4 with the screen, camera bubble and audio.")
+        );
+        assert!(body(true, false, None).starts_with("One MP4 with the screen and camera bubble."));
+        assert!(body(false, true, None).starts_with("One MP4 with the screen and audio."));
+        assert!(body(false, false, None).starts_with("One MP4 with the screen."));
+        // The captions sentence still follows, whichever tracks are in.
+        for (camera, audio) in [(true, true), (true, false), (false, true), (false, false)] {
+            assert!(body(camera, audio, Some("burned")).contains("burned into the picture"));
+        }
+        assert!(!body(false, true, None).contains("camera"));
+        assert!(!body(true, false, None).contains("audio"));
+    }
+
+    /// The result carries `has_camera` and `has_audio`; a result without them (an older daemon)
+    /// keeps the old wording, which means both.
+    #[test]
+    fn the_export_result_carries_the_contents() {
+        let done = |extra: serde_json::Value| {
+            let mut t = ExportTracker::default();
+            t.on_event("export.queued", &queued("j1", false));
+            let mut data = json!({"job_id": "j1", "capture_id": "rec_1", "title": "Lesson"});
+            data.as_object_mut()
+                .unwrap()
+                .extend(extra.as_object().unwrap().clone());
+            match t.on_event("export.done", &data).pop() {
+                Some(Effect::Done { contents, .. }) => contents,
+                other => panic!("{other:?}"),
+            }
+        };
+        assert_eq!(done(json!({})), ExportContents::default());
+        assert_eq!(
+            done(json!({"has_camera": false, "has_audio": true})),
+            ExportContents {
+                camera: false,
+                audio: true
+            }
+        );
+    }
+
     /// The export result says whether the captions were burned in or left out; "off" says nothing.
     #[test]
     fn the_result_toast_says_what_happened_to_the_captions() {
         let body = |c: Option<&str>| {
-            exported_toast("rec_1", "Lesson", c)
+            exported_toast("rec_1", "Lesson", c, ExportContents::default())
                 .body
                 .unwrap_or_default()
         };
@@ -772,6 +888,7 @@ mod tests {
                 capture_id: "rec_1".into(),
                 title: "Lesson".into(),
                 captions: Some("burned".into()),
+                contents: ExportContents::default(),
             }]
         );
     }

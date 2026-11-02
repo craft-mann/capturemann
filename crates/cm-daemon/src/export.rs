@@ -438,6 +438,10 @@ impl JobHandler for ExportHandler {
             (true, true) => "burned",
             (true, false) => "skipped_no_transcript",
         };
+        // What the file will hold besides the screen, for the result message ("camera bubble and
+        // audio" is wrong for a recording whose camera track was dropped). Unknown: say both.
+        let (has_camera, has_audio) =
+            cm_media::QuickSpec::from_manifest(&manifest).map_or((true, true), |s| s.contents());
         // FFmpeg missing: `not_found` with the install hint. Not retryable, so the job fails once.
         let tools = (self.tools)()?;
 
@@ -520,6 +524,8 @@ impl JobHandler for ExportHandler {
             "duration_ms": outcome.duration_ms,
             "encoder": outcome.encoder,
             "captions": captions_result,
+            "has_camera": has_camera,
+            "has_audio": has_audio,
             "elapsed_ms": outcome.elapsed_ms,
         });
         let mut done = result.clone();
