@@ -7,6 +7,11 @@ line the tests did not support. Nothing here has been posted. The process is `do
 - **Tag:** `v0.2.6` (never reuse a tag; see "Rollback and yank").
 - **Title:** `CaptureMann 0.2.6: early builds for Linux and Windows`
 - **Type:** draft, then **pre-release** (not "latest"): the macOS app is unchanged from 0.2.5 in this release.
+- **Images:** `docs/images/linux-ubuntu-tray-menu.webp` and `docs/images/windows-library.webp` (the Ubuntu one with the
+  tray menu open, the Windows one with the library), used in the body below through their `main` URLs
+  (`raw.githubusercontent.com/craft-mann/capturemann/main/docs/images/...`). **They show nothing until this branch is
+  merged into `main`**: before that, drag the two PNGs from `~/Downloads` into the release editor instead, which
+  uploads them to GitHub and gives the same markup with other URLs.
 - **Files to attach** (after `packaging/linux/sign-linux.sh <folder>` has written the `.minisig` files):
 
 | File | What it is |
@@ -49,6 +54,8 @@ stays on the macOS app for now). The macOS app is unchanged in this release.
 
 ### Linux (early build)
 
+<img alt="CaptureMann 0.2 on Ubuntu 24.04: the library with seven screenshots, and the tray icon menu open at the top right with Capture region, window and display, Capture delay, Open library, Open launcher and Recent captures" src="https://raw.githubusercontent.com/craft-mann/capturemann/main/docs/images/linux-ubuntu-tray-menu.webp" width="900">
+
 What works: screenshots of a region, a window or a display on X11, and of a region or a display on GNOME with Wayland;
 the editor and annotations; the library; local AI (transcription, speaker labels, translation, reports; models are
 downloaded only when you press Download); Auto-redact of sensitive text through `tesseract`
@@ -64,6 +71,8 @@ Passwords and sign-ins need a Secret Service (GNOME Keyring or KWallet). Without
 `CAPTUREMANN_SECRETS=file` keeps secrets in a file only you can read (not encrypted).
 
 ### Windows (early build)
+
+<img alt="CaptureMann 0.2.6 on Windows 11: the library with four screenshots, the Record, Region, Window and Display buttons, and the app icon in the title bar and the taskbar" src="https://raw.githubusercontent.com/craft-mann/capturemann/main/docs/images/windows-library.webp" width="900">
 
 What works: screenshots of a region, a window (cut to its visible frame) or a display; the editor and annotations; the
 library; the command line and the MCP server.
