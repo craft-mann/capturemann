@@ -58,6 +58,9 @@ function Invoke-Cli {
   $quoted = $CliArgs | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }
   $p = Start-Process -FilePath $exe -ArgumentList $quoted -NoNewWindow -PassThru `
     -RedirectStandardOutput $o -RedirectStandardError $e
+  # Windows PowerShell 5.1 reports a null ExitCode for a process started with -PassThru unless its
+  # handle was read while it ran (PowerShell 7 does not need it).
+  $null = $p.Handle
   if (-not $p.WaitForExit($TimeoutSec * 1000)) {
     try { $p.Kill() } catch {}
     throw "capturemann $($CliArgs -join ' ') did not finish within $TimeoutSec s"
