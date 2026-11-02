@@ -156,30 +156,45 @@ pub fn exclude_from_capture(window: &Window) {
 /// new pop-up (`_NET_ACTIVE_WINDOW`) without a timestamp, and GNOME's focus-stealing rules then
 /// keep the keyboard on the old window when the pop-up opens a moment after the click or key
 /// (the window picker: typing, Enter and Esc went to the library window). Setting the focus
-/// directly is what `xdotool windowfocus` did in the same situation. Wayland, macOS and Windows:
-/// nothing to do. Call it once the window is mapped.
-pub fn focus_x11(window: &Window) {
+/// directly is what `xdotool windowfocus` did in the same situation. The request fails while the
+/// window is not on screen yet, so the answer says whether the focus really is on `window`:
+/// the caller tries again until it is. Wayland, macOS and Windows: nothing to do, `true`.
+pub fn focus_x11(window: &Window) -> bool {
     #[cfg(target_os = "linux")]
     {
         use raw_window_handle::{HasWindowHandle, RawWindowHandle};
         use x11rb::connection::Connection;
         use x11rb::protocol::xproto::{ConnectionExt, InputFocus};
         let Ok(handle) = HasWindowHandle::window_handle(window) else {
-            return;
+            return true;
         };
         let id = match handle.as_raw() {
             RawWindowHandle::Xcb(h) => h.window.get(),
             RawWindowHandle::Xlib(h) => h.window as u32,
-            _ => return,
+            _ => return true,
         };
         let Ok((conn, _)) = x11rb::connect(None) else {
-            return;
+            return true;
         };
-        let _ = conn.set_input_focus(InputFocus::PARENT, id, x11rb::CURRENT_TIME);
+        let set = conn
+            .set_input_focus(InputFocus::PARENT, id, x11rb::CURRENT_TIME)
+            .ok()
+            .is_some_and(|c| c.check().is_ok());
         let _ = conn.flush();
+        let on_window = set
+            && conn
+                .get_input_focus()
+                .ok()
+                .and_then(|c| c.reply().ok())
+                .is_some_and(|r| r.focus == id);
+        log::debug!("x11 focus on window {id}: {on_window}");
+        on_window
     }
     #[cfg(not(target_os = "linux"))]
-    let _ = window;
+    {
+        let _ = window;
+        true
+    }
 }
 
 /// The CGWindowID of `window` when it is on screen (visible and not minimized), `None`

@@ -276,16 +276,22 @@ fn present(app: &Entity<AppModel>, targets: &serde_json::Value, cx: &mut App) {
             cx.set_global(PickerSlot(Some(handle)));
             // The panel needs the keyboard, and a non-activating window gets none from macOS.
             cx.activate(true);
-            // X11: the window manager may leave the keyboard with the library window; once the
-            // palette is mapped, take the focus directly (a no-op on the other platforms).
+            // X11: the window manager may leave the keyboard with the library window; take the
+            // focus directly as soon as the palette is on screen (a no-op on the other platforms).
             cx.spawn(async move |cx| {
-                cx.background_executor()
-                    .timer(Duration::from_millis(150))
-                    .await;
-                cx.update(|cx| {
-                    let _ =
-                        handle.update(cx, |_, window, _| crate::platform_window::focus_x11(window));
-                });
+                for _ in 0..12 {
+                    cx.background_executor()
+                        .timer(Duration::from_millis(150))
+                        .await;
+                    let done = cx.update(|cx| {
+                        handle
+                            .update(cx, |_, window, _| crate::platform_window::focus_x11(window))
+                            .unwrap_or(true)
+                    });
+                    if done {
+                        break;
+                    }
+                }
             })
             .detach();
         }
