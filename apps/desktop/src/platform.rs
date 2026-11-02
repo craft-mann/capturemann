@@ -198,12 +198,37 @@ fn decode_icon(bytes: &[u8]) -> Result<Icon, String> {
     Icon::from_rgba(img.into_raw(), w, h).map_err(|e| e.to_string())
 }
 
+/// Whether the Windows taskbar (and so the notification area) is light: the personalisation
+/// setting `SystemUsesLightTheme`, 1 for a light taskbar. The kit has a white glyph for dark
+/// taskbars and a dark one for light taskbars; the white one is unreadable on a light taskbar.
+/// A missing value (Windows 10 before 1903, or never set) means dark.
+#[cfg(target_os = "windows")]
+fn windows_taskbar_is_light() -> bool {
+    use windows::core::w;
+    use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_DWORD};
+    let (mut value, mut size) = (0u32, std::mem::size_of::<u32>() as u32);
+    // SAFETY: `value` and `size` are valid for the call, `size` is the byte size of `value`, and
+    // the key and value names are NUL-terminated constants.
+    let status = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            w!(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"),
+            w!("SystemUsesLightTheme"),
+            RRF_RT_REG_DWORD,
+            None,
+            Some((&mut value as *mut u32).cast()),
+            Some(&mut size),
+        )
+    };
+    status.is_ok() && value == 1
+}
+
 /// The tray icon for a state on this platform and whether macOS should treat it as a
-/// template image. Windows assumes a dark taskbar (the Windows default).
+/// template image. Windows picks the light or the dark variant by the taskbar theme.
 fn tray_icon_for(state: TrayState) -> Result<(Icon, bool), String> {
     #[cfg(target_os = "windows")]
     {
-        decode_icon(windows_tray_ico(false, state)).map(|i| (i, false))
+        decode_icon(windows_tray_ico(windows_taskbar_is_light(), state)).map(|i| (i, false))
     }
     #[cfg(not(target_os = "windows"))]
     {

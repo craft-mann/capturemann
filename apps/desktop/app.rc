@@ -1,0 +1,3 @@
+// Windows resources of cm-desktop.exe. Resource number 1 is the icon GPUI loads for the window
+// class (taskbar, Alt-Tab, title bar) and the one Explorer shows for the file.
+1 ICON "assets/brand/app.ico"

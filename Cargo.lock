@@ -1487,6 +1487,7 @@ dependencies = [
  "cm-render",
  "cm-storage",
  "dirs 7.0.0",
+ "embed-resource",
  "futures-lite",
  "global-hotkey",
  "gpui-pre",
@@ -1509,6 +1510,7 @@ dependencies = [
  "tokio",
  "tray-icon",
  "unicode-segmentation",
+ "windows 0.61.3",
  "x11rb",
  "zbus",
 ]
