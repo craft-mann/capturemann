@@ -278,6 +278,33 @@ fn wrapped_lines(text: &str, chars_per_line: usize) -> usize {
         .sum()
 }
 
+/// Gap between shortcut hints, in both directions (the hints row wraps).
+const HINT_GAP: f32 = 14.;
+
+/// How many rows the shortcut hints take in the text column (about 330 px, hints wrap as whole
+/// units): the label at about 6.5 px a character, each keycap at about 8 px a character plus its
+/// padding. Generous, like the rest of `estimate_height`; the shortcuts differ per desktop
+/// ("Ctrl Alt Shift L" is much wider than "⌘ ⇧ L").
+fn hint_rows(hints: &[Hint]) -> usize {
+    const COLUMN: f32 = 330.;
+    let (mut rows, mut used) = (1, 0.);
+    for h in hints {
+        let keys: f32 = h
+            .keys
+            .iter()
+            .map(|k| k.chars().count() as f32 * 8. + 14. + 4.)
+            .sum();
+        let w = h.text.chars().count() as f32 * 6.5 + 6. + keys;
+        if used > 0. && used + HINT_GAP + w > COLUMN {
+            rows += 1;
+            used = w;
+        } else {
+            used += if used > 0. { HINT_GAP + w } else { w };
+        }
+    }
+    rows
+}
+
 /// Height of one toast in px, estimated from its content (the toast window is sized from it;
 /// generous so text is never clipped). Card: 14 px padding, a 30 px icon tile beside a text
 /// column of about 330 px (13 px text, about 48 characters per line).
@@ -295,7 +322,8 @@ pub fn estimate_height(t: &Toast) -> f32 {
         col += 4. + 4.;
     }
     if !t.hints.is_empty() {
-        col += 8. + 22.;
+        let rows = hint_rows(&t.hints) as f32;
+        col += 8. + 22. * rows + HINT_GAP * (rows - 1.);
     }
     if !t.buttons.is_empty() {
         // Two small (32 px) actions share a row of the text column; more wrap.
@@ -505,6 +533,34 @@ mod tests {
         assert_eq!(q.toasts().len(), 1);
         assert!(q.toasts()[0].sticky());
         assert_eq!(q.next_expiry(t + Duration::from_secs(10)), None);
+    }
+
+    /// The "Saved to your library" toast on Linux has two hints that do not fit side by side (a
+    /// Ctrl+Alt+Shift shortcut): the estimate counts both rows, or the window is too short and the
+    /// top of the card (title and close button) is cut off where nothing corrects the size.
+    #[test]
+    fn hints_that_wrap_make_the_estimate_taller() {
+        let one = spec(ToastKind::Success).hint("Paste", vec!["Ctrl".into(), "V".into()]);
+        let two = one.clone().hint(
+            "Open library",
+            vec!["Ctrl".into(), "Alt".into(), "Shift".into(), "L".into()],
+        );
+        let t = Instant::now();
+        let (mut a, mut b) = (ToastQueue::default(), ToastQueue::default());
+        a.push(one, t);
+        b.push(two, t);
+        let (ha, hb) = (
+            estimate_height(&a.toasts()[0]),
+            estimate_height(&b.toasts()[0]),
+        );
+        assert!(hb >= ha + 22. + HINT_GAP, "{ha} vs {hb}");
+        // Short hints share a row.
+        let short = spec(ToastKind::Success)
+            .hint("Paste", vec!["V".into()])
+            .hint("Open", vec!["L".into()]);
+        let mut c = ToastQueue::default();
+        c.push(short, t);
+        assert_eq!(hint_rows(&c.toasts()[0].hints), 1);
     }
 
     /// DESIGN toasts: auto-dismiss 6 s except failures and anything with an action.
