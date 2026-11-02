@@ -6,7 +6,7 @@ process is `docs/development/releasing.md`, "Linux early build".
 
 ---
 
-# CaptureMann 0.2.5 for Linux (early build)
+# CaptureMann 0.2.6 for Linux (early build)
 
 The first Linux build. It is an early build: screenshots, annotation, the library, local AI, the command-line client
 and the MCP server work; **recording is not available yet** (it is switched off in this build).
@@ -38,9 +38,9 @@ and the MCP server work; **recording is not available yet** (it is switched off 
 
 Needs **glibc 2.39 or newer**: Ubuntu 24.04 and later, Debian 13, Fedora 40 and later. x86_64 and aarch64.
 
-- Ubuntu and Debian: `sudo apt install ./capturemann_0.2.5_amd64.deb` (or `_arm64.deb`). It installs the libraries
+- Ubuntu and Debian: `sudo apt install ./capturemann_0.2.6_amd64.deb` (or `_arm64.deb`). It installs the libraries
   it needs. For Auto-redact: `sudo apt install tesseract-ocr`.
-- Other distributions: unpack `capturemann-0.2.5-linux-<arch>.tar.gz`, run `./check-runtime.sh` (it names missing
+- Other distributions: unpack `capturemann-0.2.6-linux-<arch>.tar.gz`, run `./check-runtime.sh` (it names missing
   libraries) and `./install.sh`. The libraries are listed in `packaging/linux/README.md`.
 - To keep passwords and sign-ins you need a Secret Service (GNOME Keyring or KWallet). Without one the app says so;
   `CAPTUREMANN_SECRETS=file` keeps secrets in a file only you can read (not encrypted).

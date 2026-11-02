@@ -34,7 +34,7 @@ output the first time and fix what is wrong.
 
 ```sh
 scripts/testlab/lab.sh status                       # which OS answers on ssh
-scripts/testlab/lab.sh push linux dist/capturemann-0.2.5-linux-x86_64.tar.gz
+scripts/testlab/lab.sh push linux dist/capturemann-0.2.6-linux-x86_64.tar.gz
 scripts/testlab/lab.sh linux 'cd ~/lab && tar xzf capturemann-*.tar.gz && ./capturemann-*/install.sh'
 scripts/testlab/lab.sh switch windows               # reboot into Windows and wait for it
 scripts/testlab/lab.sh windows 'C:\lab\capturemann\capturemann.exe --version'
