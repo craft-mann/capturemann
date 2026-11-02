@@ -432,6 +432,9 @@ impl CaptureBackend for XcapBackend {
         crate::sys::x11_names::fill_missing_titles(&mut windows);
         // The desktop-icons and panel windows are not windows to pick; a capture of one is black.
         crate::sys::x11_kind::drop_background_windows(&mut windows);
+        // Windows: the taskbar, the desktop and tray pop-ups are listed by xcap; keep what Alt-Tab keeps.
+        #[cfg(windows)]
+        windows.retain(|w| crate::sys::win_window::is_pickable(w.id));
         Ok(windows)
     }
 

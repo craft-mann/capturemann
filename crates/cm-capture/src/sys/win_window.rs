@@ -8,16 +8,53 @@
 use std::ffi::c_void;
 
 use windows::Win32::Foundation::{HWND, RECT};
+use windows::Win32::Graphics::Dwm::DWMWA_CLOAKED;
 use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS};
 use windows::Win32::Graphics::Gdi::{
     CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, GetWindowDC,
     ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HDC,
 };
 use windows::Win32::Storage::Xps::{PrintWindow, PRINT_WINDOW_FLAGS};
-use windows::Win32::UI::WindowsAndMessaging::GetWindowRect;
+use windows::Win32::UI::WindowsAndMessaging::{GetWindowLongW, GetWindowRect, GWL_EXSTYLE};
 
 /// `PW_RENDERFULLCONTENT`: also paints DirectX and XAML content.
 const PW_RENDERFULLCONTENT: u32 = 2;
+
+const WS_EX_TOOLWINDOW: u32 = 0x0000_0080;
+const WS_EX_APPWINDOW: u32 = 0x0004_0000;
+const WS_EX_NOACTIVATE: u32 = 0x0800_0000;
+
+/// Whether a window is one a person would pick from a list of windows: the rule of Windows' own
+/// Alt-Tab list. The taskbar, the desktop and the tray pop-ups are tool windows (`WS_EX_TOOLWINDOW`)
+/// that do not ask to be listed (`WS_EX_APPWINDOW`); windows that never take the focus
+/// (`WS_EX_NOACTIVATE`) and cloaked ones (on another virtual desktop, or hidden by the shell) are
+/// not windows to capture either. xcap lists them all (the picker offered the 1920x72 taskbar as
+/// "Windows Explorer").
+pub fn is_pickable_style(ex_style: u32, cloaked: u32) -> bool {
+    let app = ex_style & WS_EX_APPWINDOW != 0;
+    cloaked == 0
+        && (app || ex_style & WS_EX_TOOLWINDOW == 0)
+        && (app || ex_style & WS_EX_NOACTIVATE == 0)
+}
+
+/// [`is_pickable_style`] for the window with this handle; a window that cannot be asked is kept.
+pub fn is_pickable(id: u32) -> bool {
+    let hwnd = HWND(id as usize as *mut c_void);
+    let mut cloaked = 0u32;
+    // SAFETY: the call only reads the window's style; a stale handle gives 0.
+    let ex_style = unsafe { GetWindowLongW(hwnd, GWL_EXSTYLE) } as u32;
+    // SAFETY: the call writes one u32 into `cloaked`, whose size is passed; a stale handle makes
+    // it return an error that is ignored (the window then counts as not cloaked).
+    let _ = unsafe {
+        DwmGetWindowAttribute(
+            hwnd,
+            DWMWA_CLOAKED,
+            &mut cloaked as *mut u32 as *mut c_void,
+            std::mem::size_of::<u32>() as u32,
+        )
+    };
+    is_pickable_style(ex_style, cloaked)
+}
 
 /// An RGBA8 picture of the visible frame of the window: `(width, height, pixels)`.
 pub fn capture(id: u32) -> Result<(u32, u32, Vec<u8>), String> {
@@ -153,7 +190,7 @@ fn print_window(hwnd: HWND, width: i32, height: i32) -> Result<Vec<u8>, String> 
 
 #[cfg(test)]
 mod tests {
-    use super::crop_box;
+    use super::{crop_box, is_pickable_style};
 
     #[test]
     fn the_crop_is_the_visible_frame_inside_the_window_rectangle() {
@@ -171,5 +208,20 @@ mod tests {
             crop_box((10, 10, 110, 60), (5, 10, 110, 60)),
             (0, 0, 100, 50)
         );
+    }
+
+    #[test]
+    fn the_taskbar_and_the_desktop_are_not_pickable_but_app_windows_are() {
+        // Shell_TrayWnd (taskbar) and Progman (desktop): tool windows, as read on Windows 11.
+        assert!(!is_pickable_style(0x0000_0088, 0));
+        assert!(!is_pickable_style(0x0020_0080, 0));
+        // An ordinary window, and the CaptureMann window (WS_EX_APPWINDOW).
+        assert!(is_pickable_style(0x0020_0100, 0));
+        assert!(is_pickable_style(0x0024_0100, 0));
+        // A tool window that asks to be listed stays; a cloaked or never-active window goes.
+        assert!(is_pickable_style(0x0004_0080, 0));
+        assert!(!is_pickable_style(0x0020_0100, 1));
+        assert!(!is_pickable_style(0x0820_0080, 0));
+        assert!(!is_pickable_style(0x0800_0000, 0));
     }
 }
