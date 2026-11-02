@@ -30,11 +30,11 @@
 
 ## Problems found
 
-- **Saved-screenshot toast cut off (fixed in `65a4af0`, not yet seen on the laptop):** the toast has action buttons, so it stays until dismissed, but its window was too short, so the title and the close button were hidden and it could not be closed. Cause: `estimate_height` counted the two shortcut hints (Paste, Open library with `Ctrl Alt Shift L`) as one row; macOS corrects the window to the painted height, Linux does not. The window was 440x206.
+- **Saved-screenshot toast cut off (fixed in `65a4af0`; seen fixed on the laptop with the package of CI run 41404587881, the same X11 session: title "Copied to clipboard", the close button, both hint rows and the four buttons are visible, and a second stacked toast fits):** the toast has action buttons, so it stays until dismissed, but its window was too short, so the title and the close button were hidden and it could not be closed. Cause: `estimate_height` counted the two shortcut hints (Paste, Open library with `Ctrl Alt Shift L`) as one row; macOS corrects the window to the painted height, Linux does not. The window was 440x206.
 - **Stray daemons (fixed in `4c6a77e`):** `smoke-linux.sh` called a `daemon stop` command the CLI does not have and left its daemons running; a CLI call also starts a headless daemon that blocks the app's socket until it is stopped (the app then shows "Command line and agents are offline"). Not changed in the product.
 - **Setup script (fixed in `0534952`):** `linux-setup.sh` stopped on a fresh Ubuntu (no `/etc/systemd/logind.conf.d`).
 - The ThinkPad has Fn Lock on by default: Esc did not close the launcher until the maintainer toggled it. Not an app problem.
 
 ## Verdict
 
-PARTIAL. X11: install from the `.deb`, diagnostics, screenshots (display, region, window), clipboard, launcher, tray menu and second-instance behave as specified. Not "verified": the editor, the keyring, the Wayland session and the tarball install have not been run, and the toast fix needs a look on the laptop.
+PARTIAL. X11: install from the `.deb`, diagnostics, screenshots (display, region, window), clipboard, launcher, tray menu and second-instance behave as specified. Not "verified": the editor, the keyring, the Wayland session and the tarball install have not been run, and the toast fix was seen working on the laptop (a screenshot was taken by hand, the picture is not stored).
