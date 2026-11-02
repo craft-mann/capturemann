@@ -24,8 +24,8 @@
 | 14b window picker (Window button, `Ctrl+Alt+Shift+2`), first builds | FAIL then fixed | the picker opened and listed windows, but typing, Enter and Esc went to the library window (maintainer with a real keyboard, and `xdotool`); clicking "Capture window" with the mouse saved the capture. It also listed GNOME's full-screen "Desktop Icons 1" window, whose capture is black. Cause and fixes under "Problems found" |
 | 14b window picker, build of CI run 41422283917 | PASS (driven with `xdotool`) | focus is on the picker window, `xcl` appears in the search box and narrows the list to xclock, Enter saves a 164x164 capture, Esc closes the picker; `targets` no longer lists "Desktop Icons 1". Still to be confirmed by hand on the keyboard |
 | 3b frame and controls on X11 | PARTIAL | one system title bar seen; minimise, maximise and close were not clicked |
-| 6 editor (6a to 6f) | NOT RUN | needs a person; Vietnamese typing needs an IBus engine |
-| 7 to 9 keyring and secrets | NOT RUN | |
+| 7 to 9 keyring and secrets (diagnostics part) | PASS | with GNOME Keyring: `Secret Service yes`, "secrets in the system credential store" (no unlock prompt from running diagnostics); with `CAPTUREMANN_SECRETS=file`: "secrets in a file (owner-only, not encrypted)"; on a private session bus without a Secret Service: `Secret Service no` and the "Missing on this system" line names GNOME Keyring or KWallet and the `CAPTUREMANN_SECRETS=file` hint. In that last case the line "secrets in the system credential store" is still printed above it, which reads oddly. Storing a fake key and the `no_keyring` error: NOT RUN, because no screen or command stores a secret without an online account (Google or YouTube sign-in) |
+| 6 editor (6a to 6f) | PARTIAL | the maintainer used the editor on X11 and said it worked; the single steps (draw, undo, copy, Save as, IBus typing) were not listed one by one |
 | 13, 14, 14a, 15b, 15c, 16 Wayland | NOT RUN | |
 | 21 to 23 tray activation, language, host restart | NOT RUN | |
 | 1, 2 tarball install and uninstall | NOT RUN | |
