@@ -32,7 +32,8 @@ and the MCP server work; **recording is not available yet** (it is switched off 
   chooser (`capturemann capture screenshot --pick`) takes the picture but does not hand it to the app. Use region or
   display.
 - Global shortcuts on GNOME 46 Wayland (no portal); use the tray menu or the launcher.
-- Copy image to the clipboard on GNOME 46 Wayland may fail.
+- Copy image to the clipboard on GNOME 46 Wayland goes through XWayland (GNOME has no data-control protocol); it
+  worked on the test laptop, and may fail on a Wayland-only session without XWayland.
 - Tray icon on GNOME needs the AppIndicator extension, otherwise the app shows a notice instead.
 - Windows and macOS builds are separate; this is Linux only.
 

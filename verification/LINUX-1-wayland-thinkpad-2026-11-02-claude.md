@@ -15,7 +15,7 @@
 | 14 region screenshot (`cm-desktop --capture region`) | PASS | the overlay covered the screen dimmed and frozen (maintainer); the saved image is 732x568, the selected region. Esc: NOT RUN |
 | 14a `capture screenshot --window x` | PASS | `not_implemented`, names `--pick`; `targets` says the desktop does not list windows |
 | 14a `capture screenshot --pick`, choosing a window | **FAIL (desktop)** | GNOME's chooser took the picture (two files in `~/Pictures/Screenshots`) but the portal answered with response code 2 and logged `xdg-desktop-portal: InteractiveScreenshot didn't return a file`; the CLI reports `user_declined` and exits 3. Nothing is saved in the library. The picture the desktop took is not handed to the app |
-| 15 clipboard | PASS (CLI) | `--copy`: `wl-paste --type image/png` shows a 1920x1080 PNG. The app logged `Tried to initialize the wayland data control protocol clipboard, but failed. Falling back to the X11 clipboard protocol`. Paste into another app: NOT RUN |
+| 15 clipboard | PASS | `--copy`: `wl-paste --type image/png` shows a 1920x1080 PNG; pasted with Ctrl+V into a text box in Firefox the picture appeared (maintainer, a later Wayland session with the build of CI run 41422283917). The app logs `Tried to initialize the wayland data control protocol clipboard, but failed. Falling back to the X11 clipboard protocol`: GNOME has no data-control protocol, so the copy goes through XWayland |
 | 15c no GlobalShortcuts portal | PARTIAL | the log says `no GlobalShortcuts portal`; `cm-desktop --launcher` shows the launcher in the running app. The start toast and the Shortcuts page wording: NOT RUN (seen by eye only) |
 | 15d second instance | PASS | exits at once, shows the running app |
 | 17/18 recording is off | PASS | `record start` answers `not_implemented`, nothing created |
@@ -29,4 +29,4 @@
 
 ## Verdict
 
-PARTIAL. Wayland display and region screenshots, the clipboard path through the CLI, the diagnostics and the window-title bar work on this machine. Picking a window does not.
+PARTIAL. Wayland display and region screenshots, the clipboard (copy and paste into another application), the diagnostics and the window-title bar work on this machine. Picking a window does not.

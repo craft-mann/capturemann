@@ -13,7 +13,7 @@ has run on a real Linux desktop yet. Test lab for that: `scripts/testlab/` (Thin
 | Screenshots, Wayland | portal screenshot; region by freezing the picture; window/region by the compositor's picker (`--pick`; its success path never ran headless) | `L1-wayland-screenshot`, `L1-capture-targets-linux` |
 | Desktop app | starts on X11 and GNOME Wayland; client-side title bar on Wayland; app id `dev.capturemann.app` | `L1-desktop-shell-linux`, `L1-windows-linux` |
 | Tray | StatusNotifierItem over D-Bus (no GTK); tested against a stand-in watcher only | `L1-tray-linux` |
-| Clipboard, hotkeys | X11 clipboard and XGrabKey hotkeys work; Wayland clipboard unproven; no GlobalShortcuts portal on GNOME 46 (toast + `cm-desktop --launcher` fallback) | `L1-clipboard-hotkeys-linux` |
+| Clipboard, hotkeys | X11 clipboard and XGrabKey hotkeys work; Wayland clipboard works through XWayland on GNOME 46 (ThinkPad, Nov 2, 2026: copy, then paste into Firefox); no GlobalShortcuts portal on GNOME 46 (toast + `cm-desktop --launcher` fallback) | `L1-clipboard-hotkeys-linux` |
 | Secrets | `no_keyring` error; `CAPTUREMANN_SECRETS=file` opt-in | acceptance row STO-2..5 |
 | Local AI | whisper (CPU), speaker engine (sherpa Linux libs, pinned; in the package with its models), llama-server (built and in the package); no text model run | `L1-local-ai-linux`, `L1-packaging-complete-linux` |
 | Auto-redact | Text recognizer = the system `tesseract` program as a helper (not linked, not bundled); button dimmed with the install command when missing; synthetic benchmark on aarch64, dev split; editor not seen on a desktop | `L1-auto-redact-linux` |

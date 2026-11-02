@@ -21,7 +21,7 @@ Draft for 0.2.6 (not released; the maintainer moves it under a version and a dat
 
 ### Known issues
 
-- Linux, Wayland, GNOME 46: no window screenshots (the desktop's window chooser does not return the picture), no global shortcuts, copying an image to the clipboard may fail.
+- Linux, Wayland, GNOME 46: no window screenshots (the desktop's window chooser does not return the picture), no global shortcuts; copying an image to the clipboard goes through XWayland there and may fail on a Wayland-only session.
 - Windows: no text recognizer for Auto-redact; the files are not signed.
 
 ## [0.2.5] - 2026-10-30

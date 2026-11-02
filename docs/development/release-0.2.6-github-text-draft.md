@@ -56,7 +56,8 @@ downloaded only when you press Download); Auto-redact of sensitive text through 
 
 What does not work yet: recording and MP4 export of recordings; window screenshots on Wayland (no window list, and
 the desktop's own window chooser on GNOME 46 does not hand the picture to the app); global shortcuts on GNOME 46
-Wayland; copying an image to the clipboard on GNOME 46 Wayland can fail. The tray icon on GNOME needs the
+Wayland. Copying an image on GNOME 46 Wayland goes through XWayland: it worked on the test laptop and may fail on
+a Wayland-only session. The tray icon on GNOME needs the
 AppIndicator extension.
 
 Passwords and sign-ins need a Secret Service (GNOME Keyring or KWallet). Without one the app says so;
