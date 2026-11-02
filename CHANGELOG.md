@@ -5,6 +5,25 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
+Draft for 0.2.6 (not released; the maintainer moves it under a version and a date when publishing).
+
+### Added
+
+- **Linux early build** (Ubuntu 24.04 and other distributions with glibc 2.39 or newer, x86_64 and aarch64): a `.deb` and a tarball with screenshots, annotation, the library, local AI, Auto-redact (through `tesseract`), the `capturemann` command line and the `cm-mcp` server. Recording is not available yet.
+- **Windows early build** (x64): a zip and a per-user installer with screenshots, annotation, the library, the command line and the MCP server. Not signed. Recording is not available yet.
+- `capturemann diagnostics` and the Permissions page describe the Linux session (X11 or Wayland), the desktop portal, PipeWire, the Secret Service and VA-API.
+- `CAPTUREMANN_SECRETS=file` keeps secrets in an owner-only file on a computer without a Secret Service.
+
+### Fixed
+
+- Windows: a window screenshot was shrunk and shifted by the invisible border; it is now cut to the window's visible frame.
+- Linux (X11): the window picker took no keyboard input under GNOME, offered GNOME's full-screen "Desktop Icons" window (captured black), and the saved-capture toast was cut off so that its close button could not be reached.
+
+### Known issues
+
+- Linux, Wayland, GNOME 46: no window screenshots (the desktop's window chooser does not return the picture), no global shortcuts, copying an image to the clipboard may fail.
+- Windows: no text recognizer for Auto-redact; the files are not signed.
+
 ## [0.2.5] - 2026-10-30
 
 0.2.5 is about what Auto-redact finds: 21 kinds of sensitive text instead of 4, chosen from the editor, the command line or an agent, with a benchmark that measures it. Benchmark results comparing 0.2.3 and 0.2.5 are added to the release notes from the stored reports in `verification/benchmarks/`.
