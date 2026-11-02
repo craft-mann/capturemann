@@ -31,7 +31,7 @@ write_file() { # write_file <path> <mode> ; content on stdin
   local path="$1" mode="$2" tmp; tmp="$(mktemp)"; cat >"$tmp"
   if [ -f "$path" ] && cmp -s "$tmp" "$path"; then rm -f "$tmp"; echo "   unchanged: $path"; return; fi
   if [ "$dry" = 1 ]; then echo "   [dry-run] would write $path"; rm -f "$tmp"; return; fi
-  sudo install -m "$mode" "$tmp" "$path"; rm -f "$tmp"; echo "   wrote: $path"
+  sudo install -D -m "$mode" "$tmp" "$path"; rm -f "$tmp"; echo "   wrote: $path"
 }
 
 [ "$(uname -s)" = Linux ] || { echo "Linux only" >&2; exit 1; }
