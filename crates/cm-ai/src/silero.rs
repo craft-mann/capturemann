@@ -124,7 +124,7 @@ pub fn regions(probs: &[f32], p: &VadParams, total_secs: f64) -> Vec<(f64, f64)>
             );
             let at = (fl..fh.min(probs.len()))
                 .min_by(|&x, &y| probs[x].total_cmp(&probs[y]))
-                .map_or(hi, |f| secs(f));
+                .map_or(hi, secs);
             cut.push((from, at));
             from = at;
         }
