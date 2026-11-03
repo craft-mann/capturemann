@@ -295,11 +295,13 @@ pub fn hit_test(
     if y < 0.0 || y > body_height(rows) || x < -HANDLE_W || x > geom.width + HANDLE_W {
         return Hit::Nothing;
     }
-    if y < RULER_H {
-        return Hit::Ruler(geom.t_of(x));
-    }
+    // The playhead wins over the ruler under its flag too: grabbing the flag on top of the line
+    // drags the playhead (scrubs); a press elsewhere on the ruler is the ruler's gesture.
     if (x - geom.x_of(playhead)).abs() <= GRAB_PX {
         return Hit::Playhead;
+    }
+    if y < RULER_H {
+        return Hit::Ruler(geom.t_of(x));
     }
     let (xin, xout) = (geom.x_of(list.start), geom.x_of(list.end));
     // The in handle hangs to the left of the in-point, the out handle to the right of the

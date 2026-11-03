@@ -18,7 +18,18 @@ use crate::ui::app::{self, AppModel};
 pub fn open(app: &Entity<AppModel>, paths: Vec<PathBuf>, cx: &mut App) {
     app::open_studio(app, cx);
     if paths.is_empty() {
-        pick(app, cx);
+        // After the window has been raised: when this runs from inside the Studio the raise is
+        // queued until the current update ends, and a file panel opened before it ended up
+        // behind the raised window (the Import button seemed to do nothing, Nov 3, 2026).
+        // The raise itself runs in a task of its own, so wait a moment for it before the panel opens.
+        let app = app.clone();
+        cx.spawn(async move |cx| {
+            cx.background_executor()
+                .timer(std::time::Duration::from_millis(200))
+                .await;
+            cx.update(|cx| pick(&app, cx));
+        })
+        .detach();
         return;
     }
     add_paths(app, paths, cx);
