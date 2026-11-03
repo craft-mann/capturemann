@@ -12,7 +12,9 @@ use std::sync::Arc;
 use cm_ai::caption::{build_captions, map_lines_to_timeline, to_srt, to_txt, to_vtt, CaptionLine};
 use cm_ai::model::{DownloadOutcome, DownloadProgress, ModelList, ModelStore};
 use cm_ai::recording::TranscribeOptions;
-use cm_ai::suggest::silence::{decode_mono_f32, silence_cuts, SilenceOptions, ANALYSIS_RATE};
+use cm_ai::suggest::silence::{
+    decode_mono_f32, silence_cuts, veto_speech, SilenceOptions, ANALYSIS_RATE,
+};
 use cm_ai::suggest::zoom::{suggest_zooms, ZoomOptions};
 use cm_ai::suggest::{filler::filler_cuts, merge_cuts, CutSuggestion, ZoomSuggestion};
 use cm_ai::text_model::engine::EngineManager;
@@ -379,22 +381,40 @@ impl SuggestService for RealSuggest {
             if t.get("missing").and_then(Value::as_bool) == Some(true) {
                 return None;
             }
-            let file = t.get("file").and_then(Value::as_str)?;
+            // The pauses are judged on the track as recorded when there is one: a noise-reduced
+            // copy pushes quiet stretches (and quiet speech) down, which hides where the room
+            // noise and the speech really are.
             let start = t.get("start").and_then(Value::as_i64).unwrap_or(0);
-            let path = bundle_dir.join(file);
-            path.is_file().then(|| (path, MediaTime::from_ticks(start)))
+            ["raw_file", "file"].iter().find_map(|key| {
+                let path = bundle_dir.join(t.get(*key).and_then(Value::as_str)?);
+                path.is_file().then(|| (path, MediaTime::from_ticks(start)))
+            })
         });
         let mut silence = Vec::new();
         if let Some((file, start)) = track {
             let tools = cm_media::tools::locate()?;
             let samples = decode_mono_f32(&tools.ffmpeg, &file, ANALYSIS_RATE)?;
-            silence = silence_cuts(
-                &samples,
-                ANALYSIS_RATE,
-                start,
-                &manifest.gaps,
-                &SilenceOptions::default(),
-            )?;
+            let opts = SilenceOptions::default();
+            silence = silence_cuts(&samples, ANALYSIS_RATE, start, &manifest.gaps, &opts)?;
+            // Where the transcript or the speaker engine says someone speaks, no pause.
+            let mut speech: Vec<cm_core::edit::Span> = transcript
+                .map(|t| {
+                    t.words
+                        .iter()
+                        .map(|w| cm_core::edit::Span::new(w.start, w.end))
+                        .collect()
+                })
+                .unwrap_or_default();
+            if let Some(v) = manifest.extra.get(cm_ai::speakers::MANIFEST_SEGMENTS) {
+                if let Ok(segs) = serde_json::from_value::<Vec<cm_ai::speakers::Segment>>(v.clone())
+                {
+                    speech.extend(
+                        segs.iter()
+                            .map(|s| cm_core::edit::Span::new(s.start, s.end)),
+                    );
+                }
+            }
+            silence = veto_speech(silence, &speech, &opts);
         } else if transcript.is_none() {
             return Err(CmError::invalid_input(
                 "This recording has no audio track to analyse",
