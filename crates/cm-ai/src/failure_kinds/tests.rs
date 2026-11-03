@@ -112,28 +112,9 @@ impl Transcriber for HearsAtStart {
 }
 
 /// The reproduction: speech at 40 s to 50 s, nothing before it, and a model that only hears the
-/// start. Today the region gets no words. (Passes: it documents the failure.)
+/// start of what it is given. Before the fix the region got no words (coverage 50 %).
 #[test]
-fn a_speech_region_in_the_middle_gets_no_words_today() {
-    let x = signal(60.0, &[(0.0, 10.0, 0.2), (40.0, 50.0, 0.2)]);
-    let (t, _) = transcribe_pieces(
-        &HearsAtStart,
-        Pcm16k {
-            samples: &x,
-            start: MediaTime::ZERO,
-        },
-        Some("en"),
-        None,
-        &mut |_| true,
-    )
-    .unwrap();
-    let c = word_coverage(&[(0.0, 10.0), (40.0, 50.0)], &t.words, 1.0, 5.0);
-    assert!((c.ratio() - 0.5).abs() < 0.1, "{c:?}");
-}
-
-#[test]
-#[ignore = "planned fix M2d-1: re-read speech regions that have no words, as a piece starting at the region"]
-fn the_fix_reads_uncovered_speech_again() {
+fn uncovered_speech_is_read_again_as_a_piece_that_starts_there() {
     let x = signal(60.0, &[(0.0, 10.0, 0.2), (40.0, 50.0, 0.2)]);
     let (t, _) = transcribe_pieces(
         &HearsAtStart,

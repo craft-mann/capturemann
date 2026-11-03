@@ -227,6 +227,10 @@ pub struct Checkpoint {
     pub broken_reread: usize,
     #[serde(default)]
     pub broken_dropped: usize,
+    #[serde(default)]
+    pub gaps_reread: usize,
+    #[serde(default)]
+    pub gaps_filled: usize,
 }
 
 /// What a run over all the pieces did, beyond the words.
@@ -250,6 +254,10 @@ pub struct PiecesReport {
     pub broken_reread_kept: usize,
     /// Words dropped or cleaned because they are not text (see [`crate::failure_kinds`]).
     pub broken_dropped: usize,
+    /// Stretches of speech-like level with no words, read again on their own, and the ones that
+    /// got words.
+    pub gaps_reread: usize,
+    pub gaps_filled: usize,
 }
 
 /// The same audio from the other source (the original microphone when the noise-reduced copy is
@@ -337,7 +345,8 @@ impl Job<'_, '_> {
     fn piece(&mut self, range: Range<usize>, depth: usize) -> Result<Vec<Word>, CmError> {
         let words = self.piece_inner(range.clone(), depth)?;
         if depth == 0 {
-            return self.repair(words, range);
+            let words = self.repair(words, range.clone())?;
+            return self.fill_gaps(words, range);
         }
         Ok(words)
     }
@@ -502,6 +511,80 @@ impl Job<'_, '_> {
     }
 }
 
+/// A stretch of speech-like level with no word for this long is read again (seconds).
+const GAP_MIN_SECS: f64 = 3.0;
+/// Words this close to a stretch count as covering it (seconds).
+const GAP_PAD_SECS: f64 = 0.5;
+/// At most this many stretches are read again per piece.
+const MAX_GAP_READS: usize = 20;
+/// A new reading of a stretch is kept when its words average at least this confidence.
+const GAP_MIN_CONFIDENCE: f32 = 0.4;
+
+impl Job<'_, '_> {
+    /// Speech that got no words: where the level says someone speaks (see
+    /// [`crate::vad::speech_regions`]) for [`GAP_MIN_SECS`] or more with no word near, the stretch
+    /// is read again as a piece of its own that starts there (no earlier text as prompt, which is
+    /// what lets Whisper skip speech in the middle of a long read). The new words are kept when
+    /// they are clean, do not loop and are not hopeless; otherwise the stretch stays empty.
+    fn fill_gaps(&mut self, words: Vec<Word>, range: Range<usize>) -> Result<Vec<Word>, CmError> {
+        let regions = crate::vad::speech_regions(&self.samples[range.clone()], GAP_MIN_SECS);
+        if regions.is_empty() {
+            return Ok(words);
+        }
+        let offset = range.start as f64 / f64::from(SAMPLE_RATE);
+        let spans: Vec<(f64, f64)> = words.iter().map(|w| self.secs_of(w)).collect();
+        // Uncovered stretches, in audio seconds.
+        let mut gaps: Vec<(f64, f64)> = Vec::new();
+        for (ra, rb) in regions {
+            let (ra, rb) = (
+                offset + ra as f64 / f64::from(SAMPLE_RATE),
+                offset + rb as f64 / f64::from(SAMPLE_RATE),
+            );
+            let mut at = ra;
+            for &(a, b) in spans.iter().filter(|(a, b)| *b > ra && *a < rb) {
+                if a - GAP_PAD_SECS - at >= GAP_MIN_SECS {
+                    gaps.push((at, a - GAP_PAD_SECS));
+                }
+                at = at.max(b + GAP_PAD_SECS);
+            }
+            if rb - at >= GAP_MIN_SECS {
+                gaps.push((at, rb));
+            }
+        }
+        let mut added: Vec<Word> = Vec::new();
+        for (a, b) in gaps.into_iter().take(MAX_GAP_READS) {
+            let (sa, sb) = (samples_of(a), samples_of(b).min(range.end));
+            if sb <= sa {
+                continue;
+            }
+            self.report.gaps_reread += 1;
+            let saved = self.prompt.take();
+            let again = self.read(sa..sb, false);
+            self.prompt = saved;
+            let again = again?.words;
+            let language = self.language.clone().unwrap_or_default();
+            let ok = !again.is_empty()
+                && again
+                    .iter()
+                    .all(|w| !crate::failure_kinds::is_broken(w, &language))
+                && !Badness::of(&again).is_bad()
+                && again.iter().map(|w| w.confidence).sum::<f32>() / again.len() as f32
+                    >= GAP_MIN_CONFIDENCE;
+            if ok {
+                self.report.gaps_filled += 1;
+                added.extend(again);
+            }
+        }
+        if added.is_empty() {
+            return Ok(words);
+        }
+        let mut all = words;
+        all.extend(added);
+        all.sort_by_key(|w| w.start);
+        Ok(all)
+    }
+}
+
 /// Transcribes `audio` piece by piece ([`plan`]), checking every piece for a repetition loop. The
 /// words come back in file time like a single run's would (`audio.start` plus the position), the
 /// language is the first piece's unless one was asked for, and `progress` runs over the whole audio
@@ -582,6 +665,8 @@ pub fn transcribe_pieces_resumable<'p>(
         job.report.other_audio_kept = c.other_audio_kept;
         job.report.broken_reread = c.broken_reread;
         job.report.broken_dropped = c.broken_dropped;
+        job.report.gaps_reread = c.gaps_reread;
+        job.report.gaps_filled = c.gaps_filled;
         // The bar starts where the finished pieces end.
         if let Some(next) = pieces.get(start) {
             job.high = next.start as f32 / audio.samples.len().max(1) as f32;
@@ -604,6 +689,8 @@ pub fn transcribe_pieces_resumable<'p>(
                 other_audio_kept: job.report.other_audio_kept,
                 broken_reread: job.report.broken_reread,
                 broken_dropped: job.report.broken_dropped,
+                gaps_reread: job.report.gaps_reread,
+                gaps_filled: job.report.gaps_filled,
             });
         }
     }

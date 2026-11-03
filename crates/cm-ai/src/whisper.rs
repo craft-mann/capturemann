@@ -251,7 +251,42 @@ fn run(
     let mut state = ctx
         .create_state()
         .map_err(|e| internal("could not start", &e))?;
-    let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+    let exp = std::env::var("CM_EXP").unwrap_or_default();
+    let has = |k: &str| exp.split(',').any(|x| x == k);
+    let val = |k: &str| {
+        exp.split(',').find_map(|x| {
+            x.strip_prefix(&format!("{k}="))
+                .and_then(|v| v.parse::<f32>().ok())
+        })
+    };
+    let mut params = if let Some(b) = val("beam") {
+        FullParams::new(SamplingStrategy::BeamSearch {
+            beam_size: b as i32,
+            patience: -1.0,
+        })
+    } else {
+        FullParams::new(SamplingStrategy::Greedy {
+            best_of: val("best_of").map_or(1, |v| v as i32),
+        })
+    };
+    if has("no_context") {
+        params.set_no_context(true);
+    }
+    if let Some(v) = val("temp_inc") {
+        params.set_temperature_inc(v);
+    }
+    if let Some(v) = val("entropy") {
+        params.set_entropy_thold(v);
+    }
+    if let Some(v) = val("logprob") {
+        params.set_logprob_thold(v);
+    }
+    if let Some(v) = val("nospeech") {
+        params.set_no_speech_thold(v);
+    }
+    if has("single_segment") {
+        params.set_single_segment(true);
+    }
     params.set_n_threads(threads);
     // The translate task makes the model write English whatever language it hears (AI-5).
     params.set_translate(translate);

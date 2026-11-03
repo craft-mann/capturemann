@@ -68,6 +68,51 @@ pub fn speech_bounds(samples: &[f32]) -> Option<(usize, usize)> {
     Some((first * FRAME, (last * FRAME).min(samples.len())))
 }
 
+/// Stretches of speech-like level in `samples`, as `(start, end)` sample indexes: 20 ms frames above a
+/// threshold a share of the way from the noise floor (10th percentile) to the speech level (90th),
+/// dips of up to [`REGION_BRIDGE_S`] bridged, stretches shorter than `min_secs` dropped. Empty when
+/// floor and speech are less than [`REGION_MIN_RANGE_DB`] apart (nothing separates them). Energy
+/// only: music and typing count as speech here, so the caller must treat these as candidates.
+pub fn speech_regions(samples: &[f32], min_secs: f64) -> Vec<(usize, usize)> {
+    let db: Vec<f32> = samples
+        .as_chunks::<FRAME>()
+        .0
+        .iter()
+        .map(|c| 10.0 * (c.iter().map(|s| s * s).sum::<f32>() / FRAME as f32 + 1e-12).log10())
+        .collect();
+    if db.len() < MIN_SPEECH_FRAMES {
+        return Vec::new();
+    }
+    let mut sorted = db.clone();
+    sorted.sort_by(f32::total_cmp);
+    let floor = sorted[sorted.len() / 10];
+    let speech = sorted[sorted.len() * 9 / 10];
+    if speech - floor < REGION_MIN_RANGE_DB {
+        return Vec::new();
+    }
+    let thr = floor + (speech - floor) * 0.4;
+    let bridge = (REGION_BRIDGE_S * 50.0) as usize;
+    let mut runs: Vec<(usize, usize)> = Vec::new();
+    for (i, l) in db.iter().enumerate() {
+        if *l <= thr {
+            continue;
+        }
+        match runs.last_mut() {
+            Some(last) if i <= last.1 + bridge => last.1 = i + 1,
+            _ => runs.push((i, i + 1)),
+        }
+    }
+    runs.into_iter()
+        .filter(|(a, b)| (b - a) as f64 / 50.0 >= min_secs)
+        .map(|(a, b)| (a * FRAME, (b * FRAME).min(samples.len())))
+        .collect()
+}
+
+/// Dips shorter than this inside speech do not split a region (seconds).
+pub const REGION_BRIDGE_S: f64 = 0.5;
+/// Floor and speech level closer than this (dB) are not told apart.
+pub const REGION_MIN_RANGE_DB: f32 = 10.0;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -118,6 +163,21 @@ mod tests {
         assert!((secs(s) - 1.0).abs() < 0.05);
         // The long silence in the middle stays inside: the span is first to last speech.
         assert!((secs(e) - secs(a.len())).abs() < 0.05, "{}", secs(e));
+    }
+
+    #[test]
+    fn regions_follow_the_speech_and_bridge_short_dips() {
+        let mut a = silence(1.0);
+        a.extend(tone(2.0, 0.2));
+        a.extend(silence(0.3));
+        a.extend(tone(2.0, 0.2));
+        a.extend(silence(3.0));
+        a.extend(tone(1.5, 0.05));
+        let r = speech_regions(&a, 1.0);
+        assert_eq!(r.len(), 2, "{r:?}");
+        assert!((secs(r[0].0) - 1.0).abs() < 0.1 && (secs(r[0].1) - 5.3).abs() < 0.1);
+        assert!(secs(r[1].0) > 8.2);
+        assert!(speech_regions(&silence(3.0), 1.0).is_empty());
     }
 
     #[test]
