@@ -122,6 +122,22 @@ pub fn open_studio(app: &Entity<AppModel>, cx: &mut App) {
         {
             return;
         }
+        // `update` also fails when the window is the one running this very handler (the Import
+        // button, a menu command from inside the window): it is being updated already. The window
+        // is alive then, so raise it once the current update has ended instead of opening a second
+        // one (seen Nov 3, 2026: every Import click opened another "CaptureMann" window).
+        let alive = cx
+            .windows()
+            .iter()
+            .any(|w| w.window_id() == gpui::AnyWindowHandle::from(handle).window_id());
+        if alive {
+            cx.defer(move |cx| {
+                let _ = handle.update(cx, |_, window, cx| {
+                    crate::surfaces::bring_to_front(cx, window, None, "studio brought to front");
+                });
+            });
+            return;
+        }
     }
     let app2 = app.clone();
     let opened = cx.open_window(
