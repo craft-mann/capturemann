@@ -18,14 +18,19 @@ through MCP and a CLI.
 <p align="center">
 <a href="https://github.com/craft-mann/capturemann/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/craft-mann/capturemann/actions/workflows/ci.yml/badge.svg"></a>
 <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue"></a>
-<img alt="Platform: macOS 13+" src="https://img.shields.io/badge/platform-macOS%2013%2B-lightgrey"> <img alt="Chips: Apple Silicon and Intel" src="https://img.shields.io/badge/chip-Apple%20Silicon%20%7C%20Intel-lightgrey">
+<a href="https://github.com/craft-mann/capturemann/releases/latest"><img alt="Version 0.2.6" src="https://img.shields.io/badge/version-0.2.6-blue"></a>
+<img alt="macOS 13+: Apple Silicon and Intel" src="https://img.shields.io/badge/macOS-13%2B%20%7C%20Apple%20Silicon%20%26%20Intel-lightgrey?logo=apple&logoColor=white">
+<img alt="Windows 11 x64: early build" src="https://img.shields.io/badge/Windows-11%20x64%20%7C%20early%20build-0078D4?logo=windows&logoColor=white">
+<img alt="Linux: early build, Ubuntu 24.04+ x86_64 and aarch64" src="https://img.shields.io/badge/Linux-Ubuntu%2024.04%2B%20%7C%20early%20build-E95420?logo=linux&logoColor=white">
 </p>
 
 <p align="center">
   <img alt="The CaptureMann library: recordings, audio and screenshots in one place, with a record button, region, window and display capture, and the AI and agent pages in the sidebar" src="docs/images/library.webp" width="900">
 </p>
 
-> **Status: 0.2.5 (macOS 13+, Apple Silicon and Intel).** Windows, then Linux follow. Most results are
+> **Status: 0.2.6. macOS 13+ (Apple Silicon and Intel) is the full app. Windows 11 (x64) and Linux (Ubuntu 24.04+,
+> x86_64 and aarch64) are early builds** with screenshots, the editor, the library, local AI and the CLI and MCP
+> server; screen and audio recording are not available there yet, and the Windows files are not signed. Most results are
 > tested with scripted fakes, plus the maintainer's own use on one Mac; there are few stored hardware
 > reports. **Speaker labels** are measured on public English conversation clips only (diarization error
 > 17 % on clips held back, [report](verification/benchmarks/speaker-detection-2026-10-29.md)); Vietnamese
@@ -172,11 +177,15 @@ cargo run -p cm-render --example redaction_bench --release --locked -- run --set
   (`letmein`) are not proposed.
 - Some lookalikes are proposed anyway (in the dev split: hash strings, timestamps, ten-digit ids, tracking
   numbers); that is why you review.
-- There is **no Windows or Linux recognizer yet**; the Auto-redact button is hidden there.
+- On **Linux** Auto-redact uses the system `tesseract` program (recall is lower than Apple Vision's); on **Windows** there is no built-in recognizer yet; it should work with `tesseract` installed, which is not tested there.
 - It is not a compliance tool. **A blurred screenshot is not proof that nothing sensitive remains**: look at
   the result before you share it.
 
 ## Install
+
+Pick your system: [macOS](#macos) (below), [Windows](#windows-early-build) or [Linux](#linux-early-build).
+
+### macOS
 
 Requires a Mac with macOS 13 or later, Apple Silicon or Intel (Apple menu > About This Mac shows the chip). There is one download per chip. **The Intel build (0.2.1 and later) is built and checked on Apple Silicon.** It installs and opens on a real Intel Mac, but starting a screen recording crashed a MacBook Pro 16" 2019 in 0.2.2 ([issue 16](https://github.com/craft-mann/capturemann/issues/16)); 0.2.3 catches the error and retries with simpler settings, which is not confirmed on that Mac yet. The speech and text models may be slow on older Intel Macs. Please report problems. The app is about 180 MB (Apple Silicon) or 190 MB (Intel).  The AI models are not in it: they download only when you press Download (about 4.4 GB for the recommended speech model, Large v3 Turbo, plus the recommended text model, Gemma 4 E2B). The two small speaker models are inside the app.
 
@@ -206,6 +215,34 @@ DMG. The `capturemann` command line is inside the app; to use it as `capturemann
 `sudo ln -s /Applications/CaptureMann.app/Contents/MacOS/capturemann /usr/local/bin/capturemann`.
 To build it yourself instead, see [building from source](docs/development/building.md). More on verifying a
 download: [docs/development/releasing.md](docs/development/releasing.md#how-users-verify-a-download).
+
+### Windows (early build)
+
+Windows 11 (x64). From [Releases](https://github.com/craft-mann/capturemann/releases) download
+`capturemann-<version>-windows-x64-setup.exe` (a per-user installer, no administrator rights) or
+`capturemann-<version>-windows-x64.zip` (unpack anywhere and run `cm-desktop.exe`; `capturemann.exe` is the command
+line). Check the download with its `.sha256` file (`certutil -hashfile <file> SHA256`).
+**The files are not signed**, so Windows SmartScreen warns before the first run (More info, then Run anyway).
+Works: screenshots of a region, a window or a display, the editor, the library, local AI that needs no extra
+program, the CLI and the MCP server. Not yet: recording, speaker labels; Auto-redact needs
+`winget install UB-Mannheim.TesseractOCR` (not tested on Windows yet).
+
+### Linux (early build)
+
+Ubuntu 24.04 or later, Debian 13, or another distribution with glibc 2.39 or newer; x86_64 and aarch64. From
+[Releases](https://github.com/craft-mann/capturemann/releases):
+
+```sh
+sudo apt install ./capturemann_<version>_amd64.deb      # or _arm64.deb; Ubuntu and Debian
+```
+
+Other distributions: unpack `capturemann-<version>-linux-<arch>.tar.gz`, run `./check-runtime.sh` (it names missing
+libraries), then `./install.sh`. Every file has a `.sha256` and a minisign signature
+(`minisign -Vm <file> -P RWTeQv8ogB2CCuZ7j0rr3MovdHod4QATmVn+I329YC8pomOC6R9Rxc2k`; the key is
+`packaging/linux/minisign.pub`). Works: screenshots (region, window and display on X11; region and display on
+GNOME Wayland), the editor, the library, local AI, Auto-redact with `sudo apt install tesseract-ocr`, the CLI and the
+MCP server. Not yet: recording, window screenshots and global shortcuts on GNOME 46 Wayland. Details and known
+issues: [`docs/development/linux-early-build.md`](docs/development/linux-early-build.md).
 
 ## Quick start
 
