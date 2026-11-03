@@ -24,6 +24,7 @@ pub mod flows;
 mod i18n_events_tests;
 #[cfg(test)]
 mod i18n_net_tests;
+pub mod import_flow;
 pub mod instance;
 pub mod launcher;
 #[cfg(test)]
