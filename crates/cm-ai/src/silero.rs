@@ -20,6 +20,23 @@ use crate::transcribe::{media_secs, Pcm16k, Transcriber, Transcript, Word};
 pub const FRAME: usize = 512;
 const RATE: f64 = 16_000.0;
 
+/// The id of the model in [`vad_catalog`].
+pub const MODEL_ID: &str = "silero-vad";
+
+const VAD_CATALOG: &str = include_str!("../data/vad_models.json");
+
+/// The pinned voice-activity model (URL, SHA-256, size), in the shape of the speech models list.
+pub fn vad_catalog() -> crate::model::Catalog {
+    crate::model::Catalog::parse(VAD_CATALOG)
+        .unwrap_or(crate::model::Catalog { models: Vec::new() })
+}
+
+/// A store for the voice-activity model under `root` (the same folder layout as the speech models,
+/// so it downloads, resumes and checks the SHA-256 the same way, and only when asked).
+pub fn vad_store(root: &Path) -> crate::model::ModelStore {
+    crate::model::ModelStore::with_catalog(root, vad_catalog())
+}
+
 /// The model's probabilities for audio.
 pub struct SileroVad {
     ctx: Mutex<WhisperVadContext>,
@@ -233,6 +250,21 @@ impl Transcriber for VadFirst<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_pinned_catalogue_parses_and_names_the_file_and_checksum() {
+        let c = vad_catalog();
+        let m = c.get(MODEL_ID).expect("silero-vad");
+        assert_eq!(m.bytes, 885_098);
+        assert_eq!(
+            m.sha256,
+            "29940d98d42b91fbd05ce489f3ecf7c72f0a42f027e4875919a28fb4c04ea2cf"
+        );
+        assert!(m
+            .url
+            .contains("/resolve/9ffd54a1e1ee413ddf265af9913beaf518d1639b/"));
+        assert!(!m.pending_pin);
+    }
 
     /// 32 ms frames: `speech` frames of probability 0.9 between silences of 0.02.
     fn probs(pattern: &[(usize, f32)]) -> Vec<f32> {
