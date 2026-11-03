@@ -6,7 +6,9 @@ Status: **draft** (Nov 3, 2026), nothing built. Scope set by the maintainer on N
   **report writing**.
 - **Windows catch-up moves to 0.2.8, Linux catch-up to 0.2.9** (kept below under "Later releases"). The 0.2.7 release
   does not change the Windows and Linux early builds; they stay at their 0.2.6 state and the release text says so.
-- The work is split into two tracks that run **at the same time** in separate git worktrees, each driven by its own
+- **Import media (Nov 3, 2026, maintainer): videos and audio files imported into the library ship in 0.2.7** as a third
+  track, M3 below (design boards I0 to I4 in `capturemann-redesign 6/`, text in `import-media-design.md`).
+- The work is split into three tracks that run **at the same time** in separate git worktrees, each driven by its own
   agent (see "How the agents work").
 
 Rules that apply to every track (from `CLAUDE.md` and the maintainer): general techniques only, no phrase lists or
@@ -175,6 +177,85 @@ Work (general techniques, measured before and after, no thresholds tuned to this
 Done when: before/after reports for each of M2a, M2b, M2c are stored, the tests (with fakes) cover the new
 splitting/cancel behaviour, and `tests/manual/AI-5/7/8/9.md` have been re-run on the new build.
 
+## Track M3: Import media (agent `mac-import`)
+
+Source: `capturemann-redesign 6/` (untracked at the repo root until the maintainer moves it; boards I0 to I4,
+`screens/png/Import*.png`, `source/Import*.dc.html`, `import-media-design.md`). The kit says "not yet in the specs":
+M3 starts by writing `specs/features/18-import.md` (feature template of `specs/README.md`, IDs `IMP-n`, acceptance
+criteria `IMP-n.ACm`) and adding the tool to `specs/02-agent-interface.md`; nothing is built before the spec meets the
+Definition of Ready. Decisions already made by the maintainer (kit, Nov 3, 2026): `import_media` is Free tier;
+**Remove the originals** is opt-in, Confirm for agents, original goes to the Trash only after the copy is verified;
+files only, no folders.
+
+What the analysis found (the plan for each is the work list below):
+
+1. **The bundled FFmpeg cannot read most of the formats the boards list.** `packaging/ffmpeg/build-macos.sh` builds only
+   what the product uses: decoders `h264 hevc aac pcm_*` (plus image codecs), demuxers `mov matroska wav image2 rawvideo
+   gif`. Missing for the listed formats: demuxers `avi mp3 aiff flac ogg aac`; decoders `vp8 vp9 opus vorbis flac
+   mp3float alac mpeg4` (and `prores` if wanted). All are LGPL and native (no GPL), but the lists must grow, the
+   self-check must require them, and `make ffmpeg` must be run for **both** architectures by the maintainer. Until then
+   MP4/MOV/M4V (H.264, HEVC, AAC), M4A, WAV and MKV with those codecs work.
+2. **"Prepared for editing"** (variable frame rate, MKV, AVI, odd codecs) means a constant-frame-rate editing copy.
+   No libx264 ships, so the copy is H.264 or HEVC through `h264_videotoolbox` / `hevc_videotoolbox` with the `fps`
+   filter (both already built). A hardware encoder is required (as for recording); without it the sheet says so.
+3. **Track model.** A bundle's tracks are `screen`, `camera`, `mic`, `system`, `cursor`. An imported video is a
+   `recording` bundle whose `screen` track is the master file (or the editing copy); its sound is decoded once to
+   `mic.wav` (48 kHz, f32, no denoised copy) so transcription, speakers, mix, mute, export and Suggest cuts work unchanged
+   (`raw_file` already falls back to `file`). The UI calls it "Audio". An imported audio file is a `kind: audio` bundle with
+   the same `mic.wav`. No new `CaptureKind` (the boards' `kind: video|audio` becomes `recording|audio`); "imported" is
+   `source: { path, imported_at, original_name, original_file }` in the manifest. No cursor or camera track: the editor's
+   existing unavailable state is reused for Cursor, and the Camera tab is disabled.
+4. **Jobs and actions.** `import` is a persisted job (copy, probe, decode, prepare, verify, optionally trash) with
+   `job.progress`, cancel and resume; disk space is checked first (`disk_full`); `capture.created` fires per file. `import_media`
+   is Free, but `remove_originals: true` is Confirm: the registry has one tier per tool, so a parameter-dependent tier
+   (or a second tool name) is needed and must be specified in the interface spec. New error reasons: `unsupported_format`,
+   `protected_media`, `unreadable_file`; `permission_missing` gets `data.permission: "files"`; a folder path is
+   `invalid_input` with `data.reason: "folder_not_supported"`. MCP tools go from 74 to 75; CLI `capturemann import`.
+5. **Files permission.** The app is not sandboxed: macOS asks by itself when a protected folder is read. The daemon must
+   turn "Operation not permitted" into `permission_missing` and let the GUI trigger the prompt first; an agent over the CLI
+   gets the error. Needs a manual script (a file on Desktop and one on an external drive).
+6. **Moving to the Trash** exists in `cm-platform::trash`; the verify step (same size, decodes, duration within 1 frame)
+   is new.
+7. **UI work in `apps/desktop`:** the import sheet (I2), drop overlay and drag onto the library (I1), library chips and
+   an "Imported" badge and progress strip on cards (I3), the editor's "Imported" chip, source line and disabled tabs (I4),
+   the Captions empty state, Launcher "Import media", menu-bar "Import file…", ⌘I. **Dock-icon drop and double-click
+   open need `CFBundleDocumentTypes` in the app bundle and an open-files event that nothing in `apps/desktop` handles
+   today**: platform code in `apps/desktop/src/platform*.rs`. All strings through `cm_i18n` with Vietnamese drafts.
+8. **Design assets not in the repo:** the kit names `capturemann-icons/` (custom `cm-import`, `cm-import-video`,
+   `cm-import-audio`, Lucide `file-x`, `files`, `lock-keyhole`, `folder-input`, `circle-slash`). `design/icons` has 144
+   icons, none of the three custom ones and only `file-x-2`; the maintainer provides the folder, or the agent draws the
+   three from the board per `design/CLAUDE.md`.
+9. **Document conflict to raise (spec rule):** the kit's toast spec says 6 s; the maintainer changed toasts to 5 s on
+   Nov 3, 2026 (`design/redesign` and `design-surfaces.md` follow 5 s). The new import toasts use 5 s except a running
+   import (progress) and failures.
+10. **Fit with M2:** an imported 15 s voice memo or a 1 hour interview is exactly the short and medium audio M2 targets;
+    "Transcribe after import" uses the M2 fixes, and imported files (often quiet or already normalised) are a second
+    real source for the quiet-speech and coverage checks.
+
+Work list, in order (one change per commit, tests with fakes plus FFmpeg fixtures made by the test tools; hardware is not
+needed):
+- **S0 spec:** `18-import.md`, the interface table, error codes, glossary; the FFmpeg component lists (a commit that
+  edits `build-macos.sh`, then the maintainer runs `make ffmpeg` for arm64 and `CM_ARCH=x86_64 make ffmpeg`).
+- **S1 engine (`cm-media`, `cm-library`):** probe (streams, duration, rotation, VFR, DRM, HDR flag), format
+  classification (Ready / Prepared / Can't import), editing-copy builder, audio decode to `mic.wav`, bundle writer
+  with `source`, verify.
+- **S2 daemon (`cm-daemon`, `cm-jobs`, `cm-cli`, `cm-mcp`):** `import` job, `import_media` action, events,
+  permission mapping, remove-originals with the Confirm tier, CLI and MCP tool, tests with scripted jobs.
+- **S3 UI part 1:** library Import… and ⌘I, the sheet with per-row status, after-import options, footer, progress strip
+  on cards, failed card, job toast (5 s rules), Imported badge and filter chips.
+- **S4 UI part 2:** drag onto the library with the drop overlay, editor Imported chip, source line, disabled tabs,
+  Captions empty state, Launcher and menu-bar entries, Dock drop and Open With (platform code).
+- **S5 checks:** `tests/manual/IMP-1.md` (a phone HEVC MOV with rotation, a variable-rate MKV, an M4A interview of
+  about 1 hour, a 15 s voice memo, a DRM-protected file, a file on Desktop and on an external drive, a folder drop,
+  cancel, disk full, remove-originals), a benchmark report of import time per GB and of prepare time, i18n check,
+  `design` side-by-side with the PNGs at 1440 px.
+
+Owns: `crates/cm-media` (probe, prepare), `crates/cm-library` (import writer, manifest `source`), `crates/cm-jobs`,
+`crates/cm-daemon` (new import files and the registry entry), `crates/cm-cli`, `crates/cm-mcp`, new `apps/desktop` import
+files, `packaging/ffmpeg/build-macos.sh` lists, specs and manual scripts. Must not touch `crates/cm-ai` (M2) or the
+window-lifetime code (`surfaces.rs`); editor and library files shared with `mac-stability` are edited in separate small
+commits and merged first-come, rebasing on `main`.
+
 ## How the agents work (parallel worktrees)
 
 Following the parallel-agent rules we already use (disjoint files, unique script names, I merge and retest).
@@ -183,6 +264,7 @@ Following the parallel-agent rules we already use (disjoint files, unique script
 # once per track, from the main checkout, after `git checkout main && git pull --ff-only public main`
 git worktree add ../capturemann-wt/mac-ai        -b track/mac-ai
 git worktree add ../capturemann-wt/mac-stability -b track/mac-stability
+git worktree add ../capturemann-wt/mac-import    -b track/mac-import
 ```
 
 The `track/*` branches are **temporary work areas**; the maintainer's rule "work on `main`, no feature branches" is
@@ -192,6 +274,7 @@ cherry-pick, keeping the commit messages), never pushed by the agent. Delete eac
 | Track | Owns (may change) | Must not touch without asking |
 | --- | --- | --- |
 | mac-ai | `crates/cm-ai`, `crates/cm-media` (transcription and report paths), `vendor/sherpa-onnx*`, `verification/benchmarks/`, `tests/manual/AI-*.md`, and only the job progress/cancel files in `crates/cm-daemon` named in its brief | `apps/desktop` UI beyond progress and cancel wiring; the rest of `cm-daemon` |
+| mac-import | see Track M3 (probe and prepare in `cm-media`, import in `cm-library`, `cm-jobs`, new `cm-daemon` import files, CLI, MCP, new `apps/desktop` import files, FFmpeg component lists) | `crates/cm-ai`, `apps/desktop/src/surfaces.rs` |
 | mac-stability | `apps/desktop` (window lifetime, diagnostics), `apps/overlay`, `crates/cm-daemon` (recording lifecycle), soak scripts | `crates/cm-ai`, the job progress/cancel files given to mac-ai |
 
 **Shared files with one owner** (agents add entries on their branch, I resolve at merge): `Cargo.lock` and workspace
