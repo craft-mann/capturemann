@@ -735,3 +735,132 @@ fn sentence_runs_see_repeats_across_punctuation_and_case() {
         (0, 6, 3, 2)
     );
 }
+
+// ---- the hallucination gate (made-up tokens; the segment numbers are the engine's) -----------------
+
+use crate::transcribe::SegmentStat;
+
+/// A long read writes real words and one sentence over audio that is not speech, with the segment
+/// numbers an engine would give; a short read of a window answers as told.
+struct GateFake {
+    window_answer: Vec<(&'static str, f64)>,
+    window_no_speech: f32,
+    long_no_speech: f32,
+}
+
+impl Transcriber for GateFake {
+    fn transcribe(
+        &self,
+        audio: Pcm16k<'_>,
+        _l: Option<&str>,
+        _p: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Transcript, CmError> {
+        let secs = audio.samples.len() as f64 / RATE as f64;
+        let mk = |t: &str, at: f64| Word {
+            text: t.into(),
+            start: audio.start + media_secs(at),
+            end: audio.start + media_secs(at + 0.4),
+            confidence: 0.97,
+        };
+        let seg = |a: f64, b: f64, ns: f32| SegmentStat {
+            start: audio.start + media_secs(a),
+            end: audio.start + media_secs(b),
+            no_speech: ns,
+            avg_logprob: -0.1,
+        };
+        let (words, segments) = if secs > 40.0 {
+            let mut v: Vec<Word> = (0..5)
+                .map(|i| mk("real", 1.0 + f64::from(i) * 0.8))
+                .collect();
+            v.extend((0..6).map(|i| mk("quux", 30.0 + f64::from(i) * 1.2)));
+            (
+                v,
+                vec![seg(0.9, 5.5, 0.02), seg(29.9, 37.5, self.long_no_speech)],
+            )
+        } else {
+            (
+                self.window_answer
+                    .iter()
+                    .map(|(t, at)| mk(t, *at))
+                    .collect(),
+                vec![seg(0.0, 5.0, self.window_no_speech)],
+            )
+        };
+        Ok(Transcript {
+            version: TRANSCRIPT_VERSION,
+            language: "xx".into(),
+            model: "gate-fake".into(),
+            words,
+            note: None,
+            sounds: Vec::new(),
+            segments,
+        })
+    }
+
+    fn gate(&self) -> Option<crate::pieces::gate::GateConfig> {
+        Some(crate::pieces::gate::GateConfig::default())
+    }
+}
+
+fn run_gate(fake: GateFake) -> Transcript {
+    let x = signal(60.0, &[(0.0, 60.0, 0.2)]);
+    transcribe_pieces(
+        &fake,
+        Pcm16k {
+            samples: &x,
+            start: MediaTime::ZERO,
+        },
+        Some("xx"),
+        None,
+        &mut |_| true,
+    )
+    .unwrap()
+    .0
+}
+
+#[test]
+fn words_under_a_no_speech_segment_are_read_again_and_replaced() {
+    let t = run_gate(GateFake {
+        window_answer: vec![("mora", 1.0), ("tel", 2.0)],
+        window_no_speech: 0.0,
+        long_no_speech: 0.9,
+    });
+    assert!(!t.words.iter().any(|w| w.text == "quux"), "{:?}", t.words);
+    assert!(t.words.iter().any(|w| w.text == "mora"));
+    assert_eq!(
+        t.words.iter().filter(|w| w.text == "real").count(),
+        5,
+        "real words stay"
+    );
+}
+
+#[test]
+fn a_segment_the_model_believes_in_is_left_alone() {
+    let t = run_gate(GateFake {
+        window_answer: vec![("mora", 1.0)],
+        window_no_speech: 0.0,
+        long_no_speech: 0.05,
+    });
+    assert_eq!(
+        t.words.iter().filter(|w| w.text == "quux").count(),
+        6,
+        "{:?}",
+        t.words
+    );
+    assert!(t.sounds.is_empty());
+}
+
+#[test]
+fn a_second_reading_that_fails_the_gate_too_becomes_a_sound() {
+    let t = run_gate(GateFake {
+        window_answer: vec![("mora", 1.0), ("tel", 2.0)],
+        window_no_speech: 0.95,
+        long_no_speech: 0.9,
+    });
+    assert!(
+        !t.words.iter().any(|w| w.text == "quux" || w.text == "mora"),
+        "{:?}",
+        t.words
+    );
+    assert_eq!(t.sounds.len(), 1, "{:?}", t.sounds);
+}

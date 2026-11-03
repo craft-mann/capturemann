@@ -130,6 +130,19 @@ pub trait Transcriber: Send + Sync {
         self.transcribe(audio, language, progress)
     }
 
+    /// Speech probabilities per frame of the audio (and the frame length in seconds) from a voice
+    /// activity model, when this decoder has one. The hallucination gate uses them as a second
+    /// opinion; `None` when there is no model.
+    fn voice_activity(&self, samples: &[f32]) -> Option<(Vec<f32>, f64)> {
+        let _ = samples;
+        None
+    }
+
+    /// The hallucination gate's thresholds when it is switched on for this decoder, else `None`.
+    fn gate(&self) -> Option<crate::pieces::gate::GateConfig> {
+        None
+    }
+
     /// The Whisper *translate* task (AI-5): the same audio, written in English whatever language
     /// is spoken. `source_language` is a hint (`None`: detect). The returned transcript has
     /// `language == "en"`. An implementation without the task answers `not_implemented`.

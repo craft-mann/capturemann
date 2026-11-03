@@ -138,6 +138,16 @@ fn main() {
         levels::high_pass(&mut samples, 80.0);
         levels::normalize_rms_capped(&mut samples, -20.0, 15.0);
     }
+    // --gain-only: the same loudness step without the high-pass, and only when the clip is quieter
+    // than --gain-below dBFS RMS (default -26): already-loud audio is left alone.
+    if args.iter().any(|a| a == "--gain-only") {
+        let below: f64 = option(&args, "--gain-below")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(-26.0);
+        if levels::db(levels::rms_over(&samples, &[])) < below {
+            levels::normalize_rms_capped(&mut samples, -20.0, 15.0);
+        }
+    }
     match option(&args, "--normalize").as_deref() {
         Some("peak") => levels::normalize_peak(&mut samples, -3.0),
         Some("loudness") => levels::normalize_loudness(&mut samples, -20.0),
@@ -164,7 +174,19 @@ fn main() {
     let vad_first = vad.as_ref().map(|v| cm_ai::silero::VadFirst {
         inner: &counting,
         vad: v,
-        params: cm_ai::silero::VadParams::default(),
+        params: {
+            let mut p = cm_ai::silero::VadParams::default();
+            if let Some(v) = option(&args, "--vad-threshold").and_then(|v| v.parse().ok()) {
+                p.threshold = v;
+            }
+            if let Some(v) = option(&args, "--vad-min-silence").and_then(|v| v.parse().ok()) {
+                p.min_silence_s = v;
+            }
+            if let Some(v) = option(&args, "--vad-pad").and_then(|v| v.parse().ok()) {
+                p.pad_s = v;
+            }
+            p
+        },
     });
     let engine: &dyn Transcriber = match &vad_first {
         Some(w) => w,
