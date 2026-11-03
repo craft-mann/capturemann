@@ -289,9 +289,25 @@ pub(crate) fn tab_button(
 }
 
 /// The vertical rail around the tabs.
-pub(crate) fn tab_rail(t: &Theme, tabs: Vec<AnyElement>) -> Stateful<Div> {
+/// The height the rail needs for `n` tabs: the tiles, the 4 px gaps, the padding and the border.
+#[cfg(test)]
+pub(crate) fn rail_content_h(n: usize) -> f32 {
+    n as f32 * TILE + n.saturating_sub(1) as f32 * 4. + 2. * RAIL_PAD + 2.
+}
+
+/// The rail never grows past the inspector: it scrolls (wheel, trackpad) when the window is too
+/// short for every tab, so the last tab is not left under the footer.
+pub(crate) fn tab_rail(
+    t: &Theme,
+    scroll: &gpui::ScrollHandle,
+    tabs: Vec<AnyElement>,
+) -> Stateful<Div> {
     div()
         .id("re-tabs")
+        .track_scroll(scroll)
+        .overflow_y_scroll()
+        .max_h_full()
+        .min_h(px(0.))
         .role(Role::TabList)
         .aria_label(tr!("Inspector tabs"))
         .aria_orientation(gpui::accesskit::Orientation::Vertical)
@@ -650,6 +666,18 @@ pub(crate) fn ease_diagram(t: &Theme) -> AnyElement {
 
 #[cfg(test)]
 mod tests {
+    /// The 11 tabs of a screen recording need about 500 px: a window of 760 px, minus the toolbar
+    /// and the footer, does not hold them, so the rail scrolls (it is never cut off); the 6 tabs of
+    /// an audio recording fit.
+    #[test]
+    fn the_video_rail_needs_scrolling_in_a_short_window() {
+        let video = rail_content_h(Inspector::VIDEO.len());
+        let audio = rail_content_h(Inspector::AUDIO.len());
+        assert!((video - 494.).abs() < 1., "{video}");
+        assert!(video > 760. - 300.);
+        assert!(audio < 300.);
+    }
+
     use super::*;
 
     fn assert_distinct(set: &[Inspector]) {

@@ -223,6 +223,10 @@ pub struct RecordingEditor {
     ai: ai_cards::AiEditor,
     /// Scroll state of the captions list, which scrolls inside the inspector.
     captions_scroll: gpui::ScrollHandle,
+    /// The inspector's tab rail scrolls when the window is too short for every tab; the tab that
+    /// was last scrolled into view, so a manual scroll is not undone on every frame.
+    tabs_scroll: gpui::ScrollHandle,
+    tabs_shown: Cell<Option<tabs::Inspector>>,
     /// The open inspector tab.
     tab: tabs::Inspector,
     /// What the tabs last followed on the timeline (a changed pick opens its tab).
@@ -393,6 +397,8 @@ impl RecordingEditor {
             presenter: Presenter::new(default_path()),
             ai: ai_cards::AiEditor::new(cx),
             captions_scroll: gpui::ScrollHandle::new(),
+            tabs_scroll: gpui::ScrollHandle::new(),
+            tabs_shown: Cell::new(None),
             tab: tabs::Inspector::Speed,
             last_selection: None,
             last_zoom: None,

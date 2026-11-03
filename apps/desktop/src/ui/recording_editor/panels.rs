@@ -512,6 +512,16 @@ impl RecordingEditor {
                 .into_any_element()
             })
             .collect();
+        // A tab chosen by key, click or the timeline comes into view in a short window.
+        if self.tabs_shown.get() != Some(self.tab) {
+            if let Some(ix) = Inspector::set(s.voice.audio)
+                .iter()
+                .position(|&x| x == self.tab)
+            {
+                self.tabs_scroll.scroll_to_item(ix);
+            }
+            self.tabs_shown.set(Some(self.tab));
+        }
         let open = match self.tab {
             Inspector::Speed => self.speed_panel(t, s, cx),
             Inspector::Camera => self.camera_panel(t, s, cx),
@@ -540,7 +550,7 @@ impl RecordingEditor {
             .flex()
             .gap(px(10.))
             .pb(px(4.))
-            .child(tab_rail(t, tabs))
+            .child(tab_rail(t, &self.tabs_scroll, tabs))
             .child(open)
             .into_any_element()
     }

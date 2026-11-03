@@ -491,7 +491,7 @@ fn upload_row(
                 .child(
                     div()
                         .w_full()
-                        .truncate()
+                        .min_w(px(0.))
                         .text_size(px(11.5))
                         .text_color(rgba_of(meta_color))
                         .mono()
@@ -928,13 +928,17 @@ impl Render for RecordingDetails {
                     .flex_col()
                     .gap(px(14.))
                     .child(
+                        // The title and the buttons wrap onto a second row instead of running past
+                        // the card's border (narrow window, long translation).
                         div()
                             .flex()
+                            .flex_wrap()
                             .items_center()
                             .gap(px(10.))
                             .child(
                                 div()
                                     .mr_auto()
+                                    .min_w(px(0.))
                                     .text_size(px(15.))
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .child(tr!("Exports & uploads")),
