@@ -12,6 +12,58 @@ use cm_i18n::{fmt, tr, tr_ctx};
 
 use crate::daemon_text::ErrorNote;
 
+/// The one "Automatic transcription" choice of the AI page, over the two stored switches
+/// (`ai.auto_transcribe`, `ai.transcribe_while_recording`; no daemon change).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AutoMode {
+    Off,
+    AfterRecording,
+    WhileRecording,
+}
+
+impl AutoMode {
+    pub const ALL: [AutoMode; 3] = [
+        AutoMode::Off,
+        AutoMode::AfterRecording,
+        AutoMode::WhileRecording,
+    ];
+
+    /// What the two stored values mean: the live flag is irrelevant while the automatic one is off.
+    pub fn from_flags(auto: bool, live: bool) -> AutoMode {
+        match (auto, live) {
+            (false, _) => AutoMode::Off,
+            (true, true) => AutoMode::WhileRecording,
+            (true, false) => AutoMode::AfterRecording,
+        }
+    }
+
+    /// The values to store for a choice: `(auto_transcribe, transcribe_while_recording)`; `None`
+    /// leaves the live flag as it is (Off).
+    pub fn to_flags(self) -> (bool, Option<bool>) {
+        match self {
+            AutoMode::Off => (false, None),
+            AutoMode::AfterRecording => (true, Some(false)),
+            AutoMode::WhileRecording => (true, Some(true)),
+        }
+    }
+
+    pub fn label(self) -> String {
+        match self {
+            AutoMode::Off => tr_ctx!("automatic transcription", "Off"),
+            AutoMode::AfterRecording => tr_ctx!("automatic transcription", "After recording"),
+            AutoMode::WhileRecording => tr_ctx!("automatic transcription", "While recording"),
+        }
+    }
+
+    pub fn key(self) -> &'static str {
+        match self {
+            AutoMode::Off => "off",
+            AutoMode::AfterRecording => "after",
+            AutoMode::WhileRecording => "while",
+        }
+    }
+}
+
 /// Where the "no model" notice may appear.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NoticeSite {
@@ -610,6 +662,34 @@ impl RowStatus {
 
 #[cfg(test)]
 mod tests {
+    /// The one "Automatic transcription" choice reads and writes the two stored switches: Off
+    /// ignores the live flag, After recording is auto on and live off, While recording both on,
+    /// and the daemon's default (auto on with live on) reads as While recording.
+    #[test]
+    fn the_automatic_transcription_choice_maps_onto_the_two_switches() {
+        use super::AutoMode::*;
+        for live in [false, true] {
+            assert_eq!(AutoMode::from_flags(false, live), Off);
+        }
+        assert_eq!(AutoMode::from_flags(true, false), AfterRecording);
+        assert_eq!(AutoMode::from_flags(true, true), WhileRecording);
+        // The default of a Mac with 16 GB or more (auto on, live on).
+        assert_eq!(AutoMode::from_flags(true, true), WhileRecording);
+        assert_eq!(Off.to_flags(), (false, None));
+        assert_eq!(AfterRecording.to_flags(), (true, Some(false)));
+        assert_eq!(WhileRecording.to_flags(), (true, Some(true)));
+        // What is written reads back as the same choice.
+        for m in AutoMode::ALL {
+            let (auto, live) = m.to_flags();
+            assert_eq!(AutoMode::from_flags(auto, live.unwrap_or(true)), m);
+            assert_eq!(AutoMode::from_flags(auto, live.unwrap_or(false)), m);
+        }
+        assert_eq!(
+            AutoMode::ALL.map(AutoMode::label),
+            ["Off", "After recording", "While recording"]
+        );
+    }
+
     use super::*;
 
     fn info(id: &str, mb: u32, installed: bool, active: bool) -> ModelInfo {

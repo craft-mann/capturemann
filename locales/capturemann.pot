@@ -468,9 +468,6 @@ msgstr ""
 msgid "Audio only: no screen, camera or cursor."
 msgstr ""
 
-msgid "Audio recordings only: reads each finished piece as you record, so the transcript is ready sooner after Stop"
-msgstr ""
-
 msgid "Audio settings"
 msgstr ""
 
@@ -484,6 +481,9 @@ msgid "Auto-redact needs the tesseract program with English data. Install it (De
 msgstr ""
 
 msgid "Auto-redact suggestions"
+msgstr ""
+
+msgid "Automatic transcription"
 msgstr ""
 
 msgid "Available"
@@ -5165,12 +5165,6 @@ msgstr ""
 msgid "Transcribe a recording"
 msgstr ""
 
-msgid "Transcribe after each recording"
-msgstr ""
-
-msgid "Transcribe while recording"
-msgstr ""
-
 msgid "Transcribe · {model}"
 msgstr ""
 
@@ -5492,6 +5486,9 @@ msgid "Where finished captures are saved, and the accounts you publish to."
 msgstr ""
 
 msgid "Where the report’s items come from"
+msgstr ""
+
+msgid "While recording: audio recordings are read piece by piece as you record, so the transcript is ready sooner after Stop; screen recordings are transcribed after they stop."
 msgstr ""
 
 msgid "Whisper only translates into English. Choose a text model on this Mac on the AI page."
@@ -6774,6 +6771,18 @@ msgstr ""
 
 msgctxt "audio preset"
 msgid "Voice note"
+msgstr ""
+
+msgctxt "automatic transcription"
+msgid "After recording"
+msgstr ""
+
+msgctxt "automatic transcription"
+msgid "Off"
+msgstr ""
+
+msgctxt "automatic transcription"
+msgid "While recording"
 msgstr ""
 
 msgctxt "automatic upload"

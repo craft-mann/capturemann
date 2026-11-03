@@ -25,7 +25,7 @@ use crate::ui::components::{button_with_icon, card, icon, shrink_text, switch, B
 use crate::ui::kit;
 use crate::ui::paint::{rgba_of, TextExt};
 use crate::ui::settings::widgets::{
-    caption, list_card, settings_row, small_button, small_button_with_icon,
+    caption, list_card, segment, segmented, settings_row, small_button, small_button_with_icon,
 };
 use crate::ui::studio::ThemeGlobal;
 
@@ -592,7 +592,7 @@ impl Render for AiPage {
         crate::ui::ai_voice::ensure_voice_loaded(&self.app, cx);
         self.voice_sync_fields(cx);
         self.languages_sync(cx);
-        let (rows, show_banner, load_error, action_error, busy, auto, active) = {
+        let (rows, show_banner, load_error, action_error, busy, active) = {
             let m = self.app.read(cx);
             (
                 m.ai.rows(),
@@ -600,38 +600,32 @@ impl Render for AiPage {
                 m.ai.load_error.clone(),
                 m.ai.action_error.clone(),
                 m.ai.busy,
-                m.ai.auto_transcribe,
                 m.ai.active().map(|a| a.label.clone()),
             )
         };
         let model_cards: Vec<AnyElement> =
             rows.iter().map(|r| self.model_card(&t, r, cx)).collect();
         let app = self.app.clone();
-        let auto_switch = switch(
-            &t,
-            "ai-auto",
-            tr!("Transcribe after each recording"),
-            auto,
-            true,
-        )
-        .on_click(cx.listener(move |_, _, _, cx| ai::set_auto_transcribe(&app, !auto, cx)));
-        let live_on = self.app.read(cx).ai.live_transcribe && auto;
-        let live_switch = switch(
-            &t,
-            "ai-live",
-            tr!("Transcribe while recording"),
-            live_on,
-            auto,
-        )
-        .on_click({
-            let app = self.app.clone();
-            let next = !self.app.read(cx).ai.live_transcribe;
-            cx.listener(move |_, _, _, cx| {
-                if auto {
-                    ai::set_live_transcribe(&app, next, cx)
-                }
-            })
-        });
+        let current = {
+            let m = self.app.read(cx);
+            crate::ai::models::AutoMode::from_flags(m.ai.auto_transcribe, m.ai.live_transcribe)
+        };
+        let auto_choice = {
+            let mut seg = segmented(&t, "ai-auto-mode", &tr!("Automatic transcription"));
+            for mode in crate::ai::models::AutoMode::ALL {
+                let app = app.clone();
+                seg = seg.child(
+                    segment(
+                        &t,
+                        SharedString::from(format!("ai-auto-{}", mode.key())),
+                        &mode.label(),
+                        current == mode,
+                    )
+                    .on_click(cx.listener(move |_, _, _, cx| ai::set_auto_mode(&app, mode, cx))),
+                );
+            }
+            seg
+        };
         let cuts_on = !self.app.read(cx).ai.auto_suggest_cuts_off;
         let cuts_switch = switch(
             &t,
@@ -772,22 +766,16 @@ impl Render for AiPage {
                                         .child(settings_row(
                                             &t,
                                             Some("captions"),
-                                            tr!("Transcribe after each recording"),
-                                            Some(SharedString::from(match active {
-                                                Some(a) => tr!("Uses {model}", model = a),
-                                                None => tr!("Needs a model above"),
-                                            })),
-                                            Some(auto_switch.into_any_element()),
-                                            false,
-                                        ))
-                                        .child(settings_row(
-                                            &t,
-                                            Some("mic"),
-                                            tr!("Transcribe while recording"),
-                                            Some(SharedString::from(tr!(
-                                                "Audio recordings only: reads each finished piece as you record, so the transcript is ready sooner after Stop"
+                                            tr!("Automatic transcription"),
+                                            Some(SharedString::from(format!(
+                                                "{}\n{}",
+                                                match active {
+                                                    Some(a) => tr!("Uses {model}", model = a),
+                                                    None => tr!("Needs a model above"),
+                                                },
+                                                tr!("While recording: audio recordings are read piece by piece as you record, so the transcript is ready sooner after Stop; screen recordings are transcribed after they stop.")
                                             ))),
-                                            Some(live_switch.into_any_element()),
+                                            Some(auto_choice.into_any_element()),
                                             false,
                                         ))
                                         .child(settings_row(
