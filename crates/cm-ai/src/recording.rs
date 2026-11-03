@@ -6,6 +6,8 @@
 //! is not a session time once the recording was paused (REC-4). The mic file starts at
 //! `tracks.mic.start`; [`file_to_session`] adds back the pause time before each word.
 
+pub mod live;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -258,6 +260,28 @@ fn run_recording(
     } else {
         // Piece by piece, each piece checked for a repetition loop (long recordings used to come
         // back as one phrase repeated thousands of times; see `crate::pieces`).
+        // A job with no checkpoint of its own may go on from the pieces read while the recording
+        // ran (`live`), when they were made with the same model, language, prompt and file.
+        let from_live;
+        let resume = match (resume, opts.model_id, chosen.as_slice()) {
+            (None, Some(model), [only]) => {
+                let key = live::LiveKey {
+                    model: model.to_owned(),
+                    language: opts.language.map(str::to_owned),
+                    prompt: opts.prompt.map(str::to_owned),
+                    original_audio: opts.original_audio,
+                    file: only
+                        .file
+                        .file_name()
+                        .map(|f| f.to_string_lossy().into_owned())
+                        .unwrap_or_default(),
+                    base: base.ticks(),
+                };
+                from_live = live::resume_from_live(bundle, &key, &mixed);
+                from_live.as_ref()
+            }
+            (r, _, _) => r,
+        };
         let resume = resume.and_then(|v| serde_json::from_value(v.clone()).ok());
         let mut other = |/* made when a piece needs it */| -> Option<Vec<f32>> {
             let (samples, other_base) = mix_of(other_tracks.as_deref()?).ok()?;
@@ -289,6 +313,15 @@ fn run_recording(
             start: file_to_session(gaps, w.start, false),
             end: file_to_session(gaps, w.end, true),
             ..w
+        })
+        .collect();
+    t.sounds = t
+        .sounds
+        .into_iter()
+        .map(|s| crate::transcribe::Sound {
+            start: file_to_session(gaps, s.start, false),
+            end: file_to_session(gaps, s.end, true),
+            ..s
         })
         .collect();
     // The model cannot place a word before the sound begins: whatever it timed earlier (words of
