@@ -109,6 +109,10 @@ fn samples() -> Vec<(&'static str, Value)> {
             "move_library",
             json!({"path": "/Volumes/X/CaptureMann", "mode": "fresh", "request_id": "r"}),
         ),
+        (
+            "import_media",
+            json!({"paths": ["/Users/me/a.mov"], "titles": ["A"], "dry_run": true, "request_id": "r"}),
+        ),
         ("list_models", json!({})),
         (
             "download_model",

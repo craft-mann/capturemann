@@ -490,12 +490,17 @@ impl Conn {
                 .actions_effective()
                 .into_iter()
                 .map(|(s, available, effective)| {
-                    json!({
+                    let mut row = json!({
                         "name": s.name, "tier": s.tier,
                         "effective_tier": effective,
                         "mutating": s.mutating, "available": available,
                         "internal": crate::action::is_internal(s.name),
-                    })
+                    });
+                    // A parameter that raises the tier of a call (`import_media`).
+                    if let Some(w) = crate::action::confirm_when(s.name) {
+                        row["confirm_when"] = w;
+                    }
+                    row
                 })
                 .collect(),
         )

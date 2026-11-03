@@ -51,6 +51,7 @@ impl Action {
             Action::PublishVideo(_) => "publish_video",
             Action::DeleteCapture(_) => "delete_capture",
             Action::MoveLibrary(_) => "move_library",
+            Action::ImportMedia(_) => "import_media",
         }
     }
 
@@ -61,6 +62,19 @@ impl Action {
             tier: Tier::Confirm,
             mutating: true,
         })
+    }
+
+    /// The registry row this *call* is gated by: the table's row, except where a parameter raises
+    /// the tier (`import_media` with `remove_originals: true` is Confirm; `02-agent-interface.md`,
+    /// "A tier can depend on a parameter"). Evaluated after the parameters are validated.
+    pub fn gating_spec(&self) -> ActionSpec {
+        let mut spec = self.spec();
+        if let Action::ImportMedia(p) = self {
+            if crate::import_ops::needs_confirmation(p) {
+                spec.tier = Tier::Confirm;
+            }
+        }
+        spec
     }
 
     pub fn request_id(&self) -> Option<&str> {
@@ -83,6 +97,7 @@ impl Action {
             Action::SetMicMuted(p) => p.request_id.as_deref(),
             Action::AddMarker(p) => p.request_id.as_deref(),
             Action::MoveLibrary(p) => p.request_id.as_deref(),
+            Action::ImportMedia(p) => p.request_id.as_deref(),
             Action::PauseRecording(p)
             | Action::ResumeRecording(p)
             | Action::StopRecording(p)
@@ -160,6 +175,7 @@ impl Action {
                     format!("Switch to the existing library at {}", p.path)
                 }
             },
+            Action::ImportMedia(p) => crate::import_ops::summary(p),
             Action::Edit(p) => crate::edit_ops::summary(p),
             Action::Ai(p) => crate::ai::summary(p),
             Action::ListDestinations => "List the destinations".to_owned(),
@@ -188,6 +204,10 @@ impl Action {
             }),
             Action::DeleteCapture(p) => json!({ "capture_id": p.capture_id }),
             Action::MoveLibrary(p) => json!({ "to": p.path, "mode": p.mode.as_str() }),
+            Action::ImportMedia(p) => json!({
+                "files": p.paths.len(), "remove_originals": p.remove_originals,
+                "dry_run": p.dry_run,
+            }),
             Action::RenameCapture(p) => json!({ "capture_id": p.capture_id, "title": p.title }),
             Action::Ai(p) => crate::ai::confirm_params(p),
             Action::ExportVideo(p) => json!({

@@ -1234,6 +1234,45 @@ pub fn all() -> Vec<ToolSpec> {
                 "warnings": { "type": "array", "items": { "type": "string" } } },
                 "required": ["job_id", "state", "mode", "restart_required"] }),
         },
+        ToolSpec {
+            name: "import_media",
+            tier: Tier::Free,
+            mutating: true,
+            destructive: false,
+            spec: "IMP-1 to IMP-4",
+            summary: "Bring video and audio files that CaptureMann did not record into the library as captures (a phone clip, a voice memo, a downloaded interview), so that the editor, transcript, speakers, reports, export, upload and publish work on them. Files only: a folder is `invalid_input` with `data.reason: \"folder_not_supported\"`. Supported: video MP4, MOV, M4V and MKV with H.264 or HEVC video and AAC or PCM audio; audio M4A, AAC in MP4 and WAV (PCM). WebM, AVI, MP3, AIFF, FLAC, OGG, Opus, bare AAC and other codecs are recognised and refused with `data.reason: \"unsupported_format\"` (the format or codec is named); a protected (DRM) file is `protected_media`; a damaged or empty one `unreadable_file`. Each file is Ready (used as it is), Prepared for editing (variable frame rate, MKV, a rotation tag or another pixel format: the original is kept as the master and a constant-frame-rate editing copy is made, which needs a hardware video encoder) or Can't import. Only one audio stream per file is imported (the default one, else the first). The sound is decoded once to `mic.wav` (48 kHz, 32-bit float); an imported capture has no cursor and no camera track. With `dry_run: true` nothing is written: it returns `{ files: [row] }` with each file's status and reasons. Otherwise it returns `{ job_id, captures: [{ capture_id, path, title, kind, status, error? }] }` at once; the `capture_id` is reserved and appears in `list_library` when `capture.created` is published for it. The `import` job (copy, probe, sound, editing copy, verify, install) reports `job.progress`, is cancellable with `cancel_job`, resumes after a restart, is held while a recording runs, and fails `disk_full` (`data.needed_bytes`, `data.free_bytes`) before copying anything when the disk is too small. A protected folder or drive the app may not read is `permission_missing` with `data.permission: \"files\"` and nothing is imported. `after` runs the existing `transcribe` (true, or `{ model, language }`), `diarize` and `generate_report` (`report_template`) on each imported capture; a step that cannot run (no model) is reported as skipped. **`remove_originals: true` is Confirm tier**: the user must approve on screen, the dialog lists every file that will be moved to the Trash, and each original goes to the Trash only after its copy in the library was verified (same size, decodes, same duration within one frame); a failed or cancelled import never removes an original. This holds even if the tool is set to Allow. The call waits up to 5 minutes and then fails with `user_declined` or `confirmation_timeout`. `dry_run` never asks.",
+            input: json!({ "type": "object", "properties": {
+                "paths": { "type": "array", "minItems": 1, "maxItems": 200,
+                           "items": { "type": "string", "minLength": 1 },
+                           "description": "Absolute paths of the files to import (files only, no folders)." },
+                "titles": { "type": "array", "items": { "type": "string" },
+                            "description": "One title per path, in order; an empty string keeps the file name without its extension." },
+                "remove_originals": { "type": "boolean", "default": false,
+                                      "description": "Move each original to the Trash after its copy is verified. Raises the call to Confirm tier: the user is asked on screen." },
+                "dry_run": { "type": "boolean", "default": false,
+                             "description": "Only check the files and return their status; import nothing." },
+                "after": { "type": "object", "additionalProperties": false, "properties": {
+                    "transcribe": { "description": "true, or { model?, language? }.", "oneOf": [
+                        { "type": "boolean" },
+                        { "type": "object", "additionalProperties": false, "properties": {
+                            "model": { "type": "string" }, "language": { "type": "string" } } } ] },
+                    "diarize": { "type": "boolean", "description": "Find speakers after the transcript. Needs `transcribe`." },
+                    "report_template": { "type": "string", "description": "A template id from list_report_templates. Needs `transcribe`." } } },
+                "request_id": request_id() },
+                "required": ["paths"], "additionalProperties": false }),
+            output: json!({ "type": "object", "properties": {
+                "job_id": { "type": "string", "description": "The `import` job (absent with `dry_run`)." },
+                "state": { "type": "string" },
+                "captures": { "type": "array", "items": { "type": "object", "properties": {
+                    "capture_id": { "type": ["string", "null"], "description": "Reserved id of the capture; null for a file that can't be imported." },
+                    "path": { "type": "string" }, "title": { "type": "string" },
+                    "kind": { "type": "string", "enum": ["video", "audio"] },
+                    "status": { "type": "string", "enum": ["queued", "cant_import"] },
+                    "error": { "type": ["object", "null"], "description": "`{ reason, message, format?, codec? }` for a file that can't be imported." } } } },
+                "needed_bytes": { "type": "integer", "description": "Estimated bytes the import writes." },
+                "files": { "type": "array", "items": { "type": "object" },
+                           "description": "Only with `dry_run`: one row per file with status (ready, prepared, cant_import), reasons, container, duration_s, size, fps, codecs, hdr, rotation." } } }),
+        },
     ];
     // Recording edits (EDT-1 to EDT-3).
     tools.extend(edit_tools());

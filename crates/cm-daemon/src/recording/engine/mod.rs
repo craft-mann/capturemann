@@ -176,7 +176,7 @@ pub const DEFAULT_EXCLUDED_BUNDLE_IDS: &[&str] = &[
 ];
 
 /// Job types held while a recording runs.
-const HELD_ALWAYS: [&str; 3] = ["export", "transcribe", "translate"];
+const HELD_ALWAYS: [&str; 4] = ["export", "transcribe", "translate", "import"];
 /// Held with the uploads unless `storage.pause_uploads_while_recording` is off: a publish is an
 /// upload over the same connection.
 const HELD_UPLOAD: [&str; 2] = ["upload", "publish"];

@@ -56,6 +56,7 @@ mod frames;
 pub mod gate;
 mod handlers;
 mod idem;
+pub mod import_ops;
 pub mod ipc;
 mod jobs;
 pub mod library_move;

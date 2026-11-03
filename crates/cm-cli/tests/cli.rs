@@ -1529,6 +1529,104 @@ async fn library_move_asks_copies_and_waits() {
     assert!(f.json()["job_id"].is_null());
 }
 
+/// IMP-3, IMP-4: `capturemann import` checks (`--dry-run`), imports and waits, refuses a folder
+/// with exit 2, and `--remove-originals` asks on screen and then moves the file to the Trash.
+/// Fixtures come from the `ffmpeg` on `PATH` (SKIPPED without libx264).
+#[tokio::test]
+async fn import_checks_imports_waits_and_asks_before_removing_originals() {
+    use cm_daemon::testing::{FakeTrasher, FixedConfirmer};
+    use cm_daemon::Decision;
+    use std::process::{Command, Stdio};
+    let have = Command::new("ffmpeg")
+        .args(["-hide_banner", "-encoders"])
+        .output()
+        .is_ok_and(|o| String::from_utf8_lossy(&o.stdout).contains("libx264"));
+    let probe = Command::new("ffprobe").arg("-version").output().is_ok();
+    if !have || !probe {
+        eprintln!("SKIPPED: FFmpeg with libx264 not found (brew install ffmpeg)");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let endpoint = Endpoint::scratch(dir.path(), "d");
+    let lib_dir = dir.path().join("lib");
+    let lib = Library::open_or_create(&lib_dir).unwrap();
+    let confirmer = Arc::new(FixedConfirmer::new(Decision::Approve));
+    let trash = tempfile::tempdir().unwrap();
+    let daemon = Daemon::builder(Capturer::new(desktop()).with_own_pid(None), lib)
+        .confirmer(confirmer.clone())
+        .trasher(FakeTrasher::into_dir(trash.path()))
+        .jobs(cm_daemon::library_job_queue(&lib_dir).unwrap())
+        .build();
+    daemon.register_import_handler().unwrap();
+    daemon.start_jobs().unwrap();
+    serve(&daemon, &endpoint);
+    let r = Rig {
+        dir,
+        endpoint,
+        daemon,
+    };
+    let src = r.dir.path().join("src");
+    std::fs::create_dir(&src).unwrap();
+    let (a, b) = (src.join("a.wav"), src.join("b.wav"));
+    for p in [&a, &b] {
+        let ok = Command::new("ffmpeg")
+            .args([
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+            ])
+            .arg("sine=frequency=440:duration=1")
+            .arg(p)
+            .stdin(Stdio::null())
+            .status()
+            .unwrap()
+            .success();
+        assert!(ok);
+    }
+    let (a_s, b_s, src_s) = (
+        a.to_str().unwrap(),
+        b.to_str().unwrap(),
+        src.to_str().unwrap(),
+    );
+    // --dry-run: the status of each file, nothing imported.
+    let d = cli(&r, &["import", a_s, "--dry-run"]).await;
+    assert_eq!(d.code, 0, "{}", d.err);
+    assert!(
+        d.out.contains("a.wav") && d.out.contains("ready"),
+        "{}",
+        d.out
+    );
+    let list = cli(&r, &["library", "list", "--json"]).await.json();
+    assert!(list["captures"].as_array().unwrap().is_empty());
+    // A folder: exit 2 and nothing happens.
+    let f = cli(&r, &["import", a_s, src_s]).await;
+    assert_eq!(f.code, cm_cli::exit_code_for("invalid_input"), "{}", f.err);
+    assert!(f.err.contains("Folders can't be imported yet"), "{}", f.err);
+    // Import and wait; the title flag names the capture.
+    let o = cli(&r, &["import", a_s, "--title", "Memo", "--wait", "--json"]).await;
+    assert_eq!(o.code, 0, "{} {}", o.out, o.err);
+    assert_eq!(o.json()["result"]["imported"], 1);
+    let list = cli(&r, &["library", "list", "--json"]).await.json();
+    assert_eq!(list["captures"][0]["title"], "Memo");
+    assert_eq!(list["captures"][0]["kind"], "audio");
+    assert!(a.is_file(), "the original stays without --remove-originals");
+    assert!(confirmer.shown().is_empty());
+    // --remove-originals asks, then the file goes to the Trash.
+    let o = cli(&r, &["import", b_s, "--remove-originals", "--wait"]).await;
+    assert_eq!(o.code, 0, "{} {}", o.out, o.err);
+    assert!(o.out.contains("moved to the Trash"), "{}", o.out);
+    assert_eq!(confirmer.shown().len(), 1);
+    assert_eq!(confirmer.shown()[0].kind, "import_remove_originals");
+    assert!(!b.exists() && trash.path().join("b.wav").is_file());
+    // More --title values than files is a usage error.
+    let t = cli(&r, &["import", a_s, "--title", "x", "--title", "y"]).await;
+    assert_eq!(t.code, 2, "{}", t.err);
+}
+
 /// AGT-1.AC4: every daemon action has a CLI mapping entry (or is a known gap).
 #[test]
 fn cli_parity_table_covers_every_action() {
