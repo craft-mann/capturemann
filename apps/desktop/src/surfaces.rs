@@ -257,18 +257,145 @@ pub fn close_self(window: &mut Window) {
     window.remove_window();
 }
 
-/// Activates the app and says why. AppKit can answer by making a window key before this returns,
-/// which runs GPUI's window callbacks while the caller still holds the app (the suspected source
-/// of `RefCell already borrowed`); the line lets the log show which call came just before one.
-pub fn activate_app(cx: &mut App, why: &str) {
-    log::info!("activating the app ({why})");
-    cx.activate(true);
+// ---- activation ------------------------------------------------------------------------------
+//
+// AppKit makes a window key before `activate` returns and then calls GPUI's window callbacks. When
+// the caller is inside an `App` or window update, those callbacks find the app borrowed and fail
+// with `RefCell already borrowed` (then `window not found` once the window is gone). Every
+// activation therefore goes through [`activate_app`] / [`activate_window`] / [`bring_to_front`],
+// which only queue the request; one spawned task performs the queue when no update is running.
+
+/// A queued request.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Activation {
+    App,
+    /// Make the window key and frontmost; with `visible`, center it there first.
+    Window {
+        id: u64,
+        visible: Option<(f64, f64, f64, f64)>,
+    },
 }
 
-/// [`activate_app`] for one window.
-pub fn activate_window(window: &mut Window, why: &str) {
-    log::info!("activating a window ({why})");
-    window.activate_window();
+/// The queue. It never calls a host itself: [`PendingActivations::request`] records,
+/// [`flush`] performs later.
+#[derive(Default)]
+pub struct PendingActivations {
+    queue: Vec<(Activation, String)>,
+    scheduled: bool,
+}
+
+impl PendingActivations {
+    pub const fn new() -> Self {
+        PendingActivations {
+            queue: Vec::new(),
+            scheduled: false,
+        }
+    }
+
+    /// Queues a request; the same one asked twice before the flush runs once (the later `visible`
+    /// wins). Returns `true` when the caller must schedule the flush.
+    pub fn request(&mut self, a: Activation, why: &str) -> bool {
+        log::info!("activation requested ({why}): {a:?}");
+        match self.queue.iter_mut().find(|(q, _)| match (q, &a) {
+            (Activation::App, Activation::App) => true,
+            (Activation::Window { id: x, .. }, Activation::Window { id: y, .. }) => x == y,
+            _ => false,
+        }) {
+            Some(slot) => *slot = (a, why.to_owned()),
+            None => self.queue.push((a, why.to_owned())),
+        }
+        !std::mem::replace(&mut self.scheduled, true)
+    }
+
+    fn take(&mut self) -> Vec<(Activation, String)> {
+        self.scheduled = false;
+        std::mem::take(&mut self.queue)
+    }
+}
+
+/// What performs an activation (GPUI/AppKit in the app, a script in tests).
+pub trait ActivationHost {
+    fn activate_app(&mut self);
+    fn bring_to_front(&mut self, id: u64, visible: Option<(f64, f64, f64, f64)>);
+}
+
+/// Performs the queued requests in order. Called only when no update is running.
+pub fn flush(pending: &mut PendingActivations, host: &mut dyn ActivationHost) {
+    for (a, why) in pending.take() {
+        log::info!("activating ({why}): {a:?}");
+        match a {
+            Activation::App => host.activate_app(),
+            Activation::Window { id, visible } => host.bring_to_front(id, visible),
+        }
+    }
+}
+
+thread_local! {
+    // The UI thread only (windows are not `Send`).
+    static PENDING: std::cell::RefCell<PendingActivations> =
+        const { std::cell::RefCell::new(PendingActivations::new()) };
+    static NATIVES: std::cell::RefCell<std::collections::HashMap<u64, crate::platform_window::NativeWindow>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+struct RealActivation<'a> {
+    cx: &'a mut gpui::AsyncApp,
+}
+
+impl ActivationHost for RealActivation<'_> {
+    fn activate_app(&mut self) {
+        // Natively, with no `App` borrow held; elsewhere through GPUI.
+        if !crate::platform_window::activate_app() {
+            self.cx.update(|cx| cx.activate(true));
+        }
+    }
+
+    fn bring_to_front(&mut self, id: u64, visible: Option<(f64, f64, f64, f64)>) {
+        let native = NATIVES.with(|n| n.borrow_mut().remove(&id));
+        if let Some(native) = native {
+            native.bring_to_front(visible);
+            return;
+        }
+        self.cx.update(|cx| {
+            if let Some(h) = cx
+                .windows()
+                .into_iter()
+                .find(|h| h.window_id().as_u64() == id)
+            {
+                let _ = h.update(cx, |_, window, _| window.activate_window());
+            }
+        });
+    }
+}
+
+fn request(cx: &mut App, a: Activation, why: &str) {
+    if PENDING.with(|p| p.borrow_mut().request(a, why)) {
+        cx.spawn(async move |cx| {
+            let mut jobs = PENDING.with(|p| std::mem::take(&mut *p.borrow_mut()));
+            flush(&mut jobs, &mut RealActivation { cx });
+        })
+        .detach();
+    }
+}
+
+/// Activates the app once the current update is over (see above).
+pub fn activate_app(cx: &mut App, why: &str) {
+    request(cx, Activation::App, why);
+}
+
+/// Makes `window` key and frontmost once the current update is over, centered on `visible` when
+/// given. `window` is the one being updated; `cx` is any `App` handle (`&mut **cx` of a context).
+pub fn bring_to_front(
+    cx: &mut App,
+    window: &Window,
+    visible: Option<(f64, f64, f64, f64)>,
+    why: &str,
+) {
+    let id = window.window_handle().window_id().as_u64();
+    if let Some(n) = crate::platform_window::NativeWindow::of(window) {
+        NATIVES.with(|m| m.borrow_mut().insert(id, n));
+    }
+    request(cx, Activation::Window { id, visible }, why);
 }
 
 struct GpuiHost<'a> {
@@ -422,5 +549,53 @@ mod tests {
         assert!(text.contains("main id=1"), "{text}");
         assert!(text.contains("untracked id=5"), "{text}");
         assert!(!text.contains("toast"), "{text}");
+    }
+
+    /// Records what a host was asked to do.
+    #[derive(Default)]
+    struct Calls(Vec<String>);
+
+    impl ActivationHost for Calls {
+        fn activate_app(&mut self) {
+            self.0.push("app".into());
+        }
+        fn bring_to_front(&mut self, id: u64, visible: Option<(f64, f64, f64, f64)>) {
+            self.0.push(format!("window {id} {}", visible.is_some()));
+        }
+    }
+
+    #[test]
+    fn an_activation_asked_inside_an_update_runs_only_after_it() {
+        let mut pending = PendingActivations::new();
+        let mut host = Calls::default();
+        // The "update": it asks for activations and must see nothing happen.
+        let must_schedule = pending.request(Activation::App, "sheet opened");
+        pending.request(
+            Activation::Window {
+                id: 4,
+                visible: None,
+            },
+            "dialog opened",
+        );
+        assert!(must_schedule, "the first request asks for a flush");
+        assert!(host.0.is_empty(), "nothing runs inside the update");
+        // The update is over: the flush performs them, in order.
+        flush(&mut pending, &mut host);
+        assert_eq!(host.0, ["app", "window 4 false"]);
+    }
+
+    #[test]
+    fn the_same_activation_asked_twice_runs_once_and_the_flush_is_scheduled_once() {
+        let mut pending = PendingActivations::new();
+        let mut host = Calls::default();
+        assert!(pending.request(Activation::App, "a"));
+        assert!(!pending.request(Activation::App, "b"));
+        let w = |visible| Activation::Window { id: 2, visible };
+        pending.request(w(None), "c");
+        pending.request(w(Some((0., 0., 10., 10.))), "d");
+        flush(&mut pending, &mut host);
+        assert_eq!(host.0, ["app", "window 2 true"]);
+        // After a flush the next request schedules again.
+        assert!(pending.request(Activation::App, "e"));
     }
 }

@@ -1643,7 +1643,7 @@ pub fn open_sheet_mode(
     if let Some(h) = rec.read(cx).sheet_win {
         if h.update(cx, |this, window, cx| {
             this.set_mode(mode, window, cx);
-            window.activate_window()
+            crate::surfaces::bring_to_front(cx, window, None, "record sheet reused");
         })
         .is_ok()
         {

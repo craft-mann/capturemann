@@ -115,13 +115,11 @@ pub fn open_studio(app: &Entity<AppModel>, cx: &mut App) {
     let existing = app.read(cx).studio;
     if let Some(handle) = existing {
         if handle
-            .update(cx, |_, window, _| {
-                crate::surfaces::activate_window(window, "studio brought to front");
-                crate::platform_window::bring_to_front(window, None);
+            .update(cx, |_, window, cx| {
+                crate::surfaces::bring_to_front(cx, window, None, "studio brought to front");
             })
             .is_ok()
         {
-            crate::surfaces::activate_app(cx, "studio brought to front");
             return;
         }
     }

@@ -161,10 +161,10 @@ pub(crate) fn raise_centered<V: 'static>(handle: gpui::WindowHandle<V>, cx: &mut
     let visible = crate::ui::recording::pointer_display(cx)
         .map(|(_, r)| crate::ui::recording::visible_part(&r))
         .map(|v| (v.x, v.y, v.w, v.h));
+    // Queued by `surfaces`: the native activation runs after the update, outside the app borrow.
     cx.defer(move |cx| {
-        let _ = handle.update(cx, |_, window, _| {
-            crate::platform_window::bring_to_front(window, visible);
-            window.activate_window();
+        let _ = handle.update(cx, |_, window, cx| {
+            crate::surfaces::bring_to_front(cx, window, visible, "dialog raised");
         });
     });
 }

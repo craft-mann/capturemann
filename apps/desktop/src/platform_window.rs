@@ -264,6 +264,21 @@ impl NativeWindow {
     }
 }
 
+impl NativeWindow {
+    /// Centers the window on `visible` (when given), activates the app and makes the window key and
+    /// frontmost. AppKit calls GPUI's window callbacks before this returns, so call it outside a
+    /// window update and outside any `App` borrow (from a spawned task; see `surfaces::request`).
+    pub fn bring_to_front(&self, visible: Option<(f64, f64, f64, f64)>) {
+        imp::native_bring_to_front(&self.0, visible);
+    }
+}
+
+/// Activates the app natively (macOS), `true` when done. Same rule as [`NativeWindow`]: call it
+/// from a task that holds no `App` borrow. Other platforms return `false` (use GPUI's `activate`).
+pub fn activate_app() -> bool {
+    imp::activate_app()
+}
+
 /// The window's frame as `(x, y, w, h)` in global points, top-left origin.
 pub fn frame(window: &Window) -> Option<(f64, f64, f64, f64)> {
     imp::frame(window)
@@ -499,6 +514,30 @@ mod imp {
         );
     }
 
+    pub fn native_bring_to_front(win: &Native, visible: Option<(f64, f64, f64, f64)>) {
+        let Some(mtm) = MainThreadMarker::new() else {
+            return;
+        };
+        if let Some(v) = visible {
+            let f = win.frame();
+            let (x, y, w, h) = super::centered_frame(v, f.size.width, f.size.height);
+            native_set_frame(win, x, y, w, h);
+        }
+        #[allow(deprecated)]
+        objc2_app_kit::NSApplication::sharedApplication(mtm).activateIgnoringOtherApps(true);
+        win.orderFrontRegardless();
+        win.makeKeyAndOrderFront(None);
+    }
+
+    pub fn activate_app() -> bool {
+        let Some(mtm) = MainThreadMarker::new() else {
+            return false;
+        };
+        #[allow(deprecated)]
+        objc2_app_kit::NSApplication::sharedApplication(mtm).activateIgnoringOtherApps(true);
+        true
+    }
+
     pub fn frame(window: &Window) -> Option<(f64, f64, f64, f64)> {
         let w = ns_window(window).ok()?;
         let h = primary_height()?;
@@ -576,6 +615,12 @@ mod imp {
     }
 
     pub fn native_set_frame(_win: &Native, _x: f64, _y: f64, _w: f64, _h: f64) {}
+
+    pub fn native_bring_to_front(_win: &Native, _visible: Option<(f64, f64, f64, f64)>) {}
+
+    pub fn activate_app() -> bool {
+        false
+    }
 
     pub fn set_level(_window: &Window, _level: isize) {}
 

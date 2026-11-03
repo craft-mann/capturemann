@@ -635,7 +635,7 @@ impl PickerView {
             self.outline = Some(handle);
             self.outline_grace_until = Some(Instant::now() + OUTLINE_GRACE);
             // A new window must not keep the keyboard from the palette.
-            crate::surfaces::activate_window(window, "picker outline opened");
+            crate::surfaces::bring_to_front(cx, window, None, "picker outline opened");
         }
     }
 
