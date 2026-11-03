@@ -52,6 +52,7 @@ pub mod save_folder;
 pub mod settings;
 pub mod shortcuts;
 pub mod studio_window;
+pub mod surfaces;
 pub mod text_buffer;
 #[cfg(test)]
 mod text_metrics_tests;
