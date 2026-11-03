@@ -14,7 +14,7 @@
 //! (`tests/tools/perf_matrix.py`) starts one process per configuration. The audio's name never
 //! appears in the output, only `--label`.
 
-#![allow(clippy::unwrap_used)]
+#![allow(clippy::unwrap_used, clippy::field_reassign_with_default)]
 
 use std::path::{Path, PathBuf};
 use std::time::Instant;
