@@ -107,8 +107,28 @@ fn an_automatic_run_uses_the_high_threshold_and_folds_tiny_clusters() {
 }
 
 #[test]
-fn too_many_automatic_speakers_cause_one_more_pass_with_the_maximum() {
-    // 12 voices of 10 s each, none small.
+fn too_many_automatic_speakers_are_folded_to_the_maximum_without_another_pass() {
+    // 12 voices of 10 s each, none small; the first two have a little more speech.
+    let mut auto: Vec<Turn> = (0..12)
+        .map(|i| turn(f64::from(i) * 10.0, f64::from(i) * 10.0 + 10.0, i))
+        .collect();
+    auto[0].end += 2.0;
+    auto[1].end += 1.0;
+    let e = Scripted::new(auto, vec![turn(0.0, 50.0, 0), turn(50.0, 99.0, 1)]);
+    let hints = DiarizeHints {
+        max_speakers: Some(2),
+        ..Default::default()
+    };
+    let out = run_with_hints(&e, &models(), &[0.0; 16], &hints, &mut |_| true).unwrap();
+    assert_eq!(e.calls().len(), 1, "the engine ran once");
+    let mut ids: Vec<i32> = out.iter().map(|t| t.speaker).collect();
+    ids.sort_unstable();
+    ids.dedup();
+    assert_eq!(ids, vec![0, 1], "the two with the most speech were kept");
+}
+
+#[test]
+fn the_measurement_switch_keeps_the_second_run_for_a_maximum() {
     let auto: Vec<Turn> = (0..12)
         .map(|i| turn(f64::from(i) * 10.0, f64::from(i) * 10.0 + 10.0, i))
         .collect();
@@ -117,7 +137,12 @@ fn too_many_automatic_speakers_cause_one_more_pass_with_the_maximum() {
         max_speakers: Some(2),
         ..Default::default()
     };
-    let out = run_with_hints(&e, &models(), &[0.0; 16], &hints, &mut |_| true).unwrap();
+    let tuning = Tuning {
+        second_run_for_max: true,
+        ..Tuning::default()
+    };
+    let out =
+        run_with_hints_tuned(&e, &models(), &[0.0; 16], &hints, tuning, &mut |_| true).unwrap();
     let calls = e.calls();
     assert_eq!(calls.len(), 2);
     assert_eq!(calls[1].num_clusters, Some(2));

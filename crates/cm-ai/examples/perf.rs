@@ -141,6 +141,28 @@ fn main() {
                 Some(_threads) => SherpaDiarizer::new(store),
                 None => SherpaDiarizer::new(store),
             };
+            // --second-run: the 0.2.6 way of keeping to a maximum (run all the audio again).
+            let d = if args.iter().any(|a| a == "--second-run") {
+                d.with_tuning(cm_ai::speaker_engine::Tuning {
+                    second_run_for_max: true,
+                    ..cm_ai::speaker_engine::Tuning::default()
+                })
+            } else {
+                d
+            };
+            // --window-secs N [--link X]: cut the audio into windows of N seconds whatever its
+            // length (M2b measurements); --turns-out <file> writes `start duration speaker` lines.
+            let d = match option(&args, "--window-secs").and_then(|s| s.parse::<f64>().ok()) {
+                Some(w) => d.with_tuning(cm_ai::speaker_engine::Tuning {
+                    long_secs: 0.0,
+                    window_secs: w,
+                    link_distance: option(&args, "--link")
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(cm_ai::speaker_engine::Tuning::default().link_distance),
+                    ..cm_ai::speaker_engine::Tuning::default()
+                }),
+                None => d,
+            };
             let input = DiarizeInput {
                 mix: &samples,
                 mic: None,
@@ -152,6 +174,7 @@ fn main() {
                 // --people N is the automatic path of the app (the count is known, one pass).
                 hints: DiarizeHints {
                     num_speakers: option(&args, "--people").and_then(|s| s.parse().ok()),
+                    max_speakers: option(&args, "--max-people").and_then(|s| s.parse().ok()),
                     ..DiarizeHints::default()
                 },
                 headset: false,
@@ -161,6 +184,22 @@ fn main() {
             let began = Instant::now();
             let r = diarize_audio(&d, &input, &opts, &mut |_| true).unwrap();
             let secs = began.elapsed().as_secs_f64();
+            if let Some(p) = option(&args, "--turns-out") {
+                let text: String = r
+                    .file
+                    .segments
+                    .iter()
+                    .map(|s| {
+                        format!(
+                            "{:.3} {:.3} S{}\n",
+                            s.start.as_secs_f64(),
+                            (s.end - s.start).as_secs_f64(),
+                            s.speaker
+                        )
+                    })
+                    .collect();
+                std::fs::write(p, text).unwrap();
+            }
             out["speakers_secs"] = json!(secs);
             out["rtf"] = json!(audio_secs / secs);
             out["speakers"] = json!(r
