@@ -4592,10 +4592,6 @@ msgid "Transcribe a recording"
 msgstr "Chép lời bản ghi"
 
 #, fuzzy
-msgid "Transcribe after each recording"
-msgstr "Chép lời sau mỗi bản ghi"
-
-#, fuzzy
 msgid "Transcribing needs a speech model. Add one on the AI page."
 msgstr "Chép lời cần một mô hình giọng nói. Hãy thêm một mô hình ở trang AI."
 
@@ -11133,14 +11129,6 @@ msgid "No silences found. Filler words need a transcript, and this recording has
 msgstr "Không thấy đoạn lặng nào. Từ đệm cần có bản chép lời, mà bản ghi này chưa có."
 
 #, fuzzy
-msgid "Transcribe while recording"
-msgstr "Chép lời trong khi ghi âm"
-
-#, fuzzy
-msgid "Audio recordings only: reads each finished piece as you record, so the transcript is ready sooner after Stop"
-msgstr "Chỉ với bản ghi âm thanh: đọc từng đoạn đã xong khi bạn ghi, nên bản chép lời sẵn sàng sớm hơn sau khi dừng"
-
-#, fuzzy
 msgid "Suggest cuts when the editor opens"
 msgstr "Gợi ý cắt khi mở trình chỉnh sửa"
 
@@ -11529,3 +11517,26 @@ msgstr "{sound} lúc {time}"
 #, fuzzy
 msgid "Back to Audio"
 msgstr "Quay lại Âm thanh"
+
+#, fuzzy
+msgctxt "automatic transcription"
+msgid "After recording"
+msgstr "Sau khi ghi"
+
+#, fuzzy
+msgctxt "automatic transcription"
+msgid "Off"
+msgstr "Tắt"
+
+#, fuzzy
+msgctxt "automatic transcription"
+msgid "While recording"
+msgstr "Trong khi ghi"
+
+#, fuzzy
+msgid "Automatic transcription"
+msgstr "Chép lời tự động"
+
+#, fuzzy
+msgid "While recording: audio recordings are read piece by piece as you record, so the transcript is ready sooner after Stop; screen recordings are transcribed after they stop."
+msgstr "Trong khi ghi: bản ghi âm được đọc từng đoạn khi bạn ghi, nên bản chép lời sẵn sàng sớm hơn sau khi dừng; bản quay màn hình được chép lời sau khi dừng."
