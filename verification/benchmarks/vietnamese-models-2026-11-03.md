@@ -6,7 +6,7 @@
 
 ## 1. Short answer (step 1)
 
-**Keep Large v3 Turbo for Vietnamese.** On the four 4-minute clips Turbo's WER is 10.6 % (mean) against 12.3 % for Large v3 and 18.0 % for Medium; on the 1-hour row 10.7 % against 17.8 % (Large v3) and 17.3 % (Medium). Large v3 is 2x to 10x slower than Turbo (3.6x real time at one hour against 20.3x), uses 3.7 to 4.7 GB against 2.0 to 2.7 GB, and re-reads: 5 and 6 Whisper calls for single 4-minute pieces (re-read factor 2.1 and 2.6) and 50 calls at one hour (1.93x). Medium is as fast as Turbo and clearly less accurate. Neither older model is a better Vietnamese reader than the default on this data.
+**Keep Large v3 Turbo for Vietnamese.** On the four 4-minute clips Turbo's WER is 10.6 % (mean) against 12.3 % for Large v3 and 18.0 % for Medium; on the 1-hour row 10.7 % against 17.8 % (Large v3) and 17.3 % (Medium). Large v3 is 2.5x to 11x slower than Turbo (3.6x real time at one hour against 20.3x), uses 3.7 to 4.7 GB against 2.0 to 2.7 GB, and re-reads: 5 and 6 Whisper calls for single 4-minute pieces (re-read factor 2.1 and 2.6) and 50 calls at one hour (1.93x). Medium is as fast as Turbo and clearly less accurate. Neither older model is a better Vietnamese reader than the default on this data.
 
 ## 2. Results (WER % / coverage % / x real time / Whisper calls)
 
@@ -38,7 +38,7 @@ Nothing shipped, nothing added to the repository except the measurement example 
 | Punctuation, casing | none (lower-case text, no punctuation) | none |
 | Speed (4 CPU threads, utterance by utterance) | 174x to 181x real time | 135x to 137x real time |
 
-FLEURS WER on the same unique-sentence utterances as `viu_a/b/c/h` (greedy search, WER folded like the others): 30M model **7.9 / 9.5 / 15.1 / 8.7 %** (mean 10.3 %), 2025 model **7.9 / 9.5 / 16.7 / 10.6 %** (mean 11.2 %), against Turbo 10.3 / 7.4 / 13.9 / 10.8 % (mean 10.6 %). Both transducers are as accurate as Turbo on read speech, 7 to 9 times faster than Turbo on the GPU although they ran on four CPU threads, and about 1/20 of the memory. Many of their errors are insertions (word splits), not examined.
+FLEURS WER on the same unique-sentence utterances as `viu_a/b/c/h` (greedy search, WER folded like the others): 30M model **7.9 / 9.5 / 15.1 / 8.7 %** (mean 10.3 %), 2025 model **7.9 / 9.5 / 16.7 / 10.6 %** (mean 11.2 %), against Turbo 10.3 / 7.4 / 13.9 / 10.8 % (mean 10.6 %). Both transducers are as accurate as Turbo on read speech, 5 to 7 times faster than Turbo on the GPU although they ran on four CPU threads (memory not measured). Many of their errors are insertions (word splits), not examined.
 
 **Licence verdict:** the 30M model is licensed **CC BY-NC-ND 4.0** on its Hugging Face card: non-commercial and no derivatives. The int8 files the app would need are a derivative, and a free app that bundles or downloads them still redistributes the weights; this model cannot be used by CaptureMann. The 2025 model's card says Apache-2.0, but its README is empty and says nothing about the 70k hours of "pseudo label" training data (provenance, consent, terms); the sherpa-onnx page does not state a licence either. **Neither can be adopted on this evidence.** Before anything else the maintainer (or a lawyer) would need the data terms of the 70k model; any model also needs a pinned URL, SHA-256 and approval.
 
