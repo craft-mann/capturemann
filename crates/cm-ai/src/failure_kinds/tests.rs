@@ -108,6 +108,7 @@ impl Transcriber for HearsAtStart {
             words,
             note: None,
             sounds: Vec::new(),
+            segments: Vec::new(),
         })
     }
 }
@@ -229,6 +230,7 @@ impl Transcriber for ListensToShortWindows {
             words,
             note: None,
             sounds: Vec::new(),
+            segments: Vec::new(),
         })
     }
 }
@@ -382,6 +384,7 @@ impl Transcriber for GarbageThenClean {
             words,
             note: None,
             sounds: Vec::new(),
+            segments: Vec::new(),
         })
     }
 }
@@ -460,6 +463,7 @@ impl Transcriber for OneWordForALongRegion {
             words,
             note: None,
             sounds: Vec::new(),
+            segments: Vec::new(),
         })
     }
 }
@@ -523,6 +527,7 @@ fn unreadable_speech_like_level_becomes_a_sound_entry() {
                 words,
                 note: None,
                 sounds: Vec::new(),
+                segments: Vec::new(),
             })
         }
     }
@@ -620,6 +625,7 @@ impl Transcriber for ReReads {
             words,
             note: None,
             sounds: Vec::new(),
+            segments: Vec::new(),
         })
     }
 }

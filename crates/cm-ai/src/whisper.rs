@@ -231,6 +231,8 @@ fn bad_model(path: &Path, e: &dyn std::fmt::Display) -> CmError {
 /// What one run of the model produced.
 struct RunOutput {
     segments: Vec<RawSegment>,
+    /// `(no_speech, avg_logprob)` per segment, same order as `segments`.
+    stats: Vec<(f32, f32)>,
     language: String,
 }
 
@@ -295,8 +297,10 @@ fn run(
 
     let _t = cm_core::perf::span("transcribe", "tokens");
     let mut segments = Vec::new();
+    let mut stats = Vec::new();
     for seg in state.as_iter() {
         let mut pieces = Vec::new();
+        let (mut plog_sum, mut plog_n) = (0.0f32, 0u32);
         for i in 0..seg.n_tokens() {
             let Some(tok) = seg.get_token(i) else {
                 continue;
@@ -304,6 +308,14 @@ fn run(
             // Raw bytes, not text: a token can end in the middle of a multi-byte character.
             let bytes = tok.to_bytes().map(<[u8]>::to_vec).unwrap_or_default();
             let d = tok.token_data();
+            // Real text tokens only: the control tokens' probabilities say nothing about the words.
+            if !tok
+                .to_bytes()
+                .is_ok_and(|b| b.starts_with(b"[_") || b.starts_with(b"<|"))
+            {
+                plog_sum += d.plog;
+                plog_n += 1;
+            }
             pieces.push(TokenBytes {
                 bytes,
                 t0: d.t0,
@@ -313,6 +325,14 @@ fn run(
             });
         }
         let tokens = join_split_characters(pieces);
+        stats.push((
+            seg.no_speech_probability(),
+            if plog_n > 0 {
+                plog_sum / plog_n as f32
+            } else {
+                0.0
+            },
+        ));
         segments.push(RawSegment {
             t0: seg.start_timestamp(),
             t1: seg.end_timestamp(),
@@ -322,7 +342,11 @@ fn run(
     let language = whisper_rs::get_lang_str(state.full_lang_id_from_state())
         .unwrap_or("en")
         .to_owned();
-    Ok(RunOutput { segments, language })
+    Ok(RunOutput {
+        segments,
+        stats,
+        language,
+    })
 }
 
 /// A token's bytes before they are decoded.
@@ -568,6 +592,7 @@ impl WhisperTranscriber {
                 words: Vec::new(),
                 note: Some("No speech detected".to_owned()),
                 sounds: Vec::new(),
+                segments: Vec::new(),
             });
         }
         let pct = Arc::new(AtomicI32::new(0));
@@ -617,6 +642,17 @@ impl WhisperTranscriber {
             words,
             note,
             sounds: Vec::new(),
+            segments: out
+                .segments
+                .iter()
+                .zip(&out.stats)
+                .map(|(s, (ns, lp))| crate::transcribe::SegmentStat {
+                    start: audio.start + MediaTime::from_ticks(s.t0 * TICKS_PER_CENTISECOND),
+                    end: audio.start + MediaTime::from_ticks(s.t1 * TICKS_PER_CENTISECOND),
+                    no_speech: *ns,
+                    avg_logprob: *lp,
+                })
+                .collect(),
         })
     }
 }

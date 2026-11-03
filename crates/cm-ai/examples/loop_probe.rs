@@ -96,6 +96,152 @@ fn main() {
         println!("{}", json!({ "windows": rows }));
         return;
     }
+    // --segments <ggml> --model-id <id> --from S --to S: decode that part of the noise-reduced
+    // track with the plain decoder and print, for every segment, its numbers: no-speech
+    // probability, mean token log-probability, mean word confidence, words, the raw level and the
+    // share of its span in speech-like level. Numbers only.
+    if let (Some(model), Some(id)) = (
+        value_of_args(&args, "--segments"),
+        value_of_args(&args, "--model-id"),
+    ) {
+        let from: f64 = value_of_args(&args, "--from")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0.0);
+        let to: f64 = value_of_args(&args, "--to")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1e9);
+        let manifest = cm_library::rec::read_manifest(bundle).unwrap();
+        let file = |k: &str| {
+            manifest
+                .tracks
+                .get("mic")
+                .and_then(|t| t.get(k))
+                .and_then(|v| v.as_str())
+                .map(str::to_owned)
+        };
+        let den =
+            decode_16k_mono(&bundle.join(file("denoised_file").or_else(|| file("file")).unwrap()))
+                .unwrap();
+        let raw = decode_16k_mono(&bundle.join(file("raw_file").or_else(|| file("file")).unwrap()))
+            .unwrap();
+        let (i, j) = (
+            (from * 16_000.0) as usize,
+            ((to * 16_000.0) as usize).min(den.len()),
+        );
+        let engine =
+            cm_ai::whisper::WhisperTranscriber::load(Path::new(&model), &id, true).unwrap();
+        let out = cm_ai::transcribe::Transcriber::transcribe(
+            &engine,
+            cm_ai::transcribe::Pcm16k {
+                samples: &den[i..j],
+                start: cm_core::MediaTime::ZERO,
+            },
+            Some("vi"),
+            &mut |_| true,
+        )
+        .unwrap();
+        let regions = cm_ai::vad::speech_regions(&raw[i..j], 0.3);
+        let sec = |m: cm_core::MediaTime| m.ticks() as f64 / cm_core::TICKS_PER_SECOND as f64;
+        let rows: Vec<_> = out
+            .segments
+            .iter()
+            .map(|s| {
+                let (a, b) = (sec(s.start), sec(s.end));
+                let words: Vec<&cm_ai::transcribe::Word> = out.words.iter().filter(|w| sec(w.start) >= a - 0.01 && sec(w.start) < b + 0.01).collect();
+                let conf = words.iter().map(|w| w.confidence).sum::<f32>() / words.len().max(1) as f32;
+                let (x, y) = ((a * 16_000.0) as usize, ((b * 16_000.0) as usize).min(raw[i..j].len()));
+                let sl = &raw[i..j][x.min(y)..y];
+                let level = 20.0 * f64::from(((sl.iter().map(|v| v * v).sum::<f32>() / sl.len().max(1) as f32).sqrt()).max(1e-9)).log10();
+                let inside: usize = regions.iter().map(|&(p, q)| q.min(y).saturating_sub(p.max(x))).sum();
+                json!({
+                    "at_s": ((a + from) * 10.0).round() / 10.0, "secs": ((b - a) * 10.0).round() / 10.0,
+                    "no_speech": s.no_speech, "avg_logprob": s.avg_logprob, "words": words.len(),
+                    "mean_conf": conf, "raw_dbfs": level, "vad_share": inside as f64 / (y - x).max(1) as f64,
+                })
+            })
+            .collect();
+        println!("{}", json!({ "segments": rows }));
+        return;
+    }
+    // --around <seconds> [--pad 20]: sentence units of the stored transcript near that time with
+    // their duration, word confidence, audio level (raw and noise-reduced), the share of the unit
+    // that lies in speech-like level (`vad::speech_regions` of the whole file) and the speaker
+    // engine's speech under it. Numbers only, no text.
+    if let Some(at) = value_of_args(&args, "--around").and_then(|v| v.parse::<f64>().ok()) {
+        let pad: f64 = value_of_args(&args, "--pad")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(20.0);
+        let stored = read_transcript(bundle).unwrap().expect("a transcript");
+        let manifest = cm_library::rec::read_manifest(bundle).unwrap();
+        let file = |k: &str| {
+            manifest
+                .tracks
+                .get("mic")
+                .and_then(|t| t.get(k))
+                .and_then(|v| v.as_str())
+                .map(str::to_owned)
+        };
+        let raw = decode_16k_mono(&bundle.join(file("raw_file").or_else(|| file("file")).unwrap()))
+            .unwrap();
+        let den =
+            decode_16k_mono(&bundle.join(file("denoised_file").or_else(|| file("file")).unwrap()))
+                .unwrap();
+        let regions_raw = cm_ai::vad::speech_regions(&raw, 0.3);
+        let regions_den = cm_ai::vad::speech_regions(&den, 0.3);
+        let segs: Vec<cm_ai::speakers::Segment> = manifest
+            .extra
+            .get(cm_ai::speakers::MANIFEST_SEGMENTS)
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default();
+        let sec = |m: cm_core::MediaTime| m.ticks() as f64 / cm_core::TICKS_PER_SECOND as f64;
+        let level = |x: &[f32], a: f64, b: f64| {
+            let (i, j) = (
+                (a * 16_000.0) as usize,
+                ((b * 16_000.0) as usize).min(x.len()),
+            );
+            let sl = &x[i.min(j)..j];
+            20.0 * f64::from(
+                ((sl.iter().map(|s| s * s).sum::<f32>() / sl.len().max(1) as f32).sqrt()).max(1e-9),
+            )
+            .log10()
+        };
+        let share = |regions: &[(usize, usize)], a: f64, b: f64| {
+            let (i, j) = ((a * 16_000.0) as usize, (b * 16_000.0) as usize);
+            let inside: usize = regions
+                .iter()
+                .map(|&(x, y)| y.min(j).saturating_sub(x.max(i)))
+                .sum();
+            inside as f64 / (j - i).max(1) as f64
+        };
+        let mut rows = Vec::new();
+        let mut start = 0;
+        for (i, w) in stored.words.iter().enumerate() {
+            let ends = w.text.trim_end().ends_with(['.', '?', '!', '…']);
+            if ends || i + 1 - start >= 6 || i + 1 == stored.words.len() {
+                let (a, b) = (sec(stored.words[start].start), sec(stored.words[i].end));
+                if a > at - pad && a < at + pad {
+                    let conf = stored.words[start..=i]
+                        .iter()
+                        .map(|w| w.confidence)
+                        .sum::<f32>()
+                        / (i + 1 - start) as f32;
+                    let spk: f64 = segs
+                        .iter()
+                        .map(|s| (sec(s.end).min(b) - sec(s.start).max(a)).max(0.0))
+                        .sum();
+                    rows.push(json!({
+                        "at_s": (a * 10.0).round() / 10.0, "secs": ((b - a) * 10.0).round() / 10.0, "words": i + 1 - start,
+                        "mean_confidence": conf, "raw_dbfs": level(&raw, a, b), "denoised_dbfs": level(&den, a, b),
+                        "vad_share_raw": share(&regions_raw, a, b), "vad_share_denoised": share(&regions_den, a, b),
+                        "speaker_engine_secs": spk,
+                    }));
+                }
+                start = i + 1;
+            }
+        }
+        println!("{}", json!({ "units": rows }));
+        return;
+    }
     let t = if let (Some(model), Some(id)) = (value_of("--transcribe"), value_of("--model-id")) {
         let engine =
             cm_ai::whisper::WhisperTranscriber::load(Path::new(&model), &id, true).unwrap();

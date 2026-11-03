@@ -57,6 +57,7 @@ impl Transcriber for Checksum {
             words,
             note: None,
             sounds: Vec::new(),
+            segments: Vec::new(),
         })
     }
 }
@@ -370,6 +371,7 @@ async fn m2i_exports_write_sounds_and_the_words_do_not_have_them() {
             start: media_secs(8.0),
             end: media_secs(14.0),
         }],
+        segments: Vec::new(),
     };
     std::fs::write(dir.join("transcript.json"), serde_json::to_vec(&t).unwrap()).unwrap();
     r.daemon

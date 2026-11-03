@@ -51,6 +51,7 @@ impl Transcriber for Checksum {
             words,
             note: None,
             sounds: Vec::new(),
+            segments: Vec::new(),
         })
     }
 }

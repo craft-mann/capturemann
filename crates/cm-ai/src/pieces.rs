@@ -931,6 +931,7 @@ pub fn transcribe_pieces_resumable<'p>(
             words,
             note,
             sounds: job.sounds,
+            segments: Vec::new(),
         },
         report,
     ))
