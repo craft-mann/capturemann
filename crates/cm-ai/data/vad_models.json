@@ -1,0 +1,16 @@
+{
+  "_comment": "The voice-activity model of whisper.cpp (Silero VAD v5.1.2, ggml format, MIT licence, repository ggml-org/whisper-vad). Same shape and rules as models.json. Pinned to a commit; sha256 and bytes read from the repository's LFS pointer file and checked against a download on Nov 3, 2026. Never bundled and never downloaded without the user asking. A second file in the same repository, ggml-silero-v6.2.0.bin (same size, sha256 2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987), exists; it is not offered.",
+  "models": [
+    {
+      "id": "silero-vad",
+      "label": "Silero voice activity (small)",
+      "hint": "Finds where people speak so the transcription can skip noise. 0.9 MB.",
+      "file": "ggml-silero-v5.1.2.bin",
+      "url": "https://huggingface.co/ggml-org/whisper-vad/resolve/9ffd54a1e1ee413ddf265af9913beaf518d1639b/ggml-silero-v5.1.2.bin",
+      "sha256": "29940d98d42b91fbd05ce489f3ecf7c72f0a42f027e4875919a28fb4c04ea2cf",
+      "bytes": 885098,
+      "ram_mb": 50,
+      "license": "MIT"
+    }
+  ]
+}

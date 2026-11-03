@@ -574,6 +574,7 @@ pub fn translate_with_whisper(
         model_id: Some(model_id),
         prompt: None,
         original_audio: false,
+        ..TranscribeOptions::default()
     };
     let t = translate_recording(bundle, transcriber, &opts, progress)?;
     Ok(whisper_lines(&t, source))

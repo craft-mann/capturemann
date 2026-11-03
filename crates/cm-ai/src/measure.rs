@@ -348,6 +348,32 @@ pub mod levels {
         out
     }
 
+    /// A first-order high-pass at `cutoff` Hz (16 kHz audio).
+    pub fn high_pass(samples: &mut [f32], cutoff: f32) {
+        let rc = 1.0 / (2.0 * std::f32::consts::PI * cutoff);
+        let dt = 1.0 / 16_000.0;
+        let a = rc / (rc + dt);
+        let (mut prev_x, mut prev_y) = (0.0f32, 0.0f32);
+        for s in samples.iter_mut() {
+            let y = a * (prev_y + *s - prev_x);
+            prev_x = *s;
+            prev_y = y;
+            *s = y;
+        }
+    }
+
+    /// Scales so the RMS of the whole signal is `target_db` dBFS, with the gain capped at
+    /// `max_gain_db` (a quiet recording is lifted, a silent one is not blown up).
+    pub fn normalize_rms_capped(samples: &mut [f32], target_db: f64, max_gain_db: f64) {
+        let level = db(rms_over(samples, &[]));
+        if level < -90.0 {
+            return;
+        }
+        let gain_db = (target_db - level).min(max_gain_db);
+        let g = 10f64.powf(gain_db / 20.0) as f32;
+        samples.iter_mut().for_each(|s| *s *= g);
+    }
+
     /// Scales so the largest sample is `target_db` dBFS (the signal is left alone when silent).
     pub fn normalize_peak(samples: &mut [f32], target_db: f64) {
         let peak = samples.iter().fold(0.0f32, |m, s| m.max(s.abs()));

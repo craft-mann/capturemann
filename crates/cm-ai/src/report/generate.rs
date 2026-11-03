@@ -149,6 +149,14 @@ fn too_long(e: &Error) -> bool {
     matches!(e, Error::Model(m) if m.kind == ErrorKind::OutputTooLong)
 }
 
+/// The request itself did not fit the context (the estimate of its size was too small): the server
+/// answers with an HTTP 400 that says so. Handled like a reply that is too long: split or side by
+/// side, never a failed report.
+fn too_big(e: &Error) -> bool {
+    too_long(e)
+        || matches!(e, Error::Model(m) if m.message.contains("exceeds the available context"))
+}
+
 /// Puts checked notes side by side: every section is a list of items, so the union of the lists is
 /// a valid set of notes (without the merge pass's de-duplication). Used when the model cannot write
 /// the merged notes in one reply, so no call is needed and nothing can run over.
@@ -206,7 +214,7 @@ fn notes_for(
 ) -> Result<Value, Error> {
     let user = prompt::notes_prompt(preamble, chunk, part);
     match ask(model, input, system, user, checker, totals, progress, slice) {
-        Err(e) if too_long(&e) && depth < 3 && chunk.chars().count() > 400 => {
+        Err(e) if too_big(&e) && depth < 3 && chunk.chars().count() > 400 => {
             let (a, b) = halve(chunk);
             let mid = (slice.0 + slice.1) / 2.0;
             let first = notes_for(
@@ -298,7 +306,7 @@ fn merge_all(
             match ask(model, input, system, user, checker, totals, progress, slice) {
                 Ok(v) => next.push(v),
                 // The merged notes do not fit in one reply: keep all of them side by side.
-                Err(e) if too_long(&e) => next.push(concat_notes(&g)),
+                Err(e) if too_big(&e) => next.push(concat_notes(&g)),
                 Err(e) => return Err(e),
             }
         }

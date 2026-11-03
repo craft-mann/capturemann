@@ -51,6 +51,9 @@ pub struct TranscribeRequest {
     pub resume: Option<serde_json::Value>,
     /// Read the microphone as it was recorded, not the noise-reduced copy.
     pub original_audio: bool,
+    /// The decoder options of the transcription review (settings `ai.lift_quiet_input`,
+    /// `ai.hallucination_gate`, `ai.vad_opinion`, `ai.carry_previous_text`).
+    pub pipeline: cm_ai::pipeline::PipelineSettings,
 }
 
 /// The speech-model store (`cm_ai::model`). Blocking: the daemon calls it off the async threads.
@@ -145,6 +148,8 @@ pub struct LiveRequest {
     pub model: String,
     pub language: Option<String>,
     pub glossary: Vec<cm_ai::glossary::GlossaryEntry>,
+    /// The decoder options the job at Stop will use (the saved state fits only the same decode).
+    pub pipeline: cm_ai::pipeline::PipelineSettings,
 }
 
 /// What a diarization needs: the bundle (the service decodes the audio) and the choices.

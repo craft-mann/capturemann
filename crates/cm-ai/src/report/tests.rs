@@ -435,6 +435,43 @@ fn merged_notes_that_do_not_fit_in_one_reply_are_kept_side_by_side() {
     );
 }
 
+/// The 1-hour `minutes` report of the 2026-11-03 M2c run failed at its merge pass with an HTTP 400
+/// ("request exceeds the available context size"): the size estimate of two big notes was too
+/// small. That is handled like a reply that is too long: the notes stay side by side.
+#[test]
+fn a_merge_request_that_exceeds_the_context_keeps_the_notes_side_by_side() {
+    let t = find_template("minutes").unwrap();
+    let lines: Vec<Line> = (0..200)
+        .map(|i| {
+            let s = f64::from(i) * 10.0;
+            line(
+                s,
+                s + 9.0,
+                None,
+                "this is a rather long sentence about the quarterly plan and the budget for the next \
+                 team to review together",
+            )
+        })
+        .collect();
+    let ctx = ReportContext::default();
+    let model = Fallible {
+        calls: Mutex::new(vec![]),
+        answer: Box::new(|req| {
+            let user = &req.messages[0].content;
+            if user.contains("Notes of part") {
+                return Err(TextModelError {
+                    kind: crate::text_model::ErrorKind::Server,
+                    message: "127.0.0.1 answered HTTP 400: request (24250 tokens) exceeds the available context size (16384 tokens), try increasing it".into(),
+                });
+            }
+            let times = line_times(user, "quarterly");
+            Ok(decisions_reply(&times[..1]))
+        }),
+    };
+    let g = generate(&model, &input(t, &lines, &ctx, &[]), &mut no_progress()).unwrap();
+    assert_eq!(g.content["decisions"].as_array().unwrap().len(), g.chunks);
+}
+
 /// Other failures are still failures: only the reply limit splits a piece.
 #[test]
 fn other_model_errors_are_not_turned_into_splits() {

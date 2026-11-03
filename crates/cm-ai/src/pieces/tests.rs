@@ -213,6 +213,7 @@ impl Transcriber for Engine {
             words,
             note: None,
             sounds: Vec::new(),
+            segments: Vec::new(),
         })
     }
 }
@@ -368,6 +369,7 @@ fn a_silent_recording_keeps_the_engines_note() {
                 words: vec![],
                 note: Some("No speech detected".into()),
                 sounds: Vec::new(),
+                segments: Vec::new(),
             })
         }
     }
@@ -671,6 +673,7 @@ impl Transcriber for TwoAudios {
             words,
             note: None,
             sounds: Vec::new(),
+            segments: Vec::new(),
         })
     }
 }

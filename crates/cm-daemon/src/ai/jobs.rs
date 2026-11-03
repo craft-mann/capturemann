@@ -305,6 +305,10 @@ impl JobHandler for TranscribeHandler {
             // Held (a recording started) or interrupted: go on from the last finished piece.
             resume: ctx.job.checkpoint.clone(),
             original_audio,
+            pipeline: self.settings.all().ok().as_ref().map_or_else(
+                Default::default,
+                cm_ai::pipeline::PipelineSettings::from_settings,
+            ),
         };
         let (service, reporter, run_flag) = (self.service.clone(), ctx.reporter.clone(), flag);
         let saver = reporter.clone();

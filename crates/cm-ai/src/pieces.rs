@@ -18,6 +18,7 @@
 use std::ops::Range;
 
 mod checks;
+pub mod gate;
 mod live;
 pub use checks::{
     drop_soft_repeats, fold, repeat_regions, soft_loop_words, Badness, SOFT_LOOP_WORDS,
@@ -295,6 +296,19 @@ struct Job<'a, 'p> {
     high: f32,
     report: PiecesReport,
     sounds: Vec<crate::transcribe::Sound>,
+    /// The decoder's segment numbers of the reads of the piece in hand (for the gate).
+    segs: Vec<crate::transcribe::SegmentStat>,
+    /// What the gate knows about the audio of the piece in hand.
+    gate_ev: Option<GateEvidence>,
+    /// The segment numbers of the latest read only (a re-read is judged on its own).
+    last_read_segs: Vec<crate::transcribe::SegmentStat>,
+}
+
+/// The gate's evidence for one piece (seconds relative to the piece).
+struct GateEvidence {
+    probs: Option<(Vec<f32>, f64)>,
+    energy: Vec<(f64, f64)>,
+    origin: f64,
 }
 
 /// No language fixed yet: none, or a list to choose from (`vi,en`, see `whisper::LanguageRequest`).
@@ -344,6 +358,8 @@ impl Job<'_, '_> {
         self.other_samples = other_samples;
         // A cancel arrives as the engine's own `cancelled` error and is passed on as it is.
         let t = result?;
+        self.segs.extend(t.segments.iter().cloned());
+        self.last_read_segs = t.segments.clone();
         if self.first.is_none() {
             self.first = Some((t.language.clone(), t.model.clone(), t.note.clone()));
         }
@@ -360,9 +376,13 @@ impl Job<'_, '_> {
     /// bad is cut in half and each half is done the same way (up to [`MAX_SPLIT_DEPTH`] levels);
     /// what survives all that has its repeats taken out.
     fn piece(&mut self, range: Range<usize>, depth: usize) -> Result<Vec<Word>, CmError> {
+        if depth == 0 {
+            self.segs.clear();
+        }
         let words = self.piece_inner(range.clone(), depth)?;
         if depth == 0 {
-            let words = self.repair(words, range.clone())?;
+            let gated = self.gate_marks(&words, &range);
+            let words = self.repair(words, range.clone(), gated)?;
             return self.fill_gaps(words, range);
         }
         Ok(words)
@@ -453,7 +473,72 @@ impl Job<'_, '_> {
     /// afterwards is cleaned: U+FFFD and control characters are removed from a word, and a word
     /// that is nothing but those, or a foreign script on low confidence, is dropped. General
     /// rules on characters and confidence, no word lists.
-    fn repair(&mut self, words: Vec<Word>, range: Range<usize>) -> Result<Vec<Word>, CmError> {
+    /// Which words the hallucination gate marks (when the decoder has it switched on): the signals
+    /// are the decoder's segment numbers and the voice-activity model's opinion of the piece's audio.
+    fn gate_marks(&mut self, words: &[Word], range: &Range<usize>) -> Vec<bool> {
+        let none = vec![false; words.len()];
+        let Some(cfg) = self.transcriber.gate() else {
+            self.gate_ev = None;
+            return none;
+        };
+        let audio = &self.samples[range.clone()];
+        let origin = range.start as f64 / f64::from(SAMPLE_RATE);
+        let energy = crate::vad::speech_regions(audio, 0.3)
+            .into_iter()
+            .map(|(a, b)| {
+                (
+                    a as f64 / f64::from(SAMPLE_RATE),
+                    b as f64 / f64::from(SAMPLE_RATE),
+                )
+            })
+            .collect();
+        self.gate_ev = Some(GateEvidence {
+            probs: self.transcriber.voice_activity(audio),
+            energy,
+            origin,
+        });
+        self.mark_with_gate(words, &self.segs.clone(), &cfg)
+            .unwrap_or(none)
+    }
+
+    /// Whether the gate marks any of `words`, the words of the read just made (a re-read must pass
+    /// the gate that the first reading did, not only a mean confidence).
+    fn gate_rejects(&self, words: &[Word]) -> bool {
+        self.transcriber
+            .gate()
+            .and_then(|cfg| self.mark_with_gate(words, &self.last_read_segs, &cfg))
+            .is_some_and(|m| m.iter().any(|x| *x))
+    }
+
+    fn mark_with_gate(
+        &self,
+        words: &[Word],
+        segs: &[crate::transcribe::SegmentStat],
+        cfg: &gate::GateConfig,
+    ) -> Option<Vec<bool>> {
+        let g = self.gate_ev.as_ref()?;
+        let ev = gate::Evidence {
+            vad: g.probs.as_ref().map(|(p, f)| (p.as_slice(), *f)),
+            vad_threshold: 0.32,
+            energy: &g.energy,
+            origin: g.origin,
+        };
+        let times = |w: &Word| self.secs_of(w);
+        let seg_secs = |s: &crate::transcribe::SegmentStat| {
+            let t = |m: cm_core::MediaTime| {
+                (m - self.base).ticks() as f64 / cm_core::TICKS_PER_SECOND as f64
+            };
+            (t(s.start), t(s.end))
+        };
+        Some(gate::mark(words, &times, segs, &seg_secs, &ev, cfg))
+    }
+
+    fn repair(
+        &mut self,
+        words: Vec<Word>,
+        range: Range<usize>,
+        gated: Vec<bool>,
+    ) -> Result<Vec<Word>, CmError> {
         let language = self.language.clone().unwrap_or_default();
         let broken = |w: &Word| crate::failure_kinds::is_broken(w, &language);
         // Suspect words: broken ones, and runs of near-zero confidence.
@@ -495,6 +580,9 @@ impl Job<'_, '_> {
             crate::failure_kinds::dense_unit_indices(&words, DENSE_MIN_REPEATS, DENSE_WINDOW_SECS)
         {
             looped[i] = true;
+        }
+        for (l, g) in looped.iter_mut().zip(&gated) {
+            *l |= *g;
         }
         for (s, l) in suspect.iter_mut().zip(&looped) {
             *s |= *l;
@@ -562,7 +650,16 @@ impl Job<'_, '_> {
                 // replaces it (silence included). If it repeats the same sentence at a human pace
                 // and about as often, it was said; otherwise there are no reliable words there.
                 let new_runs = crate::failure_kinds::sentence_runs(&again, LOOP_MIN_REPEATS);
-                if clean && new_runs.is_empty() {
+                // The second reading goes through the same gate (its own segment numbers).
+                let again_marked = self
+                    .transcriber
+                    .gate()
+                    .and_then(|cfg| {
+                        let tail = self.last_read_segs.clone();
+                        self.mark_with_gate(&again, &tail, &cfg)
+                    })
+                    .is_some_and(|m| m.iter().any(|x| *x));
+                if clean && new_runs.is_empty() && !again_marked {
                     self.report.broken_reread_kept += 1;
                     out.extend(again);
                 } else if self.said_repeatedly(&old, &new_runs) {
@@ -714,6 +811,7 @@ impl Job<'_, '_> {
                     .iter()
                     .all(|w| !crate::failure_kinds::is_broken(w, &language))
                 && !Badness::of(&again).is_bad()
+                && !self.gate_rejects(&again)
                 && again.iter().map(|w| w.confidence).sum::<f32>() / again.len() as f32
                     >= GAP_MIN_CONFIDENCE;
             if ok {
@@ -760,6 +858,7 @@ impl Job<'_, '_> {
                     .iter()
                     .all(|w| !crate::failure_kinds::is_broken(w, &language))
                 && !Badness::of(&again).is_bad()
+                && !self.gate_rejects(&again)
                 && again.iter().map(|w| w.confidence).sum::<f32>() / again.len() as f32
                     >= GAP_MIN_CONFIDENCE
                 && spoken(&again) > spoken(&old_words);
@@ -861,6 +960,9 @@ pub fn transcribe_pieces_resumable<'p>(
             ..PiecesReport::default()
         },
         sounds: Vec::new(),
+        segs: Vec::new(),
+        gate_ev: None,
+        last_read_segs: Vec::new(),
     };
     let mut words = Vec::new();
     let mut start = 0;
@@ -931,6 +1033,7 @@ pub fn transcribe_pieces_resumable<'p>(
             words,
             note,
             sounds: job.sounds,
+            segments: Vec::new(),
         },
         report,
     ))

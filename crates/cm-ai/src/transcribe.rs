@@ -42,6 +42,22 @@ pub struct Transcript {
     /// export that wants them uses [`crate::sounds::captions_with_sounds`].
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sounds: Vec<Sound>,
+    /// What the engine knew about each segment it decoded (no-speech probability, mean token
+    /// log-probability). For the checks inside the pipeline only: never stored, so a transcript
+    /// read from disk has none.
+    #[serde(default, skip)]
+    pub segments: Vec<SegmentStat>,
+}
+
+/// One decoded segment's own numbers, in the same time as the words.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SegmentStat {
+    pub start: MediaTime,
+    pub end: MediaTime,
+    /// The model's probability that the segment holds no speech (0 to 1).
+    pub no_speech: f32,
+    /// Mean log-probability of the segment's tokens (0 is certain, more negative is less sure).
+    pub avg_logprob: f32,
 }
 
 /// What a sound entry stands for.
@@ -112,6 +128,19 @@ pub trait Transcriber: Send + Sync {
     ) -> Result<Transcript, CmError> {
         let _ = prompt;
         self.transcribe(audio, language, progress)
+    }
+
+    /// Speech probabilities per frame of the audio (and the frame length in seconds) from a voice
+    /// activity model, when this decoder has one. The hallucination gate uses them as a second
+    /// opinion; `None` when there is no model.
+    fn voice_activity(&self, samples: &[f32]) -> Option<(Vec<f32>, f64)> {
+        let _ = samples;
+        None
+    }
+
+    /// The hallucination gate's thresholds when it is switched on for this decoder, else `None`.
+    fn gate(&self) -> Option<crate::pieces::gate::GateConfig> {
+        None
     }
 
     /// The Whisper *translate* task (AI-5): the same audio, written in English whatever language
@@ -241,6 +270,7 @@ impl Transcriber for ScriptedTranscriber {
             words,
             note,
             sounds: Vec::new(),
+            segments: Vec::new(),
         })
     }
 
@@ -278,6 +308,7 @@ impl Transcriber for ScriptedTranscriber {
             words,
             note,
             sounds: Vec::new(),
+            segments: Vec::new(),
         })
     }
 }

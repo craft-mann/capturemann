@@ -156,12 +156,25 @@ pub struct WhisperTranscriber {
     ctx: WhisperContext,
     model: String,
     threads: i32,
+    /// Past text a window may carry from the one before (`None`: whisper.cpp's default; `Some(0)`
+    /// stops the carry-over inside one call).
+    n_max_text_ctx: Option<i32>,
 }
 
 impl WhisperTranscriber {
     /// Loads the model file. `model_id` is recorded in the transcript. With `use_gpu` the GPU
     /// backend is tried first and the CPU is used if it cannot start.
     pub fn load(model_path: &Path, model_id: &str, use_gpu: bool) -> Result<Self, CmError> {
+        Self::load_with(model_path, model_id, use_gpu, false)
+    }
+
+    /// [`WhisperTranscriber::load`] with flash attention on or off (a measurement option).
+    pub fn load_with(
+        model_path: &Path,
+        model_id: &str,
+        use_gpu: bool,
+        flash_attn: bool,
+    ) -> Result<Self, CmError> {
         let _t = cm_core::perf::span("model", "load");
         whisper_rs::install_logging_hooks();
         // DTW token times need the model's alignment heads, known for the stock models only; any
@@ -170,6 +183,7 @@ impl WhisperTranscriber {
         let load = |gpu: bool, dtw: bool| {
             let mut params = WhisperContextParameters::default();
             params.use_gpu(gpu);
+            params.flash_attn(flash_attn);
             if let Some(preset) = dtw.then(|| dtw_preset(model_id)).flatten() {
                 params.dtw_parameters(DtwParameters {
                     mode: DtwMode::ModelPreset {
@@ -191,6 +205,7 @@ impl WhisperTranscriber {
             ctx,
             model: model_id.to_owned(),
             threads,
+            n_max_text_ctx: None,
         })
     }
 
@@ -199,6 +214,13 @@ impl WhisperTranscriber {
     #[must_use]
     pub fn with_threads(mut self, threads: i32) -> Self {
         self.threads = threads.max(1);
+        self
+    }
+
+    /// How much past text a window may carry from the one before inside one call.
+    #[must_use]
+    pub fn with_n_max_text_ctx(mut self, n: i32) -> Self {
+        self.n_max_text_ctx = Some(n);
         self
     }
 
@@ -231,6 +253,8 @@ fn bad_model(path: &Path, e: &dyn std::fmt::Display) -> CmError {
 /// What one run of the model produced.
 struct RunOutput {
     segments: Vec<RawSegment>,
+    /// `(no_speech, avg_logprob)` per segment, same order as `segments`.
+    stats: Vec<(f32, f32)>,
     language: String,
 }
 
@@ -242,6 +266,7 @@ fn run(
     threads: i32,
     prompt: Option<&str>,
     translate: bool,
+    n_max_text_ctx: Option<i32>,
     progress: Arc<AtomicI32>,
     cancel: Arc<AtomicBool>,
 ) -> Result<RunOutput, CmError> {
@@ -253,6 +278,9 @@ fn run(
         .map_err(|e| internal("could not start", &e))?;
     let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
     params.set_n_threads(threads);
+    if let Some(n) = n_max_text_ctx {
+        params.set_n_max_text_ctx(n);
+    }
     // The translate task makes the model write English whatever language it hears (AI-5).
     params.set_translate(translate);
     params.set_language(Some(language.as_str()));
@@ -295,8 +323,10 @@ fn run(
 
     let _t = cm_core::perf::span("transcribe", "tokens");
     let mut segments = Vec::new();
+    let mut stats = Vec::new();
     for seg in state.as_iter() {
         let mut pieces = Vec::new();
+        let (mut plog_sum, mut plog_n) = (0.0f32, 0u32);
         for i in 0..seg.n_tokens() {
             let Some(tok) = seg.get_token(i) else {
                 continue;
@@ -304,6 +334,14 @@ fn run(
             // Raw bytes, not text: a token can end in the middle of a multi-byte character.
             let bytes = tok.to_bytes().map(<[u8]>::to_vec).unwrap_or_default();
             let d = tok.token_data();
+            // Real text tokens only: the control tokens' probabilities say nothing about the words.
+            if !tok
+                .to_bytes()
+                .is_ok_and(|b| b.starts_with(b"[_") || b.starts_with(b"<|"))
+            {
+                plog_sum += d.plog;
+                plog_n += 1;
+            }
             pieces.push(TokenBytes {
                 bytes,
                 t0: d.t0,
@@ -313,6 +351,14 @@ fn run(
             });
         }
         let tokens = join_split_characters(pieces);
+        stats.push((
+            seg.no_speech_probability(),
+            if plog_n > 0 {
+                plog_sum / plog_n as f32
+            } else {
+                0.0
+            },
+        ));
         segments.push(RawSegment {
             t0: seg.start_timestamp(),
             t1: seg.end_timestamp(),
@@ -322,7 +368,11 @@ fn run(
     let language = whisper_rs::get_lang_str(state.full_lang_id_from_state())
         .unwrap_or("en")
         .to_owned();
-    Ok(RunOutput { segments, language })
+    Ok(RunOutput {
+        segments,
+        stats,
+        language,
+    })
 }
 
 /// A token's bytes before they are decoded.
@@ -568,6 +618,7 @@ impl WhisperTranscriber {
                 words: Vec::new(),
                 note: Some("No speech detected".to_owned()),
                 sounds: Vec::new(),
+                segments: Vec::new(),
             });
         }
         let pct = Arc::new(AtomicI32::new(0));
@@ -583,6 +634,7 @@ impl WhisperTranscriber {
                     self.threads,
                     prompt.as_deref(),
                     translate,
+                    self.n_max_text_ctx,
                     pct2,
                     cancel2,
                 )
@@ -617,6 +669,17 @@ impl WhisperTranscriber {
             words,
             note,
             sounds: Vec::new(),
+            segments: out
+                .segments
+                .iter()
+                .zip(&out.stats)
+                .map(|(s, (ns, lp))| crate::transcribe::SegmentStat {
+                    start: audio.start + MediaTime::from_ticks(s.t0 * TICKS_PER_CENTISECOND),
+                    end: audio.start + MediaTime::from_ticks(s.t1 * TICKS_PER_CENTISECOND),
+                    no_speech: *ns,
+                    avg_logprob: *lp,
+                })
+                .collect(),
         })
     }
 }

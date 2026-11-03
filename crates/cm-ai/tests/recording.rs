@@ -420,6 +420,7 @@ fn a_bad_reading_is_read_again_from_the_other_file_of_the_recording() {
                 words,
                 note: None,
                 sounds: Vec::new(),
+                segments: Vec::new(),
             })
         }
     }

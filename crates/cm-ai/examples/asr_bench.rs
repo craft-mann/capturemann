@@ -132,6 +132,22 @@ fn main() {
     if args.iter().any(|a| a == "--gate") {
         samples = levels::gate_denoise(&samples);
     }
+    // --agc: 80 Hz high-pass, then the whole clip's RMS to -20 dBFS with the gain capped at +15 dB
+    // (the review's "raw mic + loudness normalisation per piece"; the clips here are one piece).
+    if args.iter().any(|a| a == "--agc") {
+        levels::high_pass(&mut samples, 80.0);
+        levels::normalize_rms_capped(&mut samples, -20.0, 15.0);
+    }
+    // --gain-only: the same loudness step without the high-pass, and only when the clip is quieter
+    // than --gain-below dBFS RMS (default -26): already-loud audio is left alone.
+    if args.iter().any(|a| a == "--gain-only") {
+        let below: f64 = option(&args, "--gain-below")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(-26.0);
+        if levels::db(levels::rms_over(&samples, &[])) < below {
+            levels::normalize_rms_capped(&mut samples, -20.0, 15.0);
+        }
+    }
     match option(&args, "--normalize").as_deref() {
         Some("peak") => levels::normalize_peak(&mut samples, -3.0),
         Some("loudness") => levels::normalize_loudness(&mut samples, -20.0),
@@ -140,21 +156,72 @@ fn main() {
     let audio_secs = samples.len() as f64 / 16_000.0;
 
     let loaded = Instant::now();
-    let whisper = WhisperTranscriber::load(&model, &model_id, gpu).unwrap();
+    let flash = args.iter().any(|a| a == "--flash-attn");
+    let mut whisper = WhisperTranscriber::load_with(&model, &model_id, gpu, flash).unwrap();
+    if let Some(n) = option(&args, "--n-max-text-ctx").and_then(|v| v.parse::<i32>().ok()) {
+        whisper = whisper.with_n_max_text_ctx(n);
+    }
+    let prompt = option(&args, "--prompt");
     let load_secs = loaded.elapsed().as_secs_f64();
     let counting = Counting {
         inner: &whisper,
         calls: Mutex::new(Vec::new()),
     };
     let began = Instant::now();
+    // --vad <ggml silero model>: read only the speech regions, each as a call of its own.
+    let vad = option(&args, "--vad")
+        .map(|m| cm_ai::silero::SileroVad::load(std::path::Path::new(&m)).unwrap());
+    let vad_first = vad.as_ref().map(|v| cm_ai::silero::VadFirst {
+        inner: &counting,
+        vad: v,
+        params: {
+            let mut p = cm_ai::silero::VadParams::default();
+            if let Some(v) = option(&args, "--vad-threshold").and_then(|v| v.parse().ok()) {
+                p.threshold = v;
+            }
+            if let Some(v) = option(&args, "--vad-min-silence").and_then(|v| v.parse().ok()) {
+                p.min_silence_s = v;
+            }
+            if let Some(v) = option(&args, "--vad-pad").and_then(|v| v.parse().ok()) {
+                p.pad_s = v;
+            }
+            p
+        },
+    });
+    // --gate [--vad-opinion <silero model>]: the hallucination gate, with the voice-activity model
+    // as the second opinion when given. Quiet input is lifted by the --gain-only step above.
+    let opinion = option(&args, "--vad-opinion")
+        .map(|m| cm_ai::silero::SileroVad::load(std::path::Path::new(&m)).unwrap());
+    let configured = cm_ai::pipeline::Configured {
+        inner: &counting,
+        vad: opinion.as_ref(),
+        gate: args.iter().any(|a| a == "--gate").then(|| {
+            let mut g = cm_ai::pieces::gate::GateConfig::default();
+            let off = option(&args, "--gate-off").unwrap_or_default();
+            g.use_no_speech = !off.contains("ns");
+            g.use_rate = !off.contains("rate");
+            g.use_collapse = !off.contains("collapse");
+            g.use_vad = !off.contains("vad");
+            if let Some(v) = option(&args, "--gate-ns").and_then(|v| v.parse().ok()) {
+                g.no_speech = v;
+            }
+            g
+        }),
+        normalize: None,
+    };
+    let engine: &dyn Transcriber = match &vad_first {
+        Some(w) => w,
+        None if configured.gate.is_some() => &configured,
+        None => &counting,
+    };
     let (tr, report) = transcribe_pieces(
-        &counting,
+        engine,
         Pcm16k {
             samples: &samples,
             start: MediaTime::ZERO,
         },
         Some(&language),
-        None,
+        prompt.as_deref(),
         &mut |_| true,
     )
     .unwrap();
@@ -169,7 +236,27 @@ fn main() {
     let e2 = word_errors_without(&reference_all, &hyp, DISFLUENCIES);
     let h = health(&tr.words, &language);
     let spread = spread_repeats(&tr.words, 4, 10.0, 5);
+    // Insertions over reference-silent regions: words whose middle is more than half a second from
+    // every speech span, and the loops (a sentence 3 times in a row, or 5 in a minute).
+    let outside = if speech.is_empty() {
+        None
+    } else {
+        Some(
+            tr.words
+                .iter()
+                .filter(|w| {
+                    let mid = (w.start.ticks() + w.end.ticks()) as f64
+                        / 2.0
+                        / cm_core::TICKS_PER_SECOND as f64;
+                    !speech.iter().any(|&(a, b)| mid > a - 0.5 && mid < b + 0.5)
+                })
+                .count(),
+        )
+    };
+    let loops = cm_ai::failure_kinds::sentence_runs(&tr.words, 3).len();
+    let dense = cm_ai::failure_kinds::dense_unit_indices(&tr.words, 5, 60.0).len();
     let mut out = json!({
+        "outside_speech_words": outside, "loop_runs": loops, "dense_repeat_words": dense,
         "label": label, "model": model_id, "quiet_db": option(&args, "--quiet-db"), "gate": args.iter().any(|a| a == "--gate"), "normalize": option(&args, "--normalize"), "lead_secs": option(&args, "--lead-secs"), "language": language, "gpu": gpu,
         "audio_secs": audio_secs, "load_secs": load_secs, "transcribe_secs": secs,
         "rtf": audio_secs / secs,

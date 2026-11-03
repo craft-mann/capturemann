@@ -153,6 +153,7 @@ async fn rig(words: usize, provider: Option<&str>) -> Rig {
                 .collect(),
             note: None,
             sounds: Vec::new(),
+            segments: Vec::new(),
         };
         std::fs::write(
             dir.join("transcript.json"),

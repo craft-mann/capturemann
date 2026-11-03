@@ -51,6 +51,7 @@ impl Transcriber for Checksum {
             words,
             note: None,
             sounds: Vec::new(),
+            segments: Vec::new(),
         })
     }
 }
@@ -102,7 +103,7 @@ fn the_job_at_stop_resumes_from_the_pieces_read_while_recording() {
 
     // The recorder writes a chunk at a time; the live run steps after each.
     let mut w = WavWriter::create(&wav, 1, RATE as u32).unwrap();
-    let mut run = LiveRun::open(dir.path(), "m", None, None, false).unwrap();
+    let mut run = LiveRun::open(dir.path(), "m", None, None, false, "").unwrap();
     let mut finished = 0;
     for chunk in x.chunks(150 * RATE).take(7) {
         w.write(chunk).unwrap();

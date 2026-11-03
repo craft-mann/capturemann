@@ -100,6 +100,7 @@ impl Inner {
         let model = Self::pick_model(&list, None)?;
         let language = super::jobs::languages_setting(Some(&settings));
         let glossary = cm_ai::glossary::from_value(settings.get(cm_ai::glossary::SETTING_GLOSSARY));
+        let pipeline = cm_ai::pipeline::PipelineSettings::from_settings(&settings);
         let (library, id, svc) = (
             self.library.clone(),
             capture_id.to_owned(),
@@ -138,6 +139,7 @@ impl Inner {
                     model: model.clone(),
                     language: language.clone(),
                     glossary: glossary.clone(),
+                    pipeline,
                 };
                 let (svc, f) = (svc.clone(), flag.clone());
                 let mut taken = run.take();
