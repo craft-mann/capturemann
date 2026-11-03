@@ -34,7 +34,7 @@ The private meeting (the maintainer's 6 participants), whole run against 600-sec
 | 0.8, 0.1 | 8 / 8 | 58.5 % | 119 s, 1,371 MB | 127 s, 685 MB |
 | 0.8, 0.2 | 7 / 8 | 36.3 % | 60 s, 821 MB | 66 s, 530 MB |
 
-Short rows: a 15 s cut of three clips takes about 0.4 s and finds 1 speaker under every setting. Memory on the long and private audio is lower with windows in every cell (for example 575 against 830 MB).
+Short rows: a 15 s cut of three clips takes about 0.4 s and finds 1 speaker under every setting. Memory on the long and private audio is lower with windows in nearly every cell (for example 575 against 830 MB).
 
 ## 4. Decision and what is open
 - **Defaults unchanged: 1.0 and 0.1**, windowing on (the comparison of windows against the whole run is in favour of windows on all three real long meetings for the shipped pair).
