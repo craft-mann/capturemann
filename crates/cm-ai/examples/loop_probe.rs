@@ -213,12 +213,34 @@ fn main() {
                 .sum();
             inside as f64 / (j - i).max(1) as f64
         };
+        // --vad <ggml silero>: the Silero speech share under each unit as well, and how many units of
+        // the whole transcript sit under various shares.
+        let silero = value_of_args(&args, "--vad").map(|m| {
+            let v = cm_ai::silero::SileroVad::load(Path::new(&m)).unwrap();
+            v.probabilities(&raw).unwrap()
+        });
+        let mut hist = [0usize; 5]; // share < 0.1, < 0.25, < 0.5, < 0.75, rest
         let mut rows = Vec::new();
         let mut start = 0;
         for (i, w) in stored.words.iter().enumerate() {
             let ends = w.text.trim_end().ends_with(['.', '?', '!', '…']);
             if ends || i + 1 - start >= 6 || i + 1 == stored.words.len() {
                 let (a, b) = (sec(stored.words[start].start), sec(stored.words[i].end));
+                if let Some(p) = &silero {
+                    let sh = cm_ai::silero::speech_share(p, a, b, 0.32);
+                    let k = if sh < 0.1 {
+                        0
+                    } else if sh < 0.25 {
+                        1
+                    } else if sh < 0.5 {
+                        2
+                    } else if sh < 0.75 {
+                        3
+                    } else {
+                        4
+                    };
+                    hist[k] += 1;
+                }
                 if a > at - pad && a < at + pad {
                     let conf = stored.words[start..=i]
                         .iter()
@@ -234,12 +256,16 @@ fn main() {
                         "mean_confidence": conf, "raw_dbfs": level(&raw, a, b), "denoised_dbfs": level(&den, a, b),
                         "vad_share_raw": share(&regions_raw, a, b), "vad_share_denoised": share(&regions_den, a, b),
                         "speaker_engine_secs": spk,
+                        "silero_share": silero.as_ref().map(|p| cm_ai::silero::speech_share(p, a, b, 0.32)),
                     }));
                 }
                 start = i + 1;
             }
         }
-        println!("{}", json!({ "units": rows }));
+        println!(
+            "{}",
+            json!({ "units": rows, "silero_units_by_share_lt_0.1_0.25_0.5_0.75_rest": hist })
+        );
         return;
     }
     let t = if let (Some(model), Some(id)) = (value_of("--transcribe"), value_of("--model-id")) {
