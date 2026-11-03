@@ -21,9 +21,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use cm_ai::caption::CaptionLine;
-use cm_ai::report::{
-    self, generate::generate, generate::Input, rubric, Line, ReportContext,
-};
+use cm_ai::report::{self, generate::generate, generate::Input, rubric, Line, ReportContext};
 use cm_ai::text_model::engine::{EmbeddedTextModel, EngineManager, EngineSpec, TextEngine};
 use cm_ai::text_model::{JsonReply, JsonRequest, TextModel, TextModelConfig, TextModelError};
 use cm_ai::translate::{translate_with_text_model, ModelTranslator};
@@ -69,7 +67,9 @@ impl TextModel for Timed<'_> {
 fn server_totals(log: &str) -> Value {
     let (mut p_ms, mut p_tok, mut g_ms, mut g_tok) = (0.0, 0u64, 0.0, 0u64);
     for l in log.lines() {
-        let Some(at) = l.find("eval time =") else { continue };
+        let Some(at) = l.find("eval time =") else {
+            continue;
+        };
         let rest = &l[at + "eval time =".len()..];
         let ms: f64 = rest
             .split_whitespace()
@@ -116,10 +116,16 @@ fn main() {
         .collect();
     let model_path = PathBuf::from(option(&args, "--model").expect("--model <gguf>"));
     let model_id = option(&args, "--model-id").expect("--model-id");
-    let ctx: u32 = option(&args, "--ctx").and_then(|c| c.parse().ok()).unwrap_or(16384);
+    let ctx: u32 = option(&args, "--ctx")
+        .and_then(|c| c.parse().ok())
+        .unwrap_or(16384);
     let label = option(&args, "--label").unwrap_or_else(|| "lines".into());
-    let log = PathBuf::from(option(&args, "--log").unwrap_or_else(|| "text_bench_engine.log".into()));
-    std::env::set_var("CM_LLAMA_SERVER", option(&args, "--llama-server").expect("--llama-server"));
+    let log =
+        PathBuf::from(option(&args, "--log").unwrap_or_else(|| "text_bench_engine.log".into()));
+    std::env::set_var(
+        "CM_LLAMA_SERVER",
+        option(&args, "--llama-server").expect("--llama-server"),
+    );
 
     let engine: Arc<dyn TextEngine> = EngineManager::system(log.clone());
     let spec = EngineSpec {
@@ -143,7 +149,10 @@ fn main() {
         inner: &embedded,
         calls: Default::default(),
     };
-    let words: usize = lines.iter().map(|l| l.text.split_whitespace().count()).sum();
+    let words: usize = lines
+        .iter()
+        .map(|l| l.text.split_whitespace().count())
+        .sum();
     let audio_secs = lines.last().map_or(0.0, |l| l.end);
     let mut out = json!({
         "task": task, "label": label, "model": model_id, "context_tokens": ctx,
@@ -192,7 +201,8 @@ fn main() {
                         "floor_ok": s.floor_ok(),
                     });
                     if let Some(p) = option(&args, "--content-out") {
-                        std::fs::write(p, serde_json::to_string_pretty(&g.content).unwrap()).unwrap();
+                        std::fs::write(p, serde_json::to_string_pretty(&g.content).unwrap())
+                            .unwrap();
                     }
                 }
                 Err(e) => out["error"] = json!(format!("{e:?}")),
@@ -209,7 +219,14 @@ fn main() {
                 })
                 .collect();
             let translator = ModelTranslator::new(&timed, model_id.clone(), "bench");
-            let r = translate_with_text_model(&translator, &source, "English", &target, &[], &mut |_| true);
+            let r = translate_with_text_model(
+                &translator,
+                &source,
+                "English",
+                &target,
+                &[],
+                &mut |_| true,
+            );
             out["wall_secs"] = json!(began.elapsed().as_secs_f64());
             match r {
                 Ok(t) => {

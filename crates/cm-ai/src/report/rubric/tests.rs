@@ -108,6 +108,15 @@ fn a_sentence_start_and_an_attendee_are_not_invented_names() {
 }
 
 #[test]
+fn a_capitalised_heading_word_used_in_lower_case_elsewhere_is_not_a_name() {
+    let content = json!({
+        "topics": [{"topic": "Cost and Timeline", "key_points": ["the cost is high", "the timeline slips"], "at": [1.0]}],
+    });
+    let s = score(minutes(), &content, &transcript(), &[], &[]);
+    assert!(s.invented_names.is_empty(), "{s:?}");
+}
+
+#[test]
 fn an_empty_report_passes_only_without_speakers() {
     let content = json!({});
     assert!(!score(minutes(), &content, &transcript(), &[], &[]).floor_ok());

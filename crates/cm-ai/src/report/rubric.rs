@@ -360,11 +360,23 @@ pub fn score(
         .chain(attendees)
         .flat_map(|n| words_lower(n))
         .collect();
+    // A capitalised heading word ("Cost", "Timeline") is an ordinary word when the report or the
+    // transcript also uses it in lower case; only a capital word never seen in lower case is a name.
+    let lower_in_report: HashSet<String> = texts
+        .iter()
+        .flat_map(|t| t.split(|c: char| !is_word_char(c)))
+        .filter(|w| w.chars().next().is_some_and(char::is_lowercase))
+        .map(norm)
+        .collect();
     let mut bad: Vec<String> = Vec::new();
     for t in &texts {
         for w in mid_sentence_capitals(t) {
             let key = norm(&w);
-            if !transcript_words.contains(&key) && !name_words.contains(&key) && !bad.contains(&w) {
+            if !transcript_words.contains(&key)
+                && !lower_in_report.contains(&key)
+                && !name_words.contains(&key)
+                && !bad.contains(&w)
+            {
                 bad.push(w);
             }
         }
