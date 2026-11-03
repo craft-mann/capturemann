@@ -252,7 +252,7 @@ pub fn run_with_hints_tuned(
             samples,
             hints,
             tuning,
-            AUTO_THRESHOLD,
+            tuning.auto_threshold,
             progress,
         )? {
             return Ok(turns);
@@ -260,14 +260,14 @@ pub fn run_with_hints_tuned(
     }
     let exact = |n: u32| ClusterParams {
         num_clusters: Some(n),
-        threshold: AUTO_THRESHOLD,
+        threshold: tuning.auto_threshold,
     };
     let turns = if let Some(n) = hints.num_speakers {
         engine.run(models, samples, exact(n), progress)?
     } else {
         let auto = ClusterParams {
             num_clusters: None,
-            threshold: AUTO_THRESHOLD,
+            threshold: tuning.auto_threshold,
         };
         // Most runs end with this pass, so it takes nearly all of the bar; the rare second pass
         // below keeps the bar where it is (progress never goes back) and can still be stopped.

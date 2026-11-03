@@ -154,37 +154,30 @@ fn main() {
                     _ => SherpaDiarizer::new(store),
                 },
             };
-            // --second-run: the 0.2.6 way of keeping to a maximum (run all the audio again).
-            let d = if args.iter().any(|a| a == "--second-run") {
-                d.with_tuning(cm_ai::speaker_engine::Tuning {
-                    second_run_for_max: true,
-                    ..cm_ai::speaker_engine::Tuning::default()
-                })
-            } else {
-                d
-            };
-            // --whole: never in windows (the 0.2.6 way), whatever the length.
-            let d = if args.iter().any(|a| a == "--whole") {
-                d.with_tuning(cm_ai::speaker_engine::Tuning {
-                    long_secs: f64::MAX,
-                    ..cm_ai::speaker_engine::Tuning::default()
-                })
-            } else {
-                d
-            };
-            // --window-secs N [--link X]: cut the audio into windows of N seconds whatever its
-            // length (M2b measurements); --turns-out <file> writes `start duration speaker` lines.
-            let d = match option(&args, "--window-secs").and_then(|s| s.parse::<f64>().ok()) {
-                Some(w) => d.with_tuning(cm_ai::speaker_engine::Tuning {
-                    long_secs: 0.0,
-                    window_secs: w,
-                    link_distance: option(&args, "--link")
-                        .and_then(|s| s.parse().ok())
-                        .unwrap_or(cm_ai::speaker_engine::Tuning::default().link_distance),
-                    ..cm_ai::speaker_engine::Tuning::default()
-                }),
-                None => d,
-            };
+            // One tuning from all the flags (M2b measurements): --second-run (the 0.2.6 way of
+            // keeping to a maximum), --threshold X (the clustering distance for an unknown count),
+            // --whole (never in windows), --window-secs N [--link X] (windows of N seconds
+            // whatever the length), --long-secs N (audio over N seconds is run in windows).
+            // --turns-out <file> writes `start duration speaker` lines.
+            let mut tuning = cm_ai::speaker_engine::Tuning::default();
+            tuning.second_run_for_max = args.iter().any(|a| a == "--second-run");
+            if let Some(th) = option(&args, "--threshold").and_then(|s| s.parse::<f32>().ok()) {
+                tuning.auto_threshold = th;
+            }
+            if let Some(w) = option(&args, "--window-secs").and_then(|s| s.parse::<f64>().ok()) {
+                tuning.long_secs = 0.0;
+                tuning.window_secs = w;
+            }
+            if let Some(l) = option(&args, "--long-secs").and_then(|s| s.parse::<f64>().ok()) {
+                tuning.long_secs = l;
+            }
+            if args.iter().any(|a| a == "--whole") {
+                tuning.long_secs = f64::MAX;
+            }
+            if let Some(l) = option(&args, "--link").and_then(|s| s.parse().ok()) {
+                tuning.link_distance = l;
+            }
+            let d = d.with_tuning(tuning);
             let input = DiarizeInput {
                 mix: &samples,
                 mic: None,
