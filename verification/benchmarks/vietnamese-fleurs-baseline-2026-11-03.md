@@ -60,3 +60,19 @@ The PhoWhisper file: `ggml-phowhisper-small.bin`, 487,601,984 bytes, sha256 `db8
 
 - Baseline for Turbo stored: the M2d "coverage re-run" fix and the re-read-cost work are judged on `coverage` (85.4 to 89.6 %), `reread_factor` (2.0 to 3.2) and WER (20.8 to 24.8 %) on these three clips, with another FLEURS slice held out.
 - PhoWhisper (M2e) needs model-specific decoding work before a fair comparison with Turbo; until then it must not be offered and no size becomes the suggested Vietnamese model.
+
+## 7. Correction (same day): the first three clips repeated sentences
+
+FLEURS has several speakers read the same sentence, and the first three clips (`vi_a`, `vi_b`, `vi_c`) were cut from the file in order, so they hold only 7, 10 and 8 different sentences in 20, 19 and 18 utterances. The repeated sentences are real repeats, and the loop checks (soft-loop detection: repeated 8-word groups) rightly saw them. **The 2.0x to 3.2x re-read factor, the splits and the low coverage (85 to 90 %) of section 4 are artifacts of that fixture, not behaviour of Turbo on speech.** The WER of those clips is also affected (a repeated sentence is read in a long context).
+
+New clips from the first occurrence of each sentence only (`tests/tools/concat_utterances.py` over a de-duplicated list; 347 unique sentences, about 65 minutes in all): `viu_a`, `viu_b`, `viu_c` (about 4 minutes each), `viu_h` (held out) and `viu_1h` (3,463 s, 257 utterances, 7,963 words). Turbo, greedy, the 0.2.6 decode:
+
+| Clip | Length | WER | Coverage | Whisper calls (pieces) | x real time | Peak MB |
+|---|---|---|---|---|---|---|
+| viu_a | 243 s | 10.3 % | 98.5 % | 1 | 20.9 | 1,982 |
+| viu_b | 243 s | 7.4 % | 98.6 % | 1 | 26.0 | 1,983 |
+| viu_c | 253 s | 13.9 % | 99.9 % | 1 | 20.3 | 1,977 |
+| viu_h (held out) | 249 s | 10.8 % | 95.8 % | 2 | 23.5 | 1,979 |
+| viu_1h (medium row) | 3,463 s | 10.7 % | 97.3 % | 16 (12 pieces) | 19.0 | 2,725 |
+
+PhoWhisper-small with the same decode: WER 66.2 %, 56.9 %, 57.5 %, 55.8 % on the four short clips (many deleted words), 8.4x to 12.0x real time, 765 MB. Beam search of 3 or 5 (an experiment through an environment variable, removed) changed WER by -0.4 to +5.4 points (mean worse), coverage by -0.1 to -4.8 points, and was 10 % to 40 % slower; at 1 hour beam 5 gave 10.8 % against 10.7 % and 12.9x against 19.0x. **No beam search.** The conclusions of sections 1 and 6 about Turbo's coverage and re-reads are withdrawn; PhoWhisper's conclusion (not usable with the current decode) stands.
