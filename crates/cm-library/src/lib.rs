@@ -107,6 +107,7 @@
 pub mod audio;
 pub mod bundle;
 pub mod history;
+pub mod import;
 pub mod index;
 pub mod manifest;
 pub mod ops;
