@@ -225,7 +225,9 @@ pub(super) struct TranscribeHandler {
 
 /// `ai.languages` as the `language` of a run: codes joined by commas (`vi,en`), or `None` when it
 /// is unset, empty or unusable (the codes are checked when the run starts).
-fn languages_setting(settings: Option<&serde_json::Map<String, Value>>) -> Option<String> {
+pub(super) fn languages_setting(
+    settings: Option<&serde_json::Map<String, Value>>,
+) -> Option<String> {
     let v = settings?.get(super::SETTING_LANGUAGES)?;
     let text = match v {
         Value::Array(a) => a
@@ -385,6 +387,8 @@ impl JobHandler for TranscribeHandler {
                 }
             });
             let p = write_atomic(&write_dir, TRANSCRIPT_FILE, &bytes)?;
+            // The pieces read while the recording ran are in the transcript now.
+            cm_ai::recording::live::remove_live_state(&write_dir);
             let mut lib = lock_library(&library);
             let (revision, reapplied, dropped) = match kept {
                 Some((lines, reapplied, dropped)) => {

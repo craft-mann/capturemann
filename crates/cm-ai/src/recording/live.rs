@@ -123,11 +123,13 @@ impl LiveRun {
             return Ok(0);
         }
         let samples = decode_16k_mono(&self.track)?;
-        let n = self.run.advance(transcriber, &samples, progress)?;
-        if n > 0 {
+        let before = self.run.done_samples();
+        let r = self.run.advance(transcriber, &samples, progress);
+        // Pieces finished before a stop or an error in a later one are kept.
+        if self.run.done_samples() > before {
             self.save()?;
         }
-        Ok(n)
+        r
     }
 
     fn save(&self) -> Result<(), CmError> {

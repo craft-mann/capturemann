@@ -74,6 +74,28 @@ impl Daemon {
     pub fn start_ai_auto_transcribe(&self) -> tokio::task::JoinHandle<()> {
         let mut rx = self.subscribe();
         let weak = Arc::downgrade(&self.inner);
+        // Beside it: an audio recording is followed while it runs (M2h, see `live.rs`), and the
+        // pieces it finished are left for the job at Stop.
+        let mut live_rx = self.subscribe();
+        let live_weak = Arc::downgrade(&self.inner);
+        tokio::spawn(async move {
+            while let Ok(ev) = live_rx.recv().await {
+                let Some(capture_id) = ev.data.get("capture_id").and_then(Value::as_str) else {
+                    continue;
+                };
+                let Some(inner) = live_weak.upgrade() else {
+                    break;
+                };
+                let capture_id = capture_id.to_owned();
+                if ev.name == events::RECORDING_STARTED
+                    && ev.data.get("mode").and_then(Value::as_str) == Some("audio")
+                {
+                    let _ = inner.live_begin(&capture_id).await;
+                } else if ev.name == events::RECORDING_DISCARDED {
+                    inner.live_discard(&capture_id).await;
+                }
+            }
+        });
         tokio::spawn(async move {
             while let Ok(ev) = rx.recv().await {
                 if ev.name != events::RECORDING_STOPPED {
@@ -84,6 +106,8 @@ impl Daemon {
                 };
                 let Some(inner) = weak.upgrade() else { break };
                 let capture_id = capture_id.to_owned();
+                // The live run ends first: the job must not read its state while it is written.
+                super::live::finish(&capture_id).await;
                 let _ = inner
                     .auto_transcribe(&capture_id, ev.data.get("tracks"))
                     .await;

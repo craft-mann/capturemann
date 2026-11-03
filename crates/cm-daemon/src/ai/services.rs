@@ -121,6 +121,30 @@ pub trait TranscribeService: Send + Sync {
         let _ = on_checkpoint;
         self.transcribe(req, progress)
     }
+
+    /// Reads the finished pieces of a recording that is still being written (M2h): `run` is the
+    /// follower the caller keeps between calls (`None` the first time). Returns how many pieces it
+    /// finished; `progress` returning `false` stops the piece in hand. A service that cannot follow
+    /// a recording does nothing.
+    fn live_step(
+        &self,
+        req: &LiveRequest,
+        run: &mut Option<cm_ai::recording::live::LiveRun>,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<usize, CmError> {
+        let _ = (req, run, progress);
+        Ok(0)
+    }
+}
+
+/// What following a recording needs: the same model, language and glossary the job at Stop will
+/// ask for, so that the saved state fits it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LiveRequest {
+    pub bundle_dir: PathBuf,
+    pub model: String,
+    pub language: Option<String>,
+    pub glossary: Vec<cm_ai::glossary::GlossaryEntry>,
 }
 
 /// What a diarization needs: the bundle (the service decodes the audio) and the choices.
