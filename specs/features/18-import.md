@@ -8,12 +8,12 @@ Bring video and audio files that were not recorded by CaptureMann (a phone clip,
 3. **Files only, no folders.** A folder path is `invalid_input` with `data.reason: "folder_not_supported"`.
 4. **The FFmpeg build is not extended in 0.2.7** (decided with the plan). The import reads what the bundled FFmpeg can decode (the decoders `h264 hevc aac pcm_*` and the demuxers `mov matroska wav`, `packaging/ffmpeg/build-macos.sh`); everything else is recognised and refused with the reason `unsupported_format`. Extending the build is a candidate for 0.2.8.
 
-**Formats supported in 0.2.7.** Video: MP4, MOV, M4V and MKV with H.264 or HEVC video and AAC or PCM audio (or no audio). Audio: M4A, AAC in MP4/MOV, and WAV (PCM). **Recognised and refused (`unsupported_format`, with the codec or format named):** WebM (VP8/VP9, Vorbis/Opus), AVI, MP3, AIFF, FLAC, OGG, Opus, bare AAC (ADTS), and any other video or audio codec. The kit's longer list (MP4, MOV, M4V, MKV, WebM, AVI; M4A, MP3, WAV, AIFF, FLAC, OGG, Opus, AAC) is the target, not what ships in 0.2.7; the sheet lists only what works.
+**Formats supported in 0.2.7.** Video: MP4, MOV, M4V and MKV with H.264 or HEVC video and AAC or PCM audio (or no audio). Audio: M4A, AAC in MP4/MOV, and WAV (PCM: 8-bit unsigned, 16, 24 and 32-bit integer, 32-bit float, little endian; the shipped build has no other PCM decoder, so a 64-bit float or big-endian WAV is `unsupported_format`). **Recognised and refused (`unsupported_format`, with the codec or format named):** WebM (VP8/VP9, Vorbis/Opus), AVI, MP3, AIFF, FLAC, OGG, Opus, bare AAC (ADTS), and any other video or audio codec. The kit's longer list (MP4, MOV, M4V, MKV, WebM, AVI; M4A, MP3, WAV, AIFF, FLAC, OGG, Opus, AAC) is the target, not what ships in 0.2.7; the sheet lists only what works.
 
 **Track model.** No new `CaptureKind`. An imported video is a `recording` bundle whose `screen` track is the file (or its editing copy); an imported audio file is an `audio` bundle (VOC-1). The sound of either is decoded once to `mic.wav` (48 kHz, 32-bit float, 1 or 2 channels as in the source, more than 2 are mixed down to 2); there is no denoised copy, no `system`, `camera` or `cursor` track. The UI calls this track "Audio". The manifest gains `source: { path, imported_at, original_name, original_file }`; "imported" means that key exists.
 
 ### IMP-1 Probe and classify a file
-**Priority** P1 · **Status** In progress (S0 spec written Nov 3, 2026; nothing built yet) · **Crates** cm-media, cm-daemon · **Depends on** EXP-1, DESIGN kit boards I0 and I2
+**Priority** P1 · **Status** In progress (built Nov 3, 2026 on branch `track/mac-import`, tested with fakes and with fixtures made by the `ffmpeg` on `PATH`: `cm_media::import::{probe, classify}`; the shipped `ffprobe` was only checked against the unsupported-format signatures; no UI) · **Crates** cm-media, cm-daemon · **Depends on** EXP-1, DESIGN kit boards I0 and I2
 
 **User story** — As someone with a video or audio file, I want to see before I import it whether it will work and what will be done to it, so that no import surprises me.
 
@@ -41,10 +41,12 @@ Because the bundled FFmpeg has no demuxer for AVI, MP3, AIFF, FLAC, OGG or bare 
 
 **Out of scope** — Decoding WebM/AVI/MP3/AIFF/FLAC/OGG/Opus (0.2.8 candidate). Tone mapping of HDR. Importing several audio streams. Folders.
 
+**As built** — `cm_media::import::probe` runs `ffprobe` (30 s limit) and reads the first 300 video packets for the frame times; `classify` holds the codec lists; the sheet's rows are the `dry_run` rows. The shipped build lists only the PCM decoders named above.
+
 **Test notes** — Pure tests on `ffprobe` JSON and on signature bytes; fixtures made with the `ffmpeg` on `PATH` (the shipped build has no `lavfi` or `libx264`), printed SKIPPED when absent; the shipped `ffprobe` is checked against the same fixtures where the build is present.
 
 ### IMP-2 Bring a file into the library
-**Priority** P1 · **Status** In progress (S0 spec written Nov 3, 2026; nothing built yet) · **Crates** cm-media, cm-library · **Depends on** IMP-1, VOC-1, LIB-1, AUD-1
+**Priority** P1 · **Status** In progress (built Nov 3, 2026, tested with fakes and PATH fixtures: `cm_media::import::prepare`, `cm_library::import`; the editing copy needs a hardware encoder; no UI) · **Crates** cm-media, cm-library · **Depends on** IMP-1, VOC-1, LIB-1, AUD-1
 
 **User story** — As someone importing a file, I want it to become an ordinary capture that I can edit, transcribe, export and publish, with my original left intact.
 
@@ -72,10 +74,12 @@ Because the bundled FFmpeg has no demuxer for AVI, MP3, AIFF, FLAC, OGG or bare 
 
 **Out of scope** — A separate system-audio or camera track from a file; cursor data; writing back to the original.
 
+**As built** — Staging is `<library>/.capturemann/import/<job>-<n>/`; the master is `screen.<ext>` (a Ready video) or `original.<ext>`; the picture the editor plays is `screen.<ext>` or `screen.edit.mp4`; the editing copy is H.264 or (for an HEVC source) HEVC from VideoToolbox at 0.15 bits per pixel per frame, one-second GOP, `fps` filter at the source's rate snapped to a standard one (29.97 and 30 stay apart), rotation applied, even size, 8-bit 4:2:0, no sound; stereo sound is mixed down to mono when it would not fit in a 4 GiB WAV file (`tracks.mic.downmixed`). The editor and the exporter read `tracks.screen.file`; nothing needed a change.
+
 **Test notes** — Fixtures from `ffmpeg` on `PATH` (H.264/AAC MP4, HEVC MOV with a rotation tag, MKV, variable frame rate through dropped frames, WAV, M4A); the editing copy test needs a hardware H.264 encoder and prints SKIPPED without one; bundle layout and manifest tests are pure.
 
 ### IMP-3 The import job and the agent interface
-**Priority** P1 · **Status** In progress (S0 spec written Nov 3, 2026; nothing built yet) · **Crates** cm-jobs, cm-daemon, cm-cli, cm-mcp · **Depends on** IMP-1, IMP-2, EXP-4, AGT-1, AGT-2
+**Priority** P1 · **Status** In progress (built Nov 3, 2026, tested with fakes and PATH fixtures: `import_media`, the `import` job, `dry_run`, `after`, the CLI and the MCP tool 75; the app's `backend.rs` does not register the handler yet; the permission refusal (EPERM) is tested as a mapping only, the manual script is not written) · **Crates** cm-jobs, cm-daemon, cm-cli, cm-mcp · **Depends on** IMP-1, IMP-2, EXP-4, AGT-1, AGT-2
 
 **User story** — As an agent or a script, I want to import files and follow the work, with the same results as the app.
 
@@ -88,6 +92,7 @@ Because the bundled FFmpeg has no demuxer for AVI, MP3, AIFF, FLAC, OGG or bare 
 - **Disk space.** Before the first byte: the sum of the copies, the editing copies (estimated at the source size) and the sound (`duration × 48000 × 4 × channels`) must fit in the free space of the library volume minus 1 GB (NFR-7); otherwise `disk_full` with `data.needed_bytes` and `data.free_bytes` and nothing is started. Checked again per file.
 - **Permission.** Reading a file that macOS refuses with "Operation not permitted" (EPERM) gives `permission_missing` with `data.permission: "files"` and `data.path`. For the GUI the app opens the folder or the file picker, which is what grants the access; for an agent the call fails with that error before anything is imported. A refusal on any file of the call imports nothing (the check reads the first byte of every file before the job is queued).
 - **Idempotency.** `request_id` as in the other mutating tools: a repeat returns the first result.
+- **After.** The steps run inside the `import` job after the last file, for every imported capture in turn: `transcribe`, then `diarize`, then `generate_report`, each waiting for its own job; the progress message names the step. `result.after` is `{ <capture_id>: { transcribe: { state, job_id } | { state: "skipped", reason }, diarize, report } }`. A skipped or failed step does not change the import.
 
 **Acceptance criteria**
 - **AC1** Given one valid file, when `import_media` is called, then it returns `job_id` and one `captures` row at once, the job runs, `job.progress` events arrive with rising fractions, `capture.created` carries the reserved `capture_id`, and `get_job` ends `done` with the per-file result.
@@ -112,7 +117,7 @@ Because the bundled FFmpeg has no demuxer for AVI, MP3, AIFF, FLAC, OGG or bare 
 **Test notes** — The daemon test uses a scripted job (a fake copier) for progress, cancel, resume, disk and permission, and the real daemon with a fixture file for the whole flow; the CLI and MCP tests check the tool table count (75) and the exit codes.
 
 ### IMP-4 Remove the originals
-**Priority** P1 · **Status** In progress (S0 spec written Nov 3, 2026; nothing built yet) · **Crates** cm-daemon, cm-platform · **Depends on** IMP-2, IMP-3, AGT-2, LIB-1
+**Priority** P1 · **Status** In progress (built Nov 3, 2026, tested with a scripted Trash and confirmer; never run against the real Trash) · **Crates** cm-daemon, cm-platform · **Depends on** IMP-2, IMP-3, AGT-2, LIB-1
 
 **User story** — As someone importing a large file, I want an option to move it into the library instead of copying it, so that it does not take space twice, and I do not want an agent to do that without my say-so.
 
