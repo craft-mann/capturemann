@@ -603,6 +603,7 @@ fn transcript(language: &str, words: Vec<Word>) -> Transcript {
         model: "small".into(),
         words,
         note: None,
+        sounds: Vec::new(),
     }
 }
 

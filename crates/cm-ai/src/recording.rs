@@ -376,6 +376,7 @@ mod tests {
                 confidence: 0.5,
             }],
             note: None,
+            sounds: Vec::new(),
         };
         write_transcript(dir.path(), &t).unwrap();
         assert_eq!(read_transcript(dir.path()).unwrap().unwrap(), t);

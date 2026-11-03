@@ -107,6 +107,7 @@ impl Transcriber for HearsAtStart {
             model: "hears-at-start".into(),
             words,
             note: None,
+            sounds: Vec::new(),
         })
     }
 }
@@ -227,6 +228,7 @@ impl Transcriber for ListensToShortWindows {
             model: "listens".into(),
             words,
             note: None,
+            sounds: Vec::new(),
         })
     }
 }
@@ -379,6 +381,7 @@ impl Transcriber for GarbageThenClean {
             model: "garbage-then-clean".into(),
             words,
             note: None,
+            sounds: Vec::new(),
         })
     }
 }
@@ -456,6 +459,7 @@ impl Transcriber for OneWordForALongRegion {
             model: "one-word".into(),
             words,
             note: None,
+            sounds: Vec::new(),
         })
     }
 }
@@ -484,4 +488,62 @@ fn a_short_word_over_a_long_speech_region_is_read_again() {
         .count();
     assert!(in_region >= 8, "{in_region} words in the 12 s region");
     assert_eq!((report.gaps_reread, report.gaps_filled), (1, 1));
+}
+
+/// M2i: speech-like level where even the second reading finds no words is written as a sound, not
+/// as invented words; the words that are there are untouched.
+#[test]
+fn unreadable_speech_like_level_becomes_a_sound_entry() {
+    struct Deaf;
+    impl Transcriber for Deaf {
+        fn transcribe(
+            &self,
+            audio: Pcm16k<'_>,
+            _l: Option<&str>,
+            _p: &mut dyn FnMut(f32) -> bool,
+        ) -> Result<Transcript, CmError> {
+            // Reads the first region of the long read only (a word a second), never anything else.
+            let loud0 = audio.samples.len() > 30 * RATE;
+            let words = if loud0 {
+                (0..8)
+                    .map(|i| Word {
+                        text: format!("a{i}"),
+                        start: audio.start + media_secs(f64::from(i)),
+                        end: audio.start + media_secs(f64::from(i) + 0.5),
+                        confidence: 0.9,
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            Ok(Transcript {
+                version: TRANSCRIPT_VERSION,
+                language: "en".into(),
+                model: "deaf".into(),
+                words,
+                note: None,
+                sounds: Vec::new(),
+            })
+        }
+    }
+    let x = signal(60.0, &[(0.0, 10.0, 0.2), (40.0, 50.0, 0.2)]);
+    let (t, _) = transcribe_pieces(
+        &Deaf,
+        Pcm16k {
+            samples: &x,
+            start: MediaTime::ZERO,
+        },
+        Some("en"),
+        None,
+        &mut |_| true,
+    )
+    .unwrap();
+    assert_eq!(t.words.len(), 8);
+    assert_eq!(t.sounds.len(), 1, "{:?}", t.sounds);
+    let s = &t.sounds[0];
+    assert_eq!(s.kind, crate::transcribe::SoundKind::Noise);
+    assert!(
+        s.start >= media_secs(39.0) && s.end <= media_secs(51.0),
+        "{s:?}"
+    );
 }

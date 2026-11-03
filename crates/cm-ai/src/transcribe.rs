@@ -36,6 +36,40 @@ pub struct Transcript {
     pub words: Vec<Word>,
     /// Empty transcript note, e.g. "No speech detected".
     pub note: Option<String>,
+    /// Stretches written as sounds, not words (`[unclear]`, `[noise]`): the model must not guess.
+    /// Additive: an older `transcript.json` has none and still loads. Captions, reports,
+    /// translation, glossary suggestions and search read `words` only, so they never see these; an
+    /// export that wants them uses [`crate::sounds::captions_with_sounds`].
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sounds: Vec<Sound>,
+}
+
+/// What a sound entry stands for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SoundKind {
+    /// Speech evidence (speaker engine or level) but no reliable words after a second reading.
+    Unclear,
+    /// Energy with no speech evidence.
+    Noise,
+}
+
+impl SoundKind {
+    /// The bracketed text an export writes.
+    pub fn label(self) -> &'static str {
+        match self {
+            SoundKind::Unclear => "[unclear]",
+            SoundKind::Noise => "[noise]",
+        }
+    }
+}
+
+/// A span of sound that is not words, in **session time** like [`Word`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Sound {
+    pub kind: SoundKind,
+    pub start: MediaTime,
+    pub end: MediaTime,
 }
 
 impl Transcript {
@@ -206,6 +240,7 @@ impl Transcriber for ScriptedTranscriber {
             model: self.model.clone(),
             words,
             note,
+            sounds: Vec::new(),
         })
     }
 
@@ -242,6 +277,7 @@ impl Transcriber for ScriptedTranscriber {
             model: self.model.clone(),
             words,
             note,
+            sounds: Vec::new(),
         })
     }
 }

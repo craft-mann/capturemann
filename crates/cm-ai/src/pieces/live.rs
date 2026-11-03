@@ -34,6 +34,8 @@ pub struct LiveCheckpoint {
     pub language: Option<String>,
     pub first: Option<(String, String, Option<String>)>,
     pub report: PiecesReport,
+    #[serde(default)]
+    pub sounds: Vec<crate::transcribe::Sound>,
 }
 
 /// The state of a transcription that follows a growing file.
@@ -46,6 +48,7 @@ pub struct LiveTranscription {
     language: Option<String>,
     first: Option<(String, String, Option<String>)>,
     report: PiecesReport,
+    sounds: Vec<crate::transcribe::Sound>,
     high: f32,
 }
 
@@ -66,6 +69,7 @@ impl LiveTranscription {
             words: Vec::new(),
             first: None,
             report: PiecesReport::default(),
+            sounds: Vec::new(),
             high: 0.0,
         }
     }
@@ -82,6 +86,7 @@ impl LiveTranscription {
         me.words = cp.words;
         me.first = cp.first;
         me.report = cp.report;
+        me.sounds = cp.sounds;
         if is_unsettled(me.asked.as_deref()) {
             me.language = cp.language;
         }
@@ -95,6 +100,7 @@ impl LiveTranscription {
             language: self.language.clone(),
             first: self.first.clone(),
             report: self.report,
+            sounds: self.sounds.clone(),
         }
     }
 
@@ -124,6 +130,7 @@ impl LiveTranscription {
             broken_dropped: self.report.broken_dropped,
             gaps_reread: self.report.gaps_reread,
             gaps_filled: self.report.gaps_filled,
+            sounds: self.sounds.clone(),
         })
     }
 
@@ -179,6 +186,7 @@ impl LiveTranscription {
             progress,
             high: self.high,
             report: self.report,
+            sounds: std::mem::take(&mut self.sounds),
         };
         let r = job.piece(range, 0);
         // Give the state back whether the piece finished or was stopped.
@@ -186,6 +194,7 @@ impl LiveTranscription {
         self.first = job.first;
         self.high = job.high;
         self.report = job.report;
+        self.sounds = job.sounds;
         self.words.extend(r?);
         Ok(())
     }
@@ -212,6 +221,7 @@ impl LiveTranscription {
             progress,
             high: self.high,
             report: self.report,
+            sounds: std::mem::take(&mut self.sounds),
         };
         // Further cuts while more than one and a half pieces remain, then the tail as one piece.
         let mut from = self.from;
@@ -229,7 +239,8 @@ impl LiveTranscription {
             }
         }
         let _ = (job.progress)(1.0);
-        let (mut report, first, language) = (job.report, job.first, job.language);
+        let (mut report, first, language, sounds) =
+            (job.report, job.first, job.language, job.sounds);
         if is_degenerate(&words) {
             let (kept, dropped) = collapse_repeats(words);
             words = kept;
@@ -244,6 +255,7 @@ impl LiveTranscription {
                 model,
                 words,
                 note,
+                sounds,
             },
             report,
         ))
@@ -293,6 +305,7 @@ mod tests {
                 model: "checksum".into(),
                 words,
                 note: None,
+                sounds: Vec::new(),
             })
         }
     }

@@ -244,6 +244,9 @@ pub struct Checkpoint {
     pub gaps_reread: usize,
     #[serde(default)]
     pub gaps_filled: usize,
+    /// Sound entries of the finished pieces.
+    #[serde(default)]
+    pub sounds: Vec<crate::transcribe::Sound>,
 }
 
 /// What a run over all the pieces did, beyond the words.
@@ -291,6 +294,7 @@ struct Job<'a, 'p> {
     progress: &'p mut dyn FnMut(f32) -> bool,
     high: f32,
     report: PiecesReport,
+    sounds: Vec<crate::transcribe::Sound>,
 }
 
 /// No language fixed yet: none, or a list to choose from (`vi,en`, see `whisper::LanguageRequest`).
@@ -556,7 +560,36 @@ const MAX_GAP_READS: usize = 20;
 /// A new reading of a stretch is kept when its words average at least this confidence.
 const GAP_MIN_CONFIDENCE: f32 = 0.4;
 
+/// The stretches of the region `ra..rb` that no word is within [`GAP_PAD_SECS`] of and that last
+/// [`GAP_MIN_SECS`] or more.
+fn uncovered(inside: &[&(f64, f64)], ra: f64, rb: f64) -> Vec<(f64, f64)> {
+    let mut out = Vec::new();
+    let mut at = ra;
+    for &&(a, b) in inside {
+        if a - GAP_PAD_SECS - at >= GAP_MIN_SECS {
+            out.push((at, a - GAP_PAD_SECS));
+        }
+        at = at.max(b + GAP_PAD_SECS);
+    }
+    if rb - at >= GAP_MIN_SECS {
+        out.push((at, rb));
+    }
+    out
+}
+
 impl Job<'_, '_> {
+    /// Notes a stretch that still has no reliable words after the second reading: energy and no
+    /// words, written as a sound (`[noise]`) rather than as words nobody can vouch for. The
+    /// caller upgrades it to `[unclear]` where the speaker engine heard speech
+    /// ([`crate::sounds::classify`]).
+    fn note_sound(&mut self, a: f64, b: f64) {
+        self.sounds.push(crate::transcribe::Sound {
+            kind: crate::transcribe::SoundKind::Noise,
+            start: self.base + media_secs(a),
+            end: self.base + media_secs(b),
+        });
+    }
+
     /// Speech that got no words: where the level says someone speaks (see
     /// [`crate::vad::speech_regions`]) for [`GAP_MIN_SECS`] or more with no word near, the stretch
     /// is read again as a piece of its own that starts there (no earlier text as prompt, which is
@@ -586,16 +619,7 @@ impl Job<'_, '_> {
                 sparse.push((ra, rb));
                 continue;
             }
-            let mut at = ra;
-            for &&(a, b) in &inside {
-                if a - GAP_PAD_SECS - at >= GAP_MIN_SECS {
-                    gaps.push((at, a - GAP_PAD_SECS));
-                }
-                at = at.max(b + GAP_PAD_SECS);
-            }
-            if rb - at >= GAP_MIN_SECS {
-                gaps.push((at, rb));
-            }
+            gaps.extend(uncovered(&inside, ra, rb));
         }
         let mut added: Vec<Word> = Vec::new();
         for (a, b) in gaps.into_iter().take(MAX_GAP_READS) {
@@ -619,6 +643,8 @@ impl Job<'_, '_> {
             if ok {
                 self.report.gaps_filled += 1;
                 added.extend(again);
+            } else {
+                self.note_sound(a, b);
             }
         }
         // A sparse region is read again whole; its new words replace the old ones inside it when
@@ -676,6 +702,14 @@ impl Job<'_, '_> {
                 next.extend(again);
                 next.sort_by_key(|w| w.start);
                 words = next;
+            } else {
+                // Not read any better: the words that are there stay, and the rest of the region,
+                // where no word is, is written as a sound.
+                let inside: Vec<(f64, f64)> = old_words.iter().map(|w| self.secs_of(w)).collect();
+                let refs: Vec<&(f64, f64)> = inside.iter().collect();
+                for (x, y) in uncovered(&refs, a, b) {
+                    self.note_sound(x, y);
+                }
             }
         }
         if added.is_empty() {
@@ -750,6 +784,7 @@ pub fn transcribe_pieces_resumable<'p>(
             pieces: pieces.len(),
             ..PiecesReport::default()
         },
+        sounds: Vec::new(),
     };
     let mut words = Vec::new();
     let mut start = 0;
@@ -758,6 +793,7 @@ pub fn transcribe_pieces_resumable<'p>(
     }) {
         start = c.done;
         words = c.words;
+        job.sounds = c.sounds;
         job.first = c.first;
         if is_unsettled(job.language.as_deref()) {
             job.language = c.language;
@@ -794,6 +830,7 @@ pub fn transcribe_pieces_resumable<'p>(
                 broken_dropped: job.report.broken_dropped,
                 gaps_reread: job.report.gaps_reread,
                 gaps_filled: job.report.gaps_filled,
+                sounds: job.sounds.clone(),
             });
         }
     }
@@ -817,6 +854,7 @@ pub fn transcribe_pieces_resumable<'p>(
             model,
             words,
             note,
+            sounds: job.sounds,
         },
         report,
     ))

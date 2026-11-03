@@ -212,6 +212,7 @@ impl Transcriber for Engine {
             model: "scripted".into(),
             words,
             note: None,
+            sounds: Vec::new(),
         })
     }
 }
@@ -366,6 +367,7 @@ fn a_silent_recording_keeps_the_engines_note() {
                 model: "m".into(),
                 words: vec![],
                 note: Some("No speech detected".into()),
+                sounds: Vec::new(),
             })
         }
     }
@@ -476,6 +478,7 @@ fn a_checkpoint_that_does_not_fit_is_ignored() {
         broken_dropped: 0,
         gaps_reread: 0,
         gaps_filled: 0,
+        sounds: Vec::new(),
     };
     let e = Engine::new(1e9);
     let audio = Pcm16k {
@@ -667,6 +670,7 @@ impl Transcriber for TwoAudios {
             model: "scripted".into(),
             words,
             note: None,
+            sounds: Vec::new(),
         })
     }
 }

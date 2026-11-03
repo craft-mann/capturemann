@@ -259,6 +259,7 @@ impl FakeAi {
                 w("demo", 2.8, 3.4),
             ],
             note: None,
+            sounds: Vec::new(),
         }
     }
 }
@@ -445,6 +446,7 @@ impl TranslateService for FakeAi {
             model: req.model.clone(),
             words,
             note: None,
+            sounds: Vec::new(),
         };
         Ok(Some(TranslateOutput {
             lines: cm_ai::translate::whisper_lines(&english, &req.source_lines),

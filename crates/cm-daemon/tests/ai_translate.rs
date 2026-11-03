@@ -127,6 +127,7 @@ async fn rig_with(ai: FakeAi, services: cm_daemon::AiServices, source: &str) -> 
             word("học", 3.0, 3.4),
         ],
         note: None,
+        sounds: Vec::new(),
     };
     std::fs::write(
         dir.join("transcript.json"),

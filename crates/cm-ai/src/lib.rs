@@ -54,6 +54,7 @@ pub mod pieces;
 pub mod reapply;
 pub mod recording;
 pub mod report;
+pub mod sounds;
 pub mod speaker_engine;
 pub mod speakers;
 pub mod suggest;

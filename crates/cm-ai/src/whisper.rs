@@ -567,6 +567,7 @@ impl WhisperTranscriber {
                 model: self.model.clone(),
                 words: Vec::new(),
                 note: Some("No speech detected".to_owned()),
+                sounds: Vec::new(),
             });
         }
         let pct = Arc::new(AtomicI32::new(0));
@@ -615,6 +616,7 @@ impl WhisperTranscriber {
             model: self.model.clone(),
             words,
             note,
+            sounds: Vec::new(),
         })
     }
 }
