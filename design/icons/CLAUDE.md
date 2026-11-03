@@ -9,10 +9,10 @@ This kit adds icons to the CaptureMann desktop app. It is based on `specs/icon-i
 ```
 capturemann-icons/
 ├── CLAUDE.md                  ← you are here
-├── icon-map.md / icon-map.csv ← element → icon, priority, size, note (278 rows)
+├── icon-map.md / icon-map.csv ← element → icon, priority, size, note (289 rows)
 ├── icons.json                 ← manifest: name, source, new vs already in app, where used
-├── icons/                     ← 143 SVGs, 24×24, drop-in for apps/desktop/assets/icons/
-│   ├── cm-*.svg               ← 15 CaptureMann custom glyphs (same grid and stroke as Lucide)
+├── icons/                     ← 151 SVGs, 24×24, drop-in for apps/desktop/assets/icons/
+│   ├── cm-*.svg               ← 18 CaptureMann custom glyphs (same grid and stroke as Lucide)
 │   ├── *.svg                  ← Lucide v1.60.0 (the version the app already pins), ISC
 │   └── LICENSE-lucide.txt
 ├── tray/                      ← two NEW tray states: Paused and Attention
