@@ -18,9 +18,11 @@
 use std::ops::Range;
 
 mod checks;
+mod live;
 pub use checks::{
     drop_soft_repeats, fold, repeat_regions, soft_loop_words, Badness, SOFT_LOOP_WORDS,
 };
+pub use live::{LiveCheckpoint, LiveTranscription};
 
 use cm_core::CmError;
 use serde::{Deserialize, Serialize};
@@ -77,17 +79,28 @@ pub fn plan(samples: &[f32]) -> Vec<Range<usize>> {
         #[allow(clippy::single_range_in_vec_init)]
         return vec![0..total];
     }
-    let (piece, search) = (samples_of(PIECE_SECS), samples_of(SEARCH_SECS));
     let mut out = Vec::new();
     let mut from = 0usize;
-    while total - from > piece + piece / 2 {
-        let target = from + piece;
-        let cut = quietest(samples, target - search, target + search);
+    while let Some(cut) = plan_cut(samples, from) {
         out.push(from..cut);
         from = cut;
     }
     out.push(from..total);
     out
+}
+
+/// Where the piece that starts at `from` ends, when more than one and a half pieces remain in
+/// `samples` (the rule of [`plan`]): the quietest spot within [`SEARCH_SECS`] of the target.
+/// `None`: the rest is the last piece. Only the first one and a half pieces' worth of audio after
+/// `from` plus the search distance matter, which is why the live path can use it on a prefix.
+fn plan_cut(samples: &[f32], from: usize) -> Option<usize> {
+    let (piece, search) = (samples_of(PIECE_SECS), samples_of(SEARCH_SECS));
+    if samples.len().saturating_sub(from) > piece + piece / 2 {
+        let target = from + piece;
+        Some(quietest(samples, target - search, target + search))
+    } else {
+        None
+    }
 }
 
 /// A word as it is compared for repetition: lower case, letters and digits only.
@@ -234,7 +247,7 @@ pub struct Checkpoint {
 }
 
 /// What a run over all the pieces did, beyond the words.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PiecesReport {
     /// Pieces the audio was cut into at the start.
     pub pieces: usize,
@@ -355,6 +368,13 @@ impl Job<'_, '_> {
         let (from, len) = (range.start, range.len());
         let mut words = self.read(range.clone(), false)?.words;
         let mut bad = Badness::of(&words);
+        if std::env::var_os("CM_DBG").is_some() {
+            eprintln!(
+                "read {:.0}s depth {depth} words {} bad {bad:?}",
+                len as f64 / 16000.0,
+                words.len()
+            );
+        }
         if !bad.is_bad() {
             return Ok(words);
         }
