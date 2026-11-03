@@ -84,9 +84,11 @@ For the protected file use an iTunes-style `.m4v` you own (FairPlay). Without on
 15. **Dock drop and Open With.** Drag `memo.wav` onto the Dock icon (the app running, then not running): the
     sheet opens with the file. In Finder choose **Open With > CaptureMann** on `a.mp4`: the same. `.avi`, `.mp3`
     and `.flac` are not offered by Open With.
-16. **After import (AI).** Import `memo.wav` with Transcribe on and a model installed: the strip then says
-    "Transcribing" and the transcript appears in the editor; without a model nothing is started and the import
-    is unaffected. With Find speakers on and the speaker models installed, speakers follow.
+16. **After import (AI).** Import `memo.wav` and `a.mp4` with Transcribe on and a model installed: the
+    "Importing 2 files" toast closes as soon as both captures are in the library (it does not wait for the
+    transcripts); each capture's own card then shows a "Transcribing" strip with its percentage (one strip, the
+    step once), and the transcripts appear in the editor; in `capturemann jobs list` the import job is done while
+    the transcribe jobs run one by one. Without a model nothing is started and the import is unaffected. With Find speakers on and the speaker models installed, speakers follow.
 17. **Long file.** Import `interview-1h.m4a` and note the time and the library size growth (the copy plus
     `mic.wav`, 48 kHz 32-bit float, about 0.7 GB per mono hour). Quit during the import and start the app
     again: the job resumes, no duplicate capture.

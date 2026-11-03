@@ -177,6 +177,27 @@ pub(super) async fn import_media(cx: &mut Ctx<'_>, a: ImportArgs) -> Result<(), 
                                 ),
                                 None => {}
                             }
+                            // `--transcribe`: the transcript is a job of its own, not part of the import.
+                            if let Some(t) = f["after_jobs"]["transcribe"].as_object() {
+                                match t.get("state").and_then(Value::as_str) {
+                                    Some("queued") => {
+                                        let _ = write!(
+                                            s,
+                                            "\n  transcript queued as job {} (it runs on its own; `capturemann jobs get {}`)",
+                                            plain(&t["job_id"]),
+                                            plain(&t["job_id"])
+                                        );
+                                    }
+                                    Some("skipped") => {
+                                        let _ = write!(
+                                            s,
+                                            "\n  transcript skipped: {}",
+                                            plain(&t["reason"])
+                                        );
+                                    }
+                                    _ => {}
+                                }
+                            }
                             s.push('\n');
                         } else {
                             let _ = writeln!(

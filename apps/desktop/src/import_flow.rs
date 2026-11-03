@@ -629,8 +629,9 @@ pub fn drop_counts_line(c: &DropCount) -> String {
 #[derive(Debug, Clone, PartialEq)]
 pub enum CardState {
     Waiting,
-    /// The step message and the file's own fraction (`None`: no progress to show, for example
-    /// while transcribing after the copy).
+    /// The step message (copying, preparing, reading the sound, checking) and the file's own
+    /// fraction (`None`: no progress to show). Transcripts and speakers are jobs of their own, not
+    /// steps of the import.
     Step(String, Option<f64>),
     Done,
     Failed(String),
@@ -647,9 +648,6 @@ pub struct Card {
     pub state: CardState,
     pub dismissed: bool,
 }
-
-/// The daemon reports this fraction while the `after` steps run (everything is imported).
-pub const AFTER_FRACTION: f64 = 0.99;
 
 /// A job the app started (or saw) and its cards.
 #[derive(Debug, Clone, PartialEq)]
@@ -720,16 +718,6 @@ impl ImportRun {
     pub fn progress(&mut self, fraction: f64, message: &str) {
         self.fraction = fraction.clamp(0.0, 1.0);
         self.message = message.to_owned();
-        // The after steps (transcribe, speakers) run once every file is in the library: no byte
-        // progress, every capture is "in a step" without a percentage.
-        if self.fraction >= AFTER_FRACTION {
-            for c in self.cards.iter_mut().filter(|c| c.capture_id.is_some()) {
-                if !matches!(c.state, CardState::Failed(_)) {
-                    c.state = CardState::Step(message.to_owned(), None);
-                }
-            }
-            return;
-        }
         let total = self.queued_total();
         let done_bytes = self.fraction * total;
         let mut before = 0.0;
@@ -835,7 +823,6 @@ pub fn step_label(message: &str) -> String {
         "Preparing for editing" => tr!("Preparing for editing"),
         "Reading the sound" => tr!("Reading the sound"),
         "Checking the copy" => tr!("Checking the copy"),
-        "Transcribing" => tr!("Transcribing"),
         other => other.to_owned(),
     }
 }
@@ -1161,8 +1148,11 @@ mod tests {
             ui.strip_for("rec_1"),
             Some(("Copying into the library".into(), Some(0.5)))
         );
-        ui.runs[0].progress(0.99, "Transcribing");
-        assert_eq!(ui.strip_for("rec_1"), Some(("Transcribing".into(), None)));
+        ui.runs[0].progress(0.9, "Checking the copy");
+        assert_eq!(
+            ui.strip_for("rec_1"),
+            Some(("Checking the copy".into(), Some(0.9)))
+        );
         assert_eq!(
             ui.pending_cards(&ids(&["rec_1"]), PageKinds::All),
             vec![(0, 1)]
@@ -1175,7 +1165,7 @@ mod tests {
     fn nothing_is_drawn_once_the_job_ended() {
         let (a, s) = two_files();
         let mut ui = ui_with(&a, &s);
-        ui.runs[0].progress(0.99, "Transcribing");
+        ui.runs[0].progress(0.9, "Checking the copy");
         ui.runs[0].finish(&json!({"files": [{"path": "/a.m4a", "status": "imported"}]}));
         assert_eq!(ui.strip_for("rec_1"), None);
         assert_eq!(

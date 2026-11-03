@@ -684,29 +684,59 @@ async fn a_capture_that_exists_is_not_imported_twice_when_a_job_runs_again() {
 
 // ---- after: the existing AI actions ------------------------------------------------------
 
+/// The import ends when the files are in the library. `after.transcribe` queues the ordinary
+/// `transcribe` job of each capture and does not wait for it: with transcription held, the import
+/// job is `done` while the transcribe job is still queued, and it is a job of its own.
 #[tokio::test]
-async fn after_transcribe_runs_the_existing_transcribe_on_each_import() {
+async fn after_transcribe_queues_an_independent_job_and_the_import_ends_first() {
     if !have_ffmpeg() {
         return;
     }
     let r = rig(Decision::Approve, FakeAi::new().with_small_installed());
-    let a = r.wav("talk.wav");
+    r.daemon.hold_job_type("transcribe");
+    let (a, b) = (r.wav("one.wav"), r.wav("two.wav"));
     let out = r
         .call(
             Actor::User,
-            json!({"paths": [s(&a)], "after": {"transcribe": true}}),
+            json!({"paths": [s(&a), s(&b)], "after": {"transcribe": true}}),
         )
         .await
         .unwrap();
     let job = finished(&r.daemon, out["job_id"].as_str().unwrap()).await;
     assert_eq!(job["state"], "done", "{job}");
-    let id = out["captures"][0]["capture_id"].as_str().unwrap();
-    assert_eq!(
-        job["result"]["after"][id]["transcribe"]["state"], "done",
-        "{job}"
-    );
-    assert!(r.lib.path().join("talk.cmrec/transcript.json").is_file());
-    assert_eq!(r.ai.transcribe_calls().len(), 1);
+    assert_eq!(job["result"]["imported"], 2);
+    let ids: Vec<String> = out["captures"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["capture_id"].as_str().unwrap().to_owned())
+        .collect();
+    // The result names the queued job of each capture.
+    let mut queued = Vec::new();
+    for id in &ids {
+        let t = &job["result"]["after"][id]["transcribe"];
+        assert_eq!(t["state"], "queued", "{job}");
+        queued.push(t["job_id"].as_str().unwrap().to_owned());
+    }
+    // They are real, separate jobs, still waiting (held), not part of the import.
+    let list = r
+        .daemon
+        .execute_method(Actor::User, 0, "list_jobs", &json!({"type": "transcribe"}))
+        .await
+        .unwrap();
+    let jobs = list["jobs"].as_array().unwrap();
+    assert_eq!(jobs.len(), 2, "{list}");
+    for j in jobs {
+        assert!(queued.contains(&j["job_id"].as_str().unwrap().to_owned()));
+        assert_ne!(j["state"], "done");
+    }
+    // Released, each runs on its own and the transcript appears.
+    r.daemon.resume_job_type("transcribe");
+    for q in &queued {
+        assert_eq!(finished(&r.daemon, q).await["state"], "done");
+    }
+    assert!(r.lib.path().join("one.cmrec/transcript.json").is_file());
+    assert_eq!(r.ai.transcribe_calls().len(), 2);
 }
 
 #[tokio::test]

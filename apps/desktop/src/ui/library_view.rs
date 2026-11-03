@@ -534,6 +534,9 @@ struct RowCtx {
     /// The pending import cards (run, card) the `Row::Pending` rows index into.
     pending: Arc<Vec<(usize, usize)>>,
     app: Entity<AppModel>,
+    /// Imported captures whose own transcription runs (the same `TranscribeVm` the editor reads,
+    /// fed by `transcript.started` and `job.progress`), with its fraction when known.
+    transcribing: Arc<std::collections::HashMap<String, Option<f32>>>,
 }
 
 /// The darkened overlay behind the pills on a thumbnail (the thumbnail is an image, so the
@@ -845,6 +848,15 @@ fn card(ctx: &RowCtx, ix: usize, width: f32, cx: &mut gpui::App) -> AnyElement {
     // IMP-5: an imported capture carries the badge, and a strip while its import still runs.
     let frame = if item.imported_from.is_some() {
         let mut fr = frame.child(crate::ui::import_cards::imported_badge(&t));
+        if ctx.imports.strip_for(&item.id).is_none() {
+            if let Some(frac) = ctx.transcribing.get(&item.id) {
+                fr = fr.child(crate::ui::import_cards::progress_strip(
+                    &t,
+                    &tr!("Transcribing"),
+                    frac.map(f64::from),
+                ));
+            }
+        }
         if let Some((step, frac)) = ctx.imports.strip_for(&item.id) {
             fr = fr.child(crate::ui::import_cards::progress_strip(&t, &step, frac));
         }
@@ -1597,6 +1609,14 @@ impl Render for LibraryView {
                     imports: Arc::new(self.app.read(cx).import.clone()),
                     pending: self.pending.clone(),
                     app: self.app.clone(),
+                    transcribing: Arc::new({
+                        let m = self.app.read(cx);
+                        self.items
+                            .iter()
+                            .filter(|i| i.imported_from.is_some() && m.transcribe.is_running(&i.id))
+                            .map(|i| (i.id.clone(), m.transcribe.fraction(&i.id)))
+                            .collect()
+                    }),
                 };
                 div()
                     .id("library-list")
