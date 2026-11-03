@@ -350,6 +350,8 @@ pub(crate) struct PickerView {
     scroll_to_selected: bool,
     was_active: bool,
     outline: Option<WindowHandle<outline::OutlineView>>,
+    /// The outline's native window, when the platform can move it (see `outline::plan`).
+    outline_native: Option<crate::platform_window::NativeWindow>,
     outline_seq: u64,
     outline_for: Option<u32>,
     outline_grace_until: Option<Instant>,
@@ -398,6 +400,7 @@ impl PickerView {
             scroll_to_selected: true,
             was_active: false,
             outline: None,
+            outline_native: None,
             outline_seq: 0,
             outline_for: None,
             outline_grace_until: None,
@@ -418,6 +421,7 @@ impl PickerView {
         }
         self.closing = true;
         self.outline_seq += 1;
+        self.outline_native = None;
         if let Some(h) = self.outline.take() {
             crate::surfaces::close(cx, h);
         }
@@ -600,14 +604,22 @@ impl PickerView {
             return;
         }
         self.outline_for = selected;
-        if let Some(h) = self.outline.take() {
-            crate::surfaces::close(cx, h);
-        }
-        let Some((w, rect)) = self
+        let target = self
             .state
             .selected_window()
-            .and_then(|w| self.outlines.get(&w.id).map(|r| (w.clone(), *r)))
-        else {
+            .and_then(|w| self.outlines.get(&w.id).map(|r| (w.clone(), *r)));
+        let plan = outline::plan(
+            self.outline.is_some(),
+            self.outline_native.is_some(),
+            target.is_some(),
+        );
+        if matches!(plan, outline::Plan::Close | outline::Plan::Replace) {
+            self.outline_native = None;
+            if let Some(h) = self.outline.take() {
+                crate::surfaces::close(cx, h);
+            }
+        }
+        let Some((w, rect)) = target else {
             return;
         };
         let displays = crate::ui::recording::displays(cx);
@@ -623,6 +635,25 @@ impl PickerView {
         let visible = crate::ui::recording::visible_part(&display.1);
         let layout = outline::outline_frame(rect, visible);
         let title = w.title.clone();
+        if plan == outline::Plan::Move {
+            if let (Some(h), Some(native)) = (self.outline, self.outline_native.clone()) {
+                let moved = h.update(cx, |view, _, cx| {
+                    view.set(layout, title.clone());
+                    cx.notify();
+                });
+                if moved.is_ok() {
+                    let f = layout.frame;
+                    // From a task, never inside an update (see `NativeWindow`).
+                    cx.spawn(async move |_, _| native.set_frame(f.x, f.y, f.w, f.h))
+                        .detach();
+                    self.outline_grace_until = Some(Instant::now() + OUTLINE_GRACE);
+                    return;
+                }
+                // The window is gone: open a new one below.
+                self.outline = None;
+                self.outline_native = None;
+            }
+        }
         let opened = cx.open_window(
             outline::options(display, layout.frame),
             move |window, cx| {
@@ -632,6 +663,10 @@ impl PickerView {
         );
         if let Ok(handle) = opened {
             crate::surfaces::opened(crate::surfaces::Surface::Picker, handle);
+            self.outline_native = handle
+                .update(cx, |_, w, _| crate::platform_window::NativeWindow::of(w))
+                .ok()
+                .flatten();
             self.outline = Some(handle);
             self.outline_grace_until = Some(Instant::now() + OUTLINE_GRACE);
             // A new window must not keep the keyboard from the palette.

@@ -4,7 +4,8 @@
 //! A borderless, transparent, click-through window the size of the target plus its ring, hidden
 //! from screen capture like the webcam bubble and the HUD (`platform_window::apply`), one level
 //! below the picker so the palette stays on top. It is replaced, not moved, when the selection
-//! changes (GPUI 0.3.9 cannot resize a window).
+//! changes where the platform lets us move a window ([`plan`]); GPUI 0.3.9 cannot resize one, so
+//! the native handle does it from a task, and elsewhere the window is closed and opened again.
 
 use gpui::{
     div, prelude::*, px, Context, IntoElement, Render, SharedString, Window, WindowOptions,
@@ -85,7 +86,41 @@ pub struct OutlineView {
     title: SharedString,
 }
 
+/// What to do with the outline window when the selection settles.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Plan {
+    /// No target and no window.
+    Nothing,
+    /// A window exists but there is no target any more.
+    Close,
+    /// A window exists and can be moved: update its view and set its frame (no close, no open).
+    Move,
+    /// Close the old window (it cannot be moved), then open one.
+    Replace,
+    /// Open the first window.
+    Open,
+}
+
+/// One window per picker: it is reused whenever the native handle allows (every move used to close
+/// and open a window, and each open and close is a chance for AppKit to run GPUI's callbacks while
+/// the app is borrowed).
+pub fn plan(has_window: bool, can_move: bool, has_target: bool) -> Plan {
+    match (has_window, has_target) {
+        (false, false) => Plan::Nothing,
+        (false, true) => Plan::Open,
+        (true, false) => Plan::Close,
+        (true, true) if can_move => Plan::Move,
+        (true, true) => Plan::Replace,
+    }
+}
+
 impl OutlineView {
+    /// Points the existing window at another target.
+    pub fn set(&mut self, layout: OutlineFrame, title: impl Into<SharedString>) {
+        self.layout = layout;
+        self.title = title.into();
+    }
+
     pub fn new(layout: OutlineFrame, title: impl Into<SharedString>) -> Self {
         OutlineView {
             layout,
@@ -158,6 +193,15 @@ mod tests {
 
     fn visible() -> Rect {
         Rect::new(0., 25., 1512., 957.)
+    }
+
+    #[test]
+    fn the_outline_window_is_reused_when_it_can_move() {
+        assert_eq!(plan(true, true, true), Plan::Move);
+        assert_eq!(plan(true, false, true), Plan::Replace);
+        assert_eq!(plan(false, false, true), Plan::Open);
+        assert_eq!(plan(true, true, false), Plan::Close);
+        assert_eq!(plan(false, true, false), Plan::Nothing);
     }
 
     #[test]
