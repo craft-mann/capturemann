@@ -1,11 +1,12 @@
-# Release 0.2.7 plan: macOS stabilisation and faster, more accurate AI; Linux and Windows catch up
+# Release 0.2.7 plan: macOS stabilisation and faster, more accurate AI
 
 Status: **draft** (Nov 3, 2026), nothing built. Scope set by the maintainer on Nov 3, 2026, right after 0.2.6:
 
-- **macOS 0.2.7:** stabilisation, plus faster and more accurate **transcription**, **speaker detection** and
+- **0.2.7 is macOS only:** stabilisation, plus faster and more accurate **transcription**, **speaker detection** and
   **report writing**.
-- **Windows and Linux 0.2.7:** catch up with the macOS features and fix the bugs found in the 0.2.6 early builds.
-- The work is split into four tracks that run **at the same time** in separate git worktrees, each driven by its own
+- **Windows catch-up moves to 0.2.8, Linux catch-up to 0.2.9** (kept below under "Later releases"). The 0.2.7 release
+  does not change the Windows and Linux early builds; they stay at their 0.2.6 state and the release text says so.
+- The work is split into two tracks that run **at the same time** in separate git worktrees, each driven by its own
   agent (see "How the agents work").
 
 Rules that apply to every track (from `CLAUDE.md` and the maintainer): general techniques only, no phrase lists or
@@ -15,7 +16,7 @@ in platform code (`python3 scripts/check_target_os.py`); every user-facing actio
 UI text through `cm_i18n`; one change per commit with the two trailer lines; no failing tests merge to `main`; the
 maintainer pushes `main`, signs, publishes and notarizes.
 
-## Where 0.2.6 left things (inputs to this plan)
+## Where 0.2.6 left things (inputs to this plan; the Linux and Windows rows feed 0.2.8 and 0.2.9)
 
 | Area | State at 0.2.6 | Source |
 | --- | --- | --- |
@@ -42,7 +43,12 @@ Goal: nothing a user can see gets stuck, and failures leave a report.
    `REC-*`), memory and file-handle growth recorded in a report.
 4. **Intel confirmation.** Ask for one more Intel report or borrow a machine; until then the Intel DMG stays
    "built on Apple Silicon, checked under Rosetta" in every public text.
-5. Items from the 0.2.6 review that touch macOS only: none known. Add any found in M1.
+5. **Errors in the app log.** `desktop.log` shows `RefCell already borrowed` (3 to 47 per session, always in a burst of
+   3) followed by `window not found`, nine times between Oct 30 and Nov 2, and once `timed out waiting on app_will_quit`
+   (Nov 2). The pattern points at a re-entrant borrow while a window is closing (the same family as issue 21's windows).
+   Find which action triggers it (log lines at each window close, see task 1), make the close path not borrow twice,
+   and add a test with a scripted window host. The log lines carry no module name, so give them one.
+6. Items from the 0.2.6 review that touch macOS only: none other known. Add any found in M1.
 
 Done when: a stored soak report, window-lifetime tests in CI, issue 21 either fixed with a log-backed cause or still
 open with the evidence listed.
@@ -53,15 +59,15 @@ Everything starts with a **benchmark that exists before the change**, stored und
 every claim is a before/after on the same data. Public wording: "measured on ...", never "accurate".
 
 ### M2a Transcription
-- Build a word-error-rate (WER) harness over public clips with reference text (English first; Vietnamese from an open
-  corpus the maintainer approves; no private recordings in the repository). Report WER and real-time factor per model.
+- Build a word-error-rate (WER) harness over public clips with reference text (English only, O1; no private recordings in the
+  repository). Report WER and real-time factor per model.
 - Measure the cost of the repeat re-runs (performance.md item 3) and cut it: detect looping with a general rule,
   re-run only the looping piece with a changed temperature or without the previous text as prompt, not a phrase list.
 - Long-recording speed: overlap of pieces, GPU vs CPU split, model choice by length. Target set after the baseline.
-- Vietnamese: measure first (open decision O1), then decide if a different model or language setting is warranted.
+- Vietnamese: not in 0.2.7 (O1); the release text lists it as not measured.
 
 ### M2b Speaker detection
-- **Baseline for Vietnamese and for 3+ speakers** (today only English is measured, 14 clips).
+- **Baseline for 3+ speakers** (today only English, 14 clips); English only (O1).
 - Remove the second engine run for unknown speaker counts (performance.md item 1): options are a grouping pass over
   the voice prints, or a first-pass cap that does not need a rerun. Needs a change in the vendored sherpa-onnx
   wrapper (`vendor/sherpa-onnx*`, trimmed copies: keep the no-download build rule).
@@ -77,59 +83,39 @@ every claim is a before/after on the same data. Public wording: "measured on ...
 - Fix `output_too_long` for translation (performance.md item 5): keep partial work, split the piece and retry
   (the reports path already splits).
 - Candidate speed-ups to measure, not assume: prompt/KV cache reuse across pieces, smaller context for short
-  pieces, a larger quant or model choice for Apple Silicon. Any new model needs a pinned URL and SHA-256 in
-  `crates/cm-ai/data/text_models.json` (no `pending_pin` entries ship) and the maintainer's approval (O2).
+  pieces. The model stays Gemma 4 E2B (O2); a different quant of it needs a pinned URL and SHA-256 in
+  `crates/cm-ai/data/text_models.json` (no `pending_pin` entries ship) and the maintainer's approval.
+
+### M2d Findings from a real Vietnamese meeting (Nov 2, 2026) and the fixes they point to
+Input: the maintainer's 45 min meeting `EmeSoft Weekly Meeting Nov 2.cmrec` (6285 words, `vi`, large-v3-turbo, 2 to 6
+speakers). Analysed by script on Nov 3, 2026. Findings are about **kinds** of failure; the recording itself is
+private and never enters the repository or a test (a synthetic or public clip reproduces each kind). English-only
+claims stay (O1), but these failure kinds are language independent, so they are in scope.
+
+1. **Speech that got no words.** 29 gaps longer than 8 s add up to 546 s with no words; the speaker engine marks
+   329 s of them as speech, and the gaps have normal signal level. Fix to measure: compare speech regions (VAD or the
+   speaker engine) with word coverage; re-run uncovered speech regions on their own (a piece that starts at the
+   region, no previous text as prompt); report coverage (seconds of speech with words / seconds of speech) in the
+   benchmark. Baseline first.
+2. **Repeated word with spread-out times.** One word said 7 times, 14 to 39 s apart, each on weak signal and
+   high self-confidence, beside the gaps above. The loop detector (`pieces.rs`) only counts words in a row and needs
+   8 of a single word, so it misses this. General rule to test: the same short text recurring while the gap before it
+   is long and the signal under it is low (energy and speaker-engine agreement), and drop or re-decode such words.
+   No phrase list.
+3. **Broken characters.** 3 words with U+FFFD or stray symbols and 1 word with a Korean character, 102 words under
+   5 % confidence. They sit at the start of the file (first 12 s) and in weak-signal stretches. `join_split_characters`
+   already joins split bytes, so what remains is bytes that never form text. Fix to test: a token that decodes to
+   U+FFFD, or a script that does not belong to the transcript's language set and has low confidence, is re-decoded
+   (temperature fallback) or marked doubtful, never shown as text. Whisper runs greedy with one candidate and no
+   fallback or no-speech settings today (`whisper.rs`): measure the fallback parameters (temperature steps,
+   no-speech and log-probability thresholds, and a smaller or beam search) on the WER benchmark before changing them.
+4. **Short repeated phrases (11 in the meeting)** look like real disfluency ("lý do lý do"). Keep; only the long
+   or low-confidence ones are suspect. Do not collapse repeats shorter than the loop rule.
+5. **Speakers:** the file has 6 named speakers though the Record sheet said 2 people; the speaker count was set
+   afterwards by hand. M2b should report how the count was chosen next to the DER.
 
 Done when: before/after reports for each of M2a, M2b, M2c are stored, the tests (with fakes) cover the new
 splitting/cancel behaviour, and `tests/manual/AI-5/7/8/9.md` have been re-run on the new build.
-
-## Track L: Linux catch-up and bugs (agent `linux`)
-
-Lab: the ThinkPad T490 (`scripts/testlab/lab.sh`, Ubuntu 24.04, GNOME 46, Xorg and Wayland). The VM at
-`~/VMs/cm-linux` covers aarch64 and headless work.
-
-1. **Bugs from 0.2.6:** Wayland Shortcuts page shows Recording rows and Change buttons although recording is off;
-   the X11 tray "delay" check mark (stale or missed click) and "Recent captures" listing only the app's capture;
-   the `user_declined` code for a portal failure (code 2 is not a user decline); the odd "secrets in the system
-   credential store" line with no Secret Service; unlabelled steps in the X11 report (editor, tarball default prefix,
-   tray activation, language) run one by one.
-2. **Wayland window capture on GNOME 46:** the portal's `InteractiveScreenshot` returns no file. Try the ScreenCast
-   portal with the window source type for a single frame, or read the file the shell saved. Pick the approach by an
-   experiment on the laptop, record it as a report.
-3. **Recording on a real desktop:** turn on the existing recorder (`CM_LINUX_RECORDING=1`) on the T490 (VA-API H.264
-   hardware encode was seen working; software VP9 is the labelled fallback, decisions D-R1 to D-R5 in
-   `specs/plans/linux-recording-plan.md`); fix what a real desktop shows (banner controls, Start sheet keycaps, the
-   settings that mean nothing for VP9). Gate: a 10-minute recording with screen and microphone plays back in sync on X11
-   and Wayland, report stored.
-4. **Global shortcuts:** GlobalShortcuts portal on desktops that have it (KDE, newer GNOME); test one KDE machine or VM.
-5. **Hardware gaps:** a real ARM device (or keep "VM only" in the notes), NVIDIA and AMD, two monitors and mixed scale.
-6. **Packaging:** decision on signing keys stays minisign; consider an APT repository or Flatpak (open decision O3).
-
-Done when: bugs closed with tests or a stored real-device step, the Wayland window path chosen and reported, and
-recording seen on the laptop with a report (or explicitly deferred to 0.2.8 in the release text).
-
-## Track W: Windows catch-up and bugs (agent `windows`)
-
-Lab: the same ThinkPad booted into Windows 11 (`lab.sh switch windows`; private network profile; the user's session
-for GUI steps, helpers in `C:\lab`).
-
-1. **Bugs from 0.2.6:** picker app names for packaged apps ("C:\Program Files\Wi...", "Windows Terminal H...",
-   "Application Frame H..."); the 1 px difference between the listed and the saved window size; the "Unknown Monitor
-   65537" display name; the diagnostics line about FFmpeg and `llama-server` that says releases include them; the
-   missing toast seen once with the 0.2.5 build and the hotkey press that left a `cm-overlay` (try to reproduce with
-   debug logging); Windows Auto-redact with `tesseract` (never run).
-2. **Text recognizer:** `Windows.Media.Ocr` so Auto-redact needs no extra program (plan stage W5).
-3. **Speaker engine and the bundled FFmpeg:** a Windows build of the pinned sherpa-onnx libraries and an LGPL FFmpeg
-   with a self-check like macOS (`packaging/ffmpeg`), so speaker labels and export work in the zip.
-4. **Recording:** Windows.Graphics.Capture + Media Foundation H.264 into the shared fragmented-MP4 writer, WASAPI
-   microphone and loopback (stages W2, W3). Gate: a 10-minute recording with screen and microphone, plays back in
-   sync, report stored; the 30-minute gate of the platforms plan stays for 0.3.
-5. **Trust:** SmartScreen on a real download (browser, "downloaded from the internet" mark) with a report; decide on
-   signing (SignPath application, open decision O4); winget manifest once signed.
-6. **Windows 10 22H2** and a second monitor with mixed scaling, each with a stored step or an explicit "not run".
-
-Done when: the bugs are closed or listed with reasons, a recognizer works on a clean Windows 11, and either recording
-passes its gate with a report or is explicitly left for 0.2.8.
 
 ## How the agents work (parallel worktrees)
 
@@ -137,10 +123,8 @@ Following the parallel-agent rules we already use (disjoint files, unique script
 
 ```sh
 # once per track, from the main checkout, after `git checkout main && git pull --ff-only public main`
-git worktree add ../capturemann-wt/mac-ai       -b track/mac-ai
+git worktree add ../capturemann-wt/mac-ai        -b track/mac-ai
 git worktree add ../capturemann-wt/mac-stability -b track/mac-stability
-git worktree add ../capturemann-wt/linux       -b track/linux
-git worktree add ../capturemann-wt/windows     -b track/windows
 ```
 
 The `track/*` branches are **temporary work areas**; the maintainer's rule "work on `main`, no feature branches" is
@@ -149,10 +133,8 @@ cherry-pick, keeping the commit messages), never pushed by the agent. Delete eac
 
 | Track | Owns (may change) | Must not touch without asking |
 | --- | --- | --- |
-| mac-ai | `crates/cm-ai`, `crates/cm-media` (transcription and report paths), `vendor/sherpa-onnx*`, `verification/benchmarks/`, `tests/manual/AI-*.md` | `apps/desktop` UI beyond progress and cancel wiring |
-| mac-stability | `apps/desktop` (window lifetime, diagnostics), `apps/overlay`, `crates/cm-daemon` (recording lifecycle), soak scripts | `crates/cm-ai` |
-| linux | `crates/cm-capture/src/sys/` (Linux files), `crates/cm-audio` Linux files, `crates/cm-platform` Linux code, `packaging/linux`, `docs/development/linux-early-build.md`, `scripts/testlab/` Linux steps | macOS and Windows `sys/` files |
-| windows | the Windows `sys/` files and `packaging/windows`, `apps/desktop/app.rc`, `scripts/ci/windows-smoke.ps1`, `C:\lab` helpers | macOS and Linux `sys/` files |
+| mac-ai | `crates/cm-ai`, `crates/cm-media` (transcription and report paths), `vendor/sherpa-onnx*`, `verification/benchmarks/`, `tests/manual/AI-*.md`, and only the job progress/cancel files in `crates/cm-daemon` named in its brief | `apps/desktop` UI beyond progress and cancel wiring; the rest of `cm-daemon` |
+| mac-stability | `apps/desktop` (window lifetime, diagnostics), `apps/overlay`, `crates/cm-daemon` (recording lifecycle), soak scripts | `crates/cm-ai`, the job progress/cancel files given to mac-ai |
 
 **Shared files with one owner** (agents add entries on their branch, I resolve at merge): `Cargo.lock` and workspace
 `Cargo.toml` (me; version stays 0.2.6 until the release commit bumps all to 0.2.7), `locales/capturemann.pot` and
@@ -160,47 +142,66 @@ cherry-pick, keeping the commit messages), never pushed by the agent. Delete eac
 `docs/project/status.md` (me, from the agents' final reports), `THIRD_PARTY_LICENSES.md` (`make licenses` after a
 `Cargo.lock` change).
 
-**One test laptop:** Linux and Windows share it (dual boot, reboot by `lab.sh switch`), so the `linux` and `windows`
-agents take **turns**: one holds the lab at a time, says so in its report, and leaves the laptop in the other
-system's expected state (Windows booted, network Private; Ubuntu Wi-Fi joined). The macOS tracks do not need it.
-Hardware tests on the laptop are allowed (dedicated test machine); on the Mac, recording tests need the maintainer's
-consent and stay short (`CLAUDE.md`).
+**Hardware on the Mac:** recording tests (including the 3-hour soak in M1) need the maintainer's consent and a time
+slot, stay as short as the check allows, and the output is deleted (`CLAUDE.md`). The agents never start one on their
+own. The Linux/Windows laptop is not used in 0.2.7.
 
 **Each agent's brief** names the goal, the files it owns, the baseline report to create first, the commands to run
 (`cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`,
-`cargo test --workspace --locked`, `python3 scripts/check_target_os.py`), what it must not do (run `make bundle` over
+`cargo test --workspace --locked`, `python3 scripts/check_target_os.py`; the CI Linux and Windows jobs must stay green), what it must not do (run `make bundle` over
 `target/bundle`, push, publish, say "verified" without a report) and the report it hands back: commits, tests run,
 reports written, what was not done.
 
 ## Order and checkpoints
 
-1. **Week 1:** baselines and reproductions only (M2 benchmarks, M1 logging, L/W bug lists with steps). No behaviour
-   change merges before its baseline report exists.
-2. **Week 2:** fixes and speed-ups with before/after reports; Linux Wayland window path and Windows recognizer chosen.
-3. **Week 3:** recording gates on Linux and Windows (or the explicit deferral), Intel check, soak, full test run on
-   all three CI OSes.
-4. **Release:** release text from the reports; packages and DMGs by the pattern of 0.2.6 (draft, user signs, user
-   publishes, I check one download per platform, cask script, status entry); one version for everything: **0.2.7**.
+1. **Week 1:** baselines and reproductions only (M2 benchmarks, M1 logging). No behaviour change merges before its
+   baseline report exists. Decisions O1, O2 and O6 are made (see below).
+2. **Week 2:** fixes and speed-ups with before/after reports; M1 posts a "shared code done" note when its
+   `apps/desktop` window-lifetime commits are merged. "No measurable gain" is an acceptable result for any speed-up: the
+   report is stored and the change is not merged.
+3. **Week 3:** the soak (with the maintainer's slot), the Intel check, the manual scripts `AI-5/7/8/9` re-run, full test
+   run on all three CI OSes (the Linux and Windows jobs must stay green even though nothing new ships for them).
+4. **Release:** release text from the reports; macOS packages and DMGs by the pattern of 0.2.6 (draft, user signs, user
+   publishes, I check one download, cask script, status entry). The Windows and Linux early builds are not rebuilt
+   for 0.2.7 unless a shared-code change forces it; the release text says that they stay at 0.2.6. Version bump to
+   **0.2.7** is the release commit.
 
-CI: `ci:windows` label runs the Windows jobs on a branch; Linux and Windows package workflows need the temporary
-`push` trigger trick on a non-default branch (see `docs/development/releasing.md`); remove it before merging.
+CI: shared-code commits from M1 touch `apps/desktop`, which Linux and Windows also build, so the CI jobs for both
+(`ci:windows` label on a branch) run before merge.
 
-## Decisions needed from the maintainer
+## Decisions (made by the maintainer on Nov 3, 2026)
 
-- **O1** Vietnamese quality: which open corpus may we use for WER and speaker tests, and is a different Whisper
-  model for Vietnamese acceptable to ship?
-- **O2** Text model for reports: keep Gemma 4 E2B or add a second (larger) model; model licence and the download size
-  limit.
-- **O3** Linux distribution beyond `.deb`/tarball: APT repository or Flatpak in 0.2.7, or later.
-- **O4** Windows signing: apply to SignPath (open source programme) now; until then keep the unsigned warning text.
-- **O5** Is recording on Linux and Windows a **must** for 0.2.7, or may it ship as 0.2.8 if the gate is not met?
-- **O6** Issue 21: if the reporter does not answer, do we ship a diagnostics-only build to Intel testers?
+- **O1** Vietnamese: **English only** in 0.2.7. Baselines, WER and DER cover English; Vietnamese is listed as not
+  measured in the release text. No Vietnamese corpus work, no Vietnamese-specific model change.
+- **O2** Text model: **keep Gemma 4 E2B.** M2c measures and speeds up the current model; no second model, no new pin.
+  Remove the "larger model" candidate from the speed-up list.
+- **O6** Issue 21: **wait for the reporter's 0.2.6 log.** No cutoff and no diagnostics-only build. The logging and
+  window-lifetime work (M1) still ships; the release text does not claim a fix for Issue 21 unless a log-backed cause is
+  found. If the log arrives late, it goes into 0.2.8 or a 0.2.7.x.
+- Windows work may touch `crates/cm-ai` in Windows-only files and separate commits (0.2.8 plan); `mac-ai` is not
+  blocked by it, and the maintainer merges one track at a time.
+
+Moved to the 0.2.8 and 0.2.9 plans: O3 (Linux packaging), O4 (Windows signing), O5 (recording on Linux and Windows).
 
 ## Risks
 
-- The one lab laptop is a serial resource; Windows recording and Linux recording both want it. Mitigation: VM and CI
-  for headless parts, a lab schedule in the plan above.
 - Accuracy work without a good Vietnamese set can only be claimed for English; the release text must say so.
-- A change inside the vendored sherpa-onnx wrapper must keep the no-download, no-GPL build rules.
-- Three platforms edit `apps/desktop`; the window-lifetime audit (M1) touches shared code that Linux and Windows
-  also use: merge M1's shared-code commits first, then rebase the platform tracks.
+- A change inside the vendored sherpa-onnx wrapper must keep the no-download, no-GPL build rules; it goes in its own
+  commit with its own before/after report.
+- Windowed speaker runs (M2b) can split one speaker across windows; the gate is that DER on the held-out English clips
+  does not get worse than a tolerance set from the baseline. Retuning uses a tuning set and a separate held-out set.
+- The report rubric (M2c) is a floor check (timestamps exist, speakers present, no invented names or numbers); it does
+  not measure whether claims are right, and the release text must not call it accuracy.
+- Two tracks edit near `apps/desktop` and `cm-daemon`; the ownership table gives the shared job files to `mac-ai` by name,
+  and M1's shared-code commits merge first, then `mac-ai` rebases.
+- The Linux and Windows early builds get no fixes in 0.2.7; any user report of a bug there is logged for 0.2.8 or 0.2.9.
+
+## Later releases (not part of 0.2.7)
+
+Moved out on Nov 3, 2026 so 0.2.7 can stay on macOS. Each has its own plan, owned by a separate session and agent that
+runs alongside 0.2.7 on its own worktree (shared code is merged after M1's, see each plan):
+
+- **0.2.8, Windows:** `specs/plans/release-0.2.8-plan.md`
+- **0.2.9, Linux:** `specs/plans/release-0.2.9-plan.md`
+
+The one test laptop (Linux and Windows dual boot) is not used by the 0.2.7 tracks. O3, O4, O5 live in those plans.
