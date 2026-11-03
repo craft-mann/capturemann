@@ -38,19 +38,21 @@ pub const EMBEDDING_ID: &str = "speaker-embedding";
 /// The model id written to `diarization.json`.
 pub const MODEL_ID: &str = "sherpa-onnx-2.0.1+pyannote-segmentation-3.0+campplus-zh-en-advanced";
 
-/// Clustering threshold when the number of people is not given (0.8 since 0.2.7; it was 1.0). The library default (0.5) found 29
+/// Clustering threshold when the number of people is not given (1.0; a retune to 0.8 was tried on Nov 3,
+/// 2026 and put back: on a real 45 minute meeting with 6 known people it found 7 to 8 speakers and
+/// disagreed more with the whole run, see `verification/benchmarks/speaker-retune-2026-11-03.md`). The library default (0.5) found 29
 /// speakers on a 2 to 3 person file with the English-only voice model (S7), so this is deliberately
 /// high and the tiny clusters it leaves are folded ([`fold_small_speakers`]). With the Chinese-English
 /// CAM++ model the best value on 8 English clips was 1.0, and 1.2 already merged everybody into one
 /// or two speakers (`verification/benchmarks/speaker-detection-2026-10-29.md`: mean DER 22 % at 1.0
 /// against 49 % at 1.2; 17 % on 6 clips held back). The edge is close, so do not raise it without
 /// measuring. A suggestion, not a promise.
-pub const AUTO_THRESHOLD: f32 = 0.8;
+pub const AUTO_THRESHOLD: f32 = 1.0;
 /// The shift of the segmentation window as a share of its length. 0.1 (the value up to 0.2.6) is
-/// the main cost of the run; 0.2 is about twice as fast and, with [`AUTO_THRESHOLD`] 0.8, had the
-/// lowest DER on 16 real conversation clips (`verification/benchmarks/speaker-retune-2026-11-03.md`);
-/// 0.3 broke a clip on synthetic voices.
-pub const WINDOW_SHIFT_RATIO: f32 = 0.2;
+/// the main cost of the run; 0.2 is about twice as fast and had the lowest DER together with a
+/// threshold of 0.8 on 16 real conversation clips (`verification/benchmarks/speaker-retune-2026-11-03.md`),
+/// but it was not measured alone with 1.0, so 0.1 stays until it is; 0.3 broke a clip on synthetic voices.
+pub const WINDOW_SHIFT_RATIO: f32 = 0.1;
 /// A speaker with less speech than this (seconds) or [`FOLD_FRACTION`] of all speech is folded
 /// into the nearest other voice when the count is automatic.
 pub const FOLD_MIN_SECS: f64 = 8.0;
