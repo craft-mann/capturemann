@@ -237,14 +237,19 @@ fn start_inner(
     let win = target.and_then(|display| {
         let global = delay::window_rect(&visible_part(&display.1));
         let app2 = app.clone();
-        cx.open_window(
-            panel_options(display, global, false, false),
-            move |window, cx| {
-                harden(window, false);
-                cx.new(|cx| DelayPill::new(app2, reduced_motion, cx))
-            },
-        )
-        .ok()
+        let h = cx
+            .open_window(
+                panel_options(display, global, false, false),
+                move |window, cx| {
+                    harden(window, false);
+                    cx.new(|cx| DelayPill::new(app2, reduced_motion, cx))
+                },
+            )
+            .ok();
+        if let Some(h) = h {
+            crate::surfaces::opened(crate::surfaces::Surface::DelayPill, h);
+        }
+        h
     });
     app.update(cx, |m, _| {
         if let Some(r) = &mut m.delay_run {
@@ -343,7 +348,7 @@ fn close_pill(app: &Entity<AppModel>, cx: &mut App) {
     release_escape(cx);
     let run = app.update(cx, |m, _| m.delay_run.take());
     if let Some(win) = run.and_then(|r| r.win) {
-        let _ = win.update(cx, |_, window, _| window.remove_window());
+        crate::surfaces::close(cx, win);
     }
 }
 

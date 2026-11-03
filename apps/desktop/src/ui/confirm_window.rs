@@ -49,7 +49,7 @@ impl ConfirmDialog {
         if let Some(tx) = self.reply.take() {
             let _ = tx.send(decision);
         }
-        window.remove_window();
+        crate::surfaces::close_self(window);
     }
 
     /// Keyboard activation (Enter or Space on a focused button) is ignored for 1 s;

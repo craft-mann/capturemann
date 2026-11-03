@@ -195,9 +195,14 @@ pub fn run(inbox: &Arc<Inbox>, opts: Options, tracer: &Tracer) -> Result<Finishe
         error: None,
         next_monitor_check: Instant::now() + MONITOR_POLL,
     };
-    event_loop
-        .run_app(&mut app)
-        .map_err(|e| OverlayError::internal(format!("event loop failed: {e}")))?;
+    let ended = event_loop.run_app(&mut app);
+    // The windows go with `app`; say so, so a window that outlives the process is attributable.
+    log::info!(
+        "overlay event loop ended ({}); {} window(s) drop with the app",
+        if ended.is_ok() { "ok" } else { "error" },
+        app.views.iter().filter(|v| v.window.is_some()).count()
+    );
+    ended.map_err(|e| OverlayError::internal(format!("event loop failed: {e}")))?;
     if let Some(e) = app.error {
         return Err(e);
     }
@@ -385,6 +390,11 @@ impl App {
         self.tracer.mark(
             "window_created",
             serde_json::json!({"display_id": display.id}),
+        );
+        log::info!(
+            "overlay window created for display {} ({:?})",
+            display.id,
+            window.id()
         );
         let prepared = prepare_overlay_window(&window);
         self.tracer.mark(

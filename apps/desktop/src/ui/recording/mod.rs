@@ -313,7 +313,7 @@ fn rec_of(app: &Entity<AppModel>, cx: &App) -> Entity<RecState> {
 
 fn close<V: 'static + gpui::Render>(cx: &mut App, h: Option<WindowHandle<V>>) {
     if let Some(h) = h {
-        let _ = h.update(cx, |_, window, _| window.remove_window());
+        crate::surfaces::close(cx, h);
     }
 }
 
@@ -635,6 +635,7 @@ fn show_countdown(app: &Entity<AppModel>, cx: &mut App) {
         },
     );
     if let Ok(h) = opened {
+        crate::surfaces::opened(crate::surfaces::Surface::Countdown, h);
         rec.update(cx, |r, _| r.countdown_win = Some(h));
     }
 }
@@ -760,6 +761,7 @@ fn open_recording_windows(app: &Entity<AppModel>, cx: &mut App) {
             },
         );
         if let Ok(h) = opened {
+            crate::surfaces::opened(crate::surfaces::Surface::Hud, h);
             rec.update(cx, |r, _| r.hud_win = Some(h));
         }
     }
@@ -778,6 +780,7 @@ fn open_recording_windows(app: &Entity<AppModel>, cx: &mut App) {
             },
         );
         if let Ok(h) = opened {
+            crate::surfaces::opened(crate::surfaces::Surface::Indicator, h);
             // AppKit clamps a new window below the menu bar; the indicator covers the whole
             // display so the brackets line up with the recorded pixels.
             let d = display.1;
@@ -844,6 +847,7 @@ pub fn open_bubble(app: &Entity<AppModel>, cx: &mut App) {
         },
     );
     if let Ok(h) = opened {
+        crate::surfaces::opened(crate::surfaces::Surface::WebcamBubble, h);
         rec.update(cx, |r, _| r.bubble_win = Some(h));
     }
 }
@@ -1702,11 +1706,12 @@ pub fn open_sheet_mode(
         },
     );
     if let Ok(handle) = opened {
+        crate::surfaces::opened(crate::surfaces::Surface::RecordSheet, handle);
         rec.update(cx, |r, cx| {
             r.sheet_win = Some(handle);
             cx.notify(); // the main window's scrim follows the sheet
         });
-        cx.activate(true);
+        crate::surfaces::activate_app(cx, "record sheet opened");
     }
 }
 

@@ -352,7 +352,7 @@ impl Render for Studio {
                     None => cx.quit(),
                 }
             })
-            .on_action(|_: &CloseWindow, window, _| window.remove_window())
+            .on_action(|_: &CloseWindow, window, _| crate::surfaces::close_self(window))
             .size_full()
             .relative()
             .flex()

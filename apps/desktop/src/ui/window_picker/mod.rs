@@ -273,9 +273,10 @@ fn present(app: &Entity<AppModel>, targets: &serde_json::Value, cx: &mut App) {
     };
     match opened {
         Ok(handle) => {
+            crate::surfaces::opened(crate::surfaces::Surface::Picker, handle);
             cx.set_global(PickerSlot(Some(handle)));
             // The panel needs the keyboard, and a non-activating window gets none from macOS.
-            cx.activate(true);
+            crate::surfaces::activate_app(cx, "picker opened");
             // X11: the window manager may leave the keyboard with the library window; take the
             // focus directly as soon as the palette is on screen (a no-op on the other platforms).
             cx.spawn(async move |cx| {
@@ -418,10 +419,10 @@ impl PickerView {
         self.closing = true;
         self.outline_seq += 1;
         if let Some(h) = self.outline.take() {
-            let _ = h.update(cx, |_, w, _| w.remove_window());
+            crate::surfaces::close(cx, h);
         }
         self.thumbs.update(cx, |t, cx| t.release(cx));
-        window.remove_window();
+        crate::surfaces::close_self(window);
         cx.set_global(PickerSlot(None));
         let previous = cx.try_global::<PreviousApp>().and_then(|p| p.0);
         cx.set_global(PreviousApp(None));
@@ -600,7 +601,7 @@ impl PickerView {
         }
         self.outline_for = selected;
         if let Some(h) = self.outline.take() {
-            let _ = h.update(cx, |_, w, _| w.remove_window());
+            crate::surfaces::close(cx, h);
         }
         let Some((w, rect)) = self
             .state
@@ -630,10 +631,11 @@ impl PickerView {
             },
         );
         if let Ok(handle) = opened {
+            crate::surfaces::opened(crate::surfaces::Surface::Picker, handle);
             self.outline = Some(handle);
             self.outline_grace_until = Some(Instant::now() + OUTLINE_GRACE);
             // A new window must not keep the keyboard from the palette.
-            window.activate_window();
+            crate::surfaces::activate_window(window, "picker outline opened");
         }
     }
 

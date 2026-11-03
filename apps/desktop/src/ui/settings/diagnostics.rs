@@ -43,10 +43,13 @@ impl SettingsView {
         self._diag_task = Some(cx.spawn(async move |this, cx| {
             let res = work.await;
             this.update(cx, |this, cx| {
+                // The daemon cannot see the app's windows (issue 21): add them here.
+                let windows = crate::surfaces::live_report(cx);
                 this.diag = match res {
-                    Ok(Ok(v)) => {
-                        DiagState::Ready(v["text"].as_str().unwrap_or_default().to_owned())
-                    }
+                    Ok(Ok(v)) => DiagState::Ready(format!(
+                        "{}\n{windows}",
+                        v["text"].as_str().unwrap_or_default().trim_end()
+                    )),
                     Ok(Err(e)) => DiagState::Failed(e),
                     Err(e) => DiagState::Failed(e.to_string()),
                 };

@@ -1,4 +1,4 @@
-//! The floating surfaces of the app (record sheet, countdown, HUD, indicator, webcam bubble, toast
+//! The floating surfaces of the app (record sheet, countdown, HUD, indicator, webcam bubble (the setup bubble is the same window), toast
 //! stack, launcher, pickers) and their lifetime (release 0.2.7, M1; issue 21).
 //!
 //! Every surface has one owner (the field that holds its handle) and one close path: [`close`] from
@@ -25,7 +25,6 @@ pub enum Surface {
     Hud,
     Indicator,
     WebcamBubble,
-    SetupBubble,
     Toast,
     Launcher,
     Picker,
@@ -44,7 +43,6 @@ impl Surface {
             Surface::Hud => "hud",
             Surface::Indicator => "indicator",
             Surface::WebcamBubble => "webcam_bubble",
-            Surface::SetupBubble => "setup_bubble",
             Surface::Toast => "toast",
             Surface::Launcher => "launcher",
             Surface::Picker => "picker",
@@ -257,6 +255,20 @@ pub fn close_self(window: &mut Window) {
     let id = window.window_handle().window_id().as_u64();
     registry().forget(id, "closed itself");
     window.remove_window();
+}
+
+/// Activates the app and says why. AppKit can answer by making a window key before this returns,
+/// which runs GPUI's window callbacks while the caller still holds the app (the suspected source
+/// of `RefCell already borrowed`); the line lets the log show which call came just before one.
+pub fn activate_app(cx: &mut App, why: &str) {
+    log::info!("activating the app ({why})");
+    cx.activate(true);
+}
+
+/// [`activate_app`] for one window.
+pub fn activate_window(window: &mut Window, why: &str) {
+    log::info!("activating a window ({why})");
+    window.activate_window();
 }
 
 struct GpuiHost<'a> {
