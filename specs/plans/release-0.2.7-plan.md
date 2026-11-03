@@ -189,12 +189,15 @@ files only, no folders.
 
 What the analysis found (the plan for each is the work list below):
 
-1. **The bundled FFmpeg cannot read most of the formats the boards list.** `packaging/ffmpeg/build-macos.sh` builds only
-   what the product uses: decoders `h264 hevc aac pcm_*` (plus image codecs), demuxers `mov matroska wav image2 rawvideo
-   gif`. Missing for the listed formats: demuxers `avi mp3 aiff flac ogg aac`; decoders `vp8 vp9 opus vorbis flac
-   mp3float alac mpeg4` (and `prores` if wanted). All are LGPL and native (no GPL), but the lists must grow, the
-   self-check must require them, and `make ffmpeg` must be run for **both** architectures by the maintainer. Until then
-   MP4/MOV/M4V (H.264, HEVC, AAC), M4A, WAV and MKV with those codecs work.
+1. **The bundled FFmpeg reads only some of the formats the boards list.** Decided Nov 3, 2026 (maintainer): **the FFmpeg
+   build is not extended in 0.2.7.** `packaging/ffmpeg/build-macos.sh` has decoders `h264 hevc aac pcm_*` (plus image
+   codecs) and demuxers `mov matroska wav image2 rawvideo gif`, so 0.2.7 imports: video MP4, MOV, M4V and MKV with
+   H.264 or HEVC video and AAC or PCM audio; audio M4A, AAC-in-MP4 and WAV (PCM). WebM (VP9/Opus), AVI, MP3, AIFF, FLAC,
+   OGG, Opus and bare AAC are recognised by the probe as `unsupported_format` with the reason shown on the row ("not
+   supported yet"); the sheet's supported-format line lists only what works. The probe uses the bundled `ffprobe`, which
+   can still name the codec of a file it cannot decode. Extending the lists (demuxers `avi mp3 aiff flac ogg aac`,
+   decoders `vp8 vp9 opus vorbis flac mp3float alac mpeg4`, all LGPL) is a candidate for 0.2.8, with `make ffmpeg` run for both
+   architectures.
 2. **"Prepared for editing"** (variable frame rate, MKV, AVI, odd codecs) means a constant-frame-rate editing copy.
    No libx264 ships, so the copy is H.264 or HEVC through `h264_videotoolbox` / `hevc_videotoolbox` with the `fps`
    filter (both already built). A hardware encoder is required (as for recording); without it the sheet says so.
@@ -221,10 +224,11 @@ What the analysis found (the plan for each is the work list below):
    the Captions empty state, Launcher "Import media", menu-bar "Import file…", ⌘I. **Dock-icon drop and double-click
    open need `CFBundleDocumentTypes` in the app bundle and an open-files event that nothing in `apps/desktop` handles
    today**: platform code in `apps/desktop/src/platform*.rs`. All strings through `cm_i18n` with Vietnamese drafts.
-8. **Design assets not in the repo:** the kit names `capturemann-icons/` (custom `cm-import`, `cm-import-video`,
-   `cm-import-audio`, Lucide `file-x`, `files`, `lock-keyhole`, `folder-input`, `circle-slash`). `design/icons` has 144
-   icons, none of the three custom ones and only `file-x-2`; the maintainer provides the folder, or the agent draws the
-   three from the board per `design/CLAUDE.md`.
+8. **Icons:** `capturemann-icons/` is not in the repo and `design/icons` has none of the three custom ones, but all eight
+   (`cm-import`, `cm-import-video`, `cm-import-audio`, `file-x`, `files`, `lock-keyhole`, `folder-input`, `circle-slash`)
+   are inline SVGs (24 grid, 2 px stroke, `currentColor`) in `capturemann-redesign 6/source/UiIcon.dc.html`
+   (`<sc-if value="{{is.<name>}}">`). The agent extracts them into `design/icons/` with the kit's naming and updates
+   `icons.json` and `icon-map`.
 9. **Document conflict to raise (spec rule):** the kit's toast spec says 6 s; the maintainer changed toasts to 5 s on
    Nov 3, 2026 (`design/redesign` and `design-surfaces.md` follow 5 s). The new import toasts use 5 s except a running
    import (progress) and failures.
@@ -234,8 +238,8 @@ What the analysis found (the plan for each is the work list below):
 
 Work list, in order (one change per commit, tests with fakes plus FFmpeg fixtures made by the test tools; hardware is not
 needed):
-- **S0 spec:** `18-import.md`, the interface table, error codes, glossary; the FFmpeg component lists (a commit that
-  edits `build-macos.sh`, then the maintainer runs `make ffmpeg` for arm64 and `CM_ARCH=x86_64 make ffmpeg`).
+- **S0 spec:** `18-import.md`, the interface table, error codes, glossary; the icons into `design/icons`. No change to
+  the FFmpeg build (see item 1).
 - **S1 engine (`cm-media`, `cm-library`):** probe (streams, duration, rotation, VFR, DRM, HDR flag), format
   classification (Ready / Prepared / Can't import), editing-copy builder, audio decode to `mic.wav`, bundle writer
   with `source`, verify.
@@ -252,7 +256,7 @@ needed):
 
 Owns: `crates/cm-media` (probe, prepare), `crates/cm-library` (import writer, manifest `source`), `crates/cm-jobs`,
 `crates/cm-daemon` (new import files and the registry entry), `crates/cm-cli`, `crates/cm-mcp`, new `apps/desktop` import
-files, `packaging/ffmpeg/build-macos.sh` lists, specs and manual scripts. Must not touch `crates/cm-ai` (M2) or the
+files, icons in `design/icons`, specs and manual scripts. Must not touch `crates/cm-ai` (M2) or the
 window-lifetime code (`surfaces.rs`); editor and library files shared with `mac-stability` are edited in separate small
 commits and merged first-come, rebasing on `main`.
 
