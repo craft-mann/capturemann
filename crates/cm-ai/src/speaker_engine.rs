@@ -46,6 +46,9 @@ pub const MODEL_ID: &str = "sherpa-onnx-2.0.1+pyannote-segmentation-3.0+campplus
 /// against 49 % at 1.2; 17 % on 6 clips held back). The edge is close, so do not raise it without
 /// measuring. A suggestion, not a promise.
 pub const AUTO_THRESHOLD: f32 = 1.0;
+/// The shift of the segmentation window as a share of its length. 0.1 is the main cost of the run;
+/// larger values are 2x to 6x faster but changed the answers (`docs/project/performance.md`).
+pub const WINDOW_SHIFT_RATIO: f32 = 0.1;
 /// A speaker with less speech than this (seconds) or [`FOLD_FRACTION`] of all speech is folded
 /// into the nearest other voice when the count is automatic.
 pub const FOLD_MIN_SECS: f64 = 8.0;
@@ -120,12 +123,26 @@ pub trait TurnEngine: Send + Sync {
         params: ClusterParams,
         progress: &mut dyn FnMut(f32) -> bool,
     ) -> Result<Vec<Turn>, CmError>;
+
+    /// Voice prints of the clips (16 kHz mono each), for linking the speakers of separate windows
+    /// ([`windowed`]). `None`: this engine cannot, and long audio is run whole.
+    fn embed_all(
+        &self,
+        _models: &SpeakerModels,
+        _clips: &[&[f32]],
+    ) -> Result<Option<Vec<Vec<f32>>>, CmError> {
+        Ok(None)
+    }
 }
+
+pub mod windowed;
+pub use windowed::Tuning;
 
 /// A [`Diarizer`] backed by the speaker models in a [`ModelStore`].
 pub struct SherpaDiarizer {
     store: ModelStore,
     engine: Arc<dyn TurnEngine>,
+    tuning: Tuning,
 }
 
 impl SherpaDiarizer {
@@ -134,12 +151,23 @@ impl SherpaDiarizer {
         SherpaDiarizer {
             store,
             engine: default_engine(),
+            tuning: Tuning::default(),
         }
     }
 
     /// With another engine (tests).
     pub fn with_engine(store: ModelStore, engine: Arc<dyn TurnEngine>) -> SherpaDiarizer {
-        SherpaDiarizer { store, engine }
+        SherpaDiarizer {
+            store,
+            engine,
+            tuning: Tuning::default(),
+        }
+    }
+
+    /// With other window settings (measurements, tests).
+    pub fn with_tuning(mut self, tuning: Tuning) -> Self {
+        self.tuning = tuning;
+        self
     }
 }
 
@@ -168,11 +196,12 @@ impl Diarizer for SherpaDiarizer {
             Vec::new()
         } else {
             let _t = cm_core::perf::span("speakers", "engine");
-            run_with_hints(
+            run_with_hints_tuned(
                 self.engine.as_ref(),
                 &models,
                 audio.samples,
                 hints,
+                self.tuning,
                 progress,
             )?
         };
@@ -203,6 +232,32 @@ pub fn run_with_hints(
     hints: &DiarizeHints,
     progress: &mut dyn FnMut(f32) -> bool,
 ) -> Result<Vec<Turn>, CmError> {
+    run_with_hints_tuned(engine, models, samples, hints, Tuning::default(), progress)
+}
+
+/// [`run_with_hints`] with window settings: audio longer than `tuning.long_secs` goes through
+/// [`windowed::run_windowed`] when the engine can compute voice prints.
+pub fn run_with_hints_tuned(
+    engine: &dyn TurnEngine,
+    models: &SpeakerModels,
+    samples: &[f32],
+    hints: &DiarizeHints,
+    tuning: Tuning,
+    progress: &mut dyn FnMut(f32) -> bool,
+) -> Result<Vec<Turn>, CmError> {
+    if samples.len() as f64 / 16_000.0 > tuning.long_secs {
+        if let Some(turns) = windowed::run_windowed(
+            engine,
+            models,
+            samples,
+            hints,
+            tuning,
+            AUTO_THRESHOLD,
+            progress,
+        )? {
+            return Ok(turns);
+        }
+    }
     let exact = |n: u32| ClusterParams {
         num_clusters: Some(n),
         threshold: AUTO_THRESHOLD,
@@ -223,7 +278,11 @@ pub fn run_with_hints(
         let max = hints.max_speakers.unwrap_or(AUTO_MAX_SPEAKERS);
         let min = hints.min_speakers.unwrap_or(1);
         let mut hold = |_: f32| progress(FIRST_PASS_SHARE);
-        if count > max {
+        if count > max && !tuning.second_run_for_max {
+            // No second run of the whole audio: the speakers beyond the maximum (the ones with the
+            // least speech) are given to the nearest kept speaker, as the tiny ones already are.
+            fold_to_n(first, max as usize)
+        } else if count > max {
             engine.run(models, samples, exact(max), &mut hold)?
         } else if count < min {
             engine.run(models, samples, exact(min), &mut hold)?
@@ -242,6 +301,49 @@ fn speaker_count(turns: &[Turn]) -> u32 {
     ids.sort_unstable();
     ids.dedup();
     u32::try_from(ids.len()).unwrap_or(u32::MAX)
+}
+
+/// Keeps the `n` speakers with the most speech and gives the turns of all others to the speaker of
+/// the nearest turn in time that belongs to a kept speaker.
+pub fn fold_to_n(mut turns: Vec<Turn>, n: usize) -> Vec<Turn> {
+    use std::collections::BTreeMap;
+    let mut total: BTreeMap<i32, f64> = BTreeMap::new();
+    for t in &turns {
+        *total.entry(t.speaker).or_default() += (t.end - t.start).max(0.0);
+    }
+    if n == 0 || total.len() <= n {
+        return turns;
+    }
+    let mut by_speech: Vec<(i32, f64)> = total.into_iter().collect();
+    by_speech.sort_by(|a, b| b.1.total_cmp(&a.1));
+    let kept: Vec<i32> = by_speech.iter().take(n).map(|(s, _)| *s).collect();
+    let anchors: Vec<Turn> = turns
+        .iter()
+        .filter(|t| kept.contains(&t.speaker))
+        .copied()
+        .collect();
+    for t in &mut turns {
+        if kept.contains(&t.speaker) {
+            continue;
+        }
+        let mid = (t.start + t.end) / 2.0;
+        let distance = |a: &Turn| {
+            if mid < a.start {
+                a.start - mid
+            } else if mid > a.end {
+                mid - a.end
+            } else {
+                0.0
+            }
+        };
+        if let Some(near) = anchors
+            .iter()
+            .min_by(|a, b| distance(a).total_cmp(&distance(b)))
+        {
+            t.speaker = near.speaker;
+        }
+    }
+    turns
 }
 
 /// Gives the turns of speakers who hold almost no speech (under [`FOLD_MIN_SECS`] seconds or
@@ -419,6 +521,9 @@ pub struct SherpaEngine {
     /// against 34 s with 4 on a Mac with 10 performance cores, with identical turns; 14
     /// threads, which reach the efficiency cores, took 56 s.
     pub threads: i32,
+    /// The segmentation window's shift as a share of its length (`None`: [`WINDOW_SHIFT_RATIO`]).
+    /// Larger is faster and changed the answers on the 14 English clips (PERF-1); for measurements.
+    pub window_shift_ratio: Option<f32>,
 }
 
 #[cfg(feature = "sherpa")]
@@ -456,7 +561,7 @@ impl TurnEngine for SherpaEngine {
             segmentation: OfflineSpeakerSegmentationModelConfig {
                 pyannote: OfflineSpeakerSegmentationPyannoteModelConfig {
                     model: Some(seg),
-                    window_shift_ratio: 0.1,
+                    window_shift_ratio: self.window_shift_ratio.unwrap_or(WINDOW_SHIFT_RATIO),
                 },
                 num_threads: threads,
                 ..Default::default()
@@ -511,6 +616,40 @@ impl TurnEngine for SherpaEngine {
                 speaker: s.speaker,
             })
             .collect())
+    }
+
+    fn embed_all(
+        &self,
+        models: &SpeakerModels,
+        clips: &[&[f32]],
+    ) -> Result<Option<Vec<Vec<f32>>>, CmError> {
+        use sherpa_onnx::{SpeakerEmbeddingExtractor, SpeakerEmbeddingExtractorConfig};
+        let Some(model) = models.embedding.to_str().map(str::to_owned) else {
+            return Ok(None);
+        };
+        let extractor = SpeakerEmbeddingExtractor::create(&SpeakerEmbeddingExtractorConfig {
+            model: Some(model),
+            num_threads: 2,
+            ..Default::default()
+        });
+        let Some(extractor) = extractor else {
+            return Ok(None);
+        };
+        let mut out = Vec::with_capacity(clips.len());
+        for clip in clips {
+            let Some(stream) = extractor.create_stream() else {
+                return Ok(None);
+            };
+            stream.accept_waveform(16_000, clip);
+            stream.input_finished();
+            if !extractor.is_ready(&stream) {
+                continue;
+            }
+            if let Some(e) = extractor.compute(&stream) {
+                out.push(e);
+            }
+        }
+        Ok(Some(out))
     }
 }
 

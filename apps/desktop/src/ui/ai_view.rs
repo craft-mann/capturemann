@@ -615,6 +615,23 @@ impl Render for AiPage {
             true,
         )
         .on_click(cx.listener(move |_, _, _, cx| ai::set_auto_transcribe(&app, !auto, cx)));
+        let live_on = self.app.read(cx).ai.live_transcribe && auto;
+        let live_switch = switch(
+            &t,
+            "ai-live",
+            tr!("Transcribe while recording"),
+            live_on,
+            auto,
+        )
+        .on_click({
+            let app = self.app.clone();
+            let next = !self.app.read(cx).ai.live_transcribe;
+            cx.listener(move |_, _, _, cx| {
+                if auto {
+                    ai::set_live_transcribe(&app, next, cx)
+                }
+            })
+        });
         let cuts_on = !self.app.read(cx).ai.auto_suggest_cuts_off;
         let cuts_switch = switch(
             &t,
@@ -761,6 +778,16 @@ impl Render for AiPage {
                                                 None => tr!("Needs a model above"),
                                             })),
                                             Some(auto_switch.into_any_element()),
+                                            false,
+                                        ))
+                                        .child(settings_row(
+                                            &t,
+                                            Some("mic"),
+                                            tr!("Transcribe while recording"),
+                                            Some(SharedString::from(tr!(
+                                                "Audio recordings only: reads each finished piece as you record, so the transcript is ready sooner after Stop"
+                                            ))),
+                                            Some(live_switch.into_any_element()),
                                             false,
                                         ))
                                         .child(settings_row(

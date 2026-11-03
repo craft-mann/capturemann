@@ -519,6 +519,19 @@ pub fn set_auto_transcribe(app: &Entity<AppModel>, on: bool, cx: &mut App) {
     app::set_setting(app, KEY_AUTO_TRANSCRIBE, Value::Bool(on), cx);
 }
 
+/// `ai.transcribe_while_recording` (M2h): read each finished piece of an audio recording while it
+/// runs. Default on; the daemon only follows a recording when `ai.auto_transcribe` is on as well.
+pub const KEY_LIVE_TRANSCRIBE: &str = "ai.transcribe_while_recording";
+
+/// The "Transcribe while recording" switch: shown at once, saved through `set_settings`.
+pub fn set_live_transcribe(app: &Entity<AppModel>, on: bool, cx: &mut App) {
+    app.update(cx, |m, cx| {
+        m.ai.live_transcribe = on;
+        cx.notify();
+    });
+    app::set_setting(app, KEY_LIVE_TRANSCRIBE, Value::Bool(on), cx);
+}
+
 /// The "Suggest cuts when the editor opens" switch (M2f). It only starts the `suggest_cuts` action
 /// on opening a recording; nothing is applied.
 pub fn set_auto_suggest_cuts(app: &Entity<AppModel>, on: bool, cx: &mut App) {

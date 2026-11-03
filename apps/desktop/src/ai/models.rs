@@ -247,6 +247,8 @@ pub struct ModelsVm {
     pub auto_transcribe: bool,
     /// `ai.auto_suggest_cuts` is off (stored inverted so that the default, on, is `false`).
     pub auto_suggest_cuts_off: bool,
+    /// `ai.transcribe_while_recording` (M2h): default on, and only in effect with `auto_transcribe`.
+    pub live_transcribe: bool,
     /// `ai.glossary` (AI-6a): names and terms spelled the user's way in new transcripts.
     pub glossary: Vec<cm_ai::glossary::GlossaryEntry>,
     /// `ai.languages`: the languages the user speaks, as codes joined by commas (`vi,en`); empty
