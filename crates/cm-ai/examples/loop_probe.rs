@@ -24,7 +24,26 @@ fn main() {
         .and_then(|i| args.get(i + 1))
         .and_then(|v| v.parse().ok())
         .unwrap_or(3);
-    let t = read_transcript(bundle).unwrap().expect("a transcript");
+    // --transcribe <ggml> --model-id <id>: transcribe the bundle again now (the app's job path,
+    // nothing is stored) and look at that transcript instead of the stored one.
+    let value_of = |flag: &str| {
+        args.iter()
+            .position(|a| a == flag)
+            .and_then(|i| args.get(i + 1))
+            .cloned()
+    };
+    let t = if let (Some(model), Some(id)) = (value_of("--transcribe"), value_of("--model-id")) {
+        let engine =
+            cm_ai::whisper::WhisperTranscriber::load(Path::new(&model), &id, true).unwrap();
+        let opts = cm_ai::recording::TranscribeOptions {
+            language: value_of("--language").as_deref().map(|_| "vi"),
+            model_id: Some(&id),
+            ..Default::default()
+        };
+        cm_ai::recording::transcribe_recording(bundle, &engine, &opts, &mut |_| true).unwrap()
+    } else {
+        read_transcript(bundle).unwrap().expect("a transcript")
+    };
     let manifest = cm_library::rec::read_manifest(bundle).unwrap();
     let raw = manifest
         .tracks
@@ -65,9 +84,12 @@ fn main() {
             "speaker_engine_secs": spk,
         }));
     }
+    let dense = cm_ai::failure_kinds::dense_unit_indices(&t.words, 5, 60.0).len();
     println!(
         "{}",
         json!({
+            "dense_repeat_words": dense, "sounds": t.sounds.len(),
+            "sounds_secs": t.sounds.iter().map(|s| secs(s.end) - secs(s.start)).sum::<f64>(),
             "transcript_words": t.words.len(), "min_count": min, "runs": runs.len(),
             "words_in_runs": words_in, "secs_in_runs": secs_in, "speaker_engine_secs_in_runs": speaker_in,
             "rows": rows,

@@ -166,7 +166,7 @@ pub fn spread_repeats(
 /// A short sentence said again and again in a row (`unit` words, `count` times), found on sentence
 /// units: a unit ends at a word with sentence punctuation (`.`, `?`, `!`, `…`) or after
 /// `MAX_UNIT_WORDS` words, and units are compared with case and punctuation folded. This is the
-/// loop that a decoder writes over speech it cannot read ("Thank you. Thank you. Thank you."),
+/// loop that a decoder writes over speech it cannot read (one short sentence, again and again),
 /// which the exact-word loop check ([`crate::pieces::find_runs`]) misses because the repeats
 /// carry full stops and may be split across lines.
 #[derive(Debug, Clone, PartialEq)]
