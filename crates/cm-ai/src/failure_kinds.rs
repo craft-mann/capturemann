@@ -83,12 +83,7 @@ pub fn coverage(speech: &[(f64, f64)], words: &[(f64, f64)], pad: f64, min_gap: 
 }
 
 /// [`coverage`] for transcript words.
-pub fn word_coverage(
-    speech: &[(f64, f64)],
-    words: &[Word],
-    pad: f64,
-    min_gap: f64,
-) -> Coverage {
+pub fn word_coverage(speech: &[(f64, f64)], words: &[Word], pad: f64, min_gap: f64) -> Coverage {
     let spans: Vec<(f64, f64)> = words.iter().map(|w| (secs(w.start), secs(w.end))).collect();
     coverage(speech, &spans, pad, min_gap)
 }
@@ -192,8 +187,8 @@ pub fn script_of(c: char) -> Option<Script> {
 pub fn expected_scripts(language: &str) -> Option<&'static [Script]> {
     let base = language.split(['-', '_']).next().unwrap_or(language);
     match base {
-        "en" | "vi" | "es" | "fr" | "de" | "it" | "pt" | "nl" | "pl" | "tr" | "id" | "sv" | "da"
-        | "no" | "fi" | "cs" | "ro" | "hu" => Some(&[Script::Latin]),
+        "en" | "vi" | "es" | "fr" | "de" | "it" | "pt" | "nl" | "pl" | "tr" | "id" | "sv"
+        | "da" | "no" | "fi" | "cs" | "ro" | "hu" => Some(&[Script::Latin]),
         "ru" | "uk" | "bg" => Some(&[Script::Cyrillic, Script::Latin]),
         "ko" => Some(&[Script::Hangul, Script::Latin]),
         "ja" => Some(&[Script::Kana, Script::Han, Script::Latin]),

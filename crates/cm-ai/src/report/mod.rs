@@ -25,6 +25,7 @@ pub mod check;
 pub mod generate;
 pub mod prompt;
 pub mod render;
+pub mod rubric;
 pub mod store;
 #[cfg(test)]
 mod tests;

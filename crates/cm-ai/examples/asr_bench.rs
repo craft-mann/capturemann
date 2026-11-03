@@ -87,7 +87,9 @@ fn main() {
     let mut samples = decode_16k_mono(Path::new(&audio_path)).unwrap();
     let mut reference_all = reference.clone();
     let mut speech: Vec<(f64, f64)> = option(&args, "--speech")
-        .map(|p| serde_json::from_str::<Vec<(f64, f64)>>(&std::fs::read_to_string(p).unwrap()).unwrap())
+        .map(|p| {
+            serde_json::from_str::<Vec<(f64, f64)>>(&std::fs::read_to_string(p).unwrap()).unwrap()
+        })
         .unwrap_or_default();
     if let Some(n) = option(&args, "--tile-to-secs").and_then(|s| s.parse::<f64>().ok()) {
         let one = samples.clone();
@@ -98,7 +100,11 @@ fn main() {
             samples.extend_from_slice(&one);
             reference_all.push(' ');
             reference_all.push_str(&reference);
-            speech.extend(one_speech.iter().map(|(a, b)| (a + k as f64 * one_secs, b + k as f64 * one_secs)));
+            speech.extend(
+                one_speech
+                    .iter()
+                    .map(|(a, b)| (a + k as f64 * one_secs, b + k as f64 * one_secs)),
+            );
             k += 1;
         }
     }

@@ -156,9 +156,11 @@ fn the_fix_reads_uncovered_speech_again() {
 fn spread_words() -> (Vec<Word>, Vec<(f64, f64, f32)>) {
     let mut words = Vec::new();
     let mut spans = vec![(0.0, 12.0, 0.2f32)];
-    for (i, t) in ["hello", "everyone", "today", "we", "start", "with", "the", "plan"]
-        .iter()
-        .enumerate()
+    for (i, t) in [
+        "hello", "everyone", "today", "we", "start", "with", "the", "plan",
+    ]
+    .iter()
+    .enumerate()
     {
         words.push(w(t, i as f64 * 1.4, 0.9));
     }
@@ -174,7 +176,10 @@ fn spread_words() -> (Vec<Word>, Vec<(f64, f64, f32)>) {
 #[test]
 fn eight_in_a_row_does_not_see_seven_spread_out_repeats_but_the_measure_does() {
     let (words, _) = spread_words();
-    assert!(find_runs(&words).is_empty(), "find_runs needs words in a row");
+    assert!(
+        find_runs(&words).is_empty(),
+        "find_runs needs words in a row"
+    );
     let found = spread_repeats(&words, 4, 10.0, 5);
     assert_eq!(found.len(), 1, "{found:?}");
     assert_eq!(found[0].text, "ok");
@@ -184,11 +189,13 @@ fn eight_in_a_row_does_not_see_seven_spread_out_repeats_but_the_measure_does() {
 
 #[test]
 fn real_sentences_do_not_count_as_spread_repeats() {
-    let words: Vec<Word> = ["yes", "no", "yes", "fine", "yes", "ok", "yes", "right", "yes"]
-        .iter()
-        .enumerate()
-        .map(|(i, t)| w(t, i as f64 * 15.0, 0.9))
-        .collect();
+    let words: Vec<Word> = [
+        "yes", "no", "yes", "fine", "yes", "ok", "yes", "right", "yes",
+    ]
+    .iter()
+    .enumerate()
+    .map(|(i, t)| w(t, i as f64 * 15.0, 0.9))
+    .collect();
     // "yes" 5 times after long gaps is a count to look at, but a loop rule that also needs weak
     // signal (the planned fix) would keep it; the measure alone reports it, and a threshold of 6
     // does not.
