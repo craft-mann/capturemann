@@ -31,6 +31,9 @@ pub struct Tuning {
     /// exactly the maximum (the 0.2.6 way), instead of giving the extra speakers to the nearest
     /// kept ones. Only for the measurement of the two.
     pub second_run_for_max: bool,
+    /// The clustering distance when the count is not given (measurements; the shipped value is
+    /// [`super::AUTO_THRESHOLD`]).
+    pub auto_threshold: f32,
 }
 
 impl Default for Tuning {
@@ -40,6 +43,7 @@ impl Default for Tuning {
             window_secs: 600.0,
             link_distance: 0.5,
             second_run_for_max: false,
+            auto_threshold: super::AUTO_THRESHOLD,
         }
     }
 }
