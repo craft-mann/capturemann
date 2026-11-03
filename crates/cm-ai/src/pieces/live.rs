@@ -98,6 +98,35 @@ impl LiveTranscription {
         }
     }
 
+    /// The state as a batch [`super::Checkpoint`] of the finished file `samples`: the job that runs
+    /// at Stop (`transcribe_pieces_resumable`) continues from it and reads only the pieces that are
+    /// left. `None` when the finished pieces are not a prefix of the batch plan of `samples` (the
+    /// file is not the one that was followed), in which case the job starts from the first piece.
+    pub fn to_batch_checkpoint(&self, samples: &[f32]) -> Option<super::Checkpoint> {
+        let plan = super::plan(samples);
+        let done = if self.from == 0 {
+            0
+        } else {
+            plan.iter().position(|r| r.start == self.from)?
+        };
+        Some(super::Checkpoint {
+            total_samples: samples.len(),
+            pieces: plan.len(),
+            done,
+            words: self.words.clone(),
+            language: self.language.clone(),
+            first: self.first.clone(),
+            split: self.report.split,
+            repeats_dropped: self.report.repeats_dropped,
+            other_audio: self.report.other_audio,
+            other_audio_kept: self.report.other_audio_kept,
+            broken_reread: self.report.broken_reread,
+            broken_dropped: self.report.broken_dropped,
+            gaps_reread: self.report.gaps_reread,
+            gaps_filled: self.report.gaps_filled,
+        })
+    }
+
     /// Samples of the pieces finished so far.
     pub fn done_samples(&self) -> usize {
         self.from
@@ -388,6 +417,39 @@ mod tests {
             .finish(&Checksum, &x, None, &mut |_| true)
             .unwrap()
             .0;
+        assert_eq!(got.words, want.words);
+    }
+
+    /// What the job at Stop does with the live state: it resumes from the converted checkpoint and
+    /// the transcript equals the batch result.
+    #[test]
+    fn the_stop_job_resumes_from_the_live_state() {
+        let x = audio(1500);
+        let want = batch(&x);
+        let mut run = LiveTranscription::new(MediaTime::ZERO, Some("en"), None);
+        run.advance(&Checksum, &x[..1200 * RATE], &mut |_| true)
+            .unwrap();
+        let cp = run.to_batch_checkpoint(&x).unwrap();
+        assert!(
+            cp.done >= 1 && cp.done < cp.pieces,
+            "{} of {}",
+            cp.done,
+            cp.pieces
+        );
+        let (got, _) = crate::pieces::transcribe_pieces_resumable(
+            &Checksum,
+            Pcm16k {
+                samples: &x,
+                start: MediaTime::ZERO,
+            },
+            Some("en"),
+            None,
+            Some(cp),
+            &mut |_| {},
+            None,
+            &mut |_| true,
+        )
+        .unwrap();
         assert_eq!(got.words, want.words);
     }
 
