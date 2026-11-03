@@ -468,6 +468,9 @@ msgstr ""
 msgid "Audio only: no screen, camera or cursor."
 msgstr ""
 
+msgid "Audio recordings only: reads each finished piece as you record, so the transcript is ready sooner after Stop"
+msgstr ""
+
 msgid "Audio settings"
 msgstr ""
 
@@ -5163,6 +5166,9 @@ msgid "Transcribe a recording"
 msgstr ""
 
 msgid "Transcribe after each recording"
+msgstr ""
+
+msgid "Transcribe while recording"
 msgstr ""
 
 msgid "Transcribe · {model}"
