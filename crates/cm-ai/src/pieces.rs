@@ -223,6 +223,10 @@ pub struct Checkpoint {
     pub other_audio: usize,
     #[serde(default)]
     pub other_audio_kept: usize,
+    #[serde(default)]
+    pub broken_reread: usize,
+    #[serde(default)]
+    pub broken_dropped: usize,
 }
 
 /// What a run over all the pieces did, beyond the words.
@@ -239,6 +243,13 @@ pub struct PiecesReport {
     pub other_audio: usize,
     /// Of those, the ones where the other reading was better and was kept.
     pub other_audio_kept: usize,
+    /// Stretches with broken or hopeless words (U+FFFD, a foreign script on low confidence, a run
+    /// of near-zero confidence) that were read again on their own, and the ones where the new
+    /// reading replaced the old.
+    pub broken_reread: usize,
+    pub broken_reread_kept: usize,
+    /// Words dropped or cleaned because they are not text (see [`crate::failure_kinds`]).
+    pub broken_dropped: usize,
 }
 
 /// The same audio from the other source (the original microphone when the noise-reduced copy is
@@ -324,6 +335,14 @@ impl Job<'_, '_> {
     /// bad is cut in half and each half is done the same way (up to [`MAX_SPLIT_DEPTH`] levels);
     /// what survives all that has its repeats taken out.
     fn piece(&mut self, range: Range<usize>, depth: usize) -> Result<Vec<Word>, CmError> {
+        let words = self.piece_inner(range.clone(), depth)?;
+        if depth == 0 {
+            return self.repair(words, range);
+        }
+        Ok(words)
+    }
+
+    fn piece_inner(&mut self, range: Range<usize>, depth: usize) -> Result<Vec<Word>, CmError> {
         let (from, len) = (range.start, range.len());
         let mut words = self.read(range.clone(), false)?.words;
         let mut bad = Badness::of(&words);
@@ -346,14 +365,140 @@ impl Job<'_, '_> {
         if depth < MAX_SPLIT_DEPTH && len as f64 > samples_of(MIN_SPLIT_SECS * 2.0) as f64 {
             self.report.split += 1;
             let mid = quietest(self.samples, from + len * 2 / 5, from + len * 3 / 5);
-            let mut halves = self.piece(from..mid, depth + 1)?;
-            halves.extend(self.piece(mid..from + len, depth + 1)?);
+            let mut halves = self.piece_inner(from..mid, depth + 1)?;
+            halves.extend(self.piece_inner(mid..from + len, depth + 1)?);
             return Ok(halves);
         }
         let (words, exact) = collapse_repeats(words);
         let (words, soft) = drop_soft_repeats(words);
         self.report.repeats_dropped += exact + soft;
         Ok(words)
+    }
+}
+
+/// Seconds of audio kept around a suspect stretch when it is read again.
+const REPAIR_PAD_SECS: f64 = 1.0;
+/// Words under this confidence, three or more in a row, make a stretch hopeless.
+const HOPELESS_CONFIDENCE: f32 = 0.1;
+const HOPELESS_RUN: usize = 3;
+
+impl Job<'_, '_> {
+    fn secs_of(&self, w: &Word) -> (f64, f64) {
+        let t = |m: cm_core::MediaTime| {
+            (m - self.base).ticks() as f64 / cm_core::TICKS_PER_SECOND as f64
+        };
+        (t(w.start), t(w.end))
+    }
+
+    /// Words that are not text, or a stretch of words nobody is sure of, are read again on their
+    /// own (a window around them, no text of the neighbours as prompt); the new reading replaces
+    /// the old one when it has nothing broken and is not less certain. What is still broken
+    /// afterwards is cleaned: U+FFFD and control characters are removed from a word, and a word
+    /// that is nothing but those, or a foreign script on low confidence, is dropped. General
+    /// rules on characters and confidence, no word lists.
+    fn repair(&mut self, words: Vec<Word>, range: Range<usize>) -> Result<Vec<Word>, CmError> {
+        let language = self.language.clone().unwrap_or_default();
+        let broken = |w: &Word| crate::failure_kinds::is_broken(w, &language);
+        // Suspect words: broken ones, and runs of near-zero confidence.
+        let mut suspect = vec![false; words.len()];
+        for (i, w) in words.iter().enumerate() {
+            suspect[i] |= broken(w);
+        }
+        let mut i = 0;
+        while i < words.len() {
+            if words[i].confidence < HOPELESS_CONFIDENCE {
+                let mut j = i;
+                while j < words.len() && words[j].confidence < HOPELESS_CONFIDENCE {
+                    j += 1;
+                }
+                if j - i >= HOPELESS_RUN {
+                    suspect[i..j].iter_mut().for_each(|s| *s = true);
+                }
+                i = j;
+            } else {
+                i += 1;
+            }
+        }
+        if !suspect.iter().any(|s| *s) {
+            return Ok(words);
+        }
+        // Windows (seconds, in the audio) around runs of suspect words, merged when they touch.
+        let piece_secs = (
+            range.start as f64 / f64::from(SAMPLE_RATE),
+            range.end as f64 / f64::from(SAMPLE_RATE),
+        );
+        let mut windows: Vec<(f64, f64)> = Vec::new();
+        for (w, _) in words.iter().zip(&suspect).filter(|(_, s)| **s) {
+            let (a, b) = self.secs_of(w);
+            let (a, b) = (
+                (a - REPAIR_PAD_SECS).max(piece_secs.0),
+                (b + REPAIR_PAD_SECS).min(piece_secs.1),
+            );
+            match windows.last_mut() {
+                Some(last) if a <= last.1 => last.1 = last.1.max(b),
+                _ => windows.push((a, b)),
+            }
+        }
+        let mut out: Vec<Word> = Vec::new();
+        let mut taken = 0;
+        for (a, b) in windows {
+            // Words before the window stay.
+            while taken < words.len() && self.secs_of(&words[taken]).0 < a {
+                out.push(words[taken].clone());
+                taken += 1;
+            }
+            let mut old = Vec::new();
+            while taken < words.len() && self.secs_of(&words[taken]).0 < b {
+                old.push(words[taken].clone());
+                taken += 1;
+            }
+            let (sa, sb) = (samples_of(a), samples_of(b).min(self.samples.len()));
+            if sb <= sa || old.is_empty() {
+                out.extend(old);
+                continue;
+            }
+            self.report.broken_reread += 1;
+            let saved = self.prompt.take();
+            let again = self.read(sa..sb, false);
+            self.prompt = saved;
+            let again = again?.words;
+            let mean = |ws: &[Word]| {
+                if ws.is_empty() {
+                    0.0
+                } else {
+                    ws.iter().map(|w| w.confidence).sum::<f32>() / ws.len() as f32
+                }
+            };
+            let clean = again.iter().all(|w| !broken(w));
+            let old_hopeless = old
+                .iter()
+                .all(|w| broken(w) || w.confidence < HOPELESS_CONFIDENCE);
+            if clean
+                && ((again.is_empty() && old_hopeless)
+                    || (!again.is_empty() && mean(&again) >= mean(&old)))
+            {
+                self.report.broken_reread_kept += 1;
+                out.extend(again);
+            } else {
+                out.extend(old);
+            }
+        }
+        out.extend(words[taken..].iter().cloned());
+        // What is still broken is cleaned or dropped.
+        let before = out.len();
+        let mut cleaned = 0;
+        let out: Vec<Word> = out
+            .into_iter()
+            .filter_map(|mut w| {
+                if crate::failure_kinds::has_stray_chars(&w.text) {
+                    w.text = crate::failure_kinds::strip_stray_chars(&w.text);
+                    cleaned += 1;
+                }
+                (!w.text.trim().is_empty() && !broken(&w)).then_some(w)
+            })
+            .collect();
+        self.report.broken_dropped += before - out.len() + cleaned;
+        Ok(out)
     }
 }
 
@@ -435,6 +580,8 @@ pub fn transcribe_pieces_resumable<'p>(
         job.report.repeats_dropped = c.repeats_dropped;
         job.report.other_audio = c.other_audio;
         job.report.other_audio_kept = c.other_audio_kept;
+        job.report.broken_reread = c.broken_reread;
+        job.report.broken_dropped = c.broken_dropped;
         // The bar starts where the finished pieces end.
         if let Some(next) = pieces.get(start) {
             job.high = next.start as f32 / audio.samples.len().max(1) as f32;
@@ -455,6 +602,8 @@ pub fn transcribe_pieces_resumable<'p>(
                 repeats_dropped: job.report.repeats_dropped,
                 other_audio: job.report.other_audio,
                 other_audio_kept: job.report.other_audio_kept,
+                broken_reread: job.report.broken_reread,
+                broken_dropped: job.report.broken_dropped,
             });
         }
     }

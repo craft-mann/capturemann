@@ -905,13 +905,26 @@ fn m2g_quiet_speech_is_not_cut_raw_or_denoised() {
 /// change was made against (`adaptive: false` keeps that rule for callers who set a level).
 #[test]
 fn m2g_the_fixed_rule_cuts_quiet_speech() {
-    let x = quiet_speech(30.0, &QUIET_SPANS, -45.0, -60.0);
+    // A loud second at each end keeps the quiet recording's silences off the clip edges.
+    let mut x = quiet_speech(1.0, &[(0.0, 1.0)], -10.0, -60.0);
+    let body_at = x.len();
+    x.extend(quiet_speech(30.0, &QUIET_SPANS, -45.0, -60.0));
+    x.extend(quiet_speech(1.0, &[(0.0, 1.0)], -10.0, -60.0));
+    let spans: Vec<(f64, f64)> = QUIET_SPANS
+        .iter()
+        .map(|&(a, b)| {
+            (
+                a + body_at as f64 / f64::from(RATE),
+                b + body_at as f64 / f64::from(RATE),
+            )
+        })
+        .collect();
     let opts = SilenceOptions {
         adaptive: false,
         ..SilenceOptions::default()
     };
     let cuts = silence_cuts(&x, RATE, MediaTime::ZERO, &[], &opts).unwrap();
-    assert!(inside_speech(&cuts, &QUIET_SPANS) > 10.0, "{cuts:#?}");
+    assert!(inside_speech(&cuts, &spans) > 10.0, "{cuts:#?}");
 }
 
 /// A loud recording is judged as before: the threshold follows its own speech level, and the pauses
@@ -955,4 +968,55 @@ fn m2g_speech_evidence_vetoes_a_pause_inside_it() {
     filler.kind = "filler".into();
     let kept = veto_speech(vec![filler.clone()], &[Span::new(t(1.0), t(3.0))], &opts);
     assert_eq!(kept, vec![filler]);
+}
+
+/// A level the user set forces the fixed rule.
+#[test]
+fn m2g_a_user_level_uses_the_fixed_rule() {
+    let o = SilenceOptions::with_level(-35.0);
+    assert!(!o.adaptive);
+    assert_eq!(o.silence_db, -35.0);
+    assert!(SilenceOptions::default().adaptive);
+}
+
+/// M2g: a quiet speaker the raw level rule would call silence is seen on the noise-reduced copy,
+/// where the room noise is gone: the stretch becomes evidence and the veto removes the pause.
+#[test]
+fn m2g_activity_on_the_noise_reduced_copy_vetoes_a_pause() {
+    // Raw: speech at -45 dBFS with room noise at -40: no usable gap between them, the raw rule
+    // sees one flat level (nothing separates, nothing is suggested), so use the pause list of the
+    // fixed rule to stand for "the raw rule called 8 to 18 s a pause".
+    let spans = [(0.0, 8.0), (10.0, 18.0), (21.0, 30.0)];
+    let denoised = gated(&quiet_speech(30.0, &spans, -45.0, -60.0));
+    let act = activity_spans(&denoised, RATE, MediaTime::ZERO, &[], 20.0, 0.2);
+    // One stretch per speech span (the syllables are bridged), none over the pauses.
+    assert!(act.len() >= 3, "{act:?}");
+    let over_pauses = act
+        .iter()
+        .filter(|s| {
+            (secs(s.from) > 8.3 && secs(s.to) < 9.7) || (secs(s.from) > 18.3 && secs(s.to) < 20.7)
+        })
+        .count();
+    assert_eq!(over_pauses, 0, "{act:?}");
+    // A pause that the raw rule put over the second speech span is vetoed by it.
+    let kept = veto_speech(vec![cut(9.0, 19.0)], &act, &SilenceOptions::default());
+    assert!(
+        kept.is_empty() || kept.iter().all(|c| secs(c.end) - secs(c.start) < 1.0),
+        "{kept:#?}"
+    );
+}
+
+/// Short clips: a silence before the first word or after the last one is not a pause to cut.
+#[test]
+fn m2g_lead_in_and_tail_silence_are_not_suggested() {
+    let a = audio(&[
+        Part::Quiet(2.0),
+        Part::Tone(2.0, 0.3),
+        Part::Quiet(2.0),
+        Part::Tone(2.0, 0.3),
+        Part::Quiet(3.0),
+    ]);
+    let cuts = silence_cuts(&a, RATE, MediaTime::ZERO, &[], &SilenceOptions::default()).unwrap();
+    assert_eq!(cuts.len(), 1, "{cuts:#?}");
+    assert!((secs(cuts[0].start) - 4.2).abs() < 0.1);
 }

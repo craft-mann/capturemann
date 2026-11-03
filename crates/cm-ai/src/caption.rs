@@ -95,6 +95,24 @@ fn ends_clause(text: &str) -> bool {
 
 /// Builds caption lines from words (session time, in order). Words with empty text are skipped.
 pub fn build_captions(words: &[Word]) -> Vec<CaptionLine> {
+    // A transcript written before the repair of broken words (or by another engine) may hold U+FFFD
+    // and other stray characters: they are never shown. A word that is nothing else is skipped.
+    let cleaned: Vec<Word>;
+    let words = if words
+        .iter()
+        .any(|w| crate::failure_kinds::has_stray_chars(&w.text))
+    {
+        cleaned = words
+            .iter()
+            .map(|w| Word {
+                text: crate::failure_kinds::strip_stray_chars(&w.text),
+                ..w.clone()
+            })
+            .collect();
+        &cleaned[..]
+    } else {
+        words
+    };
     let mut lines: Vec<CaptionLine> = Vec::new();
     let mut cur: Vec<&Word> = Vec::new();
     let flush = |cur: &mut Vec<&Word>, lines: &mut Vec<CaptionLine>| {

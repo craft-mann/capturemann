@@ -14,6 +14,8 @@
 //! cuts the pause down to `keep_s` ([`DEFAULT_KEEP_S`], 0.4 s) of breathing room: half of it is
 //! kept on each side, so the cut never starts or ends on a word.
 //!
+//! A silence that touches the start or the end of the track is not suggested (lead-in and tail).
+//!
 //! Pauses that straddle a recording pause (the media files are compacted at a pause) are split at
 //! the join and judged on each side, and every time is mapped to session time through the
 //! track's start and the pause gaps.
@@ -81,6 +83,15 @@ impl Default for SilenceOptions {
 }
 
 impl SilenceOptions {
+    /// A level the user chose: the fixed rule applies (no adaptive threshold), as in 0.2.6.
+    pub fn with_level(silence_db: f32) -> Self {
+        SilenceOptions {
+            silence_db,
+            adaptive: false,
+            ..SilenceOptions::default()
+        }
+    }
+
     pub fn validate(&self) -> Result<(), CmError> {
         let (lo, hi) = SILENCE_DB_RANGE;
         if !(self.silence_db.is_finite() && (lo..=hi).contains(&self.silence_db)) {
@@ -263,6 +274,12 @@ pub fn silence_cuts(
     let keep = ticks_of(f64::from(opts.keep_s));
     let mut out = Vec::new();
     for (a, b) in runs {
+        // A silence that starts with the track or runs to its end is not a pause between speech
+        // (it is the lead-in or tail of the clip, which trimming handles), and on a clip of a few
+        // seconds it would be most of what is suggested.
+        if a == 0 || b == levels.len() {
+            continue;
+        }
         let (fa, fb) = (a as i64 * frame_ticks, b as i64 * frame_ticks);
         // Split at the joins strictly inside the run.
         let mut cuts_at: Vec<i64> = vec![fa];
@@ -289,6 +306,52 @@ pub fn silence_cuts(
     }
     out.sort_by_key(|c| c.start);
     Ok(out)
+}
+
+/// Stretches (session time) where the level is `above_db` dB over the track's own floor (10th
+/// percentile) for at least `min_s` seconds, with dips of up to 0.3 s bridged. On a noise-reduced
+/// copy this is where something speech-like survived the reduction: steady room noise is gone
+/// there, so a pause suggested from the raw level that lies over such a stretch is likely speech
+/// (a quiet speaker the raw level threshold missed). Used as evidence for [`veto_speech`].
+pub fn activity_spans(
+    samples: &[f32],
+    rate: u32,
+    track_start: MediaTime,
+    gaps: &[PauseGap],
+    above_db: f32,
+    min_s: f64,
+) -> Vec<Span> {
+    let levels = frame_levels(samples, rate);
+    if levels.is_empty() {
+        return Vec::new();
+    }
+    let mut sorted = levels.clone();
+    sorted.sort_by(f32::total_cmp);
+    let thr = sorted[sorted.len() / 10] + above_db;
+    let bridge = (0.3 / FRAME_S) as usize;
+    let mut runs: Vec<(usize, usize)> = Vec::new();
+    for (i, l) in levels.iter().enumerate() {
+        if *l <= thr {
+            continue;
+        }
+        match runs.last_mut() {
+            Some(last) if i <= last.1 + bridge => last.1 = i + 1,
+            _ => runs.push((i, i + 1)),
+        }
+    }
+    let mut gaps = gaps.to_vec();
+    gaps.sort_by_key(|g| g.from);
+    let base = session_to_file(&gaps, track_start).ticks();
+    let frame_ticks = ticks_of(FRAME_S);
+    runs.into_iter()
+        .filter(|(a, b)| (b - a) as f64 * FRAME_S >= min_s)
+        .map(|(a, b)| {
+            Span::new(
+                MediaTime::from_ticks(file_to_session(&gaps, a as i64 * frame_ticks + base, true)),
+                MediaTime::from_ticks(file_to_session(&gaps, b as i64 * frame_ticks + base, false)),
+            )
+        })
+        .collect()
 }
 
 /// Removes from the pause suggestions every stretch that other evidence says is speech: `speech` are

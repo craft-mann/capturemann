@@ -25,8 +25,8 @@ use serde_json::{json, Value};
 
 pub use filler::{filler_cuts, FillerLists};
 pub use silence::{
-    decode_mono_f32, drop_active, frame_diff_fraction, silence_cuts, veto_speech, ScreenActivity,
-    SilenceOptions, SCREEN_ACTIVITY_THRESHOLD,
+    activity_spans, decode_mono_f32, drop_active, frame_diff_fraction, silence_cuts, veto_speech,
+    ScreenActivity, SilenceOptions, SCREEN_ACTIVITY_THRESHOLD,
 };
 pub use zoom::{suggest_zooms, ZoomOptions};
 

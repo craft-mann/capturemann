@@ -235,5 +235,40 @@ pub fn health(words: &[Word], language: &str) -> Health {
     h
 }
 
+/// Characters that are never text in a transcript: the replacement character, control characters
+/// (except white space), zero-width and private-use characters.
+fn is_stray(c: char) -> bool {
+    c == '\u{FFFD}'
+        || (c.is_control() && !c.is_whitespace())
+        || matches!(c, '\u{200B}'..='\u{200F}' | '\u{2060}' | '\u{FEFF}' | '\u{E000}'..='\u{F8FF}')
+}
+
+/// Whether `text` holds a stray character.
+pub fn has_stray_chars(text: &str) -> bool {
+    text.chars().any(is_stray)
+}
+
+/// `text` without its stray characters.
+pub fn strip_stray_chars(text: &str) -> String {
+    text.chars().filter(|c| !is_stray(*c)).collect()
+}
+
+/// A word that is not text for a transcript in `language`: nothing left once stray characters are
+/// removed, or a letter of a script the language does not use on a confidence under 0.2. A word
+/// with a stray character beside real letters is not broken (it is cleaned), a foreign letter on
+/// high confidence is a name or a loan word and stays.
+pub fn is_broken(w: &Word, language: &str) -> bool {
+    if strip_stray_chars(&w.text).trim().is_empty() {
+        return true;
+    }
+    let foreign = expected_scripts(language).is_some_and(|ok| {
+        w.text
+            .chars()
+            .filter_map(script_of)
+            .any(|s| !ok.contains(&s))
+    });
+    foreign && w.confidence < 0.2
+}
+
 #[cfg(test)]
 mod tests;
