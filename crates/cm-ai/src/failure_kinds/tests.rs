@@ -266,8 +266,7 @@ fn health_counts_replacement_characters_and_foreign_scripts() {
 }
 
 #[test]
-#[ignore = "planned fix M2d-3: a token that decodes to U+FFFD, or a foreign script on low confidence, is re-decoded or marked doubtful, never shown as text"]
-fn the_fix_never_shows_broken_tokens_as_text() {
+fn broken_tokens_are_never_shown_as_text() {
     let x = signal(10.0, &[(0.0, 4.0, 0.2)]);
     let (t, _) = transcribe_pieces(
         &ScriptedTranscriber::new(broken_words()),
@@ -283,4 +282,75 @@ fn the_fix_never_shows_broken_tokens_as_text() {
     let h = health(&t.words, "en");
     assert_eq!(h.replacement_char, 0, "{:?}", t.words);
     assert_eq!(h.broken_and_doubtful, 0, "{:?}", t.words);
+}
+
+/// A transcriber whose long reads come out broken at the start and whose short reads (a window
+/// read on its own) are clean: the shape of weak-signal garbage at the start of a file.
+struct GarbageThenClean;
+
+impl Transcriber for GarbageThenClean {
+    fn transcribe(
+        &self,
+        audio: Pcm16k<'_>,
+        _language: Option<&str>,
+        _progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Transcript, CmError> {
+        let long = audio.samples.len() > 20 * RATE;
+        let words = if long {
+            vec![
+                Word {
+                    text: "\u{FFFD}\u{FFFD}".into(),
+                    start: audio.start + media_secs(2.0),
+                    end: audio.start + media_secs(2.3),
+                    confidence: 0.02,
+                },
+                Word {
+                    text: "한".into(),
+                    start: audio.start + media_secs(2.5),
+                    end: audio.start + media_secs(2.8),
+                    confidence: 0.03,
+                },
+                Word {
+                    text: "ok".into(),
+                    start: audio.start + media_secs(10.0),
+                    end: audio.start + media_secs(10.3),
+                    confidence: 0.9,
+                },
+            ]
+        } else {
+            vec![Word {
+                text: "hello".into(),
+                start: audio.start + media_secs(1.5),
+                end: audio.start + media_secs(2.0),
+                confidence: 0.8,
+            }]
+        };
+        Ok(Transcript {
+            version: TRANSCRIPT_VERSION,
+            language: "en".into(),
+            model: "garbage-then-clean".into(),
+            words,
+            note: None,
+        })
+    }
+}
+
+/// M2d-3: a stretch of broken words is read again on its own; a clean reading replaces it.
+#[test]
+fn a_broken_stretch_is_read_again_and_a_clean_reading_replaces_it() {
+    let x = signal(30.0, &[(0.0, 30.0, 0.2)]);
+    let (t, report) = transcribe_pieces(
+        &GarbageThenClean,
+        Pcm16k {
+            samples: &x,
+            start: MediaTime::ZERO,
+        },
+        Some("en"),
+        None,
+        &mut |_| true,
+    )
+    .unwrap();
+    let texts: Vec<&str> = t.words.iter().map(|w| w.text.as_str()).collect();
+    assert_eq!(texts, ["hello", "ok"], "{:?}", t.words);
+    assert_eq!((report.broken_reread, report.broken_reread_kept), (1, 1));
 }

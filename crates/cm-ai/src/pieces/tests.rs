@@ -472,6 +472,8 @@ fn a_checkpoint_that_does_not_fit_is_ignored() {
         repeats_dropped: 0,
         other_audio: 0,
         other_audio_kept: 0,
+        broken_reread: 0,
+        broken_dropped: 0,
     };
     let e = Engine::new(1e9);
     let audio = Pcm16k {
