@@ -14,6 +14,8 @@ pub const JOB_PUBLISH: &str = "publish";
 pub const JOB_AI_METADATA: &str = "ai_metadata";
 /// Copies the library to a new folder (LIB-2, `move_library`).
 pub const JOB_LIBRARY_MOVE: &str = "library_move";
+/// Brings media files into the library as captures (IMP-3, `import_media`).
+pub const JOB_IMPORT: &str = "import";
 
 /// Job lifecycle state. `Cancelled` is in EXP-4 ("queued -> running -> done/failed/cancelled")
 /// but not in the five states of the technical design; see the crate report.

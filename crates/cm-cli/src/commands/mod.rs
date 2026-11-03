@@ -9,6 +9,7 @@ mod ai;
 mod capture;
 mod edit;
 mod export;
+mod import;
 mod jobs;
 mod library;
 mod publish;
@@ -25,6 +26,7 @@ use crate::Env;
 use capture::{annotate, get_capture, screenshot, targets, undo_redo};
 use edit::edit;
 use export::export_video;
+use import::import_media;
 use jobs::{jobs_cancel, jobs_get, jobs_list, jobs_retry, jobs_watch};
 use library::{library_list, library_move, library_rename, library_rm};
 use publish::{destinations, publish, upload};
@@ -66,6 +68,7 @@ pub async fn execute(cli: Cli, env: &mut Env) -> Result<(), CliError> {
         Command::Undo(a) => undo_redo(&mut cx, a, true).await,
         Command::Redo(a) => undo_redo(&mut cx, a, false).await,
         Command::Export(a) => export_video(&mut cx, a).await,
+        Command::Import(a) => import_media(&mut cx, a).await,
         Command::Library { cmd } => match cmd {
             LibraryCmd::List(a) => library_list(&mut cx, a).await,
             LibraryCmd::Rename { id, title } => library_rename(&mut cx, id, title).await,

@@ -9,10 +9,10 @@ This kit adds icons to the CaptureMann desktop app. It is based on `specs/icon-i
 ```
 capturemann-icons/
 ├── CLAUDE.md                  ← you are here
-├── icon-map.md / icon-map.csv ← element → icon, priority, size, note (278 rows)
+├── icon-map.md / icon-map.csv ← element → icon, priority, size, note (289 rows)
 ├── icons.json                 ← manifest: name, source, new vs already in app, where used
-├── icons/                     ← 143 SVGs, 24×24, drop-in for apps/desktop/assets/icons/
-│   ├── cm-*.svg               ← 15 CaptureMann custom glyphs (same grid and stroke as Lucide)
+├── icons/                     ← 151 SVGs, 24×24, drop-in for apps/desktop/assets/icons/
+│   ├── cm-*.svg               ← 18 CaptureMann custom glyphs (same grid and stroke as Lucide)
 │   ├── *.svg                  ← Lucide v1.60.0 (the version the app already pins), ISC
 │   └── LICENSE-lucide.txt
 ├── tray/                      ← two NEW tray states: Paused and Attention
@@ -47,7 +47,7 @@ capturemann-icons/
 2. **P2 (99 rows):** a leading icon on text buttons (Export, Publish, Reveal, Copy link, Retry, Delete…). Add them screen by screen, and keep every label.
 3. **keep (30 rows):** already correct. Don't touch.
 4. **text only (9 rows):** deliberately no icon (see §6).
-5. **planned (8 rows):** icons are ready for controls that aren't built yet (Auto-redact, audio mix, loop, frame step, timeline Fit, export preset/Cancel/Retry/Copy path, library rescan).
+5. **planned (19 rows):** icons are ready for controls that aren't built yet (Auto-redact, audio mix, loop, frame step, timeline Fit, export preset/Cancel/Retry/Copy path, library rescan).
 
 ## 5. Fixes the inventory revealed (do these in P1)
 

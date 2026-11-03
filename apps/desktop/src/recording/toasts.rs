@@ -185,6 +185,7 @@ pub fn permission_revoked_toast(
         Permission::Microphone => tr_ctx!("permission", "Microphone"),
         Permission::Accessibility => tr_ctx!("permission", "Accessibility"),
         Permission::InputMonitoring => tr_ctx!("permission", "Input Monitoring"),
+        Permission::Files => tr_ctx!("permission", "Files and Folders"),
     };
     let mut spec = ToastSpec::new(
         ToastKind::Error,
@@ -217,6 +218,7 @@ pub fn privacy_pane(p: Permission) -> &'static str {
         Permission::Microphone => "Privacy_Microphone",
         Permission::Accessibility => "Privacy_Accessibility",
         Permission::InputMonitoring => "Privacy_ListenEvent",
+        Permission::Files => "Privacy_FilesAndFolders",
     }
 }
 

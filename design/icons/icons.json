@@ -222,6 +222,15 @@
       ]
     },
     {
+      "name": "circle-slash",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Import sheet: Can't import status chip",
+        "Editor: disabled Camera and Cursor tabs for an imported file"
+      ]
+    },
+    {
       "name": "clock",
       "source": "lucide@1.60.0",
       "status": "new",
@@ -297,6 +306,35 @@
       "status": "new",
       "used_for": [
         "Recording editor: Bubble position: 4 corners"
+      ]
+    },
+    {
+      "name": "cm-import",
+      "source": "custom",
+      "status": "new",
+      "used_for": [
+        "Library: Import… (header, ⌘I)",
+        "Library: Drop to import overlay tile",
+        "Launcher: Import media",
+        "Menu bar: Import file…"
+      ]
+    },
+    {
+      "name": "cm-import-audio",
+      "source": "custom",
+      "status": "new",
+      "used_for": [
+        "Import sheet: audio file row",
+        "Drop overlay: count of audio files"
+      ]
+    },
+    {
+      "name": "cm-import-video",
+      "source": "custom",
+      "status": "new",
+      "used_for": [
+        "Import sheet: video file row (no thumbnail yet)",
+        "Drop overlay: count of videos"
       ]
     },
     {
@@ -494,11 +532,28 @@
       ]
     },
     {
+      "name": "file-x",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Library: failed import card",
+        "Import sheet: file that cannot be opened"
+      ]
+    },
+    {
       "name": "file-x-2",
       "source": "lucide@1.60.0",
       "status": "new",
       "used_for": [
         "Library: Card: Unreadable placeholder"
+      ]
+    },
+    {
+      "name": "files",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Import sheet: Add files"
       ]
     },
     {
@@ -526,6 +581,15 @@
       "status": "new",
       "used_for": [
         "Settings: Destinations: Local folder row tile (replaces '~')"
+      ]
+    },
+    {
+      "name": "folder-input",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Drop overlay: folders skipped",
+        "Import sheet: Folders can't be imported yet"
       ]
     },
     {
@@ -749,6 +813,14 @@
         "Publish sheet: Visibility: Private / Unlisted / Public",
         "Published: Privacy pill: Private / Unlisted / Public",
         "Settings: Permissions: State: Not granted / Denied / Restricted / Restart required"
+      ]
+    },
+    {
+      "name": "lock-keyhole",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Import sheet: Can't import, protected (DRM) file"
       ]
     },
     {

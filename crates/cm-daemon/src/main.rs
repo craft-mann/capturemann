@@ -189,6 +189,10 @@ async fn main() -> ExitCode {
     if let Err(e) = daemon.register_publish_handler() {
         log::warn!("publishing is unavailable: {e}");
     }
+    // Importing media files (IMP-3).
+    if let Err(e) = daemon.register_import_handler() {
+        log::warn!("importing files is unavailable: {e}");
+    }
     // Moving the library folder (LIB-2).
     if let Err(e) = daemon.register_library_move_handler() {
         log::warn!("moving the library is unavailable: {e}");
