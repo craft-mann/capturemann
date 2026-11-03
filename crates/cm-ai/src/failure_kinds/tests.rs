@@ -424,7 +424,7 @@ fn captions_never_show_stray_characters() {
 }
 
 /// A long read that writes one short word for twelve seconds of speech; a read of the region on its
-/// own writes a word a second (the maintainer's "Cảmơn" over a full quiet sentence, in shape).
+/// own writes a word a second (a short word standing for a long quiet sentence, in shape).
 struct OneWordForALongRegion;
 
 impl Transcriber for OneWordForALongRegion {
