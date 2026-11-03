@@ -11135,6 +11135,14 @@ msgid "No silences found. Filler words need a transcript, and this recording has
 msgstr "Không thấy đoạn lặng nào. Từ đệm cần có bản chép lời, mà bản ghi này chưa có."
 
 #, fuzzy
+msgid "Transcribe while recording"
+msgstr "Chép lời trong khi ghi âm"
+
+#, fuzzy
+msgid "Audio recordings only: reads each finished piece as you record, so the transcript is ready sooner after Stop"
+msgstr "Chỉ với bản ghi âm thanh: đọc từng đoạn đã xong khi bạn ghi, nên bản chép lời sẵn sàng sớm hơn sau khi dừng"
+
+#, fuzzy
 msgid "Suggest cuts when the editor opens"
 msgstr "Gợi ý cắt khi mở trình chỉnh sửa"
 
