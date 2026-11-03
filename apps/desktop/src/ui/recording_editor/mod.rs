@@ -167,6 +167,8 @@ pub(crate) struct Session {
     pub voice: VoiceData,
     /// The waveform of each audio track, on the session clock (audio recordings only).
     pub waves: Vec<(RowKind, Wave)>,
+    /// Set for an imported capture: no camera or cursor, and the source line.
+    pub imported: Option<Imported>,
 }
 
 enum Load {
@@ -196,6 +198,17 @@ struct Loaded {
     waves: Vec<(RowKind, Wave)>,
     /// The manifest's last revision number (M2f: the automatic cut suggestions run once per revision).
     revision: u64,
+    /// An imported file (IMP-5): the source line and where the original is.
+    imported: Option<Imported>,
+}
+
+/// What the editor shows about an imported capture (board I4).
+#[derive(Debug, Clone)]
+pub(crate) struct Imported {
+    /// `Imported 2026-11-03 \u{b7} /path \u{b7} HEVC \u{b7} original kept in the bundle`.
+    pub line: String,
+    /// The original, inside the bundle.
+    pub original: PathBuf,
 }
 
 pub struct RecordingEditor {
@@ -339,7 +352,16 @@ fn load_blocking(root: Option<PathBuf>, id: &str) -> Result<Loaded, files::FileE
         .collect(),
         _ => Vec::new(),
     };
+    let imported = serde_json::to_value(&m).ok().and_then(|v| {
+        let line = crate::import_flow::source_line(&v)?;
+        let file = v["source"]["original_file"].as_str().unwrap_or_default();
+        Some(Imported {
+            line,
+            original: dir.join(file),
+        })
+    });
     Ok(Loaded {
+        imported,
         bundle: dir.clone(),
         voice,
         waves,
@@ -801,6 +823,7 @@ impl Session {
             None => (None, l.audio_note),
         };
         Session {
+            imported: l.imported,
             voice: l.voice,
             waves: l.waves,
             model: EditorModel::new(id, l.basis, l.list, l.grid, l.flags),

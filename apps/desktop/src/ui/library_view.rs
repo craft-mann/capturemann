@@ -274,7 +274,15 @@ impl LibraryView {
     }
 
     fn sync_items(&mut self) {
-        self.items = Arc::new(self.state.items().to_vec());
+        let only = self.state.imported_only;
+        self.items = Arc::new(
+            self.state
+                .items()
+                .iter()
+                .filter(|i| !only || i.imported_from.is_some())
+                .cloned()
+                .collect(),
+        );
         self.rows_dirty = true;
     }
 
@@ -290,6 +298,11 @@ impl LibraryView {
         if self.state.click_chip(chip) {
             self.keep_scroll = false;
             self.reload(cx);
+        } else if chip == Chip::Imported {
+            // Filtered here: the page is already loaded.
+            self.keep_scroll = false;
+            self.sync_items();
+            cx.notify();
         }
     }
 
@@ -514,6 +527,8 @@ struct RowCtx {
     clock: LocalClock,
     avail: f32,
     cols: usize,
+    /// Running imports: the strip on a card whose capture is still being filled.
+    imports: Arc<crate::import_flow::ImportUi>,
 }
 
 /// The darkened overlay behind the pills on a thumbnail (the thumbnail is an image, so the
@@ -822,6 +837,18 @@ fn card(ctx: &RowCtx, ix: usize, width: f32, cx: &mut gpui::App) -> AnyElement {
     }
     .border_color(rgba_of(border))
     .group_hover(group.clone(), move |s| s.border_color(hover_border));
+    // IMP-5: an imported capture carries the badge, and a strip while its import still runs.
+    let frame = if item.imported_from.is_some() {
+        let mut fr = frame.child(crate::ui::import_cards::imported_badge(&t));
+        if let Some(crate::import_flow::CardState::Step(step, frac)) =
+            ctx.imports.card_for(&item.id).map(|c| c.state.clone())
+        {
+            fr = fr.child(crate::ui::import_cards::progress_strip(&t, &step, frac));
+        }
+        fr
+    } else {
+        frame
+    };
     // The "..." button shows on hover, on keyboard focus, on the selected card while the list has
     // focus, and while its menu is open. It sits beside the clickable card (not inside it) and
     // occludes what is under it, so a click on it never also opens the capture.
@@ -1182,6 +1209,7 @@ impl Render for LibraryView {
                     .flex_none()
                     .child(self.search.clone()),
             )
+            .child(crate::ui::import_cards::header_button(&t, &self.app))
             .children((route == Route::Audio).then(|| {
                 record_audio_header_button(
                     &t,
@@ -1344,6 +1372,11 @@ impl Render for LibraryView {
                 .into_any_element(),
             );
         }
+        banners.extend(crate::ui::import_cards::pending_strip(
+            &t,
+            &self.app.read(cx).import,
+            &self.app,
+        ));
         if let Some(w) = ipc_warning {
             banners.push(
                 callout(
@@ -1513,6 +1546,7 @@ impl Render for LibraryView {
                     clock,
                     avail,
                     cols,
+                    imports: Arc::new(self.app.read(cx).import.clone()),
                 };
                 div()
                     .id("library-list")

@@ -92,6 +92,8 @@ pub enum Command {
     Capture(CaptureMode),
     ShowLibrary,
     ShowSettings,
+    /// Import these files (the Dock, Open With, a drop); no path opens the file picker.
+    ImportFiles(Vec<std::path::PathBuf>),
     OpenCapture(String),
     ToastAction(ToastAction),
     Quit,
@@ -146,6 +148,8 @@ pub struct AppModel {
     pub copy_after_capture: bool,
     /// The library folder change in progress (Settings, General; LIB-2).
     pub library_move: crate::library_move::Phase,
+    /// Import media (IMP-5): the sheet, the running imports and the drop overlay.
+    pub import: crate::import_flow::ImportUi,
     /// The AI page: speech models, downloads the user started, the notice and the switches.
     pub ai: crate::ai::models::ModelsVm,
     /// The built-in text models of the AI page (AI-7): the list by memory tier and its downloads.
@@ -249,6 +253,7 @@ impl AppModel {
             counts: NavCounts::default(),
             copy_after_capture,
             library_move: crate::library_move::Phase::default(),
+            import: Default::default(),
             ai: crate::ai::models::ModelsVm {
                 notice_dismissed: settings
                     .get(crate::ui::ai::KEY_NOTICE_DISMISSED)

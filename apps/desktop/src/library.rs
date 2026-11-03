@@ -115,6 +115,8 @@ pub struct CaptureItem {
     pub uploads: Vec<UploadRecord>,
     /// Videos published from the capture (`publishes[]`), oldest first (PUB-2).
     pub publishes: Vec<PublishRecord>,
+    /// The file it was imported from (`source.path`): an imported capture (IMP-2).
+    pub imported_from: Option<String>,
 }
 
 impl CaptureItem {
@@ -149,6 +151,11 @@ impl CaptureItem {
             broken: v.get("broken").and_then(Value::as_bool).unwrap_or(false),
             uploads: parse_uploads(v.get("uploads")),
             publishes: parse_publishes(v.get("publishes")),
+            imported_from: v
+                .get("source")
+                .and_then(|s| s.get("path"))
+                .and_then(Value::as_str)
+                .map(str::to_owned),
         })
     }
 
@@ -261,15 +268,18 @@ impl RemoteFilter {
 /// (OD-16): the sidebar expresses the kind. Only what it cannot express stays.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Chip {
+    /// Captures made by importing a file (`manifest.source`, IMP-2); filtered on this side.
+    Imported,
     Uploaded,
     Published,
 }
 
 impl Chip {
-    pub const ALL: [Chip; 2] = [Chip::Uploaded, Chip::Published];
+    pub const ALL: [Chip; 3] = [Chip::Imported, Chip::Uploaded, Chip::Published];
 
     pub fn label(self) -> String {
         match self {
+            Chip::Imported => tr_ctx!("filter chip", "Imported"),
             Chip::Uploaded => tr_ctx!("filter chip", "Uploaded"),
             Chip::Published => tr_ctx!("filter chip", "Published"),
         }
@@ -278,6 +288,7 @@ impl Chip {
     /// A stable element id part (never translated).
     pub fn key(self) -> &'static str {
         match self {
+            Chip::Imported => "Imported",
             Chip::Uploaded => "Uploaded",
             Chip::Published => "Published",
         }
@@ -286,6 +297,7 @@ impl Chip {
     /// The leading icon of the chip.
     pub fn glyph(self) -> &'static str {
         match self {
+            Chip::Imported => "cm-import",
             Chip::Uploaded => "cloud-upload",
             Chip::Published => "send",
         }
@@ -391,6 +403,8 @@ pub struct LibraryState {
     pub filter: Filter,
     /// The "Uploaded" or "Published" chip, if on.
     pub remote: Option<RemoteFilter>,
+    /// The "Imported" chip: only captures that have a `source` (applied to the loaded page).
+    pub imported_only: bool,
     /// How many captures of the page are uploaded and published, from the last load without a
     /// chip or query (the chips show them).
     pub remote_counts: Option<(usize, usize)>,
@@ -410,6 +424,7 @@ impl LibraryState {
             status,
             filter: Filter::All,
             remote: None,
+            imported_only: false,
             remote_counts: None,
             sort: SortKey::Date,
             descending: true,
@@ -428,6 +443,7 @@ impl LibraryState {
     /// Whether a chip is on.
     pub fn chip_active(&self, chip: Chip) -> bool {
         match chip {
+            Chip::Imported => self.imported_only,
             Chip::Uploaded => self.remote == Some(RemoteFilter::Uploaded),
             Chip::Published => self.remote == Some(RemoteFilter::Published),
         }
@@ -437,6 +453,11 @@ impl LibraryState {
     /// query changed (the caller reloads).
     pub fn click_chip(&mut self, chip: Chip) -> bool {
         let want = match chip {
+            Chip::Imported => {
+                self.imported_only = !self.imported_only;
+                self.selected = None;
+                return false;
+            }
             Chip::Uploaded => RemoteFilter::Uploaded,
             Chip::Published => RemoteFilter::Published,
         };
@@ -451,8 +472,17 @@ impl LibraryState {
     /// The count a chip shows, when known: the uploaded and published captures of the page's kind
     /// (all captures on "All captures").
     pub fn chip_count(&self, chip: Chip) -> Option<usize> {
+        if chip == Chip::Imported {
+            return Some(
+                self.items
+                    .iter()
+                    .filter(|i| i.imported_from.is_some())
+                    .count(),
+            );
+        }
         let (up, publ) = self.remote_counts?;
         match chip {
+            Chip::Imported => None,
             Chip::Uploaded => Some(up),
             Chip::Published => Some(publ),
         }
@@ -738,7 +768,7 @@ mod tests {
     #[test]
     fn lib1_remote_chips_toggle_and_keep_the_kind() {
         let mut s = LibraryState::new(LibraryStatus::Ready);
-        assert_eq!(Chip::ALL, [Chip::Uploaded, Chip::Published]);
+        assert_eq!(Chip::ALL, [Chip::Imported, Chip::Uploaded, Chip::Published]);
         assert!(!s.chip_active(Chip::Uploaded) && !s.chip_active(Chip::Published));
         s.filter = Filter::Recordings;
         assert!(s.click_chip(Chip::Uploaded));

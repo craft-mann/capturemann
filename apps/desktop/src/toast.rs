@@ -59,6 +59,8 @@ pub enum ToastAction {
     StopRecording(String),
     /// `cancel_job` on a running upload.
     CancelJob(String),
+    /// `cancel_job` on a running import (IMP-3): the finished files stay, the rest is dropped.
+    CancelImport(String),
     /// Open the recording's Report tab on the setup, with the preset's template suggested.
     SuggestReport(String),
     /// `upload { file }` of a file made from a capture (the exported audio): capture id, path.
@@ -117,7 +119,7 @@ impl ToastAction {
             ToastAction::RetryJob(_) => "rotate-cw",
             ToastAction::OpenDestinations => "plug",
             ToastAction::StopRecording(_) => "cm-stop",
-            ToastAction::CancelJob(_) => "x",
+            ToastAction::CancelJob(_) | ToastAction::CancelImport(_) => "x",
             ToastAction::UploadFile(..) => "cloud-upload",
             ToastAction::SuggestReport(_) => "file-text",
         }

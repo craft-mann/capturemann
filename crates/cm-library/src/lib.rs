@@ -120,6 +120,6 @@ pub use bundle::ShotBundle;
 pub use index::Library;
 pub use rec::{
     exports_of, publishes_of, read_manifest, record_export, record_publish,
-    record_remote_deletions, record_upload, remote_deletions_of, uploads_of, RecBundle,
+    record_remote_deletions, record_upload, remote_deletions_of, source_of, uploads_of, RecBundle,
     RecoveryReport,
 };

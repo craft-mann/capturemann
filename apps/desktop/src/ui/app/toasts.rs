@@ -304,6 +304,7 @@ pub(super) fn toast_action(app: &Entity<AppModel>, action: ToastAction, cx: &mut
             crate::ui::recording::stop_recording_if_running(app, &id, cx)
         }
         ToastAction::CancelJob(id) => crate::ui::upload_ui::cancel(app, &id, cx),
+        ToastAction::CancelImport(id) => crate::ui::import_actions::cancel(app, &id, cx),
         ToastAction::UploadFile(id, file) => {
             crate::ui::upload_ui::upload(app, Some(&id), Some(&file), cx)
         }

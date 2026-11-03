@@ -229,6 +229,7 @@ pub(crate) fn tab_button(
     tab: Inspector,
     active: bool,
     unavailable: bool,
+    reason: Option<String>,
 ) -> Stateful<Div> {
     let (hover, focus) = (rgba_of(t.raised), rgba_of(t.text));
     div()
@@ -237,7 +238,11 @@ pub(crate) fn tab_button(
         .aria_label(tab.label())
         .aria_selected(active)
         .when(unavailable, |d| {
-            d.aria_description(tr!("Not available for this recording"))
+            d.aria_description(
+                reason
+                    .clone()
+                    .unwrap_or_else(|| tr!("Not available for this recording")),
+            )
         })
         .focusable()
         .tab_stop(true)
@@ -251,11 +256,19 @@ pub(crate) fn tab_button(
         .border_1()
         .border_color(gpui::transparent_black())
         .cursor_pointer()
-        .when(unavailable, |d| d.opacity(0.45))
+        .when(unavailable, |d| {
+            d.opacity(if reason.is_some() { 0.35 } else { 0.45 })
+        })
         .when(active, |d| d.bg(rgba_of(t.raised)))
         .when(!active, |d| d.hover(move |s| s.bg(hover)))
         .focus_visible(move |s| s.border_color(focus))
-        .tooltip(crate::ui::tooltip::tip(tab.label(), Vec::new()))
+        .tooltip(crate::ui::tooltip::tip(
+            match &reason {
+                Some(r) => format!("{}: {r}", tab.label()),
+                None => tab.label(),
+            },
+            Vec::new(),
+        ))
         .when(active, |d| {
             d.child(
                 div()

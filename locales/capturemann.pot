@@ -10,6 +10,18 @@ msgstr ""
 msgid "(untitled)"
 msgstr ""
 
+msgid "1 audio file"
+msgstr ""
+
+msgid "1 file that may not open"
+msgstr ""
+
+msgid "1 folder skipped"
+msgstr ""
+
+msgid "1 video"
+msgstr ""
+
 msgid "30 fps suits most screens; 60 fps is smoother for motion."
 msgstr ""
 
@@ -84,6 +96,9 @@ msgid "A recording is running"
 msgstr ""
 
 msgid "A recording is running. Stop it, then change the library folder."
+msgstr ""
+
+msgid "A report for an audio file is offered after its transcript is ready."
 msgstr ""
 
 msgid "A report is written from the transcript. Transcribe the recording first."
@@ -216,6 +231,9 @@ msgstr ""
 msgid "Add client with the chosen policy"
 msgstr ""
 
+msgid "Add files"
+msgstr ""
+
 msgid "Add local folder…"
 msgstr ""
 
@@ -252,7 +270,13 @@ msgstr ""
 msgid "After granting, quit and reopen CaptureMann."
 msgstr ""
 
+msgid "After import"
+msgstr ""
+
 msgid "After recording"
+msgstr ""
+
+msgid "After the transcript: Speakers tells who said what, Translate writes it in another language and Report turns it into minutes."
 msgstr ""
 
 msgid "After you stop"
@@ -498,6 +522,9 @@ msgstr ""
 msgid "Best matches first, then front to back"
 msgstr ""
 
+msgid "Bring in a video or audio file"
+msgstr ""
+
 msgid "Bubble position"
 msgstr ""
 
@@ -568,6 +595,9 @@ msgid "Cancel the 60 fps test"
 msgstr ""
 
 msgid "Cancel the upload to YouTube"
+msgstr ""
+
+msgid "Cancelled"
 msgstr ""
 
 msgid "Cancelling…"
@@ -671,6 +701,9 @@ msgid "CaptureMann couldn’t open the microphone. Pick another one, or try agai
 msgstr ""
 
 msgid "CaptureMann is already running"
+msgstr ""
+
+msgid "CaptureMann isn't allowed to read these files. Allow it in System Settings, Privacy & Security, Files and Folders."
 msgstr ""
 
 msgid "CaptureMann isn’t allowed to use the camera yet."
@@ -785,6 +818,9 @@ msgstr ""
 msgid "Checking the account…"
 msgstr ""
 
+msgid "Checking the copy"
+msgstr ""
+
 msgid "Checking…"
 msgstr ""
 
@@ -831,6 +867,9 @@ msgid "Choose another folder…"
 msgstr ""
 
 msgid "Choose another…"
+msgstr ""
+
+msgid "Choose files"
 msgstr ""
 
 msgid "Choose folder…"
@@ -1013,6 +1052,12 @@ msgstr ""
 msgid "Copies go to the folders above when you upload a capture. Drives and accounts are connected with your own credentials."
 msgstr ""
 
+msgid "Copies into your library: {size}"
+msgstr ""
+
+msgid "Copies into your library: {size} · {free} free"
+msgstr ""
+
 msgid "Copies the export and the whole capture folder."
 msgstr ""
 
@@ -1065,6 +1110,9 @@ msgid "Copy the link after an upload"
 msgstr ""
 
 msgid "Copy the link when an upload finishes"
+msgstr ""
+
+msgid "Copying into the library"
 msgstr ""
 
 msgid "Copying your captures to {path}: {percent}%"
@@ -1546,6 +1594,9 @@ msgstr ""
 msgid "Drawn on the video in the editor."
 msgstr ""
 
+msgid "Drop to import"
+msgstr ""
+
 msgid "Dropbox shows a development app to its owner only, which is all CaptureMann needs. Set the permissions before you sign in: Dropbox ties the permissions to the sign-in, so changing them later means signing in again. The access type cannot be changed after the app is created."
 msgstr ""
 
@@ -1556,6 +1607,9 @@ msgid "Duplicate"
 msgstr ""
 
 msgid "Each Google Cloud project may upload to YouTube about 100 times a day. YouTube can also keep videos from an unverified project private; CaptureMann tells you when that happens and never changes a video’s visibility afterwards."
+msgstr ""
+
+msgid "Each original goes to the Trash after its copy is checked"
 msgstr ""
 
 msgid "Each segment has its own window: split the recording, then move the playhead into a segment to move its window."
@@ -1806,7 +1860,13 @@ msgstr ""
 msgid "Folder: the {n} copied files of {path} in {place} (files you added there stay)"
 msgstr ""
 
+msgid "Folders can't be imported yet: open the folder and select the files inside."
+msgstr ""
+
 msgid "Follow cursor"
+msgstr ""
+
+msgid "For a call or an interview. Runs after the transcript"
 msgstr ""
 
 msgid "For headset calls: the mic track is you, only the call is split into voices."
@@ -1935,10 +1995,58 @@ msgstr ""
 msgid "Image {iw} by {ih} pixels. Pointer {pointer}"
 msgstr ""
 
+msgid "Import 1 file"
+msgstr ""
+
+msgid "Import cancelled"
+msgstr ""
+
+msgid "Import failed"
+msgstr ""
+
+msgid "Import files"
+msgstr ""
+
 msgid "Import from file"
 msgstr ""
 
+msgid "Import media"
+msgstr ""
+
 msgid "Import video and audio files"
+msgstr ""
+
+msgid "Import {n} files"
+msgstr ""
+
+msgid "Imported 1 file"
+msgstr ""
+
+msgid "Imported files have no cursor data"
+msgstr ""
+
+msgid "Imported files have no separate camera track"
+msgstr ""
+
+msgid "Imported files have no separate camera track."
+msgstr ""
+
+msgid "Imported {at} · {path} · original kept in the bundle"
+msgstr ""
+
+msgid "Imported {at} · {path} · {codec} · original kept in the bundle"
+msgstr ""
+
+msgid "Imported {n} files"
+msgstr ""
+
+msgid "Importing 1 file"
+msgstr ""
+
+msgid "Importing needs the CaptureMann engine, which is not running."
+msgstr ""
+
+msgid "Importing {n} files"
 msgstr ""
 
 msgid "In (I)"
@@ -2056,6 +2164,9 @@ msgid "Kinds to look for"
 msgstr ""
 
 msgid "Language"
+msgstr ""
+
+msgid "Language detected automatically; uses the model in use"
 msgstr ""
 
 msgid "Languages you speak"
@@ -2465,6 +2576,9 @@ msgid_plural "Moved {n} captures to the Trash"
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "Moves instead of copies, so the files don't take space twice. Each original goes to the Trash only after its copy in the library is checked. Frees {size}."
+msgstr ""
+
 msgid "Moving the library"
 msgstr ""
 
@@ -2505,6 +2619,9 @@ msgid "Needs a model above"
 msgstr ""
 
 msgid "Needs about {memory} of memory"
+msgstr ""
+
+msgid "Needs the speaker model (AI page)"
 msgstr ""
 
 msgid "Network"
@@ -2688,6 +2805,9 @@ msgid "No transcript yet. Transcribe the microphone to get captions; it runs on 
 msgstr ""
 
 msgid "No transcript yet. Transcribe the recording to read it here; it runs on this Mac."
+msgstr ""
+
+msgid "No video or audio stream could be read. The file may be damaged."
 msgstr ""
 
 msgid "No web browser is set on this desktop; choose one in your desktop’s settings."
@@ -3001,6 +3121,9 @@ msgstr ""
 msgid "Original recording"
 msgstr ""
 
+msgid "Originals stay where they are unless you tick “Remove the originals”"
+msgstr ""
+
 msgid "Other action"
 msgstr ""
 
@@ -3088,6 +3211,9 @@ msgstr ""
 msgid "Pick on screen"
 msgstr ""
 
+msgid "Pick one or more files. Edit, transcribe and write reports as if you'd recorded them here."
+msgstr ""
+
 msgid "Place at the center"
 msgstr ""
 
@@ -3140,6 +3266,9 @@ msgid "Position, clicks and scroll direction (never keystrokes)"
 msgstr ""
 
 msgid "Post to a Page you manage."
+msgstr ""
+
+msgid "Preparing for editing"
 msgstr ""
 
 msgid "Preparing the preview…"
@@ -3200,6 +3329,9 @@ msgid "Product presentation recap"
 msgstr ""
 
 msgid "Proposals only"
+msgstr ""
+
+msgid "Protected by the store it came from (DRM); it can't be opened"
 msgstr ""
 
 msgid "Publish \"{title}\" to {platform} as {privacy}"
@@ -3312,6 +3444,9 @@ msgid "Reading never needs asking."
 msgstr ""
 
 msgid "Reading the model list…"
+msgstr ""
+
+msgid "Reading the sound"
 msgstr ""
 
 msgid "Reading…"
@@ -3582,7 +3717,13 @@ msgstr ""
 msgid "Remove destination"
 msgstr ""
 
+msgid "Remove from the list"
+msgstr ""
+
 msgid "Remove model"
+msgstr ""
+
+msgid "Remove the originals after importing"
 msgstr ""
 
 msgid "Remove the selected zoom"
@@ -4019,6 +4160,9 @@ msgstr ""
 msgid "Show captions in the preview"
 msgstr ""
 
+msgid "Show file"
+msgstr ""
+
 msgid "Show in folder"
 msgstr ""
 
@@ -4026,6 +4170,9 @@ msgid "Show in preview"
 msgstr ""
 
 msgid "Show or hide captions"
+msgstr ""
+
+msgid "Show original"
 msgstr ""
 
 msgid "Show the permissions setup screen again"
@@ -4553,6 +4700,15 @@ msgstr ""
 msgid "The export failed."
 msgstr ""
 
+msgid "The file can't be imported"
+msgstr ""
+
+msgid "The file can't be read. It may be damaged or cut short."
+msgstr ""
+
+msgid "The files already imported are in your library."
+msgstr ""
+
 msgid "The first time, your desktop asks which screen to share. Choose the screen to record and confirm; CaptureMann remembers it for the next recordings."
 msgstr ""
 
@@ -4560,6 +4716,12 @@ msgid "The folder pattern can’t be empty."
 msgstr ""
 
 msgid "The glossary is full. Remove an entry to add another."
+msgstr ""
+
+msgid "The import did not start."
+msgstr ""
+
+msgid "The import failed."
 msgstr ""
 
 msgid "The in point has to be before the out point"
@@ -4848,6 +5010,9 @@ msgstr ""
 msgid "There is no desktop session to record."
 msgstr ""
 
+msgid "There isn't enough free space on the library's disk."
+msgstr ""
+
 msgid "There isn’t enough room: the move needs {needed} free and the new folder has {free}."
 msgstr ""
 
@@ -4905,6 +5070,9 @@ msgid "This is a work or school account. If your administrator forbids public li
 msgstr ""
 
 msgid "This is the latest export. To upload the current edits, export again first."
+msgstr ""
+
+msgid "This kind of file isn't supported yet"
 msgstr ""
 
 msgid "This recording has no camera track."
@@ -4988,6 +5156,9 @@ msgstr ""
 msgid "Tracks"
 msgstr ""
 
+msgid "Transcribe"
+msgstr ""
+
 msgid "Transcribe a recording"
 msgstr ""
 
@@ -4998,6 +5169,9 @@ msgid "Transcribe · {model}"
 msgstr ""
 
 msgid "Transcribe, if turned on"
+msgstr ""
+
+msgid "Transcribing"
 msgstr ""
 
 msgid "Transcribing needs a speech model. Add one on the AI page."
@@ -5213,10 +5387,16 @@ msgstr ""
 msgid "Video to upload"
 msgstr ""
 
+msgid "Video: {video} · Audio: {audio}"
+msgstr ""
+
 msgid "Voice note"
 msgstr ""
 
 msgid "Voices are compared in memory only. No voiceprint is saved, and people are never recognised across recordings."
+msgstr ""
+
+msgid "Waiting"
 msgstr ""
 
 msgid "Waiting for the system…"
@@ -5549,6 +5729,9 @@ msgstr ""
 msgid "a CraftMann app"
 msgstr ""
 
+msgid "a colour format editing doesn't use"
+msgstr ""
+
 msgid "a copy"
 msgstr ""
 
@@ -5561,10 +5744,22 @@ msgstr ""
 msgid "a platform"
 msgstr ""
 
+msgid "a rotated picture"
+msgstr ""
+
+msgid "a variable frame rate"
+msgstr ""
+
 msgid "a {w} x {h} region of display {id}"
 msgstr ""
 
+msgid "an MKV container"
+msgstr ""
+
 msgid "an earlier session"
+msgstr ""
+
+msgid "an unusual format"
 msgstr ""
 
 msgid "cannot decode poster: {error}"
@@ -5657,6 +5852,9 @@ msgstr ""
 msgid "macOS usually needs the app restarted before it can capture."
 msgstr ""
 
+msgid "mono"
+msgstr ""
+
 msgid "newest first"
 msgstr ""
 
@@ -5694,6 +5892,9 @@ msgid "over a month ago"
 msgstr ""
 
 msgid "permission denied"
+msgstr ""
+
+msgid "stereo"
 msgstr ""
 
 msgid "system audio"
@@ -5826,6 +6027,9 @@ msgstr ""
 msgid "{a}, {b} and {c}"
 msgstr ""
 
+msgid "{bytes} · {ready} ready · keep working"
+msgstr ""
+
 msgid "{channel} · default visibility: {visibility}"
 msgstr ""
 
@@ -5836,6 +6040,9 @@ msgid "{count} of {max} characters"
 msgstr ""
 
 msgid "{device_kind}: {device}"
+msgstr ""
+
+msgid "{done} / {total}"
 msgstr ""
 
 msgid "{done} of {total}"
@@ -5945,7 +6152,13 @@ msgstr ""
 msgid "{name} (the file was deleted)"
 msgstr ""
 
+msgid "{name} and {n} more files need a copy prepared for smooth editing (for example because of {reason}); the original files are kept unchanged in the bundles."
+msgstr ""
+
 msgid "{name} can’t make “{link}” links."
+msgstr ""
+
+msgid "{name} has {reason}. A copy is prepared for smooth editing; the original file is kept unchanged in the bundle."
 msgstr ""
 
 msgid "{name} needs an app that you create yourself, so the sign-in belongs to you. It takes a few minutes, once. The ID you paste (no secret is involved) go to your Keychain, never to a file, and are only sent to {service}."
@@ -6039,6 +6252,9 @@ msgid_plural "{n} annotations, none selected"
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "{n} audio files"
+msgstr ""
+
 msgid "{n} caption breaks the rules (42 characters a row, 2 rows, 1 to 7 s)."
 msgid_plural "{n} captions break the rules (42 characters a row, 2 rows, 1 to 7 s)."
 msgstr[0] ""
@@ -6069,12 +6285,24 @@ msgid_plural "{n} channels"
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "{n} channels"
+msgstr ""
+
+msgid "{n} could not be imported. Their cards say why."
+msgstr ""
+
 msgid "{n} day ago"
 msgid_plural "{n} days ago"
 msgstr[0] ""
 msgstr[1] ""
 
 msgid "{n} doubtful"
+msgstr ""
+
+msgid "{n} files that may not open"
+msgstr ""
+
+msgid "{n} folders skipped"
 msgstr ""
 
 msgid "{n} found from the voices · whole recording"
@@ -6145,6 +6373,9 @@ msgid "{n} tool is set differently from its default. Resetting puts every tool b
 msgid_plural "{n} tools are set differently from their defaults. Resetting puts every tool back to its default: tools that change something run without asking, and starting a recording asks first."
 msgstr[0] ""
 msgstr[1] ""
+
+msgid "{n} videos"
+msgstr ""
 
 msgid "{n} window"
 msgid_plural "{n} windows"
@@ -6729,6 +6960,10 @@ msgid "Hide options"
 msgstr ""
 
 msgctxt "button"
+msgid "Import…"
+msgstr ""
+
+msgctxt "button"
 msgid "Manage"
 msgstr ""
 
@@ -6930,6 +7165,10 @@ msgstr ""
 
 msgctxt "card badge"
 msgid "AUDIO"
+msgstr ""
+
+msgctxt "card badge"
+msgid "Imported"
 msgstr ""
 
 msgctxt "card badge"
@@ -7140,6 +7379,10 @@ msgctxt "dropbox access type"
 msgid "Full Dropbox"
 msgstr ""
 
+msgctxt "editor chip"
+msgid "Imported"
+msgstr ""
+
 msgctxt "editor shortcut"
 msgid "Cut"
 msgstr ""
@@ -7260,6 +7503,14 @@ msgctxt "field"
 msgid "Title"
 msgstr ""
 
+msgctxt "file dialog"
+msgid "Choose files"
+msgstr ""
+
+msgctxt "filter chip"
+msgid "Imported"
+msgstr ""
+
 msgctxt "filter chip"
 msgid "Published"
 msgstr ""
@@ -7302,6 +7553,18 @@ msgstr ""
 
 msgctxt "image info"
 msgid "Size"
+msgstr ""
+
+msgctxt "import status"
+msgid "Can't import"
+msgstr ""
+
+msgctxt "import status"
+msgid "Prepared for editing"
+msgstr ""
+
+msgctxt "import status"
+msgid "Ready"
 msgstr ""
 
 msgctxt "inspector"
@@ -7517,6 +7780,10 @@ msgid "facebook"
 msgstr ""
 
 msgctxt "launcher keyword"
+msgid "file"
+msgstr ""
+
+msgctxt "launcher keyword"
 msgid "google"
 msgstr ""
 
@@ -7526,6 +7793,10 @@ msgstr ""
 
 msgctxt "launcher keyword"
 msgid "image"
+msgstr ""
+
+msgctxt "launcher keyword"
+msgid "import"
 msgstr ""
 
 msgctxt "launcher keyword"
@@ -7642,6 +7913,10 @@ msgstr ""
 
 msgctxt "marker"
 msgid "Marker"
+msgstr ""
+
+msgctxt "menu"
+msgid "Import file…"
 msgstr ""
 
 msgctxt "menu"

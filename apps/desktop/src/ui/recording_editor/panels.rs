@@ -282,6 +282,54 @@ impl RecordingEditor {
             .gap(px(12.))
             .child(frame)
             .child(transport)
+            .children(s.imported.as_ref().map(|imp| {
+                let original = imp.original.clone();
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(10.))
+                    .text_size(px(type_scale::CAPTION))
+                    .text_color(rgba_of(t.mist))
+                    .child(
+                        div()
+                            .h(px(22.))
+                            .px(px(8.))
+                            .flex()
+                            .flex_none()
+                            .items_center()
+                            .gap(px(5.))
+                            .rounded(px(scale::RADIUS_PILL))
+                            .border_1()
+                            .border_color(rgba_of(t.line))
+                            .text_color(rgba_of(t.text_2))
+                            .child(icon("cm-import", 12., t.text_2))
+                            .child(SharedString::from(tr_ctx!("editor chip", "Imported"))),
+                    )
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w(px(0.))
+                            .truncate()
+                            .mono()
+                            .child(SharedString::from(imp.line.clone())),
+                    )
+                    .child(
+                        div()
+                            .id("re-show-original")
+                            .role(Role::Button)
+                            .aria_label(tr!("Show original"))
+                            .focusable()
+                            .tab_stop(true)
+                            .flex_none()
+                            .cursor_pointer()
+                            .text_color(rgba_of(t.text_2))
+                            .hover(|s| s.text_color(rgba_of(t.text)))
+                            .child(tr!("Show original"))
+                            .on_click(move |_, _, _| {
+                                let _ = crate::recording::files::reveal_path(&original);
+                            }),
+                    )
+            }))
             .children((!warnings.is_empty()).then(|| {
                 div()
                     .flex()
@@ -429,9 +477,24 @@ impl RecordingEditor {
         self.send(reqs, cx);
     }
 
+    /// An imported file has no camera track and no cursor data: the reason a tab is disabled
+    /// (board I4, `UiInspectorTabs off="camera,cursor"`).
+    fn imported_reason_text(tab: Inspector) -> Option<String> {
+        match tab {
+            Inspector::Camera => Some(tr!("Imported files have no separate camera track")),
+            Inspector::Cursor => Some(tr!("Imported files have no cursor data")),
+            _ => None,
+        }
+    }
+
     /// The rail and the open panel.
     pub(super) fn inspector(&self, t: &Theme, s: &Session, cx: &mut Context<Self>) -> AnyElement {
         let has_camera = s.rows.iter().any(|r| r.kind == RowKind::Camera);
+        let imported_reason = |s: &Session, tab: Inspector| {
+            s.imported
+                .as_ref()
+                .and_then(|_| Self::imported_reason_text(tab))
+        };
         let tabs: Vec<AnyElement> = Inspector::set(s.voice.audio)
             .iter()
             .map(|&tab| {
@@ -440,6 +503,7 @@ impl RecordingEditor {
                     tab,
                     tab == self.tab,
                     unavailable(tab, has_camera, s.cursor_separate),
+                    imported_reason(s, tab),
                 )
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.tab = tab;
@@ -727,10 +791,16 @@ impl RecordingEditor {
                 t,
                 Inspector::Camera,
                 tr!("Not available for this recording"),
-                vec![
-                    hint(t, "video-off", tr!("This recording has no camera track."))
-                        .into_any_element(),
-                ],
+                vec![hint(
+                    t,
+                    "video-off",
+                    if s.imported.is_some() {
+                        tr!("Imported files have no separate camera track.")
+                    } else {
+                        tr!("This recording has no camera track.")
+                    },
+                )
+                .into_any_element()],
                 Vec::new(),
             );
         }

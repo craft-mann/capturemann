@@ -404,17 +404,17 @@ Priority: **P1** = add now · P2 = leading icon on a text button · keep = alrea
 
 | Element | Icon | Priority | Size | Note |
 |---|---|---|---|---|
-| Library header: Import… (⌘I) | `cm-import` | planned | 16 px | opens the import sheet; see specs/features/18-import.md |
-| Library drop overlay: Drop to import tile | `cm-import` | planned | 32 px | 84 px tile |
-| Import sheet: Video file row / count of videos | `cm-import-video` | planned | 16 px | when the frame is not read yet |
-| Import sheet: Audio file row / count of audio files | `cm-import-audio` | planned | 16 px | when the waveform is not read yet |
-| Import sheet: Add files | `files` | planned | 14 px |  |
-| Import sheet: Status chip: Can't import | `circle-slash` | planned | 12 px | amber |
-| Import sheet: Status chip: protected file (DRM) | `lock-keyhole` | planned | 12 px | amber |
-| Import sheet / drop overlay: Folders can't be imported yet | `folder-input` | planned | 14 px |  |
-| Library: Card: failed import | `file-x` | planned | 18 px | amber border, reason, Show file, Dismiss |
-| Recording editor: Camera and Cursor tabs of an imported file (disabled) | `circle-slash` | planned | 14 px | 35% opacity, tooltip with the reason |
-| Launcher: Import media | `cm-import` | planned | 16 px |  |
+| Library header: Import… (⌘I) | `cm-import` | **P1** | 16 px | opens the import sheet; see specs/features/18-import.md |
+| Library drop overlay: Drop to import tile | `cm-import` | **P1** | 32 px | 84 px tile |
+| Import sheet: Video file row / count of videos | `cm-import-video` | **P1** | 16 px | when the frame is not read yet |
+| Import sheet: Audio file row / count of audio files | `cm-import-audio` | **P1** | 16 px | when the waveform is not read yet |
+| Import sheet: Add files | `files` | **P1** | 14 px |  |
+| Import sheet: Status chip: Can't import | `circle-slash` | **P1** | 12 px | amber |
+| Import sheet: Status chip: protected file (DRM) | `lock-keyhole` | **P1** | 12 px | amber |
+| Import sheet / drop overlay: Folders can't be imported yet | `folder-input` | **P1** | 14 px |  |
+| Library: Card: failed import | `file-x` | **P1** | 18 px | amber border, reason, Show file, Dismiss |
+| Recording editor: Camera and Cursor tabs of an imported file (disabled) | `circle-slash` | **P1** | 14 px | 35% opacity, tooltip with the reason |
+| Launcher: Import media | `cm-import` | **P1** | 16 px |  |
 
 ## Planned
 

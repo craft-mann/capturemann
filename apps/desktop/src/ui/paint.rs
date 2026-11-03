@@ -371,6 +371,38 @@ pub(crate) const ASSETS: &[(&str, &str)] = &[
         include_str!("../../assets/icons/cm-split.svg"),
     ),
     (
+        "icons/cm-import.svg",
+        include_str!("../../assets/icons/cm-import.svg"),
+    ),
+    (
+        "icons/cm-import-video.svg",
+        include_str!("../../assets/icons/cm-import-video.svg"),
+    ),
+    (
+        "icons/cm-import-audio.svg",
+        include_str!("../../assets/icons/cm-import-audio.svg"),
+    ),
+    (
+        "icons/file-x.svg",
+        include_str!("../../assets/icons/file-x.svg"),
+    ),
+    (
+        "icons/files.svg",
+        include_str!("../../assets/icons/files.svg"),
+    ),
+    (
+        "icons/lock-keyhole.svg",
+        include_str!("../../assets/icons/lock-keyhole.svg"),
+    ),
+    (
+        "icons/folder-input.svg",
+        include_str!("../../assets/icons/folder-input.svg"),
+    ),
+    (
+        "icons/circle-slash.svg",
+        include_str!("../../assets/icons/circle-slash.svg"),
+    ),
+    (
         "icons/cm-stop.svg",
         include_str!("../../assets/icons/cm-stop.svg"),
     ),

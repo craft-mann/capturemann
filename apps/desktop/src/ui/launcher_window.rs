@@ -88,6 +88,7 @@ fn glyph_path(g: Glyph) -> Option<&'static str> {
     Some(match g {
         Glyph::Record => return None,
         Glyph::Mic => "icons/mic.svg",
+        Glyph::Import => "icons/cm-import.svg",
         Glyph::Frame => "icons/launcher-frame.svg",
         Glyph::Window => "icons/launcher-window.svg",
         Glyph::Monitor => "icons/launcher-monitor.svg",
@@ -528,6 +529,16 @@ fn execute(id: CommandId, option: LaunchOption, cx: &mut App) {
                     .timer(Duration::from_millis(CAPTURE_DELAY_MS))
                     .await;
                 cx.update(|cx| crate::ui::recording::open_audio_sheet(&app, cx));
+            })
+            .detach();
+        }
+        // Opens the file picker over the Studio window, then the import sheet (IMP-5).
+        CommandId::ImportMedia => {
+            cx.spawn(async move |cx| {
+                cx.background_executor()
+                    .timer(Duration::from_millis(CAPTURE_DELAY_MS))
+                    .await;
+                cx.update(|cx| crate::ui::import_actions::open(&app, Vec::new(), cx));
             })
             .detach();
         }

@@ -1124,7 +1124,17 @@ impl RecordingEditor {
                     )
                     .into_any_element(),
                     crate::ui::ai_view::transcribe_row(t, &self.app, &id, "re", cx),
-                ],
+                ]
+                .into_iter()
+                .chain(s.imported.as_ref().map(|_| {
+                    hint(
+                        t,
+                        "users",
+                        tr!("After the transcript: Speakers tells who said what, Translate writes it in another language and Report turns it into minutes."),
+                    )
+                    .into_any_element()
+                }))
+                .collect(),
                 Vec::new(),
             );
         }

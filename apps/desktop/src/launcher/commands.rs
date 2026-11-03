@@ -20,6 +20,8 @@ pub enum CommandId {
     ScreenshotWindow,
     ScreenshotDisplay,
     OpenLibrary,
+    /// "Import media" (IMP-5): opens the file picker and the import sheet.
+    ImportMedia,
     OpenSettings,
     OpenPermissions,
     PublishLast,
@@ -52,6 +54,8 @@ pub enum Glyph {
     Record,
     /// The microphone (Record audio).
     Mic,
+    /// Import media.
+    Import,
     Frame,
     Window,
     Monitor,
@@ -515,6 +519,27 @@ fn build_rows(env: &Env<'_>) -> Vec<Command> {
             shortcut: key(ShortcutAction::CaptureDisplay),
             disabled: capture_off,
             verb: tr!("Take screenshot"),
+            options: Vec::new(),
+        },
+        Command {
+            id: CommandId::ImportMedia,
+            group: Group::Capture,
+            title: tr!("Import media"),
+            keywords: keywords(
+                vec![
+                    tr_ctx!("launcher keyword", "import"),
+                    tr_ctx!("launcher keyword", "video"),
+                    tr_ctx!("launcher keyword", "audio"),
+                    tr_ctx!("launcher keyword", "file"),
+                ],
+                "Import media", // i18n-ignore: the English title is searched too
+                &["import", "video", "audio", "file"],
+            ),
+            glyph: Glyph::Import,
+            hint: Hint::Text(tr!("Bring in a video or audio file")),
+            shortcut: Vec::new(),
+            disabled: None,
+            verb: tr!("Choose files"),
             options: Vec::new(),
         },
         Command {

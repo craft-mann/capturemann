@@ -11146,3 +11146,362 @@ msgstr "Nhập tệp video và âm thanh"
 msgctxt "permission"
 msgid "Files and Folders"
 msgstr "Tệp và Thư mục"
+
+#, fuzzy
+msgid "1 audio file"
+msgstr "1 tệp âm thanh"
+
+#, fuzzy
+msgid "1 file that may not open"
+msgstr "1 tệp có thể không mở được"
+
+#, fuzzy
+msgid "1 folder skipped"
+msgstr "Đã bỏ qua 1 thư mục"
+
+#, fuzzy
+msgid "1 video"
+msgstr "1 video"
+
+#, fuzzy
+msgid "A report for an audio file is offered after its transcript is ready."
+msgstr "Báo cáo cho tệp âm thanh được gợi ý sau khi bản chép lời xong."
+
+#, fuzzy
+msgid "Add files"
+msgstr "Thêm tệp"
+
+#, fuzzy
+msgid "After import"
+msgstr "Sau khi nhập"
+
+#, fuzzy
+msgid "After the transcript: Speakers tells who said what, Translate writes it in another language and Report turns it into minutes."
+msgstr "Sau bản chép lời: Người nói cho biết ai nói gì, Dịch viết lại bằng ngôn ngữ khác và Báo cáo biến nó thành biên bản."
+
+#, fuzzy
+msgid "Bring in a video or audio file"
+msgstr "Đưa một tệp video hoặc âm thanh vào"
+
+#, fuzzy
+msgid "Cancelled"
+msgstr "Đã huỷ"
+
+#, fuzzy
+msgid "CaptureMann isn't allowed to read these files. Allow it in System Settings, Privacy & Security, Files and Folders."
+msgstr "CaptureMann chưa được phép đọc các tệp này. Hãy cho phép trong Cài đặt hệ thống, Quyền riêng tư & Bảo mật, Tệp và thư mục."
+
+#, fuzzy
+msgid "Checking the copy"
+msgstr "Đang kiểm tra bản sao"
+
+#, fuzzy
+msgid "Choose files"
+msgstr "Chọn tệp"
+
+#, fuzzy
+msgid "Copies into your library: {size}"
+msgstr "Sao chép vào thư viện: {size}"
+
+#, fuzzy
+msgid "Copies into your library: {size} · {free} free"
+msgstr "Sao chép vào thư viện: {size} · còn trống {free}"
+
+#, fuzzy
+msgid "Copying into the library"
+msgstr "Đang sao chép vào thư viện"
+
+#, fuzzy
+msgid "Drop to import"
+msgstr "Thả để nhập"
+
+#, fuzzy
+msgid "Each original goes to the Trash after its copy is checked"
+msgstr "Mỗi tệp gốc được chuyển vào Thùng rác sau khi bản sao được kiểm tra"
+
+#, fuzzy
+msgid "Folders can't be imported yet: open the folder and select the files inside."
+msgstr "Chưa thể nhập thư mục: hãy mở thư mục và chọn các tệp bên trong."
+
+#, fuzzy
+msgid "For a call or an interview. Runs after the transcript"
+msgstr "Dành cho cuộc gọi hoặc phỏng vấn. Chạy sau bản chép lời"
+
+#, fuzzy
+msgid "Import 1 file"
+msgstr "Nhập 1 tệp"
+
+#, fuzzy
+msgid "Import cancelled"
+msgstr "Đã huỷ nhập"
+
+#, fuzzy
+msgid "Import failed"
+msgstr "Nhập thất bại"
+
+#, fuzzy
+msgid "Import files"
+msgstr "Nhập tệp"
+
+#, fuzzy
+msgid "Import media"
+msgstr "Nhập tệp phương tiện"
+
+#, fuzzy
+msgid "Import {n} files"
+msgstr "Nhập {n} tệp"
+
+#, fuzzy
+msgid "Imported 1 file"
+msgstr "Đã nhập 1 tệp"
+
+#, fuzzy
+msgid "Imported files have no cursor data"
+msgstr "Tệp đã nhập không có dữ liệu con trỏ"
+
+#, fuzzy
+msgid "Imported files have no separate camera track"
+msgstr "Tệp đã nhập không có rãnh camera riêng"
+
+#, fuzzy
+msgid "Imported files have no separate camera track."
+msgstr "Tệp đã nhập không có rãnh camera riêng."
+
+#, fuzzy
+msgid "Imported {at} · {path} · original kept in the bundle"
+msgstr "Đã nhập {at} · {path} · tệp gốc được giữ trong gói"
+
+#, fuzzy
+msgid "Imported {at} · {path} · {codec} · original kept in the bundle"
+msgstr "Đã nhập {at} · {path} · {codec} · tệp gốc được giữ trong gói"
+
+#, fuzzy
+msgid "Imported {n} files"
+msgstr "Đã nhập {n} tệp"
+
+#, fuzzy
+msgid "Importing 1 file"
+msgstr "Đang nhập 1 tệp"
+
+#, fuzzy
+msgid "Importing needs the CaptureMann engine, which is not running."
+msgstr "Nhập tệp cần bộ máy của CaptureMann, hiện chưa chạy."
+
+#, fuzzy
+msgid "Importing {n} files"
+msgstr "Đang nhập {n} tệp"
+
+#, fuzzy
+msgid "Language detected automatically; uses the model in use"
+msgstr "Tự nhận diện ngôn ngữ; dùng mô hình đang chọn"
+
+#, fuzzy
+msgid "Moves instead of copies, so the files don't take space twice. Each original goes to the Trash only after its copy in the library is checked. Frees {size}."
+msgstr "Di chuyển thay vì sao chép, nên tệp không chiếm chỗ hai lần. Mỗi tệp gốc chỉ vào Thùng rác sau khi bản sao trong thư viện được kiểm tra. Giải phóng {size}."
+
+#, fuzzy
+msgid "Needs the speaker model (AI page)"
+msgstr "Cần mô hình nhận diện người nói (trang AI)"
+
+#, fuzzy
+msgid "No video or audio stream could be read. The file may be damaged."
+msgstr "Không đọc được luồng video hay âm thanh nào. Tệp có thể bị hỏng."
+
+#, fuzzy
+msgid "Originals stay where they are unless you tick “Remove the originals”"
+msgstr "Tệp gốc vẫn ở nguyên chỗ trừ khi bạn chọn “Xoá tệp gốc”"
+
+#, fuzzy
+msgid "Pick one or more files. Edit, transcribe and write reports as if you'd recorded them here."
+msgstr "Chọn một hoặc nhiều tệp. Chỉnh sửa, chép lời và viết báo cáo như thể bạn đã ghi chúng ở đây."
+
+#, fuzzy
+msgid "Preparing for editing"
+msgstr "Đang chuẩn bị để chỉnh sửa"
+
+#, fuzzy
+msgid "Protected by the store it came from (DRM); it can't be opened"
+msgstr "Được bảo vệ bởi nơi cung cấp (DRM); không thể mở"
+
+#, fuzzy
+msgid "Reading the sound"
+msgstr "Đang đọc âm thanh"
+
+#, fuzzy
+msgid "Remove from the list"
+msgstr "Bỏ khỏi danh sách"
+
+#, fuzzy
+msgid "Remove the originals after importing"
+msgstr "Xoá tệp gốc sau khi nhập"
+
+#, fuzzy
+msgid "Show file"
+msgstr "Hiện tệp"
+
+#, fuzzy
+msgid "Show original"
+msgstr "Hiện tệp gốc"
+
+#, fuzzy
+msgid "The file can't be imported"
+msgstr "Không thể nhập tệp này"
+
+#, fuzzy
+msgid "The file can't be read. It may be damaged or cut short."
+msgstr "Không đọc được tệp. Tệp có thể bị hỏng hoặc bị cắt ngắn."
+
+#, fuzzy
+msgid "The files already imported are in your library."
+msgstr "Các tệp đã nhập vẫn nằm trong thư viện của bạn."
+
+#, fuzzy
+msgid "The import did not start."
+msgstr "Việc nhập chưa bắt đầu."
+
+#, fuzzy
+msgid "The import failed."
+msgstr "Nhập thất bại."
+
+#, fuzzy
+msgid "There isn't enough free space on the library's disk."
+msgstr "Ổ đĩa của thư viện không đủ chỗ trống."
+
+#, fuzzy
+msgid "This kind of file isn't supported yet"
+msgstr "Loại tệp này chưa được hỗ trợ"
+
+#, fuzzy
+msgid "Transcribing"
+msgstr "Đang chép lời"
+
+#, fuzzy
+msgid "Video: {video} · Audio: {audio}"
+msgstr "Video: {video} · Âm thanh: {audio}"
+
+#, fuzzy
+msgid "Waiting"
+msgstr "Đang chờ"
+
+#, fuzzy
+msgid "a colour format editing doesn't use"
+msgstr "định dạng màu mà việc chỉnh sửa không dùng"
+
+#, fuzzy
+msgid "a rotated picture"
+msgstr "hình bị xoay"
+
+#, fuzzy
+msgid "a variable frame rate"
+msgstr "tốc độ khung hình thay đổi"
+
+#, fuzzy
+msgid "an MKV container"
+msgstr "vùng chứa MKV"
+
+#, fuzzy
+msgid "an unusual format"
+msgstr "một định dạng không phổ biến"
+
+#, fuzzy
+msgid "mono"
+msgstr "mono"
+
+#, fuzzy
+msgid "stereo"
+msgstr "stereo"
+
+#, fuzzy
+msgid "{bytes} · {ready} ready · keep working"
+msgstr "{bytes} · {ready} đã xong · cứ tiếp tục làm việc"
+
+#, fuzzy
+msgid "{done} / {total}"
+msgstr "{done} / {total}"
+
+#, fuzzy
+msgid "{name} and {n} more files need a copy prepared for smooth editing (for example because of {reason}); the original files are kept unchanged in the bundles."
+msgstr "{name} và {n} tệp nữa cần một bản sao được chuẩn bị để chỉnh sửa mượt (ví dụ do {reason}); các tệp gốc được giữ nguyên trong gói."
+
+#, fuzzy
+msgid "{name} has {reason}. A copy is prepared for smooth editing; the original file is kept unchanged in the bundle."
+msgstr "{name} có {reason}. Một bản sao được chuẩn bị để chỉnh sửa mượt; tệp gốc được giữ nguyên trong gói."
+
+#, fuzzy
+msgid "{n} audio files"
+msgstr "{n} tệp âm thanh"
+
+#, fuzzy
+msgid "{n} channels"
+msgstr "{n} kênh"
+
+#, fuzzy
+msgid "{n} could not be imported. Their cards say why."
+msgstr "{n} tệp không nhập được. Thẻ của chúng cho biết lý do."
+
+#, fuzzy
+msgid "{n} files that may not open"
+msgstr "{n} tệp có thể không mở được"
+
+#, fuzzy
+msgid "{n} folders skipped"
+msgstr "Đã bỏ qua {n} thư mục"
+
+#, fuzzy
+msgid "{n} videos"
+msgstr "{n} video"
+
+#, fuzzy
+msgctxt "button"
+msgid "Import…"
+msgstr "Nhập…"
+
+#, fuzzy
+msgctxt "card badge"
+msgid "Imported"
+msgstr "Đã nhập"
+
+#, fuzzy
+msgctxt "editor chip"
+msgid "Imported"
+msgstr "Đã nhập"
+
+#, fuzzy
+msgctxt "file dialog"
+msgid "Choose files"
+msgstr "Chọn tệp"
+
+#, fuzzy
+msgctxt "filter chip"
+msgid "Imported"
+msgstr "Đã nhập"
+
+#, fuzzy
+msgctxt "import status"
+msgid "Can't import"
+msgstr "Không nhập được"
+
+#, fuzzy
+msgctxt "import status"
+msgid "Prepared for editing"
+msgstr "Đã chuẩn bị để chỉnh sửa"
+
+#, fuzzy
+msgctxt "import status"
+msgid "Ready"
+msgstr "Sẵn sàng"
+
+#, fuzzy
+msgctxt "launcher keyword"
+msgid "file"
+msgstr "tệp"
+
+#, fuzzy
+msgctxt "launcher keyword"
+msgid "import"
+msgstr "nhập"
+
+#, fuzzy
+msgctxt "menu"
+msgid "Import file…"
+msgstr "Nhập tệp…"
