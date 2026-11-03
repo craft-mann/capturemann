@@ -82,6 +82,7 @@ def main():
     ap.add_argument("--speakers", type=int, default=4)
     ap.add_argument("--minutes", type=float, default=4.0)
     ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--max-gap", type=float, default=1.6, help="longest silence between turns, seconds (shortest 0.3)")
     ap.add_argument("--rate", type=int, default=175, help="words per minute for say")
     a = ap.parse_args()
     if not 1 <= a.speakers <= len(VOICES):
@@ -111,7 +112,7 @@ def main():
             lines.append({"start": round(start, 3), "end": round(end, 3), "speaker": f"Speaker {who + 1}", "text": text})
             turns.append((start, end - start, f"S{who + 1}"))
             speech.append([round(start, 3), round(end, 3)])
-            audio += b"\x00\x00" * int(16000 * rng.uniform(0.3, 1.6))
+            audio += b"\x00\x00" * int(16000 * rng.uniform(0.3, max(0.3, a.max_gap)))
     wav = out / f"{a.name}.wav"
     with wave.open(str(wav), "wb") as w:
         w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000); w.writeframes(bytes(audio))
