@@ -17,9 +17,8 @@ use crate::ai::models::NoticeSite;
 use crate::backend::Backend;
 use crate::daemon_text::{AppNote, ErrorNote};
 use crate::library::{
-    build_rows, columns_for_width, format_duration, format_size, row_of_item, CaptureItem,
-    CardAction, Chip, EmptyKind, Filter, Kind, LibraryState, LibraryStatus, LocalClock, Row,
-    SortKey, GRID_GAP,
+    columns_for_width, format_duration, format_size, row_of_item, CaptureItem, CardAction, Chip,
+    EmptyKind, Filter, Kind, LibraryState, LibraryStatus, LocalClock, Row, SortKey, GRID_GAP,
 };
 use crate::nav::{self, NavCounts};
 use crate::overlay::CaptureMode;
@@ -76,6 +75,8 @@ pub struct LibraryView {
     list_focus: FocusHandle,
     cols: usize,
     rows_dirty: bool,
+    /// Import cards that have no capture in the list yet (see `ImportUi::pending_cards`).
+    pending: Arc<Vec<(usize, usize)>>,
     seen_epoch: u64,
     /// The `cm_i18n` epoch the cached day headers and field labels were made in.
     seen_lang: u64,
@@ -168,6 +169,7 @@ impl LibraryView {
             list_focus: cx.focus_handle(),
             cols: 1,
             rows_dirty: true,
+            pending: Arc::new(Vec::new()),
             seen_epoch,
             seen_lang: cm_i18n::epoch(),
             seen_search_route: None,
@@ -529,6 +531,12 @@ struct RowCtx {
     cols: usize,
     /// Running imports: the strip on a card whose capture is still being filled.
     imports: Arc<crate::import_flow::ImportUi>,
+    /// The pending import cards (run, card) the `Row::Pending` rows index into.
+    pending: Arc<Vec<(usize, usize)>>,
+    app: Entity<AppModel>,
+    /// Imported captures whose own transcription runs (the same `TranscribeVm` the editor reads,
+    /// fed by `transcript.started` and `job.progress`), with its fraction when known.
+    transcribing: Arc<std::collections::HashMap<String, Option<f32>>>,
 }
 
 /// The darkened overlay behind the pills on a thumbnail (the thumbnail is an image, so the
@@ -840,9 +848,16 @@ fn card(ctx: &RowCtx, ix: usize, width: f32, cx: &mut gpui::App) -> AnyElement {
     // IMP-5: an imported capture carries the badge, and a strip while its import still runs.
     let frame = if item.imported_from.is_some() {
         let mut fr = frame.child(crate::ui::import_cards::imported_badge(&t));
-        if let Some(crate::import_flow::CardState::Step(step, frac)) =
-            ctx.imports.card_for(&item.id).map(|c| c.state.clone())
-        {
+        if ctx.imports.strip_for(&item.id).is_none() {
+            if let Some(frac) = ctx.transcribing.get(&item.id) {
+                fr = fr.child(crate::ui::import_cards::progress_strip(
+                    &t,
+                    &tr!("Transcribing"),
+                    frac.map(f64::from),
+                ));
+            }
+        }
+        if let Some((step, frac)) = ctx.imports.strip_for(&item.id) {
             fr = fr.child(crate::ui::import_cards::progress_strip(&t, &step, frac));
         }
         fr
@@ -985,6 +1000,23 @@ fn render_row(ctx: &RowCtx, ix: usize, cx: &mut gpui::App) -> AnyElement {
     };
     match row {
         Row::Header { label, count } => day_header(&ctx.t, ix, label, *count),
+        Row::Pending(range) => {
+            let n = ctx.cols as f32;
+            let w = ((ctx.avail - GRID_GAP * (n - 1.)) / n).floor();
+            let mut r = div().flex().gap(px(GRID_GAP));
+            for i in range.clone() {
+                if let Some(p) = ctx.pending.get(i) {
+                    r = r.child(crate::ui::import_cards::pending_card(
+                        &ctx.t,
+                        &ctx.imports,
+                        *p,
+                        w,
+                        &ctx.app,
+                    ));
+                }
+            }
+            div().w_full().pb(px(GRID_GAP)).child(r).into_any_element()
+        }
         Row::Grid(range) => {
             let n = ctx.cols as f32;
             let w = ((ctx.avail - GRID_GAP * (n - 1.)) / n).floor();
@@ -1143,12 +1175,41 @@ impl Render for LibraryView {
         let avail = (f32::from(window.viewport_size().width) - SIDEBAR_WIDTH - PAGE_PADDING * 2.)
             .max(CARD_FLOOR);
         let cols = columns_for_width(avail);
+        // Files being imported that have no capture on this page yet: cards at the top of Today.
+        let pending = {
+            let existing: std::collections::HashSet<String> =
+                self.state.items().iter().map(|i| i.id.clone()).collect();
+            let kinds = match self.state.filter {
+                Filter::All => crate::import_flow::PageKinds::All,
+                Filter::Recordings => crate::import_flow::PageKinds::Video,
+                Filter::Audio => crate::import_flow::PageKinds::Audio,
+                Filter::Screenshots => crate::import_flow::PageKinds::None,
+            };
+            let list = self.app.read(cx).import.pending_cards(&existing, kinds);
+            if self.state.imported_only
+                || !self.state.query.is_empty()
+                || self.state.remote.is_some()
+            {
+                Vec::new()
+            } else {
+                list
+            }
+        };
+        if *self.pending != pending {
+            self.pending = Arc::new(pending);
+            self.rows_dirty = true;
+        }
         if self.rows_dirty || cols != self.cols {
             let days = self
                 .state
                 .group_by_day()
                 .then(|| (&clock, OffsetDateTime::now_utc()));
-            self.rows = Arc::new(build_rows(&self.items, cols, days));
+            self.rows = Arc::new(crate::library::build_rows_with_pending(
+                &self.items,
+                cols,
+                days,
+                self.pending.len(),
+            ));
             // A refresh after a library change keeps the scroll position (reset drops it).
             let top = std::mem::take(&mut self.keep_scroll)
                 .then(|| self.list.logical_scroll_top())
@@ -1372,11 +1433,6 @@ impl Render for LibraryView {
                 .into_any_element(),
             );
         }
-        banners.extend(crate::ui::import_cards::pending_strip(
-            &t,
-            &self.app.read(cx).import,
-            &self.app,
-        ));
         if let Some(w) = ipc_warning {
             banners.push(
                 callout(
@@ -1410,7 +1466,11 @@ impl Render for LibraryView {
 
         // ---- body --------------------------------------------------------------------
         let app = self.app.clone();
-        let body: AnyElement = match (&self.state.status, self.state.empty_kind()) {
+        let body: AnyElement = match (
+            &self.state.status,
+            // Files being imported are cards of their own: not an empty page.
+            self.state.empty_kind().filter(|_| self.pending.is_empty()),
+        ) {
             (
                 LibraryStatus::Unavailable {
                     fallback_in_use: false,
@@ -1547,6 +1607,16 @@ impl Render for LibraryView {
                     avail,
                     cols,
                     imports: Arc::new(self.app.read(cx).import.clone()),
+                    pending: self.pending.clone(),
+                    app: self.app.clone(),
+                    transcribing: Arc::new({
+                        let m = self.app.read(cx);
+                        self.items
+                            .iter()
+                            .filter(|i| i.imported_from.is_some() && m.transcribe.is_running(&i.id))
+                            .map(|i| (i.id.clone(), m.transcribe.fraction(&i.id)))
+                            .collect()
+                    }),
                 };
                 div()
                     .id("library-list")

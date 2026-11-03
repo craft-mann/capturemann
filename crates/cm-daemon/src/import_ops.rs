@@ -1192,7 +1192,15 @@ impl JobHandler for ImportHandler {
             .await
             .map_err(|e| CmError::internal(format!("import worker failed: {e}")))?;
             match res {
-                Ok(o) => outcomes.push(o.to_json()),
+                Ok(o) => {
+                    let mut j = o.to_json();
+                    if o.status == "imported" {
+                        if let Some(a) = self.queue_after(&inputs["after"], &id).await {
+                            j["after_jobs"] = a;
+                        }
+                    }
+                    outcomes.push(j);
+                }
                 Err(Stop::Interrupted) => {
                     interrupted = true;
                     break;
@@ -1230,8 +1238,21 @@ impl JobHandler for ImportHandler {
             .filter(|o| o["trash"]["state"] == "trashed")
             .map(|o| o["path"].clone())
             .collect();
-        // Transcript, speakers, report.
-        let after = self.run_after(&ctx, &inputs["after"], &outcomes).await;
+        // The independent jobs queued for each capture (`after`), by capture id.
+        let after: Map<String, Value> = outcomes
+            .iter()
+            .filter_map(|o| {
+                Some((
+                    o["capture_id"].as_str()?.to_owned(),
+                    o.get("after_jobs")?.clone(),
+                ))
+            })
+            .collect();
+        let after = if after.is_empty() {
+            Value::Null
+        } else {
+            Value::Object(after)
+        };
         ctx.reporter.report(1.0, Some("Done".to_owned()));
         Ok(
             json!({ "files": outcomes, "imported": imported, "failed": failed,
@@ -1246,85 +1267,45 @@ impl JobHandler for ImportHandler {
 }
 
 impl ImportHandler {
-    /// `after`: the existing AI actions on every imported capture, one capture at a time and in
-    /// the order transcribe, diarize, report. A step that cannot run (no model, no text model) is
-    /// recorded as skipped with its reason; the import itself is never affected.
-    async fn run_after(&self, ctx: &JobContext, after: &Value, outcomes: &[Value]) -> Value {
-        let want_transcribe = after["transcribe"].is_object();
-        if !want_transcribe {
-            return Value::Null;
+    /// `after`: queues the existing `transcribe` job of the capture that was just installed, and
+    /// (when asked) `diarize` and a report once that transcript exists. Nothing here waits: the
+    /// import ends when its files are in the library, and these are ordinary jobs of their own
+    /// (`list_jobs`, `get_job`, the capture's own progress). A step that cannot run (no model) is
+    /// `skipped` with its reason; the import is never affected. `None` without `after.transcribe`.
+    async fn queue_after(&self, after: &Value, id: &str) -> Option<Value> {
+        if !after["transcribe"].is_object() {
+            return None;
         }
-        let Some(inner) = self.inner.upgrade() else {
-            return Value::Null;
-        };
+        let inner = self.inner.upgrade()?;
         let actor = Actor::User;
-        let mut report = Map::new();
-        for o in outcomes.iter().filter(|o| o["status"] == "imported") {
-            let Some(id) = o["capture_id"].as_str() else {
-                continue;
-            };
-            let mut steps = Map::new();
-            ctx.reporter.report(0.99, Some("Transcribing".to_owned()));
-            let t = &after["transcribe"];
-            let tr = crate::ai::AiParams {
-                op: crate::ai::AiOp::Transcribe {
-                    capture_id: id.to_owned(),
-                    language: t["language"].as_str().map(str::to_owned),
-                    model: t["model"].as_str().map(str::to_owned),
-                    original_audio: false,
-                },
-                request_id: None,
-            };
-            let ok = self
-                .step(&inner, ctx, &actor, "transcribe", tr, &mut steps)
-                .await;
-            if ok && after["diarize"].as_bool() == Some(true) {
-                let p = crate::ai::AiParams {
-                    op: crate::ai::AiOp::Diarize {
-                        capture_id: id.to_owned(),
-                        hints: Default::default(),
-                        headset: false,
-                    },
-                    request_id: None,
-                };
-                self.step(&inner, ctx, &actor, "diarize", p, &mut steps)
-                    .await;
+        let t = &after["transcribe"];
+        let tr = crate::ai::AiParams {
+            op: crate::ai::AiOp::Transcribe {
+                capture_id: id.to_owned(),
+                language: t["language"].as_str().map(str::to_owned),
+                model: t["model"].as_str().map(str::to_owned),
+                original_audio: false,
+            },
+            request_id: None,
+        };
+        let mut steps = Map::new();
+        let started = inner.ai_op(&actor, tr).await;
+        let job_id = match &started {
+            Ok(v) => v["job_id"].as_str().map(str::to_owned),
+            Err(_) => None,
+        };
+        match (&started, &job_id) {
+            (Ok(_), Some(j)) => {
+                steps.insert(
+                    "transcribe".into(),
+                    json!({ "state": "queued", "job_id": j }),
+                );
             }
-            if ok {
-                if let Some(tpl) = after["report_template"].as_str() {
-                    let p = crate::ai::AiParams {
-                        op: crate::ai::AiOp::GenerateReport {
-                            capture_id: id.to_owned(),
-                            template: tpl.to_owned(),
-                            language: None,
-                            context: Default::default(),
-                            report_id: None,
-                        },
-                        request_id: None,
-                    };
-                    self.step(&inner, ctx, &actor, "report", p, &mut steps)
-                        .await;
-                }
+            (Ok(_), None) => {
+                steps.insert("transcribe".into(), json!({ "state": "done" }));
             }
-            report.insert(id.to_owned(), Value::Object(steps));
-        }
-        Value::Object(report)
-    }
-
-    /// Starts one AI action and waits for its job. `true` when it finished.
-    async fn step(
-        &self,
-        inner: &Arc<Inner>,
-        ctx: &JobContext,
-        actor: &Actor,
-        name: &str,
-        p: crate::ai::AiParams,
-        steps: &mut Map<String, Value>,
-    ) -> bool {
-        let started = match inner.ai_op(actor, p).await {
-            Ok(v) => v,
-            Err(e) => {
-                let why = match &e {
+            (Err(e), _) => {
+                let why = match e {
                     DaemonError::WithData { data, .. } => {
                         data["reason"].as_str().map(str::to_owned)
                     }
@@ -1332,41 +1313,69 @@ impl ImportHandler {
                 }
                 .unwrap_or_else(|| e.to_string());
                 steps.insert(
-                    name.to_owned(),
+                    "transcribe".into(),
                     json!({ "state": "skipped", "reason": why }),
                 );
-                return false;
-            }
-        };
-        let Some(job_id) = started["job_id"].as_str().map(str::to_owned) else {
-            steps.insert(name.to_owned(), json!({ "state": "done" }));
-            return true;
-        };
-        let Ok(rt) = inner.job_queue() else {
-            return false;
-        };
-        let queue: JobQueue = rt.queue.clone();
-        loop {
-            if ctx.cancel.is_interrupted() {
-                steps.insert(
-                    name.to_owned(),
-                    json!({ "state": "interrupted", "job_id": job_id }),
-                );
-                return false;
-            }
-            match queue.get(&job_id) {
-                Ok(j) if j.state.is_finished() => {
-                    let done = j.state == cm_jobs::JobState::Done;
-                    steps.insert(
-                        name.to_owned(),
-                        json!({ "state": j.state.as_str(), "job_id": job_id }),
-                    );
-                    return done;
-                }
-                Ok(_) => tokio::time::sleep(Duration::from_millis(200)).await,
-                Err(_) => return false,
+                return Some(Value::Object(steps));
             }
         }
+        // The editor and the library card follow this transcription like an automatic one.
+        if let Some(j) = &job_id {
+            inner.events.publish(
+                events::TRANSCRIPT_STARTED,
+                json!({ "capture_id": id, "job_id": j, "automatic": false, "import": true }),
+            );
+        }
+        let want_diarize = after["diarize"].as_bool() == Some(true);
+        let template = after["report_template"].as_str().map(str::to_owned);
+        if want_diarize {
+            steps.insert("diarize".into(), json!({ "state": "after_transcript" }));
+        }
+        if template.is_some() {
+            steps.insert("report".into(), json!({ "state": "after_transcript" }));
+        }
+        if (want_diarize || template.is_some()) && job_id.is_some() {
+            // Detached: speakers and the report need the transcript, so they are queued when
+            // its job is done. The import job does not wait for this.
+            let (cid, tj) = (id.to_owned(), job_id.unwrap_or_default());
+            tokio::spawn(async move {
+                let Ok(rt) = inner.job_queue() else { return };
+                let queue: JobQueue = rt.queue.clone();
+                loop {
+                    match queue.get(&tj) {
+                        Ok(j) if j.state == cm_jobs::JobState::Done => break,
+                        Ok(j) if j.state.is_finished() => return,
+                        Ok(_) => tokio::time::sleep(Duration::from_millis(500)).await,
+                        Err(_) => return,
+                    }
+                }
+                if want_diarize {
+                    let p = crate::ai::AiParams {
+                        op: crate::ai::AiOp::Diarize {
+                            capture_id: cid.clone(),
+                            hints: Default::default(),
+                            headset: false,
+                        },
+                        request_id: None,
+                    };
+                    let _ = inner.ai_op(&Actor::User, p).await;
+                }
+                if let Some(tpl) = template {
+                    let p = crate::ai::AiParams {
+                        op: crate::ai::AiOp::GenerateReport {
+                            capture_id: cid,
+                            template: tpl,
+                            language: None,
+                            context: Default::default(),
+                            report_id: None,
+                        },
+                        request_id: None,
+                    };
+                    let _ = inner.ai_op(&Actor::User, p).await;
+                }
+            });
+        }
+        Some(Value::Object(steps))
     }
 }
 

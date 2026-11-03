@@ -911,8 +911,9 @@ pub struct ImportArgs {
     /// Only check the files and print what would happen; import nothing.
     #[arg(long = "dry-run", conflicts_with_all = ["wait", "transcribe"])]
     pub dry_run: bool,
-    /// Wait for the import to finish and print one line per file (exit 6 if no file was
-    /// imported).
+    /// Wait for the import to finish (the files in the library) and print one line per file. A
+    /// transcript from `--transcribe` is a job of its own: its id is printed, it is not waited for.
+    /// Exit 6 if no file was imported.
     #[arg(long)]
     pub wait: bool,
     /// With `--wait`: give up after this many seconds (exit 6; the job keeps running).

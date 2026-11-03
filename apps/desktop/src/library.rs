@@ -612,6 +612,9 @@ pub enum Row {
     Header { label: String, count: usize },
     /// A run of grid cards (item indexes).
     Grid(std::ops::Range<usize>),
+    /// A run of cards of files being imported that have no capture yet (indexes into the
+    /// pending list; IMP-5).
+    Pending(std::ops::Range<usize>),
 }
 
 pub const CARD_MIN_WIDTH: f32 = 232.;
@@ -667,10 +670,54 @@ pub fn build_rows(
     rows
 }
 
+/// [`build_rows`] with `pending` cards of files that are being imported and have no capture yet.
+/// With day groups they go at the top of "Today" (a new "Today" group when the page has none);
+/// without (a sort that is not by date) at the top of the flat grid.
+pub fn build_rows_with_pending(
+    items: &[CaptureItem],
+    cols: usize,
+    days: Option<(&LocalClock, OffsetDateTime)>,
+    pending: usize,
+) -> Vec<Row> {
+    let mut rows = build_rows(items, cols, days);
+    if pending == 0 {
+        return rows;
+    }
+    let cols = cols.max(1);
+    let mut extra = Vec::new();
+    let mut start = 0;
+    while start < pending {
+        let stop = (start + cols).min(pending);
+        extra.push(Row::Pending(start..stop));
+        start = stop;
+    }
+    let Some((clock, now)) = days else {
+        extra.append(&mut rows);
+        return extra;
+    };
+    let today = clock.day_label_at(now, now);
+    match rows.first_mut() {
+        Some(Row::Header { label, count }) if *label == today => {
+            *count += pending;
+            rows.splice(1..1, extra);
+        }
+        _ => {
+            let mut head = vec![Row::Header {
+                label: today,
+                count: pending,
+            }];
+            head.append(&mut extra);
+            head.append(&mut rows);
+            rows = head;
+        }
+    }
+    rows
+}
+
 /// Index of the row that contains item `ix`.
 pub fn row_of_item(rows: &[Row], ix: usize) -> Option<usize> {
     rows.iter().position(|r| match r {
-        Row::Header { .. } => false,
+        Row::Header { .. } | Row::Pending(_) => false,
         Row::Grid(g) => g.contains(&ix),
     })
 }
@@ -1151,6 +1198,46 @@ mod tests {
         );
         assert!(build_rows(&[], 3, None).is_empty());
         assert_eq!(row_of_item(&rows, 4), Some(1));
+    }
+
+    /// IMP-5: pending import cards go at the top of "Today" (joining its header), in a new "Today"
+    /// group when the page has none, and at the top of a flat grid when the sort is not by date.
+    #[test]
+    fn pending_import_cards_lead_today_or_the_flat_grid() {
+        let now = at("2026-10-23T12:00:00Z");
+        let items = days(2, &["2026-10-23T11:00:00Z", "2026-10-22T20:00:00Z"]);
+        let rows = build_rows_with_pending(&items, 2, Some((&utc(), now)), 3);
+        assert_eq!(
+            rows,
+            vec![
+                header("Today", 4),
+                Row::Pending(0..2),
+                Row::Pending(2..3),
+                Row::Grid(0..1),
+                header("Yesterday", 1),
+                Row::Grid(1..2),
+            ]
+        );
+        // The page has nothing from today: a Today group of its own comes first.
+        let old = days(1, &["2026-10-20T11:00:00Z"]);
+        let rows = build_rows_with_pending(&old, 2, Some((&utc(), now)), 1);
+        assert_eq!(rows[0], header("Today", 1));
+        assert_eq!(rows[1], Row::Pending(0..1));
+        assert_eq!(rows.len(), 4);
+        // An empty page still shows them.
+        assert_eq!(
+            build_rows_with_pending(&[], 2, Some((&utc(), now)), 1),
+            vec![header("Today", 1), Row::Pending(0..1)]
+        );
+        // Not sorted by date: the top of the flat grid, no header.
+        let rows = build_rows_with_pending(&items, 2, None, 1);
+        assert_eq!(rows, vec![Row::Pending(0..1), Row::Grid(0..2)]);
+        // None pending: unchanged.
+        assert_eq!(
+            build_rows_with_pending(&items, 2, None, 0),
+            build_rows(&items, 2, None)
+        );
+        assert_eq!(row_of_item(&rows, 1), Some(1));
     }
 
     /// OD-20: date sort buckets by local day: Today, Yesterday, then dates, each with its count

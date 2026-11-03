@@ -400,6 +400,15 @@ impl Sheet {
     }
 }
 
+/// Which imported files a library page shows pending cards for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PageKinds {
+    All,
+    Video,
+    Audio,
+    None,
+}
+
 /// Everything the import UI keeps in the app model.
 #[derive(Debug, Clone, Default)]
 pub struct ImportUi {
@@ -431,6 +440,54 @@ impl ImportUi {
             for (ci, c) in r.cards.iter().enumerate() {
                 if !c.dismissed && matches!(c.state, CardState::Failed(_)) {
                     out.push((ri, ci, c));
+                }
+            }
+        }
+        out
+    }
+
+    /// The step and fraction to draw on the card of capture `id` while its import still runs;
+    /// nothing once the job ended (even when the library list has not refreshed yet).
+    pub fn strip_for(&self, id: &str) -> Option<(String, Option<f64>)> {
+        self.runs.iter().filter(|r| r.running()).find_map(|r| {
+            r.cards
+                .iter()
+                .find(|c| c.capture_id.as_deref() == Some(id) && !c.dismissed)
+                .and_then(|c| match &c.state {
+                    CardState::Step(s, f) => Some((s.clone(), *f)),
+                    _ => None,
+                })
+        })
+    }
+
+    /// The cards that have no capture of their own on screen: waiting or in a step before the
+    /// capture exists, and failed ones. `(run, card)` indexes, newest run first. A card whose
+    /// capture is in `existing` is never listed (its own card carries the strip). `page` limits
+    /// them to the kind the library page shows.
+    pub fn pending_cards(
+        &self,
+        existing: &std::collections::HashSet<String>,
+        page: PageKinds,
+    ) -> Vec<(usize, usize)> {
+        let mut out = Vec::new();
+        for (ri, r) in self.runs.iter().enumerate().rev() {
+            for (ci, c) in r.cards.iter().enumerate() {
+                let kind_ok = match page {
+                    PageKinds::All => true,
+                    PageKinds::Video => c.kind == Kind::Video,
+                    PageKinds::Audio => c.kind == Kind::Audio,
+                    PageKinds::None => false,
+                };
+                let has_capture = c
+                    .capture_id
+                    .as_deref()
+                    .is_some_and(|id| existing.contains(id));
+                let wanted = match c.state {
+                    CardState::Done => false,
+                    CardState::Failed(_) | CardState::Waiting | CardState::Step(..) => true,
+                };
+                if !c.dismissed && kind_ok && wanted && !has_capture {
+                    out.push((ri, ci));
                 }
             }
         }
@@ -572,8 +629,10 @@ pub fn drop_counts_line(c: &DropCount) -> String {
 #[derive(Debug, Clone, PartialEq)]
 pub enum CardState {
     Waiting,
-    /// The step message and the file's own fraction.
-    Step(String, f64),
+    /// The step message (copying, preparing, reading the sound, checking) and the file's own
+    /// fraction (`None`: no progress to show). Transcripts and speakers are jobs of their own, not
+    /// steps of the import.
+    Step(String, Option<f64>),
     Done,
     Failed(String),
 }
@@ -680,7 +739,7 @@ impl ImportRun {
                 } else {
                     0.0
                 };
-                CardState::Step(message.to_owned(), own)
+                CardState::Step(message.to_owned(), Some(own))
             } else {
                 CardState::Waiting
             };
@@ -764,7 +823,6 @@ pub fn step_label(message: &str) -> String {
         "Preparing for editing" => tr!("Preparing for editing"),
         "Reading the sound" => tr!("Reading the sound"),
         "Checking the copy" => tr!("Checking the copy"),
-        "Transcribing" => tr!("Transcribing"),
         other => other.to_owned(),
     }
 }
@@ -977,12 +1035,14 @@ mod tests {
         run.progress(0.4, "Copying into the library");
         assert_eq!(
             run.cards[0].state,
-            CardState::Step("Copying into the library".into(), 0.5)
+            CardState::Step("Copying into the library".into(), Some(0.5))
         );
         assert_eq!(run.cards[1].state, CardState::Waiting);
         run.progress(0.9, "Reading the sound");
         assert_eq!(run.cards[0].state, CardState::Done);
-        assert!(matches!(run.cards[1].state, CardState::Step(_, f) if (f - 0.5).abs() < 1e-9));
+        assert!(
+            matches!(run.cards[1].state, CardState::Step(_, Some(f)) if (f - 0.5).abs() < 1e-9)
+        );
         assert_eq!(run.ready_count(), 1);
         assert!(run.bytes_text().contains("/"));
         run.finish(&json!({"files": [
@@ -1037,6 +1097,109 @@ mod tests {
         for e in ["webm", "avi", "mp3", "flac"] {
             assert!(!plist.contains(&format!("<string>{e}</string>")), "{e}");
         }
+    }
+
+    fn ui_with(answer: &Value, sizes: &[(PathBuf, u64)]) -> ImportUi {
+        ImportUi {
+            runs: vec![ImportRun::from_started(answer, sizes).unwrap()],
+            ..Default::default()
+        }
+    }
+
+    fn two_files() -> (Value, Vec<(PathBuf, u64)>) {
+        (
+            json!({"job_id": "j", "captures": [
+                {"capture_id": "rec_1", "path": "/a.m4a", "title": "a", "kind": "audio", "status": "queued"},
+                {"capture_id": "rec_2", "path": "/b.avi", "title": "b", "kind": "video", "status": "cant_import",
+                 "error": {"reason": "unsupported_format", "message": "AVI"}}]}),
+            vec![(PathBuf::from("/a.m4a"), 100)],
+        )
+    }
+
+    fn ids(v: &[&str]) -> std::collections::HashSet<String> {
+        v.iter().map(|s| (*s).to_owned()).collect()
+    }
+
+    /// Nothing exists yet: the waiting file and the failed one are pending cards, newest run first,
+    /// and no card has a strip.
+    #[test]
+    fn pending_only_before_the_capture_exists() {
+        let (a, s) = two_files();
+        let ui = ui_with(&a, &s);
+        assert_eq!(
+            ui.pending_cards(&ids(&[]), PageKinds::All),
+            vec![(0, 0), (0, 1)]
+        );
+        assert_eq!(ui.strip_for("rec_1"), None, "waiting has no strip");
+    }
+
+    /// The capture exists and the job (copy, then the after steps) still runs: no separate card, the
+    /// strip is on the capture's own card, once, with no percentage during the after steps.
+    #[test]
+    fn the_strip_moves_onto_the_capture_when_it_exists() {
+        let (a, s) = two_files();
+        let mut ui = ui_with(&a, &s);
+        ui.runs[0].progress(0.5, "Copying into the library");
+        assert_eq!(
+            ui.pending_cards(&ids(&["rec_1"]), PageKinds::All),
+            vec![(0, 1)]
+        );
+        assert_eq!(
+            ui.strip_for("rec_1"),
+            Some(("Copying into the library".into(), Some(0.5)))
+        );
+        ui.runs[0].progress(0.9, "Checking the copy");
+        assert_eq!(
+            ui.strip_for("rec_1"),
+            Some(("Checking the copy".into(), Some(0.9)))
+        );
+        assert_eq!(
+            ui.pending_cards(&ids(&["rec_1"]), PageKinds::All),
+            vec![(0, 1)]
+        );
+    }
+
+    /// The job ended: the strip is gone and no pending card is left, even when the library list
+    /// has not refreshed yet (the capture is not in `existing`).
+    #[test]
+    fn nothing_is_drawn_once_the_job_ended() {
+        let (a, s) = two_files();
+        let mut ui = ui_with(&a, &s);
+        ui.runs[0].progress(0.9, "Checking the copy");
+        ui.runs[0].finish(&json!({"files": [{"path": "/a.m4a", "status": "imported"}]}));
+        assert_eq!(ui.strip_for("rec_1"), None);
+        assert_eq!(
+            ui.pending_cards(&ids(&[]), PageKinds::All),
+            vec![(0, 1)],
+            "only the failed file"
+        );
+        assert_eq!(
+            ui.pending_cards(&ids(&["rec_1"]), PageKinds::All),
+            vec![(0, 1)]
+        );
+    }
+
+    /// A failed file is a pending (failed) card until it is dismissed; a cancelled job fails what
+    /// did not finish.
+    #[test]
+    fn a_failed_card_stays_until_dismissed() {
+        let (a, s) = two_files();
+        let mut ui = ui_with(&a, &s);
+        ui.runs[0].fail("Cancelled", true);
+        assert!(matches!(ui.runs[0].cards[0].state, CardState::Failed(_)));
+        assert_eq!(ui.pending_cards(&ids(&[]), PageKinds::All).len(), 2);
+        ui.runs[0].cards[1].dismissed = true;
+        assert_eq!(ui.pending_cards(&ids(&[]), PageKinds::All), vec![(0, 0)]);
+    }
+
+    /// A library page shows pending cards of its own kind only.
+    #[test]
+    fn a_page_shows_only_its_kind() {
+        let (a, s) = two_files();
+        let ui = ui_with(&a, &s);
+        assert_eq!(ui.pending_cards(&ids(&[]), PageKinds::Audio), vec![(0, 0)]);
+        assert_eq!(ui.pending_cards(&ids(&[]), PageKinds::Video), vec![(0, 1)]);
+        assert!(ui.pending_cards(&ids(&[]), PageKinds::None).is_empty());
     }
 
     #[test]
