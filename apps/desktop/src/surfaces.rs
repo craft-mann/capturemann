@@ -205,7 +205,7 @@ impl Surfaces {
         for id in gone {
             self.forget(id, "no longer exists");
         }
-        let mut out = format!("Live app windows: {}\n", live.len());
+        let mut out = format!("Live app windows: {}\n", live.len()); // i18n-ignore: diagnostics text
         for id in live {
             match self.entries.iter().find(|e| e.id == *id) {
                 Some(e) => {
