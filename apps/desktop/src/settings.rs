@@ -540,7 +540,7 @@ fn validate(values: &Map<String, Value>) -> Result<(), CmError> {
 impl SettingsStore for FileSettings {
     fn all(&self) -> Result<Map<String, Value>, CmError> {
         let mut out = match json!({
-            KEY_THEME: "system",
+            KEY_THEME: "dark",
             KEY_LANGUAGE: "en",
             KEY_COPY_AFTER_CAPTURE: true,
             KEY_COPY_LINK_WHEN_DONE: true,
@@ -659,7 +659,7 @@ mod tests {
         let file = dir.path().join("sub/settings.json");
         let s = FileSettings::load(file.clone());
         let all = s.all().unwrap();
-        assert_eq!(all[KEY_THEME], "system");
+        assert_eq!(all[KEY_THEME], "dark");
         assert_eq!(all[KEY_COPY_AFTER_CAPTURE], true);
 
         let Value::Object(set) =
@@ -806,7 +806,7 @@ mod tests {
         assert_eq!(got.policies, want);
         assert_eq!(got.dropped, 0);
         // Other settings are untouched.
-        assert_eq!(reloaded.all().unwrap()[KEY_THEME], "system");
+        assert_eq!(reloaded.all().unwrap()[KEY_THEME], "dark");
     }
 
     /// AGT-2.AC4: malformed stored values are ignored, never fatal.
@@ -901,7 +901,7 @@ mod tests {
         let file = dir.path().join("settings.json");
         std::fs::write(&file, "{ not json").unwrap();
         let s = FileSettings::load(file);
-        assert_eq!(s.all().unwrap()[KEY_THEME], "system");
+        assert_eq!(s.all().unwrap()[KEY_THEME], "dark");
         let report = s.load_report();
         let backup = report.backup.clone().expect("a backup path");
         assert!(backup.exists());

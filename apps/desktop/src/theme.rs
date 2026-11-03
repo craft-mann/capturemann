@@ -76,9 +76,10 @@ pub fn contrast(a: Color, b: Color) -> f64 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ThemePreference {
-    /// Follow the OS: dark by default, light when the OS is light.
-    #[default]
+    /// Follow the OS: dark when the OS is dark or unknown, light when the OS is light.
     System,
+    /// The default for a new install (dark is the product's default theme).
+    #[default]
     Dark,
     Light,
 }

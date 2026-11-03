@@ -233,7 +233,7 @@ pub trait PublishProvider {
 
 | Key | Maintainer | Type and default | Defined in |
 | --- | --- | --- | --- |
-| `appearance.theme` | agent-writable | `"system"` (default), `"dark"` or `"light"` | DESIGN §1 (Studio only) |
+| `appearance.theme` | agent-writable | `"dark"` (default), `"light"` or `"system"` (follow the OS; the default was `"system"` before 0.2.7) | DESIGN §1 (Studio only) |
 | `capture.copy_to_clipboard` | agent-writable | boolean, `true` | CAP-4 |
 | `capture.save_folder_enabled` | **app-only** (`capture.save_folder*`: it makes the app write files outside the library) | boolean, `false`: also save a PNG of each capture and of each annotation save to the folder below | CAP-4.AC2 |
 | `capture.save_folder` | app-only | folder path string; absent means none chosen (the setting then cannot take effect and the toast says so). Never created by the app: a missing folder is an unplugged drive | CAP-4.AC2, AC4 |
