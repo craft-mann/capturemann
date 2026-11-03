@@ -150,7 +150,7 @@ Because the bundled FFmpeg has no demuxer for AVI, MP3, AIFF, FLAC, OGG or bare 
 **Test notes** — A fake `Trasher` and a fake confirmer test the order (trash after verify only), the dialog contents, timeout, decline, cancel after some files, and the policy edge cases; one ignored test moves a scratch file to the real Trash (as `cm-platform` does).
 
 ### IMP-5 Import in the app
-**Priority** P1 · **Status** Draft (the UI is the next round; DESIGN §n for the import surfaces is not yet in `docs/development/design-surfaces.md`, so the Definition of Ready item 4 is open: the kit boards I0 to I4 are the named surface until it is) · **Crates** apps/desktop · **Depends on** IMP-1 to IMP-4, DESIGN kit boards I1 to I4, I18N
+**Priority** P1 · **Status** In progress (built Nov 3, 2026 on branch `track/mac-import`: sheet, drop overlay, header button and ⌘I, cards, job toast, Imported chip, editor changes, launcher, menu bar, Dock drop and Open With; view models and requests tested, the windows not checked by eye; DESIGN §5.12) · **Crates** apps/desktop · **Depends on** IMP-1 to IMP-4, DESIGN kit boards I1 to I4, I18N
 
 **User story** — As someone with files on my Mac, I want to drop or pick them, see what will happen, and have them appear in the library.
 
