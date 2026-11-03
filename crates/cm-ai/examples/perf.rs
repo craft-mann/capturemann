@@ -135,11 +135,24 @@ fn main() {
                 #[cfg(feature = "sherpa")]
                 Some(threads) => SherpaDiarizer::with_engine(
                     store,
-                    std::sync::Arc::new(cm_ai::speaker_engine::SherpaEngine { threads }),
+                    std::sync::Arc::new(cm_ai::speaker_engine::SherpaEngine {
+                        threads,
+                        window_shift_ratio: option(&args, "--shift").and_then(|s| s.parse().ok()),
+                    }),
                 ),
                 #[cfg(not(feature = "sherpa"))]
                 Some(_threads) => SherpaDiarizer::new(store),
-                None => SherpaDiarizer::new(store),
+                None => match option(&args, "--shift").and_then(|s| s.parse::<f32>().ok()) {
+                    #[cfg(feature = "sherpa")]
+                    Some(shift) => SherpaDiarizer::with_engine(
+                        store,
+                        std::sync::Arc::new(cm_ai::speaker_engine::SherpaEngine {
+                            window_shift_ratio: Some(shift),
+                            ..Default::default()
+                        }),
+                    ),
+                    _ => SherpaDiarizer::new(store),
+                },
             };
             // --second-run: the 0.2.6 way of keeping to a maximum (run all the audio again).
             let d = if args.iter().any(|a| a == "--second-run") {

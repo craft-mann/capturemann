@@ -46,6 +46,9 @@ pub const MODEL_ID: &str = "sherpa-onnx-2.0.1+pyannote-segmentation-3.0+campplus
 /// against 49 % at 1.2; 17 % on 6 clips held back). The edge is close, so do not raise it without
 /// measuring. A suggestion, not a promise.
 pub const AUTO_THRESHOLD: f32 = 1.0;
+/// The shift of the segmentation window as a share of its length. 0.1 is the main cost of the run;
+/// larger values are 2x to 6x faster but changed the answers (`docs/project/performance.md`).
+pub const WINDOW_SHIFT_RATIO: f32 = 0.1;
 /// A speaker with less speech than this (seconds) or [`FOLD_FRACTION`] of all speech is folded
 /// into the nearest other voice when the count is automatic.
 pub const FOLD_MIN_SECS: f64 = 8.0;
@@ -518,6 +521,9 @@ pub struct SherpaEngine {
     /// against 34 s with 4 on a Mac with 10 performance cores, with identical turns; 14
     /// threads, which reach the efficiency cores, took 56 s.
     pub threads: i32,
+    /// The segmentation window's shift as a share of its length (`None`: [`WINDOW_SHIFT_RATIO`]).
+    /// Larger is faster and changed the answers on the 14 English clips (PERF-1); for measurements.
+    pub window_shift_ratio: Option<f32>,
 }
 
 #[cfg(feature = "sherpa")]
@@ -555,7 +561,7 @@ impl TurnEngine for SherpaEngine {
             segmentation: OfflineSpeakerSegmentationModelConfig {
                 pyannote: OfflineSpeakerSegmentationPyannoteModelConfig {
                     model: Some(seg),
-                    window_shift_ratio: 0.1,
+                    window_shift_ratio: self.window_shift_ratio.unwrap_or(WINDOW_SHIFT_RATIO),
                 },
                 num_threads: threads,
                 ..Default::default()
