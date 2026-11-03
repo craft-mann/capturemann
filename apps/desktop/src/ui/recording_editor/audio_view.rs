@@ -1267,6 +1267,13 @@ impl RecordingEditor {
             }
         }
         let tm = g.t_of(x);
+        // The playhead itself (its line and the flag on top of it) is grabbed and dragged like in
+        // the video editor; a press anywhere else is the ruler's gesture.
+        if (x - g.x_of(s.model.playhead)).abs() <= crate::recedit::geom::GRAB_PX {
+            s.drag = Some(Drag::Playhead);
+            cx.notify();
+            return;
+        }
         if ev.modifiers.shift {
             s.model.shift_click(tm);
         } else {
