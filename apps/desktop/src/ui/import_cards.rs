@@ -73,10 +73,11 @@ pub fn imported_badge(_t: &Theme) -> AnyElement {
         .into_any_element()
 }
 
-/// The bottom strip of a thumbnail while its file is being imported: the step, the percentage and
-/// a bar.
-pub fn progress_strip(t: &Theme, step: &str, frac: f64) -> AnyElement {
-    let pct = (frac * 100.0).round().clamp(0.0, 100.0);
+/// The bottom strip of a thumbnail while its file is being imported: the step (once), the
+/// percentage when there is one, and a bar (dimmed and full while there is no progress to show,
+/// for example while transcribing).
+pub fn progress_strip(t: &Theme, step: &str, frac: Option<f64>) -> AnyElement {
+    let pct = frac.map(|f| (f * 100.0).round().clamp(0.0, 100.0));
     div()
         .absolute()
         .left(px(10.))
@@ -101,13 +102,8 @@ pub fn progress_strip(t: &Theme, step: &str, frac: f64) -> AnyElement {
                     14.,
                     Theme::DARK.agent_text,
                 ))
-                .child(
-                    div()
-                        .flex_1()
-                        .min_w(px(0.))
-                        .child(SharedString::from(step.to_owned())),
-                )
-                .child(div().mono().child(SharedString::from(format!("{pct:.0}%")))),
+                .child(shrink_text(SharedString::from(step.to_owned())).flex_1())
+                .children(pct.map(|p| div().mono().child(SharedString::from(format!("{p:.0}%"))))),
         )
         .child(
             div()
@@ -117,155 +113,120 @@ pub fn progress_strip(t: &Theme, step: &str, frac: f64) -> AnyElement {
                 .child(
                     div()
                         .h_full()
-                        .w(gpui::relative((pct / 100.0) as f32))
+                        .w(gpui::relative(pct.map_or(1.0, |p| (p / 100.0) as f32)))
                         .rounded(px(2.))
-                        .bg(rgba_of(t.agent)),
+                        .bg(rgba_of(if pct.is_some() {
+                            t.agent
+                        } else {
+                            t.agent.with_alpha(35)
+                        })),
                 ),
         )
         .into_any_element()
 }
 
-/// The cards above the grid for files that have no capture in the list yet: waiting, in progress
-/// or failed. Once a file is imported its capture shows in the grid (with the Imported badge).
-pub fn pending_strip(t: &Theme, ui: &ImportUi, app: &Entity<AppModel>) -> Option<AnyElement> {
-    let mut cards: Vec<AnyElement> = Vec::new();
-    for (ri, run) in ui.runs.iter().enumerate() {
-        for (ci, c) in run.cards.iter().enumerate() {
-            if c.dismissed {
-                continue;
-            }
-            let (border, body): (_, AnyElement) = match &c.state {
-                CardState::Done => continue,
-                CardState::Failed(why) => {
-                    let a1 = app.clone();
-                    let path = c.path.clone();
-                    (
-                        t.warning,
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap(px(6.))
-                            .child(
-                                div()
-                                    .text_size(px(12.5))
-                                    .text_color(rgba_of(t.warning))
-                                    .child(SharedString::from(why.clone())),
-                            )
-                            .child(
-                                div()
-                                    .flex()
-                                    .items_center()
-                                    .gap(px(10.))
-                                    .child(
-                                        button_with_icon(
-                                            t,
-                                            SharedString::from(format!("import-show-{ri}-{ci}")),
-                                            tr!("Show file"),
-                                            ButtonKind::Secondary,
-                                            Some("folder-open"),
-                                        )
-                                        .on_click(move |_, _, _| act::show_file(&path)),
-                                    )
-                                    .child(
-                                        div()
-                                            .id(SharedString::from(format!(
-                                                "import-dismiss-{ri}-{ci}"
-                                            )))
-                                            .role(Role::Button)
-                                            .aria_label(tr!("Dismiss"))
-                                            .focusable()
-                                            .cursor_pointer()
-                                            .text_size(px(13.))
-                                            .text_color(rgba_of(t.text_3))
-                                            .child(tr!("Dismiss"))
-                                            .on_click(move |_, _, cx| {
-                                                act::dismiss_card(&a1, ri, ci, cx)
-                                            }),
-                                    ),
-                            )
-                            .into_any_element(),
-                    )
-                }
-                CardState::Waiting => (
-                    t.border,
-                    div()
-                        .text_size(px(12.5))
-                        .text_color(rgba_of(t.mist))
-                        .child(SharedString::from(tr!("Waiting")))
-                        .into_any_element(),
-                ),
-                CardState::Step(step, frac) => (
-                    t.border,
-                    div()
-                        .text_size(px(12.5))
-                        .text_color(rgba_of(t.mist))
-                        .child(SharedString::from(format!(
-                            "{} \u{b7} {:.0}%",
-                            step,
-                            frac * 100.0
-                        )))
-                        .into_any_element(),
-                ),
-            };
-            let failed = matches!(c.state, CardState::Failed(_));
-            let glyph = if failed {
-                "file-x"
-            } else if c.kind == Kind::Audio {
-                "cm-import-audio"
-            } else {
-                "cm-import-video"
-            };
-            let tile = div()
-                .relative()
-                .w_full()
-                .h(px(130.))
-                .flex()
-                .items_center()
-                .justify_center()
-                .rounded(px(scale::RADIUS_LG))
-                .border_1()
-                .border_color(rgba_of(border))
-                .bg(rgba_of(t.raised))
-                .child(icon(glyph, 32., if failed { t.warning } else { t.mist }))
-                .child(imported_badge(t))
-                .children(match &c.state {
-                    CardState::Step(step, frac) => Some(progress_strip(t, step, *frac)),
-                    _ => None,
-                });
-            cards.push(
+/// One card of a file with no capture on screen yet (waiting, in a step, failed), drawn in the
+/// grid (`width` px) at the top of "Today". Its step shows once, in the strip; a failed card has
+/// the amber border, the reason, Show file and Dismiss.
+pub fn pending_card(
+    t: &Theme,
+    ui: &ImportUi,
+    (ri, ci): (usize, usize),
+    width: f32,
+    app: &Entity<AppModel>,
+) -> AnyElement {
+    let Some(c) = ui.runs.get(ri).and_then(|r| r.cards.get(ci)) else {
+        return div().into_any_element();
+    };
+    let failed = matches!(c.state, CardState::Failed(_));
+    let glyph = if failed {
+        "file-x"
+    } else if c.kind == Kind::Audio {
+        "cm-import-audio"
+    } else {
+        "cm-import-video"
+    };
+    let tile = div()
+        .relative()
+        .w_full()
+        .h(px((width * 10. / 16.).round()))
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded(px(scale::RADIUS_LG))
+        .border_1()
+        .border_color(rgba_of(if failed { t.warning } else { t.border }))
+        .bg(rgba_of(t.raised))
+        .child(icon(glyph, 32., if failed { t.warning } else { t.mist }))
+        .child(imported_badge(t))
+        .children(match &c.state {
+            CardState::Step(step, frac) => Some(progress_strip(t, step, *frac)),
+            CardState::Waiting => Some(progress_strip(t, &tr!("Waiting"), None)),
+            _ => None,
+        });
+    let below = match &c.state {
+        CardState::Failed(why) => {
+            let (a1, path) = (app.clone(), c.path.clone());
+            Some(
                 div()
-                    .w(px(250.))
-                    .flex_none()
                     .flex()
                     .flex_col()
-                    .gap(px(8.))
-                    .child(tile)
+                    .gap(px(6.))
                     .child(
                         div()
-                            .truncate()
-                            .text_size(px(type_scale::UI))
-                            .font_weight(FontWeight::MEDIUM)
-                            .child(SharedString::from(c.title.clone())),
+                            .text_size(px(12.5))
+                            .text_color(rgba_of(t.warning))
+                            .child(SharedString::from(why.clone())),
                     )
-                    .child(body)
-                    .into_any_element(),
-            );
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(10.))
+                            .child(
+                                button_with_icon(
+                                    t,
+                                    SharedString::from(format!("import-show-{ri}-{ci}")),
+                                    tr!("Show file"),
+                                    ButtonKind::Secondary,
+                                    Some("folder-open"),
+                                )
+                                .on_click(move |_, _, _| act::show_file(&path)),
+                            )
+                            .child(
+                                div()
+                                    .id(SharedString::from(format!("import-dismiss-{ri}-{ci}")))
+                                    .role(Role::Button)
+                                    .aria_label(tr!("Dismiss"))
+                                    .focusable()
+                                    .cursor_pointer()
+                                    .text_size(px(13.))
+                                    .text_color(rgba_of(t.text_3))
+                                    .child(tr!("Dismiss"))
+                                    .on_click(move |_, _, cx| act::dismiss_card(&a1, ri, ci, cx)),
+                            ),
+                    ),
+            )
         }
-    }
-    if cards.is_empty() {
-        return None;
-    }
-    Some(
-        div()
-            .id("import-pending")
-            .flex_none()
-            .flex()
-            .flex_wrap()
-            .gap(px(16.))
-            .py(px(10.))
-            .children(cards)
-            .into_any_element(),
-    )
+        _ => None,
+    };
+    div()
+        .w(px(width))
+        .flex_none()
+        .flex()
+        .flex_col()
+        .gap(px(10.))
+        .child(tile)
+        .child(
+            div()
+                .px(px(2.))
+                .truncate()
+                .text_size(px(type_scale::UI))
+                .font_weight(FontWeight::MEDIUM)
+                .child(SharedString::from(c.title.clone())),
+        )
+        .children(below)
+        .into_any_element()
 }
 
 #[allow(dead_code)]
