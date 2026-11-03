@@ -58,9 +58,9 @@ impl Default for PipelineSettings {
     fn default() -> Self {
         PipelineSettings {
             lift_quiet_input: true,
-            gate: true,
-            vad_opinion: true,
-            carry_previous_text: false,
+            gate: false,
+            vad_opinion: false,
+            carry_previous_text: true,
         }
     }
 }
@@ -82,7 +82,7 @@ impl PipelineSettings {
         }
     }
 
-    /// Everything as in 0.2.6.
+    /// Everything as in 0.2.6, quiet-input lift included.
     pub fn all_off() -> Self {
         PipelineSettings {
             lift_quiet_input: false,
