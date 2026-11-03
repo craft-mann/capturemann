@@ -111,6 +111,8 @@ impl JobHandler for DiarizeHandler {
                 .map(|(k, v)| (k, Some(v)))
                 .collect();
             cm_library::rec_edit::set_extra(&write_dir, changes)?;
+            // Sounds the speaker engine heard speech in become `[unclear]` (M2i).
+            super::transcripts::upgrade_sounds(&write_dir);
             lock_library(&library).index_dir(&write_dir)?;
             Ok(())
         })

@@ -160,3 +160,37 @@ impl Inner {
         .await
     }
 }
+
+/// Upgrades the `[noise]` sounds of the bundle's transcript to `[unclear]` wherever the speaker
+/// engine heard speech (M2i, `cm_ai::sounds::classify`). Safe to call at any time and from either
+/// order of the transcript and the speaker run: it does nothing without both. The transcript file
+/// is replaced in one rename only when something changed.
+pub(super) fn upgrade_sounds(dir: &std::path::Path) {
+    let Ok(text) = std::fs::read_to_string(dir.join(TRANSCRIPT_FILE)) else {
+        return;
+    };
+    let Ok(mut transcript) = serde_json::from_str::<Transcript>(&text) else {
+        return;
+    };
+    if transcript.sounds.is_empty() {
+        return;
+    }
+    let Ok(manifest) = cm_library::read_manifest(dir) else {
+        return;
+    };
+    let Some(state) = cm_ai::speakers::SpeakerState::from_manifest(&manifest) else {
+        return;
+    };
+    let evidence: Vec<cm_core::edit::Span> = state
+        .segments
+        .iter()
+        .map(|s| cm_core::edit::Span::new(s.start, s.end))
+        .collect();
+    let upgraded = cm_ai::sounds::classify(&transcript.sounds, &evidence);
+    if upgraded != transcript.sounds {
+        transcript.sounds = upgraded;
+        if let Ok(bytes) = serde_json::to_vec_pretty(&transcript) {
+            let _ = super::jobs::write_atomic(dir, TRANSCRIPT_FILE, &bytes);
+        }
+    }
+}

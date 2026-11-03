@@ -410,6 +410,9 @@ impl JobHandler for TranscribeHandler {
             } else {
                 cm_library::rec_edit::default_captions_on_first_transcript(&write_dir)?
             };
+            // A speaker run that finished first already knows where speech is: sounds it heard
+            // become `[unclear]`.
+            super::transcripts::upgrade_sounds(&write_dir);
             // The bundle changed: refresh the index row.
             lib.index_dir(&write_dir)?;
             Ok((p, replaced, revision, shown, reapplied, dropped))

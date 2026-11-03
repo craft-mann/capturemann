@@ -214,6 +214,14 @@ impl Inner {
                     captions.lines(&t)?
                 }
             };
+            // The exports write the transcript's sounds as `[unclear]` / `[noise]` lines (M2i);
+            // everything else built from the words never sees them.
+            let sounds = std::fs::read_to_string(dir.join(TRANSCRIPT_FILE))
+                .ok()
+                .and_then(|t| serde_json::from_str::<Transcript>(&t).ok())
+                .map(|t| t.sounds)
+                .unwrap_or_default();
+            let lines = cm_ai::sounds::add_sound_lines(&lines, &sounds);
             let edits = cm_library::rec_edit::load_edits(&manifest);
             // AI-8: with speakers known, VTT gets voice tags, TXT and Markdown "Name: text" per
             // turn and SRT a "NAME:" prefix when asked. Markdown always takes this path.

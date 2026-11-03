@@ -341,3 +341,57 @@ async fn m2h_screen_recordings_and_the_off_switch_start_nothing() {
     assert!(!dir.join("transcript.live.json").exists());
     assert_eq!(r.runs.load(Ordering::SeqCst), 0);
 }
+
+/// M2i: the exports write sounds as bracketed lines; a transcript's words text never has them.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn m2i_exports_write_sounds_and_the_words_do_not_have_them() {
+    let Some(r) = rig().await else { return };
+    let dir = start_bundle(&r, "rec_sounds");
+    std::fs::remove_file(dir.join("recording.lock")).unwrap();
+    std::fs::write(dir.join("mic.wav"), b"").unwrap();
+    finish_bundle(&dir, "rec_sounds");
+    let t = cm_ai::transcribe::Transcript {
+        version: 1,
+        language: "en".into(),
+        model: "small".into(),
+        words: ["hello", "there", "again"]
+            .iter()
+            .enumerate()
+            .map(|(i, w)| Word {
+                text: (*w).into(),
+                start: media_secs(i as f64 * 20.0),
+                end: media_secs(i as f64 * 20.0 + 0.5),
+                confidence: 0.9,
+            })
+            .collect(),
+        note: None,
+        sounds: vec![cm_ai::transcribe::Sound {
+            kind: cm_ai::transcribe::SoundKind::Unclear,
+            start: media_secs(8.0),
+            end: media_secs(14.0),
+        }],
+    };
+    std::fs::write(dir.join("transcript.json"), serde_json::to_vec(&t).unwrap()).unwrap();
+    r.daemon
+        .execute_method(Actor::User, 0, "rescan_library", &json!({}))
+        .await
+        .unwrap();
+    let out = r
+        .daemon
+        .execute_method(
+            Actor::User,
+            0,
+            "export_captions",
+            &json!({"capture_id": "rec_sounds", "format": "srt"}),
+        )
+        .await
+        .unwrap();
+    let text = std::fs::read_to_string(out["path"].as_str().unwrap()).unwrap();
+    assert!(text.contains("[unclear]"), "{text}");
+    assert!(text.contains("hello") && text.contains("again"), "{text}");
+    // The words-only readers: the transcript text and the caption lines built from the words.
+    assert!(!t.text().contains('['));
+    assert!(cm_ai::caption::build_captions(&t.words)
+        .iter()
+        .all(|l| !l.text.contains('[')));
+}
