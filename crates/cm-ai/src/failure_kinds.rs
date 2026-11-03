@@ -163,6 +163,106 @@ pub fn spread_repeats(
     out
 }
 
+/// A short sentence said again and again in a row (`unit` words, `count` times), found on sentence
+/// units: a unit ends at a word with sentence punctuation (`.`, `?`, `!`, `…`) or after
+/// `MAX_UNIT_WORDS` words, and units are compared with case and punctuation folded. This is the
+/// loop that a decoder writes over speech it cannot read ("Thank you. Thank you. Thank you."),
+/// which the exact-word loop check ([`crate::pieces::find_runs`]) misses because the repeats
+/// carry full stops and may be split across lines.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SentenceRun {
+    /// Index of the first word of the run in the word list, and one past the last.
+    pub first: usize,
+    pub end: usize,
+    /// Words in one repeated unit, and how many times it occurs.
+    pub unit_words: usize,
+    pub count: usize,
+    /// The folded text of one unit (compared, never shown).
+    pub text: String,
+}
+
+/// Longest unit looked for (words).
+pub const MAX_UNIT_WORDS: usize = 6;
+
+/// The runs of one sentence unit repeated at least `min_count` times in a row.
+pub fn sentence_runs(words: &[Word], min_count: usize) -> Vec<SentenceRun> {
+    // Units: (first word, one past the last word, folded text).
+    let mut units: Vec<(usize, usize, String)> = Vec::new();
+    let mut start = 0;
+    for (i, w) in words.iter().enumerate() {
+        let ends = w.text.trim_end().ends_with(['.', '?', '!', '…']);
+        if ends || i + 1 - start >= MAX_UNIT_WORDS || i + 1 == words.len() {
+            let text: Vec<String> = words[start..=i].iter().map(|w| fold(&w.text)).collect();
+            units.push((start, i + 1, text.join(" ")));
+            start = i + 1;
+        }
+    }
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < units.len() {
+        let mut j = i + 1;
+        while j < units.len() && units[j].2 == units[i].2 && !units[i].2.is_empty() {
+            j += 1;
+        }
+        if j - i >= min_count {
+            out.push(SentenceRun {
+                first: units[i].0,
+                end: units[j - 1].1,
+                unit_words: units[i].1 - units[i].0,
+                count: j - i,
+                text: units[i].2.clone(),
+            });
+        }
+        i = j.max(i + 1);
+    }
+    out
+}
+
+/// Indexes of the words of sentence units (see [`sentence_runs`]) that occur at least `min_count`
+/// times within `window_secs` of each other, whether or not they follow each other: the same short
+/// sentence coming back five times in a minute is rarely speech, and lines in between do not
+/// hide it. Compared after folding, so it is independent of language and wording.
+pub fn dense_unit_indices(words: &[Word], min_count: usize, window_secs: f64) -> Vec<usize> {
+    let mut units: Vec<(usize, usize, String)> = Vec::new();
+    let mut start = 0;
+    for (i, w) in words.iter().enumerate() {
+        let ends = w.text.trim_end().ends_with(['.', '?', '!', '…']);
+        if ends || i + 1 - start >= MAX_UNIT_WORDS || i + 1 == words.len() {
+            let text: Vec<String> = words[start..=i].iter().map(|w| fold(&w.text)).collect();
+            units.push((start, i + 1, text.join(" ")));
+            start = i + 1;
+        }
+    }
+    let mut by_text: HashMap<&str, Vec<usize>> = HashMap::new();
+    for (k, u) in units.iter().enumerate() {
+        if !u.2.is_empty() {
+            by_text.entry(u.2.as_str()).or_default().push(k);
+        }
+    }
+    let mut out = Vec::new();
+    for ks in by_text.values().filter(|ks| ks.len() >= min_count) {
+        // Units (in time order) that sit in some stretch of `window_secs` holding `min_count` of them.
+        let at = |k: usize| secs(words[units[k].0].start);
+        let mut marked = vec![false; ks.len()];
+        let mut lo = 0;
+        for hi in 0..ks.len() {
+            while at(ks[hi]) - at(ks[lo]) > window_secs {
+                lo += 1;
+            }
+            if hi + 1 - lo >= min_count {
+                marked[lo..=hi].iter_mut().for_each(|m| *m = true);
+            }
+        }
+        for (m, &k) in marked.iter().zip(ks) {
+            if *m {
+                out.extend(units[k].0..units[k].1);
+            }
+        }
+    }
+    out.sort_unstable();
+    out
+}
+
 /// A coarse writing system, enough to tell Latin text from Hangul or Cyrillic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Script {

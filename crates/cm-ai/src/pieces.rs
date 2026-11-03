@@ -404,11 +404,42 @@ impl Job<'_, '_> {
 
 /// Seconds of audio kept around a suspect stretch when it is read again.
 const REPAIR_PAD_SECS: f64 = 1.0;
+/// A sentence repeated this many times in a row is a loop suspect (and this many times within
+/// [`DENSE_WINDOW_SECS`] with other lines between).
+const LOOP_MIN_REPEATS: usize = 3;
+const DENSE_MIN_REPEATS: usize = 5;
+const DENSE_WINDOW_SECS: f64 = 60.0;
+/// A repeat that two readings agree on is taken as said only up to this many times and this many
+/// words a second (speech does not go faster; a decoder stuck on a sound does).
+const SAID_MAX_REPEATS: usize = 6;
+const MAX_WORDS_PER_SEC: f64 = 7.0;
 /// Words under this confidence, three or more in a row, make a stretch hopeless.
 const HOPELESS_CONFIDENCE: f32 = 0.1;
 const HOPELESS_RUN: usize = 3;
 
 impl Job<'_, '_> {
+    /// Whether the repeated sentence of `old` was really said: the window read again repeats the
+    /// same sentence (folded text) about as often, `old` has at most [`SAID_MAX_REPEATS`] of it,
+    /// at no more than [`MAX_WORDS_PER_SEC`].
+    fn said_repeatedly(
+        &self,
+        old: &[Word],
+        new_runs: &[crate::failure_kinds::SentenceRun],
+    ) -> bool {
+        let old_runs = crate::failure_kinds::sentence_runs(old, LOOP_MIN_REPEATS);
+        let Some(longest) = old_runs.iter().max_by_key(|r| r.count) else {
+            return false;
+        };
+        let span = old[longest.end - 1].end - old[longest.first].start;
+        let secs = (span.ticks() as f64 / cm_core::TICKS_PER_SECOND as f64).max(0.1);
+        let rate = (longest.end - longest.first) as f64 / secs;
+        longest.count <= SAID_MAX_REPEATS
+            && rate <= MAX_WORDS_PER_SEC
+            && new_runs
+                .iter()
+                .any(|n| n.text == longest.text && n.count.abs_diff(longest.count) <= 1)
+    }
+
     fn secs_of(&self, w: &Word) -> (f64, f64) {
         let t = |m: cm_core::MediaTime| {
             (m - self.base).ticks() as f64 / cm_core::TICKS_PER_SECOND as f64
@@ -452,6 +483,21 @@ impl Job<'_, '_> {
         for i in crate::failure_kinds::spread_repeat_indices(&words, 4, 10.0, 5) {
             spread[i] = true;
             suspect[i] = true;
+        }
+        // A short sentence said again and again: three or more in a row, or five or more within a
+        // minute with other lines in between. Read again on its own (the structure of the text
+        // only: no phrase is known to the rule).
+        let mut looped = vec![false; words.len()];
+        for r in crate::failure_kinds::sentence_runs(&words, LOOP_MIN_REPEATS) {
+            looped[r.first..r.end].iter_mut().for_each(|l| *l = true);
+        }
+        for i in
+            crate::failure_kinds::dense_unit_indices(&words, DENSE_MIN_REPEATS, DENSE_WINDOW_SECS)
+        {
+            looped[i] = true;
+        }
+        for (s, l) in suspect.iter_mut().zip(&looped) {
+            *s |= *l;
         }
         if !suspect.iter().any(|s| *s) {
             return Ok(words);
@@ -504,6 +550,36 @@ impl Job<'_, '_> {
                 }
             };
             let clean = again.iter().all(|w| !broken(w));
+            let is_looped = |w: &Word| {
+                words
+                    .iter()
+                    .position(|x| x.start == w.start && x.text == w.text)
+                    .is_some_and(|i| looped[i])
+            };
+            let flagged = old.iter().filter(|w| is_looped(w)).count();
+            if flagged * 2 >= old.len() {
+                // A repeated sentence. If the window read on its own repeats nothing, that reading
+                // replaces it (silence included). If it repeats the same sentence at a human pace
+                // and about as often, it was said; otherwise there are no reliable words there.
+                let new_runs = crate::failure_kinds::sentence_runs(&again, LOOP_MIN_REPEATS);
+                if clean && new_runs.is_empty() {
+                    self.report.broken_reread_kept += 1;
+                    out.extend(again);
+                } else if self.said_repeatedly(&old, &new_runs) {
+                    out.extend(old);
+                } else {
+                    let (mut from_s, mut to_s) = (f64::MAX, 0.0f64);
+                    for w in old.iter().filter(|w| is_looped(w)) {
+                        let (x, y) = self.secs_of(w);
+                        from_s = from_s.min(x);
+                        to_s = to_s.max(y);
+                    }
+                    self.report.broken_dropped += flagged;
+                    self.note_sound(from_s, to_s.max(from_s));
+                    out.extend(old.iter().filter(|w| !is_looped(w)).cloned());
+                }
+                continue;
+            }
             // Words that were only suspected for coming back after silences: whatever a clean
             // second reading of their window says replaces them, silence included.
             let old_spread = old.iter().all(|w| {

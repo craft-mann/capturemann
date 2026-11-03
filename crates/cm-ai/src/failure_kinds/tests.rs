@@ -547,3 +547,185 @@ fn unreadable_speech_like_level_becomes_a_sound_entry() {
         "{s:?}"
     );
 }
+
+// ---- a short sentence said again and again (structure only; made-up and several languages) -------
+
+/// How the window read answers: other words, the same sentence as many times as given, or a
+/// compressed loop.
+#[derive(Clone, Copy)]
+enum Window {
+    Other,
+    Same(usize),
+    Loop,
+}
+
+struct ReReads {
+    script: Vec<Word>,
+    unit: &'static [&'static str],
+    window: Window,
+}
+
+impl Transcriber for ReReads {
+    fn transcribe(
+        &self,
+        audio: Pcm16k<'_>,
+        _l: Option<&str>,
+        _p: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Transcript, CmError> {
+        let secs = audio.samples.len() as f64 / RATE as f64;
+        let mk = |text: &str, at: f64, dur: f64| Word {
+            text: text.into(),
+            start: audio.start + media_secs(at),
+            end: audio.start + media_secs(at + dur),
+            confidence: 0.9,
+        };
+        let words = if secs > 50.0 {
+            self.script
+                .iter()
+                .map(|w| Word {
+                    start: audio.start + w.start,
+                    end: audio.start + w.end,
+                    ..w.clone()
+                })
+                .collect()
+        } else {
+            match self.window {
+                Window::Other => vec![mk("mora", 0.5, 0.4), mk("tel", 1.2, 0.4)],
+                Window::Same(n) => (0..n)
+                    .flat_map(|k| {
+                        self.unit
+                            .iter()
+                            .enumerate()
+                            .map(move |(j, t)| (k, j, *t))
+                            .collect::<Vec<_>>()
+                    })
+                    .map(|(k, j, t)| mk(t, 0.3 + k as f64 * 1.5 + j as f64 * 0.4, 0.3))
+                    .collect(),
+                Window::Loop => (0..12)
+                    .flat_map(|k| {
+                        self.unit
+                            .iter()
+                            .enumerate()
+                            .map(move |(j, t)| (k, j, *t))
+                            .collect::<Vec<_>>()
+                    })
+                    .map(|(k, j, t)| mk(t, 0.2 + k as f64 * 0.25 + j as f64 * 0.1, 0.08))
+                    .collect(),
+            }
+        };
+        Ok(Transcript {
+            version: TRANSCRIPT_VERSION,
+            language: "xx".into(),
+            model: "rereads".into(),
+            words,
+            note: None,
+            sounds: Vec::new(),
+        })
+    }
+}
+
+/// `unit` (words, the last ends with a full stop) `n` times from `at`, `every` seconds apart.
+fn repeated(unit: &[&str], n: usize, at: f64, every: f64) -> Vec<Word> {
+    (0..n)
+        .flat_map(|k| {
+            unit.iter()
+                .enumerate()
+                .map(move |(j, t)| w(t, at + k as f64 * every + j as f64 * 0.4, 0.9))
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+fn run_loops(script: Vec<Word>, unit: &'static [&'static str], window: Window) -> Transcript {
+    let x = signal(60.0, &[(0.0, 60.0, 0.2)]);
+    transcribe_pieces(
+        &ReReads {
+            script,
+            unit,
+            window,
+        },
+        Pcm16k {
+            samples: &x,
+            start: MediaTime::ZERO,
+        },
+        Some("xx"),
+        None,
+        &mut |_| true,
+    )
+    .unwrap()
+    .0
+}
+
+#[test]
+fn a_made_up_sentence_repeated_five_times_is_replaced_by_the_second_reading() {
+    let unit: &'static [&'static str] = &["blorp", "zan."];
+    let t = run_loops(repeated(unit, 5, 5.0, 1.4), unit, Window::Other);
+    assert!(!t.words.iter().any(|w| w.text == "blorp"), "{:?}", t.words);
+    assert!(t.words.iter().any(|w| w.text == "mora"));
+}
+
+#[test]
+fn a_chinese_phrase_really_said_four_times_survives() {
+    let unit: &'static [&'static str] = &["好的。"];
+    let t = run_loops(repeated(unit, 4, 5.0, 1.5), unit, Window::Same(4));
+    assert_eq!(
+        t.words.iter().filter(|w| w.text == "好的。").count(),
+        4,
+        "{:?}",
+        t.words
+    );
+    assert!(t.sounds.is_empty());
+}
+
+#[test]
+fn a_repeated_word_without_full_stops_and_a_vietnamese_pair_survive() {
+    // No sentence punctuation: one unit of six words, never a run of three.
+    let words: Vec<Word> = ["vâng", "vâng", "vâng", "ừ", "ừ", "ừ"]
+        .iter()
+        .enumerate()
+        .map(|(i, t)| w(t, 5.0 + i as f64 * 0.5, 0.9))
+        .collect();
+    let t = run_loops(words, &["x"], Window::Other);
+    assert_eq!(t.words.len(), 6, "{:?}", t.words);
+}
+
+#[test]
+fn a_loop_that_survives_the_second_reading_becomes_a_sound_not_text() {
+    let unit: &'static [&'static str] = &["qux."];
+    let t = run_loops(repeated(unit, 9, 5.0, 0.3), unit, Window::Loop);
+    assert!(!t.words.iter().any(|w| w.text == "qux."), "{:?}", t.words);
+    assert_eq!(t.sounds.len(), 1, "{:?}", t.sounds);
+    assert!(t.sounds[0].start >= media_secs(4.0) && t.sounds[0].end <= media_secs(10.5));
+}
+
+#[test]
+fn a_sentence_coming_back_five_times_a_minute_with_lines_between_is_read_again() {
+    let unit: &'static [&'static str] = &["zed", "nim."];
+    let mut words = Vec::new();
+    for k in 0..6 {
+        words.extend(repeated(unit, 1, 3.0 + f64::from(k) * 7.0, 1.0));
+        words.push(w("someline.", 5.0 + f64::from(k) * 7.0, 0.9));
+    }
+    let t = run_loops(words, unit, Window::Other);
+    assert!(!t.words.iter().any(|w| w.text == "nim."), "{:?}", t.words);
+}
+
+#[test]
+fn sentence_runs_see_repeats_across_punctuation_and_case() {
+    let words: Vec<Word> = ["Ab", "cd.", "ab", "CD!", "Ab", "cd?", "other."]
+        .iter()
+        .enumerate()
+        .map(|(i, t)| w(t, i as f64, 0.9))
+        .collect();
+    let runs = sentence_runs(&words, 3);
+    assert_eq!(runs.len(), 1);
+    assert_eq!(
+        (
+            runs[0].first,
+            runs[0].end,
+            runs[0].count,
+            runs[0].unit_words
+        ),
+        (0, 6, 3, 2)
+    );
+}
