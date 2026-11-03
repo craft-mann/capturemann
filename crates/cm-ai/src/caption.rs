@@ -98,7 +98,10 @@ pub fn build_captions(words: &[Word]) -> Vec<CaptionLine> {
     // A transcript written before the repair of broken words (or by another engine) may hold U+FFFD
     // and other stray characters: they are never shown. A word that is nothing else is skipped.
     let cleaned: Vec<Word>;
-    let words = if words.iter().any(|w| crate::failure_kinds::has_stray_chars(&w.text)) {
+    let words = if words
+        .iter()
+        .any(|w| crate::failure_kinds::has_stray_chars(&w.text))
+    {
         cleaned = words
             .iter()
             .map(|w| Word {

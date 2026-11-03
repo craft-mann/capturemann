@@ -364,6 +364,10 @@ fn captions_never_show_stray_characters() {
         w("tho\u{200B}ught", 1.0, 0.9),
     ];
     let lines = crate::caption::build_captions(&words);
-    let text: String = lines.iter().map(|l| l.text.clone()).collect::<Vec<_>>().join(" ");
+    let text: String = lines
+        .iter()
+        .map(|l| l.text.clone())
+        .collect::<Vec<_>>()
+        .join(" ");
     assert_eq!(text, "cn thought");
 }
