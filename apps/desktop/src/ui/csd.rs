@@ -185,7 +185,7 @@ fn titlebar(t: &Theme, can_min: bool, can_max: bool, maximized: bool) -> Statefu
                     "csd-close",
                     "x",
                     tr!("Close window"),
-                    |window| window.remove_window(),
+                    crate::surfaces::close_self,
                 )),
         )
 }

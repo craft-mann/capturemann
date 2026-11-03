@@ -135,7 +135,7 @@ pub(crate) fn sync_toasts(app: &Entity<AppModel>, cx: &mut App) {
         if empty {
             if let Some(h) = existing {
                 app.update(cx, |m, _| m.toast_window = None);
-                let _ = h.update(cx, |_, window, _| window.remove_window());
+                crate::surfaces::close(cx, h);
             }
         } else {
             let display = cx.primary_display().map(|d| d.bounds());
@@ -174,7 +174,7 @@ pub(crate) fn sync_toasts(app: &Entity<AppModel>, cx: &mut App) {
                 } else {
                     // No native window to resize (not macOS): fall back to a new window.
                     app.update(cx, |m, _| m.toast_window = None);
-                    let _ = h.update(cx, |_, window, _| window.remove_window());
+                    crate::surfaces::close(cx, h);
                     keep_existing = None;
                 }
             }
@@ -206,6 +206,7 @@ pub(crate) fn sync_toasts(app: &Entity<AppModel>, cx: &mut App) {
                     },
                 );
                 if let Ok(handle) = opened {
+                    crate::surfaces::opened(crate::surfaces::Surface::Toast, handle);
                     app.update(cx, |m, _| {
                         m.toast_window = Some(handle);
                         m.toast_fit = win_h;

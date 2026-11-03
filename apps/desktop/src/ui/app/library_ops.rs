@@ -263,7 +263,7 @@ pub fn handle_confirm_msg(app: &Entity<AppModel>, msg: ConfirmUiMsg, cx: &mut Ap
                 h
             });
             if let Some(h) = found {
-                let _ = h.update(cx, |_, window, _| window.remove_window());
+                crate::surfaces::close(cx, h);
             }
         }
     }
@@ -319,11 +319,12 @@ pub(crate) fn open_confirm(
         },
     );
     if let Ok(handle) = opened {
+        crate::surfaces::opened(crate::surfaces::Surface::Confirm, handle);
         app.update(cx, |m, cx| {
             m.confirm_windows.push((id, handle));
             cx.notify(); // the main window's scrim follows the dialogs
         });
-        cx.activate(true);
+        crate::surfaces::activate_app(cx, "confirm dialog opened");
         raise_centered(handle, cx);
     }
 }

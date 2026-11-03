@@ -116,12 +116,12 @@ pub fn open_studio(app: &Entity<AppModel>, cx: &mut App) {
     if let Some(handle) = existing {
         if handle
             .update(cx, |_, window, _| {
-                window.activate_window();
+                crate::surfaces::activate_window(window, "studio brought to front");
                 crate::platform_window::bring_to_front(window, None);
             })
             .is_ok()
         {
-            cx.activate(true);
+            crate::surfaces::activate_app(cx, "studio brought to front");
             return;
         }
     }
@@ -137,12 +137,13 @@ pub fn open_studio(app: &Entity<AppModel>, cx: &mut App) {
     );
     match opened {
         Ok(handle) => {
+            crate::surfaces::opened(crate::surfaces::Surface::Studio, handle);
             app.update(cx, |m, _| {
                 m.studio = Some(handle);
                 m.studio_open = true;
             });
             sync_studio_window(app, cx);
-            cx.activate(true);
+            crate::surfaces::activate_app(cx, "studio opened");
         }
         Err(e) => push_toast(
             app,

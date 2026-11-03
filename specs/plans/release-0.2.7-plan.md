@@ -117,8 +117,8 @@ claims stay (O1), but these failure kinds are language independent, so they are 
 ### M2e PhoWhisper as a speech model option
 - The weights are Hugging Face transformers checkpoints (`vinai/PhoWhisper-{small,medium,large}`, BSD-3-Clause per
   the model card). whisper.cpp needs ggml files, and no whisper.cpp-compatible conversion exists (the one community
-  repo is base-size, for another engine). Decision: the maintainer uploads converted files to a Hugging Face repo they
-  control; the app pins that commit URL, SHA-256 and byte size in `crates/cm-ai/data/models.json` like every model.
+  repo is base-size, for another engine). Decision: the maintainer uploads converted files to the project's Hugging Face
+  org (`https://huggingface.co/craftmann`, repo name e.g. `craftmann/phowhisper-ggml`, decided Nov 3, 2026); the app pins that commit URL, SHA-256 and byte size in `crates/cm-ai/data/models.json` like every model.
 - Work: a reproducible conversion script (whisper.cpp `convert-h5-to-ggml.py` route; pinned tool versions; checks that
   `ModelStore::import` accepts the file and one whisper.cpp run transcribes a short public clip) under `packaging/`,
   a README for the upload, and three catalog entries marked `pending_pin` until the maintainer gives the URLs (they

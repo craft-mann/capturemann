@@ -115,7 +115,7 @@ impl Global for PreviousApp {}
 /// Closes the launcher; with `restore`, the previously active app gets focus back (Esc, a
 /// second hotkey press, commands that do not bring CaptureMann forward themselves).
 fn dismiss(window: &mut Window, cx: &mut App, restore: bool) {
-    window.remove_window();
+    crate::surfaces::close_self(window);
     let previous = cx.try_global::<PreviousApp>().and_then(|p| p.0);
     cx.set_global(PreviousApp(None));
     if let (true, Some(pid)) = (restore, previous) {
@@ -237,8 +237,9 @@ pub fn open_launcher_with(app: &Entity<AppModel>, cx: &mut App, query: &str) {
         // A non-activating panel gets no keyboard input from macOS, so the app is activated
         // (measured: keys went to the previous app) and focus is handed back on close.
         Ok(handle) => {
+            crate::surfaces::opened(crate::surfaces::Surface::Launcher, handle);
             cx.set_global(LauncherSlot(Some(handle)));
-            cx.activate(true);
+            crate::surfaces::activate_app(cx, "launcher opened");
         }
         Err(e) => app::push_toast(
             app,
