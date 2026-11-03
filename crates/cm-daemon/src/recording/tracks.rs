@@ -73,6 +73,7 @@ impl TrackNote {
             Permission::Microphone => (NoteLevel::Warning, "Microphone"),
             Permission::Accessibility => (NoteLevel::Warning, "Accessibility"),
             Permission::InputMonitoring => (NoteLevel::Warning, "Input Monitoring"),
+            Permission::Files => (NoteLevel::Warning, "Files and Folders"),
         };
         let tail = match level {
             NoteLevel::StopRequested => "the recording is stopped and what was recorded is kept",
