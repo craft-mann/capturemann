@@ -41,7 +41,7 @@ fetch_commit https://github.com/ggml-org/whisper.cpp "$WHISPER_CPP_COMMIT" "$WOR
 fetch_commit https://github.com/openai/whisper "$OPENAI_WHISPER_COMMIT" "$WORK/openai-whisper"
 
 if [ ! -x "$WORK/venv/bin/python" ]; then
-    python3 -m venv "$WORK/venv"
+    "${PYTHON:-python3}" -m venv "$WORK/venv"
     "$WORK/venv/bin/pip" install -q -r "$(dirname "$0")/requirements.txt"
 fi
 PY="$WORK/venv/bin/python"
@@ -59,6 +59,7 @@ print(HfApi().model_info(repo).sha, file=open(dest + "/.revision", "w"))
 PYEOF
 fi
 
+mkdir -p "$WORK/convert-out"
 # whisper.cpp reads the weights, the tokenizer files and the mel filters, and writes ggml-model.bin.
 "$PY" "$WORK/whisper.cpp/models/convert-h5-to-ggml.py" \
     "$WORK/$REPO" "$WORK/openai-whisper" "$WORK/convert-out"
@@ -81,6 +82,7 @@ cat "${FILE%.bin}.INFO"
 # Vietnamese clip (see the README) as CLIP, and the app's example does the rest.
 if [ -n "${CLIP:-}" ]; then
     echo "check: transcribing $CLIP"
+    cd "$(git rev-parse --show-toplevel)"
     CM_WHISPER_MODEL="$FILE" CM_WHISPER_AUDIO="$CLIP" CM_WHISPER_LANGUAGE=vi \
         cargo test -p cm-ai --release --test real_model -- --ignored --nocapture real_model_transcribes_speech
 else

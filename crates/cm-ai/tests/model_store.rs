@@ -576,3 +576,32 @@ fn a_text_model_with_the_wrong_checksum_is_deleted_not_installed() {
     assert!(!store.is_installed("gemma-4-e2b"));
     assert!(!dir.path().join("text/models/small.gguf.part").exists());
 }
+
+/// M2e: the converted PhoWhisper file (`packaging/phowhisper/convert.sh`) passes the store's import
+/// checks (ggml magic, size) once its row is pinned. Never downloads anything:
+/// `CM_PHOWHISPER_GGML=<converted file> cargo test -p cm-ai --test model_store -- --ignored`.
+#[test]
+#[ignore = "needs a converted PhoWhisper file; see packaging/phowhisper/README.md"]
+fn a_converted_phowhisper_file_is_accepted_by_import() {
+    let Some(file) = std::env::var_os("CM_PHOWHISPER_GGML") else {
+        println!("SKIPPED: set CM_PHOWHISPER_GGML");
+        return;
+    };
+    let file = std::path::PathBuf::from(file);
+    let mut catalog = Catalog::builtin();
+    // The row as the maintainer will pin it: only the flag matters for import.
+    let size = fs::metadata(&file).unwrap().len();
+    let row = catalog
+        .models
+        .iter_mut()
+        .find(|m| m.id == "phowhisper-small")
+        .unwrap();
+    assert!(row.pending_pin, "the shipped row is a placeholder");
+    row.pending_pin = false;
+    row.bytes = size;
+    row.sha256 = "0".repeat(64);
+    let dir = tempfile::tempdir().unwrap();
+    let store = ModelStore::with_catalog(dir.path(), catalog);
+    let dest = store.import("phowhisper-small", &file).unwrap();
+    assert_eq!(fs::metadata(dest).unwrap().len(), size);
+}

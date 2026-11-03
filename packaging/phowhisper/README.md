@@ -5,9 +5,15 @@ card) are Hugging Face transformers checkpoints. whisper.cpp reads ggml files, a
 conversion of these three exists, so the maintainer converts and uploads them to `craftmann/phowhisper-ggml`; the app pins the upload like every
 other model (`crates/cm-ai/data/models.json`, three `pending_pin` rows `phowhisper-small|medium|large`).
 
-Status: **the script has not been run yet.** It is written from the whisper.cpp converter's documented usage; the
-first run on `small` (about 1 GB download plus about 1 GB of Python packages) is the test of the script, and a
-changed pin or flag goes back into this file.
+Status (Nov 3, 2026): **the script ran end to end on `small`** (python 3.12 venv, the pinned packages install, the
+converter writes `ggml-model.bin`, the file is moved and hashed). Result: `ggml-phowhisper-small.bin`, 487,601,984
+bytes (float16), sha256 `db8de368e822fce5dcdce7c0c4c80c4b554c27655516dea5ec8c093e22f58785`, from checkpoint revision
+`a86b604c346caf7148c37512eafe783a16420adb`. `ModelStore::import` accepts it (ignored test
+`a_converted_phowhisper_file_is_accepted_by_import`, set `CM_PHOWHISPER_GGML`). whisper.cpp loads it and transcribes
+Vietnamese, **but not well with the app's current settings**: see
+`verification/benchmarks/vietnamese-fleurs-baseline-2026-11-03.md` (PhoWhisper was fine-tuned without timestamp
+tokens, so it needs a no-timestamps decode, and then words glue together). `medium` and `large` were not converted.
+Set `PYTHON=/opt/homebrew/bin/python3.12` (the default `python3` may be too new for the pinned torch).
 
 ## Convert
 
