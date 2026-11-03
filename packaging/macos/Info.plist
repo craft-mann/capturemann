@@ -37,5 +37,29 @@
     <key>NSNetworkVolumesUsageDescription</key>
     <string>CaptureMann saves and opens your captures in the library folder you chose, which may be on a network volume.</string>
     <key>NSCameraUseContinuityCameraDeviceType</key><true/>
+    <!-- Import media (IMP-5): Open With and a drop on the Dock icon, for the formats 0.2.7 reads. -->
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key><string>Video</string>
+            <key>CFBundleTypeRole</key><string>Viewer</string>
+            <key>LSHandlerRank</key><string>Alternate</string>
+            <key>CFBundleTypeExtensions</key>
+            <array><string>mp4</string><string>mov</string><string>m4v</string><string>mkv</string></array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key><string>Audio</string>
+            <key>CFBundleTypeRole</key><string>Viewer</string>
+            <key>LSHandlerRank</key><string>Alternate</string>
+            <key>CFBundleTypeExtensions</key>
+            <array><string>m4a</string><string>wav</string></array>
+        </dict>
+    </array>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>CaptureMann reads the files you choose to import from your Desktop.</string>
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>CaptureMann reads the files you choose to import from your Documents folder.</string>
+    <key>NSDownloadsFolderUsageDescription</key>
+    <string>CaptureMann reads the files you choose to import from your Downloads folder.</string>
 </dict>
 </plist>

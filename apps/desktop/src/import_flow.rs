@@ -440,6 +440,33 @@ impl ImportUi {
     }
 }
 
+/// The files of `file://` URLs the platform hands over (Dock drop, Open With): percent-decoded,
+/// anything else ignored.
+pub fn paths_from_urls(urls: &[String]) -> Vec<PathBuf> {
+    fn decode(s: &str) -> Option<String> {
+        let b = s.as_bytes();
+        let mut out = Vec::with_capacity(b.len());
+        let mut i = 0;
+        while i < b.len() {
+            if b[i] == b'%' {
+                let h = s.get(i + 1..i + 3)?;
+                out.push(u8::from_str_radix(h, 16).ok()?);
+                i += 3;
+            } else {
+                out.push(b[i]);
+                i += 1;
+            }
+        }
+        String::from_utf8(out).ok()
+    }
+    urls.iter()
+        .filter_map(|u| u.strip_prefix("file://"))
+        .map(|rest| rest.strip_prefix("localhost").unwrap_or(rest))
+        .filter_map(decode)
+        .map(PathBuf::from)
+        .collect()
+}
+
 // ---- the drop overlay (board I1) ----------------------------------------------------------
 
 /// What a drop holds, counted for the overlay.
@@ -962,6 +989,35 @@ mod tests {
         assert_eq!(run.cards[0].state, CardState::Done);
         assert_eq!(run.cards[1].state, CardState::Failed("Cancelled".into()));
         assert!(run.cancelled && !run.running());
+    }
+
+    #[test]
+    fn dock_and_open_with_urls_become_paths() {
+        let urls = vec![
+            "file:///Users/me/My%20Clip.mov".to_owned(),
+            "file://localhost/Users/me/a.m4a".to_owned(),
+            "https://example.com/x.mov".to_owned(),
+            "file:///bad%zz".to_owned(),
+        ];
+        assert_eq!(
+            paths_from_urls(&urls),
+            vec![
+                PathBuf::from("/Users/me/My Clip.mov"),
+                PathBuf::from("/Users/me/a.m4a")
+            ]
+        );
+    }
+
+    /// The macOS bundle registers exactly the extensions the app reads (Open With, Dock drop).
+    #[test]
+    fn the_bundle_registers_the_supported_extensions() {
+        let plist = include_str!("../../../packaging/macos/Info.plist");
+        for e in DOCUMENT_EXT {
+            assert!(plist.contains(&format!("<string>{e}</string>")), "{e}");
+        }
+        for e in ["webm", "avi", "mp3", "flac"] {
+            assert!(!plist.contains(&format!("<string>{e}</string>")), "{e}");
+        }
     }
 
     #[test]

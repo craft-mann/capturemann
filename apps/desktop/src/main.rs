@@ -322,6 +322,16 @@ fn main() {
             app::handle_command(&app, Command::ShowLibrary, cx);
         }
     });
+    // Files dropped on the Dock icon or opened with CaptureMann (Open With, double click): the
+    // platform hands them over as URLs before the windows exist, so they wait in a channel
+    // until the app model does (IMP-5).
+    let (open_tx, mut open_rx) = tokio::sync::mpsc::unbounded_channel::<Vec<std::path::PathBuf>>();
+    application.on_open_urls(move |urls| {
+        let paths = cm_desktop::import_flow::paths_from_urls(&urls);
+        if !paths.is_empty() {
+            let _ = open_tx.send(paths);
+        }
+    });
     // The instance lock stays in `main`; the closure only needs to know that this is the instance.
     let instance_held = _instance.is_some();
     let serve_dir = config_dir.clone();
@@ -502,6 +512,14 @@ fn main() {
             while let Some(cmd) = cmd_rx.recv().await {
                 cm_desktop::trace::mark("command_received");
                 cx.update(|cx| app::handle_command(&app2, cmd, cx));
+            }
+        })
+        .detach();
+
+        let app2 = model.clone();
+        cx.spawn(async move |cx| {
+            while let Some(paths) = open_rx.recv().await {
+                cx.update(|cx| app::handle_command(&app2, Command::ImportFiles(paths), cx));
             }
         })
         .detach();
