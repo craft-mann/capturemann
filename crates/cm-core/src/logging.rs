@@ -83,21 +83,39 @@ impl Log for Logger {
 
     fn log(&self, r: &Record) {
         if self.enabled(r.metadata()) {
+            let target = attributable_target(r);
             // A failed write to stderr has nowhere to be reported.
             let _ = writeln!(
                 std::io::stderr().lock(),
                 "[{} {}] {}",
                 r.level(),
-                r.target(),
+                target,
                 r.args()
             );
             if let Some(f) = &self.file {
-                f.write(r.level().as_str(), r.target(), &r.args().to_string());
+                f.write(r.level().as_str(), &target, &r.args().to_string());
             }
         }
     }
 
     fn flush(&self) {}
+}
+
+/// The target to print for a record. GPUI's `log_err` leaves the target empty for a crate built from
+/// the registry, which made `RefCell already borrowed` lines impossible to attribute; for those the
+/// last path parts of the source file and the line stand in (`gpui-pre-0.3.9/src/window.rs:1939`).
+fn attributable_target(r: &Record) -> String {
+    if !r.target().is_empty() {
+        return r.target().to_owned();
+    }
+    match (r.file(), r.line()) {
+        (Some(file), Some(line)) => {
+            let parts: Vec<&str> = file.rsplit(['/', '\\']).take(3).collect();
+            let short: Vec<&str> = parts.into_iter().rev().collect();
+            format!("{}:{line}", short.join("/"))
+        }
+        _ => "unknown".to_owned(),
+    }
 }
 
 /// Installs the stderr logger (`RUST_LOG` overrides the defaults). Later calls do nothing.
@@ -185,6 +203,24 @@ fn register_exit_handler() {}
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_empty_target_is_replaced_by_the_source_location() {
+        let r = Record::builder()
+            .target("")
+            .file(Some(
+                "/home/u/.cargo/registry/src/idx/gpui-pre-0.3.9/src/window.rs",
+            ))
+            .line(Some(1939))
+            .build();
+        assert_eq!(attributable_target(&r), "gpui-pre-0.3.9/src/window.rs:1939");
+        let named = Record::builder().target("cm_desktop").build();
+        assert_eq!(attributable_target(&named), "cm_desktop");
+        assert_eq!(
+            attributable_target(&Record::builder().target("").build()),
+            "unknown"
+        );
+    }
 
     #[test]
     fn defaults_show_info_for_our_crates_and_warn_for_others() {
