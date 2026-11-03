@@ -8,14 +8,14 @@ use gpui::{div, prelude::*, px, AnyElement, Entity, FontWeight, Role, SharedStri
 use crate::import_flow::{self as f, CardState, ImportUi, Kind};
 use crate::theme::{scale, type_scale, Theme};
 use crate::ui::app::AppModel;
-use crate::ui::components::{button_with_icon, icon, ButtonKind};
+use crate::ui::components::{button_with_icon, icon, shrink_text, ButtonKind};
 use crate::ui::import_actions as act;
 use crate::ui::paint::{rgba_of, TextExt};
 
 /// "Import…" with the chord, in the library header (board I1).
 pub fn header_button(t: &Theme, app: &Entity<AppModel>) -> AnyElement {
     let app = app.clone();
-    let key = if cfg!(target_os = "macos") {
+    let key = if crate::shortcuts::Platform::current() == crate::shortcuts::Platform::Mac {
         "\u{2318}I"
     } else {
         "Ctrl+I"
@@ -69,7 +69,7 @@ pub fn imported_badge(_t: &Theme) -> AnyElement {
         .text_size(px(11.))
         .text_color(rgba_of(Theme::DARK.text))
         .child(icon("cm-import", 12., Theme::DARK.text))
-        .child(SharedString::from(tr_ctx!("card badge", "Imported")))
+        .child(shrink_text(tr_ctx!("card badge", "Imported")))
         .into_any_element()
 }
 
@@ -101,7 +101,12 @@ pub fn progress_strip(t: &Theme, step: &str, frac: f64) -> AnyElement {
                     14.,
                     Theme::DARK.agent_text,
                 ))
-                .child(div().flex_1().child(SharedString::from(step.to_owned())))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w(px(0.))
+                        .child(SharedString::from(step.to_owned())),
+                )
                 .child(div().mono().child(SharedString::from(format!("{pct:.0}%")))),
         )
         .child(

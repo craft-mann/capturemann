@@ -11,7 +11,7 @@ use gpui::{
 use crate::import_flow::{self as f, Kind, Row, Status};
 use crate::theme::{scale, Theme};
 use crate::ui::app::AppModel;
-use crate::ui::components::{button_with_icon, icon, switch, ButtonKind};
+use crate::ui::components::{button_with_icon, icon, shrink_text, switch, ButtonKind};
 use crate::ui::import_actions as act;
 use crate::ui::paint::{rgba_of, TextExt};
 use crate::ui::studio::ThemeGlobal;
@@ -293,7 +293,7 @@ impl Render for ImportSheetView {
                 .bg(rgba_of(t.agent.with_alpha(10)))
                 .text_size(px(13.5))
                 .child(icon("info", 16., t.agent_text))
-                .child(div().flex_1().child(SharedString::from(n)))
+                .child(div().flex_1().min_w(px(0.)).child(SharedString::from(n)))
                 .into_any_element()
         });
 
@@ -388,6 +388,7 @@ impl Render for ImportSheetView {
                 .child(
                     div()
                         .flex_1()
+                        .min_w(px(0.))
                         .child(
                             div()
                                 .text_size(px(14.5))
@@ -442,7 +443,7 @@ impl Render for ImportSheetView {
                     )
                     .child(
                         div()
-                            .flex_1()
+                            .flex_1().min_w(px(0.))
                             .child(
                                 div()
                                     .text_size(px(22.))
@@ -489,7 +490,7 @@ impl Render for ImportSheetView {
             .child(
                 div()
                     .id("import-body")
-                    .flex_1()
+                    .flex_1().min_w(px(0.))
                     .min_h(px(0.))
                     .overflow_y_scroll()
                     .px(px(24.))
@@ -521,7 +522,7 @@ impl Render for ImportSheetView {
                             .text_size(px(13.))
                             .text_color(rgba_of(t.warning))
                             .child(icon("folder-input", 16., t.warning))
-                            .child(SharedString::from(format!(
+                            .child(shrink_text(format!(
                                 "{} {}",
                                 f::folder_skipped_text(sheet.folders_skipped),
                                 f::folder_hint()
@@ -546,7 +547,7 @@ impl Render for ImportSheetView {
                     .border_color(rgba_of(t.border))
                     .child(
                         div()
-                            .flex_1()
+                            .flex_1().min_w(px(0.))
                             .text_size(px(12.5))
                             .text_color(rgba_of(t.text_3))
                             .child(div().child(SharedString::from(sheet.space_line())))

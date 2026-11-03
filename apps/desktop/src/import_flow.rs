@@ -198,7 +198,7 @@ pub fn prepare_reason_text(id: &str) -> String {
 }
 
 /// The state of the sheet (board I2).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Sheet {
     pub rows: Vec<Row>,
     pub transcribe: bool,
@@ -213,23 +213,6 @@ pub struct Sheet {
     /// A check or the start is running.
     pub busy: bool,
     pub error: Option<String>,
-}
-
-impl Default for Sheet {
-    fn default() -> Self {
-        Sheet {
-            rows: Vec::new(),
-            transcribe: false,
-            diarize: false,
-            report: false,
-            speaker_model: false,
-            remove_originals: false,
-            free_bytes: None,
-            folders_skipped: 0,
-            busy: false,
-            error: None,
-        }
-    }
 }
 
 impl Sheet {
