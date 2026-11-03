@@ -1,5 +1,5 @@
 {
-  "_comment": "Whisper ggml models. An entry with pending_pin true has no pinned checksum yet: it is not offered and cannot be downloaded until sha256, bytes and ram_mb are filled in and the flag is removed. large-v3-turbo: sha256 and bytes from the LFS pointer file at the pinned commit (read Oct 27, 2026); ram_mb 2600 is an estimate (file size plus working memory), not taken from the whisper.cpp table. `large` is large-v3 (alias large-v3). url is pinned to a Hugging Face commit; sha256 and bytes come from the repository's LFS pointer files (read Oct 22, 2026). To use another mirror or revision, put a file of this shape at <config dir>/ai/catalog.json or point CAPTUREMANN_AI_CATALOG at one: it replaces this list. ram_mb is the memory the model needs while it runs, in MB, from the model table of the whisper.cpp README (https://github.com/ggml-org/whisper.cpp, read Oct 24, 2026: tiny ~273 MB, base ~388 MB, small ~852 MB, medium ~2.1 GB); its disk column is in MiB, bytes here come from the files.",
+  "_comment": "Whisper ggml models. The three phowhisper-* entries (M2e, VinAI PhoWhisper, BSD-3-Clause, converted by packaging/phowhisper/convert.sh) are pending_pin placeholders: the URL, sha256, bytes and ram_mb come from the maintainer after the converted files are uploaded, and nothing is offered until then. An entry with pending_pin true has no pinned checksum yet: it is not offered and cannot be downloaded until sha256, bytes and ram_mb are filled in and the flag is removed. large-v3-turbo: sha256 and bytes from the LFS pointer file at the pinned commit (read Oct 27, 2026); ram_mb 2600 is an estimate (file size plus working memory), not taken from the whisper.cpp table. `large` is large-v3 (alias large-v3). url is pinned to a Hugging Face commit; sha256 and bytes come from the repository's LFS pointer files (read Oct 22, 2026). To use another mirror or revision, put a file of this shape at <config dir>/ai/catalog.json or point CAPTUREMANN_AI_CATALOG at one: it replaces this list. ram_mb is the memory the model needs while it runs, in MB, from the model table of the whisper.cpp README (https://github.com/ggml-org/whisper.cpp, read Oct 24, 2026: tiny ~273 MB, base ~388 MB, small ~852 MB, medium ~2.1 GB); its disk column is in MiB, bytes here come from the files.",
   "models": [
     {
       "id": "tiny",
@@ -61,6 +61,42 @@
       "sha256": "1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69",
       "bytes": 1624555275,
       "ram_mb": 2600
+    },
+    {
+      "id": "phowhisper-small",
+      "label": "PhoWhisper Small",
+      "hint": "Vietnamese speech, balanced. Fine-tuned from Whisper small for Vietnamese; not for other languages.",
+      "file": "ggml-phowhisper-small.bin",
+      "url": "https://huggingface.co/PENDING-maintainer-repo/phowhisper-ggml/resolve/PENDING-commit/ggml-phowhisper-small.bin",
+      "sha256": "",
+      "bytes": 0,
+      "ram_mb": 0,
+      "license": "BSD-3-Clause",
+      "pending_pin": true
+    },
+    {
+      "id": "phowhisper-medium",
+      "label": "PhoWhisper Medium",
+      "hint": "Vietnamese speech, more accurate and slower. Fine-tuned from Whisper medium for Vietnamese; not for other languages.",
+      "file": "ggml-phowhisper-medium.bin",
+      "url": "https://huggingface.co/PENDING-maintainer-repo/phowhisper-ggml/resolve/PENDING-commit/ggml-phowhisper-medium.bin",
+      "sha256": "",
+      "bytes": 0,
+      "ram_mb": 0,
+      "license": "BSD-3-Clause",
+      "pending_pin": true
+    },
+    {
+      "id": "phowhisper-large",
+      "label": "PhoWhisper Large",
+      "hint": "Vietnamese speech, the largest. Fine-tuned from Whisper large for Vietnamese; not for other languages.",
+      "file": "ggml-phowhisper-large.bin",
+      "url": "https://huggingface.co/PENDING-maintainer-repo/phowhisper-ggml/resolve/PENDING-commit/ggml-phowhisper-large.bin",
+      "sha256": "",
+      "bytes": 0,
+      "ram_mb": 0,
+      "license": "BSD-3-Clause",
+      "pending_pin": true
     }
   ]
 }

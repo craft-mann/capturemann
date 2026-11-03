@@ -915,9 +915,25 @@ mod tests {
         let ids: Vec<&str> = c.models.iter().map(|m| m.id.as_str()).collect();
         assert_eq!(
             ids,
-            ["tiny", "base", "small", "medium", "large", "large-v3-turbo"]
+            [
+                "tiny",
+                "base",
+                "small",
+                "medium",
+                "large",
+                "large-v3-turbo",
+                "phowhisper-small",
+                "phowhisper-medium",
+                "phowhisper-large"
+            ]
         );
         assert!(c.models.iter().all(|m| m.url.contains("/resolve/")));
+        // The PhoWhisper rows (M2e) wait for the maintainer's pin and are not offered.
+        assert!(c
+            .models
+            .iter()
+            .filter(|m| m.id.starts_with("phowhisper-"))
+            .all(|m| m.pending_pin));
         assert_eq!(Catalog::builtin(), c.clone().with_builtin_speakers());
         // Every entry except the ones waiting for the maintainer's pin has a real checksum.
         for m in c.models.iter().filter(|m| !m.pending_pin) {
