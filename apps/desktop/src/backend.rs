@@ -383,8 +383,17 @@ impl Backend {
     /// Quit: stops a running recording and finalizes its bundle (bounded wait), then stops the job
     /// worker (REC-8, NFR-6). Safe to call with nothing running.
     pub async fn shutdown(daemon: &Daemon) {
+        // GPUI waits 200 ms for this when the app quits and logs `timed out waiting on
+        // app_will_quit` after that; these lines say what it was waiting for.
+        let started = std::time::Instant::now();
+        let running = daemon.job_queue().map_or(0, |q| q.running_count());
+        log::info!(
+            "shutdown: recording active {}, {running} job(s) running",
+            daemon.recording_active()
+        );
         daemon.shutdown_recording().await;
         daemon.shutdown_jobs().await;
+        log::info!("shutdown: done after {} ms", started.elapsed().as_millis());
     }
 
     /// One daemon call as the user.
