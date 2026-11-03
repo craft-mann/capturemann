@@ -1453,12 +1453,7 @@ impl RecordingEditor {
         if self.voice_ui.lang.is_some() {
             return Vec::new();
         }
-        crate::ai::sounds::visible(
-            &self.ai.sounds,
-            lines,
-            &self.ai.hidden_sounds,
-            &s.voice.segments,
-        )
+        crate::ai::sounds::visible(&self.ai.sounds, lines, &s.voice.segments)
     }
 
     pub(super) fn voice_turns(&self, s: &Session) -> TurnsOf {

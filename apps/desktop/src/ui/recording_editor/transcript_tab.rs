@@ -778,7 +778,7 @@ impl RecordingEditor {
     }
 
     /// One sound entry (M2i): the speaker heard over it and the time chip like a turn, the
-    /// bracketed label dimmed (no italics), a Remove button, and no way to edit it as words.
+    /// bracketed label dimmed (no italics), and no way to edit it as words.
     fn sound_row(
         &self,
         t: &Theme,
@@ -790,7 +790,7 @@ impl RecordingEditor {
         let who = sound
             .speaker
             .map(|id| (s.voice.name_of(id), speaker_index(&s.voice.speakers, id)));
-        let (start, index) = (sound.start, sound.index);
+        let start = sound.start;
         let text = crate::ai::sounds::label(sound.kind);
         div()
             .id(SharedString::from(format!("re-sound-{row}")))
@@ -836,24 +836,6 @@ impl RecordingEditor {
                     .text_size(px(14.5))
                     .text_color(rgba_of(t.faint))
                     .child(SharedString::from(text)),
-            )
-            .child(
-                div()
-                    .id(SharedString::from(format!("re-sound-remove-{row}")))
-                    .role(Role::Button)
-                    .aria_label(tr_ctx!("button", "Remove"))
-                    .focusable()
-                    .tab_stop(true)
-                    .flex_none()
-                    .size(px(28.))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .rounded(px(scale::RADIUS_SM))
-                    .cursor_pointer()
-                    .hover(|st| st.bg(rgba_of(t.raised)))
-                    .child(icon("trash-2", 14., t.text_3))
-                    .on_click(cx.listener(move |this, _, _, cx| this.ai_hide_sound(index, cx))),
             )
             .into_any_element()
     }

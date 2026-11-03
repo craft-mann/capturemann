@@ -6,9 +6,7 @@
 //!
 //! The rule for which sounds show is the exports' rule: a sound that a caption line already
 //! covers (at least half of its span, for example after the user typed over it) is not shown
-//! again, and one the user removed in this session is hidden. Pure, so unit tested.
-
-use std::collections::HashSet;
+//! again. Sounds cannot be removed in 0.2.7. Pure, so unit tested.
 
 use cm_ai::caption::CaptionLine;
 use cm_ai::speakers::Segment;
@@ -19,8 +17,6 @@ use cm_i18n::tr_ctx;
 /// A sound that is on screen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SoundRow {
-    /// Its index in `Transcript.sounds` (what Remove names).
-    pub index: usize,
     pub kind: SoundKind,
     pub start: MediaTime,
     pub end: MediaTime,
@@ -36,18 +32,12 @@ pub fn label(kind: SoundKind) -> String {
     }
 }
 
-/// The sounds to show: not covered by a line, not removed. `segments` are the speaker segments
+/// The sounds to show: not covered by a line. `segments` are the speaker segments
 /// (empty without speaker labels).
-pub fn visible(
-    sounds: &[Sound],
-    lines: &[CaptionLine],
-    hidden: &HashSet<usize>,
-    segments: &[Segment],
-) -> Vec<SoundRow> {
+pub fn visible(sounds: &[Sound], lines: &[CaptionLine], segments: &[Segment]) -> Vec<SoundRow> {
     sounds
         .iter()
         .enumerate()
-        .filter(|(i, _)| !hidden.contains(i))
         .filter(|(_, s)| {
             let span = (s.end - s.start).ticks().max(1);
             let covered: i64 = lines
@@ -56,14 +46,13 @@ pub fn visible(
                 .sum();
             covered * 2 < span
         })
-        .map(|(i, s)| {
+        .map(|(_, s)| {
             let probe = CaptionLine {
                 start: s.start,
                 end: s.end.max(s.start),
                 text: String::new(),
             };
             SoundRow {
-                index: i,
                 kind: s.kind,
                 start: s.start,
                 end: s.end,
@@ -112,7 +101,7 @@ mod tests {
     }
 
     #[test]
-    fn covered_and_removed_sounds_do_not_show() {
+    fn covered_sounds_do_not_show() {
         let sounds = vec![
             sound(SoundKind::Noise, 1.0, 2.0),
             sound(SoundKind::Unclear, 5.0, 6.0),
@@ -120,12 +109,11 @@ mod tests {
         ];
         // A line over the second one (the user wrote words there).
         let lines = vec![line(0.0, 0.5), line(4.5, 6.5)];
-        let mut hidden = HashSet::new();
-        let v = visible(&sounds, &lines, &hidden, &[]);
-        assert_eq!(v.iter().map(|r| r.index).collect::<Vec<_>>(), vec![0, 2]);
-        hidden.insert(0);
-        let v = visible(&sounds, &lines, &hidden, &[]);
-        assert_eq!(v.iter().map(|r| r.index).collect::<Vec<_>>(), vec![2]);
+        let v = visible(&sounds, &lines, &[]);
+        assert_eq!(
+            v.iter().map(|r| r.start).collect::<Vec<_>>(),
+            vec![t(1.0), t(9.0)]
+        );
         assert_eq!(v[0].speaker, None);
     }
 
@@ -145,12 +133,7 @@ mod tests {
                 energy: 0.0,
             },
         ];
-        let v = visible(
-            &[sound(SoundKind::Unclear, 5.0, 6.0)],
-            &[],
-            &HashSet::new(),
-            &seg,
-        );
+        let v = visible(&[sound(SoundKind::Unclear, 5.0, 6.0)], &[], &seg);
         assert_eq!(v[0].speaker, Some(1));
     }
 
@@ -164,7 +147,6 @@ mod tests {
                 sound(SoundKind::Noise, 0.0, 0.0),
             ],
             &lines,
-            &HashSet::new(),
             &[],
         );
         // The one at 0.0 starts with the first line: it follows it (a tie goes after the line).

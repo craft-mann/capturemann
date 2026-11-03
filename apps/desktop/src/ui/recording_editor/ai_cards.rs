@@ -149,10 +149,8 @@ pub(super) struct AiEditor {
     /// The transcript's words with their confidence (from the one `get_transcript` read that
     /// `ai_sync` already does): the doubtful words of the lines are found in them (AI-6a).
     pub(super) words: Rc<Vec<Word>>,
-    /// The transcript's sound entries (`[unclear]`, `[noise]`, M2i), the ones the user removed
-    /// from the lists in this session, and a counter the list caches key on.
+    /// The transcript's sound entries (`[unclear]`, `[noise]`, M2i), and a counter the list caches key on.
     pub(super) sounds: Rc<Vec<cm_ai::transcribe::Sound>>,
-    pub(super) hidden_sounds: std::collections::HashSet<usize>,
     pub(super) sound_epoch: u64,
     /// The doubtful words of the current lines, with the fingerprint of what they were computed
     /// from, so typing recomputes them and a plain repaint does not.
@@ -238,7 +236,6 @@ impl AiEditor {
             options: CaptionOptionsInfo::default(),
             words: Rc::default(),
             sounds: Rc::default(),
-            hidden_sounds: Default::default(),
             sound_epoch: 0,
             doubtful_cache: RefCell::new(None),
             options_busy: false,
@@ -400,7 +397,6 @@ impl RecordingEditor {
                         let lines = stored.unwrap_or_else(|| lines_from_words(&tr.words));
                         this.ai.words = Rc::new(tr.words.clone());
                         this.ai.sounds = Rc::new(tr.sounds.clone());
-                        this.ai.hidden_sounds.clear();
                         this.ai.sound_epoch += 1;
                         this.ai.has_transcript = true;
                         this.ai.transcript_language = Some(tr.language.clone());
@@ -429,17 +425,6 @@ impl RecordingEditor {
             .ok();
         })
         .detach();
-    }
-
-    // ---- sound entries ---------------------------------------------------------------------
-
-    /// Remove on a sound line: it leaves the lists. (Only the lists of this window: the transcript
-    /// file keeps it, so the exports still write it until a daemon action removes it.)
-    pub(super) fn ai_hide_sound(&mut self, index: usize, cx: &mut Context<Self>) {
-        if self.ai.hidden_sounds.insert(index) {
-            self.ai.sound_epoch += 1;
-            cx.notify();
-        }
     }
 
     // ---- caption editing -----------------------------------------------------------------

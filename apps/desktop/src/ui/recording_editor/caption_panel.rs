@@ -669,7 +669,7 @@ impl RecordingEditor {
 
     #[allow(clippy::too_many_arguments)]
     /// A sound entry between the caption lines (M2i): the time chip (a click seeks), the speaker
-    /// when known, the bracketed label dimmed, and Remove. It has no text field: it is not words.
+    /// when known, the bracketed label dimmed, It has no text field: it is not words.
     fn caption_sound_row(
         &self,
         t: &Theme,
@@ -678,7 +678,7 @@ impl RecordingEditor {
         sound: &crate::ai::sounds::SoundRow,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let (start, index) = (sound.start, sound.index);
+        let start = sound.start;
         let text = crate::ai::sounds::label(sound.kind);
         let who = sound.speaker.map(|id| s.voice.name_of(id));
         div()
@@ -727,24 +727,6 @@ impl RecordingEditor {
                     .text_size(px(14.5))
                     .text_color(rgba_of(t.faint))
                     .child(SharedString::from(text)),
-            )
-            .child(
-                div()
-                    .id(SharedString::from(format!("re-cap-sound-remove-{key}")))
-                    .role(Role::Button)
-                    .aria_label(tr_ctx!("button", "Remove"))
-                    .focusable()
-                    .tab_stop(true)
-                    .flex_none()
-                    .size(px(28.))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .rounded(px(scale::RADIUS_SM))
-                    .cursor_pointer()
-                    .hover(|st| st.bg(rgba_of(t.raised)))
-                    .child(icon("trash-2", 14., t.text_3))
-                    .on_click(cx.listener(move |this, _, _, cx| this.ai_hide_sound(index, cx))),
             )
             .into_any_element()
     }
@@ -1229,9 +1211,8 @@ impl RecordingEditor {
         let selected = ai.captions.selected;
         let matches = self.ai_matches();
         // Sound entries (M2i) are rows of their own between the lines: dimmed, bracketed, with
-        // the speaker and the time, Remove only. A line's row number shifts by the sounds before it.
-        let sound_rows =
-            crate::ai::sounds::visible(&ai.sounds, lines, &ai.hidden_sounds, &s.voice.segments);
+        // the speaker and the time, a line's row number shifts by the sounds before it.
+        let sound_rows = crate::ai::sounds::visible(&ai.sounds, lines, &s.voice.segments);
         let sound_before = crate::ai::sounds::before_lines(&sound_rows, lines);
         let row_of = |i: usize| i + sound_before.iter().filter(|b| **b <= i).count();
 

@@ -921,7 +921,6 @@ mod tests {
         let first = turns[0].start;
         let last = turns.last().unwrap().start;
         let at = |ticks: i64| crate::ai::sounds::SoundRow {
-            index: 0,
             kind: cm_ai::transcribe::SoundKind::Noise,
             start: MediaTime::from_ticks(ticks),
             end: MediaTime::from_ticks(ticks + 1),
