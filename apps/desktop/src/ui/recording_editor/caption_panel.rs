@@ -668,6 +668,70 @@ impl RecordingEditor {
     }
 
     #[allow(clippy::too_many_arguments)]
+    /// A sound entry between the caption lines (M2i): the time chip (a click seeks), the speaker
+    /// when known, the bracketed label dimmed, It has no text field: it is not words.
+    fn caption_sound_row(
+        &self,
+        t: &Theme,
+        s: &Session,
+        key: usize,
+        sound: &crate::ai::sounds::SoundRow,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let start = sound.start;
+        let text = crate::ai::sounds::label(sound.kind);
+        let who = sound.speaker.map(|id| s.voice.name_of(id));
+        div()
+            .id(SharedString::from(format!("re-cap-sound-{key}")))
+            .role(Role::ListItem)
+            .aria_label(SharedString::from(tr!(
+                "{sound} at {time}",
+                sound = text.clone(),
+                time = stamp(start)
+            )))
+            .px(px(16.))
+            .py(px(8.))
+            .flex()
+            .items_center()
+            .gap(px(10.))
+            .border_b_1()
+            .border_color(rgba_of(t.row_divider()))
+            .child(
+                div()
+                    .id(SharedString::from(format!("re-cap-sound-time-{key}")))
+                    .role(Role::Button)
+                    .aria_label(SharedString::from(tr!(
+                        "Jump to {time}",
+                        time = stamp(start)
+                    )))
+                    .flex_none()
+                    .mono()
+                    .tnum()
+                    .text_size(px(12.5))
+                    .text_color(rgba_of(t.mist))
+                    .cursor_pointer()
+                    .child(SharedString::from(stamp(start)))
+                    .on_click(cx.listener(move |this, _, _, cx| this.voice_seek(start, cx))),
+            )
+            .children(who.map(|n| {
+                div()
+                    .flex_none()
+                    .text_size(px(12.5))
+                    .text_color(rgba_of(t.text_3))
+                    .child(SharedString::from(n))
+            }))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w(px(0.))
+                    .text_size(px(14.5))
+                    .text_color(rgba_of(t.faint))
+                    .child(SharedString::from(text)),
+            )
+            .into_any_element()
+    }
+
+    #[allow(clippy::too_many_arguments)]
     fn caption_row(
         &self,
         t: &Theme,
@@ -1146,17 +1210,22 @@ impl RecordingEditor {
         let active = ai.captions.line_at(playhead);
         let selected = ai.captions.selected;
         let matches = self.ai_matches();
+        // Sound entries (M2i) are rows of their own between the lines: dimmed, bracketed, with
+        // the speaker and the time, a line's row number shifts by the sounds before it.
+        let sound_rows = crate::ai::sounds::visible(&ai.sounds, lines, &s.voice.segments);
+        let sound_before = crate::ai::sounds::before_lines(&sound_rows, lines);
+        let row_of = |i: usize| i + sound_before.iter().filter(|b| **b <= i).count();
 
         // ---- following the playhead (never while typing, never right after a manual scroll)
         let view = &ai.view;
         let since = view.last_manual.get().map(|at: Instant| at.elapsed());
         if let Some(i) = view.scroll_to.take() {
-            self.captions_scroll.scroll_to_item(i);
+            self.captions_scroll.scroll_to_item(row_of(i));
             view.last_followed.set(Some(i));
             view.last_manual.set(None);
         } else if follow_allowed(since, view.typing.get()) {
             if let Some(i) = follow_target(active, view.last_followed.get()) {
-                self.captions_scroll.scroll_to_item(i);
+                self.captions_scroll.scroll_to_item(row_of(i));
                 view.last_followed.set(Some(i));
             }
         }
@@ -1355,10 +1424,14 @@ impl RecordingEditor {
                 .collect();
             ai.field.update(cx, |f, _| f.set_doubtful(ranges));
         }
-        let rows: Vec<AnyElement> = lines
-            .iter()
-            .enumerate()
-            .map(|(i, l)| {
+        let mut rows: Vec<AnyElement> = Vec::new();
+        for (i, l) in lines.iter().enumerate() {
+            for (k, sr) in sound_rows.iter().enumerate() {
+                if sound_before[k] == i {
+                    rows.push(self.caption_sound_row(t, s, i * 1000 + k, sr, cx));
+                }
+            }
+            rows.push({
                 let hits = line_ranges(&matches, i, ai.find.current);
                 self.caption_row(
                     t,
@@ -1370,8 +1443,13 @@ impl RecordingEditor {
                     doubt_of.get(&i).map_or(&[][..], Vec::as_slice),
                     cx,
                 )
-            })
-            .collect();
+            });
+        }
+        for (k, sr) in sound_rows.iter().enumerate() {
+            if sound_before[k] >= count {
+                rows.push(self.caption_sound_row(t, s, count * 1000 + k, sr, cx));
+            }
+        }
         let view = ai.view.clone();
         let list = div()
             .id("re-cap-list")

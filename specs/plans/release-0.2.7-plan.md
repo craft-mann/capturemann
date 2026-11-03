@@ -219,6 +219,31 @@ does not catch it) and a laugh written as a word. Decision: the transcript must 
 - Whisper currently runs with `suppress_nst(true)`; whether letting it write its own sound tokens helps is measured,
   not assumed.
 
+### M2j Vietnamese transcript quality (maintainer, Nov 3, 2026: English is business-ready, Vietnamese is not yet)
+Known: Turbo reaches 22.8 % WER on clean FLEURS Vietnamese read speech and 29 to 43 % on quiet variants
+(`vietnamese-fleurs-baseline`, `level-aware-transcription`); PhoWhisper-small converted to ggml reads 60.9 % with our
+current decode settings, because a fine-tune needs its own decoding (no timestamps, word spacing and times). Business
+meetings are harder than read speech: several far-field speakers, quiet voices, Vietnamese with English terms.
+Order, cheapest first, each step measured and stored before the next (short 15 s and 1 h rows kept):
+1. **Models already installed on the maintainer's Mac (Medium, Large v3, Large v3 Turbo), no download:** Vietnamese
+   WER, coverage and speed of Large v3 and Medium against Turbo on FLEURS vi and on the private meeting reference
+   below. Large v3 is slower and re-reads more on English; its Vietnamese value is the open question.
+2. **The private reference (stays outside the repository):** the maintainer corrects about 5 minutes of the Nov 2
+   meeting by hand (text only, with the start time); `mac-ai` computes WER against it locally and publishes only numbers.
+   FLEURS is read speech and cannot show far-field, multi-speaker or code-switching errors.
+3. **Glossary and initial prompt** (exists): measure the effect of names and technical terms, including English terms
+   inside Vietnamese, on the private reference.
+4. **PhoWhisper medium and large with its own decoding** (no timestamps, word times from the alignment or VAD,
+   spacing), only if steps 1 to 3 leave a gap; the maintainer uploads the converted files to `craftmann`
+   (`packaging/phowhisper`). Check English terms inside Vietnamese: a Vietnamese fine-tune can lose them.
+5. **A Vietnamese transducer through sherpa-onnx** (already linked for speakers): the sherpa-onnx docs list
+   `sherpa-onnx-zipformer-vi-30M-int8-2026-02-09` (from `hynt/Zipformer-30M-RNNT-6000h`, about 6,000 hours); a 2025 build is
+   said to use about 70k hours. Small and fast, but **licence unverified** (one third-party page says Apache-2.0; read
+   the Hugging Face card and the release notes before anything else), and it gives no punctuation or casing. Evaluate only
+   after the licence is confirmed; any model needs a pinned URL, SHA-256 and the maintainer's approval.
+6. Not planned: fine-tuning our own model; LLM rewriting of the transcript (it would guess).
+No Vietnamese claim in the release text without a stored report; English wording stays as measured.
+
 Done when: before/after reports for each of M2a, M2b, M2c are stored, the tests (with fakes) cover the new
 splitting/cancel behaviour, and `tests/manual/AI-5/7/8/9.md` have been re-run on the new build.
 

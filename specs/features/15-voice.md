@@ -73,6 +73,7 @@ VOC-1 and VOC-2 ship in release 0.2.0 (Oct 27, 2026: built and tested with fakes
 **User story** — As a meeting host, I want to review the recording with its transcript, cut the small talk and export the audio, so that I can share a clean recording or keep it as a record.
 
 **Description**
+- **Sound entries (M2i, Nov 2026, tested with fakes, untested by eye).** The Transcript tab shows the transcript's `[unclear]` and `[noise]` sounds as rows between the turns by time: dimmed, bracketed, not italic, with the speaker's avatar (when known) and the time chip like a turn; they are not editable as words, the playing-word highlight and the Speaker names switch never touch them, and they cannot be removed in 0.2.7 (no Remove button); the exports write them as the daemon already does for TXT, SRT and VTT. A translation shows none.
 - The editor (DESIGN §5.5) shows, for `kind: "audio"`, a **waveform per track** (mic, system) instead of the video preview, with the timeline, markers and the caption/transcript panel. Playback, scrubbing, J/K/L and Space work as for video.
 - The transcript panel shows lines with speaker names when AI-8 has run ("Linh 00:04:12 — …"); clicking a line seeks. Caption editing, find and replace and glossary (AI-1, AI-6a) work unchanged.
 - Trim, cut, split and speed (EDT-1, EDT-2) and AI-4 silence/filler suggestions apply to all audio tracks together.

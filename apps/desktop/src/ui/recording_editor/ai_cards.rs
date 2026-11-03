@@ -149,6 +149,9 @@ pub(super) struct AiEditor {
     /// The transcript's words with their confidence (from the one `get_transcript` read that
     /// `ai_sync` already does): the doubtful words of the lines are found in them (AI-6a).
     pub(super) words: Rc<Vec<Word>>,
+    /// The transcript's sound entries (`[unclear]`, `[noise]`, M2i), and a counter the list caches key on.
+    pub(super) sounds: Rc<Vec<cm_ai::transcribe::Sound>>,
+    pub(super) sound_epoch: u64,
     /// The doubtful words of the current lines, with the fingerprint of what they were computed
     /// from, so typing recomputes them and a plain repaint does not.
     doubtful_cache: RefCell<Option<(u64, Rc<Vec<Doubtful>>)>>,
@@ -232,6 +235,8 @@ impl AiEditor {
             suggest_note: None,
             options: CaptionOptionsInfo::default(),
             words: Rc::default(),
+            sounds: Rc::default(),
+            sound_epoch: 0,
             doubtful_cache: RefCell::new(None),
             options_busy: false,
             rev: 0,
@@ -391,6 +396,8 @@ impl RecordingEditor {
                     Ok(Some((tr, options))) => {
                         let lines = stored.unwrap_or_else(|| lines_from_words(&tr.words));
                         this.ai.words = Rc::new(tr.words.clone());
+                        this.ai.sounds = Rc::new(tr.sounds.clone());
+                        this.ai.sound_epoch += 1;
                         this.ai.has_transcript = true;
                         this.ai.transcript_language = Some(tr.language.clone());
                         this.ai.options = options;
@@ -401,6 +408,8 @@ impl RecordingEditor {
                     Ok(None) => {
                         this.ai.has_transcript = false;
                         this.ai.words = Rc::default();
+                        this.ai.sounds = Rc::default();
+                        this.ai.sound_epoch += 1;
                         this.ai.options = CaptionOptionsInfo::default();
                         this.ai.captions = CaptionEditor::default();
                         this.ai_auto_cuts(cx);

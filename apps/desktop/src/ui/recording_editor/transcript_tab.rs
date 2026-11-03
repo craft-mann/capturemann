@@ -105,6 +105,7 @@ impl RecordingEditor {
         });
         let ui = &self.voice_ui;
         let (lines, turns, rows) = self.voice_turns(s);
+        let sound_rows = self.sound_rows(s, &lines);
         let playhead = s.model.playhead;
         let active = line_at(&lines, playhead);
 
@@ -187,6 +188,7 @@ impl RecordingEditor {
                     let m = &s.voice.markers[*i];
                     marker_row(t, ri, &m.label, m.at)
                 }
+                Row::Sound(i) => self.sound_row(t, s, ri, &sound_rows[*i], cx),
                 Row::Turn(i) => {
                     let turn = &turns[*i];
                     self.turn_row(t, s, ri, turn, &lines, active, cx)
@@ -771,6 +773,69 @@ impl RecordingEditor {
                     .gap(px(4.))
                     .child(head)
                     .child(body),
+            )
+            .into_any_element()
+    }
+
+    /// One sound entry (M2i): the speaker heard over it and the time chip like a turn, the
+    /// bracketed label dimmed (no italics), and no way to edit it as words.
+    fn sound_row(
+        &self,
+        t: &Theme,
+        s: &Session,
+        row: usize,
+        sound: &crate::ai::sounds::SoundRow,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let who = sound
+            .speaker
+            .map(|id| (s.voice.name_of(id), speaker_index(&s.voice.speakers, id)));
+        let start = sound.start;
+        let text = crate::ai::sounds::label(sound.kind);
+        div()
+            .id(SharedString::from(format!("re-sound-{row}")))
+            .role(Role::ListItem)
+            .aria_label(SharedString::from(tr!(
+                "{sound} at {time}",
+                sound = text.clone(),
+                time = clock(start)
+            )))
+            .px(px(20.))
+            .py(px(8.))
+            .flex()
+            .items_center()
+            .gap(px(12.))
+            .border_b_1()
+            .border_color(rgba_of(t.row_divider()))
+            .children(who.as_ref().map(|(name, ix)| {
+                div()
+                    .flex_none()
+                    .child(avatar(t, name, speaker_colour(*ix), 28.))
+            }))
+            .child(
+                div()
+                    .id(SharedString::from(format!("re-sound-time-{row}")))
+                    .role(Role::Button)
+                    .aria_label(SharedString::from(tr!(
+                        "Jump to {time}",
+                        time = clock(start)
+                    )))
+                    .flex_none()
+                    .mono()
+                    .tnum()
+                    .text_size(px(12.5))
+                    .text_color(rgba_of(t.mist))
+                    .cursor_pointer()
+                    .child(SharedString::from(clock(start)))
+                    .on_click(cx.listener(move |this, _, _, cx| this.voice_seek(start, cx))),
+            )
+            .child(
+                div()
+                    .flex_1()
+                    .min_w(px(0.))
+                    .text_size(px(14.5))
+                    .text_color(rgba_of(t.faint))
+                    .child(SharedString::from(text)),
             )
             .into_any_element()
     }

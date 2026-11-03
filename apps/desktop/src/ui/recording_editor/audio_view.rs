@@ -56,7 +56,7 @@ fn hsla(c: Color) -> Hsla {
 /// What the transcript list was built from; the key says when it is stale.
 pub(super) struct TurnCache {
     /// Edits of the caption lines, reads of the bundle, the language shown.
-    key: (u64, u64, Option<String>),
+    key: (u64, u64, Option<String>, u64),
     pub lines: Rc<Vec<CaptionLine>>,
     pub turns: Rc<Vec<Turn>>,
     pub rows: Rc<Vec<Row>>,
@@ -345,17 +345,16 @@ impl RecordingEditor {
     /// Export audio... (the primary button). No Publish for audio.
     fn audio_title_row(&self, t: &Theme, s: &Session, cx: &mut Context<Self>) -> AnyElement {
         let app = self.app.clone();
-        // TODO(design): the board's crumb goes to the Audio library page; until it exists the
-        // crumb goes to the library.
+        // The crumb goes back to the Audio library page (the page the editor was opened from).
         let crumb = crumb_link(
             t,
             "re-crumb",
             tr_ctx!("breadcrumb", "Audio /"),
-            tr!("Back to the library"),
+            tr!("Back to Audio"),
         )
         .on_click(move |_, _, cx| {
             let app = app.clone();
-            cx.defer(move |cx| crate::ui::app::set_route(&app, crate::ui::app::Route::Library, cx));
+            cx.defer(move |cx| crate::ui::app::set_route(&app, crate::ui::app::Route::Audio, cx));
         });
         let length = badge(t, clock(s.model.basis.end));
         let export = button_with_icon(
@@ -1444,8 +1443,25 @@ impl RecordingEditor {
 
     /// The transcript of the language shown, as turns and rows, kept until something it is built
     /// from changes.
+    /// The sounds on screen for `lines` (none while a translation is shown).
+    pub(super) fn sound_rows(
+        &self,
+        s: &Session,
+        lines: &[CaptionLine],
+    ) -> Vec<crate::ai::sounds::SoundRow> {
+        if self.voice_ui.lang.is_some() {
+            return Vec::new();
+        }
+        crate::ai::sounds::visible(&self.ai.sounds, lines, &s.voice.segments)
+    }
+
     pub(super) fn voice_turns(&self, s: &Session) -> TurnsOf {
-        let key = (self.ai.rev, s.voice.rev, self.voice_ui.lang.clone());
+        let key = (
+            self.ai.rev,
+            s.voice.rev,
+            self.voice_ui.lang.clone(),
+            self.ai.sound_epoch,
+        );
         if let Some(c) = self.voice_ui.cache.borrow().as_ref() {
             if c.key == key {
                 return (c.lines.clone(), c.turns.clone(), c.rows.clone());
@@ -1462,7 +1478,9 @@ impl RecordingEditor {
                 voice::build_turns(&lines, &self.ai.words, &labels)
             }
         };
-        let rows = voice::rows(&turns, &s.voice.markers);
+        // The sounds belong to the original transcript, not to a translation.
+        let sounds = self.sound_rows(s, &lines);
+        let rows = voice::rows_with_sounds(&turns, &s.voice.markers, &sounds);
         let out = (Rc::new(lines), Rc::new(turns), Rc::new(rows));
         *self.voice_ui.cache.borrow_mut() = Some(TurnCache {
             key,
