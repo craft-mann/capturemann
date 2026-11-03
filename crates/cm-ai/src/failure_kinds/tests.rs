@@ -352,3 +352,69 @@ fn captions_never_show_stray_characters() {
         .join(" ");
     assert_eq!(text, "cn thought");
 }
+
+/// A long read that writes one short word for twelve seconds of speech; a read of the region on its
+/// own writes a word a second (the maintainer's "Cảmơn" over a full quiet sentence, in shape).
+struct OneWordForALongRegion;
+
+impl Transcriber for OneWordForALongRegion {
+    fn transcribe(
+        &self,
+        audio: Pcm16k<'_>,
+        _language: Option<&str>,
+        _progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Transcript, CmError> {
+        let secs = audio.samples.len() as f64 / RATE as f64;
+        let w = |text: String, at: f64, end: f64| Word {
+            text,
+            start: audio.start + media_secs(at),
+            end: audio.start + media_secs(end),
+            confidence: 0.94,
+        };
+        let words = if secs > 30.0 {
+            // The first region is read properly, the second (40 to 52 s) gets one 0.6 s word.
+            let mut v: Vec<Word> = (0..9)
+                .map(|i| w(format!("a{i}"), f64::from(i), f64::from(i) + 0.5))
+                .collect();
+            v.push(w("thanks".into(), 46.0, 46.6));
+            v
+        } else {
+            (0..secs as i32 - 1)
+                .map(|i| w(format!("b{i}"), f64::from(i), f64::from(i) + 0.5))
+                .collect()
+        };
+        Ok(Transcript {
+            version: TRANSCRIPT_VERSION,
+            language: "en".into(),
+            model: "one-word".into(),
+            words,
+            note: None,
+        })
+    }
+}
+
+/// M2d-1: a short word standing for seconds of speech is not accepted as the reading of the
+/// region: the region is read again on its own and its words replace it.
+#[test]
+fn a_short_word_over_a_long_speech_region_is_read_again() {
+    let x = signal(60.0, &[(0.0, 10.0, 0.2), (40.0, 52.0, 0.2)]);
+    let (t, report) = transcribe_pieces(
+        &OneWordForALongRegion,
+        Pcm16k {
+            samples: &x,
+            start: MediaTime::ZERO,
+        },
+        Some("en"),
+        None,
+        &mut |_| true,
+    )
+    .unwrap();
+    assert!(!t.words.iter().any(|w| w.text == "thanks"), "{:?}", t.words);
+    let in_region = t
+        .words
+        .iter()
+        .filter(|w| w.start >= media_secs(39.0))
+        .count();
+    assert!(in_region >= 8, "{in_region} words in the 12 s region");
+    assert_eq!((report.gaps_reread, report.gaps_filled), (1, 1));
+}

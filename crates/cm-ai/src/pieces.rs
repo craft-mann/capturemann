@@ -535,6 +535,8 @@ impl Job<'_, '_> {
 const GAP_MIN_SECS: f64 = 3.0;
 /// Words this close to a stretch count as covering it (seconds).
 const GAP_PAD_SECS: f64 = 0.5;
+/// A speech region whose words fill less than this share of it is read again whole.
+const SPARSE_SHARE: f64 = 0.25;
 /// At most this many stretches are read again per piece.
 const MAX_GAP_READS: usize = 20;
 /// A new reading of a stretch is kept when its words average at least this confidence.
@@ -553,15 +555,25 @@ impl Job<'_, '_> {
         }
         let offset = range.start as f64 / f64::from(SAMPLE_RATE);
         let spans: Vec<(f64, f64)> = words.iter().map(|w| self.secs_of(w)).collect();
-        // Uncovered stretches, in audio seconds.
+        // Stretches to read again, in audio seconds: the gaps between words inside a speech region,
+        // and a whole region that holds almost no words for its length (a short word standing for
+        // seconds of speech, which a gap rule alone would leave as it is).
         let mut gaps: Vec<(f64, f64)> = Vec::new();
+        let mut sparse: Vec<(f64, f64)> = Vec::new();
         for (ra, rb) in regions {
             let (ra, rb) = (
                 offset + ra as f64 / f64::from(SAMPLE_RATE),
                 offset + rb as f64 / f64::from(SAMPLE_RATE),
             );
+            let inside: Vec<&(f64, f64)> =
+                spans.iter().filter(|(a, b)| *b > ra && *a < rb).collect();
+            let spoken: f64 = inside.iter().map(|(a, b)| b.min(rb) - a.max(ra)).sum();
+            if rb - ra >= GAP_MIN_SECS && spoken < SPARSE_SHARE * (rb - ra) {
+                sparse.push((ra, rb));
+                continue;
+            }
             let mut at = ra;
-            for &(a, b) in spans.iter().filter(|(a, b)| *b > ra && *a < rb) {
+            for &&(a, b) in &inside {
                 if a - GAP_PAD_SECS - at >= GAP_MIN_SECS {
                     gaps.push((at, a - GAP_PAD_SECS));
                 }
@@ -593,6 +605,63 @@ impl Job<'_, '_> {
             if ok {
                 self.report.gaps_filled += 1;
                 added.extend(again);
+            }
+        }
+        // A sparse region is read again whole; its new words replace the old ones inside it when
+        // they are clean and say more (more spoken seconds) than what was there.
+        let mut words = words;
+        for (a, b) in sparse.into_iter().take(MAX_GAP_READS) {
+            let (sa, sb) = (
+                samples_of((a - GAP_PAD_SECS).max(offset)),
+                samples_of(b + GAP_PAD_SECS).min(range.end),
+            );
+            if sb <= sa {
+                continue;
+            }
+            self.report.gaps_reread += 1;
+            let saved = self.prompt.take();
+            let again = self.read(sa..sb, false);
+            self.prompt = saved;
+            let again = again?.words;
+            let language = self.language.clone().unwrap_or_default();
+            let spoken = |ws: &[Word]| {
+                ws.iter()
+                    .map(|w| {
+                        let (x, y) = self.secs_of(w);
+                        y - x
+                    })
+                    .sum::<f64>()
+            };
+            let old: Vec<usize> = (0..words.len())
+                .filter(|&i| {
+                    let (x, _) = self.secs_of(&words[i]);
+                    x >= a - GAP_PAD_SECS && x < b
+                })
+                .collect();
+            let old_words: Vec<Word> = old.iter().map(|&i| words[i].clone()).collect();
+            let ok = !again.is_empty()
+                && again
+                    .iter()
+                    .all(|w| !crate::failure_kinds::is_broken(w, &language))
+                && !Badness::of(&again).is_bad()
+                && again.iter().map(|w| w.confidence).sum::<f32>() / again.len() as f32
+                    >= GAP_MIN_CONFIDENCE
+                && spoken(&again) > spoken(&old_words);
+            if ok {
+                self.report.gaps_filled += 1;
+                let first = old.first().copied();
+                let mut keep = vec![true; words.len()];
+                old.iter().for_each(|&i| keep[i] = false);
+                let mut next: Vec<Word> = words
+                    .iter()
+                    .zip(&keep)
+                    .filter(|(_, k)| **k)
+                    .map(|(w, _)| w.clone())
+                    .collect();
+                let _ = first;
+                next.extend(again);
+                next.sort_by_key(|w| w.start);
+                words = next;
             }
         }
         if added.is_empty() {
