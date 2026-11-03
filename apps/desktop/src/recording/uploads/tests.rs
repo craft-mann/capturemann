@@ -78,8 +78,8 @@ fn a_finished_cloud_upload_offers_copy_link_and_open() {
     let mut q = crate::toast::ToastQueue::default();
     q.push(toast, std::time::Instant::now());
     assert!(
-        q.toasts()[0].sticky(),
-        "a toast with buttons waits for the user"
+        !q.toasts()[0].sticky(),
+        "a result toast fades after 5 s even with buttons (hover pauses it)"
     );
 }
 

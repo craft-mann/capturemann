@@ -1,6 +1,8 @@
 //! Toast model (DESIGN section 4, redesign R17): at most 3 stacked in one bottom-right stack
-//! (the agent toast joins it), auto-dismiss after 6 s with a pause while the pointer is over the
-//! toast, except failures and toasts that carry an action (sticky, C7).
+//! (the agent toast joins it), auto-dismiss after 5 s with a pause while the pointer is over the
+//! toast, except failures, a running transfer with a progress bar and the agent toast's Stop
+//! (sticky, C7). Any other toast with a button also goes after 5 s (maintainer decision, Nov 3, 2026); what the button does stays
+//! reachable from the library and the HUD.
 
 use std::time::{Duration, Instant};
 
@@ -10,7 +12,7 @@ use std::time::{Duration, Instant};
 // toast (a bar, the percentage, an ETA, Cancel) are built.
 
 pub const MAX_TOASTS: usize = 3;
-pub const AUTO_DISMISS: Duration = Duration::from_secs(6);
+pub const AUTO_DISMISS: Duration = Duration::from_secs(5);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToastKind {
@@ -163,9 +165,17 @@ pub struct Toast {
 }
 
 impl Toast {
-    /// Errors and toasts that carry buttons stay until dismissed (C7).
+    /// Errors, a running transfer (a progress bar, which has Cancel) and the "recording started
+    /// by an agent" toast with its Stop button stay until dismissed (C7); any other toast goes
+    /// away by itself, buttons or not.
     pub fn sticky(&self) -> bool {
-        self.dismiss_after.is_none() && (self.kind == ToastKind::Error || !self.buttons.is_empty())
+        self.dismiss_after.is_none()
+            && (self.kind == ToastKind::Error
+                || self.progress.is_some()
+                || self
+                    .buttons
+                    .iter()
+                    .any(|b| matches!(b.action, ToastAction::StopRecording(_))))
     }
 
     /// When the toast goes away by itself; `None` for a sticky toast and while it is hovered.
@@ -563,7 +573,7 @@ mod tests {
         assert_eq!(hint_rows(&c.toasts()[0].hints), 1);
     }
 
-    /// DESIGN toasts: auto-dismiss 6 s except failures and anything with an action.
+    /// DESIGN toasts: auto-dismiss 5 s except failures, a running transfer and the agent Stop.
     #[test]
     fn auto_dismiss_rules() {
         let mut q = ToastQueue::default();
@@ -574,10 +584,12 @@ mod tests {
             spec(ToastKind::Info).button("Open library", ToastAction::OpenLibrary),
             t,
         );
+        assert_eq!(AUTO_DISMISS, Duration::from_secs(5));
         assert_eq!(q.next_expiry(t), Some(AUTO_DISMISS));
-        assert!(!q.expire(t + Duration::from_millis(5999)));
+        assert!(!q.expire(t + Duration::from_millis(4999)));
         assert!(q.expire(t + AUTO_DISMISS));
-        assert_eq!(q.toasts().len(), 2);
+        // The error stays; the Success toast and the Info toast with a button are gone.
+        assert_eq!(q.toasts().len(), 1);
         assert_eq!(q.next_expiry(t + AUTO_DISMISS), None);
         assert!(!q.expire(t + Duration::from_secs(3600)));
     }
@@ -730,7 +742,8 @@ mod tests {
         );
     }
 
-    /// Which toasts fade (C7): no buttons and not an error; the agent toast fades.
+    /// Which toasts fade (C7): everything but an error; buttons do not keep a toast (the agent
+    /// toast fades too, except its Stop).
     #[test]
     fn stickiness_decision_per_kind() {
         let t = Instant::now();
@@ -750,7 +763,7 @@ mod tests {
             ToastKind::Agent,
         ] {
             assert!(!mk(kind, false), "{kind:?} without buttons fades");
-            assert!(mk(kind, true), "{kind:?} with buttons stays");
+            assert!(!mk(kind, true), "{kind:?} with buttons fades too");
         }
         assert!(mk(ToastKind::Error, false), "errors stay");
     }
@@ -771,14 +784,14 @@ mod tests {
             !q.expire(t + Duration::from_secs(3600)),
             "paused: never expires"
         );
-        // Leaving 10 s after entering: 2 s of the 6 s were left.
+        // Leaving 10 s after entering: 1 s of the 5 s was left.
         assert!(q.set_hover(id, false, t + Duration::from_secs(14)));
         assert_eq!(
             q.next_expiry(t + Duration::from_secs(14)),
-            Some(Duration::from_secs(2))
+            Some(Duration::from_secs(1))
         );
-        assert!(!q.expire(t + Duration::from_millis(15_999)));
-        assert!(q.expire(t + Duration::from_secs(16)));
+        assert!(!q.expire(t + Duration::from_millis(14_999)));
+        assert!(q.expire(t + Duration::from_secs(15)));
         assert!(!q.set_hover(id, true, t), "gone");
     }
 
@@ -831,7 +844,7 @@ mod tests {
             toast.buttons[0].action,
             ToastAction::StopRecording("rec_9".into())
         );
-        assert!(toast.sticky(), "a toast with an action stays");
+        assert!(toast.sticky(), "the agent toast keeps its Stop");
         q.dismiss(a);
         let mut spec = ToastSpec::new(ToastKind::Info, "Uploading")
             .button("Cancel", ToastAction::CancelJob("j".into()));
