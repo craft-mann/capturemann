@@ -114,6 +114,29 @@ claims stay (O1), but these failure kinds are language independent, so they are 
 5. **Speakers:** the file has 6 named speakers though the Record sheet said 2 people; the speaker count was set
    afterwards by hand. M2b should report how the count was chosen next to the DER.
 
+### M2e PhoWhisper as a speech model option
+- The weights are Hugging Face transformers checkpoints (`vinai/PhoWhisper-{small,medium,large}`, BSD-3-Clause per
+  the model card). whisper.cpp needs ggml files, and no whisper.cpp-compatible conversion exists (the one community
+  repo is base-size, for another engine). Decision: the maintainer uploads converted files to a Hugging Face repo they
+  control; the app pins that commit URL, SHA-256 and byte size in `crates/cm-ai/data/models.json` like every model.
+- Work: a reproducible conversion script (whisper.cpp `convert-h5-to-ggml.py` route; pinned tool versions; checks that
+  `ModelStore::import` accepts the file and one whisper.cpp run transcribes a short public clip) under `packaging/`,
+  a README for the upload, and three catalog entries marked `pending_pin` until the maintainer gives the URLs (they
+  are neither offered nor downloadable until then; no `pending_pin` entry ships). NOTICE/licence text for the model.
+  Labels and hints through `cm_i18n`; the model picker says it is tuned for Vietnamese.
+- Measure first: Vietnamese WER and real-time factor of large-v3-turbo vs PhoWhisper small/medium/large on a public
+  corpus, plus the coverage and hallucination counts of M2d, stored under `verification/benchmarks/`. Whether any
+  PhoWhisper size becomes the suggested model for Vietnamese is decided from that report, not assumed.
+- Check what depends on the Whisper family: language `vi` handling, DTW word times (alignment heads are not in a
+  fine-tune's config for some conversions), the 300 s piece logic, and memory (ram_mb is measured, not guessed).
+
+### M2f Suggest cuts runs by itself
+- When the recording editor opens, `suggest_cuts` runs once per revision with silences and fillers both on (fillers
+  need a transcript: without one only silences run and the panel says so). Nothing is applied; Accept stays one undo
+  step. Setting under Settings to turn the automatic run off (default on); same `suggest_cuts` action, no new
+  agent-only behaviour. Runs off the UI thread and is cancelled when the editor closes. Owner: `apps/desktop` editor
+  files (assigned after `mac-stability`'s shared-code commits merge, to avoid conflicts).
+
 Done when: before/after reports for each of M2a, M2b, M2c are stored, the tests (with fakes) cover the new
 splitting/cancel behaviour, and `tests/manual/AI-5/7/8/9.md` have been re-run on the new build.
 
@@ -173,6 +196,12 @@ CI: shared-code commits from M1 touch `apps/desktop`, which Linux and Windows al
 
 - **O1** Vietnamese: **English only** in 0.2.7. Baselines, WER and DER cover English; Vietnamese is listed as not
   measured in the release text. No Vietnamese corpus work, no Vietnamese-specific model change.
+- **O1 amended (Nov 3, 2026, later):** the maintainer adds **PhoWhisper** (VinAI, BSD-3-Clause, Vietnamese fine-tune
+  of Whisper) as downloadable speech models, sizes **small, medium, large**. So Vietnamese is measured after all, with
+  open corpora whose licence allows it (Common Voice vi is CC0; VIVOS is non-commercial, so used for a local benchmark
+  only, never redistributed); no private recording. Release wording stays "measured on ...". See M2e.
+- **Default cuts (Nov 3, 2026):** the editor runs **Suggest cuts automatically** (silences and fillers both on) when it
+  opens; the user still accepts, one undo step (AI-3.AC3 stays). See M2f.
 - **O2** Text model: **keep Gemma 4 E2B.** M2c measures and speeds up the current model; no second model, no new pin.
   Remove the "larger model" candidate from the speed-up list.
 - **O6** Issue 21: **wait for the reporter's 0.2.6 log.** No cutoff and no diagnostics-only build. The logging and
