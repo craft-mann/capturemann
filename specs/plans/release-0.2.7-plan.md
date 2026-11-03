@@ -278,7 +278,7 @@ cherry-pick, keeping the commit messages), never pushed by the agent. Delete eac
 | Track | Owns (may change) | Must not touch without asking |
 | --- | --- | --- |
 | mac-ai | `crates/cm-ai`, `crates/cm-media` (transcription and report paths), `vendor/sherpa-onnx*`, `verification/benchmarks/`, `tests/manual/AI-*.md`, and only the job progress/cancel files in `crates/cm-daemon` named in its brief | `apps/desktop` UI beyond progress and cancel wiring; the rest of `cm-daemon` |
-| mac-import | see Track M3 (probe and prepare in `cm-media`, import in `cm-library`, `cm-jobs`, new `cm-daemon` import files, CLI, MCP, new `apps/desktop` import files, FFmpeg component lists) | `crates/cm-ai`, `apps/desktop/src/surfaces.rs` |
+| mac-import | see Track M3 (probe and prepare in `cm-media`, import in `cm-library`, `cm-jobs`, new `cm-daemon` import files, CLI, MCP, new `apps/desktop` import files) | `crates/cm-ai`, `apps/desktop/src/surfaces.rs` |
 | mac-stability | `apps/desktop` (window lifetime, diagnostics), `apps/overlay`, `crates/cm-daemon` (recording lifecycle), soak scripts | `crates/cm-ai`, the job progress/cancel files given to mac-ai |
 
 **Shared files with one owner** (agents add entries on their branch, I resolve at merge): `Cargo.lock` and workspace
