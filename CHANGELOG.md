@@ -5,7 +5,9 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
-Draft for 0.2.6 (not released; the maintainer moves it under a version and a date when publishing).
+## [0.2.6] - 2026-11-03
+
+0.2.6 is the first release with Linux and Windows builds (early builds: no recording yet), published together with the macOS DMGs. The macOS app has one fix. Reports: `verification/LINUX-1-x11-thinkpad-2026-11-02-claude.md`, `verification/LINUX-1-wayland-thinkpad-2026-11-02-claude.md`, `verification/L1-windows-thinkpad-2026-11-02-claude.md` (all PARTIAL).
 
 ### Added
 
@@ -16,6 +18,7 @@ Draft for 0.2.6 (not released; the maintainer moves it under a version and a dat
 
 ### Fixed
 
+- macOS: after an export, the message names only what the MP4 contains (it no longer mentions a camera or audio that is not in the file; part of issue 21, the stuck Record panel, bubble and message seen on an Intel Mac are not explained or fixed).
 - Windows: a window screenshot was shrunk and shifted by the invisible border; it is now cut to the window's visible frame.
 - Windows: the app window opened with its title bar above the top of a 1920x1080 screen at 150 % scaling; the window picker listed the taskbar as a window; the program and the taskbar entry had the generic icon; the tray icon was a white glyph on a light taskbar.
 - Linux (X11): the window picker took no keyboard input under GNOME, offered GNOME's full-screen "Desktop Icons" window (captured black), and the saved-capture toast was cut off so that its close button could not be reached.
