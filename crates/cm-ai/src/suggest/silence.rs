@@ -14,7 +14,8 @@
 //! cuts the pause down to `keep_s` ([`DEFAULT_KEEP_S`], 0.4 s) of breathing room: half of it is
 //! kept on each side, so the cut never starts or ends on a word.
 //!
-//! A silence that touches the start or the end of the track is not suggested (lead-in and tail).
+//! A silence that touches the start or the end of the track is not suggested on a clip shorter than
+//! [`SHORT_CLIP_S`], nor on a longer one unless it lasts [`EDGE_SILENCE_MIN_S`] or more.
 //!
 //! Pauses that straddle a recording pause (the media files are compacted at a pause) are split at
 //! the join and judged on each side, and every time is mapped to session time through the
@@ -49,6 +50,10 @@ pub const SPEECH_SHARE: f32 = 0.4;
 pub const MIN_SPEECH_RANGE_DB: f32 = 8.0;
 /// Padding around spoken words and speaker turns that no suggestion may touch ([`veto_speech`]).
 pub const VETO_PAD_S: f64 = 0.15;
+/// A recording shorter than this never gets its lead-in or tail suggested as a pause (seconds).
+pub const SHORT_CLIP_S: f64 = 60.0;
+/// On a longer recording an edge silence of at least this long may be suggested (seconds).
+pub const EDGE_SILENCE_MIN_S: f64 = 3.0;
 /// Frame length (seconds).
 pub const FRAME_S: f64 = 0.020;
 /// A screen that changed more than this share of its pixels is "active" (AI-4 edge case).
@@ -274,10 +279,13 @@ pub fn silence_cuts(
     let keep = ticks_of(f64::from(opts.keep_s));
     let mut out = Vec::new();
     for (a, b) in runs {
-        // A silence that starts with the track or runs to its end is not a pause between speech
-        // (it is the lead-in or tail of the clip, which trimming handles), and on a clip of a few
-        // seconds it would be most of what is suggested.
-        if a == 0 || b == levels.len() {
+        // A silence that starts with the track or runs to its end is the lead-in or tail of the
+        // clip, not a pause between speech. On a clip shorter than [`SHORT_CLIP_S`] it would be
+        // most of what is suggested, so it is left; on a longer recording one of
+        // [`EDGE_SILENCE_MIN_S`] or more is a dead start or end and may be suggested.
+        let edge = a == 0 || b == levels.len();
+        let run_s = (b - a) as f64 * FRAME_S;
+        if edge && (levels.len() as f64 * FRAME_S < SHORT_CLIP_S || run_s < EDGE_SILENCE_MIN_S) {
             continue;
         }
         let (fa, fb) = (a as i64 * frame_ticks, b as i64 * frame_ticks);

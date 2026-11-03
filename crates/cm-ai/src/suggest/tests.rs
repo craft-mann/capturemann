@@ -1020,3 +1020,29 @@ fn m2g_lead_in_and_tail_silence_are_not_suggested() {
     assert_eq!(cuts.len(), 1, "{cuts:#?}");
     assert!((secs(cuts[0].start) - 4.2).abs() < 0.1);
 }
+
+/// On a recording of a minute or more a dead start (3 s or more) is a normal cut; a short lead-in is not.
+#[test]
+fn m2g_a_long_dead_start_is_suggested_on_a_long_recording() {
+    let long = audio(&[
+        Part::Quiet(4.0),
+        Part::Tone(30.0, 0.3),
+        Part::Quiet(2.0),
+        Part::Tone(30.0, 0.3),
+        Part::Quiet(1.0),
+    ]);
+    let cuts = silence_cuts(
+        &long,
+        RATE,
+        MediaTime::ZERO,
+        &[],
+        &SilenceOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(cuts.len(), 2, "{cuts:#?}");
+    assert!(
+        secs(cuts[0].start) < 4.0,
+        "the dead start is first: {cuts:#?}"
+    );
+    // The 1 s tail is under 3 s, so it is left.
+}
