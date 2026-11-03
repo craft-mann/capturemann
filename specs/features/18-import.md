@@ -1,0 +1,177 @@
+# Import media (IMP)
+
+Bring video and audio files that were not recorded by CaptureMann (a phone clip, a screen recording from another tool, a voice memo, a downloaded interview) into the library as normal captures, so that the editor, local AI (transcript, speakers, reports), export, upload and publish work on them. Design source: the redesign kit boards I0 to I4 (`capturemann-redesign 6/`: `import-media-design.md`, `screens/png/Import*.png`, `source/Import*.dc.html`), proposal and maintainer decisions of Nov 3, 2026. Release plan: `../plans/release-0.2.7-plan.md`, track M3.
+
+**Decisions of Nov 3, 2026 (product maintainer), binding for this file.**
+1. `import_media` is **Free** tier. When reading a file needs a permission the app does not have yet (a protected folder such as Desktop, Documents or Downloads, or an external or network drive), the app asks for that access first, the same way for the GUI and for agents; if the user refuses, the call returns `permission_missing` with `data.permission: "files"` and nothing is imported.
+2. **Removing the originals is opt-in** (`remove_originals`, default false). It is the one parameter that changes the tier: a call with `remove_originals: true` is **Confirm** (IMP-4). The original goes to the Trash only after its copy in the library is verified; a failed or cancelled import never removes an original.
+3. **Files only, no folders.** A folder path is `invalid_input` with `data.reason: "folder_not_supported"`.
+4. **The FFmpeg build is not extended in 0.2.7** (decided with the plan). The import reads what the bundled FFmpeg can decode (the decoders `h264 hevc aac pcm_*` and the demuxers `mov matroska wav`, `packaging/ffmpeg/build-macos.sh`); everything else is recognised and refused with the reason `unsupported_format`. Extending the build is a candidate for 0.2.8.
+
+**Formats supported in 0.2.7.** Video: MP4, MOV, M4V and MKV with H.264 or HEVC video and AAC or PCM audio (or no audio). Audio: M4A, AAC in MP4/MOV, and WAV (PCM: 8-bit unsigned, 16, 24 and 32-bit integer, 32-bit float, little endian; the shipped build has no other PCM decoder, so a 64-bit float or big-endian WAV is `unsupported_format`). **Recognised and refused (`unsupported_format`, with the codec or format named):** WebM (VP8/VP9, Vorbis/Opus), AVI, MP3, AIFF, FLAC, OGG, Opus, bare AAC (ADTS), and any other video or audio codec. The kit's longer list (MP4, MOV, M4V, MKV, WebM, AVI; M4A, MP3, WAV, AIFF, FLAC, OGG, Opus, AAC) is the target, not what ships in 0.2.7; the sheet lists only what works.
+
+**Track model.** No new `CaptureKind`. An imported video is a `recording` bundle whose `screen` track is the file (or its editing copy); an imported audio file is an `audio` bundle (VOC-1). The sound of either is decoded once to `mic.wav` (48 kHz, 32-bit float, 1 or 2 channels as in the source, more than 2 are mixed down to 2); there is no denoised copy, no `system`, `camera` or `cursor` track. The UI calls this track "Audio". The manifest gains `source: { path, imported_at, original_name, original_file }`; "imported" means that key exists.
+
+### IMP-1 Probe and classify a file
+**Priority** P1 · **Status** In progress (built Nov 3, 2026 on branch `track/mac-import`, tested with fakes and with fixtures made by the `ffmpeg` on `PATH`: `cm_media::import::{probe, classify}`; the shipped `ffprobe` was only checked against the unsupported-format signatures; no UI) · **Crates** cm-media, cm-daemon · **Depends on** EXP-1, DESIGN kit boards I0 and I2
+
+**User story** — As someone with a video or audio file, I want to see before I import it whether it will work and what will be done to it, so that no import surprises me.
+
+**Description** — Probing reads the file with the bundled `ffprobe` (`cm_media::tools`), never writes, and gives per file: container, duration, the chosen video stream (codec, size in display pixels after rotation, frame rate, variable frame rate, rotation, HDR, pixel format), the chosen audio stream (codec, rate, channels) and the number of other audio streams, the size in bytes, and a **status** with reasons. Statuses:
+- **Ready**: the file is used as it is (copied into the bundle as the master).
+- **Prepared for editing**: the file is kept as the master and a constant-frame-rate editing copy is made next to it (IMP-2.AC3). Reasons: `variable_frame_rate`, `container_mkv`, `rotated` (a rotation tag other than 0), `pixel_format` (not 8-bit 4:2:0).
+- **Can't import**: with one reason: `protected_media`, `unsupported_format` (`data.format` or `data.codec` names it), `unreadable_file` (the probe fails on a file of a known container: truncated, corrupt, empty), `no_streams` (no usable video or audio stream), `folder_not_supported`.
+
+Chosen streams: the video stream is the first one that is not an attached picture (cover art in an M4A is not video). The audio stream is the one with `disposition.default` set, else the first. **Only that one audio stream is imported**; the others are counted (`other_audio_streams`) and the row says "N other audio tracks are not imported". The probe flags HDR (`smpte2084` or `arib-std-b67` transfer) as `hdr: true`; an HDR file is Ready and is shown as it is (no tone mapping), the row says so.
+
+Because the bundled FFmpeg has no demuxer for AVI, MP3, AIFF, FLAC, OGG or bare AAC, `ffprobe` cannot open them. When it fails, the first bytes decide: the signatures of those formats (`RIFF…AVI `, `ID3` or an MPEG audio frame sync, `fLaC`, `OggS`, `FORM…AIFF`, an ADTS sync) give `unsupported_format` with the format named; an unknown signature on a file with a media extension gives `unreadable_file`; an empty file is `unreadable_file`. DRM: a stream whose sample entry is a protected one (`drms`, `drmi`, `encv`, `enca`) or that carries encryption side data, or a matroska content-encryption error, is `protected_media`.
+
+**Acceptance criteria**
+- **AC1** Given an MP4, MOV, M4V or MKV with H.264 or HEVC video and AAC or PCM audio, an M4A or an AAC-in-MP4 file, or a PCM WAV, when it is probed, then the status is Ready or Prepared for editing, never Can't import.
+- **AC2** Given a WebM, AVI, MP3, AIFF, FLAC, OGG, Opus or bare AAC file (whether `ffprobe` can open it or only the signature identifies it), when it is probed, then the status is Can't import with the reason `unsupported_format` and the format or codec named; nothing crashes and no file is written.
+- **AC3** Given a video with a constant frame rate, no rotation tag, 8-bit 4:2:0, in MP4, MOV or M4V, then the status is Ready. Given variable frame rate (detected from the packet timestamps of the first 300 packets, not only from the container's average rate), an MKV container, a rotation tag, or another pixel format, then the status is Prepared for editing, with each applying reason listed.
+- **AC4** Given a protected file (FairPlay, CENC), then the status is Can't import with `protected_media`; given a truncated or empty file, `unreadable_file`; given a file with no video and no audio stream, `no_streams`.
+- **AC5** Given a video with several audio streams, then the default one (else the first) is the audio and `other_audio_streams` is the number of the rest. Given an M4A with cover art, then it is an audio file, not a video.
+- **AC6** Given a rotation tag of 90 or 270 degrees, then the reported size is the displayed size (width and height swapped) and `rotation` is reported.
+- **AC7** Given any file, the probe does not modify, move or lock it, and ends within 30 s (a hang is `unreadable_file`).
+
+**Edge cases and errors** — `ffprobe` missing: `not_found` with the FFmpeg message (the existing contract, `is_not_found_message`). A path that does not exist: `not_found`. A path that is a folder: `invalid_input`, `data.reason: "folder_not_supported"`, message "Folders can't be imported yet: open the folder and select the files inside." A file with a media extension whose content is another format is judged by its content.
+
+**Agent interface** — `import_media { paths, dry_run: true }` returns the classification and starts nothing (IMP-3). Free, read-only in effect.
+
+**Out of scope** — Decoding WebM/AVI/MP3/AIFF/FLAC/OGG/Opus (0.2.8 candidate). Tone mapping of HDR. Importing several audio streams. Folders.
+
+**As built** — `cm_media::import::probe` runs `ffprobe` (30 s limit) and reads the first 300 video packets for the frame times; `classify` holds the codec lists; the sheet's rows are the `dry_run` rows. The shipped build lists only the PCM decoders named above.
+
+**Test notes** — Pure tests on `ffprobe` JSON and on signature bytes; fixtures made with the `ffmpeg` on `PATH` (the shipped build has no `lavfi` or `libx264`), printed SKIPPED when absent; the shipped `ffprobe` is checked against the same fixtures where the build is present.
+
+### IMP-2 Bring a file into the library
+**Priority** P1 · **Status** In progress (built Nov 3, 2026, tested with fakes and PATH fixtures: `cm_media::import::prepare`, `cm_library::import`; the editing copy needs a hardware encoder; no UI) · **Crates** cm-media, cm-library · **Depends on** IMP-1, VOC-1, LIB-1, AUD-1
+
+**User story** — As someone importing a file, I want it to become an ordinary capture that I can edit, transcribe, export and publish, with my original left intact.
+
+**Description** — One file becomes one bundle, built in a staging folder `<library>/.capturemann/import/<job>/` and moved into the library with one rename when complete, so the library never shows a half-written import and a crash leaves only a staging folder that the next start removes. Steps for a video: copy the file to the bundle (`screen.<ext>`, the original container kept; the master); when Prepared, make the editing copy `screen.edit.mp4` (below); decode the sound to `mic.wav`; write `manifest.json`; verify; move into the library; index; publish `capture.created`. Steps for audio: copy (`original.<ext>`, kept as the master), decode to `mic.wav`, manifest (`kind: "audio"`), verify, move, index.
+
+- **Copy.** Byte for byte, in chunks, with progress; the source is only read. The title defaults to the file name without extension (a title can be given per file); the folder name is made unique like any capture.
+- **Editing copy.** Made with the hardware encoder of the platform (`h264_videotoolbox`, or `hevc_videotoolbox` when the source is HEVC and the build has it), the `fps` filter at the source's median frame rate rounded to the nearest of 24, 25, 30, 50, 60 (or the rate itself if the source is within 1% of a standard one), rotation applied, 8-bit 4:2:0, the audio not included (the sound is `mic.wav`). No software encoder ships (NFR-12): without a hardware encoder the row stays Prepared but the import of that file fails with `unsupported_format` and `data.reason_detail: "no_hardware_encoder"`, message "This Mac can't prepare this file for editing (no hardware video encoder)." The `screen` track points at the editing copy; `tracks.screen.master` names the original file.
+- **Tracks.** `tracks.screen { file, size (display px), fps, codec, source_size, scale: 1, start: 0, end: duration, master?, prepared: [reasons]? }`; `tracks.mic { file: "mic.wav", rate: 48000, channels, start: 0, end: duration }`; nothing else. `duration` is in ticks; `edits` is one full-length segment; `revisions[0]` is `import` by the actor; `captions` disabled; no `gaps`, no cursor, no camera.
+- **Source.** `source { path (absolute path at import time), imported_at (RFC 3339), original_name (file name), original_file (the name of the master inside the bundle) }`.
+- **Verify** (before the bundle is moved into the library and, with `remove_originals`, before anything is trashed): the master has the same size in bytes as the source; the probe of the master reads it and its duration is within one frame (1/fps; 25 ms for audio) of the source's; the first and last 2 s of video and audio decode without error; `mic.wav` duration is within 25 ms of the source audio's; the editing copy, if any, is within one frame of the source's duration.
+
+**Acceptance criteria**
+- **AC1** Given a Ready video, when it is imported, then the bundle has a `screen` track that is a byte-identical copy of the file, a `mic.wav` (48 kHz, f32) when the file has sound, `source` in the manifest, kind `recording`, and appears in `list_library` with the file's duration and size.
+- **AC2** Given a WAV or an M4A, then the bundle is kind `audio` with `mic.wav` and the original kept; the grid shows its waveform like any audio capture.
+- **AC3** Given a Prepared video, then the bundle keeps the original as the master and the `screen` track is a constant-frame-rate editing copy whose duration is within one frame of the original, rotation applied; a variable-frame-rate source and its copy play and export in sync with the sound.
+- **AC4** Given an imported capture, then trim, cut, speed, background, zoom-free layout, captions, transcribe, diarize, reports, export and upload work on it as on a recording, with no cursor and no camera (the editor shows them as unavailable); `export_video` of an imported capture produces a file whose duration matches within one frame.
+- **AC5** Given a cancel, a failure or a crash during the copy, then no bundle is in the library, the staging folder is removed, and the original is untouched.
+- **AC6** Given a file that disappears or changes size between the probe and the copy, then that file fails with `unreadable_file` and `data.detail: "changed"`; the others continue.
+- **AC7** Given the verify step fails (size, duration, decode), then the bundle is not moved into the library, the file fails with `unreadable_file` and the original is never trashed.
+- **AC8** Given two files with the same name, then both are imported with different folder names.
+
+**Edge cases and errors** — Disk full during any step: `disk_full`, the staging folder removed. No audio in a video: no `mic.wav`, no `mic` track. A video with an audio codec outside AAC and PCM (for example AC-3): the file is Can't import with `unsupported_format` and `data.codec` (the sound is never silently dropped). Duplicate imports of the same file make two captures; there is no duplicate detection in 0.2.7.
+
+**Agent interface** — Through `import_media` (IMP-3).
+
+**Out of scope** — A separate system-audio or camera track from a file; cursor data; writing back to the original.
+
+**As built** — Staging is `<library>/.capturemann/import/<job>-<n>/`; the master is `screen.<ext>` (a Ready video) or `original.<ext>`; the picture the editor plays is `screen.<ext>` or `screen.edit.mp4`; the editing copy is H.264 or (for an HEVC source) HEVC from VideoToolbox at 0.15 bits per pixel per frame, one-second GOP, `fps` filter at the source's rate snapped to a standard one (29.97 and 30 stay apart), rotation applied, even size, 8-bit 4:2:0, no sound; stereo sound is mixed down to mono when it would not fit in a 4 GiB WAV file (`tracks.mic.downmixed`). The editor and the exporter read `tracks.screen.file`; nothing needed a change.
+
+**Test notes** — Fixtures from `ffmpeg` on `PATH` (H.264/AAC MP4, HEVC MOV with a rotation tag, MKV, variable frame rate through dropped frames, WAV, M4A); the editing copy test needs a hardware H.264 encoder and prints SKIPPED without one; bundle layout and manifest tests are pure.
+
+### IMP-3 The import job and the agent interface
+**Priority** P1 · **Status** In progress (built Nov 3, 2026, tested with fakes and PATH fixtures: `import_media`, the `import` job, `dry_run`, `after`, the CLI and the MCP tool 75; the app's `backend.rs` does not register the handler yet; the permission refusal (EPERM) is tested as a mapping only, the manual script is not written) · **Crates** cm-jobs, cm-daemon, cm-cli, cm-mcp · **Depends on** IMP-1, IMP-2, EXP-4, AGT-1, AGT-2
+
+**User story** — As an agent or a script, I want to import files and follow the work, with the same results as the app.
+
+**Description** — `import_media { paths, titles?, remove_originals?: false, dry_run?: false, after?: { transcribe?, diarize?, report_template? }, request_id? }`.
+- `paths`: 1 to 200 absolute paths of files (a relative path or a folder is `invalid_input`; a missing path is `not_found`). `titles`: an optional array of the same length (an empty string keeps the default). `after`: `transcribe` (true, or `{ model?, language? }`), `diarize` (true), `report_template` (a template id of AI-9): each runs the existing action on every imported capture once it exists, in that order, with the existing rules (no model installed: the step is skipped and reported, the import itself is not affected). `diarize` and `report_template` imply nothing else.
+- `dry_run: true` probes and classifies and returns `{ files: [row] }` where a row is `{ path, name, size_bytes, kind (video | audio), status (ready | prepared | cant_import), reasons[], error?: { code, reason, … }, container, duration_s, size [w, h], fps, video_codec, audio_codec, audio_channels, other_audio_streams, hdr, rotation, title }`. Nothing is written or queued; it is never Confirm.
+- Otherwise it returns `{ job_id, captures: [{ capture_id, path, title, kind, status }] }` at once. `capture_id` is reserved for the file and is the id the bundle will have; it is not in `list_library` until `capture.created`. A file whose status is Can't import is not queued; it is in `captures` with `status: "cant_import"` and `error`. If no file is importable the call fails `invalid_input` with `data.reason` set to the one reason all files share (`unsupported_format`, `protected_media`, `unreadable_file`, `no_streams`) or `nothing_to_import`, and `data.files` carrying the rows.
+- The job is one persisted `import` job for the call (type `import`, one running at a time, the next ones queued; held while a recording runs, like an export, EXP-4.AC2, so copying a large file never costs recording frames). It processes the files in order. Progress is `job.progress` with the whole-job fraction by bytes and a message naming the step ("Copying into the library", "Preparing for editing", "Reading the sound", "Checking the copy", "Transcribing"). `capture.created` is published per file when its bundle is in the library. The result is `{ files: [{ path, capture_id?, status (imported | failed | skipped | cancelled), error? { code, reason, message } }], imported, failed, trashed[], after: { … } }`. The job is `done` when at least one file was imported, `failed` (`job_failed`, with the first reason) when none was; a cancel leaves the finished bundles in place and ends `cancelled`.
+- **Resume.** The checkpoint lists the finished files. After a restart the job continues at the first unfinished file, which starts again from its staging folder (wiped).
+- **Disk space.** Before the first byte: the sum of the copies, the editing copies (estimated at the source size) and the sound (`duration × 48000 × 4 × channels`) must fit in the free space of the library volume minus 1 GB (NFR-7); otherwise `disk_full` with `data.needed_bytes` and `data.free_bytes` and nothing is started. Checked again per file.
+- **Permission.** Reading a file that macOS refuses with "Operation not permitted" (EPERM) gives `permission_missing` with `data.permission: "files"` and `data.path`. For the GUI the app opens the folder or the file picker, which is what grants the access; for an agent the call fails with that error before anything is imported. A refusal on any file of the call imports nothing (the check reads the first byte of every file before the job is queued).
+- **Idempotency.** `request_id` as in the other mutating tools: a repeat returns the first result.
+- **After.** The steps run inside the `import` job after the last file, for every imported capture in turn: `transcribe`, then `diarize`, then `generate_report`, each waiting for its own job; the progress message names the step. `result.after` is `{ <capture_id>: { transcribe: { state, job_id } | { state: "skipped", reason }, diarize, report } }`. A skipped or failed step does not change the import.
+
+**Acceptance criteria**
+- **AC1** Given one valid file, when `import_media` is called, then it returns `job_id` and one `captures` row at once, the job runs, `job.progress` events arrive with rising fractions, `capture.created` carries the reserved `capture_id`, and `get_job` ends `done` with the per-file result.
+- **AC2** Given three files of which one is unsupported, then two are imported, the third is reported with `unsupported_format`, and the job is `done`.
+- **AC3** Given only unsupported files, then the call fails with `invalid_input` and `data.reason` and nothing is queued.
+- **AC4** Given a folder in `paths`, then the call fails with `invalid_input`, `data.reason: "folder_not_supported"` and nothing is imported, whatever else is in the list.
+- **AC5** Given `cancel_job` during an import, then the running file stops, its staging folder is removed, the files already imported stay, and the originals are untouched.
+- **AC6** Given a restart of the daemon during an import, then the job continues, finished files are not imported twice, and the unfinished one is imported from the start.
+- **AC7** Given free space below the need, then the call fails with `disk_full` and `data.needed_bytes`, `data.free_bytes`, and nothing is copied.
+- **AC8** Given an unreadable protected folder, then the call fails with `permission_missing` (`data.permission: "files"`), exit code 4, and nothing is imported.
+- **AC9** Given `after: { transcribe: true }` and an installed model, then each imported capture gets the existing `transcribe` job; without a model the result says `after.transcribe: "skipped: no model"`.
+- **AC10** Given `dry_run: true`, then rows are returned and no job, file or bundle is created, with or without `remove_originals`.
+- **AC11** Given a repeated `request_id`, then the first `job_id` is returned and nothing is imported twice.
+- **AC12** Every tool and CLI result above is the same as the app's: the app's sheet and `capturemann import` call the same action.
+
+**Edge cases and errors** — More than 200 paths: `invalid_input`. Duplicate paths in one call are imported once. A path inside the library itself: `invalid_input` (`data.reason: "inside_library"`). A recording is running: the `import` job type is held like `export`, `transcribe` and `translate` (state `queued`, `held: true` in `get_job`) and continues when the recording ends; a file being copied when a recording starts finishes its current step boundary first and the row says "Waiting for the recording to end". Network volumes may be slow; the copy has no time limit but is cancellable.
+
+**Agent interface** — MCP `import_media` (tool 75), CLI `capturemann import FILE… [--title T]… [--transcribe] [--diarize] [--report TEMPLATE] [--remove-originals] [--dry-run] [--wait] [--timeout S]` (`--wait` follows the job like `export --wait` and prints one line per file). Events: `job.progress`, `job.done`, `job.failed`, `capture.created`. Tier: **Free**; **Confirm when `remove_originals` is true and `dry_run` is not** (IMP-4). Maps to the CLI exit codes of the shared errors.
+
+**Out of scope** — Folder import, watch folders, importing from a URL or a camera roll, duplicate detection.
+
+**Test notes** — The daemon test uses a scripted job (a fake copier) for progress, cancel, resume, disk and permission, and the real daemon with a fixture file for the whole flow; the CLI and MCP tests check the tool table count (75) and the exit codes.
+
+### IMP-4 Remove the originals
+**Priority** P1 · **Status** In progress (built Nov 3, 2026, tested with a scripted Trash and confirmer; never run against the real Trash) · **Crates** cm-daemon, cm-platform · **Depends on** IMP-2, IMP-3, AGT-2, LIB-1
+
+**User story** — As someone importing a large file, I want an option to move it into the library instead of copying it, so that it does not take space twice, and I do not want an agent to do that without my say-so.
+
+**Description** — `remove_originals: true` (the sheet's checkbox "Remove the originals after importing", unchecked by default; its hint says each original goes to the Trash only after its copy is checked, and how many GB are freed). After a file's bundle is verified and moved into the library, its original is moved to the Trash (`cm_platform::trash::move_to_trash`, through the daemon's `Trasher`), never deleted. A failed, cancelled or skipped file is never trashed. If moving to the Trash fails (read-only volume, a network volume without a Trash), the capture is kept, the file result is `imported` with `trash: { state: "failed", message }` and the original stays.
+
+**The parameter-dependent tier (new rule for the interface).** The tier table gives one tier per tool; `import_media` is Free in it. A call's *gating tier* is the table's tier unless a tool declares a parameter rule. Rule for `import_media`: the gating tier is Confirm when `remove_originals` is true and `dry_run` is not true. It is computed after the parameters are parsed and validated (a bad call fails with `invalid_input` and never opens a dialog), and everything downstream (client policy, the dialog, idempotency, the activity log) uses it. Details:
+- *Who is asked.* Only agent calls (socket clients over MCP, the CLI, JSON-RPC). The app's own call as `Actor::User` is never asked: the checkbox is the consent, and the sheet states the number of files and GB.
+- *Locked.* Settings → Agents & CLI shows `import_media` as an editable Free tool (Allow, or Ask first for every call). For a call with `remove_originals` the Confirm gate cannot be loosened by any setting or edited file: `agents.tool_policy` cannot make it Allow, and an Ask-first setting does not add a second dialog (one dialog is shown, the specific one).
+- *Discovery.* `actions.list` keeps `tier: "free"` for `import_media` and adds `confirm_when: { "remove_originals": true }`; `effective_tier` is the tier for a call without the parameter. The MCP tool description says that `remove_originals: true` asks the user first.
+- *Policy.* A read-only client is refused (the tool is mutating); `dry_run` is read-only in effect but the tool as a whole is mutating, so a read-only client is refused for the tool.
+
+**The confirmation dialog** (kind `import_remove_originals`, built by the daemon from the plan before it opens, like `delete_capture`'s). The plan is made first: every path is checked (exists, is a file, readable), probed and classified; paths that fail are listed as not imported. The dialog shows: the agent chip; the sentence "<agent> wants to import N files and move the originals to the Trash"; **a row for every file that will go to the Trash** (name, folder, size, kind, the title it will get) and the total GB freed; a second list of files that will *not* be imported and stay where they are (with the reason); the line "Each original goes to the Trash only after its copy in the library has been checked. You can restore it from the Trash." `params`: `{ files: [{ path, name, size_bytes, kind, title }], not_imported: [{ path, reason }], total_bytes, trash_count }`. The dialog has the standard 5 minute timeout and queue; Cancel gives `user_declined`, a timeout `confirmation_timeout`; nothing is imported in either case. A daemon with no confirmer answers `user_declined` with `data.reason: "no_confirmer"`. The job then runs **exactly** the approved list: a file whose size or modified time changed after the dialog is not imported and not trashed (`changed_since_approval`).
+
+**Acceptance criteria**
+- **AC1** Given an agent call with `remove_originals: true`, when it is made, then a dialog lists every file that would go to the Trash, and nothing is copied until the user approves; on Cancel or timeout nothing is imported and no file is touched.
+- **AC2** Given the approval, then each original is moved to the Trash only after that file's verify step passed; a file that failed verify stays where it is.
+- **AC3** Given a cancel of the job after two of five files, then the two originals are in the Trash and the other three are where they were.
+- **AC4** Given the same call as the user in the app, then no dialog is shown and the same Trash behaviour applies.
+- **AC5** Given `agents.tool_policy` with `import_media: "allow"` or a hand-edited loosening, then a `remove_originals` call from an agent still opens the dialog.
+- **AC6** Given `dry_run: true` with `remove_originals: true`, then no dialog is shown and nothing is moved.
+- **AC7** Given a Trash failure, then the capture is kept, the original stays, and the result says so.
+- **AC8** Given `actions.list`, then `import_media` carries `confirm_when`.
+
+**Edge cases and errors** — An original on a volume that cannot be trashed is kept and reported. A file imported from inside a folder the user then removes is not an issue (it is a file copy). The dialog never lists a file that is not going to the Trash under the Trash list.
+
+**Agent interface** — The same tool (IMP-3); CLI `--remove-originals` asks on screen and `--wait` waits for the answer and the job. Tier: Confirm for that parameter.
+
+**Out of scope** — Permanent delete; trashing folders; undo of a Trash move (the user restores it from the Trash).
+
+**Test notes** — A fake `Trasher` and a fake confirmer test the order (trash after verify only), the dialog contents, timeout, decline, cancel after some files, and the policy edge cases; one ignored test moves a scratch file to the real Trash (as `cm-platform` does).
+
+### IMP-5 Import in the app
+**Priority** P1 · **Status** Draft (the UI is the next round; DESIGN §n for the import surfaces is not yet in `docs/development/design-surfaces.md`, so the Definition of Ready item 4 is open: the kit boards I0 to I4 are the named surface until it is) · **Crates** apps/desktop · **Depends on** IMP-1 to IMP-4, DESIGN kit boards I1 to I4, I18N
+
+**User story** — As someone with files on my Mac, I want to drop or pick them, see what will happen, and have them appear in the library.
+
+**Description** (from the boards; details are completed against the PNGs before work starts)
+- *Entry points* (all open the same sheet): Import… in the library header (⌘I), files dropped on the library window (a dashed full-area overlay with the 84 px `cm-import` tile, "Drop to import", live counts by kind and for files that can't be opened, and the supported formats), files dropped on the Dock icon and Open With (platform code, `CFBundleDocumentTypes`, an open-files event), Launcher "Import media", menu bar "Import file…". The file picker allows files, not folders; a dropped folder is skipped with "1 folder skipped" and "Folders can't be imported yet: open the folder and select the files inside."
+- *Sheet*: one row per file (thumbnail or waveform, editable title, mono meta, status chip Ready / Prepared for editing / Can't import, Remove, Add files); an info note for prepared files; **After import** (Transcribe with the model picker, Find speakers, Suggest a report for audio); the checkbox **Remove the originals after importing** (unchecked); the footer (space needed and free, "Originals stay where they are unless you tick “Remove the originals”", Import N files ↵ counting importable files only). The sheet calls `import_media` with `dry_run` for its rows and without it to start.
+- *Library*: filter chips Everything / Recorded / Imported / Uploaded; cards appear at once in their day group with an "Imported" badge and a bottom progress strip (Copying into the library, Preparing for editing, Transcribing · model); a failed card has an amber border, `file-x`, the reason, Show file and Dismiss; a job toast shows GB done of total, "keep working" and Cancel.
+- *Editor*: an "Imported" chip; a source line under the preview (import time, original path, codec, "original kept in the bundle", Show original); timeline tracks Video and Audio; the zoom lane explains that suggestions need cursor data; the Camera and Cursor inspector tabs are disabled (35% opacity, slash, `aria-disabled`, tooltip with the reason); the Captions empty state starts a transcript and points to Speakers, Translate and Report. An imported audio file opens in the audio editor unchanged.
+- *Toasts*: the kit says a toast closes by itself after 6 s; the maintainer set 5 s on Nov 3, 2026 (`design/redesign`, `design-surfaces.md` follow 5 s). The import toasts use 5 s, except a running import (progress, until it ends) and failures (kept until dismissed).
+- All strings go through `cm_i18n`, with Vietnamese drafts.
+
+**Acceptance criteria** (to be refined before work starts)
+- **AC1** Given the sheet with a Ready, a Prepared and an unsupported file, then the three rows show the three statuses and the footer counts two files.
+- **AC2** Given Import with the checkbox ticked, then the originals go to the Trash only after their imports are verified, with no dialog (the user's own call).
+- **AC3** Given a folder dropped on the library, then it is skipped with the message above and the files in the same drop are still offered.
+- **AC4** Given an imported video in the editor, then Camera and Cursor are disabled with their reasons and the other tabs work.
+
+**Edge cases and errors** — The same as IMP-1 to IMP-4, worded from the shared messages. A permission refusal opens System Settings → Privacy → Files and Folders from the toast.
+
+**Agent interface** — None of its own; it uses `import_media`.
+
+**Out of scope** — Folder import; dropping from a browser; a camera roll.
+
+**Test notes** — Layout tests with the pseudo-locale, the manual script `tests/manual/IMP-1.md` (a phone HEVC MOV with rotation, a variable-rate MKV, an M4A interview of about 1 hour, a 15 s voice memo, a protected file, a file on Desktop and one on an external drive, a folder drop, cancel, disk full, remove-originals), side-by-side with the PNGs at 1440 px.

@@ -1938,6 +1938,9 @@ msgstr ""
 msgid "Import from file"
 msgstr ""
 
+msgid "Import video and audio files"
+msgstr ""
+
 msgid "In (I)"
 msgstr ""
 
@@ -7735,6 +7738,10 @@ msgstr ""
 
 msgctxt "permission"
 msgid "Camera"
+msgstr ""
+
+msgctxt "permission"
+msgid "Files and Folders"
 msgstr ""
 
 msgctxt "permission"

@@ -204,6 +204,21 @@ the existing `pieces` logic and its checkpoint) while the meeting is still runni
 - **Owner:** `mac-ai` (pieces, whisper) with the named `cm-daemon` files (`ai/dispatch.rs`, `ai/jobs.rs`, the
   recording-finished event hookup); order after M2a's re-read-cost work, before the PhoWhisper decoding.
 
+### M2i Sound markers instead of invented words (maintainer, Nov 3, 2026)
+The Nov 2 meeting showed real, quiet speech written as "Cảmơn." (high word confidence, so a confidence threshold alone
+does not catch it) and a laugh written as a word. Decision: the transcript must not guess.
+- **0.2.7:** `[unclear]` where speech evidence exists (speaker engine or VAD) but no reliable words after the re-read
+  (M2d coverage re-run), keeping the speaker and the time; `[noise]` where the span has energy and no speech evidence.
+  They are marked as **sounds**, not words (an additive field on the transcript entries, old `transcript.json` files
+  still load): shown dimmed in the transcript and caption editor, written as `[unclear]` / `[noise]` in TXT and SRT/VTT
+  exports, and **excluded** from reports, translation, glossary suggestions and library text search.
+- **Later (0.2.8 candidate):** `[laughter]`, `[whispering]` and other sound labels from an audio-tagging model
+  (sherpa-onnx audio tagging is already in `vendor/sherpa-onnx`; needs a model licence check, size, a pinned SHA-256,
+  and a measurement on public data such as VocalSound (CC BY 4.0) and MUSAN (CC BY 4.0)). Do not label quiet speech
+  "whispering" without that model: it is quiet far-field speech, not whispering.
+- Whisper currently runs with `suppress_nst(true)`; whether letting it write its own sound tokens helps is measured,
+  not assumed.
+
 Done when: before/after reports for each of M2a, M2b, M2c are stored, the tests (with fakes) cover the new
 splitting/cancel behaviour, and `tests/manual/AI-5/7/8/9.md` have been re-run on the new build.
 

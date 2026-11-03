@@ -56,6 +56,11 @@ pub enum Command {
     /// Render a recording to one combined MP4 with the FFmpeg sidecar (`export_video`). Starts a
     /// background job (`jobs get <id>`); `--wait` blocks until it ends.
     Export(ExportArgs),
+    /// Bring media files that CaptureMann did not record into the library as captures
+    /// (`import_media`): `import clip.mov memo.m4a --transcribe --wait`. Files only. Starts a
+    /// background job (`jobs get <id>`); `--wait` blocks until it ends. `--remove-originals`
+    /// moves each original to the Trash after its copy is verified and asks on screen first.
+    Import(ImportArgs),
     /// Browse the library (`list_library`).
     Library {
         #[command(subcommand)]
@@ -874,6 +879,45 @@ pub enum LibraryCmd {
     /// old folder. The app uses the new folder after it restarts. Prints the job id; `--wait`
     /// blocks until the copy ends.
     Move(MoveArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct ImportArgs {
+    /// The files to import (video: MP4, MOV, M4V, MKV with H.264 or HEVC; audio: M4A, WAV).
+    /// Relative paths and `~` are resolved here. Folders are refused.
+    #[arg(required = true, num_args = 1.., value_name = "FILE")]
+    pub files: Vec<String>,
+    /// A title for the file in the same position (repeat the flag in order; the file name is the
+    /// default).
+    #[arg(long = "title", value_name = "TITLE")]
+    pub titles: Vec<String>,
+    /// Transcribe each import afterwards (needs an installed speech model; skipped otherwise).
+    #[arg(long)]
+    pub transcribe: bool,
+    /// With `--transcribe`: the language code (default: detect).
+    #[arg(long, requires = "transcribe", value_name = "CODE")]
+    pub language: Option<String>,
+    /// With `--transcribe`: label the speakers afterwards.
+    #[arg(long, requires = "transcribe")]
+    pub diarize: bool,
+    /// With `--transcribe`: write a report from this template afterwards (`ai report templates`).
+    #[arg(long, requires = "transcribe", value_name = "TEMPLATE")]
+    pub report: Option<String>,
+    /// Move each original to the Trash once its copy in the library is verified. The user must
+    /// approve on screen (the dialog lists every file); without `--wait` the answer is awaited
+    /// before the command returns the job.
+    #[arg(long = "remove-originals")]
+    pub remove_originals: bool,
+    /// Only check the files and print what would happen; import nothing.
+    #[arg(long = "dry-run", conflicts_with_all = ["wait", "transcribe"])]
+    pub dry_run: bool,
+    /// Wait for the import to finish and print one line per file (exit 6 if no file was
+    /// imported).
+    #[arg(long)]
+    pub wait: bool,
+    /// With `--wait`: give up after this many seconds (exit 6; the job keeps running).
+    #[arg(long, value_name = "SECS", requires = "wait", value_parser = positive_secs)]
+    pub timeout: Option<f64>,
 }
 
 #[derive(Debug, Args)]

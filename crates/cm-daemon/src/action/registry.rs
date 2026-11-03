@@ -103,6 +103,9 @@ pub const ACTIONS: &[ActionSpec] = &[
     // LIB-2: changing the library folder. Confirm for agents and not loosenable: no setting
     // changes a tier. The copy runs as the `library_move` job; the switch needs a restart.
     spec("move_library", Tier::Confirm, true),
+    // IMP-3/IMP-4: bring media files into the library as captures. Free in the table; a call with
+    // `remove_originals: true` is Confirm (`Action::gating_spec`, a parameter-dependent tier).
+    spec("import_media", Tier::Free, true),
     // Local AI (M5, specs/features/07-ai.md). Everything is Free except what uses the network or
     // deletes a model file: `download_model` (the only network traffic of the AI features, only
     // when asked) and `remove_model`. Suggestions only read; accepting one is `set_zooms` or
@@ -214,6 +217,15 @@ pub const NEVER_TIER: &[&str] = &[
     "disable_recording_indicator",
     "remove_excluded_apps",
 ];
+
+/// The parameter rule that raises a tool's tier, for discovery (`actions.list`): `import_media`
+/// asks first when `remove_originals` is true.
+pub fn confirm_when(name: &str) -> Option<serde_json::Value> {
+    match name {
+        "import_media" => Some(serde_json::json!({ "remove_originals": true })),
+        _ => None,
+    }
+}
 
 /// Looks up an exposed action. `None` for unknown and Never-tier names.
 pub fn spec_for(name: &str) -> Option<&'static ActionSpec> {

@@ -11137,3 +11137,12 @@ msgstr "Không thấy đoạn lặng nào. Từ đệm cần có bản chép l�
 #, fuzzy
 msgid "Suggest cuts when the editor opens"
 msgstr "Gợi ý cắt khi mở trình chỉnh sửa"
+
+#, fuzzy
+msgid "Import video and audio files"
+msgstr "Nhập tệp video và âm thanh"
+
+#, fuzzy
+msgctxt "permission"
+msgid "Files and Folders"
+msgstr "Tệp và Thư mục"

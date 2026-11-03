@@ -408,6 +408,8 @@ pub enum Action {
     DeleteCapture(ExternalParams),
     /// `move_library` (see [`crate::library_move`]).
     MoveLibrary(MoveLibraryParams),
+    /// `import_media` (see [`crate::import_ops`]).
+    ImportMedia(crate::import_ops::ImportMediaParams),
 }
 
 /// Largest accepted `request_id`.

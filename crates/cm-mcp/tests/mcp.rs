@@ -1449,6 +1449,44 @@ async fn move_library_is_a_confirm_tool_with_typed_errors() {
     c.cancel().await.unwrap();
 }
 
+/// IMP-3: `import_media` is Free in the table, says that `remove_originals` asks first, and its
+/// failures carry typed reasons. A folder and a missing file fail before anything is imported.
+#[tokio::test]
+async fn import_media_is_a_free_tool_with_typed_reasons() {
+    let confirmer = Arc::new(FixedConfirmer::new(Decision::Approve));
+    let (b, dir) = builder();
+    let d = b.confirmer(confirmer.clone()).build();
+    let (conn, _) = duplex_connector(d);
+    let c = mcp_client(conn, "claude-desktop").await;
+    let tools = c.list_all_tools().await.unwrap();
+    let t = tools.iter().find(|t| t.name == "import_media").unwrap();
+    let text = t.description.as_deref().unwrap_or_default();
+    assert!(text.contains("Tier: Free"), "{text}");
+    assert!(
+        text.contains("remove_originals: true` is Confirm tier"),
+        "{text}"
+    );
+    assert!(text.contains("Trash"), "{text}");
+    // Bad input, a folder (by name) and a missing file; none opens a dialog.
+    let rel = call(&c, "import_media", json!({"paths": ["a.mov"]})).await;
+    assert_eq!(err_code(&rel), "invalid_input");
+    let folder = call(&c, "import_media", json!({"paths": [dir.path()]})).await;
+    assert_eq!(err_code(&folder), "invalid_input");
+    assert_eq!(
+        folder.structured_content.as_ref().unwrap()["data"]["reason"],
+        "folder_not_supported"
+    );
+    let missing = call(
+        &c,
+        "import_media",
+        json!({"paths": [dir.path().join("nope.mov")], "remove_originals": true}),
+    )
+    .await;
+    assert_eq!(err_code(&missing), "not_found");
+    assert!(confirmer.shown().is_empty());
+    c.cancel().await.unwrap();
+}
+
 // ---- event notifications ---------------------------------------------------------------------
 
 mod notifications {

@@ -120,6 +120,11 @@ fn field(path: &str, schema: &Value, all: bool, variant: usize) -> Value {
         p if p.ends_with(".report_id") => json!("rpt_00000001"),
         p if p.ends_with("generate_report.language") => json!("vi"),
         p if p.ends_with("generate_report.context") => json!({ "title": "Weekly" }),
+        // IMP-3: absolute file paths, and `diarize` / `report_template` go with `transcribe`.
+        p if p.ends_with("import_media.paths") => json!(["/Users/me/Movies/clip.mov"]),
+        p if p.ends_with("import_media.after") => {
+            json!({ "transcribe": { "language": "en" }, "diarize": true, "report_template": "summary" })
+        }
         p if p.ends_with("set_captions.lines") => {
             json!([{ "start": 1, "end": 2, "text": "Hi" }])
         }

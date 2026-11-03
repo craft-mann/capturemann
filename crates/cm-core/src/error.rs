@@ -13,6 +13,9 @@ pub enum Permission {
     Microphone,
     Accessibility,
     InputMonitoring,
+    /// Reading a file or folder in a protected place (Desktop, Documents, Downloads, an external
+    /// or network drive): macOS "Files and Folders" (IMP-3).
+    Files,
 }
 
 impl Permission {
@@ -23,6 +26,7 @@ impl Permission {
             Permission::Microphone => "microphone",
             Permission::Accessibility => "accessibility",
             Permission::InputMonitoring => "input_monitoring",
+            Permission::Files => "files",
         }
     }
 }
@@ -463,6 +467,7 @@ mod tests {
             (Permission::Microphone, "microphone"),
             (Permission::Accessibility, "accessibility"),
             (Permission::InputMonitoring, "input_monitoring"),
+            (Permission::Files, "files"),
         ];
         for (p, s) in all {
             assert_eq!(p.as_str(), s);

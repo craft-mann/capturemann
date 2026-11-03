@@ -879,7 +879,7 @@ impl Daemon {
         } = call;
         // Frozen frames idle past their TTL go first, whoever calls.
         self.inner.frames.evict_expired(self.inner.clock.now());
-        let spec = action.spec();
+        let spec = action.gating_spec();
         let agent = match &actor {
             Actor::Agent(name) => Some(name.clone()),
             Actor::User => None,
@@ -957,6 +957,9 @@ impl Daemon {
         // `move_library` is checked before its dialog (every precondition), and the dialog says
         // what the check found.
         let mut prepared_move: Option<crate::library_move::MovePrepared> = None;
+        // `import_media` with `remove_originals` is planned the same way: the dialog lists every
+        // file of the plan, and the job runs that plan.
+        let mut prepared_import: Option<crate::import_ops::ImportPlan> = None;
         // AGT-2.AC9: the tier this call is gated by. The table's tier for the user; for an
         // agent, changed by the live per-tool permissions (read now, so a setting changed while
         // this call waits behind another dialog applies to the next call, not to this one).
@@ -1086,6 +1089,12 @@ impl Daemon {
                     prepared_move = Some(pr);
                     sd
                 }
+                (_, Action::ImportMedia(p)) => {
+                    let pl = self.inner.plan_import(p).await?;
+                    let sd = (pl.summary.clone(), pl.details.clone(), pl.params.clone());
+                    prepared_import = Some(pl);
+                    sd
+                }
                 // The dialog is built from the live model list: name, size, where it goes.
                 (_, Action::Ai(p)) => self.inner.plan_ai(p).await?,
                 _ => (action.summary(), action.details(), action.confirm_params()),
@@ -1098,7 +1107,11 @@ impl Daemon {
                         name,
                         session,
                         &spec,
-                        spec.name,
+                        if prepared_import.is_some() {
+                            crate::import_ops::DIALOG_KIND
+                        } else {
+                            spec.name
+                        },
                         summary.clone(),
                         details,
                         params,
@@ -1140,6 +1153,9 @@ impl Daemon {
             self.inner.run_move_library(pr).await?
         } else {
             match (action, prepared_publish, prepared_delete) {
+                (Action::ImportMedia(p), _, _) => {
+                    self.inner.import_media(&actor, p, prepared_import).await?
+                }
                 (Action::PublishVideo(p), Some(plan), _) => {
                     self.inner.run_publish(&actor, plan, p.request_id).await?
                 }
@@ -1207,6 +1223,7 @@ impl Daemon {
                 let pr = inner.plan_move_library(&p).await?;
                 inner.run_move_library(pr).await
             }
+            Action::ImportMedia(p) => inner.import_media(actor, p, None).await,
             Action::StartRecording(p) => match &inner.recording {
                 Some(e) => {
                     let prep = match prepared {
@@ -1320,7 +1337,7 @@ impl Inner {
         let n = spec.name;
         // The local part of `delete_capture` is built in; an external engine, if it claims the
         // action, takes over (it then owns the remote copies too).
-        if n == "delete_capture" || n == "move_library" {
+        if n == "delete_capture" || n == "move_library" || n == "import_media" {
             return true;
         }
         // The built-in YouTube publisher needs the accounts file; an external engine, if it

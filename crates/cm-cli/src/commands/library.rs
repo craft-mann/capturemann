@@ -85,7 +85,7 @@ pub(super) async fn library_rename(
 }
 
 /// `~`, `~/x` and relative paths made absolute (the daemon wants an absolute path).
-fn absolute_path(p: &str) -> Result<String, CliError> {
+pub(super) fn absolute_path(p: &str) -> Result<String, CliError> {
     let home = cm_platform::dirs::home_dir();
     let expanded = match (p, &home) {
         ("~", Some(h)) => h.clone(),

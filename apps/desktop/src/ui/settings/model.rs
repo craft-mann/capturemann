@@ -371,6 +371,7 @@ pub(crate) fn tool_title(name: &str) -> String {
         "publish_video" => tr!("Publish a video"),
         "delete_capture" => tr!("Delete a capture"),
         "move_library" => tr!("Change the library folder"),
+        "import_media" => tr!("Import video and audio files"),
         "run_fps_selftest" => tr!("Run the 60 fps self-test"),
         "trim" => tr!("Trim a recording"),
         "cut_segments" => tr!("Cut parts of a recording"),

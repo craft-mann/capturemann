@@ -158,6 +158,7 @@ impl Action {
                 })
             }
             "export_audio" => crate::export_audio::parse(&f)?,
+            "import_media" => crate::import_ops::parse(&f)?,
             "export_video" => {
                 // The spec's full input (EXP-1..3). Only `capture_id` and the preset `quick` work
                 // for now; the rest is refused by name instead of being silently ignored.

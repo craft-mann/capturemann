@@ -788,7 +788,9 @@ impl RecordingSession {
             Permission::Microphone => TrackKind::Mic,
             // Accessibility and Input Monitoring degrade the cursor track; they never stop a
             // recording (PRM-1) and are not polled.
-            Permission::Accessibility | Permission::InputMonitoring => return None,
+            Permission::Accessibility | Permission::InputMonitoring | Permission::Files => {
+                return None
+            }
         };
         if self.state == SessionState::Stopped
             || !self
