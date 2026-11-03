@@ -2202,6 +2202,9 @@ msgstr ""
 msgid "Look again"
 msgstr ""
 
+msgid "Looked for silences only: filler words need a transcript, and this recording has none."
+msgstr ""
+
 msgid "Looking for displays…"
 msgstr ""
 
@@ -2218,6 +2221,9 @@ msgid "Looking up your channel…"
 msgstr ""
 
 msgid "Looking…"
+msgstr ""
+
+msgid "Looks for pauses and filler words; nothing changes until you accept"
 msgstr ""
 
 msgid "Loop off: playback stops at the end"
@@ -2644,6 +2650,9 @@ msgid "No screen, microphone and calls"
 msgstr ""
 
 msgid "No silences found in this recording."
+msgstr ""
+
+msgid "No silences found. Filler words need a transcript, and this recording has none."
 msgstr ""
 
 msgid "No silences or filler words found in this recording."
@@ -4232,6 +4241,9 @@ msgid "Style the cursor"
 msgstr ""
 
 msgid "Suggest cuts"
+msgstr ""
+
+msgid "Suggest cuts when the editor opens"
 msgstr ""
 
 msgid "Suggest redactions"

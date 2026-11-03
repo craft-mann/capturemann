@@ -11121,3 +11121,19 @@ msgstr "Khôi phục"
 
 msgid "Set by your desktop: {keys}"
 msgstr "Do môi trường desktop đặt: {keys}"
+
+#, fuzzy
+msgid "Looked for silences only: filler words need a transcript, and this recording has none."
+msgstr "Chỉ tìm các đoạn lặng: từ đệm cần có bản chép lời, mà bản ghi này chưa có."
+
+#, fuzzy
+msgid "Looks for pauses and filler words; nothing changes until you accept"
+msgstr "Tìm các đoạn lặng và từ đệm; không có gì thay đổi cho đến khi bạn chấp nhận"
+
+#, fuzzy
+msgid "No silences found. Filler words need a transcript, and this recording has none."
+msgstr "Không thấy đoạn lặng nào. Từ đệm cần có bản chép lời, mà bản ghi này chưa có."
+
+#, fuzzy
+msgid "Suggest cuts when the editor opens"
+msgstr "Gợi ý cắt khi mở trình chỉnh sửa"
