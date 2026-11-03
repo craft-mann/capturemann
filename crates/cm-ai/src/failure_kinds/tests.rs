@@ -183,15 +183,58 @@ fn real_sentences_do_not_count_as_spread_repeats() {
     assert!(spread_repeats(&words, 4, 10.0, 6).is_empty());
 }
 
-#[test]
-#[ignore = "planned fix M2d-2: drop or re-decode a short word that recurs after long gaps on weak signal"]
-fn the_fix_drops_spread_out_repeats_on_weak_signal() {
-    let (words, spans) = spread_words();
-    let x = signal(300.0, &spans);
-    let mut script = ScriptedTranscriber::new(words);
-    script.language = "en".into();
-    let (t, _) = transcribe_pieces(
-        &script,
+/// Reads a short window by listening: a word where the window has energy, nothing where it does
+/// not. A long read writes the script it is given (the spread-out repeats).
+struct ListensToShortWindows {
+    script: Vec<Word>,
+}
+
+impl Transcriber for ListensToShortWindows {
+    fn transcribe(
+        &self,
+        audio: Pcm16k<'_>,
+        _language: Option<&str>,
+        _progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Transcript, CmError> {
+        let secs = audio.samples.len() as f64 / RATE as f64;
+        let words = if secs > 30.0 {
+            self.script
+                .iter()
+                .map(|w| Word {
+                    start: audio.start + w.start,
+                    end: audio.start + w.end,
+                    ..w.clone()
+                })
+                .collect()
+        } else {
+            let rms = (audio.samples.iter().map(|s| s * s).sum::<f32>()
+                / audio.samples.len().max(1) as f32)
+                .sqrt();
+            if rms > 0.01 {
+                vec![Word {
+                    text: "ok".into(),
+                    start: audio.start + media_secs(secs / 2.0 - 0.2),
+                    end: audio.start + media_secs(secs / 2.0 + 0.1),
+                    confidence: 0.9,
+                }]
+            } else {
+                Vec::new()
+            }
+        };
+        Ok(Transcript {
+            version: TRANSCRIPT_VERSION,
+            language: "en".into(),
+            model: "listens".into(),
+            words,
+            note: None,
+        })
+    }
+}
+
+fn run_listening(spans: &[(f64, f64, f32)], words: Vec<Word>) -> Vec<Word> {
+    let x = signal(300.0, spans);
+    transcribe_pieces(
+        &ListensToShortWindows { script: words },
         Pcm16k {
             samples: &x,
             start: MediaTime::ZERO,
@@ -200,9 +243,33 @@ fn the_fix_drops_spread_out_repeats_on_weak_signal() {
         None,
         &mut |_| true,
     )
-    .unwrap();
-    let oks = t.words.iter().filter(|w| w.text == "ok").count();
-    assert!(oks <= 1, "{oks} ok left");
+    .unwrap()
+    .0
+    .words
+}
+
+/// M2d-2: seven "ok" far apart on weak signal are read again and, hearing nothing, go.
+#[test]
+fn spread_out_repeats_on_weak_signal_are_read_again_and_dropped() {
+    let (words, spans) = spread_words();
+    let got = run_listening(&spans, words);
+    let oks = got.iter().filter(|w| w.text == "ok").count();
+    assert_eq!(oks, 0, "{got:?}");
+    // The real sentences stay.
+    assert!(got.iter().any(|w| w.text == "hello"));
+}
+
+/// The same words really spoken (energy under every one of them) are heard again and survive.
+#[test]
+fn spread_out_repeats_that_are_really_spoken_survive() {
+    let (words, mut spans) = spread_words();
+    for s in &mut spans[1..] {
+        s.1 = s.0 + 0.6;
+        s.2 = 0.2;
+    }
+    let got = run_listening(&spans, words);
+    let oks = got.iter().filter(|w| w.text == "ok").count();
+    assert_eq!(oks, 7, "{got:?}");
 }
 
 // ---- (c) tokens that are not text -------------------------------------------------------------

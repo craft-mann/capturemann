@@ -102,16 +102,14 @@ pub struct SpreadRepeat {
     pub mean_confidence: f32,
 }
 
-/// Words (folded text up to `max_chars` letters) that occur at least `min_count` times, each time
-/// after a gap of at least `min_gap` seconds from the word before it. Several occurrences of the
-/// same short text, each alone after a long silence, are rarely speech.
-pub fn spread_repeats(
+/// Indexes of the words that make up spread-out repeats (see [`spread_repeats`]).
+pub fn spread_repeat_indices(
     words: &[Word],
     max_chars: usize,
     min_gap: f64,
     min_count: usize,
-) -> Vec<SpreadRepeat> {
-    let mut by_text: HashMap<String, Vec<(f64, f32)>> = HashMap::new();
+) -> Vec<usize> {
+    let mut by_text: HashMap<String, Vec<usize>> = HashMap::new();
     for (i, w) in words.iter().enumerate() {
         let text = fold(&w.text);
         if text.is_empty() || text.chars().count() > max_chars {
@@ -123,15 +121,37 @@ pub fn spread_repeats(
             secs(w.start) - secs(words[i - 1].end)
         };
         if gap >= min_gap {
-            by_text
-                .entry(text)
-                .or_default()
-                .push((secs(w.start), w.confidence));
+            by_text.entry(text).or_default().push(i);
         }
+    }
+    let mut out: Vec<usize> = by_text
+        .into_values()
+        .filter(|v| v.len() >= min_count)
+        .flatten()
+        .collect();
+    out.sort_unstable();
+    out
+}
+
+/// Words (folded text up to `max_chars` letters) that occur at least `min_count` times, each time
+/// after a gap of at least `min_gap` seconds from the word before it. Several occurrences of the
+/// same short text, each alone after a long silence, are rarely speech.
+pub fn spread_repeats(
+    words: &[Word],
+    max_chars: usize,
+    min_gap: f64,
+    min_count: usize,
+) -> Vec<SpreadRepeat> {
+    let mut by_text: HashMap<String, Vec<(f64, f32)>> = HashMap::new();
+    for i in spread_repeat_indices(words, max_chars, min_gap, min_count) {
+        let w = &words[i];
+        by_text
+            .entry(fold(&w.text))
+            .or_default()
+            .push((secs(w.start), w.confidence));
     }
     let mut out: Vec<SpreadRepeat> = by_text
         .into_iter()
-        .filter(|(_, v)| v.len() >= min_count)
         .map(|(text, v)| SpreadRepeat {
             text,
             count: v.len(),

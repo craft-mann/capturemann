@@ -441,6 +441,14 @@ impl Job<'_, '_> {
                 i += 1;
             }
         }
+        // Short words that come back again and again, each alone after a long silence: rarely
+        // speech, but never dropped unheard: they are read again like the other suspects, and
+        // what the second reading says stands (a word really spoken is heard again).
+        let mut spread = vec![false; words.len()];
+        for i in crate::failure_kinds::spread_repeat_indices(&words, 4, 10.0, 5) {
+            spread[i] = true;
+            suspect[i] = true;
+        }
         if !suspect.iter().any(|s| *s) {
             return Ok(words);
         }
@@ -492,6 +500,19 @@ impl Job<'_, '_> {
                 }
             };
             let clean = again.iter().all(|w| !broken(w));
+            // Words that were only suspected for coming back after silences: whatever a clean
+            // second reading of their window says replaces them, silence included.
+            let old_spread = old.iter().all(|w| {
+                words
+                    .iter()
+                    .position(|x| x.start == w.start && x.text == w.text)
+                    .is_some_and(|i| spread[i])
+            });
+            if clean && old_spread {
+                self.report.broken_reread_kept += 1;
+                out.extend(again);
+                continue;
+            }
             let old_hopeless = old
                 .iter()
                 .all(|w| broken(w) || w.confidence < HOPELESS_CONFIDENCE);
