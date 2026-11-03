@@ -57,6 +57,10 @@ fn main() {
         out["speaker_segments"] = json!(segs.len());
     }
     out["words"] = json!(transcript.as_ref().map(|t| t.words.len()));
+    if let Some(t) = &transcript {
+        let h = cm_ai::failure_kinds::health(&t.words, &t.language);
+        out["transcript_health"] = json!({"replacement_char": h.replacement_char, "foreign_script": h.foreign_script, "low_confidence": h.low_confidence, "broken_and_doubtful": h.broken_and_doubtful});
+    }
     out["speaker_engine_secs"] = json!(seg_secs);
     let (mut pauses_before, mut pauses_after) = (vec![], vec![]);
     if let Some((name, key, path, start)) = track {

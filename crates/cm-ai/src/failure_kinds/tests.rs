@@ -354,3 +354,16 @@ fn a_broken_stretch_is_read_again_and_a_clean_reading_replaces_it() {
     assert_eq!(texts, ["hello", "ok"], "{:?}", t.words);
     assert_eq!((report.broken_reread, report.broken_reread_kept), (1, 1));
 }
+
+/// An old transcript with broken characters still shows none of them in its captions.
+#[test]
+fn captions_never_show_stray_characters() {
+    let words = vec![
+        w("\u{FFFD}\u{FFFD}", 0.0, 0.5),
+        w("c\u{FFFD}n", 0.6, 0.5),
+        w("tho\u{200B}ught", 1.0, 0.9),
+    ];
+    let lines = crate::caption::build_captions(&words);
+    let text: String = lines.iter().map(|l| l.text.clone()).collect::<Vec<_>>().join(" ");
+    assert_eq!(text, "cn thought");
+}
