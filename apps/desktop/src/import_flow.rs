@@ -381,6 +381,25 @@ impl Sheet {
     }
 }
 
+/// What a key does in the open sheet (the footer shows the Enter key on the Import button).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SheetKey {
+    Close,
+    Import,
+}
+
+impl Sheet {
+    /// Esc closes the sheet (also while it is busy: nothing has started). Enter imports when the
+    /// button would work; with the button dimmed it does nothing. Other keys are not the sheet's.
+    pub fn key(&self, key: &str) -> Option<SheetKey> {
+        match key {
+            "escape" => Some(SheetKey::Close),
+            "enter" if self.can_import() => Some(SheetKey::Import),
+            _ => None,
+        }
+    }
+}
+
 /// Everything the import UI keeps in the app model.
 #[derive(Debug, Clone, Default)]
 pub struct ImportUi {
@@ -872,6 +891,23 @@ mod tests {
         s.remove(0);
         assert_eq!(s.importable(), 0);
         assert!(!s.can_import());
+    }
+
+    #[test]
+    fn escape_closes_and_enter_imports_only_when_the_button_works() {
+        let mut s = sheet();
+        assert_eq!(s.key("escape"), Some(SheetKey::Close));
+        assert_eq!(s.key("enter"), Some(SheetKey::Import));
+        assert_eq!(s.key("a"), None);
+        s.busy = true;
+        assert_eq!(s.key("enter"), None, "a check or start is running");
+        assert_eq!(s.key("escape"), Some(SheetKey::Close));
+        s.busy = false;
+        s.free_bytes = Some(10);
+        assert_eq!(s.key("enter"), None, "the disk is too small");
+        let empty = Sheet::default();
+        assert_eq!(empty.key("enter"), None);
+        assert_eq!(empty.key("escape"), Some(SheetKey::Close));
     }
 
     #[test]

@@ -4,8 +4,8 @@
 
 use cm_i18n::{tr, tr_ctx};
 use gpui::{
-    div, prelude::*, px, AnyElement, Context, Entity, FontWeight, Render, Role, SharedString,
-    Subscription, Window,
+    div, prelude::*, px, AnyElement, Context, Entity, FocusHandle, FontWeight, KeyDownEvent,
+    Render, Role, SharedString, Subscription, Window,
 };
 
 use crate::import_flow::{self as f, Kind, Row, Status};
@@ -24,6 +24,10 @@ pub struct ImportSheetView {
     app: Entity<AppModel>,
     fields: Vec<Entity<TextField>>,
     seen_epoch: u64,
+    /// Takes the keys (Esc, Enter) while the sheet is open.
+    focus: FocusHandle,
+    /// Whether the focus was moved to the sheet since it opened.
+    focused: bool,
     observe: Subscription,
     field_subs: Vec<Subscription>,
 }
@@ -35,6 +39,8 @@ impl ImportSheetView {
             app,
             fields: Vec::new(),
             seen_epoch: u64::MAX,
+            focus: cx.focus_handle(),
+            focused: false,
             observe,
             field_subs: Vec::new(),
         }
@@ -67,8 +73,8 @@ impl ImportSheetView {
                 t.set_text(title, cx);
                 t
             });
-            let sub = cx.subscribe(&field, move |this, _, ev: &TextFieldEvent, cx| {
-                if let TextFieldEvent::Changed(text) = ev {
+            let sub = cx.subscribe(&field, move |this, _, ev: &TextFieldEvent, cx| match ev {
+                TextFieldEvent::Changed(text) => {
                     let text = text.clone();
                     this.app.update(cx, |m, _| {
                         if let Some(s) = m.import.sheet.as_mut() {
@@ -76,6 +82,8 @@ impl ImportSheetView {
                         }
                     });
                 }
+                TextFieldEvent::Submitted => act::start(&this.app, cx),
+                TextFieldEvent::Escaped => act::close_sheet(&this.app, cx),
             });
             self.field_subs.push(sub);
             self.fields.push(field);
@@ -201,12 +209,18 @@ fn after_row(
 }
 
 impl Render for ImportSheetView {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = cx.global::<ThemeGlobal>().0;
         self.sync_fields(cx);
         let Some(sheet) = self.app.read(cx).import.sheet.clone() else {
+            self.focused = false;
             return div().into_any_element();
         };
+        // The keys work as soon as the sheet opens, without a click.
+        if !self.focused {
+            self.focused = true;
+            window.focus(&self.focus, cx);
+        }
         let app = self.app.clone();
 
         let rows: Vec<AnyElement> = sheet
@@ -578,8 +592,18 @@ impl Render for ImportSheetView {
                         }
                     }),
             );
+        let key_app = app.clone();
         div()
             .id("import-scrim")
+            .track_focus(&self.focus)
+            .on_key_down(move |ev: &KeyDownEvent, _, cx| {
+                let sheet = key_app.read(cx).import.sheet.clone();
+                match sheet.and_then(|s| s.key(&ev.keystroke.key)) {
+                    Some(f::SheetKey::Close) => act::close_sheet(&key_app, cx),
+                    Some(f::SheetKey::Import) => act::start(&key_app, cx),
+                    None => {}
+                }
+            })
             .absolute()
             .top_0()
             .left_0()

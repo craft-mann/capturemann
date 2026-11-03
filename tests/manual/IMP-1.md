@@ -44,7 +44,7 @@ For the protected file use an iTunes-style `.m4v` you own (FairPlay). Without on
 5. **After import.** Transcribe is off by default; turning it on shows nothing else. Find speakers is dimmed
    with "Needs the speaker model" when the speaker models are missing. The **Remove the originals after
    importing** box is unchecked, with the hint "... Frees N GB".
-6. **Import (copy).** Tick nothing, press **Import N files** (the Enter key and Esc do not work in the sheet yet: a known gap). Expected: the sheet closes; a toast
+6. **Import (copy).** Tick nothing, press **Import N files** (Enter does the same when the button is enabled, also while typing a title; Esc closes the sheet). Expected: the sheet closes; a toast
    "Importing N files" with a progress bar and **Cancel** stays while it runs; cards appear above the grid with
    the "Imported" badge and a strip (Copying into the library, Preparing for editing for the MKV and the MOV,
    Reading the sound, Checking the copy) with a percentage; then the captures are in the grid with the
@@ -92,7 +92,7 @@ For the protected file use an iTunes-style `.m4v` you own (FairPlay). Without on
     again: the job resumes, no duplicate capture.
 18. **Language.** Switch to Tiếng Việt in Settings: the sheet, chips, toast and cards read in Vietnamese
     (drafts, marked fuzzy in `locales/vi.po`); with `CAPTUREMANN_PSEUDO_LOCALE=1` nothing is cut off.
-19. **Light theme** and **keyboard**: Tab reaches every control of the sheet; VoiceOver reads the chips and the checkbox
-    (Esc and Enter are not wired yet: note whether that is acceptable).
+19. **Light theme** and **keyboard**: Tab reaches every control of the sheet; VoiceOver reads the chips and the checkbox; Esc closes the sheet on opening without a click, and Enter
+    does nothing while the button is dimmed.
 
 Report in `verification/` (template in its README). Delete the scratch files and anything imported.
