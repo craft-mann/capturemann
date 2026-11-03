@@ -258,6 +258,42 @@ impl TranscribeService for RealTranscribe {
             Err(e) => Err(e),
         }
     }
+
+    fn live_step(
+        &self,
+        req: &crate::ai::LiveRequest,
+        run: &mut Option<cm_ai::recording::live::LiveRun>,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<usize, CmError> {
+        let prompt = cm_ai::glossary::initial_prompt(&req.glossary);
+        let (id, path) = store(&self.root).resolve(Some(&req.model))?;
+        if run.is_none() {
+            *run = cm_ai::recording::live::LiveRun::open(
+                &req.bundle_dir,
+                &id,
+                req.language.as_deref(),
+                prompt.as_deref(),
+                false,
+            );
+        }
+        let Some(r) = run.as_mut() else {
+            return Ok(0);
+        };
+        let whisper;
+        let engine: &dyn Transcriber = match &self.engine {
+            Some(e) => e.as_ref(),
+            None => {
+                // A background job beside a recording: two threads, so the recorder's audio path
+                // is never starved (the GPU does the work).
+                whisper = WhisperTranscriber::load(&path, &id, true)?.with_threads(2);
+                &whisper
+            }
+        };
+        match r.step(engine, progress) {
+            Err(e) if is_cancelled(&e) => Ok(0),
+            other => other,
+        }
+    }
 }
 
 /// Caption translation (AI-5). Only the Whisper engine exists here: the text model is the AI-7

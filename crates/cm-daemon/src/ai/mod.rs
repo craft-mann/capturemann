@@ -171,6 +171,7 @@ mod actions;
 mod captions;
 mod dispatch;
 mod jobs;
+mod live;
 mod models;
 mod reports;
 mod services;
@@ -184,6 +185,9 @@ mod translation;
 
 pub use self::actions::*;
 pub use self::jobs::*;
+pub use self::live::{
+    live_transcribe_enabled, SETTING_LIVE_POLL_MS, SETTING_TRANSCRIBE_WHILE_RECORDING,
+};
 pub use self::reports::{ReportFormat, JOB_REPORT, MAX_REPORT_MARKDOWN_CHARS};
 pub use self::services::*;
 pub use self::translation::*;

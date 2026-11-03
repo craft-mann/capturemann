@@ -40,6 +40,29 @@ pub fn captions_with_sounds(words: &[Word], sounds: &[Sound]) -> Vec<CaptionLine
     lines
 }
 
+/// `lines` with a bracketed line added for each sound that no existing line already covers (at
+/// least half of its span): for the export of lines that were edited, which have no sound entries
+/// of their own. Sorted by start.
+pub fn add_sound_lines(lines: &[CaptionLine], sounds: &[Sound]) -> Vec<CaptionLine> {
+    let mut out = lines.to_vec();
+    for s in sounds {
+        let span = (s.end - s.start).ticks().max(1);
+        let covered: i64 = lines
+            .iter()
+            .map(|l| (l.end.min(s.end) - l.start.max(s.start)).ticks().max(0))
+            .sum();
+        if covered * 2 < span {
+            out.push(CaptionLine {
+                start: s.start,
+                end: s.end.max(s.start),
+                text: s.kind.label().to_owned(),
+            });
+        }
+    }
+    out.sort_by_key(|l| l.start);
+    out
+}
+
 /// The text of `words` for anything that is not an export (search, reports, translation): the
 /// words only.
 pub fn words_text(words: &[Word]) -> String {
@@ -104,6 +127,22 @@ mod tests {
         let lines = captions_with_sounds(&words, &sounds);
         let texts: Vec<&str> = lines.iter().map(|l| l.text.as_str()).collect();
         assert_eq!(texts, ["hello", "[unclear]", "[noise]", "again"]);
+    }
+
+    #[test]
+    fn edited_lines_get_sound_lines_only_where_they_say_nothing() {
+        let lines = [CaptionLine {
+            start: media_secs(0.0),
+            end: media_secs(6.0),
+            text: "hello there".into(),
+        }];
+        let sounds = [
+            sound(SoundKind::Noise, 1.0, 5.0),
+            sound(SoundKind::Unclear, 10.0, 14.0),
+        ];
+        let out = add_sound_lines(&lines, &sounds);
+        let texts: Vec<&str> = out.iter().map(|l| l.text.as_str()).collect();
+        assert_eq!(texts, ["hello there", "[unclear]"]);
     }
 
     #[test]

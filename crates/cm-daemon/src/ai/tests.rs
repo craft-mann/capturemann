@@ -230,3 +230,45 @@ fn model_choice_prefers_the_active_one_and_says_no_model() {
     let e = Inner::pick_model(&none, Some("base")).unwrap_err();
     assert!(matches!(&e, DaemonError::WithData { data, .. } if data["reason"] == "no_model"));
 }
+
+/// M2i: after a speaker run, a `[noise]` sound the engine heard speech in becomes `[unclear]` in
+/// `transcript.json`; one it did not stays; a transcript without sounds is not rewritten.
+#[test]
+fn m2i_upgrade_sounds_makes_heard_noise_unclear() {
+    use cm_ai::transcribe::{media_secs, Sound, SoundKind, Transcript};
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("manifest.json"),
+        json!({
+            "schema": 1, "id": "rec_s", "title": "s", "created": "2026-11-03T10:00:00Z",
+            "tick_rate": 120000, "tracks": {}, "edits": [], "revisions": [], "gaps": [],
+            "speakers": [{"id": 1, "name": "Speaker 1"}],
+            "speaker_segments": [{"start": media_secs(10.0).ticks(), "end": media_secs(14.0).ticks(), "speaker": 1}],
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let sound = |a: f64, b: f64| Sound {
+        kind: SoundKind::Noise,
+        start: media_secs(a),
+        end: media_secs(b),
+    };
+    let t = Transcript {
+        version: 1,
+        language: "en".into(),
+        model: "m".into(),
+        words: Vec::new(),
+        note: None,
+        sounds: vec![sound(11.0, 13.0), sound(30.0, 33.0)],
+    };
+    std::fs::write(
+        dir.path().join(TRANSCRIPT_FILE),
+        serde_json::to_vec(&t).unwrap(),
+    )
+    .unwrap();
+    transcripts::upgrade_sounds(dir.path());
+    let back: Transcript =
+        serde_json::from_slice(&std::fs::read(dir.path().join(TRANSCRIPT_FILE)).unwrap()).unwrap();
+    assert_eq!(back.sounds[0].kind, SoundKind::Unclear);
+    assert_eq!(back.sounds[1].kind, SoundKind::Noise);
+}
