@@ -188,8 +188,22 @@ fn main() {
             p
         },
     });
+    // --gate [--vad-opinion <silero model>]: the hallucination gate, with the voice-activity model
+    // as the second opinion when given. Quiet input is lifted by the --gain-only step above.
+    let opinion = option(&args, "--vad-opinion")
+        .map(|m| cm_ai::silero::SileroVad::load(std::path::Path::new(&m)).unwrap());
+    let configured = cm_ai::pipeline::Configured {
+        inner: &counting,
+        vad: opinion.as_ref(),
+        gate: args
+            .iter()
+            .any(|a| a == "--gate")
+            .then(cm_ai::pieces::gate::GateConfig::default),
+        normalize: None,
+    };
     let engine: &dyn Transcriber = match &vad_first {
         Some(w) => w,
+        None if configured.gate.is_some() => &configured,
         None => &counting,
     };
     let (tr, report) = transcribe_pieces(
