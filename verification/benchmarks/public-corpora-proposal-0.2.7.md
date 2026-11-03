@@ -1,0 +1,15 @@
+# Public corpora proposed for the 0.2.7 benchmarks (nothing downloaded yet)
+
+Written Nov 3, 2026 by the `mac-ai` agent. **Nothing in this list has been downloaded.** Each item says what would be fetched, from where, under which licence (as published; to be checked at the source before use), how big it is, and how it would be used. Audio stays outside the repository; only numbers and clip ids go into `verification/benchmarks/`. `tests/tools/concat_utterances.py` joins utterances into 3 to 5 minute clips with a reference text and a `speech.json`; `crates/cm-ai/examples/asr_bench.rs --language vi|en` measures WER and RTF.
+
+| Purpose | Corpus | What exactly | Licence (published) | Size | Notes |
+|---|---|---|---|---|---|
+| Vietnamese WER, turbo vs PhoWhisper (M2e) | Common Voice, Vietnamese, latest release (mozilla Data Collective) | the `test` split `clips/` plus `test.tsv`, the first ~300 validated clips for a ~40 minute set (a tuning set of ~20 minutes and a held-out of ~20) | CC0 | the Vietnamese release is a few hundred MB; the first 300 clips are tens of MB | download needs an account on the Mozilla Data Collective; short read sentences, many speakers, noisy microphones: closer to real input than studio data, far from a meeting |
+| Vietnamese WER, second source | FLEURS `vi_vn` test split (google/fleurs on Hugging Face) | `test.tsv` and `test/*.wav` for ~200 utterances | CC BY 4.0 | about 150 MB for the split | read Wikipedia sentences, clean; attribution needed in the report |
+| Vietnamese, local only | VIVOS (AILAB, HCMUS) | `test` folder (about 760 utterances, ~45 min) with `prompts.txt` | CC BY-NC-SA 4.0 (non-commercial, share-alike): **local benchmark only, never committed or redistributed** | about 150 MB | per the maintainer's decision; the report quotes numbers only |
+| English WER with real speech | LibriSpeech `test-clean` | 4 clips of ~4 minutes from `test-clean`, concatenated by utterance | CC BY 4.0 | the split is 346 MB; only a few speaker folders are needed | read audiobooks; clean |
+| English conversation WER | PriMock57 (existing `tests/tools/make_reference_clips.py primock`) | the 6 clips of the 2026-10-29 report | CC BY 4.0 per the Hugging Face mirror (the GitHub repo has no LICENSE) | already scripted | doctor-patient consultations, hand-timed utterances |
+| Speaker detection, 3+ speakers (M2b) | AMI headset mix, test split (existing script `ami`) | 8 tuning plus 6 held-out clips of the 2026-10-29 report | CC BY 4.0 (dataset card states none; not checked at the source) | already scripted | the only public 3 to 4 speaker meetings in the earlier report; more clips would make the retune less fragile |
+| PhoWhisper conversion test (M2e) | `vinai/PhoWhisper-small` checkpoint | about 1 GB of weights, once, to test `packaging/phowhisper/convert.sh` | BSD-3-Clause (model card) | ~1 GB, plus ~1 GB of Python packages | **not downloaded this week**; the script is untested until it is run |
+
+To approve: say which rows to fetch. The Vietnamese rows need either the maintainer's Mozilla Data Collective login or the FLEURS row alone.
