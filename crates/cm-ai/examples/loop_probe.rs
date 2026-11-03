@@ -15,6 +15,10 @@ use cm_ai::failure_kinds::sentence_runs;
 use cm_ai::recording::read_transcript;
 use serde_json::json;
 
+fn value_of_args(args: &[String], flag: &str) -> Option<String> {
+    args.iter().position(|a| a == flag).and_then(|i| args.get(i + 1)).cloned()
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let bundle = Path::new(args.first().expect("<bundle>"));
@@ -32,6 +36,48 @@ fn main() {
             .and_then(|i| args.get(i + 1))
             .cloned()
     };
+    // --windows <ggml> --model-id <id> [--pad 40]: read the audio around each looped run of the
+    // stored transcript on its own with the plain decoder (no repair, no pieces) and print how
+    // many looped runs each reading has. Whisper's parameters come from CM_EXP when the build has
+    // that measurement hook; this binary does not ship.
+    if let (Some(model), Some(id)) = (value_of_args(&args, "--windows"), value_of_args(&args, "--model-id")) {
+        let pad: f64 = value_of_args(&args, "--pad").and_then(|v| v.parse().ok()).unwrap_or(40.0);
+        let stored = read_transcript(bundle).unwrap().expect("a transcript");
+        let engine = cm_ai::whisper::WhisperTranscriber::load(Path::new(&model), &id, true).unwrap();
+        let name = {
+            let m = cm_library::rec::read_manifest(bundle).unwrap();
+            m.tracks
+                .get("mic")
+                .and_then(|t| t.get("denoised_file").or_else(|| t.get("file")))
+                .and_then(|v| v.as_str())
+                .unwrap()
+                .to_owned()
+        };
+        let audio = decode_16k_mono(&bundle.join(name)).unwrap();
+        let sec = |m: cm_core::MediaTime| m.ticks() as f64 / cm_core::TICKS_PER_SECOND as f64;
+        let mut rows = Vec::new();
+        for r in sentence_runs(&stored.words, 3) {
+            let (a, b) = (sec(stored.words[r.first].start), sec(stored.words[r.end - 1].end));
+            let (from, to) = ((a - pad).max(0.0), b + pad);
+            let (sa, sb) = ((from * 16_000.0) as usize, ((to * 16_000.0) as usize).min(audio.len()));
+            let out = cm_ai::transcribe::Transcriber::transcribe(
+                &engine,
+                cm_ai::transcribe::Pcm16k { samples: &audio[sa..sb], start: cm_core::MediaTime::ZERO },
+                Some("vi"),
+                &mut |_| true,
+            )
+            .unwrap();
+            let runs = sentence_runs(&out.words, 3);
+            rows.push(json!({
+                "at_s": a.round(), "stored_words": r.end - r.first,
+                "window_words": out.words.len(), "window_runs": runs.len(),
+                "window_words_in_runs": runs.iter().map(|x| x.end - x.first).sum::<usize>(),
+                "dense_words": cm_ai::failure_kinds::dense_unit_indices(&out.words, 5, 60.0).len(),
+            }));
+        }
+        println!("{}", json!({ "windows": rows }));
+        return;
+    }
     let t = if let (Some(model), Some(id)) = (value_of("--transcribe"), value_of("--model-id")) {
         let engine =
             cm_ai::whisper::WhisperTranscriber::load(Path::new(&model), &id, true).unwrap();
