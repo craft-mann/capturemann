@@ -739,6 +739,11 @@ impl ModelTranslator<'_> {
     }
 }
 
+/// Whether `e` is the text model's `output_too_long` failure (a reply that reached the limit).
+fn is_output_too_long(e: &CmError) -> bool {
+    matches!(e, CmError::JobFailed { reason, .. } if reason.as_str() == "output_too_long")
+}
+
 /// What a text-model run produced.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextTranslation {
@@ -764,6 +769,8 @@ pub fn translate_with_text_model(
     let mut untranslated = 0;
     let mut from = 0;
     let total = source.len().max(1) as f32;
+    // Lines per request: BATCH_LINES, halved after a reply that reached the output limit.
+    let mut cap = BATCH_LINES;
     // The bar only moves forward and stays under 1.0 until the end; a call that streams moves it
     // inside its share (`from..to` lines) by the tokens received (about EXPECTED_TOKENS_PER_CALL
     // for half of the share).
@@ -796,7 +803,7 @@ pub fn translate_with_text_model(
         if !report(from as f32 / total, progress) {
             return Err(crate::transcribe::cancelled());
         }
-        let to = (from + BATCH_LINES).min(source.len());
+        let to = (from + cap).min(source.len());
         let req = TextTranslateRequest {
             source_language,
             target_language,
@@ -806,41 +813,72 @@ pub fn translate_with_text_model(
             keep_as_written,
         };
         // One try, and one retry when the count is wrong or a glossary term is lost (AI-5.AC4).
-        let share = (
-            from as f32 / total,
-            (from + BATCH_LINES).min(source.len()) as f32 / total,
-        );
-        let mut answer = call!(req, share)?;
-        let mut checked = enforce_batch(req.lines, answer, keep_as_written);
-        if checked.is_none()
-            || checked
-                .as_ref()
-                .is_some_and(|c| c.iter().any(Option::is_none))
-        {
-            answer = call!(req, share)?;
-            checked = enforce_batch(req.lines, answer, keep_as_written);
-        }
-        // A model that keeps merging or splitting lines gets the batch one line at a time
-        // (with its neighbours as context) instead of leaving the whole batch in the source
-        // language: in a 168-line test two such batches left 40 lines untranslated.
-        if checked.is_none() && to - from > 1 {
-            let mut singles: Vec<Option<String>> = Vec::with_capacity(to - from);
-            for i in from..to {
-                let one = TextTranslateRequest {
-                    source_language,
-                    target_language,
-                    lines: &texts[i..=i],
-                    before: &texts[i.saturating_sub(CONTEXT_LINES)..i],
-                    after: &texts[i + 1..(i + 1 + CONTEXT_LINES).min(source.len())],
-                    keep_as_written,
+        let share = (from as f32 / total, to as f32 / total);
+        // `Err(())`: a reply reached the output limit (`output_too_long`). The batch is then cut in
+        // half and tried again from the same line; what was translated before is kept.
+        let attempt: Result<Option<Vec<Option<String>>>, ()> = 'batch: {
+            let mut answer = match call!(req, share) {
+                Ok(a) => a,
+                Err(e) if is_output_too_long(&e) => break 'batch Err(()),
+                Err(e) => return Err(e),
+            };
+            let mut checked = enforce_batch(req.lines, answer, keep_as_written);
+            if checked.is_none()
+                || checked
+                    .as_ref()
+                    .is_some_and(|c| c.iter().any(Option::is_none))
+            {
+                answer = match call!(req, share) {
+                    Ok(a) => a,
+                    Err(e) if is_output_too_long(&e) => break 'batch Err(()),
+                    Err(e) => return Err(e),
                 };
-                let got = call!(one, (i as f32 / total, (i + 1) as f32 / total))?;
-                singles.push(
-                    enforce_batch(one.lines, got, keep_as_written).and_then(|mut v| v.remove(0)),
-                );
+                checked = enforce_batch(req.lines, answer, keep_as_written);
             }
-            checked = Some(singles);
-        }
+            // A model that keeps merging or splitting lines gets the batch one line at a time
+            // (with its neighbours as context) instead of leaving the whole batch in the source
+            // language: in a 168-line test two such batches left 40 lines untranslated.
+            if checked.is_none() && to - from > 1 {
+                let mut singles: Vec<Option<String>> = Vec::with_capacity(to - from);
+                for i in from..to {
+                    let one = TextTranslateRequest {
+                        source_language,
+                        target_language,
+                        lines: &texts[i..=i],
+                        before: &texts[i.saturating_sub(CONTEXT_LINES)..i],
+                        after: &texts[i + 1..(i + 1 + CONTEXT_LINES).min(source.len())],
+                        keep_as_written,
+                    };
+                    let got = match call!(one, (i as f32 / total, (i + 1) as f32 / total)) {
+                        Ok(g) => g,
+                        // One line that cannot be written within the limit stays untranslated.
+                        Err(e) if is_output_too_long(&e) => {
+                            singles.push(None);
+                            continue;
+                        }
+                        Err(e) => return Err(e),
+                    };
+                    singles.push(
+                        enforce_batch(one.lines, got, keep_as_written)
+                            .and_then(|mut v| v.remove(0)),
+                    );
+                }
+                checked = Some(singles);
+            }
+            Ok(checked)
+        };
+        let checked = match attempt {
+            Ok(c) => {
+                cap = (cap * 2).min(BATCH_LINES);
+                c
+            }
+            Err(()) if to - from > 1 => {
+                cap = ((to - from) / 2).max(1);
+                continue;
+            }
+            // A single line whose translation does not fit the limit: left as it is, flagged.
+            Err(()) => Some(vec![None]),
+        };
         let ok = checked.is_some();
         let answer: Vec<Option<String>> = checked.unwrap_or_default();
         for (k, line) in source[from..to].iter().enumerate() {
@@ -1734,5 +1772,51 @@ mod tests {
             .lines
             .iter()
             .all(|l| l.source.as_deref() == Some("short")));
+    }
+
+    /// M2c: a reply that reaches the output limit halves the batch instead of ending the job; what
+    /// was translated before stays; a line that cannot be written within the limit is left in the
+    /// source language and flagged.
+    #[test]
+    fn output_too_long_halves_the_batch_and_keeps_the_work() {
+        struct Limited(Mutex<Vec<usize>>);
+        impl TextTranslator for Limited {
+            fn model_name(&self) -> String {
+                "limited".into()
+            }
+            fn translate(&self, req: &TextTranslateRequest<'_>) -> Result<Vec<String>, CmError> {
+                self.0.lock().unwrap().push(req.lines.len());
+                // More than 4 lines at once, or the one impossible line, reach the limit.
+                if req.lines.len() > 4 || req.lines.iter().any(|l| l == "impossible") {
+                    return Err(CmError::job_failed("j", "output_too_long"));
+                }
+                Ok(req.lines.iter().map(|l| format!("tr {l}")).collect())
+            }
+        }
+        let src: Vec<CaptionLine> = (0..27)
+            .map(|i| {
+                let text = if i == 13 {
+                    "impossible".to_owned()
+                } else {
+                    format!("line {i}")
+                };
+                cap(f64::from(i) * 2.0, f64::from(i) * 2.0 + 1.5, &text)
+            })
+            .collect();
+        let tr = Limited(Mutex::new(Vec::new()));
+        let out = translate_with_text_model(&tr, &src, "en", "es", &[], &mut |_| true).unwrap();
+        assert_eq!(out.untranslated, 1, "only the impossible line");
+        assert_eq!(out.lines.len(), 27);
+        let bad: Vec<&TranslationLine> = out.lines.iter().filter(|l| l.untranslated).collect();
+        assert_eq!(bad.len(), 1);
+        assert_eq!(bad[0].text, "impossible");
+        assert!(out
+            .lines
+            .iter()
+            .filter(|l| !l.untranslated)
+            .all(|l| l.text.starts_with("tr line ")));
+        // It halved 20 -> 10 -> 5 -> 2 or 3, never asking for more than the limit after that.
+        let sizes = tr.0.lock().unwrap().clone();
+        assert_eq!(&sizes[..3], &[20, 10, 5], "{sizes:?}");
     }
 }

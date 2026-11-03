@@ -163,6 +163,15 @@ fn main() {
             } else {
                 d
             };
+            // --whole: never in windows (the 0.2.6 way), whatever the length.
+            let d = if args.iter().any(|a| a == "--whole") {
+                d.with_tuning(cm_ai::speaker_engine::Tuning {
+                    long_secs: f64::MAX,
+                    ..cm_ai::speaker_engine::Tuning::default()
+                })
+            } else {
+                d
+            };
             // --window-secs N [--link X]: cut the audio into windows of N seconds whatever its
             // length (M2b measurements); --turns-out <file> writes `start duration speaker` lines.
             let d = match option(&args, "--window-secs").and_then(|s| s.parse::<f64>().ok()) {
