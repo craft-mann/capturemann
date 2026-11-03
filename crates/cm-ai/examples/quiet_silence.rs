@@ -174,7 +174,7 @@ fn main() {
                     "measured_speech_db": db(rms_over(track, &speech)),
                     "floor_p10_db": sorted[sorted.len() / 10], "median_db": sorted[sorted.len() / 2],
                     "speech_secs": total_speech, "suggestions": cuts.len(), "suggested_secs": cut_secs,
-                    "inside_speech": inside, "speech_secs_inside_suggestions": inside_secs,
+                    "inside_speech": inside, "at_clip_edges": cuts.iter().filter(|c| secs(c.start) < 0.6 || secs(c.end) > track.len() as f64 / 16_000.0 - 0.6).count(), "speech_secs_inside_suggestions": inside_secs,
                     "wanted_pauses": wanted.len(), "wanted_found": found,
                 })
             );

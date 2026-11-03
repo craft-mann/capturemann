@@ -14,6 +14,8 @@
 //! cuts the pause down to `keep_s` ([`DEFAULT_KEEP_S`], 0.4 s) of breathing room: half of it is
 //! kept on each side, so the cut never starts or ends on a word.
 //!
+//! A silence that touches the start or the end of the track is not suggested (lead-in and tail).
+//!
 //! Pauses that straddle a recording pause (the media files are compacted at a pause) are split at
 //! the join and judged on each side, and every time is mapped to session time through the
 //! track's start and the pause gaps.
@@ -272,6 +274,12 @@ pub fn silence_cuts(
     let keep = ticks_of(f64::from(opts.keep_s));
     let mut out = Vec::new();
     for (a, b) in runs {
+        // A silence that starts with the track or runs to its end is not a pause between speech
+        // (it is the lead-in or tail of the clip, which trimming handles), and on a clip of a few
+        // seconds it would be most of what is suggested.
+        if a == 0 || b == levels.len() {
+            continue;
+        }
         let (fa, fb) = (a as i64 * frame_ticks, b as i64 * frame_ticks);
         // Split at the joins strictly inside the run.
         let mut cuts_at: Vec<i64> = vec![fa];

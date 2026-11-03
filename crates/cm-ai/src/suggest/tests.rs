@@ -905,13 +905,26 @@ fn m2g_quiet_speech_is_not_cut_raw_or_denoised() {
 /// change was made against (`adaptive: false` keeps that rule for callers who set a level).
 #[test]
 fn m2g_the_fixed_rule_cuts_quiet_speech() {
-    let x = quiet_speech(30.0, &QUIET_SPANS, -45.0, -60.0);
+    // A loud second at each end keeps the quiet recording's silences off the clip edges.
+    let mut x = quiet_speech(1.0, &[(0.0, 1.0)], -10.0, -60.0);
+    let body_at = x.len();
+    x.extend(quiet_speech(30.0, &QUIET_SPANS, -45.0, -60.0));
+    x.extend(quiet_speech(1.0, &[(0.0, 1.0)], -10.0, -60.0));
+    let spans: Vec<(f64, f64)> = QUIET_SPANS
+        .iter()
+        .map(|&(a, b)| {
+            (
+                a + body_at as f64 / f64::from(RATE),
+                b + body_at as f64 / f64::from(RATE),
+            )
+        })
+        .collect();
     let opts = SilenceOptions {
         adaptive: false,
         ..SilenceOptions::default()
     };
     let cuts = silence_cuts(&x, RATE, MediaTime::ZERO, &[], &opts).unwrap();
-    assert!(inside_speech(&cuts, &QUIET_SPANS) > 10.0, "{cuts:#?}");
+    assert!(inside_speech(&cuts, &spans) > 10.0, "{cuts:#?}");
 }
 
 /// A loud recording is judged as before: the threshold follows its own speech level, and the pauses
@@ -991,4 +1004,19 @@ fn m2g_activity_on_the_noise_reduced_copy_vetoes_a_pause() {
         kept.is_empty() || kept.iter().all(|c| secs(c.end) - secs(c.start) < 1.0),
         "{kept:#?}"
     );
+}
+
+/// Short clips: a silence before the first word or after the last one is not a pause to cut.
+#[test]
+fn m2g_lead_in_and_tail_silence_are_not_suggested() {
+    let a = audio(&[
+        Part::Quiet(2.0),
+        Part::Tone(2.0, 0.3),
+        Part::Quiet(2.0),
+        Part::Tone(2.0, 0.3),
+        Part::Quiet(3.0),
+    ]);
+    let cuts = silence_cuts(&a, RATE, MediaTime::ZERO, &[], &SilenceOptions::default()).unwrap();
+    assert_eq!(cuts.len(), 1, "{cuts:#?}");
+    assert!((secs(cuts[0].start) - 4.2).abs() < 0.1);
 }
