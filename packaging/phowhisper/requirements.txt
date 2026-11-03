@@ -1,7 +1,7 @@
 # Python packages for convert.sh (installed into $WORK/venv). The pins are the versions the
 # whisper.cpp converter was written against in 2026; the script has not been run on this machine
 # yet (see README), so change a pin only together with a successful run.
-torch==2.9.1
+torch==2.13.0
 transformers==4.57.3
 numpy==2.2.6
 huggingface_hub==0.36.0
