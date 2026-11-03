@@ -278,6 +278,25 @@ fn mid_sentence_capitals(text: &str) -> Vec<String> {
     out
 }
 
+/// Strings shorter than this are headings and labels ("Staffing", "Cost and Timeline"), not
+/// sentences, so a capital there is not read as a name.
+const MIN_SENTENCE_WORDS: usize = 4;
+
+/// Whether `t` reads as a sentence: long enough, and not Title Case (a heading such as "Billing Page
+/// Timeline" capitalises most of its words, a sentence with a name capitalises one or two).
+fn is_sentence(t: &str) -> bool {
+    let words: Vec<&str> = t.split_whitespace().collect();
+    if words.len() < MIN_SENTENCE_WORDS {
+        return false;
+    }
+    let long: Vec<&&str> = words.iter().filter(|w| w.chars().count() > 3).collect();
+    let capital = long
+        .iter()
+        .filter(|w| w.chars().next().is_some_and(char::is_uppercase))
+        .count();
+    long.len() < 4 || capital * 10 < long.len() * 6
+}
+
 /// Scores `content` (the stored `{ section: [item] }` of a report) against the transcript
 /// `lines`. `speakers` are the speaker names given to the report (also read from the lines);
 /// `attendees` the names the user typed.
@@ -369,7 +388,7 @@ pub fn score(
         .map(norm)
         .collect();
     let mut bad: Vec<String> = Vec::new();
-    for t in &texts {
+    for t in texts.iter().filter(|t| is_sentence(t)) {
         for w in mid_sentence_capitals(t) {
             let key = norm(&w);
             if !transcript_words.contains(&key)

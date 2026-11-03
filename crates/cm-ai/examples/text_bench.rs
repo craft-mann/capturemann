@@ -114,6 +114,30 @@ fn main() {
             text: v["text"].as_str().unwrap().to_owned(),
         })
         .collect();
+    // Score a stored report again without running a model (after the rubric changed).
+    if let Some(path) = option(&args, "--rescore") {
+        let template =
+            report::find_template(&option(&args, "--template").unwrap_or("summary".into()))
+                .expect("template");
+        let content: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        let mut speakers: Vec<String> = Vec::new();
+        for l in &lines {
+            if let Some(s) = &l.speaker {
+                if !speakers.contains(s) {
+                    speakers.push(s.clone());
+                }
+            }
+        }
+        let s = rubric::score(template, &content, &lines, &speakers, &[]);
+        println!("{}", s.summary());
+        println!(
+            "invented names {:?}, invented numbers {:?}, floor_ok {}",
+            s.invented_names,
+            s.invented_numbers,
+            s.floor_ok()
+        );
+        return;
+    }
     let model_path = PathBuf::from(option(&args, "--model").expect("--model <gguf>"));
     let model_id = option(&args, "--model-id").expect("--model-id");
     let ctx: u32 = option(&args, "--ctx")
