@@ -192,7 +192,7 @@ mod tests {
                 .lock()
                 .unwrap()
                 .push(levels::db(levels::rms_over(audio.samples, &[])));
-            Ok(ScriptedTranscriber::new(Vec::new()).transcribe(audio, None, &mut |_| true)?)
+            ScriptedTranscriber::new(Vec::new()).transcribe(audio, None, &mut |_| true)
         }
     }
 
