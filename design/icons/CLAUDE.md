@@ -47,7 +47,7 @@ capturemann-icons/
 2. **P2 (99 rows):** a leading icon on text buttons (Export, Publish, Reveal, Copy link, Retry, Delete…). Add them screen by screen, and keep every label.
 3. **keep (30 rows):** already correct. Don't touch.
 4. **text only (9 rows):** deliberately no icon (see §6).
-5. **planned (8 rows):** icons are ready for controls that aren't built yet (Auto-redact, audio mix, loop, frame step, timeline Fit, export preset/Cancel/Retry/Copy path, library rescan).
+5. **planned (19 rows):** icons are ready for controls that aren't built yet (Auto-redact, audio mix, loop, frame step, timeline Fit, export preset/Cancel/Retry/Copy path, library rescan).
 
 ## 5. Fixes the inventory revealed (do these in P1)
 
