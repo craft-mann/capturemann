@@ -158,8 +158,20 @@ fn main() {
         calls: Mutex::new(Vec::new()),
     };
     let began = Instant::now();
+    // --vad <ggml silero model>: read only the speech regions, each as a call of its own.
+    let vad = option(&args, "--vad")
+        .map(|m| cm_ai::silero::SileroVad::load(std::path::Path::new(&m)).unwrap());
+    let vad_first = vad.as_ref().map(|v| cm_ai::silero::VadFirst {
+        inner: &counting,
+        vad: v,
+        params: cm_ai::silero::VadParams::default(),
+    });
+    let engine: &dyn Transcriber = match &vad_first {
+        Some(w) => w,
+        None => &counting,
+    };
     let (tr, report) = transcribe_pieces(
-        &counting,
+        engine,
         Pcm16k {
             samples: &samples,
             start: MediaTime::ZERO,
