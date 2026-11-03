@@ -31,6 +31,9 @@ AMI_TEST = (
     "resolve/main/data/test-{:05d}-of-00003.parquet"
 )
 MIN_SECS, MAX_SECS = 180.0, 300.0
+# Set by --min-secs / --max-secs (the long clips of the 0.2.7 window check).
+BOUNDS = [MIN_SECS, MAX_SECS]
+SKIP = [0]
 
 
 def fetch(url: str, dest: Path) -> Path:
@@ -60,10 +63,11 @@ def textgrid_turns(path: Path, speaker: str):
     return out
 
 
-def window(turns, lo=MIN_SECS, hi=MAX_SECS):
+def window(turns, lo=None, hi=None):
     """The first stretch of `lo` to `hi` seconds that starts at a turn start and ends at a turn end.
 
     The longest one that fits is taken, so a clip holds as much conversation as allowed."""
+    lo, hi = lo or BOUNDS[0], hi or BOUNDS[1]
     turns = sorted(turns)
     # Skip the opening (the call being set up) when there is enough left after it.
     for first in turns[len(turns) // 10 :] + turns:
@@ -73,10 +77,11 @@ def window(turns, lo=MIN_SECS, hi=MAX_SECS):
     return None
 
 
-def balanced_window(turns, lo=MIN_SECS, hi=MAX_SECS, min_speakers=3):
+def balanced_window(turns, lo=None, hi=None, min_speakers=3):
     """The window of `lo` to `hi` seconds (turn start to turn end) in which the quietest speaker has
     the largest share of the speech, or None when fewer than `min_speakers` talk. Clips where one
     person talks nearly all the time say little about telling speakers apart."""
+    lo, hi = lo or BOUNDS[0], hi or BOUNDS[1]
     turns = sorted(turns)
     best = None
     for first in turns[:: max(1, len(turns) // 200)]:
@@ -125,9 +130,13 @@ def primock_ids():
 def primock(out: Path, count: int):
     cache = out / "cache"
     done = 0
+    skipped = 0
     for base in primock_ids():
         if done >= count:
             return
+        if skipped < SKIP[0]:
+            skipped += 1
+            continue
         try:
             turns = []
             for who in ("doctor", "patient"):
@@ -161,11 +170,15 @@ def ami(out: Path, count: int, balanced: bool = False):
         sys.exit("ami needs pyarrow: python3 -m venv v && v/bin/pip install pyarrow, then run with v/bin/python")
     cache = out / "cache"
     done = 0
+    skipped = 0
     for part in range(3):
         table = pq.read_table(fetch(AMI_TEST.format(part), cache / f"ami-test-{part}.parquet"))
         for row in table.to_pylist():
             if done >= count:
                 return
+            if skipped < SKIP[0]:
+                skipped += 1
+                continue
             turns = [
                 (a, b, s, clean(t))
                 for a, b, s, t in zip(
@@ -195,8 +208,13 @@ def main():
     p.add_argument("source", choices=["primock", "ami"])
     p.add_argument("--out", required=True, type=Path)
     p.add_argument("--count", type=int, default=3)
+    p.add_argument("--min-secs", type=float, default=MIN_SECS)
+    p.add_argument("--max-secs", type=float, default=MAX_SECS)
+    p.add_argument("--skip", type=int, default=0, help="skip this many meetings/consultations first (a held-out set)")
     p.add_argument("--balanced", action="store_true", help="ami: only windows where every speaker has a real share")
     a = p.parse_args()
+    BOUNDS[:] = [a.min_secs, a.max_secs]
+    SKIP[0] = a.skip
     if a.source == "primock":
         primock(a.out, a.count)
     else:
