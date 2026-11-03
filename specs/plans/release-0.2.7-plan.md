@@ -137,6 +137,32 @@ claims stay (O1), but these failure kinds are language independent, so they are 
   agent-only behaviour. Runs off the UI thread and is cancelled when the editor closes. Owner: `apps/desktop` editor
   files (assigned after `mac-stability`'s shared-code commits merge, to avoid conflicts).
 
+### M2g Suggested cuts on a quiet meeting recording (seen Nov 3, 2026, maintainer's screenshot)
+Opening the 45 min meeting as an audio recording, Suggest cuts showed "1.2 s pause at 0:04 (and 258 more)", with long
+amber blocks over stretches that hold speech (the first 15 minutes are mostly amber). Read-only statistics over the
+file (the recording stays private; the findings are the kinds):
+
+- The suggestions run on `mic.denoised.wav`. The denoiser pushes quiet stretches to near digital silence, so the
+  noise-floor estimate (10th percentile) is about -83 dBFS and the adaptive rule never raises the threshold: the fixed
+  default of **-40 dBFS** applies. The recording is quiet (median level -39 dBFS on the denoised track, words around
+  -50 dBFS, -40 dBFS on the raw track), so the default sits above a large share of the speech.
+- A replica of the rule gives 171 pauses (464 s of 2,678 s), with 150 transcript words (2.4 %) and 91 s of
+  speaker-engine speech inside them; the other suggestions of the 259 are filler cuts. Cutting those pauses would
+  delete real speech. Because M2f now shows the list by itself, this is visible at once, so it must be fixed before 0.2.7.
+- Same recording, same cause family as M2d item 1: the speech that got no words sits in quiet stretches where the
+  denoiser lowered the level by 4 to 9 dB.
+
+Work (general techniques, measured before and after, no thresholds tuned to this one file):
+1. A level-independent rule: estimate the floor from the **raw** track (or from the level distribution, e.g. the gap
+   between the noise mode and the speech mode), set the threshold relative to the speech level, not an absolute -40.
+2. A veto from other evidence: a pause is not suggested where the speaker engine or the transcript says someone
+   speaks (when they exist).
+3. Measure level-aware transcription: peak or loudness normalization of quiet input before Whisper, and whether
+   Whisper reads the denoised or the raw track (WER and coverage on synthetic quiet clips made by lowering gain and
+   adding a gating denoiser; report both).
+4. Test: a synthetic quiet-speech clip (speech at -45 dBFS RMS, room noise -60 dBFS) must not produce suggestions
+   inside speech; `silence.rs` tests cover the denoised-floor case.
+
 Done when: before/after reports for each of M2a, M2b, M2c are stored, the tests (with fakes) cover the new
 splitting/cancel behaviour, and `tests/manual/AI-5/7/8/9.md` have been re-run on the new build.
 
