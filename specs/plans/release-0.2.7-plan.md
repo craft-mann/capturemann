@@ -174,6 +174,36 @@ Work (general techniques, measured before and after, no thresholds tuned to this
 4. Test: a synthetic quiet-speech clip (speech at -45 dBFS RMS, room noise -60 dBFS) must not produce suggestions
    inside speech; `silence.rs` tests cover the denoised-floor case.
 
+### M2h Transcribe while recording (audio recordings only; maintainer, Nov 3, 2026)
+Goal: a user who stops a long audio recording must not wait minutes for the transcript. Today everything starts at stop
+(an 88 minute meeting: about 6 min for the transcript, about 8 min with speakers beside it; `docs/project/performance.md`).
+Idea: the recorder already writes `mic.wav` as it goes; transcribe each finished piece (about 5 min, cut at a pause, with
+the existing `pieces` logic and its checkpoint) while the meeting is still running, so at stop only the last piece is left.
+
+- **Scope:** `kind: audio` recordings only (a screen recording keeps the end-of-recording start: it already uses the GPU
+  and the encoders). Setting `ai.transcribe_while_recording`, default on when `ai.auto_transcribe` is on (16 GB RAM or
+  more) and a speech model is installed; off otherwise. Nothing starts without a model, no download.
+- **Conflict to resolve first:** AI jobs are held while a recording runs (a started recording holds a running job, see the
+  `Checkpoint` comment in `pieces.rs`); that rule protects the recording. M2h must lift it only for this one job, with a
+  lower priority: Whisper threads and GPU use limited so the recording's audio path is never late.
+- **Rules:** a piece starts only when its end plus the pause-search lookahead (20 s) is on disk; pause (`PauseGap`) and
+  mic mute are the same as in the batch path (the media files are compacted at a pause); Discard or restart deletes the
+  partial transcript; a crash leaves the checkpoint and `recording.lock` recovery continues from the last finished piece;
+  Stop finishes the remaining piece(s), joins the words and runs the same post steps as today (captions, auto speakers,
+  report suggestion).
+- **Result must equal the batch result:** same audio, same model: word for word, or the differences are listed in the
+  report (boundary handling at pieces is the only expected source).
+- **Targets (measured, then written down):** at stop, transcript ready in under 30 s for a 1 hour audio recording on an
+  M4 Pro (before: about 4 to 5 min); a 15 s clip unchanged (below the piece size it runs at stop, in seconds). Speaker
+  finding still needs the whole file; report its time at stop as before, and note windowed speaker runs (M2b) as the way to
+  shorten it.
+- **Recording safety gate (needs the maintainer's consent and a time slot, hardware):** a 20 minute audio recording
+  with the background transcription on, with the mic file checked for dropouts and drift (`details.gaps`, `drift_ppm`,
+  the 50 ms budget) against a run with it off; CPU, GPU and memory sampled. If the recording is affected, ship the
+  feature off by default and say so.
+- **Owner:** `mac-ai` (pieces, whisper) with the named `cm-daemon` files (`ai/dispatch.rs`, `ai/jobs.rs`, the
+  recording-finished event hookup); order after M2a's re-read-cost work, before the PhoWhisper decoding.
+
 Done when: before/after reports for each of M2a, M2b, M2c are stored, the tests (with fakes) cover the new
 splitting/cancel behaviour, and `tests/manual/AI-5/7/8/9.md` have been re-run on the new build.
 
