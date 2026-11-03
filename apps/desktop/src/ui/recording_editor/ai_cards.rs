@@ -27,6 +27,7 @@ use crate::ai::caption_find::FindState;
 use crate::ai::caption_view::LinePlay;
 use crate::ai::captions::{lines_from_words, AddAtError, CaptionEditor};
 use crate::ai::client::{CaptionFormat, CaptionOptionsInfo};
+use crate::ai::suggest::{auto_suggest_cuts_on, AutoCuts, AutoStart};
 use crate::ai::suggest::{
     cut_label, cut_request, nothing_found, zoom_label, zoom_request, Nothing, SuggestionList,
 };
@@ -136,6 +137,12 @@ pub(super) struct AiEditor {
     pub(super) cuts: Option<SuggestionList<CutSuggestion>>,
     pub(super) asking_zooms: bool,
     pub(super) asking_cuts: bool,
+    /// M2f: the once-per-revision rule and the running automatic run (dropping the task cancels
+    /// it, and the daemon call with it).
+    pub(super) auto_cuts: AutoCuts,
+    pub(super) auto_task: Option<gpui::Task<()>>,
+    /// The manifest revision the open recording was loaded at.
+    pub(super) revision: Option<u64>,
     pub(super) suggest_note: Option<AiNote>,
     /// The recording's caption switches (show in the preview, burn into exports).
     pub(super) options: CaptionOptionsInfo,
@@ -219,6 +226,9 @@ impl AiEditor {
             cuts: None,
             asking_zooms: false,
             asking_cuts: false,
+            auto_cuts: AutoCuts::default(),
+            auto_task: None,
+            revision: None,
             suggest_note: None,
             options: CaptionOptionsInfo::default(),
             words: Rc::default(),
@@ -237,8 +247,16 @@ impl AiEditor {
         }
     }
 
+    /// The editor closed or moved on: the automatic run is cancelled.
+    pub(super) fn cancel_auto(&mut self) {
+        self.auto_task = None;
+        self.auto_cuts.closed();
+        self.asking_cuts = false;
+    }
+
     /// Forgets everything about the recording that was open.
     fn reset(&mut self) {
+        self.cancel_auto();
         self.loaded_for = None;
         self.loading = false;
         self.has_transcript = false;
@@ -378,12 +396,14 @@ impl RecordingEditor {
                         this.ai.options = options;
                         this.ai.captions = CaptionEditor::new(lines);
                         this.ai.note = tr.note.map(AiNote::Transcript);
+                        this.ai_auto_cuts(cx);
                     }
                     Ok(None) => {
                         this.ai.has_transcript = false;
                         this.ai.words = Rc::default();
                         this.ai.options = CaptionOptionsInfo::default();
                         this.ai.captions = CaptionEditor::default();
+                        this.ai_auto_cuts(cx);
                     }
                     // Not "no transcript": say what went wrong instead of showing nothing.
                     Err(e) => {
@@ -598,23 +618,99 @@ impl RecordingEditor {
         }
         self.ai.asking_cuts = true;
         self.ai.suggest_note = None;
+        let with_transcript = self.ai.has_transcript;
+        let revision = self.ai.revision;
         cx.spawn(async move |this, cx| {
             let res = client.suggest_cuts(&id).await;
             this.update(cx, |this, cx| {
                 this.ai.asking_cuts = false;
-                match res {
-                    Ok(list) if list.is_empty() => {
-                        this.ai.cuts = None;
-                        this.ai.suggest_note = Some(AiNote::Nothing(Nothing::SilencesOrFillers));
-                    }
-                    Ok(list) => this.ai.cuts = Some(SuggestionList::new(list)),
-                    Err(e) => this.ai.suggest_note = Some(AiNote::Failed(ErrorNote::from_ai(&e))),
-                }
+                this.take_cuts_answer(&id, revision, with_transcript, res);
                 cx.notify();
             })
             .ok();
         })
         .detach();
+    }
+
+    /// M2f: when a recording is open and its transcript state is known, look for pauses (and
+    /// filler words when there is a transcript) once per revision, unless the setting is off. The
+    /// same `suggest_cuts` action as the button; nothing is applied. Off the UI thread, and the
+    /// task is dropped (the daemon call aborted) when the editor closes.
+    pub(super) fn ai_auto_cuts(&mut self, cx: &mut Context<Self>) {
+        let (Some(id), Some(revision)) = (self.id.clone(), self.ai.revision) else {
+            return;
+        };
+        let enabled = auto_suggest_cuts_on(&self.app.read(cx).backend.settings.snapshot());
+        let with_transcript = self.ai.has_transcript;
+        match self
+            .ai
+            .auto_cuts
+            .start(enabled, &id, revision, with_transcript)
+        {
+            AutoStart::No => {}
+            AutoStart::Cached(list) => {
+                self.ai.suggest_note = None;
+                self.take_cuts_answer(&id, Some(revision), with_transcript, Ok(list));
+            }
+            AutoStart::Run => {
+                let Some(client) = ai::client_of(&self.app, cx) else {
+                    self.ai.auto_cuts.closed();
+                    return;
+                };
+                if self.ai.asking_cuts {
+                    // The button was pressed first; its answer is the one shown.
+                    self.ai.auto_cuts.closed();
+                    return;
+                }
+                self.ai.asking_cuts = true;
+                self.ai.suggest_note = None;
+                self.ai.auto_task = Some(cx.spawn(async move |this, cx| {
+                    let res = client.suggest_cuts(&id).await;
+                    this.update(cx, |this, cx| {
+                        this.ai.asking_cuts = false;
+                        this.ai.auto_task = None;
+                        this.take_cuts_answer(&id, Some(revision), with_transcript, res);
+                        cx.notify();
+                    })
+                    .ok();
+                }));
+            }
+        }
+    }
+
+    /// Shows an answer of `suggest_cuts` (from the button, the automatic run or the cache).
+    fn take_cuts_answer(
+        &mut self,
+        id: &str,
+        revision: Option<u64>,
+        with_transcript: bool,
+        res: Result<Vec<CutSuggestion>, crate::ai::client::AiError>,
+    ) {
+        if self.id.as_deref() != Some(id) {
+            return;
+        }
+        match res {
+            Ok(list) => {
+                if let Some(rev) = revision {
+                    self.ai.auto_cuts.finished(id, rev, with_transcript, &list);
+                }
+                if list.is_empty() {
+                    self.ai.cuts = None;
+                    self.ai.suggest_note = Some(AiNote::Nothing(if with_transcript {
+                        Nothing::SilencesOrFillers
+                    } else {
+                        Nothing::NoPausesNoTranscript
+                    }));
+                } else {
+                    self.ai.cuts = Some(SuggestionList::new(list));
+                    if !with_transcript {
+                        self.ai.suggest_note =
+                            Some(AiNote::Nothing(Nothing::PausesOnlyNoTranscript));
+                    }
+                }
+            }
+            Err(e) => self.ai.suggest_note = Some(AiNote::Failed(ErrorNote::from_ai(&e))),
+        }
     }
 
     /// Accept one zoom (`Some(i)`) or all of them (`None`).

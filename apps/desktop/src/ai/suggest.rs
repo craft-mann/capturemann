@@ -7,7 +7,99 @@ use cm_core::MediaTime;
 use cm_i18n::{fmt, tr, tr_ctx};
 use serde_json::{json, Value};
 
+use std::collections::HashMap;
+
+use serde_json::Map;
+
 use crate::recedit::model::EditRequest;
+
+/// `ai.auto_suggest_cuts` (M2f): look for pauses and filler words when the editor opens. Default
+/// on. It only starts the same `suggest_cuts` action the button sends; nothing is applied.
+/// Agents can read it (like the other `ai.*` keys); only the person at the keyboard writes it.
+pub const KEY_AUTO_SUGGEST_CUTS: &str = "ai.auto_suggest_cuts";
+
+/// Whether the automatic run is on (a missing or odd value means the default, on).
+pub fn auto_suggest_cuts_on(settings: &Map<String, Value>) -> bool {
+    settings
+        .get(KEY_AUTO_SUGGEST_CUTS)
+        .and_then(Value::as_bool)
+        .unwrap_or(true)
+}
+
+/// What to do when the editor has a recording open at some revision.
+#[derive(Debug, Clone, PartialEq)]
+pub enum AutoStart {
+    /// Nothing: the setting is off, or this revision was already looked at and is being shown.
+    No,
+    /// This revision was asked before in this session: show the same list without asking again.
+    Cached(Vec<CutSuggestion>),
+    /// Ask the daemon.
+    Run,
+}
+
+/// The "once per revision" rule (a transcript that arrives later makes fillers possible, so it counts
+/// as a new question: pauses first, then pauses and fillers). A revision is the manifest's last revision number: any accepted
+/// cut, trim or undo makes a new one, but a run starts only when a recording is opened, never
+/// because the edit list changed under the user's hands.
+#[derive(Debug, Default)]
+pub struct AutoCuts {
+    /// The (recording, revision) that has been asked or is being asked.
+    asked: Option<(String, u64, bool)>,
+    /// Answers kept for reopening a recording at the same revision (a few, the oldest goes).
+    cache: HashMap<(String, u64, bool), Vec<CutSuggestion>>,
+    order: Vec<(String, u64, bool)>,
+}
+
+const CACHE_KEEPS: usize = 8;
+
+impl AutoCuts {
+    /// Called when the recording `id` at `revision` is open and its transcript state is known.
+    pub fn start(
+        &mut self,
+        enabled: bool,
+        id: &str,
+        revision: u64,
+        has_transcript: bool,
+    ) -> AutoStart {
+        let key = (id.to_owned(), revision, has_transcript);
+        if !enabled || self.asked.as_ref() == Some(&key) {
+            return AutoStart::No;
+        }
+        self.asked = Some(key.clone());
+        match self.cache.get(&key) {
+            Some(list) => AutoStart::Cached(list.clone()),
+            None => AutoStart::Run,
+        }
+    }
+
+    /// The answer for `(id, revision)` arrived.
+    pub fn finished(
+        &mut self,
+        id: &str,
+        revision: u64,
+        has_transcript: bool,
+        list: &[CutSuggestion],
+    ) {
+        let key = (id.to_owned(), revision, has_transcript);
+        if self.cache.insert(key.clone(), list.to_vec()).is_none() {
+            self.order.push(key);
+        }
+        while self.order.len() > CACHE_KEEPS {
+            let old = self.order.remove(0);
+            self.cache.remove(&old);
+        }
+    }
+
+    /// The run was cancelled or failed: the same revision may be asked again.
+    pub fn forget_ask(&mut self) {
+        self.asked = None;
+    }
+
+    /// The editor closed or moved to another recording.
+    pub fn closed(&mut self) {
+        self.asked = None;
+    }
+}
 
 /// A list the user can prune before accepting: removing a row drops that proposal only.
 #[derive(Debug, Clone, PartialEq)]
@@ -155,6 +247,10 @@ pub enum Nothing {
     ZoomSpots,
     Silences,
     SilencesOrFillers,
+    /// The recording has no transcript, so only pauses were looked for, and none were found.
+    NoPausesNoTranscript,
+    /// The recording has no transcript, so only pauses were looked for.
+    PausesOnlyNoTranscript,
 }
 
 /// A short line for an empty answer.
@@ -164,6 +260,12 @@ pub fn nothing_found(what: Nothing) -> String {
         Nothing::Silences => tr!("No silences found in this recording."),
         Nothing::SilencesOrFillers => {
             tr!("No silences or filler words found in this recording.")
+        }
+        Nothing::NoPausesNoTranscript => {
+            tr!("No silences found. Filler words need a transcript, and this recording has none.")
+        }
+        Nothing::PausesOnlyNoTranscript => {
+            tr!("Looked for silences only: filler words need a transcript, and this recording has none.")
         }
     }
 }
@@ -193,6 +295,68 @@ mod tests {
             kind: kind.into(),
             detail: detail.into(),
         }
+    }
+
+    /// M2f: the trigger rule.
+    #[test]
+    fn the_automatic_run_starts_once_per_revision() {
+        let mut a = AutoCuts::default();
+        assert_eq!(a.start(true, "cap_1", 3, true), AutoStart::Run);
+        // The editor redraws, the transcript arrives: still the same revision, no second run.
+        assert_eq!(a.start(true, "cap_1", 3, true), AutoStart::No);
+        // Another revision (an edit was accepted, then the recording is opened again) asks again.
+        assert_eq!(a.start(true, "cap_1", 4, true), AutoStart::Run);
+        assert_eq!(a.start(true, "cap_2", 4, true), AutoStart::Run);
+        // The transcript was not there at first (pauses only) and arrives later: fillers can be
+        // looked for now.
+        assert_eq!(a.start(true, "cap_3", 1, false), AutoStart::Run);
+        assert_eq!(a.start(true, "cap_3", 1, false), AutoStart::No);
+        assert_eq!(a.start(true, "cap_3", 1, true), AutoStart::Run);
+    }
+
+    #[test]
+    fn the_setting_turns_the_automatic_run_off_and_defaults_to_on() {
+        let mut a = AutoCuts::default();
+        assert_eq!(a.start(false, "cap_1", 1, true), AutoStart::No);
+        let mut s = Map::new();
+        assert!(auto_suggest_cuts_on(&s), "default on");
+        s.insert(KEY_AUTO_SUGGEST_CUTS.into(), json!(false));
+        assert!(!auto_suggest_cuts_on(&s));
+        s.insert(KEY_AUTO_SUGGEST_CUTS.into(), json!("junk"));
+        assert!(
+            auto_suggest_cuts_on(&s),
+            "a value that is not a switch means the default"
+        );
+        // Turning it back on later starts a run for the open recording.
+        assert_eq!(a.start(true, "cap_1", 1, true), AutoStart::Run);
+    }
+
+    #[test]
+    fn closing_or_cancelling_lets_the_next_open_ask_again_and_an_answer_is_reused() {
+        let mut a = AutoCuts::default();
+        assert_eq!(a.start(true, "cap_1", 2, true), AutoStart::Run);
+        // The editor closed before the answer: the run was cancelled, nothing was kept.
+        a.closed();
+        assert_eq!(a.start(true, "cap_1", 2, true), AutoStart::Run);
+        let list = vec![cut(1.0, 2.0, "silence", "1.0 s of silence")];
+        a.finished("cap_1", 2, true, &list);
+        a.closed();
+        // Reopened at the same revision: the answer is shown, the daemon is not asked again.
+        assert_eq!(a.start(true, "cap_1", 2, true), AutoStart::Cached(list));
+    }
+
+    #[test]
+    fn the_answer_cache_is_bounded() {
+        let mut a = AutoCuts::default();
+        for i in 0..20 {
+            a.finished(&format!("cap_{i}"), 1, true, &[]);
+        }
+        assert_eq!(
+            a.start(true, "cap_0", 1, true),
+            AutoStart::Run,
+            "the oldest went"
+        );
+        assert_eq!(a.start(true, "cap_19", 1, true), AutoStart::Cached(vec![]));
     }
 
     #[test]

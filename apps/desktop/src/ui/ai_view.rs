@@ -615,6 +615,18 @@ impl Render for AiPage {
             true,
         )
         .on_click(cx.listener(move |_, _, _, cx| ai::set_auto_transcribe(&app, !auto, cx)));
+        let cuts_on = !self.app.read(cx).ai.auto_suggest_cuts_off;
+        let cuts_switch = switch(
+            &t,
+            "ai-auto-cuts",
+            tr!("Suggest cuts when the editor opens"),
+            cuts_on,
+            true,
+        )
+        .on_click({
+            let app = self.app.clone();
+            cx.listener(move |_, _, _, cx| ai::set_auto_suggest_cuts(&app, !cuts_on, cx))
+        });
         let glossary = self.glossary_section(&t, cx);
         let speakers = self.speakers_section(&t, cx);
         let text_model = self.text_model_section(&t, window, cx);
@@ -749,6 +761,16 @@ impl Render for AiPage {
                                                 None => tr!("Needs a model above"),
                                             })),
                                             Some(auto_switch.into_any_element()),
+                                            false,
+                                        ))
+                                        .child(settings_row(
+                                            &t,
+                                            Some("scissors"),
+                                            tr!("Suggest cuts when the editor opens"),
+                                            Some(SharedString::from(tr!(
+                                                "Looks for pauses and filler words; nothing changes until you accept"
+                                            ))),
+                                            Some(cuts_switch.into_any_element()),
                                             false,
                                         ))
                                         .child(self.languages_row(&t, cx)),

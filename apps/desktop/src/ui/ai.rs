@@ -519,6 +519,21 @@ pub fn set_auto_transcribe(app: &Entity<AppModel>, on: bool, cx: &mut App) {
     app::set_setting(app, KEY_AUTO_TRANSCRIBE, Value::Bool(on), cx);
 }
 
+/// The "Suggest cuts when the editor opens" switch (M2f). It only starts the `suggest_cuts` action
+/// on opening a recording; nothing is applied.
+pub fn set_auto_suggest_cuts(app: &Entity<AppModel>, on: bool, cx: &mut App) {
+    app.update(cx, |m, cx| {
+        m.ai.auto_suggest_cuts_off = !on;
+        cx.notify();
+    });
+    app::set_setting(
+        app,
+        crate::ai::suggest::KEY_AUTO_SUGGEST_CUTS,
+        Value::Bool(on),
+        cx,
+    );
+}
+
 /// Saves the glossary: the page shows the new list at once and the daemon's settings follow (the
 /// next transcription uses it). The list is cleaned the way the daemon reads it.
 pub fn set_glossary(

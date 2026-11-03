@@ -19,6 +19,8 @@ pub mod summary;
 pub mod voice;
 
 #[cfg(test)]
+mod auto_cuts_tests;
+#[cfg(test)]
 mod details_contract;
 
 #[cfg(test)]

@@ -701,32 +701,57 @@ pub struct DaemonTransport {
 impl AiTransport for DaemonTransport {
     async fn call(&self, method: &str, params: Value) -> Result<Value, AiError> {
         let daemon = self.daemon.clone();
+        let cancellable = is_cancellable(method);
         let method = method.to_owned();
-        self.rt
-            .spawn(async move {
-                daemon
-                    .execute_method(Actor::User, 0, &method, &params)
-                    .await
-                    .map_err(|e| {
-                        let reason = match &e {
-                            cm_daemon::DaemonError::WithData { data, .. } => data
-                                .get("reason")
-                                .and_then(Value::as_str)
-                                .map(str::to_owned),
-                            cm_daemon::DaemonError::Declined { reason, .. } => {
-                                Some((*reason).to_owned())
-                            }
-                            _ => None,
-                        };
-                        AiError {
-                            code: e.code().map(|c| c.as_str().to_owned()),
-                            reason,
-                            message: e.to_string(),
+        let task = self.rt.spawn(async move {
+            daemon
+                .execute_method(Actor::User, 0, &method, &params)
+                .await
+                .map_err(|e| {
+                    let reason = match &e {
+                        cm_daemon::DaemonError::WithData { data, .. } => data
+                            .get("reason")
+                            .and_then(Value::as_str)
+                            .map(str::to_owned),
+                        cm_daemon::DaemonError::Declined { reason, .. } => {
+                            Some((*reason).to_owned())
                         }
-                    })
-            })
+                        _ => None,
+                    };
+                    AiError {
+                        code: e.code().map(|c| c.as_str().to_owned()),
+                        reason,
+                        message: e.to_string(),
+                    }
+                })
+        });
+        // Dropping the future (the editor closed) stops a read-only call; every other call runs to
+        // its end whatever the caller does, since it may change something.
+        let guard = cancellable.then(|| AbortOnDrop(task.abort_handle()));
+        let out = task
             .await
-            .unwrap_or_else(|e| Err(AiError::message(e.to_string())))
+            .unwrap_or_else(|e| Err(AiError::message(e.to_string())));
+        drop(guard);
+        out
+    }
+}
+
+/// Methods that only read or propose (nothing is stored), so abandoning them is safe (M2f).
+pub fn is_cancellable(method: &str) -> bool {
+    matches!(method, "suggest_cuts" | "suggest_zooms")
+}
+
+/// Aborts a runtime task when dropped.
+pub(crate) struct AbortOnDrop(tokio::task::AbortHandle);
+
+#[cfg(test)]
+pub(crate) fn abort_on_drop(h: tokio::task::AbortHandle) -> AbortOnDrop {
+    AbortOnDrop(h)
+}
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        self.0.abort();
     }
 }
 

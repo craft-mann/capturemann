@@ -258,6 +258,7 @@ impl AppModel {
                     .get(crate::ui::ai::KEY_AUTO_TRANSCRIBE)
                     .and_then(|v| v.as_bool())
                     .unwrap_or_else(crate::ui::ai::default_auto_transcribe),
+                auto_suggest_cuts_off: !crate::ai::suggest::auto_suggest_cuts_on(&settings),
                 glossary: cm_ai::glossary::from_value(settings.get(crate::ui::ai::KEY_GLOSSARY)),
                 languages: crate::ai::models::languages_from_value(
                     settings.get(crate::ui::ai::KEY_LANGUAGES),

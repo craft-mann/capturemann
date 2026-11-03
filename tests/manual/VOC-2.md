@@ -53,7 +53,8 @@ people?" answered on the Record sheet uses that number. Open a recording of
    (the ends are dimmed).
 7. **Suggested cuts.** Suggestions tab: only **Suggest cuts** (no zooms). Press it. Expected: the
    proposals are hatched amber on the lanes with "Suggested cut: {what} at {time}" under them;
-   Accept all makes them cuts in one undo step.
+   Accept all makes them cuts in one undo step. Since 0.2.7 the list also appears by itself when
+   the editor opens (see `AI-UI.md` 16a and 16b); pressing the button looks again.
 8. **Overview.** The strip under the lanes shows the whole recording, a box for what the timeline
    shows, a tick for each marker and the playhead. Click it: the view centres there.
 9. **Transcript tab.** Expected: the title, "{language} · {n} speakers · click a time to jump

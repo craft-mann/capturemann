@@ -194,6 +194,8 @@ struct Loaded {
     audio_note: Option<String>,
     voice: VoiceData,
     waves: Vec<(RowKind, Wave)>,
+    /// The manifest's last revision number (M2f: the automatic cut suggestions run once per revision).
+    revision: u64,
 }
 
 pub struct RecordingEditor {
@@ -341,6 +343,7 @@ fn load_blocking(root: Option<PathBuf>, id: &str) -> Result<Loaded, files::FileE
         bundle: dir.clone(),
         voice,
         waves,
+        revision: m.revisions.last().map_or(0, |r| r.rev),
         audio,
         audio_note,
         title: details.title,
@@ -421,7 +424,10 @@ impl RecordingEditor {
                     return;
                 }
                 this.load = match loaded {
-                    Ok(l) => Load::Ready(Box::new(Session::new(&key, l))),
+                    Ok(l) => {
+                        this.ai.revision = Some(l.revision);
+                        Load::Ready(Box::new(Session::new(&key, l)))
+                    }
                     Err(e) => {
                         app::note_open_failed(&e.to_string(), cx);
                         Load::Failed(e)
@@ -436,6 +442,7 @@ impl RecordingEditor {
 
     /// Leaves the recording: stops the renderer thread and releases the picture.
     pub fn close(&mut self, cx: &mut Context<Self>) {
+        self.ai.cancel_auto();
         self.id = None;
         self.load = Load::Idle;
         self.presenter = Presenter::new(default_path());
