@@ -2,7 +2,7 @@
 
 `vinai/PhoWhisper-{small,medium,large}` (VinAI, Whisper fine-tuned for Vietnamese, BSD-3-Clause per the model
 card) are Hugging Face transformers checkpoints. whisper.cpp reads ggml files, and no whisper.cpp-compatible
-conversion of these three exists, so the maintainer converts and uploads them; the app pins the upload like every
+conversion of these three exists, so the maintainer converts and uploads them to `craftmann/phowhisper-ggml`; the app pins the upload like every
 other model (`crates/cm-ai/data/models.json`, three `pending_pin` rows `phowhisper-small|medium|large`).
 
 Status: **the script has not been run yet.** It is written from the whisper.cpp converter's documented usage; the
@@ -31,7 +31,9 @@ packages by `requirements.txt`.
 ## Upload and pin (maintainer)
 
 Upload the three `.bin` files, the card text of each model (BSD-3-Clause, keep VinAI's copyright line) and a note
-of the tool commits to a Hugging Face repo you control. Then, for each row in `models.json`, set `url` to the
+of the tool commits to the Hugging Face repo **`craftmann/phowhisper-ggml`** (org https://huggingface.co/craftmann; the
+agent never uploads). File names: `ggml-phowhisper-small.bin`, `-medium.bin`, `-large.bin`; the repo's README should
+name the source models, the BSD-3-Clause licence and the converter commits. Then, for each row in `models.json`, set `url` to the
 commit-pinned `resolve/<commit>/<file>` URL, `sha256`, `bytes` and `ram_mb` (measured, not guessed: the
 `perf` example prints peak memory), and remove `"pending_pin": true`. Add the NOTICE entry for the weights.
 Until then the rows are neither offered nor downloadable.
