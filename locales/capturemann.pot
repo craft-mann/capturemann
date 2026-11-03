@@ -486,13 +486,13 @@ msgstr ""
 msgid "Available"
 msgstr ""
 
+msgid "Back to Audio"
+msgstr ""
+
 msgid "Back to library"
 msgstr ""
 
 msgid "Back to recordings"
-msgstr ""
-
-msgid "Back to the library"
 msgstr ""
 
 msgid "Back to the recording"

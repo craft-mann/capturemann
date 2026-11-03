@@ -345,17 +345,16 @@ impl RecordingEditor {
     /// Export audio... (the primary button). No Publish for audio.
     fn audio_title_row(&self, t: &Theme, s: &Session, cx: &mut Context<Self>) -> AnyElement {
         let app = self.app.clone();
-        // TODO(design): the board's crumb goes to the Audio library page; until it exists the
-        // crumb goes to the library.
+        // The crumb goes back to the Audio library page (the page the editor was opened from).
         let crumb = crumb_link(
             t,
             "re-crumb",
             tr_ctx!("breadcrumb", "Audio /"),
-            tr!("Back to the library"),
+            tr!("Back to Audio"),
         )
         .on_click(move |_, _, cx| {
             let app = app.clone();
-            cx.defer(move |cx| crate::ui::app::set_route(&app, crate::ui::app::Route::Library, cx));
+            cx.defer(move |cx| crate::ui::app::set_route(&app, crate::ui::app::Route::Audio, cx));
         });
         let length = badge(t, clock(s.model.basis.end));
         let export = button_with_icon(

@@ -9671,8 +9671,6 @@ msgstr "Luôn được giữ cả trong thư mục xuất của bản ghi"
 msgid "Audio exported"
 msgstr "Đã xuất âm thanh"
 
-msgid "Back to the library"
-msgstr "Quay lại thư viện"
 
 msgid "Choose a folder…"
 msgstr "Chọn thư mục…"
@@ -11519,3 +11517,7 @@ msgstr "[không rõ]"
 #, fuzzy
 msgid "{sound} at {time}"
 msgstr "{sound} lúc {time}"
+
+#, fuzzy
+msgid "Back to Audio"
+msgstr "Quay lại Âm thanh"
