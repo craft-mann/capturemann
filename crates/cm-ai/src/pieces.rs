@@ -368,13 +368,6 @@ impl Job<'_, '_> {
         let (from, len) = (range.start, range.len());
         let mut words = self.read(range.clone(), false)?.words;
         let mut bad = Badness::of(&words);
-        if std::env::var_os("CM_DBG").is_some() {
-            eprintln!(
-                "read {:.0}s depth {depth} words {} bad {bad:?}",
-                len as f64 / 16000.0,
-                words.len()
-            );
-        }
         if !bad.is_bad() {
             return Ok(words);
         }
