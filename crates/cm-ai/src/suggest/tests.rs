@@ -815,3 +815,144 @@ fn suggestions_serialize() {
     let back: ZoomSuggestion = serde_json::from_value(v).unwrap();
     assert_eq!(back, z);
 }
+
+// ---- quiet recordings (M2g) -------------------------------------------------------------------
+
+/// A quiet speech-like signal at `speech_db` dBFS RMS: syllables (a tone with a wobbling envelope,
+/// 0.22 s) with 0.08 s of room hiss between them, inside each `(from, to)` span; room hiss at
+/// `noise_db` dBFS RMS elsewhere.
+fn quiet_speech(total: f64, spans: &[(f64, f64)], speech_db: f32, noise_db: f32) -> Vec<f32> {
+    let amp = |db: f32| 10f32.powf(db / 20.0);
+    let mut seed: u32 = 777;
+    let mut hiss = move |rms: f32| {
+        seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
+        rms * 3f32.sqrt() * ((seed >> 8) as f32 / (1 << 23) as f32 - 1.0)
+    };
+    let n = (total * f64::from(RATE)) as usize;
+    (0..n)
+        .map(|i| {
+            let t = i as f64 / f64::from(RATE);
+            let speaking = spans.iter().any(|&(a, b)| t >= a && t < b);
+            if !speaking {
+                return hiss(amp(noise_db));
+            }
+            let phase = t % 0.30;
+            if phase >= 0.22 {
+                return hiss(amp(noise_db));
+            }
+            let env = 0.7 + 0.3 * (t as f32 * 5.0).sin();
+            // RMS of the sine is amp/sqrt 2, of the envelope about 0.7: scale to the stated level.
+            let a = amp(speech_db) * 2f32.sqrt() / 0.72 * env * 0.95;
+            a * (2.0 * std::f32::consts::PI * 300.0 * t as f32).sin()
+        })
+        .collect()
+}
+
+/// A gating denoiser: frames under -50 dBFS are pushed down 1.5 dB per dB, up to 40 dB.
+fn gated(x: &[f32]) -> Vec<f32> {
+    let n = (RATE / 50) as usize;
+    let mut out = Vec::with_capacity(x.len());
+    for c in x.chunks(n) {
+        let ms = c.iter().map(|s| f64::from(*s).powi(2)).sum::<f64>() / c.len() as f64;
+        let l = 10.0 * (ms + 1e-12).log10();
+        let atten = ((-50.0 - l) * 1.5).clamp(0.0, 40.0);
+        let g = 10f64.powf(-atten / 20.0) as f32;
+        out.extend(c.iter().map(|s| s * g));
+    }
+    out
+}
+
+const QUIET_SPANS: [(f64, f64); 3] = [(0.0, 8.0), (10.0, 18.0), (21.0, 30.0)];
+
+fn inside_speech(cuts: &[CutSuggestion], spans: &[(f64, f64)]) -> f64 {
+    cuts.iter()
+        .map(|c| {
+            let (a, b) = (secs(c.start), secs(c.end));
+            spans
+                .iter()
+                .map(|&(s, e)| (b.min(e) - a.max(s)).max(0.0))
+                .sum::<f64>()
+        })
+        .sum()
+}
+
+/// M2g: speech at -45 dBFS RMS over room noise at -60 dBFS gets the two real pauses suggested and
+/// nothing inside speech, on the raw signal and after a gating denoiser has pushed the quiet
+/// stretches towards silence (the floor estimate then sits far below -60 dBFS).
+#[test]
+fn m2g_quiet_speech_is_not_cut_raw_or_denoised() {
+    let raw = quiet_speech(30.0, &QUIET_SPANS, -45.0, -60.0);
+    for (name, x) in [("raw", raw.clone()), ("gated", gated(&raw))] {
+        let cuts =
+            silence_cuts(&x, RATE, MediaTime::ZERO, &[], &SilenceOptions::default()).unwrap();
+        assert_eq!(cuts.len(), 2, "{name}: {cuts:#?}");
+        assert!(
+            inside_speech(&cuts, &QUIET_SPANS) < 0.3,
+            "{name}: {cuts:#?}"
+        );
+        assert!(
+            secs(cuts[0].start) >= 8.0 && secs(cuts[0].end) <= 10.1,
+            "{name}"
+        );
+        assert!(
+            secs(cuts[1].start) >= 18.0 && secs(cuts[1].end) <= 21.1,
+            "{name}"
+        );
+    }
+}
+
+/// The same signal with the fixed -40 dBFS rule of 0.2.6 cuts into the speech: the baseline this
+/// change was made against (`adaptive: false` keeps that rule for callers who set a level).
+#[test]
+fn m2g_the_fixed_rule_cuts_quiet_speech() {
+    let x = quiet_speech(30.0, &QUIET_SPANS, -45.0, -60.0);
+    let opts = SilenceOptions {
+        adaptive: false,
+        ..SilenceOptions::default()
+    };
+    let cuts = silence_cuts(&x, RATE, MediaTime::ZERO, &[], &opts).unwrap();
+    assert!(inside_speech(&cuts, &QUIET_SPANS) > 10.0, "{cuts:#?}");
+}
+
+/// A loud recording is judged as before: the threshold follows its own speech level, and the pauses
+/// of the ten-silences case stay the same.
+#[test]
+fn m2g_a_loud_recording_keeps_its_pauses() {
+    let x = quiet_speech(30.0, &QUIET_SPANS, -20.0, -60.0);
+    let cuts = silence_cuts(&x, RATE, MediaTime::ZERO, &[], &SilenceOptions::default()).unwrap();
+    assert_eq!(cuts.len(), 2, "{cuts:#?}");
+    assert!(inside_speech(&cuts, &QUIET_SPANS) < 0.3);
+}
+
+fn cut(a: f64, b: f64) -> CutSuggestion {
+    CutSuggestion {
+        start: t(a),
+        end: t(b),
+        kind: "silence".into(),
+        detail: String::new(),
+    }
+}
+
+/// M2g: where the transcript or the speaker engine says someone speaks, a pause is not suggested;
+/// what is left on either side stays when it is still a pause.
+#[test]
+fn m2g_speech_evidence_vetoes_a_pause_inside_it() {
+    let opts = SilenceOptions::default();
+    // Speech 2.0 to 3.0 inside a pause 0.2 to 5.0: both sides stay (1.65 s and 1.85 s).
+    let kept = veto_speech(vec![cut(0.2, 5.0)], &[Span::new(t(2.0), t(3.0))], &opts);
+    assert_eq!(kept.len(), 2, "{kept:#?}");
+    assert!((secs(kept[0].end) - 1.85).abs() < 0.01 && (secs(kept[1].start) - 3.15).abs() < 0.01);
+    // Speech covering most of the pause leaves nothing worth cutting.
+    let kept = veto_speech(vec![cut(0.2, 5.0)], &[Span::new(t(0.5), t(4.5))], &opts);
+    assert!(kept.is_empty(), "{kept:#?}");
+    // No evidence near it: untouched. Fillers are never vetoed.
+    let far = Span::new(t(20.0), t(21.0));
+    assert_eq!(
+        veto_speech(vec![cut(0.2, 5.0)], &[far], &opts),
+        vec![cut(0.2, 5.0)]
+    );
+    let mut filler = cut(2.0, 2.4);
+    filler.kind = "filler".into();
+    let kept = veto_speech(vec![filler.clone()], &[Span::new(t(1.0), t(3.0))], &opts);
+    assert_eq!(kept, vec![filler]);
+}

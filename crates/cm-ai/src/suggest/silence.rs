@@ -2,9 +2,14 @@
 //!
 //! The mic track is read as mono PCM ([`decode_mono_f32`] with the FFmpeg sidecar, or any
 //! samples the caller already has). Each 20 ms frame gets an RMS level in dBFS. A frame is
-//! silent when it is below the threshold, which is the configured level ([`DEFAULT_SILENCE_DB`],
-//! -40 dBFS) or, in a noisy room, [`NOISE_MARGIN_DB`] above the noise floor (the 10th percentile
-//! of the frame levels), whichever is higher. A run of silent frames at least `min_silence_s`
+//! silent when it is below the threshold. By default the threshold follows the recording
+//! ([`adaptive_threshold_db`]): [`SPEECH_SHARE`] of the way from the noise floor (10th percentile
+//! of the frame levels) to the speech level (90th percentile), never closer than
+//! [`NOISE_MARGIN_DB`] to the floor, so a quiet recording and a loud one are judged by their own
+//! speech, not by a fixed -40 dBFS. When the levels do not separate (less than
+//! [`MIN_SPEECH_RANGE_DB`] between floor and speech) or `adaptive` is off, the fixed rule applies:
+//! the configured level ([`DEFAULT_SILENCE_DB`], -40 dBFS) or [`NOISE_MARGIN_DB`] above the floor,
+//! whichever is higher. A run of silent frames at least `min_silence_s`
 //! long ([`DEFAULT_MIN_SILENCE_S`], 1.2 s, configurable 0.5 to 5 s) becomes a suggestion that
 //! cuts the pause down to `keep_s` ([`DEFAULT_KEEP_S`], 0.4 s) of breathing room: half of it is
 //! kept on each side, so the cut never starts or ends on a word.
@@ -35,6 +40,13 @@ pub const SILENCE_DB_RANGE: (f32, f32) = (-80.0, -10.0);
 /// In a noisy room the threshold rises to this far above the noise floor, so steady room noise
 /// is not all counted as speech.
 pub const NOISE_MARGIN_DB: f32 = 6.0;
+/// How far from the noise floor to the speech level the adaptive threshold sits.
+pub const SPEECH_SHARE: f32 = 0.4;
+/// Below this many dB between the noise floor and the speech level the levels do not separate
+/// speech from room, and the fixed rule applies.
+pub const MIN_SPEECH_RANGE_DB: f32 = 8.0;
+/// Padding around spoken words and speaker turns that no suggestion may touch ([`veto_speech`]).
+pub const VETO_PAD_S: f64 = 0.15;
 /// Frame length (seconds).
 pub const FRAME_S: f64 = 0.020;
 /// A screen that changed more than this share of its pixels is "active" (AI-4 edge case).
@@ -51,6 +63,9 @@ pub struct SilenceOptions {
     pub keep_s: f32,
     /// Also suggest pauses while the screen changes ("Include silent screen activity").
     pub include_screen_activity: bool,
+    /// Set the threshold from the recording's own levels (see the module docs). Off: the fixed
+    /// `silence_db` rule of 0.2.6.
+    pub adaptive: bool,
 }
 
 impl Default for SilenceOptions {
@@ -60,6 +75,7 @@ impl Default for SilenceOptions {
             min_silence_s: DEFAULT_MIN_SILENCE_S,
             keep_s: DEFAULT_KEEP_S,
             include_screen_activity: false,
+            adaptive: true,
         }
     }
 }
@@ -144,7 +160,8 @@ fn frame_levels(samples: &[f32], rate: u32) -> Vec<f32> {
         .collect()
 }
 
-/// The silence threshold for these levels (dBFS).
+/// The fixed-rule silence threshold for these levels (dBFS): `silence_db`, or the noise floor plus
+/// [`NOISE_MARGIN_DB`] when that is higher.
 pub fn threshold_db(levels: &[f32], silence_db: f32) -> f32 {
     if levels.is_empty() {
         return silence_db;
@@ -155,6 +172,25 @@ pub fn threshold_db(levels: &[f32], silence_db: f32) -> f32 {
     (floor + NOISE_MARGIN_DB)
         .max(silence_db)
         .min(silence_db.max(-20.0))
+}
+
+/// The threshold that follows the recording: [`SPEECH_SHARE`] of the way from the noise floor to
+/// the speech level, at least [`NOISE_MARGIN_DB`] above the floor and at most -20 dBFS. The speech
+/// level is the 90th percentile of the frame levels. Falls back to [`threshold_db`] when the two
+/// are less than [`MIN_SPEECH_RANGE_DB`] apart.
+pub fn adaptive_threshold_db(levels: &[f32], silence_db: f32) -> f32 {
+    if levels.is_empty() {
+        return silence_db;
+    }
+    let mut sorted = levels.to_vec();
+    sorted.sort_by(f32::total_cmp);
+    let floor = sorted[sorted.len() / 10];
+    let speech = sorted[(sorted.len() * 9 / 10).min(sorted.len() - 1)];
+    let range = speech - floor;
+    if range < MIN_SPEECH_RANGE_DB {
+        return threshold_db(levels, silence_db);
+    }
+    (floor + (range * SPEECH_SHARE).max(NOISE_MARGIN_DB)).min(-20.0)
 }
 
 /// Session time of file position `file` (ticks of compacted file time, from the media's time
@@ -189,7 +225,11 @@ pub fn silence_cuts(
         return Err(CmError::invalid_field("rate", "must be positive"));
     }
     let levels = frame_levels(samples, rate);
-    let thr = threshold_db(&levels, opts.silence_db);
+    let thr = if opts.adaptive {
+        adaptive_threshold_db(&levels, opts.silence_db)
+    } else {
+        threshold_db(&levels, opts.silence_db)
+    };
 
     // Runs of silent frames, as (first frame, one past the last).
     let mut runs: Vec<(usize, usize)> = Vec::new();
@@ -249,6 +289,70 @@ pub fn silence_cuts(
     }
     out.sort_by_key(|c| c.start);
     Ok(out)
+}
+
+/// Removes from the pause suggestions every stretch that other evidence says is speech: `speech` are
+/// spans in session time (spoken words from the transcript, speaker turns from the speaker
+/// engine). A suggestion that overlaps a span, widened by [`VETO_PAD_S`] on both sides, is cut
+/// down to what is left on either side; a left-over is kept when, with the breathing room that
+/// stays, it is still a pause of `opts.min_silence_s`. Filler suggestions are untouched.
+pub fn veto_speech(
+    cuts: Vec<CutSuggestion>,
+    speech: &[Span],
+    opts: &SilenceOptions,
+) -> Vec<CutSuggestion> {
+    let pad = ticks_of(VETO_PAD_S);
+    let min_ticks = ticks_of(f64::from(opts.min_silence_s));
+    let keep = ticks_of(f64::from(opts.keep_s));
+    let mut spans: Vec<(i64, i64)> = speech
+        .iter()
+        .map(|s| (s.from.ticks() - pad, s.to.ticks() + pad))
+        .collect();
+    spans.sort_unstable();
+    let mut out = Vec::new();
+    for c in cuts {
+        if c.kind != "silence" {
+            out.push(c);
+            continue;
+        }
+        let (mut from, to) = (c.start.ticks(), c.end.ticks());
+        let mut pieces: Vec<(i64, i64)> = Vec::new();
+        for &(a, b) in &spans {
+            if b <= from || a >= to {
+                continue;
+            }
+            if a > from {
+                pieces.push((from, a));
+            }
+            from = from.max(b);
+            if from >= to {
+                break;
+            }
+        }
+        if from < to {
+            pieces.push((from, to));
+        }
+        let whole = pieces.len() == 1 && pieces[0] == (c.start.ticks(), c.end.ticks());
+        for (a, b) in pieces {
+            if whole {
+                out.push(c.clone());
+                break;
+            }
+            if b - a + keep >= min_ticks {
+                out.push(CutSuggestion {
+                    start: MediaTime::from_ticks(a),
+                    end: MediaTime::from_ticks(b),
+                    kind: c.kind.clone(),
+                    detail: format!(
+                        "{:.1} s pause",
+                        (b - a + keep) as f64 / cm_core::TICKS_PER_SECOND as f64
+                    ),
+                });
+            }
+        }
+    }
+    out.sort_by_key(|c| c.start);
+    out
 }
 
 /// How much of the screen changed during a span (0.0 to 1.0). The daemon implements it with

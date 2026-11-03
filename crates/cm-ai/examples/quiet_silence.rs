@@ -37,7 +37,10 @@ fn db(rms: f64) -> f64 {
 fn rms_over(samples: &[f32], spans: &[(f64, f64)]) -> f64 {
     let (mut sum, mut n) = (0.0f64, 0usize);
     for &(a, b) in spans {
-        let (a, b) = ((a * 16_000.0) as usize, ((b * 16_000.0) as usize).min(samples.len()));
+        let (a, b) = (
+            (a * 16_000.0) as usize,
+            ((b * 16_000.0) as usize).min(samples.len()),
+        );
         for s in &samples[a.min(b)..b] {
             sum += f64::from(*s) * f64::from(*s);
             n += 1;
@@ -82,7 +85,8 @@ fn write_wav(path: &Path, samples: &[f32]) {
     };
     let mut w = hound::WavWriter::create(path, spec).unwrap();
     for s in samples {
-        w.write_sample((s * 32767.0).clamp(-32768.0, 32767.0) as i16).unwrap();
+        w.write_sample((s * 32767.0).clamp(-32768.0, 32767.0) as i16)
+            .unwrap();
     }
     w.finalize().unwrap();
 }
@@ -99,28 +103,44 @@ fn main() {
         .split(',')
         .map(|v| v.parse().unwrap())
         .collect();
-    let noise_db: f64 = option(&args, "--noise").and_then(|v| v.parse().ok()).unwrap_or(-60.0);
+    let noise_db: f64 = option(&args, "--noise")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(-60.0);
     let write = option(&args, "--write");
+    // `--rule old` is the fixed 0.2.6 rule, the default is the current one.
+    let opts = SilenceOptions {
+        adaptive: option(&args, "--rule").is_none_or(|r| r != "old"),
+        ..SilenceOptions::default()
+    };
     let current = rms_over(&audio, &speech);
     let total_speech: f64 = speech.iter().map(|(a, b)| b - a).sum();
     for level in levels {
         let gain = 10f64.powf((level - db(current)) / 20.0) as f32;
         let mut raw: Vec<f32> = audio.iter().map(|s| s * gain).collect();
-        for (r, n) in raw.iter_mut().zip(noise(audio.len(), 10f64.powf(noise_db / 20.0))) {
+        for (r, n) in raw
+            .iter_mut()
+            .zip(noise(audio.len(), 10f64.powf(noise_db / 20.0)))
+        {
             *r += n;
         }
         let gated = gate(&raw);
         for (name, track) in [("raw", &raw), ("gated", &gated)] {
             if let Some(dir) = &write {
-                write_wav(&Path::new(dir).join(format!("q{}_{name}.wav", -level as i64)), track);
+                write_wav(
+                    &Path::new(dir).join(format!("q{}_{name}.wav", -level as i64)),
+                    track,
+                );
             }
-            let cuts = silence_cuts(track, RATE, MediaTime::ZERO, &[], &SilenceOptions::default()).unwrap();
+            let cuts = silence_cuts(track, RATE, MediaTime::ZERO, &[], &opts).unwrap();
             let secs = |t: MediaTime| t.ticks() as f64 / cm_core::TICKS_PER_SECOND as f64;
             let (mut inside, mut inside_secs, mut cut_secs) = (0, 0.0, 0.0);
             for c in &cuts {
                 let (a, b) = (secs(c.start), secs(c.end));
                 cut_secs += b - a;
-                let overlap: f64 = speech.iter().map(|&(s, e)| (b.min(e) - a.max(s)).max(0.0)).sum();
+                let overlap: f64 = speech
+                    .iter()
+                    .map(|&(s, e)| (b.min(e) - a.max(s)).max(0.0))
+                    .sum();
                 if overlap > 0.1 {
                     inside += 1;
                 }
@@ -140,7 +160,9 @@ fn main() {
                 let mut l: Vec<f64> = track
                     .chunks(320)
                     .filter(|c| c.len() == 320)
-                    .map(|c| db((c.iter().map(|s| f64::from(*s).powi(2)).sum::<f64>() / 320.0).sqrt()))
+                    .map(|c| {
+                        db((c.iter().map(|s| f64::from(*s).powi(2)).sum::<f64>() / 320.0).sqrt())
+                    })
                     .collect();
                 l.sort_by(f64::total_cmp);
                 l
@@ -148,7 +170,7 @@ fn main() {
             println!(
                 "{}",
                 json!({
-                    "variant": name, "speech_db": level, "noise_db": noise_db,
+                    "variant": name, "rule": if opts.adaptive { "adaptive" } else { "fixed" }, "speech_db": level, "noise_db": noise_db,
                     "measured_speech_db": db(rms_over(track, &speech)),
                     "floor_p10_db": sorted[sorted.len() / 10], "median_db": sorted[sorted.len() / 2],
                     "speech_secs": total_speech, "suggestions": cuts.len(), "suggested_secs": cut_secs,
