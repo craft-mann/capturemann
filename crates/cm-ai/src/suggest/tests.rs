@@ -956,3 +956,12 @@ fn m2g_speech_evidence_vetoes_a_pause_inside_it() {
     let kept = veto_speech(vec![filler.clone()], &[Span::new(t(1.0), t(3.0))], &opts);
     assert_eq!(kept, vec![filler]);
 }
+
+/// A level the user set forces the fixed rule.
+#[test]
+fn m2g_a_user_level_uses_the_fixed_rule() {
+    let o = SilenceOptions::with_level(-35.0);
+    assert!(!o.adaptive);
+    assert_eq!(o.silence_db, -35.0);
+    assert!(SilenceOptions::default().adaptive);
+}

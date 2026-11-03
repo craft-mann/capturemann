@@ -81,6 +81,15 @@ impl Default for SilenceOptions {
 }
 
 impl SilenceOptions {
+    /// A level the user chose: the fixed rule applies (no adaptive threshold), as in 0.2.6.
+    pub fn with_level(silence_db: f32) -> Self {
+        SilenceOptions {
+            silence_db,
+            adaptive: false,
+            ..SilenceOptions::default()
+        }
+    }
+
     pub fn validate(&self) -> Result<(), CmError> {
         let (lo, hi) = SILENCE_DB_RANGE;
         if !(self.silence_db.is_finite() && (lo..=hi).contains(&self.silence_db)) {

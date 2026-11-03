@@ -277,6 +277,111 @@ pub fn diarization_errors(reference: &[Turn], found: &[Turn], collar: f64) -> Di
     }
 }
 
+/// Level helpers for the quiet-recording measurements (release 0.2.7, M2g): they build the inputs of
+/// a benchmark and the normalisation that is being measured. Pure, deterministic.
+pub mod levels {
+    /// dBFS of a linear RMS.
+    pub fn db(rms: f64) -> f64 {
+        20.0 * rms.max(1e-12).log10()
+    }
+
+    /// RMS over the spans (seconds, 16 kHz audio) or over everything when `spans` is empty.
+    pub fn rms_over(samples: &[f32], spans: &[(f64, f64)]) -> f64 {
+        let (mut sum, mut n) = (0.0f64, 0usize);
+        let mut add = |part: &[f32]| {
+            for s in part {
+                sum += f64::from(*s) * f64::from(*s);
+            }
+            n += part.len();
+        };
+        if spans.is_empty() {
+            add(samples);
+        }
+        for &(a, b) in spans {
+            let (a, b) = (
+                (a * 16_000.0) as usize,
+                ((b * 16_000.0) as usize).min(samples.len()),
+            );
+            add(&samples[a.min(b)..b]);
+        }
+        (sum / n.max(1) as f64).sqrt()
+    }
+
+    /// Uniform noise of the given RMS (deterministic).
+    pub fn noise(len: usize, rms: f64) -> Vec<f32> {
+        let mut x: u64 = 0x2545_F491_4F6C_DD1D;
+        (0..len)
+            .map(|_| {
+                x ^= x << 13;
+                x ^= x >> 7;
+                x ^= x << 17;
+                let u = (x >> 11) as f64 / (1u64 << 53) as f64 * 2.0 - 1.0;
+                (u * rms * 3f64.sqrt()) as f32
+            })
+            .collect()
+    }
+
+    /// `samples` scaled so the speech spans have `speech_db` dBFS RMS, plus room noise at `noise_db`.
+    pub fn quiet_version(
+        samples: &[f32],
+        spans: &[(f64, f64)],
+        speech_db: f64,
+        noise_db: f64,
+    ) -> Vec<f32> {
+        let gain = 10f64.powf((speech_db - db(rms_over(samples, spans))) / 20.0) as f32;
+        let n = noise(samples.len(), 10f64.powf(noise_db / 20.0));
+        samples.iter().zip(n).map(|(s, n)| s * gain + n).collect()
+    }
+
+    /// A gating denoiser model: 20 ms frames under -50 dBFS are pushed down 1.5 dB per dB under
+    /// the gate, up to 40 dB (noise floor near -75 dBFS, quiet syllables lowered by 4 to 9 dB).
+    pub fn gate_denoise(samples: &[f32]) -> Vec<f32> {
+        let n = 16_000 / 50;
+        let mut out = Vec::with_capacity(samples.len());
+        for c in samples.chunks(n) {
+            let l =
+                db((c.iter().map(|s| f64::from(*s).powi(2)).sum::<f64>() / c.len() as f64).sqrt());
+            let atten = ((-50.0 - l) * 1.5).clamp(0.0, 40.0);
+            let g = 10f64.powf(-atten / 20.0) as f32;
+            out.extend(c.iter().map(|s| s * g));
+        }
+        out
+    }
+
+    /// Scales so the largest sample is `target_db` dBFS (the signal is left alone when silent).
+    pub fn normalize_peak(samples: &mut [f32], target_db: f64) {
+        let peak = samples.iter().fold(0.0f32, |m, s| m.max(s.abs()));
+        if peak > 1e-6 {
+            let g = 10f64.powf(target_db / 20.0) as f32 / peak;
+            samples.iter_mut().for_each(|s| *s *= g);
+        }
+    }
+
+    /// Scales so the RMS of the frames above the noise (the loudest 30 % of 20 ms frames) is
+    /// `target_db`, but never so far that the peak passes -1 dBFS.
+    pub fn normalize_loudness(samples: &mut [f32], target_db: f64) {
+        let n = 16_000 / 50;
+        let mut frames: Vec<f64> = samples
+            .chunks(n)
+            .filter(|c| c.len() == n)
+            .map(|c| (c.iter().map(|s| f64::from(*s).powi(2)).sum::<f64>() / n as f64).sqrt())
+            .collect();
+        if frames.is_empty() {
+            return;
+        }
+        frames.sort_by(f64::total_cmp);
+        let top = &frames[frames.len() * 7 / 10..];
+        let level = (top.iter().map(|r| r * r).sum::<f64>() / top.len() as f64).sqrt();
+        if level < 1e-6 {
+            return;
+        }
+        let peak = f64::from(samples.iter().fold(0.0f32, |m, s| m.max(s.abs())));
+        let g =
+            (10f64.powf(target_db / 20.0) / level).min(10f64.powf(-1.0 / 20.0) / peak.max(1e-9));
+        samples.iter_mut().for_each(|s| *s *= g as f32);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -287,6 +392,24 @@ mod tests {
             end,
             speaker: who.into(),
         }
+    }
+
+    #[test]
+    fn level_helpers_scale_gate_and_normalise() {
+        use super::levels::*;
+        let tone: Vec<f32> = (0..16_000).map(|i| 0.3 * (i as f32 * 0.2).sin()).collect();
+        let q = quiet_version(&tone, &[], -45.0, -90.0);
+        assert!((db(rms_over(&q, &[])) + 45.0).abs() < 0.5);
+        // A tone at -45 survives the gate; hiss at -60 is pushed far down.
+        assert!(db(rms_over(&gate_denoise(&q), &[])) > -47.0);
+        let hiss = noise(16_000, 10f64.powf(-60.0 / 20.0));
+        assert!(db(rms_over(&gate_denoise(&hiss), &[])) < -70.0);
+        let mut p = q.clone();
+        normalize_peak(&mut p, -3.0);
+        assert!((db(f64::from(p.iter().fold(0.0f32, |m, s| m.max(s.abs())))) + 3.0).abs() < 0.1);
+        let mut l = q;
+        normalize_loudness(&mut l, -20.0);
+        assert!((db(rms_over(&l, &[])) + 20.0).abs() < 1.0);
     }
 
     #[test]

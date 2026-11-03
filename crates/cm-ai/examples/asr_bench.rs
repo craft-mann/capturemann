@@ -23,6 +23,7 @@ use std::time::Instant;
 
 use cm_ai::audio::decode_16k_mono;
 use cm_ai::failure_kinds::{health, spread_repeats, word_coverage};
+use cm_ai::measure::levels;
 use cm_ai::measure::{word_errors, word_errors_without, DISFLUENCIES};
 use cm_ai::pieces::transcribe_pieces;
 use cm_ai::transcribe::{Pcm16k, Transcriber, Transcript};
@@ -108,6 +109,23 @@ fn main() {
             k += 1;
         }
     }
+    // Quiet-input variants (M2g item 3): `--quiet-db X` scales the speech to X dBFS RMS and adds
+    // room noise (`--noise-db`, default -60); `--gate` passes it through the gating-denoiser model;
+    // `--normalize peak|loudness` is the step being measured, applied after those.
+    if let Some(level) = option(&args, "--quiet-db").and_then(|v| v.parse::<f64>().ok()) {
+        let noise_db = option(&args, "--noise-db")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(-60.0);
+        samples = levels::quiet_version(&samples, &speech, level, noise_db);
+    }
+    if args.iter().any(|a| a == "--gate") {
+        samples = levels::gate_denoise(&samples);
+    }
+    match option(&args, "--normalize").as_deref() {
+        Some("peak") => levels::normalize_peak(&mut samples, -3.0),
+        Some("loudness") => levels::normalize_loudness(&mut samples, -20.0),
+        _ => {}
+    }
     let audio_secs = samples.len() as f64 / 16_000.0;
 
     let loaded = Instant::now();
@@ -141,7 +159,7 @@ fn main() {
     let h = health(&tr.words, &language);
     let spread = spread_repeats(&tr.words, 4, 10.0, 5);
     let mut out = json!({
-        "label": label, "model": model_id, "language": language, "gpu": gpu,
+        "label": label, "model": model_id, "quiet_db": option(&args, "--quiet-db"), "gate": args.iter().any(|a| a == "--gate"), "normalize": option(&args, "--normalize"), "language": language, "gpu": gpu,
         "audio_secs": audio_secs, "load_secs": load_secs, "transcribe_secs": secs,
         "rtf": audio_secs / secs,
         "reference_words": e.reference_words, "words": tr.words.len(),
