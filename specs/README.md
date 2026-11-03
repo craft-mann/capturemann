@@ -47,6 +47,7 @@ Plans for larger features and the design-kit traceability table live in `plans/`
 | `features/14-permissions.md` | Permissions | PRM-1 |
 | `features/15-voice.md` | Voice and meetings | VOC-1 … VOC-3 |
 | `features/17-redaction.md` | Redaction (Auto-redact kinds, benchmark, generated docs) | RED-1 … RED-3 |
+| `features/18-import.md` | Import media (probe, bundle, the `import` job and `import_media`, remove originals, the app's sheet) | IMP-1 … IMP-5 |
 
 Related: `../design/` (brand and UI kit, source of truth for visuals; start at `../design/CLAUDE.md`), `../docs/development/design-surfaces.md` (surfaces mapped to the kit), `plans/design-implementation.md` (kit traceability and build status), `../docs/project/spikes.md` (feasibility results).
 
@@ -106,13 +107,13 @@ Used by the GUI, MCP (`error.data.code`), JSON-RPC and CLI exit codes.
 
 | Code | CLI exit | Meaning |
 | --- | --- | --- |
-| `invalid_input` | 2 | Bad or missing parameter; message names the field |
+| `invalid_input` | 2 | Bad or missing parameter; message names the field. May carry `data.reason` (see "Reasons" below) |
 | `not_found` | 2 | Capture, target, device, job or account id doesn't exist |
 | `user_declined` | 3 | User refused a confirmation |
 | `confirmation_timeout` | 3 | No answer within 5 minutes |
-| `permission_missing` | 4 | OS permission absent; `data.permission` = `screen` · `camera` · `microphone` · `accessibility` · `input_monitoring` |
+| `permission_missing` | 4 | OS permission absent; `data.permission` = `screen` · `camera` · `microphone` · `accessibility` · `input_monitoring` · `files` (reading a file or folder in a protected place such as Desktop, Documents, Downloads or an external or network drive; `data.path`; IMP-3) |
 | `device_busy` | 5 | Camera or mic in exclusive use by another app |
-| `disk_full` | 5 | Below the free-space floor (NFR-7) |
+| `disk_full` | 5 | Below the free-space floor (NFR-7); an import adds `data.needed_bytes` and `data.free_bytes` |
 | `network` | 5 | Transient network failure (retryable) |
 | `platform_rejected` | 5 | Platform API refused; `data.platform_code` carries the platform's error |
 | `auth_expired` | 5 | Token revoked or expired; connection needs reconnect |
@@ -121,6 +122,8 @@ Used by the GUI, MCP (`error.data.code`), JSON-RPC and CLI exit codes.
 | `internal` | 1 | Unexpected internal, I/O or database failure not covered by another code |
 | `daemon_unavailable` | 5 | Client cannot reach the daemon (not running, socket refused); start it and retry |
 | `not_implemented` | 1 | Feature or platform backend not built yet (an action with no engine in this build, or a Windows backend that is still a stub). JSON-RPC `-32099`. Exit 1 is shared with `internal` on purpose: both mean "not your input, not a retry"; read the code to tell them apart |
+
+**Reasons (`error.data.reason`).** A code may carry a machine-readable `data.reason`; the code stays one of the 15 above (decided for import on Nov 3, 2026, IMP-1 to IMP-3: the kit's `unsupported_format`, `protected_media` and `unreadable_file` are reasons of `invalid_input`, not new top-level codes, because they describe one file of a call that may have many, and a new code would change the CLI exit table, the JSON-RPC numbers and `cm-core`). Reasons used by import, all under `invalid_input` and also in each file's entry in an `import` job's result: `folder_not_supported` (a folder was given; files only), `unsupported_format` (the container or codec is recognised and not supported yet; `data.format` or `data.codec` names it), `protected_media` (DRM or encryption), `unreadable_file` (truncated, corrupt, empty or changed while being read; `data.detail` may say `changed`), `no_streams` (no usable video or audio stream), `nothing_to_import` (no file of the call can be imported), `inside_library` (the file is inside the library folder), `changed_since_approval` (a file changed after the confirmation dialog listed it). `disk_full` and `permission_missing` keep their own codes. `move_library` reasons (`target_not_absolute`, ...) are listed in `02-agent-interface.md`.
 
 **Codes outside the table.** `method_not_found` and `invalid_request` are protocol errors of the JSON-RPC transport, not shared codes: the CLI maps any code outside the table to exit 1. `not_implemented` is a shared code (decided Oct 21, 2026, product maintainer): the daemon answers it (`-32099`, `error.data.code: "not_implemented"`) when an action is known but no engine implements it (for example `publish_video` and `delete_capture` today), and the platform stubs (the Windows encoder and capture, and the system-audio, camera and cursor recorders on unsupported systems) return it directly. Its payload is `{ "code": "not_implemented", "message": "<what is not built>", "data": null }`. `cm-core`'s `ErrorCode::NotImplemented` and `CmError::not_implemented(message)` carry it, so the table has 15 codes.
 
@@ -139,4 +142,8 @@ Used by the GUI, MCP (`error.data.code`), JSON-RPC and CLI exit codes.
 | Action | One user or agent intent on the action bus; one undo step |
 | Job | Persisted background work (export, transcribe, upload, publish) |
 | `MediaTime` | i64 ticks, 120,000 per second, on the recording's session clock |
-| Confirm tier | Actions that require an on-screen confirmation even when an agent calls them |
+| Confirm tier | Actions that require an on-screen confirmation even when an agent calls them. A tool's tier can depend on one parameter (`import_media` with `remove_originals: true`, `02-agent-interface.md`) |
+| Import | Bringing a media file that was not recorded by CaptureMann into the library as a capture (`import_media`, `features/18-import.md`) |
+| Imported capture | A capture whose manifest has `source { path, imported_at, original_name, original_file }`; a `recording` or `audio` bundle with no cursor and no camera track |
+| Editing copy | A constant-frame-rate H.264 or HEVC file made at import from a "Prepared for editing" video (variable frame rate, MKV, rotation, odd pixel format); the original stays in the bundle as the master |
+| Prepared for editing | The import status of a file that needs an editing copy (blue); the others are Ready (green) or Can't import (amber) |
