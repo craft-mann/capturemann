@@ -609,6 +609,10 @@ impl Inner {
                     let dir = lib.bundle_path(r);
                     v["uploads"] = Value::Array(cm_library::uploads_of(&dir));
                     v["publishes"] = Value::Array(cm_library::publishes_of(&dir));
+                    // An imported capture (IMP-2) carries its `source`.
+                    if let Some(s) = cm_library::source_of(&dir) {
+                        v["source"] = s;
+                    }
                     // Transcript matches (search only): the snippet around the hit and where in
                     // the recording it starts.
                     if searching {

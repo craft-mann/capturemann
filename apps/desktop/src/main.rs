@@ -548,6 +548,10 @@ fn main() {
                     {
                         cx.update(|cx| cm_desktop::ui::ai::on_event(&app2, &ev, cx));
                     }
+                    // Import media: progress on the cards and the toast, the result.
+                    if ev.name.starts_with("job.") {
+                        cx.update(|cx| cm_desktop::ui::import_actions::on_event(&app2, &ev, cx));
+                    }
                     // The publish sheet follows its job (PUB-2).
                     if ev.name.starts_with("job.") {
                         cx.update(|cx| cm_desktop::ui::publish_sheet::on_event(&app2, &ev, cx));

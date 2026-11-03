@@ -494,6 +494,13 @@ fn read_manifest_value(dir: &Path) -> Result<Value, CmError> {
     serde_json::from_str(&text).map_err(|e| json_err(MANIFEST_FILE, &e))
 }
 
+/// `manifest.source` of an imported capture (IMP-2), `None` for a recording or a screenshot.
+pub fn source_of(dir: &Path) -> Option<Value> {
+    let text = fs::read_to_string(dir.join(MANIFEST_FILE)).ok()?;
+    let v: Value = serde_json::from_str(&text).ok()?;
+    v.get("source").filter(|s| s.is_object()).cloned()
+}
+
 /// The `uploads` records of a bundle (`.cmrec` or `.cmshot`), oldest first: `{ destination_id,
 /// destination, what, remote_id, bytes, share_link, at }`. A bundle without any, or one whose
 /// manifest cannot be read, has none.

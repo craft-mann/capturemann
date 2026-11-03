@@ -398,6 +398,48 @@ impl Sheet {
     }
 }
 
+/// Everything the import UI keeps in the app model.
+#[derive(Debug, Clone, Default)]
+pub struct ImportUi {
+    /// The sheet while it is open.
+    pub sheet: Option<Sheet>,
+    /// Imports started in this run (the cards, the toast).
+    pub runs: Vec<ImportRun>,
+    /// What is being dragged over the window now (the drop overlay).
+    pub hover: Option<DropCount>,
+    /// The job toast.
+    pub toast_id: Option<u64>,
+    /// Bumped when the rows of the sheet change (its title fields are rebuilt).
+    pub epoch: u64,
+}
+
+impl ImportUi {
+    /// The card of a capture id, for the library grid.
+    pub fn card_for(&self, capture_id: &str) -> Option<&Card> {
+        self.runs
+            .iter()
+            .flat_map(|r| r.cards.iter())
+            .find(|c| c.capture_id.as_deref() == Some(capture_id) && !c.dismissed)
+    }
+
+    /// Cards that never became a capture (failed files), newest run first.
+    pub fn failed_cards(&self) -> Vec<(usize, usize, &Card)> {
+        let mut out = Vec::new();
+        for (ri, r) in self.runs.iter().enumerate().rev() {
+            for (ci, c) in r.cards.iter().enumerate() {
+                if !c.dismissed && matches!(c.state, CardState::Failed(_)) {
+                    out.push((ri, ci, c));
+                }
+            }
+        }
+        out
+    }
+
+    pub fn running(&self) -> Option<&ImportRun> {
+        self.runs.iter().rev().find(|r| r.running())
+    }
+}
+
 // ---- the drop overlay (board I1) ----------------------------------------------------------
 
 /// What a drop holds, counted for the overlay.

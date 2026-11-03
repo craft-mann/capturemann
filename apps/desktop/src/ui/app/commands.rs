@@ -63,6 +63,7 @@ pub fn handle_command(app: &Entity<AppModel>, cmd: Command, cx: &mut App) {
         Command::Capture(mode) => start_capture(app, mode, cx),
         Command::ShowLibrary => navigate(app, Route::Library, cx),
         Command::ShowSettings => navigate(app, Route::Settings, cx),
+        Command::ImportFiles(paths) => crate::ui::import_actions::open(app, paths, cx),
         Command::OpenCapture(id) => navigate(app, Route::Editor(id), cx),
         Command::ToastAction(a) => toast_action(app, a, cx),
         Command::Quit => quit(app, cx),

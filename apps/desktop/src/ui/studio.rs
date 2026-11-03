@@ -35,6 +35,7 @@ actions!(
         FocusSearch,
         ShowLibrary,
         ShowSettings,
+        ImportMedia,
         QuitApp,
         CloseWindow,
         FocusNext,
@@ -55,6 +56,7 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new("secondary-f", FocusSearch, None),
         KeyBinding::new("secondary-1", ShowLibrary, None),
         KeyBinding::new("secondary-,", ShowSettings, None),
+        KeyBinding::new("secondary-i", ImportMedia, None),
         KeyBinding::new("secondary-q", QuitApp, None),
         KeyBinding::new("secondary-w", CloseWindow, None),
         KeyBinding::new("tab", FocusNext, None),
@@ -72,6 +74,7 @@ pub fn bind_keys(cx: &mut App) {
 pub fn app_menus() -> Vec<Menu> {
     vec![Menu::new("CaptureMann").items([
         MenuItem::action(tr_ctx!("menu", "Library"), ShowLibrary),
+        MenuItem::action(tr_ctx!("menu", "Import file\u{2026}"), ImportMedia),
         MenuItem::action(tr_ctx!("menu", "Settings\u{2026}"), ShowSettings),
         MenuItem::separator(),
         MenuItem::action(tr!("Quit CaptureMann"), QuitApp),
@@ -89,6 +92,11 @@ pub fn install_app_actions(cx: &mut App) {
     cx.on_action(|_: &ShowLibrary, cx| {
         if let Some(app) = cx.try_global::<AppHandle>().map(|h| h.0.clone()) {
             app::handle_command(&app, Command::ShowLibrary, cx);
+        }
+    });
+    cx.on_action(|_: &ImportMedia, cx| {
+        if let Some(app) = cx.try_global::<AppHandle>().map(|h| h.0.clone()) {
+            app::handle_command(&app, Command::ImportFiles(Vec::new()), cx);
         }
     });
     cx.on_action(|_: &ShowSettings, cx| {
@@ -109,6 +117,8 @@ pub struct Studio {
     publish: Entity<PublishPage>,
     ai: Entity<AiPage>,
     published: Entity<PublishedView>,
+    /// The import sheet (IMP-5), drawn over the window while it is open.
+    import_sheet: Entity<crate::ui::import_sheet::ImportSheetView>,
     /// The toast cards drawn inside this window (Wayland banners, `AppModel::toasts_in_studio`).
     toast_host: Entity<crate::ui::toast_window::ToastHost>,
     /// The recording controls where a floating HUD would end up in the video (Linux).
@@ -131,6 +141,8 @@ impl Studio {
         let ai = cx.new(|cx| AiPage::new(app.clone(), cx));
         // Loads at once, so the sidebar number is real before the page is opened.
         let published = cx.new(|cx| PublishedView::new(app.clone(), cx));
+        let import_sheet =
+            cx.new(|cx| crate::ui::import_sheet::ImportSheetView::new(app.clone(), cx));
         let focus = cx.focus_handle();
         let toast_host = cx.new(|cx| crate::ui::toast_window::ToastHost::new(app.clone(), cx));
         let rec_banner =
@@ -164,6 +176,7 @@ impl Studio {
             publish,
             ai,
             published,
+            import_sheet,
             toast_host,
             rec_banner,
             shown: None,
@@ -346,6 +359,34 @@ impl Render for Studio {
             .on_action(cx.listener(|this, _: &ShowSettings, _, cx| {
                 app::set_route(&this.app, Route::Settings, cx)
             }))
+            .on_action(cx.listener(|this, _: &ImportMedia, _, cx| {
+                crate::ui::import_actions::open(&this.app, Vec::new(), cx)
+            }))
+            // Files dragged from Finder: counted for the overlay while they move, imported when
+            // dropped (folders are skipped, board I1).
+            .on_drag_move::<gpui::ExternalPaths>({
+                let app = self.app.clone();
+                move |ev, _, cx| {
+                    let paths = ev.drag(cx).paths().to_vec();
+                    let counts = crate::import_flow::count_drop(&paths, |p| p.is_dir());
+                    app.update(cx, |m, cx| {
+                        if m.import.hover.as_ref() != Some(&counts) {
+                            m.import.hover = Some(counts);
+                            cx.notify();
+                        }
+                    });
+                }
+            })
+            .on_drop::<gpui::ExternalPaths>({
+                let app = self.app.clone();
+                move |paths, _, cx| {
+                    app.update(cx, |m, cx| {
+                        m.import.hover = None;
+                        cx.notify();
+                    });
+                    crate::ui::import_actions::add_paths(&app, paths.paths().to_vec(), cx);
+                }
+            })
             .on_action(|_: &QuitApp, _, cx| {
                 match cx.try_global::<AppHandle>().map(|h| h.0.clone()) {
                     Some(app) => app::quit(&app, cx),
@@ -375,6 +416,13 @@ impl Render for Studio {
                     .children(title)
                     .child(div().flex_1().min_h(px(0.)).child(main)),
             )
+            .child(
+                crate::ui::import_sheet::drop_overlay(&t, self.app.read(cx).import.hover.as_ref())
+                    .drag_over::<gpui::ExternalPaths>(|s, _, _, _| s.visible()),
+            )
+            .when(self.app.read(cx).import.sheet.is_some(), |d| {
+                d.child(self.import_sheet.clone())
+            })
             // Board R9/R20: the app behind a pop-up sheet or dialog is greyed out, and a click on
             // it does nothing (the pop-up is a window of its own, so this is only a tint here).
             .when(dim, |d| {
