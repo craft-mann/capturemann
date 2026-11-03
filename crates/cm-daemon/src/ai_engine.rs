@@ -13,7 +13,7 @@ use cm_ai::caption::{build_captions, map_lines_to_timeline, to_srt, to_txt, to_v
 use cm_ai::model::{DownloadOutcome, DownloadProgress, ModelList, ModelStore};
 use cm_ai::recording::TranscribeOptions;
 use cm_ai::suggest::silence::{
-    decode_mono_f32, silence_cuts, veto_speech, SilenceOptions, ANALYSIS_RATE,
+    activity_spans, decode_mono_f32, silence_cuts, veto_speech, SilenceOptions, ANALYSIS_RATE,
 };
 use cm_ai::suggest::zoom::{suggest_zooms, ZoomOptions};
 use cm_ai::suggest::{filler::filler_cuts, merge_cuts, CutSuggestion, ZoomSuggestion};
@@ -360,6 +360,20 @@ fn cursor_log(
     CursorLog::read(&path)
 }
 
+/// The noise-reduced microphone file when the track keeps the raw one beside it.
+fn noise_reduced_copy(
+    bundle: &Path,
+    manifest: &cm_library::manifest::RecManifest,
+) -> Option<PathBuf> {
+    let t = manifest.tracks.get("mic")?;
+    let (file, raw) = (
+        t.get("file").and_then(Value::as_str)?,
+        t.get("raw_file").and_then(Value::as_str)?,
+    );
+    let path = bundle.join(file);
+    (file != raw && path.is_file()).then_some(path)
+}
+
 impl SuggestService for RealSuggest {
     fn zooms(&self, bundle_dir: &Path) -> Result<Vec<ZoomSuggestion>, CmError> {
         let manifest = read_manifest(bundle_dir)?;
@@ -413,6 +427,20 @@ impl SuggestService for RealSuggest {
                             .map(|s| cm_core::edit::Span::new(s.start, s.end)),
                     );
                 }
+            }
+            // The noise-reduced copy, when the track has one besides the raw file: steady room noise
+            // is gone there, so a stretch well over its own floor is something speech-like that the
+            // raw level rule and the transcript may both have missed (a quiet speaker).
+            if let Some(den) = noise_reduced_copy(bundle_dir, &manifest) {
+                let x = decode_mono_f32(&tools.ffmpeg, &den, ANALYSIS_RATE)?;
+                speech.extend(activity_spans(
+                    &x,
+                    ANALYSIS_RATE,
+                    start,
+                    &manifest.gaps,
+                    20.0,
+                    0.2,
+                ));
             }
             silence = veto_speech(silence, &speech, &opts);
         } else if transcript.is_none() {

@@ -300,6 +300,52 @@ pub fn silence_cuts(
     Ok(out)
 }
 
+/// Stretches (session time) where the level is `above_db` dB over the track's own floor (10th
+/// percentile) for at least `min_s` seconds, with dips of up to 0.3 s bridged. On a noise-reduced
+/// copy this is where something speech-like survived the reduction: steady room noise is gone
+/// there, so a pause suggested from the raw level that lies over such a stretch is likely speech
+/// (a quiet speaker the raw level threshold missed). Used as evidence for [`veto_speech`].
+pub fn activity_spans(
+    samples: &[f32],
+    rate: u32,
+    track_start: MediaTime,
+    gaps: &[PauseGap],
+    above_db: f32,
+    min_s: f64,
+) -> Vec<Span> {
+    let levels = frame_levels(samples, rate);
+    if levels.is_empty() {
+        return Vec::new();
+    }
+    let mut sorted = levels.clone();
+    sorted.sort_by(f32::total_cmp);
+    let thr = sorted[sorted.len() / 10] + above_db;
+    let bridge = (0.3 / FRAME_S) as usize;
+    let mut runs: Vec<(usize, usize)> = Vec::new();
+    for (i, l) in levels.iter().enumerate() {
+        if *l <= thr {
+            continue;
+        }
+        match runs.last_mut() {
+            Some(last) if i <= last.1 + bridge => last.1 = i + 1,
+            _ => runs.push((i, i + 1)),
+        }
+    }
+    let mut gaps = gaps.to_vec();
+    gaps.sort_by_key(|g| g.from);
+    let base = session_to_file(&gaps, track_start).ticks();
+    let frame_ticks = ticks_of(FRAME_S);
+    runs.into_iter()
+        .filter(|(a, b)| (b - a) as f64 * FRAME_S >= min_s)
+        .map(|(a, b)| {
+            Span::new(
+                MediaTime::from_ticks(file_to_session(&gaps, a as i64 * frame_ticks + base, true)),
+                MediaTime::from_ticks(file_to_session(&gaps, b as i64 * frame_ticks + base, false)),
+            )
+        })
+        .collect()
+}
+
 /// Removes from the pause suggestions every stretch that other evidence says is speech: `speech` are
 /// spans in session time (spoken words from the transcript, speaker turns from the speaker
 /// engine). A suggestion that overlaps a span, widened by [`VETO_PAD_S`] on both sides, is cut

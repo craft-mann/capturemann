@@ -965,3 +965,30 @@ fn m2g_a_user_level_uses_the_fixed_rule() {
     assert_eq!(o.silence_db, -35.0);
     assert!(SilenceOptions::default().adaptive);
 }
+
+/// M2g: a quiet speaker the raw level rule would call silence is seen on the noise-reduced copy,
+/// where the room noise is gone: the stretch becomes evidence and the veto removes the pause.
+#[test]
+fn m2g_activity_on_the_noise_reduced_copy_vetoes_a_pause() {
+    // Raw: speech at -45 dBFS with room noise at -40: no usable gap between them, the raw rule
+    // sees one flat level (nothing separates, nothing is suggested), so use the pause list of the
+    // fixed rule to stand for "the raw rule called 8 to 18 s a pause".
+    let spans = [(0.0, 8.0), (10.0, 18.0), (21.0, 30.0)];
+    let denoised = gated(&quiet_speech(30.0, &spans, -45.0, -60.0));
+    let act = activity_spans(&denoised, RATE, MediaTime::ZERO, &[], 20.0, 0.2);
+    // One stretch per speech span (the syllables are bridged), none over the pauses.
+    assert!(act.len() >= 3, "{act:?}");
+    let over_pauses = act
+        .iter()
+        .filter(|s| {
+            (secs(s.from) > 8.3 && secs(s.to) < 9.7) || (secs(s.from) > 18.3 && secs(s.to) < 20.7)
+        })
+        .count();
+    assert_eq!(over_pauses, 0, "{act:?}");
+    // A pause that the raw rule put over the second speech span is vetoed by it.
+    let kept = veto_speech(vec![cut(9.0, 19.0)], &act, &SilenceOptions::default());
+    assert!(
+        kept.is_empty() || kept.iter().all(|c| secs(c.end) - secs(c.start) < 1.0),
+        "{kept:#?}"
+    );
+}
