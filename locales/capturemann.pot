@@ -6482,6 +6482,9 @@ msgstr ""
 msgid "{size} · External"
 msgstr ""
 
+msgid "{sound} at {time}"
+msgstr ""
+
 msgid "{start} · {scale}× · {reason}"
 msgstr ""
 
@@ -8697,6 +8700,14 @@ msgstr ""
 
 msgctxt "sort key"
 msgid "Title"
+msgstr ""
+
+msgctxt "sound entry"
+msgid "[noise]"
+msgstr ""
+
+msgctxt "sound entry"
+msgid "[unclear]"
 msgstr ""
 
 msgctxt "speech model"

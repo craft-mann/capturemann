@@ -11505,3 +11505,17 @@ msgstr "nhập"
 msgctxt "menu"
 msgid "Import file…"
 msgstr "Nhập tệp…"
+
+#, fuzzy
+msgctxt "sound entry"
+msgid "[noise]"
+msgstr "[tiếng ồn]"
+
+#, fuzzy
+msgctxt "sound entry"
+msgid "[unclear]"
+msgstr "[không rõ]"
+
+#, fuzzy
+msgid "{sound} at {time}"
+msgstr "{sound} lúc {time}"

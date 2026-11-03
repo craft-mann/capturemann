@@ -14,6 +14,7 @@ pub mod glossary;
 pub mod jobs;
 pub mod models;
 pub mod report_offer;
+pub mod sounds;
 pub mod suggest;
 pub mod summary;
 pub mod voice;

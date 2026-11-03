@@ -237,6 +237,8 @@ pub enum Row {
     Turn(usize),
     /// An index into the markers.
     Marker(usize),
+    /// An index into the visible sounds (`[unclear]`, `[noise]`, M2i).
+    Sound(usize),
 }
 
 /// The turns with the markers between them: a marker goes before the first turn that starts at
@@ -255,11 +257,37 @@ pub fn rows(turns: &[Turn], markers: &[MarkerView]) -> Vec<Row> {
     out
 }
 
+/// [`rows`] with the sounds put in by time: a sound goes before the first turn or marker that
+/// starts after it, and the later ones at the end. `sounds` are sorted by start.
+pub fn rows_with_sounds(
+    turns: &[Turn],
+    markers: &[MarkerView],
+    sounds: &[crate::ai::sounds::SoundRow],
+) -> Vec<Row> {
+    let base = rows(turns, markers);
+    let time_of = |r: &Row| match r {
+        Row::Turn(i) => turns[*i].start,
+        Row::Marker(i) => markers[*i].at,
+        Row::Sound(_) => MediaTime::ZERO,
+    };
+    let mut out = Vec::with_capacity(base.len() + sounds.len());
+    let mut next = 0;
+    for r in base {
+        while next < sounds.len() && sounds[next].start < time_of(&r) {
+            out.push(Row::Sound(next));
+            next += 1;
+        }
+        out.push(r);
+    }
+    out.extend((next..sounds.len()).map(Row::Sound));
+    out
+}
+
 /// The index in `rows` of the turn that holds caption line `line`.
 pub fn row_of_line(rows: &[Row], turns: &[Turn], line: usize) -> Option<usize> {
     rows.iter().position(|r| match r {
         Row::Turn(t) => turns[*t].lines.contains(&line),
-        Row::Marker(_) => false,
+        Row::Marker(_) | Row::Sound(_) => false,
     })
 }
 
@@ -882,6 +910,32 @@ mod tests {
         ];
         assert_eq!(line_speaker(&l, &words, &labels), (Some(2), false));
         assert_eq!(line_speaker(&l, &[], &[]), (None, false));
+    }
+
+    /// M2i: a sound entry goes between the turns by time (after a marker that starts earlier,
+    /// before a turn that starts later), and the ones after the last turn go at the end.
+    #[test]
+    fn sounds_go_between_the_turns_by_time() {
+        let (lines, words, labels) = sample();
+        let turns = build_turns(&lines, &words, &labels);
+        let first = turns[0].start;
+        let last = turns.last().unwrap().start;
+        let at = |ticks: i64| crate::ai::sounds::SoundRow {
+            index: 0,
+            kind: cm_ai::transcribe::SoundKind::Noise,
+            start: MediaTime::from_ticks(ticks),
+            end: MediaTime::from_ticks(ticks + 1),
+            speaker: None,
+        };
+        let sounds = vec![at(first.ticks() - 1), at(last.ticks() + 1)];
+        let r = rows_with_sounds(&turns, &[], &sounds);
+        assert_eq!(r.first(), Some(&Row::Sound(0)));
+        assert_eq!(r.last(), Some(&Row::Sound(1)));
+        assert_eq!(r.len(), turns.len() + 2);
+        // No sounds: the same rows as before.
+        assert_eq!(rows_with_sounds(&turns, &[], &[]), rows(&turns, &[]));
+        // A sound is never a line of a turn.
+        assert_eq!(row_of_line(&r, &turns, 0), Some(1));
     }
 
     /// V4: markers sit between the turns, in time order, and the last ones go at the end.
