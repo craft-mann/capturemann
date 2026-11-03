@@ -39,8 +39,10 @@ Goal: nothing a user can see gets stuck, and failures leave a report.
 2. **Window lifetime audit.** Every floating surface (panel, bubble, toast, overlay, launcher) gets one owner, one close
    path and a test that a failed close is retried or reported. Applies to Windows and Linux hosts too (shared code in
    `apps/desktop`).
-3. **Long-session health.** A 3-hour soak of recording plus the library open (`tests/manual/VOC-1.md` soak,
-   `REC-*`), memory and file-handle growth recorded in a report.
+3. **Long-session health.** Changed Nov 3, 2026 (maintainer): the 3-hour soak is **not** a 0.2.7 gate and is not
+   scheduled; first the product must handle **short audio (about 15 s)** and **medium audio (1 hour and more)**
+   well. The soak plan (`tests/manual/M1-SOAK.md`, `scripts/soak/sample.sh`) stays for later; for 0.2.7 the memory and
+   file-handle sampler is run on a 1 hour recording instead, when the maintainer gives a slot.
 4. **Intel confirmation.** Ask for one more Intel report or borrow a machine; until then the Intel DMG stays
    "built on Apple Silicon, checked under Rosetta" in every public text.
 5. **Errors in the app log.** `desktop.log` shows `RefCell already borrowed` (3 to 47 per session, always in a burst of
@@ -57,6 +59,13 @@ open with the evidence listed.
 
 Everything starts with a **benchmark that exists before the change**, stored under `verification/benchmarks/`, so
 every claim is a before/after on the same data. Public wording: "measured on ...", never "accurate".
+
+### Audio length targets (maintainer, Nov 3, 2026)
+Every M2 benchmark and fix is checked at two lengths before anything longer: **short (about 15 s)** and **medium
+(1 hour and more)**. Short clips: transcription, speaker labels, silence suggestions and reports behave sensibly (no
+garbage first words, no "no speech" on a clip with speech, no pauses cut at the edges, a 15 s clip finishes in seconds,
+speaker count not forced). Medium: the 1 hour and the 88 minute cases of `docs/project/performance.md`. 3 to 5 hours is
+out of scope for 0.2.7. Each report lists its short and medium rows.
 
 ### M2a Transcription
 - Build a word-error-rate (WER) harness over public clips with reference text (English only, O1; no private recordings in the
