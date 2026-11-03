@@ -55,8 +55,11 @@ pub fn add_paths(app: &Entity<AppModel>, paths: Vec<PathBuf>, cx: &mut App) {
         cx.notify();
     });
     if files.is_empty() {
+        // Only folders were dropped: nothing to show (an empty sheet is not left open).
         app.update(cx, |m, cx| {
-            if let Some(s) = m.import.sheet.as_mut() {
+            if m.import.sheet.as_ref().is_some_and(|s| s.rows.is_empty()) {
+                m.import.sheet = None;
+            } else if let Some(s) = m.import.sheet.as_mut() {
                 s.busy = false;
             }
             cx.notify();
