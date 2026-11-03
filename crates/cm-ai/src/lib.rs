@@ -46,6 +46,7 @@
 pub mod audio;
 pub mod caption;
 pub mod doubtful;
+pub mod failure_kinds;
 pub mod glossary;
 pub mod measure;
 pub mod model;

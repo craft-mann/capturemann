@@ -1,0 +1,244 @@
+//! Counters for the three transcript failure kinds found on a real meeting (release 0.2.7, M2d):
+//! speech that got no words, one short word recurring after long gaps, and characters that are not
+//! text. These are **measures for benchmarks and tests**, not repairs: they say how bad a
+//! transcript is, they never change it. A fix (re-reading uncovered speech, dropping spread-out
+//! repeats, re-decoding broken tokens) is a separate, later change that these numbers judge.
+//! General rules only: gaps, signal, confidence and character classes, never a list of phrases.
+
+use std::collections::HashMap;
+
+use crate::pieces::fold;
+use crate::transcribe::Word;
+
+fn secs(t: cm_core::MediaTime) -> f64 {
+    t.ticks() as f64 / cm_core::TICKS_PER_SECOND as f64
+}
+
+/// How much of the speech has words. `speech` are the stretches a voice-activity or speaker engine
+/// calls speech, in seconds; a second of speech is covered when a word lies within `pad` seconds.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Coverage {
+    pub speech_secs: f64,
+    pub covered_secs: f64,
+    /// Stretches of speech with no word near them, at least `min_gap` long, in seconds.
+    pub uncovered: Vec<(f64, f64)>,
+}
+
+impl Coverage {
+    /// Seconds of speech with words over seconds of speech (1.0 when there is no speech).
+    pub fn ratio(&self) -> f64 {
+        if self.speech_secs <= 0.0 {
+            1.0
+        } else {
+            (self.covered_secs / self.speech_secs).clamp(0.0, 1.0)
+        }
+    }
+
+    pub fn uncovered_secs(&self) -> f64 {
+        self.uncovered.iter().map(|(a, b)| b - a).sum()
+    }
+}
+
+/// Word coverage of `speech` by `words` (spans in seconds). Resolution: 50 ms.
+pub fn coverage(speech: &[(f64, f64)], words: &[(f64, f64)], pad: f64, min_gap: f64) -> Coverage {
+    const STEP: f64 = 0.05;
+    let mut spans: Vec<(f64, f64)> = words
+        .iter()
+        .map(|(a, b)| (a - pad, b.max(*a) + pad))
+        .collect();
+    spans.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let near_word = |t: f64| {
+        let i = spans.partition_point(|s| s.0 <= t);
+        // Spans are sorted by start but may differ in length: look back a little.
+        spans[i.saturating_sub(64)..i].iter().any(|s| t <= s.1)
+    };
+    let mut out = Coverage::default();
+    for &(a, b) in speech {
+        let n = ((b - a) / STEP).floor() as usize;
+        let mut gap_from: Option<f64> = None;
+        for k in 0..=n {
+            let t = a + k as f64 * STEP;
+            let last = k == n;
+            let covered = near_word(t);
+            if k < n {
+                out.speech_secs += STEP;
+                if covered {
+                    out.covered_secs += STEP;
+                }
+            }
+            match (covered, gap_from) {
+                (false, None) if !last => gap_from = Some(t),
+                (true, Some(g)) | (false, Some(g)) if covered || last => {
+                    let end = if covered { t } else { b };
+                    if end - g >= min_gap {
+                        out.uncovered.push((g, end));
+                    }
+                    gap_from = None;
+                }
+                _ => {}
+            }
+        }
+    }
+    out
+}
+
+/// [`coverage`] for transcript words.
+pub fn word_coverage(
+    speech: &[(f64, f64)],
+    words: &[Word],
+    pad: f64,
+    min_gap: f64,
+) -> Coverage {
+    let spans: Vec<(f64, f64)> = words.iter().map(|w| (secs(w.start), secs(w.end))).collect();
+    coverage(speech, &spans, pad, min_gap)
+}
+
+/// A word that keeps coming back after long gaps (a short word said again and again with silence
+/// or other speech-free time before each one, which an in-a-row loop check does not see).
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpreadRepeat {
+    /// The folded text.
+    pub text: String,
+    /// How many times it occurs with a long gap before it.
+    pub count: usize,
+    /// The words' start times, seconds.
+    pub at: Vec<f64>,
+    /// Their mean confidence.
+    pub mean_confidence: f32,
+}
+
+/// Words (folded text up to `max_chars` letters) that occur at least `min_count` times, each time
+/// after a gap of at least `min_gap` seconds from the word before it. Several occurrences of the
+/// same short text, each alone after a long silence, are rarely speech.
+pub fn spread_repeats(
+    words: &[Word],
+    max_chars: usize,
+    min_gap: f64,
+    min_count: usize,
+) -> Vec<SpreadRepeat> {
+    let mut by_text: HashMap<String, Vec<(f64, f32)>> = HashMap::new();
+    for (i, w) in words.iter().enumerate() {
+        let text = fold(&w.text);
+        if text.is_empty() || text.chars().count() > max_chars {
+            continue;
+        }
+        let gap = if i == 0 {
+            f64::INFINITY
+        } else {
+            secs(w.start) - secs(words[i - 1].end)
+        };
+        if gap >= min_gap {
+            by_text
+                .entry(text)
+                .or_default()
+                .push((secs(w.start), w.confidence));
+        }
+    }
+    let mut out: Vec<SpreadRepeat> = by_text
+        .into_iter()
+        .filter(|(_, v)| v.len() >= min_count)
+        .map(|(text, v)| SpreadRepeat {
+            text,
+            count: v.len(),
+            mean_confidence: v.iter().map(|x| x.1).sum::<f32>() / v.len() as f32,
+            at: v.iter().map(|x| x.0).collect(),
+        })
+        .collect();
+    out.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.text.cmp(&b.text)));
+    out
+}
+
+/// A coarse writing system, enough to tell Latin text from Hangul or Cyrillic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Script {
+    Latin,
+    Cyrillic,
+    Greek,
+    Arabic,
+    Hebrew,
+    Devanagari,
+    Thai,
+    Hangul,
+    Kana,
+    Han,
+    Other,
+}
+
+/// The script of a letter (`None` for digits, punctuation and symbols).
+pub fn script_of(c: char) -> Option<Script> {
+    if !c.is_alphabetic() {
+        return None;
+    }
+    let u = c as u32;
+    Some(match u {
+        0x0041..=0x024F | 0x1E00..=0x1EFF | 0x2C60..=0x2C7F | 0xA720..=0xA7FF | 0xFF21..=0xFF5A => {
+            Script::Latin
+        }
+        0x0370..=0x03FF | 0x1F00..=0x1FFF => Script::Greek,
+        0x0400..=0x052F => Script::Cyrillic,
+        0x0590..=0x05FF => Script::Hebrew,
+        0x0600..=0x06FF | 0x0750..=0x077F => Script::Arabic,
+        0x0900..=0x097F => Script::Devanagari,
+        0x0E00..=0x0E7F => Script::Thai,
+        0x1100..=0x11FF | 0x3130..=0x318F | 0xAC00..=0xD7AF => Script::Hangul,
+        0x3040..=0x30FF => Script::Kana,
+        0x3400..=0x4DBF | 0x4E00..=0x9FFF => Script::Han,
+        _ => Script::Other,
+    })
+}
+
+/// The scripts a transcript in `language` (`en`, `vi`, ...) may use. Languages not listed return
+/// `None`: no claim is made about them.
+pub fn expected_scripts(language: &str) -> Option<&'static [Script]> {
+    let base = language.split(['-', '_']).next().unwrap_or(language);
+    match base {
+        "en" | "vi" | "es" | "fr" | "de" | "it" | "pt" | "nl" | "pl" | "tr" | "id" | "sv" | "da"
+        | "no" | "fi" | "cs" | "ro" | "hu" => Some(&[Script::Latin]),
+        "ru" | "uk" | "bg" => Some(&[Script::Cyrillic, Script::Latin]),
+        "ko" => Some(&[Script::Hangul, Script::Latin]),
+        "ja" => Some(&[Script::Kana, Script::Han, Script::Latin]),
+        "zh" => Some(&[Script::Han, Script::Latin]),
+        _ => None,
+    }
+}
+
+/// Counts of words that do not look like text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Health {
+    pub words: usize,
+    /// Words containing U+FFFD.
+    pub replacement_char: usize,
+    /// Words with a letter in a script the language does not use.
+    pub foreign_script: usize,
+    /// Words under 5 % confidence.
+    pub low_confidence: usize,
+    /// Words that are foreign-script or U+FFFD *and* under 20 % confidence (the ones a fix would
+    /// re-decode first).
+    pub broken_and_doubtful: usize,
+}
+
+/// How many of `words` are broken for a transcript in `language`.
+pub fn health(words: &[Word], language: &str) -> Health {
+    let scripts = expected_scripts(language);
+    let mut h = Health {
+        words: words.len(),
+        ..Health::default()
+    };
+    for w in words {
+        let broken = w.text.contains('\u{FFFD}');
+        let foreign = scripts.is_some_and(|ok| {
+            w.text
+                .chars()
+                .filter_map(script_of)
+                .any(|s| !ok.contains(&s))
+        });
+        h.replacement_char += usize::from(broken);
+        h.foreign_script += usize::from(foreign);
+        h.low_confidence += usize::from(w.confidence < 0.05);
+        h.broken_and_doubtful += usize::from((broken || foreign) && w.confidence < 0.2);
+    }
+    h
+}
+
+#[cfg(test)]
+mod tests;
