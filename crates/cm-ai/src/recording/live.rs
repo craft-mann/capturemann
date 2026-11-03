@@ -32,6 +32,10 @@ pub struct LiveKey {
     pub file: String,
     /// File time of its first sample, in ticks.
     pub base: i64,
+    /// The decoder options of the run (settings of the transcription review), so that a state made
+    /// with other options is not used.
+    #[serde(default)]
+    pub variant: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,6 +82,7 @@ impl LiveRun {
         language: Option<&str>,
         prompt: Option<&str>,
         original_audio: bool,
+        variant: &str,
     ) -> Option<LiveRun> {
         let (track, base) = mic_of_lock(bundle, original_audio)?;
         let key = LiveKey {
@@ -87,6 +92,7 @@ impl LiveRun {
             original_audio,
             file: track.file_name()?.to_string_lossy().into_owned(),
             base: base.ticks(),
+            variant: variant.to_owned(),
         };
         let run = LiveTranscription::new(base, language, prompt);
         Some(LiveRun {

@@ -228,13 +228,35 @@ impl TranscribeService for RealTranscribe {
         // The model is resolved and loaded for this job only.
         let (id, path) = store(&self.root).resolve(Some(&req.model))?;
         let whisper;
-        let engine: &dyn Transcriber = match &self.engine {
+        let base: &dyn Transcriber = match &self.engine {
             Some(e) => e.as_ref(),
             None => {
-                whisper = WhisperTranscriber::load(&path, &id, true)?;
+                let mut w = WhisperTranscriber::load(&path, &id, true)?;
+                if !req.pipeline.carry_previous_text {
+                    w = w.with_n_max_text_ctx(0);
+                }
+                whisper = w;
                 &whisper
             }
         };
+        // The decoder options around the engine (each has a setting and an off switch).
+        let vad = (req.pipeline.vad_opinion && req.pipeline.gate)
+            .then(|| {
+                let root = self.root.clone().unwrap_or_else(ModelStore::default_root);
+                cm_ai::silero::vad_store(&root).path_of(cm_ai::silero::MODEL_ID)
+            })
+            .flatten()
+            .and_then(|p| cm_ai::silero::SileroVad::load(&p).ok());
+        let configured = cm_ai::pipeline::Configured {
+            inner: base,
+            vad: vad.as_ref(),
+            gate: req.pipeline.gate.then(Default::default),
+            normalize: req
+                .pipeline
+                .lift_quiet_input
+                .then(cm_ai::pipeline::Normalize::default),
+        };
+        let engine: &dyn Transcriber = &configured;
         let language = req.language.as_deref();
         // The glossary's terms prime the model (AI-6a); the job replaces the wrong spellings.
         let prompt = cm_ai::glossary::initial_prompt(&req.glossary);
@@ -244,6 +266,7 @@ impl TranscribeService for RealTranscribe {
             model_id: Some(&id),
             prompt: prompt.as_deref(),
             original_audio: req.original_audio,
+            variant: &format!("{:?}", req.pipeline),
         };
         match cm_ai::recording::transcribe_recording_resumable(
             &req.bundle_dir,
@@ -274,6 +297,7 @@ impl TranscribeService for RealTranscribe {
                 req.language.as_deref(),
                 prompt.as_deref(),
                 false,
+                &format!("{:?}", req.pipeline),
             );
         }
         let Some(r) = run.as_mut() else {
@@ -285,11 +309,31 @@ impl TranscribeService for RealTranscribe {
             None => {
                 // A background job beside a recording: two threads, so the recorder's audio path
                 // is never starved (the GPU does the work).
-                whisper = WhisperTranscriber::load(&path, &id, true)?.with_threads(2);
+                let mut w = WhisperTranscriber::load(&path, &id, true)?.with_threads(2);
+                if !req.pipeline.carry_previous_text {
+                    w = w.with_n_max_text_ctx(0);
+                }
+                whisper = w;
                 &whisper
             }
         };
-        match r.step(engine, progress) {
+        let vad = (req.pipeline.vad_opinion && req.pipeline.gate)
+            .then(|| {
+                let root = self.root.clone().unwrap_or_else(ModelStore::default_root);
+                cm_ai::silero::vad_store(&root).path_of(cm_ai::silero::MODEL_ID)
+            })
+            .flatten()
+            .and_then(|p| cm_ai::silero::SileroVad::load(&p).ok());
+        let configured = cm_ai::pipeline::Configured {
+            inner: engine,
+            vad: vad.as_ref(),
+            gate: req.pipeline.gate.then(Default::default),
+            normalize: req
+                .pipeline
+                .lift_quiet_input
+                .then(cm_ai::pipeline::Normalize::default),
+        };
+        match r.step(&configured, progress) {
             Err(e) if is_cancelled(&e) => Ok(0),
             other => other,
         }

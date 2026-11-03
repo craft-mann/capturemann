@@ -31,6 +31,11 @@ pub struct GateConfig {
     pub collapse_ms: f64,
     /// More words than this per second of the segment are a collapse.
     pub max_words_per_sec: f64,
+    /// Which signals are in use (each can be switched off; all on by default).
+    pub use_no_speech: bool,
+    pub use_vad: bool,
+    pub use_collapse: bool,
+    pub use_rate: bool,
 }
 
 impl Default for GateConfig {
@@ -42,6 +47,10 @@ impl Default for GateConfig {
             min_secs: 2.0,
             collapse_ms: 20.0,
             max_words_per_sec: 7.0,
+            use_no_speech: true,
+            use_vad: true,
+            use_collapse: true,
+            use_rate: true,
         }
     }
 }
@@ -93,7 +102,7 @@ pub fn mark(
     let mut run = 0usize;
     for (i, w) in words.iter().enumerate() {
         let (a, b) = times(w);
-        if (b - a) * 1000.0 <= cfg.collapse_ms {
+        if cfg.use_collapse && (b - a) * 1000.0 <= cfg.collapse_ms {
             run += 1;
             if run >= 3 {
                 out[i + 1 - run..=i].iter_mut().for_each(|m| *m = true);
@@ -117,7 +126,7 @@ pub fn mark(
             continue;
         }
         let secs = (sb - sa).max(1e-6);
-        let mut marked = seg.no_speech >= cfg.no_speech;
+        let mut marked = cfg.use_no_speech && seg.no_speech >= cfg.no_speech;
         // Words per second of speech-like time under the segment.
         // (When the energy rule found nothing to go by, the whole segment counts.)
         let speech_secs = if ev.energy.is_empty() {
@@ -125,10 +134,13 @@ pub fn mark(
         } else {
             (share_energy(ev.energy, sa - ev.origin, sb - ev.origin) * secs).max(0.25)
         };
-        if inside.len() as f64 / speech_secs > cfg.max_words_per_sec && inside.len() >= 4 {
+        if cfg.use_rate
+            && inside.len() as f64 / speech_secs > cfg.max_words_per_sec
+            && inside.len() >= 4
+        {
             marked = true;
         }
-        if !marked && secs >= cfg.min_secs && inside.len() >= 2 {
+        if cfg.use_vad && !marked && secs >= cfg.min_secs && inside.len() >= 2 {
             if let Some((probs, frame)) = ev.vad {
                 let vad = share_vad(
                     probs,

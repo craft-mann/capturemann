@@ -195,10 +195,18 @@ fn main() {
     let configured = cm_ai::pipeline::Configured {
         inner: &counting,
         vad: opinion.as_ref(),
-        gate: args
-            .iter()
-            .any(|a| a == "--gate")
-            .then(cm_ai::pieces::gate::GateConfig::default),
+        gate: args.iter().any(|a| a == "--gate").then(|| {
+            let mut g = cm_ai::pieces::gate::GateConfig::default();
+            let off = option(&args, "--gate-off").unwrap_or_default();
+            g.use_no_speech = !off.contains("ns");
+            g.use_rate = !off.contains("rate");
+            g.use_collapse = !off.contains("collapse");
+            g.use_vad = !off.contains("vad");
+            if let Some(v) = option(&args, "--gate-ns").and_then(|v| v.parse().ok()) {
+                g.no_speech = v;
+            }
+            g
+        }),
         normalize: None,
     };
     let engine: &dyn Transcriber = match &vad_first {

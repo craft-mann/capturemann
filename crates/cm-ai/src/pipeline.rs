@@ -33,6 +33,66 @@ impl Default for Normalize {
     }
 }
 
+/// Setting keys of the decoder options (all in `settings.json`, all with an off switch).
+pub const KEY_LIFT_QUIET_INPUT: &str = "ai.lift_quiet_input";
+pub const KEY_GATE: &str = "ai.hallucination_gate";
+pub const KEY_VAD_OPINION: &str = "ai.vad_opinion";
+pub const KEY_CARRY_TEXT: &str = "ai.carry_previous_text";
+
+/// Which of the review's behaviours are on for a run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PipelineSettings {
+    /// Quiet input is lifted (to -20 dBFS RMS, at most 15 dB) before decoding.
+    pub lift_quiet_input: bool,
+    /// The hallucination gate marks words the audio does not hold; they are read again.
+    pub gate: bool,
+    /// The voice-activity model, when it is installed, is the gate's second opinion.
+    pub vad_opinion: bool,
+    /// A window carries the text of the one before it (whisper.cpp's default). Off: no carry-over
+    /// (`n_max_text_ctx` 0), which also leaves the glossary prompt out of the decode (the glossary's
+    /// spellings are still applied to the words afterwards).
+    pub carry_previous_text: bool,
+}
+
+impl Default for PipelineSettings {
+    fn default() -> Self {
+        PipelineSettings {
+            lift_quiet_input: true,
+            gate: true,
+            vad_opinion: true,
+            carry_previous_text: false,
+        }
+    }
+}
+
+impl PipelineSettings {
+    /// The user's choices from the settings map; anything unset is the default.
+    pub fn from_settings(m: &serde_json::Map<String, serde_json::Value>) -> Self {
+        let d = Self::default();
+        let b = |k: &str, dflt: bool| {
+            m.get(k)
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(dflt)
+        };
+        PipelineSettings {
+            lift_quiet_input: b(KEY_LIFT_QUIET_INPUT, d.lift_quiet_input),
+            gate: b(KEY_GATE, d.gate),
+            vad_opinion: b(KEY_VAD_OPINION, d.vad_opinion),
+            carry_previous_text: b(KEY_CARRY_TEXT, d.carry_previous_text),
+        }
+    }
+
+    /// Everything as in 0.2.6.
+    pub fn all_off() -> Self {
+        PipelineSettings {
+            lift_quiet_input: false,
+            gate: false,
+            vad_opinion: false,
+            carry_previous_text: true,
+        }
+    }
+}
+
 /// A decoder with the options of the review around it.
 pub struct Configured<'a> {
     pub inner: &'a dyn Transcriber,
@@ -141,6 +201,24 @@ mod tests {
         (0..secs * 16_000)
             .map(|i| (a * (f64::from(i as u32) * 0.05).sin()) as f32)
             .collect()
+    }
+
+    #[test]
+    fn the_settings_default_to_the_stack_and_each_has_an_off_switch() {
+        let none = serde_json::Map::new();
+        assert_eq!(
+            PipelineSettings::from_settings(&none),
+            PipelineSettings::default()
+        );
+        let mut m = serde_json::Map::new();
+        for k in [KEY_LIFT_QUIET_INPUT, KEY_GATE, KEY_VAD_OPINION] {
+            m.insert(k.into(), serde_json::Value::Bool(false));
+        }
+        m.insert(KEY_CARRY_TEXT.into(), serde_json::Value::Bool(true));
+        assert_eq!(
+            PipelineSettings::from_settings(&m),
+            PipelineSettings::all_off()
+        );
     }
 
     #[test]

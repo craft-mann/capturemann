@@ -38,6 +38,8 @@ pub struct TranscribeOptions<'a> {
     /// needs, so the original sometimes reads better; it makes no difference to a recording
     /// made without noise reduction.
     pub original_audio: bool,
+    /// The decoder options of the run, as text (see `LiveKey::variant`).
+    pub variant: &'a str,
 }
 
 /// Path of `transcript.json` in a bundle folder.
@@ -276,6 +278,7 @@ fn run_recording(
                         .map(|f| f.to_string_lossy().into_owned())
                         .unwrap_or_default(),
                     base: base.ticks(),
+                    variant: opts.variant.to_owned(),
                 };
                 from_live = live::resume_from_live(bundle, &key, &mixed);
                 from_live.as_ref()
