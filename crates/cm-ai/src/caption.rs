@@ -172,6 +172,32 @@ pub fn build_captions(words: &[Word]) -> Vec<CaptionLine> {
             };
         }
     }
+    normalize_lines(lines)
+}
+
+/// The shortest time a line is kept on screen when words are stacked at one instant (seconds).
+const MIN_STACKED_SECS: f64 = 0.25;
+
+/// Makes lines valid for `set_captions`: in order, each ending after it starts, none starting before
+/// the previous one ends. Whisper's word times can collapse several words onto one instant (zero
+/// length each), which used to build a line that starts and ends at the same tick; saving such a
+/// line failed with "end: must be after start" on the first edit. A line that has no room is given
+/// `MIN_STACKED_SECS` and the lines after it are moved later just enough to keep the order. Text
+/// is never changed, and lines that were already valid are returned as they were.
+pub fn normalize_lines(mut lines: Vec<CaptionLine>) -> Vec<CaptionLine> {
+    let min = ticks_of(MIN_STACKED_SECS);
+    let mut prev_end: Option<MediaTime> = None;
+    for line in &mut lines {
+        if let Some(pe) = prev_end {
+            if line.start < pe {
+                line.start = pe;
+            }
+        }
+        if line.end < line.start + min && line.end <= line.start {
+            line.end = line.start + min;
+        }
+        prev_end = Some(line.end);
+    }
     lines
 }
 
@@ -380,6 +406,59 @@ mod tests {
             end: media_secs(end),
             confidence: 0.9,
         }
+    }
+
+    fn valid_for_save(lines: &[CaptionLine]) -> bool {
+        lines.iter().all(|l| l.end > l.start) && lines.windows(2).all(|p| p[1].start >= p[0].end)
+    }
+
+    /// Words that Whisper stacked on one instant (zero length) made zero-length caption lines, and
+    /// saving them failed with "end: must be after start" on the first edit.
+    #[test]
+    fn words_stacked_on_one_instant_build_lines_that_can_be_saved() {
+        // Two sentences whose words all sit on the same instant: the first line ends where the
+        // next one starts, so it had no room and came out with end == start.
+        let words = vec![
+            w("How", 5.0, 5.0),
+            w("are", 5.0, 5.0),
+            w("you?", 5.0, 5.0),
+            w("Good", 5.0, 5.0),
+            w("thanks", 5.0, 5.0),
+            w("again.", 5.0, 5.0),
+            w("Later", 9.0, 9.4),
+            w("on.", 9.4, 9.8),
+        ];
+        let lines = build_captions(&words);
+        assert!(lines.len() >= 2, "{lines:?}");
+        assert!(valid_for_save(&lines), "{lines:?}");
+        let text: Vec<_> = lines
+            .iter()
+            .flat_map(|l| l.text.split_whitespace())
+            .collect();
+        assert_eq!(text.len(), 8, "no word is lost: {lines:?}");
+    }
+
+    #[test]
+    fn normalize_repairs_stored_lines_and_keeps_valid_ones() {
+        let l = |a: f64, b: f64, t: &str| CaptionLine {
+            start: media_secs(a),
+            end: media_secs(b),
+            text: t.into(),
+        };
+        let good = vec![l(0.0, 2.0, "a"), l(2.0, 4.0, "b")];
+        assert_eq!(normalize_lines(good.clone()), good);
+        let broken = vec![
+            l(0.0, 2.0, "a"),
+            l(3.0, 3.0, "b"),
+            l(3.0, 3.0, "c"),
+            l(3.0, 5.0, "d"),
+        ];
+        let fixed = normalize_lines(broken);
+        assert!(valid_for_save(&fixed), "{fixed:?}");
+        assert_eq!(
+            fixed.iter().map(|x| x.text.as_str()).collect::<Vec<_>>(),
+            ["a", "b", "c", "d"]
+        );
     }
 
     fn cue(start: f64, text: &str) -> CaptionLine {

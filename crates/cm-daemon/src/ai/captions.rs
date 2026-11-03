@@ -12,6 +12,14 @@ impl Inner {
         blocking(move || {
             let (dir, manifest) = recording_bundle(&library, &id)?;
             if let Some(stored) = cm_library::rec_edit::captions_of(&manifest).cloned() {
+                // Lines stored by an earlier build may start and end at one instant; the editor
+                // saves every line back, so repair them here (text is never changed).
+                let stored = match serde_json::from_value::<Vec<CaptionLine>>(stored.clone()) {
+                    Ok(v) => {
+                        serde_json::to_value(cm_ai::caption::normalize_lines(v)).unwrap_or(stored)
+                    }
+                    Err(_) => stored,
+                };
                 return Ok(json!({"capture_id": id, "lines": stored, "source": "edited"}));
             }
             let path = dir.join(TRANSCRIPT_FILE);
