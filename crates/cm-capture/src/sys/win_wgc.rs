@@ -470,15 +470,20 @@ impl WgcCapture {
 
     /// Stops the capture. When this returns no event is delivered any more.
     pub fn stop(&mut self) {
+        log::info!("wgc stop: removing the handlers");
         let _ = self.pool.RemoveFrameArrived(self.arrived);
         let _ = self.item.RemoveClosed(self.closed);
+        log::info!("wgc stop: closing the session");
         let _ = self.session.Close();
+        log::info!("wgc stop: closing the pool");
         let _ = self.pool.Close();
+        log::info!("wgc stop: waiting for the last frame");
         // A handler that is mid-frame holds the lock; taking it waits for that frame, and
         // clearing the sink means no later handler call can reach the owner.
         let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         g.sink = None;
         g.staging = None;
+        log::info!("wgc stop: done");
     }
 }
 

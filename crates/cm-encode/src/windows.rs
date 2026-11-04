@@ -200,12 +200,15 @@ impl VideoEncoder for HardwareEncoder {
         }
         if let Some(tx) = self.tx.take() {
             // The queue may hold frames; the worker takes them first, then the finish.
+            log::info!("encoder finish: sending Finish");
             let _ = tx.send(Cmd::Finish);
         }
         if let Some(w) = self.worker.take() {
             let _ = w.join();
+            log::info!("encoder finish: the worker has ended");
         }
         let summary = self.writer.finish()?;
+        log::info!("encoder finish: the writer is finished");
         if summary.fragments.is_empty() {
             return Err(self.shared.get().unwrap_or_else(no_frames_error));
         }
@@ -248,7 +251,9 @@ fn worker_main(
                 shared.set(e);
             }
             // Dropping the session releases every COM object before the shutdown below.
+            log::info!("encoder worker: run ended, releasing the session");
             drop(s);
+            log::info!("encoder worker: session released");
         }
         Err(e) => {
             let _ = ready.send(Err(e));
@@ -257,6 +262,7 @@ fn worker_main(
     if started {
         // SAFETY: balances the successful MFStartup above; all objects are released.
         let _ = unsafe { MFShutdown() };
+        log::info!("encoder worker: MFShutdown done");
     }
     if com {
         // SAFETY: balances the successful CoInitializeEx above.

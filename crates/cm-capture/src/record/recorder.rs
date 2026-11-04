@@ -451,14 +451,18 @@ impl<S: ScreenSource, E: VideoEncoder<Frame = S::Frame>> TrackRecorder for Scree
             .running
             .take()
             .ok_or_else(|| CmError::invalid_input("The screen track is not recording"))?;
+        log::info!("screen stop: stopping the source");
         self.source.stop();
+        log::info!("screen stop: source stopped");
         run.stop_flag.store(true, Ordering::SeqCst);
         if let Some(h) = run.heartbeat {
             let _ = h.join();
         }
         let shared = run.shared;
         let mut p = lock(&shared.pipeline);
+        log::info!("screen stop: finishing the pipeline");
         let finished = p.finish(at);
+        log::info!("screen stop: pipeline finished");
         self.last_stats = p.stats().track_stats();
         let summary = finished?;
         let start = p.first_frame_session_time().unwrap_or(at);

@@ -195,6 +195,7 @@ mod imp {
     }
 
     pub fn main() {
+        cm_core::logging::init();
         let args = parse_args();
         let code = if let Some(b) = args.analyze_only.clone() {
             analyze_only(&args, &b)
