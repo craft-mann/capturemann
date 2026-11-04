@@ -1,11 +1,11 @@
-//! Runs the system audio check once for real: plays a 0.6 s chime through `/usr/bin/afplay` and
+//! Runs the system audio check once for real: plays a 0.6 s chime through `/usr/bin/afplay` (macOS) or PowerShell (Windows) and
 //! reports whether system audio capture heard it. It makes a sound and starts a system audio
 //! capture (Screen Recording permission), so run it by hand; it never prompts for permission.
 //!
 //!   cargo run -p cm-audio --example chime_probe
 
 use cm_audio::{
-    run_check, screen_recording_permission, system_audio_factory, AfplayPlayer, ChimeConfig,
+    run_check, screen_recording_permission, system_audio_factory, system_chime_player, ChimeConfig,
     ChimeOutcome,
 };
 
@@ -13,7 +13,7 @@ fn main() {
     println!("screen recording: {:?}", screen_recording_permission());
     let mut n = 0u32;
     let outcome = run_check(
-        &AfplayPlayer,
+        system_chime_player().as_ref(),
         system_audio_factory(Vec::new()),
         &ChimeConfig::default(),
         &mut |peak| {

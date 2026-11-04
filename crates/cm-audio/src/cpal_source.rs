@@ -17,7 +17,9 @@ pub fn map_cpal_error(e: &cpal::Error, what: &str) -> CmError {
         )),
         ErrorKind::PermissionDenied => CmError::permission_missing(
             Permission::Microphone,
-            "Microphone access is off. Turn it on in System Settings > Privacy & Security > Microphone.",
+            crate::PermissionState::Denied
+                .message()
+                .unwrap_or("Microphone access is off."),
         ),
         ErrorKind::DeviceNotAvailable => {
             CmError::not_found(format!("{what} is not available (unplugged?)"))
@@ -172,6 +174,15 @@ impl AudioSource for CpalSource {
     fn stop(&mut self) {
         // Dropping the stream stops the callbacks.
         self.stream = None;
+    }
+
+    fn gap_reason(&self) -> &'static str {
+        // A WASAPI loopback stream delivers no packets while nothing is playing.
+        if self.loopback {
+            "idle"
+        } else {
+            "dropout"
+        }
     }
 
     fn needs_reopen(&mut self) -> bool {

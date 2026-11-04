@@ -146,6 +146,55 @@ impl ChimePlayer for AfplayPlayer {
     }
 }
 
+/// The Windows player: PowerShell's `System.Media.SoundPlayer` on the WAV, whose path travels in an
+/// environment variable (never inside the script text, so no quoting can go wrong).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct PowerShellPlayer;
+
+/// Name of the environment variable that carries the WAV path to [`PowerShellPlayer`]'s script.
+const CHIME_PATH_VAR: &str = "CM_CHIME_WAV";
+
+/// The arguments of the PowerShell command that plays the file named by [`CHIME_PATH_VAR`].
+fn powershell_args() -> [&'static str; 5] {
+    [
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+    ]
+}
+
+/// The script text of the PowerShell command (plays to the end, fails if the file cannot play).
+fn powershell_script() -> String {
+    format!("(New-Object System.Media.SoundPlayer $env:{CHIME_PATH_VAR}).PlaySync()")
+}
+
+impl ChimePlayer for PowerShellPlayer {
+    fn play(&self, wav_path: &Path) -> Result<ChimeHandle, CmError> {
+        let child = Command::new("powershell.exe")
+            .args(powershell_args())
+            .arg(powershell_script())
+            .env(CHIME_PATH_VAR, wav_path)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|e| CmError::internal(format!("cannot start powershell.exe: {e}")))?;
+        Ok(ChimeHandle::new(Box::new(AfplayProcess(child))))
+    }
+}
+
+/// The chime player of this system: `afplay` on macOS, PowerShell on Windows. Other systems get
+/// `afplay`, whose start failure the check reports as it does today.
+pub fn system_chime_player() -> Box<dyn ChimePlayer> {
+    if cfg!(windows) {
+        Box::new(PowerShellPlayer)
+    } else {
+        Box::new(AfplayPlayer)
+    }
+}
+
 /// What a [`FakeChimePlayer`] does.
 pub enum FakeChimeScript {
     /// The process runs for `duration`, then exits with success. `on_play` runs when it starts (a
@@ -628,6 +677,17 @@ mod tests {
         let player = FakeChimePlayer::new(FakeChimeScript::ExitsFailing);
         let (out, _) = chime_test_check(&player, factory);
         assert!(matches!(out, ChimeOutcome::Failed(m) if m.contains("busy")));
+    }
+
+    #[test]
+    fn the_powershell_command_takes_the_path_from_the_environment() {
+        let script = powershell_script();
+        assert!(script.contains("$env:CM_CHIME_WAV"), "{script}");
+        assert!(script.contains("PlaySync"), "{script}");
+        // No file name can end up inside the script text.
+        assert!(!script.contains(".wav"));
+        assert!(powershell_args().contains(&"-NonInteractive"));
+        assert_eq!(powershell_args().last(), Some(&"-Command"));
     }
 
     #[test]
