@@ -70,6 +70,25 @@ impl Transcriber for Counting<'_> {
             .push((secs, began.elapsed().as_secs_f64()));
         r
     }
+
+    fn transcribe_careful(
+        &self,
+        audio: Pcm16k<'_>,
+        language: Option<&str>,
+        prompt: Option<&str>,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Transcript, CmError> {
+        let secs = audio.samples.len() as f64 / 16_000.0;
+        let began = Instant::now();
+        let r = self
+            .inner
+            .transcribe_careful(audio, language, prompt, progress);
+        self.calls
+            .lock()
+            .unwrap()
+            .push((secs, began.elapsed().as_secs_f64()));
+        r
+    }
 }
 
 fn main() {
@@ -161,6 +180,7 @@ fn main() {
 
     let loaded = Instant::now();
     let flash = args.iter().any(|a| a == "--flash-attn");
+    let careful = args.iter().any(|a| a == "--careful-rereads");
     let mut whisper = WhisperTranscriber::load_with(&model, &model_id, gpu, flash).unwrap();
     // --decode "beam=5,temp_inc=0,logprob=-0.7": decode parameters (see `DecodeParams::parse`).
     if let Some(spec) = option(&args, "--decode") {
@@ -168,6 +188,9 @@ fn main() {
     }
     if let Some(n) = option(&args, "--n-max-text-ctx").and_then(|v| v.parse::<i32>().ok()) {
         whisper = whisper.with_n_max_text_ctx(n);
+    }
+    if careful {
+        whisper = whisper.with_careful_rereads();
     }
     let prompt = option(&args, "--prompt");
     let load_secs = loaded.elapsed().as_secs_f64();
