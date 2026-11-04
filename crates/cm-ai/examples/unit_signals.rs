@@ -76,7 +76,8 @@ fn main() {
     // Speaker engine: its segments.
     let mut diar = vec![false; n];
     let have_diar = option(&args, "--diarization").map(|p| {
-        let v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap();
+        let v: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap();
         for s in v["segments"].as_array().unwrap() {
             let (a, b) = (
                 s["start"].as_f64().unwrap() / TICKS_PER_SECOND as f64,
@@ -142,11 +143,20 @@ fn main() {
         .map(|r| (r.start as f64 / 16_000.0, r.end as f64 / 16_000.0))
         .collect();
     let level_db = |a: f64, b: f64| {
-        let (i, j) = ((a * 16_000.0) as usize, ((b * 16_000.0) as usize).min(samples.len()));
+        let (i, j) = (
+            (a * 16_000.0) as usize,
+            ((b * 16_000.0) as usize).min(samples.len()),
+        );
         if j <= i {
             return -120.0;
         }
-        10.0 * (samples[i..j].iter().map(|s| f64::from(*s).powi(2)).sum::<f64>() / (j - i) as f64 + 1e-12).log10()
+        10.0 * (samples[i..j]
+            .iter()
+            .map(|s| f64::from(*s).powi(2))
+            .sum::<f64>()
+            / (j - i) as f64
+            + 1e-12)
+            .log10()
     };
     let unit_levels: Vec<f64> = units.iter().map(|u| level_db(u.0, u.1)).collect();
     let quiet_levels: Vec<f64> = quiet.iter().map(|q| level_db(q.0, q.1)).collect();

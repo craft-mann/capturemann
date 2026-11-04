@@ -89,8 +89,7 @@ fn main() {
         inner: &whisper,
         vad: None,
         gate: None,
-        normalize: (lift_call && !flag("--region-lift"))
-            .then(cm_ai::pipeline::Normalize::default),
+        normalize: (lift_call && !flag("--region-lift")).then(cm_ai::pipeline::Normalize::default),
     };
     let region = RegionLifted(&whisper);
     let engine: &dyn Transcriber = if flag("--region-lift") {
@@ -152,9 +151,8 @@ fn main() {
         pieces = rep.pieces;
         tr = t;
     }
-    let to_src = |t: MediaTime| {
-        media_secs(map.to_source_secs(t.ticks() as f64 / TICKS_PER_SECOND as f64))
-    };
+    let to_src =
+        |t: MediaTime| media_secs(map.to_source_secs(t.ticks() as f64 / TICKS_PER_SECOND as f64));
     for w in &mut tr.words {
         w.start = to_src(w.start);
         w.end = to_src(w.end);

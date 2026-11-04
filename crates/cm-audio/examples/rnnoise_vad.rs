@@ -6,7 +6,7 @@
 //! cargo run --release -p cm-audio --example rnnoise_vad -- <audio file>
 //! ```
 
-#![allow(clippy::unwrap_used)]
+#![allow(clippy::unwrap_used, clippy::chunks_exact_to_as_chunks)]
 
 use std::io::Read;
 use std::process::{Command, Stdio};
@@ -18,7 +18,10 @@ fn main() {
     let ffmpeg = std::env::var("CM_FFMPEG").unwrap_or_else(|_| "ffmpeg".into());
     let mut raw = Vec::new();
     Command::new(&ffmpeg)
-        .args(["-nostdin", "-v", "error", "-i", &input, "-vn", "-ac", "1", "-ar", "48000", "-f", "f32le", "pipe:1"])
+        .args([
+            "-nostdin", "-v", "error", "-i", &input, "-vn", "-ac", "1", "-ar", "48000", "-f",
+            "f32le", "pipe:1",
+        ])
         .stdout(Stdio::piped())
         .spawn()
         .unwrap()

@@ -148,8 +148,15 @@ fn report(
         "spans": c.spans.iter().map(|s| json!([s.0, s.1, s.2])).collect::<Vec<_>>(),
     });
     if show_text {
-        v["text"] = json!(hit.iter().map(|&i| words[i].text.as_str()).collect::<Vec<_>>().join(" "));
-        v["hits"] = json!(hit.iter().map(|&i| json!([secs(words[i].start), secs(words[i].end), words[i].text])).collect::<Vec<_>>());
+        v["text"] = json!(hit
+            .iter()
+            .map(|&i| words[i].text.as_str())
+            .collect::<Vec<_>>()
+            .join(" "));
+        v["hits"] = json!(hit
+            .iter()
+            .map(|&i| json!([secs(words[i].start), secs(words[i].end), words[i].text]))
+            .collect::<Vec<_>>());
     }
     if let (Some(o), Some(e)) = (v.as_object_mut(), extra.as_object()) {
         for (k, x) in e {
@@ -184,7 +191,9 @@ fn main() {
         let silent = if let Some(s) = option(&args, "--silent") {
             read_spans(Path::new(&s))
         } else {
-            let sp = read_spans(Path::new(&option(&args, "--speech").expect("--silent or --speech")));
+            let sp = read_spans(Path::new(
+                &option(&args, "--speech").expect("--silent or --speech"),
+            ));
             let total: f64 = option(&args, "--secs").expect("--secs").parse().unwrap();
             complement(&sp, guard, total)
         };
@@ -246,8 +255,12 @@ fn main() {
         .filter_map(|e| e.ok().map(|e| e.path()))
         .filter(|p| p.extension().is_some_and(|x| x == "wav"))
         .filter(|p| {
-            only.as_ref()
-                .is_none_or(|o| p.file_name().unwrap().to_string_lossy().contains(o.as_str()))
+            only.as_ref().is_none_or(|o| {
+                p.file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .contains(o.as_str())
+            })
         })
         .collect();
     wavs.sort();

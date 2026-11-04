@@ -27,7 +27,9 @@ fn samples_of(secs: f64) -> usize {
 
 fn frame_db(samples: &[f32]) -> Vec<f32> {
     samples
-        .chunks_exact(FRAME)
+        .as_chunks::<FRAME>()
+        .0
+        .iter()
         .map(|c| 10.0 * (c.iter().map(|s| s * s).sum::<f32>() / FRAME as f32 + 1e-12).log10())
         .collect()
 }
@@ -231,7 +233,6 @@ pub fn trim_silences(
     (out, OffsetMap { parts })
 }
 
-
 /// Stretches of `min_secs` or more that hold no speech by a conservative test: every 1 s window
 /// (hop 0.5 s) whose frame levels have a spread (95th minus 10th percentile of 20 ms levels) under
 /// 9 dB and a top (95th percentile) under 10 dB above the recording's 10th-percentile level is quiet.
@@ -272,11 +273,7 @@ pub fn quiet_regions(samples: &[f32], min_secs: f64) -> Vec<Range<usize>> {
 /// [`trim_silences`] driven by [`quiet_regions`]: every quiet stretch longer than `min_silence_secs`
 /// is cut to `keep_secs` at each end (a leading or trailing one keeps `keep_secs` next to the
 /// speech only). Returns the copy and the map back to the source.
-pub fn trim_quiet(
-    samples: &[f32],
-    min_silence_secs: f64,
-    keep_secs: f64,
-) -> (Vec<f32>, OffsetMap) {
+pub fn trim_quiet(samples: &[f32], min_silence_secs: f64, keep_secs: f64) -> (Vec<f32>, OffsetMap) {
     let keep = samples_of(keep_secs);
     let quiet = quiet_regions(samples, min_silence_secs);
     if quiet.is_empty() {
@@ -288,7 +285,11 @@ pub fn trim_quiet(
         let lead = q.start == 0;
         let trail = q.end >= samples.len();
         let a = if lead { 0 } else { (q.start + keep).min(q.end) };
-        let b = if trail { samples.len() } else { q.end.saturating_sub(keep).max(a) };
+        let b = if trail {
+            samples.len()
+        } else {
+            q.end.saturating_sub(keep).max(a)
+        };
         // keep the speech before the stretch and `keep` of the stretch, drop the middle
         if q.start > at {
             kept.push(at..a.min(q.end).max(at));
@@ -498,10 +499,13 @@ mod tests {
         }
     }
 
-
     #[test]
     fn quiet_regions_find_flat_room_and_leave_speech() {
-        let mut v = scene(&[(12.0, false, 0.003), (3.0, true, 0.05), (12.0, false, 0.003)]);
+        let mut v = scene(&[
+            (12.0, false, 0.003),
+            (3.0, true, 0.05),
+            (12.0, false, 0.003),
+        ]);
         // a faint "speaker": a voice 30 dB under the loud test voice, in a room at 0.003
         v.extend(scene(&[(4.0, true, 0.01)]));
         let q = quiet_regions(&v, 8.0);
@@ -555,7 +559,11 @@ mod tests {
         let mut parts = Vec::new();
         let mut t = 0.0;
         while t < 700.0 {
-            let silent = if (285.0..312.0).contains(&t) { 27.0 } else { 10.0 };
+            let silent = if (285.0..312.0).contains(&t) {
+                27.0
+            } else {
+                10.0
+            };
             parts.push((20.0, true, 0.2));
             parts.push((silent, false, 0.001));
             t += 20.0 + silent;
