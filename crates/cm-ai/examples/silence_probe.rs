@@ -208,6 +208,34 @@ fn main() {
     };
     let engine: &dyn Transcriber = &configured;
 
+    // `--audio <file> --save <transcript.json>` (instead of `--dir`): transcribe one file the way the
+    // app does, store the transcript, print the pieces report (counts only).
+    if let Some(audio) = option(&args, "--audio") {
+        let samples = decode_16k_mono(Path::new(&audio)).unwrap();
+        let began = Instant::now();
+        let (tr, rep) = transcribe_pieces(
+            engine,
+            Pcm16k {
+                samples: &samples,
+                start: MediaTime::ZERO,
+            },
+            Some(&language),
+            prompt.as_deref(),
+            &mut |_| true,
+        )
+        .unwrap();
+        if let Some(s) = option(&args, "--save") {
+            std::fs::write(s, serde_json::to_string(&tr).unwrap()).unwrap();
+        }
+        println!(
+            "{}",
+            json!({"audio_secs": samples.len() as f64 / 16_000.0, "wall_secs": began.elapsed().as_secs_f64(),
+                   "words": tr.words.len(), "model": model_id, "lift": lift,
+                   "report": serde_json::to_value(rep).unwrap()})
+        );
+        return;
+    }
+
     let mut wavs: Vec<PathBuf> = std::fs::read_dir(&dir)
         .unwrap()
         .filter_map(|e| e.ok().map(|e| e.path()))
