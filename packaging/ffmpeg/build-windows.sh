@@ -71,7 +71,7 @@ REQUIRED_FILTERS="alphamerge aformat aresample atempo atrim adelay amix apad ali
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 src_cache="${CM_FFMPEG_SRC_DIR:-$root/packaging/ffmpeg/.downloads}"
-out="${CM_FFMPEG_OUT:-$root/packaging/ffmpeg/out-windows-$ARCH}"
+out="${CM_FFMPEG_OUT:-$root/packaging/ffmpeg/out-windows-x64}"
 jobs="${CM_FFMPEG_JOBS:-$(nproc)}"
 SOURCE_REPO="${CM_SOURCE_REPO:-https://github.com/craft-mann/capturemann}"
 keep_work=1
