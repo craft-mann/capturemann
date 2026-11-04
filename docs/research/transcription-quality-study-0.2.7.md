@@ -1,6 +1,6 @@
 # Transcription quality in CaptureMann 0.2.7: a study of one day's measurements
 
-Status: **draft, written Nov 4, 2026 from the stored reports** (`verification/benchmarks/`), the plans (`specs/plans/`) and the code of `crates/cm-ai` at commit `6db020f` on `main`. Every number is "measured" (one machine, mostly one run per cell); nothing here is "verified" in the project's sense (no manual script report stands behind it). Private meeting audio and text never appear: the three private recordings are called Meeting A, B and C and only counts, rates and metrics are given. Where two reports disagree, the later one is used and the disagreement is listed in section 7.3. Rows that were still running when this was written are marked **PENDING** and collected in section 7.4.
+Status: **written Nov 4, 2026 from the stored reports** (`verification/benchmarks/`), the plans (`specs/plans/`) and the code of `crates/cm-ai`, first at commit `6db020f`, then updated the same day at `b22553e` (the final release comparison, the careful-re-read measurement and the Nov 4 decisions; the 0.2.7 version bump is `407acfa`). Every number is "measured" (one machine, mostly one run per cell); nothing here is "verified" in the project's sense (no manual script report stands behind it). Private meeting audio and text never appear: the three private recordings are called Meeting A, B and C and only counts, rates and metrics are given. Where two reports disagree, the later one is used and the disagreement is listed in section 7.3. The rows that were still running in the first version are now filled (E9, E5, E6, E7.4); what remains open is marked **PENDING** in the text and listed as 0.2.8 follow-ups in section 7.4.
 
 Source key (file names are in `verification/benchmarks/` unless stated): `en-syn` = `transcription-baseline-en-synthetic-2026-11-03.md`; `vi-fleurs` = `vietnamese-fleurs-baseline-2026-11-03.md`; `vi-models` = `vietnamese-models-2026-11-03.md`; `level` = `level-aware-transcription-2026-11-03.md`; `short` = `short-clips-2026-11-03.md`; `broken` = `broken-tokens-2026-11-03.md`; `coverage` = `coverage-reread-2026-11-03.md`; `safeguards` = `whisper-safeguards-2026-11-03.md`; `repeats` = `repeated-sentences-2026-11-03.md`; `spk-retune` = `speaker-retune-2026-11-03.md`; `spk-3plus` = `speaker-detection-3plus-synthetic-2026-11-03.md`; `spk-windows` = `speaker-finding-windows-2026-11-03.md`; `cuts` = `suggested-cuts-quiet-speech-2026-11-03.md`; `review-1-3` = `review-steps-1-3-2026-11-03.md`; `review-stack` = `review-stack-2026-11-03.md`; `far-field` = `far-field-model-2026-11-04.md`; `regression` = `large-v3-regression-2026-11-04.md`; `release-cmp` = `release-compare-0.2.6-vs-0.2.7-2026-11-04.md`; `params` = `parameter-search-2026-11-04.md`; `invented` = `invented-text-repro-2026-11-04.md`; `veto` = `invented-veto-signals-2026-11-04.md`; `prep` = `audio-prep-2026-11-04.md`; `norm` = `normalization-2026-11-04.md`; `text-base` = `text-model-report-translation-baseline-2026-11-03.md`; `text-m2c` = `text-model-m2c-2026-11-03.md`; `text-oct30` = `text-model-report-translation-m4pro-2026-10-30.md`; `perf-oct29` = `performance-m4pro-2026-10-29.md`; `import` = `import-0.2.7-2026-11-03.md`; `plan` = `specs/plans/transcription-quality-plan-0.2.7.md`; `brief` = `specs/plans/transcription-pipeline-review-brief.md`; `rel-plan` = `specs/plans/release-0.2.7-plan.md`.
 
@@ -10,9 +10,9 @@ Source key (file names are in `verification/benchmarks/` unless stated): `en-syn
 
 **Method.** Public sets with references (FLEURS vi_vn read speech, AMI and PriMock57 English conversations, a synthetic English meeting, a generated silence set) and three private Vietnamese business meetings (counts only; one 1,000-word hand-corrected reference, one 298-word accepted window) were run through the app's own piece pipeline on one Apple M4 Pro, one run per cell (decodes were bit-identical when repeated). Metrics: WER folded and exact (tone marks kept), insertions/deletions/substitutions, speech coverage, loop counters, invented-text units per hour of reference-silent audio, real-time factor, peak memory.
 
-**Main findings.** (1) Coverage re-read is the largest user-visible gain: on an 84 s window of Meeting C, 0.2.6 Turbo left 86.6 % of the reference words out (WER-exact 97.3 %) and 0.2.7 recovers them (29.2 %) [`release-cmp`]. (2) Turbo word accuracy on Meeting A is unchanged: 23.3 % exact in both releases [`release-cmp`]. (3) The quiet-input lift caused a +5.6 point Large v3 regression on Meeting A (12.8 to 18.4 % exact), found and fixed twice; the final rule lifts only audio whose peak is at least 12 dB under -1 dBFS [`regression`]. (4) Invented text over near-silence is reproduced publicly: Turbo writes 171 (vi) and 109 (en) invented sentence units per hour of silent audio, Large v3 194 (vi); no decode parameter, audio preparation or veto signal removes it without cost [`invented`, `params`, `veto`, `prep`]. (5) No decode parameter passes the acceptance gate; beam 5 is the only thing that removes the synthetic invented text, at 0.36x the speed [`params`].
+**Main findings.** (1) Coverage re-read is the largest user-visible gain: on an 84 s window of Meeting C, 0.2.6 Turbo left 86.6 % of the reference words out (WER-exact 97.3 %) and 0.2.7 recovers them (29.2 %); on the full 75-row comparison 0.2.7 Turbo is better where 0.2.6 failed (PriMock day3 20.3 to 17.2, AMI IS1009b 31.0 to 30.2, Meeting B loops 3 to 0) and identical to the word on every clean row, worse on one row by one word (AMI TS3003a +0.5) [`release-cmp`]. (2) Turbo word accuracy on Meeting A is unchanged: 23.3 % exact in both releases [`release-cmp`]. (3) The quiet-input lift caused a +5.6 point Large v3 regression on Meeting A (12.8 to 18.4 % exact), found and fixed twice; the final rule lifts only audio whose peak is at least 12 dB under -1 dBFS [`regression`]. (4) Invented text over near-silence is reproduced publicly: Turbo writes 171 (vi) and 109 (en) invented sentence units per hour of silent audio, Large v3 194 (vi); no decode parameter, audio preparation, veto signal or beam re-read removes it without cost (careful re-reads: 78 vs 78 units, +83 words) [`invented`, `params`, `veto`, `prep`, `release-cmp`]. (5) Large v3 beats Turbo only on Meeting A (12.8 vs 23.3 % exact) and by 0.2 to 3.8 points on three English rows; it is worse on FLEURS b and c, the 1 h FLEURS row (17.4 vs 11.7), syn4, PriMock day1 and AMI ES2004b, 3 to 5x slower, 1.9x the memory, and invents more (86 vs 35 words outside speech on the noise set) [`release-cmp`].
 
-**Ships in 0.2.7.** Coverage re-read, broken-token repair, repeated-sentence and bare-token rules, sound entries, the headroom-limited lift, adaptive pause suggestions, windowed speaker finding, translation split-and-retry, opt-in transcript normalisation, WER-exact. **Does not ship.** Any decode-parameter change, the hallucination gate, Silero as cutter, raw-microphone default (pending a veto), per-region lift, silence trimming, piece cuts after speech, PhoWhisper, the Vietnamese Zipformer.
+**Ships in 0.2.7 (decisions of Nov 4).** Coverage re-read, broken-token repair, repeated-sentence and bare-token rules, sound entries, the headroom-limited lift, the word-time repair (`ai.repair_word_times` on), adaptive pause suggestions, windowed speaker finding, translation split-and-retry, opt-in transcript normalisation without UI, WER-exact, the Large v3 label. **Does not ship, or ships off.** Any decode-parameter change; the hallucination gate; Silero as cutter; the raw-microphone track (`ai.transcribe_raw_mic` off: +6.8 % words on Meeting B through the daemon, but the invented sentence returns over a noise-only clip and no veto was found); careful re-reads (`ai.careful_rereads` off: no gain); per-region lift; silence trimming; piece cuts after speech; PhoWhisper; the Vietnamese Zipformer.
 
 ## 1. Background and the pipeline
 
@@ -40,14 +40,16 @@ Both releases: FFmpeg decodes the chosen microphone track (the noise-reduced cop
          + bare-token rule (5+ at > 7 words/s, or 8+ under 0.5 confidence)
          + coverage re-read (energy regions >= 3 s with no word within 0.5 s; sparse < 25 %)
          + sound entries [noise] / [unclear] instead of invented words
+         + word-time repair (a stack of 4+ words under 10 ms is spread between its neighbours)
          ▼
          words + sounds ──► glossary ──► captions / speakers / reports / translation
          + opt-in normalisation (text model; punctuation and case; words invariant)
+         (off by default: ai.transcribe_raw_mic, ai.careful_rereads, ai.hallucination_gate)
 ```
 
-Thresholds from the code at `6db020f`: `Normalize { below_db: -26, target_db: -20, max_gain_db: 15, peak_limit_db: -1, min_headroom_db: 12 }` (`pipeline.rs`); `GAP_MIN_SECS 3.0`, `GAP_PAD_SECS 0.5`, `SPARSE_SHARE 0.25`, `MAX_GAP_READS 20`, `GAP_MIN_CONFIDENCE 0.4` (`pieces.rs`); `is_broken`: foreign script and confidence under 0.2 (`failure_kinds.rs`); `impossible_token_runs(min 5, 7 words/s, 0.5)` (`failure_kinds.rs`, `far-field`); repeated sentences 3 in a row or 5 in 60 s, kept when the second reading agrees within one at up to 6 repeats and 7 words/s [`repeats` §2]. Settings with off switches: `ai.lift_quiet_input` (on), `ai.hallucination_gate` (off), `ai.vad_opinion` (off), `ai.carry_previous_text` (on) (`pipeline.rs`). `DecodeParams::default()` equals the 0.2.6 decode (`whisper.rs`, [`params`]).
+Thresholds from the code at `6db020f`: `Normalize { below_db: -26, target_db: -20, max_gain_db: 15, peak_limit_db: -1, min_headroom_db: 12 }` (`pipeline.rs`); `GAP_MIN_SECS 3.0`, `GAP_PAD_SECS 0.5`, `SPARSE_SHARE 0.25`, `MAX_GAP_READS 20`, `GAP_MIN_CONFIDENCE 0.4` (`pieces.rs`); `is_broken`: foreign script and confidence under 0.2 (`failure_kinds.rs`); `impossible_token_runs(min 5, 7 words/s, 0.5)` (`failure_kinds.rs`, `far-field`); repeated sentences 3 in a row or 5 in 60 s, kept when the second reading agrees within one at up to 6 repeats and 7 words/s [`repeats` §2]. Settings with off switches (`pipeline.rs` at `b22553e`): `ai.lift_quiet_input` (on), `ai.repair_word_times` (on; `wordtimes.rs`: `COLLAPSED_SECS 0.010`, `MIN_STACK 4`, `MAX_SECS_PER_CHAR 0.12`), `ai.hallucination_gate` (off), `ai.vad_opinion` (off), `ai.carry_previous_text` (on), `ai.transcribe_raw_mic` (off), `ai.careful_rereads` (off: beam 5 and no temperature fallback on the windows the pipeline reads again). `DecodeParams::default()` equals the 0.2.6 decode (`whisper.rs`, [`params`]).
 
-Size of the change: 85 commits and 12,331 inserted lines in `crates/cm-ai` between `v0.2.6` (`39770b8`) and `6db020f` (`git log --oneline v0.2.6..HEAD -- crates/cm-ai | wc -l`, `git diff --stat`). The plan's earlier count (56 commits, 7,758 lines) was taken at `7ac19a1` [`plan` §0].
+Size of the change: 85 commits and 12,331 inserted lines in `crates/cm-ai` between `v0.2.6` (`39770b8`) and `6db020f` (`git log --oneline v0.2.6..HEAD -- crates/cm-ai | wc -l`, `git diff --stat`); the raw-mic, word-time and careful-re-read commits came after that count. The plan's earlier count (56 commits, 7,758 lines) was taken at `7ac19a1` [`plan` §0].
 
 ## 2. Data sets and metrics
 
@@ -163,7 +165,7 @@ Regression size: +5.6 exact (18.4 - 12.8), +5.2 folded. After the headroom rule 
 
 **What was given up.** The lift's possible gain for Turbo on Meeting A (up to about 3 points, rough) and the 0.4-point FLEURS gain; the lift still applies to really quiet audio (the quiet-level sets have low peaks and are unaffected).
 
-**The lesson, plainly.** The first diagnosis was wrong twice. (a) The far-field report compared the 300 s *clip* with the old binary and concluded "no step of the current pipeline makes Large v3 worse" [`far-field`]; the clip is one piece and decodes differently from the first piece of the full file (17.9 vs 12.6 %), so the comparison could not see the regression. (b) The round-1 whole-file `--gain-only` check did not exercise the daemon's per-call path, so the first fix looked complete when it was not. A regression check has to go through the exact call path of the product (`asr_bench --lift` now wraps the daemon's `Configured` per call) on the full file. Also: a "lift off" daemon run by the coordinator gave the same words as lift on, so that setting did not reach the decoder; the cause was not found in the code (`PipelineSettings::from_settings` reads `ai.lift_quiet_input`) [`regression`]. **PENDING**: a real daemon run with the headroom build confirming the table above.
+**The lesson, plainly.** The first diagnosis was wrong twice. (a) The far-field report compared the 300 s *clip* with the old binary and concluded "no step of the current pipeline makes Large v3 worse" [`far-field`]; the clip is one piece and decodes differently from the first piece of the full file (17.9 vs 12.6 %), so the comparison could not see the regression. (b) The round-1 whole-file `--gain-only` check did not exercise the daemon's per-call path, so the first fix looked complete when it was not. A regression check has to go through the exact call path of the product (`asr_bench --lift` now wraps the daemon's `Configured` per call) on the full file. Also: a "lift off" daemon run by the coordinator gave the same words as lift on, so that setting did not reach the decoder; the cause was not found in the code (`PipelineSettings::from_settings` reads `ai.lift_quiet_input`) [`regression`]. The release comparison then ran the 0.2.7 side through `asr_bench --lift` (the daemon's per-call wrapper) and cross-checked the 0.2.6 side against the coordinator's v0.2.6 daemon run (equal counts); a separate daemon run of Meeting A with the headroom build is not reported and stays a 0.2.8 follow-up [`release-cmp` §Setup].
 
 ### E3. Repetition loops: the structural repeated-sentence rule and the bare-token rule
 
@@ -241,7 +243,20 @@ Large v3 (three cells) [`params` table 3]: base Meeting A 15.8, FLEURS (a, b) 11
 
 **Other findings.** Large v3 invents *more* than Turbo on the noise set (24 vs 10 outside words), against the plan's H1 [`params` finding 2]. The made-up glossary prompt hurt English badly (16.0 vs 6.2 % on syn4) and `n_ctx 0` only "fixed" it by dropping the prompt [`review-1-3`, `review-stack`]. Earlier non-parameter options: flash attention 77 invented words on the noise set; Silero regions as decode unit 13.8 to 13.9 % on FLEURS vs 10.8 and 72 calls vs 4; high-pass hurt short FLEURS (12.1 to 12.9); the hallucination gate cost 2 to 4 points of real speech [`review-1-3`, `review-stack`]. Beam 3 / 5 on FLEURS in the first baseline: -0.4 to +5.4 points, 10 to 40 % slower [`vi-fleurs` §7].
 
-**Not reachable or not run.** `carry_initial_prompt`, `suppress_regex` (whisper-rs 0.16 keeps `FullParams.fp` crate-private); beam or `audio_ctx` on re-reads only (the Transcriber boundary does not know which call is a re-read: needs a hook in `pieces.rs`); language from the loudest piece; Medium; Large v3 `n_ctx 32/64/128`; the real glossary (P6) [`params` §"Missing"]. **PENDING (mac-ai)**: careful re-reads, beam search on re-reads only.
+**Not reachable or not run.** `carry_initial_prompt`, `suppress_regex` (whisper-rs 0.16 keeps `FullParams.fp` crate-private); beam or `audio_ctx` on re-reads only (the Transcriber boundary does not know which call is a re-read: needs a hook in `pieces.rs`); language from the loudest piece; Medium; Large v3 `n_ctx 32/64/128`; the real glossary (P6) [`params` §"Missing"].
+
+**Careful re-reads (beam on re-reads only): measured, no gain, ships off.** The hook was built (`ai.careful_rereads`, commit `df98084`: beam 5 and no temperature fallback for the windows the pipeline reads again; `asr_bench` and `silence_probe --careful-rereads`, `19dfae6`) and measured with Turbo through the app's path [`release-cmp` §"Careful re-reads"]:
+
+| Check | Baseline | Careful re-reads |
+|---|---|---|
+| public silence set (36 Vietnamese clips, 1,619 s of reference silence): units over silence (per hour) | 78 (173) | 78 (173) |
+| same set, words over silence | 896 | 979 (+83) |
+| Meeting C window, exact WER (sub/del/ins), 15 decode calls both | 29.2 (47/31/9) | 30.5 (52/24/15) (+1.3) |
+| Meeting A 300 s clip, exact | 23.7 | 23.7 (no re-read happened, 1 call) |
+| FLEURS viu_a / b / c, syn4 | 11.8 / 9.1 / 14.8, 6.2 | identical (no re-reads) |
+| decode time, Meeting C clip | 31 s | 55 s (1.77x; machine noise is of the same order: 12 vs 30 s on Meeting A with no re-read, under contention) |
+
+The beam search that cleaned the noise set in the parameter search does not change the units that the gap re-reads make here (the invented units sit *inside* the re-read windows and beam 5 writes them too). Not measured: the silence set for Turbo English and Large v3 Vietnamese, the two labelled raw-track instances through the daemon, English far-field WER with the flag, decode time per hour on an idle machine (0.2.8).
 
 ### E6. Audio preparation
 
@@ -251,7 +266,7 @@ Large v3 (three cells) [`params` table 3]: base Meeting A 15.8, FLEURS (a, b) 11
 
 | Candidate | Result | Decision |
 |---|---|---|
-| (a) raw microphone instead of the noise-reduced copy | Meeting A: **23.4 % raw vs 36.4 % copy** (13.0 points; substitutions 132 to 230). Meeting B: 8,878 vs 7,037 words (+26.2 %), word-free gaps of 5 s+ 14 vs 42. Meeting C: 19,079 vs 15,633 (+22.0 %), gaps 17 vs 41. The copy's room level is 13 to 45 dB under the raw track's; where the maintainer hears faint speech the copy has nothing. **But** on labelled silence (58 s) Turbo raw writes 56 words in 5 units vs 18 in 4 on the copy, and on a pure-background-noise clip of Meeting B the raw track brings back the outro-style sentence that the copy does not write [`prep` row a, `invented` §11] | **adopt as default only with a veto** (none exists): decision pending |
+| (a) raw microphone instead of the noise-reduced copy | Meeting A: **23.4 % raw vs 36.4 % copy** (13.0 points; substitutions 132 to 230). `prep_probe` runs: Meeting B 8,878 vs 7,037 words (+26.2 %), word-free gaps of 5 s+ 14 vs 42; Meeting C 19,079 vs 15,633 (+22.0 %), gaps 17 vs 41. **The real daemon check on Meeting B** (Turbo, `vi`, both stored tracks, `ai.transcribe_raw_mic` on): raw 8,254 words, 0 loop runs, 1 sound, 689 caption lines; copy 7,726 words, 1 loop run, 1 sound, 651 lines: **+528 words, +6.8 %** (the report phrases it as 6.8 % fewer on the copy; 528 / 7,726 = 6.8 %, 528 / 8,254 = 6.4 %) [`release-cmp` §"Real daemon check"]. The `prep_probe` +26 % counted a different run and is superseded. The copy's room level is 13 to 45 dB under the raw track's; where the maintainer hears faint speech the copy has nothing. **But** on labelled silence (58 s) Turbo raw writes 56 words in 5 units vs 18 in 4 on the copy, and on a pure-background-noise clip of Meeting B the raw track brings back the outro-style sentence that the copy does not write [`prep` row a, `invented` §11] | **Decided Nov 4: ships OFF** (`ai.transcribe_raw_mic`, commit `4a82616`; the setting and `--original-audio` / `--denoised-audio` per run exist). The noise-reduced copy stays the default as in 0.2.6, because the invented sentence returns on the raw track and none of the veto signals (perturbation, cross-model, silence signature, flatness, Silero, speaker engine) meets the bar [`veto`] |
 | (b) lift per speech region instead of per call | Meeting A 23.4 to 22.4 (-1.0); public pooled 10.52 to 11.44 (+0.92); viu_b 9.8 to 11.6, viu_h 11.6 to 15.5, s_u4 21.2 to 24.2; silence set no gain | rejected |
 | (c) trim silences of 8 s+ to 2 s with an offset map | public speech rows identical; silence set 413 to 82 words (-80.1 %), 35 to 9 units (-74.3 %); **on raw meeting tracks it removes 58 s (B) and 196 s (C), overlapping 4 of 11 stretches the maintainer heard as speech** and 286 transcript words; on the copy it removes nothing | rejected as a flatness rule (quiet far-field speech is as flat as the room, about 0 dB SNR); kept for use behind a real speech detector |
 | (d) pieces end just after speech | Meeting C words over labelled silence 17 to 2, Meeting B 1 to 15: the 15-word unit moves from one file to the other | neutral, not adopted |
@@ -339,7 +354,7 @@ Best single thresholds that catch both invented units: Silero 0 (flags 3 real), 
 
 **Decision.** No veto implemented (`invented.rs` not written): the acceptance condition (both invented, 0 of 19 real, not fitted after the fact) is not met [`veto` §5]. The cheapest honest mitigation on offer, a product decision: on the raw track, mark a unit `[unclear]` (not delete) when the two models disagree, at the cost of 6 of 19 faint-speech units. **What would settle it**: a third and fourth labelled invented instance of the noise kind (the raw-track units with high RNNoise or Silero that the maintainer calls noise; batch 3, clips 111 to 118, is prepared), and real consented room tone for the public set [`invented` §9, `veto` §5, `plan` §5].
 
-**E7.4 Side finding: collapsed word times on real speech** [`invented` §6]. Runs of 4+ words each 10 ms or shorter stacked on one instant are an alignment failure on *real* speech (the two collapsed clips the maintainer heard, 26 and 24 words, hold speech): Meeting B Turbo 24 runs (32.3 per hour, 2.5 % of words, largest 26), Meeting B Large v3 25 (33.6 per hour, 4.0 %, largest 65), Meeting C Turbo 20 (13.6 per hour, 1.0 %), Meeting A 6 (15.4 per hour) for both models. Not tied to piece ends (5 of 24 within 30 s of an edge, chance 0.22); a segment's words all get the segment end. Timing collapse is therefore not an invented-text signal; a general fallback (spread each stack over the span between neighbours) is proposed, not built.
+**E7.4 Side finding: collapsed word times on real speech** [`invented` §6]. Runs of 4+ words each 10 ms or shorter stacked on one instant are an alignment failure on *real* speech (the two collapsed clips the maintainer heard, 26 and 24 words, hold speech): Meeting B Turbo 24 runs (32.3 per hour, 2.5 % of words, largest 26), Meeting B Large v3 25 (33.6 per hour, 4.0 %, largest 65), Meeting C Turbo 20 (13.6 per hour, 1.0 %), Meeting A 6 (15.4 per hour) for both models. Not tied to piece ends (5 of 24 within 30 s of an edge, chance 0.22); a segment's words all get the segment end. Timing collapse is therefore not an invented-text signal. **The general fallback was built and ships on** (`ai.repair_word_times`, `wordtimes.rs`, commit `66654c6`): a stack of 4 or more words under 10 ms is spread between its neighbours in proportion to word length, at most 0.12 s per character, structure only. Counts reported by the coordinator on Nov 4 (not in a stored benchmark report): stacked words Meeting A 48 to 32 (-33.3 %), Meeting B 140 to 77 (-45.0 %), Meeting C 269 to 111 (-58.7 %); zero-length caption lines 0 before and 0 after, because `build_captions` already repaired them. The remaining 32 to 111 stacked words per meeting have no room between their neighbours and need a rule that may shift a neighbour (0.2.8) [`release-cmp` §"Left for 0.2.8"].
 
 ### E8. Post-ASR normalisation (AI-10)
 
@@ -376,26 +391,39 @@ Server log for the 15-minute row: 38,432 prompt tokens at 1,231 tok/s and 7,579 
 
 ### E9. Release comparison, 0.2.6 vs 0.2.7
 
-**Setup.** `bench026` built in a worktree of tag `v0.2.6` (calls that tag's `transcribe_pieces`), `asr_bench --lift` for 0.2.7 (the daemon's per-call wrapper), `compare_releases.py` and `rescore`; full files decoded as the app does, scored by word time; no glossary; one run per cell [`release-cmp`]. Cross-check: `bench026` on Meeting A equals the coordinator's v0.2.6 daemon run (Large v3 70/33/25, Turbo 111/100/22).
+**Setup.** `bench026` built in a worktree of tag `v0.2.6` (calls that tag's `transcribe_pieces`), `asr_bench --lift` for 0.2.7 (the daemon's per-call wrapper), `compare_releases.py` and `rescore`; full files decoded as the app does, scored by word time; no glossary; one run per cell; 25 clips x 3 metric rows = 75 table rows [`release-cmp`, final version, commit `1865d37`]. Cross-check: `bench026` on Meeting A equals the coordinator's v0.2.6 daemon run (Large v3 70/33/25, Turbo 111/100/22).
 
-| Row | 0.2.6 Turbo | 0.2.7 Turbo | 0.2.7 Large v3 | Status |
+Exact WER % (sub/del/ins), folded after the semicolon; private rows are counts only; the 1 h FLEURS and Meeting C 88 min rows were run for 0.2.7 only:
+
+| Row | 0.2.6 Turbo | 0.2.7 Turbo | 0.2.7 Large v3 | Large v3 vs 0.2.7 Turbo |
 |---|---|---|---|---|
-| Meeting A, 300 s, 1,000 ref words (seeded from Large v3) | 22.7 / 23.3 (111/100/22) | 22.7 / 23.3 (111/100/22) | 12.3 / 12.8 (70/33/25) | done |
-| Meeting C window, 84 s, 298 words (reference = older Large v3 output) | 96.3 / 97.3 (32/258/0) | 28.9 / 29.2 (47/31/9) | 0.7 / 0.7 (0/1/1) | done |
-| FLEURS vi 15 s (s_vi1) | 20.0 / 24.0 | 20.0 / 24.0 | 20.0 / 24.0 | done |
-| synthetic English 20 s | 4.3 / 4.3 | 4.3 / 4.3 | 4.3 / 4.3 | done |
-| FLEURS vi 4-min clips | | | | **PENDING** |
-| AMI ES2004b, TS3003a, IS1009b; PriMock day1, day3 | | | | **PENDING** |
-| syn4 | | | | **PENDING** |
-| noise set (9 clips) | | | | **PENDING** |
-| Meeting B, 45 min (counts) | | | | **PENDING** |
-| 1 h FLEURS row (0.2.7 only) | | | | **PENDING** |
-| Meeting C, 88 min (0.2.7 only, counts) | | | | **PENDING** |
-| speaker count per release | | | | **PENDING** (only stored diarization exists for private bundles) |
+| Meeting A, 300 s, 1,000 ref words (seeded from Large v3) | 23.3 (111/100/22); 22.7 | 23.3 (111/100/22); 22.7 | 12.8 (70/33/25); 12.3 | -10.5 (reference-biased) |
+| Meeting C window, 84 s, 298 words (reference = older Large v3 output) | 97.3 (32/258/0); 96.3 | 29.2 (47/31/9); 28.9 | 0.7 (0/1/1); 0.7 | meaningless |
+| FLEURS vi 15 s (s_vi1, 25 words) | 24.0 (4/2/0); 20.0 | 24.0; 20.0 | 24.0; 20.0 | 0 |
+| synthetic English 20 s (s_en2) | 4.3 (2/0/0) | 4.3 | 4.3 | 0 |
+| FLEURS viu_a | 11.8 (46/5/10); 10.3 | 11.8; 10.3 | 10.8 (35/7/14); 10.1 | -1.0 |
+| FLEURS viu_b | 9.1 (46/3/3); 7.4 | 9.1; 7.4 | 12.6 (56/12/4); 11.2 | +3.5 |
+| FLEURS viu_c | 14.8 (65/7/13); 13.9 | 14.8; 13.9 | 17.4 (54/6/40); 16.8 | +2.6 |
+| AMI ES2004b | 24.7 (55/186/20) | 24.7 | 27.0 (74/181/30) | +2.3 |
+| AMI TS3003a | 41.2 (42/31/14); loops 2, dense 12 | 41.7 (41/31/16); loops 1, dense 10, sounds 2 | 37.9 (34/31/15); loops 1 | -3.8 |
+| AMI IS1009b | 31.0 (51/239/15); 759 w | 30.2 (66/214/17); 786 w | 29.6 (36/242/13); dense 5 | -0.6 |
+| PriMock day1 | 21.6 (58/120/19) | 21.6 | 25.5 (74/124/34) | +3.9 |
+| PriMock day3 | 20.3 (46/54/40); loops 1, dense 25 | 17.2 (40/61/18); dense 7 | 17.0 (46/54/17); dense 5 | -0.2 |
+| syn4 | 6.2 (46/10/0) | 6.2 | 12.7 (58/11/45) | +6.5 |
+| noise set, 9 clips: words outside speech (sum) | 40 | 35 | 86 | +51 |
+| Meeting B, 44.6 min: words / loops / dense / sounds | 8,378 / 3 / 35 / 0 | 8,695 / 0 / 0 / 1 | 9,138 / 0 / 0 / 0 | |
+| FLEURS viu_1h (3,463 s, 7,963 ref words) | not run | 11.7 (646/146/136); 10.7 | 17.4 (712/136/539); 16.4 | +5.7 |
+| Meeting C, 88 min: words / loops / dense / bare / sounds | not run | 18,765 / 0 / 0 / 1 / 1 | 18,828 / 0 / 0 / 0 / 0 | |
 
-(WER folded / exact, sub/del/ins of the exact score.) Loops, dense repeats, bare-token runs and sounds are 0 in every finished row. Speed under contention: Turbo 5 to 12x, Large v3 2 to 7x; peak memory Turbo 2.0 to 2.2 GB, Large v3 3.7 to 3.8 GB [`release-cmp`].
+Per noise clip, words outside speech (0.2.6 Turbo / 0.2.7 Turbo / Large v3): pink -40 8 / 6 / 1; pink -45 7 / 0 / 15; pink -50 12 / 12 / 12; brown -40 0 / 0 / 14; brown -45 0 / 0 / 12; brown -50 6 / 0 / 14; pink -40 (06) 0 / 0 / 16; pink -45 (07) 7 / 17 / 0; pink -50 (08) 0 / 0 / 2. Speed under contention (rough): Turbo 4 to 35x, Large v3 1 to 12x; peak memory Turbo 1.9 to 2.6 GB, Large v3 3.7 to 4.2 GB [`release-cmp`].
 
-**Interpretation.** Where 0.2.6 already read the speech (Meeting A, the short clips), 0.2.7 is identical to the word in count; where 0.2.6 skipped speech (Meeting C window), 0.2.7 recovers it. The Turbo-vs-Large v3 gaps on both private rows are biased toward Large v3 by the references.
+**What the table shows** [`release-cmp` §"What the table shows"].
+- **0.2.6 and 0.2.7 Turbo give the same text on every clean row** (FLEURS a/b/c, syn4, PriMock day1, AMI ES2004b, the two short clips, Meeting A): the decode is unchanged there. The only public row worse on 0.2.7 is AMI TS3003a by 0.5 point (one word).
+- **0.2.7 Turbo is better where 0.2.6 failed**: PriMock day3 20.3 to 17.2 (-3.1; dense repeats 25 to 7, loops 1 to 0), AMI IS1009b 31.0 to 30.2 (-0.8; 786 vs 759 words, 27 more; the report's text says 25), the Meeting C window 97.3 to 29.2 (skipped speech recovered), Meeting B loops 3 to 0 and dense repeat words 35 to 0 (+317 words, +3.8 %).
+- **Large v3 vs Turbo**: better only on Meeting A (-10.5, reference-biased) and slightly on AMI TS3003a (-3.8), IS1009b (-0.6) and PriMock day3 (-0.2); worse on FLEURS viu_b (+3.5), viu_c (+2.6), the 1 h FLEURS row (+5.7), syn4 (+6.5), PriMock day1 (+3.9) and AMI ES2004b (+2.3); 3 to 5x slower, 1.9x the memory; and it writes more words outside speech on the noise set (86 vs 35; 0.2.6 Turbo 40). The lift change moves single noise clips both ways (pink -45: 7 to 0; clip 07: 7 to 17).
+- **Sounds**: 0.2.7 writes `[noise]`/`[unclear]` where it would otherwise invent words: 2 on AMI TS3003a, 2 on brown -40, 1 each on Meetings B and C.
+
+**Interpretation.** 0.2.7 is a pipeline that reads what 0.2.6 skipped or looped on and leaves the rest untouched; it does not read better where 0.2.6 already read. The Turbo-vs-Large v3 gaps on both private rows are biased toward Large v3 by the references; on public data Large v3 is a worse general choice and a better one only on a minority of English far-field clips. Not done (0.2.8): speaker counts per release for the private bundles (only old stored diarization exists), insertion-over-silence on private audio (needs marked silent spans), a full-file route for the Meeting C window, a Large v3 row with an independent reference.
 
 ### E10. Word-time collapse, speaker-count retune, text side
 
@@ -445,34 +473,41 @@ Same turns and DER in 0.69x the time; no memory gain shown at one hour on that c
 | Translation no longer dies on a long reply; big reports no longer fail at the merge | 1 h translation finished; bug reproduced and unit-tested | strong (functional) |
 | WER-exact reported next to folded | code and tables | strong |
 | Opt-in "tidy" normalisation | 0 tone-mark damage; 1 to 4.4 % of words left raw; period F1 0.82 vi / 0.92 en on single sentences | moderate; speed 2 to 2.5x over budget |
-| Large v3 labelled "Recommended for Vietnamese meetings. Slower." | one private clip, 5.6 points | weak |
+| Collapsed word times are spread between neighbours | stacked words Meeting A 48 to 32, B 140 to 77, C 269 to 111 (coordinator's counts, no stored report); caption lines already 0 zero-length | moderate for the count, unmeasured for caption placement |
+| Large v3 labelled "Recommended for Vietnamese meetings. Slower." | one private clip, 10.5 exact points in the final comparison; worse on 6 of 11 public rows | weak |
+| Loops and dense repeats on real English conversations | PriMock day3 loops 1 to 0, dense 25 to 7; AMI TS3003a dense 12 to 10; Meeting B loops 3 to 0, dense 35 to 0 | moderate (3 clips, one private file) |
 
 ### 4.2 What did not improve, frankly
 
 - **Turbo word accuracy on Meeting A is unchanged**: 23.3 % exact in 0.2.6 and 0.2.7, the same 111/100/22 counts [`release-cmp`]. Where the old pipeline already read the speech, nothing in 0.2.7 reads it better.
 - **Invented text over near-silence** is reproduced (171 / 109 units per hour) and not cured; the plan's target of 2 per hour is not approached by any shipped or measured option [`invented`, `params`, `prep`, `veto`].
-- **No decode parameter survived** the gate [`params`].
+- **No decode parameter survived** the gate [`params`], and **beam search on re-reads only gives nothing**: 78 vs 78 invented units, +83 words, +1.3 points on the Meeting C window, 1.77x the decode time on that clip [`release-cmp`].
+- **The raw microphone track**, which recovers +6.8 % words on Meeting B and 13 points on Meeting A against a denoised copy, cannot be the default because it brings the invented sentence back over noise; it is a per-run option.
 - **Far-field Vietnamese WER** stays around 23 % (Turbo) to 13 to 17 % (Large v3) on one reference; read speech was already at about 10 %.
 - **Speaker count** on the real meeting stays 7 for 6 people at the shipped settings [`spk-retune`].
-- **Collapsed word times** on real speech (1 to 4 % of words) are untouched [`invented` §6].
+- **Collapsed word times** on real speech (1 to 4 % of words) are only partly repaired: the spread fixes stacks that have room between their neighbours (48 to 32, 140 to 77, 269 to 111 stacked words on A, B, C); 32 to 111 per meeting remain [`invented` §6, `release-cmp` §"Left for 0.2.8"].
 
-### 4.3 Decisions taken
+### 4.3 Decisions taken (maintainer, Nov 4, 2026)
 
-1. Quiet-input lift on, limited to really quiet audio (headroom 12 dB) [`regression`].
-2. Hallucination gate, voice-model opinion and no-carry-over are settings, off [`review-stack`].
-3. No decode-parameter change; `DecodeParams` plumbing opt-in only [`params`].
-4. Speaker defaults 1.0 / 0.1 kept; windows and folding on [`spk-retune`].
-5. No normalisation before Whisper; no Silero as cutter; no flash attention [`level`, `review-stack`].
-6. Normalisation ships as an explicit action, default off [`plan` W8, `norm`].
-7. PhoWhisper not offered (60.9 % WER with the shipped decode; needs its own decode path); Vietnamese Zipformer not adopted (CC BY-NC-ND, or unknown data terms) [`vi-fleurs`, `vi-models`].
+1. **Quiet-input lift on, limited to really quiet audio** (headroom 12 dB); the possible Turbo gain on Meeting A (about 3 points, one file) is given up; a per-region lift is the 0.2.8 way to get it back [`regression`, `release-cmp` §"Left for 0.2.8"].
+2. **Raw microphone is not the default** (`ai.transcribe_raw_mic` off, commit `4a82616`, after `66654c6` and spec `f498994` had briefly made it the default): +6.8 % words on Meeting B through the daemon, 13 points on Meeting A against a denoised copy, but the invented sentence returns over a noise-only clip and no veto signal (perturbation, cross-model, silence signature, flatness, Silero, speaker engine) meets the bar [`veto`, `release-cmp`]. The noise-reduced copy stays the default as in 0.2.6; `--original-audio` / `--denoised-audio` choose per run.
+3. **Careful re-reads off** (`ai.careful_rereads`): measured, no gain [`release-cmp`].
+4. **Word-time repair on** (`ai.repair_word_times`): stacks of 4+ words under 10 ms are spread.
+5. Hallucination gate, voice-model opinion and no-carry-over are settings, off [`review-stack`].
+6. No decode-parameter change; `DecodeParams` plumbing opt-in only [`params`].
+7. Speaker defaults 1.0 / 0.1 kept; windows and folding on [`spk-retune`].
+8. No normalisation before Whisper; no Silero as cutter; no flash attention [`level`, `review-stack`].
+9. **Normalisation (AI-10) ships as an opt-in action without UI** (`capturemann ai normalize`, MCP tool, sidecar file) [`norm`, CHANGELOG 0.2.7].
+10. Large v3 Turbo stays the default model; Large v3 carries the "Recommended for Vietnamese meetings. Slower." label (commit `8a46f40`).
+11. PhoWhisper not offered (60.9 % WER with the shipped decode; needs its own decode path); Vietnamese Zipformer not adopted (CC BY-NC-ND, or unknown data terms) [`vi-fleurs`, `vi-models`].
 
-### 4.4 Decisions pending
+### 4.4 Decisions still open (0.2.8)
 
 | Decision | Evidence for | Evidence against | Needs |
 |---|---|---|---|
-| **Raw microphone as the default track** | +13.0 points on Meeting A against a synthetic denoised copy; +22.0 to +26.2 % words on B and C; word-free gaps 42 to 14 and 41 to 17 | the invented sentence returns over a background-noise clip; 56 vs 18 words over 58 s of labelled silence | a veto, or the maintainer's acceptance of `[unclear]` on model disagreement (6 of 19 faint units lost) |
-| **Careful re-reads: beam search on re-reads only** | beam 5 removes the synthetic silence insertions and helps A and C by 2.3 to 4.4 points | 0.36x speed, viu_h +4.1 | a hook in `pieces.rs` so the decoder knows a re-read; **PENDING (mac-ai)** |
-| **Large v3 recommended for Vietnamese meetings** | 5.6 points on Meeting A; label shipped | both references are Large-v3-biased; Large v3 invents more on silence (194 vs 171; 24 vs 10 noise words); 0.21x speed, 1.9x memory | a second Vietnamese reference not seeded from a machine transcript (W10); rule: >= 3 exact points on both references with FLEURS-h within 2 [`plan` §2] |
+| **Raw microphone as the default track** (decided off for 0.2.7) | +13.0 points on Meeting A against a synthetic denoised copy; +6.8 % words on Meeting B through the daemon; word-free gaps 42 to 14 (B) and 41 to 17 (C) in the probe runs | the invented sentence returns over a background-noise clip; 56 vs 18 words over 58 s of labelled silence | a second consented recording with both tracks and a reference; Large v3 on the denoised/raw pair; a veto (third labelled batch, clips 111 to 118, not labelled yet) or acceptance of `[unclear]` on model disagreement (6 of 19 faint units lost) |
+| **Careful re-reads** (decided off) | beam 5 removed the synthetic noise-set insertions in the parameter search | no gain on the silence set, +1.3 on the Meeting C window, 1.77x time | a narrower trigger (only windows the gate marks), the English and Large v3 silence rows, timing on an idle machine |
+| **Large v3 recommended for Vietnamese meetings** (label shipped, provisional) | 10.5 exact points on Meeting A | both private references are Large-v3-biased; worse on FLEURS b, c and 1 h, syn4, PriMock day1, AMI ES2004b; invents more (86 vs 35 noise words; 194 vs 171 units/h); 3 to 5x slower, 1.9x memory | a second Vietnamese reference not seeded from a machine transcript (W10); rule: >= 3 exact points on both references with FLEURS-h within 2 [`plan` §2] |
 
 ## 5. Threats to validity
 
@@ -491,16 +526,18 @@ Same turns and DER in 0.69x the time; no memory gain shown at one hour on that c
 
 | Rank | Experiment | Data needed | Decides |
 |---|---|---|---|
-| 1 | Finish the release comparison rows (section 7.4) | public sets already on disk; Meetings B and C (counts) | the 0.2.7 release text |
-| 2 | Third and fourth labelled invented instances of the noise kind (batch 3, clips 111 to 118) and a re-run of the 2-vs-19 separation at n >= 4 | the maintainer's answers (keyed file) | whether any two-signal veto exists; the raw default |
+| 1 | Third and fourth labelled invented instances of the noise kind (batch 3, clips 111 to 118, prepared, not labelled) and a re-run of the 2-vs-19 separation at n >= 4 | the maintainer's answers (keyed file) | whether any two-signal veto exists; the raw-track default |
+| 2 | A second consented recording with both microphone tracks and a reference; Large v3 on the denoised/raw pair | a recording (W6) | the raw-track default |
 | 3 | A second Vietnamese far-field reference not seeded from a machine transcript, with silent spans marked | about 3 maintainer hours (W10) | Large v3 for Vietnamese; the Turbo decision rule of the plan |
-| 4 | Beam search on re-reads only (hook in `pieces.rs`), judged on T and H and the silence set | none new | whether invented text can be cut at a fraction of beam's cost |
+| 4 | Careful re-reads with a narrower trigger (only windows the gate marks); the English and Large v3 silence rows; timing on an idle machine | none new | whether beam can cut invented text at a bearable cost |
 | 5 | Consented real room tone (10 x 60 s) published CC0, mixed into the silence set | the maintainer records | whether the public rate transfers to real rooms |
 | 6 | The real glossary on and off on Meeting A (P6) | the glossary export (counts only) | H4; the 12.6 vs 17.1 % residue |
-| 7 | Collapsed word times: spread each stack over its span; measure caption jumps | Meetings B and C counts | a general timing fallback |
-| 8 | Normalisation: shorter instructions and prompt caching; the 1 h row; the 50-turn spot-check | none new | default-on in 0.2.8 or not |
-| 9 | Large v3 on the audio-prep and silence-trim cells; Medium in the parameter search | GPU time | completeness of E5/E6 |
-| 10 | Two-stream decode (mic and system separately); PhoWhisper's own decode path; WPE prototype | a recording with both tracks; converted weights | 0.2.8 items W13 |
+| 7 | Remaining word-time stacks (32 to 111 words per meeting with no room between neighbours): a rule that may shift a neighbour; measure caption placement | Meetings A, B, C counts | completeness of the timing repair |
+| 8 | Per-region lift (W6) to recover the Turbo gain the headroom rule gave up (about 3 points on Meeting A, one file) | none new | the lift's second half |
+| 9 | Normalisation: shorter instructions and prompt caching; the 1 h row; the 50-turn spot-check; a UI | none new | default-on and UI in 0.2.8 or not |
+| 10 | Speaker counts per release on the private bundles; insertion-over-silence on private audio (marked silent spans); full-file route for the Meeting C window; a Large v3 row with an independent reference | marked spans; a reference | the rows the comparison could not fill |
+| 11 | Large v3 on the audio-prep and silence-trim cells; Medium in the parameter search | GPU time | completeness of E5/E6 |
+| 12 | Two-stream decode (mic and system separately); PhoWhisper's own decode path; WPE prototype | a recording with both tracks; converted weights | 0.2.8 items W13 |
 
 ## 7. Reproducibility appendix
 
@@ -524,7 +561,13 @@ Same turns and DER in 0.69x the time; no memory gain shown at one hour on that c
 | `8c842f7`, `2740f3c`, `cef55a6` | lift peak limit; headroom rule; merge |
 | `ce2c677`, `627b9f9`, `338c940` | `DecodeParams`, `param_search`; report; merge |
 | `4413405`, `741457a`, `04b6d96`, `1bbbc86`, `c1da28b`, `54cd0bc`, `8d3b54c`, `2463d74` | silence set and probe; `prep.rs`; invented-text and audio-prep reports |
-| `321798e`, `6db020f` | `invented_probe`, veto-signal report; merge (HEAD of this study) |
+| `321798e`, `6db020f` | `invented_probe`, veto-signal report; merge (first HEAD of this study) |
+| `66654c6`, `f498994` | raw microphone as the transcription default (later reverted); word-time repair (`wordtimes.rs`, `ai.repair_word_times`) |
+| `df98084`, `19dfae6`, `13b32ed` | careful re-reads (beam 5, no fallback, on re-read windows; `ai.careful_rereads` off); example flags; merge |
+| `d96e7e1` | this study, first version |
+| `4a82616` | raw microphone is NOT the default (`ai.transcribe_raw_mic` off); CHANGELOG [0.2.7] |
+| `407acfa` | 0.2.7 version bump |
+| `1865d37`, `dbf74e3`, `b22553e` | final release comparison (75 rows), careful re-reads measured, 0.2.8 list; merge (second HEAD of this study) |
 | `47d913e`, `14fa9a2`, `1a21881`, `c7f7991`, `4d8e7bb` | normalisation engine, action, bisect, report, merge |
 | `318f387`, `aae8cd2` | report merge-request fix; M2c report |
 
@@ -582,18 +625,37 @@ target/release/examples/text_bench --task report|translate ... ; cargo run --rel
 | "52 GB" of memory | `perf-oct29` | 48 GiB (51.5 GB decimal) | `system_profiler`, `hw.memsize` |
 | 56 commits / 7,758 lines in `cm-ai` since 0.2.6 | `plan` §0 (at `7ac19a1`) | 85 commits / 12,331 lines at `6db020f` | `git` |
 | The one-hour `minutes` report works | `text-oct30` (stand-ins) | it failed at the merge pass on a 1 h synthetic transcript (HTTP 400); fixed, not re-run | `text-m2c` |
+| The raw track gives +26 % words on Meeting B (8,878 vs 7,037) and +22 % on Meeting C | `prep` row (a), the first version of this study (E6, abstract, 4.4) | those were `prep_probe` runs; the real daemon run on Meeting B gives 8,254 vs 7,726 words, **+6.8 %** (0 vs 1 loop runs); the Meeting C pair has no daemon run | `release-cmp` §"Real daemon check" |
+| The raw microphone is the transcription default | commit `66654c6`, spec `f498994`, the plan's rank-1 acceptance ("adopt raw if it wins by >= 1 point on two recordings") | reverted the same day: `ai.transcribe_raw_mic` ships off because the invented sentence returns over noise and no veto exists | commit `4a82616`, `veto` §5 |
+| Beam search on re-reads only would remove invented text at a fraction of beam's cost (4.4 of the first version; `params` finding 1) | `params`, the first version of this study | measured: 78 vs 78 units on the silence set, +83 words, Meeting C window +1.3, 1.77x time; stays off | `release-cmp` §"Careful re-reads" |
+| Collapsed word times are "untouched" in 0.2.7 (4.2 of the first version) | the first version of this study | the repair ships on (`66654c6`); stacks 48 to 32, 140 to 77, 269 to 111 per the coordinator | commit `66654c6`, CHANGELOG 0.2.7 |
 
-### 7.4 Pending results to fill in
+### 7.4 Pending results: filled on Nov 4, and what is left for 0.2.8
+
+Filled in this version (the study's sections name the numbers):
+
+| Item | Result | Section |
+|---|---|---|
+| Release comparison rows: FLEURS 4-min, AMI x 3, PriMock x 2, syn4, noise set, Meeting B 45 min, 1 h FLEURS, Meeting C 88 min | 75 rows, `release-cmp` final (`1865d37`) | E9 |
+| Careful re-reads (beam on re-reads only) | no gain: 78 vs 78 units, +83 words, Meeting C window +1.3, 1.77x time; ships off | E5, 4.3 |
+| Raw-microphone default | daemon check on Meeting B +6.8 % words; decided off for 0.2.7 | E6, 4.3 |
+| Word-time repair | ships on; stacks 48 to 32 / 140 to 77 / 269 to 111 (coordinator's counts) | E7.4, 4.3 |
+| Normalisation | ships as an opt-in action without UI | 4.3 |
+
+Still pending (0.2.8 follow-ups, from `release-cmp` §"Left for 0.2.8" and the open items above):
 
 | Item | Owner | Where it goes | Why it matters |
 |---|---|---|---|
-| Release comparison rows: FLEURS 4-min, AMI ES2004b / TS3003a / IS1009b, PriMock day1 / day3, syn4, noise set, Meeting B 45 min, 1 h FLEURS (0.2.7 only), Meeting C 88 min (0.2.7 only), speaker count per release | mac-ai | `release-cmp` | the release's "what changed" evidence (E9) |
-| Daemon run with the headroom build confirming 12.8 / 23.3 % on Meeting A | mac-ai | `regression` | closes E2 |
-| Careful re-reads with beam search on re-reads only | mac-ai | new report | the only measured cure for synthetic invented text at a bearable cost (E5, 4.4) |
-| Third listening batch (clips 111 to 118) and the n >= 4 separation | maintainer, then mac-synth | `invented` / `veto` | any veto; the raw default (E7, 4.4) |
+| Third listening batch (clips 111 to 118, prepared, **not labelled yet**) and the n >= 4 separation | maintainer, then mac-synth | `invented` / `veto` | any veto; the raw-track default (E7, 4.4) |
+| Raw-microphone default: a second consented recording with both tracks and a reference; Large v3 on the denoised/raw pair | maintainer, mac-ai | new report | 4.4 |
+| Careful re-reads: silence set for Turbo English and Large v3 Vietnamese; the two labelled raw-track instances through the daemon; timing on an idle machine; a narrower trigger | mac-ai | `release-cmp` successor | 4.4 |
+| Remaining word-time stacks (32 to 111 words per meeting, no room between neighbours) | mac-ai | new report | E7.4 |
+| Speaker counts per release for the three private meetings; insertion-over-silence on private audio (marked silent spans); full-file route for the Meeting C window; a Large v3 row with an independent reference | mac-ai, maintainer | `release-cmp` successor | E9 |
+| Per-region lift (W6) to recover the Turbo gain given up by the headroom rule | mac-ai | new report | E2 |
+| Daemon run of Meeting A with the headroom build (the comparison used the per-call harness, not the daemon) | mac-ai | `regression` | closes E2 |
 | Second Vietnamese reference not seeded from a machine transcript; silent spans on Meeting A | maintainer | `plan` W10 | Large v3 for Vietnamese (4.4) |
 | Real glossary on / off on Meeting A | maintainer export, mac-ai | `far-field` | H4; 12.6 vs 17.1 residue |
-| Normalisation 1 h timing, 50-turn spot-check, paragraph breaks | mac-norm, maintainer | `norm`, `NORM-1` | default-on decision for 0.2.8 (E8) |
+| Normalisation 1 h timing, 50-turn spot-check, paragraph breaks, UI | mac-norm, desktop owner, maintainer | `norm`, `NORM-1` | default-on decision for 0.2.8 (E8) |
 | 1 h `minutes` report after the merge fix | mac-ai | `text-m2c` | functional check (E10) |
 | Large v3 on the audio-prep, trim and silence-set cells; Medium in the parameter search; Large v3 `n_ctx` 32 / 64 / 128 | mac-ai | `prep`, `params` | completeness (E5, E6) |
 | Uncontended RTF pass for any adopted change | mac-ai | the adopting report | every Nov 4 RTF is a rough ratio |
