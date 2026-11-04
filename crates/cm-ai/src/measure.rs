@@ -374,6 +374,30 @@ pub mod levels {
         samples.iter_mut().for_each(|s| *s *= g);
     }
 
+    /// [`normalize_rms_capped`] that never lets the largest sample pass `peak_limit_db` dBFS: the
+    /// gain is the smaller of the cap and the headroom, and none when there is no headroom. A
+    /// meeting with one loud near speaker and distant ones is low in RMS but not quiet; lifting it
+    /// by the RMS rule alone pushes the loud voice over full scale.
+    pub fn normalize_rms_capped_peak(
+        samples: &mut [f32],
+        target_db: f64,
+        max_gain_db: f64,
+        peak_limit_db: f64,
+    ) {
+        let level = db(rms_over(samples, &[]));
+        if level < -90.0 {
+            return;
+        }
+        let peak = samples.iter().fold(0.0f32, |m, s| m.max(s.abs()));
+        let headroom = peak_limit_db - db(f64::from(peak));
+        let gain_db = (target_db - level).min(max_gain_db).min(headroom);
+        if gain_db <= 0.0 {
+            return;
+        }
+        let g = 10f64.powf(gain_db / 20.0) as f32;
+        samples.iter_mut().for_each(|s| *s *= g);
+    }
+
     /// Scales so the largest sample is `target_db` dBFS (the signal is left alone when silent).
     pub fn normalize_peak(samples: &mut [f32], target_db: f64) {
         let peak = samples.iter().fold(0.0f32, |m, s| m.max(s.abs()));
