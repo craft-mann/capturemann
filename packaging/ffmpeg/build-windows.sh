@@ -142,6 +142,9 @@ configure_args=(
   --enable-ffmpeg --enable-ffprobe
   --enable-zlib
   --enable-mediafoundation
+  # mfenc.c in FFmpeg 9 uses the Direct3D 11 hardware context (AVD3D11VADeviceContext); --disable-autodetect leaves it
+  # off and the file then fails to compile (run 41848626658). Only the context and its headers are needed.
+  --enable-d3d11va
   --enable-libvpx --enable-libopus
   --disable-everything
   --enable-encoder="$ENCODERS"
