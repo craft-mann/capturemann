@@ -214,7 +214,10 @@ def place(parts, total_secs, filler, rng, gain_steps=False, rir=None, speech_db=
         i = int(start * SR)
         end = min(n, i + len(x))
         clip[i:end] += x[: end - i]
-        spans.append((start, min(total_secs, start + len(a) / SR)))
+        # a reverberant voice rings on after it stops: the reference speech lasts until the room has
+        # decayed by about 20 dB, so words written over the tail do not count as insertions
+        ring = 0.7 if rir is not None else 0.0
+        spans.append((start, min(total_secs, start + len(a) / SR + ring)))
         ref.append(text)
     return clip, spans, " ".join(ref)
 

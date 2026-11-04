@@ -93,6 +93,10 @@ struct Counts {
 fn count(words: &[Word], silent: &[(f64, f64)]) -> (Counts, Vec<usize>) {
     let mut hit = Vec::new();
     for (i, w) in words.iter().enumerate() {
+        // A token with no letter or digit (a lone full stop) is punctuation, not written text.
+        if !w.text.chars().any(char::is_alphanumeric) {
+            continue;
+        }
         let mid = (secs(w.start) + secs(w.end)) / 2.0;
         if silent.iter().any(|&(a, b)| mid >= a && mid < b) {
             hit.push(i);
@@ -145,6 +149,7 @@ fn report(
     });
     if show_text {
         v["text"] = json!(hit.iter().map(|&i| words[i].text.as_str()).collect::<Vec<_>>().join(" "));
+        v["hits"] = json!(hit.iter().map(|&i| json!([secs(words[i].start), secs(words[i].end), words[i].text])).collect::<Vec<_>>());
     }
     if let (Some(o), Some(e)) = (v.as_object_mut(), extra.as_object()) {
         for (k, x) in e {
@@ -189,7 +194,7 @@ fn main() {
     }
 
     // Decoding mode.
-    let dir = PathBuf::from(option(&args, "--dir").expect("--dir <set> or --transcript"));
+    let dir = PathBuf::from(option(&args, "--dir").unwrap_or_default());
     let model = PathBuf::from(option(&args, "--model").expect("--model <ggml file>"));
     let model_id = option(&args, "--model-id").expect("--model-id <id>");
     let language = option(&args, "--language").unwrap_or_else(|| "en".into());

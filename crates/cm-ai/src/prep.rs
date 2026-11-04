@@ -194,7 +194,7 @@ pub fn trim_silences(
     // Source ranges to keep, merged.
     let mut keep_ranges: Vec<Range<usize>> = Vec::new();
     let mut at = 0usize; // end of the previous speech (0: start of the audio)
-    let mut push = |a: usize, b: usize, out: &mut Vec<Range<usize>>| {
+    let push = |a: usize, b: usize, out: &mut Vec<Range<usize>>| {
         if b > a {
             match out.last_mut() {
                 Some(l) if a <= l.end => l.end = l.end.max(b),
