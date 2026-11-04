@@ -10,7 +10,7 @@ Status: complete for the rows below (the partial first version of this report is
 
 ## Results (exact WER % with tone marks kept, sub/del/ins in brackets; folded WER after the semicolon)
 
-Private rows: pat_5min (first 300 s of the 23-minute PAT file, 1,000 reference words), hop_84s (89 to 173 s of a 330 s clip of the Data Platform meeting, 298-word reference that is an older Large v3 output: Large v3 numbers on it mean nothing), nov2_45min and data_platform_88min (no reference: counters only).  rows have no usable WER (the clips are noise with a few speech spans): their metric is words written outside the speech spans. viu_1h and data_platform_88min were run for 0.2.7 only.
+Private rows: pat_5min (first 300 s of the 23-minute PAT file, 1,000 reference words), hop_84s (89 to 173 s of a 330 s clip of the Data Platform meeting, 298-word reference that is an older Large v3 output: Large v3 numbers on it mean nothing), nov2_45min and data_platform_88min (no reference: counters only). The noise_* rows have no usable WER (the clips are noise with a few speech spans): their metric is words written outside the speech spans. viu_1h and data_platform_88min were run for 0.2.7 only.
 
 | Row | metric | 0.2.6 Turbo | 0.2.7 Turbo | 0.2.7 Large v3 |
 |---|---|---|---|---|
@@ -96,8 +96,8 @@ Private rows: pat_5min (first 300 s of the 23-minute PAT file, 1,000 reference w
 - Noise set, words outside speech (9 clips): 0.2.6 Turbo 40, 0.2.7 Turbo 35, 0.2.7 Large v3 86. The lift change moves single clips both ways (noise_01 7 to 0, noise_07 7 to 17).
 - Sounds: 0.2.7 writes a sound ([noise]/[unclear]) where it would otherwise invent words: 2 on AMI TS3003a, 2 on noise_03, 1 each on Nov 2 and the Data Platform meeting.
 
-## Careful re-reads (, beam 5, no temperature fallback on windows the pipeline reads again): partial measurement, setting stays OFF
-Measured with the examples  and  with , Turbo, the app's own path ( over the lift), .
+## Careful re-reads (setting ai.careful_rereads, beam 5, no temperature fallback on windows the pipeline reads again): partial measurement, setting stays OFF
+Measured with the examples silence_probe and asr_bench with --careful-rereads, Turbo, the app's own path (transcribe_pieces over the lift), through /tmp/cm-gpu.
 
 | Check | Baseline | Careful re-reads |
 |---|---|---|
@@ -112,7 +112,7 @@ Measured with the examples  and  with , Turbo, the app's own path ( over the lif
 Result: on the Vietnamese silence set the careful re-reads remove none of the invented units and add 83 words, and the hop window gets 1.3 points worse. The beam search that cleaned the noise set in the parameter search does not change the units that are made by the gap re-reads here. The setting stays off (the code, tests and flag are in place). Not measured: the silence set for Turbo English and Large v3 Vietnamese, the raw-track clips 103 and 14 through the real daemon, English far-field WER with the flag, decode time per hour of audio on an idle machine.
 
 ## Real daemon check of the raw-microphone choice (Nov 2, Turbo, language vi, both tracks stored)
- was on in this check; main now defaults it OFF (maintainer decision, noise-reduced copy stays the default). Raw read: 8,254 words, 0 loop runs, 1 sound, 689 caption lines. Noise-reduced copy: 7,726 words, 1 loop run, 1 sound, 651 caption lines (6.8 % fewer words).
+The setting ai.transcribe_raw_mic was on in this check; main now defaults it OFF (maintainer decision, noise-reduced copy stays the default). Raw read: 8,254 words, 0 loop runs, 1 sound, 689 caption lines. Noise-reduced copy: 7,726 words, 1 loop run, 1 sound, 651 caption lines (6.8 % fewer words).
 
 ## Left for 0.2.8
 - Decide the raw-microphone default with a second consented recording that has both tracks and a reference; measure Large v3 on the denoised/raw pair.
