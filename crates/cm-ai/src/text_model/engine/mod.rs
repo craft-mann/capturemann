@@ -592,12 +592,26 @@ pub fn locate_helper(paths: &SearchPaths) -> Result<PathBuf, TextModelError> {
          app is damaged or incomplete. Reinstall CaptureMann."
             .to_owned()
     } else {
+        not_found_hint(cfg!(windows))
+    };
+    Err(engine_error(ErrorKind::EngineMissing, message))
+}
+
+/// The "not found" text for a build that is not a damaged macOS app. The macOS and Linux releases ship
+/// the helper and a developer builds it with `make llama`; the Windows build ships it only when it was
+/// packaged with `packaging/llama/build-windows.sh`, and has no `make`, so it names the file to add.
+fn not_found_hint(windows: bool) -> String {
+    if windows {
+        format!(
+            "The text engine was not found: this build does not include llama-server.exe. Put it \
+             next to the CaptureMann programs, or set {ENV_LLAMA_SERVER} to a llama-server.exe file."
+        )
+    } else {
         format!(
             "The text engine was not found: run `make llama` to build it, or set {ENV_LLAMA_SERVER} \
              to a llama-server executable. CaptureMann releases include their own copy."
         )
-    };
-    Err(engine_error(ErrorKind::EngineMissing, message))
+    }
 }
 
 /// The real effects.

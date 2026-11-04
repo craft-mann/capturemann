@@ -386,7 +386,10 @@ fn the_helper_is_looked_for_in_the_documented_order() {
     std::fs::remove_file(path_dir.join(exe_name())).unwrap();
     let e = locate_helper(&paths(None)).unwrap_err();
     assert_eq!(e.kind, ErrorKind::EngineMissing);
-    assert!(e.message.contains("make llama"), "{e}");
+    assert!(
+        e.message.contains("llama-server") && e.message.contains("CM_LLAMA_SERVER"),
+        "{e}"
+    );
     // A bad CM_LLAMA_SERVER is named, not silently skipped.
     let e = locate_helper(&paths(Some(&dir.path().join("nope")))).unwrap_err();
     assert!(e.message.contains("CM_LLAMA_SERVER"), "{e}");
@@ -463,4 +466,39 @@ fn the_real_platform_runs_stops_and_reports_a_fake_helper() {
     }
     assert!(how.unwrap().contains('3'));
     assert_eq!(child.log_tail(), "boom: bad model");
+}
+
+#[test]
+fn the_not_found_text_names_what_each_system_can_do() {
+    let mac = not_found_hint(false);
+    assert!(mac.contains("make llama") && mac.contains("include their own copy"), "{mac}");
+    // Windows has no `make` and the early zip does not always carry the helper.
+    let win = not_found_hint(true);
+    assert!(!win.contains("make llama") && !win.contains("include their own copy"), "{win}");
+    assert!(win.contains("llama-server.exe") && win.contains("CM_LLAMA_SERVER"), "{win}");
+}
+
+#[test]
+fn the_helper_is_found_by_its_exe_name_in_each_place() {
+    // The executable's name is `llama-server.exe` on Windows and `llama-server` elsewhere; the lookup
+    // must use the same name in the environment folder, beside the executable and on PATH.
+    let name = exe_name();
+    assert_eq!(name.to_string_lossy().ends_with(".exe"), cfg!(windows));
+    let dir = tempfile::tempdir().unwrap();
+    let beside = dir.path().join("app");
+    std::fs::create_dir_all(&beside).unwrap();
+    // A file with the other system's name must not match.
+    let other = if cfg!(windows) { "llama-server" } else { "llama-server.exe" };
+    std::fs::write(beside.join(other), b"x").unwrap();
+    let paths = SearchPaths {
+        env: None,
+        exe_dir: Some(beside.clone()),
+        path_var: None,
+    };
+    assert_eq!(
+        locate_helper(&paths).unwrap_err().kind,
+        ErrorKind::EngineMissing
+    );
+    std::fs::write(beside.join(&name), b"x").unwrap();
+    assert_eq!(locate_helper(&paths).unwrap(), beside.join(&name));
 }
