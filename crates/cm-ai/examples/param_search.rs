@@ -245,6 +245,9 @@ fn main() {
         reference: Option<String>,
         speech: Vec<(f64, f64)>,
         silent: Option<Vec<(f64, f64)>>,
+        /// Score only the words whose middle is inside `[start, end]` seconds (with `reference`
+        /// being the reference of that window).
+        window: Option<(f64, f64)>,
     }
     let mut loaded = Vec::new();
     for s in &sets {
@@ -277,6 +280,9 @@ fn main() {
             samples,
             speech,
             silent,
+            window: s["window"]
+                .as_array()
+                .map(|w| (w[0].as_f64().unwrap(), w[1].as_f64().unwrap())),
         });
     }
 
@@ -331,8 +337,18 @@ fn main() {
                 "lift": lift,
             });
             if let Some(r) = &set.reference {
-                let e = exact_errors(r, &text);
-                let f = word_errors(r, &text);
+                let scored = match set.window {
+                    Some((a, b)) => tr
+                        .words
+                        .iter()
+                        .filter(|w| (a..=b).contains(&mid(w)))
+                        .map(|w| w.text.as_str())
+                        .collect::<Vec<_>>()
+                        .join(" "),
+                    None => text.clone(),
+                };
+                let e = exact_errors(r, &scored);
+                let f = word_errors(r, &scored);
                 row["reference_words"] = json!(e.reference_words);
                 row["wer_exact"] = json!(e.wer());
                 row["ins"] = json!(e.insertions);
