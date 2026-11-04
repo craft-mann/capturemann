@@ -13,6 +13,7 @@
 
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
+pub mod convert;
 pub mod fake;
 pub mod flash;
 pub mod latency;
@@ -29,6 +30,8 @@ pub mod writer;
 mod mac;
 #[cfg(target_os = "macos")]
 use mac as platform;
+#[cfg(windows)]
+mod sys;
 #[cfg(not(target_os = "macos"))]
 mod unsupported;
 #[cfg(not(target_os = "macos"))]
@@ -64,6 +67,12 @@ use cm_core::CmError;
 /// own type; without it the iPhone is still listed, flagged `external`.
 pub fn list_cameras() -> Result<Vec<CameraInfo>, CmError> {
     platform::list_cameras()
+}
+
+/// The camera engine of this system, for hardware checks that drive a source directly (the
+/// recorder and the preview open it themselves).
+pub fn system_source() -> Box<dyn CameraSource> {
+    platform::system_source()
 }
 
 /// Picks the camera to use: the remembered one if it is still present, else the default (CAM-4

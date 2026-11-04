@@ -18,6 +18,11 @@ cm-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
+# MIT OR Apache-2.0. Media Foundation camera capture and the privacy switches (registry); the version
+# cm-platform, cm-capture and cm-cursor use.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Media_MediaFoundation", "Win32_System_Com", "Win32_System_Registry"] }
+
 # Same objc2 stack and versions as spikes/spike-encode (plain bindings, no Swift bridge).
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2.workspace = true
