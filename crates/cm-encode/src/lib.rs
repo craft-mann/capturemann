@@ -25,6 +25,7 @@ pub mod ffmpeg_vp9;
 pub mod fmp4;
 pub mod h264;
 pub mod h264_mux;
+pub mod mf_logic;
 pub mod nv12;
 pub mod settings;
 pub mod synthetic;

@@ -33,5 +33,10 @@ objc2-core-foundation.workspace = true
 objc2-core-video.workspace = true
 objc2-uniform-type-identifiers.workspace = true
 
+# Windows: the Media Foundation hardware H.264 encoder (NVENC / Quick Sync / AMF behind the
+# transform), src/windows.rs. The version cm-capture and cm-cursor use; MIT OR Apache-2.0.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Media_MediaFoundation", "Win32_System_Com", "Win32_System_Ole", "Win32_System_Variant"] }
+
 [dev-dependencies]
 tempfile.workspace = true
