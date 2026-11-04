@@ -107,6 +107,8 @@ pub const CLI_COMMANDS: &[(&str, Option<&str>)] = &[
     ("test_text_model", Some("ai text-model test")),
     ("diarize", Some("ai speakers")),
     ("set_speakers", Some("ai speakers rename")),
+    ("normalize_transcript", Some("ai normalize")),
+    ("get_normalized_transcript", Some("ai normalized")),
     ("list_report_templates", Some("ai report templates")),
     ("generate_report", Some("ai report")),
     ("get_report", Some("ai report get")),

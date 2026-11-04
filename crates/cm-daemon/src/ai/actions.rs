@@ -88,6 +88,16 @@ pub enum AiOp {
     SuggestCuts {
         capture_id: String,
     },
+    /// AI-10: a `normalize` job; writes `transcript.normalized.json`, never `transcript.json`.
+    NormalizeTranscript {
+        capture_id: String,
+        /// The prompt language (default: the transcript's).
+        language: Option<String>,
+    },
+    /// AI-10: the normalised transcript, when there is one.
+    GetNormalizedTranscript {
+        capture_id: String,
+    },
     /// AI-9: the built-in report templates.
     ListReportTemplates,
     /// AI-9: a `report` job. `report_id` regenerates that report (replaced only on success).
@@ -154,6 +164,8 @@ impl AiOp {
             AiOp::SuggestZooms { .. } => "suggest_zooms",
             AiOp::SuggestCuts { .. } => "suggest_cuts",
             AiOp::TranslateCaptions { .. } => "translate_captions",
+            AiOp::NormalizeTranscript { .. } => "normalize_transcript",
+            AiOp::GetNormalizedTranscript { .. } => "get_normalized_transcript",
             AiOp::ListReportTemplates => "list_report_templates",
             AiOp::GenerateReport { .. } => "generate_report",
             AiOp::GetReport { .. } => "get_report",
@@ -176,6 +188,8 @@ impl AiOp {
             | AiOp::TranslateCaptions { capture_id, .. }
             | AiOp::Diarize { capture_id, .. }
             | AiOp::SetSpeakers { capture_id, .. }
+            | AiOp::NormalizeTranscript { capture_id, .. }
+            | AiOp::GetNormalizedTranscript { capture_id }
             | AiOp::GenerateReport { capture_id, .. }
             | AiOp::GetReport { capture_id, .. }
             | AiOp::ExportReport { capture_id, .. }
@@ -247,6 +261,7 @@ impl AiParams {
                 }
             }
             AiOp::GetTranscript { capture_id }
+            | AiOp::GetNormalizedTranscript { capture_id }
             | AiOp::SuggestZooms { capture_id }
             | AiOp::SuggestCuts { capture_id } => {
                 o.insert("capture_id".into(), json!(capture_id));
@@ -318,6 +333,13 @@ impl AiParams {
                 }
             }
             AiOp::ListReportTemplates => {}
+            AiOp::NormalizeTranscript {
+                capture_id,
+                language,
+            } => {
+                o.insert("capture_id".into(), json!(capture_id));
+                insert_language(&mut o, language);
+            }
             AiOp::GenerateReport {
                 capture_id,
                 template,
@@ -475,6 +497,9 @@ pub(crate) fn summary(p: &AiParams) -> String {
             )
         }
         AiOp::Diarize { capture_id, .. } => format!("Tell the speakers of {capture_id} apart"),
+        AiOp::NormalizeTranscript { capture_id, .. } => {
+            format!("Add punctuation and capital letters to the transcript of {capture_id}")
+        }
         AiOp::SetSpeakers { capture_id, .. } => format!("Change the speakers of {capture_id}"),
         AiOp::GenerateReport {
             capture_id,
@@ -1078,6 +1103,19 @@ pub(crate) fn parse(method: &str, f: &Fields<'_>) -> Result<Action, CmError> {
             AiOp::SetSpeakers {
                 capture_id: f.str_req("capture_id")?,
                 edit: speaker_edit(f)?,
+            }
+        }
+        "normalize_transcript" => {
+            f.only(&["capture_id", "language", "request_id"])?;
+            AiOp::NormalizeTranscript {
+                capture_id: f.str_req("capture_id")?,
+                language: translation_language(f)?,
+            }
+        }
+        "get_normalized_transcript" => {
+            f.only(&["capture_id"])?;
+            AiOp::GetNormalizedTranscript {
+                capture_id: f.str_req("capture_id")?,
             }
         }
         "list_report_templates" => {

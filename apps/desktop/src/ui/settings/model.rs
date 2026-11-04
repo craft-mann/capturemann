@@ -405,6 +405,8 @@ pub(crate) fn tool_title(name: &str) -> String {
         "suggest_cuts" => tr!("Suggest cuts"),
         "diarize" => tr!("Find who speaks when"),
         "set_speakers" => tr!("Rename or fix speakers"),
+        "normalize_transcript" => tr!("Add punctuation to a transcript"),
+        "get_normalized_transcript" => tr!("Read a transcript with punctuation"),
         "list_report_templates" => tr!("List report templates"),
         "generate_report" => tr!("Write a report from a transcript"),
         "get_report" => tr!("Read a report"),

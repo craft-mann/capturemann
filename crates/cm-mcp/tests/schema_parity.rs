@@ -119,6 +119,7 @@ fn field(path: &str, schema: &Value, all: bool, variant: usize) -> Value {
         // AI-9: ids that match the pattern, a context the first template (summary) accepts.
         p if p.ends_with(".report_id") => json!("rpt_00000001"),
         p if p.ends_with("generate_report.language") => json!("vi"),
+        p if p.ends_with("normalize_transcript.language") => json!("vi"),
         p if p.ends_with("generate_report.context") => json!({ "title": "Weekly" }),
         // IMP-3: absolute file paths, and `diarize` / `report_template` go with `transcribe`.
         p if p.ends_with("import_media.paths") => json!(["/Users/me/Movies/clip.mov"]),
