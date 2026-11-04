@@ -7,15 +7,26 @@
 
 use std::ffi::c_void;
 
-use windows::Win32::Foundation::{HWND, RECT};
+use windows::core::{BOOL, HSTRING, PCWSTR, PWSTR};
+use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM, RECT};
 use windows::Win32::Graphics::Dwm::DWMWA_CLOAKED;
 use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS};
 use windows::Win32::Graphics::Gdi::{
     CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, GetWindowDC,
     ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HDC,
 };
+use windows::Win32::Storage::FileSystem::{
+    GetFileVersionInfoSizeW, GetFileVersionInfoW, VerQueryValueW,
+};
 use windows::Win32::Storage::Xps::{PrintWindow, PRINT_WINDOW_FLAGS};
-use windows::Win32::UI::WindowsAndMessaging::{GetWindowLongW, GetWindowRect, GWL_EXSTYLE};
+use windows::Win32::System::Threading::{
+    OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
+};
+use windows::Win32::UI::WindowsAndMessaging::{
+    EnumChildWindows, GetWindowLongW, GetWindowRect, GetWindowThreadProcessId, GWL_EXSTYLE,
+};
+
+use super::win_names::{choose_app_name, is_frame_host, rect_to_xywh};
 
 /// `PW_RENDERFULLCONTENT`: also paints DirectX and XAML content.
 const PW_RENDERFULLCONTENT: u32 = 2;
@@ -54,6 +65,153 @@ pub fn is_pickable(id: u32) -> bool {
         )
     };
     is_pickable_style(ex_style, cloaked)
+}
+
+/// The visible frame of the window as `(x, y, width, height)` in physical px. This is the rectangle `capture`
+/// cuts out of the painted window, so the size the picker lists is the size the saved picture has (the 0.2.6
+/// picker listed 1426x720 for a window that was saved as 1426x721, and the two numbers came from two code
+/// paths).
+pub fn frame_bounds(id: u32) -> Option<(i32, i32, u32, u32)> {
+    let hwnd = HWND(id as usize as *mut c_void);
+    let mut frame = RECT::default();
+    // SAFETY: the call writes one RECT, whose size is passed; a stale handle makes it return an error.
+    unsafe {
+        DwmGetWindowAttribute(
+            hwnd,
+            DWMWA_EXTENDED_FRAME_BOUNDS,
+            &mut frame as *mut RECT as *mut c_void,
+            std::mem::size_of::<RECT>() as u32,
+        )
+        .ok()?;
+    }
+    rect_to_xywh(frame.left, frame.top, frame.right, frame.bottom)
+}
+
+/// The full path of the program a process runs, when the process lets us ask.
+fn exe_path_of(pid: u32) -> Option<String> {
+    // SAFETY: the handle is opened and closed here; the buffer length is passed and updated by the call.
+    unsafe {
+        let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+        let mut buf = [0u16; 1024];
+        let mut len = buf.len() as u32;
+        let asked = QueryFullProcessImageNameW(
+            process,
+            PROCESS_NAME_WIN32,
+            PWSTR(buf.as_mut_ptr()),
+            &mut len,
+        );
+        let _ = CloseHandle(process);
+        asked.ok()?;
+        Some(String::from_utf16_lossy(&buf[..len as usize]))
+    }
+}
+
+/// `FileDescription` and `ProductName` from the version resource of a program, in the order of its languages.
+fn version_descriptions(path: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let wide = HSTRING::from(path);
+    // SAFETY: the buffer is as large as `GetFileVersionInfoSizeW` says; `VerQueryValueW` returns pointers into
+    // it that are read before it is dropped, with the lengths it reports.
+    unsafe {
+        let size = GetFileVersionInfoSizeW(PCWSTR(wide.as_ptr()), None);
+        if size == 0 {
+            return out;
+        }
+        let mut block = vec![0u8; size as usize];
+        if GetFileVersionInfoW(PCWSTR(wide.as_ptr()), None, size, block.as_mut_ptr().cast())
+            .is_err()
+        {
+            return out;
+        }
+        let (mut ptr, mut len) = (std::ptr::null_mut::<c_void>(), 0u32);
+        let translation = HSTRING::from("\\VarFileInfo\\Translation");
+        if !VerQueryValueW(block.as_ptr().cast(), &translation, &mut ptr, &mut len).as_bool()
+            || ptr.is_null()
+        {
+            return out;
+        }
+        let pairs = std::slice::from_raw_parts(ptr as *const [u16; 2], len as usize / 4);
+        for key in ["FileDescription", "ProductName"] {
+            for [lang, page] in pairs {
+                let query = HSTRING::from(format!("\\StringFileInfo\\{lang:04x}{page:04x}\\{key}"));
+                let (mut text, mut chars) = (std::ptr::null_mut::<c_void>(), 0u32);
+                if VerQueryValueW(block.as_ptr().cast(), &query, &mut text, &mut chars).as_bool()
+                    && !text.is_null()
+                    && chars > 0
+                {
+                    let units = std::slice::from_raw_parts(text as *const u16, chars as usize);
+                    let end = units.iter().position(|&c| c == 0).unwrap_or(units.len());
+                    out.push(String::from_utf16_lossy(&units[..end]));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// State of the child-window search in [`app_pid_of_frame`]: the frame host's pid, and the pid found.
+struct ChildSearch {
+    host: u32,
+    found: u32,
+}
+
+unsafe extern "system" fn first_foreign_child(hwnd: HWND, lparam: LPARAM) -> BOOL {
+    // SAFETY: `lparam` is the `ChildSearch` that `app_pid_of_frame` passed and keeps alive during the call.
+    let search = unsafe { &mut *(lparam.0 as *mut ChildSearch) };
+    let mut pid = 0u32;
+    // SAFETY: writes one u32.
+    unsafe { GetWindowThreadProcessId(hwnd, Some(&mut pid)) };
+    if pid != 0 && pid != search.host {
+        search.found = pid;
+        return BOOL(0);
+    }
+    BOOL(1)
+}
+
+/// The process of the app that a packaged window shows: Windows runs every such window in
+/// `ApplicationFrameHost.exe`, and the app's own process owns a child window inside it.
+fn app_pid_of_frame(hwnd: HWND, host: u32) -> u32 {
+    let mut search = ChildSearch { host, found: 0 };
+    // SAFETY: the callback only reads and writes `search`, which outlives the call.
+    unsafe {
+        let _ = EnumChildWindows(
+            Some(hwnd),
+            Some(first_foreign_child),
+            LPARAM(&mut search as *mut ChildSearch as isize),
+        );
+    }
+    if search.found != 0 {
+        search.found
+    } else {
+        host
+    }
+}
+
+/// The name the picker shows for the app that owns a window: the description in the program's version
+/// resource, else the program's file name, else the window title (see `win_names::choose_app_name`). For a
+/// packaged app the program is the app's own, not `ApplicationFrameHost.exe`.
+pub fn app_name(id: u32, title: &str) -> String {
+    let hwnd = HWND(id as usize as *mut c_void);
+    let mut pid = 0u32;
+    // SAFETY: writes one u32; a stale handle leaves 0.
+    unsafe { GetWindowThreadProcessId(hwnd, Some(&mut pid)) };
+    let mut exe = exe_path_of(pid).unwrap_or_default();
+    if is_frame_host(&exe) {
+        let app = app_pid_of_frame(hwnd, pid);
+        if app != pid {
+            exe = exe_path_of(app).unwrap_or_default();
+        } else {
+            // The app's process is not reachable: the host's own name says nothing, the title does.
+            exe.clear();
+        }
+    }
+    let descriptions = if exe.is_empty() {
+        Vec::new()
+    } else {
+        version_descriptions(&exe)
+    };
+    let refs: Vec<&str> = descriptions.iter().map(String::as_str).collect();
+    choose_app_name(&refs, &exe, title)
 }
 
 /// An RGBA8 picture of the visible frame of the window: `(width, height, pixels)`.
