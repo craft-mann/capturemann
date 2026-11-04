@@ -180,9 +180,10 @@ mod real {
         #[cfg(target_os = "macos")]
         let source = cm_capture::record::sck::SckSource::new();
         #[cfg(target_os = "windows")]
-        let source = cm_capture::record::WgcSource;
-        // VideoToolbox on macOS; when it rejects the plan the start fails (REC-2: no software
-        // fallback in v0.1). Windows has no encoder yet.
+        let source = cm_capture::record::WgcSource::default();
+        // VideoToolbox on macOS, a Media Foundation hardware transform on Windows; when none takes
+        // the plan the start fails with `hardware_encoder_unavailable` (REC-2: no software
+        // fallback).
         Box::new(ScreenTrack::new(
             plan.clone(),
             source,
@@ -194,11 +195,10 @@ mod real {
     /// The cursor's recorded area (see [`CursorTarget`]): macOS global space is logical points,
     /// Windows physical px.
     pub(super) fn cursor_target(plan: &CapturePlan, targets: &Targets) -> CursorTarget {
-        let (div, tscale) = if cfg!(windows) {
-            (1.0, 1.0)
-        } else {
-            (plan.scale.get(), plan.scale.get())
-        };
+        if cfg!(windows) {
+            return super::super::sys::windows::cursor_target(plan, targets);
+        }
+        let (div, tscale) = (plan.scale.get(), plan.scale.get());
         let rect = |x: f64, y: f64, w: f64, h: f64| Rect::new(x / div, y / div, w / div, h / div);
         let display = plan
             .display_id
