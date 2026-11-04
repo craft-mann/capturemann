@@ -1289,6 +1289,7 @@ dependencies = [
  "cpal",
  "dispatch2",
  "hound",
+ "log",
  "nnnoiseless",
  "objc2 0.6.5",
  "objc2-av-foundation",
@@ -1304,6 +1305,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "windows 0.61.3",
+ "windows-core 0.61.2",
 ]
 
 [[package]]

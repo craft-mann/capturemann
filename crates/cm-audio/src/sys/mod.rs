@@ -7,5 +7,7 @@ pub mod mac_permission;
 pub mod mac_sck;
 #[cfg(windows)]
 pub mod win_consent;
+#[cfg(windows)]
+pub mod win_process_loopback;
 
 pub mod linux_pipewire;

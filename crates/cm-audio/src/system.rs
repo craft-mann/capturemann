@@ -50,6 +50,14 @@ pub fn system_audio_factory(exclude_bundle_ids: Vec<String>) -> SourceFactory {
     {
         let _ = &exclude_bundle_ids;
         Box::new(|_sel: &DeviceSelector| {
+            // Without our own sound where Windows allows it (process loopback), else the plain
+            // loopback of the default output.
+            if crate::sys::win_process_loopback::available() {
+                return Ok(
+                    Box::new(crate::sys::win_process_loopback::ProcessLoopbackSource::new())
+                        as Box<dyn AudioSource>,
+                );
+            }
             Ok(
                 Box::new(crate::cpal_source::CpalSource::open_default_output_loopback()?)
                     as Box<dyn AudioSource>,

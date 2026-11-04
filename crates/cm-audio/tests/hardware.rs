@@ -141,3 +141,31 @@ fn devices_open_without_streaming() {
         }
     }
 }
+
+/// Windows: the process loopback (system audio without CaptureMann's own sound) opens, runs for 3 s and
+/// stops. Plays nothing and needs no sound: a silent computer gives an empty or short track, which is
+/// printed, not asserted. Not named after the other system-audio tests so that a filter for them never
+/// picks this one up.
+#[cfg(windows)]
+#[test]
+#[ignore = "opens the Windows process loopback for 3 s (no sound is played)"]
+fn windows_process_loopback_opens_and_stops() {
+    let dir = tempfile::tempdir().unwrap();
+    let clock = SessionClock::with_host(Arc::new(SystemHostClock));
+    let mut rec = SystemAudioRecorder::new(SystemAudioConfig::default());
+    rec.start(TrackContext {
+        dir: dir.path().to_path_buf(),
+        clock: clock.clone(),
+    })
+    .unwrap();
+    std::thread::sleep(Duration::from_secs(3));
+    let info = rec.stop(clock.now()).unwrap();
+    eprintln!("{}", serde_json::to_string_pretty(&info).unwrap());
+    let r = hound::WavReader::open(dir.path().join("system.wav")).unwrap();
+    eprintln!(
+        "system.wav: {} ch, {} Hz, {:.2} s",
+        r.spec().channels,
+        r.spec().sample_rate,
+        f64::from(r.duration()) / f64::from(r.spec().sample_rate)
+    );
+}

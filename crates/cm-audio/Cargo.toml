@@ -29,8 +29,11 @@ serde_json = "1"
 pipewire = "0.10"
 
 [target.'cfg(windows)'.dependencies]
+# MIT OR Apache-2.0. The `#[implement]` macro of `windows` expands to paths in this crate (the activation handler of the process loopback).
+windows-core = "0.61"
+log.workspace = true
 # MIT OR Apache-2.0. The microphone privacy switches (registry); the version cm-platform and cm-capture use.
-windows = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Registry"] }
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Registry", "Win32_Media_Audio", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Threading", "Win32_System_Variant", "Win32_Security"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Zlib OR Apache-2.0 OR MIT (objc2 family) and MIT (block2, libc).
