@@ -18,7 +18,7 @@ through MCP and a CLI.
 <p align="center">
 <a href="https://github.com/craft-mann/capturemann/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/craft-mann/capturemann/actions/workflows/ci.yml/badge.svg"></a>
 <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue"></a>
-<a href="https://github.com/craft-mann/capturemann/releases/latest"><img alt="Version 0.2.6" src="https://img.shields.io/badge/version-0.2.6-blue"></a>
+<a href="https://github.com/craft-mann/capturemann/releases/latest"><img alt="Version 0.2.7" src="https://img.shields.io/badge/version-0.2.7-blue"></a>
 <img alt="macOS 13+: Apple Silicon and Intel" src="https://img.shields.io/badge/macOS-13%2B%20%7C%20Apple%20Silicon%20%26%20Intel-lightgrey?logo=apple&logoColor=white">
 <img alt="Windows 11 x64: early build" src="https://img.shields.io/badge/Windows-11%20x64%20%7C%20early%20build-0078D4?logo=windows&logoColor=white">
 <img alt="Linux: early build, Ubuntu 24.04+ x86_64 and aarch64" src="https://img.shields.io/badge/Linux-Ubuntu%2024.04%2B%20%7C%20early%20build-E95420?logo=linux&logoColor=white">
@@ -28,8 +28,9 @@ through MCP and a CLI.
   <img alt="The CaptureMann library: recordings, audio and screenshots in one place, with a record button, region, window and display capture, and the AI and agent pages in the sidebar" src="docs/images/library.webp" width="900">
 </p>
 
-> **Status: 0.2.6. macOS 13+ (Apple Silicon and Intel) is the full app. Windows 11 (x64) and Linux (Ubuntu 24.04+,
-> x86_64 and aarch64) are early builds** with screenshots, the editor, the library, local AI and the CLI and MCP
+> **Status: 0.2.7. macOS 13+ (Apple Silicon and Intel) is the full app. Windows 11 (x64) and Linux (Ubuntu 24.04+,
+> x86_64 and aarch64) are early builds** (the 0.2.6 files; 0.2.7 is macOS only, Windows follows in 0.2.8 and Linux in
+> 0.2.9) with screenshots, the editor, the library, local AI and the CLI and MCP
 > server; screen and audio recording are not available there yet, and the Windows files are not signed. Most results are
 > tested with scripted fakes, plus the maintainer's own use on one Mac; there are few stored hardware
 > reports. **Speaker labels** are measured on public English conversation clips only (diarization error
