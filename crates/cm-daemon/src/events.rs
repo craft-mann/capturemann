@@ -108,6 +108,11 @@ pub const TRANSLATION_READY: &str = "translation.ready";
 pub const SPEAKERS_STARTED: &str = "speakers.started";
 /// A diarization finished (AI-8): `{ capture_id, model, speakers, segments, note, headset }`.
 pub const SPEAKERS_READY: &str = "speakers.ready";
+/// The normalised transcript was written (AI-10): `{ capture_id, turns, normalized, rejected,
+/// words, model }`.
+pub const TRANSCRIPT_NORMALIZED: &str = "transcript.normalized";
+/// A normalisation run failed (AI-10): `{ capture_id, reason, message }`.
+pub const NORMALIZE_FAILED: &str = "transcript.normalize_failed";
 /// A report was written (AI-9): `{ capture_id, report_id, template, dropped_uncited, chunks }`.
 pub const REPORT_READY: &str = "report.ready";
 /// A report run failed (AI-9): `{ capture_id, template, reason, message }`.

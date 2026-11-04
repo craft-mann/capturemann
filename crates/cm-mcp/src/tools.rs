@@ -1673,6 +1673,50 @@ fn ai_tools() -> Vec<ToolSpec> {
                 "required": ["capture_id", "changed", "speakers"] }),
         ),
         ai_tool(
+            "normalize_transcript",
+            Tier::Free,
+            true,
+            "AI-10",
+            "Add punctuation, capital letters and paragraph breaks to a recording's transcript with the built-in text model (any other provider gives `no_text_model`), without changing a word: an answer that adds, drops or changes a word (a tone mark, a letter) is rejected for that speaker turn, which then keeps its raw text. Runs in the background and returns a `job_id`; the job result is `{ turns, normalized, rejected, words, model, seconds }` and `transcript.normalized` is published. `transcript.json` is never changed (search, captions, reports and translation keep reading it); the result is the sidecar read with get_normalized_transcript. Needs a transcript and a downloaded text model; about 1 minute for 15 minutes of speech on an M-series Mac. Running it again replaces the sidecar.",
+            json!({ "language": { "type": "string", "description": "Language of the transcript for the prompt (`vi`, `en`, `pt-br`); default the transcript's." } }),
+            &["capture_id"],
+            job_started_output(json!({ "capture_id": { "type": "string" } })),
+        ),
+        ai_tool(
+            "get_normalized_transcript",
+            Tier::Free,
+            false,
+            "AI-10",
+            "Read the result of normalize_transcript: `text` (the transcript with punctuation, capitals and paragraph breaks, speaker turns separated by a blank line) and `normalized` (per turn: the word range `first`/`len` in the transcript, `display` strings per word, `breaks`, `glued`, `normalized` false with a `reason` where the turn was rejected and keeps its raw words). `stale` is true when the transcript has changed since. Fails with `not_found` until normalize_transcript has finished.",
+            json!({}),
+            &["capture_id"],
+            json!({ "type": "object", "properties": {
+                "capture_id": { "type": "string" },
+                "stale": { "type": "boolean" },
+                "text": { "type": "string" },
+                "normalized": { "type": "object", "properties": {
+                    "version": { "type": "integer" }, "language": { "type": "string" },
+                    "model": { "type": "string" }, "prompt_version": { "type": "integer" },
+                    "created": { "type": "string" }, "words": { "type": "integer" },
+                    "words_hash": { "type": "string" },
+                    "summary": { "type": "object", "properties": {
+                        "turns": { "type": "integer" }, "normalized": { "type": "integer" },
+                        "rejected": { "type": "integer" }, "words": { "type": "integer" },
+                        "rejected_words": { "type": "integer" }, "model_calls": { "type": "integer" },
+                        "retried": { "type": "integer" } } },
+                    "turns": { "type": "array", "items": { "type": "object", "properties": {
+                        "start": { "type": "integer" }, "end": { "type": "integer" },
+                        "first": { "type": "integer" }, "len": { "type": "integer" },
+                        "speaker": { "type": "integer" }, "normalized": { "type": "boolean" },
+                        "reason": { "type": "string" },
+                        "display": { "type": "array", "items": { "type": "string" } },
+                        "glued": { "type": "array", "items": { "type": "integer" } },
+                        "breaks": { "type": "array", "items": { "type": "integer" } } },
+                        "required": ["first", "len", "normalized", "display"] } } },
+                    "required": ["language", "model", "turns"] } },
+                "required": ["capture_id", "stale", "text", "normalized"] }),
+        ),
+        ai_tool(
             "list_report_templates",
             Tier::Free,
             false,
@@ -1834,6 +1878,8 @@ fn with_capture_input(mut t: ToolSpec) -> ToolSpec {
         t.name,
         "transcribe"
             | "get_transcript"
+            | "normalize_transcript"
+            | "get_normalized_transcript"
             | "get_captions"
             | "set_captions"
             | "replace_in_captions"

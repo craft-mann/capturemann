@@ -61,6 +61,11 @@ fn ai_methods_parse_to_themselves() {
                    "merge": [{"from": 3, "into": "1"}],
                    "assign": [{"start": 1.0, "end": 2.5, "speaker": 2}]}),
         ),
+        (
+            "normalize_transcript",
+            json!({"capture_id": "rec_1", "language": "vi", "request_id": "r"}),
+        ),
+        ("get_normalized_transcript", json!({"capture_id": "rec_1"})),
         ("list_report_templates", json!({})),
         (
             "generate_report",
@@ -92,7 +97,7 @@ fn ai_methods_parse_to_themselves() {
     ] {
         assert_eq!(parse_ok(m, p).op.method(), m);
     }
-    assert_eq!(AI_METHODS.len(), 27);
+    assert_eq!(AI_METHODS.len(), 29);
 }
 
 #[test]
