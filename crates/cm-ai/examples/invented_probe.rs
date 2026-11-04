@@ -84,7 +84,9 @@ fn main() {
         // The quietest stretch: the window whose 90th-percentile 1 s level is lowest.
         let n = secs as usize;
         let lv: Vec<f64> = raw
-            .chunks_exact(16_000)
+            .as_chunks::<16_000>()
+            .0
+            .iter()
             .map(|c| c.iter().map(|s| f64::from(*s).powi(2)).sum::<f64>() / 16_000.0)
             .collect();
         let mut best = (f64::MAX, 0usize);
