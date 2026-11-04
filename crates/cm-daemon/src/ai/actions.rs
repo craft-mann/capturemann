@@ -37,8 +37,8 @@ pub enum AiOp {
         /// `None`: the active model.
         model: Option<String>,
         /// `Some(true)`: the microphone as recorded; `Some(false)`: the noise-reduced copy;
-        /// `None`: what the setting `ai.transcribe_raw_mic` says (the recorded microphone unless
-        /// it is turned off).
+        /// `None`: what the setting `ai.transcribe_raw_mic` says (the noise-reduced copy unless
+        /// it is turned on).
         original_audio: Option<bool>,
     },
     GetTranscript {

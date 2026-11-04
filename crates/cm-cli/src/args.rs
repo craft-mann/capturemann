@@ -440,8 +440,8 @@ pub struct TranscribeArgs {
     /// Installed model id (default: the active one).
     #[arg(long, value_name = "MODEL")]
     pub model: Option<String>,
-    /// Read the microphone as it was recorded (the default, setting `ai.transcribe_raw_mic`; it
-    /// makes no difference to a recording made without noise reduction).
+    /// Read the microphone as it was recorded (setting `ai.transcribe_raw_mic` makes it the
+    /// default; it makes no difference to a recording made without noise reduction).
     #[arg(long, conflicts_with = "denoised_audio")]
     pub original_audio: bool,
     /// Read the noise-reduced copy instead of the microphone as recorded.

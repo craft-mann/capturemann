@@ -5,6 +5,46 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-11-04
+
+0.2.7 is a macOS release: Import, steadier transcripts, and a cleaner app log. Windows and Linux builds are not part of it (0.2.8 and 0.2.9). The measured transcript numbers are in `verification/benchmarks/` and the study `docs/research/transcription-quality-study-0.2.7.md`.
+
+### Added
+
+- **Import media.** Bring video and audio files that CaptureMann did not record into the library: an Import sheet and a drop target in the library, cards that show progress on the capture's own card, `capturemann import`, and the MCP tool `import_media`. Formats are what the bundled FFmpeg reads: MP4, MOV, M4V and MKV with H.264 or HEVC video and AAC or PCM audio, M4A and WAV. Transcription and speaker steps after an import are their own jobs, so the import is done when the files are in the library.
+- **`[unclear]` and `[noise]` markers.** A stretch the transcript cannot vouch for is shown dimmed in the caption list and the audio Transcript tab instead of as invented words. They are stored beside the words, so captions, reports, translation and search never see them.
+- **Automatic transcription** is one control on the AI page: Off, After recording, or While recording (audio recordings; the live mode is off by default and has not had its 20-minute hardware check yet).
+- **Speaker finding for long audio** runs in windows linked by voice prints (memory is capped and Cancel is noticed between windows).
+- **Tidy a transcript (opt-in).** `capturemann ai normalize <ID>` (and the MCP tool) adds punctuation, capitals and line breaks with the built-in text model. A turn is accepted only if its words are exactly the transcript's (tone marks kept); anything else keeps the raw text. The result is a separate file, `transcript.normalized.json`; the transcript is never changed. No screen for it yet.
+- Settings keys with off switches: `ai.lift_quiet_input` (on), `ai.repair_word_times` (on), `ai.background_priority` (on), `ai.transcribe_raw_mic` (off: read the microphone as recorded instead of the noise-reduced copy; `capturemann ai transcribe --original-audio` or `--denoised-audio` choose per run) and `ai.careful_rereads` (off: re-read suspect stretches with beam search; not measured enough to turn on).
+- The AI page says Large v3 is recommended for Vietnamese meetings (slower, more memory).
+
+### Changed
+
+- The default theme is dark; messages hide after 5 seconds (errors and progress stay).
+- Transcription and speaker finding run at a lower priority and leave two CPU cores free, so the app stays responsive while it works.
+- The transcription job shows real progress while it checks the transcript, instead of sitting at 99 %.
+- Large v3 Turbo remains the default speech model. Large v3 is better on far-field Vietnamese meetings in the one reference we have (12.8 % against 23.3 % word errors on 5 minutes) and about five times slower.
+
+### Fixed
+
+- **Skipped speech.** Speech that came back with no words is read again; on one private meeting stretch Turbo went from 40 of 298 words to most of them (97.3 % to 29.2 % word errors).
+- **Repeated phrases and loops.** A sentence repeated three times in a row, or a word repeated at an impossible pace, is read again and replaced; if it still loops it becomes `[unclear]` or `[noise]`.
+- **Garbled characters** (letters from other scripts inside words) are read again or dropped.
+- Words stacked on one instant no longer build zero-length caption lines, which blocked saving edits (`lines[N].end: must be after start`); their times are spread between the neighbouring words.
+- A quiet-input boost applied to audio with loud peaks made Large v3 worse; the boost now applies only to really quiet audio.
+- Import: the file panel opens in front of the window, and the Import button no longer opens a second window.
+- The audio editor's "Audio" crumb returns to the Audio library; the audio and video playheads can be dragged; the Exports card and the editor tab rail no longer overflow.
+- Log lines: a closed toast window no longer keeps being redrawn (thousands of "window not found" errors), quitting waits for running jobs before the system's 200 ms limit, and one harmless upstream font notice is shown as debug.
+- Suggested cuts keep quiet speech (adaptive silence threshold, speech check against words, speakers and the noise-reduced copy).
+
+### Known issues
+
+- Whisper can write sentences nobody said over quiet or noisy stretches (outro-style lines such as thanks for watching). It is reproduced on public test audio and it is not removed yet: no rule we tested separates it from faint speech without losing real words. Marking such a stretch `[unclear]` by hand is the workaround.
+- Word accuracy on far-field Vietnamese meetings is about 23 % word errors with Turbo and about 13 % with Large v3 on the one corrected reference we have; there is no change from 0.2.6 in word accuracy on that reference.
+- Transcribing while recording is off by default; its hardware check has not been run.
+- Windows and Linux are the 0.2.6 early builds; the changes above are macOS only.
+
 ## [0.2.6] - 2026-11-03
 
 0.2.6 is the first release with Linux and Windows builds (early builds: no recording yet), published together with the macOS DMGs. The macOS app has one fix. Reports: `verification/LINUX-1-x11-thinkpad-2026-11-02-claude.md`, `verification/LINUX-1-wayland-thinkpad-2026-11-02-claude.md`, `verification/L1-windows-thinkpad-2026-11-02-claude.md` (all PARTIAL).

@@ -83,7 +83,7 @@ impl Default for PipelineSettings {
             gate: false,
             vad_opinion: false,
             carry_previous_text: true,
-            transcribe_raw_mic: true,
+            transcribe_raw_mic: false,
             repair_word_times: true,
             careful_rereads: false,
         }
@@ -353,8 +353,8 @@ mod tests {
             PipelineSettings::from_settings(&m),
             PipelineSettings::all_off()
         );
-        // The raw microphone is on unless its key says off.
-        assert!(PipelineSettings::from_settings(&none).transcribe_raw_mic);
+        // The raw microphone is off (the noise-reduced copy is read) unless its key says on.
+        assert!(!PipelineSettings::from_settings(&none).transcribe_raw_mic);
     }
 
     #[test]
