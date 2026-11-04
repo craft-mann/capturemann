@@ -58,6 +58,12 @@ impl Daemon {
             }),
         )?;
         self.register_job_handler(
+            JOB_NORMALIZE,
+            Arc::new(normalize::NormalizeHandler {
+                inner: Arc::downgrade(&self.inner),
+            }),
+        )?;
+        self.register_job_handler(
             JOB_REPORT,
             Arc::new(reports::ReportHandler {
                 inner: Arc::downgrade(&self.inner),
@@ -395,6 +401,13 @@ impl Inner {
             } => self.diarize(actor, capture_id, hints, headset).await,
             AiOp::SetSpeakers { capture_id, edit } => {
                 self.set_speakers(actor, capture_id, edit).await
+            }
+            AiOp::NormalizeTranscript {
+                capture_id,
+                language,
+            } => self.normalize_transcript(actor, capture_id, language).await,
+            AiOp::GetNormalizedTranscript { capture_id } => {
+                self.get_normalized_transcript(capture_id).await
             }
             AiOp::ListReportTemplates => Ok(reports::list_templates()),
             AiOp::GenerateReport {

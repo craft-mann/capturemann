@@ -138,6 +138,11 @@ pub const ACTIONS: &[ActionSpec] = &[
     // `set_speakers` renames, merges or reassigns as one undoable revision.
     spec("diarize", Tier::Free, true),
     spec("set_speakers", Tier::Free, true),
+    // AI-10: tidy punctuation and case with the built-in text model into a sidecar file, as a
+    // `normalize` job. Free like `generate_report`: it only runs the local model and writes a
+    // derived file (`transcript.json` is never changed). The user can set it to Ask first.
+    spec("normalize_transcript", Tier::Free, true),
+    spec("get_normalized_transcript", Tier::Free, false),
     // AI-9 reports. `generate_report` is a `report` job on the built-in text model (provider
     // `none` is refused as `no_text_model`); create, edit and
     // delete are one undoable revision each.

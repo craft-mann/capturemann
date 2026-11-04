@@ -89,7 +89,7 @@ async fn agt_1_ac1_stdio_binary_lists_tools_and_calls_list_targets() {
     // and translate_captions (AI-5), and add_marker (VOC-1), and the six report tools (AI-9), and check_report_item.
     // and get_diagnostics (DIAG-1).
     // and import_media (IMP-3).
-    assert_eq!(list.len(), 75);
+    assert_eq!(list.len(), 77);
     assert!(list
         .iter()
         .all(|t| t["inputSchema"].is_object() && t["outputSchema"].is_object()));

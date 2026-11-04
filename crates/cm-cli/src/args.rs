@@ -152,6 +152,16 @@ pub enum AiCmd {
         #[arg(long)]
         words: bool,
     },
+    /// Add punctuation, capital letters and paragraph breaks to a transcript with the local text
+    /// model, without changing a word (`normalize_transcript`). Writes a separate file; the
+    /// transcript itself is not changed. Needs a transcript and a downloaded text model (exit 2,
+    /// `no_text_model`). Read the result with `ai normalized <id>`.
+    Normalize(NormalizeArgs),
+    /// Print the normalised transcript (`get_normalized_transcript`).
+    Normalized {
+        /// Capture id of a recording.
+        id: String,
+    },
     /// Edit the caption lines (`set_captions`).
     Captions {
         #[command(subcommand)]
@@ -402,6 +412,21 @@ pub enum ModelsCmd {
     Use { model: String },
     /// Delete an installed model (asks you to confirm in the app).
     Rm { model: String },
+}
+
+#[derive(Debug, Args)]
+pub struct NormalizeArgs {
+    /// Capture id of a recording that has a transcript.
+    pub id: String,
+    /// The language of the transcript for the prompt (`vi`, `en`, ...); default the transcript's.
+    #[arg(long, value_name = "LANG")]
+    pub language: Option<String>,
+    /// Wait for the job to finish (exit 6 if it fails).
+    #[arg(long)]
+    pub wait: bool,
+    /// With `--wait`: give up after this many seconds (the job keeps running).
+    #[arg(long, value_name = "SECS", requires = "wait", value_parser = positive_secs)]
+    pub timeout: Option<f64>,
 }
 
 #[derive(Debug, Args)]

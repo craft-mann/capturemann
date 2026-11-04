@@ -9,8 +9,8 @@ use serde_json::{json, Value};
 
 use super::{plain, Ctx};
 use crate::args::{
-    AiCmd, CaptionsCmd, ModelsCmd, ReportArgs, ReportCmd, SpeakersArgs, SpeakersCmd, SuggestCmd,
-    TextModelCmd, TextModelsCmd, TranscribeArgs, TranslateArgs,
+    AiCmd, CaptionsCmd, ModelsCmd, NormalizeArgs, ReportArgs, ReportCmd, SpeakersArgs, SpeakersCmd,
+    SuggestCmd, TextModelCmd, TextModelsCmd, TranscribeArgs, TranslateArgs,
 };
 use crate::client::Client;
 use crate::error::CliError;
@@ -118,6 +118,8 @@ pub(super) async fn ai(cx: &mut Ctx<'_>, cmd: AiCmd) -> Result<(), CliError> {
         AiCmd::Report(a) => report(cx, a).await,
         AiCmd::Transcribe(a) => transcribe(cx, a).await,
         AiCmd::Transcript { id, words } => transcript(cx, id, words).await,
+        AiCmd::Normalize(a) => normalize(cx, a).await,
+        AiCmd::Normalized { id } => normalized(cx, id).await,
         AiCmd::Translate(a) => translate(cx, a).await,
         AiCmd::Captions {
             cmd: CaptionsCmd::Get { id, language },
@@ -812,6 +814,80 @@ async fn transcribe(cx: &mut Ctx<'_>, a: TranscribeArgs) -> Result<(), CliError>
             plain(&j["result"]["model"]),
             plain(&j["result"]["capture_id"]),
         )
+    });
+    Ok(())
+}
+
+/// `ai normalize`: `normalize_transcript`, then (with `--wait`) polls the job.
+async fn normalize(cx: &mut Ctx<'_>, a: NormalizeArgs) -> Result<(), CliError> {
+    let mut p = json!({ "capture_id": a.id });
+    if let Some(l) = &a.language {
+        p["language"] = json!(l);
+    }
+    let params = cx.mutating(p, "");
+    let mut c = cx.client().await?;
+    let started = c.call("normalize_transcript", params).await?;
+    if !a.wait {
+        cx.emit(&started, |r| {
+            format!(
+                "Adding punctuation to {}: job {}{}\n  watch it with `capturemann jobs get {}`",
+                plain(&r["capture_id"]),
+                plain(&r["job_id"]),
+                if r["reused"] == json!(true) {
+                    " (already running)"
+                } else {
+                    ""
+                },
+                plain(&r["job_id"]),
+            )
+        });
+        return Ok(());
+    }
+    let job = wait_job(
+        cx,
+        &mut c,
+        &plain(&started["job_id"]),
+        "adding punctuation",
+        a.timeout,
+    )
+    .await?;
+    cx.emit(&job, |j| {
+        let r = &j["result"];
+        format!(
+            "Tidied {}: {} of {} turns, {} kept as spoken, model `{}`\n  read it with `capturemann ai normalized {}`",
+            plain(&r["capture_id"]),
+            plain(&r["normalized"]),
+            plain(&r["turns"]),
+            plain(&r["rejected"]),
+            plain(&r["model"]),
+            plain(&r["capture_id"]),
+        )
+    });
+    Ok(())
+}
+
+/// `ai normalized`: `get_normalized_transcript`.
+async fn normalized(cx: &mut Ctx<'_>, id: String) -> Result<(), CliError> {
+    let mut c = cx.client().await?;
+    let r = c
+        .call("get_normalized_transcript", json!({ "capture_id": id }))
+        .await?;
+    cx.emit(&r, |r| {
+        let n = &r["normalized"];
+        let mut s = format!(
+            "Normalised transcript of {}: {} of {} turns tidied, model `{}`{}\n\n",
+            plain(&r["capture_id"]),
+            plain(&n["summary"]["normalized"]),
+            plain(&n["summary"]["turns"]),
+            plain(&n["model"]),
+            if r["stale"] == json!(true) {
+                " (the transcript has changed since; run `ai normalize` again)"
+            } else {
+                ""
+            },
+        );
+        s.push_str(r["text"].as_str().unwrap_or_default());
+        s
     });
     Ok(())
 }

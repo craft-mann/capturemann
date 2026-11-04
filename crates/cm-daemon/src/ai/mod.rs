@@ -127,6 +127,8 @@ pub const AI_METHODS: &[&str] = &[
     "translate_captions",
     "diarize",
     "set_speakers",
+    "normalize_transcript",
+    "get_normalized_transcript",
     "list_report_templates",
     "generate_report",
     "get_report",
@@ -173,6 +175,7 @@ mod dispatch;
 mod jobs;
 mod live;
 mod models;
+mod normalize;
 mod reports;
 mod services;
 mod speakers;
@@ -188,6 +191,7 @@ pub use self::jobs::*;
 pub use self::live::{
     live_transcribe_enabled, SETTING_LIVE_POLL_MS, SETTING_TRANSCRIBE_WHILE_RECORDING,
 };
+pub use self::normalize::JOB_NORMALIZE;
 pub use self::reports::{ReportFormat, JOB_REPORT, MAX_REPORT_MARKDOWN_CHARS};
 pub use self::services::*;
 pub use self::translation::*;

@@ -167,6 +167,11 @@ fn samples() -> Vec<(&'static str, Value)> {
         ("get_text_model", json!({})),
         ("get_diagnostics", json!({})),
         ("test_text_model", json!({})),
+        (
+            "normalize_transcript",
+            json!({"capture_id": "rec_1", "language": "vi", "request_id": "r"}),
+        ),
+        ("get_normalized_transcript", json!({"capture_id": "rec_1"})),
         ("list_report_templates", json!({})),
         (
             "generate_report",
