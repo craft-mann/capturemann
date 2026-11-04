@@ -10746,6 +10746,14 @@ msgstr "Mở trong bản chép lời"
 msgid "Owners can only be attendees or speakers; anyone else becomes “Unassigned”."
 msgstr "Người phụ trách chỉ có thể là người tham dự hoặc người nói; người khác sẽ thành “Chưa giao”."
 
+#, fuzzy
+msgid "Add punctuation to a transcript"
+msgstr "Thêm dấu câu cho bản ghi lời"
+
+#, fuzzy
+msgid "Read a transcript with punctuation"
+msgstr "Đọc bản ghi lời có dấu câu"
+
 msgid "Tick a task in a report"
 msgstr "Đánh dấu một việc trong báo cáo"
 

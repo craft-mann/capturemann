@@ -237,6 +237,9 @@ msgstr ""
 msgid "Add local folder…"
 msgstr ""
 
+msgid "Add punctuation to a transcript"
+msgstr ""
+
 msgid "Add this app to the excluded apps"
 msgstr ""
 
@@ -3423,6 +3426,9 @@ msgid "Read a report"
 msgstr ""
 
 msgid "Read a transcript"
+msgstr ""
+
+msgid "Read a transcript with punctuation"
 msgstr ""
 
 msgid "Read caption lines"
