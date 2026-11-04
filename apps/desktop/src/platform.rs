@@ -109,6 +109,9 @@ pub mod ids {
     pub const OPEN_LIBRARY: &str = "open_library";
     pub const OPEN_LAUNCHER: &str = "open_launcher";
     pub const SETTINGS: &str = "settings";
+    /// "Import file…" (IMP-5): the tray's stand-in for the macOS menu bar item, on Windows where
+    /// the window has no menu bar.
+    pub const IMPORT: &str = "import_file";
     pub const PERMISSIONS: &str = "permissions";
     pub const QUIT: &str = "quit";
     pub const RECORD: &str = "record";
@@ -305,6 +308,23 @@ pub fn recording_group_start(recording: bool) -> usize {
     }
 }
 
+/// The plain (non-submenu) tray items, in the order they are created. Windows adds "Import file…"
+/// (IMP-5): macOS has the menu bar item, Linux builds its own menu.
+pub fn plain_menu_ids(with_import: bool) -> Vec<&'static str> {
+    let mut v = vec![
+        ids::CAPTURE_REGION,
+        ids::CAPTURE_WINDOW,
+        ids::CAPTURE_DISPLAY,
+        ids::OPEN_LIBRARY,
+        ids::OPEN_LAUNCHER,
+    ];
+    if with_import {
+        v.push(ids::IMPORT);
+    }
+    v.extend([ids::SETTINGS, ids::PERMISSIONS, ids::QUIT]);
+    v
+}
+
 /// The text of a tray menu item in the current UI language. One place for the strings, so
 /// building the menu and [`NativeTray::relabel`] (a live language switch) cannot disagree.
 /// `Pause recording` is set by [`NativeTray::apply_plan`] (it becomes `Resume recording`).
@@ -319,6 +339,7 @@ pub fn menu_text(id: &str) -> String {
         ids::REC_STOP => tr!("Stop recording"),
         ids::OPEN_LIBRARY => tr!("Open library"),
         ids::OPEN_LAUNCHER => tr!("Open launcher"),
+        ids::IMPORT => tr_ctx!("menu", "Import file\u{2026}"),
         ids::SETTINGS => tr_ctx!("tray menu", "Settings"),
         ids::PERMISSIONS => tr!("Permissions\u{2026}"),
         ids::QUIT => tr!("Quit CaptureMann"),
@@ -496,19 +517,10 @@ pub fn build_native_tray() -> Result<NativeTray, String> {
     let none = MenuItem::new(tr!("No captures yet"), false, None);
     recent.append(&none).map_err(|e| e.to_string())?;
     let delay_menu = Submenu::with_id(MenuId::new("delay"), menu_text("delay"), true);
-    let plain: Vec<(&'static str, MenuItem)> = [
-        ids::CAPTURE_REGION,
-        ids::CAPTURE_WINDOW,
-        ids::CAPTURE_DISPLAY,
-        ids::OPEN_LIBRARY,
-        ids::OPEN_LAUNCHER,
-        ids::SETTINGS,
-        ids::PERMISSIONS,
-        ids::QUIT,
-    ]
-    .into_iter()
-    .map(|id| (id, item(id, true)))
-    .collect();
+    let plain: Vec<(&'static str, MenuItem)> = plain_menu_ids(cfg!(windows))
+        .into_iter()
+        .map(|id| (id, item(id, true)))
+        .collect();
     let plain_item = |id: &str| -> &MenuItem {
         plain
             .iter()
@@ -528,7 +540,12 @@ pub fn build_native_tray() -> Result<NativeTray, String> {
         delay_menu.append(&check).map_err(|e| e.to_string())?;
         delays.push((secs, check));
     }
-    menu.append_items(&[
+    let (sep_a, sep_b, sep_c) = (
+        PredefinedMenuItem::separator(),
+        PredefinedMenuItem::separator(),
+        PredefinedMenuItem::separator(),
+    );
+    let mut entries: Vec<&dyn tray_icon::menu::IsMenuItem> = vec![
         plain_item(ids::CAPTURE_REGION),
         plain_item(ids::CAPTURE_WINDOW),
         plain_item(ids::CAPTURE_DISPLAY),
@@ -537,17 +554,22 @@ pub fn build_native_tray() -> Result<NativeTray, String> {
         &record_audio,
         &pause,
         &stop,
-        &PredefinedMenuItem::separator(),
+        &sep_a,
         plain_item(ids::OPEN_LIBRARY),
         plain_item(ids::OPEN_LAUNCHER),
-        &recent,
-        &PredefinedMenuItem::separator(),
+    ];
+    if let Some((_, import)) = plain.iter().find(|(i, _)| *i == ids::IMPORT) {
+        entries.push(import);
+    }
+    entries.extend([
+        &recent as &dyn tray_icon::menu::IsMenuItem,
+        &sep_b,
         plain_item(ids::SETTINGS),
         plain_item(ids::PERMISSIONS),
-        &PredefinedMenuItem::separator(),
+        &sep_c,
         plain_item(ids::QUIT),
-    ])
-    .map_err(|e| e.to_string())?;
+    ]);
+    menu.append_items(&entries).map_err(|e| e.to_string())?;
     let (icon, template) = tray_icon_for(TrayState::Idle)?;
     let builder = TrayIconBuilder::new()
         .with_menu(Box::new(menu.clone()))
@@ -583,6 +605,24 @@ pub fn build_native_tray() -> Result<NativeTray, String> {
 mod tests {
     use super::*;
     use crate::shortcuts::Platform;
+
+    /// IMP-5: only the Windows tray carries "Import file…"; the item has a label and no other
+    /// item's place changes.
+    #[test]
+    fn the_import_item_is_in_the_windows_tray_only() {
+        let without = plain_menu_ids(false);
+        let with = plain_menu_ids(true);
+        assert!(!without.contains(&ids::IMPORT));
+        assert_eq!(with.len(), without.len() + 1);
+        assert_eq!(
+            with.iter()
+                .copied()
+                .filter(|i| *i != ids::IMPORT)
+                .collect::<Vec<_>>(),
+            without
+        );
+        assert!(menu_text(ids::IMPORT).starts_with("Import file"));
+    }
 
     /// CAP-2: every default chord converts to an OS hotkey.
     #[test]
