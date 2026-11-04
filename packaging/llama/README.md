@@ -30,3 +30,18 @@ Needs the Xcode command line tools, `cmake` (`brew install cmake`), `curl` and `
 
 Bundling flags (see `packaging/macos/bundle.sh`): `CM_LLAMA_BUNDLE` (a binary to bundle),
 `CM_NO_LLAMA=1` (skip), `CM_REQUIRE_LLAMA=1` (fail without it; `make bundle-release` sets it).
+
+## Windows
+
+`packaging/llama/build-windows.sh` (an MSYS2 MINGW64 shell, `pacman -S --needed mingw-w64-x86_64-gcc
+mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja curl tar`) builds `llama-server.exe` from the same pinned
+tag and checksum as the macOS script (it reads them from `build-macos.sh` and stops while they are
+`PENDING_PIN`). CPU only (AVX2, FMA, F16C, BMI2; OpenMP off), libstdc++, libgcc and winpthread static;
+`CM_LLAMA_VULKAN=ON` adds Vulkan (needs `vulkan-1.dll` at run time, untested here). The self-check fails
+on any DLL outside the Windows system set, on curl or OpenSSL, and on a missing licence or option.
+Output (ignored by version control): `packaging/llama/out-windows-x64/{llama-server.exe,BUILD-INFO.txt,LICENSES/}`.
+
+`packaging/windows/build-windows.ps1` bundles that folder next to the programs when it exists
+(`CM_LLAMA_BUNDLE` names another; `CM_REQUIRE_LLAMA=1` makes its absence an error) and puts the build
+record and licences in `Llama\`. **Not run on Windows yet, and not in the CI workflows** (the CI job
+would build llama.cpp on every package run; add it once the maintainer wants it in the zip).

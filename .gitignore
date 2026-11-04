@@ -43,6 +43,7 @@ packaging/ffmpeg/out-x86_64/
 packaging/ffmpeg/.downloads/
 packaging/llama/out/
 packaging/llama/out-x86_64/
+packaging/llama/out-windows-*/
 packaging/llama/.downloads/
 packaging/sherpa/out/
 packaging/sherpa/out-x86_64/
