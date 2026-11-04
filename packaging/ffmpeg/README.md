@@ -50,8 +50,12 @@ records the versions, hashes, the exact `configure` line and the linked librarie
 
 **Architecture.** arm64 only, deployment target macOS 13. A universal binary needs a second build
 for x86_64 (FFmpeg and libvpx use `nasm` for x86 assembly, which this script does not install) and
-`lipo -create` of the two `ffmpeg` and the two `ffprobe`. Windows is not built (the Windows plan is
-a separate FFmpeg with Media Foundation H.264 and the same libvpx and libopus).
+`lipo -create` of the two `ffmpeg` and the two `ffprobe`. Windows has its own script,
+`build-windows.sh` (MSYS2 MINGW64 on x64; same pinned sources and component lists, `h264_mf` and `hevc_mf`
+through Media Foundation in place of VideoToolbox, static link, self-check that only Windows system DLLs are
+loaded; output `out-windows-x64/`, given to `packaging\windows\build-windows.ps1` as `CM_FFMPEG_BUNDLE`). It has
+not run on Windows yet. `h264_mf` takes whatever encoder Windows offers (a GPU's hardware encoder, or Microsoft's
+software one); whether the software one is allowed is an open decision in `specs/plans/release-0.2.8-plan.md`.
 
 ## Where the pinned hashes come from
 

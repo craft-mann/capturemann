@@ -7,7 +7,9 @@ name: Windows package
 # It then tries what it built on the runner: the portable CLI, the daemon the CLI starts, the app window (a
 # screenshot of the runner's desktop is kept), and a silent install and uninstall.
 #
-# The Windows early build has no FFmpeg (no recording or MP4 export yet) and no speaker engine.
+# The package carries an LGPL FFmpeg (built here by packaging/ffmpeg/build-windows.sh in MSYS2, cached by the
+# script's hash) and the speaker engine (sherpa-onnx /MT libraries from packaging/sherpa/fetch-windows.ps1). Both
+# steps fail the run when their self-checks fail; neither has run on a Windows runner yet (Nov 4, 2026).
 # Pinned actions: the same commits as ci.yml.
 on:
   workflow_dispatch:
@@ -38,8 +40,49 @@ jobs:
         run: |
           choco install nsis --no-progress -y
           "C:\Program Files (x86)\NSIS" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+      # The LGPL FFmpeg (Media Foundation H.264, libvpx, libopus), built with the MSYS2 that windows-latest has.
+      - name: Cache the FFmpeg sources and build
+        id: ffmpeg-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            packaging/ffmpeg/.downloads
+            packaging/ffmpeg/out-windows-x64
+          key: ffmpeg-windows-${{ hashFiles('packaging/ffmpeg/build-windows.sh') }}
+      - name: Build the LGPL FFmpeg (MSYS2 MINGW64)
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $env:MSYSTEM = 'MINGW64'
+          $env:CHERE_INVOKING = '1'
+          $env:MSYS2_PATH_TYPE = 'minimal'
+          $bash = 'C:\msys64\usr\bin\bash.exe'
+          & $bash -lc 'pacman -Sy --noconfirm --needed make diffutils perl curl xz tar mingw-w64-x86_64-gcc mingw-w64-x86_64-pkgconf mingw-w64-x86_64-nasm mingw-w64-x86_64-zlib'
+          if ($LASTEXITCODE -ne 0) { throw 'pacman failed' }
+          & $bash -lc 'packaging/ffmpeg/build-windows.sh'
+          if ($LASTEXITCODE -ne 0) { throw 'build-windows.sh failed' }
+      - name: Show the FFmpeg build record
+        shell: pwsh
+        run: |
+          Get-ChildItem packaging\ffmpeg\out-windows-x64 | Select-Object Name, Length
+          Get-Content packaging\ffmpeg\out-windows-x64\BUILD-INFO.txt | Select-Object -First 40
+      # The speaker engine: the /MT libraries, because the package build links the C runtime statically.
+      - name: Cache the sherpa-onnx archive
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: packaging/sherpa/.downloads
+          key: sherpa-Windows-mt-${{ hashFiles('packaging/sherpa/fetch-windows.ps1') }}
+      - name: Fetch the sherpa-onnx libraries (pinned, SHA-256 checked)
+        shell: pwsh
+        run: |
+          packaging\sherpa\fetch-windows.ps1 -Crt mt
+          if (-not $?) { throw 'fetch-windows.ps1 failed' }
       - name: Build the zip and the installer
         shell: pwsh
+        env:
+          CM_FFMPEG_BUNDLE: ${{ github.workspace }}\packaging\ffmpeg\out-windows-x64
+          CM_REQUIRE_FFMPEG: '1'
+          CM_REQUIRE_SHERPA: '1'
         run: packaging\windows\build-windows.ps1
       - name: List the files
         shell: pwsh
@@ -63,6 +106,12 @@ jobs:
           $lic = Get-Content (Join-Path $app 'doc\THIRD_PARTY_LICENSES.md') -Raw
           "licence list: $($lic.Length) characters; windows-sys: $($lic -match 'windows-sys'); objc2: $($lic -match 'objc2')"
           if ($lic -notmatch 'windows-sys' -or $lic -match 'objc2') { throw 'THIRD_PARTY_LICENSES.md is not the Windows list' }
+          # The bundled FFmpeg: next to the programs, LGPL, with the source offer and the licences.
+          & "$app\ffmpeg.exe" -hide_banner -version | Select-Object -First 2; if ($LASTEXITCODE -ne 0) { throw 'bundled ffmpeg.exe does not run' }
+          if ((& "$app\ffmpeg.exe" -hide_banner -buildconf) -match '--enable-(gpl|nonfree|version3|libx264)') { throw 'bundled ffmpeg.exe is not LGPL' }
+          foreach ($f in 'FFmpeg\SOURCE-OFFER.txt', 'FFmpeg\BUILD-INFO.txt', 'FFmpeg\LICENSES\FFmpeg-COPYING.LGPLv2.1.txt', 'ffprobe.exe') {
+            if (-not (Test-Path (Join-Path $app $f))) { throw "missing in the zip: $f" }
+          }
           & "$app\capturemann.exe" --version; if ($LASTEXITCODE -ne 0) { throw 'capturemann --version failed' }
           & "$app\capturemann.exe" targets; if ($LASTEXITCODE -ne 0) { throw 'capturemann targets failed' }
           & "$app\capturemann.exe" diagnostics; if ($LASTEXITCODE -ne 0) { throw 'capturemann diagnostics failed' }
