@@ -114,6 +114,9 @@ pub struct WgcCapture {
     item: GraphicsCaptureItem,
     arrived: i64,
     closed: i64,
+    /// Set by the first `stop`: touching a closed pool or session again (the `Drop` after an explicit stop)
+    /// ends the process with a fast-fail (0xC0000409).
+    stopped: bool,
 }
 
 fn err(what: &str, e: windows::core::Error) -> CmError {
@@ -465,11 +468,15 @@ impl WgcCapture {
             item,
             arrived,
             closed,
+            stopped: false,
         })
     }
 
     /// Stops the capture. When this returns no event is delivered any more.
     pub fn stop(&mut self) {
+        if std::mem::replace(&mut self.stopped, true) {
+            return;
+        }
         log::info!("wgc stop: removing the handlers");
         let _ = self.pool.RemoveFrameArrived(self.arrived);
         let _ = self.item.RemoveClosed(self.closed);
