@@ -61,3 +61,28 @@ pub fn list_cameras() -> Result<Vec<CameraInfo>, CmError> {
         })
         .collect())
 }
+
+/// One line per native media type of the first camera: size, frame-rate range and layout (for diagnosing
+/// a camera that records at fewer frames per second than asked).
+pub fn describe_native_modes() -> Result<Vec<String>, CmError> {
+    let _rt = MfRuntime::start()?;
+    let devices = enumerate_devices()?;
+    let Some(d) = devices.first() else {
+        return Ok(Vec::new());
+    };
+    // SAFETY: the activation object is live.
+    let source = unsafe { d.activate.ActivateObject::<IMFMediaSource>() }
+        .map_err(|e| CmError::internal(format!("{}: {e}", d.name)))?;
+    // SAFETY: `source` is live; no attributes are passed.
+    let reader = unsafe { MFCreateSourceReaderFromMediaSource(&source, None) }
+        .map_err(|e| CmError::internal(format!("{}: {e}", d.name)))?;
+    Ok(native_types(&reader)
+        .iter()
+        .map(|(m, _)| {
+            format!(
+                "{}x{} {:.1}..{:.1} fps {:?}",
+                m.width, m.height, m.min_fps, m.max_fps, m.subtype
+            )
+        })
+        .collect())
+}

@@ -157,6 +157,14 @@ impl FrameSink for WriteTo {
 }
 
 #[test]
+#[ignore = "opens the camera briefly to read its native modes"]
+fn prints_the_native_modes() {
+    for line in cm_camera::describe_native_modes().unwrap() {
+        eprintln!("MODE {line}");
+    }
+}
+
+#[test]
 #[ignore = "records the real camera for 6 s into a temp file (deleted afterwards)"]
 fn default_camera_records_a_fragmented_mp4() {
     let Some(cam) = camera_or_skip() else { return };

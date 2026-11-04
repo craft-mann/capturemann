@@ -44,6 +44,9 @@ pub use platform::NativeSample;
 pub use preview::{CameraPreview, PreviewFrame, PreviewOptions, RgbaImage};
 pub use recorder::{CameraRecorder, RecorderEvent, CAMERA_FILE};
 pub use retime::{Retimed, Retimer};
+/// The native modes of the first camera, one line each (diagnostics; Windows only).
+#[cfg(windows)]
+pub use sys::devices_describe_native_modes as describe_native_modes;
 pub use types::*;
 pub use watcher::{
     change_event_name, change_payload, diff_devices, system_watcher, CameraWatcher, ChangeSink,

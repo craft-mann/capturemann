@@ -15,6 +15,7 @@ use crate::types::CameraSource;
 use crate::writer::WriterFactory;
 
 pub use consent::permission_status;
+pub use devices::describe_native_modes as devices_describe_native_modes;
 pub use devices::{list_cameras, request_access};
 
 pub fn system_source() -> Box<dyn CameraSource> {
