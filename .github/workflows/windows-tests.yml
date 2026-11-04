@@ -13,6 +13,11 @@ name: Windows tests
 # Pinned actions: the same commits as ci.yml and windows-package.yml.
 on:
   workflow_dispatch:
+  # GitHub only dispatches a workflow by name once its file is on the default branch. Until then a push to
+  # this branch that changes this file runs it (remove the push trigger when the file reaches main).
+  push:
+    branches: [track/windows]
+    paths: ['.github/workflows/windows-tests.yml']
 
 permissions:
   contents: read
