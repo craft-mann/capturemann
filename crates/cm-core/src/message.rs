@@ -94,7 +94,7 @@ pub const TEMPLATES: &[Template] = &[
     t(
         "hardware_encoder_unavailable",
         ErrorCode::PlatformRejected,
-        "This Mac has no usable hardware H.264 encoder for this recording. Try a lower resolution, update to macOS 13 or later, or use a Mac from about 2016 or later.",
+        "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update your operating system (macOS 13 or later, Windows 10 or later), or use a computer from about 2016 or later.",
     ),
     // FFmpeg is missing (the exporter, the GIF and WebM presets, frame picking). The ids are the
     // stable machine-readable "FFmpeg not found" code: `cm_media::tools` raises the messages (a

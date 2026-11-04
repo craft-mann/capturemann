@@ -480,6 +480,9 @@ msgstr ""
 msgid "Auto-redact"
 msgstr ""
 
+msgid "Auto-redact needs a Windows text recognition language. Add one in Settings > Time & language > Language & region (it installs the text recognition part), then restart CaptureMann."
+msgstr ""
+
 msgid "Auto-redact needs the tesseract program with English data. Install it (Debian and Ubuntu: sudo apt install tesseract-ocr), then restart CaptureMann."
 msgstr ""
 
@@ -5031,9 +5034,6 @@ msgstr ""
 msgid "These are the defaults for every recording, including ones an agent starts. A request can override them for one recording."
 msgstr ""
 
-msgid "This Mac has no usable hardware H.264 encoder for this recording. Try a lower resolution, update to macOS 13 or later, or use a Mac from about 2016 or later."
-msgstr ""
-
 msgid "This Mac has {memory} GB of memory. The model runs inside CaptureMann and nothing leaves this Mac."
 msgstr ""
 
@@ -5056,6 +5056,9 @@ msgid "This cannot be undone"
 msgstr ""
 
 msgid "This caption is empty"
+msgstr ""
+
+msgid "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update your operating system (macOS 13 or later, Windows 10 or later), or use a computer from about 2016 or later."
 msgstr ""
 
 msgid "This computer has {memory} GB of memory. The model runs inside CaptureMann and nothing leaves this computer."
