@@ -240,25 +240,8 @@ pub fn pick_mode(raw: &[RawMode], want_height: u32, want_fps: u32) -> Option<usi
     }
     with_fps
         .into_iter()
-        .min_by_key(|(_, m)| (size_key(m, want_height), layout_rank(m, want_fps)))
+        .min_by_key(|(_, m)| (size_key(m, want_height), m.subtype.rank()))
         .map(|(i, _)| i)
-}
-
-/// Pixels per second above which an uncompressed layout cannot really run over a USB 2 camera (720p at
-/// 30 fps is 27.6 million): such a camera lists NV12 or YUY2 modes at that size and rate in its descriptors
-/// but delivers a third of the rate (the lab laptop's camera recorded about 10 fps at 720p), so only
-/// Motion JPEG is believed there.
-const UNCOMPRESSED_LIMIT_PX_PER_S: f64 = 15_000_000.0;
-
-/// The tie-break among modes of the same size: the layout that needs the least work, except that Motion JPEG
-/// comes first when the pixel rate is too high for an uncompressed one.
-fn layout_rank(m: &RawMode, fps: u32) -> u8 {
-    let rate = f64::from(m.width) * f64::from(m.height) * f64::from(fps);
-    if m.subtype == Subtype::Mjpg && rate > UNCOMPRESSED_LIMIT_PX_PER_S {
-        0
-    } else {
-        m.subtype.rank() + 1
-    }
 }
 
 /// Smaller sorts first: sizes at or above the wanted height by how much they exceed it, then
@@ -613,27 +596,6 @@ mod tests {
         assert_eq!(
             pick_mode(&[raw(0, 0, 0.0, 0.0, Subtype::Other)], 720, 30),
             None
-        );
-    }
-
-    #[test]
-    fn motion_jpeg_wins_where_uncompressed_cannot_keep_the_rate() {
-        let list = [
-            raw(1280, 720, 30.0, 30.0, Subtype::Nv12),
-            raw(1280, 720, 30.0, 30.0, Subtype::Mjpg),
-            raw(640, 480, 30.0, 30.0, Subtype::Nv12),
-            raw(640, 480, 30.0, 30.0, Subtype::Mjpg),
-        ];
-        assert_eq!(pick_mode(&list, 720, 30), Some(1), "720p30: MJPG");
-        assert_eq!(
-            pick_mode(&list, 480, 30),
-            Some(2),
-            "480p30 is small enough for NV12"
-        );
-        assert_eq!(
-            pick_mode(&list[..1], 720, 30),
-            Some(0),
-            "no MJPG: NV12 stays"
         );
     }
 
