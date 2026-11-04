@@ -12,13 +12,13 @@ ROWS.json: {"models": {"turbo": ["large-v3-turbo", "/path/ggml-large-v3-turbo.bi
  "bins": {"026": "/path/bench026", "027": "/path/asr_bench", "rescore": "/path/rescore"},
  "rows": [{"name": "..", "audio": "..wav", "reference": "..txt" or null, "language": "vi",
            "until": 300, "speech": "..json" or null, "runs": [["026", "turbo"], ["027", "turbo"], ["027", "large"]]}]}
-Every decode is wrapped in `lockf /tmp/cm-gpu.lock` (one heavy process at a time on this Mac).
+Every decode is wrapped in `/tmp/cm-gpu` (two heavy slots across agents) (one heavy process at a time on this Mac).
 """
 import json, os, subprocess, sys
 
 def sh(cmd, lock=True):
     if lock:
-        cmd = ["lockf", "/tmp/cm-gpu.lock", "nice", "-n", "10"] + cmd
+        cmd = ["/tmp/cm-gpu", "nice", "-n", "10"] + cmd
     return subprocess.run(cmd, capture_output=True, text=True)
 
 def paths(out, row, rel, model):
