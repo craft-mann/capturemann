@@ -5,7 +5,7 @@
 //! ```text
 //! cargo run --release -p cm-ai --example asr_bench -- --audio <file> --reference <text file>
 //!     --model <ggml file> --model-id <id> [--language en] [--gpu on|off] [--speech <speech.json>]
-//!     [--tile-to-secs N] [--label <short id>] [--words-out <file>]
+//!     [--tile-to-secs N] [--label <short id>] [--words-out <file>] [--decode key=value,...]
 //! ```
 //!
 //! The run is the app's own: `transcribe_pieces` over a counting wrapper of `WhisperTranscriber`.
@@ -162,6 +162,10 @@ fn main() {
     let loaded = Instant::now();
     let flash = args.iter().any(|a| a == "--flash-attn");
     let mut whisper = WhisperTranscriber::load_with(&model, &model_id, gpu, flash).unwrap();
+    // --decode "beam=5,temp_inc=0,logprob=-0.7": decode parameters (see `DecodeParams::parse`).
+    if let Some(spec) = option(&args, "--decode") {
+        whisper = whisper.with_decode(cm_ai::whisper::DecodeParams::parse(&spec).unwrap());
+    }
     if let Some(n) = option(&args, "--n-max-text-ctx").and_then(|v| v.parse::<i32>().ok()) {
         whisper = whisper.with_n_max_text_ctx(n);
     }
@@ -273,7 +277,7 @@ fn main() {
     });
     let mut out = json!({
         "outside_speech_words": outside, "loop_runs": loops, "dense_repeat_words": dense,
-        "label": label, "model": model_id, "quiet_db": option(&args, "--quiet-db"), "gate": args.iter().any(|a| a == "--gate"), "normalize": option(&args, "--normalize"), "lead_secs": option(&args, "--lead-secs"), "language": language, "gpu": gpu,
+        "label": label, "decode": option(&args, "--decode"), "model": model_id, "quiet_db": option(&args, "--quiet-db"), "gate": args.iter().any(|a| a == "--gate"), "normalize": option(&args, "--normalize"), "lead_secs": option(&args, "--lead-secs"), "language": language, "gpu": gpu,
         "audio_secs": audio_secs, "load_secs": load_secs, "transcribe_secs": secs,
         "rtf": audio_secs / secs,
         "reference_words": e.reference_words, "words": tr.words.len(),

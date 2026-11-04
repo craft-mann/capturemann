@@ -156,9 +156,8 @@ pub struct WhisperTranscriber {
     ctx: WhisperContext,
     model: String,
     threads: i32,
-    /// Past text a window may carry from the one before (`None`: whisper.cpp's default; `Some(0)`
-    /// stops the carry-over inside one call).
-    n_max_text_ctx: Option<i32>,
+    /// How the model decodes (sampling, thresholds, context); the default is the shipped decode.
+    decode: DecodeParams,
 }
 
 impl WhisperTranscriber {
@@ -205,7 +204,7 @@ impl WhisperTranscriber {
             ctx,
             model: model_id.to_owned(),
             threads,
-            n_max_text_ctx: None,
+            decode: DecodeParams::default(),
         })
     }
 
@@ -220,13 +219,198 @@ impl WhisperTranscriber {
     /// How much past text a window may carry from the one before inside one call.
     #[must_use]
     pub fn with_n_max_text_ctx(mut self, n: i32) -> Self {
-        self.n_max_text_ctx = Some(n);
+        self.decode.n_max_text_ctx = Some(n);
         self
+    }
+
+    /// Replaces the decode parameters (sampling strategy and thresholds). The default value of
+    /// [`DecodeParams`] is exactly what ships, so a caller that never calls this changes nothing.
+    #[must_use]
+    pub fn with_decode(mut self, decode: DecodeParams) -> Self {
+        self.decode = decode;
+        self
+    }
+
+    /// Replaces the decode parameters of a loaded model (parameter search: one load, many cells).
+    pub fn set_decode(&mut self, decode: DecodeParams) {
+        self.decode = decode;
+    }
+
+    /// The decode parameters in use.
+    pub fn decode(&self) -> &DecodeParams {
+        &self.decode
     }
 
     /// The thread count in use.
     pub fn threads(&self) -> i32 {
         self.threads
+    }
+}
+
+/// How the decoder picks tokens.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Strategy {
+    /// Greedy; `best_of` only matters for the temperature-fallback re-decodes (several samples,
+    /// the best by log-probability kept). 1 is what ships.
+    Greedy { best_of: i32 },
+    /// Beam search for every window.
+    Beam { beam_size: i32, patience: f32 },
+}
+
+impl Strategy {
+    fn to_whisper(self) -> SamplingStrategy {
+        match self {
+            Strategy::Greedy { best_of } => SamplingStrategy::Greedy { best_of },
+            Strategy::Beam {
+                beam_size,
+                patience,
+            } => SamplingStrategy::BeamSearch {
+                beam_size,
+                patience,
+            },
+        }
+    }
+}
+
+/// The decode parameters that can be changed (parameter search, release 0.2.7 W3). Every `Option`
+/// left `None` leaves whisper.cpp's own default; `Default` is exactly the decode that shipped in
+/// 0.2.6 (greedy `best_of` 1, `suppress_blank` and `suppress_nst` on, nothing else touched).
+///
+/// Not reachable through whisper-rs 0.16 without a fork: `carry_initial_prompt`, `suppress_regex`
+/// (`FullParams.fp` is crate private).
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct DecodeParams {
+    pub strategy: Strategy,
+    /// First temperature (whisper.cpp 0.0).
+    pub temperature: Option<f32>,
+    /// Step of the temperature fallback (0.2); 0 or less turns the fallback off.
+    pub temperature_inc: Option<f32>,
+    /// A window whose token entropy is above this is re-decoded hotter (2.4).
+    pub entropy_thold: Option<f32>,
+    /// A window whose average log-probability is below this is re-decoded hotter (-1.0).
+    pub logprob_thold: Option<f32>,
+    /// Silence threshold; whisper.cpp applies it only together with `logprob_thold` (0.6).
+    pub no_speech_thold: Option<f32>,
+    /// Beam search length penalty (-1: none).
+    pub length_penalty: Option<f32>,
+    /// How late (seconds) the first timestamp of a window may be (1.0).
+    pub max_initial_ts: Option<f32>,
+    /// Past text a window may carry from the one before (16,384, capped at 224 tokens by
+    /// whisper.cpp; 0 stops the carry-over inside one call, and the prompt with it).
+    pub n_max_text_ctx: Option<i32>,
+    /// Encoder context length (1500 = 30 s); smaller is faster and less accurate.
+    pub audio_ctx: Option<i32>,
+    pub suppress_blank: bool,
+    pub suppress_nst: bool,
+    /// Token timestamp probability thresholds (0.01, 0.01).
+    pub thold_pt: Option<f32>,
+    pub thold_ptsum: Option<f32>,
+    pub max_len: Option<i32>,
+    pub split_on_word: Option<bool>,
+}
+
+impl Default for DecodeParams {
+    fn default() -> Self {
+        DecodeParams {
+            strategy: Strategy::Greedy { best_of: 1 },
+            temperature: None,
+            temperature_inc: None,
+            entropy_thold: None,
+            logprob_thold: None,
+            no_speech_thold: None,
+            length_penalty: None,
+            max_initial_ts: None,
+            n_max_text_ctx: None,
+            audio_ctx: None,
+            suppress_blank: true,
+            suppress_nst: true,
+            thold_pt: None,
+            thold_ptsum: None,
+            max_len: None,
+            split_on_word: None,
+        }
+    }
+}
+
+impl DecodeParams {
+    /// Sets every non-default value on `params`.
+    fn apply(&self, params: &mut FullParams<'_, '_>) {
+        macro_rules! set {
+            ($field:ident, $setter:ident) => {
+                if let Some(v) = self.$field {
+                    params.$setter(v);
+                }
+            };
+        }
+        set!(temperature, set_temperature);
+        set!(temperature_inc, set_temperature_inc);
+        set!(entropy_thold, set_entropy_thold);
+        set!(logprob_thold, set_logprob_thold);
+        set!(no_speech_thold, set_no_speech_thold);
+        set!(length_penalty, set_length_penalty);
+        set!(max_initial_ts, set_max_initial_ts);
+        set!(n_max_text_ctx, set_n_max_text_ctx);
+        set!(audio_ctx, set_audio_ctx);
+        set!(thold_pt, set_thold_pt);
+        set!(thold_ptsum, set_thold_ptsum);
+        set!(max_len, set_max_len);
+        set!(split_on_word, set_split_on_word);
+        params.set_suppress_blank(self.suppress_blank);
+        params.set_suppress_nst(self.suppress_nst);
+    }
+
+    /// Parses `key=value,key=value` (measurement flag). Keys: `best_of`, `beam`, `patience`,
+    /// `temp`, `temp_inc`, `entropy`, `logprob`, `no_speech`, `length_penalty`, `max_initial_ts`,
+    /// `n_ctx`, `audio_ctx`, `suppress_blank`, `suppress_nst`, `thold_pt`, `thold_ptsum`,
+    /// `max_len`, `split_on_word`. An empty string is the default.
+    pub fn parse(spec: &str) -> Result<DecodeParams, CmError> {
+        let mut d = DecodeParams::default();
+        let (mut best_of, mut beam, mut patience) = (1, 0, -1.0f32);
+        for item in spec.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+            let (k, v) = item.split_once('=').ok_or_else(|| {
+                CmError::invalid_input(format!("decode setting {item}: key=value"))
+            })?;
+            let bad = || CmError::invalid_input(format!("decode setting {item}: bad value"));
+            let f = || v.parse::<f32>().map_err(|_| bad());
+            let i = || v.parse::<i32>().map_err(|_| bad());
+            let b = || v.parse::<bool>().map_err(|_| bad());
+            match k {
+                "best_of" => best_of = i()?,
+                "beam" => beam = i()?,
+                "patience" => patience = f()?,
+                "temp" => d.temperature = Some(f()?),
+                "temp_inc" => d.temperature_inc = Some(f()?),
+                "entropy" => d.entropy_thold = Some(f()?),
+                "logprob" => d.logprob_thold = Some(f()?),
+                "no_speech" => d.no_speech_thold = Some(f()?),
+                "length_penalty" => d.length_penalty = Some(f()?),
+                "max_initial_ts" => d.max_initial_ts = Some(f()?),
+                "n_ctx" => d.n_max_text_ctx = Some(i()?),
+                "audio_ctx" => d.audio_ctx = Some(i()?),
+                "suppress_blank" => d.suppress_blank = b()?,
+                "suppress_nst" => d.suppress_nst = b()?,
+                "thold_pt" => d.thold_pt = Some(f()?),
+                "thold_ptsum" => d.thold_ptsum = Some(f()?),
+                "max_len" => d.max_len = Some(i()?),
+                "split_on_word" => d.split_on_word = Some(b()?),
+                _ => {
+                    return Err(CmError::invalid_input(format!(
+                        "unknown decode setting {k}"
+                    )))
+                }
+            }
+        }
+        d.strategy = if beam > 1 {
+            Strategy::Beam {
+                beam_size: beam,
+                patience,
+            }
+        } else {
+            Strategy::Greedy { best_of }
+        };
+        Ok(d)
     }
 }
 
@@ -266,7 +450,7 @@ fn run(
     threads: i32,
     prompt: Option<&str>,
     translate: bool,
-    n_max_text_ctx: Option<i32>,
+    decode: &DecodeParams,
     progress: Arc<AtomicI32>,
     cancel: Arc<AtomicBool>,
 ) -> Result<RunOutput, CmError> {
@@ -276,11 +460,9 @@ fn run(
     let mut state = ctx
         .create_state()
         .map_err(|e| internal("could not start", &e))?;
-    let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+    let mut params = FullParams::new(decode.strategy.to_whisper());
     params.set_n_threads(threads);
-    if let Some(n) = n_max_text_ctx {
-        params.set_n_max_text_ctx(n);
-    }
+    decode.apply(&mut params);
     // The translate task makes the model write English whatever language it hears (AI-5).
     params.set_translate(translate);
     params.set_language(Some(language.as_str()));
@@ -289,8 +471,6 @@ fn run(
     params.set_print_realtime(false);
     params.set_print_timestamps(false);
     params.set_token_timestamps(true);
-    params.set_suppress_blank(true);
-    params.set_suppress_nst(true);
     if let Some(p) = prompt {
         params.set_initial_prompt(p);
     }
@@ -634,7 +814,7 @@ impl WhisperTranscriber {
                     self.threads,
                     prompt.as_deref(),
                     translate,
-                    self.n_max_text_ctx,
+                    &self.decode,
                     pct2,
                     cancel2,
                 )
@@ -686,6 +866,38 @@ impl WhisperTranscriber {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_default_decode_is_the_shipped_one_and_specs_parse() {
+        let d = DecodeParams::default();
+        assert_eq!(d.strategy, Strategy::Greedy { best_of: 1 });
+        assert!(d.suppress_blank && d.suppress_nst);
+        assert!(d.temperature_inc.is_none() && d.n_max_text_ctx.is_none());
+        assert_eq!(DecodeParams::parse("").unwrap(), d);
+        let p = DecodeParams::parse("beam=5,temp_inc=0, logprob=-0.7,suppress_nst=false").unwrap();
+        assert_eq!(
+            p.strategy,
+            Strategy::Beam {
+                beam_size: 5,
+                patience: -1.0
+            }
+        );
+        assert_eq!(p.temperature_inc, Some(0.0));
+        assert_eq!(p.logprob_thold, Some(-0.7));
+        assert!(!p.suppress_nst);
+        assert!(DecodeParams::parse("nonsense=1").is_err());
+        assert!(DecodeParams::parse("temp=abc").is_err());
+        assert!(DecodeParams::parse("temp").is_err());
+    }
+
+    #[test]
+    fn decode_params_round_trip_through_settings_json() {
+        let p = DecodeParams::parse("best_of=5,entropy=2.0").unwrap();
+        let v = serde_json::to_value(&p).unwrap();
+        assert_eq!(serde_json::from_value::<DecodeParams>(v).unwrap(), p);
+        let empty: DecodeParams = serde_json::from_str("{}").unwrap();
+        assert_eq!(empty, DecodeParams::default());
+    }
+
     use super::*;
 
     #[test]
