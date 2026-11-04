@@ -11,6 +11,7 @@ GROUPS = {
     "viu_h": ["viu_h"],
     "ami_b": ["ami_b"],
     "primock3": ["primock3"],
+    "hop_ref": ["hop_10"],
 }
 PRIVATE_SIGNAL = ["pat5", "nov2_10", "hop_10"]
 
