@@ -217,7 +217,9 @@ fn model_hint(id: &str, catalogue: &str) -> String {
         "base" => tr!("Fast, fine for clear speech in a quiet room."),
         "small" => tr!("Balanced accuracy and speed. A good choice on 8 GB Macs."),
         "medium" => tr!("Most accurate, slow. Best for accents and noisy audio."),
-        "large" => tr!("Recommended for Vietnamese meetings. Slower. Best for translation to English."),
+        "large" => {
+            tr!("Recommended for Vietnamese meetings. Slower. Best for translation to English.")
+        }
         "large-v3-turbo" => {
             tr!("Recommended: fast and accurate for most recordings. Not for translation.")
         }
