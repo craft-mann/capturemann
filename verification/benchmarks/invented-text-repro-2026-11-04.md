@@ -128,3 +128,32 @@ The labelled silent spans (53 s) were counted again after changing only where th
 | raw track instead of the copy (Data Platform only) | not run yet | 44 / 3 |
 
 So the instance does not go away, it moves: a 15-word unit leaves the Data Platform file and a 15-word unit appears in the cough window of Nov 2, at 100.9 s, far from any cut. The likely reason is that the quiet-input lift is decided per call (a piece), so moving a cut changes the gain of the whole piece and with it the decoding of audio far from the cut. Conclusion: invented text over a weak stretch is a **chaotic** event of the decoder, about one per labelled 50 s of quiet stretches in these meetings, whose position depends on small input changes; a cure has to act on the stretch itself (a veto from independent evidence, or a second decode), not on piece cuts.
+
+## 11. Second listening batch (clips 101 to 110) and the signal separation again
+
+Answers (kept by meeting and start second in a private file): 103 is background noise only, so it is a **second confirmed invented instance** (7 words in the stored transcript, confidence 0.67, energy 0.58, Silero 0.00, speaker engine 0.53, RNNoise voice probability on the raw track 0.58); 101, 102, 104 to 110 are speech (101 and 108 faint or noisy). Words written there were compared with what the maintainer heard in scratch only: 101 (current Turbo) partly right, 102 (stored transcript) partly right; 104 to 110 were not compared.
+
+* **Labelled silence is now 58 s** (Nov 2: 5 spans, 24.6 s; Data Platform: 4 spans, 33.4 s). Words / units over it: stored Nov 2 20 / 6; Turbo on the noise-reduced copy Nov 2 1 / 1, Data Platform 17 / 3; Large v3 on the copy, Nov 2, 0 / 0; **Turbo on the raw track: Nov 2 12 / 2, Data Platform 44 / 3**.
+* **On the raw track, Turbo writes the outro-style sentence ("thanks for watching, see you again") over the pure-noise clip 103; on the noise-reduced copy it writes nothing there.** So reading the raw track, which wins by 13 points of WER on the PAT reference and recovers 22 to 26 percent more words, also brings the invented sentence back over background noise. The audio-prep decision on the raw default must be read with this: raw needs a veto, the copy hides both the quiet speech and the noise.
+
+### Signals, 2 invented against 19 real quiet-speech units
+
+Units: the cough clip (14) and the noise clip (103) against 11 real units of batch 1 and 8 of batch 2 (101, 102, 104 to 109). Values over the words' span on the raw track, level relative to the 10th-percentile level of the surrounding 12 s (dB). Counts and numbers only.
+
+| Signal | invented (14, 103) | real, min / median / max | AUC (invented higher, 2 x 19 pairs) |
+|---|---|---|---|
+| energy share (copy) | 0.42, 0.58 | 0.21 / 0.42 / 1.00 | 0.59 |
+| Silero share (copy) | 0.00, 0.00 | 0.00 / 0.16 / 0.32 | 0.08 (invented lower) |
+| speaker-engine share (copy) | 0.32, 0.53 | 0.00 / 0.36 / 0.64 | 0.62 |
+| RNNoise voice probability (raw) | 0.35, 0.58 | 0.10 / 0.38 / 0.65 | 0.66 |
+| spectral flatness of active frames (raw) | 0.022, 0.0014 | 0.0003 / 0.0013 / 0.0033 | 0.82 (103 is inside the real range; only the cough is outside) |
+| voiced share (raw) | 0.66, 0.53 | 0.37 / 0.43 / 0.67 | 0.84 |
+| words per second | 3.3, 3.7 | 1.7 / 4.2 / 7.6 | 0.21 |
+| confidence | 0.52, 0.67 | 0.40 / 0.74 / 0.91 | 0.16 (invented lower) |
+| level above the local floor (dB) | 5.7, 10.2 | 2.6 / 6.2 / 10.3 | 0.66 |
+
+* **Best single threshold** (both invented caught, fewest real flagged): Silero share 0 (flags 3 real), confidence below 0.668 (flags 4 real), Silero below 0.04 (4 real). No single signal is clean.
+* **Flatness-based veto: no.** It removes the cough (0.022 against a real maximum of 0.0033) but not 103 (0.0014, in the middle of the real range), so a flatness veto would have removed one of two.
+* **Combinations**: 14 axis-aligned two-signal rectangles catch both invented units with 0 of 19 real flagged (in-sample), for example Silero 0.00 together with speaker-engine share of at least 0.24 to 0.32 (the two detectors disagree: Silero hears nothing, the speaker engine hears some), or Silero 0.00 with flatness at least 0.0014. **Leave-one-out kills them**: rules fitted on one invented unit (0 of 19 real flagged) number 219 and 464; only 13 and 4 of them also catch the held-out unit. The "disagreement" rule is also one step from failing: real clip 20 has Silero 0.04 and speaker-engine 0.33. With 2 positives nothing here is a finding about the world; it is a list of leads.
+* **Large-n check on the public set** (82 invented units from the synthetic silence, 186 real units, windows of at least 3 s around each): the RNNoise voice probability (AUC 0.06), voiced share (0.06), level (0.02), flatness (0.95) and words per second (0.97; the invented words are stacked on one instant) all separate them, in the quiet and far-field families too (RNNoise 0.00, flatness 1.00). That does **not** transfer: the synthetic silence is not voice-like, and the two real instances are, to the same detectors, as voice-like as the faintest real speech (RNNoise 0.35 and 0.58 against a real range of 0.10 to 0.65). So the public set measures whether a cure *removes* the failure it can make, not whether a detector can tell the real one from faint speech.
+* **No veto was implemented**, because the first test the coordinator set (does flatness remove 14 and 103 and no real unit) is answered no, and a rule fitted to two points would be a one-recording fix. The next useful data is a third and fourth labelled invented instance of the *noise* kind (clip 103): the quiet stretches of the raw track with a high RNNoise or Silero value that the maintainer calls noise.
