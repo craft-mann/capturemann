@@ -1,6 +1,6 @@
 # Release 0.2.8 plan: Windows catch-up and bugs
 
-Status: **draft** (Nov 3, 2026), nothing built. Scope set by the maintainer on Nov 3, 2026: 0.2.7 is macOS only
+Status: **draft** (Nov 3, 2026), nothing built; 0.2.7 was released Nov 4, 2026 (macOS only), and its transcription follow-ups for this release are in `transcription-followups-0.2.8.md`. Scope set by the maintainer on Nov 3, 2026: 0.2.7 is macOS only
 (`specs/plans/release-0.2.7-plan.md`), **0.2.8 is Windows**, 0.2.9 is Linux (`release-0.2.9-plan.md`). A separate
 session and agent own this plan and run alongside the 0.2.7 work (see "Working next to 0.2.7").
 
