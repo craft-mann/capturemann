@@ -25,8 +25,8 @@ Delete the test library afterwards.
    before you run the translation. Record it with the Audio mode (⌥⇧V, microphone) or add it as a
    `.cmrec`; the `make_fixture` tool has no speech and cannot be used.
 3. A 2-minute **English** recording for the text-model steps.
-4. Models: `capturemann ai models` should list `large-v3` (about 3.1 GB, "Best accuracy and
-   translation to English") and `large-v3-turbo` (about 1.6 GB, "Recommended: fast and accurate, not for
+4. Models: `capturemann ai models` should list `large-v3` (about 3.1 GB, "Recommended for
+   Vietnamese meetings. Slower. Best for translation to English.") and `large-v3-turbo` (about 1.6 GB, "Recommended: fast and accurate, not for
    translation"). Download them from the AI page (press Download; size and checksum are shown
    first), or `capturemann ai models download large-v3 --wait` and the same for `large-v3-turbo`,
    or import files you already have with `capturemann ai models import <id> <file>`.

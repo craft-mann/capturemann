@@ -519,9 +519,6 @@ msgstr ""
 msgid "Behavior"
 msgstr ""
 
-msgid "Best accuracy and translation to English"
-msgstr ""
-
 msgid "Best matches first, then front to back"
 msgstr ""
 
@@ -3465,6 +3462,9 @@ msgid "Recent captures"
 msgstr ""
 
 msgid "Recommended"
+msgstr ""
+
+msgid "Recommended for Vietnamese meetings. Slower. Best for translation to English."
 msgstr ""
 
 msgid "Recommended: fast and accurate for most recordings. Not for translation."

@@ -9921,8 +9921,9 @@ msgctxt "transcript turn"
 msgid "overlap"
 msgstr "nói chồng"
 
-msgid "Best accuracy and translation to English"
-msgstr "Chính xác nhất và dịch sang tiếng Anh"
+#, fuzzy
+msgid "Recommended for Vietnamese meetings. Slower. Best for translation to English."
+msgstr "Khuyên dùng cho cuộc họp tiếng Việt. Chậm hơn. Tốt nhất để dịch sang tiếng Anh."
 
 msgid "Everything here runs on this Mac. Nothing is downloaded unless you press Download, and nothing is sent anywhere."
 msgstr "Mọi thứ ở đây chạy ngay trên máy Mac này. Không có gì được tải xuống trừ khi bạn nhấn Tải xuống, và không có gì được gửi đi đâu cả."
