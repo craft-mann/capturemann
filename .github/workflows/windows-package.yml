@@ -35,6 +35,8 @@ jobs:
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          cache-on-failure: true
       - name: Install NSIS
         shell: pwsh
         run: |
@@ -107,7 +109,9 @@ jobs:
           "licence list: $($lic.Length) characters; windows-sys: $($lic -match 'windows-sys'); objc2: $($lic -match 'objc2')"
           if ($lic -notmatch 'windows-sys' -or $lic -match 'objc2') { throw 'THIRD_PARTY_LICENSES.md is not the Windows list' }
           # The bundled FFmpeg: next to the programs, LGPL, with the source offer and the licences.
-          & "$app\ffmpeg.exe" -hide_banner -version | Select-Object -First 2; if ($LASTEXITCODE -ne 0) { throw 'bundled ffmpeg.exe does not run' }
+          # Not `... | Select-Object -First 2`: stopping the pipeline early leaves a non-zero $LASTEXITCODE in PowerShell 7.
+          $ffv = & "$app\ffmpeg.exe" -hide_banner -version; if ($LASTEXITCODE -ne 0) { throw 'bundled ffmpeg.exe does not run' }
+          $ffv[0..1]
           if ((& "$app\ffmpeg.exe" -hide_banner -buildconf) -match '--enable-(gpl|nonfree|version3|libx264)') { throw 'bundled ffmpeg.exe is not LGPL' }
           foreach ($f in 'FFmpeg\SOURCE-OFFER.txt', 'FFmpeg\BUILD-INFO.txt', 'FFmpeg\LICENSES\FFmpeg-COPYING.LGPLv2.1.txt', 'ffprobe.exe') {
             if (-not (Test-Path (Join-Path $app $f))) { throw "missing in the zip: $f" }
