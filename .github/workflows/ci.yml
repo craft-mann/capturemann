@@ -94,10 +94,21 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: packaging/sherpa/.downloads
-          key: sherpa-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packaging/sherpa/fetch-macos.sh', 'packaging/sherpa/fetch-linux.sh', 'packaging/sherpa/fetch-models.sh') }}
+          key: sherpa-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packaging/sherpa/fetch-macos.sh', 'packaging/sherpa/fetch-linux.sh', 'packaging/sherpa/fetch-windows.ps1', 'packaging/sherpa/fetch-models.sh') }}
       - name: Fetch the sherpa-onnx libraries and speaker models (pinned, SHA-256 checked)
         if: runner.os != 'Windows'
         run: make sherpa
+      # Windows: the /MD archive, because a plain `cargo test` links the dynamic C runtime (the package build,
+      # packaging/windows/build-windows.ps1, uses +crt-static and the /MT archive). Libraries first, then the
+      # models: the fetch replaces the whole packaging/sherpa/out folder.
+      - name: Fetch the sherpa-onnx libraries and speaker models (Windows, pinned, SHA-256 checked)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          packaging\sherpa\fetch-windows.ps1 -Crt md
+          if (-not $?) { throw 'fetch-windows.ps1 failed' }
+          bash packaging/sherpa/fetch-models.sh
+          if ($LASTEXITCODE -ne 0) { throw 'fetch-models.sh failed' }
       - run: cargo fmt --all -- --check
       - name: Clippy
         if: runner.os != 'Windows'
@@ -110,14 +121,14 @@ jobs:
         env:
           CM_EXPORT_ALLOW_GPL: ${{ runner.os == 'Linux' && '1' || '' }}
         run: cargo test --workspace --locked --no-fail-fast
-      # No sherpa-onnx static libraries for Windows yet (speaker finding moves to 0.3.x, D-W5), so the
-      # `sherpa` default feature is off there.
-      - name: Clippy (no sherpa, Windows)
+      # The `sherpa` default feature is on for Windows too now (the /MD libraries fetched above). If the first
+      # run fails to LINK (a missing system library, or a C runtime mismatch), see vendor/sherpa-onnx-sys/build.rs.
+      - name: Clippy (Windows)
         if: runner.os == 'Windows'
-        run: cargo clippy --workspace --all-targets --locked --no-default-features -- -D warnings
-      - name: Test (no sherpa, Windows)
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Test (Windows)
         if: runner.os == 'Windows'
-        run: cargo test --workspace --locked --no-default-features --no-fail-fast
+        run: cargo test --workspace --locked --no-fail-fast
       # The real Trash (Recycle Bin, freedesktop Trash) of the runner: a scratch folder is moved there. Not run
       # on macOS, where it would use the developer's own Trash.
       - name: Trash test (Windows and Linux)

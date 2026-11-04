@@ -5,5 +5,7 @@
 pub mod mac_permission;
 #[cfg(target_os = "macos")]
 pub mod mac_sck;
+#[cfg(windows)]
+pub mod win_consent;
 
 pub mod linux_pipewire;

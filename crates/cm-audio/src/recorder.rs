@@ -399,6 +399,9 @@ fn run_worker(
     };
     pipeline.set_hint_cell(a.hint.clone());
     pipeline.set_mute_control(a.mute.clone());
+    if let Some(s) = live.source.as_ref() {
+        pipeline.set_default_gap_reason(s.gap_reason());
+    }
     if let Some(bytes) = a.fault_after {
         pipeline.inject_write_fault_after(bytes);
     }
@@ -518,6 +521,7 @@ fn try_reconnect(
         source.stop();
         return;
     }
+    pipeline.set_default_gap_reason(source.gap_reason());
     live.source = Some(source);
     live.generation = generation;
     *no_device = false;

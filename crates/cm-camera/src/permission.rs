@@ -39,6 +39,9 @@ impl CameraPermission {
             CameraPermission::NotDetermined => {
                 "Camera access has not been requested yet. Allow camera access when prompted."
             }
+            CameraPermission::Denied if cfg!(windows) => {
+                "Camera access is denied. Turn it on in Settings > Privacy & security > Camera, including Let desktop apps access your camera."
+            }
             CameraPermission::Denied => {
                 "Camera access is denied. Enable it in System Settings > Privacy & Security > Camera."
             }

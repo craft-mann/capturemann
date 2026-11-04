@@ -40,8 +40,8 @@ mod system;
 pub mod wav;
 
 pub use chime::{
-    chime_wav, run_check, AfplayPlayer, ChimeConfig, ChimeHandle, ChimeOutcome, ChimePlayer,
-    ChimeProcess, FakeChimePlayer, FakeChimeScript,
+    chime_wav, run_check, system_chime_player, AfplayPlayer, ChimeConfig, ChimeHandle,
+    ChimeOutcome, ChimePlayer, ChimeProcess, FakeChimePlayer, FakeChimeScript, PowerShellPlayer,
 };
 pub use cpal_source::{map_cpal_error, CpalSource};
 pub use devices::{

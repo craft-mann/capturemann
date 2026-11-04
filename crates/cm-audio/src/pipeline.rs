@@ -143,6 +143,8 @@ pub struct Pipeline {
     first_ns: Option<i128>,
     gaps: Vec<GapRecord>,
     pending_gap_reason: Option<&'static str>,
+    /// Reason recorded for a gap nobody explained (`AudioSource::gap_reason`).
+    default_gap_reason: &'static str,
     device_changes: Vec<DeviceChange>,
     device_name: String,
     device_id: String,
@@ -266,6 +268,7 @@ impl Pipeline {
             first_ns: None,
             gaps: Vec::new(),
             pending_gap_reason: None,
+            default_gap_reason: "dropout",
             device_changes: Vec::new(),
             device_name: input.device_name.clone(),
             device_id: input.device_id.clone(),
@@ -304,6 +307,12 @@ impl Pipeline {
     }
 
     /// Silences the frames inside the mute spans of `control` (AUD-6).
+    /// The reason recorded for gaps that have no other explanation (a source that stays quiet
+    /// while nothing plays says `"idle"`, not `"dropout"`).
+    pub fn set_default_gap_reason(&mut self, reason: &'static str) {
+        self.default_gap_reason = reason;
+    }
+
     pub fn set_mute_control(&mut self, control: Arc<MuteControl>) {
         self.mute = Some(control);
     }
@@ -601,7 +610,10 @@ impl Pipeline {
                     self.gaps.push(GapRecord {
                         from_ns: expected,
                         to_ns: start,
-                        reason: self.pending_gap_reason.take().unwrap_or("dropout"),
+                        reason: self
+                            .pending_gap_reason
+                            .take()
+                            .unwrap_or(self.default_gap_reason),
                     });
                     self.new_drift_epoch();
                 }

@@ -76,6 +76,28 @@ fn monitor_shows_a_level() {
 }
 
 #[test]
+#[ignore = "plays a 0.6 s chime through the speakers and listens to system audio"]
+fn system_audio_hears_a_chime_played_by_another_process() {
+    // AUD-2 check, both systems: afplay on macOS, PowerShell on Windows (WASAPI loopback).
+    let state = screen_recording_permission();
+    if state != PermissionState::Authorized {
+        eprintln!("SKIPPED: screen recording permission is {state:?}");
+        return;
+    }
+    let outcome = cm_audio::run_check(
+        cm_audio::system_chime_player().as_ref(),
+        cm_audio::system_audio_factory(Vec::new()),
+        &cm_audio::ChimeConfig::default(),
+        &mut |peak| eprintln!("peak {peak:.1} dBFS"),
+    );
+    eprintln!("{outcome:?}");
+    assert!(
+        matches!(outcome, cm_audio::ChimeOutcome::Heard { .. }),
+        "{outcome:?} (unmute the speakers and play nothing else)"
+    );
+}
+
+#[test]
 #[ignore = "records whatever the computer plays for 4 s (play a tone yourself)"]
 fn system_audio_records_four_seconds() {
     let state = screen_recording_permission();

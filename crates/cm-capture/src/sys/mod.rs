@@ -8,6 +8,11 @@ pub mod pipewire_linux;
 pub mod portal;
 pub mod session;
 #[cfg(windows)]
+#[cfg(windows)]
+pub mod win_display;
+#[cfg(any(windows, test))]
+pub mod win_names;
+#[cfg(windows)]
 pub mod win_wgc;
 #[cfg(windows)]
 pub mod win_window;

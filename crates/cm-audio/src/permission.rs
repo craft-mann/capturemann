@@ -28,9 +28,15 @@ impl PermissionState {
     pub fn message(self) -> Option<&'static str> {
         match self {
             PermissionState::Authorized => None,
+            PermissionState::NotDetermined if cfg!(windows) => Some(
+                "CaptureMann needs microphone access. Turn it on in Settings > Privacy & security > Microphone.",
+            ),
             PermissionState::NotDetermined => {
                 Some("CaptureMann needs microphone access. Choose Allow when macOS asks.")
             }
+            PermissionState::Denied if cfg!(windows) => Some(
+                "Microphone access is off. Turn it on in Settings > Privacy & security > Microphone, including Let desktop apps access your microphone.",
+            ),
             PermissionState::Denied => Some(
                 "Microphone access is off. Turn it on in System Settings > Privacy & Security > Microphone.",
             ),
@@ -41,14 +47,43 @@ impl PermissionState {
     }
 }
 
+/// The state Windows' microphone privacy switches add up to: a group policy that denies apps
+/// (`2`) is `Restricted`; `Deny` in any of the device, user or desktop-apps switches is `Denied`;
+/// a policy that forces access on (`1`) or no switch at all is `Authorized`. Values are the
+/// registry strings `Allow` and `Deny`, compared without regard to case.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub(crate) fn windows_microphone_state(
+    policy: Option<u32>,
+    machine: Option<&str>,
+    user: Option<&str>,
+    desktop_apps: Option<&str>,
+) -> PermissionState {
+    match policy {
+        Some(2) => return PermissionState::Restricted,
+        Some(1) => return PermissionState::Authorized,
+        _ => {}
+    }
+    let denied = |v: Option<&str>| v.is_some_and(|v| v.trim().eq_ignore_ascii_case("deny"));
+    if denied(machine) || denied(user) || denied(desktop_apps) {
+        PermissionState::Denied
+    } else {
+        PermissionState::Authorized
+    }
+}
+
 /// Current microphone authorization. Never prompts, safe to call from tests and pollers.
-/// On Windows the privacy switch is only visible as a stream error, so this reports `Authorized`.
+/// On Windows it reads the privacy switches of Settings > Privacy & security > Microphone (the
+/// device, the user and desktop apps) and the group policy; other systems report `Authorized`.
 pub fn microphone_permission() -> PermissionState {
     #[cfg(target_os = "macos")]
     {
         crate::sys::mac_permission::microphone_status()
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    {
+        crate::sys::win_consent::microphone_state()
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
     {
         PermissionState::Authorized
     }
@@ -123,6 +158,37 @@ mod tests {
             assert!(s.message().is_some());
             assert!(!s.is_authorized());
         }
+    }
+
+    #[test]
+    fn windows_switches_add_up_to_one_state() {
+        let st = windows_microphone_state;
+        assert_eq!(st(None, None, None, None), PermissionState::Authorized);
+        assert_eq!(
+            st(None, Some("Allow"), Some("Allow"), Some("Allow")),
+            PermissionState::Authorized
+        );
+        assert_eq!(
+            st(None, Some("Allow"), Some("Deny"), Some("Allow")),
+            PermissionState::Denied
+        );
+        assert_eq!(
+            st(None, Some("Allow"), Some("Allow"), Some("deny")),
+            PermissionState::Denied
+        );
+        assert_eq!(st(None, Some("Deny"), None, None), PermissionState::Denied);
+        assert_eq!(
+            st(Some(2), Some("Allow"), None, None),
+            PermissionState::Restricted
+        );
+        assert_eq!(
+            st(Some(1), Some("Deny"), Some("Deny"), None),
+            PermissionState::Authorized
+        );
+        assert_eq!(
+            st(Some(0), None, Some("Deny"), None),
+            PermissionState::Denied
+        );
     }
 
     #[test]
