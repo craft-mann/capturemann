@@ -145,7 +145,11 @@ fn main() {
             .and_then(|v| v.parse().ok())
             .unwrap_or(-26.0);
         if levels::db(levels::rms_over(&samples, &[])) < below {
-            levels::normalize_rms_capped(&mut samples, -20.0, 15.0);
+            if args.iter().any(|a| a == "--no-peak-limit") {
+                levels::normalize_rms_capped(&mut samples, -20.0, 15.0);
+            } else {
+                levels::normalize_rms_capped_peak(&mut samples, -20.0, 15.0, -1.0);
+            }
         }
     }
     match option(&args, "--normalize").as_deref() {
