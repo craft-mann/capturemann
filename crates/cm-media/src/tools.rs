@@ -415,7 +415,9 @@ impl Encoder {
     /// The `-pix_fmt` the encoder takes (Quick Sync wants NV12; the rest take yuv420p).
     pub fn pix_fmt(self) -> &'static str {
         match self {
-            Encoder::Qsv => "nv12",
+            // Intel's Quick Sync H.264 Media Foundation transform refuses yuv420p ("format negotiation
+            // failed" on the lab laptop's UHD 620); it takes NV12, which is the same 8-bit 4:2:0.
+            Encoder::Qsv | Encoder::H264Mf => "nv12",
             _ => "yuv420p",
         }
     }

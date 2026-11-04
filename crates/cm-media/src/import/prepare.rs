@@ -104,6 +104,15 @@ impl EncoderFamily {
         }
     }
 
+    /// The 8-bit 4:2:0 layout the encoder is fed. Media Foundation takes NV12: Intel's Quick Sync
+    /// transform refuses yuv420p with "format negotiation failed".
+    fn pixel_format(self) -> &'static str {
+        match self {
+            EncoderFamily::VideoToolbox => "yuv420p",
+            EncoderFamily::MediaFoundation => "nv12",
+        }
+    }
+
     /// Arguments that must come with the encoder to keep it on the hardware.
     fn extra_args(self) -> &'static [&'static str] {
         match self {
@@ -203,7 +212,10 @@ pub fn editing_copy_args(
     a.extend(["-an", "-sn", "-dn"].map(String::from));
     a.extend([
         "-vf".to_owned(),
-        format!("fps={fps},scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p"),
+        format!(
+            "fps={fps},scale=trunc(iw/2)*2:trunc(ih/2)*2,format={}",
+            family.pixel_format()
+        ),
         "-c:v".to_owned(),
         encoder.to_owned(),
         "-b:v".to_owned(),
@@ -583,6 +595,7 @@ mod tests {
         let s = a.join(" ");
         assert!(s.contains("-c:v h264_mf -b:v 5000000"), "{s}");
         assert!(s.contains("-hw_encoding 1"), "{s}");
+        assert!(s.contains("format=nv12"), "{s}");
         assert!(!s.contains("hvc1"), "{s}");
         let v = editing_copy_args(
             Path::new("a"),
@@ -594,6 +607,7 @@ mod tests {
             1,
         );
         assert!(!v.join(" ").contains("hw_encoding"));
+        assert!(v.join(" ").contains("format=yuv420p"));
     }
 
     #[test]
