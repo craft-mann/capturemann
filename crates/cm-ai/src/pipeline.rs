@@ -46,6 +46,10 @@ pub const KEY_LIFT_QUIET_INPUT: &str = "ai.lift_quiet_input";
 pub const KEY_GATE: &str = "ai.hallucination_gate";
 pub const KEY_VAD_OPINION: &str = "ai.vad_opinion";
 pub const KEY_CARRY_TEXT: &str = "ai.carry_previous_text";
+/// Read the microphone as recorded, not the noise-reduced copy, unless the request says otherwise.
+pub const KEY_RAW_MIC: &str = "ai.transcribe_raw_mic";
+/// Words the decoder stacked on one instant are spread over the room around them.
+pub const KEY_REPAIR_WORD_TIMES: &str = "ai.repair_word_times";
 
 /// Which of the review's behaviours are on for a run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,6 +64,11 @@ pub struct PipelineSettings {
     /// (`n_max_text_ctx` 0), which also leaves the glossary prompt out of the decode (the glossary's
     /// spellings are still applied to the words afterwards).
     pub carry_previous_text: bool,
+    /// Transcription reads the raw microphone track (the noise-reduced copy only when this is off
+    /// or the request asks for it). A request names its audio explicitly with `original_audio`.
+    pub transcribe_raw_mic: bool,
+    /// Stacks of words with collapsed times are spread (see [`crate::wordtimes`]).
+    pub repair_word_times: bool,
 }
 
 impl Default for PipelineSettings {
@@ -69,6 +78,8 @@ impl Default for PipelineSettings {
             gate: false,
             vad_opinion: false,
             carry_previous_text: true,
+            transcribe_raw_mic: true,
+            repair_word_times: true,
         }
     }
 }
@@ -87,6 +98,8 @@ impl PipelineSettings {
             gate: b(KEY_GATE, d.gate),
             vad_opinion: b(KEY_VAD_OPINION, d.vad_opinion),
             carry_previous_text: b(KEY_CARRY_TEXT, d.carry_previous_text),
+            transcribe_raw_mic: b(KEY_RAW_MIC, d.transcribe_raw_mic),
+            repair_word_times: b(KEY_REPAIR_WORD_TIMES, d.repair_word_times),
         }
     }
 
@@ -97,6 +110,8 @@ impl PipelineSettings {
             gate: false,
             vad_opinion: false,
             carry_previous_text: true,
+            transcribe_raw_mic: false,
+            repair_word_times: false,
         }
     }
 }
@@ -181,6 +196,59 @@ impl Transcriber for Configured<'_> {
     }
 }
 
+/// A decoder whose words come back with collapsed times spread (see [`crate::wordtimes`]). Wraps
+/// any [`Transcriber`], also [`Configured`]; leaving it out is the off switch.
+pub struct RepairTimes<'a> {
+    pub inner: &'a dyn Transcriber,
+}
+
+impl Transcriber for RepairTimes<'_> {
+    fn transcribe(
+        &self,
+        audio: Pcm16k<'_>,
+        language: Option<&str>,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Transcript, CmError> {
+        self.transcribe_prompted(audio, language, None, progress)
+    }
+
+    fn transcribe_prompted(
+        &self,
+        audio: Pcm16k<'_>,
+        language: Option<&str>,
+        prompt: Option<&str>,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Transcript, CmError> {
+        let end = audio.start
+            + cm_core::MediaTime::from_ticks(
+                audio.samples.len() as i64 * cm_core::TICKS_PER_SECOND / 16_000,
+            );
+        let mut t = self
+            .inner
+            .transcribe_prompted(audio, language, prompt, progress)?;
+        crate::wordtimes::repair(&mut t.words, Some(end));
+        Ok(t)
+    }
+
+    fn translate_to_english(
+        &self,
+        audio: Pcm16k<'_>,
+        source_language: Option<&str>,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Transcript, CmError> {
+        self.inner
+            .translate_to_english(audio, source_language, progress)
+    }
+
+    fn voice_activity(&self, samples: &[f32]) -> Option<(Vec<f32>, f64)> {
+        self.inner.voice_activity(samples)
+    }
+
+    fn gate(&self) -> Option<GateConfig> {
+        self.inner.gate()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,7 +289,13 @@ mod tests {
             PipelineSettings::default()
         );
         let mut m = serde_json::Map::new();
-        for k in [KEY_LIFT_QUIET_INPUT, KEY_GATE, KEY_VAD_OPINION] {
+        for k in [
+            KEY_LIFT_QUIET_INPUT,
+            KEY_GATE,
+            KEY_VAD_OPINION,
+            KEY_RAW_MIC,
+            KEY_REPAIR_WORD_TIMES,
+        ] {
             m.insert(k.into(), serde_json::Value::Bool(false));
         }
         m.insert(KEY_CARRY_TEXT.into(), serde_json::Value::Bool(true));
@@ -229,6 +303,39 @@ mod tests {
             PipelineSettings::from_settings(&m),
             PipelineSettings::all_off()
         );
+        // The raw microphone is on unless its key says off.
+        assert!(PipelineSettings::from_settings(&none).transcribe_raw_mic);
+    }
+
+    #[test]
+    fn stacked_word_times_are_spread_by_the_wrapper_and_never_past_the_audio() {
+        let w = |t: &str, a: f64| crate::transcribe::Word {
+            text: t.into(),
+            start: MediaTime::from_secs_f64(a).unwrap(),
+            end: MediaTime::from_secs_f64(a).unwrap(),
+            confidence: 0.9,
+        };
+        let stacked = vec![w("zed", 1.9), w("nim", 1.9), w("qux", 1.9), w("blorp", 1.9)];
+        let inner = ScriptedTranscriber::new(stacked);
+        let r = RepairTimes { inner: &inner };
+        let x = vec![0.0f32; 32_000]; // 2 s
+        let t = r
+            .transcribe(
+                Pcm16k {
+                    samples: &x,
+                    start: MediaTime::ZERO,
+                },
+                None,
+                &mut |_| true,
+            )
+            .unwrap();
+        let end = MediaTime::from_secs_f64(2.0).unwrap();
+        assert!(
+            t.words.iter().all(|w| w.end > w.start && w.end <= end),
+            "{:?}",
+            t.words
+        );
+        assert_eq!(t.words.len(), 4);
     }
 
     #[test]

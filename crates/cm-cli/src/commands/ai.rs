@@ -776,6 +776,8 @@ async fn transcribe(cx: &mut Ctx<'_>, a: TranscribeArgs) -> Result<(), CliError>
     }
     if a.original_audio {
         p["original_audio"] = json!(true);
+    } else if a.denoised_audio {
+        p["original_audio"] = json!(false);
     }
     let params = cx.mutating(p, "");
     let mut c = cx.client().await?;

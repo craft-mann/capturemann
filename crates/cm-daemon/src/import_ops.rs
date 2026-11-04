@@ -1284,7 +1284,7 @@ impl ImportHandler {
                 capture_id: id.to_owned(),
                 language: t["language"].as_str().map(str::to_owned),
                 model: t["model"].as_str().map(str::to_owned),
-                original_audio: false,
+                original_audio: None,
             },
             request_id: None,
         };

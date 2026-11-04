@@ -187,7 +187,7 @@ impl Default for RegenDraft {
         RegenDraft {
             model: None,
             language: "auto".to_owned(),
-            original_audio: false,
+            original_audio: true,
         }
     }
 }

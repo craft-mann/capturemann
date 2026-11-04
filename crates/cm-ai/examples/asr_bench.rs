@@ -216,8 +216,16 @@ fn main() {
             .any(|a| a == "--lift")
             .then(cm_ai::pipeline::Normalize::default),
     };
+    let repaired = cm_ai::pipeline::RepairTimes {
+        inner: if configured.gate.is_some() || configured.normalize.is_some() {
+            &configured
+        } else {
+            &counting
+        },
+    };
     let engine: &dyn Transcriber = match &vad_first {
         Some(w) => w,
+        None if args.iter().any(|a| a == "--repair-times") => &repaired,
         None if configured.gate.is_some() || configured.normalize.is_some() => &configured,
         None => &counting,
     };

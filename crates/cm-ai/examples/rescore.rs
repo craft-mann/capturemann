@@ -22,6 +22,29 @@ fn option(args: &[String], name: &str) -> Option<String> {
         .and_then(|i| args.get(i + 1).cloned())
 }
 
+fn stack_words(words: &[Word]) -> usize {
+    let c = |w: &Word| (w.end - w.start).ticks() < cm_core::TICKS_PER_SECOND / 100;
+    let (mut n, mut run) = (0, 0);
+    for w in words.iter().chain(std::iter::once(&Word {
+        text: String::new(),
+        start: cm_core::MediaTime::ZERO,
+        end: cm_core::MediaTime::from_ticks(cm_core::TICKS_PER_SECOND),
+        confidence: 1.0,
+    })) {
+        if c(w) {
+            run += 1;
+        } else {
+            if run >= 4 {
+                n += run;
+            }
+            run = 0;
+        }
+    }
+    n
+}
+
+fn out_stack_words(_: &[Word]) {}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let path = option(&args, "--hyp").expect("--hyp");
@@ -49,6 +72,11 @@ fn main() {
     } else {
         (Vec::new(), 0)
     };
+    let mut words = words;
+    if args.iter().any(|a| a == "--repair-times") {
+        out_stack_words(&words);
+        cm_ai::wordtimes::repair(&mut words, None);
+    }
     let hyp = if path.ends_with(".json") {
         words
             .iter()
@@ -66,6 +94,15 @@ fn main() {
         "dense_repeat_words": dense_unit_indices(&words, 5, 60.0).len(),
         "bare_token_runs": impossible_token_runs(&words, 5, 7.0, 0.5).len(),
     });
+    {
+        // Caption lines built from these words: how many are zero or very short.
+        let lines = cm_ai::caption::build_captions(&words);
+        let dur = |l: &cm_ai::caption::CaptionLine| (l.end - l.start).ticks() as f64 / ticks;
+        out["caption_lines"] = json!(lines.len());
+        out["lines_zero"] = json!(lines.iter().filter(|l| dur(l) <= 0.0).count());
+        out["lines_under_0_2s"] = json!(lines.iter().filter(|l| dur(l) < 0.2).count());
+        out["stack_words"] = json!(stack_words(&words));
+    }
     if let Some(l) = option(&args, "--language") {
         let h = health(&words, &l);
         out["health"] = json!({"replacement_char": h.replacement_char, "foreign_script": h.foreign_script,

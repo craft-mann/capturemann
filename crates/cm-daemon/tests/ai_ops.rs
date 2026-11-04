@@ -1159,28 +1159,34 @@ async fn ai_1_a_held_transcription_goes_on_from_its_checkpoint() {
     );
 }
 
-/// "Original microphone": the choice reaches the job and the engine, an equal run is reused and
-/// one on the other audio is not, and a wrong type is refused.
+/// The audio of a run: the recorded microphone by default (setting `ai.transcribe_raw_mic`), the
+/// noise-reduced copy when the request or the setting says so; an equal run is reused, one on the
+/// other audio is not, and a wrong type is refused.
 #[tokio::test]
-async fn ai_1_the_original_microphone_is_a_choice_of_the_run() {
+async fn ai_1_the_recorded_microphone_is_the_default_audio_of_a_run() {
     let r = rig(FakeAi::new().with_small_installed(), Decision::Approve).await;
     r.ai.set_slow(60, 10); // slow enough that the runs overlap in the queue
     let a = user(&r, "transcribe", json!({})).await.unwrap();
-    assert_eq!(a["original_audio"], json!(false));
-    // The same request again is the same job; the original microphone is a different run.
+    assert_eq!(a["original_audio"], json!(true));
+    // The same request again is the same job; the noise-reduced copy is a different run.
     let same = user(&r, "transcribe", json!({})).await.unwrap();
     assert_eq!(same["reused"], json!(true));
     assert_eq!(same["job_id"], a["job_id"]);
-    let other = user(&r, "transcribe", json!({"original_audio": true}))
+    let other = user(&r, "transcribe", json!({"original_audio": false}))
         .await
         .unwrap();
-    assert_eq!(other["original_audio"], json!(true));
+    assert_eq!(other["original_audio"], json!(false));
     assert_eq!(other["reused"], json!(false));
     assert_ne!(other["job_id"], a["job_id"]);
-    let again = user(&r, "transcribe", json!({"original_audio": true}))
+    let again = user(&r, "transcribe", json!({"original_audio": false}))
         .await
         .unwrap();
     assert_eq!(again["job_id"], other["job_id"]);
+    // Named true is the default run.
+    let named = user(&r, "transcribe", json!({"original_audio": true}))
+        .await
+        .unwrap();
+    assert_eq!(named["job_id"], a["job_id"]);
     assert!(user(&r, "transcribe", json!({"original_audio": "yes"}))
         .await
         .is_err());
@@ -1190,6 +1196,28 @@ async fn ai_1_the_original_microphone_is_a_choice_of_the_run() {
     let mut asked: Vec<bool> = calls.iter().map(|c| c.original_audio).collect();
     asked.sort();
     assert_eq!(asked, vec![false, true], "each run reached the engine once");
+}
+
+/// Turning `ai.transcribe_raw_mic` off brings back the noise-reduced copy as the default; a request
+/// that names its audio still wins.
+#[tokio::test]
+async fn ai_1_the_raw_microphone_setting_has_an_off_switch() {
+    let r = rig(FakeAi::new().with_small_installed(), Decision::Approve).await;
+    user(
+        &r,
+        "set_settings",
+        json!({"values": {"ai.transcribe_raw_mic": false}}),
+    )
+    .await
+    .unwrap();
+    let a = user(&r, "transcribe", json!({})).await.unwrap();
+    assert_eq!(a["original_audio"], json!(false));
+    job_done(&r, a["job_id"].as_str().unwrap()).await;
+    let b = user(&r, "transcribe", json!({"original_audio": true}))
+        .await
+        .unwrap();
+    assert_eq!(b["original_audio"], json!(true));
+    job_done(&r, b["job_id"].as_str().unwrap()).await;
 }
 
 fn word(text: &str, a: f64, b: f64, conf: f32) -> cm_ai::transcribe::Word {
@@ -1461,8 +1489,8 @@ async fn the_background_priority_setting_reaches_the_transcription_job() {
     )
     .await
     .unwrap();
-    // Another run (the original microphone is a different request).
-    let b = user(&r, "transcribe", json!({"original_audio": true}))
+    // Another run (the noise-reduced copy is a different request).
+    let b = user(&r, "transcribe", json!({"original_audio": false}))
         .await
         .unwrap();
     job_done(&r, b["job_id"].as_str().unwrap()).await;

@@ -355,7 +355,7 @@ pub fn start_regen(app: &Entity<AppModel>, capture_id: &str, cx: &mut App) {
         capture_id,
         draft.language_arg(),
         draft.model.as_deref(),
-        draft.original_audio,
+        Some(draft.original_audio),
         cx,
     );
 }
@@ -596,7 +596,7 @@ pub fn dismiss_notice(app: &Entity<AppModel>, cx: &mut App) {
 
 /// Transcribe pressed (the details card, the recording editor).
 pub fn transcribe(app: &Entity<AppModel>, capture_id: &str, cx: &mut App) {
-    transcribe_with(app, capture_id, None, None, false, cx);
+    transcribe_with(app, capture_id, None, None, None, cx);
 }
 
 /// Transcribe with a language (`None` = auto-detect) and a model (`None` = the active one). Also
@@ -606,7 +606,7 @@ pub fn transcribe_with(
     capture_id: &str,
     language: Option<&str>,
     model: Option<&str>,
-    original_audio: bool,
+    original_audio: Option<bool>,
     cx: &mut App,
 ) {
     let (language, model) = (language.map(str::to_owned), model.map(str::to_owned));

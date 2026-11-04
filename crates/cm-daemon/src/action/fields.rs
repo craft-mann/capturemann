@@ -39,6 +39,14 @@ impl<'a> Fields<'a> {
         }
     }
 
+    pub(crate) fn bool_opt(&self, key: &str) -> Result<Option<bool>, CmError> {
+        match self.obj.get(key) {
+            None | Some(Value::Null) => Ok(None),
+            Some(Value::Bool(b)) => Ok(Some(*b)),
+            Some(_) => Err(CmError::invalid_field(key, "must be a boolean")),
+        }
+    }
+
     pub(crate) fn bool_or(&self, key: &str, default: bool) -> Result<bool, CmError> {
         match self.obj.get(key) {
             None | Some(Value::Null) => Ok(default),

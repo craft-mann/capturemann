@@ -260,7 +260,12 @@ impl TranscribeService for RealTranscribe {
                 .lift_quiet_input
                 .then(cm_ai::pipeline::Normalize::default),
         };
-        let engine: &dyn Transcriber = &configured;
+        let repaired = cm_ai::pipeline::RepairTimes { inner: &configured };
+        let engine: &dyn Transcriber = if req.pipeline.repair_word_times {
+            &repaired
+        } else {
+            &configured
+        };
         let language = req.language.as_deref();
         // The glossary's terms prime the model (AI-6a); the job replaces the wrong spellings.
         let prompt = cm_ai::glossary::initial_prompt(&req.glossary);
@@ -300,7 +305,7 @@ impl TranscribeService for RealTranscribe {
                 &id,
                 req.language.as_deref(),
                 prompt.as_deref(),
-                false,
+                req.pipeline.transcribe_raw_mic,
                 &format!("{:?}", req.pipeline),
             );
         }
@@ -337,7 +342,13 @@ impl TranscribeService for RealTranscribe {
                 .lift_quiet_input
                 .then(cm_ai::pipeline::Normalize::default),
         };
-        match r.step(&configured, progress) {
+        let repaired = cm_ai::pipeline::RepairTimes { inner: &configured };
+        let engine: &dyn Transcriber = if req.pipeline.repair_word_times {
+            &repaired
+        } else {
+            &configured
+        };
+        match r.step(engine, progress) {
             Err(e) if is_cancelled(&e) => Ok(0),
             other => other,
         }
