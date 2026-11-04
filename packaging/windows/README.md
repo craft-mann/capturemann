@@ -9,7 +9,8 @@ run on a physical Windows PC yet (the ThinkPad, planned after the Linux test). R
 ## What the scripts do
 
 * `build-windows.ps1`: release build of `cm-cli`, `cm-mcp`, `cm-desktop`, `cm-overlay` (`--no-default-features`,
-  static CRT, GUI subsystem for the two window programs through `cargo rustc` link args), `dumpbin /dependents`
+  static CRT, GUI subsystem for the two window programs through `cargo rustc` link args; the speaker engine is
+  built in when `packaging/sherpa/out` holds the matching libraries), `dumpbin /dependents`
   deny-list check, optional LGPL FFmpeg bundle (`CM_FFMPEG_BUNDLE`, `ffmpeg.exe` next to the programs because
   `cm-media` looks beside the executable first), `THIRD_PARTY_LICENSES.md` for `x86_64-pc-windows-msvc` via
   `packaging/macos/gen-third-party.sh` (needs bash and python), `app.ico` from `design/brand/app-icon`, the zip,
@@ -26,10 +27,13 @@ SmartScreen shows "Windows protected your PC" on first run (More info, Run anywa
 
 ## Not done
 
-* `packaging/ffmpeg/build-windows.*`. Plan: MSYS2 MINGW64 (preinstalled at `C:\msys64` on `windows-latest`),
-  same pinned sources and component lists as `build-linux.sh`, `--target-os=mingw32 --enable-mediafoundation`
-  (encoder `h264_mf`, no libx264), static libvpx (`x86_64-win64-gcc`) and libopus, `-static` link, self-check with
-  `objdump -p` allowing only Windows system DLLs.
+* `packaging/ffmpeg/build-windows.sh` is written (Nov 4, 2026: MSYS2 MINGW64, `--target-os=mingw32
+  --enable-mediafoundation`, `h264_mf`/`hevc_mf`, static libvpx and libopus, self-check with `objdump -p` allowing
+  only Windows system DLLs) and wired into `windows-package.yml` and `build-windows.ps1` (`CM_FFMPEG_BUNDLE`,
+  `CM_REQUIRE_FFMPEG=1`), but it has not run on Windows. The first run decides what needs fixing.
+* The speaker engine: `packaging/sherpa/fetch-windows.ps1` and the Windows link settings are written and wired into
+  `ci.yml` (/MD libraries) and `windows-package.yml` (/MT libraries; `build-windows.ps1` builds with the default
+  features when they match the C runtime, `CM_REQUIRE_SHERPA=1` makes their absence an error). Not linked on Windows yet.
 * The Windows section in `docs/development/releasing.md` and the paragraph in `docs/project/status.md`.
 * A run on a physical Windows PC (clean install, SmartScreen, real GPU, uninstall leaving no files).
 * Executable icon and version resource: needs a `build.rs` (for example `winres`) in `apps/`; not done.

@@ -19,8 +19,10 @@
   Environment:
     CM_SKIP_BUILD=1            reuse the binaries in <target>\release
     CM_FFMPEG_BUNDLE           folder with ffmpeg.exe, ffprobe.exe (+ SOURCE-OFFER.txt, LICENSES\) from
-                               packaging/ffmpeg/build-windows.sh. Refused when its build line says GPL.
+                               packaging/ffmpeg/build-windows.sh (in an MSYS2 MINGW64 shell). Refused when its
+                               build line says GPL. When unset, packaging/ffmpeg/out-windows-x64 is used if it exists.
     CM_REQUIRE_FFMPEG=1        fail unless an LGPL FFmpeg with its licence files is bundled
+    CM_REQUIRE_SHERPA=1        fail unless the speaker engine (sherpa-onnx libraries) is built in
     CM_WINDOWS_OUT             output folder
     CM_WINDOWS_CRT_STATIC=0    link the Microsoft C runtime dynamically (default: static, so the
                                user needs no "Visual C++ Redistributable")
@@ -30,8 +32,10 @@
     CM_WINDOWS_ALLOW_MISSING   comma-separated program names that may be absent (testing only)
     CM_CARGO_JOBS              cargo -j value
 
-  The speaker engine (sherpa-onnx) has only macOS libraries, so this builds with
-  --no-default-features: "Find speakers" answers that the build has no speaker engine.
+  The speaker engine (sherpa-onnx, cargo feature `sherpa`) is built in when packaging\sherpa\fetch-windows.ps1 has
+  run with the C runtime this build uses (/MT, its default, for +crt-static; -Crt md for CM_WINDOWS_CRT_STATIC=0)
+  or SHERPA_ONNX_LIB_DIR is set. Without the libraries this builds with --no-default-features and "Find speakers"
+  answers that the build has no speaker engine. CM_REQUIRE_SHERPA=1 makes that an error.
 
   NOT RUN ON WINDOWS YET: see packaging/windows/README.md ("Status").
 #>
@@ -82,6 +86,24 @@ Write-Host "CaptureMann $fullVersion"
 $jobs = @()
 if ($env:CM_CARGO_JOBS) { $jobs = @('-j', $env:CM_CARGO_JOBS) }
 $crtStatic = $env:CM_WINDOWS_CRT_STATIC -ne '0'
+
+# ---- the speaker engine: the libraries must match the C runtime of this build (a mismatch is a link error) ----
+$crtName = if ($crtStatic) { 'MT' } else { 'MD' }
+$sherpaOut = Join-Path $root 'packaging\sherpa\out'
+$useSherpa = $false
+if ($env:SHERPA_ONNX_LIB_DIR) {
+  $useSherpa = $true
+  Write-Warning "SHERPA_ONNX_LIB_DIR is set ($($env:SHERPA_ONNX_LIB_DIR)): the speaker engine is linked from there; its C runtime is not checked"
+} elseif (Test-Path (Join-Path $sherpaOut 'lib\onnxruntime.lib')) {
+  $info = Join-Path $sherpaOut 'BUILD-INFO.txt'
+  if ((Test-Path $info) -and (Select-String -Path $info -Pattern "C runtime: $crtName" -Quiet)) { $useSherpa = $true }
+  else { Write-Warning "packaging\sherpa\out holds sherpa-onnx libraries for the other C runtime (this build needs $crtName); run packaging\sherpa\fetch-windows.ps1 -Crt $($crtName.ToLowerInvariant())" }
+}
+if (-not $useSherpa -and $env:CM_REQUIRE_SHERPA -eq '1') {
+  Fail 'CM_REQUIRE_SHERPA=1 but the sherpa-onnx libraries for this C runtime are missing (packaging\sherpa\fetch-windows.ps1)'
+}
+$features = if ($useSherpa) { @() } else { @('--no-default-features') }
+Write-Host "speaker engine: $(if ($useSherpa) { "built in ($crtName runtime)" } else { 'not built in (no libraries)' })"
 if ($env:CM_SKIP_BUILD -ne '1') {
   if ($crtStatic) {
     # /MT everywhere (Rust crates and, through cc-rs and cmake, the C and C++ ones): no vcruntime140.dll.
@@ -89,7 +111,7 @@ if ($env:CM_SKIP_BUILD -ne '1') {
   }
   Push-Location $root
   try {
-    Write-Host '==> cargo build --release --no-default-features (capturemann, cm-mcp)'
+    Write-Host '==> cargo build --release (capturemann, cm-mcp)'
     Invoke-Native cargo (@('build', '--release', '--locked', '--no-default-features') + $jobs + @('-p', 'cm-cli', '-p', 'cm-mcp'))
     # The window programs and the daemon get the GUI subsystem, so Explorer or the Start Menu opens no console
     # window with them. The crates have no `windows_subsystem` attribute (they are shared with the
@@ -100,7 +122,7 @@ if ($env:CM_SKIP_BUILD -ne '1') {
     # opens no console window of its own.
     foreach ($p in @(@('cm-desktop', 'cm-desktop'), @('cm-overlay', 'cm-overlay'), @('cm-daemon', 'cm-daemon'))) {
       Write-Host "==> cargo rustc --release -p $($p[0])"
-      Invoke-Native cargo (@('rustc', '--release', '--locked', '--no-default-features') + $jobs + @('-p', $p[0], '--bin', $p[1], '--') + $sub)
+      Invoke-Native cargo (@('rustc', '--release', '--locked') + $features + $jobs + @('-p', $p[0], '--bin', $p[1], '--') + $sub)
     }
   } finally { Pop-Location }
 }
@@ -154,6 +176,11 @@ if ($env:CM_SKIP_LIBCHECK -ne '1') {
 
 # ---- the FFmpeg ----
 $ffdir = $null; $ffLic = $false
+$ffDefault = Join-Path $root 'packaging\ffmpeg\out-windows-x64'
+if (-not $env:CM_FFMPEG_BUNDLE -and (Test-Path (Join-Path $ffDefault 'ffmpeg.exe'))) {
+  Write-Host "==> using the FFmpeg built by packaging/ffmpeg/build-windows.sh: $ffDefault"
+  $env:CM_FFMPEG_BUNDLE = $ffDefault
+}
 if ($env:CM_FFMPEG_BUNDLE) {
   $ffdir = $env:CM_FFMPEG_BUNDLE
   $ffexe = Join-Path $ffdir 'ffmpeg.exe'
@@ -215,6 +242,8 @@ try {
   $doc = Join-Path $stage 'doc'; New-Item -ItemType Directory -Path $doc | Out-Null
   Copy-Item (Join-Path $root 'LICENSE'), (Join-Path $root 'NOTICE') $doc
   Copy-Item $licenses (Join-Path $doc 'THIRD_PARTY_LICENSES.md')
+  $sherpaNotice = Join-Path $sherpaOut 'LICENSES\NOTICE.txt'
+  if ($useSherpa -and (Test-Path $sherpaNotice)) { Copy-Item $sherpaNotice (Join-Path $doc 'sherpa-onnx-NOTICE.txt') }
   if (Test-Path (Join-Path $root 'CHANGELOG.md')) { Copy-Item (Join-Path $root 'CHANGELOG.md') $doc }
   $libs = @("Dynamic libraries (DLL imports) of the programs in this build, x64:") + ($needed | ForEach-Object { "  $_" })
   if (-not $needed) { $libs += '  (not recorded: the dependency check was skipped)' }
@@ -225,6 +254,7 @@ try {
   Copy-Item $ico (Join-Path $stage 'app.ico')
   # The path helper the installer's optional "Add to PATH" uses; the zip ships it too.
   Copy-Item (Join-Path $PSScriptRoot 'path.ps1') $stage
+  $speakerLine = if ($useSherpa) { 'The speaker engine ("Find speakers") is built in; its models are downloaded from the AI page.' } else { 'This build has no speaker engine ("Find speakers" is off).' }
   $readme = @"
 CaptureMann $fullVersion for Windows (x64), early build.
 
@@ -235,7 +265,7 @@ Command line:  capturemann.exe --help      MCP server for agents:  cm-mcp.exe
 Add this folder to your PATH:  powershell -ExecutionPolicy Bypass -File path.ps1 -Action add -Dir "<this folder>"
 
 Not available yet on Windows: screen, camera and audio RECORDING (screenshots, annotation, the library, local AI,
-the CLI and MCP work). This build has no speaker engine ("Find speakers" is off).
+the CLI and MCP work). $speakerLine
 Windows may show "Windows protected your PC" (SmartScreen): the early build is not code-signed yet.
 Choose "More info" and "Run anyway", or compare the SHA-256 file first.
 Licences: doc\ . ffmpeg.exe (if present) is FFmpeg under the LGPL, see FFmpeg\ .
