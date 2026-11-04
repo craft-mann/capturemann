@@ -64,7 +64,7 @@ PROTOCOLS="file,pipe"
 FILTERS="alphamerge,aformat,aresample,atempo,atrim,adelay,amix,anull,apad,alimiter,asetpts,asplit,crop,format,fps,hflip,null,overlay,paletteuse,palettegen,scale,setpts,setsar,split,tpad,trim,volume,pan,loudnorm,ebur128,concat,anullsrc,anullsink"
 
 REQUIRED_ENCODERS="h264_mf aac libvpx-vp9 libopus gif ffv1 mjpeg pcm_f32le pcm_s24le rawvideo"
-REQUIRED_DECODERS="h264 hevc vp9 aac pcm_s16le pcm_f32le png mjpeg ffv1 rawvideo"
+REQUIRED_DECODERS="h264 hevc vp9 aac pcm_u8 pcm_s16le pcm_s24le pcm_s32le pcm_f32le png mjpeg ffv1 rawvideo"
 REQUIRED_MUXERS="mp4 webm matroska gif image2 rawvideo wav f32le null"
 REQUIRED_DEMUXERS="mov matroska wav image2 rawvideo f32le gif"
 REQUIRED_FILTERS="alphamerge aformat aresample atempo atrim adelay amix apad alimiter asetpts crop format fps hflip overlay paletteuse palettegen scale setpts setsar split tpad trim loudnorm ebur128 concat anullsrc anullsink"
