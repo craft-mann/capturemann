@@ -234,7 +234,7 @@ pub fn trim_silences(
 
 /// Stretches of `min_secs` or more that hold no speech by a conservative test: every 1 s window
 /// (hop 0.5 s) whose frame levels have a spread (95th minus 10th percentile of 20 ms levels) under
-/// 7 dB and a top (95th percentile) under 8 dB above the recording's 10th-percentile level is quiet.
+/// 9 dB and a top (95th percentile) under 10 dB above the recording's 10th-percentile level is quiet.
 /// Speech, even faint, has syllables and pauses, so its spread is wider; room tone, hum and a fan
 /// are flat. Adjacent quiet windows are merged. Sample ranges; empty for audio shorter than 2 s.
 pub fn quiet_regions(samples: &[f32], min_secs: f64) -> Vec<Range<usize>> {
@@ -255,7 +255,7 @@ pub fn quiet_regions(samples: &[f32], min_secs: f64) -> Vec<Range<usize>> {
     while i + win <= db.len() {
         let mut w = db[i..i + win].to_vec();
         let (lo, hi) = (pct(&mut w, 10), pct(&mut w, 95));
-        if hi - lo < 7.0 && hi < floor + 8.0 {
+        if hi - lo < 9.0 && hi < floor + 10.0 {
             match runs.last_mut() {
                 Some(l) if i <= l.1 => l.1 = i + win,
                 _ => runs.push((i, i + win)),

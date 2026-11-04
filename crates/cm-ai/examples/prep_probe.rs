@@ -66,10 +66,24 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let flag = |f: &str| args.iter().any(|a| a == f);
     let samples = decode_16k_mono(Path::new(&option(&args, "--audio").expect("--audio"))).unwrap();
-    let model = PathBuf::from(option(&args, "--model").expect("--model"));
-    let model_id = option(&args, "--model-id").expect("--model-id");
+    let model = PathBuf::from(option(&args, "--model").unwrap_or_default());
+    let model_id = option(&args, "--model-id").unwrap_or_default();
     let language = option(&args, "--language").unwrap_or_else(|| "en".into());
     let lift_call = option(&args, "--lift").is_none_or(|v| v != "off");
+    if flag("--dry") {
+        let (a, m) = if flag("--trim") {
+            prep::trim_quiet(&samples, 8.0, 1.0)
+        } else {
+            (samples.clone(), prep::OffsetMap::identity(samples.len()))
+        };
+        println!(
+            "{}",
+            json!({"audio_secs": samples.len() as f64 / 16000.0, "decoded_secs": a.len() as f64 / 16000.0,
+                   "removed_secs": m.removed_secs(samples.len()),
+                   "removed": m.parts.windows(2).map(|w| json!([w[0].1.end as f64 / 16000.0, w[1].1.start as f64 / 16000.0])).collect::<Vec<_>>()})
+        );
+        return;
+    }
     let whisper = WhisperTranscriber::load_with(&model, &model_id, true, false).unwrap();
     let configured = cm_ai::pipeline::Configured {
         inner: &whisper,
