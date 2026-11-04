@@ -116,7 +116,7 @@ fn show_running_instance(config_dir: &std::path::Path) {
 /// keyboard shortcut reaches the app where global shortcuts are not available.
 #[allow(dead_code)]
 fn forward_request(config_dir: &std::path::Path) {
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     {
         let args: Vec<String> = std::env::args().skip(1).collect();
         let request = cm_desktop::instance::Request::from_args(&args);
@@ -124,12 +124,12 @@ fn forward_request(config_dir: &std::path::Path) {
             log::warn!("could not reach the running CaptureMann: {e}");
         }
     }
-    #[cfg(not(unix))]
+    #[cfg(not(any(unix, windows)))]
     let _ = config_dir;
 }
 
 /// The command a request from a second launch stands for.
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 fn command_for(request: cm_desktop::instance::Request) -> Command {
     use cm_desktop::instance::{CaptureKind, Request};
     match request {
@@ -139,6 +139,7 @@ fn command_for(request: cm_desktop::instance::Request) -> Command {
         Request::Capture(CaptureKind::Region) => Command::Capture(overlay::CaptureMode::Region),
         Request::Capture(CaptureKind::Window) => Command::Capture(overlay::CaptureMode::Window),
         Request::Capture(CaptureKind::Display) => Command::Capture(overlay::CaptureMode::Display),
+        Request::Import(paths) => Command::ImportFiles(paths),
     }
 }
 
@@ -326,18 +327,25 @@ fn main() {
     // platform hands them over as URLs before the windows exist, so they wait in a channel
     // until the app model does (IMP-5).
     let (open_tx, mut open_rx) = tokio::sync::mpsc::unbounded_channel::<Vec<std::path::PathBuf>>();
+    let url_tx = open_tx.clone();
     application.on_open_urls(move |urls| {
         let paths = cm_desktop::import_flow::paths_from_urls(&urls);
         if !paths.is_empty() {
-            let _ = open_tx.send(paths);
+            let _ = url_tx.send(paths);
         }
     });
     // The instance lock stays in `main`; the closure only needs to know that this is the instance.
     let instance_held = _instance.is_some();
     let serve_dir = config_dir.clone();
     let launcher_on_start = flag("--launcher");
-    #[cfg(not(unix))]
+    #[cfg(not(any(unix, windows)))]
     let _ = (&serve_dir, instance_held);
+    // Files named on this launch's command line (Open With or a double click on Windows and
+    // Linux): imported like files dropped on the Dock icon. A second launch forwards its own.
+    let launch_files = cm_desktop::instance::file_args(&args, |p| p.exists());
+    if !launch_files.is_empty() {
+        let _ = open_tx.send(launch_files);
+    }
     application.run(move |cx: &mut App| {
         paint::load_fonts(cx);
         platform::set_dock_icon();
@@ -477,8 +485,9 @@ fn main() {
             ),
             }
         }
-        // A second launch (a desktop shortcut running `cm-desktop --launcher`) reaches this app.
-        #[cfg(unix)]
+        // A second launch (a desktop shortcut running `cm-desktop --launcher`, Open With on a
+        // media file) reaches this app.
+        #[cfg(any(unix, windows))]
         if instance_held {
             let tx = cmd_tx.clone();
             if let Err(e) = cm_desktop::instance::serve(&serve_dir, move |request| {

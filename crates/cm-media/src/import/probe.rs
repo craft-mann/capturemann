@@ -115,17 +115,52 @@ pub fn family_of(container: &str) -> Family {
     }
 }
 
+/// Windows "sharing violation" and "lock violation": another program has the file open without
+/// allowing reads (a recording still being written, a sync client). Not a permission problem.
+const WIN_SHARING_VIOLATION: i32 = 32;
+const WIN_LOCK_VIOLATION: i32 = 33;
+
 /// Maps an I/O error from opening or reading the file. EPERM (1) is what macOS answers when the
-/// app has no access to a protected folder or an external drive; it is `permission_missing` with
-/// `data.permission: "files"`. A missing file is `not_found`.
+/// app has no access to a protected folder or an external drive; on Windows the same situation is
+/// "access denied" (`PermissionDenied`: file permissions, Controlled folder access, an antivirus).
+/// Both are `permission_missing` with `data.permission: "files"`. A missing file is `not_found`;
+/// a Windows file open in another program is `unreadable_file` with that reason.
 pub fn map_open_error(path: &Path, e: &std::io::Error) -> ProbeError {
+    map_open_error_on(cfg!(windows), path, e)
+}
+
+/// [`map_open_error`] for a chosen system (`windows`), so both wordings are tested anywhere.
+pub fn map_open_error_on(windows: bool, path: &Path, e: &std::io::Error) -> ProbeError {
     use std::io::ErrorKind::{NotFound, PermissionDenied};
-    let denied = e.raw_os_error() == Some(1) || (e.kind() == PermissionDenied && cfg!(windows));
+    if windows
+        && matches!(
+            e.raw_os_error(),
+            Some(WIN_SHARING_VIOLATION | WIN_LOCK_VIOLATION)
+        )
+    {
+        return ProbeError::Problem(Problem::new(
+            Reason::UnreadableFile,
+            format!(
+                "`{}` is open in another program. Close it there (or wait for it to finish saving) and try again.",
+                path.display()
+            ),
+        ));
+    }
+    let denied = if windows {
+        e.kind() == PermissionDenied
+    } else {
+        e.raw_os_error() == Some(1)
+    };
     if denied {
+        let how = if windows {
+            "Check the file's permissions, allow CaptureMann in Windows Security > Ransomware protection > Controlled folder access, or choose the file in the file picker."
+        } else {
+            "Allow access to its folder in System Settings > Privacy & Security > Files and Folders, or choose the file in the file picker."
+        };
         return ProbeError::Permission {
             path: path.to_path_buf(),
             message: format!(
-                "CaptureMann is not allowed to read `{}`. Allow access to its folder in System Settings > Privacy & Security > Files and Folders, or choose the file in the file picker.",
+                "CaptureMann is not allowed to read `{}`. {how}",
                 path.display()
             ),
         };
@@ -671,6 +706,25 @@ mod tests {
             }
             other => panic!("{other:?}"),
         }
+        // Windows: access denied is the permission error; a sharing violation is not.
+        let denied = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        match map_open_error_on(true, Path::new("C:\\Users\\x\\a.mov"), &denied) {
+            ProbeError::Permission { message, .. } => {
+                assert!(message.contains("Controlled folder access"), "{message}");
+                assert!(!message.contains("System Settings"), "{message}");
+            }
+            other => panic!("{other:?}"),
+        }
+        let sharing = std::io::Error::from_raw_os_error(32);
+        match map_open_error_on(true, Path::new("a.mov"), &sharing) {
+            ProbeError::Problem(p) => assert!(p.message.contains("open in another program")),
+            other => panic!("{other:?}"),
+        }
+        // On macOS and Linux a plain PermissionDenied (EACCES) is still just unreadable.
+        assert!(matches!(
+            map_open_error_on(false, Path::new("a"), &denied),
+            ProbeError::Problem(_)
+        ));
         let nf = std::io::Error::from(std::io::ErrorKind::NotFound);
         assert!(matches!(
             map_open_error(Path::new("/x"), &nf),

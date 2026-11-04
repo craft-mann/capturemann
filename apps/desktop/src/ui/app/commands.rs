@@ -43,6 +43,9 @@ pub fn handle_command(app: &Entity<AppModel>, cmd: Command, cx: &mut App) {
                 "open_library" => navigate(app, Route::Library, cx),
                 "open_launcher" => crate::ui::launcher_window::toggle(app, cx),
                 "settings" => navigate(app, Route::Settings, cx),
+                crate::platform::ids::IMPORT => {
+                    crate::ui::import_actions::open(app, Vec::new(), cx)
+                }
                 crate::platform::ids::PERMISSIONS => open_permissions_page(app, cx),
                 crate::platform::ids::RECORD => recording::open_sheet(app, None, None, cx),
                 crate::platform::ids::RECORD_AUDIO => recording::open_audio_sheet(app, cx),

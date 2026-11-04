@@ -67,7 +67,82 @@ pub fn editing_bitrate(width: u32, height: u32, fps: f64) -> u64 {
     bps.clamp(2.0e6, 80.0e6) as u64
 }
 
-/// `ffmpeg -encoders` scanned for the two hardware encoders: `(h264, hevc)`.
+/// Which family of hardware encoders the editing copy may use. No software encoder ships
+/// (NFR-12), so each family names only encoders that run on the machine's media hardware.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EncoderFamily {
+    /// Apple VideoToolbox (`h264_videotoolbox`, `hevc_videotoolbox`).
+    VideoToolbox,
+    /// Windows Media Foundation (`h264_mf`), forced onto a hardware transform (`-hw_encoding 1`):
+    /// without that option FFmpeg falls back to Microsoft's software encoder when the machine has
+    /// no hardware one.
+    MediaFoundation,
+}
+
+impl EncoderFamily {
+    /// The family of the machine this runs on.
+    pub fn host() -> Self {
+        if cfg!(windows) {
+            EncoderFamily::MediaFoundation
+        } else {
+            EncoderFamily::VideoToolbox
+        }
+    }
+
+    fn h264(self) -> &'static str {
+        match self {
+            EncoderFamily::VideoToolbox => "h264_videotoolbox",
+            EncoderFamily::MediaFoundation => "h264_mf",
+        }
+    }
+
+    /// `None` when the family has no HEVC encoder that the copy uses.
+    fn hevc(self) -> Option<&'static str> {
+        match self {
+            EncoderFamily::VideoToolbox => Some("hevc_videotoolbox"),
+            EncoderFamily::MediaFoundation => None,
+        }
+    }
+
+    /// Arguments that must come with the encoder to keep it on the hardware.
+    fn extra_args(self) -> &'static [&'static str] {
+        match self {
+            EncoderFamily::VideoToolbox => &[],
+            EncoderFamily::MediaFoundation => &["-hw_encoding", "1"],
+        }
+    }
+
+    /// Whether an FFmpeg error message says the hardware encoder refused to start (no media
+    /// engine or transform, a size it cannot do). Pure.
+    fn refused(self, message: &str) -> bool {
+        let m = message.to_lowercase();
+        match self {
+            EncoderFamily::VideoToolbox => {
+                m.contains("videotoolbox") && (m.contains("error") || m.contains("cannot"))
+            }
+            EncoderFamily::MediaFoundation => {
+                (m.contains("_mf") || m.contains("mediafoundation") || m.contains("mft"))
+                    && (m.contains("error")
+                        || m.contains("cannot")
+                        || m.contains("could not")
+                        || m.contains("not found")
+                        || m.contains("failed"))
+            }
+        }
+    }
+}
+
+/// The encoders of `family` that appear in the text of `ffmpeg -encoders`: `(h264, hevc)`.
+pub fn parse_hardware_encoders(family: EncoderFamily, listing: &str) -> (bool, bool) {
+    (
+        listing.contains(family.h264()),
+        family.hevc().is_some_and(|h| listing.contains(h)),
+    )
+}
+
+/// `ffmpeg -encoders` scanned for the hardware encoders of this machine: `(h264, hevc)`. A listed
+/// Media Foundation encoder can still fail to start when the machine has no hardware transform;
+/// [`make_editing_copy`] turns that failure into [`RunFailure::NoHardwareEncoder`].
 pub fn hardware_encoders(tools: &Tools) -> Result<(bool, bool), CmError> {
     let out = Command::new(&tools.ffmpeg)
         .args(["-hide_banner", "-encoders"])
@@ -75,22 +150,23 @@ pub fn hardware_encoders(tools: &Tools) -> Result<(bool, bool), CmError> {
         .output()
         .map_err(|e| spawn_error(&tools.ffmpeg, &e))?;
     let text = String::from_utf8_lossy(&out.stdout);
-    Ok((
-        text.contains("h264_videotoolbox"),
-        text.contains("hevc_videotoolbox"),
-    ))
+    Ok(parse_hardware_encoders(EncoderFamily::host(), &text))
 }
 
 /// The encoder for the copy: HEVC for an HEVC source when the build has it, else H.264.
-pub fn pick_encoder(source_codec: &str, h264: bool, hevc: bool) -> Option<&'static str> {
-    if source_codec == "hevc" && hevc {
-        Some("hevc_videotoolbox")
+pub fn pick_encoder(
+    family: EncoderFamily,
+    source_codec: &str,
+    h264: bool,
+    hevc: bool,
+) -> Option<&'static str> {
+    let hevc_name = family.hevc().filter(|_| hevc);
+    if source_codec == "hevc" && hevc_name.is_some() {
+        hevc_name
     } else if h264 {
-        Some("h264_videotoolbox")
-    } else if hevc {
-        Some("hevc_videotoolbox")
+        Some(family.h264())
     } else {
-        None
+        hevc_name
     }
 }
 
@@ -100,6 +176,7 @@ pub fn editing_copy_args(
     input: &Path,
     output: &Path,
     video_index: u32,
+    family: EncoderFamily,
     encoder: &str,
     fps: &str,
     bitrate: u64,
@@ -136,6 +213,7 @@ pub fn editing_copy_args(
         "-fps_mode".to_owned(),
         "cfr".to_owned(),
     ]);
+    a.extend(family.extra_args().iter().map(|x| (*x).to_owned()));
     if encoder.starts_with("hevc") {
         a.extend(["-tag:v", "hvc1"].map(String::from));
     }
@@ -157,14 +235,17 @@ pub fn make_editing_copy(
         .video
         .as_ref()
         .ok_or_else(|| RunFailure::Failed(CmError::invalid_input("the file has no video")))?;
+    let family = EncoderFamily::host();
     let (h264, hevc) = hardware_encoders(tools).map_err(RunFailure::Failed)?;
-    let encoder = pick_encoder(&v.codec, h264, hevc).ok_or(RunFailure::NoHardwareEncoder)?;
+    let encoder =
+        pick_encoder(family, &v.codec, h264, hevc).ok_or(RunFailure::NoHardwareEncoder)?;
     let fps = editing_fps(v.fps);
     let rate = v.fps.unwrap_or(30.0).clamp(15.0, 60.0);
     let args = editing_copy_args(
         &source.path,
         output,
         v.index,
+        family,
         encoder,
         &fps,
         editing_bitrate(v.width, v.height, rate),
@@ -177,8 +258,7 @@ pub fn make_editing_copy(
             let _ = std::fs::remove_file(output);
             // The hardware encoder refused to start (no media engine, a size it cannot do).
             if let RunError::Failed(ce) = &e {
-                let m = ce.to_string().to_lowercase();
-                if m.contains("videotoolbox") && (m.contains("error") || m.contains("cannot")) {
+                if family.refused(&ce.to_string()) {
                     return Err(RunFailure::NoHardwareEncoder);
                 }
             }
@@ -447,11 +527,85 @@ mod tests {
 
     #[test]
     fn the_encoder_follows_the_source_and_what_exists() {
-        assert_eq!(pick_encoder("hevc", true, true), Some("hevc_videotoolbox"));
-        assert_eq!(pick_encoder("h264", true, true), Some("h264_videotoolbox"));
-        assert_eq!(pick_encoder("hevc", true, false), Some("h264_videotoolbox"));
-        assert_eq!(pick_encoder("h264", false, true), Some("hevc_videotoolbox"));
-        assert_eq!(pick_encoder("h264", false, false), None);
+        use EncoderFamily::{MediaFoundation as Mf, VideoToolbox as Vt};
+        assert_eq!(
+            pick_encoder(Vt, "hevc", true, true),
+            Some("hevc_videotoolbox")
+        );
+        assert_eq!(
+            pick_encoder(Vt, "h264", true, true),
+            Some("h264_videotoolbox")
+        );
+        assert_eq!(
+            pick_encoder(Vt, "hevc", true, false),
+            Some("h264_videotoolbox")
+        );
+        assert_eq!(
+            pick_encoder(Vt, "h264", false, true),
+            Some("hevc_videotoolbox")
+        );
+        assert_eq!(pick_encoder(Vt, "h264", false, false), None);
+        // Windows: H.264 for every source; no HEVC encoder is used there.
+        assert_eq!(pick_encoder(Mf, "hevc", true, true), Some("h264_mf"));
+        assert_eq!(pick_encoder(Mf, "h264", true, false), Some("h264_mf"));
+        assert_eq!(pick_encoder(Mf, "hevc", false, true), None);
+        assert_eq!(pick_encoder(Mf, "h264", false, false), None);
+    }
+
+    #[test]
+    fn the_listing_decides_which_family_encoders_exist() {
+        let listing = " V....D h264_mf Media Foundation\n V....D h264_videotoolbox VT\n";
+        assert_eq!(
+            parse_hardware_encoders(EncoderFamily::MediaFoundation, listing),
+            (true, false)
+        );
+        assert_eq!(
+            parse_hardware_encoders(EncoderFamily::VideoToolbox, listing),
+            (true, false)
+        );
+        assert_eq!(
+            parse_hardware_encoders(EncoderFamily::MediaFoundation, " A aac AAC\n"),
+            (false, false)
+        );
+    }
+
+    #[test]
+    fn the_media_foundation_copy_is_forced_onto_hardware_and_never_tagged_hevc() {
+        let a = editing_copy_args(
+            Path::new("a.mp4"),
+            Path::new("b.mp4"),
+            0,
+            EncoderFamily::MediaFoundation,
+            "h264_mf",
+            "30",
+            5_000_000,
+        );
+        let s = a.join(" ");
+        assert!(s.contains("-c:v h264_mf -b:v 5000000"), "{s}");
+        assert!(s.contains("-hw_encoding 1"), "{s}");
+        assert!(!s.contains("hvc1"), "{s}");
+        let v = editing_copy_args(
+            Path::new("a"),
+            Path::new("b"),
+            0,
+            EncoderFamily::VideoToolbox,
+            "h264_videotoolbox",
+            "30",
+            1,
+        );
+        assert!(!v.join(" ").contains("hw_encoding"));
+    }
+
+    #[test]
+    fn a_refused_hardware_encoder_is_recognised_per_family() {
+        let mf = EncoderFamily::MediaFoundation;
+        assert!(mf.refused("[h264_mf @ 0000] Error initializing the MFT"));
+        assert!(mf.refused("[h264_mf @ 0000] could not find a hardware encoder"));
+        assert!(!mf.refused("Invalid data found when processing input"));
+        assert!(!mf.refused("[h264_videotoolbox @ 0x1] Error: cannot create"));
+        let vt = EncoderFamily::VideoToolbox;
+        assert!(vt.refused("[h264_videotoolbox @ 0x1] Error: cannot create"));
+        assert!(!vt.refused("[h264_mf @ 0000] Error initializing the MFT"));
     }
 
     #[test]
@@ -460,6 +614,7 @@ mod tests {
             Path::new("/in/a.mkv"),
             Path::new("/out/screen.edit.mp4"),
             2,
+            EncoderFamily::VideoToolbox,
             "hevc_videotoolbox",
             "30000/1001",
             9_000_000,
@@ -483,6 +638,7 @@ mod tests {
             Path::new("a"),
             Path::new("b"),
             0,
+            EncoderFamily::VideoToolbox,
             "h264_videotoolbox",
             "25",
             1,
