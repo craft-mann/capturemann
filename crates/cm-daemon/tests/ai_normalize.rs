@@ -306,12 +306,14 @@ async fn a_run_writes_the_sidecar_and_leaves_the_transcript_alone() {
 
 #[tokio::test]
 async fn a_damaged_tone_mark_keeps_the_raw_words_and_is_counted() {
-    let r = rig(12, Some("embedded")).await;
+    // 11 words: under the bisect floor, so the turn is one piece (a longer turn is split in two
+    // and each half that still holds the damaged word is counted).
+    let r = rig(11, Some("embedded")).await;
     *r.model.damage.lock().unwrap() = Some(("chào", "chảo"));
     let job = normalize(&r, Actor::User).await;
     assert_eq!(job["state"], "done", "{job}");
     assert_eq!(job["result"]["rejected"], 1);
-    assert_eq!(job["result"]["rejected_words"], 12);
+    assert_eq!(job["result"]["rejected_words"], 11);
     let got = user(&r, "get_normalized_transcript", json!({}))
         .await
         .unwrap();
