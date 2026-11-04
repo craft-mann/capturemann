@@ -93,7 +93,7 @@ impl Rig {
     async fn transcribe(&self, language: Option<&str>, model: Option<&str>) -> Value {
         let job = self
             .client
-            .transcribe(&self.id, language, model, false)
+            .transcribe(&self.id, language, model, None)
             .await
             .unwrap();
         for _ in 0..400 {

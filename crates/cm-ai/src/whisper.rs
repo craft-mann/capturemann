@@ -158,6 +158,8 @@ pub struct WhisperTranscriber {
     threads: i32,
     /// How the model decodes (sampling, thresholds, context); the default is the shipped decode.
     decode: DecodeParams,
+    /// The decode of re-reads ([`Transcriber::transcribe_careful`]); `None`: the same as `decode`.
+    careful: Option<DecodeParams>,
 }
 
 impl WhisperTranscriber {
@@ -205,6 +207,7 @@ impl WhisperTranscriber {
             model: model_id.to_owned(),
             threads,
             decode: DecodeParams::default(),
+            careful: None,
         })
     }
 
@@ -228,6 +231,20 @@ impl WhisperTranscriber {
     #[must_use]
     pub fn with_decode(mut self, decode: DecodeParams) -> Self {
         self.decode = decode;
+        self
+    }
+
+    /// Windows read again (loops, broken words, speech with no words) are decoded with beam search
+    /// (5 beams) and no temperature fallback; the first reading keeps the decode of the model.
+    #[must_use]
+    pub fn with_careful_rereads(mut self) -> Self {
+        let mut d = self.decode.clone();
+        d.strategy = Strategy::Beam {
+            beam_size: 5,
+            patience: -1.0,
+        };
+        d.temperature_inc = Some(0.0);
+        self.careful = Some(d);
         self
     }
 
@@ -742,7 +759,18 @@ impl Transcriber for WhisperTranscriber {
         prompt: Option<&str>,
         progress: &mut dyn FnMut(f32) -> bool,
     ) -> Result<Transcript, CmError> {
-        self.run_task(audio, language, prompt, false, progress)
+        self.run_task(audio, language, prompt, false, &self.decode, progress)
+    }
+
+    fn transcribe_careful(
+        &self,
+        audio: Pcm16k<'_>,
+        language: Option<&str>,
+        prompt: Option<&str>,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Transcript, CmError> {
+        let decode = self.careful.as_ref().unwrap_or(&self.decode);
+        self.run_task(audio, language, prompt, false, decode, progress)
     }
 
     fn translate_to_english(
@@ -754,7 +782,7 @@ impl Transcriber for WhisperTranscriber {
         if !crate::translate::model_can_translate(&self.model) {
             return Err(crate::translate::turbo_cannot_translate(&self.model));
         }
-        self.run_task(audio, source_language, None, true, progress)
+        self.run_task(audio, source_language, None, true, &self.decode, progress)
     }
 }
 
@@ -766,6 +794,7 @@ impl WhisperTranscriber {
         language: Option<&str>,
         prompt: Option<&str>,
         translate: bool,
+        decode: &DecodeParams,
         progress: &mut dyn FnMut(f32) -> bool,
     ) -> Result<Transcript, CmError> {
         // whisper-rs panics on a NUL byte in the prompt.
@@ -814,7 +843,7 @@ impl WhisperTranscriber {
                     self.threads,
                     prompt.as_deref(),
                     translate,
-                    &self.decode,
+                    decode,
                     pct2,
                     cancel2,
                 )

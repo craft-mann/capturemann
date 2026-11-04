@@ -68,3 +68,4 @@ pub mod transcribe;
 pub mod translate;
 pub mod vad;
 pub mod whisper;
+pub mod wordtimes;

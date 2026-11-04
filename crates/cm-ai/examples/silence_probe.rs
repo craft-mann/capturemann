@@ -213,7 +213,10 @@ fn main() {
     let only = option(&args, "--only");
     let out = option(&args, "--out");
 
-    let whisper = WhisperTranscriber::load_with(&model, &model_id, gpu, false).unwrap();
+    let mut whisper = WhisperTranscriber::load_with(&model, &model_id, gpu, false).unwrap();
+    if args.iter().any(|a| a == "--careful-rereads") {
+        whisper = whisper.with_careful_rereads();
+    }
     let configured = cm_ai::pipeline::Configured {
         inner: &whisper,
         vad: None,

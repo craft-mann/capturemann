@@ -7,7 +7,7 @@ impl Inner {
         capture_id: String,
         language: Option<String>,
         model: Option<String>,
-        original_audio: bool,
+        original_audio: Option<bool>,
     ) -> Result<Value, DaemonError> {
         let _serial = self.capture_locks.lock(&capture_id).await;
         let list = self.model_list().await?;
@@ -43,6 +43,9 @@ impl Inner {
         })
         .await?;
         let by = actor.to_string();
+        // Not named by the request: the setting (the recorded microphone unless it is turned off).
+        let original_audio = original_audio
+            .unwrap_or_else(|| settings_raw_mic(&self.settings.all().unwrap_or_default()));
         let (id, m, l) = (capture_id.clone(), model.clone(), language.clone());
         let (job, reused) = blocking(move || {
             enqueue_transcribe(&queue, &id, &m, l.as_deref(), &by, false, original_audio)
@@ -85,9 +88,10 @@ impl Inner {
         let Ok(model) = Self::pick_model(&list, None) else {
             return Ok(());
         };
+        let raw = settings_raw_mic(&settings);
         let (queue, id, picked) = (rt.queue.clone(), capture_id.to_owned(), model.clone());
         let (job, reused) =
-            blocking(move || enqueue_transcribe(&queue, &id, &picked, None, "user", true, false))
+            blocking(move || enqueue_transcribe(&queue, &id, &picked, None, "user", true, raw))
                 .await?;
         if !reused {
             self.events.publish(
@@ -193,4 +197,9 @@ pub(super) fn upgrade_sounds(dir: &std::path::Path) {
             let _ = super::jobs::write_atomic(dir, TRANSCRIPT_FILE, &bytes);
         }
     }
+}
+
+/// The setting `ai.transcribe_raw_mic` (default on) from a settings map.
+fn settings_raw_mic(settings: &serde_json::Map<String, Value>) -> bool {
+    cm_ai::pipeline::PipelineSettings::from_settings(settings).transcribe_raw_mic
 }

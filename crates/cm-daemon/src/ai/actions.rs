@@ -36,8 +36,10 @@ pub enum AiOp {
         language: Option<String>,
         /// `None`: the active model.
         model: Option<String>,
-        /// Read the microphone as recorded, not the noise-reduced copy (default off).
-        original_audio: bool,
+        /// `Some(true)`: the microphone as recorded; `Some(false)`: the noise-reduced copy;
+        /// `None`: what the setting `ai.transcribe_raw_mic` says (the recorded microphone unless
+        /// it is turned off).
+        original_audio: Option<bool>,
     },
     GetTranscript {
         capture_id: String,
@@ -256,8 +258,8 @@ impl AiParams {
                 if let Some(m) = model {
                     o.insert("model".into(), json!(m));
                 }
-                if *original_audio {
-                    o.insert("original_audio".into(), json!(true));
+                if let Some(b) = original_audio {
+                    o.insert("original_audio".into(), json!(b));
                 }
             }
             AiOp::GetTranscript { capture_id }
@@ -968,7 +970,7 @@ pub(crate) fn parse(method: &str, f: &Fields<'_>) -> Result<Action, CmError> {
                 capture_id: f.str_req("capture_id")?,
                 language: language(f)?,
                 model,
-                original_audio: f.bool_or("original_audio", false)?,
+                original_audio: f.bool_opt("original_audio")?,
             }
         }
         "get_transcript" | "suggest_zooms" | "suggest_cuts" => {
