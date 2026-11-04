@@ -10130,6 +10130,10 @@ msgstr "Hãy bắt đầu một bản ghi trước, rồi thêm dấu mốc khi 
 msgid "Start or stop audio recording"
 msgstr "Bắt đầu hoặc dừng ghi âm"
 
+#, fuzzy
+msgid "Stopping background work…"
+msgstr "Đang dừng các tác vụ nền…"
+
 msgid "Stops by itself after {duration}"
 msgstr "Tự dừng sau {duration}"
 
@@ -10433,6 +10437,10 @@ msgstr "Dịch bản ghi lời"
 
 msgid "Type a name."
 msgstr "Hãy nhập một tên."
+
+#, fuzzy
+msgid "Unfinished jobs go on the next time CaptureMann opens."
+msgstr "Các tác vụ chưa xong sẽ tiếp tục lần sau khi CaptureMann mở."
 
 msgid "Undo brings it back."
 msgstr "Hoàn tác sẽ khôi phục lại."

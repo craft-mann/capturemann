@@ -2,6 +2,26 @@ use super::*;
 
 /// Quits. A recording in progress is stopped and its bundle closed first (REC-8, NFR-6): waiting
 /// for the engine can take a moment, so the quit happens when it is done (at most 10 s).
+/// What Quit has to wait for before the app may close.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QuitWait {
+    /// A recording is open: its bundle is closed first.
+    Recording,
+    /// Jobs are running (a transcription, an upload): they stop at a checkpoint first.
+    Jobs,
+}
+
+/// `None`: nothing to wait for, quit at once.
+pub fn quit_wait(recording_active: bool, running_jobs: usize) -> Option<QuitWait> {
+    if recording_active {
+        Some(QuitWait::Recording)
+    } else if running_jobs > 0 {
+        Some(QuitWait::Jobs)
+    } else {
+        None
+    }
+}
+
 pub fn quit(app: &Entity<AppModel>, cx: &mut App) {
     if app.update(cx, |m, _| std::mem::replace(&mut m.quitting, true)) {
         return;
@@ -11,15 +31,28 @@ pub fn quit(app: &Entity<AppModel>, cx: &mut App) {
         cx.quit();
         return;
     };
-    if !daemon.recording_active() {
+    let recording = daemon.recording_active();
+    let jobs = daemon.job_queue().map_or(0, |q| q.running_count());
+    let Some(wait) = quit_wait(recording, jobs) else {
         cx.quit();
         return;
-    }
-    // Saving a long recording can take a few seconds: say so instead of going quiet (R4-23).
+    };
+    // Saving a long recording, or a job stopping at its checkpoint, can take a few seconds: say so
+    // instead of going quiet (R4-23). GPUI itself waits only 200 ms for the quit handler and logs
+    // an error after that, so the wait happens here, before `cx.quit()`.
     push_toast(
         app,
-        ToastSpec::new(ToastKind::Info, tr!("Saving the recording\u{2026}"))
-            .body(tr!("CaptureMann closes as soon as it is saved.")),
+        match wait {
+            QuitWait::Recording => {
+                ToastSpec::new(ToastKind::Info, tr!("Saving the recording\u{2026}"))
+                    .body(tr!("CaptureMann closes as soon as it is saved."))
+            }
+            QuitWait::Jobs => {
+                ToastSpec::new(ToastKind::Info, tr!("Stopping background work\u{2026}")).body(tr!(
+                    "Unfinished jobs go on the next time CaptureMann opens."
+                ))
+            }
+        },
         cx,
     );
     cx.spawn(async move |cx| {
@@ -150,4 +183,19 @@ pub fn set_setting(
         });
     })
     .detach();
+}
+
+#[cfg(test)]
+mod quit_tests {
+    use super::*;
+
+    /// `timed out waiting on app_will_quit` (0.2.5 log): a running job was stopped inside GPUI's
+    /// 200 ms quit window. Jobs now make Quit wait first, like a recording does.
+    #[test]
+    fn quit_waits_for_a_recording_or_a_running_job() {
+        assert_eq!(quit_wait(false, 0), None);
+        assert_eq!(quit_wait(true, 0), Some(QuitWait::Recording));
+        assert_eq!(quit_wait(false, 2), Some(QuitWait::Jobs));
+        assert_eq!(quit_wait(true, 2), Some(QuitWait::Recording));
+    }
 }

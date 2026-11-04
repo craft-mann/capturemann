@@ -82,7 +82,12 @@ impl Log for Logger {
     }
 
     fn log(&self, r: &Record) {
-        if self.enabled(r.metadata()) {
+        let level = if r.target() == "gpui_apple::text_system" {
+            effective_level(r.target(), r.level(), &r.args().to_string())
+        } else {
+            r.level()
+        };
+        if level <= self.level_for(r.target()) {
             let target = attributable_target(r);
             // A failed write to stderr has nowhere to be reported.
             let _ = writeln!(
@@ -99,6 +104,26 @@ impl Log for Logger {
     }
 
     fn flush(&self) {}
+}
+
+/// The level a record is written at. One upstream message is lowered from warn to debug, because it
+/// is not about anything we or the user can change: the macOS text system of GPUI lists the system
+/// font family `.AppleSystemUIFont` with the same PostScript name twice (`.SFNS-Bold`,
+/// `.SFNS-BoldItalic`) when the first text is laid out, and GPUI skips the copy, which is the right
+/// thing to do. It appeared 13 times in the 0.2.6 logs. Only this exact message of this target is
+/// matched, never a whole target or level: any other `gpui_apple::text_system` warning, any other
+/// font, still shows.
+fn effective_level(target: &str, level: log::Level, message: &str) -> log::Level {
+    let duplicate_system_font = target == "gpui_apple::text_system"
+        && level == log::Level::Warn
+        && message.starts_with("skipping duplicate font \"")
+        && message.contains(" with PostScript name \".SFNS-")
+        && message.ends_with(" in family \".AppleSystemUIFont\"");
+    if duplicate_system_font {
+        log::Level::Debug
+    } else {
+        level
+    }
 }
 
 /// The target to print for a record. GPUI's `log_err` leaves the target empty for a crate built from
@@ -220,6 +245,24 @@ mod tests {
             attributable_target(&Record::builder().target("").build()),
             "unknown"
         );
+    }
+
+    /// The two lines of the 0.2.6 logs are lowered to debug; nothing else about fonts is.
+    #[test]
+    fn only_the_duplicate_system_font_warning_is_lowered() {
+        use log::Level::{Debug, Error, Warn};
+        let target = "gpui_apple::text_system";
+        let bold = r#"skipping duplicate font "System Font Bold" with PostScript name ".SFNS-Bold" in family ".AppleSystemUIFont""#;
+        let italic = r#"skipping duplicate font "System Font Regular Italic Bold Italic" with PostScript name ".SFNS-BoldItalic" in family ".AppleSystemUIFont""#;
+        assert_eq!(effective_level(target, Warn, bold), Debug);
+        assert_eq!(effective_level(target, Warn, italic), Debug);
+        // Another family, another target, another level or another text keep their level.
+        let other_family = r#"skipping duplicate font "Inter Bold" with PostScript name "Inter-Bold" in family "Inter""#;
+        assert_eq!(effective_level(target, Warn, other_family), Warn);
+        assert_eq!(effective_level("other::crate", Warn, bold), Warn);
+        assert_eq!(effective_level(target, Error, bold), Error);
+        let no_ps = r#"font "X" in family ".AppleSystemUIFont" has no PostScript name; skipping"#;
+        assert_eq!(effective_level(target, Warn, no_ps), Warn);
     }
 
     #[test]
