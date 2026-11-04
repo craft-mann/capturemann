@@ -21,7 +21,12 @@ serde_json.workspace = true
 # MIT OR Apache-2.0. Media Foundation camera capture and the privacy switches (registry); the version
 # cm-platform, cm-capture and cm-cursor use.
 [target.'cfg(windows)'.dependencies]
+# The shared Media Foundation hardware H.264 encoder and fragmented MP4 writer (the screen track's).
+cm-encode.workspace = true
 windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Media_MediaFoundation", "Win32_System_Com", "Win32_System_Registry"] }
+
+[target.'cfg(windows)'.dev-dependencies]
+tempfile.workspace = true
 
 # Same objc2 stack and versions as spikes/spike-encode (plain bindings, no Swift bridge).
 [target.'cfg(target_os = "macos")'.dependencies]

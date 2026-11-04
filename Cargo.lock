@@ -1332,6 +1332,7 @@ version = "0.2.7"
 dependencies = [
  "block2 0.6.2",
  "cm-core",
+ "cm-encode",
  "dispatch2",
  "objc2 0.6.5",
  "objc2-app-kit 0.3.2",
@@ -1344,6 +1345,7 @@ dependencies = [
  "objc2-uniform-type-identifiers 0.3.2",
  "serde",
  "serde_json",
+ "tempfile",
  "windows 0.61.3",
 ]
 

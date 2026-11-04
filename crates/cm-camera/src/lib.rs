@@ -75,6 +75,12 @@ pub fn system_source() -> Box<dyn CameraSource> {
     platform::system_source()
 }
 
+/// The file writer of this system, for hardware checks that drive a writer directly (the recorder
+/// creates its own).
+pub fn system_writer_factory() -> std::sync::Arc<dyn WriterFactory> {
+    platform::system_writer_factory()
+}
+
 /// Picks the camera to use: the remembered one if it is still present, else the default (CAM-4
 /// AC2). The bool is true when the remembered camera was missing and a fallback was chosen.
 pub fn resolve_camera<'a>(

@@ -123,3 +123,83 @@ fn default_camera_delivers_steady_stamped_frames() {
         .iter()
         .all(|e| !matches!(e, CameraEvent::Error(_))));
 }
+
+/// Appends every camera frame to the hardware writer at its capture time, as the recorder does
+/// (time since the first frame, in 120,000 ticks/s).
+struct WriteTo {
+    writer: Mutex<Box<dyn cm_camera::FragmentWriter>>,
+    first_ns: Mutex<Option<u64>>,
+    /// Frames written, frames the encoder had no room for.
+    stats: Mutex<(u32, u32)>,
+}
+
+impl FrameSink for WriteTo {
+    fn on_frame(&self, f: &CameraFrame) {
+        let first = *self
+            .first_ns
+            .lock()
+            .unwrap()
+            .get_or_insert(f.capture_host_ns);
+        let ticks = ((f.capture_host_ns - first) as u128 * 120_000 / 1_000_000_000) as i64;
+        let out = self.writer.lock().unwrap().append(
+            f,
+            cm_core::MediaTime::from_ticks(ticks),
+            cm_core::MediaTime::from_ticks(4_000),
+        );
+        let mut s = self.stats.lock().unwrap();
+        match out {
+            cm_camera::AppendOutcome::Written => s.0 += 1,
+            cm_camera::AppendOutcome::NotReady => s.1 += 1,
+            cm_camera::AppendOutcome::Failed(why) => panic!("the writer failed: {why}"),
+        }
+    }
+    fn on_event(&self, _: CameraEvent) {}
+}
+
+#[test]
+#[ignore = "records the real camera for 6 s into a temp file (deleted afterwards)"]
+fn default_camera_records_a_fragmented_mp4() {
+    let Some(cam) = camera_or_skip() else { return };
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("camera.mp4");
+    let spec = cm_camera::WriterSpec::for_source((1280, 720), 30);
+    let writer = match cm_camera::system_writer_factory().create(&path, &spec) {
+        Ok(w) => w,
+        Err(e) => {
+            eprintln!("SKIPPED: no hardware encoder for {spec:?}: {e}");
+            return;
+        }
+    };
+    let sink = Arc::new(WriteTo {
+        writer: Mutex::new(writer),
+        first_ns: Mutex::new(None),
+        stats: Mutex::new((0, 0)),
+    });
+    let mut src = cm_camera::system_source();
+    src.open(
+        &OpenRequest {
+            device_id: Some(cam.id.clone()),
+            resolution: CameraResolution::P720,
+            fps: 30,
+            role: SourceRole::Record,
+            first_frame_timeout: Duration::from_secs(5),
+        },
+        sink.clone(),
+    )
+    .unwrap();
+    std::thread::sleep(Duration::from_secs(6));
+    src.close();
+    let report = sink.writer.lock().unwrap().finish().unwrap();
+    let (written, not_ready) = *sink.stats.lock().unwrap();
+    eprintln!(
+        "frames written {written}, not ready {not_ready}, fragments {}, {} bytes",
+        report.fragments.len(),
+        report.bytes
+    );
+    assert!(written >= 120, "6 s at 30 fps, got {written}");
+    assert!(report.fragments.len() >= 2, "a fragment about every 2 s");
+    assert!(report.bytes > 0);
+    let scan = cm_encode::scan_file(&path).unwrap();
+    assert!(scan.is_clean(), "the file ends on a fragment boundary");
+    assert_eq!(scan.fragments.len(), report.fragments.len());
+}
