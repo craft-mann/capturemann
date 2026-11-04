@@ -6,6 +6,7 @@
 //! * [`source`]: the OS side ([`ScreenSource`]); `sck` is ScreenCaptureKit on macOS.
 //! * [`recorder`]: [`ScreenRecorder`], implementing `cm_core::TrackRecorder`.
 //! * [`fake`]: a scriptable source for tests without a display.
+//! * [`wgc_logic`]: the pure parts of the Windows.Graphics.Capture source (`windows`, `sys/win_wgc.rs`).
 
 pub mod exclude;
 pub mod fake;
@@ -17,6 +18,7 @@ pub mod recorder;
 pub mod sck;
 pub mod source;
 pub mod timeline;
+pub mod wgc_logic;
 
 pub use pipeline::{HaltReason, LateTracker, Pipeline, PipelineStats, HEALTH_WINDOW_SECS};
 pub use plan::{plan_capture, CapturePlan, Exclusions, ScreenSettings, WindowProvider};
