@@ -248,7 +248,7 @@ impl Run<'_, '_> {
             },
             None => "the answer did not have the right shape",
         };
-        let answer = match self.ask(&[piece.text.clone()], before, Some(why)) {
+        let answer = match self.ask(std::slice::from_ref(&piece.text), before, Some(why)) {
             Ok(mut a) if a.len() == 1 => a.remove(0),
             Ok(_) => {
                 out.push(piece.rejected("no_answer"));

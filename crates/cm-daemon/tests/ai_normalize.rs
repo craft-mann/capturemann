@@ -216,7 +216,9 @@ async fn job_done(r: &Rig, job_id: &str) -> Value {
 }
 
 async fn normalize(r: &Rig, who: Actor) -> Value {
-    let started = call(r, who, "normalize_transcript", json!({})).await.unwrap();
+    let started = call(r, who, "normalize_transcript", json!({}))
+        .await
+        .unwrap();
     job_done(r, started["job_id"].as_str().unwrap()).await
 }
 
@@ -224,7 +226,9 @@ async fn normalize(r: &Rig, who: Actor) -> Value {
 async fn the_edge_cases_are_refused() {
     // Provider none: invalid_input / no_text_model.
     let r = rig(20, None).await;
-    let e = user(&r, "normalize_transcript", json!({})).await.unwrap_err();
+    let e = user(&r, "normalize_transcript", json!({}))
+        .await
+        .unwrap_err();
     assert_eq!(code(&e), ErrorCode::InvalidInput);
     assert_eq!(reason(&e), "no_text_model");
     assert!(r.model.seen.lock().unwrap().is_empty());
@@ -271,7 +275,10 @@ async fn a_run_writes_the_sidecar_and_leaves_the_transcript_alone() {
     let prompt = r.model.seen.lock().unwrap()[0].messages[0].content.clone();
     assert!(prompt.contains("Language: Vietnamese."), "{prompt}");
 
-    assert_eq!(std::fs::read(r.dir.join("transcript.json")).unwrap(), before);
+    assert_eq!(
+        std::fs::read(r.dir.join("transcript.json")).unwrap(),
+        before
+    );
     assert!(r.dir.join("transcript.normalized.json").is_file());
     assert!(!r.dir.join("transcript.normalized.partial.json").exists());
 
@@ -279,7 +286,10 @@ async fn a_run_writes_the_sidecar_and_leaves_the_transcript_alone() {
         .await
         .unwrap();
     assert_eq!(got["stale"], false);
-    assert!(got["text"].as_str().unwrap().starts_with("Xin chào các bạn"));
+    assert!(got["text"]
+        .as_str()
+        .unwrap()
+        .starts_with("Xin chào các bạn"));
     assert!(got["text"].as_str().unwrap().ends_with("chào."));
     assert_eq!(got["normalized"]["summary"]["words"], 20);
     assert_eq!(got["normalized"]["model"], "qwen3.5-4b");

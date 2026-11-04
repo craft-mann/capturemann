@@ -294,7 +294,8 @@ impl Inner {
                     // A failed save only costs the resume, never the run.
                     if last_save.elapsed().as_secs() >= 5 {
                         last_save = std::time::Instant::now();
-                        let _ = saver.save_checkpoint(&checkpoint_value(&hash2, &model_id, results));
+                        let _ =
+                            saver.save_checkpoint(&checkpoint_value(&hash2, &model_id, results));
                     }
                 },
                 &mut |p| {
@@ -339,7 +340,8 @@ impl Inner {
                     "The transcript changed while it was being tidied; run it again",
                 ));
             }
-            let n = Normalized::from_run(&words, &lang, &model_name, &now_rfc3339(), results, &stats);
+            let n =
+                Normalized::from_run(&words, &lang, &model_name, &now_rfc3339(), results, &stats);
             norm::write(&dir, &n)?;
             Ok(n)
         })

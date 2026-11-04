@@ -81,8 +81,8 @@ pub fn build(words: &[Word], speakers: Option<&[Option<u32>]>) -> Vec<Span> {
     };
     let mut start = 0usize;
     let mut current = labels.iter().flatten().next().copied();
-    for i in 0..words.len() {
-        if let Some(l) = labels[i] {
+    for (i, label) in labels.iter().enumerate() {
+        if let Some(l) = *label {
             if Some(l) != current {
                 if i > start {
                     cut(

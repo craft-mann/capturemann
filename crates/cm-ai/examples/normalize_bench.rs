@@ -138,7 +138,8 @@ fn main() {
             case.turns.push(tokens);
         }
     } else if let Some(path) = option(&args, "--lines") {
-        let raw: Vec<Value> = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        let raw: Vec<Value> =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
         let mut ids: Vec<String> = Vec::new();
         for (t, v) in raw.iter().take(limit).enumerate() {
             let sp = v["speaker"].as_str().unwrap_or("").to_owned();
@@ -223,7 +224,8 @@ fn main() {
     let timed = Timed {
         inner: &embedded,
         calls: Default::default(),
-        trace: option(&args, "--trace").map(|p| std::sync::Mutex::new(std::fs::File::create(p).unwrap())),
+        trace: option(&args, "--trace")
+            .map(|p| std::sync::Mutex::new(std::fs::File::create(p).unwrap())),
     };
 
     let mut opts = Options::new(&lang, ctx as usize);
@@ -280,7 +282,7 @@ fn main() {
                         .collect()
                 };
                 let a: String = strip(&words[at + k].text);
-                let b: String = strip(&display[at + k]);
+                let b: String = strip(display[at + k]);
                 // Compare after composing both (the stored form is NFC).
                 if cm_ai::textmatch::nfc(&a) != cm_ai::textmatch::nfc(&b) {
                     damaged += 1;

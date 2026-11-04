@@ -9,8 +9,8 @@ use serde_json::{json, Value};
 
 use super::{plain, Ctx};
 use crate::args::{
-    AiCmd, CaptionsCmd, ModelsCmd, ReportArgs, ReportCmd, SpeakersArgs, SpeakersCmd, SuggestCmd,
-    NormalizeArgs, TextModelCmd, TextModelsCmd, TranscribeArgs, TranslateArgs,
+    AiCmd, CaptionsCmd, ModelsCmd, NormalizeArgs, ReportArgs, ReportCmd, SpeakersArgs, SpeakersCmd,
+    SuggestCmd, TextModelCmd, TextModelsCmd, TranscribeArgs, TranslateArgs,
 };
 use crate::client::Client;
 use crate::error::CliError;
