@@ -40,18 +40,18 @@ Speech: FLEURS vi_vn test (CC BY 4.0, utterances of 4 to 14 s, 90 of them used, 
 
 ## 4. Results (units per hour of reference-silent audio; clips with at least one insertion / clips)
 
-| family | silent min | Turbo vi units/h (clips hit/total) | Turbo vi, lift off units/h (clips hit/total) | Turbo en units/h (clips hit/total) | Large v3 en units/h (clips hit/total) |
-|---|---|---|---|---|---|
-| tail | 4.1 | 29 (1/14) | 29 (1/14) | 0 (0/14) | 0 (0/14) |
-| end31 | 0.1 | 0 (0/2) | 429 (1/2) | 0 (0/2) | 0 (0/2) |
-| lead | 1.4 | 249 (2/2) | 83 (1/2) | 38 (1/2) | 75 (2/2) |
-| gaps | 5.9 | 41 (3/6) | 41 (3/6) | 56 (3/6) | 75 (4/6) |
-| long | 8.3 | 231 (5/5) | 231 (5/5) | 206 (5/5) | 135 (5/5) |
-| far | 4.5 | 240 (4/4) | 253 (4/4) | 110 (4/4) | 147 (4/4) |
-| quiet | 2.6 | 345 (3/3) | 369 (3/3) | 132 (3/3) | 242 (3/3) |
-| all | 27.0 | **171** (18/36) | **169** (18/36) | **109** (16/36) | **111** (18/36) |
+| family | silent min | Turbo vi units/h (clips hit/total) | Turbo vi, lift off units/h (clips hit/total) | Turbo en units/h (clips hit/total) | Large v3 en units/h (clips hit/total) | Large v3 vi units/h (clips hit/total) |
+|---|---|---|---|---|---|---|
+| tail | 4.1 | 29 (1/14) | 29 (1/14) | 0 (0/14) | 0 (0/14) | 29 (1/14) |
+| end31 | 0.1 | 0 (0/2) | 429 (1/2) | 0 (0/2) | 0 (0/2) | 0 (0/2) |
+| lead | 1.4 | 249 (2/2) | 83 (1/2) | 38 (1/2) | 75 (2/2) | 124 (2/2) |
+| gaps | 5.9 | 41 (3/6) | 41 (3/6) | 56 (3/6) | 75 (4/6) | 51 (3/6) |
+| long | 8.3 | 231 (5/5) | 231 (5/5) | 206 (5/5) | 135 (5/5) | 333 (5/5) |
+| far | 4.5 | 240 (4/4) | 253 (4/4) | 110 (4/4) | 147 (4/4) | 213 (4/4) |
+| quiet | 2.6 | 345 (3/3) | 369 (3/3) | 132 (3/3) | 242 (3/3) | 345 (3/3) |
+| all | 27.0 | **171** (18/36) | **169** (18/36) | **109** (16/36) | **111** (18/36) | **194** (18/36) |
 
-Large v3 on Vietnamese was not completed (two attempts were killed after 15 of 36 clips and the rerun was still queued behind other jobs); its row is missing. Large v3 English is in the table.
+Large v3 on Vietnamese (completed in pieces, the first long run was killed twice by something outside the program) writes invented text at **194 units per hour**, more than Turbo (171): the larger model does not fix it.
 
 Each insertion in the Vietnamese runs is a whole invented sentence in one place; the words of it get one and the same time stamp (zero length), as in the plan's reports. 18 of 36 clips in each language have at least one insertion; the 18 without are the 14 `tail` clips (except one), the two `end31` clips and the digital-zero or -60 dBFS fillers.
 
@@ -109,7 +109,7 @@ On the stretches the maintainer listened to, the raw track has a room level of -
 
 ## 8. What this does not show
 
-One generator, FLEURS and text-to-speech speech, generated noise, one model family; real rooms are -36 to -44 dBFS, quieter noise gave nothing; the real-audio rate rests on 53 s of labelled silence and 1 to 5 instances; Large v3 Vietnamese not yet in the table; no prompt, no beam search, no other parameters (that is `mac-params`).
+One generator, FLEURS and text-to-speech speech, generated noise, one model family; real rooms are -36 to -44 dBFS, quieter noise gave nothing; the real-audio rate rests on 53 s of labelled silence and 1 to 5 instances; no prompt, no beam search, no other parameters (that is `mac-params`).
 
 ## 9. Decision and follow-up
 
