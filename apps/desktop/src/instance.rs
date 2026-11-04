@@ -97,7 +97,7 @@ pub fn second_launch(own: Option<&Path>, running: Option<&Path>) -> SecondLaunch
 /// What a second launch asks the running instance to do. On Linux a desktop that cannot grab
 /// global keys (Wayland without the GlobalShortcuts portal) binds its own keyboard shortcut to
 /// `cm-desktop --launcher` or `cm-desktop --capture region`, and these reach the app that runs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Request {
     /// Bring the app forward (a plain second launch).
     Show,
@@ -106,6 +106,10 @@ pub enum Request {
     Library,
     Settings,
     Capture(CaptureKind),
+    /// Files to import: what Open With, a double click or a command line with file names asks
+    /// for (IMP-5). Windows and Linux have no "open these URLs" event, so a second launch hands
+    /// the files to the running instance this way.
+    Import(Vec<PathBuf>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -119,6 +123,15 @@ impl Request {
     /// The request the command line of a launch makes: `--launcher`, `--library`, `--settings`,
     /// `--capture region|window|display`, or `Show` when none is given.
     pub fn from_args(args: &[String]) -> Request {
+        Request::from_args_with(args, |p| p.exists())
+    }
+
+    /// [`Request::from_args`] with the existence test given, for tests.
+    pub fn from_args_with(args: &[String], exists: impl Fn(&Path) -> bool) -> Request {
+        let paths = file_args(args, exists);
+        if !paths.is_empty() {
+            return Request::Import(paths);
+        }
         let after = |f: &str| {
             args.iter()
                 .position(|a| a == f)
@@ -139,16 +152,27 @@ impl Request {
         }
     }
 
-    /// The line sent over the socket.
-    pub fn to_line(self) -> &'static str {
+    /// The line sent to the running instance. Import is `import ` and a JSON array of the paths,
+    /// so a name with spaces, quotes or a line break stays one path on one line.
+    pub fn to_line(&self) -> String {
         match self {
-            Request::Show => "show",
-            Request::Launcher => "launcher",
-            Request::Library => "library",
-            Request::Settings => "settings",
-            Request::Capture(CaptureKind::Region) => "capture region",
-            Request::Capture(CaptureKind::Window) => "capture window",
-            Request::Capture(CaptureKind::Display) => "capture display",
+            Request::Show => "show".to_owned(),
+            Request::Launcher => "launcher".to_owned(),
+            Request::Library => "library".to_owned(),
+            Request::Settings => "settings".to_owned(),
+            Request::Capture(CaptureKind::Region) => "capture region".to_owned(),
+            Request::Capture(CaptureKind::Window) => "capture window".to_owned(),
+            Request::Capture(CaptureKind::Display) => "capture display".to_owned(),
+            Request::Import(paths) => {
+                let names: Vec<String> = paths
+                    .iter()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .collect();
+                format!(
+                    "import {}",
+                    serde_json::to_string(&names).unwrap_or_else(|_| "[]".to_owned())
+                )
+            }
         }
     }
 
@@ -159,12 +183,44 @@ impl Request {
             "launcher" => Some(Request::Launcher),
             "library" => Some(Request::Library),
             "settings" => Some(Request::Settings),
-            _ => line
-                .strip_prefix("capture ")
-                .and_then(CaptureKind::parse)
-                .map(Request::Capture),
+            _ => {
+                if let Some(json) = line.strip_prefix("import ") {
+                    let names: Vec<String> = serde_json::from_str(json).ok()?;
+                    let paths: Vec<PathBuf> = names.into_iter().map(PathBuf::from).collect();
+                    return (!paths.is_empty()).then_some(Request::Import(paths));
+                }
+                line.strip_prefix("capture ")
+                    .and_then(CaptureKind::parse)
+                    .map(Request::Capture)
+            }
         }
     }
+}
+
+/// The arguments of a launch that name files or folders: not flags, not the value after
+/// `--capture`, and they exist (a stray word is not an import). Several launches may each carry
+/// one path (Explorer starts one process per file for Open With).
+pub fn file_args(args: &[String], exists: impl Fn(&Path) -> bool) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let mut skip_next = false;
+    for a in args {
+        if skip_next {
+            skip_next = false;
+            continue;
+        }
+        if a == "--capture" {
+            skip_next = true;
+            continue;
+        }
+        if a.starts_with('-') || a.is_empty() {
+            continue;
+        }
+        let p = PathBuf::from(a);
+        if exists(&p) {
+            out.push(p);
+        }
+    }
+    out
 }
 
 impl CaptureKind {
@@ -180,6 +236,82 @@ impl CaptureKind {
 
 /// The running instance's request socket, in the config directory next to the lock.
 pub const SOCKET_FILE: &str = "instance.sock";
+
+/// The longest request line read: a launch can name many files (1 MiB of JSON paths).
+const MAX_LINE: u64 = 1 << 20;
+
+/// The Windows named pipe of the instance that holds the lock in `dir`. The name carries a hash of
+/// the config directory, so a second instance on its own data (a test, `CAPTUREMANN_CONFIG_DIR`)
+/// has its own pipe. FNV-1a: stable between runs, unlike the standard hasher.
+pub fn pipe_name(dir: &Path) -> String {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in dir.to_string_lossy().to_lowercase().bytes() {
+        h ^= u64::from(b);
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    format!(r"\\.\pipe\capturemann-instance-{h:016x}")
+}
+
+/// Listens for [`Request`]s from later launches on a thread (Windows: a named pipe, local clients
+/// only). The caller holds the instance lock, so no other server owns the pipe.
+#[cfg(windows)]
+pub fn serve(dir: &Path, on_request: impl Fn(Request) + Send + 'static) -> io::Result<()> {
+    use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
+    use tokio::net::windows::named_pipe::ServerOptions;
+    let name = pipe_name(dir);
+    // The first pipe is created here so that an error (name taken) is returned to the caller.
+    let mut server = ServerOptions::new()
+        .first_pipe_instance(true)
+        .reject_remote_clients(true)
+        .create(&name)?;
+    std::thread::Builder::new()
+        .name("instance-requests".into())
+        .spawn(move || {
+            let Ok(rt) = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+            else {
+                return;
+            };
+            rt.block_on(async move {
+                loop {
+                    if server.connect().await.is_err() {
+                        return;
+                    }
+                    let Ok(next) = ServerOptions::new()
+                        .reject_remote_clients(true)
+                        .create(&name)
+                    else {
+                        return;
+                    };
+                    let stream = std::mem::replace(&mut server, next);
+                    let mut line = String::new();
+                    let read = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+                        BufReader::new(stream.take(MAX_LINE))
+                            .read_line(&mut line)
+                            .await
+                    })
+                    .await;
+                    if matches!(read, Ok(Ok(_))) {
+                        if let Some(req) = Request::from_line(&line) {
+                            on_request(req);
+                        }
+                    }
+                }
+            });
+        })?;
+    Ok(())
+}
+
+/// Sends `request` to the running instance (Windows: its named pipe).
+#[cfg(windows)]
+pub fn send(dir: &Path, request: Request) -> io::Result<()> {
+    use std::io::Write;
+    let mut pipe = std::fs::OpenOptions::new()
+        .write(true)
+        .open(pipe_name(dir))?;
+    writeln!(pipe, "{}", request.to_line())
+}
 
 /// Listens for [`Request`]s from later launches on a thread. The caller holds the instance lock,
 /// so any socket file left behind is stale and is replaced. The socket is owner-only.
@@ -199,7 +331,7 @@ pub fn serve(dir: &Path, on_request: impl Fn(Request) + Send + 'static) -> io::R
                 let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(2)));
                 let mut line = String::new();
                 if BufReader::new(&stream)
-                    .take(64)
+                    .take(MAX_LINE)
                     .read_line(&mut line)
                     .is_ok()
                 {
@@ -294,6 +426,58 @@ mod tests {
         assert_eq!(running_pid(dir.path()), Some(std::process::id()));
     }
 
+    /// Files named on the command line (Open With, a double click) become one import request;
+    /// flags, the `--capture` value and names that are not files do not.
+    #[test]
+    fn file_arguments_become_an_import_request() {
+        let a = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let exists = |p: &Path| p.to_string_lossy().contains("real");
+        let r =
+            Request::from_args_with(&a(&["C:\\v\\real one.mp4", "--background", "word"]), exists);
+        assert_eq!(
+            r,
+            Request::Import(vec![PathBuf::from("C:\\v\\real one.mp4")])
+        );
+        assert_eq!(
+            Request::from_args_with(&a(&["--capture", "real-region"]), exists),
+            Request::Show
+        );
+        assert_eq!(
+            Request::from_args_with(&a(&["--launcher", "real.wav"]), exists),
+            Request::Import(vec![PathBuf::from("real.wav")])
+        );
+        assert_eq!(
+            Request::from_args_with(&a(&["nothing"]), exists),
+            Request::Show
+        );
+    }
+
+    /// A path with spaces, quotes and a line break survives the one-line wire format.
+    #[test]
+    fn an_import_request_round_trips_through_its_line() {
+        let r = Request::Import(vec![
+            PathBuf::from("C:\\My Videos\\a \"b\".mp4"),
+            PathBuf::from("/tmp/line\nbreak.wav"),
+        ]);
+        let line = r.to_line();
+        assert!(!line.contains('\n'), "{line}");
+        assert_eq!(Request::from_line(&line), Some(r));
+        assert_eq!(Request::from_line("import []"), None);
+        assert_eq!(Request::from_line("import nonsense"), None);
+    }
+
+    /// The pipe name is stable, per config directory, and a valid pipe path.
+    #[test]
+    fn the_pipe_name_follows_the_config_directory() {
+        let a = pipe_name(Path::new(r"C:\Users\x\AppData\Roaming\CaptureMann"));
+        let b = pipe_name(Path::new(r"c:\users\x\appdata\roaming\capturemann"));
+        let c = pipe_name(Path::new(r"C:\lab\cfg2"));
+        assert_eq!(a, b, "case does not matter on Windows paths");
+        assert_ne!(a, c);
+        assert!(a.starts_with(r"\\.\pipe\capturemann-instance-"), "{a}");
+        assert_eq!(a.len(), r"\\.\pipe\capturemann-instance-".len() + 16);
+    }
+
     /// A second launch's flags become the request the running instance gets.
     #[test]
     fn a_launch_line_round_trips_to_a_request() {
@@ -316,7 +500,7 @@ mod tests {
             Request::Capture(CaptureKind::Region),
             Request::Capture(CaptureKind::Display),
         ] {
-            assert_eq!(Request::from_line(r.to_line()), Some(r));
+            assert_eq!(Request::from_line(&r.to_line()), Some(r));
         }
         assert_eq!(Request::from_line("rm -rf"), None);
     }
