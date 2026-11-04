@@ -116,3 +116,15 @@ One generator, FLEURS and text-to-speech speech, generated noise, one model fami
 1. Keep `silence_probe` and the set as the public insertion-per-hour metric: any later change (parameters, normalisation, gate, pieces) is judged on `make_silence_set.py` output at Turbo and Large v3, vi and en, with the rule of the plan (at most 2 per hour) as the target. Today: 171 and 109.
 2. The shipped cure candidates to test on this set first: trimming silences longer than 8 s (audio-prep report), a veto from two independent signals only after more labelled data, and not reading from the noise-reduced copy.
 3. Ask the maintainer for the second batch of clips (flatness and low-share units) and keep the keyed answers.
+
+## 10. One more measurement on the real instances (piece cuts and the lift)
+
+The labelled silent spans (53 s) were counted again after changing only where the pieces end (`prep::plan_after_speech`, cuts just after speech instead of the quietest 100 ms; Turbo, noise-reduced copy):
+
+| Run | Nov 2 words / units over labelled silence (19.6 s) | Data Platform (33.4 s) |
+|---|---|---|
+| current cuts (quietest 100 ms) | 1 / 1 | 17 / 3 (one unit of 15 words, 1 s after a piece start) |
+| cuts after speech | **15 / 1** (one unit of 15 words in the cough window, mid-piece) | 2 / 2 |
+| raw track instead of the copy (Data Platform only) | not run yet | 44 / 3 |
+
+So the instance does not go away, it moves: a 15-word unit leaves the Data Platform file and a 15-word unit appears in the cough window of Nov 2, at 100.9 s, far from any cut. The likely reason is that the quiet-input lift is decided per call (a piece), so moving a cut changes the gain of the whole piece and with it the decoding of audio far from the cut. Conclusion: invented text over a weak stretch is a **chaotic** event of the decoder, about one per labelled 50 s of quiet stretches in these meetings, whose position depends on small input changes; a cure has to act on the stretch itself (a veto from independent evidence, or a second decode), not on piece cuts.

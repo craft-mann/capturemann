@@ -231,6 +231,94 @@ pub fn trim_silences(
     (out, OffsetMap { parts })
 }
 
+
+/// Stretches of `min_secs` or more that hold no speech by a conservative test: every 1 s window
+/// (hop 0.5 s) whose frame levels have a spread (95th minus 10th percentile of 20 ms levels) under
+/// 7 dB and a top (95th percentile) under 8 dB above the recording's 10th-percentile level is quiet.
+/// Speech, even faint, has syllables and pauses, so its spread is wider; room tone, hum and a fan
+/// are flat. Adjacent quiet windows are merged. Sample ranges; empty for audio shorter than 2 s.
+pub fn quiet_regions(samples: &[f32], min_secs: f64) -> Vec<Range<usize>> {
+    let db = frame_db(samples);
+    if db.len() < 100 {
+        return Vec::new();
+    }
+    let mut sorted = db.clone();
+    sorted.sort_by(f32::total_cmp);
+    let floor = sorted[sorted.len() / 10];
+    let (win, hop) = (50usize, 25usize);
+    let pct = |v: &mut Vec<f32>, q: usize| {
+        v.sort_by(f32::total_cmp);
+        v[(v.len() - 1) * q / 100]
+    };
+    let mut runs: Vec<(usize, usize)> = Vec::new();
+    let mut i = 0;
+    while i + win <= db.len() {
+        let mut w = db[i..i + win].to_vec();
+        let (lo, hi) = (pct(&mut w, 10), pct(&mut w, 95));
+        if hi - lo < 7.0 && hi < floor + 8.0 {
+            match runs.last_mut() {
+                Some(l) if i <= l.1 => l.1 = i + win,
+                _ => runs.push((i, i + win)),
+            }
+        }
+        i += hop;
+    }
+    runs.into_iter()
+        .filter(|(a, b)| (b - a) as f64 / 50.0 >= min_secs)
+        .map(|(a, b)| a * FRAME..(b * FRAME).min(samples.len()))
+        .collect()
+}
+
+/// [`trim_silences`] driven by [`quiet_regions`]: every quiet stretch longer than `min_silence_secs`
+/// is cut to `keep_secs` at each end (a leading or trailing one keeps `keep_secs` next to the
+/// speech only). Returns the copy and the map back to the source.
+pub fn trim_quiet(
+    samples: &[f32],
+    min_silence_secs: f64,
+    keep_secs: f64,
+) -> (Vec<f32>, OffsetMap) {
+    let keep = samples_of(keep_secs);
+    let quiet = quiet_regions(samples, min_silence_secs);
+    if quiet.is_empty() {
+        return (samples.to_vec(), OffsetMap::identity(samples.len()));
+    }
+    let mut kept: Vec<Range<usize>> = Vec::new();
+    let mut at = 0usize;
+    for q in &quiet {
+        let lead = q.start == 0;
+        let trail = q.end >= samples.len();
+        let a = if lead { 0 } else { (q.start + keep).min(q.end) };
+        let b = if trail { samples.len() } else { q.end.saturating_sub(keep).max(a) };
+        // keep the speech before the stretch and `keep` of the stretch, drop the middle
+        if q.start > at {
+            kept.push(at..a.min(q.end).max(at));
+        }
+        at = b.max(at);
+        if lead {
+            at = b.max(q.start);
+        }
+    }
+    if at < samples.len() {
+        kept.push(at..samples.len());
+    }
+    // merge touching ranges
+    let mut merged: Vec<Range<usize>> = Vec::new();
+    for r in kept.into_iter().filter(|r| !r.is_empty()) {
+        match merged.last_mut() {
+            Some(l) if r.start <= l.end => l.end = l.end.max(r.end),
+            _ => merged.push(r),
+        }
+    }
+    let mut out = Vec::new();
+    let mut parts = Vec::new();
+    for k in merged {
+        let d = out.len()..out.len() + k.len();
+        out.extend_from_slice(&samples[k.clone()]);
+        parts.push((d, k));
+    }
+    (out, OffsetMap { parts })
+}
+
 // ---- pieces that end after speech -------------------------------------------------------------
 
 /// The target length of a piece, as in [`crate::pieces`].
@@ -408,6 +496,40 @@ mod tests {
         for (d, s) in &map.parts {
             assert_eq!(&t[d.clone()], &v[s.clone()]);
         }
+    }
+
+
+    #[test]
+    fn quiet_regions_find_flat_room_and_leave_speech() {
+        let mut v = scene(&[(12.0, false, 0.003), (3.0, true, 0.05), (12.0, false, 0.003)]);
+        // a faint "speaker": a voice 30 dB under the loud test voice, in a room at 0.003
+        v.extend(scene(&[(4.0, true, 0.01)]));
+        let q = quiet_regions(&v, 8.0);
+        assert_eq!(q.len(), 2, "{q:?}");
+        let (a, b) = (q[0].start as f64 / 16000.0, q[0].end as f64 / 16000.0);
+        assert!(a < 0.6 && (b - 12.0).abs() < 1.2, "{a} {b}");
+        // the faint voice at the end is not quiet
+        assert!(q[1].end as f64 / 16000.0 <= 27.6, "{q:?}");
+    }
+
+    #[test]
+    fn trim_quiet_keeps_the_map_honest() {
+        let v = scene(&[
+            (2.0, true, 0.2),
+            (20.0, false, 0.003),
+            (2.0, true, 0.2),
+            (4.0, false, 0.003),
+            (2.0, true, 0.2),
+        ]);
+        let (t, map) = trim_quiet(&v, 8.0, 1.0);
+        let removed = map.removed_secs(v.len());
+        assert!((removed - 18.0).abs() < 1.5, "removed {removed}");
+        for (d, s) in &map.parts {
+            assert_eq!(&t[d.clone()], &v[s.clone()]);
+        }
+        // the third burst of speech starts at 28 s in the source
+        let last = t.len() as f64 / 16000.0 - 2.0;
+        assert!((map.to_source_secs(last) - 28.0).abs() < 1.5);
     }
 
     #[test]

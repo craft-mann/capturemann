@@ -87,10 +87,8 @@ fn main() {
 
     // Trim.
     let (audio, map) = if flag("--trim") {
-        let speech = prep::loud_regions(&samples, 0.25, 0.3, 0.16);
-        prep::trim_silences(
+        prep::trim_quiet(
             &samples,
-            &speech,
             option(&args, "--min-silence")
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(8.0),
