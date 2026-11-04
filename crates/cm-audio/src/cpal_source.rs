@@ -17,7 +17,9 @@ pub fn map_cpal_error(e: &cpal::Error, what: &str) -> CmError {
         )),
         ErrorKind::PermissionDenied => CmError::permission_missing(
             Permission::Microphone,
-            "Microphone access is off. Turn it on in System Settings > Privacy & Security > Microphone.",
+            crate::PermissionState::Denied
+                .message()
+                .unwrap_or("Microphone access is off."),
         ),
         ErrorKind::DeviceNotAvailable => {
             CmError::not_found(format!("{what} is not available (unplugged?)"))

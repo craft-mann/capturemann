@@ -28,6 +28,10 @@ serde_json = "1"
 # MIT. PipeWire client: microphone and the sink monitor (system audio). Needs libpipewire-0.3-dev and libclang.
 pipewire = "0.10"
 
+[target.'cfg(windows)'.dependencies]
+# MIT OR Apache-2.0. The microphone privacy switches (registry); the version cm-platform and cm-capture use.
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Registry"] }
+
 [target.'cfg(target_os = "macos")'.dependencies]
 # Zlib OR Apache-2.0 OR MIT (objc2 family) and MIT (block2, libc).
 objc2.workspace = true
