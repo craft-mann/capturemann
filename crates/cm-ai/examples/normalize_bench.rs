@@ -303,7 +303,7 @@ fn main() {
         "rejected_words": n.summary.rejected_words,
         "rejected_word_rate": n.summary.rejected_words as f64 / words.len().max(1) as f64,
         "rejected_by_reason": reasons,
-        "model_calls": stats.model_calls, "retried_turns": stats.retried,
+        "model_calls": stats.model_calls, "retried_turns": stats.retried, "bisected": stats.bisected,
         "first_answer_errors": {"substituted": stats.first_substituted,
             "deleted": stats.first_deleted, "inserted": stats.first_inserted},
         "tone_mark_damage_words": damaged, "accepted_words": accepted_words,

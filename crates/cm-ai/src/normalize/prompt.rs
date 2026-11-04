@@ -76,7 +76,8 @@ pub fn user(language: &str, items: &[String], before: &str, strict: Option<&str>
          Rules:\n\
          1. Keep every word exactly as given, in the same order, with the same spelling, accents \
          and tone marks. Never add, remove, replace, translate, correct, reorder, merge or split \
-         words. Keep numbers as words if they are words.\n\
+         words. Keep digits as digits and number words as words. Do not fix spelling or \
+         typing mistakes, even obvious ones.\n\
          2. You may add only: . , ? ! : ; and quotation marks, hyphens between words that are \
          already given, capital letters, and a line break (\\n) where a long turn changes topic. \
          Do not add line breaks to short turns.\n\

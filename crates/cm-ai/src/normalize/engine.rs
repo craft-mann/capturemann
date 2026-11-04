@@ -45,6 +45,8 @@ pub struct Stats {
     pub first_substituted: usize,
     pub first_deleted: usize,
     pub first_inserted: usize,
+    /// Pieces split in two after failing the check twice.
+    pub bisected: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -95,6 +97,8 @@ impl From<TextModelError> for NormalizeError {
 
 /// How many words of the turn before are shown as context.
 const CONTEXT_WORDS: usize = 30;
+/// A piece that failed twice is split in two while it has at least this many words.
+const BISECT_MIN_WORDS: usize = 12;
 
 struct Piece<'a> {
     span: Span,
@@ -280,7 +284,19 @@ impl Run<'_, '_> {
                 if earlier.is_none() {
                     self.count(&v);
                 }
-                out.push(piece.rejected(v.reason()));
+                // Isolate the damage: each half is asked on its own, so one bad word keeps a
+                // few words raw instead of the whole turn. The halves are checked like any
+                // other piece; nothing that fails the check is ever used.
+                if let Some((a, b)) = turns::halve(self.words, piece.span, BISECT_MIN_WORDS) {
+                    self.stats.bisected += 1;
+                    let pa = Piece::new(self.words, a);
+                    let pb = Piece::new(self.words, b);
+                    self.single(&pa, before, Some(&v), out)?;
+                    let tail = tail_of(out.last());
+                    self.single(&pb, &tail, Some(&v), out)?;
+                } else {
+                    out.push(piece.rejected(v.reason()));
+                }
             }
         }
         Ok(())

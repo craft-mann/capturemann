@@ -451,3 +451,30 @@ fn text_keeps_breaks_and_glued_words() {
     };
     assert_eq!(n.text(), "Twenty-one days.\nThen stop.");
 }
+
+#[test]
+fn one_bad_word_keeps_only_a_small_part_raw() {
+    let texts: Vec<String> = (0..40).map(|i| format!("w{i}")).collect();
+    let refs: Vec<&str> = texts.iter().map(String::as_str).collect();
+    let w = words(&refs);
+    // "w25" is always damaged: the halves that do not contain it come back clean.
+    let fake = Fake {
+        break_on: Some(("w25", "w26", true)),
+        ..Fake::good()
+    };
+    let (r, stats) = run(&fake, &w, None);
+    assert_eq!(r.iter().map(|t| t.len).sum::<usize>(), 40);
+    let raw: usize = r.iter().filter(|t| !t.normalized).map(|t| t.len).sum();
+    assert!(raw > 0 && raw < 12, "{raw}");
+    assert!(r.iter().filter(|t| t.normalized).count() >= 3);
+    assert!(stats.bisected >= 2);
+    // The rejected leaf has its raw words; every accepted word kept its text.
+    for t in &r {
+        for (k, d) in t.display.iter().enumerate() {
+            assert!(d
+                .to_lowercase()
+                .trim_end_matches('.')
+                .contains(&format!("w{}", t.first + k)));
+        }
+    }
+}
