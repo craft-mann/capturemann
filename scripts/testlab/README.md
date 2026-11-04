@@ -54,3 +54,43 @@ either `WAYLAND_DISPLAY=wayland-0` or `DISPLAY=:0` (and `XDG_SESSION_TYPE`).
 - Windows: `Get-CimInstance Win32_VideoController` shows the Intel UHD 620; Media Foundation hardware H.264
   encoders show up in the encoder list of `capturemann diagnostics` once the Windows recorder exists.
 - Rules: hardware tests (screen, camera, microphone) run only when the owner asked; delete their output.
+
+## Windows test programs (built by CI, run on the laptop)
+
+The laptop has no Rust toolchain, so the tests that need real Windows hardware are compiled on a hosted runner by
+the manual workflow **Windows tests** (`.github/workflows/windows-tests.yml`: Actions > Windows tests > Run
+workflow, on the branch to test). It does not run them; it keeps one artifact, `capturemann-windows-tests.zip`
+(+ `.sha256`, 7 days): the hardware and OS tests of `cm-capture`, `cm-encode`, `cm-audio`, `cm-camera`, `cm-media`,
+the recognizer test of `cm-render`, the `cm-desktop` parity test, the `record_e2e` and `make_fixture` examples
+(release) and the Visual C++ runtime DLLs they link. The list of programs, the exact test names and what each needs
+are in `scripts/ci/windows-tests-README.md` (the same file is inside the zip).
+
+```sh
+gh workflow run windows-tests.yml --repo craft-mann/capturemann -r track/windows   # or the Actions page
+scripts/testlab/win-run-tests.sh latest        # newest successful run on track/windows; or a run id
+                                               # downloads, checks the SHA-256, pushes, unpacks to C:\lab\tests
+```
+
+`win-run-tests.sh` ends by printing the run commands. Two ways to run a program:
+
+- **Over ssh** (`lab.sh windows '<exe> ...'`): session 0, **no desktop**. Fine for unit tests (`*__lib.exe`), the
+  `cm-media` tests, the recognizer test and the encoder test (`cm-encode__mf_real.exe`; if it finds no hardware
+  encoder here, run it in the session).
+- **In the logged-in session** (`win-run-in-session.ps1`): everything that captures the screen or a window, opens
+  the camera or the microphone, hooks the cursor, or needs a GPU adapter for the parity test. The script registers a
+  one-shot scheduled task for the console user, runs the program through a wrapper, waits, prints the output (last
+  line `EXIT <code>`), and removes the task:
+
+```sh
+scripts/testlab/lab.sh windows 'C:\lab\win-run-in-session.ps1 -Exe C:\lab\tests\cm-capture__real_display.exe -Arguments "--ignored --nocapture --test-threads=1" -OutFile C:\lab\out\real_display.txt'
+```
+
+  Options: `-TimeoutSec` (default 600; on a timeout the program is stopped and the script exits 124), `-EnvVars
+  'CM_OCR_REAL=1;K=V'`, `-WorkDir`. It needs the console user to be the ssh user and logged in (the setup keeps
+  the laptop logged in and unlocked). **Not run on the laptop yet, and not parse-checked** (written Nov 4, 2026 on
+  a Mac where `pwsh` could not be run from the agent's sandbox): run `[System.Management.Automation.Language.Parser]::ParseFile`
+  on it first and read its first output before trusting it.
+
+The `parity` test needs a full `ffmpeg` and `ffprobe` on the laptop's `PATH` (for example `winget install
+Gyan.FFmpeg`); no FFmpeg is in the artifact. Hardware tests follow the rule above: only when the owner asked, short,
+output deleted; the loopback chime test plays a sound. A result is "verified" only with a report in `verification/`.

@@ -1,0 +1,136 @@
+name: Windows tests
+
+# Run by hand (Actions > Windows tests > Run workflow). It BUILDS, and does not run, the test programs that
+# need a real Windows machine (screen, microphone, camera, hardware H.264 encoder, the text recognizer, the
+# export/preview parity test) plus the cm-daemon examples `record_e2e` and `make_fixture`, and keeps them as one
+# workflow artifact. The lab laptop (scripts/testlab) has no Rust toolchain and the hosted runner has no camera,
+# microphone or GPU, so the programs are copied to the laptop and run there:
+#   scripts/testlab/win-run-tests.sh <run id>
+# The artifact is `capturemann-windows-tests.zip` (+ `.sha256`), 7 days. It holds test programs, never a
+# release, and no FFmpeg (the parity test needs a full `ffmpeg` on the laptop's PATH, see the README inside).
+# The programs link the dynamic C runtime (the /MD sherpa-onnx libraries, as ci.yml does), so the Visual C++
+# runtime DLLs of the runner are copied next to them (app-local deployment; the laptop may not have them).
+# Pinned actions: the same commits as ci.yml and windows-package.yml.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build the Windows test programs
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable (branch tip)
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      # The /MD archive, because a plain `cargo test` links the dynamic C runtime (same as ci.yml).
+      - name: Cache the sherpa-onnx archive
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: packaging/sherpa/.downloads
+          key: sherpa-Windows-md-${{ hashFiles('packaging/sherpa/fetch-windows.ps1') }}
+      - name: Fetch the sherpa-onnx libraries (pinned, SHA-256 checked)
+        shell: pwsh
+        run: |
+          packaging\sherpa\fetch-windows.ps1 -Crt md
+          if (-not $?) { throw 'fetch-windows.ps1 failed' }
+
+      # `cargo test --no-run --message-format=json` names every test program it linked; each is copied to
+      # <package>__<target>.exe (cargo's own names carry a hash). Library unit tests are <package>__lib.exe.
+      - name: Build the test programs and the examples
+        shell: pwsh
+        run: |
+          $out = Join-Path $PWD 'windows-tests'
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $script:built = @()
+
+          function Copy-Artifacts($json, $pkg, [string]$kind) {
+            foreach ($line in $json) {
+              if (-not "$line".StartsWith('{')) { continue }
+              $m = "$line" | ConvertFrom-Json
+              if ($m.reason -ne 'compiler-artifact' -or -not $m.executable) { continue }
+              $k = $m.target.kind[0]
+              if ($kind -eq 'test') {
+                if ($m.profile.test -ne $true) { continue }
+                $name = if ($k -eq 'lib') { "${pkg}__lib" } elseif ($k -eq 'test') { "${pkg}__$($m.target.name)" } else { "${pkg}__bin-$($m.target.name)" }
+              } else {
+                if ($k -ne 'example') { continue }
+                $name = "example__$($m.target.name)"
+              }
+              Copy-Item $m.executable (Join-Path $out "$name.exe") -Force
+              $script:built += "$name.exe"
+            }
+          }
+
+          function Build-Tests([string]$pkg, [string[]]$select) {
+            "::group::cargo test --no-run -p $pkg $select"
+            $json = & cargo test --no-run --locked --message-format=json -p $pkg @select
+            if ($LASTEXITCODE -ne 0) { throw "cargo test --no-run failed for $pkg" }
+            Copy-Artifacts $json $pkg 'test'
+            '::endgroup::'
+          }
+
+          # Whole packages whose tests are cheap to ship: the libraries' unit tests (including the Windows-only
+          # ones) and every integration test (the hardware ones are #[ignore] and print SKIPPED without hardware).
+          foreach ($p in 'cm-capture', 'cm-encode', 'cm-audio', 'cm-camera', 'cm-media') {
+            Build-Tests $p @('--tests')
+          }
+          # Only the real-recognizer test of cm-render (the rest runs in ci.yml) and the M4 gate of the desktop.
+          Build-Tests 'cm-render' @('--test', 'ocr_real')
+          Build-Tests 'cm-desktop' @('--test', 'parity')
+
+          '::group::cargo build --release --example record_e2e --example make_fixture'
+          $json = & cargo build --release --locked --message-format=json -p cm-daemon --example record_e2e --example make_fixture
+          if ($LASTEXITCODE -ne 0) { throw 'cargo build of the cm-daemon examples failed' }
+          Copy-Artifacts $json 'cm-daemon' 'example'
+          '::endgroup::'
+
+          if (-not ($script:built -contains 'example__record_e2e.exe' -and $script:built -contains 'example__make_fixture.exe')) {
+            throw 'the cm-daemon examples were not found in the cargo output'
+          }
+          $script:built | Sort-Object | Out-File (Join-Path $out 'PROGRAMS.txt') -Encoding utf8
+          "built $($script:built.Count) programs:"
+          $script:built | Sort-Object
+
+          # The Visual C++ runtime next to the programs (the dynamic C runtime is what these link).
+          foreach ($pattern in 'vcruntime140*.dll', 'msvcp140*.dll', 'concrt140.dll', 'vcomp140.dll') {
+            Get-ChildItem "$env:SystemRoot\System32\$pattern" -ErrorAction SilentlyContinue | ForEach-Object {
+              Copy-Item $_.FullName $out -Force
+              "runtime: $($_.Name)"
+            }
+          }
+
+          Copy-Item scripts\ci\windows-tests-README.md (Join-Path $out 'README.md') -Force
+          $sha = (git rev-parse HEAD)
+          "commit: $sha`nbuilt: $((Get-Date).ToUniversalTime().ToString('s'))Z`nrunner: $env:ImageOS $env:ImageVersion" | Out-File (Join-Path $out 'BUILD.txt') -Encoding utf8
+          Get-ChildItem $out | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
+      - name: Zip and checksum
+        shell: pwsh
+        run: |
+          $zip = 'capturemann-windows-tests.zip'
+          Compress-Archive -Path windows-tests\* -DestinationPath $zip -Force
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  $zip" | Out-File "$zip.sha256" -Encoding ascii
+          Get-Content "$zip.sha256"
+          "{0:N1} MB" -f ((Get-Item $zip).Length / 1MB)
+      - name: Keep the files
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: capturemann-windows-tests
+          path: |
+            capturemann-windows-tests.zip
+            capturemann-windows-tests.zip.sha256
+          if-no-files-found: error
+          retention-days: 7

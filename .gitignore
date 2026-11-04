@@ -76,3 +76,4 @@ packaging/linux/out/
 packaging/ffmpeg/out-linux-*/
 packaging/windows/out/
 packaging/ffmpeg/out-windows-*/
+.testlab-downloads/
