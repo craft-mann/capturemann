@@ -325,6 +325,8 @@ fn main() {
         "{}",
         json!({
             "dense_repeat_words": dense, "sounds": t.sounds.len(),
+            "bare_token_runs": cm_ai::failure_kinds::impossible_token_runs(&t.words, 5, 7.0, 0.5)
+                .iter().map(|&(a, b)| json!({"at_s": secs(t.words[a].start).round(), "words": b - a})).collect::<Vec<_>>(),
             "sounds_secs": t.sounds.iter().map(|s| secs(s.end) - secs(s.start)).sum::<f64>(),
             "transcript_words": t.words.len(), "min_count": min, "runs": runs.len(),
             "words_in_runs": words_in, "secs_in_runs": secs_in, "speaker_engine_secs_in_runs": speaker_in,
