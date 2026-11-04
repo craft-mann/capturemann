@@ -143,9 +143,40 @@ impl From<std::io::Error> for FileError {
     }
 }
 
-/// The bundle folder of recording `id` under the library `root`.
+/// Where the bundles seen by earlier scans are, by library root and recording id. A scan reads and
+/// parses the manifests of the library one by one, so it remembers every bundle it read and a
+/// later lookup of one of them reads only that one manifest (and scans again if it is not there).
+type BundleCache = std::collections::HashMap<(PathBuf, String), PathBuf>;
+
+fn bundle_cache() -> std::sync::MutexGuard<'static, BundleCache> {
+    static CACHE: std::sync::OnceLock<Mutex<BundleCache>> = std::sync::OnceLock::new();
+    CACHE
+        .get_or_init(|| Mutex::new(BundleCache::new()))
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+}
+
+/// Whether the manifest in `path` is the one of recording `id`.
+fn bundle_has_id(path: &Path, id: &str) -> bool {
+    std::fs::read_to_string(path.join("manifest.json"))
+        .ok()
+        .is_some_and(|text| RecManifest::from_json(&text).is_ok_and(|m| m.id == id))
+}
+
+/// The bundle folder of recording `id` under the library `root`. A folder remembered from an
+/// earlier scan is checked against its own manifest first; if it moved, was renamed or deleted,
+/// the library is scanned again.
 pub fn find_bundle(root: &Path, id: &str) -> Option<PathBuf> {
+    let key = (root.to_owned(), id.to_owned());
+    let remembered = bundle_cache().get(&key).cloned();
+    if let Some(path) = remembered {
+        if bundle_has_id(&path, id) {
+            return Some(path);
+        }
+        bundle_cache().remove(&key);
+    }
     let entries = std::fs::read_dir(root).ok()?;
+    let mut found = None;
     for e in entries.flatten() {
         let path = e.path();
         if path.extension().and_then(|x| x.to_str()) != Some("cmrec") || !path.is_dir() {
@@ -154,11 +185,19 @@ pub fn find_bundle(root: &Path, id: &str) -> Option<PathBuf> {
         let Ok(text) = std::fs::read_to_string(path.join("manifest.json")) else {
             continue;
         };
-        if RecManifest::from_json(&text).is_ok_and(|m| m.id == id) {
-            return Some(path);
+        let Ok(m) = RecManifest::from_json(&text) else {
+            continue;
+        };
+        if m.id == id {
+            // Found: no need to read the rest of the library now (the cache fills as lookups go).
+            found = Some(path.clone());
+        }
+        bundle_cache().insert((root.to_owned(), m.id), path);
+        if found.is_some() {
+            break;
         }
     }
-    None
+    found
 }
 
 /// One track of a recording.
@@ -883,6 +922,37 @@ mod tests {
         assert_eq!(find_bundle(tmp.path(), "rec_b"), Some(b));
         assert_eq!(find_bundle(tmp.path(), "rec_zzz"), None);
         assert_eq!(find_bundle(&tmp.path().join("missing"), "rec_a"), None);
+    }
+
+    /// A remembered folder is checked against its own manifest: a renamed, moved or deleted bundle
+    /// is found again by a new scan (or not found), never reported at a stale path.
+    #[test]
+    fn a_remembered_bundle_that_moved_is_found_again_or_not_at_all() {
+        let tmp = tempfile::tempdir().unwrap();
+        let a = write_bundle(tmp.path(), "First.cmrec", "rec_cache_a", "First");
+        write_bundle(tmp.path(), "Second.cmrec", "rec_cache_b", "Second");
+        assert_eq!(find_bundle(tmp.path(), "rec_cache_a"), Some(a.clone()));
+        // Second lookup comes from the cache (the manifest is still the one asked for).
+        assert_eq!(find_bundle(tmp.path(), "rec_cache_a"), Some(a.clone()));
+        let renamed = tmp.path().join("Renamed.cmrec");
+        std::fs::rename(&a, &renamed).unwrap();
+        assert_eq!(
+            find_bundle(tmp.path(), "rec_cache_a"),
+            Some(renamed.clone())
+        );
+        std::fs::remove_dir_all(&renamed).unwrap();
+        assert_eq!(find_bundle(tmp.path(), "rec_cache_a"), None);
+        // A different manifest id at the remembered path is not taken for the old recording.
+        let b = tmp.path().join("Second.cmrec");
+        assert_eq!(find_bundle(tmp.path(), "rec_cache_b"), Some(b.clone()));
+        let text = std::fs::read_to_string(b.join("manifest.json")).unwrap();
+        std::fs::write(
+            b.join("manifest.json"),
+            text.replace("rec_cache_b", "rec_cache_c"),
+        )
+        .unwrap();
+        assert_eq!(find_bundle(tmp.path(), "rec_cache_b"), None);
+        assert_eq!(find_bundle(tmp.path(), "rec_cache_c"), Some(b));
     }
 
     #[test]
