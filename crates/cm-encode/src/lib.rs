@@ -12,7 +12,10 @@
 //! recording fails at the start with [`hardware_encoder_unavailable`] (REC-2).
 //! * `mac` (macOS): `AVAssetWriter` + VideoToolbox fed IOSurface frames, 2 s CMAF segments through
 //!   the writer delegate (the approach proven in spike S6). The only module with `unsafe`.
-//! * `windows` (Windows): a stub returning the shared `not_implemented` error.
+//! * [`h264`], [`h264_mux`], [`nv12`]: the pure parts of an encoder that hands over Annex B frames
+//!   (Annex B to MP4 samples, the fragmented MP4 muxer, RGB to NV12 with scaling), tested on every OS.
+//! * `windows` (Windows): Media Foundation hardware H.264 encoder (NVENC / Quick Sync / AMF behind
+//!   it), the only module with Windows `unsafe`.
 
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
@@ -20,6 +23,9 @@ pub mod cpu;
 pub mod encoder;
 pub mod ffmpeg_vp9;
 pub mod fmp4;
+pub mod h264;
+pub mod h264_mux;
+pub mod nv12;
 pub mod settings;
 pub mod synthetic;
 pub mod writer;
