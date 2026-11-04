@@ -224,12 +224,29 @@ fn ensure_primary(displays: &mut [DisplayInfo]) {
     displays[at_origin.unwrap_or(0)].is_primary = true;
 }
 
+/// Windows: xcap's friendly name is "Unknown Monitor <handle>" when its lookup fails, so the name comes from the
+/// display configuration API, else "Display N" (`sys/win_display.rs`, `sys/win_names.rs`).
+#[cfg(windows)]
+fn display_name(m: &Monitor) -> String {
+    let device = m.name().unwrap_or_default();
+    let friendly = crate::sys::win_display::friendly_name(&device);
+    let index = Monitor::all()
+        .ok()
+        .and_then(|all| all.iter().position(|o| o.id().ok() == m.id().ok()))
+        .unwrap_or(0);
+    crate::sys::win_names::display_label(friendly.as_deref(), &device, index)
+}
+
+#[cfg(not(windows))]
+fn display_name(m: &Monitor) -> String {
+    m.friendly_name()
+        .or_else(|_| m.name())
+        .unwrap_or_else(|_| String::new())
+}
+
 fn display_info(m: &Monitor) -> Result<DisplayInfo, XCapError> {
     let scale = monitor_scale(m);
-    let name = m
-        .friendly_name()
-        .or_else(|_| m.name())
-        .unwrap_or_else(|_| String::new());
+    let name = display_name(m);
     Ok(DisplayInfo {
         id: m.id()?,
         name,
@@ -372,10 +389,19 @@ fn window_info(w: &Window) -> Result<WindowInfo, XCapError> {
     let scale = monitor.as_ref().map_or(ScaleFactor::ONE, monitor_scale);
     let id = w.id()?;
     let (x, y, width, height) = (w.x()?, w.y()?, w.width()?, w.height()?);
+    // Windows: the size is read the way `capture_window` reads it, so the listing and the saved picture agree.
+    #[cfg(windows)]
+    let (x, y, width, height) =
+        crate::sys::win_window::frame_bounds(id).unwrap_or((x, y, width, height));
+    let title = w.title().unwrap_or_default();
+    #[cfg(windows)]
+    let app = crate::sys::win_window::app_name(id, &title);
+    #[cfg(not(windows))]
+    let app = w.app_name().unwrap_or_default();
     Ok(WindowInfo {
         id,
-        title: w.title().unwrap_or_default(),
-        app: w.app_name().unwrap_or_default(),
+        title,
+        app,
         pid: w.pid().unwrap_or(0),
         bounds: to_physical(x, y, width, height, scale.get()),
         scale,
