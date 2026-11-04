@@ -71,6 +71,14 @@ fn is_secret_key(k: &str) -> bool {
     })
 }
 
+/// Whether `t` could be the base64 of `user:password`: a digit, `=`, `+`, `/` or a capital letter after the
+/// first character (a plain word such as "Render" has none).
+fn looks_like_base64_credentials(t: &str) -> bool {
+    t.chars().skip(1).any(|c| c.is_ascii_uppercase())
+        || t.chars()
+            .any(|c| c.is_ascii_digit() || matches!(c, '=' | '+' | '/'))
+}
+
 /// Returns `s` with URLs reduced to scheme, host and path, bearer tokens and secret-looking
 /// `key=value` values replaced by `[redacted]`.
 pub fn scrub_secrets(s: &str) -> String {
@@ -101,10 +109,18 @@ pub fn scrub_secrets(s: &str) -> String {
                 let after = &rest[word_end..];
                 let ws = after.len() - after.trim_start().len();
                 let tok_start = word_end + ws;
-                if ws > 0 && tok_start < rest.len() {
-                    let tok_end = rest[tok_start..]
+                let tok_end = if ws > 0 && tok_start < rest.len() {
+                    rest[tok_start..]
                         .find(is_url_end)
-                        .map_or(rest.len(), |e| tok_start + e);
+                        .map_or(rest.len(), |e| tok_start + e)
+                } else {
+                    tok_start
+                };
+                // "Basic Render Driver" (the Windows software GPU) is not a credential: Basic
+                // credentials are base64, so a plain word is left alone.
+                let plain_word = word.eq_ignore_ascii_case("basic")
+                    && !looks_like_base64_credentials(&rest[tok_start..tok_end]);
+                if ws > 0 && tok_start < rest.len() && !plain_word {
                     out.push_str(word);
                     out.push(' ');
                     out.push_str(REDACTED);
@@ -180,6 +196,18 @@ mod tests {
         assert_eq!(
             scrub_secrets("HTTP://h.example/p?X-Goog-Signature=1234"),
             "HTTP://h.example/p?[redacted]"
+        );
+    }
+
+    #[test]
+    fn a_plain_word_after_basic_is_not_a_credential() {
+        assert_eq!(
+            scrub_secrets("GPU Microsoft Basic Render Driver, driver 10.0"),
+            "GPU Microsoft Basic Render Driver, driver 10.0"
+        );
+        assert_eq!(
+            scrub_secrets("Authorization: Basic dXNlcjpwYXNz now"),
+            "Authorization: Basic [redacted] now"
         );
     }
 
