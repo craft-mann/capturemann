@@ -51,7 +51,7 @@ Speech: FLEURS vi_vn test (CC BY 4.0, utterances of 4 to 14 s, 90 of them used, 
 | quiet | 2.6 | 345 (3/3) | 369 (3/3) | 132 (3/3) | 242 (3/3) |
 | all | 27.0 | **171** (18/36) | **169** (18/36) | **109** (16/36) | **111** (18/36) |
 
-Large v3 on Vietnamese: see section 4b if present (the run was queued behind other jobs when this was written).
+Large v3 on Vietnamese was not completed (two attempts were killed after 15 of 36 clips and the rerun was still queued behind other jobs); its row is missing. Large v3 English is in the table.
 
 Each insertion in the Vietnamese runs is a whole invented sentence in one place; the words of it get one and the same time stamp (zero length), as in the plan's reports. 18 of 36 clips in each language have at least one insertion; the 18 without are the 14 `tail` clips (except one), the two `end31` clips and the digital-zero or -60 dBFS fillers.
 

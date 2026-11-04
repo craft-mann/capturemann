@@ -54,3 +54,17 @@ The noise-reduced PAT copy was made with the recorder's own denoiser (48 kHz, `c
 One Vietnamese reference with 1,000 words (1 point is 10 words) that is seeded from a machine transcript; the second recording (Nov 2) has no reference, so (a) rests on PAT plus word counts and the listening labels; Turbo only (Large v3 on the same cells was not run for lack of GPU time); the silence-set rows for (c) are in section 6.
 
 ## 6. Silence set with trimming
+
+Six Turbo Vietnamese clips of the silence set, words / units over reference-silent audio without and with the trim (silences of 8 s or more cut to 2 s; times mapped back):
+
+| Clip | no trim | trim | seconds removed |
+|---|---|---|---|
+| long, room tone -55 | 75 / 9 | 17 / 1 | 77.0 |
+| far field RT60 0.9 s, room tone -45 | 103 / 9 | 11 / 2 | 52.5 |
+| quiet speaker -45 dBFS | 70 / 5 | 0 / 0 | 49.5 |
+| gaps, room tone -45 | 25 / 2 | 18 / 2 | 43.0 |
+| long, room tone with clicks and breaths | 112 / 8 | 34 / 2 | 37.5 |
+| far field RT60 0.5 s, room tone -55 | 28 / 2 | 2 / 2 | 45.0 |
+| **sum** | **413 / 35** | **82 / 9** | |
+
+So on the public set the trim cuts invented units by 74 % and words by 80 % with the speech words unchanged (FLEURS, PAT-5-min and syn4 outputs are identical to the baseline because nothing is cut there; PAT trim 23.4 %, trim plus region lift 22.4 %). The same rule is unsafe on the raw meeting tracks (section 1, row c). The two facts together are the finding: a trim removes the *synthetic* failure, but in a real raw track quiet far-field speech and room tone are not separable by flatness; the veto has to come from a speech detector that is not fooled by 0 dB signal to noise, which none of Silero, the speaker engine or RNNoise's voice probability is (see the other report, section 6). Not run for lack of GPU time: Large v3 on these cells, the Data Platform file with trim, and the English silence clips.
