@@ -38,7 +38,7 @@ def run(cfg, out, only, only_model):
                        "--language", row["language"], "--out", tr]
             else:
                 cmd = [cfg["bins"]["027"], "--audio", row["audio"], "--model", mpath, "--model-id", mid,
-                       "--language", row["language"], "--gain-only", "--transcript-out", tr, "--label", row["name"]]
+                       "--language", row["language"], "--lift", "--transcript-out", tr, "--label", row["name"]]
                 cmd += ["--reference", row["reference"] or os.devnull]
             r = sh(cmd)
             line = (r.stdout.strip().splitlines() or ["{}"])[-1]
