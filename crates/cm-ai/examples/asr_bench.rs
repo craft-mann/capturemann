@@ -24,7 +24,7 @@ use std::time::Instant;
 use cm_ai::audio::decode_16k_mono;
 use cm_ai::failure_kinds::{health, spread_repeats, word_coverage};
 use cm_ai::measure::levels;
-use cm_ai::measure::{word_errors, word_errors_without, DISFLUENCIES};
+use cm_ai::measure::{word_errors, word_errors_exact, word_errors_without, DISFLUENCIES};
 use cm_ai::pieces::transcribe_pieces;
 use cm_ai::transcribe::{Pcm16k, Transcriber, Transcript};
 use cm_ai::whisper::WhisperTranscriber;
@@ -211,11 +211,14 @@ fn main() {
             }
             g
         }),
-        normalize: None,
+        normalize: args
+            .iter()
+            .any(|a| a == "--lift")
+            .then(cm_ai::pipeline::Normalize::default),
     };
     let engine: &dyn Transcriber = match &vad_first {
         Some(w) => w,
-        None if configured.gate.is_some() => &configured,
+        None if configured.gate.is_some() || configured.normalize.is_some() => &configured,
         None => &counting,
     };
     let (tr, report) = transcribe_pieces(
@@ -236,8 +239,13 @@ fn main() {
     if let Some(p) = option(&args, "--words-out") {
         std::fs::write(p, &hyp).unwrap();
     }
+    if let Some(p) = option(&args, "--transcript-out") {
+        // The transcript as the app stores it (words with times), for rescoring and comparison.
+        std::fs::write(p, serde_json::to_string(&tr).unwrap()).unwrap();
+    }
     let e = word_errors(&reference_all, &hyp);
     let e2 = word_errors_without(&reference_all, &hyp, DISFLUENCIES);
+    let ex = word_errors_exact(&reference_all, &hyp);
     let h = health(&tr.words, &language);
     let spread = spread_repeats(&tr.words, 4, 10.0, 5);
     // Insertions over reference-silent regions: words whose middle is more than half a second from
@@ -259,6 +267,10 @@ fn main() {
     };
     let loops = cm_ai::failure_kinds::sentence_runs(&tr.words, 3).len();
     let dense = cm_ai::failure_kinds::dense_unit_indices(&tr.words, 5, 60.0).len();
+    let exact = json!({
+        "wer_exact": ex.wer(), "substitutions_exact": ex.substitutions,
+        "insertions_exact": ex.insertions, "deletions_exact": ex.deletions,
+    });
     let mut out = json!({
         "outside_speech_words": outside, "loop_runs": loops, "dense_repeat_words": dense,
         "label": label, "model": model_id, "quiet_db": option(&args, "--quiet-db"), "gate": args.iter().any(|a| a == "--gate"), "normalize": option(&args, "--normalize"), "lead_secs": option(&args, "--lead-secs"), "language": language, "gpu": gpu,
@@ -274,8 +286,12 @@ fn main() {
         "health": {"replacement_char": h.replacement_char, "foreign_script": h.foreign_script,
                    "low_confidence": h.low_confidence, "broken_and_doubtful": h.broken_and_doubtful},
         "spread_repeats": spread.iter().map(|s| json!({"text": s.text, "count": s.count})).collect::<Vec<_>>(),
+        "sounds": tr.sounds.len(),
         "peak_rss_mb": cm_core::perf::peak_rss_bytes().map(|b| b / 1_000_000),
     });
+    out.as_object_mut()
+        .unwrap()
+        .extend(exact.as_object().unwrap().clone());
     if !speech.is_empty() {
         let c = word_coverage(&speech, &tr.words, 1.0, 5.0);
         out["coverage"] = json!({
