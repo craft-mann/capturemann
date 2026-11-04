@@ -27,8 +27,13 @@ cargo build        # .cargo/config.toml points SHERPA_ONNX_LIB_DIR at packaging/
 - **Linux:** `fetch-linux.sh` pins `sherpa-onnx-v2.0.1-linux-aarch64-static-lib.tar.bz2` and
   `-linux-x64-static-lib.tar.bz2` (same libraries as macOS; `build.rs` adds `stdc++ m pthread dl`).
   See `verification/L1-local-ai-linux-2026-10-31-claude.md`.
-- **Windows:** not done. Each needs its own archive name, SHA-256 and a `LIBS` check
-  (the archives differ: Windows uses `.lib` files, and the dynamic C++ runtime changes).
+- **Windows (x64):** `fetch-windows.ps1 [-Crt mt|md]` pins `sherpa-onnx-v2.0.1-win-x64-static-MT-Release-lib.tar.bz2`
+  (122,863,596 bytes, `23e7b986...`; for the `+crt-static` package build, the default) and
+  `-static-MD-Release-lib.tar.bz2` (96,089,581 bytes, `7c1f3ef1...`; for a plain `cargo test`, the CI jobs). Same
+  eleven libraries as on the other systems, named `name.lib`; both hashes were checked by downloading the archives
+  (they equal GitHub's asset digests). The two runtimes cannot be mixed (link error LNK2038); `BUILD-INFO.txt` records
+  which one is in `out/`, and `packaging/windows/build-windows.ps1` checks it. Not run on Windows yet: `build.rs`
+  also links `advapi32 shlwapi ole32` as a precaution that the first link will confirm or trim.
 - **Signing:** nothing new. The libraries are static; the executable that contains them is signed as
   before (no extra dylib, framework or helper).
 
