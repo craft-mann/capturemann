@@ -4472,8 +4472,8 @@ msgid "These are the defaults for every recording, including ones an agent start
 msgstr "Đây là mặc định cho mọi bản ghi, kể cả bản do tác nhân AI bắt đầu. Một yêu cầu có thể ghi đè chúng cho riêng một bản ghi."
 
 #, fuzzy
-msgid "This Mac has no usable hardware H.264 encoder for this recording. Try a lower resolution, update to macOS 13 or later, or use a Mac from about 2016 or later."
-msgstr "Máy Mac này không có bộ mã hóa H.264 phần cứng dùng được cho bản ghi này. Hãy thử độ phân giải thấp hơn, cập nhật lên macOS 13 trở lên, hoặc dùng máy Mac từ khoảng năm 2016 trở đi."
+msgid "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update your operating system (macOS 13 or later, Windows 10 or later), or use a computer from about 2016 or later."
+msgstr "Máy tính này không có bộ mã hóa H.264 phần cứng dùng được cho bản ghi này. Hãy thử độ phân giải thấp hơn, cập nhật hệ điều hành (macOS 13 trở lên, Windows 10 trở lên), hoặc dùng máy tính từ khoảng năm 2016 trở đi."
 
 #, fuzzy
 msgid "This account is not connected. Connect it again in Settings → Destinations."

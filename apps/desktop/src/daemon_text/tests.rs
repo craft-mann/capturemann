@@ -482,7 +482,7 @@ fn errors_carry_their_parameters_into_the_sentence() {
     });
 }
 
-/// REC-2: a start that fails because the Mac has no usable hardware H.264 encoder reads in the
+/// REC-2: a start that fails because the computer has no usable hardware H.264 encoder reads in the
 /// chosen language (stable id `hardware_encoder_unavailable`); English is unchanged.
 #[test]
 fn the_missing_hardware_encoder_start_error_is_translated() {

@@ -133,6 +133,16 @@ pub struct Tweaks {
     pub no_shadow: bool,
 }
 
+/// What was applied after the capture-exclusion call: `exclude_from_capture` counts only when it
+/// was asked for and the OS accepted it (`ok`); the other tweaks are not applied on this path.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn applied_after_exclusion(tweaks: Tweaks, ok: bool) -> Applied {
+    Applied {
+        excluded_from_capture: tweaks.exclude_from_capture && ok,
+        click_through: false,
+    }
+}
+
 /// Applies `tweaks` to the native window behind `window`. A failure leaves the window as it was
 /// (the engine still excludes this process's windows by pid) and says why.
 pub fn apply(window: &Window, tweaks: Tweaks) -> Result<Applied, String> {
@@ -564,10 +574,36 @@ mod imp {
         Ok(Applied::default())
     }
 
-    /// Windows would use `WDA_EXCLUDEFROMCAPTURE`; that path is not built yet.
-    #[cfg(not(target_os = "linux"))]
+    /// Windows hides a window from capture with `WDA_EXCLUDEFROMCAPTURE` (Windows 10 version
+    /// 2004 and later). On an older Windows the call fails and the window stays capturable; that
+    /// is reported as "not excluded" and the caller logs it (the engine cannot exclude windows by
+    /// pid on Windows, so there is no second line of defence). Click-through, levels and shadows
+    /// are macOS tweaks and stay unapplied.
+    #[cfg(windows)]
+    pub fn apply(window: &Window, tweaks: Tweaks) -> Result<Applied, String> {
+        use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE,
+        };
+
+        if !tweaks.exclude_from_capture {
+            return Ok(Applied::default());
+        }
+        let handle = HasWindowHandle::window_handle(window).map_err(|e| e.to_string())?;
+        let RawWindowHandle::Win32(h) = handle.as_raw() else {
+            return Err("not a Win32 window".to_owned());
+        };
+        let hwnd = HWND(h.hwnd.get() as *mut std::ffi::c_void);
+        // SAFETY: `hwnd` is the live top-level window GPUI owns for as long as `window` lives;
+        // the call only sets a display affinity flag on it, from the thread that owns the window.
+        let result = unsafe { SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE) };
+        Ok(super::applied_after_exclusion(tweaks, result.is_ok()))
+    }
+
+    #[cfg(not(any(target_os = "linux", windows)))]
     pub fn apply(_window: &Window, _tweaks: Tweaks) -> Result<Applied, String> {
-        Err("hiding windows from capture is only built for macOS so far".to_owned())
+        Err("hiding windows from capture is only built for macOS and Windows so far".to_owned())
     }
 
     /// The 128 px app icon for the X11 `_NET_WM_ICON` (Wayland takes the icon from the
@@ -659,7 +695,9 @@ mod imp {
 
 #[cfg(test)]
 mod tests {
-    use super::{centered_frame, fit_to_display, is_wayland_session};
+    use super::{
+        applied_after_exclusion, centered_frame, fit_to_display, is_wayland_session, Tweaks,
+    };
 
     #[test]
     fn the_session_type_decides_wayland() {
@@ -733,5 +771,21 @@ mod tests {
         assert_eq!(fit_to_display(wanted, min, Some((640., 480.))), min);
         // No display known: unchanged.
         assert_eq!(fit_to_display(wanted, min, None), wanted);
+    }
+
+    #[test]
+    fn exclusion_counts_only_when_asked_for_and_accepted() {
+        let ask = Tweaks {
+            exclude_from_capture: true,
+            click_through: true,
+            ..Tweaks::default()
+        };
+        let done = applied_after_exclusion(ask, true);
+        assert!(done.excluded_from_capture);
+        assert!(!done.click_through, "click-through is not applied here");
+        // Windows before 10 version 2004 refuses the flag: not excluded, reported as such.
+        assert!(!applied_after_exclusion(ask, false).excluded_from_capture);
+        // Not asked for: never reported as excluded.
+        assert!(!applied_after_exclusion(Tweaks::default(), true).excluded_from_capture);
     }
 }

@@ -104,14 +104,20 @@ pub fn available() -> bool {
     *AVAILABLE.get_or_init(cm_render::ocr::system_available)
 }
 
-/// When the recognizer is missing but can be installed (Linux: the `tesseract` program), the
-/// sentence that says what to do; the editor shows Auto-redact dimmed with it as its tooltip.
+/// When the recognizer is missing but can be installed (Linux: the `tesseract` program; Windows: an
+/// OCR language), the sentence that says what to do; the editor shows Auto-redact dimmed with it
+/// as its tooltip.
 /// `None` when the button works or nothing can be installed. Checked once, like [`available`].
 pub fn unavailable_hint() -> Option<&'static str> {
     static HINT: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
     HINT.get_or_init(|| {
         if available() || cm_render::ocr::install_hint().is_none() {
             return None;
+        }
+        if cfg!(windows) {
+            return Some(tr!(
+                "Auto-redact needs a Windows text recognition language. Add one in Settings > Time & language > Language & region (it installs the text recognition part), then restart CaptureMann."
+            ));
         }
         Some(tr!(
             "Auto-redact needs the tesseract program with English data. Install it (Debian and Ubuntu: sudo apt install tesseract-ocr), then restart CaptureMann."

@@ -44,7 +44,7 @@ pub const HARDWARE_ENCODER_UNAVAILABLE: &str = "hardware_encoder_unavailable";
 
 /// The English message of that error. It has no parameters, so the app can translate it by id
 /// (`hardware_encoder_unavailable` in `cm_core::message`).
-pub const HARDWARE_ENCODER_UNAVAILABLE_MESSAGE: &str = "This Mac has no usable hardware H.264 encoder for this recording. Try a lower resolution, update to macOS 13 or later, or use a Mac from about 2016 or later.";
+pub const HARDWARE_ENCODER_UNAVAILABLE_MESSAGE: &str = "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update your operating system (macOS 13 or later, Windows 10 or later), or use a computer from about 2016 or later.";
 
 /// The error for a platform encoder that rejects or cannot start the plan: `platform_rejected`
 /// with `platform_code` `hardware_encoder_unavailable`.
