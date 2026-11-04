@@ -10,7 +10,7 @@
 //! ```text
 //! cargo run --release -p cm-ai --example silence_probe -- --dir <set dir> --model <ggml file>
 //!     --model-id <id> [--language vi] [--lift on|off] [--prompt <text>] [--gpu on|off]
-//!     [--only <name substring>] [--show-text] [--out <jsonl>]
+//!     [--only <name substring>] [--show-text] [--out <jsonl>] [--save-dir <dir>]
 //! ```
 //!
 //! Count from an existing transcript (a bundle folder or a transcript.json) and a span file:
@@ -285,6 +285,14 @@ fn main() {
         )
         .unwrap();
         let wall = began.elapsed().as_secs_f64();
+        if let Some(d) = option(&args, "--save-dir") {
+            std::fs::create_dir_all(&d).unwrap();
+            std::fs::write(
+                Path::new(&d).join(format!("{name}.transcript.json")),
+                serde_json::to_string(&tr).unwrap(),
+            )
+            .unwrap();
+        }
         let (v, c) = report(
             &name,
             &tr.words,
