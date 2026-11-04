@@ -40,6 +40,12 @@
 | Recording through the daemon (`record start/pause/resume/stop`), screen + mic + camera | PASS (with the camera caveat) | 21.7 s wall, 5.03 s paused, file 16.63 s, screen keyframes every 2 s, camera 10 fps |
 | `kill -9` recovery (`record_e2e --kill9-test`) | PASS | 10 PASS with the zip's ffmpeg/ffprobe on PATH (run 41869678741 programs, zip of run 41869669940): killed at about 7.3 s, recovered 1 bundle, 0.99 s of screen lost, recovered screen.mp4 is H.264 1920x1080 30 fps 6.30 s and decodes with no errors, cursor log parses, lock removed, indexed |
 | Stop crash | FAIL then fixed | every recording ended with exit code 0xC0000409 (fast-fail) in the daemon and in `record_e2e`; see Problems |
+| Recording of a window and of a region through the daemon (zip of run 41880377274, commit 4ad1c12) | PASS | `--window Notepad`: file 1426x720 (equal to the listed bounds), 6.3 s; `--region 100,100,1280,720`: file 1280x720, H.264, 30 fps |
+| Ticking clock on screen, `record_e2e` screen+cursor 20 s (tests run 41885987311, commit fa4d68d) | PASS | 591 frames, 0 late (delivered 302, repeated 345, coalesced 56, missed slots 0); the same scene before the fix: 54 % late |
+| Desktop app starts (zip of run 41880377274, commit 4ad1c12) | PASS | `cm-desktop.exe` alive, window "CaptureMann" fits the screen (1920x1080 capture: title bar, Import button, left rail, "MCP ready"), no panic; the CI "app window" and "silent install" steps passed on that run |
+| Second launch with a file (`cm-desktop.exe C:\lab\memo.wav` while the app runs) | PASS | no second process, the running app comes to the front and the Import sheet opens with `memo.wav` "Ready" (this is the path of the start-up panic fix) |
+| Recording started in the app with `CM_WINDOWS_RECORDING=1` (zip of run 41890304518, commit 3a10b2a) | PASS | recording saved by the app's daemon, 7.3 s, 1920x1080, 0 late; HUD and indicator windows opened and closed (log) and are not in the recorded frame; the library window is in the frame (as REC-6.AC8 says); the cursor is drawn |
+| Process loopback system audio (tests run 41895032977, commit 31d0562), `windows_process_loopback_opens_and_stops` | PASS (opens, runs, delivers) | track `System audio (without CaptureMann)`, `wasapi:process-loopback`: 299 packets in 3 s, `system.wav` 2.99 s at 48 kHz stereo with nothing playing (a process loopback keeps delivering silence, unlike the plain loopback). That it excludes CaptureMann's own sound is NOT checked (no sound was played). The first version corrupted the heap (a `PROPVARIANT` dropped over a stack blob); fixed |
 | 9.2-minute screen + mic recording (the 10-minute gate, shortened) | PARTIAL | 553.5 s (my two overlapping scripts; not 600 s): 1920x1080 H.264 High, 16598 frames (30 fps constant), keyframes every 2.0 s (277, min and max gap 2.0), mic delivered 55329 = written, no drops; daemon CPU about 3.5 % of the machine (8 threads), working set 98 to 196 MB (falling after the first minute). A/V sync not measured. 54 % "late" frames and a `screen_degraded` warning because the screen showed a ticking clock (see Problems) |
 
 ## Problems found, with root causes
@@ -54,7 +60,7 @@
    the second `RemoveFrameArrived` on the closed frame pool ended the process. The screen file was complete only up
    to the last fragment. Fixed: `stopped` flag in `crates/cm-capture/src/sys/win_wgc.rs`. Found with stage logging
    (`wgc stop: removing the handlers` printed twice).
-4. **`cm-desktop.exe` panicked at start-up** in the CI "app window" step: `there is no reactor running` at tokio's
+4. **`cm-desktop.exe` panicked at start-up** (checked on the laptop after the fix: starts, second launch works) in the CI "app window" step: `there is no reactor running` at tokio's
    `named_pipe.rs:136`. `instance::serve` created the first pipe outside a tokio runtime (the Import feature's
    second-launch pipe). Fixed: the pipe is created inside the serving thread's runtime (commit 4ad1c12). Not yet seen
    running on the laptop (next report).
@@ -62,8 +68,8 @@
    scrubber. Fixed in `cm-jobs::scrub` (credentials must look like base64).
 6. **54 % late frames and `screen_degraded` for a picture that changes 16 times a second**: the pipeline counted
    gaps shorter than 250 ms between frames as missed slots, but Windows.Graphics.Capture sends frames only when the
-   picture changes (video at 24 fps would do the same). Fixed: `ScreenSource::delivers_only_on_change` (commit fa4d68d).
-   Not yet re-measured on the laptop.
+   picture changes (video at 24 fps would do the same). Fixed: `ScreenSource::delivers_only_on_change` (commit fa4d68d);
+   re-measured on the laptop: 0 late frames with the same ticking clock.
 7. **Camera at about 10 fps at 720p** (manifest `measured_fps` 10.05, NV12 720p30 is the chosen native type). The
    recorded frames have a mean luma of 24 of 255 (a dark room); the camera most likely halves its frame rate in low
    light. A change that preferred MJPG did not help and was reverted. Not resolved; needs a re-run in a bright room
@@ -80,6 +86,6 @@ and process-loopback work.
 
 ## Not run
 
-Desktop app window behaviour on the laptop (start-up, picker, own-window exclusion, tray), speaker labels (no models
+The desktop app's picker, tray and hotkeys, whether process loopback really leaves out CaptureMann's own sound, speaker labels (no models
 installed), transcription speed (no model installed), loopback recording with sound, a second monitor, Windows 10,
 SmartScreen, the NSIS installer on the laptop, `cm-desktop__parity` with FFmpeg, A/V sync with a stimulus.
