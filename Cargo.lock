@@ -1687,6 +1687,7 @@ dependencies = [
  "serde_json",
  "tiny-skia",
  "wgpu",
+ "windows 0.61.3",
 ]
 
 [[package]]

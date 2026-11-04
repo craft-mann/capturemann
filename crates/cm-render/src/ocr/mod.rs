@@ -3,11 +3,13 @@
 //!
 //! * macOS: Apple Vision (`VNRecognizeTextRequest`, accurate level) in `apple`, the only
 //!   place with `unsafe` code.
+//! * Windows: `Windows.Media.Ocr` in `winrt` (part of the OS; reads the languages in the user's
+//!   Windows language list that have the OCR capability installed). The pure parts are in
+//!   `winocr`, tested on every platform. With no usable OCR language it falls back to `tesseract`.
 //! * Everywhere else (Linux first): the system `tesseract` program as a helper process, in
 //!   `tesseract` (Apache-2.0, never linked; found through `CM_TESSERACT`, next to the
 //!   executable or on `PATH`). With no `tesseract` installed [`system_recognizer`] reports
 //!   itself unavailable and answers `not_implemented` saying what to install.
-//!   (Windows will get `Windows.Media.Ocr` later; until then it uses `tesseract` if present.)
 //!
 //! Recognition never leaves the machine and never needs a network or an AI key. When no
 //! recognizer is available `suggest_redactions` answers `not_implemented`; the editor hides its
@@ -23,6 +25,9 @@ mod apple;
 pub mod detect;
 pub mod rules;
 pub mod tesseract;
+pub mod winocr;
+#[cfg(windows)]
+mod winrt;
 
 pub use detect::{
     mask_preview, suggest_redactions, RedactionKind, RedactionSuggestion, SuggestOptions,
@@ -62,6 +67,12 @@ pub trait TextRecognizer: Send + Sync {
         None
     }
 
+    /// An extra sentence for diagnostics (for example the languages the engine reads); the
+    /// default is `None`.
+    fn detail(&self) -> Option<String> {
+        None
+    }
+
     /// Lines of text in reading order with boxes in the image's own pixels.
     ///
     /// # Errors
@@ -69,13 +80,27 @@ pub trait TextRecognizer: Send + Sync {
     fn recognize(&self, image: &RgbaImage) -> Result<Vec<TextLine>, CmError>;
 }
 
-/// The recognizer of this OS: Apple Vision on macOS, the system `tesseract` elsewhere.
+/// The recognizer of this OS: Apple Vision on macOS, `Windows.Media.Ocr` on Windows (the system
+/// `tesseract` when no OCR language is installed there), the system `tesseract` elsewhere.
 pub fn system_recognizer() -> Arc<dyn TextRecognizer> {
     #[cfg(target_os = "macos")]
     {
         Arc::new(apple::VisionRecognizer)
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    {
+        let win = winrt::WindowsOcrRecognizer;
+        if win.is_available() {
+            return Arc::new(win);
+        }
+        let t = tesseract::TesseractRecognizer::system();
+        if t.is_available() {
+            return Arc::new(t);
+        }
+        // Neither works: the Windows recognizer answers, with its own hint (an OCR language).
+        Arc::new(win)
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
     {
         Arc::new(tesseract::TesseractRecognizer::system())
     }
@@ -101,15 +126,15 @@ pub fn system_available() -> bool {
 pub fn describe_system() -> String {
     let r = system_recognizer();
     if r.name() != "tesseract" {
-        return format!(
-            "text recognizer: {} ({})",
-            r.name(),
-            if r.is_available() {
-                "available"
-            } else {
-                "not available"
-            }
-        );
+        let state = if r.is_available() {
+            "available"
+        } else {
+            "not available"
+        };
+        return match r.detail() {
+            Some(d) => format!("text recognizer: {} ({state}; {d})", r.name()),
+            None => format!("text recognizer: {} ({state})", r.name()),
+        };
     }
     let t = tesseract::TesseractRecognizer::system();
     match t.engine() {
@@ -122,7 +147,7 @@ pub fn describe_system() -> String {
     }
 }
 
-/// The stub for platforms without a recognizer yet (Windows until Windows.Media.Ocr lands).
+/// The stub for platforms without a recognizer.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Unavailable;
 

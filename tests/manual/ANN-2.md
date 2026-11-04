@@ -54,9 +54,16 @@ Show it at a normal size (14 pt or larger) and take a screenshot of that window 
    `capturemann annotate <id> --suggest-redactions` on the screenshot still lists the secrets
    (it reads `original.png`, which stays unblurred and private in the library), but the exported
    PNG, imported as a new screenshot or opened in any OCR tool, shows none of the characters.
-9. **No recognizer.** On Windows (stub) or after hiding Vision, the Auto-redact button is not
-   shown, and `capturemann annotate <id> --suggest-redactions` exits 1 with a `not_implemented`
+9. **No recognizer.** After hiding Vision (or on Windows with no OCR language installed and no
+   `tesseract`), the Auto-redact button is not shown, and `capturemann annotate <id> --suggest-redactions` exits 1 with a `not_implemented`
    message saying text recognition is not available. Annotating by hand still works.
+   **Windows:** the recognizer is `Windows.Media.Ocr` (no extra program). `capturemann diagnostics` has a
+   "text recognizer: windows_ocr (available; reads <tag> ...; OCR languages installed: ...)" line. Run steps
+   1 to 8 on a screenshot of the sample lines (use English sample text unless the language list says
+   otherwise) and say which lines were found. To see the no-language case, remove the OCR capability
+   (`Remove-WindowsCapability -Online -Name Language.OCR~~~en-US~~~~0.0.1.0`, Administrator PowerShell, restart
+   the app): the button disappears, the CLI exits 1 with `not_implemented` and the text says how to add the
+   language; restore it with `Add-WindowsCapability` and keep a note of the state you left the machine in.
    **Linux:** with `tesseract` not installed (`sudo apt remove tesseract-ocr`, then restart the app) the
    button is shown dimmed and hovering it says to install `tesseract-ocr`; the same command exits 1
    with `not_implemented` and the same instruction. After `sudo apt install tesseract-ocr` and a restart,

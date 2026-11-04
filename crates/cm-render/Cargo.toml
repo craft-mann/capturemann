@@ -39,6 +39,9 @@ objc2-foundation = { version = "0.3", default-features = false, features = ["std
 wgpu = { version = "29", default-features = false, features = ["std", "parking_lot", "wgsl", "metal"] }
 
 [target.'cfg(windows)'.dependencies]
+# Windows.Media.Ocr text recognition (ANN-2 Auto-redact): MIT OR Apache-2.0, the same crate the
+# capture crates use. Part of the OS, so no program or model is shipped for it.
+windows = { version = "0.61", features = ["Foundation", "Foundation_Collections", "Globalization", "Graphics_Imaging", "Media_Ocr", "Storage_Streams"] }
 wgpu = { version = "29", default-features = false, features = ["std", "parking_lot", "wgsl", "dx12"] }
 
 # No GPU on the hosted Linux runners: the GPU tests print SKIPPED there (lavapipe comes with the Linux
