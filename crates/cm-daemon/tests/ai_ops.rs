@@ -1446,3 +1446,30 @@ async fn transcribe_chooses_among_the_languages_the_user_speaks() {
     assert_eq!(calls[0].language.as_deref(), Some("vi,en"));
     assert_eq!(calls[1].language.as_deref(), Some("en"));
 }
+
+/// `ai.background_priority` (default on) reaches the transcription job: the run is asked to stay
+/// polite to the app's windows, and the setting turns that off.
+#[tokio::test]
+async fn the_background_priority_setting_reaches_the_transcription_job() {
+    let r = rig(FakeAi::new().with_small_installed(), Decision::Approve).await;
+    let a = user(&r, "transcribe", json!({})).await.unwrap();
+    job_done(&r, a["job_id"].as_str().unwrap()).await;
+    user(
+        &r,
+        "set_settings",
+        json!({"values": {"ai.background_priority": false}}),
+    )
+    .await
+    .unwrap();
+    // Another run (the original microphone is a different request).
+    let b = user(&r, "transcribe", json!({"original_audio": true}))
+        .await
+        .unwrap();
+    job_done(&r, b["job_id"].as_str().unwrap()).await;
+    let asked: Vec<bool> =
+        r.ai.transcribe_calls()
+            .iter()
+            .map(|c| c.background)
+            .collect();
+    assert_eq!(asked, vec![true, false]);
+}

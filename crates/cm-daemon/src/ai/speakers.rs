@@ -78,7 +78,9 @@ impl JobHandler for DiarizeHandler {
         };
         let (flag, watcher) = interrupt_flag(&ctx);
         let (service, reporter, run_flag) = (self.service.clone(), ctx.reporter.clone(), flag);
+        let background = super::jobs::background_priority(self.settings.all().ok().as_ref());
         let joined = tokio::task::spawn_blocking(move || {
+            let _low = cm_platform::priority::lower_current_thread(background);
             let mut last = -1.0_f32;
             service.diarize(&req, &mut |p| {
                 if p >= 1.0 || p - last >= 0.01 {

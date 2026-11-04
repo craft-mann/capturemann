@@ -11,6 +11,59 @@ pub fn toasts_in_window(wayland: bool, studio_open: bool, has_toasts: bool, cloa
     wayland && studio_open && has_toasts && !cloaked
 }
 
+/// How long the toast window stays (parked, 1 px) after its last toast went, so the next toast
+/// reuses it instead of a window being destroyed and created again.
+pub const TOAST_IDLE_GRACE: Duration = Duration::from_secs(2);
+/// The least time between closing a toast window and opening the next one. GPUI on macOS logs
+/// `window not found` about 120 times a second for as long as a toast window opened within
+/// milliseconds of the previous one's close lives (seen in the 0.2.6 logs: five of 45 closes, each
+/// followed by a new window 13 to 32 ms later, and each burst lasting that window's whole life).
+pub const TOAST_REOPEN_GAP: Duration = Duration::from_millis(600);
+
+/// What `sync_toasts` does with the toast window.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WindowPlan {
+    /// No window and none wanted.
+    Nothing,
+    /// Close it now.
+    Close,
+    /// No toast to show: keep the window parked for this much longer, then close it.
+    Park(Duration),
+    /// There is a window: fit it to the stack.
+    Reuse,
+    /// Open one now.
+    Open,
+    /// A window was closed too recently: open one after this long.
+    WaitToOpen(Duration),
+}
+
+/// The rule for the toast window's life. `immediate`: it must go at once when nothing is to be
+/// shown (a capture hides the windows, or the toasts are banners in Studio). `idle_for`: how long
+/// the stack has been empty; `since_closed`: how long ago a toast window was closed.
+pub fn window_plan(
+    want_cards: bool,
+    immediate: bool,
+    have_window: bool,
+    idle_for: Duration,
+    since_closed: Option<Duration>,
+) -> WindowPlan {
+    if !want_cards {
+        return match (have_window, immediate) {
+            (false, _) => WindowPlan::Nothing,
+            (true, true) => WindowPlan::Close,
+            (true, false) if idle_for >= TOAST_IDLE_GRACE => WindowPlan::Close,
+            (true, false) => WindowPlan::Park(TOAST_IDLE_GRACE - idle_for),
+        };
+    }
+    if have_window {
+        return WindowPlan::Reuse;
+    }
+    match since_closed {
+        Some(d) if d < TOAST_REOPEN_GAP => WindowPlan::WaitToOpen(TOAST_REOPEN_GAP - d),
+        _ => WindowPlan::Open,
+    }
+}
+
 pub fn push_toast(app: &Entity<AppModel>, spec: ToastSpec, cx: &mut App) {
     app.update(cx, |m, cx| {
         m.toasts.push(spec, Instant::now());
@@ -61,6 +114,31 @@ pub fn set_toast_hover(app: &Entity<AppModel>, id: u64, hovered: bool, cx: &mut 
 pub fn toast_origin(size: (f32, f32), win_h: f32) -> (f32, f32) {
     let w = crate::toast::TOAST_WIDTH;
     (size.0 - w - 16., size.1 - win_h - 48.)
+}
+
+/// Shrinks the window of an emptied stack to one pixel in its corner, so it blocks nothing while
+/// it waits for the next toast.
+fn park_toast_window(cx: &mut App, handle: WindowHandle<ToastHost>) {
+    let Some(b) = cx.primary_display().map(|d| d.bounds()) else {
+        return;
+    };
+    let (x, y) = toast_origin((b.size.width.as_f32(), b.size.height.as_f32()), 1.);
+    let w = f64::from(crate::toast::TOAST_WIDTH);
+    let (x, y) = (
+        f64::from(b.origin.x.as_f32() + x) + w - 1.,
+        f64::from(b.origin.y.as_f32() + y),
+    );
+    let native = handle
+        .update(cx, |_, window, _| {
+            crate::platform_window::NativeWindow::of(window)
+        })
+        .ok()
+        .flatten();
+    if let Some(native) = native {
+        // Resize from a task, never inside a window update (see `NativeWindow`).
+        cx.spawn(async move |_| native.set_frame(x, y, 1., 1.))
+            .detach();
+    }
 }
 
 /// Resizes the toast window to the height the cards really painted at (`measured`), growing it
@@ -116,7 +194,7 @@ pub(crate) fn fit_toast_window(app: &Entity<AppModel>, measured: f32, cx: &mut A
 /// arms the auto-dismiss timer.
 pub(crate) fn sync_toasts(app: &Entity<AppModel>, cx: &mut App) {
     {
-        let (empty, height) = {
+        let (empty, height, immediate) = {
             let m = app.read(cx);
             let stack = m.toasts.toasts();
             log::debug!(
@@ -126,18 +204,74 @@ pub(crate) fn sync_toasts(app: &Entity<AppModel>, cx: &mut App) {
                 m.toasts_in_studio()
             );
             // No window of their own while they are banners in Studio or a capture hides them.
+            let immediate = m.toasts_in_studio() || crate::capture_cloak::is_hidden();
             (
-                stack.is_empty() || m.toasts_in_studio() || crate::capture_cloak::is_hidden(),
+                stack.is_empty() || immediate,
                 crate::toast::stack_height(stack),
+                immediate,
             )
         };
         let existing = app.read(cx).toast_window;
+        let now = Instant::now();
+        let (idle_for, since_closed) = {
+            let m = app.read(cx);
+            (
+                m.toast_idle_since.map_or(Duration::ZERO, |t| now - t),
+                m.toast_closed_at.map(|t| now - t),
+            )
+        };
+        let plan = window_plan(
+            !empty,
+            immediate,
+            existing.is_some(),
+            idle_for,
+            since_closed,
+        );
+        log::debug!("sync_toasts: window plan {plan:?}");
+        // Looks at the window again when the grace or the gap is over.
+        let look_again = |app: &Entity<AppModel>, after: Duration, cx: &mut App| {
+            let app2 = app.clone();
+            let task = cx.spawn(async move |cx| {
+                cx.background_executor().timer(after).await;
+                cx.update(|cx| sync_toasts(&app2, cx));
+            });
+            app.update(cx, |m, _| m.toast_window_timer = Some(task));
+        };
         if empty {
-            if let Some(h) = existing {
-                app.update(cx, |m, _| m.toast_window = None);
-                crate::surfaces::close(cx, h);
+            match plan {
+                WindowPlan::Close => {
+                    if let Some(h) = existing {
+                        app.update(cx, |m, _| {
+                            m.toast_window = None;
+                            m.toast_idle_since = None;
+                            m.toast_closed_at = Some(now);
+                            m.toast_window_timer = None;
+                        });
+                        crate::surfaces::close(cx, h);
+                    }
+                }
+                WindowPlan::Park(rest) => {
+                    if let Some(h) = existing {
+                        if app.read(cx).toast_idle_since.is_none() {
+                            app.update(cx, |m, _| {
+                                m.toast_idle_since = Some(now);
+                                m.toast_fit = 1.;
+                            });
+                            park_toast_window(cx, h);
+                        }
+                        look_again(app, rest, cx);
+                    }
+                }
+                _ => {}
             }
+        } else if let WindowPlan::WaitToOpen(wait) = plan {
+            // The toasts stay queued; the window opens when the gap since the last close is over.
+            look_again(app, wait, cx);
         } else {
+            app.update(cx, |m, _| {
+                m.toast_idle_since = None;
+                m.toast_window_timer = None;
+            });
             let display = cx.primary_display().map(|d| d.bounds());
             // Never taller than the display leaves room for (a pile of toasts on a short screen).
             let height = display.map_or(height, |b| {
@@ -307,6 +441,103 @@ pub(super) fn toast_action(app: &Entity<AppModel>, action: ToastAction, cx: &mut
         ToastAction::CancelImport(id) => crate::ui::import_actions::cancel(app, &id, cx),
         ToastAction::UploadFile(id, file) => {
             crate::ui::upload_ui::upload(app, Some(&id), Some(&file), cx)
+        }
+    }
+}
+
+#[cfg(test)]
+mod window_plan_tests {
+    use super::*;
+
+    const MS: fn(u64) -> Duration = Duration::from_millis;
+
+    /// The 0.2.6 log burst: a toast window closed and a new one opened 13 to 32 ms later. A new
+    /// toast right after the stack emptied reuses the parked window instead.
+    #[test]
+    fn a_toast_right_after_the_last_one_reuses_the_window() {
+        let parked = window_plan(false, false, true, MS(30), None);
+        assert_eq!(parked, WindowPlan::Park(TOAST_IDLE_GRACE - MS(30)));
+        assert_eq!(
+            window_plan(true, false, true, MS(30), None),
+            WindowPlan::Reuse
+        );
+    }
+
+    #[test]
+    fn the_parked_window_closes_after_the_grace() {
+        assert_eq!(
+            window_plan(false, false, true, TOAST_IDLE_GRACE, None),
+            WindowPlan::Close
+        );
+        assert_eq!(
+            window_plan(false, false, false, Duration::ZERO, None),
+            WindowPlan::Nothing
+        );
+    }
+
+    /// A capture (or the Studio banners) removes the window at once, grace or not.
+    #[test]
+    fn a_capture_closes_the_window_at_once() {
+        assert_eq!(
+            window_plan(false, true, true, Duration::ZERO, None),
+            WindowPlan::Close
+        );
+    }
+
+    /// No window is opened within the gap of the previous close.
+    #[test]
+    fn a_window_is_not_opened_right_after_one_was_closed() {
+        assert_eq!(
+            window_plan(true, false, false, Duration::ZERO, Some(MS(20))),
+            WindowPlan::WaitToOpen(TOAST_REOPEN_GAP - MS(20))
+        );
+        assert_eq!(
+            window_plan(true, false, false, Duration::ZERO, Some(TOAST_REOPEN_GAP)),
+            WindowPlan::Open
+        );
+        assert_eq!(
+            window_plan(true, false, false, Duration::ZERO, None),
+            WindowPlan::Open
+        );
+    }
+
+    /// Whatever the order of toasts and timers, two window opens are never closer than the gap to
+    /// a close before them: replays a stream of events through the plan.
+    #[test]
+    fn no_open_ever_follows_a_close_within_the_gap() {
+        let mut closed_at: Option<u64> = None;
+        let mut window = false;
+        let mut idle_since: Option<u64> = None;
+        for t in (0..20_000u64).step_by(10) {
+            // Toasts present in bursts: 0..300, 320..400 (20 ms after), 6000..6100, 8000..8050.
+            let want = (0..300).contains(&t)
+                || (320..400).contains(&t)
+                || (6_000..6_100).contains(&t)
+                || (8_000..8_050).contains(&t);
+            let idle_for = idle_since.map_or(Duration::ZERO, |s| MS(t - s));
+            let since = closed_at.map(|c| MS(t - c));
+            match window_plan(want, false, window, idle_for, since) {
+                WindowPlan::Close => {
+                    window = false;
+                    idle_since = None;
+                    closed_at = Some(t);
+                }
+                WindowPlan::Park(_) => {
+                    idle_since.get_or_insert(t);
+                }
+                WindowPlan::Reuse => idle_since = None,
+                WindowPlan::Open => {
+                    if let Some(c) = closed_at {
+                        assert!(
+                            t - c >= TOAST_REOPEN_GAP.as_millis() as u64,
+                            "{t} after {c}"
+                        );
+                    }
+                    window = true;
+                    idle_since = None;
+                }
+                WindowPlan::WaitToOpen(_) | WindowPlan::Nothing => {}
+            }
         }
     }
 }

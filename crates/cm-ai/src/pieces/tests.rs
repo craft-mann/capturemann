@@ -770,3 +770,110 @@ fn another_audio_of_a_different_length_is_ignored() {
     let (_, report, _) = run_two(&e, &x, None);
     assert_eq!(report.other_audio, 0);
 }
+
+// ---- progress phases (reading, then checking) -----------------------------------------------
+
+/// The first reading of a long stretch comes back with broken words; a re-read of a window around
+/// them (short audio) is clean. Every read reports its own progress in quarters.
+struct BrokenThenClean;
+
+impl Transcriber for BrokenThenClean {
+    fn transcribe(
+        &self,
+        audio: Pcm16k<'_>,
+        _language: Option<&str>,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Transcript, CmError> {
+        for i in 0..=4 {
+            if !progress(i as f32 / 4.0) {
+                return Err(cancelled());
+            }
+        }
+        let long = audio.samples.len() > 20 * RATE;
+        let w = |text: &str, at: f64, conf: f32| Word {
+            text: text.into(),
+            start: audio.start + media_secs(at),
+            end: audio.start + media_secs(at + 0.3),
+            confidence: conf,
+        };
+        let words = if long {
+            vec![
+                w("\u{FFFD}\u{FFFD}", 2.0, 0.02),
+                w("\u{FFFD}", 2.5, 0.03),
+                w("ok", 10.0, 0.9),
+            ]
+        } else {
+            vec![w("hello", 1.5, 0.8)]
+        };
+        Ok(Transcript {
+            version: TRANSCRIPT_VERSION,
+            language: "en".into(),
+            model: "scripted".into(),
+            words,
+            note: None,
+            sounds: Vec::new(),
+            segments: Vec::new(),
+        })
+    }
+}
+
+fn tone(secs: f64) -> Vec<f32> {
+    (0..(secs * RATE as f64) as usize)
+        .map(|i| 0.2 * (i as f32 * 0.31).sin())
+        .collect()
+}
+
+/// The bar never goes back, reaches 1.0 only at the end, and the checks (the re-reads after the
+/// first reading) are reported as their own phase that moves, instead of sitting at 99 %.
+#[test]
+fn the_checks_after_the_first_reading_report_their_own_moving_phase() {
+    let x = tone(30.0);
+    let mut seen: Vec<(f32, Phase)> = Vec::new();
+    let audio = Pcm16k {
+        samples: &x,
+        start: MediaTime::ZERO,
+    };
+    transcribe_pieces(&BrokenThenClean, audio, Some("en"), None, &mut |p| {
+        seen.push((p, progress_phase()));
+        true
+    })
+    .unwrap();
+    assert!(seen.windows(2).all(|w| w[0].0 <= w[1].0), "{seen:?}");
+    let (last, rest) = seen.split_last().unwrap();
+    assert_eq!(last.0, 1.0);
+    assert!(rest.iter().all(|(p, _)| *p < 1.0), "{seen:?}");
+    // Phases come in order: reading, then checking, with the first reading under 90 %.
+    let first_check = seen
+        .iter()
+        .position(|(_, ph)| *ph == Phase::Checking)
+        .expect("a checking phase");
+    assert!(seen[..first_check]
+        .iter()
+        .all(|(p, ph)| *ph == Phase::Reading && *p <= 0.9 + 1e-6));
+    assert!(seen[first_check..seen.len() - 1]
+        .iter()
+        .all(|(_, ph)| *ph == Phase::Checking));
+    // The checking values move (several distinct values), all from 90 % on.
+    let mut checks: Vec<f32> = seen[first_check..seen.len() - 1]
+        .iter()
+        .map(|(p, _)| *p)
+        .collect();
+    assert!(checks.iter().all(|p| *p >= 0.9 - 1e-6), "{checks:?}");
+    checks.dedup();
+    assert!(checks.len() >= 3, "{checks:?}");
+}
+
+/// A cancel during the checks stops the run with the engine's own cancelled error.
+#[test]
+fn a_cancel_during_the_checks_still_stops_the_run() {
+    let x = tone(30.0);
+    let audio = Pcm16k {
+        samples: &x,
+        start: MediaTime::ZERO,
+    };
+    let err = transcribe_pieces(&BrokenThenClean, audio, Some("en"), None, &mut |_| {
+        progress_phase() != Phase::Checking
+    })
+    .unwrap_err();
+    assert_eq!(err.to_string(), cancelled().to_string());
+}

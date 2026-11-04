@@ -10,6 +10,7 @@ pub mod clock;
 pub mod dirs;
 pub mod memory;
 pub mod opener;
+pub mod priority;
 pub mod sleep;
 pub mod stack;
 pub mod trash;

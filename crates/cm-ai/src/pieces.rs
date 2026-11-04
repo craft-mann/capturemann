@@ -302,6 +302,38 @@ struct Job<'a, 'p> {
     gate_ev: Option<GateEvidence>,
     /// The segment numbers of the latest read only (a re-read is judged on its own).
     last_read_segs: Vec<crate::transcribe::SegmentStat>,
+    /// The piece in hand and where its checks stand, for the progress (see [`Phase`]).
+    steps: Steps,
+}
+
+/// Where the piece in hand stands, for the progress.
+#[derive(Default)]
+struct Steps {
+    piece: Range<usize>,
+    checking: bool,
+    total: usize,
+    done: usize,
+}
+
+/// What the progress callback is reporting right now: the first reading of a piece, or the checks
+/// after it (re-reads of broken or looping stretches and of gaps). The callback is a plain
+/// fraction, so the phase is read from [`progress_phase`] inside it (same thread).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Phase {
+    Reading,
+    Checking,
+}
+
+/// The share of a piece's progress that its first reading takes; the checks take the rest.
+const READ_SHARE: f32 = 0.9;
+
+thread_local! {
+    static PHASE: std::cell::Cell<Phase> = const { std::cell::Cell::new(Phase::Reading) };
+}
+
+/// The phase of the progress value just reported to the callback of this thread's run.
+pub fn progress_phase() -> Phase {
+    PHASE.with(std::cell::Cell::get)
 }
 
 /// The gate's evidence for one piece (seconds relative to the piece).
@@ -320,9 +352,36 @@ impl Job<'_, '_> {
     /// Progress over the whole audio, never going back (a piece run again starts from its start).
     fn tick(&mut self, at_sample: usize, within: f32, len: usize) -> bool {
         let total = self.samples.len().max(1) as f32;
-        let p = ((at_sample as f32 + within.clamp(0.0, 1.0) * len as f32) / total).min(0.999);
+        let within = within.clamp(0.0, 1.0);
+        let (piece, checking) = (&self.steps.piece, self.steps.checking);
+        let p = if piece.is_empty() {
+            (at_sample as f32 + within * len as f32) / total
+        } else if checking {
+            // The checks: the share of the re-reads done, over the last tenth of the piece.
+            let done = (self.steps.done as f32 + within) / self.steps.total.max(1) as f32;
+            let frac = READ_SHARE + (1.0 - READ_SHARE) * done.min(1.0);
+            (piece.start as f32 + frac * piece.len() as f32) / total
+        } else {
+            // The first reading: the first nine tenths of the piece.
+            let at = (at_sample as f32 + within * len as f32)
+                .clamp(piece.start as f32, piece.end as f32);
+            (piece.start as f32 + READ_SHARE * (at - piece.start as f32)) / total
+        }
+        .min(0.999);
+        PHASE.with(|c| {
+            c.set(if checking {
+                Phase::Checking
+            } else {
+                Phase::Reading
+            })
+        });
         self.high = self.high.max(p);
         (self.progress)(self.high)
+    }
+
+    /// `n` re-reads are about to be made by a check (they are counted as they finish).
+    fn begin_checks(&mut self, n: usize) {
+        self.steps.total += n;
     }
 
     /// The other audio, made the first time it is asked for. It must be as long as the main audio
@@ -356,6 +415,9 @@ impl Job<'_, '_> {
                 self.tick(from, p, len)
             });
         self.other_samples = other_samples;
+        if self.steps.checking {
+            self.steps.done += 1;
+        }
         // A cancel arrives as the engine's own `cancelled` error and is passed on as it is.
         let t = result?;
         self.segs.extend(t.segments.iter().cloned());
@@ -378,9 +440,14 @@ impl Job<'_, '_> {
     fn piece(&mut self, range: Range<usize>, depth: usize) -> Result<Vec<Word>, CmError> {
         if depth == 0 {
             self.segs.clear();
+            self.steps = Steps {
+                piece: range.clone(),
+                ..Steps::default()
+            };
         }
         let words = self.piece_inner(range.clone(), depth)?;
         if depth == 0 {
+            self.steps.checking = true;
             let gated = self.gate_marks(&words, &range);
             let words = self.repair(words, range.clone(), gated)?;
             return self.fill_gaps(words, range);
@@ -619,6 +686,7 @@ impl Job<'_, '_> {
                 _ => windows.push((a, b)),
             }
         }
+        self.begin_checks(windows.len());
         let mut out: Vec<Word> = Vec::new();
         let mut taken = 0;
         for (a, b) in windows {
@@ -813,6 +881,7 @@ impl Job<'_, '_> {
             }
             gaps.extend(uncovered(&inside, ra, rb));
         }
+        self.begin_checks(gaps.len().min(MAX_GAP_READS) + sparse.len().min(MAX_GAP_READS));
         let mut added: Vec<Word> = Vec::new();
         for (a, b) in gaps.into_iter().take(MAX_GAP_READS) {
             let (sa, sb) = (samples_of(a), samples_of(b).min(range.end));
@@ -982,6 +1051,7 @@ pub fn transcribe_pieces_resumable<'p>(
         segs: Vec::new(),
         gate_ev: None,
         last_read_segs: Vec::new(),
+        steps: Steps::default(),
     };
     let mut words = Vec::new();
     let mut start = 0;
@@ -1032,6 +1102,8 @@ pub fn transcribe_pieces_resumable<'p>(
         }
     }
     // Every piece is done: the bar was held under 1.0 until now.
+    job.steps.checking = false;
+    PHASE.with(|c| c.set(Phase::Reading));
     let _ = (job.progress)(1.0);
     cm_core::perf::finish("transcribe");
     let mut report = job.report;
