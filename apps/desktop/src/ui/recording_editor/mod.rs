@@ -200,6 +200,48 @@ struct Loaded {
     revision: u64,
     /// An imported file (IMP-5): the source line and where the original is.
     imported: Option<Imported>,
+    /// How long each stage of the load took (logged when the whole open took over a second).
+    stages: LoadStages,
+}
+
+/// A load that takes longer than this is written to the log, with its slowest stage named.
+const SLOW_LOAD: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// The time of each stage of opening a recording in the editor, so a hang on `Loading...` can be
+/// diagnosed from the log. Every stage is also a `cm_core::perf` phase of the run `editor_load`
+/// (Copy diagnostics).
+#[derive(Default)]
+pub(crate) struct LoadStages(Vec<(&'static str, f64)>);
+
+impl LoadStages {
+    /// Runs `f` as the stage `name`.
+    pub(crate) fn time<T>(&mut self, name: &'static str, f: impl FnOnce() -> T) -> T {
+        let _span = cm_core::perf::span("editor_load", name);
+        let start = std::time::Instant::now();
+        let out = f();
+        self.0.push((name, start.elapsed().as_secs_f64()));
+        out
+    }
+
+    pub(crate) fn total(&self) -> f64 {
+        self.0.iter().map(|(_, s)| s).sum()
+    }
+
+    /// The one line for a load that took over [`SLOW_LOAD`]: the total, the slowest stage first.
+    pub(crate) fn slow_line(&self, id: &str) -> Option<String> {
+        let total = self.total();
+        if total <= SLOW_LOAD.as_secs_f64() {
+            return None;
+        }
+        let mut by_time = self.0.clone();
+        by_time.sort_by(|a, b| b.1.total_cmp(&a.1));
+        let (slowest, secs) = by_time.first().copied()?;
+        let all: Vec<String> = by_time.iter().map(|(n, s)| format!("{n} {s:.2}")).collect();
+        Some(format!(
+            "editor load of {id} took {total:.1} s; slowest stage: {slowest} ({secs:.1} s); stages (s): {}",
+            all.join(", ")
+        ))
+    }
 }
 
 /// What the editor shows about an imported capture (board I4).
@@ -244,10 +286,15 @@ pub struct RecordingEditor {
 const WAVE_PER_SEC: u32 = 20;
 
 fn load_blocking(root: Option<PathBuf>, id: &str) -> Result<Loaded, files::FileError> {
+    let mut st = LoadStages::default();
+    cm_core::perf::begin("editor_load");
     let root = root.ok_or(files::FileError::NoLibrary)?;
-    let dir = files::find_bundle(&root, id)
+    let dir = st
+        .time("find_bundle", || files::find_bundle(&root, id))
         .ok_or_else(|| files::FileError::RecordingNotFound(id.to_owned()))?;
-    let m = cm_library::read_manifest(&dir).map_err(|e| files::FileError::Detail(e.to_string()))?;
+    let m = st
+        .time("read_manifest", || cm_library::read_manifest(&dir))
+        .map_err(|e| files::FileError::Detail(e.to_string()))?;
     let basis = Basis {
         end: cm_library::rec_edit::session_end(&m),
         live_at: cm_library::rec_edit::live_at(&m),
@@ -276,7 +323,7 @@ fn load_blocking(root: Option<PathBuf>, id: &str) -> Result<Loaded, files::FileE
             .and_then(|s| s.get("fps"))
             .and_then(serde_json::Value::as_f64),
     );
-    let voice = VoiceData::read(&dir, &m);
+    let voice = st.time("voice_data", || VoiceData::read(&dir, &m));
     // An audio recording has no screen row: its lanes are drawn by the audio view.
     let mut rows = if voice.audio {
         Vec::new()
@@ -305,7 +352,7 @@ fn load_blocking(root: Option<PathBuf>, id: &str) -> Result<Loaded, files::FileE
             });
         }
     }
-    let details = files::read_details(&dir)?;
+    let details = st.time("read_details", || files::read_details(&dir))?;
     // An audio recording shows no picture: the test pattern stands in and is never drawn.
     let (source, note) = if voice.audio {
         (
@@ -313,7 +360,7 @@ fn load_blocking(root: Option<PathBuf>, id: &str) -> Result<Loaded, files::FileE
             None,
         )
     } else {
-        source::open(&dir, &m)
+        st.time("source_open", || source::open(&dir, &m))
     };
     // Where the cursor track is and how the recorded area maps to the picture (EDT-4, EDT-5).
     let screen_info = serde_json::to_value(&m)
@@ -333,7 +380,7 @@ fn load_blocking(root: Option<PathBuf>, id: &str) -> Result<Loaded, files::FileE
         (None, None)
     } else {
         match cm_media::tools::locate() {
-            Ok(tools) => match AudioBank::load(&tools.ffmpeg, &files) {
+            Ok(tools) => match st.time("audio_bank", || AudioBank::load(&tools.ffmpeg, &files)) {
                 Ok(bank) => (Some(bank), None),
                 Err(e) => (None, Some(tr!("No sound in the preview: {e}", e = e))),
             },
@@ -343,7 +390,7 @@ fn load_blocking(root: Option<PathBuf>, id: &str) -> Result<Loaded, files::FileE
             ),
         }
     };
-    let waves = match (&audio, voice.audio) {
+    let waves = st.time("waves", || match (&audio, voice.audio) {
         (Some(bank), true) => [
             (RowKind::Mic, cm_media::edit_plan::AudioKind::Mic),
             (RowKind::System, cm_media::edit_plan::AudioKind::System),
@@ -355,7 +402,7 @@ fn load_blocking(root: Option<PathBuf>, id: &str) -> Result<Loaded, files::FileE
         })
         .collect(),
         _ => Vec::new(),
-    };
+    });
     let imported = serde_json::to_value(&m).ok().and_then(|v| {
         let line = crate::import_flow::source_line(&v)?;
         let file = v["source"]["original_file"].as_str().unwrap_or_default();
@@ -383,6 +430,7 @@ fn load_blocking(root: Option<PathBuf>, id: &str) -> Result<Loaded, files::FileE
         source,
         view_ctx,
         note,
+        stages: st,
     })
 }
 
@@ -813,7 +861,7 @@ impl RecordingEditor {
 }
 
 impl Session {
-    fn new(id: &str, l: Loaded) -> Session {
+    fn new(id: &str, mut l: Loaded) -> Session {
         let end = l.basis.end;
         let cursor_separate = l.view_ctx.cursor_separate;
         let view = Arc::new(ViewSpec {
@@ -822,12 +870,19 @@ impl Session {
             aspect: crate::recedit::PreviewAspect::default(),
         });
         let (audio, audio_note) = match l.audio {
-            Some(bank) => match AudioEngine::open(bank, l.basis.gaps.clone()) {
+            Some(bank) => match l.stages.time("audio_engine_open", || {
+                AudioEngine::open(bank, l.basis.gaps.clone())
+            }) {
                 Ok(a) => (Some(a), None),
                 Err(e) => (None, Some(tr!("No sound in the preview: {e}", e = e))),
             },
             None => (None, l.audio_note),
         };
+        let stages = l.stages;
+        cm_core::perf::finish("editor_load");
+        if let Some(line) = stages.slow_line(id) {
+            log::info!("{line}");
+        }
         Session {
             imported: l.imported,
             voice: l.voice,
@@ -1093,5 +1148,51 @@ mod tests {
         sorted.dedup();
         assert_eq!(sorted.len(), a.len());
         assert!(a[0].starts_with("ui-edit-"));
+    }
+}
+
+#[cfg(test)]
+mod load_stage_tests {
+    use super::LoadStages;
+
+    #[test]
+    fn a_fast_load_writes_no_line() {
+        let mut st = LoadStages::default();
+        assert_eq!(st.time("find_bundle", || 7), 7);
+        st.time("waves", || ());
+        assert!(st.slow_line("rec_1").is_none());
+    }
+
+    /// A load over a second is one line that names the slowest stage first.
+    #[test]
+    fn a_slow_load_names_the_slowest_stage() {
+        let st = LoadStages(vec![
+            ("find_bundle", 0.2),
+            ("audio_bank", 2.5),
+            ("audio_engine_open", 0.4),
+        ]);
+        let line = st.slow_line("rec_9").unwrap();
+        assert!(
+            line.contains("rec_9") && line.contains("took 3.1 s"),
+            "{line}"
+        );
+        assert!(line.contains("slowest stage: audio_bank (2.5 s)"), "{line}");
+        assert!(
+            line.find("audio_bank 2.50").unwrap() < line.find("find_bundle 0.20").unwrap(),
+            "{line}"
+        );
+    }
+
+    /// Each stage is also a phase of the `editor_load` run for the diagnostics report.
+    #[test]
+    fn stages_are_perf_phases() {
+        cm_core::perf::begin("editor_load");
+        let mut st = LoadStages::default();
+        st.time("read_manifest", || ());
+        let r = cm_core::perf::records()
+            .into_iter()
+            .find(|r| r.run == "editor_load")
+            .unwrap();
+        assert!(r.phases.iter().any(|p| p.name == "read_manifest"));
     }
 }

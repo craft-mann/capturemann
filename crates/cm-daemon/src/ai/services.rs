@@ -54,6 +54,9 @@ pub struct TranscribeRequest {
     /// The decoder options of the transcription review (settings `ai.lift_quiet_input`,
     /// `ai.hallucination_gate`, `ai.vad_opinion`, `ai.carry_previous_text`).
     pub pipeline: cm_ai::pipeline::PipelineSettings,
+    /// Setting `ai.background_priority` (default on): the job runs at a lower scheduling class and
+    /// leaves cores free for the app's windows (`cm_platform::priority`).
+    pub background: bool,
 }
 
 /// The speech-model store (`cm_ai::model`). Blocking: the daemon calls it off the async threads.

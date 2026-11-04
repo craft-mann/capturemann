@@ -190,6 +190,7 @@ impl LiveTranscription {
             segs: Vec::new(),
             gate_ev: None,
             last_read_segs: Vec::new(),
+            steps: Default::default(),
         };
         let r = job.piece(range, 0);
         // Give the state back whether the piece finished or was stopped.
@@ -228,6 +229,7 @@ impl LiveTranscription {
             segs: Vec::new(),
             gate_ev: None,
             last_read_segs: Vec::new(),
+            steps: Default::default(),
         };
         // Further cuts while more than one and a half pieces remain, then the tail as one piece.
         let mut from = self.from;

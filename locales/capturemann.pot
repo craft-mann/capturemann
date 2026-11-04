@@ -4381,6 +4381,9 @@ msgstr ""
 msgid "Stop recording"
 msgstr ""
 
+msgid "Stopping background work…"
+msgstr ""
+
 msgid "Stops by itself after {duration}"
 msgstr ""
 
@@ -5274,6 +5277,9 @@ msgid "Undo and zoom"
 msgstr ""
 
 msgid "Undo brings it back."
+msgstr ""
+
+msgid "Unfinished jobs go on the next time CaptureMann opens."
 msgstr ""
 
 msgid "Unknown clients are blocked"

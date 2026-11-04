@@ -185,6 +185,11 @@ pub struct AppModel {
     toast_fit: f32,
     confirm_windows: Vec<(String, WindowHandle<ConfirmDialog>)>,
     toast_timer: Option<Task<()>>,
+    /// When the toast window was parked (its stack emptied), and when one was last closed
+    /// (`toasts::window_plan`), and the timer that looks at the window again.
+    toast_idle_since: Option<Instant>,
+    toast_closed_at: Option<Instant>,
+    toast_window_timer: Option<Task<()>>,
 }
 
 impl Global for ThemeGlobal {}
@@ -294,6 +299,9 @@ impl AppModel {
             toast_fit: 0.,
             confirm_windows: Vec::new(),
             toast_timer: None,
+            toast_idle_since: None,
+            toast_closed_at: None,
+            toast_window_timer: None,
         }
     }
 }

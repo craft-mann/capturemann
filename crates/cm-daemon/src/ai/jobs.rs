@@ -225,6 +225,17 @@ pub(super) struct TranscribeHandler {
 
 /// `ai.languages` as the `language` of a run: codes joined by commas (`vi,en`), or `None` when it
 /// is unset, empty or unusable (the codes are checked when the run starts).
+/// Setting `ai.background_priority`: long AI jobs run at a lower priority (default on; `false`
+/// turns it off, anything else leaves it on).
+pub(super) const SETTING_BACKGROUND_PRIORITY: &str = "ai.background_priority";
+
+pub(super) fn background_priority(settings: Option<&serde_json::Map<String, Value>>) -> bool {
+    settings
+        .and_then(|m| m.get(SETTING_BACKGROUND_PRIORITY))
+        .and_then(Value::as_bool)
+        .unwrap_or(true)
+}
+
 pub(super) fn languages_setting(
     settings: Option<&serde_json::Map<String, Value>>,
 ) -> Option<String> {
@@ -309,10 +320,12 @@ impl JobHandler for TranscribeHandler {
                 Default::default,
                 cm_ai::pipeline::PipelineSettings::from_settings,
             ),
+            background: background_priority(self.settings.all().ok().as_ref()),
         };
         let (service, reporter, run_flag) = (self.service.clone(), ctx.reporter.clone(), flag);
         let saver = reporter.clone();
         let joined = tokio::task::spawn_blocking(move || {
+            let _low = cm_platform::priority::lower_current_thread(req.background);
             let mut last = -1.0_f32;
             service.transcribe_resumable(
                 &req,
@@ -323,9 +336,15 @@ impl JobHandler for TranscribeHandler {
                 &mut |p| {
                     if p >= 1.0 || p - last >= 0.01 {
                         last = p;
+                        // After the first reading of a piece the job re-reads suspect stretches;
+                        // the bar moves through that too (see `cm_ai::pieces::Phase`).
+                        let what = match cm_ai::pieces::progress_phase() {
+                            cm_ai::pieces::Phase::Reading => "Transcribing",
+                            cm_ai::pieces::Phase::Checking => "Checking the transcript",
+                        };
                         reporter.report(
                             f64::from(p),
-                            Some(format!("Transcribing {}%", (p * 100.0) as u32)),
+                            Some(format!("{what} {}%", (p * 100.0) as u32)),
                         );
                     }
                     !run_flag.load(Ordering::SeqCst)

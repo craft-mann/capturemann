@@ -232,6 +232,10 @@ impl TranscribeService for RealTranscribe {
             Some(e) => e.as_ref(),
             None => {
                 let mut w = WhisperTranscriber::load(&path, &id, true)?;
+                if req.background {
+                    // Cores left for the app's own windows (the GPU does the heavy part).
+                    w = w.with_threads(cm_platform::priority::job_threads());
+                }
                 if !req.pipeline.carry_previous_text {
                     w = w.with_n_max_text_ctx(0);
                 }

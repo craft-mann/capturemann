@@ -18,6 +18,12 @@ pub struct Normalize {
     pub target_db: f64,
     /// The most gain applied (dB).
     pub max_gain_db: f64,
+    /// The largest sample is never lifted past this level (dBFS).
+    pub peak_limit_db: f64,
+    /// Audio is lifted only when its largest sample has at least this much room (dB) below the
+    /// peak limit: a signal that already reaches near full scale is loud, not quiet, however low
+    /// its average is (a meeting with sparse loud voices), and a small lift only perturbs the decode.
+    pub min_headroom_db: f64,
     /// A first-order high-pass at this frequency before the lift (Hz), if any.
     pub high_pass_hz: Option<f32>,
 }
@@ -28,6 +34,8 @@ impl Default for Normalize {
             below_db: -26.0,
             target_db: -20.0,
             max_gain_db: 15.0,
+            peak_limit_db: -1.0,
+            min_headroom_db: 12.0,
             high_pass_hz: None,
         }
     }
@@ -109,8 +117,10 @@ impl Configured<'_> {
         if let Some(hz) = n.high_pass_hz {
             levels::high_pass(&mut v, hz);
         }
-        if levels::db(levels::rms_over(&v, &[])) < n.below_db {
-            levels::normalize_rms_capped(&mut v, n.target_db, n.max_gain_db);
+        let peak = v.iter().fold(0.0f32, |m, s| m.max(s.abs()));
+        let headroom = n.peak_limit_db - levels::db(f64::from(peak));
+        if levels::db(levels::rms_over(&v, &[])) < n.below_db && headroom >= n.min_headroom_db {
+            levels::normalize_rms_capped_peak(&mut v, n.target_db, n.max_gain_db, n.peak_limit_db);
         }
         Some(v)
     }
@@ -219,6 +229,66 @@ mod tests {
             PipelineSettings::from_settings(&m),
             PipelineSettings::all_off()
         );
+    }
+
+    #[test]
+    fn a_low_rms_signal_with_a_loud_peak_is_not_lifted() {
+        let engine = Level(Mutex::new(Vec::new()));
+        let c = Configured {
+            inner: &engine,
+            vad: None,
+            gate: None,
+            normalize: Some(Normalize::default()),
+        };
+        // Quiet tone (about -34 dBFS RMS) with one loud click at -4 dBFS: 3 dB of headroom, less than
+        // the 12 dB a really quiet recording leaves, so it is left alone.
+        let mut x = tone(-34.0, 2);
+        x[100] = 10f32.powf(-4.0 / 20.0);
+        let before = levels::db(levels::rms_over(&x, &[]));
+        c.transcribe(
+            Pcm16k {
+                samples: &x,
+                start: MediaTime::ZERO,
+            },
+            None,
+            &mut |_| true,
+        )
+        .unwrap();
+        let seen = engine.0.lock().unwrap().clone();
+        assert!((seen[0] - before).abs() < 0.05, "{seen:?}");
+        // A click at -16 dBFS leaves 15 dB: lifted, but never past the peak limit.
+        let mut z = tone(-34.0, 2);
+        z[100] = 10f32.powf(-16.0 / 20.0);
+        let before_z = levels::db(levels::rms_over(&z, &[]));
+        c.transcribe(
+            Pcm16k {
+                samples: &z,
+                start: MediaTime::ZERO,
+            },
+            None,
+            &mut |_| true,
+        )
+        .unwrap();
+        let seen = engine.0.lock().unwrap().clone();
+        assert!(
+            seen[1] - before_z > 5.0 && seen[1] - before_z <= 15.05,
+            "{seen:?}"
+        );
+        // No headroom at all: left alone.
+        let mut y = tone(-34.0, 2);
+        y[100] = 1.0;
+        let before = levels::db(levels::rms_over(&y, &[]));
+        c.transcribe(
+            Pcm16k {
+                samples: &y,
+                start: MediaTime::ZERO,
+            },
+            None,
+            &mut |_| true,
+        )
+        .unwrap();
+        let seen = engine.0.lock().unwrap().clone();
+        assert!((seen[2] - before).abs() < 0.05, "{seen:?}");
     }
 
     #[test]
