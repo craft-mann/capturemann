@@ -192,7 +192,9 @@ fn open() -> Result<Opened, CmError> {
             },
         },
     };
-    let prop = PROPVARIANT {
+    // Never dropped: `PROPVARIANT`'s drop would free the blob, which lives on this stack (heap corruption,
+    // 0xC0000374, in the first version).
+    let prop = std::mem::ManuallyDrop::new(PROPVARIANT {
         Anonymous: PROPVARIANT_0 {
             Anonymous: std::mem::ManuallyDrop::new(PROPVARIANT_0_0 {
                 vt: VT_BLOB,
@@ -207,7 +209,7 @@ fn open() -> Result<Opened, CmError> {
                 },
             }),
         },
-    };
+    });
     // SAFETY: an auto-reset event handle owned by this function until `Opened` takes it.
     let done = unsafe { CreateEventW(None, false, false, None) }.map_err(|e| err("event", e))?;
     let handler: IActivateAudioInterfaceCompletionHandler = Done(done).into();
@@ -217,7 +219,7 @@ fn open() -> Result<Opened, CmError> {
         ActivateAudioInterfaceAsync(
             w!("VAD\\Process_Loopback"),
             &IAudioClient::IID,
-            Some(&prop),
+            Some(&*prop),
             &handler,
         )
     }
