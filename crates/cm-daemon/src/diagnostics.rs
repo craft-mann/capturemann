@@ -219,17 +219,44 @@ fn app_lines() -> Vec<String> {
     ]
 }
 
+/// What the report says about a helper program that was not found. The error text of the lookups promises
+/// that releases include their own copy; that is true of the macOS build and not of every build, so the
+/// report says where the program was looked for and whether this build ships one.
+fn missing_helper_line(name: &str, ships_it: bool, beside: Option<&Path>) -> String {
+    let place = beside.map_or_else(String::new, |d| format!(" next to {},", d.display()));
+    if ships_it {
+        format!("{name} not found: looked{place} in the settings and on PATH; this build should include it")
+    } else {
+        format!("{name} not found: looked{place} in the settings and on PATH; this build does not include one")
+    }
+}
+
+/// Whether the official build for this system puts the helper next to the executable. The Windows early
+/// build ships neither FFmpeg nor `llama-server` yet (release 0.2.8 plan, tasks 3 and 5).
+const SHIPS_HELPERS: bool = cfg!(not(windows));
+
 fn engine_lines() -> Vec<String> {
     let mut out = Vec::new();
+    let beside = std::env::current_exe()
+        .ok()
+        .and_then(|e| e.parent().map(Path::to_path_buf));
     match cm_media::tools::locate() {
         Ok(t) => out.push(format!("ffmpeg at {}", t.ffmpeg.display())),
-        Err(e) => out.push(format!("ffmpeg not found: {e}")),
+        Err(_) => out.push(missing_helper_line(
+            "ffmpeg",
+            SHIPS_HELPERS,
+            beside.as_deref(),
+        )),
     }
     match cm_ai::text_model::engine::locate_helper(
         &cm_ai::text_model::engine::SearchPaths::from_env(),
     ) {
         Ok(p) => out.push(format!("llama-server at {}", p.display())),
-        Err(e) => out.push(format!("llama-server not found: {e}")),
+        Err(_) => out.push(missing_helper_line(
+            "llama-server",
+            SHIPS_HELPERS,
+            beside.as_deref(),
+        )),
     }
     out.push(cm_render::ocr::describe_system());
     out.push(format!(
@@ -370,6 +397,16 @@ fn final_pass(s: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_missing_helper_says_where_it_looked_and_whether_the_build_ships_one() {
+        let dir = Path::new("/app");
+        let shipped = missing_helper_line("ffmpeg", true, Some(dir));
+        assert!(shipped.contains("next to /app") && shipped.contains("should include it"));
+        let not_shipped = missing_helper_line("llama-server", false, None);
+        assert!(not_shipped.contains("does not include one") && !not_shipped.contains("next to"));
+        assert!(!not_shipped.contains("releases include"));
+    }
+
     use super::*;
 
     #[test]
