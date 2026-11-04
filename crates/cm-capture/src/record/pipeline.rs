@@ -223,6 +223,8 @@ pub struct Pipeline<E: VideoEncoder> {
     summary: Option<WriterSummary>,
     /// The source has delivered at least one idle status sample.
     reports_idle: bool,
+    /// The source sends frames only when the picture changes (see `set_event_driven`).
+    event_driven: bool,
     /// The last delivery was an idle sample (not a frame).
     last_was_idle: bool,
     /// A stall is being reported; ends with the next delivery.
@@ -240,6 +242,11 @@ fn round_div(a: i64, b: i64) -> i64 {
 }
 
 impl<E: VideoEncoder> Pipeline<E> {
+    /// The source sends frames only on change: gaps between frames are not missed slots.
+    pub fn set_event_driven(&mut self, on: bool) {
+        self.event_driven = on;
+    }
+
     pub fn new(enc: E, fps: u32) -> Self {
         let interval = TICKS_PER_SECOND / i64::from(fps.max(1));
         Pipeline {
@@ -257,6 +264,7 @@ impl<E: VideoEncoder> Pipeline<E> {
             closed: false,
             summary: None,
             reports_idle: false,
+            event_driven: false,
             last_was_idle: false,
             stall_open: false,
             stall_closed_ms: 0,
@@ -349,6 +357,7 @@ impl<E: VideoEncoder> Pipeline<E> {
             // Only a frame after a frame can show a stall: an idle sample in between means the
             // source was alive and the screen unchanged.
             let counts = !idle
+                && !self.event_driven
                 && !self.last_was_idle
                 && gap * 2 > self.interval * 3
                 && (gap < STATIC_GAP_TICKS || self.reports_idle);
@@ -776,6 +785,21 @@ mod tests {
         assert!(p.stats().lag_late >= 1);
         assert!(p.late_pct() > 0.0);
         assert!(p.recent_late_pct(at(3000)) > 2.0);
+    }
+
+    /// A source that sends frames only on change (Windows.Graphics.Capture): a picture that changes 16 times
+    /// a second leaves gaps that are not missed delivery slots, and the slots are still filled by repeats.
+    #[test]
+    fn an_event_driven_source_has_no_missed_slots_for_a_slowly_changing_picture() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut p, _log) = pipeline(30, dir.path());
+        p.set_event_driven(true);
+        for i in 0..160 {
+            frame(&mut p, i * 62, i as u64); // a frame every 62 ms (about 16 fps)
+        }
+        assert_eq!(p.stats().missed_slots, 0, "{:?}", p.stats());
+        assert!(p.stats().repeated > 0, "{:?}", p.stats());
+        assert!(p.late_pct() < 2.0, "{}", p.late_pct());
     }
 
     /// R3-7: once the source reports idle samples, a long silence with none in it is a stall:

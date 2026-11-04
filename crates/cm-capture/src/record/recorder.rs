@@ -366,8 +366,10 @@ impl<S: ScreenSource, E: VideoEncoder<Frame = S::Frame>> TrackRecorder for Scree
             }
         };
         let bitrate = self.plan.video.bitrate_bps;
+        let mut pipeline = Pipeline::new(enc, self.plan.video.fps);
+        pipeline.set_event_driven(self.source.delivers_only_on_change());
         let shared = Arc::new(Shared {
-            pipeline: Mutex::new(Pipeline::new(enc, self.plan.video.fps)),
+            pipeline: Mutex::new(pipeline),
             clock: ctx.clock.clone(),
             started: call,
             first_frame_ms: Mutex::new(None),

@@ -76,6 +76,10 @@ impl ScreenSource for WgcSource {
         Ok(())
     }
 
+    fn delivers_only_on_change(&self) -> bool {
+        true
+    }
+
     fn stop(&mut self) {
         if let Some(mut c) = self.capture.take() {
             c.stop();

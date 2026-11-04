@@ -51,6 +51,15 @@ pub trait ScreenSource: Send + 'static {
     /// Starts delivering frames for `plan` to `sink`. Returns once the stream is running.
     fn start(&mut self, plan: &CapturePlan, sink: EventSink<Self::Frame>) -> Result<(), CmError>;
 
+    /// Whether the source sends a frame only when the picture changes and says nothing otherwise
+    /// (Windows.Graphics.Capture). Gaps between its frames are then normal, not missed delivery
+    /// slots: a video at 24 fps, or a clock that ticks 16 times a second, must not count as late
+    /// (the lab laptop recorded 54 % "late" frames and a `screen_degraded` warning with a ticking
+    /// clock on the screen). The slot grid still repeats the last frame to keep the rate constant.
+    fn delivers_only_on_change(&self) -> bool {
+        false
+    }
+
     /// Stops delivering. After this returns no more events reach the sink.
     fn stop(&mut self);
 }
