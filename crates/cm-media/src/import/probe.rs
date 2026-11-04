@@ -699,7 +699,7 @@ mod tests {
     #[test]
     fn open_errors_map_to_the_shared_codes() {
         let eperm = std::io::Error::from_raw_os_error(1);
-        match map_open_error(Path::new("/Users/x/Desktop/a.mov"), &eperm) {
+        match map_open_error_on(false, Path::new("/Users/x/Desktop/a.mov"), &eperm) {
             ProbeError::Permission { path, message } => {
                 assert!(path.ends_with("a.mov"));
                 assert!(message.contains("Files and Folders"), "{message}");
