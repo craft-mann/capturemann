@@ -2,7 +2,8 @@
 //! prebuilt archive at build time and unpacked it; this one never touches the network and
 //! unpacks nothing. It links the static sherpa-onnx and ONNX Runtime libraries found in the
 //! directory named by `SHERPA_ONNX_LIB_DIR` (in this repository: `packaging/sherpa/out/lib`,
-//! made by `make sherpa`, which `.cargo/config.toml` points the variable at).
+//! made by `make sherpa` on macOS and Linux and by `packaging/sherpa/fetch-windows.ps1` on Windows, which
+//! `.cargo/config.toml` points the variable at).
 
 use std::env;
 use std::path::PathBuf;
@@ -30,26 +31,42 @@ fn main() {
         fail(
             "SHERPA_ONNX_LIB_DIR is not set. The speaker engine (sherpa-onnx) links prebuilt \
              static libraries and this build never downloads them. Run `make sherpa` once \
-             (packaging/sherpa/fetch-macos.sh, pinned and checksummed), or point \
+             (packaging/sherpa/fetch-macos.sh, fetch-linux.sh or, on Windows, fetch-windows.ps1; \
+             pinned and checksummed), or point \
              SHERPA_ONNX_LIB_DIR at the `lib` folder of a sherpa-onnx v2.0.1 static-lib archive. \
              To build without the speaker engine, use `--no-default-features`.",
         );
     };
     let dir = PathBuf::from(dir);
+    // MSVC static libraries are `name.lib`; the Unix ones are `libname.a`.
+    let windows = env::var("CARGO_CFG_TARGET_OS").is_ok_and(|os| os == "windows");
+    let file_name = |l: &str| {
+        if windows {
+            format!("{l}.lib")
+        } else {
+            format!("lib{l}.a")
+        }
+    };
+    let fetch_hint = if windows {
+        "Run packaging\\sherpa\\fetch-windows.ps1 (-Crt md for a plain cargo build, the default mt for \
+         the +crt-static package build)"
+    } else {
+        "Run `make sherpa`"
+    };
     if !dir.is_dir() {
         fail(&format!(
-            "SHERPA_ONNX_LIB_DIR is not a directory: {}. Run `make sherpa` to create it.",
+            "SHERPA_ONNX_LIB_DIR is not a directory: {}. {fetch_hint} to create it.",
             dir.display()
         ));
     }
     let missing: Vec<String> = STATIC_LIBS
         .iter()
-        .filter(|l| !dir.join(format!("lib{l}.a")).is_file())
-        .map(|l| format!("lib{l}.a"))
+        .filter(|l| !dir.join(file_name(l)).is_file())
+        .map(|l| file_name(l))
         .collect();
     if !missing.is_empty() {
         fail(&format!(
-            "{} does not hold the sherpa-onnx static libraries (missing: {}). Run `make sherpa`, \
+            "{} does not hold the sherpa-onnx static libraries (missing: {}). {fetch_hint}, \
              or use the `lib` folder of the v2.0.1 static-lib archive for this platform.",
             dir.display(),
             missing.join(", ")
@@ -70,6 +87,14 @@ fn main() {
         "macos" => {
             println!("cargo:rustc-link-lib=dylib=c++");
             println!("cargo:rustc-link-lib=framework=Foundation");
+        }
+        "windows" => {
+            // The MSVC runtime comes in through the static libraries' own directives; these are the
+            // system libraries ONNX Runtime may reference (unresolved symbols at link time say if
+            // one more is needed; not yet linked on a Windows machine).
+            for l in ["advapi32", "shlwapi", "ole32"] {
+                println!("cargo:rustc-link-lib=dylib={l}");
+            }
         }
         _ => {}
     }
