@@ -5,7 +5,7 @@
 //!   [--language <code>]`
 //!
 //! A `.json` hypothesis is a transcript (`words[].text`, `start`/`end` in ticks, `sounds`);
-//! `--until` keeps the words that start before that many seconds (the first 5 minutes of a longer
+//! `--from`/`--until` keep the words that start in that window of seconds (the first 5 minutes of a longer
 //! file). `--speech` is a list of `[start, end]` seconds with speech: words more than half a
 //! second away from all of them are counted as outside speech, and the share of the speech with
 //! words is the coverage.
@@ -29,6 +29,9 @@ fn main() {
     let until: f64 = option(&args, "--until")
         .and_then(|v| v.parse().ok())
         .unwrap_or(f64::MAX);
+    let from: f64 = option(&args, "--from")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0.0);
     let ticks = cm_core::TICKS_PER_SECOND as f64;
     let (words, sounds): (Vec<Word>, usize) = if path.ends_with(".json") {
         let v: Value = serde_json::from_str(&raw).expect("json");
@@ -36,7 +39,10 @@ fn main() {
         let sounds = v["sounds"].as_array().map_or(0, Vec::len);
         (
             all.into_iter()
-                .filter(|w| w.start.ticks() as f64 / ticks < until)
+                .filter(|w| {
+                    let t = w.start.ticks() as f64 / ticks;
+                    t >= from && t < until
+                })
                 .collect(),
             sounds,
         )

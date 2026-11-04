@@ -7,6 +7,7 @@ transcripts stay under --out, never in the repository.
   compare_releases.py run   --out DIR --rows ROWS.json [--only name,name] [--only-model turbo]
   compare_releases.py table --out DIR --rows ROWS.json
 
+A row with "decode_as": "<other row>" reuses that row's transcripts and only scores a window of them ("from"/"until" seconds).
 ROWS.json: {"models": {"turbo": ["large-v3-turbo", "/path/ggml-large-v3-turbo.bin"], ...},
  "bins": {"026": "/path/bench026", "027": "/path/asr_bench", "rescore": "/path/rescore"},
  "rows": [{"name": "..", "audio": "..wav", "reference": "..txt" or null, "language": "vi",
@@ -22,12 +23,13 @@ def sh(cmd, lock=True):
 
 def paths(out, row, rel, model):
     d = os.path.join(out, rel); os.makedirs(d, exist_ok=True)
-    stem = os.path.join(d, f"{row['name']}__{model}")
+    stem = os.path.join(d, f"{row.get('decode_as', row['name'])}__{model}")
     return stem + ".json", stem + ".time.json"
 
 def run(cfg, out, only, only_model):
     for row in cfg["rows"]:
         if only and row["name"] not in only: continue
+        if row.get("decode_as"): continue  # scored from another row's decode
         for rel, model in row["runs"]:
             if only_model and model != only_model: continue
             tr, tm = paths(out, row, rel, model)
@@ -50,6 +52,7 @@ def run(cfg, out, only, only_model):
 def score(cfg, row, tr):
     cmd = [cfg["bins"]["rescore"], "--hyp", tr, "--language", row["language"]]
     if row.get("reference"): cmd += ["--reference", row["reference"]]
+    if row.get("from"): cmd += ["--from", str(row["from"])]
     if row.get("until"): cmd += ["--until", str(row["until"])]
     if row.get("speech"): cmd += ["--speech", row["speech"]]
     return json.loads(sh(cmd, lock=False).stdout)
