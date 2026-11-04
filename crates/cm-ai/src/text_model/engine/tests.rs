@@ -471,11 +471,20 @@ fn the_real_platform_runs_stops_and_reports_a_fake_helper() {
 #[test]
 fn the_not_found_text_names_what_each_system_can_do() {
     let mac = not_found_hint(false);
-    assert!(mac.contains("make llama") && mac.contains("include their own copy"), "{mac}");
+    assert!(
+        mac.contains("make llama") && mac.contains("include their own copy"),
+        "{mac}"
+    );
     // Windows has no `make` and the early zip does not always carry the helper.
     let win = not_found_hint(true);
-    assert!(!win.contains("make llama") && !win.contains("include their own copy"), "{win}");
-    assert!(win.contains("llama-server.exe") && win.contains("CM_LLAMA_SERVER"), "{win}");
+    assert!(
+        !win.contains("make llama") && !win.contains("include their own copy"),
+        "{win}"
+    );
+    assert!(
+        win.contains("llama-server.exe") && win.contains("CM_LLAMA_SERVER"),
+        "{win}"
+    );
 }
 
 #[test]
@@ -488,7 +497,11 @@ fn the_helper_is_found_by_its_exe_name_in_each_place() {
     let beside = dir.path().join("app");
     std::fs::create_dir_all(&beside).unwrap();
     // A file with the other system's name must not match.
-    let other = if cfg!(windows) { "llama-server" } else { "llama-server.exe" };
+    let other = if cfg!(windows) {
+        "llama-server"
+    } else {
+        "llama-server.exe"
+    };
     std::fs::write(beside.join(other), b"x").unwrap();
     let paths = SearchPaths {
         env: None,
