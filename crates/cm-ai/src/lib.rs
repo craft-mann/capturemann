@@ -53,6 +53,7 @@ pub mod model;
 pub mod normalize;
 pub mod pieces;
 pub mod pipeline;
+pub mod prep;
 pub mod reapply;
 pub mod recording;
 pub mod report;
