@@ -433,6 +433,10 @@ const DENSE_WINDOW_SECS: f64 = 60.0;
 /// words a second (speech does not go faster; a decoder stuck on a sound does).
 const SAID_MAX_REPEATS: usize = 6;
 const MAX_WORDS_PER_SEC: f64 = 7.0;
+/// One word written this many times in a row is a loop suspect when it is too fast to be said, or
+/// (from eight on) written with a mean confidence under the second figure.
+const TOKEN_RUN_MIN: usize = 5;
+const TOKEN_RUN_LOW_CONFIDENCE: f32 = 0.5;
 /// Words under this confidence, three or more in a row, make a stretch hopeless.
 const HOPELESS_CONFIDENCE: f32 = 0.1;
 const HOPELESS_RUN: usize = 3;
@@ -576,6 +580,14 @@ impl Job<'_, '_> {
         for r in crate::failure_kinds::sentence_runs(&words, LOOP_MIN_REPEATS) {
             looped[r.first..r.end].iter_mut().for_each(|l| *l = true);
         }
+        for (a, b) in crate::failure_kinds::impossible_token_runs(
+            &words,
+            TOKEN_RUN_MIN,
+            MAX_WORDS_PER_SEC,
+            TOKEN_RUN_LOW_CONFIDENCE,
+        ) {
+            looped[a..b].iter_mut().for_each(|l| *l = true);
+        }
         for i in
             crate::failure_kinds::dense_unit_indices(&words, DENSE_MIN_REPEATS, DENSE_WINDOW_SECS)
         {
@@ -659,7 +671,14 @@ impl Job<'_, '_> {
                         self.mark_with_gate(&again, &tail, &cfg)
                     })
                     .is_some_and(|m| m.iter().any(|x| *x));
-                if clean && new_runs.is_empty() && !again_marked {
+                let bare = !crate::failure_kinds::impossible_token_runs(
+                    &again,
+                    TOKEN_RUN_MIN,
+                    MAX_WORDS_PER_SEC,
+                    TOKEN_RUN_LOW_CONFIDENCE,
+                )
+                .is_empty();
+                if clean && new_runs.is_empty() && !bare && !again_marked {
                     self.report.broken_reread_kept += 1;
                     out.extend(again);
                 } else if self.said_repeatedly(&old, &new_runs) {

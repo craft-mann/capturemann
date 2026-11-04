@@ -614,7 +614,7 @@ impl Transcriber for ReReads {
                             .map(move |(j, t)| (k, j, *t))
                             .collect::<Vec<_>>()
                     })
-                    .map(|(k, j, t)| mk(t, 0.2 + k as f64 * 0.25 + j as f64 * 0.1, 0.08))
+                    .map(|(k, j, t)| mk(t, 0.2 + k as f64 * 0.08 + j as f64 * 0.03, 0.05))
                     .collect(),
             }
         };
@@ -862,5 +862,42 @@ fn a_second_reading_that_fails_the_gate_too_becomes_a_sound() {
         "{:?}",
         t.words
     );
+    assert_eq!(t.sounds.len(), 1, "{:?}", t.sounds);
+}
+
+// ---- one word written again and again at an impossible pace (made-up tokens) ------------------------
+
+fn bare_run(token: &str, n: usize, at: f64, gap: f64, conf: f32) -> Vec<Word> {
+    (0..n)
+        .map(|i| w(token, at + i as f64 * gap, conf))
+        .collect()
+}
+
+#[test]
+fn a_bare_word_repeated_at_an_impossible_pace_is_found_and_a_human_pace_is_not() {
+    let fast = bare_run("blorp", 16, 5.0, 0.07, 0.21);
+    assert_eq!(impossible_token_runs(&fast, 5, 7.0, 0.5), vec![(0, 16)]);
+    // Four times at a human pace, and eight slow ones with high confidence, are speech.
+    assert!(impossible_token_runs(&bare_run("qux", 4, 5.0, 0.4, 0.9), 5, 7.0, 0.5).is_empty());
+    assert!(impossible_token_runs(&bare_run("qux", 8, 5.0, 0.6, 0.9), 5, 7.0, 0.5).is_empty());
+    // Eight or more with low confidence are suspect even at a plausible pace; Chinese too.
+    assert_eq!(
+        impossible_token_runs(&bare_run("好", 9, 5.0, 0.5, 0.2), 5, 7.0, 0.5),
+        vec![(0, 9)]
+    );
+}
+
+#[test]
+fn a_bare_word_loop_is_read_again_and_written_as_a_sound_when_it_persists() {
+    let unit: &'static [&'static str] = &["blorp"];
+    let mut script = bare_run("blorp", 16, 5.0, 0.07, 0.21);
+    script.extend(bare_run("real", 3, 20.0, 0.8, 0.9));
+    // The window reads other words: the loop is replaced and the real words stay.
+    let t = run_loops(script.clone(), unit, Window::Other);
+    assert!(!t.words.iter().any(|w| w.text == "blorp"), "{:?}", t.words);
+    assert_eq!(t.words.iter().filter(|w| w.text == "real").count(), 3);
+    // The window loops too (compressed, impossible): the words go and a sound stands for them.
+    let t = run_loops(script, unit, Window::Loop);
+    assert!(!t.words.iter().any(|w| w.text == "blorp"), "{:?}", t.words);
     assert_eq!(t.sounds.len(), 1, "{:?}", t.sounds);
 }

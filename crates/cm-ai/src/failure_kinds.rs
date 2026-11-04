@@ -263,6 +263,39 @@ pub fn dense_unit_indices(words: &[Word], min_count: usize, window_secs: f64) ->
     out
 }
 
+/// Stretches where one folded token is written `min_count` or more times in a row at an
+/// impossible pace (more than `max_words_per_sec` words a second, a zero-length stretch counting as
+/// impossible) or, from eight repeats on, with a mean confidence under `low_confidence`. A word
+/// said again a few times at a human pace ("no no no") is not one. Returns `(first, end)` word
+/// indexes.
+pub fn impossible_token_runs(
+    words: &[Word],
+    min_count: usize,
+    max_words_per_sec: f64,
+    low_confidence: f32,
+) -> Vec<(usize, usize)> {
+    let tokens: Vec<String> = words.iter().map(|w| fold(&w.text)).collect();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < words.len() {
+        let mut j = i + 1;
+        while j < words.len() && !tokens[i].is_empty() && tokens[j] == tokens[i] {
+            j += 1;
+        }
+        let count = j - i;
+        if count >= min_count {
+            let span = secs(words[j - 1].end) - secs(words[i].start);
+            let rate = count as f64 / span.max(1e-3);
+            let conf = words[i..j].iter().map(|w| w.confidence).sum::<f32>() / count as f32;
+            if rate > max_words_per_sec || (count >= 8 && conf < low_confidence) {
+                out.push((i, j));
+            }
+        }
+        i = j;
+    }
+    out
+}
+
 /// A coarse writing system, enough to tell Latin text from Hangul or Cyrillic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Script {
