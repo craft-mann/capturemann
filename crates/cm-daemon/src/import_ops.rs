@@ -951,7 +951,7 @@ impl ImportRun {
                     cleanup(());
                     let mut o = FileOutcome::failed(
                         &path_s,
-                        CmError::invalid_input("This Mac can't prepare this file for editing (no hardware video encoder)."),
+                        CmError::invalid_input("This computer can't prepare this file for editing (no hardware video encoder)."),
                         Some("unsupported_format"),
                         Some("no_hardware_encoder"),
                     );
