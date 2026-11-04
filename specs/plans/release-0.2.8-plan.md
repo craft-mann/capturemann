@@ -62,6 +62,26 @@ hands it to the Linux agent (0.2.9) in the state that plan expects (Ubuntu Wi-Fi
 7. **Windows 10 22H2 and a second monitor with mixed scaling:** each with a stored step or an explicit "not run" in
    the release text.
 
+## Windows track: state on Nov 5, 2026 (written from the stored reports)
+
+Branch `track/windows` (pushed to `public`). Evidence: `verification/L1-windows-0.2.8-hardware-2026-11-05-claude.md`
+(one ThinkPad T490, Intel UHD 620, Windows 11 build 26200.9711; PARTIAL) and the night log next to it.
+
+- Item 1 (bugs): display name "Display 1" (was "Unknown Monitor 65537"), app names Notepad/Settings readable, listed and saved
+  window size agree (1426x720 both; fixed with per-monitor DPI awareness), diagnostics wording for FFmpeg and
+  `llama-server` is per build. Windows Terminal is still listed as "Windows Terminal Host". The missing toast and the stray
+  `cm-overlay` were not tried again.
+- Item 2 (recognizer): `Windows.Media.Ocr` ran on the laptop (synthetic PNG and a real window shot through the daemon; en-US
+  only is installed there). Other languages: not run.
+- Item 3 (FFmpeg): the bundled LGPL FFmpeg 9.0.2 runs on the laptop; export quick/youtube-1080p (h264_mf), webm, gif worked.
+  Import editing copies worked after a fix (Quick Sync needs NV12).
+- Item 4 (speaker engine): linked in the package (`speaker engine built in: true`); not run (no models on the laptop).
+- Item 5 (recording): screen (WGC) + Media Foundation hardware H.264 + mic + cursor record on the laptop through the daemon and
+  the app (`CM_WINDOWS_RECORDING=1`, hidden by default); pause/resume, kill -9 recovery and window/region targets pass. The
+  10-minute gate ran for 9.2 minutes (see the report); A/V sync with a stimulus, the camera at 30 fps and the loopback
+  exclusion of CaptureMann's own sound are not shown. Decision O5 stays with the maintainer.
+- Items 6 and 7: not run (SmartScreen, Windows 10, second monitor).
+
 ## Done when
 
 Bugs closed with a test or a stored step, or listed with reasons; a recognizer works on a clean Windows 11 (VM or
