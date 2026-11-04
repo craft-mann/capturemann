@@ -22,6 +22,9 @@ use windows::Win32::Storage::Xps::{PrintWindow, PRINT_WINDOW_FLAGS};
 use windows::Win32::System::Threading::{
     OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
 };
+use windows::Win32::UI::HiDpi::{
+    SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
+};
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumChildWindows, GetWindowLongW, GetWindowRect, GetWindowThreadProcessId, GWL_EXSTYLE,
 };
@@ -67,11 +70,27 @@ pub fn is_pickable(id: u32) -> bool {
     is_pickable_style(ex_style, cloaked)
 }
 
+/// Makes this process per-monitor DPI aware (once). A process without a DPI manifest (the headless daemon,
+/// the CLI, a test program) gets window rectangles scaled down by the display scale from `GetWindowRect`
+/// and a `PrintWindow` bitmap of that smaller size, while `DWMWA_EXTENDED_FRAME_BOUNDS` is always physical:
+/// on the lab laptop (150 %) a Notepad window listed as 1426x721 was captured as 960x485. The desktop app is
+/// already aware (the call then fails and changes nothing).
+pub fn ensure_dpi_aware() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        // SAFETY: a plain process-wide setting; it returns an error when the awareness is already set.
+        unsafe {
+            let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        }
+    });
+}
+
 /// The visible frame of the window as `(x, y, width, height)` in physical px. This is the rectangle `capture`
 /// cuts out of the painted window, so the size the picker lists is the size the saved picture has (the 0.2.6
 /// picker listed 1426x720 for a window that was saved as 1426x721, and the two numbers came from two code
 /// paths).
 pub fn frame_bounds(id: u32) -> Option<(i32, i32, u32, u32)> {
+    ensure_dpi_aware();
     let hwnd = HWND(id as usize as *mut c_void);
     let mut frame = RECT::default();
     // SAFETY: the call writes one RECT, whose size is passed; a stale handle makes it return an error.
@@ -216,6 +235,7 @@ pub fn app_name(id: u32, title: &str) -> String {
 
 /// An RGBA8 picture of the visible frame of the window: `(width, height, pixels)`.
 pub fn capture(id: u32) -> Result<(u32, u32, Vec<u8>), String> {
+    ensure_dpi_aware();
     let hwnd = HWND(id as usize as *mut c_void);
     let (mut outer, mut frame) = (RECT::default(), RECT::default());
     // SAFETY: both calls only write into the RECTs; a stale handle makes them return an error.

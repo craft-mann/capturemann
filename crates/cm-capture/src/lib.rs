@@ -32,6 +32,14 @@ mod types;
 mod xcap_backend;
 
 pub use backend::CaptureBackend;
+
+/// Makes the process per-monitor DPI aware on Windows (window rectangles, the cursor hook and the
+/// recorder then all speak physical px); nothing on other systems. Call it first thing in a program that has
+/// no DPI manifest (the headless daemon).
+pub fn ensure_dpi_aware() {
+    #[cfg(windows)]
+    sys::win_window::ensure_dpi_aware();
+}
 pub use capturer::{
     crop_display_frame, delay_from_secs, is_shell_window, CancelToken, Capture, CaptureRequest,
     Capturer, MAX_DELAY_SECS, SHELL_APPS,

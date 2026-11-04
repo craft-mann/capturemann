@@ -82,6 +82,7 @@ fn capturer() -> Result<cm_capture::Capturer, String> {
 #[tokio::main]
 async fn main() -> ExitCode {
     cm_daemon::logs::init_logging("daemon");
+    cm_capture::ensure_dpi_aware();
     let mut library: Option<PathBuf> = std::env::var_os("CAPTUREMANN_LIBRARY").map(PathBuf::from);
     let mut endpoint = Endpoint::from_env_or_default();
     let mut args = std::env::args().skip(1);
