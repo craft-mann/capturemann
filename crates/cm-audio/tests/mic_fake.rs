@@ -194,6 +194,49 @@ fn a_dropout_is_filled_with_silence_and_reported_as_a_gap() {
     assert_eq!(info.end.ticks(), 300_000);
 }
 
+/// A source that reports quiet stretches as idle, like a WASAPI loopback stream.
+struct IdleWhenQuiet(FakeAudioSource);
+
+impl cm_audio::AudioSource for IdleWhenQuiet {
+    fn format(&self) -> cm_audio::SourceFormat {
+        self.0.format()
+    }
+    fn start(&mut self, sink: cm_audio::SourceSink) -> Result<(), CmError> {
+        self.0.start(sink)
+    }
+    fn stop(&mut self) {
+        self.0.stop();
+    }
+    fn gap_reason(&self) -> &'static str {
+        "idle"
+    }
+}
+
+#[test]
+fn a_source_that_sends_nothing_while_idle_reports_the_gap_as_idle() {
+    // AUD-2 on Windows: loopback delivers no packets while nothing plays; the stretch is silence
+    // in the file and an `idle` gap, not a `dropout`.
+    let rig = Rig::new();
+    let (src, h) = FakeAudioSource::new(rig.cfg(0));
+    let cell = Mutex::new(Some(IdleWhenQuiet(src)));
+    let factory: SourceFactory = Box::new(move |_sel: &DeviceSelector| {
+        cell.lock()
+            .unwrap()
+            .take()
+            .map(|s| Box::new(s) as Box<dyn cm_audio::AudioSource>)
+            .ok_or_else(|| CmError::not_found("no more devices"))
+    });
+    let mut rec = SystemAudioRecorder::with_factory(SystemAudioConfig::default(), factory);
+    rec.start(rig.ctx()).unwrap();
+    h.advance(1.0);
+    h.skip(2.0);
+    h.advance(1.0);
+    let info = rec.stop(rig.at(&h)).unwrap();
+    let gaps = info.details["gaps"].as_array().unwrap();
+    assert_eq!(gaps.len(), 1);
+    assert_eq!(gaps[0]["reason"], "idle");
+}
+
 #[test]
 fn overlapping_stamps_are_trimmed() {
     let rig = Rig::new();

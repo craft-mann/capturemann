@@ -214,6 +214,12 @@ pub trait AudioSource {
     fn needs_reopen(&mut self) -> bool {
         false
     }
+    /// Why a stretch with no samples is a gap in the track details: `"dropout"` for a device that
+    /// should always deliver, `"idle"` for one that sends nothing while there is nothing to
+    /// record (WASAPI loopback sends no packets while nothing plays).
+    fn gap_reason(&self) -> &'static str {
+        "dropout"
+    }
 }
 
 /// Opens sources. Called on the worker thread at start and again to follow a default-device change.

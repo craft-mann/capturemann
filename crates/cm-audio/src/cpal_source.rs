@@ -174,6 +174,15 @@ impl AudioSource for CpalSource {
         self.stream = None;
     }
 
+    fn gap_reason(&self) -> &'static str {
+        // A WASAPI loopback stream delivers no packets while nothing is playing.
+        if self.loopback {
+            "idle"
+        } else {
+            "dropout"
+        }
+    }
+
     fn needs_reopen(&mut self) -> bool {
         // WASAPI does not report a default-output change on a loopback stream: compare ids.
         if !self.loopback {
