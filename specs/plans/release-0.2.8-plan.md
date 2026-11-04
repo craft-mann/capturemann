@@ -144,6 +144,7 @@ What 0.2.7 established (reports in `verification/benchmarks/`):
   passes; otherwise it moves to the next Windows release.
 - **O7** Installer (NSIS) in 0.2.8 or still a zip?
 - **O8** FFmpeg and sherpa-onnx Windows pins: approve the source versions and SHA-256 before the CI jobs are written.
+  **Approved by the maintainer on Nov 4, 2026:** FFmpeg 9.0.2, libvpx 1.17.0, libopus 1.6.1 (as in `build-macos.sh`), and sherpa-onnx v2.0.1 `win-x64-static-MT-Release-lib` (SHA-256 `23e7b986b197eda0bbc47ff3d7d5c87afd6ef2b9077214ba26b0f1ec52ef0e66`) and `win-x64-static-MD-Release-lib` (`7c1f3ef15487f2a06625ef06685a9f96f03c0a1f0b3ad52de9e3bf6af6c1be39`).
 
 ## Risks
 
