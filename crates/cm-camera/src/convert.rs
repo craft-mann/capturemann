@@ -304,6 +304,116 @@ pub fn windows_camera_state(
     }
 }
 
+// ---- NV12 for the encoder ------------------------------------------------------------------
+
+/// Where output sample `x` of `dst` starts and ends on an axis of `src` samples: the box an area
+/// average covers (at least one sample).
+fn box_span(x: u32, src: u32, dst: u32) -> (usize, usize) {
+    let start = (u64::from(x) * u64::from(src) / u64::from(dst)) as u32;
+    let end = ((u64::from(x) + 1) * u64::from(src)).div_ceil(u64::from(dst)) as u32;
+    (
+        start.min(src - 1) as usize,
+        end.max(start + 1).min(src) as usize,
+    )
+}
+
+impl RawFrame {
+    fn luma_at(&self, x: usize, y: usize) -> u32 {
+        let row = y * self.stride;
+        match self.format {
+            PixelFormat::Nv12 => u32::from(self.data[row + x]),
+            // Y0 U Y1 V: luma sits at the even bytes.
+            _ => u32::from(self.data[row + x * 2]),
+        }
+    }
+
+    /// The U and V of chroma sample (`cx`, `cy`) of the 4:2:0 grid (`ceil(w/2)` x `ceil(h/2)`).
+    fn chroma_at(&self, cx: usize, cy: usize) -> (u32, u32) {
+        match self.format {
+            PixelFormat::Nv12 => {
+                let at = self.stride * self.height as usize + cy * self.stride + cx * 2;
+                (u32::from(self.data[at]), u32::from(self.data[at + 1]))
+            }
+            _ => {
+                // YUY2 has chroma on every row: average the two rows the 4:2:0 sample covers.
+                let h = self.height as usize;
+                let (r0, r1) = (cy * 2, (cy * 2 + 1).min(h - 1));
+                let a = r0 * self.stride + cx * 4;
+                let b = r1 * self.stride + cx * 4;
+                (
+                    (u32::from(self.data[a + 1]) + u32::from(self.data[b + 1])).div_ceil(2),
+                    (u32::from(self.data[a + 3]) + u32::from(self.data[b + 3])).div_ceil(2),
+                )
+            }
+        }
+    }
+
+    /// The frame as tightly packed NV12 of exactly `dst_w` x `dst_h` (both even and non-zero),
+    /// scaled by area average when the size differs. Only NV12 and YUY2 sources (what the source
+    /// reader delivers for the camera's own formats; Motion JPEG is decoded by the reader before a
+    /// frame reaches us): `None` for packed RGB (the encoder converts and scales those itself), a
+    /// bad size, or a buffer too short for its stride.
+    pub fn to_nv12(&self, dst_w: u32, dst_h: u32) -> Option<Vec<u8>> {
+        if !matches!(self.format, PixelFormat::Nv12 | PixelFormat::Yuy2)
+            || self.width == 0
+            || self.height == 0
+            || dst_w == 0
+            || dst_h == 0
+            || !dst_w.is_multiple_of(2)
+            || !dst_h.is_multiple_of(2)
+        {
+            return None;
+        }
+        let row_bytes = match self.format {
+            PixelFormat::Nv12 => self.width as usize,
+            _ => self.width.div_ceil(2) as usize * 4,
+        };
+        if self.stride < row_bytes
+            || self.data.len() < Self::needed_len(self.format, self.stride, self.height)
+        {
+            return None;
+        }
+        let (sw, sh) = (self.width, self.height);
+        let (cw, ch) = (sw.div_ceil(2), sh.div_ceil(2));
+        let (dw, dh) = (dst_w as usize, dst_h as usize);
+        let mut out = vec![0u8; dw * dh + dw * dh / 2];
+        let (yp, uvp) = out.split_at_mut(dw * dh);
+        let x_spans: Vec<(usize, usize)> = (0..dst_w).map(|x| box_span(x, sw, dst_w)).collect();
+        for dy in 0..dh {
+            let (y0, y1) = box_span(dy as u32, sh, dst_h);
+            for (dx, &(x0, x1)) in x_spans.iter().enumerate() {
+                let (mut sum, mut n) = (0u32, 0u32);
+                for y in y0..y1 {
+                    for x in x0..x1 {
+                        sum += self.luma_at(x, y);
+                        n += 1;
+                    }
+                }
+                yp[dy * dw + dx] = ((sum + n / 2) / n) as u8;
+            }
+        }
+        let cx_spans: Vec<(usize, usize)> =
+            (0..dst_w / 2).map(|x| box_span(x, cw, dst_w / 2)).collect();
+        for dy in 0..dh / 2 {
+            let (y0, y1) = box_span(dy as u32, ch, dst_h / 2);
+            for (dx, &(x0, x1)) in cx_spans.iter().enumerate() {
+                let (mut su, mut sv, mut n) = (0u32, 0u32, 0u32);
+                for y in y0..y1 {
+                    for x in x0..x1 {
+                        let (u, v) = self.chroma_at(x, y);
+                        su += u;
+                        sv += v;
+                        n += 1;
+                    }
+                }
+                uvp[dy * dw + dx * 2] = ((su + n / 2) / n) as u8;
+                uvp[dy * dw + dx * 2 + 1] = ((sv + n / 2) / n) as u8;
+            }
+        }
+        Some(out)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -554,5 +664,69 @@ mod tests {
             st(Some(1), Some("Deny"), Some("Deny"), None),
             CameraPermission::Authorized
         );
+    }
+
+    #[test]
+    fn nv12_to_nv12_at_the_same_size_drops_the_row_padding() {
+        // 4x2, stride 6: two Y rows then one UV row, each padded by 2 bytes.
+        let mut d = vec![0u8; 6 * 2 + 6];
+        d[..4].copy_from_slice(&[10, 11, 12, 13]);
+        d[6..10].copy_from_slice(&[20, 21, 22, 23]);
+        d[12..16].copy_from_slice(&[100, 200, 101, 201]);
+        let out = frame(PixelFormat::Nv12, 4, 2, 6, d).to_nv12(4, 2).unwrap();
+        assert_eq!(
+            out,
+            vec![10, 11, 12, 13, 20, 21, 22, 23, 100, 200, 101, 201]
+        );
+    }
+
+    #[test]
+    fn yuy2_becomes_nv12_with_chroma_averaged_over_two_rows() {
+        // 4x2 YUY2: each row is (Y0 U Y1 V) twice.
+        let d = vec![
+            1, 100, 2, 200, 3, 102, 4, 202, // row 0
+            5, 110, 6, 210, 7, 112, 8, 212, // row 1
+        ];
+        let out = frame(PixelFormat::Yuy2, 4, 2, 8, d).to_nv12(4, 2).unwrap();
+        assert_eq!(&out[..8], &[1, 2, 3, 4, 5, 6, 7, 8]);
+        assert_eq!(&out[8..], &[105, 205, 107, 207]);
+    }
+
+    #[test]
+    fn nv12_scales_down_by_area_average() {
+        // 4x4 to 2x2: each output luma is the mean of a 2x2 box; the one chroma pair of the
+        // output is the mean of the four source pairs.
+        let mut d = vec![0u8; 16 + 8];
+        for (i, v) in d[..16].iter_mut().enumerate() {
+            *v = (i as u8 / 4) * 40 + (i as u8 % 4) * 4;
+        }
+        d[16..].copy_from_slice(&[10, 20, 30, 40, 50, 60, 70, 80]);
+        let out = frame(PixelFormat::Nv12, 4, 4, 4, d).to_nv12(2, 2).unwrap();
+        assert_eq!(&out[..4], &[22, 30, 102, 110]);
+        assert_eq!(&out[4..], &[40, 50]);
+    }
+
+    #[test]
+    fn to_nv12_refuses_rgb_odd_sizes_and_short_buffers() {
+        let rgb = frame(PixelFormat::Bgra, 2, 2, 8, vec![0; 16]);
+        assert!(rgb.to_nv12(2, 2).is_none(), "RGB goes to the encoder as is");
+        let nv = frame(PixelFormat::Nv12, 4, 2, 4, vec![0; 12]);
+        assert!(nv.to_nv12(3, 2).is_none());
+        assert!(nv.to_nv12(4, 0).is_none());
+        assert!(frame(PixelFormat::Nv12, 4, 2, 4, vec![0; 5])
+            .to_nv12(4, 2)
+            .is_none());
+        assert!(frame(PixelFormat::Yuy2, 4, 2, 4, vec![0; 16])
+            .to_nv12(4, 2)
+            .is_none());
+    }
+
+    #[test]
+    fn nv12_upscales_without_reading_outside_the_frame() {
+        let nv = frame(PixelFormat::Nv12, 2, 2, 2, vec![50, 60, 70, 80, 128, 129]);
+        let out = nv.to_nv12(4, 4).unwrap();
+        assert_eq!(out.len(), 4 * 4 + 4 * 2);
+        assert!(out[..16].iter().all(|v| (50..=80).contains(v)));
+        assert!(out[16..].chunks(2).all(|p| p == [128, 129]));
     }
 }
