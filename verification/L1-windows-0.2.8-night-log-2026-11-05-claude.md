@@ -20,3 +20,28 @@ report names it; these are observations.
   leaves a non-zero `$LASTEXITCODE` in PowerShell 7 (the same ffmpeg.exe runs fine on the laptop: exit 0).
   Fixed in the workflow; rust-cache now keeps its cache on failure. The zip of that run was still uploaded
   (`if: always()`) and unpacked on the laptop as `C:\lab\pk1` for the first checks.
+- 22:50 to 23:10 (the "numbers" below are runs on the laptop unless noted) camera 6 s test: about 10 fps at 720p; the
+  Windows tests programs unpacked again after each fix (runs 41855785408, 41864428269, 41869678741, 41880383062,
+  41885987311, 41892011764, 41895032977).
+- 23:10 Maintainer's instruction arrived: no sound at all. The default output of the laptop was already muted at volume 0
+  (`C:\lab\mute.ps1`, Core Audio endpoint; the saved state was left unchanged and removed at the end). No audible test was
+  run after that. Skipped for this reason: the loopback/chime tests of `cm-audio__hardware`, AUD-1/AUD-2 audible checks,
+  "does process loopback really leave out CaptureMann's sound".
+- 23:20 root causes found and fixed (details in the hardware report): window DPI (9dc56ad), Quick Sync NV12 (commit
+  "Media Foundation H.264 takes NV12"), the GitHub Windows package check (PowerShell 7 exit code), "Basic Render Driver"
+  scrub, stage logging for the stop crash.
+- 23:35 Mistake: I pushed once (980fb5a... 3a10b2a) before the pre-push run of that moment had finished; it passed
+  afterwards. No other push skipped the checks.
+- 00:20 stop crash found: `wgc stop` ran twice (log line printed twice), fixed in the WGC capture (2820e55 + later).
+- 00:50 package run 41880377274 (4ad1c12): all CI steps green, including the app window and the silent install; the
+  start-up panic (tokio pipe) was found in the failed run 41869669940 and fixed in 4ad1c12.
+- 01:00 to 01:15 gate recording (553 s) with a ticking clock: 54 % late frames; fixed in fa4d68d (event-driven
+  sources) and re-measured: 0 late.
+- 01:35 app started on the laptop; recording in the app was hidden (`recording_supported()` false on Windows):
+  `CM_WINDOWS_RECORDING=1` added (3a10b2a).
+- 02:00 process loopback system audio written; first run: heap corruption 0xC0000374 (PROPVARIANT drop); fixed (31d0562);
+  then 299 packets in 3 s with nothing playing.
+- 03:05 final package run 41897523579 (31d0562) green; re-check on the laptop; installer installed and uninstalled.
+- 03:15 laptop cleaned: recordings, screenshots, configs and test libraries deleted (a screenshot of the desktop shows a
+  personal photo from the Settings window; none was stored in the repository), no cm-* process running, output mute state
+  restored (it was muted).
