@@ -170,6 +170,8 @@ pub fn system_lines(stack: Option<&cm_platform::stack::Report>) -> Vec<String> {
     if let Ok(n) = std::thread::available_parallelism() {
         out.push(format!("threads available {n}"));
     }
+    // Windows only (empty elsewhere): the OS build and the graphics adapters with their driver versions.
+    out.extend(cm_platform::sysinfo::lines());
     // Linux only (None elsewhere): the desktop stack the screenshot and recording paths depend on.
     if let Some(stack) = stack {
         out.extend(stack.fact_lines());
@@ -231,8 +233,11 @@ fn missing_helper_line(name: &str, ships_it: bool, beside: Option<&Path>) -> Str
     }
 }
 
-/// Whether the official build for this system puts the helper next to the executable. The Windows early
-/// build ships neither FFmpeg nor `llama-server` yet (release 0.2.8 plan, tasks 3 and 5).
+/// Whether the official build for this system puts the helper next to the executable. The Windows
+/// package carries FFmpeg and `llama-server.exe` only when it was packaged with them
+/// (`packaging/windows/build-windows.ps1`, `CM_FFMPEG_BUNDLE` / `CM_LLAMA_BUNDLE`), so for Windows a miss
+/// is reported as "this build does not include one"; a copy that is there is found at run time and
+/// printed with its path, whatever this says.
 const SHIPS_HELPERS: bool = cfg!(not(windows));
 
 fn engine_lines() -> Vec<String> {

@@ -22,6 +22,11 @@
                                packaging/ffmpeg/build-windows.sh (in an MSYS2 MINGW64 shell). Refused when its
                                build line says GPL. When unset, packaging/ffmpeg/out-windows-x64 is used if it exists.
     CM_REQUIRE_FFMPEG=1        fail unless an LGPL FFmpeg with its licence files is bundled
+    CM_LLAMA_BUNDLE            folder with llama-server.exe (+ BUILD-INFO.txt, LICENSES\) from
+                               packaging/llama/build-windows.sh (in an MSYS2 MINGW64 shell). When unset,
+                               packaging/llama/out-windows-x64 is used if it exists; otherwise the build has no
+                               built-in text engine (the app says so; nothing else changes).
+    CM_REQUIRE_LLAMA=1         fail unless llama-server.exe with its build record and licence files is bundled
     CM_REQUIRE_SHERPA=1        fail unless the speaker engine (sherpa-onnx libraries) is built in
     CM_WINDOWS_OUT             output folder
     CM_WINDOWS_CRT_STATIC=0    link the Microsoft C runtime dynamically (default: static, so the
@@ -198,8 +203,27 @@ if ($env:CM_FFMPEG_BUNDLE) {
   Fail 'CM_REQUIRE_FFMPEG=1 but CM_FFMPEG_BUNDLE is not set (build one with packaging/ffmpeg/build-windows.sh)'
 }
 
+# ---- the text engine (llama-server, AI-7) ----
+$llDir = $null; $llLic = $false
+$llDefault = Join-Path $root 'packaging\llama\out-windows-x64'
+if (-not $env:CM_LLAMA_BUNDLE -and (Test-Path (Join-Path $llDefault 'llama-server.exe'))) {
+  Write-Host "==> using the llama-server built by packaging/llama/build-windows.sh: $llDefault"
+  $env:CM_LLAMA_BUNDLE = $llDefault
+}
+if ($env:CM_LLAMA_BUNDLE) {
+  $llDir = $env:CM_LLAMA_BUNDLE
+  if (-not (Test-Path (Join-Path $llDir 'llama-server.exe'))) { Fail "no llama-server.exe in CM_LLAMA_BUNDLE=$llDir" }
+  $llLic = (Test-Path (Join-Path $llDir 'BUILD-INFO.txt')) -and (Test-Path (Join-Path $llDir 'LICENSES'))
+  if (-not $llLic) {
+    if ($env:CM_REQUIRE_LLAMA -eq '1') { Fail "$llDir has no BUILD-INFO.txt and LICENSES\" }
+    Write-Warning 'no BUILD-INFO.txt / LICENSES next to llama-server.exe; this package must not be distributed'
+  }
+} elseif ($env:CM_REQUIRE_LLAMA -eq '1') {
+  Fail 'CM_REQUIRE_LLAMA=1 but CM_LLAMA_BUNDLE is not set (build one with packaging/llama/build-windows.sh)'
+}
+
 # ---- licences ----
-$tmp = Join-Path ([IO.Path]::GetTempPath()) ("cm-win-pack-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+$tmp =Join-Path ([IO.Path]::GetTempPath()) ("cm-win-pack-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
 New-Item -ItemType Directory -Path $tmp | Out-Null
 try {
   $licenses = Join-Path $root 'THIRD_PARTY_LICENSES.md'
@@ -239,6 +263,15 @@ try {
       Copy-Item (Join-Path $ffdir 'LICENSES') (Join-Path $ffl 'LICENSES') -Recurse
     }
   }
+  if ($llDir) {
+    # Next to the programs: cm_ai::text_model::engine looks beside the running executable first.
+    Copy-Item (Join-Path $llDir 'llama-server.exe') $stage
+    if ($llLic) {
+      $lll = Join-Path $stage 'Llama'; New-Item -ItemType Directory -Path $lll | Out-Null
+      Copy-Item (Join-Path $llDir 'BUILD-INFO.txt') $lll
+      Copy-Item (Join-Path $llDir 'LICENSES') (Join-Path $lll 'LICENSES') -Recurse
+    }
+  }
   $doc = Join-Path $stage 'doc'; New-Item -ItemType Directory -Path $doc | Out-Null
   Copy-Item (Join-Path $root 'LICENSE'), (Join-Path $root 'NOTICE') $doc
   Copy-Item $licenses (Join-Path $doc 'THIRD_PARTY_LICENSES.md')
@@ -269,6 +302,7 @@ the CLI and MCP work). $speakerLine
 Windows may show "Windows protected your PC" (SmartScreen): the early build is not code-signed yet.
 Choose "More info" and "Run anyway", or compare the SHA-256 file first.
 Licences: doc\ . ffmpeg.exe (if present) is FFmpeg under the LGPL, see FFmpeg\ .
+llama-server.exe (if present) is llama.cpp (MIT), the built-in text engine, see Llama\ .
 Source: https://github.com/craft-mann/capturemann
 "@
   Set-Content -Path (Join-Path $stage 'README.txt') -Value $readme -Encoding UTF8

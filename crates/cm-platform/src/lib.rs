@@ -13,4 +13,5 @@ pub mod opener;
 pub mod priority;
 pub mod sleep;
 pub mod stack;
+pub mod sysinfo;
 pub mod trash;
