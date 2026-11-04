@@ -46,6 +46,30 @@ pub fn words_of(text: &str) -> Vec<String> {
         .collect()
 }
 
+/// Words as they are compared by the exact score: NFC, lower case, letters and digits only; tone
+/// marks and `đ` are kept (a word with another tone is a different word). Tokens with no letter
+/// or digit are dropped.
+pub fn words_of_exact(text: &str) -> Vec<String> {
+    use icu_normalizer::ComposingNormalizerBorrowed;
+    text.split_whitespace()
+        .map(|w| {
+            ComposingNormalizerBorrowed::new_nfc()
+                .normalize(w)
+                .chars()
+                .flat_map(char::to_lowercase)
+                .filter(|c| c.is_alphanumeric())
+                .collect::<String>()
+        })
+        .filter(|w| !w.is_empty())
+        .collect()
+}
+
+/// [`word_errors`] with tone marks kept (see [`words_of_exact`]): the stricter score for Vietnamese,
+/// reported next to the folded one.
+pub fn word_errors_exact(reference: &str, hypothesis: &str) -> WordErrors {
+    align(words_of_exact(reference), words_of_exact(hypothesis))
+}
+
 /// Word-level edit distance of `hypothesis` against `reference`, split into the three kinds.
 pub fn word_errors(reference: &str, hypothesis: &str) -> WordErrors {
     word_errors_without(reference, hypothesis, &[])
@@ -57,6 +81,10 @@ pub fn word_errors_without(reference: &str, hypothesis: &str, skip: &[&str]) -> 
     let keep = |w: &String| !skip.contains(&w.as_str());
     let r: Vec<String> = words_of(reference).into_iter().filter(keep).collect();
     let h: Vec<String> = words_of(hypothesis).into_iter().filter(keep).collect();
+    align(r, h)
+}
+
+fn align(r: Vec<String>, h: Vec<String>) -> WordErrors {
     let (n, m) = (r.len(), h.len());
     // cost[i][j]: edits to turn r[..i] into h[..j].
     let mut cost = vec![vec![0usize; m + 1]; n + 1];
@@ -434,6 +462,21 @@ pub mod levels {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn exact_scoring_keeps_tone_marks_and_folded_scoring_does_not() {
+        // Made-up Vietnamese-looking tokens: same letters, another tone mark.
+        let (r, h) = ("ma m\u{1ea1} \u{111}\u{1ed1}ng", "ma m\u{1ea3} dong");
+        let folded = word_errors(r, h);
+        let exact = word_errors_exact(r, h);
+        assert_eq!(folded.errors(), 0);
+        assert_eq!((exact.substitutions, exact.errors()), (2, 2));
+        // Composed and decomposed spellings are the same word; case and punctuation do not count.
+        assert_eq!(
+            word_errors_exact("M\u{1ea1}, ab.", "ma\u{323} ab").errors(),
+            0
+        );
+    }
+
     use super::*;
 
     fn turn(start: f64, end: f64, who: &str) -> Turn {
