@@ -42,5 +42,14 @@ afterwards.
 9. Unplug while paused, plug in before resuming: both events appear, the resume works, nothing
    crashes.
 
+## Windows notes (0.2.8)
+Run the same steps in the logged-in session of a Windows PC. Differences: cameras come from Media Foundation
+(`devices` / `list_cameras` shows the Integrated Camera with its modes; a built-in camera cannot be unplugged, use a
+USB webcam for steps 6 to 9, or the camera privacy switch in Settings > Privacy & security > Camera for the "denied"
+case). A camera that offers 1280x720 at 30 fps in NV12 or MJPG is recorded at 30 fps only when the room is bright
+enough; many laptop cameras halve the rate in low light (the lab laptop recorded about 10 fps at 720p in a dark
+room): note the light and the measured rate (`ffprobe -show_entries stream=nb_frames,r_frame_rate camera.mp4`).
+`camera.mp4` is H.264 from the Media Foundation hardware encoder; check it with `ffprobe` and that it plays.
+
 ## Pass criteria
 Steps 1 to 3, 6 and 8 as described. Steps 4, 5, 7 and 9 are reported as observed.
