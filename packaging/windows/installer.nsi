@@ -100,6 +100,30 @@ Section "${APPNAME}" SecApp
   WriteRegDWORD HKCU "${UNINSTKEY}" "EstimatedSize" "$0"
 SectionEnd
 
+Section "Offer CaptureMann in the Open with menu of video and audio files" SecOpenWith
+  ; Per user (HKCU), never the default program: the file types stay with whatever opens them now.
+  ; The extensions are the ones the import reads (DOCUMENT_EXT in apps/desktop/src/import_flow.rs).
+  ; Open with > CaptureMann starts `cm-desktop.exe "<file>"`; a running CaptureMann gets the file.
+  WriteRegStr HKCU "Software\Classes\Applications\cm-desktop.exe" "FriendlyAppName" "${APPNAME}"
+  WriteRegStr HKCU "Software\Classes\Applications\cm-desktop.exe\shell\open" "FriendlyAppName" "${APPNAME}"
+  WriteRegStr HKCU "Software\Classes\Applications\cm-desktop.exe\shell\open\command" "" '"$INSTDIR\cm-desktop.exe" "%1"'
+  WriteRegStr HKCU "Software\Classes\Applications\cm-desktop.exe\SupportedTypes" ".mp4" ""
+  WriteRegStr HKCU "Software\Classes\.mp4\OpenWithList\cm-desktop.exe" "" ""
+  WriteRegStr HKCU "Software\Classes\Applications\cm-desktop.exe\SupportedTypes" ".mov" ""
+  WriteRegStr HKCU "Software\Classes\.mov\OpenWithList\cm-desktop.exe" "" ""
+  WriteRegStr HKCU "Software\Classes\Applications\cm-desktop.exe\SupportedTypes" ".m4v" ""
+  WriteRegStr HKCU "Software\Classes\.m4v\OpenWithList\cm-desktop.exe" "" ""
+  WriteRegStr HKCU "Software\Classes\Applications\cm-desktop.exe\SupportedTypes" ".mkv" ""
+  WriteRegStr HKCU "Software\Classes\.mkv\OpenWithList\cm-desktop.exe" "" ""
+  WriteRegStr HKCU "Software\Classes\Applications\cm-desktop.exe\SupportedTypes" ".m4a" ""
+  WriteRegStr HKCU "Software\Classes\.m4a\OpenWithList\cm-desktop.exe" "" ""
+  WriteRegStr HKCU "Software\Classes\Applications\cm-desktop.exe\SupportedTypes" ".wav" ""
+  WriteRegStr HKCU "Software\Classes\.wav\OpenWithList\cm-desktop.exe" "" ""
+  ; Tell Explorer the associations changed (SHCNE_ASSOCCHANGED).
+  System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
+  WriteRegStr HKCU "Software\${APPNAME}" "OpenWith" "1"
+SectionEnd
+
 Section /o "Add capturemann.exe and cm-mcp.exe to my PATH" SecPath
   ; Edits the per-user PATH only (HKCU), through path.ps1, then tells running programs.
   nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$INSTDIR\path.ps1" -Action add -Dir "$INSTDIR"'
@@ -122,9 +146,11 @@ Section "-pathflag"
 SectionEnd
 
 LangString DESC_SecApp ${LANG_ENGLISH} "CaptureMann, the command line, the MCP server and the licence files."
+LangString DESC_SecOpenWith ${LANG_ENGLISH} "Lists CaptureMann under Open with for MP4, MOV, M4V, MKV, M4A and WAV files so you can import them. It does not become the default program."
 LangString DESC_SecPath ${LANG_ENGLISH} "So that you can type capturemann and cm-mcp in a new terminal. Removed again by the uninstaller."
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
   !insertmacro MUI_DESCRIPTION_TEXT ${SecApp} $(DESC_SecApp)
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecOpenWith} $(DESC_SecOpenWith)
   !insertmacro MUI_DESCRIPTION_TEXT ${SecPath} $(DESC_SecPath)
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
@@ -137,6 +163,17 @@ Section "Uninstall"
     nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$INSTDIR\path.ps1" -Action remove -Dir "$INSTDIR"'
     Pop $0
     SendMessage ${HWND_BROADCAST} ${WM_WININICHANGE} 0 "STR:Environment" /TIMEOUT=5000
+  ${EndIf}
+  ReadRegStr $0 HKCU "Software\${APPNAME}" "OpenWith"
+  ${If} $0 == "1"
+    DeleteRegKey HKCU "Software\Classes\Applications\cm-desktop.exe"
+    DeleteRegKey HKCU "Software\Classes\.mp4\OpenWithList\cm-desktop.exe"
+    DeleteRegKey HKCU "Software\Classes\.mov\OpenWithList\cm-desktop.exe"
+    DeleteRegKey HKCU "Software\Classes\.m4v\OpenWithList\cm-desktop.exe"
+    DeleteRegKey HKCU "Software\Classes\.mkv\OpenWithList\cm-desktop.exe"
+    DeleteRegKey HKCU "Software\Classes\.m4a\OpenWithList\cm-desktop.exe"
+    DeleteRegKey HKCU "Software\Classes\.wav\OpenWithList\cm-desktop.exe"
+    System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
   ${EndIf}
   Delete "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk"
   Delete "$SMPROGRAMS\${APPNAME}\Uninstall ${APPNAME}.lnk"

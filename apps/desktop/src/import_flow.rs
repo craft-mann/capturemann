@@ -522,6 +522,11 @@ pub fn paths_from_urls(urls: &[String]) -> Vec<PathBuf> {
         .filter_map(|u| u.strip_prefix("file://"))
         .map(|rest| rest.strip_prefix("localhost").unwrap_or(rest))
         .filter_map(decode)
+        // A Windows file URL is `file:///C:/dir/a.mp4`: the slash before the drive letter goes.
+        .map(|p| match p.as_bytes() {
+            [b'/', d, b':', ..] if d.is_ascii_alphabetic() => p[1..].to_owned(),
+            _ => p,
+        })
         .map(PathBuf::from)
         .collect()
 }
@@ -1087,6 +1092,15 @@ mod tests {
         );
     }
 
+    #[test]
+    fn a_windows_file_url_loses_the_slash_before_the_drive() {
+        let urls = vec!["file:///C:/Users/me/My%20Clip.mov".to_owned()];
+        assert_eq!(
+            paths_from_urls(&urls),
+            vec![PathBuf::from("C:/Users/me/My Clip.mov")]
+        );
+    }
+
     /// The macOS bundle registers exactly the extensions the app reads (Open With, Dock drop).
     #[test]
     fn the_bundle_registers_the_supported_extensions() {
@@ -1097,6 +1111,28 @@ mod tests {
         for e in ["webm", "avi", "mp3", "flac"] {
             assert!(!plist.contains(&format!("<string>{e}</string>")), "{e}");
         }
+    }
+
+    /// The Windows installer lists CaptureMann under Open with for exactly the same extensions
+    /// (per user, not the default program).
+    #[test]
+    fn the_installer_registers_the_supported_extensions() {
+        let nsi = include_str!("../../../packaging/windows/installer.nsi");
+        for e in DOCUMENT_EXT {
+            assert!(
+                nsi.contains(&format!(r#"SupportedTypes" ".{e}""#)),
+                "SupportedTypes .{e}"
+            );
+            assert!(
+                nsi.contains(&format!(r"Classes\.{e}\OpenWithList\cm-desktop.exe")),
+                "OpenWithList .{e}"
+            );
+        }
+        for e in ["webm", "avi", "mp3", "flac"] {
+            assert!(!nsi.contains(&format!(".{e}\\OpenWithList")), "{e}");
+        }
+        // Never the default: no value is written on the extension key itself.
+        assert!(!nsi.contains(r#"Classes\.mp4" """#));
     }
 
     fn ui_with(answer: &Value, sizes: &[(PathBuf, u64)]) -> ImportUi {
