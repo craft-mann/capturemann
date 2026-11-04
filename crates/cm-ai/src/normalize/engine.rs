@@ -62,7 +62,7 @@ impl Options {
         Options {
             language: language.to_owned(),
             context_tokens,
-            batch_words: 220,
+            batch_words: 120,
             batch_turns: 12,
         }
     }

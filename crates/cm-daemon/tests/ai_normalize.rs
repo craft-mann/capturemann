@@ -282,7 +282,7 @@ async fn a_run_writes_the_sidecar_and_leaves_the_transcript_alone() {
     assert!(got["text"].as_str().unwrap().starts_with("Xin chào các bạn"));
     assert!(got["text"].as_str().unwrap().ends_with("chào."));
     assert_eq!(got["normalized"]["summary"]["words"], 20);
-    assert_eq!(got["normalized"]["model"], "qwen3:8b");
+    assert_eq!(got["normalized"]["model"], "qwen3.5-4b");
 
     let mut seen = false;
     while let Ok(e) = rx.try_recv() {
