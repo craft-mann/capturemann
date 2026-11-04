@@ -211,11 +211,14 @@ fn main() {
             }
             g
         }),
-        normalize: None,
+        normalize: args
+            .iter()
+            .any(|a| a == "--lift")
+            .then(cm_ai::pipeline::Normalize::default),
     };
     let engine: &dyn Transcriber = match &vad_first {
         Some(w) => w,
-        None if configured.gate.is_some() => &configured,
+        None if configured.gate.is_some() || configured.normalize.is_some() => &configured,
         None => &counting,
     };
     let (tr, report) = transcribe_pieces(
