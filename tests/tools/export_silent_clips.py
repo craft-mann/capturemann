@@ -48,6 +48,7 @@ def main():
     ap.add_argument("--count", type=int, default=20)
     ap.add_argument("--meeting", action="append", required=True, help="name=signals.json=audio")
     ap.add_argument("--ffmpeg", default="ffmpeg")
+    ap.add_argument("--collapsed", action="append", default=[], help="name=transcript.json=N: N runs of 4+ words whose times have collapsed")
     a = ap.parse_args()
     cands, controls = [], []
     sources = {}
@@ -87,6 +88,36 @@ def main():
         total = sources[name][0]["audio_secs"]
         st, ln = window(q[0], q[1], total)
         items.append((name, st, ln, f"control: no energy, Silero or speaker-engine speech for {dur:.1f} s ({q[0]:.1f}-{q[1]:.1f}), level {db:.0f} dBFS RMS, no words needed"))
+    # Runs of four or more words, each 10 ms long or less: the engine lost the timing, which is how it
+    # stores text it cannot place (invented text over silence has it, so does fast speech). The
+    # clip ends 3 s after the run and reaches back 7 s, because the run's time is where the engine
+    # gave up, not where the sound is.
+    for spec in a.collapsed:
+        name, tf, n = spec.split("=", 2)
+        ws = json.load(open(tf))["words"]
+        runs, cur = [], []
+        for w in ws:
+            if w["end"] - w["start"] <= 1200:
+                cur.append(w)
+            else:
+                if len(cur) >= 4:
+                    runs.append(cur)
+                cur = []
+        if len(cur) >= 4:
+            runs.append(cur)
+        runs.sort(key=lambda r: -len(r))
+        picked = []
+        for r in runs:
+            t = r[0]["start"] / 120000
+            if all(abs(t - q) > 60 for q in picked):
+                picked.append(t)
+            if len(picked) >= int(n):
+                break
+        for t in picked:
+            r = next(r for r in runs if r[0]["start"] / 120000 == t)
+            total = sources[name][0]["audio_secs"]
+            st = max(0.0, t - 7.0)
+            items.append((name, st, min(10.0, total - st), f"collapsed: {len(r)} words with no duration at {t:.1f} s; window reaches back 7 s from there"))
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     # shuffle deterministically so candidates and controls are not in blocks
