@@ -259,21 +259,38 @@ pub fn serve(dir: &Path, on_request: impl Fn(Request) + Send + 'static) -> io::R
     use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
     use tokio::net::windows::named_pipe::ServerOptions;
     let name = pipe_name(dir);
-    // The first pipe is created here so that an error (name taken) is returned to the caller.
-    let mut server = ServerOptions::new()
-        .first_pipe_instance(true)
-        .reject_remote_clients(true)
-        .create(&name)?;
+    // Tokio's named pipes need a runtime (creating one outside it panics: "there is no reactor running"
+    // at start-up of the 0.2.8 CI build), so the first pipe is created on the serving thread, inside its
+    // runtime, and the result comes back here so that an error (name taken) still reaches the caller.
+    let (tx, rx) = std::sync::mpsc::channel::<io::Result<()>>();
     std::thread::Builder::new()
         .name("instance-requests".into())
         .spawn(move || {
-            let Ok(rt) = tokio::runtime::Builder::new_current_thread()
+            let rt = match tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
-            else {
-                return;
+            {
+                Ok(rt) => rt,
+                Err(e) => {
+                    let _ = tx.send(Err(e));
+                    return;
+                }
             };
             rt.block_on(async move {
+                let mut server = match ServerOptions::new()
+                    .first_pipe_instance(true)
+                    .reject_remote_clients(true)
+                    .create(&name)
+                {
+                    Ok(s) => {
+                        let _ = tx.send(Ok(()));
+                        s
+                    }
+                    Err(e) => {
+                        let _ = tx.send(Err(e));
+                        return;
+                    }
+                };
                 loop {
                     if server.connect().await.is_err() {
                         return;
@@ -300,7 +317,8 @@ pub fn serve(dir: &Path, on_request: impl Fn(Request) + Send + 'static) -> io::R
                 }
             });
         })?;
-    Ok(())
+    rx.recv()
+        .unwrap_or_else(|_| Err(io::Error::other("the request thread ended at start-up")))
 }
 
 /// Sends `request` to the running instance (Windows: its named pipe).
