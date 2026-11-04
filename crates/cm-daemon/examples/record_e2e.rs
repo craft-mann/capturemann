@@ -1,4 +1,4 @@
-//! End-to-end recording harness: runs the REAL [`RecordingSession`] on this Mac (screen, cursor,
+//! End-to-end recording harness: runs the REAL [`RecordingSession`] on this Mac or Windows PC (screen, cursor,
 //! mic, camera, system audio, in any combination), then verifies the bundle and prints a report
 //! with PASS/FAIL per check against the specs (NFR-2/3/4/5/6, REC-1..4, REC-7, REC-8).
 //!
@@ -20,6 +20,11 @@
 //!   camera can take up to 3 s to start; that time is pre-roll inside the same budget).
 //! * The bundle contains your screen: it is deleted at the end unless `--keep`.
 //!
+//! On Windows (Windows.Graphics.Capture and a Media Foundation hardware H.264 encoder) it is the same
+//! harness; `--kill9-test` ends the child with `TerminateProcess`, the same as `taskkill /F`. The
+//! process's memory and processor time come from PowerShell instead of `ps`. A computer with no
+//! hardware H.264 encoder prints `hardware_encoder_unavailable` and records nothing.
+//!
 //! All times in the report are in milliseconds on the session clock unless noted.
 //!
 //! Flags: `--tracks screen,cursor,mic,camera,system`, `--secs N`, `--pause-at S --pause-for S`
@@ -28,20 +33,20 @@
 //! report on stderr), `--kill9-test`, `--analyze-only <bundle>`.
 
 #![allow(clippy::too_many_lines)]
-#![cfg_attr(not(target_os = "macos"), allow(unused))]
+#![cfg_attr(not(any(target_os = "macos", windows)), allow(unused))]
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", windows)))]
 fn main() {
-    eprintln!("record_e2e runs the real recorders and is macOS only for now");
+    eprintln!("record_e2e runs the real recorders and is macOS and Windows only for now");
     std::process::exit(2);
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn main() {
     imp::main();
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod imp {
     use std::collections::BTreeSet;
     use std::io::{BufRead, BufReader, Read, Write};
@@ -56,7 +61,10 @@ mod imp {
         MicRecorder, SystemAudioConfig, SystemAudioRecorder,
     };
     use cm_camera::{check_camera_permission, list_cameras, CameraConfig, CameraRecorder};
+    #[cfg(target_os = "macos")]
     use cm_capture::record::sck::SckSource;
+    #[cfg(windows)]
+    use cm_capture::record::WgcSource;
     use cm_capture::record::{plan_capture, RecorderOptions, ScreenSettings};
     use cm_capture::{CaptureTarget, Capturer, DisplayInfo};
     use cm_core::MediaTime;
@@ -426,6 +434,24 @@ mod imp {
     }
 
     /// `(rss_mb, cpu_seconds)` of a process from `ps`.
+    #[cfg(windows)]
+    fn ps_sample(pid: u32) -> Option<(f64, f64)> {
+        // PowerShell: working set in bytes and total processor seconds, one per line.
+        let script = format!(
+            "$p = Get-Process -Id {pid} -ErrorAction Stop; $p.WorkingSet64; $p.TotalProcessorTime.TotalSeconds"
+        );
+        let out = Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+            .output()
+            .ok()?;
+        let text = String::from_utf8_lossy(&out.stdout);
+        let mut it = text.split_whitespace();
+        let ws: f64 = it.next()?.parse().ok()?;
+        let cpu: f64 = it.next()?.parse().ok()?;
+        Some((ws / (1024.0 * 1024.0), cpu))
+    }
+
+    #[cfg(target_os = "macos")]
     fn ps_sample(pid: u32) -> Option<(f64, f64)> {
         let out = Command::new("ps")
             .args(["-o", "rss=,cputime=", "-p", &pid.to_string()])
@@ -1507,14 +1533,37 @@ mod imp {
         let plan = plan_capture(&s, &targets).map_err(|e| e.to_string())?;
         Ok(Box::new(ScreenTrack::new(
             plan,
-            SckSource::new(),
+            screen_source(),
             HardwareEncoder::create,
             RecorderOptions::default(),
         )))
     }
 
+    #[cfg(target_os = "macos")]
+    fn screen_source() -> SckSource {
+        SckSource::new()
+    }
+
+    #[cfg(windows)]
+    fn screen_source() -> WgcSource {
+        WgcSource::default()
+    }
+
     fn cursor_track(display: &DisplayInfo) -> Box<dyn SessionTrack> {
+        #[cfg(target_os = "macos")]
         let target = cm_cursor::main_display_target(Some(display.id));
+        // Windows: the virtual screen in physical px, scale 1.
+        #[cfg(windows)]
+        let target = cm_cursor::CursorTarget::display(
+            display.id,
+            cm_core::Rect::new(
+                f64::from(display.bounds.origin.x),
+                f64::from(display.bounds.origin.y),
+                f64::from(display.bounds.size.width),
+                f64::from(display.bounds.size.height),
+            ),
+            1.0,
+        );
         Box::new(CursorTrack::new(CursorRecorder::new(CursorConfig::new(
             target,
         ))))
@@ -1525,7 +1574,7 @@ mod imp {
         let display = match primary_display() {
             Ok(d) => d,
             Err(e) => {
-                eprintln!("REFUSED: {e}\nGrant Screen Recording to this terminal in System Settings, then restart it.");
+                eprintln!("REFUSED: {e}\nOn a Mac, grant Screen Recording to this terminal in System Settings, then restart it.");
                 return 3;
             }
         };
