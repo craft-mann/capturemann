@@ -239,6 +239,9 @@ impl TranscribeService for RealTranscribe {
                 if !req.pipeline.carry_previous_text {
                     w = w.with_n_max_text_ctx(0);
                 }
+                if req.pipeline.careful_rereads {
+                    w = w.with_careful_rereads();
+                }
                 whisper = w;
                 &whisper
             }
@@ -321,6 +324,9 @@ impl TranscribeService for RealTranscribe {
                 let mut w = WhisperTranscriber::load(&path, &id, true)?.with_threads(2);
                 if !req.pipeline.carry_previous_text {
                     w = w.with_n_max_text_ctx(0);
+                }
+                if req.pipeline.careful_rereads {
+                    w = w.with_careful_rereads();
                 }
                 whisper = w;
                 &whisper

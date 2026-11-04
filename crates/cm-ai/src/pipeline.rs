@@ -50,6 +50,8 @@ pub const KEY_CARRY_TEXT: &str = "ai.carry_previous_text";
 pub const KEY_RAW_MIC: &str = "ai.transcribe_raw_mic";
 /// Words the decoder stacked on one instant are spread over the room around them.
 pub const KEY_REPAIR_WORD_TIMES: &str = "ai.repair_word_times";
+/// Windows read again (loops, broken words, speech with no words) are decoded with beam search.
+pub const KEY_CAREFUL_REREADS: &str = "ai.careful_rereads";
 
 /// Which of the review's behaviours are on for a run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,6 +71,9 @@ pub struct PipelineSettings {
     pub transcribe_raw_mic: bool,
     /// Stacks of words with collapsed times are spread (see [`crate::wordtimes`]).
     pub repair_word_times: bool,
+    /// Windows read again by the pipeline use beam search (5 beams, no temperature fallback); the
+    /// first reading is unchanged.
+    pub careful_rereads: bool,
 }
 
 impl Default for PipelineSettings {
@@ -80,6 +85,7 @@ impl Default for PipelineSettings {
             carry_previous_text: true,
             transcribe_raw_mic: true,
             repair_word_times: true,
+            careful_rereads: false,
         }
     }
 }
@@ -100,6 +106,7 @@ impl PipelineSettings {
             carry_previous_text: b(KEY_CARRY_TEXT, d.carry_previous_text),
             transcribe_raw_mic: b(KEY_RAW_MIC, d.transcribe_raw_mic),
             repair_word_times: b(KEY_REPAIR_WORD_TIMES, d.repair_word_times),
+            careful_rereads: b(KEY_CAREFUL_REREADS, d.careful_rereads),
         }
     }
 
@@ -112,6 +119,7 @@ impl PipelineSettings {
             carry_previous_text: true,
             transcribe_raw_mic: false,
             repair_word_times: false,
+            careful_rereads: false,
         }
     }
 }
@@ -174,6 +182,29 @@ impl Transcriber for Configured<'_> {
         }
     }
 
+    fn transcribe_careful(
+        &self,
+        audio: Pcm16k<'_>,
+        language: Option<&str>,
+        prompt: Option<&str>,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Transcript, CmError> {
+        match self.prepared(audio.samples) {
+            Some(v) => self.inner.transcribe_careful(
+                Pcm16k {
+                    samples: &v,
+                    start: audio.start,
+                },
+                language,
+                prompt,
+                progress,
+            ),
+            None => self
+                .inner
+                .transcribe_careful(audio, language, prompt, progress),
+        }
+    }
+
     fn translate_to_english(
         &self,
         audio: Pcm16k<'_>,
@@ -226,6 +257,24 @@ impl Transcriber for RepairTimes<'_> {
         let mut t = self
             .inner
             .transcribe_prompted(audio, language, prompt, progress)?;
+        crate::wordtimes::repair(&mut t.words, Some(end));
+        Ok(t)
+    }
+
+    fn transcribe_careful(
+        &self,
+        audio: Pcm16k<'_>,
+        language: Option<&str>,
+        prompt: Option<&str>,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Transcript, CmError> {
+        let end = audio.start
+            + cm_core::MediaTime::from_ticks(
+                audio.samples.len() as i64 * cm_core::TICKS_PER_SECOND / 16_000,
+            );
+        let mut t = self
+            .inner
+            .transcribe_careful(audio, language, prompt, progress)?;
         crate::wordtimes::repair(&mut t.words, Some(end));
         Ok(t)
     }
@@ -295,6 +344,7 @@ mod tests {
             KEY_VAD_OPINION,
             KEY_RAW_MIC,
             KEY_REPAIR_WORD_TIMES,
+            KEY_CAREFUL_REREADS,
         ] {
             m.insert(k.into(), serde_json::Value::Bool(false));
         }

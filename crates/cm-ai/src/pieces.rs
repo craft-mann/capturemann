@@ -397,6 +397,16 @@ impl Job<'_, '_> {
 
     /// One reading of `range`, from the main audio or (`other`) from the other source.
     fn read(&mut self, range: Range<usize>, other: bool) -> Result<Transcript, CmError> {
+        self.read_as(range, other, false)
+    }
+
+    /// [`Job::read`] for a window read again (`careful`): the decoder may take more care.
+    fn read_as(
+        &mut self,
+        range: Range<usize>,
+        other: bool,
+        careful: bool,
+    ) -> Result<Transcript, CmError> {
         let (from, len) = (range.start, range.len());
         let main = self.samples;
         let other_samples = self.other_samples.take();
@@ -410,10 +420,15 @@ impl Job<'_, '_> {
         };
         let language = self.language.clone();
         let (transcriber, prompt) = (self.transcriber, self.prompt);
-        let result =
+        let result = if careful {
+            transcriber.transcribe_careful(audio, language.as_deref(), prompt, &mut |p| {
+                self.tick(from, p, len)
+            })
+        } else {
             transcriber.transcribe_prompted(audio, language.as_deref(), prompt, &mut |p| {
                 self.tick(from, p, len)
-            });
+            })
+        };
         self.other_samples = other_samples;
         if self.steps.checking {
             self.steps.done += 1;
@@ -707,7 +722,7 @@ impl Job<'_, '_> {
             }
             self.report.broken_reread += 1;
             let saved = self.prompt.take();
-            let again = self.read(sa..sb, false);
+            let again = self.read_as(sa..sb, false, true);
             self.prompt = saved;
             let again = again?.words;
             let mean = |ws: &[Word]| {
@@ -890,7 +905,7 @@ impl Job<'_, '_> {
             }
             self.report.gaps_reread += 1;
             let saved = self.prompt.take();
-            let again = self.read(sa..sb, false);
+            let again = self.read_as(sa..sb, false, true);
             self.prompt = saved;
             let again = again?.words;
             let language = self.language.clone().unwrap_or_default();
@@ -922,7 +937,7 @@ impl Job<'_, '_> {
             }
             self.report.gaps_reread += 1;
             let saved = self.prompt.take();
-            let again = self.read(sa..sb, false);
+            let again = self.read_as(sa..sb, false, true);
             self.prompt = saved;
             let again = again?.words;
             let language = self.language.clone().unwrap_or_default();

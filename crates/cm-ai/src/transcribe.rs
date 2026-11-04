@@ -130,6 +130,20 @@ pub trait Transcriber: Send + Sync {
         self.transcribe(audio, language, progress)
     }
 
+    /// [`Transcriber::transcribe_prompted`] for a window that is read *again* because the first
+    /// reading looked wrong (a loop, broken words, speech with no words). A decoder may read it
+    /// more carefully (the Whisper engine uses beam search when it was given that choice); the
+    /// default is the ordinary reading.
+    fn transcribe_careful(
+        &self,
+        audio: Pcm16k<'_>,
+        language: Option<&str>,
+        prompt: Option<&str>,
+        progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Transcript, CmError> {
+        self.transcribe_prompted(audio, language, prompt, progress)
+    }
+
     /// Speech probabilities per frame of the audio (and the frame length in seconds) from a voice
     /// activity model, when this decoder has one. The hallucination gate uses them as a second
     /// opinion; `None` when there is no model.
