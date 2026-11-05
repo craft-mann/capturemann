@@ -43,7 +43,7 @@ echo "downloaded and checked: $zip ($have)"
 [ "$push" = 1 ] || { echo "not pushed (--no-push)"; exit 0; }
 
 "$lab" status | grep -q 'up: windows' || die "the laptop is not up in Windows (scripts/testlab/lab.sh status)"
-"$lab" push windows "$zip" "$here/win-run-in-session.ps1"
+"$lab" push windows "$zip" "$here/win-run-in-session.ps1" "$here/win-make-speech.ps1"
 "$lab" windows '$ErrorActionPreference="Stop"; Remove-Item -Recurse -Force C:\lab\tests -ErrorAction SilentlyContinue; Expand-Archive C:\lab\capturemann-windows-tests.zip -DestinationPath C:\lab\tests -Force; Get-Content C:\lab\tests\BUILD.txt; (Get-ChildItem C:\lab\tests\*.exe).Count.ToString() + " programs in C:\lab\tests"'
 
 cat <<'EOF'

@@ -37,6 +37,7 @@ pub mod canvas;
 pub mod client;
 pub mod error;
 pub mod gate;
+pub mod lifetime;
 pub mod magnifier;
 pub mod paint;
 pub mod picker;

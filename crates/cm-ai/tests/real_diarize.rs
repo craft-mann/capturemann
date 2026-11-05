@@ -34,6 +34,14 @@ fn find(dir: &Path, names: &[&str]) -> PathBuf {
         .unwrap_or_else(|| panic!("none of {names:?} in {}", dir.display()))
 }
 
+/// A link on Unix (nothing is copied); a copy on Windows, where a link needs a privilege.
+fn link_or_copy(from: &Path, to: &Path) {
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(from, to).unwrap();
+    #[cfg(not(unix))]
+    std::fs::copy(from, to).map(drop).unwrap();
+}
+
 fn read_wav(path: &Path) -> Vec<f32> {
     let mut r = hound::WavReader::open(path).unwrap();
     let spec = r.spec();
@@ -73,7 +81,7 @@ fn real_models_tell_speakers_apart() {
         (cm_ai::speaker_engine::EMBEDDING_ID, &emb),
     ] {
         let file = &store.catalog().get(id).unwrap().file;
-        std::os::unix::fs::symlink(from, store.models_dir().join(file)).unwrap();
+        link_or_copy(from, &store.models_dir().join(file));
     }
 
     let samples = read_wav(Path::new(&audio));
@@ -190,7 +198,7 @@ fn a_real_run_can_be_stopped_from_the_progress_callback() {
         (cm_ai::speaker_engine::EMBEDDING_ID, &emb),
     ] {
         let file = &store.catalog().get(id).unwrap().file;
-        std::os::unix::fs::symlink(from, store.models_dir().join(file)).unwrap();
+        link_or_copy(from, &store.models_dir().join(file));
     }
     let samples = read_wav(Path::new(&audio));
     let d = SherpaDiarizer::new(store);

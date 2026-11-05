@@ -241,15 +241,119 @@ mod imp {
                 "a socket path endpoint is not usable on this platform",
             ));
         };
-        loop {
-            match ClientOptions::new().open(name) {
-                Ok(c) => return Ok(c),
-                Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY) => {
-                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        retry_while_busy(
+            || ClientOptions::new().open(name),
+            |e| e.raw_os_error() == Some(ERROR_PIPE_BUSY),
+            PIPE_BUSY_LIMIT,
+            PIPE_BUSY_STEP,
+        )
+        .await
+    }
+}
+
+/// How long a client keeps retrying a named pipe whose every instance is taken (the server is not
+/// accepting). Without a limit a client of a stalled daemon waits forever: a `cm-overlay` that
+/// never shows a window and never exits.
+#[cfg(windows)]
+pub const PIPE_BUSY_LIMIT: std::time::Duration = std::time::Duration::from_secs(10);
+/// The pause between two tries on a busy pipe.
+#[cfg(windows)]
+pub const PIPE_BUSY_STEP: std::time::Duration = std::time::Duration::from_millis(50);
+
+/// Calls `open` until it stops failing with an error `is_busy` accepts, for at most `limit`; then
+/// the error is `TimedOut` and says how long it waited and how many times it tried. Any other
+/// error is returned at once. (The pipe logic of `connect` on Windows; written without Windows
+/// types so it is tested everywhere.)
+#[cfg_attr(not(windows), allow(dead_code))]
+async fn retry_while_busy<T>(
+    mut open: impl FnMut() -> io::Result<T>,
+    is_busy: impl Fn(&io::Error) -> bool,
+    limit: std::time::Duration,
+    step: std::time::Duration,
+) -> io::Result<T> {
+    let began = std::time::Instant::now();
+    let mut tries = 0u32;
+    loop {
+        tries += 1;
+        match open() {
+            Ok(c) => return Ok(c),
+            Err(e) if is_busy(&e) => {
+                if began.elapsed() >= limit {
+                    return Err(io::Error::new(
+                        io::ErrorKind::TimedOut,
+                        format!(
+                            "the daemon's pipe stayed busy for {:.1} s ({tries} tries): \
+                             the daemon is not accepting connections",
+                            began.elapsed().as_secs_f64()
+                        ),
+                    ));
                 }
-                Err(e) => return Err(e),
+                tokio::time::sleep(step).await;
             }
+            Err(e) => return Err(e),
         }
+    }
+}
+
+#[cfg(test)]
+mod busy_tests {
+    use super::*;
+    use std::time::Duration;
+
+    fn busy() -> io::Error {
+        io::Error::from_raw_os_error(231)
+    }
+
+    #[tokio::test]
+    async fn a_busy_pipe_is_retried_until_it_opens() {
+        let mut left = 3;
+        let r = retry_while_busy(
+            || {
+                if left > 0 {
+                    left -= 1;
+                    Err(busy())
+                } else {
+                    Ok(7)
+                }
+            },
+            |e| e.raw_os_error() == Some(231),
+            Duration::from_secs(5),
+            Duration::from_millis(1),
+        )
+        .await;
+        assert_eq!(r.unwrap(), 7);
+    }
+
+    #[tokio::test]
+    async fn a_pipe_that_stays_busy_ends_in_a_timeout_that_says_so() {
+        let e = retry_while_busy::<()>(
+            || Err(busy()),
+            |e| e.raw_os_error() == Some(231),
+            Duration::from_millis(30),
+            Duration::from_millis(5),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(e.kind(), io::ErrorKind::TimedOut);
+        assert!(e.to_string().contains("not accepting"), "{e}");
+    }
+
+    #[tokio::test]
+    async fn another_error_is_returned_at_once() {
+        let mut n = 0;
+        let e = retry_while_busy::<()>(
+            || {
+                n += 1;
+                Err(io::Error::from(io::ErrorKind::NotFound))
+            },
+            |e| e.raw_os_error() == Some(231),
+            Duration::from_secs(5),
+            Duration::from_millis(1),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(e.kind(), io::ErrorKind::NotFound);
+        assert_eq!(n, 1);
     }
 }
 

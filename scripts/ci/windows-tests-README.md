@@ -47,6 +47,8 @@ ignored test of that program.
 | `cm-camera__windows_camera.exe` | `lists_cameras_with_modes`, `default_camera_delivers_steady_stamped_frames` | a camera; session; the camera privacy switch on |
 | `cm-render__ocr_real.exe` | `real_recognizer_finds_two_emails_and_a_key_on_a_synthetic_png` | set `CM_OCR_REAL=1`; an OCR language installed |
 | `cm-desktop__parity.exe` | (no `--ignored`) `--nocapture` | a GPU adapter, and a **full** `ffmpeg` and `ffprobe` on `PATH` (for example `winget install Gyan.FFmpeg`; the bundled LGPL build lacks the `select` filter). Without them it prints SKIPPED. `CM_PARITY_KEEP=<dir>` keeps the frames |
+| `cm-ai__real_model.exe` | `real_model_transcribes_speech` (prints a `SPEED` line), `real_model_cancel_works_and_a_normal_run_is_not_aborted` | `CM_WHISPER_MODEL` (a ggml file), `CM_WHISPER_AUDIO` (a 16 kHz mono 16-bit WAV is read directly; other formats need `ffmpeg` on `PATH`), optional `CM_WHISPER_REFERENCE`, `CM_WHISPER_LANGUAGE`, `CM_WHISPER_GPU=0`. Over ssh is fine (no desktop) |
+| `cm-ai__real_diarize.exe` | `real_models_tell_speakers_apart` | `CM_SHERPA_MODELS` (folder with the two `.onnx` files), `CM_DIARIZE_AUDIO` (16 kHz mono 16-bit WAV), optional `CM_DIARIZE_SPEAKERS=2,3,auto`. Copies the models into a temp folder (no symlink on Windows) |
 
 To list what a program holds: `<exe> --list` (all) or `<exe> --list --ignored`.
 
@@ -64,3 +66,24 @@ To list what a program holds: `<exe> --list` (all) or `<exe> --list --ignored`.
 
 `record_e2e` never prompts for a permission and deletes its bundle unless `--keep`. The 10-minute 1080p30 gate and
 the `taskkill /F` recovery step are in `tests/manual/REC-WIN.md`.
+
+## Speech and speed of the whisper model (`cm-ai__real_model.exe`)
+
+`scripts/testlab/win-make-speech.ps1` makes the audio with the voices Windows already has (no download): a
+two-speaker English clip `speech2.wav` (16 kHz mono 16-bit), the same words as one voice, and `speech2.txt`, the
+reference text.
+
+```powershell
+C:\lab\win-make-speech.ps1 -OutDir C:\lab\speech          # speech2.wav, speech1.wav, speech2.txt, speech1.txt
+$env:CM_WHISPER_MODEL     = "$env:APPDATA\CaptureMann\ai\models\ggml-medium.bin"   # the app's medium model; spaces in a path are fine
+$env:CM_WHISPER_AUDIO     = 'C:\lab\speech\speech2.wav'
+$env:CM_WHISPER_REFERENCE = 'C:\lab\speech\speech2.txt'
+C:\lab\tests\cm-ai__real_model.exe --ignored --nocapture --test-threads=1 real_model_transcribes_speech
+```
+
+It prints one line to quote, for example
+`SPEED audio_s=62.3 wall_s=41.0 rtf=0.658 model=ggml-medium.bin threads=8 gpu_requested=true`
+(`rtf` is wall time divided by audio time; below 1 is faster than real time), then the text and the word error rate.
+The build is CPU only on Windows (no Metal); `CM_WHISPER_GPU=0` changes nothing there but is harmless. For the
+speaker test: `$env:CM_DIARIZE_AUDIO='C:\lab\speech\speech2.wav'; $env:CM_SHERPA_MODELS='<folder>'`. Synthetic
+voices are not a substitute for a real recording when judging accuracy; quote them as "synthetic speech".
