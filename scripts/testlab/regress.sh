@@ -60,7 +60,9 @@ if [ -n "$cur" ] && [ "${FORCE:-0}" != 1 ]; then
 fi
 w "Set-Content C:\\lab\\lab.lock '$me|$now' -Encoding ascii" >/dev/null
 sound_on=0
+power_saved=""
 cleanup() {
+  [ -n "$power_saved" ] && w "powercfg /change monitor-timeout-ac ${power_saved%%,*}; powercfg /change standby-timeout-ac ${power_saved##*,}" >/dev/null 2>&1 || true
   [ "$sound_on" = 1 ] && w 'C:\lab\vol.ps1 -Action set -Level 0 -Mute true' >/dev/null 2>&1 || true
   w "if ((Get-Content C:\\lab\\lab.lock -ErrorAction SilentlyContinue) -like '$me|*') { Remove-Item C:\\lab\\lab.lock -Force }" >/dev/null 2>&1 || true
 }
@@ -89,6 +91,19 @@ if [[ ",$allow," == *,sound,* ]]; then
   w 'C:\lab\vol.ps1 -Action set -Level 0.3 -Mute false'
 fi
 
+# --- the display layout and power settings (the external monitor dropped out once during a run) ---
+# Monitor and system sleep are set to never for the run and put back afterwards (values in minutes).
+power_saved="$(w '$q = { param($sub,$set) $t = powercfg /query SCHEME_CURRENT $sub $set | Out-String; if ($t -match "Current AC Power Setting Index:\s+0x([0-9a-fA-F]+)") { [int][Convert]::ToInt32($Matches[1],16) / 60 } else { 0 } }; "$(& $q SUB_VIDEO VIDEOIDLE),$(& $q SUB_SLEEP STANDBYIDLE)"' | tr -d '\r\n ' || true)"
+case "$power_saved" in [0-9]*,[0-9]*) ;; *) power_saved="" ;; esac
+echo "power settings before (monitor,standby minutes): ${power_saved:-unknown}"
+[ -n "$power_saved" ] && w 'powercfg /change monitor-timeout-ac 0; powercfg /change standby-timeout-ac 0' >/dev/null || true
+want_displays="${WANT_DISPLAYS:-2}"
+for i in $(seq 1 13); do
+  n="$(w '(Get-CimInstance -Namespace root\wmi -ClassName WmiMonitorBasicDisplayParams | Where-Object Active | Measure-Object).Count' | tr -d '\r\n ')"
+  [ "$n" -ge "$want_displays" ] 2>/dev/null && break
+  echo "only ${n:-?} active monitor(s) (want $want_displays); waiting 10 s ($i/13)"; sleep 10
+done
+echo "active monitors at the start: ${n:-?}"
 # --- the run ---
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 out="C:\\lab\\regress-out\\$stamp"
@@ -104,6 +119,8 @@ set +e
 w "C:\\lab\\win-run-in-session.ps1 -Exe C:\\lab\\tests\\cm-regress.exe -Arguments '$args' -OutFile C:\\lab\\regress-out\\$stamp.console.txt -TimeoutSec $limit -WorkDir C:\\lab\\tests"
 code=$?
 set -e
+n2="$(w '(Get-CimInstance -Namespace root\wmi -ClassName WmiMonitorBasicDisplayParams | Where-Object Active | Measure-Object).Count' | tr -d '\r\n ')"
+echo "active monitors at the end: ${n2:-?} (at the start: ${n:-?})"
 echo "cm-regress exit code: $code (0 pass, 1 a case failed, 124 timed out)"
 
 # --- bring the report back ---
