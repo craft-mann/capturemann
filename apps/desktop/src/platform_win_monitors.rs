@@ -15,13 +15,14 @@ use windows::Win32::Graphics::Gdi::{
     ClientToScreen, EnumDisplayMonitors, GetMonitorInfoW, MonitorFromWindow, HDC, HMONITOR,
     MONITORINFO, MONITOR_DEFAULTTONEAREST,
 };
+use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
 use windows::Win32::UI::WindowsAndMessaging::{
     GetClientRect, GetCursorPos, GetTopWindow, GetWindow, GetWindowLongPtrW, GetWindowRect,
-    SetLayeredWindowAttributes, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, GW_HWNDNEXT,
-    HWND_TOPMOST, LWA_ALPHA, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-    SWP_NOZORDER,
+    GetWindowThreadProcessId, IsWindow, SetLayeredWindowAttributes, SetWindowLongPtrW,
+    SetWindowPos, GWL_EXSTYLE, GW_HWNDNEXT, HWND_TOPMOST, LWA_ALPHA, SWP_FRAMECHANGED,
+    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
 };
 
 use crate::recording::geometry::Rect;
@@ -177,6 +178,27 @@ fn monitor_of(h: HWND) -> Option<Monitor> {
 }
 
 /// The client area's origin and the difference to the outer window rect, in physical px.
+/// True when `h` is still a window of this thread. A deferred call (a task that runs tens of
+/// milliseconds after the window opened) may run after the window closed; the handle is then
+/// dead, or in the worst case reused by a window of someone else, and must not be touched.
+/// The skip is logged at DEBUG with the reason.
+fn usable(h: HWND, what: &str) -> bool {
+    use crate::recording::zorder::{handle_state, HandleState};
+    // SAFETY: `IsWindow` and `GetWindowThreadProcessId` accept any handle value.
+    let (is_window, owner, me) = unsafe {
+        (
+            IsWindow(Some(h)).as_bool(),
+            GetWindowThreadProcessId(h, None),
+            GetCurrentThreadId(),
+        )
+    };
+    let state = handle_state(is_window, owner, me);
+    if state != HandleState::Live {
+        log::debug!("{what}: skipped, window {:?} is {state:?}", h.0);
+    }
+    state == HandleState::Live
+}
+
 fn client_origin(h: HWND) -> Option<(RECT, RECT)> {
     let (mut outer, mut client) = (RECT::default(), RECT::default());
     let mut o = POINT::default();
@@ -244,6 +266,9 @@ pub fn set_frame(window: &Window, x: f64, y: f64, w: f64, h_pt: f64) {
 /// [`set_frame`] for a window known by its handle, so it can be called later from a task that
 /// holds no window borrow (`NativeWindow`). A handle that is gone makes the call fail quietly.
 pub fn set_frame_hwnd(h: HWND, x: f64, y: f64, w: f64, h_pt: f64) {
+    if !usable(h, "set_frame") {
+        return;
+    }
     let Some((outer, client)) = client_origin(h) else {
         return;
     };
@@ -301,6 +326,9 @@ pub fn make_click_through(h: HWND) -> bool {
 
 /// Puts a window on top of the topmost band without activating, moving or resizing it.
 pub fn raise_topmost(h: HWND) {
+    if !usable(h, "raise_topmost") {
+        return;
+    }
     // SAFETY: `h` is a live window; the flags leave position, size and activation alone.
     let _ = unsafe {
         SetWindowPos(

@@ -965,6 +965,11 @@ fn open_recording_windows(app: &Entity<AppModel>, cx: &mut App) {
                 .ok()
                 .flatten();
             let fix = move |cx: &mut App| {
+                // The late runs (60 and 250 ms) skip a window that has closed meanwhile.
+                if h.update(cx, |_, _, _| ()).is_err() {
+                    log::debug!("indicator set_frame: skipped, window closed");
+                    return;
+                }
                 if let Some(n) = native.clone() {
                     cx.spawn(async move |_| n.set_frame(d.x, d.y, d.w, d.h))
                         .detach();

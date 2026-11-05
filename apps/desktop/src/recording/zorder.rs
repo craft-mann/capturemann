@@ -81,6 +81,29 @@ pub fn z_indices(top_to_bottom: &[isize], wanted: &[isize]) -> Vec<Option<usize>
         .collect()
 }
 
+/// Whether a native window handle may still be touched by a late (deferred) call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HandleState {
+    /// A live window created by this thread.
+    Live,
+    /// The handle is not a window any more (closed before the call ran).
+    Gone,
+    /// The handle is a window of another thread or process (the number was reused).
+    Foreign,
+}
+
+/// Decides from what the OS says about a handle. `owner_thread` is the thread that created the
+/// window (0 when the handle is not a window), `current_thread` the calling thread.
+pub fn handle_state(is_window: bool, owner_thread: u32, current_thread: u32) -> HandleState {
+    if !is_window || owner_thread == 0 {
+        HandleState::Gone
+    } else if owner_thread != current_thread {
+        HandleState::Foreign
+    } else {
+        HandleState::Live
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -121,5 +144,14 @@ mod tests {
             z_indices(&[7, 3, 9], &[9, 7, 1]),
             vec![Some(2), Some(0), None]
         );
+    }
+
+    #[test]
+    fn late_calls_only_touch_live_windows_of_this_thread() {
+        assert_eq!(handle_state(true, 7, 7), HandleState::Live);
+        assert_eq!(handle_state(false, 0, 7), HandleState::Gone);
+        assert_eq!(handle_state(false, 7, 7), HandleState::Gone);
+        assert_eq!(handle_state(true, 0, 7), HandleState::Gone);
+        assert_eq!(handle_state(true, 9, 7), HandleState::Foreign);
     }
 }
