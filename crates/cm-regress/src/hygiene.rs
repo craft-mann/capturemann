@@ -165,15 +165,16 @@ mod tests {
 
     #[test]
     fn the_gpui_redraw_race_is_counted_not_failed() {
-        let dir = tempfile::tempdir().unwrap();
-        let logs = dir.path().join("logs");
+        let dir = std::env::temp_dir().join(format!("cmr-hyg-race-{}", std::process::id()));
+        let logs = dir.join("logs");
         std::fs::create_dir_all(&logs).unwrap();
         std::fs::write(
             logs.join("desktop.log"),
             "2026 desktop ERROR gpui-pre-windows-0.3.9/src/platform.rs:493: Invalid window handle. (0x80070578)\n2026 desktop ERROR gpui-pre-windows-0.3.9/src/platform.rs:493: something else\n2026 desktop ERROR other.rs:1: (0x80070578)\n",
         )
         .unwrap();
-        let (bad, warns) = scan_logs(dir.path(), &[]);
+        let (bad, warns) = scan_logs(&dir, &[]);
+        let _ = std::fs::remove_dir_all(&dir);
         assert_eq!(bad.len(), 2, "{bad:?}");
         assert_eq!(warns, 1);
     }
