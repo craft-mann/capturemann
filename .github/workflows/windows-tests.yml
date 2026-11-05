@@ -28,6 +28,14 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  # whisper.cpp must not be built for the runner's CPU (-march=native put AVX-512 into cm-desktop.exe; the ThinkPad has AVX2 only).
+  GGML_NATIVE: 'OFF'
+  GGML_AVX: 'ON'
+  GGML_AVX2: 'ON'
+  GGML_FMA: 'ON'
+  GGML_F16C: 'ON'
+  GGML_BMI2: 'ON'
+  GGML_AVX512: 'OFF'
 
 jobs:
   build:

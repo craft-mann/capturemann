@@ -114,8 +114,17 @@ if ($env:CM_SKIP_BUILD -ne '1') {
     # /MT everywhere (Rust crates and, through cc-rs and cmake, the C and C++ ones): no vcruntime140.dll.
     $env:RUSTFLAGS = (($env:RUSTFLAGS, '-C target-feature=+crt-static') -join ' ').Trim()
   }
+  # whisper.cpp (cm-ai, built by whisper-rs-sys) defaults to -march=native: it was compiled with AVX-512 on the CI
+  # runner and cm-desktop.exe died with an illegal instruction (0xc000001d, a `vmovups zmm`) when Transcribe loaded
+  # the model on a ThinkPad T490 (AVX2 only), Nov 5, 2026. Same fixed baseline as bundle.sh and build-linux.sh:
+  # the result must not depend on the build machine. whisper-rs-sys passes GGML_* variables to CMake but does not
+  # re-run when they change, so its cached output (rust-cache) is dropped first.
+  $env:GGML_NATIVE = 'OFF'; $env:GGML_AVX = 'ON'; $env:GGML_AVX2 = 'ON'; $env:GGML_FMA = 'ON'
+  $env:GGML_F16C = 'ON'; $env:GGML_BMI2 = 'ON'; $env:GGML_AVX512 = 'OFF'
   Push-Location $root
   try {
+    Write-Host '==> cargo clean -p whisper-rs-sys (portable CPU baseline: AVX2, no AVX-512)'
+    Invoke-Native cargo @('clean', '--release', '-p', 'whisper-rs-sys')
     Write-Host '==> cargo build --release (capturemann, cm-mcp)'
     Invoke-Native cargo (@('build', '--release', '--locked', '--no-default-features') + $jobs + @('-p', 'cm-cli', '-p', 'cm-mcp'))
     # The window programs and the daemon get the GUI subsystem, so Explorer or the Start Menu opens no console
