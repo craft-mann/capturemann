@@ -64,5 +64,8 @@ pub use recorder::{AudioEvent, AudioRecorder, RecorderSettings};
 pub use source::{
     AudioChunk, AudioSource, DeviceSelector, SinkNotifier, SourceFactory, SourceFormat, SourceSink,
 };
-pub use system::{system_audio_factory, SystemAudioConfig, SystemAudioRecorder, SYSTEM_FILE};
+pub use system::{
+    system_audio_check_factory, system_audio_factory, SystemAudioConfig, SystemAudioRecorder,
+    SYSTEM_FILE,
+};
 pub use wav::{read_info, repair_wav, WavInfo, WavWriter};

@@ -5,8 +5,8 @@
 //!   cargo run -p cm-audio --example chime_probe
 
 use cm_audio::{
-    run_check, screen_recording_permission, system_audio_factory, system_chime_player, ChimeConfig,
-    ChimeOutcome,
+    run_check, screen_recording_permission, system_audio_check_factory, system_chime_player,
+    ChimeConfig, ChimeOutcome,
 };
 
 fn main() {
@@ -14,7 +14,7 @@ fn main() {
     let mut n = 0u32;
     let outcome = run_check(
         system_chime_player().as_ref(),
-        system_audio_factory(Vec::new()),
+        system_audio_check_factory(),
         &ChimeConfig::default(),
         &mut |peak| {
             n += 1;

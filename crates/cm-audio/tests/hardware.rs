@@ -86,7 +86,7 @@ fn system_audio_hears_a_chime_played_by_another_process() {
     }
     let outcome = cm_audio::run_check(
         cm_audio::system_chime_player().as_ref(),
-        cm_audio::system_audio_factory(Vec::new()),
+        cm_audio::system_audio_check_factory(),
         &cm_audio::ChimeConfig::default(),
         &mut |peak| eprintln!("peak {peak:.1} dBFS"),
     );
@@ -133,7 +133,7 @@ fn devices_open_without_streaming() {
     }
     #[cfg(target_os = "macos")]
     {
-        let factory = cm_audio::system_audio_factory(Vec::new());
+        let factory = cm_audio::system_audio_check_factory();
         let mut factory = factory;
         match factory(&cm_audio::DeviceSelector::Default) {
             Ok(s) => eprintln!("system audio source: {:?}", s.format()),

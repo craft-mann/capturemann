@@ -376,7 +376,7 @@ impl SystemCheckRunner for ChimeRunner {
     fn run(&self, progress: &(dyn Fn(f32) + Send + Sync)) -> SystemOutcome {
         let outcome = cm_audio::run_check(
             cm_audio::system_chime_player().as_ref(),
-            cm_audio::system_audio_factory(Vec::new()),
+            cm_audio::system_audio_check_factory(),
             &cm_audio::ChimeConfig::default(),
             &mut |peak| progress(peak),
         );

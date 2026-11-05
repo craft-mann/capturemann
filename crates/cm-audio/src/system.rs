@@ -73,6 +73,26 @@ pub fn system_audio_factory(exclude_bundle_ids: Vec<String>) -> SourceFactory {
     }
 }
 
+/// The source the "does system audio work" check listens with. Same as [`system_audio_factory`]
+/// except on Windows, where it is the plain loopback of the default output: the process loopback
+/// leaves out CaptureMann and everything it starts, and the check's chime player (PowerShell) is
+/// such a child, so it would never hear its own chime.
+pub fn system_audio_check_factory() -> SourceFactory {
+    #[cfg(target_os = "windows")]
+    {
+        Box::new(|_sel: &DeviceSelector| {
+            Ok(
+                Box::new(crate::cpal_source::CpalSource::open_default_output_loopback()?)
+                    as Box<dyn AudioSource>,
+            )
+        })
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        system_audio_factory(Vec::new())
+    }
+}
+
 /// Records what the computer plays.
 pub struct SystemAudioRecorder {
     inner: AudioRecorder,
