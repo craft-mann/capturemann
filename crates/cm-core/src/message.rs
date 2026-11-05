@@ -106,6 +106,12 @@ pub const TEMPLATES: &[Template] = &[
         ErrorCode::PlatformRejected,
         "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update your graphics driver, or use a computer with a hardware video encoder (most computers since about 2016).",
     ),
+    // A region, window or display smaller than any H.264 encoder takes (`cm_capture::plan_capture`).
+    t(
+        "recording_area_too_small",
+        ErrorCode::InvalidInput,
+        "The recording area is too small: each side must be at least {min} px.",
+    ),
     // FFmpeg is missing (the exporter, the GIF and WebM presets, frame picking). The ids are the
     // stable machine-readable "FFmpeg not found" code: `cm_media::tools` raises the messages (a
     // test there pins the wording), and a failed job's `error.data.reason_code` carries the id.

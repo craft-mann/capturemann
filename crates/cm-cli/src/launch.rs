@@ -90,23 +90,19 @@ fn spawn_daemon(endpoint: &Endpoint, library: Option<&Path>) -> io::Result<()> {
     let bin = daemon_binary();
     let mut cmd = cm_platform::process::command(&bin);
     cmd.args(daemon_args(endpoint, library.as_deref()));
-    cmd.stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null());
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt;
-        cmd.process_group(0);
-    }
-    cmd.spawn().map(|_child| ()).map_err(|e| {
-        io::Error::new(
-            e.kind(),
-            format!(
-                "cannot run `{}`: {e} (set CAPTUREMANN_DAEMON to the cm-daemon binary)",
-                bin.display()
-            ),
-        )
-    })
+    // Detached, stdio null and no inherited caller handles (a script capturing our output must
+    // see end-of-file when we exit, not when the daemon does).
+    cm_platform::process::spawn_detached(&mut cmd)
+        .map(|_child| ())
+        .map_err(|e| {
+            io::Error::new(
+                e.kind(),
+                format!(
+                    "cannot run `{}`: {e} (set CAPTUREMANN_DAEMON to the cm-daemon binary)",
+                    bin.display()
+                ),
+            )
+        })
 }
 
 #[cfg(test)]

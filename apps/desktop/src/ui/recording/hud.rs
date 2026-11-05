@@ -190,7 +190,12 @@ impl HudView {
         };
         let snapped = snap_hud(&now, &rec::hud_bounds(&display));
         if (snapped.x - now.x).abs() > 0.5 || (snapped.y - now.y).abs() > 0.5 {
-            crate::platform_window::move_to(window, snapped.x, snapped.y);
+            // Moving sends WM_WINDOWPOSCHANGED to GPUI synchronously on Windows: do it from a task,
+            // not inside this window update (see `NativeWindow`).
+            if let Some(n) = crate::platform_window::NativeWindow::for_frame(window) {
+                cx.spawn(async move |_, _| n.set_frame(snapped.x, snapped.y, now.w, now.h))
+                    .detach();
+            }
         }
         let app = self.app.clone();
         cx.defer(move |cx| rec::remember_hud(&app, &display, &snapped, cx));

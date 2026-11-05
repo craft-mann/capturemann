@@ -955,10 +955,20 @@ fn open_recording_windows(app: &Entity<AppModel>, cx: &mut App) {
             // AppKit clamps a new window below the menu bar; the indicator covers the whole
             // display so the brackets line up with the recorded pixels.
             let d = display.1;
+            // Only the native handle is taken inside the update; the resize runs from a task
+            // (Windows sends WM_SIZE to GPUI synchronously: inside the update it re-entered the
+            // window and logged `RefCell already borrowed`).
+            let native = h
+                .update(cx, |_, window, _| {
+                    platform_window::NativeWindow::for_frame(window)
+                })
+                .ok()
+                .flatten();
             let fix = move |cx: &mut App| {
-                let _ = h.update(cx, |_, window, _| {
-                    platform_window::set_frame(window, d.x, d.y, d.w, d.h);
-                });
+                if let Some(n) = native.clone() {
+                    cx.spawn(async move |_| n.set_frame(d.x, d.y, d.w, d.h))
+                        .detach();
+                }
             };
             fix(cx);
             // AppKit may clamp again when the window is first ordered front.

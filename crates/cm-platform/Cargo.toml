@@ -18,7 +18,7 @@ libc.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 # The version cm-cursor and cm-capture use.
-windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dxgi", "Win32_System_Performance", "Win32_System_Power", "Win32_System_ProcessStatus", "Win32_System_Registry", "Win32_System_Threading"] }
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dxgi", "Win32_System_Console", "Win32_System_Performance", "Win32_System_Power", "Win32_System_ProcessStatus", "Win32_System_Registry", "Win32_System_Threading"] }
 
 [target.'cfg(any(windows, target_os = "linux"))'.dependencies]
 # MIT. Recycle Bin on Windows, the freedesktop.org Trash on Linux. (macOS moves files to the Trash with
