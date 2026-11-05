@@ -7,7 +7,7 @@ use super::common::{manifest, wait_job};
 use crate::check;
 use crate::ctx::{Ctx, Display};
 use crate::media;
-use crate::model::{fail, skip, Case, Need, Stop, Tier, ALL, R};
+use crate::model::{fail, skip, Case, Need, Stop, Tier, ALL, R, WIN};
 use crate::proc::exit_text;
 use crate::sys;
 use serde_json::Value;
@@ -92,6 +92,17 @@ pub fn cases() -> Vec<Case> {
             platforms: ALL,
             timeout_s: 240,
             run: external_4k,
+        },
+        Case {
+            id: "rec.each_monitor",
+            title: "10 s of each monitor: the cursor header names that monitor's origin and size; friendly names, sprite sizes",
+            area: "rec",
+            specs: &["REC-7", "DPI-WIN steps 7 to 7c"],
+            tier: Tier::Hardware,
+            needs: &[Need::DesktopSession, Need::Screen, Need::SecondMonitor],
+            platforms: WIN,
+            timeout_s: 300,
+            run: each_monitor,
         },
         Case {
             id: "rec.soak",
@@ -847,4 +858,118 @@ fn trouble_words(ctx: &Ctx, needles: &[&str]) -> bool {
         }
     }
     texts.iter().any(|t| needles.iter().any(|n| t.contains(n)))
+}
+
+fn find_numbers(v: &Value, key: &str) -> Option<Vec<i64>> {
+    match v {
+        Value::Object(o) => {
+            if let Some(a) = o.get(key).and_then(Value::as_array) {
+                return Some(a.iter().filter_map(Value::as_i64).collect());
+            }
+            o.values().find_map(|x| find_numbers(x, key))
+        }
+        _ => None,
+    }
+}
+
+fn each_monitor(ctx: &mut Ctx) -> R {
+    ctx.allow_recording_without_dialog()?;
+    ctx.start_daemon()?;
+    let v = ctx.cli_ok(&["targets", "--displays-only"])?;
+    let ds = crate::ctx::displays(&v);
+    if ds.len() < 2 {
+        return skip("only one display is connected");
+    }
+    let mut problems = Vec::new();
+    let names: std::collections::BTreeSet<&str> = ds.iter().map(|d| d.name.as_str()).collect();
+    for d in &ds {
+        ctx.note(format!(
+            "display {} '{}' at ({},{}) {}x{} scale {}{}",
+            d.id,
+            d.name,
+            d.x,
+            d.y,
+            d.w,
+            d.h,
+            d.scale,
+            if d.primary { " primary" } else { "" }
+        ));
+        if d.name.trim().is_empty() {
+            problems.push(format!("display {} has no name", d.id));
+        }
+    }
+    if names.len() != ds.len() {
+        problems.push("two displays share a name".to_owned());
+    }
+    for d in &ds {
+        let id = d.id.to_string();
+        let region = "100,100,400,300";
+        let out = ctx
+            .root
+            .join(format!("region-{}.png", d.id))
+            .to_string_lossy()
+            .into_owned();
+        ctx.cli_ok(&[
+            "capture",
+            "screenshot",
+            "--display",
+            &id,
+            "--region",
+            region,
+            "--out",
+            &out,
+        ])?;
+        let (w, h) = super::common::check_png(std::path::Path::new(&out))?;
+        if (w, h) != (400, 300) {
+            problems.push(format!(
+                "region on display {} saved {w}x{h}, expected 400x300",
+                d.id
+            ));
+        }
+        let rec = record(ctx, d, &["--size", "source"], &[Step::Wait(10)], None)?;
+        let cursor = Ctx::files_under(&rec.bundle).into_iter().find(|f| {
+            f.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with("cursor") && n.ends_with(".jsonl"))
+        });
+        match cursor {
+            None => problems.push(format!("display {}: no cursor log", d.id)),
+            Some(c) => {
+                let text = std::fs::read_to_string(c)?;
+                let head: Value =
+                    serde_json::from_str(text.lines().next().unwrap_or("")).unwrap_or(Value::Null);
+                let origin = find_numbers(&head, "origin");
+                let size = find_numbers(&head, "size");
+                ctx.note(format!(
+                    "display {}: cursor header origin {origin:?} size {size:?}; {} lines",
+                    d.id,
+                    text.lines().count()
+                ));
+                if origin.as_deref() != Some(&[d.x, d.y][..]) {
+                    problems.push(format!(
+                        "display {}: cursor header origin {origin:?}, expected [{}, {}]",
+                        d.id, d.x, d.y
+                    ));
+                }
+                if size.as_deref() != Some(&[d.w, d.h][..]) {
+                    problems.push(format!(
+                        "display {}: cursor header size {size:?}, expected [{}, {}]",
+                        d.id, d.w, d.h
+                    ));
+                }
+            }
+        }
+        if let Ok(idx) = std::fs::read_to_string(rec.bundle.join("cursors").join("index.json")) {
+            ctx.note(format!(
+                "display {}: cursor sprites {}",
+                d.id,
+                crate::util::cut(&idx.replace(char::is_whitespace, ""), 240)
+            ));
+        }
+    }
+    if problems.is_empty() {
+        Ok(())
+    } else {
+        fail(problems.join("; "))
+    }
 }

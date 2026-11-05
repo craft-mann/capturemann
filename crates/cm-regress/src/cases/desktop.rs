@@ -83,6 +83,17 @@ pub fn cases() -> Vec<Case> {
             run: settings_applied,
         },
         Case {
+            id: "desktop.recording_placement",
+            title: "countdown, area window and HUD of a recording of the external monitor appear on that monitor",
+            area: "desktop",
+            specs: &["REC-5", "DPI-WIN", "bug: countdown and toasts on the other monitor"],
+            tier: Tier::Full,
+            needs: &[Need::DesktopSession, Need::Screen, Need::SecondMonitor],
+            platforms: WIN,
+            timeout_s: 180,
+            run: placement,
+        },
+        Case {
             id: "desktop.tray_icon",
             title: "the tray icon exists (UI Automation probe)",
             area: "desktop",
@@ -569,4 +580,149 @@ fn settings_applied(ctx: &mut Ctx) -> R {
         waited.as_secs_f64()
     );
     Ok(())
+}
+
+fn centre(w: &WinInfo) -> (i32, i32) {
+    ((w.rect[0] + w.rect[2]) / 2, (w.rect[1] + w.rect[3]) / 2)
+}
+
+fn inside(w: &WinInfo, d: &crate::ctx::Display) -> bool {
+    let (cx, cy) = centre(w);
+    i64::from(cx) >= d.x
+        && i64::from(cx) < d.x + d.w
+        && i64::from(cy) >= d.y
+        && i64::from(cy) < d.y + d.h
+}
+
+fn placement(ctx: &mut Ctx) -> R {
+    ctx.allow_recording_without_dialog()?;
+    let app = start_app(ctx, &[])?;
+    std::thread::sleep(Duration::from_secs(3));
+    let t = ctx.cli_ok(&["targets", "--displays-only"])?;
+    let ds = displays(&t);
+    let Some(ext) = ds.iter().find(|d| !d.primary).cloned() else {
+        return skip("only one display is connected");
+    };
+    for d in &ds {
+        ctx.note(format!(
+            "display {} '{}' ({},{}) {}x{} scale {}{}",
+            d.id,
+            d.name,
+            d.x,
+            d.y,
+            d.w,
+            d.h,
+            d.scale,
+            if d.primary { " primary" } else { "" }
+        ));
+    }
+    let id = ext.id.to_string();
+    ctx.cli_ok(&[
+        "record",
+        "start",
+        "--display",
+        &id,
+        "--countdown",
+        "3",
+        "--size",
+        "720p",
+    ])?;
+    // Sample the app's small windows every 100 ms through the countdown.
+    let mut small: Vec<WinInfo> = Vec::new();
+    let end = std::time::Instant::now() + Duration::from_millis(3200);
+    while std::time::Instant::now() < end {
+        for w in sys::enum_windows() {
+            let big = w.width() > 1200 || w.height() > 700;
+            if w.pid == app.pid
+                && w.visible
+                && !big
+                && w.width() > 40
+                && !small.iter().any(|s| s.hwnd == w.hwnd)
+            {
+                small.push(w);
+            }
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    for w in &small {
+        ctx.note(format!(
+            "countdown phase: {} -> {}",
+            w.brief(),
+            if inside(w, &ext) {
+                "on the recorded monitor"
+            } else {
+                "ELSEWHERE"
+            }
+        ));
+    }
+    std::thread::sleep(Duration::from_secs(2));
+    let all: Vec<WinInfo> = sys::enum_windows()
+        .into_iter()
+        .filter(|w| w.pid == app.pid && w.visible && w.width() > 0)
+        .collect();
+    let mut problems = Vec::new();
+    if small.is_empty() {
+        problems.push("no countdown window was seen".to_owned());
+    }
+    for w in small.iter().filter(|w| !inside(w, &ext)) {
+        problems.push(format!(
+            "a countdown-phase window is not on the recorded monitor: {}",
+            w.brief()
+        ));
+    }
+    let area: Vec<&WinInfo> = all
+        .iter()
+        .filter(|w| i64::from(w.width()) >= ext.w - 80 && i64::from(w.height()) >= ext.h - 80)
+        .collect();
+    for a in &all {
+        ctx.note(format!("recording phase: {}", a.brief()));
+    }
+    match area.first() {
+        None => problems.push(format!(
+            "no area window covers the recorded monitor {}x{}",
+            ext.w, ext.h
+        )),
+        Some(a) => {
+            let off = [
+                a.rect[0] - ext.x as i32,
+                a.rect[1] - ext.y as i32,
+                a.rect[2] - (ext.x + ext.w) as i32,
+                a.rect[3] - (ext.y + ext.h) as i32,
+            ];
+            if off.iter().any(|o| o.abs() > 20) {
+                problems.push(format!(
+                    "the area window is not the display frame: offsets {off:?}"
+                ));
+            }
+        }
+    }
+    let hud = all
+        .iter()
+        .filter(|w| w.ex_style & sys::WS_EX_TOPMOST != 0 && w.width() <= 900 && w.height() <= 300)
+        .min_by_key(|w| w.width() * w.height());
+    match hud {
+        None => problems.push("no HUD window while recording".to_owned()),
+        Some(h) => {
+            let inside_frame = h.rect[0] >= ext.x as i32
+                && h.rect[1] >= ext.y as i32
+                && h.rect[2] <= (ext.x + ext.w) as i32
+                && h.rect[3] <= (ext.y + ext.h) as i32;
+            if !inside_frame {
+                problems.push(format!(
+                    "the HUD is not inside the recorded display: {}",
+                    h.brief()
+                ));
+            }
+        }
+    }
+    let stop = ctx.cli_long(&["record", "stop"], 90)?;
+    super::record::wait_idle_exports(ctx);
+    if !stop.ok() {
+        problems.push(format!("record stop failed: {}", exit_text(stop.code())));
+    }
+    if problems.is_empty() {
+        Ok(())
+    } else {
+        fail(problems.join("; "))
+    }
 }
