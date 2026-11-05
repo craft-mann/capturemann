@@ -115,6 +115,9 @@ pub struct RecState {
     /// Bumped by every `camera.connected` / `camera.disconnected`; an open start sheet reloads
     /// its device list when it sees a new value (CAM-1).
     pub camera_list_epoch: u64,
+    /// The countdown is waiting for the engine's answer on which display is recorded (the
+    /// `recording.starting` event that carries it comes after the countdown).
+    countdown_lookup: bool,
     poll: Option<Task<()>>,
 }
 
@@ -139,6 +142,7 @@ impl RecState {
             sheet_win: None,
             reduced_motion: false,
             camera_list_epoch: 0,
+            countdown_lookup: false,
             poll: None,
         }
     }
@@ -465,6 +469,8 @@ fn handle_change(app: &Entity<AppModel>, change: Change, cx: &mut App) {
         Change::Started { agent } => {
             close_countdown(app, cx);
             open_recording_windows(app, cx);
+            // A toast already on screen moves to the recorded display and clear of the HUD.
+            app::sync_toasts(app, cx);
             start_poll(app, cx);
             if let Some((client, tool)) = agent {
                 let id = rec_of(app, cx).read(cx).hud.recording_id.clone();
@@ -685,9 +691,56 @@ fn indicator_area(rec: &RecState, cx: &App) -> Option<(Rect, (DisplayId, Rect))>
 }
 
 fn show_countdown(app: &Entity<AppModel>, cx: &mut App) {
+    show_countdown_with(app, false, cx)
+}
+
+/// `looked_up`: the engine was asked already (its answer or its silence is all there is).
+fn show_countdown_with(app: &Entity<AppModel>, looked_up: bool, cx: &mut App) {
     let rec = rec_of(app, cx);
     if !rec.read(cx).hud.countdown_wanted() {
         return;
+    }
+    if rec.read(cx).countdown_win.is_none() {
+        let (resume, have, looking) = {
+            let r = rec.read(cx);
+            (
+                r.hud.phase == Phase::Resuming,
+                r.hud.indicator.is_some(),
+                r.countdown_lookup,
+            )
+        };
+        if looking {
+            return;
+        }
+        if countdown::needs_lookup(resume, have, looked_up, looking) {
+            let backend = app.read(cx).backend.clone();
+            if let Some(daemon) = backend.daemon.clone() {
+                rec.update(cx, |r, _| r.countdown_lookup = true);
+                let app2 = app.clone();
+                cx.spawn(async move |cx| {
+                    let answer = backend
+                        .rt
+                        .spawn(async move {
+                            Backend::call(&daemon, "get_recording_status", json!({})).await
+                        })
+                        .await;
+                    cx.update(|cx| {
+                        let rec = rec_of(&app2, cx);
+                        rec.update(cx, |r, _| {
+                            r.countdown_lookup = false;
+                            if let (Ok(Ok(v)), None) = (&answer, &r.hud.indicator) {
+                                r.hud.indicator = v
+                                    .get("indicator")
+                                    .and_then(crate::recording::model::Indicator::parse);
+                            }
+                        });
+                        show_countdown_with(&app2, true, cx);
+                    });
+                })
+                .detach();
+                return;
+            }
+        }
     }
     // Linux: the countdown is part of the banner in the Studio window (a disc over the screen
     // would be in the video, and Wayland cannot place it).
@@ -705,10 +758,20 @@ fn show_countdown(app: &Entity<AppModel>, cx: &mut App) {
         let r = rec.read(cx);
         match indicator_area(r, cx) {
             Some((a, d)) => Some((a, d)),
+            // Still unknown (the engine did not answer): the display with the pointer, where the
+            // user just acted, not the one of an earlier recording.
+            // `area` and `display` outlive a recording; only a camera preview that the start
+            // sheet has open says they are for this start.
             None => r
-                .display
-                .or_else(|| displays(cx).first().copied())
-                .map(|d| (r.area.unwrap_or(d.1), d)),
+                .setup_preview
+                .then_some(r.area)
+                .flatten()
+                .and_then(|a| display_for(cx, &a).map(|d| (a, d)))
+                .or_else(|| {
+                    pointer_display(cx)
+                        .or_else(|| displays(cx).first().copied())
+                        .map(|d| (d.1, d))
+                }),
         }
     };
     let Some((area, display)) = resolved else {

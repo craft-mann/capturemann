@@ -238,6 +238,12 @@ pub fn move_to(window: &Window, x: f64, y: f64) {
 /// Sets the client area to `(x, y, w, h)` points.
 pub fn set_frame(window: &Window, x: f64, y: f64, w: f64, h_pt: f64) {
     let Some(h) = hwnd(window) else { return };
+    set_frame_hwnd(h, x, y, w, h_pt);
+}
+
+/// [`set_frame`] for a window known by its handle, so it can be called later from a task that
+/// holds no window borrow (`NativeWindow`). A handle that is gone makes the call fail quietly.
+pub fn set_frame_hwnd(h: HWND, x: f64, y: f64, w: f64, h_pt: f64) {
     let Some((outer, client)) = client_origin(h) else {
         return;
     };

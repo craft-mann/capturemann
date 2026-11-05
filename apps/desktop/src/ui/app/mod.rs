@@ -183,6 +183,10 @@ pub struct AppModel {
     /// The stack height the toast window was last fitted to (measured from the painted cards), so
     /// a measurement that cannot be honoured (a pile taller than the display) does not loop.
     toast_fit: f32,
+    /// Where the toast window sits (global points) and on which display (Windows names it, so a
+    /// toast can follow the recorded monitor); a window is moved only when these change.
+    toast_pos: (f32, f32),
+    toast_display: Option<gpui::DisplayId>,
     confirm_windows: Vec<(String, WindowHandle<ConfirmDialog>)>,
     toast_timer: Option<Task<()>>,
     /// When the toast window was parked (its stack emptied), and when one was last closed
@@ -297,6 +301,8 @@ impl AppModel {
             studio_open: false,
             toast_window: None,
             toast_fit: 0.,
+            toast_pos: (0., 0.),
+            toast_display: None,
             confirm_windows: Vec::new(),
             toast_timer: None,
             toast_idle_since: None,

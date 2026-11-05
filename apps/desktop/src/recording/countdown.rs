@@ -33,6 +33,15 @@ pub fn window_rect(area: &Rect, display: &Rect) -> Rect {
     Rect::new(x, y, side, h)
 }
 
+/// Whether the countdown must ask the engine where the recording is before it opens: a start
+/// countdown (not a resume) whose indicator facts have not arrived. The engine publishes them
+/// with `recording.starting`, which comes AFTER the countdown, but `get_recording_status`
+/// answers with them from the first second. Without them the disc opened on a stale or the
+/// primary display (Windows round 3, F3).
+pub fn needs_lookup(resume: bool, have_indicator: bool, looked_up: bool, looking: bool) -> bool {
+    !resume && !have_indicator && !looked_up && !looking
+}
+
 /// How much of the ring is left `elapsed` into the current step: 1 at the start of a second,
 /// draining to 0 as the next digit arrives. With `animate` off (reduced motion) the ring is
 /// shown full.
@@ -139,6 +148,75 @@ mod tests {
                 assert!(label(3, false).contains('3'));
                 assert!(label(1, true).contains('1'));
             });
+        }
+    }
+
+    #[test]
+    fn the_lookup_happens_once_for_a_start_countdown_without_facts() {
+        assert!(needs_lookup(false, false, false, false));
+        assert!(
+            !needs_lookup(true, false, false, false),
+            "a resume knows its area"
+        );
+        assert!(!needs_lookup(false, true, false, false));
+        assert!(!needs_lookup(false, false, true, false), "asked already");
+        assert!(!needs_lookup(false, false, false, true), "being asked");
+    }
+
+    /// Round 3 (lab laptop): the disc is centred on the recorded display, in physical px, whichever
+    /// monitor holds the pointer or was recorded last.
+    mod lab {
+        use super::*;
+        use crate::recording::geometry::area_points;
+        use crate::recording::monitors::{index_for_area_px, window_bounds, Monitor};
+
+        fn lab() -> [Monitor; 2] {
+            let m = |id, f: [f64; 4], w: [f64; 4]| Monitor {
+                id,
+                frame_px: Rect::new(f[0], f[1], f[2], f[3]),
+                work_px: Rect::new(w[0], w[1], w[2], w[3]),
+                scale: 1.5,
+            };
+            [
+                m(1, [0., 0., 1920., 1080.], [0., 0., 1920., 1032.]),
+                m(2, [1920., 0., 3840., 2160.], [1920., 0., 3840., 2160.]),
+            ]
+        }
+
+        /// The disc's centre in physical px for a recording of `bounds`, and its monitor.
+        fn disc_centre(bounds: [i64; 4]) -> (usize, (f64, f64)) {
+            let ms = lab();
+            let i = index_for_area_px(&ms, bounds).expect("a monitor holds the area");
+            let display = ms[i].frame_points();
+            let area = area_points(bounds, 1.5);
+            let w = window_rect(&area, &display);
+            let px = ms[i].to_physical(&window_bounds(&w, &display, true));
+            (
+                i,
+                (px.x + px.w / 2.0, px.y + (DISC + 2.0 * PAD) / 2.0 * 1.5),
+            )
+        }
+
+        #[test]
+        fn recording_the_external_puts_the_disc_on_the_external() {
+            let (i, (x, y)) = disc_centre([1920, 0, 3840, 2160]);
+            assert_eq!(i, 1);
+            assert_eq!((x, y), (3840.0, 1080.0));
+        }
+
+        #[test]
+        fn recording_the_panel_puts_the_disc_on_the_panel() {
+            let (i, (x, y)) = disc_centre([0, 0, 1920, 1080]);
+            assert_eq!(i, 0);
+            assert_eq!((x, y), (960.0, 540.0));
+        }
+
+        #[test]
+        fn a_region_on_the_external_keeps_its_centre() {
+            // 800x600 region at (2400, 300) on the external: centre (2800, 600).
+            let (i, (x, y)) = disc_centre([2400, 300, 800, 600]);
+            assert_eq!(i, 1);
+            assert_eq!((x, y), (2800.0, 600.0));
         }
     }
 }

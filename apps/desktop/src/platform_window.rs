@@ -268,6 +268,15 @@ impl NativeWindow {
         imp::native(window).map(NativeWindow)
     }
 
+    /// A handle good for [`NativeWindow::set_frame`] only: macOS gives the same handle as [`of`],
+    /// Windows the window handle (`of` stays `None` there so activations keep going through
+    /// GPUI), elsewhere `None`.
+    ///
+    /// [`of`]: NativeWindow::of
+    pub fn for_frame(window: &Window) -> Option<NativeWindow> {
+        imp::native_for_frame(window).map(NativeWindow)
+    }
+
     /// Sets the frame (global points, top-left origin). Call outside a window update.
     pub fn set_frame(&self, x: f64, y: f64, w: f64, h: f64) {
         imp::native_set_frame(&self.0, x, y, w, h);
@@ -572,6 +581,10 @@ mod imp {
         ns_window(window).ok()
     }
 
+    pub fn native_for_frame(window: &Window) -> Option<Native> {
+        native(window)
+    }
+
     pub fn native_set_frame(win: &Native, x: f64, y: f64, w: f64, h: f64) {
         use objc2_foundation::{NSRect, NSSize};
         let Some(ph) = primary_height() else { return };
@@ -707,13 +720,39 @@ mod imp {
         None
     }
 
+    /// Windows: the window handle, so a frame can be set from a task after the window update
+    /// (`SetWindowPos` sends the size to GPUI synchronously, as AppKit does).
+    #[cfg(windows)]
+    #[derive(Clone)]
+    pub struct Native(isize);
+
+    #[cfg(not(windows))]
     #[derive(Clone)]
     pub struct Native;
 
+    /// No native window for activation and the like: Windows and Linux activate through GPUI.
     pub fn native(_window: &Window) -> Option<Native> {
         None
     }
 
+    /// A handle that can only set the frame later (see [`NativeWindow::for_frame`]).
+    #[cfg(windows)]
+    pub fn native_for_frame(window: &Window) -> Option<Native> {
+        crate::platform_win_monitors::hwnd(window).map(|h| Native(h.0 as isize))
+    }
+
+    #[cfg(not(windows))]
+    pub fn native_for_frame(_window: &Window) -> Option<Native> {
+        None
+    }
+
+    #[cfg(windows)]
+    pub fn native_set_frame(win: &Native, x: f64, y: f64, w: f64, h: f64) {
+        let hwnd = windows::Win32::Foundation::HWND(win.0 as *mut std::ffi::c_void);
+        crate::platform_win_monitors::set_frame_hwnd(hwnd, x, y, w, h);
+    }
+
+    #[cfg(not(windows))]
     pub fn native_set_frame(_win: &Native, _x: f64, _y: f64, _w: f64, _h: f64) {}
 
     pub fn native_bring_to_front(_win: &Native, _visible: Option<(f64, f64, f64, f64)>) {}
