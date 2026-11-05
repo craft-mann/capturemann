@@ -10,6 +10,7 @@
 #                                      [--speech <speech wav on the laptop>] [--speaker-models <folder with the two .onnx files on the laptop>]
 #                                        (ai.transcribe / ai.speakers; win-make-speech.ps1 makes speech2.wav; the speaker models are in
 #                                         packaging/sherpa/out/models on a machine that ran `make sherpa`/fetch-models.sh; push them with lab.sh)
+#                                      [--commit <sha of the package, written in the report header>]
 #                                      [--label run2]   (added to the report file name so an earlier report is not overwritten)
 #                                      [--installer <setup.exe on the laptop>] [--who NAME]   (the installer case replaces and restores the uninstall entry)
 #
@@ -29,7 +30,7 @@ ttl="${LOCK_TTL_MIN:-45}"
 
 sys="${1:-}"; shift || true
 [ "$sys" = windows ] || die "only 'windows' is implemented (macOS and Linux drivers come later); usage: regress.sh windows [options]"
-tier=smoke; allow=""; run=""; pkgrun=""; only=""; soak=0; model=""; speech=""; spkdir=""; who="cm-regress via regress.sh"; installer=""; label=""
+tier=smoke; allow=""; run=""; pkgrun=""; only=""; soak=0; model=""; speech=""; spkdir=""; who="cm-regress via regress.sh"; installer=""; label=""; commit=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --tier) tier="$2"; shift 2 ;;
@@ -45,6 +46,7 @@ while [ $# -gt 0 ]; do
     --who) who="$2"; shift 2 ;;
     --installer) installer="$2"; shift 2 ;;
     --label) label="$2"; shift 2 ;;
+    --commit) commit="$2"; shift 2 ;;
     *) die "unknown option $1" ;;
   esac
 done
@@ -120,6 +122,7 @@ args="--tier $tier --out $out --who \"$who\" --verdict PARTIAL"
 [ -n "$speech" ] && args="$args --speech \"$speech\""
 [ -n "$spkdir" ] && args="$args --speaker-models \"$spkdir\""
 [ -n "$installer" ] && args="$args --installer \"$installer\""
+[ -n "$commit" ] && args="$args --commit $commit"
 case "$tier" in smoke) limit=600 ;; standard) limit=2400 ;; full) limit=5400 ;; hardware) limit=$((7200 + soak * 60)) ;; esac
 echo "running: cm-regress.exe $args (limit $limit s)"
 set +e
