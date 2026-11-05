@@ -95,6 +95,11 @@ jobs:
           # Only the real-recognizer test of cm-render (the rest runs in ci.yml) and the M4 gate of the desktop.
           Build-Tests 'cm-render' @('--test', 'ocr_real')
           Build-Tests 'cm-desktop' @('--test', 'parity')
+          # The real-model checks of cm-ai (ignored; they need model files you point them at, nothing is
+          # downloaded). Not in the list above because `--tests` of cm-ai would also ship its many unit-style
+          # tests, which ci.yml already runs on Windows. whisper.cpp builds from source here (cmake and the
+          # Visual Studio C++ tools are on windows-latest), the speaker engine links the sherpa-onnx /MD libs.
+          Build-Tests 'cm-ai' @('--test', 'real_model', '--test', 'real_diarize')
 
           '::group::cargo build --release --example record_e2e --example make_fixture'
           $json = & cargo build --release --locked --message-format=json -p cm-daemon --example record_e2e --example make_fixture
