@@ -11,7 +11,7 @@
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Stdio};
 use std::sync::mpsc::{sync_channel, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -60,7 +60,7 @@ pub fn find_ffmpeg() -> Option<PathBuf> {
 
 /// Does this FFmpeg have the libvpx-vp9 encoder?
 pub fn has_vp9(ffmpeg: &Path) -> bool {
-    Command::new(ffmpeg)
+    cm_platform::process::command(ffmpeg)
         .args(["-hide_banner", "-encoders"])
         .output()
         .map(|o| String::from_utf8_lossy(&o.stdout).contains("libvpx-vp9"))
@@ -193,7 +193,7 @@ impl FfmpegVp9Encoder {
             frame.format.ffmpeg_name(),
             threads,
         );
-        let mut child = Command::new(&self.ffmpeg)
+        let mut child = cm_platform::process::command(&self.ffmpeg)
             .args(&args)
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
@@ -393,6 +393,7 @@ mod tests {
     use super::*;
     use crate::cpu::PixelFormat;
     use crate::settings::{Codec, Quality, VideoPlan};
+    use std::process::Command;
 
     fn cfg(dir: &Path, w: u32, h: u32, fps: u32) -> EncoderConfig {
         EncoderConfig {

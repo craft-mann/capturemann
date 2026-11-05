@@ -475,7 +475,7 @@ pub fn probe(tools: &Tools, path: &Path) -> Result<ProbedFile, ProbeError> {
     let ffprobe = tools.ffprobe.as_ref().ok_or_else(|| {
         CmError::not_found("ffprobe was not found next to ffmpeg (install FFmpeg completely)")
     })?;
-    let mut cmd = Command::new(ffprobe);
+    let mut cmd = cm_platform::process::command(ffprobe);
     cmd.args([
         "-v",
         "error",
@@ -523,7 +523,7 @@ pub fn probe(tools: &Tools, path: &Path) -> Result<ProbedFile, ProbeError> {
 
 /// Presentation times of the first video packets of stream `index`, in seconds.
 fn sample_video_times(ffprobe: &Path, path: &Path, index: u32) -> Option<Vec<f64>> {
-    let mut cmd = Command::new(ffprobe);
+    let mut cmd = cm_platform::process::command(ffprobe);
     cmd.args(["-v", "error", "-select_streams"])
         .arg(index.to_string())
         .args(["-read_intervals"])

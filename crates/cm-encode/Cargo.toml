@@ -14,6 +14,7 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
+cm-platform.workspace = true
 cm-core.workspace = true
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

@@ -1286,6 +1286,7 @@ version = "0.2.7"
 dependencies = [
  "block2 0.6.2",
  "cm-core",
+ "cm-platform",
  "cpal",
  "dispatch2",
  "hound",
@@ -1335,6 +1336,7 @@ dependencies = [
  "block2 0.6.2",
  "cm-core",
  "cm-encode",
+ "cm-platform",
  "dispatch2",
  "objc2 0.6.5",
  "objc2-app-kit 0.3.2",
@@ -1527,6 +1529,7 @@ version = "0.2.7"
 dependencies = [
  "block2 0.6.2",
  "cm-core",
+ "cm-platform",
  "log",
  "objc2 0.6.5",
  "objc2-av-foundation",
@@ -1618,6 +1621,7 @@ dependencies = [
  "cm-audio",
  "cm-core",
  "cm-cursor",
+ "cm-platform",
  "cm-render",
  "hound",
  "image",
@@ -1640,6 +1644,7 @@ dependencies = [
  "cm-i18n",
  "cm-ipc",
  "cm-library",
+ "cm-platform",
  "image",
  "log",
  "objc2-app-kit 0.3.2",
@@ -1685,6 +1690,7 @@ version = "0.2.7"
 dependencies = [
  "bytemuck",
  "cm-core",
+ "cm-platform",
  "cosmic-text",
  "image",
  "objc2 0.6.5",

@@ -3,7 +3,7 @@
 
 use std::io::Read;
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 use cm_core::CmError;
 
@@ -15,7 +15,7 @@ pub const SAMPLE_RATE: u32 = 16_000;
 pub fn decode_16k_mono(file: &Path) -> Result<Vec<f32>, CmError> {
     let _t = cm_core::perf::span("audio", "decode");
     let tools = cm_media::tools::locate()?;
-    let mut child = Command::new(&tools.ffmpeg)
+    let mut child = cm_platform::process::command(&tools.ffmpeg)
         .args(["-nostdin", "-v", "error", "-i"])
         .arg(file)
         .args(["-vn", "-ac", "1", "-ar"])
@@ -77,6 +77,7 @@ pub fn mix_at(dst: &mut Vec<f32>, src: &[f32], offset: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::process::Command;
 
     #[test]
     fn mix_at_places_grows_and_clamps() {

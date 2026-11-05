@@ -10,7 +10,7 @@
 //! fallback, and the error names both reasons and what to install.
 
 use std::io::{ErrorKind, Write};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 /// A helper program that can put text on the clipboard.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,7 +41,7 @@ fn helpers(wayland: bool) -> [Helper; 2] {
 /// once it owns the selection, so a zero exit is the success signal. Output is not captured:
 /// the forked server would hold the pipe open.
 fn run(h: &Helper, text: &str) -> Result<(), String> {
-    let mut child = Command::new(h.program)
+    let mut child = cm_platform::process::command(h.program)
         .args(h.args)
         .stdin(Stdio::piped())
         .stdout(Stdio::null())

@@ -3,7 +3,6 @@
 //! when a flashing window changed colour, or against the same steps in another track.
 
 use std::path::Path;
-use std::process::Command;
 
 use cm_core::CmError;
 use serde::{Deserialize, Serialize};
@@ -96,7 +95,7 @@ pub fn expected_edges(log: &[FlashEvent], origin_host_ns: u64) -> Vec<Edge> {
 
 /// Decodes `path` to a 16x16 gray series (ffmpeg) with per-frame times (ffprobe).
 pub fn luma_series(path: &Path) -> Result<LumaSeries, CmError> {
-    let probe = Command::new("ffprobe")
+    let probe = cm_platform::process::command("ffprobe")
         .args([
             "-v",
             "error",
@@ -120,7 +119,7 @@ pub fn luma_series(path: &Path) -> Result<LumaSeries, CmError> {
         .lines()
         .filter_map(|l| l.trim().trim_end_matches(',').parse().ok())
         .collect();
-    let dec = Command::new("ffmpeg")
+    let dec = cm_platform::process::command("ffmpeg")
         .args(["-v", "error", "-i"])
         .arg(path)
         .args([

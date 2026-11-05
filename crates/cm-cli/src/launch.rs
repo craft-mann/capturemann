@@ -88,7 +88,7 @@ fn spawn_daemon(endpoint: &Endpoint, library: Option<&Path>) -> io::Result<()> {
         .map(Path::to_path_buf)
         .or_else(|| std::env::var_os("CAPTUREMANN_LIBRARY").map(PathBuf::from));
     let bin = daemon_binary();
-    let mut cmd = std::process::Command::new(&bin);
+    let mut cmd = cm_platform::process::command(&bin);
     cmd.args(daemon_args(endpoint, library.as_deref()));
     cmd.stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())

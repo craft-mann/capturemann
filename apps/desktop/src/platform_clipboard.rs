@@ -86,7 +86,7 @@ fn with_clipboard<T>(
 mod linux {
     use super::CmError;
     use std::io::{ErrorKind, Write};
-    use std::process::{Command, Stdio};
+    use std::process::Stdio;
 
     /// A helper program that can put data on the clipboard.
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -124,7 +124,7 @@ mod linux {
     /// the selection and the parent exits 0 once it owns it, so a zero exit is the success signal.
     /// The helper's output is not captured: the forked server would hold the pipe open.
     pub(super) fn run(h: &Helper, args: &[&str], data: &[u8]) -> Result<(), CmError> {
-        let mut child = Command::new(h.program)
+        let mut child = cm_platform::process::command(h.program)
             .args(args)
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
@@ -220,10 +220,10 @@ mod linux {
             .unwrap();
             super::super::set_image(&png).unwrap();
             let out = match std::env::var("CM_CLIP_READER").as_deref() {
-                Ok("wl-paste") => Command::new("wl-paste")
+                Ok("wl-paste") => cm_platform::process::command("wl-paste")
                     .args(["--type", "image/png"])
                     .output(),
-                _ => Command::new("xclip")
+                _ => cm_platform::process::command("xclip")
                     .args(["-selection", "clipboard", "-t", "image/png", "-o"])
                     .output(),
             }

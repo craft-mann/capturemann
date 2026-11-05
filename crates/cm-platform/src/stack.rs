@@ -268,7 +268,7 @@ pub fn session_of(
 mod sys {
     use super::{lists_name, parse_version, session_of, Inputs};
     use std::path::PathBuf;
-    use std::process::{Command, Stdio};
+    use std::process::Stdio;
     use std::time::{Duration, Instant};
 
     const PORTAL: &str = "org.freedesktop.portal.Desktop";
@@ -276,7 +276,7 @@ mod sys {
 
     /// Runs a tool with a deadline; `None` when it is missing, fails or is too slow.
     fn run(program: &str, args: &[&str]) -> Option<String> {
-        let mut child = Command::new(program)
+        let mut child = crate::process::command(program)
             .args(args)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())

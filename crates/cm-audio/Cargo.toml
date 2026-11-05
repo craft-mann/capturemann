@@ -14,6 +14,7 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
+cm-platform.workspace = true
 cm-core.workspace = true
 # Apache-2.0. Microphone input (CoreAudio / WASAPI); also WASAPI loopback of the default output on Windows.
 cpal = "0.18"

@@ -2,7 +2,7 @@
 //! speed changes, optional loudness normalisation and the true-peak limiter, on decoded PCM.
 
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 use cm_audio::mix::{mix_tracks, MixParams, TrackAudio};
 use cm_core::CmError;
@@ -66,7 +66,7 @@ impl AudioProcessor for DspAudio {
 /// (1 or 2) channels.
 #[allow(clippy::chunks_exact_to_as_chunks)]
 pub fn decode_pcm(ffmpeg: &Path, file: &Path, channels: u16) -> Result<Vec<f32>, CmError> {
-    let out = Command::new(ffmpeg)
+    let out = cm_platform::process::command(ffmpeg)
         .args(["-hide_banner", "-nostdin", "-v", "error", "-i"])
         .arg(file)
         .args(["-vn", "-f", "f32le", "-ac"])

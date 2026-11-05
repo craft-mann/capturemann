@@ -22,7 +22,7 @@
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::time::Duration;
 
 use cm_core::{CmError, EditContext, EditList, MediaTime, PauseGap};
@@ -580,7 +580,7 @@ fn missing_component(reason: impl Into<String>) -> CmError {
 /// the run.
 pub fn check_components(tools: &Tools, opts: &AudioOptions) -> Result<(), CmError> {
     let run = |args: &[&str]| -> String {
-        Command::new(&tools.ffmpeg)
+        cm_platform::process::command(&tools.ffmpeg)
             .args(["-hide_banner"])
             .args(args)
             .stdin(Stdio::null())
@@ -619,7 +619,7 @@ fn run_capture(
     args: &[String],
     cancel: &dyn Fn() -> bool,
 ) -> Result<String, ExportError> {
-    let mut child = Command::new(ffmpeg)
+    let mut child = cm_platform::process::command(ffmpeg)
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::null())

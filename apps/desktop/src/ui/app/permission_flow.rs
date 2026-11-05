@@ -105,7 +105,7 @@ pub fn restart(app: &Entity<AppModel>, cx: &mut App) {
     {
         // The helper waits for this process to be gone (it may be saving a recording first), so the
         // two instances never overlap on the library, the socket or the shortcuts (R4-10).
-        let _ = std::process::Command::new("sh")
+        let _ = cm_platform::process::command("sh")
             .arg("-c")
             .arg(crate::instance::relaunch_script(std::process::id()))
             .arg(&bundle)

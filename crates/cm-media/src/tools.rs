@@ -16,7 +16,7 @@
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 use cm_core::CmError;
 
@@ -300,7 +300,7 @@ pub fn caps_from_output(version_out: &str, encoders_out: &str) -> Caps {
 }
 
 fn run_capture(exe: &Path, args: &[&str]) -> Result<String, CmError> {
-    let out = Command::new(exe)
+    let out = cm_platform::process::command(exe)
         .args(args)
         .stdin(Stdio::null())
         .output()
@@ -688,7 +688,7 @@ pub fn probe_file(tools: &Tools, file: &Path) -> Result<MediaInfo, CmError> {
     let ffprobe = tools.ffprobe.as_ref().ok_or_else(|| {
         CmError::not_found("ffprobe was not found next to ffmpeg (install FFmpeg completely)")
     })?;
-    let out = Command::new(ffprobe)
+    let out = cm_platform::process::command(ffprobe)
         .args([
             "-v",
             "error",

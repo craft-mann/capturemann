@@ -662,11 +662,11 @@ pub fn open_settings(os: Os, id: Id) {
     };
     #[cfg(target_os = "macos")]
     {
-        let _ = std::process::Command::new("open").arg(link).spawn();
+        let _ = cm_platform::process::command("open").arg(link).spawn();
     }
     #[cfg(windows)]
     {
-        let _ = std::process::Command::new("cmd")
+        let _ = cm_platform::process::command("cmd")
             .args(["/C", "start", "", link])
             .spawn();
     }

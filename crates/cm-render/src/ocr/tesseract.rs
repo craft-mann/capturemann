@@ -240,7 +240,7 @@ fn tessdata_args(cmd: &mut Command) {
 
 /// The installed language codes (`tesseract --list-langs`).
 fn list_langs(exe: &Path) -> Result<Vec<String>, CmError> {
-    let mut cmd = Command::new(exe);
+    let mut cmd = cm_platform::process::command(exe);
     tessdata_args(&mut cmd);
     let out = cmd
         .arg("--list-langs")
@@ -263,7 +263,7 @@ fn list_langs(exe: &Path) -> Result<Vec<String>, CmError> {
 
 /// The version line for diagnostics, for example `tesseract 5.3.4`.
 pub fn version(exe: &Path) -> Option<String> {
-    let out = Command::new(exe)
+    let out = cm_platform::process::command(exe)
         .arg("--version")
         .stdin(Stdio::null())
         .output()
@@ -342,7 +342,7 @@ fn drain<R: Read + Send + 'static>(r: Option<R>) -> std::thread::JoinHandle<Stri
 }
 
 fn run(exe: &Path, png: &[u8], psm: u32) -> Result<String, CmError> {
-    let mut cmd = Command::new(exe);
+    let mut cmd = cm_platform::process::command(exe);
     tessdata_args(&mut cmd);
     cmd.args([
         "stdin",

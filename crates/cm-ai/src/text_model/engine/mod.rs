@@ -642,7 +642,7 @@ impl ChildHandle for SystemChild {
     fn kill(&mut self) {
         let pid = self.child.id().to_string();
         // SIGTERM first: the shell that started the helper passes it on. Then the hard way.
-        let _ = std::process::Command::new("kill")
+        let _ = cm_platform::process::command("kill")
             .args(["-TERM", &pid])
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
@@ -653,7 +653,7 @@ impl ChildHandle for SystemChild {
             }
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
-        let _ = std::process::Command::new("pkill")
+        let _ = cm_platform::process::command("pkill")
             .args(["-KILL", "-P", &pid])
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
@@ -727,7 +727,7 @@ impl Platform for SystemPlatform {
             .map_err(|e| engine_error(ErrorKind::EngineFailed, e.to_string()))?;
         #[cfg(unix)]
         let mut cmd = {
-            let mut c = std::process::Command::new("/bin/sh");
+            let mut c = cm_platform::process::command("/bin/sh");
             c.arg("-c")
                 .arg(WATCHDOG)
                 .arg("llama-watchdog")
@@ -738,7 +738,7 @@ impl Platform for SystemPlatform {
         };
         #[cfg(not(unix))]
         let mut cmd = {
-            let mut c = std::process::Command::new(helper);
+            let mut c = cm_platform::process::command(helper);
             c.args(args);
             c
         };
@@ -785,7 +785,7 @@ impl Platform for SystemPlatform {
 pub fn available_ram_mb() -> Option<u64> {
     #[cfg(target_os = "macos")]
     {
-        let out = std::process::Command::new("vm_stat").output().ok()?;
+        let out = cm_platform::process::command("vm_stat").output().ok()?;
         parse_vm_stat(&String::from_utf8_lossy(&out.stdout))
     }
     #[cfg(target_os = "linux")]
