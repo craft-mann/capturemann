@@ -1,4 +1,5 @@
 use super::*;
+use crate::recording::geometry::Rect;
 
 /// Where the toasts are drawn: inside the Studio window (`true`) or in a window of their own.
 /// A separate toast window cannot be always-on-top or unfocused on Wayland, so there the stack
@@ -127,21 +128,162 @@ pub fn toast_origin(size: (f32, f32), win_h: f32) -> (f32, f32) {
     (size.0 - w - 16., size.1 - win_h - 48.)
 }
 
+/// Margin between the toast window and the edges of the work area (Windows).
+pub const TOAST_EDGE: f64 = 16.;
+/// Gap between the toast window and the HUD when it is moved above it (Windows).
+pub const TOAST_HUD_GAP: f64 = 8.;
+
+fn overlaps(a: &Rect, b: &Rect) -> bool {
+    a.x < b.right() && b.x < a.right() && a.y < b.bottom() && b.y < a.bottom()
+}
+
+/// Where the toast window of `win_h` sits inside `work` (the display without the taskbar, global
+/// points): the lower right corner, `TOAST_EDGE` from both edges. When that would cover `avoid`
+/// (the recording HUD, bottom centre) the window is lifted to sit above it. Used on Windows;
+/// macOS keeps `toast_origin`.
+pub fn toast_rect(work: &Rect, win_h: f64, avoid: Option<&Rect>) -> Rect {
+    let w = f64::from(crate::toast::TOAST_WIDTH);
+    let x = (work.right() - w - TOAST_EDGE).max(work.x);
+    let mut r = Rect::new(x, work.bottom() - win_h - TOAST_EDGE, w, win_h);
+    if let Some(a) = avoid {
+        if overlaps(&r, a) {
+            r.y = a.y - win_h - TOAST_HUD_GAP;
+        }
+    }
+    r.y = r.y.max(work.y);
+    r
+}
+
+/// What to do with a toast window that exists when the stack changes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FitPlan {
+    /// Same display, same frame: leave it alone (the host repaints from the model).
+    Keep,
+    /// Move or resize the native window.
+    Move,
+    /// Close it and open a new one (another display, or no way to resize it).
+    Recreate,
+}
+
+/// The rule that stops the toast window being re-created on every sync: only a window on the
+/// wrong display, or one that must change its frame and cannot (`has_native` false), is replaced.
+pub fn fit_plan(has_native: bool, display_changed: bool, frame_changed: bool) -> FitPlan {
+    if display_changed {
+        FitPlan::Recreate
+    } else if !frame_changed {
+        FitPlan::Keep
+    } else if has_native {
+        FitPlan::Move
+    } else {
+        FitPlan::Recreate
+    }
+}
+
+/// The monitor the toasts belong on (Windows): the recorded display while a recording runs, else
+/// the display the toast window already is on, else the one holding the pointer, else the first
+/// (the primary). `shown` and `displays` are GPUI display ids.
+pub fn toast_display_index<I: Copy + PartialEq>(
+    displays: &[I],
+    recording: Option<I>,
+    shown: Option<I>,
+    pointer: Option<I>,
+) -> Option<usize> {
+    [recording, shown, pointer]
+        .into_iter()
+        .flatten()
+        .find_map(|id| displays.iter().position(|d| *d == id))
+        .or(if displays.is_empty() { None } else { Some(0) })
+}
+
+/// Where toasts go now.
+struct ToastTarget {
+    /// The display and its bounds (global points).
+    display: Option<(gpui::DisplayId, Rect)>,
+    /// The part of it a toast may use (the work area on Windows, the display elsewhere).
+    work: Rect,
+    /// The recording HUD on this display, if there is one to keep clear of.
+    avoid: Option<Rect>,
+}
+
+fn toast_target(app: &Entity<AppModel>, cx: &App) -> Option<ToastTarget> {
+    if !cfg!(windows) {
+        let b = cx.primary_display().map(|d| d.bounds())?;
+        return Some(ToastTarget {
+            display: None,
+            work: Rect::new(
+                f64::from(b.origin.x.as_f32()),
+                f64::from(b.origin.y.as_f32()),
+                f64::from(b.size.width.as_f32()),
+                f64::from(b.size.height.as_f32()),
+            ),
+            avoid: None,
+        });
+    }
+    let all = crate::ui::recording::displays(cx);
+    let ids: Vec<gpui::DisplayId> = all.iter().map(|(id, _)| *id).collect();
+    let recording = {
+        let rec = app.read(cx).rec.read(cx);
+        rec.display
+            .filter(|_| rec.hud.phase.is_active())
+            .map(|d| d.0)
+    };
+    let shown = app.read(cx).toast_display;
+    let pointer = crate::ui::recording::pointer_display(cx).map(|d| d.0);
+    let i = toast_display_index(&ids, recording, shown, pointer)?;
+    let display = all[i];
+    let work = crate::ui::recording::visible_part(&display.1);
+    // The HUD of a recording on this display, so a toast never covers its buttons.
+    let avoid = {
+        let rec = app.read(cx).rec.read(cx);
+        (recording == Some(display.0) && rec.hud_win.is_some()).then(|| {
+            let agent = rec
+                .hud
+                .started_by_agent()
+                .map(|(client, _)| client.to_owned());
+            crate::ui::recording::hud_rect(
+                app,
+                &display.1,
+                agent.as_deref(),
+                rec.hud.is_audio(),
+                cx,
+            )
+        })
+    };
+    Some(ToastTarget {
+        display: Some(display),
+        work,
+        avoid,
+    })
+}
+
+/// The toast window's frame of height `win_h` (global points) on `t`.
+fn toast_frame(t: &ToastTarget, win_h: f32) -> (f32, f32, f32, f32) {
+    let w = crate::toast::TOAST_WIDTH;
+    if cfg!(windows) {
+        let r = toast_rect(&t.work, f64::from(win_h), t.avoid.as_ref());
+        (r.x as f32, r.y as f32, w, win_h)
+    } else {
+        let (x, y) = toast_origin((t.work.w as f32, t.work.h as f32), win_h);
+        (t.work.x as f32 + x, t.work.y as f32 + y, w, win_h)
+    }
+}
+
+/// Never taller than the display leaves room for (a pile of toasts on a short screen).
+fn clamp_height(t: &ToastTarget, h: f32) -> f32 {
+    h.min((t.work.h as f32 - 96.).max(60.))
+}
+
 /// Shrinks the window of an emptied stack to one pixel in its corner, so it blocks nothing while
 /// it waits for the next toast.
-fn park_toast_window(cx: &mut App, handle: WindowHandle<ToastHost>) {
-    let Some(b) = cx.primary_display().map(|d| d.bounds()) else {
+fn park_toast_window(app: &Entity<AppModel>, cx: &mut App, handle: WindowHandle<ToastHost>) {
+    let Some(t) = toast_target(app, cx) else {
         return;
     };
-    let (x, y) = toast_origin((b.size.width.as_f32(), b.size.height.as_f32()), 1.);
-    let w = f64::from(crate::toast::TOAST_WIDTH);
-    let (x, y) = (
-        f64::from(b.origin.x.as_f32() + x) + w - 1.,
-        f64::from(b.origin.y.as_f32() + y),
-    );
+    let (x, y, w, _) = toast_frame(&t, 1.);
+    let (x, y) = (f64::from(x) + f64::from(w) - 1., f64::from(y));
     let native = handle
         .update(cx, |_, window, _| {
-            crate::platform_window::NativeWindow::of(window)
+            crate::platform_window::NativeWindow::for_frame(window)
         })
         .ok()
         .flatten();
@@ -160,40 +302,30 @@ pub(crate) fn fit_toast_window(app: &Entity<AppModel>, measured: f32, cx: &mut A
     let Some(handle) = app.read(cx).toast_window else {
         return;
     };
-    let display = cx.primary_display().map(|d| d.bounds());
-    let height = display.map_or(measured, |b| {
-        measured.min((b.size.height.as_f32() - 96.).max(60.))
-    });
-    let height = height.ceil();
+    let Some(t) = toast_target(app, cx) else {
+        return;
+    };
+    let height = clamp_height(&t, measured).ceil();
     if (app.read(cx).toast_fit - height).abs() < 0.5 {
         return;
     }
-    let Some(b) = display else {
-        return;
-    };
-    let (x, y) = toast_origin((b.size.width.as_f32(), b.size.height.as_f32()), height);
-    let (x, y) = (
-        f64::from(b.origin.x.as_f32() + x),
-        f64::from(b.origin.y.as_f32() + y),
-    );
+    let (x, y, w, h) = toast_frame(&t, height);
     let native = handle
         .update(cx, |_, window, _| {
-            crate::platform_window::NativeWindow::of(window)
+            crate::platform_window::NativeWindow::for_frame(window)
         })
         .ok()
         .flatten();
     let Some(native) = native else {
         return;
     };
-    app.update(cx, |m, _| m.toast_fit = height);
+    app.update(cx, |m, _| {
+        m.toast_fit = height;
+        m.toast_pos = (x, y);
+    });
     // Resize from a task, never inside a window update (see `NativeWindow`).
     cx.spawn(async move |_| {
-        native.set_frame(
-            x,
-            y,
-            f64::from(crate::toast::TOAST_WIDTH),
-            f64::from(height),
-        );
+        native.set_frame(f64::from(x), f64::from(y), f64::from(w), f64::from(h));
     })
     .detach();
 }
@@ -254,6 +386,7 @@ pub(crate) fn sync_toasts(app: &Entity<AppModel>, cx: &mut App) {
                     if let Some(h) = existing {
                         app.update(cx, |m, _| {
                             m.toast_window = None;
+                            m.toast_display = None;
                             m.toast_idle_since = None;
                             m.toast_closed_at = Some(now);
                             m.toast_window_timer = None;
@@ -268,7 +401,7 @@ pub(crate) fn sync_toasts(app: &Entity<AppModel>, cx: &mut App) {
                                 m.toast_idle_since = Some(now);
                                 m.toast_fit = 1.;
                             });
-                            park_toast_window(cx, h);
+                            park_toast_window(app, cx, h);
                         }
                         look_again(app, rest, cx);
                     }
@@ -283,44 +416,63 @@ pub(crate) fn sync_toasts(app: &Entity<AppModel>, cx: &mut App) {
                 m.toast_idle_since = None;
                 m.toast_window_timer = None;
             });
-            let display = cx.primary_display().map(|d| d.bounds());
-            // Never taller than the display leaves room for (a pile of toasts on a short screen).
-            let height = display.map_or(height, |b| {
-                height.min((b.size.height.as_f32() - 96.).max(60.))
-            });
-            let (win_w, win_h) = (crate::toast::TOAST_WIDTH, height);
-            let origin = match display {
-                Some(b) => {
-                    let (x, y) =
-                        toast_origin((b.size.width.as_f32(), b.size.height.as_f32()), win_h);
-                    point(b.origin.x + px(x), b.origin.y + px(y))
-                }
-                None => point(px(100.), px(100.)),
+            let target = toast_target(app, cx);
+            let win_h = target.as_ref().map_or(height, |t| clamp_height(t, height));
+            let (x, y, win_w, win_h) = match &target {
+                Some(t) => toast_frame(t, win_h),
+                None => (100., 100., crate::toast::TOAST_WIDTH, win_h),
             };
+            let display_id = target.as_ref().and_then(|t| t.display.map(|d| d.0));
             let mut keep_existing = existing;
             if let Some(h) = existing {
-                // Resize from a task, never inside a window update (see `NativeWindow`).
-                let native = h
-                    .update(cx, |_, window, _| {
-                        crate::platform_window::NativeWindow::of(window)
+                let (shown, shown_pos, shown_fit) = {
+                    let m = app.read(cx);
+                    (m.toast_display, m.toast_pos, m.toast_fit)
+                };
+                let moved = (shown_pos.0 - x).abs() > 0.5 || (shown_pos.1 - y).abs() > 0.5;
+                let frame_changed = moved || (shown_fit - win_h).abs() > 0.5;
+                let native = if frame_changed {
+                    // Resize from a task, never inside a window update (see `NativeWindow`).
+                    h.update(cx, |_, window, _| {
+                        crate::platform_window::NativeWindow::for_frame(window)
                     })
                     .ok()
-                    .flatten();
-                if let Some(native) = native {
-                    app.update(cx, |m, _| m.toast_fit = win_h);
-                    let (x, y) = (
-                        f64::from(f32::from(origin.x)),
-                        f64::from(f32::from(origin.y)),
-                    );
-                    cx.spawn(async move |_| {
-                        native.set_frame(x, y, f64::from(win_w), f64::from(win_h));
-                    })
-                    .detach();
+                    .flatten()
                 } else {
-                    // No native window to resize (not macOS): fall back to a new window.
-                    app.update(cx, |m, _| m.toast_window = None);
-                    crate::surfaces::close(cx, h);
-                    keep_existing = None;
+                    None
+                };
+                let plan = fit_plan(
+                    native.is_some(),
+                    display_id.is_some() && shown.is_some() && shown != display_id,
+                    frame_changed,
+                );
+                log::debug!("sync_toasts: fit plan {plan:?}");
+                match (plan, native) {
+                    (FitPlan::Move, Some(native)) => {
+                        app.update(cx, |m, _| {
+                            m.toast_fit = win_h;
+                            m.toast_pos = (x, y);
+                        });
+                        cx.spawn(async move |_| {
+                            native.set_frame(
+                                f64::from(x),
+                                f64::from(y),
+                                f64::from(win_w),
+                                f64::from(win_h),
+                            );
+                        })
+                        .detach();
+                    }
+                    (FitPlan::Recreate, _) => {
+                        app.update(cx, |m, _| {
+                            m.toast_window = None;
+                            // Another display is not the quick re-open the gap protects against.
+                            m.toast_closed_at = (shown == display_id).then_some(Instant::now());
+                        });
+                        crate::surfaces::close(cx, h);
+                        keep_existing = None;
+                    }
+                    _ => {}
                 }
             }
             if keep_existing.is_none() {
@@ -328,7 +480,7 @@ pub(crate) fn sync_toasts(app: &Entity<AppModel>, cx: &mut App) {
                 let opened = cx.open_window(
                     WindowOptions {
                         window_bounds: Some(WindowBounds::Windowed(Bounds {
-                            origin,
+                            origin: point(px(x), px(y)),
                             size: size(px(win_w), px(win_h)),
                         })),
                         titlebar: None,
@@ -338,6 +490,7 @@ pub(crate) fn sync_toasts(app: &Entity<AppModel>, cx: &mut App) {
                         is_movable: false,
                         is_resizable: false,
                         is_minimizable: false,
+                        display_id,
                         // Only the cards are drawn: no panel behind the stack.
                         window_background: gpui::WindowBackgroundAppearance::Transparent,
                         ..crate::platform_window::popup_base()
@@ -356,19 +509,18 @@ pub(crate) fn sync_toasts(app: &Entity<AppModel>, cx: &mut App) {
                 }
                 if let Ok(handle) = opened {
                     log::info!(
-                        "toast window opened: {win_w} x {win_h} at ({}, {}), display {}",
-                        f32::from(origin.x),
-                        f32::from(origin.y),
-                        if display.is_some() {
-                            "known"
-                        } else {
-                            "unknown"
+                        "toast window opened: {win_w} x {win_h} at ({x}, {y}), display {}",
+                        match display_id {
+                            Some(d) => format!("{}", u64::from(d)),
+                            None => "primary".to_owned(),
                         }
                     );
                     crate::surfaces::opened(crate::surfaces::Surface::Toast, handle);
                     app.update(cx, |m, _| {
                         m.toast_window = Some(handle);
                         m.toast_fit = win_h;
+                        m.toast_pos = (x, y);
+                        m.toast_display = display_id;
                     });
                 }
             }
@@ -590,5 +742,150 @@ mod placement_tests {
             !toasts_in_window(true, true, true, true),
             "a capture is running"
         );
+    }
+}
+
+#[cfg(test)]
+mod toast_placement_tests {
+    use super::*;
+    use crate::recording::geometry::hud_default;
+    use crate::recording::monitors::Monitor;
+
+    const W: f64 = 440.;
+    const HUD: (f64, f64) = (739., 150.);
+
+    /// The lab laptop of Nov 5, 2026 (round 3): panel 1920x1080 at 150 % with a 48 px taskbar, and
+    /// an external 3840x2160 at 150 % to its right.
+    fn lab() -> [Monitor; 2] {
+        let m = |id, f: [f64; 4], w: [f64; 4]| Monitor {
+            id,
+            frame_px: Rect::new(f[0], f[1], f[2], f[3]),
+            work_px: Rect::new(w[0], w[1], w[2], w[3]),
+            scale: 1.5,
+        };
+        [
+            m(1, [0., 0., 1920., 1080.], [0., 0., 1920., 1032.]),
+            m(2, [1920., 0., 3840., 2160.], [1920., 0., 3840., 2160.]),
+        ]
+    }
+
+    fn physical(m: &Monitor, r: &Rect) -> Rect {
+        m.to_physical(r)
+    }
+
+    #[test]
+    fn without_a_hud_the_toast_sits_in_the_lower_right_of_the_work_area() {
+        let ms = lab();
+        // Panel: work area 1280 x 688 points. The log of the round: (824, 518) 440 x 154.
+        let r = toast_rect(&ms[0].work_points(), 154., None);
+        assert_eq!((r.x, r.y, r.w, r.h), (824., 518., W, 154.));
+        // External: work area 2560 x 1440 points at x 1280.
+        let r = toast_rect(&ms[1].work_points(), 154., None);
+        assert_eq!((r.x, r.y), (1280. + 2560. - W - 16., 1440. - 154. - 16.));
+        // In physical px it is inside the external monitor, not the panel.
+        let p = physical(&ms[1], &r);
+        assert!(
+            p.x >= 1920. && p.right() <= 5760. && p.bottom() <= 2160.,
+            "{p:?}"
+        );
+    }
+
+    #[test]
+    fn a_toast_that_would_cover_the_hud_goes_above_it() {
+        let ms = lab();
+        let work = ms[0].work_points();
+        let hud = hud_default(&work, HUD);
+        // The HUD is bottom centre: x 270..1009; the corner toast (824..1264) would cover it.
+        let plain = toast_rect(&work, 154., None);
+        assert!(overlaps(&plain, &hud));
+        let r = toast_rect(&work, 154., Some(&hud));
+        assert!(!overlaps(&r, &hud), "{r:?} {hud:?}");
+        assert_eq!(r.x, plain.x, "the right edge stays");
+        assert_eq!(r.y, hud.y - 154. - TOAST_HUD_GAP);
+        // On the 4K external the HUD is far from the right edge: nothing moves.
+        let work = ms[1].work_points();
+        let hud = hud_default(&work, HUD);
+        let r = toast_rect(&work, 154., Some(&hud));
+        assert_eq!(r, toast_rect(&work, 154., None));
+    }
+
+    #[test]
+    fn a_tall_pile_above_the_hud_stays_on_the_display() {
+        let work = Rect::new(0., 0., 1280., 688.);
+        let hud = Rect::new(270., 538., 739., 150.);
+        let r = toast_rect(&work, 600., Some(&hud));
+        assert!(r.y >= 0.);
+    }
+
+    #[test]
+    fn the_display_is_the_recorded_one_then_the_shown_one_then_the_pointer_then_the_primary() {
+        let d = [10u32, 20];
+        // Recording the external while the pointer is on the panel (round 3, F2).
+        assert_eq!(toast_display_index(&d, Some(20), None, Some(10)), Some(1));
+        // Recording wins over a toast already shown elsewhere.
+        assert_eq!(
+            toast_display_index(&d, Some(10), Some(20), Some(20)),
+            Some(0)
+        );
+        // No recording: a window already up stays where it is; else the pointer; else primary.
+        assert_eq!(toast_display_index(&d, None, Some(20), Some(10)), Some(1));
+        assert_eq!(toast_display_index(&d, None, None, Some(20)), Some(1));
+        assert_eq!(toast_display_index(&d, None, None, None), Some(0));
+        // An id that is no longer attached is skipped.
+        assert_eq!(toast_display_index(&d, Some(99), None, Some(20)), Some(1));
+        assert_eq!(toast_display_index::<u32>(&[], Some(1), None, None), None);
+    }
+
+    /// Six toasts queued in a row, with a hover and an expiry sync after each (what the 11 minute
+    /// log of round 3 shows), open the window once: after the first open every sync reuses it, and
+    /// a window that can be resized (macOS, Windows) is only moved, never replaced.
+    #[test]
+    fn queued_toasts_open_one_window_and_never_recreate_it() {
+        let mut have_window = false;
+        let mut opens = 0;
+        let mut height = 0.;
+        for n in 1..=6 {
+            for sync in 0..3 {
+                // The first sync of a toast (push) grows the stack; the others change nothing.
+                let new_height = if sync == 0 {
+                    154. * f64::from(n)
+                } else {
+                    height
+                };
+                match window_plan(true, false, have_window, Duration::ZERO, None) {
+                    WindowPlan::Open => {
+                        opens += 1;
+                        have_window = true;
+                    }
+                    WindowPlan::Reuse => {
+                        let changed = new_height != height;
+                        let native = fit_plan(true, false, changed);
+                        assert_eq!(
+                            native,
+                            if changed {
+                                FitPlan::Move
+                            } else {
+                                FitPlan::Keep
+                            }
+                        );
+                        if !changed {
+                            assert_eq!(fit_plan(false, false, false), FitPlan::Keep);
+                        }
+                    }
+                    other => panic!("{other:?}"),
+                }
+                height = new_height;
+            }
+        }
+        assert_eq!(opens, 1);
+    }
+
+    #[test]
+    fn a_window_is_recreated_only_for_another_display_or_when_it_cannot_be_resized() {
+        assert_eq!(fit_plan(true, false, false), FitPlan::Keep);
+        assert_eq!(fit_plan(false, false, false), FitPlan::Keep);
+        assert_eq!(fit_plan(true, false, true), FitPlan::Move);
+        assert_eq!(fit_plan(false, false, true), FitPlan::Recreate);
+        assert_eq!(fit_plan(true, true, false), FitPlan::Recreate);
     }
 }

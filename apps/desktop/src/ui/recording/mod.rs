@@ -465,6 +465,8 @@ fn handle_change(app: &Entity<AppModel>, change: Change, cx: &mut App) {
         Change::Started { agent } => {
             close_countdown(app, cx);
             open_recording_windows(app, cx);
+            // A toast already on screen moves to the recorded display and clear of the HUD.
+            app::sync_toasts(app, cx);
             start_poll(app, cx);
             if let Some((client, tool)) = agent {
                 let id = rec_of(app, cx).read(cx).hud.recording_id.clone();
