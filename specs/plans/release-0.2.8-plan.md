@@ -77,7 +77,7 @@ Branch `track/windows` (pushed to `public`). Evidence: `verification/L1-windows-
   Import editing copies worked after a fix (Quick Sync needs NV12).
 - Item 4 (speaker engine): linked in the package (`speaker engine built in: true`); not run (no models on the laptop).
 - Item 5 (recording): screen (WGC) + Media Foundation hardware H.264 + mic + cursor record on the laptop through the daemon and
-  the app (`CM_WINDOWS_RECORDING=1`, hidden by default); pause/resume, kill -9 recovery and window/region targets pass. The
+  the app (on by default since O5: ships in 0.2.8, decided Nov 5, 2026); pause/resume, kill -9 recovery and window/region targets pass. The
   10-minute gate ran for 9.2 minutes (see the report); A/V sync with a stimulus, the camera at 30 fps and the loopback
   exclusion of CaptureMann's own sound are not shown. Decision O5 stays with the maintainer.
 - Items 6 and 7: not run (SmartScreen, Windows 10, second monitor).
