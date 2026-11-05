@@ -41,6 +41,10 @@ const BIN_TICKS: i64 = TICKS_PER_SECOND / 2000;
 const BINS: usize = 4000; // up to 2 s of lag
 /// Window of the health monitor (REC-3: "late frames exceed 2% over the last 30 s").
 pub const HEALTH_WINDOW_SECS: i64 = 30;
+/// A rate over fewer frames than this is not a rate: a screen that changes once a second (a mostly
+/// static desktop captured by Windows.Graphics.Capture, which sends frames only when the picture changes)
+/// has 30 frames in the window, and two late ones would read as "7 % late". Three seconds of 30 fps.
+const HEALTH_MIN_OBSERVED: u64 = 90;
 
 /// Why a recording stopped by itself.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -191,7 +195,7 @@ impl HealthWindow {
                 bad += b.2;
             }
         }
-        if obs == 0 {
+        if obs < HEALTH_MIN_OBSERVED {
             0.0
         } else {
             100.0 * bad as f64 / obs as f64
@@ -579,6 +583,22 @@ impl<E: VideoEncoder> Pipeline<E> {
 mod tests {
     use super::*;
     use cm_encode::synthetic::{Appended, SyntheticEncoder, SyntheticFrame};
+
+    #[test]
+    fn a_few_frames_in_the_window_are_not_a_late_rate() {
+        // A mostly static screen sends about one frame a second: 2 late of 16 is not "12.5 % late".
+        let mut h = HealthWindow::default();
+        for s in 0..16 {
+            h.add(s, 1, u64::from(s < 2));
+        }
+        assert_eq!(h.late_pct(16), 0.0);
+        // The same ratio over 160 frames is a rate.
+        let mut h = HealthWindow::default();
+        for s in 0..16 {
+            h.add(s, 10, u64::from(s < 2) * 10);
+        }
+        assert!(h.late_pct(16) > 12.0);
+    }
     use cm_encode::{plan_video, EncoderConfig, VideoSettings};
 
     fn pipeline(
