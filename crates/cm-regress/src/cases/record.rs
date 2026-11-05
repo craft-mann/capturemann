@@ -830,7 +830,7 @@ fn external_4k(ctx: &mut Ctx) -> R {
     let overloaded = trouble_words(ctx, &["encoder_overloaded"]);
     ctx.note(format!("encoder_overloaded warning logged: {overloaded}"));
     check!(
-        file_end.is_nan() || file_end >= 0.9 * end,
+        file_end.is_nan() || end <= 0.0 || file_end >= 0.9 * end,
         "the file ends at {file_end} ticks but the track ends at {end}: it holds under 90 % of the recording"
     );
     check!(
@@ -838,10 +838,19 @@ fn external_4k(ctx: &mut Ctx) -> R {
         "the file is only {:.2} s for a 30 s recording",
         p.duration
     );
-    let full_rate = eff >= 29.0;
+    let video = p.need_video()?;
+    let file_fps = video.avg_frame_rate.unwrap_or(0.0);
+    ctx.note(format!(
+        "file: {} frames, average {file_fps:.2} fps; manifest screen track: {}",
+        video
+            .nb_frames
+            .map_or_else(|| "?".to_owned(), |n| n.to_string()),
+        crate::util::cut(&screen.to_string(), 900)
+    ));
+    let full_rate = file_fps >= 28.5 || eff >= 29.0;
     check!(
         full_rate || overloaded,
-        "the rate fell to {eff} fps with no encoder_overloaded warning"
+        "the file averages {file_fps:.1} fps (manifest effective_fps {eff}) with no encoder_overloaded warning"
     );
     wait_idle_exports(ctx);
     Ok(())

@@ -73,7 +73,7 @@ pub fn cases() -> Vec<Case> {
         },
         Case {
             id: "desktop.settings_applied",
-            title: "settings set capture.delay_s reaches the running app: a forwarded display capture waits that long",
+            title: "settings set capture.delay_s (0, 3, 5 or 10) reaches the running app: a forwarded display capture waits that long",
             area: "desktop",
             specs: &["bug: settings set not applied to the running app", "AGT-1"],
             tier: Tier::Standard,
@@ -540,13 +540,13 @@ fn tray_stub(_ctx: &mut Ctx) -> R {
 fn settings_applied(ctx: &mut Ctx) -> R {
     let _app = start_app(ctx, &[])?;
     std::thread::sleep(Duration::from_secs(3));
-    ctx.cli_ok(&["settings", "set", "capture.delay_s", "4"])?;
+    ctx.cli_ok(&["settings", "set", "capture.delay_s", "5"])?;
     let g = ctx.cli_ok(&["settings", "get", "capture.delay_s"])?;
     check!(
         g.pointer("/settings/capture.delay_s")
             .and_then(Value::as_i64)
-            == Some(4),
-        "settings get does not return 4: {g}"
+            == Some(5),
+        "settings get does not return 5: {g}"
     );
     // The app is told through settings.changed; a display capture asked for by a second launch must wait.
     let t0 = std::time::Instant::now();
@@ -571,12 +571,12 @@ fn settings_applied(ctx: &mut Ctx) -> R {
         return fail("no screenshot appeared within 30 s of the forwarded display capture request");
     };
     ctx.note(format!(
-        "the screenshot appeared after {:.1} s with capture.delay_s = 4",
+        "the screenshot appeared after {:.1} s with capture.delay_s = 5",
         waited.as_secs_f64()
     ));
     check!(
-        waited.as_secs_f64() >= 3.5,
-        "the capture happened after {:.1} s although capture.delay_s was set to 4: the running app did not apply the setting",
+        waited.as_secs_f64() >= 4.5,
+        "the capture happened after {:.1} s although capture.delay_s was set to 5: the running app did not apply the setting",
         waited.as_secs_f64()
     );
     Ok(())
