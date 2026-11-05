@@ -297,8 +297,11 @@ pub struct ChimeConfig {
 
 impl Default for ChimeConfig {
     fn default() -> Self {
+        // PowerShell needs about 2 s to start on a slow laptop (ThinkPad T490, Nov 5, 2026), and the
+        // chime only begins then: the Windows window leaves room for that start.
+        let start_allowance = if cfg!(windows) { 3000 } else { 0 };
         ChimeConfig {
-            total: Duration::from_millis(2500),
+            total: Duration::from_millis(2500 + start_allowance),
             baseline: Duration::from_millis(300),
             floor_dbfs: -50.0,
             margin_db: 6.0,
