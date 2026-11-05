@@ -18,6 +18,28 @@ pub fn set_capture_delay(app: &Entity<AppModel>, secs: u32, cx: &mut App) {
     set_setting(app, KEY_CAPTURE_DELAY, serde_json::json!(secs), cx);
 }
 
+/// The delay for this capture, read from the shared settings store (what `set_settings` from
+/// the CLI or an agent wrote), not from the cached model value; the model follows.
+pub(crate) fn current_capture_delay(app: &Entity<AppModel>, cx: &mut App) -> u32 {
+    let secs = crate::delay::from_setting(
+        app.read(cx)
+            .backend
+            .settings
+            .snapshot()
+            .get(KEY_CAPTURE_DELAY),
+    );
+    if app.read(cx).capture_delay_s != secs {
+        app.update(cx, |m, cx| {
+            m.capture_delay_s = secs;
+            cx.notify();
+        });
+        if let Some(t) = &app.read(cx).tray {
+            t.set_delay(secs);
+        }
+    }
+    secs
+}
+
 /// Hotkey, tray menu or toolbar button: wait out the chosen delay if one is set (CAP-5), then
 /// run the overlay and CAP-4.
 pub fn start_capture(app: &Entity<AppModel>, mode: CaptureMode, cx: &mut App) {
@@ -34,7 +56,7 @@ pub fn start_capture(app: &Entity<AppModel>, mode: CaptureMode, cx: &mut App) {
 /// The overlay path of [`start_capture`]: the delay pill if a delay is set (CAP-5), then the
 /// overlay and CAP-4.
 pub(crate) fn start_hover_capture(app: &Entity<AppModel>, mode: CaptureMode, cx: &mut App) {
-    let secs = app.read(cx).capture_delay_s;
+    let secs = current_capture_delay(app, cx);
     if secs > 0 {
         crate::ui::delay_pill::start(app, mode, secs, cx);
     } else {
@@ -125,8 +147,8 @@ pub(crate) fn run_window_capture(app: &Entity<AppModel>, window_id: u32, cx: &mu
     }
     // CAP-5: the remembered delay applies to a window chosen from the list too (the pill counts
     // down, the daemon captures that window afterwards, Esc cancels).
-    if backend.daemon.is_some() && app.read(cx).capture_delay_s > 0 {
-        let secs = app.read(cx).capture_delay_s;
+    let secs = current_capture_delay(app, cx);
+    if backend.daemon.is_some() && secs > 0 {
         crate::ui::delay_pill::start_window(app, window_id, secs, cx);
         return;
     }

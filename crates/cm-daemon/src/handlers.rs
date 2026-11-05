@@ -682,7 +682,12 @@ impl Inner {
         check_setting_writes(actor.is_agent(), &p.values)?;
         // The store may write a file: keep that I/O off the async workers.
         let (store, values) = (self.settings.clone(), p.values);
+        let keys: Vec<String> = values.keys().cloned().collect();
         let effective = blocking(move || store.set(&values)).await?;
+        self.events.publish(
+            events::SETTINGS_CHANGED,
+            json!({ "keys": keys, "by": actor }),
+        );
         Ok(settings_result(
             effective
                 .into_iter()

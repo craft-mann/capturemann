@@ -568,6 +568,9 @@ fn main() {
                         // A publish or an upload record was added to a manifest: the Published
                         // page, the details page and the library's Copy link reload.
                         cx.update(|cx| cm_desktop::ui::app::capture_changed(&app2, None, cx));
+                    } else if ev.name == cm_daemon::events::SETTINGS_CHANGED {
+                        // The CLI or an agent stored a setting: the cached view follows.
+                        cx.update(|cx| cm_desktop::ui::app::sync_from_settings(&app2, cx));
                     } else if ev.name.starts_with("recording.") || ev.name.starts_with("camera.") {
                         cx.update(|cx| cm_desktop::ui::recording::on_event(&app2, &ev, cx));
                     }

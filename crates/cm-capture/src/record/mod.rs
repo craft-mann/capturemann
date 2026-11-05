@@ -5,11 +5,13 @@
 //! * [`pipeline`]: frame retiming to constant frame rate, repeats, late-frame accounting.
 //! * [`source`]: the OS side ([`ScreenSource`]); `sck` is ScreenCaptureKit on macOS.
 //! * [`recorder`]: [`ScreenRecorder`], implementing `cm_core::TrackRecorder`.
+//! * [`load`]: the encoder load monitor (lowers the offered rate when the encoder cannot keep up).
 //! * [`fake`]: a scriptable source for tests without a display.
 //! * [`wgc_logic`]: the pure parts of the Windows.Graphics.Capture source (`windows`, `sys/win_wgc.rs`).
 
 pub mod exclude;
 pub mod fake;
+pub mod load;
 pub mod pipeline;
 pub mod pipewire;
 pub mod plan;

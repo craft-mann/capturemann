@@ -51,7 +51,7 @@
 //! was dropped), `engine_dropped`, `no_frames` (stopped before the first frame: the empty bundle
 //! was deleted, there is no capture) or `error`.
 //!
-//! `recording.warning` codes a client may see: `disk_low`, `disk_full`, `screen_degraded`,
+//! `recording.warning` codes a client may see: `disk_low`, `disk_full`, `screen_degraded`, `encoder_overloaded`,
 //! `capture_stalled` (no frames for over 1 s, R3-7), `track_failed` (a track could not be
 //! written any more and ends where its file ends, R3-1), `mic_silent`, `camera_lost`,
 //! `audio_device_*`, `fps60_unverified_with_camera`, `screen_stopped_early`, `permission_revoked`
