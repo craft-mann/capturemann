@@ -71,6 +71,16 @@ The wrapper takes `C:\lab\lab.lock` (refuses while another agent holds it, `FORC
 files and the lock. Read the report, put real findings in the release checklist
 ([`windows-0.2.8-release-checklist.md`](windows-0.2.8-release-checklist.md)) and fix the suite, not the evidence.
 
+## Run it on macOS
+
+The app has no `cm-daemon` (it is embedded in `cm-desktop`), so give the headless cases a build of the same commit:
+`cargo build --release -p cm-daemon`, then
+`cm-regress --tier standard --package-dir <App>.app/Contents/MacOS --daemon target/release/cm-daemon --out <dir>`.
+Licences are looked up in `Contents/Resources`. A locked screen or a display that is off lists no display: the
+cases that need a desktop session report SKIP with that reason (unlock the Mac and use `--allow screen` for the
+screenshot cases). Crashes are read from `~/Library/Logs/DiagnosticReports`. The desktop-app and window cases are
+not implemented for macOS yet and report SKIP.
+
 ## Reading a result
 
 - **FAIL** with the message and evidence lines: expected against actual. A failure in the suite itself (a wrong

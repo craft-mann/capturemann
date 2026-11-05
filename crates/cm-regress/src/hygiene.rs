@@ -85,6 +85,9 @@ pub fn scan_logs(config: &Path, allow: &[String]) -> (Vec<String>, usize) {
 
 /// Crash records of our programs in the Windows Application log since a time. Empty elsewhere.
 pub fn app_crashes_since(since: SystemTime) -> Vec<String> {
+    if sys::PLATFORM == "macos" {
+        return mac_crash_reports_since(since);
+    }
     if sys::PLATFORM != "windows" {
         return Vec::new();
     }
@@ -106,6 +109,36 @@ pub fn app_crashes_since(since: SystemTime) -> Vec<String> {
         return Vec::new();
     };
     parse_crash_events(&String::from_utf8_lossy(&out.stdout))
+}
+
+/// macOS: crash reports (`.ips`, `.crash`) of our programs written to `~/Library/Logs/DiagnosticReports`
+/// since a time.
+fn mac_crash_reports_since(since: SystemTime) -> Vec<String> {
+    let Some(home) = std::env::var_os("HOME") else {
+        return Vec::new();
+    };
+    let dir = Path::new(&home).join("Library/Logs/DiagnosticReports");
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for e in rd.flatten() {
+        let name = e.file_name().to_string_lossy().into_owned();
+        let lower = name.to_lowercase();
+        let ours = ["cm-", "capturemann", "llama-server"]
+            .iter()
+            .any(|p| lower.starts_with(p));
+        let report = lower.ends_with(".ips") || lower.ends_with(".crash");
+        let recent = e
+            .metadata()
+            .and_then(|m| m.modified())
+            .map(|t| t >= since)
+            .unwrap_or(false);
+        if ours && report && recent {
+            out.push(name);
+        }
+    }
+    out
 }
 
 /// Keeps the event blocks that name one of our programs; one summary line each.

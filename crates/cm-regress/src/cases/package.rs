@@ -82,6 +82,18 @@ fn files(ctx: &mut Ctx) -> R {
             ));
             continue;
         }
+        if base == "cm-daemon" && sys::PLATFORM == "macos" && !ctx.pkg.dir.join(base).is_file() {
+            // The macOS app embeds the daemon in cm-desktop; the headless cases use `--daemon`.
+            ctx.note(match &ctx.opts.daemon {
+                Some(d) => format!(
+                    "cm-daemon is not in the app (embedded in cm-desktop); using --daemon {}",
+                    d.display()
+                ),
+                None => "cm-daemon is not in the app (embedded in cm-desktop); no --daemon given"
+                    .to_owned(),
+            });
+            continue;
+        }
         let p = ctx.pkg.exe(base);
         match std::fs::metadata(&p) {
             Ok(m) if m.len() > 100_000 => {
@@ -106,7 +118,11 @@ fn files(ctx: &mut Ctx) -> R {
                     .to_owned(),
             );
         }
-        let dir = ctx.pkg.dir.clone();
+        let mut dir = ctx.pkg.dir.clone();
+        if sys::PLATFORM == "macos" && dir.ends_with("Contents/MacOS") {
+            // Inside CaptureMann.app the licences sit in Contents/Resources.
+            dir = dir.join("../Resources");
+        }
         let lic = find_named(&dir, 2, &|n| {
             n.starts_with("license") || n.starts_with("licence")
         });
@@ -143,8 +159,10 @@ fn startup(ctx: &mut Ctx) -> R {
     let mut runs: Vec<(&str, Vec<&str>, i32)> = vec![
         ("capturemann", vec!["--version"], 0),
         ("cm-mcp", vec!["--bogus"], 2),
-        ("cm-daemon", vec!["--bogus"], 2),
     ];
+    if ctx.pkg.has("cm-daemon") {
+        runs.push(("cm-daemon", vec!["--bogus"], 2));
+    }
     if ctx.pkg.has("cm-overlay") {
         runs.push(("cm-overlay", vec!["--help"], 0));
     }
