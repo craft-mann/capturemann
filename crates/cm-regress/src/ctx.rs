@@ -28,6 +28,10 @@ pub struct Options {
     pub commit: Option<String>,
     pub whisper_model: Option<PathBuf>,
     pub whisper_model_id: String,
+    /// A speech recording (WAV or any import format) for the transcription and speaker cases, given with `--speech`.
+    pub speech_audio: Option<PathBuf>,
+    /// A folder with the two speaker models (`CM_SPEAKER_MODELS_DIR` for the programs), given with `--speaker-models`.
+    pub speaker_models: Option<PathBuf>,
     pub soak_minutes: u32,
     pub timeout_scale: f64,
     pub verdict: String,
@@ -200,6 +204,9 @@ impl Ctx {
             .env_remove("CM_FFMPEG")
             .env_remove("CAPTUREMANN_MCP")
             .env_remove("CAPTUREMANN_DAEMON");
+        if let Some(dir) = &self.opts.speaker_models {
+            cmd.env("CM_SPEAKER_MODELS_DIR", dir);
+        }
         for (k, v) in &self.extra_env {
             cmd.env(k, v);
         }

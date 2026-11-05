@@ -1,6 +1,12 @@
 //! The per-user installer: silent install into a temporary folder, the installed programs work, silent
 //! uninstall leaves nothing behind. Only with `--installer <setup.exe>`; it restores the machine's own
 //! uninstall registry entry afterwards (the installer writes the same key as a real install).
+//!
+//! The installer and the uninstaller work on per-user places that every install shares, whatever its folder:
+//! the uninstall key, `HKCU\Software\CaptureMann`, the Open with registrations, the Start menu folder and the
+//! per-user PATH. A temporary install and its uninstall therefore also remove what a real install on the same
+//! account put there (found Nov 5, 2026, when this case took the Start menu shortcuts of the lab laptop's own
+//! install). The case saves all of it first and puts it back at the end.
 
 use crate::check;
 use crate::ctx::Ctx;
@@ -26,6 +32,18 @@ pub fn cases() -> Vec<Case> {
 }
 
 const UNINSTALL_ROOT: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall";
+
+/// Other registry keys the installer writes and the uninstaller deletes (installer.nsi), shared by all installs.
+const SHARED_KEYS: &[&str] = &[
+    r"HKCU\Software\CaptureMann",
+    r"HKCU\Software\Classes\Applications\cm-desktop.exe",
+    r"HKCU\Software\Classes\.mp4\OpenWithList\cm-desktop.exe",
+    r"HKCU\Software\Classes\.mov\OpenWithList\cm-desktop.exe",
+    r"HKCU\Software\Classes\.m4v\OpenWithList\cm-desktop.exe",
+    r"HKCU\Software\Classes\.mkv\OpenWithList\cm-desktop.exe",
+    r"HKCU\Software\Classes\.m4a\OpenWithList\cm-desktop.exe",
+    r"HKCU\Software\Classes\.wav\OpenWithList\cm-desktop.exe",
+];
 
 fn reg(ctx: &mut Ctx, args: &[&str]) -> R<crate::proc::Output> {
     let mut c = Command::new("reg");
@@ -69,9 +87,31 @@ fn silent(ctx: &mut Ctx) -> R {
         "{} uninstall key(s) of CaptureMann before: {before_keys:?}",
         before_keys.len()
     ));
+    // The other shared keys: export those that exist now, and delete them again at the end before the import.
+    let mut shared_exports: Vec<(String, String)> = Vec::new();
+    for (i, k) in SHARED_KEYS.iter().enumerate() {
+        let f = ctx.root.join(format!("shared-key-{i}.reg"));
+        let fs = f.to_string_lossy().into_owned();
+        if reg(ctx, &["export", k, &fs, "/y"])?.success() {
+            shared_exports.push(((*k).to_owned(), fs));
+        }
+    }
+    let user_path = reg_user_path(ctx);
     let menu = std::env::var_os("APPDATA")
         .map(|a| PathBuf::from(a).join(r"Microsoft\Windows\Start Menu\Programs"));
     let menu_before = menu.as_ref().map(|m| list_matching(m)).unwrap_or_default();
+    // The Start menu folder of a real install is copied away; the uninstaller deletes it (same folder name).
+    let menu_dir = menu.as_ref().map(|m| m.join("CaptureMann"));
+    let menu_backup = ctx.root.join("startmenu-backup");
+    let menu_saved = menu_dir
+        .as_ref()
+        .is_some_and(|d| d.is_dir() && copy_dir(d, &menu_backup).is_ok());
+    ctx.note(format!(
+        "saved before: {} shared key(s), Start menu folder {}, user PATH {}",
+        shared_exports.len(),
+        if menu_saved { "yes" } else { "no (none there)" },
+        if user_path.is_some() { "yes" } else { "no" }
+    ));
 
     let result = (|| -> R {
         let mut c = Command::new(&setup);
@@ -99,6 +139,13 @@ fn silent(ctx: &mut Ctx) -> R {
             "cm-overlay.exe",
         ] {
             check!(dest.join(f).is_file(), "{f} is not installed");
+        }
+        if let Some(d) = &menu_dir {
+            check!(
+                d.join("CaptureMann.lnk").is_file(),
+                "the installer made no Start menu shortcut in {}",
+                d.display()
+            );
         }
         // The installed programs work.
         ctx.pkg.dir = dest.clone();
@@ -153,10 +200,12 @@ fn silent(ctx: &mut Ctx) -> R {
             left.len(),
             crate::util::cut(&left.join(", "), 300)
         );
+        // The folder is shared by every install, so the uninstaller must remove it whether or not one was there
+        // before (then it is put back below).
         let menu_after = menu.as_ref().map(|m| list_matching(m)).unwrap_or_default();
         check!(
-            menu_after == menu_before,
-            "the Start menu entries changed: before {menu_before:?}, after {menu_after:?}"
+            menu_after.is_empty(),
+            "the uninstaller left Start menu entries behind: {menu_after:?} (before the run: {menu_before:?})"
         );
         Ok(())
     })();
@@ -171,10 +220,42 @@ fn silent(ctx: &mut Ctx) -> R {
     for f in &exports {
         let _ = reg(ctx, &["import", f]);
     }
+    // The shared keys: remove what the run left, then import the saved ones.
+    for k in SHARED_KEYS {
+        let _ = reg(ctx, &["delete", k, "/f"]);
+    }
+    for (_, f) in &shared_exports {
+        let _ = reg(ctx, &["import", f]);
+    }
+    if let Some(d) = &menu_dir {
+        let _ = std::fs::remove_dir_all(d);
+        if menu_saved {
+            let _ = copy_dir(&menu_backup, d);
+        }
+    }
+    if let Some(p) = &user_path {
+        let _ = reg(
+            ctx,
+            &[
+                "add",
+                r"HKCU\Environment",
+                "/v",
+                "Path",
+                "/t",
+                "REG_EXPAND_SZ",
+                "/d",
+                p,
+                "/f",
+            ],
+        );
+    }
     let _ = std::fs::remove_dir_all(&dest);
     match result {
         Ok(()) => {
             let end = keys(ctx)?;
+            if reg_user_path(ctx) != user_path {
+                return fail("the per-user PATH differs after the run".to_owned());
+            }
             if end != before_keys {
                 return fail(format!("the uninstall registry keys differ after the run: before {before_keys:?}, after {end:?}"));
             }
@@ -182,6 +263,31 @@ fn silent(ctx: &mut Ctx) -> R {
         }
         e => e,
     }
+}
+
+/// The raw per-user PATH value (`reg query` text after the type), None when there is none.
+fn reg_user_path(ctx: &mut Ctx) -> Option<String> {
+    let out = reg(ctx, &["query", r"HKCU\Environment", "/v", "Path"]).ok()?;
+    out.stdout.lines().find_map(|l| {
+        let l = l.trim();
+        let rest = l.strip_prefix("Path")?.trim_start();
+        let (_ty, val) = rest.split_once(char::is_whitespace)?;
+        Some(val.trim().to_owned())
+    })
+}
+
+fn copy_dir(from: &std::path::Path, to: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(to)?;
+    for e in std::fs::read_dir(from)? {
+        let e = e?;
+        let t = to.join(e.file_name());
+        if e.file_type()?.is_dir() {
+            copy_dir(&e.path(), &t)?;
+        } else {
+            std::fs::copy(e.path(), t)?;
+        }
+    }
+    Ok(())
 }
 
 fn list_matching(dir: &std::path::Path) -> Vec<String> {

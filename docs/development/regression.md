@@ -38,6 +38,7 @@ cm-regress --tier smoke|standard|full|hardware --package-dir <dir> --out <dir>
            [--only id,area,...] [--allow screen,sound,mic,camera,second_monitor,models,ffmpeg_full,network]
            [--keep] [--list] [--dev] [--installer <setup.exe>] [--zip <file>] [--commit <sha>]
            [--whisper-model <ggml file>] [--whisper-model-id small] [--soak-minutes N]
+           [--speech <audio file>] [--speaker-models <dir>]
            [--timeout-scale F] [--verdict PARTIAL] [--who NAME]
 ```
 
@@ -98,8 +99,7 @@ files and the lock. Read the report, put real findings in the release checklist
 - Sound, camera and second-monitor cases need the hardware, the room (a lit room for the camera) and
   `--allow`; the volume must be above 0 for the system-audio case. Process-loopback exclusion of CaptureMann's own
   sound cannot be driven from outside; it stays with the `cm-audio` hardware test.
-- Stubs in the first version: the tray icon probe (needs UI Automation), speaker labels (needs the two speaker
-  models), clipboard copy (touches the user's clipboard), the macOS and Linux drivers (cases list the platforms they
+- Stubs in the first version: clipboard copy (touches the user's clipboard), the macOS and Linux drivers (cases list the platforms they
   support; the CLI/MCP/library/import/export cases already run on macOS with `--dev`).
 - The Windows package workflow does not run `cm-regress`: the suite has not run on a hosted runner yet and a red
   step caused by an unproven assumption would hide real failures. Add `cm-regress.exe --tier smoke --allow screen
