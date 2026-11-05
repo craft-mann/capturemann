@@ -24,6 +24,8 @@ pub struct Options {
     /// The package dir is a build tree (`target/debug`): no bundled FFmpeg, licences or helpers expected.
     pub dev: bool,
     pub installer: Option<PathBuf>,
+    /// A `cm-daemon` to use when the package has none (`--daemon`, macOS).
+    pub daemon: Option<PathBuf>,
     pub zip: Option<PathBuf>,
     pub commit: Option<String>,
     pub whisper_model: Option<PathBuf>,
@@ -44,11 +46,18 @@ pub struct Options {
 #[derive(Debug, Clone)]
 pub struct Pkg {
     pub dir: PathBuf,
+    /// A `cm-daemon` from outside the package (`--daemon`): the macOS app embeds the daemon in `cm-desktop`
+    /// and ships no separate binary, so the headless cases use a build of the same commit.
+    pub daemon: Option<PathBuf>,
 }
 
 impl Pkg {
     pub fn exe(&self, base: &str) -> PathBuf {
-        self.dir.join(sys::exe_name(base))
+        let own = self.dir.join(sys::exe_name(base));
+        match (&self.daemon, base) {
+            (Some(d), "cm-daemon") if !own.is_file() => d.clone(),
+            _ => own,
+        }
     }
     pub fn has(&self, base: &str) -> bool {
         self.exe(base).is_file()
@@ -160,6 +169,7 @@ impl Ctx {
         Ok(Ctx {
             pkg: Pkg {
                 dir: opts.package_dir.clone(),
+                daemon: opts.daemon.clone(),
             },
             timeout_scale: opts.timeout_scale,
             opts,
@@ -204,6 +214,9 @@ impl Ctx {
             .env_remove("CM_FFMPEG")
             .env_remove("CAPTUREMANN_MCP")
             .env_remove("CAPTUREMANN_DAEMON");
+        if self.pkg.has("cm-daemon") {
+            cmd.env("CAPTUREMANN_DAEMON", self.pkg.exe("cm-daemon"));
+        }
         if let Some(dir) = &self.opts.speaker_models {
             cmd.env("CM_SPEAKER_MODELS_DIR", dir);
         }

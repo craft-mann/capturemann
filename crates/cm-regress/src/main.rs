@@ -29,7 +29,7 @@ use std::time::{Duration, SystemTime};
 
 const USAGE: &str = "usage: cm-regress [--tier smoke|standard|full|hardware] [--only <id|area>,...] [--allow screen,sound,mic,camera,second_monitor,models,ffmpeg_full,network]
                   [--package-dir <dir>] [--out <dir>] [--keep] [--list] [--dev]
-                  [--installer <setup.exe>] [--zip <file>] [--commit <sha>] [--whisper-model <ggml file>] [--whisper-model-id <id>]
+                  [--installer <setup.exe>] [--daemon <cm-daemon>] [--zip <file>] [--commit <sha>] [--whisper-model <ggml file>] [--whisper-model-id <id>]
                   [--speech <audio file>] [--speaker-models <dir>]
                   [--soak-minutes <n>] [--timeout-scale <f>] [--verdict <text>] [--who <name>]
 
@@ -48,6 +48,7 @@ pub fn parse_args(args: &[String]) -> Result<Options, String> {
         list: false,
         dev: false,
         installer: None,
+        daemon: None,
         zip: None,
         commit: None,
         whisper_model: None,
@@ -108,6 +109,7 @@ pub fn parse_args(args: &[String]) -> Result<Options, String> {
             "--keep" => o.keep = true,
             "--list" => o.list = true,
             "--dev" => o.dev = true,
+            "--daemon" => o.daemon = Some(PathBuf::from(value(&mut i, a)?)),
             "--installer" => o.installer = Some(PathBuf::from(value(&mut i, a)?)),
             "--zip" => o.zip = Some(PathBuf::from(value(&mut i, a)?)),
             "--commit" => o.commit = Some(value(&mut i, a)?),
@@ -190,6 +192,7 @@ fn run_info(o: &Options, flags: String, started: SystemTime) -> report::RunInfo 
     let (os, gpu) = os_and_gpu();
     let pkg = ctx::Pkg {
         dir: o.package_dir.clone(),
+        daemon: o.daemon.clone(),
     };
     let version = command_output(&pkg.exe("capturemann").to_string_lossy(), &["--version"]);
     let ffmpeg_exe = if pkg.has("ffmpeg") {

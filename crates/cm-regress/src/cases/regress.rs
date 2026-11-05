@@ -34,7 +34,7 @@ pub fn cases() -> Vec<Case> {
         },
         Case {
             id: "zz.crash_events",
-            title: "no crash of a CaptureMann program was logged by Windows during the whole run",
+            title: "no crash of a CaptureMann program was logged (Windows event log, macOS DiagnosticReports) during the whole run",
             area: "zz",
             specs: &["bug: recording stop crash 0xC0000409", "bug: illegal instruction"],
             tier: Tier::Smoke,
@@ -177,8 +177,8 @@ fn encoder_wording(ctx: &mut Ctx) -> R {
 }
 
 fn crash_events(ctx: &mut Ctx) -> R {
-    if sys::PLATFORM != "windows" {
-        return skip("the Application event log is Windows only");
+    if sys::PLATFORM == "linux" {
+        return skip("no crash log is read on Linux yet");
     }
     let crashes = hygiene::app_crashes_since(ctx.opts.started - std::time::Duration::from_secs(2));
     for c in &crashes {

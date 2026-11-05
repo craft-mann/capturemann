@@ -5,7 +5,7 @@ use super::common::{seed_screenshot, write_clips, SEEDED_SHOT};
 use crate::check;
 use crate::ctx::Ctx;
 use crate::mcp::{McpClient, ToolResult};
-use crate::model::{fail, Case, Stop, Tier, ALL, R};
+use crate::model::{fail, skip, Case, Stop, Tier, ALL, R};
 use crate::proc::exit_text;
 use crate::spec;
 use crate::sys;
@@ -318,6 +318,12 @@ fn read_only_calls(ctx: &mut Ctx) -> R {
 }
 
 fn confirm_tier(ctx: &mut Ctx) -> R {
+    if sys::PLATFORM == "macos" && !sys::has_desktop() {
+        // The daemon checks the target before it asks, and a locked Mac lists no display.
+        return skip(
+            "the Mac screen is locked or off: no display exists to name in start_recording",
+        );
+    }
     seed_screenshot(ctx)?;
     ctx.start_daemon()?;
     let mut c = open(ctx)?;

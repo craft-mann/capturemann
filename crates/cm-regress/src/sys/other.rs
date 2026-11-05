@@ -51,6 +51,19 @@ pub fn new_endpoint(dir: &std::path::Path, n: u32) -> String {
 }
 
 pub fn has_desktop() -> bool {
+    // macOS: a locked screen (or a display that is off) lists no display and cannot be captured, so the
+    // cases that need a desktop session report SKIP instead of blaming the product.
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(out) = Command::new("ioreg")
+            .args(["-r", "-k", "IOConsoleUsers", "-d", "1"])
+            .output()
+        {
+            if String::from_utf8_lossy(&out.stdout).contains("\"CGSSessionScreenIsLocked\"=Yes") {
+                return false;
+            }
+        }
+    }
     true
 }
 
