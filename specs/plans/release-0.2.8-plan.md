@@ -1,6 +1,6 @@
 # Release 0.2.8 plan: Windows catch-up and bugs
 
-Status: **draft** (updated Nov 4, 2026), nothing built. Scope set by the maintainer on Nov 3, 2026: 0.2.7 is macOS only
+Status: **in progress on `track/windows`, not released** (updated Nov 5, 2026). Windows recording, import, OCR and packaging are built on the branch and were run on a lab laptop (reports PARTIAL in `verification/L1-windows-0.2.8-*`). Scope set by the maintainer on Nov 3, 2026: 0.2.7 is macOS only
 (`specs/plans/release-0.2.7-plan.md`, **released Nov 4, 2026**), **0.2.8 is Windows**, 0.2.9 is Linux
 (`release-0.2.9-plan.md`). A separate session and agent own this plan. The transcription follow-ups from 0.2.7 are a
 parallel track, not part of the Windows scope (see "Transcription track").
@@ -97,7 +97,7 @@ Windows-only code under `crates/cm-ai` (recognizer, engine glue) and `vendor/she
 only, in separate commits. Must not touch macOS or Linux `sys/` files, run `make bundle` over `target/bundle`, push,
 publish, or say "verified" without a report. Shared files with one owner (the maintainer resolves at merge):
 `Cargo.lock`, workspace `Cargo.toml`, `locales/*.pot`/`vi.po`, `CHANGELOG.md`, `docs/project/status.md`,
-`THIRD_PARTY_LICENSES.md`. Version stays 0.2.6 on the branch until the release commit.
+`THIRD_PARTY_LICENSES.md`. Version stays 0.2.7 on the branch until the release commit (the maintainer bumps it).
 Commands before every handoff: `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D
 warnings`, `cargo test --workspace --locked`, `python3 scripts/check_target_os.py`, and the Windows jobs (`ci:windows`
 label on a branch). Final report: commits, tests run, reports written, what was not done.

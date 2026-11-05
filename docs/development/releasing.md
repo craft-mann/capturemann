@@ -1,6 +1,6 @@
 # Releasing CaptureMann
 
-A release is two signed, notarized and stapled DMGs (Apple Silicon `arm64` and Intel `x86_64`, one per chip, never universal) plus a SHA-256 file for each, attached to a GitHub release.
+This document is mostly about the macOS release; Windows and Linux files are covered in their own sections below. A macOS release is two signed, notarized and stapled DMGs (Apple Silicon `arm64` and Intel `x86_64`, one per chip, never universal) plus a SHA-256 file for each, attached to a GitHub release.
 macOS 13+. The Intel DMG is cross-built on the Apple Silicon runner and has only been checked under Rosetta until it has run on a real Intel Mac (specs/plans/intel-mac-plan.md). Updates are manual: users download the new
 DMG, the app has no update code.
 
@@ -219,6 +219,16 @@ Intel one: a `tar.gz` and a `.deb` per CPU, attached by hand to a pre-release. F
    how to verify (`minisign -Vm <file> -P <public key>`, the key is on the release page).
 5. Not done for Linux: Flatpak, an AppImage, a package repository (apt/dnf), an RPM, and a Linux item in the website
    and Homebrew steps. Windows has no speaker engine yet.
+
+## Windows (zip and installer)
+
+Windows is not part of the `Release` workflow. The files (`capturemann-<version>-windows-x64.zip`,
+`capturemann-<version>-windows-x64-setup.exe` and their `.sha256` files) come from the manual **Windows package**
+workflow (`windows-package.yml`), are unsigned (maintainer decision O4: no signing in 0.x, SHA-256 sums and a winget
+manifest instead) and are attached by hand to a pre-release. The exact steps for 0.2.8 are in
+[`release-day-0.2.8.md`](release-day-0.2.8.md); `packaging/windows/release-files.sh` checks the downloaded artifact
+against its `.sha256` files, writes `SHA256SUMS.txt` and renders the winget manifest. Packaging details:
+`packaging/windows/README.md`.
 
 ## Rollback and yank
 

@@ -1,4 +1,4 @@
-# Windows packaging (early build)
+# Windows packaging
 
 Status, Nov 1, 2026: the scripts ran on a GitHub `windows-latest` runner (workflow `windows-package.yml`, manual)
 and produced the zip and the installer; the runner then unpacked the zip, ran the CLI (it started `cm-daemon`),
@@ -22,8 +22,9 @@ run on a physical Windows PC yet (the ThinkPad, planned after the Linux test). R
 ## Decision (v0)
 
 NSIS per-user installer plus portable zip (maintainer decision D-W3). MSIX is not chosen: it needs a signing
-certificate to install at all and sandbox/identity work; revisit with SignPath. The early build is unsigned, so
-SmartScreen shows "Windows protected your PC" on first run (More info, Run anyway).
+certificate to install at all and sandbox/identity work. Signing (maintainer decision O4, Nov 5, 2026): no code
+signing in 0.x; the files are unsigned and published with SHA-256 sums and a winget manifest, so SmartScreen shows
+"Windows protected your PC" on first run (More info, Run anyway).
 
 ## Text engine (llama-server)
 
@@ -31,17 +32,16 @@ SmartScreen shows "Windows protected your PC" on first run (More info, Run anywa
 DLLs allowed by its self-check) builds llama.cpp's `llama-server.exe` from the same pin as macOS (`LLAMA_TAG` and
 `LLAMA_SHA256` in `packaging/llama/build-macos.sh`). `windows-package.yml` builds and caches it, runs
 `--version` and `--help` only (no model), packages it with `CM_REQUIRE_LLAMA=1` and checks `capturemann diagnostics`
-reports it as bundled. Not yet run with a model on Windows.
+reports it as bundled. Whether a model ran with it on Windows: see `verification/` (`L1-windows-0.2.8-win-checks6-*`).
 
 ## Not done
 
 * `packaging/ffmpeg/build-windows.sh` is written (Nov 4, 2026: MSYS2 MINGW64, `--target-os=mingw32
   --enable-mediafoundation`, `h264_mf`/`hevc_mf`, static libvpx and libopus, self-check with `objdump -p` allowing
   only Windows system DLLs) and wired into `windows-package.yml` and `build-windows.ps1` (`CM_FFMPEG_BUNDLE`,
-  `CM_REQUIRE_FFMPEG=1`), but it has not run on Windows. The first run decides what needs fixing.
+  `CM_REQUIRE_FFMPEG=1`), but check the 0.2.8 reports in `verification/` for what ran on the lab laptop before relying on it.
 * The speaker engine: `packaging/sherpa/fetch-windows.ps1` and the Windows link settings are written and wired into
   `ci.yml` (/MD libraries) and `windows-package.yml` (/MT libraries; `build-windows.ps1` builds with the default
-  features when they match the C runtime, `CM_REQUIRE_SHERPA=1` makes their absence an error). Not linked on Windows yet.
-* The Windows section in `docs/development/releasing.md` and the paragraph in `docs/project/status.md`.
-* A run on a physical Windows PC (clean install, SmartScreen, real GPU, uninstall leaving no files).
+  features when they match the C runtime, `CM_REQUIRE_SHERPA=1` makes their absence an error). See the 0.2.8 reports in `verification/` for whether it ran on the lab laptop.
+* SmartScreen on a real browser download, Windows 10 22H2 and mixed-DPI layouts were not run (see the 0.2.8 reports).
 * Executable icon and version resource: needs a `build.rs` (for example `winres`) in `apps/`; not done.

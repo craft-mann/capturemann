@@ -29,9 +29,10 @@ through MCP and a CLI.
 </p>
 
 > **Status: 0.2.7. macOS 13+ (Apple Silicon and Intel) is the full app. Windows 11 (x64) and Linux (Ubuntu 24.04+,
-> x86_64 and aarch64) are early builds** (the 0.2.6 files; 0.2.7 is macOS only, Windows follows in 0.2.8 and Linux in
-> 0.2.9) with screenshots, the editor, the library, local AI and the CLI and MCP
-> server; screen and audio recording are not available there yet, and the Windows files are not signed. Most results are
+> x86_64 and aarch64) are early builds** (the published files are 0.2.6; 0.2.7 is macOS only). **Windows recording is
+> available in the 0.2.8 track** (screen, microphone, system audio and camera on one lab laptop, reports marked PARTIAL in
+> `verification/`; not released yet); Linux follows in 0.2.9. The published Windows and Linux files have screenshots,
+> the editor, the library, local AI and the CLI and MCP server but no recording, and the Windows files are not signed. Most results are
 > tested with scripted fakes, plus the maintainer's own use on one Mac; there are few stored hardware
 > reports. **Speaker labels** are measured on public English conversation clips only (diarization error
 > 17 % on clips held back, [report](verification/benchmarks/speaker-detection-2026-10-29.md)); Vietnamese
@@ -224,9 +225,11 @@ Windows 11 (x64). From [Releases](https://github.com/craft-mann/capturemann/rele
 `capturemann-<version>-windows-x64.zip` (unpack anywhere and run `cm-desktop.exe`; `capturemann.exe` is the command
 line). Check the download with its `.sha256` file (`certutil -hashfile <file> SHA256`).
 **The files are not signed**, so Windows SmartScreen warns before the first run (More info, then Run anyway).
-Works: screenshots of a region, a window or a display, the editor, the library, local AI that needs no extra
-program, the CLI and the MCP server. Not yet: recording, speaker labels; Auto-redact needs
-`winget install UB-Mannheim.TesseractOCR` (not tested on Windows yet).
+The published 0.2.6 files work for screenshots of a region, a window or a display, the editor, the library, local AI
+that needs no extra program, the CLI and the MCP server; they have no recording. Recording (screen, microphone, system
+audio, camera) is in the 0.2.8 Windows track and comes with that release; it was checked on one lab laptop, see the
+reports `verification/L1-windows-0.2.8-*.md` (PARTIAL). Auto-redact on Windows is covered by those reports; the
+`tesseract` route (`winget install UB-Mannheim.TesseractOCR`) is not tested there.
 
 ### Linux (early build)
 
