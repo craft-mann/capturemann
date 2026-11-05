@@ -51,5 +51,25 @@ enough; many laptop cameras halve the rate in low light (the lab laptop recorded
 room): note the light and the measured rate (`ffprobe -show_entries stream=nb_frames,r_frame_rate camera.mp4`).
 `camera.mp4` is H.264 from the Media Foundation hardware encoder; check it with `ffprobe` and that it plays.
 
+### Windows: camera comes back during a recording (0.2.8, built, not yet run on hardware)
+Unlike macOS, the Windows camera source reopens the same camera by itself (back-off 0.25 s doubling to 2 s, until the
+recording stops). Needs a USB webcam; a built-in camera cannot be unplugged (Device Manager > Cameras > right-click the
+camera > Disable device, then Enable device, also works and needs no cable).
+W1. Start `capturemann events` (or the watch command above), pick the USB camera and record for about 25 s.
+W2. After about 5 s unplug the camera (or disable it). Expected: the bubble shows the camera-off placeholder,
+    `recording.warning` `camera_lost` and `camera.disconnected`; screen and mic keep recording.
+W3. After about 5 s more plug it in again (or enable it), into the same USB port. Expected within a few seconds: the
+    bubble shows the picture again, an Info note `camera_restored` ("The camera is back") appears and
+    `camera.connected` appears.
+W4. Repeat W2 and W3 once. Expected: it comes back again.
+W5. Stop the recording. Expected: `camera.mp4` plays with a freeze or gap for each unplug (the screen and mic tracks run
+    to the end and stay in sync with the pictures after the gap), `manifest.json` has `camera_disconnected` and
+    `camera_restored` warnings in that order, per unplug.
+W6. Unplug and do not plug in again; stop after 10 s. Expected: the recording is saved, no hang on Stop.
+W7. Plug it into a different USB port instead of the same one and note whether it comes back (Windows may give the
+    camera a new device id on another port; the app waits for the same id, so it may not resume; report what you see).
+Privacy: the camera light is on during this test and the picture is recorded; use a neutral scene and delete the
+recording afterwards.
+
 ## Pass criteria
-Steps 1 to 3, 6 and 8 as described. Steps 4, 5, 7 and 9 are reported as observed.
+Steps 1 to 3, 6 and 8 as described. Steps 4, 5, 7 and 9 are reported as observed. On Windows also W1 to W6 (W7 as observed).
