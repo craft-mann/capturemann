@@ -16,3 +16,4 @@ pub mod sleep;
 pub mod stack;
 pub mod sysinfo;
 pub mod trash;
+pub mod vocab;
