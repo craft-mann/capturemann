@@ -11748,3 +11748,11 @@ msgstr "máy tính của bạn"
 msgctxt "platform word"
 msgid "your system settings"
 msgstr "cài đặt hệ thống của bạn"
+
+#, fuzzy
+msgid "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update Windows and the graphics driver, or use a computer with a hardware video encoder (most computers since about 2016)."
+msgstr "Máy tính này không có bộ mã hóa H.264 phần cứng dùng được cho bản ghi này. Hãy thử độ phân giải thấp hơn, cập nhật Windows và trình điều khiển đồ họa, hoặc dùng máy tính có bộ mã hóa video phần cứng (hầu hết máy từ khoảng năm 2016)."
+
+#, fuzzy
+msgid "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update your graphics driver, or use a computer with a hardware video encoder (most computers since about 2016)."
+msgstr "Máy tính này không có bộ mã hóa H.264 phần cứng dùng được cho bản ghi này. Hãy thử độ phân giải thấp hơn, cập nhật trình điều khiển đồ họa, hoặc dùng máy tính có bộ mã hóa video phần cứng (hầu hết máy từ khoảng năm 2016)."

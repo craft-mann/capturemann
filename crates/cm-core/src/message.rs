@@ -96,6 +96,16 @@ pub const TEMPLATES: &[Template] = &[
         ErrorCode::PlatformRejected,
         "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update your operating system (macOS 13 or later, Windows 10 or later), or use a computer from about 2016 or later.",
     ),
+    t(
+        "hardware_encoder_unavailable_windows",
+        ErrorCode::PlatformRejected,
+        "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update Windows and the graphics driver, or use a computer with a hardware video encoder (most computers since about 2016).",
+    ),
+    t(
+        "hardware_encoder_unavailable_linux",
+        ErrorCode::PlatformRejected,
+        "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update your graphics driver, or use a computer with a hardware video encoder (most computers since about 2016).",
+    ),
     // FFmpeg is missing (the exporter, the GIF and WebM presets, frame picking). The ids are the
     // stable machine-readable "FFmpeg not found" code: `cm_media::tools` raises the messages (a
     // test there pins the wording), and a failed job's `error.data.reason_code` carries the id.

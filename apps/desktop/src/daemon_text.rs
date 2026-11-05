@@ -237,6 +237,12 @@ fn translated(p: &MessageParts) -> Option<String> {
         "hardware_encoder_unavailable" => tr!(
             "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update your operating system (macOS 13 or later, Windows 10 or later), or use a computer from about 2016 or later."
         ),
+        "hardware_encoder_unavailable_windows" => tr!(
+            "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update Windows and the graphics driver, or use a computer with a hardware video encoder (most computers since about 2016)."
+        ),
+        "hardware_encoder_unavailable_linux" => tr!(
+            "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update your graphics driver, or use a computer with a hardware video encoder (most computers since about 2016)."
+        ),
         "ffmpeg_not_found" => tr!(
             "FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."
         ),

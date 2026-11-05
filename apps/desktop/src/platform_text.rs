@@ -150,7 +150,7 @@ mod tests {
         ("Show in Finder", "the Mac branch of Term::ShowLabel"),
         ("System audio needs Screen Recording permission on macOS.", "shown only when the Screen Recording permission is blocked, which is macOS only"),
         ("The recording is saved, but the single MP4 needs FFmpeg. Install it with Homebrew", "the macOS and Linux branch of ffmpeg_missing_body(windows)"),
-        ("This computer has no usable hardware H.264 encoder", "names every supported system on purpose"),
+        ("This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update your operating system", "the macOS id lists the minimum of every system; Windows and Linux have their own ids"),
         ("Waits this long before a screenshot starts, from the dock", "the dock of any desktop"),
         ("macOS keeps these under your control", "the Mac branch of intro_note(os)"),
         ("macOS shows its own dialog only once", "Screen Recording card, macOS only"),
