@@ -658,12 +658,20 @@ mod tests {
         std::fs::write(
             &script,
             format!(
-                "#!/bin/sh\necho $$ > '{}'\nexec sleep 60\n",
+                "#!/bin/sh\n[ \"$1\" = warm ] && exit 0\necho $$ > '{}'\nexec sleep 60\n",
                 marker.display()
             ),
         )
         .unwrap();
         std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+        // The first run of a freshly written executable can take over a second on macOS (the
+        // system scans it), which would eat the watchdog before the script wrote its marker. Run it
+        // once outside the watchdog so the measured run starts promptly.
+        assert!(std::process::Command::new(&script)
+            .arg("warm")
+            .status()
+            .unwrap()
+            .success());
         let l = OverlayLauncher::new(Some(script), None).with_watchdog(Duration::from_millis(1500));
         let started = std::time::Instant::now();
         assert_eq!(
