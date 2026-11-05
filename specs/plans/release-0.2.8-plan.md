@@ -22,7 +22,7 @@ From `verification/L1-windows-thinkpad-2026-11-02-claude.md` and `specs/plans/re
 - Picker: app names of packaged apps are cut or wrong ("C:\Program Files\Wi...", "Windows Terminal H...",
   "Application Frame H..."); the listed and the saved window size differ by 1 px; a display shows as
   "Unknown Monitor 65537".
-- Diagnostics say releases include FFmpeg and `llama-server`, which the Windows zip does not.
+- ~~Diagnostics say releases include FFmpeg and `llama-server`, which the Windows zip does not.~~ Closed Nov 5, 2026: the diagnostics line is per build, and the zip and installer now include `llama-server.exe` (llama.cpp v0.7.0, CI run 41963086549; no model was run with it yet).
 - Seen once with the 0.2.5 build: no toast, and a hotkey press that left a `cm-overlay` running; not reproduced.
 - Auto-redact on Windows uses `tesseract` (never run on Windows).
 - SmartScreen on a real download and Windows 10 22H2 have never been run.
