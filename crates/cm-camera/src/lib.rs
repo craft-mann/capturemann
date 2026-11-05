@@ -20,6 +20,7 @@ pub mod latency;
 pub mod mp4;
 pub mod permission;
 pub mod preview;
+pub mod reconnect;
 pub mod recorder;
 pub mod retime;
 pub mod types;
@@ -42,6 +43,7 @@ pub use latency::{LatencyStats, LatencySummary};
 pub use permission::{check_camera_permission, request_camera_access, CameraPermission};
 pub use platform::NativeSample;
 pub use preview::{CameraPreview, PreviewFrame, PreviewOptions, RgbaImage};
+pub use reconnect::{Backoff, ReconnectingSource};
 pub use recorder::{CameraRecorder, RecorderEvent, CAMERA_FILE};
 pub use retime::{Retimed, Retimer};
 /// The native modes of the first camera, one line each (diagnostics; Windows only).
