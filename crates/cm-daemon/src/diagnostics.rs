@@ -233,12 +233,49 @@ fn missing_helper_line(name: &str, ships_it: bool, beside: Option<&Path>) -> Str
     }
 }
 
-/// Whether the official build for this system puts the helper next to the executable. The Windows
-/// package carries FFmpeg and `llama-server.exe` only when it was packaged with them
-/// (`packaging/windows/build-windows.ps1`, `CM_FFMPEG_BUNDLE` / `CM_LLAMA_BUNDLE`), so for Windows a miss
-/// is reported as "this build does not include one"; a copy that is there is found at run time and
-/// printed with its path, whatever this says.
-const SHIPS_HELPERS: bool = cfg!(not(windows));
+/// Whether the official build for this system puts the helper next to the executable. The official
+/// macOS bundle and Windows package both carry FFmpeg and `llama-server`
+/// (`packaging/windows/build-windows.ps1` with `CM_REQUIRE_FFMPEG` / `CM_REQUIRE_LLAMA`); a package
+/// made without them still reports a miss as "should include it" here, and a copy that is there is
+/// found at run time and printed with its path.
+const SHIPS_HELPERS: bool = true;
+
+/// The llama.cpp release from the build record that travels with a bundled `llama-server`
+/// (`Llama/BUILD-INFO.txt` next to the program on Windows, the same file elsewhere when present).
+/// Reads a text file only; the helper is never started here.
+fn llama_version_from_record(text: &str) -> Option<String> {
+    text.lines()
+        .map(str::trim)
+        .find_map(|l| l.strip_prefix("llama.cpp "))
+        .and_then(|rest| rest.split_whitespace().next())
+        .map(str::to_owned)
+}
+
+fn llama_line(path: &Path) -> String {
+    let dir = path.parent();
+    let version = dir
+        .into_iter()
+        .flat_map(|d| {
+            [
+                d.join("Llama").join("BUILD-INFO.txt"),
+                d.join("BUILD-INFO.txt"),
+            ]
+        })
+        .find_map(|f| std::fs::read_to_string(f).ok())
+        .and_then(|t| llama_version_from_record(&t));
+    let bundled = std::env::current_exe()
+        .ok()
+        .and_then(|e| e.parent().map(|p| p == dir.unwrap_or(Path::new(""))))
+        .unwrap_or(false);
+    let mut s = format!("llama-server at {}", path.display());
+    match (bundled, version) {
+        (true, Some(v)) => s.push_str(&format!(" (bundled with this build, llama.cpp {v})")),
+        (true, None) => s.push_str(" (bundled with this build)"),
+        (false, Some(v)) => s.push_str(&format!(" (llama.cpp {v})")),
+        (false, None) => {}
+    }
+    s
+}
 
 fn engine_lines() -> Vec<String> {
     let mut out = Vec::new();
@@ -256,7 +293,7 @@ fn engine_lines() -> Vec<String> {
     match cm_ai::text_model::engine::locate_helper(
         &cm_ai::text_model::engine::SearchPaths::from_env(),
     ) {
-        Ok(p) => out.push(format!("llama-server at {}", p.display())),
+        Ok(p) => out.push(llama_line(&p)),
         Err(_) => out.push(missing_helper_line(
             "llama-server",
             SHIPS_HELPERS,
@@ -413,6 +450,27 @@ mod tests {
     }
 
     use super::*;
+
+    #[test]
+    fn the_llama_version_comes_from_the_build_record() {
+        let rec = "Source:\n  llama.cpp  v0.7.0  https://x/y.tar.gz\n             sha256 ab\n";
+        assert_eq!(llama_version_from_record(rec).as_deref(), Some("v0.7.0"));
+        assert_eq!(llama_version_from_record("nothing here"), None);
+    }
+
+    #[test]
+    fn the_llama_line_names_the_version_of_a_copy_with_a_record() {
+        let d = std::env::temp_dir().join(format!("cm-diag-llama-{}", std::process::id()));
+        std::fs::create_dir_all(d.join("Llama")).unwrap();
+        std::fs::write(
+            d.join("Llama").join("BUILD-INFO.txt"),
+            "  llama.cpp  v9.9.9  url\n",
+        )
+        .unwrap();
+        let line = llama_line(&d.join("llama-server.exe"));
+        std::fs::remove_dir_all(&d).ok();
+        assert!(line.contains("llama-server at") && line.contains("(llama.cpp v9.9.9)"));
+    }
 
     #[test]
     fn the_text_has_a_heading_per_section_and_a_dash_per_line() {
