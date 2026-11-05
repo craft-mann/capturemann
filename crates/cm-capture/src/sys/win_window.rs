@@ -73,8 +73,8 @@ pub fn is_pickable(id: u32) -> bool {
 /// Makes this process per-monitor DPI aware (once). A process without a DPI manifest (the headless daemon,
 /// the CLI, a test program) gets window rectangles scaled down by the display scale from `GetWindowRect`
 /// and a `PrintWindow` bitmap of that smaller size, while `DWMWA_EXTENDED_FRAME_BOUNDS` is always physical:
-/// on the lab laptop (150 %) a Notepad window listed as 1426x721 was captured as 960x485. The desktop app is
-/// already aware (the call then fails and changes nothing).
+/// on the lab laptop (150 %) a Notepad window listed as 1426x721 was captured as 960x485. The desktop app calls it first thing in `main` (it has no
+/// manifest); when the awareness is already set the call fails and changes nothing.
 pub fn ensure_dpi_aware() {
     static ONCE: std::sync::Once = std::sync::Once::new();
     ONCE.call_once(|| {
