@@ -75,12 +75,11 @@ Branch `track/windows` (pushed to `public`). Evidence: `verification/L1-windows-
   only is installed there). Other languages: not run.
 - Item 3 (FFmpeg): the bundled LGPL FFmpeg 9.0.2 runs on the laptop; export quick/youtube-1080p (h264_mf), webm, gif worked.
   Import editing copies worked after a fix (Quick Sync needs NV12).
-- Item 4 (speaker engine): linked in the package (`speaker engine built in: true`); not run (no models on the laptop).
+- Item 4 (speaker engine): linked in the package; run with the real models on a synthetic two-voice clip (2 speakers found, RTF 0.16) and `medium` transcription measured at 0.63x real time (round 2 report).
 - Item 5 (recording): screen (WGC) + Media Foundation hardware H.264 + mic + cursor record on the laptop through the daemon and
   the app (on by default since O5: ships in 0.2.8, decided Nov 5, 2026); pause/resume, kill -9 recovery and window/region targets pass. The
-  10-minute gate ran for 9.2 minutes (see the report); A/V sync with a stimulus, the camera at 30 fps and the loopback
-  exclusion of CaptureMann's own sound are not shown. Decision O5 stays with the maintainer.
-- Items 6 and 7: not run (SmartScreen, Windows 10, second monitor).
+  10-minute gate ran 621 s with all tracks (round 2 report); the camera makes 30 fps in a lit room; the loopback excludes a child's sound; the A/V offset is about 87 ms with the stimulus's own latency included, so the 40 ms criterion is not shown. Decision O5 stays with the maintainer.
+- Items 6 and 7: SmartScreen and Windows 10 not run. A second monitor (3840x2160, 150 %, right of the panel, equal scales) was run on Nov 5: shots and recordings match the listing; the countdown, HUD and brackets are placed as if the monitor began at 0,0 (open); mixed DPI, negative origins and the cursor sprite premise need another layout.
 
 ## Done when
 
