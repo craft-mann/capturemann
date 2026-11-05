@@ -690,7 +690,6 @@ fn missing_ffmpeg_maps_to_not_found() {
     };
     assert_eq!(e.code(), cm_core::ErrorCode::NotFound);
     assert!(e.to_string().contains("FFmpeg was not found"), "{e}");
-    assert!(e.to_string().contains("brew install ffmpeg"), "{e}");
     assert!(!dir.path().join("exports").join("T - quick.mp4").exists());
 }
 

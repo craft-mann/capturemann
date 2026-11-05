@@ -34,8 +34,43 @@ pub fn is_not_found_message(reason: &str) -> bool {
     reason.contains(NOT_FOUND_PREFIX)
 }
 
-/// The message users see when no FFmpeg is found (also the `job.failed` reason).
-pub const NOT_FOUND_MESSAGE: &str = "FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy.";
+/// The message users see when no FFmpeg is found on macOS and Linux (also the `job.failed` reason).
+pub const NOT_FOUND_MESSAGE_UNIX: &str = "FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy.";
+
+/// The same message on Windows, where there is no Homebrew.
+pub const NOT_FOUND_MESSAGE_WINDOWS: &str = "FFmpeg was not found: CaptureMann includes its own copy, so reinstall CaptureMann, or set CM_FFMPEG to the path of ffmpeg.exe. (For development: winget install Gyan.FFmpeg.)";
+
+/// The "not found" message for a system: `windows` picks the Windows wording. The ids in
+/// `cm_core::message` (`ffmpeg_not_found`, `ffmpeg_not_found_windows`) match both texts.
+pub fn not_found_message_for(windows: bool) -> &'static str {
+    if windows {
+        NOT_FOUND_MESSAGE_WINDOWS
+    } else {
+        NOT_FOUND_MESSAGE_UNIX
+    }
+}
+
+/// The message users see when no FFmpeg is found, worded for the system this runs on.
+pub fn not_found_message() -> &'static str {
+    not_found_message_for(cfg!(windows))
+}
+
+/// The message for an FFmpeg that exists but cannot be run (permission denied).
+pub fn permission_denied_message_for(windows: bool, path: &str) -> String {
+    format!(
+        "FFmpeg at `{path}` cannot be run (permission denied). {}",
+        not_found_message_for(windows)
+    )
+}
+
+/// The hint that ends "needs a full FFmpeg" errors, worded for a system.
+pub fn full_ffmpeg_hint_for(windows: bool) -> &'static str {
+    if windows {
+        "Use the FFmpeg that comes with CaptureMann, or set CM_FFMPEG to a full ffmpeg.exe (winget install Gyan.FFmpeg)."
+    } else {
+        "Install a full FFmpeg with Homebrew (brew install ffmpeg)."
+    }
+}
 
 /// The message when the app is running from a `.app` bundle and the FFmpeg that ships inside it
 /// is gone. It keeps the `FFmpeg was not found` prefix, which the app and the job reasons match on.
@@ -130,7 +165,7 @@ impl SearchPaths {
     }
 }
 
-/// Locates FFmpeg for this process. Errors with `not_found` and [`NOT_FOUND_MESSAGE`] (or a
+/// Locates FFmpeg for this process. Errors with `not_found` and [`not_found_message`] (or a
 /// message naming a bad `CM_FFMPEG`).
 pub fn locate() -> Result<Tools, CmError> {
     locate_in(&SearchPaths::from_env())
@@ -160,7 +195,7 @@ pub fn locate_in(paths: &SearchPaths) -> Result<Tools, CmError> {
             if paths.exe_dir.as_deref().is_some_and(in_app_bundle) {
                 CmError::not_found(BUNDLE_MISSING_MESSAGE)
             } else {
-                CmError::not_found(NOT_FOUND_MESSAGE)
+                CmError::not_found(not_found_message())
             }
         })?,
     };
@@ -286,10 +321,10 @@ pub fn spawn_error(exe: &Path, e: &std::io::Error) -> CmError {
         ));
     }
     match e.kind() {
-        NotFound => CmError::not_found(NOT_FOUND_MESSAGE),
-        PermissionDenied => CmError::not_found(format!(
-            "FFmpeg at `{}` cannot be run (permission denied). {NOT_FOUND_MESSAGE}",
-            exe.display()
+        NotFound => CmError::not_found(not_found_message()),
+        PermissionDenied => CmError::not_found(permission_denied_message_for(
+            cfg!(windows),
+            &exe.display().to_string(),
         )),
         _ => CmError::internal(format!("cannot run FFmpeg at `{}`: {e}", exe.display())),
     }
@@ -498,9 +533,10 @@ pub fn encoder_candidates_for(
 ) -> Result<Vec<Encoder>, CmError> {
     let lgpl_only = policy.lgpl_only;
     if !caps.aac {
-        return Err(CmError::internal(
-            "This FFmpeg has no AAC encoder, so the MP4 cannot be written. Install a full FFmpeg (brew install ffmpeg).",
-        ));
+        return Err(CmError::internal(format!(
+            "This FFmpeg has no AAC encoder, so the MP4 cannot be written. {}",
+            full_ffmpeg_hint_for(cfg!(windows))
+        )));
     }
     let ok = |e: &Encoder| {
         caps.has(*e)
@@ -525,11 +561,14 @@ pub fn encoder_candidates_for(
     }
     if out.is_empty() {
         return Err(CmError::internal(if policy.linux_set {
-            "This FFmpeg has neither a usable VAAPI device (h264_vaapi and a /dev/dri render node) nor libvpx-vp9, so MP4 cannot be written. Use the FFmpeg that comes with CaptureMann, or export WebM."
+            "This FFmpeg has neither a usable VAAPI device (h264_vaapi and a /dev/dri render node) nor libvpx-vp9, so MP4 cannot be written. Use the FFmpeg that comes with CaptureMann, or export WebM.".to_owned()
         } else if lgpl_only {
-            "This FFmpeg has no LGPL-compatible H.264 encoder (h264_videotoolbox, h264_mf, libopenh264, h264_nvenc, h264_qsv or h264_amf)."
+            "This FFmpeg has no LGPL-compatible H.264 encoder (h264_videotoolbox, h264_mf, libopenh264, h264_nvenc, h264_qsv or h264_amf).".to_owned()
         } else {
-            "This FFmpeg has no H.264 encoder (none of h264_videotoolbox, h264_mf, libopenh264, h264_nvenc, h264_qsv, h264_amf or libx264). Install one with Homebrew (brew install ffmpeg)."
+            format!(
+                "This FFmpeg has no H.264 encoder (none of h264_videotoolbox, h264_mf, libopenh264, h264_nvenc, h264_qsv, h264_amf or libx264). {}",
+                full_ffmpeg_hint_for(cfg!(windows))
+            )
         }));
     }
     Ok(out)
@@ -683,14 +722,40 @@ mod tests {
     fn every_missing_message_has_a_stable_id() {
         use cm_core::message::ffmpeg_missing_id;
         let id = |m: &str| ffmpeg_missing_id(m);
-        assert_eq!(id(NOT_FOUND_MESSAGE), Some("ffmpeg_not_found"));
+        assert_eq!(id(NOT_FOUND_MESSAGE_UNIX), Some("ffmpeg_not_found"));
+        assert_eq!(
+            id(NOT_FOUND_MESSAGE_WINDOWS),
+            Some("ffmpeg_not_found_windows")
+        );
         assert_eq!(id(BUNDLE_MISSING_MESSAGE), Some("ffmpeg_bundle_missing"));
         let notfound = std::io::Error::from(std::io::ErrorKind::NotFound);
         let e = spawn_error(Path::new("/usr/bin/ffmpeg"), &notfound);
-        assert_eq!(id(&e.to_string()), Some("ffmpeg_not_found"));
+        assert_eq!(
+            id(&e.to_string()),
+            Some(if cfg!(windows) {
+                "ffmpeg_not_found_windows"
+            } else {
+                "ffmpeg_not_found"
+            })
+        );
+        for windows in [false, true] {
+            let m = permission_denied_message_for(windows, "/opt/x/ffmpeg");
+            let parts = cm_core::message::describe(cm_core::ErrorCode::NotFound, &m).unwrap();
+            assert_eq!(
+                parts.id,
+                if windows {
+                    "ffmpeg_permission_denied_windows"
+                } else {
+                    "ffmpeg_permission_denied"
+                }
+            );
+            assert_eq!(parts.get("path"), "/opt/x/ffmpeg");
+        }
         let denied = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
         let e = spawn_error(Path::new("/opt/x/ffmpeg"), &denied);
-        assert_eq!(id(&e.to_string()), Some("ffmpeg_permission_denied"));
+        assert!(id(&e.to_string())
+            .unwrap()
+            .starts_with("ffmpeg_permission_denied"));
         let e = spawn_error(
             Path::new("/Applications/CaptureMann.app/Contents/MacOS/ffmpeg"),
             &notfound,
@@ -714,11 +779,29 @@ mod tests {
 
     #[test]
     fn the_missing_messages_keep_the_prefix_the_app_reads() {
-        assert!(is_not_found_message(NOT_FOUND_MESSAGE));
+        assert!(is_not_found_message(NOT_FOUND_MESSAGE_UNIX));
+        assert!(is_not_found_message(NOT_FOUND_MESSAGE_WINDOWS));
         assert!(is_not_found_message(BUNDLE_MISSING_MESSAGE));
-        assert!(NOT_FOUND_MESSAGE.starts_with(NOT_FOUND_PREFIX));
+        assert!(NOT_FOUND_MESSAGE_UNIX.starts_with(NOT_FOUND_PREFIX));
+        assert!(NOT_FOUND_MESSAGE_WINDOWS.starts_with(NOT_FOUND_PREFIX));
         assert!(BUNDLE_MISSING_MESSAGE.starts_with(NOT_FOUND_PREFIX));
         assert!(!is_not_found_message("The export failed."));
+    }
+
+    /// The install hint depends on the system: Homebrew on macOS and Linux, the app's own copy on
+    /// Windows (no Homebrew there). Both keep the prefix and neither mentions the other's tool.
+    #[test]
+    fn the_install_hint_follows_the_system() {
+        let unix = not_found_message_for(false);
+        let win = not_found_message_for(true);
+        assert!(unix.contains("brew install ffmpeg") && !unix.contains("winget"));
+        assert!(win.contains("ffmpeg.exe") && win.contains("reinstall CaptureMann"));
+        assert!(!win.contains("Homebrew") && !win.contains("brew "));
+        assert!(permission_denied_message_for(true, "C:\\f.exe").contains("permission denied"));
+        assert!(!permission_denied_message_for(true, "x").contains("brew"));
+        assert!(full_ffmpeg_hint_for(false).contains("brew install ffmpeg"));
+        assert!(!full_ffmpeg_hint_for(true).contains("brew"));
+        assert!(full_ffmpeg_hint_for(true).contains("CM_FFMPEG"));
     }
 
     #[test]
@@ -960,7 +1043,7 @@ mod tests {
         let none = SearchPaths::default();
         let e = locate_in(&none).unwrap_err();
         assert_eq!(e.code(), cm_core::ErrorCode::NotFound);
-        assert!(e.to_string().contains("brew install ffmpeg"), "{e}");
+        assert_eq!(e.to_string(), not_found_message());
         let bad = SearchPaths {
             env: Some("/nonexistent/ffmpeg".into()),
             ..Default::default()
@@ -1028,10 +1111,10 @@ mod tests {
             exe_dir: Some(dev_dir),
             ..Default::default()
         };
-        assert!(locate_in(&dev)
-            .unwrap_err()
-            .to_string()
-            .contains("brew install ffmpeg"));
+        assert_eq!(
+            locate_in(&dev).unwrap_err().to_string(),
+            not_found_message()
+        );
         // A bundled copy that cannot start.
         let io = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
         let e = spawn_error(&macos.join("ffmpeg"), &io).to_string();

@@ -239,6 +239,9 @@ fn translated(p: &MessageParts) -> Option<String> {
         "ffmpeg_not_found" => tr!(
             "FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."
         ),
+        "ffmpeg_not_found_windows" => tr!(
+            "FFmpeg was not found: CaptureMann includes its own copy, so reinstall CaptureMann, or set CM_FFMPEG to the path of ffmpeg.exe. (For development: winget install Gyan.FFmpeg.)"
+        ),
         "ffmpeg_bundle_missing" => tr!(
             "FFmpeg was not found: the copy that ships inside CaptureMann is missing, so the app is damaged or incomplete. Reinstall CaptureMann. (Advanced: set CM_FFMPEG to an ffmpeg executable.)"
         ),
@@ -253,6 +256,10 @@ fn translated(p: &MessageParts) -> Option<String> {
         ),
         "ffmpeg_permission_denied" => tr!(
             "FFmpeg at `{path}` cannot be run (permission denied). FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy.",
+            path = g("path")
+        ),
+        "ffmpeg_permission_denied_windows" => tr!(
+            "FFmpeg at `{path}` cannot be run (permission denied). FFmpeg was not found: CaptureMann includes its own copy, so reinstall CaptureMann, or set CM_FFMPEG to the path of ffmpeg.exe. (For development: winget install Gyan.FFmpeg.)",
             path = g("path")
         ),
         "no_recording_running" => tr!("No recording is running"),

@@ -285,14 +285,17 @@ mod tests {
             data: serde_json::json!({"type": "export", "error": {"code": "job_failed",
                 "message": reason, "data": {"job_id": "j1", "reason": reason}}}),
         };
-        publish_job_event(
-            &bus,
-            failed("FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."),
-        );
+        publish_job_event(&bus, failed(cm_media::tools::NOT_FOUND_MESSAGE_UNIX));
+        publish_job_event(&bus, failed(cm_media::tools::NOT_FOUND_MESSAGE_WINDOWS));
         publish_job_event(&bus, failed("FFmpeg failed (exit status: 1): boom"));
         let a = rx.try_recv().unwrap();
         assert_eq!(a.data["error"]["data"]["reason_code"], "ffmpeg_not_found");
         assert_eq!(a.data["error"]["code"], "job_failed");
+        let w = rx.try_recv().unwrap();
+        assert_eq!(
+            w.data["error"]["data"]["reason_code"],
+            "ffmpeg_not_found_windows"
+        );
         let b = rx.try_recv().unwrap();
         assert!(b.data["error"]["data"].get("reason_code").is_none());
     }

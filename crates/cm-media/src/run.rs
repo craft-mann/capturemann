@@ -373,7 +373,7 @@ mod tests {
         match r {
             Err(RunError::Failed(e)) => {
                 assert_eq!(e.code(), cm_core::ErrorCode::NotFound);
-                assert!(e.to_string().contains("brew install ffmpeg"));
+                assert!(crate::tools::is_not_found_message(&e.to_string()));
             }
             other => panic!("{other:?}"),
         }

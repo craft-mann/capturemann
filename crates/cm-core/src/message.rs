@@ -104,6 +104,12 @@ pub const TEMPLATES: &[Template] = &[
         ErrorCode::NotFound,
         "FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy.",
     ),
+    // The same on Windows (no Homebrew there); `cm_media::tools` picks the text by system.
+    t(
+        "ffmpeg_not_found_windows",
+        ErrorCode::NotFound,
+        "FFmpeg was not found: CaptureMann includes its own copy, so reinstall CaptureMann, or set CM_FFMPEG to the path of ffmpeg.exe. (For development: winget install Gyan.FFmpeg.)",
+    ),
     t(
         "ffmpeg_bundle_missing",
         ErrorCode::NotFound,
@@ -123,6 +129,11 @@ pub const TEMPLATES: &[Template] = &[
         "ffmpeg_permission_denied",
         ErrorCode::NotFound,
         "FFmpeg at `{path}` cannot be run (permission denied). FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy.",
+    ),
+    t(
+        "ffmpeg_permission_denied_windows",
+        ErrorCode::NotFound,
+        "FFmpeg at `{path}` cannot be run (permission denied). FFmpeg was not found: CaptureMann includes its own copy, so reinstall CaptureMann, or set CM_FFMPEG to the path of ffmpeg.exe. (For development: winget install Gyan.FFmpeg.)",
     ),
     // Targets.
     t(
