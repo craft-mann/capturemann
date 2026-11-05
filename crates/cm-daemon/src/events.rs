@@ -35,6 +35,9 @@ pub const LIBRARY_MOVE_STARTED: &str = "library.move_started";
 /// `use_existing`): `{ from, to, mode, bundles, bytes, skipped, restart_required }`. The new
 /// folder is used after a restart.
 pub const LIBRARY_MOVED: &str = "library.moved";
+/// `{ keys: [..], by }`: `set_settings` stored new values. Lets every client of the daemon (the
+/// desktop app's cached view, the tray) follow a change made by another client.
+pub const SETTINGS_CHANGED: &str = "settings.changed";
 pub const CONFIRMATION_REQUESTED: &str = "confirmation.requested";
 pub const CONFIRMATION_RESOLVED: &str = "confirmation.resolved";
 pub const RECORDING_COUNTDOWN: &str = "recording.countdown";

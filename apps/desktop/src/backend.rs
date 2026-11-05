@@ -822,6 +822,45 @@ mod tests {
         });
     }
 
+    /// F7 (Windows lab round 3): the CLI and the app are two clients of one daemon. A
+    /// `set_settings` over the socket reaches the app's `FileSettings` (the handle the capture
+    /// path and the Settings page read) and raises `settings.changed`; a write by the app is
+    /// what `get_settings` over the socket returns.
+    #[test]
+    fn settings_are_shared_between_the_cli_and_the_app() {
+        let f = fixture();
+        let daemon = f.backend.daemon.clone().unwrap();
+        let ep = f.backend.endpoint.clone().unwrap();
+        let mut events = daemon.subscribe();
+        f.rt.block_on(async {
+            use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+            let stream = cm_daemon::connect(&ep).await.unwrap();
+            let (r, mut w) = tokio::io::split(stream);
+            let mut lines = BufReader::new(r).lines();
+            let req = json!({"jsonrpc":"2.0","id":1,"method":"set_settings",
+                "params":{"values":{"capture.delay_s":5}}});
+            w.write_all(format!("{req}\n").as_bytes()).await.unwrap();
+            let resp = lines.next_line().await.unwrap().unwrap();
+            assert!(resp.contains("\"result\""), "{resp}");
+            assert_eq!(f.backend.settings.snapshot()["capture.delay_s"], 5);
+            assert_eq!(events.recv().await.unwrap().name, "settings.changed");
+
+            Backend::call(
+                &daemon,
+                "set_settings",
+                json!({"values": {"capture.delay_s": 10}}),
+            )
+            .await
+            .unwrap();
+            let req = json!({"jsonrpc":"2.0","id":2,"method":"get_settings",
+                "params":{"keys":["capture.delay_s"]}});
+            w.write_all(format!("{req}\n").as_bytes()).await.unwrap();
+            let resp = lines.next_line().await.unwrap().unwrap();
+            let v: Value = serde_json::from_str(&resp).unwrap();
+            assert_eq!(v["result"]["settings"]["capture.delay_s"], 10, "{resp}");
+        });
+    }
+
     /// CAP-4.AC1: after a capture the clipboard holds the rendered PNG.
     #[test]
     fn after_capture_copies_to_the_clipboard() {

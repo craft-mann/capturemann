@@ -185,6 +185,48 @@ pub fn set_setting(
     .detach();
 }
 
+/// Another client of the daemon (the CLI, an MCP agent) stored settings: the model keeps a
+/// cached copy of the ones the UI shows (theme, language, copy after capture, capture delay), so
+/// re-read them from the shared store and bring the tray and the windows along. Idempotent: the
+/// app's own writes send the same event.
+pub fn sync_from_settings(app: &Entity<AppModel>, cx: &mut App) {
+    let snap = app.read(cx).backend.settings.snapshot();
+    let theme = snap
+        .get(KEY_THEME)
+        .and_then(|v| v.as_str())
+        .and_then(ThemePreference::parse);
+    let copy = snap
+        .get(KEY_COPY_AFTER_CAPTURE)
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
+    let language = crate::settings::language_from_settings(&snap);
+    let delay = crate::delay::from_setting(snap.get(KEY_CAPTURE_DELAY));
+    let (theme_changed, language_changed, delay_changed) = app.update(cx, |m, cx| {
+        let t = theme.is_some_and(|t| t != m.theme_pref);
+        if let Some(t) = theme {
+            m.theme_pref = t;
+        }
+        let l = m.language != language;
+        m.language = language;
+        let d = m.capture_delay_s != delay;
+        m.capture_delay_s = delay;
+        m.copy_after_capture = copy;
+        cx.notify();
+        (t, l, d)
+    });
+    if delay_changed {
+        if let Some(t) = &app.read(cx).tray {
+            t.set_delay(delay);
+        }
+    }
+    if theme_changed {
+        apply_theme(app, cx);
+    }
+    if language_changed {
+        apply_language(app, cx);
+    }
+}
+
 #[cfg(test)]
 mod quit_tests {
     use super::*;
