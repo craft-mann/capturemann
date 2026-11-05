@@ -3017,3 +3017,37 @@ async fn record_start_people_is_sent_and_checked() {
     assert_eq!(shown.last().unwrap().params["people"], 3);
     cli(&r.rig, &["record", "stop"]).await;
 }
+
+/// `platform-rules` and `cursor` call `get_platform_rules` and `get_cursor_track` (EXP-2, REC-7).
+#[tokio::test]
+async fn read_tools_platform_rules_and_cursor_commands() {
+    let r = rig();
+    let o = cli(&r, &["--json", "platform-rules", "youtube"]).await;
+    assert_eq!(o.code, 0, "{}", o.err);
+    let v = o.json();
+    assert_eq!(v["limits"]["title_max_chars"], 100);
+    assert_eq!(v["recommended_preset"], "youtube-1080p");
+
+    let text = cli(&r, &["platform-rules", "youtube"]).await;
+    assert_eq!(text.code, 0, "{}", text.err);
+    assert!(
+        text.out.contains("title: up to 100 characters"),
+        "{}",
+        text.out
+    );
+    assert!(text.out.contains("youtube-1080p"), "{}", text.out);
+
+    let bad = cli(&r, &["platform-rules", "vimeo"]).await;
+    assert_ne!(bad.code, 0);
+    assert!(bad.err.contains("platform"), "{}", bad.err);
+
+    let missing = cli(
+        &r,
+        &["cursor", "rec_nope", "--from", "1", "--to", "t:600000"],
+    )
+    .await;
+    assert_ne!(missing.code, 0);
+    let notime = cli(&r, &["cursor", "rec_nope", "--from", "soon"]).await;
+    assert_ne!(notime.code, 0);
+    assert!(notime.err.contains("from"), "{}", notime.err);
+}

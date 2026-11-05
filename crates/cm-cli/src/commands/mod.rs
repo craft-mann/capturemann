@@ -35,7 +35,8 @@ use record::{
     record_watch,
 };
 use settings::{
-    daemon_start, daemon_status, devices, diagnostics, mcp, settings_get, settings_set,
+    cursor_track, daemon_start, daemon_status, devices, diagnostics, mcp, platform_rules,
+    settings_get, settings_set,
 };
 
 struct Ctx<'a> {
@@ -104,6 +105,13 @@ pub async fn execute(cli: Cli, env: &mut Env) -> Result<(), CliError> {
         },
         Command::Devices => devices(&mut cx).await,
         Command::Diagnostics => diagnostics(&mut cx).await,
+        Command::Cursor {
+            id,
+            from,
+            to,
+            limit,
+        } => cursor_track(&mut cx, id, from, to, limit).await,
+        Command::PlatformRules { platform } => platform_rules(&mut cx, platform).await,
         Command::Destinations => destinations(&mut cx).await,
         Command::Upload(a) => upload(&mut cx, a).await,
         Command::Publish(a) => publish(&mut cx, a).await,

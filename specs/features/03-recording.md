@@ -254,7 +254,7 @@ Recording writes each source as its own track on one session clock (Technical de
 
 **Edge cases and errors** — Cursor outside the recorded region → events still recorded with out-of-range coordinates (used for zoom-out decisions), flagged `outside: true`. A torn last line after a crash is reported as truncated and skipped; at most about 1 s of events is lost.
 
-**Agent interface** — MCP resource `capturemann://capture/{id}/cursor`; tool `get_cursor_track { capture_id, from?, to? }` → events in video coordinates (Free).
+**Agent interface** — MCP resource `capturemann://capture/{id}/cursor`; tool `get_cursor_track { capture_id, from?, to?, limit? }` → events in video coordinates (Free, read-only; built Nov 5, 2026 for all platforms, tested with fakes; pages of at most 50,000 events with `next_from`). The MCP resource is not built.
 
 **Out of scope** — Keystroke overlay display (P2, would need explicit opt-in and its own spec).
 

@@ -1927,6 +1927,45 @@ async fn pub_list_publish_accounts_and_publish_validation_tools() {
     );
 }
 
+/// `get_cursor_track` and `get_platform_rules` through MCP (REC-7, EXP-2): both are listed as
+/// read-only, the rules answer from the app's data, and a recording without a cursor is `not_found`.
+#[tokio::test]
+async fn read_tools_cursor_track_and_platform_rules() {
+    let (b, _dir) = builder();
+    let d = b.build();
+    let (conn, _) = duplex_connector(d);
+    let c = mcp_client(conn, "claude-desktop").await;
+
+    let tools = c.list_all_tools().await.unwrap();
+    for n in ["get_cursor_track", "get_platform_rules"] {
+        let t = tools.iter().find(|t| t.name == n).unwrap();
+        assert_eq!(
+            t.annotations.as_ref().and_then(|a| a.read_only_hint),
+            Some(true),
+            "{n}"
+        );
+    }
+
+    let r = call(&c, "get_platform_rules", json!({"platform": "youtube"})).await;
+    let v = ok(&r);
+    assert_eq!(v["limits"]["title_max_chars"], 100);
+    assert_eq!(v["recommended_preset"], "youtube-1080p");
+    let tiktok = call(&c, "get_platform_rules", json!({"platform": "tiktok"})).await;
+    assert_eq!(err_code(&tiktok), "not_implemented");
+    let bad = call(&c, "get_platform_rules", json!({"platform": "vimeo"})).await;
+    assert_eq!(err_code(&bad), "invalid_input");
+
+    let missing = call(&c, "get_cursor_track", json!({"capture_id": "rec_nope"})).await;
+    assert_eq!(err_code(&missing), "not_found");
+    let extra = call(
+        &c,
+        "get_cursor_track",
+        json!({"capture_id": "rec_1", "x": 1}),
+    )
+    .await;
+    assert_eq!(err_code(&extra), "invalid_input");
+}
+
 // ---- resources and prompts (AGT-1) -------------------------------------------------------
 
 mod resources_and_prompts {

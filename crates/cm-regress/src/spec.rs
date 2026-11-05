@@ -135,7 +135,7 @@ mod tests {
         assert_eq!(missing, ["b"]);
     }
 
-    /// The checked-in spec and a list of the real server's tools (Nov 5, 2026, 77 tools) agree.
+    /// The checked-in spec and a list of the real server's tools (Nov 5, 2026, 79 tools) agree.
     #[test]
     fn the_real_spec_table_parses() {
         let t = parse_tool_table(SPEC_TEXT);

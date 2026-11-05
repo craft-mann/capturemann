@@ -1213,6 +1213,8 @@ impl Daemon {
             Action::ListPublishAccounts => inner.list_publish_accounts().await,
             Action::GetTextModel => inner.get_text_model().await,
             Action::GetDiagnostics => inner.get_diagnostics().await,
+            Action::GetCursorTrack(p) => inner.get_cursor_track(p).await,
+            Action::GetPlatformRules(p) => inner.get_platform_rules(p).await,
             Action::TestTextModel => inner.test_text_model().await,
             Action::Upload(p) => inner.upload(actor, p).await,
             Action::CaptionOptions(p) => inner.set_caption_options(actor, p).await,

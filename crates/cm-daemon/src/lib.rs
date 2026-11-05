@@ -65,6 +65,7 @@ pub mod logs;
 pub mod markers;
 pub mod publish_ops;
 mod publish_records;
+pub mod read_tools;
 pub mod recording;
 mod recovery;
 mod remote_delete;

@@ -86,7 +86,7 @@ Exports render master tracks + edit list through the `cm-render` compositor (Tec
 
 **Agent interface** — `export_video { preset: "<id>" }`; MCP `get_platform_rules { platform }` returns limits and recommended preset.
 
-*As built (Oct 22, 2026).* `export_video { preset }` takes any id of the table; `quick` stays the default and is not in the table. The table is `crates/cm-media/data/presets.toml` (version 1, embedded in the binary; the spec's `cm-publish/platform_rules.toml` moves there when `cm-publish` exists). A file named by the environment variable `CAPTUREMANN_PLATFORM_RULES` replaces it the next time an export starts, without rebuilding (AC4); a file that does not parse is ignored with a warning, never an error. `get_platform_rules` and the per-platform limits (TikTok's 10 minutes, 4 GB) are not built: they belong to `cm-publish`.
+*As built (Oct 22, 2026).* `export_video { preset }` takes any id of the table; `quick` stays the default and is not in the table. The table is `crates/cm-media/data/presets.toml` (version 1, embedded in the binary; the spec's `cm-publish/platform_rules.toml` moves there when `cm-publish` exists). A file named by the environment variable `CAPTUREMANN_PLATFORM_RULES` replaces it the next time an export starts, without rebuilding (AC4); a file that does not parse is ignored with a warning, never an error. `get_platform_rules` is built (Nov 5, 2026, all platforms, tested with fakes): it serves the YouTube limits of `cm-publish` and the presets named `youtube-*` of this table; the per-platform limits of TikTok (10 minutes, 4 GB) and Facebook are not built.
 
 | Preset | Frame | fps | Video | Audio |
 | --- | --- | --- | --- | --- |

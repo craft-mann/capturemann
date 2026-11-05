@@ -232,7 +232,7 @@ fn tools_list(ctx: &mut Ctx) -> R {
     let (unlisted, mut missing) = spec::drift(&table, &names);
     // Rows of the spec table that no build has ever registered (found Nov 5, 2026). The case reports them
     // every run and fails on any NEW difference; remove a name here when the spec or the server is fixed.
-    const KNOWN_SPEC_ONLY: &[&str] = &["get_cursor_track", "export_image", "get_platform_rules"];
+    const KNOWN_SPEC_ONLY: &[&str] = &["export_image"];
     let known: Vec<String> = missing
         .iter()
         .filter(|m| KNOWN_SPEC_ONLY.contains(&m.as_str()))

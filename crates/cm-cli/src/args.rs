@@ -81,6 +81,28 @@ pub enum Command {
     /// Print the diagnostics report to paste into an issue (`get_diagnostics`): versions, system,
     /// permissions, models, a few settings, library counts and the last warnings. Nothing is sent.
     Diagnostics,
+    /// Print the pointer path and clicks of a recording (`get_cursor_track`): moves, button
+    /// down/up, scroll direction, in physical pixels of the screen track. Times are seconds or
+    /// `t:<ticks>` (session time); a long track is read in pages (`--limit`, `next_from`).
+    Cursor {
+        /// Capture id of a recording.
+        id: String,
+        /// Start of the range, inclusive (seconds or `t:<ticks>`).
+        #[arg(long)]
+        from: Option<String>,
+        /// End of the range, exclusive (seconds or `t:<ticks>`).
+        #[arg(long)]
+        to: Option<String>,
+        /// Most events to print (default 5000, at most 50000).
+        #[arg(long)]
+        limit: Option<u64>,
+    },
+    /// Print the limits, required fields, privacy options and export presets of a publishing
+    /// platform (`get_platform_rules`). Today: `youtube`.
+    PlatformRules {
+        /// The platform: `youtube`.
+        platform: String,
+    },
     /// List the destinations set up in Settings (`list_destinations`).
     Destinations,
     /// Copy a capture or a file to a destination in the background (`upload`). Prints the job id.
