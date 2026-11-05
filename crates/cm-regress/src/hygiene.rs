@@ -42,8 +42,16 @@ pub fn strays_since(before: &BTreeSet<u32>) -> Vec<(u32, String)> {
         .collect()
 }
 
+/// A known harmless ERROR of the GPUI Windows backend: its vsync thread calls `RedrawWindow` on a window
+/// that was destroyed a message earlier; the window leaves the tracked list one message later
+/// (`gpui-pre-windows-0.3.9/src/platform.rs:493`, read in the GPUI source on Nov 5, 2026). Windows answers
+/// `ERROR_INVALID_WINDOW_HANDLE` (0x80070578). It appears in a burst once per recording when the recording
+/// windows close. Matched by file position AND code, counted as a WARN, never failed.
+const GPUI_REDRAW_RACE: (&str, &str) = ("gpui-pre-windows-0.3.9/src/platform.rs:493", "0x80070578");
+
 /// Lines of the logs below `config/logs` that count as a problem: panics and ERROR lines, minus the
-/// allowed substrings. Also returns how many WARN lines there were (reported, not failed).
+/// allowed substrings and [`GPUI_REDRAW_RACE`]. Also returns how many WARN lines there were, the redraw race
+/// lines included (reported, not failed).
 pub fn scan_logs(config: &Path, allow: &[String]) -> (Vec<String>, usize) {
     let mut bad = Vec::new();
     let mut warns = 0;
@@ -62,6 +70,10 @@ pub fn scan_logs(config: &Path, allow: &[String]) -> (Vec<String>, usize) {
                 || line.contains("thread '") && line.contains("panicked");
             if line.contains(" WARN ") {
                 warns += 1;
+            }
+            if is_err && line.contains(GPUI_REDRAW_RACE.0) && line.contains(GPUI_REDRAW_RACE.1) {
+                warns += 1;
+                continue;
             }
             if is_err && !allow.iter().any(|a| line.contains(a.as_str())) {
                 bad.push(format!("{file}: {}", crate::util::cut(line, 240)));
@@ -149,6 +161,21 @@ mod tests {
         assert!(is_product("CM-OVERLAY.EXE"));
         assert!(is_product("ffmpeg"));
         assert!(!is_product("notepad.exe"));
+    }
+
+    #[test]
+    fn the_gpui_redraw_race_is_counted_not_failed() {
+        let dir = tempfile::tempdir().unwrap();
+        let logs = dir.path().join("logs");
+        std::fs::create_dir_all(&logs).unwrap();
+        std::fs::write(
+            logs.join("desktop.log"),
+            "2026 desktop ERROR gpui-pre-windows-0.3.9/src/platform.rs:493: Invalid window handle. (0x80070578)\n2026 desktop ERROR gpui-pre-windows-0.3.9/src/platform.rs:493: something else\n2026 desktop ERROR other.rs:1: (0x80070578)\n",
+        )
+        .unwrap();
+        let (bad, warns) = scan_logs(dir.path(), &[]);
+        assert_eq!(bad.len(), 2, "{bad:?}");
+        assert_eq!(warns, 1);
     }
 
     #[test]
