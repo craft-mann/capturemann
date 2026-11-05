@@ -410,6 +410,8 @@ pub(crate) fn tool_title(name: &str) -> String {
         "list_report_templates" => tr!("List report templates"),
         "generate_report" => tr!("Write a report from a transcript"),
         "get_report" => tr!("Read a report"),
+        "get_cursor_track" => tr!("Read a cursor track"),
+        "get_platform_rules" => tr!("Read publishing rules"),
         "export_report" => tr!("Export a report"),
         "delete_report" => tr!("Delete a report"),
         "edit_report" => tr!("Edit a report"),

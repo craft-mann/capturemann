@@ -3433,6 +3433,9 @@ msgstr ""
 msgid "Read a capture"
 msgstr ""
 
+msgid "Read a cursor track"
+msgstr ""
+
 msgid "Read a report"
 msgstr ""
 
@@ -3443,6 +3446,9 @@ msgid "Read a transcript with punctuation"
 msgstr ""
 
 msgid "Read caption lines"
+msgstr ""
+
+msgid "Read publishing rules"
 msgstr ""
 
 msgid "Read recording status"
