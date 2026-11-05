@@ -202,6 +202,7 @@ mod tests {
             rotation: 0,
             pix_fmt: Some("yuv420p".into()),
             hdr: false,
+            color_space: None,
             variable_frame_rate: false,
         }
     }

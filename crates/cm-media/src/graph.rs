@@ -206,6 +206,66 @@ fn audio_chain(in_idx: usize, offset: f64, layout: &str, label: &str) -> String 
     format!("[{in_idx}:a]{}[{label}]", f.join(","))
 }
 
+/// The BT.709 limited-range tags of an H.264 stream made by Media Foundation (`h264_mf`).
+///
+/// `h264_mf` writes no VUI colour description, and the MP4 muxer writes a `colr` atom only when the
+/// primaries, the transfer and the matrix are all known, yet FFmpeg's command line hands the encoder
+/// only the matrix and the range (found on the lab laptop, Nov 5, 2026: `-colorspace` and
+/// `-color_range` alone left ffprobe with empty `color_*` fields). So: the options (matrix and range
+/// reach the stream), `-movflags +write_colr` (see [`mp4_movflags`]: the `colr` atom is written even
+/// with unknown primaries) and, when this FFmpeg has it, the `h264_metadata` filter that writes the
+/// full colour description into the SPS. Empty for every other encoder (VideoToolbox, VAAPI and the
+/// software encoders tag themselves).
+pub(crate) fn mf_colour_args(media_foundation: bool, caps: &crate::tools::Caps) -> Vec<String> {
+    if !media_foundation {
+        return Vec::new();
+    }
+    let mut a: Vec<String> = [
+        "-colorspace",
+        "bt709",
+        "-color_primaries",
+        "bt709",
+        "-color_trc",
+        "bt709",
+        "-color_range",
+        "tv",
+    ]
+    .map(String::from)
+    .to_vec();
+    a.extend(mf_vui_args(true, caps, 1));
+    a
+}
+
+/// Only the `h264_metadata` part of [`mf_colour_args`] (the exporters that tag the matrix and the
+/// range themselves add this). `code` is the H.264 table value shared by primaries, transfer and
+/// matrix: 1 for BT.709, 6 for SMPTE 170M (BT.601). Limited range.
+pub(crate) fn mf_vui_args(
+    media_foundation: bool,
+    caps: &crate::tools::Caps,
+    code: u8,
+) -> Vec<String> {
+    if media_foundation && caps.h264_metadata {
+        vec!["-bsf:v".into(), mf_vui_bsf(code)]
+    } else {
+        Vec::new()
+    }
+}
+
+/// The `h264_metadata` filter that writes the colour description into the SPS.
+pub(crate) fn mf_vui_bsf(code: u8) -> String {
+    format!("h264_metadata=colour_primaries={code}:transfer_characteristics={code}:matrix_coefficients={code}:video_full_range_flag=0")
+}
+
+/// `-movflags` of an MP4 output: fast start, and the `colr` atom for `h264_mf` (see
+/// [`mf_colour_args`]).
+pub(crate) fn mp4_movflags(media_foundation: bool) -> &'static str {
+    if media_foundation {
+        "+faststart+write_colr"
+    } else {
+        "+faststart"
+    }
+}
+
 /// The video encoder arguments of an encoder at an output size and rate.
 #[derive(Debug, Clone, PartialEq)]
 pub struct VideoCodec {
@@ -518,6 +578,7 @@ pub fn build(i: &BuildInput<'_>) -> Plan {
         "-tag:v".into(),
         "avc1".into(),
     ]);
+    args.extend(mf_colour_args(i.encoder == Encoder::H264Mf, i.caps));
     if i.caps.fps_mode() {
         args.extend(["-fps_mode".into(), "cfr".into()]);
     }
@@ -541,7 +602,17 @@ pub fn build(i: &BuildInput<'_>) -> Plan {
             .map(String::from),
         );
     }
-    args.extend(["-movflags", "+faststart", "-f", "mp4", "-t", &secs(dur)].map(String::from));
+    args.extend(
+        [
+            "-movflags",
+            mp4_movflags(i.encoder == Encoder::H264Mf),
+            "-f",
+            "mp4",
+            "-t",
+            &secs(dur),
+        ]
+        .map(String::from),
+    );
     args.push(i.out.to_string_lossy().into_owned());
 
     let settings = json!({
@@ -625,6 +696,35 @@ mod tests {
             have_system: sys,
             out: Path::new("/b/Lesson 1.cmrec/exports/x.part"),
         })
+    }
+
+    /// The quick export on Media Foundation tags the stream BT.709 limited range (the lab found it
+    /// untagged: `h264_mf` writes no colour description); the other encoders are left as they were.
+    #[test]
+    fn media_foundation_quick_export_is_tagged_and_the_others_are_not() {
+        let mut c = caps("7.1");
+        c.h264_metadata = true;
+        let a = plan_with(&manifest(), Encoder::H264Mf, true, true, &c).args;
+        let j = a.join(" ");
+        assert!(
+            j.contains("-colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv"),
+            "{j}"
+        );
+        assert!(j.contains("-bsf:v h264_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1:video_full_range_flag=0"), "{j}");
+        assert_eq!(arg_after(&a, "-movflags"), Some("+faststart+write_colr"));
+        c.h264_metadata = false;
+        let j = plan_with(&manifest(), Encoder::H264Mf, true, true, &c)
+            .args
+            .join(" ");
+        assert!(
+            j.contains("-color_range tv") && !j.contains("-bsf:v"),
+            "{j}"
+        );
+        for enc in [Encoder::VideoToolbox, Encoder::Libx264, Encoder::Qsv] {
+            let a = plan_with(&manifest(), enc, true, true, &c).args;
+            assert!(!a.join(" ").contains("-colorspace"), "{enc:?}");
+            assert_eq!(arg_after(&a, "-movflags"), Some("+faststart"));
+        }
     }
 
     /// R5-4: every encoder gets its own arguments; only libx264 uses a CRF and is not LGPL safe.

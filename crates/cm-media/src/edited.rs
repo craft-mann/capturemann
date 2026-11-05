@@ -40,7 +40,8 @@ use crate::edit_plan::{
 };
 use crate::edit_view::{CursorMedia, EditView, ViewParams};
 use crate::graph::{
-    output_size, rate, secs, video_codec_at, AUDIO_BPS_MONO, AUDIO_BPS_STEREO, AUDIO_RATE,
+    mf_vui_args, mp4_movflags, output_size, rate, secs, video_codec_at, AUDIO_BPS_MONO,
+    AUDIO_BPS_STEREO, AUDIO_RATE,
 };
 use crate::layout_plan::{geom_of, LayoutPlanner, Placement};
 use crate::preset::{self, fit_rect, Kind, Target};
@@ -1436,6 +1437,12 @@ fn encode_args(
             .map(String::from),
         );
     }
+    let media_foundation = fmt
+        .video
+        .windows(2)
+        .any(|w| w[0] == "-c:v" && w[1] == "h264_mf");
+    // Media Foundation leaves the primaries and the transfer unknown without this (`mf_colour_args`).
+    args.extend(mf_vui_args(media_foundation, caps, 1));
     if fmt.tag_avc1 {
         args.extend(["-tag:v".into(), "avc1".into()]);
     }
@@ -1462,7 +1469,7 @@ fn encode_args(
         );
     }
     if fmt.faststart {
-        args.extend(["-movflags".into(), "+faststart".into()]);
+        args.extend(["-movflags".into(), mp4_movflags(media_foundation).into()]);
     }
     args.extend(["-f", fmt.container, "-t", &secs(duration_s)].map(String::from));
     args.push(out.to_string_lossy().into_owned());
@@ -1592,6 +1599,44 @@ mod tests {
                 ),
                 "{j}"
             );
+        }
+    }
+
+    /// Media Foundation writes no colour description: the `colr` atom is forced and, when this
+    /// FFmpeg has `h264_metadata`, the SPS gets BT.709 limited range; no other encoder gets either.
+    #[test]
+    fn media_foundation_output_gets_the_colr_atom_and_the_vui_filter() {
+        let enc_args = |enc: Encoder, bsf: bool| {
+            let mut caps = crate::tools::caps_from_output("ffmpeg version 7.1", "V....D h264_mf");
+            caps.h264_metadata = bsf;
+            let codec = video_codec_at(enc, (1280, 720), 30.0, None);
+            encode_args(
+                &OutFormat::h264(enc, &codec.args),
+                &caps,
+                (1280, 720),
+                30.0,
+                &[],
+                None,
+                None,
+                None,
+                AUDIO_BPS_STEREO,
+                10.0,
+                Path::new("/b/o.part"),
+            )
+            .join(" ")
+        };
+        let mf = enc_args(Encoder::H264Mf, true);
+        assert!(mf.contains("-movflags +faststart+write_colr"), "{mf}");
+        assert!(mf.contains("-bsf:v h264_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1:video_full_range_flag=0"), "{mf}");
+        let old = enc_args(Encoder::H264Mf, false);
+        assert!(
+            old.contains("write_colr") && !old.contains("-bsf:v"),
+            "{old}"
+        );
+        for other in [Encoder::VideoToolbox, Encoder::Qsv] {
+            let j = enc_args(other, true);
+            assert!(!j.contains("write_colr") && !j.contains("-bsf:v"), "{j}");
+            assert!(j.contains("-movflags +faststart -f mp4"), "{j}");
         }
     }
 

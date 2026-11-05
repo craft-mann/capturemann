@@ -235,6 +235,10 @@ pub struct Caps {
     /// The GIF encoder and the lossless FFV1 used for the GIF's first stage (both LGPL, native).
     pub gif: bool,
     pub ffv1: bool,
+    /// The `h264_metadata` bitstream filter (listed by `-bsfs`; read by [`probe_caps`], false from
+    /// [`caps_from_output`]). The Media Foundation encoder writes no colour information of its own,
+    /// so the exporter uses this filter to put BT.709 into the stream's VUI.
+    pub h264_metadata: bool,
     /// Built with `--enable-gpl`. A GPL FFmpeg is fine on a developer machine and must never be
     /// bundled (NFR-12).
     pub gpl: bool,
@@ -294,6 +298,7 @@ pub fn caps_from_output(version_out: &str, encoders_out: &str) -> Caps {
         libopus: has("libopus"),
         gif: has("gif"),
         ffv1: has("ffv1"),
+        h264_metadata: false,
         gpl: version_out.contains("--enable-gpl"),
         version_line,
     }
@@ -342,10 +347,21 @@ pub fn probe_caps(tools: &Tools) -> Result<Caps, CmError> {
     }
     let encoders = run_capture(&tools.ffmpeg, &["-hide_banner", "-encoders"])?;
     let mut caps = caps_from_output(&version, &encoders);
+    caps.h264_metadata = has_bitstream_filter(tools, "h264_metadata");
     if caps.vaapi_h264 {
         caps.vaapi_device = find_vaapi_device(Path::new("/dev/dri"));
     }
     Ok(caps)
+}
+
+/// Whether `ffmpeg -bsfs` lists the bitstream filter `name`.
+pub fn has_bitstream_filter(tools: &Tools, name: &str) -> bool {
+    run_capture(&tools.ffmpeg, &["-hide_banner", "-bsfs"]).is_ok_and(|out| bsf_listed(&out, name))
+}
+
+/// Pure part of [`has_bitstream_filter`]: the listing has one name per line.
+pub fn bsf_listed(listing: &str, name: &str) -> bool {
+    listing.lines().any(|l| l.trim() == name)
 }
 
 /// The first DRM render node (`renderD128`, ...) in `dir`: what `-vaapi_device` needs. `None` when
@@ -1138,5 +1154,13 @@ mod tests {
         assert_eq!(i.duration_s, Some(12.5));
         assert!(i.has_video && i.has_audio);
         assert!(parse_probe("not json").is_err());
+    }
+
+    #[test]
+    fn the_bitstream_filter_listing_is_read_by_whole_lines() {
+        let listing = "Bitstream filters:\naac_adtstoasc\nh264_metadata\nh264_mp4toannexb\n";
+        assert!(bsf_listed(listing, "h264_metadata"));
+        assert!(!bsf_listed(listing, "h264_redundant_pps"));
+        assert!(!bsf_listed("h264_metadata_x\n", "h264_metadata"));
     }
 }
