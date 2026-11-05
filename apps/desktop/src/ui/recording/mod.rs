@@ -33,8 +33,8 @@ use crate::confirm::{discard_dialog, ConfirmUiMsg};
 use crate::platform_window::{self, Tweaks};
 use crate::recording::countdown;
 use crate::recording::geometry::{
-    self, bubble_dims, bubble_layout, hud_default, pick_display, rect_from_center_fraction,
-    snap_hud, AreaKind, BubblePosition, BubbleShape, BubbleSize, Rect,
+    self, bubble_dims, bubble_layout, hud_default, pick_display, pick_display_for,
+    rect_from_center_fraction, snap_hud, AreaKind, BubblePosition, BubbleShape, BubbleSize, Rect,
 };
 use crate::recording::model::{Change, Ended, EscAction, HudState, Phase};
 use crate::recording::preview::{FrameSlot, PreviewRunner, PreviewSource};
@@ -584,8 +584,13 @@ fn indicator_area(rec: &RecState, cx: &App) -> Option<(Rect, (DisplayId, Rect))>
         Some(b) => geometry::area_points(b, ind.area.scale),
         None => displays.first()?.1,
     };
-    let rects: Vec<Rect> = displays.iter().map(|(_, r)| *r).collect();
-    let i = pick_display(&rects, &area)?;
+    // The engine names the display; the center test alone is wrong where two displays' point rectangles overlap
+    // (mixed DPI), see `pick_display_for`.
+    let ids: Vec<(Option<u32>, Rect)> = displays
+        .iter()
+        .map(|(id, r)| (u32::try_from(u64::from(*id)).ok(), *r))
+        .collect();
+    let i = pick_display_for(&ids, ind.area.display_id, &area)?;
     Some((area, displays[i]))
 }
 

@@ -144,6 +144,10 @@ fn command_for(request: cm_desktop::instance::Request) -> Command {
 }
 
 fn main() {
+    // Windows: per-monitor-v2 DPI awareness before any window exists (the executable has no manifest and GPUI does
+    // not set it). Without it the window is scaled by the system and the in-process daemon's capture code would
+    // switch the process to aware later, in the middle of the session. Nothing on other systems.
+    cm_capture::ensure_dpi_aware();
     cm_daemon::logs::init_logging("desktop");
     cm_desktop::trace::init();
     let args: Vec<String> = std::env::args().skip(1).collect();

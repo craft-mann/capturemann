@@ -84,6 +84,28 @@ pub fn pick_display(displays: &[Rect], area: &Rect) -> Option<usize> {
         .map(|(i, _)| i)
 }
 
+/// The display an area belongs to when the engine named one (`indicator.area.display_id`), else
+/// [`pick_display`]. `displays` pairs each display's platform id with its point bounds.
+///
+/// Point bounds are `physical / that display's own scale`, so on a mixed-DPI desktop they overlap: a 100 %
+/// display at physical x 0..1920 is points 0..1920, and a 150 % display to its right (physical x 1920..4480) is
+/// points 1280..2987. A region in the left part of the second display has a center that lies inside both
+/// rectangles, and the center test alone then names the first display in the list, which is the wrong one.
+/// The id has no such ambiguity.
+pub fn pick_display_for(
+    displays: &[(Option<u32>, Rect)],
+    display_id: Option<u32>,
+    area: &Rect,
+) -> Option<usize> {
+    if let Some(id) = display_id {
+        if let Some(i) = displays.iter().position(|(d, _)| *d == Some(id)) {
+            return Some(i);
+        }
+    }
+    let rects: Vec<Rect> = displays.iter().map(|(_, r)| *r).collect();
+    pick_display(&rects, area)
+}
+
 // ---- area indicator --------------------------------------------------------------------------
 
 /// Crop-bracket arm length (kit `Recording`: 28 px).
@@ -731,6 +753,67 @@ mod tests {
             Some(1)
         );
         assert_eq!(pick_display(&[], &DISPLAY), None);
+    }
+
+    /// Mixed-DPI desktops, each display as `(id, physical x, y, w, h, scale)`: the area's display is found by
+    /// its id even where the point rectangles of two displays overlap or a display sits at negative coordinates.
+    #[test]
+    fn the_areas_display_is_found_by_id_on_mixed_dpi_layouts() {
+        type Layout = Vec<(u32, i64, i64, i64, i64, f64)>;
+        let points = |l: &Layout| -> Vec<(Option<u32>, Rect)> {
+            l.iter()
+                .map(|&(id, x, y, w, h, s)| (Some(id), area_points([x, y, w, h], s)))
+                .collect()
+        };
+        // (name, layout, display holding the area, the area in physical px, the display the center test alone gives)
+        type Case = (&'static str, Layout, u32, [i64; 4], Option<usize>);
+        let cases: Vec<Case> = vec![
+            (
+                "100 % at 0,0 + 150 % at 1920,0, region at the left edge of the second",
+                vec![(1, 0, 0, 1920, 1080, 1.0), (2, 1920, 0, 2560, 1440, 1.5)],
+                2,
+                [1950, 100, 1000, 600],
+                Some(0), // the center test picks the wrong display here
+            ),
+            (
+                "200 % primary + 100 % to the left at -1920,0",
+                vec![(1, 0, 0, 3840, 2160, 2.0), (2, -1920, 0, 1920, 1080, 1.0)],
+                2,
+                [-1500, 100, 800, 600],
+                Some(1),
+            ),
+            (
+                "a 150 % display above a 100 % primary",
+                vec![(1, 0, 0, 1920, 1080, 1.0), (2, 0, -1440, 2560, 1440, 1.5)],
+                2,
+                [100, -1000, 800, 600],
+                Some(1),
+            ),
+            (
+                "100 % + 200 % to its right (points 960..2880 overlap the first)",
+                vec![(1, 0, 0, 1920, 1080, 1.0), (2, 1920, 0, 3840, 2160, 2.0)],
+                2,
+                [1950, 100, 1200, 800],
+                Some(0),
+            ),
+        ];
+        for (name, layout, want_id, area, center_only) in cases {
+            let d = points(&layout);
+            let scale = layout.iter().find(|l| l.0 == want_id).unwrap().5;
+            let a = area_points(area, scale);
+            let i = pick_display_for(&d, Some(want_id), &a).unwrap();
+            assert_eq!(d[i].0, Some(want_id), "{name}");
+            let rects: Vec<Rect> = d.iter().map(|x| x.1).collect();
+            assert_eq!(pick_display(&rects, &a), center_only, "{name}: center test");
+            // The area sits inside the display it belongs to, in that display's own points.
+            assert!(
+                a.x >= d[i].1.x - 0.5 && a.right() <= d[i].1.right() + 0.5,
+                "{name}"
+            );
+            // Without an id (or an id of a display that is gone) the center test answers as before.
+            assert_eq!(pick_display_for(&d, None, &a), center_only, "{name}");
+            assert_eq!(pick_display_for(&d, Some(99), &a), center_only, "{name}");
+        }
     }
 
     /// Kit chips: `1920 × 1080` and `2× · native`.

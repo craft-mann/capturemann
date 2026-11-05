@@ -179,4 +179,187 @@ mod tests {
             "a point on the primary monitor is outside"
         );
     }
+
+    fn display(id: u32, x: i32, y: i32, w: u32, h: u32, scale: f64) -> DisplayInfo {
+        DisplayInfo {
+            id,
+            name: format!("d{id}"),
+            bounds: prect(x, y, w, h),
+            scale: ScaleFactor::new(scale).unwrap(),
+            is_primary: x == 0 && y == 0,
+            is_builtin: false,
+        }
+    }
+
+    fn layout(displays: Vec<DisplayInfo>) -> Targets {
+        Targets {
+            displays,
+            windows: vec![],
+        }
+    }
+
+    /// Mixed-DPI desktops (virtual-screen physical px, monitors at negative coordinates): for a display and a
+    /// region on each monitor the cursor target is that area's physical rectangle, the area's top-left maps to
+    /// (0, 0), its bottom-right corner is outside, and a point on the neighbouring monitor is outside.
+    #[test]
+    fn region_cursor_targets_on_mixed_dpi_layouts() {
+        // (name, monitors, display holding the region, region in that display's own physical px)
+        let cases = [
+            (
+                "100 % at 0,0 + 150 % at 1920,0",
+                vec![
+                    display(1, 0, 0, 1920, 1080, 1.0),
+                    display(2, 1920, 0, 2560, 1440, 1.5),
+                ],
+                2,
+                prect(300, 200, 1280, 720),
+            ),
+            (
+                "200 % primary + 100 % to the left at -1920,0",
+                vec![
+                    display(1, 0, 0, 3840, 2160, 2.0),
+                    display(2, -1920, 0, 1920, 1080, 1.0),
+                ],
+                2,
+                prect(100, 50, 800, 600),
+            ),
+            (
+                "150 % display above a 100 % primary",
+                vec![
+                    display(1, 0, 0, 1920, 1080, 1.0),
+                    display(2, 0, -1440, 2560, 1440, 1.5),
+                ],
+                2,
+                prect(10, 10, 640, 480),
+            ),
+            (
+                "primary 125 % with a 100 % display left and above (-1920,-1080)",
+                vec![
+                    display(1, 0, 0, 2400, 1350, 1.25),
+                    display(2, -1920, -1080, 1920, 1080, 1.0),
+                ],
+                2,
+                prect(0, 0, 1920, 1080),
+            ),
+        ];
+        for (name, monitors, id, region) in cases {
+            let t = layout(monitors.clone());
+            let d = monitors.iter().find(|d| d.id == id).unwrap().clone();
+            let plan = plan_capture(
+                &ScreenSettings::new(CaptureTarget::Region {
+                    display_id: id,
+                    rect: RegionRect::Physical(region),
+                }),
+                &t,
+            )
+            .unwrap();
+            assert_eq!(plan.display_id, Some(id), "{name}");
+            assert_eq!(
+                plan.scale, d.scale,
+                "{name}: the region uses its own display's scale"
+            );
+            let c = cursor_target(&plan, &t);
+            let (ox, oy) = (
+                d.bounds.origin.x + region.origin.x,
+                d.bounds.origin.y + region.origin.y,
+            );
+            assert_eq!(c.origin, [f64::from(ox), f64::from(oy)], "{name}");
+            assert_eq!(
+                (c.size.width, c.size.height),
+                (region.size.width, region.size.height),
+                "{name}"
+            );
+            assert!((c.scale - 1.0).abs() < 1e-9, "{name}");
+            let (gx, gy) = (f64::from(ox), f64::from(oy));
+            assert_eq!(c.map(gx, gy), (0, 0, false), "{name}");
+            assert_eq!(c.map(gx + 10.0, gy + 20.0), (10, 20, false), "{name}");
+            let (w, h) = (f64::from(region.size.width), f64::from(region.size.height));
+            assert!(c.map(gx + w, gy + h).2, "{name}: the far corner is outside");
+            assert!(c.map(gx - 1.0, gy).2, "{name}: one px left is outside");
+            // A point on the other monitor is outside the region.
+            let other = monitors.iter().find(|m| m.id != id).unwrap();
+            let (px_, py_) = (
+                f64::from(other.bounds.origin.x) + 5.0,
+                f64::from(other.bounds.origin.y) + 5.0,
+            );
+            assert!(c.map(px_, py_).2, "{name}: other monitor");
+        }
+    }
+
+    /// A logical region is converted with the scale of the display it is on, never the primary's.
+    #[test]
+    fn a_logical_region_uses_the_scale_of_its_own_display() {
+        let t = layout(vec![
+            display(1, 0, 0, 1920, 1080, 1.0),
+            display(2, 1920, 0, 2560, 1440, 1.5),
+        ]);
+        let plan = plan_capture(
+            &ScreenSettings::new(CaptureTarget::Region {
+                display_id: 2,
+                rect: RegionRect::Logical(cm_core::Rect::new(100.0, 40.0, 400.0, 300.0)),
+            }),
+            &t,
+        )
+        .unwrap();
+        assert_eq!(plan.crop, Some(prect(150, 60, 600, 450)));
+        let c = cursor_target(&plan, &t);
+        assert_eq!(c.origin, [2070.0, 60.0]);
+        assert_eq!((c.size.width, c.size.height), (600, 450));
+    }
+
+    /// A region that is on no monitor, or that spans two, is refused at the plan, so no recording and no cursor
+    /// target is ever made for it (REC-1: a region lives on one display).
+    #[test]
+    fn a_region_on_no_monitor_or_on_two_is_refused() {
+        let t = layout(vec![
+            display(1, 0, 0, 1920, 1080, 1.0),
+            display(2, 1920, 0, 2560, 1440, 1.5),
+        ]);
+        let plan = |display_id, r| {
+            plan_capture(
+                &ScreenSettings::new(CaptureTarget::Region {
+                    display_id,
+                    rect: RegionRect::Physical(r),
+                }),
+                &t,
+            )
+        };
+        // Spans the seam, expressed on either display.
+        assert!(plan(1, prect(1800, 100, 400, 300)).is_err());
+        assert!(plan(2, prect(-100, 100, 400, 300)).is_err());
+        // Beyond the display's own pixels.
+        assert!(plan(2, prect(2400, 0, 400, 300)).is_err());
+        // A display that is gone (unplugged, or a stale id).
+        let e = plan(7, prect(0, 0, 100, 100)).unwrap_err();
+        assert_eq!(e.code(), cm_core::ErrorCode::NotFound);
+    }
+
+    /// A window on the left or the upper monitor (negative coordinates) maps its own pixels from (0, 0).
+    #[test]
+    fn a_window_on_a_negative_monitor_maps_from_its_own_corner() {
+        let mut t = layout(vec![
+            display(1, 0, 0, 3840, 2160, 2.0),
+            display(2, -1920, 0, 1920, 1080, 1.0),
+        ]);
+        t.windows.push(WindowInfo {
+            id: 9,
+            title: "w".into(),
+            app: "a".into(),
+            pid: 1,
+            bounds: prect(-1500, 120, 800, 600),
+            scale: ScaleFactor::ONE,
+            display_id: Some(2),
+            minimized: false,
+        });
+        let plan = plan_capture(
+            &ScreenSettings::new(CaptureTarget::Window { window_id: 9 }),
+            &t,
+        )
+        .unwrap();
+        let c = cursor_target(&plan, &t);
+        assert_eq!(c.origin, [-1500.0, 120.0]);
+        assert_eq!(c.map(-1500.0, 120.0), (0, 0, false));
+        assert_eq!(c.map(-701.0, 719.0), (799, 599, false));
+        assert!(c.map(-700.0, 719.0).2);
+    }
 }

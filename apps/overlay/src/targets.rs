@@ -213,6 +213,45 @@ mod tests {
         }
     }
 
+    /// Mixed DPI: monitors of different pixel sizes, one left of and one above the primary (negative origins),
+    /// listed by the OS in another order than the daemon lists the displays.
+    #[test]
+    fn displays_pair_with_monitors_on_a_mixed_dpi_desktop() {
+        let displays = vec![
+            display(1, 0, 0, 3840, 2160),     // 200 % primary
+            display(2, -1920, 0, 1920, 1080), // 100 % to the left
+            display(3, 0, -1440, 2560, 1440), // 150 % above
+        ];
+        let mon = |x, y, w, h| MonitorGeometry {
+            position: PhysicalPoint { x, y },
+            size: PhysicalSize {
+                width: w,
+                height: h,
+            },
+        };
+        let monitors = vec![
+            mon(0, -1440, 2560, 1440),
+            mon(0, 0, 3840, 2160),
+            mon(-1920, 0, 1920, 1080),
+        ];
+        assert_eq!(
+            match_monitors(&displays, &monitors),
+            vec![Some(1), Some(2), Some(0)]
+        );
+        // The left monitor is unplugged: only that display is lost.
+        assert_eq!(lost_displays(&displays, &monitors[..2]), vec![2]);
+        // The point under the pointer is on the display whose pixels hold it, negative coordinates included.
+        assert_eq!(
+            display_at(&displays, PhysicalPoint { x: -1, y: 10 }).map(|d| d.id),
+            Some(2)
+        );
+        assert_eq!(
+            display_at(&displays, PhysicalPoint { x: 10, y: -1 }).map(|d| d.id),
+            Some(3)
+        );
+        assert!(display_at(&displays, PhysicalPoint { x: -1, y: -1 }).is_none());
+    }
+
     #[test]
     fn parses_the_daemon_list_targets_shape() {
         let v = json!({
