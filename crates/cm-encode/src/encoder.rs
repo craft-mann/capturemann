@@ -144,7 +144,7 @@ mod tests {
         assert!(words.contains("2016"), "{words}");
         assert_eq!(
             words.contains("macOS 13"),
-            cfg!(target_os = "macos"),
+            cm_platform::vocab::Platform::current() == cm_platform::vocab::Platform::Mac,
             "{words}"
         );
         let id = match cm_platform::vocab::Platform::current() {
