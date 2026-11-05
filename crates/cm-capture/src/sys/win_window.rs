@@ -29,7 +29,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     EnumChildWindows, GetWindowLongW, GetWindowRect, GetWindowThreadProcessId, GWL_EXSTYLE,
 };
 
-use super::win_names::{choose_app_name, is_frame_host, rect_to_xywh};
+use super::win_names::{choose_app_name, crop_box, is_frame_host, visible_xywh};
 
 /// `PW_RENDERFULLCONTENT`: also paints DirectX and XAML content.
 const PW_RENDERFULLCONTENT: u32 = 2;
@@ -92,9 +92,10 @@ pub fn ensure_dpi_aware() {
 pub fn frame_bounds(id: u32) -> Option<(i32, i32, u32, u32)> {
     ensure_dpi_aware();
     let hwnd = HWND(id as usize as *mut c_void);
-    let mut frame = RECT::default();
-    // SAFETY: the call writes one RECT, whose size is passed; a stale handle makes it return an error.
+    let (mut outer, mut frame) = (RECT::default(), RECT::default());
+    // SAFETY: both calls only write into the RECTs, whose sizes are passed; a stale handle makes them return an error.
     unsafe {
+        GetWindowRect(hwnd, &mut outer).ok()?;
         DwmGetWindowAttribute(
             hwnd,
             DWMWA_EXTENDED_FRAME_BOUNDS,
@@ -103,7 +104,12 @@ pub fn frame_bounds(id: u32) -> Option<(i32, i32, u32, u32)> {
         )
         .ok()?;
     }
-    rect_to_xywh(frame.left, frame.top, frame.right, frame.bottom)
+    // The same rule `capture` cuts the picture with, so the listed size is the saved size even when the frame
+    // is not inside the rectangle (a rounding difference at a fractional scale, a window between two monitors).
+    visible_xywh(
+        (outer.left, outer.top, outer.right, outer.bottom),
+        (frame.left, frame.top, frame.right, frame.bottom),
+    )
 }
 
 /// The full path of the program a process runs, when the process lets us ask.
@@ -269,27 +275,6 @@ pub fn capture(id: u32) -> Result<(u32, u32, Vec<u8>), String> {
     Ok((w as u32, h as u32, rgba))
 }
 
-/// Where the visible frame sits inside the window rectangle: `(x, y, width, height)` in the rectangle's own
-/// pixels. A frame that is empty or not inside the rectangle gives the whole rectangle.
-pub fn crop_box(outer: (i32, i32, i32, i32), frame: (i32, i32, i32, i32)) -> (i32, i32, i32, i32) {
-    let inside = frame.2 > frame.0
-        && frame.3 > frame.1
-        && frame.0 >= outer.0
-        && frame.1 >= outer.1
-        && frame.2 <= outer.2
-        && frame.3 <= outer.3;
-    if inside {
-        (
-            frame.0 - outer.0,
-            frame.1 - outer.1,
-            frame.2 - frame.0,
-            frame.3 - frame.1,
-        )
-    } else {
-        (0, 0, outer.2 - outer.0, outer.3 - outer.1)
-    }
-}
-
 /// Frees the GDI objects of one capture, in the right order.
 struct Gdi {
     hwnd: HWND,
@@ -368,25 +353,7 @@ fn print_window(hwnd: HWND, width: i32, height: i32) -> Result<Vec<u8>, String> 
 
 #[cfg(test)]
 mod tests {
-    use super::{crop_box, is_pickable_style};
-
-    #[test]
-    fn the_crop_is_the_visible_frame_inside_the_window_rectangle() {
-        // The runner's Notepad: rectangle (104,104)-(872,623), frame (111,104)-(865,616).
-        assert_eq!(
-            crop_box((104, 104, 872, 623), (111, 104, 865, 616)),
-            (7, 0, 754, 512)
-        );
-    }
-
-    #[test]
-    fn a_frame_that_does_not_fit_gives_the_whole_rectangle() {
-        assert_eq!(crop_box((10, 10, 110, 60), (0, 0, 0, 0)), (0, 0, 100, 50));
-        assert_eq!(
-            crop_box((10, 10, 110, 60), (5, 10, 110, 60)),
-            (0, 0, 100, 50)
-        );
-    }
+    use super::is_pickable_style;
 
     #[test]
     fn the_taskbar_and_the_desktop_are_not_pickable_but_app_windows_are() {

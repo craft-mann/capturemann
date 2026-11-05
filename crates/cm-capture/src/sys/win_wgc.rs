@@ -44,7 +44,7 @@ use windows::Win32::System::WinRT::{RoInitialize, RO_INIT_MULTITHREADED};
 use windows::Win32::UI::WindowsAndMessaging::GetWindowRect;
 
 use crate::record::wgc_logic::{clamp_crop, copy_rows};
-use crate::sys::win_window::crop_box;
+use crate::sys::win_names::crop_box;
 
 const FORMAT: DirectXPixelFormat = DirectXPixelFormat::B8G8R8A8UIntNormalized;
 /// Buffers in the frame pool: one being copied, one being filled, one spare.

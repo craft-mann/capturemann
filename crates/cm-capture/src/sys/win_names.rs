@@ -81,6 +81,39 @@ pub fn rect_to_xywh(left: i32, top: i32, right: i32, bottom: i32) -> Option<(i32
     Some((left, top, (right - left) as u32, (bottom - top) as u32))
 }
 
+/// Where the visible frame sits inside the window rectangle: `(x, y, width, height)` in the rectangle's own
+/// pixels. A frame that is empty or not inside the rectangle gives the whole rectangle. Both rectangles are
+/// `(left, top, right, bottom)` in the same (physical) pixels.
+pub fn crop_box(outer: (i32, i32, i32, i32), frame: (i32, i32, i32, i32)) -> (i32, i32, i32, i32) {
+    let inside = frame.2 > frame.0
+        && frame.3 > frame.1
+        && frame.0 >= outer.0
+        && frame.1 >= outer.1
+        && frame.2 <= outer.2
+        && frame.3 <= outer.3;
+    if inside {
+        (
+            frame.0 - outer.0,
+            frame.1 - outer.1,
+            frame.2 - frame.0,
+            frame.3 - frame.1,
+        )
+    } else {
+        (0, 0, outer.2 - outer.0, outer.3 - outer.1)
+    }
+}
+
+/// The rectangle a window screenshot covers, `(x, y, width, height)` in virtual-screen px: the visible frame
+/// inside the window rectangle, or the whole rectangle (see [`crop_box`]). The picker lists this and `capture`
+/// saves this, so the two cannot differ. `None` for an empty rectangle.
+pub fn visible_xywh(
+    outer: (i32, i32, i32, i32),
+    frame: (i32, i32, i32, i32),
+) -> Option<(i32, i32, u32, u32)> {
+    let (x, y, w, h) = crop_box(outer, frame);
+    rect_to_xywh(outer.0 + x, outer.1 + y, outer.0 + x + w, outer.1 + y + h)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -153,5 +186,77 @@ mod tests {
         );
         assert_eq!(rect_to_xywh(0, 0, 0, 10), None);
         assert_eq!(rect_to_xywh(5, 5, 4, 9), None);
+    }
+
+    #[test]
+    fn the_crop_is_the_visible_frame_inside_the_window_rectangle() {
+        // The runner's Notepad: rectangle (104,104)-(872,623), frame (111,104)-(865,616).
+        assert_eq!(
+            crop_box((104, 104, 872, 623), (111, 104, 865, 616)),
+            (7, 0, 754, 512)
+        );
+    }
+
+    #[test]
+    fn a_frame_that_does_not_fit_gives_the_whole_rectangle() {
+        assert_eq!(crop_box((10, 10, 110, 60), (0, 0, 0, 0)), (0, 0, 100, 50));
+        assert_eq!(
+            crop_box((10, 10, 110, 60), (5, 10, 110, 60)),
+            (0, 0, 100, 50)
+        );
+    }
+
+    /// Mixed-DPI layouts (virtual-screen physical px): the listed rectangle is the rectangle `capture` cuts, also
+    /// where the frame pokes 1 px out of the window rectangle (the old listing then said 1426x720 or 1427x721
+    /// and the saved picture was the whole rectangle) and on monitors at negative coordinates.
+    #[test]
+    fn the_listed_rectangle_is_the_saved_rectangle_on_every_layout() {
+        // (outer, frame, listed)
+        let cases: [(
+            (i32, i32, i32, i32),
+            (i32, i32, i32, i32),
+            (i32, i32, u32, u32),
+        ); 6] = [
+            // 100 % laptop panel at 0,0 next to a 150 % monitor at 1920,0: a window on the second monitor.
+            (
+                (2000, 100, 3500, 900),
+                (2011, 100, 3489, 892),
+                (2011, 100, 1478, 792),
+            ),
+            // 200 % primary, a 100 % monitor to the LEFT at -1920,0: negative coordinates.
+            (
+                (-1900, 50, -900, 650),
+                (-1893, 50, -907, 643),
+                (-1893, 50, 986, 593),
+            ),
+            // A monitor ABOVE the primary (y < 0).
+            (
+                (100, -1000, 900, -400),
+                (107, -1000, 893, -407),
+                (107, -1000, 786, 593),
+            ),
+            // The frame pokes 1 px outside the rectangle (rounding at 150 %): the whole rectangle, as saved.
+            (
+                (1920, 0, 2720, 600),
+                (1919, 0, 2720, 600),
+                (1920, 0, 800, 600),
+            ),
+            // A window straddling two monitors: the same rule, nothing clipped to a monitor.
+            (
+                (1800, 100, 2200, 500),
+                (1807, 100, 2193, 493),
+                (1807, 100, 386, 393),
+            ),
+            // No frame reported.
+            ((10, 10, 110, 60), (0, 0, 0, 0), (10, 10, 100, 50)),
+        ];
+        for (outer, frame, want) in cases {
+            assert_eq!(
+                visible_xywh(outer, frame),
+                Some(want),
+                "{outer:?} {frame:?}"
+            );
+        }
+        assert_eq!(visible_xywh((5, 5, 5, 9), (0, 0, 0, 0)), None);
     }
 }
