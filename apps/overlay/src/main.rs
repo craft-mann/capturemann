@@ -25,9 +25,6 @@ const LOG_DIR_ENV: &str = "CAPTUREMANN_LOG_DIR";
 
 fn main() -> ExitCode {
     let started = Instant::now();
-    // Windows: the pointer, the monitors and the frozen frame must all be physical px (winit sets the same
-    // awareness when the event loop starts; asking first keeps the order independent of it).
-    cm_capture::ensure_dpi_aware();
     // The app tells the overlay where its log files go (the overlay does not link the daemon).
     match std::env::var_os(LOG_DIR_ENV).filter(|v| !v.is_empty()) {
         Some(dir) => cm_core::logging::init_with_file(cm_core::logfile::FileLogConfig {

@@ -212,11 +212,7 @@ mod tests {
     #[test]
     fn the_listed_rectangle_is_the_saved_rectangle_on_every_layout() {
         // (outer, frame, listed)
-        let cases: [(
-            (i32, i32, i32, i32),
-            (i32, i32, i32, i32),
-            (i32, i32, u32, u32),
-        ); 6] = [
+        let cases = [
             // 100 % laptop panel at 0,0 next to a 150 % monitor at 1920,0: a window on the second monitor.
             (
                 (2000, 100, 3500, 900),
