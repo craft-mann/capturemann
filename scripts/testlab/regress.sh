@@ -76,7 +76,7 @@ w 'if (-not (Test-Path C:\lab\tests\cm-regress.exe)) { Write-Error "C:\lab\tests
 if [ -n "$pkgrun" ]; then
   d="$root/.testlab-downloads/pkg-$pkgrun"; rm -rf "$d"; mkdir -p "$d"
   gh run download "$pkgrun" --repo "$repo" --name capturemann-windows-x64 --dir "$d"
-  setup="$(ls "$d"/*-setup.exe | head -1)"; [ -f "$setup" ] || die "no *-setup.exe in the package artifact"
+  setup="$(find "$d" -name "*-setup.exe" | head -1)"; [ -f "$setup" ] || die "no *-setup.exe in the package artifact"
   want="$(cut -d' ' -f1 "$setup.sha256")"; have="$(shasum -a 256 "$setup" | cut -d' ' -f1)"
   [ "$want" = "$have" ] || die "installer SHA-256 mismatch"
   "$lab" push windows "$setup"
