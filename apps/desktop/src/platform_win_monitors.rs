@@ -9,7 +9,8 @@
 
 use gpui::Window;
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-use windows::Win32::Foundation::{BOOL, HWND, LPARAM, POINT, RECT};
+use windows::core::BOOL;
+use windows::Win32::Foundation::{HWND, LPARAM, POINT, RECT};
 use windows::Win32::Graphics::Gdi::{
     ClientToScreen, EnumDisplayMonitors, GetMonitorInfoW, MonitorFromWindow, HDC, HMONITOR,
     MONITORINFO, MONITOR_DEFAULTTONEAREST,
