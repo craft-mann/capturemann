@@ -6,6 +6,8 @@ CaptureMann is a free, Apache-2.0, pure-Rust desktop app for screenshots and scr
 
 ## Current state
 
+**Windows 0.2.8** is on branch `track/windows` (version still 0.2.7, not merged, not released): recording, import, export, Auto-redact and the speaker and text engines run on one ThinkPad T490 (Intel UHD 620, Windows 11) as PARTIAL reports in `verification/`; Windows 10, SmartScreen, mixed-DPI monitors and NVIDIA/AMD encoders have not been run. Release text and release-day steps: `docs/development/release-0.2.8-github-text.md`, `docs/development/release-day-0.2.8.md`.
+
 What is built and how each part was checked: [`docs/project/status.md`](docs/project/status.md); plan and milestones: [`docs/project/plan.md`](docs/project/plan.md). **Wording rule:** do not write "verified" without a stored report in `verification/` (template in its README); say "tested with fakes" or "verified on hardware (as reported)". Specs use `In progress (...)` for partly built features and reserve `Ready` for "meets the Definition of Ready and not started".
 
 ## Reading the specs

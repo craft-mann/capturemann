@@ -1,5 +1,7 @@
 # Windows 0.2.8: release notes (DRAFT, not published)
 
+**Superseded on Nov 5, 2026 by `release-0.2.8-github-text.md` (final text) and `release-day-0.2.8.md` (steps).** Kept for history.
+
 Draft of Nov 5, 2026 for the maintainer. Facts only, taken from `docs/project/status.md`,
 `specs/plans/release-0.2.8-plan.md` ("Known limitations of the Windows 0.2.8 release") and the stored reports in
 `verification/` (`L1-windows-0.2.8-hardware-2026-11-05-claude.md`, `L1-windows-0.2.8-round2-2026-11-05-claude.md`,
