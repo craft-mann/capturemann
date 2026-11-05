@@ -169,14 +169,10 @@ fn quick(ctx: &mut Ctx) -> R {
         p.duration
     );
     check!(v.width > 0 && v.height > 0, "no picture size");
-    if e.encoder.contains("_mf") || e.encoder.contains("qsv") {
-        check!(
-            v.color_space == "bt709" && v.color_range == "tv",
-            "the {} export is tagged space '{}' range '{}', expected bt709 and tv",
-            e.encoder,
-            v.color_space,
-            v.color_range
-        );
+    if let Some(problem) = tag_problem(v, &e.encoder) {
+        return Err(crate::model::Stop::Fail(format!(
+            "the quick export: {problem}"
+        )));
     } else {
         ctx.note(format!(
             "encoder {}: colour tags not asserted (only the Media Foundation path had the bug)",
@@ -184,6 +180,28 @@ fn quick(ctx: &mut Ctx) -> R {
         ));
     }
     Ok(())
+}
+
+/// The colour tags an H.264 export by a NV12 hardware encoder must carry in the file (ffprobe's
+/// view of the stream and the `colr` atom): BT.709 matrix, primaries and transfer, limited range.
+/// Media Foundation writes none of them by itself, so a missing field means the exporter's
+/// `colr`/`h264_metadata` step is not working (or the installed FFmpeg lacks `h264_metadata`).
+fn tag_problem(v: &media::Stream, encoder: &str) -> Option<String> {
+    if !(encoder.contains("_mf") || encoder.contains("qsv")) {
+        return None;
+    }
+    let got = [
+        ("color_space", v.color_space.as_str(), "bt709"),
+        ("color_primaries", v.color_primaries.as_str(), "bt709"),
+        ("color_transfer", v.color_transfer.as_str(), "bt709"),
+        ("color_range", v.color_range.as_str(), "tv"),
+    ];
+    let bad: Vec<String> = got
+        .iter()
+        .filter(|(_, have, want)| have != want)
+        .map(|(k, have, want)| format!("{k} '{have}' (expected {want})"))
+        .collect();
+    (!bad.is_empty()).then(|| format!("{encoder} export is badly tagged: {}", bad.join(", ")))
 }
 
 fn presets(ctx: &mut Ctx) -> R {
@@ -228,20 +246,20 @@ fn presets(ctx: &mut Ctx) -> R {
                 if v.codec_name != "h264" || v.width > 1920 || v.height > 1080 {
                     problems.push(format!("{name}: {} {}x{}", v.codec_name, v.width, v.height));
                 }
-                if (e.encoder.contains("_mf") || e.encoder.contains("qsv"))
-                    && (v.color_space != "bt709" || v.color_range != "tv")
-                {
-                    problems.push(format!(
-                        "{name}: tagged space '{}' range '{}' by {}",
-                        v.color_space, v.color_range, e.encoder
-                    ));
+                if let Some(t) = tag_problem(v, &e.encoder) {
+                    problems.push(format!("{name}: {t}"));
                 }
             }
-            "vertical-1080" if v.height <= v.width => {
-                problems.push(format!("{name}: {}x{} is not portrait", v.width, v.height))
-            }
-            "square-1080" if v.height != v.width => {
-                problems.push(format!("{name}: {}x{} is not square", v.width, v.height))
+            "vertical-1080" | "square-1080" => {
+                if name == "vertical-1080" && v.height <= v.width {
+                    problems.push(format!("{name}: {}x{} is not portrait", v.width, v.height));
+                }
+                if name == "square-1080" && v.height != v.width {
+                    problems.push(format!("{name}: {}x{} is not square", v.width, v.height));
+                }
+                if let Some(t) = tag_problem(v, &e.encoder) {
+                    problems.push(format!("{name}: {t}"));
+                }
             }
             "webm"
                 if !(p.format_name.contains("webm") || p.format_name.contains("matroska"))
