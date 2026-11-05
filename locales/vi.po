@@ -4332,6 +4332,10 @@ msgid "The publish was not confirmed, so nothing was sent to YouTube."
 msgstr "Việc đăng chưa được xác nhận nên chưa có gì được gửi lên YouTube."
 
 #, fuzzy
+msgid "The recording area is too small: each side must be at least {min} px."
+msgstr "Vùng quay quá nhỏ: mỗi cạnh phải dài ít nhất {min} px."
+
+#, fuzzy
 msgid "The recording could not start."
 msgstr "Không thể bắt đầu quay."
 

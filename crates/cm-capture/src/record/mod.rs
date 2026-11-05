@@ -23,7 +23,9 @@ pub mod timeline;
 pub mod wgc_logic;
 
 pub use pipeline::{HaltReason, LateTracker, Pipeline, PipelineStats, HEALTH_WINDOW_SECS};
-pub use plan::{plan_capture, CapturePlan, Exclusions, ScreenSettings, WindowProvider};
+pub use plan::{
+    plan_capture, CapturePlan, Exclusions, ScreenSettings, WindowProvider, MIN_RECORDING_SIDE,
+};
 pub use recorder::{
     Latency, RecorderEvent, RecorderOptions, ScreenRecorder, ScreenStatus, SCREEN_FILE,
 };

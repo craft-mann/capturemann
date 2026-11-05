@@ -236,6 +236,10 @@ fn translated(p: &MessageParts) -> Option<String> {
         "hardware_encoder_unavailable" => tr!(
             "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update your operating system (macOS 13 or later, Windows 10 or later), or use a computer from about 2016 or later."
         ),
+        "recording_area_too_small" => tr!(
+            "The recording area is too small: each side must be at least {min} px.",
+            min = g("min")
+        ),
         "ffmpeg_not_found" => tr!(
             "FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."
         ),

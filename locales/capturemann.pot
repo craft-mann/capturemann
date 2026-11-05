@@ -4869,6 +4869,9 @@ msgstr ""
 msgid "The recorded camera track is never flipped."
 msgstr ""
 
+msgid "The recording area is too small: each side must be at least {min} px."
+msgstr ""
+
 msgid "The recording could not start."
 msgstr ""
 
