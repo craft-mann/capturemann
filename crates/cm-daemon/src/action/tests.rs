@@ -166,6 +166,11 @@ fn samples() -> Vec<(&'static str, Value)> {
         ("list_publish_accounts", json!({})),
         ("get_text_model", json!({})),
         ("get_diagnostics", json!({})),
+        (
+            "get_cursor_track",
+            json!({"capture_id": "rec_1", "from": 1, "to": 5, "limit": 10}),
+        ),
+        ("get_platform_rules", json!({"platform": "youtube"})),
         ("test_text_model", json!({})),
         (
             "normalize_transcript",
@@ -493,6 +498,24 @@ fn bad_inputs_name_the_field() {
         ("list_destinations", json!({"x": 1}), "x"),
         ("list_publish_accounts", json!({"x": 1}), "x"),
         ("get_diagnostics", json!({"x": 1}), "x"),
+        ("get_cursor_track", json!({}), "capture_id"),
+        ("get_cursor_track", json!({"capture_id": "a", "x": 1}), "x"),
+        (
+            "get_cursor_track",
+            json!({"capture_id": "a", "from": 5, "to": 4}),
+            "to",
+        ),
+        (
+            "get_cursor_track",
+            json!({"capture_id": "a", "limit": 0}),
+            "limit",
+        ),
+        ("get_platform_rules", json!({}), "platform"),
+        (
+            "get_platform_rules",
+            json!({"platform": "youtube", "x": 1}),
+            "x",
+        ),
         ("upload", json!({}), "capture_id"),
         (
             "upload",

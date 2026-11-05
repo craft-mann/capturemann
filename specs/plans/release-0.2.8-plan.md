@@ -173,7 +173,7 @@ What 0.2.7 established (reports in `verification/benchmarks/`):
 - `llama-server` for Windows: a CI job builds it from the same pin as macOS (LLAMA_TAG v0.7.0); the model rows in `text_models.json` stay `pending_pin` until the maintainer pins them.
 - Cursor sprite density: when a monitor's scale is not 100 %, the monitor's DPI is used (not the system DPI).
 - The camera after an unplug: Windows reopens the same device and the daemon publishes `camera.reconnected`; macOS reconnect is on the backlog (documented difference).
-- MCP tools `get_cursor_track`, `get_platform_rules` and `export_image`: the spec says "planned, not built" (maintainer approved Nov 5, 2026); build the first two in the next release for all platforms (the cursor reader and the platform-rules data exist), `export_image` with CAP-4. `cm-regress` (`mcp.tools_list`) lists them as known spec-only tools and fails on any other drift.
+- MCP tools `get_cursor_track`, `get_platform_rules` and `export_image`: the spec says "planned, not built" (maintainer approved Nov 5, 2026); the first two are built on branch `mcp-tools` (Nov 5, 2026, all platforms; daemon actions, MCP tools, CLI `cursor` and `platform-rules`, 79 tools in all); `export_image` stays planned, with CAP-4. `cm-regress` (`mcp.tools_list`) lists `export_image` as a known spec-only tool and fails on any other drift.
 - The macOS camera reconnect and the PhoWhisper pin (small is uploaded and pinned in `models.json`, hidden by `pending_pin` until the measurement of T1; medium and large are not converted) are backlog.
 - Merging `track/windows` into `main`: after 0.2.8 is developed and tested, by the maintainer.
 

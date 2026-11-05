@@ -169,6 +169,10 @@ pub const ACTIONS: &[ActionSpec] = &[
     // DIAG-1: the text a user pastes into an issue. Read-only; it never contains tokens, titles,
     // transcripts or file names of recordings.
     spec("get_diagnostics", Tier::Free, false),
+    // REC-7, EXP-2: read-only. The cursor track is the pointer path and clicks of a recording
+    // (never a key); the rules are the public limits of a publishing platform.
+    spec("get_cursor_track", Tier::Free, false),
+    spec("get_platform_rules", Tier::Free, false),
 ];
 
 /// Actions that are plumbing for first-party GUI clients and are deliberately **not** exposed

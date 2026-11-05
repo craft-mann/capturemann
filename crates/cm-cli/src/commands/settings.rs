@@ -207,3 +207,144 @@ pub(super) async fn diagnostics(cx: &mut Ctx<'_>) -> Result<(), CliError> {
     cx.emit(&r, |r| plain(&r["text"]));
     Ok(())
 }
+
+/// A time argument: seconds (`12.5`) or ticks (`t:1500000`), passed on for the daemon to check.
+fn time_value(field: &str, s: &str) -> Result<Value, CliError> {
+    if s.strip_prefix("t:")
+        .is_some_and(|t| t.parse::<i64>().is_ok())
+    {
+        return Ok(json!(s));
+    }
+    s.parse::<f64>()
+        .ok()
+        .filter(|n| n.is_finite())
+        .map(|n| json!(n))
+        .ok_or_else(|| {
+            CliError::invalid_input(format!("{field}: `{s}` is not seconds or t:<ticks>"))
+        })
+}
+
+/// `cursor <id>`: the cursor track of a recording (`get_cursor_track`).
+pub(super) async fn cursor_track(
+    cx: &mut Ctx<'_>,
+    id: String,
+    from: Option<String>,
+    to: Option<String>,
+    limit: Option<u64>,
+) -> Result<(), CliError> {
+    let mut p = json!({ "capture_id": id });
+    if let Some(f) = from {
+        p["from"] = time_value("from", &f)?;
+    }
+    if let Some(t) = to {
+        p["to"] = time_value("to", &t)?;
+    }
+    if let Some(l) = limit {
+        p["limit"] = json!(l);
+    }
+    let mut c = cx.client().await?;
+    let r = c.call("get_cursor_track", p).await?;
+    cx.emit(&r, |r| {
+        let rate = r["tick_rate"].as_f64().unwrap_or(120_000.0);
+        let mut s = format!(
+            "{}: {} of {} events (clicks {}, scroll {}, moves from {})\n",
+            plain(&r["capture_id"]),
+            plain(&r["count"]),
+            plain(&r["total_in_range"]),
+            plain(&r["clicks"]),
+            plain(&r["scroll"]),
+            plain(&r["move_source"]),
+        );
+        for e in r["events"].as_array().into_iter().flatten() {
+            let t = e["t"].as_f64().unwrap_or(0.0) / rate;
+            let kind = plain(&e["type"]);
+            let _ = write!(s, "  {t:9.3}s  {kind:<6}");
+            match kind.as_str() {
+                "move" | "down" | "up" => {
+                    let _ = write!(s, " {}, {}", plain(&e["x"]), plain(&e["y"]));
+                    if kind != "move" {
+                        let _ = write!(s, "  {}", plain(&e["button"]));
+                    }
+                }
+                "scroll" => {
+                    let _ = write!(s, " {}, {}", plain(&e["dx"]), plain(&e["dy"]));
+                }
+                "cursor" => {
+                    let _ = write!(s, " {}", plain(&e["id"]));
+                }
+                _ => {}
+            }
+            s.push('\n');
+        }
+        if let Some(n) = r["next_from"].as_i64() {
+            let _ = writeln!(s, "More: run again with --from t:{n}");
+        }
+        s
+    });
+    Ok(())
+}
+
+/// `platform-rules <platform>`: limits, required fields and presets (`get_platform_rules`).
+pub(super) async fn platform_rules(cx: &mut Ctx<'_>, platform: String) -> Result<(), CliError> {
+    let mut c = cx.client().await?;
+    let r = c
+        .call("get_platform_rules", json!({ "platform": platform }))
+        .await?;
+    cx.emit(&r, |r| {
+        let l = &r["limits"];
+        let list = |v: &Value| {
+            v.as_array()
+                .into_iter()
+                .flatten()
+                .map(plain)
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        let mut s = format!("{}\n", plain(&r["platform"]));
+        let _ = writeln!(s, "  max file size: {} bytes", plain(&l["max_bytes"]));
+        let _ = writeln!(s, "  max duration: {} s", plain(&l["max_duration_secs"]));
+        let _ = writeln!(s, "  video files: {}", list(&l["video_extensions"]));
+        let _ = writeln!(
+            s,
+            "  title: up to {} characters",
+            plain(&l["title_max_chars"])
+        );
+        let _ = writeln!(
+            s,
+            "  description: up to {} bytes",
+            plain(&l["description_max_bytes"])
+        );
+        let _ = writeln!(
+            s,
+            "  tags: up to {} characters in all",
+            plain(&l["tags_max_total_chars"])
+        );
+        let _ = writeln!(
+            s,
+            "  thumbnail: up to {} bytes ({})",
+            plain(&l["thumbnail_max_bytes"]),
+            list(&l["thumbnail_extensions"])
+        );
+        let _ = writeln!(s, "  uploads per day: {}", plain(&l["uploads_per_day"]));
+        let _ = writeln!(s, "  required: {}", list(&r["required_fields"]));
+        let _ = writeln!(
+            s,
+            "  privacy: {} (default {})",
+            list(&r["privacy_options"]),
+            plain(&r["default_privacy"])
+        );
+        let _ = writeln!(
+            s,
+            "  recommended preset: {}",
+            plain(&r["recommended_preset"])
+        );
+        for p in r["presets"].as_array().into_iter().flatten() {
+            let _ = writeln!(s, "    {}  {}", plain(&p["id"]), plain(&p["label"]));
+        }
+        if let Some(w) = r["warning"].as_str() {
+            let _ = writeln!(s, "  note: {w}");
+        }
+        s
+    });
+    Ok(())
+}

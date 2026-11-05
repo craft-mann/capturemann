@@ -11,8 +11,8 @@
 //! | `capturemann://capture/{id}/reports` | `get_report` (without a report id) |
 //! | `capturemann://platforms/{name}/rules` | `list_publish_accounts` (only its `platforms` part) |
 //!
-//! Not built: `capturemann://capture/{id}/cursor` (no daemon action serves the cursor log
-//! yet). Nothing here can return a token or a keychain key: the actions behind it do not
+//! Not built: `capturemann://capture/{id}/cursor` (the `get_cursor_track` tool exists; the resource
+//! does not yet). Nothing here can return a token or a keychain key: the actions behind it do not
 //! carry one, the platform rules are cut out of the accounts answer before it is returned,
 //! and the content is bounded by [`MAX_RESOURCE_BYTES`].
 

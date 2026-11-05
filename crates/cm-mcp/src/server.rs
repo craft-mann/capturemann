@@ -262,7 +262,8 @@ impl ServerHandler for McpServer {
                  rectangles, apply the ones you accept with annotate), get_capture. Recording: list_devices, start_recording \
                  (the user approves on screen and sees a countdown), get_recording_status, \
                  pause_recording / resume_recording, set_mic_muted (mute the mic without stopping it), add_marker (mark a moment), stop_recording (returns the capture id); \
-                 60 fps needs a passing run_fps_selftest first. \
+                 60 fps needs a passing run_fps_selftest first. get_cursor_track reads a recording's pointer path \
+                 and clicks; get_platform_rules reads a publishing platform's limits and presets. \
                  Read-only resources (resources/list and resources/templates/list): the library, \
                  jobs, a capture, its transcript and the platform rules. Prompts (prompts/list): \
                  record-tutorial, publish-everywhere, bug-report-screenshot, lesson-to-drive, \

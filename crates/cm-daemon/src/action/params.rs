@@ -383,6 +383,10 @@ pub enum Action {
     GetTextModel,
     /// `get_diagnostics` (see [`crate::diagnostics`]).
     GetDiagnostics,
+    /// `get_cursor_track` (see [`crate::read_tools`]).
+    GetCursorTrack(crate::read_tools::CursorTrackParams),
+    /// `get_platform_rules` (see [`crate::read_tools`]).
+    GetPlatformRules(crate::read_tools::PlatformRulesParams),
     /// `test_text_model` (see [`crate::text_model_ops`]).
     TestTextModel,
     /// Internal: rebuild the index from the bundle folders.

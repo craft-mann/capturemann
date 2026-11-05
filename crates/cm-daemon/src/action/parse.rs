@@ -274,6 +274,12 @@ impl Action {
                 f.only(&[])?;
                 Action::GetDiagnostics
             }
+            crate::read_tools::CURSOR_METHOD => {
+                return crate::read_tools::parse_cursor(&f);
+            }
+            crate::read_tools::RULES_METHOD => {
+                return crate::read_tools::parse_rules(&f);
+            }
             "get_text_model" => {
                 f.only(&[])?;
                 Action::GetTextModel
