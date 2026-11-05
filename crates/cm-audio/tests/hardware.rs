@@ -169,3 +169,169 @@ fn windows_process_loopback_opens_and_stops() {
         f64::from(r.duration()) / f64::from(r.spec().sample_rate)
     );
 }
+
+/// Writes a mono 48 kHz 16-bit sine of `secs` seconds at half scale.
+#[cfg(windows)]
+fn write_tone(path: &std::path::Path, hz: f64, secs: f64) {
+    let spec = hound::WavSpec {
+        channels: 1,
+        sample_rate: 48_000,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
+    let mut w = hound::WavWriter::create(path, spec).unwrap();
+    for i in 0..(48_000.0 * secs) as usize {
+        let s = (2.0 * std::f64::consts::PI * hz * i as f64 / 48_000.0).sin() * 0.5;
+        w.write_sample((s * f64::from(i16::MAX)) as i16).unwrap();
+    }
+    w.finalize().unwrap();
+}
+
+/// Level of one frequency in a recording, in dBFS of a full-scale sine (Goertzel over the left channel,
+/// the whole file).
+#[cfg(windows)]
+fn tone_level_dbfs(path: &std::path::Path, hz: f64) -> f64 {
+    let mut r = hound::WavReader::open(path).unwrap();
+    let spec = r.spec();
+    let ch = usize::from(spec.channels);
+    let samples: Vec<f64> = match spec.sample_format {
+        hound::SampleFormat::Float => r
+            .samples::<f32>()
+            .step_by(ch)
+            .map(|s| f64::from(s.unwrap()))
+            .collect(),
+        hound::SampleFormat::Int => r
+            .samples::<i32>()
+            .step_by(ch)
+            .map(|s| f64::from(s.unwrap()) / f64::from(1i32 << (spec.bits_per_sample - 1)))
+            .collect(),
+    };
+    let w = 2.0 * std::f64::consts::PI * hz / f64::from(spec.sample_rate);
+    let coeff = 2.0 * w.cos();
+    let (mut s1, mut s2) = (0.0f64, 0.0f64);
+    for x in &samples {
+        let s0 = x + coeff * s1 - s2;
+        s2 = s1;
+        s1 = s0;
+    }
+    let power = s1 * s1 + s2 * s2 - coeff * s1 * s2;
+    // Amplitude of the component: 2 * |X| / N; a full-scale sine is amplitude 1.
+    let amp = 2.0 * power.max(0.0).sqrt() / samples.len().max(1) as f64;
+    20.0 * amp.max(1e-9).log10()
+}
+
+/// Windows: the process loopback leaves out the sound of CaptureMann's own process tree and keeps
+/// everything else. The test records with the product's system-audio source while (a) a CHILD of this
+/// process (PowerShell `SoundPlayer`) plays a 440 Hz tone, which must be absent, and (b) an UNRELATED
+/// process (a Task Scheduler task, not a descendant) plays a 1000 Hz tone, which must be present. The
+/// two tones are told apart by frequency, so no timing is needed. Needs audible speakers: the output must
+/// not be muted (set the volume low).
+#[cfg(windows)]
+#[test]
+#[ignore = "plays two 2 s tones through the speakers (one from a child process, one from a scheduled task)"]
+fn windows_process_loopback_excludes_own_children() {
+    use std::process::Command;
+
+    struct TaskGuard(&'static str);
+    impl Drop for TaskGuard {
+        fn drop(&mut self) {
+            let _ = Command::new("schtasks")
+                .args(["/delete", "/tn", self.0, "/f"])
+                .output();
+        }
+    }
+
+    let dir = tempfile::tempdir().unwrap();
+    let rec_dir = dir.path().join("rec");
+    std::fs::create_dir_all(&rec_dir).unwrap();
+    let tone_a = dir.path().join("own-440.wav");
+    let tone_b = dir.path().join("other-1000.wav");
+    write_tone(&tone_a, 440.0, 2.0);
+    write_tone(&tone_b, 1000.0, 2.0);
+    let done = dir.path().join("other-done.txt");
+    let script = dir.path().join("other.ps1");
+    std::fs::write(
+        &script,
+        format!(
+            "(New-Object Media.SoundPlayer '{}').PlaySync(); Set-Content -Path '{}' -Value done",
+            tone_b.display(),
+            done.display()
+        ),
+    )
+    .unwrap();
+
+    let clock = SessionClock::with_host(Arc::new(SystemHostClock));
+    let mut rec = SystemAudioRecorder::new(SystemAudioConfig::default());
+    rec.start(TrackContext {
+        dir: rec_dir.clone(),
+        clock: clock.clone(),
+    })
+    .unwrap();
+    std::thread::sleep(Duration::from_secs(1));
+
+    // (a) a child of this process plays tone A.
+    let st = Command::new("powershell")
+        .args(["-NoProfile", "-Command"])
+        .arg(format!(
+            "(New-Object Media.SoundPlayer '{}').PlaySync()",
+            tone_a.display()
+        ))
+        .status()
+        .unwrap();
+    assert!(st.success(), "the child player failed: {st}");
+    std::thread::sleep(Duration::from_millis(500));
+
+    // (b) an unrelated process (Task Scheduler, interactive for this user) plays tone B.
+    let name = "cm-own-sound-test";
+    let _guard = TaskGuard(name);
+    let tr = format!(
+        "powershell -NoProfile -ExecutionPolicy Bypass -File \"{}\"",
+        script.display()
+    );
+    let created = Command::new("schtasks")
+        .args([
+            "/create", "/tn", name, "/tr", &tr, "/sc", "once", "/st", "00:00", "/it", "/f",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        created.status.success(),
+        "schtasks /create: {}",
+        String::from_utf8_lossy(&created.stderr)
+    );
+    let run = Command::new("schtasks")
+        .args(["/run", "/tn", name])
+        .output()
+        .unwrap();
+    assert!(
+        run.status.success(),
+        "schtasks /run: {}",
+        String::from_utf8_lossy(&run.stderr)
+    );
+    let started = std::time::Instant::now();
+    while !done.exists() && started.elapsed() < Duration::from_secs(30) {
+        std::thread::sleep(Duration::from_millis(250));
+    }
+    assert!(done.exists(), "the unrelated player did not finish in 30 s");
+    std::thread::sleep(Duration::from_millis(500));
+
+    let info = rec.stop(clock.now()).unwrap();
+    let info_text = serde_json::to_string_pretty(&info).unwrap();
+    eprintln!("{info_text}");
+    assert!(
+        info_text.contains("process-loopback"),
+        "the recorder did not use the process loopback (so there is nothing to check)"
+    );
+    let wav = rec_dir.join("system.wav");
+    let own = tone_level_dbfs(&wav, 440.0);
+    let other = tone_level_dbfs(&wav, 1000.0);
+    eprintln!("440 Hz (child of this process): {own:.1} dBFS; 1000 Hz (unrelated process): {other:.1} dBFS");
+    assert!(
+        other > -45.0,
+        "the unrelated process's tone is missing: {other:.1} dBFS (is the output muted?)"
+    );
+    assert!(
+        own < other - 40.0,
+        "the child's tone is in the recording: {own:.1} dBFS against {other:.1} dBFS"
+    );
+}
