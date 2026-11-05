@@ -160,6 +160,8 @@ struct App {
     /// The view that last saw the pointer: keys go there, whichever window the OS focused.
     active: usize,
     shift: bool,
+    /// The modifiers as last reported (logged with each key).
+    mods: ModifiersState,
     /// How many overlay windows have the keyboard focus (0 or 1 when all is well).
     focused: i32,
     /// Esc was down at the last poll (the poll runs only while no window has the focus).
@@ -195,6 +197,7 @@ pub fn run(inbox: &Arc<Inbox>, opts: Options, tracer: &Tracer) -> Result<Finishe
         all_visible_marked: false,
         active: 0,
         shift: false,
+        mods: ModifiersState::empty(),
         focused: 0,
         esc_was_down: false,
         finish: None,
@@ -257,24 +260,50 @@ fn cursor_icon(h: CursorHint) -> CursorIcon {
     }
 }
 
-/// Tab, once (not a key repeat), when the desktop app asked for the hand-over.
-fn is_tab_to_list(enabled: bool, event: &winit::event::KeyEvent) -> bool {
-    enabled && !event.repeat && matches!(&event.logical_key, WinKey::Named(NamedKey::Tab))
+/// What the picker does with one key press (pure, so it is tested without a window).
+#[derive(Debug, PartialEq)]
+enum KeyAction {
+    /// Tab: leave for the window list (R19).
+    ToList,
+    /// A key the picker state machine handles.
+    Picker(Key),
+    /// Not for the picker; the string says why (logged).
+    Ignored(&'static str),
 }
 
-fn map_key(event: &winit::event::KeyEvent, shift: bool) -> Option<Key> {
-    let arrow = |dx, dy| Some(Key::Arrow { dx, dy, shift });
-    match &event.logical_key {
-        WinKey::Named(NamedKey::Escape) => Some(Key::Escape),
-        WinKey::Named(NamedKey::Enter) => Some(Key::Enter),
+/// Decides what a key press does. Modifiers never block a key: the hotkey (Ctrl+Alt+Shift+n) may
+/// still be down when the overlay takes the keyboard, and arrows still nudge. `synthetic` is a
+/// press winit invents for every key already held when a window gets the focus (Windows); the
+/// Tab that started the overlay is such a key, and must not be taken for a new Tab.
+fn classify_key(
+    logical: &WinKey,
+    repeat: bool,
+    synthetic: bool,
+    tab_to_list: bool,
+    shift: bool,
+) -> KeyAction {
+    if synthetic {
+        return KeyAction::Ignored("synthetic press for a key already held at focus");
+    }
+    if matches!(logical, WinKey::Named(NamedKey::Tab)) && tab_to_list {
+        return if repeat {
+            KeyAction::Ignored("tab repeat")
+        } else {
+            KeyAction::ToList
+        };
+    }
+    let arrow = |dx, dy| KeyAction::Picker(Key::Arrow { dx, dy, shift });
+    match logical {
+        WinKey::Named(NamedKey::Escape) => KeyAction::Picker(Key::Escape),
+        WinKey::Named(NamedKey::Enter) => KeyAction::Picker(Key::Enter),
         WinKey::Named(NamedKey::ArrowLeft) => arrow(-1, 0),
         WinKey::Named(NamedKey::ArrowRight) => arrow(1, 0),
         WinKey::Named(NamedKey::ArrowUp) => arrow(0, -1),
         WinKey::Named(NamedKey::ArrowDown) => arrow(0, 1),
-        WinKey::Character(c) if c.eq_ignore_ascii_case("c") && !event.repeat => {
-            Some(Key::CopyColor)
+        WinKey::Character(c) if c.eq_ignore_ascii_case("c") && !repeat => {
+            KeyAction::Picker(Key::CopyColor)
         }
-        _ => None,
+        _ => KeyAction::Ignored("no meaning in the overlay"),
     }
 }
 
@@ -758,7 +787,8 @@ impl ApplicationHandler<()> for App {
                 self.views[i].visible = true;
             }
             WindowEvent::ModifiersChanged(m) => {
-                self.shift = m.state().contains(ModifiersState::SHIFT)
+                self.shift = m.state().contains(ModifiersState::SHIFT);
+                self.mods = m.state();
             }
             WindowEvent::CursorEntered { .. } => {
                 if self.active != i {
@@ -818,22 +848,49 @@ impl ApplicationHandler<()> for App {
                     &serde_json::json!({"trace": "focus", "display_id": i, "focused": focused}),
                 );
             }
-            WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => {
+            WindowEvent::KeyboardInput {
+                event,
+                is_synthetic,
+                ..
+            } if event.state == ElementState::Pressed => {
                 self.tracer.note(
                     &serde_json::json!({"trace": "key", "key": format!("{:?}", event.logical_key)}),
                 );
-                if is_tab_to_list(self.opts.tab_to_list, &event) {
-                    self.finish = Some(Finish::SwitchToList);
-                    el.exit();
-                } else if let Some(key) = map_key(&event, self.shift) {
-                    // Keys go to the display the pointer is on, not the window the OS made key.
-                    let target = if self.active < self.views.len() {
-                        self.active
-                    } else {
-                        i
-                    };
-                    let e = self.views[target].picker.key(key);
-                    self.apply(target, e, el);
+                let action = classify_key(
+                    &event.logical_key,
+                    event.repeat,
+                    is_synthetic,
+                    self.opts.tab_to_list,
+                    self.shift,
+                );
+                log::debug!(
+                    "overlay key: {:?} mods {:?} repeat {} synthetic {} -> {}",
+                    event.logical_key,
+                    self.mods,
+                    event.repeat,
+                    is_synthetic,
+                    match &action {
+                        KeyAction::ToList => "Tab to the list".to_string(),
+                        KeyAction::Picker(k) => format!("handled {k:?}"),
+                        KeyAction::Ignored(why) => format!("ignored ({why})"),
+                    }
+                );
+                match action {
+                    KeyAction::ToList => {
+                        self.finish = Some(Finish::SwitchToList);
+                        el.exit();
+                    }
+                    KeyAction::Picker(key) => {
+                        // Keys go to the display the pointer is on, not the window the OS made key.
+                        let target = if self.active < self.views.len() {
+                            self.active
+                        } else {
+                            i
+                        };
+                        let e = self.views[target].picker.key(key);
+                        self.apply(target, e, el);
+                    }
+                    KeyAction::Ignored(_) => {}
                 }
             }
             _ => {}
@@ -875,5 +932,110 @@ impl ApplicationHandler<()> for App {
             wake = wake.min(now + Duration::from_millis(50));
         }
         el.set_control_flow(ControlFlow::WaitUntil(wake));
+    }
+}
+
+#[cfg(test)]
+mod key_tests {
+    use super::*;
+
+    fn named(k: NamedKey) -> WinKey {
+        WinKey::Named(k)
+    }
+
+    fn arrow(dx: i32, dy: i32, shift: bool) -> KeyAction {
+        KeyAction::Picker(Key::Arrow { dx, dy, shift })
+    }
+
+    /// Down/Up/Left/Right, Enter and Esc, with and without the held hotkey's Shift, and repeats.
+    #[test]
+    fn keys_table() {
+        // (key, repeat, shift, expected); the held Ctrl+Alt never changes the result.
+        let rows = [
+            (NamedKey::ArrowDown, false, false, arrow(0, 1, false)),
+            (NamedKey::ArrowDown, true, false, arrow(0, 1, false)),
+            (NamedKey::ArrowDown, false, true, arrow(0, 1, true)),
+            (NamedKey::ArrowUp, false, false, arrow(0, -1, false)),
+            (NamedKey::ArrowUp, true, true, arrow(0, -1, true)),
+            (NamedKey::ArrowLeft, false, false, arrow(-1, 0, false)),
+            (NamedKey::ArrowRight, false, false, arrow(1, 0, false)),
+            (NamedKey::Enter, false, false, KeyAction::Picker(Key::Enter)),
+            (NamedKey::Enter, false, true, KeyAction::Picker(Key::Enter)),
+            (
+                NamedKey::Escape,
+                false,
+                false,
+                KeyAction::Picker(Key::Escape),
+            ),
+            (
+                NamedKey::Escape,
+                false,
+                true,
+                KeyAction::Picker(Key::Escape),
+            ),
+        ];
+        for (k, repeat, shift, want) in rows {
+            for tab_to_list in [false, true] {
+                assert_eq!(
+                    classify_key(&named(k), repeat, false, tab_to_list, shift),
+                    want,
+                    "{k:?} repeat {repeat} shift {shift}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn tab_goes_to_the_list_once_and_only_when_asked() {
+        let tab = named(NamedKey::Tab);
+        assert_eq!(
+            classify_key(&tab, false, false, true, false),
+            KeyAction::ToList
+        );
+        assert!(matches!(
+            classify_key(&tab, true, false, true, false),
+            KeyAction::Ignored(_)
+        ));
+        assert!(matches!(
+            classify_key(&tab, false, false, false, false),
+            KeyAction::Ignored(_)
+        ));
+    }
+
+    /// F6: the Tab held while the overlay takes the focus arrives as a synthetic press.
+    #[test]
+    fn synthetic_press_of_a_held_key_is_ignored() {
+        for k in [
+            NamedKey::Tab,
+            NamedKey::Escape,
+            NamedKey::Enter,
+            NamedKey::ArrowDown,
+        ] {
+            assert!(
+                matches!(
+                    classify_key(&named(k), false, true, true, false),
+                    KeyAction::Ignored(_)
+                ),
+                "{k:?}"
+            );
+        }
+        let c = WinKey::Character("c".into());
+        assert!(matches!(
+            classify_key(&c, false, true, true, false),
+            KeyAction::Ignored(_)
+        ));
+    }
+
+    #[test]
+    fn c_copies_the_colour_once() {
+        let c = WinKey::Character("C".into());
+        assert_eq!(
+            classify_key(&c, false, false, false, false),
+            KeyAction::Picker(Key::CopyColor)
+        );
+        assert!(matches!(
+            classify_key(&c, true, false, false, false),
+            KeyAction::Ignored(_)
+        ));
     }
 }
