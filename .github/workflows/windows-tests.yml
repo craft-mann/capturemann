@@ -115,6 +115,22 @@ jobs:
           Copy-Artifacts $json 'cm-daemon' 'example'
           '::endgroup::'
 
+          # The release regression suite (docs/development/regression.md). It links no product crate, so this build is
+          # small; it is run on the lab laptop against an installed package, never in CI.
+          '::group::cargo build --release -p cm-regress'
+          $json = & cargo build --release --locked --message-format=json -p cm-regress
+          if ($LASTEXITCODE -ne 0) { throw 'cargo build of cm-regress failed' }
+          foreach ($line in $json) {
+            if (-not "$line".StartsWith('{')) { continue }
+            $m = "$line" | ConvertFrom-Json
+            if ($m.reason -eq 'compiler-artifact' -and $m.executable -and $m.target.name -eq 'cm-regress' -and $m.target.kind[0] -eq 'bin') {
+              Copy-Item $m.executable (Join-Path $out 'cm-regress.exe') -Force
+              $script:built += 'cm-regress.exe'
+            }
+          }
+          '::endgroup::'
+          if (-not ($script:built -contains 'cm-regress.exe')) { throw 'cm-regress.exe was not found in the cargo output' }
+
           if (-not ($script:built -contains 'example__record_e2e.exe' -and $script:built -contains 'example__make_fixture.exe')) {
             throw 'the cm-daemon examples were not found in the cargo output'
           }
