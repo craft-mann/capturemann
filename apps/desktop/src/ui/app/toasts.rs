@@ -65,6 +65,17 @@ pub fn window_plan(
 }
 
 pub fn push_toast(app: &Entity<AppModel>, spec: ToastSpec, cx: &mut App) {
+    log::info!(
+        "toast queued: {:?}, {} button(s), {} already queued, window {}",
+        spec.kind,
+        spec.buttons.len(),
+        app.read(cx).toasts.toasts().len(),
+        if app.read(cx).toast_window.is_some() {
+            "exists"
+        } else {
+            "none"
+        }
+    );
     app.update(cx, |m, cx| {
         m.toasts.push(spec, Instant::now());
         cx.notify();
@@ -339,7 +350,21 @@ pub(crate) fn sync_toasts(app: &Entity<AppModel>, cx: &mut App) {
                         cx.new(|cx| ToastHost::new(app2, cx))
                     },
                 );
+                if let Err(e) = &opened {
+                    // Without this line a toast that cannot get a window is silent.
+                    log::error!("the toast window could not be opened: {e:#}");
+                }
                 if let Ok(handle) = opened {
+                    log::info!(
+                        "toast window opened: {win_w} x {win_h} at ({}, {}), display {}",
+                        f32::from(origin.x),
+                        f32::from(origin.y),
+                        if display.is_some() {
+                            "known"
+                        } else {
+                            "unknown"
+                        }
+                    );
                     crate::surfaces::opened(crate::surfaces::Surface::Toast, handle);
                     app.update(cx, |m, _| {
                         m.toast_window = Some(handle);

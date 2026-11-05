@@ -148,6 +148,10 @@ impl OverlayError {
 /// The environment variable `cm-overlay` reads its UI language from (`apps/overlay/src/main.rs`).
 pub const LANG_ENV: &str = "CAPTUREMANN_LANG";
 
+/// The environment variable that tells `cm-overlay` which process started it (it ends when that
+/// process is gone; `apps/overlay/src/lifetime.rs`).
+pub const PARENT_PID_ENV: &str = "CAPTUREMANN_PARENT_PID";
+
 /// The code to pass in [`LANG_ENV`]: the app's current UI language. The pseudo-locale is passed on
 /// by its own environment variable, which the child inherits.
 pub fn child_language_code() -> &'static str {
@@ -345,19 +349,70 @@ impl OverlayLauncher {
                 OverlayError::Spawn(e.to_string())
             }
         };
+        // The overlay ends itself when this process is gone (a stray `cm-overlay` otherwise stays
+        // after the app is killed; Windows does not end a child with its parent).
+        cmd.env(PARENT_PID_ENV, std::process::id().to_string());
         crate::trace::mark("overlay_spawn_begin");
-        let child = cmd.spawn().map_err(map_spawn)?;
+        let mut child = cmd.spawn().map_err(|e| {
+            log::error!("cm-overlay did not start ({}): {e}", bin.display());
+            map_spawn(e)
+        })?;
         crate::trace::mark("overlay_spawned");
-        // `kill_on_drop`: when the watchdog fires the pending wait is dropped with the child in it,
-        // which kills the overlay; the caller then clears the capture-busy flag (R4-20).
-        let out = match tokio::time::timeout(self.watchdog, child.wait_with_output()).await {
-            Ok(out) => out.map_err(map_spawn)?,
+        let pid = child.id();
+        let began = std::time::Instant::now();
+        log::info!(
+            "cm-overlay started: pid {pid:?}, {} {}, watchdog {} s",
+            mode.arg(),
+            if pick { "pick" } else { "capture" },
+            self.watchdog.as_secs()
+        );
+        let (mut stdout, mut stderr) = (child.stdout.take(), child.stderr.take());
+        // Output and exit are waited for together, like `wait_with_output`, but the child stays
+        // ours, so the watchdog can kill it by name and log the result (R4-20).
+        let finished = {
+            async fn drain<R: tokio::io::AsyncRead + Unpin>(r: &mut Option<R>) -> Vec<u8> {
+                use tokio::io::AsyncReadExt;
+                let mut v = Vec::new();
+                if let Some(r) = r {
+                    let _ = r.read_to_end(&mut v).await;
+                }
+                v
+            }
+            let wait = async {
+                let (out, err, status) =
+                    tokio::join!(drain(&mut stdout), drain(&mut stderr), child.wait());
+                (status, out, err)
+            };
+            tokio::time::timeout(self.watchdog, wait).await
+        };
+        let out = match finished {
+            Ok((status, stdout, stderr)) => std::process::Output {
+                status: status.map_err(map_spawn)?,
+                stdout,
+                stderr,
+            },
             Err(_) => {
                 crate::trace::mark("overlay_watchdog");
+                let killed = child.kill().await;
+                log::warn!(
+                    "cm-overlay pid {pid:?} did not finish within {} s; killed: {}",
+                    self.watchdog.as_secs(),
+                    match &killed {
+                        Ok(()) => "yes".to_owned(),
+                        Err(e) => format!("no ({e})"),
+                    }
+                );
                 return Err(OverlayError::TimedOut);
             }
         };
         crate::trace::mark("overlay_exited");
+        log::info!(
+            "cm-overlay pid {pid:?} exited with {:?} after {} ms ({} bytes on stdout, {} on stderr)",
+            out.status.code(),
+            began.elapsed().as_millis(),
+            out.stdout.len(),
+            out.stderr.len()
+        );
         if tracing {
             eprint!("{}", String::from_utf8_lossy(&out.stderr));
         }

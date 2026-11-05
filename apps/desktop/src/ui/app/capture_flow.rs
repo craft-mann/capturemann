@@ -174,6 +174,17 @@ pub(crate) fn run_window_capture(app: &Entity<AppModel>, window_id: u32, cx: &mu
 
 /// Ends a capture: frees the capture slot, then the result toast and the recents list.
 pub(crate) fn finish_capture(app: &Entity<AppModel>, flow: CaptureFlow, cx: &mut App) {
+    log::info!(
+        "capture ended: {}",
+        match &flow {
+            CaptureFlow::Done(Ok(_)) => "saved".to_owned(),
+            CaptureFlow::Done(Err(e)) => format!("saved, but the finish failed: {e}"),
+            CaptureFlow::Cancelled => "cancelled".to_owned(),
+            CaptureFlow::SwitchToList => "switch to the window list".to_owned(),
+            CaptureFlow::Overlay(e) => format!("overlay error: {e:?}"),
+            CaptureFlow::Failed(e) => format!("failed: {e}"),
+        }
+    );
     app.update(cx, |m, _| m.capture_busy = false);
     match flow {
         CaptureFlow::Done(Ok(done)) => {
