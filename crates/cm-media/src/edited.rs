@@ -1389,7 +1389,9 @@ fn encode_args(
     // RGBA to YUV with the BT.709 matrix and limited range, and say so in the stream: FFmpeg's
     // default is BT.601, and players take an untagged HD stream as BT.709, which shifts every
     // colour (found by the M4 preview/export parity test).
-    let yuv = fmt.pix_fmt.starts_with("yuv") || fmt.hw_device.is_some();
+    // NV12 (Quick Sync, Media Foundation) is YUV too: it used to fall through to FFmpeg's BT.601
+    // default and an untagged stream (pure green came out 215 instead of 254 on Windows).
+    let yuv = fmt.pix_fmt.starts_with("yuv") || fmt.pix_fmt == "nv12" || fmt.hw_device.is_some();
     let convert = if fmt.hw_device.is_some() {
         format!(
             "scale=out_color_matrix=bt709:out_range=tv,format={},hwupload",
@@ -1557,6 +1559,40 @@ mod tests {
         assert!(j.contains("-map [outv] -map [outa]"));
         assert!(j.contains("-c:v h264_videotoolbox"));
         assert!(j.ends_with("-t 10 /b/o.part"), "{j}");
+    }
+
+    /// NV12 encoders (Media Foundation, Quick Sync) get the BT.709 conversion and the colour tags
+    /// like the yuv420p ones (the Windows parity test caught an untagged BT.601 export).
+    #[test]
+    fn nv12_encoders_convert_with_bt709_and_tag_the_stream() {
+        let caps = crate::tools::caps_from_output("ffmpeg version 7.1", "V....D h264_mf");
+        for enc in [Encoder::H264Mf, Encoder::Qsv] {
+            let codec = video_codec_at(enc, (1280, 720), 30.0, None);
+            let a = encode_args(
+                &OutFormat::h264(enc, &codec.args),
+                &caps,
+                (1280, 720),
+                30.0,
+                &[],
+                None,
+                None,
+                None,
+                AUDIO_BPS_STEREO,
+                10.0,
+                Path::new("/b/o.part"),
+            );
+            let j = a.join(" ");
+            assert!(
+                j.contains("[0:v]scale=out_color_matrix=bt709:out_range=tv,format=nv12[outv]"),
+                "{j}"
+            );
+            assert!(
+                j.contains(
+                    "-colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv"
+                ),
+                "{j}"
+            );
+        }
     }
 
     fn linux_args(enc: Encoder) -> String {
