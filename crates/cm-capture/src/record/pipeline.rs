@@ -30,6 +30,7 @@ use cm_core::{CmError, MediaTime, PauseGap, TrackStats, TICKS_PER_SECOND};
 use cm_encode::{AppendOutcome, VideoEncoder, WriterSummary};
 use serde::Serialize;
 
+use super::load::{LoadMonitor, RateChange};
 use super::timeline::PauseTimeline;
 
 /// A silence between deliveries longer than this is treated as a static screen, not a stall.
@@ -38,6 +39,8 @@ const STATIC_GAP_TICKS: i64 = TICKS_PER_SECOND / 4;
 pub const STALL_TICKS: i64 = TICKS_PER_SECOND;
 /// Histogram bin for the lag median: 0.5 ms.
 const BIN_TICKS: i64 = TICKS_PER_SECOND / 2000;
+const FINAL_SLOT_TRIES: u32 = 100;
+const FINAL_SLOT_WAIT: std::time::Duration = std::time::Duration::from_millis(10);
 const BINS: usize = 4000; // up to 2 s of lag
 /// Window of the health monitor (REC-3: "late frames exceed 2% over the last 30 s").
 pub const HEALTH_WINDOW_SECS: i64 = 30;
@@ -67,13 +70,15 @@ pub struct PipelineStats {
     pub delivered: u64,
     /// Status-only samples (screen unchanged) delivered by the OS.
     pub idle: u64,
-    /// Samples appended to the file, repeats included.
+    /// Samples appended to the file, repeats included. Every slot the pipeline offers the encoder
+    /// ends as exactly one of `written` or [`PipelineStats::dropped`]; `delivered` counts the OS's
+    /// frames, a different unit (the OS may deliver more or fewer than there are slots).
     pub written: u64,
     /// Of `written`, repeats of the previous frame (constant frame rate).
     pub repeated: u64,
     /// Frames that landed on an already occupied slot (OS faster than the target fps).
     pub coalesced: u64,
-    /// Encoder not ready: the frame was not written.
+    /// Encoder not ready: the slot was not written (its time stays empty in the file).
     pub not_ready: u64,
     /// Encoder or disk failure while appending.
     pub append_failed: u64,
@@ -89,16 +94,31 @@ pub struct PipelineStats {
     pub stalls: u64,
     /// Total length of those stalls, milliseconds (an open one counts up to its last update).
     pub stall_ms: u64,
+    /// Slots not offered to the encoder on purpose because the encoder could not keep up and the
+    /// rate was lowered (see [`LoadMonitor`]); not counted as dropped or late.
+    pub rate_skipped: u64,
+    /// How often the offered rate was lowered.
+    pub rate_changes: u64,
 }
 
 impl PipelineStats {
-    /// Late frames for NFR-2: lag-late, missed delivery slots, and frames the encoder refused.
+    /// Late frames for NFR-2: frames that arrived more than one interval behind the steady lag,
+    /// delivery slots with no sample (`missed_slots`), and slots the encoder refused (`dropped`).
+    /// A count of events, not of distinct frames: it can exceed the slots in a file, so
+    /// [`Pipeline::late_pct`] clamps the share to 100.
     pub fn late(&self) -> u64 {
-        self.lag_late + self.missed_slots + self.not_ready + self.append_failed
+        self.lag_late + self.missed_slots + self.dropped()
     }
 
+    /// Slots the encoder did not take: the file has no sample for them (and the sample before
+    /// them lasts through their time, so the file keeps its length).
     pub fn dropped(&self) -> u64 {
         self.not_ready + self.append_failed
+    }
+
+    /// Slots offered to the encoder: `written + dropped`.
+    pub fn slots_offered(&self) -> u64 {
+        self.written + self.dropped()
     }
 
     pub fn track_stats(&self) -> TrackStats {
@@ -217,7 +237,15 @@ pub struct Pipeline<E: VideoEncoder> {
     timeline: PauseTimeline,
     held: Option<E::Frame>,
     first_slot: Option<i64>,
+    /// The last slot written to the file.
     last_slot: Option<i64>,
+    /// The last slot dealt with: written, dropped or skipped. Slots never come back, so a slot the
+    /// encoder refused stays empty and the file never runs ahead of the recording (a refused
+    /// slot used to be retried by the next one, which squeezed 73 s of recording into 33 s).
+    cursor: Option<i64>,
+    /// The last slot the encoder refused.
+    last_dropped: Option<i64>,
+    load: LoadMonitor,
     last_delivery: Option<MediaTime>,
     stats: PipelineStats,
     late: LateTracker,
@@ -260,6 +288,9 @@ impl<E: VideoEncoder> Pipeline<E> {
             held: None,
             first_slot: None,
             last_slot: None,
+            cursor: None,
+            last_dropped: None,
+            load: LoadMonitor::new(fps),
             last_delivery: None,
             stats: PipelineStats::default(),
             late: LateTracker::new(interval),
@@ -317,13 +348,33 @@ impl<E: VideoEncoder> Pipeline<E> {
         ))
     }
 
-    /// Late percentage over the whole recording (slots in the file as denominator).
+    /// Late percentage over the whole recording: late events over the slots from the first
+    /// written one to the last dealt with, never above 100.
     pub fn late_pct(&self) -> f64 {
-        let slots = match (self.first_slot, self.last_slot) {
-            (Some(a), Some(b)) => (b - a + 1).max(1) as f64,
+        let slots = match (self.first_slot, self.cursor) {
+            (Some(a), Some(b)) => (b - a + 1).max(1) as u64,
             _ => return 0.0,
         };
-        100.0 * self.stats.late() as f64 / slots
+        100.0 * self.stats.late().min(slots) as f64 / slots as f64
+    }
+
+    /// The frame rate offered to the encoder now (the asked rate unless the encoder could not
+    /// keep up).
+    pub fn effective_fps(&self) -> f64 {
+        self.load.effective_fps()
+    }
+
+    /// Checks whether the encoder keeps up; call from the heartbeat with the session time. On an
+    /// overload the offered rate is lowered and the decision returned (once per step).
+    pub fn check_load(&mut self, now: MediaTime) -> Option<RateChange> {
+        let c = self.load.evaluate(Self::second_of(now))?;
+        self.stats.rate_changes += 1;
+        Some(c)
+    }
+
+    /// Whether a slot is offered to the encoder at the current rate.
+    fn due(&self, slot: i64) -> bool {
+        slot.rem_euclid(i64::from(self.load.stride())) == 0
     }
 
     /// Late percentage over the last 30 s of session time (REC-3 health monitor).
@@ -435,9 +486,9 @@ impl<E: VideoEncoder> Pipeline<E> {
             .add(Self::second_of(session_pts), 1, u64::from(was_late));
 
         let slot = round_div(file_t.ticks(), self.interval);
-        let first = self.last_slot.is_none();
-        if let Some(ls) = self.last_slot {
-            if slot <= ls {
+        let first = self.first_slot.is_none();
+        if let Some(c) = self.cursor {
+            if slot <= c {
                 self.stats.coalesced += 1;
                 self.held = Some(frame);
                 return FrameOutcome::Handled;
@@ -448,7 +499,7 @@ impl<E: VideoEncoder> Pipeline<E> {
                 return FrameOutcome::Handled;
             }
         }
-        let ok = self.append(&frame, slot, false);
+        let ok = self.offer(&frame, slot, false);
         self.held = Some(frame);
         if ok && first {
             self.first_slot = Some(slot);
@@ -456,6 +507,17 @@ impl<E: VideoEncoder> Pipeline<E> {
         } else {
             FrameOutcome::Handled
         }
+    }
+
+    /// Deals with `slot` once: skips it when the rate was lowered, else offers it to the encoder.
+    /// Returns true when written.
+    fn offer(&mut self, frame: &E::Frame, slot: i64, repeat: bool) -> bool {
+        self.cursor = Some(self.cursor.map_or(slot, |c| c.max(slot)));
+        if !self.due(slot) {
+            self.stats.rate_skipped += 1;
+            return false;
+        }
+        self.append(frame, slot, repeat)
     }
 
     /// Appends one sample at `slot`. Returns true when written.
@@ -474,12 +536,16 @@ impl<E: VideoEncoder> Pipeline<E> {
                 if self.first_slot.is_none() {
                     self.first_slot = Some(slot);
                 }
+                self.load
+                    .record(Self::second_of(self.timeline.unmap(pts)), false);
                 true
             }
             Ok(AppendOutcome::NotReady) => {
                 self.stats.not_ready += 1;
-                self.health
-                    .add(Self::second_of(self.timeline.unmap(pts)), 1, 1);
+                self.last_dropped = Some(slot);
+                let second = Self::second_of(self.timeline.unmap(pts));
+                self.health.add(second, 1, 1);
+                self.load.record(second, true);
                 false
             }
             Err(e) => {
@@ -494,19 +560,55 @@ impl<E: VideoEncoder> Pipeline<E> {
         }
     }
 
+    /// Writes the held frame at the final `slot`, waiting up to a second for an encoder that is
+    /// behind, so the file ends where the recording does.
+    fn append_last(&mut self, slot: i64) {
+        let Some(held) = self.held.clone() else {
+            return;
+        };
+        self.cursor = Some(self.cursor.map_or(slot, |c| c.max(slot)));
+        let pts = MediaTime::from_ticks(slot * self.interval);
+        for _ in 0..FINAL_SLOT_TRIES {
+            match self.enc.append(&held, pts, MediaTime::from_ticks(self.interval)) {
+                Ok(AppendOutcome::Written) => {
+                    self.stats.written += 1;
+                    self.stats.repeated += 1;
+                    if self.last_dropped == Some(slot) {
+                        // This slot was counted as refused a moment ago: it is written now.
+                        self.stats.not_ready = self.stats.not_ready.saturating_sub(1);
+                    }
+                    self.last_slot = Some(slot);
+                    if self.first_slot.is_none() {
+                        self.first_slot = Some(slot);
+                    }
+                    return;
+                }
+                Ok(AppendOutcome::NotReady) => std::thread::sleep(FINAL_SLOT_WAIT),
+                Err(e) => {
+                    self.stats.append_failed += 1;
+                    let reason = match e {
+                        CmError::DiskFull { .. } => HaltReason::DiskFull,
+                        other => HaltReason::EncoderFailed(other.to_string()),
+                    };
+                    self.halt(reason);
+                    return;
+                }
+            }
+        }
+        self.stats.not_ready += 1;
+    }
+
     /// Repeats the held frame into every empty slot up to and including `upto`.
     fn fill_to(&mut self, upto: i64) {
         let Some(held) = self.held.clone() else {
             return;
         };
-        let Some(mut next) = self.last_slot.map(|s| s + 1) else {
-            return;
-        };
-        while next <= upto && self.accepting() {
-            if !self.append(&held, next, true) {
+        // A refused or skipped slot stays empty and the next one is tried: time never stands still.
+        while let Some(next) = self.cursor.map(|c| c + 1) {
+            if next > upto || !self.accepting() {
                 break;
             }
-            next += 1;
+            self.offer(&held, next, true);
         }
     }
 
@@ -522,7 +624,7 @@ impl<E: VideoEncoder> Pipeline<E> {
         };
         let margin = (3 * self.interval).max(TICKS_PER_SECOND / 16);
         let safe = (file_now.ticks() - margin).div_euclid(self.interval);
-        if self.last_slot.is_some_and(|ls| safe > ls) {
+        if self.cursor.is_some_and(|c| safe > c) {
             self.fill_to(safe);
         }
     }
@@ -567,10 +669,17 @@ impl<E: VideoEncoder> Pipeline<E> {
         if let Some(s) = &self.summary {
             return Ok(s.clone());
         }
-        if self.accepting() && self.last_slot.is_some() {
+        if self.accepting() && self.cursor.is_some() {
             let end = self.timeline.end_file_time(at);
             let upto = self.last_slot_before(end);
-            self.fill_to(upto);
+            if self.cursor.is_some_and(|c| upto > c) {
+                self.fill_to(upto - 1);
+            }
+            // The last slot gives the file its end (a lowered rate or a refusal may have left it
+            // empty): wait briefly for a busy encoder.
+            if self.last_slot.is_none_or(|l| l < upto) {
+                self.append_last(upto);
+            }
         }
         self.closed = true;
         let s = self.enc.finish()?;
@@ -778,14 +887,161 @@ mod tests {
         }
         p.finish(at(2000)).unwrap();
         // Every 5th append is refused, repeats included, so at least the 12 real ones.
-        assert!(p.stats().not_ready >= 12);
+        assert!(p.stats().not_ready >= 10);
         assert_eq!(p.stats().dropped(), p.stats().not_ready);
-        assert!(p.stats().late() >= 12);
-        // Repeats cover the refused slots: the file has no holes.
+        assert!(p.stats().late() >= 10);
+        // A refused slot stays empty (the previous frame lasts through it): every sample sits on
+        // the slot grid at its own time, so the file keeps the length of the recording.
         let l: Vec<Appended> = log.lock().unwrap().clone();
-        assert!(l
-            .windows(2)
-            .all(|w| w[1].pts.ticks() - w[0].pts.ticks() == 4000));
+        assert!(l.windows(2).all(|w| w[1].pts > w[0].pts));
+        assert!(l.iter().all(|a| a.pts.ticks() % 4000 == 0));
+        let last = l.last().unwrap().pts.ticks();
+        assert!(last >= 2 * 120_000 - 3 * 4000, "file ends at {last}");
+        assert_eq!(p.stats().slots_offered(), p.stats().written + p.stats().dropped());
+    }
+
+    /// An encoder that accepts a number of slots per second (a budget the test refills), like a
+    /// hardware encoder that cannot do 4K30.
+    struct Limited {
+        inner: SyntheticEncoder,
+        budget: std::sync::Arc<std::sync::Mutex<f64>>,
+    }
+
+    impl VideoEncoder for Limited {
+        type Frame = SyntheticFrame;
+        fn append(
+            &mut self,
+            f: &SyntheticFrame,
+            pts: MediaTime,
+            d: MediaTime,
+        ) -> Result<AppendOutcome, CmError> {
+            let mut b = self.budget.lock().unwrap();
+            if *b < 1.0 {
+                return Ok(AppendOutcome::NotReady);
+            }
+            *b -= 1.0;
+            drop(b);
+            self.inner.append(f, pts, d)
+        }
+        fn check(&self) -> Result<(), CmError> {
+            self.inner.check()
+        }
+        fn fragments_written(&self) -> usize {
+            self.inner.fragments_written()
+        }
+        fn finish(&mut self) -> Result<WriterSummary, CmError> {
+            self.inner.finish()
+        }
+    }
+
+    /// Drives 30 fps delivery, the heartbeat and the load check over `secs` seconds against an
+    /// encoder that takes `capacity` slots a second.
+    fn overloaded(
+        capacity: f64,
+        secs: i64,
+        dir: &std::path::Path,
+    ) -> (Pipeline<Limited>, cm_encode::synthetic::AppendLog, Vec<RateChange>) {
+        let plan = plan_video(3840, 2160, &VideoSettings::default()).unwrap();
+        let inner = SyntheticEncoder::create(&EncoderConfig {
+            path: dir.join("screen.mp4"),
+            plan,
+        })
+        .unwrap();
+        let log = inner.log();
+        let budget = std::sync::Arc::new(std::sync::Mutex::new(2.0));
+        let mut p = Pipeline::new(
+            Limited {
+                inner,
+                budget: budget.clone(),
+            },
+            30,
+        );
+        let mut changes = Vec::new();
+        let mut next_frame = 0.0f64;
+        let mut id = 0;
+        for ms in 0..secs * 1000 {
+            {
+                let mut b = budget.lock().unwrap();
+                *b = (*b + capacity / 1000.0).min(4.0); // a short queue
+            }
+            if ms as f64 >= next_frame {
+                p.on_frame(at(ms), at(ms + 5), SyntheticFrame(id));
+                id += 1;
+                next_frame += 1000.0 / 30.0;
+            }
+            if ms % 16 == 0 {
+                p.heartbeat(at(ms));
+            }
+            if ms % 100 == 0 {
+                changes.extend(p.check_load(at(ms)));
+            }
+        }
+        // The encoder has caught up a little by the stop.
+        *budget.lock().unwrap() = 6.0;
+        p.finish(at(secs * 1000)).unwrap();
+        (p, log, changes)
+    }
+
+    /// Finding F4 (Windows lab round 3): a 4K30 recording of 73.5 s on an encoder that managed
+    /// 13 fps produced 981 frames = 32.7 s. A refused slot was retried by the next one, so the file
+    /// ran at the encoder's rate on a squeezed timeline. Dropped slots must stay empty.
+    #[test]
+    fn f4_an_overloaded_encoder_never_shortens_the_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let (p, log, _) = overloaded(13.0, 40, dir.path());
+        let l = log.lock().unwrap();
+        let last = l.last().unwrap();
+        let end = last.pts.ticks() + last.duration.ticks();
+        assert!(
+            (end - 40 * 120_000).abs() <= 4000,
+            "the file is {:.2} s for a 40 s recording",
+            end as f64 / 120_000.0
+        );
+        assert!(l.windows(2).all(|w| w[1].pts > w[0].pts));
+        assert!(l.iter().all(|a| a.pts.ticks() % 4000 == 0), "on the slot grid");
+        let _ = p;
+    }
+
+    #[test]
+    fn f4_the_rate_is_lowered_early_and_the_counters_agree() {
+        let dir = tempfile::tempdir().unwrap();
+        let (p, log, changes) = overloaded(13.0, 40, dir.path());
+        let first = changes.first().expect("a rate change");
+        assert!(first.attempted >= 20 && first.dropped > 0);
+        assert_eq!(first.asked_fps, 30);
+        assert!(p.effective_fps() < 30.0 && p.effective_fps() >= 5.0);
+        let s = p.stats();
+        // A slot is written or dropped, never both; counted once.
+        assert_eq!(s.written, log.lock().unwrap().len() as u64);
+        assert_eq!(s.slots_offered(), s.written + s.dropped());
+        // After the step down the encoder keeps up: refusals stop growing.
+        assert!(s.dropped() < 150, "{s:?}");
+        assert!(s.rate_skipped > 0 && s.rate_changes >= 1);
+        // A rate, never above 100 %, and far lower than the 920 % the lab saw.
+        assert!(p.late_pct() <= 100.0, "{}", p.late_pct());
+        assert!(s.late() >= s.dropped());
+    }
+
+    #[test]
+    fn f4_a_healthy_encoder_keeps_the_asked_rate_and_drops_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let (p, log, changes) = overloaded(60.0, 20, dir.path());
+        assert!(changes.is_empty());
+        assert_eq!(p.effective_fps(), 30.0);
+        assert_eq!(p.stats().dropped(), 0);
+        assert_eq!(p.stats().rate_skipped, 0);
+        assert!((599..=601).contains(&log.lock().unwrap().len()));
+    }
+
+    #[test]
+    fn late_percentage_cannot_exceed_one_hundred() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut p, _log) = pipeline(30, dir.path());
+        frame(&mut p, 0, 1);
+        frame(&mut p, 33, 2);
+        p.stats.lag_late = 500;
+        p.stats.not_ready = 9000;
+        assert_eq!(p.late_pct(), 100.0);
     }
 
     #[test]
