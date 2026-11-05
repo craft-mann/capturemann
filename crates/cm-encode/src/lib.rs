@@ -44,6 +44,7 @@ pub use encoder::{
 };
 pub use ffmpeg_vp9::FfmpegVp9Encoder;
 pub use fmp4::{scan_bytes, scan_file, truncate_to_last_fragment, Fragment, Mp4Scan};
+pub use mf_logic::platform_plan;
 pub use settings::{
     bitrate_bps, disk_mb_per_minute, output_dimensions, plan_video, resolve_codec, smaller_plans,
     Codec, CodecChoice, OutputSize, Quality, VideoPlan, VideoSettings, FRAGMENT_SECS,

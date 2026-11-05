@@ -37,6 +37,18 @@ pub enum RecorderEvent {
     DiskFull { free_bytes: u64 },
     /// More than 2% late frames over the last 30 s (REC-3.AC4).
     Degraded { late_pct: f64 },
+    /// The encoder could not keep up with the capture rate (more than 10 % of the slots refused
+    /// over `window_secs`), so the rate offered to it was lowered from `from_fps` to `to_fps`.
+    /// The file keeps the length of the recording and stays in sync; it holds fewer distinct
+    /// frames. Reported on every step, within the first seconds of an overload.
+    EncoderOverloaded {
+        dropped: u64,
+        attempted: u64,
+        window_secs: i64,
+        from_fps: f64,
+        to_fps: f64,
+        asked_fps: u32,
+    },
     /// Back below the threshold.
     Healthy,
     /// The source delivered nothing for `silence_ms` while recording (R3-7): a capture stall.
@@ -166,11 +178,21 @@ impl<E: VideoEncoder> Shared<E> {
     /// Heartbeat (every call) plus the periodic disk and health checks (`checks`).
     fn tick(&self, checks: bool) {
         let now = self.clock.now();
-        let stalled = {
+        let (stalled, overload) = {
             let mut p = lock(&self.pipeline);
             p.heartbeat(now);
-            p.watchdog(now)
+            (p.watchdog(now), p.check_load(now))
         };
+        if let Some(c) = overload {
+            self.emit(RecorderEvent::EncoderOverloaded {
+                dropped: c.dropped,
+                attempted: c.attempted,
+                window_secs: c.window_secs,
+                from_fps: c.from_fps,
+                to_fps: c.to_fps,
+                asked_fps: c.asked_fps,
+            });
+        }
         if let Some(silence) = stalled {
             self.emit(RecorderEvent::Stalled {
                 silence_ms: u64::try_from(silence.ticks() / (TICKS_PER_SECOND / 1000)).unwrap_or(0),
@@ -481,6 +503,7 @@ impl<S: ScreenSource, E: VideoEncoder<Frame = S::Frame>> TrackRecorder for Scree
             })
         });
         let late_pct = p.late_pct();
+        let effective_fps = p.effective_fps();
         // A Mac that rejected the asked-for settings may have recorded with simpler ones (another
         // codec): the manifest says what the file really holds.
         let used_plan = p.encoder().used_plan();
@@ -522,6 +545,13 @@ impl<S: ScreenSource, E: VideoEncoder<Frame = S::Frame>> TrackRecorder for Scree
             "stalls": stats.stalls,
             "stall_ms": stats.stall_ms,
             "late_pct": late_pct,
+            // Slots the encoder refused (empty in the file), slots skipped on purpose after the
+            // rate was lowered, and the rate offered to the encoder at the end (F4).
+            "written": stats.written,
+            "dropped": stats.dropped(),
+            "rate_skipped": stats.rate_skipped,
+            "rate_changes": stats.rate_changes,
+            "effective_fps": effective_fps,
             "latency_ms": self.latency,
             "stopped_early": halted,
             "writer_halt": summary.halt.as_ref().map(|h| json!({

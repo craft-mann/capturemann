@@ -234,6 +234,23 @@ fn screen_note(ev: &ScreenEvent) -> Option<TrackNote> {
             "screen_degraded",
             format!("{late_pct:.1}% of screen frames were late over the last 30 s"),
         ),
+        ScreenEvent::EncoderOverloaded {
+            dropped,
+            attempted,
+            window_secs,
+            from_fps,
+            to_fps,
+            asked_fps,
+        } => TrackNote::new(
+            NoteLevel::Warning,
+            "encoder_overloaded",
+            format!(
+                "The video encoder cannot keep up at {asked_fps} fps: it refused {dropped} of \
+                 {attempted} frames in {window_secs} s. Recording at {to_fps:.1} fps instead of \
+                 {from_fps:.1} fps; the recording keeps its length and stays in sync with the \
+                 audio, but the video is less smooth. A lower size (1080p) avoids this."
+            ),
+        ),
         ScreenEvent::Healthy => TrackNote::new(
             NoteLevel::Info,
             "screen_healthy",
@@ -296,6 +313,10 @@ impl<S: ScreenSource, E: VideoEncoder<Frame = S::Frame>> SessionTrack for Screen
             Some(s) => json!({
                 "late_pct": s.late_pct,
                 "recent_late_pct": s.recent_late_pct,
+                "written": s.stats.written,
+                "dropped": s.stats.dropped(),
+                "rate_skipped": s.stats.rate_skipped,
+                "rate_changes": s.stats.rate_changes,
                 "fragments": s.fragments,
                 "disk_left_minutes": s.disk_left_minutes,
                 "repeated": s.stats.repeated,
@@ -624,5 +645,28 @@ impl SessionTrack for PlainTrack {
     }
     fn stats(&self) -> TrackStats {
         self.rec.stats()
+    }
+}
+
+#[cfg(test)]
+mod screen_note_tests {
+    use super::*;
+
+    #[test]
+    fn an_overloaded_encoder_is_a_warning_with_the_numbers() {
+        let n = screen_note(&ScreenEvent::EncoderOverloaded {
+            dropped: 61,
+            attempted: 90,
+            window_secs: 3,
+            from_fps: 30.0,
+            to_fps: 10.0,
+            asked_fps: 30,
+        })
+        .unwrap();
+        assert_eq!(n.code, "encoder_overloaded");
+        assert_eq!(n.level, NoteLevel::Warning);
+        for needle in ["61 of 90", "3 s", "10.0 fps", "30.0 fps"] {
+            assert!(n.message.contains(needle), "{needle}: {}", n.message);
+        }
     }
 }
