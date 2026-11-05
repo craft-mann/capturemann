@@ -52,8 +52,13 @@ pub struct BuiltInRow {
 impl BuiltInRow {
     /// The warning under a row whose model may not fit in memory.
     pub fn memory_warning(&self) -> Option<String> {
-        self.low_memory
-            .then(|| tr!("This Mac may not have enough free memory for this model."))
+        self.low_memory.then(|| {
+            tr!(
+                "{this_computer_cap} may not have enough free memory for this model.",
+                this_computer_cap =
+                    crate::platform_text::here(crate::platform_text::Term::ThisComputerCap)
+            )
+        })
     }
 }
 
@@ -189,18 +194,18 @@ pub fn recommended_tag() -> String {
 
 /// The caption under the list.
 pub fn list_caption(mem_gb: Option<u32>) -> String {
-    let mac = crate::permissions::Os::current() == crate::permissions::Os::Mac;
-    match (mem_gb, mac) {
-        (Some(g), true) => tr!(
-            "This Mac has {memory} GB of memory. The model runs inside CaptureMann and nothing leaves this Mac.",
+    use crate::platform_text::{here, Term};
+    match mem_gb {
+        Some(g) => tr!(
+            "{this_computer_cap} has {memory} GB of memory. The model runs inside CaptureMann and nothing leaves {this_computer}.",
+            this_computer_cap = here(Term::ThisComputerCap),
+            this_computer = here(Term::ThisComputer),
             memory = g
         ),
-        (Some(g), false) => tr!(
-            "This computer has {memory} GB of memory. The model runs inside CaptureMann and nothing leaves this computer.",
-            memory = g
+        None => tr!(
+            "The model runs inside CaptureMann and nothing leaves {this_computer}.",
+            this_computer = here(Term::ThisComputer)
         ),
-        (None, true) => tr!("The model runs inside CaptureMann and nothing leaves this Mac."),
-        (None, false) => tr!("The model runs inside CaptureMann and nothing leaves this computer."),
     }
 }
 

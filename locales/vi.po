@@ -74,8 +74,8 @@ msgid "A countdown pill, Esc cancels"
 msgstr "Thanh đếm ngược, Esc để huỷ"
 
 #, fuzzy
-msgid "A folder on this Mac, an external drive or a mounted network folder."
-msgstr "Một thư mục trên máy Mac này, ổ đĩa ngoài hoặc thư mục mạng đã gắn."
+msgid "A folder on {this_computer}, an external drive or a mounted network folder."
+msgstr "Một thư mục trên {this_computer}, ổ đĩa ngoài hoặc thư mục mạng đã gắn."
 
 # FACT: owner review required
 #. FACT: owner review required
@@ -527,12 +527,12 @@ msgid "Camera access has not been requested yet. Allow camera access when prompt
 msgstr "Chưa yêu cầu quyền truy cập camera. Hãy cho phép truy cập camera khi được hỏi."
 
 #, fuzzy
-msgid "Camera access is denied. Enable it in System Settings > Privacy & Security > Camera."
-msgstr "Quyền truy cập camera bị từ chối. Bật trong Cài đặt Hệ thống > Quyền riêng tư & Bảo mật > Camera."
+msgid "Camera access is denied. Enable it in {settings_path}."
+msgstr "Quyền truy cập camera bị từ chối. Bật trong {settings_path}."
 
 #, fuzzy
-msgid "Camera access is off. Turn it on in System Settings; you can also record without the camera."
-msgstr "Quyền truy cập camera đang tắt. Bật trong Cài đặt Hệ thống; bạn cũng có thể quay không dùng camera."
+msgid "Camera access is off. Turn it on in {settings_app}; you can also record without the camera."
+msgstr "Quyền truy cập camera đang tắt. Bật trong {settings_app}; bạn cũng có thể quay không dùng camera."
 
 #, fuzzy
 msgid "Camera access is restricted by a device policy and cannot be granted here."
@@ -1482,18 +1482,18 @@ msgstr "Ngắt kết nối {name}"
 
 # FACT: owner review required
 #, fuzzy
-msgid "Disconnect “{name}”? CaptureMann asks Google to revoke the access you gave it, then deletes the sign-in and app credentials from this Mac. Videos already on YouTube stay. If Google cannot be reached, it is still signed out here and you can remove the access at myaccount.google.com/permissions."
-msgstr "Ngắt kết nối “{name}”? CaptureMann sẽ yêu cầu Google thu hồi quyền truy cập bạn đã cấp, rồi xoá thông tin đăng nhập và thông tin xác thực ứng dụng khỏi máy Mac này. Video đã có trên YouTube vẫn được giữ. Nếu không kết nối được với Google, tài khoản vẫn bị đăng xuất tại đây và bạn có thể gỡ quyền truy cập tại myaccount.google.com/permissions."
+msgid "Disconnect “{name}”? CaptureMann asks Google to revoke the access you gave it, then deletes the sign-in and app credentials from {this_computer}. Videos already on YouTube stay. If Google cannot be reached, it is still signed out here and you can remove the access at myaccount.google.com/permissions."
+msgstr "Ngắt kết nối “{name}”? CaptureMann sẽ yêu cầu Google thu hồi quyền truy cập bạn đã cấp, rồi xoá thông tin đăng nhập và thông tin xác thực ứng dụng khỏi {this_computer}. Video đã có trên YouTube vẫn được giữ. Nếu không kết nối được với Google, tài khoản vẫn bị đăng xuất tại đây và bạn có thể gỡ quyền truy cập tại myaccount.google.com/permissions."
 
 # FACT: owner review required
 #, fuzzy
-msgid "Disconnect “{name}”? Uploads to it stop and its sign-in is deleted from this Mac. CaptureMann also asks Google to revoke the access you gave it; if Google cannot be reached, you can remove it at myaccount.google.com/permissions. Files already in your drive stay there."
-msgstr "Ngắt kết nối “{name}”? Việc tải lên sẽ dừng và thông tin đăng nhập bị xoá khỏi máy Mac này. CaptureMann cũng yêu cầu Google thu hồi quyền truy cập bạn đã cấp; nếu không kết nối được với Google, bạn có thể gỡ quyền tại myaccount.google.com/permissions. Tệp đã có trong ổ của bạn vẫn được giữ nguyên."
+msgid "Disconnect “{name}”? Uploads to it stop and its sign-in is deleted from {this_computer}. CaptureMann also asks Google to revoke the access you gave it; if Google cannot be reached, you can remove it at myaccount.google.com/permissions. Files already in your drive stay there."
+msgstr "Ngắt kết nối “{name}”? Việc tải lên sẽ dừng và thông tin đăng nhập bị xoá khỏi {this_computer}. CaptureMann cũng yêu cầu Google thu hồi quyền truy cập bạn đã cấp; nếu không kết nối được với Google, bạn có thể gỡ quyền tại myaccount.google.com/permissions. Tệp đã có trong ổ của bạn vẫn được giữ nguyên."
 
 # FACT: owner review required
 #, fuzzy
-msgid "Disconnect “{name}”? Uploads to it stop and its sign-in is deleted from this Mac. Files already in your drive stay there, and the access you gave is not revoked at the provider (you can do that in your account settings)."
-msgstr "Ngắt kết nối “{name}”? Việc tải lên sẽ dừng và thông tin đăng nhập bị xoá khỏi máy Mac này. Tệp đã có trong ổ của bạn vẫn được giữ nguyên, và quyền truy cập bạn đã cấp không bị thu hồi tại nhà cung cấp (bạn có thể làm việc đó trong cài đặt tài khoản)."
+msgid "Disconnect “{name}”? Uploads to it stop and its sign-in is deleted from {this_computer}. Files already in your drive stay there, and the access you gave is not revoked at the provider (you can do that in your account settings)."
+msgstr "Ngắt kết nối “{name}”? Việc tải lên sẽ dừng và thông tin đăng nhập bị xoá khỏi {this_computer}. Tệp đã có trong ổ của bạn vẫn được giữ nguyên, và quyền truy cập bạn đã cấp không bị thu hồi tại nhà cung cấp (bạn có thể làm việc đó trong cài đặt tài khoản)."
 
 #, fuzzy
 msgid "Disconnected “{name}”."
@@ -1948,13 +1948,13 @@ msgstr "Video này có dành cho trẻ em không?"
 
 # FACT: owner review required
 #, fuzzy
-msgid "It is removed from your library and moved to the Trash."
-msgstr "Mục này sẽ bị xoá khỏi thư viện và chuyển vào Thùng rác."
+msgid "It is removed from your library and moved to {trash}."
+msgstr "Mục này sẽ bị xoá khỏi thư viện và chuyển vào {trash}."
 
 # FACT: owner review required
 #, fuzzy
-msgid "It is removed from your library and moved to the Trash. Its copies online stay there unless you tick the box: deleting them cannot be undone ({services})."
-msgstr "Mục này sẽ bị xoá khỏi thư viện và chuyển vào Thùng rác. Các bản sao trực tuyến vẫn được giữ trừ khi bạn chọn ô này: việc xoá chúng không thể hoàn tác ({services})."
+msgid "It is removed from your library and moved to {trash}. Its copies online stay there unless you tick the box: deleting them cannot be undone ({services})."
+msgstr "Mục này sẽ bị xoá khỏi thư viện và chuyển vào {trash}. Các bản sao trực tuyến vẫn được giữ trừ khi bạn chọn ô này: việc xoá chúng không thể hoàn tác ({services})."
 
 #, fuzzy
 msgid "Its own windows, toolbars and the webcam bubble preview"
@@ -2191,13 +2191,13 @@ msgstr "Micrô"
 
 # FACT: owner review required
 #, fuzzy
-msgid "Microphone access is off. Turn it on in System Settings > Privacy & Security > Microphone."
-msgstr "Quyền truy cập micrô đang tắt. Hãy bật trong Cài đặt Hệ thống > Quyền riêng tư & Bảo mật > Micrô."
+msgid "Microphone access is off. Turn it on in {settings_path}."
+msgstr "Quyền truy cập micrô đang tắt. Hãy bật trong {settings_path}."
 
 # FACT: owner review required
 #, fuzzy
-msgid "Microphone access is off. Turn it on in System Settings; recording starts without it."
-msgstr "Quyền truy cập micrô đang tắt. Hãy bật trong Cài đặt Hệ thống; bản ghi vẫn bắt đầu mà không có micrô."
+msgid "Microphone access is off. Turn it on in {settings_app}; recording starts without it."
+msgstr "Quyền truy cập micrô đang tắt. Hãy bật trong {settings_app}; bản ghi vẫn bắt đầu mà không có micrô."
 
 #, fuzzy
 msgid "Microphone and system audio"
@@ -2284,8 +2284,8 @@ msgid "Move the zoom focus up"
 msgstr "Di chuyển tiêu điểm thu phóng lên"
 
 #, fuzzy
-msgid "Moved to the Trash"
-msgstr "Đã chuyển vào Thùng rác"
+msgid "Moved to {trash}"
+msgstr "Đã chuyển vào {trash}"
 
 #, fuzzy
 msgid "Name"
@@ -2488,8 +2488,8 @@ msgid "No telemetry. No network traffic unless you connect a destination."
 msgstr "Không thu thập dữ liệu đo lường. Không có lưu lượng mạng trừ khi bạn kết nối một điểm lưu."
 
 #, fuzzy
-msgid "No transcript yet. Transcribe the microphone to get captions; it runs on this Mac."
-msgstr "Chưa có bản chép lời. Hãy chép lời từ micrô để có phụ đề; quá trình này chạy ngay trên máy Mac này."
+msgid "No transcript yet. Transcribe the microphone to get captions; it runs on {this_computer}."
+msgstr "Chưa có bản chép lời. Hãy chép lời từ micrô để có phụ đề; quá trình này chạy ngay trên {this_computer}."
 
 #, fuzzy
 msgid "No webcam, no sound"
@@ -2546,8 +2546,8 @@ msgid "Not set"
 msgstr "Chưa đặt"
 
 #, fuzzy
-msgid "Not signed in on this Mac."
-msgstr "Chưa đăng nhập trên máy Mac này."
+msgid "Not signed in on {this_computer}."
+msgstr "Chưa đăng nhập trên {this_computer}."
 
 #, fuzzy
 msgid "Note"
@@ -3317,8 +3317,8 @@ msgid "Recordings go into a folder named “{folder}”. Manage the destination 
 msgstr "Bản ghi được lưu vào thư mục tên “{folder}”. Quản lý điểm lưu bên dưới để chọn nội dung được sao chép và thời điểm."
 
 #, fuzzy
-msgid "Recordings stay at 30 fps on this Mac."
-msgstr "Bản ghi giữ ở 30 fps trên máy Mac này."
+msgid "Recordings stay at 30 fps on {this_computer}."
+msgstr "Bản ghi giữ ở 30 fps trên {this_computer}."
 
 # FACT: owner review required
 #. FACT: owner review required (what the permission is for)
@@ -3963,8 +3963,8 @@ msgstr "Sắp bắt đầu"
 
 # FACT: owner review required
 #, fuzzy
-msgid "Starts CaptureMann in the menu bar with no window. Takes effect for the installed app only."
-msgstr "Khởi động CaptureMann ở thanh menu, không mở cửa sổ. Chỉ có hiệu lực với ứng dụng đã cài đặt."
+msgid "Starts CaptureMann in the {tray_area} with no window. Takes effect for the installed app only."
+msgstr "Khởi động CaptureMann ở {tray_area}, không mở cửa sổ. Chỉ có hiệu lực với ứng dụng đã cài đặt."
 
 #, fuzzy
 msgid "Starts before the previous caption ends"
@@ -4383,8 +4383,8 @@ msgstr "Phần đã quay bị xoá và một bản quay mới bắt đầu sau �
 
 # FACT: owner review required
 #, fuzzy
-msgid "The remote copies are deleted, then the capture is moved to the Trash"
-msgstr "Các bản sao trực tuyến bị xoá, rồi bản chụp được chuyển vào Thùng rác"
+msgid "The remote copies are deleted, then the capture is moved to {trash}"
+msgstr "Các bản sao trực tuyến bị xoá, rồi bản chụp được chuyển vào {trash}"
 
 #, fuzzy
 msgid "The selection is outside the kept part"
@@ -4950,8 +4950,8 @@ msgstr "Bạn có thể rời trang này; việc tải lên vẫn tiếp tục t
 #. FACT: owner review required (every permission note states what macOS does)
 # FACT: owner review required
 #, fuzzy
-msgid "You turned this off. Turn it on in System Settings; recording works without it."
-msgstr "Bạn đã tắt mục này. Hãy bật lại trong Cài đặt Hệ thống; việc quay vẫn hoạt động khi không có nó."
+msgid "You turned this off. Turn it on in {settings_app}; recording works without it."
+msgstr "Bạn đã tắt mục này. Hãy bật lại trong {settings_app}; việc quay vẫn hoạt động khi không có nó."
 
 #, fuzzy
 msgid "YouTube account"
@@ -4972,8 +4972,8 @@ msgstr "YouTube đã giữ video này ở chế độ riêng tư vì dự án Go
 
 # FACT: owner review required
 #, fuzzy
-msgid "YouTube needs an app that you create yourself, so the sign-in and the upload limit belong to you. It takes a few minutes, once. The client ID and secret go to your Keychain, never to a file, and are only sent to Google."
-msgstr "YouTube cần một ứng dụng do chính bạn tạo, nên việc đăng nhập và giới hạn tải lên thuộc về bạn. Chỉ mất vài phút và chỉ làm một lần. Client ID và secret được lưu vào Keychain của bạn, không bao giờ vào tệp, và chỉ được gửi tới Google."
+msgid "YouTube needs an app that you create yourself, so the sign-in and the upload limit belong to you. It takes a few minutes, once. The client ID and secret go to your {secret_store}, never to a file, and are only sent to Google."
+msgstr "YouTube cần một ứng dụng do chính bạn tạo, nên việc đăng nhập và giới hạn tải lên thuộc về bạn. Chỉ mất vài phút và chỉ làm một lần. Client ID và secret được lưu vào {secret_store} của bạn, không bao giờ vào tệp, và chỉ được gửi tới Google."
 
 #, fuzzy
 msgid "YouTube no longer accepts this sign-in. Reconnect the account in Settings → Destinations. {message}"
@@ -5007,8 +5007,8 @@ msgid "Your settings file was unreadable"
 msgstr "Không đọc được tệp cài đặt của bạn"
 
 #, fuzzy
-msgid "Your sign-in expired or was removed. Sign in again with the app credentials already saved in your Keychain:"
-msgstr "Phiên đăng nhập của bạn đã hết hạn hoặc đã bị gỡ. Hãy đăng nhập lại bằng thông tin xác thực ứng dụng đã lưu trong Keychain:"
+msgid "Your sign-in expired or was removed. Sign in again with the app credentials already saved in your {secret_store}:"
+msgstr "Phiên đăng nhập của bạn đã hết hạn hoặc đã bị gỡ. Hãy đăng nhập lại bằng thông tin xác thực ứng dụng đã lưu trong {secret_store}:"
 
 #, fuzzy
 msgid "Zoom in"
@@ -5405,13 +5405,13 @@ msgstr "{name} không thể tạo liên kết “{link}”."
 
 # FACT: owner review required
 #, fuzzy
-msgid "{name} needs an app that you create yourself, so the sign-in belongs to you. It takes a few minutes, once. The ID you paste (no secret is involved) go to your Keychain, never to a file, and are only sent to {service}."
-msgstr "{name} cần một ứng dụng do chính bạn tạo, nên việc đăng nhập thuộc về bạn. Chỉ mất vài phút và chỉ làm một lần. ID bạn dán vào (không có secret) được lưu vào Keychain của bạn, không bao giờ vào tệp, và chỉ được gửi tới {service}."
+msgid "{name} needs an app that you create yourself, so the sign-in belongs to you. It takes a few minutes, once. The ID you paste (no secret is involved) go to your {secret_store}, never to a file, and are only sent to {service}."
+msgstr "{name} cần một ứng dụng do chính bạn tạo, nên việc đăng nhập thuộc về bạn. Chỉ mất vài phút và chỉ làm một lần. ID bạn dán vào (không có secret) được lưu vào {secret_store} của bạn, không bao giờ vào tệp, và chỉ được gửi tới {service}."
 
 # FACT: owner review required
 #, fuzzy
-msgid "{name} needs an app that you create yourself, so the sign-in belongs to you. It takes a few minutes, once. The client ID and secret go to your Keychain, never to a file, and are only sent to {service}."
-msgstr "{name} cần một ứng dụng do chính bạn tạo, nên việc đăng nhập thuộc về bạn. Chỉ mất vài phút và chỉ làm một lần. Client ID và secret được lưu vào Keychain của bạn, không bao giờ vào tệp, và chỉ được gửi tới {service}."
+msgid "{name} needs an app that you create yourself, so the sign-in belongs to you. It takes a few minutes, once. The client ID and secret go to your {secret_store}, never to a file, and are only sent to {service}."
+msgstr "{name} cần một ứng dụng do chính bạn tạo, nên việc đăng nhập thuộc về bạn. Chỉ mất vài phút và chỉ làm một lần. Client ID và secret được lưu vào {secret_store} của bạn, không bao giờ vào tệp, và chỉ được gửi tới {service}."
 
 #, fuzzy
 msgid "{name} needs no secret; leave this empty."
@@ -7960,8 +7960,9 @@ msgid "{n} line · click text to edit, a time to jump"
 msgid_plural "{n} lines · click text to edit, a time to jump"
 msgstr[0] "{n} dòng · nhấn chữ để sửa, nhấn giờ để chuyển tới"
 
-msgid "Balanced accuracy and speed. A good choice on 8 GB Macs."
-msgstr "Cân bằng giữa độ chính xác và tốc độ. Lựa chọn tốt cho máy Mac 8 GB."
+#, fuzzy
+msgid "Balanced accuracy and speed. A good choice on 8 GB {computers}."
+msgstr "Cân bằng giữa độ chính xác và tốc độ. Lựa chọn tốt cho {computers} 8 GB."
 
 #, fuzzy
 msgid "Fast, fine for clear speech in a quiet room."
@@ -8135,8 +8136,8 @@ msgid "FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or s
 msgstr "Không tìm thấy FFmpeg: hãy cài bằng Homebrew (brew install ffmpeg) hoặc đặt CM_FFMPEG trỏ tới tệp thực thi ffmpeg. Bản phát hành CaptureMann đã kèm sẵn một bản FFmpeg."
 
 #, fuzzy
-msgid "FFmpeg was not found: the copy inside CaptureMann (`{path}`) cannot be run ({error}). The app is damaged or macOS blocked it. Reinstall CaptureMann. (Advanced: set CM_FFMPEG to an ffmpeg executable.)"
-msgstr "Không tìm thấy FFmpeg: không chạy được bản nằm trong CaptureMann (`{path}`) ({error}). Ứng dụng bị hỏng hoặc macOS đã chặn nó. Hãy cài lại CaptureMann. (Nâng cao: đặt CM_FFMPEG trỏ tới tệp thực thi ffmpeg.)"
+msgid "FFmpeg was not found: the copy inside CaptureMann (`{path}`) cannot be run ({error}). The app is damaged or {os_name} blocked it. Reinstall CaptureMann. (Advanced: set CM_FFMPEG to an ffmpeg executable.)"
+msgstr "Không tìm thấy FFmpeg: không chạy được bản nằm trong CaptureMann (`{path}`) ({error}). Ứng dụng bị hỏng hoặc {os_name} đã chặn nó. Hãy cài lại CaptureMann. (Nâng cao: đặt CM_FFMPEG trỏ tới tệp thực thi ffmpeg.)"
 
 #, fuzzy
 msgid "FFmpeg was not found: the copy that ships inside CaptureMann is missing, so the app is damaged or incomplete. Reinstall CaptureMann. (Advanced: set CM_FFMPEG to an ffmpeg executable.)"
@@ -9000,8 +9001,8 @@ msgid "Couldn’t change the library folder"
 msgstr "Không thể đổi thư mục thư viện"
 
 #, fuzzy
-msgid "Couldn’t move the old copies to the Trash"
-msgstr "Không thể chuyển các bản sao cũ vào Thùng rác"
+msgid "Couldn’t move the old copies to {trash}"
+msgstr "Không thể chuyển các bản sao cũ vào {trash}"
 
 #, fuzzy
 msgid "Move my captures to the new folder"
@@ -9016,21 +9017,21 @@ msgid "Move the library from {from} to {to} ({size}, {n} captures)"
 msgstr "Chuyển thư viện từ {from} sang {to} ({size}, {n} bản chụp)"
 
 #, fuzzy
-msgid "Move the old copies to the Trash?"
-msgstr "Chuyển các bản sao cũ vào Thùng rác?"
+msgid "Move the old copies to {trash}?"
+msgstr "Chuyển các bản sao cũ vào {trash}?"
 
 #, fuzzy
-msgid "Move the old copies to the Trash…"
-msgstr "Chuyển các bản sao cũ vào Thùng rác…"
+msgid "Move the old copies to {trash}…"
+msgstr "Chuyển các bản sao cũ vào {trash}…"
 
 #, fuzzy
-msgid "Move to the Trash"
-msgstr "Chuyển vào Thùng rác"
+msgid "Move to {trash}"
+msgstr "Chuyển vào {trash}"
 
 #, fuzzy
-msgid "Moved {n} capture to the Trash"
-msgid_plural "Moved {n} captures to the Trash"
-msgstr[0] "Đã chuyển {n} bản chụp vào Thùng rác"
+msgid "Moved {n} capture to {trash}"
+msgid_plural "Moved {n} captures to {trash}"
+msgstr[0] "Đã chuyển {n} bản chụp vào {trash}"
 
 #, fuzzy
 msgid "Moving the library"
@@ -9193,9 +9194,9 @@ msgid "{kind} is still running. Wait for it to finish, then change the library f
 msgstr "{kind} vẫn đang chạy. Hãy chờ xong rồi đổi thư mục thư viện. Không có gì bị huỷ thay bạn."
 
 #, fuzzy
-msgid "{n} capture in the old folder was copied and checked. It moves to the Trash, where you can restore it. Anything that changed since the copy stays where it is."
-msgid_plural "{n} captures in the old folder were copied and checked. They move to the Trash, where you can restore them. Anything that changed since the copy stays where it is."
-msgstr[0] "{n} bản chụp trong thư mục cũ đã được sao chép và kiểm tra. Chúng được chuyển vào Thùng rác, nơi bạn có thể khôi phục. Bản nào đã thay đổi sau khi sao chép vẫn ở nguyên chỗ."
+msgid "{n} capture in the old folder was copied and checked. It moves to {trash}, where you can restore it. Anything that changed since the copy stays where it is."
+msgid_plural "{n} captures in the old folder were copied and checked. They move to {trash}, where you can restore them. Anything that changed since the copy stays where it is."
+msgstr[0] "{n} bản chụp trong thư mục cũ đã được sao chép và kiểm tra. Chúng được chuyển vào {trash}, nơi bạn có thể khôi phục. Bản nào đã thay đổi sau khi sao chép vẫn ở nguyên chỗ."
 
 #, fuzzy
 msgid "{n} capture stayed in the old folder: it changed after it was copied, or it was not found."
@@ -9392,8 +9393,8 @@ msgid "Off: every recording starts bottom-left."
 msgstr "Tắt: mỗi bản quay bắt đầu ở góc dưới bên trái."
 
 #, fuzzy
-msgid "Peaks hit the top. Lower the input volume in System Settings."
-msgstr "Đỉnh âm chạm mức tối đa. Hãy giảm âm lượng đầu vào trong Cài đặt Hệ thống."
+msgid "Peaks hit the top. Lower the input volume in {settings_app}."
+msgstr "Đỉnh âm chạm mức tối đa. Hãy giảm âm lượng đầu vào trong {settings_app}."
 
 #, fuzzy
 msgid "Play test sound"
@@ -9730,8 +9731,9 @@ msgstr "Điểm đánh dấu {label} lúc {time}"
 msgid "Microphone and system audio together"
 msgstr "Micrô và âm thanh hệ thống cùng nhau"
 
-msgid "No transcript yet. Transcribe the recording to read it here; it runs on this Mac."
-msgstr "Chưa có bản chép lời. Hãy chép lời bản ghi để đọc ở đây; việc này chạy ngay trên máy Mac này."
+#, fuzzy
+msgid "No transcript yet. Transcribe the recording to read it here; it runs on {this_computer}."
+msgstr "Chưa có bản chép lời. Hãy chép lời bản ghi để đọc ở đây; việc này chạy ngay trên {this_computer}."
 
 msgid "No web browser is set on this desktop; choose one in your desktop’s settings."
 msgstr "Máy tính này chưa đặt trình duyệt web; hãy chọn một trình duyệt trong phần cài đặt của máy tính."
@@ -9924,8 +9926,9 @@ msgstr "nói chồng"
 msgid "Recommended for Vietnamese meetings. Slower. Best for translation to English."
 msgstr "Khuyên dùng cho cuộc họp tiếng Việt. Chậm hơn. Tốt nhất để dịch sang tiếng Anh."
 
-msgid "Everything here runs on this Mac. Nothing is downloaded unless you press Download, and nothing is sent anywhere."
-msgstr "Mọi thứ ở đây chạy ngay trên máy Mac này. Không có gì được tải xuống trừ khi bạn nhấn Tải xuống, và không có gì được gửi đi đâu cả."
+#, fuzzy
+msgid "Everything here runs on {this_computer}. Nothing is downloaded unless you press Download, and nothing is sent anywhere."
+msgstr "Mọi thứ ở đây chạy ngay trên {this_computer}. Không có gì được tải xuống trừ khi bạn nhấn Tải xuống, và không có gì được gửi đi đâu cả."
 
 msgid "Recommended: fast and accurate for most recordings. Not for translation."
 msgstr "Khuyên dùng: nhanh và chính xác cho hầu hết bản ghi. Không dùng để dịch."
@@ -9966,8 +9969,9 @@ msgstr "Kiểm thử không thành công"
 msgid "The text model did not answer."
 msgstr "Mô hình văn bản không phản hồi."
 
-msgid "Transcripts, speakers, translations and reports, made on this Mac."
-msgstr "Bản chép lời, người nói, bản dịch và báo cáo, tạo ngay trên máy Mac này."
+#, fuzzy
+msgid "Transcripts, speakers, translations and reports, made on {this_computer}."
+msgstr "Bản chép lời, người nói, bản dịch và báo cáo, tạo ngay trên {this_computer}."
 
 msgid "Used for “My microphone only hears me”"
 msgstr "Dùng cho tùy chọn “Micrô của tôi chỉ nghe thấy tôi”"
@@ -10075,8 +10079,9 @@ msgstr "Biên bản cuộc họp"
 msgid "Microphone access is off for CaptureMann."
 msgstr "CaptureMann chưa được phép dùng micrô."
 
-msgid "Microphone access is off. Turn it on in System Settings to record your voice."
-msgstr "Quyền truy cập micrô đang tắt. Hãy bật trong Cài đặt Hệ thống để ghi giọng của bạn."
+#, fuzzy
+msgid "Microphone access is off. Turn it on in {settings_app} to record your voice."
+msgstr "Quyền truy cập micrô đang tắt. Hãy bật trong {settings_app} để ghi giọng của bạn."
 
 msgid "Microphone level"
 msgstr "Mức micrô"
@@ -10145,8 +10150,9 @@ msgstr "Tóm tắt"
 msgid "System audio needs Screen Recording permission on macOS."
 msgstr "Âm thanh hệ thống cần quyền Ghi màn hình trên macOS."
 
-msgid "System audio needs Screen Recording permission. Turn it on in System Settings, or record the microphone only."
-msgstr "Âm thanh hệ thống cần quyền Ghi màn hình. Hãy bật trong Cài đặt Hệ thống, hoặc chỉ ghi micrô."
+#, fuzzy
+msgid "System audio needs Screen Recording permission. Turn it on in {settings_app}, or record the microphone only."
+msgstr "Âm thanh hệ thống cần quyền Ghi màn hình. Hãy bật trong {settings_app}, hoặc chỉ ghi micrô."
 
 msgid "The selected sources are not available."
 msgstr "Các nguồn đã chọn không khả dụng."
@@ -10453,8 +10459,9 @@ msgstr "Giọng nói chỉ được so sánh trong bộ nhớ. Không lưu dấu
 msgid "Name of the meeting"
 msgstr "Tên cuộc họp"
 
-msgid "Whisper only translates into English. Choose a text model on this Mac on the AI page."
-msgstr "Whisper chỉ dịch sang tiếng Anh. Hãy chọn một mô hình văn bản trên máy Mac này ở trang AI."
+#, fuzzy
+msgid "Whisper only translates into English. Choose a text model on {this_computer} on the AI page."
+msgstr "Whisper chỉ dịch sang tiếng Anh. Hãy chọn một mô hình văn bản trên {this_computer} ở trang AI."
 
 msgid "Whisper, from the audio"
 msgstr "Whisper, từ âm thanh"
@@ -10480,14 +10487,17 @@ msgstr "Đang viết báo cáo… {percent}%"
 msgid "{language} needs a text model"
 msgstr "{language} cần một mô hình văn bản"
 
-msgid "{model} on this Mac. Any language; each line keeps its start and end."
-msgstr "{model} trên máy Mac này. Mọi ngôn ngữ; mỗi dòng giữ nguyên thời điểm bắt đầu và kết thúc."
+#, fuzzy
+msgid "{model} on {this_computer}. Any language; each line keeps its start and end."
+msgstr "{model} trên {this_computer}. Mọi ngôn ngữ; mỗi dòng giữ nguyên thời điểm bắt đầu và kết thúc."
 
-msgid "{model} · on this Mac"
-msgstr "{model} · trên máy Mac này"
+#, fuzzy
+msgid "{model} · on {this_computer}"
+msgstr "{model} · trên {this_computer}"
 
-msgid "{model} · runs on this Mac"
-msgstr "{model} · chạy trên máy Mac này"
+#, fuzzy
+msgid "{model} · runs on {this_computer}"
+msgstr "{model} · chạy trên {this_computer}"
 
 msgid "{n} found from the voices · whole recording"
 msgstr "Tìm thấy {n} từ giọng nói · toàn bộ bản ghi"
@@ -10716,11 +10726,13 @@ msgstr "Kèm thời điểm trích dẫn"
 msgid "Speakers are found after the transcript is written, and this starts by itself unless you turned it off in Settings."
 msgstr "Người nói được nhận diện sau khi bản chép lời xong, và việc này tự chạy trừ khi bạn đã tắt trong Cài đặt."
 
-msgid "The transcript is being written on this Mac. A long recording takes several minutes. You don’t need to press anything: it appears here when it’s done, and speaker labels follow."
-msgstr "Bản chép lời đang được tạo trên máy Mac này. Bản ghi dài có thể mất vài phút. Bạn không cần bấm gì cả: nó sẽ hiện ở đây khi xong, rồi đến phần nhãn người nói."
+#, fuzzy
+msgid "The transcript is being written on {this_computer}. A long recording takes several minutes. You don’t need to press anything: it appears here when it’s done, and speaker labels follow."
+msgstr "Bản chép lời đang được tạo trên {this_computer}. Bản ghi dài có thể mất vài phút. Bạn không cần bấm gì cả: nó sẽ hiện ở đây khi xong, rồi đến phần nhãn người nói."
 
-msgid "This runs on this Mac and takes a few minutes for a long recording. You don’t need to press anything: the speakers appear here when it’s done."
-msgstr "Việc này chạy trên máy Mac này và mất vài phút với bản ghi dài. Bạn không cần bấm gì cả: người nói sẽ hiện ở đây khi xong."
+#, fuzzy
+msgid "This runs on {this_computer} and takes a few minutes for a long recording. You don’t need to press anything: the speakers appear here when it’s done."
+msgstr "Việc này chạy trên {this_computer} và mất vài phút với bản ghi dài. Bạn không cần bấm gì cả: người nói sẽ hiện ở đây khi xong."
 
 msgid "Waiting for the transcript"
 msgstr "Đang chờ bản chép lời"
@@ -10822,8 +10834,9 @@ msgstr "Đang tìm các mô hình tích hợp…"
 msgid "The engine could not start."
 msgstr "Bộ máy không khởi động được."
 
-msgid "The model runs inside CaptureMann and nothing leaves this Mac."
-msgstr "Mô hình chạy ngay trong CaptureMann và không có gì rời khỏi máy Mac này."
+#, fuzzy
+msgid "The model runs inside CaptureMann and nothing leaves {this_computer}."
+msgstr "Mô hình chạy ngay trong CaptureMann và không có gì rời khỏi {this_computer}."
 
 msgid "The mouse pointer is part of the video; it is not recorded as a separate track yet."
 msgstr "Con trỏ chuột nằm trong video; chưa được ghi thành một rãnh riêng."
@@ -10831,8 +10844,9 @@ msgstr "Con trỏ chuột nằm trong video; chưa được ghi thành một rã
 msgid "The text engine is missing from this copy of CaptureMann. Reinstall CaptureMann."
 msgstr "Bản CaptureMann này thiếu bộ máy văn bản. Hãy cài lại CaptureMann."
 
-msgid "This Mac has {memory} GB of memory. The model runs inside CaptureMann and nothing leaves this Mac."
-msgstr "Máy Mac này có {memory} GB bộ nhớ. Mô hình chạy ngay trong CaptureMann và không có gì rời khỏi máy."
+#, fuzzy
+msgid "{this_computer_cap} has {memory} GB of memory. The model runs inside CaptureMann and nothing leaves {this_computer}."
+msgstr "{this_computer_cap} có {memory} GB bộ nhớ. Mô hình chạy ngay trong CaptureMann và không có gì rời khỏi {this_computer}."
 
 msgid "List built-in text models"
 msgstr "Liệt kê các mô hình văn bản tích hợp"
@@ -10861,8 +10875,9 @@ msgstr "So sánh giọng nói để cùng một người luôn có cùng một n
 msgid "No built-in model is available in this version yet. Check for an update."
 msgstr "Phiên bản này chưa có mô hình tích hợp nào. Hãy kiểm tra bản cập nhật."
 
-msgid "Reports are written by the text model built into CaptureMann, which runs on this Mac. Download it on the AI page; nothing is sent anywhere else."
-msgstr "Báo cáo được viết bởi mô hình văn bản tích hợp trong CaptureMann, chạy ngay trên máy Mac này. Hãy tải nó trong trang AI; không có gì được gửi đi nơi khác."
+#, fuzzy
+msgid "Reports are written by the text model built into CaptureMann, which runs on {this_computer}. Download it on the AI page; nothing is sent anywhere else."
+msgstr "Báo cáo được viết bởi mô hình văn bản tích hợp trong CaptureMann, chạy ngay trên {this_computer}. Hãy tải nó trong trang AI; không có gì được gửi đi nơi khác."
 
 msgid "The built-in text engine is not part of this copy of CaptureMann. Reinstall CaptureMann, or use a build that includes the engine."
 msgstr "Bản CaptureMann này không có công cụ văn bản tích hợp. Hãy cài lại CaptureMann hoặc dùng bản có kèm công cụ này."
@@ -10870,8 +10885,9 @@ msgstr "Bản CaptureMann này không có công cụ văn bản tích hợp. Hã
 msgid "Recommended"
 msgstr "Đề xuất"
 
-msgid "This Mac may not have enough free memory for this model."
-msgstr "Máy Mac này có thể không đủ bộ nhớ trống cho mô hình này."
+#, fuzzy
+msgid "{this_computer_cap} may not have enough free memory for this model."
+msgstr "{this_computer_cap} có thể không đủ bộ nhớ trống cho mô hình này."
 
 msgid "Don’t use a model"
 msgstr "Không dùng mô hình"
@@ -10965,8 +10981,9 @@ msgid "What this system is missing"
 msgstr "Hệ thống này còn thiếu gì"
 
 #. FACT: owner review required (privacy)
-msgid "When something goes wrong, copy this and paste it into a bug report. It has the version, your Mac, permissions, models, a few settings and the last warnings. It has no audio, no transcripts and no file names. Nothing is sent: check it, then paste it yourself."
-msgstr "Khi có sự cố, hãy sao chép nội dung này và dán vào báo cáo lỗi. Nội dung gồm phiên bản, máy Mac của bạn, quyền truy cập, các mô hình, vài cài đặt và những cảnh báo gần nhất. Không có âm thanh, bản chép lời hay tên tệp. Không có gì được gửi đi: hãy kiểm tra rồi tự dán."
+#, fuzzy
+msgid "When something goes wrong, copy this and paste it into a bug report. It has the version, {your_computer}, permissions, models, a few settings and the last warnings. It has no audio, no transcripts and no file names. Nothing is sent: check it, then paste it yourself."
+msgstr "Khi có sự cố, hãy sao chép nội dung này và dán vào báo cáo lỗi. Nội dung gồm phiên bản, {your_computer}, quyền truy cập, các mô hình, vài cài đặt và những cảnh báo gần nhất. Không có âm thanh, bản chép lời hay tên tệp. Không có gì được gửi đi: hãy kiểm tra rồi tự dán."
 
 #. FACT: owner review required (nothing is requested until a button is pressed)
 msgid "Windows keeps these under your control. Nothing is requested until you press a button; you can change any of them later in Settings → Permissions."
@@ -11226,8 +11243,8 @@ msgid "Drop to import"
 msgstr "Thả để nhập"
 
 #, fuzzy
-msgid "Each original goes to the Trash after its copy is checked"
-msgstr "Mỗi tệp gốc được chuyển vào Thùng rác sau khi bản sao được kiểm tra"
+msgid "Each original goes to {trash} after its copy is checked"
+msgstr "Mỗi tệp gốc được chuyển vào {trash} sau khi bản sao được kiểm tra"
 
 #, fuzzy
 msgid "Folders can't be imported yet: open the folder and select the files inside."
@@ -11306,8 +11323,8 @@ msgid "Language detected automatically; uses the model in use"
 msgstr "Tự nhận diện ngôn ngữ; dùng mô hình đang chọn"
 
 #, fuzzy
-msgid "Moves instead of copies, so the files don't take space twice. Each original goes to the Trash only after its copy in the library is checked. Frees {size}."
-msgstr "Di chuyển thay vì sao chép, nên tệp không chiếm chỗ hai lần. Mỗi tệp gốc chỉ vào Thùng rác sau khi bản sao trong thư viện được kiểm tra. Giải phóng {size}."
+msgid "Moves instead of copies, so the files don't take space twice. Each original goes to {trash} only after its copy in the library is checked. Frees {size}."
+msgstr "Di chuyển thay vì sao chép, nên tệp không chiếm chỗ hai lần. Mỗi tệp gốc chỉ vào {trash} sau khi bản sao trong thư viện được kiểm tra. Giải phóng {size}."
 
 #, fuzzy
 msgid "Needs the speaker model (AI page)"
@@ -11571,3 +11588,163 @@ msgstr "Tạo một video MP4 kết hợp màn hình, khung hình camera và âm
 
 msgid "The recording is saved, but the single MP4 needs FFmpeg. Reinstall CaptureMann (it includes its own copy), or set CM_FFMPEG to ffmpeg.exe, then press Export on the recording."
 msgstr "Đã lưu bản ghi nhưng không thể xuất video MP4 do thiếu FFmpeg. Vui lòng cài đặt lại CaptureMann (đã tích hợp sẵn FFmpeg) hoặc thiết lập CM_FFMPEG trỏ đến tệp ffmpeg.exe, sau đó nhấn Xuất tại bản ghi để thử lại."
+
+#, fuzzy
+msgid "Camera access is denied. Turn it on in {settings_path}, including Let desktop apps access your camera."
+msgstr "Quyền truy cập camera bị từ chối. Hãy bật trong {settings_path}, kể cả mục Cho phép ứng dụng trên máy tính để bàn truy cập camera của bạn."
+
+#, fuzzy
+msgid "CaptureMann isn't allowed to read these files. Check the permissions of the folder they are in."
+msgstr "CaptureMann chưa được phép đọc các tệp này. Hãy kiểm tra quyền của thư mục chứa chúng."
+
+#, fuzzy
+msgid "Microphone access is off. Turn it on in {settings_path}, including Let desktop apps access your microphone."
+msgstr "Quyền truy cập micrô đang tắt. Hãy bật trong {settings_path}, kể cả mục Cho phép ứng dụng trên máy tính để bàn truy cập micrô của bạn."
+
+#, fuzzy
+msgid "Show in File Explorer"
+msgstr "Hiện trong File Explorer"
+
+#, fuzzy
+msgid "Your organization blocks this. Only an administrator can allow it."
+msgstr "Tổ chức của bạn chặn mục này. Chỉ quản trị viên mới có thể cho phép."
+
+#, fuzzy
+msgctxt "button"
+msgid "Show in File Explorer"
+msgstr "Hiện trong File Explorer"
+
+#, fuzzy
+msgctxt "button"
+msgid "Show in folder"
+msgstr "Hiện trong thư mục"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "Credential Manager"
+msgstr "Credential Manager"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "Keychain"
+msgstr "Keychain"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "Linux"
+msgstr "Linux"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "Macs"
+msgstr "máy Mac"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "Settings"
+msgstr "Cài đặt"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "Settings > Privacy & security > Camera"
+msgstr "Cài đặt > Quyền riêng tư & bảo mật > Camera"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "Settings > Privacy & security > Microphone"
+msgstr "Cài đặt > Quyền riêng tư & bảo mật > Micrô"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "System Settings"
+msgstr "Cài đặt Hệ thống"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "System Settings > Privacy & Security > Camera"
+msgstr "Cài đặt Hệ thống > Quyền riêng tư & Bảo mật > Camera"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "System Settings > Privacy & Security > Microphone"
+msgstr "Cài đặt Hệ thống > Quyền riêng tư & Bảo mật > Micrô"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "This Mac"
+msgstr "Máy Mac này"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "This computer"
+msgstr "Máy tính này"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "Windows"
+msgstr "Windows"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "computers"
+msgstr "máy tính"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "keyring"
+msgstr "chuỗi khoá"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "macOS"
+msgstr "macOS"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "menu bar"
+msgstr "thanh menu"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "notification area"
+msgstr "khu vực thông báo"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "system tray"
+msgstr "khay hệ thống"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "the Recycle Bin"
+msgstr "Thùng rác"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "the Trash"
+msgstr "Thùng rác"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "this Mac"
+msgstr "máy Mac này"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "this computer"
+msgstr "máy tính này"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "your Mac"
+msgstr "máy Mac của bạn"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "your computer"
+msgstr "máy tính của bạn"
+
+#, fuzzy
+msgctxt "platform word"
+msgid "your system settings"
+msgstr "cài đặt hệ thống của bạn"

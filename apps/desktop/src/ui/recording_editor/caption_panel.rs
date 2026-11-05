@@ -1183,7 +1183,8 @@ impl RecordingEditor {
                         "captions",
                         tr!(
                             "No transcript yet. Transcribe the microphone to get captions; it runs \
-                             on this Mac."
+                             on {this_computer}.",
+                            this_computer = crate::platform_text::this_computer()
                         ),
                     )
                     .into_any_element(),

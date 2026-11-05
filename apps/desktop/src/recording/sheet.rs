@@ -506,7 +506,8 @@ impl SheetModel {
         if self.camera && self.devices.camera_permission.blocked() {
             return Some(Note::Problem {
                 text: tr!(
-                    "Camera access is off. Turn it on in System Settings; you can also record without the camera."
+                    "Camera access is off. Turn it on in {settings_app}; you can also record without the camera.",
+                    settings_app = crate::platform_text::settings_app()
                 ),
                 settings: true,
             });
@@ -523,7 +524,8 @@ impl SheetModel {
         if self.mic && self.devices.mic_permission.blocked() {
             return Some(Note::Problem {
                 text: tr!(
-                    "Microphone access is off. Turn it on in System Settings; recording starts without it."
+                    "Microphone access is off. Turn it on in {settings_app}; recording starts without it.",
+                    settings_app = crate::platform_text::settings_app()
                 ),
                 settings: true,
             });

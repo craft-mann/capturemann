@@ -305,7 +305,10 @@ impl Sheet {
     /// The second footer line.
     pub fn originals_line(&self) -> String {
         if self.remove_originals {
-            tr!("Each original goes to the Trash after its copy is checked")
+            tr!(
+                "Each original goes to {trash} after its copy is checked",
+                trash = crate::platform_text::here(crate::platform_text::Term::Trash)
+            )
         } else {
             tr!("Originals stay where they are unless you tick \u{201c}Remove the originals\u{201d}")
         }
@@ -314,8 +317,9 @@ impl Sheet {
     /// The hint under the Remove-the-originals checkbox.
     pub fn remove_hint(&self) -> String {
         tr!(
-            "Moves instead of copies, so the files don't take space twice. Each original goes to the Trash only after its copy in the library is checked. Frees {size}.",
-            size = size_text(self.freed_bytes())
+            "Moves instead of copies, so the files don't take space twice. Each original goes to {trash} only after its copy in the library is checked. Frees {size}.",
+            size = size_text(self.freed_bytes()),
+            trash = crate::platform_text::here(crate::platform_text::Term::Trash)
         )
     }
 

@@ -571,7 +571,11 @@ fn a_missing_ffmpeg_is_translated_by_id() {
         ),
         (
             "ffmpeg_bundle_cannot_run",
-            vec![("path", "/A.app/ffmpeg"), ("error", "denied")],
+            vec![
+                ("path", "/A.app/ffmpeg"),
+                ("error", "denied"),
+                ("os_name", "macOS"),
+            ],
             "Không tìm thấy FFmpeg: không chạy được bản nằm trong CaptureMann (`/A.app/ffmpeg`) (denied)",
         ),
         (

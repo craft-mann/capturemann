@@ -393,11 +393,7 @@ impl RecordingEditor {
     /// screenshot editor's). It replaces "Recording details": an audio recording has no details
     /// page.
     fn audio_reveal_button(&self, t: &Theme, s: &Session, cx: &mut Context<Self>) -> AnyElement {
-        let label = if cfg!(target_os = "macos") {
-            tr!("Reveal in Finder")
-        } else {
-            tr!("Show in folder")
-        };
+        let label = crate::platform_text::here(crate::platform_text::Term::RevealLabel);
         let c = ButtonKind::Secondary.colors(t);
         let (hover, focus) = (rgba_of(c.hover), rgba_of(t.text));
         let dir = s.bundle.clone();

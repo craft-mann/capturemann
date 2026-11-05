@@ -366,7 +366,11 @@ pub fn on_event(app: &Entity<AppModel>, ev: &cm_daemon::Event, cx: &mut App) {
             let msg = if code == "disk_full" {
                 tr!("There isn't enough free space on the library's disk.")
             } else if code == "permission_missing" {
-                tr!("CaptureMann isn't allowed to read these files. Allow it in System Settings, Privacy & Security, Files and Folders.")
+                if crate::permissions::Os::current() == crate::permissions::Os::Mac {
+                    tr!("CaptureMann isn't allowed to read these files. Allow it in System Settings, Privacy & Security, Files and Folders.")
+                } else {
+                    tr!("CaptureMann isn't allowed to read these files. Check the permissions of the folder they are in.")
+                }
             } else if reason.is_empty() {
                 tr!("The import failed.")
             } else {

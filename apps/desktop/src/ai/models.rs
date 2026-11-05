@@ -91,11 +91,10 @@ pub fn transcribe_hint() -> String {
 
 // TRANSLATORS: FACT: owner review required (privacy statement)
 pub fn privacy_copy() -> String {
-    if crate::permissions::Os::current() == crate::permissions::Os::Mac {
-        tr!("Everything here runs on this Mac. Nothing is downloaded unless you press Download, and nothing is sent anywhere.")
-    } else {
-        tr!("Everything here runs on this computer. Nothing is downloaded unless you press Download, and nothing is sent anywhere.")
-    }
+    tr!(
+        "Everything here runs on {this_computer}. Nothing is downloaded unless you press Download, and nothing is sent anywhere.",
+        this_computer = crate::platform_text::this_computer()
+    )
 }
 
 /// One download in flight or interrupted.
@@ -215,7 +214,10 @@ fn model_hint(id: &str, catalogue: &str) -> String {
     match id {
         "tiny" => tr!("Fastest, lowest accuracy. Good for quick drafts on any machine."),
         "base" => tr!("Fast, fine for clear speech in a quiet room."),
-        "small" => tr!("Balanced accuracy and speed. A good choice on 8 GB Macs."),
+        "small" => tr!(
+            "Balanced accuracy and speed. A good choice on 8 GB {computers}.",
+            computers = crate::platform_text::here(crate::platform_text::Term::Computers)
+        ),
         "medium" => tr!("Most accurate, slow. Best for accents and noisy audio."),
         "large" => {
             tr!("Recommended for Vietnamese meetings. Slower. Best for translation to English.")

@@ -204,7 +204,7 @@ fn the_block_sentences_take_at_most_four_lines() {
                 tr!("Nothing is heard until you ask. The orange microphone dot stays off."),
                 tr!("CaptureMann isn\u{2019}t allowed to use the microphone yet."),
                 tr!("Your voice barely reaches the good range. Move closer or pick another mic."),
-                tr!("Peaks hit the top. Lower the input volume in System Settings."),
+                tr!("Peaks hit the top. Lower the input volume in {settings_app}.", settings_app = crate::platform_text::settings_app()),
                 tr!("The mic is selected but silent. It may be muted with a hardware switch."),
                 tr!("CaptureMann couldn\u{2019}t open the microphone. Pick another one, or try again."),
                 tr!("System audio needs Screen Recording access. Check your output is not muted."),

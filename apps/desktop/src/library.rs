@@ -43,12 +43,13 @@ impl CardAction {
         v
     }
 
-    pub fn label(self, mac: bool) -> String {
+    pub fn label(self, platform: crate::platform_text::Platform) -> String {
         match self {
             CardAction::Open => tr_ctx!("card menu", "Open"),
             CardAction::CopyLink => tr!("Copy link"),
-            CardAction::Reveal if mac => tr!("Reveal in Finder"),
-            CardAction::Reveal => tr!("Show in folder"),
+            CardAction::Reveal => {
+                crate::platform_text::term(platform, crate::platform_text::Term::RevealLabel)
+            }
             CardAction::Rename => tr_ctx!("card menu", "Rename\u{2026}"),
             CardAction::Delete => tr_ctx!("card menu", "Delete\u{2026}"),
         }
@@ -896,7 +897,10 @@ mod tests {
     /// word for the file manager.
     #[test]
     fn lib1_card_menu_actions() {
-        let labels: Vec<_> = CardAction::ALL.iter().map(|a| a.label(true)).collect();
+        let labels: Vec<_> = CardAction::ALL
+            .iter()
+            .map(|a| a.label(Platform::Mac))
+            .collect();
         assert_eq!(
             labels,
             [
@@ -906,7 +910,11 @@ mod tests {
                 "Delete\u{2026}"
             ]
         );
-        assert_eq!(CardAction::Reveal.label(false), "Show in folder");
+        assert_eq!(CardAction::Reveal.label(Platform::Linux), "Show in folder");
+        assert_eq!(
+            CardAction::Reveal.label(Platform::Windows),
+            "Show in File Explorer"
+        );
     }
 
     /// Board R1: every row has an icon; only Open has a key hint (Enter), and Delete has none.
@@ -942,7 +950,7 @@ mod tests {
             json!([{ "destination": "Drive", "what": "export", "share_link": "https://d/1" }]);
         let labels: Vec<_> = CardAction::for_item(&CaptureItem::from_json(&v).unwrap())
             .iter()
-            .map(|a| a.label(true))
+            .map(|a| a.label(Platform::Mac))
             .collect();
         assert_eq!(
             labels,
@@ -957,6 +965,7 @@ mod tests {
     }
 
     use super::*;
+    use crate::platform_text::Platform;
     use serde_json::json;
 
     fn rec(id: &str, title: &str, kind: &str, created: &str, dur: Option<i64>, size: u64) -> Value {
@@ -1534,7 +1543,11 @@ mod tests {
         assert_eq!(Chip::Uploaded.key(), "Uploaded");
         assert_eq!(SortKey::Size.key(), "Size");
         assert_eq!(CardAction::Reveal.key(true), "Reveal in Finder");
-        assert_eq!(CardAction::Reveal.label(false), "Show in folder");
+        assert_eq!(CardAction::Reveal.label(Platform::Linux), "Show in folder");
+        assert_eq!(
+            CardAction::Reveal.label(Platform::Windows),
+            "Show in File Explorer"
+        );
     }
 
     /// VOC-1.AC10: an audio capture parses as its own kind with a duration, and appears in the

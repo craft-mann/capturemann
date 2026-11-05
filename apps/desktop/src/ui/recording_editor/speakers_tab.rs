@@ -112,9 +112,10 @@ impl RecordingEditor {
                     title,
                     Some(
                         tr!(
-                            "This runs on this Mac and takes a few minutes for a long recording. \
+                            "This runs on {this_computer} and takes a few minutes for a long recording. \
                              You don\u{2019}t need to press anything: the speakers appear here \
-                             when it\u{2019}s done."
+                             when it\u{2019}s done.",
+                            this_computer = crate::platform_text::this_computer()
                         )
                         .into(),
                     ),

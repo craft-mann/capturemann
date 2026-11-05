@@ -645,7 +645,7 @@ fn note_view(t: &Theme, note: &Note, pane: &'static str) -> gpui::Div {
                         button(
                             t,
                             "open-system-settings",
-                            tr!("Open System Settings"),
+                            crate::platform_text::here(crate::platform_text::Term::OpenSettings),
                             ButtonKind::Secondary,
                         )
                         .on_click(move |_, _, _| app::open_privacy_pane(pane)),
@@ -795,7 +795,9 @@ impl StartSheet {
                                     button(
                                         &t,
                                         "open-system-settings",
-                                        tr!("Open System Settings"),
+                                        crate::platform_text::here(
+                                            crate::platform_text::Term::OpenSettings,
+                                        ),
                                         ButtonKind::Secondary,
                                     )
                                     .on_click(

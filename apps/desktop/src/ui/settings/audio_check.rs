@@ -538,7 +538,7 @@ impl SettingsView {
                         tone: Tone::Error,
                         glyph: "volume-2",
                         title: tr!("Too loud, clipping"),
-                        text: tr!("Peaks hit the top. Lower the input volume in System Settings."),
+                        text: tr!("Peaks hit the top. Lower the input volume in {settings_app}.", settings_app = crate::platform_text::settings_app()),
                     },
                     Some(self.press_button(
                         t,

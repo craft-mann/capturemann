@@ -22,6 +22,7 @@ use serde_json::{Map, Value};
 
 use crate::ai::client::AiError;
 use crate::backend::CallError;
+use crate::platform_text::translate_known;
 
 // ---- small readers -------------------------------------------------------------------------
 
@@ -250,9 +251,10 @@ fn translated(p: &MessageParts) -> Option<String> {
             path = g("path")
         ),
         "ffmpeg_bundle_cannot_run" => tr!(
-            "FFmpeg was not found: the copy inside CaptureMann (`{path}`) cannot be run ({error}). The app is damaged or macOS blocked it. Reinstall CaptureMann. (Advanced: set CM_FFMPEG to an ffmpeg executable.)",
+            "FFmpeg was not found: the copy inside CaptureMann (`{path}`) cannot be run ({error}). The app is damaged or {os_name} blocked it. Reinstall CaptureMann. (Advanced: set CM_FFMPEG to an ffmpeg executable.)",
             path = g("path"),
-            error = g("error")
+            error = g("error"),
+            os_name = translate_known(&g("os_name"))
         ),
         "ffmpeg_permission_denied" => tr!(
             "FFmpeg at `{path}` cannot be run (permission denied). FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy.",
@@ -326,13 +328,23 @@ fn translated(p: &MessageParts) -> Option<String> {
             "Screen Recording permission is not granted. Enable it in System Settings > Privacy & Security > Screen & System Audio Recording, then restart CaptureMann."
         ),
         "microphone_access_off" => tr!(
-            "Microphone access is off. Turn it on in System Settings > Privacy & Security > Microphone."
+            "Microphone access is off. Turn it on in {settings_path}.",
+            settings_path = translate_known(&g("settings_path"))
+        ),
+        "microphone_access_off_windows" => tr!(
+            "Microphone access is off. Turn it on in {settings_path}, including Let desktop apps access your microphone.",
+            settings_path = translate_known(&g("settings_path"))
         ),
         "camera_not_requested" => {
             tr!("Camera access has not been requested yet. Allow camera access when prompted.")
         }
         "camera_denied" => tr!(
-            "Camera access is denied. Enable it in System Settings > Privacy & Security > Camera."
+            "Camera access is denied. Enable it in {settings_path}.",
+            settings_path = translate_known(&g("settings_path"))
+        ),
+        "camera_denied_windows" => tr!(
+            "Camera access is denied. Turn it on in {settings_path}, including Let desktop apps access your camera.",
+            settings_path = translate_known(&g("settings_path"))
         ),
         "camera_restricted" => {
             tr!("Camera access is restricted by a device policy and cannot be granted here.")
@@ -897,9 +909,9 @@ fn delete_row(key: &str, p: &Value) -> Option<String> {
         "size" => size_text(num(p, "size_bytes")?),
         "result" => {
             if num(p, "remote_copies").unwrap_or(0) > 0 {
-                tr!("The remote copies are deleted, then the capture is moved to the Trash")
+                tr!("The remote copies are deleted, then the capture is moved to {trash}", trash = crate::platform_text::here(crate::platform_text::Term::Trash))
             } else {
-                tr!("Moved to the Trash")
+                tr!("Moved to {trash}", trash = crate::platform_text::here(crate::platform_text::Term::Trash))
             }
         }
         _ => return None,

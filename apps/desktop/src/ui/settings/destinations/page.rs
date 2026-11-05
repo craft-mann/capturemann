@@ -74,11 +74,10 @@ impl SettingsView {
                 )
                 .child(caption(
                     t,
-                    if crate::permissions::Os::current() == crate::permissions::Os::Mac {
-                        tr!("A folder on this Mac, an external drive or a mounted network folder.")
-                    } else {
-                        tr!("A folder on this computer, an external drive or a mounted network folder.")
-                    },
+                    tr!(
+                        "A folder on {this_computer}, an external drive or a mounted network folder.",
+                        this_computer = crate::platform_text::this_computer()
+                    ),
                 ))
                 .into_any_element(),
         )

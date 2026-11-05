@@ -316,8 +316,9 @@ pub fn spawn_error(exe: &Path, e: &std::io::Error) -> CmError {
     // The copy inside the app exists on disk but cannot start: damaged, or macOS blocked it.
     if exe.parent().is_some_and(in_app_bundle) && matches!(e.kind(), NotFound | PermissionDenied) {
         return CmError::not_found(format!(
-            "FFmpeg was not found: the copy inside CaptureMann (`{}`) cannot be run ({e}). The app is damaged or macOS blocked it. Reinstall CaptureMann. (Advanced: set CM_FFMPEG to an ffmpeg executable.)",
-            exe.display()
+            "FFmpeg was not found: the copy inside CaptureMann (`{}`) cannot be run ({e}). The app is damaged or {os} blocked it. Reinstall CaptureMann. (Advanced: set CM_FFMPEG to an ffmpeg executable.)",
+            exe.display(),
+            os = cm_platform::vocab::here(cm_platform::vocab::Term::OsName)
         ));
     }
     match e.kind() {

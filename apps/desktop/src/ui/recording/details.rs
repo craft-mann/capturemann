@@ -552,12 +552,8 @@ impl Render for RecordingDetails {
                 };
 
                 // ---- the header's verbs: Reveal, Publish..., Edit (the neutral primary) -----
-                let mac = cfg!(target_os = "macos");
-                let reveal_label = if mac {
-                    tr!("Reveal in Finder")
-                } else {
-                    tr!("Show in folder")
-                };
+                let reveal_label =
+                    crate::platform_text::here(crate::platform_text::Term::RevealLabel);
                 actions.push(
                     icon_button(
                         &t,

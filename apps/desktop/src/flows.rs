@@ -104,7 +104,7 @@ fn overlay_error_toast_now(err: &OverlayError) -> ToastSpec {
                 ToastAction::OpenPermissions,
             )
             .button(
-                tr!("Open System Settings"),
+                crate::platform_text::here(crate::platform_text::Term::OpenSettings),
                 ToastAction::OpenScreenRecordingSettings,
             );
     }

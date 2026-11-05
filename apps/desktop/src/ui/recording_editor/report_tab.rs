@@ -304,8 +304,9 @@ impl RecordingEditor {
                         .text_color(rgba_of(t.mist))
                         .text_center()
                         .child(tr!(
-                            "{model} \u{00B7} runs on this Mac",
-                            model = model.clone()
+                            "{model} \u{00B7} runs on {this_computer}",
+                            model = model.clone(),
+                            this_computer = crate::platform_text::this_computer()
                         )),
                 ),
                 _ => None,
@@ -389,7 +390,8 @@ impl RecordingEditor {
             Some(
                 tr!(
                     "Reports are written by the text model built into CaptureMann, which runs on \
-                     this Mac. Download it on the AI page; nothing is sent anywhere else."
+                     {this_computer}. Download it on the AI page; nothing is sent anywhere else.",
+                    this_computer = crate::platform_text::this_computer()
                 )
                 .into(),
             ),
@@ -1011,11 +1013,11 @@ impl RecordingEditor {
         let mut parts: Vec<String> = vec![rules::created_day(&r.created)];
         if !r.model.is_empty() {
             parts.push(if r.provider == "local" {
-                if crate::permissions::Os::current() == crate::permissions::Os::Mac {
-                    tr!("{model} \u{00B7} on this Mac", model = r.model.clone())
-                } else {
-                    tr!("{model} \u{00B7} on this computer", model = r.model.clone())
-                }
+                tr!(
+                    "{model} \u{00B7} on {this_computer}",
+                    model = r.model.clone(),
+                    this_computer = crate::platform_text::this_computer()
+                )
             } else {
                 r.model.clone()
             });

@@ -877,7 +877,12 @@ fn cases() -> Vec<Case> {
         ),
         (
             "Move to the Trash",
-            Box::new(|| cm_i18n::tr!("Move to the Trash")),
+            Box::new(|| {
+                cm_i18n::tr!(
+                    "Move to {trash}",
+                    trash = crate::platform_text::here(crate::platform_text::Term::Trash)
+                )
+            }),
         ),
         (
             "Move the library",

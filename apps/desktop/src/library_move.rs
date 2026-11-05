@@ -393,23 +393,25 @@ pub fn switched_dialog(to: &Path) -> DialogModel {
 pub fn trash_dialog(info: &MovedInfo) -> DialogModel {
     let n = info.copied.len();
     base(
-        tr!("Move the old copies to the Trash?"),
+        tr!("Move the old copies to {trash}?", trash = crate::platform_text::here(crate::platform_text::Term::Trash)),
         trn!(
-            "{n} capture in the old folder was copied and checked. It moves to the Trash, where you can restore it. Anything that changed since the copy stays where it is.",
-            "{n} captures in the old folder were copied and checked. They move to the Trash, where you can restore them. Anything that changed since the copy stays where it is.",
-            n
+            "{n} capture in the old folder was copied and checked. It moves to {trash}, where you can restore it. Anything that changed since the copy stays where it is.",
+            "{n} captures in the old folder were copied and checked. They move to {trash}, where you can restore them. Anything that changed since the copy stays where it is.",
+            n,
+            trash = crate::platform_text::here(crate::platform_text::Term::Trash)
         ),
         vec![(tr_ctx!("dialog row", "Folder"), shown_path(&info.from))],
-        tr!("Move to the Trash"),
+        tr!("Move to {trash}", trash = crate::platform_text::here(crate::platform_text::Term::Trash)),
     )
 }
 
 /// The toast after the Trash step: `(title, body)`.
 pub fn trash_result_text(trashed: usize, kept: usize) -> (String, Option<String>) {
     let title = trn!(
-        "Moved {n} capture to the Trash",
-        "Moved {n} captures to the Trash",
-        trashed
+        "Moved {n} capture to {trash}",
+        "Moved {n} captures to {trash}",
+        trashed,
+        trash = crate::platform_text::here(crate::platform_text::Term::Trash)
     );
     let body = (kept > 0).then(|| {
         trn!(

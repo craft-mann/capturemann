@@ -249,7 +249,10 @@ pub fn delete_dialog(title: &str) -> DialogModel {
         agent: String::new(),
         tool: String::new(),
         title: tr!("Delete this capture?"),
-        summary: tr!("It is removed from your library and moved to the Trash."),
+        summary: tr!(
+            "It is removed from your library and moved to {trash}.",
+            trash = crate::platform_text::here(crate::platform_text::Term::Trash)
+        ),
         details: vec![(tr!("Capture"), title.to_owned())],
         primary_label: tr!("Delete capture"),
         primary_is_danger: true,

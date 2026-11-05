@@ -224,13 +224,15 @@ impl SettingsView {
                         .child(SharedString::from(
                             if is_cloud && d.kind == cm_storage::Kind::GoogleDrive {
                                 tr!(
-                                    "Disconnect \u{201c}{name}\u{201d}? Uploads to it stop and its sign-in is deleted from this Mac. CaptureMann also asks Google to revoke the access you gave it; if Google cannot be reached, you can remove it at myaccount.google.com/permissions. Files already in your drive stay there.",
-                                    name = d.name
+                                    "Disconnect \u{201c}{name}\u{201d}? Uploads to it stop and its sign-in is deleted from {this_computer}. CaptureMann also asks Google to revoke the access you gave it; if Google cannot be reached, you can remove it at myaccount.google.com/permissions. Files already in your drive stay there.",
+                                    name = d.name,
+                                    this_computer = crate::platform_text::this_computer()
                                 )
                             } else if is_cloud {
                                 tr!(
-                                    "Disconnect \u{201c}{name}\u{201d}? Uploads to it stop and its sign-in is deleted from this Mac. Files already in your drive stay there, and the access you gave is not revoked at the provider (you can do that in your account settings).",
-                                    name = d.name
+                                    "Disconnect \u{201c}{name}\u{201d}? Uploads to it stop and its sign-in is deleted from {this_computer}. Files already in your drive stay there, and the access you gave is not revoked at the provider (you can do that in your account settings).",
+                                    name = d.name,
+                                    this_computer = crate::platform_text::this_computer()
                                 )
                             } else {
                                 tr!(

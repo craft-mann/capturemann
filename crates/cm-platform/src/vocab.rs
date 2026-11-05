@@ -40,6 +40,8 @@ pub enum Term {
     ThisComputer,
     /// "This Mac" / "This computer" (start of a sentence).
     ThisComputerCap,
+    /// "your Mac" / "your computer".
+    YourComputer,
     /// "Macs" / "computers": "a good choice on 8 GB Macs".
     Computers,
     /// "System Settings" / "Settings".
@@ -58,8 +60,6 @@ pub enum Term {
     RevealLabel,
     /// The button that shows a file in the file manager.
     ShowLabel,
-    /// How to install FFmpeg: "Homebrew (brew install ffmpeg)".
-    InstallFfmpeg,
     /// Where the camera switch is.
     PrivacyCamera,
     /// Where the microphone switch is.
@@ -71,6 +71,7 @@ impl Term {
     pub const ALL: [Term; 14] = [
         Term::ThisComputer,
         Term::ThisComputerCap,
+        Term::YourComputer,
         Term::Computers,
         Term::SettingsApp,
         Term::OpenSettings,
@@ -80,7 +81,6 @@ impl Term {
         Term::OsName,
         Term::RevealLabel,
         Term::ShowLabel,
-        Term::InstallFfmpeg,
         Term::PrivacyCamera,
         Term::PrivacyMicrophone,
     ];
@@ -94,6 +94,8 @@ pub fn english(platform: Platform, term: Term) -> &'static str {
         (Term::ThisComputer, _) => "this computer",
         (Term::ThisComputerCap, Mac) => "This Mac",
         (Term::ThisComputerCap, _) => "This computer",
+        (Term::YourComputer, Mac) => "your Mac",
+        (Term::YourComputer, _) => "your computer",
         (Term::Computers, Mac) => "Macs",
         (Term::Computers, _) => "computers",
         (Term::SettingsApp, Mac) => "System Settings",
@@ -117,9 +119,6 @@ pub fn english(platform: Platform, term: Term) -> &'static str {
         (Term::ShowLabel, Mac) => "Show in Finder",
         (Term::ShowLabel, Windows) => "Show in File Explorer",
         (Term::ShowLabel, Linux) => "Show in folder",
-        (Term::InstallFfmpeg, Mac) => "Homebrew (brew install ffmpeg)",
-        (Term::InstallFfmpeg, Windows) => "winget (winget install ffmpeg)",
-        (Term::InstallFfmpeg, Linux) => "your package manager (for example apt install ffmpeg)",
         (Term::PrivacyCamera, Mac) => "System Settings > Privacy & Security > Camera",
         (Term::PrivacyCamera, Windows) => "Settings > Privacy & security > Camera",
         (Term::PrivacyCamera, Linux) => "your system settings",
@@ -149,6 +148,10 @@ mod tests {
             (
                 Term::ThisComputerCap,
                 ["This Mac", "This computer", "This computer"],
+            ),
+            (
+                Term::YourComputer,
+                ["your Mac", "your computer", "your computer"],
             ),
             (Term::Computers, ["Macs", "computers", "computers"]),
             (
@@ -180,14 +183,6 @@ mod tests {
             (
                 Term::ShowLabel,
                 ["Show in Finder", "Show in File Explorer", "Show in folder"],
-            ),
-            (
-                Term::InstallFfmpeg,
-                [
-                    "Homebrew (brew install ffmpeg)",
-                    "winget (winget install ffmpeg)",
-                    "your package manager (for example apt install ffmpeg)",
-                ],
             ),
             (
                 Term::PrivacyCamera,

@@ -394,7 +394,8 @@ impl AudioSheetModel {
         if self.mic && self.mic_blocked() {
             return Some(Note::Problem {
                 text: tr!(
-                    "Microphone access is off. Turn it on in System Settings to record your voice."
+                    "Microphone access is off. Turn it on in {settings_app} to record your voice.",
+                    settings_app = crate::platform_text::settings_app()
                 ),
                 settings: true,
             });
@@ -417,7 +418,8 @@ impl AudioSheetModel {
         if self.system_audio && self.screen_blocked() {
             return Some(Note::Problem {
                 text: tr!(
-                    "System audio needs Screen Recording permission. Turn it on in System Settings, or record the microphone only."
+                    "System audio needs Screen Recording permission. Turn it on in {settings_app}, or record the microphone only.",
+                    settings_app = crate::platform_text::settings_app()
                 ),
                 settings: true,
             });
