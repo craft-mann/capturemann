@@ -78,7 +78,7 @@ pub fn system_audio_factory(exclude_bundle_ids: Vec<String>) -> SourceFactory {
 /// leaves out CaptureMann and everything it starts, and the check's chime player (PowerShell) is
 /// such a child, so it would never hear its own chime.
 pub fn system_audio_check_factory() -> SourceFactory {
-    #[cfg(target_os = "windows")]
+    #[cfg(windows)]
     {
         Box::new(|_sel: &DeviceSelector| {
             Ok(
@@ -87,7 +87,7 @@ pub fn system_audio_check_factory() -> SourceFactory {
             )
         })
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(not(windows))]
     {
         system_audio_factory(Vec::new())
     }
