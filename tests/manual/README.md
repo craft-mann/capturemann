@@ -3,6 +3,9 @@
 Hands-on checks for what automation cannot see: real screens, devices, accounts and Google's own pages.
 Each script lists its setup, privacy notes and pass criteria. After a run, store a report in
 [`verification/`](../../verification/README.md) (template in its README); say "verified" only with one.
+The release regression suite [`cm-regress`](../../docs/development/regression.md) automates the fundamentals of a shipped
+package (CLI, MCP, daemon, import, export, screenshots, recordings, desktop probes) and is run before a release
+(`scripts/testlab/regress.sh`); the scripts below cover what it cannot see or hear.
 Automated tests are listed in the [quality report](../../reports/README.md); hardware tests marked `#[ignore]`
 are run by hand, see [`CLAUDE.md`](../../CLAUDE.md).
 

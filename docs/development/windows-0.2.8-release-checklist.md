@@ -20,6 +20,11 @@ Decisions already taken (Nov 5, 2026): no code signing in 0.x (O4), recording sh
    `capturemann-0.2.8-windows-x64-setup.exe` and their `.sha256` files.
 7. **Check the sums:** `certutil -hashfile <file> SHA256` (or `shasum -a 256`) and compare with the `.sha256` files.
    Write the two sums into the release text in place of `<sha256 zip>` and `<sha256 installer>`.
+7b. **Run the regression suite on the lab laptop** against the package from step 5 (the lab laptop is shared; see
+   `scripts/testlab/README.md`): `scripts/testlab/regress.sh windows --tier standard --allow screen --package-run <run id>`,
+   and `--tier full --allow screen` when the release touches recording, import or export. Store the reports
+   (`verification/L1-windows-<version>-regression-<tier>-<date>-claude.md`) and read the failures before going on.
+   What it covers and does not: `docs/development/regression.md`. *The report says PARTIAL; it is not a sign-off.*
 8. **Install once by hand** on a Windows machine that is not the build machine (zip: unpack and run `cm-desktop.exe`;
    installer: per user), start the app, take a screenshot, make a 10 s recording, uninstall. Store a report in
    `verification/` if anything is said about it in the notes.
