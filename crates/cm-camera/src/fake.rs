@@ -24,6 +24,7 @@ struct FakeState {
     open_error: Option<CmError>,
     last_request: Option<OpenRequest>,
     closed: bool,
+    opens: usize,
 }
 
 /// Drives a [`FakeCameraSource`] from a test.
@@ -69,6 +70,11 @@ impl FakeCameraHandle {
         lock(&self.state).last_request.clone()
     }
 
+    /// How many times `open` succeeded (a reconnect adds one).
+    pub fn open_count(&self) -> usize {
+        lock(&self.state).opens
+    }
+
     pub fn is_open(&self) -> bool {
         let s = lock(&self.state);
         s.sink.is_some() && !s.closed
@@ -102,6 +108,7 @@ impl CameraSource for FakeCameraSource {
         }
         s.sink = Some(sink);
         s.closed = false;
+        s.opens += 1;
         Ok(SourceInfo {
             device_id: req.device_id.clone().unwrap_or_else(|| "fake-cam".into()),
             device_name: if matches!(req.role, SourceRole::Record) {

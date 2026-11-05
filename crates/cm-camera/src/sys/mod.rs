@@ -19,7 +19,12 @@ pub use devices::describe_native_modes as devices_describe_native_modes;
 pub use devices::{list_cameras, request_access};
 
 pub fn system_source() -> Box<dyn CameraSource> {
-    Box::new(source::MfSource::default())
+    // A recording survives the camera being unplugged and plugged in again: the wrapper reopens
+    // the same device with back-off (crate::reconnect, tested with fakes).
+    Box::new(crate::reconnect::ReconnectingSource::new(
+        Box::new(source::MfSource::default()),
+        crate::reconnect::Backoff::default(),
+    ))
 }
 
 pub fn system_writer_factory() -> Arc<dyn WriterFactory> {
