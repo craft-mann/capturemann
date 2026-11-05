@@ -145,6 +145,11 @@ cmake_args=(
   # Same as the macOS build: v0.7.0 downloads a prebuilt Web UI from Hugging Face at build time
   # (network, unpinned). The app starts the server with --no-webui.
   -DLLAMA_USE_PREBUILT_UI=OFF
+  # Windows 10 API level for every target: the vendored cpp-httplib calls CreateFile2 (Windows 8 and later)
+  # and is not given GGML_WIN_VER, so MinGW's older default hides the declaration.
+  -DGGML_WIN_VER=0x0A00
+  -DCMAKE_C_FLAGS="-D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00"
+  -DCMAKE_CXX_FLAGS="-D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00"
   -DCMAKE_EXE_LINKER_FLAGS="-static -static-libstdc++ -static-libgcc"
 )
 cmake_args+=(-DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON -DGGML_BMI2=ON
