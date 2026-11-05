@@ -1,0 +1,33 @@
+[package]
+name = "cm-regress"
+description = "Release regression suite: drives the SHIPPED package (capturemann, cm-mcp, cm-daemon, cm-desktop, cm-overlay) as a black box on a real machine. Links no engine crate."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+publish = false
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "cm-regress"
+path = "src/main.rs"
+
+# Deliberately nothing from this repository: a test that links the product can hide a product bug.
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_System_Threading",
+  "Win32_System_RemoteDesktop",
+  "Win32_UI_HiDpi",
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_UI_Input_KeyboardAndMouse",
+] }
