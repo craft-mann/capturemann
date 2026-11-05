@@ -412,6 +412,10 @@ fn window_info(w: &Window) -> Result<WindowInfo, XCapError> {
 
 impl CaptureBackend for XcapBackend {
     fn check_permission(&self) -> Result<(), CmError> {
+        // Every call starts here. xcap reads monitor positions, sizes and scales and `GetDpiForMonitor` answers
+        // depend on the process's DPI awareness, so it is set before the first of them (a no-op when set).
+        #[cfg(windows)]
+        crate::sys::win_window::ensure_dpi_aware();
         crate::sys::permission::check()
     }
 
