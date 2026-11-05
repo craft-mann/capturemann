@@ -8,7 +8,11 @@ Decisions already taken (Nov 5, 2026): no code signing in 0.x (O4), recording sh
    *Maintainer only.*
 2. **Bump the version to 0.2.8** in the root `Cargo.toml` (`[workspace.package]`), run `cargo update -w`, add the
    `## [0.2.8]` section to `CHANGELOG.md`, run `make licenses` if `Cargo.lock` changed. (The build names its files from
-   the workspace version.) Run fmt, clippy `-D warnings`, `cargo test --workspace --locked` and `python3
+   the workspace version.) That one number is the only source: `capturemann diagnostics`, the About page, the sidebar badge, the
+   daemon/CLI hello, `build-windows.ps1` (file names, installer version) and `installer.nsi` all read it
+   (`CARGO_PKG_VERSION` or `cargo metadata`); a build made before the bump says 0.2.7. Nothing else needs a bump
+   except text: the example line 2 of `installer.nsi` (`/DVERSION=0.2.6`, a comment), the example in
+   `packaging/windows/winget/README.md` (0.2.8, already right) and `CHANGELOG.md`. Run fmt, clippy `-D warnings`, `cargo test --workspace --locked` and `python3
    scripts/check_target_os.py`.
 3. **Merge `track/windows` into `main`** and wait for CI (`ci.yml`, Security scan) to pass. *Maintainer only.*
 4. **Tag** `v0.2.8` (never reuse a tag) and push it. *Maintainer only.* The macOS part of 0.2.8 (if shipped in the same
