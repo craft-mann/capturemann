@@ -220,6 +220,40 @@ fn tone_level_dbfs(path: &std::path::Path, hz: f64) -> f64 {
     20.0 * amp.max(1e-9).log10()
 }
 
+/// First and last time (seconds from the start of the file) at which the left channel is above 5 % of full
+/// scale, and the length between them.
+#[cfg(windows)]
+fn audible_span(path: &std::path::Path) -> Option<(f64, f64, f64)> {
+    let mut r = hound::WavReader::open(path).unwrap();
+    let spec = r.spec();
+    let ch = usize::from(spec.channels);
+    let rate = f64::from(spec.sample_rate);
+    let loud: Vec<usize> = match spec.sample_format {
+        hound::SampleFormat::Float => r
+            .samples::<f32>()
+            .step_by(ch)
+            .enumerate()
+            .filter(|(_, s)| s.as_ref().is_ok_and(|v| v.abs() > 0.05))
+            .map(|(i, _)| i)
+            .collect(),
+        hound::SampleFormat::Int => {
+            let full = f64::from(1i32 << (spec.bits_per_sample - 1));
+            r.samples::<i32>()
+                .step_by(ch)
+                .enumerate()
+                .filter(|(_, s)| s.as_ref().is_ok_and(|v| f64::from(*v).abs() / full > 0.05))
+                .map(|(i, _)| i)
+                .collect()
+        }
+    };
+    let (first, last) = (*loud.first()?, *loud.last()?);
+    Some((
+        first as f64 / rate,
+        last as f64 / rate,
+        (last - first) as f64 / rate,
+    ))
+}
+
 /// Windows: the process loopback leaves out the sound of CaptureMann's own process tree and keeps
 /// everything else. The test records with the product's system-audio source while (a) a CHILD of this
 /// process (PowerShell `SoundPlayer`) plays a 440 Hz tone, which must be absent, and (b) an UNRELATED
@@ -325,6 +359,12 @@ fn windows_process_loopback_excludes_own_children() {
     let wav = rec_dir.join("system.wav");
     let own = tone_level_dbfs(&wav, 440.0);
     let other = tone_level_dbfs(&wav, 1000.0);
+    if let Some((first, last, span)) = audible_span(&wav) {
+        eprintln!(
+            "audible from {first:.3} s to {last:.3} s = {:.0} ms (tone B is 2000 ms long; a shorter span means its start or end was lost)",
+            span * 1000.0
+        );
+    }
     eprintln!("440 Hz (child of this process): {own:.1} dBFS; 1000 Hz (unrelated process): {other:.1} dBFS");
     assert!(
         other > -45.0,
