@@ -38,6 +38,8 @@ pub struct VideoStream {
     pub pix_fmt: Option<String>,
     /// PQ or HLG transfer.
     pub hdr: bool,
+    /// ffprobe's `color_space` (`bt709`, `smpte170m`, ...); `None` when absent or `unknown`.
+    pub color_space: Option<String>,
     /// Frame times are not evenly spaced (see [`vfr_from_pts`]).
     pub variable_frame_rate: bool,
 }
@@ -325,6 +327,10 @@ pub fn parse_ffprobe(json: &str, path: &Path, size_bytes: u64) -> Result<ProbedF
                         rotation: rot,
                         pix_fmt: s["pix_fmt"].as_str().map(str::to_owned),
                         hdr: matches!(transfer, "smpte2084" | "arib-std-b67"),
+                        color_space: s["color_space"]
+                            .as_str()
+                            .filter(|c| !c.is_empty() && *c != "unknown")
+                            .map(str::to_owned),
                         variable_frame_rate: vfr_from_rates(avg, nominal),
                     });
                 }

@@ -9,7 +9,7 @@ use std::process::Stdio;
 use cm_core::CmError;
 
 use super::classify::MediaKind;
-use super::probe::{probe, ProbeError, ProbedFile};
+use super::probe::{probe, ProbeError, ProbedFile, VideoStream};
 use super::{Problem, Reason};
 use crate::run::{run_ffmpeg, Progress, RunError};
 use crate::tools::{spawn_error, Tools};
@@ -179,8 +179,57 @@ pub fn pick_encoder(
     }
 }
 
+/// The colour standard of an editing copy made by Media Foundation, which writes no colour
+/// information of its own (VideoToolbox tags its output, so the macOS copy is left alone).
+/// Standard-definition video is BT.601 (`smpte170m`), high definition BT.709: the guess every
+/// player makes for an untagged stream, and the source's own tag when it has one. Anything else a
+/// file can carry (BT.2020, ...) is left as it is rather than mislabelled.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Standard {
+    Bt709,
+    Smpte170m,
+}
+
+impl Standard {
+    /// `None`: the source says something this copy does not re-tag.
+    pub fn of_source(v: &VideoStream) -> Option<Standard> {
+        match v.color_space.as_deref() {
+            Some("bt709") => Some(Standard::Bt709),
+            Some("smpte170m" | "bt470bg") => Some(Standard::Smpte170m),
+            Some(_) => None,
+            None if v.height >= 720 || v.width >= 1280 => Some(Standard::Bt709),
+            None => Some(Standard::Smpte170m),
+        }
+    }
+
+    /// FFmpeg's name (matrix, primaries and transfer all carry it).
+    fn name(self) -> &'static str {
+        match self {
+            Standard::Bt709 => "bt709",
+            Standard::Smpte170m => "smpte170m",
+        }
+    }
+
+    /// The H.264 table code for primaries, transfer and matrix.
+    fn code(self) -> u8 {
+        match self {
+            Standard::Bt709 => 1,
+            Standard::Smpte170m => 6,
+        }
+    }
+}
+
+/// How the Media Foundation copy is tagged: the standard, and whether this FFmpeg has the
+/// `h264_metadata` filter that puts it into the SPS (`Caps::h264_metadata`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CopyColour {
+    pub standard: Standard,
+    pub vui: bool,
+}
+
 /// The FFmpeg arguments of the editing copy. Pure. FFmpeg applies the rotation tag by itself
 /// (autorotate), so the copy is upright with no tag.
+#[allow(clippy::too_many_arguments)]
 pub fn editing_copy_args(
     input: &Path,
     output: &Path,
@@ -189,6 +238,7 @@ pub fn editing_copy_args(
     encoder: &str,
     fps: &str,
     bitrate: u64,
+    colour: Option<CopyColour>,
 ) -> Vec<String> {
     let rate: f64 = match fps.split_once('/') {
         Some((n, d)) => n.parse::<f64>().unwrap_or(30.0) / d.parse::<f64>().unwrap_or(1.0),
@@ -210,10 +260,18 @@ pub fn editing_copy_args(
     a.push(input.display().to_string());
     a.extend(["-map".to_owned(), format!("0:{video_index}")]);
     a.extend(["-an", "-sn", "-dn"].map(String::from));
+    // The scale keeps the matrix the source has (or the one players assume for its size) on both
+    // sides, so the pixels are not converted, and makes the range limited.
+    let matrix = colour.map_or(String::new(), |c| {
+        format!(
+            ":in_color_matrix={m}:out_color_matrix={m}:out_range=tv",
+            m = c.standard.name()
+        )
+    });
     a.extend([
         "-vf".to_owned(),
         format!(
-            "fps={fps},scale=trunc(iw/2)*2:trunc(ih/2)*2,format={}",
+            "fps={fps},scale=trunc(iw/2)*2:trunc(ih/2)*2{matrix},format={}",
             family.pixel_format()
         ),
         "-c:v".to_owned(),
@@ -229,7 +287,33 @@ pub fn editing_copy_args(
     if encoder.starts_with("hevc") {
         a.extend(["-tag:v", "hvc1"].map(String::from));
     }
-    a.extend(["-movflags", "+faststart"].map(String::from));
+    if let Some(c) = colour {
+        let n = c.standard.name();
+        a.extend(
+            [
+                "-colorspace",
+                n,
+                "-color_primaries",
+                n,
+                "-color_trc",
+                n,
+                "-color_range",
+                "tv",
+            ]
+            .map(String::from),
+        );
+        if c.vui {
+            a.extend([
+                "-bsf:v".to_owned(),
+                crate::graph::mf_vui_bsf(c.standard.code()),
+            ]);
+        }
+    }
+    // The `colr` atom for Media Foundation, whose stream carries no colour description itself.
+    a.extend([
+        "-movflags".to_owned(),
+        crate::graph::mp4_movflags(colour.is_some()).to_owned(),
+    ]);
     a.push(output.display().to_string());
     a
 }
@@ -253,6 +337,13 @@ pub fn make_editing_copy(
         pick_encoder(family, &v.codec, h264, hevc).ok_or(RunFailure::NoHardwareEncoder)?;
     let fps = editing_fps(v.fps);
     let rate = v.fps.unwrap_or(30.0).clamp(15.0, 60.0);
+    let colour = (family == EncoderFamily::MediaFoundation)
+        .then(|| Standard::of_source(v))
+        .flatten()
+        .map(|standard| CopyColour {
+            standard,
+            vui: crate::tools::has_bitstream_filter(tools, "h264_metadata"),
+        });
     let args = editing_copy_args(
         &source.path,
         output,
@@ -261,6 +352,7 @@ pub fn make_editing_copy(
         encoder,
         &fps,
         editing_bitrate(v.width, v.height, rate),
+        colour,
     );
     let mut on = |p: Progress| progress(p.fraction);
     let r = run_ffmpeg(&tools.ffmpeg, &args, source.duration_s, &mut on, cancel);
@@ -591,6 +683,7 @@ mod tests {
             "h264_mf",
             "30",
             5_000_000,
+            None,
         );
         let s = a.join(" ");
         assert!(s.contains("-c:v h264_mf -b:v 5000000"), "{s}");
@@ -605,9 +698,104 @@ mod tests {
             "h264_videotoolbox",
             "30",
             1,
+            None,
         );
         assert!(!v.join(" ").contains("hw_encoding"));
         assert!(v.join(" ").contains("format=yuv420p"));
+    }
+
+    fn stream(w: u32, h: u32, space: Option<&str>) -> VideoStream {
+        VideoStream {
+            index: 0,
+            codec: "h264".into(),
+            width: w,
+            height: h,
+            fps: Some(30.0),
+            rotation: 0,
+            pix_fmt: Some("yuv420p".into()),
+            hdr: false,
+            color_space: space.map(str::to_owned),
+            variable_frame_rate: false,
+        }
+    }
+
+    #[test]
+    fn the_standard_follows_the_source_tag_else_its_size() {
+        use Standard::*;
+        assert_eq!(
+            Standard::of_source(&stream(1920, 1080, Some("bt709"))),
+            Some(Bt709)
+        );
+        assert_eq!(Standard::of_source(&stream(1920, 1080, None)), Some(Bt709));
+        assert_eq!(Standard::of_source(&stream(1280, 720, None)), Some(Bt709));
+        assert_eq!(
+            Standard::of_source(&stream(720, 576, None)),
+            Some(Smpte170m)
+        );
+        assert_eq!(
+            Standard::of_source(&stream(320, 240, None)),
+            Some(Smpte170m)
+        );
+        // A source tag wins over the size, and an unusual one is not re-tagged.
+        assert_eq!(
+            Standard::of_source(&stream(1920, 1080, Some("smpte170m"))),
+            Some(Smpte170m)
+        );
+        assert_eq!(
+            Standard::of_source(&stream(720, 576, Some("bt470bg"))),
+            Some(Smpte170m)
+        );
+        assert_eq!(
+            Standard::of_source(&stream(720, 576, Some("bt709"))),
+            Some(Bt709)
+        );
+        assert_eq!(
+            Standard::of_source(&stream(3840, 2160, Some("bt2020nc"))),
+            None
+        );
+    }
+
+    #[test]
+    fn the_media_foundation_copy_keeps_the_matrix_and_is_tagged() {
+        let run = |std: Standard, vui: bool| {
+            editing_copy_args(
+                Path::new("a.mp4"),
+                Path::new("b.mp4"),
+                0,
+                EncoderFamily::MediaFoundation,
+                "h264_mf",
+                "30",
+                5_000_000,
+                Some(CopyColour { standard: std, vui }),
+            )
+            .join(" ")
+        };
+        let hd = run(Standard::Bt709, true);
+        assert!(
+            hd.contains("scale=trunc(iw/2)*2:trunc(ih/2)*2:in_color_matrix=bt709:out_color_matrix=bt709:out_range=tv,format=nv12"),
+            "{hd}"
+        );
+        assert!(
+            hd.contains(
+                "-colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv"
+            ),
+            "{hd}"
+        );
+        assert!(hd.contains("-bsf:v h264_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1:video_full_range_flag=0"), "{hd}");
+        assert!(hd.contains("-movflags +faststart+write_colr"), "{hd}");
+        let sd = run(Standard::Smpte170m, false);
+        assert!(sd.contains("out_color_matrix=smpte170m"), "{sd}");
+        assert!(
+            sd.contains("-colorspace smpte170m -color_primaries smpte170m -color_trc smpte170m"),
+            "{sd}"
+        );
+        assert!(
+            !sd.contains("-bsf:v"),
+            "no h264_metadata in this FFmpeg: {sd}"
+        );
+        assert!(sd.contains("-movflags +faststart+write_colr"), "{sd}");
+        // The tags come before the output file and after the encoder.
+        assert!(hd.ends_with("b.mp4"));
     }
 
     #[test]
@@ -632,6 +820,7 @@ mod tests {
             "hevc_videotoolbox",
             "30000/1001",
             9_000_000,
+            None,
         );
         let s = a.join(" ");
         assert!(s.contains("-map 0:2 -an -sn -dn"), "{s}");
@@ -656,6 +845,7 @@ mod tests {
             "h264_videotoolbox",
             "25",
             1,
+            None,
         );
         assert!(!h.join(" ").contains("hvc1"));
     }
