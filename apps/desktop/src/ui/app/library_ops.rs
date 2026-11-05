@@ -285,13 +285,15 @@ pub(crate) fn open_confirm(
     let (win_w, win_h) = (crate::confirm::DIALOG_WIDTH, height);
     let bounds = match (display, visible) {
         (Some((_, d)), Some(v)) => {
-            let g = crate::recording::geometry::Rect::new(
-                v.x + (v.w - f64::from(win_w)) / 2.0,
-                v.y + (v.h - f64::from(win_h)) / 2.0,
-                f64::from(win_w),
-                f64::from(win_h),
-            )
-            .relative_to(&d);
+            let g = crate::ui::recording::window_bounds_rect(
+                &crate::recording::geometry::Rect::new(
+                    v.x + (v.w - f64::from(win_w)) / 2.0,
+                    v.y + (v.h - f64::from(win_h)) / 2.0,
+                    f64::from(win_w),
+                    f64::from(win_h),
+                ),
+                &d,
+            );
             Bounds {
                 origin: point(px(g.x as f32), px(g.y as f32)),
                 size: size(px(win_w), px(win_h)),

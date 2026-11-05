@@ -223,8 +223,16 @@ pub fn pointer_display(cx: &App) -> Option<(DisplayId, Rect)> {
     {
         return Some(d);
     }
-    crate::ui::launcher_window::pointer(cx)
-        .and_then(|p| {
+    // Windows names the monitor under the pointer exactly (physical px); point rectangles of
+    // monitors with different scales can overlap.
+    crate::platform_window::pointer_display_id()
+        .and_then(|id| {
+            all.iter()
+                .find(|(d, _)| u32::try_from(u64::from(*d)).ok() == Some(id))
+                .copied()
+        })
+        .or_else(|| {
+            let p = crate::ui::launcher_window::pointer(cx)?;
             let (x, y) = (f64::from(f32::from(p.x)), f64::from(f32::from(p.y)));
             all.iter().find(|(_, r)| r.contains(x, y)).copied()
         })
@@ -263,6 +271,13 @@ pub fn demo_short(v: Rect) -> Rect {
     v
 }
 
+/// The rectangle `WindowBounds::Windowed` wants for a window covering `global` (points) on
+/// `display`: relative to the display on macOS, in global points on Windows (GPUI's Windows
+/// backend converts them with the display's own scale; `recording::monitors`).
+pub fn window_bounds_rect(global: &Rect, display: &Rect) -> Rect {
+    crate::recording::monitors::window_bounds(global, display, cfg!(windows))
+}
+
 /// Window options for a borderless always-on-top panel at `global` (points), on `display`.
 /// GPUI positions a window relative to its display, hence the subtraction.
 pub fn panel_options(
@@ -271,7 +286,7 @@ pub fn panel_options(
     focus: bool,
     movable: bool,
 ) -> WindowOptions {
-    let local = global.relative_to(&display.1);
+    let local = window_bounds_rect(&global, &display.1);
     WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(Bounds {
             origin: point(px(local.x as f32), px(local.y as f32)),
@@ -590,7 +605,16 @@ fn indicator_area(rec: &RecState, cx: &App) -> Option<(Rect, (DisplayId, Rect))>
         .iter()
         .map(|(id, r)| (u32::try_from(u64::from(*id)).ok(), *r))
         .collect();
-    let i = pick_display_for(&ids, ind.area.display_id, &area)?;
+    // Windows: the engine's display id is not GPUI's (the monitor handle), and point rectangles
+    // of different scales overlap; the recorded pixels name the monitor exactly.
+    let by_pixels = ind
+        .area
+        .bounds
+        .and_then(crate::platform_window::display_id_for_area);
+    let i = match by_pixels {
+        Some(id) => pick_display_for(&ids, Some(id), &area)?,
+        None => pick_display_for(&ids, ind.area.display_id, &area)?,
+    };
     Some((area, displays[i]))
 }
 
@@ -652,6 +676,16 @@ fn close_countdown(app: &Entity<AppModel>, cx: &mut App) {
 
 // ---- the windows of a live recording ---------------------------------------------------------
 
+/// Where the HUD may sit on `display`: on Windows the work area (above the taskbar), elsewhere
+/// the whole display as before.
+pub fn hud_bounds(display: &Rect) -> Rect {
+    if cfg!(windows) {
+        visible_part(display)
+    } else {
+        *display
+    }
+}
+
 fn hud_positions_key(display: &Rect) -> String {
     format!("{:.0},{:.0}", display.x, display.y)
 }
@@ -677,10 +711,13 @@ pub fn hud_rect(
         .and_then(|v| v.get(hud_positions_key(display)))
         .and_then(|v| Some((v.get(0)?.as_f64()?, v.get(1)?.as_f64()?)));
     match stored {
-        Some(f) => snap_hud(&rect_from_center_fraction(f, window, display), display),
+        Some(f) => {
+            let within = hud_bounds(display);
+            snap_hud(&rect_from_center_fraction(f, window, &within), &within)
+        }
         None => {
             // Bottom centre stays the default (OD-20, Q13).
-            let bar = hud_default(display, bar);
+            let bar = hud_default(&hud_bounds(display), bar);
             Rect::new(bar.x, bar.y - HUD_STRIP, window.0, window.1)
         }
     }
@@ -688,7 +725,7 @@ pub fn hud_rect(
 
 /// Remembers the HUD's position for its display (center fractions).
 pub fn remember_hud(app: &Entity<AppModel>, display: &Rect, hud: &Rect, cx: &mut App) {
-    let f = geometry::center_fraction(hud, display);
+    let f = geometry::center_fraction(hud, &hud_bounds(display));
     let mut all = app
         .read(cx)
         .backend

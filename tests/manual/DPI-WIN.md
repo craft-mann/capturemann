@@ -122,3 +122,65 @@ recording and check `cursors/index.json` and the exported video:
 4. Move the pointer between the two monitors during a recording of one: the index holds two images for the same
    shape with different `scale` (only the first is used while the pointer is on the recorded monitor).
 5. A cursor-size change in Settings > Accessibility changes the bitmap size; the drawn size follows.
+
+## Recording windows on a second monitor (Nov 5, 2026 fix; NOT run on hardware)
+
+Report: `verification/L1-windows-0.2.8-round2-2026-11-05-claude.md` item 6d (panel 1920x1080 at 150 % +
+Samsung 3840x2160 at 150 % to the right; recording display 131073 put the countdown on the panel, the
+brackets window at (-11,-5) and the HUD at (1366,1960) straddling the seam).
+
+**Root cause (found by reading the code and GPUI 0.3.9's Windows backend; not reproduced on hardware).**
+Three things combined:
+
+1. `ui::recording::panel_options` made the window origin relative to the display (`global.relative_to(display)`),
+   which is what GPUI's macOS backend wants. GPUI's Windows backend takes `WindowBounds` as **absolute** points
+   (physical px / the display's own scale) and only keeps them if their center lies on the named monitor,
+   otherwise it falls back to the display's default bounds. The numbers of the report follow exactly:
+   the HUD's local origin on the external was (910, 1307) points = (1366, 1960) px at 150 %, and its center
+   x was 1920, the seam. The brackets window had local origin (0,0) = the panel's origin. The same mistake sat
+   in the launcher (origin (0,0) on whichever display) and the confirm dialog (`library_ops`).
+2. The engine's `indicator.area.display_id` (131073) is not GPUI's display id (the `HMONITOR` handle), so the
+   `pick_display_for` by id of c990dd1 could never match on Windows and fell back to the point-centre test,
+   which is ambiguous when point rectangles overlap (mixed DPI).
+3. `display_frame`, `visible_frame_at`, `frame`, `set_frame`, `move_to`, `mouse_location` and `left_button_down`
+   were stubs, so the HUD was placed in the whole display (not the work area) and could not be snapped, and the
+   launcher and start sheet never followed the pointer (finding 12).
+
+**What is correct now (contract, `recording/monitors.rs`).** The recorded monitor is found from the recorded
+pixels in physical px (never from the id or from points). The countdown disc is centered on the recorded area,
+kept on that monitor. The area window covers exactly that monitor's frame (physical (1920,0) 3840x2160 on the
+lab layout). The HUD sits at the bottom centre of that monitor's work area (above the taskbar) and its snap
+and remembered position use the same work area. The launcher, the Record sheet and the dialogs open on the
+monitor under the pointer (`GetCursorPos` + physical containment), primary as the fallback. Windows opened on
+a display get absolute points; macOS keeps display-relative ones.
+
+**Tested with fakes (any OS).** `recording::monitors::tests`: the lab layout (external and panel), 100 % external
+right of a 150 % panel, a 150 % monitor whose points overlap a 100 % one, 100 % left of a 200 % primary
+(negative x), a monitor above the primary (negative y); each checks the countdown, the area window, the
+brackets and the HUD in physical px. The Win32 reading code (`platform_win_monitors.rs`) was type-checked for
+`x86_64-pc-windows-msvc` in isolation; `cargo check --target x86_64-pc-windows-msvc -p cm-desktop` fails on
+the Mac in the SQLite C build (no MSVC headers), so the wiring in `platform_window.rs` is checked by the
+Windows CI build only.
+
+**Run on the laptop (two monitors, Windows):**
+
+1. Install the package built from this commit. Layout A (panel primary + Samsung to the right, both 150 %).
+2. `capturemann record start --display <Samsung id> --countdown 5`: the disc is on the Samsung, centered; during
+   the recording a window of exactly 3840x2160 at (1920,0) (read the HWND client rect, not the outer rect) and
+   the HUD fully on the Samsung at its bottom centre; nothing on the panel except the bubble if the camera is on.
+3. Same for the panel (`--display 65608`): the HUD is above the taskbar, centered on the panel.
+4. A region and a window recording on the Samsung (brackets around the region, HUD on the Samsung).
+5. Press the launcher hotkey and "Record..." with the pointer on the Samsung, then on the panel: both open on the
+   monitor with the pointer.
+6. Drag the HUD near an edge of the Samsung and release: it snaps to the margin, and the next recording of that
+   display opens there.
+7. Repeat with layouts B and C (mixed DPI) and a monitor left of / above the panel.
+
+**Not checked / risks.** (a) The area window is not click-through on Windows (`Tweaks::click_through` is a
+macOS-only tweak), so it may swallow clicks on the recorded monitor: look for this in step 2. (b) Dragging the
+HUD and the bubble relies on GPUI starting a native window move on Windows; `frame` and `move_to` now work but
+the drag start was not looked at. (c) The Record sheet's Display tiles and the delay pill send GPUI's display
+id (the `HMONITOR`) as the engine's `display_id`: on Windows that is another number, so "Display" capture from
+the pill or a tile may name the wrong display; this needs a map from the monitor to the engine's id (not done).
+(d) The `frame` rect is the client area, which is what GPUI calls its bounds; the 3862x2171 outer rect of the
+report includes the invisible resize frame, so compare against the client rect.
