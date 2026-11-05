@@ -105,12 +105,17 @@ fn no_model(ctx: &mut Ctx) -> R {
     let clips = write_clips(ctx)?;
     ctx.start_daemon()?;
     let m = ctx.cli_ok(&["ai", "models"])?;
-    let models = m
+    // Speaker models can be installed through CM_SPEAKER_MODELS_DIR (--speaker-models) or be bundled; only the
+    // speech models count here.
+    let models: Vec<Value> = m
         .get("models")
         .and_then(Value::as_array)
         .cloned()
-        .unwrap_or_default();
-    check!(!models.is_empty(), "`ai models` lists no model");
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|x| x.get("kind").and_then(Value::as_str) != Some("speaker"))
+        .collect();
+    check!(!models.is_empty(), "`ai models` lists no speech model");
     check!(
         models
             .iter()
@@ -318,8 +323,34 @@ fn speakers(ctx: &mut Ctx) -> R {
             "no --speaker-models <dir> given (the two ONNX files; this package bundles none)",
         );
     }
+    // `speakers list` reads the transcript, so the recording is transcribed first (as a user does).
+    let Some(model) = ctx.opts.whisper_model.clone() else {
+        return skip("no --whisper-model given (`speakers list` reads the transcript)");
+    };
+    let model_id = ctx.opts.whisper_model_id.clone();
     ctx.start_daemon()?;
+    let m = model.to_string_lossy().into_owned();
+    ctx.cli_ok(&["ai", "models", "import", &model_id, &m])?;
+    ctx.cli_ok(&["ai", "models", "use", &model_id])?;
     let (id, _) = import_file(ctx, &speech)?;
+    let t = ctx.cli_long(
+        &[
+            "ai",
+            "transcribe",
+            &id,
+            "--language",
+            "en",
+            "--wait",
+            "--timeout",
+            "600",
+        ],
+        700,
+    )?;
+    check!(
+        t.ok(),
+        "transcribe before the speakers failed: {}",
+        crate::util::cut(&crate::util::one_line(&t.out.text()), 300)
+    );
     let r = ctx.cli_long(
         &[
             "ai",
@@ -361,5 +392,24 @@ fn speakers(ctx: &mut Ctx) -> R {
         .map_or(0, Vec::len);
     ctx.note(format!("speakers listed: {n}"));
     check!(n == 2, "asked for 2 speakers, `speakers list` shows {n}");
+    // After a transcription the words carry their speaker.
+    let j = ctx.cli_ok(&["ai", "transcript", &id])?;
+    let mut seen = std::collections::BTreeSet::new();
+    for w in j
+        .pointer("/transcript/words")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        if let Some(sp) = w.get("speaker") {
+            seen.insert(sp.to_string());
+        }
+    }
+    ctx.note(format!("speakers on the words: {seen:?}"));
+    check!(
+        seen.len() == 2,
+        "the transcript's words carry {} distinct speaker(s), expected 2",
+        seen.len()
+    );
     Ok(())
 }
