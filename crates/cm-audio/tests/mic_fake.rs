@@ -237,6 +237,81 @@ fn a_source_that_sends_nothing_while_idle_reports_the_gap_as_idle() {
     assert_eq!(gaps[0]["reason"], "idle");
 }
 
+fn idle_recorder(rig: &Rig, cfg: FakeConfig) -> (SystemAudioRecorder, FakeHandle) {
+    let (src, h) = FakeAudioSource::new(cfg);
+    let cell = Mutex::new(Some(IdleWhenQuiet(src)));
+    let factory: SourceFactory = Box::new(move |_sel: &DeviceSelector| {
+        cell.lock()
+            .unwrap()
+            .take()
+            .map(|s| Box::new(s) as Box<dyn cm_audio::AudioSource>)
+            .ok_or_else(|| CmError::not_found("no more devices"))
+    });
+    let _ = rig;
+    (
+        SystemAudioRecorder::with_factory(SystemAudioConfig::default(), factory),
+        h,
+    )
+}
+
+#[test]
+fn an_idle_stretch_is_not_late_data_and_adds_no_drift() {
+    // 1 s of packets, 5 s of nothing, 1 s of packets: one `idle` gap of 5 s, no late packets,
+    // the second second of sound at its own place on the timeline, drift near zero.
+    let rig = Rig::new();
+    let (mut rec, h) = idle_recorder(&rig, rig.cfg(0));
+    rec.start(rig.ctx()).unwrap();
+    h.advance(1.0);
+    h.skip(5.0);
+    h.advance(1.0);
+    let info = rec.stop(rig.at(&h)).unwrap();
+    assert_eq!(info.stats.late, 0);
+    assert_eq!(info.details["resyncs"]["count"], 0);
+    let idle_ms = info.details["resyncs"]["idle_ms"].as_f64().unwrap();
+    assert!((idle_ms - 5000.0).abs() < 25.0, "{idle_ms}");
+    let gaps = info.details["gaps"].as_array().unwrap();
+    assert_eq!(gaps.len(), 1);
+    assert_eq!(gaps[0]["reason"], "idle");
+    let (from, to) = (
+        gaps[0]["from"].as_i64().unwrap(),
+        gaps[0]["to"].as_i64().unwrap(),
+    );
+    // 120,000 ticks per second: gap 1 s to 6 s.
+    assert!(
+        (from - 120_000).abs() <= 120 && (to - 720_000).abs() <= 120,
+        "{from} {to}"
+    );
+    assert_eq!(info.end.ticks(), 840_000);
+    let (_, s) = read(&rig.path("system.wav"));
+    // Stereo: two samples per frame.
+    assert!((s.len() as i64 - 7 * 96_000).abs() <= 96, "{}", s.len());
+    assert!(rms(&s[96_000 + 960..6 * 96_000 - 960]) < 1e-6);
+    assert!(rms(&s[6 * 96_000 + 960..7 * 96_000]) > 0.3);
+    let drift = info.details["drift_ppm"].as_f64().unwrap_or(0.0);
+    assert!(drift.abs() < 100.0, "{drift}");
+}
+
+#[test]
+fn many_short_idle_stretches_at_sound_onsets_are_not_counted_as_late() {
+    // The Windows round-2 finding: one beep every second, packets only while it plays, a 51 ms
+    // stretch of nothing in front of each. 60 onsets: no late packets, drift stays near zero.
+    let rig = Rig::new();
+    let (mut rec, h) = idle_recorder(&rig, rig.cfg(0));
+    rec.start(rig.ctx()).unwrap();
+    for _ in 0..60 {
+        h.advance(0.949);
+        h.skip(0.051);
+    }
+    h.advance(0.5);
+    let info = rec.stop(rig.at(&h)).unwrap();
+    assert_eq!(info.stats.late, 0);
+    assert_eq!(info.details["resyncs"]["count"], 0);
+    let drift = info.details["drift_ppm"].as_f64().unwrap_or(0.0);
+    assert!(drift.abs() < 100.0, "{drift}");
+    let n = frames(&rig.path("system.wav"));
+    assert!((n as i64 - 60 * 48_000 - 24_000).abs() <= 96, "{n}");
+}
+
 #[test]
 fn overlapping_stamps_are_trimmed() {
     let rig = Rig::new();

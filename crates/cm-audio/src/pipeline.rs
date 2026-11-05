@@ -152,6 +152,8 @@ pub struct Pipeline {
     first_device_channels: u16,
     resync_count: u64,
     inserted_frames: u64,
+    /// Silence filled in after quiet stretches of an `idle` source (not a resync).
+    idle_frames: u64,
     trimmed_frames: u64,
     max_offset_ns: i128,
     epoch_start_ns: i128,
@@ -276,6 +278,7 @@ impl Pipeline {
             first_device_channels: input.channels,
             resync_count: 0,
             inserted_frames: 0,
+            idle_frames: 0,
             trimmed_frames: 0,
             max_offset_ns: 0,
             epoch_start_ns: 0,
@@ -597,10 +600,27 @@ impl Pipeline {
             // Drift sample: host elapsed in this epoch minus what the sample count says.
             let h = (start - self.epoch_start_ns) as f64;
             let s = self.frames_to_ns(self.epoch_received) as f64;
-            if offset.abs() < (GAP_REPORT_MS * 1e6) as i128 {
+            // A source that sends nothing while nothing plays (WASAPI loopback) restarts after a
+            // quiet stretch with a stamp that jumped forward by the idle time. That is not late
+            // data and not clock drift: fill the stretch with silence on the timeline, record it
+            // as an `idle` gap and start a new drift epoch.
+            let idle_gap = offset > thr && self.default_gap_reason == "idle";
+            if offset.abs() < (GAP_REPORT_MS * 1e6) as i128 && !idle_gap {
                 self.drift.add(h / NS, h - s);
             }
-            if offset > thr {
+            if idle_gap {
+                let k = self.ns_to_frames(offset).max(0) as u64;
+                self.insert_silence(k);
+                self.idle_frames += k;
+                if offset as f64 >= GAP_REPORT_MS * 1e6 {
+                    self.gaps.push(GapRecord {
+                        from_ns: expected,
+                        to_ns: start,
+                        reason: self.pending_gap_reason.take().unwrap_or("idle"),
+                    });
+                }
+                self.new_drift_epoch();
+            } else if offset > thr {
                 let k = self.ns_to_frames(offset).max(0) as u64;
                 self.insert_silence(k);
                 self.resync_count += 1;
@@ -848,6 +868,7 @@ impl Pipeline {
                 "count": self.resync_count,
                 "inserted_ms": self.inserted_frames as f64 * 1000.0 / f64::from(self.in_rate.max(1)),
                 "trimmed_ms": self.trimmed_frames as f64 * 1000.0 / f64::from(self.in_rate.max(1)),
+                "idle_ms": self.idle_frames as f64 * 1000.0 / f64::from(self.in_rate.max(1)),
             },
             "gaps": gaps,
             "pauses": pauses,
