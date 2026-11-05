@@ -11,7 +11,7 @@ machine, the Windows build and the app build); a box is checked only on the plat
 shipped binaries; `target_os` only in platform code (`python3 scripts/check_target_os.py`); every user-facing action
 has an MCP tool and a CLI command; UI text through `cm_i18n`; one change per commit with the two trailer lines; no
 failing tests merge to `main`; the maintainer pushes `main`, signs, publishes and notarizes (signs Windows packages
-once O4 is done).
+never while O4 stays unsigned).
 
 ## Where 0.2.6 left Windows (inputs)
 
@@ -57,7 +57,7 @@ hands it to the Linux agent (0.2.9) in the state that plan expects (Ubuntu Wi-Fi
    `hardware_encoder_unavailable` (check in a VM without a GPU). Hardware tests are `#[ignore]` and run one at a time on
    the lab laptop (it is a dedicated test machine, so the "ask first" rule for the Mac does not apply there).
 6. **Trust and install:** SmartScreen on a real download in a browser (the "downloaded from the internet" mark) with a
-   report; SignPath application (O4); winget manifest once signed. Installer work (NSIS, stage W6) only if the
+   report; no signing (O4 decided Nov 5, 2026); winget manifest (unsigned installers are accepted). Installer work (NSIS, stage W6) only if the
    maintainer pulls it into 0.2.8 (O7); otherwise the release stays a zip.
 7. **Windows 10 22H2 and a second monitor with mixed scaling:** each with a stored step or an explicit "not run" in
    the release text.
@@ -158,8 +158,10 @@ What 0.2.7 established (reports in `verification/benchmarks/`):
 
 ## Decisions needed from the maintainer
 
-- **O4** Windows signing: apply to SignPath (open source programme) now, because approval takes calendar time; until
-  then keep the unsigned warning text.
+- **O4** Windows signing. **Decided by the maintainer on Nov 5, 2026:** no signing while CaptureMann is 0.x. Windows
+  releases ship unsigned with SHA-256 checksums in the release text, the SmartScreen warning text and a winget manifest
+  (`packaging/windows/winget/`). SignPath asks for too much in its application; Azure Artifact Signing or a
+  cloud-signing certificate are the options to revisit for 1.0.
 - **O5** Is recording on Windows a **must** for 0.2.8? Default proposal: no. It is attempted, and ships only if the gate
   passes; otherwise it moves to the next Windows release.
 - **O7** Installer (NSIS) in 0.2.8 or still a zip?
