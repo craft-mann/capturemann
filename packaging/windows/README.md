@@ -11,7 +11,7 @@ run on a physical Windows PC yet (the ThinkPad, planned after the Linux test). R
 * `build-windows.ps1`: release build of `cm-cli`, `cm-mcp`, `cm-desktop`, `cm-overlay` (`--no-default-features`,
   static CRT, GUI subsystem for the two window programs through `cargo rustc` link args; the speaker engine is
   built in when `packaging/sherpa/out` holds the matching libraries), `dumpbin /dependents`
-  deny-list check, optional LGPL FFmpeg bundle (`CM_FFMPEG_BUNDLE`, `ffmpeg.exe` next to the programs because
+  deny-list check, optional `llama-server.exe` bundle (`CM_LLAMA_BUNDLE`, `CM_REQUIRE_LLAMA=1`; next to the programs, with `Llama\BUILD-INFO.txt` and `Llama\LICENSES\`), optional LGPL FFmpeg bundle (`CM_FFMPEG_BUNDLE`, `ffmpeg.exe` next to the programs because
   `cm-media` looks beside the executable first), `THIRD_PARTY_LICENSES.md` for `x86_64-pc-windows-msvc` via
   `packaging/macos/gen-third-party.sh` (needs bash and python), `app.ico` from `design/brand/app-icon`, the zip,
   the NSIS installer and `.sha256` files. The .ps1 files parse (PowerShell 7).
@@ -24,6 +24,14 @@ run on a physical Windows PC yet (the ThinkPad, planned after the Linux test). R
 NSIS per-user installer plus portable zip (maintainer decision D-W3). MSIX is not chosen: it needs a signing
 certificate to install at all and sandbox/identity work; revisit with SignPath. The early build is unsigned, so
 SmartScreen shows "Windows protected your PC" on first run (More info, Run anyway).
+
+## Text engine (llama-server)
+
+`packaging/llama/build-windows.sh` (MSYS2 MINGW64; static, CPU only, AVX2, no libcurl/OpenSSL, only Windows system
+DLLs allowed by its self-check) builds llama.cpp's `llama-server.exe` from the same pin as macOS (`LLAMA_TAG` and
+`LLAMA_SHA256` in `packaging/llama/build-macos.sh`). `windows-package.yml` builds and caches it, runs
+`--version` and `--help` only (no model), packages it with `CM_REQUIRE_LLAMA=1` and checks `capturemann diagnostics`
+reports it as bundled. Not yet run with a model on Windows.
 
 ## Not done
 

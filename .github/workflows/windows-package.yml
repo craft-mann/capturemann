@@ -8,7 +8,7 @@ name: Windows package
 # screenshot of the runner's desktop is kept), and a silent install and uninstall.
 #
 # The package carries an LGPL FFmpeg (built here by packaging/ffmpeg/build-windows.sh in MSYS2, cached by the
-# script's hash) and the speaker engine (sherpa-onnx /MT libraries from packaging/sherpa/fetch-windows.ps1). Both
+# script's hash), llama-server.exe (built by packaging/llama/build-windows.sh, same pin as macOS) and the speaker engine (sherpa-onnx /MT libraries from packaging/sherpa/fetch-windows.ps1). Both
 # steps fail the run when their self-checks fail; neither has run on a Windows runner yet (Nov 4, 2026).
 # Pinned actions: the same commits as ci.yml.
 on:
@@ -68,6 +68,42 @@ jobs:
         run: |
           Get-ChildItem packaging\ffmpeg\out-windows-x64 | Select-Object Name, Length
           Get-Content packaging\ffmpeg\out-windows-x64\BUILD-INFO.txt | Select-Object -First 40
+      # The built-in text engine: llama.cpp's llama-server.exe (MIT), from the same pin as macOS (LLAMA_TAG and
+      # LLAMA_SHA256 at the top of packaging/llama/build-macos.sh), CPU only, static, built in MSYS2.
+      - name: Cache the llama-server build
+        id: llama-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            packaging/llama/.downloads
+            packaging/llama/out-windows-x64
+          key: llama-windows-${{ hashFiles('packaging/llama/build-windows.sh') }}-${{ hashFiles('packaging/llama/build-macos.sh') }}
+      - name: Build llama-server (MSYS2 MINGW64)
+        if: steps.llama-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $env:MSYSTEM = 'MINGW64'
+          $env:CHERE_INVOKING = '1'
+          $env:MSYS2_PATH_TYPE = 'minimal'
+          $bash = 'C:\msys64\usr\bin\bash.exe'
+          & $bash -lc 'pacman -Sy --noconfirm --needed curl tar mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja'
+          if ($LASTEXITCODE -ne 0) { throw 'pacman failed' }
+          & $bash -lc 'packaging/llama/build-windows.sh'
+          if ($LASTEXITCODE -ne 0) { throw 'packaging/llama/build-windows.sh failed' }
+      - name: Show the llama-server build record
+        shell: pwsh
+        run: |
+          Get-ChildItem packaging\llama\out-windows-x64 | Select-Object Name, Length
+          Get-Content packaging\llama\out-windows-x64\BUILD-INFO.txt
+          (Get-FileHash -Algorithm SHA256 packaging\llama\out-windows-x64\llama-server.exe).Hash
+      # Starts the program for its version and help text only: no model, no server, no network.
+      - name: llama-server.exe starts (--version, --help)
+        shell: pwsh
+        run: |
+          $ll = 'packaging\llama\out-windows-x64\llama-server.exe'
+          & $ll --version 2>&1 | ForEach-Object { "$_" }; if ($LASTEXITCODE -ne 0) { throw "llama-server --version exited with $LASTEXITCODE" }
+          $h = (& $ll --help 2>&1 | ForEach-Object { "$_" }) -join "`n"; if ($LASTEXITCODE -ne 0) { throw "llama-server --help exited with $LASTEXITCODE" }
+          if ($h -notmatch '--no-webui') { throw 'llama-server --help lacks --no-webui' }
       # The speaker engine: the /MT libraries, because the package build links the C runtime statically.
       - name: Cache the sherpa-onnx archive
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -84,6 +120,8 @@ jobs:
         env:
           CM_FFMPEG_BUNDLE: ${{ github.workspace }}\packaging\ffmpeg\out-windows-x64
           CM_REQUIRE_FFMPEG: '1'
+          CM_LLAMA_BUNDLE: ${{ github.workspace }}\packaging\llama\out-windows-x64
+          CM_REQUIRE_LLAMA: '1'
           CM_REQUIRE_SHERPA: '1'
         run: packaging\windows\build-windows.ps1
       - name: List the files
@@ -116,9 +154,17 @@ jobs:
           foreach ($f in 'FFmpeg\SOURCE-OFFER.txt', 'FFmpeg\BUILD-INFO.txt', 'FFmpeg\LICENSES\FFmpeg-COPYING.LGPLv2.1.txt', 'ffprobe.exe') {
             if (-not (Test-Path (Join-Path $app $f))) { throw "missing in the zip: $f" }
           }
+          # The bundled text engine: next to the programs, MIT, with its build record and licences. Version/help only.
+          foreach ($f in 'llama-server.exe', 'Llama\BUILD-INFO.txt', 'Llama\LICENSES\llama.cpp-LICENSE.txt') {
+            if (-not (Test-Path (Join-Path $app $f))) { throw "missing in the zip: $f" }
+          }
+          & "$app\llama-server.exe" --version 2>&1 | ForEach-Object { "llama-server: $_" }
+          if ($LASTEXITCODE -ne 0) { throw 'packaged llama-server.exe --version failed' }
           & "$app\capturemann.exe" --version; if ($LASTEXITCODE -ne 0) { throw 'capturemann --version failed' }
           & "$app\capturemann.exe" targets; if ($LASTEXITCODE -ne 0) { throw 'capturemann targets failed' }
-          & "$app\capturemann.exe" diagnostics; if ($LASTEXITCODE -ne 0) { throw 'capturemann diagnostics failed' }
+          $diag = & "$app\capturemann.exe" diagnostics; if ($LASTEXITCODE -ne 0) { throw 'capturemann diagnostics failed' }
+          $diag | Select-String 'llama-server|ffmpeg at'
+          if (-not ($diag -match 'llama-server at .*bundled with this build')) { throw 'diagnostics do not report the bundled llama-server' }
           # One screenshot of the runner's own desktop, through the CLI and the daemon it started.
           $t = (& "$app\capturemann.exe" --json targets) | ConvertFrom-Json
           $id = $t.displays[0].id
