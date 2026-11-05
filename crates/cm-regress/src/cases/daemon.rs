@@ -3,7 +3,7 @@
 use crate::check;
 use crate::ctx::Ctx;
 use crate::hygiene;
-use crate::model::{fail, Case, Tier, ALL, R};
+use crate::model::{fail, Case, Stop, Tier, ALL, R};
 use crate::proc::exit_text;
 use crate::sys;
 use serde_json::Value;
@@ -183,29 +183,70 @@ fn second_instance(ctx: &mut Ctx) -> R {
 
 fn autostart(ctx: &mut Ctx) -> R {
     let before = hygiene::product_pids();
-    // Without --no-start: the CLI starts the daemon next to it.
+    let ep = ctx.endpoint.clone();
+    // Without --no-start: the CLI starts the daemon next to it. First with its output captured through
+    // pipes, the way a script calls it: the CLI must return even though the daemon it started lives on.
     let mut c = ctx.product_cmd("capturemann");
-    c.args([
-        "--json",
-        "--socket",
-        &ctx.endpoint.clone(),
-        "library",
-        "list",
-    ]);
-    let out = ctx.run(c, 60)?;
-    let started: Vec<u32> = hygiene::strays_since(&before)
+    c.args(["--json", "--socket", &ep, "library", "list"]);
+    let out = ctx.run(c, 30)?;
+    let mut pipe_held = out.timed_out;
+    let mut started: Vec<u32> = hygiene::strays_since(&before)
         .into_iter()
         .filter(|(_, n)| n.to_lowercase().starts_with("cm-daemon"))
         .map(|(p, _)| p)
         .collect();
     ctx.note(format!(
-        "capturemann library list: {}; new cm-daemon pids {started:?}",
-        exit_text(out.code)
+        "piped run: {}{}; new cm-daemon pids {started:?}",
+        exit_text(out.code),
+        if pipe_held {
+            " (hung until killed: the started daemon keeps the caller's output pipe open)"
+        } else {
+            ""
+        }
     ));
+    if pipe_held {
+        // Check the start itself with the output going to files instead of pipes.
+        for p in &started {
+            sys::kill_tree(*p);
+        }
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        let log = std::fs::File::create(ctx.root.join("autostart.out.txt"))?;
+        let mut c = ctx.product_cmd("capturemann");
+        c.args(["--json", "--socket", &ep, "library", "list"])
+            .stdin(std::process::Stdio::null())
+            .stdout(log.try_clone()?)
+            .stderr(log);
+        let mut child = c
+            .spawn()
+            .map_err(|e| Stop::Fail(format!("capturemann did not start: {e}")))?;
+        let waited =
+            crate::proc::wait_for(ctx.secs(40), std::time::Duration::from_millis(200), || {
+                child.try_wait().ok().flatten()
+            });
+        if waited.is_none() {
+            sys::kill_tree(child.id());
+            let _ = child.kill();
+        }
+        ctx.note(format!(
+            "file-redirected run: {:?}",
+            waited.map(|s| s.code())
+        ));
+        started = hygiene::strays_since(&before)
+            .into_iter()
+            .filter(|(_, n)| n.to_lowercase().starts_with("cm-daemon"))
+            .map(|(p, _)| p)
+            .collect();
+        pipe_held = true;
+    }
     let answered = ctx.daemon_answers();
     for p in &started {
         sys::kill_tree(*p);
     }
+    check!(
+        !pipe_held,
+        "PRODUCT: when `capturemann` starts the daemon, the daemon inherits the caller's output pipe, so a script that captures the output never gets EOF (the CLI hung for 30 s until killed); the daemon itself {}",
+        if answered { "did start and answer" } else { "did not answer either" }
+    );
     check!(
         out.success(),
         "the CLI did not start a daemon and answer: {}",

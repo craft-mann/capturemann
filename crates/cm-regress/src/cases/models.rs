@@ -5,10 +5,11 @@ use super::common::{
 };
 use crate::check;
 use crate::ctx::Ctx;
+use crate::mcp::McpClient;
 use crate::model::{fail, skip, Case, Need, Stop, Tier, ALL, R};
 use crate::proc::{exit_text, is_crash_code};
 use crate::sys;
-use serde_json::Value;
+use serde_json::{json, Value};
 
 pub fn cases() -> Vec<Case> {
     vec![
@@ -155,6 +156,46 @@ fn no_model(ctx: &mut Ctx) -> R {
         exit_text(tm.code()),
         tm.error_code(),
         tm.error_reason()
+    );
+    // The same error has the same shape everywhere (maintainer decision Nov 5, 2026): code invalid_input,
+    // data.reason no_model / no_text_model, a hint, through the CLI and through MCP, on every platform.
+    check!(
+        r.error_code().as_deref() == Some("invalid_input")
+            && tm.error_code().as_deref() == Some("invalid_input"),
+        "the shared code should be invalid_input, got {:?} and {:?}",
+        r.error_code(),
+        tm.error_code()
+    );
+    let hint = r
+        .error
+        .as_ref()
+        .and_then(|e| e.pointer("/data/hint"))
+        .and_then(Value::as_str);
+    check!(
+        hint.is_some_and(|h| h.contains("ai models")),
+        "the no_model error has no usable hint: {hint:?}"
+    );
+    let mut mc = McpClient::spawn(ctx, &[])?;
+    mc.initialize().map_err(Stop::Fail)?;
+    let res = mc
+        .call("transcribe", json!({"capture_id": id}))
+        .map_err(Stop::Fail)?
+        .map_err(|(c, m)| Stop::Fail(format!("JSON-RPC error {c}: {m}")))?;
+    let s = res.structured.clone().unwrap_or(Value::Null);
+    ctx.note(format!(
+        "MCP transcribe without a model: error {} {}",
+        res.is_error,
+        crate::util::cut(&s.to_string(), 200)
+    ));
+    mc.close();
+    check!(
+        res.is_error,
+        "MCP transcribe without a model did not report an error"
+    );
+    check!(
+        s.get("code").and_then(Value::as_str) == Some("invalid_input")
+            && s.pointer("/data/reason").and_then(Value::as_str) == Some("no_model"),
+        "MCP error shape differs from the CLI's: {s}"
     );
     Ok(())
 }

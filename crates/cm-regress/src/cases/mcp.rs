@@ -321,11 +321,17 @@ fn confirm_tier(ctx: &mut Ctx) -> R {
     seed_screenshot(ctx)?;
     ctx.start_daemon()?;
     let mut c = open(ctx)?;
+    // A real display id when there is a desktop: the call may validate the target before it asks.
+    let display_id = if sys::has_desktop() {
+        ctx.primary_display().map_or(1, |d| d.id)
+    } else {
+        1
+    };
     let r = call(
         ctx,
         &mut c,
         "start_recording",
-        json!({"target": {"display_id": 1}}),
+        json!({"target": {"display_id": display_id}}),
     )?;
     ctx.note(format!(
         "start_recording: error={} code={:?} {}",

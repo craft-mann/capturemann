@@ -149,6 +149,16 @@ impl ConsoleWatch {
 /// The running app of a case.
 struct App {
     pid: u32,
+    tracker: crate::proc::Tracker,
+}
+
+impl Drop for App {
+    fn drop(&mut self) {
+        sys::kill_tree(self.pid);
+        if let Ok(mut t) = self.tracker.lock() {
+            t.retain(|p| *p != self.pid);
+        }
+    }
 }
 
 /// Starts `cm-desktop` on the sandbox endpoint and waits for its embedded daemon to answer.
@@ -174,7 +184,10 @@ fn start_app(ctx: &mut Ctx, args: &[&str]) -> R<App> {
         ctx.daemon_answers().then_some(true)
     });
     match ok {
-        Some(true) => Ok(App { pid }),
+        Some(true) => Ok(App {
+            pid,
+            tracker: ctx.tracker.clone(),
+        }),
         Some(false) => fail(format!(
             "cm-desktop (pid {pid}) exited during start-up; log: {}",
             log_tail(ctx)
@@ -237,6 +250,7 @@ fn stays_up(ctx: &mut Ctx) -> R {
 fn second_launch(ctx: &mut Ctx) -> R {
     need_ffmpeg(ctx)?;
     let clips = write_clips(ctx)?;
+    let baseline = crate::hygiene::product_pids();
     let app = start_app(ctx, &[])?;
     std::thread::sleep(Duration::from_secs(3));
     let before = sys::enum_windows()
@@ -274,7 +288,9 @@ fn second_launch(ctx: &mut Ctx) -> R {
     ));
     let others = sys::list_processes()
         .iter()
-        .filter(|(p, n)| *p != app.pid && n.to_lowercase().starts_with("cm-desktop"))
+        .filter(|(p, n)| {
+            *p != app.pid && !baseline.contains(p) && n.to_lowercase().starts_with("cm-desktop")
+        })
         .count();
     check!(others == 0, "{others} other cm-desktop process(es) are still running: the second launch did not hand over");
     Ok(())
@@ -435,6 +451,8 @@ fn hud(ctx: &mut Ctx) -> R {
     }
     let stop = ctx.cli_long(&["record", "stop"], 90)?;
     let seen = consoles.finish();
+    // The automatic export after the stop starts an ffmpeg; let it finish so it is not left behind.
+    super::record::wait_idle_exports(ctx);
     if !stop.ok() {
         problems.push(format!("record stop failed: {}", exit_text(stop.code())));
     }

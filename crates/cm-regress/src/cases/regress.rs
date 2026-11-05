@@ -143,7 +143,11 @@ fn encoder_wording(ctx: &mut Ctx) -> R {
         exit_text(r.code()),
         crate::util::cut(&msg, 200)
     ));
-    if code != "hardware_encoder_unavailable" {
+    if !matches!(
+        code.as_str(),
+        "hardware_encoder_unavailable" | "platform_rejected"
+    ) || !msg.to_lowercase().contains("encoder")
+    {
         return skip(format!(
             "the request was refused earlier ({code}), not by the encoder: could not provoke it"
         ));

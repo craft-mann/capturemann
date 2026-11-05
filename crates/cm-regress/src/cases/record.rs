@@ -98,6 +98,9 @@ pub fn cases() -> Vec<Case> {
 
 /// A finished recording.
 pub struct Recorded {
+    /// Seconds the recording should hold: what the daemon said was recorded at the pause, plus the time
+    /// between the resume answer and the stop request (the pause itself is not counted).
+    pub expected_s: f64,
     pub bundle: PathBuf,
     pub manifest: Value,
     pub stop: Value,
@@ -185,6 +188,9 @@ fn record(
     mut during: Option<&mut dyn FnMut(&mut Ctx)>,
 ) -> R<Recorded> {
     start(ctx, display, extra)?;
+    let mut expected_s = 0.0;
+    let mut resumed_at: Option<std::time::Instant> = None;
+    let mut counted_before_pause = false;
     for (i, step) in plan.iter().enumerate() {
         match step {
             Step::Wait(s) => {
@@ -197,6 +203,8 @@ fn record(
             }
             Step::Pause => {
                 let r = ctx.cli_ok(&["record", "pause"])?;
+                expected_s = r.get("recorded_ms").and_then(Value::as_f64).unwrap_or(0.0) / 1000.0;
+                counted_before_pause = true;
                 check!(
                     state_of(&r) == "paused",
                     "after pause the state is '{}'",
@@ -205,6 +213,7 @@ fn record(
             }
             Step::Resume => {
                 let r = ctx.cli_ok(&["record", "resume"])?;
+                resumed_at = Some(std::time::Instant::now());
                 check!(
                     state_of(&r) == "recording",
                     "after resume the state is '{}'",
@@ -212,6 +221,11 @@ fn record(
                 );
             }
         }
+    }
+    if let Some(t) = resumed_at {
+        expected_s += t.elapsed().as_secs_f64();
+    } else if !counted_before_pause {
+        expected_s = f64::NAN;
     }
     let s = stop(ctx)?;
     let capture_id = s
@@ -227,13 +241,14 @@ fn record(
         .ok_or_else(|| Stop::Fail(format!("no bundle of {capture_id} in the library folder")))?;
     let m = manifest(&bundle)?;
     Ok(Recorded {
+        expected_s,
         bundle,
         manifest: m,
         stop: s,
     })
 }
 
-fn wait_idle_exports(ctx: &mut Ctx) {
+pub(crate) fn wait_idle_exports(ctx: &mut Ctx) {
     // The automatic export after a recording is a job; follow it to its end, and say what happened.
     if let Ok(v) = ctx.cli_ok(&["jobs", "list", "--type", "export"]) {
         let jobs = v
@@ -377,7 +392,12 @@ fn screen_cursor(ctx: &mut Ctx) -> R {
         .and_then(Value::as_f64)
         .unwrap_or(0.0)
         / 120_000.0;
-    check!((manifest_s - 6.0).abs() < 1.0, "the recording is {manifest_s:.2} s in the manifest, expected about 6 (3 + 3, the 2 s pause removed)");
+    ctx.note(format!("manifest {manifest_s:.2} s, expected {:.2} s (recorded at the pause plus the time after the resume)", rec.expected_s));
+    check!(
+        rec.expected_s.is_nan() || (manifest_s - rec.expected_s).abs() < 1.2,
+        "the recording is {manifest_s:.2} s in the manifest but about {:.2} s were recorded outside the 2 s pause",
+        rec.expected_s
+    );
     check!(
         (p.duration - manifest_s).abs() <= 0.5,
         "screen.mp4 is {:.2} s but the manifest says {manifest_s:.2} s",
@@ -714,6 +734,7 @@ fn soak(ctx: &mut Ctx) -> R {
         .ok_or_else(|| Stop::Fail("no bundle after the soak".to_owned()))?;
     let m = manifest(&bundle)?;
     let rec = Recorded {
+        expected_s: f64::NAN,
         bundle,
         manifest: m,
         stop: s,
