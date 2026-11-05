@@ -214,41 +214,68 @@ pub fn keyframes(ctx: &mut Ctx, file: &Path) -> R<Vec<f64>> {
     Ok(parse_keyframes(&out.stdout))
 }
 
-/// Mean and peak level in dB of a window of an audio file, read by FFmpeg's `volumedetect`.
-pub fn audio_level(ctx: &mut Ctx, file: &Path, from_s: f64, dur_s: f64) -> R<(f64, f64)> {
-    let mut c = Command::new(tool(ctx, "ffmpeg"));
-    c.args([
-        "-hide_banner",
-        "-nostats",
-        "-ss",
-        &format!("{from_s:.3}"),
-        "-t",
-        &format!("{dur_s:.3}"),
-        "-i",
-    ])
-    .arg(file)
-    .args(["-af", "volumedetect", "-vn", "-f", "null", "-"]);
-    let out = ctx.run(c, 120)?;
-    parse_volumedetect(&out.stderr).ok_or_else(|| {
-        Stop::Fail(format!(
-            "no volumedetect output: {}",
-            crate::util::cut(&out.stderr, 300)
-        ))
-    })
-}
-
-pub fn parse_volumedetect(stderr: &str) -> Option<(f64, f64)> {
-    let grab = |key: &str| -> Option<f64> {
-        let l = stderr.lines().find(|l| l.contains(key))?;
-        l.split(key)
-            .nth(1)?
-            .trim()
-            .trim_end_matches("dB")
-            .trim()
-            .parse()
-            .ok()
-    };
-    Some((grab("mean_volume:")?, grab("max_volume:")?))
+/// Mean and peak level in dBFS of a window of a PCM or float WAV, read directly (the bundled LGPL FFmpeg
+/// has no `volumedetect` filter). Channels are averaged by absolute value.
+pub fn wav_levels(bytes: &[u8], from_s: f64, dur_s: f64) -> Result<(f64, f64), String> {
+    if bytes.len() < 12 || &bytes[..4] != b"RIFF" || &bytes[8..12] != b"WAVE" {
+        return Err("not a WAV".to_owned());
+    }
+    let (mut pos, mut fmt, mut data) = (12, None, None);
+    while pos + 8 <= bytes.len() {
+        let id = &bytes[pos..pos + 4];
+        let len = u32::from_le_bytes([
+            bytes[pos + 4],
+            bytes[pos + 5],
+            bytes[pos + 6],
+            bytes[pos + 7],
+        ]) as usize;
+        let body = pos + 8;
+        let end = (body + len).min(bytes.len());
+        if id == b"fmt " && end - body >= 16 {
+            let b = &bytes[body..end];
+            fmt = Some((
+                u16::from_le_bytes([b[0], b[1]]),
+                u16::from_le_bytes([b[2], b[3]]) as usize,
+                u32::from_le_bytes([b[4], b[5], b[6], b[7]]) as f64,
+                u16::from_le_bytes([b[14], b[15]]) as usize,
+            ));
+        } else if id == b"data" {
+            data = Some(&bytes[body..end]);
+            break;
+        }
+        pos = body + len + (len & 1);
+    }
+    let ((format, channels, rate, bits), data) = fmt.zip(data).ok_or("no fmt or data chunk")?;
+    let frame = channels * bits / 8;
+    if frame == 0 {
+        return Err("bad WAV header".to_owned());
+    }
+    let first = ((from_s * rate) as usize) * frame;
+    let last = (((from_s + dur_s) * rate) as usize * frame).min(data.len());
+    let (mut sum, mut peak, mut n) = (0.0f64, 0.0f64, 0usize);
+    let mut i = first;
+    while i + bits / 8 <= last {
+        let v = match (format, bits) {
+            (3, 32) => f64::from(f32::from_le_bytes([
+                data[i],
+                data[i + 1],
+                data[i + 2],
+                data[i + 3],
+            ])),
+            (1 | 0xFFFE, 16) => f64::from(i16::from_le_bytes([data[i], data[i + 1]])) / 32768.0,
+            _ => return Err(format!("unsupported WAV format {format} with {bits} bits")),
+        }
+        .abs();
+        sum += v * v;
+        peak = peak.max(v);
+        n += 1;
+        i += bits / 8;
+    }
+    if n == 0 {
+        return Err("the window holds no samples".to_owned());
+    }
+    let db = |x: f64| if x <= 0.0 { -200.0 } else { 20.0 * x.log10() };
+    Ok((db((sum / n as f64).sqrt()), db(peak)))
 }
 
 #[cfg(test)]
@@ -300,9 +327,13 @@ mod tests {
     }
 
     #[test]
-    fn volumedetect() {
-        let s = "[Parsed_volumedetect_0 @ 0x1] mean_volume: -23.4 dB\n[Parsed_volumedetect_0 @ 0x1] max_volume: -6.0 dB\n";
-        assert_eq!(parse_volumedetect(s), Some((-23.4, -6.0)));
-        assert_eq!(parse_volumedetect("nothing"), None);
+    fn wav_levels_read_a_generated_tone() {
+        let w = crate::fixtures::make_wav(1000.0, 1.0, 8000, 0.5);
+        let (mean, peak) = wav_levels(&w, 0.0, 1.0).unwrap();
+        assert!((peak + 6.0).abs() < 0.3, "peak {peak}");
+        assert!((mean + 9.0).abs() < 0.5, "mean {mean}");
+        let silent = crate::fixtures::make_wav(1000.0, 1.0, 8000, 0.0);
+        assert!(wav_levels(&silent, 0.0, 1.0).unwrap().1 < -100.0);
+        assert!(wav_levels(b"nope", 0.0, 1.0).is_err());
     }
 }

@@ -240,6 +240,8 @@ fn record(
         .find(|b| manifest(b).is_ok_and(|m| m["id"] == capture_id.as_str()))
         .ok_or_else(|| Stop::Fail(format!("no bundle of {capture_id} in the library folder")))?;
     let m = manifest(&bundle)?;
+    // The automatic export after the stop runs an ffmpeg: follow it to its end so it is not left behind.
+    wait_idle_exports(ctx);
     Ok(Recorded {
         expected_s,
         bundle,
@@ -649,7 +651,7 @@ fn system_audio(ctx: &mut Ctx) -> R {
         .ok_or_else(|| Stop::Fail("the manifest has no system audio track".to_owned()))?
         .to_owned();
     let file = rec.bundle.join(f);
-    let (mean, max) = media::audio_level(ctx, &file, 0.0, 4.0)?;
+    let (mean, max) = media::wav_levels(&std::fs::read(&file)?, 0.0, 4.0).map_err(Stop::Fail)?;
     ctx.note(format!("system audio level: mean {mean:.1} dB, peak {max:.1} dB (the tone is 1 kHz, 2 s, played by another process)"));
     check!(max > -45.0, "the system audio track is silent (peak {max:.1} dB): is the volume at 0 or muted, or is the tone missing?");
     Ok(())

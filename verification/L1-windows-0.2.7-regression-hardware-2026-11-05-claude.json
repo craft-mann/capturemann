@@ -1,0 +1,155 @@
+{
+  "cases": [
+    {
+      "area": "shot",
+      "duration_ms": 3474,
+      "evidence": [
+        "daemon pid 14848 answered after 319 ms",
+        "display 4327037 'Display 1' at (0,0) listed 1920x1080, saved 1920x1080",
+        "display 7931565 'S27B80P' at (-3840,-1861) listed 3840x2160, saved 3840x2160",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "shot.second_monitor",
+      "message": "",
+      "needs": [
+        "desktop_session",
+        "screen",
+        "second_monitor"
+      ],
+      "specs": [
+        "CAP-1.AC1",
+        "DPI-WIN layout A"
+      ],
+      "status": "PASS",
+      "tier": "hardware",
+      "title": "every extra monitor lists and captures at its own physical size"
+    },
+    {
+      "area": "rec",
+      "duration_ms": 6604,
+      "evidence": [
+        "daemon pid 9440 answered after 319 ms",
+        "started rec_01a1aad8c9d9_0001",
+        "mic track 4.18 s",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "rec.mic",
+      "message": "left programs running: ffmpeg.exe (1484) ",
+      "needs": [
+        "desktop_session",
+        "screen",
+        "mic"
+      ],
+      "specs": [
+        "AUD-1",
+        "AUD-2"
+      ],
+      "status": "FAIL",
+      "tier": "hardware",
+      "title": "a microphone track is recorded for the length of the recording"
+    },
+    {
+      "area": "rec",
+      "duration_ms": 8510,
+      "evidence": [
+        "daemon pid 7796 answered after 322 ms",
+        "started rec_01a1aad8e53b_0001"
+      ],
+      "id": "rec.system_audio",
+      "message": "no volumedetect output: [aist#0:0/pcm_f32le @ 000002ba2ebb58c0] Guessed Channel Layout: stereo\r\nInput #0, wav, from 'C:\\Users\\trung\\AppData\\Local\\Temp\\cmr4320\\3\\library\\regress recording.cmrec\\system.wav':\r\n  Duration: 00:00:06.85, bitrate: 3072 kb/s\r\n  Stream #0:0: Audio: pcm_f32le ([3][0][0][0] / 0x0003), 48000 Hz, stere...",
+      "needs": [
+        "desktop_session",
+        "screen",
+        "sound"
+      ],
+      "specs": [
+        "AUD-1",
+        "bug class: process loopback"
+      ],
+      "status": "FAIL",
+      "tier": "hardware",
+      "title": "system audio contains a tone played by another process"
+    },
+    {
+      "area": "rec",
+      "duration_ms": 7581,
+      "evidence": [
+        "daemon pid 7068 answered after 320 ms",
+        "started rec_01a1aad907e8_0001",
+        "camera 1280x720 h264 measured 29.4 fps, 5.47 s",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "rec.camera",
+      "message": "",
+      "needs": [
+        "desktop_session",
+        "screen",
+        "camera"
+      ],
+      "specs": [
+        "CAM-1",
+        "CAM-2",
+        "bug class: camera 10 fps in low light"
+      ],
+      "status": "PASS",
+      "tier": "hardware",
+      "title": "a camera track keeps at least 24 fps in a lit room"
+    }
+  ],
+  "run": {
+    "commit": "",
+    "ffmpeg": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
+    "finished": "2026-11-05T08:35:19Z",
+    "flags": "--tier hardware --out C:\\lab\\regress-out\\20261105T083447Z --who cm-regress via regress.sh --verdict PARTIAL --allow screen,sound,mic,camera,second_monitor --only rec.mic,rec.system_audio,rec.camera,shot.second_monitor",
+    "gpu": "Intel(R) UHD Graphics 620 (driver 31.0.101.2137)",
+    "hashes": [
+      [
+        "capturemann.exe",
+        "4ce16c07d21d28a65e73c780850ed5072d18cd90a4738bc21ad2efe2c8150518"
+      ],
+      [
+        "cm-mcp.exe",
+        "c8b5462820c2a2ab65e25704328f001f82797de77a0ef4500a12b0ea03b95e57"
+      ],
+      [
+        "cm-daemon.exe",
+        "5c87af51434d35fab0b07a9afb66050e80d6f4c045dfb6678a841e85feb67e09"
+      ],
+      [
+        "cm-desktop.exe",
+        "38445bd66ccd7727ed9918774c8c37de2d1f8eda649f75b1b826d642194574e0"
+      ],
+      [
+        "cm-overlay.exe",
+        "102c291228b4b3fbfc1813e02895e38dfbd70e2d476a6222a11608e49ef358df"
+      ],
+      [
+        "ffmpeg.exe",
+        "08d073edcbbbf6b8c3c11efb9a78a8f21af9c555da86d815fa2fbcb0c2d8d609"
+      ],
+      [
+        "ffprobe.exe",
+        "e09a5180f022cc05bab32a8ba3aed0d54e642cb81a9952a57aa24a121e46102f"
+      ],
+      [
+        "llama-server.exe",
+        "be54819796793a564b088083e8d46febe2b7d3507745d12d886a52465080b115"
+      ]
+    ],
+    "os": "Microsoft Windows 11 Pro 10.0.26200 build 26200",
+    "package_dir": "C:\\Users\\trung\\AppData\\Local\\Programs\\CaptureMann",
+    "platform": "windows",
+    "started": "2026-11-05T08:34:50Z",
+    "tier": "hardware",
+    "verdict": "PARTIAL",
+    "version": "0.2.7",
+    "who": "cm-regress via regress.sh"
+  },
+  "schema": 1,
+  "summary": {
+    "fail": 2,
+    "pass": 2,
+    "skip": 0,
+    "total": 4
+  }
+}
