@@ -222,6 +222,8 @@ jobs:
       - run: python3 scripts/check_md_links.py
       # target_os only in platform code (the older files are a shrinking baseline).
       - run: python3 scripts/check_target_os.py
+      # Every child program starts through cm_platform::process (no console window flash on Windows).
+      - run: python3 scripts/check_no_bare_command.py
 
   licenses:
     runs-on: ubuntu-latest
