@@ -121,6 +121,16 @@ if ($env:CM_SKIP_BUILD -ne '1') {
   # re-run when they change, so its cached output (rust-cache) is dropped first.
   $env:GGML_NATIVE = 'OFF'; $env:GGML_AVX = 'ON'; $env:GGML_AVX2 = 'ON'; $env:GGML_FMA = 'ON'
   $env:GGML_F16C = 'ON'; $env:GGML_BMI2 = 'ON'; $env:GGML_AVX512 = 'OFF'
+  # Optimisation flags of the whisper.cpp build. cmake-rs (used by whisper-rs-sys) builds with the Visual Studio
+  # generator and then REPLACES CMAKE_C_FLAGS_<BUILD TYPE> / CMAKE_CXX_FLAGS_<BUILD TYPE> with the cc-rs flags minus
+  # every -O flag, for the build type named by CMAKE_BUILD_TYPE. whisper-rs-sys sets that to "Release" in a release
+  # build (the config actually built is Release too), so /O2 /Ob2 /DNDEBUG were dropped and ggml compiled with no
+  # optimisation: 11x slower than the CI test build, whose debug_assertions make CMAKE_BUILD_TYPE "RelWithDebInfo",
+  # a configuration that is never built, so its Release flags kept /O2 (Nov 5, 2026). cmake-rs leaves a variable
+  # alone when it is already defined, and whisper-rs-sys forwards every CMAKE_* environment variable as a define.
+  $crtFlag = if ($crtStatic) { '/MT' } else { '/MD' }
+  $env:CMAKE_C_FLAGS_RELEASE = "/O2 /Ob2 /DNDEBUG $crtFlag"
+  $env:CMAKE_CXX_FLAGS_RELEASE = "/O2 /Ob2 /DNDEBUG $crtFlag"
   Push-Location $root
   try {
     Write-Host '==> cargo clean -p whisper-rs-sys (portable CPU baseline: AVX2, no AVX-512)'
