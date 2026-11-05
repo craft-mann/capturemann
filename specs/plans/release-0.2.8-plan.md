@@ -164,9 +164,26 @@ What 0.2.7 established (reports in `verification/benchmarks/`):
   cloud-signing certificate are the options to revisit for 1.0.
 - **O5** Is recording on Windows a **must** for 0.2.8? Default proposal: no. It is attempted, and ships only if the gate
   passes; otherwise it moves to the next Windows release.
-- **O7** Installer (NSIS) in 0.2.8 or still a zip?
+- **O7** Installer (NSIS) in 0.2.8 or still a zip? **Decided by the maintainer on Nov 5, 2026:** both. The zip and the unsigned NSIS installer are published; the winget manifest points at the installer.
 - **O8** FFmpeg and sherpa-onnx Windows pins: approve the source versions and SHA-256 before the CI jobs are written.
   **Approved by the maintainer on Nov 4, 2026:** FFmpeg 9.0.2, libvpx 1.17.0, libopus 1.6.1 (as in `build-macos.sh`), and sherpa-onnx v2.0.1 `win-x64-static-MT-Release-lib` (SHA-256 `23e7b986b197eda0bbc47ff3d7d5c87afd6ef2b9077214ba26b0f1ec52ef0e66`) and `win-x64-static-MD-Release-lib` (`7c1f3ef15487f2a06625ef06685a9f96f03c0a1f0b3ad52de9e3bf6af6c1be39`).
+
+## Decisions of Nov 5, 2026 (maintainer)
+
+- O4: no signing in 0.x (unsigned zip and installer, SHA-256 sums, winget manifest). O5: Windows recording ships. O7: zip and installer.
+- `llama-server` for Windows: a CI job builds it from the same pin as macOS (LLAMA_TAG v0.7.0); the model rows in `text_models.json` stay `pending_pin` until the maintainer pins them.
+- Cursor sprite density: when a monitor's scale is not 100 %, the monitor's DPI is used (not the system DPI).
+- The camera after an unplug: Windows reopens the same device and the daemon publishes `camera.reconnected`; macOS reconnect is on the backlog (documented difference).
+- Merging `track/windows` into `main`: after 0.2.8 is developed and tested, by the maintainer.
+
+## Known limitations of the Windows 0.2.8 release (for the release text)
+
+- **Not run:** Windows 10 22H2; a second monitor with mixed scaling (review and steps in `tests/manual/DPI-WIN.md`, if the maintainer connects a monitor the steps are run and reported separately); SmartScreen on a real browser download (the installer and zip are unsigned, see O4).
+- **Camera:** replugging a camera into a different USB port may give it another device id; the recorder reopens the same id only, so it may not resume (CAM-1 step W7 checks it). A camera in a dark room may drop its frame rate (the camera's own low-light behaviour).
+- **Hardware:** tested on one ThinkPad T490 with an Intel UHD 620 only. NVIDIA and AMD hardware encoders and drivers are untried.
+- **Multi-monitor:** the launcher and the start sheet always open on the primary display, and the HUD and the camera bubble cannot be dragged or snapped on Windows.
+- **Text recognition:** only the languages installed in Windows are recognized; en-US was the one checked.
+- **Process loopback** (system audio without CaptureMann's own sound) needs a recent Windows 10 or 11; older ones fall back to the plain loopback, which includes CaptureMann's sound.
 
 ## Risks
 
