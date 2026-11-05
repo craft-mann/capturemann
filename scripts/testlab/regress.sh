@@ -7,6 +7,7 @@
 #                                      [--package-run <Windows package run id>]  download that package's installer and install it silently first
 #                                      [--installed]                             test what is installed (the default)
 #                                      [--only id,area,...] [--soak-minutes N] [--whisper-model <file on the laptop>]
+#                                      [--label run2]   (added to the report file name so an earlier report is not overwritten)
 #                                      [--installer <setup.exe on the laptop>] [--who NAME]   (the installer case replaces and restores the uninstall entry)
 #
 # The laptop is shared: C:\lab\lab.lock ("owner|epoch seconds") says who uses it. The script refuses while the lock is
@@ -25,7 +26,7 @@ ttl="${LOCK_TTL_MIN:-45}"
 
 sys="${1:-}"; shift || true
 [ "$sys" = windows ] || die "only 'windows' is implemented (macOS and Linux drivers come later); usage: regress.sh windows [options]"
-tier=smoke; allow=""; run=""; pkgrun=""; only=""; soak=0; model=""; who="cm-regress via regress.sh"; installer=""
+tier=smoke; allow=""; run=""; pkgrun=""; only=""; soak=0; model=""; who="cm-regress via regress.sh"; installer=""; label=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --tier) tier="$2"; shift 2 ;;
@@ -38,6 +39,7 @@ while [ $# -gt 0 ]; do
     --whisper-model) model="$2"; shift 2 ;;
     --who) who="$2"; shift 2 ;;
     --installer) installer="$2"; shift 2 ;;
+    --label) label="$2"; shift 2 ;;
     *) die "unknown option $1" ;;
   esac
 done
@@ -112,7 +114,7 @@ tmp="$root/.testlab-downloads/regress-$stamp"; mkdir -p "$tmp"
 [ -f "$tmp/results.json" ] || die "no results.json came back; see $tmp and C:\\lab\\regress-out on the laptop"
 version="$(python3 -c "import json,sys; print(json.load(open('$tmp/results.json'))['run']['version'] or 'unknown')")"
 version="${version// /_}"
-name="L1-windows-$version-regression-$tier-$(date -u +%Y-%m-%d)-claude"
+name="L1-windows-$version-regression-$tier${label:+-$label}-$(date -u +%Y-%m-%d)-claude"
 cp "$tmp/report-$tier.md" "$root/verification/$name.md"
 cp "$tmp/results.json" "$root/verification/$name.json"
 python3 - "$tmp/results.json" <<'PY'

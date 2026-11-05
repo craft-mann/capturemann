@@ -8,6 +8,7 @@ use crate::ctx::{displays, Ctx};
 use crate::model::{fail, skip, Case, Need, Stop, Tier, R, WIN};
 use crate::proc::exit_text;
 use crate::sys::{self, Key, WinInfo};
+use serde_json::Value;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -69,6 +70,17 @@ pub fn cases() -> Vec<Case> {
             platforms: WIN,
             timeout_s: 240,
             run: no_console,
+        },
+        Case {
+            id: "desktop.settings_applied",
+            title: "settings set capture.delay_s reaches the running app: a forwarded display capture waits that long",
+            area: "desktop",
+            specs: &["bug: settings set not applied to the running app", "AGT-1"],
+            tier: Tier::Standard,
+            needs: &[Need::DesktopSession, Need::Screen],
+            platforms: WIN,
+            timeout_s: 120,
+            run: settings_applied,
         },
         Case {
             id: "desktop.tray_icon",
@@ -512,4 +524,49 @@ fn no_console(ctx: &mut Ctx) -> R {
 
 fn tray_stub(_ctx: &mut Ctx) -> R {
     skip("not implemented: the tray icon lives in the hidden-icons overflow and needs a UI Automation probe; see tests/manual/REC-5.md")
+}
+
+fn settings_applied(ctx: &mut Ctx) -> R {
+    let _app = start_app(ctx, &[])?;
+    std::thread::sleep(Duration::from_secs(3));
+    ctx.cli_ok(&["settings", "set", "capture.delay_s", "4"])?;
+    let g = ctx.cli_ok(&["settings", "get", "capture.delay_s"])?;
+    check!(
+        g.pointer("/settings/capture.delay_s")
+            .and_then(Value::as_i64)
+            == Some(4),
+        "settings get does not return 4: {g}"
+    );
+    // The app is told through settings.changed; a display capture asked for by a second launch must wait.
+    let t0 = std::time::Instant::now();
+    let mut c = ctx.product_cmd("cm-desktop");
+    c.args(["--capture", "display"]);
+    let out = ctx.run(c, 30)?;
+    ctx.note(format!(
+        "forwarded capture request: {}",
+        exit_text(out.code)
+    ));
+    let appeared = crate::proc::wait_for(ctx.secs(30), Duration::from_millis(300), || {
+        let v = ctx
+            .cli(&["library", "list", "--kind", "screenshot"])
+            .ok()?
+            .json?;
+        v.get("captures")?
+            .as_array()
+            .filter(|a| !a.is_empty())
+            .map(|_| t0.elapsed())
+    });
+    let Some(waited) = appeared else {
+        return fail("no screenshot appeared within 30 s of the forwarded display capture request");
+    };
+    ctx.note(format!(
+        "the screenshot appeared after {:.1} s with capture.delay_s = 4",
+        waited.as_secs_f64()
+    ));
+    check!(
+        waited.as_secs_f64() >= 3.5,
+        "the capture happened after {:.1} s although capture.delay_s was set to 4: the running app did not apply the setting",
+        waited.as_secs_f64()
+    );
+    Ok(())
 }

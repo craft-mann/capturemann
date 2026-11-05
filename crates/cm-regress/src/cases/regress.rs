@@ -143,6 +143,14 @@ fn encoder_wording(ctx: &mut Ctx) -> R {
         exit_text(r.code()),
         crate::util::cut(&msg, 200)
     ));
+    if code == "invalid_input" && msg.to_lowercase().contains("too small") {
+        ctx.note("a tiny area is refused up front: invalid_input, too small");
+        check!(
+            ctx.bundles("cmrec").is_empty(),
+            "a refused start left a recording bundle behind"
+        );
+        return Ok(());
+    }
     if !matches!(
         code.as_str(),
         "hardware_encoder_unavailable" | "platform_rejected"

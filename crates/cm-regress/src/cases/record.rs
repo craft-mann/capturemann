@@ -83,6 +83,17 @@ pub fn cases() -> Vec<Case> {
             run: camera,
         },
         Case {
+            id: "rec.external_4k",
+            title: "30 s of a 4K external monitor: a full-length file (with an encoder_overloaded warning) or full 30 fps",
+            area: "rec",
+            specs: &["REC-3", "NFR-2", "bug: 4K recording of the external lost frames on the UHD 620"],
+            tier: Tier::Hardware,
+            needs: &[Need::DesktopSession, Need::Screen, Need::SecondMonitor],
+            platforms: ALL,
+            timeout_s: 240,
+            run: external_4k,
+        },
+        Case {
             id: "rec.soak",
             title: "a long recording (--soak-minutes) keeps constant 30 fps and 2 s key frames",
             area: "rec",
@@ -764,4 +775,76 @@ fn soak(ctx: &mut Ctx) -> R {
     );
     let _ = ALL;
     Ok(())
+}
+
+fn external_4k(ctx: &mut Ctx) -> R {
+    ctx.allow_recording_without_dialog()?;
+    ctx.start_daemon()?;
+    let v = ctx.cli_ok(&["targets", "--displays-only"])?;
+    let ds = crate::ctx::displays(&v);
+    let Some(d) = ds.iter().find(|d| d.w >= 3000 && !d.primary).cloned() else {
+        return skip("no non-primary display of 3000 px or more is connected");
+    };
+    let rec = record(
+        ctx,
+        &d,
+        &["--size", "source", "--fps", "30"],
+        &[Step::Wait(30)],
+        None,
+    )?;
+    let screen = rec
+        .manifest
+        .pointer("/tracks/screen")
+        .cloned()
+        .unwrap_or(Value::Null);
+    let st = screen.get("stats").cloned().unwrap_or(Value::Null);
+    let (start, end) = (
+        screen.get("start").and_then(Value::as_f64).unwrap_or(0.0),
+        screen.get("end").and_then(Value::as_f64).unwrap_or(0.0),
+    );
+    let file_end = st
+        .get("file_end")
+        .and_then(Value::as_f64)
+        .unwrap_or(f64::NAN);
+    let eff = st
+        .get("effective_fps")
+        .and_then(Value::as_f64)
+        .unwrap_or(f64::NAN);
+    ctx.note(format!(
+        "display {} {}x{}: track {start}..{end} ticks, file_end {file_end}, effective_fps {eff}, late_pct {:?}, dropped {:?}, rate_changes {:?}",
+        d.id, d.w, d.h, st.get("late_pct"), st.get("dropped"), st.get("rate_changes")
+    ));
+    let p = screen_probe(ctx, &rec)?;
+    ctx.note(format!("file {:.2} s", p.duration));
+    let overloaded = trouble_words(ctx, &["encoder_overloaded"]);
+    ctx.note(format!("encoder_overloaded warning logged: {overloaded}"));
+    check!(
+        file_end.is_nan() || file_end >= 0.9 * end,
+        "the file ends at {file_end} ticks but the track ends at {end}: it holds under 90 % of the recording"
+    );
+    check!(
+        p.duration >= 27.0,
+        "the file is only {:.2} s for a 30 s recording",
+        p.duration
+    );
+    let full_rate = eff >= 29.0;
+    check!(
+        full_rate || overloaded,
+        "the rate fell to {eff} fps with no encoder_overloaded warning"
+    );
+    wait_idle_exports(ctx);
+    Ok(())
+}
+
+fn trouble_words(ctx: &Ctx, needles: &[&str]) -> bool {
+    let mut texts = vec![
+        std::fs::read_to_string(ctx.root.join("daemon.out.txt")).unwrap_or_default(),
+        std::fs::read_to_string(ctx.root.join("daemon.err.txt")).unwrap_or_default(),
+    ];
+    if let Ok(rd) = std::fs::read_dir(ctx.config.join("logs")) {
+        for e in rd.flatten() {
+            texts.push(std::fs::read_to_string(e.path()).unwrap_or_default());
+        }
+    }
+    texts.iter().any(|t| needles.iter().any(|n| t.contains(n)))
 }
