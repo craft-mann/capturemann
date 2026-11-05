@@ -322,6 +322,12 @@ pub fn display_id_for_area(bounds: [i64; 4]) -> Option<u32> {
     imp::display_id_for_area(bounds)
 }
 
+/// Every GPUI display (by GPUI's id) with its rectangle in physical px, where GPUI's display id
+/// is not the engine's (Windows: the monitor handle); `None` where the two ids agree (macOS).
+pub fn gpui_monitor_rects_px() -> Option<Vec<(u32, [i64; 4])>> {
+    imp::gpui_monitor_rects_px()
+}
+
 /// The visible frame (the display minus the menu bar and the Dock) of the display that holds the
 /// global point `(x, y)`, as `(x, y, w, h)` in global points, top-left origin. `None` where the
 /// platform cannot say (callers fall back to the display bounds).
@@ -433,6 +439,10 @@ mod imp {
     }
 
     pub fn pointer_display_id() -> Option<u32> {
+        None
+    }
+
+    pub fn gpui_monitor_rects_px() -> Option<Vec<(u32, [i64; 4])>> {
         None
     }
 
@@ -701,8 +711,13 @@ mod imp {
 
     #[cfg(windows)]
     pub use crate::platform_win_monitors::{
-        display_id_for_area, left_button_down, pointer_display_id,
+        display_id_for_area, gpui_monitor_rects_px, left_button_down, pointer_display_id,
     };
+
+    #[cfg(not(windows))]
+    pub fn gpui_monitor_rects_px() -> Option<Vec<(u32, [i64; 4])>> {
+        None
+    }
 
     #[cfg(not(windows))]
     pub fn pointer_display_id() -> Option<u32> {

@@ -259,6 +259,28 @@ fn start_inner(
 
     // Display mode waits in the daemon: Esc is `cancel_delayed_capture(request_id)`.
     let display_id = target.and_then(|(id, _)| u32::try_from(u64::from(id)).ok());
+    // GPUI's display id is the engine's only where they agree (macOS); on Windows it is the
+    // monitor handle and the engine's id is found by the monitor's physical rectangle below.
+    let gpui_rects: Option<Vec<(u32, crate::recording::geometry::Rect)>> =
+        crate::platform_window::gpui_monitor_rects_px().map(|v| {
+            v.into_iter()
+                .map(|(id, r)| {
+                    (
+                        id,
+                        crate::recording::geometry::Rect::new(
+                            r[0] as f64,
+                            r[1] as f64,
+                            r[2] as f64,
+                            r[3] as f64,
+                        ),
+                    )
+                })
+                .collect()
+        });
+    let map_display = (fixed_target.is_none() && mode == CaptureMode::Display)
+        .then_some(display_id)
+        .flatten()
+        .filter(|_| gpui_rects.is_some());
     let daemon_target = match (fixed_target, mode, display_id) {
         (Some(t), _, _) => Some(t),
         (None, CaptureMode::Display, Some(display_id)) => Some(json!({ "display_id": display_id })),
@@ -275,6 +297,21 @@ fn start_inner(
             let flow = backend
                 .rt
                 .spawn(async move {
+                    let mut daemon_target = daemon_target;
+                    if let (Some(gpui_id), Some(rects)) = (map_display, &gpui_rects) {
+                        let listed =
+                            Backend::call(&daemon, "list_targets", json!({ "windows": false }))
+                                .await
+                                .map(|v| crate::recording::monitors::parse_engine_displays(&v))
+                                .unwrap_or_default();
+                        if let Some(id) = crate::recording::monitors::engine_display_id(
+                            gpui_id,
+                            Some(rects),
+                            &listed,
+                        ) {
+                            daemon_target = json!({ "display_id": id });
+                        }
+                    }
                     let params = json!({
                         "target": daemon_target,
                         "delay_s": secs,

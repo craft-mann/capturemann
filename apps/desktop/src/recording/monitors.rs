@@ -140,6 +140,83 @@ pub fn window_bounds(global: &Rect, display: &Rect, absolute: bool) -> Rect {
     }
 }
 
+/// A display as the engine lists it (`list_targets`): its own id and its rectangle in physical
+/// px.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EngineDisplay {
+    pub id: u32,
+    pub rect_px: Rect,
+    pub primary: bool,
+}
+
+/// Reads the `displays` of a `list_targets` answer (`bounds.origin` `{x, y}`, `bounds.size`
+/// `[w, h]` or `{width, height}`). Entries that lack a field are skipped.
+pub fn parse_engine_displays(v: &serde_json::Value) -> Vec<EngineDisplay> {
+    use serde_json::Value;
+    v.get("displays")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|d| {
+            let b = d.get("bounds")?;
+            let o = b.get("origin")?;
+            let size = b.get("size")?;
+            let (w, h) = match size.as_array() {
+                Some(a) => (a.first()?.as_f64()?, a.get(1)?.as_f64()?),
+                None => (size.get("width")?.as_f64()?, size.get("height")?.as_f64()?),
+            };
+            Some(EngineDisplay {
+                id: u32::try_from(d.get("id")?.as_u64()?).ok()?,
+                rect_px: Rect::new(o.get("x")?.as_f64()?, o.get("y")?.as_f64()?, w, h),
+                primary: d.get("is_primary").and_then(Value::as_bool) == Some(true),
+            })
+        })
+        .collect()
+}
+
+/// The engine's id of the display GPUI names `gpui_id`. On Windows GPUI's id is the monitor
+/// handle and the engine's is its own number, so the two are matched by the monitor's physical
+/// rectangle (origin and size, 1 px tolerance for rounding). `gpui` lists every GPUI display
+/// with its physical rectangle; `None` means the ids already agree (macOS) and `gpui_id` is
+/// returned as it is. A display that matches no rectangle falls back to the engine's primary
+/// display, then to the first one; `None` only when the engine lists nothing.
+pub fn engine_display_id(
+    gpui_id: u32,
+    gpui: Option<&[(u32, Rect)]>,
+    engine: &[EngineDisplay],
+) -> Option<u32> {
+    let Some(gpui) = gpui else {
+        return Some(gpui_id);
+    };
+    let near = |a: f64, b: f64| (a - b).abs() <= 1.0;
+    let by_rect = gpui
+        .iter()
+        .find(|(id, _)| *id == gpui_id)
+        .and_then(|(_, r)| {
+            engine
+                .iter()
+                .find(|e| {
+                    near(e.rect_px.x, r.x)
+                        && near(e.rect_px.y, r.y)
+                        && near(e.rect_px.w, r.w)
+                        && near(e.rect_px.h, r.h)
+                })
+                .or_else(|| {
+                    // Same origin but another size (a mode change between the two reads), else the
+                    // engine display holding the monitor's center.
+                    let (cx, cy) = r.center();
+                    engine
+                        .iter()
+                        .find(|e| near(e.rect_px.x, r.x) && near(e.rect_px.y, r.y))
+                        .or_else(|| engine.iter().find(|e| e.rect_px.contains(cx, cy)))
+                })
+        });
+    by_rect
+        .or_else(|| engine.iter().find(|e| e.primary))
+        .or_else(|| engine.first())
+        .map(|e| e.id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -366,5 +443,98 @@ mod tests {
         // Straddling the seam: the larger part wins.
         assert_eq!(index_for_area_px(&lab(), [1800, 0, 400, 200]), Some(1));
         assert_eq!(index_for_area_px(&lab(), [1500, 0, 400, 200]), Some(0));
+    }
+
+    fn eng(id: u32, r: [f64; 4], primary: bool) -> EngineDisplay {
+        EngineDisplay {
+            id,
+            rect_px: Rect::new(r[0], r[1], r[2], r[3]),
+            primary,
+        }
+    }
+
+    fn g(id: u32, r: [f64; 4]) -> (u32, Rect) {
+        (id, Rect::new(r[0], r[1], r[2], r[3]))
+    }
+
+    #[test]
+    fn gpui_display_ids_map_to_the_engines_by_rectangle() {
+        let panel = [0.0, 0.0, 1920.0, 1080.0];
+        let ext = [1920.0, 0.0, 3840.0, 2160.0];
+        let lab = [eng(65608, panel, true), eng(131073, ext, false)];
+        let handles = [g(0x30011, panel), g(0x20007, ext)];
+        let m = |id| engine_display_id(id, Some(&handles), &lab);
+        assert_eq!(m(0x30011), Some(65608));
+        assert_eq!(m(0x20007), Some(131073));
+
+        // The engine lists the other way round (ids and order swapped).
+        let rev = [eng(131073, panel, true), eng(65608, ext, false)];
+        assert_eq!(
+            engine_display_id(0x30011, Some(&handles), &rev),
+            Some(131073)
+        );
+        assert_eq!(
+            engine_display_id(0x20007, Some(&handles), &rev),
+            Some(65608)
+        );
+
+        // A monitor left of the primary (negative x).
+        let left = [-2560.0, 0.0, 2560.0, 1440.0];
+        let eng_neg = [eng(7, panel, true), eng(9, left, false)];
+        let h_neg = [g(1, panel), g(2, left)];
+        assert_eq!(engine_display_id(2, Some(&h_neg), &eng_neg), Some(9));
+        assert_eq!(engine_display_id(1, Some(&h_neg), &eng_neg), Some(7));
+
+        // Two monitors of the same size: told apart by origin.
+        let a = [0.0, 0.0, 1920.0, 1080.0];
+        let b = [1920.0, 0.0, 1920.0, 1080.0];
+        let same = [eng(10, a, true), eng(11, b, false)];
+        let hs = [g(5, b), g(6, a)];
+        assert_eq!(engine_display_id(5, Some(&hs), &same), Some(11));
+        assert_eq!(engine_display_id(6, Some(&hs), &same), Some(10));
+
+        // 1 px of rounding on the origin or size still matches.
+        let off = [
+            eng(1, panel, true),
+            eng(2, [1921.0, 0.0, 3840.0, 2159.0], false),
+        ];
+        assert_eq!(engine_display_id(0x20007, Some(&handles), &off), Some(2));
+    }
+
+    #[test]
+    fn an_unmatched_display_falls_back_to_the_primary() {
+        let lab = [
+            eng(1, [0.0, 0.0, 1920.0, 1080.0], false),
+            eng(2, [1920.0, 0.0, 1920.0, 1080.0], true),
+        ];
+        let far = [g(9, [8000.0, 8000.0, 100.0, 100.0])];
+        assert_eq!(engine_display_id(9, Some(&far), &lab), Some(2));
+        // An unknown handle.
+        let known = [g(1, [0.0, 0.0, 1920.0, 1080.0])];
+        assert_eq!(engine_display_id(9, Some(&known), &lab), Some(2));
+        // No primary flag: the first one. Nothing listed: nothing.
+        let nop = [eng(3, [0.0, 0.0, 10.0, 10.0], false)];
+        assert_eq!(engine_display_id(9, Some(&far), &nop), Some(3));
+        assert_eq!(engine_display_id(9, Some(&far), &[]), None);
+    }
+
+    #[test]
+    fn where_the_ids_agree_nothing_changes() {
+        let lab = [eng(1, [0.0, 0.0, 10.0, 10.0], true)];
+        assert_eq!(engine_display_id(42, None, &lab), Some(42));
+        assert_eq!(engine_display_id(42, None, &[]), Some(42));
+    }
+
+    #[test]
+    fn the_engine_listing_is_read_with_its_origin() {
+        let v = serde_json::json!({"displays": [
+            {"id": 65608, "name": "a", "bounds": {"origin": {"x": 0, "y": 0}, "size": [1920, 1080]}, "is_primary": true},
+            {"id": 131073, "bounds": {"origin": {"x": -1920, "y": 5}, "size": {"width": 3840, "height": 2160}}},
+            {"id": 3}
+        ]});
+        let d = parse_engine_displays(&v);
+        assert_eq!(d.len(), 2);
+        assert!(d[0].primary && !d[1].primary);
+        assert_eq!(d[1].rect_px, Rect::new(-1920.0, 5.0, 3840.0, 2160.0));
     }
 }

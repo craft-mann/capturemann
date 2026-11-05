@@ -139,6 +139,19 @@ pub fn left_button_down() -> bool {
     state < 0
 }
 
+/// Every monitor by its handle (GPUI's display id) with its frame in physical px.
+pub fn gpui_monitor_rects_px() -> Option<Vec<(u32, [i64; 4])>> {
+    Some(
+        monitors()
+            .iter()
+            .map(|m| {
+                let r = m.frame_px;
+                (m.id, [r.x as i64, r.y as i64, r.w as i64, r.h as i64])
+            })
+            .collect(),
+    )
+}
+
 /// The handle of the monitor holding a recorded area (`[x, y, w, h]` physical px).
 pub fn display_id_for_area(bounds: [i64; 4]) -> Option<u32> {
     let ms = monitors();

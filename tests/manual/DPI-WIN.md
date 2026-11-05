@@ -177,10 +177,25 @@ Windows CI build only.
 7. Repeat with layouts B and C (mixed DPI) and a monitor left of / above the panel.
 
 **Not checked / risks.** (a) The area window is not click-through on Windows (`Tweaks::click_through` is a
-macOS-only tweak), so it may swallow clicks on the recorded monitor: look for this in step 2. (b) Dragging the
+macOS-only tweak), so it may swallow clicks on the recorded monitor: look for this in step 2. Left as it is on purpose: GPUI 0.3.9 creates every window with `WS_EX_NOREDIRECTIONBITMAP` and renders through a DirectComposition swap chain (`gpui-windows` window.rs:514, directx_renderer.rs:177), and nothing in its source shows that adding `WS_EX_LAYERED|WS_EX_TRANSPARENT` afterwards keeps the picture; `WM_NCHITTEST` with `HTTRANSPARENT` only passes clicks to windows of the same thread. If the clicks are swallowed, try on the laptop (one experiment, area window only): `SetWindowLongPtrW(GWL_EXSTYLE, old | WS_EX_LAYERED | WS_EX_TRANSPARENT)` after the window exists and check that the brackets still draw. (b) Dragging the
 HUD and the bubble relies on GPUI starting a native window move on Windows; `frame` and `move_to` now work but
-the drag start was not looked at. (c) The Record sheet's Display tiles and the delay pill send GPUI's display
-id (the `HMONITOR`) as the engine's `display_id`: on Windows that is another number, so "Display" capture from
-the pill or a tile may name the wrong display; this needs a map from the monitor to the engine's id (not done).
+the drag start was not looked at. (c) FIXED in code (Nov 5, win-dispid, tested with fakes only): the Record sheet's tiles already send the engine's own
+ids (they come from `list_targets`); the delay pill sent GPUI's display id (the `HMONITOR`). It now maps the monitor
+to the engine's display by physical rectangle (`monitors::engine_display_id`, 1 px tolerance, primary as the fallback;
+macOS passes the id through). Check on the laptop: see "Display capture ids" below.
 (d) The `frame` rect is the client area, which is what GPUI calls its bounds; the 3862x2171 outer rect of the
 report includes the invisible resize frame, so compare against the client rect.
+
+## Display capture ids (win-dispid; NOT run on hardware)
+
+The delay pill's display capture names the engine's display by mapping GPUI's monitor handle through the monitor's
+physical rectangle. On the lab laptop (panel 1920x1080 id 65608, Samsung 3840x2160 at (1920,0) id 131073):
+
+1. Set a capture delay (3 s) in the launcher. Put the pointer on the panel, press the Capture display hotkey (or tray
+   "Capture display"). Pass: the PNG is 1920x1080 and shows the panel.
+2. Repeat with the pointer on the Samsung. Pass: the PNG is 3840x2160 and shows the Samsung.
+3. From the Record sheet: open it with the pointer on each monitor, pick each Display tile in turn and Start (a few
+   seconds; ask first; delete the output). Pass: the recorded display is the tile's, its size matches the tile label.
+4. With a delay, log folder: the `capture_screenshot` call carries `display_id` 65608 for the panel and 131073 for the
+   Samsung (not a handle like 197xxx).
+5. Swap the primary in Windows Settings and repeat 1 and 2 (the engine's ids may change; the result must not).
