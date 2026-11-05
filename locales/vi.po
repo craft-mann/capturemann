@@ -1281,9 +1281,8 @@ msgstr "Đếm ngược trước khi tiếp tục"
 msgid "Countdown settings"
 msgstr "Cài đặt đếm ngược"
 
-#, fuzzy
 msgid "Create a single MP4 after recording"
-msgstr "Tạo một tệp MP4 duy nhất sau khi quay"
+msgstr "Tạo một video MP4 sau khi ghi hình"
 
 # NOTE: column header (creation date); "Ngày tạo" chosen over "Đã tạo".
 #, fuzzy
@@ -11558,22 +11557,17 @@ msgstr "Chép lời tự động"
 msgid "While recording: audio recordings are read piece by piece as you record, so the transcript is ready sooner after Stop; screen recordings are transcribed after they stop."
 msgstr "Trong khi ghi: bản ghi âm được đọc từng đoạn khi bạn ghi, nên bản chép lời sẵn sàng sớm hơn sau khi dừng; bản quay màn hình được chép lời sau khi dừng."
 
-#, fuzzy
 msgid "FFmpeg at `{path}` cannot be run (permission denied). FFmpeg was not found: CaptureMann includes its own copy, so reinstall CaptureMann, or set CM_FFMPEG to the path of ffmpeg.exe. (For development: winget install Gyan.FFmpeg.)"
-msgstr "Không chạy được FFmpeg tại `{path}` (bị từ chối quyền). Không tìm thấy FFmpeg: CaptureMann đã kèm sẵn một bản, hãy cài lại CaptureMann hoặc đặt CM_FFMPEG trỏ tới ffmpeg.exe. (Khi phát triển: winget install Gyan.FFmpeg.)"
+msgstr "Không thể chạy FFmpeg tại `{path}` do không có quyền truy cập. CaptureMann đã tích hợp sẵn FFmpeg, vui lòng cài đặt lại ứng dụng hoặc thiết lập biến môi trường CM_FFMPEG trỏ đến tệp ffmpeg.exe. (Dành cho nhà phát triển: winget install Gyan.FFmpeg.)"
 
-#, fuzzy
 msgid "FFmpeg was not found: CaptureMann includes its own copy, so reinstall CaptureMann, or set CM_FFMPEG to the path of ffmpeg.exe. (For development: winget install Gyan.FFmpeg.)"
-msgstr "Không tìm thấy FFmpeg: CaptureMann đã kèm sẵn một bản, hãy cài lại CaptureMann hoặc đặt CM_FFMPEG trỏ tới ffmpeg.exe. (Khi phát triển: winget install Gyan.FFmpeg.)"
+msgstr "Không tìm thấy FFmpeg. CaptureMann đã tích hợp sẵn FFmpeg, vui lòng cài đặt lại ứng dụng hoặc thiết lập biến môi trường CM_FFMPEG trỏ đến tệp ffmpeg.exe. (Dành cho nhà phát triển: winget install Gyan.FFmpeg.)"
 
-#, fuzzy
 msgid "FFmpeg wasn’t found, so the combined video was not made. Reinstall CaptureMann (it includes its own copy), then press Export on the recording."
-msgstr "Không tìm thấy FFmpeg nên video gộp chưa được tạo. Hãy cài lại CaptureMann (đã kèm sẵn một bản), rồi nhấn Xuất trên bản ghi."
+msgstr "Không thể tạo video tổng hợp do không tìm thấy FFmpeg. Vui lòng cài đặt lại CaptureMann (đã tích hợp sẵn FFmpeg), sau đó nhấn Xuất tại bản ghi để thử lại."
 
-#, fuzzy
 msgid "Renders one video with the screen, the camera bubble and your audio into the recording’s exports folder. The original tracks are never changed. Needs FFmpeg (included with CaptureMann)."
-msgstr "Tạo một video gồm màn hình, bong bóng camera và âm thanh của bạn trong thư mục xuất của bản ghi. Các rãnh gốc không bao giờ bị thay đổi. Cần FFmpeg (đã kèm trong CaptureMann)."
+msgstr "Tạo một video MP4 kết hợp màn hình, khung hình camera và âm thanh, lưu vào thư mục xuất của bản ghi. Các tệp gốc được giữ nguyên. Yêu cầu FFmpeg (đã tích hợp sẵn trong CaptureMann)."
 
-#, fuzzy
 msgid "The recording is saved, but the single MP4 needs FFmpeg. Reinstall CaptureMann (it includes its own copy), or set CM_FFMPEG to ffmpeg.exe, then press Export on the recording."
-msgstr "Đã lưu bản ghi, nhưng MP4 đơn cần FFmpeg. Hãy cài lại CaptureMann (đã kèm sẵn một bản) hoặc đặt CM_FFMPEG trỏ tới ffmpeg.exe, rồi nhấn Xuất trên bản ghi."
+msgstr "Đã lưu bản ghi nhưng không thể xuất video MP4 do thiếu FFmpeg. Vui lòng cài đặt lại CaptureMann (đã tích hợp sẵn FFmpeg) hoặc thiết lập CM_FFMPEG trỏ đến tệp ffmpeg.exe, sau đó nhấn Xuất tại bản ghi để thử lại."
