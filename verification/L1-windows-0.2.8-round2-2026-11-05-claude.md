@@ -54,3 +54,10 @@ Volume was set to 0.3 unmuted only inside `loud.ps1`/`gate2.ps1` (try/finally) f
 ## Cleanup
 
 Removed from the laptop: ffmpeg-full, the speaker models and clip, all libraries, recordings, configs of these runs, shots, installer copies, my scripts' temp files. No cm-* process, scheduled task or ffmpeg is left. The maintainer's `ggml-medium.bin` is untouched. `C:\lab\tests` (CI test programs of run 41962900083) and my small helper scripts remain.
+
+## Addendum (Nov 5, 2026, later): items 5b and 6d after fixes (PARTIAL)
+
+- **5b parity: fixed, then PASS on the laptop (one run).** Cause: the export of `h264_mf` / Quick Sync feeds `nv12`, and `encode_args` in `crates/cm-media/src/edited.rs` applied the BT.709 conversion and the colour tags only for `yuv*` pixel formats, so FFmpeg converted with its default BT.601 and left the stream untagged (measured: preview green (0,254,0), export (0,215,0); decoding the export as BT.601 gave MAE 0.97). Fix: commit 2d7145c0 (`nv12` counts as YUV; unit test `nv12_encoders_convert_with_bt709_and_tag_the_stream`). On the laptop (Intel UHD 620 adapter, not a software one; backend not printed) `cm-desktop__parity.exe` from Windows tests run 41971550916 gave 3 passed, 0 failed; control MAE 0.57 to 0.64, other cases 0.5 to 1.4 (limit 3). The other `cm-media` tests were not re-run after the fix. This was a product bug (every quick/YouTube export through `h264_mf` had shifted colours); it is fixed in the code the next package contains.
+- **Open from the same finding:** `crates/cm-media/src/import/prepare.rs` also feeds `nv12` to `h264_mf`; it converts YUV to YUV (no matrix change), so a colour shift is not expected, but nobody compared its output by eye or by frame.
+- **6d HUD, countdown and brackets on a non-primary monitor:** code fix merged (commit 6ba2215c, display ids 3cb7a05b); not yet run on the laptop.
+- **6b picker overlay:** the overlay windows are excluded from capture on purpose, so the blank grabs are expected; deadline and focus fixes are merged (af6eb171); not yet run on the laptop.
