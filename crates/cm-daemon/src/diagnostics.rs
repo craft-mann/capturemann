@@ -170,6 +170,12 @@ pub fn system_lines(stack: Option<&cm_platform::stack::Report>) -> Vec<String> {
     if let Ok(n) = std::thread::available_parallelism() {
         out.push(format!("threads available {n}"));
     }
+    // What the bundled whisper.cpp/ggml was compiled for (AVX2, FMA, F16C, ...): a build without these
+    // transcribes several times slower (Windows lab, Nov 5, 2026), and this line shows it in a report.
+    out.push(format!(
+        "speech engine CPU features: {}",
+        cm_ai::whisper::system_info().trim()
+    ));
     // Windows only (empty elsewhere): the OS build and the graphics adapters with their driver versions.
     out.extend(cm_platform::sysinfo::lines());
     // Linux only (None elsewhere): the desktop stack the screenshot and recording paths depend on.
