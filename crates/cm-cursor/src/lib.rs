@@ -8,6 +8,8 @@
 
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
+#[cfg_attr(not(windows), allow(dead_code))]
+mod dpi;
 pub mod image;
 mod pipeline;
 mod platform;

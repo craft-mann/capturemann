@@ -19,12 +19,12 @@ use std::time::Duration;
 use cm_core::{CmError, HostClock, SystemHostClock};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
-    DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFO, BITMAPINFOHEADER,
-    BI_RGB, DIB_RGB_COLORS, HBITMAP, HGDIOBJ,
+    DeleteObject, GetDC, GetDIBits, GetObjectW, MonitorFromPoint, ReleaseDC, BITMAP, BITMAPINFO,
+    BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HGDIOBJ, MONITOR_DEFAULTTONEAREST,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Threading::GetCurrentThreadId;
-use windows::Win32::UI::HiDpi::GetDpiForSystem;
+use windows::Win32::UI::HiDpi::{GetDpiForMonitor, GetDpiForSystem, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
 };
@@ -189,7 +189,26 @@ fn hook_thread(tx: RawSender, activity: Arc<Activity>, ready: mpsc::Sender<Optio
 
 /// Polls `GetCursorInfo` and extracts the image when the `HCURSOR` handle changes.
 struct WinImageProvider {
-    last: Option<isize>,
+    /// The cursor handle and the DPI of the monitor it was extracted for: a new image is taken
+    /// when either changes (the same handle is drawn at another size on another monitor).
+    last: Option<(isize, u32)>,
+}
+
+/// Effective DPI of the monitor under the pointer; 96 when it cannot be read.
+fn monitor_dpi_at_pointer() -> u32 {
+    let mut p = POINT::default();
+    // SAFETY: `p` is writable.
+    if unsafe { GetCursorPos(&mut p) }.is_err() {
+        return crate::dpi::BASE_DPI;
+    }
+    // SAFETY: MonitorFromPoint takes a plain point and returns a handle (nearest monitor).
+    let mon = unsafe { MonitorFromPoint(p, MONITOR_DEFAULTTONEAREST) };
+    let (mut x, mut y) = (0u32, 0u32);
+    // SAFETY: both out parameters are writable u32s.
+    match unsafe { GetDpiForMonitor(mon, MDT_EFFECTIVE_DPI, &mut x, &mut y) } {
+        Ok(()) if x > 0 => x,
+        _ => crate::dpi::BASE_DPI,
+    }
 }
 
 impl ImageProvider for WinImageProvider {
@@ -203,13 +222,14 @@ impl ImageProvider for WinImageProvider {
         if ci.flags.0 & CURSOR_SHOWING.0 == 0 {
             return None;
         }
-        let key = ci.hCursor.0 as isize;
+        let monitor_dpi = monitor_dpi_at_pointer();
+        let key = (ci.hCursor.0 as isize, monitor_dpi);
         if self.last == Some(key) {
             return None;
         }
         self.last = Some(key);
         // SAFETY: the handle comes from GetCursorInfo just now.
-        unsafe { extract(HICON(ci.hCursor.0)) }
+        unsafe { extract(HICON(ci.hCursor.0), monitor_dpi) }
     }
 }
 
@@ -217,7 +237,7 @@ impl ImageProvider for WinImageProvider {
 ///
 /// # Safety
 /// `icon` must be a valid cursor handle.
-unsafe fn extract(icon: HICON) -> Option<CursorImage> {
+unsafe fn extract(icon: HICON, monitor_dpi: u32) -> Option<CursorImage> {
     let mut info = ICONINFO::default();
     // SAFETY: `info` is writable; on success the bitmaps are ours to delete.
     unsafe { GetIconInfo(icon, &mut info) }.ok()?;
@@ -234,7 +254,9 @@ unsafe fn extract(icon: HICON) -> Option<CursorImage> {
     }
     let (w, h, rgba) = out?;
     // SAFETY: GetDpiForSystem takes no arguments and touches no memory.
-    let scale = f64::from(unsafe { GetDpiForSystem() }) / 96.0;
+    let system_dpi = unsafe { GetDpiForSystem() };
+    // The bitmap is at the system DPI, the screen shows it at the monitor's: see `dpi`.
+    let scale = crate::dpi::sprite_density(system_dpi, monitor_dpi);
     Some(CursorImage {
         width: w,
         height: h,
