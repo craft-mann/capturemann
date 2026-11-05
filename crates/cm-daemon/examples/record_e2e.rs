@@ -428,7 +428,7 @@ mod imp {
         let out = Command::new("ffmpeg")
             .args(["-v", "error", "-i"])
             .arg(path)
-            .args(["-f", "null", "-"])
+            .args(["-fps_mode", "passthrough", "-f", "null", "-"])
             .output()
             .ok()?;
         Some(String::from_utf8_lossy(&out.stderr).trim().to_owned())
@@ -1300,7 +1300,7 @@ mod imp {
                     let end = t["end"].as_i64().unwrap_or(0);
                     let tol = if name == "camera" { 260.0 } else { 100.0 };
                     r.check(
-                        (ms_of(w - end)).abs() <= tol && end <= w + 120,
+                        (ms_of(w - end)).abs() <= tol && ms_of(end - w) <= 120.0,
                         &format!("{name}: ends at the stop time"),
                         format!("{} before the stop", fmt_ms(ms_of(w - end))),
                         &format!("0..{tol} ms (camera delivery lag is ~75 ms)"),
