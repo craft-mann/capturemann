@@ -65,6 +65,11 @@ pub const CAMERA_CONNECTED: &str = "camera.connected";
 /// A camera went away (also while idle; during a recording it comes with the
 /// `recording.warning` `camera_lost`): `{ device_id, name, kind, is_default }`.
 pub const CAMERA_DISCONNECTED: &str = "camera.disconnected";
+/// The camera track of the running recording is back after a loss (the same device was opened again
+/// and its first frame was written): `{ recording_id, at_ms }`, `at_ms` in session time. The gap
+/// stays in the camera file. It follows `camera_lost`; agents and the CLI read it without parsing
+/// the recording warnings (the `camera_restored` note is Info and is not published as a warning).
+pub const CAMERA_RECONNECTED: &str = "camera.reconnected";
 /// An `export` job was enqueued: `{ job_id, capture_id, title, preset, auto }`; `recovered: true`
 /// when it is republished after a restart for a job that survived in the queue (EXP-4.AC3).
 pub const EXPORT_QUEUED: &str = "export.queued";

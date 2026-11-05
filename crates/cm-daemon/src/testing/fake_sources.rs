@@ -66,6 +66,11 @@ impl FakeTrackHandle {
         lock(&self.state.notes).push(TrackNote::new(NoteLevel::Warning, code, message));
     }
 
+    /// The track reports an Info note (`camera_restored`, ...).
+    pub fn info(&self, code: &str, message: &str) {
+        lock(&self.state.notes).push(TrackNote::new(NoteLevel::Info, code, message));
+    }
+
     /// The track itself notices that the OS removed its permission (a ScreenCaptureKit
     /// "user declined TCCs" stop, an AVCapture not-authorized error): it raises the typed
     /// `permission_revoked` note, a stop request for the screen and a warning otherwise.

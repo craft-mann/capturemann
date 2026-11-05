@@ -607,6 +607,12 @@ impl Driver {
         };
         let mut stop: Option<String> = None;
         for n in &notes {
+            if n.code == "camera_restored" {
+                self.publish(
+                    events::CAMERA_RECONNECTED,
+                    json!({ "at_ms": n.at.map(|t| t.as_millis_floor()) }),
+                );
+            }
             if n.level == NoteLevel::Info {
                 continue;
             }

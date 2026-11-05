@@ -104,3 +104,37 @@ async fn cam1_unplug_during_a_recording_fires_the_event_and_the_recording_goes_o
         .await
         .unwrap();
 }
+
+#[tokio::test]
+async fn cam1_replug_during_a_recording_fires_camera_reconnected() {
+    let (b, _dir) = builder(desktop());
+    let (watcher, hw) = FakeCameraWatcher::new();
+    hw.connect(cam("usb-1", "Logitech C920"));
+    let sources = FakeSources::new();
+    let daemon = b
+        .camera_watcher(watcher)
+        .recording_sources(sources.clone())
+        .build();
+    let mut rx = daemon.subscribe();
+    daemon
+        .execute_method(
+            cm_core::Actor::User,
+            0,
+            "start_recording",
+            &json!({ "target": { "display_id": 1 }, "countdown_s": 0, "camera": {} }),
+        )
+        .await
+        .unwrap();
+    let handle = sources.handle(TrackKind::Camera).unwrap();
+    handle.warn("camera_lost", "The camera was disconnected");
+    let w = next(&mut rx, "recording.warning").await;
+    assert_eq!(w.data["code"], "camera_lost");
+    handle.info("camera_restored", "The camera is back");
+    let ev = next(&mut rx, "camera.reconnected").await;
+    assert!(ev.data["recording_id"].is_string(), "{:?}", ev.data);
+    assert!(daemon.recording_active(), "the session continues");
+    daemon
+        .execute_method(cm_core::Actor::User, 0, "stop_recording", &json!({}))
+        .await
+        .unwrap();
+}
