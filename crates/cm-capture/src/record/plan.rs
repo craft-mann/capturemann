@@ -124,9 +124,12 @@ pub struct CapturePlan {
 
 /// The smallest recorded width and height, in physical px. H.264 encoders work in 16 px macroblocks
 /// and hardware transforms refuse anything smaller (a 2 x 2 region made the Windows encoder fail
-/// to start, which looked like a missing encoder). Smaller areas are `invalid_input` up front;
+/// to start, which looked like a missing encoder). Measured on the Windows lab laptop (Intel UHD 620,
+/// Media Foundation hardware H.264, Nov 5, 2026): sides of 18 and more record, a side of 16 (and so 17,
+/// which is made even) makes the encoder refuse to start (`no encoder setup worked at 16x16`), so the
+/// limit is 18, not the macroblock size. Smaller areas are `invalid_input` up front;
 /// `hardware_encoder_unavailable` stays for a computer that has no hardware encoder at all.
-pub const MIN_RECORDING_SIDE: u32 = 16;
+pub const MIN_RECORDING_SIDE: u32 = 18;
 
 /// Resolves the target against the current displays and windows (REC-1, REC-2).
 pub fn plan_capture(settings: &ScreenSettings, targets: &Targets) -> Result<CapturePlan, CmError> {
@@ -258,7 +261,15 @@ mod tests {
     /// "no hardware encoder" error the Windows encoder start used to give.
     #[test]
     fn a_region_below_the_encoder_minimum_is_invalid_input() {
-        for (w, h) in [(2, 2), (15, 400), (400, 15), (1, 1)] {
+        for (w, h) in [
+            (2, 2),
+            (15, 400),
+            (400, 15),
+            (1, 1),
+            (16, 16),
+            (17, 400),
+            (400, 17),
+        ] {
             let s = ScreenSettings::new(CaptureTarget::Region {
                 display_id: 1,
                 rect: RegionRect::Physical(rect(10, 10, w, h)),
@@ -267,7 +278,7 @@ mod tests {
             assert_eq!(e.code(), cm_core::ErrorCode::InvalidInput, "{w}x{h}");
             assert_eq!(
                 e.to_string(),
-                "The recording area is too small: each side must be at least 16 px."
+                "The recording area is too small: each side must be at least 18 px."
             );
             assert_eq!(
                 cm_core::message::describe(cm_core::ErrorCode::InvalidInput, &e.to_string())
@@ -277,7 +288,7 @@ mod tests {
         }
         let s = ScreenSettings::new(CaptureTarget::Region {
             display_id: 1,
-            rect: RegionRect::Physical(rect(10, 10, 16, 16)),
+            rect: RegionRect::Physical(rect(10, 10, 18, 18)),
         });
         assert!(plan_capture(&s, &targets()).is_ok());
     }

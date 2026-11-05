@@ -48,14 +48,14 @@ pub fn cases() -> Vec<Case> {
         },
         Case {
             id: "ai.speakers",
-            title: "speaker labels with the speaker models (not driven by this suite yet)",
+            title: "speaker labels: two voices give two speakers with the speaker models (--speech, --speaker-models)",
             area: "ai",
             specs: &["AI-8"],
             tier: Tier::Full,
             needs: &[Need::Models],
             platforms: ALL,
-            timeout_s: 60,
-            run: speakers_stub,
+            timeout_s: 420,
+            run: speakers,
         },
     ]
 }
@@ -211,7 +211,11 @@ fn transcribe(ctx: &mut Ctx) -> R {
     let m = model.to_string_lossy().into_owned();
     ctx.cli_ok(&["ai", "models", "import", &model_id, &m])?;
     ctx.cli_ok(&["ai", "models", "use", &model_id])?;
-    let (id, _) = import_file(ctx, &clips.join("clip-h264.mp4"))?;
+    let speech = ctx.opts.speech_audio.clone();
+    let (id, _) = match &speech {
+        Some(f) => import_file(ctx, f)?,
+        None => import_file(ctx, &clips.join("clip-h264.mp4"))?,
+    };
     let r = ctx.cli_long(
         &[
             "ai",
@@ -271,9 +275,91 @@ fn transcribe(ctx: &mut Ctx) -> R {
         "ai transcript failed after a finished transcription: {}",
         exit_text(t.code())
     );
+    if speech.is_some() {
+        // With real speech the transcript must hold words, and about as many as a person speaks (about 1 to 4
+        // a second; the lower bound only rejects an empty or near-empty result, the upper an invented flood).
+        let j = ctx.cli_ok(&["ai", "transcript", &id])?;
+        let words = j
+            .pointer("/transcript/words")
+            .and_then(Value::as_array)
+            .map_or(0, Vec::len);
+        let secs = library_entry(ctx, &id)?
+            .get("duration")
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0)
+            / 120_000.0;
+        ctx.note(format!(
+            "transcript: {words} words over {secs:.1} s of speech"
+        ));
+        check!(
+            words > 0,
+            "the transcript of a speech recording has no words"
+        );
+        if secs > 5.0 {
+            let per_s = words as f64 / secs;
+            check!(
+                (0.3..=6.0).contains(&per_s),
+                "{words} words in {secs:.1} s of speech is not plausible ({per_s:.2} a second)"
+            );
+        }
+    }
     Ok(())
 }
 
-fn speakers_stub(_ctx: &mut Ctx) -> R {
-    Err(Stop::Skip("not driven yet: needs the two speaker models; the real-model check is cm-ai__real_diarize in the Windows tests artifact".to_owned()))
+/// Speaker labels on a two-voice recording (`--speech`, for example `win-make-speech.ps1`'s speech2.wav) with the
+/// two speaker models in `--speaker-models`: two speakers are found when two are asked for, their turns are
+/// stored, and words get a speaker after a transcription. Synthetic voices: no accuracy claim.
+fn speakers(ctx: &mut Ctx) -> R {
+    let Some(speech) = ctx.opts.speech_audio.clone() else {
+        return skip("no --speech <two-voice recording> given");
+    };
+    if ctx.opts.speaker_models.is_none() {
+        return skip(
+            "no --speaker-models <dir> given (the two ONNX files; this package bundles none)",
+        );
+    }
+    ctx.start_daemon()?;
+    let (id, _) = import_file(ctx, &speech)?;
+    let r = ctx.cli_long(
+        &[
+            "ai",
+            "speakers",
+            &id,
+            "--num",
+            "2",
+            "--wait",
+            "--timeout",
+            "300",
+        ],
+        360,
+    )?;
+    ctx.note(format!(
+        "speakers: {} {}",
+        exit_text(r.code()),
+        crate::util::cut(&crate::util::one_line(&r.out.text()), 200)
+    ));
+    check!(
+        !is_crash_code(r.code()),
+        "the speaker engine crashed: {}",
+        exit_text(r.code())
+    );
+    if r.code() == Some(2) {
+        return fail(format!(
+            "the speaker models were not found or not accepted: {}",
+            crate::util::cut(&crate::util::one_line(&r.out.text()), 300)
+        ));
+    }
+    check!(
+        r.ok(),
+        "ai speakers failed: {}",
+        crate::util::cut(&crate::util::one_line(&r.out.text()), 300)
+    );
+    let l = ctx.cli_ok(&["ai", "speakers", "list", &id])?;
+    let n = l
+        .get("speakers")
+        .and_then(Value::as_array)
+        .map_or(0, Vec::len);
+    ctx.note(format!("speakers listed: {n}"));
+    check!(n == 2, "asked for 2 speakers, `speakers list` shows {n}");
+    Ok(())
 }

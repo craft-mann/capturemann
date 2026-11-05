@@ -30,6 +30,7 @@ use std::time::{Duration, SystemTime};
 const USAGE: &str = "usage: cm-regress [--tier smoke|standard|full|hardware] [--only <id|area>,...] [--allow screen,sound,mic,camera,second_monitor,models,ffmpeg_full,network]
                   [--package-dir <dir>] [--out <dir>] [--keep] [--list] [--dev]
                   [--installer <setup.exe>] [--zip <file>] [--commit <sha>] [--whisper-model <ggml file>] [--whisper-model-id <id>]
+                  [--speech <audio file>] [--speaker-models <dir>]
                   [--soak-minutes <n>] [--timeout-scale <f>] [--verdict <text>] [--who <name>]
 
 Runs the regression cases against the programs in --package-dir (default: the per-user install folder, else the
@@ -51,6 +52,8 @@ pub fn parse_args(args: &[String]) -> Result<Options, String> {
         commit: None,
         whisper_model: None,
         whisper_model_id: "small".to_owned(),
+        speech_audio: None,
+        speaker_models: None,
         soak_minutes: 0,
         timeout_scale: 1.0,
         verdict: "PARTIAL".to_owned(),
@@ -113,6 +116,11 @@ pub fn parse_args(args: &[String]) -> Result<Options, String> {
                 o.allow.insert("models".to_owned());
             }
             "--whisper-model-id" => o.whisper_model_id = value(&mut i, a)?,
+            "--speech" => o.speech_audio = Some(PathBuf::from(value(&mut i, a)?)),
+            "--speaker-models" => {
+                o.speaker_models = Some(PathBuf::from(value(&mut i, a)?));
+                o.allow.insert("models".to_owned());
+            }
             "--soak-minutes" => {
                 o.soak_minutes = value(&mut i, a)?
                     .parse()
@@ -273,7 +281,7 @@ fn main() -> ExitCode {
         has_desktop,
         platform: sys::PLATFORM,
         have_installer: opts.installer.is_some(),
-        have_models: opts.whisper_model.is_some(),
+        have_models: opts.whisper_model.is_some() || opts.speaker_models.is_some(),
     };
     let selected = runner::select(&all, &opts.only, opts.tier);
     if opts.list {

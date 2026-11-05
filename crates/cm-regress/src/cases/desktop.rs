@@ -95,14 +95,14 @@ pub fn cases() -> Vec<Case> {
         },
         Case {
             id: "desktop.tray_icon",
-            title: "the tray icon exists (UI Automation probe)",
+            title: "the tray icon appears in the notification area while the app runs (UI Automation probe)",
             area: "desktop",
             specs: &["REC-5 tray"],
             tier: Tier::Standard,
             needs: &[Need::DesktopSession],
             platforms: WIN,
             timeout_s: 30,
-            run: tray_stub,
+            run: tray_icon,
         },
     ]
 }
@@ -533,8 +533,83 @@ fn no_console(ctx: &mut Ctx) -> R {
     Ok(())
 }
 
-fn tray_stub(_ctx: &mut Ctx) -> R {
-    skip("not implemented: the tray icon lives in the hidden-icons overflow and needs a UI Automation probe; see tests/manual/REC-5.md")
+/// Counts the notification-area buttons named exactly "CaptureMann" with UI Automation: the Windows 11
+/// tray keeps the icon in the "Show Hidden Icons" overflow, so the probe opens that flyout, reads it and
+/// closes it again (Esc). The taskbar's own task button is named "CaptureMann - 1 running window" and
+/// does not count. Prints `TRAY <n> <names>`.
+const TRAY_PROBE: &str = r#"
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes
+Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class CmKey { [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte sc, uint fl, UIntPtr e); }'
+$A = [System.Windows.Automation.AutomationElement]; $TS = [System.Windows.Automation.TreeScope]
+$all = [System.Windows.Automation.Condition]::TrueCondition
+$root = $A::RootElement
+$names = New-Object System.Collections.Generic.List[string]
+function Scan($el) { foreach ($e in $el.FindAll($TS::Descendants, $all)) { if ($e.Current.Name -eq 'CaptureMann' -and $e.Current.ControlType.ProgrammaticName -eq 'ControlType.Button') { $names.Add('button') } } }
+$tb = $root.FindFirst($TS::Children, (New-Object System.Windows.Automation.PropertyCondition($A::ClassNameProperty, 'Shell_TrayWnd')))
+if (-not $tb) { 'TRAY -1 no taskbar'; exit 0 }
+Scan $tb
+$more = $tb.FindAll($TS::Descendants, $all) | Where-Object { $_.Current.Name -eq 'Show Hidden Icons' } | Select-Object -First 1
+if ($more) {
+  $ip = $null
+  if ($more.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$ip)) {
+    $ip.Invoke(); Start-Sleep -Milliseconds 1500
+    foreach ($c in $root.FindAll($TS::Children, $all)) { if ($c.Current.ClassName -match 'Overflow') { Scan $c } }
+    [CmKey]::keybd_event(0x1B, 0, 0, [UIntPtr]::Zero); Start-Sleep -Milliseconds 80; [CmKey]::keybd_event(0x1B, 0, 2, [UIntPtr]::Zero)
+  }
+}
+"TRAY $($names.Count) $($names -join ',')"
+"#;
+
+fn tray_count(ctx: &mut Ctx) -> R<i64> {
+    let script = ctx.root.join("tray-probe.ps1");
+    std::fs::write(&script, TRAY_PROBE)
+        .map_err(|e| Stop::Fail(format!("could not write the probe script: {e}")))?;
+    let mut c = std::process::Command::new("powershell");
+    c.args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"])
+        .arg(&script);
+    let out = ctx.run(c, 60)?;
+    let text = out.text();
+    let line = text
+        .lines()
+        .find(|l| l.starts_with("TRAY "))
+        .unwrap_or_default();
+    ctx.note(format!(
+        "tray probe: {} {}",
+        exit_text(out.code),
+        crate::util::cut(&crate::util::one_line(&text), 160)
+    ));
+    line.split_whitespace()
+        .nth(1)
+        .and_then(|n| n.parse::<i64>().ok())
+        .ok_or_else(|| Stop::Fail(format!("the tray probe printed no result: {text}")))
+}
+
+fn tray_icon(ctx: &mut Ctx) -> R {
+    if sys::PLATFORM != "windows" {
+        return skip("the tray probe uses Windows UI Automation");
+    }
+    // Icons of other CaptureMann programs already running (the maintainer's app) are the baseline.
+    let before = tray_count(ctx)?;
+    if before < 0 {
+        return skip("the machine shows no taskbar (Shell_TrayWnd)");
+    }
+    let app = start_app(ctx, &[])?;
+    std::thread::sleep(Duration::from_secs(6));
+    let after = tray_count(ctx)?;
+    ctx.note(format!(
+        "tray buttons named CaptureMann: {before} before the app, {after} with it"
+    ));
+    check!(
+        alive(app.pid),
+        "cm-desktop (pid {}) is gone after the probe",
+        app.pid
+    );
+    check!(
+        after > before,
+        "no new CaptureMann icon in the notification area ({before} before, {after} with the app running)"
+    );
+    Ok(())
 }
 
 fn settings_applied(ctx: &mut Ctx) -> R {

@@ -222,7 +222,7 @@ pub fn not_runnable(case: &Case, env: &RunEnv) -> Option<String> {
                 return Some("needs --installer <setup.exe>".to_owned())
             }
             Need::Models if !env.have_models => {
-                return Some("needs --whisper-model <ggml file>".to_owned())
+                return Some("needs --whisper-model <ggml file> (and --speaker-models <dir> for the speaker case)".to_owned())
             }
             _ => {}
         }
