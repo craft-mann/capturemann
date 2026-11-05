@@ -15,7 +15,8 @@ import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-FREE = re.compile(r"(^|/)(tests|examples|benches)/|^crates/cm-platform/src/process\.rs$")
+# cm-regress is the release test driver: it links no product crate (so no cm_platform) and sets CREATE_NO_WINDOW itself.
+FREE = re.compile(r"(^|/)(tests|examples|benches)/|^crates/cm-platform/src/process\.rs$|^crates/cm-regress/")
 BARE = re.compile(r"\bCommand::new\(")
 ALLOW = {
     # `capturemann mcp` runs cm-mcp with this terminal's stdio on purpose (the CLI owns the console).

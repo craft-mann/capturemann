@@ -1685,6 +1685,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cm-regress"
+version = "0.2.7"
+dependencies = [
+ "serde",
+ "serde_json",
+ "windows 0.61.3",
+]
+
+[[package]]
 name = "cm-render"
 version = "0.2.7"
 dependencies = [
