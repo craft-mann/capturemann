@@ -30,7 +30,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 use cm_core::{
     CmError, MediaTime, PauseGap, PhysicalSize, TrackInfo, TrackKind, TrackStats, TICKS_PER_SECOND,
@@ -175,7 +175,7 @@ fn err(msg: impl Into<String>) -> CmError {
 }
 
 fn ff(tools: &Tools, args: &[String]) -> Result<(), CmError> {
-    let out = Command::new(&tools.ffmpeg)
+    let out = cm_platform::process::command(&tools.ffmpeg)
         .args(["-hide_banner", "-loglevel", "error", "-y"])
         .args(args)
         .stdin(Stdio::null())

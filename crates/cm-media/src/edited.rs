@@ -20,7 +20,7 @@
 use std::fs;
 use std::io::{ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::mpsc::{sync_channel, Receiver};
 use std::time::Instant;
 
@@ -255,7 +255,7 @@ fn spawn_pump(job: PumpJob) -> Receiver<PumpMsg> {
         let frame_bytes = (job.size.0 as usize) * (job.size.1 as usize) * 3 / 2;
         let mut last: Option<Vec<u8>> = None;
         for seg in &job.segments {
-            let mut child = match Command::new(&job.ffmpeg)
+            let mut child = match cm_platform::process::command(&job.ffmpeg)
                 .args(decoder_args(&job, seg))
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())

@@ -6,7 +6,7 @@ use super::*;
 pub fn system_ram_gb() -> Option<u64> {
     #[cfg(target_os = "macos")]
     {
-        let out = std::process::Command::new("sysctl")
+        let out = cm_platform::process::command("sysctl")
             .args(["-n", "hw.memsize"])
             .output()
             .ok()?;

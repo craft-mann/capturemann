@@ -11,7 +11,7 @@
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -135,7 +135,7 @@ impl ChimeProcess for AfplayProcess {
 
 impl ChimePlayer for AfplayPlayer {
     fn play(&self, wav_path: &Path) -> Result<ChimeHandle, CmError> {
-        let child = Command::new(AFPLAY)
+        let child = cm_platform::process::command(AFPLAY)
             .arg(wav_path)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
@@ -172,7 +172,7 @@ fn powershell_script() -> String {
 
 impl ChimePlayer for PowerShellPlayer {
     fn play(&self, wav_path: &Path) -> Result<ChimeHandle, CmError> {
-        let child = Command::new("powershell.exe")
+        let child = cm_platform::process::command("powershell.exe")
             .args(powershell_args())
             .arg(powershell_script())
             .env(CHIME_PATH_VAR, wav_path)

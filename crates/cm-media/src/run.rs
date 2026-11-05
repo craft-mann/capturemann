@@ -7,7 +7,7 @@
 use std::collections::VecDeque;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
 
@@ -165,7 +165,7 @@ pub fn run_ffmpeg_fed(
     feeder: Option<Feeder>,
 ) -> Result<(), RunError> {
     let feed_error: Arc<Mutex<Option<CmError>>> = Arc::new(Mutex::new(None));
-    let mut child = Command::new(ffmpeg)
+    let mut child = cm_platform::process::command(ffmpeg)
         .args(args)
         .stdin(if feeder.is_some() {
             Stdio::piped()

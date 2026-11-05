@@ -18,7 +18,7 @@ use std::collections::VecDeque;
 use std::fmt;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Stdio};
 use std::sync::mpsc::{sync_channel, Receiver};
 use std::sync::Arc;
 use std::thread::JoinHandle;
@@ -307,7 +307,7 @@ impl FrameStream for FfmpegStream {
         if let Some(r) = self.running.take() {
             r.stop();
         }
-        let mut child = Command::new(&self.ffmpeg)
+        let mut child = cm_platform::process::command(&self.ffmpeg)
             .args(self.args(pos))
             .stdin(Stdio::null())
             .stdout(Stdio::piped())

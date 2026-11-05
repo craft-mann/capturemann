@@ -74,7 +74,7 @@ pub(super) fn open_screen_recording_settings() {
 pub fn open_privacy_pane(pane: &str) {
     #[cfg(target_os = "macos")]
     {
-        let _ = std::process::Command::new("open")
+        let _ = cm_platform::process::command("open")
             .arg(format!(
                 "x-apple.systempreferences:com.apple.preference.security?{pane}"
             ))

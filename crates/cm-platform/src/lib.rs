@@ -11,6 +11,7 @@ pub mod dirs;
 pub mod memory;
 pub mod opener;
 pub mod priority;
+pub mod process;
 pub mod sleep;
 pub mod stack;
 pub mod sysinfo;

@@ -2,7 +2,7 @@
 //! the opener is missing (a bare "entity not found" helps nobody).
 
 use std::ffi::OsStr;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 /// Why a link or path could not be handed to the opener.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,7 +41,7 @@ pub fn spawn_opener(
     args: &[&OsStr],
     target: &OsStr,
 ) -> Result<(), OpenError> {
-    match Command::new(program)
+    match crate::process::command(program)
         .args(args)
         .arg(target)
         .stdin(Stdio::null())

@@ -28,7 +28,7 @@ pub const DEFAULT_DISPLAY_NAME: &str = "Me";
 pub fn system_memory_bytes() -> Option<u64> {
     #[cfg(target_os = "macos")]
     {
-        std::process::Command::new("sysctl")
+        cm_platform::process::command("sysctl")
             .args(["-n", "hw.memsize"])
             .output()
             .ok()

@@ -4,7 +4,7 @@
 //! cancelled run removes its partial output.
 
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 use cm_core::CmError;
 
@@ -153,7 +153,7 @@ pub fn parse_hardware_encoders(family: EncoderFamily, listing: &str) -> (bool, b
 /// Media Foundation encoder can still fail to start when the machine has no hardware transform;
 /// [`make_editing_copy`] turns that failure into [`RunFailure::NoHardwareEncoder`].
 pub fn hardware_encoders(tools: &Tools) -> Result<(bool, bool), CmError> {
-    let out = Command::new(&tools.ffmpeg)
+    let out = cm_platform::process::command(&tools.ffmpeg)
         .args(["-hide_banner", "-encoders"])
         .stdin(Stdio::null())
         .output()
@@ -366,7 +366,7 @@ fn unreadable(m: impl Into<String>) -> Problem {
 
 /// Decodes `seconds` at the start (`head`) or the end of `file` and reports any decode error.
 pub fn decode_check(tools: &Tools, file: &Path, head: bool, seconds: u32) -> Result<(), Problem> {
-    let mut cmd = Command::new(&tools.ffmpeg);
+    let mut cmd = cm_platform::process::command(&tools.ffmpeg);
     cmd.args(["-hide_banner", "-loglevel", "error", "-nostdin"]);
     if head {
         cmd.args(["-t".to_owned(), seconds.to_string()]);

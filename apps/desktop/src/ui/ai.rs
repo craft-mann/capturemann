@@ -31,7 +31,7 @@ pub const KEY_NOTICE_DISMISSED: &str = "ai.notice_dismissed";
 pub fn default_auto_transcribe() -> bool {
     #[cfg(target_os = "macos")]
     {
-        let bytes = std::process::Command::new("sysctl")
+        let bytes = cm_platform::process::command("sysctl")
             .args(["-n", "hw.memsize"])
             .output()
             .ok()

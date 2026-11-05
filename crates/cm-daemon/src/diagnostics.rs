@@ -134,7 +134,7 @@ pub fn log_report_lines(lines: &[LogLine]) -> Vec<String> {
 
 #[cfg(target_os = "macos")]
 fn sysctl(name: &str) -> Option<String> {
-    let out = std::process::Command::new("sysctl")
+    let out = cm_platform::process::command("sysctl")
         .args(["-n", name])
         .output()
         .ok()?;

@@ -64,7 +64,7 @@ fn show_running_instance(config_dir: &std::path::Path) {
             .ok()
             .and_then(|e| cm_desktop::ui::app::bundle_of(&e));
         let running = running_pid(config_dir).and_then(|pid| {
-            let out = std::process::Command::new("ps")
+            let out = cm_platform::process::command("ps")
                 .args(["-p", &pid.to_string(), "-o", "comm="])
                 .output()
                 .ok()?;
@@ -74,11 +74,11 @@ fn show_running_instance(config_dir: &std::path::Path) {
         match second_launch(own.as_deref(), running.as_deref()) {
             SecondLaunch::ShowIt => {
                 if let Some(bundle) = own {
-                    let _ = std::process::Command::new("open").arg(bundle).status();
+                    let _ = cm_platform::process::command("open").arg(bundle).status();
                 }
             }
             SecondLaunch::OtherCopy { bundle } => {
-                let _ = std::process::Command::new("open").arg(&bundle).status();
+                let _ = cm_platform::process::command("open").arg(&bundle).status();
                 let name = bundle
                     .file_stem()
                     .map(|n| n.to_string_lossy().into_owned())
@@ -89,7 +89,7 @@ fn show_running_instance(config_dir: &std::path::Path) {
                     name = name
                 );
                 // Arguments, never interpolated into the script.
-                let _ = std::process::Command::new("osascript")
+                let _ = cm_platform::process::command("osascript")
                     .args([
                         "-e",
                         "on run argv",

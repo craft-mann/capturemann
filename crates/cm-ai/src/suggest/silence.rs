@@ -23,7 +23,7 @@
 
 use std::io::Read;
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 use cm_core::edit::{session_to_file, Span};
 use cm_core::{CmError, MediaTime, PauseGap};
@@ -129,7 +129,7 @@ pub fn decode_mono_f32(ffmpeg: &Path, file: &Path, rate: u32) -> Result<Vec<f32>
     if !file.exists() {
         return Err(CmError::not_found(format!("{}", file.display())));
     }
-    let mut child = Command::new(ffmpeg)
+    let mut child = cm_platform::process::command(ffmpeg)
         .args(["-v", "error", "-nostdin", "-i"])
         .arg(file)
         .args(["-vn", "-ac", "1", "-ar"])

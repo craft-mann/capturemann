@@ -3,7 +3,6 @@
 //! the exporter finds it; there is no other decoder in the app.
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use cm_i18n::tr;
 
@@ -92,7 +91,7 @@ pub fn extract(video: &Path, at_secs: f64, out: &Path) -> Result<(), ExtractErro
         std::fs::create_dir_all(dir).map_err(|e| ExtractError::Io(e.to_string()))?;
     }
     let _ = std::fs::remove_file(out);
-    let mut cmd = Command::new(tools.ffmpeg);
+    let mut cmd = cm_platform::process::command(tools.ffmpeg);
     cmd.args(ffmpeg_args(video, at_secs)).arg(out);
     match run_with_timeout(cmd, POSTER_TIMEOUT) {
         Ok(true) if out.is_file() => Ok(()),

@@ -322,7 +322,7 @@ impl OverlayLauncher {
             return Err(OverlayError::NotFound);
         };
         crate::trace::mark("overlay_task_started");
-        let mut cmd = tokio::process::Command::new(bin);
+        let mut cmd = tokio::process::Command::from(cm_platform::process::command(bin));
         cmd.args(self.args_with(mode, pick));
         if Self::tab_to_list(mode, pick) {
             cmd.arg("--tab-to-list");

@@ -438,7 +438,7 @@ impl Drop for Permit {
 }
 
 fn poster_with_ffmpeg(bin: &Path, video: &Path, out: &Path) -> Result<(), PosterError> {
-    let mut cmd = Command::new(bin);
+    let mut cmd = cm_platform::process::command(bin);
     cmd.args(["-nostdin", "-y", "-v", "error", "-i"])
         .arg(video)
         .args(["-frames:v", "1", "-vf"])
@@ -471,7 +471,7 @@ fn poster_with_quicklook(video: &Path, out: &Path) -> Result<(), PosterError> {
     let tmp = unique_temp_dir("cm-ql");
     std::fs::create_dir_all(&tmp).map_err(|e| PosterError::Os(e.to_string()))?;
     let result = (|| {
-        let mut cmd = Command::new("/usr/bin/qlmanage");
+        let mut cmd = cm_platform::process::command("/usr/bin/qlmanage");
         cmd.args(["-t", "-s", &POSTER_EDGE.to_string(), "-o"])
             .arg(&tmp)
             .arg(video);
@@ -614,7 +614,7 @@ pub fn open_link(url: &str) -> Result<(), FileError> {
     }
     #[cfg(target_os = "macos")]
     {
-        Command::new("open")
+        cm_platform::process::command("open")
             .arg(url)
             .spawn()
             .map(|_| ())
@@ -622,7 +622,7 @@ pub fn open_link(url: &str) -> Result<(), FileError> {
     }
     #[cfg(target_os = "windows")]
     {
-        Command::new("rundll32")
+        cm_platform::process::command("rundll32")
             .args(["url.dll,FileProtocolHandler", url])
             .spawn()
             .map(|_| ())
@@ -655,7 +655,7 @@ pub fn run_opener(
     target: &std::ffi::OsStr,
     wait: Duration,
 ) -> std::io::Result<OpenerOutcome> {
-    let mut child = Command::new(program)
+    let mut child = cm_platform::process::command(program)
         .args(args)
         .arg(target)
         .stdin(Stdio::null())
@@ -750,7 +750,7 @@ pub fn reveal(bundle: &Path) -> Result<(), FileError> {
 fn open_path(path: &Path, reveal: bool) -> Result<(), FileError> {
     #[cfg(target_os = "macos")]
     {
-        let mut c = Command::new("open");
+        let mut c = cm_platform::process::command("open");
         if reveal {
             c.arg("-R");
         }
@@ -759,11 +759,11 @@ fn open_path(path: &Path, reveal: bool) -> Result<(), FileError> {
     #[cfg(target_os = "windows")]
     {
         let mut c = if reveal {
-            let mut c = Command::new("explorer");
+            let mut c = cm_platform::process::command("explorer");
             c.arg("/select,").arg(path);
             c
         } else {
-            let mut c = Command::new("cmd");
+            let mut c = cm_platform::process::command("cmd");
             c.args(["/C", "start", ""]).arg(path);
             c
         };

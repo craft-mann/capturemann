@@ -88,7 +88,7 @@ impl Default for AudioCheckState {
 fn open_sound_settings() {
     #[cfg(target_os = "macos")]
     {
-        let _ = std::process::Command::new("open")
+        let _ = cm_platform::process::command("open")
             .arg("x-apple.systempreferences:com.apple.Sound-Settings.extension")
             .spawn();
     }
