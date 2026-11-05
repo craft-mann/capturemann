@@ -359,6 +359,10 @@ impl OverlayLauncher {
         })?;
         crate::trace::mark("overlay_spawned");
         let pid = child.id();
+        if let Some(p) = pid {
+            let allowed = crate::platform::allow_foreground_for(p);
+            log::debug!("cm-overlay pid {p}: foreground handed over: {allowed}");
+        }
         let began = std::time::Instant::now();
         log::info!(
             "cm-overlay started: pid {pid:?}, {} {}, watchdog {} s",

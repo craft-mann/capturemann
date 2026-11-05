@@ -601,6 +601,25 @@ pub fn build_native_tray() -> Result<NativeTray, String> {
     })
 }
 
+/// Lets the process `pid` (the picker overlay the app just started) take the foreground and with
+/// it the keyboard. Windows only lets the process that owns the foreground hand it on; the app
+/// has just handled the capture shortcut, so it may. Without this a picker started by a hotkey
+/// may never get the keyboard focus and Esc does nothing. Returns whether Windows accepted it
+/// (always `false` elsewhere, where nothing is needed).
+pub fn allow_foreground_for(pid: u32) -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        // SAFETY: plain value call; fails (returns 0) when the caller may not hand on the
+        // foreground, which only costs the picker its automatic focus.
+        unsafe { windows::Win32::UI::WindowsAndMessaging::AllowSetForegroundWindow(pid).is_ok() }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = pid;
+        false
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

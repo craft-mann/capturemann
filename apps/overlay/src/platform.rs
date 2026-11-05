@@ -33,6 +33,69 @@ pub fn wait_for_process_exit(pid: u32) -> bool {
     imp::wait_for_process_exit(pid)
 }
 
+/// Asks Windows to make this window the foreground window with the keyboard focus, which a
+/// process started by another process's hotkey is not given on its own (`SetForegroundWindow`
+/// restrictions). Returns whether the window is the foreground window afterwards. A no-op
+/// (`true`) on macOS and Linux, where the toolkit handles focus.
+pub fn take_foreground(window: &Window) -> bool {
+    match window.window_handle() {
+        Ok(h) => imp::take_foreground(h.as_raw()),
+        Err(_) => false,
+    }
+}
+
+/// One line for the log: handle, rectangle, styles, display affinity and focus state (so a
+/// hardware run can show what the picker windows look like without writing any screen content).
+pub fn describe_window(window: &Window) -> String {
+    match window.window_handle() {
+        Ok(h) => imp::describe(h.as_raw()),
+        Err(e) => format!("no window handle: {e}"),
+    }
+}
+
+/// Whether Esc is down right now, whichever window has the keyboard (Windows; `false` elsewhere).
+/// The picker's way out when Windows never gave it the keyboard focus.
+pub fn escape_is_down() -> bool {
+    imp::escape_is_down()
+}
+
+/// Ends the process now, without running exit handlers or waiting for other threads (Windows:
+/// `TerminateProcess`; `ExitProcess` waits for the loader lock and can hang behind a thread that
+/// is stuck in a driver). Elsewhere `std::process::exit`.
+pub fn hard_exit(code: i32) -> ! {
+    imp::hard_exit(code)
+}
+
+/// The names of the extended window styles that matter for a picker (pure; for the log).
+pub fn describe_ex_style(ex: u32) -> String {
+    const FLAGS: [(u32, &str); 8] = [
+        (0x0000_0008, "TOPMOST"),
+        (0x0000_0020, "TRANSPARENT"),
+        (0x0000_0080, "TOOLWINDOW"),
+        (0x0000_0100, "WINDOWEDGE"),
+        (0x0004_0000, "APPWINDOW"),
+        (0x0008_0000, "LAYERED"),
+        (0x0800_0000, "NOACTIVATE"),
+        (0x0020_0000, "NOREDIRECTIONBITMAP"),
+    ];
+    let names: Vec<&str> = FLAGS
+        .iter()
+        .filter(|(bit, _)| ex & bit != 0)
+        .map(|(_, n)| *n)
+        .collect();
+    format!("0x{ex:08x} [{}]", names.join("|"))
+}
+
+/// The meaning of a display affinity value (pure; for the log).
+pub fn describe_affinity(a: u32) -> &'static str {
+    match a {
+        0 => "NONE (visible to capture)",
+        1 => "MONITOR (black in capture)",
+        0x11 => "EXCLUDEFROMCAPTURE (absent from capture)",
+        _ => "unknown",
+    }
+}
+
 #[cfg(target_os = "macos")]
 mod imp {
     use super::{Prepared, RawWindowHandle};
@@ -43,6 +106,22 @@ mod imp {
 
     pub fn wait_for_process_exit(_pid: u32) -> bool {
         false
+    }
+
+    pub fn take_foreground(_raw: RawWindowHandle) -> bool {
+        true
+    }
+
+    pub fn describe(_raw: RawWindowHandle) -> String {
+        "AppKit window".into()
+    }
+
+    pub fn escape_is_down() -> bool {
+        false
+    }
+
+    pub fn hard_exit(code: i32) -> ! {
+        std::process::exit(code)
     }
 
     pub fn prepare(raw: RawWindowHandle) -> Result<Prepared, String> {
@@ -85,8 +164,17 @@ mod imp {
 #[cfg(windows)]
 mod imp {
     use super::{Prepared, RawWindowHandle};
+    use windows_sys::Win32::Foundation::{HWND, RECT};
+    use windows_sys::Win32::System::Threading::{
+        AttachThreadInput, GetCurrentProcess, GetCurrentThreadId, TerminateProcess,
+    };
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+        GetActiveWindow, GetAsyncKeyState, GetFocus, SetFocus, VK_ESCAPE,
+    };
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE,
+        BringWindowToTop, GetForegroundWindow, GetWindowDisplayAffinity, GetWindowLongW,
+        GetWindowRect, GetWindowThreadProcessId, IsWindowVisible, SetForegroundWindow,
+        SetWindowDisplayAffinity, GWL_EXSTYLE, GWL_STYLE, WDA_EXCLUDEFROMCAPTURE,
     };
 
     pub fn wait_for_process_exit(pid: u32) -> bool {
@@ -107,6 +195,99 @@ mod imp {
         // SAFETY: as above.
         unsafe { CloseHandle(handle) };
         ended
+    }
+
+    fn hwnd_of(raw: RawWindowHandle) -> Option<HWND> {
+        match raw {
+            RawWindowHandle::Win32(h) => Some(h.hwnd.get() as HWND),
+            _ => None,
+        }
+    }
+
+    pub fn hard_exit(code: i32) -> ! {
+        // SAFETY: ends this process; nothing runs afterwards.
+        unsafe { TerminateProcess(GetCurrentProcess(), code as u32) };
+        std::process::exit(code)
+    }
+
+    pub fn escape_is_down() -> bool {
+        // SAFETY: reads the asynchronous key state; no pointers.
+        let state = unsafe { GetAsyncKeyState(i32::from(VK_ESCAPE)) };
+        state < 0
+    }
+
+    /// Foreground-lock workaround: join the input queue of the thread that owns the foreground,
+    /// ask for the foreground, then leave that queue again.
+    pub fn take_foreground(raw: RawWindowHandle) -> bool {
+        let Some(hwnd) = hwnd_of(raw) else {
+            return false;
+        };
+        // SAFETY: `hwnd` is the live window winit owns; the calls take plain values. The input
+        // queue attachment is undone before returning.
+        unsafe {
+            let fg = GetForegroundWindow();
+            if fg == hwnd {
+                return true;
+            }
+            let this_thread = GetCurrentThreadId();
+            let fg_thread = if fg.is_null() {
+                0
+            } else {
+                GetWindowThreadProcessId(fg, std::ptr::null_mut())
+            };
+            let attached = fg_thread != 0
+                && fg_thread != this_thread
+                && AttachThreadInput(this_thread, fg_thread, 1) != 0;
+            BringWindowToTop(hwnd);
+            SetForegroundWindow(hwnd);
+            SetFocus(hwnd);
+            if attached {
+                AttachThreadInput(this_thread, fg_thread, 0);
+            }
+            GetForegroundWindow() == hwnd
+        }
+    }
+
+    pub fn describe(raw: RawWindowHandle) -> String {
+        let Some(hwnd) = hwnd_of(raw) else {
+            return "not a Win32 window".into();
+        };
+        // SAFETY: `hwnd` is the live window winit owns; the out-parameters are locals.
+        unsafe {
+            let mut rect: RECT = std::mem::zeroed();
+            let got_rect = GetWindowRect(hwnd, &mut rect) != 0;
+            let mut affinity = 0u32;
+            let got_aff = GetWindowDisplayAffinity(hwnd, &mut affinity) != 0;
+            let style = GetWindowLongW(hwnd, GWL_STYLE) as u32;
+            let ex = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
+            let fg = GetForegroundWindow();
+            format!(
+                "hwnd {:#x}, rect {}, visible {}, style 0x{style:08x}, ex-style {}, affinity {}, foreground {:#x} (this window: {}), focus {:#x}, active {:#x}",
+                hwnd as usize,
+                if got_rect {
+                    format!(
+                        "({},{}) {}x{}",
+                        rect.left,
+                        rect.top,
+                        rect.right - rect.left,
+                        rect.bottom - rect.top
+                    )
+                } else {
+                    "unknown".into()
+                },
+                IsWindowVisible(hwnd) != 0,
+                super::describe_ex_style(ex),
+                if got_aff {
+                    super::describe_affinity(affinity)
+                } else {
+                    "unreadable"
+                },
+                fg as usize,
+                fg == hwnd,
+                GetFocus() as usize,
+                GetActiveWindow() as usize,
+            )
+        }
     }
 
     pub fn prepare(raw: RawWindowHandle) -> Result<Prepared, String> {
@@ -133,10 +314,46 @@ mod imp {
         false
     }
 
+    pub fn take_foreground(_raw: RawWindowHandle) -> bool {
+        true
+    }
+
+    pub fn describe(_raw: RawWindowHandle) -> String {
+        "window".into()
+    }
+
+    pub fn escape_is_down() -> bool {
+        false
+    }
+
+    pub fn hard_exit(code: i32) -> ! {
+        std::process::exit(code)
+    }
+
     pub fn prepare(_raw: RawWindowHandle) -> Result<Prepared, String> {
         Ok(Prepared {
             frame_points: None,
             excluded_from_capture: false,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_extended_styles_are_named() {
+        assert_eq!(describe_ex_style(0), "0x00000000 []");
+        let s = describe_ex_style(0x0800_0008 | 0x0008_0000);
+        assert!(s.contains("TOPMOST") && s.contains("NOACTIVATE") && s.contains("LAYERED"));
+        assert!(!s.contains("TRANSPARENT"));
+    }
+
+    #[test]
+    fn the_affinity_values_are_named() {
+        assert!(describe_affinity(0x11).starts_with("EXCLUDEFROMCAPTURE"));
+        assert!(describe_affinity(0).starts_with("NONE"));
+        assert_eq!(describe_affinity(7), "unknown");
     }
 }

@@ -35,7 +35,7 @@ use crate::error::OverlayError;
 use crate::gate::{Gate, Held, Pointer};
 use crate::paint::{paint, tokens, Scene};
 use crate::picker::{CursorHint, Effect, Key, Mode, Picker};
-use crate::platform::prepare_overlay_window;
+use crate::platform::{describe_window, escape_is_down, prepare_overlay_window, take_foreground};
 use crate::selection::Handle;
 use crate::session::{Choice, Frozen, SessionEvent};
 use crate::targets::{
@@ -160,6 +160,10 @@ struct App {
     /// The view that last saw the pointer: keys go there, whichever window the OS focused.
     active: usize,
     shift: bool,
+    /// How many overlay windows have the keyboard focus (0 or 1 when all is well).
+    focused: i32,
+    /// Esc was down at the last poll (the poll runs only while no window has the focus).
+    esc_was_down: bool,
     finish: Option<Finish>,
     error: Option<OverlayError>,
     next_monitor_check: Instant,
@@ -191,6 +195,8 @@ pub fn run(inbox: &Arc<Inbox>, opts: Options, tracer: &Tracer) -> Result<Finishe
         all_visible_marked: false,
         active: 0,
         shift: false,
+        focused: 0,
+        esc_was_down: false,
         finish: None,
         error: None,
         next_monitor_check: Instant::now() + MONITOR_POLL,
@@ -619,7 +625,15 @@ impl App {
             );
             if i == 0 {
                 window.focus_window();
+                // A process started by a hotkey is not given the foreground on its own.
+                let fg = take_foreground(window);
+                log::info!("overlay window {i}: took the foreground: {fg}");
             }
+            log::info!(
+                "overlay window {i} (display {}) shown: {}",
+                view.display.id,
+                describe_window(window)
+            );
             newly_shown = true;
         }
         if newly_shown
@@ -640,10 +654,12 @@ impl App {
                 }
             }
             Effect::Cancel => {
+                log::info!("overlay ends: cancelled by the user (Esc or the cancel gesture)");
                 self.finish = Some(Finish::Cancelled);
                 el.exit();
             }
             Effect::Done(outcome) => {
+                log::info!("overlay ends: the user chose a target");
                 self.finish = Some(Finish::Chosen(Choice {
                     display_id: self.views[i].display.id,
                     outcome,
@@ -780,6 +796,13 @@ impl ApplicationHandler<()> for App {
                 ..
             } => {
                 self.active = i;
+                // A click on a window that does not have the keyboard takes it (Esc must work).
+                if state == ElementState::Pressed && self.focused <= 0 {
+                    if let Some(w) = &self.views[i].window {
+                        let fg = take_foreground(w);
+                        log::info!("overlay: click without keyboard focus; foreground now: {fg}");
+                    }
+                }
                 let ev = match state {
                     ElementState::Pressed => Pointer::Pressed,
                     ElementState::Released => Pointer::Released,
@@ -789,6 +812,8 @@ impl ApplicationHandler<()> for App {
             WindowEvent::Focused(focused) => {
                 // Wayland compositors may refuse keyboard focus to a window nobody activated;
                 // the trace shows whether this one got it (the pointer works either way).
+                self.focused = (self.focused + if focused { 1 } else { -1 }).max(0);
+                log::info!("overlay window {i}: focused {focused}");
                 self.tracer.note(
                     &serde_json::json!({"trace": "focus", "display_id": i, "focused": focused}),
                 );
@@ -825,12 +850,29 @@ impl ApplicationHandler<()> for App {
             self.sync_windows(el);
         }
         self.check_first_frames(el);
+        // No window has the keyboard (Windows may refuse it): Esc is still read from the key
+        // state, so the picker can always be left.
+        let mut esc_poll = false;
+        if cfg!(windows) && self.focused <= 0 && self.views.iter().any(|v| v.shown) {
+            esc_poll = true;
+            let down = escape_is_down();
+            if down && !self.esc_was_down && self.active < self.views.len() {
+                log::info!("overlay: Esc read from the key state (no window has the focus)");
+                let e = self.views[self.active].picker.key(Key::Escape);
+                let a = self.active;
+                self.apply(a, e, el);
+            }
+            self.esc_was_down = down;
+        }
         let mut wake = self
             .gate
             .deadline()
             .map_or(self.next_monitor_check, |d| d.min(self.next_monitor_check));
         if let (true, Some(t)) = (self.opts.exit_after_first_frame, self.first_frames_at) {
             wake = wake.min(t + VISIBLE_WAIT);
+        }
+        if esc_poll {
+            wake = wake.min(now + Duration::from_millis(50));
         }
         el.set_control_flow(ControlFlow::WaitUntil(wake));
     }

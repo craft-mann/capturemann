@@ -69,8 +69,17 @@ fn main() -> ExitCode {
     lifetime::guard(deadline, parent, |reason| {
         log::error!("overlay: {}", reason.describe());
         let e = OverlayError::internal(reason.describe());
+        let code = e.exit;
+        // Whatever blocks below (a full stderr pipe, a stuck exit handler), the process ends:
+        // `TerminateProcess` / exit after a second at the latest.
+        let _ = std::thread::Builder::new()
+            .name("overlay-hard-exit".into())
+            .spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                cm_overlay::platform::hard_exit(code);
+            });
         eprintln!("{}", e.render_json());
-        std::process::exit(e.exit);
+        cm_overlay::platform::hard_exit(code);
     });
     let result = cm_overlay::run(&args, started);
     log::info!(

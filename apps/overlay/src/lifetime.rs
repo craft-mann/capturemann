@@ -59,6 +59,26 @@ pub fn parent_pid_from(value: Option<&str>) -> Option<u32> {
         .filter(|p| *p > 0)
 }
 
+/// How often the deadline thread looks at the clocks.
+const POLL: Duration = Duration::from_millis(500);
+
+/// Blocks until `deadline` has passed on the monotonic clock **or** the wall clock. A single long
+/// `sleep` is not enough: on a laptop the monotonic clock may stand still while the computer
+/// sleeps, and a timer that is not re-checked can then fire late or not at all. Short polls
+/// against both clocks end at the first one that is past the deadline.
+fn wait_until_expired(deadline: Duration) {
+    let mono = std::time::Instant::now();
+    let wall = std::time::SystemTime::now();
+    loop {
+        let left = deadline.saturating_sub(mono.elapsed());
+        let wall_passed = wall.elapsed().is_ok_and(|e| e >= deadline);
+        if left.is_zero() || wall_passed {
+            return;
+        }
+        std::thread::sleep(left.min(POLL));
+    }
+}
+
 /// Starts the guards. `on_expire` runs on a helper thread, once, when a guard fires; the binary's
 /// one ends the process.
 pub fn guard(
@@ -72,7 +92,7 @@ pub fn guard(
         std::thread::Builder::new()
             .name("overlay-deadline".into())
             .spawn(move || {
-                std::thread::sleep(deadline);
+                wait_until_expired(deadline);
                 on_expire(Reason::Deadline(deadline));
             })
             .ok();
