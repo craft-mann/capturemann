@@ -150,7 +150,8 @@ pub(crate) fn pointer(cx: &App) -> Option<gpui::Point<gpui::Pixels>> {
 
 #[cfg(not(target_os = "macos"))]
 pub(crate) fn pointer(_cx: &App) -> Option<gpui::Point<gpui::Pixels>> {
-    None
+    // Windows: the pointer in GPUI points (`platform_win_monitors`); Linux cannot say.
+    crate::platform_window::mouse_location().map(|(x, y)| point(px(x as f32), px(y as f32)))
 }
 
 /// Height reserved for the window: the full list (all groups, all rows) plus chrome, capped to
@@ -198,18 +199,29 @@ pub fn open_launcher_with(app: &Entity<AppModel>, cx: &mut App, query: &str) {
         .unwrap_or_default();
     cx.set_global(PreviousApp(crate::launcher::focus::frontmost_other_app()));
     let mut model = LauncherModel::new(commands, recent);
-    // GPUI places a window relative to its display, so the origin is (0, 0) on whichever
-    // display holds the pointer.
+    // On the display with the pointer. macOS places a window relative to its display (origin
+    // (0, 0)); Windows takes global points (`window_bounds_rect`).
     let display = crate::ui::recording::pointer_display(cx);
     let (dw, dh, ox, oy) = match display {
-        Some((_, r)) => (r.w as f32, r.h as f32, 0., 0.),
+        Some((_, r)) => (r.w as f32, r.h as f32, r.x as f32, r.y as f32),
         None => (1440., 900., 0., 0.),
     };
     let h = window_height(model.visible_len(), model.groups().len(), dh);
     model.set_query(query);
-    let bounds = Bounds {
-        origin: point(px(ox + (dw - WIDTH) / 2.), px(oy + dh * 0.14)),
-        size: size(px(WIDTH), px(h)),
+    let bounds = {
+        use crate::recording::geometry::Rect;
+        let shown = display.map_or(Rect::new(0., 0., f64::from(dw), f64::from(dh)), |d| d.1);
+        let g = Rect::new(
+            f64::from(ox + (dw - WIDTH) / 2.),
+            f64::from(oy + dh * 0.14),
+            f64::from(WIDTH),
+            f64::from(h),
+        );
+        let o = crate::ui::recording::window_bounds_rect(&g, &shown);
+        Bounds {
+            origin: point(px(o.x as f32), px(o.y as f32)),
+            size: size(px(WIDTH), px(h)),
+        }
     };
     let opened = cx.open_window(
         WindowOptions {

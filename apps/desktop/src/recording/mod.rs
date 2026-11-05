@@ -31,6 +31,7 @@ pub mod files;
 pub mod geometry;
 pub mod hud_layout;
 pub mod model;
+pub mod monitors;
 pub mod preview;
 pub mod sheet;
 pub mod start;

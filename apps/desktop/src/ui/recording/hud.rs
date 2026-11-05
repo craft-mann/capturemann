@@ -183,10 +183,12 @@ impl HudView {
             return;
         };
         let now = geometry::Rect::new(x, y, w, h);
-        let Some((_, display)) = rec::display_for(cx, &now) else {
+        // The recorded display (exact where point rectangles overlap), else the one holding the HUD.
+        let recorded = self.rec.read(cx).display.map(|d| d.1);
+        let Some(display) = recorded.or_else(|| rec::display_for(cx, &now).map(|d| d.1)) else {
             return;
         };
-        let snapped = snap_hud(&now, &display);
+        let snapped = snap_hud(&now, &rec::hud_bounds(&display));
         if (snapped.x - now.x).abs() > 0.5 || (snapped.y - now.y).abs() > 0.5 {
             crate::platform_window::move_to(window, snapped.x, snapped.y);
         }

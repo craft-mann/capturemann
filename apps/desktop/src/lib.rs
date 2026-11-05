@@ -40,6 +40,8 @@ pub mod platform_clipboard;
 pub mod platform_hotkeys;
 pub mod platform_linux;
 pub mod platform_linux_menu;
+#[cfg(windows)]
+mod platform_win_monitors;
 pub mod platform_window;
 pub mod poster;
 pub mod preview;

@@ -309,6 +309,19 @@ pub fn display_frame(id: u32) -> Option<(f64, f64, f64, f64)> {
     imp::display_frame(id)
 }
 
+/// The handle (GPUI's `DisplayId`) of the display that holds the pointer, where the platform can
+/// name it exactly (Windows: from the pointer's physical position); `None` elsewhere.
+pub fn pointer_display_id() -> Option<u32> {
+    imp::pointer_display_id()
+}
+
+/// The display that holds a recorded area (`indicator.area.bounds`, physical px in the global
+/// desktop space), as GPUI's display handle (Windows: the engine's display id is another number
+/// and the point rectangles of displays with different scales overlap); `None` elsewhere.
+pub fn display_id_for_area(bounds: [i64; 4]) -> Option<u32> {
+    imp::display_id_for_area(bounds)
+}
+
 /// The visible frame (the display minus the menu bar and the Dock) of the display that holds the
 /// global point `(x, y)`, as `(x, y, w, h)` in global points, top-left origin. `None` where the
 /// platform cannot say (callers fall back to the display bounds).
@@ -417,6 +430,14 @@ mod imp {
 
     extern "C" {
         fn CGDisplayBounds(display: u32) -> CgRect;
+    }
+
+    pub fn pointer_display_id() -> Option<u32> {
+        None
+    }
+
+    pub fn display_id_for_area(_bounds: [i64; 4]) -> Option<u32> {
+        None
     }
 
     pub fn display_frame(id: u32) -> Option<(f64, f64, f64, f64)> {
@@ -639,6 +660,10 @@ mod imp {
         cfg!(target_os = "linux")
     }
 
+    #[cfg(windows)]
+    pub use crate::platform_win_monitors::display_frame;
+
+    #[cfg(not(windows))]
     pub fn display_frame(_id: u32) -> Option<(f64, f64, f64, f64)> {
         None
     }
@@ -662,6 +687,10 @@ mod imp {
 
     pub fn set_ignores_mouse(_window: &Window, _ignore: bool) {}
 
+    #[cfg(windows)]
+    pub use crate::platform_win_monitors::mouse_location;
+
+    #[cfg(not(windows))]
     pub fn mouse_location() -> Option<(f64, f64)> {
         None
     }
@@ -670,6 +699,22 @@ mod imp {
         false
     }
 
+    #[cfg(windows)]
+    pub use crate::platform_win_monitors::{
+        display_id_for_area, left_button_down, pointer_display_id,
+    };
+
+    #[cfg(not(windows))]
+    pub fn pointer_display_id() -> Option<u32> {
+        None
+    }
+
+    #[cfg(not(windows))]
+    pub fn display_id_for_area(_bounds: [i64; 4]) -> Option<u32> {
+        None
+    }
+
+    #[cfg(not(windows))]
     pub fn left_button_down() -> bool {
         false
     }
@@ -680,14 +725,30 @@ mod imp {
         None
     }
 
+    #[cfg(windows)]
+    pub use crate::platform_win_monitors::visible_frame_at;
+
+    #[cfg(not(windows))]
     pub fn visible_frame_at(_x: f64, _y: f64) -> Option<(f64, f64, f64, f64)> {
         None
     }
 
+    #[cfg(windows)]
+    pub use crate::platform_win_monitors::move_to;
+
+    #[cfg(not(windows))]
     pub fn move_to(_window: &Window, _x: f64, _y: f64) {}
 
+    #[cfg(windows)]
+    pub use crate::platform_win_monitors::set_frame;
+
+    #[cfg(not(windows))]
     pub fn set_frame(_window: &Window, _x: f64, _y: f64, _w: f64, _h: f64) {}
 
+    #[cfg(windows)]
+    pub use crate::platform_win_monitors::frame;
+
+    #[cfg(not(windows))]
     pub fn frame(_window: &Window) -> Option<(f64, f64, f64, f64)> {
         None
     }
