@@ -1,0 +1,328 @@
+{
+  "cases": [
+    {
+      "area": "pkg",
+      "duration_ms": 719,
+      "evidence": [
+        "capturemann.exe: 4556800 bytes",
+        "cm-mcp.exe: 8084992 bytes",
+        "cm-daemon.exe: 57489920 bytes",
+        "cm-desktop.exe: 95506944 bytes",
+        "cm-overlay.exe: 2780160 bytes",
+        "licence: Some(\"C:\\\\Users\\\\trung\\\\AppData\\\\Local\\\\Programs\\\\CaptureMann\\\\doc\\\\LICENSE\"), third party: Some(\"C:\\\\Users\\\\trung\\\\AppData\\\\Local\\\\Programs\\\\CaptureMann\\\\doc\\\\THIRD_PARTY_LICENSES.md\"), notice: Some(\"C:\\\\Users\\\\trung\\\\AppData\\\\Local\\\\Programs\\\\CaptureMann\\\\doc\\\\NOTICE\")"
+      ],
+      "id": "pkg.files",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "NFR-licence",
+        "PKG-contents"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "the package holds the programs, FFmpeg, the helper and the licences"
+    },
+    {
+      "area": "pkg",
+      "duration_ms": 14295,
+      "evidence": [
+        "capturemann --version: exit 0 (0x00000000) in 33 ms",
+        "cm-mcp --bogus: exit 2 (0x00000002) in 2123 ms",
+        "cm-daemon --bogus: exit 2 (0x00000002) in 7962 ms",
+        "cm-overlay --help: exit 0 (0x00000000) in 2222 ms",
+        "ffmpeg -hide_banner -version: exit 0 (0x00000000) in 33 ms",
+        "ffprobe -hide_banner -version: exit 0 (0x00000000) in 464 ms",
+        "llama-server --version: exit 0 (0x00000000) in 731 ms"
+      ],
+      "id": "pkg.startup",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "bug: Transcribe illegal instruction (AVX-512 in the build)",
+        "bug: 0xC0000409 at start"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "every program starts without a crash (illegal instruction, fast fail)"
+    },
+    {
+      "area": "pkg",
+      "duration_ms": 1267,
+      "evidence": [
+        "version 0.2.7",
+        "daemon pid 11732 answered after 321 ms",
+        "- windows x86_64",
+        "- GPU Intel(R) UHD Graphics 620, driver 31.0.101.2137, 134 MB dedicated memory, vendor id 0x8086",
+        "- GPU Microsoft Basic Render Driver (software renderer: no hardware GPU is in use), driver 10.0.26100.9711, vendor id 0x1414",
+        "- ffmpeg at ~\\AppData\\Local\\Programs\\CaptureMann\\ffmpeg.exe",
+        "- llama-server at ~\\AppData\\Local\\Programs\\CaptureMann\\llama-server.exe (bundled with this build, llama.cpp v0.7.0)",
+        "- text recognizer: windows_ocr (available; reads en-US (the first language of your Windows language list with OCR); OCR languages installed: en-US)",
+        "- speaker engine built in: true",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "pkg.diagnostics",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "DIAG-1"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "diagnostics reports app, system, models and engines, FFmpeg and the helper"
+    },
+    {
+      "area": "daemon",
+      "duration_ms": 2128,
+      "evidence": [
+        "daemon pid 12384 answered after 321 ms",
+        "pid 12384, 84 actions",
+        "stop: killed (Windows has no signal for a hidden process)",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "daemon.lifecycle",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-1",
+        "R2-8"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "daemon starts on a private endpoint, answers, stops, and the endpoint is gone"
+    },
+    {
+      "area": "daemon",
+      "duration_ms": 2130,
+      "evidence": [
+        "daemon pid 14248 answered after 321 ms",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "daemon.library_created",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "LIB-1",
+        "AI-7: the text engine starts only when asked"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "a fresh library is created and lists no captures; no helper program runs while idle"
+    },
+    {
+      "area": "settings",
+      "duration_ms": 1874,
+      "evidence": [
+        "daemon pid 9848 answered after 321 ms",
+        "daemon pid 3048 answered after 318 ms",
+        "recording.fps=47: exit 0 (0x00000000) None",
+        "47 was accepted: {\"settings\":{\"recording.fps\":47}}",
+        "log hygiene: 2 WARN line(s) in the case's logs"
+      ],
+      "id": "settings.roundtrip",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-1"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "settings set and get round trip, and survive a daemon restart"
+    },
+    {
+      "area": "targets",
+      "duration_ms": 1237,
+      "evidence": [
+        "daemon pid 11356 answered after 321 ms",
+        "display 4327037 'Display 1' 1920x1080 at (0,0) scale 1.5 primary",
+        "display 7931565 'S27B80P' 3840x2160 at (-3840,-1861) scale 1.5",
+        "3 windows; capabilities {\"capture_region\":true,\"capture_window\":true,\"list_windows\":true,\"pick\":false}",
+        "apps: Settings, Windows Terminal, cm-desktop",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "targets.list",
+      "message": "",
+      "needs": [
+        "desktop_session"
+      ],
+      "specs": [
+        "CAP-1",
+        "CAP-3",
+        "bug: Windows Terminal Host name",
+        "bug: window name garbled"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "targets lists displays and windows with readable names and real sizes"
+    },
+    {
+      "area": "shot",
+      "duration_ms": 1513,
+      "evidence": [
+        "daemon pid 11092 answered after 321 ms",
+        "display 4327037 1920x1080; PNG 1920x1080; capture shot_06GTNHH5WW21NCSZ",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "shot.display",
+      "message": "",
+      "needs": [
+        "desktop_session",
+        "screen"
+      ],
+      "specs": [
+        "CAP-1.AC1"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "a display screenshot is a valid PNG of the display's physical size"
+    },
+    {
+      "area": "lib",
+      "duration_ms": 1173,
+      "evidence": [
+        "daemon pid 13856 answered after 322 ms",
+        "manifest keys ok; exported PNG 1000x260, 35254 bytes",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "lib.manifest",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "LIB-1",
+        "CAP-4: export_image",
+        "data model: bundles are the source of truth"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "the library lists a bundle; manifest.json has the schema keys; export of the image is a valid PNG"
+    },
+    {
+      "area": "mcp",
+      "duration_ms": 1318,
+      "evidence": [
+        "daemon pid 3796 answered after 323 ms",
+        "server capturemann 0.2.7, protocol \"2025-06-18\"",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "mcp.handshake",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-2",
+        "MCP protocol"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "initialize answers with the server name, the product version and tool support"
+    },
+    {
+      "area": "mcp",
+      "duration_ms": 1259,
+      "evidence": [
+        "daemon pid 6420 answered after 320 ms",
+        "77 tools",
+        "known drift (spec lists, server lacks): get_cursor_track, export_image, get_platform_rules",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "mcp.tools_list",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-2",
+        "specs/02-agent-interface.md tool table"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "tools/list matches the tool table of the spec (no drift either way)"
+    },
+    {
+      "area": "ai",
+      "duration_ms": 2116,
+      "evidence": [
+        "llama-server --version: exit 0 (0x00000000) version: 0.7.0-dev (build 0, commit unknown) built with GNU 16.2.0 for Windows AMD64",
+        "daemon pid 8168 answered after 321 ms",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "ai.llama_version",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AI-7",
+        "bug class: llama-server missing in the Windows package"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "the bundled llama-server runs --version and is not started by the daemon"
+    },
+    {
+      "area": "zz",
+      "duration_ms": 742,
+      "evidence": [],
+      "id": "zz.crash_events",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "bug: recording stop crash 0xC0000409",
+        "bug: illegal instruction"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "no crash of a CaptureMann program was logged by Windows during the whole run"
+    }
+  ],
+  "run": {
+    "commit": "",
+    "ffmpeg": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
+    "finished": "2026-11-05T08:14:45Z",
+    "flags": "--tier smoke --out C:\\lab\\regress-out\\20261105T081358Z --who cm-regress via regress.sh --verdict PARTIAL --allow screen",
+    "gpu": "Intel(R) UHD Graphics 620 (driver 31.0.101.2137)",
+    "hashes": [
+      [
+        "capturemann.exe",
+        "4ce16c07d21d28a65e73c780850ed5072d18cd90a4738bc21ad2efe2c8150518"
+      ],
+      [
+        "cm-mcp.exe",
+        "c8b5462820c2a2ab65e25704328f001f82797de77a0ef4500a12b0ea03b95e57"
+      ],
+      [
+        "cm-daemon.exe",
+        "5c87af51434d35fab0b07a9afb66050e80d6f4c045dfb6678a841e85feb67e09"
+      ],
+      [
+        "cm-desktop.exe",
+        "38445bd66ccd7727ed9918774c8c37de2d1f8eda649f75b1b826d642194574e0"
+      ],
+      [
+        "cm-overlay.exe",
+        "102c291228b4b3fbfc1813e02895e38dfbd70e2d476a6222a11608e49ef358df"
+      ],
+      [
+        "ffmpeg.exe",
+        "08d073edcbbbf6b8c3c11efb9a78a8f21af9c555da86d815fa2fbcb0c2d8d609"
+      ],
+      [
+        "ffprobe.exe",
+        "e09a5180f022cc05bab32a8ba3aed0d54e642cb81a9952a57aa24a121e46102f"
+      ],
+      [
+        "llama-server.exe",
+        "be54819796793a564b088083e8d46febe2b7d3507745d12d886a52465080b115"
+      ]
+    ],
+    "os": "Microsoft Windows 11 Pro 10.0.26200 build 26200",
+    "package_dir": "C:\\Users\\trung\\AppData\\Local\\Programs\\CaptureMann",
+    "platform": "windows",
+    "started": "2026-11-05T08:14:03Z",
+    "tier": "smoke",
+    "verdict": "PARTIAL",
+    "version": "0.2.7",
+    "who": "cm-regress via regress.sh"
+  },
+  "schema": 1,
+  "summary": {
+    "fail": 0,
+    "pass": 13,
+    "skip": 0,
+    "total": 13
+  }
+}
