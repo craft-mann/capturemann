@@ -7,6 +7,9 @@
 #                                      [--package-run <Windows package run id>]  download that package's installer and install it silently first
 #                                      [--installed]                             test what is installed (the default)
 #                                      [--only id,area,...] [--soak-minutes N] [--whisper-model <file on the laptop>]
+#                                      [--speech <speech wav on the laptop>] [--speaker-models <folder with the two .onnx files on the laptop>]
+#                                        (ai.transcribe / ai.speakers; win-make-speech.ps1 makes speech2.wav; the speaker models are in
+#                                         packaging/sherpa/out/models on a machine that ran `make sherpa`/fetch-models.sh; push them with lab.sh)
 #                                      [--label run2]   (added to the report file name so an earlier report is not overwritten)
 #                                      [--installer <setup.exe on the laptop>] [--who NAME]   (the installer case replaces and restores the uninstall entry)
 #
@@ -26,7 +29,7 @@ ttl="${LOCK_TTL_MIN:-45}"
 
 sys="${1:-}"; shift || true
 [ "$sys" = windows ] || die "only 'windows' is implemented (macOS and Linux drivers come later); usage: regress.sh windows [options]"
-tier=smoke; allow=""; run=""; pkgrun=""; only=""; soak=0; model=""; who="cm-regress via regress.sh"; installer=""; label=""
+tier=smoke; allow=""; run=""; pkgrun=""; only=""; soak=0; model=""; speech=""; spkdir=""; who="cm-regress via regress.sh"; installer=""; label=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --tier) tier="$2"; shift 2 ;;
@@ -37,6 +40,8 @@ while [ $# -gt 0 ]; do
     --only) only="$2"; shift 2 ;;
     --soak-minutes) soak="$2"; shift 2 ;;
     --whisper-model) model="$2"; shift 2 ;;
+    --speech) speech="$2"; shift 2 ;;
+    --speaker-models) spkdir="$2"; shift 2 ;;
     --who) who="$2"; shift 2 ;;
     --installer) installer="$2"; shift 2 ;;
     --label) label="$2"; shift 2 ;;
@@ -112,6 +117,8 @@ args="--tier $tier --out $out --who \"$who\" --verdict PARTIAL"
 [ -n "$only" ] && args="$args --only $only"
 [ "$soak" != 0 ] && args="$args --soak-minutes $soak"
 [ -n "$model" ] && args="$args --whisper-model \"$model\""
+[ -n "$speech" ] && args="$args --speech \"$speech\""
+[ -n "$spkdir" ] && args="$args --speaker-models \"$spkdir\""
 [ -n "$installer" ] && args="$args --installer \"$installer\""
 case "$tier" in smoke) limit=600 ;; standard) limit=2400 ;; full) limit=5400 ;; hardware) limit=$((7200 + soak * 60)) ;; esac
 echo "running: cm-regress.exe $args (limit $limit s)"
