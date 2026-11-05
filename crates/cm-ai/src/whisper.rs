@@ -178,6 +178,7 @@ impl WhisperTranscriber {
     ) -> Result<Self, CmError> {
         let _t = cm_core::perf::span("model", "load");
         whisper_rs::install_logging_hooks();
+        log::info!("speech engine: {}", system_info().trim());
         // DTW token times need the model's alignment heads, known for the stock models only; any
         // other id (or a context that cannot start with DTW) runs without and uses the default
         // token times.
@@ -432,6 +433,12 @@ impl DecodeParams {
 }
 
 /// The alignment-head preset of a stock model id (`large` is large-v3).
+/// The CPU features whisper.cpp/ggml was compiled for and found (`AVX = 1 | AVX2 = 1 | FMA = 1 | ...`).
+/// A package built without AVX2/FMA/F16C is several times slower than one built with them.
+pub fn system_info() -> &'static str {
+    whisper_rs::print_system_info()
+}
+
 fn dtw_preset(model_id: &str) -> Option<DtwModelPreset> {
     match model_id {
         "tiny" => Some(DtwModelPreset::Tiny),

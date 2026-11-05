@@ -28,6 +28,7 @@ cm-cursor.workspace = true
 cm-library.workspace = true
 # FFmpeg lookup only (`tools::locate`): one set of rules for CM_FFMPEG, next to the exe, PATH.
 cm-media.workspace = true
+log.workspace = true
 serde = { version = "1", features = ["derive"] }
 # Unicode composition (NFC) and grapheme boundaries for the Vietnamese-exact text matching of the
 # glossary and of find and replace in captions (the same crates the desktop app already uses).
