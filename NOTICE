@@ -22,8 +22,8 @@ llama-server (the text engine built into the app, run as a separate program on 1
 unmodified build of llama.cpp (https://github.com/ggml-org/llama.cpp), licensed under the MIT
 License, Copyright the ggml authors; the licence texts of llama.cpp and of the small libraries it
 vendors, the exact version, the SHA-256 of the source archive and the configure line are in
-Contents/Resources/Llama/ (LICENSES/ and BUILD-INFO.txt), and the build script is
-packaging/llama/build-macos.sh. The text models CaptureMann downloads on request are separate files
+Contents/Resources/Llama/ on macOS and Llama\ in the Windows package (LICENSES/ and BUILD-INFO.txt),
+and the build scripts are packaging/llama/build-macos.sh and build-windows.sh. The text models CaptureMann downloads on request are separate files
 under their own open licences (Apache-2.0 or MIT), shown on the AI page before the download.
 
 Speaker labels use sherpa-onnx (https://github.com/k2-fsa/sherpa-onnx, Apache License 2.0; Rust

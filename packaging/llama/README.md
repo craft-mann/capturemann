@@ -43,5 +43,5 @@ Output (ignored by version control): `packaging/llama/out-windows-x64/{llama-ser
 
 `packaging/windows/build-windows.ps1` bundles that folder next to the programs when it exists
 (`CM_LLAMA_BUNDLE` names another; `CM_REQUIRE_LLAMA=1` makes its absence an error) and puts the build
-record and licences in `Llama\`. **Not run on Windows yet, and not in the CI workflows** (the CI job
-would build llama.cpp on every package run; add it once the maintainer wants it in the zip).
+record and licences in `Llama\`. `windows-package.yml` builds it (cached on both scripts), runs
+`--version` and `--help` only, and packages it with `CM_REQUIRE_LLAMA=1` (maintainer decision, Nov 5, 2026).
