@@ -312,7 +312,8 @@ pub fn editing_copy_args(
     // The `colr` atom for Media Foundation, whose stream carries no colour description itself.
     a.extend([
         "-movflags".to_owned(),
-        crate::graph::mp4_movflags(colour.is_some()).to_owned(),
+        crate::graph::mp4_movflags(colour.is_some(), colour.as_ref().is_some_and(|c| c.vui))
+            .to_owned(),
     ]);
     a.push(output.display().to_string());
     a
@@ -782,7 +783,10 @@ mod tests {
             "{hd}"
         );
         assert!(hd.contains("-bsf:v h264_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1:video_full_range_flag=0"), "{hd}");
-        assert!(hd.contains("-movflags +faststart+write_colr"), "{hd}");
+        assert!(
+            hd.contains("-movflags +faststart") && !hd.contains("write_colr"),
+            "{hd}"
+        );
         let sd = run(Standard::Smpte170m, false);
         assert!(sd.contains("out_color_matrix=smpte170m"), "{sd}");
         assert!(

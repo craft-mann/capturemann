@@ -1469,7 +1469,10 @@ fn encode_args(
         );
     }
     if fmt.faststart {
-        args.extend(["-movflags".into(), mp4_movflags(media_foundation).into()]);
+        args.extend([
+            "-movflags".into(),
+            mp4_movflags(media_foundation, caps.h264_metadata).into(),
+        ]);
     }
     args.extend(["-f", fmt.container, "-t", &secs(duration_s)].map(String::from));
     args.push(out.to_string_lossy().into_owned());
@@ -1626,7 +1629,10 @@ mod tests {
             .join(" ")
         };
         let mf = enc_args(Encoder::H264Mf, true);
-        assert!(mf.contains("-movflags +faststart+write_colr"), "{mf}");
+        assert!(
+            mf.contains("-movflags +faststart -f mp4") && !mf.contains("write_colr"),
+            "{mf}"
+        );
         assert!(mf.contains("-bsf:v h264_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1:video_full_range_flag=0"), "{mf}");
         let old = enc_args(Encoder::H264Mf, false);
         assert!(

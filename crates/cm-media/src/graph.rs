@@ -212,9 +212,8 @@ fn audio_chain(in_idx: usize, offset: f64, layout: &str, label: &str) -> String 
 /// primaries, the transfer and the matrix are all known, yet FFmpeg's command line hands the encoder
 /// only the matrix and the range (found on the lab laptop, Nov 5, 2026: `-colorspace` and
 /// `-color_range` alone left ffprobe with empty `color_*` fields). So: the options (matrix and range
-/// reach the stream), `-movflags +write_colr` (see [`mp4_movflags`]: the `colr` atom is written even
-/// with unknown primaries) and, when this FFmpeg has it, the `h264_metadata` filter that writes the
-/// full colour description into the SPS. Empty for every other encoder (VideoToolbox, VAAPI and the
+/// reach the stream), the `h264_metadata` filter that writes the full colour description into the
+/// SPS when this FFmpeg has it (else `-movflags +write_colr`, see [`mp4_movflags`]). Empty for every other encoder (VideoToolbox, VAAPI and the
 /// software encoders tag themselves).
 pub(crate) fn mf_colour_args(media_foundation: bool, caps: &crate::tools::Caps) -> Vec<String> {
     if !media_foundation {
@@ -256,10 +255,14 @@ pub(crate) fn mf_vui_bsf(code: u8) -> String {
     format!("h264_metadata=colour_primaries={code}:transfer_characteristics={code}:matrix_coefficients={code}:video_full_range_flag=0")
 }
 
-/// `-movflags` of an MP4 output: fast start, and the `colr` atom for `h264_mf` (see
-/// [`mf_colour_args`]).
-pub(crate) fn mp4_movflags(media_foundation: bool) -> &'static str {
-    if media_foundation {
+/// `-movflags` of an MP4 output: fast start, and for `h264_mf` the `colr` atom only when the SPS
+/// is not tagged (`vui` false). The muxer writes that atom from the codec parameters, where the
+/// primaries and the transfer stay unspecified (`h264_mf` hands the encoder only the matrix and
+/// the range); ffprobe reports the atom over the SPS, so with `write_colr` the lab laptop showed
+/// empty `color_primaries` and `color_transfer` even though `h264_metadata` had written
+/// BT.709 into the SPS (Nov 5, 2026). Without the atom ffprobe reads the SPS.
+pub(crate) fn mp4_movflags(media_foundation: bool, vui: bool) -> &'static str {
+    if media_foundation && !vui {
         "+faststart+write_colr"
     } else {
         "+faststart"
@@ -605,7 +608,7 @@ pub fn build(i: &BuildInput<'_>) -> Plan {
     args.extend(
         [
             "-movflags",
-            mp4_movflags(i.encoder == Encoder::H264Mf),
+            mp4_movflags(i.encoder == Encoder::H264Mf, i.caps.h264_metadata),
             "-f",
             "mp4",
             "-t",
@@ -711,7 +714,7 @@ mod tests {
             "{j}"
         );
         assert!(j.contains("-bsf:v h264_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1:video_full_range_flag=0"), "{j}");
-        assert_eq!(arg_after(&a, "-movflags"), Some("+faststart+write_colr"));
+        assert_eq!(arg_after(&a, "-movflags"), Some("+faststart"));
         c.h264_metadata = false;
         let j = plan_with(&manifest(), Encoder::H264Mf, true, true, &c)
             .args
