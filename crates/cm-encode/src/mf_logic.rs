@@ -37,6 +37,18 @@ pub fn h264_plan_for(plan: &VideoPlan) -> Result<VideoPlan, CmError> {
     })
 }
 
+/// The plan as the recorder on this computer will really run it: on Windows the H.264 plan
+/// [`h264_plan_for`] gives (the automatic HEVC above 1920 px wide becomes H.264, so `record start`
+/// and the manifest name the codec of the file); a plan H.264 cannot take (wider than 4096 px) is
+/// kept as asked, and the recorder then tries the smaller sizes. Elsewhere the plan is unchanged.
+pub fn platform_plan(plan: VideoPlan) -> VideoPlan {
+    if cfg!(windows) {
+        h264_plan_for(&plan).unwrap_or(plan)
+    } else {
+        plan
+    }
+}
+
 /// Media Foundation stores a size (`MF_MT_FRAME_SIZE`) or a ratio (`MF_MT_FRAME_RATE`) as one
 /// 64-bit attribute: the first number in the high half, the second in the low half.
 pub fn pack_pair(high: u32, low: u32) -> u64 {
@@ -106,6 +118,23 @@ mod tests {
             q.bitrate_bps,
             bitrate_bps(Codec::H264, 30, Quality::High, 2560, 1440)
         );
+    }
+
+    #[test]
+    fn the_platform_plan_names_the_codec_the_file_gets() {
+        let hevc = plan(3840, 2160, Codec::Hevc);
+        let p = platform_plan(hevc);
+        if cfg!(windows) {
+            assert_eq!(p.codec, Codec::H264);
+            assert_eq!((p.width, p.height), (3840, 2160));
+            // Wider than H.264 allows: kept, the recorder falls back to smaller sizes.
+            let wide = plan(5120, 2880, Codec::Hevc);
+            assert_eq!(platform_plan(wide), wide);
+        } else {
+            assert_eq!(p, hevc);
+        }
+        let h = plan(1920, 1080, Codec::H264);
+        assert_eq!(platform_plan(h), h);
     }
 
     #[test]

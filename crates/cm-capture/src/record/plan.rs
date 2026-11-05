@@ -156,7 +156,11 @@ pub fn plan_capture(settings: &ScreenSettings, targets: &Targets) -> Result<Capt
             (w.display_id, w.scale, w.bounds.size, None)
         }
     };
-    let video = plan_video(source_size.width, source_size.height, &settings.video)?;
+    let video = cm_encode::platform_plan(plan_video(
+        source_size.width,
+        source_size.height,
+        &settings.video,
+    )?);
     Ok(CapturePlan {
         target: settings.target,
         display_id,
@@ -193,6 +197,7 @@ impl CapturePlan {
         self.video.height = h;
         self.video.bitrate_bps =
             cm_encode::bitrate_bps(self.video.codec, self.video.fps, self.video.quality, w, h);
+        self.video = cm_encode::platform_plan(self.video);
     }
 }
 

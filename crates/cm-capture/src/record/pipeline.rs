@@ -569,7 +569,10 @@ impl<E: VideoEncoder> Pipeline<E> {
         self.cursor = Some(self.cursor.map_or(slot, |c| c.max(slot)));
         let pts = MediaTime::from_ticks(slot * self.interval);
         for _ in 0..FINAL_SLOT_TRIES {
-            match self.enc.append(&held, pts, MediaTime::from_ticks(self.interval)) {
+            match self
+                .enc
+                .append(&held, pts, MediaTime::from_ticks(self.interval))
+            {
                 Ok(AppendOutcome::Written) => {
                     self.stats.written += 1;
                     self.stats.repeated += 1;
@@ -897,7 +900,10 @@ mod tests {
         assert!(l.iter().all(|a| a.pts.ticks() % 4000 == 0));
         let last = l.last().unwrap().pts.ticks();
         assert!(last >= 2 * 120_000 - 3 * 4000, "file ends at {last}");
-        assert_eq!(p.stats().slots_offered(), p.stats().written + p.stats().dropped());
+        assert_eq!(
+            p.stats().slots_offered(),
+            p.stats().written + p.stats().dropped()
+        );
     }
 
     /// An encoder that accepts a number of slots per second (a budget the test refills), like a
@@ -940,7 +946,11 @@ mod tests {
         capacity: f64,
         secs: i64,
         dir: &std::path::Path,
-    ) -> (Pipeline<Limited>, cm_encode::synthetic::AppendLog, Vec<RateChange>) {
+    ) -> (
+        Pipeline<Limited>,
+        cm_encode::synthetic::AppendLog,
+        Vec<RateChange>,
+    ) {
         let plan = plan_video(3840, 2160, &VideoSettings::default()).unwrap();
         let inner = SyntheticEncoder::create(&EncoderConfig {
             path: dir.join("screen.mp4"),
@@ -998,7 +1008,10 @@ mod tests {
             end as f64 / 120_000.0
         );
         assert!(l.windows(2).all(|w| w[1].pts > w[0].pts));
-        assert!(l.iter().all(|a| a.pts.ticks() % 4000 == 0), "on the slot grid");
+        assert!(
+            l.iter().all(|a| a.pts.ticks() % 4000 == 0),
+            "on the slot grid"
+        );
         let _ = p;
     }
 
