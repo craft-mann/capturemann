@@ -544,9 +544,7 @@ pub fn export_skipped_toast(capture_id: &str) -> ToastSpec {
 /// recording is saved; this is information, not an error.
 fn export_skipped_toast_now(capture_id: &str) -> ToastSpec {
     ToastSpec::new(ToastKind::Info, tr!("Saved without a single MP4"))
-        .body(tr!(
-            "FFmpeg isn\u{2019}t installed, so the combined video was not made. Install it with Homebrew (brew install ffmpeg), then press Export on the recording."
-        ))
+        .body(export_skipped_body(cfg!(windows)))
         .button(
             tr_ctx!("button", "Open"),
             ToastAction::OpenCapture(capture_id.to_owned()),
@@ -557,6 +555,33 @@ fn export_skipped_toast_now(capture_id: &str) -> ToastSpec {
 pub fn export_failed_toast(capture_id: &str, reason: &str, ffmpeg_missing: bool) -> ToastSpec {
     let (capture_id, reason) = (capture_id.to_owned(), reason.to_owned());
     ToastSpec::live(move || export_failed_toast_now(&capture_id, &reason, ffmpeg_missing))
+}
+
+/// The body of the one-time hint when FFmpeg is missing; `windows` picks the wording (no Homebrew
+/// on Windows, where the app includes its own copy).
+fn export_skipped_body(windows: bool) -> String {
+    if windows {
+        tr!(
+            "FFmpeg wasn\u{2019}t found, so the combined video was not made. Reinstall CaptureMann (it includes its own copy), then press Export on the recording."
+        )
+    } else {
+        tr!(
+            "FFmpeg isn\u{2019}t installed, so the combined video was not made. Install it with Homebrew (brew install ffmpeg), then press Export on the recording."
+        )
+    }
+}
+
+/// The body of the toast for a failed export whose FFmpeg is missing; `windows` picks the wording.
+fn ffmpeg_missing_body(windows: bool) -> String {
+    if windows {
+        tr!(
+            "The recording is saved, but the single MP4 needs FFmpeg. Reinstall CaptureMann (it includes its own copy), or set CM_FFMPEG to ffmpeg.exe, then press Export on the recording."
+        )
+    } else {
+        tr!(
+            "The recording is saved, but the single MP4 needs FFmpeg. Install it with Homebrew (brew install ffmpeg), then press Export on the recording."
+        )
+    }
 }
 
 /// A failed export. A missing FFmpeg gets its own wording and the install hint; the recording is
@@ -574,9 +599,7 @@ fn export_failed_toast_now(capture_id: &str, reason: &str, ffmpeg_missing: bool)
     }
     if ffmpeg_missing {
         return ToastSpec::new(ToastKind::Error, tr!("FFmpeg not found"))
-            .body(tr!(
-                "The recording is saved, but the single MP4 needs FFmpeg. Install it with Homebrew (brew install ffmpeg), then press Export on the recording."
-            ))
+            .body(ffmpeg_missing_body(cfg!(windows)))
             .button(
                 tr_ctx!("button", "Open"),
                 ToastAction::OpenCapture(capture_id.to_owned()),
@@ -634,7 +657,9 @@ mod tests {
         );
         let toast = export_skipped_toast("rec_1");
         assert_eq!(toast.kind, ToastKind::Info);
-        assert!(toast.body.unwrap().contains("brew install ffmpeg"));
+        assert_eq!(toast.body.unwrap(), export_skipped_body(cfg!(windows)));
+        assert!(export_skipped_body(false).contains("brew install ffmpeg"));
+        assert!(!export_skipped_body(true).contains("brew"));
     }
 
     /// REC-1: queued -> progress in 5% steps -> done; the toasts follow.
@@ -717,10 +742,12 @@ mod tests {
             panic!()
         };
         assert!(ffmpeg_missing);
-        assert!(reason.contains("brew install ffmpeg"));
+        assert!(reason.contains("FFmpeg was not found"));
         let toast = export_failed_toast("rec_1", reason, *ffmpeg_missing);
         assert_eq!(toast.title, "FFmpeg not found");
-        assert!(toast.body.unwrap().contains("brew install ffmpeg"));
+        assert_eq!(toast.body.unwrap(), ffmpeg_missing_body(cfg!(windows)));
+        assert!(ffmpeg_missing_body(false).contains("brew install ffmpeg"));
+        assert!(!ffmpeg_missing_body(true).contains("brew"));
         assert_eq!(toast.kind, ToastKind::Error);
 
         t.on_event("export.queued", &queued("j2", false));
@@ -781,8 +808,8 @@ mod tests {
             assert!(body.contains("cài lại CaptureMann"), "{body}");
         });
         // Not the damaged-app case: the developer hint stays.
-        let toast = export_failed_toast("rec_1", cm_media::tools::NOT_FOUND_MESSAGE, true);
-        assert!(toast.body.unwrap().contains("brew install ffmpeg"));
+        let toast = export_failed_toast("rec_1", cm_media::tools::not_found_message(), true);
+        assert_eq!(toast.body.unwrap(), ffmpeg_missing_body(cfg!(windows)));
         // A generic failure shows the reason, worded by id when it has one.
         let toast = export_failed_toast("rec_1", "FFmpeg failed (exit status: 1): boom", false);
         assert!(toast.body.unwrap().contains("boom"));

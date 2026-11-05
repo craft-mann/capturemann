@@ -205,7 +205,7 @@ impl SettingsView {
                         "rec-auto-export",
                         tile::AUTO_EXPORT,
                         &tr!("Create a single MP4 after recording"),
-                        &tr!("Renders one video with the screen, the camera bubble and your audio into the recording\u{2019}s exports folder. The original tracks are never changed. Needs FFmpeg (brew install ffmpeg)."),
+                        &auto_export_hint(cfg!(windows)),
                         crate::recording::exports::KEY_AUTO_EXPORT,
                         auto_export,
                         true,
@@ -454,5 +454,15 @@ impl SettingsView {
         let mut list = self.recording_settings(cx).excluded_apps;
         list.retain(|x| x != id);
         self.write(keys::KEY_EXCLUDED, json!(list), cx);
+    }
+}
+
+/// The explanation under "Create a single MP4 after recording"; `windows` picks the FFmpeg note (no
+/// Homebrew on Windows, where the app includes FFmpeg).
+fn auto_export_hint(windows: bool) -> String {
+    if windows {
+        tr!("Renders one video with the screen, the camera bubble and your audio into the recording\u{2019}s exports folder. The original tracks are never changed. Needs FFmpeg (included with CaptureMann).")
+    } else {
+        tr!("Renders one video with the screen, the camera bubble and your audio into the recording\u{2019}s exports folder. The original tracks are never changed. Needs FFmpeg (brew install ffmpeg).")
     }
 }

@@ -1163,7 +1163,7 @@ fn check_sidecar(caps: &crate::tools::Caps, kind: Kind) -> Result<(), CmError> {
     Err(CmError::platform_rejected(
         format!(
             "This FFmpeg has no {m} encoder, which {k} export needs. Use an FFmpeg built with {m} \
-             (for example `brew install ffmpeg`), or export MP4.",
+             (the FFmpeg that comes with CaptureMann has it), or export MP4.",
             m = missing.join(" and "),
             k = kind.extension().to_uppercase(),
         ),

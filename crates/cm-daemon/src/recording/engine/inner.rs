@@ -236,7 +236,7 @@ impl EngineInner {
                     events::EXPORT_SKIPPED,
                     json!({ "capture_id": capture_id, "title": title,
                             "reason": "ffmpeg_not_found",
-                            "message": cm_media::tools::NOT_FOUND_MESSAGE }),
+                            "message": cm_media::tools::not_found_message() }),
                 );
             }
             return Err("FFmpeg was not found".to_owned());

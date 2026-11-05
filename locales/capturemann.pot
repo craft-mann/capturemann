@@ -1758,6 +1758,9 @@ msgstr ""
 msgid "Exports go to the default first"
 msgstr ""
 
+msgid "FFmpeg at `{path}` cannot be run (permission denied). FFmpeg was not found: CaptureMann includes its own copy, so reinstall CaptureMann, or set CM_FFMPEG to the path of ffmpeg.exe. (For development: winget install Gyan.FFmpeg.)"
+msgstr ""
+
 msgid "FFmpeg at `{path}` cannot be run (permission denied). FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."
 msgstr ""
 
@@ -1782,6 +1785,9 @@ msgstr ""
 msgid "FFmpeg was not found: CM_FFMPEG points to `{path}`, which is not a file. Fix or unset CM_FFMPEG."
 msgstr ""
 
+msgid "FFmpeg was not found: CaptureMann includes its own copy, so reinstall CaptureMann, or set CM_FFMPEG to the path of ffmpeg.exe. (For development: winget install Gyan.FFmpeg.)"
+msgstr ""
+
 msgid "FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."
 msgstr ""
 
@@ -1789,6 +1795,9 @@ msgid "FFmpeg was not found: the copy inside CaptureMann (`{path}`) cannot be ru
 msgstr ""
 
 msgid "FFmpeg was not found: the copy that ships inside CaptureMann is missing, so the app is damaged or incomplete. Reinstall CaptureMann. (Advanced: set CM_FFMPEG to an ffmpeg executable.)"
+msgstr ""
+
+msgid "FFmpeg wasn’t found, so the combined video was not made. Reinstall CaptureMann (it includes its own copy), then press Export on the recording."
 msgstr ""
 
 msgid "FFmpeg: {error}"
@@ -3771,6 +3780,9 @@ msgstr ""
 msgid "Renders one video with the screen, the camera bubble and your audio into the recording’s exports folder. The original tracks are never changed. Needs FFmpeg (brew install ffmpeg)."
 msgstr ""
 
+msgid "Renders one video with the screen, the camera bubble and your audio into the recording’s exports folder. The original tracks are never changed. Needs FFmpeg (included with CaptureMann)."
+msgstr ""
+
 msgid "Reopen setup"
 msgstr ""
 
@@ -4894,6 +4906,9 @@ msgid "The recording is saved, but the single MP4 needs FFmpeg, and the copy ins
 msgstr ""
 
 msgid "The recording is saved, but the single MP4 needs FFmpeg. Install it with Homebrew (brew install ffmpeg), then press Export on the recording."
+msgstr ""
+
+msgid "The recording is saved, but the single MP4 needs FFmpeg. Reinstall CaptureMann (it includes its own copy), or set CM_FFMPEG to ffmpeg.exe, then press Export on the recording."
 msgstr ""
 
 msgid "The recording is stopped and its files are deleted."
