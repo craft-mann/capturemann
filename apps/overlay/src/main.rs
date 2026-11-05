@@ -5,6 +5,7 @@ use std::time::Instant;
 
 use cm_overlay::args::{parse, Parsed, USAGE};
 use cm_overlay::error::OverlayError;
+use cm_overlay::lifetime;
 
 fn fail(e: &OverlayError) -> ExitCode {
     if e.code == "user_declined" {
@@ -53,7 +54,35 @@ fn main() -> ExitCode {
             return ExitCode::from(u8::try_from(e.exit).unwrap_or(2));
         }
     };
-    match cm_overlay::run(&args, started) {
+    let parent = lifetime::parent_pid_from(std::env::var(lifetime::PARENT_PID_ENV).ok().as_deref());
+    let deadline = lifetime::deadline_from(std::env::var(lifetime::DEADLINE_ENV).ok().as_deref());
+    log::info!(
+        "overlay started: pid {}, mode {:?}, pick {}, endpoint {}, parent pid {:?}, deadline {} s",
+        std::process::id(),
+        args.mode,
+        args.pick,
+        args.endpoint.describe(),
+        parent,
+        deadline.as_secs()
+    );
+    // A stray overlay (the app was killed, or the daemon never answers) ends itself and says so.
+    lifetime::guard(deadline, parent, |reason| {
+        log::error!("overlay: {}", reason.describe());
+        let e = OverlayError::internal(reason.describe());
+        eprintln!("{}", e.render_json());
+        std::process::exit(e.exit);
+    });
+    let result = cm_overlay::run(&args, started);
+    log::info!(
+        "overlay finished after {} ms: {}",
+        started.elapsed().as_millis(),
+        match &result {
+            Ok(v) if v.get("capture_id").is_some() => "capture made".to_owned(),
+            Ok(_) => "ok".to_owned(),
+            Err(e) => format!("{} ({})", e.code, e.exit),
+        }
+    );
+    match result {
         Ok(v) => {
             println!("{v}");
             ExitCode::SUCCESS
