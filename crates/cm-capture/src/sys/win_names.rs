@@ -31,15 +31,37 @@ pub fn is_frame_host(exe_path: &str) -> bool {
         .is_some_and(|f| f.eq_ignore_ascii_case("ApplicationFrameHost.exe"))
 }
 
+/// Whether a description is a generic "... Host" name of a program that hosts another one (a console
+/// host, a frame host): its last word is `Host` and it has at least one more word.
+fn is_host_description(d: &str) -> bool {
+    let mut words = d.split_whitespace().rev();
+    words.next().is_some_and(|w| w.eq_ignore_ascii_case("host")) && words.next().is_some()
+}
+
 /// The name the picker shows for a window's app: the first of the program's own descriptions
 /// (`FileDescription`, `ProductName`) that is text a person can read, else the program's file name, else
 /// the window title. Never a path.
+///
+/// A program that only hosts the app often describes itself as the host ("Windows Terminal Host" for the
+/// terminal's `OpenConsole.exe`) while its product name is the app's ("Windows Terminal"). When the first
+/// description ends in "Host" and a later readable description differs from it, the later one is used.
 pub fn choose_app_name(descriptions: &[&str], exe_path: &str, title: &str) -> String {
-    for d in descriptions {
-        let d = d.trim();
-        if !d.is_empty() && !looks_like_path(d) {
-            return d.to_string();
+    let readable: Vec<&str> = descriptions
+        .iter()
+        .map(|d| d.trim())
+        .filter(|d| !d.is_empty() && !looks_like_path(d))
+        .collect();
+    if let Some(first) = readable.first() {
+        if is_host_description(first) {
+            if let Some(other) = readable
+                .iter()
+                .skip(1)
+                .find(|d| !d.eq_ignore_ascii_case(first) && !is_host_description(d))
+            {
+                return (*other).to_string();
+            }
         }
+        return (*first).to_string();
     }
     let stem = exe_stem(exe_path);
     if !stem.trim().is_empty() {
@@ -130,6 +152,40 @@ mod tests {
         // No description and no program: the title, unless it is a path.
         assert_eq!(choose_app_name(&[], "", " Settings "), "Settings");
         assert_eq!(choose_app_name(&[], "", r"C:\x\y.exe"), "");
+    }
+
+    #[test]
+    fn a_host_description_gives_way_to_the_product_name() {
+        let exe = r"C:\Program Files\WindowsApps\t\OpenConsole.exe";
+        // FileDescription first, ProductName second, as the lookup passes them.
+        assert_eq!(
+            choose_app_name(&["Windows Terminal Host", "Windows Terminal"], exe, "x"),
+            "Windows Terminal"
+        );
+        // Both are hosts, or the product name is the same: the first stays.
+        assert_eq!(
+            choose_app_name(&["Console Window Host", "Microsoft Windows Host"], exe, "x"),
+            "Console Window Host"
+        );
+        assert_eq!(
+            choose_app_name(
+                &["Windows Terminal Host", "windows terminal host"],
+                exe,
+                "x"
+            ),
+            "Windows Terminal Host"
+        );
+        // A host with no other readable name keeps its own; a one-word "Host" is not a host suffix.
+        assert_eq!(
+            choose_app_name(&["Windows Terminal Host", r"C:\x.exe"], exe, "x"),
+            "Windows Terminal Host"
+        );
+        assert_eq!(choose_app_name(&["Host", "Other"], exe, "x"), "Host");
+        // A description that does not end in Host is not touched.
+        assert_eq!(
+            choose_app_name(&["Notepad", "Microsoft Notepad"], exe, "x"),
+            "Notepad"
+        );
     }
 
     #[test]
