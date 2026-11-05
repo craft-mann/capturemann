@@ -301,6 +301,22 @@ pub fn set_level(window: &Window, level: isize) {
     imp::set_level(window, level);
 }
 
+/// Windows: puts the window on top of the topmost band without activating or moving it
+/// (`recording::zorder` decides the order). No-op elsewhere.
+pub fn raise_topmost(window: &Window) {
+    imp::raise_topmost(window);
+}
+
+/// The native window handle (`HWND` on Windows), for logging; `None` elsewhere.
+pub fn native_id(window: &Window) -> Option<isize> {
+    imp::native_id(window)
+}
+
+/// Windows: one log line per `(name, hwnd)` with rectangle, extended style and stack position.
+pub fn describe_windows(wins: &[(&str, isize)]) -> Vec<String> {
+    imp::describe_windows(wins)
+}
+
 /// The display's frame as `(x, y, w, h)` in global points, top-left origin of the primary display.
 /// GPUI 0.3.9 reports every display's bounds with origin (0, 0), so the real position of a
 /// secondary display (it can be left of or above the primary, with negative coordinates) comes
@@ -495,6 +511,16 @@ mod imp {
         }
     }
 
+    pub fn raise_topmost(_window: &Window) {}
+
+    pub fn native_id(_window: &Window) -> Option<isize> {
+        None
+    }
+
+    pub fn describe_windows(_wins: &[(&str, isize)]) -> Vec<String> {
+        Vec::new()
+    }
+
     pub fn bring_to_front(window: &Window) {
         let (Ok(w), Some(mtm)) = (ns_window(window), MainThreadMarker::new()) else {
             return;
@@ -608,28 +634,31 @@ mod imp {
     /// Windows hides a window from capture with `WDA_EXCLUDEFROMCAPTURE` (Windows 10 version
     /// 2004 and later). On an older Windows the call fails and the window stays capturable; that
     /// is reported as "not excluded" and the caller logs it (the engine cannot exclude windows by
-    /// pid on Windows, so there is no second line of defence). Click-through, levels and shadows
-    /// are macOS tweaks and stay unapplied.
+    /// pid on Windows, so there is no second line of defence). `click_through` makes the window
+    /// layered, transparent and non-activating (`recording::zorder`); levels and shadows are
+    /// macOS tweaks and stay unapplied.
     #[cfg(windows)]
     pub fn apply(window: &Window, tweaks: Tweaks) -> Result<Applied, String> {
-        use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-        use windows::Win32::Foundation::HWND;
+        use crate::platform_win_monitors as win;
         use windows::Win32::UI::WindowsAndMessaging::{
             SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE,
         };
 
-        if !tweaks.exclude_from_capture {
+        if !tweaks.exclude_from_capture && !tweaks.click_through {
             return Ok(Applied::default());
         }
-        let handle = HasWindowHandle::window_handle(window).map_err(|e| e.to_string())?;
-        let RawWindowHandle::Win32(h) = handle.as_raw() else {
-            return Err("not a Win32 window".to_owned());
-        };
-        let hwnd = HWND(h.hwnd.get() as *mut std::ffi::c_void);
-        // SAFETY: `hwnd` is the live top-level window GPUI owns for as long as `window` lives;
-        // the call only sets a display affinity flag on it, from the thread that owns the window.
-        let result = unsafe { SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE) };
-        Ok(super::applied_after_exclusion(tweaks, result.is_ok()))
+        let hwnd = win::hwnd(window).ok_or_else(|| "not a Win32 window".to_owned())?;
+        let mut done = Applied::default();
+        if tweaks.exclude_from_capture {
+            // SAFETY: `hwnd` is the live top-level window GPUI owns for as long as `window`
+            // lives; the call only sets a display affinity flag on it, from its own thread.
+            let result = unsafe { SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE) };
+            done = super::applied_after_exclusion(tweaks, result.is_ok());
+        }
+        if tweaks.click_through {
+            done.click_through = win::make_click_through(hwnd);
+        }
+        Ok(done)
     }
 
     #[cfg(not(any(target_os = "linux", windows)))]
@@ -694,6 +723,36 @@ mod imp {
     }
 
     pub fn set_level(_window: &Window, _level: isize) {}
+
+    #[cfg(windows)]
+    pub fn raise_topmost(window: &Window) {
+        if let Some(h) = crate::platform_win_monitors::hwnd(window) {
+            crate::platform_win_monitors::raise_topmost(h);
+        }
+    }
+
+    #[cfg(not(windows))]
+    pub fn raise_topmost(_window: &Window) {}
+
+    #[cfg(windows)]
+    pub fn native_id(window: &Window) -> Option<isize> {
+        crate::platform_win_monitors::hwnd(window).map(|h| h.0 as isize)
+    }
+
+    #[cfg(not(windows))]
+    pub fn native_id(_window: &Window) -> Option<isize> {
+        None
+    }
+
+    #[cfg(windows)]
+    pub fn describe_windows(wins: &[(&str, isize)]) -> Vec<String> {
+        crate::platform_win_monitors::describe_windows(wins)
+    }
+
+    #[cfg(not(windows))]
+    pub fn describe_windows(_wins: &[(&str, isize)]) -> Vec<String> {
+        Vec::new()
+    }
 
     pub fn set_ignores_mouse(_window: &Window, _ignore: bool) {}
 

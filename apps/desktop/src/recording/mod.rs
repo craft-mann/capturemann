@@ -41,3 +41,4 @@ pub mod tray;
 pub mod upload_progress;
 pub mod uploads;
 pub mod window_rows;
+pub mod zorder;

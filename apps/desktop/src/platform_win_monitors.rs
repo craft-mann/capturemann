@@ -18,7 +18,9 @@ use windows::Win32::Graphics::Gdi::{
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetClientRect, GetCursorPos, GetWindowRect, SetWindowPos, SWP_NOACTIVATE, SWP_NOSIZE,
+    GetClientRect, GetCursorPos, GetTopWindow, GetWindow, GetWindowLongPtrW, GetWindowRect,
+    SetLayeredWindowAttributes, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, GW_HWNDNEXT,
+    HWND_TOPMOST, LWA_ALPHA, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
     SWP_NOZORDER,
 };
 
@@ -159,7 +161,7 @@ pub fn display_id_for_area(bounds: [i64; 4]) -> Option<u32> {
     monitors::index_for_area_px(&ms, bounds).map(|i| ms[i].id)
 }
 
-fn hwnd(window: &Window) -> Option<HWND> {
+pub fn hwnd(window: &Window) -> Option<HWND> {
     let handle = HasWindowHandle::window_handle(window).ok()?;
     match handle.as_raw() {
         RawWindowHandle::Win32(h) => Some(HWND(h.hwnd.get() as *mut std::ffi::c_void)),
@@ -262,4 +264,94 @@ pub fn set_frame(window: &Window, x: f64, y: f64, w: f64, h_pt: f64) {
             SWP_NOZORDER | SWP_NOACTIVATE,
         )
     };
+}
+
+/// Makes a window ignore the mouse for good: `WS_EX_LAYERED | WS_EX_TRANSPARENT` (clicks fall
+/// through to whatever is below, in any process), `WS_EX_NOACTIVATE`, `WS_EX_TOOLWINDOW`,
+/// topmost; `SetLayeredWindowAttributes(255, LWA_ALPHA)` makes the layered window valid (a
+/// layered window without it is not drawn at all). `UpdateLayeredWindow` is never used, so GPUI's
+/// DirectComposition swap chain (`WS_EX_NOREDIRECTIONBITMAP`) keeps presenting: layered
+/// top-level windows may be composed through DirectComposition from Windows 8 on.
+pub fn make_click_through(h: HWND) -> bool {
+    // SAFETY: `h` is a live top-level window of this process, used from its own thread.
+    unsafe {
+        let old = GetWindowLongPtrW(h, GWL_EXSTYLE) as u32;
+        let new = crate::recording::zorder::area_ex_style(old);
+        SetWindowLongPtrW(h, GWL_EXSTYLE, new as isize);
+        let alpha = SetLayeredWindowAttributes(h, Default::default(), 255, LWA_ALPHA).is_ok();
+        let _ = SetWindowPos(
+            h,
+            None,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
+        );
+        let now = GetWindowLongPtrW(h, GWL_EXSTYLE) as u32;
+        alpha && now & crate::recording::zorder::WS_EX_TRANSPARENT != 0
+    }
+}
+
+/// Puts a window on top of the topmost band without activating, moving or resizing it.
+pub fn raise_topmost(h: HWND) {
+    // SAFETY: `h` is a live window; the flags leave position, size and activation alone.
+    let _ = unsafe {
+        SetWindowPos(
+            h,
+            Some(HWND_TOPMOST),
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+        )
+    };
+}
+
+/// One line per window: handle, rectangle (physical px), extended style and stack position
+/// (0 = highest top-level window of the desktop).
+pub fn describe_windows(wins: &[(&str, isize)]) -> Vec<String> {
+    let mut stack: Vec<isize> = Vec::new();
+    // SAFETY: plain window-list walk; handles may go stale, the calls then just fail.
+    unsafe {
+        let mut cur = GetTopWindow(None).ok();
+        while let Some(c) = cur {
+            stack.push(c.0 as isize);
+            cur = GetWindow(c, GW_HWNDNEXT).ok();
+            if stack.len() > 5000 {
+                break;
+            }
+        }
+    }
+    let ids: Vec<isize> = wins.iter().map(|(_, h)| *h).collect();
+    let z = crate::recording::zorder::z_indices(&stack, &ids);
+    wins.iter()
+        .zip(z)
+        .map(|((name, id), z)| {
+            let h = HWND(*id as *mut std::ffi::c_void);
+            let mut r = RECT::default();
+            // SAFETY: out-parameter on this frame.
+            let ok = unsafe { GetWindowRect(h, &mut r) }.is_ok();
+            // SAFETY: reading the style of a window handle.
+            let ex = unsafe { GetWindowLongPtrW(h, GWL_EXSTYLE) } as u32;
+            format!(
+                "{name}: hwnd=0x{id:x} rect={}{} ex={} z={}",
+                if ok {
+                    format!(
+                        "({},{} {}x{})",
+                        r.left,
+                        r.top,
+                        r.right - r.left,
+                        r.bottom - r.top
+                    )
+                } else {
+                    "?".to_owned()
+                },
+                "px",
+                crate::recording::zorder::describe_ex(ex),
+                z.map_or("not found".to_owned(), |i| i.to_string()),
+            )
+        })
+        .collect()
 }

@@ -308,7 +308,8 @@ pub fn panel_options(
 /// Hides a freshly opened window from screen capture (and optionally from the mouse). Only the
 /// debug demo (`CM_DEMO_CAPTURABLE`) leaves windows capturable, so they can be screenshotted.
 pub fn harden(window: &gpui::Window, click_through: bool) {
-    if let Err(e) = platform_window::apply(
+    let want_click_through = click_through;
+    match platform_window::apply(
         window,
         Tweaks {
             exclude_from_capture: !crate::recording::demo::capturable(),
@@ -318,7 +319,72 @@ pub fn harden(window: &gpui::Window, click_through: bool) {
             level: click_through.then_some(1000),
         },
     ) {
-        log::warn!("could not hide a recording window from capture: {e}");
+        Ok(done) => {
+            if cfg!(windows) && want_click_through && !done.click_through {
+                log::warn!("the recording area window could not be made click-through");
+            }
+        }
+        Err(e) => log::warn!("could not hide a recording window from capture: {e}"),
+    }
+}
+
+/// Windows: stacks the open recording windows area < bubble < HUD (each raise puts a window on
+/// top of the topmost band without activating it) and logs each window's handle, rectangle,
+/// extended style and stack position to `desktop.log`, so a run that still blocks clicks shows
+/// what the desktop looked like. No-op elsewhere.
+fn raise_recording_windows(rec: &Entity<RecState>, why: &str, cx: &mut App) {
+    use crate::recording::zorder::{raise_order, Role};
+    if !cfg!(windows) {
+        return;
+    }
+    let (hud, area, bubble) = {
+        let r = rec.read(cx);
+        (r.hud_win, r.indicator_win, r.bubble_win)
+    };
+    let mut open = Vec::new();
+    if area.is_some() {
+        open.push(Role::Area);
+    }
+    if bubble.is_some() {
+        open.push(Role::Bubble);
+    }
+    if hud.is_some() {
+        open.push(Role::Hud);
+    }
+    let mut ids: Vec<(&'static str, isize)> = Vec::new();
+    for role in raise_order(&open) {
+        let id = match role {
+            Role::Area => area.and_then(|h| {
+                h.update(cx, |_, w, _| {
+                    platform_window::raise_topmost(w);
+                    platform_window::native_id(w)
+                })
+                .ok()
+                .flatten()
+            }),
+            Role::Bubble => bubble.and_then(|h| {
+                h.update(cx, |_, w, _| {
+                    platform_window::raise_topmost(w);
+                    platform_window::native_id(w)
+                })
+                .ok()
+                .flatten()
+            }),
+            Role::Hud => hud.and_then(|h| {
+                h.update(cx, |_, w, _| {
+                    platform_window::raise_topmost(w);
+                    platform_window::native_id(w)
+                })
+                .ok()
+                .flatten()
+            }),
+        };
+        if let Some(id) = id {
+            ids.push((role.name(), id));
+        }
+    }
+    for line in platform_window::describe_windows(&ids) {
+        log::debug!("recording windows ({why}): {line}");
     }
 }
 
@@ -833,18 +899,23 @@ fn open_recording_windows(app: &Entity<AppModel>, cx: &mut App) {
             };
             fix(cx);
             // AppKit may clamp again when the window is first ordered front.
+            let rec3 = rec.clone();
             cx.spawn(async move |cx| {
-                for ms in [60u64, 250] {
+                for (n, ms) in [60u64, 250].into_iter().enumerate() {
                     cx.background_executor()
                         .timer(Duration::from_millis(ms))
                         .await;
-                    cx.update(|cx| fix(cx));
+                    cx.update(|cx| {
+                        fix(cx);
+                        raise_recording_windows(&rec3, if n == 0 { "60 ms" } else { "250 ms" }, cx);
+                    });
                 }
             })
             .detach();
             rec.update(cx, |r, _| r.indicator_win = Some(h));
         }
     }
+    raise_recording_windows(&rec, "opened", cx);
     if rec.read(cx).hud.camera_on() {
         let hidden = rec.read(cx).hud.bubble_hidden;
         if !hidden {
@@ -891,6 +962,8 @@ pub fn open_bubble(app: &Entity<AppModel>, cx: &mut App) {
     if let Ok(h) = opened {
         crate::surfaces::opened(crate::surfaces::Surface::WebcamBubble, h);
         rec.update(cx, |r, _| r.bubble_win = Some(h));
+        // Opened after the HUD: keep the HUD on top (Windows).
+        raise_recording_windows(&rec, "bubble opened", cx);
     }
 }
 

@@ -33,6 +33,14 @@ The kept file is not stored; for a look at the output use the recording of secti
 Record 30 s, pause 10 s, resume 30 s. Pass: the file is 60 s long, continuous, the clock on screen
 jumps 10 s at the join.
 
+## 2b. HUD clicks and the area border (win-hudclick; NOT run on hardware)
+
+Record the display on the external monitor, then on the panel. Pass, on each: click Pause on the HUD (the
+recording pauses, the HUD shows it; click Resume); the recorded area border must not block clicks to other apps
+on the recorded monitor (click a window behind it: it takes the click and comes to the front); the border is still
+drawn and the HUD stays above it. If not, send the `recording windows` lines of `desktop.log` (hwnd, rect, ex-style,
+z-order of the area window, the bubble and the HUD).
+
 ## 3. Crash recovery (taskkill)
 
 1. Record the display. After 30 s, in another shell: `taskkill /F /IM cm-desktop.exe` (and
