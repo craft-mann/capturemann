@@ -193,9 +193,12 @@ fn tools() -> Option<Tools> {
             return None;
         }
     };
-    if Compositor::new().is_err() {
-        eprintln!("SKIPPED: no GPU adapter for the compositor");
-        return None;
+    match Compositor::new() {
+        Ok(c) => eprintln!("GPU adapter: {}", c.adapter_name()),
+        Err(_) => {
+            eprintln!("SKIPPED: no GPU adapter for the compositor");
+            return None;
+        }
     }
     Some(t)
 }
