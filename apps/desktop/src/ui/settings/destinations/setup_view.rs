@@ -104,7 +104,10 @@ impl SettingsView {
                         .gap(px(12.))
                         .child(caption(
                             t,
-                            tr!("Your sign-in expired or was removed. Sign in again with the app credentials already saved in your Keychain:"),
+                            tr!(
+                                "Your sign-in expired or was removed. Sign in again with the app credentials already saved in your {secret_store}:",
+                                secret_store = crate::platform_text::here(crate::platform_text::Term::SecretStore)
+                            ),
                         ))
                         .child(caption(t, saved.client_id).mono())
                         .children(error(s.error.as_ref().map(Problem::text), "dest-setup-error"))
@@ -154,14 +157,16 @@ impl SettingsView {
                             t,
                             if s.provider.needs_secret() {
                                 tr!(
-                                    "{name} needs an app that you create yourself, so the sign-in belongs to you. It takes a few minutes, once. The client ID and secret go to your Keychain, never to a file, and are only sent to {service}.",
+                                    "{name} needs an app that you create yourself, so the sign-in belongs to you. It takes a few minutes, once. The client ID and secret go to your {secret_store}, never to a file, and are only sent to {service}.",
                                     name = name,
+                                    secret_store = crate::platform_text::here(crate::platform_text::Term::SecretStore),
                                     service = (s.provider.config)().display_name
                                 )
                             } else {
                                 tr!(
-                                    "{name} needs an app that you create yourself, so the sign-in belongs to you. It takes a few minutes, once. The ID you paste (no secret is involved) go to your Keychain, never to a file, and are only sent to {service}.",
+                                    "{name} needs an app that you create yourself, so the sign-in belongs to you. It takes a few minutes, once. The ID you paste (no secret is involved) go to your {secret_store}, never to a file, and are only sent to {service}.",
                                     name = name,
+                                    secret_store = crate::platform_text::here(crate::platform_text::Term::SecretStore),
                                     service = (s.provider.config)().display_name
                                 )
                             },

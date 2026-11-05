@@ -536,7 +536,14 @@ pub fn ask_trash(app: &Entity<AppModel>, cx: &mut App) {
                     Ok(Err(e)) => app::push_toast(
                         &app2,
                         flows::error_toast_live(
-                            || tr!("Couldn\u{2019}t move the old copies to the Trash"),
+                            || {
+                                tr!(
+                                    "Couldn\u{2019}t move the old copies to {trash}",
+                                    trash = crate::platform_text::here(
+                                        crate::platform_text::Term::Trash
+                                    )
+                                )
+                            },
                             e.to_string(),
                         ),
                         cx,
@@ -544,7 +551,14 @@ pub fn ask_trash(app: &Entity<AppModel>, cx: &mut App) {
                     Err(e) => app::push_toast(
                         &app2,
                         flows::error_toast_live(
-                            || tr!("Couldn\u{2019}t move the old copies to the Trash"),
+                            || {
+                                tr!(
+                                    "Couldn\u{2019}t move the old copies to {trash}",
+                                    trash = crate::platform_text::here(
+                                        crate::platform_text::Term::Trash
+                                    )
+                                )
+                            },
                             e.to_string(),
                         ),
                         cx,

@@ -61,14 +61,16 @@ impl RecordingEditor {
             let running = self.app.read(cx).transcribe.status_text(&id).is_some();
             let message = if running {
                 tr!(
-                    "The transcript is being written on this Mac. A long recording takes several \
+                    "The transcript is being written on {this_computer}. A long recording takes several \
                      minutes. You don\u{2019}t need to press anything: it appears here when it\u{2019}s \
-                     done, and speaker labels follow."
+                     done, and speaker labels follow.",
+                    this_computer = crate::platform_text::this_computer()
                 )
             } else {
                 tr!(
                     "No transcript yet. Transcribe the recording to read it here; it runs on \
-                     this Mac."
+                     {this_computer}.",
+                    this_computer = crate::platform_text::this_computer()
                 )
             };
             return shell(vec![
@@ -443,8 +445,9 @@ impl RecordingEditor {
                     language = language_name(pick)
                 ),
                 tr!(
-                    "Whisper only translates into English. Choose a text model on this Mac \
-                     on the AI page."
+                    "Whisper only translates into English. Choose a text model on {this_computer} \
+                     on the AI page.",
+                    this_computer = crate::platform_text::this_computer()
                 ),
             ))
         } else {
@@ -486,8 +489,9 @@ impl RecordingEditor {
                 tr!("Text model, line by line"),
                 match &text {
                     super::report_tab::TextState::Ready(model) => tr!(
-                        "{model} on this Mac. Any language; each line keeps its start and end.",
-                        model = model.clone()
+                        "{model} on {this_computer}. Any language; each line keeps its start and end.",
+                        model = model.clone(),
+                        this_computer = crate::platform_text::this_computer()
                     ),
                     _ => tr!("Any language; each line keeps its start and end."),
                 },
@@ -863,7 +867,7 @@ impl RecordingEditor {
                     )
                     .body(path.display().to_string())
                     .button(
-                        tr_ctx!("button", "Show in Finder"),
+                        crate::platform_text::here(crate::platform_text::Term::ShowLabel),
                         crate::toast::ToastAction::RevealPath(path.display().to_string()),
                     ),
                     Err(e) => crate::flows::error_toast_live(

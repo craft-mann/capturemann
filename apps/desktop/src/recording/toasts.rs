@@ -146,8 +146,10 @@ fn ended_toast_now(e: &Ended) -> Option<ToastSpec> {
                 tr!("60 fps test passed"),
             )),
             "failed" => Some(
-                ToastSpec::new(ToastKind::Warning, tr!("60 fps test did not pass"))
-                    .body(tr!("Recordings stay at 30 fps on this Mac.")),
+                ToastSpec::new(ToastKind::Warning, tr!("60 fps test did not pass")).body(tr!(
+                    "Recordings stay at 30 fps on {this_computer}.",
+                    this_computer = crate::platform_text::this_computer()
+                )),
             ),
             "error" => Some(
                 ToastSpec::new(
@@ -288,7 +290,10 @@ pub fn start_error_spec(
                 tr!("Open Permissions\u{2026}"),
                 ToastAction::OpenPermissions,
             )
-            .button(tr!("Open System Settings"), pane);
+            .button(
+                crate::platform_text::here(crate::platform_text::Term::OpenSettings),
+                pane,
+            );
     }
     if linux && code == Some(ErrorCode::NotImplemented) {
         spec.kind = ToastKind::Info;

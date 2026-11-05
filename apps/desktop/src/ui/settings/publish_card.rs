@@ -904,7 +904,10 @@ impl SettingsView {
                     .gap(px(12.))
                     .child(caption(
                         t,
-                        tr!("Your sign-in expired or was removed. Sign in again with the app credentials already saved in your Keychain:"),
+                        tr!(
+                            "Your sign-in expired or was removed. Sign in again with the app credentials already saved in your {secret_store}:",
+                            secret_store = crate::platform_text::here(crate::platform_text::Term::SecretStore)
+                        ),
                     ))
                     .child(caption(t, saved.client_id).mono())
                     .children(self.yt_error_line(t, s.error.as_ref().map(Problem::text), "yt-setup-error"))
@@ -961,7 +964,10 @@ impl SettingsView {
                         .gap(px(14.))
                         .child(caption(
                             t,
-                            tr!("YouTube needs an app that you create yourself, so the sign-in and the upload limit belong to you. It takes a few minutes, once. The client ID and secret go to your Keychain, never to a file, and are only sent to Google."),
+                            tr!(
+                                "YouTube needs an app that you create yourself, so the sign-in and the upload limit belong to you. It takes a few minutes, once. The client ID and secret go to your {secret_store}, never to a file, and are only sent to Google.",
+                                secret_store = crate::platform_text::here(crate::platform_text::Term::SecretStore)
+                            ),
                         ))
                         .child(steps)
                         .child(div().flex().flex_col().gap(px(8.)).children(notes))
@@ -1096,8 +1102,9 @@ impl SettingsView {
                         .min_w(px(220.))
                         .text_size(px(type_scale::UI))
                         .child(SharedString::from(tr!(
-                            "Disconnect \u{201c}{name}\u{201d}? CaptureMann asks Google to revoke the access you gave it, then deletes the sign-in and app credentials from this Mac. Videos already on YouTube stay. If Google cannot be reached, it is still signed out here and you can remove the access at myaccount.google.com/permissions.",
-                            name = a.name
+                            "Disconnect \u{201c}{name}\u{201d}? CaptureMann asks Google to revoke the access you gave it, then deletes the sign-in and app credentials from {this_computer}. Videos already on YouTube stay. If Google cannot be reached, it is still signed out here and you can remove the access at myaccount.google.com/permissions.",
+                            name = a.name,
+                            this_computer = crate::platform_text::this_computer()
                         ))),
                 )
                 .child(

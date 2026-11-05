@@ -42,11 +42,14 @@ pub fn state_note(id: Id, state: State) -> Option<String> {
         (Id::ScreenRecording, State::GrantedNeedsRestart) => Some(
             tr!("macOS usually keeps refusing capture to an app that was already running when you granted this. CaptureMann can\u{2019}t check whether yours does, so restart it to be sure."),
         ),
-        (_, State::Restricted) => {
+        (_, State::Restricted) if crate::permissions::Os::current() == crate::permissions::Os::Mac => {
             Some(tr!("Your organization or Screen Time blocks this. Only an administrator can allow it."))
         }
+        (_, State::Restricted) => {
+            Some(tr!("Your organization blocks this. Only an administrator can allow it."))
+        }
         (Id::Microphone | Id::Camera, State::Denied) => {
-            Some(tr!("You turned this off. Turn it on in System Settings; recording works without it."))
+            Some(tr!("You turned this off. Turn it on in {settings_app}; recording works without it.", settings_app = crate::platform_text::settings_app()))
         }
         (Id::InputMonitoring, State::NotGranted) => Some(
             tr!("Optional: without it recordings keep the cursor position but not clicks or scroll. After granting, quit and reopen CaptureMann."),

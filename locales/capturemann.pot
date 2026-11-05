@@ -70,10 +70,7 @@ msgstr ""
 msgid "A countdown pill, Esc cancels"
 msgstr ""
 
-msgid "A folder on this Mac, an external drive or a mounted network folder."
-msgstr ""
-
-msgid "A folder on this computer, an external drive or a mounted network folder."
+msgid "A folder on {this_computer}, an external drive or a mounted network folder."
 msgstr ""
 
 #. FACT: owner review required
@@ -516,7 +513,7 @@ msgstr ""
 msgid "Background preset"
 msgstr ""
 
-msgid "Balanced accuracy and speed. A good choice on 8 GB Macs."
+msgid "Balanced accuracy and speed. A good choice on 8 GB {computers}."
 msgstr ""
 
 msgid "Before a screenshot"
@@ -567,10 +564,13 @@ msgstr ""
 msgid "Camera access has not been requested yet. Allow camera access when prompted."
 msgstr ""
 
-msgid "Camera access is denied. Enable it in System Settings > Privacy & Security > Camera."
+msgid "Camera access is denied. Enable it in {settings_path}."
 msgstr ""
 
-msgid "Camera access is off. Turn it on in System Settings; you can also record without the camera."
+msgid "Camera access is denied. Turn it on in {settings_path}, including Let desktop apps access your camera."
+msgstr ""
+
+msgid "Camera access is off. Turn it on in {settings_app}; you can also record without the camera."
 msgstr ""
 
 msgid "Camera access is restricted by a device policy and cannot be granted here."
@@ -710,6 +710,9 @@ msgid "CaptureMann is already running"
 msgstr ""
 
 msgid "CaptureMann isn't allowed to read these files. Allow it in System Settings, Privacy & Security, Files and Folders."
+msgstr ""
+
+msgid "CaptureMann isn't allowed to read these files. Check the permissions of the folder they are in."
 msgstr ""
 
 msgid "CaptureMann isn’t allowed to use the camera yet."
@@ -1196,7 +1199,7 @@ msgstr ""
 msgid "Couldn’t look for text: {e}"
 msgstr ""
 
-msgid "Couldn’t move the old copies to the Trash"
+msgid "Couldn’t move the old copies to {trash}"
 msgstr ""
 
 msgid "Couldn’t open the launcher"
@@ -1480,13 +1483,13 @@ msgstr ""
 msgid "Disconnect {name}"
 msgstr ""
 
-msgid "Disconnect “{name}”? CaptureMann asks Google to revoke the access you gave it, then deletes the sign-in and app credentials from this Mac. Videos already on YouTube stay. If Google cannot be reached, it is still signed out here and you can remove the access at myaccount.google.com/permissions."
+msgid "Disconnect “{name}”? CaptureMann asks Google to revoke the access you gave it, then deletes the sign-in and app credentials from {this_computer}. Videos already on YouTube stay. If Google cannot be reached, it is still signed out here and you can remove the access at myaccount.google.com/permissions."
 msgstr ""
 
-msgid "Disconnect “{name}”? Uploads to it stop and its sign-in is deleted from this Mac. CaptureMann also asks Google to revoke the access you gave it; if Google cannot be reached, you can remove it at myaccount.google.com/permissions. Files already in your drive stay there."
+msgid "Disconnect “{name}”? Uploads to it stop and its sign-in is deleted from {this_computer}. CaptureMann also asks Google to revoke the access you gave it; if Google cannot be reached, you can remove it at myaccount.google.com/permissions. Files already in your drive stay there."
 msgstr ""
 
-msgid "Disconnect “{name}”? Uploads to it stop and its sign-in is deleted from this Mac. Files already in your drive stay there, and the access you gave is not revoked at the provider (you can do that in your account settings)."
+msgid "Disconnect “{name}”? Uploads to it stop and its sign-in is deleted from {this_computer}. Files already in your drive stay there, and the access you gave is not revoked at the provider (you can do that in your account settings)."
 msgstr ""
 
 msgid "Disconnected “{name}”."
@@ -1615,7 +1618,7 @@ msgstr ""
 msgid "Each Google Cloud project may upload to YouTube about 100 times a day. YouTube can also keep videos from an unverified project private; CaptureMann tells you when that happens and never changes a video’s visibility afterwards."
 msgstr ""
 
-msgid "Each original goes to the Trash after its copy is checked"
+msgid "Each original goes to {trash} after its copy is checked"
 msgstr ""
 
 msgid "Each segment has its own window: split the recording, then move the playhead into a segment to move its window."
@@ -1688,11 +1691,7 @@ msgid "Everything CaptureMann can use is allowed."
 msgstr ""
 
 #. FACT: owner review required (privacy statement)
-msgid "Everything here runs on this Mac. Nothing is downloaded unless you press Download, and nothing is sent anywhere."
-msgstr ""
-
-#. FACT: owner review required (privacy statement)
-msgid "Everything here runs on this computer. Nothing is downloaded unless you press Download, and nothing is sent anywhere."
+msgid "Everything here runs on {this_computer}. Nothing is downloaded unless you press Download, and nothing is sent anywhere."
 msgstr ""
 
 msgid "Excluded windows"
@@ -1791,7 +1790,7 @@ msgstr ""
 msgid "FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."
 msgstr ""
 
-msgid "FFmpeg was not found: the copy inside CaptureMann (`{path}`) cannot be run ({error}). The app is damaged or macOS blocked it. Reinstall CaptureMann. (Advanced: set CM_FFMPEG to an ffmpeg executable.)"
+msgid "FFmpeg was not found: the copy inside CaptureMann (`{path}`) cannot be run ({error}). The app is damaged or {os_name} blocked it. Reinstall CaptureMann. (Advanced: set CM_FFMPEG to an ffmpeg executable.)"
 msgstr ""
 
 msgid "FFmpeg was not found: the copy that ships inside CaptureMann is missing, so the app is damaged or incomplete. Reinstall CaptureMann. (Advanced: set CM_FFMPEG to an ffmpeg executable.)"
@@ -2130,10 +2129,10 @@ msgstr ""
 msgid "Is this video made for kids?"
 msgstr ""
 
-msgid "It is removed from your library and moved to the Trash."
+msgid "It is removed from your library and moved to {trash}."
 msgstr ""
 
-msgid "It is removed from your library and moved to the Trash. Its copies online stay there unless you tick the box: deleting them cannot be undone ({services})."
+msgid "It is removed from your library and moved to {trash}. Its copies online stay there unless you tick the box: deleting them cannot be undone ({services})."
 msgstr ""
 
 msgid "Its own windows, toolbars and the webcam bubble preview"
@@ -2454,13 +2453,16 @@ msgstr ""
 msgid "Microphone access is off for CaptureMann."
 msgstr ""
 
-msgid "Microphone access is off. Turn it on in System Settings > Privacy & Security > Microphone."
+msgid "Microphone access is off. Turn it on in {settings_app} to record your voice."
 msgstr ""
 
-msgid "Microphone access is off. Turn it on in System Settings to record your voice."
+msgid "Microphone access is off. Turn it on in {settings_app}; recording starts without it."
 msgstr ""
 
-msgid "Microphone access is off. Turn it on in System Settings; recording starts without it."
+msgid "Microphone access is off. Turn it on in {settings_path}, including Let desktop apps access your microphone."
+msgstr ""
+
+msgid "Microphone access is off. Turn it on in {settings_path}."
 msgstr ""
 
 msgid "Microphone access needed"
@@ -2541,10 +2543,10 @@ msgstr ""
 msgid "Move the library from {from} to {to} ({size}, {n} captures)"
 msgstr ""
 
-msgid "Move the old copies to the Trash?"
+msgid "Move the old copies to {trash}?"
 msgstr ""
 
-msgid "Move the old copies to the Trash…"
+msgid "Move the old copies to {trash}…"
 msgstr ""
 
 msgid "Move the playhead inside the kept part to add a zoom"
@@ -2580,18 +2582,18 @@ msgstr ""
 msgid "Move the zoom focus up"
 msgstr ""
 
-msgid "Move to the Trash"
+msgid "Move to {trash}"
 msgstr ""
 
-msgid "Moved to the Trash"
+msgid "Moved to {trash}"
 msgstr ""
 
-msgid "Moved {n} capture to the Trash"
-msgid_plural "Moved {n} captures to the Trash"
+msgid "Moved {n} capture to {trash}"
+msgid_plural "Moved {n} captures to {trash}"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Moves instead of copies, so the files don't take space twice. Each original goes to the Trash only after its copy in the library is checked. Frees {size}."
+msgid "Moves instead of copies, so the files don't take space twice. Each original goes to {trash} only after its copy in the library is checked. Frees {size}."
 msgstr ""
 
 msgid "Moving the library"
@@ -2816,10 +2818,10 @@ msgstr ""
 msgid "No terms yet. Add a name or a word you want spelled your way."
 msgstr ""
 
-msgid "No transcript yet. Transcribe the microphone to get captions; it runs on this Mac."
+msgid "No transcript yet. Transcribe the microphone to get captions; it runs on {this_computer}."
 msgstr ""
 
-msgid "No transcript yet. Transcribe the recording to read it here; it runs on this Mac."
+msgid "No transcript yet. Transcribe the recording to read it here; it runs on {this_computer}."
 msgstr ""
 
 msgid "No video or audio stream could be read. The file may be damaged."
@@ -2900,10 +2902,7 @@ msgstr ""
 msgid "Not set"
 msgstr ""
 
-msgid "Not signed in on this Mac."
-msgstr ""
-
-msgid "Not signed in on this computer."
+msgid "Not signed in on {this_computer}."
 msgstr ""
 
 msgid "Not sure"
@@ -3196,7 +3195,7 @@ msgstr ""
 msgid "Paused, {t}"
 msgstr ""
 
-msgid "Peaks hit the top. Lower the input volume in System Settings."
+msgid "Peaks hit the top. Lower the input volume in {settings_app}."
 msgstr ""
 
 msgid "People in my organization"
@@ -3683,7 +3682,7 @@ msgstr ""
 msgid "Recordings go into a folder named “{folder}”. Manage the destination below to choose what is copied and when."
 msgstr ""
 
-msgid "Recordings stay at 30 fps on this Mac."
+msgid "Recordings stay at 30 fps on {this_computer}."
 msgstr ""
 
 #. FACT: owner review required (what the permission is for)
@@ -3818,7 +3817,7 @@ msgstr ""
 msgid "Reports and translation to any language"
 msgstr ""
 
-msgid "Reports are written by the text model built into CaptureMann, which runs on this Mac. Download it on the AI page; nothing is sent anywhere else."
+msgid "Reports are written by the text model built into CaptureMann, which runs on {this_computer}. Download it on the AI page; nothing is sent anywhere else."
 msgstr ""
 
 msgid "Reports of this recording"
@@ -4187,6 +4186,9 @@ msgstr ""
 msgid "Show file"
 msgstr ""
 
+msgid "Show in File Explorer"
+msgstr ""
+
 msgid "Show in folder"
 msgstr ""
 
@@ -4372,7 +4374,7 @@ msgstr ""
 msgid "Starting the camera…"
 msgstr ""
 
-msgid "Starts CaptureMann in the menu bar with no window. Takes effect for the installed app only."
+msgid "Starts CaptureMann in the {tray_area} with no window. Takes effect for the installed app only."
 msgstr ""
 
 msgid "Starts before the previous caption ends"
@@ -4465,7 +4467,7 @@ msgstr ""
 msgid "System audio needs Screen Recording permission on macOS."
 msgstr ""
 
-msgid "System audio needs Screen Recording permission. Turn it on in System Settings, or record the microphone only."
+msgid "System audio needs Screen Recording permission. Turn it on in {settings_app}, or record the microphone only."
 msgstr ""
 
 msgid "System default input"
@@ -4812,10 +4814,7 @@ msgstr ""
 msgid "The microphone has delivered only silence for 15 s (muted, or its access was revoked); the recording continues"
 msgstr ""
 
-msgid "The model runs inside CaptureMann and nothing leaves this Mac."
-msgstr ""
-
-msgid "The model runs inside CaptureMann and nothing leaves this computer."
+msgid "The model runs inside CaptureMann and nothing leaves {this_computer}."
 msgstr ""
 
 msgid "The mouse pointer is part of the video; it is not recorded as a separate track yet."
@@ -4920,7 +4919,7 @@ msgstr ""
 msgid "The remote copies are deleted first; if one fails the capture stays here and the result says what was and was not deleted"
 msgstr ""
 
-msgid "The remote copies are deleted, then the capture is moved to the Trash"
+msgid "The remote copies are deleted, then the capture is moved to {trash}"
 msgstr ""
 
 msgid "The ring is always the record color."
@@ -4968,7 +4967,7 @@ msgstr ""
 msgid "The text model did not answer."
 msgstr ""
 
-msgid "The transcript is being written on this Mac. A long recording takes several minutes. You don’t need to press anything: it appears here when it’s done, and speaker labels follow."
+msgid "The transcript is being written on {this_computer}. A long recording takes several minutes. You don’t need to press anything: it appears here when it’s done, and speaker labels follow."
 msgstr ""
 
 msgid "The upload couldn’t start"
@@ -5049,12 +5048,6 @@ msgstr ""
 msgid "These are the defaults for every recording, including ones an agent starts. A request can override them for one recording."
 msgstr ""
 
-msgid "This Mac has {memory} GB of memory. The model runs inside CaptureMann and nothing leaves this Mac."
-msgstr ""
-
-msgid "This Mac may not have enough free memory for this model."
-msgstr ""
-
 msgid "This account is not connected. Connect it again in Settings → Destinations."
 msgstr ""
 
@@ -5073,10 +5066,13 @@ msgstr ""
 msgid "This caption is empty"
 msgstr ""
 
-msgid "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update your operating system (macOS 13 or later, Windows 10 or later), or use a computer from about 2016 or later."
+msgid "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update Windows and the graphics driver, or use a computer with a hardware video encoder (most computers since about 2016)."
 msgstr ""
 
-msgid "This computer has {memory} GB of memory. The model runs inside CaptureMann and nothing leaves this computer."
+msgid "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update your graphics driver, or use a computer with a hardware video encoder (most computers since about 2016)."
+msgstr ""
+
+msgid "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update your operating system (macOS 13 or later, Windows 10 or later), or use a computer from about 2016 or later."
 msgstr ""
 
 msgid "This copy is not running from a CaptureMann.app, so it can’t relaunch itself."
@@ -5123,7 +5119,7 @@ msgstr ""
 msgid "This report was made with a template this version doesn’t know."
 msgstr ""
 
-msgid "This runs on this Mac and takes a few minutes for a long recording. You don’t need to press anything: the speakers appear here when it’s done."
+msgid "This runs on {this_computer} and takes a few minutes for a long recording. You don’t need to press anything: the speakers appear here when it’s done."
 msgstr ""
 
 msgid "Thumbnail"
@@ -5219,10 +5215,7 @@ msgstr ""
 msgid "Transcript ready"
 msgstr ""
 
-msgid "Transcripts, speakers, translations and reports, made on this Mac."
-msgstr ""
-
-msgid "Transcripts, speakers, translations and reports, made on this computer."
+msgid "Transcripts, speakers, translations and reports, made on {this_computer}."
 msgstr ""
 
 msgid "Translate"
@@ -5506,7 +5499,7 @@ msgid "What was recorded up to that moment is saved in your library."
 msgstr ""
 
 #. FACT: owner review required (privacy)
-msgid "When something goes wrong, copy this and paste it into a bug report. It has the version, your Mac, permissions, models, a few settings and the last warnings. It has no audio, no transcripts and no file names. Nothing is sent: check it, then paste it yourself."
+msgid "When something goes wrong, copy this and paste it into a bug report. It has the version, {your_computer}, permissions, models, a few settings and the last warnings. It has no audio, no transcripts and no file names. Nothing is sent: check it, then paste it yourself."
 msgstr ""
 
 msgid "When you press Publish, CaptureMann asks you to confirm in a separate dialog. Nothing is sent to YouTube before you do. Chapters are not added yet."
@@ -5521,7 +5514,7 @@ msgstr ""
 msgid "While recording: audio recordings are read piece by piece as you record, so the transcript is ready sooner after Stop; screen recordings are transcribed after they stop."
 msgstr ""
 
-msgid "Whisper only translates into English. Choose a text model on this Mac on the AI page."
+msgid "Whisper only translates into English. Choose a text model on {this_computer} on the AI page."
 msgstr ""
 
 msgid "Whisper · transcripts, captions, translation to English"
@@ -5625,7 +5618,7 @@ msgid "You can leave this page; the upload continues in the background and resum
 msgstr ""
 
 #. FACT: owner review required (every permission note states what macOS does)
-msgid "You turned this off. Turn it on in System Settings; recording works without it."
+msgid "You turned this off. Turn it on in {settings_app}; recording works without it."
 msgstr ""
 
 msgid "YouTube account"
@@ -5640,7 +5633,7 @@ msgstr ""
 msgid "YouTube kept this video private because your Google Cloud project is not verified. Nothing was changed afterwards. Open the video in YouTube Studio to make it unlisted or public, or verify your project."
 msgstr ""
 
-msgid "YouTube needs an app that you create yourself, so the sign-in and the upload limit belong to you. It takes a few minutes, once. The client ID and secret go to your Keychain, never to a file, and are only sent to Google."
+msgid "YouTube needs an app that you create yourself, so the sign-in and the upload limit belong to you. It takes a few minutes, once. The client ID and secret go to your {secret_store}, never to a file, and are only sent to Google."
 msgstr ""
 
 msgid "YouTube no longer accepts this sign-in. Reconnect the account in Settings → Destinations. {message}"
@@ -5689,6 +5682,10 @@ msgid "Your name in transcripts"
 msgstr ""
 
 #. FACT: owner review required (every permission note states what macOS does)
+msgid "Your organization blocks this. Only an administrator can allow it."
+msgstr ""
+
+#. FACT: owner review required (every permission note states what macOS does)
 msgid "Your organization or Screen Time blocks this. Only an administrator can allow it."
 msgstr ""
 
@@ -5698,7 +5695,7 @@ msgstr ""
 msgid "Your settings file was unreadable"
 msgstr ""
 
-msgid "Your sign-in expired or was removed. Sign in again with the app credentials already saved in your Keychain:"
+msgid "Your sign-in expired or was removed. Sign in again with the app credentials already saved in your {secret_store}:"
 msgstr ""
 
 msgid "Your voice barely reaches the good range. Move closer or pick another mic."
@@ -6164,16 +6161,13 @@ msgstr ""
 msgid "{language} …"
 msgstr ""
 
-msgid "{model} on this Mac. Any language; each line keeps its start and end."
+msgid "{model} on {this_computer}. Any language; each line keeps its start and end."
 msgstr ""
 
-msgid "{model} · on this Mac"
+msgid "{model} · on {this_computer}"
 msgstr ""
 
-msgid "{model} · on this computer"
-msgstr ""
-
-msgid "{model} · runs on this Mac"
+msgid "{model} · runs on {this_computer}"
 msgstr ""
 
 msgid "{month} {day}, {year}"
@@ -6194,10 +6188,10 @@ msgstr ""
 msgid "{name} has {reason}. A copy is prepared for smooth editing; the original file is kept unchanged in the bundle."
 msgstr ""
 
-msgid "{name} needs an app that you create yourself, so the sign-in belongs to you. It takes a few minutes, once. The ID you paste (no secret is involved) go to your Keychain, never to a file, and are only sent to {service}."
+msgid "{name} needs an app that you create yourself, so the sign-in belongs to you. It takes a few minutes, once. The ID you paste (no secret is involved) go to your {secret_store}, never to a file, and are only sent to {service}."
 msgstr ""
 
-msgid "{name} needs an app that you create yourself, so the sign-in belongs to you. It takes a few minutes, once. The client ID and secret go to your Keychain, never to a file, and are only sent to {service}."
+msgid "{name} needs an app that you create yourself, so the sign-in belongs to you. It takes a few minutes, once. The client ID and secret go to your {secret_store}, never to a file, and are only sent to {service}."
 msgstr ""
 
 msgid "{name} needs no secret; leave this empty."
@@ -6303,8 +6297,8 @@ msgid_plural "{n} caption edits were kept where the same words were heard again.
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "{n} capture in the old folder was copied and checked. It moves to the Trash, where you can restore it. Anything that changed since the copy stays where it is."
-msgid_plural "{n} captures in the old folder were copied and checked. They move to the Trash, where you can restore them. Anything that changed since the copy stays where it is."
+msgid "{n} capture in the old folder was copied and checked. It moves to {trash}, where you can restore it. Anything that changed since the copy stays where it is."
+msgid_plural "{n} captures in the old folder were copied and checked. They move to {trash}, where you can restore them. Anything that changed since the copy stays where it is."
 msgstr[0] ""
 msgstr[1] ""
 
@@ -6525,6 +6519,12 @@ msgid "{start} · {secs} s · {what}"
 msgstr ""
 
 msgid "{template} suits this recording. Nothing is written until you ask."
+msgstr ""
+
+msgid "{this_computer_cap} has {memory} GB of memory. The model runs inside CaptureMann and nothing leaves {this_computer}."
+msgstr ""
+
+msgid "{this_computer_cap} may not have enough free memory for this model."
 msgstr ""
 
 msgid "{time} after cuts · about {size}"
@@ -7088,7 +7088,15 @@ msgid "Show diagnostics"
 msgstr ""
 
 msgctxt "button"
+msgid "Show in File Explorer"
+msgstr ""
+
+msgctxt "button"
 msgid "Show in Finder"
+msgstr ""
+
+msgctxt "button"
+msgid "Show in folder"
 msgstr ""
 
 msgctxt "button"
@@ -8137,6 +8145,110 @@ msgstr ""
 
 msgctxt "permissions setup"
 msgid "Skip optional"
+msgstr ""
+
+msgctxt "platform word"
+msgid "Credential Manager"
+msgstr ""
+
+msgctxt "platform word"
+msgid "Keychain"
+msgstr ""
+
+msgctxt "platform word"
+msgid "Linux"
+msgstr ""
+
+msgctxt "platform word"
+msgid "Macs"
+msgstr ""
+
+msgctxt "platform word"
+msgid "Settings"
+msgstr ""
+
+msgctxt "platform word"
+msgid "Settings > Privacy & security > Camera"
+msgstr ""
+
+msgctxt "platform word"
+msgid "Settings > Privacy & security > Microphone"
+msgstr ""
+
+msgctxt "platform word"
+msgid "System Settings"
+msgstr ""
+
+msgctxt "platform word"
+msgid "System Settings > Privacy & Security > Camera"
+msgstr ""
+
+msgctxt "platform word"
+msgid "System Settings > Privacy & Security > Microphone"
+msgstr ""
+
+msgctxt "platform word"
+msgid "This Mac"
+msgstr ""
+
+msgctxt "platform word"
+msgid "This computer"
+msgstr ""
+
+msgctxt "platform word"
+msgid "Windows"
+msgstr ""
+
+msgctxt "platform word"
+msgid "computers"
+msgstr ""
+
+msgctxt "platform word"
+msgid "keyring"
+msgstr ""
+
+msgctxt "platform word"
+msgid "macOS"
+msgstr ""
+
+msgctxt "platform word"
+msgid "menu bar"
+msgstr ""
+
+msgctxt "platform word"
+msgid "notification area"
+msgstr ""
+
+msgctxt "platform word"
+msgid "system tray"
+msgstr ""
+
+msgctxt "platform word"
+msgid "the Recycle Bin"
+msgstr ""
+
+msgctxt "platform word"
+msgid "the Trash"
+msgstr ""
+
+msgctxt "platform word"
+msgid "this Mac"
+msgstr ""
+
+msgctxt "platform word"
+msgid "this computer"
+msgstr ""
+
+msgctxt "platform word"
+msgid "your Mac"
+msgstr ""
+
+msgctxt "platform word"
+msgid "your computer"
+msgstr ""
+
+msgctxt "platform word"
+msgid "your system settings"
 msgstr ""
 
 msgctxt "privacy"

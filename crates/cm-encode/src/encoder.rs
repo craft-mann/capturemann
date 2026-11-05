@@ -46,11 +46,28 @@ pub const HARDWARE_ENCODER_UNAVAILABLE: &str = "hardware_encoder_unavailable";
 /// (`hardware_encoder_unavailable` in `cm_core::message`).
 pub const HARDWARE_ENCODER_UNAVAILABLE_MESSAGE: &str = "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update your operating system (macOS 13 or later, Windows 10 or later), or use a computer from about 2016 or later.";
 
+/// The same on Windows: only Windows' own requirement is named.
+pub const HARDWARE_ENCODER_UNAVAILABLE_MESSAGE_WINDOWS: &str = "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update Windows and the graphics driver, or use a computer with a hardware video encoder (most computers since about 2016).";
+
+/// The same on Linux.
+pub const HARDWARE_ENCODER_UNAVAILABLE_MESSAGE_LINUX: &str = "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update your graphics driver, or use a computer with a hardware video encoder (most computers since about 2016).";
+
+/// The message for a system (ids in `cm_core::message`: `hardware_encoder_unavailable`, `_windows`,
+/// `_linux`).
+pub fn hardware_encoder_message_for(platform: cm_platform::vocab::Platform) -> &'static str {
+    use cm_platform::vocab::Platform;
+    match platform {
+        Platform::Mac => HARDWARE_ENCODER_UNAVAILABLE_MESSAGE,
+        Platform::Windows => HARDWARE_ENCODER_UNAVAILABLE_MESSAGE_WINDOWS,
+        Platform::Linux => HARDWARE_ENCODER_UNAVAILABLE_MESSAGE_LINUX,
+    }
+}
+
 /// The error for a platform encoder that rejects or cannot start the plan: `platform_rejected`
 /// with `platform_code` `hardware_encoder_unavailable`.
 pub fn hardware_encoder_unavailable() -> CmError {
     CmError::platform_rejected(
-        HARDWARE_ENCODER_UNAVAILABLE_MESSAGE,
+        hardware_encoder_message_for(cm_platform::vocab::Platform::current()),
         Some(HARDWARE_ENCODER_UNAVAILABLE.into()),
     )
 }
@@ -124,14 +141,44 @@ mod tests {
             "{words}"
         );
         assert!(words.contains("lower resolution"), "{words}");
-        assert!(words.contains("macOS 13"), "{words}");
         assert!(words.contains("2016"), "{words}");
         assert_eq!(
-            e.message_parts().map(|p| p.id),
-            Some("hardware_encoder_unavailable")
+            words.contains("macOS 13"),
+            cm_platform::vocab::Platform::current() == cm_platform::vocab::Platform::Mac,
+            "{words}"
         );
+        let id = match cm_platform::vocab::Platform::current() {
+            cm_platform::vocab::Platform::Mac => "hardware_encoder_unavailable",
+            cm_platform::vocab::Platform::Windows => "hardware_encoder_unavailable_windows",
+            cm_platform::vocab::Platform::Linux => "hardware_encoder_unavailable_linux",
+        };
+        assert_eq!(e.message_parts().map(|p| p.id), Some(id));
         assert!(!is_hardware_encoder_unavailable(
             &CmError::platform_rejected("x", None)
         ));
+    }
+
+    /// Each system names only its own requirement; macOS keeps its text.
+    #[test]
+    fn each_system_has_its_own_wording_and_id() {
+        use cm_platform::vocab::Platform;
+        let mac = hardware_encoder_message_for(Platform::Mac);
+        assert!(mac.contains("macOS 13 or later, Windows 10 or later"));
+        for (p, id) in [
+            (Platform::Windows, "hardware_encoder_unavailable_windows"),
+            (Platform::Linux, "hardware_encoder_unavailable_linux"),
+        ] {
+            let m = hardware_encoder_message_for(p);
+            assert!(!m.contains("macOS") && !m.contains("Mac"), "{m}");
+            assert!(m.contains("graphics driver"), "{m}");
+            let parts = cm_core::message::describe(ErrorCode::PlatformRejected, m).unwrap();
+            assert_eq!(parts.id, id);
+        }
+        assert_eq!(
+            cm_core::message::describe(ErrorCode::PlatformRejected, mac)
+                .unwrap()
+                .id,
+            "hardware_encoder_unavailable"
+        );
     }
 }

@@ -125,9 +125,9 @@ fn corpus() -> Vec<(String, String)> {
     for d in DockAction::ALL {
         c.add(format!("DockAction::label({d:?})"), d.label());
     }
-    for mac in [true, false] {
+    for p in crate::platform_text::Platform::ALL {
         for a in CardAction::ALL {
-            c.add(format!("CardAction::label({a:?}, mac={mac})"), a.label(mac));
+            c.add(format!("CardAction::label({a:?}, {p:?})"), a.label(p));
         }
     }
     for k in [Kind::Screenshot, Kind::Recording] {

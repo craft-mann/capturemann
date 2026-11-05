@@ -146,7 +146,7 @@ impl SettingsView {
             .child(caption(
                 t,
                 // TRANSLATORS: FACT: owner review required (privacy)
-                tr!("When something goes wrong, copy this and paste it into a bug report. It has the version, your Mac, permissions, models, a few settings and the last warnings. It has no audio, no transcripts and no file names. Nothing is sent: check it, then paste it yourself."),
+                tr!("When something goes wrong, copy this and paste it into a bug report. It has the version, {your_computer}, permissions, models, a few settings and the last warnings. It has no audio, no transcripts and no file names. Nothing is sent: check it, then paste it yourself.", your_computer = crate::platform_text::here(crate::platform_text::Term::YourComputer)),
             ))
             .child(buttons)
             .children(body)

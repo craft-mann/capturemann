@@ -96,6 +96,16 @@ pub const TEMPLATES: &[Template] = &[
         ErrorCode::PlatformRejected,
         "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update your operating system (macOS 13 or later, Windows 10 or later), or use a computer from about 2016 or later.",
     ),
+    t(
+        "hardware_encoder_unavailable_windows",
+        ErrorCode::PlatformRejected,
+        "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update Windows and the graphics driver, or use a computer with a hardware video encoder (most computers since about 2016).",
+    ),
+    t(
+        "hardware_encoder_unavailable_linux",
+        ErrorCode::PlatformRejected,
+        "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update your graphics driver, or use a computer with a hardware video encoder (most computers since about 2016).",
+    ),
     // FFmpeg is missing (the exporter, the GIF and WebM presets, frame picking). The ids are the
     // stable machine-readable "FFmpeg not found" code: `cm_media::tools` raises the messages (a
     // test there pins the wording), and a failed job's `error.data.reason_code` carries the id.
@@ -123,7 +133,7 @@ pub const TEMPLATES: &[Template] = &[
     t(
         "ffmpeg_bundle_cannot_run",
         ErrorCode::NotFound,
-        "FFmpeg was not found: the copy inside CaptureMann (`{path}`) cannot be run ({error}). The app is damaged or macOS blocked it. Reinstall CaptureMann. (Advanced: set CM_FFMPEG to an ffmpeg executable.)",
+        "FFmpeg was not found: the copy inside CaptureMann (`{path}`) cannot be run ({error}). The app is damaged or {os_name} blocked it. Reinstall CaptureMann. (Advanced: set CM_FFMPEG to an ffmpeg executable.)",
     ),
     t(
         "ffmpeg_permission_denied",
@@ -244,10 +254,17 @@ pub const TEMPLATES: &[Template] = &[
         ErrorCode::PermissionMissing,
         "Screen Recording permission is not granted. Enable it in System Settings > Privacy & Security > Screen & System Audio Recording, then restart CaptureMann.",
     ),
+    // The Windows wording first: `describe` takes the first template that matches, and the
+    // macOS one below would also match this text.
+    t(
+        "microphone_access_off_windows",
+        ErrorCode::PermissionMissing,
+        "Microphone access is off. Turn it on in {settings_path}, including Let desktop apps access your microphone.",
+    ),
     t(
         "microphone_access_off",
         ErrorCode::PermissionMissing,
-        "Microphone access is off. Turn it on in System Settings > Privacy & Security > Microphone.",
+        "Microphone access is off. Turn it on in {settings_path}.",
     ),
     t(
         "camera_not_requested",
@@ -255,9 +272,14 @@ pub const TEMPLATES: &[Template] = &[
         "Camera access has not been requested yet. Allow camera access when prompted.",
     ),
     t(
+        "camera_denied_windows",
+        ErrorCode::PermissionMissing,
+        "Camera access is denied. Turn it on in {settings_path}, including Let desktop apps access your camera.",
+    ),
+    t(
         "camera_denied",
         ErrorCode::PermissionMissing,
-        "Camera access is denied. Enable it in System Settings > Privacy & Security > Camera.",
+        "Camera access is denied. Enable it in {settings_path}.",
     ),
     t(
         "camera_restricted",
@@ -503,6 +525,31 @@ pub fn render_warning(id: &str, params: &[(&str, &str)]) -> Option<String> {
 mod tests {
     use super::*;
     use std::collections::HashSet;
+
+    /// The permission messages each system raises get their own id and carry the settings path.
+    #[test]
+    fn permission_messages_of_each_system_have_their_ids() {
+        use cm_platform::vocab::{english, Platform, Term};
+        let cases = [
+            (Platform::Mac, Term::PrivacyMicrophone, "Microphone access is off. Turn it on in {}.", "microphone_access_off"),
+            (Platform::Windows, Term::PrivacyMicrophone, "Microphone access is off. Turn it on in {}, including Let desktop apps access your microphone.", "microphone_access_off_windows"),
+            (Platform::Mac, Term::PrivacyCamera, "Camera access is denied. Enable it in {}.", "camera_denied"),
+            (Platform::Windows, Term::PrivacyCamera, "Camera access is denied. Turn it on in {}, including Let desktop apps access your camera.", "camera_denied_windows"),
+        ];
+        for (p, term, fmt, id) in cases {
+            let path = english(p, term);
+            let msg = fmt.replace("{}", path);
+            let parts =
+                describe(ErrorCode::PermissionMissing, &msg).unwrap_or_else(|| panic!("{msg}"));
+            assert_eq!(parts.id, id, "{msg}");
+            assert_eq!(parts.get("settings_path"), path);
+        }
+        // The macOS wording is unchanged.
+        assert_eq!(
+            render("microphone_access_off", &[("settings_path", english(Platform::Mac, Term::PrivacyMicrophone))]).unwrap(),
+            "Microphone access is off. Turn it on in System Settings > Privacy & Security > Microphone."
+        );
+    }
 
     #[test]
     fn ids_are_unique_and_every_template_round_trips() {

@@ -782,11 +782,10 @@ impl ReconnectWhy {
         match self {
             ReconnectWhy::NoAccount => tr!("No account is set for this destination."),
             ReconnectWhy::NotSignedIn => {
-                if crate::permissions::Os::current() == crate::permissions::Os::Mac {
-                    tr!("Not signed in on this Mac.")
-                } else {
-                    tr!("Not signed in on this computer.")
-                }
+                tr!(
+                    "Not signed in on {this_computer}.",
+                    this_computer = crate::platform_text::this_computer()
+                )
             }
             ReconnectWhy::UploadsWaiting => tr!("The sign-in expired; uploads are waiting."),
             ReconnectWhy::Refused => tr!("The sign-in was refused."),

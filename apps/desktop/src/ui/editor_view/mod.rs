@@ -403,7 +403,13 @@ mod tests {
     #[test]
     fn reveal_label_is_platform_neutral() {
         let l = EditorView::reveal_label();
-        assert!(l == "Reveal in Finder" || l == "Show in folder");
+        assert!([
+            "Reveal in Finder",
+            "Show in File Explorer",
+            "Show in folder"
+        ]
+        .contains(&l.as_str()));
         assert_eq!(l == "Reveal in Finder", cfg!(target_os = "macos"));
+        assert_eq!(l == "Show in File Explorer", cfg!(windows));
     }
 }

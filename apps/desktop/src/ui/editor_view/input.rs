@@ -230,11 +230,7 @@ impl EditorView {
     }
 
     pub(super) fn reveal_label() -> String {
-        if cfg!(target_os = "macos") {
-            tr!("Reveal in Finder")
-        } else {
-            tr!("Show in folder")
-        }
+        crate::platform_text::here(crate::platform_text::Term::RevealLabel)
     }
 
     pub(super) fn reveal(&mut self, cx: &mut Context<Self>) {

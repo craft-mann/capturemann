@@ -1751,7 +1751,9 @@ impl LibraryView {
                     div()
                         .id(SharedString::from(format!("card-menu-{}", a.key(mac))))
                         .role(Role::MenuItem)
-                        .aria_label(SharedString::from(a.label(mac)))
+                        .aria_label(SharedString::from(
+                            a.label(crate::platform_text::Platform::current()),
+                        ))
                         .focusable()
                         .tab_stop(true)
                         .min_h(px(34.))
@@ -1770,7 +1772,7 @@ impl LibraryView {
                             this.run_card_action(a, window, cx)
                         }))
                         .child(icon(a.glyph(), 15., fg))
-                        .child(a.label(mac))
+                        .child(a.label(crate::platform_text::Platform::current()))
                         .children(a.hint().map(|h| {
                             div()
                                 .ml_auto()

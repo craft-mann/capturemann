@@ -121,8 +121,9 @@ impl DeletePrompt {
         let mut m = delete_dialog(title);
         if self.offers_remote() {
             m.summary = tr!(
-                "It is removed from your library and moved to the Trash. Its copies online stay there unless you tick the box: deleting them cannot be undone ({services}).",
-                services = self.services().join(", ")
+                "It is removed from your library and moved to {trash}. Its copies online stay there unless you tick the box: deleting them cannot be undone ({services}).",
+                services = self.services().join(", "),
+                trash = crate::platform_text::here(crate::platform_text::Term::Trash)
             );
             for item in &self.removable {
                 m.details

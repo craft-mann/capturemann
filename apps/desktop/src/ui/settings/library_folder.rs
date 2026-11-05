@@ -196,7 +196,11 @@ impl SettingsView {
                         small_button_with_icon(
                             t,
                             "library-trash-old",
-                            &tr!("Move the old copies to the Trash\u{2026}"),
+                            &tr!(
+                                "Move the old copies to {trash}\u{2026}",
+                                trash =
+                                    crate::platform_text::here(crate::platform_text::Term::Trash)
+                            ),
                             Some("trash-2"),
                         )
                         .on_click(move |_, _, cx| flow::ask_trash(&b, cx)),

@@ -8,7 +8,7 @@
 
 use gpui::{AppContext, Context, Entity, Subscription, Window};
 
-use cm_i18n::{tr, tr_ctx};
+use cm_i18n::tr;
 
 use super::{RecordingEditor, Session};
 use crate::ai::jobs::VoiceJobKind;
@@ -623,7 +623,7 @@ impl RecordingEditor {
                     )
                     .body(path.display().to_string())
                     .button(
-                        tr_ctx!("button", "Show in Finder"),
+                        crate::platform_text::here(crate::platform_text::Term::ShowLabel),
                         crate::toast::ToastAction::RevealPath(path.display().to_string()),
                     ),
                     Err(e) => crate::flows::error_toast_live(

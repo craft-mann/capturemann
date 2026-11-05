@@ -429,7 +429,7 @@ fn audio_exported_toast_now(capture_id: &str, done: &AudioDone) -> ToastSpec {
     ToastSpec::new(ToastKind::Success, tr!("Audio exported"))
         .body(body)
         .button(
-            tr_ctx!("button", "Show in Finder"),
+            crate::platform_text::here(crate::platform_text::Term::ShowLabel),
             ToastAction::RevealPath(done.path.clone()),
         )
         .button(

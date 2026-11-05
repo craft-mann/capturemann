@@ -65,7 +65,8 @@ impl GeneralText {
             save_png: tr!("Also save a PNG to a folder"),
             login: tr!("Launch at login"),
             login_hint: tr!(
-                "Starts CaptureMann in the menu bar with no window. Takes effect for the installed app only."
+                "Starts CaptureMann in the {tray_area} with no window. Takes effect for the installed app only.",
+                tray_area = crate::platform_text::here(crate::platform_text::Term::TrayArea)
             ),
         }
     }
@@ -468,7 +469,10 @@ mod tests {
             "The capture is always saved to the library.",
             "Also save a PNG to a folder",
             "Launch at login",
-            "Starts CaptureMann in the menu bar with no window. Takes effect for the installed app only.",
+            &format!(
+                "Starts CaptureMann in the {} with no window. Takes effect for the installed app only.",
+                cm_platform::vocab::here(cm_platform::vocab::Term::TrayArea)
+            ),
         ];
         assert_eq!(got.map(String::as_str), want);
         assert_eq!(t.language, "Language");
