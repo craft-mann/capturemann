@@ -53,6 +53,11 @@ impl EditorView {
                 cx.stop_propagation();
                 return;
             }
+            // Typed text goes to the platform input method (Telex, VNI), which composes it
+            // and calls `replace_text_in_range`; do not consume the event (ANN-1.AC7).
+            if crate::editor::state::EditorState::is_typed_text(k.key_char.as_deref(), mods) {
+                return;
+            }
             let used = doc.update(cx, |d, cx| {
                 d.text_key(&k.key, k.key_char.as_deref(), mods, cx)
             });

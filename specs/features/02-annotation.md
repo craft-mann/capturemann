@@ -27,7 +27,7 @@ Annotations are vector operations stored in `manifest.json` (`ops` list) and ren
 - Shift constrains: arrows/lines to 0/45/90°, rectangles to squares, ellipses to circles.
 - Every op is selectable, movable, resizable via handles, recolorable, and deletable (Delete/Backspace). Copy/paste duplicates ops with +10 px offset.
 - Step badges auto-number in creation order (1, 2, 3…); deleting one renumbers the rest; the next number is shown on the cursor.
-- Text: click to place, type, Enter for a new line, Esc to finish; default 24 px white with 2 px black outline (DESIGN annotation palette).
+- Text: click to place, type, Enter for a new line, Esc to finish; default 24 px white with no outline or shadow (changed in 0.2.9, AC8; the user changes colour and size in the panel); typed text goes through the platform input method so Telex, VNI and Pinyin compose (AC7).
 - Defaults: color `#FF3B3B`, width 4 px; the last used color and width persist per tool.
 - Crop is non-destructive: it sets the visible rect; ops outside it remain stored.
 - Rendering is anti-aliased and resolution-independent; widths are physical px of the original.
@@ -40,6 +40,8 @@ Annotations are vector operations stored in `manifest.json` (`ops` list) and ren
 - **AC4** Given a crop to (0, 0, 1200, 800), when exported, then the PNG is 1200×800 and contains the ops inside that rect.
 - **AC5** Given any op is selected, when the user changes its color, then only that op changes and the change is one undo step.
 - **AC6** Given an agent sends the op list from the schema above to `annotate`, then the result renders identically to the same ops drawn in the GUI.
+- **AC7** Given the Text tool is open and a Vietnamese input source (Telex or VNI) is active, when the user types `Tieengs Vieetj cos daaus` (Telex), then the text reads `Tiếng Việt có dấu` in the editor, with no raw Latin letter left in front of a composed one, and the exported PNG shows the same glyphs (no missing-glyph boxes). Tested with fakes: the key handler leaves typed text to the input method and the draft/commit path builds the phrase (`editor::state` tests); glyph coverage in `cm-render` (`tests/fallback_fonts.rs`); by hand on Windows and macOS: `tests/manual/ANN-1-IME.md`. Linux (IBus, Fcitx) is not tested in 0.2.9.
+- **AC8** Given a new text annotation is placed, then it is 24 px, white, with no outline and no shadow; an existing text annotation keeps its stored colour, size and outline, and the user can still change colour and size in the panel.
 
 **Edge cases and errors** — Text with emoji or CJK renders with font fallback (`cosmic-text`); ops with coordinates outside the image are clipped, not rejected; invalid op type → `invalid_input` naming the op index (`ops[3]: ...`) when it comes from a client. **Forward compatibility:** an op type this build does not know that is already stored in a manifest (written by a newer version) is preserved and written back unchanged, not treated as corruption; it is not rendered.
 

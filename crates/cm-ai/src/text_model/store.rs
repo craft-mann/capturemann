@@ -32,10 +32,10 @@ const BUILTIN: &str = include_str!("../../data/text_models.json");
 pub struct TextCatalogEntry {
     #[serde(flatten)]
     pub base: CatalogEntry,
-    /// The default entry, recommended on every Mac. Exactly one entry has it.
+    /// The default entry, recommended on every computer. Exactly one entry has it.
     #[serde(default)]
     pub recommended: bool,
-    /// The model is offered only on a Mac with at least this much memory, in GB (0: every Mac).
+    /// The model is offered only on a computer with at least this much memory, in GB (0: every computer).
     /// The list still reports it; the app hides it below that memory unless it is installed.
     #[serde(default)]
     pub min_memory_gb: u32,
@@ -137,7 +137,7 @@ pub struct TextModelInfo {
     pub info: ModelInfo,
     /// The default entry (`recommended` in the catalogue).
     pub recommended: bool,
-    /// Offered only on a Mac with at least this much memory, in GB (0: every Mac).
+    /// Offered only on a computer with at least this much memory, in GB (0: every computer).
     #[serde(default)]
     pub min_memory_gb: u32,
     pub license: String,
@@ -295,7 +295,7 @@ pub fn no_text_model(requested: Option<&str>) -> CmError {
     }
 }
 
-/// The model to suggest: the catalogue's `recommended` entry, whatever the Mac's memory (the AI
+/// The model to suggest: the catalogue's `recommended` entry, whatever the computer's memory (the AI
 /// page warns separately when its `ram_mb` exceeds the free memory).
 pub fn recommended(list: &TextModelList) -> Option<&TextModelInfo> {
     list.models.iter().find(|m| m.recommended)
@@ -329,7 +329,7 @@ mod tests {
                 ("qwen3.5-2b", false)
             ]
         );
-        // Only the big Gemma is limited by memory (a Mac with 32 GB or more).
+        // Only the big Gemma is limited by memory (a computer with 32 GB or more).
         assert_eq!(
             c.models
                 .iter()

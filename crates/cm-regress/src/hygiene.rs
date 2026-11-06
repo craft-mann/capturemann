@@ -128,27 +128,7 @@ fn mac_crash_reports_since(since: SystemTime) -> Vec<String> {
         return Vec::new();
     };
     let dir = Path::new(&home).join("Library/Logs/DiagnosticReports");
-    let Ok(rd) = std::fs::read_dir(dir) else {
-        return Vec::new();
-    };
-    let mut out = Vec::new();
-    for e in rd.flatten() {
-        let name = e.file_name().to_string_lossy().into_owned();
-        let lower = name.to_lowercase();
-        let ours = ["cm-", "capturemann", "llama-server"]
-            .iter()
-            .any(|p| lower.starts_with(p));
-        let report = lower.ends_with(".ips") || lower.ends_with(".crash");
-        let recent = e
-            .metadata()
-            .and_then(|m| m.modified())
-            .map(|t| t >= since)
-            .unwrap_or(false);
-        if ours && report && recent {
-            out.push(name);
-        }
-    }
-    out
+    sys::crash_reports_since(&dir, since)
 }
 
 /// Keeps the event blocks that name one of our programs; one summary line each.

@@ -4,7 +4,7 @@
     {
       "id": "gemma-4-e2b",
       "label": "Gemma 4 E2B",
-      "hint": "Recommended for reports and notes on every Mac. Best score in our test, English and Vietnamese.",
+      "hint": "Recommended for reports and notes on every computer. Best score in our test, English and Vietnamese.",
       "file": "gemma-4-E2B-it-Q4_0.gguf",
       "url": "https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF/resolve/6938c58e698502037401a5f19f6905f2fb2f7dee/gemma-4-E2B-it-Q4_0.gguf",
       "sha256": "8e30dff3ac4c8434c49a7036fa15564bdbb6044e42bf04550bf1a096ad7e6a52",
@@ -17,7 +17,7 @@
     {
       "id": "gemma-4-26b-a4b",
       "label": "Gemma 4 26B-A4B",
-      "hint": "Higher quality for Macs with plenty of memory: better at decisions, owners and translation. About 15 GB to download.",
+      "hint": "Higher quality for computers with plenty of memory: better at decisions, owners and translation. About 15 GB to download.",
       "file": "gemma-4-26B-A4B-it-Q4_0.gguf",
       "url": "https://huggingface.co/ggml-org/gemma-4-26B-A4B-it-GGUF/resolve/9cf8c8db0f83fb4582f15381f8fb1a7c1b0b9ca2/gemma-4-26B-A4B-it-Q4_0.gguf",
       "sha256": "d208665ab1cd3a69f7a9a4bc59430e8448c8093d9b06334f566ac59d6d504a03",
@@ -43,7 +43,7 @@
     {
       "id": "qwen3.5-2b",
       "label": "Qwen3.5 2B",
-      "hint": "Smallest option for Macs with little free memory. Notes can miss items.",
+      "hint": "Smallest option for computers with little free memory. Notes can miss items.",
       "file": "Qwen3.5-2B-Q4_K_M.gguf",
       "url": "https://huggingface.co/lmstudio-community/Qwen3.5-2B-GGUF/resolve/bb84e11355a036e28f080c7793fa6d22b7c4e344/Qwen3.5-2B-Q4_K_M.gguf",
       "sha256": "0bfe35afc9f05b7fac3fa04925e051ac7939a42a8a17ea11afc99701bea826cc",

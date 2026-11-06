@@ -10,14 +10,26 @@
 
 use crate::check;
 use crate::ctx::Ctx;
-use crate::model::{fail, skip, Case, Need, Tier, R, WIN};
+use crate::model::{fail, skip, Case, Need, Tier, MAC, R, WIN};
 use crate::proc::exit_text;
 use crate::sys;
 use std::path::PathBuf;
 use std::process::Command;
 
 pub fn cases() -> Vec<Case> {
-    vec![Case {
+    vec![
+        Case {
+            id: "installer.dmg",
+            title: "the DMG (or .app) installs into a temp folder: signature intact, programs work, removal leaves nothing",
+            area: "installer",
+            specs: &["packaging/macos", "make verify-release"],
+            tier: Tier::Full,
+            needs: &[Need::Installer],
+            platforms: MAC,
+            timeout_s: 300,
+            run: dmg,
+        },
+        Case {
         id: "installer.silent",
         title:
             "silent install into a temp folder, the programs run, silent uninstall leaves nothing",
@@ -28,7 +40,27 @@ pub fn cases() -> Vec<Case> {
         platforms: WIN,
         timeout_s: 420,
         run: silent,
-    }]
+    },
+    ]
+}
+
+/// macOS: the same idea as `silent`, without a registry: the disk image is mounted under the sandbox, the app
+/// is copied into the sandbox (never `/Applications`), checked and removed, and the image is ejected. The app
+/// is not opened, so the user's own copy and its permissions are untouched.
+fn dmg(ctx: &mut Ctx) -> R {
+    let Some(src) = ctx.opts.installer.clone() else {
+        return skip("no --installer given (a .dmg or a .app)");
+    };
+    let work = ctx.dir("dmg");
+    match sys::check_app_install(&src, &work) {
+        Ok(notes) => {
+            for n in notes {
+                ctx.note(n);
+            }
+            Ok(())
+        }
+        Err(e) => fail(e),
+    }
 }
 
 const UNINSTALL_ROOT: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall";

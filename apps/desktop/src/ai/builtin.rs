@@ -29,7 +29,7 @@ pub struct BuiltInVm {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct Meta {
     ram_mb: u32,
-    /// Offered only on a Mac with at least this much memory, in GB (0: every Mac).
+    /// Offered only on a computer with at least this much memory, in GB (0: every computer).
     min_memory_gb: u32,
     recommended: bool,
     license: String,
@@ -41,11 +41,11 @@ struct Meta {
 pub struct BuiltInRow {
     pub row: ModelRow,
     pub license: String,
-    /// The default model, recommended on every Mac.
+    /// The default model, recommended on every computer.
     pub recommended: bool,
     /// The model the built-in engine is set to use.
     pub in_use: bool,
-    /// The model needs more memory than this Mac has to spare.
+    /// The model needs more memory than this computer has to spare.
     pub low_memory: bool,
 }
 
@@ -103,7 +103,7 @@ impl BuiltInVm {
         self.models.installed_any()
     }
 
-    /// The recommended model: the catalogue's default entry, on every Mac.
+    /// The recommended model: the catalogue's default entry, on every computer.
     pub fn recommended_id(&self) -> Option<String> {
         self.meta
             .iter()
@@ -122,13 +122,13 @@ impl BuiltInVm {
 
     /// The rows in catalogue order. `in_use` is the model the engine is set to use (`TextVm`): its
     /// row shows "In use" and "Don't use a model"; the other downloaded ones show Use. Import is
-    /// not offered for text models. `mem_gb` is this Mac's memory, for the warning.
+    /// not offered for text models. `mem_gb` is this computer's memory, for the warning.
     pub fn rows(&self, mem_gb: Option<u32>, in_use: Option<&str>) -> Vec<BuiltInRow> {
         use crate::ai::models::RowStatus;
         self.models
             .rows()
             .into_iter()
-            // A higher-quality model for big Macs is hidden on a smaller one, unless it is
+            // A higher-quality model for big computers is hidden on a smaller one, unless it is
             // already downloaded (then it can still be used or removed).
             .filter(|row| {
                 let min = self.meta.get(&row.id).map_or(0, |m| m.min_memory_gb);
@@ -288,7 +288,7 @@ mod tests {
         );
         assert_eq!(rows[0].license, "Apache-2.0");
         assert_eq!(vm.recommended_id().as_deref(), Some("a"));
-        // The recommendation does not depend on the Mac's memory.
+        // The recommendation does not depend on the computer's memory.
         assert!(vm.rows(None, None)[0].recommended);
         assert!(vm.rows(Some(4), None)[0].recommended);
     }

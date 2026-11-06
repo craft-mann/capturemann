@@ -1,6 +1,8 @@
 //! The Speakers tab (redesign V5, AI-8). Labelled state: one row per speaker (colour, name,
 //! share of the talk time with a bar, Play sample, Rename and Merge into...), the "My microphone
-//! only hears me" switch and the privacy line. Not-run state: an empty card, "How many people?",
+//! only hears me" switch. The list takes the free height of the panel (at least
+//! [`LIST_MIN_H`], three rows) and scrolls inside; the voiceprint sentence lives in Settings ->
+//! Privacy. Not-run state: an empty card, "How many people?",
 //! the notice when this build has no speaker models, with Find speakers dimmed.
 //!
 //! Renaming and merging go through `set_speakers`, Find speakers through `diarize`; nothing here
@@ -27,7 +29,19 @@ use crate::theme::{scale, type_scale, Color, Theme};
 use crate::ui::components::{button_with_icon, icon, label_fill, shrink_text, switch, ButtonKind};
 use crate::ui::kit::{callout, Tone};
 use crate::ui::paint::{rgba_of, TextExt};
+use crate::ui::scroll::fill_scroll;
 use crate::ui::settings::widgets::{segment, segmented, small_button_with_icon};
+
+/// What one speaker row asks for: 12 + 12 padding, the 30 px icon buttons, an 8 px gap, the 4 px
+/// bar and the 1 px divider.
+pub(super) const ROW_H: f32 = 12. + 30. + 8. + 4. + 12. + 1.;
+/// The list never gets shorter than three rows.
+pub(super) const LIST_MIN_H: f32 = 3. * ROW_H;
+
+/// The height the list asks for before the panel shrinks it: every speaker, up to ten rows.
+pub(super) fn list_basis(speakers: usize) -> f32 {
+    speakers.clamp(3, 10) as f32 * ROW_H
+}
 
 /// A 30 px icon button of a speaker row.
 pub(super) fn row_icon(
@@ -184,7 +198,6 @@ impl RecordingEditor {
             _ => {}
         }
         body.push(self.headset_row(t, s, cx));
-        body.push(privacy_line(t));
 
         // The foot: Find speakers (dimmed without a model), or the progress.
         let ready = matches!(card_state, SpeakerCard::Ready);
@@ -351,14 +364,24 @@ impl RecordingEditor {
                 self.speaker_row(t, s, sp, ix, share, ix + 1 == n, cx)
             })
             .collect::<Vec<_>>();
-        card(t)
+        let list = card(t)
             .id("re-speakers")
             .role(Role::List)
             .aria_label(tr!("Speakers"))
             .overflow_hidden()
             .flex()
             .flex_col()
-            .children(rows)
+            .children(rows);
+        // Flexible height: the room the rows ask for, shrunk to what the panel has, never below
+        // three rows; past that the list scrolls (thin bar, wheel and keyboard).
+        div()
+            .flex()
+            .flex_col()
+            .flex_shrink(1.)
+            .flex_grow(0.)
+            .h(px(list_basis(n)))
+            .min_h(px(LIST_MIN_H))
+            .child(fill_scroll(t, &self.speakers_scroll, list, || {}))
             .into_any_element()
     }
 
@@ -611,20 +634,59 @@ fn empty_card(t: &Theme) -> AnyElement {
         .into_any_element()
 }
 
-/// "Voices are compared in memory only..." with a lock.
-fn privacy_line(t: &Theme) -> AnyElement {
-    div()
-        .flex()
-        .items_start()
-        .gap(px(10.))
-        .child(div().pt(px(2.)).child(icon("lock", 16., t.mist)))
-        .child(
-            label_fill(tr!(
-                "Voices are compared in memory only. No voiceprint is saved, and people are \
-                 never recognised across recordings."
-            ))
-            .text_size(px(13.))
-            .text_color(rgba_of(t.text_3)),
-        )
-        .into_any_element()
+#[cfg(test)]
+mod layout_tests {
+    //! Speakers tab layout (0.2.9 bug 5): the list keeps three rows and scrolls, the controls stay
+    //! reachable, in English, Vietnamese and the pseudo-locale. Worked out from the sizes in the
+    //! code, like `layout_width_tests` (no window).
+    use super::*;
+    use crate::ai::caption_view::INSPECTOR_MIN_W;
+    use crate::text_metrics_tests::{lines, Face};
+    use cm_i18n::{with_language, Lang};
+
+    /// The height the flex layout gives the list: what the rows ask for, shrunk to the room the
+    /// panel has left, never below three rows.
+    fn list_height(free: f32, speakers: usize) -> f32 {
+        free.max(LIST_MIN_H).min(list_basis(speakers))
+    }
+
+    /// The controls under the list: "How many people?" (the label wraps above the chips) and the
+    /// headset row (a hint of one to four lines), `avail` px wide, in the language `lang`.
+    fn controls_h(lang: Lang, avail: f32) -> f32 {
+        with_language(lang, || {
+            let label = tr!("How many people?");
+            let hint =
+                tr!("For headset calls: the mic track is you, only the call is split into voices.");
+            let label_lines = lines(&label, Face::Regular, type_scale::UI, avail).unwrap_or(3);
+            // The text column is narrower: 16 px glyph + 10 gap + 10 gap + 40 px switch.
+            let hint_lines =
+                lines(&hint, Face::Regular, type_scale::CAPTION, avail - 76.).unwrap_or(4);
+            let people = 18. * label_lines as f32 + 10. + 32.;
+            let headset = 18. + 2. + 16. * hint_lines as f32;
+            people + 16. + headset
+        })
+    }
+
+    #[test]
+    fn three_rows_always_show_and_the_rest_scrolls_at_the_smallest_window() {
+        // Panel text width at the narrowest inspector: rail, padding and bar taken off.
+        let avail = INSPECTOR_MIN_W - 64. - 2. - 40.;
+        for lang in [Lang::En, Lang::Vi, Lang::EnXa] {
+            let controls = controls_h(lang, avail);
+            for n in [3usize, 6, 10] {
+                // The smallest window (720 x 480) leaves the panel less than a row, because the
+                // timeline is as tall as its tracks: the list still takes three rows and the
+                // panel body scrolls to the controls. A tall window gives it every row it asks for.
+                for free in [0., 120., 300., 600.] {
+                    let h = list_height(free, n);
+                    assert!(h >= 3. * ROW_H - 0.01, "{lang:?} n={n} free={free}: {h}");
+                    assert!(h <= list_basis(n) + 0.01);
+                }
+                assert!(controls < 200., "{lang:?}: controls need {controls} px");
+            }
+        }
+        assert_eq!(list_height(10_000., 3), 3. * ROW_H);
+        assert_eq!(list_height(10_000., 10), 10. * ROW_H);
+        assert_eq!(list_height(10_000., 25), 10. * ROW_H);
+    }
 }
