@@ -16,7 +16,7 @@ merge to `main`; the maintainer pushes `main`, signs (minisign) and publishes.
 wording with "bản ghi" for track, the diagnostics CPU-features line, Recycle Bin wording from `vocab`, the speaker-model
 lookup, `get_cursor_track` and `get_platform_rules`, the 18 px minimum recording side) reach the Mac and Linux only with
 0.3.0. So 0.3.0 is **macOS (0.3.0) and Linux, each after a full regression run on that platform** (`cm-regress` per platform,
-stored PARTIAL report; the macOS and Linux drivers do not exist yet, see below). Do not tag 0.3.0 before the macOS regression
+stored PARTIAL report; the drivers are built in 0.2.9). Do not tag 0.3.0 before the macOS regression
 report exists. The Linux tasks below are unchanged.
 
 ### Backlog from 0.2.8 (added Nov 6, 2026)
@@ -28,8 +28,7 @@ report exists. The Linux tasks below are unchanged.
 2. **Windows CI speed-up** (the Windows `Test` step took about 55 min on a cold cache): `cache-on-failure: true` for
    rust-cache; skip `compose_perf` and the GPU `parity` test on the Windows runner (macOS covers them); split the job or use
    nextest; optional opt-level 2 for dependencies. Measure before and after on a branch; target 15 to 20 min warm.
-3. **Regression drivers:** `cm-regress` for macOS (smoke and standard exist as a dev driver; add window and desktop-app
-   cases) and for Linux. Required before the 0.3.0 macOS and Linux releases.
+3. **Regression drivers for macOS and Linux:** moved to 0.2.9 (`release-0.2.9-plan.md`, item 5, Nov 6, 2026). 0.3.0 reuses them.
 4. **Output-device chooser** in the editor (playback follows the system default; an external monitor with speakers can take
    it over).
 5. **Spec decisions and small features:** `export_image` MCP tool needs a spec decision; the

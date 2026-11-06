@@ -8,7 +8,8 @@ Rules that apply: general techniques only, no one-recording fixes; **nothing is 
 report in `verification/`**; no GPL/AGPL in shipped binaries; `target_os` only in platform code
 (`python3 scripts/check_target_os.py`); UI text through `cm_i18n`; one change per commit with the two trailer lines; a
 regression test or a stored real-device step for every bug; no failing tests merge to `main`; the maintainer pushes
-`main`, tags and publishes. Which platforms ship 0.2.9 is open (see O1).
+`main`, tags and publishes. **0.2.9 ships on all three platforms** (decided Nov 6, 2026): Windows, macOS and Linux get the fixes, and each platform
+passes the same release regression as Windows 0.2.8 before its files go out (item 5).
 
 ## Bugs
 
@@ -47,18 +48,44 @@ regression test or a stored real-device step for every bug; no failing tests mer
    Treat the checkpoints as untrusted input in the meantime: the README says to convert only the three pinned VinAI
    revisions in a throwaway virtual environment.
 
+5. **Release regression on macOS and Linux, the same as Windows 0.2.8** (`cm-regress`, tiers smoke, standard,
+   hardware; a stored PARTIAL report per platform and tier in `verification/`, template and rules as for
+   `L1-windows-0.2.8-regression-*`). Today only the CLI, MCP, library, import and export cases run on macOS (`--dev`
+   or `--package-dir`); the desktop-app, window, recording, audio and installer cases are stubs there and there is no
+   Linux driver (`docs/development/regression.md`, "Run it on macOS"; `crates/cm-regress/src/sys/` has only `windows.rs`
+   and `other.rs`). Work:
+   - **macOS driver** (`sys/macos.rs`): display and window listing, the desktop-app cases (stays up, second launch,
+     hotkey and overlay, settings applied, menu-bar icon), recording on the screen, microphone, system audio and camera
+     with the same picture and frame-rate checks as Windows, crash reports, the app bundle and the DMG install and
+     uninstall case. Run on the Mac with `--allow screen,sound,mic,camera` (permissions granted to the dev bundle,
+     see `docs/development/building.md`). Screen Recording needs the grant of the bundle that runs the test.
+   - **Linux driver** (`sys/linux.rs`): the same list for X11 and for GNOME Wayland on the lab laptop (Ubuntu 24.04),
+     the `.deb` install, uninstall and tarball install cases, VA-API versus software encoder reporting. Recording
+     cases run only where the build has recording (Linux recording stays behind `CM_LINUX_RECORDING=1`; otherwise they
+     report SKIP with that reason).
+   - **Runner scripts** (`scripts/testlab/regress.sh macos|linux`): the lock, volume restore, power settings, report
+     copy-back and clean-up the Windows script has; Linux runs on the lab laptop, macOS on the maintainer's Mac or a
+     second Mac. Never touch the user's real library, the display settings or the audio output device.
+   - **Gate:** smoke, standard and hardware tiers run on the final 0.2.9 files of each platform, failures read and
+     fixed in the product or the suite (not the evidence), and the release text says what was and was not run per
+     platform (as the 0.2.8 text does). Build the drivers **first**, so the bug fixes in items 1 to 4 get regress cases on
+     all platforms as they land.
+
 ## Decisions needed from the maintainer
 
-- **O1** Platforms for 0.2.9: Windows only (as 0.2.8), or Windows plus macOS if bug 2 and 3 also hit the Mac? Bugs 2
-  and 3 are in shared code, so the Mac gets them either way in 0.3.0; a Mac 0.2.9 needs a macOS regression run first.
+- **O1** (answered) All three platforms ship 0.2.9, each after its own regression run. Open: a second Mac for the
+  Intel build, or is the Intel macOS DMG built and checked on Apple Silicon only, as in 0.2.1 to 0.2.7 (the release text
+  must then say it)?
+- **O4** Lab time: the ThinkPad serves both Windows and Ubuntu; agree a window for Ubuntu hardware runs (Wayland and
+  X11 each) and for the Samsung monitor cases on Windows.
 - **O2** Bug 3: send a screenshot of the Models page, or confirm the lead strings.
 - **O3** Alerts in bug 4: bump and re-convert (needs the Python 3.12 setup and about 500 MB of download), or dismiss as
   not used in shipped code.
 
 ## Done when
 
-Each bug has a test or a stored real-device step; the Windows package for 0.2.9 is rebuilt, `cm-regress` standard and
-hardware are run on the lab laptop (reports stored, PARTIAL), CI is green on `main`, and the code-scanning list for
+Each bug has a test or a stored real-device step; the packages for 0.2.9 are built for Windows, macOS and Linux, and
+`cm-regress` smoke, standard and hardware are run on each (reports stored, PARTIAL), CI is green on `main`, and the code-scanning list for
 `packaging/phowhisper/requirements.txt` is empty or dismissed with reasons.
 
 ## How the agent works
