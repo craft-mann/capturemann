@@ -1071,7 +1071,7 @@ fn warning_translated(p: &MessageParts) -> Option<String> {
         ),
         // TRANSLATORS: FACT: owner review required (what happens when the microphone is silent)
         "warn_mic_silent" => tr!(
-            "The microphone has delivered only silence for 15 s (muted, or its access was revoked); the recording continues"
+            "The microphone has delivered only silence (muted, or its access was revoked); the recording continues"
         ),
         "warn_audio_write_failed" => tr!(
             "The audio file could not be written ({detail}); the track ends here and the recording continues",

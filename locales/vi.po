@@ -8378,8 +8378,8 @@ msgstr "Camera đã bị ngắt kết nối; rãnh camera có một khoảng tr�
 
 # FACT: owner review required
 #, fuzzy
-msgid "The microphone has delivered only silence for 15 s (muted, or its access was revoked); the recording continues"
-msgstr "Micrô chỉ cho âm thanh im lặng trong 15 giây (đã tắt tiếng hoặc quyền truy cập đã bị thu hồi); bản ghi vẫn tiếp tục"
+msgid "The microphone has delivered only silence (muted, or its access was revoked); the recording continues"
+msgstr "Micrô chỉ cho âm thanh im lặng (đã tắt tiếng hoặc quyền truy cập đã bị thu hồi); bản ghi vẫn tiếp tục"
 
 #, fuzzy
 msgid "The recording engine failed; saving what was recorded"

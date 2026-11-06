@@ -1989,7 +1989,7 @@ Terms follow `locales/vi-glossary.md`. Placeholders such as `{n}`, `{title}`, `{
 | 1888 | The camera file could not be written: {detail} | Không thể ghi tệp camera: {detail} | |
 | 1889 | The camera is back | Camera đã hoạt động trở lại | |
 | 1890 | The camera was disconnected; the camera track has a gap | Camera đã bị ngắt kết nối; rãnh camera có một khoảng trống | |
-| 1891 | The microphone has delivered only silence for 15 s (muted, or its access was revoked); the recording continues | Micrô chỉ cho âm thanh im lặng trong 15 giây (đã tắt tiếng hoặc quyền truy cập đã bị thu hồi); bản ghi vẫn tiếp tục | |
+| 1891 | The microphone has delivered only silence (muted, or its access was revoked); the recording continues | Micrô chỉ cho âm thanh im lặng (đã tắt tiếng hoặc quyền truy cập đã bị thu hồi); bản ghi vẫn tiếp tục | |
 | 1892 | The recording engine failed; saving what was recorded | Bộ máy quay đã gặp lỗi; đang lưu phần đã ghi | |
 | 1893 | The recording engine was stopped; saving what was recorded | Bộ máy quay đã bị dừng; đang lưu phần đã ghi | |
 | 1894 | The {track} file ended early ({detail}); what was written is kept | Tệp {track} kết thúc sớm ({detail}); phần đã ghi được giữ lại | |

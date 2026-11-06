@@ -41,6 +41,11 @@ pub const GAP_REPORT_MS: f64 = 100.0;
 /// lost its access (the OS keeps the stream open and feeds zeros): the recorder warns, once per
 /// episode, and keeps recording (R3-21).
 pub const DIGITAL_SILENCE_ALERT_MS: f64 = 15_000.0;
+/// The same, for a microphone that has not delivered a single non-zero sample since the
+/// recording began: nobody records a take of exact silence on purpose, and a short take would
+/// end before the longer limit and keep the user from ever hearing about it (a Windows privacy
+/// switch or a muted device feeds zeros without an error).
+pub const DIGITAL_SILENCE_FROM_START_MS: f64 = 4_000.0;
 
 const NS: f64 = 1e9;
 
@@ -167,6 +172,8 @@ pub struct Pipeline {
     /// Input frames in a row that were exactly 0.0 (microphone only).
     zero_run_frames: u64,
     silence_alerted: bool,
+    /// Any non-zero sample has arrived since the recording began.
+    heard_signal: bool,
     silence_pending: bool,
     /// The mute spans (AUD-6), shared with the recorder that toggles them.
     mute: Option<Arc<MuteControl>>,
@@ -291,6 +298,7 @@ impl Pipeline {
             hint: None,
             zero_run_frames: 0,
             silence_alerted: false,
+            heard_signal: false,
             silence_pending: false,
             mute: None,
             rs_in: 0,
@@ -553,10 +561,16 @@ impl Pipeline {
         if data.iter().any(|v| *v != 0.0) {
             self.zero_run_frames = 0;
             self.silence_alerted = false;
+            self.heard_signal = true;
             return;
         }
         self.zero_run_frames += frames as u64;
-        let limit = (DIGITAL_SILENCE_ALERT_MS / 1000.0 * f64::from(self.in_rate.max(1))) as u64;
+        let ms = if self.heard_signal {
+            DIGITAL_SILENCE_ALERT_MS
+        } else {
+            DIGITAL_SILENCE_FROM_START_MS
+        };
+        let limit = (ms / 1000.0 * f64::from(self.in_rate.max(1))) as u64;
         if self.zero_run_frames >= limit && !self.silence_alerted {
             self.silence_alerted = true;
             self.silence_pending = true;

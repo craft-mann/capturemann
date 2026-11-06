@@ -4817,7 +4817,7 @@ msgid "The microphone didn’t start"
 msgstr ""
 
 #. FACT: owner review required (what happens when the microphone is silent)
-msgid "The microphone has delivered only silence for 15 s (muted, or its access was revoked); the recording continues"
+msgid "The microphone has delivered only silence (muted, or its access was revoked); the recording continues"
 msgstr ""
 
 msgid "The model runs inside CaptureMann and nothing leaves {this_computer}."

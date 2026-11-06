@@ -429,7 +429,7 @@ pub const WARNING_TEMPLATES: &[(&str, &str)] = &[
     ),
     (
         "warn_mic_silent",
-        "The microphone has delivered only silence for 15 s (muted, or its access was revoked); the recording continues",
+        "The microphone has delivered only silence (muted, or its access was revoked); the recording continues",
     ),
     (
         "warn_audio_write_failed",

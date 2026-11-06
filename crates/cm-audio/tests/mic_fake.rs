@@ -792,7 +792,8 @@ fn r3_13_a_start_timeout_stops_the_worker_and_cleans_up() {
     panic!("the partial files were not cleaned up");
 }
 
-/// R3-21: a microphone that delivers only digital silence for 15 s (muted, or access revoked
+/// R3-21: a microphone that delivers only digital silence for 4 s from the start of the
+/// recording, or for 15 s after it had sound (muted, or access revoked
 /// while the stream stays open) raises one `DigitalSilence` event; recording goes on; sound
 /// returning re-arms it; system audio (silent when nothing plays) never warns.
 #[test]
@@ -803,10 +804,10 @@ fn r3_21_a_mic_stuck_on_digital_silence_is_reported_once() {
     let (src, h) = FakeAudioSource::new(cfg);
     let mut rec = MicRecorder::with_factory(no_denoise(), factory_of(src));
     rec.start(rig.ctx()).unwrap();
-    h.advance(10.0);
+    h.advance(2.0);
     rec.sync().unwrap();
     assert!(rec.drain_events().is_empty(), "not yet");
-    h.advance(10.0);
+    h.advance(3.0);
     rec.sync().unwrap();
     let ev = rec.drain_events();
     assert_eq!(

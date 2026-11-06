@@ -365,7 +365,7 @@ fn audio_note(ev: &AudioEvent) -> TrackNote {
         AudioEvent::DigitalSilence { at } => TrackNote::new(
             NoteLevel::Warning,
             "mic_silent",
-            "The microphone has delivered only silence for 15 s (muted, or its access was \
+            "The microphone has delivered only silence (muted, or its access was \
              revoked); the recording continues",
         )
         .at(*at),

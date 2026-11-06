@@ -660,6 +660,22 @@ fn mic(ctx: &mut Ctx) -> R {
         (secs - 4.0).abs() < 0.8,
         "the microphone track is {secs:.2} s, expected about 4"
     );
+    // A track of the right length can still hold exact zeros (a privacy switch or a muted device
+    // feeds silence without an error): a real microphone always has some noise floor.
+    let f = rec
+        .manifest
+        .pointer("/tracks/mic/file")
+        .and_then(Value::as_str)
+        .ok_or_else(|| Stop::Fail("the manifest has no microphone file".to_owned()))?;
+    let (mean_db, peak_db) =
+        media::wav_levels(&std::fs::read(rec.bundle.join(f))?, 0.5, 3.0).map_err(Stop::Fail)?;
+    ctx.note(format!(
+        "mic level: rms {mean_db:.1} dBFS, peak {peak_db:.1} dBFS"
+    ));
+    check!(
+        peak_db > -150.0,
+        "the microphone track is digital silence (peak {peak_db:.0} dBFS): the microphone delivered only zeros"
+    );
     Ok(())
 }
 
