@@ -318,9 +318,31 @@ fn speakers(ctx: &mut Ctx) -> R {
     let Some(speech) = ctx.opts.speech_audio.clone() else {
         return skip("no --speech <two-voice recording> given");
     };
+    // Without --speaker-models the models the package bundles (Resources/Models/speaker next to the programs)
+    // must be found by the product itself: no CM_SPEAKER_MODELS_DIR is set then.
+    let bundled = ctx.pkg.dir.join("Resources").join("Models").join("speaker");
+    let bundled_onnx = std::fs::read_dir(&bundled)
+        .map(|d| {
+            d.flatten()
+                .filter(|e| e.path().extension().is_some_and(|x| x == "onnx"))
+                .count()
+        })
+        .unwrap_or(0);
     if ctx.opts.speaker_models.is_none() {
-        return skip(
-            "no --speaker-models <dir> given (the two ONNX files; this package bundles none)",
+        if bundled_onnx < 2 {
+            return skip(
+                "no --speaker-models <dir> given and the package bundles no speaker models (Resources/Models/speaker)",
+            );
+        }
+        ctx.start_daemon()?;
+        let d = ctx.cli_text(&["diagnostics"])?;
+        let text = d.out.stdout.clone();
+        ctx.note(format!(
+            "bundled speaker models: {bundled_onnx} .onnx files"
+        ));
+        check!(
+            text.contains("bundled with this build"),
+            "diagnostics does not report the bundled speaker models"
         );
     }
     // `speakers list` reads the transcript, so the recording is transcribed first (as a user does).
