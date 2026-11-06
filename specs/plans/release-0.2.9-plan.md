@@ -85,8 +85,10 @@ passes the same release regression as Windows 0.2.8 (items 6 and 7).
      "My microphone only hears me", "Find again") stay visible under it or in one compact row group.
    - Acceptance: with 3, 6 and 10 speakers at the smallest window the app allows (**720 x 480 logical px**, the minimum set in
      `ui/app/routing.rs`; the default is 1180 x 760; also the laptop in the screenshot, and
-     the pseudo-locale, which is 30 % longer), at least three rows show at once, the rest scroll with the wheel and the
-     keyboard, nothing is cut mid-row, and the controls are reachable. Add a layout test (the `layout_width_tests`
+     the pseudo-locale, which is 30 % longer), the list scrolls with the wheel and the keyboard, nothing is cut mid-row, and
+     the controls are reachable (maintainer decision, Nov 6, 2026: at the 720 x 480 minimum the panel may scroll as a whole,
+     "scrolls, nothing is cut"; three rows without scrolling are required only from the default window size down to the
+     laptop screen in the screenshot, and the layout test pins the 3-row minimum of the list itself). Add a layout test (the `layout_width_tests`
      pattern) and a stored screenshot of the result with sample names only.
 6. **Regression drivers and reports for macOS and Linux, the same as Windows 0.2.8** (a gate for the macOS and Linux packages) (`cm-regress`, tiers smoke, standard,
    hardware; a stored PARTIAL report per platform and tier in `verification/`, template and rules as for
