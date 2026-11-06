@@ -176,7 +176,11 @@ impl Inner {
         list: &ModelList,
         wanted: Option<&str>,
     ) -> Result<String, DaemonError> {
-        let installed: Vec<&ModelInfo> = list.models.iter().filter(|m| m.installed).collect();
+        let installed: Vec<&ModelInfo> = list
+            .models
+            .iter()
+            .filter(|m| m.installed && m.kind == cm_ai::model::ModelKind::Speech)
+            .collect();
         let ids = || installed.iter().map(|m| m.id.clone()).collect::<Vec<_>>();
         if let Some(w) = wanted {
             return if installed.iter().any(|m| m.id == w) {
