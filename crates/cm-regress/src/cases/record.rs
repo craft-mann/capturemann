@@ -39,6 +39,17 @@ pub fn cases() -> Vec<Case> {
             run: region,
         },
         Case {
+            id: "rec.region_min",
+            title: "the smallest recording areas (18x18 and 20x20) record with the real encoder: exact size, frames present",
+            area: "rec",
+            specs: &["REC-1.AC", "CAP-1.AC2", "bug: 16 px area fails on Intel UHD 620"],
+            tier: Tier::Full,
+            needs: &[Need::DesktopSession, Need::Screen],
+            platforms: ALL,
+            timeout_s: 240,
+            run: region_min,
+        },
+        Case {
             id: "rec.kill9_recovery",
             title: "the daemon killed mid-recording: the next start recovers the bundle and loses under 3 s",
             area: "rec",
@@ -518,6 +529,35 @@ fn region(ctx: &mut Ctx) -> R {
         v.width,
         v.height
     );
+    Ok(())
+}
+
+fn region_min(ctx: &mut Ctx) -> R {
+    ctx.allow_recording_without_dialog()?;
+    ctx.start_daemon()?;
+    let d = ctx.primary_display()?;
+    check!(d.w >= 100 && d.h >= 100, "the display is too small");
+    for side in [18_i64, 20] {
+        let region = format!("0,0,{side},{side}");
+        let rec = record(ctx, &d, &["--region", &region], &[Step::Wait(3)], None)?;
+        let p = screen_probe(ctx, &rec)?;
+        let v = p.need_video()?;
+        ctx.note(format!(
+            "region {side}x{side}: {}x{} {} {:.2} s",
+            v.width, v.height, v.codec_name, p.duration
+        ));
+        check!(
+            v.width == side && v.height == side,
+            "the {side}x{side} region recording is {}x{}",
+            v.width,
+            v.height
+        );
+        check!(
+            p.duration > 1.5,
+            "the {side}x{side} region recording is only {:.2} s long (no frames?)",
+            p.duration
+        );
+    }
     Ok(())
 }
 
