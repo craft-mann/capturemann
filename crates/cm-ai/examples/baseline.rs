@@ -65,8 +65,13 @@ fn model_store(dir: &Path, models: &Path, embedding: Option<&Path>) -> ModelStor
                 .unwrap_or_else(|| panic!("none of {names:?} in {}", models.display())),
         };
         let file = &store.catalog().get(id).unwrap().file;
-        std::os::unix::fs::symlink(from.canonicalize().unwrap(), store.models_dir().join(file))
-            .unwrap();
+        let from = from.canonicalize().unwrap();
+        let to = store.models_dir().join(file);
+        // A link on Unix; a copy elsewhere (a Windows link needs a privilege).
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(from, to).unwrap();
+        #[cfg(not(unix))]
+        std::fs::copy(from, to).map(drop).unwrap();
     }
     store
 }

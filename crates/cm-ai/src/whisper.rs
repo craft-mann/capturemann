@@ -432,13 +432,27 @@ impl DecodeParams {
     }
 }
 
-/// The alignment-head preset of a stock model id (`large` is large-v3).
 /// The CPU features whisper.cpp/ggml was compiled for and found (`AVX = 1 | AVX2 = 1 | FMA = 1 | ...`).
 /// A package built without AVX2/FMA/F16C is several times slower than one built with them.
-pub fn system_info() -> &'static str {
-    whisper_rs::print_system_info()
+///
+/// Never panics: `whisper_rs::print_system_info` unwraps the UTF-8 conversion and aborted on macOS and
+/// Linux CI, so the C function is called directly and the text is converted lossily.
+pub fn system_info() -> String {
+    // SAFETY: whisper.cpp returns a pointer to a static, NUL-terminated buffer (or null on failure).
+    let ptr = unsafe { whisper_rs::whisper_rs_sys::whisper_print_system_info() };
+    if ptr.is_null() {
+        return String::new();
+    }
+    // SAFETY: `ptr` is non-null and points at a NUL-terminated string that lives for the whole process.
+    let bytes = unsafe { std::ffi::CStr::from_ptr(ptr) }.to_bytes();
+    system_info_text(bytes)
 }
 
+fn system_info_text(bytes: &[u8]) -> String {
+    String::from_utf8_lossy(bytes).into_owned()
+}
+
+/// The alignment-head preset of a stock model id (`large` is large-v3).
 fn dtw_preset(model_id: &str) -> Option<DtwModelPreset> {
     match model_id {
         "tiny" => Some(DtwModelPreset::Tiny),
@@ -902,6 +916,21 @@ impl WhisperTranscriber {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn system_info_text_never_panics_on_invalid_utf8() {
+        assert_eq!(
+            super::system_info_text(b"AVX = 1 | FMA = 1 | "),
+            "AVX = 1 | FMA = 1 | "
+        );
+        assert_eq!(super::system_info_text(&[0xff, b'A']), "\u{fffd}A");
+        assert_eq!(super::system_info_text(b""), "");
+    }
+
+    #[test]
+    fn system_info_does_not_panic() {
+        let _ = super::system_info();
+    }
+
     #[test]
     fn the_default_decode_is_the_shipped_one_and_specs_parse() {
         let d = DecodeParams::default();

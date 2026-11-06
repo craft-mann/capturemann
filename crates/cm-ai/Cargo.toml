@@ -41,13 +41,13 @@ sha2.workspace = true
 ureq = { workspace = true, features = ["native-tls-no-default"] }
 # Unlicense (a public domain dedication). It builds whisper.cpp and ggml (MIT) from source, so it
 # needs `cmake` and a C++ toolchain at build time. See `[[licenses.exceptions]]` in deny.toml.
-whisper-rs = "0.16"
+whisper-rs = { version = "0.16", features = ["raw-api"] }
 
 # Apache-2.0, vendored in vendor/ (build.rs trimmed: no download, no unpack). Optional: feature `sherpa`.
 sherpa-onnx = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-whisper-rs = { version = "0.16", features = ["metal"] }
+whisper-rs = { version = "0.16", features = ["metal", "raw-api"] }
 
 [dev-dependencies]
 tempfile.workspace = true

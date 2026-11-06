@@ -281,10 +281,20 @@ async fn a_video_and_an_audio_file_become_captures() {
     assert_eq!(m["source"]["path"], s(&video));
     assert_eq!(m["source"]["original_file"], "screen.mp4");
     assert_eq!(m["revisions"][0]["action"], "import");
-    // 48 kHz, 32-bit float: the RIFF header's format tag (3), rate and bit depth.
+    // 48 kHz, 32-bit float: the RIFF header's format tag, rate and bit depth. FFmpeg 6.x (Ubuntu 24.04)
+    // writes 32-bit float as WAVE_FORMAT_EXTENSIBLE (0xFFFE) whose sub-format GUID starts with the
+    // float tag (3); newer FFmpeg writes the plain tag 3. Both are float; the rate and the bit depth
+    // sit at the same offsets in both layouts.
     let head = std::fs::read(vdir.join("mic.wav")).unwrap();
     assert_eq!(&head[0..4], b"RIFF");
-    assert_eq!(u16::from_le_bytes([head[20], head[21]]), 3);
+    let tag = u16::from_le_bytes([head[20], head[21]]);
+    let float_tag = if tag == 0xFFFE {
+        // fmt chunk body starts at 20; cbSize 2, valid bits 2, channel mask 4, then the GUID.
+        u16::from_le_bytes([head[44], head[45]])
+    } else {
+        tag
+    };
+    assert_eq!(float_tag, 3, "format tag {tag:#x}");
     assert_eq!(
         u32::from_le_bytes([head[24], head[25], head[26], head[27]]),
         48_000
