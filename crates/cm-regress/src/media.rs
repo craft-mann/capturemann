@@ -169,6 +169,126 @@ fn tool(ctx: &Ctx, name: &str) -> PathBuf {
     }
 }
 
+/// Width and height of the thumbnail a picture is compared at (grayscale, 16:9, one byte per pixel).
+pub const THUMB_W: usize = 32;
+pub const THUMB_H: usize = 18;
+
+/// A recording frame and a screenshot of the same display, taken about 2 s apart on a desktop that
+/// is mostly still, differ by well under this mean absolute difference (0 = identical, 1 = black
+/// against white). Scaling to 32x18, the cursor, window animation and a clock account for a few
+/// percent; a different display's content is usually far above it.
+pub const PICTURE_MATCH_MAX: f64 = 0.15;
+/// The recording frame must be at least this much closer to the chosen display's screenshot than to
+/// another display's (the same unit).
+pub const PICTURE_SEPARATION_MIN: f64 = 0.03;
+/// Two displays whose screenshots differ by less than this show (nearly) the same picture, so a
+/// frame cannot tell them apart: that pair is reported as not telling, never as a pass.
+pub const DISPLAYS_DISTINCT_MIN: f64 = 0.05;
+
+/// Mean absolute difference of two equally long gray buffers, scaled to 0..1.
+pub fn mean_abs_diff(a: &[u8], b: &[u8]) -> Option<f64> {
+    if a.is_empty() || a.len() != b.len() {
+        return None;
+    }
+    let sum: u64 = a
+        .iter()
+        .zip(b)
+        .map(|(x, y)| u64::from(x.abs_diff(*y)))
+        .sum();
+    Some(sum as f64 / (a.len() as f64 * 255.0))
+}
+
+/// The physical px size of a display listed in logical px at `scale` (a missing scale counts as 1).
+pub fn physical_size(w: i64, h: i64, scale: f64) -> (i64, i64) {
+    let s = if scale > 0.0 { scale } else { 1.0 };
+    ((w as f64 * s).round() as i64, (h as f64 * s).round() as i64)
+}
+
+#[derive(Debug, PartialEq)]
+pub struct PictureVerdict {
+    /// Failure text, None when the frame matches the chosen display.
+    pub problem: Option<String>,
+    /// How many other displays the frame could be told apart from.
+    pub told_apart: usize,
+    /// How many other displays showed too similar a picture to tell.
+    pub not_telling: usize,
+}
+
+/// Judges a recording frame against the chosen display's screenshot (`rec_vs_self`) and, per other
+/// display, `(rec_vs_other, self_vs_other)`: the frame against that display's screenshot, and the
+/// two screenshots against each other.
+pub fn judge_picture(rec_vs_self: f64, others: &[(f64, f64)]) -> PictureVerdict {
+    let mut v = PictureVerdict {
+        problem: None,
+        told_apart: 0,
+        not_telling: 0,
+    };
+    if rec_vs_self > PICTURE_MATCH_MAX {
+        v.problem = Some(format!(
+            "the frame differs from a screenshot of the chosen display by {rec_vs_self:.3} (limit {PICTURE_MATCH_MAX})"
+        ));
+        return v;
+    }
+    for (rec_vs_other, self_vs_other) in others {
+        if *self_vs_other < DISPLAYS_DISTINCT_MIN {
+            v.not_telling += 1;
+        } else if rec_vs_self + PICTURE_SEPARATION_MIN > *rec_vs_other {
+            v.problem = Some(format!(
+                "the frame is not closer to the chosen display ({rec_vs_self:.3}) than to another one ({rec_vs_other:.3}) by {PICTURE_SEPARATION_MIN}: it may show the wrong display"
+            ));
+            return v;
+        } else {
+            v.told_apart += 1;
+        }
+    }
+    v
+}
+
+/// A 32x18 gray thumbnail of one frame of a video (`at_s` seconds in) or of an image, read with the
+/// package's `ffmpeg` through a scratch file that is deleted again (no frame is kept).
+pub fn gray_thumb(ctx: &mut Ctx, file: &Path, at_s: Option<f64>) -> R<Vec<u8>> {
+    let scratch = ctx.root.join(format!(
+        "thumb-{}-{}.gray",
+        std::process::id(),
+        file.file_name().and_then(|n| n.to_str()).unwrap_or("x")
+    ));
+    let mut c = Command::new(tool(ctx, "ffmpeg"));
+    c.args(["-v", "error", "-y"]);
+    if let Some(t) = at_s {
+        c.arg("-ss").arg(format!("{t}"));
+    }
+    c.arg("-i").arg(file).args([
+        "-frames:v",
+        "1",
+        "-vf",
+        &format!("scale={THUMB_W}:{THUMB_H}:flags=area,format=gray"),
+        "-f",
+        "rawvideo",
+    ]);
+    c.arg(&scratch);
+    let out = ctx.run(c, 120);
+    let bytes = std::fs::read(&scratch);
+    let _ = std::fs::remove_file(&scratch);
+    let out = out?;
+    if !out.success() {
+        return fail(format!(
+            "ffmpeg could not read a frame of {}: {}",
+            file.display(),
+            crate::util::cut(&crate::util::one_line(&out.text()), 300)
+        ));
+    }
+    let bytes = bytes.map_err(|e| Stop::Fail(format!("no frame of {}: {e}", file.display())))?;
+    if bytes.len() != THUMB_W * THUMB_H {
+        return fail(format!(
+            "the frame of {} came out as {} bytes, expected {}",
+            file.display(),
+            bytes.len(),
+            THUMB_W * THUMB_H
+        ));
+    }
+    Ok(bytes)
+}
+
 pub fn probe(ctx: &mut Ctx, file: &Path) -> R<Probe> {
     let mut c = Command::new(tool(ctx, "ffprobe"));
     c.args([
@@ -281,6 +401,46 @@ pub fn wav_levels(bytes: &[u8], from_s: f64, dur_s: f64) -> Result<(f64, f64), S
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mean_abs_diff_of_synthetic_buffers() {
+        let black = vec![0u8; 576];
+        let white = vec![255u8; 576];
+        let grey = vec![51u8; 576];
+        assert_eq!(mean_abs_diff(&black, &black), Some(0.0));
+        assert_eq!(mean_abs_diff(&black, &white), Some(1.0));
+        assert!((mean_abs_diff(&black, &grey).unwrap() - 0.2).abs() < 1e-9);
+        assert_eq!(mean_abs_diff(&black, &white[..10]), None);
+        assert_eq!(mean_abs_diff(&[], &[]), None);
+    }
+
+    #[test]
+    fn physical_size_scales_and_defaults() {
+        assert_eq!(physical_size(1920, 1080, 1.5), (2880, 1620));
+        assert_eq!(physical_size(3840, 2160, 1.0), (3840, 2160));
+        assert_eq!(physical_size(1280, 720, 0.0), (1280, 720));
+    }
+
+    #[test]
+    fn the_right_display_passes_and_the_wrong_one_fails() {
+        // Frame matches its own screenshot (0.02), the other display looks very different (0.4).
+        let v = judge_picture(0.02, &[(0.4, 0.4)]);
+        assert_eq!(v.problem, None);
+        assert_eq!(v.told_apart, 1);
+        // The frame is the other display's picture.
+        let v = judge_picture(0.4, &[(0.02, 0.4)]);
+        assert!(v.problem.unwrap().contains("differs from a screenshot"));
+        // Close to both although the screenshots differ: cannot be told apart, so it fails.
+        let v = judge_picture(0.14, &[(0.15, 0.2)]);
+        assert!(v.problem.unwrap().contains("wrong display"));
+    }
+
+    #[test]
+    fn identical_displays_are_not_telling() {
+        let v = judge_picture(0.01, &[(0.01, 0.0)]);
+        assert_eq!(v.problem, None);
+        assert_eq!((v.told_apart, v.not_telling), (0, 1));
+    }
 
     const SAMPLE: &str = r#"{"streams":[
       {"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"r_frame_rate":"30/1","avg_frame_rate":"30000/1001","pix_fmt":"yuv420p","color_space":"bt709","color_range":"tv","duration":"6.000000","nb_frames":"180","side_data_list":[{"side_data_type":"Display Matrix","rotation":-90}]},

@@ -844,21 +844,122 @@ fn soak(ctx: &mut Ctx) -> R {
     Ok(())
 }
 
+/// Screenshots of every display, taken while a recording runs (deleted again by `picture_check`).
+type Shots = Vec<(u64, Result<PathBuf, String>)>;
+
+fn shoot_all(ctx: &mut Ctx, ds: &[Display]) -> Shots {
+    let mut shots = Vec::new();
+    for d in ds {
+        let out = ctx.root.join(format!("picture-{}.png", d.id));
+        let r = ctx
+            .cli_ok(&[
+                "capture",
+                "screenshot",
+                "--display",
+                &d.id.to_string(),
+                "--out",
+                &out.to_string_lossy(),
+            ])
+            .map(|_| out)
+            .map_err(|e| format!("{e:?}"));
+        shots.push((d.id, r));
+    }
+    shots
+}
+
+/// Where in the recording the compared frame is taken, about when the screenshots were.
+const PICTURE_AT_S: f64 = 2.0;
+
+/// Checks the PICTURE of a recording of `d`: the video is the display's physical size, and a frame
+/// matches a screenshot of that display and not another display's (limits in `media`). Returns
+/// the problems; every screenshot is deleted before it returns.
+fn picture_check(ctx: &mut Ctx, rec: &Recorded, d: &Display, shots: &Shots) -> R<Vec<String>> {
+    let result = picture_measure(ctx, rec, d, shots);
+    for (_, s) in shots {
+        if let Ok(p) = s {
+            let _ = std::fs::remove_file(p);
+        }
+    }
+    result
+}
+
+fn picture_measure(ctx: &mut Ctx, rec: &Recorded, d: &Display, shots: &Shots) -> R<Vec<String>> {
+    let mut problems = Vec::new();
+    let p = screen_probe(ctx, rec)?;
+    let v = p.need_video()?;
+    let (ew, eh) = media::physical_size(d.w, d.h, d.scale);
+    ctx.note(format!(
+        "display {}: video {}x{}, display {}x{} at scale {} = {ew}x{eh} physical",
+        d.id, v.width, v.height, d.w, d.h, d.scale
+    ));
+    if (v.width, v.height) != (ew, eh) {
+        problems.push(format!(
+            "display {}: the video is {}x{}, the display is {ew}x{eh} physical px",
+            d.id, v.width, v.height
+        ));
+    }
+    let file = rec.bundle.join(
+        rec.manifest
+            .pointer("/tracks/screen/file")
+            .and_then(Value::as_str)
+            .unwrap_or_default(),
+    );
+    let frame = media::gray_thumb(ctx, &file, Some(PICTURE_AT_S))?;
+    let mut thumbs = Vec::new();
+    for (id, s) in shots {
+        match s {
+            Ok(path) => thumbs.push((*id, media::gray_thumb(ctx, path, None)?)),
+            Err(e) => problems.push(format!("screenshot of display {id} failed: {e}")),
+        }
+    }
+    let Some(own) = thumbs.iter().find(|t| t.0 == d.id).map(|t| &t.1) else {
+        return Ok(problems);
+    };
+    let diff = |a: &[u8], b: &[u8]| media::mean_abs_diff(a, b).unwrap_or(1.0);
+    let rec_vs_self = diff(&frame, own);
+    let others: Vec<(f64, f64)> = thumbs
+        .iter()
+        .filter(|t| t.0 != d.id)
+        .map(|t| (diff(&frame, &t.1), diff(own, &t.1)))
+        .collect();
+    let verdict = media::judge_picture(rec_vs_self, &others);
+    ctx.note(format!(
+        "display {}: frame at {PICTURE_AT_S} s vs its screenshot {rec_vs_self:.3} (limit {}); vs others (frame, screenshots) {others:.3?}; told apart from {}, not telling for {} (screenshots too alike, under {})",
+        d.id,
+        media::PICTURE_MATCH_MAX,
+        verdict.told_apart,
+        verdict.not_telling,
+        media::DISPLAYS_DISTINCT_MIN
+    ));
+    if let Some(msg) = verdict.problem {
+        problems.push(format!("display {}: {msg}", d.id));
+    }
+    Ok(problems)
+}
+
 fn external_4k(ctx: &mut Ctx) -> R {
     ctx.allow_recording_without_dialog()?;
     ctx.start_daemon()?;
     let v = ctx.cli_ok(&["targets", "--displays-only"])?;
     let ds = crate::ctx::displays(&v);
+    if ds.len() < 2 {
+        return skip(
+            "only one display is connected, so the picture cannot be told from another display's",
+        );
+    }
     let Some(d) = ds.iter().find(|d| d.w >= 3000 && !d.primary).cloned() else {
         return skip("no non-primary display of 3000 px or more is connected");
     };
+    let mut shots: Shots = Vec::new();
+    let all = ds.clone();
     let rec = record(
         ctx,
         &d,
         &["--size", "source", "--fps", "30"],
-        &[Step::Wait(30)],
-        None,
+        &[Step::Wait(2), Step::Wait(28)],
+        Some(&mut |c: &mut Ctx| shots = shoot_all(c, &all)),
     )?;
+    let picture = picture_check(ctx, &rec, &d, &shots)?;
     let screen = rec
         .manifest
         .pointer("/tracks/screen")
@@ -909,6 +1010,7 @@ fn external_4k(ctx: &mut Ctx) -> R {
         "the file averages {file_fps:.1} fps (manifest effective_fps {eff}) with no encoder_overloaded warning"
     );
     wait_idle_exports(ctx);
+    check!(picture.is_empty(), "{}", picture.join("; "));
     Ok(())
 }
 
@@ -996,7 +1098,15 @@ fn each_monitor(ctx: &mut Ctx) -> R {
                 d.id
             ));
         }
-        let rec = record(ctx, d, &["--size", "source"], &[Step::Wait(10)], None)?;
+        let mut shots: Shots = Vec::new();
+        let rec = record(
+            ctx,
+            d,
+            &["--size", "source"],
+            &[Step::Wait(2), Step::Wait(8)],
+            Some(&mut |c: &mut Ctx| shots = shoot_all(c, &ds)),
+        )?;
+        problems.extend(picture_check(ctx, &rec, d, &shots)?);
         let cursor = Ctx::files_under(&rec.bundle).into_iter().find(|f| {
             f.file_name()
                 .and_then(|n| n.to_str())
