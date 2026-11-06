@@ -747,24 +747,93 @@ pub fn reveal(bundle: &Path) -> Result<(), FileError> {
     open_path(bundle, true)
 }
 
+/// The system a file manager call is built for (see [`reveal_plan`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RevealOs {
+    Mac,
+    Windows,
+    Linux,
+}
+
+/// A file manager call as data: the program and its arguments. `raw_last` means the last argument
+/// goes onto the command line as written (Windows `explorer /select,"path"`); the usual quoting
+/// would wrap the whole `/select,path` in quotes, which Explorer does not parse.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RevealPlan {
+    pub program: &'static str,
+    pub args: Vec<std::ffi::OsString>,
+    pub raw_last: bool,
+}
+
+/// A path as Explorer wants it: backslashes only and no `\\?\` prefix. The export file is the
+/// bundle folder joined with the manifest's `exports/<name>.mp4`, so on Windows it holds both `\`
+/// and `/`; `explorer /select,` does not read such a path and opens a default folder (Documents)
+/// instead of the export (EXP-4.AC5).
+pub fn explorer_path(path: &str) -> String {
+    let p = path.replace('/', "\\");
+    if let Some(rest) = p.strip_prefix("\\\\?\\UNC\\") {
+        return format!("\\\\{rest}");
+    }
+    match p.strip_prefix("\\\\?\\") {
+        Some(rest) if rest.as_bytes().get(1) == Some(&b':') => rest.to_owned(),
+        _ => p,
+    }
+}
+
+/// How to show `path` in the system's file manager (EXP-4.AC5), without running anything. macOS:
+/// `open -R <path>` (selects it). Windows: `explorer /select,"<path>"` with [`explorer_path`]
+/// (selects it). Linux: `xdg-open <folder>`, the folder that holds the file (or the folder itself
+/// when `is_dir`), because a file manager cannot be told to select a file in general.
+pub fn reveal_plan(os: RevealOs, path: &Path, is_dir: bool) -> RevealPlan {
+    match os {
+        RevealOs::Mac => RevealPlan {
+            program: "open",
+            args: vec!["-R".into(), path.as_os_str().to_owned()],
+            raw_last: false,
+        },
+        RevealOs::Windows => RevealPlan {
+            program: "explorer",
+            args: vec![format!("/select,\"{}\"", explorer_path(&path.to_string_lossy())).into()],
+            raw_last: true,
+        },
+        RevealOs::Linux => {
+            let folder = if is_dir {
+                path
+            } else {
+                path.parent().unwrap_or(path)
+            };
+            RevealPlan {
+                program: "xdg-open",
+                args: vec![folder.as_os_str().to_owned()],
+                raw_last: false,
+            }
+        }
+    }
+}
+
 fn open_path(path: &Path, reveal: bool) -> Result<(), FileError> {
     #[cfg(target_os = "macos")]
     {
         let mut c = cm_platform::process::command("open");
         if reveal {
-            c.arg("-R");
+            c.args(&reveal_plan(RevealOs::Mac, path, path.is_dir()).args);
+        } else {
+            c.arg(path);
         }
-        c.arg(path).spawn().map(|_| ()).map_err(FileError::from)
+        c.spawn().map(|_| ()).map_err(FileError::from)
     }
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
         let mut c = if reveal {
-            let mut c = cm_platform::process::command("explorer");
-            c.arg("/select,").arg(path);
+            let plan = reveal_plan(RevealOs::Windows, path, path.is_dir());
+            let mut c = cm_platform::process::command(plan.program);
+            c.raw_arg(&plan.args[0]);
             c
         } else {
             let mut c = cm_platform::process::command("cmd");
-            c.args(["/C", "start", ""]).arg(path);
+            c.args(["/C", "start", ""])
+                .arg(explorer_path(&path.to_string_lossy()));
             c
         };
         c.spawn().map(|_| ()).map_err(FileError::from)
@@ -783,6 +852,51 @@ fn open_path(path: &Path, reveal: bool) -> Result<(), FileError> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// EXP-4.AC5: macOS selects the file with `open -R`; Linux opens the folder that holds it (or
+    /// the folder itself).
+    #[test]
+    fn reveal_plan_unix_paths() {
+        let file = Path::new("/Users/me/Lib/Rec 1.cmrec/exports/A - quick.mp4");
+        let mac = reveal_plan(RevealOs::Mac, file, false);
+        assert_eq!(mac.program, "open");
+        assert_eq!(
+            mac.args,
+            vec!["-R", "/Users/me/Lib/Rec 1.cmrec/exports/A - quick.mp4"]
+        );
+        assert!(!mac.raw_last);
+        let linux = reveal_plan(RevealOs::Linux, file, false);
+        assert_eq!(linux.program, "xdg-open");
+        assert_eq!(linux.args, vec!["/Users/me/Lib/Rec 1.cmrec/exports"]);
+        let dir = Path::new("/home/me/Videos");
+        assert_eq!(
+            reveal_plan(RevealOs::Linux, dir, true).args,
+            vec!["/home/me/Videos"]
+        );
+    }
+
+    /// EXP-4.AC5: the Windows call is one raw `/select,"<path>"` argument with backslashes only,
+    /// also for a path built as folder + `exports/name.mp4` (mixed separators), no `\\?\` prefix.
+    #[test]
+    fn reveal_plan_windows_paths() {
+        let mixed = Path::new("C:\\Users\\me\\Videos\\Rec 1.cmrec\\exports/A - quick.mp4");
+        let plan = reveal_plan(RevealOs::Windows, mixed, false);
+        assert_eq!(plan.program, "explorer");
+        assert!(plan.raw_last);
+        assert_eq!(
+            plan.args,
+            vec!["/select,\"C:\\Users\\me\\Videos\\Rec 1.cmrec\\exports\\A - quick.mp4\""]
+        );
+        assert_eq!(
+            explorer_path("\\\\?\\C:\\lib\\x.cmrec/exports/a.mp4"),
+            "C:\\lib\\x.cmrec\\exports\\a.mp4"
+        );
+        assert_eq!(
+            explorer_path("\\\\?\\UNC\\nas\\share/a.mp4"),
+            "\\\\nas\\share\\a.mp4"
+        );
+        assert_eq!(explorer_path("D:/a b/c.mp4"), "D:\\a b\\c.mp4");
+    }
 
     /// Linux "Show in folder": a file shows its folder, a bundle folder shows itself.
     #[test]
