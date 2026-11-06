@@ -101,7 +101,7 @@ open a console window; the CLI no longer hangs when it starts the daemon.
 
 ## Install
 
-Windows 11, x64. Windows 10 is not tested.
+Windows 11, x64. Windows 10 (22H2) is listed as supported but has not been tested on a real device yet; all testing so far was on Windows 11 with an Intel processor.
 
 - **Installer** `capturemann-0.2.8-windows-x64-setup.exe` (per user, no administrator rights). SHA-256 `<sha256 installer>`
 - **Zip** `capturemann-0.2.8-windows-x64.zip`: unpack anywhere and run `cm-desktop.exe`; `capturemann.exe` is the command line.
