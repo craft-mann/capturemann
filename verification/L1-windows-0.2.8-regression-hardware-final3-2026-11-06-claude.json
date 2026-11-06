@@ -1,0 +1,128 @@
+{
+  "cases": [
+    {
+      "area": "ai",
+      "duration_ms": 2262,
+      "evidence": [
+        "daemon pid 14420 answered after 324 ms",
+        "transcribe without a model: exit 2 (0x00000002) Some(\"invalid_input\") No speech model is installed, so nothing can be transcribed. Open the AI page in CaptureMann, or run `capturemann ai models`, to download or import one. Nothing...",
+        "text-model test: exit 2 (0x00000002) Some(\"invalid_input\")",
+        "MCP transcribe without a model: error true {\"code\":\"invalid_input\",\"data\":{\"hint\":\"capturemann ai models download small\",\"reason\":\"no_model\"},\"message\":\"No speech model is installed, so nothing can be transcribed. Open the AI page in CaptureMa...",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "ai.no_model",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AI-1",
+        "AI-7"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "without a model, transcribe and the text model say what to do (exit 2) instead of failing"
+    },
+    {
+      "area": "ai",
+      "duration_ms": 32562,
+      "evidence": [
+        "daemon pid 8900 answered after 339 ms",
+        "transcribe: exit 0 (0x00000000) { \"attempts\": 1, \"created_at\": \"2026-11-06T05:52:50.719Z\", \"depends_on\": [], \"elapsed_ms\": 29811, \"error\": null, \"eta_ms\": null, \"finished_at\": \"2026-11-06T05:53:20.532Z\", \"held\": false, \"inputs\": { \"...",
+        "library entry after transcription: {\"broken\":false,\"created\":\"2026-11-06T05:52:50.4453916Z\",\"duration\":6015000,\"height\":null,\"id\":\"rec_06GTYTNVYVSDPV0M\",\"kind\":\"audio\",\"publishes\":[],\"size_bytes\":11241994,\"source\":{\"imported_at\":\"2026-...",
+        "transcript: 116 words over 50.1 s of speech",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "ai.transcribe",
+      "message": "",
+      "needs": [
+        "models"
+      ],
+      "specs": [
+        "AI-1",
+        "AI-3",
+        "bug: Transcribe illegal instruction (AVX-512)"
+      ],
+      "status": "PASS",
+      "tier": "full",
+      "title": "a transcription with a real model runs to the end without a crash"
+    },
+    {
+      "area": "ai",
+      "duration_ms": 48614,
+      "evidence": [
+        "daemon pid 12808 answered after 321 ms",
+        "bundled speaker models: 2 .onnx files",
+        "speakers: exit 0 (0x00000000) { \"attempts\": 1, \"created_at\": \"2026-11-06T05:53:53.821Z\", \"depends_on\": [], \"elapsed_ms\": 8082, \"error\": null, \"eta_ms\": null, \"finished_at\": \"2026-11-06T05:54:09.875Z\", \"held\": false, \"inputs\": { \"b...",
+        "speakers listed: 2",
+        "speakers on the words: {\"1\", \"2\"}",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "ai.speakers",
+      "message": "",
+      "needs": [
+        "models"
+      ],
+      "specs": [
+        "AI-8"
+      ],
+      "status": "PASS",
+      "tier": "full",
+      "title": "speaker labels: two voices give two speakers with the speaker models (--speech, --speaker-models)"
+    }
+  ],
+  "run": {
+    "commit": "eb3cb47c",
+    "ffmpeg": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
+    "finished": "2026-11-06T05:54:11Z",
+    "flags": "--tier hardware --out C:\\lab\\regress-out\\20261106T055238Z --who cm-regress via regress.sh --verdict PARTIAL --allow screen,sound,mic,camera,second_monitor --only ai.speakers,ai.transcribe,ai.no_model --whisper-model C:\\lab\\r6\\ggml-small.bin --speech C:\\lab\\r6\\speech2.wav --commit eb3cb47c",
+    "gpu": "Intel(R) UHD Graphics 620 (driver 31.0.101.2137)",
+    "hashes": [
+      [
+        "capturemann.exe",
+        "9fd2c3b855167ea45af84bf8692500d167afcb704b848970e900faec2a0c8bd7"
+      ],
+      [
+        "cm-mcp.exe",
+        "8b3edef2119bd02f8901e2d126a809ce6cc53c6c363b2b20727aa6a49a8145ba"
+      ],
+      [
+        "cm-daemon.exe",
+        "fe5a069f7dd1ff59a7d55e2ca289351372bd5f4c521cd619d0eba0eaa95563fe"
+      ],
+      [
+        "cm-desktop.exe",
+        "06566742e157e32486ef9e8f4677a7c608e3be1c0830460dabe72d59e4bc3925"
+      ],
+      [
+        "cm-overlay.exe",
+        "1742f13a1db6f7f06b05b675399ff96a901bc75436b8080280b132249db52d5a"
+      ],
+      [
+        "ffmpeg.exe",
+        "2c1a80e031805cd110bc5cad0c4847dcbccc277ba924a47ff0f1503d92066f91"
+      ],
+      [
+        "ffprobe.exe",
+        "5fec37a87e26a8c3b3da8528045471612003010e22e12f3d25ead8baf0b594fa"
+      ],
+      [
+        "llama-server.exe",
+        "be54819796793a564b088083e8d46febe2b7d3507745d12d886a52465080b115"
+      ]
+    ],
+    "os": "Microsoft Windows 11 Pro 10.0.26200 build 26200",
+    "package_dir": "C:\\Users\\trung\\AppData\\Local\\Programs\\CaptureMann",
+    "platform": "windows",
+    "started": "2026-11-06T05:52:44Z",
+    "tier": "hardware",
+    "verdict": "PARTIAL",
+    "version": "0.2.8",
+    "who": "cm-regress via regress.sh"
+  },
+  "schema": 1,
+  "summary": {
+    "fail": 0,
+    "pass": 3,
+    "skip": 0,
+    "total": 3
+  }
+}
