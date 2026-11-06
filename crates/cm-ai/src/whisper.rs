@@ -438,14 +438,22 @@ impl DecodeParams {
 /// Never panics: `whisper_rs::print_system_info` unwraps the UTF-8 conversion and aborted on macOS and
 /// Linux CI, so the C function is called directly and the text is converted lossily.
 pub fn system_info() -> String {
-    // SAFETY: whisper.cpp returns a pointer to a static, NUL-terminated buffer (or null on failure).
-    let ptr = unsafe { whisper_rs::whisper_rs_sys::whisper_print_system_info() };
-    if ptr.is_null() {
-        return String::new();
-    }
-    // SAFETY: `ptr` is non-null and points at a NUL-terminated string that lives for the whole process.
-    let bytes = unsafe { std::ffi::CStr::from_ptr(ptr) }.to_bytes();
-    system_info_text(bytes)
+    // whisper.cpp builds the text in a function-local `static std::string` that every call rewrites, so
+    // two threads calling at once (parallel tests, the daemon and a job) race and crash (SIGSEGV on
+    // Linux CI). The answer never changes in a process: compute it once, under `OnceLock`'s lock.
+    static INFO: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    INFO.get_or_init(|| {
+        // SAFETY: whisper.cpp returns a pointer to a static, NUL-terminated buffer (or null on failure);
+        // `get_or_init` runs this closure on one thread at a time.
+        let ptr = unsafe { whisper_rs::whisper_rs_sys::whisper_print_system_info() };
+        if ptr.is_null() {
+            return String::new();
+        }
+        // SAFETY: `ptr` is non-null and points at a NUL-terminated string; it is copied before returning.
+        let bytes = unsafe { std::ffi::CStr::from_ptr(ptr) }.to_bytes();
+        system_info_text(bytes)
+    })
+    .clone()
 }
 
 fn system_info_text(bytes: &[u8]) -> String {

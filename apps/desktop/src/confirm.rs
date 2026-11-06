@@ -651,7 +651,10 @@ mod tests {
         assert!(d.chip.is_empty() && d.primary_is_danger && !d.allow_session);
         assert_eq!(d.primary_label, "Delete capture");
         assert_eq!(d.details[0].1, "Screenshot 10.30");
-        assert!(d.summary.contains("Trash"));
+        // "Trash", or "Recycle Bin" on Windows (`cm_platform::vocab`).
+        let trash =
+            cm_platform::vocab::here(cm_platform::vocab::Term::Trash).trim_start_matches("the ");
+        assert!(d.summary.contains(trash), "{}", d.summary);
     }
 
     /// P3: the dialog is worded from `kind` and `params`; in English it reads as the daemon's own
@@ -660,9 +663,14 @@ mod tests {
     #[test]
     fn p3_dialog_text_follows_the_language() {
         use cm_i18n::{with_language, Lang};
+        // The daemon words it for the system it runs on (`cm_platform::vocab`).
+        let moved = format!(
+            "Moved to {}",
+            cm_platform::vocab::here(cm_platform::vocab::Term::Trash)
+        );
         let mut r = request(
             "delete_capture",
-            json!({"capture": "Take", "size": "2.4 MB", "result": "Moved to the Trash"}),
+            json!({"capture": "Take", "size": "2.4 MB", "result": moved}),
             false,
         );
         r.summary = "Delete \"Take\" (2.4 MB)".into();
@@ -672,10 +680,7 @@ mod tests {
         assert_eq!(en.title, "Delete capture?");
         assert_eq!(en.chip, "Requested by Claude Desktop");
         assert_eq!(en.agent_name(), Some("Claude Desktop"));
-        assert_eq!(
-            en.details[3],
-            ("Result".into(), "Moved to the Trash".into())
-        );
+        assert_eq!(en.details[3], ("Result".into(), moved.clone()));
         with_language(Lang::EnXa, || {
             let x = DialogModel::from_request(&r);
             assert_ne!(x.summary, en.summary);

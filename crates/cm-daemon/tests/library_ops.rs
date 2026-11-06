@@ -440,7 +440,13 @@ async fn delete_asks_with_title_and_size_then_trashes_and_unindexes() {
     );
     assert_eq!(shown[0].details["capture"], "Quarterly numbers");
     assert_eq!(shown[0].details["id"], json!(id));
-    assert_eq!(shown[0].details["result"], "Moved to the Trash");
+    assert_eq!(
+        shown[0].details["result"],
+        format!(
+            "Moved to {}",
+            cm_platform::vocab::here(cm_platform::vocab::Term::Trash)
+        )
+    );
     assert!(
         shown[0].details["size"].as_str().unwrap().ends_with("KB"),
         "{}",

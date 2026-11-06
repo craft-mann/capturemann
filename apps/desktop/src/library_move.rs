@@ -748,9 +748,17 @@ mod tests {
             "{}",
             t.summary
         );
-        assert!(t.summary.contains("Trash"));
+        let trash =
+            cm_platform::vocab::here(cm_platform::vocab::Term::Trash).trim_start_matches("the ");
+        assert!(t.summary.contains(trash), "{}", t.summary);
         let (title, body) = trash_result_text(2, 1);
-        assert_eq!(title, "Moved 2 captures to the Trash");
+        assert_eq!(
+            title,
+            format!(
+                "Moved 2 captures to {}",
+                cm_platform::vocab::here(cm_platform::vocab::Term::Trash)
+            )
+        );
         assert!(body.unwrap().starts_with("1 capture stayed"));
         assert!(trash_result_text(1, 0).1.is_none());
     }

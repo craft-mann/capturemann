@@ -933,7 +933,10 @@ mod tests {
         s.speaker_model = true;
         assert_eq!(s.request()["after"]["diarize"], true);
         // The daemon accepts it.
-        cm_daemon::Action::parse("import_media", &s.request()).unwrap();
+        // (absolute paths of this system: `/m/a.mov` has no drive letter on Windows)
+        let mut req = s.request();
+        req["paths"] = json!(["a.mov", "b.mkv", "c.m4a"].map(|n| std::env::temp_dir().join(n)));
+        cm_daemon::Action::parse("import_media", &req).unwrap();
     }
 
     #[test]
@@ -986,7 +989,9 @@ mod tests {
         assert!(s.prepared_note().unwrap().contains("1 more files"));
         assert!(s.originals_line().starts_with("Originals stay"));
         s.remove_originals = true;
-        assert!(s.originals_line().contains("Trash"));
+        let trash =
+            cm_platform::vocab::here(cm_platform::vocab::Term::Trash).trim_start_matches("the ");
+        assert!(s.originals_line().contains(trash), "{}", s.originals_line());
         assert!(
             s.remove_hint().contains("Frees 1.5 GB"),
             "{}",

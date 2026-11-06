@@ -175,14 +175,15 @@ impl Inner {
             if let Some(r) = &remote {
                 r.rows(&mut rows);
             }
-            rows.insert(
-                "result".into(),
+            rows.insert("result".into(), {
+                // "the Trash", or "the Recycle Bin" on Windows.
+                let trash = cm_platform::vocab::here(cm_platform::vocab::Term::Trash);
                 json!(if deletes > 0 {
-                    "The remote copies are deleted, then the capture is moved to the Trash"
+                    format!("The remote copies are deleted, then the capture is moved to {trash}")
                 } else {
-                    "Moved to the Trash"
-                }),
-            );
+                    format!("Moved to {trash}")
+                })
+            });
             let params = json!({
                 "title": rec.title,
                 "id": rec.id,

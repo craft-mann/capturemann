@@ -1392,7 +1392,12 @@ async fn library_management_tools_rename_delete_and_annotate_without_image() {
     let shown = confirmer.shown();
     assert_eq!(shown.len(), 1);
     assert_eq!(shown[0].details["capture"], "New title");
-    assert_eq!(shown[0].details["result"], "Moved to the Trash");
+    let bin = if cfg!(windows) {
+        "the Recycle Bin"
+    } else {
+        "the Trash"
+    };
+    assert_eq!(shown[0].details["result"], format!("Moved to {bin}"));
     assert_eq!(trasher.trashed().len(), 1);
     let lib = call(&c, "list_library", json!({})).await;
     assert!(ok(&lib)["captures"].as_array().unwrap().is_empty());

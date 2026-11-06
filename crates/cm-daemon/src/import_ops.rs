@@ -1406,6 +1406,14 @@ impl crate::Daemon {
 mod tests {
     use super::*;
 
+    /// An absolute path on this platform (`/a.mov` has no drive letter on Windows).
+    fn abs(name: &str) -> String {
+        std::env::temp_dir()
+            .join(name)
+            .to_string_lossy()
+            .into_owned()
+    }
+
     fn params(v: Value) -> Result<ImportMediaParams, CmError> {
         let empty = Map::new();
         let f = Fields::new(&v, &empty)?;
@@ -1417,22 +1425,24 @@ mod tests {
 
     #[test]
     fn the_input_is_checked_by_name() {
-        let p = params(json!({"paths": ["/a/b.mov"]})).unwrap();
+        let p = params(json!({"paths": [abs("b.mov")]})).unwrap();
         assert!(!p.remove_originals && !p.dry_run && p.after.is_empty());
         let msg = |v: Value| params(v).unwrap_err().to_string();
         assert!(msg(json!({})).contains("paths: is required"));
         assert!(msg(json!({"paths": []})).contains("1 to 200"));
         assert!(msg(json!({"paths": ["rel/a.mov"]})).contains("paths[0]: must be an absolute path"));
-        assert!(msg(json!({"paths": ["/a.mov"], "titles": ["x", "y"]})).contains("titles"));
-        assert!(msg(json!({"paths": ["/a.mov"], "extra": 1})).contains("unknown parameter"));
+        assert!(msg(json!({"paths": [abs("a.mov")], "titles": ["x", "y"]})).contains("titles"));
+        assert!(msg(json!({"paths": [abs("a.mov")], "extra": 1})).contains("unknown parameter"));
         assert!(
-            msg(json!({"paths": ["/a.mov"], "after": {"diarize": true}}))
+            msg(json!({"paths": [abs("a.mov")], "after": {"diarize": true}}))
                 .contains("need `transcribe`")
         );
-        assert!(msg(json!({"paths": ["/a.mov"], "remove_originals": "yes"})).contains("boolean"));
+        assert!(
+            msg(json!({"paths": [abs("a.mov")], "remove_originals": "yes"})).contains("boolean")
+        );
         let many: Vec<String> = (0..201).map(|i| format!("/a/{i}.mov")).collect();
         assert!(msg(json!({"paths": many})).contains("1 to 200"));
-        let p = params(json!({"paths": ["/a.mov", "/b.wav"], "titles": ["One", ""],
+        let p = params(json!({"paths": [abs("a.mov"), abs("b.wav")], "titles": ["One", ""],
             "after": {"transcribe": {"language": "en"}, "diarize": true, "report_template": "minutes"},
             "remove_originals": true, "request_id": "r1"})).unwrap();
         assert_eq!(p.after.transcribe.unwrap().language.as_deref(), Some("en"));
@@ -1441,14 +1451,14 @@ mod tests {
                 && needs_confirmation(&ImportMediaParams {
                     remove_originals: true,
                     dry_run: false,
-                    ..params(json!({"paths": ["/a.mov"]})).unwrap()
+                    ..params(json!({"paths": [abs("a.mov")]})).unwrap()
                 })
         );
     }
 
     #[test]
     fn only_a_real_remove_originals_call_needs_the_dialog() {
-        let mut p = params(json!({"paths": ["/a.mov"]})).unwrap();
+        let mut p = params(json!({"paths": [abs("a.mov")]})).unwrap();
         assert!(!needs_confirmation(&p));
         p.remove_originals = true;
         assert!(needs_confirmation(&p));
@@ -1492,7 +1502,7 @@ mod tests {
 
     #[test]
     fn the_summary_says_what_will_happen() {
-        let mut p = params(json!({"paths": ["/a.mov", "/b.mov"]})).unwrap();
+        let mut p = params(json!({"paths": [abs("a.mov"), abs("b.mov")]})).unwrap();
         assert_eq!(summary(&p), "Import 2 files");
         p.remove_originals = true;
         assert_eq!(

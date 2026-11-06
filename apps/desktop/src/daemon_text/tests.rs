@@ -196,7 +196,7 @@ fn samples() -> Vec<Sample> {
             details: json!({
                 "capture": "Quarterly numbers", "id": "shot_1", "kind": "screenshot",
                 "created": "2026-10-23T14:49:18.337402Z", "size": "13.2 KB",
-                "result": "Moved to the Trash",
+                "result": moved_to_trash(),
             }),
             params: json!({"title": "Quarterly numbers", "id": "shot_1", "kind": "screenshot", "size_bytes": 13212, "remote_copies": 0}),
             worded: &["result"],
@@ -207,7 +207,7 @@ fn samples() -> Vec<Sample> {
             details: json!({
                 "capture": "Take", "id": "rec_1", "kind": "recording",
                 "created": "2026-10-23T14:49:18.337402Z", "size": "2.4 MB",
-                "result": "The remote copies are deleted, then the capture is moved to the Trash",
+                "result": deleted_then_trashed(),
             }),
             params: json!({"title": "Take", "id": "rec_1", "kind": "recording", "size_bytes": 2_400_000, "remote_copies": 2}),
             worded: &["result"],
@@ -229,7 +229,7 @@ fn samples() -> Vec<Sample> {
                 "remote_left_1": "Left in place: export b.mp4 at \"Old disk\" (that destination was removed from Settings)",
                 "permanent": "Deleting remote copies is permanent and cannot be undone: Google Drive files skip the Drive Trash and a deleted YouTube video cannot be restored",
                 "order": "The remote copies are deleted first; if one fails the capture stays here and the result says what was and was not deleted",
-                "result": "The remote copies are deleted, then the capture is moved to the Trash",
+                "result": deleted_then_trashed(),
             }),
             params: json!({
                 "title": "Take", "id": "rec_1", "kind": "recording", "size_bytes": 2_400_000,
@@ -252,7 +252,7 @@ fn samples() -> Vec<Sample> {
             details: json!({
                 "capture": "Take", "size": "2.4 MB",
                 "remote": "No remote copy is recorded for this capture, so nothing is deleted remotely",
-                "result": "Moved to the Trash",
+                "result": moved_to_trash(),
             }),
             params: json!({"title": "Take", "id": "rec_1", "kind": "recording", "size_bytes": 2_400_000, "remote_copies": 0, "remote_items": []}),
             worded: &["remote", "result"],
@@ -289,6 +289,21 @@ fn samples() -> Vec<Sample> {
             worded: &[],
         },
     ]
+}
+
+/// What the daemon says for a deleted capture on this system (`cm_platform::vocab`).
+fn moved_to_trash() -> String {
+    format!(
+        "Moved to {}",
+        cm_platform::vocab::here(cm_platform::vocab::Term::Trash)
+    )
+}
+
+fn deleted_then_trashed() -> String {
+    format!(
+        "The remote copies are deleted, then the capture is moved to {}",
+        cm_platform::vocab::here(cm_platform::vocab::Term::Trash)
+    )
 }
 
 /// The English a row shows with no wording of its own.

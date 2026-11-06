@@ -603,7 +603,13 @@ async fn describe_delete_gives_the_same_rows_as_the_dialog() {
     let r2 = rig().await;
     let plain = r2.daemon.describe_delete(&r2.id, false).await.unwrap();
     assert!(plain.details.get("remote").is_none());
-    assert_eq!(plain.details["result"], "Moved to the Trash");
+    assert_eq!(
+        plain.details["result"],
+        format!(
+            "Moved to {}",
+            cm_platform::vocab::here(cm_platform::vocab::Term::Trash)
+        )
+    );
 }
 
 #[tokio::test]

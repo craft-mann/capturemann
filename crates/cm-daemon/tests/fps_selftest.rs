@@ -415,6 +415,14 @@ async fn stale_and_changed_settings_are_refused() {
     } else {
         codec
     };
+    if cfg!(windows) {
+        // Windows records H.264 only (`cm_encode::platform_plan`): a request for HEVC is planned as the
+        // same H.264 output, which is exactly what the self-test measured (the verdict is keyed by the
+        // codec of the file, not by the word in the request), so there is no untested codec to refuse.
+        user(&r.daemon, "start_recording", other).await.unwrap();
+        user(&r.daemon, "stop_recording", json!({})).await.unwrap();
+        return;
+    }
     let e = user(&r.daemon, "start_recording", other).await.unwrap_err();
     assert_eq!(code(&e), ErrorCode::InvalidInput);
 }

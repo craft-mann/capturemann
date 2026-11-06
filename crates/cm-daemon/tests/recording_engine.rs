@@ -1435,7 +1435,9 @@ async fn agt2_agent_start_asks_with_the_exact_plan() {
         "{}",
         text("target")
     );
-    assert!(text("output").contains("HEVC") && text("output").contains("60 fps"));
+    // The plan names the codec the file gets: HEVC, or H.264 on Windows (`cm_encode::platform_plan`).
+    let codec = if cfg!(windows) { "H.264" } else { "HEVC" };
+    assert!(text("output").contains(codec) && text("output").contains("60 fps"));
     assert!(text("output").contains(" x "), "{}", text("output"));
     assert!(text("microphone").starts_with("On: Fake Microphone"));
     assert!(text("camera").starts_with("On: Fake Camera, 720p"));

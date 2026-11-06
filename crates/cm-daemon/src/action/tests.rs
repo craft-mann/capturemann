@@ -111,7 +111,7 @@ fn samples() -> Vec<(&'static str, Value)> {
         ),
         (
             "import_media",
-            json!({"paths": ["/Users/me/a.mov"], "titles": ["A"], "dry_run": true, "request_id": "r"}),
+            json!({"paths": [std::env::temp_dir().join("a.mov")], "titles": ["A"], "dry_run": true, "request_id": "r"}),
         ),
         ("list_models", json!({})),
         (

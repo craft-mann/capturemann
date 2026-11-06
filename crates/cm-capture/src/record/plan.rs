@@ -298,7 +298,13 @@ mod tests {
         let s = ScreenSettings::new(CaptureTarget::Display { display_id: 1 });
         let p = plan_capture(&s, &targets()).unwrap();
         assert_eq!((p.video.width, p.video.height), (3024, 1964));
-        assert_eq!(p.video.codec, Codec::Hevc); // REC-2.AC1
+        // REC-2.AC1: HEVC by default; on Windows the plan is H.264 by design (`cm_encode::platform_plan`).
+        let expected = if cfg!(windows) {
+            Codec::H264
+        } else {
+            Codec::Hevc
+        };
+        assert_eq!(p.video.codec, expected);
         assert!(p.crop.is_none() && p.show_cursor);
     }
 
