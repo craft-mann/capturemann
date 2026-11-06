@@ -2,18 +2,17 @@
 
 Written Nov 5, 2026 from the stored reports in `verification/` (all PARTIAL: one agent, one laptop, nothing seen by a
 person unless a line says so). It replaces `windows-0.2.8-release-notes-draft.md`. Paste "Release body" into the release
-page. Only two things are left to fill: the two checksums (`<sha256 zip>`, `<sha256 installer>`, from the package run
-you ship) and the winget line (after the pull request is merged). Lines marked **[confirm]** need a maintainer
-decision; delete the marker. Nothing here has been posted. Steps: `windows-0.2.8-release-checklist.md` and
+page. Two things are left: the date (`DD` in the CHANGELOG section) and the winget pull request URL (after the pull
+request is opened). The checksums are those of package run 42160646234 (commit `eb3cb47c`). Nothing here has been
+posted. Steps: `windows-0.2.8-release-checklist.md` and
 `release-day-0.2.8.md`.
 
 - **Tag:** `v0.2.8` (never reuse a tag). **Title:** `CaptureMann 0.2.8: recording comes to Windows`.
 - **Type:** draft, then **pre-release** (the version is 0.x).
 - **Files to attach:** `capturemann-0.2.8-windows-x64-setup.exe`, `capturemann-0.2.8-windows-x64.zip`, their two
   `.sha256` files and `SHA256SUMS.txt` (made by `packaging/windows/release-files.sh`). Windows files are not signed
-  (decision O4, Nov 5, 2026). **[confirm]** No macOS or Linux files are attached: `main` has no code change since
-  0.2.7, and the shared changes below reach the Mac and Linux with their next builds (0.2.9 is Linux). If a DMG is
-  built anyway, add the DMG lines and the CHANGELOG section at the end.
+  (decision O4, Nov 5, 2026). No macOS or Linux files are attached (decided Nov 6, 2026: 0.2.8 is Windows only); the
+  shared changes below reach the Mac and Linux with their next builds (0.2.9 is Linux).
 
 ---
 
@@ -134,18 +133,18 @@ open a console window; the CLI no longer hangs when it starts the daemon.
 - **Second monitor:** on a 3840x2160 monitor at 150 % next to the panel, screenshots and a 10 s recording matched the listing
   and the window picker works on both monitors. The launcher and the start sheet always open on the primary display, and the
   recording bar and the camera bubble cannot be dragged or snapped on Windows. A 4K recording on the UHD 620 could not keep
-  up in an earlier test (it now carries an `encoder_overloaded` warning; the case was not run again).
+  up in an earlier test; in the final run a 30 s 4K recording of the external monitor passed the suite (full length or full 30 fps; it carries an `encoder_overloaded` warning when the encoder falls behind).
 - **Smallest recording area:** 18 px per side (16 failed on the test laptop's encoder). Other GPUs may need more.
 - **Sound and picture timing:** the recorded system audio lands about 15 to 35 ms after the picture in the best test, but
   that test cannot separate the product from its own stimulus, so "within 40 ms" is **not shown**. Microphone timing was not
   measured.
 - **Text recognition:** only languages installed in Windows are recognized; en-US was the one checked.
 - **Transcription:** CPU only (no GPU path on Windows). On the test laptop 50 s of speech took about 3 to 4 minutes with the
-  `small` model end to end. The two speaker model files are bundled in the package; in the lab test (which used imported copies of
-  the same files), two synthetic voices were separated when the count was given, and merged into one when it was left to
-  "auto". **[confirm after the CI build: the bundled models are found without importing]**
+  `small` model end to end. The two speaker model files are bundled in the package and found without importing (`capturemann diagnostics` says
+  "bundled with this build"). Two synthetic voices were separated when the count was given, and merged into one when it
+  was left to "auto".
   **An invented outro-style sentence over quiet stretches is still a known fault** (see the 0.2.7 notes and
-  `ai.transcribe_raw_mic`). **[confirm: say this only if no transcription mitigation is merged for 0.2.8]**
+  `ai.transcribe_raw_mic`): no transcription mitigation is part of this release.
 - **Region picker:** it could not be seen or driven by the automated runs (the window picker was looked at by the
   maintainer on both monitors).
 - **Vietnamese:** the full Vietnamese interface text was reviewed by the maintainer on Nov 6, 2026, except 86 entries (new Windows and Linux wording) that are still marked as drafts.
@@ -155,10 +154,10 @@ open a console window; the CLI no longer hangs when it starts the daemon.
 
 Windows 11, x64. Windows 10 (22H2) is listed as supported but has not been tested on a real device yet; all testing so far was on Windows 11 with an Intel processor.
 
-- **Installer** `capturemann-0.2.8-windows-x64-setup.exe` (per user, no administrator rights). SHA-256 `<sha256 installer>`
+- **Installer** `capturemann-0.2.8-windows-x64-setup.exe` (per user, no administrator rights). SHA-256 `5d173869b6b393eb56c0b9d064d553287922974ed4209170dd263d603457899e`
 - **Zip** `capturemann-0.2.8-windows-x64.zip`: unpack anywhere and run `cm-desktop.exe`; `capturemann.exe` is the command line.
-  SHA-256 `<sha256 zip>`
-- **winget** (once the package is accepted): `winget install CaptureMann.CaptureMann` **[add after the pull request is merged]**
+  SHA-256 `0385831a2664f802a07eb0eb2f3c06074b75a8e89f08761b0c1b2f82ba526b86`
+- **winget** (once the package is accepted): `winget install CaptureMann.CaptureMann` (pull request: `<winget pull request URL>`; add this line to the release only after it is merged)
 - Check a download: `certutil -hashfile <file> SHA256` and compare with the sum above (or `SHA256SUMS.txt`).
 
 **Windows may show a SmartScreen warning for a file downloaded in a browser**, because the files are not code-signed
@@ -170,14 +169,21 @@ normally avoids it.
 - GitHub's `windows-latest`: build, the package, a smoke script, silent install and uninstall
   (`verification/L1-windows-package-ci-2026-11-01-claude.md`, PARTIAL).
 - One ThinkPad T490 (Intel UHD 620, Windows 11 build 26200), driven by an agent over ssh and the desktop session, with the
-  release regression suite `cm-regress` on package run 42010089424: standard tier 48 passed, 0 failed, 1 skipped; hardware
-  tier 58 passed, 0 failed, 8 skipped (second monitor, 4K external, transcription, installer and tray cases were not run
-  in those runs). Also a 621 s run with screen, microphone, system audio, camera and cursor at 1080p30 (0.011 % late screen
-  frames, keyframes every 2.0 s, about 5.5 % of the machine's CPU), `kill -9` recovery, speaker labels and transcription on
-  synthetic speech. Reports (all PARTIAL): `verification/L1-windows-0.2.8-*` and `verification/L1-windows-0.2.7-regression-*`.
-  **[confirm: the shipped package is a later build than run 42010089424; rerun `regress.sh` on it and update this
-  paragraph]**
-- Not tested: Windows 10, ARM, mixed-DPI monitors, NVIDIA or AMD graphics.
+  release regression suite `cm-regress` on the package that is shipped (package run 42160646234, commit `eb3cb47c`;
+  reports `verification/L1-windows-0.2.8-regression-*-final-*`, all PARTIAL): smoke tier 13 of 13 passed, standard tier
+  49 of 49, hardware tier 64 passed, 2 failed, 1 skipped of 67. The two failures were bugs in the test suite (it compared a
+  recording with the display size times the scale, but Windows lists physical pixels; the recordings matched the displays
+  exactly) and are fixed in the suite; a rerun of those two cases on the same install passed (`...-hardware-final2-*`, the
+  4K external monitor and each monitor, both monitors connected). The skipped case is the speaker labels with the
+  bundled models; it was done by hand on the same install (the bundled models are found without importing; two speakers
+  with the count given), and its rerun in the suite stopped on another suite bug (a daemon started twice), fixed and not
+  run again. Earlier work on one laptop: a 621 s run with screen, microphone, system audio, camera and cursor at 1080p30
+  (0.011 % late screen frames, keyframes every 2.0 s, about 5.5 % of the machine's CPU), `kill -9` recovery, and
+  transcription on synthetic speech (`verification/L1-windows-0.2.8-*`).
+- The maintainer looked at the Transcribe button by hand and saw nothing odd in a quick look (not a stored test).
+- Sound and picture timing: an estimate from a flash-and-beep test of 28 to 37 ms with an uncertainty of 10 to 20 ms; it was not confirmed
+  with a phone camera, so no 40 ms claim is made.
+- Not tested: Windows 10, ARM, mixed-DPI second monitor, SmartScreen on a real download, NVIDIA or AMD graphics.
 
 Report problems at the issue tracker with the output of `capturemann diagnostics`.
 

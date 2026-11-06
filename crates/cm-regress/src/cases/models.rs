@@ -328,6 +328,7 @@ fn speakers(ctx: &mut Ctx) -> R {
                 .count()
         })
         .unwrap_or(0);
+    let mut started = false;
     if ctx.opts.speaker_models.is_none() {
         if bundled_onnx < 2 {
             return skip(
@@ -335,6 +336,7 @@ fn speakers(ctx: &mut Ctx) -> R {
             );
         }
         ctx.start_daemon()?;
+        started = true;
         let d = ctx.cli_text(&["diagnostics"])?;
         let text = d.out.stdout.clone();
         ctx.note(format!(
@@ -350,7 +352,9 @@ fn speakers(ctx: &mut Ctx) -> R {
         return skip("no --whisper-model given (`speakers list` reads the transcript)");
     };
     let model_id = ctx.opts.whisper_model_id.clone();
-    ctx.start_daemon()?;
+    if !started {
+        ctx.start_daemon()?;
+    }
     let m = model.to_string_lossy().into_owned();
     ctx.cli_ok(&["ai", "models", "import", &model_id, &m])?;
     ctx.cli_ok(&["ai", "models", "use", &model_id])?;

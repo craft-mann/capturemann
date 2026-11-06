@@ -8,14 +8,15 @@ Written Nov 5, 2026 from how 0.2.7 was done (commits `407acfa3` version bump, `b
 ## Before the day: decisions that block the text
 
 1. ~~Is a macOS DMG (or Linux file) part of the 0.2.8 tag?~~ Decided Nov 6, 2026: **no**. 0.2.8 is Windows files only, a pre-release; macOS and Linux get their update in 0.2.9, after a full regression run on each.
-2. **[M]** Transcription track (invented outro text): if nothing was merged for it, keep the "still a known fault" line;
-   otherwise replace it with the measured result and its report.
-3. **[M]** Vietnamese: the 2268 draft entries (`locales/` review sheet, commit `bf7523ee`) are reviewed, or the "draft
-   translations" line stays in the text.
+2. ~~Transcription track~~ Nothing was merged for it on the 0.2.8 track, so the "still a known fault" line stays in the
+   text (checked against `specs/plans/release-0.2.8-plan.md`, "Transcription track": not a gate).
+3. ~~Vietnamese~~ Reviewed by the maintainer on Nov 6, 2026 except 86 entries (new Windows and Linux wording) that stay
+   marked as drafts; the text says so.
 4. **[M]** `llama-server` model rows in `crates/cm-ai/data/text_models.json` are still `pending_pin`: pin them or leave
    the local text model as "download not offered yet" in the text.
-5. Open points found in the reports and not yet fixed on hardware (see "Stale or open" in the hand-off): decide whether
-   each is in the text as a limitation (it is) or blocks the release.
+5. ~~Open points~~ Each is a limitation in the text ("Known limitations"); none blocks the release. Windows 10: winget
+   keeps `MinimumOSVersion: 10.0.19045.0` and the text says Windows 10 is untested. The speaker models are bundled.
+   Files are Windows only (no DMG, decided Nov 6, 2026).
 
 ## 1. Version bump (one commit, on the branch that becomes `main`)
 
@@ -73,7 +74,9 @@ cargo run -p cm-i18n -- check
    nothing else. Dry run on the newest successful package run on Nov 5, 2026 (run 42010089424, files named 0.2.7): it printed
    `987cf943...bb31b *capturemann-0.2.7-windows-x64.zip` and `4763088b...012621 *capturemann-0.2.7-windows-x64-setup.exe`,
    `shasum -a 256 -c` said OK for both, and the manifest was written with the uppercase installer hash.
-3. Put the two sums into the release text (`<sha256 zip>`, `<sha256 installer>`).
+3. The two sums are already in the release text for package run 42160646234 (commit `eb3cb47c`; zip
+   `0385831a...b526b86`, installer `5d173869...3457899e`). If you rebuild, compare the new `SHA256SUMS.txt` with the text and
+   replace both.
 
 ## 4. Check the package (before anything is public)
 
@@ -81,8 +84,8 @@ cargo run -p cm-i18n -- check
    `scripts/testlab/regress.sh windows --tier standard --allow screen --package-run <run id>`, then
    `--tier hardware --allow screen,sound,mic,camera,second_monitor --installer <setup.exe> --soak-minutes 3`
    (the installer case, the tray case and the 4K case need the matching flag or the second monitor). Read the failures.
-   Store the reports in `verification/` and change the "How it was tested" paragraph of the text to this run's numbers
-   (the stored runs are on commit `668eef82`, package run 42010089424; later commits are not covered by any stored run).
+   The stored final runs cover this package (commit `eb3cb47c`, run 42160646234): `verification/L1-windows-0.2.8-regression-*-final-*`
+   and the `final2` rerun; the "How it was tested" paragraph already uses their numbers. A rebuilt package needs a new run.
 2. Install once by hand on a machine that is not the build machine, start the app, take a screenshot, make a 10 s
    recording, uninstall. Store a report if the text says anything about it.
 3. Optional, not run so far: SmartScreen on a real browser download, Windows 10 22H2, a second monitor with mixed scaling.
@@ -113,8 +116,8 @@ The installer URL must answer before the pull request.
 2. **[M]** Fork `microsoft/winget-pkgs`, copy the folder `manifests/c/CaptureMann/CaptureMann/0.2.8/` to the same path in
    the fork, open the pull request (title `New version: CaptureMann.CaptureMann version 0.2.8`; for the first submission
    `New package: ...`). Expect questions about the unsigned installer; the validation pipeline runs the installer silently
-   with `/S`. Note: the template says `MinimumOSVersion: 10.0.19045.0` (Windows 10 22H2) while Windows 10 is untested; keep
-   or change it before submitting.
+   with `/S`. Decided: the template keeps `MinimumOSVersion: 10.0.19045.0` (Windows 10 22H2) although Windows 10 is untested;
+   the release text says so.
 3. After the merge, add the `winget install CaptureMann.CaptureMann` line to the release body (edit the release).
 
 ## 7. Homebrew cask
