@@ -887,9 +887,19 @@ fn picture_measure(ctx: &mut Ctx, rec: &Recorded, d: &Display, shots: &Shots) ->
     let mut problems = Vec::new();
     let p = screen_probe(ctx, rec)?;
     let v = p.need_video()?;
-    let (ew, eh) = media::physical_size(d.w, d.h, d.scale);
+    // The display's own screenshot is the reference for its physical size: Windows lists physical px, macOS
+    // lists points, so the listed size times the scale would be wrong on Windows (found Nov 6, 2026: a 1920x1080
+    // panel at 150 % was expected at 2880x1620). Without a readable screenshot the listed size is used.
+    let from_shot = shots
+        .iter()
+        .find(|(id, _)| *id == d.id)
+        .and_then(|(_, s)| s.as_ref().ok())
+        .and_then(|path| std::fs::read(path).ok())
+        .and_then(|b| crate::fixtures::png_info(&b).ok())
+        .map(|(w, h)| (i64::from(w), i64::from(h)));
+    let (ew, eh) = from_shot.unwrap_or_else(|| media::physical_size(d.w, d.h, 1.0));
     ctx.note(format!(
-        "display {}: video {}x{}, display {}x{} at scale {} = {ew}x{eh} physical",
+        "display {}: video {}x{}, display listed {}x{} at scale {}, screenshot/physical {ew}x{eh}",
         d.id, v.width, v.height, d.w, d.h, d.scale
     ));
     if (v.width, v.height) != (ew, eh) {
