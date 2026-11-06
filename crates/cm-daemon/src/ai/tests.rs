@@ -236,6 +236,21 @@ fn model_choice_prefers_the_active_one_and_says_no_model() {
     assert!(matches!(&e, DaemonError::WithData { data, .. } if data["reason"] == "no_model"));
 }
 
+/// An installed speaker model is not a speech model: with only speaker models installed a
+/// transcription says `no_model` instead of running a speaker model as Whisper.
+#[test]
+fn model_choice_ignores_speaker_models() {
+    let mut l = list(&[
+        ("speaker-segmentation", true, false),
+        ("base", false, false),
+    ]);
+    l.models[0].kind = cm_ai::model::ModelKind::Speaker;
+    let e = Inner::pick_model(&l, None).unwrap_err();
+    assert!(matches!(&e, DaemonError::WithData { data, .. } if data["reason"] == "no_model"));
+    let e = Inner::pick_model(&l, Some("speaker-segmentation")).unwrap_err();
+    assert!(matches!(&e, DaemonError::WithData { data, .. } if data["reason"] == "no_model"));
+}
+
 /// M2i: after a speaker run, a `[noise]` sound the engine heard speech in becomes `[unclear]` in
 /// `transcript.json`; one it did not stays; a transcript without sounds is not rewritten.
 #[test]
