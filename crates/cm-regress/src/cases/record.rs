@@ -913,7 +913,12 @@ fn find_numbers(v: &Value, key: &str) -> Option<Vec<i64>> {
     match v {
         Value::Object(o) => {
             if let Some(a) = o.get(key).and_then(Value::as_array) {
-                return Some(a.iter().filter_map(Value::as_i64).collect());
+                // The cursor header writes `origin` as floats (0.0, -3840.0): as_i64 would drop them.
+                return Some(
+                    a.iter()
+                        .filter_map(|x| x.as_i64().or_else(|| x.as_f64().map(|f| f.round() as i64)))
+                        .collect(),
+                );
             }
             o.values().find_map(|x| find_numbers(x, key))
         }
@@ -1020,5 +1025,20 @@ fn each_monitor(ctx: &mut Ctx) -> R {
         Ok(())
     } else {
         fail(problems.join("; "))
+    }
+}
+
+#[cfg(test)]
+mod find_numbers_tests {
+    use super::find_numbers;
+
+    #[test]
+    fn the_cursor_header_origin_is_written_as_floats() {
+        let head: serde_json::Value = serde_json::from_str(
+            r#"{"target":{"origin":[-3640.0,-1661.0],"size":[640,360],"scale":1.0}}"#,
+        )
+        .unwrap();
+        assert_eq!(find_numbers(&head, "origin"), Some(vec![-3640, -1661]));
+        assert_eq!(find_numbers(&head, "size"), Some(vec![640, 360]));
     }
 }
