@@ -141,8 +141,11 @@ failing test prints. A line that matches nothing fails the test, so the list can
 A language is shipped when the owner or a native reviewer has gone through the app in it. Until then the file
 carries a header comment saying which entries are still drafts. `vi.po` (Oct 27, 2026): the strings added for
 0.2.0 (386 messages not in v0.1.0's catalogue) were reviewed by the maintainer, a native reader, and passed,
-so their `#, fuzzy` flag was removed (385 flags; one of them was not flagged); the older entries keep `#, fuzzy`
-until the full catalogue is reviewed (`cargo run -p cm-i18n -- coverage`: 2575 of 2576 translated, 2183 draft).
+so their `#, fuzzy` flag was removed (385 flags; one of them was not flagged); the older entries kept `#, fuzzy`
+until the full catalogue was reviewed. On Nov 6, 2026 the maintainer reviewed the complete Vietnamese draft sheet
+(`locales/vi-review-drafts-reviewed.md`, 2268 rows: 36 corrected, the rest accepted) and the flag was removed from
+every entry on it. 86 entries added since (Windows and Linux wording) are still `#, fuzzy`
+(`cargo run -p cm-i18n -- coverage`: 2828 of 2839 translated, 86 draft).
 
 ## Plural rules
 

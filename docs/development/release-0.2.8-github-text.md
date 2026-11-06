@@ -96,7 +96,7 @@ open a console window; the CLI no longer hangs when it starts the daemon.
   `ai.transcribe_raw_mic`). **[confirm: say this only if no transcription mitigation is merged for 0.2.8]**
 - **Region picker:** it could not be seen or driven by the automated runs (the window picker was looked at by the
   maintainer on both monitors).
-- **Vietnamese:** the interface has draft translations still under review. **[confirm]**
+- **Vietnamese:** the full Vietnamese interface text was reviewed by the maintainer on Nov 6, 2026, except 86 entries (new Windows and Linux wording) that are still marked as drafts.
 - **Not signed** (see Install).
 
 ## Install

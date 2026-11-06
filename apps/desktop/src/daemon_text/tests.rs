@@ -567,7 +567,7 @@ fn a_missing_ffmpeg_is_translated_by_id() {
         (
             "ffmpeg_env_invalid",
             vec![("path", "/x/ffmpeg")],
-            "Không tìm thấy FFmpeg: CM_FFMPEG trỏ tới `/x/ffmpeg`",
+            "Không tìm thấy FFmpeg: CM_FFMPEG trỏ đến `/x/ffmpeg`",
         ),
         (
             "ffmpeg_bundle_cannot_run",
@@ -581,7 +581,7 @@ fn a_missing_ffmpeg_is_translated_by_id() {
         (
             "ffmpeg_permission_denied",
             vec![("path", "/b/ffmpeg")],
-            "Không chạy được FFmpeg tại `/b/ffmpeg` (bị từ chối quyền)",
+            "Không thể chạy FFmpeg tại `/b/ffmpeg` (không có quyền truy cập)",
         ),
     ];
     for (id, params, vi) in cases {
