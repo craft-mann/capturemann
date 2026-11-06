@@ -74,8 +74,8 @@ cargo run -p cm-i18n -- check
    nothing else. Dry run on the newest successful package run on Nov 5, 2026 (run 42010089424, files named 0.2.7): it printed
    `987cf943...bb31b *capturemann-0.2.7-windows-x64.zip` and `4763088b...012621 *capturemann-0.2.7-windows-x64-setup.exe`,
    `shasum -a 256 -c` said OK for both, and the manifest was written with the uppercase installer hash.
-3. The two sums are already in the release text for package run 42160646234 (commit `eb3cb47c`; zip
-   `0eaa87ea...e33350`, installer `e4d0eb35...273fba46`). If you rebuild, compare the new `SHA256SUMS.txt` with the text and
+3. The two sums are already in the release text for package run 42201119181 (tag commit `e54cc665`; zip
+   `5169e7eb...fdcd`, installer `a10f5272...f0f7`). If you rebuild, compare the new `SHA256SUMS.txt` with the text and
    replace both.
 
 ## 4. Check the package (before anything is public)
