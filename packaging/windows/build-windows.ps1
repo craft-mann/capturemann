@@ -28,6 +28,11 @@
                                built-in text engine (the app says so; nothing else changes).
     CM_REQUIRE_LLAMA=1         fail unless llama-server.exe with its build record and licence files is bundled
     CM_REQUIRE_SHERPA=1        fail unless the speaker engine (sherpa-onnx libraries) is built in
+    CM_SPEAKER_MODELS_BUNDLE   folder with the two speaker-label models (+ BUILD-INFO.txt, LICENSES\) from
+                               packaging/sherpa/fetch-models.ps1 (default: packaging\sherpa\out\models). They go to
+                               Resources\Models\speaker\ next to the programs (cm_ai::model::bundled_speaker_dir).
+    CM_REQUIRE_SPEAKER_MODELS=1  fail unless both models and their licence files are bundled
+    CM_NO_SPEAKER_MODELS=1     do not bundle the speaker models (testing only)
     CM_WINDOWS_OUT             output folder
     CM_WINDOWS_CRT_STATIC=0    link the Microsoft C runtime dynamically (default: static, so the
                                user needs no "Visual C++ Redistributable")
@@ -241,6 +246,24 @@ if ($env:CM_LLAMA_BUNDLE) {
   Fail 'CM_REQUIRE_LLAMA=1 but CM_LLAMA_BUNDLE is not set (build one with packaging/llama/build-windows.sh)'
 }
 
+# ---- the speaker-label models (AI-8): pyannote segmentation-3.0 (MIT) and CAM++ (Apache-2.0), ~35 MB ----
+$spkDir = $null
+$spkFiles = 'pyannote-segmentation-3-0.onnx', 'campplus-sv-zh-en-16k-advanced.onnx'
+$spkLicenses = 'pyannote-segmentation-3.0-LICENSE.txt', 'campplus-3D-Speaker-NOTICE.txt'
+if ($env:CM_NO_SPEAKER_MODELS -eq '1') {
+  if ($env:CM_REQUIRE_SPEAKER_MODELS -eq '1') { Fail 'CM_NO_SPEAKER_MODELS=1 and CM_REQUIRE_SPEAKER_MODELS=1 contradict each other' }
+  Write-Warning 'CM_NO_SPEAKER_MODELS=1: the speaker models are not bundled (a test package, not for release)'
+} else {
+  $spkCandidate = if ($env:CM_SPEAKER_MODELS_BUNDLE) { $env:CM_SPEAKER_MODELS_BUNDLE } else { Join-Path $sherpaOut 'models' }
+  $spkMissing = @($spkFiles | Where-Object { -not (Test-Path (Join-Path $spkCandidate $_)) }) +
+    @($spkLicenses | Where-Object { -not (Test-Path (Join-Path $spkCandidate "LICENSES\$_")) }) +
+    @('BUILD-INFO.txt' | Where-Object { -not (Test-Path (Join-Path $spkCandidate $_)) })
+  if ($spkMissing.Count -eq 0) { $spkDir = $spkCandidate; Write-Host "==> bundling the speaker models from $spkDir" }
+  elseif ($env:CM_REQUIRE_SPEAKER_MODELS -eq '1') { Fail "CM_REQUIRE_SPEAKER_MODELS=1 but $spkCandidate lacks: $($spkMissing -join ', ') (packaging\sherpa\fetch-models.ps1)" }
+  elseif ($env:CM_SPEAKER_MODELS_BUNDLE) { Fail "CM_SPEAKER_MODELS_BUNDLE=$spkCandidate lacks: $($spkMissing -join ', ')" }
+  else { Write-Warning "no speaker models in $spkCandidate (run packaging\sherpa\fetch-models.ps1); this build downloads none and has no speaker labels until they are imported" }
+}
+
 # ---- licences ----
 $tmp =Join-Path ([IO.Path]::GetTempPath()) ("cm-win-pack-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
 New-Item -ItemType Directory -Path $tmp | Out-Null
@@ -291,6 +314,13 @@ try {
       Copy-Item (Join-Path $llDir 'LICENSES') (Join-Path $lll 'LICENSES') -Recurse
     }
   }
+  if ($spkDir) {
+    # <install dir>\Resources\Models\speaker: cm_ai::model::bundled_speaker_dir looks there on Windows.
+    $spk = Join-Path $stage 'Resources\Models\speaker'; New-Item -ItemType Directory -Path $spk -Force | Out-Null
+    foreach ($f in $spkFiles) { Copy-Item (Join-Path $spkDir $f) $spk }
+    Copy-Item (Join-Path $spkDir 'BUILD-INFO.txt') $spk
+    Copy-Item (Join-Path $spkDir 'LICENSES') (Join-Path $spk 'LICENSES') -Recurse
+  }
   $doc = Join-Path $stage 'doc'; New-Item -ItemType Directory -Path $doc | Out-Null
   Copy-Item (Join-Path $root 'LICENSE'), (Join-Path $root 'NOTICE') $doc
   Copy-Item $licenses (Join-Path $doc 'THIRD_PARTY_LICENSES.md')
@@ -306,7 +336,7 @@ try {
   Copy-Item $ico (Join-Path $stage 'app.ico')
   # The path helper the installer's optional "Add to PATH" uses; the zip ships it too.
   Copy-Item (Join-Path $PSScriptRoot 'path.ps1') $stage
-  $speakerLine = if ($useSherpa) { 'The speaker engine ("Find speakers") is built in; its models are downloaded from the AI page.' } else { 'This build has no speaker engine ("Find speakers" is off).' }
+  $speakerLine = if ($useSherpa -and $spkDir) { 'The speaker engine ("Find speakers") is built in and its two models ship in Resources\Models\speaker (MIT and Apache-2.0, licences there).' } elseif ($useSherpa) { 'The speaker engine ("Find speakers") is built in; this package has no speaker models (import them on the AI page).' } else { 'This build has no speaker engine ("Find speakers" is off).' }
   $readme = @"
 CaptureMann $fullVersion for Windows (x64), early build.
 
@@ -322,6 +352,7 @@ Windows may show "Windows protected your PC" (SmartScreen): the early build is n
 Choose "More info" and "Run anyway", or compare the SHA-256 file first.
 Licences: doc\ . ffmpeg.exe (if present) is FFmpeg under the LGPL, see FFmpeg\ .
 llama-server.exe (if present) is llama.cpp (MIT), the built-in text engine, see Llama\ .
+Resources\Models\speaker (if present): the two speaker-label models, pyannote segmentation-3.0 (MIT) and CAM++ (Apache-2.0), see its LICENSES\ .
 Source: https://github.com/craft-mann/capturemann
 "@
   Set-Content -Path (Join-Path $stage 'README.txt') -Value $readme -Encoding UTF8

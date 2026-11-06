@@ -311,7 +311,32 @@ fn engine_lines() -> Vec<String> {
         "speaker engine built in: {}",
         cfg!(feature = "sherpa")
     ));
+    out.push(speaker_models_line(
+        cm_ai::model::bundled_speaker_dir().as_deref(),
+    ));
     out
+}
+
+/// The speaker-label models that ship with the app: where they are, or that this build has none.
+fn speaker_models_line(dir: Option<&Path>) -> String {
+    match dir {
+        Some(d) => {
+            let have = |f: &str| d.join(f).is_file();
+            if have("pyannote-segmentation-3-0.onnx") && have("campplus-sv-zh-en-16k-advanced.onnx")
+            {
+                format!(
+                    "speaker models at {} (bundled with this build)",
+                    d.display()
+                )
+            } else {
+                format!(
+                    "speaker models at {} (incomplete: a model file is missing)",
+                    d.display()
+                )
+            }
+        }
+        None => "speaker models: not bundled with this build".to_string(),
+    }
 }
 
 impl Inner {
@@ -462,6 +487,21 @@ mod tests {
         let rec = "Source:\n  llama.cpp  v0.7.0  https://x/y.tar.gz\n             sha256 ab\n";
         assert_eq!(llama_version_from_record(rec).as_deref(), Some("v0.7.0"));
         assert_eq!(llama_version_from_record("nothing here"), None);
+    }
+
+    #[test]
+    fn speaker_models_line_says_bundled_only_when_both_files_exist() {
+        let d = tempfile::tempdir().unwrap();
+        assert!(speaker_models_line(None).contains("not bundled"));
+        assert!(speaker_models_line(Some(d.path())).contains("incomplete"));
+        for f in [
+            "pyannote-segmentation-3-0.onnx",
+            "campplus-sv-zh-en-16k-advanced.onnx",
+        ] {
+            std::fs::write(d.path().join(f), b"x").unwrap();
+        }
+        let l = speaker_models_line(Some(d.path()));
+        assert!(l.starts_with("speaker models at ") && l.ends_with("(bundled with this build)"));
     }
 
     #[test]

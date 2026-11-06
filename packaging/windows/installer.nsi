@@ -78,7 +78,8 @@ FunctionEnd
 Section "${APPNAME}" SecApp
   SectionIn RO
   SetOutPath "$INSTDIR"
-  ; The whole staged tree, flat: ffmpeg.exe must sit next to the programs (cm-media looks there first).
+  ; The whole staged tree, flat: ffmpeg.exe must sit next to the programs (cm-media looks there first); the
+  ; subfolders (FFmpeg, Llama, doc, Resources\Models\speaker) come with it and RMDir /r removes them again.
   File /r "${STAGE}\*.*"
   WriteUninstaller "$INSTDIR\uninstall.exe"
   CreateDirectory "$SMPROGRAMS\${APPNAME}"
@@ -145,7 +146,7 @@ Section "-pathflag"
   ${EndIf}
 SectionEnd
 
-LangString DESC_SecApp ${LANG_ENGLISH} "CaptureMann, the command line, the MCP server and the licence files."
+LangString DESC_SecApp ${LANG_ENGLISH} "CaptureMann, the command line, the MCP server, the speaker-label models and the licence files."
 LangString DESC_SecOpenWith ${LANG_ENGLISH} "Lists CaptureMann under Open with for MP4, MOV, M4V, MKV, M4A and WAV files so you can import them. It does not become the default program."
 LangString DESC_SecPath ${LANG_ENGLISH} "So that you can type capturemann and cm-mcp in a new terminal. Removed again by the uninstaller."
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN

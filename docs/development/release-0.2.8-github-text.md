@@ -38,8 +38,9 @@ ThinkPad T490, Intel UHD 620 graphics, Windows 11), the limits are listed below,
   H.264 files are tagged BT.709.
 - **Auto-redact** with `Windows.Media.Ocr`: no extra program to install. It reads the languages installed in Windows.
 - **Speaker labels** (sherpa-onnx engine) and **local transcription and the built-in text model** (whisper.cpp built for a
-  portable AVX2 CPU, `llama-server` v0.7.0, the same pin as on macOS). Models are downloaded or imported by you, as on
-  the Mac.
+  portable AVX2 CPU, `llama-server` v0.7.0, the same pin as on macOS). The two speaker-label models are bundled
+  (`Resources\Models\speaker`; pyannote segmentation-3.0, MIT, and CAM++ from 3D-Speaker, Apache-2.0; about 35 MB; the
+  licences and notices ship with them). Speech models are downloaded or imported by you, as on the Mac.
 - **Installer** (per user, no administrator rights) and the zip; the `capturemann` command line and the `cm-mcp` server.
 - **Names and sizes that were wrong in 0.2.6** are fixed: displays are named ("Display 1", not "Unknown Monitor 65537"),
   packaged apps show their real names (Notepad, Settings, Windows Terminal), and a window screenshot has the size the picker
@@ -88,8 +89,9 @@ open a console window; the CLI no longer hangs when it starts the daemon.
   measured.
 - **Text recognition:** only languages installed in Windows are recognized; en-US was the one checked.
 - **Transcription:** CPU only (no GPU path on Windows). On the test laptop 50 s of speech took about 3 to 4 minutes with the
-  `small` model end to end. The two speaker model files are not in the package (the segmentation model is import-only); with
-  them, two synthetic voices were separated when the count was given, and merged into one when it was left to "auto".
+  `small` model end to end. The two speaker model files are bundled in the package; in the lab test (which used imported copies of
+  the same files), two synthetic voices were separated when the count was given, and merged into one when it was left to
+  "auto". **[confirm after the CI build: the bundled models are found without importing]**
   **An invented outro-style sentence over quiet stretches is still a known fault** (see the 0.2.7 notes and
   `ai.transcribe_raw_mic`). **[confirm: say this only if no transcription mitigation is merged for 0.2.8]**
 - **Region picker:** it could not be seen or driven by the automated runs (the window picker was looked at by the

@@ -10,7 +10,8 @@
 //!   `list_models`, `download_model`, `import_model` and `remove_model` actions (and their MCP tools
 //!   and CLI commands) cover them. They never become the active speech model and `transcribe`
 //!   refuses them. A row marked `import_only` has no download URL yet: the file is imported.
-//! * The two speaker models **ship inside the app** (`Contents/Resources/Models/speaker/`, or the
+//! * The two speaker models **ship inside the app** (`Contents/Resources/Models/speaker/`, or
+//!   `Resources\Models\speaker\` next to the programs on Windows, or the
 //!   folder in `CM_SPEAKER_MODELS_DIR`): [`ModelStore`] treats those files as installed
 //!   ([`ModelInfo::bundled`]). A copy in the user's models folder (imported or downloaded) wins; a
 //!   bundled file is checked against the catalogue size and SHA-256 once per process and refused
@@ -319,16 +320,31 @@ pub struct ModelStore {
     bundled_dir: Option<PathBuf>,
 }
 
-/// Where the speaker models shipped with the app are: `CM_SPEAKER_MODELS_DIR`, else
-/// `<executable dir>/../Resources/Models/speaker` (`Contents/Resources/...` in the app bundle).
-/// `None` when neither exists.
+/// Where the speaker models shipped with the app are: `CM_SPEAKER_MODELS_DIR`, else the first of
+/// [`bundled_speaker_candidates`] that exists. `None` when none does.
 pub fn bundled_speaker_dir() -> Option<PathBuf> {
     if let Some(v) = std::env::var_os(ENV_SPEAKER_MODELS_DIR).filter(|v| !v.is_empty()) {
         return Some(PathBuf::from(v));
     }
     let exe = std::env::current_exe().ok()?;
-    let dir = exe.parent()?.parent()?.join("Resources/Models/speaker");
-    dir.is_dir().then_some(dir)
+    bundled_speaker_candidates(exe.parent()?)
+        .into_iter()
+        .find(|d| d.is_dir())
+}
+
+/// The folders that can hold the bundled speaker models for a program in `exe_dir`, in the order
+/// they are tried: `<exe dir>/../Resources/Models/speaker` (`Contents/Resources/...` in the macOS
+/// app bundle, `lib/Resources/...` in the Linux tarball) and `<exe dir>/Resources/Models/speaker`
+/// (the flat Windows layout: the programs and `Resources\` sit in the install folder). Pure path
+/// logic, the same on every system; a folder that does not exist is simply skipped.
+pub fn bundled_speaker_candidates(exe_dir: &Path) -> Vec<PathBuf> {
+    let rel = Path::new("Resources").join("Models").join("speaker");
+    let mut v = Vec::new();
+    if let Some(parent) = exe_dir.parent() {
+        v.push(parent.join(&rel));
+    }
+    v.push(exe_dir.join(rel));
+    v
 }
 
 /// Bundled files already checked in this process: path -> `Ok` or what was wrong.
@@ -907,6 +923,22 @@ pub fn sha256_hex(path: &Path) -> io::Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The macOS/Linux lookup stays, and the flat Windows layout is added after it.
+    #[test]
+    fn bundled_speaker_candidates_cover_bundle_and_flat_layouts() {
+        let c = bundled_speaker_candidates(Path::new("/app/Contents/MacOS"));
+        assert_eq!(
+            c,
+            [
+                Path::new("/app/Contents/Resources/Models/speaker").to_path_buf(),
+                Path::new("/app/Contents/MacOS/Resources/Models/speaker").to_path_buf(),
+            ]
+        );
+        // A program at the root of a drive has no parent folder: only the flat lookup remains.
+        let c = bundled_speaker_candidates(Path::new("/"));
+        assert_eq!(c, [Path::new("/Resources/Models/speaker").to_path_buf()]);
+    }
 
     /// The embedded catalog parses and holds the four models the AI page offers.
     #[test]

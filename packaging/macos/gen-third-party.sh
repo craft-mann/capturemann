@@ -109,7 +109,7 @@ w.append("### ONNX Runtime, third-party components\n\n"
          "ONNX Runtime itself bundles.\n\n````text\n" + n + "\n````\n")
 w.append("## Models shipped inside the app\n")
 w.append("Speaker labels (Find speakers) use two model files that ship inside the app, unmodified, in "
-         "`Contents/Resources/Models/speaker/` (fetched by `packaging/sherpa/fetch-models.sh`, SHA-256 pinned): pyannote "
+         "`Contents/Resources/Models/speaker/` (`Resources\Models\speaker\` next to the programs on Windows; fetched by `packaging/sherpa/fetch-models.sh` or `fetch-models.ps1`, SHA-256 pinned): pyannote "
          "segmentation-3.0 (MIT) and the 3D-Speaker CAM++ Chinese-English model (Apache-2.0; the Apache-2.0 text is the "
          "one given for the vendored `sherpa-onnx` crates below).\n")
 for label, rel in [("pyannote segmentation 3.0 (MIT)", "packaging/sherpa/models-licenses/pyannote-segmentation-3.0-LICENSE.txt"),

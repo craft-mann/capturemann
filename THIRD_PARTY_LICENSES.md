@@ -6656,7 +6656,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 ## Models shipped inside the app
 
-Speaker labels (Find speakers) use two model files that ship inside the app, unmodified, in `Contents/Resources/Models/speaker/` (fetched by `packaging/sherpa/fetch-models.sh`, SHA-256 pinned): pyannote segmentation-3.0 (MIT) and the 3D-Speaker CAM++ Chinese-English model (Apache-2.0; the Apache-2.0 text is the one given for the vendored `sherpa-onnx` crates below).
+Speaker labels (Find speakers) use two model files that ship inside the app, unmodified, in `Contents/Resources/Models/speaker/` (`Resources\Models\speaker\` next to the programs on Windows; fetched by `packaging/sherpa/fetch-models.sh` or `fetch-models.ps1`, SHA-256 pinned): pyannote segmentation-3.0 (MIT) and the 3D-Speaker CAM++ Chinese-English model (Apache-2.0; the Apache-2.0 text is the one given for the vendored `sherpa-onnx` crates below).
 
 ### pyannote segmentation 3.0 (MIT)
 

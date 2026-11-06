@@ -8,7 +8,7 @@ name: Windows package
 # screenshot of the runner's desktop is kept), and a silent install and uninstall.
 #
 # The package carries an LGPL FFmpeg (built here by packaging/ffmpeg/build-windows.sh in MSYS2, cached by the
-# script's hash), llama-server.exe (built by packaging/llama/build-windows.sh, same pin as macOS) and the speaker engine (sherpa-onnx /MT libraries from packaging/sherpa/fetch-windows.ps1). Both
+# script's hash), llama-server.exe (built by packaging/llama/build-windows.sh, same pin as macOS), the speaker engine (sherpa-onnx /MT libraries from packaging/sherpa/fetch-windows.ps1) and its two models (packaging/sherpa/fetch-models.ps1, in Resources\Models\speaker). Both
 # steps fail the run when their self-checks fail; neither has run on a Windows runner yet (Nov 4, 2026).
 # Pinned actions: the same commits as ci.yml.
 on:
@@ -115,6 +115,20 @@ jobs:
         run: |
           packaging\sherpa\fetch-windows.ps1 -Crt mt
           if (-not $?) { throw 'fetch-windows.ps1 failed' }
+      # The two speaker-label models that ship in the package (pyannote segmentation-3.0, MIT; CAM++, Apache-2.0,
+      # ~35 MB). Runs AFTER fetch-windows.ps1, which replaces packaging\sherpa\out; the script checks the pinned
+      # SHA-256 and size of every file. Cache key: the script (it holds the pins).
+      - name: Cache the speaker models
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: packaging/sherpa/.downloads
+          key: sherpa-models-${{ hashFiles('packaging/sherpa/fetch-models.ps1', 'packaging/sherpa/fetch-models.sh') }}
+      - name: Fetch the speaker models (pinned, SHA-256 checked)
+        shell: pwsh
+        run: |
+          packaging\sherpa\fetch-models.ps1
+          if (-not $?) { throw 'fetch-models.ps1 failed' }
+          Get-ChildItem -Recurse packaging\sherpa\out\models | Select-Object FullName, Length
       - name: Build the zip and the installer
         shell: pwsh
         env:
@@ -123,6 +137,7 @@ jobs:
           CM_LLAMA_BUNDLE: ${{ github.workspace }}\packaging\llama\out-windows-x64
           CM_REQUIRE_LLAMA: '1'
           CM_REQUIRE_SHERPA: '1'
+          CM_REQUIRE_SPEAKER_MODELS: '1'
         run: packaging\windows\build-windows.ps1
       - name: List the files
         shell: pwsh
@@ -160,11 +175,17 @@ jobs:
           }
           & "$app\llama-server.exe" --version 2>&1 | ForEach-Object { "llama-server: $_" }
           if ($LASTEXITCODE -ne 0) { throw 'packaged llama-server.exe --version failed' }
+          # The bundled speaker models: both .onnx files and both licence files, in Resources\Models\speaker.
+          foreach ($f in 'pyannote-segmentation-3-0.onnx', 'campplus-sv-zh-en-16k-advanced.onnx', 'BUILD-INFO.txt', 'LICENSES\pyannote-segmentation-3.0-LICENSE.txt', 'LICENSES\campplus-3D-Speaker-NOTICE.txt') {
+            if (-not (Test-Path (Join-Path $app "Resources\Models\speaker\$f"))) { throw "missing in the zip: Resources\Models\speaker\$f" }
+          }
           & "$app\capturemann.exe" --version; if ($LASTEXITCODE -ne 0) { throw 'capturemann --version failed' }
           & "$app\capturemann.exe" targets; if ($LASTEXITCODE -ne 0) { throw 'capturemann targets failed' }
           $diag = & "$app\capturemann.exe" diagnostics; if ($LASTEXITCODE -ne 0) { throw 'capturemann diagnostics failed' }
           $diag | Select-String 'llama-server|ffmpeg at'
           if (-not ($diag -match 'llama-server at .*bundled with this build')) { throw 'diagnostics do not report the bundled llama-server' }
+          $diag | Select-String 'speaker'
+          if (-not ($diag -match 'speaker models at .*Resources.*speaker.*\(bundled with this build\)')) { throw 'diagnostics do not report the bundled speaker models' }
           # One screenshot of the runner's own desktop, through the CLI and the daemon it started.
           $t = (& "$app\capturemann.exe" --json targets) | ConvertFrom-Json
           $id = $t.displays[0].id
@@ -222,8 +243,12 @@ jobs:
           "installer exit code: $($i.ExitCode)"
           Get-ChildItem $dest | Select-Object Name, Length
           & "$dest\capturemann.exe" --version; if ($LASTEXITCODE -ne 0) { throw 'installed capturemann --version failed' }
+          foreach ($f in 'pyannote-segmentation-3-0.onnx', 'campplus-sv-zh-en-16k-advanced.onnx') {
+            if (-not (Test-Path "$dest\Resources\Models\speaker\$f")) { throw "the installer did not install $f" }
+          }
           $u = Start-Process -FilePath "$dest\uninstall.exe" -ArgumentList '/S', "_?=$dest" -Wait -PassThru
           "uninstaller exit code: $($u.ExitCode)"
+          if (Test-Path "$dest\Resources") { throw 'the uninstaller left Resources\Models\speaker behind' }
           Remove-Item -Recurse -Force $dest -ErrorAction SilentlyContinue
           if ($i.ExitCode -ne 0 -or $u.ExitCode -ne 0) { throw 'installer or uninstaller returned an error' }
 

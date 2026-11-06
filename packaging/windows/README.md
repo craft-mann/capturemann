@@ -11,7 +11,7 @@ run on a physical Windows PC yet (the ThinkPad, planned after the Linux test). R
 * `build-windows.ps1`: release build of `cm-cli`, `cm-mcp`, `cm-desktop`, `cm-overlay` (`--no-default-features`,
   static CRT, GUI subsystem for the two window programs through `cargo rustc` link args; the speaker engine is
   built in when `packaging/sherpa/out` holds the matching libraries), `dumpbin /dependents`
-  deny-list check, optional `llama-server.exe` bundle (`CM_LLAMA_BUNDLE`, `CM_REQUIRE_LLAMA=1`; next to the programs, with `Llama\BUILD-INFO.txt` and `Llama\LICENSES\`), optional LGPL FFmpeg bundle (`CM_FFMPEG_BUNDLE`, `ffmpeg.exe` next to the programs because
+  deny-list check, the speaker models bundle (above), optional `llama-server.exe` bundle (`CM_LLAMA_BUNDLE`, `CM_REQUIRE_LLAMA=1`; next to the programs, with `Llama\BUILD-INFO.txt` and `Llama\LICENSES\`), optional LGPL FFmpeg bundle (`CM_FFMPEG_BUNDLE`, `ffmpeg.exe` next to the programs because
   `cm-media` looks beside the executable first), `THIRD_PARTY_LICENSES.md` for `x86_64-pc-windows-msvc` via
   `packaging/macos/gen-third-party.sh` (needs bash and python), `app.ico` from `design/brand/app-icon`, the zip,
   the NSIS installer and `.sha256` files. The .ps1 files parse (PowerShell 7).
@@ -25,6 +25,20 @@ NSIS per-user installer plus portable zip (maintainer decision D-W3). MSIX is no
 certificate to install at all and sandbox/identity work. Signing (maintainer decision O4, Nov 5, 2026): no code
 signing in 0.x; the files are unsigned and published with SHA-256 sums and a winget manifest, so SmartScreen shows
 "Windows protected your PC" on first run (More info, Run anyway).
+
+## Speaker models
+
+The two speaker-label models (pyannote segmentation-3.0, MIT; 3D-Speaker CAM++, Apache-2.0; about 35 MB) ship in the
+package like on macOS and Linux (maintainer decision, Nov 6, 2026). `packaging/sherpa/fetch-models.ps1` (the twin of
+`fetch-models.sh`, same pins and SHA-256 checks) writes `packaging\sherpa\out\models`; run it after
+`fetch-windows.ps1` (that script replaces `packaging\sherpa\out`). `build-windows.ps1` copies the folder, with
+`BUILD-INFO.txt` and `LICENSES\`, to `Resources\Models\speaker\` next to the programs (`CM_SPEAKER_MODELS_BUNDLE`
+overrides the source, `CM_REQUIRE_SPEAKER_MODELS=1` fails when they are missing, `CM_NO_SPEAKER_MODELS=1` skips them). The app
+looks there: `cm_ai::model::bundled_speaker_candidates` tries `<exe dir>\..\Resources\Models\speaker`
+(macOS bundle, Linux tarball) and `<exe dir>\Resources\Models\speaker` (flat Windows layout). `capturemann diagnostics`
+prints `speaker models at ... (bundled with this build)`. The installer installs the folder and the uninstaller removes it.
+`windows-package.yml` fetches (cached by the script hash), requires them, and checks the zip, the diagnostics line and the
+silent install. Not run on Windows yet: the first CI run has to confirm all of this.
 
 ## Text engine (llama-server)
 
