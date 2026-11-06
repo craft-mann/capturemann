@@ -3328,7 +3328,7 @@ msgid "The recording has no audio"
 msgstr "Bản ghi không có âm thanh"
 
 msgid "The recording has no screen track to show."
-msgstr "Bản ghi không có bản ghi màn hình để hiển thị."
+msgstr "Không có bản ghi màn hình để hiển thị."
 
 msgid "The recording is saved, but the single MP4 needs FFmpeg. Install it with Homebrew (brew install ffmpeg), then press Export on the recording."
 msgstr "Đã lưu bản ghi, nhưng MP4 đơn cần FFmpeg. Hãy cài bằng Homebrew (brew install ffmpeg), rồi nhấn Xuất trên bản ghi."
@@ -4001,7 +4001,7 @@ msgid "the microphone"
 msgstr "micrô"
 
 msgid "the recording has no screen track"
-msgstr "bản ghi không có bản ghi màn hình"
+msgstr "không có bản ghi màn hình"
 
 msgid "the shortcut has no key"
 msgstr "phím tắt chưa có phím nào"
@@ -6475,7 +6475,7 @@ msgid "The 60 fps check measured the screen alone. With the camera on, frames ma
 msgstr "Phép thử 60 fps chỉ đo riêng màn hình. Khi bật camera, khung hình có thể đến trễ; hãy theo dõi chỉ báo tình trạng hoặc quay ở 30 fps"
 
 msgid "The audio file could not be written ({detail}); the track ends here and the recording continues"
-msgstr "Không thể ghi tệp âm thanh ({detail}); bản ghi kết thúc tại đây và bản ghi vẫn tiếp tục"
+msgstr "Không thể ghi tệp âm thanh ({detail}); bản ghi âm thanh kết thúc tại đây, còn việc quay vẫn tiếp tục"
 
 msgid "The camera file could not be written: {detail}"
 msgstr "Không thể ghi tệp camera: {detail}"
@@ -6533,7 +6533,7 @@ msgid "{pct}% of screen frames were late over the last 30 s"
 msgstr "{pct}% khung hình màn hình bị trễ trong 30 giây gần nhất"
 
 msgid "{track} track could not be finished: {detail}; its files were kept in the recording folder"
-msgstr "Không thể hoàn tất bản ghi {track}: {detail}; các tệp của bản ghi được giữ trong thư mục bản ghi"
+msgstr "Không thể hoàn tất bản ghi {track}: {detail}; các tệp của nó vẫn được giữ trong thư mục của lần quay này"
 
 msgid "{track} track could not pause: {detail}"
 msgstr "Không thể tạm dừng bản ghi {track}: {detail}"
@@ -6546,7 +6546,7 @@ msgstr "Không thể bắt đầu bản ghi {track}: {detail}"
 
 # FACT: owner review required
 msgid "{what} permission was removed; the recording continues without this track from here on"
-msgstr "Quyền {what} đã bị gỡ; bản ghi tiếp tục mà không có bản ghi này từ đây"
+msgstr "Quyền {what} đã bị gỡ; việc quay vẫn tiếp tục nhưng không có bản ghi này từ đây"
 
 # FACT: owner review required
 msgid "{what} permission was removed; the recording is stopped and what was recorded is kept"
