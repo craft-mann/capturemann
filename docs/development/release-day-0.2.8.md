@@ -7,7 +7,7 @@ Written Nov 5, 2026 from how 0.2.7 was done (commits `407acfa3` version bump, `b
 
 ## Before the day: decisions that block the text
 
-1. **[M]** Is a macOS DMG (or Linux file) part of the 0.2.8 tag? The text assumes **no**: Windows files only, a pre-release.
+1. ~~Is a macOS DMG (or Linux file) part of the 0.2.8 tag?~~ Decided Nov 6, 2026: **no**. 0.2.8 is Windows files only, a pre-release; macOS and Linux get their update in 0.2.9, after a full regression run on each.
 2. **[M]** Transcription track (invented outro text): if nothing was merged for it, keep the "still a known fault" line;
    otherwise replace it with the measured result and its report.
 3. **[M]** Vietnamese: the 2268 draft entries (`locales/` review sheet, commit `bf7523ee`) are reviewed, or the "draft
