@@ -113,7 +113,11 @@ was not captured for these pictures.
 
 ## Fixes found on the test laptop
 
-Every recording ended in a crash at stop (a stop that ran twice); the app panicked at start (a named pipe created outside a
+Transcription was 10 times too slow because the speech engine was compiled without optimisation (50 s of speech took 5 to 6
+minutes, now about 21 s with `small`); "Transcribe" crashed the app on a CPU without AVX-512 (the engine is now built for a
+portable AVX2 baseline); a folder of speaker models was taken for a speech model by `ai transcribe` when no speech model was
+installed (it answers `no_model` again); a microphone that delivers only silence is now reported after 4 s instead of 15 s;
+the smallest recording area is 18 px, as 16 and 17 px made the hardware encoder refuse to start; every recording ended in a crash at stop (a stop that ran twice); the app panicked at start (a named pipe created outside a
 runtime); Quick Sync refused the video format used for import copies and exports (NV12 is used now); a slowly changing screen
 was reported as 54 % late frames; the area window swallowed clicks meant for the recording bar (it is click-through now); the
 countdown, bar and area appear on the monitor being recorded; the window picker and the helper overlay end themselves
@@ -139,12 +143,16 @@ open a console window; the CLI no longer hangs when it starts the daemon.
   that test cannot separate the product from its own stimulus, so "within 40 ms" is **not shown**. Microphone timing was not
   measured.
 - **Text recognition:** only languages installed in Windows are recognized; en-US was the one checked.
-- **Transcription:** CPU only (no GPU path on Windows). On the test laptop 50 s of speech took about 3 to 4 minutes with the
-  `small` model end to end. The two speaker model files are bundled in the package and found without importing (`capturemann diagnostics` says
+- **Transcription:** CPU only (no GPU path on Windows). On the test laptop 50 s of speech took about 21 s with the `small`
+  model and about 77 s with `medium` (`verification/L1-windows-whisper-speed-3-2026-11-06-claude.md`; the same clip took
+  5 to 6 minutes before the speech engine was built with its optimisation flags). The two speaker model files are bundled in the package and found without importing (`capturemann diagnostics` says
   "bundled with this build"). Two synthetic voices were separated when the count was given, and merged into one when it
   was left to "auto".
   **An invented outro-style sentence over quiet stretches is still a known fault** (see the 0.2.7 notes and
   `ai.transcribe_raw_mic`): no transcription mitigation is part of this release.
+- **Playback follows Windows' default output device.** The editor plays on the device Windows has selected. When a monitor
+  with its own audio is connected, Windows may make it the default and the sound goes there; choose your speakers in Windows
+  Settings, System, Sound. An output-device choice inside CaptureMann is not part of this release.
 - **Region picker:** it could not be seen or driven by the automated runs (the window picker was looked at by the
   maintainer on both monitors).
 - **Vietnamese:** the full Vietnamese interface text was reviewed by the maintainer on Nov 6, 2026, except 86 entries (new Windows and Linux wording) that are still marked as drafts.
@@ -174,10 +182,9 @@ normally avoids it.
   49 of 49, hardware tier 64 passed, 2 failed, 1 skipped of 67. The two failures were bugs in the test suite (it compared a
   recording with the display size times the scale, but Windows lists physical pixels; the recordings matched the displays
   exactly) and are fixed in the suite; a rerun of those two cases on the same install passed (`...-hardware-final2-*`, the
-  4K external monitor and each monitor, both monitors connected). The skipped case is the speaker labels with the
-  bundled models; it was done by hand on the same install (the bundled models are found without importing; two speakers
-  with the count given), and its rerun in the suite stopped on another suite bug (a daemon started twice), fixed and not
-  run again. Earlier work on one laptop: a 621 s run with screen, microphone, system audio, camera and cursor at 1080p30
+  4K external monitor and each monitor, both monitors connected). The skipped case was the speaker labels with the
+  bundled models; a later suite run on the same install passed it, with `ai.transcribe` and `ai.no_model`
+  (`...-hardware-final3-*`: two speakers found with the bundled models, no import). Earlier work on one laptop: a 621 s run with screen, microphone, system audio, camera and cursor at 1080p30
   (0.011 % late screen frames, keyframes every 2.0 s, about 5.5 % of the machine's CPU), `kill -9` recovery, and
   transcription on synthetic speech (`verification/L1-windows-0.2.8-*`).
 - The maintainer looked at the Transcribe button by hand and saw nothing odd in a quick look (not a stored test).

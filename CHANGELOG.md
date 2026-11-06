@@ -7,26 +7,52 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [0.2.8] - 2026-11-06
 
-0.2.8 is the Windows release: recording, import, export, Auto-redact, speaker labels and the text engine on Windows
-(Windows 11 x64, unsigned, tested on one laptop). macOS and Linux get the shared changes below with their next builds.
+0.2.8 is the Windows release. CaptureMann on Windows 11 (x64) now records, imports, exports, finds sensitive text, labels
+speakers and runs the local text model, as on the Mac. The files are not code-signed (SHA-256 files and winget instead).
+It was tested on one laptop (ThinkPad T490, Intel UHD 620, Windows 11); the reports are in `verification/` and all are
+PARTIAL. No macOS or Linux build is part of this release: the shared changes below reach them in 0.2.9.
 
 ### Added
-- Windows: recording of screen, cursor, microphone, system audio and camera; Import; export with a bundled LGPL FFmpeg;
-  Auto-redact with Windows.Media.Ocr; speaker engine and `llama-server`; NSIS installer and zip.
-- MCP tools and CLI commands `get_cursor_track` (`capturemann cursor`) and `get_platform_rules` (`capturemann platform-rules`).
-- `settings.changed` and `camera.reconnected` events; `encoder_overloaded` recording warning.
-- `cm-regress`, a release regression suite that drives the shipped package.
+- **Windows recording** of a display, a window or a region, with the cursor, microphone, system audio (without
+  CaptureMann's own sound on a recent Windows) and camera; pause and resume; recovery after a crash. The screen is captured
+  with Windows.Graphics.Capture and encoded by the Media Foundation hardware H.264 encoder.
+- **Import** of video and audio files on Windows, and **export** with a bundled LGPL FFmpeg (H.264 files tagged BT.709).
+- **Auto-redact on Windows** with the recognizer built into Windows (`Windows.Media.Ocr`).
+- **Speaker labels** with the two bundled speaker models (pyannote segmentation-3.0, MIT; CAM++, Apache-2.0), **local
+  transcription** (whisper.cpp, portable AVX2 build) and the **built-in text model** (`llama-server` v0.7.0).
+- **Windows installer** (per user, no administrator rights) and zip, with SHA-256 files and a winget manifest.
+- **Agent tools:** `get_cursor_track` (`capturemann cursor`) and `get_platform_rules` (`capturemann platform-rules`); the MCP
+  server lists 79 tools.
+- **Events and warnings:** `settings.changed`, `camera.reconnected`, an `encoder_overloaded` recording warning and a
+  `mic_silent` warning after 4 s of digital silence.
+- **`cm-regress`,** a release regression suite that drives the shipped package (tiers smoke, standard, full and hardware);
+  `docs/development/regression.md`. A report is stored for each release and platform.
+- Vietnamese: the interface text was reviewed by the maintainer on Nov 6, 2026 (86 new entries are still drafts).
 
 ### Changed
-- Messages and help use the system's own words (Windows, Linux, Mac).
-- A recording area that is too small is `invalid_input` (`recording_area_too_small`).
+- Messages, help and settings use the system's own words (Windows, Linux or Mac; File Explorer, Recycle Bin, Credential
+  Manager, notification area) instead of always saying "Mac".
+- `capturemann settings set` reaches the running app at once, and the capture delay is read for each capture.
+- A recording area that is too small is `invalid_input` (`recording_area_too_small`; the smallest side is 18 px); a recording
+  whose encoder cannot keep up carries an `encoder_overloaded` warning and honest drop counters.
+- Windows is a supported release (Windows 11 x64) and no longer called an early build; Linux stays an early build.
 
 ### Fixed
-- See the Windows release text: stop crash, start-up panic, Quick Sync format, late-frame count, HUD clicks, monitor placement,
-  window size at 150 % scaling, display and app names, console windows, CLI hang.
+- Windows: every recording crashed at stop; the app panicked at start; Quick Sync refused the video format of import copies
+  and exports; a slow screen was reported as 54 % late frames; the area window swallowed clicks meant for the recording
+  bar; the countdown, bar and area now appear on the monitor being recorded; windows and displays have their real names;
+  window screenshots have the size the picker listed; helper programs no longer open a console window; the CLI no longer
+  hangs when it starts the daemon; a 4K recording on an external monitor kept its frame rate.
+- Transcription was about 10 times too slow on Windows because the speech engine was built without optimisation (50 s of
+  speech now take about 21 s with the `small` model), and "Transcribe" crashed on a CPU without AVX-512.
+- `ai transcribe` took a folder of speaker models for a speech model when none was installed; it answers `no_model` again.
 
-### Notes
-- Windows 11 (x64) is a supported release from 0.2.8, no longer an "early build" (not code-signed; SHA-256 files and winget). Not tested: Windows 10 on a real device, NVIDIA and AMD hardware, a second monitor with mixed scaling; a camera replugged into a different USB port may not resume. Linux stays an early build.
+### Known limitations
+- Not tested: Windows 10 on a real device, NVIDIA and AMD graphics, a second monitor with mixed scaling, SmartScreen on a
+  real download. A camera replugged into a different USB port may not resume. Playback follows Windows' default output
+  device (an external monitor with speakers may take it over). Sound and picture timing is estimated at 28 to 37 ms, not
+  confirmed with an outside reference. The invented outro-style sentence in transcripts of quiet stretches is still a known
+  fault. See the release notes for the full list.
 
 ## [0.2.7] - 2026-11-04
 
