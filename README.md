@@ -18,7 +18,7 @@ through MCP and a CLI.
 <p align="center">
 <a href="https://github.com/craft-mann/capturemann/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/craft-mann/capturemann/actions/workflows/ci.yml/badge.svg"></a>
 <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue"></a>
-<a href="https://github.com/craft-mann/capturemann/releases/latest"><img alt="Version 0.2.8" src="https://img.shields.io/badge/version-0.2.8-blue"></a>
+<a href="https://github.com/craft-mann/capturemann/releases/latest"><img alt="Version 0.2.9" src="https://img.shields.io/badge/version-0.2.9-blue"></a>
 <img alt="macOS 13+: Apple Silicon and Intel" src="https://img.shields.io/badge/macOS-13%2B%20%7C%20Apple%20Silicon%20%26%20Intel-lightgrey?logo=apple&logoColor=white">
 <img alt="Windows 11 x64, unsigned" src="https://img.shields.io/badge/Windows-11%20x64%20%7C%20unsigned-0078D4?logo=windows&logoColor=white">
 <img alt="Linux: early build, Ubuntu 24.04+ x86_64 and aarch64" src="https://img.shields.io/badge/Linux-Ubuntu%2024.04%2B%20%7C%20early%20build-E95420?logo=linux&logoColor=white">
