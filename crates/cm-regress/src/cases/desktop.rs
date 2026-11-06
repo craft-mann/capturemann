@@ -5,7 +5,7 @@
 use super::common::{need_ffmpeg, write_clips};
 use crate::check;
 use crate::ctx::{displays, Ctx};
-use crate::model::{fail, skip, Case, Need, Stop, Tier, R, WIN};
+use crate::model::{fail, skip, Case, Need, Stop, Tier, R, WIN, WIN_MAC};
 use crate::proc::exit_text;
 use crate::sys::{self, Key, WinInfo};
 use serde_json::Value;
@@ -23,7 +23,7 @@ pub fn cases() -> Vec<Case> {
             specs: &["bug: cm-desktop panic at start (tokio pipe outside a runtime)", "bug class: illegal instruction"],
             tier: Tier::Standard,
             needs: &[Need::DesktopSession],
-            platforms: WIN,
+            platforms: WIN_MAC,
             timeout_s: 90,
             run: stays_up,
         },
@@ -34,18 +34,18 @@ pub fn cases() -> Vec<Case> {
             specs: &["IMP-4: second launch opens Import", "named pipe single instance"],
             tier: Tier::Standard,
             needs: &[Need::DesktopSession],
-            platforms: WIN,
+            platforms: WIN_MAC,
             timeout_s: 120,
             run: second_launch,
         },
         Case {
             id: "desktop.hotkey_overlay",
-            title: "Ctrl+Alt+Shift+1 opens one overlay window per monitor on its exact rectangle; Esc ends it",
+            title: "the screenshot hotkey (Ctrl+Alt+Shift+1; Option+Shift+1 on macOS) opens one overlay window per monitor on its exact rectangle; Esc ends it",
             area: "desktop",
             specs: &["CAP-1 overlay", "CAP-3", "DPI-WIN"],
             tier: Tier::Standard,
             needs: &[Need::DesktopSession, Need::Screen],
-            platforms: WIN,
+            platforms: WIN_MAC,
             timeout_s: 120,
             run: hotkey_overlay,
         },
@@ -78,7 +78,7 @@ pub fn cases() -> Vec<Case> {
             specs: &["bug: settings set not applied to the running app", "AGT-1"],
             tier: Tier::Standard,
             needs: &[Need::DesktopSession, Need::Screen],
-            platforms: WIN,
+            platforms: WIN_MAC,
             timeout_s: 120,
             run: settings_applied,
         },
@@ -100,7 +100,7 @@ pub fn cases() -> Vec<Case> {
             specs: &["REC-5 tray"],
             tier: Tier::Standard,
             needs: &[Need::DesktopSession],
-            platforms: WIN,
+            platforms: WIN_MAC,
             timeout_s: 30,
             run: tray_icon,
         },
@@ -266,7 +266,16 @@ fn stays_up(ctx: &mut Ctx) -> R {
             .collect::<Vec<_>>()
             .join(", ")
     ));
-    check!(!wins.is_empty(), "the app shows no window after start-up");
+    // A macOS app may live in the menu bar only: a window or a menu-bar icon counts as "shows something".
+    let icons = if sys::PLATFORM == "macos" {
+        sys::status_item_count(app.pid).unwrap_or(0)
+    } else {
+        0
+    };
+    check!(
+        !wins.is_empty() || icons > 0,
+        "the app shows no window and no menu-bar icon after start-up"
+    );
     Ok(())
 }
 
@@ -340,7 +349,18 @@ fn hotkey_overlay(ctx: &mut Ctx) -> R {
     let t = ctx.cli_ok(&["targets", "--displays-only"])?;
     let ds = displays(&t);
     check!(!ds.is_empty(), "no displays");
-    sys::send_chord(&[Key::Ctrl, Key::Alt, Key::Shift, Key::Char('1')]).map_err(Stop::Fail)?;
+    let chord: &[Key] = if sys::PLATFORM == "macos" {
+        &[Key::Alt, Key::Shift, Key::Char('1')]
+    } else {
+        &[Key::Ctrl, Key::Alt, Key::Shift, Key::Char('1')]
+    };
+    if let Err(e) = sys::send_chord(chord) {
+        return if sys::PLATFORM == "macos" {
+            skip(format!("keys cannot be injected: {e}"))
+        } else {
+            fail(e)
+        };
+    }
     let found = crate::proc::wait_for(ctx.secs(10), Duration::from_millis(250), || {
         let w = overlay_windows();
         (w.len() >= ds.len()).then_some(w)
@@ -585,7 +605,26 @@ fn tray_count(ctx: &mut Ctx) -> R<i64> {
         .ok_or_else(|| Stop::Fail(format!("the tray probe printed no result: {text}")))
 }
 
+fn menu_bar_icon(ctx: &mut Ctx) -> R {
+    let app = start_app(ctx, &[])?;
+    std::thread::sleep(Duration::from_secs(6));
+    let Some(n) = sys::status_item_count(app.pid) else {
+        return skip("the menu-bar probe needs the Accessibility permission for the program that runs the suite");
+    };
+    ctx.note(format!("menu-bar items of the app: {n}"));
+    check!(
+        alive(app.pid),
+        "cm-desktop (pid {}) is gone after the probe",
+        app.pid
+    );
+    check!(n > 0, "the app shows no icon in the menu bar");
+    Ok(())
+}
+
 fn tray_icon(ctx: &mut Ctx) -> R {
+    if sys::PLATFORM == "macos" {
+        return menu_bar_icon(ctx);
+    }
     if sys::PLATFORM != "windows" {
         return skip("the tray probe uses Windows UI Automation");
     }

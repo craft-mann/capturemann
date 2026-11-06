@@ -9,9 +9,16 @@ mod windows;
 #[cfg(windows)]
 use windows as imp;
 
-#[cfg(not(windows))]
+// macOS driver. Compiled in test builds everywhere so its fake-runner unit tests run on any machine.
+#[cfg(any(target_os = "macos", test))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+mod macos;
+#[cfg(target_os = "macos")]
+use macos as imp;
+
+#[cfg(not(any(windows, target_os = "macos")))]
 mod other;
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 use other as imp;
 
 /// `"windows"`, `"macos"` or `"linux"`.
@@ -134,4 +141,48 @@ pub fn text_window_command(path: &std::path::Path) -> Option<Command> {
 /// The path of the install folder a per-user installer uses by default.
 pub fn default_install_dir() -> Option<std::path::PathBuf> {
     imp::default_install_dir()
+}
+
+/// macOS only: how many menu-bar icons the process shows; `None` when it cannot be probed (always `None`
+/// elsewhere).
+pub fn status_item_count(pid: u32) -> Option<usize> {
+    #[cfg(target_os = "macos")]
+    {
+        imp::status_item_count(pid)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = pid;
+        None
+    }
+}
+
+/// macOS crash reports of our programs in a DiagnosticReports folder, written since a time.
+pub fn crash_reports_since(dir: &std::path::Path, since: std::time::SystemTime) -> Vec<String> {
+    #[cfg(any(target_os = "macos", test))]
+    {
+        macos::crash_reports_since(dir, since)
+    }
+    #[cfg(not(any(target_os = "macos", test)))]
+    {
+        let _ = (dir, since);
+        Vec::new()
+    }
+}
+
+/// macOS only: mounts a DMG (or takes an `.app`), copies the app into `work`, checks signature, programs
+/// and version, removes the copy; one note per step. Never touches `/Applications`.
+pub fn check_app_install(
+    source: &std::path::Path,
+    work: &std::path::Path,
+) -> Result<Vec<String>, String> {
+    #[cfg(target_os = "macos")]
+    {
+        macos::check_app_install(&macos::RealRunner, source, work)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (source, work);
+        Err("the app bundle and DMG check is only implemented on macOS".to_owned())
+    }
 }

@@ -698,7 +698,9 @@ impl EditorState {
             cursor: 0,
             size: s.size,
             color: s.color,
-            outline: Some(Color::BLACK),
+            // New text has no automatic outline or shadow (ANN-1.AC8): the user changes the
+            // colour if the screenshot is light.
+            outline: None,
             bg: None,
             marked: None,
         });
@@ -948,16 +950,21 @@ impl EditorState {
             "enter" => t.insert("\n"),
             "escape" => return false,
             _ => {
-                if mods.secondary {
-                    return false;
-                }
-                match key_char {
-                    Some(c) => t.insert(c),
-                    None => return false,
-                }
+                // Typed text is not handled here (ANN-1.AC7): the platform feeds it through the
+                // input method into `text_ime`, so Telex and VNI can compose. Inserting
+                // `key_char` here would stop the event and leave the raw Latin letters.
+                let _ = (key_char, mods);
+                return false;
             }
         }
         true
+    }
+
+    /// Whether a key press in the text tool is typed text that belongs to the platform input
+    /// method (not a shortcut and not an editing key).
+    pub fn is_typed_text(key_char: Option<&str>, mods: Mods) -> bool {
+        !mods.secondary
+            && key_char.is_some_and(|c| !c.is_empty() && c.chars().all(|ch| !ch.is_control()))
     }
 
     /// An input method committed or is composing text in the text being typed.
@@ -1390,7 +1397,7 @@ mod tests {
     }
 
     /// ANN-1: text — click to place, type, Enter for a new line, Esc to finish; defaults 24 px
-    /// white with a black outline.
+    /// white, no outline (ANN-1.AC8).
     #[test]
     fn text_flow_click_type_enter_escape() {
         let mut s = st();
@@ -1399,11 +1406,13 @@ mod tests {
             .pointer_down(Pt::new(130.0, 320.0), NONE, 1, TOL)
             .is_empty());
         for c in "Click".chars() {
-            assert!(s.text_key(&c.to_string(), Some(&c.to_string()), NONE));
+            // Typed text goes through the input method, not through the key handler.
+            assert!(!s.text_key(&c.to_string(), Some(&c.to_string()), NONE));
+            s.text_ime(None, &c.to_string(), false);
         }
         assert!(s.text_key("enter", None, NONE));
         for c in "Save".chars() {
-            s.text_key(&c.to_string(), Some(&c.to_string()), NONE);
+            s.text_ime(None, &c.to_string(), false);
         }
         // Live: the draft shows in the preview list before it is committed.
         assert!(
@@ -1421,7 +1430,7 @@ mod tests {
                 text: "Click\nSave".into(),
                 size: 24.0,
                 color: Color::WHITE,
-                outline: Some(Color::BLACK),
+                outline: None,
                 bg: None
             }
         );
@@ -1437,7 +1446,7 @@ mod tests {
         assert!(s.ops.is_empty());
         // Create one, then re-edit it (double click with Select) and wipe it.
         s.pointer_down(Pt::new(10.0, 10.0), NONE, 1, TOL);
-        s.text_key("h", Some("h"), NONE);
+        s.text_ime(None, "h", false);
         s.finish_text();
         s.set_tool(Tool::Select);
         let b = geom::bounds(&s.ops[0].kind.clone(), &mut s.metrics);
@@ -1719,5 +1728,39 @@ mod tests {
         assert_eq!(t.marked_utf16(), None);
         t.ime_replace(None, "\u{1b}q", false);
         assert!(t.text.contains('q') && !t.text.contains('\u{1b}'));
+    }
+
+    /// ANN-1.AC7: Telex composition reaches the text; "Tiếng Việt có dấu" is typed through the
+    /// input-method path (draft, then commit), not through the key handler.
+    #[test]
+    fn telex_composition_builds_vietnamese_text() {
+        let mut s = st();
+        s.set_tool(Tool::Text);
+        s.pointer_down(Pt::new(10.0, 10.0), NONE, 1, TOL);
+        // A raw key press with a printable character is left to the input method.
+        assert!(EditorState::is_typed_text(Some("T"), NONE));
+        assert!(!EditorState::is_typed_text(
+            Some("v"),
+            Mods {
+                secondary: true,
+                ..NONE
+            }
+        ));
+        assert!(!s.text_key("t", Some("t"), NONE));
+        // Telex: each step replaces the draft (the whole marked range) with a longer one.
+        let steps = ["T", "Ti", "Tie", "Tiê", "Tiêm", "Tiêng", "Tiếng"];
+        for st_ in steps {
+            s.text_ime(None, st_, true);
+        }
+        s.text_ime(None, "Tiếng", false);
+        s.text_ime(None, " ", false);
+        for st_ in ["V", "Vi", "Viê", "Việ", "Việt"] {
+            s.text_ime(None, st_, true);
+        }
+        s.text_ime(None, "Việt ", false);
+        s.text_ime(None, "có dấu", false);
+        let t = s.text.as_ref().unwrap();
+        assert_eq!(t.text, "Tiếng Việt có dấu");
+        assert!(t.marked.is_none());
     }
 }

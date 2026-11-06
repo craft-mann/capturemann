@@ -73,13 +73,47 @@ files and the lock. Read the report, put real findings in the release checklist
 
 ## Run it on macOS
 
-The app has no `cm-daemon` (it is embedded in `cm-desktop`), so give the headless cases a build of the same commit:
-`cargo build --release -p cm-daemon`, then
-`cm-regress --tier standard --package-dir <App>.app/Contents/MacOS --daemon target/release/cm-daemon --out <dir>`.
-Licences are looked up in `Contents/Resources`. A locked screen or a display that is off lists no display: the
-cases that need a desktop session report SKIP with that reason (unlock the Mac and use `--allow screen` for the
-screenshot cases). Crashes are read from `~/Library/Logs/DiagnosticReports`. The desktop-app and window cases are
-not implemented for macOS yet and report SKIP.
+Driver: `crates/cm-regress/src/sys/macos.rs` (written Nov 6, 2026 for 0.2.9, tested with a fake command runner only;
+no hardware tier has been run yet, so there is no stored macOS report). Every probe goes through one `Runner`
+trait, so each function has a unit test with scripted output (`cargo test -p cm-regress`, which also runs on
+Linux and Windows).
+
+```sh
+make bundle-dev                       # target/bundle/CaptureMann-dev.app (bundle id dev.capturemann.app.dev)
+scripts/testlab/regress.sh macos --tier smoke
+scripts/testlab/regress.sh macos --tier standard --allow screen
+scripts/testlab/regress.sh macos --tier full --allow screen --installer target/bundle/CaptureMann.dmg
+scripts/testlab/regress.sh macos --tier hardware --allow screen,sound,mic,camera   # only when asked
+```
+
+The wrapper builds `cm-regress` and `cm-daemon` (release), takes `${TMPDIR}/cm-regress-mac.lock`, keeps the Mac
+awake with `caffeinate`, with `--allow sound` sets the output volume to 30 % unmuted and puts the level and mute
+state back, runs the suite, and copies the report to `verification/L1-macos-<version>-regression-<tier>-<date>-claude.md`
+(+ `.json`). It refuses a package folder under `/Applications`, and never changes the display settings or the output
+device. The app has no `cm-daemon` (it is embedded in `cm-desktop`), so the headless cases use a build of the same
+commit; by hand: `cm-regress --tier standard --package-dir <App>.app/Contents/MacOS --daemon target/release/cm-daemon --out <dir>`.
+Licences are looked up in `Contents/Resources`.
+
+What the driver provides:
+
+| Part | How | Needs |
+| --- | --- | --- |
+| Processes | `ps`, `pgrep -P`, `kill -9` (children first) | nothing |
+| Window and display listing | JavaScript for Automation reading CoreGraphics (`CGWindowListCopyWindowInfo`, `NSScreen`); window layer above 0 counts as "topmost", `window_from_point` takes the frontmost visible window at the point | nothing (window titles are empty without Screen Recording) |
+| Desktop session | `ioreg` screen-lock flag, and at least one display listed | nothing |
+| `desktop.stays_up`, `desktop.second_launch`, `desktop.settings_applied` | start `Contents/MacOS/cm-desktop` on the case's own endpoint; a window or a menu-bar icon counts as showing something | `desktop_session` (the last also `screen`) |
+| `desktop.hotkey_overlay` | Option+Shift+1 sent through System Events, one overlay window per display on its exact rectangle, Esc ends it | `screen`, Accessibility (SKIP when the key cannot be injected) |
+| `desktop.tray_icon` | counts the app's menu-bar items with System Events (`menu bar 2`) | Accessibility (SKIP without it) |
+| Recording: screen, mic, system audio (a 1 kHz tone played with `afplay`), camera | the shared `rec.*` cases and their picture, length and frame-rate checks | `screen`, `sound`, `mic`, `camera` |
+| Crash reports | `~/Library/Logs/DiagnosticReports` `.ips` / `.crash` of `cm-*`, `capturemann`, `llama-server` written since the case started (a free check of every case) | nothing |
+| `installer.dmg` | `hdiutil attach -nobrowse -readonly -mountpoint <sandbox>/mnt`, `ditto` the app into the sandbox, eject, `codesign --verify --deep --strict`, bundle id and version through `plutil`, the four programs present, `capturemann --version`, remove the copy and check nothing is left; a `.app` given instead of a `.dmg` skips the mount. The app is never opened and `/Applications` is never touched | `--installer <file>` |
+
+Not implemented on macOS (they report SKIP, "not implemented for macos"): `desktop.hud_click_through` (click-through
+is not readable from CoreGraphics), `desktop.recording_placement`, `desktop.no_console_flash` (a Windows
+problem), `shot.window` / `redact.window_text` (they open Notepad) and `rec.each_monitor`. A locked screen or a
+display that is off lists no display: the cases that need a desktop session report SKIP with that reason. Screen
+Recording, Microphone, Camera and Accessibility are granted to the program that runs the suite (Terminal) and to the
+dev bundle; see [`building.md`](building.md).
 
 ## Reading a result
 
@@ -109,8 +143,8 @@ not implemented for macOS yet and report SKIP.
 - Sound, camera and second-monitor cases need the hardware, the room (a lit room for the camera) and
   `--allow`; the volume must be above 0 for the system-audio case. Process-loopback exclusion of CaptureMann's own
   sound cannot be driven from outside; it stays with the `cm-audio` hardware test.
-- Stubs in the first version: clipboard copy (touches the user's clipboard), the macOS and Linux drivers (cases list the platforms they
-  support; the CLI/MCP/library/import/export cases already run on macOS with `--dev`).
+- Stubs in the first version: clipboard copy (touches the user's clipboard), the Linux driver (cases list the platforms they
+  support; the macOS driver is described above).
 - The Windows package workflow does not run `cm-regress`: the suite has not run on a hosted runner yet and a red
   step caused by an unproven assumption would hide real failures. Add `cm-regress.exe --tier smoke --allow screen
   --package-dir <unpacked zip>` after the existing smoke step once a lab run has shown it stable.

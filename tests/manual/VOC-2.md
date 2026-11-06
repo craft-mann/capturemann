@@ -97,3 +97,23 @@ people?" answered on the Record sheet uses that number. Open a recording of
 
 Pass: every expected result above, the keys work with the focus on the editor, nothing is
 recorded or sent anywhere except the Upload you ask for.
+
+## Speakers tab layout (0.2.9 bug 5)
+
+Uses a library of your own with a 3-speaker, a 6-speaker and a 10-speaker recording (the fixture
+`make_fixture` has none; rename speakers in a test recording or merge/split with Find again). The
+screenshots are stored with sample names only (Speaker 1, Speaker 2, Alex, Sam), never the names of
+real people.
+
+1. Open the recording, Speakers tab, window 1180 x 760: the list shows every row of a 3- and
+   6-speaker recording, a 10-speaker list scrolls inside its card with a thin bar; "How many
+   people?", "My microphone only hears me" and Find again are visible or one scroll away.
+2. Shrink the window to its minimum (720 x 480): at least three rows show at once (the panel body
+   scrolls to reach the controls), no row is cut mid-row at rest, wheel and Up/Down scroll the
+   list. Repeat with `CAPTUREMANN_PSEUDO_LOCALE=1` and in Vietnamese.
+3. Settings > Privacy has five tiles; the fifth reads "Voices are compared in memory only. No
+   voiceprint is saved, and people are never recognised across recordings." The Speakers tab
+   carries no such sentence.
+
+Store the screenshots (window at 720 x 480 and at the default size, 3 and 10 speakers) in
+`verification/` with the report.
