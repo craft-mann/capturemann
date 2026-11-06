@@ -66,6 +66,8 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          cache-on-failure: true
       # The FFmpeg-gated tests (export: EXP AC3, AC6-AC8) print SKIPPED and pass when no ffmpeg is
       # on PATH, so install one; otherwise CI would not cover the export path at all.
       - name: Install FFmpeg (macOS)
@@ -126,9 +128,22 @@ jobs:
       - name: Clippy (Windows)
         if: runner.os == 'Windows'
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      # Two tests are skipped here and run on the macOS job of this same workflow (release 0.2.9 plan, item 7):
+      # `compose_ms_per_frame_1080p_and_4k` (compose_perf, a timing smoke) and
+      # `m4_gate_export_matches_the_preview_frame_for_frame` (the GPU parity test). The hosted Windows runner has
+      # no GPU, so wgpu falls back to the software rasteriser and these two take most of the step. The Windows
+      # lab laptop builds and runs the parity program from windows-tests.yml. `--skip` is an exact-name filter
+      # of the libtest harness; the other parity test (the pure diff-metric check) still runs.
+      # Dependencies are built with opt-level 2 for this step only (`--config`): the test programs run image,
+      # encode and software-GPU code that is very slow unoptimised. Nothing else is skipped or weakened.
       - name: Test (Windows)
         if: runner.os == 'Windows'
-        run: cargo test --workspace --locked --no-fail-fast
+        run: >
+          cargo test --workspace --locked --no-fail-fast
+          --config "profile.dev.package.'*'.opt-level=2"
+          --
+          --skip compose_ms_per_frame_1080p_and_4k
+          --skip m4_gate_export_matches_the_preview_frame_for_frame
       # The real Trash (Recycle Bin, freedesktop Trash) of the runner: a scratch folder is moved there. Not run
       # on macOS, where it would use the developer's own Trash.
       - name: Trash test (Windows and Linux)
@@ -171,6 +186,8 @@ jobs:
         with:
           toolchain: "1.95"
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          cache-on-failure: true
       # The speaker engine (AI-8) links the pinned sherpa-onnx static libraries; `.cargo/config.toml`
       # points SHERPA_ONNX_LIB_DIR at packaging/sherpa/out/lib. The build never downloads them.
       - name: Cache the sherpa-onnx archive and the speaker models
@@ -192,6 +209,8 @@ jobs:
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          cache-on-failure: true
       # The speaker engine (AI-8) links the pinned sherpa-onnx static libraries; `.cargo/config.toml`
       # points SHERPA_ONNX_LIB_DIR at packaging/sherpa/out/lib. The build never downloads them.
       - name: Cache the sherpa-onnx archive and the speaker models
