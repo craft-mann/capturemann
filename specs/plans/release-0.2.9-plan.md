@@ -9,7 +9,7 @@ report in `verification/`**; no GPL/AGPL in shipped binaries; `target_os` only i
 (`python3 scripts/check_target_os.py`); UI text through `cm_i18n`; one change per commit with the two trailer lines; a
 regression test or a stored real-device step for every bug; no failing tests merge to `main`; the maintainer pushes
 `main`, tags and publishes. **0.2.9 ships on all three platforms** (decided Nov 6, 2026): Windows, macOS and Linux get the fixes, and each platform
-passes the same release regression as Windows 0.2.8 before its files go out (item 5).
+passes the same release regression as Windows 0.2.8 before its files go out (item 6).
 
 ## Bugs
 
