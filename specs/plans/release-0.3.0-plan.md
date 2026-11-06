@@ -28,7 +28,7 @@ report exists. The Linux tasks below are unchanged.
 2. **Windows CI speed-up** (the Windows `Test` step took about 55 min on a cold cache): `cache-on-failure: true` for
    rust-cache; skip `compose_perf` and the GPU `parity` test on the Windows runner (macOS covers them); split the job or use
    nextest; optional opt-level 2 for dependencies. Measure before and after on a branch; target 15 to 20 min warm.
-3. **Regression drivers for macOS and Linux:** moved to 0.2.9 (`release-0.2.9-plan.md`, item 5, Nov 6, 2026). 0.3.0 reuses them.
+3. **Regression drivers for macOS and Linux:** moved to 0.2.9 (`release-0.2.9-plan.md`, item 6, Nov 6, 2026). 0.3.0 reuses them.
 4. **Output-device chooser** in the editor (playback follows the system default; an external monitor with speakers can take
    it over).
 5. **Spec decisions and small features:** `export_image` MCP tool needs a spec decision; the

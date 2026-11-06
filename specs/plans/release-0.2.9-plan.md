@@ -48,7 +48,23 @@ passes the same release regression as Windows 0.2.8 before its files go out (ite
    Treat the checkpoints as untrusted input in the meantime: the README says to convert only the three pinned VinAI
    revisions in a throwaway virtual environment.
 
-5. **Release regression on macOS and Linux, the same as Windows 0.2.8** (`cm-regress`, tiers smoke, standard,
+5. **Speakers tab on a laptop screen: the list is cramped** (maintainer's screenshot, Nov 6, 2026, a 3-speaker recording
+   on the Mac laptop; the screenshot shows names of real people, so it is not stored in the repository). The speaker list
+   shows one and a half rows between the heading and the controls, because the rows have a fixed small height and the
+   panel below takes the space. Work, in `apps/desktop/src/ui/recording_editor/speakers_tab.rs`:
+   - Move the sentence "Voices are compared in memory only. No voiceprint is saved, and people are never recognised across
+     recordings." (the `lock` note at the end of the tab, around line 614) to **Settings -> Privacy**, as a fifth fact
+     (`privacy_facts()` in `apps/desktop/src/ui/settings/model.rs`; the test that pins four facts and the i18n catalogue
+     change with it; translate to Vietnamese). The tab keeps no long note; if a short pointer is wanted, a link to the
+     Privacy page, not the sentence.
+   - Give the list the free height of the panel and let it **scroll** when it has more speakers than fit (a flexible
+     height with a minimum of about three rows and a thin scrollbar, not a fixed one); the controls ("How many people?",
+     "My microphone only hears me", "Find again") stay visible under it or in one compact row group.
+   - Acceptance: with 3, 6 and 10 speakers at the smallest supported window height (the laptop in the screenshot, and
+     the pseudo-locale, which is 30 % longer), at least three rows show at once, the rest scroll with the wheel and the
+     keyboard, nothing is cut mid-row, and the controls are reachable. Add a layout test (the `layout_width_tests`
+     pattern) and a stored screenshot of the result with sample names only.
+6. **Release regression on macOS and Linux, the same as Windows 0.2.8** (`cm-regress`, tiers smoke, standard,
    hardware; a stored PARTIAL report per platform and tier in `verification/`, template and rules as for
    `L1-windows-0.2.8-regression-*`). Today only the CLI, MCP, library, import and export cases run on macOS (`--dev`
    or `--package-dir`); the desktop-app, window, recording, audio and installer cases are stubs there and there is no
@@ -68,7 +84,7 @@ passes the same release regression as Windows 0.2.8 before its files go out (ite
      second Mac. Never touch the user's real library, the display settings or the audio output device.
    - **Gate:** smoke, standard and hardware tiers run on the final 0.2.9 files of each platform, failures read and
      fixed in the product or the suite (not the evidence), and the release text says what was and was not run per
-     platform (as the 0.2.8 text does). Build the drivers **first**, so the bug fixes in items 1 to 4 get regress cases on
+     platform (as the 0.2.8 text does). Build the drivers **first**, so the bug fixes in items 1 to 5 get regress cases on
      all platforms as they land.
 
 ## Decisions needed from the maintainer
