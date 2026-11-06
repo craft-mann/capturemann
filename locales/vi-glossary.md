@@ -52,7 +52,7 @@ Mark a term you want changed and the whole catalogue follows.
 | transcript | bản chép lời | the result of transcription (owner review, Oct 24, 2026; was "bản ghi lời nói") |
 | to transcribe | chép lời | the action ("chép lời bằng AI") |
 | silence | khoảng lặng | |
-| track (media track) | rãnh | "rãnh micrô", "rãnh màn hình"; "luồng" only where a stream is meant |
+| track (media track) | bản ghi | "bản ghi micrô", "bản ghi màn hình" (maintainer decision Nov 6, 2026, replaces "rãnh"); the same word also means a whole recording, so a sentence that names both should say it clearly; "luồng" only where a stream is meant |
 | blocked (state) / Block (button) | Bị chặn / Chặn | a state label uses "Bị chặn", an action "Chặn" |
 | client (an app that connects over MCP or the CLI) | ứng dụng khách | "client ID" and "client secret" of OAuth stay in English |
 | online copy | bản sao trực tuyến | also "Remote" in the delete dialog; not "bản sao từ xa" |

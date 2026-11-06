@@ -2003,28 +2003,28 @@ msgid "On: {device}, {resolution} (the camera light turns on)"
 msgstr "Bật: {device}, {resolution} (đèn camera sẽ sáng)"
 
 msgid "One MP4 with the screen, camera bubble and audio. The original tracks are untouched."
-msgstr "Một tệp MP4 gồm màn hình, bong bóng camera và âm thanh. Các rãnh gốc được giữ nguyên."
+msgstr "Một tệp MP4 gồm màn hình, bong bóng camera và âm thanh. Các bản ghi gốc được giữ nguyên."
 
 msgid "One MP4 with the screen, camera bubble and audio. The original tracks are untouched. {captions}"
-msgstr "Một tệp MP4 gồm màn hình, bong bóng camera và âm thanh. Các rãnh gốc được giữ nguyên. {captions}"
+msgstr "Một tệp MP4 gồm màn hình, bong bóng camera và âm thanh. Các bản ghi gốc được giữ nguyên. {captions}"
 
 msgid "One MP4 with the screen and camera bubble. The original tracks are untouched."
-msgstr "Một tệp MP4 gồm màn hình và bong bóng camera. Các rãnh gốc được giữ nguyên."
+msgstr "Một tệp MP4 gồm màn hình và bong bóng camera. Các bản ghi gốc được giữ nguyên."
 
 msgid "One MP4 with the screen and camera bubble. The original tracks are untouched. {captions}"
-msgstr "Một tệp MP4 gồm màn hình và bong bóng camera. Các rãnh gốc được giữ nguyên. {captions}"
+msgstr "Một tệp MP4 gồm màn hình và bong bóng camera. Các bản ghi gốc được giữ nguyên. {captions}"
 
 msgid "One MP4 with the screen and audio. The original tracks are untouched."
-msgstr "Một tệp MP4 gồm màn hình và âm thanh. Các rãnh gốc được giữ nguyên."
+msgstr "Một tệp MP4 gồm màn hình và âm thanh. Các bản ghi gốc được giữ nguyên."
 
 msgid "One MP4 with the screen and audio. The original tracks are untouched. {captions}"
-msgstr "Một tệp MP4 gồm màn hình và âm thanh. Các rãnh gốc được giữ nguyên. {captions}"
+msgstr "Một tệp MP4 gồm màn hình và âm thanh. Các bản ghi gốc được giữ nguyên. {captions}"
 
 msgid "One MP4 with the screen. The original tracks are untouched."
-msgstr "Một tệp MP4 chỉ gồm màn hình. Các rãnh gốc được giữ nguyên."
+msgstr "Một tệp MP4 chỉ gồm màn hình. Các bản ghi gốc được giữ nguyên."
 
 msgid "One MP4 with the screen. The original tracks are untouched. {captions}"
-msgstr "Một tệp MP4 chỉ gồm màn hình. Các rãnh gốc được giữ nguyên. {captions}"
+msgstr "Một tệp MP4 chỉ gồm màn hình. Các bản ghi gốc được giữ nguyên. {captions}"
 
 # FACT: owner review required
 msgid "Only you can watch it."
@@ -2515,10 +2515,10 @@ msgid "Recording: cursor clicks and scroll"
 msgstr "Đang ghi: nhấp và cuộn của con trỏ"
 
 msgid "Recording: microphone track"
-msgstr "Đang ghi: rãnh micrô"
+msgstr "Đang ghi: bản ghi micrô"
 
 msgid "Recording: webcam bubble and camera track"
-msgstr "Đang ghi: bong bóng webcam và rãnh camera"
+msgstr "Đang ghi: bong bóng webcam và bản ghi camera"
 
 msgid "Recordings go into a folder named “{folder}”. Manage the destination below to choose what is copied and when."
 msgstr "Bản ghi được lưu vào thư mục tên “{folder}”. Quản lý điểm lưu bên dưới để chọn nội dung được sao chép và thời điểm."
@@ -2592,7 +2592,7 @@ msgstr "Đổi tên bản chụp"
 
 # FACT: owner review required
 msgid "Renders one video with the screen, the camera bubble and your audio into the recording’s exports folder. The original tracks are never changed. Needs FFmpeg (brew install ffmpeg)."
-msgstr "Tạo một video gồm màn hình, bong bóng camera và âm thanh, rồi lưu vào thư mục xuất của bản ghi. Các rãnh gốc được giữ nguyên. Cần FFmpeg (brew install ffmpeg)."
+msgstr "Tạo một video gồm màn hình, bong bóng camera và âm thanh, rồi lưu vào thư mục xuất của bản ghi. Các bản ghi gốc được giữ nguyên. Cần FFmpeg (brew install ffmpeg)."
 
 msgid "Reopen setup"
 msgstr "Mở lại phần thiết lập"
@@ -2924,7 +2924,7 @@ msgstr "Hiện trong {secs} giây (tối đa {limit} giây)"
 # FACT: owner review required
 #. FACT: owner review required (what the permission is for)
 msgid "Shows your webcam in the bubble and records it as its own track."
-msgstr "Hiển thị hình ảnh từ webcam trong bong bóng và ghi thành một rãnh riêng."
+msgstr "Hiển thị hình ảnh từ webcam trong bong bóng và ghi thành một bản ghi riêng."
 
 msgid "Sign in again"
 msgstr "Đăng nhập lại"
@@ -3328,7 +3328,7 @@ msgid "The recording has no audio"
 msgstr "Bản ghi không có âm thanh"
 
 msgid "The recording has no screen track to show."
-msgstr "Bản ghi không có rãnh màn hình để hiển thị."
+msgstr "Bản ghi không có bản ghi màn hình để hiển thị."
 
 msgid "The recording is saved, but the single MP4 needs FFmpeg. Install it with Homebrew (brew install ffmpeg), then press Export on the recording."
 msgstr "Đã lưu bản ghi, nhưng MP4 đơn cần FFmpeg. Hãy cài bằng Homebrew (brew install ffmpeg), rồi nhấn Xuất trên bản ghi."
@@ -4001,7 +4001,7 @@ msgid "the microphone"
 msgstr "micrô"
 
 msgid "the recording has no screen track"
-msgstr "bản ghi không có rãnh màn hình"
+msgstr "bản ghi không có bản ghi màn hình"
 
 msgid "the shortcut has no key"
 msgstr "phím tắt chưa có phím nào"
@@ -5626,7 +5626,7 @@ msgstr "Bám theo"
 
 msgctxt "section"
 msgid "Tracks"
-msgstr "Rãnh"
+msgstr "Bản ghi"
 
 msgctxt "settings group"
 msgid "Countdown"
@@ -6475,7 +6475,7 @@ msgid "The 60 fps check measured the screen alone. With the camera on, frames ma
 msgstr "Phép thử 60 fps chỉ đo riêng màn hình. Khi bật camera, khung hình có thể đến trễ; hãy theo dõi chỉ báo tình trạng hoặc quay ở 30 fps"
 
 msgid "The audio file could not be written ({detail}); the track ends here and the recording continues"
-msgstr "Không thể ghi tệp âm thanh ({detail}); rãnh kết thúc tại đây và bản ghi vẫn tiếp tục"
+msgstr "Không thể ghi tệp âm thanh ({detail}); bản ghi kết thúc tại đây và bản ghi vẫn tiếp tục"
 
 msgid "The camera file could not be written: {detail}"
 msgstr "Không thể ghi tệp camera: {detail}"
@@ -6484,7 +6484,7 @@ msgid "The camera is back"
 msgstr "Camera đã hoạt động trở lại"
 
 msgid "The camera was disconnected; the camera track has a gap"
-msgstr "Camera đã bị ngắt kết nối; rãnh camera có một khoảng trống"
+msgstr "Camera đã bị ngắt kết nối; bản ghi camera có một khoảng trống"
 
 # FACT: owner review required
 msgid "The microphone has delivered only silence (muted, or its access was revoked); the recording continues"
@@ -6500,13 +6500,13 @@ msgid "The {track} file ended early ({detail}); what was written is kept"
 msgstr "Tệp {track} kết thúc sớm ({detail}); phần đã ghi được giữ lại"
 
 msgid "The {track} track stopped early ({detail}); what was written is kept"
-msgstr "Rãnh {track} dừng sớm ({detail}); phần đã ghi được giữ lại"
+msgstr "Bản ghi {track} dừng sớm ({detail}); phần đã ghi được giữ lại"
 
 msgid "cannot decode poster: {error}"
 msgstr "không giải mã được ảnh bìa: {error}"
 
 msgid "cannot read the screen track: {error}"
-msgstr "không đọc được rãnh màn hình: {error}"
+msgstr "không đọc được bản ghi màn hình: {error}"
 
 msgid "ffmpeg could not read a frame"
 msgstr "ffmpeg không đọc được khung hình"
@@ -6521,7 +6521,7 @@ msgid "no thumbnail tool on this OS"
 msgstr "hệ điều hành này không có công cụ tạo ảnh thu nhỏ"
 
 msgid "the screen track is not an MP4 file"
-msgstr "rãnh màn hình không phải tệp MP4"
+msgstr "bản ghi màn hình không phải tệp MP4"
 
 msgid "timed out after {secs} s"
 msgstr "hết thời gian chờ sau {secs} giây"
@@ -6533,20 +6533,20 @@ msgid "{pct}% of screen frames were late over the last 30 s"
 msgstr "{pct}% khung hình màn hình bị trễ trong 30 giây gần nhất"
 
 msgid "{track} track could not be finished: {detail}; its files were kept in the recording folder"
-msgstr "Không thể hoàn tất rãnh {track}: {detail}; các tệp của rãnh được giữ trong thư mục bản ghi"
+msgstr "Không thể hoàn tất bản ghi {track}: {detail}; các tệp của bản ghi được giữ trong thư mục bản ghi"
 
 msgid "{track} track could not pause: {detail}"
-msgstr "Không thể tạm dừng rãnh {track}: {detail}"
+msgstr "Không thể tạm dừng bản ghi {track}: {detail}"
 
 msgid "{track} track could not resume: {detail}"
-msgstr "Không thể tiếp tục rãnh {track}: {detail}"
+msgstr "Không thể tiếp tục bản ghi {track}: {detail}"
 
 msgid "{track} track could not start: {detail}"
-msgstr "Không thể bắt đầu rãnh {track}: {detail}"
+msgstr "Không thể bắt đầu bản ghi {track}: {detail}"
 
 # FACT: owner review required
 msgid "{what} permission was removed; the recording continues without this track from here on"
-msgstr "Quyền {what} đã bị gỡ; bản ghi tiếp tục mà không có rãnh này từ đây"
+msgstr "Quyền {what} đã bị gỡ; bản ghi tiếp tục mà không có bản ghi này từ đây"
 
 # FACT: owner review required
 msgid "{what} permission was removed; the recording is stopped and what was recorded is kept"
@@ -7346,7 +7346,7 @@ msgid "The microphone didn’t start"
 msgstr "Micrô không bật được"
 
 msgid "The recorded camera track is never flipped."
-msgstr "Rãnh camera được ghi không bao giờ bị lật."
+msgstr "Bản ghi camera được ghi không bao giờ bị lật."
 
 msgid "The ring is always the record color."
 msgstr "Viền luôn có màu quay."
@@ -7639,7 +7639,7 @@ msgid "Title and date are written into the file"
 msgstr "Tiêu đề và ngày được ghi vào tệp"
 
 msgid "Tracks"
-msgstr "Rãnh"
+msgstr "Bản ghi"
 
 msgid "Transcript language"
 msgstr "Ngôn ngữ bản chép lời"
@@ -8683,7 +8683,7 @@ msgid "The model runs inside CaptureMann and nothing leaves {this_computer}."
 msgstr "Mô hình chạy ngay trong CaptureMann và không có gì rời khỏi {this_computer}."
 
 msgid "The mouse pointer is part of the video; it is not recorded as a separate track yet."
-msgstr "Con trỏ chuột nằm trong video; chưa được ghi thành một rãnh riêng."
+msgstr "Con trỏ chuột nằm trong video; chưa được ghi thành một bản ghi riêng."
 
 msgid "The text engine is missing from this copy of CaptureMann. Reinstall CaptureMann."
 msgstr "Bản CaptureMann này thiếu bộ máy văn bản. Hãy cài lại CaptureMann."
@@ -9091,10 +9091,10 @@ msgid "Imported files have no cursor data"
 msgstr "Tệp đã nhập không có dữ liệu con trỏ"
 
 msgid "Imported files have no separate camera track"
-msgstr "Tệp đã nhập không có rãnh camera riêng"
+msgstr "Tệp đã nhập không có bản ghi camera riêng"
 
 msgid "Imported files have no separate camera track."
-msgstr "Tệp đã nhập không có rãnh camera riêng."
+msgstr "Tệp đã nhập không có bản ghi camera riêng."
 
 msgid "Imported {at} · {path} · original kept in the bundle"
 msgstr "Đã nhập {at} · {path} · tệp gốc được giữ trong gói"
