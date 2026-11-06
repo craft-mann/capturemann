@@ -762,6 +762,8 @@ mod tests {
         ]
     }
 
+    // The fake install tree is built with Unix paths; the module only runs on macOS (CI Windows failure, Nov 6, 2026).
+    #[cfg(unix)]
     #[test]
     fn dmg_install_checks_signature_programs_and_removal() {
         let w = work("dmg");
@@ -804,6 +806,8 @@ mod tests {
         let _ = std::fs::remove_dir_all(w);
     }
 
+    // The fake install tree is built with Unix paths; the module only runs on macOS (CI Windows failure, Nov 6, 2026).
+    #[cfg(unix)]
     #[test]
     fn a_missing_program_a_failed_copy_and_a_leftover_are_reported() {
         let w = work("miss");
