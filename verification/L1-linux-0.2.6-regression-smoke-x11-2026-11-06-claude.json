@@ -1,0 +1,341 @@
+{
+  "cases": [
+    {
+      "area": "pkg",
+      "duration_ms": 329,
+      "evidence": [
+        "capturemann: 4249672 bytes",
+        "cm-mcp: 9240448 bytes",
+        "cm-daemon: 93259440 bytes",
+        "cm-desktop: 144953024 bytes",
+        "cm-overlay: 10249136 bytes",
+        "licence: None, third party: None, notice: None",
+        "note: no README in the package folder"
+      ],
+      "id": "pkg.files",
+      "message": "no LICENSE file; no THIRD_PARTY_LICENSES file",
+      "needs": [],
+      "specs": [
+        "NFR-licence",
+        "PKG-contents"
+      ],
+      "status": "FAIL",
+      "tier": "smoke",
+      "title": "the package holds the programs, FFmpeg, the helper and the licences"
+    },
+    {
+      "area": "pkg",
+      "duration_ms": 426,
+      "evidence": [
+        "capturemann --version: exit 0 (0x00000000) in 15 ms",
+        "cm-mcp --bogus: exit 2 (0x00000002) in 15 ms",
+        "cm-daemon --bogus: exit 2 (0x00000002) in 15 ms",
+        "cm-overlay --help: exit 0 (0x00000000) in 15 ms",
+        "ffmpeg -hide_banner -version: exit 0 (0x00000000) in 15 ms",
+        "ffprobe -hide_banner -version: exit 0 (0x00000000) in 15 ms",
+        "llama-server --version: exit 0 (0x00000000) in 16 ms"
+      ],
+      "id": "pkg.startup",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "bug: Transcribe illegal instruction (AVX-512 in the build)",
+        "bug: 0xC0000409 at start"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "every program starts without a crash (illegal instruction, fast fail)"
+    },
+    {
+      "area": "pkg",
+      "duration_ms": 963,
+      "evidence": [
+        "version 0.2.6",
+        "daemon pid 3579 answered after 282 ms",
+        "- video encoder: software VP9 through ffmpeg at /opt/capturemann/lib/capturemann/ffmpeg",
+        "- speech model speaker-segmentation (6 MB)",
+        "- speech model speaker-embedding (29 MB)",
+        "- ffmpeg at /opt/capturemann/lib/capturemann/ffmpeg",
+        "- llama-server at /opt/capturemann/lib/capturemann/llama-server",
+        "- text recognizer: tesseract at /usr/bin/tesseract (tesseract 5.3.4)",
+        "- speaker engine built in: true"
+      ],
+      "id": "pkg.diagnostics",
+      "message": "the llama-server line does not say `bundled with this build`",
+      "needs": [],
+      "specs": [
+        "DIAG-1"
+      ],
+      "status": "FAIL",
+      "tier": "smoke",
+      "title": "diagnostics reports app, system, models and engines, FFmpeg and the helper"
+    },
+    {
+      "area": "daemon",
+      "duration_ms": 1260,
+      "evidence": [
+        "daemon pid 3641 answered after 281 ms",
+        "pid 3641, 81 actions",
+        "stop: clean exit on SIGTERM",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "daemon.lifecycle",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-1",
+        "R2-8"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "daemon starts on a private endpoint, answers, stops, and the endpoint is gone"
+    },
+    {
+      "area": "daemon",
+      "duration_ms": 1597,
+      "evidence": [
+        "daemon pid 3706 answered after 282 ms",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "daemon.library_created",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "LIB-1",
+        "AI-7: the text engine starts only when asked"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "a fresh library is created and lists no captures; no helper program runs while idle"
+    },
+    {
+      "area": "settings",
+      "duration_ms": 1042,
+      "evidence": [
+        "daemon pid 3783 answered after 282 ms",
+        "daemon pid 3842 answered after 282 ms",
+        "recording.fps=47: exit 0 (0x00000000) None",
+        "47 was accepted: {\"settings\":{\"recording.fps\":47}}",
+        "log hygiene: 2 WARN line(s) in the case's logs"
+      ],
+      "id": "settings.roundtrip",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-1"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "settings set and get round trip, and survive a daemon restart"
+    },
+    {
+      "area": "targets",
+      "duration_ms": 764,
+      "evidence": [
+        "daemon pid 3939 answered after 282 ms",
+        "display 65 'eDP-1' 1920x1080 at (0,0) scale 1 primary",
+        "1 windows; capabilities {\"capture_region\":true,\"capture_window\":true,\"list_windows\":true,\"pick\":false}",
+        "apps: Gnome-terminal",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "targets.list",
+      "message": "",
+      "needs": [
+        "desktop_session"
+      ],
+      "specs": [
+        "CAP-1",
+        "CAP-3",
+        "bug: Windows Terminal Host name",
+        "bug: window name garbled"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "targets lists displays and windows with readable names and real sizes"
+    },
+    {
+      "area": "shot",
+      "duration_ms": 0,
+      "evidence": [],
+      "id": "shot.display",
+      "message": "needs --allow screen",
+      "needs": [
+        "desktop_session",
+        "screen"
+      ],
+      "specs": [
+        "CAP-1.AC1"
+      ],
+      "status": "SKIP",
+      "tier": "smoke",
+      "title": "a display screenshot is a valid PNG of the display's physical size"
+    },
+    {
+      "area": "lib",
+      "duration_ms": 749,
+      "evidence": [
+        "daemon pid 3992 answered after 282 ms",
+        "manifest keys ok; exported PNG 1000x260, 35254 bytes",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "lib.manifest",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "LIB-1",
+        "CAP-4: export_image",
+        "data model: bundles are the source of truth"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "the library lists a bundle; manifest.json has the schema keys; export of the image is a valid PNG"
+    },
+    {
+      "area": "mcp",
+      "duration_ms": 810,
+      "evidence": [
+        "daemon pid 4056 answered after 282 ms",
+        "server capturemann 0.2.6, protocol \"2025-06-18\"",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "mcp.handshake",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-2",
+        "MCP protocol"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "initialize answers with the server name, the product version and tool support"
+    },
+    {
+      "area": "mcp",
+      "duration_ms": 796,
+      "evidence": [
+        "daemon pid 4131 answered after 282 ms",
+        "74 tools"
+      ],
+      "id": "mcp.tools_list",
+      "message": "tools the spec lists as built but the server lacks: get_cursor_track, normalize_transcript, get_normalized_transcript, import_media, get_platform_rules",
+      "needs": [],
+      "specs": [
+        "AGT-2",
+        "specs/02-agent-interface.md tool table"
+      ],
+      "status": "FAIL",
+      "tier": "smoke",
+      "title": "tools/list matches the tool table of the spec (no drift either way)"
+    },
+    {
+      "area": "ai",
+      "duration_ms": 1264,
+      "evidence": [
+        "llama-server --version: exit 0 (0x00000000) version: 0.7.0-dev (build 0, commit unknown) built with GNU 13.3.0 for Linux x86_64",
+        "daemon pid 4189 answered after 282 ms",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "ai.llama_version",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AI-7",
+        "bug class: llama-server missing in the Windows package"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "the bundled llama-server runs --version and is not started by the daemon"
+    },
+    {
+      "area": "linux",
+      "duration_ms": 335,
+      "evidence": [
+        "session x11 desktop ubuntu:GNOME runtime dir /run/user/1000",
+        "desktop portal answers on the session bus"
+      ],
+      "id": "linux.session",
+      "message": "",
+      "needs": [
+        "desktop_session"
+      ],
+      "specs": [
+        "LINUX-1",
+        "platform-acceptance"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "the run sees a desktop session; the report names X11 or Wayland, the desktop and the portal"
+    },
+    {
+      "area": "zz",
+      "duration_ms": 331,
+      "evidence": [],
+      "id": "zz.crash_events",
+      "message": "no crash log is read on Linux yet",
+      "needs": [],
+      "specs": [
+        "bug: recording stop crash 0xC0000409",
+        "bug: illegal instruction"
+      ],
+      "status": "SKIP",
+      "tier": "smoke",
+      "title": "no crash of a CaptureMann program was logged (Windows event log, macOS DiagnosticReports) during the whole run"
+    }
+  ],
+  "run": {
+    "commit": "",
+    "ffmpeg": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
+    "finished": "2026-11-06T14:15:19Z",
+    "flags": "--tier smoke --out /home/trung/lab/regress-out/20261106T141506Z --who claude-orchestrator --verdict PARTIAL",
+    "gpu": "n/a",
+    "hashes": [
+      [
+        "capturemann",
+        "0b686eba9fb5a8055ffd9326f40aef8330e3e4d0f9fdab0b9fe3e9d312c46b75"
+      ],
+      [
+        "cm-mcp",
+        "bf4ce173a625f22e526827ef3dbb0d82582ca7bacb0230a73f7a7e98933a588c"
+      ],
+      [
+        "cm-daemon",
+        "07f613d3303af7e7a97d9575bb060729cf655f8ffdf163afed4b94a86a3ca3bd"
+      ],
+      [
+        "cm-desktop",
+        "eafc57097cdca0b8339b9b3f21d94183e143288a190a1c8f24a1f29cf3de7bc1"
+      ],
+      [
+        "cm-overlay",
+        "ff6cc670214d44dfc3e1e226497cd6a6971872b5ab4f6ec54012485a1ad3fb7c"
+      ],
+      [
+        "ffmpeg",
+        "a50fdb123b89d9122b62da6c5030b6bb5e09eb9d8df7f07bd8cff3e8f91ef846"
+      ],
+      [
+        "ffprobe",
+        "c5bc5542f0cb02501a2431a6f474d5672a569401ec654c4a44c660919d5ca188"
+      ],
+      [
+        "llama-server",
+        "eb1ea7337742b604ecf1702486f21683fb2f065ad86cfd054e517170f31a1c62"
+      ]
+    ],
+    "os": "Linux 7.0.0-42-generic x86_64",
+    "package_dir": "/opt/capturemann/lib/capturemann",
+    "platform": "linux",
+    "started": "2026-11-06T14:15:07Z",
+    "tier": "smoke",
+    "verdict": "PARTIAL",
+    "version": "0.2.6",
+    "who": "claude-orchestrator"
+  },
+  "schema": 1,
+  "summary": {
+    "fail": 3,
+    "pass": 9,
+    "skip": 2,
+    "total": 14
+  }
+}

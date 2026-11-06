@@ -83,7 +83,7 @@ run_linux() {
   if [ -n "$binary" ]; then
     [ -f "$binary" ] || die "no such file: $binary"
     "$lab" push linux "$binary" >/dev/null
-    lx "mv -f ~/lab/$(basename "$binary") ~/lab/cm-regress && chmod 755 ~/lab/cm-regress"
+    lx "[ \"$(basename "$binary")\" = cm-regress ] || mv -f ~/lab/$(basename "$binary") ~/lab/cm-regress; chmod 755 ~/lab/cm-regress"
   fi
   lx 'test -x ~/lab/cm-regress && ls -l ~/lab/cm-regress | awk "{print \$5, \"bytes\"}"' \
     || die "~/lab/cm-regress is missing: build it on Linux (cargo build --release -p cm-regress) and pass --binary"
