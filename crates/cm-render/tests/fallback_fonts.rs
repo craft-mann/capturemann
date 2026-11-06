@@ -92,3 +92,31 @@ fn ann1_text_emoji_golden() {
     assert_golden("text_emoji", &out, LIMIT);
     assert!(diff_fraction(&out, &base, 8) > 0.02);
 }
+
+/// ANN-1.AC7: Vietnamese (every tone mark and the horn/breve/circumflex letters) renders real
+/// glyphs from the bundled font, in the render path the editor and the exported PNG share.
+#[test]
+fn vietnamese_glyphs_render_without_missing_glyph_boxes() {
+    let tofu = tofu();
+    for ch in "TiếngViệtcóấdàảãạăằẳẵặâầẩẫậđèẻẽẹêềểễệìỉĩịòỏõọôồổỗộơờởỡợùủũụưừửữựỳỷỹỵ".chars()
+    {
+        let img = render(&ch.to_string());
+        assert!(ink(&img) > 20, "{ch} rendered no pixels");
+        assert_ne!(img, tofu, "{ch} rendered as the missing-glyph box");
+    }
+    // A tone mark or a horn is not dropped: the letter differs from its plain base.
+    let pic = |c: char| render(&c.to_string());
+    assert_ne!(pic('e'), pic('ế'));
+    assert_ne!(pic('ế'), pic('ề'));
+    assert_ne!(pic('o'), pic('ơ'));
+    assert_ne!(pic('d'), pic('đ'));
+}
+
+/// A decomposed (NFD) phrase must not draw missing-glyph boxes either: some input methods commit
+/// a base letter and a combining mark.
+#[test]
+fn vietnamese_decomposed_text_has_no_missing_glyph_boxes() {
+    let img = render("Tie\u{302}\u{301}ng Vie\u{323}\u{302}t");
+    assert!(ink(&img) > 20);
+    assert_ne!(img, tofu());
+}
