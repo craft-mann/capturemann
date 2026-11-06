@@ -1,0 +1,150 @@
+{
+  "cases": [
+    {
+      "area": "rec",
+      "duration_ms": 9519,
+      "evidence": [
+        "daemon pid 14224 answered after 321 ms",
+        "started rec_01a1ae6544d3_0001",
+        "export job job_9b15ea1d0e011548: done",
+        "camera 1280x720 h264 measured 26.1 fps, 5.59 s",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "rec.camera",
+      "message": "",
+      "needs": [
+        "desktop_session",
+        "screen",
+        "camera"
+      ],
+      "specs": [
+        "CAM-1",
+        "CAM-2",
+        "bug class: camera 10 fps in low light"
+      ],
+      "status": "PASS",
+      "tier": "hardware",
+      "title": "a camera track keeps at least 24 fps in a lit room"
+    },
+    {
+      "area": "ai",
+      "duration_ms": 2017,
+      "evidence": [
+        "daemon pid 2300 answered after 321 ms",
+        "transcribe without a model: exit 0 (0x00000000) None "
+      ],
+      "id": "ai.no_model",
+      "message": "expected exit 2 with reason no_model, got exit 0 (0x00000000) None None",
+      "needs": [],
+      "specs": [
+        "AI-1",
+        "AI-7"
+      ],
+      "status": "FAIL",
+      "tier": "standard",
+      "title": "without a model, transcribe and the text model say what to do (exit 2) instead of failing"
+    },
+    {
+      "area": "ai",
+      "duration_ms": 29155,
+      "evidence": [
+        "daemon pid 6668 answered after 321 ms",
+        "transcribe: exit 0 (0x00000000) { \"attempts\": 1, \"created_at\": \"2026-11-06T01:07:27.872Z\", \"depends_on\": [], \"elapsed_ms\": 26785, \"error\": null, \"eta_ms\": null, \"finished_at\": \"2026-11-06T01:07:54.66Z\", \"held\": false, \"inputs\": { \"a...",
+        "library entry after transcription: {\"broken\":false,\"created\":\"2026-11-06T01:07:27.7936642Z\",\"duration\":6015000,\"height\":null,\"id\":\"rec_06GTWSBPS4JS98QC\",\"kind\":\"audio\",\"publishes\":[],\"size_bytes\":11241994,\"source\":{\"imported_at\":\"2026-...",
+        "transcript: 116 words over 50.1 s of speech",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "ai.transcribe",
+      "message": "",
+      "needs": [
+        "models"
+      ],
+      "specs": [
+        "AI-1",
+        "AI-3",
+        "bug: Transcribe illegal instruction (AVX-512)"
+      ],
+      "status": "PASS",
+      "tier": "full",
+      "title": "a transcription with a real model runs to the end without a crash"
+    },
+    {
+      "area": "ai",
+      "duration_ms": 44897,
+      "evidence": [
+        "daemon pid 3236 answered after 321 ms",
+        "speakers: exit 0 (0x00000000) { \"attempts\": 1, \"created_at\": \"2026-11-06T01:08:24.726Z\", \"depends_on\": [], \"elapsed_ms\": 7691, \"error\": null, \"eta_ms\": null, \"finished_at\": \"2026-11-06T01:08:40.117Z\", \"held\": false, \"inputs\": { \"b...",
+        "speakers listed: 2",
+        "speakers on the words: {\"1\", \"2\"}",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "ai.speakers",
+      "message": "",
+      "needs": [
+        "models"
+      ],
+      "specs": [
+        "AI-8"
+      ],
+      "status": "PASS",
+      "tier": "full",
+      "title": "speaker labels: two voices give two speakers with the speaker models (--speech, --speaker-models)"
+    }
+  ],
+  "run": {
+    "commit": "2e299d68b1be6c815d19bde47ed81fec8bdb09ad",
+    "ffmpeg": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
+    "finished": "2026-11-06T01:08:41Z",
+    "flags": "--tier hardware --out C:\\lab\\regress-out\\20261106T010707Z --who verify7-agent --verdict PARTIAL --allow screen,sound,mic,camera --only ai.no_model,ai.speakers,ai.transcribe,rec.camera --whisper-model C:/lab/r6/ggml-small.bin --speech C:/lab/r6/speech2.wav --speaker-models C:/lab/r6/spk --commit 2e299d68b1be6c815d19bde47ed81fec8bdb09ad",
+    "gpu": "Intel(R) UHD Graphics 620 (driver 31.0.101.2137)",
+    "hashes": [
+      [
+        "capturemann.exe",
+        "151778d1c113ac4275a98fc23f5228ee33e71df4499b3aa5e72796a0768acc3c"
+      ],
+      [
+        "cm-mcp.exe",
+        "ae6fbf68c31c2b1044dd1ca6a66c14ad7c4193ff88766560bf695ef486b1e514"
+      ],
+      [
+        "cm-daemon.exe",
+        "79cc26336e889696b4da1227e7a36e1b5aef378c043b5b285f4bc44d1bdf23af"
+      ],
+      [
+        "cm-desktop.exe",
+        "3e255bc92a491c0fe1743cac1305002027e9b544c789474c0ada21ecdad1ee5a"
+      ],
+      [
+        "cm-overlay.exe",
+        "39e0356725895600049b88306d88f4abfd2aa141c82e78da4a44b699af370fef"
+      ],
+      [
+        "ffmpeg.exe",
+        "2c1a80e031805cd110bc5cad0c4847dcbccc277ba924a47ff0f1503d92066f91"
+      ],
+      [
+        "ffprobe.exe",
+        "5fec37a87e26a8c3b3da8528045471612003010e22e12f3d25ead8baf0b594fa"
+      ],
+      [
+        "llama-server.exe",
+        "be54819796793a564b088083e8d46febe2b7d3507745d12d886a52465080b115"
+      ]
+    ],
+    "os": "Microsoft Windows 11 Pro 10.0.26200 build 26200",
+    "package_dir": "C:\\Users\\trung\\AppData\\Local\\Programs\\CaptureMann",
+    "platform": "windows",
+    "started": "2026-11-06T01:07:12Z",
+    "tier": "hardware",
+    "verdict": "PARTIAL",
+    "version": "0.2.7",
+    "who": "verify7-agent"
+  },
+  "schema": 1,
+  "summary": {
+    "fail": 1,
+    "pass": 3,
+    "skip": 0,
+    "total": 4
+  }
+}
