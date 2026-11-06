@@ -1,8 +1,8 @@
-# Python packages for convert.sh (installed into $WORK/venv). The pins are the versions the
-# whisper.cpp converter was written against in 2026; the script has not been run on this machine
-# yet (see README), so change a pin only together with a successful run.
-torch==2.9.1
-transformers==4.57.3
-numpy==2.2.6
-huggingface_hub==0.36.0
-safetensors==0.6.2
+# Python packages for convert.sh (installed into $WORK/venv). Bumped on Nov 6, 2026 (0.2.9, bug 4) to
+# versions that clear the open Dependabot alerts (torch fixed in 2.13.0, transformers in 5.10.0); the
+# script was re-run with exactly these pins (see README). Change a pin only together with a successful run.
+torch==2.15.0
+transformers==5.22.1
+numpy==2.5.4
+huggingface_hub==2.4.0
+safetensors==0.8.0

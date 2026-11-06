@@ -13,6 +13,11 @@ bytes (float16), sha256 `db8de368e822fce5dcdce7c0c4c80c4b554c27655516dea5ec8c093
 Vietnamese, **but not well with the app's current settings**: see
 `verification/benchmarks/vietnamese-fleurs-baseline-2026-11-03.md` (PhoWhisper was fine-tuned without timestamp
 tokens, so it needs a no-timestamps decode, and then words glue together). `medium` and `large` were not converted.
+Re-run on Nov 6, 2026 (0.2.9, bug 4) with the bumped pins in `requirements.txt` (torch 2.15.0, transformers 5.22.1,
+numpy 2.5.4, huggingface_hub 2.4.0, safetensors 0.8.0; the old pins were torch 2.9.1, transformers 4.57.3): the converter
+runs unchanged and writes a **byte-identical file** (same sha256 `db8de368...f58785`, 487,601,984 bytes), so the
+benchmark above and the import check still apply and no WER comparison was needed. The pins clear the torch (fixed in
+2.13.0) and transformers (5.10.0) Dependabot alerts; transformers alert 8 has no patched version yet.
 Set `PYTHON=/opt/homebrew/bin/python3.12` (the default `python3` may be too new for the pinned torch).
 
 ## Convert
