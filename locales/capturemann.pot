@@ -513,7 +513,7 @@ msgstr ""
 msgid "Background preset"
 msgstr ""
 
-msgid "Balanced accuracy and speed. A good choice on 8 GB {computers}."
+msgid "Balanced accuracy and speed. A good choice with 8 GB of memory."
 msgstr ""
 
 msgid "Before a screenshot"
@@ -1850,6 +1850,9 @@ msgstr ""
 msgid "Finding speakers… {percent}%"
 msgstr ""
 
+msgid "Finds where people speak so the transcription can skip noise. 0.9 MB."
+msgstr ""
+
 msgid "Finds where speech happens and who overlaps. First of the two files that tell speakers apart."
 msgstr ""
 
@@ -1977,6 +1980,9 @@ msgid "Hide webcam bubble"
 msgstr ""
 
 msgid "Hide when idle"
+msgstr ""
+
+msgid "Higher quality for computers with plenty of memory: better at decisions, owners and translation. About 15 GB to download."
 msgstr ""
 
 msgid "Higher quality makes bigger files."
@@ -3116,6 +3122,9 @@ msgstr ""
 msgid "Opening the capture…"
 msgstr ""
 
+msgid "Optional: best for translation into other languages. Needs about 4 GB of memory."
+msgstr ""
+
 #. FACT: owner review required (every permission note states what macOS does)
 msgid "Optional: without it recordings keep the cursor position but not clicks or scroll. After granting, quit and reopen CaptureMann."
 msgstr ""
@@ -3488,6 +3497,9 @@ msgid "Recommended"
 msgstr ""
 
 msgid "Recommended for Vietnamese meetings. Slower. Best for translation to English."
+msgstr ""
+
+msgid "Recommended for reports and notes on every computer. Best score in our test, English and Vietnamese."
 msgstr ""
 
 msgid "Recommended: fast and accurate for most recordings. Not for translation."
@@ -4236,6 +4248,9 @@ msgid "Size mb"
 msgstr ""
 
 msgid "Size {size}"
+msgstr ""
+
+msgid "Smallest option for computers with little free memory. Notes can miss items."
 msgstr ""
 
 msgid "Smooth move"
@@ -5422,10 +5437,24 @@ msgstr ""
 msgid "Video: {video} · Audio: {audio}"
 msgstr ""
 
+msgid "Vietnamese speech, balanced. Fine-tuned from Whisper small for Vietnamese; not for other languages."
+msgstr ""
+
+msgid "Vietnamese speech, more accurate and slower. Fine-tuned from Whisper medium for Vietnamese; not for other languages."
+msgstr ""
+
+msgid "Vietnamese speech, the largest. Fine-tuned from Whisper large for Vietnamese; not for other languages."
+msgstr ""
+
 msgid "Voice note"
 msgstr ""
 
+#. FACT: owner review required
 msgid "Voices are compared in memory only. No voiceprint is saved, and people are never recognised across recordings."
+msgstr ""
+
+#. FACT: owner review required
+msgid "Voices stay in memory"
 msgstr ""
 
 msgid "Waiting"
