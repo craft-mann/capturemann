@@ -28,13 +28,15 @@ through MCP and a CLI.
   <img alt="The CaptureMann library: recordings, audio and screenshots in one place, with a record button, region, window and display capture, and the AI and agent pages in the sidebar" src="docs/images/library.webp" width="900">
 </p>
 
-> **Status: 0.2.8 (Windows files; macOS stays at 0.2.7). macOS 13+ (Apple Silicon and Intel) is the full app. From 0.2.8
-> Windows 11 (x64) is a supported release (not code-signed; SHA-256 files and winget), with the limits listed in the
-> release notes: Windows 10 not tested on a real device, only Windows 11 on an Intel laptop tested, NVIDIA and AMD
-> hardware untried, a second monitor with mixed scaling not tested, a camera replugged into a different USB port may not
-> resume. Linux (Ubuntu 24.04+, x86_64 and aarch64) stays an early build** (the published Linux files are 0.2.6; 0.2.7 is
-> macOS only). **Windows recording** (screen, microphone, system audio and camera) was run on one lab laptop; the reports
-> are marked PARTIAL in `verification/`. Linux follows in 0.2.9 and its published files have no recording. Most results are
+> **Status: 0.2.8 is out for Windows only (published Nov 6, 2026); the macOS app stays at 0.2.7 and gets the shared
+> changes in 0.2.9. macOS 13+ (Apple Silicon and Intel) is the full app. Windows 11 (x64) is a supported release since
+> 0.2.8: it records the screen, microphone, system audio and camera, and has the editor, local AI, speaker labels and
+> Auto-redact. The files are not code-signed (SHA-256 files; a winget package is submitted, not yet accepted). Limits,
+> also in the release notes: Windows 10 not tested on a real device, only Windows 11 on one Intel laptop tested, NVIDIA
+> and AMD hardware encoders untried, a second monitor with mixed scaling not tested, a camera replugged into a different
+> USB port may not resume. Linux (Ubuntu 24.04+, x86_64 and aarch64) stays an early build** (the published Linux files
+> are 0.2.6, with no recording; they follow in 0.2.9). The Windows results are the `cm-regress` suite on that one lab
+> laptop; the reports are marked PARTIAL in `verification/`. Most other results are
 > tested with scripted fakes, plus the maintainer's own use on one Mac; there are few stored hardware
 > reports. **Speaker labels** are measured on public English conversation clips only (diarization error
 > 17 % on clips held back, [report](verification/benchmarks/speaker-detection-2026-10-29.md)); Vietnamese
@@ -56,7 +58,7 @@ through MCP and a CLI.
   optionally, system audio. A compact recording bar with a level meter, markers (press `M`), a consent
   reminder, and a WAV master that survives a crash. An audio editor with a waveform, a transcript,
   trim and cut, and export to M4A or WAV with loudness levelling.
-- **Local AI**, all on your Mac: Whisper transcripts and captions (SRT, VTT, TXT, or burned in) with
+- **Local AI**, all on your computer: Whisper transcripts and captions (SRT, VTT, TXT, or burned in) with
   Large v3 Turbo as the recommended model, a caption editor, translation to English with Whisper and to
   other languages with the built-in text model, and zoom and silence-cut suggestions. Models download
   only when you press Download.
@@ -72,7 +74,8 @@ through MCP and a CLI.
 - **For agents**: 74 MCP tools plus resources and prompts, and an identical `capturemann` CLI. Risky
   actions (start recording, publish, delete) need an on-screen confirmation.
 - **Private by design**: no telemetry, and no network traffic unless you connect a destination or
-  download a model. You bring your own Google credentials; secrets live in the macOS Keychain.
+  download a model. You bring your own Google credentials; secrets live in the system keychain (macOS Keychain, Windows
+  Credential Manager).
 - English and Vietnamese interface.
 
 <p align="center">
@@ -181,7 +184,7 @@ cargo run -p cm-render --example redaction_bench --release --locked -- run --set
   (`letmein`) are not proposed.
 - Some lookalikes are proposed anyway (in the dev split: hash strings, timestamps, ten-digit ids, tracking
   numbers); that is why you review.
-- On **Linux** Auto-redact uses the system `tesseract` program (recall is lower than Apple Vision's); on **Windows** there is no built-in recognizer yet; it should work with `tesseract` installed, which is not tested there.
+- On **Windows** Auto-redact uses the recognizer built into Windows (0.2.8); on **Linux** it uses the system `tesseract` program (recall is lower than Apple Vision's). The numbers below are for Apple Vision on macOS only; neither of the others has been measured.
 - It is not a compliance tool. **A blurred screenshot is not proof that nothing sensitive remains**: look at
   the result before you share it.
 
@@ -225,11 +228,14 @@ download: [docs/development/releasing.md](docs/development/releasing.md#how-user
 Windows 11 (x64). From [Releases](https://github.com/craft-mann/capturemann/releases) download
 `capturemann-<version>-windows-x64-setup.exe` (a per-user installer, no administrator rights) or
 `capturemann-<version>-windows-x64.zip` (unpack anywhere and run `cm-desktop.exe`; `capturemann.exe` is the command
-line). Check the download with its `.sha256` file (`certutil -hashfile <file> SHA256`).
+line). Check the download with its `.sha256` file (`certutil -hashfile <file> SHA256`) or the release's `SHA256SUMS.txt`.
+A winget package (`winget install CaptureMann.CaptureMann`) is submitted ([pull request](https://github.com/microsoft/winget-pkgs/pull/472327))
+and works only after it is accepted.
 **The files are not signed**, so Windows SmartScreen warns before the first run (More info, then Run anyway).
 From 0.2.8 the Windows build records (screen, microphone, system audio, camera), and has screenshots, the editor, the
-library, local AI, Auto-redact with the recognizer built into Windows, the CLI and the MCP server. It was checked on one
-lab laptop (Windows 11, Intel graphics), see the reports `verification/L1-windows-0.2.8-*.md` (PARTIAL). Not tested:
+library, local AI with the speaker and text models bundled, Auto-redact with the recognizer built into Windows, the CLI
+and the MCP server. It was checked on one lab laptop (Windows 11, Intel graphics), see the reports
+`verification/L1-windows-0.2.8-*.md` (PARTIAL). Not tested:
 Windows 10, NVIDIA and AMD hardware encoders, a second monitor with mixed scaling, SmartScreen on a real download. The
 older 0.2.6 Windows files have no recording.
 
