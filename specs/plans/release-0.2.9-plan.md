@@ -26,12 +26,23 @@ passes the same release regression as Windows 0.2.8 before its files go out (ite
      "Tiếng Việt có dấu" with Telex on Windows and macOS; it appears and exports correctly (font has the glyphs, no tofu).
    - Defaults (new text only; existing annotations are untouched and the user can change colour and size in the panel as before): the text annotation starts at **size 24** and **white**. Check the saved/exported render and a light
      background (white on white needs the existing outline or shadow, or say so).
-3. **AI models page on Windows shows macOS wording.** The page repeats "Mac" platform messages for every model
-   (for example "every Mac", options "for Macs"). Show only what applies to the running platform and use the
-   platform noun from `vocab` ("computer" where none fits). Leads: `apps/desktop/src/platform_text.rs`,
-   `apps/desktop/src/ai/builtin.rs`, the model descriptions in `crates/cm-ai/data/*.json`, `crates/cm-ai/src/text_model/store.rs`
-   and `speaker_engine.rs`. Acceptance: a pass over the Models page on Windows with the pseudo-locale and English finds no "Mac", "Apple Silicon" or "Metal" that does not apply; a test pins the platform
-   filter. (Maintainer's note was short; confirm the exact strings from a screenshot before changing, O2.)
+3. **AI models page on Windows says "Mac" in the model descriptions** (maintainer, Nov 6, 2026: look at the text model
+   section on the Windows app). Cause found in the data, not in the UI: each model's one-line `hint` comes from the
+   catalogues `crates/cm-ai/data/text_models.json` and `models.json` and is shown as is, on every platform:
+   - Gemma 4 E2B: "Recommended for reports and notes on **every Mac**. ..." (recommended model)
+   - Gemma 4 26B-A4B: "Higher quality for **Macs** with plenty of memory ..."
+   - Qwen3.5 2B: "Smallest option for **Macs** with little free memory ..."
+   - Whisper medium (`models.json`): "... A good choice on **8 GB Macs**."
+   These hints are English-only (they are not in `locales/capturemann.pot`, so the Vietnamese page shows English).
+   Fix: make the hints platform-neutral ("every computer", "computers with plenty of memory", "8 GB of memory") **and
+   translatable**: either keep the JSON hint as a message id that goes through `tr!` (extracted into the `.pot`), or move
+   the hint text into the app and look it up by model id; write the Vietnamese. Check the whole Models page (speech, text,
+   speaker sections, sizes and memory lines, the "Metal" or "Apple Silicon" mentions in `speaker_engine.rs` and
+   `text_model/store.rs`) on Windows for the same problem. Acceptance: on Windows, English and Vietnamese, the page
+   shows no "Mac", "Apple Silicon" or "Metal" text; a test fails if a catalogue hint contains a platform noun
+   (`Mac`, `macOS`, `Windows`, `Linux`) without going through the platform vocabulary. The hint wording is a product
+   decision for the 0.2.9 notes only if a hint claims something (like "best score in our test"); keep those claims
+   as written.
 4. **Code-scanning findings, all High, all in `packaging/phowhisper/requirements.txt`** (Trivy and Dependabot):
    `torch==2.9.1` (arbitrary code execution through a malicious checkpoint file, Trivy #7, Dependabot #9) and
    `transformers==4.57.3` (remote code execution, `trust_remote_code` override, `save_pretrained` path traversal,
@@ -110,7 +121,6 @@ passes the same release regression as Windows 0.2.8 before its files go out (ite
 
 ## Still open
 
-- **O2** Bug 3: a screenshot of the Windows Models page, so the exact strings are changed (or confirm the lead strings).
 - **O3** Alerts in bug 4: default is to bump `torch` to 2.10.0 or later and `transformers` to 5.10.0 or later and re-convert
   `small` (about 500 MB download, Python 3.12, on the maintainer's Mac or the agent's, with the throwaway virtual
   environment). If the converter does not work with transformers 5, the pins stay and the maintainer dismisses the
