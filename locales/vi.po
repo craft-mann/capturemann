@@ -6168,9 +6168,32 @@ msgid "{n} line · click text to edit, a time to jump"
 msgid_plural "{n} lines · click text to edit, a time to jump"
 msgstr[0] "{n} dòng · nhấn chữ để sửa, nhấn giờ để chuyển tới"
 
-#, fuzzy
-msgid "Balanced accuracy and speed. A good choice on 8 GB {computers}."
-msgstr "Cân bằng giữa độ chính xác và tốc độ. Lựa chọn tốt cho {computers} 8 GB."
+msgid "Balanced accuracy and speed. A good choice with 8 GB of memory."
+msgstr "Cân bằng giữa độ chính xác và tốc độ. Lựa chọn tốt khi máy có 8 GB bộ nhớ."
+
+msgid "Finds where people speak so the transcription can skip noise. 0.9 MB."
+msgstr "Tìm chỗ có người nói để bản chép lời bỏ qua tạp âm. 0,9 MB."
+
+msgid "Vietnamese speech, balanced. Fine-tuned from Whisper small for Vietnamese; not for other languages."
+msgstr "Giọng nói tiếng Việt, cân bằng. Tinh chỉnh từ Whisper small cho tiếng Việt; không dùng cho ngôn ngữ khác."
+
+msgid "Vietnamese speech, more accurate and slower. Fine-tuned from Whisper medium for Vietnamese; not for other languages."
+msgstr "Giọng nói tiếng Việt, chính xác hơn và chậm hơn. Tinh chỉnh từ Whisper medium cho tiếng Việt; không dùng cho ngôn ngữ khác."
+
+msgid "Vietnamese speech, the largest. Fine-tuned from Whisper large for Vietnamese; not for other languages."
+msgstr "Giọng nói tiếng Việt, bản lớn nhất. Tinh chỉnh từ Whisper large cho tiếng Việt; không dùng cho ngôn ngữ khác."
+
+msgid "Recommended for reports and notes on every computer. Best score in our test, English and Vietnamese."
+msgstr "Khuyên dùng cho báo cáo và ghi chú trên mọi máy tính. Điểm cao nhất trong bài thử của chúng tôi, tiếng Anh và tiếng Việt."
+
+msgid "Higher quality for computers with plenty of memory: better at decisions, owners and translation. About 15 GB to download."
+msgstr "Chất lượng cao hơn cho máy tính có nhiều bộ nhớ: tốt hơn ở các quyết định, người phụ trách và bản dịch. Cần tải khoảng 15 GB."
+
+msgid "Optional: best for translation into other languages. Needs about 4 GB of memory."
+msgstr "Tùy chọn: tốt nhất để dịch sang ngôn ngữ khác. Cần khoảng 4 GB bộ nhớ."
+
+msgid "Smallest option for computers with little free memory. Notes can miss items."
+msgstr "Lựa chọn nhỏ nhất cho máy tính còn ít bộ nhớ trống. Ghi chú có thể bỏ sót mục."
 
 msgid "Fast, fine for clear speech in a quiet room."
 msgstr "Nhanh, đủ dùng cho giọng nói rõ trong phòng yên tĩnh."

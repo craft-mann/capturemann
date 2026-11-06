@@ -269,7 +269,7 @@ impl EngineManager {
                     return Err(engine_error(
                         ErrorKind::NotEnoughMemory,
                         format!(
-                            "The text model `{}` needs about {:.1} GB of free memory and this Mac has {:.1} GB \
+                            "The text model `{}` needs about {:.1} GB of free memory and this computer has {:.1} GB \
                              free. Close other apps, or choose a smaller model on the AI page.",
                             spec.model_id,
                             f64::from(spec.ram_mb) / 1000.0,

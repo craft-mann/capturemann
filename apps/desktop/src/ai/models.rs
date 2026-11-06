@@ -214,10 +214,7 @@ fn model_hint(id: &str, catalogue: &str) -> String {
     match id {
         "tiny" => tr!("Fastest, lowest accuracy. Good for quick drafts on any machine."),
         "base" => tr!("Fast, fine for clear speech in a quiet room."),
-        "small" => tr!(
-            "Balanced accuracy and speed. A good choice on 8 GB {computers}.",
-            computers = crate::platform_text::here(crate::platform_text::Term::Computers)
-        ),
+        "small" => tr!("Balanced accuracy and speed. A good choice with 8 GB of memory."),
         "medium" => tr!("Most accurate, slow. Best for accents and noisy audio."),
         "large" => {
             tr!("Recommended for Vietnamese meetings. Slower. Best for translation to English.")
@@ -230,6 +227,28 @@ fn model_hint(id: &str, catalogue: &str) -> String {
         }
         "speaker-embedding" => {
             tr!("Compares voices so the same person gets the same label. Second of the two files that tell speakers apart.")
+        }
+        "silero-vad" => tr!("Finds where people speak so the transcription can skip noise. 0.9 MB."),
+        "phowhisper-small" => tr!(
+            "Vietnamese speech, balanced. Fine-tuned from Whisper small for Vietnamese; not for other languages."
+        ),
+        "phowhisper-medium" => tr!(
+            "Vietnamese speech, more accurate and slower. Fine-tuned from Whisper medium for Vietnamese; not for other languages."
+        ),
+        "phowhisper-large" => tr!(
+            "Vietnamese speech, the largest. Fine-tuned from Whisper large for Vietnamese; not for other languages."
+        ),
+        "gemma-4-e2b" => tr!(
+            "Recommended for reports and notes on every computer. Best score in our test, English and Vietnamese."
+        ),
+        "gemma-4-26b-a4b" => tr!(
+            "Higher quality for computers with plenty of memory: better at decisions, owners and translation. About 15 GB to download."
+        ),
+        "qwen3.5-4b" => {
+            tr!("Optional: best for translation into other languages. Needs about 4 GB of memory.")
+        }
+        "qwen3.5-2b" => {
+            tr!("Smallest option for computers with little free memory. Notes can miss items.")
         }
         _ => catalogue.to_owned(),
     }
@@ -854,6 +873,19 @@ mod tests {
             assert_ne!(model_hint(id, "catalogue"), "catalogue", "{id}");
         }
         assert!(!model_hint("medium", "").contains("16 GB"));
+        // Every built-in catalogue model has a lookup entry (the English is the catalogue's, so a
+        // hint added to a catalogue without a message id fails here, not in Vietnamese).
+        for m in &cm_ai::model::Catalog::builtin().models {
+            assert_eq!(model_hint(&m.id, "catalogue"), m.hint, "{}", m.id);
+        }
+        for m in &cm_ai::text_model::store::TextCatalog::builtin().models {
+            assert_eq!(
+                model_hint(&m.base.id, "catalogue"),
+                m.base.hint,
+                "{}",
+                m.base.id
+            );
+        }
         // A model from a user's own catalogue keeps its own hint.
         assert_eq!(model_hint("mine", "My hint"), "My hint");
     }
