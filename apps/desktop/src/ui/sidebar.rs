@@ -287,7 +287,7 @@ fn dock(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> AnyElement {
         .gap(px(6.))
         .child(record_btn)
         .child(record_audio_button(t, p, app, 42.));
-    // Without a recorder (Linux and Windows early builds) the buttons stay, so the shortcut and the "not
+    // Without a recorder (early Linux builds) the buttons stay, so the shortcut and the "not
     // available yet" answer are still there, but they read as unavailable.
     let record_row = if crate::backend::recording_supported() {
         record_row

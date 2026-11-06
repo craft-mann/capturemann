@@ -46,7 +46,7 @@ impl SettingsSection {
         SettingsSection::About,
     ];
 
-    /// The sections the sidebar lists: without a recorder (Linux and Windows early builds) the
+    /// The sections the sidebar lists: without a recorder (early Linux builds) the
     /// Webcam & audio page has nothing to configure, so it is left out.
     pub fn visible() -> Vec<SettingsSection> {
         let recording = crate::backend::recording_supported();
@@ -71,7 +71,7 @@ impl SettingsSection {
         }
     }
 
-    /// The label the sidebar shows: without a recorder (Linux and Windows early builds) the Capture page
+    /// The label the sidebar shows: without a recorder (early Linux builds) the Capture page
     /// only holds the screenshot delay, so it is not called "recording".
     pub fn nav_label(self) -> String {
         match self {

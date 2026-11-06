@@ -23,8 +23,8 @@ decision; delete the marker. Nothing here has been posted. Steps: `windows-0.2.8
 
 The Windows build now **records**: the screen, the cursor, the microphone, system audio and the camera. It also imports
 video and audio, exports with a bundled FFmpeg, finds sensitive text with the recognizer built into Windows, and ships the
-speaker engine and the local text engine. It is still an early Windows build. It was tested on **one laptop** (a Lenovo
-ThinkPad T490, Intel UHD 620 graphics, Windows 11), the limits are listed below, and the files are **not signed**.
+speaker engine and the local text engine. Windows 11 (x64) is a supported release from this version. It was tested on **one laptop** (a Lenovo
+ThinkPad T490, Intel UHD 620 graphics, Windows 11; Windows 10 and other graphics hardware were not tested), the limits are listed below, and the files are **not signed**.
 
 ## What is new on Windows
 

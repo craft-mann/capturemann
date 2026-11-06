@@ -20,7 +20,7 @@ through MCP and a CLI.
 <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue"></a>
 <a href="https://github.com/craft-mann/capturemann/releases/latest"><img alt="Version 0.2.8" src="https://img.shields.io/badge/version-0.2.8-blue"></a>
 <img alt="macOS 13+: Apple Silicon and Intel" src="https://img.shields.io/badge/macOS-13%2B%20%7C%20Apple%20Silicon%20%26%20Intel-lightgrey?logo=apple&logoColor=white">
-<img alt="Windows 11 x64: early build" src="https://img.shields.io/badge/Windows-11%20x64%20%7C%20early%20build-0078D4?logo=windows&logoColor=white">
+<img alt="Windows 11 x64, unsigned" src="https://img.shields.io/badge/Windows-11%20x64%20%7C%20unsigned-0078D4?logo=windows&logoColor=white">
 <img alt="Linux: early build, Ubuntu 24.04+ x86_64 and aarch64" src="https://img.shields.io/badge/Linux-Ubuntu%2024.04%2B%20%7C%20early%20build-E95420?logo=linux&logoColor=white">
 </p>
 
@@ -28,11 +28,13 @@ through MCP and a CLI.
   <img alt="The CaptureMann library: recordings, audio and screenshots in one place, with a record button, region, window and display capture, and the AI and agent pages in the sidebar" src="docs/images/library.webp" width="900">
 </p>
 
-> **Status: 0.2.8 (Windows files; macOS stays at 0.2.7). macOS 13+ (Apple Silicon and Intel) is the full app. Windows 11 (x64) and Linux (Ubuntu 24.04+,
-> x86_64 and aarch64) are early builds** (the published files are 0.2.6; 0.2.7 is macOS only). **Windows recording is
-> available in the 0.2.8 track** (screen, microphone, system audio and camera on one lab laptop, reports marked PARTIAL in
-> `verification/`; not released yet); Linux follows in 0.2.9. The published Windows and Linux files have screenshots,
-> the editor, the library, local AI and the CLI and MCP server but no recording, and the Windows files are not signed. Most results are
+> **Status: 0.2.8 (Windows files; macOS stays at 0.2.7). macOS 13+ (Apple Silicon and Intel) is the full app. From 0.2.8
+> Windows 11 (x64) is a supported release (not code-signed; SHA-256 files and winget), with the limits listed in the
+> release notes: Windows 10 not tested on a real device, only Windows 11 on an Intel laptop tested, NVIDIA and AMD
+> hardware untried, a second monitor with mixed scaling not tested, a camera replugged into a different USB port may not
+> resume. Linux (Ubuntu 24.04+, x86_64 and aarch64) stays an early build** (the published Linux files are 0.2.6; 0.2.7 is
+> macOS only). **Windows recording** (screen, microphone, system audio and camera) was run on one lab laptop; the reports
+> are marked PARTIAL in `verification/`. Linux follows in 0.2.9 and its published files have no recording. Most results are
 > tested with scripted fakes, plus the maintainer's own use on one Mac; there are few stored hardware
 > reports. **Speaker labels** are measured on public English conversation clips only (diarization error
 > 17 % on clips held back, [report](verification/benchmarks/speaker-detection-2026-10-29.md)); Vietnamese
@@ -185,7 +187,7 @@ cargo run -p cm-render --example redaction_bench --release --locked -- run --set
 
 ## Install
 
-Pick your system: [macOS](#macos) (below), [Windows](#windows-early-build) or [Linux](#linux-early-build).
+Pick your system: [macOS](#macos) (below), [Windows](#windows) or [Linux](#linux-early-build).
 
 ### macOS
 
@@ -218,18 +220,18 @@ DMG. The `capturemann` command line is inside the app; to use it as `capturemann
 To build it yourself instead, see [building from source](docs/development/building.md). More on verifying a
 download: [docs/development/releasing.md](docs/development/releasing.md#how-users-verify-a-download).
 
-### Windows (early build)
+### Windows
 
 Windows 11 (x64). From [Releases](https://github.com/craft-mann/capturemann/releases) download
 `capturemann-<version>-windows-x64-setup.exe` (a per-user installer, no administrator rights) or
 `capturemann-<version>-windows-x64.zip` (unpack anywhere and run `cm-desktop.exe`; `capturemann.exe` is the command
 line). Check the download with its `.sha256` file (`certutil -hashfile <file> SHA256`).
 **The files are not signed**, so Windows SmartScreen warns before the first run (More info, then Run anyway).
-The published 0.2.6 files work for screenshots of a region, a window or a display, the editor, the library, local AI
-that needs no extra program, the CLI and the MCP server; they have no recording. Recording (screen, microphone, system
-audio, camera) is in the 0.2.8 Windows track and comes with that release; it was checked on one lab laptop, see the
-reports `verification/L1-windows-0.2.8-*.md` (PARTIAL). Auto-redact on Windows is covered by those reports; the
-`tesseract` route (`winget install UB-Mannheim.TesseractOCR`) is not tested there.
+From 0.2.8 the Windows build records (screen, microphone, system audio, camera), and has screenshots, the editor, the
+library, local AI, Auto-redact with the recognizer built into Windows, the CLI and the MCP server. It was checked on one
+lab laptop (Windows 11, Intel graphics), see the reports `verification/L1-windows-0.2.8-*.md` (PARTIAL). Not tested:
+Windows 10, NVIDIA and AMD hardware encoders, a second monitor with mixed scaling, SmartScreen on a real download. The
+older 0.2.6 Windows files have no recording.
 
 ### Linux (early build)
 

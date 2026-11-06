@@ -90,7 +90,7 @@ pub fn recording_enabled_for(mode: &RecordingMode, supported: bool) -> bool {
 /// Why recording cannot start now.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RecordingBlocker {
-    /// This system has no recorder yet (early Linux and Windows builds).
+    /// This system has no recorder yet (early Linux builds).
     NotAvailableYet,
     /// The library could not be opened, so there is nowhere to save.
     NoLibrary,

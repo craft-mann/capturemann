@@ -14,8 +14,8 @@ and delete any line a later run did not support. Nothing here has been posted. S
 # CaptureMann 0.2.8 for Windows
 
 Recording comes to Windows. The Windows build now records the screen, the cursor, the microphone, system audio and
-the camera, imports video and audio, and finds sensitive text with the recognizer built into Windows. It is an early
-Windows build: it was tested on one laptop, and the list of what is not covered is below. The files are **not
+the camera, imports video and audio, and finds sensitive text with the recognizer built into Windows. Windows 11 (x64) is a
+supported release from this version: it was tested on one laptop, and the list of what is not covered is below. The files are **not
 signed**: Windows SmartScreen may warn before it runs a file downloaded in a browser.
 
 ## What is in the Windows build
@@ -32,7 +32,7 @@ signed**: Windows SmartScreen may warn before it runs a file downloaded in a bro
 - **Speaker labels** with the bundled sherpa-onnx speaker engine, and **local transcription and the built-in text
   model** through the bundled `llama-server` (v0.7.0, the same pin as on macOS).
 - Screenshots, the editor and annotations, the library, the `capturemann` command line and the `cm-mcp` server, in
-  English and Vietnamese, as in the early build. Secrets stay in the Windows credential store.
+  English and Vietnamese, as in 0.2.6. Secrets stay in the Windows credential store.
 
 ## What is not there, or limited
 

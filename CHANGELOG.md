@@ -5,6 +5,8 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
+- Windows 11 (x64) is a supported release from 0.2.8, no longer an "early build" (not code-signed; SHA-256 files and winget). Not tested: Windows 10 on a real device, NVIDIA and AMD hardware, a second monitor with mixed scaling; a camera replugged into a different USB port may not resume. Linux stays an early build.
+
 ## [0.2.7] - 2026-11-04
 
 0.2.7 is a macOS release: Import, steadier transcripts, and a cleaner app log. Windows and Linux builds are not part of it (0.2.8 and 0.2.9). The measured transcript numbers are in `verification/benchmarks/` and the study `docs/research/transcription-quality-study-0.2.7.md`.

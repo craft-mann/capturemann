@@ -105,7 +105,7 @@ impl SettingsView {
                         ),
                         true,
                     );
-        // Without a recorder (Linux and Windows early builds) only the screenshot delay applies.
+        // Without a recorder (early Linux builds) only the screenshot delay applies.
         if !crate::backend::recording_supported() {
             return div()
                 .flex()

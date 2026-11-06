@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Builds the Windows "early build": a portable zip and a per-user NSIS installer.
+  Builds the Windows release files: a portable zip and a per-user NSIS installer.
 
 .DESCRIPTION
   Output (packaging\windows\out, git-ignored, or $env:CM_WINDOWS_OUT):
@@ -66,7 +66,7 @@ function Invoke-Native {
 }
 
 if ([Environment]::OSVersion.Platform -ne 'Win32NT') { Fail 'this script only runs on Windows' }
-if ($env:PROCESSOR_ARCHITECTURE -ne 'AMD64') { Fail "unsupported CPU $($env:PROCESSOR_ARCHITECTURE) (x86_64 only for the early build)" }
+if ($env:PROCESSOR_ARCHITECTURE -ne 'AMD64') { Fail "unsupported CPU $($env:PROCESSOR_ARCHITECTURE) (x86_64 only for now)" }
 foreach ($t in 'cargo', 'python') {
   if (-not (Get-Command $t -ErrorAction SilentlyContinue)) {
     if ($t -eq 'python' -and (Get-Command python3 -ErrorAction SilentlyContinue)) { continue }
@@ -338,7 +338,7 @@ try {
   Copy-Item (Join-Path $PSScriptRoot 'path.ps1') $stage
   $speakerLine = if ($useSherpa -and $spkDir) { 'The speaker engine ("Find speakers") is built in and its two models ship in Resources\Models\speaker (MIT and Apache-2.0, licences there).' } elseif ($useSherpa) { 'The speaker engine ("Find speakers") is built in; this package has no speaker models (import them on the AI page).' } else { 'This build has no speaker engine ("Find speakers" is off).' }
   $readme = @"
-CaptureMann $fullVersion for Windows (x64), early build.
+CaptureMann $fullVersion for Windows (x64).
 
 Portable:  unzip anywhere and run cm-desktop.exe. Nothing is written outside this folder and your
            settings and library (%APPDATA%\CaptureMann and your Videos folder).
@@ -346,9 +346,9 @@ Command line:  capturemann.exe --help      MCP server for agents:  cm-mcp.exe
                (both start cm-daemon.exe, next to them, when the app is not running)
 Add this folder to your PATH:  powershell -ExecutionPolicy Bypass -File path.ps1 -Action add -Dir "<this folder>"
 
-Not available yet on Windows: screen, camera and audio RECORDING (screenshots, annotation, the library, local AI,
-the CLI and MCP work). $speakerLine
-Windows may show "Windows protected your PC" (SmartScreen): the early build is not code-signed yet.
+Windows 11 (x64) is supported. Not tested: Windows 10, NVIDIA and AMD hardware encoders, a second monitor with mixed
+scaling. $speakerLine
+Windows may show "Windows protected your PC" (SmartScreen): this build is not code-signed yet.
 Choose "More info" and "Run anyway", or compare the SHA-256 file first.
 Licences: doc\ . ffmpeg.exe (if present) is FFmpeg under the LGPL, see FFmpeg\ .
 llama-server.exe (if present) is llama.cpp (MIT), the built-in text engine, see Llama\ .
