@@ -213,6 +213,21 @@ pub fn has_desktop_with(r: &dyn Runner) -> bool {
 
 // ---- injected keys (System Events, needs Accessibility) ----
 
+/// The virtual key code of a letter or digit on a US layout (the physical key the shortcut names).
+fn key_code(c: char) -> Option<u8> {
+    const LETTERS: [u8; 26] = [
+        0, 11, 8, 2, 14, 3, 5, 4, 34, 38, 40, 37, 46, 45, 31, 35, 12, 15, 1, 17, 32, 9, 13, 7, 16,
+        6,
+    ];
+    const DIGITS: [u8; 10] = [29, 18, 19, 20, 21, 23, 22, 26, 28, 25];
+    let c = c.to_ascii_lowercase();
+    match c {
+        'a'..='z' => Some(LETTERS[(c as u8 - b'a') as usize]),
+        '0'..='9' => Some(DIGITS[(c as u8 - b'0') as usize]),
+        _ => None,
+    }
+}
+
 /// The AppleScript for a chord: modifiers held while the last non-modifier key is pressed.
 pub fn chord_script(keys: &[Key]) -> Result<String, String> {
     let mut mods: Vec<&str> = Vec::new();
@@ -223,10 +238,12 @@ pub fn chord_script(keys: &[Key]) -> Result<String, String> {
             Key::Alt => mods.push("option down"),
             Key::Shift => mods.push("shift down"),
             Key::Esc => base = Some("key code 53".to_owned()),
-            Key::Char(c) if c.is_ascii_alphanumeric() => {
-                base = Some(format!("keystroke \"{}\"", c.to_ascii_lowercase()))
-            }
-            Key::Char(c) => return Err(format!("no key mapping for '{c}'")),
+            // A physical key, not the typed character: with Shift held `keystroke "1"` types "!" and
+            // the app's global hotkey (Option+Shift+1) never fires.
+            Key::Char(c) => match key_code(*c) {
+                Some(code) => base = Some(format!("key code {code}")),
+                None => return Err(format!("no key mapping for '{c}'")),
+            },
         }
     }
     let base = base.ok_or("a chord needs one key besides the modifiers")?;
@@ -674,7 +691,7 @@ mod tests {
     fn chords_become_system_events_scripts() {
         assert_eq!(
             chord_script(&[Key::Alt, Key::Shift, Key::Char('1')]).unwrap(),
-            "tell application \"System Events\" to keystroke \"1\" using {option down, shift down}"
+            "tell application \"System Events\" to key code 18 using {option down, shift down}"
         );
         assert_eq!(
             chord_script(&[Key::Esc]).unwrap(),

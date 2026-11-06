@@ -78,7 +78,8 @@ pub fn cases() -> Vec<Case> {
             specs: &["bug: settings set not applied to the running app", "AGT-1"],
             tier: Tier::Standard,
             needs: &[Need::DesktopSession, Need::Screen],
-            platforms: WIN_MAC,
+            // A second launch forwards `--capture` on Windows and Linux only; on macOS it just shows the running app.
+            platforms: WIN,
             timeout_s: 120,
             run: settings_applied,
         },
@@ -378,12 +379,14 @@ fn hotkey_overlay(ctx: &mut Ctx) -> R {
         ));
     }
     for d in &ds {
-        let want = [
-            d.x as i32,
-            d.y as i32,
-            (d.x + d.w) as i32,
-            (d.y + d.h) as i32,
-        ];
+        // macOS lists window bounds in points; the target list holds physical pixels.
+        let k = if sys::PLATFORM == "macos" && d.scale > 0.0 {
+            d.scale
+        } else {
+            1.0
+        };
+        let px = |v: i64| (v as f64 / k).round() as i32;
+        let want = [px(d.x), px(d.y), px(d.x + d.w), px(d.y + d.h)];
         let hit = wins.iter().any(|w| {
             w.rect
                 .iter()
