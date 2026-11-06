@@ -1,5 +1,5 @@
 ; CaptureMann per-user installer (NSIS 3, Unicode). Built by build-windows.ps1:
-;   makensis /DVERSION=0.2.8 /DVI_VERSION=0.2.8.0 /DSTAGE=<staged tree> /DOUTFILE=<setup.exe> installer.nsi
+;   makensis /DVERSION=0.2.9 /DVI_VERSION=0.2.9.0 /DSTAGE=<staged tree> /DOUTFILE=<setup.exe> installer.nsi
 ;
 ; Per user: no administrator rights, files in %LOCALAPPDATA%\Programs\CaptureMann, Start Menu shortcut,
 ; an entry under "Apps > Installed apps" (HKCU), an optional PATH entry for capturemann.exe and cm-mcp.exe.
