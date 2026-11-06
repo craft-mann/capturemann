@@ -30,6 +30,7 @@ repo="${REPO:-craft-mann/capturemann}"
 ttl="${LOCK_TTL_MIN:-45}"
 
 sys="${1:-}"; shift || true
+if [ "$sys" = linux ]; then . "$here/regress-linux.sh"; code=0; run_linux "$@" || code=$?; exit "$code"; fi
 [ "$sys" = windows ] || die "only 'windows' is implemented (macOS and Linux drivers come later); usage: regress.sh windows [options]"
 tier=smoke; allow=""; run=""; pkgrun=""; only=""; soak=0; model=""; speech=""; spkdir=""; who="cm-regress via regress.sh"; installer=""; label=""; commit=""
 while [ $# -gt 0 ]; do

@@ -88,6 +88,16 @@ pub fn app_crashes_since(since: SystemTime) -> Vec<String> {
     if sys::PLATFORM == "macos" {
         return mac_crash_reports_since(since);
     }
+    if sys::PLATFORM == "linux" {
+        // systemd-coredump records through coredumpctl; `@<seconds>` is a Unix time.
+        let secs = since
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs());
+        return sys::linux::crashes_since(
+            &sys::linux::SystemRunner::default(),
+            &format!("@{secs}"),
+        );
+    }
     if sys::PLATFORM != "windows" {
         return Vec::new();
     }

@@ -146,6 +146,10 @@ enum Step {
 }
 
 fn start(ctx: &mut Ctx, display: &Display, extra: &[&str]) -> R<String> {
+    // Linux keeps recording hidden unless CM_LINUX_RECORDING=1 (None elsewhere).
+    if let Some(why) = sys::recording_unavailable() {
+        return skip(why);
+    }
     let id = display.id.to_string();
     let mut args = vec![
         "record",

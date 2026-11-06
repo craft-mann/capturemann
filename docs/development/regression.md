@@ -81,6 +81,53 @@ cases that need a desktop session report SKIP with that reason (unlock the Mac a
 screenshot cases). Crashes are read from `~/Library/Logs/DiagnosticReports`. The desktop-app and window cases are
 not implemented for macOS yet and report SKIP.
 
+## Run it on Linux (the Ubuntu 24.04 lab laptop)
+
+The Linux driver is `crates/cm-regress/src/sys/linux.rs` (probes and parsers, unit-tested with a fake command runner on
+any machine) and `cases/linux.rs` (the `linux.*` cases). It was written on a Mac and **cross-checked only**
+(`cargo check` and `clippy` for `x86_64-unknown-linux-gnu`); no case has run on the laptop yet, so the first run may
+show wrong assumptions in the suite (fix the suite, not the evidence).
+
+```sh
+cargo build --release -p cm-regress            # on a Linux machine or CI: the laptop has no Rust toolchain
+scripts/testlab/regress.sh linux --tier smoke    --binary <path to cm-regress> --session x11
+scripts/testlab/regress.sh linux --tier standard --allow screen --session wayland
+scripts/testlab/regress.sh linux --tier full     --allow screen --installer capturemann_<v>_amd64.deb      # linux.deb_install
+scripts/testlab/regress.sh linux --tier full     --allow screen --installer capturemann-<v>-linux-x86_64.tar.gz   # linux.tarball_install
+scripts/testlab/regress.sh linux --tier hardware --allow screen,sound,mic --recording    # on request only
+```
+
+- The wrapper (`scripts/testlab/regress-linux.sh`, sourced by `regress.sh`) takes `~/lab/lab.lock` on the laptop, reads
+  the desktop session's environment (`DISPLAY`, `WAYLAND_DISPLAY`, `XAUTHORITY`, `DBUS_SESSION_BUS_ADDRESS`,
+  `XDG_RUNTIME_DIR`) from the running `gnome-shell`, runs `cm-regress` in it, and copies `results.json` and the report to
+  `verification/L1-linux-<version>-regression-<tier>-<x11|wayland>-<date>-claude.md` (+ `.json`). It sets GNOME's idle
+  delay and AC sleep to never for the run and puts them back; with `--allow sound` it saves, sets (0.3, unmuted) and
+  restores the **volume and mute** of the default output with `wpctl` (the default device is never changed). The
+  monitor layout is only read (`xrandr --listmonitors`); `WANT_DISPLAYS=2` waits for an external monitor. It never
+  switches between X11 and Wayland: `--session` refuses to run on the wrong one, the person at the laptop chooses at the
+  login screen. Run each tier once per session type.
+- Every case has its own library and config folder, as on Windows: the real library is never touched.
+- Window and monitor probes use `xprop`, `xwininfo` and `xrandr` (`apt install x11-utils`, installed by
+  `linux-setup.sh`). On **Wayland** GNOME offers no way to list native windows from outside, so window-based checks say
+  so and the app is checked by "stays up and its daemon answers"; the global hotkey and overlay case (`linux.hotkey_overlay`)
+  reports SKIP always (no portal path on GNOME 46, no key injection). Screenshots of a window on Wayland need the
+  desktop's own chooser and are a manual step (`tests/manual/LINUX-1.md`).
+- `linux.vaapi_encoder` runs `vainfo` and compares it with the VAAPI line of `capturemann diagnostics`: H.264 encode
+  listed but no render device reported (or the software-VP9 note) fails; no H.264 encode is reported as "software VP9
+  encoder", the expected state on a machine without a VA-API GPU.
+- `linux.deb_install` needs `--installer <file>.deb`, passwordless `sudo` and no capturemann package installed
+  (otherwise SKIP, so a real install is never replaced). It runs `apt-get install`, checks `dpkg`, the files, that every
+  program's libraries resolve (`ldd`, which tests the `Depends:` list) and `capturemann --version`, then `remove` and
+  `purge`, and purges again whatever happened. `linux.tarball_install` extracts the tarball, installs with
+  `install.sh --prefix <sandbox>` and `HOME` in the sandbox, runs the same checks and `--uninstall`.
+- **Recording** (`rec.*`) runs only with `--recording` (it sets `CM_LINUX_RECORDING=1` for the suite); otherwise each
+  recording case reports SKIP with that reason. The daemon itself is not gated, so the switch only says that the
+  release being tested offers recording.
+- Crashes: `systemd-coredump` records are read with `coredumpctl list --since @<time>` by the same hygiene check that reads the Windows event log (empty when
+  journald keeps no dumps); `kill -9`/signal exits are still caught by the exit-code checks.
+- Not covered on Linux (manual): tray menu entries as the shell draws them, KDE, NVIDIA/AMD encoders, Wayland window
+  capture, the Record sheet look, aarch64.
+
 ## Reading a result
 
 - **FAIL** with the message and evidence lines: expected against actual. A failure in the suite itself (a wrong
@@ -109,8 +156,8 @@ not implemented for macOS yet and report SKIP.
 - Sound, camera and second-monitor cases need the hardware, the room (a lit room for the camera) and
   `--allow`; the volume must be above 0 for the system-audio case. Process-loopback exclusion of CaptureMann's own
   sound cannot be driven from outside; it stays with the `cm-audio` hardware test.
-- Stubs in the first version: clipboard copy (touches the user's clipboard), the macOS and Linux drivers (cases list the platforms they
-  support; the CLI/MCP/library/import/export cases already run on macOS with `--dev`).
+- Stubs: clipboard copy (touches the user's clipboard); the macOS driver (cases list the platforms they support; the
+  CLI/MCP/library/import/export cases already run on macOS with `--dev`).
 - The Windows package workflow does not run `cm-regress`: the suite has not run on a hosted runner yet and a red
   step caused by an unproven assumption would hide real failures. Add `cm-regress.exe --tier smoke --allow screen
   --package-dir <unpacked zip>` after the existing smoke step once a lab run has shown it stable.

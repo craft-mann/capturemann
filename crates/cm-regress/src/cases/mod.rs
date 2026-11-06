@@ -9,6 +9,7 @@ mod export;
 mod import;
 mod installer;
 mod library;
+mod linux;
 mod mcp;
 mod models;
 mod package;
@@ -29,6 +30,7 @@ pub fn all() -> Vec<Case> {
     v.extend(models::cases());
     v.extend(installer::cases());
     v.extend(desktop::cases());
+    v.extend(linux::cases());
     v.extend(regress::cases());
     v
 }

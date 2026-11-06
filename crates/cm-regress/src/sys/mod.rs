@@ -9,9 +9,15 @@ mod windows;
 #[cfg(windows)]
 use windows as imp;
 
-#[cfg(not(windows))]
+// The Linux driver always compiles (std only, its parsers are unit-tested on any machine) and is the
+// active one on Linux; `cases/linux.rs` reaches its probes as `sys::linux::...`.
+pub mod linux;
+#[cfg(target_os = "linux")]
+use linux as imp;
+
+#[cfg(not(any(windows, target_os = "linux")))]
 mod other;
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "linux")))]
 use other as imp;
 
 /// `"windows"`, `"macos"` or `"linux"`.
@@ -129,6 +135,16 @@ pub fn hold_file_open(path: &std::path::Path) -> Result<Box<dyn std::any::Any>, 
 /// The command that opens a small text window on a file (Windows: Notepad), for the window cases.
 pub fn text_window_command(path: &std::path::Path) -> Option<Command> {
     imp::text_window_command(path)
+}
+
+/// Linux only: why the recording cases cannot run (the build keeps recording hidden unless
+/// `CM_LINUX_RECORDING=1`). `None` on the other systems and when the switch is on.
+pub fn recording_unavailable() -> Option<String> {
+    if PLATFORM == "linux" {
+        linux::recording_unavailable()
+    } else {
+        None
+    }
 }
 
 /// The path of the install folder a per-user installer uses by default.
