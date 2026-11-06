@@ -668,11 +668,11 @@ pub fn shortcut_groups() -> [(String, String, Vec<ShortcutAction>); 2] {
 // Privacy
 // ---------------------------------------------------------------------------------------
 
-/// The four fact tiles of Settings -> Privacy: (icon, title, body). The facts are the app's, not
+/// The five fact tiles of Settings -> Privacy: (icon, title, body). The facts are the app's, not
 /// the board's: nothing claims the app "works offline" (the Whisper model download and the OAuth
 /// sign-in use the network when the user starts them), and the agent tile keeps the confirmation
 /// and recording-indicator guarantees (AGT-2).
-pub fn privacy_facts() -> [(&'static str, String, String); 4] {
+pub fn privacy_facts() -> [(&'static str, String, String); 5] {
     [
         (
             "eye-off",
@@ -701,6 +701,13 @@ pub fn privacy_facts() -> [(&'static str, String, String); 4] {
             tr!("Agents stay on this computer"),
             // TRANSLATORS: FACT: owner review required
             tr!("The CLI and MCP server reach the app over a local socket. An agent starting a recording, publishing or deleting always asks you first; the recording indicator can\u{2019}t be hidden."),
+        ),
+        (
+            "lock",
+            // TRANSLATORS: FACT: owner review required
+            tr!("Voices stay in memory"),
+            // TRANSLATORS: FACT: owner review required
+            tr!("Voices are compared in memory only. No voiceprint is saved, and people are never recognised across recordings."),
         ),
     ]
 }
@@ -1188,6 +1195,11 @@ mod tests {
         assert!(all.contains("always asks you first"));
         assert!(all.contains("indicator can\u{2019}t be hidden"));
         assert!(all.contains("unless you connect"));
+        // The speaker sentence moved here from the Speakers tab (0.2.9 bug 5), wording unchanged.
+        assert_eq!(privacy_facts().len(), 5);
+        assert!(all.contains(
+            "voices are compared in memory only. no voiceprint is saved, and people are never recognised across recordings."
+        ));
     }
 
     #[test]

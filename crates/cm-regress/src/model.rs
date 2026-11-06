@@ -103,6 +103,8 @@ impl Platform {
 
 pub const ALL: &[Platform] = &[Platform::Windows, Platform::MacOs, Platform::Linux];
 pub const WIN: &[Platform] = &[Platform::Windows];
+pub const WIN_MAC: &[Platform] = &[Platform::Windows, Platform::MacOs];
+pub const MAC: &[Platform] = &[Platform::MacOs];
 
 /// Why a case ended early.
 #[derive(Debug, Clone)]
