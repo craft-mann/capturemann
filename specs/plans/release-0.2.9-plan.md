@@ -92,10 +92,12 @@ passes the same release regression as Windows 0.2.8 (items 6 and 7).
      pattern) and a stored screenshot of the result with sample names only.
 6. **Regression drivers and reports for macOS and Linux, the same as Windows 0.2.8** (a gate for the macOS and Linux packages) (`cm-regress`, tiers smoke, standard,
    hardware; a stored PARTIAL report per platform and tier in `verification/`, template and rules as for
-   `L1-windows-0.2.8-regression-*`). Today only the CLI, MCP, library, import and export cases run on macOS (`--dev`
-   or `--package-dir`); the desktop-app, window, recording, audio and installer cases are stubs there and there is no
-   Linux driver (`docs/development/regression.md`, "Run it on macOS"; `crates/cm-regress/src/sys/` has only `windows.rs`
-   and `other.rs`). Work:
+   `L1-windows-0.2.8-regression-*`). **Status Nov 6, 2026:** both drivers are written and merged (`sys/macos.rs`, `sys/linux.rs`, `cases/linux.rs`,
+   `regress.sh macos|linux`), tested with fakes only. First dry runs: macOS `--dev --tier standard` 40 passed, 0 failed,
+   16 skipped (no `--allow`); Linux smoke on the lab laptop against the installed 0.2.6 package 9 passed, 3 failed (old package:
+   missing licences, `llama-server` line, MCP tools added in 0.2.8), report `verification/L1-linux-0.2.6-regression-smoke-x11-*`.
+   Still SKIP on macOS: `hud_click_through`, `recording_placement`, `shot.window`, `redact.window_text`, `rec.each_monitor`.
+   Linux needs a Linux x86_64 `cm-regress` (the Mac builds a static musl one with `rust-lld`, no Docker needed). Remaining work:
    - **macOS driver** (`sys/macos.rs`): display and window listing, the desktop-app cases (stays up, second launch,
      hotkey and overlay, settings applied, menu-bar icon), recording on the screen, microphone, system audio and camera
      with the same picture and frame-rate checks as Windows, crash reports, the app bundle and the DMG install and
