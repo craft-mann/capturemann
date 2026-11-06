@@ -1,6 +1,6 @@
 # Release 0.2.9 plan: bug fixes
 
-Status: **draft** (Nov 6, 2026), nothing built. Scope set by the maintainer on Nov 6, 2026: 0.2.9 is a **bug-fix release**.
+Status: **draft** (Nov 6, 2026), nothing built. Scope set by the maintainer on Nov 6, 2026: 0.2.9 is a **bug-fix release** whose main targets are **stabilization, security and some UI/UX enhancements** (no new features).
 The macOS and Linux catch-up moved to 0.3.0 (`release-0.3.0-plan.md`). More bugs will be added as the maintainer
 sends them; every item below keeps its number.
 
