@@ -8302,6 +8302,11 @@ msgstr "Dùng tối đa 60 ký tự."
 msgid "Voices are compared in memory only. No voiceprint is saved, and people are never recognised across recordings."
 msgstr "Giọng nói chỉ được so sánh trong bộ nhớ. Không lưu dấu giọng nói, và không bao giờ nhận ra một người giữa các bản ghi."
 
+# FACT: owner review required
+#. FACT: owner review required
+msgid "Voices stay in memory"
+msgstr "Giọng nói chỉ nằm trong bộ nhớ"
+
 msgid "Name of the meeting"
 msgstr "Tên cuộc họp"
 
