@@ -12,8 +12,8 @@ merge to `main`; the maintainer pushes `main`, signs (minisign) and publishes.
 
 ## Scope change (Nov 6, 2026)
 
-0.2.8 shipped as a **Windows-only** release (tag `v0.2.8`, commit `e54cc665`). **0.2.9 now ships on Windows, macOS and Linux**
-(`release-0.2.9-plan.md`): the 0.2.8 shared-code changes and the 0.2.9 fixes reach the Mac and Linux there, after a
+0.2.8 shipped as a **Windows-only** release (tag `v0.2.8`, commit `e54cc665`). **0.2.9 now ships on Windows and macOS only** (changed Nov 7, 2026: beta users next week; Linux moves here)
+(`release-0.2.9-plan.md`): the 0.2.8 shared-code changes and the 0.2.9 fixes reach the Mac there and Linux here in 0.3.0, after a
 `cm-regress` run per platform (the drivers are built in 0.2.9). **0.3.0 adds features for Linux and is released for Linux
 only.** The Linux tasks below are unchanged; items below that name macOS or Windows are backlog to place in a later release
 unless the maintainer pulls them in.

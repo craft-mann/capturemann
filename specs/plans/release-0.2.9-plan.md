@@ -1,7 +1,8 @@
 # Release 0.2.9 plan: bug fixes
 
 Status: **draft** (Nov 6, 2026), nothing built. Scope set by the maintainer on Nov 6, 2026: 0.2.9 is a **bug-fix release** whose main targets are **stabilization, security, regression testing and some UI/UX enhancements** (no new features).
-**0.2.9 ships on all three platforms** (Windows, macOS, Linux) with the bug fixes, the security work, the regression suite and the UI/UX fixes.
+**0.2.9 ships on Windows and macOS** (maintainer, Nov 7, 2026: beta users next week) with the bug fixes, the security work, the regression suite and the UI/UX fixes.
+Linux moves to 0.3.0 with its features (a Linux-only release): the Linux driver and the Nov 6 to 7 Ubuntu reports stay as input (see "Linux, moved to 0.3.0")
 New Linux features and a Linux-only release are 0.3.0 (`release-0.3.0-plan.md`). More bugs will be added as the maintainer
 sends them; every item below keeps its number.
 
@@ -124,8 +125,8 @@ passes the same release regression as Windows 0.2.8 (items 6 and 7).
 
 ## Decisions (maintainer, Nov 6, 2026)
 
-- **Platforms and order:** one 0.2.9 tag for Windows, macOS and Linux, released when all three regressions have passed.
-  0.3.0 is Linux-only (new Linux features).
+- **Platforms and order (changed Nov 7, 2026):** one 0.2.9 tag for **Windows and macOS**, released when both regressions have passed.
+  Linux is not in 0.2.9: it ships in 0.3.0 with its features (Linux-only). The Linux package workflow still builds, nothing is published for Linux in 0.2.9.
 - **Intel Mac:** no Intel Mac is available. The Intel DMG is built and checked on Apple Silicon only, and the release
   text says so (as in 0.2.1 to 0.2.7).
 - **Linux recording:** stays behind `CM_LINUX_RECORDING=1`; Linux stays an early build. Linux files are signed with
@@ -148,11 +149,11 @@ passes the same release regression as Windows 0.2.8 (items 6 and 7).
 
 ## Done when
 
-Each bug has a test or a stored real-device step; the 0.2.9 packages are built for Windows, macOS and Linux, and `cm-regress` smoke, standard and
+Each bug has a test or a stored real-device step; the 0.2.9 packages are built for Windows and macOS, and `cm-regress` smoke, standard and
 hardware are run on each (reports stored, PARTIAL); the Windows CI job meets
 item 7; CI is green on `main`; and the code-scanning list for `packaging/phowhisper/requirements.txt` is empty or dismissed
 with reasons. Release mechanics, as for 0.2.8: version bump, `docs/project/status.md` and `CLAUDE.md` current-state update,
-release text and steps from the 0.2.8 files as the template, winget package update, Homebrew cask, macOS notarization, Linux minisign signatures; the maintainer pushes `main`, the tag and
+release text and steps from the 0.2.8 files as the template, winget package update, Homebrew cask, macOS notarization; the maintainer pushes `main`, the tag and
 publishes.
 
 ## How the agent works
@@ -163,3 +164,12 @@ handoff: `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -
 `cargo test --workspace --locked`, `python3 scripts/check_target_os.py`, `cargo run -p cm-i18n -- check`. Windows-only
 code cannot be compiled on the Mac: CI on `track/windows` (workflow_dispatch) is the check, and the Windows job takes
 about an hour until the CI speed-up (item 7) lands, so do that first.
+
+## Linux, moved to 0.3.0 (Nov 7, 2026)
+
+Not part of the 0.2.9 gate. Kept as input for 0.3.0: the driver (`sys/linux.rs`, `cases/linux.rs`, `regress-linux.sh`) is merged; the 0.2.9 Linux
+packages built in the "Linux package" workflow (run 42235708429) and ran on the lab laptop (Ubuntu 24.04, X11): deb and tarball install cases
+passed; smoke 11/1/2, standard and hardware (no sound) reports are in `verification/L1-linux-0.2.9-*`. Open for 0.3.0: `rec.screen_cursor` and
+`rec.mic` start killed by a signal, `rec.kill9_recovery` portal refusal, `linux.*` desktop cases leaving `cm-desktop` running (and the share-screen
+prompt), `linux.vaapi_encoder` mismatch, import/export on a machine with no hardware encoder (software VP9), and suite expectations that should be
+SKIP or Linux-specific (`pkg.files` licence paths in the deb, region/camera "not available on Linux yet", H.264/BT.709 checks).
