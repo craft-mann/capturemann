@@ -29,13 +29,13 @@ through MCP and a CLI.
 </p>
 
 > **Status: 0.2.8 is out for Windows only (published Nov 6, 2026); the macOS app stays at 0.2.7 and gets the shared
-> changes in 0.2.9. macOS 13+ (Apple Silicon and Intel) is the full app. Windows 11 (x64) is a supported release since
+> changes in 0.3.0. macOS 13+ (Apple Silicon and Intel) is the full app. Windows 11 (x64) is a supported release since
 > 0.2.8: it records the screen, microphone, system audio and camera, and has the editor, local AI, speaker labels and
 > Auto-redact. The files are not code-signed (SHA-256 files; a winget package is submitted, not yet accepted). Limits,
 > also in the release notes: Windows 10 not tested on a real device, only Windows 11 on one Intel laptop tested, NVIDIA
 > and AMD hardware encoders untried, a second monitor with mixed scaling not tested, a camera replugged into a different
 > USB port may not resume. Linux (Ubuntu 24.04+, x86_64 and aarch64) stays an early build** (the published Linux files
-> are 0.2.6, with no recording; they follow in 0.2.9). The Windows results are the `cm-regress` suite on that one lab
+> are 0.2.6, with no recording; they follow in 0.3.0). The Windows results are the `cm-regress` suite on that one lab
 > laptop; the reports are marked PARTIAL in `verification/`. Most other results are
 > tested with scripted fakes, plus the maintainer's own use on one Mac; there are few stored hardware
 > reports. **Speaker labels** are measured on public English conversation clips only (diarization error

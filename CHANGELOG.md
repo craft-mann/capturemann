@@ -10,7 +10,7 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 0.2.8 is the Windows release. CaptureMann on Windows 11 (x64) now records, imports, exports, finds sensitive text, labels
 speakers and runs the local text model, as on the Mac. The files are not code-signed (SHA-256 files and winget instead).
 It was tested on one laptop (ThinkPad T490, Intel UHD 620, Windows 11); the reports are in `verification/` and all are
-PARTIAL. No macOS or Linux build is part of this release: the shared changes below reach them in 0.2.9.
+PARTIAL. No macOS or Linux build is part of this release: the shared changes below reach them in 0.3.0.
 
 ### Added
 - **Windows recording** of a display, a window or a region, with the cursor, microphone, system audio (without
@@ -56,7 +56,7 @@ PARTIAL. No macOS or Linux build is part of this release: the shared changes bel
 
 ## [0.2.7] - 2026-11-04
 
-0.2.7 is a macOS release: Import, steadier transcripts, and a cleaner app log. Windows and Linux builds are not part of it (0.2.8 and 0.2.9). The measured transcript numbers are in `verification/benchmarks/` and the study `docs/research/transcription-quality-study-0.2.7.md`.
+0.2.7 is a macOS release: Import, steadier transcripts, and a cleaner app log. Windows and Linux builds are not part of it (0.2.8 and 0.3.0). The measured transcript numbers are in `verification/benchmarks/` and the study `docs/research/transcription-quality-study-0.2.7.md`.
 
 ### Added
 

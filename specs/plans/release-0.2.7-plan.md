@@ -4,7 +4,7 @@ Status: **released Nov 4, 2026** (tag `v0.2.7` on `6e992cd`; entry in `docs/proj
 
 - **0.2.7 is macOS only:** stabilisation, plus faster and more accurate **transcription**, **speaker detection** and
   **report writing**.
-- **Windows catch-up moves to 0.2.8, Linux catch-up to 0.2.9** (kept below under "Later releases"). The 0.2.7 release
+- **Windows catch-up moves to 0.2.8, Linux catch-up to 0.3.0** (kept below under "Later releases"). The 0.2.7 release
   does not change the Windows and Linux early builds; they stay at their 0.2.6 state and the release text says so.
 - **Import media (Nov 3, 2026, maintainer): videos and audio files imported into the library ship in 0.2.7** as a third
   track, M3 below (design boards I0 to I4 in `capturemann-redesign 6/`, text in `import-media-design.md`).
@@ -18,7 +18,7 @@ in platform code (`python3 scripts/check_target_os.py`); every user-facing actio
 UI text through `cm_i18n`; one change per commit with the two trailer lines; no failing tests merge to `main`; the
 maintainer pushes `main`, signs, publishes and notarizes.
 
-## Where 0.2.6 left things (inputs to this plan; the Linux and Windows rows feed 0.2.8 and 0.2.9)
+## Where 0.2.6 left things (inputs to this plan; the Linux and Windows rows feed 0.2.8 and 0.3.0)
 
 | Area | State at 0.2.6 | Source |
 | --- | --- | --- |
@@ -402,7 +402,7 @@ CI: shared-code commits from M1 touch `apps/desktop`, which Linux and Windows al
 - Windows work may touch `crates/cm-ai` in Windows-only files and separate commits (0.2.8 plan); `mac-ai` is not
   blocked by it, and the maintainer merges one track at a time.
 
-Moved to the 0.2.8 and 0.2.9 plans: O3 (Linux packaging), O4 (Windows signing), O5 (recording on Linux and Windows).
+Moved to the 0.2.8 and 0.3.0 plans: O3 (Linux packaging), O4 (Windows signing), O5 (recording on Linux and Windows).
 
 ## Risks
 
@@ -415,7 +415,7 @@ Moved to the 0.2.8 and 0.2.9 plans: O3 (Linux packaging), O4 (Windows signing), 
   not measure whether claims are right, and the release text must not call it accuracy.
 - Two tracks edit near `apps/desktop` and `cm-daemon`; the ownership table gives the shared job files to `mac-ai` by name,
   and M1's shared-code commits merge first, then `mac-ai` rebases.
-- The Linux and Windows early builds get no fixes in 0.2.7; any user report of a bug there is logged for 0.2.8 or 0.2.9.
+- The Linux and Windows early builds get no fixes in 0.2.7; any user report of a bug there is logged for 0.2.8 or 0.3.0.
 
 ## Later releases (not part of 0.2.7)
 
@@ -423,6 +423,6 @@ Moved out on Nov 3, 2026 so 0.2.7 can stay on macOS. Each has its own plan, owne
 runs alongside 0.2.7 on its own worktree (shared code is merged after M1's, see each plan):
 
 - **0.2.8, Windows:** `specs/plans/release-0.2.8-plan.md`
-- **0.2.9, Linux:** `specs/plans/release-0.2.9-plan.md`
+- **0.3.0, Linux:** `specs/plans/release-0.3.0-plan.md`
 
 The one test laptop (Linux and Windows dual boot) is not used by the 0.2.7 tracks. O3, O4, O5 live in those plans.

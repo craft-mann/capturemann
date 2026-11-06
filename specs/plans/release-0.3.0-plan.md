@@ -1,7 +1,7 @@
-# Release 0.2.9 plan: macOS and Linux catch-up, Windows follow-ups
+# Release 0.3.0 plan: macOS and Linux catch-up, Windows follow-ups
 
 Status: **draft** (Nov 3, 2026, scope widened Nov 6, 2026), nothing built; 0.2.7 was released Nov 4, 2026. Scope set by the maintainer on Nov 3, 2026: 0.2.7 macOS only
-(`release-0.2.7-plan.md`), 0.2.8 Windows (`release-0.2.8-plan.md`), **0.2.9 Linux**. A separate session and agent own
+(`release-0.2.7-plan.md`), 0.2.8 Windows (`release-0.2.8-plan.md`), **0.3.0 Linux**. A separate session and agent own
 this plan and run alongside the 0.2.7 work (see "Working next to 0.2.7 and 0.2.8").
 
 Rules that apply: general techniques only, no one-recording fixes; **nothing is called "verified" without a stored
@@ -15,8 +15,8 @@ merge to `main`; the maintainer pushes `main`, signs (minisign) and publishes.
 0.2.8 shipped as a **Windows-only** release (tag `v0.2.8`, commit `e54cc665`). The shared-code changes in it (Vietnamese
 wording with "bản ghi" for track, the diagnostics CPU-features line, Recycle Bin wording from `vocab`, the speaker-model
 lookup, `get_cursor_track` and `get_platform_rules`, the 18 px minimum recording side) reach the Mac and Linux only with
-0.2.9. So 0.2.9 is **macOS (0.2.9) and Linux, each after a full regression run on that platform** (`cm-regress` per platform,
-stored PARTIAL report; the macOS and Linux drivers do not exist yet, see below). Do not tag 0.2.9 before the macOS regression
+0.3.0. So 0.3.0 is **macOS (0.3.0) and Linux, each after a full regression run on that platform** (`cm-regress` per platform,
+stored PARTIAL report; the macOS and Linux drivers do not exist yet, see below). Do not tag 0.3.0 before the macOS regression
 report exists. The Linux tasks below are unchanged.
 
 ### Backlog from 0.2.8 (added Nov 6, 2026)
@@ -29,7 +29,7 @@ report exists. The Linux tasks below are unchanged.
    rust-cache; skip `compose_perf` and the GPU `parity` test on the Windows runner (macOS covers them); split the job or use
    nextest; optional opt-level 2 for dependencies. Measure before and after on a branch; target 15 to 20 min warm.
 3. **Regression drivers:** `cm-regress` for macOS (smoke and standard exist as a dev driver; add window and desktop-app
-   cases) and for Linux. Required before the 0.2.9 macOS and Linux releases.
+   cases) and for Linux. Required before the 0.3.0 macOS and Linux releases.
 4. **Output-device chooser** in the editor (playback follows the system default; an external monitor with speakers can take
    it over).
 5. **Spec decisions and small features:** `export_image` MCP tool needs a spec decision; the
@@ -37,7 +37,7 @@ report exists. The Linux tasks below are unchanged.
 6. **Wording:** the import summary messages in `import_ops` still say "Trash" on every platform (the capture-delete text
    uses `vocab::here(Term::Trash)` since 0.2.8); 86 Vietnamese entries are still fuzzy.
 7. **Windows items not run for 0.2.8:** Windows 10, a mixed-DPI second monitor, NVIDIA and AMD encoders, SmartScreen on a
-   real download, a phone A/V clap check; each a stored step or an explicit "not run" in the 0.2.9 notes.
+   real download, a phone A/V clap check; each a stored step or an explicit "not run" in the 0.3.0 notes.
 
 ## Where 0.2.6 left Linux (inputs)
 
@@ -101,13 +101,13 @@ scripts/check_target_os.py`. Final report: commits, tests run, reports written, 
 Same rules as the Windows plan: merge 0.2.7's M1 shared-code commits (`apps/desktop` window lifetime) first and
 rebase; keep `apps/desktop` edits to Linux-specific files until then; `cm-platform` is shared with the Windows agent, so
 Linux and Windows code live in separate files and the maintainer merges one track at a time. Release order is 0.2.7,
-0.2.8, 0.2.9; do not tag 0.2.9 before 0.2.8 is published. Linux early builds are rebuilt only with 0.2.9 unless a
+0.2.8, 0.3.0; do not tag 0.3.0 before 0.2.8 is published. Linux early builds are rebuilt only with 0.3.0 unless a
 shared-code change forces it.
 
 ## Decisions needed from the maintainer
 
-- **O3** Linux distribution beyond `.deb` and tarball: APT repository or Flatpak in 0.2.9, or later.
-- **O5** Is recording on Linux a **must** for 0.2.9? Default proposal: no. It ships only if the gate passes.
+- **O3** Linux distribution beyond `.deb` and tarball: APT repository or Flatpak in 0.3.0, or later.
+- **O5** Is recording on Linux a **must** for 0.3.0? Default proposal: no. It ships only if the gate passes.
 - **O9** Which machines are acceptable for the hardware gaps (a KDE VM for shortcuts, an ARM device, NVIDIA/AMD).
 
 ## Risks

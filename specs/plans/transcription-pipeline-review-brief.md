@@ -6,7 +6,7 @@
 
 - Open source (Apache-2.0). **No phrase lists, no per-language blocklists, no fixes for one recording.** Only general techniques and options.
 - Everything runs locally (no cloud ASR). No GPL code in shipped binaries. Models are downloaded by the user; the app never ships weights.
-- macOS (Apple Silicon first) is the 0.2.7 target. Windows and Linux follow in 0.2.8 and 0.2.9.
+- macOS (Apple Silicon first) is the 0.2.7 target. Windows and Linux follow in 0.2.8 and 0.3.0.
 - Every claim about quality needs a stored report.
 
 ---

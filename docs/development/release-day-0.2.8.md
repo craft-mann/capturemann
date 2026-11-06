@@ -7,7 +7,7 @@ Written Nov 5, 2026 from how 0.2.7 was done (commits `407acfa3` version bump, `b
 
 ## Before the day: decisions that block the text
 
-1. ~~Is a macOS DMG (or Linux file) part of the 0.2.8 tag?~~ Decided Nov 6, 2026: **no**. 0.2.8 is Windows files only, a pre-release; macOS and Linux get their update in 0.2.9, after a full regression run on each.
+1. ~~Is a macOS DMG (or Linux file) part of the 0.2.8 tag?~~ Decided Nov 6, 2026: **no**. 0.2.8 is Windows files only, a pre-release; macOS and Linux get their update in 0.3.0, after a full regression run on each.
 2. ~~Transcription track~~ Nothing was merged for it on the 0.2.8 track, so the "still a known fault" line stays in the
    text (checked against `specs/plans/release-0.2.8-plan.md`, "Transcription track": not a gate).
 3. ~~Vietnamese~~ Reviewed by the maintainer on Nov 6, 2026 except 86 entries (new Windows and Linux wording) that stay
@@ -133,5 +133,5 @@ tap, test with `brew install --cask` from a throwaway tap (`releasing.md` step 9
    `specs/plans/release-0.2.8-plan.md`, the README status line. Push.
 2. Update the website download link (manual; <https://www.craftmann.app/capturemann/>) and announce. **[M]**
 3. Clean up: remove `~/release-0.2.8`, the `capturemann-wt/*` worktrees and their `target/` folders (disk filled up on Nov 5).
-4. Rollback: `releasing.md` "Rollback and yank"; a bad Windows file is replaced by a new tag (0.2.9 is Linux, so use 0.2.8.1 or
+4. Rollback: `releasing.md` "Rollback and yank"; a bad Windows file is replaced by a new tag (0.3.0 is Linux, so use 0.2.8.1 or
    agree the number first), never an edited asset.

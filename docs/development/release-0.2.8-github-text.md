@@ -12,7 +12,7 @@ posted. Steps: `windows-0.2.8-release-checklist.md` and
 - **Files to attach:** `capturemann-0.2.8-windows-x64-setup.exe`, `capturemann-0.2.8-windows-x64.zip`, their two
   `.sha256` files and `SHA256SUMS.txt` (made by `packaging/windows/release-files.sh`). Windows files are not signed
   (decision O4, Nov 5, 2026). No macOS or Linux files are attached (decided Nov 6, 2026: 0.2.8 is Windows only); the
-  shared changes below reach the Mac and Linux with their next builds (0.2.9 is Linux).
+  shared changes below reach the Mac and Linux with their next builds (0.3.0 is Linux).
 
 ---
 

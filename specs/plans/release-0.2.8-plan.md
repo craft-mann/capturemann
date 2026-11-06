@@ -2,9 +2,9 @@
 
 Status: **in progress on `track/windows`, not released** (updated Nov 5, 2026). Windows recording, import, OCR and packaging are built on the branch and were run on a lab laptop (reports PARTIAL in `verification/L1-windows-0.2.8-*`). Scope set by the maintainer on Nov 3, 2026: 0.2.7 is macOS only
 
-Decision (maintainer, Nov 6, 2026): 0.2.8 ships Windows files only. The shared-code changes on this branch reach macOS and Linux in 0.2.9, after a full regression run on each platform.
-(`specs/plans/release-0.2.7-plan.md`, **released Nov 4, 2026**), **0.2.8 is Windows**, 0.2.9 is Linux
-(`release-0.2.9-plan.md`). A separate session and agent own this plan. The transcription follow-ups from 0.2.7 are a
+Decision (maintainer, Nov 6, 2026): 0.2.8 ships Windows files only. The shared-code changes on this branch reach macOS and Linux in 0.3.0, after a full regression run on each platform.
+(`specs/plans/release-0.2.7-plan.md`, **released Nov 4, 2026**), **0.2.8 is Windows**, 0.3.0 is Linux
+(`release-0.3.0-plan.md`). A separate session and agent own this plan. The transcription follow-ups from 0.2.7 are a
 parallel track, not part of the Windows scope (see "Transcription track").
 
 Rules that apply (from `CLAUDE.md` and the maintainer): general techniques only, no phrase lists or one-recording
@@ -33,7 +33,7 @@ From `verification/L1-windows-thinkpad-2026-11-02-claude.md` and `specs/plans/re
 
 Lab: the ThinkPad booted into Windows 11 (`scripts/testlab/lab.sh switch windows`; network profile Private; the user's
 session for GUI steps; helpers in `C:\lab`). 0.2.7 does not use the laptop, so the Windows agent holds it until it
-hands it to the Linux agent (0.2.9) in the state that plan expects (Ubuntu Wi-Fi joined).
+hands it to the Linux agent (0.3.0) in the state that plan expects (Ubuntu Wi-Fi joined).
 
 1. **Bugs from 0.2.6** (reproduce first with a stored step, then fix, then re-run the step):
    packaged-app names in the picker (read the display name from the package or window title, not the executable path);
