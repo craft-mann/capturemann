@@ -1,6 +1,6 @@
-# Release 0.3.0 plan: macOS and Linux catch-up, Windows follow-ups
+# Release 0.3.0 plan: Linux features (Linux-only release)
 
-Status: **draft** (Nov 3, 2026, scope widened Nov 6, 2026), nothing built; 0.2.7 was released Nov 4, 2026. Scope set by the maintainer on Nov 3, 2026: 0.2.7 macOS only
+Status: **draft** (Nov 3, 2026, scope changed Nov 6, 2026: 0.2.9 ships on all three platforms; 0.3.0 is Linux-only), nothing built; 0.2.7 was released Nov 4, 2026. Scope set by the maintainer on Nov 3, 2026: 0.2.7 macOS only
 (`release-0.2.7-plan.md`), 0.2.8 Windows (`release-0.2.8-plan.md`), **0.3.0 Linux**. A separate session and agent own
 this plan and run alongside the 0.2.7 work (see "Working next to 0.2.7 and 0.2.8").
 
@@ -12,12 +12,11 @@ merge to `main`; the maintainer pushes `main`, signs (minisign) and publishes.
 
 ## Scope change (Nov 6, 2026)
 
-0.2.8 shipped as a **Windows-only** release (tag `v0.2.8`, commit `e54cc665`). The shared-code changes in it (Vietnamese
-wording with "bản ghi" for track, the diagnostics CPU-features line, Recycle Bin wording from `vocab`, the speaker-model
-lookup, `get_cursor_track` and `get_platform_rules`, the 18 px minimum recording side) reach the Mac and Linux only with
-0.3.0. So 0.3.0 is **macOS (0.3.0) and Linux, each after a full regression run on that platform** (`cm-regress` per platform,
-stored PARTIAL report; the drivers are built in 0.2.9). Do not tag 0.3.0 before the macOS regression
-report exists. The Linux tasks below are unchanged.
+0.2.8 shipped as a **Windows-only** release (tag `v0.2.8`, commit `e54cc665`). **0.2.9 now ships on Windows, macOS and Linux**
+(`release-0.2.9-plan.md`): the 0.2.8 shared-code changes and the 0.2.9 fixes reach the Mac and Linux there, after a
+`cm-regress` run per platform (the drivers are built in 0.2.9). **0.3.0 adds features for Linux and is released for Linux
+only.** The Linux tasks below are unchanged; items below that name macOS or Windows are backlog to place in a later release
+unless the maintainer pulls them in.
 
 ### Backlog from 0.2.8 (added Nov 6, 2026)
 
@@ -25,9 +24,7 @@ report exists. The Linux tasks below are unchanged.
    `ToastAction::RevealExport(id)` in `apps/desktop/src/toast.rs`, handled by `crate::ui::export_ui::reveal`
    (`apps/desktop/src/ui/app/toasts.rs`); check the path it opens (the recording's exports folder versus the exported
    file, path separators, `explorer /select`). Add a regress case.
-2. **Windows CI speed-up** (the Windows `Test` step took about 55 min on a cold cache): `cache-on-failure: true` for
-   rust-cache; skip `compose_perf` and the GPU `parity` test on the Windows runner (macOS covers them); split the job or use
-   nextest; optional opt-level 2 for dependencies. Measure before and after on a branch; target 15 to 20 min warm.
+2. **Windows CI speed-up:** moved to 0.2.9 (`release-0.2.9-plan.md`, item 7, Nov 6, 2026).
 3. **Regression drivers for macOS and Linux:** moved to 0.2.9 (`release-0.2.9-plan.md`, item 6, Nov 6, 2026). 0.3.0 reuses them.
 4. **Output-device chooser** in the editor (playback follows the system default; an external monitor with speakers can take
    it over).

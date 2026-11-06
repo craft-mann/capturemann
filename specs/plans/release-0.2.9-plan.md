@@ -1,15 +1,16 @@
 # Release 0.2.9 plan: bug fixes
 
-Status: **draft** (Nov 6, 2026), nothing built. Scope set by the maintainer on Nov 6, 2026: 0.2.9 is a **bug-fix release** whose main targets are **stabilization, security and some UI/UX enhancements** (no new features).
-The macOS and Linux catch-up moved to 0.3.0 (`release-0.3.0-plan.md`). More bugs will be added as the maintainer
+Status: **draft** (Nov 6, 2026), nothing built. Scope set by the maintainer on Nov 6, 2026: 0.2.9 is a **bug-fix release** whose main targets are **stabilization, security, regression testing and some UI/UX enhancements** (no new features).
+**0.2.9 ships on all three platforms** (Windows, macOS, Linux) with the bug fixes, the security work, the regression suite and the UI/UX fixes.
+New Linux features and a Linux-only release are 0.3.0 (`release-0.3.0-plan.md`). More bugs will be added as the maintainer
 sends them; every item below keeps its number.
 
 Rules that apply: general techniques only, no one-recording fixes; **nothing is called "verified" without a stored
 report in `verification/`**; no GPL/AGPL in shipped binaries; `target_os` only in platform code
 (`python3 scripts/check_target_os.py`); UI text through `cm_i18n`; one change per commit with the two trailer lines; a
 regression test or a stored real-device step for every bug; no failing tests merge to `main`; the maintainer pushes
-`main`, tags and publishes. **0.2.9 ships on all three platforms** (decided Nov 6, 2026): Windows, macOS and Linux get the fixes, and each platform
-passes the same release regression as Windows 0.2.8 before its files go out (item 6).
+`main`, tags and publishes. **0.2.9 ships on all three platforms** (decided Nov 6, 2026): each platform's files go out only after that platform
+passes the same release regression as Windows 0.2.8 (items 6 and 7).
 
 ## Bugs
 
@@ -17,15 +18,14 @@ passes the same release regression as Windows 0.2.8 before its files go out (ite
    Leads: `ToastAction::RevealExport(id)` in `apps/desktop/src/toast.rs`, handled by `crate::ui::export_ui::reveal`
    (`apps/desktop/src/ui/app/toasts.rs`). Check which path it opens (the recording's exports folder versus the exported
    file, path separators, `explorer /select,`). Acceptance: after an export, Reveal opens the folder holding that file
-   with the file selected, on Windows and on macOS. Add a regress case (`cm-regress`, desktop area) and a unit test of
+   with the file selected, on Windows and on macOS; on Linux it opens the folder (a file manager cannot be told to select a file in general). Add the acceptance as a new AC in `specs/features/08-export.md` (next free number, EXP-4 or the feature that owns Reveal) and cite it in the test and commit. Add a regress case (`cm-regress`, desktop area) and a unit test of
    the path it builds.
 2. **Screenshot annotation editor: Vietnamese (Unicode) text cannot be typed, and the text defaults are wrong.**
    - Typing: Telex and VNI input (composed characters, IME composition) does not reach the Text tool. Leads:
      `apps/desktop/src/editor/tools.rs` and `keys.rs` (the Text tool takes key events; IME needs the platform's
      text-input path, as the caption editor and the manual script `tests/manual/I18N-IME.md` use). Acceptance: type
-     "Tiếng Việt có dấu" with Telex on Windows and macOS; it appears and exports correctly (font has the glyphs, no tofu).
-   - Defaults (new text only; existing annotations are untouched and the user can change colour and size in the panel as before): the text annotation starts at **size 24** and **white**. Check the saved/exported render and a light
-     background (white on white needs the existing outline or shadow, or say so).
+     "Tiếng Việt có dấu" with Telex on Windows and macOS; it appears in the editor **and in the exported PNG** (font has the glyphs, no tofu; the export path in `cm-render` has its own font handling, check it separately). Linux (IBus, Fcitx) is not tested in 0.2.9: the release text says so. Add the acceptance as a new AC (next free number after ANN-1.AC6) in `specs/features/02-annotation.md` and cite it in the test and commit.
+   - Defaults (new text only; existing annotations are untouched and the user can change colour and size in the panel as before): the text annotation starts at **size 24** and **white**. Check the saved/exported render. **No automatic outline or shadow** (maintainer decision, Nov 6, 2026: the user can change colour if the screenshot is light).
 3. **AI models page on Windows says "Mac" in the model descriptions** (maintainer, Nov 6, 2026: look at the text model
    section on the Windows app). Cause found in the data, not in the UI: each model's one-line `hint` comes from the
    catalogues `crates/cm-ai/data/text_models.json` and `models.json` and is shown as is, on every platform:
@@ -39,8 +39,9 @@ passes the same release regression as Windows 0.2.8 before its files go out (ite
    the hint text into the app and look it up by model id; write the Vietnamese. Check the whole Models page (speech, text,
    speaker sections, sizes and memory lines, the "Metal" or "Apple Silicon" mentions in `speaker_engine.rs` and
    `text_model/store.rs`) on Windows for the same problem. Acceptance: on Windows, English and Vietnamese, the page
-   shows no "Mac", "Apple Silicon" or "Metal" text; a test fails if a catalogue hint contains a platform noun
-   (`Mac`, `macOS`, `Windows`, `Linux`) without going through the platform vocabulary. The hint wording is a product
+   shows no "Mac", "Apple Silicon" or "Metal" text; a test fails if any catalogue hint (`text_models.json`, `models.json`) contains a platform noun (`Mac`, `macOS`, `Apple`,
+   `Metal`, `Windows`, `Linux`); no exemptions. A hint from a replacement catalogue (`CAPTUREMANN_TEXT_CATALOG`) that has no
+   translation is shown in English as written. The hint wording is a product
    decision for the 0.2.9 notes only if a hint claims something (like "best score in our test"); keep those claims
    as written.
 4. **Code-scanning findings, all High, all in `packaging/phowhisper/requirements.txt`** (Trivy and Dependabot):
@@ -50,9 +51,12 @@ passes the same release regression as Windows 0.2.8 before its files go out (ite
    The file is used only by `packaging/phowhisper/convert.sh`, which the maintainer runs by hand to convert PhoWhisper
    checkpoints; nothing from it ships in the app, the zip or the installer. Work: (a) read each advisory and write down
    the patched versions and whether the converter's use (loading the VinAI checkpoints it names, saving nothing through
-   `save_pretrained`) reaches the vulnerable path; (b) bump `torch`, `transformers`, `huggingface_hub`, `safetensors` and
-   `numpy` to patched versions and **re-run `convert.sh small`** to check that the output hash is unchanged (pins change
-   only together with a successful run, see the file header; the previous result is in `packaging/phowhisper/README.md`);
+   `save_pretrained`) reaches the vulnerable path; (b) bump `torch`, `transformers`, `huggingface_hub` (transformers 5 needs 1.0 or later), `safetensors` and
+   `numpy` to patched versions and **re-run `convert.sh small`** (pins change only together with a successful run, see the file header; the previous result
+   is in `packaging/phowhisper/README.md`). **Pass criterion:** the new ggml file loads in `cm-ai`
+   (`real_model` test) and transcribes a fixed Vietnamese audio file with a word error rate no worse than the stored result
+   for the pinned file. A different file hash alone is not a failure (a torch or transformers major version can change the
+   bytes of an equivalent model); record both hashes in the README and say which file is the new pin;
    (c) if no patched version works with the converter, say so in the README, keep the pins with a short written
    justification, and let the maintainer dismiss the alerts as "not used in shipped code" (only the maintainer can
    dismiss them). Acceptance: the alert list for the file is empty, or each remaining alert is dismissed with a reason.
@@ -62,7 +66,7 @@ passes the same release regression as Windows 0.2.8 before its files go out (ite
    **5.10.0** (the newest of its high alerts, CVE-2026-9856, `save_pretrained` path traversal; the others are fixed from
    5.3.0 and 5.5.0; Dependabot lists the vulnerable range as 4.49.0 to 5.8.1). That is a **major-version jump** (4.x to
    5.x) for the converter, which was written against 4.x: expect `huggingface_hub` and the whisper.cpp
-   `convert-h5-to-ggml.py` loading code to need checks, so the re-conversion of `small` and its hash comparison is the real
+   `convert-h5-to-ggml.py` loading code to need checks, so the re-conversion of `small` and its transcript comparison is the real
    test, not the pin edit.
    Treat the checkpoints as untrusted input in the meantime: the README says to convert only the three pinned VinAI
    revisions in a throwaway virtual environment.
@@ -79,11 +83,12 @@ passes the same release regression as Windows 0.2.8 before its files go out (ite
    - Give the list the free height of the panel and let it **scroll** when it has more speakers than fit (a flexible
      height with a minimum of about three rows and a thin scrollbar, not a fixed one); the controls ("How many people?",
      "My microphone only hears me", "Find again") stay visible under it or in one compact row group.
-   - Acceptance: with 3, 6 and 10 speakers at the smallest supported window height (the laptop in the screenshot, and
+   - Acceptance: with 3, 6 and 10 speakers at the smallest window the app allows (**720 x 480 logical px**, the minimum set in
+     `ui/app/routing.rs`; the default is 1180 x 760; also the laptop in the screenshot, and
      the pseudo-locale, which is 30 % longer), at least three rows show at once, the rest scroll with the wheel and the
      keyboard, nothing is cut mid-row, and the controls are reachable. Add a layout test (the `layout_width_tests`
      pattern) and a stored screenshot of the result with sample names only.
-6. **Release regression on macOS and Linux, the same as Windows 0.2.8** (`cm-regress`, tiers smoke, standard,
+6. **Regression drivers and reports for macOS and Linux, the same as Windows 0.2.8** (a gate for the macOS and Linux packages) (`cm-regress`, tiers smoke, standard,
    hardware; a stored PARTIAL report per platform and tier in `verification/`, template and rules as for
    `L1-windows-0.2.8-regression-*`). Today only the CLI, MCP, library, import and export cases run on macOS (`--dev`
    or `--package-dir`); the desktop-app, window, recording, audio and installer cases are stubs there and there is no
@@ -101,14 +106,22 @@ passes the same release regression as Windows 0.2.8 before its files go out (ite
    - **Runner scripts** (`scripts/testlab/regress.sh macos|linux`): the lock, volume restore, power settings, report
      copy-back and clean-up the Windows script has; Linux runs on the lab laptop, macOS on the maintainer's Mac or a
      second Mac. Never touch the user's real library, the display settings or the audio output device.
-   - **Gate:** smoke, standard and hardware tiers run on the final 0.2.9 files of each platform, failures read and
-     fixed in the product or the suite (not the evidence), and the release text says what was and was not run per
-     platform (as the 0.2.8 text does). Build the drivers **first**, so the bug fixes in items 1 to 5 get regress cases on
-     all platforms as they land.
+   - **Gate:** smoke, standard and hardware tiers run on the final 0.2.9 files of each platform (the Mac, and the Ubuntu
+     24.04 lab laptop for Linux; the laptop is available, so no reduced Linux scope is planned). Failures are read and fixed in the product or the suite (not the evidence), and the
+     release text says what was and was not run per platform (as the 0.2.8 text does). Build the drivers **early**, so the bug
+     fixes in items 1 to 5 get regress cases on all platforms as they land.
+   - Hardware-tier runs record the real screen, microphone and camera: run them only when the maintainer asks. On the Mac
+     use the `-dev` bundle and never touch `/Applications`.
+7. **Windows CI speed-up** (moved from `release-0.3.0-plan.md` item 2, Nov 6, 2026; the Windows `Test` step took about 55 min
+   on a cold cache): `cache-on-failure: true` for rust-cache; skip `compose_perf` and the GPU `parity` test on the Windows
+   runner (macOS covers them); split the job or use nextest; optional opt-level 2 for dependencies. Measure before and after
+   on a branch; target 15 to 20 min warm. Acceptance: the Windows job on `track/windows` takes 20 min or less warm, the skipped
+   tests still run on the macOS job, and nothing else in coverage drops.
 
 ## Decisions (maintainer, Nov 6, 2026)
 
 - **Platforms and order:** one 0.2.9 tag for Windows, macOS and Linux, released when all three regressions have passed.
+  0.3.0 is Linux-only (new Linux features).
 - **Intel Mac:** no Intel Mac is available. The Intel DMG is built and checked on Apple Silicon only, and the release
   text says so (as in 0.2.1 to 0.2.7).
 - **Linux recording:** stays behind `CM_LINUX_RECORDING=1`; Linux stays an early build. Linux files are signed with
@@ -119,21 +132,24 @@ passes the same release regression as Windows 0.2.8 before its files go out (ite
 - **Release process:** as for 0.2.8 (the agent prepares; the maintainer pushes `main` and the tag, and disables the tag
   ruleset for a moment only if a tag has to move).
 
-## Still open
+## Defaults pending confirmation
 
 - **O3** Alerts in bug 4: default is to bump `torch` to 2.10.0 or later and `transformers` to 5.10.0 or later and re-convert
   `small` (about 500 MB download, Python 3.12, on the maintainer's Mac or the agent's, with the throwaway virtual
   environment). If the converter does not work with transformers 5, the pins stay and the maintainer dismisses the
   alerts as "not used in shipped code" (the file is not part of any shipped artifact).
-- **O5** Order of work (default): CI speed-up first (the Windows job takes about an hour), then the regression drivers
+- **O5** Order of work (default): CI speed-up first (item 7; the Windows job takes about an hour), then the regression drivers
   (item 6), then bugs 1 to 5 with their regress cases, then the PhoWhisper pins, then the three regression runs, then the
-  package and release.
+  packages and release.
 
 ## Done when
 
-Each bug has a test or a stored real-device step; the packages for 0.2.9 are built for Windows, macOS and Linux, and
-`cm-regress` smoke, standard and hardware are run on each (reports stored, PARTIAL), CI is green on `main`, and the code-scanning list for
-`packaging/phowhisper/requirements.txt` is empty or dismissed with reasons.
+Each bug has a test or a stored real-device step; the 0.2.9 packages are built for Windows, macOS and Linux, and `cm-regress` smoke, standard and
+hardware are run on each (reports stored, PARTIAL); the Windows CI job meets
+item 7; CI is green on `main`; and the code-scanning list for `packaging/phowhisper/requirements.txt` is empty or dismissed
+with reasons. Release mechanics, as for 0.2.8: version bump, `docs/project/status.md` and `CLAUDE.md` current-state update,
+release text and steps from the 0.2.8 files as the template, winget package update, Homebrew cask, macOS notarization, Linux minisign signatures; the maintainer pushes `main`, the tag and
+publishes.
 
 ## How the agent works
 
@@ -142,4 +158,4 @@ One agent per bug where the files are disjoint, each in its own worktree off `ma
 handoff: `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`,
 `cargo test --workspace --locked`, `python3 scripts/check_target_os.py`, `cargo run -p cm-i18n -- check`. Windows-only
 code cannot be compiled on the Mac: CI on `track/windows` (workflow_dispatch) is the check, and the Windows job takes
-about an hour until the CI speed-up in `release-0.3.0-plan.md` lands (consider doing that first).
+about an hour until the CI speed-up (item 7) lands, so do that first.
