@@ -5,6 +5,27 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-11-06
+
+0.2.8 is the Windows release: recording, import, export, Auto-redact, speaker labels and the text engine on Windows
+(Windows 11 x64, unsigned, tested on one laptop). macOS and Linux get the shared changes below with their next builds.
+
+### Added
+- Windows: recording of screen, cursor, microphone, system audio and camera; Import; export with a bundled LGPL FFmpeg;
+  Auto-redact with Windows.Media.Ocr; speaker engine and `llama-server`; NSIS installer and zip.
+- MCP tools and CLI commands `get_cursor_track` (`capturemann cursor`) and `get_platform_rules` (`capturemann platform-rules`).
+- `settings.changed` and `camera.reconnected` events; `encoder_overloaded` recording warning.
+- `cm-regress`, a release regression suite that drives the shipped package.
+
+### Changed
+- Messages and help use the system's own words (Windows, Linux, Mac).
+- A recording area that is too small is `invalid_input` (`recording_area_too_small`).
+
+### Fixed
+- See the Windows release text: stop crash, start-up panic, Quick Sync format, late-frame count, HUD clicks, monitor placement,
+  window size at 150 % scaling, display and app names, console windows, CLI hang.
+
+### Notes
 - Windows 11 (x64) is a supported release from 0.2.8, no longer an "early build" (not code-signed; SHA-256 files and winget). Not tested: Windows 10 on a real device, NVIDIA and AMD hardware, a second monitor with mixed scaling; a camera replugged into a different USB port may not resume. Linux stays an early build.
 
 ## [0.2.7] - 2026-11-04

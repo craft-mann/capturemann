@@ -2,8 +2,8 @@
 
 Written Nov 5, 2026 from the stored reports in `verification/` (all PARTIAL: one agent, one laptop, nothing seen by a
 person unless a line says so). It replaces `windows-0.2.8-release-notes-draft.md`. Paste "Release body" into the release
-page. Two things are left: the date (`DD` in the CHANGELOG section) and the winget pull request URL (after the pull
-request is opened). The checksums are those of package run 42160646234 (commit `eb3cb47c`). Nothing here has been
+page. One thing is left: the winget pull request URL (after the pull request is opened). The CHANGELOG section is dated Nov 6, 2026
+(change it if the release goes out on another day). The checksums are those of package run 42160646234 (commit `eb3cb47c`). Nothing here has been
 posted. Steps: `windows-0.2.8-release-checklist.md` and
 `release-day-0.2.8.md`.
 
@@ -197,7 +197,7 @@ offer is in the package.
 ## Optional: CHANGELOG section (only if `release.yml` is used for a macOS build in the same tag)
 
 ```
-## [0.2.8] - 2026-11-DD
+## [0.2.8] - 2026-11-06
 
 0.2.8 is the Windows release: recording, import, export, Auto-redact, speaker labels and the text engine on Windows
 (Windows 11 x64, unsigned, tested on one laptop). macOS and Linux get the shared changes below with their next builds.
