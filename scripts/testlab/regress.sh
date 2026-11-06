@@ -16,7 +16,8 @@
 #
 # The laptop is shared: C:\lab\lab.lock ("owner|epoch seconds") says who uses it. The script refuses while the lock is
 # younger than LOCK_TTL_MIN minutes (default 45; FORCE=1 overrides) and removes its own lock when it ends.
-# With `--allow sound` the volume is set to 0.3 unmuted for the run and put back to 0 muted afterwards (C:\lab\vol.ps1).
+# With `--allow sound` the volume is set to 0.3 unmuted for the run and put back to the level and mute state it had before (read first with `vol.ps1 -Action get`; 0 muted only when that
+# could not be read) (C:\lab\vol.ps1).
 # The report is written to verification/L1-windows-<version>-regression-<tier>-<date>-claude.md (+ .json beside it).
 # Needs: gh (for --run / --package-run), python3, the lab settings of lab.sh. The laptop must be up in Windows and a user
 # must be logged in (the tests run in that session through win-run-in-session.ps1).
@@ -67,10 +68,12 @@ if [ -n "$cur" ] && [ "${FORCE:-0}" != 1 ]; then
 fi
 w "Set-Content C:\\lab\\lab.lock '$me|$now' -Encoding ascii" >/dev/null
 sound_on=0
+vol_level=0
+vol_mute=true
 power_saved=""
 cleanup() {
   [ -n "$power_saved" ] && w "powercfg /change monitor-timeout-ac ${power_saved%%,*}; powercfg /change standby-timeout-ac ${power_saved##*,}" >/dev/null 2>&1 || true
-  [ "$sound_on" = 1 ] && w 'C:\lab\vol.ps1 -Action set -Level 0 -Mute true' >/dev/null 2>&1 || true
+  [ "$sound_on" = 1 ] && w "C:\\lab\\vol.ps1 -Action set -Level $vol_level -Mute $vol_mute" >/dev/null 2>&1 || true
   w "if ((Get-Content C:\\lab\\lab.lock -ErrorAction SilentlyContinue) -like '$me|*') { Remove-Item C:\\lab\\lab.lock -Force }" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -94,6 +97,14 @@ fi
 
 # --- sound ---
 if [[ ",$allow," == *,sound,* ]]; then
+  # Read what the laptop has now ("volume=0.62 mute=False") so that the end of the run restores exactly that.
+  vol_read="$(w 'C:\lab\vol.ps1 -Action get' | tr -d '\r' | grep -o 'volume=[0-9.]* mute=[A-Za-z]*' | head -1 || true)"
+  if [[ "$vol_read" =~ ^volume=([0-9.]+)\ mute=([A-Za-z]+)$ ]]; then
+    vol_level="${BASH_REMATCH[1]}"; vol_mute="$(echo "${BASH_REMATCH[2]}" | tr 'A-Z' 'a-z')"
+  else
+    echo "regress.sh: could not read the volume ('$vol_read'); it will be set to 0 muted at the end" >&2
+  fi
+  echo "volume before the run: $vol_level (muted: $vol_mute)"
   sound_on=1
   w 'C:\lab\vol.ps1 -Action set -Level 0.3 -Mute false'
 fi

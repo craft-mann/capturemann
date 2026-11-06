@@ -49,6 +49,58 @@ ThinkPad T490, Intel UHD 620 graphics, Windows 11; Windows 10 and other graphics
 - **Diagnostics** (`capturemann diagnostics`) lists the Windows build, each graphics adapter with its driver, the recognizer,
   FFmpeg, `llama-server` and the speaker engine, and says what this build includes.
 
+## What it looks like
+
+<!-- The images below are in docs/images/windows/ on the Windows track and reach `main` with the merge; the release text
+     refers to them by their raw GitHub address on `main`, so they only show once the merge is done. All were taken on
+     the lab ThinkPad T490 (Windows 11, package 0.2.8) with a private library and made-up content only: generated sample
+     pages, a synthetic voice clip (two Windows text-to-speech voices), no real names, accounts or recordings. -->
+
+Screenshots of the 0.2.8 Windows build on the test laptop. Everything on screen is sample content made for this page.
+
+**Start recording.** The start sheet lists every display (here the laptop panel and an external 4K monitor), and has
+switches for the webcam bubble, the microphone and system audio.
+
+![The Record sheet on Windows with Display, Window and Region, two displays listed (Display 1 and an external monitor), and switches for webcam bubble, microphone and system audio](https://raw.githubusercontent.com/craft-mann/capturemann/main/docs/images/windows/windows-record-sheet.webp)
+
+**Countdown and recording bar.** A 3-second countdown appears on the display being recorded, then the bar with Stop,
+the timer, pause, microphone, camera, pen, restart and discard.
+
+![The 3-second countdown, showing the number 2 in a ring](https://raw.githubusercontent.com/craft-mann/capturemann/main/docs/images/windows/windows-recording-countdown.webp)
+
+![The recording bar at the bottom of the screen showing 00:04, with Stop, pause, microphone, camera, pen, restart and discard buttons, and a red frame around the recorded display](https://raw.githubusercontent.com/craft-mann/capturemann/main/docs/images/windows/windows-recording-bar.webp)
+
+**Transcript with speaker labels.** A 50-second clip of two synthetic voices, transcribed on the laptop with the `small`
+model and labelled by the bundled speaker models (renamed Host and Guest). On this clip one boundary between the voices
+is off by a few words, which is why the labels can be corrected by hand.
+
+![The audio editor on Windows: the transcript on the right with the speakers Host and Guest and their times, and the speaker track under the waveform](https://raw.githubusercontent.com/craft-mann/capturemann/main/docs/images/windows/windows-editor-transcript-speakers.webp)
+
+**Auto-redact.** On a sample page full of made-up personal data, Auto-redact found four items with the recognizer built
+into Windows (two e-mail addresses, a phone number and an IP address). Two are accepted and blurred here; nothing is
+blurred until you accept it. It did not flag the sample card number or the sample key on this page: the recognizer
+finds what it can, so check the result before you share an image.
+
+![The editor with a sample order page: two values are blurred, two are marked with dashed boxes, and the right panel lists the suggested items with Accept buttons](https://raw.githubusercontent.com/craft-mann/capturemann/main/docs/images/windows/windows-auto-redact.webp)
+
+**Speech models and speaker labels.** The AI page lists the Whisper speech models (here `small` is installed and in
+use) and the speaker-label settings. The two speaker-label models are inside the Windows package, so nothing has to be
+downloaded for them.
+
+![The AI models page showing the Tiny, Base and Small speech models, Small marked In use, and the Medium and Large models not installed](https://raw.githubusercontent.com/craft-mann/capturemann/main/docs/images/windows/windows-ai-models.webp)
+
+![The Speaker labels settings: Find speakers after each transcript, switched on, and Your name in transcripts](https://raw.githubusercontent.com/craft-mann/capturemann/main/docs/images/windows/windows-speaker-labels-setting.webp)
+
+**Vietnamese interface.** Settings, General, with the language set to Tiếng Việt. The full interface text was reviewed
+by the maintainer (see the limits above for the 86 draft entries).
+
+![The Settings page in Vietnamese: Cài đặt, Chung, with the language switch on Tiếng Việt](https://raw.githubusercontent.com/craft-mann/capturemann/main/docs/images/windows/windows-vietnamese-settings.webp)
+
+**Window picker.** Pick a window to capture from a list with live thumbnails, or search by name. The region picker
+was not captured for these pictures.
+
+![The window picker listing two windows with thumbnails and their sizes, with a search field and a Capture window button](https://raw.githubusercontent.com/craft-mann/capturemann/main/docs/images/windows/windows-window-picker.webp)
+
 ## Also in this release (all platforms; the Mac and Linux get it with their next builds)
 
 - Two new agent tools, with CLI commands: `get_cursor_track` (`capturemann cursor`) and `get_platform_rules`

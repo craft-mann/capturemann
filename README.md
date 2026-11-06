@@ -233,6 +233,13 @@ lab laptop (Windows 11, Intel graphics), see the reports `verification/L1-window
 Windows 10, NVIDIA and AMD hardware encoders, a second monitor with mixed scaling, SmartScreen on a real download. The
 older 0.2.6 Windows files have no recording.
 
+<p>
+<img alt="The Record sheet on Windows: Display, Window and Region, two displays listed, and switches for the webcam bubble, microphone and system audio" src="docs/images/windows/windows-record-sheet.webp" width="360">
+<img alt="The audio editor on Windows with a transcript labelled with the speakers Host and Guest" src="docs/images/windows/windows-editor-transcript-speakers.webp" width="520">
+</p>
+
+<sub>Screenshots from the 0.2.8 Windows build on the lab laptop, with sample content only. More are in the release notes.</sub>
+
 ### Linux (early build)
 
 Ubuntu 24.04 or later, Debian 13, or another distribution with glibc 2.39 or newer; x86_64 and aarch64. From
