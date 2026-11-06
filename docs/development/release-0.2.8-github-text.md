@@ -3,7 +3,7 @@
 Written Nov 5, 2026 from the stored reports in `verification/` (all PARTIAL: one agent, one laptop, nothing seen by a
 person unless a line says so). It replaces `windows-0.2.8-release-notes-draft.md`. Paste "Release body" into the release
 page. One thing is left: the winget pull request URL (after the pull request is opened). The CHANGELOG section is dated Nov 6, 2026
-(change it if the release goes out on another day). The checksums are those of package run 42160646234 (commit `eb3cb47c`). Nothing here has been
+(change it if the release goes out on another day). The checksums are those of the files built from the tag `v0.2.8` (package run 42175042134, commit `5dffbbab`). Nothing here has been
 posted. Steps: `windows-0.2.8-release-checklist.md` and
 `release-day-0.2.8.md`.
 
@@ -162,9 +162,9 @@ open a console window; the CLI no longer hangs when it starts the daemon.
 
 Windows 11, x64. Windows 10 (22H2) is listed as supported but has not been tested on a real device yet; all testing so far was on Windows 11 with an Intel processor.
 
-- **Installer** `capturemann-0.2.8-windows-x64-setup.exe` (per user, no administrator rights). SHA-256 `5d173869b6b393eb56c0b9d064d553287922974ed4209170dd263d603457899e`
+- **Installer** `capturemann-0.2.8-windows-x64-setup.exe` (per user, no administrator rights). SHA-256 `e4d0eb35af642a46a51bbb40bc59e020acdef56405d4f95e8ce6f043273fba46`
 - **Zip** `capturemann-0.2.8-windows-x64.zip`: unpack anywhere and run `cm-desktop.exe`; `capturemann.exe` is the command line.
-  SHA-256 `0385831a2664f802a07eb0eb2f3c06074b75a8e89f08761b0c1b2f82ba526b86`
+  SHA-256 `0eaa87ea0a9a5cf6bc4117f7994d6b70e9da5b65b6d4b032ef0e2feeb5e33350`
 - **winget** (once the package is accepted): `winget install CaptureMann.CaptureMann` (pull request: `<winget pull request URL>`; add this line to the release only after it is merged)
 - Check a download: `certutil -hashfile <file> SHA256` and compare with the sum above (or `SHA256SUMS.txt`).
 
@@ -177,7 +177,7 @@ normally avoids it.
 - GitHub's `windows-latest`: build, the package, a smoke script, silent install and uninstall
   (`verification/L1-windows-package-ci-2026-11-01-claude.md`, PARTIAL).
 - One ThinkPad T490 (Intel UHD 620, Windows 11 build 26200), driven by an agent over ssh and the desktop session, with the
-  release regression suite `cm-regress` on the package that is shipped (package run 42160646234, commit `eb3cb47c`;
+  release regression suite `cm-regress` on the release candidate (package run 42160646234, commit `eb3cb47c`; the released files were built later from the tag, commit `5dffbbab`, which adds only documents, pictures, the changelog and test-suite code, no product code;
   reports `verification/L1-windows-0.2.8-regression-*-final-*`, all PARTIAL): smoke tier 13 of 13 passed, standard tier
   49 of 49, hardware tier 64 passed, 2 failed, 1 skipped of 67. The two failures were bugs in the test suite (it compared a
   recording with the display size times the scale, but Windows lists physical pixels; the recordings matched the displays
