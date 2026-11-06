@@ -76,7 +76,8 @@ regress_macos() {
   local reg="$root/target/release/cm-regress"
   (cd "$root" && cargo build --release --locked -p cm-regress) || die "cm-regress did not build"
 
-  local lock="${TMPDIR:-/tmp}/cm-regress-mac.lock" me now cur at owner
+  # Globals, not `local`: the EXIT trap runs after this function has returned (with `set -u` a local made it fail and the volume was not restored, Nov 6, 2026).
+  lock="${TMPDIR:-/tmp}/cm-regress-mac.lock"; local cur at owner; me=""; now=""
   me="${USER:-agent}-regress-$$"; now="$(date +%s)"
   if [ -f "$lock" ] && [ "${FORCE:-0}" != 1 ]; then
     cur="$(cat "$lock")"; at="${cur##*|}"; owner="${cur%%|*}"
@@ -85,7 +86,7 @@ regress_macos() {
     fi
   fi
   echo "$me|$now" > "$lock"
-  local sound_on=0 vol_level=0 vol_mute=true caff=""
+  sound_on=0; vol_level=0; vol_mute=true; caff=""
   mac_cleanup() {
     [ "$sound_on" = 1 ] && osascript -e "set volume output volume $vol_level" -e "set volume output muted $vol_mute" >/dev/null 2>&1 || true
     [ -n "$caff" ] && kill "$caff" >/dev/null 2>&1 || true
