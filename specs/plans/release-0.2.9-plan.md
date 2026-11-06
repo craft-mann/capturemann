@@ -1,6 +1,6 @@
-# Release 0.2.9 plan: Linux catch-up and bugs
+# Release 0.2.9 plan: macOS and Linux catch-up, Windows follow-ups
 
-Status: **draft** (Nov 3, 2026), nothing built; 0.2.7 was released Nov 4, 2026. Scope set by the maintainer on Nov 3, 2026: 0.2.7 macOS only
+Status: **draft** (Nov 3, 2026, scope widened Nov 6, 2026), nothing built; 0.2.7 was released Nov 4, 2026. Scope set by the maintainer on Nov 3, 2026: 0.2.7 macOS only
 (`release-0.2.7-plan.md`), 0.2.8 Windows (`release-0.2.8-plan.md`), **0.2.9 Linux**. A separate session and agent own
 this plan and run alongside the 0.2.7 work (see "Working next to 0.2.7 and 0.2.8").
 
@@ -9,6 +9,35 @@ report in `verification/`** (name the distribution, desktop, session type, GPU a
 binaries; `target_os` only in platform code (`python3 scripts/check_target_os.py`); every user-facing action has an MCP
 tool and a CLI command; UI text through `cm_i18n`; one change per commit with the two trailer lines; no failing tests
 merge to `main`; the maintainer pushes `main`, signs (minisign) and publishes.
+
+## Scope change (Nov 6, 2026)
+
+0.2.8 shipped as a **Windows-only** release (tag `v0.2.8`, commit `e54cc665`). The shared-code changes in it (Vietnamese
+wording with "bản ghi" for track, the diagnostics CPU-features line, Recycle Bin wording from `vocab`, the speaker-model
+lookup, `get_cursor_track` and `get_platform_rules`, the 18 px minimum recording side) reach the Mac and Linux only with
+0.2.9. So 0.2.9 is **macOS (0.2.9) and Linux, each after a full regression run on that platform** (`cm-regress` per platform,
+stored PARTIAL report; the macOS and Linux drivers do not exist yet, see below). Do not tag 0.2.9 before the macOS regression
+report exists. The Linux tasks below are unchanged.
+
+### Backlog from 0.2.8 (added Nov 6, 2026)
+
+1. **Windows: the Reveal button in the export toast opens the wrong folder** (window export of a recording). Leads:
+   `ToastAction::RevealExport(id)` in `apps/desktop/src/toast.rs`, handled by `crate::ui::export_ui::reveal`
+   (`apps/desktop/src/ui/app/toasts.rs`); check the path it opens (the recording's exports folder versus the exported
+   file, path separators, `explorer /select`). Add a regress case.
+2. **Windows CI speed-up** (the Windows `Test` step took about 55 min on a cold cache): `cache-on-failure: true` for
+   rust-cache; skip `compose_perf` and the GPU `parity` test on the Windows runner (macOS covers them); split the job or use
+   nextest; optional opt-level 2 for dependencies. Measure before and after on a branch; target 15 to 20 min warm.
+3. **Regression drivers:** `cm-regress` for macOS (smoke and standard exist as a dev driver; add window and desktop-app
+   cases) and for Linux. Required before the 0.2.9 macOS and Linux releases.
+4. **Output-device chooser** in the editor (playback follows the system default; an external monitor with speakers can take
+   it over).
+5. **Spec decisions and small features:** `export_image` MCP tool needs a spec decision; the
+   `capturemann://capture/{id}/cursor` MCP resource; macOS camera reconnect after replugging into another USB port.
+6. **Wording:** the import summary messages in `import_ops` still say "Trash" on every platform (the capture-delete text
+   uses `vocab::here(Term::Trash)` since 0.2.8); 86 Vietnamese entries are still fuzzy.
+7. **Windows items not run for 0.2.8:** Windows 10, a mixed-DPI second monitor, NVIDIA and AMD encoders, SmartScreen on a
+   real download, a phone A/V clap check; each a stored step or an explicit "not run" in the 0.2.9 notes.
 
 ## Where 0.2.6 left Linux (inputs)
 
