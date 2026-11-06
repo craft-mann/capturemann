@@ -24,7 +24,7 @@ passes the same release regression as Windows 0.2.8 before its files go out (ite
      `apps/desktop/src/editor/tools.rs` and `keys.rs` (the Text tool takes key events; IME needs the platform's
      text-input path, as the caption editor and the manual script `tests/manual/I18N-IME.md` use). Acceptance: type
      "Tiếng Việt có dấu" with Telex on Windows and macOS; it appears and exports correctly (font has the glyphs, no tofu).
-   - Defaults: the text annotation starts at **size 24** and **white**. Check the saved/exported render and a light
+   - Defaults (new text only; existing annotations are untouched and the user can change colour and size in the panel as before): the text annotation starts at **size 24** and **white**. Check the saved/exported render and a light
      background (white on white needs the existing outline or shadow, or say so).
 3. **AI models page on Windows shows macOS wording.** The page repeats "Mac" platform messages for every model
    (for example "every Mac", options "for Macs"). Show only what applies to the running platform and use the
@@ -45,6 +45,14 @@ passes the same release regression as Windows 0.2.8 before its files go out (ite
    (c) if no patched version works with the converter, say so in the README, keep the pins with a short written
    justification, and let the maintainer dismiss the alerts as "not used in shipped code" (only the maintainer can
    dismiss them). Acceptance: the alert list for the file is empty, or each remaining alert is dismissed with a reason.
+   **What the open alerts say (read Nov 6, 2026; 8 Dependabot and 7 code-scanning alerts, all in that one file, none in
+   the Cargo, Actions or other dependencies):** `torch==2.9.1` is fixed in **2.10.0** (high: CVE-2026-24747, checkpoint
+   loading; two low and two medium older ones are covered by the same bump); `transformers==4.57.3` is fixed only from
+   **5.10.0** (the newest of its high alerts, CVE-2026-9856, `save_pretrained` path traversal; the others are fixed from
+   5.3.0 and 5.5.0; Dependabot lists the vulnerable range as 4.49.0 to 5.8.1). That is a **major-version jump** (4.x to
+   5.x) for the converter, which was written against 4.x: expect `huggingface_hub` and the whisper.cpp
+   `convert-h5-to-ggml.py` loading code to need checks, so the re-conversion of `small` and its hash comparison is the real
+   test, not the pin edit.
    Treat the checkpoints as untrusted input in the meantime: the README says to convert only the three pinned VinAI
    revisions in a throwaway virtual environment.
 
@@ -87,16 +95,29 @@ passes the same release regression as Windows 0.2.8 before its files go out (ite
      platform (as the 0.2.8 text does). Build the drivers **first**, so the bug fixes in items 1 to 5 get regress cases on
      all platforms as they land.
 
-## Decisions needed from the maintainer
+## Decisions (maintainer, Nov 6, 2026)
 
-- **O1** (answered) All three platforms ship 0.2.9, each after its own regression run. Open: a second Mac for the
-  Intel build, or is the Intel macOS DMG built and checked on Apple Silicon only, as in 0.2.1 to 0.2.7 (the release text
-  must then say it)?
-- **O4** Lab time: the ThinkPad serves both Windows and Ubuntu; agree a window for Ubuntu hardware runs (Wayland and
-  X11 each) and for the Samsung monitor cases on Windows.
-- **O2** Bug 3: send a screenshot of the Models page, or confirm the lead strings.
-- **O3** Alerts in bug 4: bump and re-convert (needs the Python 3.12 setup and about 500 MB of download), or dismiss as
-  not used in shipped code.
+- **Platforms and order:** one 0.2.9 tag for Windows, macOS and Linux, released when all three regressions have passed.
+- **Intel Mac:** no Intel Mac is available. The Intel DMG is built and checked on Apple Silicon only, and the release
+  text says so (as in 0.2.1 to 0.2.7).
+- **Linux recording:** stays behind `CM_LINUX_RECORDING=1`; Linux stays an early build. Linux files are signed with
+  minisign as in 0.2.6.
+- **Bug 2:** the 24 and white defaults apply to new text only.
+- **Lab:** the ThinkPad has two systems (Windows 11 Pro and Ubuntu), so the runs take turns. The Samsung monitor cases are
+  skipped; Windows 10 and a mixed-DPI monitor stay "not run" in the release text.
+- **Release process:** as for 0.2.8 (the agent prepares; the maintainer pushes `main` and the tag, and disables the tag
+  ruleset for a moment only if a tag has to move).
+
+## Still open
+
+- **O2** Bug 3: a screenshot of the Windows Models page, so the exact strings are changed (or confirm the lead strings).
+- **O3** Alerts in bug 4: default is to bump `torch` to 2.10.0 or later and `transformers` to 5.10.0 or later and re-convert
+  `small` (about 500 MB download, Python 3.12, on the maintainer's Mac or the agent's, with the throwaway virtual
+  environment). If the converter does not work with transformers 5, the pins stay and the maintainer dismisses the
+  alerts as "not used in shipped code" (the file is not part of any shipped artifact).
+- **O5** Order of work (default): CI speed-up first (the Windows job takes about an hour), then the regression drivers
+  (item 6), then bugs 1 to 5 with their regress cases, then the PhoWhisper pins, then the three regression runs, then the
+  package and release.
 
 ## Done when
 
