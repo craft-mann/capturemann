@@ -112,14 +112,17 @@ fn toast_view(t: &Theme, toast: &Toast, app: &Entity<AppModel>) -> gpui::Div {
             .border_1()
             .border_color(rgba_of(t.border))
             .bg(rgba_of(t.surface_2))
-            // The tone stripe (the kit's inset 3 px shadow), clipped by the card's corners.
+            // The tone stripe (the kit's inset 3 px shadow). GPUI clips to a rectangle, not to the card's
+            // rounded corners, so a full-height bar stuck out of them: it stays on the straight part of the
+            // left edge instead.
             .child(
                 div()
                     .absolute()
                     .left_0()
-                    .top_0()
-                    .bottom_0()
+                    .top(px(scale::RADIUS_LG - 2.))
+                    .bottom(px(scale::RADIUS_LG - 2.))
                     .w(px(3.))
+                    .rounded(px(1.5))
                     .bg(rgba_of(stripe)),
             )
             .child(
