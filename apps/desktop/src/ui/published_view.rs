@@ -329,7 +329,12 @@ impl PublishedView {
             .bg(rgba_of(t.raised));
         match state {
             Thumb::Ready(image) => {
-                frame = frame.child(img(image).size_full().object_fit(ObjectFit::Cover));
+                frame = frame.child(
+                    img(image)
+                        .size_full()
+                        .rounded(px(scale::RADIUS_MD - 1.))
+                        .object_fit(ObjectFit::Cover),
+                );
             }
             Thumb::Loading | Thumb::Missing => {
                 frame = frame.child(

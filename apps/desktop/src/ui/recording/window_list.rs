@@ -109,7 +109,12 @@ fn thumb_tile(t: &Theme, image: Option<Arc<gpui::RenderImage>>) -> gpui::Div {
         .border_color(rgba_of(t.border))
         .bg(rgba_of(t.field));
     if let Some(image) = image {
-        return tile.child(img(image).size_full().object_fit(ObjectFit::Cover));
+        return tile.child(
+            img(image)
+                .size_full()
+                .rounded(px(5.))
+                .object_fit(ObjectFit::Cover),
+        );
     }
     tile.child(
         div()

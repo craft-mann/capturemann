@@ -586,7 +586,12 @@ fn thumb_frame(ctx: &RowCtx, item: &CaptureItem, width: f32, cx: &mut gpui::App)
         .bg(rgba_of(t.raised));
     match state {
         Thumb::Ready(image) => {
-            frame = frame.child(img(image).size_full().object_fit(ObjectFit::Cover));
+            frame = frame.child(
+                img(image)
+                    .size_full()
+                    .rounded(px(scale::RADIUS_LG - 1.))
+                    .object_fit(ObjectFit::Cover),
+            );
         }
         Thumb::Loading => {}
         Thumb::Missing => {

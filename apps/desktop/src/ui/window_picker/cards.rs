@@ -83,6 +83,7 @@ fn well(t: &Theme, thumb: &ThumbState) -> gpui::Div {
         ThumbState::Ready(image) => base.child(
             img(image.clone())
                 .size_full()
+                .rounded(px(8.))
                 .object_fit(ObjectFit::Contain),
         ),
         ThumbState::Loading | ThumbState::Failed => base

@@ -489,7 +489,12 @@ impl SettingsView {
                 .id("webcam-live-feed")
                 .role(Role::Image)
                 .aria_label(SharedString::from(tr!("Live camera")))
-                .child(img(image.clone()).size_full().object_fit(ObjectFit::Cover))
+                .child(
+                    img(image.clone())
+                        .size_full()
+                        .rounded(px(11.))
+                        .object_fit(ObjectFit::Cover),
+                )
                 .children(mirror.then(|| mirrored_tag(t)))
                 .into_any_element(),
             (CameraCard::Starting, _) => framed(feed)

@@ -641,6 +641,7 @@ impl Render for RecordingDetails {
                     .child(match poster {
                         Some(p) => img(p.clone())
                             .size_full()
+                            .rounded(px(scale::RADIUS_DIALOG - 1.))
                             .object_fit(ObjectFit::Contain)
                             .into_any_element(),
                         None => div()

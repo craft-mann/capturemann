@@ -499,6 +499,7 @@ impl PublishPage {
             .child(match &self.thumb.image {
                 Some(i) => img(i.clone())
                     .size_full()
+                    .rounded(px(scale::RADIUS_MD - 1.))
                     .object_fit(ObjectFit::Contain)
                     .into_any_element(),
                 None => div()
