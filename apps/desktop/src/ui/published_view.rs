@@ -316,7 +316,9 @@ impl PublishedView {
         cx: &mut Context<Self>,
     ) -> gpui::AnyElement {
         let id = row.capture_id.clone();
-        let state = self.thumbs.update(cx, |c, cx| c.get(&id, cx));
+        let state = self.thumbs.update(cx, |c, cx| {
+            c.get_cover(&id, (THUMB_W - 2.) / (THUMB_W * 9. / 16. - 2.), cx)
+        });
         let mut frame = div()
             .relative()
             .w(px(THUMB_W))
@@ -333,7 +335,7 @@ impl PublishedView {
                     img(image)
                         .size_full()
                         .rounded(px(scale::RADIUS_MD - 1.))
-                        .object_fit(ObjectFit::Cover),
+                        .object_fit(ObjectFit::Fill),
                 );
             }
             Thumb::Loading | Thumb::Missing => {

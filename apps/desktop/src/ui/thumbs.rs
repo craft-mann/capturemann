@@ -34,7 +34,39 @@ pub enum Thumb {
 pub struct ThumbCache {
     backend: Arc<Backend>,
     entries: HashMap<String, Entry>,
+    /// Posters cut to a card's shape, by capture id and aspect (see [`ThumbCache::get_cover`]).
+    crops: HashMap<(String, u32), Arc<RenderImage>>,
     tick: u64,
+}
+
+/// The middle of `image` cut to the width-over-height `aspect`, or `None` when it already has that
+/// shape (within a pixel) or cannot be read. The card draws it with `ObjectFit::Fill` and its own
+/// corner radius: GPUI's `Cover` fit rounds the corners of the oversize image, not of the visible
+/// part, so a cropped poster poked out of the rounded border of its frame.
+fn cover_crop(image: &RenderImage, aspect: f32) -> Option<Arc<RenderImage>> {
+    let size = image.size(0);
+    let (w, h) = (u32::from(size.width), u32::from(size.height));
+    let bytes = image.as_bytes(0)?;
+    if w == 0 || h == 0 || bytes.len() != (w as usize) * (h as usize) * 4 || aspect <= 0.0 {
+        return None;
+    }
+    let (cw, ch) = if (w as f32) / (h as f32) > aspect {
+        (((h as f32) * aspect).round().clamp(1.0, w as f32) as u32, h)
+    } else {
+        (w, ((w as f32) / aspect).round().clamp(1.0, h as f32) as u32)
+    };
+    if cw.abs_diff(w) <= 1 && ch.abs_diff(h) <= 1 {
+        return None;
+    }
+    let (x0, y0) = ((w - cw) / 2, (h - ch) / 2);
+    let mut out = Vec::with_capacity((cw as usize) * (ch as usize) * 4);
+    for row in y0..y0 + ch {
+        let start = ((row as usize) * (w as usize) + x0 as usize) * 4;
+        out.extend_from_slice(&bytes[start..start + (cw as usize) * 4]);
+    }
+    // The bytes keep the channel order GPUI stores them in; only the buffer type is `RgbaImage`.
+    let cropped = image::RgbaImage::from_raw(cw, ch, out)?;
+    Some(Arc::new(RenderImage::new([Frame::new(cropped)])))
 }
 
 impl ThumbCache {
@@ -42,7 +74,29 @@ impl ThumbCache {
         ThumbCache {
             backend,
             entries: HashMap::new(),
+            crops: HashMap::new(),
             tick: 0,
+        }
+    }
+
+    /// Like [`ThumbCache::get`], with the poster cut to the width-over-height `aspect` of the frame
+    /// that shows it, so the frame can draw it unscaled-to-fit and round its corners exactly.
+    pub fn get_cover(&mut self, id: &str, aspect: f32, cx: &mut Context<Self>) -> Thumb {
+        match self.get(id, cx) {
+            Thumb::Ready(image) => {
+                let key = (id.to_owned(), (aspect * 1000.0).round() as u32);
+                if let Some(c) = self.crops.get(&key) {
+                    return Thumb::Ready(c.clone());
+                }
+                match cover_crop(&image, aspect) {
+                    Some(c) => {
+                        self.crops.insert(key, c.clone());
+                        Thumb::Ready(c)
+                    }
+                    None => Thumb::Ready(image),
+                }
+            }
+            other => other,
         }
     }
 
@@ -204,6 +258,55 @@ impl ThumbCache {
             if let Some(Entry::Ready { image, .. }) = self.entries.remove(&k) {
                 cx.drop_image(image, None);
             }
+            let cut: Vec<(String, u32)> = self
+                .crops
+                .keys()
+                .filter(|(id, _)| *id == k)
+                .cloned()
+                .collect();
+            for key in cut {
+                if let Some(c) = self.crops.remove(&key) {
+                    cx.drop_image(c, None);
+                }
+            }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn render(w: u32, h: u32) -> RenderImage {
+        let mut img = image::RgbaImage::new(w, h);
+        for (x, _, p) in img.enumerate_pixels_mut() {
+            p.0 = [(x % 251) as u8, 0, 0, 255];
+        }
+        RenderImage::new([Frame::new(img)])
+    }
+
+    #[test]
+    fn a_poster_is_cut_to_the_middle_in_the_frames_shape() {
+        let wide = render(200, 100);
+        let sq = cover_crop(&wide, 1.0).unwrap();
+        assert_eq!(
+            (u32::from(sq.size(0).width), u32::from(sq.size(0).height)),
+            (100, 100)
+        );
+        // The middle: the first column of the cut is column 50 of the source.
+        assert_eq!(sq.as_bytes(0).unwrap()[0], 50);
+        let tall = render(100, 200);
+        let sq = cover_crop(&tall, 1.0).unwrap();
+        assert_eq!(
+            (u32::from(sq.size(0).width), u32::from(sq.size(0).height)),
+            (100, 100)
+        );
+    }
+
+    #[test]
+    fn a_poster_of_the_frames_shape_is_used_as_it_is() {
+        assert!(cover_crop(&render(160, 100), 1.6).is_none());
+        assert!(cover_crop(&render(161, 100), 1.6).is_none());
+        assert!(cover_crop(&render(160, 100), 0.0).is_none());
     }
 }

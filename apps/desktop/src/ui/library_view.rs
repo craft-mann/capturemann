@@ -574,11 +574,14 @@ fn kind_pill(item: &CaptureItem) -> AnyElement {
 fn thumb_frame(ctx: &RowCtx, item: &CaptureItem, width: f32, cx: &mut gpui::App) -> gpui::Div {
     let t = &ctx.t;
     let id = item.id.clone();
-    let state = ctx.thumbs.update(cx, |c, cx| c.get(&id, cx));
+    let (frame_w, frame_h) = (width, (width * THUMB_ASPECT).round());
+    let state = ctx.thumbs.update(cx, |c, cx| {
+        c.get_cover(&id, (frame_w - 2.) / (frame_h - 2.), cx)
+    });
     let mut frame = div()
         .relative()
         .w(px(width))
-        .h(px((width * THUMB_ASPECT).round()))
+        .h(px(frame_h))
         .flex_none()
         .overflow_hidden()
         .rounded(px(scale::RADIUS_LG))
@@ -590,7 +593,7 @@ fn thumb_frame(ctx: &RowCtx, item: &CaptureItem, width: f32, cx: &mut gpui::App)
                 img(image)
                     .size_full()
                     .rounded(px(scale::RADIUS_LG - 1.))
-                    .object_fit(ObjectFit::Cover),
+                    .object_fit(ObjectFit::Fill),
             );
         }
         Thumb::Loading => {}
