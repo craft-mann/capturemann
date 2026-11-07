@@ -58,6 +58,7 @@ async fn r2_3_agents_cannot_write_app_only_settings_but_the_app_can() {
         "storage.pause_uploads_while_recording",
         "export.auto_on_stop",
         "recording.hud_positions",
+        "recording.hud_collapsed",
         "agents.client_policies",
     ] {
         let r = c.call("set_settings", json!({"values": {key: "x"}})).await;
