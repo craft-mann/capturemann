@@ -6,9 +6,15 @@ impl EditorView {
         f: impl Fn(&mut EditorDoc, &mut Context<EditorDoc>) + 'static,
     ) -> impl Fn(&ClickEvent, &mut Window, &mut App) + 'static {
         let doc = self.doc.clone();
-        move |_, _, cx| {
+        let canvas_focus = self.canvas_focus.clone();
+        move |_, window, cx| {
             if let Some(d) = &doc {
                 d.update(cx, |d, cx| f(d, cx));
+                // Typed text reaches the open text box only through the canvas's input handler, which needs
+                // the canvas focused (ANN-1.AC7): a colour or size click must not take typing away.
+                if d.read(cx).state.text.is_some() {
+                    window.focus(&canvas_focus, cx);
+                }
             }
         }
     }

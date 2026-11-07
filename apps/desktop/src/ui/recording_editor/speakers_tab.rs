@@ -1,7 +1,7 @@
 //! The Speakers tab (redesign V5, AI-8). Labelled state: one row per speaker (colour, name,
 //! share of the talk time with a bar, Play sample, Rename and Merge into...), the "My microphone
 //! only hears me" switch. The list takes the free height of the panel (at least
-//! [`LIST_MIN_H`], three rows) and scrolls inside; the voiceprint sentence lives in Settings ->
+//! `list_min_h`, three rows) and scrolls inside; the voiceprint sentence lives in Settings ->
 //! Privacy. Not-run state: an empty card, "How many people?",
 //! the notice when this build has no speaker models, with Find speakers dimmed.
 //!
@@ -35,12 +35,15 @@ use crate::ui::settings::widgets::{segment, segmented, small_button_with_icon};
 /// What one speaker row asks for: 12 + 12 padding, the 30 px icon buttons, an 8 px gap, the 4 px
 /// bar and the 1 px divider.
 pub(super) const ROW_H: f32 = 12. + 30. + 8. + 4. + 12. + 1.;
-/// The list never gets shorter than three rows.
-pub(super) const LIST_MIN_H: f32 = 3. * ROW_H;
+/// The list never gets shorter than three rows, or than its own rows when there are fewer (a card
+/// stretched over empty rows looks broken with the common two speakers of a headset call).
+pub(super) fn list_min_h(speakers: usize) -> f32 {
+    speakers.clamp(1, 3) as f32 * ROW_H
+}
 
 /// The height the list asks for before the panel shrinks it: every speaker, up to ten rows.
 pub(super) fn list_basis(speakers: usize) -> f32 {
-    speakers.clamp(3, 10) as f32 * ROW_H
+    speakers.clamp(1, 10) as f32 * ROW_H
 }
 
 /// A 30 px icon button of a speaker row.
@@ -380,7 +383,7 @@ impl RecordingEditor {
             .flex_shrink(1.)
             .flex_grow(0.)
             .h(px(list_basis(n)))
-            .min_h(px(LIST_MIN_H))
+            .min_h(px(list_min_h(n)))
             .child(fill_scroll(t, &self.speakers_scroll, list, || {}))
             .into_any_element()
     }
@@ -647,7 +650,7 @@ mod layout_tests {
     /// The height the flex layout gives the list: what the rows ask for, shrunk to the room the
     /// panel has left, never below three rows.
     fn list_height(free: f32, speakers: usize) -> f32 {
-        free.max(LIST_MIN_H).min(list_basis(speakers))
+        free.max(list_min_h(speakers)).min(list_basis(speakers))
     }
 
     /// The controls under the list: "How many people?" (the label wraps above the chips) and the
@@ -673,18 +676,23 @@ mod layout_tests {
         let avail = INSPECTOR_MIN_W - 64. - 2. - 40.;
         for lang in [Lang::En, Lang::Vi, Lang::EnXa] {
             let controls = controls_h(lang, avail);
-            for n in [3usize, 6, 10] {
+            for n in [1usize, 2, 3, 6, 10] {
                 // The smallest window (720 x 480) leaves the panel less than a row, because the
                 // timeline is as tall as its tracks: the list still takes three rows and the
                 // panel body scrolls to the controls. A tall window gives it every row it asks for.
                 for free in [0., 120., 300., 600.] {
                     let h = list_height(free, n);
-                    assert!(h >= 3. * ROW_H - 0.01, "{lang:?} n={n} free={free}: {h}");
+                    assert!(
+                        h >= n.min(3) as f32 * ROW_H - 0.01,
+                        "{lang:?} n={n} free={free}: {h}"
+                    );
                     assert!(h <= list_basis(n) + 0.01);
                 }
                 assert!(controls < 200., "{lang:?}: controls need {controls} px");
             }
         }
+        assert_eq!(list_height(10_000., 1), ROW_H);
+        assert_eq!(list_height(10_000., 2), 2. * ROW_H);
         assert_eq!(list_height(10_000., 3), 3. * ROW_H);
         assert_eq!(list_height(10_000., 10), 10. * ROW_H);
         assert_eq!(list_height(10_000., 25), 10. * ROW_H);

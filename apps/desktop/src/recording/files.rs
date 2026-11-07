@@ -831,9 +831,11 @@ fn open_path(path: &Path, reveal: bool) -> Result<(), FileError> {
             c.raw_arg(&plan.args[0]);
             c
         } else {
-            let mut c = cm_platform::process::command("cmd");
-            c.args(["/C", "start", ""])
-                .arg(explorer_path(&path.to_string_lossy()));
+            // Not `cmd /C start`: cmd reads `&`, `^` and `%` in a folder name (a capture title keeps them)
+            // as commands and variables. Explorer opens a file with its default program and takes the
+            // path as one quoted argument (a path cannot hold a quote on Windows).
+            let mut c = cm_platform::process::command("explorer");
+            c.raw_arg(format!("\"{}\"", explorer_path(&path.to_string_lossy())));
             c
         };
         c.spawn().map(|_| ()).map_err(FileError::from)
