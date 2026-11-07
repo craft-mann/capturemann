@@ -324,6 +324,37 @@ pub fn make_click_through(h: HWND) -> bool {
     }
 }
 
+/// Windows 11 draws a grey 1 px border and rounds the corners of every top-level window, so the
+/// transparent strip above the recording HUD (room for hints and chips) showed as a framed empty
+/// box. Asks DWM for no border and square corners; Windows 10 and older builds refuse the two
+/// attributes, which leaves the window as it was.
+pub fn strip_frame(h: HWND) -> bool {
+    use windows::Win32::Graphics::Dwm::{
+        DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_WINDOW_CORNER_PREFERENCE,
+        DWMWCP_DONOTROUND,
+    };
+    // DWMWA_COLOR_NONE: no border at all.
+    let none: u32 = 0xFFFF_FFFE;
+    let square = DWMWCP_DONOTROUND;
+    // SAFETY: `h` is a live top-level window of this process; both calls read a value of the
+    // size given from a local that outlives the call.
+    unsafe {
+        let border = DwmSetWindowAttribute(
+            h,
+            DWMWA_BORDER_COLOR,
+            std::ptr::addr_of!(none).cast(),
+            std::mem::size_of::<u32>() as u32,
+        );
+        let corners = DwmSetWindowAttribute(
+            h,
+            DWMWA_WINDOW_CORNER_PREFERENCE,
+            std::ptr::addr_of!(square).cast(),
+            std::mem::size_of_val(&square) as u32,
+        );
+        border.is_ok() || corners.is_ok()
+    }
+}
+
 /// Puts a window on top of the topmost band without activating, moving or resizing it.
 pub fn raise_topmost(h: HWND) {
     if !usable(h, "raise_topmost") {

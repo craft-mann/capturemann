@@ -648,8 +648,8 @@ mod imp {
     /// 2004 and later). On an older Windows the call fails and the window stays capturable; that
     /// is reported as "not excluded" and the caller logs it (the engine cannot exclude windows by
     /// pid on Windows, so there is no second line of defence). `click_through` makes the window
-    /// layered, transparent and non-activating (`recording::zorder`); levels and shadows are
-    /// macOS tweaks and stay unapplied.
+    /// layered, transparent and non-activating (`recording::zorder`); levels are a macOS tweak and
+    /// stay unapplied; `no_shadow` asks Windows 11 for no border and square corners.
     #[cfg(windows)]
     pub fn apply(window: &Window, tweaks: Tweaks) -> Result<Applied, String> {
         use crate::platform_win_monitors as win;
@@ -657,11 +657,15 @@ mod imp {
             SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE,
         };
 
-        if !tweaks.exclude_from_capture && !tweaks.click_through {
+        if !tweaks.exclude_from_capture && !tweaks.click_through && !tweaks.no_shadow {
             return Ok(Applied::default());
         }
         let hwnd = win::hwnd(window).ok_or_else(|| "not a Win32 window".to_owned())?;
         let mut done = Applied::default();
+        if tweaks.no_shadow {
+            // The macOS "no shadow" tweak; here it is the Windows 11 frame (border and corners).
+            let _ = win::strip_frame(hwnd);
+        }
         if tweaks.exclude_from_capture {
             // SAFETY: `hwnd` is the live top-level window GPUI owns for as long as `window`
             // lives; the call only sets a display affinity flag on it, from its own thread.
