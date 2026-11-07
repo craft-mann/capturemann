@@ -22,6 +22,7 @@
 //! | `camera.shape`, `camera.size`, `camera.mirror`, `camera.position` | the bubble (CAM-1); the position is only restored when `camera.remember_position` is on, else every recording starts bottom-left |
 //! | `camera.remember_position` | bool, default false (CAM-1.AC8) |
 //! | `recording.hud_positions` | `{ "<display>": [x, y] }` HUD center fractions (REC-5.AC4) |
+//! | `recording.hud_collapsed` | bool, default false: the HUD opens collapsed (REC-5.AC16); app-only |
 
 use cm_i18n::{tr, tr_ctx};
 use serde_json::{json, Map, Value};
@@ -50,6 +51,8 @@ pub const KEY_BUBBLE_POSITION: &str = "camera.position";
 /// Bool, default false: restore the last dragged `camera.position` instead of bottom-left.
 pub const KEY_BUBBLE_REMEMBER: &str = "camera.remember_position";
 pub const KEY_HUD_POSITIONS: &str = "recording.hud_positions";
+/// Bool, default false: the HUD is collapsed (REC-5.AC16). App-only, like the positions.
+pub const KEY_HUD_COLLAPSED: &str = "recording.hud_collapsed";
 
 /// What the start sheet records.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

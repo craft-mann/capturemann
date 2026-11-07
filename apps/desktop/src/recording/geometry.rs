@@ -264,6 +264,51 @@ pub fn snap_hud(hud: &Rect, display: &Rect) -> Rect {
     )
 }
 
+/// REC-5.AC16: the HUD after the bar changes to `new_w` (collapse or expand). A bar snapped to
+/// the right edge keeps its right edge, one snapped to the left keeps its left edge, any other
+/// keeps its centre. The result is pulled back inside the display's edge margin when it would
+/// cross it, but not snapped (the default bottom-centre place stays where it is).
+pub fn resize_hud(hud: &Rect, new_w: f64, display: &Rect) -> Rect {
+    let right_snapped = (display.right() - HUD_EDGE_MARGIN - hud.right()).abs() < 1.0;
+    let left_snapped = (hud.x - display.x - HUD_EDGE_MARGIN).abs() < 1.0;
+    let x = if right_snapped {
+        hud.right() - new_w
+    } else if left_snapped {
+        hud.x
+    } else {
+        hud.center().0 - new_w / 2.0
+    };
+    let min_x = display.x + HUD_EDGE_MARGIN;
+    let max_x = (display.right() - HUD_EDGE_MARGIN - new_w).max(min_x.min(display.x));
+    let max_y = (display.bottom() - hud.h).max(display.y);
+    Rect::new(
+        x.clamp(min_x.min(max_x), max_x),
+        hud.y.clamp(display.y, max_y),
+        new_w,
+        hud.h,
+    )
+}
+
+/// REC-5.AC17: a remembered position is used only when both centre fractions are finite and
+/// within 0..=1; anything else (a hand-edited or damaged setting) means the default position.
+pub fn usable_center_fraction(f: (f64, f64)) -> Option<(f64, f64)> {
+    let ok = |v: f64| v.is_finite() && (0.0..=1.0).contains(&v);
+    (ok(f.0) && ok(f.1)).then_some(f)
+}
+
+/// REC-5.AC17: whether the HUD is wholly on one of `displays` (1 px of slack for rounding). When a
+/// display is removed or rearranged during a recording and this turns false, the HUD is put back
+/// on a connected display.
+pub fn hud_fully_visible(hud: &Rect, displays: &[Rect]) -> bool {
+    const SLACK: f64 = 1.0;
+    displays.iter().any(|d| {
+        hud.x >= d.x - SLACK
+            && hud.y >= d.y - SLACK
+            && hud.right() <= d.right() + SLACK
+            && hud.bottom() <= d.bottom() + SLACK
+    })
+}
+
 /// The HUD's center as fractions of its display (what is remembered per display).
 pub fn center_fraction(r: &Rect, within: &Rect) -> (f64, f64) {
     let (cx, cy) = r.center();
@@ -876,12 +921,13 @@ mod tests {
     /// REC-5.AC4: dropped near an edge, the HUD snaps to it; elsewhere it stays.
     #[test]
     fn rec5_ac4_hud_snaps_to_edges() {
-        // The HUD bar of the redesign (Stop carries its label): 506 x 58; with an agent chip it
-        // is wider and still centred, snapped and remembered the same way.
+        // The HUD bar of the redesign (Stop carries its label, the Collapse toggle ends it):
+        // 556 x 58; with an agent chip it is wider and still centred, snapped and remembered the
+        // same way.
         let hud = crate::ui::recording::HUD_BAR;
-        assert_eq!(hud, (506.0, 58.0));
+        assert_eq!(hud, (556.0, 58.0));
         let d = hud_default(&DISPLAY, hud);
-        assert_eq!(d.x, (1440.0 - 506.0) / 2.0);
+        assert_eq!(d.x, (1440.0 - 556.0) / 2.0);
         let wide = crate::recording::hud_layout::bar_size(Some("Claude Code"));
         assert!(wide.0 > hud.0);
         let dw = hud_default(&DISPLAY, wide);
@@ -900,6 +946,73 @@ mod tests {
         // The middle of the screen is left alone.
         let s = snap_hud(&Rect::new(500.0, 400.0, hud.0, hud.1), &DISPLAY);
         assert_eq!((s.x, s.y), (500.0, 400.0));
+    }
+
+    /// REC-5.AC16: collapsing keeps the edge the bar was snapped to, or its centre, and the bar
+    /// stays on the display; expanding back returns it to where it was.
+    #[test]
+    fn rec5_ac16_collapse_keeps_the_snapped_edge_or_the_centre() {
+        let (wide, narrow) = (556.0, 292.0);
+        // Snapped right: the right edge stays.
+        let r = snap_hud(&Rect::new(2000.0, 400.0, wide, 94.0), &DISPLAY);
+        let c = resize_hud(&r, narrow, &DISPLAY);
+        assert_eq!((c.right(), c.y, c.w), (r.right(), r.y, narrow));
+        assert_eq!(resize_hud(&c, wide, &DISPLAY), r);
+        // Snapped left: the left edge stays.
+        let l = snap_hud(&Rect::new(0.0, 400.0, wide, 94.0), &DISPLAY);
+        let c = resize_hud(&l, narrow, &DISPLAY);
+        assert_eq!((c.x, c.w), (l.x, narrow));
+        assert_eq!(resize_hud(&c, wide, &DISPLAY), l);
+        // The default bottom-centre place: the centre stays.
+        let d = hud_default(&DISPLAY, (wide, 94.0));
+        let c = resize_hud(&d, narrow, &DISPLAY);
+        assert_eq!(c.center(), d.center());
+        assert_eq!(resize_hud(&c, wide, &DISPLAY), d);
+        // Expanding a collapsed bar near an edge (not snapped) never leaves the display.
+        let near = Rect::new(1440.0 - narrow - 40.0, 400.0, narrow, 94.0);
+        let e = resize_hud(&near, wide, &DISPLAY);
+        assert!(e.right() <= 1440.0 - HUD_EDGE_MARGIN && e.x >= HUD_EDGE_MARGIN);
+    }
+
+    /// REC-5.AC17: a damaged remembered position falls back to the default place.
+    #[test]
+    fn rec5_ac17_only_sane_fractions_are_used() {
+        assert_eq!(usable_center_fraction((0.5, 0.9)), Some((0.5, 0.9)));
+        assert_eq!(usable_center_fraction((0.0, 1.0)), Some((0.0, 1.0)));
+        for bad in [
+            (f64::NAN, 0.5),
+            (0.5, f64::INFINITY),
+            (-0.1, 0.5),
+            (0.5, 1.5),
+            (40.0, 900.0),
+        ] {
+            assert_eq!(usable_center_fraction(bad), None, "{bad:?}");
+        }
+    }
+
+    /// REC-5.AC17: on a display, or on another connected one, is visible; across the gap where a
+    /// display was unplugged, or half off, is not.
+    #[test]
+    fn rec5_ac17_the_hud_must_sit_wholly_on_a_connected_display() {
+        let second = Rect::new(1440.0, 0.0, 1920.0, 1080.0);
+        let both = [DISPLAY, second];
+        let on_first = hud_default(&DISPLAY, (556.0, 94.0));
+        let on_second = hud_default(&second, (556.0, 94.0));
+        assert!(hud_fully_visible(&on_first, &both));
+        assert!(hud_fully_visible(&on_second, &both));
+        // The second display is unplugged: its HUD is now nowhere.
+        assert!(!hud_fully_visible(&on_second, &[DISPLAY]));
+        // Half off the right edge of a lone display.
+        assert!(!hud_fully_visible(
+            &Rect::new(1200.0, 400.0, 556.0, 94.0),
+            &[DISPLAY]
+        ));
+        // Sub-pixel rounding at the edge still counts as on screen.
+        assert!(hud_fully_visible(
+            &Rect::new(1440.0 - 556.0 + 0.5, 400.0, 556.0, 94.0),
+            &[DISPLAY]
+        ));
+        assert!(!hud_fully_visible(&on_first, &[]));
     }
 
     #[test]

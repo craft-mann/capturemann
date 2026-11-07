@@ -8,6 +8,12 @@
 //! after which Tab reaches the buttons), is always on top and draggable, and is excluded from
 //! capture. During the 60 fps self-test (REC-3) it shrinks to Stop and a "Testing 60 fps" chip. Dragging uses the native window move; after the drag settles the bar
 //! snaps to an edge and its position is remembered per display (REC-5.AC4).
+//!
+//! The bar's background and the timer are the grip (a press on a button never starts a drag).
+//! The last button collapses the bar to Stop, the timer and Pause, and expands it again
+//! (REC-5.AC16); the state is remembered in `recording.hud_collapsed`. Once a second the HUD
+//! checks that it still sits wholly on a connected display and goes back to its place on one when
+//! a display was removed or rearranged (REC-5.AC17).
 
 use std::time::{Duration, Instant};
 
@@ -18,7 +24,7 @@ use gpui::{
 };
 
 use crate::recording::drag::DragState;
-use crate::recording::geometry::{self, snap_hud};
+use crate::recording::geometry::{self, hud_fully_visible, resize_hud, snap_hud};
 use crate::recording::hud_layout::{self, HudControl, HudItem};
 use crate::recording::model::{mic_bars, Health, Phase};
 use crate::shortcuts::ShortcutAction;
@@ -34,6 +40,8 @@ use crate::ui::text_field::{TextField, TextFieldEvent};
 const FILL: Color = crate::theme::derived::HUD_FILL;
 /// How long after the last move the HUD settles and snaps.
 const SETTLE: Duration = Duration::from_millis(300);
+/// How often the HUD checks that it is still on a connected display (REC-5.AC17).
+const DISPLAY_WATCH: Duration = Duration::from_secs(1);
 
 /// The hover hint of a HUD control. Kept as an id and turned into text when the strip is drawn,
 /// so a language switch changes it with the rest of the screen.
@@ -53,6 +61,8 @@ enum HudHint {
     Restart,
     Discard,
     Marker,
+    Collapse,
+    Expand,
 }
 
 impl HudHint {
@@ -72,6 +82,8 @@ impl HudHint {
             HudHint::Restart => tr!("Restart \u{2014} discard this take and start over"),
             HudHint::Discard => tr!("Discard this take"),
             HudHint::Marker => tr!("Mark this moment"),
+            HudHint::Collapse => hud_layout::collapse_label(false),
+            HudHint::Expand => hud_layout::collapse_label(true),
         }
     }
 }
@@ -82,7 +94,7 @@ pub(crate) fn all_hints() -> Vec<String> {
     use HudHint::*;
     [
         CancelTest, Stop, Resume, Pause, MicMute, MicUnmute, MicOff, WebcamOff, HideBubble,
-        ShowBubble, Draw, Restart, Discard, Marker,
+        ShowBubble, Draw, Restart, Discard, Marker, Collapse, Expand,
     ]
     .into_iter()
     .map(HudHint::text)
@@ -102,7 +114,11 @@ pub struct HudView {
     focus: FocusHandle,
     /// The marker whose prompt the field was last cleared for.
     prompt_for: Option<i64>,
+    /// The bar is the short one (REC-5.AC16); read from `recording.hud_collapsed` at open.
+    collapsed: bool,
     _subs: Vec<Subscription>,
+    /// The once-a-second display check (REC-5.AC17).
+    _watch: Task<()>,
 }
 
 impl HudView {
@@ -147,6 +163,16 @@ impl HudView {
                 TextFieldEvent::Changed(_) => {}
             }),
         ];
+        let watch = cx.spawn_in(window, async move |this, cx| loop {
+            cx.background_executor().timer(DISPLAY_WATCH).await;
+            if this
+                .update_in(cx, |this, window, cx| this.keep_on_screen(window, cx))
+                .is_err()
+            {
+                break;
+            }
+        });
+        let collapsed = rec::hud_collapsed(&app, cx);
         HudView {
             app,
             rec,
@@ -156,8 +182,99 @@ impl HudView {
             label,
             focus: cx.focus_handle(),
             prompt_for: None,
+            collapsed,
             _subs: subs,
+            _watch: watch,
         }
+    }
+
+    /// The display the HUD belongs to, as it is now: the recorded one (exact where point
+    /// rectangles overlap) while it is connected, else the one holding `hud`.
+    fn home_display(&self, hud: &geometry::Rect, cx: &Context<Self>) -> Option<geometry::Rect> {
+        let recorded = self.rec.read(cx).display.map(|d| d.0);
+        recorded
+            .and_then(|id| rec::displays(cx).into_iter().find(|d| d.0 == id))
+            .or_else(|| rec::display_for(cx, hud))
+            .map(|d| d.1)
+    }
+
+    /// The bar's kind: audio or screen, and the agent that started the take.
+    fn bar_kind(&self, cx: &Context<Self>) -> (bool, Option<String>) {
+        let hud = &self.rec.read(cx).hud;
+        (
+            hud.is_audio(),
+            hud.started_by_agent().map(|(client, _)| client.to_owned()),
+        )
+    }
+
+    /// Moves the window to `to` from a task: moving sends WM_WINDOWPOSCHANGED to GPUI
+    /// synchronously on Windows, so not inside this window update (see `NativeWindow`).
+    fn move_window(window: &Window, to: geometry::Rect, cx: &mut Context<Self>) {
+        if let Some(n) = crate::platform_window::NativeWindow::for_frame(window) {
+            cx.spawn(async move |_, _| n.set_frame(to.x, to.y, to.w, to.h))
+                .detach();
+        }
+    }
+
+    /// REC-5.AC16: collapse or expand the bar. The window takes the new width keeping the edge it
+    /// was snapped to (else its centre), and the state and position are remembered.
+    fn toggle_collapsed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.collapsed = !self.collapsed;
+        let collapsed = self.collapsed;
+        let app = self.app.clone();
+        cx.defer(move |cx| rec::remember_hud_collapsed(&app, collapsed, cx));
+        // The hint under the pointer named the old action.
+        self.hint = None;
+        cx.notify();
+        let Some((x, y, w, h)) = crate::platform_window::frame(window) else {
+            return;
+        };
+        let now = geometry::Rect::new(x, y, w, h);
+        let Some(display) = self.home_display(&now, cx) else {
+            return;
+        };
+        let (audio, agent) = self.bar_kind(cx);
+        let new_w = hud_layout::window_size_view(audio, collapsed, agent.as_deref()).0;
+        let to = resize_hud(&now, new_w, &rec::hud_bounds(&display));
+        Self::move_window(window, to, cx);
+        let app = self.app.clone();
+        cx.defer(move |cx| rec::remember_hud(&app, &display, &to, cx));
+    }
+
+    /// REC-5.AC17: when no connected display holds the whole HUD any more (one was unplugged or
+    /// rearranged), put it back where it opens on its display: the remembered place, else the
+    /// default one.
+    fn keep_on_screen(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self
+            .drag
+            .is_live(Instant::now(), crate::platform_window::left_button_down())
+        {
+            return;
+        }
+        let Some((x, y, w, h)) = crate::platform_window::frame(window) else {
+            return;
+        };
+        let now = geometry::Rect::new(x, y, w, h);
+        let all: Vec<geometry::Rect> = rec::displays(cx).into_iter().map(|d| d.1).collect();
+        if all.is_empty() || hud_fully_visible(&now, &all) {
+            return;
+        }
+        let Some(display) = self
+            .home_display(&now, cx)
+            .or_else(|| rec::pointer_display(cx).map(|d| d.1))
+        else {
+            return;
+        };
+        let (audio, agent) = self.bar_kind(cx);
+        let to = rec::hud_rect_view(
+            &self.app,
+            &display,
+            agent.as_deref(),
+            audio,
+            self.collapsed,
+            cx,
+        );
+        Self::move_window(window, to, cx);
     }
 
     fn moved(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -183,19 +300,12 @@ impl HudView {
             return;
         };
         let now = geometry::Rect::new(x, y, w, h);
-        // The recorded display (exact where point rectangles overlap), else the one holding the HUD.
-        let recorded = self.rec.read(cx).display.map(|d| d.1);
-        let Some(display) = recorded.or_else(|| rec::display_for(cx, &now).map(|d| d.1)) else {
+        let Some(display) = self.home_display(&now, cx) else {
             return;
         };
         let snapped = snap_hud(&now, &rec::hud_bounds(&display));
         if (snapped.x - now.x).abs() > 0.5 || (snapped.y - now.y).abs() > 0.5 {
-            // Moving sends WM_WINDOWPOSCHANGED to GPUI synchronously on Windows: do it from a task,
-            // not inside this window update (see `NativeWindow`).
-            if let Some(n) = crate::platform_window::NativeWindow::for_frame(window) {
-                cx.spawn(async move |_, _| n.set_frame(snapped.x, snapped.y, now.w, now.h))
-                    .detach();
-            }
+            Self::move_window(window, snapped, cx);
         }
         let app = self.app.clone();
         cx.defer(move |cx| rec::remember_hud(&app, &display, &snapped, cx));
@@ -401,19 +511,8 @@ impl Render for HudView {
             .tnum()
             .child(dot(dot_color, 8.))
             .child(SharedString::from(timer_text))
-            // The timer is the grip: dragging it moves the HUD.
-            .cursor_grab()
-            .on_mouse_down(
-                MouseButton::Left,
-                cx.listener(|this, _, window, _| {
-                    this.drag.press(Instant::now());
-                    window.start_window_move();
-                }),
-            )
-            .on_mouse_up(
-                MouseButton::Left,
-                cx.listener(|this, _, _, _| this.drag.clear()),
-            );
+            // The timer is part of the grip (the bar below): dragging it moves the HUD.
+            .cursor_grab();
 
         let pause_label = if paused {
             tr!("Resume recording")
@@ -621,6 +720,29 @@ impl Render for HudView {
             Some(discard.into_any_element()),
         );
         let mut chip = chip.map(IntoElement::into_any_element);
+        // REC-5.AC16: the last button folds the bar to Stop, the timer and Pause, and back.
+        let collapsed = self.collapsed;
+        let collapse_hint = if collapsed {
+            HudHint::Expand
+        } else {
+            HudHint::Collapse
+        };
+        let mut collapse = Some(
+            hud_button(
+                &t,
+                "hud-collapse",
+                &hud_layout::collapse_label(collapsed),
+                false,
+                true,
+            )
+            .aria_expanded(!collapsed)
+            .on_hover(cx.listener(move |this, over: &bool, _, cx| {
+                this.set_hint(over.then(|| (collapse_hint, Vec::new())), cx);
+            }))
+            .on_click(cx.listener(|this, _, window, cx| this.toggle_collapsed(window, cx)))
+            .child(icon(hud_layout::collapse_icon(collapsed), 18., t.text_2))
+            .into_any_element(),
+        );
         // The audio bar's two own slots (VOC-1, board V2): the 14-bar meter and Marker.
         let mut meter_slot = audio.then(|| {
             audio_meter(
@@ -669,7 +791,7 @@ impl Render for HudView {
             )
             .into_any_element()
         });
-        let slots = hud_layout::hud_items_for(audio, agent.is_some())
+        let slots = hud_layout::hud_items_view(audio, collapsed, agent.is_some())
             .into_iter()
             .filter_map(|item| match item {
                 HudItem::Divider => Some(divider(&t).into_any_element()),
@@ -685,13 +807,16 @@ impl Render for HudView {
                     HudControl::AgentChip => chip.take(),
                     HudControl::Meter => meter_slot.take(),
                     HudControl::Marker => marker.take(),
+                    HudControl::Collapse => collapse.take(),
                 },
             });
         let bar = div()
             .id("rec-hud")
             .role(Role::Toolbar)
             .aria_label(tr!("Recording controls"))
-            .w(px(hud_layout::bar_width_for(audio, agent.as_deref()) as f32))
+            .w(px(
+                hud_layout::bar_width_view(audio, collapsed, agent.as_deref()) as f32,
+            ))
             .h(px(HUD_BAR.1 as f32))
             .flex_none()
             .p(px(hud_layout::PAD as f32))
@@ -702,6 +827,20 @@ impl Render for HudView {
             .border_1()
             .border_color(rgba_of(t.line))
             .bg(rgba_of(FILL))
+            // The bar's background (and the timer, the meter and the chip on it) is the grip:
+            // the buttons stop the press, so a click on one never starts a drag.
+            .cursor_grab()
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, window, _| {
+                    this.drag.press(Instant::now());
+                    window.start_window_move();
+                }),
+            )
+            .on_mouse_up(
+                MouseButton::Left,
+                cx.listener(|this, _, _, _| this.drag.clear()),
+            )
             .children(slots);
 
         // The strip above the bar: hover hint, else the agent and health chips.
@@ -713,7 +852,10 @@ impl Render for HudView {
                 .items_center()
                 .pb(px(6.))
                 .gap(px(8.));
-            let prompt = state.marker_prompt_at(now).filter(|_| audio && live);
+            // The short bar has no room for the label prompt: the marker is set all the same.
+            let prompt = state
+                .marker_prompt_at(now)
+                .filter(|_| audio && live && !collapsed);
             if let Some(p) = prompt {
                 // "Marker at 12:48" and an optional label (board V2). The marker exists already;
                 // Enter names it, Esc or the timeout leaves it as it is.

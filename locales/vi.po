@@ -6836,6 +6836,13 @@ msgstr "Đang dừng tải lên."
 msgid "Cancel the upload to YouTube"
 msgstr "Huỷ việc tải lên YouTube"
 
+# ---- HUD: collapse and expand (REC-5.AC16) ----
+msgid "Collapse recording controls"
+msgstr "Thu gọn điều khiển quay"
+
+msgid "Expand recording controls"
+msgstr "Mở rộng điều khiển quay"
+
 # ---- HUD: mic mute ----
 msgid "Mute microphone"
 msgstr "Tắt tiếng micrô"

@@ -977,6 +977,9 @@ msgstr ""
 msgid "Codec"
 msgstr ""
 
+msgid "Collapse recording controls"
+msgstr ""
+
 msgid "Coming soon"
 msgstr ""
 
@@ -1695,6 +1698,9 @@ msgid "Everything here runs on {this_computer}. Nothing is downloaded unless you
 msgstr ""
 
 msgid "Excluded windows"
+msgstr ""
+
+msgid "Expand recording controls"
 msgstr ""
 
 msgid "Export MP4"

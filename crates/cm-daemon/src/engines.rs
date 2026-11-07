@@ -95,7 +95,8 @@ pub(crate) const NOT_SECRET_KEYS: &[&str] = &["ai.text.context_tokens"];
 /// global hotkeys; `permissions.*` and `agents.*` are the setup state and the per-client
 /// policies; `storage.*` and `export.*` change what leaves the machine or runs unattended
 /// (`storage.pause_uploads_while_recording`, `export.auto_on_stop`); `recording.fps60_selftest`
-/// is the self-test verdict, `recording.hud_positions` is window geometry; `mcp.*` and `auth.*`
+/// is the self-test verdict, `recording.hud_positions` is window geometry and
+/// `recording.hud_collapsed` the HUD's look (REC-5.AC16); `mcp.*` and `auth.*`
 /// are server and account configuration; `app.*` (and a bare `launch_at_login`) is the shell's
 /// own state, such as login-item and window preferences; `capture.save_folder_enabled`,
 /// `capture.save_folder` and `capture.save_pattern` make the app write PNG files outside the
@@ -118,6 +119,7 @@ pub const APP_ONLY_SETTINGS: &[&str] = &[
     "launch_at_login",
     "recording.fps60_selftest",
     "recording.hud_positions",
+    "recording.hud_collapsed",
     // VOC-1: the legal one-liner of the audio start sheet; only the person at the keyboard may
     // switch it off.
     "recording.consent_notice",
@@ -360,6 +362,7 @@ mod tests {
             "export.auto_on_stop",
             "recording.fps60_selftest",
             "recording.hud_positions",
+            "recording.hud_collapsed",
             "capture.save_folder_enabled",
             "capture.save_folder",
             "capture.save_pattern",
