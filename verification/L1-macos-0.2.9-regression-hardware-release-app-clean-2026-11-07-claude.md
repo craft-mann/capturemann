@@ -1,21 +1,21 @@
 # L1 macos 0.2.9 regression report (hardware)
 
-- **Date:** 2026-11-06T23:51:31Z to 2026-11-06T23:53:55Z
+- **Date:** 2026-11-07T00:19:36Z to 2026-11-07T00:22:04Z
 - **Who:** cm-regress via regress.sh
 - **Machine:** Darwin 25.6.0 arm64; GPU: n/a
-- **Build:** commit unknown, package folder `/Users/trungtran/source/repos/capturemann/target/bundle/CaptureMann-dev.app/Contents/MacOS`
+- **Build:** commit unknown, package folder `/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel/CaptureMann.app/Contents/MacOS`
 - **FFmpeg:** ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers
-- **Suite:** `cm-regress --tier hardware --package-dir /Users/trungtran/source/repos/capturemann/target/bundle/CaptureMann-dev.app/Contents/MacOS --daemon /Users/trungtran/source/repos/capturemann/target/release/cm-daemon --out /var/folders/xm/d48xc26519j40jmsdcwh6v040000gp/T//cm-regress-mac-20261106T235130Z --who cm-regress via regress.sh --verdict PARTIAL --allow screen,sound,mic,camera`, tier `hardware`
-- **Result:** 51 passed, 1 failed, 25 skipped of 77 cases
+- **Suite:** `cm-regress --tier hardware --package-dir /private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel/CaptureMann.app/Contents/MacOS --daemon /Users/trungtran/source/repos/capturemann/target/release/cm-daemon --out /var/folders/xm/d48xc26519j40jmsdcwh6v040000gp/T//cm-regress-mac-20261107T001934Z --who cm-regress via regress.sh --verdict PARTIAL --allow screen,sound,mic,camera`, tier `hardware`
+- **Result:** 53 passed, 0 failed, 24 skipped of 77 cases
 - **SHA-256 of the files under test:**
-  - `capturemann` `44d5da6176022e08436ec37d8e5a1a4a5eb3adb8525b7901cecffa74a4ed1ea5`
-  - `cm-mcp` `c893a7aac9a70d69d914a15d3e2dfae8b5fb2839f89a56c38bc1b6d242a83ee9`
-  - `cm-daemon` `34dfeceeee3973515d173c4806c68deb8dcf4e03dc6285f5148f5b56a1f3d3f4`
-  - `cm-desktop` `28a0e768dafb1d0bfea4fbd47405658078b46400bc5cbb332ddf1ab38c1a99be`
-  - `cm-overlay` `babd5f55c5922679cf648820aa6b64f6d1708a251a0115a9fb8234abbfc7f345`
-  - `ffmpeg` `e52a04d18cc2205e66d763904d608b54eddd94738b6d3f96a10235beb545ce05`
-  - `ffprobe` `ad4c6850e0864724e1bcaf60d8d22669202b2a5f95a31e10a3afdbe1c45873cc`
-  - `llama-server` `d9e916fb218a72a445c4d0e51508ec02c1d1d5bbdd2796bf90a2c06423afde07`
+  - `capturemann` `6e8b4a4c3794488e98866545a8ac5c10518c18f57d0c7ba9fba5014f5af4cbc5`
+  - `cm-mcp` `50cbc86c1ec03adcd3de3cbe7786358c58042a62b5ef8c3d27a3f68924eded8a`
+  - `cm-daemon` `a272d3d793619b3333214cdf61c896bed421af0e400a465443711629de6ba31d`
+  - `cm-desktop` `900af6be3d132b1012aaa0ec9a4a7ce0f9b0d97cf48d6d975b43743a3625fa36`
+  - `cm-overlay` `c6de698a112af795a97063a53055277d61070e6d1a0786f7b5b9eaad1dd7fee0`
+  - `ffmpeg` `971e0179ed134cfa59df6a2d9735e8aa6edb2b8c90e394610e972f68d4b10d63`
+  - `ffprobe` `6da79db5fb7b9a9e64b9f266c1072a52174ab03bb06da823be94749253b1a910`
+  - `llama-server` `a90441179dce4eb46cea5df8c98cb69a4231f8edb095dfa9b92b567946084478`
 
 ## Steps
 
@@ -23,7 +23,7 @@
 | --- | --- | --- |
 | `pkg.files` | PASS | the package holds the programs, FFmpeg, the helper and the licences |
 | `pkg.startup` | PASS | every program starts without a crash (illegal instruction, fast fail) |
-| `pkg.diagnostics` | FAIL | diagnostics reports app, system, models and engines, FFmpeg and the helper: `CaptureMann 0.2.9` not in the App section; the llama-server line does not say `bundled with this build` |
+| `pkg.diagnostics` | PASS | diagnostics reports app, system, models and engines, FFmpeg and the helper |
 | `daemon.lifecycle` | PASS | daemon starts on a private endpoint, answers, stops, and the endpoint is gone |
 | `daemon.library_created` | PASS | a fresh library is created and lists no captures; no helper program runs while idle |
 | `daemon.second_instance` | PASS | a second daemon on a busy endpoint exits cleanly and leaves the first one working |
@@ -96,7 +96,7 @@
 | `linux.deb_install` | SKIP | the .deb installs, its programs find their libraries and run, remove and purge leave nothing: not implemented for macos |
 | `linux.tarball_install` | SKIP | the tarball installs into a temporary prefix, its programs run, --uninstall leaves nothing: not implemented for macos |
 | `regress.ffmpeg_missing_wording` | SKIP | with no FFmpeg anywhere the message says so in the platform's own words (no Homebrew on Windows): this system has an FFmpeg in a standard folder the suite cannot hide (- ffmpeg at /opt/homebrew/bin/ffmpeg) |
-| `regress.encoder_unavailable_wording` | SKIP | a recording the hardware encoder refuses ends with neutral wording and leaves no bundle: the machine recorded a 2x2 region: could not provoke the encoder refusal |
+| `regress.encoder_unavailable_wording` | PASS | a recording the hardware encoder refuses ends with neutral wording and leaves no bundle |
 | `zz.crash_events` | PASS | no crash of a CaptureMann program was logged (Windows event log, macOS DiagnosticReports) during the whole run |
 
 ## Acceptance criteria and bug classes
@@ -133,7 +133,7 @@
 | CAP-3 | PASS | `targets.list`, `desktop.hotkey_overlay`, `linux.displays` |
 | CAP-4: export_image | PASS | `lib.manifest` |
 | D-R2 software VP9 fallback | not run | `linux.vaapi_encoder` |
-| DIAG-1 | FAIL | `pkg.diagnostics`, `linux.vaapi_encoder` |
+| DIAG-1 | PASS | `pkg.diagnostics`, `linux.vaapi_encoder` |
 | DPI-WIN | PASS | `desktop.hotkey_overlay`, `desktop.recording_placement` |
 | DPI-WIN layout A | not run | `shot.second_monitor` |
 | DPI-WIN steps 7 to 7c | not run | `rec.each_monitor` |
@@ -168,7 +168,7 @@
 | REC-7 | PASS | `rec.screen_cursor`, `rec.each_monitor` |
 | REC-8 | PASS | `rec.kill9_recovery` |
 | REC-WIN gate | not run | `rec.soak` |
-| REC-WIN section 5 | not run | `regress.encoder_unavailable_wording` |
+| REC-WIN section 5 | PASS | `regress.encoder_unavailable_wording` |
 | RED-1 | not run | `redact.window_text` |
 | VOC-2 | PASS | `import.audio`, `export.audio` |
 | Windows.Media.Ocr recogniser | PASS | `redact.fixture` |
@@ -192,7 +192,7 @@
 | bug: console window flashes (child programs without CREATE_NO_WINDOW) | not run | `desktop.no_console_flash` |
 | bug: countdown and toasts on the other monitor | not run | `desktop.recording_placement` |
 | bug: export colour tags (NV12 encoders converted with BT.601, stream untagged) | PASS | `export.quick` |
-| bug: hardware_encoder_unavailable text named a Mac | not run | `regress.encoder_unavailable_wording` |
+| bug: hardware_encoder_unavailable text named a Mac | PASS | `regress.encoder_unavailable_wording` |
 | bug: illegal instruction | PASS | `zz.crash_events` |
 | bug: recording stop crash 0xC0000409 | PASS | `rec.screen_cursor`, `zz.crash_events` |
 | bug: settings set not applied to the running app | not run | `desktop.settings_applied` |
@@ -216,21 +216,7 @@
 
 ## Problems found
 
-### `pkg.diagnostics`: diagnostics reports app, system, models and engines, FFmpeg and the helper
-
-- `CaptureMann 0.2.9` not in the App section; the llama-server line does not say `bundled with this build`
-
-Evidence:
-
-```text
-version 0.2.9
-daemon pid 80371 answered after 289 ms
-- ffmpeg at /opt/homebrew/bin/ffmpeg
-- llama-server not found: The text engine was not found: run `make llama` to build it, or set CM_LLAMA_SERVER to a llama-server executable. CaptureMann releases...
-- text recognizer: apple_vision (available)
-- speaker engine built in: true
-```
-
+- None in the cases that ran.
 ## Not run
 
 - give --soak-minutes <n> to run a long recording (1): rec.soak
@@ -238,61 +224,62 @@ daemon pid 80371 answered after 289 ms
 - needs --installer <setup.exe> (1): installer.dmg
 - needs --whisper-model <ggml file> (and --speaker-models <dir> for the speaker case) (2): ai.transcribe, ai.speakers
 - not implemented for macos (17): shot.window, redact.window_text, rec.each_monitor, installer.silent, desktop.hud_click_through, desktop.no_console_flash, desktop.settings_applied, desktop.recording_placement, linux.session, linux.displays, linux.desktop_stays_up, linux.second_launch, linux.tray_icon, linux.hotkey_overlay, linux.vaapi_encoder, linux.deb_install, linux.tarball_install
-- the machine recorded a 2x2 region: could not provoke the encoder refusal (1): regress.encoder_unavailable_wording
 - this system has an FFmpeg in a standard folder the suite cannot hide (- ffmpeg at /opt/homebrew/bin/ffmpeg) (1): regress.ffmpeg_missing_wording
 
 ## Evidence of passing cases
 
-- `pkg.files` (344 ms): capturemann: 4026416 bytes; cm-mcp: 9570656 bytes; cm-daemon is not in the app (embedded in cm-desktop); using --daemon /Users/trungtran/source/repos/capturemann/target/release/cm-daemon; cm-desktop: 105674944 bytes; cm-overlay: 5657040 bytes; licence: Some("/Users/trungtran/source/repos/capturemann/target/bundle/CaptureMann-dev.app/Contents/MacOS/../Resources/LICENSE"), third party: Some("/Users/trungtran/source/repos/capturemann/target/bundle/CaptureMann-dev.app/Contents/MacOS/../Resources/THI...
-- `pkg.startup` (548 ms): capturemann --version: exit 0 (0x00000000) in 19 ms; cm-mcp --bogus: exit 2 (0x00000002) in 73 ms; cm-daemon --bogus: exit 2 (0x00000002) in 19 ms; cm-overlay --help: exit 0 (0x00000000) in 17 ms; ffmpeg -hide_banner -version: exit 0 (0x00000000) in 19 ms; ffprobe -hide_banner -version: exit 0 (0x00000000) in 20 ms; llama-server --version: exit 0 (0x00000000) in 20 ms
-- `daemon.lifecycle` (1239 ms): daemon pid 80491 answered after 293 ms; pid 80491, 82 actions; stop: clean exit on SIGTERM; log hygiene: 1 WARN line(s) in the case's logs
-- `daemon.library_created` (1273 ms): daemon pid 80557 answered after 293 ms; log hygiene: 1 WARN line(s) in the case's logs
-- `daemon.second_instance` (726 ms): daemon pid 80693 answered after 289 ms; second daemon: exit 0 (0x00000000) in 19 ms; output: [INFO cm_core::logging] daemon 0.2.6 started [WARN cm_daemon] cm-daemon: the CaptureMann app or another daemon is already serving /var/folders/xm/d48xc26519j40jmsdcwh6v040000gp/T/cmr80226/6/s6.sock; n...; log hygiene: 2 WARN line(s) in the case's logs
-- `daemon.autostart` (956 ms): piped run: exit 0 (0x00000000); new cm-daemon pids [80759]; log hygiene: 1 WARN line(s) in the case's logs
-- `settings.roundtrip` (1121 ms): daemon pid 80870 answered after 291 ms; daemon pid 80887 answered after 290 ms; recording.fps=47: exit 0 (0x00000000) None; 47 was accepted: {"settings":{"recording.fps":47}}; log hygiene: 2 WARN line(s) in the case's logs
-- `settings.app_only_refused` (754 ms): daemon pid 80949 answered after 292 ms; set agents.tool_policy: exit 3 (0x00000003) Some("user_declined") `agents.tool_policy` can only be changed in the CaptureMann app (Settings); set library.path: exit 3 (0x00000003) Some("user_declined") `library.path` can only be changed in the CaptureMann app (Settings); set privacy.recording_indicator: exit 3 (0x00000003) Some("user_declined") `privacy.recording_indicator` can only be changed in the CaptureMann app (Settings); set auth.token: exit 2 (0x00...
-- `targets.list` (744 ms): daemon pid 81020 answered after 293 ms; display 1 'Built-in Retina Display' 3024x1964 at (0,0) scale 2 primary; 19 windows; capabilities {"capture_region":true,"capture_window":true,"list_windows":true,"pick":false}; apps: ChatGPT, Claude, Code, Discord, Finder, Google Chrome, Microsoft Outlook, Neo, Notes, Slack, System Information, Telegram, Terminal, WeChat; log hygiene: 1 WARN line(s) in the case's logs
-- `shot.display` (1092 ms): daemon pid 81061 answered after 290 ms; display 1 3024x1964; PNG 3024x1964; capture shot_06GV6HKJ2HW5VP49; log hygiene: 1 WARN line(s) in the case's logs
-- `shot.region` (856 ms): daemon pid 81131 answered after 293 ms; region 100,100,400,300: PNG 400x300; log hygiene: 1 WARN line(s) in the case's logs
-- `shot.invalid` (854 ms): daemon pid 81173 answered after 291 ms; unknown display: exit 2 (0x00000002) Some("not_found"); empty region: exit 2 (0x00000002) Some("invalid_input"); region off the display: exit 2 (0x00000002) Some("invalid_input"); unknown window: exit 2 (0x00000002) Some("not_found"); log hygiene: 1 WARN line(s) in the case's logs
-- `lib.manifest` (689 ms): daemon pid 81245 answered after 292 ms; manifest keys ok; exported PNG 1000x260, 35254 bytes; log hygiene: 1 WARN line(s) in the case's logs
-- `lib.rename` (707 ms): daemon pid 81302 answered after 293 ms; log hygiene: 1 WARN line(s) in the case's logs
-- `lib.annotate_undo` (816 ms): daemon pid 81344 answered after 291 ms; after annotate: 1 op(s), 1 revision(s); redo with nothing to redo: exit 0 (0x00000000) None; log hygiene: 1 WARN line(s) in the case's logs
-- `lib.delete_needs_confirmation` (673 ms): daemon pid 81415 answered after 293 ms; library rm: exit 3 (0x00000003) Some("user_declined") No confirmation UI is attached to this daemon; log hygiene: 1 WARN line(s) in the case's logs
-- `redact.fixture` (913 ms): daemon pid 81457 answered after 289 ms; recogniser Some(String("apple_vision")); 2 suggestion(s): email,ip_address; --redact-emails: exit 2 (0x00000002) None (not asserted); log hygiene: 1 WARN line(s) in the case's logs
-- `import.formats` (2288 ms): daemon pid 81500 answered after 289 ms; clip-h264.mp4: rec_06GV6HMD871GNEER, 320x240, 3.00 s, job 185 ms; clip-h264.mov: rec_06GV6HMEJZCBFPAB, 320x240, 3.00 s, job 174 ms; clip-h264.mkv: rec_06GV6HMFWCMRFNKA, 320x240, 3.02 s, job 505 ms; log hygiene: 1 WARN line(s) in the case's logs
-- `import.rotated` (1273 ms): daemon pid 81646 answered after 291 ms; library size 240x320 (stored 320x240 with a 90 degree tag); stored track screen.edit.mp4: 240x320 rotation 0 fps Some(30.0); log hygiene: 1 WARN line(s) in the case's logs
-- `import.vfr` (1267 ms): daemon pid 81704 answered after 289 ms; stored track: h264 320x240 r Some(28.0) avg Some(28.0) 4.00 s; prepared ["variable_frame_rate"]; log hygiene: 1 WARN line(s) in the case's logs
-- `import.audio` (989 ms): daemon pid 81788 answered after 293 ms; rec_06GV6HMZZEGYDS5A: kind Some(String("audio")), 2.00 s; log hygiene: 1 WARN line(s) in the case's logs
-- `import.errors` (1463 ms): daemon pid 81835 answered after 290 ms; not a media file: exit 2 (0x00000002) state None {"error":{"code":"invalid_input","message":"The file can't be read. It may be damaged, cut short or not a media file.","data":{"reason":"unreadable_file","files...; a PNG picture: exit 2 (0x00000002) state None {"error":{"code":"invalid_input","message":"The file has no content to import.","data":{"reason":"unreadable_file","files":[{"path":"/var/folders/xm/d48xc26519j...; missing file: exit 2 (0x00000002) S...
-- `import.dry_run` (765 ms): daemon pid 81930 answered after 293 ms; dry run: exit 0 (0x00000000) { "files": [ { "path": "/var/folders/xm/d48xc26519j40jmsdcwh6v040000gp/T/cmr80226/24/clips/clip-h264.mp4", "name": "clip-h264.mp4", "size_bytes": 86456, "title": "clip-h264", "kind": "video", "status"...; log hygiene: 1 WARN line(s) in the case's logs
-- `export.quick` (1267 ms): daemon pid 82002 answered after 289 ms; export --preset quick: clip-h264 - quick.mp4 by h264_videotoolbox, 236 ms; h264 320x240 yuv420p range space trc prim , 3.00 s; encoder h264_videotoolbox: colour tags not asserted (only the Media Foundation path had the bug); log hygiene: 1 WARN line(s) in the case's logs
-- `export.presets` (4918 ms): daemon pid 82076 answered after 291 ms; export --preset youtube-1080p: clip-h264 - youtube-1080p.mp4 by h264_videotoolbox, 634 ms; youtube-1080p: h264 1920x1080 3.00 s mov,mp4,m4a,3gp,3g2,mj2 fps Some(30.0) (1308057 bytes); export --preset vertical-1080: clip-h264 - vertical-1080.mp4 by h264_videotoolbox, 632 ms; vertical-1080: h264 1080x1920 3.00 s mov,mp4,m4a,3gp,3g2,mj2 fps Some(30.0) (1559030 bytes); export --preset square-1080: clip-h264 - square-1080.mp4 by h264_videotoolbox, 465 ms; squar...
-- `export.audio` (1551 ms): daemon pid 82277 answered after 290 ms; export --audio --format wav: clip-h264 - audio.wav by , 0 ms; wav: pcm_s24le 48000 Hz 1 ch 3.00 s; export --audio --format m4a: clip-h264 - audio.m4a by , 0 ms; m4a: aac 48000 Hz 1 ch 3.00 s; log hygiene: 1 WARN line(s) in the case's logs
-- `export.errors` (1014 ms): daemon pid 82346 answered after 289 ms; unknown preset: exit 2 (0x00000002) Some("invalid_input") preset: unknown preset `no-such-preset`; use one of: quick, youtube-4k, youtube-1440p, youtube-1080p, vertical-1080, square-1080, source, gi...; unknown capture: exit 2 (0x00000002) Some("not_found"); log hygiene: 1 WARN line(s) in the case's logs
-- `mcp.handshake` (767 ms): daemon pid 82424 answered after 293 ms; server capturemann 0.2.9, protocol "2025-06-18"; log hygiene: 1 WARN line(s) in the case's logs
-- `mcp.tools_list` (732 ms): daemon pid 82466 answered after 293 ms; 79 tools; log hygiene: 1 WARN line(s) in the case's logs
-- `mcp.read_only_calls` (904 ms): daemon pid 82533 answered after 293 ms; get_settings: ok, 15 chars; list_library: ok, 241 chars; get_capture: ok, 541 chars; get_diagnostics: ok, 3139 chars; list_models: ok, 1779 chars; get_text_model: ok, 253 chars; list_jobs: ok, 11 chars; list_destinations: ok, 19 chars; list_report_templates: ok, 2917 chars; list_text_models: ok, 1329 chars; list_targets: ok, 264 chars; list_devices: ok, 1881 chars; log hygiene: 1 WARN line(s) in the case's logs
-- `mcp.confirm_tier` (969 ms): daemon pid 82676 answered after 290 ms; start_recording: error=true code=Some("user_declined") user_declined: No confirmation UI is attached to this daemon {"reason":"no_confirmer"}; get_recording_status after the refusal: state 'idle'; log hygiene: 1 WARN line(s) in the case's logs
-- `mcp.policy_allow` (777 ms): daemon pid 82768 answered after 290 ms; CLI with policy allow: exit 2 (0x00000002) Some("not_found"); MCP with policy allow: Some("not_found"); log hygiene: 1 WARN line(s) in the case's logs
-- `mcp.request_id` (735 ms): daemon pid 82810 answered after 291 ms; log hygiene: 1 WARN line(s) in the case's logs
-- `mcp.errors` (748 ms): daemon pid 82850 answered after 293 ms; log hygiene: 1 WARN line(s) in the case's logs
-- `mcp.events` (7804 ms): daemon pid 82919 answered after 290 ms; 1 notification(s); capture.revised seen: true; events after import: capture.revised, job.progress, job.progress, job.progress, job.progress, capture.created, job.progress, job.progress, job.done; log hygiene: 1 WARN line(s) in the case's logs
-- `mcp.cli_parity` (961 ms): daemon pid 83150 answered after 292 ms; log hygiene: 1 WARN line(s) in the case's logs
-- `mcp.http` (908 ms): daemon pid 83248 answered after 293 ms; port 62656: no token 401, wrong token 401, right token 200; log hygiene: 1 WARN line(s) in the case's logs
-- `rec.screen_cursor` (13004 ms): daemon pid 83349 answered after 285 ms; started rec_01a1b3470c95_0001; export job job_721e6db0fed21ff5: done; screen: h264 3024x1964 yuv420p r 30.00 avg 30.00 frames None 6.37 s; manifest duration Some(Number(762031)) ticks; manifest 6.35 s, expected 6.04 s (recorded at the pause plus the time after the resume); 4 key frames, gaps Some((1.733333, 2.0)); cursor log: 5 lines, header {"clicks":"available","clock":"CLOCK_UPTIME_RAW ns (mach_absolute_time)","move_source":"event_tap","permission_missi...
-- `rec.region` (4717 ms): daemon pid 83602 answered after 288 ms; started rec_01a1b3473f83_0001; export job job_a73a83e34d8d3431: done; region recording 640x360 h264; log hygiene: 1 WARN line(s) in the case's logs
-- `rec.region_min` (8604 ms): daemon pid 83724 answered after 293 ms; started rec_01a1b3475212_0001; export job job_ed53d46889ed6642: done; region 18x18: 18x18 h264 3.30 s; started rec_01a1b34761a9_0002; export job job_00c9d22a49d05ba0: done; export job job_ed53d46889ed6642: done; region 20x20: 20x20 h264 3.23 s; log hygiene: 1 WARN line(s) in the case's logs
-- `rec.kill9_recovery` (8217 ms): daemon pid 83933 answered after 291 ms; started rec_01a1b34773cc_0001; before the kill: state recording recorded 6.0 s; daemon pid 84049 answered after 292 ms; recovered: 6.00 s of about 6.0 s recorded before the kill; log hygiene: 4 WARN line(s) in the case's logs
-- `rec.mic` (5661 ms): daemon pid 84120 answered after 293 ms; started rec_01a1b347940b_0001; export job job_42c1a2ff587a69e5: done; mic track 4.21 s; mic level: rms -95.3 dBFS, peak -79.3 dBFS; log hygiene: 1 WARN line(s) in the case's logs
-- `rec.system_audio` (9275 ms): daemon pid 84272 answered after 293 ms; started rec_01a1b347aa40_0001; export job job_6883d096e0b44bdf: done; system audio level: mean -10.5 dB, peak -4.4 dB (the tone is 1 kHz, 2 s, played by another process); log hygiene: 1 WARN line(s) in the case's logs
-- `rec.camera` (7601 ms): daemon pid 84546 answered after 293 ms; started rec_01a1b347ce99_0001; export job job_176000a926da7009: done; camera 1920x1080 h264 measured 30.0 fps, 5.59 s; log hygiene: 1 WARN line(s) in the case's logs
-- `ai.no_model` (1148 ms): daemon pid 84770 answered after 290 ms; transcribe without a model: exit 2 (0x00000002) Some("invalid_input") No speech model is installed, so nothing can be transcribed. Open the AI page in CaptureMann, or run `capturemann ai models`, to download or import one. Nothing...; text-model test: exit 2 (0x00000002) Some("invalid_input"); MCP transcribe without a model: error true {"code":"invalid_input","data":{"hint":"capturemann ai models download small","reason":"no_model"},"message":"No speech mo...
-- `ai.llama_version` (1256 ms): llama-server --version: exit 0 (0x00000000) version: 0.7.0-dev (build 0, commit unknown) built with AppleClang 21.0.0.21000334 for Darwin arm64; daemon pid 84853 answered after 289 ms; log hygiene: 1 WARN line(s) in the case's logs
-- `desktop.stays_up` (11428 ms): 1 visible window(s) of the app: 'CaptureMann' 1180x793
-- `desktop.second_launch` (7342 ms): second launch: exit 0 (0x00000000) after 56 ms; visible windows of the first instance: 1 before, 1 after
-- `desktop.hotkey_overlay` (5850 ms): hwnd 0x1f387 pid 85691 class 'CaptureMann-dev' title 'CaptureMann overlay' rect [-1, 0, 1513, 982] ex 0x8
-- `desktop.tray_icon` (7234 ms): menu-bar items of the app: 1
+- `pkg.files` (352 ms): capturemann: 4026496 bytes; cm-mcp: 9570736 bytes; cm-daemon is not in the app (embedded in cm-desktop); using --daemon /Users/trungtran/source/repos/capturemann/target/release/cm-daemon; cm-desktop: 105675024 bytes; cm-overlay: 5657136 bytes; licence: Some("/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel/CaptureMann.app/Contents/MacOS/../Resources/LICENSE"), third party: Some("/private/tmp/claude-502/-Users-trungtran-source-r...
+- `pkg.startup` (2299 ms): capturemann --version: exit 0 (0x00000000) in 19 ms; cm-mcp --bogus: exit 2 (0x00000002) in 19 ms; cm-daemon --bogus: exit 2 (0x00000002) in 1835 ms; cm-overlay --help: exit 0 (0x00000000) in 17 ms; ffmpeg -hide_banner -version: exit 0 (0x00000000) in 19 ms; ffprobe -hide_banner -version: exit 0 (0x00000000) in 19 ms; llama-server --version: exit 0 (0x00000000) in 19 ms
+- `pkg.diagnostics` (1273 ms): version 0.2.9; daemon pid 28017 answered after 293 ms; - ffmpeg at /opt/homebrew/bin/ffmpeg; - llama-server not found: looked next to ~/source/repos/capturemann/target/release, in the settings and on PATH; this build should include it; - text recognizer: apple_vision (available); - speaker engine built in: true; - speaker models: not bundled with this build; log hygiene: 1 WARN line(s) in the case's logs
+- `daemon.lifecycle` (1247 ms): daemon pid 28109 answered after 292 ms; pid 28109, 86 actions; stop: clean exit on SIGTERM; log hygiene: 1 WARN line(s) in the case's logs
+- `daemon.library_created` (1799 ms): daemon pid 28191 answered after 293 ms; log hygiene: 1 WARN line(s) in the case's logs
+- `daemon.second_instance` (730 ms): daemon pid 28325 answered after 293 ms; second daemon: exit 0 (0x00000000) in 18 ms; output: [INFO cm_core::logging] daemon 0.2.9 started [WARN cm_daemon] cm-daemon: the CaptureMann app or another daemon is already serving /var/folders/xm/d48xc26519j40jmsdcwh6v040000gp/T/cmr27827/6/s6.sock; n...; log hygiene: 2 WARN line(s) in the case's logs
+- `daemon.autostart` (945 ms): piped run: exit 0 (0x00000000); new cm-daemon pids [28391]; log hygiene: 1 WARN line(s) in the case's logs
+- `settings.roundtrip` (1117 ms): daemon pid 28480 answered after 290 ms; daemon pid 28497 answered after 293 ms; recording.fps=47: exit 0 (0x00000000) None; 47 was accepted: {"settings":{"recording.fps":47}}; log hygiene: 2 WARN line(s) in the case's logs
+- `settings.app_only_refused` (754 ms): daemon pid 28543 answered after 287 ms; set agents.tool_policy: exit 3 (0x00000003) Some("user_declined") `agents.tool_policy` can only be changed in the CaptureMann app (Settings); set library.path: exit 3 (0x00000003) Some("user_declined") `library.path` can only be changed in the CaptureMann app (Settings); set privacy.recording_indicator: exit 3 (0x00000003) Some("user_declined") `privacy.recording_indicator` can only be changed in the CaptureMann app (Settings); set auth.token: exit 2 (0x00...
+- `targets.list` (719 ms): daemon pid 28614 answered after 294 ms; display 1 'Built-in Retina Display' 3024x1964 at (0,0) scale 2 primary; 19 windows; capabilities {"capture_region":true,"capture_window":true,"list_windows":true,"pick":false}; apps: ChatGPT, Claude, Code, Discord, Finder, Google Chrome, Microsoft Outlook, Neo, Notes, Slack, System Information, Telegram, Terminal, WeChat; log hygiene: 1 WARN line(s) in the case's logs
+- `shot.display` (1052 ms): daemon pid 28654 answered after 293 ms; display 1 3024x1964; PNG 3024x1964; capture shot_06GV6R1K2J83E73T; log hygiene: 1 WARN line(s) in the case's logs
+- `shot.region` (849 ms): daemon pid 28699 answered after 291 ms; region 100,100,400,300: PNG 400x300; log hygiene: 1 WARN line(s) in the case's logs
+- `shot.invalid` (833 ms): daemon pid 28767 answered after 293 ms; unknown display: exit 2 (0x00000002) Some("not_found"); empty region: exit 2 (0x00000002) Some("invalid_input"); region off the display: exit 2 (0x00000002) Some("invalid_input"); unknown window: exit 2 (0x00000002) Some("not_found"); log hygiene: 1 WARN line(s) in the case's logs
+- `lib.manifest` (706 ms): daemon pid 28812 answered after 293 ms; manifest keys ok; exported PNG 1000x260, 35254 bytes; log hygiene: 1 WARN line(s) in the case's logs
+- `lib.rename` (718 ms): daemon pid 28882 answered after 293 ms; log hygiene: 1 WARN line(s) in the case's logs
+- `lib.annotate_undo` (819 ms): daemon pid 28924 answered after 292 ms; after annotate: 1 op(s), 1 revision(s); redo with nothing to redo: exit 0 (0x00000000) None; log hygiene: 1 WARN line(s) in the case's logs
+- `lib.delete_needs_confirmation` (687 ms): daemon pid 28969 answered after 293 ms; library rm: exit 3 (0x00000003) Some("user_declined") No confirmation UI is attached to this daemon; log hygiene: 1 WARN line(s) in the case's logs
+- `redact.fixture` (909 ms): daemon pid 29036 answered after 294 ms; recogniser Some(String("apple_vision")); 2 suggestion(s): email,ip_address; --redact-emails: exit 2 (0x00000002) None (not asserted); log hygiene: 1 WARN line(s) in the case's logs
+- `import.formats` (1934 ms): daemon pid 29077 answered after 289 ms; clip-h264.mp4: rec_06GV6R2DPBMNYRMT, 320x240, 3.00 s, job 176 ms; clip-h264.mov: rec_06GV6R2F01YNXK07, 320x240, 3.00 s, job 175 ms; clip-h264.mkv: rec_06GV6R2G9ZFNRC6B, 320x240, 3.02 s, job 467 ms; log hygiene: 1 WARN line(s) in the case's logs
+- `import.rotated` (1294 ms): daemon pid 29185 answered after 290 ms; library size 240x320 (stored 320x240 with a 90 degree tag); stored track screen.edit.mp4: 240x320 rotation 0 fps Some(30.0); log hygiene: 1 WARN line(s) in the case's logs
+- `import.vfr` (1272 ms): daemon pid 29270 answered after 293 ms; stored track: h264 320x240 r Some(28.0) avg Some(28.0) 4.00 s; prepared ["variable_frame_rate"]; log hygiene: 1 WARN line(s) in the case's logs
+- `import.audio` (993 ms): daemon pid 29354 answered after 293 ms; rec_06GV6R2ZJKH6R8E7: kind Some(String("audio")), 2.00 s; log hygiene: 1 WARN line(s) in the case's logs
+- `import.errors` (1488 ms): daemon pid 29401 answered after 291 ms; not a media file: exit 2 (0x00000002) state None {"error":{"code":"invalid_input","message":"The file can't be read. It may be damaged, cut short or not a media file.","data":{"reason":"unreadable_file","files...; a PNG picture: exit 2 (0x00000002) state None {"error":{"code":"invalid_input","message":"The file has no content to import.","data":{"reason":"unreadable_file","files":[{"path":"/var/folders/xm/d48xc26519j...; missing file: exit 2 (0x00000002) S...
+- `import.dry_run` (779 ms): daemon pid 29499 answered after 293 ms; dry run: exit 0 (0x00000000) { "files": [ { "path": "/var/folders/xm/d48xc26519j40jmsdcwh6v040000gp/T/cmr27827/24/clips/clip-h264.mp4", "name": "clip-h264.mp4", "size_bytes": 86456, "title": "clip-h264", "kind": "video", "status"...; log hygiene: 1 WARN line(s) in the case's logs
+- `export.quick` (1546 ms): daemon pid 29543 answered after 293 ms; export --preset quick: clip-h264 - quick.mp4 by h264_videotoolbox, 253 ms; h264 320x240 yuv420p range space trc prim , 3.00 s; encoder h264_videotoolbox: colour tags not asserted (only the Media Foundation path had the bug); log hygiene: 1 WARN line(s) in the case's logs
+- `export.presets` (5201 ms): daemon pid 29628 answered after 293 ms; export --preset youtube-1080p: clip-h264 - youtube-1080p.mp4 by h264_videotoolbox, 647 ms; youtube-1080p: h264 1920x1080 3.00 s mov,mp4,m4a,3gp,3g2,mj2 fps Some(30.0) (1308057 bytes); export --preset vertical-1080: clip-h264 - vertical-1080.mp4 by h264_videotoolbox, 641 ms; vertical-1080: h264 1080x1920 3.00 s mov,mp4,m4a,3gp,3g2,mj2 fps Some(30.0) (1559030 bytes); export --preset square-1080: clip-h264 - square-1080.mp4 by h264_videotoolbox, 478 ms; squar...
+- `export.audio` (1564 ms): daemon pid 29819 answered after 293 ms; export --audio --format wav: clip-h264 - audio.wav by , 0 ms; wav: pcm_s24le 48000 Hz 1 ch 3.00 s; export --audio --format m4a: clip-h264 - audio.m4a by , 0 ms; m4a: aac 48000 Hz 1 ch 3.00 s; log hygiene: 1 WARN line(s) in the case's logs
+- `export.errors` (1022 ms): daemon pid 29885 answered after 290 ms; unknown preset: exit 2 (0x00000002) Some("invalid_input") preset: unknown preset `no-such-preset`; use one of: quick, youtube-4k, youtube-1440p, youtube-1080p, vertical-1080, square-1080, source, gi...; unknown capture: exit 2 (0x00000002) Some("not_found"); log hygiene: 1 WARN line(s) in the case's logs
+- `mcp.handshake` (756 ms): daemon pid 29964 answered after 290 ms; server capturemann 0.2.9, protocol "2025-06-18"; log hygiene: 1 WARN line(s) in the case's logs
+- `mcp.tools_list` (731 ms): daemon pid 30007 answered after 292 ms; 79 tools; log hygiene: 1 WARN line(s) in the case's logs
+- `mcp.read_only_calls` (1317 ms): daemon pid 30076 answered after 292 ms; get_settings: ok, 15 chars; list_library: ok, 241 chars; get_capture: ok, 541 chars; get_diagnostics: ok, 3573 chars; list_models: ok, 1786 chars; get_text_model: ok, 253 chars; list_jobs: ok, 11 chars; list_destinations: ok, 19 chars; list_report_templates: ok, 2917 chars; list_text_models: ok, 1344 chars; list_targets: ok, 264 chars; list_devices: ok, 1881 chars; log hygiene: 1 WARN line(s) in the case's logs
+- `mcp.confirm_tier` (970 ms): daemon pid 30218 answered after 293 ms; start_recording: error=true code=Some("user_declined") user_declined: No confirmation UI is attached to this daemon {"reason":"no_confirmer"}; get_recording_status after the refusal: state 'idle'; log hygiene: 1 WARN line(s) in the case's logs
+- `mcp.policy_allow` (786 ms): daemon pid 30312 answered after 290 ms; CLI with policy allow: exit 2 (0x00000002) Some("not_found"); MCP with policy allow: Some("not_found"); log hygiene: 1 WARN line(s) in the case's logs
+- `mcp.request_id` (754 ms): daemon pid 30355 answered after 289 ms; log hygiene: 1 WARN line(s) in the case's logs
+- `mcp.errors` (746 ms): daemon pid 30422 answered after 293 ms; log hygiene: 1 WARN line(s) in the case's logs
+- `mcp.events` (7833 ms): daemon pid 30463 answered after 290 ms; 1 notification(s); capture.revised seen: true; events after import: capture.revised, job.progress, job.progress, job.progress, job.progress, capture.created, job.progress, job.progress, job.done; log hygiene: 1 WARN line(s) in the case's logs
+- `mcp.cli_parity` (931 ms): daemon pid 30628 answered after 293 ms; log hygiene: 1 WARN line(s) in the case's logs
+- `mcp.http` (905 ms): daemon pid 30696 answered after 291 ms; port 63039: no token 401, wrong token 401, right token 200; log hygiene: 1 WARN line(s) in the case's logs
+- `rec.screen_cursor` (13011 ms): daemon pid 30789 answered after 291 ms; started rec_01a1b360d039_0001; export job job_4565a897042ba77a: done; screen: h264 3024x1964 yuv420p r 30.00 avg 30.00 frames None 6.33 s; manifest duration Some(Number(760375)) ticks; manifest 6.34 s, expected 6.04 s (recorded at the pause plus the time after the resume); 4 key frames, gaps Some((1.733333, 2.0)); cursor log: 5 lines, header {"clicks":"available","clock":"CLOCK_UPTIME_RAW ns (mach_absolute_time)","move_source":"event_tap","permission_missi...
+- `rec.region` (4705 ms): daemon pid 31022 answered after 288 ms; started rec_01a1b3610324_0001; export job job_c80fd318dc5fe82a: done; region recording 640x360 h264; log hygiene: 1 WARN line(s) in the case's logs
+- `rec.region_min` (8629 ms): daemon pid 31163 answered after 293 ms; started rec_01a1b36115a7_0001; export job job_e80b6b27c432ab58: done; region 18x18: 18x18 h264 3.30 s; started rec_01a1b3612545_0002; export job job_d905976b35fa4786: done; export job job_e80b6b27c432ab58: done; region 20x20: 20x20 h264 3.23 s; log hygiene: 1 WARN line(s) in the case's logs
+- `rec.kill9_recovery` (8222 ms): daemon pid 31346 answered after 293 ms; started rec_01a1b361377a_0001; before the kill: state recording recorded 6.0 s; daemon pid 31489 answered after 292 ms; recovered: 6.00 s of about 6.0 s recorded before the kill; log hygiene: 4 WARN line(s) in the case's logs
+- `rec.mic` (5764 ms): daemon pid 31530 answered after 293 ms; started rec_01a1b36157c1_0001; export job job_b943268b4ce661ef: done; mic track 4.23 s; mic level: rms -82.9 dBFS, peak -59.1 dBFS; log hygiene: 1 WARN line(s) in the case's logs
+- `rec.system_audio` (9273 ms): daemon pid 31683 answered after 292 ms; started rec_01a1b3616e55_0001; export job job_21df6c74221b8151: done; system audio level: mean -10.5 dB, peak -4.4 dB (the tone is 1 kHz, 2 s, played by another process); log hygiene: 1 WARN line(s) in the case's logs
+- `rec.camera` (7605 ms): daemon pid 31879 answered after 289 ms; started rec_01a1b36192a7_0001; export job job_31312bff65676571: done; camera 1920x1080 h264 measured 30.0 fps, 5.53 s; log hygiene: 1 WARN line(s) in the case's logs
+- `ai.no_model` (1116 ms): daemon pid 32073 answered after 289 ms; transcribe without a model: exit 2 (0x00000002) Some("invalid_input") No speech model is installed, so nothing can be transcribed. Open the AI page in CaptureMann, or run `capturemann ai models`, to download or import one. Nothing...; text-model test: exit 2 (0x00000002) Some("invalid_input"); MCP transcribe without a model: error true {"code":"invalid_input","data":{"hint":"capturemann ai models download small","reason":"no_model"},"message":"No speech mo...
+- `ai.llama_version` (1254 ms): llama-server --version: exit 0 (0x00000000) version: 0.7.0-dev (build 0, commit unknown) built with AppleClang 21.0.0.21000334 for Darwin arm64; daemon pid 32155 answered after 290 ms; log hygiene: 1 WARN line(s) in the case's logs
+- `desktop.stays_up` (11277 ms): 1 visible window(s) of the app: 'CaptureMann' 1180x793
+- `desktop.second_launch` (7338 ms): second launch: exit 0 (0x00000000) after 71 ms; visible windows of the first instance: 1 before, 1 after
+- `desktop.hotkey_overlay` (5790 ms): hwnd 0x1f523 pid 32918 class 'CaptureMann' title 'CaptureMann overlay' rect [-1, 0, 1513, 982] ex 0x8
+- `desktop.tray_icon` (7197 ms): menu-bar items of the app: 1
+- `regress.encoder_unavailable_wording` (742 ms): daemon pid 33346 answered after 293 ms; 2x2 region: exit 2 (0x00000002) invalid_input: The recording area is too small: each side must be at least 18 px.; a tiny area is refused up front: invalid_input, too small; log hygiene: 1 WARN line(s) in the case's logs
 
 ## Verdict
 

@@ -69,10 +69,13 @@ regress_macos() {
   pkg="$(cd "$pkg" && pwd -P)"
   case "$pkg" in /Applications|/Applications/*) die "refusing to test /Applications: use the dev bundle or a copy" ;; esac
   [ -n "$daemon" ] || daemon="$root/target/release/cm-daemon"
-  if [ ! -x "$daemon" ]; then
+  # Always rebuilt (incremental): a daemon left from an older checkout made the Nov 6 macOS runs test 0.2.6 code (found Nov 7, 2026).
+  if [ "$daemon" = "$root/target/release/cm-daemon" ]; then
     echo "building cm-daemon (release) for the headless cases"
     (cd "$root" && cargo build --release --locked -p cm-daemon) || die "cm-daemon did not build"
   fi
+  [ -x "$daemon" ] || die "no cm-daemon at $daemon"
+  echo "cm-daemon: $(ls -l "$daemon" | awk '{print $6, $7, $8}') ($daemon)"   # cm-daemon has no --version: running it would start a daemon
   local reg="$root/target/release/cm-regress"
   (cd "$root" && cargo build --release --locked -p cm-regress) || die "cm-regress did not build"
 
