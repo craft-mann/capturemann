@@ -2,14 +2,14 @@
   "cases": [
     {
       "area": "pkg",
-      "duration_ms": 342,
+      "duration_ms": 352,
       "evidence": [
         "capturemann: 4026496 bytes",
         "cm-mcp: 9570736 bytes",
         "cm-daemon is not in the app (embedded in cm-desktop); using --daemon /Users/trungtran/source/repos/capturemann/target/release/cm-daemon",
-        "cm-desktop: 105675024 bytes",
+        "cm-desktop: 105664448 bytes",
         "cm-overlay: 5657136 bytes",
-        "licence: Some(\"/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel/CaptureMann.app/Contents/MacOS/../Resources/LICENSE\"), third party: Some(\"/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel/CaptureMann.app/Contents/MacOS/../Resources/THIRD_PARTY_LICENSES.md\"), notice: Some(\"/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel/CaptureMann.app/Contents/MacOS/../Resources/NOTICE\")",
+        "licence: Some(\"/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel2/CaptureMann.app/Contents/MacOS/../Resources/LICENSE\"), third party: Some(\"/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel2/CaptureMann.app/Contents/MacOS/../Resources/THIRD_PARTY_LICENSES.md\"), notice: Some(\"/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel2/CaptureMann.app/Contents/MacOS/../Resources/NOTICE\")",
         "note: no README in the package folder"
       ],
       "id": "pkg.files",
@@ -25,15 +25,15 @@
     },
     {
       "area": "pkg",
-      "duration_ms": 1107,
+      "duration_ms": 1646,
       "evidence": [
-        "capturemann --version: exit 0 (0x00000000) in 22 ms",
-        "cm-mcp --bogus: exit 2 (0x00000002) in 22 ms",
-        "cm-daemon --bogus: exit 2 (0x00000002) in 620 ms",
-        "cm-overlay --help: exit 0 (0x00000000) in 16 ms",
-        "ffmpeg -hide_banner -version: exit 0 (0x00000000) in 20 ms",
-        "ffprobe -hide_banner -version: exit 0 (0x00000000) in 21 ms",
-        "llama-server --version: exit 0 (0x00000000) in 22 ms"
+        "capturemann --version: exit 0 (0x00000000) in 19 ms",
+        "cm-mcp --bogus: exit 2 (0x00000002) in 94 ms",
+        "cm-daemon --bogus: exit 2 (0x00000002) in 901 ms",
+        "cm-overlay --help: exit 0 (0x00000000) in 55 ms",
+        "ffmpeg -hide_banner -version: exit 0 (0x00000000) in 18 ms",
+        "ffprobe -hide_banner -version: exit 0 (0x00000000) in 80 ms",
+        "llama-server --version: exit 0 (0x00000000) in 112 ms"
       ],
       "id": "pkg.startup",
       "message": "",
@@ -48,10 +48,10 @@
     },
     {
       "area": "pkg",
-      "duration_ms": 1318,
+      "duration_ms": 1295,
       "evidence": [
         "version 0.2.9",
-        "daemon pid 10450 answered after 300 ms",
+        "daemon pid 82580 answered after 293 ms",
         "- ffmpeg at /opt/homebrew/bin/ffmpeg",
         "- llama-server not found: looked next to ~/source/repos/capturemann/target/release, in the settings and on PATH; this build should include it",
         "- text recognizer: apple_vision (available)",
@@ -71,10 +71,10 @@
     },
     {
       "area": "daemon",
-      "duration_ms": 1255,
+      "duration_ms": 1247,
       "evidence": [
-        "daemon pid 10574 answered after 291 ms",
-        "pid 10574, 86 actions",
+        "daemon pid 82677 answered after 290 ms",
+        "pid 82677, 86 actions",
         "stop: clean exit on SIGTERM",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -91,9 +91,9 @@
     },
     {
       "area": "daemon",
-      "duration_ms": 1760,
+      "duration_ms": 1834,
       "evidence": [
-        "daemon pid 10654 answered after 304 ms",
+        "daemon pid 82758 answered after 293 ms",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "daemon.library_created",
@@ -109,10 +109,10 @@
     },
     {
       "area": "settings",
-      "duration_ms": 1156,
+      "duration_ms": 1111,
       "evidence": [
-        "daemon pid 10761 answered after 297 ms",
-        "daemon pid 10805 answered after 303 ms",
+        "daemon pid 82892 answered after 293 ms",
+        "daemon pid 82909 answered after 293 ms",
         "recording.fps=47: exit 0 (0x00000000) None",
         "47 was accepted: {\"settings\":{\"recording.fps\":47}}",
         "log hygiene: 2 WARN line(s) in the case's logs"
@@ -129,12 +129,12 @@
     },
     {
       "area": "targets",
-      "duration_ms": 743,
+      "duration_ms": 738,
       "evidence": [
-        "daemon pid 10849 answered after 294 ms",
+        "daemon pid 82953 answered after 291 ms",
         "display 1 'Built-in Retina Display' 3024x1964 at (0,0) scale 2 primary",
-        "20 windows; capabilities {\"capture_region\":true,\"capture_window\":true,\"list_windows\":true,\"pick\":false}",
-        "apps: CaptureMann, ChatGPT, Claude, Code, Discord, Finder, Google Chrome, Microsoft Outlook, Neo, Notes, Slack, System Information, Telegram, Terminal, WeChat",
+        "19 windows; capabilities {\"capture_region\":true,\"capture_window\":true,\"list_windows\":true,\"pick\":false}",
+        "apps: ChatGPT, Claude, Code, Discord, Finder, Google Chrome, Microsoft Outlook, Neo, Notes, Slack, System Information, Telegram, Terminal, WeChat",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "targets.list",
@@ -171,9 +171,9 @@
     },
     {
       "area": "lib",
-      "duration_ms": 708,
+      "duration_ms": 706,
       "evidence": [
-        "daemon pid 10889 answered after 295 ms",
+        "daemon pid 83020 answered after 292 ms",
         "manifest keys ok; exported PNG 1000x260, 35254 bytes",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -191,9 +191,9 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 784,
+      "duration_ms": 762,
       "evidence": [
-        "daemon pid 10959 answered after 293 ms",
+        "daemon pid 83064 answered after 287 ms",
         "server capturemann 0.2.9, protocol \"2025-06-18\"",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -210,9 +210,9 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 744,
+      "duration_ms": 733,
       "evidence": [
-        "daemon pid 11001 answered after 298 ms",
+        "daemon pid 83107 answered after 291 ms",
         "79 tools",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -229,10 +229,10 @@
     },
     {
       "area": "ai",
-      "duration_ms": 1269,
+      "duration_ms": 1253,
       "evidence": [
         "llama-server --version: exit 0 (0x00000000) version: 0.7.0-dev (build 0, commit unknown) built with AppleClang 21.0.0.21000334 for Darwin arm64",
-        "daemon pid 11069 answered after 303 ms",
+        "daemon pid 83175 answered after 285 ms",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "ai.llama_version",
@@ -265,7 +265,7 @@
     },
     {
       "area": "zz",
-      "duration_ms": 358,
+      "duration_ms": 355,
       "evidence": [],
       "id": "zz.crash_events",
       "message": "",
@@ -280,49 +280,49 @@
     }
   ],
   "run": {
-    "commit": "",
+    "commit": "c9432fde",
     "ffmpeg": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
-    "finished": "2026-11-07T00:12:58Z",
-    "flags": "--tier smoke --package-dir /private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel/CaptureMann.app/Contents/MacOS --daemon /Users/trungtran/source/repos/capturemann/target/release/cm-daemon --out /var/folders/xm/d48xc26519j40jmsdcwh6v040000gp/T//cm-regress-mac-20261107T001245Z --who cm-regress via regress.sh --verdict PARTIAL",
+    "finished": "2026-11-07T04:37:27Z",
+    "flags": "--tier smoke --package-dir /private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel2/CaptureMann.app/Contents/MacOS --daemon /Users/trungtran/source/repos/capturemann/target/release/cm-daemon --out /var/folders/xm/d48xc26519j40jmsdcwh6v040000gp/T//cm-regress-mac-20261107T043714Z --who cm-regress via regress.sh --verdict PARTIAL --commit c9432fde",
     "gpu": "n/a",
     "hashes": [
       [
         "capturemann",
-        "6e8b4a4c3794488e98866545a8ac5c10518c18f57d0c7ba9fba5014f5af4cbc5"
+        "afecd54e13d133ffc7a0c2339822748657146d5f807f0444e3c9266d3f3cb899"
       ],
       [
         "cm-mcp",
-        "50cbc86c1ec03adcd3de3cbe7786358c58042a62b5ef8c3d27a3f68924eded8a"
+        "6205fd941d273ba3e38caf64d97e9e8c7f2853fd4e4273b95c3a876b421b6b20"
       ],
       [
         "cm-daemon",
-        "a272d3d793619b3333214cdf61c896bed421af0e400a465443711629de6ba31d"
+        "a03c732bb18275db18adaeb08ec88e27b087b11773fc72ce37866a7ecb9aa474"
       ],
       [
         "cm-desktop",
-        "900af6be3d132b1012aaa0ec9a4a7ce0f9b0d97cf48d6d975b43743a3625fa36"
+        "7c063211230b25409799967e7c1b94e8c31db2b00a22adf8c7e0fb343321e379"
       ],
       [
         "cm-overlay",
-        "c6de698a112af795a97063a53055277d61070e6d1a0786f7b5b9eaad1dd7fee0"
+        "aa5ff77489e07e6654b793775c107c9c45e91d0397dc883c64f68f11afd6be83"
       ],
       [
         "ffmpeg",
-        "971e0179ed134cfa59df6a2d9735e8aa6edb2b8c90e394610e972f68d4b10d63"
+        "f847e53b2ef3ebdbf86c3f81c8e08a221f07a3c42a8f3e4d9523c1e4f5c5654a"
       ],
       [
         "ffprobe",
-        "6da79db5fb7b9a9e64b9f266c1072a52174ab03bb06da823be94749253b1a910"
+        "7a488f55bf36a50aab682effb75eec42c684edae3c610e934f733b7ad3acf846"
       ],
       [
         "llama-server",
-        "a90441179dce4eb46cea5df8c98cb69a4231f8edb095dfa9b92b567946084478"
+        "b07f336db501f1e121953c221beaaf82baefc953418363d41eafa3c9c8352eb1"
       ]
     ],
     "os": "Darwin 25.6.0 arm64",
-    "package_dir": "/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel/CaptureMann.app/Contents/MacOS",
+    "package_dir": "/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel2/CaptureMann.app/Contents/MacOS",
     "platform": "macos",
-    "started": "2026-11-07T00:12:45Z",
+    "started": "2026-11-07T04:37:14Z",
     "tier": "smoke",
     "verdict": "PARTIAL",
     "version": "0.2.9",

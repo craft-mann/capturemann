@@ -2,14 +2,14 @@
   "cases": [
     {
       "area": "pkg",
-      "duration_ms": 352,
+      "duration_ms": 349,
       "evidence": [
         "capturemann: 4026496 bytes",
         "cm-mcp: 9570736 bytes",
         "cm-daemon is not in the app (embedded in cm-desktop); using --daemon /Users/trungtran/source/repos/capturemann/target/release/cm-daemon",
-        "cm-desktop: 105675024 bytes",
+        "cm-desktop: 105664448 bytes",
         "cm-overlay: 5657136 bytes",
-        "licence: Some(\"/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel/CaptureMann.app/Contents/MacOS/../Resources/LICENSE\"), third party: Some(\"/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel/CaptureMann.app/Contents/MacOS/../Resources/THIRD_PARTY_LICENSES.md\"), notice: Some(\"/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel/CaptureMann.app/Contents/MacOS/../Resources/NOTICE\")",
+        "licence: Some(\"/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel2/CaptureMann.app/Contents/MacOS/../Resources/LICENSE\"), third party: Some(\"/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel2/CaptureMann.app/Contents/MacOS/../Resources/THIRD_PARTY_LICENSES.md\"), notice: Some(\"/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel2/CaptureMann.app/Contents/MacOS/../Resources/NOTICE\")",
         "note: no README in the package folder"
       ],
       "id": "pkg.files",
@@ -25,12 +25,12 @@
     },
     {
       "area": "pkg",
-      "duration_ms": 2299,
+      "duration_ms": 1897,
       "evidence": [
         "capturemann --version: exit 0 (0x00000000) in 19 ms",
         "cm-mcp --bogus: exit 2 (0x00000002) in 19 ms",
-        "cm-daemon --bogus: exit 2 (0x00000002) in 1835 ms",
-        "cm-overlay --help: exit 0 (0x00000000) in 17 ms",
+        "cm-daemon --bogus: exit 2 (0x00000002) in 1424 ms",
+        "cm-overlay --help: exit 0 (0x00000000) in 19 ms",
         "ffmpeg -hide_banner -version: exit 0 (0x00000000) in 19 ms",
         "ffprobe -hide_banner -version: exit 0 (0x00000000) in 19 ms",
         "llama-server --version: exit 0 (0x00000000) in 19 ms"
@@ -48,10 +48,10 @@
     },
     {
       "area": "pkg",
-      "duration_ms": 1273,
+      "duration_ms": 1274,
       "evidence": [
         "version 0.2.9",
-        "daemon pid 28017 answered after 293 ms",
+        "daemon pid 87618 answered after 290 ms",
         "- ffmpeg at /opt/homebrew/bin/ffmpeg",
         "- llama-server not found: looked next to ~/source/repos/capturemann/target/release, in the settings and on PATH; this build should include it",
         "- text recognizer: apple_vision (available)",
@@ -71,10 +71,10 @@
     },
     {
       "area": "daemon",
-      "duration_ms": 1247,
+      "duration_ms": 1246,
       "evidence": [
-        "daemon pid 28109 answered after 292 ms",
-        "pid 28109, 86 actions",
+        "daemon pid 87740 answered after 293 ms",
+        "pid 87740, 86 actions",
         "stop: clean exit on SIGTERM",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -91,9 +91,9 @@
     },
     {
       "area": "daemon",
-      "duration_ms": 1799,
+      "duration_ms": 1729,
       "evidence": [
-        "daemon pid 28191 answered after 293 ms",
+        "daemon pid 87793 answered after 293 ms",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "daemon.library_created",
@@ -109,10 +109,10 @@
     },
     {
       "area": "daemon",
-      "duration_ms": 730,
+      "duration_ms": 737,
       "evidence": [
-        "daemon pid 28325 answered after 293 ms",
-        "second daemon: exit 0 (0x00000000) in 18 ms; output: [INFO cm_core::logging] daemon 0.2.9 started [WARN cm_daemon] cm-daemon: the CaptureMann app or another daemon is already serving /var/folders/xm/d48xc26519j40jmsdcwh6v040000gp/T/cmr27827/6/s6.sock; n...",
+        "daemon pid 87926 answered after 290 ms",
+        "second daemon: exit 0 (0x00000000) in 19 ms; output: [INFO cm_core::logging] daemon 0.2.9 started [WARN cm_daemon] cm-daemon: the CaptureMann app or another daemon is already serving /var/folders/xm/d48xc26519j40jmsdcwh6v040000gp/T/cmr87456/6/s6.sock; n...",
         "log hygiene: 2 WARN line(s) in the case's logs"
       ],
       "id": "daemon.second_instance",
@@ -127,9 +127,9 @@
     },
     {
       "area": "daemon",
-      "duration_ms": 945,
+      "duration_ms": 957,
       "evidence": [
-        "piped run: exit 0 (0x00000000); new cm-daemon pids [28391]",
+        "piped run: exit 0 (0x00000000); new cm-daemon pids [87993]",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "daemon.autostart",
@@ -144,10 +144,10 @@
     },
     {
       "area": "settings",
-      "duration_ms": 1117,
+      "duration_ms": 1112,
       "evidence": [
-        "daemon pid 28480 answered after 290 ms",
-        "daemon pid 28497 answered after 293 ms",
+        "daemon pid 88081 answered after 292 ms",
+        "daemon pid 88098 answered after 289 ms",
         "recording.fps=47: exit 0 (0x00000000) None",
         "47 was accepted: {\"settings\":{\"recording.fps\":47}}",
         "log hygiene: 2 WARN line(s) in the case's logs"
@@ -164,9 +164,9 @@
     },
     {
       "area": "settings",
-      "duration_ms": 754,
+      "duration_ms": 766,
       "evidence": [
-        "daemon pid 28543 answered after 287 ms",
+        "daemon pid 88144 answered after 293 ms",
         "set agents.tool_policy: exit 3 (0x00000003) Some(\"user_declined\") `agents.tool_policy` can only be changed in the CaptureMann app (Settings)",
         "set library.path: exit 3 (0x00000003) Some(\"user_declined\") `library.path` can only be changed in the CaptureMann app (Settings)",
         "set privacy.recording_indicator: exit 3 (0x00000003) Some(\"user_declined\") `privacy.recording_indicator` can only be changed in the CaptureMann app (Settings)",
@@ -186,9 +186,9 @@
     },
     {
       "area": "targets",
-      "duration_ms": 719,
+      "duration_ms": 745,
       "evidence": [
-        "daemon pid 28614 answered after 294 ms",
+        "daemon pid 88217 answered after 293 ms",
         "display 1 'Built-in Retina Display' 3024x1964 at (0,0) scale 2 primary",
         "19 windows; capabilities {\"capture_region\":true,\"capture_window\":true,\"list_windows\":true,\"pick\":false}",
         "apps: ChatGPT, Claude, Code, Discord, Finder, Google Chrome, Microsoft Outlook, Neo, Notes, Slack, System Information, Telegram, Terminal, WeChat",
@@ -211,10 +211,10 @@
     },
     {
       "area": "shot",
-      "duration_ms": 1052,
+      "duration_ms": 1071,
       "evidence": [
-        "daemon pid 28654 answered after 293 ms",
-        "display 1 3024x1964; PNG 3024x1964; capture shot_06GV6R1K2J83E73T",
+        "daemon pid 88257 answered after 293 ms",
+        "display 1 3024x1964; PNG 3024x1964; capture shot_06GV8KCRF9G17VB4",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "shot.display",
@@ -232,9 +232,9 @@
     },
     {
       "area": "shot",
-      "duration_ms": 849,
+      "duration_ms": 853,
       "evidence": [
-        "daemon pid 28699 answered after 291 ms",
+        "daemon pid 88327 answered after 293 ms",
         "region 100,100,400,300: PNG 400x300",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -290,9 +290,9 @@
     },
     {
       "area": "shot",
-      "duration_ms": 833,
+      "duration_ms": 856,
       "evidence": [
-        "daemon pid 28767 answered after 293 ms",
+        "daemon pid 88368 answered after 293 ms",
         "unknown display: exit 2 (0x00000002) Some(\"not_found\")",
         "empty region: exit 2 (0x00000002) Some(\"invalid_input\")",
         "region off the display: exit 2 (0x00000002) Some(\"invalid_input\")",
@@ -314,9 +314,9 @@
     },
     {
       "area": "lib",
-      "duration_ms": 706,
+      "duration_ms": 708,
       "evidence": [
-        "daemon pid 28812 answered after 293 ms",
+        "daemon pid 88441 answered after 293 ms",
         "manifest keys ok; exported PNG 1000x260, 35254 bytes",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -334,9 +334,9 @@
     },
     {
       "area": "lib",
-      "duration_ms": 718,
+      "duration_ms": 706,
       "evidence": [
-        "daemon pid 28882 answered after 293 ms",
+        "daemon pid 88482 answered after 293 ms",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "lib.rename",
@@ -351,9 +351,9 @@
     },
     {
       "area": "lib",
-      "duration_ms": 819,
+      "duration_ms": 817,
       "evidence": [
-        "daemon pid 28924 answered after 292 ms",
+        "daemon pid 88523 answered after 292 ms",
         "after annotate: 1 op(s), 1 revision(s)",
         "redo with nothing to redo: exit 0 (0x00000000) None",
         "log hygiene: 1 WARN line(s) in the case's logs"
@@ -371,9 +371,9 @@
     },
     {
       "area": "lib",
-      "duration_ms": 687,
+      "duration_ms": 676,
       "evidence": [
-        "daemon pid 28969 answered after 293 ms",
+        "daemon pid 88595 answered after 293 ms",
         "library rm: exit 3 (0x00000003) Some(\"user_declined\") No confirmation UI is attached to this daemon",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -390,9 +390,9 @@
     },
     {
       "area": "redact",
-      "duration_ms": 909,
+      "duration_ms": 915,
       "evidence": [
-        "daemon pid 29036 answered after 294 ms",
+        "daemon pid 88636 answered after 293 ms",
         "recogniser Some(String(\"apple_vision\")); 2 suggestion(s): email,ip_address",
         "--redact-emails: exit 2 (0x00000002) None (not asserted)",
         "log hygiene: 1 WARN line(s) in the case's logs"
@@ -429,12 +429,12 @@
     },
     {
       "area": "import",
-      "duration_ms": 1934,
+      "duration_ms": 1950,
       "evidence": [
-        "daemon pid 29077 answered after 289 ms",
-        "clip-h264.mp4: rec_06GV6R2DPBMNYRMT, 320x240, 3.00 s, job 176 ms",
-        "clip-h264.mov: rec_06GV6R2F01YNXK07, 320x240, 3.00 s, job 175 ms",
-        "clip-h264.mkv: rec_06GV6R2G9ZFNRC6B, 320x240, 3.02 s, job 467 ms",
+        "daemon pid 88705 answered after 293 ms",
+        "clip-h264.mp4: rec_06GV8KDK91V0BBFM, 320x240, 3.00 s, job 182 ms",
+        "clip-h264.mov: rec_06GV8KDMK7TX19G6, 320x240, 3.00 s, job 177 ms",
+        "clip-h264.mkv: rec_06GV8KDNX70BB76S, 320x240, 3.02 s, job 469 ms",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "import.formats",
@@ -450,9 +450,9 @@
     },
     {
       "area": "import",
-      "duration_ms": 1294,
+      "duration_ms": 1278,
       "evidence": [
-        "daemon pid 29185 answered after 290 ms",
+        "daemon pid 88812 answered after 293 ms",
         "library size 240x320 (stored 320x240 with a 90 degree tag)",
         "stored track screen.edit.mp4: 240x320 rotation 0 fps Some(30.0)",
         "log hygiene: 1 WARN line(s) in the case's logs"
@@ -470,9 +470,9 @@
     },
     {
       "area": "import",
-      "duration_ms": 1272,
+      "duration_ms": 1247,
       "evidence": [
-        "daemon pid 29270 answered after 293 ms",
+        "daemon pid 88870 answered after 290 ms",
         "stored track: h264 320x240 r Some(28.0) avg Some(28.0) 4.00 s; prepared [\"variable_frame_rate\"]",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -490,10 +490,10 @@
     },
     {
       "area": "import",
-      "duration_ms": 993,
+      "duration_ms": 1004,
       "evidence": [
-        "daemon pid 29354 answered after 293 ms",
-        "rec_06GV6R2ZJKH6R8E7: kind Some(String(\"audio\")), 2.00 s",
+        "daemon pid 88955 answered after 293 ms",
+        "rec_06GV8KE50PVDVJM4: kind Some(String(\"audio\")), 2.00 s",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "import.audio",
@@ -509,13 +509,13 @@
     },
     {
       "area": "import",
-      "duration_ms": 1488,
+      "duration_ms": 1489,
       "evidence": [
-        "daemon pid 29401 answered after 291 ms",
+        "daemon pid 89005 answered after 293 ms",
         "not a media file: exit 2 (0x00000002) state None {\"error\":{\"code\":\"invalid_input\",\"message\":\"The file can't be read. It may be damaged, cut short or not a media file.\",\"data\":{\"reason\":\"unreadable_file\",\"files...",
         "a PNG picture: exit 2 (0x00000002) state None {\"error\":{\"code\":\"invalid_input\",\"message\":\"The file has no content to import.\",\"data\":{\"reason\":\"unreadable_file\",\"files\":[{\"path\":\"/var/folders/xm/d48xc26519j...",
         "missing file: exit 2 (0x00000002) Some(\"not_found\")",
-        "file open elsewhere: exit 0 (0x00000000) state Some(\"done\") { \"job_id\": \"job_c2b11ff419a5bf8b\", \"type\": \"import\", \"state\": \"done\", \"progress\": 1.0, \"message\": \"Done\", \"attempts\": 1, \"depends_on\": [], \"inputs\": { \"files\":...",
+        "file open elsewhere: exit 0 (0x00000000) state Some(\"done\") { \"job_id\": \"job_dcdea1390927ffb0\", \"type\": \"import\", \"state\": \"done\", \"progress\": 1.0, \"message\": \"Done\", \"attempts\": 1, \"depends_on\": [], \"inputs\": { \"files\":...",
         "Unicode name imported as title 'Chào bạn – bản ghi màn hình đầy đủ ✓'",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -534,8 +534,8 @@
       "area": "import",
       "duration_ms": 779,
       "evidence": [
-        "daemon pid 29499 answered after 293 ms",
-        "dry run: exit 0 (0x00000000) { \"files\": [ { \"path\": \"/var/folders/xm/d48xc26519j40jmsdcwh6v040000gp/T/cmr27827/24/clips/clip-h264.mp4\", \"name\": \"clip-h264.mp4\", \"size_bytes\": 86456, \"title\": \"clip-h264\", \"kind\": \"video\", \"status\"...",
+        "daemon pid 89103 answered after 290 ms",
+        "dry run: exit 0 (0x00000000) { \"files\": [ { \"path\": \"/var/folders/xm/d48xc26519j40jmsdcwh6v040000gp/T/cmr87456/24/clips/clip-h264.mp4\", \"name\": \"clip-h264.mp4\", \"size_bytes\": 86456, \"title\": \"clip-h264\", \"kind\": \"video\", \"status\"...",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "import.dry_run",
@@ -550,10 +550,10 @@
     },
     {
       "area": "export",
-      "duration_ms": 1546,
+      "duration_ms": 1544,
       "evidence": [
-        "daemon pid 29543 answered after 293 ms",
-        "export --preset quick: clip-h264 - quick.mp4 by h264_videotoolbox, 253 ms",
+        "daemon pid 89175 answered after 290 ms",
+        "export --preset quick: clip-h264 - quick.mp4 by h264_videotoolbox, 255 ms",
         "h264 320x240 yuv420p range  space  trc  prim , 3.00 s",
         "encoder h264_videotoolbox: colour tags not asserted (only the Media Foundation path had the bug)",
         "log hygiene: 1 WARN line(s) in the case's logs"
@@ -571,18 +571,18 @@
     },
     {
       "area": "export",
-      "duration_ms": 5201,
+      "duration_ms": 5216,
       "evidence": [
-        "daemon pid 29628 answered after 293 ms",
-        "export --preset youtube-1080p: clip-h264 - youtube-1080p.mp4 by h264_videotoolbox, 647 ms",
+        "daemon pid 89234 answered after 293 ms",
+        "export --preset youtube-1080p: clip-h264 - youtube-1080p.mp4 by h264_videotoolbox, 648 ms",
         "youtube-1080p: h264 1920x1080 3.00 s mov,mp4,m4a,3gp,3g2,mj2 fps Some(30.0) (1308057 bytes)",
-        "export --preset vertical-1080: clip-h264 - vertical-1080.mp4 by h264_videotoolbox, 641 ms",
+        "export --preset vertical-1080: clip-h264 - vertical-1080.mp4 by h264_videotoolbox, 660 ms",
         "vertical-1080: h264 1080x1920 3.00 s mov,mp4,m4a,3gp,3g2,mj2 fps Some(30.0) (1559030 bytes)",
-        "export --preset square-1080: clip-h264 - square-1080.mp4 by h264_videotoolbox, 478 ms",
+        "export --preset square-1080: clip-h264 - square-1080.mp4 by h264_videotoolbox, 500 ms",
         "square-1080: h264 1080x1080 3.00 s mov,mp4,m4a,3gp,3g2,mj2 fps Some(30.0) (1532457 bytes)",
         "export --preset webm: clip-h264 - webm.webm by libvpx-vp9, 417 ms",
         "webm: vp9 320x240 3.01 s matroska,webm fps Some(30.0) (121266 bytes)",
-        "export --preset gif: clip-h264 - gif.gif by gif, 1160 ms",
+        "export --preset gif: clip-h264 - gif.gif by gif, 1199 ms",
         "gif: gif 800x600 3.00 s gif fps Some(16.666666666666668) (2086646 bytes)",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -599,9 +599,9 @@
     },
     {
       "area": "export",
-      "duration_ms": 1564,
+      "duration_ms": 1557,
       "evidence": [
-        "daemon pid 29819 answered after 293 ms",
+        "daemon pid 89423 answered after 293 ms",
         "export --audio --format wav: clip-h264 - audio.wav by , 0 ms",
         "wav: pcm_s24le 48000 Hz 1 ch 3.00 s",
         "export --audio --format m4a: clip-h264 - audio.m4a by , 0 ms",
@@ -621,9 +621,9 @@
     },
     {
       "area": "export",
-      "duration_ms": 1022,
+      "duration_ms": 1039,
       "evidence": [
-        "daemon pid 29885 answered after 290 ms",
+        "daemon pid 89518 answered after 293 ms",
         "unknown preset: exit 2 (0x00000002) Some(\"invalid_input\") preset: unknown preset `no-such-preset`; use one of: quick, youtube-4k, youtube-1440p, youtube-1080p, vertical-1080, square-1080, source, gi...",
         "unknown capture: exit 2 (0x00000002) Some(\"not_found\")",
         "log hygiene: 1 WARN line(s) in the case's logs"
@@ -641,9 +641,9 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 756,
+      "duration_ms": 768,
       "evidence": [
-        "daemon pid 29964 answered after 290 ms",
+        "daemon pid 89570 answered after 293 ms",
         "server capturemann 0.2.9, protocol \"2025-06-18\"",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -662,7 +662,7 @@
       "area": "mcp",
       "duration_ms": 731,
       "evidence": [
-        "daemon pid 30007 answered after 292 ms",
+        "daemon pid 89639 answered after 293 ms",
         "79 tools",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -679,9 +679,9 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 1317,
+      "duration_ms": 1324,
       "evidence": [
-        "daemon pid 30076 answered after 292 ms",
+        "daemon pid 89680 answered after 290 ms",
         "get_settings: ok, 15 chars",
         "list_library: ok, 241 chars",
         "get_capture: ok, 541 chars",
@@ -708,9 +708,9 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 970,
+      "duration_ms": 981,
       "evidence": [
-        "daemon pid 30218 answered after 293 ms",
+        "daemon pid 89847 answered after 291 ms",
         "start_recording: error=true code=Some(\"user_declined\") user_declined: No confirmation UI is attached to this daemon {\"reason\":\"no_confirmer\"}",
         "get_recording_status after the refusal: state 'idle'",
         "log hygiene: 1 WARN line(s) in the case's logs"
@@ -728,9 +728,9 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 786,
+      "duration_ms": 793,
       "evidence": [
-        "daemon pid 30312 answered after 290 ms",
+        "daemon pid 89913 answered after 292 ms",
         "CLI with policy allow: exit 2 (0x00000002) Some(\"not_found\")",
         "MCP with policy allow: Some(\"not_found\")",
         "log hygiene: 1 WARN line(s) in the case's logs"
@@ -748,9 +748,9 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 754,
+      "duration_ms": 749,
       "evidence": [
-        "daemon pid 30355 answered after 289 ms",
+        "daemon pid 89982 answered after 293 ms",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "mcp.request_id",
@@ -765,9 +765,9 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 746,
+      "duration_ms": 751,
       "evidence": [
-        "daemon pid 30422 answered after 293 ms",
+        "daemon pid 90022 answered after 293 ms",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "mcp.errors",
@@ -783,9 +783,9 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 7833,
+      "duration_ms": 7831,
       "evidence": [
-        "daemon pid 30463 answered after 290 ms",
+        "daemon pid 90063 answered after 288 ms",
         "1 notification(s); capture.revised seen: true",
         "events after import: capture.revised, job.progress, job.progress, job.progress, job.progress, capture.created, job.progress, job.progress, job.done",
         "log hygiene: 1 WARN line(s) in the case's logs"
@@ -803,9 +803,9 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 931,
+      "duration_ms": 944,
       "evidence": [
-        "daemon pid 30628 answered after 293 ms",
+        "daemon pid 90227 answered after 293 ms",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "mcp.cli_parity",
@@ -820,10 +820,10 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 905,
+      "duration_ms": 909,
       "evidence": [
-        "daemon pid 30696 answered after 291 ms",
-        "port 63039: no token 401, wrong token 401, right token 200",
+        "daemon pid 90322 answered after 293 ms",
+        "port 50837: no token 401, wrong token 401, right token 200",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "mcp.http",
@@ -838,16 +838,16 @@
     },
     {
       "area": "rec",
-      "duration_ms": 13011,
+      "duration_ms": 13022,
       "evidence": [
-        "daemon pid 30789 answered after 291 ms",
-        "started rec_01a1b360d039_0001",
-        "export job job_4565a897042ba77a: done",
-        "screen: h264 3024x1964 yuv420p r 30.00 avg 30.00 frames None 6.33 s; manifest duration Some(Number(760375)) ticks",
+        "daemon pid 90386 answered after 290 ms",
+        "started rec_01a1b44e362c_0001",
+        "export job job_7a895b042c447535: done",
+        "screen: h264 3024x1964 yuv420p r 30.00 avg 30.00 frames None 6.33 s; manifest duration Some(Number(760230)) ticks",
         "manifest 6.34 s, expected 6.04 s (recorded at the pause plus the time after the resume)",
         "4 key frames, gaps Some((1.733333, 2.0))",
         "cursor log: 5 lines, header {\"clicks\":\"available\",\"clock\":\"CLOCK_UPTIME_RAW ns (mach_absolute_time)\",\"move_source\":\"event_tap\",\"permission_missing\":null,\"platform\":\"macos\",\"schema\":1,\"scro...",
-        "export job job_4565a897042ba77a: done",
+        "export job job_7a895b042c447535: done",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "rec.screen_cursor",
@@ -872,11 +872,11 @@
     },
     {
       "area": "rec",
-      "duration_ms": 4705,
+      "duration_ms": 4736,
       "evidence": [
-        "daemon pid 31022 answered after 288 ms",
-        "started rec_01a1b3610324_0001",
-        "export job job_c80fd318dc5fe82a: done",
+        "daemon pid 90650 answered after 293 ms",
+        "started rec_01a1b44e693e_0001",
+        "export job job_d7fea77dbf4f7956: done",
         "region recording 640x360 h264",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -896,16 +896,16 @@
     },
     {
       "area": "rec",
-      "duration_ms": 8629,
+      "duration_ms": 8622,
       "evidence": [
-        "daemon pid 31163 answered after 293 ms",
-        "started rec_01a1b36115a7_0001",
-        "export job job_e80b6b27c432ab58: done",
+        "daemon pid 90766 answered after 293 ms",
+        "started rec_01a1b44e7bd8_0001",
+        "export job job_b84e1b28f5b8ee2b: done",
         "region 18x18: 18x18 h264 3.30 s",
-        "started rec_01a1b3612545_0002",
-        "export job job_d905976b35fa4786: done",
-        "export job job_e80b6b27c432ab58: done",
-        "region 20x20: 20x20 h264 3.23 s",
+        "started rec_01a1b44e8b73_0002",
+        "export job job_18ba9c5c26ccb486: done",
+        "export job job_b84e1b28f5b8ee2b: done",
+        "region 20x20: 20x20 h264 3.20 s",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "rec.region_min",
@@ -925,12 +925,12 @@
     },
     {
       "area": "rec",
-      "duration_ms": 8222,
+      "duration_ms": 8227,
       "evidence": [
-        "daemon pid 31346 answered after 293 ms",
-        "started rec_01a1b361377a_0001",
+        "daemon pid 90952 answered after 292 ms",
+        "started rec_01a1b44e9d98_0001",
         "before the kill: state recording recorded 6.0 s",
-        "daemon pid 31489 answered after 292 ms",
+        "daemon pid 91098 answered after 291 ms",
         "recovered: 6.00 s of about 6.0 s recorded before the kill",
         "log hygiene: 4 WARN line(s) in the case's logs"
       ],
@@ -950,13 +950,13 @@
     },
     {
       "area": "rec",
-      "duration_ms": 5764,
+      "duration_ms": 5777,
       "evidence": [
-        "daemon pid 31530 answered after 293 ms",
-        "started rec_01a1b36157c1_0001",
-        "export job job_b943268b4ce661ef: done",
-        "mic track 4.23 s",
-        "mic level: rms -82.9 dBFS, peak -59.1 dBFS",
+        "daemon pid 91139 answered after 293 ms",
+        "started rec_01a1b44ebde9_0001",
+        "export job job_ba373d007f6f099f: done",
+        "mic track 4.22 s",
+        "mic level: rms -99.9 dBFS, peak -82.6 dBFS",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "rec.mic",
@@ -976,11 +976,11 @@
     },
     {
       "area": "rec",
-      "duration_ms": 9273,
+      "duration_ms": 9322,
       "evidence": [
-        "daemon pid 31683 answered after 292 ms",
-        "started rec_01a1b3616e55_0001",
-        "export job job_21df6c74221b8151: done",
+        "daemon pid 91289 answered after 293 ms",
+        "started rec_01a1b44ed49c_0001",
+        "export job job_33aaf895f6f564ca: done",
         "system audio level: mean -10.5 dB, peak -4.4 dB (the tone is 1 kHz, 2 s, played by another process)",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -1001,12 +1001,12 @@
     },
     {
       "area": "rec",
-      "duration_ms": 7605,
+      "duration_ms": 7619,
       "evidence": [
-        "daemon pid 31879 answered after 289 ms",
-        "started rec_01a1b36192a7_0001",
-        "export job job_31312bff65676571: done",
-        "camera 1920x1080 h264 measured 30.0 fps, 5.53 s",
+        "daemon pid 91511 answered after 293 ms",
+        "started rec_01a1b44ef919_0001",
+        "export job job_83605593731b9e4e: done",
+        "camera 1920x1080 h264 measured 30.0 fps, 5.58 s",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "rec.camera",
@@ -1066,7 +1066,7 @@
     },
     {
       "area": "rec",
-      "duration_ms": 351,
+      "duration_ms": 346,
       "evidence": [],
       "id": "rec.soak",
       "message": "give --soak-minutes <n> to run a long recording",
@@ -1085,9 +1085,9 @@
     },
     {
       "area": "ai",
-      "duration_ms": 1116,
+      "duration_ms": 1118,
       "evidence": [
-        "daemon pid 32073 answered after 289 ms",
+        "daemon pid 91732 answered after 292 ms",
         "transcribe without a model: exit 2 (0x00000002) Some(\"invalid_input\") No speech model is installed, so nothing can be transcribed. Open the AI page in CaptureMann, or run `capturemann ai models`, to download or import one. Nothing...",
         "text-model test: exit 2 (0x00000002) Some(\"invalid_input\")",
         "MCP transcribe without a model: error true {\"code\":\"invalid_input\",\"data\":{\"hint\":\"capturemann ai models download small\",\"reason\":\"no_model\"},\"message\":\"No speech model is installed, so nothing can be transcribed. Open the AI page in CaptureMa...",
@@ -1106,10 +1106,10 @@
     },
     {
       "area": "ai",
-      "duration_ms": 1254,
+      "duration_ms": 1259,
       "evidence": [
         "llama-server --version: exit 0 (0x00000000) version: 0.7.0-dev (build 0, commit unknown) built with AppleClang 21.0.0.21000334 for Darwin arm64",
-        "daemon pid 32155 answered after 290 ms",
+        "daemon pid 91787 answered after 293 ms",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "ai.llama_version",
@@ -1193,9 +1193,9 @@
     },
     {
       "area": "desktop",
-      "duration_ms": 11277,
+      "duration_ms": 11290,
       "evidence": [
-        "1 visible window(s) of the app: 'CaptureMann' 1180x793"
+        "1 visible window(s) of the app: 'CaptureMann' 1180x792"
       ],
       "id": "desktop.stays_up",
       "message": "",
@@ -1212,9 +1212,9 @@
     },
     {
       "area": "desktop",
-      "duration_ms": 7338,
+      "duration_ms": 7352,
       "evidence": [
-        "second launch: exit 0 (0x00000000) after 71 ms",
+        "second launch: exit 0 (0x00000000) after 72 ms",
         "visible windows of the first instance: 1 before, 1 after"
       ],
       "id": "desktop.second_launch",
@@ -1232,9 +1232,9 @@
     },
     {
       "area": "desktop",
-      "duration_ms": 5790,
+      "duration_ms": 5834,
       "evidence": [
-        "hwnd 0x1f523 pid 32918 class 'CaptureMann' title 'CaptureMann overlay' rect [-1, 0, 1513, 982] ex 0x8"
+        "hwnd 0x1f6ff pid 92586 class 'CaptureMann' title 'CaptureMann overlay' rect [-1, 0, 1513, 982] ex 0x8"
       ],
       "id": "desktop.hotkey_overlay",
       "message": "",
@@ -1326,7 +1326,7 @@
     },
     {
       "area": "desktop",
-      "duration_ms": 7197,
+      "duration_ms": 7203,
       "evidence": [
         "menu-bar items of the app: 1"
       ],
@@ -1494,9 +1494,9 @@
     },
     {
       "area": "regress",
-      "duration_ms": 2480,
+      "duration_ms": 2164,
       "evidence": [
-        "daemon pid 33270 answered after 1537 ms",
+        "daemon pid 92952 answered after 1214 ms",
         "diagnostics: - ffmpeg at /opt/homebrew/bin/ffmpeg"
       ],
       "id": "regress.ffmpeg_missing_wording",
@@ -1512,9 +1512,9 @@
     },
     {
       "area": "regress",
-      "duration_ms": 742,
+      "duration_ms": 741,
       "evidence": [
-        "daemon pid 33346 answered after 293 ms",
+        "daemon pid 93029 answered after 292 ms",
         "2x2 region: exit 2 (0x00000002) invalid_input: The recording area is too small: each side must be at least 18 px.",
         "a tiny area is refused up front: invalid_input, too small",
         "log hygiene: 1 WARN line(s) in the case's logs"
@@ -1535,7 +1535,7 @@
     },
     {
       "area": "zz",
-      "duration_ms": 352,
+      "duration_ms": 353,
       "evidence": [],
       "id": "zz.crash_events",
       "message": "",
@@ -1550,49 +1550,49 @@
     }
   ],
   "run": {
-    "commit": "",
+    "commit": "c9432fde",
     "ffmpeg": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
-    "finished": "2026-11-07T00:22:04Z",
-    "flags": "--tier hardware --package-dir /private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel/CaptureMann.app/Contents/MacOS --daemon /Users/trungtran/source/repos/capturemann/target/release/cm-daemon --out /var/folders/xm/d48xc26519j40jmsdcwh6v040000gp/T//cm-regress-mac-20261107T001934Z --who cm-regress via regress.sh --verdict PARTIAL --allow screen,sound,mic,camera",
+    "finished": "2026-11-07T04:41:22Z",
+    "flags": "--tier hardware --package-dir /private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel2/CaptureMann.app/Contents/MacOS --daemon /Users/trungtran/source/repos/capturemann/target/release/cm-daemon --out /var/folders/xm/d48xc26519j40jmsdcwh6v040000gp/T//cm-regress-mac-20261107T043854Z --who cm-regress via regress.sh --verdict PARTIAL --allow screen,sound,mic,camera --commit c9432fde",
     "gpu": "n/a",
     "hashes": [
       [
         "capturemann",
-        "6e8b4a4c3794488e98866545a8ac5c10518c18f57d0c7ba9fba5014f5af4cbc5"
+        "afecd54e13d133ffc7a0c2339822748657146d5f807f0444e3c9266d3f3cb899"
       ],
       [
         "cm-mcp",
-        "50cbc86c1ec03adcd3de3cbe7786358c58042a62b5ef8c3d27a3f68924eded8a"
+        "6205fd941d273ba3e38caf64d97e9e8c7f2853fd4e4273b95c3a876b421b6b20"
       ],
       [
         "cm-daemon",
-        "a272d3d793619b3333214cdf61c896bed421af0e400a465443711629de6ba31d"
+        "a03c732bb18275db18adaeb08ec88e27b087b11773fc72ce37866a7ecb9aa474"
       ],
       [
         "cm-desktop",
-        "900af6be3d132b1012aaa0ec9a4a7ce0f9b0d97cf48d6d975b43743a3625fa36"
+        "7c063211230b25409799967e7c1b94e8c31db2b00a22adf8c7e0fb343321e379"
       ],
       [
         "cm-overlay",
-        "c6de698a112af795a97063a53055277d61070e6d1a0786f7b5b9eaad1dd7fee0"
+        "aa5ff77489e07e6654b793775c107c9c45e91d0397dc883c64f68f11afd6be83"
       ],
       [
         "ffmpeg",
-        "971e0179ed134cfa59df6a2d9735e8aa6edb2b8c90e394610e972f68d4b10d63"
+        "f847e53b2ef3ebdbf86c3f81c8e08a221f07a3c42a8f3e4d9523c1e4f5c5654a"
       ],
       [
         "ffprobe",
-        "6da79db5fb7b9a9e64b9f266c1072a52174ab03bb06da823be94749253b1a910"
+        "7a488f55bf36a50aab682effb75eec42c684edae3c610e934f733b7ad3acf846"
       ],
       [
         "llama-server",
-        "a90441179dce4eb46cea5df8c98cb69a4231f8edb095dfa9b92b567946084478"
+        "b07f336db501f1e121953c221beaaf82baefc953418363d41eafa3c9c8352eb1"
       ]
     ],
     "os": "Darwin 25.6.0 arm64",
-    "package_dir": "/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel/CaptureMann.app/Contents/MacOS",
+    "package_dir": "/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel2/CaptureMann.app/Contents/MacOS",
     "platform": "macos",
-    "started": "2026-11-07T00:19:36Z",
+    "started": "2026-11-07T04:38:54Z",
     "tier": "hardware",
     "verdict": "PARTIAL",
     "version": "0.2.9",
