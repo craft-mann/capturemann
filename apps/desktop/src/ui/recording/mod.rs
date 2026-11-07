@@ -60,9 +60,10 @@ use hud::HudView;
 use indicator::IndicatorView;
 use sheet::StartSheet;
 
-/// HUD window size without an agent chip: the bar (506 x 58, Stop carries its label) under a 36 px
-/// strip for chips and hints. With an agent chip the bar is wider: `hud_layout::window_size`.
-pub const HUD_BAR: (f64, f64) = (506.0, crate::recording::hud_layout::BAR_H);
+/// HUD window size without an agent chip: the bar (556 x 58, Stop carries its label, the Collapse
+/// toggle ends it) under a 36 px strip for chips and hints. With an agent chip the bar is wider,
+/// collapsed it is narrower: `hud_layout::window_size_view`.
+pub const HUD_BAR: (f64, f64) = (556.0, crate::recording::hud_layout::BAR_H);
 pub const HUD_STRIP: f64 = crate::recording::hud_layout::STRIP_H;
 pub const HUD_WINDOW: (f64, f64) = (HUD_BAR.0, HUD_BAR.1 + HUD_STRIP);
 
@@ -819,7 +820,28 @@ fn hud_positions_key(display: &Rect) -> String {
     format!("{:.0},{:.0}", display.x, display.y)
 }
 
-/// REC-5.AC4: where the HUD opens on `display`: the remembered position, else bottom center.
+/// REC-5.AC16: whether the HUD is collapsed (remembered across recordings; default expanded).
+/// The 60 fps self-test always has its own Stop-only bar at full width.
+pub fn hud_collapsed(app: &Entity<AppModel>, cx: &App) -> bool {
+    let m = app.read(cx);
+    if m.rec.read(cx).hud.phase == Phase::SelfTest {
+        return false;
+    }
+    m.backend
+        .settings
+        .snapshot()
+        .get(start::KEY_HUD_COLLAPSED)
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+}
+
+/// REC-5.AC16: remembers the collapsed state for the next recordings.
+pub fn remember_hud_collapsed(app: &Entity<AppModel>, collapsed: bool, cx: &mut App) {
+    app::set_setting(app, start::KEY_HUD_COLLAPSED, Value::Bool(collapsed), cx);
+}
+
+/// REC-5.AC4: where the HUD opens on `display`: the remembered position, else bottom center
+/// (also when the remembered one is damaged, REC-5.AC17).
 pub fn hud_rect(
     app: &Entity<AppModel>,
     display: &Rect,
@@ -827,9 +849,21 @@ pub fn hud_rect(
     audio: bool,
     cx: &App,
 ) -> Rect {
-    // The window is exactly the bar under the strip; an agent chip makes it wider, and the audio
-    // bar is its own (narrower) one.
-    let window = crate::recording::hud_layout::window_size_for(audio, agent);
+    hud_rect_view(app, display, agent, audio, hud_collapsed(app, cx), cx)
+}
+
+/// [`hud_rect`] for the bar expanded or `collapsed`.
+pub fn hud_rect_view(
+    app: &Entity<AppModel>,
+    display: &Rect,
+    agent: Option<&str>,
+    audio: bool,
+    collapsed: bool,
+    cx: &App,
+) -> Rect {
+    // The window is exactly the bar under the strip; an agent chip makes it wider, the audio bar
+    // is its own one, and collapsed it is the short bar (REC-5.AC16).
+    let window = crate::recording::hud_layout::window_size_view(audio, collapsed, agent);
     let bar = (window.0, HUD_BAR.1);
     let stored = app
         .read(cx)
@@ -838,7 +872,8 @@ pub fn hud_rect(
         .snapshot()
         .get(start::KEY_HUD_POSITIONS)
         .and_then(|v| v.get(hud_positions_key(display)))
-        .and_then(|v| Some((v.get(0)?.as_f64()?, v.get(1)?.as_f64()?)));
+        .and_then(|v| Some((v.get(0)?.as_f64()?, v.get(1)?.as_f64()?)))
+        .and_then(geometry::usable_center_fraction);
     match stored {
         Some(f) => {
             let within = hud_bounds(display);

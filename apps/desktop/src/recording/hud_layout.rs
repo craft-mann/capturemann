@@ -10,6 +10,11 @@
 //! An audio recording (VOC-1, board V2) has a compact bar: Stop, the timer, the 14-bar mic meter,
 //! a divider, Pause or Resume, Mute mic, Marker, Discard, then the agent chip. No camera, Draw or
 //! Restart (there is no picture to redo or draw on).
+//!
+//! Both bars end with the Collapse toggle (REC-5.AC16). Collapsed, the bar keeps only Stop, the
+//! timer with its dot, Pause or Resume, the agent chip when an agent started the take, and the
+//! toggle (now Expand); the rest is reached by expanding it again or through the global
+//! shortcuts.
 
 use cm_i18n::{tr, tr_ctx};
 
@@ -29,6 +34,8 @@ pub enum HudControl {
     Meter,
     /// "Marker" with its key hint (audio HUD).
     Marker,
+    /// Collapse or expand the bar (REC-5.AC16); always the last slot.
+    Collapse,
 }
 
 /// One slot of the bar, left to right.
@@ -56,6 +63,7 @@ pub fn hud_items(agent: bool) -> Vec<HudItem> {
     if agent {
         v.push(HudItem::Control(AgentChip));
     }
+    v.push(HudItem::Control(Collapse));
     v
 }
 
@@ -75,15 +83,57 @@ pub fn hud_items_audio(agent: bool) -> Vec<HudItem> {
     if agent {
         v.push(HudItem::Control(AgentChip));
     }
+    v.push(HudItem::Control(Collapse));
+    v
+}
+
+/// The collapsed bar (REC-5.AC16), the same for a screen and an audio recording: Stop, the timer
+/// with its dot, Pause or Resume, the agent chip (who started the take stays visible) and Expand.
+pub fn hud_items_collapsed(agent: bool) -> Vec<HudItem> {
+    use HudControl::*;
+    let mut v = vec![
+        HudItem::Control(Stop),
+        HudItem::Control(Timer),
+        HudItem::Control(Pause),
+    ];
+    if agent {
+        v.push(HudItem::Control(AgentChip));
+    }
+    v.push(HudItem::Control(Collapse));
     v
 }
 
 /// The slots of the bar for a screen (`audio` false) or an audio recording.
 pub fn hud_items_for(audio: bool, agent: bool) -> Vec<HudItem> {
-    if audio {
+    hud_items_view(audio, false, agent)
+}
+
+/// The slots of the bar as it is shown: expanded (screen or audio) or collapsed.
+pub fn hud_items_view(audio: bool, collapsed: bool, agent: bool) -> Vec<HudItem> {
+    if collapsed {
+        hud_items_collapsed(agent)
+    } else if audio {
         hud_items_audio(agent)
     } else {
         hud_items(agent)
+    }
+}
+
+/// The Collapse toggle's icon: points left (fold in) when expanded, right (unfold) when collapsed.
+pub fn collapse_icon(collapsed: bool) -> &'static str {
+    if collapsed {
+        "chevron-right"
+    } else {
+        "chevron-left"
+    }
+}
+
+/// The Collapse toggle's accessible name: the action a click does.
+pub fn collapse_label(collapsed: bool) -> String {
+    if collapsed {
+        tr!("Expand recording controls")
+    } else {
+        tr!("Collapse recording controls")
     }
 }
 
@@ -260,7 +310,12 @@ pub fn bar_width(agent: Option<&str>) -> f64 {
 
 /// [`bar_width`] of a screen or an audio recording.
 pub fn bar_width_for(audio: bool, agent: Option<&str>) -> f64 {
-    let items = hud_items_for(audio, agent.is_some());
+    bar_width_view(audio, false, agent)
+}
+
+/// [`bar_width`] of the bar as it is shown, expanded or collapsed.
+pub fn bar_width_view(audio: bool, collapsed: bool, agent: Option<&str>) -> f64 {
+    let items = hud_items_view(audio, collapsed, agent.is_some());
     let slots: f64 = items.iter().map(|i| slot_width(*i, agent)).sum();
     slots + GAP * (items.len() - 1) as f64 + 2.0 * PAD + BORDER
 }
@@ -277,7 +332,12 @@ pub fn window_size(agent: Option<&str>) -> (f64, f64) {
 
 /// [`window_size`] of a screen or an audio recording.
 pub fn window_size_for(audio: bool, agent: Option<&str>) -> (f64, f64) {
-    (bar_width_for(audio, agent), BAR_H + STRIP_H)
+    window_size_view(audio, false, agent)
+}
+
+/// [`window_size`] of the bar as it is shown, expanded or collapsed.
+pub fn window_size_view(audio: bool, collapsed: bool, agent: Option<&str>) -> (f64, f64) {
+    (bar_width_view(audio, collapsed, agent), BAR_H + STRIP_H)
 }
 
 #[cfg(test)]
@@ -302,12 +362,14 @@ mod tests {
                 Divider,
                 Control(Restart),
                 Control(Discard),
+                Control(Collapse),
             ]
         );
         let with = hud_items(true);
-        assert_eq!(with.len(), 11);
+        assert_eq!(with.len(), 12);
         assert_eq!(with[10], Control(AgentChip));
-        assert_eq!(&with[..10], hud_items(false).as_slice());
+        assert_eq!(with[11], Control(Collapse));
+        assert_eq!(&with[..10], &hud_items(false)[..10]);
     }
 
     /// The icon table: the kit's names, the slashed ones when off, the app's own where the kit
@@ -329,19 +391,19 @@ mod tests {
         );
     }
 
-    /// The bar is 506 wide without the chip and grows by a gap and the chip with it; the height
-    /// and the strip are unchanged.
+    /// The bar is 556 wide without the chip (506 of the board plus a gap and the 44 px Collapse
+    /// toggle) and grows by a gap and the chip with it; the height and the strip are unchanged.
     #[test]
     fn bar_widths() {
-        assert_eq!(bar_width(None), 506.0);
+        assert_eq!(bar_width(None), 556.0);
         assert_eq!(BAR_H, 58.0);
         let w = bar_width(Some("Claude Code"));
-        assert_eq!(w, 506.0 + GAP + agent_chip_width("Claude Code"));
+        assert_eq!(w, 556.0 + GAP + agent_chip_width("Claude Code"));
         assert!(agent_chip_width("a") < agent_chip_width("Claude Code"));
         // A very long name is capped.
         assert_eq!(agent_chip_width(&"x".repeat(200)), CHIP_MAX);
-        assert_eq!(window_size(None), (506.0, 58.0 + 36.0));
-        assert_eq!(bar_size(None), (506.0, 58.0));
+        assert_eq!(window_size(None), (556.0, 58.0 + 36.0));
+        assert_eq!(bar_size(None), (556.0, 58.0));
     }
 
     /// The window constants of `ui::recording` are this module's sizes.
@@ -388,10 +450,12 @@ mod tests {
                 Control(Mic),
                 Control(Marker),
                 Control(Discard),
+                Control(Collapse),
             ]
         );
         let with = hud_items_audio(true);
-        assert_eq!(with.last(), Some(&Control(AgentChip)));
+        assert_eq!(with[with.len() - 2], Control(AgentChip));
+        assert_eq!(with.last(), Some(&Control(Collapse)));
         for banned in [Camera, Draw, Restart] {
             assert!(!with.contains(&Control(banned)));
         }
@@ -399,7 +463,7 @@ mod tests {
         // 14 bars of 4 px with 2 px gaps and 6 px padding.
         assert_eq!(METER_W, 94.0);
         // The chip adds a gap and its own width.
-        assert_eq!(bar_width_for(true, None), 579.0);
+        assert_eq!(bar_width_for(true, None), 629.0);
         let w = bar_width_for(true, Some("Claude Code"));
         assert_eq!(
             w,
@@ -423,6 +487,58 @@ mod tests {
         assert!(meter_lit(Some(-40.0)) < meter_lit(Some(-20.0)));
         assert_eq!(MARKER_ICON, "bookmark");
         assert_eq!(marker_label(), "Marker");
+    }
+
+    /// REC-5.AC16: collapsed, a screen and an audio bar are both Stop, the timer, Pause and
+    /// Expand (the agent chip stays when an agent started the take); the toggle is always last.
+    #[test]
+    fn rec5_ac16_the_collapsed_bar_keeps_stop_timer_and_pause() {
+        use HudControl::*;
+        use HudItem::*;
+        let short = [
+            Control(Stop),
+            Control(Timer),
+            Control(Pause),
+            Control(Collapse),
+        ];
+        for audio in [false, true] {
+            assert_eq!(hud_items_view(audio, true, false), short);
+            let with = hud_items_view(audio, true, true);
+            assert_eq!(
+                with,
+                [
+                    Control(Stop),
+                    Control(Timer),
+                    Control(Pause),
+                    Control(AgentChip),
+                    Control(Collapse),
+                ]
+            );
+            // Expanded is today's bar plus the toggle at the end.
+            let open = hud_items_view(audio, false, true);
+            assert_eq!(open, hud_items_for(audio, true));
+            assert_eq!(open.last(), Some(&Control(Collapse)));
+        }
+        // 88 + 84 + 44 + 44, three gaps, the padding and the border.
+        assert_eq!(bar_width_view(false, true, None), 292.0);
+        assert_eq!(bar_width_view(true, true, None), 292.0);
+        let chip = agent_chip_width("Claude Code");
+        assert_eq!(
+            bar_width_view(false, true, Some("Claude Code")),
+            292.0 + GAP + chip
+        );
+        assert!(bar_width_view(false, true, None) < bar_width_view(false, false, None));
+        assert_eq!(window_size_view(true, true, None), (292.0, BAR_H + STRIP_H));
+        assert_eq!(window_size_view(false, false, None), window_size(None));
+    }
+
+    /// REC-5.AC16: the toggle names what a click does and its chevron points that way.
+    #[test]
+    fn rec5_ac16_the_toggle_says_what_it_does() {
+        assert_eq!(collapse_icon(false), "chevron-left");
+        assert_eq!(collapse_icon(true), "chevron-right");
+        assert_eq!(collapse_label(false), "Collapse recording controls");
+        assert_eq!(collapse_label(true), "Expand recording controls");
     }
 
     #[test]
