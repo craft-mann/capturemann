@@ -2,7 +2,7 @@
   "cases": [
     {
       "area": "pkg",
-      "duration_ms": 605,
+      "duration_ms": 607,
       "evidence": [
         "capturemann.exe: 4626432 bytes",
         "cm-mcp.exe: 8208384 bytes",
@@ -24,13 +24,13 @@
     },
     {
       "area": "pkg",
-      "duration_ms": 860,
+      "duration_ms": 857,
       "evidence": [
         "capturemann --version: exit 0 (0x00000000) in 32 ms",
         "cm-mcp --bogus: exit 2 (0x00000002) in 34 ms",
         "cm-daemon --bogus: exit 2 (0x00000002) in 34 ms",
-        "cm-overlay --help: exit 0 (0x00000000) in 21 ms",
-        "ffmpeg -hide_banner -version: exit 0 (0x00000000) in 33 ms",
+        "cm-overlay --help: exit 0 (0x00000000) in 19 ms",
+        "ffmpeg -hide_banner -version: exit 0 (0x00000000) in 32 ms",
         "ffprobe -hide_banner -version: exit 0 (0x00000000) in 35 ms",
         "llama-server --version: exit 0 (0x00000000) in 35 ms"
       ],
@@ -47,10 +47,10 @@
     },
     {
       "area": "pkg",
-      "duration_ms": 1252,
+      "duration_ms": 1250,
       "evidence": [
         "version 0.2.9",
-        "daemon pid 3372 answered after 319 ms",
+        "daemon pid 3648 answered after 319 ms",
         "- windows x86_64",
         "- GPU Intel(R) UHD Graphics 620, driver 31.0.101.2137, 134 MB dedicated memory, vendor id 0x8086",
         "- GPU Microsoft Basic Render Driver (software renderer: no hardware GPU is in use), driver 10.0.26100.9711, vendor id 0x1414",
@@ -77,8 +77,8 @@
       "area": "daemon",
       "duration_ms": 1924,
       "evidence": [
-        "daemon pid 4840 answered after 319 ms",
-        "pid 4840, 86 actions",
+        "daemon pid 8896 answered after 319 ms",
+        "pid 8896, 86 actions",
         "stop: killed (Windows has no signal for a hidden process)",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -95,9 +95,9 @@
     },
     {
       "area": "daemon",
-      "duration_ms": 2059,
+      "duration_ms": 2062,
       "evidence": [
-        "daemon pid 15264 answered after 319 ms",
+        "daemon pid 12492 answered after 319 ms",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "daemon.library_created",
@@ -113,10 +113,10 @@
     },
     {
       "area": "daemon",
-      "duration_ms": 1415,
+      "duration_ms": 1423,
       "evidence": [
-        "daemon pid 2972 answered after 319 ms",
-        "second daemon: exit 0 (0x00000000) in 32 ms; output: [INFO cm_core::logging] daemon 0.2.9 started [WARN cm_daemon] cm-daemon: the CaptureMann app or another daemon is already serving \\\\.\\pipe\\cm-regress-9604-6; nothing to do",
+        "daemon pid 2672 answered after 319 ms",
+        "second daemon: exit 0 (0x00000000) in 33 ms; output: [INFO cm_core::logging] daemon 0.2.9 started [WARN cm_daemon] cm-daemon: the CaptureMann app or another daemon is already serving \\\\.\\pipe\\cm-regress-8848-6; nothing to do",
         "log hygiene: 2 WARN line(s) in the case's logs"
       ],
       "id": "daemon.second_instance",
@@ -131,9 +131,9 @@
     },
     {
       "area": "daemon",
-      "duration_ms": 1971,
+      "duration_ms": 2026,
       "evidence": [
-        "piped run: exit 0 (0x00000000); new cm-daemon pids [15584]",
+        "piped run: exit 0 (0x00000000); new cm-daemon pids [6140]",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "daemon.autostart",
@@ -148,10 +148,10 @@
     },
     {
       "area": "settings",
-      "duration_ms": 1690,
+      "duration_ms": 1691,
       "evidence": [
-        "daemon pid 7728 answered after 319 ms",
-        "daemon pid 11916 answered after 317 ms",
+        "daemon pid 1964 answered after 319 ms",
+        "daemon pid 6624 answered after 317 ms",
         "recording.fps=47: exit 0 (0x00000000) None",
         "47 was accepted: {\"settings\":{\"recording.fps\":47}}",
         "log hygiene: 2 WARN line(s) in the case's logs"
@@ -168,9 +168,9 @@
     },
     {
       "area": "settings",
-      "duration_ms": 1220,
+      "duration_ms": 1228,
       "evidence": [
-        "daemon pid 15380 answered after 318 ms",
+        "daemon pid 16172 answered after 320 ms",
         "set agents.tool_policy: exit 3 (0x00000003) Some(\"user_declined\") `agents.tool_policy` can only be changed in the CaptureMann app (Settings)",
         "set library.path: exit 3 (0x00000003) Some(\"user_declined\") `library.path` can only be changed in the CaptureMann app (Settings)",
         "set privacy.recording_indicator: exit 3 (0x00000003) Some(\"user_declined\") `privacy.recording_indicator` can only be changed in the CaptureMann app (Settings)",
@@ -190,9 +190,9 @@
     },
     {
       "area": "targets",
-      "duration_ms": 1085,
+      "duration_ms": 1084,
       "evidence": [
-        "daemon pid 4316 answered after 319 ms",
+        "daemon pid 13712 answered after 319 ms",
         "display 65537 'Display 1' 1920x1080 at (0,0) scale 1.5 primary",
         "1 windows; capabilities {\"capture_region\":true,\"capture_window\":true,\"list_windows\":true,\"pick\":false}",
         "apps: Windows Terminal",
@@ -215,10 +215,10 @@
     },
     {
       "area": "shot",
-      "duration_ms": 1722,
+      "duration_ms": 1728,
       "evidence": [
-        "daemon pid 13428 answered after 320 ms",
-        "display 65537 1920x1080; PNG 1920x1080; capture shot_06GVARR2Y99MDHVB",
+        "daemon pid 2464 answered after 318 ms",
+        "display 65537 1920x1080; PNG 1920x1080; capture shot_06GVBTWJQD2C394D",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "shot.display",
@@ -236,9 +236,9 @@
     },
     {
       "area": "shot",
-      "duration_ms": 1198,
+      "duration_ms": 1212,
       "evidence": [
-        "daemon pid 13120 answered after 319 ms",
+        "daemon pid 7948 answered after 320 ms",
         "region 100,100,400,300: PNG 400x300",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -257,10 +257,10 @@
     },
     {
       "area": "shot",
-      "duration_ms": 3482,
+      "duration_ms": 4173,
       "evidence": [
-        "daemon pid 10516 answered after 320 ms",
-        "window 1181190: listed 1426x721, saved 1426x721",
+        "daemon pid 2440 answered after 319 ms",
+        "window 1574464: listed 1426x721, saved 1426x721",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "shot.window",
@@ -298,9 +298,9 @@
     },
     {
       "area": "shot",
-      "duration_ms": 1259,
+      "duration_ms": 1261,
       "evidence": [
-        "daemon pid 11328 answered after 319 ms",
+        "daemon pid 7048 answered after 319 ms",
         "unknown display: exit 2 (0x00000002) Some(\"not_found\")",
         "empty region: exit 2 (0x00000002) Some(\"invalid_input\")",
         "region off the display: exit 2 (0x00000002) Some(\"invalid_input\")",
@@ -322,9 +322,9 @@
     },
     {
       "area": "lib",
-      "duration_ms": 1117,
+      "duration_ms": 1133,
       "evidence": [
-        "daemon pid 8996 answered after 319 ms",
+        "daemon pid 8112 answered after 319 ms",
         "manifest keys ok; exported PNG 1000x260, 35254 bytes",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -342,9 +342,9 @@
     },
     {
       "area": "lib",
-      "duration_ms": 1129,
+      "duration_ms": 1135,
       "evidence": [
-        "daemon pid 7908 answered after 319 ms",
+        "daemon pid 10944 answered after 319 ms",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "lib.rename",
@@ -359,9 +359,9 @@
     },
     {
       "area": "lib",
-      "duration_ms": 1347,
+      "duration_ms": 1288,
       "evidence": [
-        "daemon pid 1384 answered after 320 ms",
+        "daemon pid 2780 answered after 320 ms",
         "after annotate: 1 op(s), 1 revision(s)",
         "redo with nothing to redo: exit 0 (0x00000000) None",
         "log hygiene: 1 WARN line(s) in the case's logs"
@@ -379,9 +379,9 @@
     },
     {
       "area": "lib",
-      "duration_ms": 1119,
+      "duration_ms": 1113,
       "evidence": [
-        "daemon pid 6084 answered after 320 ms",
+        "daemon pid 13216 answered after 320 ms",
         "library rm: exit 3 (0x00000003) Some(\"user_declined\") No confirmation UI is attached to this daemon",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -398,9 +398,9 @@
     },
     {
       "area": "redact",
-      "duration_ms": 1226,
+      "duration_ms": 1231,
       "evidence": [
-        "daemon pid 15852 answered after 320 ms",
+        "daemon pid 1964 answered after 320 ms",
         "recogniser Some(String(\"windows_ocr\")); 2 suggestion(s): email,ip_address",
         "--redact-emails: exit 2 (0x00000002) None (not asserted)",
         "log hygiene: 1 WARN line(s) in the case's logs"
@@ -419,10 +419,10 @@
     },
     {
       "area": "redact",
-      "duration_ms": 4494,
+      "duration_ms": 4519,
       "evidence": [
-        "daemon pid 15232 answered after 319 ms",
-        "window screenshot shot_06GVARTEJSRP2BGK: suggestions [\"email\", \"ip_address\"]",
+        "daemon pid 15368 answered after 319 ms",
+        "window screenshot shot_06GVBTZ0W378EWKH: suggestions [\"email\", \"ip_address\"]",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "redact.window_text",
@@ -441,12 +441,12 @@
     },
     {
       "area": "import",
-      "duration_ms": 4335,
+      "duration_ms": 4329,
       "evidence": [
-        "daemon pid 12420 answered after 321 ms",
-        "clip-h264.mp4: rec_06GVARTPVPCM2S62, 320x240, 3.00 s, job 313 ms",
-        "clip-h264.mov: rec_06GVARTSFQQ99RE7, 320x240, 3.00 s, job 310 ms",
-        "clip-h264.mkv: rec_06GVARTW1YMW2QWE, 320x240, 3.02 s, job 1664 ms",
+        "daemon pid 9420 answered after 322 ms",
+        "clip-h264.mp4: rec_06GVBTZ9AATH7KDV, 320x240, 3.00 s, job 325 ms",
+        "clip-h264.mov: rec_06GVBTZBWE8XH2FG, 320x240, 3.00 s, job 311 ms",
+        "clip-h264.mkv: rec_06GVBTZEECP18P4B, 320x240, 3.02 s, job 1663 ms",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "import.formats",
@@ -462,9 +462,9 @@
     },
     {
       "area": "import",
-      "duration_ms": 2819,
+      "duration_ms": 2813,
       "evidence": [
-        "daemon pid 14260 answered after 321 ms",
+        "daemon pid 11972 answered after 321 ms",
         "library size 240x320 (stored 320x240 with a 90 degree tag)",
         "stored track screen.edit.mp4: 240x320 rotation 0 fps Some(30.0)",
         "log hygiene: 1 WARN line(s) in the case's logs"
@@ -482,9 +482,9 @@
     },
     {
       "area": "import",
-      "duration_ms": 3022,
+      "duration_ms": 2999,
       "evidence": [
-        "daemon pid 2756 answered after 322 ms",
+        "daemon pid 14288 answered after 320 ms",
         "stored track: h264 320x240 r Some(28.0) avg Some(28.0) 4.00 s; prepared [\"variable_frame_rate\"]",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -502,10 +502,10 @@
     },
     {
       "area": "import",
-      "duration_ms": 1472,
+      "duration_ms": 1463,
       "evidence": [
-        "daemon pid 356 answered after 319 ms",
-        "rec_06GVARW2PRCX0DCK: kind Some(String(\"audio\")), 2.00 s",
+        "daemon pid 15604 answered after 320 ms",
+        "rec_06GVBV0N164C4DP2: kind Some(String(\"audio\")), 2.00 s",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "import.audio",
@@ -521,13 +521,13 @@
     },
     {
       "area": "import",
-      "duration_ms": 2076,
+      "duration_ms": 2075,
       "evidence": [
-        "daemon pid 1632 answered after 321 ms",
+        "daemon pid 15624 answered after 322 ms",
         "not a media file: exit 2 (0x00000002) state None {\"error\":{\"code\":\"invalid_input\",\"data\":{\"files\":[{\"error\":{\"message\":\"The file can't be read. It may be damaged, cut short or not a media file.\",\"reason\":\"unre...",
         "a PNG picture: exit 2 (0x00000002) state None {\"error\":{\"code\":\"invalid_input\",\"data\":{\"files\":[{\"container\":\"image2\",\"duration_s\":0.04,\"error\":{\"codec\":\"png\",\"message\":\"The video codec Png is not supported...",
         "missing file: exit 2 (0x00000002) Some(\"not_found\")",
-        "file open elsewhere: exit 2 (0x00000002) state None {\"error\":{\"code\":\"invalid_input\",\"data\":{\"files\":[{\"error\":{\"message\":\"`C:\\\\Users\\\\trung\\\\AppData\\\\Local\\\\Temp\\\\cmr9604\\\\25\\\\held.mp4` is open in another progra...",
+        "file open elsewhere: exit 2 (0x00000002) state None {\"error\":{\"code\":\"invalid_input\",\"data\":{\"files\":[{\"error\":{\"message\":\"`C:\\\\Users\\\\trung\\\\AppData\\\\Local\\\\Temp\\\\cmr8848\\\\25\\\\held.mp4` is open in another progra...",
         "Unicode name imported as title 'Chào bạn – bản ghi màn hình đầy đủ ✓'",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -544,9 +544,9 @@
     },
     {
       "area": "import",
-      "duration_ms": 1262,
+      "duration_ms": 1271,
       "evidence": [
-        "daemon pid 14792 answered after 321 ms",
+        "daemon pid 4152 answered after 321 ms",
         "dry run: exit 0 (0x00000000) { \"files\": [ { \"audio_channels\": 1, \"audio_codec\": \"aac\", \"container\": \"mov\", \"duration_s\": 3.0, \"fps\": 30.0, \"hdr\": false, \"kind\": \"video\", \"name\": \"clip-h264.mp4\", \"other_audio_streams\": 0, \"path\": ...",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -562,10 +562,10 @@
     },
     {
       "area": "export",
-      "duration_ms": 2314,
+      "duration_ms": 2305,
       "evidence": [
-        "daemon pid 1084 answered after 321 ms",
-        "export --preset quick: clip-h264 - quick.mp4 by h264_mf, 313 ms",
+        "daemon pid 1064 answered after 321 ms",
+        "export --preset quick: clip-h264 - quick.mp4 by h264_mf, 321 ms",
         "h264 320x240 yuv420p range tv space bt709 trc bt709 prim bt709, 3.00 s",
         "encoder h264_mf: colour tags not asserted (only the Media Foundation path had the bug)",
         "log hygiene: 1 WARN line(s) in the case's logs"
@@ -583,18 +583,18 @@
     },
     {
       "area": "export",
-      "duration_ms": 14483,
+      "duration_ms": 13519,
       "evidence": [
-        "daemon pid 14876 answered after 321 ms",
-        "export --preset youtube-1080p: clip-h264 - youtube-1080p.mp4 by h264_mf, 2003 ms",
+        "daemon pid 9144 answered after 320 ms",
+        "export --preset youtube-1080p: clip-h264 - youtube-1080p.mp4 by h264_mf, 1916 ms",
         "youtube-1080p: h264 1920x1080 3.00 s mov,mp4,m4a,3gp,3g2,mj2 fps Some(30.0) (2266281 bytes)",
-        "export --preset vertical-1080: clip-h264 - vertical-1080.mp4 by h264_mf, 1944 ms",
+        "export --preset vertical-1080: clip-h264 - vertical-1080.mp4 by h264_mf, 1982 ms",
         "vertical-1080: h264 1080x1920 3.00 s mov,mp4,m4a,3gp,3g2,mj2 fps Some(30.0) (1667874 bytes)",
-        "export --preset square-1080: clip-h264 - square-1080.mp4 by h264_mf, 1723 ms",
+        "export --preset square-1080: clip-h264 - square-1080.mp4 by h264_mf, 1533 ms",
         "square-1080: h264 1080x1080 3.00 s mov,mp4,m4a,3gp,3g2,mj2 fps Some(30.0) (1631106 bytes)",
-        "export --preset webm: clip-h264 - webm.webm by libvpx-vp9, 1565 ms",
+        "export --preset webm: clip-h264 - webm.webm by libvpx-vp9, 1331 ms",
         "webm: vp9 320x240 3.01 s matroska,webm fps Some(30.0) (121447 bytes)",
-        "export --preset gif: clip-h264 - gif.gif by gif, 4035 ms",
+        "export --preset gif: clip-h264 - gif.gif by gif, 3799 ms",
         "gif: gif 800x600 3.00 s gif fps Some(16.666666666666668) (2084503 bytes)",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -611,9 +611,9 @@
     },
     {
       "area": "export",
-      "duration_ms": 2643,
+      "duration_ms": 2644,
       "evidence": [
-        "daemon pid 11304 answered after 324 ms",
+        "daemon pid 14916 answered after 321 ms",
         "export --audio --format wav: clip-h264 - audio.wav by , 0 ms",
         "wav: pcm_s24le 48000 Hz 1 ch 3.00 s",
         "export --audio --format m4a: clip-h264 - audio.m4a by , 0 ms",
@@ -633,9 +633,9 @@
     },
     {
       "area": "export",
-      "duration_ms": 1816,
+      "duration_ms": 1760,
       "evidence": [
-        "daemon pid 2592 answered after 322 ms",
+        "daemon pid 10408 answered after 319 ms",
         "unknown preset: exit 2 (0x00000002) Some(\"invalid_input\") preset: unknown preset `no-such-preset`; use one of: quick, youtube-4k, youtube-1440p, youtube-1080p, vertical-1080, square-1080, source, gi...",
         "unknown capture: exit 2 (0x00000002) Some(\"not_found\")",
         "log hygiene: 1 WARN line(s) in the case's logs"
@@ -653,9 +653,9 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 1219,
+      "duration_ms": 1208,
       "evidence": [
-        "daemon pid 10344 answered after 320 ms",
+        "daemon pid 12692 answered after 320 ms",
         "server capturemann 0.2.9, protocol \"2025-06-18\"",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -672,9 +672,9 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 1160,
+      "duration_ms": 1151,
       "evidence": [
-        "daemon pid 14872 answered after 320 ms",
+        "daemon pid 13400 answered after 320 ms",
         "79 tools",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -691,9 +691,9 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 1537,
+      "duration_ms": 1534,
       "evidence": [
-        "daemon pid 1148 answered after 319 ms",
+        "daemon pid 8340 answered after 319 ms",
         "get_settings: ok, 15 chars",
         "list_library: ok, 241 chars",
         "get_capture: ok, 534 chars",
@@ -720,9 +720,9 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 1194,
+      "duration_ms": 1188,
       "evidence": [
-        "daemon pid 9168 answered after 320 ms",
+        "daemon pid 15268 answered after 320 ms",
         "start_recording: error=true code=Some(\"user_declined\") user_declined: No confirmation UI is attached to this daemon {\"reason\":\"no_confirmer\"}",
         "get_recording_status after the refusal: state 'idle'",
         "log hygiene: 1 WARN line(s) in the case's logs"
@@ -740,9 +740,9 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 1188,
+      "duration_ms": 1183,
       "evidence": [
-        "daemon pid 3036 answered after 320 ms",
+        "daemon pid 8128 answered after 320 ms",
         "CLI with policy allow: exit 2 (0x00000002) Some(\"not_found\")",
         "MCP with policy allow: Some(\"not_found\")",
         "log hygiene: 1 WARN line(s) in the case's logs"
@@ -760,9 +760,9 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 1178,
+      "duration_ms": 1176,
       "evidence": [
-        "daemon pid 9956 answered after 319 ms",
+        "daemon pid 15264 answered after 320 ms",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "mcp.request_id",
@@ -777,9 +777,9 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 1191,
+      "duration_ms": 1175,
       "evidence": [
-        "daemon pid 9428 answered after 320 ms",
+        "daemon pid 11508 answered after 319 ms",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "mcp.errors",
@@ -795,9 +795,9 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 8263,
+      "duration_ms": 8273,
       "evidence": [
-        "daemon pid 11924 answered after 320 ms",
+        "daemon pid 4004 answered after 322 ms",
         "1 notification(s); capture.revised seen: true",
         "events after import: capture.revised, job.progress, job.progress, job.progress, job.progress, capture.created, job.progress, job.progress, job.done",
         "log hygiene: 1 WARN line(s) in the case's logs"
@@ -815,9 +815,9 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 1265,
+      "duration_ms": 1267,
       "evidence": [
-        "daemon pid 3928 answered after 319 ms",
+        "daemon pid 8340 answered after 320 ms",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "mcp.cli_parity",
@@ -832,10 +832,10 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 1339,
+      "duration_ms": 1347,
       "evidence": [
-        "daemon pid 2996 answered after 319 ms",
-        "port 51611: no token 401, wrong token 401, right token 200",
+        "daemon pid 2752 answered after 319 ms",
+        "port 55510: no token 401, wrong token 401, right token 200",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "mcp.http",
@@ -850,16 +850,16 @@
     },
     {
       "area": "rec",
-      "duration_ms": 12938,
+      "duration_ms": 12928,
       "evidence": [
-        "daemon pid 2360 answered after 319 ms",
-        "started rec_01a1b5644d91_0001",
-        "export job job_2692a636763de514: done",
-        "screen: h264 1920x1080 yuv420p r 30.00 avg 30.00 frames None 6.37 s; manifest duration Some(Number(762232)) ticks",
-        "manifest 6.35 s, expected 6.03 s (recorded at the pause plus the time after the resume)",
+        "daemon pid 10588 answered after 318 ms",
+        "started rec_01a1b5ecdaf6_0001",
+        "export job job_e328ce1531ca91f7: done",
+        "screen: h264 1920x1080 yuv420p r 30.00 avg 30.00 frames None 6.37 s; manifest duration Some(Number(763454)) ticks",
+        "manifest 6.36 s, expected 6.05 s (recorded at the pause plus the time after the resume)",
         "4 key frames, gaps Some((1.9999999999999998, 2.0))",
         "cursor log: 3 lines, header {\"clicks\":\"available\",\"clock\":\"session host clock (QPC) at hook entry\",\"move_source\":\"hook\",\"permission_missing\":null,\"platform\":\"windows\",\"schema\":1,\"scroll\":\"...",
-        "export job job_2692a636763de514: done",
+        "export job job_e328ce1531ca91f7: done",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "rec.screen_cursor",
@@ -884,11 +884,11 @@
     },
     {
       "area": "rec",
-      "duration_ms": 5495,
+      "duration_ms": 5462,
       "evidence": [
-        "daemon pid 16300 answered after 319 ms",
-        "started rec_01a1b5648151_0001",
-        "export job job_11f31a235f28b4aa: done",
+        "daemon pid 10356 answered after 318 ms",
+        "started rec_01a1b5ed0eab_0001",
+        "export job job_4f8ada5bc17097b5: done",
         "region recording 640x360 h264",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -908,15 +908,15 @@
     },
     {
       "area": "rec",
-      "duration_ms": 9829,
+      "duration_ms": 9819,
       "evidence": [
-        "daemon pid 6620 answered after 319 ms",
-        "started rec_01a1b56497ff_0001",
-        "export job job_489db182c83d0952: failed",
+        "daemon pid 6748 answered after 319 ms",
+        "started rec_01a1b5ed253b_0001",
+        "export job job_ab3fe000e4add9f3: failed",
         "region 18x18: 18x18 h264 3.30 s",
-        "started rec_01a1b564a91e_0002",
-        "export job job_0805ecd2204d8180: failed",
-        "export job job_489db182c83d0952: failed",
+        "started rec_01a1b5ed3656_0002",
+        "export job job_b482459dcbe8d4d6: failed",
+        "export job job_ab3fe000e4add9f3: failed",
         "region 20x20: 20x20 h264 3.23 s",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -937,12 +937,12 @@
     },
     {
       "area": "rec",
-      "duration_ms": 8760,
+      "duration_ms": 8754,
       "evidence": [
-        "daemon pid 6508 answered after 319 ms",
-        "started rec_01a1b564bf9a_0001",
+        "daemon pid 13984 answered after 319 ms",
+        "started rec_01a1b5ed4cc9_0001",
         "before the kill: state recording recorded 6.0 s",
-        "daemon pid 11472 answered after 317 ms",
+        "daemon pid 5296 answered after 316 ms",
         "recovered: 4.30 s of about 6.0 s recorded before the kill",
         "log hygiene: 3 WARN line(s) in the case's logs"
       ],
@@ -962,13 +962,13 @@
     },
     {
       "area": "rec",
-      "duration_ms": 7229,
+      "duration_ms": 7213,
       "evidence": [
-        "daemon pid 11088 answered after 319 ms",
-        "started rec_01a1b564e3bd_0001",
-        "export job job_6b07f2613b713e7a: done",
+        "daemon pid 9740 answered after 319 ms",
+        "started rec_01a1b5ed70ea_0001",
+        "export job job_f8f38462880add5c: done",
         "mic track 4.11 s",
-        "mic level: rms -75.8 dBFS, peak -52.9 dBFS",
+        "mic level: rms -81.1 dBFS, peak -50.8 dBFS",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "rec.mic",
@@ -988,11 +988,11 @@
     },
     {
       "area": "rec",
-      "duration_ms": 9695,
+      "duration_ms": 9712,
       "evidence": [
-        "daemon pid 14532 answered after 319 ms",
-        "started rec_01a1b5650089_0001",
-        "export job job_25dee9c150fbc0b2: done",
+        "daemon pid 4636 answered after 320 ms",
+        "started rec_01a1b5ed8d8f_0001",
+        "export job job_7da6e2d683ee8d98: done",
         "system audio level: mean -6.2 dB, peak -0.1 dB (the tone is 1 kHz, 2 s, played by another process)",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -1013,15 +1013,15 @@
     },
     {
       "area": "rec",
-      "duration_ms": 8621,
+      "duration_ms": 8609,
       "evidence": [
-        "daemon pid 15352 answered after 319 ms",
-        "started rec_01a1b56527c4_0001",
-        "export job job_3e4e2baad23a477a: done",
-        "camera 1280x720 h264 measured 12.5 fps, 5.50 s"
+        "daemon pid 12500 answered after 319 ms",
+        "started rec_01a1b5edb4d9_0001",
+        "export job job_7686ef0d15206f44: done",
+        "camera 1280x720 h264 measured 10.1 fps, 5.54 s"
       ],
       "id": "rec.camera",
-      "message": "the camera ran at 12.5 fps (a dark room makes some cameras drop to 10 fps; light the room and rerun)",
+      "message": "the camera ran at 10.1 fps (a dark room makes some cameras drop to 10 fps; light the room and rerun)",
       "needs": [
         "desktop_session",
         "screen",
@@ -1077,7 +1077,7 @@
     },
     {
       "area": "rec",
-      "duration_ms": 604,
+      "duration_ms": 601,
       "evidence": [],
       "id": "rec.soak",
       "message": "give --soak-minutes <n> to run a long recording",
@@ -1096,9 +1096,9 @@
     },
     {
       "area": "ai",
-      "duration_ms": 2028,
+      "duration_ms": 2019,
       "evidence": [
-        "daemon pid 2592 answered after 320 ms",
+        "daemon pid 2004 answered after 322 ms",
         "transcribe without a model: exit 2 (0x00000002) Some(\"invalid_input\") No speech model is installed, so nothing can be transcribed. Open the AI page in CaptureMann, or run `capturemann ai models`, to download or import one. Nothing...",
         "text-model test: exit 2 (0x00000002) Some(\"invalid_input\")",
         "MCP transcribe without a model: error true {\"code\":\"invalid_input\",\"data\":{\"hint\":\"capturemann ai models download small\",\"reason\":\"no_model\"},\"message\":\"No speech model is installed, so nothing can be transcribed. Open the AI page in CaptureMa...",
@@ -1117,10 +1117,10 @@
     },
     {
       "area": "ai",
-      "duration_ms": 1923,
+      "duration_ms": 1925,
       "evidence": [
         "llama-server --version: exit 0 (0x00000000) version: 0.7.0-dev (build 0, commit unknown) built with GNU 16.2.0 for Windows AMD64",
-        "daemon pid 3344 answered after 319 ms",
+        "daemon pid 8384 answered after 318 ms",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "ai.llama_version",
@@ -1204,7 +1204,7 @@
     },
     {
       "area": "desktop",
-      "duration_ms": 11447,
+      "duration_ms": 11425,
       "evidence": [
         "1 visible window(s) of the app: 'CaptureMann' 1792x992"
       ],
@@ -1223,9 +1223,9 @@
     },
     {
       "area": "desktop",
-      "duration_ms": 8064,
+      "duration_ms": 8043,
       "evidence": [
-        "second launch: exit 0 (0x00000000) after 35 ms",
+        "second launch: exit 0 (0x00000000) after 49 ms",
         "visible windows of the first instance: 1 before, 1 after"
       ],
       "id": "desktop.second_launch",
@@ -1243,9 +1243,9 @@
     },
     {
       "area": "desktop",
-      "duration_ms": 6244,
+      "duration_ms": 6234,
       "evidence": [
-        "hwnd 0x35051e pid 5276 class 'Window Class' title 'CaptureMann overlay' rect [0, 0, 1920, 1080] ex 0x40018"
+        "hwnd 0x2205c4 pid 15704 class 'Window Class' title 'CaptureMann overlay' rect [0, 0, 1920, 1080] ex 0x40018"
       ],
       "id": "desktop.hotkey_overlay",
       "message": "",
@@ -1264,15 +1264,15 @@
     },
     {
       "area": "desktop",
-      "duration_ms": 9515,
+      "duration_ms": 9503,
       "evidence": [
-        "hwnd 0x11058e pid 11832 class 'Zed::Window' title '' rect [369, 808, 1552, 960] ex 0x200188",
-        "hwnd 0x1005a6 pid 11832 class 'Zed::Window' title '' rect [-11, 0, 1931, 1091] ex 0x82801a8",
-        "hwnd 0x2004f4 pid 11832 class 'Zed::Window' title '' rect [1225, 589, 1907, 807] ex 0x200188",
-        "hwnd 0x1405f0 pid 11832 class 'Zed::Window' title 'CaptureMann' rect [64, 8, 1856, 1000] ex 0x240100",
+        "hwnd 0x17060e pid 1352 class 'Zed::Window' title '' rect [369, 808, 1552, 960] ex 0x200188",
+        "hwnd 0x1b0612 pid 1352 class 'Zed::Window' title '' rect [-11, 0, 1931, 1091] ex 0x82801a8",
+        "hwnd 0x1a05b4 pid 1352 class 'Zed::Window' title '' rect [1225, 589, 1907, 807] ex 0x200188",
+        "hwnd 0x1905dc pid 1352 class 'Zed::Window' title 'CaptureMann' rect [64, 8, 1856, 1000] ex 0x240100",
         "WindowFromPoint(1566,698) is the HUD",
-        "export job job_afac8b04bf28a2ee: done",
-        "log hygiene: 4 WARN line(s) in the case's logs"
+        "export job job_0ce07899ef1c209e: done",
+        "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "desktop.hud_click_through",
       "message": "",
@@ -1290,9 +1290,9 @@
     },
     {
       "area": "desktop",
-      "duration_ms": 3100,
+      "duration_ms": 3090,
       "evidence": [
-        "daemon pid 10344 answered after 321 ms",
+        "daemon pid 15512 answered after 322 ms",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "desktop.no_console_flash",
@@ -1310,7 +1310,7 @@
     },
     {
       "area": "desktop",
-      "duration_ms": 9636,
+      "duration_ms": 9625,
       "evidence": [
         "forwarded capture request: exit 0 (0x00000000)",
         "the screenshot appeared after 5.4 s with capture.delay_s = 5"
@@ -1351,7 +1351,7 @@
     },
     {
       "area": "desktop",
-      "duration_ms": 11758,
+      "duration_ms": 11780,
       "evidence": [
         "tray probe: exit 0 (0x00000000) TRAY 0",
         "tray probe: exit 0 (0x00000000) TRAY 1 button",
@@ -1521,10 +1521,10 @@
     },
     {
       "area": "regress",
-      "duration_ms": 1715,
+      "duration_ms": 1701,
       "evidence": [
-        "daemon pid 11272 answered after 209 ms",
-        "diagnostics: - ffmpeg not found: looked next to ~\\AppData\\Local\\Temp\\cmr9604\\58\\bin-no-ffmpeg, in the settings and on PATH; this build should include it",
+        "daemon pid 15364 answered after 208 ms",
+        "diagnostics: - ffmpeg not found: looked next to ~\\AppData\\Local\\Temp\\cmr8848\\58\\bin-no-ffmpeg, in the settings and on PATH; this build should include it",
         "import without FFmpeg: exit 2 (0x00000002) {\"error\":{\"code\":\"not_found\",\"data\":null,\"exit_code\":2,\"message\":\"FFmpeg was not found: CaptureMann includes its own copy, so reinstall CaptureMann, or set CM_FFMPEG to the path of ffmpeg.exe. (For development: winget install Gyan.FFmpeg.)\"}}",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -1541,9 +1541,9 @@
     },
     {
       "area": "regress",
-      "duration_ms": 1122,
+      "duration_ms": 1116,
       "evidence": [
-        "daemon pid 3120 answered after 319 ms",
+        "daemon pid 15368 answered after 319 ms",
         "2x2 region: exit 2 (0x00000002) invalid_input: The recording area is too small: each side must be at least 18 px.",
         "a tiny area is refused up front: invalid_input, too small",
         "log hygiene: 1 WARN line(s) in the case's logs"
@@ -1564,7 +1564,7 @@
     },
     {
       "area": "zz",
-      "duration_ms": 637,
+      "duration_ms": 630,
       "evidence": [],
       "id": "zz.crash_events",
       "message": "",
@@ -1579,31 +1579,31 @@
     }
   ],
   "run": {
-    "commit": "26f81195",
+    "commit": "ae61845f",
     "ffmpeg": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
-    "finished": "2026-11-07T09:45:47Z",
-    "flags": "--tier hardware --out C:\\lab\\regress-out\\20261107T094146Z --who cm-regress via regress.sh --verdict PARTIAL --allow screen,sound,mic,camera --commit 26f81195",
+    "finished": "2026-11-07T12:14:56Z",
+    "flags": "--tier hardware --out C:\\lab\\regress-out\\20261107T121056Z --who cm-regress via regress.sh --verdict PARTIAL --allow screen,sound,mic,camera --commit ae61845f",
     "gpu": "Intel(R) UHD Graphics 620 (driver 31.0.101.2137)",
     "hashes": [
       [
         "capturemann.exe",
-        "ab4704176bdbf7ac9bc49ffb33e9f6a830905f81a9c0e1f4c053f232375a1b72"
+        "18a95748ff29971c44f0227ed03580137decfb5dcd51b807000d7c8e9e0253b8"
       ],
       [
         "cm-mcp.exe",
-        "d3764667873b92279e8a1df746406410ff92dc50320c9ec7a0106316a3d26a6e"
+        "c1665f768a7249cf1febea50b8c52f26fd838641ea917adeb103d79123acc823"
       ],
       [
         "cm-daemon.exe",
-        "2cc3d376291f1d1c1744304d3ed835d803b8756224ccb53c8653f7bd9b4bc079"
+        "aa13dc180d57ba60772883899bfe2642328a65360f694b3faeb9289cc6c032ed"
       ],
       [
         "cm-desktop.exe",
-        "37bc20e754fdd4a687e3131c389df9318bc20bb6699576542deac88160c2f30d"
+        "dbf5fc09437efd909e2c21b3213f0b89b168b844e97930c491e6d2d34f474682"
       ],
       [
         "cm-overlay.exe",
-        "a9d3b72c3b5a5e8fc1aff089075219fbb9f57dd3260cce66ccc6cca6b3706a94"
+        "92a8325b84d64c039d70f0fdee61f343afaf89e1013e86c5ed32935a7f99bcd0"
       ],
       [
         "ffmpeg.exe",
@@ -1621,7 +1621,7 @@
     "os": "Microsoft Windows 11 Pro 10.0.26200 build 26200",
     "package_dir": "C:\\Users\\trung\\AppData\\Local\\Programs\\CaptureMann",
     "platform": "windows",
-    "started": "2026-11-07T09:41:47Z",
+    "started": "2026-11-07T12:10:57Z",
     "tier": "hardware",
     "verdict": "PARTIAL",
     "version": "0.2.9",
