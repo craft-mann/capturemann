@@ -1,0 +1,338 @@
+{
+  "cases": [
+    {
+      "area": "pkg",
+      "duration_ms": 334,
+      "evidence": [
+        "capturemann: 4026496 bytes",
+        "cm-mcp: 9570736 bytes",
+        "cm-daemon is not in the app (embedded in cm-desktop); using --daemon /Users/trungtran/source/repos/capturemann/target/release/cm-daemon",
+        "cm-desktop: 105519984 bytes",
+        "cm-overlay: 5657136 bytes",
+        "licence: Some(\"/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel5/CaptureMann.app/Contents/MacOS/../Resources/LICENSE\"), third party: Some(\"/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel5/CaptureMann.app/Contents/MacOS/../Resources/THIRD_PARTY_LICENSES.md\"), notice: Some(\"/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel5/CaptureMann.app/Contents/MacOS/../Resources/NOTICE\")",
+        "note: no README in the package folder"
+      ],
+      "id": "pkg.files",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "NFR-licence",
+        "PKG-contents"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "the package holds the programs, FFmpeg, the helper and the licences"
+    },
+    {
+      "area": "pkg",
+      "duration_ms": 1587,
+      "evidence": [
+        "capturemann --version: exit 0 (0x00000000) in 19 ms",
+        "cm-mcp --bogus: exit 2 (0x00000002) in 109 ms",
+        "cm-daemon --bogus: exit 2 (0x00000002) in 840 ms",
+        "cm-overlay --help: exit 0 (0x00000000) in 57 ms",
+        "ffmpeg -hide_banner -version: exit 0 (0x00000000) in 19 ms",
+        "ffprobe -hide_banner -version: exit 0 (0x00000000) in 61 ms",
+        "llama-server --version: exit 0 (0x00000000) in 111 ms"
+      ],
+      "id": "pkg.startup",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "bug: Transcribe illegal instruction (AVX-512 in the build)",
+        "bug: 0xC0000409 at start"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "every program starts without a crash (illegal instruction, fast fail)"
+    },
+    {
+      "area": "pkg",
+      "duration_ms": 2906,
+      "evidence": [
+        "version 0.2.9",
+        "daemon pid 45561 answered after 1923 ms",
+        "- ffmpeg at /opt/homebrew/bin/ffmpeg",
+        "- llama-server not found: looked next to ~/source/repos/capturemann/target/release, in the settings and on PATH; this build should include it",
+        "- text recognizer: apple_vision (available)",
+        "- speaker engine built in: true",
+        "- speaker models: not bundled with this build",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "pkg.diagnostics",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "DIAG-1"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "diagnostics reports app, system, models and engines, FFmpeg and the helper"
+    },
+    {
+      "area": "daemon",
+      "duration_ms": 1223,
+      "evidence": [
+        "daemon pid 45715 answered after 288 ms",
+        "pid 45715, 86 actions",
+        "stop: clean exit on SIGTERM",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "daemon.lifecycle",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-1",
+        "R2-8"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "daemon starts on a private endpoint, answers, stops, and the endpoint is gone"
+    },
+    {
+      "area": "daemon",
+      "duration_ms": 1795,
+      "evidence": [
+        "daemon pid 45769 answered after 288 ms",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "daemon.library_created",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "LIB-1",
+        "AI-7: the text engine starts only when asked"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "a fresh library is created and lists no captures; no helper program runs while idle"
+    },
+    {
+      "area": "settings",
+      "duration_ms": 1117,
+      "evidence": [
+        "daemon pid 45902 answered after 289 ms",
+        "daemon pid 45920 answered after 293 ms",
+        "recording.fps=47: exit 0 (0x00000000) None",
+        "47 was accepted: {\"settings\":{\"recording.fps\":47}}",
+        "log hygiene: 2 WARN line(s) in the case's logs"
+      ],
+      "id": "settings.roundtrip",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-1"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "settings set and get round trip, and survive a daemon restart"
+    },
+    {
+      "area": "targets",
+      "duration_ms": 708,
+      "evidence": [
+        "daemon pid 45993 answered after 293 ms",
+        "display 1 'Built-in Retina Display' 3024x1964 at (0,0) scale 2 primary",
+        "21 windows; capabilities {\"capture_region\":true,\"capture_window\":true,\"list_windows\":true,\"pick\":false}",
+        "apps: Calendar, CaptureMann, ChatGPT, Claude, Code, Discord, Finder, Google Chrome, Microsoft Outlook, Neo, Notes, Slack, System Information, Terminal, WeChat, ‎WhatsApp",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "targets.list",
+      "message": "",
+      "needs": [
+        "desktop_session"
+      ],
+      "specs": [
+        "CAP-1",
+        "CAP-3",
+        "bug: Windows Terminal Host name",
+        "bug: window name garbled"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "targets lists displays and windows with readable names and real sizes"
+    },
+    {
+      "area": "shot",
+      "duration_ms": 0,
+      "evidence": [],
+      "id": "shot.display",
+      "message": "needs --allow screen",
+      "needs": [
+        "desktop_session",
+        "screen"
+      ],
+      "specs": [
+        "CAP-1.AC1"
+      ],
+      "status": "SKIP",
+      "tier": "smoke",
+      "title": "a display screenshot is a valid PNG of the display's physical size"
+    },
+    {
+      "area": "lib",
+      "duration_ms": 684,
+      "evidence": [
+        "daemon pid 46033 answered after 293 ms",
+        "manifest keys ok; exported PNG 1000x260, 35254 bytes",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "lib.manifest",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "LIB-1",
+        "CAP-4: export_image",
+        "data model: bundles are the source of truth"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "the library lists a bundle; manifest.json has the schema keys; export of the image is a valid PNG"
+    },
+    {
+      "area": "mcp",
+      "duration_ms": 737,
+      "evidence": [
+        "daemon pid 46074 answered after 293 ms",
+        "server capturemann 0.2.9, protocol \"2025-06-18\"",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "mcp.handshake",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-2",
+        "MCP protocol"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "initialize answers with the server name, the product version and tool support"
+    },
+    {
+      "area": "mcp",
+      "duration_ms": 716,
+      "evidence": [
+        "daemon pid 46149 answered after 292 ms",
+        "79 tools",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "mcp.tools_list",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-2",
+        "specs/02-agent-interface.md tool table"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "tools/list matches the tool table of the spec (no drift either way)"
+    },
+    {
+      "area": "ai",
+      "duration_ms": 1232,
+      "evidence": [
+        "llama-server --version: exit 0 (0x00000000) version: 0.7.0-dev (build 0, commit unknown) built with AppleClang 21.0.0.21000334 for Darwin arm64",
+        "daemon pid 46192 answered after 293 ms",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "ai.llama_version",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AI-7",
+        "bug class: llama-server missing in the Windows package"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "the bundled llama-server runs --version and is not started by the daemon"
+    },
+    {
+      "area": "linux",
+      "duration_ms": 0,
+      "evidence": [],
+      "id": "linux.session",
+      "message": "not implemented for macos",
+      "needs": [
+        "desktop_session"
+      ],
+      "specs": [
+        "LINUX-1",
+        "platform-acceptance"
+      ],
+      "status": "SKIP",
+      "tier": "smoke",
+      "title": "the run sees a desktop session; the report names X11 or Wayland, the desktop and the portal"
+    },
+    {
+      "area": "zz",
+      "duration_ms": 346,
+      "evidence": [],
+      "id": "zz.crash_events",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "bug: recording stop crash 0xC0000409",
+        "bug: illegal instruction"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "no crash of a CaptureMann program was logged (Windows event log, macOS DiagnosticReports) during the whole run"
+    }
+  ],
+  "run": {
+    "commit": "1d5f429d",
+    "ffmpeg": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
+    "finished": "2026-11-08T01:00:06Z",
+    "flags": "--tier smoke --package-dir /private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel5/CaptureMann.app/Contents/MacOS --daemon /Users/trungtran/source/repos/capturemann/target/release/cm-daemon --out /var/folders/xm/d48xc26519j40jmsdcwh6v040000gp/T//cm-regress-mac-20261108T005952Z --who cm-regress via regress.sh --verdict PARTIAL --commit 1d5f429d",
+    "gpu": "n/a",
+    "hashes": [
+      [
+        "capturemann",
+        "0ff644b188010ce3eac3c1e81501e038d3062300f888690ca0f7c2e2a8e38a32"
+      ],
+      [
+        "cm-mcp",
+        "df24632de1ab9c9aa08dd85488af2b9dbe0e855e5c9537a1096cf8e7516606fb"
+      ],
+      [
+        "cm-daemon",
+        "a03c732bb18275db18adaeb08ec88e27b087b11773fc72ce37866a7ecb9aa474"
+      ],
+      [
+        "cm-desktop",
+        "c10712ca143ca1ef0ab3ba18a8579d081d2e656522031a288668bb691cc1fb37"
+      ],
+      [
+        "cm-overlay",
+        "aa707edd4ba4be6508dc1b301ca1760ba87ac5224af7564f5bd802e1a03163a8"
+      ],
+      [
+        "ffmpeg",
+        "9881c6972c875e3f52db8923abfe08454681b6cdbfa9bc07d4b83e9433a278c8"
+      ],
+      [
+        "ffprobe",
+        "7a547933d3015bc4920bda1f6bd22df825b779f01f2c68414123105b1d058acb"
+      ],
+      [
+        "llama-server",
+        "ca8f0a0801c3d765e9f48bb0f0cea64e57f890030dc44a4452f8b263891c8840"
+      ]
+    ],
+    "os": "Darwin 25.6.0 arm64",
+    "package_dir": "/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel5/CaptureMann.app/Contents/MacOS",
+    "platform": "macos",
+    "started": "2026-11-08T00:59:52Z",
+    "tier": "smoke",
+    "verdict": "PARTIAL",
+    "version": "0.2.9",
+    "who": "cm-regress via regress.sh"
+  },
+  "schema": 1,
+  "summary": {
+    "fail": 0,
+    "pass": 12,
+    "skip": 2,
+    "total": 14
+  }
+}

@@ -1,0 +1,47 @@
+# L1 macos 0.2.9 regression report (full)
+
+- **Date:** 2026-11-08T00:59:49Z to 2026-11-08T00:59:51Z
+- **Who:** cm-regress via regress.sh
+- **Machine:** Darwin 25.6.0 arm64; GPU: n/a
+- **Build:** commit 1d5f429d, package folder `/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel5/CaptureMann.app/Contents/MacOS`
+- **FFmpeg:** ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers
+- **Suite:** `cm-regress --tier full --package-dir /private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel5/CaptureMann.app/Contents/MacOS --daemon /Users/trungtran/source/repos/capturemann/target/release/cm-daemon --out /var/folders/xm/d48xc26519j40jmsdcwh6v040000gp/T//cm-regress-mac-20261108T005948Z --who cm-regress via regress.sh --verdict PARTIAL --only installer.dmg --installer /Users/trungtran/source/repos/capturemann/target/bundle/CaptureMann-0.2.9-arm64.dmg --commit 1d5f429d`, tier `full`
+- **Result:** 1 passed, 0 failed, 0 skipped of 1 cases
+- **SHA-256 of the files under test:**
+  - `capturemann` `0ff644b188010ce3eac3c1e81501e038d3062300f888690ca0f7c2e2a8e38a32`
+  - `cm-mcp` `df24632de1ab9c9aa08dd85488af2b9dbe0e855e5c9537a1096cf8e7516606fb`
+  - `cm-daemon` `a03c732bb18275db18adaeb08ec88e27b087b11773fc72ce37866a7ecb9aa474`
+  - `cm-desktop` `c10712ca143ca1ef0ab3ba18a8579d081d2e656522031a288668bb691cc1fb37`
+  - `cm-overlay` `aa707edd4ba4be6508dc1b301ca1760ba87ac5224af7564f5bd802e1a03163a8`
+  - `ffmpeg` `9881c6972c875e3f52db8923abfe08454681b6cdbfa9bc07d4b83e9433a278c8`
+  - `ffprobe` `7a547933d3015bc4920bda1f6bd22df825b779f01f2c68414123105b1d058acb`
+  - `llama-server` `ca8f0a0801c3d765e9f48bb0f0cea64e57f890030dc44a4452f8b263891c8840`
+  - `CaptureMann-0.2.9-arm64.dmg` `39c84bdf11c003c90481e14e1363139a1c23d53b0b87d91d125853945a139e33`
+
+## Steps
+
+| Case | Result | Notes |
+| --- | --- | --- |
+| `installer.dmg` | PASS | the DMG (or .app) installs into a temp folder: signature intact, programs work, removal leaves nothing |
+
+## Acceptance criteria and bug classes
+
+| Item | Result | Cases |
+| --- | --- | --- |
+| make verify-release | PASS | `installer.dmg` |
+| packaging/macos | PASS | `installer.dmg` |
+
+## Problems found
+
+- None in the cases that ran.
+## Not run
+
+- Every selected case ran.
+
+## Evidence of passing cases
+
+- `installer.dmg` (1180 ms): mounted /Users/trungtran/source/repos/capturemann/target/bundle/CaptureMann-0.2.9-arm64.dmg (CaptureMann.app); copied the app to /var/folders/xm/d48xc26519j40jmsdcwh6v040000gp/T/cmr45065/1/dmg/CaptureMann.app; ejected the image; the code signature verifies (deep, strict); bundle id dev.capturemann.app, version 0.2.9; installed: capturemann 0.2.9; removed the copy; nothing left
+
+## Verdict
+
+PARTIAL. An automated run on one machine; it covers what `docs/development/regression.md` lists and does not replace the manual scripts in `tests/manual/`. Nothing here is "verified" until a person has read it and says so.

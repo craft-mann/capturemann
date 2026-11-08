@@ -345,6 +345,18 @@ fn overlay_windows() -> Vec<WinInfo> {
 }
 
 fn hotkey_overlay(ctx: &mut Ctx) -> R {
+    // Another CaptureMann (the maintainer's own, or one left by an earlier run) holds the same global
+    // hotkey and opens its own overlay too, so the case would count two overlays for one monitor.
+    let others: Vec<u32> = sys::list_processes()
+        .iter()
+        .filter(|(_, n)| n.to_lowercase().starts_with("cm-desktop"))
+        .map(|(p, _)| *p)
+        .collect();
+    if !others.is_empty() {
+        return skip(format!(
+            "another CaptureMann is running (pid {others:?}) and answers the same hotkey: quit it, then run this case"
+        ));
+    }
     let _app = start_app(ctx, &[])?;
     std::thread::sleep(Duration::from_secs(4));
     let t = ctx.cli_ok(&["targets", "--displays-only"])?;
