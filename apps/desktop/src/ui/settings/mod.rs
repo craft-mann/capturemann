@@ -346,7 +346,11 @@ impl SettingsView {
             .child(crate::ui::permissions_view::cards(t, &self.app, &snap, busy, &tried))
             .child(widgets::caption(
                 t,
-                tr!("States are read without asking the system. Granting only happens when you press \u{201C}Grant access\u{2026}\u{201D}."),
+                if crate::permissions::Os::current() == crate::permissions::Os::Linux {
+                    tr!("States are read without asking the system.")
+                } else {
+                    tr!("States are read without asking the system. Granting only happens when you press \u{201C}Grant access\u{2026}\u{201D}.")
+                },
             ))
             .into_any_element()
     }

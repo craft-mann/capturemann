@@ -588,6 +588,7 @@ impl SettingsView {
 
     fn system_section(&self, t: &Theme, cx: &mut Context<Self>) -> AnyElement {
         let status = self.audio.system.status().clone();
+        let linux = crate::permissions::Os::current() == crate::permissions::Os::Linux;
         let status_chip = match status {
             SystemStatus::Heard => Some(chip(
                 t,
@@ -646,9 +647,11 @@ impl SettingsView {
                             .text_size(px(12.))
                             .line_height(px(17.))
                             .text_color(rgba_of(t.mist))
-                            .child(SharedString::from(tr!(
-                                "Plays a short chime and checks that CaptureMann can hear it. Uses the Screen Recording permission."
-                            ))),
+                            .child(SharedString::from(if linux {
+                                tr!("Plays a short chime and checks that CaptureMann can hear it.")
+                            } else {
+                                tr!("Plays a short chime and checks that CaptureMann can hear it. Uses the Screen Recording permission.")
+                            })),
                     )
                     .into_any_element()
             }
@@ -659,16 +662,23 @@ impl SettingsView {
                     tone: Tone::Warning,
                     glyph: "volume-2",
                     title: tr!("Chime not heard"),
-                    text: tr!("System audio needs Screen Recording access. Check your output is not muted."),
+                    text: if linux {
+                        tr!("Check that your output is not muted and that PipeWire is running.")
+                    } else {
+                        tr!("System audio needs Screen Recording access. Check your output is not muted.")
+                    },
                 },
-                Some(self.press_button(
-                    t,
-                    "system-allow-access",
-                    "external-link",
-                    tr!("Allow access"),
-                    Press::AllowSystem,
-                    cx,
-                )),
+                // Linux has no switch to allow: the access button would lead nowhere.
+                (!linux).then(|| {
+                    self.press_button(
+                        t,
+                        "system-allow-access",
+                        "external-link",
+                        tr!("Allow access"),
+                        Press::AllowSystem,
+                        cx,
+                    )
+                }),
             )
             .into_any_element(),
             SystemStatus::NoPermission => state_block(
