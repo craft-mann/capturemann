@@ -259,6 +259,77 @@ pub fn props(n: &MenuNode, names: &[String]) -> Vec<(&'static str, Prop)> {
     }
 }
 
+/// What a host must be told after the menu changed (`com.canonical.dbusmenu` signals).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MenuChange {
+    /// Nothing differs.
+    None,
+    /// The same items in the same places, only properties moved (a check mark, a label, enabled):
+    /// `ItemsPropertiesUpdated`, which hosts apply to the items they hold. `updated` has the full
+    /// property set of each changed item, `removed` the names that no longer apply.
+    Props {
+        updated: Vec<(i32, Vec<(&'static str, Prop)>)>,
+        removed: Vec<(i32, Vec<String>)>,
+    },
+    /// Items came or went or moved: `LayoutUpdated`, the host asks for the layout again.
+    Layout,
+}
+
+fn shape(items: &[MenuNode], out: &mut Vec<(i32, usize)>) {
+    for n in items {
+        out.push((n.id, n.children.len()));
+        shape(&n.children, out);
+    }
+}
+
+fn collect_changed<'a>(
+    old: &'a [MenuNode],
+    new: &'a [MenuNode],
+    out: &mut Vec<(&'a MenuNode, &'a MenuNode)>,
+) {
+    for (o, n) in old.iter().zip(new) {
+        if o.label != n.label || o.kind != n.kind || o.enabled != n.enabled {
+            out.push((o, n));
+        }
+        collect_changed(&o.children, &n.children, out);
+    }
+}
+
+/// How to announce the move from `old` to `new`. A host that caches the layout (the GNOME
+/// AppIndicator extension keeps submenus it has already built) shows a stale check mark when
+/// only `LayoutUpdated` arrives, so a change of properties alone is sent as properties.
+pub fn diff(old: &[MenuNode], new: &[MenuNode]) -> MenuChange {
+    if old == new {
+        return MenuChange::None;
+    }
+    let (mut a, mut b) = (Vec::new(), Vec::new());
+    shape(old, &mut a);
+    shape(new, &mut b);
+    if a != b {
+        return MenuChange::Layout;
+    }
+    let mut changed = Vec::new();
+    collect_changed(old, new, &mut changed);
+    let mut updated = Vec::new();
+    let mut removed = Vec::new();
+    for (o, n) in changed {
+        let np = props(n, &[]);
+        let gone: Vec<String> = props(o, &[])
+            .into_iter()
+            .map(|(k, _)| k)
+            .filter(|k| !np.iter().any(|(nk, _)| nk == k))
+            .map(str::to_owned)
+            .collect();
+        // A property that returned to its protocol default is simply absent from `np`; naming it
+        // in `removed` makes the host fall back to the default.
+        if !gone.is_empty() {
+            removed.push((n.id, gone));
+        }
+        updated.push((n.id, np));
+    }
+    MenuChange::Props { updated, removed }
+}
+
 /// Premultiplication-free ARGB32, network byte order, as StatusNotifierItem `IconPixmap` wants.
 pub fn rgba_to_argb(rgba: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(rgba.len());
@@ -486,6 +557,64 @@ mod tests {
         assert!(p.contains(&("toggle-state", Prop::Int(1))));
         let d = find(&m, item_id("delay")).unwrap();
         assert!(props(d, &[]).contains(&("children-display", Prop::Str("submenu".into()))));
+    }
+
+    /// CAP-5 (Linux tray): moving the delay check mark changes properties only, so the host is
+    /// told with `ItemsPropertiesUpdated` (2 items: the one that lost the mark and the new one).
+    #[test]
+    fn cap5_a_moved_check_mark_is_a_property_change() {
+        let at = |s| {
+            build_menu(&MenuInputs {
+                delay_s: s,
+                ..MenuInputs::default()
+            })
+        };
+        assert_eq!(diff(&at(0), &at(0)), MenuChange::None);
+        let MenuChange::Props { updated, removed } = diff(&at(0), &at(3)) else {
+            panic!("expected a property change");
+        };
+        assert_eq!(updated.len(), 2, "{updated:?}");
+        assert!(removed.is_empty());
+        for (_, p) in &updated {
+            assert!(p.iter().any(|(k, _)| *k == "toggle-state"));
+        }
+        assert!(updated
+            .iter()
+            .any(|(id, p)| *id == DELAY_BASE + 1 && p.contains(&("toggle-state", Prop::Int(1)))));
+    }
+
+    /// A Stop item that becomes enabled loses its `enabled: false`: that is sent as removed.
+    #[test]
+    fn an_enabled_item_reports_the_dropped_disabled_property() {
+        let idle = build_menu(&MenuInputs::default());
+        let rec = build_menu(&MenuInputs {
+            stop_enabled: true,
+            ..MenuInputs::default()
+        });
+        let MenuChange::Props { removed, .. } = diff(&idle, &rec) else {
+            panic!("expected a property change");
+        };
+        assert_eq!(
+            removed,
+            vec![(item_id(ids::REC_STOP), vec!["enabled".to_owned()])]
+        );
+    }
+
+    /// New or removed items need the host to read the layout again.
+    #[test]
+    fn a_changed_recents_list_is_a_layout_change() {
+        let a = build_menu(&MenuInputs::default());
+        let b = build_menu(&MenuInputs {
+            recents: vec![("c1".into(), "One".into())],
+            ..MenuInputs::default()
+        });
+        assert_eq!(diff(&a, &b), MenuChange::Layout);
+        // The same count with another title is a label change on the same item id.
+        let c = build_menu(&MenuInputs {
+            recents: vec![("c2".into(), "Two".into())],
+            ..MenuInputs::default()
+        });
+        assert!(matches!(diff(&b, &c), MenuChange::Props { .. }));
     }
 
     #[test]

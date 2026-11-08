@@ -22,7 +22,8 @@ use zbus::zvariant::{OwnedValue, Type, Value};
 
 use crate::platform::{menu_text, TrayState};
 use crate::platform_linux_menu::{
-    action_for, build_menu, props, rgba_to_argb, sni_status, Kind, MenuInputs, MenuNode, Prop,
+    action_for, build_menu, diff, props, rgba_to_argb, sni_status, Kind, MenuChange, MenuInputs,
+    MenuNode, Prop,
 };
 
 const ITEM_PATH: &str = "/StatusNotifierItem";
@@ -301,12 +302,15 @@ impl DbusMenu {
         unknown
     }
 
+    /// A menu is about to open: say the layout may have changed, so a host that kept an older
+    /// copy (the GNOME AppIndicator extension caches built submenus) reads it again. The cost is
+    /// one `GetLayout` of a 20-item tree.
     fn about_to_show(&self, _id: i32) -> bool {
-        false
+        true
     }
 
-    fn about_to_show_group(&self, _ids: Vec<i32>) -> (Vec<i32>, Vec<i32>) {
-        (Vec::new(), Vec::new())
+    fn about_to_show_group(&self, ids: Vec<i32>) -> (Vec<i32>, Vec<i32>) {
+        (ids, Vec::new())
     }
 }
 
@@ -404,7 +408,7 @@ impl TrayHandle {
 
     /// Applies a change to the inputs and tells the host what changed.
     fn update(&self, f: impl FnOnce(&mut MenuInputs)) {
-        let (icon, tooltip, status, layout, revision) = {
+        let (icon, tooltip, status, change, revision) = {
             let mut g = self.shared.lock();
             let old = g.inputs.clone();
             let mut new = old.clone();
@@ -413,8 +417,8 @@ impl TrayHandle {
                 return;
             }
             let menu = build_menu(&new);
-            let layout = menu != g.menu;
-            if layout {
+            let change = diff(&g.menu, &menu);
+            if change != MenuChange::None {
                 g.menu = menu;
                 g.revision += 1;
             }
@@ -424,7 +428,7 @@ impl TrayHandle {
             }
             let tooltip = new.tooltip != old.tooltip;
             g.inputs = new;
-            (icon, tooltip, icon, layout, g.revision)
+            (icon, tooltip, icon, change, g.revision)
         };
         const ITEM: &str = "org.kde.StatusNotifierItem";
         if icon {
@@ -437,13 +441,33 @@ impl TrayHandle {
         if tooltip {
             self.emit(ITEM_PATH, ITEM, "NewToolTip", ());
         }
-        if layout {
-            self.emit(
+        match change {
+            MenuChange::None => {}
+            MenuChange::Layout => self.emit(
                 MENU_PATH,
                 "com.canonical.dbusmenu",
                 "LayoutUpdated",
                 (revision, 0i32),
-            );
+            ),
+            MenuChange::Props { updated, removed } => {
+                let updated: Vec<(i32, HashMap<String, OwnedValue>)> = updated
+                    .into_iter()
+                    .map(|(id, p)| {
+                        (
+                            id,
+                            p.into_iter()
+                                .map(|(k, v)| (k.to_owned(), prop_value(v)))
+                                .collect(),
+                        )
+                    })
+                    .collect();
+                self.emit(
+                    MENU_PATH,
+                    "com.canonical.dbusmenu",
+                    "ItemsPropertiesUpdated",
+                    (updated, removed),
+                );
+            }
         }
     }
 
