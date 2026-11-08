@@ -18,24 +18,29 @@ through MCP and a CLI.
 <p align="center">
 <a href="https://github.com/craft-mann/capturemann/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/craft-mann/capturemann/actions/workflows/ci.yml/badge.svg"></a>
 <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue"></a>
-<a href="https://github.com/craft-mann/capturemann/releases/latest"><img alt="Version 0.2.9" src="https://img.shields.io/badge/version-0.2.9-blue"></a>
+<a href="https://github.com/craft-mann/capturemann/releases/latest"><img alt="Version 0.3.0" src="https://img.shields.io/badge/version-0.3.0-blue"></a>
 <img alt="macOS 13+: Apple Silicon and Intel" src="https://img.shields.io/badge/macOS-13%2B%20%7C%20Apple%20Silicon%20%26%20Intel-lightgrey?logo=apple&logoColor=white">
 <img alt="Windows 11 x64, unsigned" src="https://img.shields.io/badge/Windows-11%20x64%20%7C%20unsigned-0078D4?logo=windows&logoColor=white">
-<img alt="Linux: early build, Ubuntu 24.04+ x86_64 and aarch64" src="https://img.shields.io/badge/Linux-Ubuntu%2024.04%2B%20%7C%20early%20build-E95420?logo=linux&logoColor=white">
+<img alt="Linux: Ubuntu 24.04+ x86_64 and aarch64" src="https://img.shields.io/badge/Linux-Ubuntu%2024.04%2B%20%7C%20x86__64%20%26%20aarch64-E95420?logo=linux&logoColor=white">
 </p>
 
 <p align="center">
   <img alt="The CaptureMann library: recordings, audio and screenshots in one place, with a record button, region, window and display capture, and the AI and agent pages in the sidebar" src="docs/images/library.webp" width="900">
 </p>
 
-> **Status: 0.2.9 is out for Windows and macOS (published Nov 8, 2026; 0.2.8 was Windows only). macOS 13+ (Apple Silicon and Intel) is the full app. Windows 11 (x64) is a supported release since
-> 0.2.8: it records the screen, microphone, system audio and camera, and has the editor, local AI, speaker labels and
-> Auto-redact. The files are not code-signed (SHA-256 files; a winget package is submitted, not yet accepted). Limits,
-> also in the release notes: Windows 10 not tested on a real device, only Windows 11 on one Intel laptop tested, NVIDIA
-> and AMD hardware encoders untried, a second monitor with mixed scaling not tested, a camera replugged into a different
-> USB port may not resume. Linux (Ubuntu 24.04+, x86_64 and aarch64) stays an early build** (the published Linux files
-> are 0.2.6, with no recording; they follow in 0.3.0). The Windows results are the `cm-regress` suite on that one lab
-> laptop; the reports are marked PARTIAL in `verification/`. Most other results are
+> **Status: 0.3.0 is the Linux release (prepared Nov 9, 2026; the files are built and tested but the release is not published until the maintainer
+> publishes it). Linux (Ubuntu 24.04+, x86_64 and aarch64) is no longer an early build:** it records the screen, microphone,
+> system audio and camera, imports and exports video with or without a GPU encoder, and has the tray, the editor, local AI,
+> speaker labels and Auto-redact. Differences and gaps are listed in the release notes (no live webcam bubble, window
+> recording on X11 only, global shortcuts and the cursor track on X11 only, one computer tested: a ThinkPad T490 with an Intel GPU,
+> GNOME 46, X11 and Wayland; AMD, NVIDIA, KDE and other distributions not run). The results are the `cm-regress` suite
+> and hand runs on that laptop; the reports are marked PARTIAL in `verification/`.
+> **0.2.9 (Nov 8, 2026) is the current release for Windows and macOS.** macOS 13+ (Apple Silicon and Intel) is the full app.
+> Windows 11 (x64) is a supported release since 0.2.8: it records the screen, microphone, system audio and camera, and has
+> the editor, local AI, speaker labels and Auto-redact. The Windows files are not code-signed (SHA-256 files; a winget
+> package is submitted, not yet accepted). Limits, also in the release notes: Windows 10 not tested on a real device, only
+> Windows 11 on one Intel laptop tested, NVIDIA and AMD hardware encoders untried, a second monitor with mixed scaling not
+> tested, a camera replugged into a different USB port may not resume. Most other results are
 > tested with scripted fakes, plus the maintainer's own use on one Mac; there are few stored hardware
 > reports. **Speaker labels** are measured on public English conversation clips only (diarization error
 > 17 % on clips held back, [report](verification/benchmarks/speaker-detection-2026-10-29.md)); Vietnamese
@@ -189,7 +194,7 @@ cargo run -p cm-render --example redaction_bench --release --locked -- run --set
 
 ## Install
 
-Pick your system: [macOS](#macos) (below), [Windows](#windows) or [Linux](#linux-early-build).
+Pick your system: [macOS](#macos) (below), [Windows](#windows) or [Linux](#linux).
 
 ### macOS
 
@@ -245,7 +250,7 @@ older 0.2.6 Windows files have no recording.
 
 <sub>Screenshots from the 0.2.8 Windows build on the lab laptop, with sample content only. More are in the release notes.</sub>
 
-### Linux (early build)
+### Linux
 
 Ubuntu 24.04 or later, Debian 13, or another distribution with glibc 2.39 or newer; x86_64 and aarch64. From
 [Releases](https://github.com/craft-mann/capturemann/releases):
@@ -257,10 +262,14 @@ sudo apt install ./capturemann_<version>_amd64.deb      # or _arm64.deb; Ubuntu 
 Other distributions: unpack `capturemann-<version>-linux-<arch>.tar.gz`, run `./check-runtime.sh` (it names missing
 libraries), then `./install.sh`. Every file has a `.sha256` and a minisign signature
 (`minisign -Vm <file> -P RWTeQv8ogB2CCuZ7j0rr3MovdHod4QATmVn+I329YC8pomOC6R9Rxc2k`; the key is
-`packaging/linux/minisign.pub`). Works: screenshots (region, window and display on X11; region and display on
-GNOME Wayland), the editor, the library, local AI, Auto-redact with `sudo apt install tesseract-ocr`, the CLI and the
-MCP server. Not yet: recording, window screenshots and global shortcuts on GNOME 46 Wayland. Details and known
-issues: [`docs/development/linux-early-build.md`](docs/development/linux-early-build.md).
+`packaging/linux/minisign.pub`). 0.3.0 works like the other systems for: screenshots (region, window and display on X11;
+region, display and, through the desktop's picker, window on GNOME Wayland), screen recording (on by default; GNOME records
+without a share dialog, other desktops use the portal), microphone, system audio and camera, import and export (VA-API
+H.264, or labelled software VP9 without a GPU encoder), the editor, the library, local AI, Auto-redact with
+`sudo apt install tesseract-ocr`, the CLI and the MCP server. Differences by design: no live webcam bubble during a take (the
+camera is a track, composited at export), a banner instead of a floating HUD, no per-app exclusion; window recording, global
+shortcuts and the cursor track are X11 only. Details, the list of what was not run and the known gaps are in the release
+notes and in [`specs/plans/linux-parity-matrix.md`](specs/plans/linux-parity-matrix.md).
 
 ## Quick start
 
