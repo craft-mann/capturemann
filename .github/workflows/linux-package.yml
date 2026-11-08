@@ -7,6 +7,11 @@ name: Linux package
 # docs/development/releasing.md, "Linux early build"). It does not run on pull requests: a full
 # release build takes too long for that; the packaging scripts are tried in the VM and by hand.
 #
+# After the packages, the job `apt-repo` builds a signed APT repository from both architectures' .deb files with a
+# THROWAWAY key and proves add source -> install -> upgrade -> remove -> purge in a clean ubuntu:24.04 container
+# (packaging/linux/test-apt-repo.sh). Nothing is published; the real repository is made by the maintainer with the real
+# key (docs/development/linux-apt.md).
+#
 # Pinned actions: the same commits as ci.yml and release.yml.
 on:
   workflow_dispatch:
@@ -122,6 +127,18 @@ jobs:
         env:
           CM_DEB_MAINTAINER: "CraftMann <trungtlt@outlook.com>"
         run: packaging/linux/build-deb.sh
+      # The release checker (packaging/linux/check-package.sh): architecture, glibc ceiling, no bundled system or
+      # GPU libraries, licence files (LICENSE, NOTICE, THIRD_PARTY_LICENSES, FFmpeg source offer, llama.cpp MIT),
+      # desktop entry, the programs start. The FFmpeg and llama.cpp inputs are required unless the run turned them off.
+      - name: Check the packages (check-package.sh)
+        run: |
+          allow=""
+          [ "${{ inputs.with_ffmpeg }}" = true ] || allow="ffmpeg"
+          [ "${{ inputs.with_llama }}" = true ] || allow="${allow:+$allow,}llama"
+          cd packaging/linux/out
+          for f in ./*.tar.gz ./*.deb; do
+            ../check-package.sh --allow-missing "$allow" "$f"
+          done
       - name: Check the .deb (install with apt, run, remove)
         run: |
           cd packaging/linux/out
@@ -150,5 +167,64 @@ jobs:
         with:
           name: capturemann-linux-${{ matrix.arch }}-debug
           path: packaging/linux/out/debug/
+          if-no-files-found: error
+          retention-days: 14
+
+  # The APT repository, built from the artifacts of both architectures and tried on both: the hosted
+  # amd64 runner uses an amd64 container, the arm runner an arm64 one. A throwaway key signs it.
+  apt-repo:
+    name: APT repository (${{ matrix.arch }})
+    needs: package
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      HAVE_KEY: ${{ secrets.APT_SIGNING_KEY != '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: x86_64
+          - os: ubuntu-24.04-arm
+            arch: aarch64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install the repository tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends apt-utils gnupg gpgv xz-utils curl
+      # The two package artifacts (not the -debug ones, which are about 700 MB each).
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: capturemann-linux-x86_64
+          path: debs-and-tarballs
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: capturemann-linux-aarch64
+          path: debs-and-tarballs
+      - name: Keep only the .deb files
+        run: |
+          mkdir debs
+          find debs-and-tarballs -name '*.deb' -exec cp {} debs/ \;
+          ls -l debs; test "$(ls debs/*.deb | wc -l)" -eq 2
+      # pool layout (dists/ and pool/): install, upgrade, tamper check, remove, purge
+      - name: Install, upgrade, remove through the pool repository
+        run: packaging/linux/test-apt-repo.sh --runner docker --layout pool debs/*.deb
+      # flat layout (every file in one folder, for a release-asset host)
+      - name: Install, upgrade, remove through the flat repository
+        run: packaging/linux/test-apt-repo.sh --runner docker --layout flat debs/*.deb
+      # The repository the maintainer would publish, made only when the signing key is a repository secret
+      # (APT_SIGNING_KEY: the armored secret key, APT_SIGNING_PASSPHRASE: its passphrase). Without them this
+      # step is skipped. Kept as a workflow artifact for 14 days, never uploaded anywhere else.
+      - name: Build the signed repository (only with the real key as a secret)
+        if: ${{ matrix.arch == 'x86_64' && env.HAVE_KEY == 'true' }}
+        env:
+          CM_APT_GPG_PRIVATE_KEY: ${{ secrets.APT_SIGNING_KEY }}
+          CM_APT_GPG_PASSPHRASE: ${{ secrets.APT_SIGNING_PASSPHRASE }}
+        run: packaging/linux/make-apt-repo.sh --out apt-repo --url "${{ vars.APT_REPO_URL }}" debs/*.deb
+      - name: Keep the signed repository
+        if: ${{ matrix.arch == 'x86_64' && env.HAVE_KEY == 'true' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: capturemann-apt-repo
+          path: apt-repo
           if-no-files-found: error
           retention-days: 14
