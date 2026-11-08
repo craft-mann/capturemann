@@ -85,6 +85,24 @@ pub(crate) fn parse_rules(f: &Fields<'_>) -> Result<Action, CmError> {
 }
 
 fn preset_json(d: &PresetDef) -> Value {
+    let mut v = preset_fields(d);
+    // O10: on Linux an MP4 preset is H.264 only where the computer has a hardware H.264 encoder
+    // (VA-API); otherwise the export is VP9 video in the MP4 and its result says so.
+    if linux_h264_note_applies(std::env::consts::OS, d.kind.extension()) {
+        v["codec_note"] = json!(LINUX_H264_NOTE);
+    }
+    v
+}
+
+/// What an MP4 preset makes on Linux (EXP-2, O10).
+const LINUX_H264_NOTE: &str = "H.264 when this computer has a hardware H.264 encoder (VA-API); otherwise VP9 video in the MP4 (not H.264). The export result names the codec used and why.";
+
+/// Whether the Linux H.264 note belongs on a preset. Pure.
+fn linux_h264_note_applies(os: &str, extension: &str) -> bool {
+    os == "linux" && extension == "mp4"
+}
+
+fn preset_fields(d: &PresetDef) -> Value {
     json!({
         "id": d.id,
         "label": d.label,
@@ -301,6 +319,17 @@ mod tests {
         let v2 = cursor_json(&params(Some(6000), Some(8000), 4), &l);
         assert_eq!(v2["count"], 2);
         assert!(v2["next_from"].is_null());
+    }
+
+    /// EXP-2 on Linux (O10): only MP4 presets carry the H.264-or-VP9 note, and only on Linux.
+    #[test]
+    fn the_linux_h264_note_is_for_mp4_presets_on_linux_only() {
+        assert!(linux_h264_note_applies("linux", "mp4"));
+        assert!(!linux_h264_note_applies("linux", "webm"));
+        assert!(!linux_h264_note_applies("linux", "gif"));
+        assert!(!linux_h264_note_applies("macos", "mp4"));
+        assert!(!linux_h264_note_applies("windows", "mp4"));
+        assert!(LINUX_H264_NOTE.contains("VP9") && LINUX_H264_NOTE.contains("not H.264"));
     }
 
     #[test]

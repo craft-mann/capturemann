@@ -12,4 +12,4 @@ Categories=AudioVideo;Video;Recorder;
 Keywords=screenshot;screen recording;screencast;capture;webcam;
 StartupNotify=false
 StartupWMClass=dev.capturemann.app
-MimeType=video/mp4;video/quicktime;video/x-matroska;video/webm;audio/mp4;audio/x-m4a;audio/x-wav;audio/wav;audio/mpeg;
+MimeType=video/mp4;video/quicktime;video/x-m4v;video/x-matroska;video/webm;audio/mp4;audio/x-m4a;audio/x-wav;audio/wav;audio/mpeg;
