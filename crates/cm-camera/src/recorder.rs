@@ -458,7 +458,7 @@ fn build_details(
         "size": size,
         "fps": g.config.fps,
         "measured_fps": (measured_fps * 100.0).round() / 100.0,
-        "codec": "h264",
+        "codec": g.factory.codec(),
         "bitrate_bps": g.spec.map(|s| s.bitrate_bps),
         "b_frames": false,
         "resolution_setting": g.config.resolution.as_str(),

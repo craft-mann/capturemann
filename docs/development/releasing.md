@@ -217,7 +217,10 @@ Intel one: a `tar.gz` and a `.deb` per CPU, attached by hand to a pre-release. F
    (`sudo apt install ./capturemann_<version>_<arch>.deb`, which installs the libraries it needs) or the tarball plus
    the apt packages from `packaging/linux/README.md`, the local text model needs a model file the user downloads, and
    how to verify (`minisign -Vm <file> -P <public key>`, the key is on the release page).
-5. Not done for Linux: Flatpak, an AppImage, a package repository (apt/dnf), an RPM, and a Linux item in the website
+5. APT repository (0.3.0): build it from the two `.deb` artifacts with `packaging/linux/make-apt-repo.sh` and the repository key,
+   as described in [`linux-apt.md`](linux-apt.md) (the workflow job `apt-repo` has already proved install, upgrade and remove
+   with a throwaway key); `packaging/linux/check-package.sh` runs in the workflow on every tarball and `.deb`.
+6. Not done for Linux: Flatpak, an AppImage, a dnf repository, an RPM, and a Linux item in the website
    and Homebrew steps. Windows has no speaker engine yet.
 
 ## Windows (zip and installer)

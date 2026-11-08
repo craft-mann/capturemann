@@ -524,6 +524,35 @@ fn check_programs(ctx: &mut Ctx, dir: &Path, version_hint: Option<&str>) -> R {
     Ok(())
 }
 
+/// What `pkg.files` wants of a package, for an installed one: the licence and third-party licence documents
+/// in the documentation folder and the LGPL source offer next to the programs.
+fn check_package_documents(ctx: &mut Ctx, doc_dir: &Path, lib_dir: &Path) -> R {
+    let has = |dir: &Path, prefix: &str| {
+        std::fs::read_dir(dir).is_ok_and(|rd| {
+            rd.flatten().any(|e| {
+                e.file_name()
+                    .to_string_lossy()
+                    .to_lowercase()
+                    .starts_with(prefix)
+            })
+        })
+    };
+    let mut missing = Vec::new();
+    for prefix in ["license", "third_party_licenses"] {
+        if !has(doc_dir, prefix) {
+            missing.push(format!("no {prefix}* file in {}", doc_dir.display()));
+        }
+    }
+    for rel in ["FFmpeg/SOURCE-OFFER.txt", "FFmpeg/BUILD-INFO.txt"] {
+        if !lib_dir.join(rel).is_file() {
+            missing.push(format!("{rel} is missing in {}", lib_dir.display()));
+        }
+    }
+    ctx.note(format!("documents checked in {}", doc_dir.display()));
+    check!(missing.is_empty(), "{}", missing.join("; "));
+    Ok(())
+}
+
 fn deb_install(ctx: &mut Ctx) -> R {
     let deb = installer_file(ctx, &[".deb"])?;
     let r = runner();
@@ -595,6 +624,7 @@ fn deb_cycle(ctx: &mut Ctx, deb: &str, version: &str) -> R {
     );
     let dir = Path::new("/opt/capturemann/lib/capturemann");
     check_programs(ctx, dir, version.split(['-', '+']).next())?;
+    check_package_documents(ctx, Path::new("/usr/share/doc/capturemann"), dir)?;
     for f in [
         "/usr/bin/capturemann",
         "/usr/bin/cm-desktop",
@@ -677,6 +707,7 @@ fn tarball_install(ctx: &mut Ctx) -> R {
         check!(link.exists(), "{} is missing after install", link.display());
     }
     check_programs(ctx, &lib, None)?;
+    check_package_documents(ctx, &prefix.join("share/doc/capturemann"), &lib)?;
     check!(
         prefix
             .join("share/applications/dev.capturemann.app.desktop")

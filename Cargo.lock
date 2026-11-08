@@ -1339,6 +1339,7 @@ dependencies = [
  "cm-encode",
  "cm-platform",
  "dispatch2",
+ "libc",
  "objc2 0.6.5",
  "objc2-app-kit 0.3.2",
  "objc2-av-foundation",
@@ -1352,6 +1353,8 @@ dependencies = [
  "serde_json",
  "tempfile",
  "windows 0.61.3",
+ "zune-core",
+ "zune-jpeg",
 ]
 
 [[package]]
@@ -1436,6 +1439,7 @@ dependencies = [
  "sha2 0.10.9",
  "tempfile",
  "windows 0.61.3",
+ "x11rb",
 ]
 
 [[package]]
@@ -1622,6 +1626,7 @@ dependencies = [
  "cm-audio",
  "cm-core",
  "cm-cursor",
+ "cm-encode",
  "cm-platform",
  "cm-render",
  "hound",

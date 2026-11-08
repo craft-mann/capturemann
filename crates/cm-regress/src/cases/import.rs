@@ -188,6 +188,32 @@ fn rotated(ctx: &mut Ctx) -> R {
     Ok(())
 }
 
+/// IMP-2 under O10: the editing copy is H.264 everywhere; on Linux it may be software VP9 when the
+/// import result says so (`editing_copy` with `codec: vp9`, `software: true` and a note). An
+/// unlabelled VP9 copy, a result that disagrees with the file, or VP9 elsewhere is a failure. Pure.
+fn copy_codec_problem(os: &str, file_codec: &str, editing_copy: Option<&Value>) -> Option<String> {
+    if file_codec == "h264" {
+        return None;
+    }
+    if os != "linux" || file_codec != "vp9" {
+        return Some(format!("the editing copy is {file_codec} not h264"));
+    }
+    let Some(c) = editing_copy else {
+        return Some("the copy is VP9 but the import result has no editing_copy".to_owned());
+    };
+    let says_vp9 = c.get("codec").and_then(Value::as_str) == Some("vp9")
+        && c.get("software").and_then(Value::as_bool) == Some(true);
+    let noted = c
+        .get("note")
+        .and_then(Value::as_str)
+        .is_some_and(|n| n.contains("VP9"));
+    if says_vp9 && noted {
+        None
+    } else {
+        Some("the copy is VP9 but the import result does not label it".to_owned())
+    }
+}
+
 fn vfr(ctx: &mut Ctx) -> R {
     need_ffmpeg(ctx)?;
     let clips = write_clips(ctx)?;
@@ -204,11 +230,19 @@ fn vfr(ctx: &mut Ctx) -> R {
         "stored track: {} {}x{} r {:?} avg {:?} {:.2} s; prepared {prepared}",
         v.codec_name, v.width, v.height, v.r_frame_rate, v.avg_frame_rate, p.duration
     ));
-    check!(
-        v.codec_name == "h264",
-        "the editing copy is {} not h264",
-        v.codec_name
-    );
+    if let Some(problem) = copy_codec_problem(
+        sys::PLATFORM,
+        &v.codec_name,
+        job.pointer("/result/files/0/editing_copy"),
+    ) {
+        return fail(format!("the editing copy: {problem}"));
+    }
+    if let Some(n) = job
+        .pointer("/result/files/0/editing_copy/note")
+        .and_then(Value::as_str)
+    {
+        ctx.note(format!("editing copy note: {n}"));
+    }
     let (r, a) = (
         v.r_frame_rate.unwrap_or(0.0),
         v.avg_frame_rate.unwrap_or(0.0),
@@ -389,4 +423,33 @@ fn dry_run(ctx: &mut Ctx) -> R {
     let n = jobs["jobs"].as_array().map_or(0, Vec::len);
     check!(n == 0, "a dry run queued {n} import job(s)");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    /// IMP-2 under O10.
+    #[test]
+    fn linux_accepts_h264_or_a_labelled_vp9_copy() {
+        assert_eq!(copy_codec_problem("linux", "h264", None), None);
+        let label = json!({"codec": "vp9", "software": true,
+            "note": "The editing copy is software VP9: x."});
+        assert_eq!(copy_codec_problem("linux", "vp9", Some(&label)), None);
+        // Unlabelled, or no editing_copy at all: the product is not honest.
+        assert!(copy_codec_problem("linux", "vp9", None).is_some());
+        let silent = json!({"codec": "vp9", "software": true, "note": null});
+        assert!(copy_codec_problem("linux", "vp9", Some(&silent)).is_some());
+        let liar = json!({"codec": "h264", "software": false, "note": null});
+        assert!(copy_codec_problem("linux", "vp9", Some(&liar)).is_some());
+        // macOS and Windows never get VP9.
+        for os in ["macos", "windows"] {
+            assert!(
+                copy_codec_problem(os, "vp9", Some(&label)).is_some(),
+                "{os}"
+            );
+            assert_eq!(copy_codec_problem(os, "h264", None), None);
+        }
+    }
 }

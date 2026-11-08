@@ -4,4 +4,5 @@
 //! [`linux::RealLinuxEnv`] and the Windows backends needs its own system.
 
 pub mod linux;
+pub mod linux_camera;
 pub mod windows;

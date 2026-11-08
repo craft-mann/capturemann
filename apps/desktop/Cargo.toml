@@ -80,6 +80,8 @@ hound.workspace = true
 gpui = { package = "gpui-pre", version = "=0.3.9", features = ["test-support"] }
 # The fake Drive server for the connect-flow tests.
 cm-storage = { workspace = true, features = ["testing"] }
+# The scripted portal tests of platform_hotkeys run on every OS.
+futures-lite = "2"
 
 # Dock icon at run time (macOS only); versions already in the lockfile through tray-icon.
 # Windows clipboard (macOS writes the pasteboard itself, with a TIFF flavor).

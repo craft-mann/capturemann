@@ -573,6 +573,9 @@ msgstr ""
 msgid "Camera access is denied. Turn it on in {settings_path}, including Let desktop apps access your camera."
 msgstr ""
 
+msgid "Camera access is denied: add your user to the video group (sudo usermod -aG video $USER), then log in again. You can also record without the camera."
+msgstr ""
+
 msgid "Camera access is off. Turn it on in {settings_app}; you can also record without the camera."
 msgstr ""
 
@@ -2284,7 +2287,7 @@ msgid "Link copied to the clipboard"
 msgstr ""
 
 #. FACT: owner review required (the desktop portal asks, not CaptureMann)
-msgid "Linux does not ask per app. Your desktop asks when CaptureMann captures the screen, and the microphone is not gated by the system. Below is what this system can and cannot do for CaptureMann."
+msgid "Linux does not ask per app. Your desktop asks when CaptureMann captures the screen, and neither the microphone nor the camera is gated by the system (the camera only needs permission to open its device). Below is what this system can and cannot do for CaptureMann."
 msgstr ""
 
 msgid "List"
@@ -2758,6 +2761,9 @@ msgstr ""
 msgid "No hardware video encoder was found; recording will use a slower software encoder."
 msgstr ""
 
+msgid "No key assigned yet; choose one in your desktop’s keyboard settings"
+msgstr ""
+
 msgid "No limit"
 msgstr ""
 
@@ -2997,6 +3003,9 @@ msgid "On"
 msgstr ""
 
 msgid "On (always recorded)"
+msgstr ""
+
+msgid "On Linux the webcam bubble is hidden while recording, because the desktop cannot keep it out of the video. The webcam is still recorded as its own track and appears in the export."
 msgstr ""
 
 msgid "On the Overview page copy the “Application (client) ID” and paste it below."
@@ -4245,6 +4254,10 @@ msgstr ""
 
 #. FACT: owner review required (what the permission is for)
 msgid "Shows your webcam in the bubble and records it as its own track."
+msgstr ""
+
+#. FACT: owner review required (what the permission is for; Linux has no prompt)
+msgid "Shows your webcam in the bubble and records it as its own track. Linux has no camera prompt: if access is denied, add your user to the video group and log in again."
 msgstr ""
 
 msgid "Sign in again"

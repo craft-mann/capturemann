@@ -246,7 +246,14 @@ impl Default for PortalBackend {
 
 impl PortalBackend {
     pub fn new() -> Self {
-        Self::with_parts(Box::new(SystemPortal), Box::new(MutterMonitors))
+        // GNOME's picker saves the picture itself but answers the portal with "no file" (code 2):
+        // `ShellSavedFallback` picks that file up (see `shell_saved`).
+        Self::with_parts(
+            Box::new(super::shell_saved::ShellSavedFallback::new(Box::new(
+                SystemPortal,
+            ))),
+            Box::new(MutterMonitors),
+        )
     }
 
     /// A backend over another portal and monitor source (tests).

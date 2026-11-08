@@ -293,6 +293,45 @@ pub fn video_codec_at(
     fps: f64,
     target_bps: Option<u64>,
 ) -> VideoCodec {
+    video_codec_for(encoder, out_size, fps, target_bps, false)
+}
+
+/// Constant quantiser of VA-API H.264 when the driver offers no bit-rate mode (about the quality
+/// of `videotoolbox_bitrate`'s default for screen content).
+pub const VAAPI_CQP_QP: u32 = 23;
+
+/// [`video_codec_at`] for a driver that may offer constant quality only (`cqp`, Caps::vaapi_cqp):
+/// VA-API H.264 then gets `-rc_mode CQP -qp N` and no bit rate (a preset's bit rate or size limit
+/// cannot be honoured, the file is as large as the quality needs).
+pub fn video_codec_for(
+    encoder: Encoder,
+    out_size: (u32, u32),
+    fps: f64,
+    target_bps: Option<u64>,
+    cqp: bool,
+) -> VideoCodec {
+    if encoder == Encoder::Vaapi && cqp {
+        let gop = ((fps / 2.0).round() as u32).max(1);
+        let args = [
+            "-c:v",
+            "h264_vaapi",
+            "-profile:v",
+            "high",
+            "-rc_mode",
+            "CQP",
+            "-qp",
+            &VAAPI_CQP_QP.to_string(),
+            "-g",
+            &gop.to_string(),
+        ]
+        .map(String::from)
+        .to_vec();
+        return VideoCodec {
+            args,
+            bitrate: None,
+            gop,
+        };
+    }
     let gop = ((fps / 2.0).round() as u32).max(1);
     let mut bitrate = None;
     let bps = target_bps.unwrap_or_else(|| videotoolbox_bitrate(out_size, fps));
@@ -664,6 +703,26 @@ pub fn build(i: &BuildInput<'_>) -> Plan {
 
 #[cfg(test)]
 mod tests {
+    /// EXP-1 / EXP-2 on Intel iHD (CQP only): VA-API exports get constant quality, no bit rate.
+    #[test]
+    fn vaapi_export_args_follow_the_drivers_rate_mode() {
+        let q = video_codec_for(Encoder::Vaapi, (1920, 1080), 30.0, Some(8_000_000), true);
+        let j = q.args.join(" ");
+        assert!(
+            j.contains("-c:v h264_vaapi -profile:v high -rc_mode CQP -qp 23 -g 15"),
+            "{j}"
+        );
+        assert!(!j.contains("-b:v") && q.bitrate.is_none());
+        let b = video_codec_for(Encoder::Vaapi, (1920, 1080), 30.0, Some(8_000_000), false);
+        assert!(b.args.join(" ").contains("-b:v 8000000"));
+        assert_eq!(b.bitrate, Some(8_000_000));
+        // cqp changes nothing for the other encoders.
+        assert_eq!(
+            video_codec_for(Encoder::VideoToolbox, (1920, 1080), 30.0, None, true),
+            video_codec_at(Encoder::VideoToolbox, (1920, 1080), 30.0, None)
+        );
+    }
+
     use super::*;
     use crate::spec::fixtures::manifest;
     use crate::tools::caps_from_output;

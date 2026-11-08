@@ -185,11 +185,58 @@ impl ChimePlayer for PowerShellPlayer {
     }
 }
 
-/// The chime player of this system: `afplay` on macOS, PowerShell on Windows. Other systems get
-/// `afplay`, whose start failure the check reports as it does today.
+/// Plays the WAV with the first of several command line players that is installed. Each candidate
+/// is a program and the arguments that go before the path (no shell, the path is its own
+/// argument). A missing program moves on to the next; when none exists the error names them all,
+/// which is what the Webcam & audio check page shows.
+#[derive(Debug, Clone)]
+pub struct CommandPlayer {
+    candidates: Vec<(&'static str, &'static [&'static str])>,
+}
+
+impl CommandPlayer {
+    pub fn new(candidates: Vec<(&'static str, &'static [&'static str])>) -> Self {
+        Self { candidates }
+    }
+
+    /// The candidate program names in order.
+    pub fn names(&self) -> Vec<&'static str> {
+        self.candidates.iter().map(|(p, _)| *p).collect()
+    }
+}
+
+impl ChimePlayer for CommandPlayer {
+    fn play(&self, wav_path: &Path) -> Result<ChimeHandle, CmError> {
+        for (program, args) in &self.candidates {
+            match cm_platform::process::command(program)
+                .args(*args)
+                .arg(wav_path)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+            {
+                Ok(child) => return Ok(ChimeHandle::new(Box::new(AfplayProcess(child)))),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(e) => {
+                    return Err(CmError::internal(format!("cannot start {program}: {e}")));
+                }
+            }
+        }
+        Err(CmError::not_found(format!(
+            "No audio player was found (tried {}). Install pipewire-bin (pw-play), pulseaudio-utils (paplay) or alsa-utils (aplay).",
+            self.names().join(", ")
+        )))
+    }
+}
+
+/// The chime player of this system: `afplay` on macOS, PowerShell on Windows, and on Linux the
+/// first of `pw-play`, `paplay` and `aplay` that is installed.
 pub fn system_chime_player() -> Box<dyn ChimePlayer> {
     if cfg!(windows) {
         Box::new(PowerShellPlayer)
+    } else if let Some(p) = crate::sys::linux_pipewire::chime_player() {
+        Box::new(p)
     } else {
         Box::new(AfplayPlayer)
     }
@@ -469,6 +516,40 @@ mod tests {
     use super::*;
     use crate::fake::{FakeAudioSource, FakeConfig, FakeHandle, FakeSignal};
     use crate::source::AudioSource;
+
+    /// DEVICE-CHECK on Linux: no installed player is a named error, not a bare "not found".
+    #[test]
+    fn no_player_installed_names_every_candidate() {
+        let p = CommandPlayer::new(vec![
+            ("cm-no-such-player-a", &[]),
+            ("cm-no-such-player-b", &[]),
+        ]);
+        let e = p
+            .play(Path::new("/nonexistent.wav"))
+            .err()
+            .expect("an error");
+        assert_eq!(e.code(), cm_core::ErrorCode::NotFound);
+        let m = e.to_string();
+        assert!(
+            m.contains("cm-no-such-player-a") && m.contains("cm-no-such-player-b"),
+            "{m}"
+        );
+    }
+
+    /// A missing first choice moves on to the next installed one.
+    #[cfg(unix)]
+    #[test]
+    fn a_missing_player_falls_through_to_the_next() {
+        let p = CommandPlayer::new(vec![("cm-no-such-player", &[]), ("true", &[])]);
+        let mut h = p.play(Path::new("/nonexistent.wav")).expect("true starts");
+        h.kill();
+    }
+
+    #[test]
+    fn linux_order_is_pipewire_pulse_alsa() {
+        let names: Vec<_> = crate::sys::linux_pipewire::chime_player_for_order().names();
+        assert_eq!(names, ["pw-play", "paplay", "aplay"]);
+    }
 
     fn chime_test_cfg() -> ChimeConfig {
         ChimeConfig {

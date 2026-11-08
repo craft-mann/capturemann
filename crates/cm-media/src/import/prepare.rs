@@ -294,7 +294,7 @@ pub fn hardware_encoders(tools: &Tools) -> Result<(bool, bool), CmError> {
     let text = String::from_utf8_lossy(&out.stdout);
     let host = EncoderFamily::host();
     if host == EncoderFamily::Vaapi
-        && crate::tools::find_vaapi_device(Path::new("/dev/dri")).is_none()
+        && (!text.contains("h264_vaapi") || crate::tools::vaapi_probe(&tools.ffmpeg).is_none())
     {
         return Ok((false, false));
     }
@@ -307,21 +307,29 @@ pub fn hardware_encoders(tools: &Tools) -> Result<(bool, bool), CmError> {
 pub fn editing_copy_encoders(
     tools: &Tools,
     source_codec: &str,
-) -> Result<(Vec<CopyEncoder>, Option<String>), CmError> {
+) -> Result<(Vec<CopyEncoder>, Option<String>, bool), CmError> {
     let out = cm_platform::process::command(&tools.ffmpeg)
         .args(["-hide_banner", "-encoders"])
         .stdin(Stdio::null())
         .output()
         .map_err(|e| spawn_error(&tools.ffmpeg, &e))?;
     let text = String::from_utf8_lossy(&out.stdout);
-    let device = crate::tools::find_vaapi_device(Path::new("/dev/dri"));
+    // A render node counts only when a probe encode works on it (and says whether the driver
+    // takes constant quality only).
+    let probed = if EncoderFamily::host() == EncoderFamily::Vaapi && text.contains("h264_vaapi") {
+        crate::tools::vaapi_probe(&tools.ffmpeg)
+    } else {
+        None
+    };
+    let cqp = probed.as_ref().is_some_and(|p| p.1);
+    let device = probed.map(|p| p.0);
     let ladder = copy_ladder(
         EncoderFamily::host(),
         source_codec,
         &text,
         device.as_deref(),
     );
-    Ok((ladder, device))
+    Ok((ladder, device, cqp))
 }
 
 /// The encoder for the copy: HEVC for an HEVC source when the build has it, else H.264.
@@ -402,6 +410,7 @@ pub fn editing_copy_args(
     bitrate: u64,
     colour: Option<CopyColour>,
     vaapi_device: Option<&str>,
+    vaapi_cqp: bool,
 ) -> Vec<String> {
     let rate: f64 = match fps.split_once('/') {
         Some((n, d)) => n.parse::<f64>().unwrap_or(30.0) / d.parse::<f64>().unwrap_or(1.0),
@@ -449,8 +458,14 @@ pub fn editing_copy_args(
         ),
         "-c:v".to_owned(),
         encoder.to_owned(),
-        "-b:v".to_owned(),
-        bitrate.to_string(),
+    ]);
+    if family == EncoderFamily::Vaapi && vaapi_cqp {
+        // The driver has no bit-rate mode (Intel iHD): constant quality instead.
+        a.extend(["-rc_mode", "CQP", "-qp", "23"].map(String::from));
+    } else {
+        a.extend(["-b:v".to_owned(), bitrate.to_string()]);
+    }
+    a.extend([
         "-g".to_owned(),
         format!("{}", rate.round().max(1.0)),
         "-fps_mode".to_owned(),
@@ -507,7 +522,8 @@ pub fn make_editing_copy(
         .video
         .as_ref()
         .ok_or_else(|| RunFailure::Failed(CmError::invalid_input("the file has no video")))?;
-    let (ladder, device) = editing_copy_encoders(tools, &v.codec).map_err(RunFailure::Failed)?;
+    let (ladder, device, cqp) =
+        editing_copy_encoders(tools, &v.codec).map_err(RunFailure::Failed)?;
     if ladder.is_empty() {
         return Err(RunFailure::NoHardwareEncoder);
     }
@@ -533,6 +549,7 @@ pub fn make_editing_copy(
             editing_bitrate(v.width, v.height, rate),
             colour,
             device.as_deref(),
+            cqp,
         );
         let mut on = |p: Progress| progress(p.fraction);
         let r = run_ffmpeg(&tools.ffmpeg, &args, source.duration_s, &mut on, cancel);
@@ -872,6 +889,7 @@ mod tests {
             5_000_000,
             None,
             None,
+            false,
         );
         let s = a.join(" ");
         assert!(s.contains("-c:v h264_mf -b:v 5000000"), "{s}");
@@ -888,6 +906,7 @@ mod tests {
             1,
             None,
             None,
+            false,
         );
         assert!(!v.join(" ").contains("hw_encoding"));
         assert!(v.join(" ").contains("format=yuv420p"));
@@ -957,6 +976,7 @@ mod tests {
                 5_000_000,
                 Some(CopyColour { standard: std, vui }),
                 None,
+                false,
             )
             .join(" ")
         };
@@ -1015,6 +1035,7 @@ mod tests {
             9_000_000,
             None,
             None,
+            false,
         );
         let s = a.join(" ");
         assert!(s.contains("-map 0:2 -an -sn -dn"), "{s}");
@@ -1041,6 +1062,7 @@ mod tests {
             1,
             None,
             None,
+            false,
         );
         assert!(!h.join(" ").contains("hvc1"));
     }
@@ -1150,6 +1172,7 @@ mod tests {
             5_000_000,
             None,
             Some("/dev/dri/renderD129"),
+            false,
         );
         let s = a.join(" ");
         assert!(
@@ -1175,6 +1198,7 @@ mod tests {
             4_000_000,
             None,
             Some("/dev/dri/renderD128"),
+            false,
         );
         let s = a.join(" ");
         assert!(!s.contains("-vaapi_device"), "{s}");
@@ -1225,5 +1249,35 @@ mod tests {
         };
         let hw = EditingCopy::of(va, false);
         assert!(!hw.software && hw.codec == "h264" && hw.note.is_none());
+    }
+
+    /// IMP-2 on the T490 (Intel iHD offers CQP only): the VA-API copy gets constant quality and
+    /// no bit rate; a driver with a bit-rate mode keeps `-b:v`.
+    #[test]
+    fn the_vaapi_copy_uses_constant_quality_when_the_driver_has_no_bit_rate_mode() {
+        let run = |cqp: bool| {
+            editing_copy_args(
+                Path::new("a.mkv"),
+                Path::new("b.mp4"),
+                0,
+                EncoderFamily::Vaapi,
+                "h264_vaapi",
+                "30",
+                5_000_000,
+                None,
+                Some("/dev/dri/renderD128"),
+                cqp,
+            )
+            .join(" ")
+        };
+        let q = run(true);
+        assert!(
+            q.contains("-c:v h264_vaapi -rc_mode CQP -qp 23 -g 30"),
+            "{q}"
+        );
+        assert!(!q.contains("-b:v"), "{q}");
+        let b = run(false);
+        assert!(b.contains("-c:v h264_vaapi -b:v 5000000 -g 30"), "{b}");
+        assert!(!b.contains("CQP"), "{b}");
     }
 }

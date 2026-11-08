@@ -560,6 +560,30 @@ pub fn parse_coredump_list(text: &str, names: &[&str]) -> Vec<String> {
         .collect()
 }
 
+/// The graphics adapters from `lspci -mm -nn`: the VGA, display and 3D controllers as
+/// `<vendor> <device>`, joined with `; ` (empty when there are none). Used in the report header,
+/// which said "GPU: n/a" on Linux.
+pub fn parse_lspci_gpus(text: &str) -> String {
+    let mut out = Vec::new();
+    for l in text.lines() {
+        let q: Vec<&str> = l.split('"').collect();
+        // 00:02.0 "class [0300]" "vendor [8086]" "device [3ea0]" ...
+        let (Some(class), Some(vendor), Some(device)) = (q.get(1), q.get(3), q.get(5)) else {
+            continue;
+        };
+        let c = class.to_lowercase();
+        if !(c.contains("vga") || c.contains("display controller") || c.contains("3d controller")) {
+            continue;
+        }
+        let strip = |s: &str| match s.rfind(" [") {
+            Some(i) if s.ends_with(']') => s[..i].to_owned(),
+            _ => s.to_owned(),
+        };
+        out.push(format!("{} {}", strip(vendor), strip(device)));
+    }
+    out.join("; ")
+}
+
 /// Core dumps of the product's programs since `since` (a `coredumpctl --since` time such as `-30min` or
 /// `2026-11-06 10:00:00`). Empty when `coredumpctl` is missing or journald keeps no dumps.
 pub fn crashes_since(r: &dyn CommandRunner, since: &str) -> Vec<String> {
@@ -607,23 +631,33 @@ pub fn kill_tree(pid: u32) {
         .status();
 }
 
-/// Parses `ps -A -o pid=,comm=` (the name is the executable's file name, cut to 15 characters by the kernel).
-pub fn parse_ps(text: &str) -> Vec<(u32, String)> {
+/// Parses `ps -A -o pid=,stat=,comm=` and leaves out zombies (state `Z`): a process the case killed
+/// but whose parent has not waited for yet is not running, and must not count as a program left
+/// behind (0.2.9 report: `linux.desktop_stays_up`, `linux.second_launch`, `linux.tray_icon`).
+pub fn parse_ps_stat(text: &str) -> Vec<(u32, String)> {
     text.lines()
         .filter_map(|l| {
-            let l = l.trim();
-            let (pid, name) = l.split_once(' ')?;
-            let name = name.trim().rsplit('/').next()?.to_owned();
+            let mut it = l.split_whitespace();
+            let pid = it.next()?;
+            let stat = it.next()?;
+            if stat.starts_with('Z') {
+                return None;
+            }
+            let name = it.collect::<Vec<_>>().join(" ");
+            let name = name.rsplit('/').next()?.to_owned();
             Some((pid.parse().ok()?, name))
         })
         .collect()
 }
 
 pub fn list_processes() -> Vec<(u32, String)> {
-    let Ok(out) = Command::new("ps").args(["-A", "-o", "pid=,comm="]).output() else {
+    let Ok(out) = Command::new("ps")
+        .args(["-A", "-o", "pid=,stat=,comm="])
+        .output()
+    else {
         return Vec::new();
     };
-    parse_ps(&String::from_utf8_lossy(&out.stdout))
+    parse_ps_stat(&String::from_utf8_lossy(&out.stdout))
 }
 
 pub fn new_endpoint(dir: &std::path::Path, n: u32) -> String {
@@ -667,7 +701,27 @@ pub fn hold_file_open(path: &std::path::Path) -> Result<Box<dyn std::any::Any>, 
         .map_err(|e| e.to_string())
 }
 
-pub fn text_window_command(_path: &std::path::Path) -> Option<Command> {
+/// A small window that shows a text file and carries the file's stem in its title (the window cases look
+/// the window up by that title): `zenity --text-info` (Ubuntu desktop ships it), else `xmessage`.
+pub fn text_window_command(path: &std::path::Path) -> Option<Command> {
+    text_window_with(path, &SystemRunner::default())
+}
+
+pub fn text_window_with(path: &std::path::Path, r: &dyn CommandRunner) -> Option<Command> {
+    let stem = path.file_stem()?.to_string_lossy().into_owned();
+    if r.run("zenity", &["--version"]).is_some_and(|o| o.ok()) {
+        let mut c = Command::new("zenity");
+        c.arg("--text-info")
+            .arg(format!("--title={stem}"))
+            .arg(format!("--filename={}", path.display()))
+            .args(["--width=720", "--height=320"]);
+        return Some(c);
+    }
+    if r.run("xmessage", &["-version"]).is_some() {
+        let mut c = Command::new("xmessage");
+        c.args(["-title", &stem, "-file"]).arg(path);
+        return Some(c);
+    }
     None
 }
 
@@ -729,6 +783,21 @@ mod tests {
                 .find(|(n, _)| *n == k)
                 .map(|(_, v)| (*v).to_owned())
         }
+    }
+
+    #[test]
+    fn text_window_prefers_zenity_and_titles_it_with_the_file_stem() {
+        let r = Fake::new(&[("zenity --version", 0, "4.0.1\n")]);
+        let c = text_window_with(std::path::Path::new("/tmp/regress-window-7.txt"), &r).unwrap();
+        assert_eq!(c.get_program(), "zenity");
+        let args: Vec<_> = c
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect();
+        assert!(args.contains(&"--title=regress-window-7".to_owned()));
+        assert!(args.contains(&"--filename=/tmp/regress-window-7.txt".to_owned()));
+        let none = Fake::new(&[]);
+        assert!(text_window_with(std::path::Path::new("/tmp/a.txt"), &none).is_none());
     }
 
     #[test]
@@ -936,6 +1005,16 @@ mod tests {
     }
 
     #[test]
+    fn lspci_gpus_are_named_for_the_report_header() {
+        let t = "00:02.0 \"VGA compatible controller [0300]\" \"Intel Corporation [8086]\" \"WhiskeyLake-U GT2 [UHD Graphics 620] [3ea0]\" -r02 -p00 \"Lenovo [17aa]\" \"x [2279]\"\n3d:00.0 \"Non-Volatile memory controller [0108]\" \"Samsung [144d]\" \"SSD [a808]\"\n";
+        assert_eq!(
+            parse_lspci_gpus(t),
+            "Intel Corporation WhiskeyLake-U GT2 [UHD Graphics 620]"
+        );
+        assert_eq!(parse_lspci_gpus(""), "");
+    }
+
+    #[test]
     fn tray_items_are_parsed() {
         let t = "(<['org.kde.StatusNotifierItem-4242-1/StatusNotifierItem', ':1.55/org/ayatana/NotificationItem/x']>,)\n";
         let v = parse_tray_items(t);
@@ -948,12 +1027,19 @@ mod tests {
         assert!(tray_items(&Fake::new(&[])).is_err());
     }
 
+    /// A killed program that its parent has not reaped yet (state Z) is not "left running".
     #[test]
-    fn ps_lines_are_parsed() {
-        let p = parse_ps("    1 systemd\n 4242 cm-desktop\n 77 /usr/bin/x\nbad line\n");
-        assert_eq!(p[0], (1, "systemd".to_owned()));
-        assert_eq!(p[1], (4242, "cm-desktop".to_owned()));
-        assert_eq!(p[2], (77, "x".to_owned()));
-        assert_eq!(p.len(), 3);
+    fn zombies_are_not_running_programs() {
+        let p = parse_ps_stat(
+            "    1 Ss   systemd\n 4242 Z    cm-desktop\n 4300 Sl+  cm-desktop\n 77 R /usr/bin/x\n",
+        );
+        assert_eq!(
+            p,
+            vec![
+                (1, "systemd".to_owned()),
+                (4300, "cm-desktop".to_owned()),
+                (77, "x".to_owned())
+            ]
+        );
     }
 }

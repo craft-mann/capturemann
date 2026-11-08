@@ -8,7 +8,27 @@ mod imp;
 #[path = "windows.rs"]
 mod imp;
 
-#[cfg(not(any(target_os = "macos", windows)))]
+#[cfg(target_os = "linux")]
+mod imp {
+    use crate::recorder::CursorConfig;
+    use crate::schema::CursorStatus;
+    use crate::source::CursorSource;
+    use crate::sys::linux_x11::{preflight as x11_preflight, X11Source};
+
+    pub const CLOCK_NAME: &str = "session host clock (CLOCK_MONOTONIC) at event read";
+    pub const PLATFORM: &str = "linux-x11";
+
+    pub fn default_source(_config: &CursorConfig) -> Box<dyn CursorSource> {
+        Box::new(X11Source::default())
+    }
+
+    /// Full on an X11 session; on Wayland positions and clicks are unavailable (stated, not hidden).
+    pub fn preflight() -> CursorStatus {
+        x11_preflight()
+    }
+}
+
+#[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
 mod imp {
     use cm_core::CmError;
 

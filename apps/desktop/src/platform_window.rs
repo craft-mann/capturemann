@@ -14,6 +14,15 @@
 
 use gpui::{px, size, App, Bounds, TitlebarOptions, Window, WindowBounds, WindowOptions};
 
+/// Whether the live webcam bubble window stays on screen during a take. The camera is recorded as
+/// its own track and the bubble is composited at export (CAM-1.AC2), so a bubble that also lands in
+/// `screen.mp4` would show twice. Where the windows cannot be kept out of the capture (Linux: the
+/// desktop's share dialog records everything it shows), it is hidden while recording; the setup
+/// bubble before the take is unaffected.
+pub fn bubble_shown_while_recording() -> bool {
+    !cfg!(target_os = "linux")
+}
+
 /// The application id of every window: the Wayland `app_id` and the X11 `WM_CLASS`. It must be
 /// the name of the installed `.desktop` file (`dev.capturemann.app.desktop`) so GNOME and KDE
 /// match a window to its launcher entry and icon. Ignored by macOS and Windows.

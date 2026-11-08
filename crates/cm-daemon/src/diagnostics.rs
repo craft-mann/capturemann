@@ -176,17 +176,31 @@ pub fn system_lines(stack: Option<&cm_platform::stack::Report>) -> Vec<String> {
         "speech engine CPU features: {}",
         cm_ai::whisper::system_info().trim()
     ));
-    // Windows only (empty elsewhere): the OS build and the graphics adapters with their driver versions.
+    // Windows: the OS build and the graphics adapters with their driver versions. Linux: the OS release,
+    // the kernel and one line per DRM graphics device with its kernel driver. Empty on macOS.
     out.extend(cm_platform::sysinfo::lines());
     // Linux only (None elsewhere): the desktop stack the screenshot and recording paths depend on.
     if let Some(stack) = stack {
         out.extend(stack.fact_lines());
     }
-    out.push(match cm_auth::backend_from_env() {
-        cm_auth::Backend::Keyring => "secrets in the system credential store".to_owned(),
-        cm_auth::Backend::File(_) => "secrets in a file (owner-only, not encrypted)".to_owned(),
-    });
+    out.push(secrets_line(
+        matches!(cm_auth::backend_from_env(), cm_auth::Backend::File(_)),
+        stack.is_some_and(|s| s.has(cm_platform::stack::GapKind::NoSecretService)),
+    ));
     out
+}
+
+/// Where the secrets go. With no Secret Service running (Linux) the keyring is not usable, so
+/// the line says that instead of claiming the system credential store (STO-2..5).
+fn secrets_line(file_backend: bool, no_secret_service: bool) -> String {
+    if file_backend {
+        "secrets in a file (owner-only, not encrypted)".to_owned()
+    } else if no_secret_service {
+        "secrets: the system credential store is not available (no Secret Service is running)"
+            .to_owned()
+    } else {
+        "secrets in the system credential store".to_owned()
+    }
 }
 
 fn permission_lines() -> Vec<String> {
@@ -470,6 +484,23 @@ fn final_pass(s: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::secrets_line;
+
+    /// STO-2..5: no Secret Service means the line must not claim the system credential store.
+    #[test]
+    fn sto_secrets_line_is_honest_without_a_secret_service() {
+        assert_eq!(
+            secrets_line(false, false),
+            "secrets in the system credential store"
+        );
+        assert!(secrets_line(false, true).contains("not available"));
+        // The file backend does not need a Secret Service.
+        assert_eq!(
+            secrets_line(true, true),
+            "secrets in a file (owner-only, not encrypted)"
+        );
+    }
+
     #[test]
     fn a_missing_helper_says_where_it_looked_and_whether_the_build_ships_one() {
         let dir = Path::new("/app");

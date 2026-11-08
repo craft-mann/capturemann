@@ -42,6 +42,11 @@ impl CameraPermission {
             CameraPermission::Denied if cfg!(windows) => {
                 "Camera access is denied. Turn it on in Settings > Privacy & security > Camera, including Let desktop apps access your camera."
             }
+            CameraPermission::Denied
+                if cm_platform::vocab::Platform::current() == cm_platform::vocab::Platform::Linux =>
+            {
+                "Camera access is denied: your account cannot open the camera device (/dev/video*). Add your user to the video group (sudo usermod -aG video $USER), then log out and in again."
+            }
             CameraPermission::Denied => {
                 "Camera access is denied. Enable it in System Settings > Privacy & Security > Camera."
             }

@@ -1,6 +1,6 @@
 //! Facts about the machine the diagnostics report prints (DIAG-1): on Windows the OS edition and build
 //! and the graphics adapters with their driver versions, which decide whether the GPU compositor and the
-//! hardware video encoder work. Elsewhere [`lines`] is empty (macOS and Linux have their own probes in
+//! hardware video encoder work. Elsewhere [`lines`] is empty (macOS has its own probes in
 //! the report). The formatting is plain functions so it is tested on every system; only the reading of
 //! the registry and of DXGI is Windows code.
 
@@ -74,6 +74,55 @@ pub fn format_gpu(
     }
     out.push_str(&format!(", vendor id {vendor_id:#06x}"));
     out
+}
+
+/// Looks `vendor` and `device` (PCI ids) up in the text of a `pci.ids` file: the vendor's name and the
+/// device's name. A vendor line starts at column 0 (`8086  Intel Corporation`), its devices follow
+/// indented by one tab (`\t3ea0  WhiskeyLake-U GT2 [UHD Graphics 620]`); subdevice lines (two tabs) are
+/// ignored. Pure, so it is tested on every system.
+pub fn pci_names(pci_ids: &str, vendor: u16, device: u16) -> (Option<String>, Option<String>) {
+    let (v, d) = (format!("{vendor:04x}"), format!("{device:04x}"));
+    let mut vendor_name = None;
+    let mut in_vendor = false;
+    for line in pci_ids.lines() {
+        if line.starts_with('#') || line.trim().is_empty() {
+            continue;
+        }
+        if !line.starts_with('\t') {
+            in_vendor = line.get(..4).is_some_and(|id| id.eq_ignore_ascii_case(&v));
+            if in_vendor {
+                vendor_name = line.get(4..).map(|n| n.trim().to_owned());
+            } else if vendor_name.is_some() {
+                break;
+            }
+        } else if in_vendor && !line.starts_with("\t\t") {
+            let t = line.trim_start_matches('\t');
+            if t.get(..4).is_some_and(|id| id.eq_ignore_ascii_case(&d)) {
+                return (vendor_name, t.get(4..).map(|n| n.trim().to_owned()));
+            }
+        }
+    }
+    (vendor_name, None)
+}
+
+/// One DRM graphics device (Linux) as a report line: the names from `pci.ids` when found, else the
+/// ids, then the kernel driver (`i915`, `amdgpu`, `nvidia`, `nouveau`, `vmwgfx`...).
+pub fn format_drm_gpu(
+    vendor: u16,
+    device: u16,
+    vendor_name: Option<&str>,
+    device_name: Option<&str>,
+    driver: Option<&str>,
+) -> String {
+    let name = match (vendor_name, device_name) {
+        (Some(v), Some(d)) => format!("{} {}", v.trim(), d.trim()),
+        (Some(v), None) => format!("{} device {device:04x}", v.trim()),
+        _ => format!("PCI {vendor:04x}:{device:04x}"),
+    };
+    format!(
+        "GPU {name}, kernel driver {}, pci id {vendor:04x}:{device:04x}",
+        driver.unwrap_or("unknown")
+    )
 }
 
 /// The report lines this system adds to "System": OS build, then one line per graphics adapter.
@@ -208,7 +257,73 @@ mod sys {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
+mod sys {
+    use super::{format_drm_gpu, pci_names};
+
+    fn hex(path: &std::path::Path) -> Option<u16> {
+        let t = std::fs::read_to_string(path).ok()?;
+        u16::from_str_radix(t.trim().trim_start_matches("0x"), 16).ok()
+    }
+
+    fn pci_ids() -> String {
+        ["/usr/share/hwdata/pci.ids", "/usr/share/misc/pci.ids"]
+            .iter()
+            .find_map(|p| std::fs::read_to_string(p).ok())
+            .unwrap_or_default()
+    }
+
+    /// The OS release and one line per GPU the kernel exposes (`/sys/class/drm/card*`, render nodes
+    /// and connectors are skipped), each with its kernel driver.
+    pub fn lines() -> Vec<String> {
+        let mut out = Vec::new();
+        if let Ok(t) = std::fs::read_to_string("/etc/os-release") {
+            let pretty = t
+                .lines()
+                .find_map(|l| l.strip_prefix("PRETTY_NAME="))
+                .map(|v| v.trim_matches('"').to_owned());
+            if let Some(p) = pretty {
+                out.push(format!("OS {p}"));
+            }
+        }
+        if let Ok(k) = std::fs::read_to_string("/proc/sys/kernel/osrelease") {
+            out.push(format!("kernel {}", k.trim()));
+        }
+        let mut cards: Vec<_> = std::fs::read_dir("/sys/class/drm")
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| {
+                p.file_name().and_then(|n| n.to_str()).is_some_and(|n| {
+                    n.starts_with("card") && n[4..].bytes().all(|b| b.is_ascii_digit())
+                })
+            })
+            .collect();
+        cards.sort();
+        let ids = pci_ids();
+        for c in cards {
+            let dev = c.join("device");
+            let (Some(v), Some(d)) = (hex(&dev.join("vendor")), hex(&dev.join("device"))) else {
+                continue;
+            };
+            let driver = std::fs::read_link(dev.join("driver"))
+                .ok()
+                .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()));
+            let (vn, dn) = pci_names(&ids, v, d);
+            out.push(format_drm_gpu(
+                v,
+                d,
+                vn.as_deref(),
+                dn.as_deref(),
+                driver.as_deref(),
+            ));
+        }
+        out
+    }
+}
+
+#[cfg(not(any(windows, target_os = "linux")))]
 mod sys {
     pub fn lines() -> Vec<String> {
         Vec::new()
@@ -218,6 +333,33 @@ mod sys {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// DIAG-1: a GPU line on Linux names the device from `pci.ids` and the kernel driver.
+    #[test]
+    fn diag1_pci_ids_name_the_gpu() {
+        let ids = "# header\n8086  Intel Corporation\n\t3ea0  WhiskeyLake-U GT2 [UHD Graphics 620]\n\t\t1028 0000  sub\n10de  NVIDIA Corporation\n\t1c82  GP107 [GeForce GTX 1050 Ti]\n";
+        let (v, d) = pci_names(ids, 0x8086, 0x3ea0);
+        assert_eq!(v.as_deref(), Some("Intel Corporation"));
+        assert_eq!(d.as_deref(), Some("WhiskeyLake-U GT2 [UHD Graphics 620]"));
+        assert_eq!(
+            pci_names(ids, 0x10de, 0x1c82).1.as_deref(),
+            Some("GP107 [GeForce GTX 1050 Ti]")
+        );
+        // A known vendor with an unknown device, and an unknown vendor.
+        assert_eq!(
+            pci_names(ids, 0x8086, 0x9999),
+            (Some("Intel Corporation".into()), None)
+        );
+        assert_eq!(pci_names(ids, 0x1234, 0x1111), (None, None));
+        assert_eq!(
+            format_drm_gpu(0x8086, 0x3ea0, v.as_deref(), d.as_deref(), Some("i915")),
+            "GPU Intel Corporation WhiskeyLake-U GT2 [UHD Graphics 620], kernel driver i915, pci id 8086:3ea0"
+        );
+        assert_eq!(
+            format_drm_gpu(0x1234, 0x1111, None, None, None),
+            "GPU PCI 1234:1111, kernel driver unknown, pci id 1234:1111"
+        );
+    }
 
     #[test]
     fn windows_11_is_named_by_its_build_not_by_the_registry_product_name() {
@@ -264,8 +406,8 @@ mod tests {
     }
 
     #[test]
-    fn off_windows_the_system_adds_no_lines() {
-        if cfg!(not(windows)) {
+    fn on_macos_the_system_adds_no_lines() {
+        if cfg!(target_os = "macos") {
             assert!(lines().is_empty());
         }
     }

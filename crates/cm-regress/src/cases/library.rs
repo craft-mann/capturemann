@@ -6,7 +6,7 @@ use super::targets::open_text_window;
 use crate::check;
 use crate::ctx::Ctx;
 use crate::fixtures;
-use crate::model::{fail, skip, Case, Need, Tier, ALL, R, WIN};
+use crate::model::{fail, skip, Case, Need, Tier, ALL, R, WIN_LINUX};
 use crate::proc::exit_text;
 use serde_json::Value;
 
@@ -74,7 +74,7 @@ pub fn cases() -> Vec<Case> {
             specs: &["ANN-2", "RED-1"],
             tier: Tier::Standard,
             needs: &[Need::DesktopSession, Need::Screen],
-            platforms: WIN,
+            platforms: WIN_LINUX,
             timeout_s: 150,
             run: redact_window,
         },

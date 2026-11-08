@@ -71,5 +71,18 @@ W7. Plug it into a different USB port instead of the same one and note whether i
 Privacy: the camera light is on during this test and the picture is recorded; use a neutral scene and delete the
 recording afterwards.
 
+## Linux notes (0.3.0)
+Run the same steps in the logged-in desktop session (X11 or Wayland) of an Ubuntu PC; set `CM_LINUX_RECORDING=1` for the
+app or daemon while Linux recording is opt-in. Differences: cameras are the Video4Linux2 nodes `/dev/video*` that
+capture pictures (a UVC camera also has a metadata node, which is not listed); the id is the `/dev/v4l/by-id/...` link,
+so the same camera keeps its id in another USB port. There is no permission prompt: if the user cannot open the device
+(not in the `video` group, no desktop login), the Permissions page shows Camera as Denied and `list_devices` says so.
+A built-in camera cannot be unplugged; use a USB webcam for the unplug steps, or `sudo modprobe -r uvcvideo` and
+`sudo modprobe uvcvideo` (removes and restores every UVC camera). `camera.mp4` is software VP9 (decision O10: no
+software H.264 ships; a hardware H.264 path through VA-API is not wired for the camera yet): `ffprobe` shows `vp9`
+and the track details in `manifest.json` say `"codec": "vp9"`. The source reopens the same camera by itself after an
+unplug (steps W1 to W6 apply as written, with `modprobe` for W2/W3 on a built-in camera). Note the room light and
+`ffprobe -show_entries stream=nb_frames,r_frame_rate camera.mp4`.
+
 ## Pass criteria
-Steps 1 to 3, 6 and 8 as described. Steps 4, 5, 7 and 9 are reported as observed. On Windows also W1 to W6 (W7 as observed).
+Steps 1 to 3, 6 and 8 as described. Steps 4, 5, 7 and 9 are reported as observed. On Windows and Linux also W1 to W6 (W7 as observed).

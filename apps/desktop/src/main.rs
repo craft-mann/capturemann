@@ -628,6 +628,7 @@ fn main() {
             .detach();
         }
         app::start_agent_watch(&model, cx);
+        app::start_tray_recents_watch(&model, cx);
         app::start_studio_window_watch(&model, cx);
         app::start_capture_cloak_watch(&model, cx);
         // R1-6: bundles copied into the folder while the app was closed appear, deleted ones go.

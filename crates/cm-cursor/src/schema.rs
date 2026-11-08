@@ -67,6 +67,8 @@ pub enum MoveSource {
     EventTap,
     /// Windows low-level mouse hook, stamped at hook entry.
     Hook,
+    /// Linux X11: XInput2 raw motion and button events, stamped when read (about 2 ms).
+    Xi2Raw,
     /// Position polling at 120 Hz (permission fallback): stamped at poll time.
     Poll,
     /// Injected source (tests).
