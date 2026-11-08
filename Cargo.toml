@@ -103,5 +103,9 @@ debug = "line-tables-only"
 [profile.dev.package."*"]
 debug = false
 
+# MJPEG decoding of a webcam runs at about 4 fps in an unoptimised build otherwise.
+[profile.dev.package.zune-jpeg]
+opt-level = 3
+
 [profile.release]
 debug = 1
