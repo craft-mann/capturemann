@@ -19,6 +19,13 @@ const MS: i64 = 120; // ticks per millisecond
 const FPS: u32 = 30;
 
 fn tools() -> Option<Tools> {
+    if !cm_media::tools::EncoderPolicy::h264_list_available() {
+        eprintln!(
+            "SKIPPED: this test expects H.264 from the developer encoder list; on Linux set \
+             CM_EXPORT_ALLOW_GPL=1 (CI does). The Linux policy is covered by vp9_export.rs"
+        );
+        return None;
+    }
     match locate() {
         Ok(t) if t.ffprobe.is_some() => Some(t),
         _ => {

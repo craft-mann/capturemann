@@ -22,6 +22,13 @@ const SECS: u32 = 3;
 const RED: [u8; 3] = [0xdc, 0x1e, 0x1e];
 
 fn tools() -> Option<Tools> {
+    if !cm_media::tools::EncoderPolicy::h264_list_available() {
+        eprintln!(
+            "SKIPPED: this test expects H.264 from the developer encoder list; on Linux set \
+             CM_EXPORT_ALLOW_GPL=1 (CI does). The Linux policy is covered by vp9_export.rs"
+        );
+        return None;
+    }
     match locate() {
         Ok(t) if t.ffprobe.is_some() => {}
         _ => {
