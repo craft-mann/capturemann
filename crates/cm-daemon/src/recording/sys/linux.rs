@@ -56,7 +56,7 @@ pub const WAYLAND_WINDOW_MESSAGE: &str = "Recording one window is not available 
 /// A window or region where only the portal is available.
 pub const PORTAL_ONLY_MESSAGE: &str = "Recording a region or a window needs GNOME's screen-cast service, and this desktop only offers the portal's dialog. Record the whole screen; the desktop asks which one the first time.";
 /// The cursor sentence shown as a preflight warning and in `list_devices`.
-pub const CURSOR_NOTE: &str = "On Linux the pointer is part of the video; there is no separate cursor track (positions and clicks are not recorded) yet.";
+pub const CURSOR_NOTE: &str = "In a Wayland session the pointer is part of the video and there is no separate cursor track (positions and clicks are not recorded): the desktop does not let programs read the pointer. An X11 session records the track.";
 
 /// Everything the Linux sources need from the machine.
 pub trait LinuxEnv: Send + Sync + 'static {
@@ -86,6 +86,12 @@ pub trait LinuxEnv: Send + Sync + 'static {
     fn screen_track_for(&self, plan: CapturePlan, target: PwTarget) -> Box<dyn SessionTrack> {
         let _ = target;
         self.screen_track(plan)
+    }
+    /// The cursor telemetry track (REC-7) for `target`, if this session can record one: an X11
+    /// session can (XInput2), a Wayland session cannot.
+    fn cursor_track(&self, target: cm_cursor::CursorTarget) -> Option<Box<dyn SessionTrack>> {
+        let _ = target;
+        None
     }
     fn mic_factory(&self) -> AudioFactory;
     fn system_audio_factory(&self) -> AudioFactory;
@@ -164,6 +170,14 @@ impl LinuxEnv for RealLinuxEnv {
             cm_encode::FfmpegVp9Encoder::create,
             RecorderOptions::default(),
         ))
+    }
+
+    fn cursor_track(&self, target: cm_cursor::CursorTarget) -> Option<Box<dyn SessionTrack>> {
+        (self.display_session() == "x11").then(|| {
+            Box::new(crate::recording::tracks::CursorTrack::new(
+                cm_cursor::CursorRecorder::new(cm_cursor::CursorConfig::new(target)),
+            )) as Box<dyn SessionTrack>
+        })
     }
 
     fn mic_factory(&self) -> AudioFactory {
@@ -544,7 +558,7 @@ impl<E: LinuxEnv> SourceFactory for LinuxSources<E> {
                 });
             }
         }
-        if req.cursor {
+        if req.cursor && self.env.display_session() != "x11" {
             out.warnings.push(PreflightWarning {
                 track: Some("cursor".to_owned()),
                 code: "cursor_in_video".to_owned(),
@@ -620,15 +634,24 @@ impl<E: LinuxEnv> SourceFactory for LinuxSources<E> {
     fn build(&self, cx: &BuildContext<'_>) -> Result<Vec<Box<dyn SessionTrack>>, CmError> {
         let p = cx.params;
         let mut plan = cx.plan.clone();
-        // No cursor telemetry yet: the pointer stays in the picture even when a separate track
-        // was asked for (the preflight warned).
-        plan.show_cursor = true;
+        // Without a cursor track (Wayland) the pointer stays in the picture even when a separate
+        // track was asked for (the preflight warned). On X11 the user's choice stands.
+        let cursor = if p.cursor {
+            self.env
+                .cursor_track(super::windows::cursor_target(&plan, cx.targets))
+        } else {
+            None
+        };
+        if cursor.is_none() {
+            plan.show_cursor = true;
+        }
         let target = if self.env.gnome_screencast() {
             pw_target(&plan, cx.targets, self.env.display_session())?
         } else {
             PwTarget::Screen
         };
         let mut tracks = vec![self.env.screen_track_for(plan, target)];
+        tracks.extend(cursor);
         tracks.extend(self.mic_track(p));
         tracks.extend(self.system_track(p));
         if let Some(c) = &p.camera {
@@ -668,9 +691,13 @@ impl<E: LinuxEnv> SourceFactory for LinuxSources<E> {
             // The portal has no query: "authorized" once its restore token is stored.
             "screen_recording_permission": consent,
             "cursor": {
-                "clicks": false,
-                "mode": "embedded",
-                "note": CURSOR_NOTE,
+                "clicks": self.env.display_session() == "x11",
+                "mode": if self.env.display_session() == "x11" { "track" } else { "embedded" },
+                "note": if self.env.display_session() == "x11" {
+                    "The pointer is recorded as a separate track (positions, clicks, shapes)."
+                } else {
+                    CURSOR_NOTE
+                },
                 "missing_permission": Value::Null,
             },
         });

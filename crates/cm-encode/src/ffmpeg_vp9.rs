@@ -319,6 +319,10 @@ pub fn ffmpeg_args_for(
         "frag_keyframe+empty_moov+default_base_moof",
         "-frag_duration",
         "2000000",
+        // Every fragment reaches the file when it is complete, so a crash loses at most one
+        // (without it the muxer's output buffer holds back a quiet screen's fragments).
+        "-flush_packets",
+        "1",
     ]));
     a.push(cfg.path.to_string_lossy().into_owned());
     a

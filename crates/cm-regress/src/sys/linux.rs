@@ -122,15 +122,15 @@ pub fn session_kind(env: EnvLookup) -> Session {
     }
 }
 
-/// `CM_LINUX_RECORDING=1` (the same switch the app reads, `cm_platform::capability`) says the build under
-/// test records. Without it the recording cases report SKIP with this reason.
+/// `CM_LINUX_RECORDING=0` (the same switch the app reads, `cm_platform::capability`) says the build under
+/// test has recording switched off. Since 0.3.0 recording is on by default.
 pub fn recording_unavailable_with(env: EnvLookup) -> Option<String> {
     match env("CM_LINUX_RECORDING").as_deref().map(str::trim) {
-        Some("1") => None,
-        _ => Some(
-            "recording is hidden in the Linux build (set CM_LINUX_RECORDING=1 in the environment of the run to try it)"
+        Some("0") => Some(
+            "recording is switched off in this Linux build (CM_LINUX_RECORDING=0 in the environment of the run)"
                 .to_owned(),
         ),
+        _ => None,
     }
 }
 
@@ -824,12 +824,11 @@ mod tests {
     }
 
     #[test]
-    fn recording_needs_the_opt_in() {
+    fn recording_is_on_unless_switched_off() {
+        assert!(recording_unavailable_with(&env_of(&[])).is_none());
         assert!(recording_unavailable_with(&env_of(&[("CM_LINUX_RECORDING", "1")])).is_none());
-        assert!(recording_unavailable_with(&env_of(&[("CM_LINUX_RECORDING", " 1 ")])).is_none());
-        let why = recording_unavailable_with(&env_of(&[])).unwrap();
-        assert!(why.contains("CM_LINUX_RECORDING=1"));
-        assert!(recording_unavailable_with(&env_of(&[("CM_LINUX_RECORDING", "0")])).is_some());
+        let why = recording_unavailable_with(&env_of(&[("CM_LINUX_RECORDING", " 0 ")])).unwrap();
+        assert!(why.contains("CM_LINUX_RECORDING=0"));
     }
 
     #[test]

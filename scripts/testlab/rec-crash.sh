@@ -19,7 +19,7 @@ b=$(find "$RUN/lib" -name '*.cmrec' | tail -1)
 echo "before the kill:"; ls -la "$b"
 kill -9 "$(pgrep -x cm-daemon)"
 sleep 1
-pkill -x ffmpeg 2>/dev/null
+echo "after the kill, holders of the owner file:"; fuser -v "$b"/recording.owner 2>&1 | head -5; ps -eo pid,ppid,etimes,cmd | grep "[f]fmpeg" | head -3; [ "${KEEP_CHILD:-0}" = 1 ] || pkill -x ffmpeg
 "$BIN/cm-daemon" > "$RUN/daemon2.log" 2>&1 &
 sleep 6
 echo "after the restart:"; ls -la "$b"

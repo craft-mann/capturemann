@@ -8,7 +8,6 @@ secs="$1"; shift
 BIN="${BIN:-$HOME/wt/rec-target/debug}"
 RUN="${RUN:-$HOME/rec-t}"
 . "$HOME/lab/rec-env.sh"
-[ -f "$HOME/lab/session.env" ] && { set -a; . "$HOME/lab/session.env"; set +a; }
 export CAPTUREMANN_CONFIG_DIR="$RUN/config" CAPTUREMANN_LIBRARY="$RUN/lib" CAPTUREMANN_SOCKET="$RUN/sock"
 mkdir -p "$CAPTUREMANN_CONFIG_DIR"
 echo '{"agents.tool_policy":{"start_recording":"allow"}}' > "$CAPTUREMANN_CONFIG_DIR/settings.json"

@@ -8,7 +8,7 @@
 
 
 Written Oct 31, 2026. Scope of the early build (maintainer, Oct 31, 2026): screenshots, annotation, library, local AI,
-CLI and MCP. Recording is built as a prototype and hidden in the app (`CM_LINUX_RECORDING=1` turns it on). Everything
+CLI and MCP. Recording is on by default since 0.3.0 (`CM_LINUX_RECORDING=0` hides it in the app); the 0.2.x early build kept it hidden behind `CM_LINUX_RECORDING=1`. Everything
 below was tested in an aarch64 Ubuntu 24.04 VM (headless GNOME 46 Wayland, Xvfb + openbox for X11) or on CI; nothing
 has run on a real Linux desktop yet. Test lab for that: `scripts/testlab/` (ThinkPad T490, Intel UHD 620).
 
