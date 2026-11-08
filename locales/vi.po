@@ -2026,6 +2026,9 @@ msgstr "Một tệp MP4 chỉ gồm màn hình. Các bản ghi gốc được gi
 msgid "One MP4 with the screen. The original tracks are untouched. {captions}"
 msgstr "Một tệp MP4 chỉ gồm màn hình. Các bản ghi gốc được giữ nguyên. {captions}"
 
+msgid "The video is VP9, not H.264, because this computer has no usable hardware H.264 encoder."
+msgstr "Video là VP9, không phải H.264, vì máy tính này không có bộ mã hóa H.264 phần cứng dùng được."
+
 # FACT: owner review required
 msgid "Only you can watch it."
 msgstr "Chỉ mình bạn xem được."

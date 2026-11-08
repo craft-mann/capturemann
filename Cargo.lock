@@ -1626,6 +1626,7 @@ dependencies = [
  "cm-audio",
  "cm-core",
  "cm-cursor",
+ "cm-encode",
  "cm-platform",
  "cm-render",
  "hound",

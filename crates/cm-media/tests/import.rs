@@ -409,7 +409,7 @@ fn the_sound_is_decoded_to_a_48k_float_wav_and_verified() {
 fn an_editing_copy_is_constant_rate_upright_and_the_same_length() {
     let Some((m, tools)) = maker() else { return };
     match editing_copy_encoders(&tools, "h264") {
-        Ok((ladder, _)) if !ladder.is_empty() => {}
+        Ok((ladder, _, _)) if !ladder.is_empty() => {}
         _ => {
             eprintln!("SKIPPED: no hardware video encoder in this FFmpeg");
             return;

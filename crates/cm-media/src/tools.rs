@@ -228,6 +228,9 @@ pub struct Caps {
     pub vaapi_h264: bool,
     /// The VAAPI render node found on this machine (`/dev/dri/renderD128`), if any.
     pub vaapi_device: Option<String>,
+    /// The VA-API driver accepts constant quality only (`-rc_mode CQP -qp N`), no bit rate: Intel
+    /// UHD 620 with the iHD driver. Set by the probe encode in [`vaapi_probe`].
+    pub vaapi_cqp: bool,
     pub aac: bool,
     /// VP9 (`libvpx-vp9`, BSD) and Opus (`libopus`, BSD) for WebM (EXP-3).
     pub libvpx_vp9: bool,
@@ -293,6 +296,7 @@ pub fn caps_from_output(version_out: &str, encoders_out: &str) -> Caps {
         libx264: has("libx264"),
         vaapi_h264: has("h264_vaapi"),
         vaapi_device: None,
+        vaapi_cqp: false,
         aac: has("aac"),
         libvpx_vp9: has("libvpx-vp9"),
         libopus: has("libopus"),
@@ -349,7 +353,10 @@ pub fn probe_caps(tools: &Tools) -> Result<Caps, CmError> {
     let mut caps = caps_from_output(&version, &encoders);
     caps.h264_metadata = has_bitstream_filter(tools, "h264_metadata");
     if caps.vaapi_h264 {
-        caps.vaapi_device = find_vaapi_device(Path::new("/dev/dri"));
+        if let Some((device, cqp)) = vaapi_probe(&tools.ffmpeg) {
+            caps.vaapi_device = Some(device);
+            caps.vaapi_cqp = cqp;
+        }
     }
     Ok(caps)
 }
@@ -362,6 +369,20 @@ pub fn has_bitstream_filter(tools: &Tools, name: &str) -> bool {
 /// Pure part of [`has_bitstream_filter`]: the listing has one name per line.
 pub fn bsf_listed(listing: &str, name: &str) -> bool {
     listing.lines().any(|l| l.trim() == name)
+}
+
+/// The render node on which this FFmpeg really encodes H.264 through VA-API, and whether the
+/// driver takes constant quality only. One probe encode, shared with the recorder
+/// (`cm_encode::ffmpeg_vp9::choose_backend`), cached per FFmpeg for the life of the process.
+/// `None`: no node works (a VM, a missing driver) or `CM_VIDEO_ENCODER=vp9` asks for software.
+/// Listing `h264_vaapi` proves nothing: the T490's iHD driver lists it and refuses `-b:v`.
+pub fn vaapi_probe(ffmpeg: &Path) -> Option<(String, bool)> {
+    match cm_encode::ffmpeg_vp9::choose_backend(ffmpeg) {
+        cm_encode::ffmpeg_vp9::VideoBackend::VaapiH264 { device, cqp } => {
+            Some((device.to_string_lossy().into_owned(), cqp))
+        }
+        cm_encode::ffmpeg_vp9::VideoBackend::Vp9 => None,
+    }
 }
 
 /// The first DRM render node (`renderD128`, ...) in `dir`: what `-vaapi_device` needs. `None` when
