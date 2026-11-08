@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+"""Runs ON the lab laptop in a Wayland session: experiments for the Wayland window screenshot (0.3.0 task 4, screenshot side).
+
+  desk-wl-portal.py screenshot-interactive [--modal]   Screenshot portal with interactive=true: prints the response code and uri,
+                                                        and every new file in ~/Pictures/Screenshots
+  desk-wl-portal.py screenshot                          interactive=false (the whole screen) into <out>
+  desk-wl-portal.py screencast-window <out.png> [monitor|window]   ScreenCast portal with a window (or monitor) source, one frame
+Needs python3-dbus and python3-gi (Gst). The desktop's own dialogs are answered by a person or by desk-uinput.py.
+"""
+import os
+import sys
+import time
+
+import dbus
+import dbus.mainloop.glib
+import gi
+
+gi.require_version("Gst", "1.0")
+from gi.repository import GLib, Gst  # noqa: E402
+
+dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+bus = dbus.SessionBus()
+portal = bus.get_object("org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop")
+loop = GLib.MainLoop()
+sender = bus.get_unique_name()[1:].replace(".", "_")
+counter = [0]
+SHOTS = os.path.expanduser("~/Pictures/Screenshots")
+
+
+def token():
+    counter[0] += 1
+    return f"cmexp{os.getpid()}_{counter[0]}"
+
+
+def call(iface, method, *args, timeout_s=90):
+    """Calls a portal method that answers with a Request and waits for its Response: (code, results)."""
+    tok = token()
+    path = f"/org/freedesktop/portal/desktop/request/{sender}/{tok}"
+    got = {}
+
+    def on_response(code, results):
+        got["r"] = (int(code), results)
+        loop.quit()
+
+    bus.add_signal_receiver(on_response, signal_name="Response", dbus_interface="org.freedesktop.portal.Request", path=path)
+    opts = dict(args[-1])
+    opts["handle_token"] = tok
+    iface_obj = dbus.Interface(portal, iface)
+    getattr(iface_obj, method)(*args[:-1], dbus.Dictionary(opts, signature="sv"))
+    GLib.timeout_add_seconds(timeout_s, loop.quit)
+    loop.run()
+    return got.get("r", (None, {}))
+
+
+def shots():
+    try:
+        return set(os.listdir(SHOTS))
+    except OSError:
+        return set()
+
+
+def screenshot(interactive):
+    before = shots()
+    t = time.time()
+    code, res = call("org.freedesktop.portal.Screenshot", "Screenshot", "", {"interactive": dbus.Boolean(interactive), "modal": dbus.Boolean(False)})
+    print(f"Screenshot interactive={interactive}: response code {code} after {time.time() - t:.1f} s, results {dict(res)}")
+    new = sorted(shots() - before)
+    print("new files in ~/Pictures/Screenshots:", new)
+    return code, res, new
+
+
+def screencast(out, kind):
+    types = {"monitor": 1, "window": 2}[kind]
+    sess_tok = token()
+    code, res = call("org.freedesktop.portal.ScreenCast", "CreateSession", {"session_handle_token": sess_tok})
+    session = res.get("session_handle")
+    print("CreateSession:", code, session)
+    sc = dbus.Interface(portal, "org.freedesktop.portal.ScreenCast")
+    code, res = call("org.freedesktop.portal.ScreenCast", "SelectSources", session, {"types": dbus.UInt32(types), "multiple": False, "cursor_mode": dbus.UInt32(1)})
+    print("SelectSources:", code)
+    t = time.time()
+    code, res = call("org.freedesktop.portal.ScreenCast", "Start", session, "", {})
+    print(f"Start: code {code} after {time.time() - t:.1f} s")
+    streams = res.get("streams", [])
+    if code != 0 or not streams:
+        print("no stream:", dict(res))
+        return 1
+    node, props = int(streams[0][0]), dict(streams[0][1])
+    print("stream node", node, {k: (str(v) if not isinstance(v, (dbus.Array, dbus.Struct)) else [int(x) for x in v]) for k, v in props.items()})
+    fd = sc.OpenPipeWireRemote(session, dbus.Dictionary({}, signature="sv"))
+    fd = fd.take()
+    Gst.init(None)
+    import subprocess
+
+    base = out[:-4]
+    cmd = ["gst-launch-1.0", "-v", "pipewiresrc", f"fd={fd}", f"path={node}", "num-buffers=1", "!", "videoconvert", "!", "pngenc", "snapshot=true", "!", "multifilesink", f"location={base}.png"]
+    r = subprocess.run(cmd, pass_fds=(fd,), capture_output=True, text=True, timeout=25)
+    caps = sorted({l.split("caps = ")[1][:200] for l in r.stdout.splitlines() if "caps = " in l and "video/x-raw" in l})
+    print("gst exit", r.returncode, "caps seen:")
+    for c in caps:
+        print("  ", c)
+    print("stderr:", r.stderr[-300:])
+    dbus.Interface(bus.get_object("org.freedesktop.portal.Desktop", session), "org.freedesktop.portal.Session").Close()
+    print("frames:", sorted(f for f in os.listdir(os.path.dirname(out)) if f.startswith(os.path.basename(out)[:-4] + "-")))
+    return 0
+
+
+def main():
+    a = sys.argv[1:]
+    if a[0] == "screenshot-interactive":
+        screenshot(True)
+    elif a[0] == "screenshot":
+        screenshot(False)
+    elif a[0] == "screencast-window":
+        sys.exit(screencast(a[1], a[2] if len(a) > 2 else "window"))
+
+
+main()
