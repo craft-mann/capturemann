@@ -9,7 +9,8 @@
 //!   folder, mode 0600) makes later starts silent.
 //! * **Cursor**: no telemetry track. The pointer is part of the picture (cursor mode "embedded");
 //!   a request for a separate cursor track records the pointer in the picture anyway and says so.
-//! * **Camera**: `not_implemented`.
+//! * **Camera**: Video4Linux2 through `cm-camera`, recorded as software VP9 (the camera half is
+//!   in `linux_camera.rs`; this file only calls it).
 //!
 //! [`LinuxEnv`] is everything that touches the machine, so the logic here is tested on any system
 //! with a scripted environment (`tests/linux_recording.rs`).
@@ -20,6 +21,7 @@ use cm_audio::{
     AudioDevices, DeviceSelector, MicConfig, MicRecorder, SourceFactory as AudioFactory,
     SystemAudioConfig, SystemAudioRecorder,
 };
+use cm_camera::{CameraConfig, CameraInfo, CameraPermission, CameraRecorder};
 use cm_capture::record::pipewire::NOT_A_DISPLAY_MESSAGE;
 use cm_capture::record::pipewire::{FileTokenStore, PipeWireScreenSource, TokenStore};
 use cm_capture::record::{CapturePlan, RecorderOptions};
@@ -31,7 +33,9 @@ use crate::recording::params::ResolvedStart;
 use crate::recording::sources::{
     BuildContext, DeviceNames, Preflight, PreflightWarning, SensorRequest, SourceFactory,
 };
-use crate::recording::tracks::{MicTrack, ScreenTrack, SessionTrack, SystemAudioTrack};
+use crate::recording::tracks::{
+    CameraTrack, MicTrack, ScreenTrack, SessionTrack, SystemAudioTrack,
+};
 
 /// The id of the one display the portal's dialog stands for.
 pub const DESKTOP_DISPLAY_ID: u32 = 1;
@@ -39,8 +43,6 @@ pub const DESKTOP_DISPLAY_ID: u32 = 1;
 /// connects, `ScreenSource::prepare`).
 pub const HINT_SIZE: (u32, u32) = (1920, 1080);
 
-/// Message of the error for a camera request.
-pub const CAMERA_MESSAGE: &str = "Camera recording is not available on Linux yet.";
 /// What the screen track really is on Linux, shown as a preflight warning.
 pub const SOFTWARE_NOTE: &str = "On Linux the video is encoded in software as VP9 (expect more CPU use than a hardware encoder), at the size of the screen you pick in the desktop's share dialog; the size and codec shown above are the plan, the recording's details say what was written.";
 /// The cursor sentence shown as a preflight warning and in `list_devices`.
@@ -65,6 +67,20 @@ pub trait LinuxEnv: Send + Sync + 'static {
     fn mic_factory(&self) -> AudioFactory;
     fn system_audio_factory(&self) -> AudioFactory;
     fn audio_devices(&self) -> AudioDevices;
+    /// The cameras (`cm_camera::list_cameras`). The default is a machine without cameras, so
+    /// scripted environments never touch a device.
+    fn cameras(&self) -> Result<Vec<CameraInfo>, CmError> {
+        Ok(Vec::new())
+    }
+    /// Whether the user may open the camera devices.
+    fn camera_permission(&self) -> CameraPermission {
+        CameraPermission::Authorized
+    }
+    /// The camera track for `cfg`.
+    fn camera_track(&self, cfg: CameraConfig) -> Result<Box<dyn SessionTrack>, CmError> {
+        let _ = cfg;
+        Err(CmError::not_found("No camera was found."))
+    }
 }
 
 /// The machine this process runs on.
@@ -122,6 +138,18 @@ impl LinuxEnv for RealLinuxEnv {
 
     fn audio_devices(&self) -> AudioDevices {
         cm_audio::list_audio_devices()
+    }
+
+    fn cameras(&self) -> Result<Vec<CameraInfo>, CmError> {
+        cm_camera::list_cameras()
+    }
+
+    fn camera_permission(&self) -> CameraPermission {
+        cm_camera::check_camera_permission()
+    }
+
+    fn camera_track(&self, cfg: CameraConfig) -> Result<Box<dyn SessionTrack>, CmError> {
+        Ok(Box::new(CameraTrack::new(CameraRecorder::system(cfg))))
     }
 }
 
@@ -275,7 +303,7 @@ impl<E: LinuxEnv> LinuxSources<E> {
                     "unavailable without PipeWire"
                 }
             ),
-            "camera: not available on Linux yet".to_owned(),
+            super::linux_camera::report_line(&self.env.cameras(), self.env.camera_permission()),
             "cursor: part of the video (no separate track yet)".to_owned(),
         ];
         out.push(match self.env.ffmpeg() {
@@ -348,9 +376,11 @@ impl<E: LinuxEnv> SourceFactory for LinuxSources<E> {
         if req.system_audio && !self.env.pipewire_available() {
             out.errors.push(Self::pipewire_error("System audio"));
         }
-        if req.camera {
-            out.errors.push(CmError::not_implemented(CAMERA_MESSAGE));
-        }
+        out.errors.extend(super::linux_camera::preflight(
+            req,
+            &self.env.cameras(),
+            self.env.camera_permission(),
+        ));
         if !req.audio_only {
             // The start answer still describes the plan (a hint size and the plan's codec); the
             // truth is only known once the desktop's stream is connected.
@@ -415,14 +445,14 @@ impl<E: LinuxEnv> SourceFactory for LinuxSources<E> {
             Some(id) if !id.eq_ignore_ascii_case("default") => id.to_owned(),
             _ => "the default microphone".to_owned(),
         });
-        DeviceNames { mic, camera: None }
+        DeviceNames {
+            mic,
+            camera: super::linux_camera::device_name(req, &self.env.cameras()),
+        }
     }
 
     fn build(&self, cx: &BuildContext<'_>) -> Result<Vec<Box<dyn SessionTrack>>, CmError> {
         let p = cx.params;
-        if p.camera.is_some() {
-            return Err(CmError::not_implemented(CAMERA_MESSAGE));
-        }
         let mut plan = cx.plan.clone();
         // No cursor telemetry yet: the pointer stays in the picture even when a separate track
         // was asked for (the preflight warned).
@@ -430,6 +460,9 @@ impl<E: LinuxEnv> SourceFactory for LinuxSources<E> {
         let mut tracks = vec![self.env.screen_track(plan)];
         tracks.extend(self.mic_track(p));
         tracks.extend(self.system_track(p));
+        if let Some(c) = &p.camera {
+            tracks.push(self.env.camera_track(super::linux_camera::config(c))?);
+        }
         Ok(tracks)
     }
 
@@ -449,10 +482,8 @@ impl<E: LinuxEnv> SourceFactory for LinuxSources<E> {
         } else {
             "not_determined"
         };
-        json!({
+        let mut v = json!({
             "platform": "linux",
-            "cameras": [],
-            "cameras_error": CAMERA_MESSAGE,
             "mics": audio.mics,
             "mic_backend": if pw { "pipewire" } else { "none" },
             "microphone_permission": "authorized",
@@ -471,6 +502,13 @@ impl<E: LinuxEnv> SourceFactory for LinuxSources<E> {
                 "note": CURSOR_NOTE,
                 "missing_permission": Value::Null,
             },
-        })
+        });
+        if let Some(o) = v.as_object_mut() {
+            o.extend(
+                super::linux_camera::devices(self.env.cameras(), self.env.camera_permission())
+                    .map(|(k, val)| (k.to_owned(), val)),
+            );
+        }
+        v
     }
 }

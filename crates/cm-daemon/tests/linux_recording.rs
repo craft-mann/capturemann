@@ -48,6 +48,10 @@ struct FakeEnv {
     /// The size the stream reports (the monitor the dialog picked).
     stream: (u32, u32),
     plans: Arc<Mutex<Vec<CapturePlan>>>,
+    /// The cameras the machine has, whether the user may open them, and the configs asked for.
+    cameras: Vec<cm_camera::CameraInfo>,
+    camera_permission: cm_camera::CameraPermission,
+    camera_configs: Arc<Mutex<Vec<cm_camera::CameraConfig>>>,
 }
 
 impl FakeEnv {
@@ -66,6 +70,9 @@ impl FakeEnv {
             seen: Arc::default(),
             stream: (1280, 720),
             plans: Arc::default(),
+            cameras: Vec::new(),
+            camera_permission: cm_camera::CameraPermission::Authorized,
+            camera_configs: Arc::default(),
         }
     }
 
@@ -76,6 +83,24 @@ impl FakeEnv {
             .iter()
             .map(|s| s.lock().unwrap().clone().expect("open was called"))
             .collect()
+    }
+}
+
+fn test_camera() -> cm_camera::CameraInfo {
+    cm_camera::CameraInfo {
+        id: "/dev/v4l/by-id/usb-Test_Camera-video-index0".into(),
+        name: "Test Camera".into(),
+        kind: cm_camera::CameraKind::BuiltIn,
+        is_default: true,
+        max_size: [1280, 720],
+        max_fps: 30.0,
+        modes: vec![cm_camera::CameraMode {
+            width: 1280,
+            height: 720,
+            min_fps: 5.0,
+            max_fps: 30.0,
+        }],
+        in_use_elsewhere: false,
     }
 }
 
@@ -154,6 +179,36 @@ impl LinuxEnv for FakeEnv {
     }
     fn system_audio_factory(&self) -> AudioFactory {
         audio_factory(2, "pipewire:default-monitor")
+    }
+    fn cameras(&self) -> Result<Vec<cm_camera::CameraInfo>, cm_core::CmError> {
+        Ok(self.cameras.clone())
+    }
+    fn camera_permission(&self) -> cm_camera::CameraPermission {
+        self.camera_permission
+    }
+    fn camera_track(
+        &self,
+        cfg: cm_camera::CameraConfig,
+    ) -> Result<Box<dyn SessionTrack>, cm_core::CmError> {
+        self.camera_configs.lock().unwrap().push(cfg.clone());
+        let (src, h) = cm_camera::FakeCameraSource::new((1280, 720));
+        std::thread::spawn(move || {
+            while !h.is_open() {
+                std::thread::sleep(Duration::from_millis(2));
+            }
+            while h.is_open() {
+                let now = SystemHostClock.now_ns();
+                h.deliver(now, 1_000_000);
+                std::thread::sleep(Duration::from_millis(33));
+            }
+        });
+        Ok(Box::new(cm_daemon::recording::CameraTrack::new(
+            cm_camera::CameraRecorder::new(
+                cfg,
+                Box::new(src),
+                Arc::new(cm_camera::FakeWriterFactory::new()),
+            ),
+        )))
     }
     fn audio_devices(&self) -> AudioDevices {
         AudioDevices {
@@ -429,6 +484,7 @@ async fn missing_parts_and_unsupported_requests_answer_clearly() {
     assert_eq!(code(&e), ErrorCode::PlatformRejected, "{e:?}");
     assert!(!r.daemon.recording_active());
 
+    // A camera request on a machine without a camera, or without access to it, says so.
     let ok = rig(FakeEnv::healthy());
     let e = user(
         &ok.daemon,
@@ -437,8 +493,21 @@ async fn missing_parts_and_unsupported_requests_answer_clearly() {
     )
     .await
     .unwrap_err();
-    assert_eq!(code(&e), ErrorCode::NotImplemented, "{e:?}");
-    assert!(e.to_string().contains("Camera"), "{e}");
+    assert_eq!(code(&e), ErrorCode::NotFound, "{e:?}");
+    assert!(e.to_string().contains("camera"), "{e}");
+    let mut env = FakeEnv::healthy();
+    env.cameras = vec![test_camera()];
+    env.camera_permission = cm_camera::CameraPermission::Denied;
+    let denied = rig(env);
+    let e = user(
+        &denied.daemon,
+        "start_recording",
+        start_params(json!({ "camera": {} })),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(code(&e), ErrorCode::PermissionMissing, "{e:?}");
+    assert!(e.to_string().contains("Camera access is denied"), "{e}");
 
     for target in [
         json!({ "window_id": 10 }),
@@ -471,10 +540,8 @@ async fn list_devices_tells_the_truth_on_linux() {
     assert_eq!(v["mics"][0]["id"], "default");
     assert_eq!(v["system_audio"]["backend"], "pipewire_monitor");
     assert_eq!(v["cameras"], json!([]));
-    assert!(v["cameras_error"]
-        .as_str()
-        .unwrap()
-        .contains("not available"));
+    assert_eq!(v["cameras_error"], Value::Null);
+    assert_eq!(v["camera_permission"], "authorized");
     assert_eq!(v["cursor"]["mode"], "embedded");
 
     // The diagnostics report says the same in its Permissions section.
@@ -490,10 +557,7 @@ async fn list_devices_tells_the_truth_on_linux() {
     );
     assert!(lines.contains("consent not asked yet"), "{lines}");
     assert!(lines.contains("PipeWire running"), "{lines}");
-    assert!(
-        lines.contains("camera: not available on Linux yet"),
-        "{lines}"
-    );
+    assert!(lines.contains("camera: none found"), "{lines}");
     assert!(lines.contains("software VP9"), "{lines}");
 
     let mut env = FakeEnv::healthy();
@@ -518,4 +582,31 @@ async fn list_devices_tells_the_truth_on_linux() {
     );
     assert!(lines.contains("PipeWire not running"), "{lines}");
     assert!(lines.contains("ffmpeg not found"), "{lines}");
+}
+
+/// A camera on the machine is listed, named in the start answer and recorded with the settings the
+/// request carried (CAM-1, CAM-4).
+#[tokio::test(flavor = "multi_thread")]
+async fn a_camera_request_starts_the_camera_track() {
+    let mut env = FakeEnv::healthy();
+    env.cameras = vec![test_camera()];
+    let configs = env.camera_configs.clone();
+    let r = rig(env);
+    let v = user(&r.daemon, "list_devices", json!({})).await.unwrap();
+    assert_eq!(v["cameras"][0]["name"], "Test Camera", "{v}");
+    assert_eq!(v["cameras"][0]["kind"], "built_in");
+    let started = user(
+        &r.daemon,
+        "start_recording",
+        start_params(json!({ "camera": { "resolution": "720p", "mirror": false } })),
+    )
+    .await
+    .unwrap();
+    assert_eq!(started["tracks"], json!(["screen", "camera"]), "{started}");
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    user(&r.daemon, "stop_recording", json!({})).await.unwrap();
+    let c = configs.lock().unwrap();
+    assert_eq!(c.len(), 1);
+    assert_eq!(c[0].resolution, cm_camera::CameraResolution::P720);
+    assert!(!c[0].mirror);
 }
