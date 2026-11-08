@@ -1,6 +1,6 @@
 # Release 0.2.9 plan: bug fixes
 
-Status: **draft** (Nov 6, 2026), nothing built. Scope set by the maintainer on Nov 6, 2026: 0.2.9 is a **bug-fix release** whose main targets are **stabilization, security, regression testing and some UI/UX enhancements** (no new features).
+Status: **released Nov 8, 2026** (tag `v0.2.9`, `2a2911fc`; drafted Nov 6, 2026). Scope set by the maintainer on Nov 6, 2026: 0.2.9 is a **bug-fix release** whose main targets are **stabilization, security, regression testing and some UI/UX enhancements** (no new features).
 **0.2.9 ships on Windows and macOS** (maintainer, Nov 7, 2026: beta users next week) with the bug fixes, the security work, the regression suite and the UI/UX fixes.
 Linux moves to 0.3.0 with its features (a Linux-only release): the Linux driver and the Nov 6 to 7 Ubuntu reports stay as input (see "Linux, moved to 0.3.0")
 New Linux features and a Linux-only release are 0.3.0 (`release-0.3.0-plan.md`). More bugs will be added as the maintainer

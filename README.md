@@ -28,8 +28,7 @@ through MCP and a CLI.
   <img alt="The CaptureMann library: recordings, audio and screenshots in one place, with a record button, region, window and display capture, and the AI and agent pages in the sidebar" src="docs/images/library.webp" width="900">
 </p>
 
-> **Status: 0.2.8 is out for Windows only (published Nov 6, 2026); the macOS app stays at 0.2.7 and gets the shared
-> changes in 0.3.0. macOS 13+ (Apple Silicon and Intel) is the full app. Windows 11 (x64) is a supported release since
+> **Status: 0.2.9 is out for Windows and macOS (published Nov 8, 2026; 0.2.8 was Windows only). macOS 13+ (Apple Silicon and Intel) is the full app. Windows 11 (x64) is a supported release since
 > 0.2.8: it records the screen, microphone, system audio and camera, and has the editor, local AI, speaker labels and
 > Auto-redact. The files are not code-signed (SHA-256 files; a winget package is submitted, not yet accepted). Limits,
 > also in the release notes: Windows 10 not tested on a real device, only Windows 11 on one Intel laptop tested, NVIDIA
