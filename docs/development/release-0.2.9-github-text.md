@@ -3,9 +3,10 @@
 Prepared Nov 6, 2026 from `specs/plans/release-0.2.9-plan.md`, `git log v0.2.8..HEAD` and the 0.2.8 text
 (`release-0.2.8-github-text.md`). **Nothing here is final until the regression reports exist.** Every `<FILL: ...>` below is
 a placeholder to fill from a stored report in `verification/`; if there is no report for a line, delete the line or write
-"not run". Never write "passed" or "verified" without a report (CLAUDE.md wording rule). Today `verification/` holds only
-dry-run reports (macOS `--dev` standard run on 0.2.7), which are not release
-evidence for 0.2.9. Steps: `release-day-0.2.9.md`.
+"not run". Never write "passed" or "verified" without a report (CLAUDE.md wording rule). Updated Nov 8, 2026: the table
+below is filled from the reports in `verification/` (`L1-windows-0.2.9-*`, `L1-macos-0.2.9-*`, `VOC-1-soak-*`); what is still
+a `<FILL>` is a decision or a number that only exists on the release day (checksums, notarization, winget, the manual runs
+by the maintainer). Steps: `release-day-0.2.9.md`.
 
 - **Tag:** `v0.2.9` (never reuse a tag). **Title:** `CaptureMann 0.2.9: fixes on Windows and macOS`.
 - **Type:** draft, then **pre-release** (the version is 0.x). One tag, released when both platforms have a stored
@@ -22,8 +23,9 @@ evidence for 0.2.9. Steps: `release-day-0.2.9.md`.
 
 # CaptureMann 0.2.9: fixes on Windows and macOS
 
-0.2.9 is a bug-fix release. It fixes four problems reported on 0.2.8 and earlier, and it has **files for Windows 11 (x64)
-and macOS 13+ (Apple Silicon and Intel)**. No new features. **macOS users also get everything that came in 0.2.8** (see
+0.2.9 is a bug-fix release. It fixes five problems reported on 0.2.8 and earlier, polishes a few edges, and has **files for
+Windows 11 (x64) and macOS 13+ (Apple Silicon and Intel)**. The one addition: **you can drag the recording HUD to where you
+want it and collapse it** (see "Improved"). **macOS users also get everything that came in 0.2.8** (see
 "Also new for macOS" below), because 0.2.8 was Windows only. Linux stays at 0.2.6; the next Linux release is 0.3.0.
 
 ## Fixed
@@ -34,17 +36,35 @@ and macOS 13+ (Apple Silicon and Intel)**. No new features. **macOS users also g
 2. **Screenshot annotation editor, Vietnamese text.** Typing with Telex or VNI in the Text tool now reaches the annotation
    (the tool leaves composition to the system input method), and the text is drawn and exported with its accents.
    **New text** starts at size 24, in white, with no outline; change the colour and size in the panel as before. Existing
-   annotations are not changed. Tested on Windows and macOS input methods: <FILL: from the stored manual report for
-   `tests/manual/I18N-IME.md` and the ANN-1 steps; if none, write "tested with fakes only">.
+   annotations are not changed. Typing also keeps working after you change the colour or size with the text box open.
+   Typing through a real Telex or VNI input method has **not** been run by the test suite: the steps in
+   `tests/manual/ANN-1-IME.md` are a manual run by the maintainer: <FILL: result of the maintainer's run on Windows and
+   macOS, or "not run">. The Vietnamese glyphs of the bundled font are covered by a test.
 3. **The Models page no longer says "Mac" on Windows.** The one-line model descriptions were written for the Mac
    ("every Mac", "8 GB Macs") and were English-only. They are now neutral ("every computer", "8 GB of memory") and are
    translated, including Vietnamese. A test fails if a model description in the catalogues names a platform.
 4. **The Speakers tab** gives the speaker list the free height of the panel and scrolls when there are many speakers (before,
    about one and a half rows were visible on a laptop screen). The note "Voices are compared in memory only. No voiceprint is
    saved, and people are never recognised across recordings." moved to **Settings, Privacy**, as a fifth fact; nothing about
-   how voices are handled changed. At the smallest window (720 x 480) the panel scrolls as a whole and nothing is cut.
+   how voices are handled changed. At the smallest window (720 x 480) the panel scrolls as a whole and nothing is cut. With
+   one or two speakers the list is only as tall as its rows.
+5. **Play on Windows no longer passes the file name through `cmd`.** A capture whose title contained `&`, `^` or `%` could
+   make Windows run an extra command when you pressed Play. The file is now opened through File Explorer with the path
+   quoted. (A bug found in a review of the changes since 0.2.8; no report of it being used.)
 
-The Windows test job on CI is also faster; that is internal and changes nothing you download.
+## Improved
+
+- **Recording HUD: drag it, collapse it.** While recording (screen or audio) you can drag the HUD by its background, and a
+  new button collapses it to Stop, the timer and Pause (and the agent chip when an agent started the recording). The
+  position (per display) and the collapsed state are remembered; if the display is unplugged the HUD comes back to a
+  visible place. Agents cannot change this setting.
+- **Windows 11: the recording HUD no longer shows a grey frame** around its empty strip, and has no white line on its top edge.
+- **Thumbnails** of screenshots and recordings (library, published list, publish sheet, recording details, window picker)
+  follow the rounded corner of their frame; before, a cropped picture kept square corners that stuck out of the border.
+- **Notifications:** the coloured stripe on the left of a toast no longer sticks out of the card's rounded corners.
+
+The Windows test job on CI is also changed to run faster (it still takes about 48 minutes, against a 20 minute target); that
+is internal and changes nothing you download.
 
 ## Security
 
@@ -83,15 +103,29 @@ release notes and are unchanged here.
 **To be filled from the stored reports; delete a cell's claim if its report does not exist.** All runs are by an agent on
 one lab machine per platform unless a line says a person looked. A PARTIAL report is not "verified".
 
-| Platform | Package built from the tag (CI run, commit) | Smoke | Standard | Hardware | Report files |
+| Platform | Package (CI run, commit) | Smoke | Standard | Hardware | Report files |
 | --- | --- | --- | --- | --- | --- |
-| Windows 11 x64 (ThinkPad T490, Intel UHD 620) | <FILL: run id, commit> | <FILL: n of m> | <FILL: n of m> | <FILL: passed / failed / skipped, which cases skipped> | <FILL: `verification/L1-windows-0.2.9-regression-*`> |
-| macOS arm64 (the maintainer's Mac, `-dev` bundle for the runs) | <FILL> | <FILL> | <FILL> | <FILL: screen, microphone, system audio and camera run only with the maintainer's consent> | <FILL: `verification/L1-macos-0.2.9-regression-*`> |
-| macOS x86_64 (Intel) | <FILL: built and checked on Apple Silicon only> | not run on Intel hardware | not run | not run | none |
+| Windows 11 x64 (ThinkPad T490, Intel UHD 620) | installer from the Windows package run 42363837840, commit `ae61845f` (installed silently on the lab laptop) | 12 passed, 2 skipped | 49 passed, 7 skipped | 58 passed, **1 failed**, 18 skipped: `rec.camera` measured 10.1 fps in the evening (a low-light camera mode) and passed in daylight (9.9 s run, Nov 8); the full tier: 56 passed, 14 skipped | `verification/L1-windows-0.2.9-regression-{smoke,standard,hardware,full}-pkg-ae61845f-*`, `...-hardware-camera-again{1,2}-*` (the evening failures), `...-hardware-camera-day-*` |
+| macOS arm64 (the maintainer's Mac, Apple M4 Pro, macOS 26.6.2) | the notarized DMG built on the maintainer's Mac on Nov 8, 2026 after commit `53a3cb4e` (a local `make release`), app copied out of the DMG for the runs | 12 passed, 2 skipped | 44 passed, 12 skipped | 53 passed, 0 failed, 24 skipped (screen, microphone, system audio and camera ran with the maintainer's consent); the DMG install check passed | `verification/L1-macos-0.2.9-regression-{full-dmg,smoke-app,standard-app,hardware-app}-53a3cb4e-*` |
+| macOS x86_64 (Intel) | built and checked on Apple Silicon only | not run on Intel hardware | not run | not run | none |
+
+**One hour of audio recording** (the case for long meetings), one run per platform, mic only on the Mac, mic plus system audio
+on Windows, nobody speaking: 3602.6 s recorded on the Mac and 3601.6 s on Windows, no gaps, no resyncs, the app's memory
+stayed flat (Mac 113 to 135 MB; Windows 42 to 43 MB after the first minute) and it did not crash. **Disk use is large: about
+1.4 GB per hour on the Mac and 4.1 GB per hour on Windows** (raw mic, denoised mic and system audio are each stored as
+32-bit float). Reports: `verification/VOC-1-soak-macos-1h-*`, `VOC-1-soak-windows-1h-*`. The Mac run and the Windows run used
+the packages built before the HUD change.
+
+The macOS runs above are on the DMG built on the maintainer's Mac. The DMGs attached to this release are built again by the
+`Release` workflow from the tag: <FILL: result of the checks on the downloaded draft DMG (`releasing.md`), or "not rerun">.
 
 Bug fixes: Reveal (EXP-4.AC5) and the text defaults (ANN-1.AC7, AC8) have unit tests with fakes; the Speakers tab layout and
-the hint wording have layout and catalogue tests; the regress cases or stored manual steps for each: <FILL: report files, or
-"not run">. CI on the tag commit (`cargo test --workspace` on macOS and Windows): <FILL: link or "see Actions">.
+the hint wording have layout and catalogue tests; the HUD drag and collapse have tests for the positions and the stored
+state (REC-5.AC16, AC17). **The HUD, the thumbnails and the toast were seen by eye on the Windows laptop** (screenshots
+of the demo recording and toast; Nov 7, 2026, not stored in the repository). On the Mac the maintainer looked at the
+thumbnails and said the corners are right; the HUD on macOS has not been seen by eye (`tests/manual/HUD-1.md`:
+<FILL: result of the maintainer's run, or "not run">).
+CI on the tag commit (`cargo test --workspace` on macOS and Windows): <FILL: link or "see Actions">.
 
 ### Not run (same as 0.2.8 unless a report says otherwise)
 
@@ -99,8 +133,10 @@ the hint wording have layout and catalogue tests; the regress cases or stored ma
   (`tests/manual/DPI-WIN.md`); NVIDIA and AMD hardware encoders and drivers (only Intel UHD 620 was used); the Samsung
   monitor cases.
 - **macOS:** the Intel DMG on a real Intel Mac (no Intel Mac is available; the Intel crash of issue 16 is not confirmed
-  fixed on hardware); <FILL: any macOS case that stayed SKIP, for example `hud_click_through`, `recording_placement`,
-  `shot.window`, `redact.window_text`, `rec.each_monitor`>.
+  fixed on hardware); cases that were skipped: `shot.window`, `redact.window_text`, `rec.each_monitor`,
+  `desktop.hud_click_through`, `desktop.recording_placement`, `desktop.settings_applied` (not built for macOS), a second monitor
+  and a 4K external monitor, transcription and speaker steps (no models given to the run), and the long-recording soak case.
+- **Windows (also):** the same second-monitor, installer-silent, transcription and speaker cases were not run.
 - **All:** the invented outro-style sentence in transcripts of quiet stretches is still a known fault (no transcription
   mitigation in this release); playback follows the system's default output device.
 
@@ -140,6 +176,13 @@ versions).
   text starts at size 24, white, without an outline.
 - The Models page no longer says "Mac" on Windows; the model descriptions are neutral and translated.
 - The Speakers tab list scrolls and has a flexible height; the voiceprint note moved to Settings, Privacy.
+- Play on Windows opens the file through File Explorer with a quoted path (a capture title with `&`, `^` or `%` could make
+  Windows run an extra command).
+
+### Improved
+- Recording HUD: drag it by its background and collapse it; position and state are remembered.
+- Windows 11: no grey frame or white line around the recording HUD.
+- Thumbnails and notification stripes follow the rounded corners of their frame.
 
 ### Security
 - The PhoWhisper converter requirements (`packaging/phowhisper/requirements.txt`, used only by a maintainer script, not
