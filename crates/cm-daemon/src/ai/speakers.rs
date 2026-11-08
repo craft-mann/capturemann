@@ -23,6 +23,8 @@ pub(super) struct DiarizeHandler {
     pub(super) events: EventBus,
     pub(super) service: Arc<dyn SpeakerService>,
     pub(super) settings: Arc<dyn crate::engines::SettingsStore>,
+    /// The per-capture lock `rename_capture` takes: held while the result is written.
+    pub(super) capture_locks: Arc<crate::daemon::LockMap>,
 }
 
 fn count(inputs: &Value, key: &str) -> Option<u32> {
@@ -103,8 +105,11 @@ impl JobHandler for DiarizeHandler {
         };
         // Replace the stored result in one go, only now that the run finished. A new run is not
         // a user edit: no revision, and `set_extra` drops undo steps of the older run.
-        let (library, write_dir, stored) = (self.library.clone(), dir, done.clone());
+        // Asked for again: the title may have been edited (the folder renamed) while the run went on.
+        let _serial = self.capture_locks.lock(&capture_id).await;
+        let (library, cid, stored) = (self.library.clone(), capture_id.clone(), done.clone());
         blocking(move || {
+            let write_dir = super::current_bundle_dir(&library, &cid)?;
             spk::write_diarization(&write_dir, &stored.file)?;
             let changes = stored
                 .state()

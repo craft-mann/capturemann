@@ -221,6 +221,8 @@ pub(super) struct TranscribeHandler {
     pub(super) service: Arc<dyn TranscribeService>,
     pub(super) captions: Arc<dyn CaptionService>,
     pub(super) settings: Arc<dyn crate::engines::SettingsStore>,
+    /// The per-capture lock `rename_capture` takes: held while the result is written.
+    pub(super) capture_locks: Arc<crate::daemon::LockMap>,
 }
 
 /// `ai.languages` as the `language` of a run: codes joined by commas (`vi,en`), or `None` when it
@@ -375,7 +377,10 @@ impl JobHandler for TranscribeHandler {
             .and_then(Value::as_str)
             .and_then(|b| b.parse::<Actor>().ok())
             .unwrap_or(Actor::User);
-        let (library, write_dir) = (self.library.clone(), dir);
+        // The folder is asked for again here: the title may have been edited (the folder renamed) while the
+        // model ran. The capture lock keeps a rename from moving it during the write.
+        let _serial = self.capture_locks.lock(&capture_id).await;
+        let (library, cid) = (self.library.clone(), capture_id.clone());
         let (captions, new_transcript) = (self.captions.clone(), transcript.clone());
         // The new transcript replaces the old one in one rename, only now that the run finished:
         // a failed or cancelled run never reached this point, so the previous transcript is intact.
@@ -383,6 +388,7 @@ impl JobHandler for TranscribeHandler {
         // words were heard again (`cm_ai::reapply`, AI-6a) and dropped otherwise; either way the
         // caption change is ONE undoable revision (`undo` brings the old lines back).
         let (path, replaced, revision, shown, reapplied, dropped) = blocking(move || {
+            let write_dir = super::current_bundle_dir(&library, &cid)?;
             let old_transcript: Option<Transcript> =
                 std::fs::read_to_string(write_dir.join(TRANSCRIPT_FILE))
                     .ok()

@@ -35,6 +35,7 @@ impl Daemon {
                 service: inner.ai.transcribe.clone(),
                 captions: inner.ai.captions.clone(),
                 settings: inner.settings.clone(),
+                capture_locks: inner.capture_locks.clone(),
             }),
         )?;
         self.register_job_handler(
@@ -55,6 +56,7 @@ impl Daemon {
                 events: inner.events.clone(),
                 service: inner.ai.speakers.clone(),
                 settings: inner.settings.clone(),
+                capture_locks: inner.capture_locks.clone(),
             }),
         )?;
         self.register_job_handler(

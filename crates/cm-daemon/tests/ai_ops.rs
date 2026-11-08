@@ -237,6 +237,36 @@ async fn ai_1_transcribe_job_writes_transcript_json_and_publishes_ready() {
     assert!(e.to_string().contains("transcribe"));
 }
 
+/// AI-1: a rename while the transcript is being made does not lose it. Found on Nov 8, 2026: the title of
+/// a just-recorded meeting was edited while the model ran, the folder moved, and the finished job could not
+/// read the old path (`cannot read .../manifest.json`). The job writes into the folder as it is at the end.
+#[tokio::test]
+async fn ai_1_a_rename_during_the_transcription_does_not_lose_the_transcript() {
+    let r = rig(
+        FakeAi::new().with_small_installed().slow_downloads(4, 200),
+        Decision::Approve,
+    )
+    .await;
+    let started = user(&r, "transcribe", json!({})).await.unwrap();
+    tokio::time::sleep(Duration::from_millis(250)).await;
+    let renamed = user(
+        &r,
+        "rename_capture",
+        json!({"capture_id": r.id, "title": "Renamed while the model ran"}),
+    )
+    .await
+    .unwrap();
+    let new_dir = std::path::PathBuf::from(renamed["path"].as_str().unwrap());
+    assert_ne!(new_dir, r.dir, "the folder moved");
+    let job = job_done(&r, started["job_id"].as_str().unwrap()).await;
+    assert_eq!(job["state"], "done", "{job}");
+    assert!(
+        new_dir.join("transcript.json").is_file(),
+        "the transcript is in the renamed folder"
+    );
+    assert!(!r.dir.exists(), "nothing was written into the old folder");
+}
+
 /// AI-1: the recording's FIRST transcript switches the preview captions on and leaves the export
 /// default off, without an extra revision; `get_transcript` reports the switches.
 #[tokio::test]

@@ -143,6 +143,27 @@ pub fn is_ai_method(name: &str) -> bool {
     AI_METHODS.contains(&name)
 }
 
+/// The folder of capture `id` as it is now. Renaming a capture moves its folder, so a job that began
+/// earlier asks again before it writes instead of using the path it saw at the start (Nov 8, 2026: the
+/// title was edited while the model ran and the finished transcript could not be saved).
+pub(crate) fn current_bundle_dir(
+    library: &Arc<std::sync::Mutex<cm_library::Library>>,
+    id: &str,
+) -> Result<PathBuf, CmError> {
+    let dir = {
+        let lib = lock_library(library);
+        let r = lib.get(id)?;
+        lib.bundle_path(&r)
+    };
+    if !dir.is_dir() {
+        return Err(CmError::not_found(format!(
+            "The recording folder `{}` was moved or deleted",
+            dir.display()
+        )));
+    }
+    Ok(dir)
+}
+
 /// The recording's bundle folder and manifest; `invalid_input` for a screenshot.
 pub(crate) fn recording_bundle(
     library: &Arc<std::sync::Mutex<cm_library::Library>>,
