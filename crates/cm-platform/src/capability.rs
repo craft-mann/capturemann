@@ -21,9 +21,43 @@ fn supported_for(records: bool, linux: bool, linux_switch: Option<&str>) -> bool
     records || (linux && linux_switch.is_none_or(|v| v.trim() != "0"))
 }
 
+/// Whether this session records a separate cursor track (positions, clicks, scroll): every system except a
+/// Linux session that is not X11 (a Wayland desktop does not let programs read the pointer; the pointer stays
+/// in the video). Same rule as the Linux preflight of the recorder.
+pub fn records_cursor_track() -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        let get = |k: &str| std::env::var(k).ok();
+        linux_cursor_track(
+            get("XDG_SESSION_TYPE").as_deref(),
+            get("WAYLAND_DISPLAY").as_deref(),
+            get("DISPLAY").as_deref(),
+        )
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        true
+    }
+}
+
+/// The Linux rule of [`records_cursor_track`], from the session variables.
+#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
+pub fn linux_cursor_track(
+    xdg_session_type: Option<&str>,
+    wayland_display: Option<&str>,
+    display: Option<&str>,
+) -> bool {
+    let set = |v: Option<&str>| v.is_some_and(|s| !s.is_empty());
+    match xdg_session_type {
+        Some("x11") => true,
+        Some("wayland") => false,
+        _ => !set(wayland_display) && set(display),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::supported_for;
+    use super::{linux_cursor_track, supported_for};
 
     #[test]
     fn macos_windows_and_linux_record_and_linux_can_opt_out() {
@@ -33,5 +67,19 @@ mod tests {
         assert!(!supported_for(false, true, Some("0")));
         assert!(!supported_for(false, true, Some(" 0 ")));
         assert!(!supported_for(false, false, Some("1")));
+    }
+
+    #[test]
+    fn only_an_x11_session_records_a_cursor_track() {
+        assert!(linux_cursor_track(Some("x11"), None, Some(":0")));
+        assert!(!linux_cursor_track(
+            Some("wayland"),
+            Some("wayland-0"),
+            Some(":0")
+        ));
+        // No XDG_SESSION_TYPE: Wayland wins when both displays are set, as in the recorder.
+        assert!(!linux_cursor_track(None, Some("wayland-0"), Some(":0")));
+        assert!(linux_cursor_track(None, None, Some(":0")));
+        assert!(!linux_cursor_track(None, None, None));
     }
 }

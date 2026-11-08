@@ -13,7 +13,7 @@ run have an outcome. Nothing was pushed, tagged, signed or uploaded. What is mis
 
 ## What is done and merged
 
-Final `main` head: see `git log -1` (code frozen at `5301d4b8`; later commits are documents, `cm-regress` cases and reports only).
+Final `main` head: see `git log -1`. Code frozen at `5301d4b8` (the packages are built from it); later commits are documents, `cm-regress` cases, tests and reports, plus one behaviour-neutral move: the cursor-track rule (`records_cursor_track`) went from `cm-daemon` to `cm-platform::capability` because `check_target_os.py` (CI job `docs`) failed on it; the packages therefore differ from `main` by that move only.
 175 commits and 40 merges since `2a2911fc` (0.2.9).
 
 | Track | Result (branch merged) |
