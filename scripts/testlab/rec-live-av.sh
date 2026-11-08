@@ -27,7 +27,8 @@ rm -rf "$RUN/lib"
 pkill -x cm-daemon 2>/dev/null; sleep 0.5
 "$BIN/cm-daemon" > "$RUN/daemon.log" 2>&1 &
 sleep 2
-ffplay -v quiet -x 1700 -y 950 -left 100 -top 60 -noborder -autoexit -loop 0 "$clip" > /dev/null 2>&1 &
+noaudio=""; [ "${SILENT:-0}" = 1 ] && noaudio="-an"   # quiet hours: a flash with no sound
+ffplay -v quiet $noaudio -x 1700 -y 950 -left 100 -top 60 -noborder -autoexit -loop 0 "$clip" > /dev/null 2>&1 &
 fp=$!
 sleep 3
 "$BIN/capturemann" record start --json --size 720p --countdown 0 --mic default --system-audio "$@" > "$RUN/start.json" 2>&1
