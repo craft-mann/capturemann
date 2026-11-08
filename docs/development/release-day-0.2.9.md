@@ -15,8 +15,10 @@ has a stored regression run on its final files** (decision of Nov 6, 2026; Linux
    leave it open; only the maintainer can dismiss. The text's Security paragraph has a `<FILL>` for the alert state.
 3. **[M]** Is the macOS build notarized? If the five signing secrets are not set, `release.yml` makes an ad hoc DMG and the
    notes must say "not notarized" (`releasing.md`, "GitHub secrets").
-4. **[M]** winget: a 0.2.9 update to the existing package (pull request to `microsoft/winget-pkgs`; 472327 was the 0.2.8 first
-   submission, check its state) or wait. Same for the Homebrew tap.
+4. **[M]** winget (decided Nov 8, 2026): 0.2.9 ships **without** winget. The 0.2.8 package (pull request 472327) is still waiting
+   for a moderator. Say so with a clear version in three places: the 0.2.9 release body (done in the draft text), the 0.2.8
+   release notes and the website; ready-to-paste wording is in `release-0.2.9-winget-note.md`. A 0.2.9 update pull request
+   comes after 472327 is accepted (step 7 then applies).
 5. No Intel Mac is available (plan decision): the Intel DMG is checked on Apple Silicon only and the text says so.
 
 ## 1. Version bump (done, one commit)

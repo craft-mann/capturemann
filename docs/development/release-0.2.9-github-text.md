@@ -144,7 +144,10 @@ CI on the tag commit (`cargo test --workspace` on macOS and Windows): <FILL: lin
 
 - **Windows 11, x64:** installer `capturemann-0.2.9-windows-x64-setup.exe` (per user, no administrator rights) or the zip
   `capturemann-0.2.9-windows-x64.zip` (unpack anywhere, run `cm-desktop.exe`; `capturemann.exe` is the command line).
-  winget: `winget upgrade CaptureMann.CaptureMann` <FILL: only once the winget package is accepted; pull request `<URL>`>.
+  **winget:** 0.2.9 is **not** in winget. The package `CaptureMann.CaptureMann` was submitted for **0.2.8** (pull request
+  <https://github.com/microsoft/winget-pkgs/pull/472327>, waiting for a moderator); if it is accepted, `winget install
+  CaptureMann.CaptureMann` gives 0.2.8, not 0.2.9. Use the installer or the zip above for 0.2.9. A 0.2.9 winget update comes
+  after the first package is accepted.
   The files are **not code-signed**; a browser download may show a SmartScreen warning (More info, then Run anyway).
   SHA-256: installer `<FILL>`, zip `<FILL>`. Check with `certutil -hashfile <file> SHA256`.
 - **macOS 13+:** `CaptureMann-v0.2.9-macos-arm64.dmg` (Apple Silicon) or `CaptureMann-v0.2.9-macos-x86_64.dmg` (Intel);
