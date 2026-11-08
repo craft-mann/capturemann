@@ -78,9 +78,7 @@ pub fn prefer_pipewire_mic(fallback: SourceFactory) -> SourceFactory {
     }
 }
 
-/// The one microphone entry `list_devices` shows when PipeWire serves the audio: the default
-/// source. Picking another input is done in the desktop's sound settings (PipeWire's own default),
-/// the same way the recording follows it.
+/// The "Default microphone" entry used when the registry cannot be read.
 pub fn default_mic_device() -> crate::MicDevice {
     crate::MicDevice {
         id: "default".into(),
@@ -94,6 +92,61 @@ pub fn default_mic_device() -> crate::MicDevice {
             max: STREAM_RATE,
         }],
     }
+}
+
+/// The microphones `list_devices` shows when PipeWire serves the audio: every source node of the
+/// registry (AUD-1), the default marked. The id is the node name, which the recording passes to
+/// PipeWire as `target.object`. When the registry cannot be read (no `pw-dump`), the one default
+/// entry.
+pub fn mic_devices() -> Vec<crate::MicDevice> {
+    match super::pw_registry::query() {
+        Ok(reg) => {
+            let devices = mic_devices_from(&reg);
+            if devices.is_empty() {
+                vec![default_mic_device()]
+            } else {
+                devices
+            }
+        }
+        Err(_) => vec![default_mic_device()],
+    }
+}
+
+/// [`mic_devices`] for a registry already read.
+pub fn mic_devices_from(reg: &super::pw_registry::Registry) -> Vec<crate::MicDevice> {
+    reg.sources()
+        .map(|n| crate::MicDevice {
+            id: n.name.clone(),
+            name: n.description.clone(),
+            default: reg.default_source.as_deref() == Some(n.name.as_str()),
+            // The stream asks PipeWire for one channel; the device may have more.
+            channels: 1,
+            sample_rate: STREAM_RATE,
+            max_channels: n.channels.max(1),
+            sample_rate_ranges: vec![crate::RateRange {
+                min: STREAM_RATE,
+                max: STREAM_RATE,
+            }],
+        })
+        .collect()
+}
+
+/// The Linux test-sound player (NEW-C): `pw-play` (PipeWire), then `paplay` (PulseAudio's tools,
+/// also served by pipewire-pulse), then `aplay -q` (ALSA). `None` off Linux.
+#[cfg(target_os = "linux")]
+pub fn chime_player() -> Option<crate::chime::CommandPlayer> {
+    Some(chime_player_for_order())
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn chime_player() -> Option<crate::chime::CommandPlayer> {
+    None
+}
+
+/// The candidates in order of preference.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+pub fn chime_player_for_order() -> crate::chime::CommandPlayer {
+    crate::chime::CommandPlayer::new(vec![("pw-play", &[]), ("paplay", &[]), ("aplay", &["-q"])])
 }
 
 /// Is PipeWire usable here? (Linux with a reachable daemon.)
@@ -172,6 +225,8 @@ mod imp {
             },
             stop: Arc::new(AtomicBool::new(false)),
             thread: None,
+            default_seen: None,
+            last_check: std::time::Instant::now(),
         }))
     }
 
@@ -182,6 +237,19 @@ mod imp {
         format: SourceFormat,
         stop: Arc<AtomicBool>,
         thread: Option<JoinHandle<()>>,
+        /// The default device name when the stream started (only followed for `Default`).
+        default_seen: Option<String>,
+        last_check: std::time::Instant,
+    }
+
+    impl PipeWireAudioSource {
+        fn default_key(&self) -> &'static str {
+            if self.monitor {
+                "default.audio.sink"
+            } else {
+                "default.audio.source"
+            }
+        }
     }
 
     fn run_loop(
@@ -334,6 +402,8 @@ mod imp {
 
         fn start(&mut self, sink: SourceSink) -> Result<(), CmError> {
             self.stop.store(false, Ordering::Relaxed);
+            self.default_seen = crate::sys::pw_registry::default_name(self.default_key());
+            self.last_check = std::time::Instant::now();
             let (tx, rx) = channel();
             let (monitor, target, channels) =
                 (self.monitor, self.target.clone(), self.format.channels);
@@ -360,6 +430,21 @@ mod imp {
                     self.stop();
                     Err(CmError::internal("the PipeWire audio thread ended early"))
                 }
+            }
+        }
+
+        /// AUD-1: a recording on the default device follows a changed default. WirePlumber
+        /// re-links the stream by itself, but with a new format and a gap; reopening keeps the
+        /// track's bookkeeping honest. Looked at every 2 s (a short `pw-metadata` run).
+        fn needs_reopen(&mut self) -> bool {
+            if self.target.is_some() || self.last_check.elapsed() < Duration::from_secs(2) {
+                return false;
+            }
+            self.last_check = std::time::Instant::now();
+            let now = crate::sys::pw_registry::default_name(self.default_key());
+            match (&self.default_seen, now) {
+                (Some(seen), Some(now)) => *seen != now,
+                _ => false,
             }
         }
 
@@ -416,6 +501,34 @@ mod tests {
         assert_eq!(graph_start_ns(5_000_000_000, 96_000, 1, 48_000), None);
         // Early in the clock the stamp cannot go below zero.
         assert_eq!(graph_start_ns(1_000, 480, 1, 48_000), Some(0));
+    }
+
+    #[test]
+    fn the_registry_becomes_the_picker_list_with_the_default_marked() {
+        use crate::sys::pw_registry::{PwNode, Registry};
+        let node = |id, name: &str, ch| PwNode {
+            id,
+            name: name.into(),
+            description: format!("{name} (desc)"),
+            class: "Audio/Source".into(),
+            channels: ch,
+        };
+        let reg = Registry {
+            nodes: vec![node(1, "a", 2), node(2, "b", 0)],
+            default_source: Some("b".into()),
+            default_sink: None,
+        };
+        let list = mic_devices_from(&reg);
+        assert_eq!(list.len(), 2);
+        assert_eq!(
+            (list[0].id.as_str(), list[0].default, list[0].max_channels),
+            ("a", false, 2)
+        );
+        assert_eq!(
+            (list[1].id.as_str(), list[1].default, list[1].max_channels),
+            ("b", true, 1)
+        );
+        assert_eq!(list[1].name, "b (desc)");
     }
 
     #[test]
