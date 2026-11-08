@@ -13,6 +13,8 @@ pub mod opener;
 pub mod priority;
 pub mod process;
 pub mod sleep;
+#[cfg(target_os = "linux")]
+pub mod sleep_linux;
 pub mod stack;
 pub mod sysinfo;
 pub mod trash;

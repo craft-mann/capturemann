@@ -8,7 +8,7 @@ use std::process::{Command, Stdio};
 
 use cm_media::import::classify::{classify, MediaKind, PrepareReason, Status};
 use cm_media::import::prepare::{
-    decode_sound, hardware_encoders, make_editing_copy, verify, wav_seconds, RunFailure,
+    decode_sound, editing_copy_encoders, make_editing_copy, verify, wav_seconds, RunFailure,
     VerifyInput,
 };
 use cm_media::import::probe::{probe, ProbeError};
@@ -408,8 +408,8 @@ fn the_sound_is_decoded_to_a_48k_float_wav_and_verified() {
 #[test]
 fn an_editing_copy_is_constant_rate_upright_and_the_same_length() {
     let Some((m, tools)) = maker() else { return };
-    match hardware_encoders(&tools) {
-        Ok((h264, hevc)) if h264 || hevc => {}
+    match editing_copy_encoders(&tools, "h264") {
+        Ok((ladder, _)) if !ladder.is_empty() => {}
         _ => {
             eprintln!("SKIPPED: no hardware video encoder in this FFmpeg");
             return;
@@ -457,7 +457,7 @@ fn an_editing_copy_is_constant_rate_upright_and_the_same_length() {
     let out = m.path("screen.edit.mp4");
     let mut last = 0.0;
     match make_editing_copy(&tools, &f, &out, &mut |p| last = p, &|| false) {
-        Ok(()) => {}
+        Ok(copy) => eprintln!("editing copy by {} ({})", copy.encoder, copy.codec),
         Err(RunFailure::NoHardwareEncoder) => {
             eprintln!("SKIPPED: this machine has no hardware video encoder");
             return;
