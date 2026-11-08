@@ -1,5 +1,12 @@
 # Linux early build: where it stands and what is left
 
+> **Retired for 0.3.0 (Nov 9, 2026).** This page describes the Linux early build of 0.2.6 as it stood on Oct 31, 2026. Linux is no
+> longer an early build: 0.3.0 is the release that brings Linux to feature parity with Windows and macOS (reasoned gaps are listed in
+> the release text). The current state, the parity table and what remains are in `specs/plans/linux-parity-matrix.md`,
+> `specs/plans/release-0.3.0-plan.md`, `docs/development/release-0.3.0-github-text.md` and `docs/project/status.md`. The text
+> below is kept as history; recording is on by default in 0.3.0 (`CM_LINUX_RECORDING=0` turns it off).
+
+
 Written Oct 31, 2026. Scope of the early build (maintainer, Oct 31, 2026): screenshots, annotation, library, local AI,
 CLI and MCP. Recording is on by default since 0.3.0 (`CM_LINUX_RECORDING=0` hides it in the app); the 0.2.x early build kept it hidden behind `CM_LINUX_RECORDING=1`. Everything
 below was tested in an aarch64 Ubuntu 24.04 VM (headless GNOME 46 Wayland, Xvfb + openbox for X11) or on CI; nothing

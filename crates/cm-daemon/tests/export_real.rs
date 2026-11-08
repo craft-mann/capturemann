@@ -21,6 +21,13 @@ use serde_json::{json, Value};
 use time::macros::datetime;
 
 fn ffmpeg() -> Option<Tools> {
+    if !cm_media::tools::EncoderPolicy::h264_list_available() {
+        eprintln!(
+            "SKIPPED: this test expects H.264 from the developer encoder list; on Linux set \
+             CM_EXPORT_ALLOW_GPL=1 (CI does). The Linux policy is covered by vp9_export.rs"
+        );
+        return None;
+    }
     match locate() {
         Ok(t) => Some(t),
         Err(_) => {

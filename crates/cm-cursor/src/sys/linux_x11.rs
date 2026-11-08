@@ -174,6 +174,8 @@ fn event_loop(
             .and_then(|c| c.reply().ok())
             .map(|r| (f64::from(r.root_x), f64::from(r.root_y), u16::from(r.mask)))
     };
+    let mut last: Option<(f64, f64)> = None;
+    let mut last_poll = std::time::Instant::now();
     while !stop.load(Ordering::Relaxed) {
         let mut moved: Option<u64> = None;
         let mut idle = true;
@@ -197,8 +199,15 @@ fn event_loop(
                 _ => {}
             }
         }
+        // A warp (`XWarpPointer`: remote desktops, `xdotool mousemove`, some games) makes no raw
+        // event, so the position is also read every 16 ms and sent when it changed.
+        if moved.is_none() && last_poll.elapsed() >= Duration::from_millis(16) {
+            moved = Some(clock.now_ns());
+        }
         if let Some(host_ns) = moved {
-            if let Some((gx, gy, _)) = pointer() {
+            last_poll = std::time::Instant::now();
+            if let Some((gx, gy, _)) = pointer().filter(|p| last != Some((p.0, p.1))) {
+                last = Some((gx, gy));
                 activity.touch(host_ns);
                 if !tx.send(RawEvent {
                     host_ns,

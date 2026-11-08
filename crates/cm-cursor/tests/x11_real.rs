@@ -27,7 +27,31 @@ fn moves_clicks_scroll_and_images_are_recorded() {
         .clicks
         .eq(&cm_cursor::Availability::Available)
     {
-        eprintln!("SKIPPED: not an X11 session");
+        // Wayland (or no X display): the honest answer is a stated absence, not a silent track.
+        let st = cm_cursor::preflight();
+        eprintln!("not an X11 session; status: {st:?}");
+        assert_eq!(st.clicks, cm_cursor::Availability::Unavailable);
+        assert!(st
+            .warnings
+            .iter()
+            .any(|w| w.code == cm_core::ErrorCode::NotImplemented));
+        let mut rec = CursorRecorder::new(CursorConfig::new(CursorTarget::display(
+            1,
+            Rect::new(0.0, 0.0, 1920.0, 1080.0),
+            1.0,
+        )));
+        let dir = tempfile::tempdir().unwrap();
+        let err = rec
+            .start(TrackContext {
+                dir: dir.path().to_path_buf(),
+                clock: SessionClock::with_host(Arc::new(SystemHostClock)),
+            })
+            .unwrap_err();
+        assert_eq!(err.code(), cm_core::ErrorCode::NotImplemented);
+        assert!(
+            !dir.path().join(CURSOR_FILE).exists(),
+            "no empty track left behind"
+        );
         return;
     }
     let target = CursorTarget::display(1, Rect::new(0.0, 0.0, 1920.0, 1080.0), 1.0);
