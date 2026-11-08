@@ -177,9 +177,6 @@ fn encoder_wording(ctx: &mut Ctx) -> R {
 }
 
 fn crash_events(ctx: &mut Ctx) -> R {
-    if sys::PLATFORM == "linux" {
-        return skip("no crash log is read on Linux yet");
-    }
     let crashes = hygiene::app_crashes_since(ctx.opts.started - std::time::Duration::from_secs(2));
     for c in &crashes {
         ctx.note(format!("crash event: {c}"));

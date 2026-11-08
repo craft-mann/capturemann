@@ -11,3 +11,4 @@ pub mod win_consent;
 pub mod win_process_loopback;
 
 pub mod linux_pipewire;
+pub mod pw_registry;

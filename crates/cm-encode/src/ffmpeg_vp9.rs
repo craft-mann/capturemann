@@ -1,6 +1,9 @@
-//! A software VP9 encoder for [`CpuFrame`]s: raw frames go to an FFmpeg child process
-//! (`libvpx-vp9`, real-time mode) that writes a fragmented MP4 (`vp09`, 2 s fragments, so a crash
-//! loses at most one fragment and `truncate_to_last_fragment` recovers the file).
+//! The Linux encoder for [`CpuFrame`]s: raw frames go to an FFmpeg child process that writes a
+//! fragmented MP4 (2 s fragments, so a crash loses at most one fragment and
+//! `truncate_to_last_fragment` recovers the file). The codec is hardware H.264 through VA-API
+//! (`h264_vaapi`, the user's own GPU driver) where the computer has it and a probe encode works,
+//! and software VP9 (`libvpx-vp9`, real-time mode) otherwise: [`VideoBackend`], decision O10 of
+//! release 0.3.0.
 //!
 //! Why this exists: Linux has no hardware encoder in a headless VM, and software H.264 does not
 //! ship (OpenH264 was removed on Oct 24, 2026). libvpx is BSD-3 and already part of the LGPL FFmpeg
@@ -67,6 +70,147 @@ pub fn has_vp9(ffmpeg: &Path) -> bool {
         .unwrap_or(false)
 }
 
+/// How the video is encoded.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VideoBackend {
+    /// Software VP9 (libvpx), any computer.
+    Vp9,
+    /// Hardware H.264 through VA-API on this render node (for example `/dev/dri/renderD128`).
+    /// `cqp`: the driver offers constant quality only (Intel UHD 620 with the iHD driver); the
+    /// quality setting then picks the quantiser instead of a bit rate.
+    VaapiH264 { device: PathBuf, cqp: bool },
+}
+
+impl VideoBackend {
+    /// The codec name written to the recording's details.
+    pub fn codec_name(&self) -> &'static str {
+        match self {
+            VideoBackend::Vp9 => "vp9",
+            VideoBackend::VaapiH264 { .. } => "h264",
+        }
+    }
+
+    /// One plain sentence for the person: what encodes the video and why.
+    pub fn describe(&self) -> String {
+        match self {
+            VideoBackend::Vp9 => "software VP9 (no usable hardware H.264 encoder was found; \
+                expect more CPU use)"
+                .to_owned(),
+            VideoBackend::VaapiH264 { device, .. } => {
+                format!("hardware H.264 through VA-API ({})", device.display())
+            }
+        }
+    }
+}
+
+/// The render nodes of the GPUs, in order (`/dev/dri/renderD128`, ...).
+pub fn render_nodes() -> Vec<PathBuf> {
+    let mut v: Vec<PathBuf> = std::fs::read_dir("/dev/dri")
+        .map(|d| {
+            d.filter_map(Result::ok)
+                .map(|e| e.path())
+                .filter(|p| {
+                    p.file_name()
+                        .and_then(|n| n.to_str())
+                        .is_some_and(|n| n.starts_with("renderD"))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    v.sort();
+    v
+}
+
+/// Does this FFmpeg list the `h264_vaapi` encoder?
+pub fn has_h264_vaapi(ffmpeg: &Path) -> bool {
+    cm_platform::process::command(ffmpeg)
+        .args(["-hide_banner", "-encoders"])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).contains("h264_vaapi"))
+        .unwrap_or(false)
+}
+
+/// One probe encode on `device` with or without constant quality.
+fn probe_once(ffmpeg: &Path, device: &Path, cqp: bool) -> bool {
+    use std::io::Write as _;
+    let mut cmd = cm_platform::process::command(ffmpeg);
+    cmd.args(["-hide_banner", "-loglevel", "error", "-vaapi_device"])
+        .arg(device)
+        .args([
+            "-f", "rawvideo", "-pix_fmt", "nv12", "-s", "256x256", "-i", "pipe:0",
+        ])
+        .args([
+            "-vf",
+            "format=nv12,hwupload",
+            "-c:v",
+            "h264_vaapi",
+            "-profile:v",
+            "high",
+        ])
+        .args(["-bf", "0", "-g", "60", "-frames:v", "1"]);
+    if cqp {
+        cmd.args(["-rc_mode", "CQP", "-qp", "26"]);
+    } else {
+        cmd.args(["-b:v", "2000000"]);
+    }
+    let Ok(mut child) = cmd
+        .args(["-f", "null", "-"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+    else {
+        return false;
+    };
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(&vec![128_u8; 256 * 256 * 3 / 2]);
+    }
+    child.wait().map(|s| s.success()).unwrap_or(false)
+}
+
+/// Encodes one 256x256 frame on `device` to find out whether the driver really accepts H.264
+/// (listing the encoder proves nothing: a computer without the right driver lists it too).
+/// `Some(false)`: works with a bit rate; `Some(true)`: only with constant quality; `None`: no.
+/// Takes well under a second on a working GPU.
+pub fn probe_vaapi(ffmpeg: &Path, device: &Path) -> Option<bool> {
+    if probe_once(ffmpeg, device, false) {
+        Some(false)
+    } else if probe_once(ffmpeg, device, true) {
+        Some(true)
+    } else {
+        None
+    }
+}
+
+/// The encoder this computer will use: VA-API H.264 when an FFmpeg with `h264_vaapi` and a
+/// render node that passes [`probe_vaapi`] exist, else software VP9. `CM_VIDEO_ENCODER=vp9`
+/// forces software (a way out for a driver that probes well and then misbehaves). The answer is
+/// cached per FFmpeg for the life of the process.
+pub fn choose_backend(ffmpeg: &Path) -> VideoBackend {
+    use std::sync::OnceLock;
+    static CHOSEN: OnceLock<(PathBuf, VideoBackend)> = OnceLock::new();
+    if let Some((f, b)) = CHOSEN.get() {
+        if f == ffmpeg {
+            return b.clone();
+        }
+    }
+    let forced_software =
+        std::env::var("CM_VIDEO_ENCODER").is_ok_and(|v| v.eq_ignore_ascii_case("vp9"));
+    let backend = if forced_software || !has_h264_vaapi(ffmpeg) {
+        VideoBackend::Vp9
+    } else {
+        render_nodes()
+            .into_iter()
+            .find_map(|d| probe_vaapi(ffmpeg, &d).map(|cqp| (d, cqp)))
+            .map_or(VideoBackend::Vp9, |(device, cqp)| VideoBackend::VaapiH264 {
+                device,
+                cqp,
+            })
+    };
+    let _ = CHOSEN.set((ffmpeg.to_path_buf(), backend.clone()));
+    backend
+}
+
 /// The FFmpeg arguments for a stream of `src_w`x`src_h` frames of `pix_fmt`. Pure, so tests can
 /// check them without running anything.
 pub fn ffmpeg_args(
@@ -76,50 +220,98 @@ pub fn ffmpeg_args(
     pix_fmt: &str,
     threads: u32,
 ) -> Vec<String> {
+    ffmpeg_args_for(&VideoBackend::Vp9, cfg, src_w, src_h, pix_fmt, threads)
+}
+
+/// [`ffmpeg_args`] for a chosen [`VideoBackend`].
+pub fn ffmpeg_args_for(
+    backend: &VideoBackend,
+    cfg: &EncoderConfig,
+    src_w: u32,
+    src_h: u32,
+    pix_fmt: &str,
+    threads: u32,
+) -> Vec<String> {
     let p = &cfg.plan;
     let fps = p.fps.max(1);
     let s = |v: &[&str]| v.iter().map(|x| (*x).to_string()).collect::<Vec<_>>();
-    let mut a = s(&[
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-y",
-        "-f",
-        "rawvideo",
-        "-pix_fmt",
-        pix_fmt,
-    ]);
+    let mut a = s(&["-hide_banner", "-loglevel", "error", "-y"]);
+    if let VideoBackend::VaapiH264 { device, .. } = backend {
+        a.extend([
+            "-vaapi_device".into(),
+            device.to_string_lossy().into_owned(),
+        ]);
+    }
+    a.extend(s(&["-f", "rawvideo", "-pix_fmt", pix_fmt]));
     a.extend(["-s".into(), format!("{src_w}x{src_h}")]);
     a.extend(["-r".into(), fps.to_string(), "-i".into(), "pipe:0".into()]);
     let mut vf = Vec::new();
-    // Even sizes are required for 4:2:0.
+    // Even sizes are required for 4:2:0. The picture is converted with the BT.709 matrix and
+    // the stream is tagged with it, so players show the colours the screen had.
     let (ow, oh) = (p.width & !1, p.height & !1);
-    if (ow, oh) != (src_w, src_h) {
-        vf.push(format!("scale={ow}:{oh}:flags=bilinear"));
+    let resize = if (ow, oh) != (src_w, src_h) {
+        format!("{ow}:{oh}:flags=bilinear:")
+    } else {
+        String::new()
+    };
+    vf.push(format!("scale={resize}out_color_matrix=bt709:out_range=tv"));
+    match backend {
+        VideoBackend::Vp9 => {
+            vf.push("format=yuv420p".into());
+            a.extend(["-vf".into(), vf.join(",")]);
+            a.extend(s(&[
+                "-c:v",
+                "libvpx-vp9",
+                "-deadline",
+                "realtime",
+                "-cpu-used",
+                "8",
+                "-row-mt",
+                "1",
+                "-lag-in-frames",
+                "0",
+                "-tile-columns",
+                "2",
+            ]));
+            a.extend(["-threads".into(), threads.to_string()]);
+        }
+        VideoBackend::VaapiH264 { cqp, .. } => {
+            // The frame is converted on the CPU (BT.709) and uploaded as NV12; the GPU encodes.
+            vf.push("format=nv12".into());
+            vf.push("hwupload".into());
+            a.extend(["-vf".into(), vf.join(",")]);
+            // No B-frames: the pipeline stamps every frame, and a decoder needs no reordering.
+            a.extend(s(&["-c:v", "h264_vaapi", "-profile:v", "high", "-bf", "0"]));
+            if *cqp {
+                // The driver has no bit-rate control (Intel UHD 620): constant quality.
+                let qp = match p.quality {
+                    crate::settings::Quality::High => 22,
+                    crate::settings::Quality::Balanced => 26,
+                    crate::settings::Quality::Small => 30,
+                };
+                a.extend([
+                    "-rc_mode".into(),
+                    "CQP".into(),
+                    "-qp".into(),
+                    qp.to_string(),
+                ]);
+            }
+        }
     }
-    vf.push("format=yuv420p".into());
-    a.extend(["-vf".into(), vf.join(",")]);
     a.extend(s(&[
-        "-c:v",
-        "libvpx-vp9",
-        "-deadline",
-        "realtime",
-        "-cpu-used",
-        "8",
-        "-row-mt",
-        "1",
-        "-lag-in-frames",
-        "0",
-        "-tile-columns",
-        "2",
+        "-colorspace",
+        "bt709",
+        "-color_primaries",
+        "bt709",
+        "-color_trc",
+        "bt709",
+        "-color_range",
+        "tv",
     ]));
-    a.extend(["-threads".into(), threads.to_string()]);
-    a.extend([
-        "-b:v".into(),
-        p.bitrate_bps.max(100_000).to_string(),
-        "-g".into(),
-        (fps * 2).to_string(),
-    ]);
+    if !matches!(backend, VideoBackend::VaapiH264 { cqp: true, .. }) {
+        a.extend(["-b:v".into(), p.bitrate_bps.max(100_000).to_string()]);
+    }
+    a.extend(["-g".into(), (fps * 2).to_string()]);
     a.extend(s(&[
         "-f",
         "mp4",
@@ -141,6 +333,7 @@ struct Running {
 pub struct FfmpegVp9Encoder {
     cfg: EncoderConfig,
     ffmpeg: PathBuf,
+    backend: VideoBackend,
     shared: Arc<Shared>,
     running: Option<Running>,
     /// Slot index (frame number at the plan's fps) the next written frame takes.
@@ -157,19 +350,40 @@ impl FfmpegVp9Encoder {
         let ffmpeg = find_ffmpeg().ok_or_else(|| {
             CmError::not_found("FFmpeg was not found (set CM_FFMPEG); needed for VP9 recording.")
         })?;
-        Self::with_ffmpeg(cfg, ffmpeg)
+        let backend = choose_backend(&ffmpeg);
+        Self::with_backend(cfg, ffmpeg, backend)
     }
 
+    /// Software VP9 with this FFmpeg (tests and the fallback).
     pub fn with_ffmpeg(cfg: &EncoderConfig, ffmpeg: PathBuf) -> Result<Self, CmError> {
-        if !has_vp9(&ffmpeg) {
-            return Err(CmError::not_found(format!(
-                "`{}` has no libvpx-vp9 encoder.",
-                ffmpeg.display()
-            )));
+        Self::with_backend(cfg, ffmpeg, VideoBackend::Vp9)
+    }
+
+    /// The encoder `backend` names. `not_found` when the FFmpeg lacks the codec it needs.
+    pub fn with_backend(
+        cfg: &EncoderConfig,
+        ffmpeg: PathBuf,
+        backend: VideoBackend,
+    ) -> Result<Self, CmError> {
+        match &backend {
+            VideoBackend::Vp9 if !has_vp9(&ffmpeg) => {
+                return Err(CmError::not_found(format!(
+                    "`{}` has no libvpx-vp9 encoder (and no hardware H.264 encoder was found).",
+                    ffmpeg.display()
+                )));
+            }
+            VideoBackend::VaapiH264 { .. } if !has_h264_vaapi(&ffmpeg) => {
+                return Err(CmError::not_found(format!(
+                    "`{}` has no h264_vaapi encoder.",
+                    ffmpeg.display()
+                )));
+            }
+            _ => {}
         }
         Ok(FfmpegVp9Encoder {
             cfg: cfg.clone(),
             ffmpeg,
+            backend,
             shared: Arc::new(Shared {
                 error: Mutex::new(None),
             }),
@@ -186,7 +400,8 @@ impl FfmpegVp9Encoder {
             .map(|n| n.get() as u32)
             .unwrap_or(2)
             .clamp(1, 8);
-        let args = ffmpeg_args(
+        let args = ffmpeg_args_for(
+            &self.backend,
             &self.cfg,
             frame.width,
             frame.height,
@@ -230,7 +445,12 @@ impl FfmpegVp9Encoder {
 
     /// The codec in the file (the manifest's `Codec` enum has no VP9 yet).
     pub fn codec_name(&self) -> &'static str {
-        "vp9"
+        self.backend.codec_name()
+    }
+
+    /// What encodes the video, for the recording's details and the diagnostics.
+    pub fn backend(&self) -> &VideoBackend {
+        &self.backend
     }
 
     /// Slots handed to the pipe so far (frames in the output, repeats included).
@@ -300,7 +520,7 @@ impl VideoEncoder for FfmpegVp9Encoder {
     }
 
     fn codec_name(&self) -> Option<&'static str> {
-        Some("vp9")
+        Some(self.backend.codec_name())
     }
 
     fn check(&self) -> Result<(), CmError> {
@@ -426,11 +646,65 @@ mod tests {
         MediaTime::from_ticks(slot * TICKS / fps)
     }
 
+    /// O10 / REC-2: hardware H.264 through VA-API keeps 2 s key frames, has no B-frames and is
+    /// tagged BT.709; the picture is converted on the CPU and uploaded as NV12.
+    #[test]
+    fn vaapi_args_encode_h264_with_two_second_keyframes_and_tagged_colours() {
+        let d = Path::new("/x");
+        let backend = VideoBackend::VaapiH264 {
+            device: PathBuf::from("/dev/dri/renderD128"),
+            cqp: false,
+        };
+        let a = ffmpeg_args_for(&backend, &cfg(d, 1920, 1080, 30), 1920, 1080, "bgr0", 4).join(" ");
+        assert!(
+            a.starts_with(
+                "-hide_banner -loglevel error -y -vaapi_device /dev/dri/renderD128 -f rawvideo"
+            ),
+            "{a}"
+        );
+        assert!(a.contains("format=nv12,hwupload"), "{a}");
+        assert!(a.contains("-c:v h264_vaapi") && a.contains("-bf 0"), "{a}");
+        assert!(a.contains("-g 60"), "{a}");
+        assert!(a.contains("-colorspace bt709"), "{a}");
+        assert!(a.contains("frag_keyframe+empty_moov"), "{a}");
+        assert!(!a.contains("libvpx"), "{a}");
+        // A driver with constant quality only gets a quantiser, no bit rate.
+        let q = VideoBackend::VaapiH264 {
+            device: PathBuf::from("/dev/dri/renderD128"),
+            cqp: true,
+        };
+        let c = ffmpeg_args_for(&q, &cfg(d, 1920, 1080, 30), 1920, 1080, "bgr0", 4).join(" ");
+        assert!(
+            c.contains("-rc_mode CQP -qp 26") && !c.contains("-b:v"),
+            "{c}"
+        );
+        // The software path is tagged the same way.
+        let v = ffmpeg_args(&cfg(d, 1920, 1080, 30), 1920, 1080, "bgr0", 4).join(" ");
+        assert!(
+            v.contains("out_color_matrix=bt709") && v.contains("-colorspace bt709"),
+            "{v}"
+        );
+    }
+
+    #[test]
+    fn the_backend_names_its_codec() {
+        assert_eq!(VideoBackend::Vp9.codec_name(), "vp9");
+        let v = VideoBackend::VaapiH264 {
+            device: PathBuf::from("/dev/dri/renderD128"),
+            cqp: true,
+        };
+        assert_eq!(v.codec_name(), "h264");
+        assert!(v.describe().contains("VA-API"));
+        assert!(VideoBackend::Vp9.describe().contains("software VP9"));
+    }
+
     #[test]
     fn args_scale_only_when_the_sizes_differ_and_force_even_output() {
         let d = Path::new("/x");
         let a = ffmpeg_args(&cfg(d, 1280, 720, 30), 1280, 720, "bgr0", 4).join(" ");
-        assert!(!a.contains("scale="), "{a}");
+        // Only the colour conversion, no resize.
+        assert!(a.contains("scale=out_color_matrix=bt709"), "{a}");
+        assert!(!a.contains("scale=1280"), "{a}");
         assert!(
             a.contains("-pix_fmt bgr0 -s 1280x720 -r 30 -i pipe:0"),
             "{a}"

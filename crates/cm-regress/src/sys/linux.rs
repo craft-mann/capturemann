@@ -560,6 +560,30 @@ pub fn parse_coredump_list(text: &str, names: &[&str]) -> Vec<String> {
         .collect()
 }
 
+/// The graphics adapters from `lspci -mm -nn`: the VGA, display and 3D controllers as
+/// `<vendor> <device>`, joined with `; ` (empty when there are none). Used in the report header,
+/// which said "GPU: n/a" on Linux.
+pub fn parse_lspci_gpus(text: &str) -> String {
+    let mut out = Vec::new();
+    for l in text.lines() {
+        let q: Vec<&str> = l.split('"').collect();
+        // 00:02.0 "class [0300]" "vendor [8086]" "device [3ea0]" ...
+        let (Some(class), Some(vendor), Some(device)) = (q.get(1), q.get(3), q.get(5)) else {
+            continue;
+        };
+        let c = class.to_lowercase();
+        if !(c.contains("vga") || c.contains("display controller") || c.contains("3d controller")) {
+            continue;
+        }
+        let strip = |s: &str| match s.rfind(" [") {
+            Some(i) if s.ends_with(']') => s[..i].to_owned(),
+            _ => s.to_owned(),
+        };
+        out.push(format!("{} {}", strip(vendor), strip(device)));
+    }
+    out.join("; ")
+}
+
 /// Core dumps of the product's programs since `since` (a `coredumpctl --since` time such as `-30min` or
 /// `2026-11-06 10:00:00`). Empty when `coredumpctl` is missing or journald keeps no dumps.
 pub fn crashes_since(r: &dyn CommandRunner, since: &str) -> Vec<String> {
@@ -607,23 +631,33 @@ pub fn kill_tree(pid: u32) {
         .status();
 }
 
-/// Parses `ps -A -o pid=,comm=` (the name is the executable's file name, cut to 15 characters by the kernel).
-pub fn parse_ps(text: &str) -> Vec<(u32, String)> {
+/// Parses `ps -A -o pid=,stat=,comm=` and leaves out zombies (state `Z`): a process the case killed
+/// but whose parent has not waited for yet is not running, and must not count as a program left
+/// behind (0.2.9 report: `linux.desktop_stays_up`, `linux.second_launch`, `linux.tray_icon`).
+pub fn parse_ps_stat(text: &str) -> Vec<(u32, String)> {
     text.lines()
         .filter_map(|l| {
-            let l = l.trim();
-            let (pid, name) = l.split_once(' ')?;
-            let name = name.trim().rsplit('/').next()?.to_owned();
+            let mut it = l.split_whitespace();
+            let pid = it.next()?;
+            let stat = it.next()?;
+            if stat.starts_with('Z') {
+                return None;
+            }
+            let name = it.collect::<Vec<_>>().join(" ");
+            let name = name.rsplit('/').next()?.to_owned();
             Some((pid.parse().ok()?, name))
         })
         .collect()
 }
 
 pub fn list_processes() -> Vec<(u32, String)> {
-    let Ok(out) = Command::new("ps").args(["-A", "-o", "pid=,comm="]).output() else {
+    let Ok(out) = Command::new("ps")
+        .args(["-A", "-o", "pid=,stat=,comm="])
+        .output()
+    else {
         return Vec::new();
     };
-    parse_ps(&String::from_utf8_lossy(&out.stdout))
+    parse_ps_stat(&String::from_utf8_lossy(&out.stdout))
 }
 
 pub fn new_endpoint(dir: &std::path::Path, n: u32) -> String {
@@ -936,6 +970,16 @@ mod tests {
     }
 
     #[test]
+    fn lspci_gpus_are_named_for_the_report_header() {
+        let t = "00:02.0 \"VGA compatible controller [0300]\" \"Intel Corporation [8086]\" \"WhiskeyLake-U GT2 [UHD Graphics 620] [3ea0]\" -r02 -p00 \"Lenovo [17aa]\" \"x [2279]\"\n3d:00.0 \"Non-Volatile memory controller [0108]\" \"Samsung [144d]\" \"SSD [a808]\"\n";
+        assert_eq!(
+            parse_lspci_gpus(t),
+            "Intel Corporation WhiskeyLake-U GT2 [UHD Graphics 620]"
+        );
+        assert_eq!(parse_lspci_gpus(""), "");
+    }
+
+    #[test]
     fn tray_items_are_parsed() {
         let t = "(<['org.kde.StatusNotifierItem-4242-1/StatusNotifierItem', ':1.55/org/ayatana/NotificationItem/x']>,)\n";
         let v = parse_tray_items(t);
@@ -948,12 +992,19 @@ mod tests {
         assert!(tray_items(&Fake::new(&[])).is_err());
     }
 
+    /// A killed program that its parent has not reaped yet (state Z) is not "left running".
     #[test]
-    fn ps_lines_are_parsed() {
-        let p = parse_ps("    1 systemd\n 4242 cm-desktop\n 77 /usr/bin/x\nbad line\n");
-        assert_eq!(p[0], (1, "systemd".to_owned()));
-        assert_eq!(p[1], (4242, "cm-desktop".to_owned()));
-        assert_eq!(p[2], (77, "x".to_owned()));
-        assert_eq!(p.len(), 3);
+    fn zombies_are_not_running_programs() {
+        let p = parse_ps_stat(
+            "    1 Ss   systemd\n 4242 Z    cm-desktop\n 4300 Sl+  cm-desktop\n 77 R /usr/bin/x\n",
+        );
+        assert_eq!(
+            p,
+            vec![
+                (1, "systemd".to_owned()),
+                (4300, "cm-desktop".to_owned()),
+                (77, "x".to_owned())
+            ]
+        );
     }
 }

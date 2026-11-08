@@ -19,7 +19,7 @@ use cm_audio::{
     SourceFactory as AudioFactory, SystemAudioSupport,
 };
 use cm_capture::record::pipewire::{
-    MemoryTokenStore, PipeWireScreenSource, ScriptedPw, StreamInfo,
+    MemoryTokenStore, PipeWireScreenSource, PwTarget, ScriptedPw, StreamInfo,
 };
 use cm_capture::record::{CapturePlan, RecorderOptions};
 use cm_capture::PortalStatus;
@@ -52,6 +52,12 @@ struct FakeEnv {
     cameras: Vec<cm_camera::CameraInfo>,
     camera_permission: cm_camera::CameraPermission,
     camera_configs: Arc<Mutex<Vec<cm_camera::CameraConfig>>>,
+    /// GNOME's screen-cast service is present (a monitor or an area without a dialog).
+    gnome: bool,
+    /// The session type the desktop reports.
+    session: &'static str,
+    /// What each recording asked the backend to record.
+    targets: Arc<Mutex<Vec<PwTarget>>>,
 }
 
 impl FakeEnv {
@@ -73,6 +79,9 @@ impl FakeEnv {
             cameras: Vec::new(),
             camera_permission: cm_camera::CameraPermission::Authorized,
             camera_configs: Arc::default(),
+            gnome: false,
+            session: "wayland",
+            targets: Arc::default(),
         }
     }
 
@@ -140,7 +149,10 @@ impl LinuxEnv for FakeEnv {
         self.pipewire
     }
     fn display_session(&self) -> &'static str {
-        "wayland"
+        self.session
+    }
+    fn gnome_screencast(&self) -> bool {
+        self.gnome
     }
     fn portal(&self) -> PortalStatus {
         self.portal.clone()
@@ -155,30 +167,21 @@ impl LinuxEnv for FakeEnv {
     fn token_file(&self) -> PathBuf {
         PathBuf::from("/nonexistent/screencast-token")
     }
+    fn screen_track_for(&self, plan: CapturePlan, target: PwTarget) -> Box<dyn SessionTrack> {
+        self.targets.lock().unwrap().push(target.clone());
+        self.track(plan, Some(target))
+    }
     fn screen_track(&self, plan: CapturePlan) -> Box<dyn SessionTrack> {
-        self.plans.lock().unwrap().push(plan.clone());
-        let backend = ScriptedPw::live(
-            StreamInfo {
-                width: self.stream.0,
-                height: self.stream.1,
-                restore_token: Some("tok1".into()),
-            },
-            30,
-            self.lose_after,
-        );
-        self.seen.lock().unwrap().push(backend.seen_token.clone());
-        Box::new(ScreenTrack::new(
-            plan,
-            PipeWireScreenSource::new(backend, self.tokens.clone()),
-            CpuSyntheticEncoder::create,
-            RecorderOptions::default(),
-        ))
+        self.track(plan, None)
     }
     fn mic_factory(&self) -> AudioFactory {
         audio_factory(1, "pipewire:default-source")
     }
     fn system_audio_factory(&self) -> AudioFactory {
         audio_factory(2, "pipewire:default-monitor")
+    }
+    fn audio_devices(&self) -> AudioDevices {
+        self.devices()
     }
     fn cameras(&self) -> Result<Vec<cm_camera::CameraInfo>, cm_core::CmError> {
         Ok(self.cameras.clone())
@@ -210,7 +213,34 @@ impl LinuxEnv for FakeEnv {
             ),
         )))
     }
-    fn audio_devices(&self) -> AudioDevices {
+}
+
+impl FakeEnv {
+    fn track(&self, plan: CapturePlan, target: Option<PwTarget>) -> Box<dyn SessionTrack> {
+        self.plans.lock().unwrap().push(plan.clone());
+        let backend = ScriptedPw::live(
+            StreamInfo {
+                width: self.stream.0,
+                height: self.stream.1,
+                restore_token: Some("tok1".into()),
+            },
+            30,
+            self.lose_after,
+        );
+        self.seen.lock().unwrap().push(backend.seen_token.clone());
+        let mut source = PipeWireScreenSource::new(backend, self.tokens.clone());
+        if let Some(t) = target {
+            source = source.with_target(t);
+        }
+        Box::new(ScreenTrack::new(
+            plan,
+            source,
+            CpuSyntheticEncoder::create,
+            RecorderOptions::default(),
+        ))
+    }
+
+    fn devices(&self) -> AudioDevices {
         AudioDevices {
             mics: if self.pipewire {
                 vec![MicDevice {
@@ -609,4 +639,67 @@ async fn a_camera_request_starts_the_camera_track() {
     assert_eq!(c.len(), 1);
     assert_eq!(c[0].resolution, cm_camera::CameraResolution::P720);
     assert!(!c[0].mirror);
+}
+
+/// REC-1 / CAP-1.AC2: where GNOME's screen-cast service exists a region is recorded by the
+/// compositor with no dialog; a window works in an X11 session and is refused with the reason in a
+/// Wayland one. Without the service (KDE, another GNOME) the portal path and its message stay.
+#[tokio::test(flavor = "multi_thread")]
+async fn gnome_records_a_region_and_says_what_a_wayland_window_needs() {
+    let mut env = FakeEnv::healthy();
+    env.gnome = true;
+    env.stream = (100, 50);
+    let r = rig(env);
+    // The fake desktop's display 1 is 400x300 physical at scale 2: a 100x50 physical region at
+    // (20, 10) is the logical area 10,5 50x25.
+    let v = user(
+        &r.daemon,
+        "start_recording",
+        json!({ "target": { "display_id": 1, "rect": [20, 10, 100, 50] }, "countdown_s": 0 }),
+    )
+    .await
+    .unwrap();
+    assert_eq!(v["state"], "recording", "{v}");
+    user(&r.daemon, "stop_recording", json!({})).await.unwrap();
+    assert_eq!(
+        r.env.targets.lock().unwrap().as_slice(),
+        [PwTarget::Area {
+            x: 10,
+            y: 5,
+            width: 50,
+            height: 25
+        }]
+    );
+
+    let e = user(
+        &r.daemon,
+        "start_recording",
+        json!({ "target": { "window_id": 10 }, "countdown_s": 0 }),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(code(&e), ErrorCode::NotImplemented, "{e:?}");
+    assert!(e.to_string().contains("X11 session"), "{e}");
+
+    let mut x11 = FakeEnv::healthy();
+    x11.gnome = true;
+    x11.session = "x11";
+    x11.stream = (100, 80);
+    let r = rig(x11);
+    user(
+        &r.daemon,
+        "start_recording",
+        json!({ "target": { "window_id": 10 }, "countdown_s": 0 }),
+    )
+    .await
+    .unwrap();
+    user(&r.daemon, "stop_recording", json!({})).await.unwrap();
+    assert_eq!(r.env.targets.lock().unwrap().len(), 1);
+
+    // The portal says the same about what it cannot do, and `list_devices` lists the targets.
+    let v = user(&r.daemon, "list_devices", json!({})).await.unwrap();
+    assert_eq!(
+        v["screen"]["targets"],
+        json!(["display", "region", "window"])
+    );
 }

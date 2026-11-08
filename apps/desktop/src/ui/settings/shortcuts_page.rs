@@ -46,6 +46,10 @@ impl SettingsView {
             )
         };
         let rows = model::shortcut_rows(&map, platform);
+        let mode = model::shortcuts_page_mode(
+            crate::platform_hotkeys::backend(),
+            cm_platform::capability::recording_supported(),
+        );
         // Design gap: the board's rows "Skip the countdown", "Draw
         // on screen", "Show or hide the webcam bubble" and "Mute or unmute the microphone" are
         // not built: there is no such action, and D, T and A are Discard, Restart and Annotate.
@@ -53,6 +57,7 @@ impl SettingsView {
             shortcut_groups()
                 .into_iter()
                 .enumerate()
+                .filter(|(gi, _)| *gi == 0 || mode.show_recording_group)
                 .map(|(gi, (title, note, actions))| {
                     let last = actions.len().saturating_sub(1);
                     let items = actions.into_iter().enumerate().filter_map(|(i, a)| {
@@ -87,6 +92,15 @@ impl SettingsView {
                         let chosen = portal.iter().find(|(x, _)| *x == a).map(|(_, d)| {
                             SharedString::from(tr!("Set by your desktop: {keys}", keys = d))
                         });
+                        // Bound by the portal but no key assigned yet: say where to assign one.
+                        let chosen = chosen.or_else(|| {
+                            let bound = reg.iter().any(|(x, res)| *x == a && res.is_ok());
+                            (!mode.can_change && bound).then(|| {
+                                SharedString::from(tr!(
+                                    "No key assigned yet; choose one in your desktop\u{2019}s keyboard settings"
+                                ))
+                            })
+                        });
                         let control = div()
                             .flex()
                             .flex_wrap()
@@ -105,6 +119,9 @@ impl SettingsView {
                                     .text_color(rgba_of(t.text))
                                     .child(tr!("Press the new shortcut"))
                                     .into_any_element()
+                            } else if !mode.can_change {
+                                // The desktop owns the keys: our defaults are only a wish.
+                                div().into_any_element()
                             } else {
                                 div()
                                     .flex()
@@ -113,7 +130,7 @@ impl SettingsView {
                                     .children(r.keycaps.iter().map(|k| keycap_lg(t, k.clone())))
                                     .into_any_element()
                             })
-                            .child(if waiting {
+                            .children((mode.can_change).then(|| if waiting {
                                 small_button_with_icon(
                                     t,
                                     change_id,
@@ -144,7 +161,7 @@ impl SettingsView {
                                     cx.notify();
                                 }))
                                 .into_any_element()
-                            });
+                            }));
                         Some(
                             settings_row(
                                 t,
@@ -156,11 +173,11 @@ impl SettingsView {
                             )
                             .id(SharedString::from(format!("shortcut-{}", r.key)))
                             .role(Role::ListItem)
-                            .aria_label(SharedString::from(format!(
-                                "{}, {}",
-                                label,
-                                r.keycaps.join(" ")
-                            ))),
+                            .aria_label(SharedString::from(if mode.can_change {
+                                format!("{}, {}", label, r.keycaps.join(" "))
+                            } else {
+                                label.to_string()
+                            })),
                         )
                     });
                     group_with_card(
@@ -223,7 +240,9 @@ impl SettingsView {
                     .role(Role::Alert)
                     .aria_label(SharedString::from(e))
             }))
-            .child(caption(t, tr!("Choose Change, then press the new combination. A shortcut another action or another app already uses is refused. Esc cancels.")))
+            .when(mode.can_change, |d| {
+                d.child(caption(t, tr!("Choose Change, then press the new combination. A shortcut another action or another app already uses is refused. Esc cancels.")))
+            })
             .into_any_element()
     }
 }
