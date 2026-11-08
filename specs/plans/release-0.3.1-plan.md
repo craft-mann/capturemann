@@ -46,3 +46,11 @@ before release, the maintainer pushes and signs).
 12. `mcp.policy_allow` failure (agents.tool_policy `allow` for `start_recording`), if the 0.3.0 triage finds it is not
     Linux-only.
 13. Any other shared-code failure found by the Linux regression that is not Linux-only.
+
+## Found during the 0.3.0 night work (Nov 8, 2026)
+
+14. **`mcp.policy_allow` passes on the Mac** (`cm-regress --dev --tier standard`, 34 passed, 0 failed, Nov 8): the 0.2.9 Linux failure is therefore Linux-only; see the 0.3.0 triage note in `verification/` for its outcome.
+15. **Real WebM/Opus output for the `youtube-1080p` preset on Linux without a hardware encoder.** 0.3.0 keeps VP9 + AAC in MP4, labelled "VP9, not H.264" (YouTube accepts it); O10 said WebM.
+16. **Shared code changed by the Linux work, no-op on macOS and Windows, to review there:** `copy_ladder` / `EncoderFamily::for_os` in `cm-media`, the `editing_copy` field in the import outcome, `ExportContents.vp9` in `apps/desktop`, `cm-media` now depends on `cm-encode`, `Caps::vaapi_cqp`, `editing_copy_encoders` returns a 3-tuple; the tray "Recent captures" list polls the library every 10 s in shared app code (`5900e4a5`); `MoveSource::Xi2Raw` in the cursor schema (the REC-7 spec list and the editor readers do not name it yet); `futures-lite` dev-dependency of `cm-desktop`.
+17. **Camera track on Linux is software VP9**; wiring it to the shared VA-API probe (`cm_encode::ffmpeg_vp9::choose_backend`) is open.
+18. **Intel-only stimulus-measured sync** was measured on Wayland; an X11 stimulus measurement and other GPUs (AMD, NVIDIA) are open for Linux and for Windows NVIDIA/AMD.
