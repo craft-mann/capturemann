@@ -217,18 +217,35 @@ pub fn request_access(_timeout: Duration) -> CameraPermission {
 }
 
 // ---- the source ----------------------------------------------------------------------------
+//
+// A Video4Linux2 node streams to one program at a time (a second `STREAMON` answers `EBUSY`), but
+// the Record sheet's bubble and the recorder both want the camera. So the device is opened once per
+// process by a worker thread, and every source attached to that node (the recorder, a preview)
+// receives the frames: the recorder's settings win, and a preview that finds the camera running
+// just joins it.
 
-#[derive(Default)]
-pub struct V4lSource {
-    worker: Option<Worker>,
+/// One receiver attached to a running camera.
+struct Entry {
+    id: u64,
+    role: SourceRole,
+    sink: Arc<dyn FrameSink>,
+    last_preview: Option<u64>,
+    /// Answered once, with the first delivered frame or the reason there is none.
+    ready: Option<mpsc::Sender<Result<SourceInfo, CmError>>>,
 }
 
-struct Worker {
+/// A worker streaming one node.
+struct Hub {
+    entries: Arc<Mutex<Vec<Entry>>>,
     stop: Arc<AtomicBool>,
+    alive: Arc<AtomicBool>,
+    /// Streaming at a recorder's settings (else a preview's).
+    record: bool,
+    info: Arc<Mutex<Option<SourceInfo>>>,
     join: Option<JoinHandle<()>>,
 }
 
-impl Worker {
+impl Hub {
     fn stop(&mut self) {
         self.stop.store(true, Ordering::SeqCst);
         if let Some(j) = self.join.take() {
@@ -237,33 +254,125 @@ impl Worker {
     }
 }
 
+static HUBS: Mutex<Vec<(PathBuf, Hub)>> = Mutex::new(Vec::new());
+static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
+fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|p| p.into_inner())
+}
+
+/// What `open` waits on.
+type Ready = mpsc::Receiver<Result<SourceInfo, CmError>>;
+
+#[derive(Default)]
+pub struct V4lSource {
+    /// The node and the entry id this source attached.
+    attached: Option<(PathBuf, u64)>,
+}
+
+impl V4lSource {
+    /// Attaches `sink` to the node's worker, starting or restarting it as the request needs.
+    fn attach(&mut self, req: &OpenRequest, sink: Arc<dyn FrameSink>) -> Result<Ready, CmError> {
+        let path = resolve(req)?;
+        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+        let (tx, rx) = mpsc::channel();
+        let record = req.role == SourceRole::Record;
+        let mut entry = Entry {
+            id,
+            role: req.role.clone(),
+            sink,
+            last_preview: None,
+            ready: Some(tx),
+        };
+        let mut hubs = lock(&HUBS);
+        let mut carried: Vec<Entry> = Vec::new();
+        if let Some(i) = hubs.iter().position(|(p, _)| *p == path) {
+            let live = hubs[i].1.alive.load(Ordering::SeqCst);
+            if live && (hubs[i].1.record || !record) {
+                // Join the running camera.
+                if let Some(info) = lock(&hubs[i].1.info).clone() {
+                    if let Some(t) = entry.ready.take() {
+                        let _ = t.send(Ok(info));
+                    }
+                }
+                lock(&hubs[i].1.entries).push(entry);
+                self.attached = Some((path, id));
+                return Ok(rx);
+            }
+            // A recorder needs the camera at its settings, or the worker is dead: start a new one
+            // and keep the receivers that were attached.
+            let (_, mut old) = hubs.remove(i);
+            old.stop();
+            carried = std::mem::take(&mut *lock(&old.entries));
+        }
+        let mut all = carried;
+        all.push(entry);
+        let entries = Arc::new(Mutex::new(all));
+        let stop = Arc::new(AtomicBool::new(false));
+        let alive = Arc::new(AtomicBool::new(true));
+        let info = Arc::new(Mutex::new(None));
+        let join = {
+            let (req, entries, stop, alive, info) = (
+                req.clone(),
+                entries.clone(),
+                stop.clone(),
+                alive.clone(),
+                info.clone(),
+            );
+            std::thread::Builder::new()
+                .name("cm-camera-v4l".into())
+                .spawn(move || {
+                    run(&req, &entries, &stop, &info);
+                    alive.store(false, Ordering::SeqCst);
+                })
+                .map_err(|e| CmError::internal(format!("camera thread: {e}")))?
+        };
+        hubs.push((
+            path.clone(),
+            Hub {
+                entries,
+                stop,
+                alive,
+                record,
+                info,
+                join: Some(join),
+            },
+        ));
+        self.attached = Some((path, id));
+        Ok(rx)
+    }
+}
+
+/// The device node a request names (or the first camera).
+fn resolve(req: &OpenRequest) -> Result<PathBuf, CmError> {
+    let s = scan();
+    match &req.device_id {
+        Some(id) => s
+            .nodes
+            .iter()
+            .find(|n| &n.info.id == id || n.path.to_str() == Some(id))
+            .map(|n| n.path.clone())
+            .ok_or_else(|| CmError::not_found(format!("Camera {id} not found."))),
+        None => match s.nodes.first() {
+            Some(n) => Ok(n.path.clone()),
+            None if s.existing > 0 && s.opened == 0 && s.denied > 0 => Err(permission_error()),
+            None => Err(CmError::not_found("No camera found.")),
+        },
+    }
+}
+
 impl CameraSource for V4lSource {
     fn open(&mut self, req: &OpenRequest, sink: Arc<dyn FrameSink>) -> Result<SourceInfo, CmError> {
         self.close();
-        let (tx, rx) = mpsc::channel::<Result<SourceInfo, CmError>>();
-        let stop = Arc::new(AtomicBool::new(false));
-        let join = {
-            let (req, stop) = (req.clone(), stop.clone());
-            std::thread::Builder::new()
-                .name("cm-camera-v4l".into())
-                .spawn(move || run(&req, sink, &stop, &tx))
-                .map_err(|e| CmError::internal(format!("camera thread: {e}")))?
-        };
-        let mut worker = Worker {
-            stop,
-            join: Some(join),
-        };
+        let rx = self.attach(req, sink)?;
         match rx.recv_timeout(req.first_frame_timeout + OPEN_GRACE) {
-            Ok(Ok(info)) => {
-                self.worker = Some(worker);
-                Ok(info)
-            }
+            Ok(Ok(info)) => Ok(info),
             Ok(Err(e)) => {
-                worker.stop();
+                self.close();
                 Err(e)
             }
             Err(_) => {
-                worker.stop();
+                self.close();
                 Err(CmError::device_busy(
                     "The camera did not deliver a picture. It may be in use by another application.",
                 ))
@@ -272,8 +381,23 @@ impl CameraSource for V4lSource {
     }
 
     fn close(&mut self) {
-        if let Some(mut w) = self.worker.take() {
-            w.stop();
+        let Some((path, id)) = self.attached.take() else {
+            return;
+        };
+        let last = {
+            let mut hubs = lock(&HUBS);
+            let Some(i) = hubs.iter().position(|(p, _)| *p == path) else {
+                return;
+            };
+            let empty = {
+                let mut e = lock(&hubs[i].1.entries);
+                e.retain(|x| x.id != id);
+                e.is_empty()
+            };
+            empty.then(|| hubs.remove(i).1)
+        };
+        if let Some(mut hub) = last {
+            hub.stop();
         }
     }
 }
@@ -374,10 +498,18 @@ fn frame_of(data: &[u8], got: &Negotiated) -> Option<RawFrame> {
 
 fn run(
     req: &OpenRequest,
-    sink: Arc<dyn FrameSink>,
+    entries: &Mutex<Vec<Entry>>,
     stop: &AtomicBool,
-    ready: &mpsc::Sender<Result<SourceInfo, CmError>>,
+    info_out: &Mutex<Option<SourceInfo>>,
 ) {
+    let fail = |e: CmError| {
+        let mut g = lock(entries);
+        for en in g.iter_mut() {
+            if let Some(t) = en.ready.take() {
+                let _ = t.send(Err(e.clone()));
+            }
+        }
+    };
     let Started {
         mut stream,
         info,
@@ -385,64 +517,78 @@ fn run(
     } = match start(req) {
         Ok(x) => x,
         Err(e) => {
-            let _ = ready.send(Err(e));
+            fail(e);
             return;
+        }
+    };
+    let broadcast = |event: CameraEvent| {
+        let sinks: Vec<_> = lock(entries).iter().map(|e| e.sink.clone()).collect();
+        for s in sinks {
+            s.on_event(event.clone());
         }
     };
     let clock = SystemHostClock;
     let mut announced = false;
-    let mut last_preview: Option<u64> = None;
     let began = Instant::now();
     while !stop.load(Ordering::SeqCst) {
         let d = match stream.next(200) {
             Ok(Next::Frame(d)) => d,
             Ok(Next::Idle) => {
                 if !announced && began.elapsed() > req.first_frame_timeout + OPEN_GRACE {
-                    let _ = ready.send(Err(CmError::device_busy(
+                    fail(CmError::device_busy(
                         "The camera did not deliver a picture. It may be in use by another application.",
-                    )));
+                    ));
                     return;
                 }
                 continue;
             }
             Ok(Next::Gone) => {
                 if announced {
-                    sink.on_event(CameraEvent::Disconnected);
+                    broadcast(CameraEvent::Disconnected);
                 } else {
-                    let _ = ready.send(Err(CmError::not_found(format!(
+                    fail(CmError::not_found(format!(
                         "{} stopped before its first picture.",
                         info.device_name
-                    ))));
+                    )));
                 }
                 return;
             }
             Err(e) => {
                 if announced {
-                    sink.on_event(CameraEvent::Error(e.to_string()));
+                    broadcast(CameraEvent::Error(e.to_string()));
                 } else {
-                    let _ = ready.send(Err(io_error(&e, &info.device_name)));
+                    fail(io_error(&e, &info.device_name));
                 }
                 return;
             }
         };
         let delivered = clock.now_ns();
-        let due = match req.role {
-            SourceRole::Preview { fps } => {
-                let due = preview_due(last_preview, delivered, fps);
-                if due {
-                    last_preview = Some(delivered);
-                }
-                due
-            }
-            SourceRole::Record => true,
+        // Who gets this picture: every recorder, and a preview when its rate says so.
+        let wanted: Vec<Arc<dyn FrameSink>> = {
+            let mut g = lock(entries);
+            g.iter_mut()
+                .filter_map(|e| {
+                    let want = match e.role {
+                        SourceRole::Record => true,
+                        SourceRole::Preview { fps } => {
+                            let due = preview_due(e.last_preview, delivered, fps);
+                            if due {
+                                e.last_preview = Some(delivered);
+                            }
+                            due
+                        }
+                    };
+                    want.then(|| e.sink.clone())
+                })
+                .collect()
         };
-        let raw = if due && !d.error {
+        let raw = if !wanted.is_empty() && !d.error {
             frame_of(stream.data(&d), &got)
         } else {
             None
         };
         if stream.requeue(&d).is_err() {
-            sink.on_event(CameraEvent::Disconnected);
+            broadcast(CameraEvent::Disconnected);
             return;
         }
         let Some(raw) = raw else { continue };
@@ -458,10 +604,18 @@ fn run(
             height: raw.height,
             native: Some(NativeSample(raw)),
         };
-        sink.on_frame(&frame);
+        for s in &wanted {
+            s.on_frame(&frame);
+        }
         if !announced {
             announced = true;
-            let _ = ready.send(Ok(info.clone()));
+            *lock(info_out) = Some(info.clone());
+        }
+        // Receivers waiting for their first picture, including ones that joined meanwhile.
+        for en in lock(entries).iter_mut() {
+            if let Some(t) = en.ready.take() {
+                let _ = t.send(Ok(info.clone()));
+            }
         }
     }
 }
