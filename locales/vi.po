@@ -1,5 +1,5 @@
 # Vietnamese (Tiếng Việt) catalogue of the CaptureMann UI.
-# Entries marked `#, fuzzy` are drafts (86 entries added after the Nov 6, 2026 full review: Windows and Linux wording); the app shows them anyway.
+# Entries marked `#, fuzzy` are drafts (113 entries added after the Nov 6, 2026 full review: Windows and Linux wording); the app shows them anyway.
 # The rest of the catalogue was reviewed by the maintainer (native reading: 0.2.0 strings Oct 27, 2026; the remaining draft sheet Nov 6, 2026) and carries no `fuzzy` flag.
 # Entries with `# FACT: owner review required` state what the app really does (privacy, permissions,
 # deletion, confirmations): read each one. Terms follow locales/vi-glossary.md.
@@ -9530,3 +9530,118 @@ msgstr "Không tìm thấy một tệp cần thiết. Tệp có thể đã bị 
 
 msgid "Something went wrong while working with a file. Try again, and if it keeps happening, please report it."
 msgstr "Đã xảy ra sự cố khi làm việc với một tệp. Hãy thử lại; nếu vẫn lỗi, vui lòng báo cho chúng tôi."
+
+#, fuzzy
+msgid "Auto-redact needs a Windows text recognition language. Add one in Settings > Time & language > Language & region (it installs the text recognition part), then restart CaptureMann."
+msgstr "Tự động che cần một ngôn ngữ nhận dạng văn bản của Windows. Hãy thêm một ngôn ngữ trong Settings > Time & language > Language & region (phần nhận dạng văn bản sẽ được cài đặt kèm), rồi khởi động lại CaptureMann."
+
+#, fuzzy
+msgid "Camera access is denied: add your user to the video group (sudo usermod -aG video $USER), then log in again. You can also record without the camera."
+msgstr "Quyền truy cập camera bị từ chối: hãy thêm người dùng của bạn vào nhóm video (sudo usermod -aG video $USER), rồi đăng nhập lại. Bạn cũng có thể quay mà không dùng camera."
+
+#, fuzzy
+msgid "Check that your output is not muted and that PipeWire is running."
+msgstr "Hãy kiểm tra thiết bị phát chưa bị tắt tiếng và PipeWire đang chạy."
+
+#, fuzzy
+msgid "Couldn’t open the save dialog"
+msgstr "Không thể mở hộp thoại lưu"
+
+#, fuzzy
+msgid "Cursor position is saved with the recording on X11, so the editor can draw and zoom on it. On Wayland the pointer is part of the video and cannot be edited."
+msgstr "Vị trí con trỏ được lưu cùng bản ghi trên X11, nên trình chỉnh sửa có thể vẽ và thu phóng theo con trỏ. Trên Wayland, con trỏ nằm sẵn trong video và không thể chỉnh sửa."
+
+#, fuzzy
+msgid "Leaving apps out of a recording"
+msgstr "Loại ứng dụng khỏi bản ghi"
+
+#, fuzzy
+msgid "No key assigned yet; choose one in your desktop’s keyboard settings"
+msgstr "Chưa gán phím; hãy chọn một phím trong cài đặt bàn phím của môi trường desktop"
+
+#, fuzzy
+msgid "Not available on Linux: every window on the screen is recorded, CaptureMann's own included"
+msgstr "Không khả dụng trên Linux: mọi cửa sổ trên màn hình đều được quay, kể cả cửa sổ của chính CaptureMann"
+
+#, fuzzy
+msgid "Not available on Linux: the desktop hands CaptureMann the whole picture, so a recording shows every window on the screen, CaptureMann’s own included. Close or move what you do not want recorded."
+msgstr "Không khả dụng trên Linux: môi trường desktop đưa cho CaptureMann toàn bộ hình ảnh, nên bản ghi hiển thị mọi cửa sổ trên màn hình, kể cả cửa sổ của chính CaptureMann. Hãy đóng hoặc di chuyển những gì bạn không muốn quay."
+
+#, fuzzy
+msgid "On Linux the webcam bubble is hidden while recording, because the desktop cannot keep it out of the video. The webcam is still recorded as its own track and appears in the export."
+msgstr "Trên Linux, bong bóng webcam bị ẩn khi đang quay, vì môi trường desktop không thể loại nó khỏi video. Webcam vẫn được ghi thành một bản ghi riêng và xuất hiện trong bản xuất."
+
+#, fuzzy
+msgid "Plays a short chime and checks that CaptureMann can hear it."
+msgstr "Phát một tiếng chuông ngắn và kiểm tra CaptureMann có nghe được không."
+
+#, fuzzy
+msgid "Read a cursor track"
+msgstr "Đọc bản ghi con trỏ"
+
+#, fuzzy
+msgid "Read publishing rules"
+msgstr "Đọc quy tắc đăng"
+
+#, fuzzy
+msgid "Recording a region is not available on this desktop. Record the whole screen or a window."
+msgstr "Môi trường desktop này không hỗ trợ quay một vùng. Hãy quay toàn màn hình hoặc một cửa sổ."
+
+#, fuzzy
+msgid "Recording a window or a region is not available on this desktop. Record the whole screen."
+msgstr "Môi trường desktop này không hỗ trợ quay một cửa sổ hay một vùng. Hãy quay toàn màn hình."
+
+#, fuzzy
+msgid "Recording one window needs an X11 session on this desktop. Record the whole screen or a region."
+msgstr "Quay một cửa sổ cần phiên X11 trên môi trường desktop này. Hãy quay toàn màn hình hoặc một vùng."
+
+#, fuzzy
+msgid "Screenshot settings"
+msgstr "Cài đặt ảnh chụp màn hình"
+
+# FACT: owner review required (what the permission is for; Linux has no prompt)
+#, fuzzy
+msgid "Shows your webcam in the bubble and records it as its own track. Linux has no camera prompt: if access is denied, add your user to the video group and log in again."
+msgstr "Hiển thị webcam trong bong bóng và ghi thành một bản ghi riêng. Linux không có hộp thoại xin quyền camera: nếu quyền truy cập bị từ chối, hãy thêm người dùng của bạn vào nhóm video và đăng nhập lại."
+
+#, fuzzy
+msgid "States are read without asking the system."
+msgstr "Trạng thái được đọc mà không cần hỏi hệ thống."
+
+#, fuzzy
+msgid "The bubble is not shown on screen while recording on Linux. Its shape and size are used when the recording is exported, and the editor can move it."
+msgstr "Trên Linux, bong bóng không hiển thị trên màn hình khi đang quay. Hình dạng và kích thước của nó được dùng khi xuất bản ghi, và trình chỉnh sửa có thể di chuyển nó."
+
+#, fuzzy
+msgid "The video is encoded with hardware H.264 (VA-API) when this computer has it, otherwise in software as VP9. The recording’s details say which."
+msgstr "Video được mã hóa bằng H.264 phần cứng (VA-API) khi máy tính này hỗ trợ, nếu không thì mã hóa bằng phần mềm sang VP9. Chi tiết của bản ghi cho biết dùng loại nào."
+
+#, fuzzy
+msgid "There is no StatusNotifier host on this desktop. On GNOME turn on the “AppIndicator and KStatusNotifierItem Support” extension; KDE, XFCE, Cinnamon and MATE need nothing. Use the launcher window meanwhile."
+msgstr "Môi trường desktop này không có StatusNotifier host. Trên GNOME, hãy bật tiện ích “AppIndicator and KStatusNotifierItem Support”; KDE, XFCE, Cinnamon và MATE không cần gì thêm. Trong lúc đó, hãy dùng cửa sổ trình khởi chạy."
+
+#, fuzzy
+msgid "Tray icon unavailable"
+msgstr "Biểu tượng khay hệ thống không khả dụng"
+
+#, fuzzy
+msgid "What happens before a screenshot is taken."
+msgstr "Những gì diễn ra trước khi chụp ảnh màn hình."
+
+#, fuzzy
+msgid "Your desktop and the tray icon also show that the microphone is in use. Stop from either one if this window is hidden."
+msgstr "Môi trường desktop và biểu tượng khay hệ thống cũng cho biết micrô đang được dùng. Nếu cửa sổ này bị ẩn, hãy dừng từ một trong hai nơi đó."
+
+#, fuzzy
+msgctxt "settings group"
+msgid "Screenshots"
+msgstr "Ảnh chụp màn hình"
+
+#, fuzzy
+msgctxt "settings page"
+msgid "Capture"
+msgstr "Chụp"
+
+#, fuzzy
+msgid "Transcribe"
+msgstr "Chép lời"
