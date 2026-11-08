@@ -497,11 +497,7 @@ impl SheetModel {
     /// (CAM-4.AC2).
     pub fn camera_note(&self) -> Option<Note> {
         if self.devices.loaded && self.devices.cameras.is_empty() {
-            return Some(Note::Info(if self.is_linux() {
-                tr!("Recording with a webcam bubble is not available on Linux yet.")
-            } else {
-                tr!("No camera found")
-            }));
+            return Some(Note::Info(tr!("No camera found")));
         }
         if self.camera && self.devices.camera_permission.blocked() {
             return Some(Note::Problem {
@@ -1628,12 +1624,7 @@ mod tests {
             "an unavailable kind cannot be chosen"
         );
         assert!(m.kinds_note().unwrap().contains("not available on Linux"));
-        assert_eq!(
-            m.camera_note(),
-            Some(Note::Info(
-                "Recording with a webcam bubble is not available on Linux yet.".into()
-            ))
-        );
+        assert_eq!(m.camera_note(), Some(Note::Info("No camera found".into())));
         // Start stays possible with the display, the microphone and the system audio.
         assert!(m.blocker().is_none());
         let o = m.options().unwrap();
