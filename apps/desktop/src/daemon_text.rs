@@ -801,7 +801,9 @@ fn start_row(kind: &str, key: &str, p: &Value) -> Option<String> {
             }
         }
         "cursor" => {
-            if flag(p, "cursor") {
+            if flag(p, "cursor") && p.get("cursor_track").and_then(Value::as_bool) == Some(false) {
+                tr!("Shown in the video only: this desktop does not let programs record the pointer\u{2019}s position or clicks")
+            } else if flag(p, "cursor") {
                 tr!("Position, clicks and scroll direction (never keystrokes)")
             } else {
                 tr!("Off")
