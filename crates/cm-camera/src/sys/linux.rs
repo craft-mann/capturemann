@@ -158,7 +158,7 @@ fn scan_now() -> Scan {
         scan.nodes.push(Node {
             info: CameraInfo {
                 id,
-                name: caps.card,
+                name: crate::v4l_logic::display_name(&caps.card),
                 kind: classify_linux(&caps.bus_info, &sys_path, removable.as_deref()),
                 is_default: scan.nodes.is_empty(),
                 max_size: top.map_or([0, 0], |m| [m.width, m.height]),
