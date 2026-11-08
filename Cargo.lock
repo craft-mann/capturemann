@@ -1436,6 +1436,7 @@ dependencies = [
  "sha2 0.10.9",
  "tempfile",
  "windows 0.61.3",
+ "x11rb",
 ]
 
 [[package]]
