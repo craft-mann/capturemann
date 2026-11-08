@@ -79,7 +79,7 @@ Files (SHA-256): `capturemann-0.3.0-linux-x86_64.tar.gz` `cae0cfea6617891ffaea0c
 `capturemann_0.3.0_amd64.deb` `30b2cd10316233755cc730271315c03cbcdb6c0d16aa4f54267b37fc128a7158`;
 `capturemann-0.3.0-linux-aarch64.tar.gz` `10513d7059f595d834d525b43e03f5da61341f8ec363efc09ebecd8f6171c968`;
 `capturemann_0.3.0_arm64.deb` `46f7909df48c893fac6261062607c0d888a15eeb8878131fe11b086c3a50f06a`.
-A copy of the four files and the sums is on the Mac under the session scratchpad (`rel-x64`, `rel-a64`) and on the laptop and VM as above; the scratchpad is temporary, so copy them from the laptop and the VM.
+**The four files with their `.sha256`, `SHA256SUMS.txt` and `BUILD-INFO.txt` are on this Mac in `~/release-0.3.0/x86_64` and `~/release-0.3.0/aarch64`** (checked against the sums), and the x86_64 set is also in `~/lab/release-0.3.0-linux/` on the laptop; the build folders are `~/wt/release-out/5301d4b8-*` on the laptop and the VM (with the unstripped programs in `debug/`).
 
 ## Risks
 
