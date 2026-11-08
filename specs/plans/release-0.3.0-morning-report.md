@@ -38,7 +38,7 @@ since `9c6133cb`, where the whole suite passed earlier the same night; I could n
 (the GPU path of the compositor; the machine was busy with the aarch64 VM). **Treat as environment-dependent, rerun on a quiet Mac
 before pushing** (`cargo test -p cm-desktop --lib recedit::render`). `cm-regress --dev --tier standard` on the Mac: 34 passed, 0 failed,
 22 skipped (`L1-macos-0.3.0-dev-cm-regress-standard-shared-code-check-*`): the shared changes do not break import, export or MCP on the Mac.
-Laptop (Linux): fmt and clippy pass; `cargo test --workspace` result: `<see the end of this file>`.
+Laptop (Linux, x86_64, run over ssh without a desktop session): fmt and clippy pass; `cargo test --workspace --no-fail-fast`: 166 suites ok and 1 failure (`agt2_agent_start_asks_with_the_exact_plan`: the cursor row of the start confirmation now says "Shown in the video only" when the run has no X11 session; the test expectation was widened for Linux, then `recording_engine` 65/65 passed on the laptop). Not re-run as a whole after that one-line test change.
 
 `cm-regress` on the final files (passed / failed / skipped; reports `L1-linux-0.3.0-regression-*`):
 
