@@ -25,6 +25,11 @@ windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dx
 # NSFileManager in cm-daemon.)
 trash = { version = "5.2", default-features = false, features = ["coinit_apartmentthreaded"] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+# MIT. D-Bus for the idle-sleep guard (logind and the desktop portal); the version apps/desktop and
+# cm-capture's ashpd already use.
+zbus = "5"
+
 # macOS: NSFileManager, the same objc2 family the capture and daemon crates use (MIT / Zlib / Apache-2.0).
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSFileManager", "NSURL", "NSString", "NSError"] }
