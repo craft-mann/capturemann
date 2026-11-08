@@ -2,10 +2,10 @@
   "cases": [
     {
       "area": "installer",
-      "duration_ms": 1180,
+      "duration_ms": 1127,
       "evidence": [
         "mounted /Users/trungtran/source/repos/capturemann/target/bundle/CaptureMann-0.2.9-arm64.dmg (CaptureMann.app)",
-        "copied the app to /var/folders/xm/d48xc26519j40jmsdcwh6v040000gp/T/cmr45065/1/dmg/CaptureMann.app",
+        "copied the app to /var/folders/xm/d48xc26519j40jmsdcwh6v040000gp/T/cmr69835/1/dmg/CaptureMann.app",
         "ejected the image",
         "the code signature verifies (deep, strict)",
         "bundle id dev.capturemann.app, version 0.2.9",
@@ -27,19 +27,19 @@
     }
   ],
   "run": {
-    "commit": "1d5f429d",
+    "commit": "53a3cb4e",
     "ffmpeg": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
-    "finished": "2026-11-08T00:59:51Z",
-    "flags": "--tier full --package-dir /private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel5/CaptureMann.app/Contents/MacOS --daemon /Users/trungtran/source/repos/capturemann/target/release/cm-daemon --out /var/folders/xm/d48xc26519j40jmsdcwh6v040000gp/T//cm-regress-mac-20261108T005948Z --who cm-regress via regress.sh --verdict PARTIAL --only installer.dmg --installer /Users/trungtran/source/repos/capturemann/target/bundle/CaptureMann-0.2.9-arm64.dmg --commit 1d5f429d",
+    "finished": "2026-11-08T01:17:26Z",
+    "flags": "--tier full --package-dir /private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel6/CaptureMann.app/Contents/MacOS --daemon /Users/trungtran/source/repos/capturemann/target/release/cm-daemon --out /var/folders/xm/d48xc26519j40jmsdcwh6v040000gp/T//cm-regress-mac-20261108T011723Z --who cm-regress via regress.sh --verdict PARTIAL --only installer.dmg --installer /Users/trungtran/source/repos/capturemann/target/bundle/CaptureMann-0.2.9-arm64.dmg --commit 53a3cb4e",
     "gpu": "n/a",
     "hashes": [
       [
         "capturemann",
-        "0ff644b188010ce3eac3c1e81501e038d3062300f888690ca0f7c2e2a8e38a32"
+        "ac33aaf1b350a43ca95591b415f50096808156520f53a34b53e4e59e2dccaccc"
       ],
       [
         "cm-mcp",
-        "df24632de1ab9c9aa08dd85488af2b9dbe0e855e5c9537a1096cf8e7516606fb"
+        "df2df224d6e8cb9defc3d5c62e8a75c9f4b623e5fe68f66e1bae9299121c4398"
       ],
       [
         "cm-daemon",
@@ -47,33 +47,33 @@
       ],
       [
         "cm-desktop",
-        "c10712ca143ca1ef0ab3ba18a8579d081d2e656522031a288668bb691cc1fb37"
+        "72a4352701c566e5a864b6c547ca8e3b8ba5edd9c2145974c4f54ddd91c0b777"
       ],
       [
         "cm-overlay",
-        "aa707edd4ba4be6508dc1b301ca1760ba87ac5224af7564f5bd802e1a03163a8"
+        "2428f236b1e301daab04275439f9fecfff1d66fadf76df15aefa0638da77be4f"
       ],
       [
         "ffmpeg",
-        "9881c6972c875e3f52db8923abfe08454681b6cdbfa9bc07d4b83e9433a278c8"
+        "fd4fb21978726bc356a9d113d81de3a56ec028da8adf18a753b8eb4febef9203"
       ],
       [
         "ffprobe",
-        "7a547933d3015bc4920bda1f6bd22df825b779f01f2c68414123105b1d058acb"
+        "cb65a5d80f376c25ae2b293c56b263ee81488c50cf63c76d8449879d5f20fd34"
       ],
       [
         "llama-server",
-        "ca8f0a0801c3d765e9f48bb0f0cea64e57f890030dc44a4452f8b263891c8840"
+        "9214af6070458059eeaf77c70ff30453d62a51b5fc7a38bdc16ce2484c5d6113"
       ],
       [
         "CaptureMann-0.2.9-arm64.dmg",
-        "39c84bdf11c003c90481e14e1363139a1c23d53b0b87d91d125853945a139e33"
+        "e85e9b097b304f5330bb207ffa64c506239688acfe185ee9e8419291be2f6f35"
       ]
     ],
     "os": "Darwin 25.6.0 arm64",
-    "package_dir": "/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel5/CaptureMann.app/Contents/MacOS",
+    "package_dir": "/private/tmp/claude-502/-Users-trungtran-source-repos-capturemann/1f2d4a7d-d900-4b93-afe1-037068344dda/scratchpad/rel6/CaptureMann.app/Contents/MacOS",
     "platform": "macos",
-    "started": "2026-11-08T00:59:49Z",
+    "started": "2026-11-08T01:17:24Z",
     "tier": "full",
     "verdict": "PARTIAL",
     "version": "0.2.9",
