@@ -80,8 +80,8 @@ pub struct Banner {
     pub discard: bool,
     /// Restart (discard this take and start over) is offered, with Discard.
     pub restart: bool,
-    /// The line under the controls: what else shows the recording, or (while it starts) what the
-    /// desktop may ask; empty during the countdown and while the take is saved.
+    /// The line under the controls: what else shows the recording; empty while it starts, during
+    /// the countdown and while the take is saved.
     pub hint: String,
 }
 
@@ -121,9 +121,6 @@ pub fn banner(hud: &HudState, now: Instant) -> Option<Banner> {
         discard: running,
         restart: running,
         hint: match phase {
-            Phase::Starting => {
-                tr!("Your desktop may ask which screen to share. Choose the screen and press Share.")
-            }
             Phase::Recording | Phase::Paused | Phase::Resuming | Phase::SelfTest
                 if hud.is_audio() =>
             {
@@ -132,7 +129,8 @@ pub fn banner(hud: &HudState, now: Instant) -> Option<Banner> {
             Phase::Recording | Phase::Paused | Phase::Resuming | Phase::SelfTest => {
                 tr!("Your desktop and the tray icon also show that the screen is being recorded. Stop from either one if this window is hidden.")
             }
-            // Nothing is being recorded yet (countdown) or any more (saving): no claim to make.
+            // Nothing is being recorded yet (starting, countdown) or any more (saving): no claim to
+            // make. (The portal's own share dialog says what it wants; GNOME's service shows none.)
             _ => String::new(),
         },
     })
@@ -230,7 +228,7 @@ mod tests {
         let starting = banner(&state("starting"), now).unwrap();
         assert_eq!(starting.label, "Starting");
         assert!(starting.pause.is_none() && starting.timer.is_none() && !starting.stop);
-        assert!(starting.hint.contains("may ask which screen to share"));
+        assert!(starting.hint.is_empty());
         assert!(rec_hint_is_the_indicator_line(
             &banner(&state("recording"), now).unwrap()
         ));
