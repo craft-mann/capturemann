@@ -8,7 +8,7 @@ without a stored report; lines without a report say "not run". Steps: `release-d
 
 - **Tag:** `v0.3.0` (never reuse a tag). **Title:** `CaptureMann 0.3.0: Linux catches up`.
 - **Type:** draft, then **pre-release** (the version is 0.x). Linux only: no Windows or macOS file.
-- **Files to attach** (x86_64 from the lab laptop, aarch64 from the VM, built from commit `<FILL: final commit>`): 
+- **Files to attach** (x86_64 from the lab laptop, aarch64 from the VM, built from commit `5301d4b8`): 
   `capturemann-0.3.0-linux-x86_64.tar.gz`, `capturemann_0.3.0_amd64.deb`, `capturemann-0.3.0-linux-aarch64.tar.gz`,
   `capturemann_0.3.0_arm64.deb`, each with `.sha256` and `.minisig`, and `SHA256SUMS.txt`.
 
@@ -70,7 +70,22 @@ systems. A few things differ by design or are not possible on Linux; they are li
 
 Reports are in `verification/` (`L1-linux-0.3.0-*`); all are marked PARTIAL. Tested on **one** computer: ThinkPad T490, Intel UHD
 620, Ubuntu 24.04.5, GNOME 46, X11 and Wayland, built-in webcam, plus an aarch64 Ubuntu 24.04 VM (headless: no recording, no
-desktop cases). `<FILL: numbers from the final regression reports: tier, session, package, passed/failed/skipped>`.
+desktop cases). `cm-regress` on the files above (commit `5301d4b8`, extracted tarball unless noted), passed / failed / skipped:
+
+| Run | Result |
+| --- | --- |
+| X11, smoke | 13 / 0 / 1 |
+| X11, standard | 49 / 0 / 7 |
+| X11, hardware tier (screen, microphone, camera; no sound) | 58 / 0 / 20 of 78 |
+| X11, full tier with the tarball installer case | 57 / 0 / 14 |
+| X11, full tier with the `.deb` installer case | 56 / 0 / 15 (the `.deb` case itself was skipped there because 0.2.9 was installed; run on its own after `apt remove` and `purge`: 1 / 0 / 0) |
+| X11, standard on the installed `.deb` (an `apt` upgrade from 0.2.9 first) | 49 / 0 / 7 |
+| GNOME 46 Wayland, smoke | 13 / 0 / 1 |
+| GNOME 46 Wayland, standard | 47 / 0 / 9 |
+| GNOME 46 Wayland, hardware tier (no sound) | 55 / 0 / 23 of 78 |
+| aarch64 VM (headless), standard / full | 34 / 0 / 22 and 35 / 0 / 36 |
+
+All 17 failures of the 0.2.6/0.2.9 Linux run have an outcome in `verification/L1-linux-0.3.0-triage-2026-11-09-claude.md`.
 10-minute recording gate on X11 (silent: 18013 frames, none dropped, 300 of 300 flashes, tracks end within 24 ms) and on
 Wayland (screen + microphone + system audio: flash-to-beep offset median -5.9 ms, no drift); `kill -9` recovery lost less
 than one second on Wayland.
@@ -90,10 +105,10 @@ than one second on Wayland.
 
 | File | SHA-256 |
 | --- | --- |
-| `capturemann-0.3.0-linux-x86_64.tar.gz` | `<FILL>` |
-| `capturemann_0.3.0_amd64.deb` | `<FILL>` |
-| `capturemann-0.3.0-linux-aarch64.tar.gz` | `<FILL>` |
-| `capturemann_0.3.0_arm64.deb` | `<FILL>` |
+| `capturemann-0.3.0-linux-x86_64.tar.gz` | `cae0cfea6617891ffaea0cba048686007b039b99cb297d1ee3c685f8f0805072` |
+| `capturemann_0.3.0_amd64.deb` | `30b2cd10316233755cc730271315c03cbcdb6c0d16aa4f54267b37fc128a7158` |
+| `capturemann-0.3.0-linux-aarch64.tar.gz` | `10513d7059f595d834d525b43e03f5da61341f8ec363efc09ebecd8f6171c968` |
+| `capturemann_0.3.0_arm64.deb` | `46f7909df48c893fac6261062607c0d888a15eeb8878131fe11b086c3a50f06a` |
 
 Minisign public key: `packaging/linux/minisign.pub`; fingerprint `<FILL>`.
 Install: `sudo apt install ./capturemann_0.3.0_amd64.deb` (or the tarball and `install.sh`).
