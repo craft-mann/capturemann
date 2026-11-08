@@ -375,6 +375,14 @@ impl<B: PwBackend, T: TokenStore> PipeWireScreenSource<B, T> {
 impl<B: PwBackend, T: TokenStore> ScreenSource for PipeWireScreenSource<B, T> {
     type Frame = CpuFrame;
 
+    /// PipeWire screen streams send a buffer only when the picture changes (damage), so the gaps
+    /// between frames of a window or a moving picture are not missed delivery slots (REC-3, NFR-2:
+    /// a cropped window of a mostly still desktop read 30 % "late"). The idle ticker below keeps
+    /// the stall watchdog informed.
+    fn delivers_only_on_change(&self) -> bool {
+        true
+    }
+
     fn check_permission(&self) -> Result<(), CmError> {
         // There is no query: the portal's dialog is the permission flow and a refusal comes back
         // from `prepare` or `start`.
@@ -805,6 +813,24 @@ mod tests {
             l2.lock().unwrap().push(s);
         });
         (sink, log)
+    }
+
+    /// REC-3 / NFR-2: the screen stream is damage-driven, so the pipeline must not read its gaps
+    /// as late frames (the Linux window recording showed 30.8 % late on a mostly still desktop).
+    #[test]
+    fn a_pipewire_screen_stream_is_event_driven() {
+        let src = PipeWireScreenSource::new(
+            ScriptedPw::new(
+                StreamInfo {
+                    width: 640,
+                    height: 360,
+                    restore_token: None,
+                },
+                Vec::new(),
+            ),
+            MemoryTokenStore::default(),
+        );
+        assert!(src.delivers_only_on_change());
     }
 
     #[test]
