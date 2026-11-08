@@ -109,6 +109,14 @@ for v in DISPLAY WAYLAND_DISPLAY XAUTHORITY DBUS_SESSION_BUS_ADDRESS XDG_RUNTIME
   val=$(tr '\0' '\n' < "/proc/$pid/environ" | sed -n "s/^$v=//p" | head -1)
   [ -n "$val" ] && printf '%s=%q\n' "$v" "$val" >> ~/lab/session.env
 done
+# A Wayland session started by gdm: gnome-shell itself has no WAYLAND_DISPLAY, DISPLAY or XAUTHORITY in its environment (it creates
+# them for its children); the user manager holds them (found with `systemctl --user show-environment`, Nov 9, 2026).
+for v in DISPLAY WAYLAND_DISPLAY XAUTHORITY; do
+  grep -q "^$v=" ~/lab/session.env || {
+    val=$(systemctl --user show-environment 2>/dev/null | sed -n "s/^$v=//p" | head -1)
+    [ -n "$val" ] && printf '%s=%q\n' "$v" "$val" >> ~/lab/session.env
+  }
+done
 sid=$(loginctl show-user "$uid" -p Display --value 2>/dev/null)
 type=$(loginctl show-session "$sid" -p Type --value 2>/dev/null)
 echo "XDG_SESSION_TYPE=${type:-unknown}" >> ~/lab/session.env
