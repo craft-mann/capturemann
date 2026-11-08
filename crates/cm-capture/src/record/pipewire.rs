@@ -523,6 +523,11 @@ impl ScriptedPw {
 }
 
 impl PwBackend for ScriptedPw {
+    /// A scripted desktop can record anything.
+    fn select(&mut self, _target: &PwTarget) -> Result<(), CmError> {
+        Ok(())
+    }
+
     fn open(
         &mut self,
         restore_token: Option<&str>,
