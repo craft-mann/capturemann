@@ -124,6 +124,11 @@ pub fn banner(hud: &HudState, now: Instant) -> Option<Banner> {
             Phase::Starting => {
                 tr!("Your desktop may ask which screen to share. Choose the screen and press Share.")
             }
+            Phase::Recording | Phase::Paused | Phase::Resuming | Phase::SelfTest
+                if hud.is_audio() =>
+            {
+                tr!("Your desktop and the tray icon also show that the microphone is in use. Stop from either one if this window is hidden.")
+            }
             Phase::Recording | Phase::Paused | Phase::Resuming | Phase::SelfTest => {
                 tr!("Your desktop and the tray icon also show that the screen is being recorded. Stop from either one if this window is hidden.")
             }
@@ -233,6 +238,29 @@ mod tests {
         assert_eq!(saving.label, "Saving");
         assert!(!saving.stop && !saving.discard && !saving.restart);
         assert!(saving.hint.is_empty(), "nothing is recorded any more");
+    }
+
+    /// An audio recording has no screen: its banner must not say the screen is recorded.
+    #[test]
+    fn an_audio_recording_names_the_microphone_not_the_screen() {
+        let mut h = HudState::default();
+        let now = Instant::now();
+        h.apply_event(
+            "recording.started",
+            &json!({"recording_id": "rec_1", "capture_id": "rec_abc", "live_at_ms": 0,
+                    "indicator": {"mode": "audio", "preset": "room", "area": null,
+                                  "output": null, "camera": null, "mic": true,
+                                  "system_audio": false, "cursor": false}}),
+            now,
+        );
+        h.apply_status(
+            &json!({"state": "recording", "recording_id": "rec_1", "recorded_ms": 3000}),
+            now,
+        );
+        assert!(h.is_audio());
+        let b = banner(&h, now).unwrap();
+        assert!(b.hint.contains("microphone is in use"), "{}", b.hint);
+        assert!(!b.hint.contains("screen"));
     }
 
     fn rec_hint_is_the_indicator_line(b: &Banner) -> bool {
