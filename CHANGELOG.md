@@ -10,6 +10,8 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 0.2.9 is a bug-fix release for Windows and macOS. macOS also receives the changes of 0.2.8 (Windows only). Linux stays at 0.2.6; the next Linux release is 0.3.0.
 
 ### Fixed
+- Renaming a recording while it is transcribed or while speakers are found no longer loses the result.
+- Errors that showed a job id, an operating-system error or a file path now read as a plain sentence (Vietnamese included).
 - Reveal in the export toast opens the folder of the exported file with the file selected.
 - Annotation editor: Vietnamese text typed with Telex or VNI reaches the Text tool and is exported with its accents; new
   text starts at size 24, white, without an outline.

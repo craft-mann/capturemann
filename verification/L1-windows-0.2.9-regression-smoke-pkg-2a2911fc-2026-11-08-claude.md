@@ -1,18 +1,18 @@
 # L1 windows 0.2.9 regression report (smoke)
 
-- **Date:** 2026-11-07T12:02:44Z to 2026-11-07T12:03:14Z
+- **Date:** 2026-11-08T10:04:51Z to 2026-11-08T10:05:24Z
 - **Who:** cm-regress via regress.sh
 - **Machine:** Microsoft Windows 11 Pro 10.0.26200 build 26200; GPU: Intel(R) UHD Graphics 620 (driver 31.0.101.2137)
-- **Build:** commit ae61845f, package folder `C:\Users\trung\AppData\Local\Programs\CaptureMann`
+- **Build:** commit 2a2911fc, package folder `C:\Users\trung\AppData\Local\Programs\CaptureMann`
 - **FFmpeg:** ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers
-- **Suite:** `cm-regress --tier smoke --out C:\lab\regress-out\20261107T120243Z --who cm-regress via regress.sh --verdict PARTIAL --commit ae61845f`, tier `smoke`
+- **Suite:** `cm-regress --tier smoke --out C:\lab\regress-out\20261108T100449Z --who cm-regress via regress.sh --verdict PARTIAL --commit 2a2911fc`, tier `smoke`
 - **Result:** 12 passed, 0 failed, 2 skipped of 14 cases
 - **SHA-256 of the files under test:**
-  - `capturemann.exe` `18a95748ff29971c44f0227ed03580137decfb5dcd51b807000d7c8e9e0253b8`
-  - `cm-mcp.exe` `c1665f768a7249cf1febea50b8c52f26fd838641ea917adeb103d79123acc823`
-  - `cm-daemon.exe` `aa13dc180d57ba60772883899bfe2642328a65360f694b3faeb9289cc6c032ed`
-  - `cm-desktop.exe` `dbf5fc09437efd909e2c21b3213f0b89b168b844e97930c491e6d2d34f474682`
-  - `cm-overlay.exe` `92a8325b84d64c039d70f0fdee61f343afaf89e1013e86c5ed32935a7f99bcd0`
+  - `capturemann.exe` `3cbe8a8a5fa250f9602d179474fcd07964a6fddff9ecc215dce0a8e967625b3a`
+  - `cm-mcp.exe` `7a42eeb89f30117d0172f17a63b7e7368e0a17426577f5c5328f244f6b02e494`
+  - `cm-daemon.exe` `e9d642b426fb82c8e198c05e6a4ca1447771e465638e72fc217e538cf4cb6abb`
+  - `cm-desktop.exe` `f249439f9c88d403d0dbec9f282dc6e7417889f7b5fc8c3d76e544856387c637`
+  - `cm-overlay.exe` `f771cbdb155910798b59d7829c58225c569b0b4db3c364e5749a6c3699eb4629`
   - `ffmpeg.exe` `b94bead6469a51a9e44db2f06a4daea3efb90686e937262ea2569c304cf31b7e`
   - `ffprobe.exe` `7f13cb52988e7589090d2afe5f1a81dad1656d21578843f282a2ad241db54ad8`
   - `llama-server.exe` `340b747fd5cd59e27a402c8e0d68bd03376cc2d33026c2c14d1818fd97c23d7b`
@@ -76,17 +76,17 @@
 
 ## Evidence of passing cases
 
-- `pkg.files` (602 ms): capturemann.exe: 4626432 bytes; cm-mcp.exe: 8208384 bytes; cm-daemon.exe: 56285184 bytes; cm-desktop.exe: 94044160 bytes; cm-overlay.exe: 2769920 bytes; licence: Some("C:\\Users\\trung\\AppData\\Local\\Programs\\CaptureMann\\doc\\LICENSE"), third party: Some("C:\\Users\\trung\\AppData\\Local\\Programs\\CaptureMann\\doc\\THIRD_PARTY_LICENSES.md"), notice: Some("C:\\Users\\trung\\AppData\\Local\\Programs\\CaptureMann\\doc\\NOTICE")
-- `pkg.startup` (8719 ms): capturemann --version: exit 0 (0x00000000) in 32 ms; cm-mcp --bogus: exit 2 (0x00000002) in 1808 ms; cm-daemon --bogus: exit 2 (0x00000002) in 3925 ms; cm-overlay --help: exit 0 (0x00000000) in 1233 ms; ffmpeg -hide_banner -version: exit 0 (0x00000000) in 33 ms; ffprobe -hide_banner -version: exit 0 (0x00000000) in 454 ms; llama-server --version: exit 0 (0x00000000) in 595 ms
-- `pkg.diagnostics` (1240 ms): version 0.2.9; daemon pid 13896 answered after 319 ms; - windows x86_64; - GPU Intel(R) UHD Graphics 620, driver 31.0.101.2137, 134 MB dedicated memory, vendor id 0x8086; - GPU Microsoft Basic Render Driver (software renderer: no hardware GPU is in use), driver 10.0.26100.9711, vendor id 0x1414; - speech model speaker-segmentation (6 MB); - speech model speaker-embedding (29 MB); - ffmpeg at ~\AppData\Local\Programs\CaptureMann\ffmpeg.exe; - llama-server at ~\AppData\Local\Programs\CaptureMann\l...
-- `daemon.lifecycle` (1915 ms): daemon pid 4616 answered after 319 ms; pid 4616, 86 actions; stop: killed (Windows has no signal for a hidden process); log hygiene: 1 WARN line(s) in the case's logs
-- `daemon.library_created` (2052 ms): daemon pid 2976 answered after 320 ms; log hygiene: 1 WARN line(s) in the case's logs
-- `settings.roundtrip` (1687 ms): daemon pid 5232 answered after 320 ms; daemon pid 6028 answered after 317 ms; recording.fps=47: exit 0 (0x00000000) None; 47 was accepted: {"settings":{"recording.fps":47}}; log hygiene: 2 WARN line(s) in the case's logs
-- `targets.list` (1078 ms): daemon pid 1352 answered after 319 ms; display 65537 'Display 1' 1920x1080 at (0,0) scale 1.5 primary; 1 windows; capabilities {"capture_region":true,"capture_window":true,"list_windows":true,"pick":false}; apps: Windows Terminal; log hygiene: 1 WARN line(s) in the case's logs
-- `lib.manifest` (1117 ms): daemon pid 2356 answered after 320 ms; manifest keys ok; exported PNG 1000x260, 35254 bytes; log hygiene: 1 WARN line(s) in the case's logs
-- `mcp.handshake` (1185 ms): daemon pid 10312 answered after 319 ms; server capturemann 0.2.9, protocol "2025-06-18"; log hygiene: 1 WARN line(s) in the case's logs
-- `mcp.tools_list` (1127 ms): daemon pid 3168 answered after 318 ms; 79 tools; log hygiene: 1 WARN line(s) in the case's logs
-- `ai.llama_version` (1909 ms): llama-server --version: exit 0 (0x00000000) version: 0.7.0-dev (build 0, commit unknown) built with GNU 16.2.0 for Windows AMD64; daemon pid 15592 answered after 319 ms; log hygiene: 1 WARN line(s) in the case's logs
+- `pkg.files` (610 ms): capturemann.exe: 4626432 bytes; cm-mcp.exe: 8208384 bytes; cm-daemon.exe: 56221696 bytes; cm-desktop.exe: 94094848 bytes; cm-overlay.exe: 2770432 bytes; licence: Some("C:\\Users\\trung\\AppData\\Local\\Programs\\CaptureMann\\doc\\LICENSE"), third party: Some("C:\\Users\\trung\\AppData\\Local\\Programs\\CaptureMann\\doc\\THIRD_PARTY_LICENSES.md"), notice: Some("C:\\Users\\trung\\AppData\\Local\\Programs\\CaptureMann\\doc\\NOTICE")
+- `pkg.startup` (10762 ms): capturemann --version: exit 0 (0x00000000) in 32 ms; cm-mcp --bogus: exit 2 (0x00000002) in 1874 ms; cm-daemon --bogus: exit 2 (0x00000002) in 5672 ms; cm-overlay --help: exit 0 (0x00000000) in 1430 ms; ffmpeg -hide_banner -version: exit 0 (0x00000000) in 33 ms; ffprobe -hide_banner -version: exit 0 (0x00000000) in 463 ms; llama-server --version: exit 0 (0x00000000) in 614 ms
+- `pkg.diagnostics` (1253 ms): version 0.2.9; daemon pid 12092 answered after 319 ms; - windows x86_64; - GPU Intel(R) UHD Graphics 620, driver 31.0.101.2137, 134 MB dedicated memory, vendor id 0x8086; - GPU Microsoft Basic Render Driver (software renderer: no hardware GPU is in use), driver 10.0.26100.9711, vendor id 0x1414; - speech model speaker-segmentation (6 MB); - speech model speaker-embedding (29 MB); - ffmpeg at ~\AppData\Local\Programs\CaptureMann\ffmpeg.exe; - llama-server at ~\AppData\Local\Programs\CaptureMann\l...
+- `daemon.lifecycle` (1928 ms): daemon pid 6916 answered after 318 ms; pid 6916, 86 actions; stop: killed (Windows has no signal for a hidden process); log hygiene: 1 WARN line(s) in the case's logs
+- `daemon.library_created` (2065 ms): daemon pid 13944 answered after 320 ms; log hygiene: 1 WARN line(s) in the case's logs
+- `settings.roundtrip` (1708 ms): daemon pid 1768 answered after 320 ms; daemon pid 6480 answered after 315 ms; recording.fps=47: exit 0 (0x00000000) None; 47 was accepted: {"settings":{"recording.fps":47}}; log hygiene: 2 WARN line(s) in the case's logs
+- `targets.list` (1091 ms): daemon pid 7736 answered after 320 ms; display 65537 'Display 1' 1920x1080 at (0,0) scale 1.5 primary; 1 windows; capabilities {"capture_region":true,"capture_window":true,"list_windows":true,"pick":false}; apps: Windows Terminal; log hygiene: 1 WARN line(s) in the case's logs
+- `lib.manifest` (1133 ms): daemon pid 9984 answered after 321 ms; manifest keys ok; exported PNG 1000x260, 35254 bytes; log hygiene: 1 WARN line(s) in the case's logs
+- `mcp.handshake` (1203 ms): daemon pid 16224 answered after 320 ms; server capturemann 0.2.9, protocol "2025-06-18"; log hygiene: 1 WARN line(s) in the case's logs
+- `mcp.tools_list` (1137 ms): daemon pid 200 answered after 320 ms; 79 tools; log hygiene: 1 WARN line(s) in the case's logs
+- `ai.llama_version` (1931 ms): llama-server --version: exit 0 (0x00000000) version: 0.7.0-dev (build 0, commit unknown) built with GNU 16.2.0 for Windows AMD64; daemon pid 9532 answered after 318 ms; log hygiene: 1 WARN line(s) in the case's logs
 
 ## Verdict
 

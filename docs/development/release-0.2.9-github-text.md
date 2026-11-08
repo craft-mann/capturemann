@@ -52,6 +52,10 @@ want it and collapse it** (see "Improved"). **macOS users also get everything th
 5. **Play on Windows no longer passes the file name through `cmd`.** A capture whose title contained `&`, `^` or `%` could
    make Windows run an extra command when you pressed Play. The file is now opened through File Explorer with the path
    quoted. (A bug found in a review of the changes since 0.2.8; no report of it being used.)
+6. **Renaming a recording while it is transcribed or while speakers are found** no longer loses the result: the job writes into the
+   recording's folder as it is when the job finishes (before, the transcript failed with `cannot read .../manifest.json`).
+7. **Error messages** that carried a job id, an operating-system error or a file path now say what happened in a plain
+   sentence ("A file this needs could not be found..."); the original text goes to the log. Vietnamese is included.
 
 ## Improved
 
@@ -106,9 +110,9 @@ one lab machine per platform unless a line says a person looked. A PARTIAL repor
 
 | Platform | Package (CI run, commit) | Smoke | Standard | Hardware | Report files |
 | --- | --- | --- | --- | --- | --- |
-| Windows 11 x64 (ThinkPad T490, Intel UHD 620) | installer from the Windows package run 42363837840, commit `ae61845f` (installed silently on the lab laptop) | 12 passed, 2 skipped | 49 passed, 7 skipped | 58 passed, **1 failed**, 18 skipped: `rec.camera` measured 10.1 fps in the evening (a low-light camera mode) and passed in daylight (9.9 s run, Nov 8); the full tier: 56 passed, 14 skipped | `verification/L1-windows-0.2.9-regression-{smoke,standard,hardware,full}-pkg-ae61845f-*`, `...-hardware-camera-again{1,2}-*` (the evening failures), `...-hardware-camera-day-*` |
-| macOS arm64 (the maintainer's Mac, Apple M4 Pro, macOS 26.6.2) | the notarized, stapled DMG built on the maintainer's Mac from tag `v0.2.9` (commit `e6ce0fd1`, `make release`), app copied out of the DMG for the runs | 12 passed, 2 skipped | 44 passed, 12 skipped | 53 passed, 0 failed, 24 skipped (screen, microphone, system audio and camera ran with the maintainer's consent); the DMG install check passed | `verification/L1-macos-0.2.9-regression-{full-dmg-arm64,full-dmg-x86_64,smoke-app,standard-app,hardware-app}-v0.2.9-*` |
-| macOS x86_64 (Intel) | the notarized, stapled DMG built on the maintainer's Mac with `make release CM_ARCH=x86_64` from the same tag; checked on Apple Silicon only: the DMG install check passed and its command-line tool ran under Rosetta | not run on Intel hardware | not run | not run | `...-full-dmg-x86_64-v0.2.9-*` |
+| Windows 11 x64 (ThinkPad T490, Intel UHD 620) | installer from the Windows package run 42463440019 on tag `v0.2.9` (commit `2a2911fc`), installed silently on the lab laptop | 12 passed, 0 failed, 2 skipped | 49 passed, 0 failed, 7 skipped | 59 passed, 0 failed, 18 skipped (screen, sound, microphone and camera ran); the full tier: 43 passed, 0 failed, 27 skipped | `verification/L1-windows-0.2.9-regression-{smoke,standard,hardware,full}-pkg-2a2911fc-*` |
+| macOS arm64 (the maintainer's Mac, Apple M4 Pro, macOS 26.6.2) | the notarized, stapled DMG built on the maintainer's Mac from tag `v0.2.9` (commit `2a2911fc`, `make release`), app copied out of the DMG for the runs | 12 passed, 0 failed, 2 skipped | 44 passed, 0 failed, 12 skipped | 53 passed, 0 failed, 24 skipped (screen, microphone, system audio and camera ran with the maintainer's consent); the DMG install check passed | `verification/L1-macos-0.2.9-regression-{full-dmg-arm64,smoke-app,standard-app,hardware-app}-2a2911fc-*` |
+| macOS x86_64 (Intel) | the notarized, stapled DMG built on the maintainer's Mac with `make release CM_ARCH=x86_64` from the same tag (commit `2a2911fc`); checked on Apple Silicon only: the DMG install check passed and its command-line tool ran under Rosetta | not run on Intel hardware | not run | not run | `...-full-dmg-x86_64-2a2911fc-*` |
 
 **One hour of audio recording** (the case for long meetings), one run per platform, mic only on the Mac, mic plus system audio
 on Windows, nobody speaking: 3602.6 s recorded on the Mac and 3601.6 s on Windows, no gaps, no resyncs, the app's memory
@@ -153,8 +157,8 @@ CI on the tag commit (`cargo test --workspace` on macOS and Windows): <FILL: lin
   SHA-256: installer `<FILL>`, zip `<FILL>`. Check with `certutil -hashfile <file> SHA256`.
 - **macOS 13+:** `CaptureMann-v0.2.9-macos-arm64.dmg` (Apple Silicon) or `CaptureMann-v0.2.9-macos-x86_64.dmg` (Intel);
   signed with a Developer ID, notarized and stapled. Or `brew upgrade --cask craft-mann/tap/capturemann`
-  (`brew install --cask craft-mann/tap/capturemann` for a first install). SHA-256: arm64 `f2234e0c56f46d115639b97b0307793e4bf82dbfe7cdadb998312533c6ce0d58`, x86_64
-  `78fff050db66d29831ab0b4ea821412793119e19d042657f537ed7d7f7fc8628`.
+  (`brew install --cask craft-mann/tap/capturemann` for a first install). SHA-256: arm64 `fd5aed2d16dbcc09dd1ff4220453573a64af0a449948b3feb9e55ceace9b1e09`, x86_64
+  `dc3e44fb1cf605567d7259b18d5f8537cadf8c6d5e2254666e8ac155a2978d97`.
   Check with `shasum -a 256 -c <file>.sha256`.
 - **Linux:** no 0.2.9 files. Linux stays at 0.2.6; the next Linux release is 0.3.0.
 

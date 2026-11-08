@@ -2,13 +2,13 @@
   "cases": [
     {
       "area": "pkg",
-      "duration_ms": 602,
+      "duration_ms": 610,
       "evidence": [
         "capturemann.exe: 4626432 bytes",
         "cm-mcp.exe: 8208384 bytes",
-        "cm-daemon.exe: 56285184 bytes",
-        "cm-desktop.exe: 94044160 bytes",
-        "cm-overlay.exe: 2769920 bytes",
+        "cm-daemon.exe: 56221696 bytes",
+        "cm-desktop.exe: 94094848 bytes",
+        "cm-overlay.exe: 2770432 bytes",
         "licence: Some(\"C:\\\\Users\\\\trung\\\\AppData\\\\Local\\\\Programs\\\\CaptureMann\\\\doc\\\\LICENSE\"), third party: Some(\"C:\\\\Users\\\\trung\\\\AppData\\\\Local\\\\Programs\\\\CaptureMann\\\\doc\\\\THIRD_PARTY_LICENSES.md\"), notice: Some(\"C:\\\\Users\\\\trung\\\\AppData\\\\Local\\\\Programs\\\\CaptureMann\\\\doc\\\\NOTICE\")"
       ],
       "id": "pkg.files",
@@ -24,15 +24,15 @@
     },
     {
       "area": "pkg",
-      "duration_ms": 8719,
+      "duration_ms": 10762,
       "evidence": [
         "capturemann --version: exit 0 (0x00000000) in 32 ms",
-        "cm-mcp --bogus: exit 2 (0x00000002) in 1808 ms",
-        "cm-daemon --bogus: exit 2 (0x00000002) in 3925 ms",
-        "cm-overlay --help: exit 0 (0x00000000) in 1233 ms",
+        "cm-mcp --bogus: exit 2 (0x00000002) in 1874 ms",
+        "cm-daemon --bogus: exit 2 (0x00000002) in 5672 ms",
+        "cm-overlay --help: exit 0 (0x00000000) in 1430 ms",
         "ffmpeg -hide_banner -version: exit 0 (0x00000000) in 33 ms",
-        "ffprobe -hide_banner -version: exit 0 (0x00000000) in 454 ms",
-        "llama-server --version: exit 0 (0x00000000) in 595 ms"
+        "ffprobe -hide_banner -version: exit 0 (0x00000000) in 463 ms",
+        "llama-server --version: exit 0 (0x00000000) in 614 ms"
       ],
       "id": "pkg.startup",
       "message": "",
@@ -47,10 +47,10 @@
     },
     {
       "area": "pkg",
-      "duration_ms": 1240,
+      "duration_ms": 1253,
       "evidence": [
         "version 0.2.9",
-        "daemon pid 13896 answered after 319 ms",
+        "daemon pid 12092 answered after 319 ms",
         "- windows x86_64",
         "- GPU Intel(R) UHD Graphics 620, driver 31.0.101.2137, 134 MB dedicated memory, vendor id 0x8086",
         "- GPU Microsoft Basic Render Driver (software renderer: no hardware GPU is in use), driver 10.0.26100.9711, vendor id 0x1414",
@@ -75,10 +75,10 @@
     },
     {
       "area": "daemon",
-      "duration_ms": 1915,
+      "duration_ms": 1928,
       "evidence": [
-        "daemon pid 4616 answered after 319 ms",
-        "pid 4616, 86 actions",
+        "daemon pid 6916 answered after 318 ms",
+        "pid 6916, 86 actions",
         "stop: killed (Windows has no signal for a hidden process)",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -95,9 +95,9 @@
     },
     {
       "area": "daemon",
-      "duration_ms": 2052,
+      "duration_ms": 2065,
       "evidence": [
-        "daemon pid 2976 answered after 320 ms",
+        "daemon pid 13944 answered after 320 ms",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "daemon.library_created",
@@ -113,10 +113,10 @@
     },
     {
       "area": "settings",
-      "duration_ms": 1687,
+      "duration_ms": 1708,
       "evidence": [
-        "daemon pid 5232 answered after 320 ms",
-        "daemon pid 6028 answered after 317 ms",
+        "daemon pid 1768 answered after 320 ms",
+        "daemon pid 6480 answered after 315 ms",
         "recording.fps=47: exit 0 (0x00000000) None",
         "47 was accepted: {\"settings\":{\"recording.fps\":47}}",
         "log hygiene: 2 WARN line(s) in the case's logs"
@@ -133,9 +133,9 @@
     },
     {
       "area": "targets",
-      "duration_ms": 1078,
+      "duration_ms": 1091,
       "evidence": [
-        "daemon pid 1352 answered after 319 ms",
+        "daemon pid 7736 answered after 320 ms",
         "display 65537 'Display 1' 1920x1080 at (0,0) scale 1.5 primary",
         "1 windows; capabilities {\"capture_region\":true,\"capture_window\":true,\"list_windows\":true,\"pick\":false}",
         "apps: Windows Terminal",
@@ -175,9 +175,9 @@
     },
     {
       "area": "lib",
-      "duration_ms": 1117,
+      "duration_ms": 1133,
       "evidence": [
-        "daemon pid 2356 answered after 320 ms",
+        "daemon pid 9984 answered after 321 ms",
         "manifest keys ok; exported PNG 1000x260, 35254 bytes",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -195,9 +195,9 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 1185,
+      "duration_ms": 1203,
       "evidence": [
-        "daemon pid 10312 answered after 319 ms",
+        "daemon pid 16224 answered after 320 ms",
         "server capturemann 0.2.9, protocol \"2025-06-18\"",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -214,9 +214,9 @@
     },
     {
       "area": "mcp",
-      "duration_ms": 1127,
+      "duration_ms": 1137,
       "evidence": [
-        "daemon pid 3168 answered after 318 ms",
+        "daemon pid 200 answered after 320 ms",
         "79 tools",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
@@ -233,10 +233,10 @@
     },
     {
       "area": "ai",
-      "duration_ms": 1909,
+      "duration_ms": 1931,
       "evidence": [
         "llama-server --version: exit 0 (0x00000000) version: 0.7.0-dev (build 0, commit unknown) built with GNU 16.2.0 for Windows AMD64",
-        "daemon pid 15592 answered after 319 ms",
+        "daemon pid 9532 answered after 318 ms",
         "log hygiene: 1 WARN line(s) in the case's logs"
       ],
       "id": "ai.llama_version",
@@ -269,7 +269,7 @@
     },
     {
       "area": "zz",
-      "duration_ms": 636,
+      "duration_ms": 635,
       "evidence": [],
       "id": "zz.crash_events",
       "message": "",
@@ -284,31 +284,31 @@
     }
   ],
   "run": {
-    "commit": "ae61845f",
+    "commit": "2a2911fc",
     "ffmpeg": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
-    "finished": "2026-11-07T12:03:14Z",
-    "flags": "--tier smoke --out C:\\lab\\regress-out\\20261107T120243Z --who cm-regress via regress.sh --verdict PARTIAL --commit ae61845f",
+    "finished": "2026-11-08T10:05:24Z",
+    "flags": "--tier smoke --out C:\\lab\\regress-out\\20261108T100449Z --who cm-regress via regress.sh --verdict PARTIAL --commit 2a2911fc",
     "gpu": "Intel(R) UHD Graphics 620 (driver 31.0.101.2137)",
     "hashes": [
       [
         "capturemann.exe",
-        "18a95748ff29971c44f0227ed03580137decfb5dcd51b807000d7c8e9e0253b8"
+        "3cbe8a8a5fa250f9602d179474fcd07964a6fddff9ecc215dce0a8e967625b3a"
       ],
       [
         "cm-mcp.exe",
-        "c1665f768a7249cf1febea50b8c52f26fd838641ea917adeb103d79123acc823"
+        "7a42eeb89f30117d0172f17a63b7e7368e0a17426577f5c5328f244f6b02e494"
       ],
       [
         "cm-daemon.exe",
-        "aa13dc180d57ba60772883899bfe2642328a65360f694b3faeb9289cc6c032ed"
+        "e9d642b426fb82c8e198c05e6a4ca1447771e465638e72fc217e538cf4cb6abb"
       ],
       [
         "cm-desktop.exe",
-        "dbf5fc09437efd909e2c21b3213f0b89b168b844e97930c491e6d2d34f474682"
+        "f249439f9c88d403d0dbec9f282dc6e7417889f7b5fc8c3d76e544856387c637"
       ],
       [
         "cm-overlay.exe",
-        "92a8325b84d64c039d70f0fdee61f343afaf89e1013e86c5ed32935a7f99bcd0"
+        "f771cbdb155910798b59d7829c58225c569b0b4db3c364e5749a6c3699eb4629"
       ],
       [
         "ffmpeg.exe",
@@ -326,7 +326,7 @@
     "os": "Microsoft Windows 11 Pro 10.0.26200 build 26200",
     "package_dir": "C:\\Users\\trung\\AppData\\Local\\Programs\\CaptureMann",
     "platform": "windows",
-    "started": "2026-11-07T12:02:44Z",
+    "started": "2026-11-08T10:04:51Z",
     "tier": "smoke",
     "verdict": "PARTIAL",
     "version": "0.2.9",
