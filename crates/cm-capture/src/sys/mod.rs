@@ -7,6 +7,7 @@ pub mod permission;
 pub mod pipewire_linux;
 pub mod portal;
 pub mod session;
+pub mod shell_saved;
 #[cfg(windows)]
 #[cfg(windows)]
 pub mod win_display;
