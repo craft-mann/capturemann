@@ -36,7 +36,15 @@ Mac (the final code state, commit `5301d4b8`): `cargo fmt --check`, `cargo clipp
 and `worker_is_latest_wins_and_stops`: the preview renderer produces no picture within 20 s). The code of that path is unchanged
 since `9c6133cb`, where the whole suite passed earlier the same night; I could not tell why the Mac stopped producing the picture
 (the GPU path of the compositor; the machine was busy with the aarch64 VM). **Treat as environment-dependent, rerun on a quiet Mac
-before pushing** (`cargo test -p cm-desktop --lib recedit::render`). `cm-regress --dev --tier standard` on the Mac: 34 passed, 0 failed,
+before pushing** (`cargo test -p cm-desktop --lib recedit::render`). **Follow-up on the two Mac render tests (Nov 9, 04:50, lead):** I reran them. The same source passes (8/8, under 1 s, eight runs) when
+built into a fresh target directory outside the repository, on the commits `a18c7641`, `5301d4b8` and the current `main`, and
+`v0.2.9` passes too; a `git bisect` between `9c6133cb` and `5301d4b8` ended on a documents-only commit, so no code change causes it.
+Inside the repository's own `target/` (also after `cargo clean -p cm-desktop`) both tests still time out at `render.rs:760`
+(the worker thread never returns a picture). So the failure depends on where the test binary is built and run in this session's
+environment (the GPU path of the preview renderer), not on the 0.3.0 code. Still run `cargo test -p cm-desktop --lib recedit::render`
+once in your own terminal before pushing.
+
+`cm-regress --dev --tier standard` on the Mac: 34 passed, 0 failed,
 22 skipped (`L1-macos-0.3.0-dev-cm-regress-standard-shared-code-check-*`): the shared changes do not break import, export or MCP on the Mac.
 Laptop (Linux, x86_64, run over ssh without a desktop session): fmt and clippy pass; `cargo test --workspace --no-fail-fast`: 166 suites ok and 1 failure (`agt2_agent_start_asks_with_the_exact_plan`: the cursor row of the start confirmation now says "Shown in the video only" when the run has no X11 session; the test expectation was widened for Linux, then `recording_engine` 65/65 passed on the laptop). Not re-run as a whole after that one-line test change.
 
@@ -86,4 +94,4 @@ Files (SHA-256): `capturemann-0.3.0-linux-x86_64.tar.gz` `cae0cfea6617891ffaea0c
 - One laptop, one GPU (Intel UHD 620) and one desktop (GNOME 46 on Ubuntu 24.04): other Linux setups are untested. The release text says so.
 - Skipping GNOME's share dialog means the compositor's consent prompt is gone: our own Confirm tier, banner and tray state remain, and GNOME's orange dot. Say it in the release text (it does).
 - Network downloads in the package build are flaky from the lab (stalls at ~190 KB/s): source tarballs were cached for the final build; a rebuild from a clean machine downloads again and may stall.
-- The preview-render test failure on the Mac (above) is unexplained.
+- The preview-render test failure on the Mac depends on the build location and environment, not on the code (see the follow-up above); confirm it in your own terminal.
