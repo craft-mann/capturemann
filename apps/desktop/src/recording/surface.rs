@@ -78,6 +78,8 @@ pub struct Banner {
     pub countdown: bool,
     /// Discard this take is offered.
     pub discard: bool,
+    /// Restart (discard this take and start over) is offered, with Discard.
+    pub restart: bool,
     /// The line under the controls: what else shows the recording, or (while it starts) what the
     /// desktop may ask.
     pub hint: String,
@@ -117,6 +119,7 @@ pub fn banner(hud: &HudState, now: Instant) -> Option<Banner> {
         ),
         countdown: matches!(phase, Phase::Countdown | Phase::Resuming) && digit.is_some(),
         discard: running,
+        restart: running,
         hint: if phase == Phase::Starting {
             tr!("Your desktop may ask which screen to share. Choose the screen and press Share.")
         } else {
@@ -202,7 +205,7 @@ mod tests {
         let rec = banner(&state("recording"), now).unwrap();
         assert_eq!(rec.label, "Recording");
         assert!(rec.timer.as_deref().unwrap().starts_with("01:0"), "{rec:?}");
-        assert!(rec.live && rec.stop && rec.discard);
+        assert!(rec.live && rec.stop && rec.discard && rec.restart);
         assert_eq!(rec.pause, Some(false));
         assert_eq!(rec.mic, Some(false));
         let paused = banner(&state("paused"), now + Duration::from_secs(1)).unwrap();
@@ -223,7 +226,7 @@ mod tests {
         ));
         let saving = banner(&state("stopping"), now).unwrap();
         assert_eq!(saving.label, "Saving");
-        assert!(!saving.stop && !saving.discard);
+        assert!(!saving.stop && !saving.discard && !saving.restart);
     }
 
     fn rec_hint_is_the_indicator_line(b: &Banner) -> bool {

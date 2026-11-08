@@ -123,6 +123,23 @@ fn view(t: &Theme, b: &Banner, app: &Entity<AppModel>) -> impl IntoElement {
                 .into_any_element(),
         );
     }
+    if b.restart {
+        let a = app.clone();
+        actions.push(
+            button_with_icon(
+                t,
+                "banner-restart",
+                tr!("Restart recording"),
+                ButtonKind::Ghost,
+                Some(crate::recording::hud_layout::RESTART_ICON),
+            )
+            .on_click(move |_, _, cx| {
+                let a = a.clone();
+                cx.defer(move |cx| rec::ask_discard(&a, true, cx));
+            })
+            .into_any_element(),
+        );
+    }
     if b.discard {
         let a = app.clone();
         actions.push(
@@ -177,8 +194,10 @@ fn view(t: &Theme, b: &Banner, app: &Entity<AppModel>) -> impl IntoElement {
         .child(
             div()
                 .flex()
+                .flex_wrap()
                 .items_center()
-                .gap(px(12.))
+                .gap_x(px(12.))
+                .gap_y(px(6.))
                 .child(dot(dot_color, 10.))
                 .child(
                     div()
@@ -188,7 +207,14 @@ fn view(t: &Theme, b: &Banner, app: &Entity<AppModel>) -> impl IntoElement {
                 )
                 .children(timer)
                 .child(div().flex_1().min_w(px(0.)))
-                .child(div().flex().items_center().gap(px(8.)).children(actions)),
+                .child(
+                    div()
+                        .flex()
+                        .flex_wrap()
+                        .items_center()
+                        .gap(px(8.))
+                        .children(actions),
+                ),
         )
         .child(
             div()
