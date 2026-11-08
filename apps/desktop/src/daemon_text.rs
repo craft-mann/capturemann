@@ -830,6 +830,9 @@ fn start_row(kind: &str, key: &str, p: &Value) -> Option<String> {
             0 => tr_ctx!("countdown", "None"),
             n => format!("{n} s"),
         },
+        "excluded_windows" if p.get("hides_windows").and_then(Value::as_bool) == Some(false) => {
+            tr!("Not available on Linux: every window on the screen is recorded, CaptureMann's own included")
+        }
         "excluded_windows" => {
             tr!("CaptureMann's own windows and your password managers never appear")
         }

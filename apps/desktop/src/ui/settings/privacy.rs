@@ -77,6 +77,23 @@ impl SettingsView {
     /// The apps that never appear in a recording (REC-6). The defaults are listed and cannot be
     /// removed (REC-6.AC3).
     pub(super) fn excluded_apps(&self, t: &Theme, cx: &mut Context<Self>) -> AnyElement {
+        // Linux gives the recorder the whole picture (REC-6): no list can leave an app out.
+        if crate::permissions::Os::current() == crate::permissions::Os::Linux {
+            return div()
+                .flex()
+                .flex_col()
+                .gap(px(10.))
+                .child(group_header(
+                    t,
+                    &tr!("Leaving apps out of a recording"),
+                    None,
+                ))
+                .child(caption(
+                    t,
+                    tr!("Not available on Linux: the desktop hands CaptureMann the whole picture, so a recording shows every window on the screen, CaptureMann\u{2019}s own included. Close or move what you do not want recorded."),
+                ))
+                .into_any_element();
+        }
         let s = self.recording_settings(cx);
         let defaults = default_exclusions();
         // Design gap: the board lists "Keychain Access" as a default and makes 1Password
