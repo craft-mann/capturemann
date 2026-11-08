@@ -112,22 +112,34 @@ fn files(ctx: &mut Ctx) -> R {
                 ));
             }
         }
-        if sys::PLATFORM == "windows" && !ctx.pkg.has("llama-server") {
-            missing.push(
-                "llama-server.exe is missing (the Windows package ships the text engine)"
-                    .to_owned(),
-            );
+        if matches!(sys::PLATFORM, "windows" | "linux") && !ctx.pkg.has("llama-server") {
+            missing.push(format!(
+                "{} is missing (the {} package ships the text engine)",
+                sys::exe_name("llama-server"),
+                sys::PLATFORM
+            ));
         }
         let mut dir = ctx.pkg.dir.clone();
         if sys::PLATFORM == "macos" && dir.ends_with("Contents/MacOS") {
             // Inside CaptureMann.app the licences sit in Contents/Resources.
             dir = dir.join("../Resources");
         }
-        let lic = find_named(&dir, 2, &|n| {
-            n.starts_with("license") || n.starts_with("licence")
-        });
-        let third = find_named(&dir, 2, &|n| n.starts_with("third_party_licenses"));
-        let notice = find_named(&dir, 2, &|n| n.starts_with("notice"));
+        // The package folder first; on Linux the documents sit in share/doc/capturemann of the install
+        // prefix (tarball: <prefix>/lib/capturemann/../../share/doc/capturemann), and in the .deb in
+        // /usr/share/doc/capturemann (the programs are in /opt/capturemann/lib/capturemann).
+        let mut doc_dirs = vec![dir.clone()];
+        if sys::PLATFORM == "linux" {
+            let real = std::fs::canonicalize(&dir).unwrap_or_else(|_| dir.clone());
+            doc_dirs.push(real.join("../../share/doc/capturemann"));
+            if real.starts_with("/opt/capturemann") {
+                doc_dirs.push(Path::new("/usr/share/doc/capturemann").to_path_buf());
+            }
+        }
+        let find_doc =
+            |pred: &dyn Fn(&str) -> bool| doc_dirs.iter().find_map(|d| find_named(d, 2, pred));
+        let lic = find_doc(&|n| n.starts_with("license") || n.starts_with("licence"));
+        let third = find_doc(&|n| n.starts_with("third_party_licenses"));
+        let notice = find_doc(&|n| n.starts_with("notice"));
         if lic.is_none() {
             missing.push("no LICENSE file".to_owned());
         }
@@ -140,7 +152,7 @@ fn files(ctx: &mut Ctx) -> R {
         if find_named(&dir, 2, &|n| n.starts_with("readme")).is_none() {
             ctx.note("note: no README in the package folder");
         }
-        if sys::PLATFORM == "windows" {
+        if matches!(sys::PLATFORM, "windows" | "linux") {
             for rel in ["FFmpeg/SOURCE-OFFER.txt", "FFmpeg/BUILD-INFO.txt"] {
                 if !dir.join(rel).is_file() {
                     missing.push(format!("{rel} is missing (LGPL source offer)"));

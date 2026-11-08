@@ -102,7 +102,7 @@ mkdir -p "$pkg/usr/share/icons"
 cp -R "$src/share/icons/hicolor" "$pkg/usr/share/icons/hicolor"
 find "$pkg/usr/share/icons" -type d -exec chmod 755 {} + -o -type f -exec chmod 644 {} +
 doc="$pkg/usr/share/doc/capturemann"
-for f in NOTICE THIRD_PARTY_LICENSES.md LIBRARIES.txt; do cp "$src/share/doc/capturemann/$f" "$doc/"; done
+for f in LICENSE NOTICE THIRD_PARTY_LICENSES.md LIBRARIES.txt; do cp "$src/share/doc/capturemann/$f" "$doc/"; done
 [ ! -d "$src/share/doc/capturemann/SHERPA-ONNX" ] || cp -R "$src/share/doc/capturemann/SHERPA-ONNX" "$doc/SHERPA-ONNX"
 # Upstream change log (Markdown, not the Debian format, so not named changelog.gz), compressed.
 if [ -f "$src/share/doc/capturemann/CHANGELOG.md" ]; then gzip -9n -c "$src/share/doc/capturemann/CHANGELOG.md" > "$doc/CHANGELOG.md.gz"; fi
