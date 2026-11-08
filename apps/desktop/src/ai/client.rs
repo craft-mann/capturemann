@@ -722,7 +722,8 @@ impl AiTransport for DaemonTransport {
                     AiError {
                         code: e.code().map(|c| c.as_str().to_owned()),
                         reason,
-                        message: e.to_string(),
+                        // No job id, OS error or file path in front of the person.
+                        message: crate::daemon_text::soften(e.code(), &e.to_string()),
                     }
                 })
         });

@@ -83,7 +83,56 @@ pub fn error_text(code: Option<ErrorCode>, message: &str) -> String {
         None => message::describe_any(message),
     }
     .and_then(|p| translated(&p))
-    .unwrap_or_else(|| message.to_owned())
+    .unwrap_or_else(|| soften(code, message))
+}
+
+/// A message with something in it that a person should not have to read: a job id, an
+/// operating-system error such as `(os error 2)`, or the path of a file. Such a message is
+/// replaced by a sentence that says what to do; the original goes to the log. Any other message
+/// is returned as it is, without a leading `job <id> failed: `.
+pub fn soften(code: Option<ErrorCode>, message: &str) -> String {
+    let inner = without_job_prefix(message);
+    if !looks_technical(inner) {
+        return inner.to_owned();
+    }
+    log::warn!("an error is shown in plain words: code {code:?}: {message}");
+    match code {
+        Some(ErrorCode::NotFound) => tr!(
+            "A file this needs could not be found. It may have been moved or deleted. Try again."
+        ),
+        _ => tr!(
+            "Something went wrong while working with a file. Try again, and if it keeps happening, please report it."
+        ),
+    }
+}
+
+/// `job job_ab12 failed: the reason` -> `the reason`.
+fn without_job_prefix(message: &str) -> &str {
+    if let Some((id, tail)) = message
+        .strip_prefix("job ")
+        .and_then(|rest| rest.split_once(" failed: "))
+    {
+        if !id.contains(' ') {
+            return tail;
+        }
+    }
+    message
+}
+
+/// An OS error, or a path to a file on this computer.
+fn looks_technical(message: &str) -> bool {
+    let drive_path = message
+        .as_bytes()
+        .windows(3)
+        .any(|w| w[0].is_ascii_alphabetic() && w[1] == b':' && w[2] == b'\\');
+    message.contains("(os error")
+        || message.contains("`/")
+        || message.contains("`\\")
+        || message.contains("/Users/")
+        || message.contains("/home/")
+        || message.contains("/var/folders/")
+        || message.contains("\\\\?\\")
+        || drive_path
 }
 
 /// [`error_text`] for a message whose code was lost on the way (a plain string from

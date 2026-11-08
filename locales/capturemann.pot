@@ -70,6 +70,9 @@ msgstr ""
 msgid "A countdown pill, Esc cancels"
 msgstr ""
 
+msgid "A file this needs could not be found. It may have been moved or deleted. Try again."
+msgstr ""
+
 msgid "A folder on {this_computer}, an external drive or a mounted network folder."
 msgstr ""
 
@@ -4278,6 +4281,9 @@ msgid "Snap (N): on"
 msgstr ""
 
 msgid "Some online copies weren’t deleted"
+msgstr ""
+
+msgid "Something went wrong while working with a file. Try again, and if it keeps happening, please report it."
 msgstr ""
 
 msgid "Sort captures"

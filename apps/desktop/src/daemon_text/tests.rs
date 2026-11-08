@@ -749,3 +749,38 @@ fn linux_recorder_notes_are_worded() {
     });
     assert_eq!(warning_text("something new"), "something new");
 }
+
+/// A message with an OS error or a file path is not shown as it came (Nov 8, 2026: a failed
+/// transcription showed `job job_3d03... failed: cannot read `/Users/.../manifest.json`: No such
+/// file or directory (os error 2)`).
+#[test]
+fn technical_messages_are_replaced_by_a_sentence_and_plain_ones_stay() {
+    let raw = "job job_3d0324f7874d4c1c failed: cannot read `/Users/a/Movies/CaptureMann/Audio recording.cmrec/manifest.json`: No such file or directory (os error 2)";
+    let nf = soften(Some(ErrorCode::NotFound), raw);
+    assert!(nf.contains("could not be found"), "{nf}");
+    for bad in ["job_3d03", "/Users/", "os error", "manifest.json"] {
+        assert!(!nf.contains(bad), "{bad} in {nf}");
+    }
+    let other = soften(None, raw);
+    assert!(other.contains("Something went wrong"), "{other}");
+    // Windows paths and verbatim paths.
+    assert!(
+        soften(None, "cannot open C:\\Users\\a\\x.wav: Access is denied.")
+            .contains("Something went wrong")
+    );
+    assert!(soften(None, "cannot open \\\\?\\C:\\x: nope").contains("Something went wrong"));
+    // Plain text stays; only the job prefix goes.
+    assert_eq!(
+        soften(None, "The model is not installed"),
+        "The model is not installed"
+    );
+    assert_eq!(
+        soften(None, "job job_ab failed: The text engine was not found"),
+        "The text engine was not found"
+    );
+    // A sentence that merely starts with "job " is not a job prefix.
+    assert_eq!(
+        soften(None, "job interrupted: try again"),
+        "job interrupted: try again"
+    );
+}
