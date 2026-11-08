@@ -2295,8 +2295,14 @@ msgstr ""
 msgid "Link copied to the clipboard"
 msgstr ""
 
+msgid "Linux does not ask per app. On this desktop CaptureMann records the screen without a dialog; the desktop shows its recording indicator while it runs. Neither the microphone nor the camera is gated by the system."
+msgstr ""
+
 #. FACT: owner review required (the desktop portal asks, not CaptureMann)
 msgid "Linux does not ask per app. Your desktop asks when CaptureMann captures the screen, and neither the microphone nor the camera is gated by the system (the camera only needs permission to open its device). Below is what this system can and cannot do for CaptureMann."
+msgstr ""
+
+msgid "Linux does not ask per app. Your desktop asks which screen to share when CaptureMann records, and neither the microphone nor the camera is gated by the system."
 msgstr ""
 
 msgid "List"
@@ -4270,6 +4276,9 @@ msgstr ""
 msgid "Showing the newest 5,000 captures"
 msgstr ""
 
+msgid "Shown in the video only: this desktop does not let programs record the pointer’s position or clicks"
+msgstr ""
+
 msgid "Shows for {secs} s (at least {limit} s)"
 msgstr ""
 
@@ -5161,6 +5170,9 @@ msgid "This computer has no usable hardware H.264 encoder for this recording. Tr
 msgstr ""
 
 msgid "This copy is not running from a CaptureMann.app, so it can’t relaunch itself."
+msgstr ""
+
+msgid "This desktop has no global shortcuts for apps. Use its own keyboard settings instead."
 msgstr ""
 
 msgid "This destination has no account; connect it first."

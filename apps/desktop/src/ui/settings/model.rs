@@ -674,6 +674,16 @@ pub struct ShortcutsPageMode {
     pub can_change: bool,
 }
 
+/// The Shortcuts page subtitle: "Global shortcuts" only where at least one can be registered;
+/// where none can (GNOME on Wayland) it says what works instead.
+pub fn shortcuts_subtitle(none_registered: bool) -> String {
+    if none_registered {
+        tr!("This desktop has no global shortcuts for apps. Use its own keyboard settings instead.")
+    } else {
+        tr!("Global shortcuts that work from any app.")
+    }
+}
+
 pub fn shortcuts_page_mode(
     backend: crate::platform_hotkeys::Backend,
     recording_supported: bool,
@@ -1212,6 +1222,14 @@ mod tests {
         assert!(!m.can_change && m.show_recording_group);
         let m = shortcuts_page_mode(Backend::Native, true);
         assert!(m.can_change && m.show_recording_group);
+    }
+
+    #[test]
+    fn shortcuts_subtitle_is_honest_when_none_register() {
+        assert!(shortcuts_subtitle(false).contains("Global shortcuts"));
+        let s = shortcuts_subtitle(true);
+        assert!(!s.contains("work from any app"), "{s}");
+        assert!(s.contains("keyboard settings"), "{s}");
     }
 
     #[test]

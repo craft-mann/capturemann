@@ -1,5 +1,5 @@
 # Vietnamese (Tiếng Việt) catalogue of the CaptureMann UI.
-# Entries marked `#, fuzzy` are drafts (113 entries added after the Nov 6, 2026 full review: Windows and Linux wording); the app shows them anyway.
+# Entries marked `#, fuzzy` are drafts (117 entries added after the Nov 6, 2026 full review: Windows and Linux wording); the app shows them anyway.
 # The rest of the catalogue was reviewed by the maintainer (native reading: 0.2.0 strings Oct 27, 2026; the remaining draft sheet Nov 6, 2026) and carries no `fuzzy` flag.
 # Entries with `# FACT: owner review required` state what the app really does (privacy, permissions,
 # deletion, confirmations): read each one. Terms follow locales/vi-glossary.md.
@@ -9645,3 +9645,19 @@ msgstr "Chụp"
 #, fuzzy
 msgid "Transcribe"
 msgstr "Chép lời"
+
+#, fuzzy
+msgid "This desktop has no global shortcuts for apps. Use its own keyboard settings instead."
+msgstr "Môi trường desktop này không có phím tắt toàn cục cho ứng dụng. Hãy dùng phần cài đặt bàn phím của chính nó."
+
+#, fuzzy
+msgid "Linux does not ask per app. On this desktop CaptureMann records the screen without a dialog; the desktop shows its recording indicator while it runs. Neither the microphone nor the camera is gated by the system."
+msgstr "Linux không hỏi quyền theo từng ứng dụng. Trên môi trường desktop này, CaptureMann ghi màn hình mà không hiện hộp thoại; desktop hiển thị chỉ báo đang ghi khi bản ghi chạy. Cả micrô lẫn camera đều không bị hệ thống chặn bằng quyền."
+
+#, fuzzy
+msgid "Linux does not ask per app. Your desktop asks which screen to share when CaptureMann records, and neither the microphone nor the camera is gated by the system."
+msgstr "Linux không hỏi quyền theo từng ứng dụng. Môi trường desktop của bạn sẽ hỏi chia sẻ màn hình nào khi CaptureMann ghi, còn micrô và camera đều không bị hệ thống chặn bằng quyền."
+
+#, fuzzy
+msgid "Shown in the video only: this desktop does not let programs record the pointer’s position or clicks"
+msgstr "Chỉ hiện trong video: desktop này không cho chương trình ghi vị trí hay lượt nhấp của con trỏ"

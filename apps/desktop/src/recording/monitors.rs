@@ -501,6 +501,28 @@ mod tests {
         assert_eq!(engine_display_id(0x20007, Some(&handles), &off), Some(2));
     }
 
+    /// CAP-5 (Linux, 0.3.0 `desktop.settings_applied`): GPUI numbers displays from 0, the engine's
+    /// X11 id is 65 ("Display 0 not found"); the display's rectangle finds it.
+    #[test]
+    fn a_zero_based_gpui_id_finds_the_engines_x11_id() {
+        let lab = [eng(65, [0.0, 0.0, 1920.0, 1080.0], true)];
+        let gpui = [g(0, [0.0, 0.0, 1920.0, 1080.0])];
+        assert_eq!(engine_display_id(0, Some(&gpui), &lab), Some(65));
+        // A second display whose GPUI bounds all start at (0, 0) still ends on a real engine id.
+        let two = [
+            eng(65, [0.0, 0.0, 1920.0, 1080.0], true),
+            eng(66, [1920.0, 0.0, 1920.0, 1080.0], false),
+        ];
+        let gpui2 = [
+            g(0, [0.0, 0.0, 1920.0, 1080.0]),
+            g(1, [0.0, 0.0, 1920.0, 1080.0]),
+        ];
+        assert!(matches!(
+            engine_display_id(1, Some(&gpui2), &two),
+            Some(65 | 66)
+        ));
+    }
+
     #[test]
     fn an_unmatched_display_falls_back_to_the_primary() {
         let lab = [

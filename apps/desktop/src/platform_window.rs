@@ -356,6 +356,13 @@ pub fn display_id_for_area(bounds: [i64; 4]) -> Option<u32> {
     imp::display_id_for_area(bounds)
 }
 
+/// Whether GPUI's display ids are a different numbering from the capture engine's, so a capture of
+/// "this display" must find the engine's id by the display's rectangle: Windows (monitor handles)
+/// and Linux (GPUI counts displays from 0; the engine's ids come from X11 or the compositor).
+pub fn display_ids_differ_from_engine() -> bool {
+    cfg!(any(windows, target_os = "linux"))
+}
+
 /// Every GPUI display (by GPUI's id) with its rectangle in physical px, where GPUI's display id
 /// is not the engine's (Windows: the monitor handle); `None` where the two ids agree (macOS).
 pub fn gpui_monitor_rects_px() -> Option<Vec<(u32, [i64; 4])>> {

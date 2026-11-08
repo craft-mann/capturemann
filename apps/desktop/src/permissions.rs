@@ -209,6 +209,18 @@ pub fn intro_note(os: Os) -> String {
     }
 }
 
+/// The note on Settings -> Permissions on Linux, by the recorder's screen report: GNOME's
+/// screen-cast service (`share_dialog` false) records without a dialog and shows its recording
+/// indicator; the portal backend (or an older daemon that does not say) asks in the desktop's
+/// own dialog.
+pub fn linux_screen_note(share_dialog: Option<bool>) -> String {
+    if share_dialog == Some(false) {
+        tr!("Linux does not ask per app. On this desktop CaptureMann records the screen without a dialog; the desktop shows its recording indicator while it runs. Neither the microphone nor the camera is gated by the system.")
+    } else {
+        tr!("Linux does not ask per app. Your desktop asks which screen to share when CaptureMann records, and neither the microphone nor the camera is gated by the system.")
+    }
+}
+
 /// How long a Linux stack answer is reused.
 const STACK_TTL: Duration = Duration::from_secs(20);
 
@@ -789,6 +801,17 @@ pub fn debug_capturer() -> Option<cm_capture::Capturer> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn linux_screen_note_follows_the_share_dialog() {
+        let gnome = linux_screen_note(Some(false));
+        assert!(gnome.contains("without a dialog"), "{gnome}");
+        for portal in [Some(true), None] {
+            let n = linux_screen_note(portal);
+            assert!(n.contains("asks which screen"), "{n}");
+            assert!(!n.contains("without a dialog"), "{n}");
+        }
+    }
 
     const ALL_MISSING: [(Id, State); 4] = [
         (Id::ScreenRecording, State::NotGranted),
