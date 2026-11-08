@@ -98,6 +98,21 @@ pub fn stable_id(node: &Path, links: &[String]) -> String {
         .unwrap_or_else(|| node.to_string_lossy().into_owned())
 }
 
+/// The name to show for a V4L2 `card`. The kernel keeps 31 characters, and UVC cameras name
+/// themselves `<product>: <interface>` (`Integrated Camera: Integrated C`), so a card that fills
+/// the field is cut at the colon and keeps the product only.
+pub fn display_name(card: &str) -> String {
+    let card = card.trim();
+    if card.chars().count() >= 31 {
+        if let Some((product, _)) = card.split_once(": ") {
+            if !product.trim().is_empty() {
+                return product.trim().to_owned();
+            }
+        }
+    }
+    card.to_owned()
+}
+
 /// What kind of camera a node is. `device_path` is the canonical sysfs path of the node's device
 /// (`/sys/devices/pci.../usb1/1-8/1-8:1.0`), `removable` the `removable` attribute of its USB
 /// device (`fixed`, `removable` or `unknown`).
@@ -358,6 +373,22 @@ fn build_std_dht() -> [u8; 420] {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_full_card_name_keeps_the_product_only() {
+        assert_eq!(
+            display_name("Integrated Camera: Integrated C"),
+            "Integrated Camera"
+        );
+        // A short name is shown as the driver gave it, colon or not.
+        assert_eq!(display_name("HD Pro Webcam C920"), "HD Pro Webcam C920");
+        assert_eq!(display_name("Cam: front"), "Cam: front");
+        // A full field with no colon has nothing to cut at.
+        assert_eq!(
+            display_name("A very long camera name with no c"),
+            "A very long camera name with no c"
+        );
+    }
+
     use super::*;
 
     #[test]

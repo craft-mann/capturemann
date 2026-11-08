@@ -43,10 +43,14 @@ use crate::window_picker::LastUsed;
 
 pub use crate::recording::sheet::SHEET_WIDTH;
 
+/// What the desktop's top bar and dock take from the display's height when the platform cannot
+/// tell the visible part (Linux): the sheet stays this much shorter than the display at most.
+const LINUX_PANEL_ALLOWANCE: f64 = 120.0;
+
 mod audio;
 
 /// What the sheet records: the screen (display, window or region) or audio only (VOC-1).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum SheetMode {
     #[default]
     Screen,
@@ -87,6 +91,12 @@ pub struct StartSheet {
     preset: crate::recording::start::SheetPreset,
     /// The window height last asked for; the window is re-fitted when the content changes.
     fitted_h: f64,
+    /// Linux: how much taller than the row estimate the content turned out to be (the body
+    /// scrolled at the size that was asked for). The estimate is tuned to the Mac's text metrics.
+    measured_extra: std::collections::HashMap<(SheetMode, TargetKind), f64>,
+    /// The window height of the previous render (Linux fit).
+    last_h: f64,
+    last_page: (SheetMode, TargetKind),
     native: Option<crate::platform_window::NativeWindow>,
     /// The body's scroll state; its overflow is how far the row estimate is off (debug trace).
     scroll: ScrollHandle,
@@ -194,6 +204,9 @@ impl StartSheet {
             countdown_s,
             preset,
             fitted_h: initial_h,
+            measured_extra: std::collections::HashMap::new(),
+            last_h: 0.0,
+            last_page: (SheetMode::Screen, TargetKind::Display),
             native: crate::platform_window::NativeWindow::of(window),
             scroll: ScrollHandle::new(),
             display,
@@ -510,7 +523,7 @@ impl StartSheet {
     /// The top-left stays put unless the bottom would leave the visible part of the display.
     fn fit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some((x, y, w, h)) = crate::platform_window::frame(window) else {
-            return;
+            return self.fit_by_resize(window, cx);
         };
         let visible = crate::platform_window::visible_frame_at(x + w / 2.0, y + 8.0)
             .map(|(vx, vy, vw, vh)| rec::demo_short(Rect::new(vx, vy, vw, vh)));
@@ -541,6 +554,64 @@ impl StartSheet {
             cx.spawn(async move |_, _| n.set_frame(to.x, to.y, to.w, to.h))
                 .detach();
         }
+    }
+
+    /// [`Self::fit`] where the platform cannot say or set the window's frame (Linux: X11 gives no
+    /// frame, Wayland never places a window): the sheet is opened at the height its first rows
+    /// need, and when the devices arrive and add notes (Linux explains where the screen comes
+    /// from) the window is resized to the new content size, which both X11 and Wayland allow.
+    /// The height cap is the display's height; the top bar and dock are not known here.
+    fn fit_by_resize(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(display_h) = window
+            .display(cx)
+            .map(|d| f64::from(f32::from(d.bounds().size.height)))
+        else {
+            return;
+        };
+        let size = window.viewport_size();
+        let (w, h) = (
+            f64::from(f32::from(size.width)),
+            f64::from(f32::from(size.height)),
+        );
+        let (mut heights, want_w) = match self.mode {
+            SheetMode::Screen => (self.model.heights(), SHEET_WIDTH),
+            SheetMode::Audio => (self.audio.heights(), AUDIO_SHEET_WIDTH),
+        };
+        let page = (self.mode, self.model.kind);
+        let overflow = f64::from(f32::from(self.scroll.max_offset().y.abs()));
+        if std::env::var_os("CM_DEMO_SHEET_TRACE").is_some() {
+            log::info!(
+                "sheet: window {h} est {} overflow {overflow} extra {}",
+                heights.total(),
+                self.measured_extra.get(&page).copied().unwrap_or(0.0)
+            );
+        }
+        // The body scrolls at the size that was asked for although the display has room: the
+        // estimate is short by that much, so ask for it too. (Leave room for the desktop's top
+        // bar and dock.)
+        let cap = display_h - LINUX_PANEL_ALLOWANCE;
+        // `overflow` is from the last layout: it counts only once a frame was laid out at this
+        // height (the first render at a new size still holds the old layout's overflow).
+        let laid_out = (h - self.last_h).abs() < 0.5 && self.last_page == page;
+        self.last_page = page;
+        self.last_h = h;
+        if overflow > 0.5
+            && laid_out
+            && (h - self.fitted_h).abs() < 1.5
+            && h < cap - 2.0 * SHEET_MARGIN
+        {
+            *self.measured_extra.entry(page).or_insert(0.0) += overflow;
+        }
+        heights.body += self.measured_extra.get(&page).copied().unwrap_or(0.0);
+        let want = fit_height(&heights, cap);
+        if (want - self.fitted_h).abs() < 0.5 && (want - h).abs() < 1.5 && (want_w - w).abs() < 1.5
+        {
+            return;
+        }
+        self.fitted_h = want;
+        cx.defer_in(window, move |_, window, _| {
+            window.resize(gpui::size(px(want_w as f32), px(want as f32)));
+        });
     }
 
     fn start(&mut self, cx: &mut Context<Self>) {
@@ -1240,17 +1311,21 @@ impl StartSheet {
                                     .child(icon("timer", 13., t.mist))
                                     .child(shrink_text(countdown_text)),
                             )
-                            // Not on Linux: the keycaps overflow the footer there and GNOME on Wayland has no
-                            // global shortcut to promise (the tray and the banner start and stop).
+                            // Not on a Wayland session: GNOME there has no global shortcut to promise (the
+                            // tray and the banner start and stop). X11 grabs the keys itself.
                             .children(
                                 (m.kind != TargetKind::Window
-                                    && crate::permissions::Os::current()
-                                        != crate::permissions::Os::Linux)
+                                    && crate::platform_hotkeys::backend()
+                                        == crate::platform_hotkeys::Backend::Native)
                                     .then(|| {
+                                        // Wraps: the words of Windows and Linux keycaps (Ctrl Alt Shift R)
+                                        // do not fit beside the caption in the narrow footer.
                                         div()
                                             .flex()
+                                            .flex_wrap()
                                             .items_center()
-                                            .gap(px(6.))
+                                            .gap_x(px(6.))
+                                            .gap_y(px(2.))
                                             .child(caption(&t, tr!("Start or stop from anywhere")))
                                             .child(keycaps(&t, &toggle_keys))
                                     }),

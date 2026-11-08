@@ -79,6 +79,10 @@ pub struct Devices {
     pub screen_problems: Vec<String>,
     /// The video is encoded in software (`screen.encoder.kind == "software"`).
     pub software_encoder: bool,
+    /// Linux: the desktop's own share dialog picks the screen (the portal backend), `Some(false)`
+    /// when the recorder takes the monitor, region or window the sheet names (GNOME's screen-cast
+    /// service); `None` when the reply does not say (an older daemon: the dialog).
+    pub share_dialog: Option<bool>,
     /// The device list has been loaded.
     pub loaded: bool,
 }
@@ -163,6 +167,10 @@ impl Devices {
                 .and_then(|e| e.get("kind"))
                 .and_then(Value::as_str)
                 == Some("software"),
+            share_dialog: v
+                .get("screen")
+                .and_then(|s| s.get("share_dialog"))
+                .and_then(Value::as_bool),
             loaded: true,
         }
     }
@@ -362,7 +370,13 @@ impl SheetModel {
     /// One chip per display, to pick which one is recorded. Not on Linux: the desktop's own
     /// dialog picks the screen there, so the sheet's list could only mislead.
     pub fn display_chips_shown(&self) -> bool {
-        self.kind == TargetKind::Display && self.displays.len() > 1 && !self.is_linux()
+        self.kind == TargetKind::Display && self.displays.len() > 1 && !self.uses_share_dialog()
+    }
+
+    /// Whether the desktop's own dialog picks what is recorded (the Linux portal backend), so the
+    /// sheet cannot name it. GNOME's screen-cast service records what the sheet asks for.
+    pub fn uses_share_dialog(&self) -> bool {
+        self.is_linux() && self.devices.share_dialog != Some(false)
     }
 
     /// Whether this is the Linux recorder (the desktop's portal picks the screen).
@@ -377,8 +391,12 @@ impl SheetModel {
         if window && region {
             return None;
         }
-        Some(if self.is_linux() {
-            tr!("Recording a window or a region is not available on Linux yet. Record the whole screen.")
+        Some(if self.is_linux() && window && !region {
+            tr!("Recording a region is not available on this desktop. Record the whole screen or a window.")
+        } else if self.is_linux() && !window && region {
+            tr!("Recording one window needs an X11 session on this desktop. Record the whole screen or a region.")
+        } else if self.is_linux() {
+            tr!("Recording a window or a region is not available on this desktop. Record the whole screen.")
         } else {
             tr!("Recording a window or a region is not available on this system yet.")
         })
@@ -391,11 +409,14 @@ impl SheetModel {
         if !self.is_linux() || !self.devices.loaded || !self.devices.screen_problems.is_empty() {
             return Vec::new();
         }
-        let mut out = vec![if self.devices.screen_permission == Perm::Authorized {
-            tr!("Your desktop remembers the screen you shared before, so recording starts without asking.")
-        } else {
-            tr!("The first time, your desktop asks which screen to share. Choose the screen to record and confirm; CaptureMann remembers it for the next recordings.")
-        }];
+        let mut out = Vec::new();
+        if self.uses_share_dialog() {
+            out.push(if self.devices.screen_permission == Perm::Authorized {
+                tr!("Your desktop remembers the screen you shared before, so recording starts without asking.")
+            } else {
+                tr!("The first time, your desktop asks which screen to share. Choose the screen to record and confirm; CaptureMann remembers it for the next recordings.")
+            });
+        }
         if self.devices.software_encoder {
             out.push(tr!(
                 "The video is encoded by the processor (VP9), so long recordings use more of it."
@@ -432,7 +453,7 @@ impl SheetModel {
     }
 
     pub fn target_summary(&self) -> String {
-        if self.is_linux() && self.kind == TargetKind::Display && self.target().is_some() {
+        if self.uses_share_dialog() && self.kind == TargetKind::Display && self.target().is_some() {
             return tr!("The screen you choose in your desktop\u{2019}s share dialog");
         }
         match self.target() {
@@ -851,7 +872,8 @@ impl SheetModel {
 
     /// The caption of the webcam row (the live preview text when the bubble is on).
     pub fn camera_hint(&self) -> String {
-        if self.camera {
+        // Linux shows no live bubble (the note under the row says so).
+        if self.camera && !self.is_linux() {
             tr!("Live preview on screen. Drag it anywhere; it stays out of the recording.")
         } else {
             tr!("A circle with your face on the recording.")
@@ -1637,7 +1659,10 @@ mod tests {
             TargetKind::Display,
             "an unavailable kind cannot be chosen"
         );
-        assert!(m.kinds_note().unwrap().contains("not available on Linux"));
+        assert!(m
+            .kinds_note()
+            .unwrap()
+            .contains("not available on this desktop"));
         assert_eq!(m.camera_note(), Some(Note::Info("No camera found".into())));
         // Start stays possible with the display, the microphone and the system audio.
         assert!(m.blocker().is_none());
@@ -1706,6 +1731,37 @@ mod tests {
         assert!(mac.display_chips_shown());
         assert!(mac.target_summary().starts_with("Built-in"));
         mac.set_kind(TargetKind::Display);
+    }
+
+    /// GNOME's screen-cast service records the monitor, region or X11 window the sheet names:
+    /// no share dialog is promised, the display chips and the summary come back, and a Wayland
+    /// session says why one window cannot be recorded.
+    #[test]
+    fn rec1_linux_gnome_service_has_no_share_dialog() {
+        let gnome = |targets: Value| {
+            let mut j = linux_devices_json("not_determined", json!([]));
+            j["screen"]["targets"] = targets;
+            j["screen"]["share_dialog"] = json!(false);
+            let mut m = SheetModel::new(&SheetDefaults::from_settings(&serde_json::Map::new()));
+            m.set_displays(parse_displays(&displays_json()));
+            m.set_devices(Devices::parse(&j));
+            m
+        };
+        let session = gnome(json!(["display", "region", "window"]));
+        assert!(!session.uses_share_dialog());
+        assert!(session.kinds_note().is_none(), "every kind is offered");
+        assert!(session.display_chips_shown(), "two displays, two chips");
+        assert!(!session.target_summary().contains("share dialog"));
+        let notes = session.screen_notes();
+        assert!(notes.iter().all(|n| !n.contains("asks which screen")));
+        assert!(notes.iter().all(|n| !n.contains("remembers the screen")));
+        let no_window = gnome(json!(["display", "region"]));
+        assert!(no_window.kind_available(TargetKind::Region));
+        assert!(!no_window.kind_available(TargetKind::Window));
+        assert!(no_window
+            .kinds_note()
+            .unwrap()
+            .contains("needs an X11 session"));
     }
 
     /// The extra lines are part of the computed height, so the footer never gets cut.

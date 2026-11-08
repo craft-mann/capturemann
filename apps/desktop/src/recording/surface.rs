@@ -78,8 +78,10 @@ pub struct Banner {
     pub countdown: bool,
     /// Discard this take is offered.
     pub discard: bool,
-    /// The line under the controls: what else shows the recording, or (while it starts) what the
-    /// desktop may ask.
+    /// Restart (discard this take and start over) is offered, with Discard.
+    pub restart: bool,
+    /// The line under the controls: what else shows the recording; empty while it starts, during
+    /// the countdown and while the take is saved.
     pub hint: String,
 }
 
@@ -117,10 +119,19 @@ pub fn banner(hud: &HudState, now: Instant) -> Option<Banner> {
         ),
         countdown: matches!(phase, Phase::Countdown | Phase::Resuming) && digit.is_some(),
         discard: running,
-        hint: if phase == Phase::Starting {
-            tr!("Your desktop may ask which screen to share. Choose the screen and press Share.")
-        } else {
-            tr!("Your desktop and the tray icon also show that the screen is being recorded. Stop from either one if this window is hidden.")
+        restart: running,
+        hint: match phase {
+            Phase::Recording | Phase::Paused | Phase::Resuming | Phase::SelfTest
+                if hud.is_audio() =>
+            {
+                tr!("Your desktop and the tray icon also show that the microphone is in use. Stop from either one if this window is hidden.")
+            }
+            Phase::Recording | Phase::Paused | Phase::Resuming | Phase::SelfTest => {
+                tr!("Your desktop and the tray icon also show that the screen is being recorded. Stop from either one if this window is hidden.")
+            }
+            // Nothing is being recorded yet (starting, countdown) or any more (saving): no claim to
+            // make. (The portal's own share dialog says what it wants; GNOME's service shows none.)
+            _ => String::new(),
         },
     })
 }
@@ -202,7 +213,7 @@ mod tests {
         let rec = banner(&state("recording"), now).unwrap();
         assert_eq!(rec.label, "Recording");
         assert!(rec.timer.as_deref().unwrap().starts_with("01:0"), "{rec:?}");
-        assert!(rec.live && rec.stop && rec.discard);
+        assert!(rec.live && rec.stop && rec.discard && rec.restart);
         assert_eq!(rec.pause, Some(false));
         assert_eq!(rec.mic, Some(false));
         let paused = banner(&state("paused"), now + Duration::from_secs(1)).unwrap();
@@ -217,13 +228,37 @@ mod tests {
         let starting = banner(&state("starting"), now).unwrap();
         assert_eq!(starting.label, "Starting");
         assert!(starting.pause.is_none() && starting.timer.is_none() && !starting.stop);
-        assert!(starting.hint.contains("may ask which screen to share"));
+        assert!(starting.hint.is_empty());
         assert!(rec_hint_is_the_indicator_line(
             &banner(&state("recording"), now).unwrap()
         ));
         let saving = banner(&state("stopping"), now).unwrap();
         assert_eq!(saving.label, "Saving");
-        assert!(!saving.stop && !saving.discard);
+        assert!(!saving.stop && !saving.discard && !saving.restart);
+        assert!(saving.hint.is_empty(), "nothing is recorded any more");
+    }
+
+    /// An audio recording has no screen: its banner must not say the screen is recorded.
+    #[test]
+    fn an_audio_recording_names_the_microphone_not_the_screen() {
+        let mut h = HudState::default();
+        let now = Instant::now();
+        h.apply_event(
+            "recording.started",
+            &json!({"recording_id": "rec_1", "capture_id": "rec_abc", "live_at_ms": 0,
+                    "indicator": {"mode": "audio", "preset": "room", "area": null,
+                                  "output": null, "camera": null, "mic": true,
+                                  "system_audio": false, "cursor": false}}),
+            now,
+        );
+        h.apply_status(
+            &json!({"state": "recording", "recording_id": "rec_1", "recorded_ms": 3000}),
+            now,
+        );
+        assert!(h.is_audio());
+        let b = banner(&h, now).unwrap();
+        assert!(b.hint.contains("microphone is in use"), "{}", b.hint);
+        assert!(!b.hint.contains("screen"));
     }
 
     fn rec_hint_is_the_indicator_line(b: &Banner) -> bool {
@@ -243,5 +278,9 @@ mod tests {
         let b = banner(&h, now).unwrap();
         assert_eq!(b.label, "Starting in 3");
         assert!(b.countdown && b.pause.is_none() && !b.stop);
+        assert!(
+            b.hint.is_empty(),
+            "nothing is recorded during the countdown"
+        );
     }
 }

@@ -90,6 +90,7 @@ impl SettingsView {
             .on_click(move |_, _, cx| app::set_capture_delay(&app, secs, cx))
         });
         let a = &self.app;
+        let linux = crate::permissions::Os::current() == crate::permissions::Os::Linux;
         let sizes = options_of(&SIZES, size_label);
         let codecs = options_of(&CODECS, codec_label);
         let qualities = options_of(&QUALITIES, quality_label);
@@ -156,18 +157,22 @@ impl SettingsView {
                             ),
                             false,
                         ))
-                        .child(choice_row(
-                            t,
-                            a,
-                            "rec-codec",
-                            tile::CODEC,
-                            &tr!("Codec"),
-                            &tr!("Auto picks HEVC when this computer\u{2019}s encoder supports it, else H.264."),
-                            keys::KEY_CODEC,
-                            &codecs,
-                            &s.codec,
-                            false,
-                        ))
+                        // Linux records with the one encoder that works on the computer (hardware H.264
+                        // through VA-API, else software VP9), so the codec is not a choice there.
+                        .children((!linux).then(|| {
+                            choice_row(
+                                t,
+                                a,
+                                "rec-codec",
+                                tile::CODEC,
+                                &tr!("Codec"),
+                                &tr!("Auto picks HEVC when this computer\u{2019}s encoder supports it, else H.264."),
+                                keys::KEY_CODEC,
+                                &codecs,
+                                &s.codec,
+                                false,
+                            )
+                        }))
                         .child(choice_row(
                             t,
                             a,
@@ -181,7 +186,13 @@ impl SettingsView {
                             true,
                         )),
                 )
-                .children(fps_note),
+                .children(fps_note)
+                .children(linux.then(|| {
+                    div().px(px(4.)).child(caption(
+                        t,
+                        tr!("The video is encoded with hardware H.264 (VA-API) when this computer has it, otherwise in software as VP9. The recording\u{2019}s details say which."),
+                    ))
+                })),
             )
             .child(group_with_card(
                 t,
@@ -194,7 +205,11 @@ impl SettingsView {
                         "rec-cursor",
                         tile::CURSOR,
                         &tr!("Record the cursor"),
-                        &tr!("Cursor position and clicks are saved with the recording, so the editor can draw and zoom on them."),
+                        &if linux {
+                            tr!("Cursor position is saved with the recording on X11, so the editor can draw and zoom on it. On Wayland the pointer is part of the video and cannot be edited.")
+                        } else {
+                            tr!("Cursor position and clicks are saved with the recording, so the editor can draw and zoom on them.")
+                        },
                         keys::KEY_CURSOR,
                         s.cursor,
                         false,
@@ -205,7 +220,7 @@ impl SettingsView {
                         "rec-auto-export",
                         tile::AUTO_EXPORT,
                         &tr!("Create a single MP4 after recording"),
-                        &auto_export_hint(cfg!(windows)),
+                        &auto_export_hint(crate::permissions::Os::current() != crate::permissions::Os::Mac),
                         crate::recording::exports::KEY_AUTO_EXPORT,
                         auto_export,
                         true,
@@ -294,6 +309,7 @@ impl SettingsView {
         // The Camera and Microphone dropdowns live in the check cards; they choose
         // `camera.device` and `audio.mic_device`, the devices used when nothing names one. The
         // Record sheet's chips override them for one recording.
+        let linux = crate::permissions::Os::current() == crate::permissions::Os::Linux;
         let camera_card = self
             .camera_check_card(t, cx)
             .flex_grow(1.45)
@@ -338,19 +354,22 @@ impl SettingsView {
                 &tr!("The recorded camera track is never flipped."),
                 keys::KEY_BUBBLE_MIRROR,
                 b.mirror,
-                false,
+                linux,
             ))
-            .child(toggle_row(
-                t,
-                &app,
-                "bubble-remember-position",
-                tile::REMEMBER,
-                &tr!("Remember where I put the bubble"),
-                &tr!("Off: every recording starts bottom-left."),
-                keys::KEY_BUBBLE_REMEMBER,
-                remember_position,
-                true,
-            ));
+            // Linux shows no live bubble while recording, so there is no place to remember.
+            .children((!linux).then(|| {
+                toggle_row(
+                    t,
+                    &app,
+                    "bubble-remember-position",
+                    tile::REMEMBER,
+                    &tr!("Remember where I put the bubble"),
+                    &tr!("Off: every recording starts bottom-left."),
+                    keys::KEY_BUBBLE_REMEMBER,
+                    remember_position,
+                    true,
+                )
+            }));
         // "Position" is not a row: it had no control. Its text is a hint under the card.
         let position_hint = div()
             .flex()
@@ -366,9 +385,11 @@ impl SettingsView {
             .line_height(px(19.))
             .text_color(rgba_of(t.mist))
             .child(div().pt(px(2.)).child(icon("move", 14., t.mist)))
-            .child(label_fill(tr!(
-                "Drag the bubble anywhere before or during a recording. It snaps to corners and edge midpoints."
-            )));
+            .child(label_fill(if linux {
+                tr!("The bubble is not shown on screen while recording on Linux. Its shape and size are used when the recording is exported, and the editor can move it.")
+            } else {
+                tr!("Drag the bubble anywhere before or during a recording. It snaps to corners and edge midpoints.")
+            }));
         let mic_card = card_group(t, "audio-settings", &tr!("Audio settings")).child(toggle_row(
             t,
             &app,
@@ -457,10 +478,10 @@ impl SettingsView {
     }
 }
 
-/// The explanation under "Create a single MP4 after recording"; `windows` picks the FFmpeg note (no
-/// Homebrew on Windows, where the app includes FFmpeg).
-fn auto_export_hint(windows: bool) -> String {
-    if windows {
+/// The explanation under "Create a single MP4 after recording"; `bundled` picks the FFmpeg note (no
+/// Homebrew on Windows and Linux, where the app includes FFmpeg).
+fn auto_export_hint(bundled: bool) -> String {
+    if bundled {
         tr!("Renders one video with the screen, the camera bubble and your audio into the recording\u{2019}s exports folder. The original tracks are never changed. Needs FFmpeg (included with CaptureMann).")
     } else {
         tr!("Renders one video with the screen, the camera bubble and your audio into the recording\u{2019}s exports folder. The original tracks are never changed. Needs FFmpeg (brew install ffmpeg).")

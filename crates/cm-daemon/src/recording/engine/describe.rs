@@ -260,9 +260,17 @@ pub(super) fn describe(
             format!("{} s", r.countdown_s)
         }),
     );
+    // Linux hands the recorder the whole picture (the portal or the compositor's screen-cast
+    // service), so no window can be left out of a recording there (REC-6): say so plainly.
+    let hides_windows =
+        cm_platform::vocab::Platform::current() != cm_platform::vocab::Platform::Linux;
     details.insert(
         "excluded_windows".into(),
-        json!("CaptureMann's own windows and your password managers never appear"),
+        json!(if hides_windows {
+            "CaptureMann's own windows and your password managers never appear"
+        } else {
+            "Not available on Linux: every window on the screen is recorded, CaptureMann's own included"
+        }),
     );
     if restart {
         details.insert(
@@ -292,6 +300,7 @@ pub(super) fn describe(
         "title": r.title.as_deref().map(dialog_text),
         "max_duration_s": r.max_duration_s,
         "countdown_s": r.countdown_s,
+        "hides_windows": hides_windows,
     });
     (summary, Value::Object(details), params)
 }
