@@ -26,7 +26,7 @@ merge to `main`; the maintainer pushes `main`, signs (minisign) and publishes.
 ## Tasks
 
 Lab: the ThinkPad T490 at 192.168.0.102 (`scripts/testlab/lab.sh`, Ubuntu 24.04, GNOME 46, Xorg and Wayland; Windows work is finished, so
-the laptop is free). The VM at `~/VMs/cm-linux` covers aarch64 and headless work. No sound-playing tests after 23:00
+the laptop is free). The VM at `~/VMs/cm-linux` covers aarch64 and headless work. No sound-playing tests after 22:00 (maintainer, Nov 8, 2026; it was 23:00)
 Vietnam time.
 
 1. **Triage the 17 regression failures** (first, one by one, each a product bug, a wrong test expectation or a lab limit,
