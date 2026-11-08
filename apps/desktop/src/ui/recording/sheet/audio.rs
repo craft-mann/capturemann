@@ -238,7 +238,16 @@ impl StartSheet {
             let a = self.app.read(cx);
             (a.platform, a.shortcuts.clone())
         };
-        let hint = |a: ShortcutAction| -> String { shortcuts.get(a).keycaps(platform).concat() };
+        // Mac glyphs are one short string; the words of Windows and Linux (Ctrl Alt Shift R) would
+        // run together and push the title out of the header, so only the Mac shows them here (the
+        // Shortcuts page and the sheet's footer name them).
+        let hint = |a: ShortcutAction| -> String {
+            if platform == crate::shortcuts::Platform::Mac {
+                shortcuts.get(a).keycaps(platform).concat()
+            } else {
+                String::new()
+            }
+        };
         let (screen, audio) = model::mode_labels();
         let seg = |mode: SheetMode, glyph: &'static str, label: String, keys: String| {
             let on = self.mode == mode;
@@ -275,13 +284,13 @@ impl StartSheet {
                 .text_color(rgba_of(fg))
                 .child(icon(glyph, 14., fg))
                 .child(label)
-                .child(
+                .children((!keys.is_empty()).then(|| {
                     div()
                         .text_size(px(10.5))
                         .text_color(rgba_of(t.faint))
                         .mono()
-                        .child(keys),
-                )
+                        .child(keys)
+                }))
                 .on_click(cx.listener(move |this, _, window, cx| {
                     this.set_mode(mode, window, cx);
                 }))

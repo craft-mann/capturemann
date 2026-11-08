@@ -320,6 +320,9 @@ impl<E: LinuxEnv> LinuxSources<E> {
                 "program": ffmpeg.map(|p| p.display().to_string()),
             },
             "targets": targets,
+            // The portal backend asks the user in the desktop's own dialog; GNOME's service records
+            // the monitor, region or window the caller names (the Record sheet words itself by this).
+            "share_dialog": !gnome,
             "window_and_region": other,
             "consent": if gnome {
                 "not needed: GNOME lets the logged-in user's programs record the screen; the desktop shows its recording indicator"
