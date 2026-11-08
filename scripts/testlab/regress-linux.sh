@@ -8,7 +8,7 @@
 #                                    [--package-dir <folder on the laptop>]  default: what is installed (~/.local/lib/capturemann, then /opt/capturemann/lib/capturemann)
 #                                    [--installer <.deb or .tar.gz on this Mac>]  pushed first; runs linux.deb_install or linux.tarball_install (tier full)
 #                                    [--session x11|wayland]  refuse to run unless the logged-in session is of that kind (switching is done at the login screen)
-#                                    [--recording]  sets CM_LINUX_RECORDING=1 so the rec.* cases run (otherwise they report SKIP with that reason)
+#                                    [--no-recording]  sets CM_LINUX_RECORDING=0 (recording is on by default since 0.3.0; the rec.* cases then SKIP); --recording is accepted and changes nothing
 #                                    [--restore-token <screencast-token file on the laptop>]  CM_REGRESS_RESTORE_TOKEN: copied into each case's private config folder (desktops that ask for the screen once)
 #                                    [--only ...] [--soak-minutes N] [--whisper-model F] [--speech F] [--speaker-models D] [--label X] [--commit SHA] [--who NAME]
 #
@@ -39,7 +39,7 @@ cleanup_linux() {
 }
 
 run_linux() {
-  local tier=smoke allow="" only="" pkgdir="" installer="" binary="" recording=0 who="cm-regress via regress.sh" label="" commit=""
+  local tier=smoke allow="" only="" pkgdir="" installer="" binary="" recording=1 who="cm-regress via regress.sh" label="" commit=""
   local want_session="" soak=0 model="" speech="" spkdir="" token=""
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -50,7 +50,8 @@ run_linux() {
       --installer) installer="$2"; shift 2 ;;
       --binary) binary="$2"; shift 2 ;;
       --session) want_session="$2"; shift 2 ;;
-      --recording) recording=1; shift ;;
+      --recording) shift ;;
+      --no-recording) recording=0; shift ;;
       --restore-token) token="$2"; shift 2 ;;
       --soak-minutes) soak="$2"; shift 2 ;;
       --whisper-model) model="$2"; shift 2 ;;
@@ -179,9 +180,9 @@ EOS
   [ -n "$commit" ] && args="$args --commit $commit"
   local limit rec_line=""
   case "$tier" in smoke) limit=600 ;; standard) limit=2400 ;; full) limit=5400 ;; hardware) limit=$((7200 + soak * 60)) ;; esac
-  [ "$recording" = 1 ] && rec_line="export CM_LINUX_RECORDING=1"
+  [ "$recording" = 0 ] && rec_line="export CM_LINUX_RECORDING=0"
   if [ -n "$token" ]; then rec_line="$rec_line"$'\n'"export CM_REGRESS_RESTORE_TOKEN='$token'"; fi
-  echo "running: cm-regress $args (limit $limit s; recording $([ "$recording" = 1 ] && echo on || echo off))"
+  echo "running: cm-regress $args (limit $limit s; recording $([ "$recording" = 0 ] && echo off || echo on))"
   local code
   set +e
   lx bash -s <<EOS
