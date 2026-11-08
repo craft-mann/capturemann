@@ -533,6 +533,14 @@ impl EncoderPolicy {
         }
     }
 
+    /// Whether tests that assert an H.264 stream from the usual encoder list (`libx264` on a
+    /// developer's FFmpeg) can run here: false under the Linux set (VA-API H.264 or VP9, decision
+    /// O10) unless `CM_EXPORT_ALLOW_GPL=1` asks for the developer list, which CI sets. Those tests
+    /// print SKIPPED instead of failing, so a plain `cargo test` on Linux stays green.
+    pub fn h264_list_available() -> bool {
+        !EncoderPolicy::host().linux_set
+    }
+
     /// The policy of the machine this runs on. A developer who sets `CM_EXPORT_ALLOW_GPL=1` gets
     /// the usual H.264 list (GPL `libx264` last, flagged `lgpl_safe: false`) on Linux too, for the
     /// tests that need a GPL FFmpeg anyway; the app and its packages never set it.
