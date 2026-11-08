@@ -39,7 +39,7 @@ pub fn cases() -> Vec<Case> {
         },
         Case {
             id: "import.vfr",
-            title: "a variable-frame-rate source gets a constant-rate editing copy through the hardware encoder",
+            title: "a variable-frame-rate source gets a constant-rate editing copy (hardware H.264, or labelled software VP9 on Linux)",
             area: "import",
             specs: &["IMP-2", "bug: yuv420p refused by Quick Sync (NV12 needed)", "bug: Import copy not constant 30 fps"],
             tier: Tier::Standard,
