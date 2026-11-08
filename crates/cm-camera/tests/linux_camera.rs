@@ -203,3 +203,41 @@ fn default_camera_records_a_fragmented_mp4() {
     assert!(scan.is_clean(), "the file ends on a fragment boundary");
     assert_eq!(scan.fragments.len(), report.fragments.len());
 }
+
+#[test]
+#[ignore = "opens the real camera for 3 s as a recorder and a preview at once (frames are discarded)"]
+fn a_preview_joins_a_recorder_on_the_same_camera() {
+    let Some(cam) = camera_or_skip() else { return };
+    let rec_sink = Arc::new(Collect::default());
+    let prev_sink = Arc::new(Collect::default());
+    let req = |role| OpenRequest {
+        device_id: Some(cam.id.clone()),
+        resolution: CameraResolution::P720,
+        fps: 30,
+        role,
+        first_frame_timeout: Duration::from_secs(5),
+    };
+    let mut rec = cm_camera::system_source();
+    rec.open(&req(SourceRole::Record), rec_sink.clone())
+        .unwrap();
+    let mut prev = cm_camera::system_source();
+    prev.open(&req(SourceRole::Preview { fps: 10 }), prev_sink.clone())
+        .expect("a preview must share the streaming camera, not fail with a busy device");
+    std::thread::sleep(Duration::from_secs(3));
+    prev.close();
+    // The recorder keeps going after the preview left.
+    let before = rec_sink.stamps.lock().unwrap().len();
+    std::thread::sleep(Duration::from_secs(1));
+    let after = rec_sink.stamps.lock().unwrap().len();
+    rec.close();
+    let previews = prev_sink.stamps.lock().unwrap().len();
+    eprintln!("recorder frames {after}, preview frames {previews}");
+    assert!(
+        after > before + 10,
+        "the recorder stalled when the preview left"
+    );
+    assert!(
+        (15..=45).contains(&previews),
+        "preview at 10 fps, got {previews}"
+    );
+}
