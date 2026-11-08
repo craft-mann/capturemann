@@ -224,7 +224,7 @@ impl ChimePlayer for CommandPlayer {
             }
         }
         Err(CmError::not_found(format!(
-            "no sound player found (tried {}); install pipewire-bin, pulseaudio-utils or alsa-utils",
+            "No audio player was found (tried {}). Install pipewire-bin (pw-play), pulseaudio-utils (paplay) or alsa-utils (aplay).",
             self.names().join(", ")
         )))
     }
