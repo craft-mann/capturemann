@@ -5,6 +5,28 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-09
+
+0.3.0 is the Linux release: Linux (Ubuntu 24.04+, x86_64 and aarch64) is no longer an early build. Recording, the camera, import, export and the other features of Windows and macOS are on Linux; reasoned gaps are listed in the release notes. No Windows or macOS file ships with 0.3.0.
+
+### Added (Linux)
+- Screen recording is on by default: display, region and (on X11) window recording; GNOME records without the share dialog (Mutter screen-cast, the portal as the fallback); VA-API H.264 where the GPU has it, software VP9 otherwise (labelled); pause, resume, microphone, system audio, banner in the Studio window, crash recovery.
+- Webcam recording through Video4Linux2 (MJPEG/YUYV), the camera as its own track, camera picker and check in Settings.
+- Cursor track on X11 (XInput2 and XFixes), idle-sleep guard while recording, microphone list from PipeWire, chime player (pw-play, paplay, aplay).
+- Import and export without a hardware encoder: software VP9 is the labelled fallback (the result, the CLI and the toast say "VP9, not H.264" and why); VA-API rate mode is probed (CQP-only drivers such as Intel iHD work).
+- Wayland: window screenshot through the desktop's own picker (the shell's saved file is used); tray fixes; Shortcuts page tells what works on each desktop.
+- Packages: a signed APT repository tool (`make-apt-repo.sh`), `check-package.sh`, `release-build.sh`; the `.deb` ships LICENSE and the desktop entry offers Open with for importable media.
+- `cm-regress` for Linux: window shots, Auto-redact window text, recording banner, settings applied, installer cases, Wayland skips with reasons.
+
+### Fixed (Linux)
+- "Killed by a signal" when starting a recording (a portal dialog waited for a click).
+- Tray: the delay check mark follows, "Recent captures" follows the library.
+- Diagnostics: no claim of the system credential store when no Secret Service runs; GPU/encoder line.
+- Recording UI: sheet height, shortcut keycaps, share-dialog wording, banner controls, false privacy claims about excluded apps, camera name.
+
+### Changed
+- Vietnamese: 117 Linux strings are drafts.
+
 ## [0.2.9] - 2026-11-08
 
 0.2.9 is a bug-fix release for Windows and macOS. macOS also receives the changes of 0.2.8 (Windows only). Linux stays at 0.2.6; the next Linux release is 0.3.0.
