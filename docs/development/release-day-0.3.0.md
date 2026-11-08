@@ -47,7 +47,7 @@ Text to publish: `release-0.3.0-github-text.md`. What happened during the night:
 
 ## 3. The release files and their checks
 
-The files built the night of Nov 8 to 9 from commit `5301d4b8` (code frozen there; later commits change documents, `cm-regress` and tests only):
+The files built the night of Nov 8 to 9 from commit `5301d4b8` (code frozen there; later commits change documents, `cm-regress`, tests and one behaviour-neutral move of the cursor-track rule to `cm-platform`; see the morning report):
 
 - `capturemann-0.3.0-linux-x86_64.tar.gz`, `capturemann_0.3.0_amd64.deb` (laptop; `~/wt/release-out/<sha8>-x86_64/`)
 - `capturemann-0.3.0-linux-aarch64.tar.gz`, `capturemann_0.3.0_arm64.deb` (VM; `~/wt/release-out/<sha8>-aarch64/`)
