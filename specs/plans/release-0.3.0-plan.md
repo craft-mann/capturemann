@@ -24,7 +24,7 @@ unless the maintainer pulls them in.
    `ToastAction::RevealExport(id)` in `apps/desktop/src/toast.rs`, handled by `crate::ui::export_ui::reveal`
    (`apps/desktop/src/ui/app/toasts.rs`); check the path it opens (the recording's exports folder versus the exported
    file, path separators, `explorer /select`). Add a regress case.
-2. **Windows CI speed-up:** moved to 0.2.9 (`release-0.2.9-plan.md`, item 7, Nov 6, 2026).
+2. **Windows CI speed-up:** not done in 0.2.9 (`release-0.2.9-plan.md`, item 7): the Windows test job takes about 48 minutes (target 20) and `quick_export` alone 345 s. Same item: the flaky `exp4_ac4_cancel_deletes_partial_output` (`cm-media/tests/quick_export.rs`; cancel noticed after 0.44 s but the export took 31.8 s to wind down against a 20 s limit, CI run 42477256615, Nov 8, 2026; it also failed once earlier): wait for the cancel signal instead of the clock, or give Windows CI a longer limit. Also harden the NSIS install step in `windows-package.yml` with a retry (Chocolatey 5xx on Nov 7, 2026).
 3. **Regression drivers for macOS and Linux:** moved to 0.2.9 (`release-0.2.9-plan.md`, item 6, Nov 6, 2026). 0.3.0 reuses them.
 4. **Output-device chooser** in the editor (playback follows the system default; an external monitor with speakers can take
    it over).
