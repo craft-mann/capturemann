@@ -318,10 +318,11 @@ fn read_only_calls(ctx: &mut Ctx) -> R {
 }
 
 fn confirm_tier(ctx: &mut Ctx) -> R {
-    if sys::PLATFORM == "macos" && !sys::has_desktop() {
-        // The daemon checks the target before it asks, and a locked Mac lists no display.
+    if (sys::PLATFORM == "macos" || sys::PLATFORM == "linux") && !sys::has_desktop() {
+        // The daemon checks the target before it asks, and a locked Mac (or a Linux run with no desktop
+        // session, such as a headless VM) lists no display.
         return skip(
-            "the Mac screen is locked or off: no display exists to name in start_recording",
+            "no desktop session or the screen is locked: no display exists to name in start_recording",
         );
     }
     seed_screenshot(ctx)?;
@@ -389,6 +390,9 @@ fn confirm_tier(ctx: &mut Ctx) -> R {
 fn policy_allow(ctx: &mut Ctx) -> R {
     // With the user's own setting (written to the config folder, which an agent cannot do), the daemon
     // stops asking: the call proceeds to validation and fails on the bogus display instead.
+    if sys::PLATFORM == "linux" && !sys::has_desktop() {
+        return skip("no desktop session: a recording cannot name a display (a headless computer answers platform_rejected)");
+    }
     ctx.allow_recording_without_dialog()?;
     ctx.start_daemon()?;
     let r = ctx.cli(&["record", "start", "--display", "987654", "--countdown", "0"])?;
