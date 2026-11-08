@@ -427,8 +427,8 @@ async fn a_prepared_video_keeps_its_original_and_gets_an_editing_copy() {
     }
     let enc = cm_media::tools::locate()
         .ok()
-        .and_then(|t| cm_media::import::prepare::hardware_encoders(&t).ok())
-        .is_some_and(|(a, b)| a || b);
+        .and_then(|t| cm_media::import::prepare::editing_copy_encoders(&t, "h264").ok())
+        .is_some_and(|(ladder, _)| !ladder.is_empty());
     if !enc {
         eprintln!("SKIPPED: no hardware video encoder");
         return;
