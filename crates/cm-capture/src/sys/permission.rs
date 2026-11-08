@@ -51,8 +51,12 @@ mod imp {
             DisplayServer::X11 => Ok(()),
             // The desktop portal asks the user on the first capture.
             DisplayServer::Wayland => Ok(()),
-            DisplayServer::None => Err(CmError::internal(
-                "no display: neither DISPLAY nor WAYLAND_DISPLAY is set",
+            // Not an internal failure: this process simply has no desktop to capture (a console, an
+            // ssh login, a service). The same code the recording preflight uses.
+            DisplayServer::None => Err(CmError::platform_rejected(
+                "There is no desktop session to capture here (neither DISPLAY nor WAYLAND_DISPLAY \
+                 is set). Run CaptureMann from a logged-in desktop session.",
+                Some("no_display_session".into()),
             )),
         }
     }
