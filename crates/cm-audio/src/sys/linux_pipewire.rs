@@ -131,6 +131,24 @@ pub fn mic_devices_from(reg: &super::pw_registry::Registry) -> Vec<crate::MicDev
         .collect()
 }
 
+/// The Linux test-sound player (NEW-C): `pw-play` (PipeWire), then `paplay` (PulseAudio's tools,
+/// also served by pipewire-pulse), then `aplay -q` (ALSA). `None` off Linux.
+#[cfg(target_os = "linux")]
+pub fn chime_player() -> Option<crate::chime::CommandPlayer> {
+    Some(chime_player_for_order())
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn chime_player() -> Option<crate::chime::CommandPlayer> {
+    None
+}
+
+/// The candidates in order of preference.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+pub fn chime_player_for_order() -> crate::chime::CommandPlayer {
+    crate::chime::CommandPlayer::new(vec![("pw-play", &[]), ("paplay", &[]), ("aplay", &["-q"])])
+}
+
 /// Is PipeWire usable here? (Linux with a reachable daemon.)
 pub fn available() -> bool {
     imp::available()
