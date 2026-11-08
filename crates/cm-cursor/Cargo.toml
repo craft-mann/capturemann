@@ -32,5 +32,10 @@ windows = { version = "0.61", features = [
   "Win32_UI_WindowsAndMessaging", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse",
 ] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+# MIT OR Apache-2.0. X11 without C libraries: XInput2 raw pointer events and XFixes cursor images
+# (already in the tree through cm-capture and GPUI; only these two protocol features are added).
+x11rb = { version = "0.13", features = ["xinput", "xfixes"] }
+
 [dev-dependencies]
 tempfile.workspace = true
