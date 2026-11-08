@@ -405,13 +405,12 @@ impl Render for SettingsView {
                         .gap(px(24.))
                         // Agents & CLI draws its own hero (title, subtitle and the MCP pill).
                         .children((current != SettingsSection::Agents).then(|| {
-                            page_header_tile(
-                                &t,
-                                header.icon(),
-                                &header.title(),
-                                &header.subtitle(),
-                                right,
-                            )
+                            let subtitle = if current == SettingsSection::Shortcuts {
+                                model::shortcuts_subtitle(self.shortcuts_none_registered(cx))
+                            } else {
+                                header.subtitle()
+                            };
+                            page_header_tile(&t, header.icon(), &header.title(), &subtitle, right)
                         }))
                         .child(body),
                 ),

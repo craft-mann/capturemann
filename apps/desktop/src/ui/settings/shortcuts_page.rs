@@ -35,6 +35,17 @@ impl SettingsView {
         }
     }
 
+    /// True when the session registers no global shortcut at all (GNOME on Wayland).
+    pub(super) fn shortcuts_none_registered(&self, cx: &Context<Self>) -> bool {
+        let reg = self.app.read(cx).registration.clone();
+        !reg.is_empty()
+            && reg.iter().all(|(_, r)| {
+                r.as_ref()
+                    .err()
+                    .is_some_and(|e| e == crate::platform_hotkeys::UNSUPPORTED)
+            })
+    }
+
     pub(super) fn shortcuts(&self, t: &Theme, cx: &mut Context<Self>) -> AnyElement {
         let (platform, map, reg, portal) = {
             let m = self.app.read(cx);
@@ -194,12 +205,7 @@ impl SettingsView {
                             .children(items),
                     )
                 });
-        let none_registered = !reg.is_empty()
-            && reg.iter().all(|(_, r)| {
-                r.as_ref()
-                    .err()
-                    .is_some_and(|e| e == crate::platform_hotkeys::UNSUPPORTED)
-            });
+        let none_registered = self.shortcuts_none_registered(cx);
         let portal_managed = crate::platform_hotkeys::backend()
             == crate::platform_hotkeys::Backend::WaylandPortal
             && reg.iter().any(|(_, r)| r.is_ok());
