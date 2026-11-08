@@ -7,7 +7,7 @@ set -u
 secs="$1"; shift
 BIN="${BIN:-$HOME/wt/rec-target/debug}"
 RUN="${RUN:-$HOME/rec-t}"
-. "$HOME/lab/cm-env.sh"
+. "$HOME/lab/rec-env.sh"
 [ -f "$HOME/lab/session.env" ] && { set -a; . "$HOME/lab/session.env"; set +a; }
 export CAPTUREMANN_CONFIG_DIR="$RUN/config" CAPTUREMANN_LIBRARY="$RUN/lib" CAPTUREMANN_SOCKET="$RUN/sock"
 mkdir -p "$CAPTUREMANN_CONFIG_DIR"

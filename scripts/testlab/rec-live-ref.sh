@@ -6,7 +6,7 @@ set -u
 secs="$1"
 RUN="${RUN:-$HOME/rec-g}"
 here="$(cd "$(dirname "$0")" && pwd)"
-. "$HOME/lab/cm-env.sh"
+. "$HOME/lab/rec-env.sh"
 clip="$RUN/sync-clip.mkv"
 [ -f "$clip" ] || { echo "run rec-live-av.sh once first (it makes the clip)"; exit 1; }
 ffplay -v quiet -x 1700 -y 950 -left 100 -top 60 -noborder -autoexit -loop 0 "$clip" > /dev/null 2>&1 &
