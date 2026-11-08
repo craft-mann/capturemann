@@ -15,6 +15,7 @@ workspace = true
 
 [dependencies]
 cm-platform.workspace = true
+cm-encode.workspace = true
 cm-core.workspace = true
 cm-render.workspace = true
 cm-audio.workspace = true

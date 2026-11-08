@@ -40,8 +40,8 @@ use crate::edit_plan::{
 };
 use crate::edit_view::{CursorMedia, EditView, ViewParams};
 use crate::graph::{
-    mf_vui_args, mp4_movflags, output_size, rate, secs, video_codec_at, AUDIO_BPS_MONO,
-    AUDIO_BPS_STEREO, AUDIO_RATE,
+    mf_vui_args, mp4_movflags, output_size, rate, secs, video_codec_at, video_codec_for,
+    AUDIO_BPS_MONO, AUDIO_BPS_STEREO, AUDIO_RATE,
 };
 use crate::layout_plan::{geom_of, LayoutPlanner, Placement};
 use crate::preset::{self, fit_rect, Kind, Target};
@@ -761,7 +761,13 @@ pub fn export_edited(
     loop {
         let fmt = match (kind, encoder) {
             (Kind::Mp4, Some(enc)) => {
-                let codec = video_codec_at(enc, out_size, fps, target.and_then(|t| t.video_bps));
+                let codec = video_codec_for(
+                    enc,
+                    out_size,
+                    fps,
+                    target.and_then(|t| t.video_bps),
+                    caps.vaapi_cqp,
+                );
                 bitrate = codec.bitrate;
                 OutFormat::mp4(enc, &codec.args, caps.vaapi_device.as_deref())
             }

@@ -1436,6 +1436,7 @@ dependencies = [
  "sha2 0.10.9",
  "tempfile",
  "windows 0.61.3",
+ "x11rb",
 ]
 
 [[package]]
@@ -1622,6 +1623,7 @@ dependencies = [
  "cm-audio",
  "cm-core",
  "cm-cursor",
+ "cm-encode",
  "cm-platform",
  "cm-render",
  "hound",
