@@ -131,8 +131,12 @@ fn files(ctx: &mut Ctx) -> R {
         if sys::PLATFORM == "linux" {
             let real = std::fs::canonicalize(&dir).unwrap_or_else(|_| dir.clone());
             doc_dirs.push(real.join("../../share/doc/capturemann"));
-            if real.starts_with("/opt/capturemann") {
-                doc_dirs.push(Path::new("/usr/share/doc/capturemann").to_path_buf());
+            // The .deb: <root>/opt/capturemann/lib/capturemann with the documents in <root>/usr/share/doc/capturemann
+            // (<root> is / when installed, a folder when the package was unpacked with `dpkg -x`).
+            if real.ends_with("opt/capturemann/lib/capturemann") {
+                if let Some(root) = real.ancestors().nth(4) {
+                    doc_dirs.push(root.join("usr/share/doc/capturemann"));
+                }
             }
         }
         let find_doc =

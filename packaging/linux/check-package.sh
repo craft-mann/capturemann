@@ -222,8 +222,9 @@ else
   # (a computer without a VA-API driver is normal; export then falls back to VP9).
   if [ -x "$progs/ffmpeg" ] && ls /dev/dri/renderD* >/dev/null 2>&1 \
      && "$progs/ffmpeg" -hide_banner -encoders 2>/dev/null | grep -q h264_vaapi; then
-    if head -c 98304 /dev/zero | timeout 60 "$progs/ffmpeg" -v error -vaapi_device "$(ls /dev/dri/renderD* | head -1)" \
-         -f rawvideo -pix_fmt nv12 -s 256x256 -i - -vf format=nv12,hwupload -c:v h264_vaapi -rc_mode CQP -qp 26 \
+    head -c 98304 /dev/zero > "$tmp/probe.nv12"   # the bundled FFmpeg has no pipe protocol
+    if timeout 60 "$progs/ffmpeg" -v error -vaapi_device "$(ls /dev/dri/renderD* | head -1)" \
+         -f rawvideo -pix_fmt nv12 -s 256x256 -i "$tmp/probe.nv12" -vf format=nv12,hwupload -c:v h264_vaapi -rc_mode CQP -qp 26 \
          -frames:v 1 -f null - >"$tmp/vaapi.txt" 2>&1; then note "VA-API: one H.264 frame encoded with h264_vaapi"
     else note "VA-API: h264_vaapi did not encode on this machine ($(head -c 150 "$tmp/vaapi.txt" | tr '\n' ' '))"; fi
   fi
