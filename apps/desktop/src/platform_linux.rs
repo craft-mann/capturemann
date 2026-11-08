@@ -102,8 +102,11 @@ impl Item {
     fn status(&self) -> String {
         sni_status(self.0.lock().inputs.icon).into()
     }
+    /// `WindowId` is an `i` (int32) in the StatusNotifierItem interface; the GNOME AppIndicator
+    /// extension refuses the whole item when it reads another type ("Received property WindowId
+    /// with type u does not match expected type i"), so no icon is drawn at all.
     #[zbus(property)]
-    fn window_id(&self) -> u32 {
+    fn window_id(&self) -> i32 {
         0
     }
     #[zbus(property)]
@@ -302,15 +305,16 @@ impl DbusMenu {
         unknown
     }
 
-    /// A menu is about to open: say the layout may have changed, so a host that kept an older
-    /// copy (the GNOME AppIndicator extension caches built submenus) reads it again. The cost is
-    /// one `GetLayout` of a 20-item tree.
+    /// A menu is about to open. The answer stays `false` on purpose: with `true` the GNOME
+    /// AppIndicator extension asks for the layout again with only the properties `type` and
+    /// `children-display`, and then opens "Capture delay" and "Recent captures" empty (seen on the
+    /// ThinkPad, Ubuntu 24.04, Nov 8, 2026). Changes reach the host as signals instead.
     fn about_to_show(&self, _id: i32) -> bool {
-        true
+        false
     }
 
-    fn about_to_show_group(&self, ids: Vec<i32>) -> (Vec<i32>, Vec<i32>) {
-        (ids, Vec::new())
+    fn about_to_show_group(&self, _ids: Vec<i32>) -> (Vec<i32>, Vec<i32>) {
+        (Vec::new(), Vec::new())
     }
 }
 
@@ -520,5 +524,26 @@ impl TrayHandle {
     /// Replaces the "Recent captures" entries (last 5, CAP-2).
     pub fn set_recents(&self, recents: &[(String, String)]) {
         self.update(|i| i.recents = recents.to_vec());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// CAP-2 (Linux tray): the property types the AppIndicator extension checks. A `WindowId` of
+    /// type `u` made GNOME 46 draw no tray icon at all (found on the ThinkPad, Nov 8, 2026).
+    #[test]
+    fn cap2_window_id_is_an_int32_as_the_interface_says() {
+        let item = Item(Arc::new(Shared(Mutex::new(Inner {
+            inputs: MenuInputs::default(),
+            menu: Vec::new(),
+            revision: 1,
+            pixmaps: Vec::new(),
+        }))));
+        fn sig<T: Type>(_: &T) -> String {
+            T::SIGNATURE.to_string()
+        }
+        assert_eq!(sig(&item.window_id()), "i");
     }
 }
