@@ -110,5 +110,5 @@ than one second on Wayland.
 | `capturemann-0.3.0-linux-aarch64.tar.gz` | `10513d7059f595d834d525b43e03f5da61341f8ec363efc09ebecd8f6171c968` |
 | `capturemann_0.3.0_arm64.deb` | `46f7909df48c893fac6261062607c0d888a15eeb8878131fe11b086c3a50f06a` |
 
-Minisign public key: `packaging/linux/minisign.pub`; fingerprint `<FILL>`.
+Minisign public key: `packaging/linux/minisign.pub`; public key `RWTeQv8ogB2CCuZ7j0rr3MovdHod4QATmVn+I329YC8pomOC6R9Rxc2k` (verify: `minisign -Vm <file> -P <that key>`).
 Install: `sudo apt install ./capturemann_0.3.0_amd64.deb` (or the tarball and `install.sh`).
