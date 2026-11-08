@@ -259,6 +259,7 @@ impl Render for Studio {
                 .read(cx)
                 .audio_open(&self.app.read(cx).library_route);
         let status = agent_status_of(&self.app.read(cx).backend);
+        let recording = self.app.read(cx).rec.read(cx).hud.phase.is_active();
         let sidebar = sidebar(
             &t,
             &SidebarProps {
@@ -270,6 +271,7 @@ impl Render for Studio {
                 library_route,
                 section,
                 audio_open,
+                recording,
             },
             &self.app,
             &self.settings,

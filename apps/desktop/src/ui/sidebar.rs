@@ -38,6 +38,19 @@ pub struct SidebarProps {
     pub section: SettingsSection,
     /// The recording editor shows an audio recording: Audio is the highlighted item, not Recordings.
     pub audio_open: bool,
+    /// A recording is starting, running or stopping: the Record controls are unavailable (as the
+    /// tray's "Record..." is), so the dock and the rail do not offer a second start.
+    pub recording: bool,
+}
+
+/// How strongly the Record controls are drawn: dimmed without a recorder and while a recording
+/// is on.
+fn record_opacity(supported: bool, recording: bool) -> f32 {
+    if supported && !recording {
+        1.0
+    } else {
+        0.45
+    }
 }
 
 impl SidebarProps {
@@ -139,7 +152,10 @@ fn record_audio_button(
         .hover(|s| s.opacity(0.85))
         .focus_visible(move |s| s.border_color(focus))
         .tooltip(tip(nav::record_audio_label(), keys))
-        .on_click(move |_, _, cx| open_record_audio(&app, cx))
+        .when(!p.recording, |b| {
+            b.on_click(move |_, _, cx| open_record_audio(&app, cx))
+        })
+        .when(p.recording, |b| b.cursor_default())
         .child(icon("mic", 18., t.rec_soft))
 }
 
@@ -281,7 +297,10 @@ fn dock(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> AnyElement {
             .mono()
             .child(SharedString::from(nav::tile_keys(&record.keys).join(""))),
     )
-    .on_click(move |_, _, cx| open_capture(&rec_app, DockAction::Record, cx));
+    .when(!p.recording, |b| {
+        b.on_click(move |_, _, cx| open_capture(&rec_app, DockAction::Record, cx))
+    })
+    .when(p.recording, |b| b.cursor_default());
     let record_row = div()
         .flex()
         .gap(px(6.))
@@ -289,11 +308,10 @@ fn dock(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> AnyElement {
         .child(record_audio_button(t, p, app, 42.));
     // Without a recorder (early Linux builds) the buttons stay, so the shortcut and the "not
     // available yet" answer are still there, but they read as unavailable.
-    let record_row = if crate::backend::recording_supported() {
-        record_row
-    } else {
-        record_row.opacity(0.45)
-    };
+    let record_row = record_row.opacity(record_opacity(
+        crate::backend::recording_supported(),
+        p.recording,
+    ));
 
     let tiles = entries.iter().skip(1).map(|e| {
         let action = e.action;
@@ -438,13 +456,15 @@ fn rail_body(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> Vec<AnyElem
                         tr_ctx!("capture dock", "Record\u{2026}"),
                         e.keys.clone(),
                     ))
-                    .on_click(move |_, _, cx| open_capture(&app, DockAction::Record, cx))
-                    .child(icon(e.action.icon(), 18., t.on_rec))
-                    .opacity(if crate::backend::recording_supported() {
-                        1.0
-                    } else {
-                        0.45
+                    .when(!p.recording, |b| {
+                        b.on_click(move |_, _, cx| open_capture(&app, DockAction::Record, cx))
                     })
+                    .when(p.recording, |b| b.cursor_default())
+                    .child(icon(e.action.icon(), 18., t.on_rec))
+                    .opacity(record_opacity(
+                        crate::backend::recording_supported(),
+                        p.recording,
+                    ))
                     .into_any_element()
             }
             RailEntry::Region => {
@@ -462,11 +482,10 @@ fn rail_body(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> Vec<AnyElem
                 .into_any_element()
             }
             RailEntry::RecordAudio => record_audio_button(t, p, app, scale::TARGET)
-                .opacity(if crate::backend::recording_supported() {
-                    1.0
-                } else {
-                    0.45
-                })
+                .opacity(record_opacity(
+                    crate::backend::recording_supported(),
+                    p.recording,
+                ))
                 .into_any_element(),
             RailEntry::Divider => div()
                 .w(px(32.))
@@ -604,4 +623,16 @@ fn settings_body(
     out.push(div().flex_1().into_any_element());
     out.push(mcp_card(t, p, app));
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::record_opacity;
+
+    #[test]
+    fn record_controls_are_dimmed_without_a_recorder_and_while_recording() {
+        assert_eq!(record_opacity(true, false), 1.0);
+        assert!(record_opacity(true, true) < 1.0);
+        assert!(record_opacity(false, false) < 1.0);
+    }
 }
