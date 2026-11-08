@@ -203,3 +203,92 @@ pub fn request_rescan(app: &Entity<AppModel>, force: bool, cx: &mut App) {
     })
     .detach();
 }
+
+/// How often the tray's "Recent captures" list asks the library again (captures made by the CLI,
+/// an agent or another window do not bump `library_epoch` of this process).
+const RECENTS_EVERY: Duration = Duration::from_secs(10);
+
+/// Keeps the tray's "Recent captures" list the newest screenshots of the library, not only the
+/// ones this run of the app took (CAP-2, 0.2.6 bug: the Linux tray listed just its own capture).
+/// Asks once at start, then every [`RECENTS_EVERY`], and sends the list on only when it changed.
+pub fn start_tray_recents_watch(app: &Entity<AppModel>, cx: &mut App) {
+    let app2 = app.clone();
+    cx.spawn(async move |cx| loop {
+        let (backend, has_tray) = cx.update(|cx| {
+            let m = app2.read(cx);
+            (m.backend.clone(), m.tray.is_some())
+        });
+        if has_tray {
+            if let Some(daemon) = backend.daemon.clone() {
+                let got = backend
+                    .rt
+                    .spawn(async move {
+                        Backend::call(
+                            &daemon,
+                            "list_library",
+                            serde_json::json!({ "limit": TRAY_RECENTS, "kind": "screenshot" }),
+                        )
+                        .await
+                    })
+                    .await;
+                if let Ok(Ok(page)) = got {
+                    if let Some((items, _, _)) = crate::library::parse_page(&page) {
+                        let recents = recents_from(&items);
+                        cx.update(|cx| {
+                            let changed = app2.update(cx, |m, _| {
+                                let changed = m.recents != recents;
+                                m.recents = recents;
+                                changed
+                            });
+                            if changed {
+                                refresh_tray_recents(&app2, cx);
+                            }
+                        });
+                    }
+                }
+            }
+        }
+        cx.background_executor().timer(RECENTS_EVERY).await;
+    })
+    .detach();
+}
+
+/// The tray lists at most this many captures.
+const TRAY_RECENTS: usize = 5;
+
+/// `(capture id, title)` of the newest items, in the library's order (newest first).
+pub fn recents_from(items: &[crate::library::CaptureItem]) -> Vec<(String, String)> {
+    items
+        .iter()
+        .filter(|i| !i.broken)
+        .take(TRAY_RECENTS)
+        .map(|i| (i.id.clone(), i.title.clone()))
+        .collect()
+}
+
+#[cfg(test)]
+mod recents_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn page(n: usize) -> serde_json::Value {
+        let captures: Vec<_> = (0..n)
+            .map(|i| {
+                json!({
+                    "id": format!("c{i}"), "title": format!("Shot {i}"), "kind": "screenshot",
+                    "created": "2026-11-08T10:00:00Z", "size_bytes": 1
+                })
+            })
+            .collect();
+        json!({ "captures": captures })
+    }
+
+    /// CAP-2: the tray lists the library's newest captures (at most five, in the library's order).
+    #[test]
+    fn the_tray_recents_follow_the_library_not_only_this_run() {
+        let (items, _, _) = crate::library::parse_page(&page(8)).expect("a page");
+        let r = recents_from(&items);
+        assert_eq!(r.len(), 5);
+        assert_eq!(r[0], ("c0".to_owned(), "Shot 0".to_owned()));
+    }
+}
