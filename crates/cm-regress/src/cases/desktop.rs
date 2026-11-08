@@ -5,7 +5,7 @@
 use super::common::{need_ffmpeg, write_clips};
 use crate::check;
 use crate::ctx::{displays, Ctx};
-use crate::model::{fail, skip, Case, Need, Stop, Tier, R, WIN, WIN_MAC};
+use crate::model::{fail, skip, Case, Need, Stop, Tier, LINUX, R, WIN, WIN_MAC};
 use crate::proc::exit_text;
 use crate::sys::{self, Key, WinInfo};
 use serde_json::Value;
@@ -59,6 +59,17 @@ pub fn cases() -> Vec<Case> {
             platforms: WIN,
             timeout_s: 180,
             run: hud,
+        },
+        Case {
+            id: "desktop.recording_banner",
+            title: "Linux: during a recording the app shows its banner window and no floating HUD or screen-sized topmost window that would be in the video",
+            area: "desktop",
+            specs: &["REC-5 (Linux: banner in the Studio window, not a floating HUD)", "LINUX-REC-5"],
+            tier: Tier::Full,
+            needs: &[Need::DesktopSession, Need::Screen],
+            platforms: LINUX,
+            timeout_s: 180,
+            run: banner,
         },
         Case {
             id: "desktop.no_console_flash",
@@ -519,6 +530,108 @@ fn hud(ctx: &mut Ctx) -> R {
             "console windows appeared while stopping: {}",
             seen.join("; ")
         ));
+    }
+    if problems.is_empty() {
+        Ok(())
+    } else {
+        fail(problems.join("; "))
+    }
+}
+
+/// Linux: the recording surface is a banner inside the Studio window, not a floating HUD (they would be in the
+/// video and Wayland cannot place them). From outside the process only the windows can be seen: the Studio
+/// window must be on screen, no small topmost window (the floating HUD) may exist unless the run opted in with
+/// `CM_LINUX_FLOATING_HUD=1`, and no screen-sized topmost window (the area frame) may cover the display.
+fn banner(ctx: &mut Ctx) -> R {
+    if let Some(why) = sys::recording_unavailable() {
+        return skip(why);
+    }
+    if let Some(why) = sys::window_cases_unavailable() {
+        return skip(why);
+    }
+    ctx.allow_recording_without_dialog()?;
+    let app = start_app(ctx, &[])?;
+    std::thread::sleep(Duration::from_secs(3));
+    let d = ctx.primary_display()?;
+    let id = d.id.to_string();
+    let r = ctx.cli_long(
+        &[
+            "record",
+            "start",
+            "--display",
+            &id,
+            "--countdown",
+            "0",
+            "--size",
+            "720p",
+        ],
+        90,
+    )?;
+    if !r.ok() {
+        if r.out.timed_out {
+            return skip("record start did not answer within 90 s: the desktop is waiting for a person (portal dialog); this case needs a recording path without a dialog");
+        }
+        return fail(format!(
+            "record start failed ({}): {}",
+            exit_text(r.code()),
+            crate::util::cut(&r.error_message(), 300)
+        ));
+    }
+    std::thread::sleep(Duration::from_secs(4));
+    let all: Vec<WinInfo> = sys::enum_windows()
+        .into_iter()
+        .filter(|w| w.pid == app.pid && w.visible && w.width() > 0 && w.height() > 0)
+        .collect();
+    for w in &all {
+        ctx.note(w.brief());
+    }
+    let floating_hud = std::env::var("CM_LINUX_FLOATING_HUD").is_ok_and(|v| v.trim() == "1");
+    let topmost = |w: &&WinInfo| w.ex_style & sys::WS_EX_TOPMOST != 0;
+    let mut problems = Vec::new();
+    if !all.iter().any(|w| w.width() >= 400 && w.height() >= 200) {
+        problems.push(
+            "the Studio window (the banner's home) is not on screen during the recording"
+                .to_owned(),
+        );
+    }
+    let hud: Vec<_> = all
+        .iter()
+        .filter(topmost)
+        .filter(|w| w.width() <= 900 && w.height() <= 300)
+        .collect();
+    if !floating_hud && !hud.is_empty() {
+        problems.push(format!(
+            "a floating HUD-like window is on screen (it would be in the video): {}",
+            hud[0].brief()
+        ));
+    }
+    if floating_hud && hud.is_empty() {
+        problems.push("CM_LINUX_FLOATING_HUD=1 but no small topmost window appeared".to_owned());
+    }
+    for w in all.iter().filter(topmost) {
+        if i64::from(w.width()) >= d.w - 60 && i64::from(w.height()) >= d.h - 60 {
+            problems.push(format!(
+                "a screen-sized topmost window covers the display: {}",
+                w.brief()
+            ));
+        }
+    }
+    let st = ctx.cli_ok(&["record", "status"])?;
+    let state = st
+        .get("state")
+        .and_then(Value::as_str)
+        .unwrap_or("?")
+        .to_owned();
+    ctx.note(format!("record status: {state}"));
+    if state != "recording" {
+        problems.push(format!(
+            "record status says `{state}`, expected `recording`"
+        ));
+    }
+    let stop = ctx.cli_long(&["record", "stop"], 90)?;
+    super::record::wait_idle_exports(ctx);
+    if !stop.ok() {
+        problems.push(format!("record stop failed: {}", exit_text(stop.code())));
     }
     if problems.is_empty() {
         Ok(())
