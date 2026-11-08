@@ -183,8 +183,5 @@ recorder) can be edited and exported. The `cm-media` exporter probes the FFmpeg 
   Wayland screenshot portal) while `gpui-pre-linux` pulls `oo7/async-std`, which turns on `ashpd/async-io`. Whoever
   owns `cm-capture` has to select one runtime (the `async-io` feature is the one GPUI needs). Until then no release
   tarball can contain the app; `CM_LINUX_ALLOW_MISSING=cm-desktop` only lets the packaging be tried.
-* The window's `app_id` in the app is `app.capturemann.desktop` while the desktop file is `dev.capturemann.app`
-  (the login item and the macOS bundle id use the latter). `StartupWMClass` is set to the former so the taskbar
-  groups the window; on Wayland the shell matches the `app_id` to the desktop file name, so the app should use
-  `dev.capturemann.app` as `app_id`.
+* The window's `app_id` and the desktop file are both `dev.capturemann.app` (`StartupWMClass` too; fixed in 0.3.0 packaging, the app side is `APP_ID` in `apps/desktop/src/platform_window.rs`). The entry has `Exec=... %F` and a `MimeType=` list (MP4, MOV, M4V, MKV, WebM, M4A, WAV, MP3) for "Open with" (IMP-5); it is never the default program.
 * Nothing here was run on a real desktop or on x86_64 hardware; see the verification report.
