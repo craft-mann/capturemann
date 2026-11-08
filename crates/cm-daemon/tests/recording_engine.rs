@@ -1442,7 +1442,14 @@ async fn agt2_agent_start_asks_with_the_exact_plan() {
     assert!(text("microphone").starts_with("On: Fake Microphone"));
     assert!(text("camera").starts_with("On: Fake Camera, 720p"));
     assert_eq!(text("system_audio"), "On");
-    assert!(text("cursor").contains("never keystrokes"));
+    // Where a cursor track is recorded (every system except a Linux session that is not X11) the row names
+    // what is logged; on Wayland, or an ssh login without a desktop, it says the pointer is only in the video.
+    assert!(
+        text("cursor").contains("never keystrokes")
+            || (cfg!(target_os = "linux") && text("cursor").starts_with("Shown in the video only")),
+        "{}",
+        text("cursor")
+    );
     assert!(text("save_to").contains(r.dir.path().to_str().unwrap()));
     assert!(text("save_to").contains("Demo"));
     assert_eq!(text("max_duration"), "30 min");
