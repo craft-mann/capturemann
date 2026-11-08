@@ -81,7 +81,7 @@ pub struct Banner {
     /// Restart (discard this take and start over) is offered, with Discard.
     pub restart: bool,
     /// The line under the controls: what else shows the recording, or (while it starts) what the
-    /// desktop may ask.
+    /// desktop may ask; empty during the countdown and while the take is saved.
     pub hint: String,
 }
 
@@ -120,10 +120,15 @@ pub fn banner(hud: &HudState, now: Instant) -> Option<Banner> {
         countdown: matches!(phase, Phase::Countdown | Phase::Resuming) && digit.is_some(),
         discard: running,
         restart: running,
-        hint: if phase == Phase::Starting {
-            tr!("Your desktop may ask which screen to share. Choose the screen and press Share.")
-        } else {
-            tr!("Your desktop and the tray icon also show that the screen is being recorded. Stop from either one if this window is hidden.")
+        hint: match phase {
+            Phase::Starting => {
+                tr!("Your desktop may ask which screen to share. Choose the screen and press Share.")
+            }
+            Phase::Recording | Phase::Paused | Phase::Resuming | Phase::SelfTest => {
+                tr!("Your desktop and the tray icon also show that the screen is being recorded. Stop from either one if this window is hidden.")
+            }
+            // Nothing is being recorded yet (countdown) or any more (saving): no claim to make.
+            _ => String::new(),
         },
     })
 }
@@ -227,6 +232,7 @@ mod tests {
         let saving = banner(&state("stopping"), now).unwrap();
         assert_eq!(saving.label, "Saving");
         assert!(!saving.stop && !saving.discard && !saving.restart);
+        assert!(saving.hint.is_empty(), "nothing is recorded any more");
     }
 
     fn rec_hint_is_the_indicator_line(b: &Banner) -> bool {
@@ -246,5 +252,9 @@ mod tests {
         let b = banner(&h, now).unwrap();
         assert_eq!(b.label, "Starting in 3");
         assert!(b.countdown && b.pause.is_none() && !b.stop);
+        assert!(
+            b.hint.is_empty(),
+            "nothing is recorded during the countdown"
+        );
     }
 }
