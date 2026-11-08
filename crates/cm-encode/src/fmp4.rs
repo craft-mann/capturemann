@@ -381,6 +381,11 @@ pub fn scan<R: Read + Seek>(r: &mut R, len: u64) -> Result<Mp4Scan, CmError> {
                     break;
                 }
             }
+            // FFmpeg's MP4 muxer ends a finished fragmented file with a random-access index
+            // (`mfra`). It is a complete box after the last fragment, so the file is clean.
+            b"mfra" if moof.is_none() && end <= len && !out.fragments.is_empty() => {
+                out.valid_len = end;
+            }
             _ => {}
         }
         if &kind != b"ftyp" {
@@ -704,6 +709,22 @@ mod tests {
             assert_eq!(s.valid_len, want_valid, "cut {cut}");
             assert_eq!(s.is_clean(), cut == want_valid, "cut {cut}");
         }
+    }
+
+    /// REC-8: a file FFmpeg finished (a trailing `mfra` index) is clean, and a cut inside the
+    /// index is only a partial tail.
+    #[test]
+    fn a_trailing_mfra_index_does_not_make_a_finished_file_look_damaged() {
+        let mut bytes = file(3);
+        let good = bytes.len() as u64;
+        let mfra = boxed(b"mfra", &boxed(b"mfro", &[0, 0, 0, 0, 0, 0, 0, 24]));
+        bytes.extend(&mfra);
+        let s = scan_bytes(&bytes).unwrap();
+        assert_eq!(s.fragments.len(), 3);
+        assert!(s.is_clean(), "valid {} total {}", s.valid_len, s.total_len);
+        let cut = scan_bytes(&bytes[..bytes.len() - 5]).unwrap();
+        assert_eq!(cut.valid_len, good);
+        assert!(!cut.is_clean());
     }
 
     #[test]
