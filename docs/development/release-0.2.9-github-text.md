@@ -25,7 +25,7 @@ by the maintainer). Steps: `release-day-0.2.9.md`.
 
 # CaptureMann 0.2.9: fixes on Windows and macOS
 
-0.2.9 is a bug-fix release. It fixes five problems reported on 0.2.8 and earlier, polishes a few edges, and has **files for
+0.2.9 is a bug-fix release. It fixes seven problems reported on 0.2.8 and earlier, polishes a few edges, and has **files for
 Windows 11 (x64) and macOS 13+ (Apple Silicon and Intel)**. The one addition: **you can drag the recording HUD to where you
 want it and collapse it** (see "Improved"). **macOS users also get everything that came in 0.2.8** (see
 "Also new for macOS" below), because 0.2.8 was Windows only. Linux stays at 0.2.6; the next Linux release is 0.3.0.
@@ -130,7 +130,7 @@ the hint wording have layout and catalogue tests; the HUD drag and collapse have
 state (REC-5.AC16, AC17). **The HUD, the thumbnails and the toast were seen by eye on the Windows laptop** (screenshots
 of the demo recording and toast; Nov 7, 2026, not stored in the repository). On the Mac the maintainer looked at the
 thumbnails and said the corners are right; the HUD on macOS has not been seen by eye (`tests/manual/HUD-1.md` was **not run** before this release).
-CI on the tag commit (`cargo test --workspace` on macOS and Windows): <FILL: link or "see Actions">.
+CI on the tag commit (`cargo test --workspace` on macOS and Windows): <https://github.com/craft-mann/capturemann/actions/runs/42462803469>, Security scan <https://github.com/craft-mann/capturemann/actions/runs/42462803477>, Windows package <https://github.com/craft-mann/capturemann/actions/runs/42463440019>.
 
 ### Not run (same as 0.2.8 unless a report says otherwise)
 
@@ -154,7 +154,7 @@ CI on the tag commit (`cargo test --workspace` on macOS and Windows): <FILL: lin
   CaptureMann.CaptureMann` gives 0.2.8, not 0.2.9. Use the installer or the zip above for 0.2.9. A 0.2.9 winget update comes
   after the first package is accepted.
   The files are **not code-signed**; a browser download may show a SmartScreen warning (More info, then Run anyway).
-  SHA-256: installer `<FILL>`, zip `<FILL>`. Check with `certutil -hashfile <file> SHA256`.
+  SHA-256: installer `261358b388d7205783d09cd8f7d8ee073e043f5728f574e5efcb7e2cfafc080f`, zip `c97609b1b6860a522796cd434bf5404fb576de972ab6a69c928da60f06c8620e`. Check with `certutil -hashfile <file> SHA256`.
 - **macOS 13+:** `CaptureMann-v0.2.9-macos-arm64.dmg` (Apple Silicon) or `CaptureMann-v0.2.9-macos-x86_64.dmg` (Intel);
   signed with a Developer ID, notarized and stapled. Or `brew upgrade --cask craft-mann/tap/capturemann`
   (`brew install --cask craft-mann/tap/capturemann` for a first install). SHA-256: arm64 `fd5aed2d16dbcc09dd1ff4220453573a64af0a449948b3feb9e55ceace9b1e09`, x86_64
@@ -180,6 +180,8 @@ versions).
 0.2.9 is a bug-fix release for Windows and macOS. macOS also receives the changes of 0.2.8 (Windows only). Linux stays at 0.2.6; the next Linux release is 0.3.0.
 
 ### Fixed
+- Renaming a recording while it is transcribed or while speakers are found no longer loses the result.
+- Errors that showed a job id, an operating-system error or a file path now read as a plain sentence (Vietnamese included).
 - Reveal in the export toast opens the folder of the exported file with the file selected.
 - Annotation editor: Vietnamese text typed with Telex or VNI reaches the Text tool and is exported with its accents; new
   text starts at size 24, white, without an outline.
