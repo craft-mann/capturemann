@@ -477,6 +477,20 @@ fn screen_cursor(ctx: &mut Ctx) -> R {
             .is_some_and(|n| n.starts_with("cursor") && n.ends_with(".jsonl"))
     });
     let Some(cursor) = cursor else {
+        if sys::is_linux_wayland() {
+            // A stated gap of the Linux release: Wayland gives no pointer position or clicks, the pointer is
+            // drawn into the picture and the recording says so (`cursor_in_video`).
+            ctx.note(
+                "no cursor log on a Wayland session (the pointer is in the picture; a stated gap)",
+            );
+            let trouble = trouble_in_logs(ctx);
+            check!(
+                trouble.is_empty(),
+                "recording trouble in the logs: {trouble:?}"
+            );
+            wait_idle_exports(ctx);
+            return Ok(());
+        }
         return fail(format!(
             "no cursor log in the bundle; files: {:?}",
             Ctx::files_under(&rec.bundle)

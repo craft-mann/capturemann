@@ -157,6 +157,14 @@ pub fn window_cases_unavailable() -> Option<String> {
     }
 }
 
+/// True on a Linux Wayland session: windows have no ids there and the pointer is drawn into the picture (no
+/// cursor track), both stated gaps of the Linux release. `false` everywhere else.
+pub fn is_linux_wayland() -> bool {
+    PLATFORM == "linux"
+        && linux::session_kind(&|k| std::env::var(k).ok().filter(|v| !v.is_empty()))
+            == linux::Session::Wayland
+}
+
 /// Linux only: why the recording cases cannot run (the build keeps recording hidden unless
 /// `CM_LINUX_RECORDING=1`). `None` on the other systems and when the switch is on.
 pub fn recording_unavailable() -> Option<String> {

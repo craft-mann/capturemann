@@ -439,6 +439,12 @@ fn invalid(ctx: &mut Ctx) -> R {
         ));
         if r.ok() {
             problems.push(format!("{what}: the command succeeded"));
+        } else if what == "unknown window"
+            && sys::is_linux_wayland()
+            && r.error_code().as_deref() == Some("not_implemented")
+        {
+            // A stated gap: a Wayland session has no window ids, so a window is only picked through the desktop's
+            // own picker (`--pick`); the refusal is still an error with a shared code and no capture.
         } else if r.code() != Some(2) {
             problems.push(format!("{what}: exit {:?}, expected 2", r.code()));
         } else if r.error_code().as_deref() != Some(want) {
