@@ -1,131 +1,124 @@
-# Release 0.3.0 plan: Linux features (Linux-only release)
+# Release 0.3.0 plan: Linux catches up (no longer an early build)
 
-Status: **draft** (Nov 3, 2026, scope changed Nov 6 and Nov 7, 2026: 0.2.9 shipped on Windows and macOS on Nov 8, 2026; 0.3.0 is Linux-only), nothing built; 0.2.7 was released Nov 4, 2026. Scope set by the maintainer on Nov 3, 2026: 0.2.7 macOS only
-(`release-0.2.7-plan.md`), 0.2.8 Windows (`release-0.2.8-plan.md`), **0.3.0 Linux**. A separate session and agent own
-this plan and run alongside the 0.2.7 work (see "Working next to 0.2.7 and 0.2.8").
+Status: **draft** (rewritten Nov 8, 2026 after 0.2.9 shipped on Windows and macOS). Nothing built.
+
+**Scope rule (maintainer, Nov 8, 2026):** 0.3.0 is a Linux-only release with one goal: Linux gets the features Windows and
+macOS have, so it stops being an "early build"; then a complete regression and the release. Anything that is not
+Linux-only goes to [`release-0.3.1-plan.md`](release-0.3.1-plan.md). A shared-code fix comes in here only when a Linux
+task cannot be finished without it, and then it is named in the task.
 
 Rules that apply: general techniques only, no one-recording fixes; **nothing is called "verified" without a stored
 report in `verification/`** (name the distribution, desktop, session type, GPU and app build); no GPL/AGPL in shipped
 binaries; `target_os` only in platform code (`python3 scripts/check_target_os.py`); every user-facing action has an MCP
-tool and a CLI command; UI text through `cm_i18n`; one change per commit with the two trailer lines; no failing tests
+tool and a CLI command; UI text through `cm_i18n`; one change per commit with the trailer lines; no failing tests
 merge to `main`; the maintainer pushes `main`, signs (minisign) and publishes.
 
-## Scope change (Nov 6, 2026)
+## Where Linux stands (inputs)
 
-0.2.8 shipped as a **Windows-only** release (tag `v0.2.8`, commit `e54cc665`). **0.2.9 now ships on Windows and macOS only** (changed Nov 7, 2026: beta users next week; Linux moves here)
-(`release-0.2.9-plan.md`): the 0.2.8 shared-code changes and the 0.2.9 fixes reach the Mac there and Linux here in 0.3.0, after a
-`cm-regress` run per platform (the drivers are built in 0.2.9). **0.3.0 adds features for Linux and is released for Linux
-only.** The Linux tasks below are unchanged; items below that name macOS or Windows are backlog to place in a later release
-unless the maintainer pulls them in.
-
-### Backlog from 0.2.8 (added Nov 6, 2026)
-
-1. **Windows: the Reveal button in the export toast opens the wrong folder** (window export of a recording). Leads:
-   `ToastAction::RevealExport(id)` in `apps/desktop/src/toast.rs`, handled by `crate::ui::export_ui::reveal`
-   (`apps/desktop/src/ui/app/toasts.rs`); check the path it opens (the recording's exports folder versus the exported
-   file, path separators, `explorer /select`). Add a regress case.
-2. **Windows CI speed-up:** not done in 0.2.9 (`release-0.2.9-plan.md`, item 7): the Windows test job takes about 48 minutes (target 20) and `quick_export` alone 345 s. Same item: the flaky `exp4_ac4_cancel_deletes_partial_output` (`cm-media/tests/quick_export.rs`; cancel noticed after 0.44 s but the export took 31.8 s to wind down against a 20 s limit, CI run 42477256615, Nov 8, 2026; it also failed once earlier): wait for the cancel signal instead of the clock, or give Windows CI a longer limit. Also harden the NSIS install step in `windows-package.yml` with a retry (Chocolatey 5xx on Nov 7, 2026).
-3. **Regression drivers for macOS and Linux:** moved to 0.2.9 (`release-0.2.9-plan.md`, item 6, Nov 6, 2026). 0.3.0 reuses them.
-4. **Output-device chooser** in the editor (playback follows the system default; an external monitor with speakers can take
-   it over).
-5. **Spec decisions and small features:** `export_image` MCP tool needs a spec decision; the
-   `capturemann://capture/{id}/cursor` MCP resource; macOS camera reconnect after replugging into another USB port.
-6. **Wording:** the import summary messages in `import_ops` still say "Trash" on every platform (the capture-delete text
-   uses `vocab::here(Term::Trash)` since 0.2.8); 86 Vietnamese entries are still fuzzy.
-8. **MP3 import (and bare AAC)** (asked for Nov 8, 2026): the bundled FFmpeg has no MP3 demuxer or decoder; plan, tasks and the
-   release decision (0.3.0 or a 0.2.10) in `mp3-import-plan.md`.
-7. **Windows items not run for 0.2.8:** Windows 10, a mixed-DPI second monitor, NVIDIA and AMD encoders, SmartScreen on a
-   real download, a phone A/V clap check; each a stored step or an explicit "not run" in the 0.3.0 notes.
-
-### Backlog from 0.2.9 (added Nov 8, 2026, after the release)
-
-1. **MP3 and bare AAC import** (plan `mp3-import-plan.md`, asked for by the maintainer Nov 8): decisions still open there are the
-   release (0.3.0 or a 0.2.10 for Windows and macOS), bare AAC (recommended yes), title from the ID3 tag, disk use.
-2. **Disk use of audio recordings:** about 69 MB per minute on Windows (`online` preset, mic, denoised mic and system audio as
-   32-bit float) and 23 MB per minute on the Mac; a smaller stored format is a candidate (VOC-1 soak reports).
-3. **Manual runs not done for 0.2.9:** `tests/manual/ANN-1-IME.md` (Telex and VNI), `tests/manual/HUD-1.md`, VOC-2 screenshots; the
-   HUD design questions the maintainer still has to answer.
-4. **Windows details:** the file version field of `cm-desktop.exe` is empty; Windows 10, SmartScreen, mixed DPI, NVIDIA and AMD
-   encoders and Intel Mac hardware were not run for 0.2.9.
-5. **Linux input from 0.2.9:** the Ubuntu reports of Nov 6 to 7 and the Linux driver in `cm-regress` (kept in `verification/`).
-6. **After 0.2.9:** winget for 0.2.9 (the 0.2.8 package, PR 472327, was still waiting), the website download links and the
-   winget wording in the 0.2.8 notes.
-
-## Where 0.2.6 left Linux (inputs)
-
-From `docs/development/linux-early-build.md`, `verification/LINUX-1-*`, `specs/plans/linux-recording-plan.md`
-(decisions D-R1 to D-R5) and `specs/plans/auto-redact-linux-plan.md`:
-
-- `.deb` and tarball early build; recording exists behind `CM_LINUX_RECORDING=1` but has never run on a real desktop;
-  the VM run (headless GNOME 46) recorded 10 s at 30 fps with PipeWire and VP9.
+- 0.2.6 `.deb` and tarball early build; recording exists behind `CM_LINUX_RECORDING=1`; the VM run (headless GNOME 46)
+  recorded 10 s at 30 fps with PipeWire and VP9 (`docs/development/linux-early-build.md`,
+  `specs/plans/linux-recording-plan.md`, decisions D-R1 to D-R5, `specs/plans/auto-redact-linux-plan.md`).
 - Wayland window capture and global shortcuts have no path on GNOME 46; aarch64 is tested only in a VM.
-- Bugs found in the 0.2.6 reports (listed in task 1).
+- The `cm-regress` Linux driver exists (`crates/cm-regress/src/cases/linux.rs`, `scripts/testlab/regress-linux.sh`).
+  Reports of Nov 6, 2026 on the ThinkPad T490 (X11, `verification/L1-linux-0.2.9-regression-*`): the hardware tier was
+  PARTIAL with **35 passed, 17 failed, 25 skipped of 77**. Task 1 starts from those failures.
 
 ## Tasks
 
-Lab: the ThinkPad T490 (`scripts/testlab/lab.sh`, Ubuntu 24.04, GNOME 46, Xorg and Wayland). The VM at
-`~/VMs/cm-linux` covers aarch64 and headless work. The Windows agent (0.2.8) uses the same laptop; this plan starts
-its laptop work when that agent reports it has handed the laptop back, and leaves it in the state 0.2.8 expects when
-done (Windows bootable, network Private). VM and CI work can start at any time.
+Lab: the ThinkPad T490 at 192.168.0.102 (`scripts/testlab/lab.sh`, Ubuntu 24.04, GNOME 46, Xorg and Wayland; Windows work is finished, so
+the laptop is free). The VM at `~/VMs/cm-linux` covers aarch64 and headless work. No sound-playing tests after 23:00
+Vietnam time.
 
-1. **Bugs from 0.2.6:** the Wayland Shortcuts page shows Recording rows and Change buttons although recording is off;
-   the X11 tray "delay" check mark (stale or missed click) and "Recent captures" listing only the app's own capture; the
-   `user_declined` code returned for a portal failure (portal response code 2 is not a user decline); the line about
+1. **Triage the 17 regression failures** (first, one by one, each a product bug, a wrong test expectation or a lab limit,
+   written into a short triage note in `verification/`):
+   - `pkg.files`: the package has no `LICENSE` or `THIRD_PARTY_LICENSES` (compliance; fix in `packaging/linux`).
+   - `import.formats`, `import.rotated`, `import.vfr`: import fails with "no hardware video encoder" when VA-API is
+     missing. A Linux computer without a hardware encoder must still import (software VP9 editing copy, as D-R1 chose
+     for recording), or say clearly why not.
+   - `export.quick`, `export.presets`: exports come out as VP9, not H.264. Decide from the export spec whether H.264 is
+     required on Linux (no libx264 in the LGPL build; VA-API H.264 where present) or the test expectation changes.
+   - `rec.screen_cursor`, `rec.kill9_recovery` (portal refused screen capture, process killed by a signal),
+     `rec.region`, `rec.region_min` (`not_implemented` for window and region recording).
+   - `mcp.policy_allow`: reproduce on macOS first; fix here only if it is Linux-only, otherwise it goes to 0.3.1.
+   - The remaining failures in the same report.
+2. **Bugs from 0.2.6:** the Wayland Shortcuts page shows Recording rows and Change buttons although recording is off; the
+   X11 tray "delay" check mark and "Recent captures" listing only the app's own capture; `user_declined` returned for a
+   portal failure (portal response code 2 is not a user decline; `crates/cm-capture/src/sys/portal.rs`); the line about
    secrets "in the system credential store" when there is no Secret Service; the unlabelled steps in the X11 report
-   (editor, tarball default prefix, tray activation, language), each run one by one with a label.
-2. **Wayland window capture on GNOME 46:** `InteractiveScreenshot` returns no file. Experiment on the laptop: the
-   ScreenCast portal with the window source type for a single frame, or reading the file the shell saved. Pick the
-   approach by experiment and store it as a report before building.
-3. **Recording on a real desktop** (see O5): turn on the existing recorder on the T490. VA-API H.264 hardware encode
-   was seen working; software VP9 is the labelled fallback (D-R1 to D-R5). Fix what a real desktop shows (banner
-   controls, Start sheet keycaps, settings that mean nothing for VP9). Gate: a 10-minute recording with screen and
-   microphone plays back in sync on X11 and on Wayland (measured, report stored), plus `recording.lock` and `kill -9`
-   recovery (REC-8). The 30-minute soak from `linux-recording-plan.md` stays a later gate.
-4. **Global shortcuts:** the GlobalShortcuts portal on desktops that have it (KDE, newer GNOME); test one KDE machine or
-   VM. Where no portal exists, the Shortcuts page says what works instead.
-5. **Hardware gaps:** a real ARM device (or keep "VM only" in the notes), NVIDIA and AMD, two monitors and mixed scale;
-   each a stored step or an explicit "not run".
-6. **Packaging:** keep minisign for signing; decide on an APT repository or Flatpak (O3). A package checker script
-   (architecture, glibc ceiling, no bundled `libwayland` or GPU libraries) runs in CI.
-7. **Auto-redact and speaker engine on Linux:** re-run `CM_TESSERACT`/`CM_TESSDATA` Auto-redact and the sherpa-onnx
-   `linux-x64` and `linux-aarch64` builds on the laptop and the VM, and record the result; fix what fails.
+   (editor, tarball default prefix, tray activation, language), each run one by one with a label. Each fix cites its
+   AC ID and has a test or a stored real-device step.
+3. **Recording, on by default:** remove the `CM_LINUX_RECORDING=1` gate once the gate below passes. Screen, microphone,
+   system audio and cursor tracks; pause and resume; `recording.lock` and `kill -9` recovery (REC-8; add
+   `tests/manual/REC-8.md`, it does not exist). VA-API H.264 where present, software VP9 as the labelled fallback. Fix what
+   a real desktop shows (banner controls, Start sheet keycaps, settings that mean nothing for VP9). Gate: a 10-minute
+   recording with screen and microphone plays back in sync on X11 and on Wayland, measured (`scripts/testlab/av-sync-analyze.py`),
+   report stored. The 30-minute soak stays a later gate.
+4. **Window and region recording / capture:** region recording through the portal crop or a compositor-side crop; window
+   capture on Wayland GNOME 46 (ScreenCast portal window source for one frame, or the file the shell saved). Choose by
+   experiment, store the report before building. Where a path does not exist, the UI and the error say which versions
+   work and which do not (never a silent empty result).
+5. **Camera:** webcam bubble and camera track on Linux (V4L2 or PipeWire), to match CAM-1 to CAM-3; if it cannot be done, the
+   release text says so.
+6. **Global shortcuts:** the GlobalShortcuts portal where it exists (KDE, newer GNOME), tested on one KDE machine or VM;
+   where none exists the Shortcuts page says what works instead.
+7. **Parity sweep:** go through `docs/project/status.md` and `specs/platform-acceptance.md` row by row; every feature that
+   works on Windows or macOS is on Linux, is a new task here, or is listed as an explicit gap in the release text (with the
+   reason). The result is the "no longer early build" statement the release makes.
+8. **Auto-redact and speaker engine:** re-run Auto-redact (`CM_TESSERACT`/`CM_TESSDATA`) and the sherpa-onnx `linux-x64` and
+   `linux-aarch64` builds on the laptop and the VM; fix what fails; bundle `llama-server` in the tarball and `.deb` if the
+   built-in text engine is to work (it is not bundled yet).
+9. **Packaging and APT repository:** keep minisign for the tarball; a signed APT repository (O3) for amd64 and arm64 with an
+   install, upgrade and remove check in CI; a package checker script (architecture, glibc ceiling, no bundled `libwayland`
+   or GPU libraries, licence files present) runs in CI.
+10. **Hardware matrix:** NVIDIA and AMD encoders, a real ARM device, two monitors and mixed scale; each a stored step or an
+    explicit "not run" in the release text.
+11. **Complete regression and release:** `cm-regress` full and hardware tiers on X11 and on Wayland, on the `.deb` and the
+    tarball, plus the aarch64 VM; every failure is fixed, or listed in the release text with its reason. Then version
+    bump to 0.3.0, CHANGELOG, release text (`docs/development/release-0.3.0-github-text.md`), checksums, minisign, tag.
+    Release text lists the distribution, desktop, session type and GPU of every run.
 
 ## Done when
 
-Bugs closed with a test or a stored real-device step; the Wayland window path chosen, reported and built or explicitly
-left for the next Linux release; and either recording seen on the laptop with a report or recording left for the next
-Linux release with the release text saying so.
+Tasks 1 to 4 and 7 closed with tests or stored reports; recording is on by default and passed its gate on X11 and Wayland;
+the full regression has no unexplained failure; the release text states exactly what runs on which Linux setup and what
+does not; and the Linux status in the README and `docs/project/status.md` no longer says "early build".
 
 ## How the agent works
 
 One agent, one worktree: `git worktree add ../capturemann-wt/linux -b track/linux` from `main`. Owns:
-`crates/cm-capture/src/sys/` (Linux files), Linux files in `crates/cm-audio`, Linux code in `crates/cm-platform`,
-`packaging/linux`, `docs/development/linux-early-build.md`, Linux steps in `scripts/testlab/`, Linux manual scripts and
-reports. Must not touch macOS or Windows `sys/` files, run `make bundle`, push, publish, or say "verified" without a
-report. Shared files with one owner (the maintainer resolves at merge): `Cargo.lock`, workspace `Cargo.toml`,
-`locales/*.pot`/`vi.po`, `CHANGELOG.md`, `docs/project/status.md`, `THIRD_PARTY_LICENSES.md`. Version stays 0.2.6 on the
-branch until the release commit. Commands before every handoff: `cargo fmt --all -- --check`, `cargo clippy
---workspace --all-targets --locked -- -D warnings`, `cargo test --workspace --locked`, `python3
-scripts/check_target_os.py`. Final report: commits, tests run, reports written, what was not done.
+`crates/cm-capture/src/sys/` (Linux files), Linux files in `crates/cm-audio`, `crates/cm-camera`, Linux code in
+`crates/cm-platform`, `packaging/linux`, `docs/development/linux-early-build.md`, Linux steps in `scripts/testlab/`, Linux
+cases in `cm-regress`, Linux manual scripts and reports. Must not touch macOS or Windows `sys/` files, run `make bundle`,
+push, publish, or say "verified" without a report. Shared files with one owner (the maintainer resolves at merge):
+`Cargo.lock`, workspace `Cargo.toml`, `locales/*.pot`/`vi.po`, `CHANGELOG.md`, `docs/project/status.md`,
+`THIRD_PARTY_LICENSES.md`. Version stays 0.2.9 on the branch until the release commit. Commands before every handoff:
+`cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`,
+`cargo test --workspace --locked`, `python3 scripts/check_target_os.py`. Final report: commits, tests run, reports written,
+what was not done. Clean the worktree's `target/` when merged.
 
-## Working next to 0.2.7 and 0.2.8
+## Decisions
 
-Same rules as the Windows plan: merge 0.2.7's M1 shared-code commits (`apps/desktop` window lifetime) first and
-rebase; keep `apps/desktop` edits to Linux-specific files until then; `cm-platform` is shared with the Windows agent, so
-Linux and Windows code live in separate files and the maintainer merges one track at a time. Release order is 0.2.7,
-0.2.8, 0.3.0; do not tag 0.3.0 before 0.2.8 is published. Linux early builds are rebuilt only with 0.3.0 unless a
-shared-code change forces it.
+Decided by the maintainer on Nov 8, 2026 (all four decisions are closed):
 
-## Decisions needed from the maintainer
+- **O5** 0.3.0 catches up **every feature that is available on Windows and macOS**, recording included (screen, window and
+  region, microphone, system audio, camera, cursor, pause, recovery, shortcuts). A feature may be left out only with an
+  explicit, reasoned entry in the release text (for example a compositor that offers no path), never silently.
+- **O3** Distribution beyond `.deb` and tarball: an **APT repository** in 0.3.0 (signed repository, published with the
+  release; add a task for the repository layout, signing key handling and an install-and-upgrade check in CI).
+- **O9** Hardware gaps: the same ThinkPad T490 at `192.168.0.102` (lab laptop, `scripts/testlab/lab.sh`) is the machine
+  for every real-device step. Gaps that this machine cannot cover (ARM hardware, NVIDIA/AMD, KDE shortcuts, a second
+  monitor) stay "not run" in the release text unless the maintainer names another machine.
 
-- **O3** Linux distribution beyond `.deb` and tarball: APT repository or Flatpak in 0.3.0, or later.
-- **O5** Is recording on Linux a **must** for 0.3.0? Default proposal: no. It ships only if the gate passes.
-- **O9** Which machines are acceptable for the hardware gaps (a KDE VM for shortcuts, an ARM device, NVIDIA/AMD).
+- **O10** (decided Nov 8, 2026) H.264 on Linux: hardware H.264 (VA-API, NVENC) where it works, software VP9 as the
+  labelled fallback for import, editing copy and export where it does not (no x264, no OpenH264: GPL and patents). The
+  export dialog and the CLI say which codec is used and why; the `youtube-1080p` preset says it makes WebM when there is
+  no hardware H.264 encoder.
 
 ## Risks
 
-- The laptop is shared with the Windows plan; a delay in 0.2.8 delays the laptop work here. VM and CI work does not wait.
+- One laptop is not a hardware matrix; the release text lists the GPU of each run.
 - GNOME gives no stable window-capture or shortcut path on every version; claim only the versions tested.
-- Hardware encode paths differ by GPU and driver; one laptop is not a matrix, and the release text lists the GPU.
 - Wayland gives apps no recording indicator or permission control of their own; the product text must match what the
   portal shows.
+- Region recording and the camera are the largest unknowns; if they slip, the release still ships with named gaps rather
+  than waiting.
