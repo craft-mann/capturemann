@@ -701,7 +701,27 @@ pub fn hold_file_open(path: &std::path::Path) -> Result<Box<dyn std::any::Any>, 
         .map_err(|e| e.to_string())
 }
 
-pub fn text_window_command(_path: &std::path::Path) -> Option<Command> {
+/// A small window that shows a text file and carries the file's stem in its title (the window cases look
+/// the window up by that title): `zenity --text-info` (Ubuntu desktop ships it), else `xmessage`.
+pub fn text_window_command(path: &std::path::Path) -> Option<Command> {
+    text_window_with(path, &SystemRunner::default())
+}
+
+pub fn text_window_with(path: &std::path::Path, r: &dyn CommandRunner) -> Option<Command> {
+    let stem = path.file_stem()?.to_string_lossy().into_owned();
+    if r.run("zenity", &["--version"]).is_some_and(|o| o.ok()) {
+        let mut c = Command::new("zenity");
+        c.arg("--text-info")
+            .arg(format!("--title={stem}"))
+            .arg(format!("--filename={}", path.display()))
+            .args(["--width=720", "--height=320"]);
+        return Some(c);
+    }
+    if r.run("xmessage", &["-version"]).is_some() {
+        let mut c = Command::new("xmessage");
+        c.args(["-title", &stem, "-file"]).arg(path);
+        return Some(c);
+    }
     None
 }
 
@@ -763,6 +783,21 @@ mod tests {
                 .find(|(n, _)| *n == k)
                 .map(|(_, v)| (*v).to_owned())
         }
+    }
+
+    #[test]
+    fn text_window_prefers_zenity_and_titles_it_with_the_file_stem() {
+        let r = Fake::new(&[("zenity --version", 0, "4.0.1\n")]);
+        let c = text_window_with(std::path::Path::new("/tmp/regress-window-7.txt"), &r).unwrap();
+        assert_eq!(c.get_program(), "zenity");
+        let args: Vec<_> = c
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect();
+        assert!(args.contains(&"--title=regress-window-7".to_owned()));
+        assert!(args.contains(&"--filename=/tmp/regress-window-7.txt".to_owned()));
+        let none = Fake::new(&[]);
+        assert!(text_window_with(std::path::Path::new("/tmp/a.txt"), &none).is_none());
     }
 
     #[test]

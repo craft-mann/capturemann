@@ -9,6 +9,7 @@
 #                                    [--installer <.deb or .tar.gz on this Mac>]  pushed first; runs linux.deb_install or linux.tarball_install (tier full)
 #                                    [--session x11|wayland]  refuse to run unless the logged-in session is of that kind (switching is done at the login screen)
 #                                    [--recording]  sets CM_LINUX_RECORDING=1 so the rec.* cases run (otherwise they report SKIP with that reason)
+#                                    [--restore-token <screencast-token file on the laptop>]  CM_REGRESS_RESTORE_TOKEN: copied into each case's private config folder (desktops that ask for the screen once)
 #                                    [--only ...] [--soak-minutes N] [--whisper-model F] [--speech F] [--speaker-models D] [--label X] [--commit SHA] [--who NAME]
 #
 # The lock is ~/lab/lab.lock on the laptop ("owner|epoch seconds"; LOCK_TTL_MIN and FORCE as for Windows). The desktop session's environment
@@ -39,7 +40,7 @@ cleanup_linux() {
 
 run_linux() {
   local tier=smoke allow="" only="" pkgdir="" installer="" binary="" recording=0 who="cm-regress via regress.sh" label="" commit=""
-  local want_session="" soak=0 model="" speech="" spkdir=""
+  local want_session="" soak=0 model="" speech="" spkdir="" token=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --tier) tier="$2"; shift 2 ;;
@@ -50,6 +51,7 @@ run_linux() {
       --binary) binary="$2"; shift 2 ;;
       --session) want_session="$2"; shift 2 ;;
       --recording) recording=1; shift ;;
+      --restore-token) token="$2"; shift 2 ;;
       --soak-minutes) soak="$2"; shift 2 ;;
       --whisper-model) model="$2"; shift 2 ;;
       --speech) speech="$2"; shift 2 ;;
@@ -117,6 +119,9 @@ EOS
     none|"") die "no desktop session on the laptop (gnome-shell does not run for the test user); log in at the laptop or check auto-login" ;;
   esac
   echo "desktop session: $sess"
+  if [ "$sess" = wayland ]; then
+    echo "Wayland run: no X11 tool drives the desktop (xrandr only lists monitors through XWayland); the window cases (shot.window, redact.window_text, desktop.recording_banner, linux.desktop_stays_up's window check) report SKIP with their reason"
+  fi
   if [ -n "$want_session" ] && [ "$want_session" != "$sess" ]; then
     die "the logged-in session is '$sess', wanted '$want_session'. Choose it at the login screen (gear icon) on the laptop; this script never changes the display or session settings."
   fi
@@ -175,6 +180,7 @@ EOS
   local limit rec_line=""
   case "$tier" in smoke) limit=600 ;; standard) limit=2400 ;; full) limit=5400 ;; hardware) limit=$((7200 + soak * 60)) ;; esac
   [ "$recording" = 1 ] && rec_line="export CM_LINUX_RECORDING=1"
+  if [ -n "$token" ]; then rec_line="$rec_line"$'\n'"export CM_REGRESS_RESTORE_TOKEN='$token'"; fi
   echo "running: cm-regress $args (limit $limit s; recording $([ "$recording" = 1 ] && echo on || echo off))"
   local code
   set +e

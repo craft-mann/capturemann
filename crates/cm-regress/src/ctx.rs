@@ -165,6 +165,24 @@ impl Ctx {
         let config = root.join("config");
         std::fs::create_dir_all(&library)?;
         std::fs::create_dir_all(&config)?;
+        // Linux desktops without a dialog-free recording path (KDE, wlroots) ask for the screen once and keep a
+        // restore token in the config folder; every case has a private folder, so a token the maintainer made
+        // once (a copy of `screencast-token`) is handed over here and the portal's dialog does not wait.
+        if sys::PLATFORM == "linux" {
+            if let Some(tok) =
+                std::env::var_os("CM_REGRESS_RESTORE_TOKEN").filter(|v| !v.is_empty())
+            {
+                let dest = config.join("screencast-token");
+                if std::fs::copy(&tok, &dest).is_ok() {
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::PermissionsExt;
+                        let _ =
+                            std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o600));
+                    }
+                }
+            }
+        }
         let endpoint = sys::new_endpoint(&root, n);
         Ok(Ctx {
             pkg: Pkg {

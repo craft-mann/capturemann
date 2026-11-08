@@ -103,6 +103,8 @@ impl Platform {
 
 pub const ALL: &[Platform] = &[Platform::Windows, Platform::MacOs, Platform::Linux];
 pub const WIN: &[Platform] = &[Platform::Windows];
+pub const LINUX: &[Platform] = &[Platform::Linux];
+pub const WIN_LINUX: &[Platform] = &[Platform::Windows, Platform::Linux];
 pub const WIN_MAC: &[Platform] = &[Platform::Windows, Platform::MacOs];
 pub const MAC: &[Platform] = &[Platform::MacOs];
 
