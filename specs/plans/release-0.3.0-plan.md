@@ -1,6 +1,6 @@
 # Release 0.3.0 plan: Linux features (Linux-only release)
 
-Status: **draft** (Nov 3, 2026, scope changed Nov 6, 2026: 0.2.9 ships on all three platforms; 0.3.0 is Linux-only), nothing built; 0.2.7 was released Nov 4, 2026. Scope set by the maintainer on Nov 3, 2026: 0.2.7 macOS only
+Status: **draft** (Nov 3, 2026, scope changed Nov 6 and Nov 7, 2026: 0.2.9 shipped on Windows and macOS on Nov 8, 2026; 0.3.0 is Linux-only), nothing built; 0.2.7 was released Nov 4, 2026. Scope set by the maintainer on Nov 3, 2026: 0.2.7 macOS only
 (`release-0.2.7-plan.md`), 0.2.8 Windows (`release-0.2.8-plan.md`), **0.3.0 Linux**. A separate session and agent own
 this plan and run alongside the 0.2.7 work (see "Working next to 0.2.7 and 0.2.8").
 
@@ -36,6 +36,20 @@ unless the maintainer pulls them in.
    release decision (0.3.0 or a 0.2.10) in `mp3-import-plan.md`.
 7. **Windows items not run for 0.2.8:** Windows 10, a mixed-DPI second monitor, NVIDIA and AMD encoders, SmartScreen on a
    real download, a phone A/V clap check; each a stored step or an explicit "not run" in the 0.3.0 notes.
+
+### Backlog from 0.2.9 (added Nov 8, 2026, after the release)
+
+1. **MP3 and bare AAC import** (plan `mp3-import-plan.md`, asked for by the maintainer Nov 8): decisions still open there are the
+   release (0.3.0 or a 0.2.10 for Windows and macOS), bare AAC (recommended yes), title from the ID3 tag, disk use.
+2. **Disk use of audio recordings:** about 69 MB per minute on Windows (`online` preset, mic, denoised mic and system audio as
+   32-bit float) and 23 MB per minute on the Mac; a smaller stored format is a candidate (VOC-1 soak reports).
+3. **Manual runs not done for 0.2.9:** `tests/manual/ANN-1-IME.md` (Telex and VNI), `tests/manual/HUD-1.md`, VOC-2 screenshots; the
+   HUD design questions the maintainer still has to answer.
+4. **Windows details:** the file version field of `cm-desktop.exe` is empty; Windows 10, SmartScreen, mixed DPI, NVIDIA and AMD
+   encoders and Intel Mac hardware were not run for 0.2.9.
+5. **Linux input from 0.2.9:** the Ubuntu reports of Nov 6 to 7 and the Linux driver in `cm-regress` (kept in `verification/`).
+6. **After 0.2.9:** winget for 0.2.9 (the 0.2.8 package, PR 472327, was still waiting), the website download links and the
+   winget wording in the 0.2.8 notes.
 
 ## Where 0.2.6 left Linux (inputs)
 
