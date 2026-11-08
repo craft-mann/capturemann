@@ -12,6 +12,7 @@ duration. Needs ffmpeg and ffprobe.
 import json, statistics as st, struct, subprocess, sys
 
 R = 120000.0
+ONSETS = {}
 
 
 def flashes_of(video):
@@ -28,7 +29,9 @@ def flashes_of(video):
 
 
 def report(name, path, rate, start, flashes):
-    a = subprocess.run(["ffmpeg", "-v", "error", "-i", path, "-f", "f32le", "-ac", "1", "-ar", str(rate), "-"], capture_output=True).stdout
+    # The microphone hears the beep through the room: keep only the 1 kHz band so the room noise is gone.
+    af = ["-af", "bandpass=f=1000:width_type=h:w=200,highpass=f=800"] if name == "mic_raw" else []
+    a = subprocess.run(["ffmpeg", "-v", "error", "-i", path, *af, "-f", "f32le", "-ac", "1", "-ar", str(rate), "-"], capture_output=True).stdout
     n = len(a) // 4
     x = struct.unpack("<%df" % n, a[: n * 4])
     peak = max((abs(v) for v in x), default=0) or 1
@@ -47,6 +50,7 @@ def report(name, path, rate, start, flashes):
         if best is not None and abs(best - f) < 0.5:
             diffs.append((f, (f - best) * 1000))
     print(f"\n{name}: {n / rate:.2f} s of audio, peak {peak:.3f}, onsets {len(onsets)}, matched {len(diffs)}")
+    ONSETS[name] = onsets
     if not diffs:
         return
     v = [d for _, d in diffs]
@@ -66,6 +70,17 @@ T = json.load(open(f"{d}/manifest.json"))["tracks"]
 print("tracks:", {k: {kk: v[kk] for kk in v if kk in ("start", "end", "file_start", "rate", "channels", "file")} for k, v in T.items()})
 # The mp4 timeline starts at 0; the track's `file_start` is where that is on the session clock.
 fl = [f + T["screen"].get("file_start", T["screen"]["start"]) / R for f in flashes_of(f"{d}/screen.mp4")]
-for name in sys.argv[2:] or [k for k in T if k in ("mic", "system")]:
-    t = T[name]
-    report(name, f"{d}/{t.get('file') or name + '.wav'}", t["rate"], t.get("file_start", t["start"]) / R, fl)
+for name in sys.argv[2:] or ["mic_raw", "system"]:
+    # `mic_raw`: the microphone as captured (mic.wav), not the noise-suppressed copy, which treats a pure tone as noise.
+    t = T["mic" if name == "mic_raw" else name]
+    f = "mic.wav" if name == "mic_raw" else (t.get("file") or name + ".wav")
+    report(name, f"{d}/{f}", t["rate"], t.get("file_start", t["start"]) / R, fl)
+
+if "mic_raw" in ONSETS and "system" in ONSETS:
+    pairs = []
+    for o in ONSETS["system"]:
+        m = min(ONSETS["mic_raw"], key=lambda x: abs(x - o), default=None)
+        if m is not None and abs(m - o) < 0.3:
+            pairs.append((m - o) * 1000)
+    if pairs:
+        print("\nmic onset minus system onset (ms; the speaker-to-microphone path adds a few ms): n=%d median %.1f sd %.1f min %.1f max %.1f" % (len(pairs), st.median(pairs), st.pstdev(pairs), min(pairs), max(pairs)))
