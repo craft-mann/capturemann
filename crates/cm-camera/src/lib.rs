@@ -24,6 +24,7 @@ pub mod reconnect;
 pub mod recorder;
 pub mod retime;
 pub mod types;
+pub mod v4l_logic;
 pub mod watcher;
 pub mod writer;
 
@@ -31,7 +32,7 @@ pub mod writer;
 mod mac;
 #[cfg(target_os = "macos")]
 use mac as platform;
-#[cfg(windows)]
+#[cfg(not(target_vendor = "apple"))]
 mod sys;
 #[cfg(not(target_os = "macos"))]
 mod unsupported;

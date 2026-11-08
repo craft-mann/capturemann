@@ -18,6 +18,10 @@ cm-platform.workspace = true
 cm-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+# MIT OR Apache-2.0 OR Zlib. The Motion JPEG decoder of the Linux camera backend (already in the
+# build through `image`); pure Rust.
+zune-jpeg = "0.5"
+zune-core = "0.5"
 
 # MIT OR Apache-2.0. Media Foundation camera capture and the privacy switches (registry); the version
 # cm-platform, cm-capture and cm-cursor use.
@@ -26,7 +30,7 @@ serde_json.workspace = true
 cm-encode.workspace = true
 windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Media_MediaFoundation", "Win32_System_Com", "Win32_System_Registry"] }
 
-[target.'cfg(windows)'.dev-dependencies]
+[target.'cfg(any(windows, target_os = "linux"))'.dev-dependencies]
 tempfile.workspace = true
 
 # Same objc2 stack and versions as spikes/spike-encode (plain bindings, no Swift bridge).
@@ -44,3 +48,8 @@ objc2-uniform-type-identifiers.workspace = true
 
 [target.'cfg(target_os = "macos")'.dev-dependencies]
 objc2-app-kit = { version = "0.3", features = ["objc2-core-graphics", "objc2-quartz-core", "block2"] }
+
+# Linux: Video4Linux2 through plain ioctls (no bindgen), and the software VP9 writer of cm-encode.
+[target.'cfg(target_os = "linux")'.dependencies]
+cm-encode.workspace = true
+libc.workspace = true
