@@ -497,11 +497,16 @@ impl SheetModel {
     /// (CAM-4.AC2).
     pub fn camera_note(&self) -> Option<Note> {
         if self.devices.loaded && self.devices.cameras.is_empty() {
-            return Some(Note::Info(if self.is_linux() {
-                tr!("Recording with a webcam bubble is not available on Linux yet.")
-            } else {
-                tr!("No camera found")
-            }));
+            return Some(Note::Info(tr!("No camera found")));
+        }
+        if self.camera && self.devices.camera_permission.blocked() && self.is_linux() {
+            // Linux has no camera prompt or privacy pane: the user's account cannot open the device.
+            return Some(Note::Problem {
+                text: tr!(
+                    "Camera access is denied: add your user to the video group (sudo usermod -aG video $USER), then log in again. You can also record without the camera."
+                ),
+                settings: false,
+            });
         }
         if self.camera && self.devices.camera_permission.blocked() {
             return Some(Note::Problem {
@@ -515,6 +520,11 @@ impl SheetModel {
         if self.camera_fell_back {
             return Some(Note::Info(tr!(
                 "The camera chosen in Settings isn\u{2019}t connected. Using the system default."
+            )));
+        }
+        if self.camera && self.is_linux() {
+            return Some(Note::Info(tr!(
+                "On Linux the webcam bubble is hidden while recording, because the desktop cannot keep it out of the video. The webcam is still recorded as its own track and appears in the export."
             )));
         }
         None
@@ -1628,12 +1638,7 @@ mod tests {
             "an unavailable kind cannot be chosen"
         );
         assert!(m.kinds_note().unwrap().contains("not available on Linux"));
-        assert_eq!(
-            m.camera_note(),
-            Some(Note::Info(
-                "Recording with a webcam bubble is not available on Linux yet.".into()
-            ))
-        );
+        assert_eq!(m.camera_note(), Some(Note::Info("No camera found".into())));
         // Start stays possible with the display, the microphone and the system audio.
         assert!(m.blocker().is_none());
         let o = m.options().unwrap();

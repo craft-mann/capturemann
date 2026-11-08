@@ -94,6 +94,11 @@ pub trait FragmentWriter: Send {
 }
 
 pub trait WriterFactory: Send + Sync {
+    /// The codec of the files this factory writes, as recorded in the track's details (`h264`;
+    /// `vp9` for the software fallback on Linux).
+    fn codec(&self) -> &'static str {
+        "h264"
+    }
     fn create(&self, path: &Path, spec: &WriterSpec) -> Result<Box<dyn FragmentWriter>, CmError>;
 }
 

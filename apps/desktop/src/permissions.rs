@@ -162,13 +162,19 @@ pub fn specs(os: Os) -> Vec<Spec> {
         features: tr!("Recording: microphone track"),
         required: false,
     });
-    // Only the Mac build records with a camera (webcam bubble and camera track): no row on Windows and Linux.
-    if os == Os::Mac {
+    // The Mac and Linux builds list the camera (Windows shows its own privacy switches elsewhere). On
+    // Linux the row says whether the camera device can be opened, which is all the system decides.
+    if matches!(os, Os::Mac | Os::Linux) {
         v.push(Spec {
             id: Id::Camera,
             name: tr_ctx!("permission", "Camera"),
-            // TRANSLATORS: FACT: owner review required (what the permission is for)
-            why: tr!("Shows your webcam in the bubble and records it as its own track."),
+            why: if os == Os::Linux {
+                // TRANSLATORS: FACT: owner review required (what the permission is for; Linux has no prompt)
+                tr!("Shows your webcam in the bubble and records it as its own track. Linux has no camera prompt: if access is denied, add your user to the video group and log in again.")
+            } else {
+                // TRANSLATORS: FACT: owner review required (what the permission is for)
+                tr!("Shows your webcam in the bubble and records it as its own track.")
+            },
             features: tr!("Recording: webcam bubble and camera track"),
             required: false,
         });
@@ -199,7 +205,7 @@ pub fn intro_note(os: Os) -> String {
         // TRANSLATORS: FACT: owner review required (nothing is requested until a button is pressed)
         Os::Windows => tr!("Windows keeps these under your control. Nothing is requested until you press a button; you can change any of them later in Settings \u{2192} Permissions."),
         // TRANSLATORS: FACT: owner review required (the desktop portal asks, not CaptureMann)
-        Os::Linux => tr!("Linux does not ask per app. Your desktop asks when CaptureMann captures the screen, and the microphone is not gated by the system. Below is what this system can and cannot do for CaptureMann."),
+        Os::Linux => tr!("Linux does not ask per app. Your desktop asks when CaptureMann captures the screen, and neither the microphone nor the camera is gated by the system (the camera only needs permission to open its device). Below is what this system can and cannot do for CaptureMann."),
     }
 }
 
@@ -850,11 +856,12 @@ mod tests {
     }
 
     /// Linux has no per-app prompts: no Screen Recording or Input Monitoring card, no deep links,
-    /// nothing to grant, no Camera row (no camera support yet), and the Windows-only note is not shown there.
+    /// nothing to grant, and the Windows-only note is not shown there. The Camera row reports
+    /// whether the device can be opened.
     #[test]
-    fn linux_lists_only_the_microphone_without_links() {
+    fn linux_lists_the_microphone_and_camera_without_links() {
         let ids: Vec<Id> = specs(Os::Linux).iter().map(|s| s.id).collect();
-        assert_eq!(ids, vec![Id::Microphone]);
+        assert_eq!(ids, vec![Id::Microphone, Id::Camera]);
         for id in [
             Id::ScreenRecording,
             Id::Microphone,

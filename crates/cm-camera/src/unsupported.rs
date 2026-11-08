@@ -1,11 +1,11 @@
-//! Systems without AVFoundation: Windows uses Media Foundation (`sys/`), the others have no camera
-//! backend yet and answer `not_implemented`.
+//! Systems without AVFoundation: Windows (Media Foundation) and Linux (Video4Linux2) have a camera
+//! backend in `sys/`; any other system answers `not_implemented` from `sys/none.rs`.
 
 use crate::convert::RawFrame;
 use crate::preview::RgbaImage;
 
-/// A camera picture kept as bytes (Media Foundation delivers system-memory frames). Cloning shares
-/// the pixels.
+/// A camera picture kept as bytes (Media Foundation and Video4Linux2 deliver system-memory
+/// frames). Cloning shares the pixels.
 #[derive(Debug, Clone)]
 pub struct NativeSample(pub(crate) RawFrame);
 
@@ -18,73 +18,6 @@ impl NativeSample {
     }
 }
 
-#[cfg(windows)]
 pub use crate::sys::{
     list_cameras, permission_status, request_access, system_source, system_writer_factory,
 };
-
-#[cfg(not(windows))]
-pub use none::{
-    list_cameras, permission_status, request_access, system_source, system_writer_factory,
-};
-
-#[cfg(not(windows))]
-mod none {
-    use std::sync::Arc;
-    use std::time::Duration;
-
-    use cm_core::CmError;
-
-    use crate::permission::CameraPermission;
-    use crate::types::{CameraInfo, CameraSource, FrameSink, OpenRequest, SourceInfo};
-    use crate::writer::{FragmentWriter, WriterFactory, WriterSpec};
-
-    fn unsupported() -> CmError {
-        CmError::not_implemented("camera capture is not implemented on this platform yet")
-    }
-
-    pub fn permission_status() -> CameraPermission {
-        CameraPermission::NotDetermined
-    }
-
-    pub fn request_access(_timeout: Duration) -> CameraPermission {
-        CameraPermission::NotDetermined
-    }
-
-    pub fn list_cameras() -> Result<Vec<CameraInfo>, CmError> {
-        Err(unsupported())
-    }
-
-    struct NoSource;
-
-    impl CameraSource for NoSource {
-        fn open(
-            &mut self,
-            _r: &OpenRequest,
-            _s: Arc<dyn FrameSink>,
-        ) -> Result<SourceInfo, CmError> {
-            Err(unsupported())
-        }
-        fn close(&mut self) {}
-    }
-
-    pub fn system_source() -> Box<dyn CameraSource> {
-        Box::new(NoSource)
-    }
-
-    struct NoWriters;
-
-    impl WriterFactory for NoWriters {
-        fn create(
-            &self,
-            _p: &std::path::Path,
-            _s: &WriterSpec,
-        ) -> Result<Box<dyn FragmentWriter>, CmError> {
-            Err(unsupported())
-        }
-    }
-
-    pub fn system_writer_factory() -> Arc<dyn WriterFactory> {
-        Arc::new(NoWriters)
-    }
-}

@@ -1031,7 +1031,7 @@ fn open_recording_windows(app: &Entity<AppModel>, cx: &mut App) {
     raise_recording_windows(&rec, "opened", cx);
     if rec.read(cx).hud.camera_on() {
         let hidden = rec.read(cx).hud.bubble_hidden;
-        if !hidden {
+        if !hidden && platform_window::bubble_shown_while_recording() {
             open_bubble(app, cx);
         }
         if rec.read(cx).preview.is_none() {
