@@ -142,8 +142,12 @@ pub(super) async fn export_video(cx: &mut Ctx<'_>, a: ExportArgs) -> Result<(), 
         match j["state"].as_str() {
             Some("done") => {
                 cx.emit(&j, |j| {
+                    let note = j["result"]["codec_note"]
+                        .as_str()
+                        .map(|n| format!("\n  note: {n}"))
+                        .unwrap_or_default();
                     format!(
-                        "Exported {}\n  file: {}\n  size: {} bytes, {} s, {}",
+                        "Exported {}\n  file: {}\n  size: {} bytes, {} s, {}{note}",
                         plain(&j["result"]["capture_id"]),
                         plain(&j["result"]["path"]),
                         plain(&j["result"]["size_bytes"]),

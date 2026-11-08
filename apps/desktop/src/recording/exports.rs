@@ -69,6 +69,9 @@ pub struct ExportStatus {
 pub struct ExportContents {
     pub camera: bool,
     pub audio: bool,
+    /// The file is VP9, not H.264, and the result says why (`codec_note`; Linux without a
+    /// hardware H.264 encoder, decision O10).
+    pub vp9: bool,
 }
 
 impl Default for ExportContents {
@@ -76,6 +79,7 @@ impl Default for ExportContents {
         ExportContents {
             camera: true,
             audio: true,
+            vp9: false,
         }
     }
 }
@@ -85,6 +89,7 @@ impl ExportContents {
         ExportContents {
             camera: data["has_camera"].as_bool().unwrap_or(true),
             audio: data["has_audio"].as_bool().unwrap_or(true),
+            vp9: data["codec"].as_str() == Some("vp9") && data["codec_note"].is_string(),
         }
     }
 }
@@ -473,6 +478,18 @@ pub fn exported_toast(
 /// The body of the "Exported" toast: what the one MP4 holds (the sentence follows the tracks that
 /// are in it), that the original tracks are untouched, and what happened to the captions.
 fn exported_body(contents: ExportContents, captions: Option<String>) -> String {
+    let body = exported_tracks_body(contents, captions);
+    if contents.vp9 {
+        // O10: the file is not what the preset's name suggests; say so in the same toast.
+        return format!(
+            "{body} {}",
+            tr!("The video is VP9, not H.264, because this computer has no usable hardware H.264 encoder.")
+        );
+    }
+    body
+}
+
+fn exported_tracks_body(contents: ExportContents, captions: Option<String>) -> String {
     match (contents.camera, contents.audio, captions) {
         (true, true, Some(note)) => tr!(
             "One MP4 with the screen, camera bubble and audio. The original tracks are untouched. {captions}",
@@ -847,9 +864,18 @@ mod tests {
     #[test]
     fn the_result_toast_names_only_what_the_mp4_holds() {
         let body = |camera: bool, audio: bool, c: Option<&str>| {
-            exported_toast("rec_1", "Lesson", c, ExportContents { camera, audio })
-                .body
-                .unwrap_or_default()
+            exported_toast(
+                "rec_1",
+                "Lesson",
+                c,
+                ExportContents {
+                    camera,
+                    audio,
+                    vp9: false,
+                },
+            )
+            .body
+            .unwrap_or_default()
         };
         assert!(
             body(true, true, None).starts_with("One MP4 with the screen, camera bubble and audio.")
@@ -886,9 +912,31 @@ mod tests {
             done(json!({"has_camera": false, "has_audio": true})),
             ExportContents {
                 camera: false,
-                audio: true
+                audio: true,
+                vp9: false
             }
         );
+    }
+
+    /// EXP-2 on Linux (O10): when the file is VP9 because there is no hardware H.264 encoder the
+    /// result toast says so; a plain H.264 export, or a WebM preset, says nothing extra.
+    #[test]
+    fn the_result_toast_says_when_the_video_is_vp9_not_h264() {
+        let of = |data: serde_json::Value| ExportContents::of(&data);
+        let vp9 =
+            of(json!({"codec": "vp9", "codec_note": "This export is VP9 video, not H.264: x."}));
+        assert!(vp9.vp9);
+        assert!(!of(json!({"codec": "h264", "codec_note": null})).vp9);
+        // A WebM export is VP9 by design and carries no note.
+        assert!(!of(json!({"codec": "vp9", "codec_note": null})).vp9);
+        assert!(!of(json!({})).vp9);
+        let body = |c: ExportContents| {
+            exported_toast("rec_1", "Lesson", None, c)
+                .body
+                .unwrap_or_default()
+        };
+        assert!(body(vp9).contains("The video is VP9, not H.264"));
+        assert!(!body(ExportContents::default()).contains("VP9"));
     }
 
     /// The export result says whether the captions were burned in or left out; "off" says nothing.

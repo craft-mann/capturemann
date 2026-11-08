@@ -597,6 +597,29 @@ pub fn choose_encoder(caps: &Caps, prefer: Option<Encoder>) -> Result<Encoder, C
     encoder_candidates(caps, prefer, false).map(|c| c[0])
 }
 
+/// Why an MP4 export is not hardware H.264, as one sentence for the export result, the CLI and the
+/// toast (decision O10, Nov 8, 2026). `None` when the encoder is the expected one. Pure.
+///
+/// `forced`: the caller named the encoder. `retried`: the first encoder failed to start and this
+/// one took over (the failure text is in `settings.encoder_fallback`).
+pub fn codec_reason(caps: &Caps, used: Encoder, forced: bool, retried: bool) -> Option<String> {
+    if used != Encoder::Vp9Mp4 {
+        return None;
+    }
+    let why = if forced {
+        "it was chosen on request".to_owned()
+    } else if retried {
+        "the hardware H.264 encoder (VA-API) did not start on this computer".to_owned()
+    } else if !caps.vaapi_h264 {
+        "this FFmpeg has no VA-API H.264 encoder".to_owned()
+    } else if caps.vaapi_device.is_none() {
+        "this computer has no VA-API render node (/dev/dri/renderD*), so it has no hardware H.264 encoder".to_owned()
+    } else {
+        "no hardware H.264 encoder was available".to_owned()
+    };
+    Some(format!("This export is VP9 video, not H.264: {why}."))
+}
+
 /// Does FFmpeg's stderr say the *encoder* could not start (a size, profile, driver or device it
 /// refuses), as opposed to bad input, a full disk or a kill? Only those failures justify
 /// re-running the export with another encoder (R5-4).
@@ -902,6 +925,37 @@ mod tests {
         assert_eq!(
             encoder_candidates_for(&c, Some(Encoder::Vp9Mp4), mac).unwrap()[0],
             Encoder::Vp9Mp4
+        );
+    }
+
+    /// EXP-1 / EXP-2 on Linux (O10): the export says why it is VP9.
+    #[test]
+    fn the_codec_reason_names_why_an_export_is_vp9() {
+        let mut c = caps_from_output("ffmpeg version 7.1", BUNDLED);
+        c.vaapi_device = Some("/dev/dri/renderD128".into());
+        // Hardware H.264 in use: nothing to explain.
+        assert_eq!(codec_reason(&c, Encoder::Vaapi, false, false), None);
+        // VA-API worked on the first try but did not on this run: the retry is named.
+        let r = codec_reason(&c, Encoder::Vp9Mp4, false, true).unwrap();
+        assert!(r.contains("VP9") && r.contains("did not start"), "{r}");
+        // No render node (a VM).
+        c.vaapi_device = None;
+        let r = codec_reason(&c, Encoder::Vp9Mp4, false, false).unwrap();
+        assert!(
+            r.contains("no VA-API render node") && r.contains("not H.264"),
+            "{r}"
+        );
+        // A build without h264_vaapi.
+        let nova = caps_from_output("ffmpeg version 7.1", " V libvpx-vp9 x\n A aac z\n");
+        let r = codec_reason(&nova, Encoder::Vp9Mp4, false, false).unwrap();
+        assert!(r.contains("no VA-API H.264 encoder"), "{r}");
+        assert!(codec_reason(&nova, Encoder::Vp9Mp4, true, false)
+            .unwrap()
+            .contains("on request"));
+        // macOS and Windows encoders never get a note.
+        assert_eq!(
+            codec_reason(&nova, Encoder::VideoToolbox, false, false),
+            None
         );
     }
 
