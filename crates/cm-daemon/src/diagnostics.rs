@@ -176,7 +176,8 @@ pub fn system_lines(stack: Option<&cm_platform::stack::Report>) -> Vec<String> {
         "speech engine CPU features: {}",
         cm_ai::whisper::system_info().trim()
     ));
-    // Windows only (empty elsewhere): the OS build and the graphics adapters with their driver versions.
+    // Windows: the OS build and the graphics adapters with their driver versions. Linux: the OS release,
+    // the kernel and one line per DRM graphics device with its kernel driver. Empty on macOS.
     out.extend(cm_platform::sysinfo::lines());
     // Linux only (None elsewhere): the desktop stack the screenshot and recording paths depend on.
     if let Some(stack) = stack {
