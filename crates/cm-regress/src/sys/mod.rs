@@ -144,6 +144,19 @@ pub fn text_window_command(path: &std::path::Path) -> Option<Command> {
     imp::text_window_command(path)
 }
 
+/// Linux only: why a case that needs to find and capture another program's window cannot run (a Wayland
+/// session has no window list, X tools missing, no desktop). `None` elsewhere and on a usable X11 session.
+pub fn window_cases_unavailable() -> Option<String> {
+    if PLATFORM == "linux" {
+        linux::window_probe_unavailable(
+            &|k| std::env::var(k).ok().filter(|v| !v.is_empty()),
+            &linux::SystemRunner::default(),
+        )
+    } else {
+        None
+    }
+}
+
 /// Linux only: why the recording cases cannot run (the build keeps recording hidden unless
 /// `CM_LINUX_RECORDING=1`). `None` on the other systems and when the switch is on.
 pub fn recording_unavailable() -> Option<String> {

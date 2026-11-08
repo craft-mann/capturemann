@@ -3,7 +3,7 @@
 use super::common::{check_png, library_entry};
 use crate::check;
 use crate::ctx::{displays, Ctx};
-use crate::model::{fail, skip, Case, Need, Tier, ALL, R, WIN};
+use crate::model::{fail, skip, Case, Need, Tier, ALL, R, WIN_LINUX};
 use crate::sys;
 use serde_json::Value;
 use std::collections::BTreeSet;
@@ -50,7 +50,7 @@ pub fn cases() -> Vec<Case> {
             specs: &["CAP-1.AC4", "bug: window shot saved at 960x485 while listed 1426x721 (headless daemon not DPI aware)"],
             tier: Tier::Standard,
             needs: &[Need::DesktopSession, Need::Screen],
-            platforms: WIN,
+            platforms: WIN_LINUX,
             timeout_s: 120,
             run: window,
         },
@@ -281,6 +281,9 @@ impl Drop for TestWindow {
 /// Opens a text file in a small window and returns the window as `targets` lists it:
 /// (window id, width, height).
 pub fn open_text_window(ctx: &mut Ctx, text: &str) -> R<(TestWindow, u64, i64, i64)> {
+    if let Some(why) = sys::window_cases_unavailable() {
+        return skip(why);
+    }
     let stem = format!("regress-window-{}", std::process::id());
     let path = ctx.root.join(format!("{stem}.txt"));
     std::fs::write(&path, text)?;
