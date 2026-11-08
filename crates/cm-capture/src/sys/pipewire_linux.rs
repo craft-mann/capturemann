@@ -97,15 +97,18 @@ mod imp {
     const OPEN_TIMEOUT: Duration = Duration::from_secs(180);
 
     use crate::record::pipewire::{
-        frame_from_buffer, portal_declined, PtsMapper, PwBackend, RawBuffer, StreamInfo,
+        frame_from_buffer, portal_declined, PtsMapper, PwBackend, PwTarget, RawBuffer, StreamInfo,
     };
     use crate::record::source::{EventSink, SourceEvent, StopReason};
+    use crate::sys::mutter_cast;
 
-    /// Portal + PipeWire. One instance per recording.
+    /// Portal + PipeWire, or GNOME's own screen-cast service + PipeWire for a monitor or an area
+    /// ([`PwTarget`]). One instance per recording.
     #[derive(Default)]
     pub struct PortalPipeWire {
         stop: Arc<AtomicBool>,
         thread: Option<JoinHandle<()>>,
+        target: PwTarget,
     }
 
     impl PortalPipeWire {
@@ -150,7 +153,9 @@ mod imp {
 
     struct Opened {
         node: u32,
-        fd: OwnedFd,
+        /// The portal's private PipeWire connection; `None` for GNOME's service, whose node is
+        /// in the default PipeWire instance.
+        fd: Option<OwnedFd>,
         size: (u32, u32),
         token: Option<String>,
     }
@@ -170,6 +175,7 @@ mod imp {
     async fn open_portal(
         restore_token: Option<&str>,
         show_cursor: bool,
+        window: bool,
     ) -> Result<(Opened, Screencast, ashpd::desktop::Session<Screencast>), CmError> {
         let proxy = Screencast::new()
             .await
@@ -192,7 +198,11 @@ mod imp {
                 &session,
                 SelectSourcesOptions::default()
                     .set_cursor_mode(mode)
-                    .set_sources(ashpd::enumflags2::BitFlags::from_flag(SourceType::Monitor))
+                    .set_sources(ashpd::enumflags2::BitFlags::from_flag(if window {
+                        SourceType::Window
+                    } else {
+                        SourceType::Monitor
+                    }))
                     .set_multiple(false)
                     .set_restore_token(restore_token)
                     .set_persist_mode(PersistMode::ExplicitlyRevoked),
@@ -219,7 +229,7 @@ mod imp {
         Ok((
             Opened {
                 node: stream.pipe_wire_node_id(),
-                fd,
+                fd: Some(fd),
                 size: (w.max(0) as u32, h.max(0) as u32),
                 token,
             },
@@ -420,7 +430,7 @@ mod imp {
     /// Runs the PipeWire loop until `stop` is set or the stream fails.
     fn stream_loop(
         node: u32,
-        fd: OwnedFd,
+        fd: Option<OwnedFd>,
         sink: SharedSink,
         stop: Arc<AtomicBool>,
         closed: Arc<AtomicBool>,
@@ -431,9 +441,11 @@ mod imp {
             pw::main_loop::MainLoopRc::new(None).map_err(|e| pw_err("PipeWire loop", &e))?;
         let context = pw::context::ContextRc::new(&mainloop, None)
             .map_err(|e| pw_err("PipeWire context", &e))?;
-        let core = context
-            .connect_fd_rc(fd, None)
-            .map_err(|e| pw_err("PipeWire connect", &e))?;
+        let core = match fd {
+            Some(fd) => context.connect_fd_rc(fd, None),
+            None => context.connect_rc(None),
+        }
+        .map_err(|e| pw_err("PipeWire connect", &e))?;
         let stream = pw::stream::StreamBox::new(
             &core,
             "capturemann-screen",
@@ -614,35 +626,106 @@ mod imp {
         }
     }
 
-    /// Sets `closed` when the portal reports that it closed `session`; returns when that happened
-    /// or `done` is set.
-    fn watch_closed(
-        session: &ashpd::desktop::Session<Screencast>,
-        closed: &AtomicBool,
-        done: &AtomicBool,
-    ) {
+    /// Takes the `closed` and `done` flags (see [`Live::watch`]).
+    type Watcher = Box<dyn FnOnce(&AtomicBool, &AtomicBool) + Send>;
+
+    /// A started screen-cast session, from the portal or from GNOME's service.
+    struct Live {
+        opened: Opened,
+        /// Runs on the watcher thread: sets `closed` once the desktop ended the session by itself
+        /// and returns then, or when `done` is set.
+        watch: Watcher,
+        /// Ends the session.
+        end: Box<dyn FnOnce() + Send>,
+    }
+
+    /// Opens the session `target` asks for. GNOME's service is used for a monitor or an area (no
+    /// dialog, cropped by the compositor); the portal for the screen the person picks and for a
+    /// window.
+    fn start_session(
+        target: &PwTarget,
+        token: Option<&str>,
+        show_cursor: bool,
+    ) -> Result<Live, CmError> {
         use futures_lite::future::{block_on, poll_once};
         use futures_lite::StreamExt;
-        let Ok(mut signal) = block_on(session.receive_closed()) else {
-            return;
-        };
-        while !done.load(Ordering::Relaxed) {
-            match block_on(poll_once(signal.next())) {
-                Some(Some(_)) => {
-                    closed.store(true, Ordering::Relaxed);
-                    return;
-                }
-                // The signal stream ended: the connection to the portal is gone with it.
-                Some(None) => {
-                    closed.store(true, Ordering::Relaxed);
-                    return;
-                }
-                None => std::thread::sleep(Duration::from_millis(50)),
+        match target {
+            PwTarget::Monitor { size, .. } => {
+                let m = mutter_cast::open(target, show_cursor)?;
+                Ok(from_mutter(m, size.unwrap_or((0, 0))))
+            }
+            PwTarget::Area { width, height, .. } => {
+                let m = mutter_cast::open(target, show_cursor)?;
+                Ok(from_mutter(m, (*width, *height)))
+            }
+            PwTarget::Screen | PwTarget::PortalWindow => {
+                let window = matches!(target, PwTarget::PortalWindow);
+                let (opened, proxy, session) = block_on(open_portal(token, show_cursor, window))?;
+                let session = Arc::new(session);
+                let for_watch = Arc::clone(&session);
+                Ok(Live {
+                    opened,
+                    watch: Box::new(move |closed, done| {
+                        let Ok(mut signal) = block_on(for_watch.receive_closed()) else {
+                            return;
+                        };
+                        while !done.load(Ordering::Relaxed) {
+                            match block_on(poll_once(signal.next())) {
+                                // `Closed`, or the signal stream ended: the connection to the
+                                // portal is gone with it.
+                                Some(_) => {
+                                    closed.store(true, Ordering::Relaxed);
+                                    return;
+                                }
+                                None => std::thread::sleep(Duration::from_millis(50)),
+                            }
+                        }
+                    }),
+                    end: Box::new(move || {
+                        let _ = block_on(session.close());
+                        drop(proxy);
+                    }),
+                })
             }
         }
     }
 
+    fn from_mutter(m: mutter_cast::MutterStream, size: (u32, u32)) -> Live {
+        let node = m.node;
+        let shared = Arc::new(std::sync::Mutex::new(m));
+        let for_poll = Arc::clone(&shared);
+        Live {
+            opened: Opened {
+                node,
+                fd: None,
+                size,
+                token: None,
+            },
+            watch: Box::new(move |closed, done| {
+                while !done.load(Ordering::Relaxed) {
+                    if for_poll.lock().map(|mut g| g.was_closed()).unwrap_or(false) {
+                        closed.store(true, Ordering::Relaxed);
+                        return;
+                    }
+                    std::thread::sleep(Duration::from_millis(50));
+                }
+            }),
+            end: Box::new(move || {
+                if let Ok(g) = Arc::try_unwrap(shared) {
+                    if let Ok(m) = g.into_inner() {
+                        m.stop();
+                    }
+                }
+            }),
+        }
+    }
+
     impl PwBackend for PortalPipeWire {
+        fn select(&mut self, target: &PwTarget) -> Result<(), CmError> {
+            self.target = target.clone();
+            Ok(())
+        }
+
         fn open(
             &mut self,
             restore_token: Option<&str>,
@@ -655,37 +738,39 @@ mod imp {
             self.stop.store(false, Ordering::Relaxed);
             let stop = Arc::clone(&self.stop);
             let token = restore_token.map(str::to_owned);
+            let target = self.target.clone();
             let (tx, rx) = channel::<Result<StreamInfo, CmError>>();
             let sink: SharedSink = Arc::new(std::sync::Mutex::new(sink));
             let thread = std::thread::Builder::new()
                 .name("cm-pw-screen".into())
                 .spawn(move || {
-                    let opened =
-                        futures_lite::future::block_on(open_portal(token.as_deref(), show_cursor));
-                    let (o, _proxy, session) = match opened {
+                    let live = match start_session(&target, token.as_deref(), show_cursor) {
                         Ok(v) => v,
                         Err(e) => {
                             let _ = tx.send(Err(e));
                             return;
                         }
                     };
+                    let Live {
+                        opened: o,
+                        watch,
+                        end,
+                    } = live;
                     let _ = tx.send(Ok(StreamInfo {
                         width: o.size.0,
                         height: o.size.1,
                         restore_token: o.token.clone(),
                     }));
-                    // The portal tells when it ends the session (the share indicator's "stop",
+                    // The desktop tells when it ends the session (the share indicator's "stop",
                     // the compositor restarting). A watcher thread turns the signal into a flag
                     // the PipeWire loop looks at; it ends with the loop.
-                    let session = Arc::new(session);
                     let closed = Arc::new(AtomicBool::new(false));
                     let done = Arc::new(AtomicBool::new(false));
                     let watcher = {
-                        let (session, closed, done) =
-                            (Arc::clone(&session), Arc::clone(&closed), Arc::clone(&done));
+                        let (closed, done) = (Arc::clone(&closed), Arc::clone(&done));
                         std::thread::Builder::new()
                             .name("cm-portal-closed".into())
-                            .spawn(move || watch_closed(&session, &closed, &done))
+                            .spawn(move || watch(&closed, &done))
                             .ok()
                     };
                     let result = stream_loop(
@@ -706,7 +791,7 @@ mod imp {
                             emit(&sink, SourceEvent::Stopped(why.clone().into_stop()));
                         }
                     }
-                    let _ = futures_lite::future::block_on(session.close());
+                    end();
                 })
                 .map_err(|e| CmError::internal(format!("cannot start the capture thread: {e}")))?;
             self.thread = Some(thread);

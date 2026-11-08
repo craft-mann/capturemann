@@ -48,6 +48,7 @@ pub use frame::Frame;
 pub use record::WindowProvider;
 pub use region::resolve_region;
 pub use sys::linux_recorder::{linux_screen_recorder, LinuxScreenRecorder};
+pub use sys::mutter_cast::available as mutter_screencast_available;
 pub use sys::pipewire_linux::{portal_status, PortalPipeWire, PortalStatus};
 pub use sys::portal::{
     MonitorSource, PortalBackend, ScreenshotPortal, PICK_TIMEOUT as PORTAL_PICK_TIMEOUT,
