@@ -22,7 +22,8 @@ use zbus::zvariant::{OwnedValue, Type, Value};
 
 use crate::platform::{menu_text, TrayState};
 use crate::platform_linux_menu::{
-    action_for, build_menu, props, rgba_to_argb, sni_status, Kind, MenuInputs, MenuNode, Prop,
+    action_for, build_menu, diff, props, rgba_to_argb, sni_status, Kind, MenuChange, MenuInputs,
+    MenuNode, Prop,
 };
 
 const ITEM_PATH: &str = "/StatusNotifierItem";
@@ -101,8 +102,11 @@ impl Item {
     fn status(&self) -> String {
         sni_status(self.0.lock().inputs.icon).into()
     }
+    /// `WindowId` is an `i` (int32) in the StatusNotifierItem interface; the GNOME AppIndicator
+    /// extension refuses the whole item when it reads another type ("Received property WindowId
+    /// with type u does not match expected type i"), so no icon is drawn at all.
     #[zbus(property)]
-    fn window_id(&self) -> u32 {
+    fn window_id(&self) -> i32 {
         0
     }
     #[zbus(property)]
@@ -301,6 +305,10 @@ impl DbusMenu {
         unknown
     }
 
+    /// A menu is about to open. The answer stays `false` on purpose: with `true` the GNOME
+    /// AppIndicator extension asks for the layout again with only the properties `type` and
+    /// `children-display`, and then opens "Capture delay" and "Recent captures" empty (seen on the
+    /// ThinkPad, Ubuntu 24.04, Nov 8, 2026). Changes reach the host as signals instead.
     fn about_to_show(&self, _id: i32) -> bool {
         false
     }
@@ -404,7 +412,7 @@ impl TrayHandle {
 
     /// Applies a change to the inputs and tells the host what changed.
     fn update(&self, f: impl FnOnce(&mut MenuInputs)) {
-        let (icon, tooltip, status, layout, revision) = {
+        let (icon, tooltip, status, change, revision) = {
             let mut g = self.shared.lock();
             let old = g.inputs.clone();
             let mut new = old.clone();
@@ -413,8 +421,8 @@ impl TrayHandle {
                 return;
             }
             let menu = build_menu(&new);
-            let layout = menu != g.menu;
-            if layout {
+            let change = diff(&g.menu, &menu);
+            if change != MenuChange::None {
                 g.menu = menu;
                 g.revision += 1;
             }
@@ -424,7 +432,7 @@ impl TrayHandle {
             }
             let tooltip = new.tooltip != old.tooltip;
             g.inputs = new;
-            (icon, tooltip, icon, layout, g.revision)
+            (icon, tooltip, icon, change, g.revision)
         };
         const ITEM: &str = "org.kde.StatusNotifierItem";
         if icon {
@@ -437,13 +445,33 @@ impl TrayHandle {
         if tooltip {
             self.emit(ITEM_PATH, ITEM, "NewToolTip", ());
         }
-        if layout {
-            self.emit(
+        match change {
+            MenuChange::None => {}
+            MenuChange::Layout => self.emit(
                 MENU_PATH,
                 "com.canonical.dbusmenu",
                 "LayoutUpdated",
                 (revision, 0i32),
-            );
+            ),
+            MenuChange::Props { updated, removed } => {
+                let updated: Vec<(i32, HashMap<String, OwnedValue>)> = updated
+                    .into_iter()
+                    .map(|(id, p)| {
+                        (
+                            id,
+                            p.into_iter()
+                                .map(|(k, v)| (k.to_owned(), prop_value(v)))
+                                .collect(),
+                        )
+                    })
+                    .collect();
+                self.emit(
+                    MENU_PATH,
+                    "com.canonical.dbusmenu",
+                    "ItemsPropertiesUpdated",
+                    (updated, removed),
+                );
+            }
         }
     }
 
@@ -496,5 +524,26 @@ impl TrayHandle {
     /// Replaces the "Recent captures" entries (last 5, CAP-2).
     pub fn set_recents(&self, recents: &[(String, String)]) {
         self.update(|i| i.recents = recents.to_vec());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// CAP-2 (Linux tray): the property types the AppIndicator extension checks. A `WindowId` of
+    /// type `u` made GNOME 46 draw no tray icon at all (found on the ThinkPad, Nov 8, 2026).
+    #[test]
+    fn cap2_window_id_is_an_int32_as_the_interface_says() {
+        let item = Item(Arc::new(Shared(Mutex::new(Inner {
+            inputs: MenuInputs::default(),
+            menu: Vec::new(),
+            revision: 1,
+            pixmaps: Vec::new(),
+        }))));
+        fn sig<T: Type>(_: &T) -> String {
+            T::SIGNATURE.to_string()
+        }
+        assert_eq!(sig(&item.window_id()), "i");
     }
 }

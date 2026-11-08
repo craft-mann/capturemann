@@ -664,6 +664,26 @@ pub fn shortcut_groups() -> [(String, String, Vec<ShortcutAction>); 2] {
     ]
 }
 
+/// What the Shortcuts page offers in this session (CAP-2): the Recording group only where the
+/// app records, and the Change buttons only where the app owns the keys. On a Wayland desktop
+/// the keys belong to the desktop (the GlobalShortcuts portal, or its own keyboard settings), so
+/// a button that rebinds a chord inside the app would change nothing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ShortcutsPageMode {
+    pub show_recording_group: bool,
+    pub can_change: bool,
+}
+
+pub fn shortcuts_page_mode(
+    backend: crate::platform_hotkeys::Backend,
+    recording_supported: bool,
+) -> ShortcutsPageMode {
+    ShortcutsPageMode {
+        show_recording_group: recording_supported,
+        can_change: backend == crate::platform_hotkeys::Backend::Native,
+    }
+}
+
 // ---------------------------------------------------------------------------------------
 // Privacy
 // ---------------------------------------------------------------------------------------
@@ -1179,6 +1199,19 @@ mod tests {
         for (_, note, _) in &groups {
             assert!(!note.to_lowercase().contains("only active"), "{note}");
         }
+    }
+
+    /// CAP-2 (0.2.6 bug): on Wayland there are no Change buttons, and without a recorder no
+    /// Recording rows.
+    #[test]
+    fn cap2_wayland_page_has_no_change_buttons_and_recording_rows_follow_the_recorder() {
+        use crate::platform_hotkeys::Backend;
+        let m = shortcuts_page_mode(Backend::WaylandPortal, false);
+        assert!(!m.can_change && !m.show_recording_group);
+        let m = shortcuts_page_mode(Backend::WaylandPortal, true);
+        assert!(!m.can_change && m.show_recording_group);
+        let m = shortcuts_page_mode(Backend::Native, true);
+        assert!(m.can_change && m.show_recording_group);
     }
 
     #[test]
