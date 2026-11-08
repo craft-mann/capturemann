@@ -64,7 +64,8 @@ if sys.argv[1] == "--ref":
 d = sys.argv[1]
 T = json.load(open(f"{d}/manifest.json"))["tracks"]
 print("tracks:", {k: {kk: v[kk] for kk in v if kk in ("start", "end", "file_start", "rate", "channels", "file")} for k, v in T.items()})
-fl = flashes_of(f"{d}/screen.mp4")
+# The mp4 timeline starts at 0; the track's `file_start` is where that is on the session clock.
+fl = [f + T["screen"].get("file_start", T["screen"]["start"]) / R for f in flashes_of(f"{d}/screen.mp4")]
 for name in sys.argv[2:] or [k for k in T if k in ("mic", "system")]:
     t = T[name]
     report(name, f"{d}/{t.get('file') or name + '.wav'}", t["rate"], t.get("file_start", t["start"]) / R, fl)
