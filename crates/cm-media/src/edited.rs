@@ -1022,6 +1022,15 @@ pub fn export_edited(
                 video["profile"] = json!("high");
             }
             video["software"] = json!(!enc.is_hardware());
+            // O10: say why the file is VP9 (Linux without a hardware H.264 encoder).
+            if let Some(note) = crate::tools::codec_reason(
+                &caps,
+                enc,
+                req.prefer_encoder == Some(enc),
+                fallback_note.is_some(),
+            ) {
+                video["note"] = json!(note);
+            }
             video["container"] = json!("mp4");
             video["bitrate_bps"] = json!(bitrate);
             video["gop"] = json!(video_codec_at(enc, out_size, fps, None).gop);

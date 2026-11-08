@@ -523,6 +523,9 @@ impl JobHandler for ExportHandler {
             "duration_s": duration_s,
             "duration_ms": outcome.duration_ms,
             "encoder": outcome.encoder,
+            // O10: the codec the file really has, and why when it is not hardware H.264.
+            "codec": outcome.settings.pointer("/video/codec").cloned().unwrap_or(Value::Null),
+            "codec_note": outcome.settings.pointer("/video/note").cloned().unwrap_or(Value::Null),
             "captions": captions_result,
             "has_camera": has_camera,
             "has_audio": has_audio,
