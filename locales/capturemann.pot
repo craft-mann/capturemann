@@ -2758,6 +2758,9 @@ msgstr ""
 msgid "No hardware video encoder was found; recording will use a slower software encoder."
 msgstr ""
 
+msgid "No key assigned yet; choose one in your desktop’s keyboard settings"
+msgstr ""
+
 msgid "No limit"
 msgstr ""
 
