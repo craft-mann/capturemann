@@ -2411,9 +2411,6 @@ msgstr "Bản ghi `{id}` không tồn tại"
 msgid "Recording `{id}` is not running"
 msgstr "Bản ghi `{id}` không đang quay"
 
-msgid "Recording a window or a region is not available on Linux yet. Record the whole screen."
-msgstr "Chưa thể quay một cửa sổ hay một vùng trên Linux. Hãy quay toàn màn hình."
-
 msgid "Recording a window or a region is not available on Linux yet. Record the whole screen; the desktop asks which one the first time."
 msgstr "Chưa thể quay một cửa sổ hay một vùng trên Linux. Hãy quay toàn màn hình; lần đầu máy tính sẽ hỏi chọn màn hình nào."
 
@@ -8997,9 +8994,6 @@ msgstr "Không khả dụng trên desktop này"
 
 msgid "Your desktop manages these shortcuts and may have chosen other keys; change them in its keyboard settings."
 msgstr "Desktop của bạn quản lý các phím tắt này và có thể đã chọn phím khác; hãy đổi trong cài đặt bàn phím của desktop."
-
-msgid "Your desktop may ask which screen to share. Choose the screen and press Share."
-msgstr "Máy tính có thể hỏi bạn chia sẻ màn hình nào. Hãy chọn màn hình rồi nhấn Share."
 
 msgid "Your desktop remembers the screen you shared before, so recording starts without asking."
 msgstr "Máy tính nhớ màn hình bạn đã chia sẻ trước đó, nên việc quay bắt đầu mà không hỏi lại."

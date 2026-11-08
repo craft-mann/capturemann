@@ -809,6 +809,9 @@ msgstr ""
 msgid "Check again"
 msgstr ""
 
+msgid "Check that your output is not muted and that PipeWire is running."
+msgstr ""
+
 msgid "Check the app key, that the permissions were submitted on the Permissions tab before signing in, and that http://127.0.0.1/callback is a redirect URI of the app."
 msgstr ""
 
@@ -1339,6 +1342,9 @@ msgid "Cursor clicks will not be recorded (only the position): Input Monitoring 
 msgstr ""
 
 msgid "Cursor position and clicks are saved with the recording, so the editor can draw and zoom on them."
+msgstr ""
+
+msgid "Cursor position is saved with the recording on X11, so the editor can draw and zoom on it. On Wayland the pointer is part of the video and cannot be edited."
 msgstr ""
 
 msgid "Cursor smoothing"
@@ -2222,6 +2228,9 @@ msgstr ""
 msgid "Leave the clipboard alone"
 msgstr ""
 
+msgid "Leaving apps out of a recording"
+msgstr ""
+
 msgid "Lecture notes"
 msgstr ""
 
@@ -2890,6 +2899,12 @@ msgstr ""
 msgid "Not available in this build"
 msgstr ""
 
+msgid "Not available on Linux: every window on the screen is recorded, CaptureMann's own included"
+msgstr ""
+
+msgid "Not available on Linux: the desktop hands CaptureMann the whole picture, so a recording shows every window on the screen, CaptureMann’s own included. Close or move what you do not want recorded."
+msgstr ""
+
 msgid "Not available on this desktop"
 msgstr ""
 
@@ -3294,6 +3309,9 @@ msgstr ""
 msgid "Playlist (optional)"
 msgstr ""
 
+msgid "Plays a short chime and checks that CaptureMann can hear it."
+msgstr ""
+
 msgid "Plays a short chime and checks that CaptureMann can hear it. Uses the Screen Recording permission."
 msgstr ""
 
@@ -3577,10 +3595,13 @@ msgstr ""
 msgid "Recording `{id}` is not running"
 msgstr ""
 
-msgid "Recording a window or a region is not available on Linux yet. Record the whole screen."
+msgid "Recording a region is not available on this desktop. Record the whole screen or a window."
 msgstr ""
 
 msgid "Recording a window or a region is not available on Linux yet. Record the whole screen; the desktop asks which one the first time."
+msgstr ""
+
+msgid "Recording a window or a region is not available on this desktop. Record the whole screen."
 msgstr ""
 
 msgid "Recording a window or a region is not available on this system yet."
@@ -3638,6 +3659,9 @@ msgid "Recording needs PipeWire, and no sound server was found. Install and star
 msgstr ""
 
 msgid "Recording needs PipeWire; this system only has PulseAudio. Install and start PipeWire."
+msgstr ""
+
+msgid "Recording one window needs an X11 session on this desktop. Record the whole screen or a region."
 msgstr ""
 
 msgid "Recording quality, frame rate and what gets captured."
@@ -4432,6 +4456,9 @@ msgstr ""
 msgid "Starts when a transcript is ready"
 msgstr ""
 
+msgid "States are read without asking the system."
+msgstr ""
+
 msgid "States are read without asking the system. Granting only happens when you press “Grant access…”."
 msgstr ""
 
@@ -4668,6 +4695,9 @@ msgid "The audio couldn’t be exported"
 msgstr ""
 
 msgid "The audio file could not be written ({detail}); the track ends here and the recording continues"
+msgstr ""
+
+msgid "The bubble is not shown on screen while recording on Linux. Its shape and size are used when the recording is exported, and the editor can move it."
 msgstr ""
 
 msgid "The built-in text engine is not part of this copy of CaptureMann. Reinstall CaptureMann, or use a build that includes the engine."
@@ -5047,6 +5077,9 @@ msgid "The video is encoded by the processor (VP9), so it uses more of it than a
 msgstr ""
 
 msgid "The video is encoded by the processor (VP9), so long recordings use more of it."
+msgstr ""
+
+msgid "The video is encoded with hardware H.264 (VA-API) when this computer has it, otherwise in software as VP9. The recording’s details say which."
 msgstr ""
 
 msgid "The video is on YouTube, but it refused the thumbnail: a custom thumbnail needs a verified YouTube account (verify your phone number in YouTube Studio)."
@@ -5726,6 +5759,9 @@ msgstr ""
 msgid "Your captures need {needed} free and the new folder has {free}. You can start with an empty library there instead. The captures in the old folder stay where they are."
 msgstr ""
 
+msgid "Your desktop and the tray icon also show that the microphone is in use. Stop from either one if this window is hidden."
+msgstr ""
+
 msgid "Your desktop and the tray icon also show that the screen is being recorded. Stop from either one if this window is hidden."
 msgstr ""
 
@@ -5733,9 +5769,6 @@ msgid "Your desktop cannot share a whole screen."
 msgstr ""
 
 msgid "Your desktop manages these shortcuts and may have chosen other keys; change them in its keyboard settings."
-msgstr ""
-
-msgid "Your desktop may ask which screen to share. Choose the screen and press Share."
 msgstr ""
 
 msgid "Your desktop remembers the screen you shared before, so recording starts without asking."
