@@ -32,6 +32,8 @@ unless the maintainer pulls them in.
    `capturemann://capture/{id}/cursor` MCP resource; macOS camera reconnect after replugging into another USB port.
 6. **Wording:** the import summary messages in `import_ops` still say "Trash" on every platform (the capture-delete text
    uses `vocab::here(Term::Trash)` since 0.2.8); 86 Vietnamese entries are still fuzzy.
+8. **MP3 import (and bare AAC)** (asked for Nov 8, 2026): the bundled FFmpeg has no MP3 demuxer or decoder; plan, tasks and the
+   release decision (0.3.0 or a 0.2.10) in `mp3-import-plan.md`.
 7. **Windows items not run for 0.2.8:** Windows 10, a mixed-DPI second monitor, NVIDIA and AMD encoders, SmartScreen on a
    real download, a phone A/V clap check; each a stored step or an explicit "not run" in the 0.3.0 notes.
 
