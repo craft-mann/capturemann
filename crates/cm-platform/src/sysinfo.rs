@@ -406,8 +406,8 @@ mod tests {
     }
 
     #[test]
-    fn off_windows_the_system_adds_no_lines() {
-        if cfg!(not(windows)) {
+    fn on_macos_the_system_adds_no_lines() {
+        if cfg!(target_os = "macos") {
             assert!(lines().is_empty());
         }
     }

@@ -631,18 +631,6 @@ pub fn kill_tree(pid: u32) {
         .status();
 }
 
-/// Parses `ps -A -o pid=,comm=` (the name is the executable's file name, cut to 15 characters by the kernel).
-pub fn parse_ps(text: &str) -> Vec<(u32, String)> {
-    text.lines()
-        .filter_map(|l| {
-            let l = l.trim();
-            let (pid, name) = l.split_once(' ')?;
-            let name = name.trim().rsplit('/').next()?.to_owned();
-            Some((pid.parse().ok()?, name))
-        })
-        .collect()
-}
-
 /// Parses `ps -A -o pid=,stat=,comm=` and leaves out zombies (state `Z`): a process the case killed
 /// but whose parent has not waited for yet is not running, and must not count as a program left
 /// behind (0.2.9 report: `linux.desktop_stays_up`, `linux.second_launch`, `linux.tray_icon`).
@@ -1018,14 +1006,5 @@ mod tests {
                 (77, "x".to_owned())
             ]
         );
-    }
-
-    #[test]
-    fn ps_lines_are_parsed() {
-        let p = parse_ps("    1 systemd\n 4242 cm-desktop\n 77 /usr/bin/x\nbad line\n");
-        assert_eq!(p[0], (1, "systemd".to_owned()));
-        assert_eq!(p[1], (4242, "cm-desktop".to_owned()));
-        assert_eq!(p[2], (77, "x".to_owned()));
-        assert_eq!(p.len(), 3);
     }
 }
