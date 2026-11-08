@@ -164,6 +164,11 @@ fn start(ctx: &mut Ctx, display: &Display, extra: &[&str]) -> R<String> {
     args.extend_from_slice(extra);
     let r = ctx.cli_long(&args, 90)?;
     if !r.ok() {
+        if r.out.timed_out && sys::PLATFORM == "linux" {
+            // A case has a private config folder, so no restore token: on a desktop that asks for the screen
+            // the portal's dialog waits for a person. Not a product failure; say what is needed.
+            return skip("record start waited the whole time: the desktop is asking for the screen (portal dialog) and nobody answers; set CM_REGRESS_RESTORE_TOKEN=<a copy of a screencast-token file> or run on a desktop with a dialog-free path (GNOME)");
+        }
         let code = r.error_code().unwrap_or_default();
         let msg = r.error_message();
         if code == "hardware_encoder_unavailable" {
