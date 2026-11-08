@@ -784,3 +784,26 @@ fn technical_messages_are_replaced_by_a_sentence_and_plain_ones_stay() {
         "job interrupted: try again"
     );
 }
+
+#[test]
+fn the_cursor_row_follows_whether_a_cursor_track_is_recorded() {
+    let mut p = start_params(false);
+    let full = "Position, clicks and scroll direction (never keystrokes)";
+    assert_eq!(
+        start_row("start_recording", "cursor", &p).as_deref(),
+        Some(full)
+    );
+    p["cursor_track"] = json!(true);
+    assert_eq!(
+        start_row("start_recording", "cursor", &p).as_deref(),
+        Some(full)
+    );
+    p["cursor_track"] = json!(false);
+    let text = start_row("start_recording", "cursor", &p).unwrap();
+    assert!(text.starts_with("Shown in the video only"), "{text}");
+    p["cursor"] = json!(false);
+    assert_eq!(
+        start_row("start_recording", "cursor", &p).as_deref(),
+        Some("Off")
+    );
+}

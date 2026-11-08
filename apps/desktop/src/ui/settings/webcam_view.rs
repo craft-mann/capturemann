@@ -39,7 +39,7 @@ const CHECK_FPS: u32 = 30;
 
 /// What the Webcam & audio page keeps between frames.
 pub struct WebcamState {
-    devices: Devices,
+    pub(super) devices: Devices,
     /// The device list was asked for since the page was entered.
     listed: bool,
     seen_epoch: u64,

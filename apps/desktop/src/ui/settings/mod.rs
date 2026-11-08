@@ -343,6 +343,17 @@ impl SettingsView {
                     ),
             )
             .child(crate::ui::permissions_view::summary_bar(t, &snap))
+            .children(
+                (crate::permissions::Os::current() == crate::permissions::Os::Linux
+                    && self.webcam.devices.loaded)
+                    .then(|| {
+                        widgets::caption(
+                            t,
+                            crate::permissions::linux_screen_note(self.webcam.devices.share_dialog),
+                        )
+                        .id("permissions-linux-screen-note")
+                    }),
+            )
             .child(crate::ui::permissions_view::cards(t, &self.app, &snap, busy, &tried))
             .child(widgets::caption(
                 t,
@@ -365,7 +376,11 @@ impl Render for SettingsView {
         self.refresh_field_labels(cx);
         let current = self.current_section(&route);
         self.webcam_sync(cx);
-        if current == SettingsSection::Webcam {
+        if current == SettingsSection::Webcam
+            || (current == SettingsSection::Permissions
+                && crate::permissions::Os::current() == crate::permissions::Os::Linux)
+        {
+            // The Linux Permissions note reads the screen report of the same device list.
             self.webcam_ensure_devices(cx);
         }
         let header = current;
@@ -405,13 +420,12 @@ impl Render for SettingsView {
                         .gap(px(24.))
                         // Agents & CLI draws its own hero (title, subtitle and the MCP pill).
                         .children((current != SettingsSection::Agents).then(|| {
-                            page_header_tile(
-                                &t,
-                                header.icon(),
-                                &header.title(),
-                                &header.subtitle(),
-                                right,
-                            )
+                            let subtitle = if current == SettingsSection::Shortcuts {
+                                model::shortcuts_subtitle(self.shortcuts_none_registered(cx))
+                            } else {
+                                header.subtitle()
+                            };
+                            page_header_tile(&t, header.icon(), &header.title(), &subtitle, right)
                         }))
                         .child(body),
                 ),
