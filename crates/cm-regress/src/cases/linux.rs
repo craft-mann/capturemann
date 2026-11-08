@@ -422,7 +422,11 @@ fn vaapi(ctx: &mut Ctx) -> R {
         "diagnostics has no `VAAPI render device` line"
     );
     let says_none = line.ends_with("none");
-    let note_software = text.contains("software VP9");
+    // Only the screen encoder line: the camera line says "recorded as software VP9" on purpose (the camera track is VP9).
+    let note_software = text
+        .lines()
+        .filter(|l| l.trim_start().starts_with("- video encoder:"))
+        .any(|l| l.contains("software VP9"));
     if va.h264_encode {
         check!(
             !says_none,
