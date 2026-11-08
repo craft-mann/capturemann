@@ -192,15 +192,22 @@ fn portal_error(failure: PortalFailure, interactive: bool) -> CmError {
              was closed. An interactive screenshot needs a person at the screen.",
             PICK_TIMEOUT.as_secs()
         )),
-        // In the picker "Cancelled" is Esc or a closed dialog. GNOME answers "Other" for the
-        // same (it logs "InteractiveScreenshot didn't return a file" for Esc as well as for a
-        // failed capture, so the two cannot be told apart): both are "no image was chosen".
-        PortalFailure::Portal(Error::Response(ResponseError::Cancelled | ResponseError::Other))
-            if interactive =>
-        {
+        // In the picker "Cancelled" (portal response 1) is the user pressing Esc or closing the
+        // dialog. Response 2 ("Other") is the portal's "the interaction ended otherwise": the
+        // desktop's picker failed or a capture failed. That is not a decision of the user, so it
+        // is a platform failure (GNOME also uses it for Esc; the text says both).
+        PortalFailure::Portal(Error::Response(ResponseError::Cancelled)) if interactive => {
             CmError::user_declined(
-                "The screenshot picker ended without an image (closed, or the desktop's picker \
-                 failed). Try again, or use a display or region screenshot.",
+                "The screenshot picker was closed without choosing an image. Try again, or use \
+                 a display or region screenshot.",
+            )
+        }
+        PortalFailure::Portal(Error::Response(ResponseError::Other)) if interactive => {
+            CmError::platform_rejected(
+                "The desktop's screenshot picker ended without an image (it was closed or it \
+                 failed; the desktop does not say which). Try again, or use a display or region \
+                 screenshot.",
+                Some("portal_response_other".into()),
             )
         }
         // Otherwise "Cancelled" is a refused prompt; "Other" is what a prompt nobody answered
@@ -388,6 +395,23 @@ mod tests {
             Frame::new(1, 1, vec![50, 50, 50, 255]).unwrap()
         );
         assert!(frame_from_png(b"not a png").is_err());
+    }
+
+    /// CAP-1: portal response 1 is the user closing the picker; response 2 is a failure of the
+    /// desktop, not a decision (it used to come back as `user_declined`).
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn portal_response_other_is_not_a_user_decline() {
+        use ashpd::desktop::ResponseError;
+        let e = |r| portal_error(PortalFailure::Portal(ashpd::Error::Response(r)), true);
+        assert!(matches!(
+            e(ResponseError::Cancelled),
+            CmError::UserDeclined { .. }
+        ));
+        assert!(matches!(
+            e(ResponseError::Other),
+            CmError::PlatformRejected { .. }
+        ));
     }
 
     /// A scripted portal: every non-interactive picture is a pattern of the given size, the

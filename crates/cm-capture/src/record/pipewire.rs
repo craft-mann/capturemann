@@ -197,8 +197,42 @@ pub trait PwBackend: Send + 'static {
         sink: EventSink<CpuFrame>,
     ) -> Result<StreamInfo, CmError>;
 
+    /// Tells the backend what to record before `open` (REC-1: screen, region, window). The
+    /// default accepts only [`PwTarget::Screen`], the portal's own choice.
+    fn select(&mut self, target: &PwTarget) -> Result<(), CmError> {
+        match target {
+            PwTarget::Screen => Ok(()),
+            _ => Err(CmError::not_implemented(NOT_A_DISPLAY_MESSAGE)),
+        }
+    }
+
     /// Ends the stream and the portal session; no events reach the sink afterwards.
     fn close(&mut self);
+}
+
+/// What a Linux recording captures, as the backend needs to know it (the compositor-side
+/// description of a [`crate::CaptureTarget`], see `specs/plans/linux-recording-plan.md`, task 7).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum PwTarget {
+    /// What the desktop's share dialog picks (the portal; a restore token makes it silent).
+    #[default]
+    Screen,
+    /// A window the user picks in the desktop's share dialog (the portal's window source).
+    PortalWindow,
+    /// One monitor by connector name (`""` is the primary one), asked of the compositor directly.
+    Monitor {
+        connector: String,
+        /// The monitor's size in pixels, when the layout told it.
+        size: Option<(u32, u32)>,
+    },
+    /// A rectangle of the desktop in the compositor's logical coordinates, cropped by the
+    /// compositor (`width` and `height` are the size of the stream).
+    Area {
+        x: i32,
+        y: i32,
+        width: u32,
+        height: u32,
+    },
 }
 
 /// Why a window or region recording is refused on Linux for now.
@@ -227,6 +261,7 @@ pub struct PipeWireScreenSource<B: PwBackend, T: TokenStore> {
     clock: Arc<dyn HostClock>,
     shared: Option<Arc<Shared>>,
     ticker: Option<JoinHandle<()>>,
+    target: Option<PwTarget>,
     info: Option<StreamInfo>,
     attached: bool,
 }
@@ -243,9 +278,17 @@ impl<B: PwBackend, T: TokenStore> PipeWireScreenSource<B, T> {
             clock,
             shared: None,
             ticker: None,
+            target: None,
             info: None,
             attached: false,
         }
+    }
+
+    /// What to record (the machine knows its monitors and windows and resolves the plan's target
+    /// to this). Without it only a display is accepted and the portal's dialog picks it.
+    pub fn with_target(mut self, target: PwTarget) -> Self {
+        self.target = Some(target);
+        self
     }
 
     /// The negotiated size after `prepare` or `start` (the plan's size is only a hint on
@@ -259,11 +302,14 @@ impl<B: PwBackend, T: TokenStore> PipeWireScreenSource<B, T> {
         if self.shared.is_some() {
             return Ok(());
         }
-        // The portal's dialog picks the monitor; a window or a region would need its other source
-        // types and a crop (plan, task 7), so they are refused here rather than recorded wrongly.
-        if !matches!(plan.target, crate::CaptureTarget::Display { .. }) {
-            return Err(CmError::not_implemented(NOT_A_DISPLAY_MESSAGE));
-        }
+        // Without a resolver the portal's dialog picks the monitor and a window or a region is
+        // refused rather than recorded wrongly.
+        let target = match &self.target {
+            Some(t) => t.clone(),
+            None if matches!(plan.target, crate::CaptureTarget::Display { .. }) => PwTarget::Screen,
+            None => return Err(CmError::not_implemented(NOT_A_DISPLAY_MESSAGE)),
+        };
+        self.backend.select(&target)?;
         let shared = Arc::new(Shared {
             inner: Mutex::new(Inner {
                 sink: None,
@@ -477,6 +523,11 @@ impl ScriptedPw {
 }
 
 impl PwBackend for ScriptedPw {
+    /// A scripted desktop can record anything.
+    fn select(&mut self, _target: &PwTarget) -> Result<(), CmError> {
+        Ok(())
+    }
+
     fn open(
         &mut self,
         restore_token: Option<&str>,

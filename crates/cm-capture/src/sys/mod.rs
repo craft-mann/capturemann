@@ -3,6 +3,7 @@
 
 pub mod linux_recorder;
 pub mod mutter;
+pub mod mutter_cast;
 pub mod permission;
 pub mod pipewire_linux;
 pub mod portal;
