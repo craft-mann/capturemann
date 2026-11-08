@@ -55,6 +55,7 @@ Laptop (Linux, x86_64, run over ssh without a desktop session): fmt and clippy p
 | X11 smoke / standard | 13/0/1 and 49/0/7 |
 | X11 hardware tier (screen, mic, camera; no sound) | 58/0/20 of 78 |
 | X11 full with tarball installer / `.deb` installer | 57/0/14 and 56/0/15; `linux.deb_install` on a clean machine 1/1 |
+| X11 `rec.soak` 10 minutes (screen + microphone, silent) | 1/0/0 |
 | X11 standard on the installed `.deb` (apt upgrade from 0.2.9 first) | 49/0/7 |
 | Wayland smoke / standard / hardware (no sound) | 13/0/1, 47/0/9, 55/0/23 of 78 |
 | aarch64 VM headless, standard / full | 34/0/22 and 35/0/36 |
@@ -70,7 +71,7 @@ Recording gates (reports `L1-linux-0.3.0-recording-ten-minutes-*`): X11 silent 1
 ## Not done / not run (also in the release text)
 
 - AMD and NVIDIA encoders, ARM hardware, a second monitor or scale other than 1, KDE and wlroots (the GlobalShortcuts portal path is written and tested with a fake portal only), Fedora/Arch/Debian, Flatpak/Snap.
-- Sound cases (rec.system_audio, chime, speakers): quiet hours. The X11 flash-to-beep offset was not measured. No 30-minute soak.
+- Sound cases (rec.system_audio, chime, speakers): quiet hours. The X11 flash-to-beep offset was not measured. No 30-minute soak (a 10-minute soak case passed on X11).
 - Wayland window recording (needs the buffer's crop metadata), cursor track and global shortcuts on Wayland (GNOME 46 has neither path).
 - The GitHub workflows `linux-package.yml` (including the `apt-repo` job) have never run on GitHub: expect a first-run fix. The APT repository was proved in a chroot with a throwaway key, not with the real key or host.
 - Manual IME scripts (Telex/VNI under IBus) on the final build, the editor's "Screen" lane has no thumbnails on any OS (0.3.1), the first-run Linux intro note still says "your desktop asks" (0.3.1), the Auto-redact editor button was not clicked on a real desktop.

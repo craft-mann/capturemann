@@ -80,6 +80,7 @@ desktop cases). `cm-regress` on the files above (commit `5301d4b8`, extracted ta
 | X11, full tier with the tarball installer case | 57 / 0 / 14 |
 | X11, full tier with the `.deb` installer case | 56 / 0 / 15 (the `.deb` case itself was skipped there because 0.2.9 was installed; run on its own after `apt remove` and `purge`: 1 / 0 / 0) |
 | X11, standard on the installed `.deb` (an `apt` upgrade from 0.2.9 first) | 49 / 0 / 7 |
+| X11, `rec.soak` 10 minutes (screen and microphone; constant 30 fps and 2 s key frames checked) | 1 / 0 / 0 |
 | GNOME 46 Wayland, smoke | 13 / 0 / 1 |
 | GNOME 46 Wayland, standard | 47 / 0 / 9 |
 | GNOME 46 Wayland, hardware tier (no sound) | 55 / 0 / 23 of 78 |
