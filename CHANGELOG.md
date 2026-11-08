@@ -5,6 +5,28 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
+## [0.2.9] - 2026-11-08
+
+0.2.9 is a bug-fix release for Windows and macOS. macOS also receives the changes of 0.2.8 (Windows only). Linux stays at 0.2.6; the next Linux release is 0.3.0.
+
+### Fixed
+- Reveal in the export toast opens the folder of the exported file with the file selected.
+- Annotation editor: Vietnamese text typed with Telex or VNI reaches the Text tool and is exported with its accents; new
+  text starts at size 24, white, without an outline.
+- The Models page no longer says "Mac" on Windows; the model descriptions are neutral and translated.
+- The Speakers tab list scrolls and has a flexible height; the voiceprint note moved to Settings, Privacy.
+- Play on Windows opens the file through File Explorer with a quoted path (a capture title with `&`, `^` or `%` could make
+  Windows run an extra command).
+
+### Improved
+- Recording HUD: drag it by its background and collapse it; position and state are remembered.
+- Windows 11: no grey frame or white line around the recording HUD.
+- Thumbnails and notification stripes follow the rounded corners of their frame.
+
+### Security
+- The PhoWhisper converter requirements (`packaging/phowhisper/requirements.txt`, used only by a maintainer script, not
+  shipped) were raised to patched torch and transformers; nothing in the shipped files changed.
+
 ## [0.2.8] - 2026-11-06
 
 0.2.8 is the Windows release. CaptureMann on Windows 11 (x64) now records, imports, exports, finds sensitive text, labels

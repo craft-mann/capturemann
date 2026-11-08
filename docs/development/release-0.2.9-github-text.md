@@ -38,8 +38,7 @@ want it and collapse it** (see "Improved"). **macOS users also get everything th
    **New text** starts at size 24, in white, with no outline; change the colour and size in the panel as before. Existing
    annotations are not changed. Typing also keeps working after you change the colour or size with the text box open.
    Typing through a real Telex or VNI input method has **not** been run by the test suite: the steps in
-   `tests/manual/ANN-1-IME.md` are a manual run by the maintainer: <FILL: result of the maintainer's run on Windows and
-   macOS, or "not run">. The Vietnamese glyphs of the bundled font are covered by a test.
+   `tests/manual/ANN-1-IME.md` (a manual run) were **not run** before this release. The Vietnamese glyphs of the bundled font are covered by a test.
 3. **The Models page no longer says "Mac" on Windows.** The one-line model descriptions were written for the Mac
    ("every Mac", "8 GB Macs") and were English-only. They are now neutral ("every computer", "8 GB of memory") and are
    translated, including Vietnamese. A test fails if a model description in the catalogues names a platform.
@@ -74,8 +73,8 @@ installers, the zip, the DMGs uses that file, so nothing in the files you downlo
 there is nothing for you to update.** The pins were raised (torch 2.15.0, transformers 5.22.1 and their companions) and the
 `small` model was converted again; the result is a byte-identical model file (same SHA-256), so the Vietnamese benchmark
 still applies (`packaging/phowhisper/README.md`). One transformers alert (alert 8) has no patched version yet: the maintainer
-dismisses it as "not used in shipped code" or it closes when a fix is published <FILL: state of the alert list on the
-release day>. The converter README says to convert only the three pinned VinAI revisions in a throwaway virtual environment.
+dismisses it as "not used in shipped code" or it closes when a fix is published. State on Nov 8, 2026: GitHub shows **no open
+code-scanning alerts and no open Dependabot alerts** for the repository. The converter README says to convert only the three pinned VinAI revisions in a throwaway virtual environment.
 
 ## Also new for macOS (from 0.2.8, which was Windows only)
 
@@ -123,8 +122,7 @@ Bug fixes: Reveal (EXP-4.AC5) and the text defaults (ANN-1.AC7, AC8) have unit t
 the hint wording have layout and catalogue tests; the HUD drag and collapse have tests for the positions and the stored
 state (REC-5.AC16, AC17). **The HUD, the thumbnails and the toast were seen by eye on the Windows laptop** (screenshots
 of the demo recording and toast; Nov 7, 2026, not stored in the repository). On the Mac the maintainer looked at the
-thumbnails and said the corners are right; the HUD on macOS has not been seen by eye (`tests/manual/HUD-1.md`:
-<FILL: result of the maintainer's run, or "not run">).
+thumbnails and said the corners are right; the HUD on macOS has not been seen by eye (`tests/manual/HUD-1.md` was **not run** before this release).
 CI on the tag commit (`cargo test --workspace` on macOS and Windows): <FILL: link or "see Actions">.
 
 ### Not run (same as 0.2.8 unless a report says otherwise)
