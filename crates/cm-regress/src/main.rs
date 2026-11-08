@@ -183,6 +183,16 @@ fn os_and_gpu() -> (String, String) {
             &["-NoProfile", "-Command", "(Get-CimInstance Win32_VideoController | ForEach-Object { $_.Name + ' (driver ' + $_.DriverVersion + ')' }) -join '; '"],
         );
         (os, gpu)
+    } else if sys::PLATFORM == "linux" {
+        let gpu = sys::linux::parse_lspci_gpus(&command_output("lspci", &["-mm", "-nn"]));
+        (
+            command_output("uname", &["-srm"]),
+            if gpu.is_empty() {
+                "n/a".to_owned()
+            } else {
+                gpu
+            },
+        )
     } else {
         (command_output("uname", &["-srm"]), "n/a".to_owned())
     }
