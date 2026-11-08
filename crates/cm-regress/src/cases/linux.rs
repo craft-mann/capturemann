@@ -5,7 +5,7 @@
 //!
 //! The install cases take the package from `--installer <file>`: a `.deb` runs `linux.deb_install`, a
 //! `.tar.gz` runs `linux.tarball_install`. Recording cases are the shared `rec.*` ones; they report SKIP
-//! unless the run has `CM_LINUX_RECORDING=1` (`sys::recording_unavailable`).
+//! when the run has `CM_LINUX_RECORDING=0` (`sys::recording_unavailable`; recording is on by default since 0.3.0).
 
 use crate::check;
 use crate::ctx::{displays, Ctx};

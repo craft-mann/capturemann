@@ -11,7 +11,6 @@ BIN="${BIN:-$HOME/wt/rec-target/debug}"
 RUN="${RUN:-$HOME/rec-g}"
 mkdir -p "$RUN"
 . "$HOME/lab/rec-env.sh"
-[ -f "$HOME/lab/session.env" ] && { set -a; . "$HOME/lab/session.env"; set +a; }
 clip="$RUN/sync-clip.mkv"
 if [ ! -f "$clip" ] || [ "${REGEN:-0}" = 1 ]; then
   len=$((secs + 40))
