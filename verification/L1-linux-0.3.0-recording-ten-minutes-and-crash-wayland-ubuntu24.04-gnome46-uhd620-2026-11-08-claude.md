@@ -4,7 +4,7 @@
 - Build: branch `track/linux-recording` (commits 8213ed99, 4bd55698, 2ce8d977, 62486390, 6c92a401), **release** build of `cm-daemon` and `capturemann`, `--no-default-features` (no speaker engine; irrelevant here). FFmpeg: the system `/usr/bin/ffmpeg` (h264_vaapi, libx264 used only to make the stimulus clip).
 - Encoder used: hardware H.264 through VA-API (constant quality: the driver has no bit-rate control). Recording path: GNOME's screen-cast service, no dialog.
 - Scripts: `scripts/testlab/rec-live-av.sh`, `rec-av-analyze.py`, `rec-crash.sh`, `rec-hold.sh`.
-- **Status of the gate: PARTIAL. Wayland measured; X11 not measured** (see "Not run"). The `CM_LINUX_RECORDING` switch stays until X11 is measured.
+- **Status of the gate: PARTIAL.** Wayland: A/V offset and drift measured here. X11: a silent 10-minute run (lengths, drops, cross-track agreement, no offset because of quiet hours) is in `L1-linux-0.3.0-recording-ten-minutes-silent-x11-*`. The X11 flash-to-beep offset was not measured. Recording is on by default since the commit that follows these reports.
 
 ## Stimulus and method
 
@@ -35,5 +35,5 @@ Result: **a 10-minute screen + microphone + system-audio recording plays back in
 
 ## Not run
 
-- **X11 session, 10 minutes**: the lab was switched to Wayland by the desktop agent before this run and the clip needs sound, which is not allowed after 22:00. The first X11 numbers are a 30 s debug-build run (flash-to-beep offset not meaningful there, the player's own latency was not separated; `verification/` has no report for it) and are not evidence. To run: log in to X11, `bash ~/lab/rec-ten.sh 600` before 22:00 or with a silent stimulus.
+- **X11 flash-to-beep offset**: not run (quiet hours; sound barred after 22:00). The silent X11 run is a separate report.
 - Window recording on Wayland (stated gap, see the targets report), second monitor, scale 2, the 30-minute soak, system audio from a player other than `ffplay`.
