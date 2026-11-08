@@ -249,3 +249,67 @@ fn a_preview_joins_a_recorder_on_the_same_camera() {
         "preview at 10 fps, got {previews}"
     );
 }
+
+/// The USB device (`1-8`) behind the first video node, from sysfs.
+fn usb_device_of_video0() -> Option<String> {
+    let dev = std::fs::canonicalize("/sys/class/video4linux/video0/device").ok()?;
+    dev.parent()?.file_name()?.to_str().map(str::to_owned)
+}
+
+/// Binds or unbinds a USB device with the kernel's own switch, which looks to every program like
+/// pulling the cable out and plugging it in.
+fn usb_switch(file: &str, id: &str) -> bool {
+    std::process::Command::new("sudo")
+        .args(["-n", "sh", "-c"])
+        .arg(format!("echo {id} > /sys/bus/usb/drivers/usb/{file}"))
+        .status()
+        .is_ok_and(|s| s.success())
+}
+
+/// Unbinding the camera's USB device is an unplug as far as a program can tell; binding it is a
+/// plug-in. A recording source must report both and deliver pictures again. Needs passwordless
+/// sudo and a USB camera (the T490's built-in camera is one); the device is always bound again.
+#[test]
+#[ignore = "unbinds and rebinds the camera's USB device (needs sudo -n)"]
+fn the_source_reconnects_when_the_camera_is_replugged() {
+    let Some(cam) = camera_or_skip() else { return };
+    let ok_sudo = std::process::Command::new("sudo")
+        .args(["-n", "true"])
+        .status()
+        .is_ok_and(|s| s.success());
+    let Some(usb) = usb_device_of_video0().filter(|_| ok_sudo) else {
+        eprintln!("SKIPPED: no passwordless sudo or no USB camera");
+        return;
+    };
+    let sink = Arc::new(Collect::default());
+    let mut src = cm_camera::system_source();
+    src.open(
+        &OpenRequest {
+            device_id: Some(cam.id.clone()),
+            resolution: CameraResolution::P720,
+            fps: 30,
+            role: SourceRole::Record,
+            first_frame_timeout: Duration::from_secs(5),
+        },
+        sink.clone(),
+    )
+    .unwrap();
+    std::thread::sleep(Duration::from_secs(2));
+    let before_unplug = sink.stamps.lock().unwrap().len();
+    let removed = usb_switch("unbind", &usb);
+    std::thread::sleep(Duration::from_secs(2));
+    let restored = usb_switch("bind", &usb);
+    assert!(restored, "the USB device {usb} must be bound again");
+    assert!(removed, "could not unbind {usb}");
+    std::thread::sleep(Duration::from_secs(8));
+    let after = sink.stamps.lock().unwrap().len();
+    src.close();
+    let events = sink.events.lock().unwrap().clone();
+    eprintln!("frames before {before_unplug}, total {after}, events {events:?}");
+    assert!(events.contains(&CameraEvent::Disconnected));
+    assert!(events.contains(&CameraEvent::Reconnected));
+    assert!(
+        after > before_unplug + 30,
+        "no pictures after the camera came back"
+    );
+}
