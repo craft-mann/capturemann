@@ -14,8 +14,10 @@ by the maintainer). Steps: `release-day-0.2.9.md`.
 - **Files to attach:**
   - Windows: `capturemann-0.2.9-windows-x64-setup.exe`, `capturemann-0.2.9-windows-x64.zip`, their two `.sha256` files and
     `SHA256SUMS.txt` (from `packaging/windows/release-files.sh`). Not code-signed.
-  - macOS: `CaptureMann-v0.2.9-macos-arm64.dmg` and `CaptureMann-v0.2.9-macos-x86_64.dmg` with their `.sha256` files (made by
-    the `Release` workflow; signed, notarized and stapled if the notarization secrets are set, otherwise say "not notarized").
+  - macOS: `CaptureMann-v0.2.9-macos-arm64.dmg` and `CaptureMann-v0.2.9-macos-x86_64.dmg` with their `.sha256` files: the
+    notarized DMGs built locally (`make release`, `make release CM_ARCH=x86_64`; named `CaptureMann-0.2.9-arm64.dmg` and
+    `CaptureMann-0.2.9-x86_64.dmg`). **Rename them to the names above** (the Homebrew cask and `releasing.md` expect them) and
+    write the `.sha256` files again with the new names (`shasum -a 256 <file> > <file>.sha256`); the checksums do not change.
 
 ---
 
@@ -105,8 +107,8 @@ one lab machine per platform unless a line says a person looked. A PARTIAL repor
 | Platform | Package (CI run, commit) | Smoke | Standard | Hardware | Report files |
 | --- | --- | --- | --- | --- | --- |
 | Windows 11 x64 (ThinkPad T490, Intel UHD 620) | installer from the Windows package run 42363837840, commit `ae61845f` (installed silently on the lab laptop) | 12 passed, 2 skipped | 49 passed, 7 skipped | 58 passed, **1 failed**, 18 skipped: `rec.camera` measured 10.1 fps in the evening (a low-light camera mode) and passed in daylight (9.9 s run, Nov 8); the full tier: 56 passed, 14 skipped | `verification/L1-windows-0.2.9-regression-{smoke,standard,hardware,full}-pkg-ae61845f-*`, `...-hardware-camera-again{1,2}-*` (the evening failures), `...-hardware-camera-day-*` |
-| macOS arm64 (the maintainer's Mac, Apple M4 Pro, macOS 26.6.2) | the notarized DMG built on the maintainer's Mac on Nov 8, 2026 after commit `53a3cb4e` (a local `make release`), app copied out of the DMG for the runs | 12 passed, 2 skipped | 44 passed, 12 skipped | 53 passed, 0 failed, 24 skipped (screen, microphone, system audio and camera ran with the maintainer's consent); the DMG install check passed | `verification/L1-macos-0.2.9-regression-{full-dmg,smoke-app,standard-app,hardware-app}-53a3cb4e-*` |
-| macOS x86_64 (Intel) | built and checked on Apple Silicon only | not run on Intel hardware | not run | not run | none |
+| macOS arm64 (the maintainer's Mac, Apple M4 Pro, macOS 26.6.2) | the notarized, stapled DMG built on the maintainer's Mac from tag `v0.2.9` (commit `e6ce0fd1`, `make release`), app copied out of the DMG for the runs | 12 passed, 2 skipped | 44 passed, 12 skipped | 53 passed, 0 failed, 24 skipped (screen, microphone, system audio and camera ran with the maintainer's consent); the DMG install check passed | `verification/L1-macos-0.2.9-regression-{full-dmg-arm64,full-dmg-x86_64,smoke-app,standard-app,hardware-app}-v0.2.9-*` |
+| macOS x86_64 (Intel) | the notarized, stapled DMG built on the maintainer's Mac with `make release CM_ARCH=x86_64` from the same tag; checked on Apple Silicon only: the DMG install check passed and its command-line tool ran under Rosetta | not run on Intel hardware | not run | not run | `...-full-dmg-x86_64-v0.2.9-*` |
 
 **One hour of audio recording** (the case for long meetings), one run per platform, mic only on the Mac, mic plus system audio
 on Windows, nobody speaking: 3602.6 s recorded on the Mac and 3601.6 s on Windows, no gaps, no resyncs, the app's memory
@@ -115,8 +117,9 @@ stayed flat (Mac 113 to 135 MB; Windows 42 to 43 MB after the first minute) and 
 32-bit float). Reports: `verification/VOC-1-soak-macos-1h-*`, `VOC-1-soak-windows-1h-*`. The Mac run and the Windows run used
 the packages built before the HUD change.
 
-The macOS runs above are on the DMG built on the maintainer's Mac. The DMGs attached to this release are built again by the
-`Release` workflow from the tag: <FILL: result of the checks on the downloaded draft DMG (`releasing.md`), or "not rerun">.
+The DMGs attached to this release are the files that were tested: built on the maintainer's Mac from the tag, signed with a
+Developer ID, notarized and stapled (`spctl` accepts both). The regression ran on the arm64 file. The Intel file was not run
+on Intel hardware.
 
 Bug fixes: Reveal (EXP-4.AC5) and the text defaults (ANN-1.AC7, AC8) have unit tests with fakes; the Speakers tab layout and
 the hint wording have layout and catalogue tests; the HUD drag and collapse have tests for the positions and the stored
@@ -149,8 +152,9 @@ CI on the tag commit (`cargo test --workspace` on macOS and Windows): <FILL: lin
   The files are **not code-signed**; a browser download may show a SmartScreen warning (More info, then Run anyway).
   SHA-256: installer `<FILL>`, zip `<FILL>`. Check with `certutil -hashfile <file> SHA256`.
 - **macOS 13+:** `CaptureMann-v0.2.9-macos-arm64.dmg` (Apple Silicon) or `CaptureMann-v0.2.9-macos-x86_64.dmg` (Intel);
-  <FILL: "signed and notarized" or "not notarized">. Or `brew upgrade --cask craft-mann/tap/capturemann`
-  (`brew install --cask craft-mann/tap/capturemann` for a first install). SHA-256: arm64 `<FILL>`, x86_64 `<FILL>`.
+  signed with a Developer ID, notarized and stapled. Or `brew upgrade --cask craft-mann/tap/capturemann`
+  (`brew install --cask craft-mann/tap/capturemann` for a first install). SHA-256: arm64 `f2234e0c56f46d115639b97b0307793e4bf82dbfe7cdadb998312533c6ce0d58`, x86_64
+  `78fff050db66d29831ab0b4ea821412793119e19d042657f537ed7d7f7fc8628`.
   Check with `shasum -a 256 -c <file>.sha256`.
 - **Linux:** no 0.2.9 files. Linux stays at 0.2.6; the next Linux release is 0.3.0.
 
