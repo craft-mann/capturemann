@@ -1670,6 +1670,7 @@ dependencies = [
  "tempfile",
  "trash",
  "windows 0.61.3",
+ "zbus",
 ]
 
 [[package]]

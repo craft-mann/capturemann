@@ -23,8 +23,9 @@ const WAV_LIMIT_BYTES: f64 = 3.9e9;
 #[derive(Debug)]
 pub enum RunFailure {
     Cancelled,
-    /// No hardware H.264 or HEVC encoder in this FFmpeg or on this machine (no software encoder
-    /// ships, NFR-12).
+    /// No usable encoder for the copy: no hardware H.264 or HEVC encoder on macOS and Windows (no
+    /// software H.264 encoder ships, NFR-12), and on Linux neither VA-API H.264 nor `libvpx-vp9`
+    /// in this FFmpeg (O10).
     NoHardwareEncoder,
     Failed(CmError),
 }
@@ -67,8 +68,9 @@ pub fn editing_bitrate(width: u32, height: u32, fps: f64) -> u64 {
     bps.clamp(2.0e6, 80.0e6) as u64
 }
 
-/// Which family of hardware encoders the editing copy may use. No software encoder ships
-/// (NFR-12), so each family names only encoders that run on the machine's media hardware.
+/// Which family of encoders the editing copy may use. No software H.264 encoder ships (NFR-12), so
+/// each family names only encoders that run on the machine's media hardware, except on Linux
+/// where software VP9 is the labelled fallback (decision O10, Nov 8, 2026).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EncoderFamily {
     /// Apple VideoToolbox (`h264_videotoolbox`, `hevc_videotoolbox`).
@@ -77,22 +79,35 @@ pub enum EncoderFamily {
     /// without that option FFmpeg falls back to Microsoft's software encoder when the machine has
     /// no hardware one.
     MediaFoundation,
+    /// Linux VA-API (`h264_vaapi`): frames are uploaded to the GPU through a render node.
+    Vaapi,
+    /// Software VP9 (`libvpx-vp9`, BSD) in an MP4: the Linux fallback when VA-API H.264 is missing
+    /// or refuses to start (O10). It is not H.264, and the import says so.
+    SoftwareVp9,
 }
 
 impl EncoderFamily {
     /// The family of the machine this runs on.
     pub fn host() -> Self {
-        if cfg!(windows) {
-            EncoderFamily::MediaFoundation
-        } else {
-            EncoderFamily::VideoToolbox
+        Self::for_os(std::env::consts::OS)
+    }
+
+    /// The first family tried on `os` (`std::env::consts::OS`). Pure.
+    pub fn for_os(os: &str) -> Self {
+        match os {
+            "windows" => EncoderFamily::MediaFoundation,
+            "linux" => EncoderFamily::Vaapi,
+            _ => EncoderFamily::VideoToolbox,
         }
     }
 
+    /// The name of the family's main encoder (H.264, or VP9 for the software family).
     fn h264(self) -> &'static str {
         match self {
             EncoderFamily::VideoToolbox => "h264_videotoolbox",
             EncoderFamily::MediaFoundation => "h264_mf",
+            EncoderFamily::Vaapi => "h264_vaapi",
+            EncoderFamily::SoftwareVp9 => "libvpx-vp9",
         }
     }
 
@@ -100,7 +115,9 @@ impl EncoderFamily {
     fn hevc(self) -> Option<&'static str> {
         match self {
             EncoderFamily::VideoToolbox => Some("hevc_videotoolbox"),
-            EncoderFamily::MediaFoundation => None,
+            EncoderFamily::MediaFoundation | EncoderFamily::Vaapi | EncoderFamily::SoftwareVp9 => {
+                None
+            }
         }
     }
 
@@ -108,16 +125,23 @@ impl EncoderFamily {
     /// transform refuses yuv420p with "format negotiation failed".
     fn pixel_format(self) -> &'static str {
         match self {
-            EncoderFamily::VideoToolbox => "yuv420p",
+            EncoderFamily::VideoToolbox | EncoderFamily::SoftwareVp9 => "yuv420p",
             EncoderFamily::MediaFoundation => "nv12",
+            // VA-API takes NV12 frames uploaded to the GPU.
+            EncoderFamily::Vaapi => "nv12,hwupload",
         }
     }
 
-    /// Arguments that must come with the encoder to keep it on the hardware.
+    /// Arguments that must come with the encoder to keep it on the hardware (or, for VP9, to keep
+    /// it fast: the copy is for scrubbing, not for delivery).
     fn extra_args(self) -> &'static [&'static str] {
         match self {
             EncoderFamily::VideoToolbox => &[],
             EncoderFamily::MediaFoundation => &["-hw_encoding", "1"],
+            EncoderFamily::Vaapi => &["-profile:v", "high"],
+            EncoderFamily::SoftwareVp9 => {
+                &["-deadline", "realtime", "-cpu-used", "6", "-row-mt", "1"]
+            }
         }
     }
 
@@ -137,6 +161,115 @@ impl EncoderFamily {
                         || m.contains("not found")
                         || m.contains("failed"))
             }
+            EncoderFamily::Vaapi => {
+                ["vaapi", "libva", "hwupload", "/dev/dri", "render node"]
+                    .iter()
+                    .any(|k| m.contains(k))
+                    && [
+                        "error",
+                        "cannot",
+                        "could not",
+                        "failed",
+                        "not found",
+                        "no usable",
+                        "no such",
+                        "no va display",
+                    ]
+                    .iter()
+                    .any(|k| m.contains(k))
+            }
+            // Software: it starts, or the input is bad; never "no encoder on this computer".
+            EncoderFamily::SoftwareVp9 => false,
+        }
+    }
+}
+
+/// One encoder the editing copy can be made with.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CopyEncoder {
+    pub family: EncoderFamily,
+    /// FFmpeg's encoder name.
+    pub name: &'static str,
+}
+
+impl CopyEncoder {
+    /// `h264`, `hevc` or `vp9`.
+    pub fn codec(&self) -> &'static str {
+        if self.name.starts_with("hevc") {
+            "hevc"
+        } else if self.family == EncoderFamily::SoftwareVp9 {
+            "vp9"
+        } else {
+            "h264"
+        }
+    }
+
+    pub fn is_software(&self) -> bool {
+        self.family == EncoderFamily::SoftwareVp9
+    }
+}
+
+/// The encoders to try for the editing copy, best first. Pure: `listing` is the text of
+/// `ffmpeg -encoders`, `vaapi_device` the render node when the computer has one.
+///
+/// macOS and Windows: the one hardware encoder of the platform (unchanged, NFR-12). Linux (O10):
+/// `h264_vaapi` when the build has it and a render node exists, then software VP9 when the build
+/// has `libvpx-vp9`. Never `libx264` or OpenH264.
+pub fn copy_ladder(
+    host: EncoderFamily,
+    source_codec: &str,
+    listing: &str,
+    vaapi_device: Option<&str>,
+) -> Vec<CopyEncoder> {
+    if host == EncoderFamily::Vaapi {
+        let mut out = Vec::new();
+        if listing.contains("h264_vaapi") && vaapi_device.is_some() {
+            out.push(CopyEncoder {
+                family: EncoderFamily::Vaapi,
+                name: "h264_vaapi",
+            });
+        }
+        if listing.contains("libvpx-vp9") {
+            out.push(CopyEncoder {
+                family: EncoderFamily::SoftwareVp9,
+                name: "libvpx-vp9",
+            });
+        }
+        return out;
+    }
+    let (h264, hevc) = parse_hardware_encoders(host, listing);
+    pick_encoder(host, source_codec, h264, hevc)
+        .map(|name| CopyEncoder { family: host, name })
+        .into_iter()
+        .collect()
+}
+
+/// What the import records about the editing copy it made: which encoder, and why it was this one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EditingCopy {
+    pub encoder: &'static str,
+    /// `h264`, `hevc` or `vp9`.
+    pub codec: &'static str,
+    pub software: bool,
+    /// The sentence the CLI, the MCP result and the import sheet show when the copy is not
+    /// hardware H.264 (O10).
+    pub note: Option<String>,
+}
+
+impl EditingCopy {
+    fn of(used: CopyEncoder, hardware_refused: bool) -> EditingCopy {
+        let note = used.is_software().then(|| {
+            if hardware_refused {
+                "The editing copy is software VP9: the hardware H.264 encoder did not start on this computer.".to_owned()
+            } else {
+                "The editing copy is software VP9: this computer has no hardware H.264 encoder (VA-API).".to_owned()
+            }
+        });
+        EditingCopy {
+            encoder: used.name,
+            codec: used.codec(),
+            software: used.is_software(),
+            note,
         }
     }
 }
@@ -159,7 +292,36 @@ pub fn hardware_encoders(tools: &Tools) -> Result<(bool, bool), CmError> {
         .output()
         .map_err(|e| spawn_error(&tools.ffmpeg, &e))?;
     let text = String::from_utf8_lossy(&out.stdout);
-    Ok(parse_hardware_encoders(EncoderFamily::host(), &text))
+    let host = EncoderFamily::host();
+    if host == EncoderFamily::Vaapi
+        && crate::tools::find_vaapi_device(Path::new("/dev/dri")).is_none()
+    {
+        return Ok((false, false));
+    }
+    Ok(parse_hardware_encoders(host, &text))
+}
+
+/// The encoders the editing copy can be made with on this computer, best first, and the VA-API
+/// render node (see [`copy_ladder`]). Empty: nothing can make the copy
+/// ([`RunFailure::NoHardwareEncoder`]).
+pub fn editing_copy_encoders(
+    tools: &Tools,
+    source_codec: &str,
+) -> Result<(Vec<CopyEncoder>, Option<String>), CmError> {
+    let out = cm_platform::process::command(&tools.ffmpeg)
+        .args(["-hide_banner", "-encoders"])
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|e| spawn_error(&tools.ffmpeg, &e))?;
+    let text = String::from_utf8_lossy(&out.stdout);
+    let device = crate::tools::find_vaapi_device(Path::new("/dev/dri"));
+    let ladder = copy_ladder(
+        EncoderFamily::host(),
+        source_codec,
+        &text,
+        device.as_deref(),
+    );
+    Ok((ladder, device))
 }
 
 /// The encoder for the copy: HEVC for an HEVC source when the build has it, else H.264.
@@ -239,6 +401,7 @@ pub fn editing_copy_args(
     fps: &str,
     bitrate: u64,
     colour: Option<CopyColour>,
+    vaapi_device: Option<&str>,
 ) -> Vec<String> {
     let rate: f64 = match fps.split_once('/') {
         Some((n, d)) => n.parse::<f64>().unwrap_or(30.0) / d.parse::<f64>().unwrap_or(1.0),
@@ -257,6 +420,16 @@ pub fn editing_copy_args(
     ]
     .map(String::from)
     .to_vec();
+    if family == EncoderFamily::Vaapi {
+        // A global option: the render node the `hwupload` filter and the encoder share.
+        a.splice(
+            1..1,
+            [
+                "-vaapi_device".to_owned(),
+                vaapi_device.unwrap_or("/dev/dri/renderD128").to_owned(),
+            ],
+        );
+    }
     a.push(input.display().to_string());
     a.extend(["-map".to_owned(), format!("0:{video_index}")]);
     a.extend(["-an", "-sn", "-dn"].map(String::from));
@@ -320,56 +493,69 @@ pub fn editing_copy_args(
 }
 
 /// Makes the editing copy of a video: constant frame rate, upright, 8-bit 4:2:0, no sound.
-/// `progress` gets 0..=1. A cancel removes the partial file.
+/// `progress` gets 0..=1. A cancel removes the partial file. Returns the encoder used: on Linux
+/// it is hardware H.264 (VA-API) where that works and software VP9 otherwise (O10), and the
+/// caller says which.
 pub fn make_editing_copy(
     tools: &Tools,
     source: &ProbedFile,
     output: &Path,
     progress: &mut dyn FnMut(f64),
     cancel: &dyn Fn() -> bool,
-) -> Result<(), RunFailure> {
+) -> Result<EditingCopy, RunFailure> {
     let v = source
         .video
         .as_ref()
         .ok_or_else(|| RunFailure::Failed(CmError::invalid_input("the file has no video")))?;
-    let family = EncoderFamily::host();
-    let (h264, hevc) = hardware_encoders(tools).map_err(RunFailure::Failed)?;
-    let encoder =
-        pick_encoder(family, &v.codec, h264, hevc).ok_or(RunFailure::NoHardwareEncoder)?;
+    let (ladder, device) = editing_copy_encoders(tools, &v.codec).map_err(RunFailure::Failed)?;
+    if ladder.is_empty() {
+        return Err(RunFailure::NoHardwareEncoder);
+    }
     let fps = editing_fps(v.fps);
     let rate = v.fps.unwrap_or(30.0).clamp(15.0, 60.0);
-    let colour = (family == EncoderFamily::MediaFoundation)
-        .then(|| Standard::of_source(v))
-        .flatten()
-        .map(|standard| CopyColour {
-            standard,
-            vui: crate::tools::has_bitstream_filter(tools, "h264_metadata"),
-        });
-    let args = editing_copy_args(
-        &source.path,
-        output,
-        v.index,
-        family,
-        encoder,
-        &fps,
-        editing_bitrate(v.width, v.height, rate),
-        colour,
-    );
-    let mut on = |p: Progress| progress(p.fraction);
-    let r = run_ffmpeg(&tools.ffmpeg, &args, source.duration_s, &mut on, cancel);
-    match r {
-        Ok(()) => Ok(()),
-        Err(e) => {
-            let _ = std::fs::remove_file(output);
-            // The hardware encoder refused to start (no media engine, a size it cannot do).
-            if let RunError::Failed(ce) = &e {
-                if family.refused(&ce.to_string()) {
-                    return Err(RunFailure::NoHardwareEncoder);
+    let mut refused_before = false;
+    for (n, enc) in ladder.iter().enumerate() {
+        let family = enc.family;
+        let colour = (family == EncoderFamily::MediaFoundation)
+            .then(|| Standard::of_source(v))
+            .flatten()
+            .map(|standard| CopyColour {
+                standard,
+                vui: crate::tools::has_bitstream_filter(tools, "h264_metadata"),
+            });
+        let args = editing_copy_args(
+            &source.path,
+            output,
+            v.index,
+            family,
+            enc.name,
+            &fps,
+            editing_bitrate(v.width, v.height, rate),
+            colour,
+            device.as_deref(),
+        );
+        let mut on = |p: Progress| progress(p.fraction);
+        let r = run_ffmpeg(&tools.ffmpeg, &args, source.duration_s, &mut on, cancel);
+        match r {
+            Ok(()) => return Ok(EditingCopy::of(*enc, refused_before)),
+            Err(e) => {
+                let _ = std::fs::remove_file(output);
+                // The encoder refused to start (no media engine, a size it cannot do): the next
+                // one is tried, and when there is none the file cannot be prepared here.
+                if let RunError::Failed(ce) = &e {
+                    if family.refused(&ce.to_string()) {
+                        if n + 1 < ladder.len() {
+                            refused_before = true;
+                            continue;
+                        }
+                        return Err(RunFailure::NoHardwareEncoder);
+                    }
                 }
+                return Err(e.into());
             }
-            Err(e.into())
         }
     }
+    Err(RunFailure::NoHardwareEncoder)
 }
 
 /// How many channels `mic.wav` gets: the source's, at most 2, and mono when stereo would not fit
@@ -685,6 +871,7 @@ mod tests {
             "30",
             5_000_000,
             None,
+            None,
         );
         let s = a.join(" ");
         assert!(s.contains("-c:v h264_mf -b:v 5000000"), "{s}");
@@ -699,6 +886,7 @@ mod tests {
             "h264_videotoolbox",
             "30",
             1,
+            None,
             None,
         );
         assert!(!v.join(" ").contains("hw_encoding"));
@@ -768,6 +956,7 @@ mod tests {
                 "30",
                 5_000_000,
                 Some(CopyColour { standard: std, vui }),
+                None,
             )
             .join(" ")
         };
@@ -825,6 +1014,7 @@ mod tests {
             "30000/1001",
             9_000_000,
             None,
+            None,
         );
         let s = a.join(" ");
         assert!(s.contains("-map 0:2 -an -sn -dn"), "{s}");
@@ -849,6 +1039,7 @@ mod tests {
             "h264_videotoolbox",
             "25",
             1,
+            None,
             None,
         );
         assert!(!h.join(" ").contains("hvc1"));
@@ -877,5 +1068,162 @@ mod tests {
         assert!((duration_tolerance(MediaKind::Video, Some(25.0)) - 0.04).abs() < 1e-9);
         assert_eq!(duration_tolerance(MediaKind::Audio, Some(25.0)), 0.025);
         assert!(duration_tolerance(MediaKind::Video, None) > 0.0);
+    }
+
+    // IMP-2 on Linux (decision O10): VA-API H.264 where it works, software VP9 as the labelled
+    // fallback, never libx264 or OpenH264. Tested with fakes: scripted encoder listings.
+    const LINUX_FULL: &str =
+        " V....D h264_vaapi H.264 (VAAPI)\n V....D libvpx-vp9 VP9\n A aac AAC\n";
+    const LINUX_NO_VAAPI_BUILD: &str = " V....D libvpx-vp9 VP9\n A aac AAC\n";
+    const LINUX_GPL_ONLY: &str = " V....D libx264 H.264\n V....D libopenh264 H.264\n";
+
+    fn names(l: &[CopyEncoder]) -> Vec<&'static str> {
+        l.iter().map(|e| e.name).collect()
+    }
+
+    #[test]
+    fn linux_tries_vaapi_then_vp9_and_only_with_a_render_node() {
+        let host = EncoderFamily::for_os("linux");
+        assert_eq!(host, EncoderFamily::Vaapi);
+        // Hardware present: VA-API first, VP9 stays as the retry.
+        let l = copy_ladder(host, "h264", LINUX_FULL, Some("/dev/dri/renderD128"));
+        assert_eq!(names(&l), ["h264_vaapi", "libvpx-vp9"]);
+        assert!(!l[0].is_software() && l[1].is_software());
+        assert_eq!((l[0].codec(), l[1].codec()), ("h264", "vp9"));
+        // The build lists h264_vaapi but the computer has no render node (a VM): VP9 only.
+        let l = copy_ladder(host, "hevc", LINUX_FULL, None);
+        assert_eq!(names(&l), ["libvpx-vp9"]);
+        // A build without VA-API: VP9 only, with or without a node.
+        assert_eq!(
+            names(&copy_ladder(
+                host,
+                "h264",
+                LINUX_NO_VAAPI_BUILD,
+                Some("/dev/dri/renderD128")
+            )),
+            ["libvpx-vp9"]
+        );
+        // Only GPL or patent-encumbered encoders listed: nothing, never libx264 or OpenH264.
+        assert!(copy_ladder(host, "h264", LINUX_GPL_ONLY, Some("/dev/dri/renderD128")).is_empty());
+    }
+
+    #[test]
+    fn macos_and_windows_ladders_are_unchanged() {
+        let mac = EncoderFamily::for_os("macos");
+        let l = copy_ladder(
+            mac,
+            "hevc",
+            " V h264_videotoolbox x\n V hevc_videotoolbox y\n",
+            None,
+        );
+        assert_eq!(names(&l), ["hevc_videotoolbox"]);
+        // No software fallback on macOS, even when libvpx is there.
+        assert!(copy_ladder(mac, "h264", " V libvpx-vp9 x\n", None).is_empty());
+        let win = EncoderFamily::for_os("windows");
+        assert_eq!(
+            names(&copy_ladder(
+                win,
+                "hevc",
+                " V h264_mf x\n V libvpx-vp9 y\n",
+                None
+            )),
+            ["h264_mf"]
+        );
+        assert!(copy_ladder(
+            win,
+            "h264",
+            " V libvpx-vp9 y\n",
+            Some("/dev/dri/renderD128")
+        )
+        .is_empty());
+    }
+
+    #[test]
+    fn the_vaapi_copy_uploads_nv12_frames_to_the_render_node() {
+        let a = editing_copy_args(
+            Path::new("a.mkv"),
+            Path::new("b.mp4"),
+            0,
+            EncoderFamily::Vaapi,
+            "h264_vaapi",
+            "30",
+            5_000_000,
+            None,
+            Some("/dev/dri/renderD129"),
+        );
+        let s = a.join(" ");
+        assert!(
+            s.starts_with("-hide_banner -vaapi_device /dev/dri/renderD129 "),
+            "{s}"
+        );
+        assert!(s.contains("format=nv12,hwupload"), "{s}");
+        assert!(s.contains("-c:v h264_vaapi -b:v 5000000 -g 30"), "{s}");
+        assert!(!s.contains("libx264") && !s.contains("openh264"), "{s}");
+    }
+
+    #[test]
+    fn the_vp9_copy_is_constant_rate_upright_fast_and_untagged_for_avc() {
+        // A rotated source and a variable-rate source go through the same arguments: the fps
+        // filter makes the rate constant, FFmpeg's autorotate makes the picture upright.
+        let a = editing_copy_args(
+            Path::new("rot.mkv"),
+            Path::new("screen.edit.mp4"),
+            1,
+            EncoderFamily::SoftwareVp9,
+            "libvpx-vp9",
+            "30000/1001",
+            4_000_000,
+            None,
+            Some("/dev/dri/renderD128"),
+        );
+        let s = a.join(" ");
+        assert!(!s.contains("-vaapi_device"), "{s}");
+        assert!(s.contains("-map 0:1 -an -sn -dn"), "{s}");
+        assert!(
+            s.contains("fps=30000/1001,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p"),
+            "{s}"
+        );
+        assert!(s.contains("-c:v libvpx-vp9 -b:v 4000000 -g 30"), "{s}");
+        assert!(s.contains("-deadline realtime"), "{s}");
+        assert!(s.contains("-fps_mode cfr"), "{s}");
+        assert!(
+            !s.contains("hwupload") && !s.contains("hvc1") && !s.contains("avc1"),
+            "{s}"
+        );
+    }
+
+    #[test]
+    fn a_refused_vaapi_encoder_is_recognised_and_vp9_is_never_refused() {
+        let va = EncoderFamily::Vaapi;
+        assert!(va.refused(
+            "[AVHWDeviceContext @ 0x1] No VA display found for device /dev/dri/renderD128."
+        ));
+        assert!(va.refused("Failed to initialise VAAPI connection: -1 (unknown libva error)."));
+        assert!(!va.refused("Invalid data found when processing input"));
+        assert!(!va.refused("[h264_videotoolbox @ 0x1] Error: cannot create"));
+        assert!(!EncoderFamily::SoftwareVp9.refused("libvpx error vaapi failed"));
+    }
+
+    #[test]
+    fn the_copy_says_when_it_is_software_vp9() {
+        let vp9 = CopyEncoder {
+            family: EncoderFamily::SoftwareVp9,
+            name: "libvpx-vp9",
+        };
+        let none = EditingCopy::of(vp9, false);
+        assert!(none.software && none.codec == "vp9");
+        assert!(none
+            .note
+            .as_deref()
+            .unwrap()
+            .contains("no hardware H.264 encoder"));
+        let refused = EditingCopy::of(vp9, true);
+        assert!(refused.note.as_deref().unwrap().contains("did not start"));
+        let va = CopyEncoder {
+            family: EncoderFamily::Vaapi,
+            name: "h264_vaapi",
+        };
+        let hw = EditingCopy::of(va, false);
+        assert!(!hw.software && hw.codec == "h264" && hw.note.is_none());
     }
 }

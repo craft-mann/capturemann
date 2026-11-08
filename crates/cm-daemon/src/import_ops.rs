@@ -696,6 +696,9 @@ struct FileOutcome {
     status: &'static str,
     error: Option<Value>,
     trash: Option<Value>,
+    /// How the editing copy was made (IMP-2; O10): the encoder, its codec, and a sentence when it
+    /// is not hardware H.264.
+    editing_copy: Option<Value>,
     code: Option<CmError>,
 }
 
@@ -710,6 +713,9 @@ impl FileOutcome {
         }
         if let Some(t) = &self.trash {
             v["trash"] = t.clone();
+        }
+        if let Some(c) = &self.editing_copy {
+            v["editing_copy"] = c.clone();
         }
         v
     }
@@ -728,6 +734,7 @@ impl FileOutcome {
             status: "failed",
             error: Some(err),
             trash: None,
+            editing_copy: None,
             code: Some(e),
         }
     }
@@ -743,6 +750,16 @@ impl FileOutcome {
             }
         }
         o
+    }
+}
+
+/// The message of a file that cannot be prepared for editing. On Linux the build has a software
+/// fallback (VP9, O10), so reaching this means even that is missing.
+fn no_encoder_message() -> &'static str {
+    if std::env::consts::OS == "linux" {
+        "This computer can't prepare this file for editing (no hardware H.264 encoder, and this FFmpeg has no VP9 encoder to fall back on)."
+    } else {
+        "This computer can't prepare this file for editing (no hardware video encoder)."
     }
 }
 
@@ -940,18 +957,25 @@ impl ImportRun {
         let _ = last;
         // 2. The editing copy.
         let mut screen_file = master.clone();
+        let mut editing_copy: Option<Value> = None;
         if prepared {
             let out = stage.join(EDITING_COPY_FILE);
             prog.set(copy_share, "Preparing for editing");
             let mut on = |p: f64| prog.set(copy_share + 0.4 * p, "Preparing for editing");
             match make_editing_copy(&self.tools, &source, &out, &mut on, cancel) {
-                Ok(()) => screen_file = EDITING_COPY_FILE.to_owned(),
+                Ok(copy) => {
+                    screen_file = EDITING_COPY_FILE.to_owned();
+                    editing_copy = Some(json!({
+                        "encoder": copy.encoder, "codec": copy.codec,
+                        "software": copy.software, "note": copy.note,
+                    }));
+                }
                 Err(RunFailure::Cancelled) => return Err(finish_err(Stop::Interrupted)),
                 Err(RunFailure::NoHardwareEncoder) => {
                     cleanup(());
                     let mut o = FileOutcome::failed(
                         &path_s,
-                        CmError::invalid_input("This computer can't prepare this file for editing (no hardware video encoder)."),
+                        CmError::invalid_input(no_encoder_message()),
                         Some("unsupported_format"),
                         Some("no_hardware_encoder"),
                     );
@@ -1070,6 +1094,7 @@ impl ImportRun {
             status: "imported",
             error: None,
             trash,
+            editing_copy,
             code: None,
         })
     }
@@ -1149,6 +1174,7 @@ impl JobHandler for ImportHandler {
                     status: "imported",
                     error: None,
                     trash: None,
+                    editing_copy: None,
                     code: None,
                 };
                 if remove_originals && Path::new(&o.path).is_file() {

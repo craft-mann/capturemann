@@ -61,6 +61,39 @@ pub fn cases() -> Vec<Case> {
 struct Exported {
     path: std::path::PathBuf,
     encoder: String,
+    /// The codec the job says the file has, and why when it is not hardware H.264 (O10).
+    codec: String,
+    codec_note: Option<String>,
+}
+
+/// EXP-1 / EXP-2 on Linux (decision O10): an MP4 preset is hardware H.264 (VA-API) or, where the
+/// computer has none, VP9 video that the job result labels (`codec` and a `codec_note`). A
+/// VP9 file with no label, or H.264 from a software encoder, is a failure; macOS and Windows
+/// still require H.264. Pure, so `cargo test -p cm-regress` covers it.
+fn video_codec_problem(os: &str, file_codec: &str, e: &Exported) -> Option<String> {
+    if file_codec == "h264" {
+        let software = ["libx264", "libopenh264"];
+        return (os == "linux" && software.contains(&e.encoder.as_str()))
+            .then(|| format!("software H.264 encoder {} must never ship", e.encoder));
+    }
+    if os != "linux" {
+        return Some(format!("the export is {file_codec} not h264"));
+    }
+    if file_codec != "vp9" {
+        return Some(format!(
+            "the export is {file_codec}, expected h264 or labelled vp9"
+        ));
+    }
+    if e.codec != "vp9" {
+        return Some(format!(
+            "the file is VP9 but the job result says codec `{}`",
+            e.codec
+        ));
+    }
+    match e.codec_note.as_deref() {
+        Some(n) if n.contains("VP9") && n.contains("H.264") => None,
+        _ => Some("the file is VP9 but the job result gives no codec_note saying why".to_owned()),
+    }
 }
 
 fn export(ctx: &mut Ctx, id: &str, extra: &[&str]) -> R<Exported> {
@@ -123,9 +156,20 @@ fn export(ctx: &mut Ctx, id: &str, extra: &[&str]) -> R<Exported> {
             .and_then(Value::as_u64)
             .unwrap_or(0)
     ));
+    let codec = job
+        .pointer("/result/codec")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_owned();
+    let codec_note = job
+        .pointer("/result/codec_note")
+        .and_then(Value::as_str)
+        .map(str::to_owned);
     Ok(Exported {
         path: path.into(),
         encoder,
+        codec,
+        codec_note,
     })
 }
 
@@ -153,11 +197,12 @@ fn quick(ctx: &mut Ctx) -> R {
         v.color_primaries,
         p.duration
     ));
-    check!(
-        v.codec_name == "h264",
-        "the quick export is {} not h264",
-        v.codec_name
-    );
+    if let Some(problem) = video_codec_problem(sys::PLATFORM, &v.codec_name, &e) {
+        return fail(format!("the quick export: {problem}"));
+    }
+    if let Some(n) = &e.codec_note {
+        ctx.note(format!("codec note: {n}"));
+    }
     check!(
         p.format_name.contains("mp4"),
         "container is {}",
@@ -243,8 +288,14 @@ fn presets(ctx: &mut Ctx) -> R {
         }
         match name {
             "youtube-1080p" => {
-                if v.codec_name != "h264" || v.width > 1920 || v.height > 1080 {
+                if let Some(p) = video_codec_problem(sys::PLATFORM, &v.codec_name, &e) {
+                    problems.push(format!("{name}: {p}"));
+                }
+                if v.width > 1920 || v.height > 1080 {
                     problems.push(format!("{name}: {} {}x{}", v.codec_name, v.width, v.height));
+                }
+                if let Some(n) = &e.codec_note {
+                    ctx.note(format!("{name}: codec note: {n}"));
                 }
                 if let Some(t) = tag_problem(v, &e.encoder) {
                     problems.push(format!("{name}: {t}"));
@@ -346,5 +397,54 @@ fn errors(ctx: &mut Ctx) -> R {
         Ok(())
     } else {
         fail(problems.join("; "))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn exported(encoder: &str, codec: &str, note: Option<&str>) -> Exported {
+        Exported {
+            path: "x.mp4".into(),
+            encoder: encoder.into(),
+            codec: codec.into(),
+            codec_note: note.map(str::to_owned),
+        }
+    }
+
+    /// EXP-1 / EXP-2 under O10: Linux accepts hardware H.264 or labelled VP9, nothing else.
+    #[test]
+    fn linux_accepts_hardware_h264_or_a_labelled_vp9() {
+        let hw = exported("h264_vaapi", "h264", None);
+        assert_eq!(video_codec_problem("linux", "h264", &hw), None);
+        let note = "This export is VP9 video, not H.264: this computer has no VA-API render node.";
+        let vp9 = exported("libvpx-vp9", "vp9", Some(note));
+        assert_eq!(video_codec_problem("linux", "vp9", &vp9), None);
+        // An unlabelled VP9 file is the product being dishonest.
+        let silent = exported("libvpx-vp9", "vp9", None);
+        assert!(video_codec_problem("linux", "vp9", &silent)
+            .unwrap()
+            .contains("no codec_note"));
+        // The result must agree with the file.
+        let liar = exported("libvpx-vp9", "h264", Some(note));
+        assert!(video_codec_problem("linux", "vp9", &liar).is_some());
+        // Software H.264 never ships.
+        let x264 = exported("libx264", "h264", None);
+        assert!(video_codec_problem("linux", "h264", &x264).is_some());
+    }
+
+    #[test]
+    fn macos_and_windows_still_require_h264() {
+        let vp9 = exported(
+            "libvpx-vp9",
+            "vp9",
+            Some("This export is VP9 video, not H.264: x."),
+        );
+        for os in ["macos", "windows"] {
+            assert!(video_codec_problem(os, "vp9", &vp9).is_some(), "{os}");
+            let hw = exported("h264_videotoolbox", "h264", None);
+            assert_eq!(video_codec_problem(os, "h264", &hw), None, "{os}");
+        }
     }
 }
