@@ -5,7 +5,7 @@
 use super::common::{need_ffmpeg, write_clips};
 use crate::check;
 use crate::ctx::{displays, Ctx};
-use crate::model::{fail, skip, Case, Need, Stop, Tier, LINUX, R, WIN, WIN_MAC};
+use crate::model::{fail, skip, Case, Need, Stop, Tier, LINUX, R, WIN, WIN_LINUX, WIN_MAC};
 use crate::proc::exit_text;
 use crate::sys::{self, Key, WinInfo};
 use serde_json::Value;
@@ -90,7 +90,7 @@ pub fn cases() -> Vec<Case> {
             tier: Tier::Standard,
             needs: &[Need::DesktopSession, Need::Screen],
             // A second launch forwards `--capture` on Windows and Linux only; on macOS it just shows the running app.
-            platforms: WIN,
+            platforms: WIN_LINUX,
             timeout_s: 120,
             run: settings_applied,
         },
