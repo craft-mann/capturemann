@@ -619,11 +619,33 @@ pub fn parse_ps(text: &str) -> Vec<(u32, String)> {
         .collect()
 }
 
+/// Parses `ps -A -o pid=,stat=,comm=` and leaves out zombies (state `Z`): a process the case killed
+/// but whose parent has not waited for yet is not running, and must not count as a program left
+/// behind (0.2.9 report: `linux.desktop_stays_up`, `linux.second_launch`, `linux.tray_icon`).
+pub fn parse_ps_stat(text: &str) -> Vec<(u32, String)> {
+    text.lines()
+        .filter_map(|l| {
+            let mut it = l.split_whitespace();
+            let pid = it.next()?;
+            let stat = it.next()?;
+            if stat.starts_with('Z') {
+                return None;
+            }
+            let name = it.collect::<Vec<_>>().join(" ");
+            let name = name.rsplit('/').next()?.to_owned();
+            Some((pid.parse().ok()?, name))
+        })
+        .collect()
+}
+
 pub fn list_processes() -> Vec<(u32, String)> {
-    let Ok(out) = Command::new("ps").args(["-A", "-o", "pid=,comm="]).output() else {
+    let Ok(out) = Command::new("ps")
+        .args(["-A", "-o", "pid=,stat=,comm="])
+        .output()
+    else {
         return Vec::new();
     };
-    parse_ps(&String::from_utf8_lossy(&out.stdout))
+    parse_ps_stat(&String::from_utf8_lossy(&out.stdout))
 }
 
 pub fn new_endpoint(dir: &std::path::Path, n: u32) -> String {
@@ -946,6 +968,22 @@ mod tests {
         let r = Fake::new(&[(key, 0, t)]);
         assert_eq!(tray_items(&r).unwrap().len(), 2);
         assert!(tray_items(&Fake::new(&[])).is_err());
+    }
+
+    /// A killed program that its parent has not reaped yet (state Z) is not "left running".
+    #[test]
+    fn zombies_are_not_running_programs() {
+        let p = parse_ps_stat(
+            "    1 Ss   systemd\n 4242 Z    cm-desktop\n 4300 Sl+  cm-desktop\n 77 R /usr/bin/x\n",
+        );
+        assert_eq!(
+            p,
+            vec![
+                (1, "systemd".to_owned()),
+                (4300, "cm-desktop".to_owned()),
+                (77, "x".to_owned())
+            ]
+        );
     }
 
     #[test]
