@@ -262,21 +262,33 @@ fn start_inner(
     // GPUI's display id is the engine's only where they agree (macOS); on Windows it is the
     // monitor handle and the engine's id is found by the monitor's physical rectangle below.
     let gpui_rects: Option<Vec<(u32, crate::recording::geometry::Rect)>> =
-        crate::platform_window::gpui_monitor_rects_px().map(|v| {
-            v.into_iter()
-                .map(|(id, r)| {
-                    (
-                        id,
-                        crate::recording::geometry::Rect::new(
-                            r[0] as f64,
-                            r[1] as f64,
-                            r[2] as f64,
-                            r[3] as f64,
-                        ),
-                    )
+        crate::platform_window::gpui_monitor_rects_px()
+            .map(|v| {
+                v.into_iter()
+                    .map(|(id, r)| {
+                        (
+                            id,
+                            crate::recording::geometry::Rect::new(
+                                r[0] as f64,
+                                r[1] as f64,
+                                r[2] as f64,
+                                r[3] as f64,
+                            ),
+                        )
+                    })
+                    .collect()
+            })
+            // Linux: GPUI's display ids count from 0 and are not the engine's (Display 0 not found,
+            // 0.3.0 desktop.settings_applied). The displays' own rectangles find the engine's id; a
+            // display that matches none falls back to the engine's primary one.
+            .or_else(|| {
+                crate::platform_window::display_ids_differ_from_engine().then(|| {
+                    crate::ui::recording::displays(cx)
+                        .into_iter()
+                        .filter_map(|(id, r)| Some((u32::try_from(u64::from(id)).ok()?, r)))
+                        .collect()
                 })
-                .collect()
-        });
+            });
     let map_display = (fixed_target.is_none() && mode == CaptureMode::Display)
         .then_some(display_id)
         .flatten()
