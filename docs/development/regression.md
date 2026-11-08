@@ -128,7 +128,7 @@ scripts/testlab/regress.sh linux --tier smoke    --binary <path to cm-regress> -
 scripts/testlab/regress.sh linux --tier standard --allow screen --session wayland
 scripts/testlab/regress.sh linux --tier full     --allow screen --installer capturemann_<v>_amd64.deb      # linux.deb_install
 scripts/testlab/regress.sh linux --tier full     --allow screen --installer capturemann-<v>-linux-x86_64.tar.gz   # linux.tarball_install
-scripts/testlab/regress.sh linux --tier hardware --allow screen,sound,mic --recording    # on request only
+scripts/testlab/regress.sh linux --tier hardware --allow screen,sound,mic    # on request only
 ```
 
 - The wrapper (`scripts/testlab/regress-linux.sh`, sourced by `regress.sh`) takes `~/lab/lab.lock` on the laptop, reads
@@ -154,9 +154,8 @@ scripts/testlab/regress.sh linux --tier hardware --allow screen,sound,mic --reco
   program's libraries resolve (`ldd`, which tests the `Depends:` list) and `capturemann --version`, then `remove` and
   `purge`, and purges again whatever happened. `linux.tarball_install` extracts the tarball, installs with
   `install.sh --prefix <sandbox>` and `HOME` in the sandbox, runs the same checks and `--uninstall`.
-- **Recording** (`rec.*`) runs only with `--recording` (it sets `CM_LINUX_RECORDING=1` for the suite); otherwise each
-  recording case reports SKIP with that reason. The daemon itself is not gated, so the switch only says that the
-  release being tested offers recording.
+- **Recording** (`rec.*`) runs by default since 0.3.0 (recording is on in the Linux build); `--no-recording` sets `CM_LINUX_RECORDING=0`
+  for the suite and each recording case then reports SKIP with that reason. `--recording` is still accepted and does nothing new.
 - Crashes: `systemd-coredump` records are read with `coredumpctl list --since @<time>` by the same hygiene check that reads the Windows event log (empty when
   journald keeps no dumps); `kill -9`/signal exits are still caught by the exit-code checks.
 - Not covered on Linux (manual): tray menu entries as the shell draws them, KDE, NVIDIA/AMD encoders, Wayland window
