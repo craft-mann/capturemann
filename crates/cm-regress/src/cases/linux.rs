@@ -172,7 +172,16 @@ fn session(ctx: &mut Ctx) -> R {
 
 fn monitors(ctx: &mut Ctx) -> R {
     let r = runner();
-    let found = lx::list_monitors(&r).map_err(Stop::Fail)?;
+    let found = match lx::list_monitors(&r) {
+        Ok(f) => f,
+        // A Wayland session started by gdm has no XWayland display for an ssh run: xrandr has nothing to ask.
+        Err(e) if lx::no_x_display(&e) => {
+            return skip(format!(
+                "no X display to ask xrandr in this session ({e}); the product's display list is checked by shot.display"
+            ))
+        }
+        Err(e) => return Err(Stop::Fail(e)),
+    };
     check!(!found.is_empty(), "xrandr lists no monitor");
     for m in &found {
         ctx.note(format!(

@@ -33,4 +33,4 @@ echo "--- tray menu again (after 4 s)"; sleep 4
 b=$(count)
 gdbus call --session --dest "org.kde.StatusNotifierItem-$APP-1" --object-path /MenuBar --method com.canonical.dbusmenu.Event 3 clicked "<0>" 0 2>&1 | head -1
 wait_new "$b"
-grep -v "zbus::proxy" "$W/app.log" | cut -c1-200 | tail -14
+grep -v "zbus::proxy" "$W/app.log" | cut -c1-900 | grep -i overlay | tail -3

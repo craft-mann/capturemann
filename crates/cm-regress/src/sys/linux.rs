@@ -210,6 +210,15 @@ fn mm_strip(s: &str) -> Option<i32> {
     s.split('/').next()?.parse().ok()
 }
 
+/// Whether an X tool's error means "there is no X display to talk to" (a Wayland session without
+/// XWayland for this process), as opposed to a real failure.
+pub fn no_x_display(err: &str) -> bool {
+    let e = err.to_lowercase();
+    e.contains("can't open display")
+        || e.contains("cannot open display")
+        || e.contains("unable to open display")
+}
+
 pub fn list_monitors(r: &dyn CommandRunner) -> Result<Vec<Monitor>, String> {
     let out = r
         .run("xrandr", &["--listmonitors"])
@@ -1001,6 +1010,13 @@ mod tests {
         assert_eq!(c.len(), 1);
         assert!(c[0].contains("cm-desktop"));
         assert!(crashes_since(&Fake::new(&[]), "-1h").is_empty());
+    }
+
+    #[test]
+    fn a_missing_x_display_is_recognised() {
+        assert!(no_x_display("xrandr failed: Can't open display"));
+        assert!(no_x_display("xrandr failed: Can't open display :0"));
+        assert!(!no_x_display("xrandr failed: Screen not found"));
     }
 
     #[test]
