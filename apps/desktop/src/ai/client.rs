@@ -318,7 +318,8 @@ impl AiClient {
             p["model"] = json!(m);
         }
         // Named only when the Re-generate panel chose (true: the recorded microphone, false: the
-        // noise-reduced copy); otherwise the daemon follows the setting `ai.transcribe_raw_mic` (off by default).
+        // noise-reduced copy); otherwise the daemon follows the setting `ai.transcribe_raw_mic`
+        // (on by default: the original microphone).
         if let Some(b) = original_audio {
             p["original_audio"] = json!(b);
         }

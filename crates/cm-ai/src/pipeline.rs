@@ -46,7 +46,9 @@ pub const KEY_LIFT_QUIET_INPUT: &str = "ai.lift_quiet_input";
 pub const KEY_GATE: &str = "ai.hallucination_gate";
 pub const KEY_VAD_OPINION: &str = "ai.vad_opinion";
 pub const KEY_CARRY_TEXT: &str = "ai.carry_previous_text";
-/// Read the microphone as recorded, not the noise-reduced copy, unless the request says otherwise.
+/// Read the microphone as recorded (on, the default since 0.3.1) or the noise-reduced copy (off),
+/// unless the request names its audio. A library with no stored value reads the original
+/// microphone; a stored value is kept as it is (no migration).
 pub const KEY_RAW_MIC: &str = "ai.transcribe_raw_mic";
 /// Words the decoder stacked on one instant are spread over the room around them.
 pub const KEY_REPAIR_WORD_TIMES: &str = "ai.repair_word_times";
@@ -66,8 +68,9 @@ pub struct PipelineSettings {
     /// (`n_max_text_ctx` 0), which also leaves the glossary prompt out of the decode (the glossary's
     /// spellings are still applied to the words afterwards).
     pub carry_previous_text: bool,
-    /// Transcription reads the raw microphone track (the noise-reduced copy only when this is off
-    /// or the request asks for it). A request names its audio explicitly with `original_audio`.
+    /// Transcription reads the original microphone track (the default; the noise-reduced copy
+    /// only when this is off or the request asks for it). A request names its audio explicitly
+    /// with `original_audio`.
     pub transcribe_raw_mic: bool,
     /// Stacks of words with collapsed times are spread (see [`crate::wordtimes`]).
     pub repair_word_times: bool,
@@ -83,7 +86,7 @@ impl Default for PipelineSettings {
             gate: false,
             vad_opinion: false,
             carry_previous_text: true,
-            transcribe_raw_mic: false,
+            transcribe_raw_mic: true,
             repair_word_times: true,
             careful_rereads: false,
         }
@@ -110,7 +113,7 @@ impl PipelineSettings {
         }
     }
 
-    /// Everything as in 0.2.6, quiet-input lift included.
+    /// Everything as in 0.2.6, quiet-input lift included (0.2.6 read the noise-reduced copy).
     pub fn all_off() -> Self {
         PipelineSettings {
             lift_quiet_input: false,
@@ -353,8 +356,16 @@ mod tests {
             PipelineSettings::from_settings(&m),
             PipelineSettings::all_off()
         );
-        // The raw microphone is off (the noise-reduced copy is read) unless its key says on.
-        assert!(!PipelineSettings::from_settings(&none).transcribe_raw_mic);
+        // No stored key: the original microphone is read (no migration is needed for a library
+        // that never stored the key). A stored `false` keeps the noise-reduced copy; a stored
+        // `true` is kept too.
+        assert!(PipelineSettings::from_settings(&none).transcribe_raw_mic);
+        let mut off = serde_json::Map::new();
+        off.insert(KEY_RAW_MIC.into(), serde_json::Value::Bool(false));
+        assert!(!PipelineSettings::from_settings(&off).transcribe_raw_mic);
+        let mut on = serde_json::Map::new();
+        on.insert(KEY_RAW_MIC.into(), serde_json::Value::Bool(true));
+        assert!(PipelineSettings::from_settings(&on).transcribe_raw_mic);
     }
 
     #[test]

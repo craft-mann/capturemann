@@ -1189,31 +1189,31 @@ async fn ai_1_a_held_transcription_goes_on_from_its_checkpoint() {
     );
 }
 
-/// The audio of a run: the noise-reduced copy by default (setting `ai.transcribe_raw_mic` is off),
-/// the recorded microphone when the request or the setting says so; an equal run is reused, one on
-/// the other audio is not, and a wrong type is refused.
+/// The audio of a run: the original microphone by default (setting `ai.transcribe_raw_mic`, on
+/// when nothing is stored), the noise-reduced copy when the request or the setting says so; an
+/// equal run is reused, one on the other audio is not, and a wrong type is refused.
 #[tokio::test]
-async fn ai_1_the_noise_reduced_copy_is_the_default_audio_of_a_run() {
+async fn ai_1_the_original_microphone_is_the_default_audio_of_a_run() {
     let r = rig(FakeAi::new().with_small_installed(), Decision::Approve).await;
     r.ai.set_slow(60, 10); // slow enough that the runs overlap in the queue
     let a = user(&r, "transcribe", json!({})).await.unwrap();
-    assert_eq!(a["original_audio"], json!(false));
-    // The same request again is the same job; the recorded microphone is a different run.
+    assert_eq!(a["original_audio"], json!(true));
+    // The same request again is the same job; the noise-reduced copy is a different run.
     let same = user(&r, "transcribe", json!({})).await.unwrap();
     assert_eq!(same["reused"], json!(true));
     assert_eq!(same["job_id"], a["job_id"]);
-    let other = user(&r, "transcribe", json!({"original_audio": true}))
+    let other = user(&r, "transcribe", json!({"original_audio": false}))
         .await
         .unwrap();
-    assert_eq!(other["original_audio"], json!(true));
+    assert_eq!(other["original_audio"], json!(false));
     assert_eq!(other["reused"], json!(false));
     assert_ne!(other["job_id"], a["job_id"]);
-    let again = user(&r, "transcribe", json!({"original_audio": true}))
+    let again = user(&r, "transcribe", json!({"original_audio": false}))
         .await
         .unwrap();
     assert_eq!(again["job_id"], other["job_id"]);
-    // Named false is the default run.
-    let named = user(&r, "transcribe", json!({"original_audio": false}))
+    // Named true is the default run.
+    let named = user(&r, "transcribe", json!({"original_audio": true}))
         .await
         .unwrap();
     assert_eq!(named["job_id"], a["job_id"]);
@@ -1228,26 +1228,54 @@ async fn ai_1_the_noise_reduced_copy_is_the_default_audio_of_a_run() {
     assert_eq!(asked, vec![false, true], "each run reached the engine once");
 }
 
-/// Turning `ai.transcribe_raw_mic` on makes the recorded microphone the default; a request that
-/// names its audio still wins.
+/// The setting is read when a transcription starts, and there is no migration: a library with no
+/// stored `ai.transcribe_raw_mic` reads the original microphone; a stored `false` (the
+/// noise-reduced copy, the choice before 0.3.1) is kept as it is and becomes the default of the
+/// next run; a request that names its audio still wins over the setting.
 #[tokio::test]
-async fn ai_1_the_raw_microphone_setting_has_an_on_switch() {
+async fn ai_1_the_raw_microphone_setting_has_an_off_switch_and_no_migration() {
     let r = rig(FakeAi::new().with_small_installed(), Decision::Approve).await;
-    user(
-        &r,
-        "set_settings",
-        json!({"values": {"ai.transcribe_raw_mic": true}}),
-    )
-    .await
-    .unwrap();
+    // No key stored (`get_settings` says the key is not set): the original microphone.
+    assert!(
+        user(
+            &r,
+            "get_settings",
+            json!({"keys": ["ai.transcribe_raw_mic"]})
+        )
+        .await
+        .is_err(),
+        "a fresh library stores nothing for the key"
+    );
     let a = user(&r, "transcribe", json!({})).await.unwrap();
     assert_eq!(a["original_audio"], json!(true));
     job_done(&r, a["job_id"].as_str().unwrap()).await;
-    let b = user(&r, "transcribe", json!({"original_audio": false}))
+    // A stored `false` is kept, so the noise-reduced copy is the default of the next run; a
+    // transcript that was already made is not touched (the re-run is a new job, not a rewrite).
+    user(
+        &r,
+        "set_settings",
+        json!({"values": {"ai.transcribe_raw_mic": false}}),
+    )
+    .await
+    .unwrap();
+    let b = user(&r, "transcribe", json!({})).await.unwrap();
+    assert_eq!(b["original_audio"], json!(false));
+    assert_ne!(b["job_id"], a["job_id"]);
+    job_done(&r, b["job_id"].as_str().unwrap()).await;
+    let c = user(&r, "transcribe", json!({"original_audio": true}))
         .await
         .unwrap();
-    assert_eq!(b["original_audio"], json!(false));
-    job_done(&r, b["job_id"].as_str().unwrap()).await;
+    assert_eq!(c["original_audio"], json!(true));
+    job_done(&r, c["job_id"].as_str().unwrap()).await;
+    // The store holds only what was written: `false` stays on disk, nothing else about it.
+    let settings = user(
+        &r,
+        "get_settings",
+        json!({"keys": ["ai.transcribe_raw_mic"]}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(settings["settings"]["ai.transcribe_raw_mic"], json!(false));
 }
 
 fn word(text: &str, a: f64, b: f64, conf: f32) -> cm_ai::transcribe::Word {
