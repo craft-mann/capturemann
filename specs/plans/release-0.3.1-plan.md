@@ -44,8 +44,9 @@ Today a transcript is made from the noise-reduced microphone copy unless the set
 
 Plan: [`mp3-import-plan.md`](mp3-import-plan.md) (the bundled FFmpeg has no MP3 demuxer or decoder; `mp3float` is LGPL, no
 encoder is added). **Decided (maintainer, Nov 9, 2026):** MP3 only, bare AAC stays refused; the capture title comes from the ID3
-title when there is one, else the file name; the MP3 is converted once to the standard WAV master and the Import sheet shows the
-size first.
+title when there is one, else the file name; the MP3 is converted once to the standard WAV master (`mic.wav`) and the Import sheet shows the
+size first (counting the decoded WAV). **The original `original.mp3` is kept next to `mic.wav`** (decided Nov 9, 2026: it is small, and
+the user can delete it themselves if they want the space back).
 
 - Acceptance: an `.mp3` file imports as an audio capture on Windows, macOS and Linux through the app, the CLI and MCP
   (`import`), with the transcript, the audio editor and Export audio working on it; a clear error for a broken file; the
