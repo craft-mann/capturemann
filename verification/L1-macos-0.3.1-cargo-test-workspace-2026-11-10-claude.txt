@@ -1,3 +1,4 @@
+# cargo test --workspace --locked --no-fail-fast on main d62549ec (macOS arm64, Nov 10, 2026): one "test result" line per test binary; total 4626 passed, 0 failed, 50 ignored. fmt, clippy -D warnings, cargo deny, check_target_os, cm-i18n check were also clean. Not a regression report.
 test result: ok. 383 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 76.30s
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.81s
