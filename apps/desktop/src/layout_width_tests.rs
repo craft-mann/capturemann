@@ -435,6 +435,54 @@ fn cases() -> Vec<Case> {
         )
         .text("Dropping frames", || cm_i18n::tr!("Dropping frames")),
     );
+    // The Export popover (EXP-5, board E4): 460 px, 20 px padding and 8 px gaps leave 128 px for a
+    // format card; its text has 12 px padding each side and wraps (the card grows, three lines
+    // are drawn in the board). In a narrow window the three cards wrap onto more rows.
+    v.push(
+        Case::new(
+            "Export popover format card text",
+            "(460 - 2*20 padding - 2*8 gaps) / 3 - 2*12 padding - 2 border",
+            (460. - 40. - 16.) / 3. - 24. - 2.,
+            12.,
+            400,
+            Overflow::Lines(3),
+        )
+        .text("Plays almost everywhere", || {
+            cm_i18n::tr!("Plays almost everywhere")
+        })
+        .text("Smaller, for the web", || {
+            cm_i18n::tr!("Smaller, for the web")
+        })
+        .text("Short loop for docs and PRs", || {
+            cm_i18n::tr!("Short loop for docs and PRs")
+        }),
+    );
+    // The size block's detail line: 460 - 2*20 - 2*16 padding - 40 icon - 14 gap, 12.5 px, wraps.
+    v.push(
+        Case::new(
+            "Export popover size block lines",
+            "460 - 2*20 padding - 2*16 block padding - 2 border - 40 icon - 14 gap",
+            460. - 40. - 32. - 2. - 40. - 14.,
+            12.5,
+            400,
+            Overflow::Lines(3),
+        )
+        .text("detail line", || {
+            cm_i18n::tr!(
+                "{format} \u{00B7} {codec} \u{00B7} {width} \u{00D7} {height}. The real size is shown after export.",
+                format = "MP4",
+                codec = "H.264",
+                width = 2880,
+                height = 1800
+            )
+        })
+        .text("GIF keep-under line", || {
+            cm_i18n::tr!(
+                "GIF size can\u{2019}t be estimated. It will stay under {mb} MB: width, then frame rate, step down to fit.",
+                mb = 10
+            )
+        }),
+    );
     // The audio HUD (VOC-1, board V2): the Marker button is MARKER_W 124 with 12 px padding, a
     // 1 px border, an 18 px icon, two 6 px gaps and the 10.5 px key hint "M" (about 9 px).
     v.push(

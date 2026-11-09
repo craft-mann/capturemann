@@ -44,6 +44,25 @@ pub fn status_of(capture_id: &str) -> Option<ExportStatus> {
     lock(&TRACKER).status_of(capture_id).cloned()
 }
 
+/// The "burn in captions" choice a page passes to `export_video`: `None` when the recording has no
+/// transcript, else the switch's value (it starts at the recording's own setting).
+pub fn captions_choice(app: &Entity<AppModel>, capture_id: &str, cx: &App) -> Option<bool> {
+    let m = app.read(cx);
+    m.transcribe
+        .transcripts
+        .info(capture_id)
+        .map(|i| m.transcribe.export_burn(capture_id, i.options.burn_in))
+}
+
+/// The progress (0 to 1) of the running video export of a recording, `None` when no file of it
+/// exports: the Export button reads "Exporting 42%" then. With several waiting, the one that runs
+/// first by number is shown.
+pub fn running_progress(capture_id: &str) -> Option<f64> {
+    status_of(capture_id)
+        .filter(|s| s.phase == crate::recording::exports::Phase::Running && !s.audio)
+        .map(|s| s.progress)
+}
+
 /// Applies one `export.*` or `job.*` event.
 pub fn on_event(app: &Entity<AppModel>, ev: &Event, cx: &mut App) {
     let effects = {

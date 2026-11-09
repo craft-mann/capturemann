@@ -33,6 +33,7 @@ actions!(
     cm_desktop,
     [
         FocusSearch,
+        OpenExport,
         ShowLibrary,
         ShowSettings,
         ImportMedia,
@@ -54,6 +55,8 @@ pub const SIDEBAR_WIDTH: f32 = scale::SIDEBAR_W;
 pub fn bind_keys(cx: &mut App) {
     cx.bind_keys([
         KeyBinding::new("secondary-f", FocusSearch, None),
+        // EXP-5: opens the Export popover on a recording page or in its editor.
+        KeyBinding::new("secondary-e", OpenExport, None),
         KeyBinding::new("secondary-1", ShowLibrary, None),
         KeyBinding::new("secondary-,", ShowSettings, None),
         KeyBinding::new("secondary-i", ImportMedia, None),
@@ -119,6 +122,8 @@ pub struct Studio {
     published: Entity<PublishedView>,
     /// The import sheet (IMP-5), drawn over the window while it is open.
     import_sheet: Entity<crate::ui::import_sheet::ImportSheetView>,
+    /// The Export popover (EXP-5), drawn over the window while it is open.
+    export_popover: Entity<crate::ui::export_popover::ExportPopoverView>,
     /// The toast cards drawn inside this window (Wayland banners, `AppModel::toasts_in_studio`).
     toast_host: Entity<crate::ui::toast_window::ToastHost>,
     /// The recording controls where a floating HUD would end up in the video (Linux).
@@ -130,6 +135,21 @@ pub struct Studio {
 }
 
 impl Studio {
+    /// Cmd/Ctrl+E: the Export popover for the recording on screen (its page or its editor). An
+    /// audio recording has its own Export audio sheet; nothing happens there.
+    fn open_export(&mut self, cx: &mut Context<Self>) {
+        let route = self.app.read(cx).route.clone();
+        let ctx = match route {
+            Route::Recording(_) => self.details.read(cx).export_context(cx),
+            Route::RecordingEditor(_) => self.rec_editor.read(cx).export_context(cx),
+            _ => None,
+        };
+        if let Some(c) = ctx {
+            let app = self.app.clone();
+            cx.defer(move |cx| crate::ui::export_popover::open(&app, c, cx));
+        }
+    }
+
     pub fn new(app: Entity<AppModel>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let library = cx.new(|cx| LibraryView::new(app.clone(), window, cx));
         let settings = cx.new(|cx| SettingsView::new(app.clone(), cx));
@@ -143,6 +163,8 @@ impl Studio {
         let published = cx.new(|cx| PublishedView::new(app.clone(), cx));
         let import_sheet =
             cx.new(|cx| crate::ui::import_sheet::ImportSheetView::new(app.clone(), cx));
+        let export_popover =
+            cx.new(|cx| crate::ui::export_popover::ExportPopoverView::new(app.clone(), cx));
         let focus = cx.focus_handle();
         let toast_host = cx.new(|cx| crate::ui::toast_window::ToastHost::new(app.clone(), cx));
         let rec_banner =
@@ -177,6 +199,7 @@ impl Studio {
             ai,
             published,
             import_sheet,
+            export_popover,
             toast_host,
             rec_banner,
             shown: None,
@@ -342,6 +365,7 @@ impl Render for Studio {
             .track_focus(&self.focus)
             .on_action(cx.listener(|_, _: &FocusNext, window, cx| window.focus_next(cx)))
             .on_action(cx.listener(|_, _: &FocusPrev, window, cx| window.focus_prev(cx)))
+            .on_action(cx.listener(|this, _: &OpenExport, _, cx| this.open_export(cx)))
             .on_action(move |_: &FocusSearch, window, cx| {
                 // The search field belongs to the library: land on All captures unless a library
                 // page is already showing.
@@ -422,6 +446,9 @@ impl Render for Studio {
             )
             .when(self.app.read(cx).import.sheet.is_some(), |d| {
                 d.child(self.import_sheet.clone())
+            })
+            .when(self.app.read(cx).export_popover.is_some(), |d| {
+                d.child(self.export_popover.clone())
             })
             // Board R9/R20: the app behind a pop-up sheet or dialog is greyed out, and a click on
             // it does nothing (the pop-up is a window of its own, so this is only a tint here).

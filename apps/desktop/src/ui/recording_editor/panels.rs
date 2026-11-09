@@ -131,12 +131,54 @@ impl RecordingEditor {
         })
     }
 
-    pub(super) fn export_click(&self, burn: Option<bool>) -> ClickFn {
-        let (app, id) = (self.app.clone(), self.id.clone().unwrap_or_default());
-        Box::new(move |_, _, cx| {
-            let (app, id) = (app.clone(), id.clone());
-            cx.defer(move |cx| crate::ui::export_ui::request(&app, &id, burn, cx));
+    /// What the Export popover needs from the editor: the recording, its title, the Output
+    /// panel's burn-in choice and In and Out when they are set. `None` for audio (its own
+    /// Export audio sheet) and while the recording loads.
+    pub(crate) fn export_context(
+        &self,
+        cx: &gpui::App,
+    ) -> Option<crate::ui::export_popover::ExportContext> {
+        let Load::Ready(s) = &self.load else {
+            return None;
+        };
+        if s.voice.audio {
+            return None;
+        }
+        let m = &s.model;
+        let range = (m.list.start != cm_core::MediaTime::ZERO || m.list.end != m.basis.end)
+            .then(|| (m.list.start.as_secs_f64(), m.list.end.as_secs_f64()));
+        let title = s.title.clone();
+        let id = self.id.clone()?;
+        Some(crate::ui::export_popover::ExportContext {
+            captions: self.ai.has_transcript().then(|| {
+                self.app
+                    .read(cx)
+                    .transcribe
+                    .export_burn(&id, self.ai.burn_in_default())
+            }),
+            capture_id: id,
+            title,
+            range,
         })
+    }
+
+    /// The Export button of the editor: the same one as the recording page's.
+    pub(super) fn export_button(
+        &self,
+        t: &Theme,
+        id: &'static str,
+        cx: &mut Context<Self>,
+    ) -> gpui::Stateful<gpui::Div> {
+        match self.export_context(cx) {
+            Some(c) => crate::ui::export_popover::export_button(t, id, &self.app, c),
+            None => button_with_icon(
+                t,
+                id,
+                tr_ctx!("button", "Export\u{2026}"),
+                ButtonKind::Secondary,
+                Some("download"),
+            ),
+        }
     }
 
     pub(super) fn publish_click(&self) -> ClickFn {
@@ -405,16 +447,8 @@ impl RecordingEditor {
         title: &str,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
-        // Export MP4 uses the Output panel's burn-in choice (Q1).
-        let burn = self.burn_choice(cx);
-        let export = button_with_icon(
-            t,
-            "re-export-top",
-            tr!("Export MP4"),
-            ButtonKind::Secondary,
-            Some("file-output"),
-        )
-        .on_click(self.export_click(burn));
+        // Export\u{2026} opens the popover with the Output panel's burn-in choice (Q1).
+        let export = self.export_button(t, "re-export-top", cx);
         let publish = button_with_icon(
             t,
             "re-publish-top",
@@ -1149,15 +1183,7 @@ impl RecordingEditor {
             )
             .into_any_element(),
         );
-        let export = button_with_icon(
-            t,
-            "re-export",
-            tr!("Export MP4"),
-            ButtonKind::Secondary,
-            Some("file-output"),
-        )
-        .flex_1()
-        .on_click(self.export_click(burn));
+        let export = self.export_button(t, "re-export", cx).flex_1();
         let publish = button_with_icon(
             t,
             "re-publish",

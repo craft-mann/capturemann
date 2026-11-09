@@ -150,6 +150,8 @@ pub struct AppModel {
     pub library_move: crate::library_move::Phase,
     /// Import media (IMP-5): the sheet, the running imports and the drop overlay.
     pub import: crate::import_flow::ImportUi,
+    /// The Export popover (EXP-5), open or not; nothing of it is kept between exports.
+    pub export_popover: Option<crate::export_flow::Popover>,
     /// The AI page: speech models, downloads the user started, the notice and the switches.
     pub ai: crate::ai::models::ModelsVm,
     /// The built-in text models of the AI page (AI-7): the list by memory tier and its downloads.
@@ -263,6 +265,7 @@ impl AppModel {
             copy_after_capture,
             library_move: crate::library_move::Phase::default(),
             import: Default::default(),
+            export_popover: None,
             ai: crate::ai::models::ModelsVm {
                 notice_dismissed: settings
                     .get(crate::ui::ai::KEY_NOTICE_DISMISSED)

@@ -341,11 +341,11 @@ impl Popover {
     /// GIF, or "known after export" under MP4), which would mislead.
     pub fn begin_estimate(&mut self) -> (u64, Value) {
         self.seq += 1;
-        let keep = match (&self.look, self.format) {
-            (Look::Bound { .. }, Format::Mp4 | Format::Webm) => true,
-            (Look::Unknown | Look::NotAllowed { .. }, Format::Gif) => true,
-            _ => false,
-        };
+        let keep = matches!(
+            (&self.look, self.format),
+            (Look::Bound { .. }, Format::Mp4 | Format::Webm)
+                | (Look::Unknown | Look::NotAllowed { .. }, Format::Gif)
+        );
         if !keep {
             self.look = Look::Pending;
         }

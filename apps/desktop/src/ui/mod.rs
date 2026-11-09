@@ -13,6 +13,7 @@ pub mod csd;
 pub mod delay_pill;
 pub mod editor_doc;
 pub mod editor_view;
+pub mod export_popover;
 pub mod export_ui;
 pub mod import_actions;
 pub mod import_cards;

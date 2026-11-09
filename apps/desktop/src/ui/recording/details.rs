@@ -94,6 +94,26 @@ impl RecordingDetails {
     }
 
     /// Loads the card again, keeping what is shown until the new data arrives.
+    /// What the Export popover needs from this page (Cmd/Ctrl+E): the recording once it is
+    /// loaded, and the page's burn-in choice.
+    pub fn export_context(
+        &self,
+        cx: &gpui::App,
+    ) -> Option<crate::ui::export_popover::ExportContext> {
+        let Load::Ready { details: d, .. } = &self.load else {
+            return None;
+        };
+        if d.audio {
+            return None;
+        }
+        Some(crate::ui::export_popover::ExportContext {
+            capture_id: d.id.clone(),
+            title: d.title.clone(),
+            captions: export_ui::captions_choice(&self.app, &d.id, cx),
+            range: None,
+        })
+    }
+
     fn reload(&mut self, cx: &mut Context<Self>) {
         if self.id.is_some() {
             self.start_load(cx);
@@ -572,6 +592,22 @@ impl Render for RecordingDetails {
                     .on_click(cx.listener(|this, _, _, cx| this.run(files::reveal, cx)))
                     .into_any_element(),
                 );
+                // EXP-5: Export… opens the popover (format, size, estimate); while a file
+                // exports it reads "Exporting 42%" and still opens it, to queue another.
+                actions.push(
+                    crate::ui::export_popover::export_button(
+                        &t,
+                        "rec-export",
+                        &self.app,
+                        crate::ui::export_popover::ExportContext {
+                            capture_id: d.id.clone(),
+                            title: d.title.clone(),
+                            captions: burn_choice,
+                            range: None,
+                        },
+                    )
+                    .into_any_element(),
+                );
                 actions.push({
                     // PUB-2: the publish sheet (YouTube). It offers to export first.
                     let (app, id) = (self.app.clone(), d.id.clone());
@@ -845,31 +881,12 @@ impl Render for RecordingDetails {
                         "file-output",
                         tr_ctx!("exports list", "None yet").into(),
                         None,
-                        tr!("Press Export MP4 to make one file with the screen, camera bubble and audio.")
+                        tr!("Press Export\u{2026} to choose a format and size for one file with the screen, camera bubble and audio.")
                             .into(),
                         t.mist,
                         Vec::new(),
                     ));
                 }
-                let export_button = (!exporting).then(|| {
-                    // "Export again" re-renders with the current edits and captions (the automatic
-                    // export after recording has no transcript yet).
-                    let (app, id) = (self.app.clone(), d.id.clone());
-                    small_button_with_icon(
-                        &t,
-                        "rec-export",
-                        &if has_export {
-                            tr!("Export again")
-                        } else {
-                            tr!("Export MP4")
-                        },
-                        Some("file-output"),
-                    )
-                    .on_click(move |_, _, cx| {
-                        let (app, id) = (app.clone(), id.clone());
-                        cx.defer(move |cx| export_ui::request(&app, &id, burn_choice, cx));
-                    })
-                });
                 // VOC-2: the sound alone, with the same cuts (the Export audio sheet).
                 let has_audio = d
                     .tracks
@@ -944,8 +961,7 @@ impl Render for RecordingDetails {
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .child(tr!("Exports & uploads")),
                             )
-                            .children(audio_button)
-                            .children(export_button),
+                            .children(audio_button),
                     )
                     .children(rows)
                     .children(burn_row);
