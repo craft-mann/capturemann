@@ -9791,8 +9791,9 @@ msgstr "Không thể ước tính dung lượng GIF. Dung lượng thật hiện
 msgid "The real size is shown after export."
 msgstr "Dung lượng thật hiện sau khi xuất."
 
-msgid "{format} · {codec} · {width} × {height}. The real size is shown after export."
-msgstr "{format} · {codec} · {width} × {height}. Dung lượng thật hiện sau khi xuất."
+#, fuzzy
+msgid "{format} · {codec} · {width} × {height}. A quiet screen usually comes out much smaller. The real size is shown after export."
+msgstr "{format} · {codec} · {width} × {height}. Màn hình ít chuyển động thường nhỏ hơn nhiều. Dung lượng thật hiện sau khi xuất."
 
 #, fuzzy
 msgid "{format}, {width} × {height}. The original tracks are untouched."

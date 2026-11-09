@@ -469,7 +469,7 @@ fn cases() -> Vec<Case> {
         )
         .text("detail line", || {
             cm_i18n::tr!(
-                "{format} \u{00B7} {codec} \u{00B7} {width} \u{00D7} {height}. The real size is shown after export.",
+                "{format} \u{00B7} {codec} \u{00B7} {width} \u{00D7} {height}. A quiet screen usually comes out much smaller. The real size is shown after export.",
                 format = "MP4",
                 codec = "H.264",
                 width = 2880,

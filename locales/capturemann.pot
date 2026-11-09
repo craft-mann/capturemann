@@ -6309,7 +6309,7 @@ msgstr ""
 msgid "{format} saved"
 msgstr ""
 
-msgid "{format} · {codec} · {width} × {height}. The real size is shown after export."
+msgid "{format} · {codec} · {width} × {height}. A quiet screen usually comes out much smaller. The real size is shown after export."
 msgstr ""
 
 msgid "{format}, {width} × {height}. The original tracks are untouched."

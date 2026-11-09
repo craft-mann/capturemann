@@ -541,7 +541,7 @@ fn size_block(t: &Theme, p: &Popover) -> AnyElement {
                 small(
                     t,
                     tr!(
-                        "{format} \u{00B7} {codec} \u{00B7} {width} \u{00D7} {height}. The real size is shown after export.",
+                        "{format} \u{00B7} {codec} \u{00B7} {width} \u{00D7} {height}. A quiet screen usually comes out much smaller. The real size is shown after export.",
                         format = p.format.label(),
                         codec = codec.label(),
                         width = width,
