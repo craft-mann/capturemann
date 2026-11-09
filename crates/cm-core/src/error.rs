@@ -316,6 +316,18 @@ impl CmError {
             CmError::JobFailed { job_id, reason, .. } => {
                 Some(json!({ "job_id": job_id, "reason": reason }))
             }
+            // The export refusals (EXP-5) carry their stable id and parameters.
+            CmError::InvalidInput { message } => crate::message::export_refusal(message).map(|p| {
+                let mut d = serde_json::Map::new();
+                d.insert("reason".into(), json!(p.id));
+                for (k, v) in p.params {
+                    d.insert(k.into(), json!(v));
+                }
+                if p.id == "gif_too_long" {
+                    d.insert("hint".into(), json!(crate::message::GIF_TOO_LONG_HINT));
+                }
+                Value::Object(d)
+            }),
             _ => None,
         }
     }

@@ -86,6 +86,12 @@ pub fn error_text(code: Option<ErrorCode>, message: &str) -> String {
     .unwrap_or_else(|| soften(code, message))
 }
 
+/// The hint that goes with the `gif_too_long` refusal (`error.data.hint`, EXP-5), a line of its
+/// own under the refusal.
+pub fn gif_too_long_hint() -> String {
+    tr!("Set In and Out on the timeline to pick a short part, or choose MP4 or WebM.")
+}
+
 /// A message with something in it that a person should not have to read: a job id, an
 /// operating-system error such as `(os error 2)`, or the path of a file. Such a message is
 /// replaced by a sentence that says what to do; the original goes to the log. Any other message
@@ -295,6 +301,25 @@ fn translated(p: &MessageParts) -> Option<String> {
         "recording_area_too_small" => tr!(
             "The recording area is too small: each side must be at least {min} px.",
             min = g("min")
+        ),
+        // EXP-5: the export refusals. The hint of `gif_too_long` is a separate sentence
+        // ([`gif_too_long_hint`]), so the popover shows it as its own line.
+        "gif_too_long" => tr!(
+            "GIF is for clips of {max} s or less. This one is {duration}.",
+            max = g("max"),
+            duration = g("duration")
+        ),
+        "size_larger_than_source" => tr!(
+            "{size} is larger than the recording ({width} × {height}). Choose the recording size or a smaller one.",
+            size = g("size"),
+            width = g("width"),
+            height = g("height")
+        ),
+        "gif_cannot_fit" => tr!(
+            "Can't fit under {max} MB at {width} px and {fps} fps.",
+            max = g("max"),
+            width = g("width"),
+            fps = g("fps")
         ),
         "ffmpeg_not_found" => tr!(
             "FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."

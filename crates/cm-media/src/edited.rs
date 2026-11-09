@@ -428,13 +428,6 @@ fn even_floor(x: u32) -> u32 {
     (x - x % 2).max(2)
 }
 
-/// The refusal for a clip over a preset's length limit (GIF: 30 s).
-fn too_long(max: f64, duration_s: f64) -> CmError {
-    CmError::invalid_input(format!(
-        "Use MP4 or WebM for clips longer than {max} s (this one is {duration_s:.1} s)"
-    ))
-}
-
 /// Checks a preset request against a recording without running FFmpeg: the preset exists, its
 /// options are allowed, it does not enlarge the recording where it must not (EXP-2.AC3) and a
 /// length limit holds (EXP-3). Returns what the export would use. `export_video` calls this
@@ -456,7 +449,7 @@ pub fn check_request(
         let list = with_pauses_cut(&resolved.list, &resolved.gaps);
         let d = secs_of(list.timeline().duration());
         if d > max + 0.5 {
-            return Err(too_long(max, d));
+            return Err(crate::estimate::gif_too_long(max, d));
         }
     }
     Ok(target)
@@ -515,7 +508,7 @@ pub fn export_edited(
     let duration_s = frames as f64 / fps;
     if let Some(t) = target {
         if let Some(max) = t.max_seconds.filter(|m| duration_s > *m + 0.5 / fps) {
-            return Err(too_long(max, duration_s).into());
+            return Err(crate::estimate::gif_too_long(max, duration_s).into());
         }
         if let Some(warn) = t.warn_seconds.filter(|w| duration_s > *w) {
             spec.notes.push(format!(
@@ -965,13 +958,8 @@ pub fn export_edited(
             } else if !fps_ladder.is_empty() {
                 gif_fps = fps_ladder.remove(0);
             } else {
-                return Err(CmError::invalid_input(format!(
-                    "The smallest GIF of this clip is {:.1} MB, over the {:.1} MB limit; \
-                     use WebM or a shorter clip",
-                    got as f64 / 1e6,
-                    max as f64 / 1e6
-                ))
-                .into());
+                let _ = got;
+                return Err(crate::estimate::gif_cannot_fit(max, width, gif_fps).into());
             }
             let _ = fs::remove_file(&part);
         }

@@ -1215,6 +1215,7 @@ impl Daemon {
             Action::GetDiagnostics => inner.get_diagnostics().await,
             Action::GetCursorTrack(p) => inner.get_cursor_track(p).await,
             Action::GetPlatformRules(p) => inner.get_platform_rules(p).await,
+            Action::EstimateExport(p) => inner.estimate_export(p).await,
             Action::TestTextModel => inner.test_text_model().await,
             Action::Upload(p) => inner.upload(actor, p).await,
             Action::CaptionOptions(p) => inner.set_caption_options(actor, p).await,

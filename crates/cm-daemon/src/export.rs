@@ -53,6 +53,8 @@ use cm_media::{
 use serde_json::{json, Map, Value};
 use time::format_description::well_known::Rfc3339;
 
+use cm_media::estimate::SizeChoice;
+
 use crate::action::ExportVideoParams;
 use crate::daemon::{blocking, lock_library, Daemon, Inner};
 use crate::error::DaemonError;
@@ -113,6 +115,8 @@ pub struct ExportOpts {
     pub width: Option<u32>,
     pub fps: Option<f64>,
     pub max_mb: Option<f64>,
+    /// EXP-5: the frame of an MP4 or WebM (the recording size or a step).
+    pub size: Option<SizeChoice>,
     pub captions: Option<CaptionChoice>,
 }
 
@@ -122,6 +126,7 @@ impl ExportOpts {
             width: p.width,
             fps: p.fps,
             max_mb: p.max_mb,
+            size: p.size,
             captions: p.captions,
         }
     }
@@ -134,6 +139,7 @@ impl ExportOpts {
                 .and_then(|w| u32::try_from(w).ok()),
             fps: inputs.get("fps").and_then(Value::as_f64),
             max_mb: inputs.get("max_mb").and_then(Value::as_f64),
+            size: inputs.get("size").and_then(SizeChoice::from_json),
             captions: inputs
                 .get("captions")
                 .and_then(Value::as_str)
@@ -154,7 +160,19 @@ impl ExportOpts {
             width: self.width,
             fps: self.fps,
             max_mb: self.max_mb,
+            size: self.size,
         }
+    }
+}
+
+/// The preset an export really runs: an MP4 of a chosen size (EXP-5) is the `source` preset at
+/// that frame; everything else runs as named. The job, the result and the manifest keep the name
+/// the caller used for the job and the preset of the table for the file.
+pub(crate) fn effective_preset<'a>(preset: &'a str, opts: &ExportOpts) -> &'a str {
+    if preset == PRESET_QUICK && matches!(opts.size, Some(SizeChoice::Height(_))) {
+        "source"
+    } else {
+        preset
     }
 }
 
@@ -163,7 +181,11 @@ impl ExportOpts {
 /// `CAPTUREMANN_PLATFORM_RULES`, EXP-2.AC4).
 pub fn check_preset(preset: &str, opts: &ExportOpts) -> Result<(), CmError> {
     if preset == PRESET_QUICK {
-        if opts.media_only() != ExportOpts::default() {
+        let only_size = ExportOpts {
+            size: opts.size,
+            ..ExportOpts::default()
+        };
+        if opts.media_only() != ExportOpts::default() && opts.media_only() != only_size {
             let key = if opts.width.is_some() {
                 "width"
             } else if opts.fps.is_some() {
@@ -201,6 +223,7 @@ pub(crate) fn check_preset_for_recording(
     preset: &str,
     opts: ExportOpts,
 ) -> Result<(), CmError> {
+    let preset = effective_preset(preset, &opts);
     if preset == PRESET_QUICK {
         return Ok(());
     }
@@ -232,6 +255,37 @@ pub(crate) fn enqueue_export(
     by: &str,
     auto: bool,
 ) -> Result<(Job, bool), CmError> {
+    enqueue_export_with(
+        queue,
+        events,
+        capture_id,
+        title,
+        preset,
+        loudness_lufs,
+        opts,
+        by,
+        auto,
+        None,
+    )
+}
+
+/// [`enqueue_export`] that also stores the size estimate shown to the user (`min_bytes`,
+/// `max_bytes`) in the job's inputs, so the finished job can say what was estimated (EXP-5).
+/// Exports that differ in any option (format, size, width, `max_mb`, captions, loudness) are
+/// different jobs; only an equal request is answered with the job already queued.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn enqueue_export_with(
+    queue: &JobQueue,
+    events: &EventBus,
+    capture_id: &str,
+    title: &str,
+    preset: &str,
+    loudness_lufs: Option<f64>,
+    opts: ExportOpts,
+    by: &str,
+    auto: bool,
+    estimate: Option<(u64, u64)>,
+) -> Result<(Job, bool), CmError> {
     // R2-14: list-then-enqueue is one step per process, so two callers (an `export_video`
     // and the auto-export, or two agents) cannot both see "none" and create two jobs for the
     // same capture and preset.
@@ -256,6 +310,8 @@ pub(crate) fn enqueue_export(
         JOB_EXPORT,
         json!({ "capture_id": capture_id, "preset": preset, "loudness_lufs": loudness_lufs,
                 "width": opts.width, "fps": opts.fps, "max_mb": opts.max_mb,
+                "size": opts.size.map(SizeChoice::to_json),
+                "estimate": estimate.map(|(a, b)| json!({ "min_bytes": a, "max_bytes": b })),
                 "captions": opts.captions.map(CaptionChoice::as_str),
                 "by": by, "auto": auto }),
     ))?;
@@ -346,7 +402,7 @@ impl ExportHandler {
 }
 
 /// The recording's index row, bundle folder and manifest as JSON.
-fn load_recording(
+pub(crate) fn load_recording(
     library: &Arc<Mutex<Library>>,
     capture_id: &str,
 ) -> Result<(CaptureRecord, std::path::PathBuf, Value), CmError> {
@@ -458,7 +514,7 @@ impl JobHandler for ExportHandler {
         };
         let reporter = ctx.reporter.clone();
         let run_flag = flag.clone();
-        let preset_id = preset.clone();
+        let preset_id = effective_preset(&preset, &opts).to_owned();
         let joined = tokio::task::spawn_blocking(move || {
             let mut last = -1.0;
             // The table is read when the export starts, so an updated rules file applies to it.
@@ -526,6 +582,12 @@ impl JobHandler for ExportHandler {
             // O10: the codec the file really has, and why when it is not hardware H.264.
             "codec": outcome.settings.pointer("/video/codec").cloned().unwrap_or(Value::Null),
             "codec_note": outcome.settings.pointer("/video/note").cloned().unwrap_or(Value::Null),
+            "width": outcome.settings.pointer("/size/0").cloned().unwrap_or(Value::Null),
+            "height": outcome.settings.pointer("/size/1").cloned().unwrap_or(Value::Null),
+            "size": opts.size.map(SizeChoice::to_json),
+            // What the user was told before the export (null for GIF and for a request that
+            // was not estimated), next to the real `size_bytes`.
+            "estimate": inputs.get("estimate").cloned().unwrap_or(Value::Null),
             "captions": captions_result,
             "has_camera": has_camera,
             "has_audio": has_audio,
@@ -624,10 +686,12 @@ impl Inner {
         .await?;
         let (events, by) = (self.events.clone(), actor.to_string());
         let (capture_id, preset, loudness_lufs) = (p.capture_id, p.preset, p.loudness_lufs);
+        // EXP-5: the estimate of what was asked for, for the result and the finished job.
+        let estimate = self.export_estimate(&capture_id, &preset, opts).await;
         let q = queue.clone();
         let store = self.destinations.clone();
         let (job, reused) = blocking(move || {
-            let (job, reused) = enqueue_export(
+            let (job, reused) = enqueue_export_with(
                 &q,
                 &events,
                 &capture_id,
@@ -637,6 +701,7 @@ impl Inner {
                 opts,
                 &by,
                 false,
+                estimate,
             )?;
             // STO-3: destinations set to "after export" get an upload that waits for this job.
             if let Some(store) = &store {
@@ -662,9 +727,50 @@ impl Inner {
             "preset": job.inputs.get("preset"),
             "loudness_lufs": job.inputs.get("loudness_lufs"),
             "captions": job.inputs.get("captions"),
+            "size": job.inputs.get("size"),
+            // `{ min_bytes, max_bytes }`, or null for GIF (known after the export).
+            "estimate": job.inputs.get("estimate").cloned().unwrap_or(Value::Null),
             "state": job.state.as_str(),
             "reused": reused,
         }))
+    }
+
+    /// The estimate to show for an `export_video` request: `None` for a GIF, a preset with its
+    /// own frame and bitrate (the platform presets) and when it cannot be worked out (no FFmpeg
+    /// on Linux). Never fails the export.
+    async fn export_estimate(
+        &self,
+        capture_id: &str,
+        preset: &str,
+        opts: ExportOpts,
+    ) -> Option<(u64, u64)> {
+        let format = match preset {
+            PRESET_QUICK | "source" => cm_media::estimate::Format::Mp4,
+            "webm" => cm_media::estimate::Format::WebM,
+            _ => return None,
+        };
+        let (library, id) = (self.library.clone(), capture_id.to_owned());
+        blocking(move || {
+            let (_, _, manifest) = load_recording(&library, &id)?;
+            let codec = if format == cm_media::estimate::Format::Mp4 {
+                crate::estimate_ops::mp4_codec_here()?
+            } else {
+                cm_media::estimate::Codec::H264
+            };
+            let choice = cm_media::estimate::Choice {
+                format,
+                size: opts.size,
+                width: opts.width,
+                max_mb: opts.max_mb,
+            };
+            match cm_media::estimate::estimate(&manifest, &choice, codec)? {
+                cm_media::estimate::Estimated::Range(e) => Ok(Some((e.min_bytes, e.max_bytes))),
+                cm_media::estimate::Estimated::KnownAfterExport { .. } => Ok(None),
+            }
+        })
+        .await
+        .ok()
+        .flatten()
     }
 }
 

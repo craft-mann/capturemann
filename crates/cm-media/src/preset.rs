@@ -324,6 +324,9 @@ pub struct ExportOptions {
     pub fps: Option<f64>,
     /// "Fit under N MB".
     pub max_mb: Option<f64>,
+    /// EXP-5: the size of an MP4 (presets with the recording's own size, `source`) or a WebM:
+    /// the recording size or a step. Not for GIF (it has `width`), not for the platform presets.
+    pub size: Option<crate::estimate::SizeChoice>,
 }
 
 /// How the recording fills a frame of another aspect.
@@ -374,7 +377,7 @@ impl Target {
     }
 }
 
-fn even_up(x: f64) -> u32 {
+pub(crate) fn even_up(x: f64) -> u32 {
     let n = x.round().max(2.0) as u32;
     n + n % 2
 }
@@ -426,6 +429,25 @@ pub fn resolve(
     })?;
     let mut notes = Vec::new();
     let has_opts = opts.width.is_some() || opts.fps.is_some() || opts.max_mb.is_some();
+    if opts.size.is_some() {
+        let ok = match def.kind {
+            Kind::Mp4 => def.frame == FrameDef::Master,
+            Kind::WebM => opts.width.is_none(),
+            Kind::Gif => false,
+        };
+        if !ok {
+            return Err(CmError::invalid_field(
+                "size",
+                match def.kind {
+                    Kind::Gif => "GIF is sized by `width` (480, 640, 800 or 1024), not by `size`".to_owned(),
+                    Kind::WebM => "and `width` cannot be combined; choose the frame with `size`".to_owned(),
+                    Kind::Mp4 => format!(
+                        "applies to the MP4 at the recording's size and to WebM only; `{id}` has a fixed frame"
+                    ),
+                },
+            ));
+        }
+    }
     if def.kind == Kind::Mp4 && has_opts {
         let key = if opts.width.is_some() {
             "width"
@@ -493,6 +515,9 @@ pub fn resolve(
                     }
                     t.frame = Some((w, h));
                 }
+            }
+            if let Some(size @ crate::estimate::SizeChoice::Height(_)) = opts.size {
+                t.frame = Some(crate::estimate::frame_for(size, master)?);
             }
             t.fps = Some(fps);
             let mbps = if fps > 31.0 {
@@ -562,7 +587,10 @@ pub fn resolve(
             }
             // A recording narrower than the asked width is not enlarged.
             let width = width.min(even_up(f64::from(master.0)));
-            t.frame = Some(sized_by_width(width, master));
+            t.frame = Some(match opts.size {
+                Some(size) => crate::estimate::frame_for(size, master)?,
+                None => sized_by_width(width, master),
+            });
             t.fps = Some(fps);
         }
     }
@@ -571,7 +599,7 @@ pub fn resolve(
 }
 
 /// A frame `width` wide with the recording's aspect (even sizes).
-fn sized_by_width(width: u32, master: (u32, u32)) -> (u32, u32) {
+pub(crate) fn sized_by_width(width: u32, master: (u32, u32)) -> (u32, u32) {
     let h = f64::from(width) * f64::from(master.1) / f64::from(master.0.max(1));
     (width, even_up(h))
 }
@@ -835,6 +863,7 @@ mod tests {
             width: Some(1024),
             fps: Some(24.0),
             max_mb: Some(10.0),
+            ..ExportOptions::default()
         };
         let t = resolve(&presets(), "gif", (3024, 1964), 60.0, &o).unwrap();
         assert_eq!(t.frame, Some((1024, 666)));
@@ -988,5 +1017,63 @@ mod tests {
         let b = fit_bitrate(10_000_000, 10.0, 96_000);
         assert_eq!(b, ((8_000_000.0 * 0.94) - 96_000.0) as u64);
         assert_eq!(fit_bitrate(1_000, 600.0, 96_000), 20_000);
+    }
+
+    /// EXP-5.AC2: `size` sets the frame of the MP4 at the recording's size and of a WebM; a step
+    /// equal to the recording merges into it; GIF, the platform presets and `width` with `size`
+    /// refuse it.
+    #[test]
+    fn exp5_ac2_size_sets_the_frame() {
+        use crate::estimate::SizeChoice;
+        let with = |id: &str, master: (u32, u32), o: ExportOptions| {
+            resolve(&presets(), id, master, 30.0, &o)
+        };
+        let size = |s| ExportOptions {
+            size: Some(s),
+            ..ExportOptions::default()
+        };
+        let t = with("source", (2880, 1800), size(SizeChoice::Height(720))).unwrap();
+        assert_eq!(t.frame, Some((1152, 720)));
+        let t = with("source", (2880, 1800), size(SizeChoice::Source)).unwrap();
+        assert_eq!(t.frame, None);
+        let t = with("source", (1920, 1080), size(SizeChoice::Height(1080))).unwrap();
+        assert_eq!(t.frame, Some((1920, 1080)));
+        // WebM: the recording size is the recording's, not the preset's 1280.
+        let t = with("webm", (2880, 1800), size(SizeChoice::Source)).unwrap();
+        assert_eq!(t.frame, Some((2880, 1800)));
+        let t = with("webm", (2880, 1800), size(SizeChoice::Height(480))).unwrap();
+        assert_eq!(t.frame, Some((768, 480)));
+        // Refused: above the recording, GIF, a platform preset, width with size.
+        let e = with("webm", (1920, 1080), size(SizeChoice::Height(1440))).unwrap_err();
+        assert!(e
+            .to_string()
+            .starts_with("1440p is larger than the recording"));
+        for (id, o) in [
+            ("gif", size(SizeChoice::Height(720))),
+            ("youtube-1080p", size(SizeChoice::Height(720))),
+            (
+                "webm",
+                ExportOptions {
+                    size: Some(SizeChoice::Height(720)),
+                    width: Some(640),
+                    ..ExportOptions::default()
+                },
+            ),
+        ] {
+            let e = with(id, (2880, 1800), o).unwrap_err();
+            assert_eq!(e.code(), cm_core::ErrorCode::InvalidInput, "{id}");
+            assert!(e.to_string().starts_with("size:"), "{e}");
+        }
+        // Existing behaviour: WebM width alone still works.
+        let t = with(
+            "webm",
+            (2880, 1800),
+            ExportOptions {
+                width: Some(640),
+                ..ExportOptions::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(t.frame, Some((640, 400)));
     }
 }

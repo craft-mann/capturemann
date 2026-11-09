@@ -106,7 +106,7 @@ pub(super) fn parse_export_preset(f: &Fields<'_>) -> Result<String, CmError> {
 /// `width`, `fps` and `max_mb` of an `export_video` (EXP-3). Which presets take them is checked
 /// where the preset is resolved.
 #[allow(clippy::type_complexity)]
-pub(super) fn parse_export_options(
+pub(crate) fn parse_export_options(
     f: &Fields<'_>,
 ) -> Result<(Option<u32>, Option<f64>, Option<f64>), CmError> {
     let number = |key: &str| -> Result<Option<f64>, CmError> {
@@ -134,6 +134,47 @@ pub(super) fn parse_export_options(
         return Err(CmError::invalid_field("fps", "must be from 1 to 60"));
     }
     Ok((width, fps, number("max_mb")?))
+}
+
+/// `size` of an `export_video` or `estimate_export` (EXP-5): `source`, or a step as `720` or
+/// `"720p"`.
+pub(crate) fn parse_export_size(
+    f: &Fields<'_>,
+) -> Result<Option<cm_media::estimate::SizeChoice>, CmError> {
+    use cm_media::estimate::SizeChoice;
+    match f.obj.get("size") {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::String(s)) => SizeChoice::parse(s).map(Some),
+        Some(v @ Value::Number(_)) => SizeChoice::from_json(v).map(Some).ok_or_else(|| {
+            CmError::invalid_field("size", "must be `source`, 1440, 1080, 720 or 480")
+        }),
+        Some(_) => Err(CmError::invalid_field(
+            "size",
+            "must be `source`, 1440, 1080, 720 or 480",
+        )),
+    }
+}
+
+/// The combinations of `size` and `width` that need no recording to refuse: GIF is sized by
+/// `width` only, and `width` cannot be combined with `size`.
+pub(crate) fn check_size_options(
+    preset: &str,
+    size: Option<cm_media::estimate::SizeChoice>,
+    width: Option<u32>,
+) -> Result<(), CmError> {
+    if size.is_some() && preset == "gif" {
+        return Err(CmError::invalid_field(
+            "size",
+            "GIF is sized by `width` (480, 640, 800 or 1024), not by `size`",
+        ));
+    }
+    if size.is_some() && width.is_some() {
+        return Err(CmError::invalid_field(
+            "width",
+            "is for GIF only; choose the frame of an MP4 or WebM with `size`",
+        ));
+    }
+    Ok(())
 }
 
 pub(super) fn recording_id(f: &Fields<'_>) -> Result<Option<String>, CmError> {

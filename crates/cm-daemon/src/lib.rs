@@ -48,6 +48,7 @@ pub mod diagnostics;
 pub mod edit_ops;
 pub mod engines;
 pub mod error;
+pub mod estimate_ops;
 pub mod events;
 pub mod export;
 pub mod export_audio;

@@ -597,6 +597,9 @@ msgstr ""
 msgid "Can look but not change anything."
 msgstr ""
 
+msgid "Can't fit under {max} MB at {width} px and {fps} fps."
+msgstr ""
+
 msgid "Cancel"
 msgstr ""
 
@@ -1684,6 +1687,9 @@ msgstr ""
 msgid "Enter the client’s name."
 msgstr ""
 
+msgid "Estimate the size of an export"
+msgstr ""
+
 msgid "Even out the loudness"
 msgstr ""
 
@@ -1932,6 +1938,9 @@ msgid "Front to back, most recently used first"
 msgstr ""
 
 msgid "Fully offline, no text model needed. It uses Large v3 or Medium; Large v3 Turbo can’t translate."
+msgstr ""
+
+msgid "GIF is for clips of {max} s or less. This one is {duration}."
 msgstr ""
 
 msgid "Getting the picture…"
@@ -4214,6 +4223,9 @@ msgid "Sends"
 msgstr ""
 
 msgid "Separated by commas."
+msgstr ""
+
+msgid "Set In and Out on the timeline to pick a short part, or choose MP4 or WebM."
 msgstr ""
 
 msgid "Set In point"
@@ -6615,6 +6627,9 @@ msgid "{shape} shape"
 msgstr ""
 
 msgid "{shown} of {total} windows"
+msgstr ""
+
+msgid "{size} is larger than the recording ({width} × {height}). Choose the recording size or a smaller one."
 msgstr ""
 
 msgid "{size} · External"

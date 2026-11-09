@@ -162,7 +162,7 @@ impl Action {
             "export_video" => {
                 // The spec's full input (EXP-1..3). Only `capture_id` and the preset `quick` work
                 // for now; the rest is refused by name instead of being silently ignored.
-                const LATER: &[&str] = &["size", "codec", "quality", "out_dir"];
+                const LATER: &[&str] = &["codec", "quality", "out_dir"];
                 let mut allowed = vec![
                     "capture_id",
                     "preset",
@@ -170,6 +170,7 @@ impl Action {
                     "width",
                     "fps",
                     "max_mb",
+                    "size",
                     "loudness_lufs",
                     "captions",
                     "request_id",
@@ -182,11 +183,13 @@ impl Action {
                 {
                     return Err(CmError::invalid_field(
                         k,
-                        "is not available yet: export_video takes a `preset` (or `format` gif or webm with `width`, `fps`, `max_mb`)",
+                        "is not available yet: export_video takes a `preset` (or `format` mp4, gif or webm with `size`, `width`, `fps`, `max_mb`)",
                     ));
                 }
                 let preset = parse_export_preset(&f)?;
                 let (width, fps, max_mb) = parse_export_options(&f)?;
+                let size = parse_export_size(&f)?;
+                check_size_options(&preset, size, width)?;
                 let loudness_lufs = match f.obj.get("loudness_lufs") {
                     None | Some(Value::Null) => None,
                     Some(v) => {
@@ -221,10 +224,12 @@ impl Action {
                     width,
                     fps,
                     max_mb,
+                    size,
                     captions,
                     request_id: f.request_id()?,
                 })
             }
+            crate::estimate_ops::METHOD => return crate::estimate_ops::parse(&f),
             "annotate" => {
                 f.only(&[
                     "capture_id",

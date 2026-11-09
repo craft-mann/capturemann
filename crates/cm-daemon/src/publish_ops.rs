@@ -428,6 +428,7 @@ impl Inner {
                             width: None,
                             fps: None,
                             max_mb: None,
+                            size: None,
                             captions: None,
                             request_id: None,
                         },
