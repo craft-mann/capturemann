@@ -67,19 +67,24 @@ Today the app has no export dialog: Export starts one export at the recording's 
   progress and still opens the popover, so a second export can be queued.
 - **Resolution:** the recording's size plus fixed steps (1440p, 1080p, 720p, 480p), never above the source, no custom sizes.
   **Format:** MP4, WebM and GIF (audio export stays in the audio editor).
-- An **estimated file size** before pressing Export, updating as the choice changes, shown as a range ("About 200–290 MB") and
+- An **estimated file size** before pressing Export, updating as the choice changes, shown as an upper bound ("Up to 290 MB") and
   labelled an estimate; after the export the real size is shown. On Linux without a hardware H.264 encoder the MP4 choice is
   VP9 and the popover says so.
 - **No presets in the popover and none added in 0.3.1** (decided Nov 9, 2026); the engine's existing presets stay available
   to the CLI and MCP unchanged.
 
-**Estimate**
-- A formula only (duration after cuts, resolution, a per-codec per-size bit-rate table, audio included), no probe. Range =
-  estimate −15 % to +20 %, 2 significant figures.
-- **Pass line (decided Nov 9, 2026): the shown range contains the real size on every sample.** One miss fails the test. A stored
-  test compares estimate and real size on three recordings for each format that has an estimate (MP4, WebM); the three
-  recordings must span a mostly static screen, a typical screen recording and a high-motion one, so the table is shown to hold
-  across content. If it fails, fix the rule or bring the probe back as a new decision; the label is not the fix.
+**Estimate (changed Nov 9, 2026: an upper bound, not a range)**
+- A formula only (duration after cuts, resolution, a per-codec per-size bit-rate table, audio included), no probe, shown as an
+  **upper bound**: "Up to 290 MB" (2 significant figures, rounded up), "Under 5 MB" below 5 MB, labelled an estimate. The first
+  range version (estimate -15 % to +20 %) failed the stored test: 12 of 18 samples fell outside it, because hardware H.264
+  and VP9 size follows the picture (0.56 MB static against 40.6 MB motion for the same 20 s of WebM); see
+  `verification/benchmarks/export-estimate-2026-11-09.md`.
+- To make the bound true, WebM gets a bit-rate cap (constrained quality) and the H.264 bound includes any measured overshoot.
+- **Pass line: the real size is at or below the shown bound on every sample.** One miss fails the test. A stored test
+  (`estimate_vs_real.rs`) exports three recordings for each format that has an estimate (MP4, WebM): a mostly static screen, a
+  typical screen recording and a high-motion one, at the recording size, 720p and 480p, and also stores how far under the bound
+  each lands. A static screen lands far under the bound: that is the accepted trade-off. The samples are synthetic; a real
+  screen recording of each kind is a later check. If a sample is above the bound, fix the cap or the table, never the label.
 
 **GIF (decided Nov 9, 2026)**
 - GIF stays in the chooser (the engine, CLI and MCP options already exist; the dialog gets it now) and has **no estimate**: the
@@ -96,7 +101,8 @@ Today the app has no export dialog: Export starts one export at the recording's 
 - MCP: `export_video` takes `format`, `size`, `width` (GIF only) and `max_mb`, and its result carries the estimate; a new Free
   read-only tool `estimate_export` takes the same fields (added to the tool table in `specs/02-agent-interface.md`).
 - Rule for `--size` and the existing `--width`: `--size` sets the frame for MP4 and WebM, `--width` stays GIF-only, and
-  `--width` with MP4 or WebM is `invalid_input`.
+  `--width` with `--size` or with MP4 is `invalid_input`; `--width` alone still works for WebM as before (kept so existing scripts
+  do not break; maintainer, Nov 9, 2026, provided a real end-to-end test shows it works).
 - The refusals have one text in the app, CLI and MCP (`gif_too_long`, `size_larger_than_source`, `gif_cannot_fit`); on Linux
   without H.264 the estimate reports `codec: "vp9"`.
 
