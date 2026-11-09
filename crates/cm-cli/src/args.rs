@@ -462,11 +462,12 @@ pub struct TranscribeArgs {
     /// Installed model id (default: the active one).
     #[arg(long, value_name = "MODEL")]
     pub model: Option<String>,
-    /// Read the microphone as it was recorded (setting `ai.transcribe_raw_mic` makes it the
-    /// default; it makes no difference to a recording made without noise reduction).
+    /// Read the original microphone, as it was recorded (the default; setting
+    /// `ai.transcribe_raw_mic` off makes the noise-reduced copy the default instead). It makes no
+    /// difference to a recording made without noise reduction.
     #[arg(long, conflicts_with = "denoised_audio")]
     pub original_audio: bool,
-    /// Read the noise-reduced copy instead of the microphone as recorded.
+    /// Read the noise-reduced copy a recording stores instead of the original microphone.
     #[arg(long, conflicts_with = "original_audio")]
     pub denoised_audio: bool,
     /// Wait for the transcription to finish (exit 6 if it fails).
@@ -949,7 +950,7 @@ pub enum LibraryCmd {
 
 #[derive(Debug, Args)]
 pub struct ImportArgs {
-    /// The files to import (video: MP4, MOV, M4V, MKV with H.264 or HEVC; audio: M4A, WAV).
+    /// The files to import (video: MP4, MOV, M4V, MKV with H.264 or HEVC; audio: M4A, WAV, MP3).
     /// Relative paths and `~` are resolved here. Folders are refused.
     #[arg(required = true, num_args = 1.., value_name = "FILE")]
     pub files: Vec<String>,

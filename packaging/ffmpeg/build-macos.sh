@@ -81,20 +81,20 @@ SOURCE_REPO="${CM_SOURCE_REPO:-https://github.com/craft-mann/capturemann}"
 # (The buffer, abuffer, buffersink, abuffersink, fifo and afifo filters are always built into
 # libavfilter and are not selectable components.)
 ENCODERS="h264_videotoolbox,hevc_videotoolbox,aac,libvpx_vp9,libopus,gif,ffv1,mjpeg,png,pcm_f32le,pcm_s16le,pcm_s24le,rawvideo,wrapped_avframe"
-DECODERS="h264,hevc,aac,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_u8,png,mjpeg,ffv1,gif,rawvideo"
+DECODERS="h264,hevc,aac,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_u8,png,mjpeg,ffv1,gif,rawvideo,mp3float"
 HWACCELS="h264_videotoolbox,hevc_videotoolbox"
 MUXERS="mp4,mov,webm,matroska,gif,image2,rawvideo,wav,pcm_f32le,pcm_s16le,null"
-DEMUXERS="mov,matroska,wav,image2,rawvideo,gif,pcm_f32le,pcm_s16le"
-PARSERS="h264,hevc,aac,mjpeg,png,opus,vp9,ffv1,gif"
+DEMUXERS="mov,matroska,wav,image2,rawvideo,gif,pcm_f32le,pcm_s16le,mp3"
+PARSERS="h264,hevc,aac,mjpeg,png,opus,vp9,ffv1,gif,mpegaudio"
 BSFS="aac_adtstoasc,h264_mp4toannexb,hevc_mp4toannexb,extract_extradata,null,vp9_superframe,vp9_superframe_split"
 PROTOCOLS="file,pipe"
 FILTERS="alphamerge,aformat,aresample,atempo,atrim,adelay,amix,anull,apad,alimiter,asetpts,asplit,crop,format,fps,hflip,null,overlay,paletteuse,palettegen,scale,setpts,setsar,split,tpad,trim,volume,pan,loudnorm,ebur128,concat,anullsrc,anullsink"
 
 # Encoders, decoders and filters the self-check requires in the finished binary.
 REQUIRED_ENCODERS="h264_videotoolbox aac libvpx-vp9 libopus gif ffv1 mjpeg pcm_f32le pcm_s24le rawvideo"
-REQUIRED_DECODERS="h264 hevc aac pcm_s16le pcm_f32le png mjpeg ffv1 rawvideo"
+REQUIRED_DECODERS="h264 hevc aac pcm_s16le pcm_f32le png mjpeg ffv1 rawvideo mp3float"
 REQUIRED_MUXERS="mp4 webm matroska gif image2 rawvideo wav f32le null"
-REQUIRED_DEMUXERS="mov matroska wav image2 rawvideo f32le gif"
+REQUIRED_DEMUXERS="mov matroska wav image2 rawvideo f32le gif mp3"
 REQUIRED_FILTERS="alphamerge aformat aresample atempo atrim adelay amix apad alimiter asetpts crop format fps hflip overlay paletteuse palettegen scale setpts setsar split tpad trim loudnorm ebur128 concat anullsrc anullsink"
 
 [ "$(uname -s)" = "Darwin" ] || die "this script only runs on macOS"

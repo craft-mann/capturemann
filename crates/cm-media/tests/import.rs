@@ -237,18 +237,11 @@ fn audio_files_are_audio_and_cover_art_is_not_video() {
 fn recognised_but_unsupported_formats_are_named_never_a_crash() {
     let Some((m, tools)) = maker() else { return };
     let tone = ["-f", "lavfi", "-i", "sine=frequency=440:duration=1"];
-    let mut cases: Vec<(&str, Vec<&str>)> = vec![
+    let cases: Vec<(&str, Vec<&str>)> = vec![
         ("a.flac", [&tone[..], &[][..]].concat()),
         ("a.aiff", tone.to_vec()),
         ("a.aac", [&tone[..], &["-c:a", "aac"][..]].concat()),
     ];
-    if Command::new("ffmpeg")
-        .args(["-hide_banner", "-encoders"])
-        .output()
-        .is_ok_and(|o| String::from_utf8_lossy(&o.stdout).contains("libmp3lame"))
-    {
-        cases.push(("a.mp3", [&tone[..], &["-c:a", "libmp3lame"][..]].concat()));
-    }
     for (name, args) in cases {
         let p = m.path(name);
         let mut a = args.clone();
@@ -289,7 +282,7 @@ fn recognised_but_unsupported_formats_are_named_never_a_crash() {
 
 #[test]
 fn the_shipped_ffprobe_names_what_it_cannot_open() {
-    // The shipped build has no AVI, MP3, AIFF, FLAC or AAC demuxer: the first bytes decide.
+    // The shipped build has no AVI, AIFF, FLAC or AAC demuxer (MP3 has one since 0.3.1): the first bytes decide.
     let dir = std::env::var_os("CM_IMPORT_BUNDLED_FFMPEG_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| {
@@ -490,4 +483,171 @@ fn an_editing_copy_is_constant_rate_upright_and_the_same_length() {
         Err(RunFailure::Cancelled)
     ));
     assert!(!out2.exists());
+}
+
+// ---- MP3 (0.3.1; MP3-1 in `specs/features/18-import.md`) ----
+
+/// True when the `ffmpeg` on `PATH` can write MP3 (fixtures only; the shipped build never encodes it).
+fn can_make_mp3() -> bool {
+    Command::new("ffmpeg")
+        .args(["-hide_banner", "-encoders"])
+        .output()
+        .is_ok_and(|o| String::from_utf8_lossy(&o.stdout).contains("libmp3lame"))
+}
+
+/// A 2 s 440 Hz tone as MP3 with the given extra encoder or muxer arguments.
+fn make_mp3(m: &Maker, name: &str, extra: &[&str]) -> PathBuf {
+    let p = m.path(name);
+    let mut a = vec![
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=440:sample_rate=44100:duration=2",
+    ];
+    a.extend(["-c:a", "libmp3lame"]);
+    a.extend(extra);
+    a.push(p.to_str().unwrap());
+    assert!(ff(&a), "{name}");
+    p
+}
+
+/// The first samples of a decoded `mic.wav` (channel 0) and its length in seconds.
+fn first_peak(wav: &Path, ms: u32) -> f32 {
+    let mut r = hound::WavReader::open(wav).unwrap();
+    let spec = r.spec();
+    let n = (spec.sample_rate * ms / 1000) as usize * spec.channels as usize;
+    r.samples::<f32>()
+        .take(n)
+        .map(|x| x.unwrap().abs())
+        .fold(0.0, f32::max)
+}
+
+#[test]
+fn an_mp3_is_ready_audio_whose_sound_has_the_files_length_and_no_leading_gap() {
+    if !can_make_mp3() {
+        eprintln!("SKIPPED: the ffmpeg on PATH has no libmp3lame (fixtures)");
+        return;
+    }
+    let Some((m, tools)) = maker() else { return };
+    // Constant bit rate with an ID3v2 title and a cover picture; variable bit rate mono at
+    // 22.05 kHz (MPEG-2); no Xing/Info header, so the length is only an estimate.
+    let cover = m.path("cover.png");
+    assert!(ff(&[
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc=size=64x64:duration=1",
+        "-frames:v",
+        "1",
+        cover.to_str().unwrap()
+    ]));
+    let tagged = m.path("tagged.mp3");
+    assert!(ff(&[
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=440:sample_rate=44100:duration=2",
+        "-i",
+        cover.to_str().unwrap(),
+        "-map",
+        "0:a",
+        "-map",
+        "1:v",
+        "-c:a",
+        "libmp3lame",
+        "-ac",
+        "2",
+        "-b:a",
+        "128k",
+        "-c:v",
+        "copy",
+        "-disposition:v:0",
+        "attached_pic",
+        "-id3v2_version",
+        "3",
+        "-metadata",
+        "title=  Weekly sync  ",
+        tagged.to_str().unwrap()
+    ]));
+    let vbr_mono = make_mp3(&m, "vbr.mp3", &["-q:a", "4", "-ac", "1", "-ar", "22050"]);
+    let no_header = make_mp3(
+        &m,
+        "noxing.mp3",
+        &["-ac", "2", "-b:a", "96k", "-write_xing", "0"],
+    );
+    for (p, want_title, channels) in [
+        (&tagged, Some("Weekly sync"), 2),
+        (&vbr_mono, None, 1),
+        (&no_header, None, 2),
+    ] {
+        let f = probe(&tools, p).unwrap();
+        assert_eq!(
+            f.family(),
+            cm_media::import::probe::Family::Mp3,
+            "{}",
+            p.display()
+        );
+        assert!(f.video.is_none(), "cover art is not video: {f:?}");
+        assert_eq!(f.title.as_deref(), want_title);
+        let c = classify(&f);
+        assert_eq!((c.kind, c.status), (MediaKind::Audio, Status::Ready));
+        let wav = m.path("mic.wav");
+        let ch = decode_sound(&tools, &f, &wav, &mut |_| {}, &|| false)
+            .unwrap_or_else(|_| panic!("decode {}", p.display()));
+        assert_eq!(ch, channels);
+        let spec = hound::WavReader::open(&wav).unwrap().spec();
+        assert_eq!((spec.sample_rate, spec.bits_per_sample), (48_000, 32));
+        // The decoded length is the length of the sound within 50 ms (an MP3 is whole frames of
+        // 26 ms, so the file can end up to one frame long).
+        let secs = wav_seconds(&wav).unwrap();
+        assert!((secs - 2.0).abs() < 0.05, "{}: {secs}", p.display());
+        // The tone starts at once: no encoder delay of silence at the start.
+        assert!(first_peak(&wav, 30) > 0.05, "{}", p.display());
+        // The copy in the bundle verifies like any other audio master.
+        let master = m.path("master.mp3");
+        std::fs::copy(p, &master).unwrap();
+        verify(&VerifyInput {
+            tools: &tools,
+            source: &f,
+            kind: MediaKind::Audio,
+            master: &master,
+            sound: Some(&wav),
+            editing_copy: None,
+        })
+        .unwrap_or_else(|e| panic!("verify {}: {e:?}", p.display()));
+    }
+}
+
+#[test]
+fn an_mp3_is_found_by_its_content_not_its_name() {
+    if !can_make_mp3() {
+        eprintln!("SKIPPED: the ffmpeg on PATH has no libmp3lame (fixtures)");
+        return;
+    }
+    let Some((m, tools)) = maker() else { return };
+    let mp3 = make_mp3(&m, "a.mp3", &["-b:a", "128k"]);
+    let renamed = m.path("really-an-mp3.wav");
+    std::fs::copy(&mp3, &renamed).unwrap();
+    assert_eq!(
+        status_of(&tools, &renamed),
+        (MediaKind::Audio, Status::Ready)
+    );
+}
+
+#[test]
+fn a_damaged_mp3_is_unreadable_not_unsupported() {
+    let Some((m, tools)) = maker() else { return };
+    // An ID3 header with nothing behind it, and bytes that only look like a frame header.
+    let id3 = m.path("id3-only.mp3");
+    std::fs::write(&id3, b"ID3\x04\0\0\0\0\0\x10not an mp3, just a tag").unwrap();
+    let junk = m.path("junk.mp3");
+    std::fs::write(&junk, [0xFF, 0xFB, 0x90, 0x00, 1, 2, 3, 4, 5, 6, 7, 8]).unwrap();
+    for p in [&id3, &junk] {
+        match probe(&tools, p) {
+            Err(ProbeError::Problem(pr)) => {
+                assert_eq!(pr.reason, Reason::UnreadableFile, "{}", p.display())
+            }
+            other => panic!("{}: {other:?}", p.display()),
+        }
+    }
 }

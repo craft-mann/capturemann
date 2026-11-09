@@ -120,6 +120,8 @@ Section "Offer CaptureMann in the Open with menu of video and audio files" SecOp
   WriteRegStr HKCU "Software\Classes\.m4a\OpenWithList\cm-desktop.exe" "" ""
   WriteRegStr HKCU "Software\Classes\Applications\cm-desktop.exe\SupportedTypes" ".wav" ""
   WriteRegStr HKCU "Software\Classes\.wav\OpenWithList\cm-desktop.exe" "" ""
+  WriteRegStr HKCU "Software\Classes\Applications\cm-desktop.exe\SupportedTypes" ".mp3" ""
+  WriteRegStr HKCU "Software\Classes\.mp3\OpenWithList\cm-desktop.exe" "" ""
   ; Tell Explorer the associations changed (SHCNE_ASSOCCHANGED).
   System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
   WriteRegStr HKCU "Software\${APPNAME}" "OpenWith" "1"
@@ -147,7 +149,7 @@ Section "-pathflag"
 SectionEnd
 
 LangString DESC_SecApp ${LANG_ENGLISH} "CaptureMann, the command line, the MCP server, the speaker-label models and the licence files."
-LangString DESC_SecOpenWith ${LANG_ENGLISH} "Lists CaptureMann under Open with for MP4, MOV, M4V, MKV, M4A and WAV files so you can import them. It does not become the default program."
+LangString DESC_SecOpenWith ${LANG_ENGLISH} "Lists CaptureMann under Open with for MP4, MOV, M4V, MKV, M4A, WAV and MP3 files so you can import them. It does not become the default program."
 LangString DESC_SecPath ${LANG_ENGLISH} "So that you can type capturemann and cm-mcp in a new terminal. Removed again by the uninstaller."
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
   !insertmacro MUI_DESCRIPTION_TEXT ${SecApp} $(DESC_SecApp)
@@ -174,6 +176,7 @@ Section "Uninstall"
     DeleteRegKey HKCU "Software\Classes\.mkv\OpenWithList\cm-desktop.exe"
     DeleteRegKey HKCU "Software\Classes\.m4a\OpenWithList\cm-desktop.exe"
     DeleteRegKey HKCU "Software\Classes\.wav\OpenWithList\cm-desktop.exe"
+    DeleteRegKey HKCU "Software\Classes\.mp3\OpenWithList\cm-desktop.exe"
     System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
   ${EndIf}
   Delete "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk"
