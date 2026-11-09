@@ -842,6 +842,9 @@ msgstr ""
 msgid "Checking the copy"
 msgstr ""
 
+msgid "Checking the transcript"
+msgstr ""
+
 msgid "Checking…"
 msgstr ""
 
@@ -1155,6 +1158,9 @@ msgid "Couldn’t apply the edit"
 msgstr ""
 
 msgid "Couldn’t cancel the publish"
+msgstr ""
+
+msgid "Couldn’t cancel the transcription"
 msgstr ""
 
 msgid "Couldn’t cancel the upload"
@@ -5695,9 +5701,6 @@ msgstr ""
 msgid "Without webcam"
 msgstr ""
 
-msgid "Working"
-msgstr ""
-
 msgid "Working…"
 msgstr ""
 
@@ -7247,10 +7250,6 @@ msgstr ""
 
 msgctxt "button"
 msgid "craftmann.app"
-msgstr ""
-
-msgctxt "button reason"
-msgid "Working"
 msgstr ""
 
 msgctxt "button, after the link was copied"

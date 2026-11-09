@@ -73,16 +73,15 @@ pub fn imported_badge(_t: &Theme) -> AnyElement {
         .into_any_element()
 }
 
-/// The bottom strip of a thumbnail while its file is being imported: the step (once), the
+/// The step line and the bar of a running import step or transcription: the step (once), the
 /// percentage when there is one, and a bar (dimmed and full while there is no progress to show,
-/// for example while transcribing).
-pub fn progress_strip(t: &Theme, step: &str, frac: Option<f64>) -> AnyElement {
+/// for example while waiting). `on_dark`: drawn on a thumbnail (the dark palette) rather than on a
+/// page (the theme's own). One look for the library strip and for the recording's page.
+pub fn progress_body(t: &Theme, step: &str, frac: Option<f64>, on_dark: bool) -> gpui::Div {
     let pct = frac.map(|f| (f * 100.0).round().clamp(0.0, 100.0));
+    let p = if on_dark { &Theme::DARK } else { t };
     div()
-        .absolute()
-        .left(px(10.))
-        .right(px(10.))
-        .bottom(px(8.))
+        .w_full()
         .flex()
         .flex_col()
         .gap(px(6.))
@@ -92,7 +91,7 @@ pub fn progress_strip(t: &Theme, step: &str, frac: Option<f64>) -> AnyElement {
                 .items_center()
                 .gap(px(6.))
                 .text_size(px(12.5))
-                .text_color(rgba_of(Theme::DARK.text))
+                .text_color(rgba_of(p.text))
                 .child(icon(
                     if step == tr!("Preparing for editing") {
                         "refresh-cw"
@@ -100,28 +99,36 @@ pub fn progress_strip(t: &Theme, step: &str, frac: Option<f64>) -> AnyElement {
                         "cm-import"
                     },
                     14.,
-                    Theme::DARK.agent_text,
+                    p.agent_text,
                 ))
                 .child(shrink_text(SharedString::from(step.to_owned())).flex_1())
                 .children(pct.map(|p| div().mono().child(SharedString::from(format!("{p:.0}%"))))),
         )
         .child(
-            div()
-                .h(px(4.))
-                .rounded(px(2.))
-                .bg(rgba_of(Theme::DARK.line))
-                .child(
-                    div()
-                        .h_full()
-                        .w(gpui::relative(pct.map_or(1.0, |p| (p / 100.0) as f32)))
-                        .rounded(px(2.))
-                        .bg(rgba_of(if pct.is_some() {
-                            t.agent
-                        } else {
-                            t.agent.with_alpha(35)
-                        })),
-                ),
+            div().h(px(4.)).rounded(px(2.)).bg(rgba_of(p.line)).child(
+                div()
+                    .h_full()
+                    .w(gpui::relative(pct.map_or(1.0, |p| (p / 100.0) as f32)))
+                    .rounded(px(2.))
+                    .bg(rgba_of(if pct.is_some() {
+                        t.agent
+                    } else {
+                        t.agent.with_alpha(35)
+                    })),
+            ),
         )
+}
+
+/// The bottom strip of a thumbnail while its file is being imported or transcribed.
+pub fn progress_strip(t: &Theme, step: &str, frac: Option<f64>) -> AnyElement {
+    div()
+        .absolute()
+        .left(px(10.))
+        .right(px(10.))
+        .bottom(px(8.))
+        .flex()
+        .flex_col()
+        .child(progress_body(t, step, frac, true))
         .into_any_element()
 }
 

@@ -134,6 +134,8 @@ pub struct ActiveJob {
     pub capture_id: String,
     /// 0.0 to 1.0.
     pub progress: f32,
+    /// The job's progress message ("Transcribing 40%"), when it has one.
+    pub message: Option<String>,
 }
 
 /// Which job `type` in `list_jobs` is which kind of run on the editor's tabs.
@@ -161,6 +163,7 @@ pub fn active_jobs_of(answer: &Value) -> Vec<ActiveJob> {
                         kind: active_kind(j["type"].as_str()?)?,
                         capture_id: j["inputs"]["capture_id"].as_str()?.to_owned(),
                         progress: j["progress"].as_f64().unwrap_or(0.0) as f32,
+                        message: j["message"].as_str().map(str::to_owned),
                     })
                 })
                 .collect()
@@ -250,18 +253,19 @@ impl AiClient {
 
     /// The transcription, speaker and report jobs that are waiting or running (the daemon picks
     /// up the ones a restart left in its queue, and nothing tells the window about those).
-    pub async fn active_voice_jobs(&self) -> Vec<ActiveJob> {
+    /// The active transcription, speaker and report jobs; `None` when the list could not be read
+    /// (an empty answer then must not be taken for "nothing is running").
+    pub async fn active_voice_jobs(&self) -> Option<Vec<ActiveJob>> {
         let mut out = Vec::new();
         for job_type in ["transcribe", "diarize", "report"] {
-            if let Ok(v) = self
+            let v = self
                 .transport
                 .call("list_jobs", json!({ "type": job_type, "limit": 20 }))
                 .await
-            {
-                out.extend(active_jobs_of(&v));
-            }
+                .ok()?;
+            out.extend(active_jobs_of(&v));
         }
-        out
+        Some(out)
     }
 
     pub async fn cancel_job(&self, job_id: &str) -> Result<(), AiError> {
@@ -1168,7 +1172,7 @@ mod tests {
             t.answer("list_jobs", Ok(list(ty)));
         }
         let c = AiClient::new(t.clone());
-        let jobs = run(c.active_voice_jobs());
+        let jobs = run(c.active_voice_jobs()).unwrap();
         let summary: Vec<(String, crate::ai::jobs::ActiveKind, String)> = jobs
             .iter()
             .map(|j| (j.job_id.clone(), j.kind, j.capture_id.clone()))
@@ -1184,6 +1188,11 @@ mod tests {
             ],
             "only active jobs of the three kinds that name a recording"
         );
+        assert_eq!(jobs[0].message, None);
+        let with_message = active_jobs_of(&json!({"jobs": [{
+            "job_id": "job_9", "type": "transcribe", "state": "running", "progress": 0.5,
+            "message": "Transcribing 50%", "inputs": {"capture_id": "rec_z"}}]}));
+        assert_eq!(with_message[0].message.as_deref(), Some("Transcribing 50%"));
         assert_eq!(jobs[0].progress, 0.4);
         let asked = t.calls_of("list_jobs");
         assert_eq!(asked.len(), 3);
