@@ -58,7 +58,7 @@ folder tree.
 
 `--layout flat` puts every file (the `.deb` files, `Packages*`, `Release`, `InRelease`, `Release.gpg`) in one folder, for a
 host that only gives a flat list of files, such as the assets of one GitHub release. The user's source then has
-`Suites: ./` and no `Components:`. `capturemann.sources` is written for the chosen layout.
+`Suites: /` and no `Components:` (`Suites: ./` makes apt request `<URL>/./InRelease`, which GitHub release downloads answer with a 504; `/` was tested against the real `apt` release on Nov 9, 2026). `capturemann.sources` is written for the chosen layout.
 
 ## For the maintainer
 
@@ -125,7 +125,7 @@ Locally, on a machine without Docker: `packaging/linux/test-apt-repo.sh --runner
 
    | Option | How | For | Against |
    |---|---|---|---|
-   | A. GitHub release assets, flat layout (recommended if there is no domain and no wish to run anything) | one release with a fixed tag (for example `apt`); `gh release upload apt apt-repo/* --clobber`; sources `URIs: https://github.com/craft-mann/capturemann/releases/download/apt/` `Suites: ./` | free, no new account, assets up to 2 GB each, nothing to operate; apt follows the redirect | URL is tied to GitHub; the upload is not atomic (a user who runs `apt update` in the minute of an upload can see a hash mismatch and retry); old versions must be kept in the release by you; GitHub may change redirects |
+   | A. GitHub release assets, flat layout (recommended if there is no domain and no wish to run anything) | one release with a fixed tag (for example `apt`); `gh release upload apt apt-repo/* --clobber`; sources `URIs: https://github.com/craft-mann/capturemann/releases/download/apt/` `Suites: /` | free, no new account, assets up to 2 GB each, nothing to operate; apt follows the redirect | URL is tied to GitHub; the upload is not atomic (a user who runs `apt update` in the minute of an upload can see a hash mismatch and retry); old versions must be kept in the release by you; GitHub may change redirects |
    | B. Static file host with your domain (Cloudflare R2 or any object store plus CDN, or a small VPS with nginx) at `apt.<domain>` | `rclone sync apt-repo remote:bucket` (or `rsync`) after `make-apt-repo.sh`, pool layout | clean URL you control, can move later without changing users' files, atomic enough (upload pool first, index last), cheap | needs a domain and an account; something else to pay for and keep alive |
    | C. GitHub Pages | publish `apt-repo` from a `gh-pages` branch or a Pages workflow | familiar | the `.deb` files are above the 100 MB limit of a git file on a branch; the site limit is 1 GB (about four releases of two architectures), and the soft traffic limit is 100 GB/month. Only workable for the index with the `.deb` files elsewhere, which apt does not support. Not recommended |
 

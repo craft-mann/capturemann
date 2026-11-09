@@ -13,7 +13,8 @@
 #   pool (default)  dists/<suite>/main/binary-<arch>/Packages{,.gz,.xz}, dists/<suite>/{Release,InRelease,Release.gpg},
 #                   pool/main/c/capturemann/*.deb.  Users write:  Suites: stable  Components: main
 #   flat            all files in one folder (Packages, Release, InRelease, Release.gpg and the .deb files), for hosts
-#                   that give a flat file list, such as the assets of one GitHub release.  Users write:  Suites: ./
+#                   that give a flat file list, such as the assets of one GitHub release.  Users write:  Suites: /  (not ./ :
+#                   apt then asks for <URL>/./InRelease and GitHub release downloads answer that path with a 504)
 #
 # Signing (the PRIVATE key is never in the repository; this script only reads it from the environment):
 #   CM_APT_GPG_PRIVATE_KEY       the ASCII-armored secret key (the text, for example from a CI secret), or
@@ -146,7 +147,7 @@ gpg --batch --armor --export "$fpr" > "$out/capturemann-archive-keyring.asc"
 if [ -n "$url" ]; then
   u="${url%/}/"
   if [ "$layout" = pool ]; then suites_line="Suites: $suite
-Components: $comp"; else suites_line="Suites: ./"; fi
+Components: $comp"; else suites_line="Suites: /"; fi
   cat > "$out/capturemann.sources" <<EOF
 Types: deb
 URIs: $u
