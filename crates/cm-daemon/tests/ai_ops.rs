@@ -237,6 +237,47 @@ async fn ai_1_transcribe_job_writes_transcript_json_and_publishes_ready() {
     assert!(e.to_string().contains("transcribe"));
 }
 
+/// 0.3.1 section 4 (TRN-PROGRESS): a transcription is a `transcribe` job whose `job.progress`
+/// events carry the fraction and the stage ("Transcribing 40%"), so the app (a recording's page, the
+/// audio page, the library card), the CLI and MCP all report the same percent and stage; `list_jobs`
+/// and `get_job` carry them too, so a window opened later reads the running job's state.
+#[tokio::test]
+async fn trn_progress_a_transcription_reports_percent_and_stage_on_the_bus_and_in_the_job() {
+    let r = rig(FakeAi::new().with_small_installed(), Decision::Approve).await;
+    let mut rx = r.daemon.subscribe();
+    let started = user(&r, "transcribe", json!({})).await.unwrap();
+    let id = started["job_id"].as_str().unwrap().to_owned();
+    let job = job_done(&r, &id).await;
+    assert_eq!(job["state"], "done", "{job}");
+    let progress: Vec<Event> = drain(&mut rx)
+        .into_iter()
+        .filter(|e| e.name == "job.progress" && e.data["job_id"] == json!(id))
+        .collect();
+    assert!(!progress.is_empty(), "the job reports progress on the bus");
+    for e in &progress {
+        let p = e.data["progress"].as_f64().unwrap();
+        assert!((0.0..=1.0).contains(&p), "{e:?}");
+        let message = e.data["message"].as_str().unwrap_or_default();
+        assert!(
+            message.starts_with("Transcribing ") || message.starts_with("Checking the transcript "),
+            "the stage is in the message: {message}"
+        );
+        assert!(message.ends_with('%'), "{message}");
+    }
+    // `get_job` and `list_jobs` carry the same fields (the CLI prints them as they are).
+    let got = user(&r, "get_job", json!({"job_id": id})).await.unwrap();
+    assert_eq!(got["progress"], json!(1.0), "{got}");
+    assert!(
+        got["message"].as_str().is_some_and(|m| m.contains('%')),
+        "{got}"
+    );
+    let list = user(&r, "list_jobs", json!({"type": "transcribe"}))
+        .await
+        .unwrap();
+    assert_eq!(list["jobs"][0]["inputs"]["capture_id"], json!(r.id));
+    assert!(list["jobs"][0].get("progress").is_some() && list["jobs"][0].get("message").is_some());
+}
+
 /// AI-1: a rename while the transcript is being made does not lose it. Found on Nov 8, 2026: the title of
 /// a just-recorded meeting was edited while the model ran, the folder moved, and the finished job could not
 /// read the old path (`cannot read .../manifest.json`). The job writes into the folder as it is at the end.

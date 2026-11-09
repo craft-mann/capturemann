@@ -281,11 +281,16 @@ pub fn sync_running_jobs(app: &Entity<AppModel>, cx: &mut App) {
     let Some(client) = client_of(app, cx) else {
         return;
     };
-    let epoch = app.read(cx).transcribe.epoch;
+    let (epoch, known) = {
+        let m = &app.read(cx).transcribe;
+        (m.epoch, m.running_job_ids())
+    };
     let app2 = app.clone();
     cx.spawn(async move |cx| {
-        let jobs = client.active_voice_jobs().await;
-        if jobs.is_empty() {
+        let Some(jobs) = client.active_voice_jobs().await else {
+            return;
+        };
+        if jobs.is_empty() && known.is_empty() {
             return;
         }
         cx.update(|cx| {
@@ -295,9 +300,18 @@ pub fn sync_running_jobs(app: &Entity<AppModel>, cx: &mut App) {
                 if m.transcribe.epoch != epoch {
                     return;
                 }
+                // A job cancelled elsewhere (the CLI, an agent) sends no event: the list is the
+                // only place that says it is over.
+                let active: Vec<String> = jobs.iter().map(|j| j.job_id.clone()).collect();
+                m.transcribe.drop_ended(&known, &active);
                 for j in &jobs {
-                    m.transcribe
-                        .adopt_active(j.kind, &j.capture_id, &j.job_id, j.progress);
+                    m.transcribe.adopt_active(
+                        j.kind,
+                        &j.capture_id,
+                        &j.job_id,
+                        j.progress,
+                        j.message.as_deref(),
+                    );
                 }
                 cx.notify();
             })
@@ -599,6 +613,39 @@ pub fn transcribe(app: &Entity<AppModel>, capture_id: &str, cx: &mut App) {
     transcribe_with(app, capture_id, None, None, None, cx);
 }
 
+/// Cancel on the progress of a transcription (the details page, the editor, the audio page): the
+/// same `cancel_job` the CLI and MCP use. A cancelled job sends no bus event, so the window
+/// clears the run itself once the daemon has answered.
+pub fn cancel_transcribe(app: &Entity<AppModel>, capture_id: &str, cx: &mut App) {
+    let job = app
+        .read(cx)
+        .transcribe
+        .view(capture_id)
+        .and_then(|v| v.job_id);
+    let (Some(job), Some(client)) = (job, client_of(app, cx)) else {
+        return;
+    };
+    let (app2, id) = (app.clone(), capture_id.to_owned());
+    cx.spawn(async move |cx| {
+        let res = client.cancel_job(&job).await;
+        cx.update(|cx| match res {
+            Ok(()) => app2.update(cx, |m, cx| {
+                m.transcribe.cancelled(&id);
+                cx.notify();
+            }),
+            Err(e) => app::push_toast(
+                &app2,
+                flows::error_toast_live(
+                    || tr!("Couldn\u{2019}t cancel the transcription"),
+                    e.message.clone(),
+                ),
+                cx,
+            ),
+        });
+    })
+    .detach();
+}
+
 /// Transcribe with a language (`None` = auto-detect) and a model (`None` = the active one). Also
 /// the re-generate of a recording that already has a transcript: the daemon replaces it.
 pub fn transcribe_with(
@@ -774,13 +821,15 @@ pub fn on_event(app: &Entity<AppModel>, ev: &cm_daemon::events::Event, cx: &mut 
             });
         }
         "job.progress" => {
+            let message = str_of("message");
             if let (Some(job), Some(p)) = (
                 str_of("job_id"),
                 data.get("progress").and_then(Value::as_f64),
             ) {
                 app.update(cx, |m, cx| {
                     if m.transcribe.voice_progress_by_job(&job, p)
-                        || m.transcribe.progress_by_job(&job, p)
+                        || m.transcribe
+                            .progress_by_job_message(&job, p, message.as_deref())
                     {
                         cx.notify();
                     }

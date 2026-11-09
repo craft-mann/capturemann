@@ -35,10 +35,9 @@ Today a transcript is made from the noise-reduced microphone copy unless the set
   test covers both cases (no key: raw mic; key `false`: noise-reduced copy). Also update the texts that say "off by default":
   the MCP `transcribe` description (`cm-mcp/src/tools.rs`), the CLI help (`cm-cli/src/args.rs`), the comments in
   `cm-daemon/src/ai/{actions,transcripts}.rs` and `apps/desktop/src/ai/client.rs`, and the test in `cm-daemon/tests/ai_ops.rs`.
-- To check first: why the noise-reduced copy was the default (transcription-quality plan 0.2.7, `specs/plans/transcription-quality-plan-0.2.7.md`);
-  run the transcript benchmark (`verification/benchmarks/`) on both sources before the change and store the numbers. The
-  default moves only if the raw mic is not worse on the benchmark, in word error rate and in invented text over noise (open
-  problem #1 of 0.2.7); if it is worse on noisy clips, say so in the Settings text.
+- **No benchmark gate (decided Nov 9, 2026):** the maintainer already tested the raw mic as the default; the change is only
+  the default. The reason the noise-reduced copy was the default is in the 0.2.7 transcription-quality plan; the MCP text
+  still explains the trade-off of each source.
 - The system-audio track is unchanged.
 
 ## 2. Import MP3 (audio)

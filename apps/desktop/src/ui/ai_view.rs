@@ -824,7 +824,7 @@ pub fn transcribe_row(
     let (running, error, can, hint) = {
         let m = app.read(cx);
         (
-            m.transcribe.status_text(capture_id),
+            m.transcribe.view(capture_id),
             m.transcribe.error_of(capture_id),
             m.ai.can_transcribe(),
             m.ai.notice_visible(NoticeSite::Transcribe),
@@ -832,9 +832,12 @@ pub fn transcribe_row(
     };
     let id_of = |what: &str| SharedString::from(format!("{prefix}-{what}"));
     let (open, run, cap) = (app.clone(), app.clone(), capture_id.to_owned());
-    let action: AnyElement = if let Some(text) = running {
-        disabled_button(t, id_of("transcribe"), &text, &tr!("Working"), false).into_any_element()
-    } else if can {
+    // A run in progress: the import's strip (stage, percent, bar) with Cancel, for a click, the
+    // automatic run after a recording and a job the CLI or an agent started alike.
+    if let Some(view) = running {
+        return transcribe_progress(t, app, capture_id, prefix, &view);
+    }
+    let action: AnyElement = if can {
         small_button(t, id_of("transcribe"), &tr_ctx!("button", "Transcribe"))
             .on_click(move |_, _, cx| {
                 let (app, cap) = (run.clone(), cap.clone());
@@ -875,12 +878,94 @@ pub fn transcribe_row(
                     ),
                 )
         }))
-        .children(error.map(|e| {
+        .children(error.map(|e| transcribe_error(t, app, capture_id, prefix, e, false)))
+        .into_any_element()
+}
+
+/// The progress of a running transcription, the same strip an imported file shows (stage,
+/// percent, bar: `import_cards::progress_body`), with Cancel (`cancel_job`, the CLI's too) once
+/// the job has an id. On the recording's page, the editor tabs and the audio page.
+pub fn transcribe_progress(
+    t: &Theme,
+    app: &Entity<AppModel>,
+    capture_id: &str,
+    prefix: &'static str,
+    view: &crate::ai::jobs::RunView,
+) -> AnyElement {
+    let (app, cap) = (app.clone(), capture_id.to_owned());
+    let cancel = view.job_id.is_some().then(|| {
+        small_button(
+            t,
+            SharedString::from(format!("{prefix}-transcribe-cancel")),
+            &tr_ctx!("button", "Cancel"),
+        )
+        .on_click(move |_, _, cx| {
+            let (app, cap) = (app.clone(), cap.clone());
+            cx.defer(move |cx| ai::cancel_transcribe(&app, &cap, cx));
+        })
+    });
+    div()
+        .id(SharedString::from(format!("{prefix}-transcribe-progress")))
+        .w_full()
+        .max_w(px(420.))
+        .flex()
+        .items_center()
+        .gap(px(12.))
+        .child(
+            div()
+                .flex_1()
+                .min_w(px(0.))
+                .child(crate::ui::import_cards::progress_body(
+                    t,
+                    &view.stage,
+                    view.fraction.map(f64::from),
+                    false,
+                )),
+        )
+        .children(cancel)
+        .into_any_element()
+}
+
+/// The failure of the last run, with Retry. `has_transcript`: a transcript is stored (a failed
+/// Re-generate), so Retry opens the Re-generate panel, which says what a new run replaces,
+/// instead of running again at once.
+pub fn transcribe_error(
+    t: &Theme,
+    app: &Entity<AppModel>,
+    capture_id: &str,
+    prefix: &'static str,
+    message: String,
+    has_transcript: bool,
+) -> AnyElement {
+    let (app, cap) = (app.clone(), capture_id.to_owned());
+    div()
+        .flex()
+        .flex_wrap()
+        .items_center()
+        .gap(px(10.))
+        .child(
             div()
                 .text_size(px(type_scale::CAPTION))
                 .text_color(rgba_of(t.warning))
-                .child(SharedString::from(e))
-        }))
+                .child(SharedString::from(message)),
+        )
+        .child(
+            small_button(
+                t,
+                SharedString::from(format!("{prefix}-transcribe-retry")),
+                &tr_ctx!("button", "Retry"),
+            )
+            .on_click(move |_, _, cx| {
+                let (app, cap) = (app.clone(), cap.clone());
+                cx.defer(move |cx| {
+                    if has_transcript {
+                        ai::open_regen(&app, &cap, cx);
+                    } else {
+                        ai::transcribe(&app, &cap, cx);
+                    }
+                });
+            }),
+        )
         .into_any_element()
 }
 
