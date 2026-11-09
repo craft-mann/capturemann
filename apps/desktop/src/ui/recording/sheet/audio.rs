@@ -238,11 +238,11 @@ impl StartSheet {
             let a = self.app.read(cx);
             (a.platform, a.shortcuts.clone())
         };
-        // Mac glyphs are one short string; the words of Windows and Linux (Ctrl Alt Shift R) would
-        // run together and push the title out of the header, so only the Mac shows them here (the
-        // Shortcuts page and the sheet's footer name them).
+        // Mac glyphs are one short string; the words of Linux (Ctrl Alt Shift R) would run together
+        // and push the title out of the header, so Linux leaves them out here (the Shortcuts page
+        // and the sheet's footer name them). Windows and macOS show them as in 0.2.9.
         let hint = |a: ShortcutAction| -> String {
-            if platform == crate::shortcuts::Platform::Mac {
+            if platform != crate::shortcuts::Platform::Linux {
                 shortcuts.get(a).keycaps(platform).concat()
             } else {
                 String::new()
