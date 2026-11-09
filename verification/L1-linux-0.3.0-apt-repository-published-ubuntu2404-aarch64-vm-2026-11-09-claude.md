@@ -9,11 +9,11 @@
 
 | Step | Result | Note |
 | --- | --- | --- |
-| Download `capturemann-archive-keyring.gpg` and `capturemann.sources` with `curl` | PASS, after retries | GitHub answered some release downloads with a 504 that succeeded when retried |
-| `apt update` with `Suites: ./` | FAIL | apt asks for `<URL>/./InRelease`; GitHub answers a `/./` path with a 504 every time (also with `curl --path-as-is`), the plain path gives 200 |
-| `apt update` with `Suites: /` | PASS | `InRelease` fetched, no warning on the second run; `apt-cache policy` shows candidate 0.3.0 |
+| Download `capturemann-archive-keyring.gpg` and `capturemann.sources` with `curl` | PASS, after retries | the first download of an asset from GitHub's release host takes about 11 s and often ends in a 504; the 504 is cached for a short time (answers in 0.1 s), later requests give 200/206 in 0.3 s |
+| `apt update` with `Suites: ./`, first run, assets not yet requested | PARTIAL | `InRelease` fetched; `Packages` ignored (504) until the host had it; two minutes later `apt update` ends clean ("Hit") |
+| `apt update` with `Suites: /` | PASS | same behaviour once warm; it is **not** better than `./` (an earlier note here said GitHub rejects `/./`; wrong: a never-requested `/./Packages.xz` returned 200 after 11 s, then 0.3 s) |
 | `apt install capturemann` | PASS | `capturemann --version` prints `capturemann 0.3.0`; `dpkg -s` Architecture arm64 |
 | An amd64 install, upgrade, `apt remove`/`purge` from this repository | NOT RUN | |
-| `test-apt-repo.sh --layout flat` with `Suites: /` (CI job `apt-repo`) | NOT RUN | the script and the sources file now write `Suites: /`; the job has not run on GitHub |
+| `test-apt-repo.sh --layout flat` (CI job `apt-repo`) | NOT RUN | the job has not run on GitHub |
 
-Found: the flat layout must use `Suites: /` on GitHub release assets (changed in `make-apt-repo.sh`, `linux-apt.md` and the published `capturemann.sources`). A copy of the old `capturemann.sources` (`Suites: ./`) may be cached for a while by the download network.
+Found: GitHub release downloads answer the first request for an asset slowly (about 11 s) and sometimes with a 504; a user's first `apt update` can fail and succeed on a repeat. `apt` does not retry by default, so the install lines use `curl --retry` and `apt -o Acquire::Retries=5`. The assets were requested once each after publishing to warm them. A stable host (S3 + CloudFront, 0.3.1 plan item 25) does not have this.
