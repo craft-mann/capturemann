@@ -3,8 +3,8 @@
 //! Three recordings per format with an estimate (MP4, WebM): a mostly static screen, a typical
 //! screen recording and a high-motion one (`make_fixture --content static|typical|motion`, 1080p,
 //! 20 s, microphone and system audio), each exported through the real exporter at the recording
-//! size, 720p and 480p. **Pass line: the shown range (`min_bytes` to `max_bytes` of
-//! `cm_media::estimate`) contains the real size on every sample.** One miss fails the test.
+//! size, 720p and 480p. **Pass line: the real size is at or below the bound shown (`max_bytes` of
+//! `cm_media::estimate`) on every sample.** One miss fails the test.
 //!
 //! The recordings are synthetic (FFmpeg `lavfi` sources), not real screen recordings: the table
 //! is only as good as these three looks. Run it, with the FFmpeg that ships, as
@@ -34,7 +34,8 @@ struct Row {
     format: &'static str,
     size: String,
     frame: (u32, u32),
-    est: (u64, u64),
+    bound: u64,
+    nominal: f64,
     real: u64,
     est_s: f64,
     real_s: f64,
@@ -97,6 +98,7 @@ fn exp5_ac6_the_range_contains_the_real_size() {
     let codec = estimate::mp4_codec(Some(&tools)).unwrap();
     let lib = tempfile::tempdir().unwrap();
     let mut rows: Vec<Row> = Vec::new();
+    let mut quality: Vec<String> = Vec::new();
     for content in [
         FixtureContent::Static,
         FixtureContent::Typical,
@@ -133,9 +135,9 @@ fn exp5_ac6_the_range_contains_the_real_size() {
                     width: None,
                     max_mb: None,
                 };
-                let Estimated::Range(e) = estimate::estimate(&manifest, &choice, codec).unwrap()
+                let Estimated::Bound(e) = estimate::estimate(&manifest, &choice, codec).unwrap()
                 else {
-                    panic!("MP4 and WebM have an estimate");
+                    panic!("MP4 and WebM have a bound");
                 };
                 let out = match export(&tools, &fx.dir, &manifest, format, size) {
                     Ok(o) => o,
@@ -148,6 +150,15 @@ fn exp5_ac6_the_range_contains_the_real_size() {
                     }
                     Err(err) => panic!("{} {format:?} {size:?}: {err:?}", content.as_str()),
                 };
+                if size == SizeChoice::Source && content != FixtureContent::Static {
+                    quality.push(quality_line(
+                        &fx.dir,
+                        &out.path,
+                        content,
+                        format,
+                        e.width * e.height,
+                    ));
+                }
                 rows.push(Row {
                     content: content.as_str(),
                     format: format.as_str(),
@@ -156,7 +167,19 @@ fn exp5_ac6_the_range_contains_the_real_size() {
                         SizeChoice::Height(h) => format!("{h}p"),
                     },
                     frame: (e.width, e.height),
-                    est: (e.min_bytes, e.max_bytes),
+                    bound: e.max_bytes,
+                    nominal: estimate::estimate_bytes(&estimate::Inputs {
+                        codec: if format == Format::WebM {
+                            estimate::Codec::Vp9
+                        } else {
+                            codec
+                        },
+                        format,
+                        frame: (e.width, e.height),
+                        fps: e.fps,
+                        duration_s: e.duration_s,
+                        audio_channels: Some(2),
+                    }),
                     real: out.size_bytes,
                     est_s: e.duration_s,
                     real_s: out.duration_ms as f64 / 1000.0,
@@ -168,37 +191,44 @@ fn exp5_ac6_the_range_contains_the_real_size() {
     let mut md = String::new();
     writeln!(
         md,
-        "| content | format | size | pixels | estimate | real | real / middle | duration est. / real |"
+        "| content | format | size | pixels | bound shown | real | real / bound | real / nominal | length est. / real |"
     )
     .unwrap();
-    writeln!(md, "|---|---|---|---|---|---|---|---|").unwrap();
+    writeln!(md, "|---|---|---|---|---|---|---|---|---|").unwrap();
     let mut misses = Vec::new();
     for r in &rows {
-        let mid =
-            (r.est.0 as f64 / estimate::RANGE_LOW + r.est.1 as f64 / estimate::RANGE_HIGH) / 2.0;
-        let inside = r.est.0 <= r.real && r.real <= r.est.1;
+        let ok = r.real <= r.bound;
         writeln!(
             md,
-            "| {} | {} | {} | {}×{} | {} | {:.1} MB {} | {:.2} | {:.1} s / {:.1} s |",
+            "| {} | {} | {} | {}×{} | {} | {:.2} MB {} | {:.2} | {:.3} | {:.1} s / {:.1} s |",
             r.content,
             r.format,
             r.size,
             r.frame.0,
             r.frame.1,
-            estimate::label_of(r.est.0, r.est.1),
+            estimate::label_of(r.bound),
             r.real as f64 / 1e6,
-            if inside { "inside" } else { "**OUTSIDE**" },
-            r.real as f64 / mid,
+            if ok { "at or below" } else { "**ABOVE**" },
+            r.real as f64 / r.bound as f64,
+            r.real as f64 / r.nominal,
             r.est_s,
             r.real_s,
         )
         .unwrap();
-        if !inside {
+        if !ok {
             misses.push(format!(
-                "{} {} {}: real {} B, range {}..{} B",
-                r.content, r.format, r.size, r.real, r.est.0, r.est.1
+                "{} {} {}: real {} B, bound {} B",
+                r.content, r.format, r.size, r.real, r.bound
             ));
         }
+    }
+    writeln!(
+        md,
+        "\nQuality at the recording size (information, not a pass line):\n"
+    )
+    .unwrap();
+    for q in &quality {
+        writeln!(md, "- {q}").unwrap();
     }
     println!("{md}");
     if let Some(path) = std::env::var_os("CM_ESTIMATE_REPORT") {
@@ -206,7 +236,98 @@ fn exp5_ac6_the_range_contains_the_real_size() {
     }
     assert!(
         misses.is_empty(),
-        "the shown range must contain the real size on every sample:\n{}",
+        "the real size must be at or below the bound on every sample:\n{}",
         misses.join("\n")
     );
+}
+
+/// `SSIM All:` and `PSNR average:` of `file` against the master's frames (same size, same start:
+/// the export starts at the master's first frame), through the FFmpeg on PATH (the shipped build
+/// has no `ssim` or `psnr` filter).
+fn ssim_psnr(file: &std::path::Path, master: &std::path::Path) -> Option<(f64, f64)> {
+    let out = std::process::Command::new("ffmpeg")
+        .args(["-v", "info", "-nostats", "-i"])
+        .arg(file)
+        .arg("-i")
+        .arg(master)
+        .args([
+            "-lavfi",
+            "[0:v]split[a1][a2];[1:v]split[b1][b2];[a1][b1]ssim;[a2][b2]psnr",
+            "-f",
+            "null",
+            "-",
+        ])
+        .output()
+        .ok()?;
+    let text = String::from_utf8_lossy(&out.stderr).into_owned();
+    let after = |key: &str| -> Option<f64> {
+        let i = text.rfind(key)? + key.len();
+        text[i..].split_whitespace().next()?.parse().ok()
+    };
+    Some((after("All:")?, after("average:")?))
+}
+
+/// One line of the quality section: bits per pixel and SSIM and PSNR of the export against the
+/// master, and for WebM the same for an uncapped constant-quality re-encode of the master
+/// (`-b:v 0 -crf 32`, the exporter's settings before the cap).
+fn quality_line(
+    dir: &std::path::Path,
+    out: &std::path::Path,
+    content: FixtureContent,
+    format: Format,
+    pixels: u32,
+) -> String {
+    let master = dir.join("screen.mp4");
+    let bytes = std::fs::metadata(out).map_or(0, |m| m.len());
+    let bpp = |b: u64| b as f64 * 8.0 / (f64::from(pixels) * 20.0 * 30.0);
+    let q = ssim_psnr(out, &master);
+    let mut line = format!(
+        "{} {}: {:.3} bits per pixel, {}",
+        content.as_str(),
+        format.as_str(),
+        bpp(bytes),
+        q.map_or("SSIM/PSNR not measured".to_owned(), |(s, p)| format!(
+            "SSIM {s:.4}, PSNR {p:.2} dB (export)"
+        ))
+    );
+    if format == Format::WebM {
+        let reference = dir.join("uncapped-reference.webm");
+        let ok = std::process::Command::new("ffmpeg")
+            .args(["-y", "-v", "error", "-i"])
+            .arg(&master)
+            .args([
+                "-an",
+                "-c:v",
+                "libvpx-vp9",
+                "-row-mt",
+                "1",
+                "-deadline",
+                "good",
+                "-cpu-used",
+                "4",
+                "-g",
+                "120",
+                "-b:v",
+                "0",
+                "-crf",
+                "32",
+            ])
+            .arg(&reference)
+            .status()
+            .is_ok_and(|s| s.success());
+        if ok {
+            let rb = std::fs::metadata(&reference).map_or(0, |m| m.len());
+            let rq = ssim_psnr(&reference, &master);
+            let _ = write!(
+                line,
+                "; uncapped reference: {:.3} bits per pixel ({:.1} MB), {}",
+                bpp(rb),
+                rb as f64 / 1e6,
+                rq.map_or("not measured".to_owned(), |(s, p)| format!(
+                    "SSIM {s:.4}, PSNR {p:.2} dB"
+                ))
+            );
+        }
+    }
+    line
 }

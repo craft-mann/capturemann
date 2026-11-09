@@ -3136,14 +3136,14 @@ async fn exp5_export_estimate_and_size() {
     .await;
     assert_eq!(o.code, 0, "{}", o.err);
     assert!(
-        o.out.starts_with("About ") && o.out.contains("(estimate) · WEBM · VP9 · 1152×720"),
+        o.out.starts_with("Up to ") && o.out.contains("(estimate) · WEBM · VP9 · 1152×720"),
         "{}",
         o.out
     );
     let o = cli(&r, &["--json", "export", &id, "--estimate"]).await;
     assert_eq!(o.code, 0, "{}", o.err);
     let j = o.json();
-    assert!(j["min_bytes"].as_u64().unwrap() < j["max_bytes"].as_u64().unwrap());
+    assert!(j["max_bytes"].as_u64().unwrap() > 0 && j.get("min_bytes").is_none());
     assert_eq!(j["width"], 2880);
     let jobs = call("list_jobs", json!({"type": "export"})).await;
     assert!(
@@ -3152,7 +3152,6 @@ async fn exp5_export_estimate_and_size() {
     );
     // The same numbers as `estimate_export`, which is what MCP calls.
     let direct = call("estimate_export", json!({"capture_id": id})).await;
-    assert_eq!(direct["min_bytes"], j["min_bytes"]);
     assert_eq!(direct["max_bytes"], j["max_bytes"]);
     // GIF: no estimate; over 30 s it is refused with the hint on its own line.
     let o = cli(&r, &["export", &id, "--format", "gif", "--estimate"]).await;
@@ -3202,8 +3201,141 @@ async fn exp5_export_estimate_and_size() {
     let j = o.json();
     assert_eq!(j["preset"], "webm");
     assert_eq!(j["size"], 480);
-    assert!(j["estimate"]["min_bytes"].as_u64().is_some());
+    assert!(j["estimate"]["max_bytes"].as_u64().is_some());
     // --estimate does not combine with an export-only option.
     let o = cli(&r, &["export", &id, "--estimate", "--wait"]).await;
     assert_eq!(o.code, 2, "{}", o.err);
+}
+
+/// EXP-5, maintainer decision of Nov 9, 2026: `export --format webm --width 640` without `--size`
+/// still works end to end (a real 640 px WebM from a synthetic recording, through the real
+/// exporter, with an estimate that bounds it); `--size` with `--width` and `--width` with an MP4
+/// are refused. Skipped without FFmpeg (libx264, lavfi) or a GPU adapter.
+#[tokio::test]
+async fn exp5_webm_width_works_end_to_end_and_is_refused_elsewhere() {
+    use cm_daemon::fixture::{make_fixture, FixtureContent, FixtureSpec};
+    let Ok(tools) = cm_media::tools::locate() else {
+        eprintln!("SKIPPED: FFmpeg was not found");
+        return;
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let endpoint = Endpoint::scratch(dir.path(), "d");
+    let lib_dir = dir.path().join("lib");
+    let lib = Library::open_or_create(&lib_dir).unwrap();
+    let spec = FixtureSpec {
+        title: "Width".into(),
+        secs: 4,
+        size: (1280, 720),
+        content: FixtureContent::Typical,
+        camera: false,
+        pause: None,
+        ..FixtureSpec::default()
+    };
+    if let Err(e) = make_fixture(&tools, &lib_dir, &spec) {
+        eprintln!("SKIPPED: the fixture could not be made ({e})");
+        return;
+    }
+    let queue = cm_daemon::library_job_queue(lib.root()).unwrap();
+    let daemon = Daemon::builder(Capturer::new(desktop()).with_own_pid(None), lib)
+        .jobs(queue)
+        .build();
+    daemon.register_export_handler().unwrap();
+    daemon.start_jobs().unwrap();
+    serve(&daemon, &endpoint);
+    daemon
+        .execute_method(cm_core::Actor::User, 0, "rescan_library", &json!({}))
+        .await
+        .unwrap();
+    let r = Rig {
+        dir,
+        endpoint,
+        daemon: daemon.clone(),
+    };
+    let id = daemon
+        .execute_method(cm_core::Actor::User, 0, "list_library", &json!({}))
+        .await
+        .unwrap()["captures"][0]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+
+    // Refused before any job: `--size` with `--width`, `--width` with an MP4.
+    let o = cli(
+        &r,
+        &[
+            "export", &id, "--format", "webm", "--width", "640", "--size", "480p",
+        ],
+    )
+    .await;
+    assert_eq!(o.code, 2, "{}", o.err);
+    let o = cli(&r, &["export", &id, "--width", "640"]).await;
+    assert_eq!(o.code, 2, "{}", o.err);
+    let o = cli(&r, &["export", &id, "--format", "mp4", "--width", "640"]).await;
+    assert_eq!(o.code, 2, "{}", o.err);
+    let jobs = daemon
+        .execute_method(
+            cm_core::Actor::User,
+            0,
+            "list_jobs",
+            &json!({"type": "export"}),
+        )
+        .await
+        .unwrap();
+    assert!(jobs["jobs"].as_array().unwrap().is_empty());
+
+    // The estimate for the same request, then the export itself.
+    let est = cli(
+        &r,
+        &[
+            "--json",
+            "export",
+            &id,
+            "--format",
+            "webm",
+            "--width",
+            "640",
+            "--estimate",
+        ],
+    )
+    .await;
+    assert_eq!(est.code, 0, "{}", est.err);
+    let est = est.json();
+    assert_eq!(
+        (est["width"].as_u64(), est["height"].as_u64()),
+        (Some(640), Some(360))
+    );
+    let o = cli(
+        &r,
+        &[
+            "--json",
+            "export",
+            &id,
+            "--format",
+            "webm",
+            "--width",
+            "640",
+            "--wait",
+            "--timeout",
+            "120",
+        ],
+    )
+    .await;
+    if o.err.to_lowercase().contains("gpu") || o.err.to_lowercase().contains("adapter") {
+        eprintln!("SKIPPED: no GPU compositor ({})", o.err);
+        return;
+    }
+    assert_eq!(o.code, 0, "{}", o.err);
+    let job = o.json();
+    assert_eq!(job["state"], "done", "{job}");
+    let path = std::path::PathBuf::from(job["result"]["path"].as_str().unwrap());
+    assert_eq!(path.extension().and_then(|e| e.to_str()), Some("webm"));
+    let info = cm_media::tools::probe_file(&tools, &path).unwrap();
+    assert_eq!(info.width, Some(640), "a 640 px WebM");
+    let size = std::fs::metadata(&path).unwrap().len();
+    // The estimate the job carries is the bound of the same request, and the file is under it.
+    assert_eq!(job["result"]["estimate"]["max_bytes"], est["max_bytes"]);
+    assert!(
+        size <= est["max_bytes"].as_u64().unwrap(),
+        "{size} against {est}"
+    );
 }
