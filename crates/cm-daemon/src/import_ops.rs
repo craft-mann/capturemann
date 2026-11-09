@@ -135,7 +135,7 @@ pub(crate) fn parse(f: &Fields<'_>) -> Result<Action, CmError> {
     if !titles.is_empty() && titles.len() != paths.len() {
         return Err(CmError::invalid_field(
             "titles",
-            "must have one entry per path (an empty string keeps the file name)",
+            "must have one entry per path (an empty string keeps the default: the file's own title tag, else the file name)",
         ));
     }
     let after = match f.obj.get("after") {
@@ -392,12 +392,12 @@ pub(crate) fn make_plan(
     let mut files = Vec::new();
     for (i, path, meta) in metas {
         let name = file_name(&path);
-        let title = p
+        let given = p
             .titles
             .get(i)
             .map(|t| t.trim())
             .filter(|t| !t.is_empty())
-            .map_or_else(|| default_title(&path), str::to_owned);
+            .map(str::to_owned);
         let size_bytes = meta.len();
         let mtime = mtime_ms(&meta);
         let (probed, error): (Option<ProbedFile>, Option<Problem>) = match probe(&tools, &path) {
@@ -411,6 +411,11 @@ pub(crate) fn make_plan(
             }
             Err(ProbeError::Other(e)) => return Err(e.into()),
         };
+        // The title: the one the caller gave, else the file's own title tag (ID3 for an MP3), else
+        // the file name.
+        let title = given
+            .or_else(|| probed.as_ref().and_then(|f| f.title.clone()))
+            .unwrap_or_else(|| default_title(&path));
         let (kind, status, prepared, problem) = match (&probed, error) {
             (_, Some(pr)) => (MediaKind::Video, "cant_import", Vec::new(), Some(pr)),
             (Some(f), None) => {
@@ -433,18 +438,22 @@ pub(crate) fn make_plan(
             (Some(f), None) => need_bytes(f, status == "prepared"),
             _ => 0,
         };
+        let mut row = row_of(
+            &path,
+            &name,
+            size_bytes,
+            &title,
+            probed.as_ref(),
+            kind,
+            status,
+            &prepared,
+            err_value.as_ref(),
+        );
+        // What the import writes for this file (the master, an editing copy, the decoded sound):
+        // the sheet shows the total before the user confirms.
+        row["needed_bytes"] = json!(need);
         files.push(PlannedFile {
-            row: row_of(
-                &path,
-                &name,
-                size_bytes,
-                &title,
-                probed.as_ref(),
-                kind,
-                status,
-                &prepared,
-                err_value.as_ref(),
-            ),
+            row,
             path,
             name,
             size_bytes,

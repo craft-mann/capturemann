@@ -3,8 +3,9 @@
 //! The probe never writes. It runs `ffprobe` twice at most: once for the streams and the format,
 //! once for the timestamps of the first [`PACKET_SAMPLE`] video packets (variable frame rate shows
 //! in those, not in the container's average rate). A file the bundled `ffprobe` cannot open at all
-//! (AVI, MP3, AIFF, FLAC, OGG and bare AAC have no demuxer in the bundled build) is named from its
-//! first bytes by [`sniff_container`].
+//! (AVI, AIFF, FLAC, OGG and bare AAC have no demuxer in the bundled build) is named from its
+//! first bytes by [`sniff_container`]. MP3 has one since 0.3.1; a damaged MP3 that `ffprobe`
+//! cannot open is `unreadable_file`, not an unsupported format.
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -71,6 +72,9 @@ pub struct ProbedFile {
     pub other_audio_streams: usize,
     /// A stream is protected (DRM or encryption).
     pub protected: bool,
+    /// The title tag of the file (ID3 `title`, MP4 `title`), cleaned by [`clean_title`]; `None`
+    /// when absent or empty. Read only, never written, never logged.
+    pub title: Option<String>,
 }
 
 /// Why a probe produced no [`ProbedFile`].
@@ -97,6 +101,8 @@ pub enum Family {
     Mov,
     Matroska,
     Wav,
+    /// MP3 (MPEG audio layer III, with or without ID3 tags).
+    Mp3,
     Other,
 }
 
@@ -113,6 +119,7 @@ pub fn family_of(container: &str) -> Family {
         "mov" | "mp4" | "m4a" => Family::Mov,
         "matroska" | "webm" => Family::Matroska,
         "wav" => Family::Wav,
+        "mp3" => Family::Mp3,
         _ => Family::Other,
     }
 }
@@ -373,7 +380,42 @@ pub fn parse_ffprobe(json: &str, path: &Path, size_bytes: u64) -> Result<ProbedF
         video,
         audio,
         protected,
+        title: clean_title(v["format"]["tags"].as_object().and_then(tag_title)),
     })
+}
+
+/// The `title` entry of an ffprobe tag object (tag names are case-insensitive: ID3 gives `title`,
+/// some containers `TITLE`).
+fn tag_title(tags: &serde_json::Map<String, Value>) -> Option<&str> {
+    tags.iter()
+        .find(|(k, _)| k.eq_ignore_ascii_case("title"))
+        .and_then(|(_, v)| v.as_str())
+}
+
+/// Longest title kept from a tag, in characters.
+pub const TITLE_MAX_CHARS: usize = 120;
+
+/// A tag text as a capture title: control characters and path separators become spaces, runs of
+/// white space collapse, the ends are trimmed and the length is cut at [`TITLE_MAX_CHARS`]. An
+/// empty result is `None` (the caller then uses the file name). The text is only a title, never a
+/// path. Pure.
+pub fn clean_title(raw: Option<&str>) -> Option<String> {
+    let raw = raw?;
+    let mapped: String = raw
+        .chars()
+        .map(|c| {
+            if c.is_control() || c == '/' || c == '\\' {
+                ' '
+            } else {
+                c
+            }
+        })
+        .collect();
+    let words: Vec<&str> = mapped.split_whitespace().collect();
+    let joined = words.join(" ");
+    let cut: String = joined.chars().take(TITLE_MAX_CHARS).collect();
+    let cut = cut.trim().to_owned();
+    (!cut.is_empty()).then_some(cut)
 }
 
 /// Variable frame rate from the container's two rates: the average and the nominal one differ by
@@ -509,6 +551,13 @@ pub fn probe(tools: &Tools, path: &Path) -> Result<ProbedFile, ProbeError> {
             )));
         }
         if let Some(fmt) = sniff_container(&head) {
+            // MP3 is supported: a file that starts like one but cannot be opened is damaged.
+            if fmt == "mp3" {
+                return Err(ProbeError::Problem(Problem::new(
+                    Reason::UnreadableFile,
+                    "The MP3 file can't be read. It may be damaged or cut short.",
+                )));
+            }
             return Err(ProbeError::Problem(Problem::unsupported_format(fmt)));
         }
         return Err(ProbeError::Problem(Problem::new(
@@ -630,6 +679,45 @@ mod tests {
         assert_eq!(p.other_audio_streams, 2);
         let p = parse(file(vec![audio(0, json!({})), audio(1, json!({}))]));
         assert_eq!(p.audio.unwrap().index, 0);
+    }
+
+    #[test]
+    fn mp3_is_a_family_and_its_title_comes_from_the_tag() {
+        assert_eq!(family_of("mp3"), Family::Mp3);
+        let mut j = json!({"format": {"format_name": "mp3", "duration": "2.0",
+            "tags": {"title": "  Weekly\tsync / notes\u{7} "}},
+            "streams": [audio(0, json!({"codec_name": "mp3"})),
+                json!({"index": 1, "codec_type": "video", "codec_name": "mjpeg",
+                       "disposition": {"attached_pic": 1}})]});
+        let p = parse(j.clone());
+        assert_eq!(p.family(), Family::Mp3);
+        assert!(p.video.is_none());
+        assert_eq!(p.title.as_deref(), Some("Weekly sync notes"));
+        // Tag names are case-insensitive; an empty or missing title is None.
+        j["format"]["tags"] = json!({"TITLE": "Upper"});
+        assert_eq!(parse(j.clone()).title.as_deref(), Some("Upper"));
+        j["format"]["tags"] = json!({"title": " \n "});
+        assert_eq!(parse(j.clone()).title, None);
+        j["format"].as_object_mut().unwrap().remove("tags");
+        assert_eq!(parse(j).title, None);
+    }
+
+    #[test]
+    fn clean_title_limits_length_and_never_yields_a_path() {
+        assert_eq!(clean_title(None), None);
+        assert_eq!(
+            clean_title(Some("../../etc/passwd")).as_deref(),
+            Some(".. .. etc passwd")
+        );
+        let long = "x".repeat(500);
+        assert_eq!(
+            clean_title(Some(&long)).unwrap().chars().count(),
+            TITLE_MAX_CHARS
+        );
+        assert_eq!(
+            clean_title(Some("Tiếng Việt \u{1F600}")).as_deref(),
+            Some("Tiếng Việt \u{1F600}")
+        );
     }
 
     #[test]
