@@ -601,6 +601,9 @@ mod tests {
     /// The worker answers the newest request, drops older ones and stops cleanly.
     #[test]
     fn worker_is_latest_wins_and_stops() {
+        // Metal's device list is built once per process; on macOS that first call can block when it is made
+        // only from a worker thread (seen in `sample`: MTLCopyAllDevices, Nov 10, 2026), so make it here.
+        let _ = Compositor::new();
         let mut r = PreviewRenderer::spawn(Box::new(SyntheticFrames::default()));
         assert_eq!(r.size(), (1280, 720));
         for seq in 1..=5 {
@@ -748,6 +751,9 @@ mod tests {
                 "flaky".into()
             }
         }
+        // Metal's device list is built once per process; on macOS that first call can block when it is made
+        // only from a worker thread (seen in `sample`: MTLCopyAllDevices, Nov 10, 2026), so make it here.
+        let _ = Compositor::new();
         let r = PreviewRenderer::spawn(Box::new(Flaky(0)));
         let wait = |r: &PreviewRenderer, seq: u64| {
             let t = Instant::now();
