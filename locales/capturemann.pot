@@ -618,6 +618,9 @@ msgstr ""
 msgid "Cancelling…"
 msgstr ""
 
+msgid "Can’t export as GIF"
+msgstr ""
+
 msgid "Can’t use this folder"
 msgstr ""
 
@@ -1696,6 +1699,9 @@ msgstr ""
 msgid "Estimate the size of an export"
 msgstr ""
 
+msgid "Estimated size"
+msgstr ""
+
 msgid "Even out the loudness"
 msgstr ""
 
@@ -1769,6 +1775,9 @@ msgstr ""
 msgid "Exported {title}"
 msgstr ""
 
+msgid "Exported · {size}"
+msgstr ""
+
 msgid "Exporting audio…"
 msgstr ""
 
@@ -1839,6 +1848,9 @@ msgid "Fastest, lowest accuracy. Good for quick drafts on any machine."
 msgstr ""
 
 msgid "File"
+msgstr ""
+
+msgid "File size"
 msgstr ""
 
 msgid "Files go into a CaptureMann folder at the top of your Dropbox."
@@ -1947,6 +1959,12 @@ msgid "Fully offline, no text model needed. It uses Large v3 or Medium; Large v3
 msgstr ""
 
 msgid "GIF is for clips of {max} s or less. This one is {duration}."
+msgstr ""
+
+msgid "GIF size can’t be estimated. It will stay under {mb} MB: width, then frame rate, step down to fit."
+msgstr ""
+
+msgid "GIF size can’t be estimated. The real size is shown after export."
 msgstr ""
 
 msgid "Getting the picture…"
@@ -2108,6 +2126,9 @@ msgstr ""
 msgid "In the room"
 msgstr ""
 
+msgid "In {from} → Out {to} · {secs} s ({max} s at most)"
+msgstr ""
+
 msgid "Include captions in the exported video"
 msgstr ""
 
@@ -2196,6 +2217,12 @@ msgid "Keep audio"
 msgstr ""
 
 msgid "Keep it"
+msgstr ""
+
+msgid "Keep the file under"
+msgstr ""
+
+msgid "Keep the file under {mb} MB"
 msgstr ""
 
 msgid "Keep the lid open: closing it stops the recording"
@@ -2480,6 +2507,9 @@ msgstr ""
 msgid "Meeting minutes"
 msgstr ""
 
+msgid "Megabytes"
+msgstr ""
+
 msgid "Menu bar icon unavailable"
 msgstr ""
 
@@ -2690,6 +2720,9 @@ msgid "Needs the speaker model (AI page)"
 msgstr ""
 
 msgid "Network"
+msgstr ""
+
+msgid "Never larger than the recording"
 msgstr ""
 
 msgid "New captures are saved to a folder on this computer until it is back. {path} ({reason})"
@@ -3339,6 +3372,9 @@ msgstr ""
 msgid "Plays a short chime and checks that CaptureMann can hear it. Uses the Screen Recording permission."
 msgstr ""
 
+msgid "Plays almost everywhere"
+msgstr ""
+
 msgid "Plug in a camera, or record without the bubble."
 msgstr ""
 
@@ -3357,7 +3393,7 @@ msgstr ""
 msgid "Preparing the preview…"
 msgstr ""
 
-msgid "Press Export MP4 to make one file with the screen, camera bubble and audio."
+msgid "Press Export… to choose a format and size for one file with the screen, camera bubble and audio."
 msgstr ""
 
 msgid "Press Z to add one at the playhead."
@@ -3700,6 +3736,9 @@ msgstr ""
 msgid "Recording saved — exporting…"
 msgstr ""
 
+msgid "Recording size"
+msgstr ""
+
 msgid "Recording starts in {remaining}"
 msgstr ""
 
@@ -4020,6 +4059,9 @@ msgstr ""
 msgid "Runs as the permissions above say."
 msgstr ""
 
+msgid "Runs in the background"
+msgstr ""
+
 msgid "Runs in the background; you can keep working"
 msgstr ""
 
@@ -4261,6 +4303,9 @@ msgstr ""
 msgid "Shadow"
 msgstr ""
 
+msgid "Short loop for docs and PRs"
+msgstr ""
+
 msgid "Shortcut {key}"
 msgstr ""
 
@@ -4320,10 +4365,16 @@ msgstr ""
 msgid "Size"
 msgstr ""
 
+msgid "Size known after export"
+msgstr ""
+
 msgid "Size mb"
 msgstr ""
 
 msgid "Size {size}"
+msgstr ""
+
+msgid "Smaller, for the web"
 msgstr ""
 
 msgid "Smallest option for computers with little free memory. Notes can miss items."
@@ -4974,6 +5025,9 @@ msgstr ""
 msgid "The publish was not confirmed, so nothing was sent to YouTube."
 msgstr ""
 
+msgid "The real size is shown after export."
+msgstr ""
+
 msgid "The recorded camera track is never flipped."
 msgstr ""
 
@@ -5182,6 +5236,9 @@ msgid "This cannot be undone"
 msgstr ""
 
 msgid "This caption is empty"
+msgstr ""
+
+msgid "This computer has no H.264 video encoder, so MP4 files use VP9 video. Browsers play them; some older players and editors may not."
 msgstr ""
 
 msgid "This computer has no usable hardware H.264 encoder for this recording. Try a lower resolution, update Windows and the graphics driver, or use a computer with a hardware video encoder (most computers since about 2016)."
@@ -5671,6 +5728,12 @@ msgid "Who spoke when, from the voices"
 msgstr ""
 
 msgid "Whole recording"
+msgstr ""
+
+msgid "Whole recording · {length} ({max} s at most)"
+msgstr ""
+
+msgid "Width"
 msgstr ""
 
 msgid "Will change"
@@ -6246,6 +6309,12 @@ msgstr ""
 msgid "{format} saved"
 msgstr ""
 
+msgid "{format} · {codec} · {width} × {height}. The real size is shown after export."
+msgstr ""
+
+msgid "{format}, {width} × {height}. The original tracks are untouched."
+msgstr ""
+
 msgid "{free} GB free, room for about {left} at this setting (an estimate)"
 msgstr ""
 
@@ -6677,7 +6746,13 @@ msgstr ""
 msgid "{this_computer_cap} may not have enough free memory for this model."
 msgstr ""
 
+msgid "{time} after cuts"
+msgstr ""
+
 msgid "{time} after cuts · about {size}"
+msgstr ""
+
+msgid "{time} between In and Out"
 msgstr ""
 
 msgid "{title} panel"
@@ -7151,6 +7226,14 @@ msgstr ""
 
 msgctxt "button"
 msgid "Edit"
+msgstr ""
+
+msgctxt "button"
+msgid "Exporting {pct}%"
+msgstr ""
+
+msgctxt "button"
+msgid "Export…"
 msgstr ""
 
 msgctxt "button"
@@ -7653,6 +7736,10 @@ msgctxt "excluded app"
 msgid "Default"
 msgstr ""
 
+msgctxt "export popover"
+msgid "Export"
+msgstr ""
+
 msgctxt "export row"
 msgid "Exporting"
 msgstr ""
@@ -7695,6 +7782,10 @@ msgstr ""
 
 msgctxt "field"
 msgid "Language"
+msgstr ""
+
+msgctxt "field"
+msgid "MB"
 msgstr ""
 
 msgctxt "field"
@@ -8977,6 +9068,10 @@ msgctxt "sidebar group"
 msgid "LIBRARY"
 msgstr ""
 
+msgctxt "size tag"
+msgid "Estimate"
+msgstr ""
+
 msgctxt "smoothing"
 msgid "Light"
 msgstr ""
@@ -9259,6 +9354,10 @@ msgstr ""
 
 msgctxt "tray menu"
 msgid "Settings"
+msgstr ""
+
+msgctxt "unit"
+msgid "MB"
 msgstr ""
 
 msgctxt "upload content"

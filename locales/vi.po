@@ -2231,9 +2231,6 @@ msgstr "Đăng lên một Trang bạn quản lý."
 msgid "Preparing the preview…"
 msgstr "Đang chuẩn bị bản xem trước…"
 
-msgid "Press Export MP4 to make one file with the screen, camera bubble and audio."
-msgstr "Nhấn Xuất MP4 để tạo một tệp gồm màn hình, bong bóng camera và âm thanh."
-
 msgid "Press Z to add one at the playhead."
 msgstr "Nhấn Z để thêm một điểm tại đầu phát."
 
@@ -9703,3 +9700,118 @@ msgstr "ước tính: dưới 5 MB"
 #, fuzzy
 msgid "estimate: up to {size}"
 msgstr "ước tính: tối đa {size}"
+
+msgctxt "export popover"
+msgid "Export"
+msgstr "Xuất"
+
+msgid "Recording size"
+msgstr "Kích thước gốc"
+
+msgid "Plays almost everywhere"
+msgstr "Phát được hầu hết mọi nơi"
+
+msgid "Smaller, for the web"
+msgstr "Nhỏ hơn, dùng cho web"
+
+msgid "Short loop for docs and PRs"
+msgstr "Ảnh động ngắn cho tài liệu, PR"
+
+msgid "Never larger than the recording"
+msgstr "Không lớn hơn bản ghi"
+
+msgid "Width"
+msgstr "Chiều rộng"
+
+msgid "Keep the file under"
+msgstr "Giữ tệp dưới"
+
+msgid "Keep the file under {mb} MB"
+msgstr "Giữ tệp dưới {mb} MB"
+
+#, fuzzy
+msgid "Megabytes"
+msgstr "Megabyte"
+
+#, fuzzy
+msgctxt "field"
+msgid "MB"
+msgstr "MB"
+
+#, fuzzy
+msgctxt "unit"
+msgid "MB"
+msgstr "MB"
+
+msgid "Estimated size"
+msgstr "Dung lượng ước tính"
+
+msgctxt "size tag"
+msgid "Estimate"
+msgstr "Ước tính"
+
+#, fuzzy
+msgid "File size"
+msgstr "Dung lượng tệp"
+
+msgid "Size known after export"
+msgstr "Biết dung lượng sau khi xuất"
+
+msgid "Can’t export as GIF"
+msgstr "Không xuất được GIF"
+
+msgid "Runs in the background"
+msgstr "Chạy nền"
+
+msgid "Exported · {size}"
+msgstr "Đã xuất · {size}"
+
+msgid "{time} after cuts"
+msgstr "{time} sau khi cắt"
+
+#, fuzzy
+msgid "{time} between In and Out"
+msgstr "{time} giữa In và Out"
+
+#, fuzzy
+msgid "In {from} → Out {to} · {secs} s ({max} s at most)"
+msgstr "In {from} → Out {to} · {secs} giây (tối đa {max} giây)"
+
+msgid "Whole recording · {length} ({max} s at most)"
+msgstr "Cả bản ghi · {length} (tối đa {max} giây)"
+
+#, fuzzy
+msgid "GIF size can’t be estimated. It will stay under {mb} MB: width, then frame rate, step down to fit."
+msgstr "Không thể ước tính dung lượng GIF. Tệp sẽ dưới {mb} MB: giảm chiều rộng, rồi tốc độ khung hình cho vừa."
+
+#, fuzzy
+msgid "GIF size can’t be estimated. The real size is shown after export."
+msgstr "Không thể ước tính dung lượng GIF. Dung lượng thật hiện sau khi xuất."
+
+msgid "The real size is shown after export."
+msgstr "Dung lượng thật hiện sau khi xuất."
+
+msgid "{format} · {codec} · {width} × {height}. The real size is shown after export."
+msgstr "{format} · {codec} · {width} × {height}. Dung lượng thật hiện sau khi xuất."
+
+#, fuzzy
+msgid "{format}, {width} × {height}. The original tracks are untouched."
+msgstr "{format}, {width} × {height}. Các track gốc không bị thay đổi."
+
+#, fuzzy
+msgid "This computer has no H.264 video encoder, so MP4 files use VP9 video. Browsers play them; some older players and editors may not."
+msgstr "Máy này không có bộ mã hoá video H.264, nên tệp MP4 dùng video VP9. Trình duyệt phát được; một số trình phát và trình chỉnh sửa cũ có thể không phát được."
+
+#, fuzzy
+msgid "Press Export… to choose a format and size for one file with the screen, camera bubble and audio."
+msgstr "Nhấn Xuất… để chọn định dạng và kích thước cho một tệp gồm màn hình, bong bóng camera và âm thanh."
+
+#, fuzzy
+msgctxt "button"
+msgid "Export…"
+msgstr "Xuất…"
+
+#, fuzzy
+msgctxt "button"
+msgid "Exporting {pct}%"
+msgstr "Đang xuất {pct}%"
