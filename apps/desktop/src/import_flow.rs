@@ -15,12 +15,12 @@ use crate::daemon_text::{duration_text, size_text};
 
 /// Shown in the sheet and the drop overlay: only what the shipped FFmpeg reads.
 pub const SUPPORTED_VIDEO: &str = "MP4, MOV, M4V, MKV";
-pub const SUPPORTED_AUDIO: &str = "M4A, WAV";
+pub const SUPPORTED_AUDIO: &str = "M4A, WAV, MP3";
 /// Extensions the drop overlay counts as media (the probe decides for real).
 pub const VIDEO_EXT: [&str; 5] = ["mp4", "mov", "m4v", "mkv", "webm"];
-pub const AUDIO_EXT: [&str; 3] = ["m4a", "wav", "aac"];
+pub const AUDIO_EXT: [&str; 4] = ["m4a", "wav", "aac", "mp3"];
 /// The extensions the macOS bundle registers for Open With and the Dock (`CFBundleDocumentTypes`).
-pub const DOCUMENT_EXT: [&str; 6] = ["mp4", "mov", "m4v", "mkv", "m4a", "wav"];
+pub const DOCUMENT_EXT: [&str; 7] = ["mp4", "mov", "m4v", "mkv", "m4a", "wav", "mp3"];
 
 /// The free-space floor the daemon keeps (NFR-7), for the footer's "free" figure.
 pub const FLOOR_BYTES: u64 = 1_000_000_000;
@@ -50,6 +50,9 @@ pub struct Row {
     pub status: Status,
     pub meta: String,
     pub other_audio: u64,
+    /// What the daemon says the import writes for this file (the copy, an editing copy and the
+    /// decoded sound); `None` from an older daemon.
+    pub planned_bytes: Option<u64>,
 }
 
 impl Row {
@@ -57,10 +60,13 @@ impl Row {
         !matches!(self.status, Status::Cant(..))
     }
 
-    /// Bytes the import writes for this file (the copy, twice with an editing copy).
+    /// Bytes the import writes for this file (the copy, twice with an editing copy, plus the decoded sound).
     pub fn needed(&self) -> u64 {
         if !self.importable() {
             return 0;
+        }
+        if let Some(n) = self.planned_bytes {
+            return n;
         }
         self.size_bytes
             * if matches!(self.status, Status::Prepared(_)) {
@@ -162,6 +168,7 @@ pub fn row_from_json(r: &Value) -> Row {
         status,
         meta,
         other_audio: r["other_audio_streams"].as_u64().unwrap_or(0),
+        planned_bytes: r["needed_bytes"].as_u64(),
     }
 }
 
@@ -1027,7 +1034,7 @@ mod tests {
         assert!(folder_hint().starts_with("Folders can't be imported yet"));
         assert_eq!(
             drop_formats_line(),
-            "Video: MP4, MOV, M4V, MKV \u{b7} Audio: M4A, WAV"
+            "Video: MP4, MOV, M4V, MKV \u{b7} Audio: M4A, WAV, MP3"
         );
     }
 
@@ -1102,6 +1109,23 @@ mod tests {
     }
 
     #[test]
+    fn a_row_counts_what_the_daemon_says_the_import_writes() {
+        // An MP3: the copy (3 MB) plus the decoded sound, which the daemon adds up.
+        let r = row_from_json(&json!({
+            "path": "/m/talk.mp3", "name": "talk.mp3", "title": "Talk", "size_bytes": 3_000_000,
+            "kind": "audio", "status": "ready", "reasons": [], "needed_bytes": 700_000_000
+        }));
+        assert_eq!(r.needed(), 700_000_000);
+        // An older daemon sends no figure: the copy is counted, twice when prepared.
+        let r = row_from_json(&json!({
+            "path": "/m/a.wav", "name": "a.wav", "title": "a", "size_bytes": 5,
+            "kind": "audio", "status": "ready", "reasons": []
+        }));
+        assert_eq!(r.needed(), 5);
+        assert!(AUDIO_EXT.contains(&"mp3") && DOCUMENT_EXT.contains(&"mp3"));
+    }
+
+    #[test]
     fn a_windows_file_url_loses_the_slash_before_the_drive() {
         let urls = vec!["file:///C:/Users/me/My%20Clip.mov".to_owned()];
         assert_eq!(
@@ -1117,7 +1141,7 @@ mod tests {
         for e in DOCUMENT_EXT {
             assert!(plist.contains(&format!("<string>{e}</string>")), "{e}");
         }
-        for e in ["webm", "avi", "mp3", "flac"] {
+        for e in ["webm", "avi", "flac"] {
             assert!(!plist.contains(&format!("<string>{e}</string>")), "{e}");
         }
     }
@@ -1137,7 +1161,7 @@ mod tests {
                 "OpenWithList .{e}"
             );
         }
-        for e in ["webm", "avi", "mp3", "flac"] {
+        for e in ["webm", "avi", "flac"] {
             assert!(!nsi.contains(&format!(".{e}\\OpenWithList")), "{e}");
         }
         // Never the default: no value is written on the extension key itself.

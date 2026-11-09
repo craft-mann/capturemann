@@ -933,7 +933,7 @@ pub enum LibraryCmd {
 
 #[derive(Debug, Args)]
 pub struct ImportArgs {
-    /// The files to import (video: MP4, MOV, M4V, MKV with H.264 or HEVC; audio: M4A, WAV).
+    /// The files to import (video: MP4, MOV, M4V, MKV with H.264 or HEVC; audio: M4A, WAV, MP3).
     /// Relative paths and `~` are resolved here. Folders are refused.
     #[arg(required = true, num_args = 1.., value_name = "FILE")]
     pub files: Vec<String>,

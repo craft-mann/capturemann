@@ -52,7 +52,7 @@
             <key>CFBundleTypeRole</key><string>Viewer</string>
             <key>LSHandlerRank</key><string>Alternate</string>
             <key>CFBundleTypeExtensions</key>
-            <array><string>m4a</string><string>wav</string></array>
+            <array><string>m4a</string><string>wav</string><string>mp3</string></array>
         </dict>
     </array>
     <key>NSDesktopFolderUsageDescription</key>
