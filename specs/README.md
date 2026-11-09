@@ -38,7 +38,7 @@ Plans for larger features and the design-kit traceability table live in `plans/`
 | `features/05-audio.md` | Audio | AUD-1 … AUD-4 |
 | `features/06-editing.md` | Editing | EDT-1 … EDT-5 |
 | `features/07-ai.md` | AI | AI-1 … AI-10 |
-| `features/08-export.md` | Export | EXP-1 … EXP-4 |
+| `features/08-export.md` | Export | EXP-1 … EXP-5 |
 | `features/09-library.md` | Library | LIB-1 … LIB-3 |
 | `features/10-storage.md` | Storage | STO-1 … STO-5 |
 | `features/11-publishing.md` | Publishing | PUB-1 … PUB-7 |
