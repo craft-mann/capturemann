@@ -26,6 +26,13 @@ Contents/Resources/Llama/ on macOS and Llama\ in the Windows package (LICENSES/ 
 and the build scripts are packaging/llama/build-macos.sh and build-windows.sh. The text models CaptureMann downloads on request are separate files
 under their own open licences (Apache-2.0 or MIT), shown on the AI page before the download.
 
+Speech recognition uses whisper.cpp and ggml (https://github.com/ggml-org/whisper.cpp, MIT License,
+Copyright the ggml authors), compiled into the app through the whisper-rs bindings (Unlicense). The
+whisper.cpp 1.8.3 source is a vendored copy in vendor/whisper-rs-sys with one change, marked
+"CaptureMann patch" in src/whisper.cpp and listed in vendor/README-CaptureMann.md: a decode window
+the word-timing alignment cannot use is skipped instead of aborting the program. Its LICENSE is kept
+beside it and in THIRD_PARTY_LICENSES.md.
+
 Speaker labels use sherpa-onnx (https://github.com/k2-fsa/sherpa-onnx, Apache License 2.0; Rust
 bindings vendored unchanged in vendor/sherpa-onnx and vendor/sherpa-onnx-sys with a build script that
 only links, each with its LICENSE) and the ONNX Runtime inside its prebuilt static libraries (MIT

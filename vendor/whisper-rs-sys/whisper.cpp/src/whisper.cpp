@@ -8812,8 +8812,20 @@ static void whisper_exp_compute_token_level_timestamps_dtw(
 {
     const int n_audio_ctx = state->exp_n_audio_ctx > 0 ? state->exp_n_audio_ctx : ctx->model.hparams.n_audio_ctx;
     WHISPER_ASSERT(medfilt_width % 2);
-    WHISPER_ASSERT(n_frames <= n_audio_ctx * 2);
     WHISPER_ASSERT(ctx->params.dtw_aheads_preset != WHISPER_AHEADS_NONE);
+
+    // CaptureMann patch (vendor/README-CaptureMann.md): a window the alignment cannot use keeps
+    // t_dtw = -1 on its tokens instead of aborting the process. Upstream 1.8.3 asserts
+    // n_frames <= 2*n_audio_ctx here and filter_width < n_audio_tokens (= n_frames/2) in
+    // median_filter(); the second fails whenever the window's decoded segments end within its
+    // first 160 ms (a stray token at the start of a window, then silence), which a long recording
+    // reaches sooner or later, and WHISPER_ASSERT is abort(). The caller then falls back to the
+    // default token times for this window.
+    if (n_frames / 2 <= medfilt_width || n_frames > n_audio_ctx * 2) {
+        WHISPER_LOG_WARN("%s: DTW skipped for a window of %d frames (median filter width %d, audio context %d); its tokens keep t_dtw = -1\n",
+                __func__, n_frames, medfilt_width, n_audio_ctx);
+        return;
+    }
 
     // FIXME: Allocating mem everytime we call this func
     // Our ggml buffer should be pre-allocated somewhere during init and reused
@@ -8854,8 +8866,11 @@ static void whisper_exp_compute_token_level_timestamps_dtw(
     whisper_batch_prep_legacy(state->batch, tokens.data(), tokens.size(), 0, 0);
     whisper_kv_cache_seq_rm(state->kv_self, 0, 0, -1);
     if (!whisper_decode_internal(*ctx, *state, state->batch, n_threads, true, nullptr, nullptr)) {
-        WHISPER_LOG_INFO("DECODER FAILED\n");
-        WHISPER_ASSERT(0);
+        // CaptureMann patch: a failed alignment decode leaves this window without DTW times
+        // (upstream: WHISPER_ASSERT(0), an abort).
+        WHISPER_LOG_WARN("%s: DTW skipped: the alignment decode failed; its tokens keep t_dtw = -1\n", __func__);
+        ggml_free(gctx);
+        return;
     }
     WHISPER_ASSERT(state->aheads_cross_QKs != nullptr);
 
