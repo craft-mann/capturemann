@@ -7,7 +7,7 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ### Added
 - **Import MP3.** An `.mp3` file imports as an audio capture (app, CLI and MCP): decoded once to the standard WAV master, the original kept beside it, the title from the ID3 tag or the file name, and the Import sheet shows the full size first. Bare AAC is still refused. The bundled FFmpeg adds only the MP3 demuxer, decoder and parser (still LGPL).
-- **Export: choose size and format, see the file size first.** The Export button opens a popover: MP4, WebM or GIF, the recording's size or 1440p, 1080p, 720p or 480p (never above the recording), and an estimated size shown as an upper bound ("Up to 290 MB"; a GIF's size is known after export). `capturemann export <id> --format webm --size 720p [--estimate]` and the MCP `export_video` and new `estimate_export` do the same. WebM now has a bit-rate cap so the bound holds.
+- **Export: choose size and format, see the file size first.** The Export button opens a popover: MP4, WebM or GIF, the recording's size or 1440p, 1080p, 720p or 480p (never above the recording), and an estimated size: a best guess ("About 14 MB", from the recording's own file size, calibrated on real screen recordings) with the upper bound next to it ("up to 69 MB"; a GIF's size is known after export). `capturemann export <id> --format webm --size 720p [--estimate]` and the MCP `export_video` and new `estimate_export` do the same (`typical_bytes` next to `max_bytes`). WebM now has a bit-rate cap so the bound holds.
 - **Transcript progress on every capture.** A recording's page, the audio page and the library card show the same progress (percent, stage, Cancel, error with Retry) as an imported file.
 
 ### Fixed
