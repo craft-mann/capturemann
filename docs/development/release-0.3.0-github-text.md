@@ -44,9 +44,7 @@ systems. A few things differ by design or are not possible on Linux; they are li
   Auto-redact (uses the system `tesseract`), speaker labels and the built-in text model: as listed in the parity table in
   `specs/plans/linux-parity-matrix.md`.
 - **Install:** a tarball and a `.deb` for x86_64 and aarch64, minisign signatures, and a signed APT repository tool
-  (host: the assets of the GitHub release tagged `apt`, `https://github.com/craft-mann/capturemann/releases/download/apt/`;
-  repository key fingerprint `516C CD4F C7B3 5167 8803  F71B DEB1 BB54 FAEF 557D`; install lines: `docs/development/linux-apt.md`).
-  <!-- Publish this line only after the `apt` release exists and the clean Ubuntu 24.04 install check passed. -->
+  (published: the assets of the GitHub release tagged `apt`; key fingerprint `516C CD4F C7B3 5167 8803  F71B DEB1 BB54 FAEF 557D`; install lines at the end of the notes; `docs/development/linux-apt.md`).
 
 
 ## What is different or missing on Linux (and why)
