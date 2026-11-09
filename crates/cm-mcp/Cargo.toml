@@ -21,7 +21,7 @@ path = "src/main.rs"
 cm-core.workspace = true
 cm-ipc.workspace = true
 # Apache-2.0
-rmcp = { version = "3.5.1", default-features = false, features = ["server", "client", "macros", "transport-io", "transport-async-rw", "transport-streamable-http-server"] }
+rmcp = { version = "3.9.0", default-features = false, features = ["server", "client", "macros", "transport-io", "transport-async-rw", "transport-streamable-http-server"] }
 # MIT
 http = "1"
 bytes = "1"
