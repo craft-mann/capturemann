@@ -1,4 +1,4 @@
-# GitHub release text for 0.3.0 (draft, not published)
+# GitHub release text for 0.3.0 (published Nov 9, 2026 as a pre-release; the release body below is a copy of the live notes)
 
 Prepared the night of Nov 8 to 9, 2026 by the night orchestrator, from `specs/plans/release-0.3.0-plan.md`,
 `specs/plans/linux-parity-matrix.md`, `git log v0.2.9..HEAD` and the stored reports in `verification/` (`L1-linux-0.3.0-*`).
@@ -43,8 +43,8 @@ systems. A few things differ by design or are not possible on Linux; they are li
 - **Tray, shortcuts, Open with** (the desktop entry offers CaptureMann for importable media), idle-sleep guard while recording,
   Auto-redact (uses the system `tesseract`), speaker labels and the built-in text model: as listed in the parity table in
   `specs/plans/linux-parity-matrix.md`.
-- **Install:** a tarball and a `.deb` for x86_64 and aarch64, minisign signatures, and a signed APT repository tool
-  (published: the assets of the GitHub release tagged `apt`; key fingerprint `516C CD4F C7B3 5167 8803  F71B DEB1 BB54 FAEF 557D`; install lines at the end of the notes; `docs/development/linux-apt.md`).
+- **Install:** a tarball and a `.deb` for x86_64 and aarch64, minisign signatures, and a signed APT repository
+  (install steps at the end of these notes).
 
 
 ## What is different or missing on Linux (and why)
@@ -71,7 +71,7 @@ systems. A few things differ by design or are not possible on Linux; they are li
 
 Reports are in `verification/` (`L1-linux-0.3.0-*`); all are marked PARTIAL. Tested on **one** computer: ThinkPad T490, Intel UHD
 620, Ubuntu 24.04.5, GNOME 46, X11 and Wayland, built-in webcam, plus an aarch64 Ubuntu 24.04 VM (headless: no recording, no
-desktop cases). `cm-regress` on the first build of these files (commit `5301d4b8`, extracted tarball unless noted), passed / failed / skipped. The files above were rebuilt from `6cdcb033` (only the "early build" wording, the cursor-rule move to `cm-platform`, `pw_registry.rs` starting its helper through `cm_platform::process::command`, and Linux-only gating of two desktop details differ): <FILL: result of the smoke and standard runs on the rebuilt files>.
+desktop cases). `cm-regress` on the first build of these files (commit `5301d4b8`, extracted tarball unless noted), passed / failed / skipped. The files above were rebuilt from `6cdcb033` afterwards (wording changes, one behaviour-neutral move of a rule to `cm-platform`, one helper call, and two Linux-only gates on desktop details); **no separate `cm-regress` run was made on the rebuilt files**, and CI (build, clippy and tests on Ubuntu, macOS and Windows) passed on the commit before them.
 
 | Run | Result |
 | --- | --- |
@@ -99,7 +99,7 @@ than one second on Wayland.
 - **Sound cases** (system audio recording, the chime player, the speakers) in the final regression: quiet hours.
 - The flash-to-beep offset on X11, a 30-minute soak, X11 window recording from the CLI on hardware, Wayland window recording.
 - A second USB webcam, low light, replugging, a camera without access (video group).
-- The APT repository on GitHub's runners and with a real key, the Linux package workflow on GitHub (never run there),
+- The APT repository was installed from once, on an aarch64 Ubuntu 24.04 VM; **not run:** an amd64 install from it, an upgrade or removal through it, and the Linux package workflow on GitHub (never run there),
   `ubuntu` versions other than 24.04.
 - The 3 manual scripts for IME typing (IBus Telex/VNI) on the final build.
 
@@ -113,4 +113,17 @@ than one second on Wayland.
 | `capturemann_0.3.0_arm64.deb` | `4e024e03801764a1ca1df56b1af09990bfcae12b30fdc0dffb1b41ada1b65e0b` |
 
 Minisign public key: `packaging/linux/minisign.pub`; public key `RWTeQv8ogB2CCuZ7j0rr3MovdHod4QATmVn+I329YC8pomOC6R9Rxc2k` (verify: `minisign -Vm <file> -P <that key>`).
+### Install with APT (Ubuntu 24.04 or newer, amd64 and arm64)
+
+```sh
+U=https://github.com/craft-mann/capturemann/releases/download/apt
+sudo curl -fsSL --retry 5 --retry-all-errors $U/capturemann-archive-keyring.gpg -o /usr/share/keyrings/capturemann-archive-keyring.gpg
+sudo curl -fsSL --retry 5 --retry-all-errors $U/capturemann.sources -o /etc/apt/sources.list.d/capturemann.sources
+sudo apt -o Acquire::Retries=5 update && sudo apt -o Acquire::Retries=5 install capturemann
+```
+
+GitHub's release host sometimes answers the first download of a file with a `504`; repeating the command works (the `Retries` option does it for you). The repository is hosted on GitHub release assets for now.
+
+Repository key fingerprint: `516C CD4F C7B3 5167 8803  F71B DEB1 BB54 FAEF 557D` (RSA 4096, signing only, expires Nov 8, 2031). The repository is the set of files of the release tagged [`apt`](https://github.com/craft-mann/capturemann/releases/tag/apt). The key and source files must be the ones from that release; check the fingerprint with `gpg --show-keys /usr/share/keyrings/capturemann-archive-keyring.gpg`.
+
 Install: `sudo apt install ./capturemann_0.3.0_amd64.deb` (or the tarball and `install.sh`).
