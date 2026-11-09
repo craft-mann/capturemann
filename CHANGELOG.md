@@ -5,6 +5,14 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
+### Added
+- **Import MP3.** An `.mp3` file imports as an audio capture (app, CLI and MCP): decoded once to the standard WAV master, the original kept beside it, the title from the ID3 tag or the file name, and the Import sheet shows the full size first. Bare AAC is still refused. The bundled FFmpeg adds only the MP3 demuxer, decoder and parser (still LGPL).
+- **Export: choose size and format, see the file size first.** The Export button opens a popover: MP4, WebM or GIF, the recording's size or 1440p, 1080p, 720p or 480p (never above the recording), and an estimated size shown as an upper bound ("Up to 290 MB"; a GIF's size is known after export). `capturemann export <id> --format webm --size 720p [--estimate]` and the MCP `export_video` and new `estimate_export` do the same. WebM now has a bit-rate cap so the bound holds.
+- **Transcript progress on every capture.** A recording's page, the audio page and the library card show the same progress (percent, stage, Cancel, error with Retry) as an imported file.
+
+### Fixed
+- The export's cancel no longer waits on a pipe held by another process (a Windows CI flake); wind-down waits are bounded.
+
 ### Changed
 - Transcripts are made from the **original microphone** by default. Since 0.2.7 the default was the noise-reduced copy a recording stores beside the microphone track, which can drop quiet or distant speakers; the original track reads them. The setting `ai.transcribe_raw_mic` (AI page, "Transcribe from": Original microphone or Noise-reduced copy; `capturemann settings set`, MCP `set_settings`) turns the copy back on, and `capturemann ai transcribe --original-audio` / `--denoised-audio` and the MCP `transcribe` field `original_audio` still choose per run. Nothing is migrated: the setting is read when a transcription starts, a library that never stored it uses the original microphone, a stored value (on or off) is kept, and transcripts already made are not changed. The system-audio track is unchanged.
 
