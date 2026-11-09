@@ -67,6 +67,13 @@ pub struct ExportStatus {
 /// counts as holding both.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ExportContents {
+    /// The file's format (`preset` of `export.done`: `webm` and `gif` are those formats, every
+    /// other preset is an MP4).
+    pub kind: FileKind,
+    /// The pixels of the file, when the result says.
+    pub size_px: Option<(u32, u32)>,
+    /// The real size and the estimate that was shown before (EXP-5).
+    pub finished: crate::export_flow::Finished,
     pub camera: bool,
     pub audio: bool,
     /// The file is VP9, not H.264, and the result says why (`codec_note`; Linux without a
@@ -74,9 +81,31 @@ pub struct ExportContents {
     pub vp9: bool,
 }
 
+/// The format of a finished video export.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum FileKind {
+    #[default]
+    Mp4,
+    WebM,
+    Gif,
+}
+
+impl FileKind {
+    fn label(self) -> &'static str {
+        match self {
+            FileKind::Mp4 => "MP4",
+            FileKind::WebM => "WebM",
+            FileKind::Gif => "GIF",
+        }
+    }
+}
+
 impl Default for ExportContents {
     fn default() -> Self {
         ExportContents {
+            kind: FileKind::Mp4,
+            size_px: None,
+            finished: crate::export_flow::Finished::default(),
             camera: true,
             audio: true,
             vp9: false,
@@ -86,7 +115,15 @@ impl Default for ExportContents {
 
 impl ExportContents {
     fn of(data: &serde_json::Value) -> Self {
+        let px = |k: &str| data[k].as_u64().and_then(|n| u32::try_from(n).ok());
         ExportContents {
+            kind: match data["preset"].as_str() {
+                Some("webm") => FileKind::WebM,
+                Some("gif") => FileKind::Gif,
+                _ => FileKind::Mp4,
+            },
+            size_px: px("width").zip(px("height")),
+            finished: crate::export_flow::Finished::of(data),
             camera: data["has_camera"].as_bool().unwrap_or(true),
             audio: data["has_audio"].as_bool().unwrap_or(true),
             vp9: data["codec"].as_str() == Some("vp9") && data["codec_note"].is_string(),
@@ -478,7 +515,21 @@ pub fn exported_toast(
 /// The body of the "Exported" toast: what the one MP4 holds (the sentence follows the tracks that
 /// are in it), that the original tracks are untouched, and what happened to the captions.
 fn exported_body(contents: ExportContents, captions: Option<String>) -> String {
-    let body = exported_tracks_body(contents, captions);
+    let body = match (contents.kind, contents.size_px) {
+        // WebM and GIF: the file's format and pixels (the MP4 sentences below name the tracks).
+        (kind @ (FileKind::WebM | FileKind::Gif), Some((w, h))) => tr!(
+            "{format}, {width} \u{00D7} {height}. The original tracks are untouched.",
+            format = kind.label(),
+            width = w,
+            height = h
+        ),
+        _ => exported_tracks_body(contents, captions),
+    };
+    // The estimate that was shown before the export, under the real size (a GIF has none).
+    let body = match contents.finished.estimate_max_bytes {
+        Some(max) => format!("{body}\n{}", crate::daemon_text::estimate_note(max)),
+        None => body,
+    };
     if contents.vp9 {
         // O10: the file is not what the preset's name suggests; say so in the same toast.
         return format!(
@@ -528,7 +579,15 @@ fn exported_toast_now(
     contents: ExportContents,
 ) -> ToastSpec {
     let body = exported_body(contents, captions_note(captions));
-    ToastSpec::new(ToastKind::Success, tr!("Exported {title}", title = title))
+    // EXP-5: the real size is the title of the toast; Play and Reveal act on the recording.
+    let heading = match contents.finished.size_bytes {
+        Some(bytes) => tr!(
+            "Exported \u{00B7} {size}",
+            size = crate::daemon_text::real_size_text(bytes)
+        ),
+        None => tr!("Exported {title}", title = title),
+    };
+    ToastSpec::new(ToastKind::Success, heading)
         .body(body)
         .button(
             tr_ctx!("button", "Play"),
@@ -871,7 +930,7 @@ mod tests {
                 ExportContents {
                     camera,
                     audio,
-                    vp9: false,
+                    ..ExportContents::default()
                 },
             )
             .body
@@ -913,9 +972,42 @@ mod tests {
             ExportContents {
                 camera: false,
                 audio: true,
-                vp9: false
+                ..ExportContents::default()
             }
         );
+    }
+
+    /// EXP-5: the done toast leads with the real size and says under it what the estimate was;
+    /// a GIF has no estimate line; a WebM says its format and pixels instead of the MP4 tracks.
+    #[test]
+    fn the_done_toast_shows_the_real_size_and_the_estimate() {
+        let toast = |data: serde_json::Value| {
+            let t = exported_toast("rec_1", "Lesson", None, ExportContents::of(&data));
+            (t.title.clone(), t.body.clone().unwrap_or_default())
+        };
+        let (title, body) = toast(json!({
+            "preset": "quick", "size_bytes": 243_000_000u64, "width": 2880, "height": 1800,
+            "estimate": {"max_bytes": 290_000_000u64}
+        }));
+        assert_eq!(title, "Exported \u{b7} 243 MB");
+        assert!(body.starts_with("One MP4 with the screen"));
+        assert!(body.ends_with("\nestimate: up to 290 MB"), "{body}");
+        let (title, body) = toast(json!({
+            "preset": "webm", "size_bytes": 4_100_000u64, "width": 1152, "height": 720,
+            "estimate": {"max_bytes": 5_000_000u64}
+        }));
+        assert_eq!(title, "Exported \u{b7} 4.1 MB");
+        assert!(body.starts_with("WebM, 1152 \u{d7} 720."), "{body}");
+        assert!(body.ends_with("estimate: under 5 MB"), "{body}");
+        let (title, body) = toast(json!({
+            "preset": "gif", "size_bytes": 8_900_000u64, "width": 800, "height": 500,
+            "estimate": null
+        }));
+        assert_eq!(title, "Exported \u{b7} 8.9 MB");
+        assert!(body.starts_with("GIF, 800 \u{d7} 500."));
+        assert!(!body.contains("estimate"));
+        // An older result without the size keeps the old title.
+        assert_eq!(toast(json!({})).0, "Exported Lesson");
     }
 
     /// EXP-2 on Linux (O10): when the file is VP9 because there is no hardware H.264 encoder the

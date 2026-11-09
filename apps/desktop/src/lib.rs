@@ -19,6 +19,7 @@ pub mod delay;
 pub mod delete_flow;
 pub mod destinations;
 pub mod editor;
+pub mod export_flow;
 pub mod flows;
 #[cfg(test)]
 mod i18n_events_tests;

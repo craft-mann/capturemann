@@ -75,6 +75,12 @@ fn bound_size_text(bytes: u64) -> String {
     }
 }
 
+/// The real size of a finished file: `243 MB`, `1.2 GB` (same figures and decimal mark as the
+/// estimate's).
+pub fn real_size_text(bytes: u64) -> String {
+    bound_size_text(bytes)
+}
+
 /// The size estimate of an export as the popover shows it (EXP-5): "Up to 290 MB", or "Under 5 MB"
 /// at 5 MB and below. `max_bytes` is `estimate_export`'s bound; the English is the daemon's
 /// `label`.
