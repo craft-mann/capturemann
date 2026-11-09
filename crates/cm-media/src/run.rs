@@ -9,7 +9,8 @@ use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::Stdio;
 use std::sync::{mpsc, Arc, Mutex};
-use std::time::Duration;
+use std::thread::JoinHandle;
+use std::time::{Duration, Instant};
 
 use cm_core::CmError;
 
@@ -108,6 +109,26 @@ impl ProgressParser {
     }
 }
 
+/// How long the end of a run waits for its helper threads (the stdout and stderr readers and the
+/// feeder) once FFmpeg has exited or been killed. A reader only ends when every holder of the pipe
+/// has closed it; on Windows another child started at the same moment can hold a copy (see
+/// `cm_platform::process::spawn`), and the feeder may sit in a slow GPU step. The run must not
+/// wait for them: a cancel (EXP-4.AC4) is prompt and bounded on every system. A thread that is
+/// still busy after this is left to end by itself (its pipe or channel is closed, so it does).
+pub const WIND_DOWN_WAIT: Duration = Duration::from_secs(3);
+
+/// Joins `handle` when it ends within `wait`; `None` (the thread is detached) otherwise.
+pub fn join_within<T>(handle: JoinHandle<T>, wait: Duration) -> Option<T> {
+    let end = Instant::now() + wait;
+    while !handle.is_finished() {
+        if Instant::now() >= end {
+            return None;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    handle.join().ok()
+}
+
 /// Marker text of a feeder error that only says FFmpeg stopped reading.
 pub const BROKEN_PIPE: &str = "FFmpeg closed its input";
 
@@ -165,16 +186,16 @@ pub fn run_ffmpeg_fed(
     feeder: Option<Feeder>,
 ) -> Result<(), RunError> {
     let feed_error: Arc<Mutex<Option<CmError>>> = Arc::new(Mutex::new(None));
-    let mut child = cm_platform::process::command(ffmpeg)
-        .args(args)
+    let mut cmd = cm_platform::process::command(ffmpeg);
+    cmd.args(args)
         .stdin(if feeder.is_some() {
             Stdio::piped()
         } else {
             Stdio::null()
         })
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+        .stderr(Stdio::piped());
+    let mut child = cm_platform::process::spawn(&mut cmd)
         .map_err(|e| RunError::Failed(spawn_error(ffmpeg, &e)))?;
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
@@ -246,10 +267,12 @@ pub fn run_ffmpeg_fed(
             break child.wait();
         }
     };
-    let _ = out_thread.join();
-    let tail = err_thread.join().unwrap_or_default();
+    // Bounded: see WIND_DOWN_WAIT. The feeder is waited for first when FFmpeg failed on its own
+    // (its error may be the reason); after a cancel nobody needs what it has to say.
+    let _ = join_within(out_thread, WIND_DOWN_WAIT);
+    let tail = join_within(err_thread, WIND_DOWN_WAIT).unwrap_or_default();
     if let Some(t) = feed_thread {
-        let _ = t.join();
+        let _ = join_within(t, WIND_DOWN_WAIT);
     }
     if cancelled {
         return Err(RunError::Cancelled);
@@ -340,6 +363,79 @@ mod tests {
         );
         assert!(matches!(r, Err(RunError::Cancelled)));
         assert!(start.elapsed() < Duration::from_secs(5));
+    }
+
+    /// A grandchild that keeps FFmpeg's stdout and stderr open (on Windows: a child started at
+    /// the same moment that inherited the pipe ends) must not hold a cancel back: the readers
+    /// only end when the last holder exits, so the run stops waiting for them after a bound.
+    #[cfg(unix)]
+    #[test]
+    fn a_cancel_does_not_wait_for_a_holder_of_the_output_pipes() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let flag = AtomicBool::new(false);
+        let start = std::time::Instant::now();
+        // The shell starts a background sleeper that inherits both pipes, then waits for it.
+        let r = run_ffmpeg(
+            Path::new("/bin/sh"),
+            &["-c".to_owned(), "sleep 12 & wait".to_owned()],
+            1.0,
+            &mut |_| {},
+            &|| {
+                if start.elapsed() > Duration::from_millis(200) {
+                    flag.store(true, Ordering::SeqCst);
+                }
+                flag.load(Ordering::SeqCst)
+            },
+        );
+        assert!(matches!(r, Err(RunError::Cancelled)));
+        assert!(
+            start.elapsed() < WIND_DOWN_WAIT + Duration::from_secs(4),
+            "took {:?}",
+            start.elapsed()
+        );
+    }
+
+    /// A feeder stuck in a slow step (a GPU frame, a decoder that does not deliver) must not hold
+    /// a cancel back either.
+    #[cfg(unix)]
+    #[test]
+    fn a_cancel_does_not_wait_for_a_stuck_feeder() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let flag = AtomicBool::new(false);
+        let start = std::time::Instant::now();
+        let feeder: Feeder = Box::new(|_stdin| {
+            std::thread::sleep(Duration::from_secs(12));
+            Ok(())
+        });
+        let r = run_ffmpeg_fed(
+            Path::new("/bin/sleep"),
+            &["30".to_owned()],
+            1.0,
+            &mut |_| {},
+            &|| {
+                if start.elapsed() > Duration::from_millis(200) {
+                    flag.store(true, Ordering::SeqCst);
+                }
+                flag.load(Ordering::SeqCst)
+            },
+            Some(feeder),
+        );
+        assert!(matches!(r, Err(RunError::Cancelled)));
+        assert!(
+            start.elapsed() < WIND_DOWN_WAIT + Duration::from_secs(4),
+            "took {:?}",
+            start.elapsed()
+        );
+    }
+
+    #[test]
+    fn join_within_returns_a_result_or_gives_up() {
+        let quick = std::thread::spawn(|| 7);
+        assert_eq!(join_within(quick, Duration::from_secs(2)), Some(7));
+        let slow = std::thread::spawn(|| std::thread::sleep(Duration::from_millis(600)));
+        let t = Instant::now();
+        assert!(join_within(slow, Duration::from_millis(50)).is_none());
+        assert!(t.elapsed() < Duration::from_millis(500));
     }
 
     #[cfg(unix)]

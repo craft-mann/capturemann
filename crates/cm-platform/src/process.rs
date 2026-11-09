@@ -36,6 +36,24 @@ pub fn command(program: impl AsRef<OsStr>) -> Command {
     cmd
 }
 
+static SPAWN_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// `cmd.spawn()` for a child whose stdout or stderr is read to the end of file: one spawn at a
+/// time in this process.
+///
+/// Why: on Windows `std::process::Command` creates the child's pipe ends as inheritable and then
+/// calls `CreateProcess` with `bInheritHandles = TRUE`. A second thread that starts another child
+/// between those two steps hands that child the first child's pipe ends too. The second child
+/// (a decoder that lives for many seconds) then keeps the first one's stdout open after the
+/// first was killed, and a reader waiting for end-of-file blocks until the second child exits
+/// (a cancelled export took 23 to 31 s on loaded GitHub runners, 0.3.1 plan section 5). Holding
+/// one process-wide lock around every such spawn closes that window. The lock is held for the
+/// spawn only, never while the child runs. Elsewhere it changes nothing visible.
+pub fn spawn(cmd: &mut Command) -> io::Result<Child> {
+    let _guard = SPAWN_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    cmd.spawn()
+}
+
 /// Windows: `CREATE_NEW_PROCESS_GROUP` (Ctrl+C aimed at the caller does not reach the child).
 pub const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
 /// Windows: `DETACHED_PROCESS` (the child has no console, not even the caller's).

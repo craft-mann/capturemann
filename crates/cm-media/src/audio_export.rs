@@ -619,12 +619,12 @@ fn run_capture(
     args: &[String],
     cancel: &dyn Fn() -> bool,
 ) -> Result<String, ExportError> {
-    let mut child = cm_platform::process::command(ffmpeg)
-        .args(args)
+    let mut cmd = cm_platform::process::command(ffmpeg);
+    cmd.args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
+        .stderr(Stdio::piped());
+    let mut child = cm_platform::process::spawn(&mut cmd)
         .map_err(|e| ExportError::Failed(crate::tools::spawn_error(ffmpeg, &e)))?;
     let mut err = child.stderr.take();
     let reader = std::thread::spawn(move || {
@@ -640,12 +640,14 @@ fn run_capture(
         if cancel() {
             let _ = child.kill();
             let _ = child.wait();
-            let _ = reader.join();
+            // Bounded: a holder of the pipe must not hold a cancel back (run::WIND_DOWN_WAIT).
+            let _ = crate::run::join_within(reader, crate::run::WIND_DOWN_WAIT);
             return Err(ExportError::Cancelled);
         }
         match child.try_wait() {
             Ok(Some(status)) => {
-                let text = reader.join().unwrap_or_default();
+                let text =
+                    crate::run::join_within(reader, crate::run::WIND_DOWN_WAIT).unwrap_or_default();
                 if !status.success() {
                     let tail: Vec<String> = text
                         .lines()

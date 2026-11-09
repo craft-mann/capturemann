@@ -256,13 +256,12 @@ fn spawn_pump(job: PumpJob) -> Receiver<PumpMsg> {
         let frame_bytes = (job.size.0 as usize) * (job.size.1 as usize) * 3 / 2;
         let mut last: Option<Vec<u8>> = None;
         for seg in &job.segments {
-            let mut child = match cm_platform::process::command(&job.ffmpeg)
-                .args(decoder_args(&job, seg))
+            let mut cmd = cm_platform::process::command(&job.ffmpeg);
+            cmd.args(decoder_args(&job, seg))
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())
-                .stderr(Stdio::null())
-                .spawn()
-            {
+                .stderr(Stdio::null());
+            let mut child = match cm_platform::process::spawn(&mut cmd) {
                 Ok(c) => c,
                 Err(e) => {
                     let _ = tx.send(Err(crate::tools::spawn_error(&job.ffmpeg, &e)));
