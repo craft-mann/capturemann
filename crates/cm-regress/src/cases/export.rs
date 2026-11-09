@@ -45,6 +45,28 @@ pub fn cases() -> Vec<Case> {
             run: audio,
         },
         Case {
+            id: "export.estimate",
+            title: "export --estimate prints a range with codec and pixels; a GIF has none; the refusals are the shared ones",
+            area: "export",
+            specs: &["EXP-5.AC3", "EXP-5.AC4"],
+            tier: Tier::Standard,
+            needs: &[],
+            platforms: ALL,
+            timeout_s: 240,
+            run: estimate_cli,
+        },
+        Case {
+            id: "export.estimate_mcp",
+            title: "the MCP tool estimate_export answers the same range as the CLI",
+            area: "export",
+            specs: &["EXP-5.AC3", "AGT-1"],
+            tier: Tier::Standard,
+            needs: &[],
+            platforms: ALL,
+            timeout_s: 240,
+            run: estimate_mcp,
+        },
+        Case {
             id: "export.errors",
             title: "an unknown preset or capture is refused with the shared error codes",
             area: "export",
@@ -355,6 +377,159 @@ fn audio(ctx: &mut Ctx) -> R {
             (p.duration - 3.0).abs() < 0.4,
             "{fmt}: duration {:.2} s, expected about 3",
             p.duration
+        );
+    }
+    Ok(())
+}
+
+/// EXP-5: `export <id> --estimate` (no export is made): a range, the codec and the pixels; the
+/// MP4 on Linux without H.264 says `vp9`; a GIF has no estimate; a step above the recording is
+/// refused with `size_larger_than_source`.
+fn estimate_cli(ctx: &mut Ctx) -> R {
+    let id = import_clip(ctx)?;
+    let j = ctx.cli_ok(&["export", &id, "--estimate"])?;
+    let (lo, hi) = (
+        j.get("min_bytes").and_then(Value::as_u64),
+        j.get("max_bytes").and_then(Value::as_u64),
+    );
+    check!(
+        matches!((lo, hi), (Some(a), Some(b)) if a > 0 && a < b),
+        "no sensible range: {j}"
+    );
+    let codec = j.get("codec").and_then(Value::as_str).unwrap_or("");
+    check!(
+        codec == "h264" || (sys::PLATFORM == "linux" && codec == "vp9"),
+        "the MP4 estimate says codec `{codec}`"
+    );
+    check!(
+        j.get("label")
+            .and_then(Value::as_str)
+            .is_some_and(|l| l.starts_with("About ") || l == "Under 5 MB"),
+        "the label is not 'About N-M MB' or 'Under 5 MB': {j}"
+    );
+    let w = j.get("width").and_then(Value::as_u64).unwrap_or(0);
+    let h = j.get("height").and_then(Value::as_u64).unwrap_or(0);
+    check!(w > 0 && h > 0 && w % 2 == 0 && h % 2 == 0, "pixels {w}x{h}");
+    // A WebM at a smaller step: VP9, smaller pixels, and nothing was exported.
+    let sizes = j
+        .pointer("/options/sizes")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    check!(!sizes.is_empty(), "the options list no sizes: {j}");
+    if let Some(step) = sizes.get(1) {
+        let size = step.get("size").map(Value::to_string).unwrap_or_default();
+        let r = ctx.cli_ok(&[
+            "export",
+            &id,
+            "--format",
+            "webm",
+            "--size",
+            &size,
+            "--estimate",
+        ])?;
+        check!(
+            r.get("codec").and_then(Value::as_str) == Some("vp9"),
+            "webm: {r}"
+        );
+        check!(
+            r.get("height").and_then(Value::as_u64) == step.get("height").and_then(Value::as_u64),
+            "webm {size}: {r}"
+        );
+    }
+    let jobs = ctx.cli_ok(&["jobs", "list", "--type", "export"])?;
+    check!(
+        jobs.get("jobs")
+            .and_then(Value::as_array)
+            .is_none_or(Vec::is_empty),
+        "--estimate queued an export: {jobs}"
+    );
+    // GIF: no range ("known after export"), or the 30 s refusal for a long clip.
+    let g = ctx.cli(&["export", &id, "--format", "gif", "--estimate"])?;
+    check!(
+        (g.ok()
+            && g.json.as_ref().and_then(|v| v.get("known_after_export"))
+                == Some(&Value::Bool(true)))
+            || g.error_code().as_deref() == Some("invalid_input"),
+        "GIF estimate: {}",
+        crate::util::cut(&g.out.text(), 200)
+    );
+    // A step above the recording is refused with the shared text; `--size` with GIF is invalid.
+    let r = ctx.cli(&["export", &id, "--size", "1440p", "--estimate"])?;
+    if r.ok() {
+        ctx.note("the clip is larger than 1440p: the step is allowed".to_owned());
+    } else {
+        check!(
+            r.code() == Some(2) && r.error_code().as_deref() == Some("invalid_input"),
+            "1440p above the recording gave {} {:?}",
+            exit_text(r.code()),
+            r.error_code()
+        );
+        check!(
+            r.error_message().contains("is larger than the recording"),
+            "text: {}",
+            r.error_message()
+        );
+    }
+    let r = ctx.cli(&[
+        "export",
+        &id,
+        "--format",
+        "gif",
+        "--size",
+        "720p",
+        "--estimate",
+    ])?;
+    check!(
+        !r.ok() && r.error_code().as_deref() == Some("invalid_input"),
+        "--size with GIF gave {}",
+        exit_text(r.code())
+    );
+    Ok(())
+}
+
+/// EXP-5: the MCP tool `estimate_export` gives the numbers of `export --estimate`.
+fn estimate_mcp(ctx: &mut Ctx) -> R {
+    let id = import_clip(ctx)?;
+    let cli = ctx.cli_ok(&["export", &id, "--estimate"])?;
+    let mut c = crate::mcp::McpClient::spawn(ctx, &[])?;
+    if let Err(e) = c.initialize() {
+        return fail(format!("initialize failed: {e}\n{}", c.transcript()));
+    }
+    let r = match c.call("estimate_export", serde_json::json!({ "capture_id": id })) {
+        Ok(Ok(r)) => r,
+        Ok(Err((code, msg))) => return fail(format!("estimate_export: JSON-RPC {code} {msg}")),
+        Err(e) => return fail(format!("estimate_export: {e}\n{}", c.transcript())),
+    };
+    let v = r.json().unwrap_or(Value::Null);
+    let g = c.call(
+        "estimate_export",
+        serde_json::json!({ "capture_id": id, "format": "webm", "size": "source" }),
+    );
+    c.close();
+    check!(
+        !r.is_error,
+        "estimate_export failed: {}",
+        crate::util::cut(&r.text, 200)
+    );
+    for key in [
+        "min_bytes",
+        "max_bytes",
+        "label",
+        "codec",
+        "width",
+        "height",
+    ] {
+        check!(
+            v.get(key) == cli.get(key),
+            "MCP and CLI differ in `{key}`: {v} / {cli}"
+        );
+    }
+    if let Ok(Ok(g)) = g {
+        check!(
+            !g.is_error,
+            "webm estimate failed: {}",
+            crate::util::cut(&g.text, 200)
         );
     }
     Ok(())
