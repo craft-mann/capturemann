@@ -536,7 +536,7 @@ struct RowCtx {
     app: Entity<AppModel>,
     /// Imported captures whose own transcription runs (the same `TranscribeVm` the editor reads,
     /// fed by `transcript.started` and `job.progress`), with its fraction when known.
-    transcribing: Arc<std::collections::HashMap<String, Option<f32>>>,
+    transcribing: Arc<std::collections::HashMap<String, (String, Option<f32>)>>,
 }
 
 /// The darkened overlay behind the pills on a thumbnail (the thumbnail is an image, so the
@@ -853,25 +853,30 @@ fn card(ctx: &RowCtx, ix: usize, width: f32, cx: &mut gpui::App) -> AnyElement {
     }
     .border_color(rgba_of(border))
     .group_hover(group.clone(), move |s| s.border_color(hover_border));
-    // IMP-5: an imported capture carries the badge, and a strip while its import still runs.
-    let frame = if item.imported_from.is_some() {
-        let mut fr = frame.child(crate::ui::import_cards::imported_badge(&t));
-        if ctx.imports.strip_for(&item.id).is_none() {
-            if let Some(frac) = ctx.transcribing.get(&item.id) {
-                fr = fr.child(crate::ui::import_cards::progress_strip(
+    // IMP-5: an imported capture carries the badge, and a strip while its import still runs. A
+    // running transcription shows the same strip on any capture (a recording or an audio capture
+    // made here as well as an import), unless the import's own step is showing.
+    let imported = item.imported_from.is_some();
+    let mut frame = if imported {
+        frame.child(crate::ui::import_cards::imported_badge(&t))
+    } else {
+        frame
+    };
+    match ctx.imports.strip_for(&item.id) {
+        Some((step, frac)) if imported => {
+            frame = frame.child(crate::ui::import_cards::progress_strip(&t, &step, frac));
+        }
+        _ => {
+            if let Some((stage, frac)) = ctx.transcribing.get(&item.id) {
+                frame = frame.child(crate::ui::import_cards::progress_strip(
                     &t,
-                    &tr!("Transcribing"),
+                    stage,
                     frac.map(f64::from),
                 ));
             }
         }
-        if let Some((step, frac)) = ctx.imports.strip_for(&item.id) {
-            fr = fr.child(crate::ui::import_cards::progress_strip(&t, &step, frac));
-        }
-        fr
-    } else {
-        frame
-    };
+    }
+    let frame = frame;
     // The "..." button shows on hover, on keyboard focus, on the selected card while the list has
     // focus, and while its menu is open. It sits beside the clickable card (not inside it) and
     // occludes what is under it, so a click on it never also opens the capture.
@@ -1621,8 +1626,11 @@ impl Render for LibraryView {
                         let m = self.app.read(cx);
                         self.items
                             .iter()
-                            .filter(|i| i.imported_from.is_some() && m.transcribe.is_running(&i.id))
-                            .map(|i| (i.id.clone(), m.transcribe.fraction(&i.id)))
+                            .filter_map(|i| {
+                                m.transcribe
+                                    .view(&i.id)
+                                    .map(|v| (i.id.clone(), (v.stage, v.fraction)))
+                            })
                             .collect()
                     }),
                 };

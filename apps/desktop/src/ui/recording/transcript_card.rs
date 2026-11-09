@@ -16,11 +16,12 @@ use cm_i18n::{tr, tr_ctx};
 use crate::ai::client::CaptionFormat;
 use crate::theme::{scale, type_scale, Theme};
 use crate::ui::ai;
+use crate::ui::ai_view;
 use crate::ui::app::AppModel;
 use crate::ui::components::{button, icon, icon_size, switch, ButtonKind};
 use crate::ui::kit::{callout, Tone};
 use crate::ui::paint::rgba_of;
-use crate::ui::settings::widgets::{disabled_button, segment, segmented, small_button_with_icon};
+use crate::ui::settings::widgets::{segment, segmented, small_button_with_icon};
 
 /// The hint under "Timestamps in TXT": what the switch changes in the file (`[mm:ss]` before every
 /// line, see `ai::client`).
@@ -296,7 +297,7 @@ pub fn transcript_section(
         let m = app.read(cx);
         (
             m.transcribe.transcripts.state(capture_id).cloned(),
-            m.transcribe.status_text(capture_id),
+            m.transcribe.view(capture_id),
             m.transcribe.error_of(capture_id),
             m.transcribe.regen_of(capture_id).cloned(),
             m.ai.installed_models()
@@ -357,15 +358,8 @@ pub fn transcript_section(
             cx.defer(move |cx| ai::export_captions(&app, &cap, fmt, cx));
         }
     };
-    let actions: AnyElement = if let Some(text) = &running {
-        disabled_button(
-            t,
-            id_of("working"),
-            text,
-            &tr_ctx!("button reason", "Working"),
-            false,
-        )
-        .into_any_element()
+    let actions: AnyElement = if let Some(view) = &running {
+        ai_view::transcribe_progress(t, app, capture_id, prefix, view)
     } else {
         let mut group = div()
             .flex()
@@ -489,12 +483,7 @@ pub fn transcript_section(
                     false,
                 )),
         )
-        .children(error.map(|e| {
-            div()
-                .text_size(px(type_scale::CAPTION))
-                .text_color(rgba_of(t.warning))
-                .child(SharedString::from(e))
-        }))
+        .children(error.map(|e| ai_view::transcribe_error(t, app, capture_id, prefix, e, true)))
         .into_any_element()
 }
 

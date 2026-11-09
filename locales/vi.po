@@ -953,6 +953,12 @@ msgstr "Không thể khởi động lớp phủ chụp: {e}"
 msgid "Couldn’t start the transcription"
 msgstr "Không thể bắt đầu chép lời"
 
+msgid "Couldn’t cancel the transcription"
+msgstr "Không thể hủy việc chép lời"
+
+msgid "Checking the transcript"
+msgstr "Đang kiểm tra bản chép lời"
+
 msgid "Couldn’t stop the download"
 msgstr "Không thể dừng tải xuống"
 
@@ -3752,9 +3758,6 @@ msgstr "Không có âm thanh"
 msgid "Without webcam"
 msgstr "Không có webcam"
 
-msgid "Working"
-msgstr "Đang xử lý"
-
 msgid "Working…"
 msgstr "Đang xử lý…"
 
@@ -4723,10 +4726,6 @@ msgstr "Hiện"
 msgctxt "button"
 msgid "Transcribe"
 msgstr "Chép lời"
-
-msgctxt "button reason"
-msgid "Working"
-msgstr "Đang xử lý"
 
 msgctxt "button, after the link was copied"
 msgid "Copied"

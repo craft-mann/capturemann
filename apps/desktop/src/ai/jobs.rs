@@ -14,6 +14,39 @@ struct Run {
     job_id: Option<String>,
     /// 0.0 to 1.0 when the job reports it.
     progress: Option<f32>,
+    /// The job's own progress message (`job.progress` `message`, `list_jobs` `message`), for
+    /// example "Transcribing 40%" or "Checking the transcript 80%".
+    message: Option<String>,
+}
+
+/// What a running transcription looks like on a page or a card: the stage in words (no
+/// percentage in it), the fraction when the job reports one, and the job to cancel.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RunView {
+    pub stage: String,
+    pub fraction: Option<f32>,
+    pub job_id: Option<String>,
+}
+
+/// The stage named by a transcription job's progress message, worded in the current language:
+/// the daemon sends "Transcribing 40%" or "Checking the transcript 80%"; the percentage is shown
+/// by its own part of the strip. No message (not started yet, or a job from an older daemon)
+/// reads "Transcribing".
+pub fn stage_label(message: Option<&str>) -> String {
+    let text = message.map(str::trim).unwrap_or_default();
+    let base = match text.rsplit_once(' ') {
+        Some((head, tail))
+            if tail.ends_with('%') && tail[..tail.len() - 1].parse::<f64>().is_ok() =>
+        {
+            head
+        }
+        _ => text,
+    };
+    match base {
+        "" | "Transcribing" => tr!("Transcribing"),
+        "Checking the transcript" => tr!("Checking the transcript"),
+        other => other.to_owned(),
+    }
 }
 
 /// The background jobs of the Speakers and Report tabs.
@@ -190,13 +223,14 @@ impl TranscribeVm {
         capture_id: &str,
         job_id: &str,
         progress: f32,
+        message: Option<&str>,
     ) {
         match kind {
             ActiveKind::Transcribe => {
                 self.start(capture_id);
                 self.started(capture_id, job_id.to_owned());
-                if progress > 0.0 {
-                    self.progress_by_job(job_id, f64::from(progress));
+                if progress > 0.0 || message.is_some() {
+                    self.progress_by_job_message(job_id, f64::from(progress), message);
                 }
             }
             ActiveKind::Speakers | ActiveKind::Report => {
@@ -245,6 +279,16 @@ impl TranscribeVm {
 
     /// `job.progress`: `progress` is 0 to 1 (a value above 1 is read as a percentage).
     pub fn progress_by_job(&mut self, job_id: &str, progress: f64) -> bool {
+        self.progress_by_job_message(job_id, progress, None)
+    }
+
+    /// `job.progress` with the job's message (the stage). A `None` message keeps the last one.
+    pub fn progress_by_job_message(
+        &mut self,
+        job_id: &str,
+        progress: f64,
+        message: Option<&str>,
+    ) -> bool {
         let p = if progress > 1.0 {
             progress / 100.0
         } else {
@@ -253,6 +297,9 @@ impl TranscribeVm {
         for r in self.running.values_mut() {
             if r.job_id.as_deref() == Some(job_id) {
                 r.progress = Some(p.clamp(0.0, 1.0) as f32);
+                if let Some(m) = message {
+                    r.message = Some(m.to_owned());
+                }
                 return true;
             }
         }
@@ -339,6 +386,57 @@ impl TranscribeVm {
         })
     }
 
+    /// What to draw for a running transcription (the same strip as an import); `None` when it is
+    /// not running.
+    pub fn view(&self, capture_id: &str) -> Option<RunView> {
+        let r = self.running.get(capture_id)?;
+        Some(RunView {
+            stage: stage_label(r.message.as_deref()),
+            fraction: r.progress,
+            job_id: r.job_id.clone(),
+        })
+    }
+
+    /// The job ids of the transcriptions shown as running (those that have one).
+    pub fn running_job_ids(&self) -> Vec<String> {
+        self.running
+            .values()
+            .filter_map(|r| r.job_id.clone())
+            .collect()
+    }
+
+    /// The daemon's job list no longer has these jobs as active (`known` is what was shown when
+    /// the list was asked for): they were cancelled, or ended while the window was not told (a
+    /// cancel sends no bus event; the CLI or an agent may have cancelled it). They stop showing as
+    /// running, without an error. Returns whether anything changed.
+    pub fn drop_ended(&mut self, known: &[String], active: &[String]) -> bool {
+        let gone: Vec<String> = self
+            .running
+            .iter()
+            .filter(|(_, r)| {
+                r.job_id
+                    .as_ref()
+                    .is_some_and(|j| known.contains(j) && !active.contains(j))
+            })
+            .map(|(id, _)| id.clone())
+            .collect();
+        for id in &gone {
+            self.running.remove(id);
+        }
+        if !gone.is_empty() {
+            self.epoch += 1;
+        }
+        !gone.is_empty()
+    }
+
+    /// The user cancelled the run: it is not running and it is not an error. (A cancelled job
+    /// sends no bus event, so the window must say so itself.)
+    pub fn cancelled(&mut self, capture_id: &str) {
+        self.running.remove(capture_id);
+        self.errors.remove(capture_id);
+        self.epoch += 1;
+    }
+
     pub fn fraction(&self, capture_id: &str) -> Option<f32> {
         self.running.get(capture_id).and_then(|r| r.progress)
     }
@@ -353,13 +451,13 @@ mod tests {
     #[test]
     fn jobs_the_daemon_already_has_are_shown_as_running() {
         let mut v = TranscribeVm::default();
-        v.adopt_active(ActiveKind::Transcribe, "rec_1", "job_1", 0.4);
+        v.adopt_active(ActiveKind::Transcribe, "rec_1", "job_1", 0.4, None);
         assert_eq!(
             v.status_text("rec_1").as_deref(),
             Some("Transcribing\u{2026} 40%")
         );
-        v.adopt_active(ActiveKind::Speakers, "rec_1", "job_2", 0.7);
-        v.adopt_active(ActiveKind::Report, "rec_2", "job_3", 0.0);
+        v.adopt_active(ActiveKind::Speakers, "rec_1", "job_2", 0.7, None);
+        v.adopt_active(ActiveKind::Report, "rec_2", "job_3", 0.0, None);
         assert_eq!(
             v.voice_job("rec_1", VoiceJobKind::Speakers)
                 .unwrap()
@@ -369,8 +467,8 @@ mod tests {
         assert!(v.voice_job("rec_2", VoiceJobKind::Report).is_some());
         assert!(v.voice_job("rec_2", VoiceJobKind::Speakers).is_none());
         // Again (every editor that opens asks): nothing is duplicated and the progress carries on.
-        v.adopt_active(ActiveKind::Transcribe, "rec_1", "job_1", 0.5);
-        v.adopt_active(ActiveKind::Speakers, "rec_1", "job_2", 0.8);
+        v.adopt_active(ActiveKind::Transcribe, "rec_1", "job_1", 0.5, None);
+        v.adopt_active(ActiveKind::Speakers, "rec_1", "job_2", 0.8, None);
         assert_eq!(v.fraction("rec_1"), Some(0.5));
         assert_eq!(
             v.voice_job_id("rec_1", VoiceJobKind::Speakers).as_deref(),
@@ -555,5 +653,115 @@ mod tests {
         v.failed("rec_1", "x");
         v.clear_error("rec_1");
         assert_eq!(v.error_of("rec_1"), None);
+    }
+
+    /// TRN-PROGRESS: the stage comes from the job's message without its percentage, the page
+    /// shows it with the fraction and the job to cancel.
+    #[test]
+    fn a_run_view_has_the_stage_the_fraction_and_the_job() {
+        assert_eq!(stage_label(None), "Transcribing");
+        assert_eq!(stage_label(Some("Transcribing 40%")), "Transcribing");
+        assert_eq!(
+            stage_label(Some("Checking the transcript 80%")),
+            "Checking the transcript"
+        );
+        assert_eq!(stage_label(Some("Something else 5%")), "Something else");
+        assert_eq!(
+            stage_label(Some("Waiting for 3 files")),
+            "Waiting for 3 files"
+        );
+        let mut v = TranscribeVm::default();
+        assert_eq!(v.view("rec_1"), None);
+        v.start("rec_1");
+        assert_eq!(
+            v.view("rec_1").unwrap().job_id,
+            None,
+            "no Cancel before an id"
+        );
+        v.started("rec_1", "job_1".into());
+        assert!(v.progress_by_job_message("job_1", 0.8, Some("Checking the transcript 80%")));
+        let view = v.view("rec_1").unwrap();
+        assert_eq!(view.stage, "Checking the transcript");
+        assert_eq!(view.fraction, Some(0.8));
+        assert_eq!(view.job_id.as_deref(), Some("job_1"));
+        // A progress event without a message keeps the stage.
+        assert!(v.progress_by_job("job_1", 0.9));
+        assert_eq!(v.view("rec_1").unwrap().stage, "Checking the transcript");
+    }
+
+    /// TRN-PROGRESS: a page opened while the daemon is already transcribing (the automatic run
+    /// after the stop) reads the job's state, with its stage, from the job list.
+    #[test]
+    fn a_reopened_page_adopts_the_running_job_with_its_stage() {
+        let mut v = TranscribeVm::default();
+        v.adopt_active(
+            ActiveKind::Transcribe,
+            "rec_1",
+            "job_1",
+            0.4,
+            Some("Transcribing 40%"),
+        );
+        let view = v.view("rec_1").unwrap();
+        assert_eq!(
+            (view.stage.as_str(), view.fraction),
+            ("Transcribing", Some(0.4))
+        );
+        // Asking again (every page that opens asks) keeps the run and updates it.
+        v.adopt_active(
+            ActiveKind::Transcribe,
+            "rec_1",
+            "job_1",
+            0.6,
+            Some("Transcribing 60%"),
+        );
+        assert_eq!(v.view("rec_1").unwrap().fraction, Some(0.6));
+    }
+
+    /// TRN-PROGRESS: a failed run shows its error (no progress), Retry runs again and clears it,
+    /// and a cancel ends the run without an error.
+    #[test]
+    fn an_error_is_kept_until_retry_and_cancel_is_not_an_error() {
+        let mut v = TranscribeVm::default();
+        v.start("rec_1");
+        v.started("rec_1", "job_1".into());
+        assert_eq!(
+            v.failed_by_job("job_1", "no model").as_deref(),
+            Some("rec_1")
+        );
+        assert_eq!(v.view("rec_1"), None);
+        assert_eq!(v.error_of("rec_1").as_deref(), Some("no model"));
+        // Retry.
+        assert!(v.start("rec_1"));
+        assert_eq!(v.error_of("rec_1"), None);
+        v.started("rec_1", "job_2".into());
+        // Cancel: a cancelled job sends no bus event, so the window ends the run itself.
+        let epoch = v.epoch;
+        v.cancelled("rec_1");
+        assert_eq!(v.view("rec_1"), None);
+        assert_eq!(v.error_of("rec_1"), None);
+        assert!(v.epoch > epoch);
+        assert!(v.start("rec_1"), "can start again after a cancel");
+    }
+
+    /// TRN-PROGRESS: a run the daemon no longer lists (cancelled from the CLI, no bus event) stops
+    /// showing as running; one that started after the list was asked for is left alone.
+    #[test]
+    fn a_run_the_daemon_no_longer_lists_stops_showing() {
+        let mut v = TranscribeVm::default();
+        v.adopt_active(ActiveKind::Transcribe, "rec_1", "job_1", 0.2, None);
+        v.adopt_active(ActiveKind::Transcribe, "rec_2", "job_2", 0.2, None);
+        v.start("rec_3"); // the call is still on its way: no id yet
+        let known = v.running_job_ids();
+        v.adopt_active(ActiveKind::Transcribe, "rec_4", "job_4", 0.0, None); // after the ask
+        assert!(v.drop_ended(&known, &["job_2".to_owned()]));
+        assert!(v.view("rec_1").is_none(), "cancelled elsewhere");
+        assert!(v.view("rec_2").is_some(), "still listed");
+        assert!(v.view("rec_3").is_some(), "no id yet");
+        assert!(
+            v.view("rec_4").is_some(),
+            "started after the list was asked for"
+        );
+        assert_eq!(v.error_of("rec_1"), None);
+        assert!(!v.drop_ended(&known, &["job_2".to_owned()]));
     }
 }
