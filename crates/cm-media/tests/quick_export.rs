@@ -1936,7 +1936,10 @@ fn exp3_ac2_gif_fits_under_the_size_limit() {
         },
     );
     if let Err(e) = e {
-        assert!(e.to_string().contains("WebM"), "{e}");
+        assert!(
+            e.to_string().starts_with("Can't fit under 0.1 MB at "),
+            "{e}"
+        );
     }
 }
 
