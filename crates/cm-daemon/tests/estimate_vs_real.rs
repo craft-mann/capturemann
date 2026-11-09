@@ -36,6 +36,9 @@ struct Row {
     frame: (u32, u32),
     bound: u64,
     nominal: f64,
+    /// The typical size from the synthetic master's rate (information: the rule was calibrated on
+    /// real recordings, and a `lavfi` master is unlike one).
+    typical: Option<u64>,
     real: u64,
     est_s: f64,
     real_s: f64,
@@ -123,6 +126,9 @@ fn exp5_ac6_the_range_contains_the_real_size() {
             }
         };
         let manifest = serde_json::to_value(cm_library::read_manifest(&fx.dir).unwrap()).unwrap();
+        let master = cm_media::QuickSpec::from_manifest(&manifest)
+            .ok()
+            .and_then(|spec| estimate::master_rate(&fx.dir, &manifest, &spec));
         for format in [Format::Mp4, Format::WebM] {
             for size in [
                 SizeChoice::Source,
@@ -135,7 +141,9 @@ fn exp5_ac6_the_range_contains_the_real_size() {
                     width: None,
                     max_mb: None,
                 };
-                let Estimated::Bound(e) = estimate::estimate(&manifest, &choice, codec).unwrap()
+                let Estimated::Bound(e) =
+                    estimate::estimate_with_master(&manifest, &choice, codec, master.as_ref())
+                        .unwrap()
                 else {
                     panic!("MP4 and WebM have a bound");
                 };
@@ -168,6 +176,7 @@ fn exp5_ac6_the_range_contains_the_real_size() {
                     },
                     frame: (e.width, e.height),
                     bound: e.max_bytes,
+                    typical: e.typical_bytes,
                     nominal: estimate::estimate_bytes(&estimate::Inputs {
                         codec: if format == Format::WebM {
                             estimate::Codec::Vp9
@@ -191,16 +200,16 @@ fn exp5_ac6_the_range_contains_the_real_size() {
     let mut md = String::new();
     writeln!(
         md,
-        "| content | format | size | pixels | bound shown | real | real / bound | real / nominal | length est. / real |"
+        "| content | format | size | pixels | bound shown | real | real / bound | real / nominal | typical (information) | real / typical | length est. / real |"
     )
     .unwrap();
-    writeln!(md, "|---|---|---|---|---|---|---|---|---|").unwrap();
+    writeln!(md, "|---|---|---|---|---|---|---|---|---|---|---|").unwrap();
     let mut misses = Vec::new();
     for r in &rows {
         let ok = r.real <= r.bound;
         writeln!(
             md,
-            "| {} | {} | {} | {}×{} | {} | {:.2} MB {} | {:.2} | {:.3} | {:.1} s / {:.1} s |",
+            "| {} | {} | {} | {}×{} | {} | {:.2} MB {} | {:.2} | {:.3} | {} | {} | {:.1} s / {:.1} s |",
             r.content,
             r.format,
             r.size,
@@ -211,6 +220,9 @@ fn exp5_ac6_the_range_contains_the_real_size() {
             if ok { "at or below" } else { "**ABOVE**" },
             r.real as f64 / r.bound as f64,
             r.real as f64 / r.nominal,
+            r.typical.map_or("none".to_owned(), estimate::typical_label_of),
+            r.typical
+                .map_or("-".to_owned(), |t| format!("{:.2}", r.real as f64 / t as f64)),
             r.est_s,
             r.real_s,
         )

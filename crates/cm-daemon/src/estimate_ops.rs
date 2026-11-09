@@ -1,12 +1,14 @@
 //! `estimate_export` (EXP-5): the size an export would have, before it runs.
 //!
 //! Free and read-only: a formula over the length after cuts, the chosen frame and a per-codec
-//! bit-rate table (`cm_media::estimate`); no file of the recording is read besides its manifest.
+//! bit-rate table (`cm_media::estimate`) for the bound, plus the screen master's file size (one
+//! `stat`, no decoding) for the typical size; no file of the recording is read besides its
+//! manifest.
 //! It takes the fields of `export_video` that choose the file (`format`, `size`, `width`,
 //! `max_mb`) and refuses what `export_video` refuses, with the same text.
 
 use cm_core::CmError;
-use cm_media::estimate::{self, Choice, Codec, Estimated, Format, SizeChoice};
+use cm_media::estimate::{self, Choice, Codec, Estimated, Format, MasterRate, SizeChoice};
 use serde_json::{json, Value};
 
 use crate::action::{parse_export_options, parse_export_size, Action, Fields};
@@ -58,6 +60,14 @@ pub(crate) fn parse(f: &Fields<'_>) -> Result<Action, CmError> {
     }))
 }
 
+/// The screen master's size and length for the typical estimate: one `stat` of the master file,
+/// no decoding. `None` (the bound alone) for an audio or imported capture without a screen
+/// master, a missing file or an unreadable manifest; never an error.
+pub(crate) fn master_rate_of(dir: &std::path::Path, manifest: &Value) -> Option<MasterRate> {
+    let spec = cm_media::QuickSpec::from_manifest(manifest).ok()?;
+    estimate::master_rate(dir, manifest, &spec)
+}
+
 /// The codec of an MP4 here. FFmpeg is looked up only where the answer needs it (Linux).
 pub(crate) fn mp4_codec_here() -> Result<Codec, CmError> {
     let tools = cm_media::tools::locate().ok();
@@ -77,16 +87,20 @@ pub(crate) fn options_json(master: (u32, u32)) -> Value {
     })
 }
 
-/// The reply for a manifest and a choice (pure but for the FFmpeg lookup of `codec`).
+/// The reply for a manifest and a choice (pure but for the FFmpeg lookup of `codec`). `master`
+/// is the screen master's rate ([`estimate::master_rate`] of the bundle folder) for the typical
+/// size; `None` answers the bound alone.
 pub(crate) fn estimate_json(
     manifest: &Value,
     choice: &Choice,
     mp4_codec: Codec,
+    master: Option<&MasterRate>,
 ) -> Result<Value, CmError> {
     let spec = cm_media::QuickSpec::from_manifest(manifest)?;
-    let mut v = match estimate::estimate(manifest, choice, mp4_codec)? {
+    let mut v = match estimate::estimate_with_master(manifest, choice, mp4_codec, master)? {
         Estimated::Bound(e) => json!({
             "max_bytes": e.max_bytes, "label": e.label,
+            "typical_bytes": e.typical_bytes, "typical_label": e.typical_label,
             "codec": e.codec.as_str(), "width": e.width, "height": e.height,
             "fps": e.fps, "duration_s": e.duration_s,
         }),
@@ -109,14 +123,15 @@ impl Inner {
         crate::action::check_size_options(&p.format, p.size, p.width)?;
         let library = self.library.clone();
         blocking(move || {
-            let (_, _, manifest) = crate::export::load_recording(&library, &p.capture_id)?;
+            let (_, dir, manifest) = crate::export::load_recording(&library, &p.capture_id)?;
             let choice = p.choice();
             let codec = if choice.format == Format::Mp4 {
                 mp4_codec_here()?
             } else {
                 Codec::H264
             };
-            estimate_json(&manifest, &choice, codec)
+            let master = master_rate_of(&dir, &manifest);
+            estimate_json(&manifest, &choice, codec, master.as_ref())
         })
         .await
     }

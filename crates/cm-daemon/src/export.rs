@@ -270,8 +270,9 @@ pub(crate) fn enqueue_export(
     )
 }
 
-/// [`enqueue_export`] that also stores the size estimate shown to the user (`max_bytes`)
-/// in the job's inputs, so the finished job can say what was estimated (EXP-5).
+/// [`enqueue_export`] that also stores the size estimate shown to the user (`max_bytes` and,
+/// when the screen master could be measured, `typical_bytes`) in the job's inputs, so the
+/// finished job can say what was estimated (EXP-5).
 /// Exports that differ in any option (format, size, width, `max_mb`, captions, loudness) are
 /// different jobs; only an equal request is answered with the job already queued.
 #[allow(clippy::too_many_arguments)]
@@ -285,7 +286,7 @@ pub(crate) fn enqueue_export_with(
     opts: ExportOpts,
     by: &str,
     auto: bool,
-    estimate: Option<u64>,
+    estimate: Option<ExportEstimate>,
 ) -> Result<(Job, bool), CmError> {
     // R2-14: list-then-enqueue is one step per process, so two callers (an `export_video`
     // and the auto-export, or two agents) cannot both see "none" and create two jobs for the
@@ -312,7 +313,7 @@ pub(crate) fn enqueue_export_with(
         json!({ "capture_id": capture_id, "preset": preset, "loudness_lufs": loudness_lufs,
                 "width": opts.width, "fps": opts.fps, "max_mb": opts.max_mb,
                 "size": opts.size.map(SizeChoice::to_json),
-                "estimate": estimate.map(|b| json!({ "max_bytes": b })),
+                "estimate": estimate.map(ExportEstimate::to_json),
                 "captions": opts.captions.map(CaptionChoice::as_str),
                 "by": by, "auto": auto }),
     ))?;
@@ -744,7 +745,7 @@ impl Inner {
         capture_id: &str,
         preset: &str,
         opts: ExportOpts,
-    ) -> Option<u64> {
+    ) -> Option<ExportEstimate> {
         let format = match preset {
             PRESET_QUICK | "source" => cm_media::estimate::Format::Mp4,
             "webm" => cm_media::estimate::Format::WebM,
@@ -752,7 +753,7 @@ impl Inner {
         };
         let (library, id) = (self.library.clone(), capture_id.to_owned());
         blocking(move || {
-            let (_, _, manifest) = load_recording(&library, &id)?;
+            let (_, dir, manifest) = load_recording(&library, &id)?;
             let codec = if format == cm_media::estimate::Format::Mp4 {
                 crate::estimate_ops::mp4_codec_here()?
             } else {
@@ -764,14 +765,39 @@ impl Inner {
                 width: opts.width,
                 max_mb: opts.max_mb,
             };
-            match cm_media::estimate::estimate(&manifest, &choice, codec)? {
-                cm_media::estimate::Estimated::Bound(e) => Ok(Some(e.max_bytes)),
+            let master = crate::estimate_ops::master_rate_of(&dir, &manifest);
+            match cm_media::estimate::estimate_with_master(
+                &manifest,
+                &choice,
+                codec,
+                master.as_ref(),
+            )? {
+                cm_media::estimate::Estimated::Bound(e) => Ok(Some(ExportEstimate {
+                    max_bytes: e.max_bytes,
+                    typical_bytes: e.typical_bytes,
+                })),
                 cm_media::estimate::Estimated::KnownAfterExport { .. } => Ok(None),
             }
         })
         .await
         .ok()
         .flatten()
+    }
+}
+
+/// What the user was told an export would be (EXP-5), kept in the job's inputs and repeated in
+/// its result next to the real size: the bound and, when the screen master could be measured,
+/// the typical size.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ExportEstimate {
+    pub max_bytes: u64,
+    pub typical_bytes: Option<u64>,
+}
+
+impl ExportEstimate {
+    /// `{ max_bytes, typical_bytes }` (`typical_bytes` null when unknown).
+    pub(crate) fn to_json(self) -> Value {
+        json!({ "max_bytes": self.max_bytes, "typical_bytes": self.typical_bytes })
     }
 }
 
