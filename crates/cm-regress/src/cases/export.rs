@@ -46,7 +46,7 @@ pub fn cases() -> Vec<Case> {
         },
         Case {
             id: "export.estimate",
-            title: "export --estimate prints a range with codec and pixels; a GIF has none; the refusals are the shared ones",
+            title: "export --estimate prints Up to N MB with codec and pixels; a GIF has none; the refusals are the shared ones",
             area: "export",
             specs: &["EXP-5.AC3", "EXP-5.AC4"],
             tier: Tier::Standard,
@@ -57,7 +57,7 @@ pub fn cases() -> Vec<Case> {
         },
         Case {
             id: "export.estimate_mcp",
-            title: "the MCP tool estimate_export answers the same range as the CLI",
+            title: "the MCP tool estimate_export answers the same bound as the CLI",
             area: "export",
             specs: &["EXP-5.AC3", "AGT-1"],
             tier: Tier::Standard,
@@ -382,19 +382,18 @@ fn audio(ctx: &mut Ctx) -> R {
     Ok(())
 }
 
-/// EXP-5: `export <id> --estimate` (no export is made): a range, the codec and the pixels; the
+/// EXP-5: `export <id> --estimate` (no export is made): an upper bound, the codec and the pixels; the
 /// MP4 on Linux without H.264 says `vp9`; a GIF has no estimate; a step above the recording is
 /// refused with `size_larger_than_source`.
 fn estimate_cli(ctx: &mut Ctx) -> R {
     let id = import_clip(ctx)?;
     let j = ctx.cli_ok(&["export", &id, "--estimate"])?;
-    let (lo, hi) = (
-        j.get("min_bytes").and_then(Value::as_u64),
-        j.get("max_bytes").and_then(Value::as_u64),
-    );
     check!(
-        matches!((lo, hi), (Some(a), Some(b)) if a > 0 && a < b),
-        "no sensible range: {j}"
+        j.get("max_bytes")
+            .and_then(Value::as_u64)
+            .is_some_and(|b| b > 0)
+            && j.get("min_bytes").is_none(),
+        "no upper bound: {j}"
     );
     let codec = j.get("codec").and_then(Value::as_str).unwrap_or("");
     check!(
@@ -404,8 +403,8 @@ fn estimate_cli(ctx: &mut Ctx) -> R {
     check!(
         j.get("label")
             .and_then(Value::as_str)
-            .is_some_and(|l| l.starts_with("About ") || l == "Under 5 MB"),
-        "the label is not 'About N-M MB' or 'Under 5 MB': {j}"
+            .is_some_and(|l| l.starts_with("Up to ") || l == "Under 5 MB"),
+        "the label is not 'Up to N MB' or 'Under 5 MB': {j}"
     );
     let w = j.get("width").and_then(Value::as_u64).unwrap_or(0);
     let h = j.get("height").and_then(Value::as_u64).unwrap_or(0);
@@ -512,14 +511,7 @@ fn estimate_mcp(ctx: &mut Ctx) -> R {
         "estimate_export failed: {}",
         crate::util::cut(&r.text, 200)
     );
-    for key in [
-        "min_bytes",
-        "max_bytes",
-        "label",
-        "codec",
-        "width",
-        "height",
-    ] {
+    for key in ["max_bytes", "label", "codec", "width", "height"] {
         check!(
             v.get(key) == cli.get(key),
             "MCP and CLI differ in `{key}`: {v} / {cli}"

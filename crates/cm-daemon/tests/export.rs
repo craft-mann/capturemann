@@ -781,19 +781,18 @@ async fn exp5_estimate_export_and_the_size_parameters() {
         (a["duration_s"].as_f64().unwrap() - 60.0).abs() < 0.5,
         "{a}"
     );
-    let (lo, hi) = (
-        a["min_bytes"].as_u64().unwrap(),
-        a["max_bytes"].as_u64().unwrap(),
-    );
+    let hi = a["max_bytes"].as_u64().unwrap();
     assert!(
-        lo < hi && a["label"].as_str().unwrap().starts_with("About "),
-        "{a}"
+        a.get("min_bytes").is_none(),
+        "an upper bound, not a range: {a}"
     );
+    assert!(a["label"].as_str().unwrap().starts_with("Up to "), "{a}");
     if !cfg!(target_os = "linux") {
         assert_eq!(a["codec"], "h264");
         let mid = (12_000_000.0 * (2880.0 * 1800.0) / (1920.0 * 1080.0) + 128_000.0) * 60.0 / 8.0;
+        // The nominal size with the margin, rounded up to two figures.
         assert!(
-            lo as f64 <= mid * 0.85 + 1.0 && hi as f64 >= mid * 1.2 - 1.0,
+            hi as f64 >= mid * 1.05 && hi as f64 <= mid * 1.05 * 1.1,
             "{a}"
         );
     }
@@ -897,7 +896,6 @@ async fn exp5_estimate_export_and_the_size_parameters() {
     assert_eq!(ok["preset"], "webm");
     assert_eq!(ok["size"], 480);
     let want = est(json!({ "format": "webm", "size": 480 })).await.unwrap();
-    assert_eq!(ok["estimate"]["min_bytes"], want["min_bytes"]);
     assert_eq!(ok["estimate"]["max_bytes"], want["max_bytes"]);
     let done = wait_job(&r.daemon, ok["job_id"].as_str().unwrap(), "done").await;
     assert_eq!(done["inputs"]["size"], 480);

@@ -85,8 +85,8 @@ pub(crate) fn estimate_json(
 ) -> Result<Value, CmError> {
     let spec = cm_media::QuickSpec::from_manifest(manifest)?;
     let mut v = match estimate::estimate(manifest, choice, mp4_codec)? {
-        Estimated::Range(e) => json!({
-            "min_bytes": e.min_bytes, "max_bytes": e.max_bytes, "label": e.label,
+        Estimated::Bound(e) => json!({
+            "max_bytes": e.max_bytes, "label": e.label,
             "codec": e.codec.as_str(), "width": e.width, "height": e.height,
             "fps": e.fps, "duration_s": e.duration_s,
         }),

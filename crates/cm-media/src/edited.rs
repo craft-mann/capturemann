@@ -741,7 +741,9 @@ pub fn export_edited(
     let mut webm_bps: Option<u64> = (kind == Kind::WebM)
         .then(|| {
             max_bytes.map(|m| {
+                // Never above the ceiling the estimate shows (EXP-5).
                 preset::fit_bitrate(m, duration_s, if has_audio { audio_bps.into() } else { 0 })
+                    .min(crate::graph::vp9_cap_bitrate(out_size, fps))
             })
         })
         .flatten();
@@ -764,7 +766,12 @@ pub fn export_edited(
                 bitrate = codec.bitrate;
                 OutFormat::mp4(enc, &codec.args, caps.vaapi_device.as_deref())
             }
-            (Kind::WebM, _) => OutFormat::vp9(webm_bps, fps, audio_bps),
+            (Kind::WebM, _) => OutFormat::vp9(
+                webm_bps,
+                crate::graph::vp9_cap_bitrate(out_size, fps),
+                fps,
+                audio_bps,
+            ),
             _ => OutFormat::lossless_stage(),
         };
         let args = encode_args(
@@ -1227,7 +1234,7 @@ impl OutFormat {
 
     /// VP9 in WebM with Opus (EXP-3). With `bps` the rate is constrained to it (the size limit);
     /// without, constant quality.
-    fn vp9(bps: Option<u64>, fps: f64, _audio_bps: u32) -> OutFormat {
+    fn vp9(bps: Option<u64>, cap_bps: u64, fps: f64, _audio_bps: u32) -> OutFormat {
         let gop = ((fps * 4.0).round() as u32).max(1).to_string();
         let mut video: Vec<String> = ["-c:v", "libvpx-vp9", "-row-mt", "1", "-deadline", "good"]
             .map(String::from)
@@ -1242,9 +1249,11 @@ impl OutFormat {
                 "-bufsize".into(),
                 (b * 2).to_string(),
             ]),
+            // Constrained quality (EXP-5): the CRF's quality, never above the ceiling the
+            // estimate shows (`graph::vp9_cap_bitrate`).
             None => video.extend([
                 "-b:v".into(),
-                "0".into(),
+                cap_bps.to_string(),
                 "-crf".into(),
                 WEBM_CRF.to_string(),
             ]),
@@ -1694,7 +1703,7 @@ mod tests {
             j.contains("-c:v libvpx-vp9 -row-mt 1 -deadline good"),
             "{j}"
         );
-        assert!(j.contains("-b:v 0 -crf 32"), "{j}");
+        assert!(j.contains("-b:v 2666667 -crf 32"), "{j}");
         assert!(
             j.contains("-pix_fmt yuv420p") && !j.contains("-tag:v avc1"),
             "{j}"

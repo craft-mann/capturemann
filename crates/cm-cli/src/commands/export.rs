@@ -38,7 +38,7 @@ fn audio_params(a: &ExportArgs) -> Result<serde_json::Value, CliError> {
 }
 
 /// `export <id> --estimate [--format webm] [--size 720p]`: `estimate_export`, printed as
-/// `About 24–35 MB (estimate) · WebM · VP9 · 1152×720`; a GIF says there is none.
+/// `Up to 35 MB (estimate) · WEBM · VP9 · 1152×720`; a GIF says there is none.
 async fn estimate(cx: &mut Ctx<'_>, a: ExportArgs) -> Result<(), CliError> {
     // `--preset gif` and `--preset webm` are the formats of the same name; the other presets
     // have their own frame and bit rate and no estimate.
@@ -204,6 +204,11 @@ pub(super) async fn export_video(cx: &mut Ctx<'_>, a: ExportArgs) -> Result<(), 
                         .as_str()
                         .map(|n| format!("\n  note: {n}"))
                         .unwrap_or_default();
+                    // EXP-5: what was estimated before the export, next to the real size.
+                    let note = match j["result"]["estimate"]["max_bytes"].as_u64() {
+                        Some(b) => format!("{note}\n  estimate: up to {b} bytes"),
+                        None => note,
+                    };
                     format!(
                         "Exported {}\n  file: {}\n  size: {} bytes, {} s, {}{note}",
                         plain(&j["result"]["capture_id"]),

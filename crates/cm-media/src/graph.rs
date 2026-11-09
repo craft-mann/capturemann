@@ -49,6 +49,8 @@ pub const X264_CRF: u32 = 20;
 pub const VP9_CRF: u32 = 32;
 /// Hardware encoder bitrate at 1080p30; scaled by area and fps.
 pub const VT_BITRATE_1080P30: f64 = 12_000_000.0;
+/// VP9 bit-rate ceiling at 1080p30, see [`vp9_cap_bitrate`].
+pub const VP9_CAP_BPS_1080P30: f64 = 6_000_000.0;
 pub const AUDIO_RATE: u32 = 48_000;
 pub const AUDIO_BPS_MONO: u32 = 128_000;
 pub const AUDIO_BPS_STEREO: u32 = 192_000;
@@ -158,6 +160,17 @@ pub fn videotoolbox_bitrate(size: (u32, u32), fps: f64) -> u64 {
     let area = f64::from(size.0) * f64::from(size.1) / (1920.0 * 1080.0);
     let rate = (VT_BITRATE_1080P30 * area * (fps / 30.0).max(1.0)).clamp(2_000_000.0, 60_000_000.0);
     rate.round() as u64
+}
+
+/// Ceiling of the VP9 video bit rate at constant quality (EXP-5): 6 Mbps at 1080p30, scaled by
+/// area and by fps above 30, 0.8..40 Mbps. Used as `-b:v` next to `-crf` (constrained quality), so a
+/// static screen stays small and a busy picture stops here. The estimate's bound
+/// (`estimate::video_bps`) is built from this same function: one table, one place.
+pub fn vp9_cap_bitrate(size: (u32, u32), fps: f64) -> u64 {
+    let area = f64::from(size.0) * f64::from(size.1) / (1920.0 * 1080.0);
+    (VP9_CAP_BPS_1080P30 * area * (fps / 30.0).max(1.0))
+        .clamp(800_000.0, 40_000_000.0)
+        .round() as u64
 }
 
 fn video_filters_for_camera(
@@ -337,6 +350,7 @@ pub fn video_codec_for(
     let bps = target_bps.unwrap_or_else(|| videotoolbox_bitrate(out_size, fps));
     let (g, b, crf) = (gop.to_string(), bps.to_string(), X264_CRF.to_string());
     let vp9_crf = VP9_CRF.to_string();
+    let vp9_cap = vp9_cap_bitrate(out_size, fps).to_string();
     let codec_args: Vec<&str> = match encoder {
         Encoder::VideoToolbox => vec![
             "-c:v",
@@ -413,7 +427,8 @@ pub fn video_codec_for(
             if target_bps.is_some() {
                 v.extend(["-b:v", &b]);
             } else {
-                v.extend(["-b:v", "0", "-crf", &vp9_crf]);
+                // Constrained quality: the quality of the CRF, never above the ceiling.
+                v.extend(["-b:v", &vp9_cap, "-crf", &vp9_crf]);
             }
             return VideoCodec {
                 args: v.into_iter().map(String::from).collect(),

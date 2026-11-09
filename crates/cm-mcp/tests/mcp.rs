@@ -2331,8 +2331,8 @@ async fn exp5_estimate_export_tool() {
         (v["width"].as_u64(), v["height"].as_u64()),
         (Some(1152), Some(720))
     );
-    assert!(v["min_bytes"].as_u64().unwrap() < v["max_bytes"].as_u64().unwrap());
-    assert!(v["label"].as_str().unwrap().starts_with("About "), "{v}");
+    assert!(v["max_bytes"].as_u64().unwrap() > 0 && v.get("min_bytes").is_none());
+    assert!(v["label"].as_str().unwrap().starts_with("Up to "), "{v}");
     assert!((v["duration_s"].as_f64().unwrap() - 192.0).abs() < 0.5);
     // The same range comes back in the result of `export_video` for the same choice.
     let e = call(
@@ -2342,7 +2342,6 @@ async fn exp5_estimate_export_tool() {
     )
     .await;
     let e = ok(&e);
-    assert_eq!(e["estimate"]["min_bytes"], v["min_bytes"]);
     assert_eq!(e["estimate"]["max_bytes"], v["max_bytes"]);
     assert_eq!(e["size"], 720);
 

@@ -4,9 +4,11 @@
 //!   plus fixed height steps 1440, 1080, 720 and 480, never above the recording; the frame keeps
 //!   the recording's shape and has even sides. A step equal to the recording's height is the
 //!   recording size. No custom size.
-//! * **The estimate** ([`estimate`]): a formula only, no probe of the files: the length after cuts
-//!   and In/Out, the chosen frame, a per-codec bit-rate and the audio bit rate. The range is the
-//!   estimate -15 % to +20 %, widened outward to two significant figures.
+//! * **The estimate** ([`estimate`]): an **upper bound** ("Up to 290 MB"), a formula only, no probe
+//!   of the files: the length after cuts and In/Out, the chosen frame, the bit-rate ceiling the
+//!   exporter sets for the codec (H.264: the rate it asks the encoder for; VP9: the cap it gives
+//!   `libvpx` next to the CRF), the audio bit rate and a measured margin, rounded **up** to two
+//!   significant figures. A quiet screen lands far under the bound; that is the accepted trade-off.
 //! * **Refusals** with one text for the app, the CLI and MCP (`gif_too_long`,
 //!   `size_larger_than_source`; `gif_cannot_fit` is raised by the exporter): the ids and the
 //!   wording are templates in `cm_core::message`.
@@ -30,9 +32,10 @@ pub const SIZE_STEPS: [u32; 4] = [1440, 1080, 720, 480];
 pub const GIF_WIDTHS: [u32; 4] = [480, 640, 800, 1024];
 /// A GIF is at most this long (seconds), as the `gif` preset says.
 pub const GIF_MAX_SECONDS: f64 = 30.0;
-/// The estimate range: this much below and above the formula's value.
-pub const RANGE_LOW: f64 = 0.85;
-pub const RANGE_HIGH: f64 = 1.20;
+/// What the real file may exceed the nominal size (bit rate times length) by: container
+/// overhead and the encoders' overshoot of their rate request, measured by
+/// `tests/estimate_vs_real.rs` (the worst sample is in `verification/benchmarks/export-estimate-*.md`).
+pub const BOUND_MARGIN: f64 = 1.05;
 /// Below this many bytes (10^6) the label reads "Under 5 MB".
 pub const UNDER_BYTES: f64 = 5_000_000.0;
 /// WebM audio is Opus at these rates (`edited::OPUS_BPS_*`).
@@ -269,54 +272,18 @@ pub fn mp4_codec_for(caps: &crate::tools::Caps, policy: EncoderPolicy) -> Result
     })
 }
 
-/// VP9 video bit rate (bit/s at 30 fps) by frame size in pixels at the exporter's constant
-/// quality (`edited::WEBM_CRF` and `graph::VP9_CRF`, both 32: `libvpx-vp9 -b:v 0 -crf 32` in
-/// `edited::OutFormat::vp9` and `graph::video_codec_for`). Constant quality has no bit-rate
-/// ceiling, so the size depends on the picture: the rows are a *typical* screen recording (the
-/// middle sample of `tests/estimate_vs_real.rs`, within 10 % of Google's published VP9 ladder for
-/// 480p to 1080p; 1440p and 2160p follow the same area law). A mostly static screen comes out
-/// far smaller and a full-screen video far larger (`verification/benchmarks/export-estimate-*.md`).
-/// Between rows the rate is interpolated on a log-log scale; outside them it scales with the area.
-const VP9_TABLE: [(f64, f64); 5] = [
-    // (pixels, bit/s)
-    (854.0 * 480.0, 600_000.0),
-    (1280.0 * 720.0, 1_100_000.0),
-    (1920.0 * 1080.0, 2_300_000.0),
-    (2560.0 * 1440.0, 3_700_000.0),
-    (3840.0 * 2160.0, 7_300_000.0),
-];
-
-fn interpolate(table: &[(f64, f64)], pixels: f64) -> f64 {
-    let first = table[0];
-    let last = table[table.len() - 1];
-    if pixels <= first.0 {
-        return first.1 * pixels / first.0;
-    }
-    if pixels >= last.0 {
-        return last.1 * pixels / last.0;
-    }
-    for pair in table.windows(2) {
-        let (a, b) = (pair[0], pair[1]);
-        if pixels <= b.0 {
-            let t = (pixels.ln() - a.0.ln()) / (b.0.ln() - a.0.ln());
-            return (a.1.ln() + t * (b.1.ln() - a.1.ln())).exp();
-        }
-    }
-    last.1
-}
-
-/// The video bit rate of `codec` for a `frame` at `fps`.
+/// The video bit-rate **ceiling** of `codec` for a `frame` at `fps`: what the exporter asks of
+/// the encoder and never lets it exceed.
 ///
-/// H.264 is exactly what the hardware encoders are asked for (`graph::videotoolbox_bitrate`:
-/// 12 Mbps at 1080p30, scaled by area and by fps above 30); VP9 is [`VP9_TABLE`] scaled by
-/// `fps / 30`.
+/// H.264 is `graph::videotoolbox_bitrate` (12 Mbps at 1080p30, scaled by area and by fps above
+/// 30), the `-b:v` of the hardware encoders; VP9 is `graph::vp9_cap_bitrate` (6 Mbps at 1080p30,
+/// the `-b:v` given to `libvpx-vp9` next to `-crf 32`, `edited::OutFormat::vp9` and
+/// `graph::video_codec_for`). Both functions are the exporter's own, so the bound follows the
+/// code.
 pub fn video_bps(codec: Codec, frame: (u32, u32), fps: f64) -> f64 {
     match codec {
         Codec::H264 => videotoolbox_bitrate(frame, fps) as f64,
-        Codec::Vp9 => {
-            let px = f64::from(frame.0) * f64::from(frame.1);
-            interpolate(&VP9_TABLE, px) * (fps / 30.0).clamp(0.25, 2.0)
-        }
+        Codec::Vp9 => crate::graph::vp9_cap_bitrate(frame, fps) as f64,
     }
 }
 
@@ -346,7 +313,7 @@ pub struct Inputs {
     pub audio_channels: Option<u32>,
 }
 
-/// The formula's value in bytes, before the range.
+/// The nominal size in bytes (bit rate times length), before the margin and the rounding.
 pub fn estimate_bytes(i: &Inputs) -> f64 {
     let bps = video_bps(i.codec, i.frame, i.fps) + audio_bps(i.format, i.audio_channels);
     bps * i.duration_s.max(0.0) / 8.0
@@ -368,13 +335,10 @@ fn two_sf(x: f64, up: bool) -> f64 {
     r * mag
 }
 
-/// The range of an estimate: `-15 %` to `+20 %`, the low end rounded down and the high end up
-/// to two significant figures, in bytes.
-pub fn range_of(estimate: f64) -> (u64, u64) {
-    (
-        two_sf(estimate * RANGE_LOW, false).round() as u64,
-        two_sf(estimate * RANGE_HIGH, true).round() as u64,
-    )
+/// The upper bound of an estimate: the nominal size times [`BOUND_MARGIN`], rounded **up** to
+/// two significant figures, in bytes.
+pub fn bound_of(nominal: f64) -> u64 {
+    two_sf(nominal * BOUND_MARGIN, true).round() as u64
 }
 
 fn number_text(v: f64) -> String {
@@ -385,9 +349,9 @@ fn number_text(v: f64) -> String {
     }
 }
 
-/// The English label: "About 200–290 MB", "About 1.1–1.5 GB", "Under 5 MB". The app builds the
-/// same sentence in its language from `min_bytes` and `max_bytes`.
-pub fn label_of(min_bytes: u64, max_bytes: u64) -> String {
+/// The English label: "Up to 290 MB", "Up to 1.2 GB", "Under 5 MB". The app builds the same
+/// sentence in its language from `max_bytes`.
+pub fn label_of(max_bytes: u64) -> String {
     if max_bytes as f64 <= UNDER_BYTES {
         return "Under 5 MB".to_owned();
     }
@@ -396,14 +360,13 @@ pub fn label_of(min_bytes: u64, max_bytes: u64) -> String {
     } else {
         (1e6, "MB")
     };
-    let (a, b) = (min_bytes as f64 / div, max_bytes as f64 / div);
-    format!("About {}–{} {unit}", number_text(a), number_text(b))
+    format!("Up to {} {unit}", number_text(max_bytes as f64 / div))
 }
 
 /// A size estimate of one choice.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SizeEstimate {
-    pub min_bytes: u64,
+    /// The file is not larger than this (two significant figures, rounded up).
     pub max_bytes: u64,
     pub label: String,
     /// `h264` or `vp9`: what the file's video will be (MP4 on a machine without a hardware
@@ -419,7 +382,7 @@ pub struct SizeEstimate {
 /// The estimate of a choice, or that there is none.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Estimated {
-    Range(SizeEstimate),
+    Bound(SizeEstimate),
     /// GIF: the size is known only after the export.
     KnownAfterExport {
         /// Length after the cuts and In/Out, in seconds.
@@ -427,13 +390,12 @@ pub enum Estimated {
     },
 }
 
-/// The estimate of the formula for `i`, as a range with its label.
-pub fn estimate_range(i: &Inputs) -> SizeEstimate {
-    let (min_bytes, max_bytes) = range_of(estimate_bytes(i));
+/// The upper bound of the formula for `i`, with its label.
+pub fn estimate_bound(i: &Inputs) -> SizeEstimate {
+    let max_bytes = bound_of(estimate_bytes(i));
     SizeEstimate {
-        min_bytes,
         max_bytes,
-        label: label_of(min_bytes, max_bytes),
+        label: label_of(max_bytes),
         codec: i.codec,
         width: i.frame.0,
         height: i.frame.1,
@@ -527,7 +489,7 @@ fn check_choice_for(manifest: &Value, spec: &QuickSpec, c: &Choice) -> Result<f6
 }
 
 /// The estimate of `choice` for a recording (its manifest as JSON). `mp4_codec` is
-/// [`mp4_codec`]. Refuses what [`check_choice`] refuses. GIF, and nothing else, has no range.
+/// [`mp4_codec`]. Refuses what [`check_choice`] refuses. GIF, and nothing else, has no bound.
 pub fn estimate(manifest: &Value, c: &Choice, mp4_codec: Codec) -> Result<Estimated, CmError> {
     let spec = QuickSpec::from_manifest(manifest)?;
     let duration_s = check_choice_for(manifest, &spec, c)?;
@@ -553,7 +515,7 @@ pub fn estimate(manifest: &Value, c: &Choice, mp4_codec: Codec) -> Result<Estima
         .map(|a| a.channels)
         .max()
         .map(|c| c.clamp(1, 2));
-    Ok(Estimated::Range(estimate_range(&Inputs {
+    Ok(Estimated::Bound(estimate_bound(&Inputs {
         codec,
         format: c.format,
         frame,
@@ -657,23 +619,23 @@ mod tests {
     }
 
     #[test]
-    fn range_is_minus_15_plus_20_rounded_to_two_figures_outward() {
-        // 243 MB: 206.55 .. 291.6 -> 200 .. 300 (outward), never narrower than the formula's range.
-        let (lo, hi) = range_of(243e6);
-        assert_eq!((lo, hi), (200_000_000, 300_000_000));
-        assert_eq!(label_of(lo, hi), "About 200–300 MB");
-        let (lo, hi) = range_of(1.25e9);
-        assert_eq!(label_of(lo, hi), "About 1.0–1.5 GB");
-        assert_eq!(label_of(4_200_000, 5_800_000), "About 4.2–5.8 MB");
-        assert_eq!(label_of(1_000_000, 4_800_000), "Under 5 MB");
+    fn the_bound_is_rounded_up_to_two_figures_and_labelled_up_to() {
+        // Never down: 243 MB nominal with the 5 % margin is 255.15 MB, shown as 260 MB.
+        assert_eq!(bound_of(243e6), 260_000_000);
+        assert_eq!(label_of(bound_of(243e6)), "Up to 260 MB");
+        // Exact two-figure values stay (the margin applied first).
+        assert_eq!(bound_of(200e6 / BOUND_MARGIN), 200_000_000);
+        assert_eq!(label_of(1_200_000_000), "Up to 1.2 GB");
+        assert_eq!(label_of(7_300_000), "Up to 7.3 MB");
+        assert_eq!(label_of(4_800_000), "Under 5 MB");
+        assert_eq!(label_of(5_000_000), "Under 5 MB");
         for x in [3e6, 7.7e6, 55e6, 640e6, 2.2e9] {
-            let (lo, hi) = range_of(x);
-            assert!(lo as f64 <= x * RANGE_LOW + 1.0 && hi as f64 >= x * RANGE_HIGH - 1.0);
+            let b = bound_of(x);
+            assert!(b as f64 >= x * BOUND_MARGIN - 1.0, "{x} {b}");
+            assert!(b as f64 <= x * BOUND_MARGIN * 1.1, "two figures: {x} {b}");
         }
     }
 
-    /// EXP-5.AC7: an MP4 is `vp9` on Linux without a usable VA-API H.264 encoder (no render node,
-    /// or no `h264_vaapi` in the build) and `h264` with one; elsewhere it is always `h264`.
     #[test]
     fn mp4_is_vp9_on_linux_without_a_hardware_h264_encoder() {
         use crate::tools::caps_from_output;
@@ -703,8 +665,8 @@ mod tests {
             audio_channels: None,
         };
         let (h, v) = (
-            estimate_range(&i(Codec::H264)),
-            estimate_range(&i(Codec::Vp9)),
+            estimate_bound(&i(Codec::H264)),
+            estimate_bound(&i(Codec::Vp9)),
         );
         assert_eq!((h.codec.as_str(), v.codec.as_str()), ("h264", "vp9"));
         assert!(v.max_bytes < h.max_bytes);
@@ -733,7 +695,7 @@ mod tests {
     }
 
     #[test]
-    fn vp9_table_is_monotonic_and_scales_with_fps() {
+    fn vp9_cap_is_monotonic_and_scales_with_fps() {
         let mut last = 0.0;
         for h in [240u32, 480, 720, 1080, 1440, 2160, 2880] {
             let w = h * 16 / 9;

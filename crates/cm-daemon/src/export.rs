@@ -270,8 +270,8 @@ pub(crate) fn enqueue_export(
     )
 }
 
-/// [`enqueue_export`] that also stores the size estimate shown to the user (`min_bytes`,
-/// `max_bytes`) in the job's inputs, so the finished job can say what was estimated (EXP-5).
+/// [`enqueue_export`] that also stores the size estimate shown to the user (`max_bytes`)
+/// in the job's inputs, so the finished job can say what was estimated (EXP-5).
 /// Exports that differ in any option (format, size, width, `max_mb`, captions, loudness) are
 /// different jobs; only an equal request is answered with the job already queued.
 #[allow(clippy::too_many_arguments)]
@@ -285,7 +285,7 @@ pub(crate) fn enqueue_export_with(
     opts: ExportOpts,
     by: &str,
     auto: bool,
-    estimate: Option<(u64, u64)>,
+    estimate: Option<u64>,
 ) -> Result<(Job, bool), CmError> {
     // R2-14: list-then-enqueue is one step per process, so two callers (an `export_video`
     // and the auto-export, or two agents) cannot both see "none" and create two jobs for the
@@ -312,7 +312,7 @@ pub(crate) fn enqueue_export_with(
         json!({ "capture_id": capture_id, "preset": preset, "loudness_lufs": loudness_lufs,
                 "width": opts.width, "fps": opts.fps, "max_mb": opts.max_mb,
                 "size": opts.size.map(SizeChoice::to_json),
-                "estimate": estimate.map(|(a, b)| json!({ "min_bytes": a, "max_bytes": b })),
+                "estimate": estimate.map(|b| json!({ "max_bytes": b })),
                 "captions": opts.captions.map(CaptionChoice::as_str),
                 "by": by, "auto": auto }),
     ))?;
@@ -729,7 +729,7 @@ impl Inner {
             "loudness_lufs": job.inputs.get("loudness_lufs"),
             "captions": job.inputs.get("captions"),
             "size": job.inputs.get("size"),
-            // `{ min_bytes, max_bytes }`, or null for GIF (known after the export).
+            // `{ max_bytes }`, or null for GIF (known after the export).
             "estimate": job.inputs.get("estimate").cloned().unwrap_or(Value::Null),
             "state": job.state.as_str(),
             "reused": reused,
@@ -744,7 +744,7 @@ impl Inner {
         capture_id: &str,
         preset: &str,
         opts: ExportOpts,
-    ) -> Option<(u64, u64)> {
+    ) -> Option<u64> {
         let format = match preset {
             PRESET_QUICK | "source" => cm_media::estimate::Format::Mp4,
             "webm" => cm_media::estimate::Format::WebM,
@@ -765,7 +765,7 @@ impl Inner {
                 max_mb: opts.max_mb,
             };
             match cm_media::estimate::estimate(&manifest, &choice, codec)? {
-                cm_media::estimate::Estimated::Range(e) => Ok(Some((e.min_bytes, e.max_bytes))),
+                cm_media::estimate::Estimated::Bound(e) => Ok(Some(e.max_bytes)),
                 cm_media::estimate::Estimated::KnownAfterExport { .. } => Ok(None),
             }
         })
