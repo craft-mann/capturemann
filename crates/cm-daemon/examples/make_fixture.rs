@@ -18,20 +18,21 @@
 //!
 //! Flags: `--library DIR` (required), `--title T`, `--secs N` (screen file length, 4 to 120,
 //! default 12), `--size WxH` (default 1280x720), `--fps N` (default 30), `--no-camera`,
-//! `--no-audio`, `--no-cursor`, `--no-pause`, `--audio-only` (an audio recording, VOC-1: microphone and
+//! `--content testsrc|static|typical|motion` (the screen: the counter pattern, a mostly static
+//! screen, a typical screen recording, high motion; EXP-5 estimate test), `--no-audio`, `--no-cursor`, `--no-pause`, `--audio-only` (an audio recording, VOC-1: microphone and
 //! system audio, a pause and one marker at 2 s; no screen, camera or cursor), `--pause-at S --pause-for S` (screen file time).
 //! Needs FFmpeg with libx264 (`brew install ffmpeg`).
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use cm_daemon::fixture::{make_fixture, FixturePause, FixtureSpec};
+use cm_daemon::fixture::{make_fixture, FixtureContent, FixturePause, FixtureSpec};
 
 fn usage(msg: &str) -> ExitCode {
     eprintln!("make_fixture: {msg}");
     eprintln!(
         "usage: make_fixture --library DIR [--title T] [--secs N] [--size WxH] [--fps N] \
-         [--no-camera] [--no-audio] [--no-cursor] [--no-pause] [--audio-only] [--pause-at S --pause-for S]"
+         [--content testsrc|static|typical|motion] [--no-camera] [--no-audio] [--no-cursor] [--no-pause] [--audio-only] [--pause-at S --pause-for S]"
     );
     ExitCode::from(2)
 }
@@ -73,6 +74,10 @@ fn main() -> ExitCode {
                         .ok()
                         .filter(|n| (1..=60).contains(n))
                         .ok_or("--fps is 1 to 60")?;
+                }
+                "--content" => {
+                    spec.content = FixtureContent::parse(&value("--content")?)
+                        .ok_or("--content is testsrc, static, typical or motion")?;
                 }
                 "--no-camera" => spec.camera = false,
                 "--no-audio" => spec.audio = false,

@@ -255,10 +255,13 @@ pub fn mp4_codec(tools: Option<&Tools>) -> Result<Codec, CmError> {
         return Ok(Codec::H264);
     }
     let tools = tools.ok_or_else(|| CmError::not_found(crate::tools::not_found_message()))?;
-    let caps = probe_caps(tools)?;
-    let first = encoder_candidates_for(&caps, None, policy)?
-        .first()
-        .copied();
+    mp4_codec_for(&probe_caps(tools)?, policy)
+}
+
+/// [`mp4_codec`] for known FFmpeg capabilities and policy (pure, tested without a Linux machine):
+/// the first encoder the exporter would try decides.
+pub fn mp4_codec_for(caps: &crate::tools::Caps, policy: EncoderPolicy) -> Result<Codec, CmError> {
+    let first = encoder_candidates_for(caps, None, policy)?.first().copied();
     Ok(if first == Some(Encoder::Vp9Mp4) {
         Codec::Vp9
     } else {
@@ -266,17 +269,21 @@ pub fn mp4_codec(tools: Option<&Tools>) -> Result<Codec, CmError> {
     })
 }
 
-/// VP9 video bit rate (bit/s at 30 fps) by frame size in pixels: a typical screen recording
-/// at the exporter's constant quality (`edited::WEBM_CRF`, `graph::VP9_CRF`, both 32). Between
-/// rows the rate is interpolated on a log-log scale; outside them it scales with the area.
-/// Mirrors `libvpx-vp9 -b:v 0 -crf 32` in `edited::OutFormat::vp9` and `graph::video_codec_for`.
+/// VP9 video bit rate (bit/s at 30 fps) by frame size in pixels at the exporter's constant
+/// quality (`edited::WEBM_CRF` and `graph::VP9_CRF`, both 32: `libvpx-vp9 -b:v 0 -crf 32` in
+/// `edited::OutFormat::vp9` and `graph::video_codec_for`). Constant quality has no bit-rate
+/// ceiling, so the size depends on the picture: the rows are a *typical* screen recording (the
+/// middle sample of `tests/estimate_vs_real.rs`, within 10 % of Google's published VP9 ladder for
+/// 480p to 1080p; 1440p and 2160p follow the same area law). A mostly static screen comes out
+/// far smaller and a full-screen video far larger (`verification/benchmarks/export-estimate-*.md`).
+/// Between rows the rate is interpolated on a log-log scale; outside them it scales with the area.
 const VP9_TABLE: [(f64, f64); 5] = [
     // (pixels, bit/s)
-    (854.0 * 480.0, 300_000.0),
-    (1280.0 * 720.0, 520_000.0),
-    (1920.0 * 1080.0, 900_000.0),
-    (2560.0 * 1440.0, 1_400_000.0),
-    (3840.0 * 2160.0, 2_600_000.0),
+    (854.0 * 480.0, 600_000.0),
+    (1280.0 * 720.0, 1_100_000.0),
+    (1920.0 * 1080.0, 2_300_000.0),
+    (2560.0 * 1440.0, 3_700_000.0),
+    (3840.0 * 2160.0, 7_300_000.0),
 ];
 
 fn interpolate(table: &[(f64, f64)], pixels: f64) -> f64 {
@@ -663,6 +670,44 @@ mod tests {
             let (lo, hi) = range_of(x);
             assert!(lo as f64 <= x * RANGE_LOW + 1.0 && hi as f64 >= x * RANGE_HIGH - 1.0);
         }
+    }
+
+    /// EXP-5.AC7: an MP4 is `vp9` on Linux without a usable VA-API H.264 encoder (no render node,
+    /// or no `h264_vaapi` in the build) and `h264` with one; elsewhere it is always `h264`.
+    #[test]
+    fn mp4_is_vp9_on_linux_without_a_hardware_h264_encoder() {
+        use crate::tools::caps_from_output;
+        let linux = EncoderPolicy::for_os("linux");
+        let both = " V h264_vaapi x\n V libvpx-vp9 y\n A aac z\n";
+        let mut c = caps_from_output("ffmpeg version 7.1", both);
+        // A build with VA-API but no render node (a VM): VP9.
+        assert_eq!(mp4_codec_for(&c, linux).unwrap(), Codec::Vp9);
+        c.vaapi_device = Some("/dev/dri/renderD128".into());
+        assert_eq!(mp4_codec_for(&c, linux).unwrap(), Codec::H264);
+        // A build without h264_vaapi.
+        let nova = caps_from_output("ffmpeg version 7.1", " V libvpx-vp9 y\n A aac z\n");
+        assert_eq!(mp4_codec_for(&nova, linux).unwrap(), Codec::Vp9);
+        // macOS and Windows: the hardware H.264 encoder of the platform.
+        let mac = caps_from_output("ffmpeg version 7.1", " V h264_videotoolbox x\n A aac z\n");
+        assert_eq!(
+            mp4_codec_for(&mac, EncoderPolicy::for_os("macos")).unwrap(),
+            Codec::H264
+        );
+        // The estimate reports the codec and sizes the file with the VP9 rate.
+        let i = |codec| Inputs {
+            codec,
+            format: Format::Mp4,
+            frame: (1920, 1080),
+            fps: 30.0,
+            duration_s: 60.0,
+            audio_channels: None,
+        };
+        let (h, v) = (
+            estimate_range(&i(Codec::H264)),
+            estimate_range(&i(Codec::Vp9)),
+        );
+        assert_eq!((h.codec.as_str(), v.codec.as_str()), ("h264", "vp9"));
+        assert!(v.max_bytes < h.max_bytes);
     }
 
     #[test]
