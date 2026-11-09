@@ -847,7 +847,13 @@ async fn an_mp3_imports_as_audio_titled_by_its_tag_and_the_row_counts_the_decode
     assert_eq!(rows[1]["title"], "Plain file");
     // The decoded sound: 2 s of 48 kHz 32-bit float mono is 384 000 bytes, on top of the copy.
     let size = rows[0]["size_bytes"].as_u64().unwrap();
-    assert_eq!(rows[0]["needed_bytes"].as_u64().unwrap(), size + 384_000);
+    // The estimate comes from the probed length, which for an MP3 includes encoder delay and
+    // padding and differs by a few frames between ffmpeg versions: within 10 %.
+    let sound = rows[0]["needed_bytes"].as_u64().unwrap() - size;
+    assert!(
+        (sound as f64 - 384_000.0).abs() < 38_400.0,
+        "decoded-sound estimate {sound}"
+    );
     // An explicit title wins over the tag.
     let out = r
         .call(

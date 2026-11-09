@@ -615,6 +615,28 @@ fn an_mp3_is_ready_audio_whose_sound_has_the_files_length_and_no_leading_gap() {
             editing_copy: None,
         })
         .unwrap_or_else(|e| panic!("verify {}: {e:?}", p.display()));
+        // The few frames of slack for an MP3 do not hide a truncated decode: a sound cut to
+        // half its length is refused.
+        let half = m.path("half.wav");
+        let mut r = hound::WavReader::open(&wav).unwrap();
+        let spec = r.spec();
+        let samples: Vec<f32> = r.samples::<f32>().map(Result::unwrap).collect();
+        let mut w = hound::WavWriter::create(&half, spec).unwrap();
+        let keep = samples.len() / 2 / 2 * 2;
+        for x in &samples[..keep] {
+            w.write_sample(*x).unwrap();
+        }
+        w.finalize().unwrap();
+        let e = verify(&VerifyInput {
+            tools: &tools,
+            source: &f,
+            kind: MediaKind::Audio,
+            master: &master,
+            sound: Some(&half),
+            editing_copy: None,
+        })
+        .unwrap_err();
+        assert_eq!(e.reason, Reason::UnreadableFile, "{}", p.display());
     }
 }
 
