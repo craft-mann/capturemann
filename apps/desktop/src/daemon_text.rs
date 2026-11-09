@@ -60,6 +60,41 @@ pub fn size_text(bytes: u64) -> String {
     }
 }
 
+/// `290 MB`, `7.3 MB`, `1.2 GB` for an estimate bound (EXP-5): two significant figures as the
+/// daemon rounded them, with the language's decimal mark.
+fn bound_size_text(bytes: u64) -> String {
+    let (v, unit) = if bytes >= 1_000_000_000 {
+        (bytes as f64 / 1e9, "GB")
+    } else {
+        (bytes as f64 / 1e6, "MB")
+    };
+    if v < 10.0 {
+        format!("{} {unit}", fmt::decimal(v, 1))
+    } else {
+        format!("{} {unit}", v.round() as u64)
+    }
+}
+
+/// The size estimate of an export as the popover shows it (EXP-5): "Up to 290 MB", or "Under 5 MB"
+/// at 5 MB and below. `max_bytes` is `estimate_export`'s bound; the English is the daemon's
+/// `label`.
+pub fn estimate_label(max_bytes: u64) -> String {
+    if max_bytes <= 5_000_000 {
+        tr!("Under 5 MB")
+    } else {
+        tr!("Up to {size}", size = bound_size_text(max_bytes))
+    }
+}
+
+/// The line under the finished export's real size (EXP-5): what was estimated before it started.
+pub fn estimate_note(max_bytes: u64) -> String {
+    if max_bytes <= 5_000_000 {
+        tr!("estimate: under 5 MB")
+    } else {
+        tr!("estimate: up to {size}", size = bound_size_text(max_bytes))
+    }
+}
+
 /// `45 s`, `2 min`, `1 min 30 s`, `1 h`, `1 h 5 min` like the daemon's `duration_words`.
 pub fn duration_text(secs: f64) -> String {
     let s = secs.round() as u64;

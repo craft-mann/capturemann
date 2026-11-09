@@ -5408,6 +5408,9 @@ msgstr ""
 msgid "Unavailable — connect {hint}. Using a folder on this computer meanwhile."
 msgstr ""
 
+msgid "Under 5 MB"
+msgstr ""
+
 msgid "Under Redirect URI choose the platform “Public client/native (mobile & desktop)” and enter http://127.0.0.1 (a loopback address; the port is ignored). Select Register."
 msgstr ""
 
@@ -5436,6 +5439,9 @@ msgid "Unmute microphone"
 msgstr ""
 
 msgid "Unreadable"
+msgstr ""
+
+msgid "Up to {size}"
 msgstr ""
 
 msgid "Upload automatically"
@@ -5973,6 +5979,12 @@ msgid "drive not available"
 msgstr ""
 
 msgid "ease in {secs} s"
+msgstr ""
+
+msgid "estimate: under 5 MB"
+msgstr ""
+
+msgid "estimate: up to {size}"
 msgstr ""
 
 msgid "export {path} at \"{name}\""

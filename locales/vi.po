@@ -9687,3 +9687,19 @@ msgstr "Đặt In và Out trên dòng thời gian để chọn một đoạn ng�
 #, fuzzy
 msgid "{size} is larger than the recording ({width} × {height}). Choose the recording size or a smaller one."
 msgstr "{size} lớn hơn bản ghi ({width} × {height}). Hãy chọn kích thước gốc hoặc nhỏ hơn."
+
+#, fuzzy
+msgid "Under 5 MB"
+msgstr "Dưới 5 MB"
+
+#, fuzzy
+msgid "Up to {size}"
+msgstr "Tối đa {size}"
+
+#, fuzzy
+msgid "estimate: under 5 MB"
+msgstr "ước tính: dưới 5 MB"
+
+#, fuzzy
+msgid "estimate: up to {size}"
+msgstr "ước tính: tối đa {size}"
