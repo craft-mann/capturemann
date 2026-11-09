@@ -6,6 +6,7 @@ pub const CLIP_MOV: &[u8] = include_bytes!("../../../tests/data/regress/clip-h26
 pub const CLIP_MKV: &[u8] = include_bytes!("../../../tests/data/regress/clip-h264.mkv");
 pub const CLIP_ROTATED: &[u8] = include_bytes!("../../../tests/data/regress/clip-rotated.mp4");
 pub const CLIP_VFR: &[u8] = include_bytes!("../../../tests/data/regress/clip-vfr.mp4");
+pub const TONE_MP3: &[u8] = include_bytes!("../../../tests/data/regress/tone.mp3");
 pub const REDACT_PNG: &[u8] = include_bytes!("../../../tests/data/regress/redact-text.png");
 
 /// CRC-32 (IEEE), as PNG uses it.
@@ -213,6 +214,7 @@ mod tests {
             ("mkv", CLIP_MKV),
             ("rot", CLIP_ROTATED),
             ("vfr", CLIP_VFR),
+            ("mp3", TONE_MP3),
         ] {
             assert!(b.len() < 200_000, "{n} is {} bytes", b.len());
         }

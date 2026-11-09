@@ -9,6 +9,7 @@ About 0.4 MB in total; each file is under 200 KB (a unit test checks it).
 | `clip-h264.mov`, `clip-h264.mkv` | `ffmpeg -i clip-h264.mp4 -c copy ...` |
 | `clip-rotated.mp4` | the same picture without audio, then `ffmpeg -display_rotation 90 -i plain.mp4 -c copy clip-rotated.mp4` (a 320x240 stream with a 90 degree display matrix) |
 | `clip-vfr.mp4` | `ffmpeg -f lavfi -i testsrc2=size=320x240:rate=30:duration=4 -vf "select='not(eq(mod(n,10),4))+eq(mod(n,50),4)'" -fps_mode vfr -c:v libx264 -preset veryfast -crf 30 -pix_fmt yuv420p clip-vfr.mp4` (frames dropped at irregular spacing: nominal 30 fps, average 27.75) |
+| `tone.mp3` | `ffmpeg -f lavfi -i sine=frequency=440:duration=2:sample_rate=16000 -ac 1 -c:a libmp3lame -b:a 32k -write_xing 0 tone.mp3` (2 s, mono, constant 32 kbit/s, 8 KB; used by `import.audio`) |
 | `redact-text.png` | `cargo run -p cm-render --example ocr_fixture -- tests/data/regress/redact-text.png`: black text on white, drawn by the project's own renderer: `Owner: jane.doe@example.com` and `Server address 203.0.113.45 is down` (an invented address and a documentation IPv4 address) |
 
 The suite writes the PNG into a screenshot bundle (`.cmshot`) in a throw-away library, so Auto-redact, annotate,

@@ -50,7 +50,7 @@ pub fn cases() -> Vec<Case> {
         },
         Case {
             id: "import.audio",
-            title: "a WAV file imports as an audio capture of the right length",
+            title: "a WAV file and an MP3 file import as an audio capture of the right length",
             area: "import",
             specs: &["IMP-1", "VOC-2"],
             tier: Tier::Standard,
@@ -287,6 +287,21 @@ fn audio(ctx: &mut Ctx) -> R {
     check!(
         (secs - 2.0).abs() < 0.2,
         "duration {secs:.2} s, expected about 2.0"
+    );
+    // 0.3.1 MP3 import (specs/plans/mp3-import-plan.md): a 2 s constant-rate MP3 imports as audio of the same length.
+    let mp3 = ctx.write_file("tone.mp3", fixtures::TONE_MP3)?;
+    let (id, _) = import_file(ctx, &mp3)?;
+    let e = library_entry(ctx, &id)?;
+    let secs = seconds_of(&e);
+    ctx.note(format!("mp3 {id}: kind {:?}, {secs:.2} s", e.get("kind")));
+    check!(
+        matches!(e.get("kind").and_then(Value::as_str), Some("audio")),
+        "the MP3 imported as kind {:?}, expected audio",
+        e.get("kind")
+    );
+    check!(
+        (secs - 2.0).abs() < 0.25,
+        "MP3 duration {secs:.2} s, expected about 2.0"
     );
     Ok(())
 }
