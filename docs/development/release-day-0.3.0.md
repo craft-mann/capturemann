@@ -47,13 +47,14 @@ Text to publish: `release-0.3.0-github-text.md`. What happened during the night:
 
 ## 3. The release files and their checks
 
-The files built the night of Nov 8 to 9 from commit `5301d4b8` (code frozen there; later commits change documents, `cm-regress`, tests and one behaviour-neutral move of the cursor-track rule to `cm-platform`; see the morning report):
+The files were rebuilt on Nov 9, 2026 from commit `6cdcb033` (the first build, from `5301d4b8`, said "early build" in the tarball README
+and in the signature comment; that wording is gone). Later commits may change documents only:
 
-- `capturemann-0.3.0-linux-x86_64.tar.gz`, `capturemann_0.3.0_amd64.deb` (laptop; `~/wt/release-out/<sha8>-x86_64/`)
-- `capturemann-0.3.0-linux-aarch64.tar.gz`, `capturemann_0.3.0_arm64.deb` (VM; `~/wt/release-out/<sha8>-aarch64/`)
+- `capturemann-0.3.0-linux-x86_64.tar.gz`, `capturemann_0.3.0_amd64.deb` (laptop; `~/wt/release-out/6cdcb033-x86_64/`)
+- `capturemann-0.3.0-linux-aarch64.tar.gz`, `capturemann_0.3.0_arm64.deb` (VM; `~/wt/release-out/6cdcb033-aarch64/`)
 - each with `.sha256`, plus `SHA256SUMS.txt` and `BUILD-INFO.txt` in each folder.
 
-The night copied them to this Mac: `~/release-0.3.0/x86_64` and `~/release-0.3.0/aarch64` (sums checked). Originals: laptop `~/wt/release-out/<sha8>-x86_64/` (and `~/lab/release-0.3.0-linux/`), VM `~/wt/release-out/<sha8>-aarch64/`.
+They are on this Mac in `~/release-0.3.0-final/x86_64` and `~/release-0.3.0-final/aarch64` (sums checked; `~/release-0.3.0` holds the first build, do not publish it).
 Check: `shasum -a 256 -c SHA256SUMS.txt` in the folder, and compare with the numbers in the release text. If you rebuild, rebuild
 from the tag with `packaging/linux/release-build.sh --src <checkout> --commit v0.3.0` (about one hour on the laptop).
 

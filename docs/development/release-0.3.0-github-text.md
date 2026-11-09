@@ -8,7 +8,7 @@ without a stored report; lines without a report say "not run". Steps: `release-d
 
 - **Tag:** `v0.3.0` (never reuse a tag). **Title:** `CaptureMann 0.3.0: Linux catches up`.
 - **Type:** draft, then **pre-release** (the version is 0.x). Linux only: no Windows or macOS file.
-- **Files to attach** (x86_64 from the lab laptop, aarch64 from the VM, built from commit `5301d4b8`): 
+- **Files to attach** (x86_64 from the lab laptop, aarch64 from the VM, built from commit `6cdcb033`): 
   `capturemann-0.3.0-linux-x86_64.tar.gz`, `capturemann_0.3.0_amd64.deb`, `capturemann-0.3.0-linux-aarch64.tar.gz`,
   `capturemann_0.3.0_arm64.deb`, each with `.sha256` and `.minisig`, and `SHA256SUMS.txt`.
 
@@ -73,7 +73,7 @@ systems. A few things differ by design or are not possible on Linux; they are li
 
 Reports are in `verification/` (`L1-linux-0.3.0-*`); all are marked PARTIAL. Tested on **one** computer: ThinkPad T490, Intel UHD
 620, Ubuntu 24.04.5, GNOME 46, X11 and Wayland, built-in webcam, plus an aarch64 Ubuntu 24.04 VM (headless: no recording, no
-desktop cases). `cm-regress` on the files above (commit `5301d4b8`, extracted tarball unless noted), passed / failed / skipped:
+desktop cases). `cm-regress` on the first build of these files (commit `5301d4b8`, extracted tarball unless noted), passed / failed / skipped. The files above were rebuilt from `6cdcb033` (only the "early build" wording, the cursor-rule move to `cm-platform`, `pw_registry.rs` starting its helper through `cm_platform::process::command`, and Linux-only gating of two desktop details differ): <FILL: result of the smoke and standard runs on the rebuilt files>.
 
 | Run | Result |
 | --- | --- |
@@ -109,10 +109,10 @@ than one second on Wayland.
 
 | File | SHA-256 |
 | --- | --- |
-| `capturemann-0.3.0-linux-x86_64.tar.gz` | `cae0cfea6617891ffaea0cba048686007b039b99cb297d1ee3c685f8f0805072` |
-| `capturemann_0.3.0_amd64.deb` | `30b2cd10316233755cc730271315c03cbcdb6c0d16aa4f54267b37fc128a7158` |
-| `capturemann-0.3.0-linux-aarch64.tar.gz` | `10513d7059f595d834d525b43e03f5da61341f8ec363efc09ebecd8f6171c968` |
-| `capturemann_0.3.0_arm64.deb` | `46f7909df48c893fac6261062607c0d888a15eeb8878131fe11b086c3a50f06a` |
+| `capturemann-0.3.0-linux-x86_64.tar.gz` | `6f6904df654fadbd7c74772f9ee9bfa6e595dc2da2ee60bda2cf473bd7dc166f` |
+| `capturemann_0.3.0_amd64.deb` | `d2b928d359f706bff6ce05124fca29f0fbb0f4c6d8685a9933600ba5e543e311` |
+| `capturemann-0.3.0-linux-aarch64.tar.gz` | `41b4782e31d80ce5a47f0adac28065d357c09f769cbc578657dd507ee2d60463` |
+| `capturemann_0.3.0_arm64.deb` | `4e024e03801764a1ca1df56b1af09990bfcae12b30fdc0dffb1b41ada1b65e0b` |
 
 Minisign public key: `packaging/linux/minisign.pub`; public key `RWTeQv8ogB2CCuZ7j0rr3MovdHod4QATmVn+I329YC8pomOC6R9Rxc2k` (verify: `minisign -Vm <file> -P <that key>`).
 Install: `sudo apt install ./capturemann_0.3.0_amd64.deb` (or the tarball and `install.sh`).
