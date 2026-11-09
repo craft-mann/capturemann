@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the Linux "early build" tarball:
+# Builds the Linux tarball:
 #   capturemann-<version>-linux-<arch>.tar.gz   (+ .sha256)
 # holding cm-desktop, cm-overlay, capturemann, cm-mcp, cm-daemon, the licence files, the .desktop entry, the
 # icons from design/brand/app-icon, install.sh and, when given, an LGPL FFmpeg.
@@ -278,7 +278,7 @@ done
 mkdir -p "$stage/share/icons/hicolor/scalable/apps"
 cp "$icons/svg/app-icon.svg" "$stage/share/icons/hicolor/scalable/apps/dev.capturemann.app.svg"
 cat > "$stage/README.txt" <<EOF
-CaptureMann $version for Linux ($arch), early build.
+CaptureMann $version for Linux ($arch).
 
 Install for yourself:   ./install.sh                 (into ~/.local, no root)
 Install for everyone:   sudo ./install.sh --prefix /usr/local

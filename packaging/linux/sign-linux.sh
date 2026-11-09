@@ -34,7 +34,7 @@ files=("$dir"/capturemann-*-linux-*.tar.gz "$dir"/capturemann-*-linux-*.tar.gz.s
 for f in "${files[@]}"; do
   name="$(basename "$f")"
   # The trusted comment is signed too: it names the file, so a signature cannot be moved to another file.
-  minisign -S -s "$key" -m "$f" -t "CaptureMann Linux early build: $name"
+  minisign -S -s "$key" -m "$f" -t "CaptureMann Linux: $name"
   minisign -V -p "$pub" -m "$f" -q || die "the signature of $name does not verify with $pub (wrong key?)"
   echo "signed and verified: $name.minisig"
 done

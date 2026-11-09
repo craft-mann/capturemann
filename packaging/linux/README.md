@@ -1,4 +1,4 @@
-# Linux packaging (early build)
+# Linux packaging
 
 `packaging/linux/build-linux.sh` builds `capturemann-<version>-linux-<arch>.tar.gz` (and a `.sha256`), and
 `packaging/linux/build-deb.sh` turns that tarball into `capturemann_<version>_<amd64|arm64>.deb` (see "The .deb"), for
