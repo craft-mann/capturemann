@@ -1,6 +1,6 @@
-# Plan: import MP3 audio (target 0.3.0)
+# Plan: import MP3 audio (target 0.3.1)
 
-Status: **draft** (Nov 8, 2026), nothing built. Asked for by the maintainer on Nov 8, 2026 ("we can't import mp3 audio"). Not for
+Status: **draft** (Nov 8, 2026), nothing built; **scheduled for 0.3.1** (maintainer, Nov 9, 2026, see release-0.3.1-plan.md section 2). Asked for by the maintainer on Nov 8, 2026 ("we can't import mp3 audio"). Not for
 0.2.9 (a stabilization release; a new FFmpeg build means every export and recording path is tested again). Place it in 0.3.0
 (Linux features) or in a 0.2.10 if the maintainer wants it sooner; decision below.
 

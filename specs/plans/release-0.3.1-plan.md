@@ -1,68 +1,89 @@
-# Release 0.3.1 plan: backlog that is not Linux-only
+# Release 0.3.1 plan
 
-Status: **draft** (created Nov 8, 2026). Nothing built. Holds everything moved out of
-[`release-0.3.0-plan.md`](release-0.3.0-plan.md), which is Linux-only. Platforms: Windows, macOS and Linux as each item
-says; set the final scope after 0.3.0 ships.
+Status: **draft** (rewritten Nov 9, 2026 by the maintainer's list). Nothing built. Platforms: Windows, macOS and Linux
+(0.3.1 is the first release since 0.2.9 that covers all three, so it becomes the next "Latest" on GitHub).
 
-Rules: same as the 0.3.0 plan (general techniques, no "verified" without a stored report, `cm-regress` per platform
-before release, the maintainer pushes and signs).
+The earlier backlog of this file (27 items, Nov 8 to 9, 2026) was cleared at the maintainer's request; it is in git history
+(`git show 2ef3e02a:specs/plans/release-0.3.1-plan.md`). Items from it are brought back only when listed below.
 
-## From the 0.2.8 backlog
+Rules: same as the 0.3.0 plan (general techniques only, no one-recording fixes; nothing is called "verified" without a stored
+report in `verification/`; no GPL/AGPL in shipped binaries; `target_os` only in platform code; every user-facing action has an
+MCP tool and a CLI command; UI text through `cm_i18n` with a `vi.po` entry; one change per commit with the trailer lines;
+`cm-regress` per platform before release; the maintainer pushes, signs, tags and publishes).
 
-1. **Windows: the Reveal button in the export toast opens the wrong folder** (window export of a recording). Leads:
-   `ToastAction::RevealExport(id)` in `apps/desktop/src/toast.rs`, handled by `crate::ui::export_ui::reveal`
-   (`apps/desktop/src/ui/app/toasts.rs`); check the path it opens (recording's exports folder versus the exported file,
-   path separators, `explorer /select`). Add a regress case.
-2. **Windows CI speed-up:** the Windows test job takes about 48 minutes (target 20) and `quick_export` alone 345 s. Same
-   item: the flaky `exp4_ac4_cancel_deletes_partial_output` (`cm-media/tests/quick_export.rs`; cancel noticed after 0.44 s
-   but the export took 31.8 s to wind down against a 20 s limit, CI run 42477256615, Nov 8, 2026): wait for the cancel
-   signal instead of the clock, or give Windows CI a longer limit. Harden the NSIS install step in
-   `windows-package.yml` with a retry (Chocolatey 5xx on Nov 7, 2026).
-3. **Output-device chooser** in the editor (playback follows the system default; an external monitor with speakers can take
-   it over).
-4. **Spec decisions and small features:** `export_image` MCP tool needs a spec decision; the
-   `capturemann://capture/{id}/cursor` MCP resource; macOS camera reconnect after replugging into another USB port.
-5. **Wording:** the import summary messages in `import_ops` still say "Trash" on every platform (the capture-delete text
-   uses `vocab::here(Term::Trash)` since 0.2.8); 86 Vietnamese entries are still fuzzy.
-6. **Windows items not run for 0.2.8 and 0.2.9:** Windows 10, a mixed-DPI second monitor, NVIDIA and AMD encoders,
-   SmartScreen on a real download, a phone A/V clap check, Intel Mac hardware; each a stored step or an explicit
-   "not run" in the notes.
+## 1. The transcript uses the original microphone by default
 
-## From the 0.2.9 backlog
+Today a transcript is made from the noise-reduced microphone copy unless the setting `ai.transcribe_raw_mic` is on
+(`crates/cm-daemon/src/ai/actions.rs`, `Transcribe` request field and the setting). Change the default to the **original**
+(raw) microphone track.
 
-7. **MP3 and bare AAC import** (plan `mp3-import-plan.md`, asked for Nov 8, 2026): the bundled FFmpeg has no MP3 demuxer or
-   decoder. Open decisions there: bare AAC (recommended yes), title from the ID3 tag, disk use. The question "0.3.1 or a
-   0.2.10 for Windows and macOS" is now answered as 0.3.1 unless the maintainer pulls it forward.
-8. **Disk use of audio recordings:** about 69 MB per minute on Windows (`online` preset, mic, denoised mic and system
-   audio as 32-bit float) and 23 MB per minute on the Mac; a smaller stored format is a candidate (VOC-1 soak reports).
-9. **Manual runs not done for 0.2.9:** `tests/manual/ANN-1-IME.md` (Telex and VNI), `tests/manual/HUD-1.md`, VOC-2
-   screenshots; the HUD design questions the maintainer still has to answer.
-10. **Windows details:** the file version field of `cm-desktop.exe` is empty.
-11. **After 0.2.9:** winget for 0.2.9 (the 0.2.8 package, PR 472327, was still waiting), the website download links and the
-    winget wording in the 0.2.8 notes.
+- Acceptance: a new recording or import with both tracks is transcribed from the raw mic unless the user (or the request)
+  asks for the noise-reduced copy; Settings shows the choice in plain words; `set_settings`, the CLI and MCP name it the
+  same way; a library whose user already chose a value keeps that value (migration: only an unset setting changes).
+- To check first: why the noise-reduced copy was the default (transcription-quality plan 0.2.7, `specs/plans/transcription-quality-plan-0.2.7.md`);
+  run the transcript benchmark (`verification/benchmarks/`) on both sources before the change and store the numbers. The
+  default moves only if the raw mic is not worse on the benchmark; if it is worse on noisy clips, say so in the Settings text.
+- Both platforms of the system-audio track are unchanged.
 
-## From the 0.3.0 triage
+## 2. Import MP3 (audio)
 
-12. `mcp.policy_allow` failure (agents.tool_policy `allow` for `start_recording`), if the 0.3.0 triage finds it is not
-    Linux-only.
-13. Any other shared-code failure found by the Linux regression that is not Linux-only.
+Plan: [`mp3-import-plan.md`](mp3-import-plan.md) (the bundled FFmpeg has no MP3 demuxer or decoder; `mp3float` is LGPL, no
+encoder is added). Decisions still open there: bare AAC (recommended yes), the title from the ID3 tag, disk use.
 
-## Found during the 0.3.0 night work (Nov 8, 2026)
+- Acceptance: an `.mp3` file imports as an audio capture on Windows, macOS and Linux through the app, the CLI and MCP
+  (`import`), with the transcript, the audio editor and Export audio working on it; a clear error for a broken file; the
+  FFmpeg build lists only the added components; `make licenses` and `cargo deny` stay clean; the FFmpeg change is tested on
+  every export and recording path (`cm-regress` standard on all three systems), because a new FFmpeg build touches all of them.
+- Linux: the FFmpeg build is `packaging/ffmpeg/build-linux.sh`; Windows and macOS have their own build scripts.
 
-14. **`mcp.policy_allow` passes on the Mac** (`cm-regress --dev --tier standard`, 34 passed, 0 failed, Nov 8): the 0.2.9 Linux failure is therefore Linux-only; see the 0.3.0 triage note in `verification/` for its outcome.
-15. **Real WebM/Opus output for the `youtube-1080p` preset on Linux without a hardware encoder.** 0.3.0 keeps VP9 + AAC in MP4, labelled "VP9, not H.264" (YouTube accepts it); O10 said WebM.
-16. **Shared code changed by the Linux work, no-op on macOS and Windows, to review there:** `copy_ladder` / `EncoderFamily::for_os` in `cm-media`, the `editing_copy` field in the import outcome, `ExportContents.vp9` in `apps/desktop`, `cm-media` now depends on `cm-encode`, `Caps::vaapi_cqp`, `editing_copy_encoders` returns a 3-tuple; the tray "Recent captures" list polls the library every 10 s in shared app code (`5900e4a5`); `MoveSource::Xi2Raw` in the cursor schema (the REC-7 spec list and the editor readers do not name it yet); `futures-lite` dev-dependency of `cm-desktop`.
-17. **Camera track on Linux is software VP9**; wiring it to the shared VA-API probe (`cm_encode::ffmpeg_vp9::choose_backend`) is open.
-18. **Intel-only stimulus-measured sync** was measured on Wayland; an X11 stimulus measurement and other GPUs (AMD, NVIDIA) are open for Linux and for Windows NVIDIA/AMD.
-19. **Sidebar Record stays clickable during a recording on every OS.** The Linux UI pass noticed it; only the tray disables Record. A change that dims the sidebar Record row, the rail button and the two "Record audio" buttons while a recording runs was written on a 0.3.0 branch (`fa225b6d`) and reverted because it changes macOS and Windows too. Decide the behaviour for all three systems.
-20. **Linux first-run intro note** (`permissions::intro_note`) still says "Your desktop asks when CaptureMann captures the screen", true for the portal backend only; GNOME's screen-cast service records without a dialog. It needs a new msgid and a vi.po entry (the Settings -> Permissions page has the true note).
-21. **Recording editor timeline draws no thumbnails on any OS** (the Screen row is a plain bar; found in the Linux UI pass, not a decode problem). A feature, not a bug fix.
-22. **Editor warning row cuts `source_note`** ("Decoded from the recording wi...") at 1180 px on every OS: wrap or ellipsis with a tooltip (`apps/desktop/src/recedit/source.rs`, `ui/recording_editor/panels.rs`).
-23. **Event-driven PipeWire screen source on Linux** (late frames of still pictures) is the same bug class as the Windows WGC "54 % late" fix; the Linux fix could not be reproduced with a sparse-damage window on hardware (a repainting test clip was used), so a still-picture window recording on the T490 is open.
+## 3. Export a recording: choose resolution and format, see the file size first
 
-## Found during the 0.3.0 release (Nov 9, 2026)
+Today the export dialog offers a preset or the recording's own size (`apps/desktop/src/ui/export_ui.rs`, spec
+`specs/features/08-export.md`, EXP-1 to EXP-3).
 
-24. **`cm-regress` smoke and standard on the rebuilt 0.3.0 files** (`6cdcb033`): the stored regression ran on the first build (`5301d4b8`).
-25. **APT repository:** published first as the flat layout in a GitHub release tagged `apt`; move to S3 + CloudFront at `apt.<domain>` later (the users' `.sources` file then changes). The repository key (RSA 4096, signing) expires **Nov 8, 2031**: rotate before then (`linux-apt.md`, "Rotating").
-26. **Windows CI:** `exp4_ac4_cancel_deletes_partial_output` failed again on the 0.3.0 push (cancel noticed after 0.42 s, export wound down after 31.4 s; passed on re-run); same fix as item 2.
-27. **Two Mac `cm-desktop` render tests** (`recedit::render::source_errors_keep_the_last_picture`, `worker_is_latest_wins_and_stops`) fail inside this repo's own `target/` (also after `cargo clean -p zune-jpeg`) and pass in a clean external target directory and in CI; find what in the repo `target/` causes it.
+- The user chooses the **resolution** (the source size and smaller steps, for example 2160p, 1440p, 1080p, 720p, 480p,
+  never above the source) and the **format** (MP4, WebM, GIF, and audio-only where it applies), and sees an **estimated file
+  size** before pressing Export, updating as the choice changes.
+- The estimate comes from the duration, the chosen resolution and the encoder's bit-rate rule (hardware H.264 rate, the
+  Linux VP9 fallback, GIF palette size, audio bit rate), shown as a range ("about 180 MB") and labelled an estimate; after
+  the export the real size is shown. If the estimate is far off in the tests, the rule is wrong, not the label.
+- Acceptance: the same choices exist in the CLI (`capturemann export <id> --resolution 1080p --format mp4`, plus a
+  `--estimate` that prints the size without exporting) and in MCP (`export_video` parameters and an estimate tool or field);
+  a stored test compares estimate and real size on three recordings per format; presets stay and fill the two fields.
+- Open decisions: which resolutions and formats to offer (Windows and macOS hardware encoders have limits; Linux without a
+  hardware encoder is VP9); whether the estimate may take a short probe of the recording (cheap, more accurate) or only a formula.
+
+## 4. Transcript progress for a recording, like an imported file
+
+An imported recording or audio file shows the transcription's progress; a recording or audio capture made in the app does
+not show it the same way (`apps/desktop/src/ui/recording/transcript_card.rs` versus the progress of
+`ui/import_cards.rs` and `ui/ai.rs`).
+
+- Acceptance: while a transcript of a recording or an audio capture is being made, the same progress (percent, the stage,
+  cancel) appears as for an import, in the recording's page, the audio page and the library card, on all three systems;
+  it survives closing and reopening the page, shows an error with a retry, and is the same job (`transcribe`, progress
+  events on the bus) so the CLI and MCP report it too.
+- To check first: whether the two screens already read the same job events and one of them does not subscribe, or the
+  recording path starts the job another way.
+
+## 5. Regression, bug fixes and stabilization
+
+The release ends with a complete regression and fixes of what it finds. No new feature goes in after the freeze.
+
+- `cm-regress` full and hardware tiers on **Windows 11** (the lab laptop), **macOS** (Apple Silicon; Intel if a machine is
+  available) and **Linux** (X11 and Wayland, `.deb` and tarball, the aarch64 VM), run on the **final release files**, each
+  report stored in `verification/` and marked PARTIAL when it covers one computer.
+- Fix every failure or list it in the release text with its reason. Known: the Windows CI flake
+  `exp4_ac4_cancel_deletes_partial_output` (cancel noticed after about 0.4 s, export wound down after about 31 s against a 20 s
+  limit; failed on two of three Windows runs of Nov 8 to 9); the two Mac `cm-desktop` render tests that fail only inside the
+  repository's `target/` (`recedit::render`); the rebuilt 0.3.0 files had no separate `cm-regress` run.
+- CI green on all three systems before the tag; GitHub's Linux package workflow (never run) run once and fixed.
+- The APT repository: an amd64 install, upgrade and removal from it tested; the host (GitHub release assets for now)
+  answers a first download slowly and sometimes with a 504, so decide whether 0.3.1 moves it (S3 + CloudFront at
+  `apt.<domain>`; the users' `.sources` file would change). The repository key expires Nov 8, 2031.
+- Version bump, CHANGELOG, release text, checksums, signatures, tag: as in `docs/development/release-day-0.3.0.md`.
+
+## Not in 0.3.1 unless the maintainer adds it
+
+The cleared backlog (Windows Reveal button, output-device chooser, audio disk use, Windows 10 and other hardware runs, winget,
+and the rest) stays out. Bugs found by the regression in section 5 are in.
