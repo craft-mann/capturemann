@@ -87,6 +87,10 @@ impl RecordingDetails {
         self.load = Load::Loading;
         self.action_error = None;
         self.start_load(cx);
+        // The daemon may be transcribing this recording already (the automatic run after the
+        // stop, one the CLI started): read its running job, not only the live events.
+        let app = self.app.clone();
+        cx.defer(move |cx| crate::ui::ai::sync_running_jobs(&app, cx));
     }
 
     /// Loads the card again, keeping what is shown until the new data arrives.
