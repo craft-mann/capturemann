@@ -59,3 +59,10 @@ before release, the maintainer pushes and signs).
 21. **Recording editor timeline draws no thumbnails on any OS** (the Screen row is a plain bar; found in the Linux UI pass, not a decode problem). A feature, not a bug fix.
 22. **Editor warning row cuts `source_note`** ("Decoded from the recording wi...") at 1180 px on every OS: wrap or ellipsis with a tooltip (`apps/desktop/src/recedit/source.rs`, `ui/recording_editor/panels.rs`).
 23. **Event-driven PipeWire screen source on Linux** (late frames of still pictures) is the same bug class as the Windows WGC "54 % late" fix; the Linux fix could not be reproduced with a sparse-damage window on hardware (a repainting test clip was used), so a still-picture window recording on the T490 is open.
+
+## Found during the 0.3.0 release (Nov 9, 2026)
+
+24. **`cm-regress` smoke and standard on the rebuilt 0.3.0 files** (`6cdcb033`): the stored regression ran on the first build (`5301d4b8`).
+25. **APT repository:** published first as the flat layout in a GitHub release tagged `apt`; move to S3 + CloudFront at `apt.<domain>` later (the users' `.sources` file then changes). The repository key (RSA 4096, signing) expires **Nov 8, 2031**: rotate before then (`linux-apt.md`, "Rotating").
+26. **Windows CI:** `exp4_ac4_cancel_deletes_partial_output` failed again on the 0.3.0 push (cancel noticed after 0.42 s, export wound down after 31.4 s; passed on re-run); same fix as item 2.
+27. **Two Mac `cm-desktop` render tests** (`recedit::render::source_errors_keep_the_last_picture`, `worker_is_latest_wins_and_stops`) fail inside this repo's own `target/` (also after `cargo clean -p zune-jpeg`) and pass in a clean external target directory and in CI; find what in the repo `target/` causes it.
