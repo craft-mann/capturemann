@@ -626,6 +626,33 @@ impl Render for AiPage {
             }
             seg
         };
+        // "Transcribe from": the stored `ai.transcribe_raw_mic`, or the daemon's default (the
+        // original microphone) while nothing is stored. Only a click writes the key.
+        let raw_mic = self
+            .app
+            .read(cx)
+            .ai
+            .transcribe_raw_mic
+            .unwrap_or(cm_ai::pipeline::PipelineSettings::default().transcribe_raw_mic);
+        let source_choice = {
+            let mut seg = segmented(&t, "ai-transcribe-source", &tr!("Transcribe from"));
+            for (raw, id, label) in [
+                (true, "ai-source-original", tr!("Original microphone")),
+                (false, "ai-source-reduced", tr!("Noise-reduced copy")),
+            ] {
+                let app = self.app.clone();
+                seg = seg.child(
+                    segment(&t, id, &label, raw_mic == raw).on_click(cx.listener(
+                        move |_, _, _, cx| {
+                            if raw_mic != raw {
+                                set_transcribe_source(&app, raw, cx);
+                            }
+                        },
+                    )),
+                );
+            }
+            seg
+        };
         let cuts_on = !self.app.read(cx).ai.auto_suggest_cuts_off;
         let cuts_switch = switch(
             &t,
@@ -779,6 +806,16 @@ impl Render for AiPage {
                                         ))
                                         .child(settings_row(
                                             &t,
+                                            Some("mic"),
+                                            tr!("Transcribe from"),
+                                            Some(SharedString::from(tr!(
+                                                "The original microphone keeps quiet and distant voices that noise reduction can drop. A recording made without noise reduction has only the original. Applies to transcripts started from now on."
+                                            ))),
+                                            Some(source_choice.into_any_element()),
+                                            false,
+                                        ))
+                                        .child(settings_row(
+                                            &t,
                                             Some("scissors"),
                                             tr!("Suggest cuts when the editor opens"),
                                             Some(SharedString::from(tr!(
@@ -806,6 +843,24 @@ impl Render for AiPage {
                 )
         )
     }
+}
+
+/// "Transcribe from" on the AI page: the choice shows at once, the daemon stores
+/// `ai.transcribe_raw_mic` (through `set_settings`, so the CLI and agents see the same value) and
+/// the next Re-generate panel opens on it. Called only when the user picks the other option, so a
+/// library that never stored the key keeps following the default until then.
+fn set_transcribe_source(app: &Entity<AppModel>, original_microphone: bool, cx: &mut gpui::App) {
+    app.update(cx, |m, cx| {
+        m.ai.transcribe_raw_mic = Some(original_microphone);
+        m.transcribe.regen_original_audio = Some(original_microphone);
+        cx.notify();
+    });
+    crate::ui::app::set_setting(
+        app,
+        cm_ai::pipeline::KEY_RAW_MIC,
+        serde_json::Value::Bool(original_microphone),
+        cx,
+    );
 }
 
 /// The Transcribe control of a recording (the details card, the recording editor): the button, its

@@ -324,6 +324,11 @@ pub struct ModelsVm {
     pub auto_suggest_cuts_off: bool,
     /// `ai.transcribe_while_recording` (M2h): default on, and only in effect with `auto_transcribe`.
     pub live_transcribe: bool,
+    /// `ai.transcribe_raw_mic` as the AI page shows it ("Transcribe from"): `None` while nothing
+    /// is stored (the daemon's default, the original microphone, applies), `Some(true)` the
+    /// original microphone, `Some(false)` the noise-reduced copy. Written only when the user
+    /// changes the choice.
+    pub transcribe_raw_mic: Option<bool>,
     /// `ai.glossary` (AI-6a): names and terms spelled the user's way in new transcripts.
     pub glossary: Vec<cm_ai::glossary::GlossaryEntry>,
     /// `ai.languages`: the languages the user speaks, as codes joined by commas (`vi,en`); empty

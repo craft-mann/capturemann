@@ -95,6 +95,9 @@ pub struct TranscribeVm {
     pub info_epoch: u64,
     /// Open "Re-generate" panels (model and language for this run), by recording.
     pub regen: HashMap<String, RegenDraft>,
+    /// The Audio choice a Re-generate panel opens on: the stored `ai.transcribe_raw_mic`, or
+    /// `None` for the daemon's default (the original microphone). Kept in step by the AI page.
+    pub regen_original_audio: Option<bool>,
     /// Put `[mm:ss]` before every line of a TXT export.
     pub txt_timestamps: bool,
     /// Bumped when a translation was written (`translation.ready`): the audio editor reads the
@@ -114,6 +117,14 @@ pub struct TranscribeVm {
 }
 
 impl TranscribeVm {
+    /// A fresh view model that knows the stored `ai.transcribe_raw_mic` (`None`: nothing stored).
+    pub fn with_regen_original_audio(regen_original_audio: Option<bool>) -> Self {
+        TranscribeVm {
+            regen_original_audio,
+            ..Default::default()
+        }
+    }
+
     /// Whether the next export of `capture_id` burns the captions in: what the user ticked for it,
     /// else the recording's own `burn_in` setting.
     pub fn export_burn(&self, capture_id: &str, recording_default: bool) -> bool {
@@ -320,9 +331,18 @@ impl TranscribeVm {
         self.info_epoch += 1;
     }
 
-    /// Opens the Re-generate panel (the defaults: the active model, auto-detect).
+    /// Opens the Re-generate panel (the defaults: the active model, auto-detect, the audio the
+    /// setting `ai.transcribe_raw_mic` names, the original microphone when nothing is stored).
     pub fn open_regen(&mut self, capture_id: &str) {
-        self.regen.entry(capture_id.to_owned()).or_default();
+        let original_audio = self
+            .regen_original_audio
+            .unwrap_or(RegenDraft::default().original_audio);
+        self.regen
+            .entry(capture_id.to_owned())
+            .or_insert_with(|| RegenDraft {
+                original_audio,
+                ..Default::default()
+            });
     }
 
     pub fn close_regen(&mut self, capture_id: &str) {
@@ -614,6 +634,10 @@ mod tests {
         assert!(v.regen_of("rec_1").is_none());
         v.open_regen("rec_1");
         assert_eq!(v.regen_of("rec_1"), Some(&RegenDraft::default()));
+        assert!(
+            v.regen_of("rec_1").unwrap().original_audio,
+            "nothing stored: the original microphone"
+        );
         v.regen_mut("rec_1").unwrap().model = Some("medium".into());
         v.regen_mut("rec_1").unwrap().language = "vi".into();
         // Opening again keeps the choices.
@@ -631,6 +655,22 @@ mod tests {
         assert_eq!(v.info_epoch, info + 1);
         v.bump_info();
         assert_eq!(v.info_epoch, info + 2);
+    }
+
+    /// The Audio choice of a new Re-generate panel follows the stored `ai.transcribe_raw_mic`:
+    /// a stored `false` opens on the noise-reduced copy, nothing stored on the original microphone.
+    #[test]
+    fn a_regenerate_panel_opens_on_the_stored_audio_choice() {
+        let mut v = TranscribeVm::with_regen_original_audio(Some(false));
+        v.open_regen("rec_1");
+        assert!(!v.regen_of("rec_1").unwrap().original_audio);
+        v.regen_original_audio = None;
+        v.open_regen("rec_2");
+        assert!(v.regen_of("rec_2").unwrap().original_audio);
+        // An open panel keeps what the user picked in it.
+        v.regen_mut("rec_1").unwrap().original_audio = true;
+        v.open_regen("rec_1");
+        assert!(v.regen_of("rec_1").unwrap().original_audio);
     }
 
     /// The export checkbox starts at the recording's own setting, remembers a tick, and goes back

@@ -8626,6 +8626,15 @@ msgstr "Đã khử nhiễu"
 msgid "Original microphone"
 msgstr "Micrô gốc"
 
+msgid "Transcribe from"
+msgstr "Chép lời từ"
+
+msgid "Noise-reduced copy"
+msgstr "Bản đã khử nhiễu"
+
+msgid "The original microphone keeps quiet and distant voices that noise reduction can drop. A recording made without noise reduction has only the original. Applies to transcripts started from now on."
+msgstr "Micrô gốc giữ được những giọng nhỏ và ở xa mà khử nhiễu có thể làm mất. Bản ghi không dùng khử nhiễu chỉ có micrô gốc. Áp dụng cho các bản chép lời bắt đầu từ bây giờ."
+
 msgctxt "field"
 msgid "Audio"
 msgstr "Âm thanh"

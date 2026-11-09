@@ -2902,6 +2902,9 @@ msgstr ""
 msgid "Noise-reduced"
 msgstr ""
 
+msgid "Noise-reduced copy"
+msgstr ""
+
 msgid "Normalise to {lufs} LUFS, the level podcasts and players expect"
 msgstr ""
 
@@ -4923,6 +4926,9 @@ msgstr ""
 msgid "The online copies were already gone."
 msgstr ""
 
+msgid "The original microphone keeps quiet and distant voices that noise reduction can drop. A recording made without noise reduction has only the original. Applies to transcripts started from now on."
+msgstr ""
+
 msgid "The out point has to be after the in point"
 msgstr ""
 
@@ -5289,6 +5295,9 @@ msgid "Transcribe"
 msgstr ""
 
 msgid "Transcribe a recording"
+msgstr ""
+
+msgid "Transcribe from"
 msgstr ""
 
 msgid "Transcribe · {model}"
