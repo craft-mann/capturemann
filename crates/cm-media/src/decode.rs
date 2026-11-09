@@ -307,13 +307,13 @@ impl FrameStream for FfmpegStream {
         if let Some(r) = self.running.take() {
             r.stop();
         }
-        let mut child = cm_platform::process::command(&self.ffmpeg)
-            .args(self.args(pos))
+        let mut cmd = cm_platform::process::command(&self.ffmpeg);
+        cmd.args(self.args(pos))
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()
-            .map_err(|e| format!("cannot run FFmpeg: {e}"))?;
+            .stderr(Stdio::null());
+        let mut child =
+            cm_platform::process::spawn(&mut cmd).map_err(|e| format!("cannot run FFmpeg: {e}"))?;
         let Some(mut out) = child.stdout.take() else {
             let _ = child.kill();
             return Err("FFmpeg has no output pipe".to_owned());

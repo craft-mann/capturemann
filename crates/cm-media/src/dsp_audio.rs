@@ -66,8 +66,8 @@ impl AudioProcessor for DspAudio {
 /// (1 or 2) channels.
 #[allow(clippy::chunks_exact_to_as_chunks)]
 pub fn decode_pcm(ffmpeg: &Path, file: &Path, channels: u16) -> Result<Vec<f32>, CmError> {
-    let out = cm_platform::process::command(ffmpeg)
-        .args(["-hide_banner", "-nostdin", "-v", "error", "-i"])
+    let mut cmd = cm_platform::process::command(ffmpeg);
+    cmd.args(["-hide_banner", "-nostdin", "-v", "error", "-i"])
         .arg(file)
         .args(["-vn", "-f", "f32le", "-ac"])
         .arg(channels.to_string())
@@ -75,7 +75,11 @@ pub fn decode_pcm(ffmpeg: &Path, file: &Path, channels: u16) -> Result<Vec<f32>,
         .arg(AUDIO_RATE.to_string())
         .arg("pipe:1")
         .stdin(Stdio::null())
-        .output()
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    // One spawn at a time (see `cm_platform::process::spawn`), then wait without the lock.
+    let out = cm_platform::process::spawn(&mut cmd)
+        .and_then(std::process::Child::wait_with_output)
         .map_err(|e| CmError::internal(format!("cannot run FFmpeg to read audio: {e}")))?;
     if !out.status.success() {
         return Err(CmError::internal(format!(
