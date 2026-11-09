@@ -559,21 +559,6 @@ fn bad_inputs_name_the_field() {
             "size",
         ),
         (
-            "export_video",
-            json!({"capture_id": "r", "format": "gif", "size": 720}),
-            "size",
-        ),
-        (
-            "export_video",
-            json!({"capture_id": "r", "format": "webm", "size": 720, "width": 640}),
-            "width",
-        ),
-        (
-            "estimate_export",
-            json!({"capture_id": "r", "format": "gif", "size": "720p"}),
-            "size",
-        ),
-        (
             "estimate_export",
             json!({"capture_id": "r", "format": "avi"}),
             "format",

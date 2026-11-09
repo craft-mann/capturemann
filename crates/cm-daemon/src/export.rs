@@ -180,6 +180,7 @@ pub(crate) fn effective_preset<'a>(preset: &'a str, opts: &ExportOpts) -> &'a st
 /// be in the preset table in force (the shipped one, or the file named by
 /// `CAPTUREMANN_PLATFORM_RULES`, EXP-2.AC4).
 pub fn check_preset(preset: &str, opts: &ExportOpts) -> Result<(), CmError> {
+    crate::action::check_size_options(preset, opts.size, opts.width)?;
     if preset == PRESET_QUICK {
         let only_size = ExportOpts {
             size: opts.size,

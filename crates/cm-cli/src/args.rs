@@ -720,7 +720,7 @@ pub struct ExportArgs {
     /// normalised to -16 LUFS unless `--loudness` says otherwise.
     #[arg(
         long,
-        conflicts_with_all = ["preset", "width", "fps", "max_mb", "captions", "burn_captions", "no_captions"]
+        conflicts_with_all = ["preset", "width", "fps", "max_mb", "size", "estimate", "captions", "burn_captions", "no_captions"]
     )]
     pub audio: bool,
     /// For the audio export (`--audio`, or `--format m4a|wav`): which tracks, `mix` (the default), `mic` or `system`.
@@ -729,7 +729,23 @@ pub struct ExportArgs {
     /// For the audio export: also copy the file into this existing folder (never overwrites).
     #[arg(long, value_name = "DIR")]
     pub out_dir: Option<std::path::PathBuf>,
-    /// GIF and WebM width in px (GIF: 480, 640, 800 or 1024).
+    /// The frame of an MP4 or WebM: `source` (the recording's own size, the default) or a height
+    /// step, `1440p`, `1080p`, `720p` or `480p` (`1440`, `1080`, `720` and `480` work too). The
+    /// picture keeps its shape and is never enlarged: a step above the recording is refused, one
+    /// equal to it is the recording's size. Not for GIF (use `--width`).
+    #[arg(long, value_name = "SIZE")]
+    pub size: Option<String>,
+    /// Print the estimated file size (a range, the codec and the pixels) instead of exporting.
+    /// Takes `--format`, `--size`, `--width` and `--max-mb`; a GIF has no estimate (the size is
+    /// known after the export). Free and read-only (`estimate_export`).
+    #[arg(
+        long,
+        conflicts_with_all = ["audio", "fps", "loudness", "captions", "burn_captions", "no_captions", "wait", "timeout"]
+    )]
+    pub estimate: bool,
+    /// GIF width in px (480, 640, 800 or 1024); for WebM an even width, kept for older scripts
+    /// (`--size` is the way to choose the frame of an MP4 or WebM, and `--width` cannot be
+    /// combined with it).
     #[arg(long, value_name = "PX")]
     pub width: Option<u32>,
     /// GIF and WebM frame rate (GIF: 10, 15 or 24).
@@ -751,7 +767,7 @@ pub struct ExportArgs {
         long,
         value_name = "FORMAT",
         value_parser = ["srt", "vtt", "txt", "md"],
-        conflicts_with_all = ["preset", "format", "width", "fps", "max_mb", "loudness", "wait", "timeout"]
+        conflicts_with_all = ["preset", "format", "width", "fps", "max_mb", "size", "estimate", "loudness", "wait", "timeout"]
     )]
     pub captions: Option<String>,
     /// With `--captions txt`: start every line with `[mm:ss]` (or `[hh:mm:ss]` for long

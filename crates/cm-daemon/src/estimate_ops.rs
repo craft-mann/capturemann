@@ -49,7 +49,6 @@ pub(crate) fn parse(f: &Fields<'_>) -> Result<Action, CmError> {
     }
     let (width, _fps, max_mb) = parse_export_options(f)?;
     let size = parse_export_size(f)?;
-    crate::action::check_size_options(&format, size, width)?;
     Ok(Action::EstimateExport(EstimateExportParams {
         capture_id: f.str_req("capture_id")?,
         format,
@@ -106,6 +105,8 @@ impl Inner {
         &self,
         p: EstimateExportParams,
     ) -> Result<Value, DaemonError> {
+        // Option combinations that need no recording to refuse (the same as `export_video`).
+        crate::action::check_size_options(&p.format, p.size, p.width)?;
         let library = self.library.clone();
         blocking(move || {
             let (_, _, manifest) = crate::export::load_recording(&library, &p.capture_id)?;

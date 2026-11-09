@@ -189,7 +189,6 @@ impl Action {
                 let preset = parse_export_preset(&f)?;
                 let (width, fps, max_mb) = parse_export_options(&f)?;
                 let size = parse_export_size(&f)?;
-                check_size_options(&preset, size, width)?;
                 let loudness_lufs = match f.obj.get("loudness_lufs") {
                     None | Some(Value::Null) => None,
                     Some(v) => {

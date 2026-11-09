@@ -84,6 +84,10 @@ impl CliError {
         if let Some(r) = self.data["reason"].as_str() {
             s.push_str(&format!("\n  reason: {r}"));
         }
+        // EXP-5: the hint that goes with an export refusal (`gif_too_long`).
+        if let Some(h) = self.data["hint"].as_str() {
+            s.push_str(&format!("\n  {h}"));
+        }
         // REC-3: `invalid_input` for an unvalidated 60 fps carries `data.suggestion`.
         let sg = &self.data["suggestion"];
         if let Some(fps) = sg["fps"].as_u64() {
