@@ -145,6 +145,11 @@ The release ends with a complete regression and fixes of what it finds. No new f
     change is allowed only if the cause is shown to be the runner and not the product.
   - The two Mac `cm-desktop` render tests that fail only inside the repository's `target/` (`recedit::render`).
   - The rebuilt 0.3.0 files had no separate `cm-regress` run.
+- The export estimate's stored test (`crates/cm-daemon/tests/estimate_vs_real.rs`, `#[ignore]`, heavy) is run on **Windows 11** and
+  on **Linux** (X11, with and without a hardware H.264 encoder if possible) and its report stored in `verification/benchmarks/`:
+  the 5 % margin in the bound is the one measured for the macOS hardware encoder (VideoToolbox overshoot at most 1.8 %); the
+  Media Foundation and Linux encoders may overshoot more. If a sample is above the bound there, fix the margin or the cap in the
+  table, not the label; otherwise list it in the release text as a known limit.
 - The hardware tier records the screen, camera and microphone and plays sound: run it only when the maintainer asks, and not
   after 22:00 Vietnam time for anything that plays sound.
 - CI green on all three systems and the regression passed on all three before the tag or the publish (the release gate above); GitHub's Linux package workflow (never run) run once and fixed.
