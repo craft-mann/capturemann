@@ -25,10 +25,10 @@ associations list `m4a` and `wav` only.
 ## Scope
 
 In: import of **MP3** (MPEG-1/2 Layer III, constant or variable bit rate, mono or stereo, 8 to 48 kHz) from the Import sheet,
-drag and drop, Open With, the CLI (`capturemann import`) and MCP (`import_media`). Also **bare AAC** (`.aac`, ADTS) because the
-extension is already accepted by the file lists and then refused (same kind of change: the `aac` demuxer and the ADTS parser).
+drag and drop, Open With, the CLI (`capturemann import`) and MCP (`import_media`). **Bare AAC (`.aac`, ADTS) stays out** (maintainer,
+Nov 9, 2026): it is still refused with the existing message; the `.aac` extension is not added to the accepted lists.
 
-Out: exporting MP3 (needs an encoder, libmp3lame, a separate decision; `15-voice.md` lists it as out of scope), FLAC, OGG,
+Out: bare AAC (above), exporting MP3 (needs an encoder, libmp3lame, a separate decision; `15-voice.md` lists it as out of scope), FLAC, OGG,
 Opus, AIFF and WebM audio (each needs its own demuxer and decoder; see "Later"), more than one audio stream, ID3 chapters.
 
 ## Tasks
@@ -41,7 +41,7 @@ Opus, AIFF and WebM audio (each needs its own demuxer and decoder; see "Later"),
    Run the whole export, preview and regression set with the new binaries (the existing test run under
    `packaging/ffmpeg/with-bundled-ffmpeg.sh`), because FFmpeg is shared by every export.
 2. **Probe and classify (`crates/cm-media/src/import/`).** `probe.rs`: `ffprobe` now opens MP3, so the container name `mp3`
-   becomes a `Family::Mp3` (and bare AAC `Family::Aac`); keep `sniff_container` for damaged files. `classify.rs`: add the family
+   becomes a `Family::Mp3`; keep `sniff_container` for damaged files. `classify.rs`: add the family
    to the audio containers and `mp3` to the accepted audio codecs (`AUDIO_CODECS` comment says "AAC and PCM"); the status is
    **Prepared for editing** (the original is kept as the master, `mic.wav` is made from it) like other non-PCM audio, with a
    reason `container_mp3`, or **Ready** if the spec keeps M4A as the model: decide in task 2 by reading how M4A is classified
@@ -99,10 +99,11 @@ Opus, AIFF and WebM audio (each needs its own demuxer and decoder; see "Later"),
 FLAC, OGG/Vorbis, Opus, AIFF, WebM audio: the same three kinds of change per format (demuxer, decoder and parser in the three
 build scripts; one `Family`; tests). MP3 export: the libmp3lame encoder (LGPL) plus a new format in Export audio.
 
-## Decisions needed from the maintainer
+## Decisions (maintainer, Nov 9, 2026)
 
-- **Release:** 0.3.0 (with the Linux features), or a 0.2.10 for Windows and macOS only? The FFmpeg rebuild has to be re-tested
-  on every platform that ships it either way.
-- **Bare AAC (`.aac`):** include (recommended, same change) or leave refused.
-- **Title from the ID3 tag:** yes or file name only.
-- **Disk use:** accept the large float WAV for now, or add a smaller stored format to this plan.
+- **Release:** 0.3.1, on all three systems (the FFmpeg rebuild is re-tested on every platform that ships it).
+- **Bare AAC (`.aac`):** not included; MP3 only.
+- **Title from the ID3 tag:** yes. The ID3 `title` is the default capture title, else the file name; the tag text is cut to a
+  sensible length and stripped of control characters, and is never used as a path.
+- **Disk use:** the imported MP3 is converted once to the standard float WAV master; the Import sheet shows the size it will
+  take before the user confirms, and the release notes say so. A smaller stored format is not part of this plan.

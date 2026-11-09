@@ -28,7 +28,9 @@ Today a transcript is made from the noise-reduced microphone copy unless the set
 ## 2. Import MP3 (audio)
 
 Plan: [`mp3-import-plan.md`](mp3-import-plan.md) (the bundled FFmpeg has no MP3 demuxer or decoder; `mp3float` is LGPL, no
-encoder is added). Decisions still open there: bare AAC (recommended yes), the title from the ID3 tag, disk use.
+encoder is added). **Decided (maintainer, Nov 9, 2026):** MP3 only, bare AAC stays refused; the capture title comes from the ID3
+title when there is one, else the file name; the MP3 is converted once to the standard WAV master and the Import sheet shows the
+size first.
 
 - Acceptance: an `.mp3` file imports as an audio capture on Windows, macOS and Linux through the app, the CLI and MCP
   (`import`), with the transcript, the audio editor and Export audio working on it; a clear error for a broken file; the
@@ -50,8 +52,10 @@ Today the export dialog offers a preset or the recording's own size (`apps/deskt
 - Acceptance: the same choices exist in the CLI (`capturemann export <id> --resolution 1080p --format mp4`, plus a
   `--estimate` that prints the size without exporting) and in MCP (`export_video` parameters and an estimate tool or field);
   a stored test compares estimate and real size on three recordings per format; presets stay and fill the two fields.
-- Open decisions: which resolutions and formats to offer (Windows and macOS hardware encoders have limits; Linux without a
-  hardware encoder is VP9); whether the estimate may take a short probe of the recording (cheap, more accurate) or only a formula.
+- **Decided (maintainer, Nov 9, 2026):** resolutions = the source size plus fixed steps (1440p, 1080p, 720p, 480p), never above
+  the source, no custom sizes; formats = MP4, WebM and GIF (audio export stays in the audio editor); the estimate is a **formula
+  only** (duration, resolution, the encoder's rate rule), no probe. If the stored test shows the formula far off, fix the rule or
+  bring the probe back as a new decision. On Linux without a hardware encoder the MP4 choice is VP9 and the dialog says so.
 
 ## 4. Transcript progress for a recording, like an imported file
 
@@ -78,9 +82,10 @@ The release ends with a complete regression and fixes of what it finds. No new f
   limit; failed on two of three Windows runs of Nov 8 to 9); the two Mac `cm-desktop` render tests that fail only inside the
   repository's `target/` (`recedit::render`); the rebuilt 0.3.0 files had no separate `cm-regress` run.
 - CI green on all three systems before the tag; GitHub's Linux package workflow (never run) run once and fixed.
-- The APT repository: an amd64 install, upgrade and removal from it tested; the host (GitHub release assets for now)
-  answers a first download slowly and sometimes with a 504, so decide whether 0.3.1 moves it (S3 + CloudFront at
-  `apt.<domain>`; the users' `.sources` file would change). The repository key expires Nov 8, 2031.
+- The APT repository: an amd64 install, upgrade and removal from it tested. **Decided (maintainer, Nov 9, 2026): the host stays
+  on GitHub release assets** (few Linux users yet; no move in 0.3.1). GitHub answers a first download slowly and sometimes with a
+  504, which the install lines work around with retries; a later move to S3 + CloudFront at `apt.<domain>` would change every
+  user's `.sources` file. The repository key expires Nov 8, 2031.
 - Version bump, CHANGELOG, release text, checksums, signatures, tag: as in `docs/development/release-day-0.3.0.md`.
 
 ## Not in 0.3.1 unless the maintainer adds it
