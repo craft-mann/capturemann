@@ -10,7 +10,7 @@
 #![cfg_attr(not(target_os = "linux"), allow(dead_code))]
 
 use serde_json::Value;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 /// One audio node of the graph.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -128,7 +128,7 @@ pub fn parse_metadata_default(output: &str, key: &str) -> Option<String> {
 }
 
 fn run(program: &str, args: &[&str]) -> Result<String, String> {
-    let out = Command::new(program)
+    let out = cm_platform::process::command(program)
         .args(args)
         .stdin(Stdio::null())
         .stderr(Stdio::null())
