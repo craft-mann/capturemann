@@ -11,6 +11,7 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 - **Transcript progress on every capture.** A recording's page, the audio page and the library card show the same progress (percent, stage, Cancel, error with Retry) as an imported file.
 
 ### Fixed
+- **The app no longer quits during a transcription** when the speech engine meets a decode window whose text ends within its first 160 ms (a stray token at the start of a 30-second window, then silence; a long recording reaches one sooner or later, and a 73-minute imported MP3 did on Nov 9, 2026). whisper.cpp 1.8.3 aborted the whole process there (an assertion in the word-timing median filter, present in every release since 0.2.x that used DTW word times). The engine is now a vendored copy (`vendor/whisper-rs-sys`, one patch, exact diff in `vendor/README-CaptureMann.md`) that skips DTW word timing for that one window; its words keep the model's default token times, every other window is unchanged. Reproduced and tested with synthetic clips on this Mac (`cargo test -p cm-ai --test real_dtw_short_window -- --ignored`).
 - The export's cancel no longer waits on a pipe held by another process (a Windows CI flake); wind-down waits are bounded.
 
 ### Changed
