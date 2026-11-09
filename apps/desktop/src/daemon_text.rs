@@ -92,12 +92,50 @@ pub fn estimate_label(max_bytes: u64) -> String {
     }
 }
 
+/// The typical size of an export as the popover shows it (EXP-5): "About 14 MB", or "Under 5 MB"
+/// at 5 MB and below. `typical_bytes` is `estimate_export`'s best guess (already rounded to two
+/// figures by the daemon, never above its bound); the English is the daemon's `typical_label`.
+pub fn typical_label(typical_bytes: u64) -> String {
+    if typical_bytes <= 5_000_000 {
+        tr!("Under 5 MB")
+    } else {
+        tr!("About {size}", size = bound_size_text(typical_bytes))
+    }
+}
+
+/// The bound as a tail after the typical size: "up to 69 MB" (lower case, to follow "About 14 MB");
+/// empty when the bound is also under 5 MB, since "Under 5 MB" says it all.
+pub fn bound_tail(typical_bytes: u64, max_bytes: u64) -> String {
+    if typical_bytes <= 5_000_000 && max_bytes <= 5_000_000 {
+        String::new()
+    } else {
+        tr!("up to {size}", size = bound_size_text(max_bytes))
+    }
+}
+
 /// The line under the finished export's real size (EXP-5): what was estimated before it started.
+/// With a typical size: "estimate: about 14 MB, up to 69 MB".
 pub fn estimate_note(max_bytes: u64) -> String {
     if max_bytes <= 5_000_000 {
         tr!("estimate: under 5 MB")
     } else {
         tr!("estimate: up to {size}", size = bound_size_text(max_bytes))
+    }
+}
+
+/// [`estimate_note`] with the typical size first when the daemon gave one.
+pub fn estimate_note_with(typical_bytes: Option<u64>, max_bytes: u64) -> String {
+    match typical_bytes {
+        Some(t) if max_bytes > 5_000_000 && t > 5_000_000 => tr!(
+            "estimate: about {size}, up to {max}",
+            size = bound_size_text(t),
+            max = bound_size_text(max_bytes)
+        ),
+        Some(_) if max_bytes > 5_000_000 => tr!(
+            "estimate: under 5 MB, up to {max}",
+            max = bound_size_text(max_bytes)
+        ),
+        _ => estimate_note(max_bytes),
     }
 }
 

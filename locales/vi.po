@@ -9694,12 +9694,28 @@ msgid "Up to {size}"
 msgstr "Tối đa {size}"
 
 #, fuzzy
+msgid "About {size}"
+msgstr "Khoảng {size}"
+
+#, fuzzy
+msgid "up to {size}"
+msgstr "tối đa {size}"
+
+#, fuzzy
 msgid "estimate: under 5 MB"
 msgstr "ước tính: dưới 5 MB"
 
 #, fuzzy
 msgid "estimate: up to {size}"
 msgstr "ước tính: tối đa {size}"
+
+#, fuzzy
+msgid "estimate: about {size}, up to {max}"
+msgstr "ước tính: khoảng {size}, tối đa {max}"
+
+#, fuzzy
+msgid "estimate: under 5 MB, up to {max}"
+msgstr "ước tính: dưới 5 MB, tối đa {max}"
 
 msgctxt "export popover"
 msgid "Export"

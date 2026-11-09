@@ -826,3 +826,41 @@ fn exp5_the_estimate_bound_is_worded_in_each_language() {
         assert_eq!(estimate_note(290_000_000), "ước tính: tối đa 290 MB");
     });
 }
+
+/// EXP-5: the typical size reads "About 14 MB" with "up to 69 MB" as its tail, "Khoảng 14 MB" and
+/// "tối đa 69 MB" in Vietnamese; under 5 MB both say "Under 5 MB" once; the done note carries both.
+#[test]
+fn exp5_the_typical_size_is_worded_in_each_language() {
+    with_language(Lang::En, || {
+        assert_eq!(typical_label(14_000_000), "About 14 MB");
+        assert_eq!(typical_label(1_200_000_000), "About 1.2 GB");
+        assert_eq!(typical_label(4_900_000), "Under 5 MB");
+        assert_eq!(bound_tail(14_000_000, 69_000_000), "up to 69 MB");
+        assert_eq!(bound_tail(2_000_000, 4_800_000), "");
+        assert_eq!(
+            estimate_note_with(Some(14_000_000), 69_000_000),
+            "estimate: about 14 MB, up to 69 MB"
+        );
+        assert_eq!(
+            estimate_note_with(Some(2_000_000), 69_000_000),
+            "estimate: under 5 MB, up to 69 MB"
+        );
+        assert_eq!(
+            estimate_note_with(None, 69_000_000),
+            "estimate: up to 69 MB"
+        );
+        assert_eq!(
+            estimate_note_with(Some(2_000_000), 4_000_000),
+            "estimate: under 5 MB"
+        );
+    });
+    with_language(Lang::Vi, || {
+        assert_eq!(typical_label(14_000_000), "Khoảng 14 MB");
+        assert_eq!(typical_label(1_200_000_000), "Khoảng 1,2 GB");
+        assert_eq!(bound_tail(14_000_000, 69_000_000), "tối đa 69 MB");
+        assert_eq!(
+            estimate_note_with(Some(14_000_000), 69_000_000),
+            "ước tính: khoảng 14 MB, tối đa 69 MB"
+        );
+    });
+}

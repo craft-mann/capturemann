@@ -149,6 +149,9 @@ msgstr ""
 msgid "About {minutes} minutes of disk space left at this setting"
 msgstr ""
 
+msgid "About {size}"
+msgstr ""
+
 msgid "Accept all"
 msgstr ""
 
@@ -6044,7 +6047,13 @@ msgstr ""
 msgid "ease in {secs} s"
 msgstr ""
 
+msgid "estimate: about {size}, up to {max}"
+msgstr ""
+
 msgid "estimate: under 5 MB"
+msgstr ""
+
+msgid "estimate: under 5 MB, up to {max}"
 msgstr ""
 
 msgid "estimate: up to {size}"
@@ -6225,6 +6234,9 @@ msgid "unreadable"
 msgstr ""
 
 msgid "unsupported key `{key}`"
+msgstr ""
+
+msgid "up to {size}"
 msgstr ""
 
 msgid "vi, en"
