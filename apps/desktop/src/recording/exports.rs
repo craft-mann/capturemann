@@ -428,7 +428,11 @@ pub fn exporting_toast(
             pct = pct
         ),
     };
-    spec.body(body)
+    // A progress bar makes the toast stick until the export ends (a toast without one went away
+    // after 5 s and the next progress event pushed a new one).
+    let mut spec = spec.body(body);
+    spec.progress = Some(pct.min(100) as u8);
+    spec
 }
 
 /// "Exporting audio..." with progress (VOC-2).
@@ -441,12 +445,14 @@ pub fn audio_exporting_toast(capture_id: &str, title: Option<&str>, pct: u32) ->
         ),
         None => tr!("Exporting the audio: {pct}%", pct = pct),
     };
-    ToastSpec::new(ToastKind::Info, tr!("Exporting audio\u{2026}"))
+    let mut spec = ToastSpec::new(ToastKind::Info, tr!("Exporting audio\u{2026}"))
         .body(body)
         .button(
             tr_ctx!("button", "Open"),
             ToastAction::OpenCapture(capture_id.to_owned()),
-        )
+        );
+    spec.progress = Some(pct.min(100) as u8);
+    spec
 }
 
 /// "Audio exported": the file name, its size and the loudness, with Show in Finder and Upload
@@ -903,6 +909,32 @@ mod tests {
         assert_eq!(
             exporting_toast("rec_1", None, 0, false).title,
             "Exporting\u{2026}"
+        );
+        // A running export sticks (it has a progress bar) until its result replaces it.
+        let running = |spec: ToastSpec| {
+            let t = crate::toast::Toast {
+                id: 1,
+                kind: spec.kind,
+                title: spec.title,
+                body: spec.body,
+                hints: spec.hints,
+                buttons: spec.buttons,
+                agent: spec.agent,
+                rebuild: spec.rebuild,
+                progress: spec.progress,
+                created: std::time::Instant::now(),
+                dismiss_after: spec.dismiss_after,
+                hovered_since: None,
+            };
+            (t.sticky(), t.progress)
+        };
+        assert_eq!(
+            running(exporting_toast("rec_1", None, 42, false)),
+            (true, Some(42))
+        );
+        assert_eq!(
+            running(audio_exporting_toast("rec_1", None, 7)),
+            (true, Some(7))
         );
         let done = exported_toast("rec_1", "Lesson", None, ExportContents::default());
         assert_eq!(done.title, "Exported Lesson");

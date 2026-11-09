@@ -86,6 +86,7 @@ pub fn on_event(app: &Entity<AppModel>, ev: &Event, cx: &mut App) {
                 &capture_id,
                 exporting_toast(&capture_id, title.as_deref(), pct, auto),
                 first,
+                false,
                 cx,
             ),
             Effect::Done {
@@ -99,6 +100,7 @@ pub fn on_event(app: &Entity<AppModel>, ev: &Event, cx: &mut App) {
                     &capture_id,
                     exported_toast(&capture_id, &title, captions.as_deref(), contents),
                     false,
+                    true,
                     cx,
                 );
                 lock(&TOASTS).remove(&capture_id);
@@ -115,6 +117,7 @@ pub fn on_event(app: &Entity<AppModel>, ev: &Event, cx: &mut App) {
                 &capture_id,
                 audio_exporting_toast(&capture_id, title.as_deref(), pct),
                 false,
+                false,
                 cx,
             ),
             Effect::AudioDone {
@@ -125,6 +128,7 @@ pub fn on_event(app: &Entity<AppModel>, ev: &Event, cx: &mut App) {
                     &capture_id,
                     audio_exported_toast(&capture_id, &done),
                     false,
+                    true,
                     cx,
                 );
                 lock(&TOASTS).remove(&capture_id);
@@ -140,6 +144,7 @@ pub fn on_event(app: &Entity<AppModel>, ev: &Event, cx: &mut App) {
                     &capture_id,
                     audio_export_failed_toast(&reason, ffmpeg_missing),
                     false,
+                    true,
                     cx,
                 );
                 lock(&TOASTS).remove(&capture_id);
@@ -161,6 +166,7 @@ pub fn on_event(app: &Entity<AppModel>, ev: &Event, cx: &mut App) {
                     &capture_id,
                     export_failed_toast(&capture_id, &reason, ffmpeg_missing),
                     false,
+                    true,
                     cx,
                 );
                 lock(&TOASTS).remove(&capture_id);
@@ -172,8 +178,16 @@ pub fn on_event(app: &Entity<AppModel>, ev: &Event, cx: &mut App) {
 }
 
 /// Shows `spec` in the capture's export toast: replaces the one it already has, or (for the
-/// first update) turns the take's "Recording saved" toast into it, or pushes a new toast.
-fn upsert(app: &Entity<AppModel>, capture_id: &str, spec: ToastSpec, first: bool, cx: &mut App) {
+/// first update) turns the take's "Recording saved" toast into it, or pushes a new toast. With
+/// `revive` off (a progress update) a toast the user has closed stays closed; a result always shows.
+fn upsert(
+    app: &Entity<AppModel>,
+    capture_id: &str,
+    spec: ToastSpec,
+    first: bool,
+    revive: bool,
+    cx: &mut App,
+) {
     let known = lock(&TOASTS).get(capture_id).copied();
     let id = app.update(cx, |m, cx| {
         let now = Instant::now();
@@ -184,10 +198,16 @@ fn upsert(app: &Entity<AppModel>, capture_id: &str, spec: ToastSpec, first: bool
                 .find_for_capture(capture_id, &saved_prefix())
                 .filter(|id| m.toasts.replace(*id, spec.clone(), now));
         }
+        if id.is_none() && !revive && !first && known.is_some() {
+            return None;
+        }
         let id = id.unwrap_or_else(|| m.toasts.push(spec, now));
         cx.notify();
-        id
+        Some(id)
     });
+    let Some(id) = id else {
+        return;
+    };
     lock(&TOASTS).insert(capture_id.to_owned(), id);
     app::sync_toasts(app, cx);
 }
