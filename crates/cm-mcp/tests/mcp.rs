@@ -2300,6 +2300,12 @@ async fn exp5_estimate_export_tool() {
     m["tracks"]["screen"]["end"] = json!(192 * 120_000);
     m["edits"] = json!([{ "version": 2, "in": 0, "out": 192 * 120_000, "speed": 1.0 }]);
     std::fs::write(&p, serde_json::to_string_pretty(&m).unwrap()).unwrap();
+    // A master of 3 Mbps (an imported file of ordinary activity) so the typical size can be measured.
+    std::fs::write(
+        dir.path().join("Est.cmrec/screen.mp4"),
+        vec![0u8; 3_000_000 * 192 / 8],
+    )
+    .unwrap();
     d.register_job_handler(
         "export",
         cm_jobs::handler_fn(|_ctx| async move { Ok(json!({"path": "/x.mp4", "size_bytes": 1})) }),
@@ -2334,7 +2340,18 @@ async fn exp5_estimate_export_tool() {
     assert!(v["max_bytes"].as_u64().unwrap() > 0 && v.get("min_bytes").is_none());
     assert!(v["label"].as_str().unwrap().starts_with("Up to "), "{v}");
     assert!((v["duration_s"].as_f64().unwrap() - 192.0).abs() < 0.5);
-    // The same range comes back in the result of `export_video` for the same choice.
+    // The typical size from the master: a best guess at or below the bound, "About N MB".
+    let typical = v["typical_bytes"].as_u64().unwrap();
+    assert!(
+        typical > 0 && typical <= v["max_bytes"].as_u64().unwrap(),
+        "{v}"
+    );
+    assert!(
+        v["typical_label"].as_str().unwrap().starts_with("About "),
+        "{v}"
+    );
+    // The same bound and typical size come back in the result of `export_video` for the same
+    // choice.
     let e = call(
         &c,
         "export_video",
@@ -2343,6 +2360,7 @@ async fn exp5_estimate_export_tool() {
     .await;
     let e = ok(&e);
     assert_eq!(e["estimate"]["max_bytes"], v["max_bytes"]);
+    assert_eq!(e["estimate"]["typical_bytes"], v["typical_bytes"]);
     assert_eq!(e["size"], 720);
 
     // The 192 s GIF is refused, with the id and the hint in the error data.
