@@ -752,13 +752,26 @@ pub fn verify(i: &VerifyInput<'_>) -> Result<(), Problem> {
             .and_then(|a| a.duration_s)
             .unwrap_or(i.source.duration_s);
         let got = wav_seconds(s).map_err(unreadable)?;
-        if (got - want).abs() > 0.05_f64.max(tol) {
+        let slack = 0.05_f64.max(tol).max(mp3_slack(i.source.audio.as_ref()));
+        if (got - want).abs() > slack {
             return Err(unreadable(format!(
                 "The decoded sound lasts {got:.2} s but the original's sound lasts {want:.2} s."
             )));
         }
     }
     Ok(())
+}
+
+/// Extra tolerance for an MP3's stated length. An MP3 stream's duration is an estimate that
+/// includes the encoder delay and padding (a Xing/LAME header, or a guess from the bitrate for a
+/// variable-bitrate file without one), and ffmpeg versions differ by a few frames (2.06 s against
+/// 2.00 s decoded for a 2 s file on ffmpeg 6.1). Three frames of 1152 samples are allowed; a
+/// truncated decode is off by far more and still fails. Other codecs get none (IMP-1.AC-mp3).
+fn mp3_slack(a: Option<&crate::import::probe::AudioStream>) -> f64 {
+    match a {
+        Some(a) if a.codec == "mp3" && a.sample_rate > 0 => 3.0 * 1152.0 / f64::from(a.sample_rate),
+        _ => 0.0,
+    }
 }
 
 /// Length of a WAV file in seconds, from its chunk headers (no dependency: the `fmt ` and `data`
