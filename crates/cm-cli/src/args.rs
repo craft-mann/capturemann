@@ -736,7 +736,7 @@ pub struct ExportArgs {
     /// equal to it is the recording's size. Not for GIF (use `--width`).
     #[arg(long, value_name = "SIZE")]
     pub size: Option<String>,
-    /// Print the largest the file can be ("Up to 35 MB", with the codec and the pixels) instead of exporting.
+    /// Print the size to expect ("About 14 MB, up to 35 MB", with the codec and the pixels) instead of exporting.
     /// Takes `--format`, `--size`, `--width` and `--max-mb`; a GIF has no estimate (the size is
     /// known after the export). Free and read-only (`estimate_export`).
     #[arg(

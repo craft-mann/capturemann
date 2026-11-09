@@ -38,7 +38,9 @@ fn audio_params(a: &ExportArgs) -> Result<serde_json::Value, CliError> {
 }
 
 /// `export <id> --estimate [--format webm] [--size 720p]`: `estimate_export`, printed as
-/// `Up to 35 MB (estimate) · WEBM · VP9 · 1152×720`; a GIF says there is none.
+/// `About 14 MB, up to 35 MB (estimate) · WEBM · VP9 · 1152×720` (the typical size first when the
+/// screen master could be measured, else `Up to 35 MB (estimate) · ...`); a GIF says there is
+/// none.
 async fn estimate(cx: &mut Ctx<'_>, a: ExportArgs) -> Result<(), CliError> {
     // `--preset gif` and `--preset webm` are the formats of the same name; the other presets
     // have their own frame and bit rate and no estimate.
@@ -74,9 +76,16 @@ async fn estimate(cx: &mut Ctx<'_>, a: ExportArgs) -> Result<(), CliError> {
             Some("h264") => "H.264",
             _ => "",
         };
+        // "About 14 MB, up to 69 MB": the typical size and the bound; the bound alone when the
+        // master could not be measured. "Under 5 MB" twice says it once.
+        let size = match (r["typical_label"].as_str(), r["label"].as_str()) {
+            (Some(t), Some(b)) if t == b => t.to_owned(),
+            (Some(t), Some(b)) => format!("{t}, {}{}", b[..1].to_lowercase(), &b[1..]),
+            (_, Some(b)) => b.to_owned(),
+            _ => String::new(),
+        };
         format!(
-            "{} (estimate) · {} · {} · {}×{}",
-            plain(&r["label"]),
+            "{size} (estimate) · {} · {} · {}×{}",
             plain(&r["format"]).to_uppercase(),
             codec,
             plain(&r["width"]),
@@ -205,9 +214,13 @@ pub(super) async fn export_video(cx: &mut Ctx<'_>, a: ExportArgs) -> Result<(), 
                         .map(|n| format!("\n  note: {n}"))
                         .unwrap_or_default();
                     // EXP-5: what was estimated before the export, next to the real size.
-                    let note = match j["result"]["estimate"]["max_bytes"].as_u64() {
-                        Some(b) => format!("{note}\n  estimate: up to {b} bytes"),
-                        None => note,
+                    let est = &j["result"]["estimate"];
+                    let note = match (est["typical_bytes"].as_u64(), est["max_bytes"].as_u64()) {
+                        (Some(t), Some(b)) => {
+                            format!("{note}\n  estimate: about {t} bytes, up to {b} bytes")
+                        }
+                        (None, Some(b)) => format!("{note}\n  estimate: up to {b} bytes"),
+                        _ => note,
                     };
                     format!(
                         "Exported {}\n  file: {}\n  size: {} bytes, {} s, {}{note}",

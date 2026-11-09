@@ -3119,8 +3119,14 @@ async fn exp5_export_estimate_and_size() {
     m["tracks"]["screen"]["end"] = json!(192 * 120_000);
     m["edits"] = json!([{ "version": 2, "in": 0, "out": 192 * 120_000, "speed": 1.0 }]);
     std::fs::write(&p, serde_json::to_string_pretty(&m).unwrap()).unwrap();
+    // A master of 3 Mbps (an imported file of ordinary activity) for the typical size.
+    std::fs::write(
+        r.dir.path().join("lib/Est.cmrec/screen.mp4"),
+        vec![0u8; 3_000_000 * 192 / 8],
+    )
+    .unwrap();
 
-    // The range, the codec and the pixels, nothing exported.
+    // The typical size and the bound, the codec and the pixels, nothing exported.
     let o = cli(
         &r,
         &[
@@ -3136,7 +3142,9 @@ async fn exp5_export_estimate_and_size() {
     .await;
     assert_eq!(o.code, 0, "{}", o.err);
     assert!(
-        o.out.starts_with("Up to ") && o.out.contains("(estimate) · WEBM · VP9 · 1152×720"),
+        o.out.starts_with("About ")
+            && o.out.contains(" MB, up to ")
+            && o.out.contains("(estimate) · WEBM · VP9 · 1152×720"),
         "{}",
         o.out
     );
@@ -3145,6 +3153,29 @@ async fn exp5_export_estimate_and_size() {
     let j = o.json();
     assert!(j["max_bytes"].as_u64().unwrap() > 0 && j.get("min_bytes").is_none());
     assert_eq!(j["width"], 2880);
+    // The typical size is the best guess from the master, never above the bound.
+    let typical = j["typical_bytes"].as_u64().unwrap();
+    assert!(
+        typical > 0 && typical <= j["max_bytes"].as_u64().unwrap(),
+        "{j}"
+    );
+    assert!(
+        j["typical_label"].as_str().unwrap().starts_with("About "),
+        "{j}"
+    );
+    // Without a screen master file there is only the bound (an imported audio-only capture would
+    // have none; here the file is taken away).
+    let master = r.dir.path().join("lib/Est.cmrec/screen.mp4");
+    std::fs::remove_file(&master).unwrap();
+    let o = cli(&r, &["--json", "export", &id, "--estimate"]).await;
+    assert_eq!(o.code, 0, "{}", o.err);
+    let only_bound = o.json();
+    assert!(only_bound["typical_bytes"].is_null(), "{only_bound}");
+    assert!(only_bound["typical_label"].is_null(), "{only_bound}");
+    assert_eq!(only_bound["max_bytes"], j["max_bytes"]);
+    let o = cli(&r, &["export", &id, "--estimate"]).await;
+    assert!(o.out.starts_with("Up to "), "{}", o.out);
+    std::fs::write(&master, vec![0u8; 3_000_000 * 192 / 8]).unwrap();
     let jobs = call("list_jobs", json!({"type": "export"})).await;
     assert!(
         jobs["jobs"].as_array().unwrap().is_empty(),
@@ -3202,6 +3233,7 @@ async fn exp5_export_estimate_and_size() {
     assert_eq!(j["preset"], "webm");
     assert_eq!(j["size"], 480);
     assert!(j["estimate"]["max_bytes"].as_u64().is_some());
+    assert!(j["estimate"]["typical_bytes"].as_u64().is_some(), "{j}");
     // --estimate does not combine with an export-only option.
     let o = cli(&r, &["export", &id, "--estimate", "--wait"]).await;
     assert_eq!(o.code, 2, "{}", o.err);
