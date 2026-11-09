@@ -244,6 +244,8 @@ mod tests {
         );
     }
 
+    // The fixture uses Unix paths; "/home/anna" is not an absolute path on Windows.
+    #[cfg(unix)]
     #[test]
     fn the_folders_follow_the_pictures_dir_of_a_localised_desktop() {
         let home = Path::new("/home/anna");
