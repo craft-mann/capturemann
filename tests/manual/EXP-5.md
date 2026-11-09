@@ -27,13 +27,22 @@ fit). The rest can be done from the keyboard.
 2. **Defaults and the estimate (MP4).** Header line: the title and "3:12 after cuts". Format cards
    MP4 (chosen), WebM, GIF with their lines; Size list with real pixels on the right (Recording
    size first, then 1440p, 1080p, 720p, 480p, only steps below the recording) and the hint "Never
-   larger than the recording"; the size block shows "Estimated size", an "Estimate" tag, "Up to
-   N MB" and "MP4 · H.264 · W × H. The real size is shown after export." Choose 720p, then WebM:
+   larger than the recording"; the size block shows "Estimated size", an "Estimate" tag, the
+   typical figure big ("About N MB", or "Under 5 MB" when small) and under it "MP4 · H.264 ·
+   W × H. At most M MB. The real size is shown after export." (the ceiling M is never below N;
+   when both are under 5 MB the "At most" sentence is left out). **Audio-only capture or any
+   recording without a screen master:** no typical figure, so the block shows the bound alone,
+   "Up to M MB" with "A quiet screen usually comes out much smaller. The real size is shown
+   after export." (Vietnamese: "Khoảng N MB" / "Tối đa M MB"; "About" and "Up to" come first in
+   English.) Choose 720p, then WebM:
    the number changes the moment you click, with no spinner and no flicker of an old value under
    the wrong format. Footer: "Runs in the background", Cancel, "Export MP4" / "Export WebM".
 3. **Estimate against the file.** Export MP4 at 720p; when it ends, the toast reads
-   "Exported · NNN MB" and under it "estimate: up to NNN MB"; the real size is at or below the
-   estimate. Repeat with WebM. The Exports list shows only the real size.
+   "Exported · NNN MB" and under it "estimate: about NNN MB, up to NNN MB" (bound alone,
+   "estimate: up to NNN MB", when the estimate had no typical figure); the real size is at or
+   below the ceiling and close to the typical figure. While it runs, the progress toast names
+   the format: "Making one MP4 ...", "Making one WebM ...", "Making a GIF of the screen: N%"
+   (it said MP4 for every format before 0.3.1). Repeat with WebM. The Exports list shows only the real size.
 4. **Queueing.** Start an export of the 3:12 recording; while it runs the header button reads
    "Exporting 42%" (with a spinner icon), and clicking it still opens the popover. Choose another
    option and press Export: a second job queues (no error, popover closes). Open it again and

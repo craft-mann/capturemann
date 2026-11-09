@@ -2459,7 +2459,13 @@ msgstr ""
 msgid "Make this the default channel"
 msgstr ""
 
+msgid "Making a GIF of the screen: {pct}%"
+msgstr ""
+
 msgid "Making one MP4 with the camera bubble and audio: {pct}%"
+msgstr ""
+
+msgid "Making one WebM with the camera bubble and audio: {pct}%"
 msgstr ""
 
 msgid "Manage {name}"
@@ -6324,6 +6330,12 @@ msgstr ""
 msgid "{format} · {codec} · {width} × {height}. A quiet screen usually comes out much smaller. The real size is shown after export."
 msgstr ""
 
+msgid "{format} · {codec} · {width} × {height}. At most {size}. The real size is shown after export."
+msgstr ""
+
+msgid "{format} · {codec} · {width} × {height}. The real size is shown after export."
+msgstr ""
+
 msgid "{format}, {width} × {height}. The original tracks are untouched."
 msgstr ""
 
@@ -6773,7 +6785,13 @@ msgstr ""
 msgid "{title} · Exporting the audio: {pct}%"
 msgstr ""
 
+msgid "{title} · Making a GIF of the screen: {pct}%"
+msgstr ""
+
 msgid "{title} · Making one MP4 with the camera bubble and audio: {pct}%"
+msgstr ""
+
+msgid "{title} · Making one WebM with the camera bubble and audio: {pct}%"
 msgstr ""
 
 msgid "{title} · cuts and speed applied"

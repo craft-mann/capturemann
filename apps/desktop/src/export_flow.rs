@@ -168,6 +168,9 @@ pub enum Look {
     /// MP4 or WebM: the upper bound.
     Bound {
         max_bytes: u64,
+        /// The best guess (`typical_bytes`), never above `max_bytes`; `None` when the daemon has
+        /// no screen master to measure (an audio capture): the bound then stands alone.
+        typical_bytes: Option<u64>,
         codec: Codec,
         width: u32,
         height: u32,
@@ -389,8 +392,10 @@ impl Popover {
                 if v["format"].as_str() == Some("mp4") {
                     self.mp4_codec = Some(codec);
                 }
+                let typical_bytes = v["typical_bytes"].as_u64().map(|t| t.min(max_bytes));
                 Look::Bound {
                     max_bytes,
+                    typical_bytes,
                     codec,
                     width,
                     height,
@@ -543,6 +548,8 @@ impl Popover {
 pub struct Finished {
     pub size_bytes: Option<u64>,
     pub estimate_max_bytes: Option<u64>,
+    /// The estimate's typical figure, when it had one.
+    pub estimate_typical_bytes: Option<u64>,
 }
 
 impl Finished {
@@ -550,6 +557,7 @@ impl Finished {
         Finished {
             size_bytes: data["size_bytes"].as_u64(),
             estimate_max_bytes: data["estimate"]["max_bytes"].as_u64(),
+            estimate_typical_bytes: data["estimate"]["typical_bytes"].as_u64(),
         }
     }
 }
@@ -694,6 +702,59 @@ mod tests {
         p.set_max_mb_text("");
         assert!(p.can_export());
         assert!(p.export_params().get("max_mb").is_none());
+    }
+
+    /// EXP-5 AC10: the reply's `typical_bytes` is kept next to the bound; null or missing means
+    /// the bound stands alone; the old look stays until the new reply.
+    #[test]
+    fn the_typical_size_is_read_and_may_be_missing() {
+        let mut p = popover();
+        let (s1, _) = p.begin_estimate();
+        let mut v = bound("mp4", "h264", 69_000_000);
+        v["typical_bytes"] = json!(14_000_000u64);
+        v["typical_label"] = json!("About 14 MB");
+        assert!(p.apply_estimate(s1, Ok(v)));
+        assert!(matches!(
+            p.look,
+            Look::Bound {
+                max_bytes: 69_000_000,
+                typical_bytes: Some(14_000_000),
+                ..
+            }
+        ));
+        // The old figure stays while the next estimate is asked.
+        let _ = p.begin_estimate();
+        assert!(matches!(
+            p.look,
+            Look::Bound {
+                typical_bytes: Some(14_000_000),
+                ..
+            }
+        ));
+        // An audio capture: null typical.
+        let (s2, _) = p.begin_estimate();
+        let mut v = bound("mp4", "h264", 9_000_000);
+        v["typical_bytes"] = Value::Null;
+        p.apply_estimate(s2, Ok(v));
+        assert!(matches!(
+            p.look,
+            Look::Bound {
+                typical_bytes: None,
+                ..
+            }
+        ));
+        // A typical above the bound (never sent) is clamped.
+        let (s3, _) = p.begin_estimate();
+        let mut v = bound("mp4", "h264", 9_000_000);
+        v["typical_bytes"] = json!(12_000_000u64);
+        p.apply_estimate(s3, Ok(v));
+        assert!(matches!(
+            p.look,
+            Look::Bound {
+                typical_bytes: Some(9_000_000),
+                ..
+            }
+        ));
     }
 
     /// EXP-5: a GIF has no estimate: "Size known after export".
@@ -891,6 +952,13 @@ mod tests {
         );
         assert_eq!(f.size_bytes, Some(243_000_000));
         assert_eq!(f.estimate_max_bytes, Some(290_000_000));
+        assert_eq!(f.estimate_typical_bytes, None);
+        let t = Finished::of(&json!({"size_bytes": 14_000_000u64,
+            "estimate": {"max_bytes": 69_000_000u64, "typical_bytes": 14_000_000u64}}));
+        assert_eq!(
+            (t.estimate_max_bytes, t.estimate_typical_bytes),
+            (Some(69_000_000), Some(14_000_000))
+        );
         let g = Finished::of(&json!({"size_bytes": 5_000_000u64, "estimate": null}));
         assert_eq!(g.estimate_max_bytes, None);
     }

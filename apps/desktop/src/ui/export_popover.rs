@@ -529,17 +529,27 @@ fn size_block(t: &Theme, p: &Popover) -> AnyElement {
     match &p.look {
         Look::Bound {
             max_bytes,
+            typical_bytes,
             codec,
             width,
             height,
-        } => block(
-            Tone::Neutral,
-            "hard-drive",
-            vec![
-                title_row(t, true),
-                big(t, daemon_text::estimate_label(*max_bytes)),
-                small(
-                    t,
+        } => {
+            // EXP-5 AC10: the typical figure leads and the ceiling follows in the same sentence;
+            // without one (an audio capture) the bound alone, as before.
+            let (big_text, detail) = match typical_bytes {
+                Some(typ) => (
+                    daemon_text::typical_label(*typ),
+                    daemon_text::typical_detail(
+                        p.format.label(),
+                        codec.label(),
+                        *width,
+                        *height,
+                        *typ,
+                        *max_bytes,
+                    ),
+                ),
+                None => (
+                    daemon_text::estimate_label(*max_bytes),
                     tr!(
                         "{format} \u{00B7} {codec} \u{00B7} {width} \u{00D7} {height}. A quiet screen usually comes out much smaller. The real size is shown after export.",
                         format = p.format.label(),
@@ -548,9 +558,14 @@ fn size_block(t: &Theme, p: &Popover) -> AnyElement {
                         height = height
                     ),
                 ),
-            ],
-        )
-        .into_any_element(),
+            };
+            block(
+                Tone::Neutral,
+                "hard-drive",
+                vec![title_row(t, true), big(t, big_text), small(t, detail)],
+            )
+            .into_any_element()
+        }
         Look::Unknown => block(
             Tone::Neutral,
             "image",

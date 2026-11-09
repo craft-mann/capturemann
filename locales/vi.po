@@ -9832,3 +9832,27 @@ msgstr "Xuất…"
 msgctxt "button"
 msgid "Exporting {pct}%"
 msgstr "Đang xuất {pct}%"
+
+#, fuzzy
+msgid "{format} · {codec} · {width} × {height}. At most {size}. The real size is shown after export."
+msgstr "{format} · {codec} · {width} × {height}. Tối đa {size}. Dung lượng thật hiện sau khi xuất."
+
+#, fuzzy
+msgid "{format} · {codec} · {width} × {height}. The real size is shown after export."
+msgstr "{format} · {codec} · {width} × {height}. Dung lượng thật hiện sau khi xuất."
+
+#, fuzzy
+msgid "Making one WebM with the camera bubble and audio: {pct}%"
+msgstr "Đang tạo một WebM gồm bong bóng camera và âm thanh: {pct}%"
+
+#, fuzzy
+msgid "{title} · Making one WebM with the camera bubble and audio: {pct}%"
+msgstr "{title} · Đang tạo một WebM có bong bóng camera và âm thanh: {pct}%"
+
+#, fuzzy
+msgid "Making a GIF of the screen: {pct}%"
+msgstr "Đang tạo ảnh GIF của màn hình: {pct}%"
+
+#, fuzzy
+msgid "{title} · Making a GIF of the screen: {pct}%"
+msgstr "{title} · Đang tạo ảnh GIF của màn hình: {pct}%"

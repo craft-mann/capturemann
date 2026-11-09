@@ -476,6 +476,9 @@ fn cases() -> Vec<Case> {
                 height = 1800
             )
         })
+        .text("detail line with the typical size", || {
+            crate::daemon_text::typical_detail("WebM", "VP9", 1152, 720, 14_000_000, 69_000_000)
+        })
         .text("GIF keep-under line", || {
             cm_i18n::tr!(
                 "GIF size can\u{2019}t be estimated. It will stay under {mb} MB: width, then frame rate, step down to fit.",

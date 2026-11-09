@@ -81,10 +81,11 @@ pub fn on_event(app: &Entity<AppModel>, ev: &Event, cx: &mut App) {
                 pct,
                 auto,
                 first,
+                kind,
             } => upsert(
                 app,
                 &capture_id,
-                exporting_toast(&capture_id, title.as_deref(), pct, auto),
+                exporting_toast(&capture_id, title.as_deref(), pct, auto, kind),
                 first,
                 false,
                 cx,

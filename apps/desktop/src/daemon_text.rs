@@ -113,6 +113,37 @@ pub fn bound_tail(typical_bytes: u64, max_bytes: u64) -> String {
     }
 }
 
+/// The detail line of the size block when the estimate has a typical figure (EXP-5 AC10): the
+/// format, codec and pixels, the ceiling in the same sentence, and that the real size comes after
+/// the export. Under 5 MB for both figures the big line already says it all, so no ceiling.
+pub fn typical_detail(
+    format: &str,
+    codec: &str,
+    width: u32,
+    height: u32,
+    typical_bytes: u64,
+    max_bytes: u64,
+) -> String {
+    if typical_bytes <= 5_000_000 && max_bytes <= 5_000_000 {
+        tr!(
+            "{format} \u{00B7} {codec} \u{00B7} {width} \u{00D7} {height}. The real size is shown after export.",
+            format = format,
+            codec = codec,
+            width = width,
+            height = height
+        )
+    } else {
+        tr!(
+            "{format} \u{00B7} {codec} \u{00B7} {width} \u{00D7} {height}. At most {size}. The real size is shown after export.",
+            format = format,
+            codec = codec,
+            width = width,
+            height = height,
+            size = bound_size_text(max_bytes)
+        )
+    }
+}
+
 /// The line under the finished export's real size (EXP-5): what was estimated before it started.
 /// With a typical size: "estimate: about 14 MB, up to 69 MB".
 pub fn estimate_note(max_bytes: u64) -> String {

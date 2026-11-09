@@ -59,6 +59,8 @@ pub struct ExportStatus {
     pub seq: u64,
     /// An audio export (VOC-2): M4A or WAV, not the combined MP4.
     pub audio: bool,
+    /// The file's format (`preset` of `export.queued`).
+    pub kind: FileKind,
 }
 
 /// What the exported MP4 holds besides the screen (`has_camera` and `has_audio` of `export.done`).
@@ -91,6 +93,15 @@ pub enum FileKind {
 }
 
 impl FileKind {
+    /// The format of a `preset`: `webm` and `gif` are those formats, every other preset is an MP4.
+    fn of_preset(preset: Option<&str>) -> FileKind {
+        match preset {
+            Some("webm") => FileKind::WebM,
+            Some("gif") => FileKind::Gif,
+            _ => FileKind::Mp4,
+        }
+    }
+
     fn label(self) -> &'static str {
         match self {
             FileKind::Mp4 => "MP4",
@@ -117,11 +128,7 @@ impl ExportContents {
     fn of(data: &serde_json::Value) -> Self {
         let px = |k: &str| data[k].as_u64().and_then(|n| u32::try_from(n).ok());
         ExportContents {
-            kind: match data["preset"].as_str() {
-                Some("webm") => FileKind::WebM,
-                Some("gif") => FileKind::Gif,
-                _ => FileKind::Mp4,
-            },
+            kind: FileKind::of_preset(data["preset"].as_str()),
             size_px: px("width").zip(px("height")),
             finished: crate::export_flow::Finished::of(data),
             camera: data["has_camera"].as_bool().unwrap_or(true),
@@ -153,6 +160,7 @@ pub enum Effect {
         pct: u32,
         auto: bool,
         first: bool,
+        kind: FileKind,
     },
     Done {
         capture_id: String,
@@ -236,6 +244,7 @@ impl ExportTracker {
                 let title = data["title"].as_str().map(str::to_owned);
                 let auto = data["auto"].as_bool().unwrap_or(false);
                 let audio = data["kind"].as_str() == Some("audio");
+                let kind = FileKind::of_preset(data["preset"].as_str());
                 self.next_seq += 1;
                 let seq = self.next_seq;
                 self.jobs.insert(
@@ -251,6 +260,7 @@ impl ExportTracker {
                         reason: None,
                         seq,
                         audio,
+                        kind,
                     },
                 );
                 if audio {
@@ -267,6 +277,7 @@ impl ExportTracker {
                     pct: 0,
                     auto,
                     first: true,
+                    kind,
                 }]
             }
             "job.progress" if data["type"] == "export" => {
@@ -293,6 +304,7 @@ impl ExportTracker {
                         pct: j.toast_pct as u32,
                         auto: j.auto,
                         first: false,
+                        kind: j.kind,
                     }];
                 }
                 Vec::new()
@@ -407,6 +419,7 @@ pub fn exporting_toast(
     title: Option<&str>,
     pct: u32,
     after_recording: bool,
+    kind: FileKind,
 ) -> ToastSpec {
     let head = if after_recording {
         tr!("Recording saved \u{2014} exporting\u{2026}")
@@ -417,22 +430,43 @@ pub fn exporting_toast(
         tr_ctx!("button", "Open"),
         ToastAction::OpenCapture(capture_id.to_owned()),
     );
-    let body = match title {
-        Some(t) => tr!(
-            "{title} \u{00B7} Making one MP4 with the camera bubble and audio: {pct}%",
-            title = t,
-            pct = pct
-        ),
-        None => tr!(
-            "Making one MP4 with the camera bubble and audio: {pct}%",
-            pct = pct
-        ),
-    };
+    let body = exporting_body(title, pct, kind);
     // A progress bar makes the toast stick until the export ends (a toast without one went away
     // after 5 s and the next progress event pushed a new one).
     let mut spec = spec.body(body);
     spec.progress = Some(pct.min(100) as u8);
     spec
+}
+
+/// The progress line: an MP4 holds the camera bubble and audio, a WebM the same in the web format,
+/// a GIF is a silent loop of the screen.
+fn exporting_body(title: Option<&str>, pct: u32, kind: FileKind) -> String {
+    match (kind, title) {
+        (FileKind::Mp4, Some(t)) => tr!(
+            "{title} \u{00B7} Making one MP4 with the camera bubble and audio: {pct}%",
+            title = t,
+            pct = pct
+        ),
+        (FileKind::Mp4, None) => tr!(
+            "Making one MP4 with the camera bubble and audio: {pct}%",
+            pct = pct
+        ),
+        (FileKind::WebM, Some(t)) => tr!(
+            "{title} \u{00B7} Making one WebM with the camera bubble and audio: {pct}%",
+            title = t,
+            pct = pct
+        ),
+        (FileKind::WebM, None) => tr!(
+            "Making one WebM with the camera bubble and audio: {pct}%",
+            pct = pct
+        ),
+        (FileKind::Gif, Some(t)) => tr!(
+            "{title} \u{00B7} Making a GIF of the screen: {pct}%",
+            title = t,
+            pct = pct
+        ),
+        (FileKind::Gif, None) => tr!("Making a GIF of the screen: {pct}%", pct = pct),
+    }
 }
 
 /// "Exporting audio..." with progress (VOC-2).
@@ -533,7 +567,10 @@ fn exported_body(contents: ExportContents, captions: Option<String>) -> String {
     };
     // The estimate that was shown before the export, under the real size (a GIF has none).
     let body = match contents.finished.estimate_max_bytes {
-        Some(max) => format!("{body}\n{}", crate::daemon_text::estimate_note(max)),
+        Some(max) => format!(
+            "{body}\n{}",
+            crate::daemon_text::estimate_note_with(contents.finished.estimate_typical_bytes, max)
+        ),
         None => body,
     };
     if contents.vp9 {
@@ -756,7 +793,8 @@ mod tests {
                 title: Some("Lesson".into()),
                 pct: 0,
                 auto: true,
-                first: true
+                first: true,
+                kind: FileKind::Mp4
             }]
         );
         assert!(t.is_running("rec_1"));
@@ -899,7 +937,7 @@ mod tests {
 
     #[test]
     fn toasts_say_what_is_happening() {
-        let saving = exporting_toast("rec_1", Some("Lesson"), 40, true);
+        let saving = exporting_toast("rec_1", Some("Lesson"), 40, true, FileKind::Mp4);
         assert_eq!(saving.title, "Recording saved \u{2014} exporting\u{2026}");
         assert!(saving.body.as_deref().unwrap().contains("40%"));
         assert_eq!(
@@ -907,7 +945,7 @@ mod tests {
             ToastAction::OpenCapture("rec_1".into())
         );
         assert_eq!(
-            exporting_toast("rec_1", None, 0, false).title,
+            exporting_toast("rec_1", None, 0, false, FileKind::Mp4).title,
             "Exporting\u{2026}"
         );
         // A running export sticks (it has a progress bar) until its result replaces it.
@@ -929,7 +967,7 @@ mod tests {
             (t.sticky(), t.progress)
         };
         assert_eq!(
-            running(exporting_toast("rec_1", None, 42, false)),
+            running(exporting_toast("rec_1", None, 42, false, FileKind::Mp4)),
             (true, Some(42))
         );
         assert_eq!(
@@ -1040,6 +1078,67 @@ mod tests {
         assert!(!body.contains("estimate"));
         // An older result without the size keeps the old title.
         assert_eq!(toast(json!({})).0, "Exported Lesson");
+    }
+
+    /// EXP-5 AC10: with a typical figure the note under the real size says both.
+    #[test]
+    fn the_done_toast_names_the_typical_size_when_there_is_one() {
+        let body = |est: serde_json::Value| {
+            let data = json!({"preset": "webm", "size_bytes": 14_000_000u64,
+                "width": 1152, "height": 720, "estimate": est});
+            exported_toast("rec_1", "Lesson", None, ExportContents::of(&data))
+                .body
+                .clone()
+                .unwrap_or_default()
+        };
+        let with = body(json!({"max_bytes": 69_000_000u64, "typical_bytes": 14_000_000u64}));
+        assert!(
+            with.ends_with("\nestimate: about 14 MB, up to 69 MB"),
+            "{with}"
+        );
+        let without = body(json!({"max_bytes": 69_000_000u64, "typical_bytes": null}));
+        assert!(without.ends_with("\nestimate: up to 69 MB"), "{without}");
+    }
+
+    /// The Exporting toast names the file that is being made, not always an MP4.
+    #[test]
+    fn the_exporting_text_follows_the_format() {
+        let text = |kind| exporting_body(Some("Lesson"), 40, kind);
+        assert_eq!(
+            text(FileKind::Mp4),
+            "Lesson \u{b7} Making one MP4 with the camera bubble and audio: 40%"
+        );
+        assert!(text(FileKind::WebM).contains("one WebM"));
+        assert!(!text(FileKind::WebM).contains("MP4"));
+        assert!(text(FileKind::Gif).contains("GIF"));
+        assert!(!text(FileKind::Gif).contains("MP4"));
+        assert_eq!(
+            exporting_body(None, 5, FileKind::Gif),
+            "Making a GIF of the screen: 5%"
+        );
+        // The tracker takes the format from the preset of `export.queued` and keeps it.
+        let mut t = ExportTracker::default();
+        let queued = json!({"job_id": "j9", "capture_id": "rec_1", "title": "Lesson",
+            "preset": "webm", "auto": false});
+        let e = t.on_event("export.queued", &queued);
+        assert!(matches!(
+            e.as_slice(),
+            [Effect::Progress {
+                kind: FileKind::WebM,
+                ..
+            }]
+        ));
+        let e = t.on_event(
+            "job.progress",
+            &json!({"job_id": "j9", "type": "export", "progress": 0.5}),
+        );
+        assert!(matches!(
+            e.as_slice(),
+            [Effect::Progress {
+                kind: FileKind::WebM,
+                ..
+            }]
+        ));
     }
 
     /// EXP-2 on Linux (O10): when the file is VP9 because there is no hardware H.264 encoder the
