@@ -184,6 +184,7 @@ Scope (maintainer, Oct 28, 2026): transcript accuracy for long recordings and th
 | Checkpoint per finished piece, a held job resumes | built | tested through the real job queue with a fake engine; observed once on the real run |
 | Jobs the daemon already has are shown on the Transcript and Speakers tabs | built | tested (list parsing, app model); not looked at by eye on every screen |
 | Audio choice (original microphone) in Re-generate, MCP and CLI | built | tested; A/B on the real recording, the maintainer's own judgement of the passages was not reported yet |
+| The original microphone is the transcription default (0.3.1, `ai.transcribe_raw_mic` on when nothing is stored; off keeps the noise-reduced copy; no migration; the AI page shows "Transcribe from") | built | tested with fakes (daemon: no key reads the original, a stored `false` reads the copy, a request still wins; settings level in `cm-ai`); the maintainer tested the raw track on his recordings before the decision (Nov 9, 2026), no stored report |
 | Report on long recordings (`output_too_long`), citation times opt-in, audio preview mix, sidebar highlight and version, one-line fields follow the caret, Re-generate in the audio editor | built | tested with fakes; the maintainer confirmed the report, citation times, sidebar, silence and one-line field fixes in the app (as reported) |
 | Anything on an Intel Mac | not tested | no Intel Mac yet |
 

@@ -199,7 +199,9 @@ pub(super) fn upgrade_sounds(dir: &std::path::Path) {
     }
 }
 
-/// The setting `ai.transcribe_raw_mic` (default off) from a settings map.
+/// The setting `ai.transcribe_raw_mic` (default on: the original microphone; off: the
+/// noise-reduced copy) from a settings map. Read when a transcription starts, so a library with
+/// no stored value follows the default and a stored value, on or off, is kept.
 fn settings_raw_mic(settings: &serde_json::Map<String, Value>) -> bool {
     cm_ai::pipeline::PipelineSettings::from_settings(settings).transcribe_raw_mic
 }

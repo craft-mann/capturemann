@@ -1561,7 +1561,7 @@ fn ai_tools() -> Vec<ToolSpec> {
                                   "description": "`auto` to detect, a language code such as `en`, `vi` or `es`, or codes separated by commas to choose among, such as `vi,en` (default: the languages in the `ai.languages` setting, else detect among all)." },
                     "model": model_id_schema(),
                     "original_audio": { "type": "boolean",
-                                        "description": "true: read the microphone as it was recorded; false: read the noise-reduced copy a recording may store. Omitted: the user's setting `ai.transcribe_raw_mic`, which is off by default (the noise-reduced copy). Noise reduction can remove soft sounds that speech recognition needs, so the recorded microphone can read more words (6.8 % more on one 45-minute recording) but it can also bring back invented text over noise; it makes no difference to a recording made without noise reduction." } }),
+                                        "description": "true: read the original microphone, as it was recorded; false: read the noise-reduced copy a recording may store. Omitted: the user's setting `ai.transcribe_raw_mic`, which is on by default (the original microphone; the AI page shows it as \"Transcribe from\"). Noise reduction can remove soft sounds that speech recognition needs, so the original microphone reads quiet or distant speakers the copy drops; it makes no difference to a recording made without noise reduction." } }),
             &["capture_id"],
             job_started_output(json!({
                 "capture_id": { "type": "string" }, "model": { "type": "string" },

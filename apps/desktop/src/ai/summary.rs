@@ -178,7 +178,9 @@ pub struct RegenDraft {
     pub model: Option<String>,
     /// A code from [`LANGUAGES`].
     pub language: String,
-    /// Read the microphone as recorded instead of the noise-reduced copy.
+    /// Read the microphone as recorded (the default since 0.3.1) instead of the noise-reduced
+    /// copy. The panel opens on the user's `ai.transcribe_raw_mic` choice (see
+    /// [`super::jobs::TranscribeVm::open_regen`]).
     pub original_audio: bool,
 }
 
@@ -187,7 +189,7 @@ impl Default for RegenDraft {
         RegenDraft {
             model: None,
             language: "auto".to_owned(),
-            original_audio: false,
+            original_audio: true,
         }
     }
 }
@@ -354,6 +356,10 @@ mod tests {
         let d = RegenDraft::default();
         assert_eq!(d.model, None);
         assert_eq!(d.language_arg(), None);
+        assert!(
+            d.original_audio,
+            "the original microphone, as the daemon's default"
+        );
         let d = RegenDraft {
             model: Some("medium".into()),
             language: "vi".into(),

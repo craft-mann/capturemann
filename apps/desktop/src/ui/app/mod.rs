@@ -277,6 +277,9 @@ impl AppModel {
                     .get(crate::ui::ai::KEY_LIVE_TRANSCRIBE)
                     .and_then(|v| v.as_bool())
                     .unwrap_or(true),
+                transcribe_raw_mic: settings
+                    .get(cm_ai::pipeline::KEY_RAW_MIC)
+                    .and_then(|v| v.as_bool()),
                 glossary: cm_ai::glossary::from_value(settings.get(crate::ui::ai::KEY_GLOSSARY)),
                 languages: crate::ai::models::languages_from_value(
                     settings.get(crate::ui::ai::KEY_LANGUAGES),
@@ -285,7 +288,11 @@ impl AppModel {
                 ..Default::default()
             },
             builtin: crate::ai::builtin::BuiltInVm::default(),
-            transcribe: crate::ai::jobs::TranscribeVm::default(),
+            transcribe: crate::ai::jobs::TranscribeVm::with_regen_original_audio(
+                settings
+                    .get(cm_ai::pipeline::KEY_RAW_MIC)
+                    .and_then(|v| v.as_bool()),
+            ),
             agent_seen: 0,
             recents: Vec::new(),
             hotkey_ids: HashMap::new(),
