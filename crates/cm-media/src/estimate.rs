@@ -9,6 +9,12 @@
 //!   exporter sets for the codec (H.264: the rate it asks the encoder for; VP9: the cap it gives
 //!   `libvpx` next to the CRF), the audio bit rate and a measured margin, rounded **up** to two
 //!   significant figures. A quiet screen lands far under the bound; that is the accepted trade-off.
+//! * **The typical size** ([`typical_video_bps`], `typical_bytes` of [`SizeEstimate`]): a best
+//!   guess ("About 14 MB") next to the bound, from one cheap measure of the picture's activity
+//!   that needs no decoding: the master screen track's bytes per second ([`MasterRate`], file size
+//!   over length), scaled to the chosen frame and the export codec with constants calibrated on
+//!   real recordings (see the constants' comments). Never above the bound; absent when there is no
+//!   screen master to measure.
 //! * **Refusals** with one text for the app, the CLI and MCP (`gif_too_long`,
 //!   `size_larger_than_source`; `gif_cannot_fit` is raised by the exporter): the ids and the
 //!   wording are templates in `cm_core::message`.
@@ -17,7 +23,9 @@
 //! they mirror changes, the stored comparison test (`tests/estimate_vs_real.rs`,
 //! `verification/benchmarks/export-estimate-*.md`) must be run again.
 
-use cm_core::CmError;
+use std::path::Path;
+
+use cm_core::{CmError, TICKS_PER_SECOND};
 use serde_json::Value;
 
 use crate::edit_plan::{secs_of, with_pauses_cut};
@@ -247,6 +255,15 @@ impl Codec {
             Codec::Vp9 => "vp9",
         }
     }
+
+    /// `vp9` is VP9; anything else (including `None`) is H.264.
+    pub fn parse_or_h264(s: Option<&str>) -> Codec {
+        if s == Some("vp9") {
+            Codec::Vp9
+        } else {
+            Codec::H264
+        }
+    }
 }
 
 /// What an MP4 is on this computer: VP9 on Linux without a hardware H.264 encoder (the exporter's
@@ -299,6 +316,152 @@ pub fn audio_bps(format: Format, channels: Option<u32>) -> f64 {
     })
 }
 
+// ---- the typical size ------------------------------------------------------------------------
+//
+// One rule, few constants, calibrated on real screen recordings of one user on one Mac (Apple
+// M4 Pro, hardware H.264 through VideoToolbox, the FFmpeg that ships), Nov 9, 2026: 10 captures
+// (8 recorded by CaptureMann, HEVC masters at the recorder's high quality, 1964p to 4K, 5 with a
+// camera bubble; 2 imported H.264 files of 1080p and 1440p), 12 one-minute slices, 36 exports
+// (WebM 480p and 1080p, MP4 at the recording size). Leave-one-recording-out: median real /
+// typical 1.03, 86 % within a factor 1.5, worst 2.4 and 0.39. The table, the fit and the limits:
+// `verification/benchmarks/export-typical-estimate-2026-11-09.md`. Not calibrated: Windows and
+// Linux encoders, recorder masters at other quality settings or in H.264, 60 fps, 720p and 480p
+// MP4, imports other than two H.264 files.
+
+/// The export codec's typical video rate as a fraction of the master's rate at the master's own
+/// frame: `typical = TYPICAL_K[codec] * budget * master_bps * (export area / master area) ^
+/// TYPICAL_AREA_EXP`, where `budget` is 1 for the recorder's own master and
+/// [`TYPICAL_IMPORT_FACTOR`] for any other file.
+pub const TYPICAL_K_H264: f64 = 2.0;
+pub const TYPICAL_K_VP9: f64 = 0.30;
+/// How the typical rate follows the frame area: a little under 1, because a smaller picture keeps
+/// more of its detail per pixel.
+pub const TYPICAL_AREA_EXP: f64 = 0.9;
+/// An imported file (no `quality` on its screen track) spends far fewer bytes on the same picture
+/// than the recorder's master, which asks its encoder for 30 to 40 Mbps and gets 2 to 18: its rate
+/// counts this many times. Measured on two imported H.264 files; a weak constant, see the report.
+pub const TYPICAL_IMPORT_FACTOR: f64 = 3.8;
+/// The typical video rate never drops under this many bits per pixel per frame (a flat screen
+/// still costs something: the synthetic static sample of the bound test measured 0.004 to 0.02).
+/// 0.003 at 1080p30 is 190 kbps.
+pub const TYPICAL_FLOOR_BPP: f64 = 0.003;
+/// What the real file adds to the video and audio rates: the container and the key frames.
+pub const TYPICAL_MARGIN: f64 = 1.02;
+
+/// The master screen track's size and length: the cheap activity measure of the typical estimate.
+/// Read from the capture bundle by [`master_rate`]; tests build it by hand.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MasterRate {
+    /// The screen master file's size in bytes.
+    pub bytes: u64,
+    /// The length the file covers (file time, without the pauses), in seconds.
+    pub duration_s: f64,
+    /// The master's frame in pixels.
+    pub frame: (u32, u32),
+    pub fps: f64,
+    /// The recorder's own master (its screen track carries the recorder's `quality`), as against
+    /// an imported file.
+    pub recorded: bool,
+}
+
+impl MasterRate {
+    /// The master's bits per second.
+    pub fn bps(&self) -> f64 {
+        self.bytes as f64 * 8.0 / self.duration_s.max(0.001)
+    }
+
+    /// The master's rate as a measure of the picture's activity: an imported file's bytes count
+    /// [`TYPICAL_IMPORT_FACTOR`] times.
+    pub fn activity_bps(&self) -> f64 {
+        self.bps()
+            * if self.recorded {
+                1.0
+            } else {
+                TYPICAL_IMPORT_FACTOR
+            }
+    }
+}
+
+/// The master screen track's [`MasterRate`] from the bundle folder: the screen file's size and the
+/// track's length (end minus start, minus the pauses inside it); `recorded` is whether the
+/// manifest's screen track carries the recorder's `quality`. `None` when the recording has no
+/// screen track, the file is missing or empty, or the length is not positive: the caller then
+/// shows the bound alone. Never fails.
+pub fn master_rate(bundle_dir: &Path, manifest: &Value, spec: &QuickSpec) -> Option<MasterRate> {
+    let s = &spec.screen;
+    if s.file.is_empty() {
+        return None;
+    }
+    let bytes = std::fs::metadata(bundle_dir.join(&s.file)).ok()?.len();
+    if bytes == 0 {
+        return None;
+    }
+    let paused: i64 = spec
+        .gaps
+        .iter()
+        .map(|&(from, to)| to.min(s.end).saturating_sub(from.max(s.start)).max(0))
+        .sum();
+    let ticks = (s.end - s.start - paused).max(0);
+    let duration_s = ticks as f64 / TICKS_PER_SECOND as f64;
+    if duration_s <= 0.0 || !duration_s.is_finite() {
+        return None;
+    }
+    let recorded = manifest
+        .pointer("/tracks/screen/quality")
+        .is_some_and(Value::is_string);
+    Some(MasterRate {
+        bytes,
+        duration_s,
+        frame: s.size,
+        fps: s.fps,
+        recorded,
+    })
+}
+
+/// The video bit rate a file of `codec` at `frame` typically has for a recording whose master is
+/// `master`: the rule above, clamped between the floor and the codec's ceiling
+/// ([`video_bps`]). The export's `fps` only sets the floor and the ceiling: the exporter keeps the
+/// recording's frame rate (WebM at most 30), so the master's rate already counts the frames.
+pub fn typical_video_bps(codec: Codec, frame: (u32, u32), fps: f64, master: &MasterRate) -> f64 {
+    let area = f64::from(frame.0) * f64::from(frame.1);
+    let master_area = (f64::from(master.frame.0) * f64::from(master.frame.1)).max(1.0);
+    let k = match codec {
+        Codec::H264 => TYPICAL_K_H264,
+        Codec::Vp9 => TYPICAL_K_VP9,
+    };
+    let raw = k * master.activity_bps() * (area / master_area).powf(TYPICAL_AREA_EXP);
+    let floor = TYPICAL_FLOOR_BPP * area * fps.max(1.0);
+    raw.max(floor).min(video_bps(codec, frame, fps))
+}
+
+/// The typical size in bytes before the rounding: the typical video rate plus the audio, times
+/// the length, times [`TYPICAL_MARGIN`].
+pub fn typical_bytes_of(i: &Inputs, master: &MasterRate) -> f64 {
+    let bps =
+        typical_video_bps(i.codec, i.frame, i.fps, master) + audio_bps(i.format, i.audio_channels);
+    bps * i.duration_s.max(0.0) / 8.0 * TYPICAL_MARGIN
+}
+
+/// The typical size as shown: rounded to the nearest two significant figures and never above
+/// `max_bytes`.
+pub fn typical_of(nominal: f64, max_bytes: u64) -> u64 {
+    (two_sf_nearest(nominal).round() as u64).min(max_bytes)
+}
+
+/// The English label of the typical size: "About 14 MB", "About 1.2 GB", "Under 5 MB" at 5 MB and
+/// below. The app builds the same sentence in its language from `typical_bytes`.
+pub fn typical_label_of(typical_bytes: u64) -> String {
+    if typical_bytes as f64 <= UNDER_BYTES {
+        return "Under 5 MB".to_owned();
+    }
+    let (div, unit) = if typical_bytes >= 1_000_000_000 {
+        (1e9, "GB")
+    } else {
+        (1e6, "MB")
+    };
+    format!("About {} {unit}", number_text(typical_bytes as f64 / div))
+}
+
 // ---- the estimate --------------------------------------------------------------------------
 
 /// What the formula needs.
@@ -335,6 +498,15 @@ fn two_sf(x: f64, up: bool) -> f64 {
     r * mag
 }
 
+/// Rounds `x` to the nearest two significant figures.
+fn two_sf_nearest(x: f64) -> f64 {
+    if x <= 0.0 {
+        return 0.0;
+    }
+    let mag = 10f64.powi(x.log10().floor() as i32 - 1);
+    (x / mag).round() * mag
+}
+
 /// The upper bound of an estimate: the nominal size times [`BOUND_MARGIN`], rounded **up** to
 /// two significant figures, in bytes.
 pub fn bound_of(nominal: f64) -> u64 {
@@ -368,7 +540,13 @@ pub fn label_of(max_bytes: u64) -> String {
 pub struct SizeEstimate {
     /// The file is not larger than this (two significant figures, rounded up).
     pub max_bytes: u64,
+    /// "Up to 290 MB" or "Under 5 MB".
     pub label: String,
+    /// The best guess (nearest two significant figures, never above `max_bytes`), from the master
+    /// screen track's bytes per second; `None` when there is no screen master to measure.
+    pub typical_bytes: Option<u64>,
+    /// "About 14 MB" or "Under 5 MB"; `None` with `typical_bytes`.
+    pub typical_label: Option<String>,
     /// `h264` or `vp9`: what the file's video will be (MP4 on a machine without a hardware
     /// H.264 encoder is `vp9`).
     pub codec: Codec,
@@ -390,12 +568,16 @@ pub enum Estimated {
     },
 }
 
-/// The upper bound of the formula for `i`, with its label.
-pub fn estimate_bound(i: &Inputs) -> SizeEstimate {
+/// The upper bound of the formula for `i`, with its label, and the typical size when `master`
+/// is known.
+pub fn estimate_bound(i: &Inputs, master: Option<&MasterRate>) -> SizeEstimate {
     let max_bytes = bound_of(estimate_bytes(i));
+    let typical_bytes = master.map(|m| typical_of(typical_bytes_of(i, m), max_bytes));
     SizeEstimate {
         max_bytes,
         label: label_of(max_bytes),
+        typical_bytes,
+        typical_label: typical_bytes.map(typical_label_of),
         codec: i.codec,
         width: i.frame.0,
         height: i.frame.1,
@@ -488,9 +670,21 @@ fn check_choice_for(manifest: &Value, spec: &QuickSpec, c: &Choice) -> Result<f6
     Ok(d)
 }
 
-/// The estimate of `choice` for a recording (its manifest as JSON). `mp4_codec` is
-/// [`mp4_codec`]. Refuses what [`check_choice`] refuses. GIF, and nothing else, has no bound.
+/// The estimate of `choice` for a recording (its manifest as JSON): the bound alone, without a
+/// typical size. `mp4_codec` is [`mp4_codec`]. Refuses what [`check_choice`] refuses. GIF, and
+/// nothing else, has no bound.
 pub fn estimate(manifest: &Value, c: &Choice, mp4_codec: Codec) -> Result<Estimated, CmError> {
+    estimate_with_master(manifest, c, mp4_codec, None)
+}
+
+/// [`estimate`] with the typical size too, when the master screen track's rate is known
+/// ([`master_rate`] of the bundle folder; `None` gives the bound alone).
+pub fn estimate_with_master(
+    manifest: &Value,
+    c: &Choice,
+    mp4_codec: Codec,
+    master: Option<&MasterRate>,
+) -> Result<Estimated, CmError> {
     let spec = QuickSpec::from_manifest(manifest)?;
     let duration_s = check_choice_for(manifest, &spec, c)?;
     if c.format == Format::Gif {
@@ -515,14 +709,17 @@ pub fn estimate(manifest: &Value, c: &Choice, mp4_codec: Codec) -> Result<Estima
         .map(|a| a.channels)
         .max()
         .map(|c| c.clamp(1, 2));
-    Ok(Estimated::Bound(estimate_bound(&Inputs {
-        codec,
-        format: c.format,
-        frame,
-        fps,
-        duration_s,
-        audio_channels: channels,
-    })))
+    Ok(Estimated::Bound(estimate_bound(
+        &Inputs {
+            codec,
+            format: c.format,
+            frame,
+            fps,
+            duration_s,
+            audio_channels: channels,
+        },
+        master,
+    )))
 }
 
 #[cfg(test)]
@@ -665,8 +862,8 @@ mod tests {
             audio_channels: None,
         };
         let (h, v) = (
-            estimate_bound(&i(Codec::H264)),
-            estimate_bound(&i(Codec::Vp9)),
+            estimate_bound(&i(Codec::H264), None),
+            estimate_bound(&i(Codec::Vp9), None),
         );
         assert_eq!((h.codec.as_str(), v.codec.as_str()), ("h264", "vp9"));
         assert!(v.max_bytes < h.max_bytes);
@@ -692,6 +889,138 @@ mod tests {
         assert_eq!(audio_bps(Format::Mp4, None), 0.0);
         assert_eq!(audio_bps(Format::WebM, Some(1)), 64_000.0);
         assert_eq!(audio_bps(Format::Mp4, Some(1)), 128_000.0);
+    }
+
+    /// An imported master of `kbps` at `frame` for `secs`, as the calibration table lists them.
+    fn master(kbps: f64, frame: (u32, u32), secs: f64) -> MasterRate {
+        MasterRate {
+            bytes: (kbps * 1000.0 * secs / 8.0).round() as u64,
+            duration_s: secs,
+            frame,
+            fps: 30.0,
+            recorded: false,
+        }
+    }
+
+    #[test]
+    fn the_typical_size_follows_the_master_rate_and_never_exceeds_the_bound() {
+        // The maintainer's capture of Nov 9, 2026 (R1 of the calibration report): 8:00 of
+        // 2218 x 1440, an imported H.264 file at 705 kbps, exported as a 480p WebM, came out at
+        // 14.2 MB where the bound said 69 MB. The rule says about 11 MB.
+        let m = master(705.0, (2218, 1440), 480.0);
+        let i = Inputs {
+            codec: Codec::Vp9,
+            format: Format::WebM,
+            frame: (740, 480),
+            fps: 30.0,
+            duration_s: 480.0,
+            audio_channels: Some(2),
+        };
+        let e = estimate_bound(&i, Some(&m));
+        let t = e.typical_bytes.unwrap();
+        assert!(t <= e.max_bytes);
+        assert!(
+            (9e6..=20e6).contains(&(t as f64)),
+            "about 11 MB expected, got {t} ({})",
+            e.typical_label.as_deref().unwrap_or("")
+        );
+        assert!(e.typical_label.as_deref().unwrap().starts_with("About "));
+        // The recorder's own master at the same rate is a quieter picture: a smaller guess.
+        let own = MasterRate {
+            recorded: true,
+            ..m
+        };
+        let o = estimate_bound(&i, Some(&own));
+        assert!(o.typical_bytes.unwrap() < t, "{o:?}");
+        // R10 of the report: a recorded HEVC master of 1648 kbps at 3024 x 1964 came out at
+        // 92 kbps as a 480p WebM (64 kbps of it mono Opus) and 4538 kbps as an MP4 at the
+        // recording size; the rule lands within a factor 1.5 of both.
+        let r10 = MasterRate {
+            recorded: true,
+            ..master(1648.0, (3024, 1964), 24.0)
+        };
+        let webm = typical_video_bps(Codec::Vp9, (740, 480), 30.0, &r10) + 64_000.0;
+        assert!((webm / 92_000.0 - 1.0).abs() < 0.5, "{webm}");
+        let mp4 = typical_video_bps(Codec::H264, (3024, 1964), 30.0, &r10) + 128_000.0;
+        assert!((mp4 / 4_538_000.0 - 1.0).abs() < 0.5, "{mp4}");
+        // Without a master there is only the bound.
+        let b = estimate_bound(&i, None);
+        assert_eq!((b.typical_bytes, b.typical_label), (None, None));
+        assert_eq!(b.max_bytes, e.max_bytes);
+        // A busier master is a larger typical size; a bigger frame too.
+        let busy = typical_video_bps(
+            Codec::Vp9,
+            (740, 480),
+            30.0,
+            &master(5000.0, (2218, 1440), 60.0),
+        );
+        let quiet = typical_video_bps(
+            Codec::Vp9,
+            (740, 480),
+            30.0,
+            &master(705.0, (2218, 1440), 60.0),
+        );
+        assert!(busy > quiet);
+        let large = typical_video_bps(
+            Codec::Vp9,
+            (1664, 1080),
+            30.0,
+            &master(705.0, (2218, 1440), 60.0),
+        );
+        assert!(large > quiet);
+        // Clamped: a nearly empty master still costs the floor; a frantic one stops at the ceiling.
+        let still = master(1.0, (1920, 1080), 60.0);
+        let fl = typical_video_bps(Codec::H264, (1920, 1080), 30.0, &still);
+        assert!(
+            (fl - TYPICAL_FLOOR_BPP * 1920.0 * 1080.0 * 30.0).abs() < 1.0,
+            "{fl}"
+        );
+        let frantic = master(200_000.0, (1920, 1080), 60.0);
+        let ceil = typical_video_bps(Codec::H264, (1920, 1080), 30.0, &frantic);
+        assert_eq!(ceil, video_bps(Codec::H264, (1920, 1080), 30.0));
+        // The shown value is the nearest two figures, capped at the bound; the labels.
+        assert_eq!(typical_of(14_237_000.0, 69_000_000), 14_000_000);
+        assert_eq!(typical_of(14_650_000.0, 69_000_000), 15_000_000);
+        assert_eq!(typical_of(80_000_000.0, 69_000_000), 69_000_000);
+        assert_eq!(typical_label_of(14_000_000), "About 14 MB");
+        assert_eq!(typical_label_of(1_200_000_000), "About 1.2 GB");
+        assert_eq!(typical_label_of(7_300_000), "About 7.3 MB");
+        assert_eq!(typical_label_of(4_900_000), "Under 5 MB");
+    }
+
+    #[test]
+    fn the_master_rate_is_read_from_the_bundle_or_absent() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut manifest = serde_json::json!({
+            "id": "rec_x", "title": "t", "tick_rate": 120000, "duration": 60 * 120000,
+            "tracks": { "screen": { "file": "screen.mp4", "size": [1920, 1080], "fps": 30,
+                                    "start": 0, "end": 60 * 120000 } },
+            "gaps": [{ "from": 10 * 120000, "to": 20 * 120000 }],
+        });
+        let mut spec = QuickSpec::from_manifest(&manifest).unwrap();
+        // No file: no typical size, no error.
+        assert_eq!(master_rate(dir.path(), &manifest, &spec), None);
+        // An empty file: the same.
+        std::fs::write(dir.path().join("screen.mp4"), b"").unwrap();
+        assert_eq!(master_rate(dir.path(), &manifest, &spec), None);
+        // 5 MB over 60 s of track time with a 10 s pause inside it: 50 s of file. No `quality`
+        // on the track: an imported file.
+        std::fs::write(dir.path().join("screen.mp4"), vec![0u8; 5_000_000]).unwrap();
+        let m = master_rate(dir.path(), &manifest, &spec).unwrap();
+        assert_eq!(m.bytes, 5_000_000);
+        assert!((m.duration_s - 50.0).abs() < 1e-6, "{}", m.duration_s);
+        assert!((m.bps() - 800_000.0).abs() < 1.0);
+        assert_eq!((m.frame, m.fps), ((1920, 1080), 30.0));
+        assert!(!m.recorded);
+        assert!((m.activity_bps() - 800_000.0 * TYPICAL_IMPORT_FACTOR).abs() < 1.0);
+        // The recorder's master carries its quality setting.
+        manifest["tracks"]["screen"]["quality"] = serde_json::json!("high");
+        let m = master_rate(dir.path(), &manifest, &spec).unwrap();
+        assert!(m.recorded);
+        assert!((m.activity_bps() - 800_000.0).abs() < 1.0);
+        // A track of no length: absent.
+        spec.screen.end = spec.screen.start;
+        assert_eq!(master_rate(dir.path(), &manifest, &spec), None);
     }
 
     #[test]
