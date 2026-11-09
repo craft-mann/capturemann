@@ -46,7 +46,7 @@ pub fn cases() -> Vec<Case> {
         },
         Case {
             id: "export.estimate",
-            title: "export --estimate prints Up to N MB with codec and pixels; a GIF has none; the refusals are the shared ones",
+            title: "export --estimate prints About N MB, up to M MB with codec and pixels; a GIF has none; the refusals are the shared ones",
             area: "export",
             specs: &["EXP-5.AC3", "EXP-5.AC4"],
             tier: Tier::Standard,
@@ -57,7 +57,7 @@ pub fn cases() -> Vec<Case> {
         },
         Case {
             id: "export.estimate_mcp",
-            title: "the MCP tool estimate_export answers the same bound as the CLI",
+            title: "the MCP tool estimate_export answers the same bound and typical size as the CLI",
             area: "export",
             specs: &["EXP-5.AC3", "AGT-1"],
             tier: Tier::Standard,
@@ -409,6 +409,19 @@ fn estimate_cli(ctx: &mut Ctx) -> R {
     let w = j.get("width").and_then(Value::as_u64).unwrap_or(0);
     let h = j.get("height").and_then(Value::as_u64).unwrap_or(0);
     check!(w > 0 && h > 0 && w % 2 == 0 && h % 2 == 0, "pixels {w}x{h}");
+    // The typical size (an imported clip has a screen master to measure): never above the bound,
+    // labelled "About N MB" or "Under 5 MB".
+    let typical = j.get("typical_bytes").and_then(Value::as_u64);
+    check!(
+        typical.is_some_and(|t| t > 0 && t <= j["max_bytes"].as_u64().unwrap_or(0)),
+        "no typical size at or below the bound: {j}"
+    );
+    check!(
+        j.get("typical_label")
+            .and_then(Value::as_str)
+            .is_some_and(|l| l.starts_with("About ") || l == "Under 5 MB"),
+        "the typical label is not 'About N MB' or 'Under 5 MB': {j}"
+    );
     // A WebM at a smaller step: VP9, smaller pixels, and nothing was exported.
     let sizes = j
         .pointer("/options/sizes")
@@ -511,7 +524,15 @@ fn estimate_mcp(ctx: &mut Ctx) -> R {
         "estimate_export failed: {}",
         crate::util::cut(&r.text, 200)
     );
-    for key in ["max_bytes", "label", "codec", "width", "height"] {
+    for key in [
+        "max_bytes",
+        "label",
+        "typical_bytes",
+        "typical_label",
+        "codec",
+        "width",
+        "height",
+    ] {
         check!(
             v.get(key) == cli.get(key),
             "MCP and CLI differ in `{key}`: {v} / {cli}"
