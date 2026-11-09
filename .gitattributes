@@ -20,3 +20,5 @@ reports/*.md                linguist-generated=true
 # Vendored fonts and brand assets are not our source.
 crates/cm-render/assets/*   linguist-vendored
 design/fonts/**             linguist-vendored
+# The vendored whisper.cpp and ggml sources (vendor/whisper-rs-sys, one patch) are not our source.
+vendor/whisper-rs-sys/**    linguist-vendored

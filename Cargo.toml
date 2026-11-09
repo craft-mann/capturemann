@@ -2,7 +2,8 @@
 resolver = "2"
 members = ["crates/*", "apps/*"]
 # `spikes` is a separate workspace; `vendor` holds the trimmed sherpa-onnx crates (path dependencies of
-# cm-ai) that are built as dependencies only, so fmt, clippy and test do not run on them.
+# cm-ai) and the patched xim-ctext and whisper-rs-sys copies (`[patch.crates-io]` below) that are built
+# as dependencies only, so fmt, clippy and test do not run on them.
 exclude = ["spikes", "vendor"]
 
 [workspace.package]
@@ -94,8 +95,12 @@ result_large_err = "allow"
 # unchanged. Use `debug = true` locally if you need lldb to inspect variables.
 # xim-ctext: `compound_text_to_utf8` never fails (see vendor/README-CaptureMann.md). Upstream returned an
 # error for the Latin-1 text IBus sends while composing Vietnamese on X11 and `zed-xim` panicked on it.
+# whisper-rs-sys: whisper.cpp 1.8.3 with one patch (vendor/README-CaptureMann.md): a decode window whose
+# segments end within its first 160 ms gets no DTW token times instead of aborting the process in
+# `median_filter` (WHISPER_ASSERT); the app quit this way on a 73-minute imported recording (Nov 9, 2026).
 [patch.crates-io]
 xim-ctext = { path = "vendor/xim-ctext" }
+whisper-rs-sys = { path = "vendor/whisper-rs-sys" }
 
 [profile.dev]
 debug = "line-tables-only"
