@@ -79,6 +79,14 @@ Today the app has no export dialog: Export starts one export at the recording's 
   range version (estimate -15 % to +20 %) failed the stored test: 12 of 18 samples fell outside it, because hardware H.264
   and VP9 size follows the picture (0.56 MB static against 40.6 MB motion for the same 20 s of WebM); see
   `verification/benchmarks/export-estimate-2026-11-09.md`.
+- **Typical figure on top (decided Nov 9, 2026, after the first real recording read "Up to 69 MB" for a real 14 MB WebM):** the main number is
+  a best guess, "About 14 MB", with the ceiling kept as the detail ("up to 69 MB"). It is predicted from the master screen track's
+  bytes per second (no decoding, no trial export) with a few constants calibrated on 10 real recordings of one user (12 one-minute
+  slices, 36 exports; `verification/benchmarks/export-typical-estimate-2026-11-09.md`). **Pass line (accepted): real size within a
+  factor 1.5 of the typical figure on at least 80 % of held-out samples, and never above the ceiling**; measured 86 % overall
+  (WebM alone 79 %, MP4 12 of 12), median real/typical 1.03. With no screen master (an audio capture) only the ceiling shows.
+  **Known limits to list in the release text:** calibrated on one Mac and one user's screens; the factor for imported masters
+  (3.8) rests on two imported H.264 files; Windows and Linux encoders, 60 fps, 4K and Intel are not calibrated.
 - To make the bound true, WebM gets a bit-rate cap (constrained quality) and the H.264 bound includes any measured overshoot.
 - **Pass line: the real size is at or below the shown bound on every sample.** One miss fails the test. A stored test
   (`estimate_vs_real.rs`) exports three recordings for each format that has an estimate (MP4, WebM): a mostly static screen, a
