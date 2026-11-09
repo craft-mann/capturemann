@@ -1158,6 +1158,61 @@ mod tests {
         assert_eq!(secs(&words[1]), (0.40, 0.80));
     }
 
+    /// One decode window may run without DTW (the vendored whisper.cpp skips it for a window
+    /// whose segments end within its first 160 ms instead of aborting the process; see
+    /// vendor/README-CaptureMann.md). Its tokens arrive with `dtw: -1`, so the segments of that
+    /// window use the default token times, while the segments of the windows around it keep their
+    /// DTW times, and the words stay in order across the seam. A segment with a mixed window
+    /// (one token without DTW) is treated as a whole without DTW.
+    #[test]
+    fn a_window_without_dtw_falls_back_alone_and_the_others_keep_dtw() {
+        // Window 1 (0 to 3 s): DTW times. Window 2 (3 to 3.1 s, the short one): defaults.
+        // Window 3 (3.1 s on): DTW times again.
+        let with_dtw = RawSegment {
+            t0: 0,
+            t1: 300,
+            tokens: vec![
+                tok("[_BEG_]", 0, 0),
+                dtw_tok(" one", 120),
+                dtw_tok(" two", 250),
+                tok("[_TT_150]", 300, 300),
+            ],
+        };
+        let short_window = RawSegment {
+            t0: 300,
+            t1: 310,
+            tokens: vec![tok("[_BEG_]", 300, 300), tok(" hm", 300, 310)],
+        };
+        let after = RawSegment {
+            t0: 310,
+            t1: 800,
+            tokens: vec![dtw_tok(" three", 520), dtw_tok(" four", 790)],
+        };
+        let words = build_words(&[with_dtw, short_window, after], MediaTime::ZERO);
+        let text: Vec<&str> = words.iter().map(|w| w.text.as_str()).collect();
+        assert_eq!(text, ["one", "two", "hm", "three", "four"]);
+        // DTW spans end at the token's DTW time (and start a spoken length before it).
+        assert_eq!(secs(&words[0]).1, 1.2);
+        assert_eq!(secs(&words[1]).1, 2.5);
+        // The window without DTW keeps the default token times, clamped to its segment.
+        assert_eq!(secs(&words[2]), (3.0, 3.1));
+        // After it, DTW again; a word never starts before the previous one ended.
+        assert_eq!(secs(&words[3]).1, 5.2);
+        assert!(secs(&words[3]).0 >= 3.1);
+        assert_eq!(secs(&words[4]).1, 7.9);
+        assert!(words.windows(2).all(|p| p[1].start >= p[0].end));
+
+        // A segment where one token has no DTW time (a mixed window) uses the defaults as a whole.
+        let mixed = RawSegment {
+            t0: 0,
+            t1: 100,
+            tokens: vec![dtw_tok(" a", 40), tok(" b", 50, 90)],
+        };
+        let words = build_words(&[mixed], MediaTime::ZERO);
+        assert_eq!(secs(&words[0]), (0.0, 0.0));
+        assert_eq!(secs(&words[1]), (0.5, 0.9));
+    }
+
     #[test]
     fn subword_tokens_and_punctuation_join_their_word() {
         let seg = RawSegment {
