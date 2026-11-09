@@ -35,8 +35,8 @@ For the protected file use an iTunes-style `.m4v` you own (FairPlay). Without on
    Prepared for editing (blue); the audio files Ready; `no.flac` Can't import (amber) with "This kind of
    file isn't supported yet". A blue note names the first prepared file and why. The heading says "Import
    6 files", the button "Import 5 files". Remove a row with its x: the counts follow. **Add files** adds more.
-3. **Formats text.** The drop overlay and the sheet list only "MP4, MOV, M4V, MKV" and "M4A, WAV". WebM, AVI,
-   MP3, FLAC are not listed as supported.
+3. **Formats text.** The drop overlay and the sheet list only "MP4, MOV, M4V, MKV" and "M4A, WAV, MP3". WebM, AVI,
+   AIFF, FLAC, bare AAC are not listed as supported.
 4. **Drop overlay.** Drag `a.mp4`, `memo.wav` and a folder over the window (do not release). Expected: a dashed
    full-area zone with the 84 px tile, "Drop to import", "1 video · 1 audio file", "1 folder skipped" and the
    sentence about folders. Release: the sheet opens with two rows (the folder is skipped, with the message in
@@ -82,8 +82,8 @@ For the protected file use an iTunes-style `.m4v` you own (FairPlay). Without on
     note says the Trash was not possible. **An agent:** `capturemann import copy.mp4 --remove-originals --wait`
     must ask on screen first; the dialog lists every file that goes to the Trash; Cancel imports nothing.
 15. **Dock drop and Open With.** Drag `memo.wav` onto the Dock icon (the app running, then not running): the
-    sheet opens with the file. In Finder choose **Open With > CaptureMann** on `a.mp4`: the same. `.avi`, `.mp3`
-    and `.flac` are not offered by Open With.
+    sheet opens with the file. In Finder choose **Open With > CaptureMann** on `a.mp4`: the same. `.mp3` is offered like `.wav`; `.avi`
+    and `.flac` are not.
 16. **After import (AI).** Import `memo.wav` and `a.mp4` with Transcribe on and a model installed: the
     "Importing 2 files" toast closes as soon as both captures are in the library (it does not wait for the
     transcripts); each capture's own card then shows a "Transcribing" strip with its percentage (one strip, the
@@ -96,5 +96,15 @@ For the protected file use an iTunes-style `.m4v` you own (FairPlay). Without on
     (drafts, marked fuzzy in `locales/vi.po`); with `CAPTUREMANN_PSEUDO_LOCALE=1` nothing is cut off.
 19. **Light theme** and **keyboard**: Tab reaches every control of the sheet; VoiceOver reads the chips and the checkbox; Esc closes the sheet on opening without a click, and Enter
     does nothing while the button is dimmed.
+20. **MP3 (0.3.1, IMP-1.AC8 to AC10, IMP-2.AC9, IMP-2.AC10).** Make three MP3 files with an encoder you have (for
+    example `ffmpeg -f lavfi -i sine=frequency=440:duration=3 -metadata title="Board meeting" tagged.mp3`; one with
+    an ID3 title and a cover picture, one without tags, one mono at 22.05 kHz) and a text file renamed `broken.mp3`.
+    In the sheet: the tagged file is titled "Board meeting", the other by its file name, all three Ready as audio;
+    the footer's "Copies into your library" is larger than the MP3 sizes (it counts the decoded sound, about 0.7 GB
+    per mono hour, checked against the library growth after the import); `broken.mp3`
+    says it can't be read (not "isn't supported yet"). Import: three audio captures; open one: the waveform starts
+    with the tone, the length is the file's; transcribe it and Export audio (M4A and WAV). Repeat with
+    `capturemann import tagged.mp3 --wait` and the MCP tool `import_media`. On Windows use Explorer Open with and
+    drag and drop; on Linux Open With from the file manager. Not on this list: a 1 hour MP3 (item 17 applies).
 
 Report in `verification/` (template in its README). Delete the scratch files and anything imported.

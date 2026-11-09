@@ -798,3 +798,76 @@ async fn actions_list_says_which_parameter_asks_first() {
     );
     assert_eq!(cm_daemon::action::confirm_when("trim"), None);
 }
+
+/// MP3 import (0.3.1, MP3-1): the title tag names the capture unless the caller gave a title, the
+/// sound is decoded to `mic.wav`, and the sheet's row says what the import will write.
+#[tokio::test]
+async fn an_mp3_imports_as_audio_titled_by_its_tag_and_the_row_counts_the_decoded_sound() {
+    if !have_ffmpeg() {
+        return;
+    }
+    if !Command::new("ffmpeg")
+        .args(["-hide_banner", "-encoders"])
+        .output()
+        .is_ok_and(|o| String::from_utf8_lossy(&o.stdout).contains("libmp3lame"))
+    {
+        eprintln!("SKIPPED: the ffmpeg on PATH has no libmp3lame (fixtures)");
+        return;
+    }
+    let r = rig(Decision::Approve, FakeAi::new());
+    let tagged = r.src.path().join("take 3.mp3");
+    let plain = r.src.path().join("Plain file.mp3");
+    for (p, tag) in [(&tagged, Some("Board meeting")), (&plain, None)] {
+        let mut a = vec![
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:sample_rate=44100:duration=2",
+            "-c:a",
+            "libmp3lame",
+        ];
+        let meta = tag.map(|t| format!("title={t}"));
+        if let Some(m) = &meta {
+            a.extend(["-metadata", m.as_str()]);
+        }
+        a.push(s(p));
+        assert!(ff(&a));
+    }
+    let dry = r
+        .call(
+            Actor::User,
+            json!({"paths": [s(&tagged), s(&plain)], "dry_run": true}),
+        )
+        .await
+        .unwrap();
+    let rows = dry["files"].as_array().unwrap();
+    assert_eq!(rows[0]["status"], "ready");
+    assert_eq!(rows[0]["kind"], "audio");
+    assert_eq!(rows[0]["title"], "Board meeting");
+    assert_eq!(rows[1]["title"], "Plain file");
+    // The decoded sound: 2 s of 48 kHz 32-bit float mono is 384 000 bytes, on top of the copy.
+    let size = rows[0]["size_bytes"].as_u64().unwrap();
+    assert_eq!(rows[0]["needed_bytes"].as_u64().unwrap(), size + 384_000);
+    // An explicit title wins over the tag.
+    let out = r
+        .call(
+            Actor::User,
+            json!({"paths": [s(&tagged), s(&plain)], "titles": ["My title", ""]}),
+        )
+        .await
+        .unwrap();
+    assert_eq!(out["captures"][0]["title"], "My title");
+    assert_eq!(out["captures"][1]["title"], "Plain file");
+    let job = finished(&r.daemon, out["job_id"].as_str().unwrap()).await;
+    assert_eq!(job["state"], "done", "{job}");
+    let dir = r.lib.path().join("My title.cmrec");
+    let m = manifest(&dir);
+    assert_eq!(m["kind"], "audio");
+    assert!(dir.join("mic.wav").is_file());
+    assert_eq!(m["source"]["original_name"], "take 3.mp3");
+    let master = m["source"]["original_file"].as_str().unwrap();
+    assert!(std::path::Path::new(master)
+        .extension()
+        .is_some_and(|e| e == "mp3"));
+    assert!(dir.join(master).is_file());
+}

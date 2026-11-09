@@ -5,10 +5,11 @@ use super::{Problem, Reason};
 
 /// Video codecs the bundled FFmpeg decodes (`DECODERS` in `packaging/ffmpeg/build-macos.sh`).
 pub const VIDEO_CODECS: [&str; 2] = ["h264", "hevc"];
-/// Audio codecs the bundled FFmpeg decodes: AAC and PCM (8-bit unsigned, 16, 24 and 32-bit
+/// Audio codecs the bundled FFmpeg decodes: AAC, MP3 (`mp3float`, since 0.3.1) and PCM (8-bit unsigned, 16, 24 and 32-bit
 /// integer, 32-bit float, little endian).
-pub const AUDIO_CODECS: [&str; 6] = [
+pub const AUDIO_CODECS: [&str; 7] = [
     "aac",
+    "mp3",
     "pcm_u8",
     "pcm_s16le",
     "pcm_s24le",
@@ -134,11 +135,11 @@ pub fn classify(f: &ProbedFile) -> Classification {
         );
     }
     let family = f.family();
-    // Containers: video in MP4/MOV/M4V or Matroska; audio in MP4/M4A or WAV.
+    // Containers: video in MP4/MOV/M4V or Matroska; audio in MP4/M4A, WAV or MP3.
     let container_ok = matches!(
         (kind, family),
         (MediaKind::Video, Family::Mov | Family::Matroska)
-            | (MediaKind::Audio, Family::Mov | Family::Wav)
+            | (MediaKind::Audio, Family::Mov | Family::Wav | Family::Mp3)
     );
     if let Some(v) = &f.video {
         if !VIDEO_CODECS.contains(&v.codec.as_str()) {
@@ -228,6 +229,7 @@ mod tests {
             audio: a,
             other_audio_streams: 0,
             protected: false,
+            title: None,
         }
     }
 
@@ -331,5 +333,30 @@ mod tests {
         f.duration_s = 0.0;
         assert_eq!(reason(&classify(&f)), "unreadable_file");
         assert!(!classify(&f).status.is_importable());
+    }
+
+    #[test]
+    fn mp3_is_ready_as_audio_and_only_as_audio() {
+        let c = classify(&file("mp3", None, Some(audio("mp3"))));
+        assert_eq!((c.kind, c.status), (MediaKind::Audio, Status::Ready));
+        // Bare AAC stays refused (no demuxer; ffprobe cannot open it, the probe names it).
+        assert_eq!(
+            reason(&classify(&file("aac", None, Some(audio("aac"))))),
+            "unsupported_format"
+        );
+        // An MP3 stream is audio only; a video in an MP3 container is not a thing we read.
+        assert_eq!(
+            reason(&classify(&file(
+                "mp3",
+                Some(video("h264")),
+                Some(audio("mp3"))
+            ))),
+            "unsupported_format"
+        );
+        // Another codec in the MP3 container is named by its codec.
+        assert_eq!(
+            reason(&classify(&file("mp3", None, Some(audio("ac3"))))),
+            "unsupported_format"
+        );
     }
 }

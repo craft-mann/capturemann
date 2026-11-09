@@ -55,18 +55,18 @@ done
 # The same lists as build-macos.sh / build-linux.sh; Media Foundation encoders in place of VideoToolbox/VAAPI.
 # Keep in step with the other two (the decoders follow build-linux.sh: it adds vp9).
 ENCODERS="h264_mf,hevc_mf,aac,libvpx_vp9,libopus,gif,ffv1,mjpeg,png,pcm_f32le,pcm_s16le,pcm_s24le,rawvideo,wrapped_avframe"
-DECODERS="h264,hevc,vp9,aac,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_u8,png,mjpeg,ffv1,gif,rawvideo"
+DECODERS="h264,hevc,vp9,aac,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_u8,png,mjpeg,ffv1,gif,rawvideo,mp3float"
 MUXERS="mp4,mov,webm,matroska,gif,image2,rawvideo,wav,pcm_f32le,pcm_s16le,null"
-DEMUXERS="mov,matroska,wav,image2,rawvideo,gif,pcm_f32le,pcm_s16le"
-PARSERS="h264,hevc,aac,mjpeg,png,opus,vp9,ffv1,gif"
+DEMUXERS="mov,matroska,wav,image2,rawvideo,gif,pcm_f32le,pcm_s16le,mp3"
+PARSERS="h264,hevc,aac,mjpeg,png,opus,vp9,ffv1,gif,mpegaudio"
 BSFS="aac_adtstoasc,h264_metadata,h264_mp4toannexb,hevc_mp4toannexb,extract_extradata,null,vp9_superframe,vp9_superframe_split"
 PROTOCOLS="file,pipe"
 FILTERS="alphamerge,aformat,aresample,atempo,atrim,adelay,amix,anull,apad,alimiter,asetpts,asplit,crop,format,fps,hflip,null,overlay,paletteuse,palettegen,scale,setpts,setsar,split,tpad,trim,volume,pan,loudnorm,ebur128,concat,anullsrc,anullsink"
 
 REQUIRED_ENCODERS="h264_mf aac libvpx-vp9 libopus gif ffv1 mjpeg pcm_f32le pcm_s24le rawvideo"
-REQUIRED_DECODERS="h264 hevc vp9 aac pcm_u8 pcm_s16le pcm_s24le pcm_s32le pcm_f32le png mjpeg ffv1 rawvideo"
+REQUIRED_DECODERS="h264 hevc vp9 aac pcm_u8 pcm_s16le pcm_s24le pcm_s32le pcm_f32le png mjpeg ffv1 rawvideo mp3float"
 REQUIRED_MUXERS="mp4 webm matroska gif image2 rawvideo wav f32le null"
-REQUIRED_DEMUXERS="mov matroska wav image2 rawvideo f32le gif"
+REQUIRED_DEMUXERS="mov matroska wav image2 rawvideo f32le gif mp3"
 REQUIRED_FILTERS="alphamerge aformat aresample atempo atrim adelay amix apad alimiter asetpts crop format fps hflip overlay paletteuse palettegen scale setpts setsar split tpad trim loudnorm ebur128 concat anullsrc anullsink"
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
