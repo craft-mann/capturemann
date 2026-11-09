@@ -1401,6 +1401,7 @@ dependencies = [
  "cm-ipc",
  "cm-jobs",
  "cm-library",
+ "cm-media",
  "cm-platform",
  "cm-publish",
  "cm-storage",

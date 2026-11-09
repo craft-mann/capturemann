@@ -281,10 +281,20 @@ pub struct ExportVideoParams {
     pub fps: Option<f64>,
     /// GIF and WebM "fit under N MB" (EXP-3).
     pub max_mb: Option<f64>,
+    /// EXP-5: the frame of an MP4 or WebM: the recording size or a step of 1440, 1080, 720, 480.
+    #[serde(serialize_with = "ser_size")]
+    pub size: Option<cm_media::estimate::SizeChoice>,
     /// `burn`: burn the captions into the picture (fails without a transcript); `none`: leave
     /// them out; `None`: what the recording's `set_caption_options` says (AI-1).
     pub captions: Option<crate::export::CaptionChoice>,
     pub request_id: Option<String>,
+}
+
+pub(crate) fn ser_size<S: serde::Serializer>(
+    v: &Option<cm_media::estimate::SizeChoice>,
+    s: S,
+) -> Result<S::Ok, S::Error> {
+    serde::Serialize::serialize(&v.map(cm_media::estimate::SizeChoice::to_json), s)
 }
 
 /// Range of `export_video.loudness_lufs` (LUFS): quiet enough for speech, loud enough for music.
@@ -387,6 +397,8 @@ pub enum Action {
     GetCursorTrack(crate::read_tools::CursorTrackParams),
     /// `get_platform_rules` (see [`crate::read_tools`]).
     GetPlatformRules(crate::read_tools::PlatformRulesParams),
+    /// `estimate_export` (see [`crate::estimate_ops`]).
+    EstimateExport(crate::estimate_ops::EstimateExportParams),
     /// `test_text_model` (see [`crate::text_model_ops`]).
     TestTextModel,
     /// Internal: rebuild the index from the bundle folders.

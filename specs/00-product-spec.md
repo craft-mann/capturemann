@@ -134,6 +134,7 @@ P0 items block the v0.1 release; P1 items ship in v0.1 unless they threaten the 
 | EXP-2 | Platform presets: YouTube 16:9, YouTube Shorts / TikTok / Reels 9:16, square | P0 | Yes |
 | EXP-3 | GIF and WebM export | P1 | Yes |
 | EXP-4 | Export runs in the background with progress; app stays usable | P0 | — |
+| EXP-5 | Choose size and format, see the estimated file size first (0.3.1) | P1 | — |
 | **Library** |  |  |  |
 | LIB-1 | Local library with thumbnails, search by title, date and transcript text | P0 | Yes |
 | LIB-2 | Library folder configurable (internal, external drive or NAS) | P0 | Yes |

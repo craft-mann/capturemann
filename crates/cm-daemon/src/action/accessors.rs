@@ -36,6 +36,7 @@ impl Action {
             Action::GetDiagnostics => "get_diagnostics",
             Action::GetCursorTrack(_) => crate::read_tools::CURSOR_METHOD,
             Action::GetPlatformRules(_) => crate::read_tools::RULES_METHOD,
+            Action::EstimateExport(_) => crate::estimate_ops::METHOD,
             Action::TestTextModel => "test_text_model",
             Action::RescanLibrary => "rescan_library",
             Action::StartRecording(_) => "start_recording",
@@ -127,6 +128,7 @@ impl Action {
             Action::AddMarker(p) => p.capture_id.as_deref(),
             Action::ExportVideo(p) => Some(&p.capture_id),
             Action::ExportAudio(p) => Some(&p.capture_id),
+            Action::EstimateExport(p) => Some(&p.capture_id),
             Action::PublishVideo(p) | Action::DeleteCapture(p) => p.capture_id.as_deref(),
             _ => None,
         }
@@ -186,6 +188,9 @@ impl Action {
             Action::GetDiagnostics => "Show the diagnostics".to_owned(),
             Action::GetCursorTrack(p) => format!("Read the cursor track of {}", p.capture_id),
             Action::GetPlatformRules(p) => format!("Read the {} publishing rules", p.platform),
+            Action::EstimateExport(p) => {
+                format!("Estimate the size of an export of {}", p.capture_id)
+            }
             Action::TestTextModel => "Test the text model".to_owned(),
             Action::Upload(p) => crate::storage_ops::summary(p),
             Action::CaptionOptions(p) => crate::caption_options::summary(p),

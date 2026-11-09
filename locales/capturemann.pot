@@ -597,6 +597,9 @@ msgstr ""
 msgid "Can look but not change anything."
 msgstr ""
 
+msgid "Can't fit under {max} MB at {width} px and {fps} fps."
+msgstr ""
+
 msgid "Cancel"
 msgstr ""
 
@@ -1690,6 +1693,9 @@ msgstr ""
 msgid "Enter the client’s name."
 msgstr ""
 
+msgid "Estimate the size of an export"
+msgstr ""
+
 msgid "Even out the loudness"
 msgstr ""
 
@@ -1938,6 +1944,9 @@ msgid "Front to back, most recently used first"
 msgstr ""
 
 msgid "Fully offline, no text model needed. It uses Large v3 or Medium; Large v3 Turbo can’t translate."
+msgstr ""
+
+msgid "GIF is for clips of {max} s or less. This one is {duration}."
 msgstr ""
 
 msgid "Getting the picture…"
@@ -4225,6 +4234,9 @@ msgstr ""
 msgid "Separated by commas."
 msgstr ""
 
+msgid "Set In and Out on the timeline to pick a short part, or choose MP4 or WebM."
+msgstr ""
+
 msgid "Set In point"
 msgstr ""
 
@@ -5396,6 +5408,9 @@ msgstr ""
 msgid "Unavailable — connect {hint}. Using a folder on this computer meanwhile."
 msgstr ""
 
+msgid "Under 5 MB"
+msgstr ""
+
 msgid "Under Redirect URI choose the platform “Public client/native (mobile & desktop)” and enter http://127.0.0.1 (a loopback address; the port is ignored). Select Register."
 msgstr ""
 
@@ -5424,6 +5439,9 @@ msgid "Unmute microphone"
 msgstr ""
 
 msgid "Unreadable"
+msgstr ""
+
+msgid "Up to {size}"
 msgstr ""
 
 msgid "Upload automatically"
@@ -5961,6 +5979,12 @@ msgid "drive not available"
 msgstr ""
 
 msgid "ease in {secs} s"
+msgstr ""
+
+msgid "estimate: under 5 MB"
+msgstr ""
+
+msgid "estimate: up to {size}"
 msgstr ""
 
 msgid "export {path} at \"{name}\""
@@ -6627,6 +6651,9 @@ msgid "{shape} shape"
 msgstr ""
 
 msgid "{shown} of {total} windows"
+msgstr ""
+
+msgid "{size} is larger than the recording ({width} × {height}). Choose the recording size or a smaller one."
 msgstr ""
 
 msgid "{size} · External"

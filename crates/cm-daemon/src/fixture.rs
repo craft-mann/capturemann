@@ -81,6 +81,80 @@ pub struct FixturePause {
     pub len_s: f64,
 }
 
+/// What the synthetic screen shows (EXP-5 estimate test: the size of an export depends on the
+/// content, so the table is checked on three looks).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum FixtureContent {
+    /// FFmpeg's `testsrc` pattern with a frame counter (the default; edits are visible in it).
+    #[default]
+    Testsrc,
+    /// A mostly static screen: flat panels and lines, one small animated region (a clock, a
+    /// blinking cursor, a spinner).
+    Static,
+    /// A typical screen recording: the same screen with a window of moving content (a page that
+    /// scrolls, a video) over about a third of the frame.
+    Typical,
+    /// High motion: the whole frame moves and carries film grain (a game, a full-screen video).
+    Motion,
+}
+
+impl FixtureContent {
+    pub fn parse(s: &str) -> Option<FixtureContent> {
+        match s {
+            "testsrc" => Some(FixtureContent::Testsrc),
+            "static" => Some(FixtureContent::Static),
+            "typical" => Some(FixtureContent::Typical),
+            "motion" => Some(FixtureContent::Motion),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            FixtureContent::Testsrc => "testsrc",
+            FixtureContent::Static => "static",
+            FixtureContent::Typical => "typical",
+            FixtureContent::Motion => "motion",
+        }
+    }
+
+    /// The FFmpeg `lavfi` graph of the screen picture.
+    fn lavfi(self, size: (u32, u32), fps: u32, secs: u32) -> String {
+        let (w, h) = size;
+        let desk = format!(
+            "color=c=0xf4f4f6:size={w}x{h}:rate={fps}:duration={secs},\
+             drawgrid=w={}:h={}:t=2:c=0x9a9aa4@0.9,\
+             drawbox=x={}:y={}:w={}:h={}:color=0x2b2f3a:t=fill",
+            (w / 12).max(8),
+            (h / 8).max(8),
+            w / 16,
+            h / 10,
+            w * 5 / 8,
+            h * 7 / 10,
+        );
+        match self {
+            FixtureContent::Testsrc => format!("testsrc=size={w}x{h}:rate={fps}:duration={secs}"),
+            FixtureContent::Static => format!(
+                "{desk}[bg];testsrc=size=256x144:rate={fps}:duration={secs}[fg];\
+                 [bg][fg]overlay=x=W-w-24:y=24"
+            ),
+            FixtureContent::Typical => {
+                let (mw, mh) = ((w * 55 / 100) & !1, (h * 55 / 100) & !1);
+                format!(
+                    "{desk}[bg];testsrc2=size={mw}x{mh}:rate={fps}:duration={secs}[win];\
+                     [bg][win]overlay=x={}:y={}",
+                    w / 6,
+                    h / 5
+                )
+            }
+            FixtureContent::Motion => format!(
+                "testsrc2=size={w}x{h}:rate={fps}:duration={secs},\
+                 noise=alls=12:allf=t,hue=h=t*40"
+            ),
+        }
+    }
+}
+
 /// What to synthesize.
 #[derive(Debug, Clone)]
 pub struct FixtureSpec {
@@ -89,6 +163,8 @@ pub struct FixtureSpec {
     pub secs: u32,
     pub size: (u32, u32),
     pub fps: u32,
+    /// What the screen shows.
+    pub content: FixtureContent,
     pub camera: bool,
     pub audio: bool,
     pub cursor: bool,
@@ -106,6 +182,7 @@ impl Default for FixtureSpec {
             secs: 12,
             size: (1280, 720),
             fps: 30,
+            content: FixtureContent::Testsrc,
             camera: true,
             audio: true,
             cursor: true,
@@ -326,10 +403,7 @@ pub fn make_fixture(tools: &Tools, library: &Path, spec: &FixtureSpec) -> Result
         flash_enable(spec, 0.0)
     );
     let mut a = s(&["-f", "lavfi", "-i"]);
-    a.push(format!(
-        "testsrc=size={w}x{h}:rate={}:duration={}",
-        spec.fps, spec.secs
-    ));
+    a.push(spec.content.lavfi((w, h), spec.fps, spec.secs));
     a.extend(s(&["-vf"]));
     a.push(flash);
     a.extend(s(&[

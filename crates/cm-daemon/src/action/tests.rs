@@ -171,6 +171,10 @@ fn samples() -> Vec<(&'static str, Value)> {
             json!({"capture_id": "rec_1", "from": 1, "to": 5, "limit": 10}),
         ),
         ("get_platform_rules", json!({"platform": "youtube"})),
+        (
+            "estimate_export",
+            json!({"capture_id": "rec_1", "format": "webm", "size": "720p", "max_mb": 20}),
+        ),
         ("test_text_model", json!({})),
         (
             "normalize_transcript",
@@ -551,8 +555,19 @@ fn bad_inputs_name_the_field() {
         ),
         (
             "export_video",
-            json!({"capture_id": "r", "size": "1080p"}),
+            json!({"capture_id": "r", "size": "900p"}),
             "size",
+        ),
+        (
+            "estimate_export",
+            json!({"capture_id": "r", "format": "avi"}),
+            "format",
+        ),
+        ("estimate_export", json!({"format": "mp4"}), "capture_id"),
+        (
+            "estimate_export",
+            json!({"capture_id": "r", "fps": 30}),
+            "fps",
         ),
         (
             "export_video",
@@ -721,6 +736,37 @@ fn export_video_parses_the_quick_preset_only() {
         assert_eq!(e.code(), cm_core::ErrorCode::InvalidInput, "{bad}");
     }
     assert!(Action::parse("export_video", &json!({"capture_id": "r", "size": null})).is_ok());
+    // EXP-5.AC3: `size` is the recording size or a step, as a number or "720p".
+    for (v, want) in [
+        (json!("source"), cm_media::estimate::SizeChoice::Source),
+        (json!(720), cm_media::estimate::SizeChoice::Height(720)),
+        (json!("480p"), cm_media::estimate::SizeChoice::Height(480)),
+    ] {
+        let Action::ExportVideo(p) = Action::parse(
+            "export_video",
+            &json!({"capture_id": "r", "format": "webm", "size": v}),
+        )
+        .unwrap() else {
+            panic!()
+        };
+        assert_eq!((p.preset.as_str(), p.size), ("webm", Some(want)));
+    }
+    let a = Action::parse(
+        "estimate_export",
+        &json!({"capture_id": "rec_1", "format": "gif", "width": 640}),
+    )
+    .unwrap();
+    assert_eq!(a.method(), "estimate_export");
+    assert_eq!(a.spec().tier, Tier::Free);
+    assert!(!a.spec().mutating);
+    assert_eq!(a.capture_id(), Some("rec_1"));
+    // Without `format` the estimate is for the MP4.
+    let Action::EstimateExport(p) =
+        Action::parse("estimate_export", &json!({"capture_id": "rec_1"})).unwrap()
+    else {
+        panic!()
+    };
+    assert_eq!(p.format, "mp4");
     // AUD-4: the loudness target parses and is range checked.
     let a = Action::parse(
         "export_video",

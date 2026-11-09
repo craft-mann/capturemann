@@ -173,6 +173,8 @@ pub const ACTIONS: &[ActionSpec] = &[
     // (never a key); the rules are the public limits of a publishing platform.
     spec("get_cursor_track", Tier::Free, false),
     spec("get_platform_rules", Tier::Free, false),
+    // EXP-5: the size an export would have (a formula, no file is read or written).
+    spec("estimate_export", Tier::Free, false),
 ];
 
 /// Actions that are plumbing for first-party GUI clients and are deliberately **not** exposed

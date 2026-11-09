@@ -264,10 +264,15 @@ pub(crate) fn publish_job_event(bus: &EventBus, ev: JobEvent) {
             .and_then(|e| e.get_mut("data"))
             .and_then(Value::as_object_mut)
         {
-            let id = d
-                .get("reason")
-                .and_then(Value::as_str)
-                .and_then(cm_core::message::ffmpeg_missing_id);
+            let reason = d.get("reason").and_then(Value::as_str);
+            // A missing FFmpeg, or an export refusal found while exporting (`gif_cannot_fit`).
+            let id = reason
+                .and_then(cm_core::message::ffmpeg_missing_id)
+                .or_else(|| {
+                    reason
+                        .and_then(cm_core::message::export_refusal)
+                        .map(|p| p.id)
+                });
             if let Some(id) = id {
                 d.insert("reason_code".into(), Value::String(id.to_owned()));
             }
@@ -306,6 +311,27 @@ mod tests {
         );
         let b = rx.try_recv().unwrap();
         assert!(b.data["error"]["data"].get("reason_code").is_none());
+    }
+
+    /// EXP-5.AC5: a GIF that cannot be made small enough fails the job with the design's text and
+    /// the stable id `gif_cannot_fit` in `error.data.reason_code`.
+    #[test]
+    fn exp5_ac5_a_gif_that_cannot_fit_carries_its_reason_code() {
+        let bus = EventBus::new(Arc::new(crate::clock::SystemClock));
+        let mut rx = bus.subscribe();
+        let reason = cm_media::estimate::gif_cannot_fit(10_000_000, 480, 10.0).to_string();
+        assert_eq!(reason, "Can't fit under 10 MB at 480 px and 10 fps.");
+        publish_job_event(
+            &bus,
+            JobEvent {
+                kind: JobEventKind::Failed,
+                job_id: "j1".into(),
+                data: serde_json::json!({"type": "export", "error": {"code": "job_failed",
+                    "message": reason, "data": {"job_id": "j1", "reason": reason}}}),
+            },
+        );
+        let a = rx.try_recv().unwrap();
+        assert_eq!(a.data["error"]["data"]["reason_code"], "gif_cannot_fit");
     }
 
     #[test]

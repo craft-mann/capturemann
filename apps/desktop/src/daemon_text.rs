@@ -60,6 +60,41 @@ pub fn size_text(bytes: u64) -> String {
     }
 }
 
+/// `290 MB`, `7.3 MB`, `1.2 GB` for an estimate bound (EXP-5): two significant figures as the
+/// daemon rounded them, with the language's decimal mark.
+fn bound_size_text(bytes: u64) -> String {
+    let (v, unit) = if bytes >= 1_000_000_000 {
+        (bytes as f64 / 1e9, "GB")
+    } else {
+        (bytes as f64 / 1e6, "MB")
+    };
+    if v < 10.0 {
+        format!("{} {unit}", fmt::decimal(v, 1))
+    } else {
+        format!("{} {unit}", v.round() as u64)
+    }
+}
+
+/// The size estimate of an export as the popover shows it (EXP-5): "Up to 290 MB", or "Under 5 MB"
+/// at 5 MB and below. `max_bytes` is `estimate_export`'s bound; the English is the daemon's
+/// `label`.
+pub fn estimate_label(max_bytes: u64) -> String {
+    if max_bytes <= 5_000_000 {
+        tr!("Under 5 MB")
+    } else {
+        tr!("Up to {size}", size = bound_size_text(max_bytes))
+    }
+}
+
+/// The line under the finished export's real size (EXP-5): what was estimated before it started.
+pub fn estimate_note(max_bytes: u64) -> String {
+    if max_bytes <= 5_000_000 {
+        tr!("estimate: under 5 MB")
+    } else {
+        tr!("estimate: up to {size}", size = bound_size_text(max_bytes))
+    }
+}
+
 /// `45 s`, `2 min`, `1 min 30 s`, `1 h`, `1 h 5 min` like the daemon's `duration_words`.
 pub fn duration_text(secs: f64) -> String {
     let s = secs.round() as u64;
@@ -84,6 +119,12 @@ pub fn error_text(code: Option<ErrorCode>, message: &str) -> String {
     }
     .and_then(|p| translated(&p))
     .unwrap_or_else(|| soften(code, message))
+}
+
+/// The hint that goes with the `gif_too_long` refusal (`error.data.hint`, EXP-5), a line of its
+/// own under the refusal.
+pub fn gif_too_long_hint() -> String {
+    tr!("Set In and Out on the timeline to pick a short part, or choose MP4 or WebM.")
 }
 
 /// A message with something in it that a person should not have to read: a job id, an
@@ -295,6 +336,25 @@ fn translated(p: &MessageParts) -> Option<String> {
         "recording_area_too_small" => tr!(
             "The recording area is too small: each side must be at least {min} px.",
             min = g("min")
+        ),
+        // EXP-5: the export refusals. The hint of `gif_too_long` is a separate sentence
+        // ([`gif_too_long_hint`]), so the popover shows it as its own line.
+        "gif_too_long" => tr!(
+            "GIF is for clips of {max} s or less. This one is {duration}.",
+            max = g("max"),
+            duration = g("duration")
+        ),
+        "size_larger_than_source" => tr!(
+            "{size} is larger than the recording ({width} × {height}). Choose the recording size or a smaller one.",
+            size = g("size"),
+            width = g("width"),
+            height = g("height")
+        ),
+        "gif_cannot_fit" => tr!(
+            "Can't fit under {max} MB at {width} px and {fps} fps.",
+            max = g("max"),
+            width = g("width"),
+            fps = g("fps")
         ),
         "ffmpeg_not_found" => tr!(
             "FFmpeg was not found: install it with Homebrew (brew install ffmpeg) or set CM_FFMPEG to the ffmpeg executable. CaptureMann releases include their own copy."

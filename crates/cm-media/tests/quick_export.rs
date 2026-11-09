@@ -1936,11 +1936,14 @@ fn exp3_ac2_gif_fits_under_the_size_limit() {
         },
     );
     if let Err(e) = e {
-        assert!(e.to_string().contains("WebM"), "{e}");
+        assert!(
+            e.to_string().starts_with("Can't fit under 0.1 MB at "),
+            "{e}"
+        );
     }
 }
 
-/// EXP-3: a GIF longer than 30 s is refused with the hint, before any work.
+/// EXP-3, EXP-5.AC4: a GIF longer than 30 s is refused with the design's text, before any work.
 #[test]
 fn exp3_gif_over_30_s_is_refused() {
     let Some(t) = tools() else { return };
@@ -1949,7 +1952,7 @@ fn exp3_gif_over_30_s_is_refused() {
     assert_eq!(e.code(), cm_core::ErrorCode::InvalidInput);
     assert!(
         e.to_string()
-            .contains("Use MP4 or WebM for clips longer than 30 s"),
+            .starts_with("GIF is for clips of 30 s or less. This one is 0:32."),
         "{e}"
     );
     // Trimmed to 10 s it is fine to ask (the check alone, no render).

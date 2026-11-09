@@ -497,7 +497,7 @@ async fn export_video_errors() {
     // preset and a preset/format mismatch name what is wrong.
     for (p, want) in [
         (
-            json!({ "capture_id": "x", "size": "1080p" }),
+            json!({ "capture_id": "x", "quality": "high" }),
             "not available yet",
         ),
         (
@@ -727,4 +727,240 @@ async fn layout_at_stop_is_stored_in_the_first_edit() {
     start(&r.daemon, json!({ "title": "C" })).await;
     user(&r.daemon, "stop_recording", json!({})).await.unwrap();
     assert!(manifest_of(&r, "C")["edits"][0].get("layout").is_none());
+}
+
+/// Gives a stopped fake recording a 60 s screen track of `size` at 30 fps.
+fn give_screen_a_minute(r: &Rig, title: &str, size: (u32, u32), with_mic: bool) {
+    let p = r._dir.path().join(format!("{title}.cmrec/manifest.json"));
+    let mut m: Value = serde_json::from_str(&std::fs::read_to_string(&p).unwrap()).unwrap();
+    m["tracks"]["screen"]["size"] = json!([size.0, size.1]);
+    m["tracks"]["screen"]["fps"] = json!(30);
+    m["tracks"]["screen"]["start"] = json!(0);
+    m["tracks"]["screen"]["end"] = json!(60 * 120_000);
+    m["edits"] = json!([{ "version": 2, "in": 0, "out": 60 * 120_000, "speed": 1.0 }]);
+    if with_mic {
+        m["tracks"]["mic"] =
+            json!({ "file": "mic.m4a", "start": 0, "end": 60 * 120_000, "channels": 1 });
+    }
+    std::fs::write(&p, serde_json::to_string_pretty(&m).unwrap()).unwrap();
+}
+
+/// EXP-5.AC1, AC2, AC3, AC4, AC7: `estimate_export` answers a range with its label for MP4 and
+/// WebM, "known after export" for a GIF, refuses a GIF over 30 s and a step above the recording
+/// with the shared texts, and `export_video` takes the same `format` and `size`.
+#[tokio::test]
+async fn exp5_estimate_export_and_the_size_parameters() {
+    let r = rig(true);
+    user(
+        &r.daemon,
+        "set_settings",
+        json!({ "values": { "export.auto_on_stop": false } }),
+    )
+    .await
+    .unwrap();
+    let s = start(&r.daemon, json!({ "title": "E" })).await;
+    let id = s["capture_id"].as_str().unwrap().to_owned();
+    user(&r.daemon, "stop_recording", json!({})).await.unwrap();
+    give_screen_a_minute(&r, "E", (2880, 1800), true);
+    let est = |extra: Value| {
+        let mut p = json!({ "capture_id": id });
+        p.as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        let d = r.daemon.clone();
+        async move { user(&d, "estimate_export", p).await }
+    };
+
+    // MP4 at the recording size: the hardware rate (12 Mbps at 1080p30, scaled by area), mono AAC.
+    let a = est(json!({})).await.unwrap();
+    assert_eq!(
+        (a["width"].as_u64(), a["height"].as_u64()),
+        (Some(2880), Some(1800))
+    );
+    assert!(
+        (a["duration_s"].as_f64().unwrap() - 60.0).abs() < 0.5,
+        "{a}"
+    );
+    let hi = a["max_bytes"].as_u64().unwrap();
+    assert!(
+        a.get("min_bytes").is_none(),
+        "an upper bound, not a range: {a}"
+    );
+    assert!(a["label"].as_str().unwrap().starts_with("Up to "), "{a}");
+    if !cfg!(target_os = "linux") {
+        assert_eq!(a["codec"], "h264");
+        let mid = (12_000_000.0 * (2880.0 * 1800.0) / (1920.0 * 1080.0) + 128_000.0) * 60.0 / 8.0;
+        // The nominal size with the margin, rounded up to two figures.
+        assert!(
+            hi as f64 >= mid * 1.05 && hi as f64 <= mid * 1.05 * 1.1,
+            "{a}"
+        );
+    }
+    // The list the chooser shows: the recording size and the steps below it, with real pixels.
+    let sizes: Vec<(u64, u64)> = a["options"]["sizes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|o| (o["width"].as_u64().unwrap(), o["height"].as_u64().unwrap()))
+        .collect();
+    assert_eq!(
+        sizes,
+        [
+            (2880, 1800),
+            (2304, 1440),
+            (1728, 1080),
+            (1152, 720),
+            (768, 480)
+        ]
+    );
+    assert_eq!(a["options"]["gif_widths"], json!([480, 640, 800, 1024]));
+    // A smaller size is a smaller estimate; WebM is VP9.
+    let b = est(json!({ "size": "720p" })).await.unwrap();
+    assert_eq!(
+        (b["width"].as_u64(), b["height"].as_u64()),
+        (Some(1152), Some(720))
+    );
+    assert!(b["max_bytes"].as_u64().unwrap() < hi);
+    let w = est(json!({ "format": "webm", "size": 720 })).await.unwrap();
+    assert_eq!(w["codec"], "vp9");
+    assert_eq!(w["format"], "webm");
+    // A GIF over 30 s is refused with the design's text and the hint.
+    let e = est(json!({ "format": "gif", "width": 640 }))
+        .await
+        .unwrap_err();
+    assert_eq!(code(&e), ErrorCode::InvalidInput);
+    assert_eq!(
+        e.to_string(),
+        "GIF is for clips of 30 s or less. This one is 1:00."
+    );
+    let data = match &e {
+        DaemonError::Cm(c) => c.data().unwrap(),
+        DaemonError::WithData { data, .. } => data.clone(),
+        other => panic!("{other:?}"),
+    };
+    assert_eq!(data["reason"], "gif_too_long");
+    assert_eq!(data["hint"], cm_core::message::GIF_TOO_LONG_HINT);
+    // A step above the recording; 1080p on a 1080p recording is the recording size.
+    give_screen_a_minute(&r, "E", (1920, 1080), false);
+    let e = est(json!({ "size": 1440 })).await.unwrap_err();
+    assert_eq!(code(&e), ErrorCode::InvalidInput);
+    assert_eq!(
+        e.to_string(),
+        "1440p is larger than the recording (1920 × 1080). Choose the recording size or a smaller one."
+    );
+    let same = est(json!({ "size": 1080 })).await.unwrap();
+    assert_eq!(
+        (same["width"].as_u64(), same["height"].as_u64()),
+        (Some(1920), Some(1080))
+    );
+    for bad in [
+        json!({ "format": "gif", "size": 720 }),
+        json!({ "format": "webm", "size": 720, "width": 640 }),
+        json!({ "format": "mp4", "width": 640 }),
+        json!({ "size": 999 }),
+    ] {
+        let e = est(bad.clone()).await.unwrap_err();
+        assert_eq!(code(&e), ErrorCode::InvalidInput, "{bad}");
+    }
+
+    // `export_video` refuses the same things before it queues anything, and carries the
+    // estimate in its result and in the job.
+    let e = user(
+        &r.daemon,
+        "export_video",
+        json!({ "capture_id": id, "size": 1440 }),
+    )
+    .await
+    .unwrap_err();
+    assert!(
+        e.to_string()
+            .starts_with("1440p is larger than the recording"),
+        "{e}"
+    );
+    let e = user(
+        &r.daemon,
+        "export_video",
+        json!({ "capture_id": id, "format": "gif", "size": 720 }),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(code(&e), ErrorCode::InvalidInput);
+    assert!(export_jobs(&r.daemon).await.is_empty());
+    let ok = user(
+        &r.daemon,
+        "export_video",
+        json!({ "capture_id": id, "format": "webm", "size": "480p" }),
+    )
+    .await
+    .unwrap();
+    assert_eq!(ok["preset"], "webm");
+    assert_eq!(ok["size"], 480);
+    let want = est(json!({ "format": "webm", "size": 480 })).await.unwrap();
+    assert_eq!(ok["estimate"]["max_bytes"], want["max_bytes"]);
+    let done = wait_job(&r.daemon, ok["job_id"].as_str().unwrap(), "done").await;
+    assert_eq!(done["inputs"]["size"], 480);
+}
+
+/// EXP-5.AC8: a second export with other options is a different job, and several can be asked
+/// for while one is running; an equal request still reuses the active job.
+#[tokio::test]
+async fn exp5_ac8_a_second_export_with_other_options_is_queued() {
+    let r = rig(true);
+    r.stub.block_first.store(true, Ordering::SeqCst);
+    user(
+        &r.daemon,
+        "set_settings",
+        json!({ "values": { "export.auto_on_stop": false } }),
+    )
+    .await
+    .unwrap();
+    let s = start(&r.daemon, json!({ "title": "Q" })).await;
+    let id = s["capture_id"].as_str().unwrap().to_owned();
+    user(&r.daemon, "stop_recording", json!({})).await.unwrap();
+    give_screen_a_minute(&r, "Q", (2880, 1800), false);
+    let export = |extra: Value| {
+        let mut p = json!({ "capture_id": id });
+        p.as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        let d = r.daemon.clone();
+        async move { user(&d, "export_video", p).await.unwrap() }
+    };
+    let first = export(json!({})).await;
+    until(async || (r.stub.started.load(Ordering::SeqCst) == 1).then_some(())).await;
+    // The first is running (blocked). Others with other options are accepted, each its own job.
+    let mp4_720 = export(json!({ "size": 720 })).await;
+    let webm = export(json!({ "format": "webm" })).await;
+    let webm_480 = export(json!({ "format": "webm", "size": 480 })).await;
+    let ids =
+        [&first, &mp4_720, &webm, &webm_480].map(|v| v["job_id"].as_str().unwrap().to_owned());
+    for (i, a) in ids.iter().enumerate() {
+        for b in &ids[i + 1..] {
+            assert_ne!(a, b);
+        }
+    }
+    for v in [&mp4_720, &webm, &webm_480] {
+        assert_eq!(v["reused"], false);
+    }
+    // An equal request is the job already queued, not another copy.
+    let again = export(json!({ "size": 720 })).await;
+    assert_eq!(again["job_id"], mp4_720["job_id"]);
+    assert_eq!(again["reused"], true);
+    assert_eq!(export_jobs(&r.daemon).await.len(), 4);
+    let j = user(&r.daemon, "get_job", json!({ "job_id": mp4_720["job_id"] }))
+        .await
+        .unwrap();
+    assert_eq!(j["inputs"]["size"], 720);
+    // Ending the blocked first export lets the others run to the end.
+    user(
+        &r.daemon,
+        "cancel_job",
+        json!({ "job_id": first["job_id"] }),
+    )
+    .await
+    .unwrap();
+    wait_job(&r.daemon, &ids[0], "cancelled").await;
+    for other in &ids[1..] {
+        wait_job(&r.daemon, other, "done").await;
+    }
 }

@@ -37,6 +37,55 @@ fn audio_params(a: &ExportArgs) -> Result<serde_json::Value, CliError> {
     Ok(p)
 }
 
+/// `export <id> --estimate [--format webm] [--size 720p]`: `estimate_export`, printed as
+/// `Up to 35 MB (estimate) · WEBM · VP9 · 1152×720`; a GIF says there is none.
+async fn estimate(cx: &mut Ctx<'_>, a: ExportArgs) -> Result<(), CliError> {
+    // `--preset gif` and `--preset webm` are the formats of the same name; the other presets
+    // have their own frame and bit rate and no estimate.
+    let format = match (a.format.as_deref(), a.preset.as_str()) {
+        (Some(f), "quick") => f.to_owned(),
+        (None, "quick") => "mp4".to_owned(),
+        (None, p @ ("gif" | "webm")) => p.to_owned(),
+        (Some(f), p) if f == p => f.to_owned(),
+        _ => {
+            return Err(CliError::invalid_input(
+                "--estimate takes --format, --size, --width and --max-mb; a platform preset has its own size and no estimate",
+            ))
+        }
+    };
+    let mut p = json!({ "capture_id": a.id, "format": format });
+    for (key, value) in [
+        ("size", a.size.as_ref().map(|s| json!(s))),
+        ("width", a.width.map(|w| json!(w))),
+        ("max_mb", a.max_mb.map(|m| json!(m))),
+    ] {
+        if let Some(v) = value {
+            p[key] = v;
+        }
+    }
+    let mut c = cx.client().await?;
+    let r = c.call("estimate_export", p).await?;
+    cx.emit(&r, |r| {
+        if r["known_after_export"] == json!(true) {
+            return "No estimate for GIF: the size is known after the export.".to_owned();
+        }
+        let codec = match r["codec"].as_str() {
+            Some("vp9") => "VP9",
+            Some("h264") => "H.264",
+            _ => "",
+        };
+        format!(
+            "{} (estimate) · {} · {} · {}×{}",
+            plain(&r["label"]),
+            plain(&r["format"]).to_uppercase(),
+            codec,
+            plain(&r["width"]),
+            plain(&r["height"]),
+        )
+    });
+    Ok(())
+}
+
 /// `export <id> [--preset quick] [--wait]`: `export_video`, then (with `--wait`) polls the job.
 pub(super) async fn export_video(cx: &mut Ctx<'_>, a: ExportArgs) -> Result<(), CliError> {
     // `--captions srt|vtt|txt|md` writes the caption file (AI-1) instead of rendering a video.
@@ -53,6 +102,14 @@ pub(super) async fn export_video(cx: &mut Ctx<'_>, a: ExportArgs) -> Result<(), 
         }
         return ai::export_captions(cx, a.id, format, a.timestamps, a.language, a.speaker_names)
             .await;
+    }
+    if a.estimate {
+        if matches!(a.format.as_deref(), Some("m4a" | "wav")) {
+            return Err(CliError::invalid_input(
+                "--estimate is for video (mp4, webm, gif); the audio export has no estimate",
+            ));
+        }
+        return estimate(cx, a).await;
     }
     let audio = a.audio || matches!(a.format.as_deref(), Some("m4a" | "wav"));
     if !audio && (a.tracks.is_some() || a.out_dir.is_some()) {
@@ -102,6 +159,7 @@ pub(super) async fn export_video(cx: &mut Ctx<'_>, a: ExportArgs) -> Result<(), 
         ("width", a.width.map(|w| json!(w))),
         ("fps", a.fps.map(|f| json!(f))),
         ("max_mb", a.max_mb.map(|m| json!(m))),
+        ("size", a.size.as_ref().map(|s| json!(s))),
     ] {
         if let Some(v) = value {
             p[key] = v;
@@ -146,6 +204,11 @@ pub(super) async fn export_video(cx: &mut Ctx<'_>, a: ExportArgs) -> Result<(), 
                         .as_str()
                         .map(|n| format!("\n  note: {n}"))
                         .unwrap_or_default();
+                    // EXP-5: what was estimated before the export, next to the real size.
+                    let note = match j["result"]["estimate"]["max_bytes"].as_u64() {
+                        Some(b) => format!("{note}\n  estimate: up to {b} bytes"),
+                        None => note,
+                    };
                     format!(
                         "Exported {}\n  file: {}\n  size: {} bytes, {} s, {}{note}",
                         plain(&j["result"]["capture_id"]),

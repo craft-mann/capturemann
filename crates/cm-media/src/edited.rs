@@ -428,13 +428,6 @@ fn even_floor(x: u32) -> u32 {
     (x - x % 2).max(2)
 }
 
-/// The refusal for a clip over a preset's length limit (GIF: 30 s).
-fn too_long(max: f64, duration_s: f64) -> CmError {
-    CmError::invalid_input(format!(
-        "Use MP4 or WebM for clips longer than {max} s (this one is {duration_s:.1} s)"
-    ))
-}
-
 /// Checks a preset request against a recording without running FFmpeg: the preset exists, its
 /// options are allowed, it does not enlarge the recording where it must not (EXP-2.AC3) and a
 /// length limit holds (EXP-3). Returns what the export would use. `export_video` calls this
@@ -456,7 +449,7 @@ pub fn check_request(
         let list = with_pauses_cut(&resolved.list, &resolved.gaps);
         let d = secs_of(list.timeline().duration());
         if d > max + 0.5 {
-            return Err(too_long(max, d));
+            return Err(crate::estimate::gif_too_long(max, d));
         }
     }
     Ok(target)
@@ -515,7 +508,7 @@ pub fn export_edited(
     let duration_s = frames as f64 / fps;
     if let Some(t) = target {
         if let Some(max) = t.max_seconds.filter(|m| duration_s > *m + 0.5 / fps) {
-            return Err(too_long(max, duration_s).into());
+            return Err(crate::estimate::gif_too_long(max, duration_s).into());
         }
         if let Some(warn) = t.warn_seconds.filter(|w| duration_s > *w) {
             spec.notes.push(format!(
@@ -748,7 +741,9 @@ pub fn export_edited(
     let mut webm_bps: Option<u64> = (kind == Kind::WebM)
         .then(|| {
             max_bytes.map(|m| {
+                // Never above the ceiling the estimate shows (EXP-5).
                 preset::fit_bitrate(m, duration_s, if has_audio { audio_bps.into() } else { 0 })
+                    .min(crate::graph::vp9_cap_bitrate(out_size, fps))
             })
         })
         .flatten();
@@ -771,7 +766,12 @@ pub fn export_edited(
                 bitrate = codec.bitrate;
                 OutFormat::mp4(enc, &codec.args, caps.vaapi_device.as_deref())
             }
-            (Kind::WebM, _) => OutFormat::vp9(webm_bps, fps, audio_bps),
+            (Kind::WebM, _) => OutFormat::vp9(
+                webm_bps,
+                crate::graph::vp9_cap_bitrate(out_size, fps),
+                fps,
+                audio_bps,
+            ),
             _ => OutFormat::lossless_stage(),
         };
         let args = encode_args(
@@ -965,13 +965,8 @@ pub fn export_edited(
             } else if !fps_ladder.is_empty() {
                 gif_fps = fps_ladder.remove(0);
             } else {
-                return Err(CmError::invalid_input(format!(
-                    "The smallest GIF of this clip is {:.1} MB, over the {:.1} MB limit; \
-                     use WebM or a shorter clip",
-                    got as f64 / 1e6,
-                    max as f64 / 1e6
-                ))
-                .into());
+                let _ = got;
+                return Err(crate::estimate::gif_cannot_fit(max, width, gif_fps).into());
             }
             let _ = fs::remove_file(&part);
         }
@@ -1239,7 +1234,7 @@ impl OutFormat {
 
     /// VP9 in WebM with Opus (EXP-3). With `bps` the rate is constrained to it (the size limit);
     /// without, constant quality.
-    fn vp9(bps: Option<u64>, fps: f64, _audio_bps: u32) -> OutFormat {
+    fn vp9(bps: Option<u64>, cap_bps: u64, fps: f64, _audio_bps: u32) -> OutFormat {
         let gop = ((fps * 4.0).round() as u32).max(1).to_string();
         let mut video: Vec<String> = ["-c:v", "libvpx-vp9", "-row-mt", "1", "-deadline", "good"]
             .map(String::from)
@@ -1254,9 +1249,11 @@ impl OutFormat {
                 "-bufsize".into(),
                 (b * 2).to_string(),
             ]),
+            // Constrained quality (EXP-5): the CRF's quality, never above the ceiling the
+            // estimate shows (`graph::vp9_cap_bitrate`).
             None => video.extend([
                 "-b:v".into(),
-                "0".into(),
+                cap_bps.to_string(),
                 "-crf".into(),
                 WEBM_CRF.to_string(),
             ]),
@@ -1706,7 +1703,7 @@ mod tests {
             j.contains("-c:v libvpx-vp9 -row-mt 1 -deadline good"),
             "{j}"
         );
-        assert!(j.contains("-b:v 0 -crf 32"), "{j}");
+        assert!(j.contains("-b:v 2666667 -crf 32"), "{j}");
         assert!(
             j.contains("-pix_fmt yuv420p") && !j.contains("-tag:v avc1"),
             "{j}"

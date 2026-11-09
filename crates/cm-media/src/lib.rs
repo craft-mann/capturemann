@@ -46,6 +46,7 @@ pub mod dsp_audio;
 pub mod edit_plan;
 pub mod edit_view;
 pub mod edited;
+pub mod estimate;
 pub mod graph;
 pub mod import;
 pub mod layout;

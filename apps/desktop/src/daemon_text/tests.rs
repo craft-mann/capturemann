@@ -807,3 +807,22 @@ fn the_cursor_row_follows_whether_a_cursor_track_is_recorded() {
         Some("Off")
     );
 }
+
+/// EXP-5: the estimate bound reads "Up to 290 MB" in English (the daemon's own `label`) and
+/// "Tối đa 290 MB" in Vietnamese, with the decimal comma; at or below 5 MB it is "Under 5 MB".
+#[test]
+fn exp5_the_estimate_bound_is_worded_in_each_language() {
+    with_language(Lang::En, || {
+        assert_eq!(estimate_label(290_000_000), "Up to 290 MB");
+        assert_eq!(estimate_label(1_200_000_000), "Up to 1.2 GB");
+        assert_eq!(estimate_label(7_300_000), "Up to 7.3 MB");
+        assert_eq!(estimate_label(4_800_000), "Under 5 MB");
+        assert_eq!(estimate_note(290_000_000), "estimate: up to 290 MB");
+    });
+    with_language(Lang::Vi, || {
+        assert_eq!(estimate_label(35_000_000), "Tối đa 35 MB");
+        assert_eq!(estimate_label(1_200_000_000), "Tối đa 1,2 GB");
+        assert_eq!(estimate_label(4_800_000), "Dưới 5 MB");
+        assert_eq!(estimate_note(290_000_000), "ước tính: tối đa 290 MB");
+    });
+}

@@ -2248,3 +2248,145 @@ async fn voc1_agent_records_audio_and_marks_moments() {
     assert_eq!(ok(&list)["captures"][0]["id"], id.as_str());
     c.cancel().await.unwrap();
 }
+
+/// EXP-5.AC3, AC4: `estimate_export` is a Free read-only tool with the design's shapes: a range
+/// with its label, codec and pixels; `{ known_after_export }` for a GIF; the shared refusals with
+/// their id in `error.data.data.reason`; `export_video` takes `size` and its result carries the
+/// same estimate.
+#[tokio::test]
+async fn exp5_estimate_export_tool() {
+    let (b, dir) = builder();
+    let queue = cm_daemon::library_job_queue(dir.path()).unwrap();
+    let d = b
+        .jobs(queue)
+        .recording_sources(cm_daemon::testing::FakeSources::new())
+        .recording_options(cm_daemon::EngineOptions {
+            tick_every: std::time::Duration::from_millis(20),
+            countdown_step: std::time::Duration::from_millis(20),
+            host: Arc::new(cm_core::ManualHostClock::new(1_000_000_000)),
+            free_space: Arc::new(cm_capture::disk::FakeFreeSpace::new(500_000_000_000)),
+            disk_check_every: std::time::Duration::ZERO,
+            own_pid: None,
+            ..cm_daemon::EngineOptions::default()
+        })
+        .build();
+    d.execute_method(
+        cm_core::Actor::User,
+        0,
+        "set_settings",
+        &json!({"values": {"export.auto_on_stop": false}}),
+    )
+    .await
+    .unwrap();
+    let started = d
+        .execute_method(
+            cm_core::Actor::User,
+            0,
+            "start_recording",
+            &json!({"target": {"display_id": 1}, "countdown_s": 0, "title": "Est"}),
+        )
+        .await
+        .unwrap();
+    d.execute_method(cm_core::Actor::User, 0, "stop_recording", &json!({}))
+        .await
+        .unwrap();
+    let id = started["capture_id"].as_str().unwrap().to_owned();
+    // 3:12 of 2880 x 1800 at 30 fps.
+    let p = dir.path().join("Est.cmrec/manifest.json");
+    let mut m: Value = serde_json::from_str(&std::fs::read_to_string(&p).unwrap()).unwrap();
+    m["tracks"]["screen"]["size"] = json!([2880, 1800]);
+    m["tracks"]["screen"]["fps"] = json!(30);
+    m["tracks"]["screen"]["start"] = json!(0);
+    m["tracks"]["screen"]["end"] = json!(192 * 120_000);
+    m["edits"] = json!([{ "version": 2, "in": 0, "out": 192 * 120_000, "speed": 1.0 }]);
+    std::fs::write(&p, serde_json::to_string_pretty(&m).unwrap()).unwrap();
+    d.register_job_handler(
+        "export",
+        cm_jobs::handler_fn(|_ctx| async move { Ok(json!({"path": "/x.mp4", "size_bytes": 1})) }),
+    )
+    .unwrap();
+    d.start_jobs().unwrap();
+    let (conn, _) = duplex_connector(d.clone());
+    let c = mcp_client(conn, "claude-desktop").await;
+
+    let tools = c.list_all_tools().await.unwrap();
+    let t = tools.iter().find(|t| t.name == "estimate_export").unwrap();
+    assert!(t.description.as_deref().unwrap().contains("Tier: Free"));
+    assert_eq!(t.input_schema["required"], json!(["capture_id"]));
+    assert_eq!(t.input_schema["additionalProperties"], false);
+    assert_eq!(
+        t.annotations.as_ref().and_then(|a| a.read_only_hint),
+        Some(true)
+    );
+
+    let r = call(
+        &c,
+        "estimate_export",
+        json!({"capture_id": id, "format": "webm", "size": "720p"}),
+    )
+    .await;
+    let v = ok(&r);
+    assert_eq!(v["codec"], "vp9");
+    assert_eq!(
+        (v["width"].as_u64(), v["height"].as_u64()),
+        (Some(1152), Some(720))
+    );
+    assert!(v["max_bytes"].as_u64().unwrap() > 0 && v.get("min_bytes").is_none());
+    assert!(v["label"].as_str().unwrap().starts_with("Up to "), "{v}");
+    assert!((v["duration_s"].as_f64().unwrap() - 192.0).abs() < 0.5);
+    // The same range comes back in the result of `export_video` for the same choice.
+    let e = call(
+        &c,
+        "export_video",
+        json!({"capture_id": id, "format": "webm", "size": 720}),
+    )
+    .await;
+    let e = ok(&e);
+    assert_eq!(e["estimate"]["max_bytes"], v["max_bytes"]);
+    assert_eq!(e["size"], 720);
+
+    // The 192 s GIF is refused, with the id and the hint in the error data.
+    let g = call(
+        &c,
+        "estimate_export",
+        json!({"capture_id": id, "format": "gif"}),
+    )
+    .await;
+    assert_eq!(err_code(&g), "invalid_input");
+    let sc = g.structured_content.as_ref().unwrap();
+    assert_eq!(
+        sc["message"],
+        "GIF is for clips of 30 s or less. This one is 3:12."
+    );
+    assert_eq!(sc["data"]["reason"], "gif_too_long");
+    assert_eq!(
+        sc["data"]["hint"],
+        "Set In and Out on the timeline to pick a short part, or choose MP4 or WebM."
+    );
+    // A step above the recording, and `size` with a GIF.
+    let big = call(
+        &c,
+        "estimate_export",
+        json!({"capture_id": id, "size": 4320}),
+    )
+    .await;
+    assert_eq!(err_code(&big), "invalid_input");
+    let small = call(
+        &c,
+        "estimate_export",
+        json!({"capture_id": id, "format": "gif", "size": 720}),
+    )
+    .await;
+    assert_eq!(err_code(&small), "invalid_input");
+    // `export_video` refuses the GIF with the same text.
+    let eg = call(
+        &c,
+        "export_video",
+        json!({"capture_id": id, "format": "gif"}),
+    )
+    .await;
+    assert_eq!(
+        eg.structured_content.as_ref().unwrap()["message"],
+        "GIF is for clips of 30 s or less. This one is 3:12."
+    );
+}

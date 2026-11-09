@@ -112,6 +112,23 @@ pub const TEMPLATES: &[Template] = &[
         ErrorCode::InvalidInput,
         "The recording area is too small: each side must be at least {min} px.",
     ),
+    // Export refusals (EXP-5): the same text in the app, the CLI and MCP. `cm_media::estimate`
+    // raises them (tests there pin the wording); `CmError::data` carries the id as `reason`.
+    t(
+        "gif_too_long",
+        ErrorCode::InvalidInput,
+        "GIF is for clips of {max} s or less. This one is {duration}.",
+    ),
+    t(
+        "size_larger_than_source",
+        ErrorCode::InvalidInput,
+        "{size} is larger than the recording ({width} × {height}). Choose the recording size or a smaller one.",
+    ),
+    t(
+        "gif_cannot_fit",
+        ErrorCode::InvalidInput,
+        "Can't fit under {max} MB at {width} px and {fps} fps.",
+    ),
     // FFmpeg is missing (the exporter, the GIF and WebM presets, frame picking). The ids are the
     // stable machine-readable "FFmpeg not found" code: `cm_media::tools` raises the messages (a
     // test there pins the wording), and a failed job's `error.data.reason_code` carries the id.
@@ -365,6 +382,20 @@ pub fn describe(code: ErrorCode, message: &str) -> Option<MessageParts> {
 /// string): the first template, whatever its code, that the whole message matches.
 pub fn describe_any(message: &str) -> Option<MessageParts> {
     TEMPLATES.iter().find_map(|t| match_template(t, message))
+}
+
+/// The ids of the export refusals (`gif_too_long`, `size_larger_than_source`, `gif_cannot_fit`).
+pub const EXPORT_REFUSAL_IDS: [&str; 3] =
+    ["gif_too_long", "size_larger_than_source", "gif_cannot_fit"];
+
+/// The hint that goes with `gif_too_long`, a separate sentence (the app shows it as its own line;
+/// `error.data.hint` carries it for the CLI and MCP).
+pub const GIF_TOO_LONG_HINT: &str =
+    "Set In and Out on the timeline to pick a short part, or choose MP4 or WebM.";
+
+/// The stable id when `message` is one of the export refusals, with its parameters.
+pub fn export_refusal(message: &str) -> Option<MessageParts> {
+    describe(ErrorCode::InvalidInput, message).filter(|p| EXPORT_REFUSAL_IDS.contains(&p.id))
 }
 
 /// The stable id when `reason` (a failed job's English reason, which wraps the original message)
