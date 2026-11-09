@@ -28,59 +28,41 @@ through MCP and a CLI.
   <img alt="The CaptureMann library: recordings, audio and screenshots in one place, with a record button, region, window and display capture, and the AI and agent pages in the sidebar" src="docs/images/library.webp" width="900">
 </p>
 
-> **Status: 0.3.0 is the Linux release (prepared Nov 9, 2026; the files are built and tested but the release is not published until the maintainer
-> publishes it). Linux (Ubuntu 24.04+, x86_64 and aarch64) is no longer an early build:** it records the screen, microphone,
-> system audio and camera, imports and exports video with or without a GPU encoder, and has the tray, the editor, local AI,
-> speaker labels and Auto-redact. Differences and gaps are listed in the release notes (no live webcam bubble, window
-> recording on X11 only, global shortcuts and the cursor track on X11 only, one computer tested: a ThinkPad T490 with an Intel GPU,
-> GNOME 46, X11 and Wayland; AMD, NVIDIA, KDE and other distributions not run). The results are the `cm-regress` suite
-> and hand runs on that laptop; the reports are marked PARTIAL in `verification/`.
-> **0.2.9 (Nov 8, 2026) is the current release for Windows and macOS.** macOS 13+ (Apple Silicon and Intel) is the full app.
-> Windows 11 (x64) is a supported release since 0.2.8: it records the screen, microphone, system audio and camera, and has
-> the editor, local AI, speaker labels and Auto-redact. The Windows files are not code-signed (SHA-256 files; a winget
-> package is submitted, not yet accepted). Limits, also in the release notes: Windows 10 not tested on a real device, only
-> Windows 11 on one Intel laptop tested, NVIDIA and AMD hardware encoders untried, a second monitor with mixed scaling not
-> tested, a camera replugged into a different USB port may not resume. Most other results are
-> tested with scripted fakes, plus the maintainer's own use on one Mac; there are few stored hardware
-> reports. **Speaker labels** are measured on public English conversation clips only (diarization error
-> 17 % on clips held back, [report](verification/benchmarks/speaker-detection-2026-10-29.md)); Vietnamese
-> is not measured yet. **Intel:** the build installs, opens and asks for permissions on a real Intel Mac, but
-> starting a recording crashed one (issue 16); 0.2.3 and later have a fix that is not confirmed yet. What is still
-> unverified is tracked in [`specs/04-delivery-plan.md`](specs/04-delivery-plan.md) under "Verification
-> debt" and in [`docs/project/status.md`](docs/project/status.md).
-
 ## Features
 
-- **Screenshots** of a display, a window or a region, with an annotation editor and Auto-redact for
-  personal data and secrets (see below).
-- **Screen recording** up to the display's native resolution (4K/5K) at 30 or 60 fps, with a webcam
-  bubble, microphone (noise suppression), system audio and cursor telemetry. Pause, resume, and
-  crash recovery that loses at most two seconds.
-- **Editor**: trim, cut, split, speed, backgrounds, zoom regions, restylable cursor, 9:16 and 1:1
-  reframe. Export to MP4, platform presets, GIF or WebM.
-- **Audio recording**: meetings, interviews, lectures and voice notes from the microphone and,
-  optionally, system audio. A compact recording bar with a level meter, markers (press `M`), a consent
-  reminder, and a WAV master that survives a crash. An audio editor with a waveform, a transcript,
-  trim and cut, and export to M4A or WAV with loudness levelling.
-- **Local AI**, all on your computer: Whisper transcripts and captions (SRT, VTT, TXT, or burned in) with
-  Large v3 Turbo as the recommended model, a caption editor, translation to English with Whisper and to
-  other languages with the built-in text model, and zoom and silence-cut suggestions. Models download
-  only when you press Download.
-- **Speaker labels**: who spoke when, from the voices, with rename and merge and a progress bar on long
-  recordings. The two small models ship inside the app; nothing is sent anywhere. Tell the app which
-  languages you speak (for example `vi, en`) so a short recording is not heard as a related language.
-- **Meeting minutes and reports**: summary, minutes, one-on-one notes, interview notes, product
-  recap and lecture notes written by a built-in text model (Gemma 4 E2B by default). Every item links
-  to the moment it was said; export as Markdown or text. The model runs through a bundled
-  `llama-server`; no cloud and no account. The picture below shows a report with sample data.
-- **Library** of self-contained capture bundles, stored in a folder you choose.
-- **Share**: save to local folders or Google Drive, publish to YouTube (private by default).
-- **For agents**: 74 MCP tools plus resources and prompts, and an identical `capturemann` CLI. Risky
-  actions (start recording, publish, delete) need an on-screen confirmation.
-- **Private by design**: no telemetry, and no network traffic unless you connect a destination or
-  download a model. You bring your own Google credentials; secrets live in the system keychain (macOS Keychain, Windows
-  Credential Manager).
-- English and Vietnamese interface.
+✓ works, — not available. Notes in brackets name the limit. Current versions and downloads are on the
+[releases page](https://github.com/craft-mann/capturemann/releases/latest); what each platform has been tested on is
+in the release notes and in [`verification/`](verification/).
+
+| Feature | macOS | Windows | Linux |
+| --- | :---: | :---: | :---: |
+| **Screenshots** of a display or a region, with an annotation editor | ✓ | ✓ | ✓ |
+| Window screenshots | ✓ | ✓ | ✓ [Wayland: through the desktop's own picker] |
+| **Auto-redact** of personal data and secrets in screenshots (see below) | ✓ | ✓ | ✓ [uses the system `tesseract`] |
+| **Screen recording** (display, up to native resolution, 30 or 60 fps), pause, resume, crash recovery | ✓ | ✓ | ✓ [GNOME records without the share dialog; other desktops ask through the portal] |
+| Window and region recording | ✓ | ✓ | ✓ [window recording on X11 only] |
+| Microphone (noise suppression) and system audio | ✓ | ✓ | ✓ |
+| Webcam track and live webcam bubble while recording | ✓ | ✓ | ✓ [camera track; no live bubble] |
+| Cursor telemetry (restylable cursor, auto-zoom) | ✓ | ✓ | ✓ [X11 only] |
+| Global shortcuts | ✓ | ✓ | ✓ [X11 only] |
+| **Editor**: trim, cut, split, speed, backgrounds, zoom regions, 9:16 and 1:1 reframe | ✓ | ✓ | ✓ |
+| Export to MP4, platform presets, GIF or WebM | ✓ | ✓ | ✓ [H.264 with a hardware encoder, else labelled VP9] |
+| Import MP4, MOV, MKV and other formats | ✓ | ✓ | ✓ |
+| **Audio recording** (meetings, lectures, voice notes), audio editor, export to M4A or WAV | ✓ | ✓ | ✓ |
+| **Local AI**: Whisper transcripts and captions (SRT, VTT, TXT, burned in), caption editor, translation | ✓ | ✓ | ✓ |
+| **Speaker labels**: who spoke when, with rename and merge | ✓ | ✓ | ✓ |
+| **Meeting minutes and reports** by a built-in text model (no cloud, no account) | ✓ | ✓ | ✓ |
+| **Library** of self-contained capture bundles, in a folder you choose | ✓ | ✓ | ✓ |
+| **Share**: local folders, Google Drive, YouTube (private by default) | ✓ | ✓ | ✓ [not run on Linux yet] |
+| **For agents**: 74 MCP tools plus resources and prompts, and an identical `capturemann` CLI; risky actions need an on-screen confirmation | ✓ | ✓ | ✓ |
+| Secrets stored in the system keychain | ✓ [Keychain] | ✓ [Credential Manager] | ✓ [Secret Service, else an owner-only file] |
+| Install through an APT repository | — | — | ✓ |
+| English and Vietnamese interface | ✓ | ✓ | ✓ |
+
+Models download only when you press Download. Speaker labels run on two small models that ship inside the app; tell
+the app which languages you speak (for example `vi, en`) so a short recording is not heard as a related language.
+**Private by design:** no telemetry, and no network traffic unless you connect a destination or download a model; you
+bring your own Google credentials. Actions of a recording that start, publish or delete need your confirmation.
 
 <p align="center">
   <img alt="A meeting-minutes report beside the transcript: summary, attendees, decisions and action items, each with a button that plays the moment it was said, and a waveform that marks where the items come from (sample data)" src="docs/images/meeting-report.webp" width="900">
