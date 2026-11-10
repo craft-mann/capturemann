@@ -519,7 +519,31 @@ impl RecordingEditor {
         let m = &s.model;
         let lines = self.ai.lines();
         let labels = self.ai_labels(s);
-        let now = voice::now_speaking(lines, &self.ai.words, &labels, m.playhead);
+        // A finished transcript wins. While only the first part of a long one exists (AI-1.AC11),
+        // the same lookup runs on the partial words; past that part the line says so.
+        let mut pending = false;
+        let mut has_partial = false;
+        let now = if self.ai.has_transcript {
+            voice::now_speaking(lines, &self.ai.words, &labels, m.playhead)
+        } else {
+            let id = self.id.clone().unwrap_or_default();
+            crate::ui::ai_view::prime_transcript_info(&self.app, &id, cx);
+            let found = self
+                .app
+                .read(cx)
+                .transcribe
+                .partial_of(&id)
+                .map(|p| p.now_at(m.playhead));
+            has_partial = found.is_some();
+            match found {
+                Some(crate::ai::partial::PartialNow::Words(n)) => Some(n),
+                Some(crate::ai::partial::PartialNow::Pending) => {
+                    pending = true;
+                    None
+                }
+                _ => None,
+            }
+        };
         let speaker_ix = now
             .as_ref()
             .and_then(|n| n.speaker)
@@ -584,7 +608,9 @@ impl RecordingEditor {
             None => div()
                 .text_size(px(type_scale::BODY))
                 .text_color(rgba_of(t.mist))
-                .child(if self.ai.has_transcript() {
+                .child(if pending {
+                    crate::ai::partial::pending_line()
+                } else if self.ai.has_transcript() || has_partial {
                     tr!("Play to follow the words here.")
                 } else {
                     tr!("The words appear here once the recording has a transcript.")

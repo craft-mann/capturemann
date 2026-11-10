@@ -76,4 +76,11 @@ looked at the screen yet. Run it on macOS, Windows 11 and Ubuntu (one pass each)
     job, and see the first part stay; stop the recording and see the run go on.
     Layout: repeat once with `CAPTUREMANN_PSEUDO_LOCALE=1` at the smallest window width: the banner wraps, nothing is cut.
 
+12. **The words line and row clicks follow the first part (AI-1.AC11).** During step 11, in the audio editor with the first part ready:
+    play inside the first minutes, and drag the playhead there.
+    Pass: the line above the transport shows the current words, the word being said marked, as it does for a finished
+    transcript; past the ready part (move the playhead beyond N minutes) it reads "The words for this part are still being
+    made."; the Transcript tab no longer says the transcript "appears here when it's done"; clicking a row moves the
+    playhead to its time. When the run finishes the line follows the final transcript; after a Cancel the old hint returns.
+
 Record the result in `verification/` (template in its README) with the platform, the build and which steps were run.

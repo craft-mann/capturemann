@@ -59,7 +59,15 @@ impl RecordingEditor {
             // A run is on its way (the automatic one after a recording, or a click): say so, and
             // that nothing needs pressing, instead of the "No transcript yet" of an idle tab.
             let running = self.app.read(cx).transcribe.status_text(&id).is_some();
-            let message = if running {
+            let has_partial = self.app.read(cx).transcribe.partial_of(&id).is_some();
+            let message = if running && has_partial {
+                // The first part exists (AI-1.AC11): "appears here when it's done" is no longer true.
+                tr!(
+                    "The transcript is being written on {this_computer}. The first part is below \
+                     and the rest follows by itself. Speaker labels follow when it is complete.",
+                    this_computer = crate::platform_text::this_computer()
+                )
+            } else if running {
                 tr!(
                     "The transcript is being written on {this_computer}. A long recording takes several \
                      minutes. You don\u{2019}t need to press anything: it appears here when it\u{2019}s \
@@ -75,7 +83,13 @@ impl RecordingEditor {
             };
             // The first part of a long run, read-only, grows here while the rest is made.
             crate::ui::ai_view::prime_transcript_info(&self.app, &id, cx);
-            let partial = crate::ui::ai_view::partial_transcript(t, &self.app, &id, "re", cx);
+            let seek = |secs: f64| -> crate::ui::ai_view::ClickFn {
+                let at = cm_core::MediaTime::from_secs_f64(secs)
+                    .unwrap_or(cm_core::MediaTime::from_ticks(0));
+                Box::new(cx.listener(move |this, _, _, cx| this.voice_seek(at, cx)))
+            };
+            let partial =
+                crate::ui::ai_view::partial_transcript(t, &self.app, &id, "re", Some(&seek), cx);
             let mut body = vec![hint(t, "captions", message).into_any_element()];
             body.extend(partial);
             body.push(crate::ui::ai_view::transcribe_row(

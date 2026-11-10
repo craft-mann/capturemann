@@ -522,6 +522,8 @@ mod tests {
             rows: vec![],
             covered_secs: 300.0,
             total_secs: 3000.0,
+            words: vec![],
+            lines: vec![],
         };
         let mut v = TranscribeVm::default();
         assert!(

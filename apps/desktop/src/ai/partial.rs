@@ -4,6 +4,9 @@
 //! (a start time and a text) and words the banner. The page shows them read-only; nothing here
 //! edits, exports or sends the partial transcript anywhere.
 
+use cm_ai::caption::CaptionLine;
+use cm_ai::transcribe::Word;
+use cm_core::MediaTime;
 use cm_i18n::{tr, trn};
 use serde_json::Value;
 
@@ -27,6 +30,42 @@ pub struct PartialView {
     pub rows: Vec<PartialRow>,
     pub covered_secs: f64,
     pub total_secs: f64,
+    /// The words with their times (session clock, like the final transcript's) and the caption
+    /// lines built from them the way a finished transcript's are: the playback words line reads
+    /// these (AI-1.AC11).
+    pub words: Vec<Word>,
+    pub lines: Vec<CaptionLine>,
+}
+
+/// What the playback words line shows while a transcript is partial.
+#[derive(Debug, Clone, PartialEq)]
+pub enum PartialNow {
+    /// The playhead is inside the covered part and under a line.
+    Words(crate::recedit::voice::NowSpeaking),
+    /// The playhead is inside the covered part but before the first word.
+    Idle,
+    /// The playhead is past the covered part: those words are still being made.
+    Pending,
+}
+
+impl PartialView {
+    /// The words line at `playhead`: the same lookup as a finished transcript's
+    /// (`voice::now_speaking`), fed with the partial words; past the covered part it answers
+    /// [`PartialNow::Pending`].
+    pub fn now_at(&self, playhead: MediaTime) -> PartialNow {
+        if playhead.as_secs_f64() >= self.covered_secs {
+            return PartialNow::Pending;
+        }
+        match crate::recedit::voice::now_speaking(&self.lines, &self.words, &[], playhead) {
+            Some(n) => PartialNow::Words(n),
+            None => PartialNow::Idle,
+        }
+    }
+}
+
+/// The line shown where the words of the playhead are not ready yet.
+pub fn pending_line() -> String {
+    tr!("The words for this part are still being made.")
 }
 
 /// Reads a `get_transcript` answer: `Some` only when it is marked `partial: true`.
@@ -34,7 +73,7 @@ pub fn parse_partial(answer: &Value) -> Option<PartialView> {
     if answer.get("partial") != Some(&Value::Bool(true)) {
         return None;
     }
-    let words = answer
+    let raw = answer
         .get("transcript")?
         .get("words")?
         .as_array()?
@@ -46,10 +85,21 @@ pub fn parse_partial(answer: &Value) -> Option<PartialView> {
             (!text.is_empty()).then(|| (start, end.max(start), text.to_owned()))
         })
         .collect::<Vec<_>>();
+    let words: Vec<Word> = raw
+        .iter()
+        .map(|(start, end, text)| Word {
+            text: text.clone(),
+            start: MediaTime::from_ticks((start * TICKS_PER_SEC).round() as i64),
+            end: MediaTime::from_ticks((end * TICKS_PER_SEC).round() as i64),
+            confidence: 1.0,
+        })
+        .collect();
     Some(PartialView {
-        rows: rows_of(&words),
+        rows: rows_of(&raw),
         covered_secs: answer.get("covered_secs").and_then(Value::as_f64)?,
         total_secs: answer.get("total_secs").and_then(Value::as_f64)?,
+        lines: crate::ai::captions::lines_from_words(&words),
+        words,
     })
 }
 
@@ -185,5 +235,48 @@ mod tests {
         assert_eq!(clock(3725.0), "1:02:05");
         assert!(banner(25.0 * 60.0 + 30.0).contains("first 25 minutes"));
         assert!(banner(10.0).contains("first 1 minute is"));
+    }
+
+    fn two_sentences() -> PartialView {
+        let a = json!({"partial": true, "covered_secs": 60.0, "total_secs": 600.0,
+            "transcript": {"words": [w(1.0, 1.4, "Hello"), w(1.5, 2.0, "there"),
+                                     w(10.0, 10.5, "Next"), w(10.6, 11.0, "part")]}});
+        parse_partial(&a).unwrap()
+    }
+
+    fn at(secs: f64) -> MediaTime {
+        MediaTime::from_secs_f64(secs).unwrap()
+    }
+
+    #[test]
+    fn the_words_line_follows_the_partial_words_inside_the_covered_part() {
+        let v = two_sentences();
+        assert_eq!(v.words.len(), 4);
+        match v.now_at(at(1.6)) {
+            PartialNow::Words(n) => {
+                assert!(n.text.starts_with("Hello there"), "{}", n.text);
+                assert_eq!(n.speaker, None);
+                // The current word is marked, as for a finished transcript.
+                let r = n.highlight.expect("the word under the playhead");
+                assert_eq!(&n.text[r], "there");
+            }
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(v.now_at(at(0.2)), PartialNow::Idle);
+    }
+
+    #[test]
+    fn beyond_the_covered_part_the_line_says_the_words_are_still_being_made() {
+        let v = two_sentences();
+        assert_eq!(v.now_at(at(60.0)), PartialNow::Pending);
+        assert_eq!(v.now_at(at(500.0)), PartialNow::Pending);
+        assert!(pending_line().contains("still being made"));
+    }
+
+    #[test]
+    fn the_partial_lookup_gives_what_the_final_one_gives_for_the_same_words() {
+        let v = two_sentences();
+        let direct = crate::recedit::voice::now_speaking(&v.lines, &v.words, &[], at(10.7));
+        assert_eq!(v.now_at(at(10.7)), PartialNow::Words(direct.unwrap()));
     }
 }

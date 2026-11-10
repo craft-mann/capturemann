@@ -2033,6 +2033,14 @@ msgid "One MP4 with the screen. The original tracks are untouched. {captions}"
 msgstr "Một tệp MP4 chỉ gồm màn hình. Các bản ghi gốc được giữ nguyên. {captions}"
 
 #, fuzzy
+msgid "The words for this part are still being made."
+msgstr "Lời của đoạn này vẫn đang được tạo."
+
+#, fuzzy
+msgid "The transcript is being written on {this_computer}. The first part is below and the rest follows by itself. Speaker labels follow when it is complete."
+msgstr "Bản chép lời đang được tạo trên {this_computer}. Phần đầu ở bên dưới, phần còn lại sẽ tự đến. Nhãn người nói được thêm khi bản chép lời hoàn tất."
+
+#, fuzzy
 msgid "Partial transcript"
 msgstr "Bản chép lời một phần"
 

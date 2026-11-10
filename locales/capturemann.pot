@@ -5148,6 +5148,9 @@ msgstr ""
 msgid "The transcript is being written on {this_computer}. A long recording takes several minutes. You don’t need to press anything: it appears here when it’s done, and speaker labels follow."
 msgstr ""
 
+msgid "The transcript is being written on {this_computer}. The first part is below and the rest follows by itself. Speaker labels follow when it is complete."
+msgstr ""
+
 msgid "The upload couldn’t start"
 msgstr ""
 
@@ -5194,6 +5197,9 @@ msgid "The windows could not be listed."
 msgstr ""
 
 msgid "The words appear here once the recording has a transcript."
+msgstr ""
+
+msgid "The words for this part are still being made."
 msgstr ""
 
 msgid "The {track} file ended early ({detail}); what was written is kept"

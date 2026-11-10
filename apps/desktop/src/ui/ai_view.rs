@@ -937,6 +937,9 @@ pub fn transcribe_row(
         .into_any_element()
 }
 
+/// A click handler built for one partial row.
+pub type ClickFn = Box<dyn Fn(&gpui::ClickEvent, &mut Window, &mut gpui::App)>;
+
 /// The first part of a long transcription, read-only, while the rest is still being made
 /// (AI-1.AC10; DESIGN §5.5 "Transcript" rows: a time chip over the text, `row_divider` rules). A
 /// banner says how much is ready, and the list grows as pieces finish without losing its scroll
@@ -947,6 +950,7 @@ pub fn partial_transcript(
     app: &Entity<AppModel>,
     capture_id: &str,
     prefix: &'static str,
+    seek: Option<&dyn Fn(f64) -> ClickFn>,
     cx: &gpui::App,
 ) -> Option<AnyElement> {
     let (view, handle) = {
@@ -973,7 +977,7 @@ pub fn partial_transcript(
                 ))),
         );
     let rows = view.rows.iter().enumerate().map(|(i, r)| {
-        div()
+        let row = div()
             .id(SharedString::from(format!("{prefix}-partial-row-{i}")))
             .role(Role::ListItem)
             .px(px(14.))
@@ -997,7 +1001,15 @@ pub fn partial_transcript(
                     .line_height(px(22.))
                     .text_color(rgba_of(t.text_2))
                     .child(SharedString::from(r.text.clone())),
-            )
+            );
+        // A click seeks playback to the row, as a row of the finished transcript does.
+        match seek {
+            Some(f) => row
+                .cursor_pointer()
+                .on_click(f(r.start_secs))
+                .into_any_element(),
+            None => row.into_any_element(),
+        }
     });
     let list = div()
         .id(SharedString::from(format!("{prefix}-partial-list")))
