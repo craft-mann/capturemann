@@ -68,6 +68,40 @@ bring your own Google credentials. Actions of a recording that start, publish or
   <img alt="A meeting-minutes report beside the transcript: summary, attendees, decisions and action items, each with a button that plays the moment it was said, and a waveform that marks where the items come from (sample data)" src="docs/images/meeting-report.webp" width="900">
 </p>
 
+## Long recordings: how they are transcribed, and what it costs
+
+A meeting of two or four hours is not sent to the speech model in one piece. The app decodes the audio once, then
+reads it **piece by piece** (about 5 minutes each, cut at a quiet point near the target) as a background job:
+
+- **Each piece is its own run.** A loop of the same sentence (a known Whisper failure on long audio) cannot pass a
+  piece boundary; every piece is checked for loops, and one that loops is cut in half and read again.
+- **Checkpoint after every piece.** If the app quits, the computer sleeps or a recording starts (the job holds
+  while you record), the job goes on from the last finished piece, not from the start.
+- **Results show up while the rest is made** (0.3.1): the finished minutes are readable in the transcript and
+  follow the playback line at once, marked as partial; captions, speakers and reports wait for the end. The CLI and
+  the MCP tool return the same partial transcript (`partial: true`, `covered_secs`, `total_secs`).
+- **Speakers are one pass over the whole file**, so "Speaker 2" is the same person in hour 1 and hour 3.
+- Everything runs on your computer; nothing is uploaded.
+
+What it cost on one computer (Apple M4 Pro, 48 GB, Metal, model large-v3, an imported MP3 each; 0.3.1 dev build; one run
+per row, so read them as examples, not as a guarantee):
+
+| File | Audio | Time to transcribe | Speed | Memory (peak) | Result |
+| --- | --- | --- | --- | --- | --- |
+| English meeting | 2 h 07 min | 25 min | 5.1 times real time | 4.1 GB | 17,324 words, 5 % of words under 0.6 confidence, no crash |
+| Vietnamese meeting, speakers at the same time | 4 h 14 min | 85 min | 3.0 times real time | 4.3 GB alone, **11.7 GB** with the speaker job | 41,060 words, 25 % under 0.6 confidence, no crash |
+
+Full reports, with progress and memory over time and what was not measured:
+[`long-audio-transcription-large-v3-m4pro-2026-11-10.md`](verification/benchmarks/long-audio-transcription-large-v3-m4pro-2026-11-10.md)
+and
+[`long-audio-transcription-vietnamese-4h13-large-v3-m4pro-2026-11-10.md`](verification/benchmarks/long-audio-transcription-vietnamese-4h13-large-v3-m4pro-2026-11-10.md).
+
+**Known limits.** Memory is not flat yet: the whole file is decoded into memory (about 1 GB per 4 hours on top of the
+model), and the speaker job at the same time more than doubles the peak, so on a 16 GB computer run the speakers after
+the transcript. Vietnamese with large-v3 is much less confident than English; the Vietnamese-specific models
+(PhoWhisper) or a re-read of doubtful stretches help, and word times are stacked in some places. These numbers are from
+one Mac: Windows and Linux have not been measured on a long file.
+
 ## Find personal data before you share a screenshot
 
 **Auto-redact** reads the text in a screenshot with the recognizer built into your Mac (Apple Vision) and
