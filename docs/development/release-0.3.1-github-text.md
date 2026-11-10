@@ -49,7 +49,7 @@ without a stored report in `verification/` (CLAUDE.md wording rule). Steps: `rel
   it is no louder than the room and the line is long or every word is certain (switch "Leave out lines the audio does not hold" on the
   AI page, on by default) and you can add your own "Lines to leave out". Every dropped line is kept with its time range in the
   transcript. **It runs on Vietnamese only for now:** on one English call it dropped a sentence a person had said softly, so other
-  languages keep every line. It does not catch every invented line. Three drops of a 4 hour Vietnamese file were listened to by the
+  languages keep every line. It does not catch every invented line: one heard over real sound (other voices, music) is not dropped, and your own list "Lines to leave out" is for those. Neither changes a finished transcript; re-generate to apply. Three drops of a 4 hour Vietnamese file were listened to by the
   maintainer and were all noise; the other nine were not.
 
 ## Changed
