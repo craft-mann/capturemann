@@ -35,6 +35,12 @@ without a stored report in `verification/` (CLAUDE.md wording rule). Steps: `rel
 - **Transcript progress on every capture.** A recording's page, the audio page and the library card show the same progress
   (percent, stage, Cancel, errors with Retry) as an imported file.
 
+- **Long transcripts show up while they are made.** A recording or audio file longer than 10 minutes is transcribed in
+  5-minute pieces (as before); now the text of the finished pieces is readable at once on the recording page and in the audio
+  editor ("Transcribing: the first 25 minutes are ready. The rest follows."), read-only, while the rest is made. Cancelling removes
+  it; a held job (a recording started) keeps it. `capturemann ai transcript` and the MCP `get_transcript` return it marked
+  `partial: true` with `covered_secs` and `total_secs`. Captions, translation, speakers and reports wait for the final transcript.
+
 ## Changed
 
 - **Transcripts use the original microphone by default.** The noise-reduced copy can drop quiet or distant speakers. Settings
@@ -45,12 +51,20 @@ without a stored report in `verification/` (CLAUDE.md wording rule). Steps: `rel
 - The app no longer quits during a transcription when the speech engine meets a decode window whose text ends within its first
   160 ms (found on a 73-minute imported MP3).
 - Cancelling an export no longer waits on a pipe held by another process (a Windows CI flake); wind-down waits are bounded.
-- <FILL: fixes from the regression of the night, from `specs/plans/release-0.3.1-morning-report.md`>
+- A good MP3 was refused as unreadable on Ubuntu 24.04's FFmpeg 6.1 when its stated length ran a few frames past the decoded
+  length (variable bit rate files); the check now allows three MP3 frames.
+- A cancelled edited export could leave its `.part` and `.mix.part` files behind on Windows (a just-killed process still held
+  them); deleting them is retried for up to 2 seconds.
+- Two macOS render tests hung in Metal device discovery (a test setup problem, not a render bug).
+- The MP4 "Up to" size was not a ceiling on Linux GPUs with constant-quality H.264 only (see Known limits).
 
 ## Checked, and what was not
 
-Reports in `verification/` (all PARTIAL; one computer each): <FILL: file names of the final-files runs: `L1-windows-0.3.1-*`,
-`L1-macos-0.3.1-*`, `L1-linux-0.3.1-*`>. Not run: **Intel Mac hardware**, Windows 10, SmartScreen, mixed DPI, NVIDIA/AMD
+Reports in `verification/` (all PARTIAL; one computer each): <FILL: the final-files runs (after the last push, on the release files): `L1-windows-0.3.1-*`, `L1-macos-0.3.1-*`,
+`L1-linux-0.3.1-*`>. Runs so far, on the dev bundle or CI packages of earlier commits, 0 failed in each: macOS `standard` 43 passed,
+`full` 52, `hardware` 55; Windows 11 (ThinkPad T490) `standard` 44, `full` 58, plus transcription, speakers and the silent installer 3 of 3;
+Linux x86_64 (same laptop, X11) `standard` 51, `full` 59; Linux aarch64 VM `full` 37. The export-size test: macOS 18 of 18 samples within
+the ceiling, Linux UHD 620 18 of 18 after the fix. Not run: **Intel Mac hardware**, Windows 10, SmartScreen, mixed DPI, NVIDIA/AMD
 encoders, KDE and other Linux distributions, a second monitor.
 
 ## Known limits
@@ -58,13 +72,16 @@ encoders, KDE and other Linux distributions, a second monitor.
 - **The typical export size is a calibrated guess.** Calibrated on one Mac and one user's screens (10 recordings, 36 exports;
   86 % of held-out samples within a factor 1.5, never above the ceiling). The factor for imported files (3.8) rests on two
   imported H.264 files. **Windows and Linux encoders, 60 fps, 4K and Intel are not calibrated**; the ceiling is stated for the
-  macOS hardware encoder and <FILL: result of `estimate_vs_real` on Windows/Linux, or "not run there">.
+  macOS hardware encoder and the Linux UHD 620 laptop; `estimate_vs_real` was **not run on Windows**.
 - **On Linux GPUs that take no bit rate (VA-API constant quality, for example Intel UHD 620 with iHD) the MP4 "Up to" figure is a
   scaled worst case (video counted at 4 times the usual rate) and there is no "About" figure.** The first run had 3 of 18 samples
   over the old bound, all high-motion MP4 (worst 3.6 times); the second run (18 of 18 within the bound, worst MP4 at 0.91 of it) is
   `verification/L1-linux-0.3.1-estimate-vs-real-x11-uhd620-vaapi-run2-2026-11-10-claude.md`. A noisier picture than the synthetic test could still pass 4 times; the ceiling is not a guarantee there.
 - An MP3's length is an estimate in the file; imports allow a few frames of difference between the stated and decoded length.
-- <FILL: failures listed in the morning report that were not fixed>
+- A rare failure of one test of the daemon's local socket (`r2_7_stale_socket_is_replaced_live_one_is_not`) was seen once in CI
+  and did not repeat in more than 200 runs; the cause is not known.
+- Not run in this release: the Linux `.deb` install on a clean computer, the Linux Wayland session, transcription and speakers
+  on Linux, the transcript of a 4-hour file (the 73-minute file was tested by the maintainer by hand).
 
 ## Install and checks
 
