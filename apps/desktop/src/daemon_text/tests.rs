@@ -860,7 +860,7 @@ fn exp5_the_typical_size_is_worded_in_each_language() {
         assert_eq!(bound_tail(14_000_000, 69_000_000), "tối đa 69 MB");
         assert_eq!(
             estimate_note_with(Some(14_000_000), 69_000_000),
-            "ước tính: khoảng 14 MB, tối đa 69 MB"
+            "ước tính: thường khoảng 14 MB, tối đa 69 MB"
         );
     });
 }
