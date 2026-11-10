@@ -127,7 +127,13 @@ impl Runner {
             sys::kill_tree(*p);
         }
         std::thread::sleep(Duration::from_millis(300));
-        let strays = hygiene::strays_since(&before);
+        // A helper still exiting after its daemon was stopped (cm-overlay once, twice in one macOS run) is
+        // given a few seconds; a program that outlives that is a stray.
+        let strays = hygiene::settle(
+            || hygiene::strays_since(&before),
+            Duration::from_secs(4),
+            Duration::from_millis(200),
+        );
         for (p, _) in &strays {
             sys::kill_tree(*p);
         }

@@ -42,6 +42,23 @@ pub fn strays_since(before: &BTreeSet<u32>) -> Vec<(u32, String)> {
         .collect()
 }
 
+/// Polls `get` until it returns nothing or `grace` has passed, and returns the last answer. A helper
+/// program that is still exiting when a case ends (an overlay that notices its daemon is gone) is not
+/// a leak; one that is still there after the grace is.
+pub fn settle<T>(
+    mut get: impl FnMut() -> Vec<T>,
+    grace: std::time::Duration,
+    step: std::time::Duration,
+) -> Vec<T> {
+    let end = std::time::Instant::now() + grace;
+    let mut found = get();
+    while !found.is_empty() && std::time::Instant::now() < end {
+        std::thread::sleep(step);
+        found = get();
+    }
+    found
+}
+
 /// A known harmless ERROR of the GPUI Windows backend: its vsync thread calls `RedrawWindow` on a window
 /// that was destroyed a message earlier; the window leaves the tracked list one message later
 /// (`gpui-pre-windows-0.3.9/src/platform.rs:493`, read in the GPUI source on Nov 5, 2026). Windows answers
@@ -176,6 +193,32 @@ pub fn parse_crash_events(text: &str) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    /// A helper that is still exiting is waited for; one that never leaves is reported.
+    #[test]
+    fn settle_waits_for_a_slow_exit_but_reports_a_program_that_stays() {
+        use std::time::Duration;
+        let mut calls = 0;
+        let gone = super::settle(
+            || {
+                calls += 1;
+                if calls < 3 {
+                    vec![1u32]
+                } else {
+                    Vec::new()
+                }
+            },
+            Duration::from_secs(2),
+            Duration::from_millis(5),
+        );
+        assert!(gone.is_empty());
+        let stays = super::settle(
+            || vec![7u32],
+            Duration::from_millis(30),
+            Duration::from_millis(5),
+        );
+        assert_eq!(stays, vec![7]);
+    }
+
     use super::*;
 
     #[test]
