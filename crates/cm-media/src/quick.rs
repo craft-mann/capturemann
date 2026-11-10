@@ -188,16 +188,25 @@ pub(crate) struct Cleanup {
     pub(crate) dirs: Vec<PathBuf>,
 }
 
-/// Removes a temp file, trying again for up to two seconds when it is still there: on Windows a
-/// file cannot be deleted while a process that was just killed, or a thread that has not yet let
-/// go, still holds it open (a cancelled export left its `.part` and `.mix.part` behind in CI).
+/// Removes a temp file, trying again for up to ten seconds while it is still there: on Windows a
+/// file cannot be deleted while something still holds it open (a process that was just killed, or
+/// the virus scanner reading what it wrote), and a cancelled export left its `.part` and
+/// `.mix.part` behind in CI even after two seconds of trying. The last error is printed, so the
+/// next failure names its cause. Where nothing holds the file this returns at the first try.
 fn remove_temp(p: &Path) {
-    for _ in 0..20 {
+    let mut last = None;
+    for _ in 0..100 {
         match fs::remove_file(p) {
             Ok(()) => return,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return,
-            Err(_) => std::thread::sleep(std::time::Duration::from_millis(100)),
+            Err(e) => {
+                last = Some(e);
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
         }
+    }
+    if let Some(e) = last {
+        eprintln!("cm-media: could not remove {}: {e}", p.display());
     }
 }
 
