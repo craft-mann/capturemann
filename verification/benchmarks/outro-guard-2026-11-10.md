@@ -67,3 +67,7 @@ Never judged: audio under 30 s, or where the 90th and 10th percentiles are less 
 - **The 4 h 13 min Vietnamese file (not listened to):** the shape check drops 12 lines (115 words) with margins of 4.6 to 7.7 dB for the five lines that were close to the rule, and several 10 to 15-word lines inside 1.5 s (stacked word times). It is not known whether they are invented or spoken; they need listening before the guard is trusted on long Vietnamese meetings.
 - **Decision (maintainer, Nov 10, 2026): the shape check runs on Vietnamese transcripts only for now** (`cm_ai::guard::LANGUAGES = ["vi"]`; the setting still turns it off). English and every other language keep all lines. This is a limit of what was measured (the invented sign-offs seen were Vietnamese; the only English drop was wrong), not a finding that English does not have them.
 - **Still to try:** a speech detector as a second opinion on the lines the shape check would drop (the segmentation model of the speaker engine is already on the computer; Silero was not tried). Not built.
+
+## Update: three drops of the 4 h Vietnamese file listened to (Nov 10, 2026, maintainer's report)
+
+The maintainer listened to three of the 12 drops of the 4 h 13 min file: at 15:31, 1:07:35 and 1:09:15. **All three were correct drops** (background noise, nobody speaking). The other nine were not listened to. The maintainer approved keeping the guard on (Vietnamese only, setting `ai.drop_unsupported_lines` default on) for 0.3.1. Three of twelve is a spot check, not proof: the status stays PARTIAL.
