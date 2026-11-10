@@ -76,6 +76,18 @@ jobs:
       - name: Install FFmpeg (Windows)
         if: runner.os == 'Windows'
         run: choco install ffmpeg --no-progress -y
+      # Chocolatey puts a ShimGen launcher named ffmpeg.exe on PATH: it starts the real ffmpeg.exe and waits for it.
+      # Cancelling an export kills the launcher only, so the real ffmpeg.exe kept its `.part` file open for seconds
+      # (os error 32) and the EXP-4 cancel tests failed about every second run. Point the tests at the real binary.
+      - name: Use the real ffmpeg.exe, not the Chocolatey shim (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $real = Get-ChildItem 'C:\ProgramData\chocolatey\lib\ffmpeg\tools' -Recurse -Filter ffmpeg.exe |
+            Where-Object { $_.FullName -match '\\bin\\' } | Select-Object -First 1
+          if (-not $real) { throw 'the real ffmpeg.exe was not found under the Chocolatey package' }
+          "CM_FFMPEG=$($real.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          & $real.FullName -hide_banner -version | Select-Object -First 1
       # Ubuntu 24.04, not 22.04: the exporter needs FFmpeg 5.1+ (`-fps_mode`) and 22.04 ships 4.4. The shipped
       # build bundles its own FFmpeg, so this only concerns the tests.
       # System libraries the GPUI shell and the capture crates link on Linux (assumed list: trim or extend
