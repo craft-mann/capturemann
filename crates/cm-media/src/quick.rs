@@ -188,10 +188,23 @@ pub(crate) struct Cleanup {
     pub(crate) dirs: Vec<PathBuf>,
 }
 
+/// Removes a temp file, trying again for up to two seconds when it is still there: on Windows a
+/// file cannot be deleted while a process that was just killed, or a thread that has not yet let
+/// go, still holds it open (a cancelled export left its `.part` and `.mix.part` behind in CI).
+fn remove_temp(p: &Path) {
+    for _ in 0..20 {
+        match fs::remove_file(p) {
+            Ok(()) => return,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return,
+            Err(_) => std::thread::sleep(std::time::Duration::from_millis(100)),
+        }
+    }
+}
+
 impl Drop for Cleanup {
     fn drop(&mut self) {
         for p in &self.paths {
-            let _ = fs::remove_file(p);
+            remove_temp(p);
         }
         for d in &self.dirs {
             let _ = fs::remove_dir_all(d);
