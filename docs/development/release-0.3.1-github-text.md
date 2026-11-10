@@ -59,6 +59,10 @@ encoders, KDE and other Linux distributions, a second monitor.
   86 % of held-out samples within a factor 1.5, never above the ceiling). The factor for imported files (3.8) rests on two
   imported H.264 files. **Windows and Linux encoders, 60 fps, 4K and Intel are not calibrated**; the ceiling is stated for the
   macOS hardware encoder and <FILL: result of `estimate_vs_real` on Windows/Linux, or "not run there">.
+- **On Linux GPUs that take no bit rate (VA-API constant quality, for example Intel UHD 620 with iHD) the MP4 "Up to" figure is a
+  scaled worst case (video counted at 4 times the usual rate) and there is no "About" figure.** The first run had 3 of 18 samples
+  over the old bound, all high-motion MP4 (worst 3.6 times); the second run is `verification/L1-linux-0.3.1-estimate-vs-real-x11-uhd620-vaapi-run2-*`
+  <FILL: result>. A noisier picture than the synthetic test could still pass 4 times; the ceiling is not a guarantee there.
 - An MP3's length is an estimate in the file; imports allow a few frames of difference between the stated and decoded length.
 - <FILL: failures listed in the morning report that were not fixed>
 

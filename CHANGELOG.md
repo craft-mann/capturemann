@@ -17,6 +17,7 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 - The export's cancel no longer waits on a pipe held by another process (a Windows CI flake); wind-down waits are bounded.
 
 ### Changed
+- **The export size bound is honest on Linux GPUs that cannot take a bit rate** (VA-API constant-quality mode, such as the Intel UHD 620 with the iHD driver): the "Up to N MB" figure of an MP4 counts the video at 4 times the usual rate (the stored run had a high-motion 1080p file at 3.6 times the old bound), and no "About" figure is shown there because it is not calibrated; `estimate_export` has a new `constant_quality` field. Mac, Windows and WebM numbers are unchanged.
 - Transcripts are made from the **original microphone** by default. Since 0.2.7 the default was the noise-reduced copy a recording stores beside the microphone track, which can drop quiet or distant speakers; the original track reads them. The setting `ai.transcribe_raw_mic` (AI page, "Transcribe from": Original microphone or Noise-reduced copy; `capturemann settings set`, MCP `set_settings`) turns the copy back on, and `capturemann ai transcribe --original-audio` / `--denoised-audio` and the MCP `transcribe` field `original_audio` still choose per run. Nothing is migrated: the setting is read when a transcription starts, a library that never stored it uses the original microphone, a stored value (on or off) is kept, and transcripts already made are not changed. The system-audio track is unchanged.
 
 ## [0.3.0] - 2026-11-09

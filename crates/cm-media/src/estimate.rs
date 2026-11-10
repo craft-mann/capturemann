@@ -281,11 +281,48 @@ pub fn mp4_codec(tools: Option<&Tools>) -> Result<Codec, CmError> {
 /// [`mp4_codec`] for known FFmpeg capabilities and policy (pure, tested without a Linux machine):
 /// the first encoder the exporter would try decides.
 pub fn mp4_codec_for(caps: &crate::tools::Caps, policy: EncoderPolicy) -> Result<Codec, CmError> {
+    mp4_plan_for(caps, policy).map(|p| p.codec)
+}
+
+/// How the MP4 video is encoded on this computer: the codec and whether the rate is held by a
+/// cap (every encoder but one) or only by a constant quality (VA-API H.264 on a driver without a
+/// bit-rate mode, `Caps::vaapi_cqp`, where the exporter cannot give the encoder a rate).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Mp4Plan {
+    pub codec: Codec,
+    /// Constant quality, no rate cap: the bit-rate table is no ceiling, see [`CQP_WORST_CASE`].
+    pub cqp: bool,
+}
+
+impl From<Codec> for Mp4Plan {
+    /// A codec with a rate cap (what every platform but VA-API CQP has).
+    fn from(codec: Codec) -> Self {
+        Mp4Plan { codec, cqp: false }
+    }
+}
+
+/// [`mp4_codec`] with the constant-quality fact; FFmpeg is probed only on Linux.
+pub fn mp4_plan(tools: Option<&Tools>) -> Result<Mp4Plan, CmError> {
+    let policy = EncoderPolicy::host();
+    if !policy.linux_set {
+        return Ok(Codec::H264.into());
+    }
+    let tools = tools.ok_or_else(|| CmError::not_found(crate::tools::not_found_message()))?;
+    mp4_plan_for(&probe_caps(tools)?, policy)
+}
+
+/// [`mp4_plan`] for known capabilities and policy (pure): the first encoder the exporter would
+/// try decides, and `cqp` is set when that is VA-API with the constant-quality fallback (the same
+/// `caps.vaapi_cqp` that `graph::video_codec_for` is given).
+pub fn mp4_plan_for(caps: &crate::tools::Caps, policy: EncoderPolicy) -> Result<Mp4Plan, CmError> {
     let first = encoder_candidates_for(caps, None, policy)?.first().copied();
-    Ok(if first == Some(Encoder::Vp9Mp4) {
-        Codec::Vp9
-    } else {
-        Codec::H264
+    Ok(Mp4Plan {
+        codec: if first == Some(Encoder::Vp9Mp4) {
+            Codec::Vp9
+        } else {
+            Codec::H264
+        },
+        cqp: first == Some(Encoder::Vaapi) && caps.vaapi_cqp,
     })
 }
 
@@ -303,6 +340,16 @@ pub fn video_bps(codec: Codec, frame: (u32, u32), fps: f64) -> f64 {
         Codec::Vp9 => crate::graph::vp9_cap_bitrate(frame, fps) as f64,
     }
 }
+
+/// The factor by which constant-quality (CQP) H.264 can exceed the bit-rate table, applied to the
+/// video part of the bound when [`Mp4Plan::cqp`]. With `-rc_mode CQP -qp 23` and no `-b:v`
+/// (`graph::VAAPI_CQP_QP`) the file follows the picture, not a rate: the Intel UHD 620 run of
+/// Nov 10, 2026 (`verification/L1-linux-0.3.1-estimate-vs-real-x11-uhd620-vaapi-2026-11-10-claude.md`)
+/// had 3 of 18 samples over the bound, all high-motion MP4, worst real / bound 3.6 (1080p: 117.97
+/// MB against 33). 4.0 is that worst ratio rounded up with a margin; a noisier picture than the
+/// test's synthetic motion could still pass it, which is the limit of any formula without
+/// probing the files. Not used on any other encoder.
+pub const CQP_WORST_CASE: f64 = 4.0;
 
 /// The audio bit rate: AAC 128 kbps mono or 192 kbps stereo in MP4, Opus 64 or 96 kbps in WebM
 /// (`edited::export_edited`), `0` without audio.
@@ -474,11 +521,15 @@ pub struct Inputs {
     pub duration_s: f64,
     /// Output audio channels; `None` without audio.
     pub audio_channels: Option<u32>,
+    /// The MP4 video is constant quality without a rate cap ([`Mp4Plan::cqp`]).
+    pub cqp: bool,
 }
 
-/// The nominal size in bytes (bit rate times length), before the margin and the rounding.
+/// The nominal size in bytes (bit rate times length), before the margin and the rounding. The
+/// video rate of a constant-quality encode counts [`CQP_WORST_CASE`] times.
 pub fn estimate_bytes(i: &Inputs) -> f64 {
-    let bps = video_bps(i.codec, i.frame, i.fps) + audio_bps(i.format, i.audio_channels);
+    let scale = if i.cqp { CQP_WORST_CASE } else { 1.0 };
+    let bps = video_bps(i.codec, i.frame, i.fps) * scale + audio_bps(i.format, i.audio_channels);
     bps * i.duration_s.max(0.0) / 8.0
 }
 
@@ -550,6 +601,9 @@ pub struct SizeEstimate {
     /// `h264` or `vp9`: what the file's video will be (MP4 on a machine without a hardware
     /// H.264 encoder is `vp9`).
     pub codec: Codec,
+    /// The video is constant quality without a rate cap (VA-API CQP): the bound is scaled by
+    /// [`CQP_WORST_CASE`] and there is no typical size.
+    pub constant_quality: bool,
     pub width: u32,
     pub height: u32,
     pub fps: f64,
@@ -572,13 +626,18 @@ pub enum Estimated {
 /// is known.
 pub fn estimate_bound(i: &Inputs, master: Option<&MasterRate>) -> SizeEstimate {
     let max_bytes = bound_of(estimate_bytes(i));
-    let typical_bytes = master.map(|m| typical_of(typical_bytes_of(i, m), max_bytes));
+    // The typical rule is calibrated on rate-capped encoders only; for constant quality there is
+    // no calibration, so the bound stands alone (the simpler honest choice).
+    let typical_bytes = master
+        .filter(|_| !i.cqp)
+        .map(|m| typical_of(typical_bytes_of(i, m), max_bytes));
     SizeEstimate {
         max_bytes,
         label: label_of(max_bytes),
         typical_bytes,
         typical_label: typical_bytes.map(typical_label_of),
         codec: i.codec,
+        constant_quality: i.cqp,
         width: i.frame.0,
         height: i.frame.1,
         fps: i.fps,
@@ -673,7 +732,11 @@ fn check_choice_for(manifest: &Value, spec: &QuickSpec, c: &Choice) -> Result<f6
 /// The estimate of `choice` for a recording (its manifest as JSON): the bound alone, without a
 /// typical size. `mp4_codec` is [`mp4_codec`]. Refuses what [`check_choice`] refuses. GIF, and
 /// nothing else, has no bound.
-pub fn estimate(manifest: &Value, c: &Choice, mp4_codec: Codec) -> Result<Estimated, CmError> {
+pub fn estimate(
+    manifest: &Value,
+    c: &Choice,
+    mp4_codec: impl Into<Mp4Plan>,
+) -> Result<Estimated, CmError> {
     estimate_with_master(manifest, c, mp4_codec, None)
 }
 
@@ -682,9 +745,10 @@ pub fn estimate(manifest: &Value, c: &Choice, mp4_codec: Codec) -> Result<Estima
 pub fn estimate_with_master(
     manifest: &Value,
     c: &Choice,
-    mp4_codec: Codec,
+    mp4_codec: impl Into<Mp4Plan>,
     master: Option<&MasterRate>,
 ) -> Result<Estimated, CmError> {
+    let mp4 = mp4_codec.into();
     let spec = QuickSpec::from_manifest(manifest)?;
     let duration_s = check_choice_for(manifest, &spec, c)?;
     if c.format == Format::Gif {
@@ -699,9 +763,13 @@ pub fn estimate_with_master(
         }
         _ => frame_for(c.size.unwrap_or(SizeChoice::Source), spec.screen.size)?,
     };
-    let (codec, fps) = match c.format {
-        Format::WebM => (Codec::Vp9, WEBM_FPS.min(spec.screen.fps.max(1.0))),
-        _ => (mp4_codec, spec.screen.fps),
+    let (codec, fps, cqp) = match c.format {
+        Format::WebM => (Codec::Vp9, WEBM_FPS.min(spec.screen.fps.max(1.0)), false),
+        _ => (
+            mp4.codec,
+            spec.screen.fps,
+            mp4.cqp && mp4.codec == Codec::H264,
+        ),
     };
     let channels = [spec.mic.as_ref(), spec.system.as_ref()]
         .into_iter()
@@ -717,6 +785,7 @@ pub fn estimate_with_master(
             fps,
             duration_s,
             audio_channels: channels,
+            cqp,
         },
         master,
     )))
@@ -860,6 +929,7 @@ mod tests {
             fps: 30.0,
             duration_s: 60.0,
             audio_channels: None,
+            cqp: false,
         };
         let (h, v) = (
             estimate_bound(&i(Codec::H264), None),
@@ -879,6 +949,7 @@ mod tests {
             fps: 30.0,
             duration_s: 60.0,
             audio_channels: Some(2),
+            cqp: false,
         };
         let b = estimate_bytes(&i);
         assert!(
@@ -915,6 +986,7 @@ mod tests {
             fps: 30.0,
             duration_s: 480.0,
             audio_channels: Some(2),
+            cqp: false,
         };
         let e = estimate_bound(&i, Some(&m));
         let t = e.typical_bytes.unwrap();
@@ -1035,5 +1107,92 @@ mod tests {
         let a = video_bps(Codec::Vp9, (1920, 1080), 30.0);
         let b = video_bps(Codec::Vp9, (1920, 1080), 60.0);
         assert!((b / a - 2.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn constant_quality_scales_the_video_part_of_the_bound_only() {
+        use crate::tools::caps_from_output;
+        let linux = EncoderPolicy::for_os("linux");
+        let mut c = caps_from_output(
+            "ffmpeg version 7.1",
+            " V h264_vaapi x\n V libvpx-vp9 y\n A aac z\n",
+        );
+        c.vaapi_device = Some("/dev/dri/renderD128".into());
+        // A driver with a bit-rate mode: capped, as before.
+        assert_eq!(
+            mp4_plan_for(&c, linux).unwrap(),
+            Mp4Plan {
+                codec: Codec::H264,
+                cqp: false
+            }
+        );
+        // The iHD driver of the UHD 620: constant quality.
+        c.vaapi_cqp = true;
+        assert_eq!(
+            mp4_plan_for(&c, linux).unwrap(),
+            Mp4Plan {
+                codec: Codec::H264,
+                cqp: true
+            }
+        );
+        // No render node: VP9, which has a cap whatever the flag says.
+        c.vaapi_device = None;
+        assert_eq!(
+            mp4_plan_for(&c, linux).unwrap(),
+            Mp4Plan {
+                codec: Codec::Vp9,
+                cqp: false
+            }
+        );
+        // macOS and Windows never set it.
+        let mac = caps_from_output("ffmpeg version 7.1", " V h264_videotoolbox x\n A aac z\n");
+        assert!(
+            !mp4_plan_for(&mac, EncoderPolicy::for_os("macos"))
+                .unwrap()
+                .cqp
+        );
+        assert!(!Mp4Plan::from(Codec::H264).cqp);
+
+        // Numbers: 1080p30, 20 s, no audio. Capped: (12 Mbps + 192 kbps) for 20 s is 30.5 MB,
+        // times 1.05, rounded up to 33 MB. Constant quality: four times the video part.
+        let i = |cqp| Inputs {
+            codec: Codec::H264,
+            format: Format::Mp4,
+            frame: (1920, 1080),
+            fps: 30.0,
+            duration_s: 20.0,
+            audio_channels: Some(2),
+            cqp,
+        };
+        let capped = estimate_bound(&i(false), None);
+        let cq = estimate_bound(&i(true), None);
+        assert_eq!(capped.max_bytes, 33_000_000); // unchanged: the report's "bound 33"
+        assert!(!capped.constant_quality && cq.constant_quality);
+        let video = 12_000_000.0 * 20.0 / 8.0;
+        let audio = 192_000.0 * 20.0 / 8.0;
+        let want = (video * CQP_WORST_CASE + audio) * BOUND_MARGIN;
+        assert!(cq.max_bytes as f64 >= want && (cq.max_bytes as f64) < want * 1.1);
+        // The three samples that were over the bound on the UHD 620 (real MB, old bound MB, frame):
+        // each ratio is under CQP_WORST_CASE, so each is inside the new bound.
+        for (real, old, frame) in [
+            (117.97, 33.0, (1920, 1080)),
+            (22.52, 15.0, (1280, 720)),
+            (6.82, 6.8, (854, 480)),
+        ] {
+            assert!(real / old <= CQP_WORST_CASE, "{frame:?}");
+            let e = estimate_bound(&Inputs { frame, ..i(true) }, None);
+            assert!(
+                e.max_bytes as f64 >= real * 1e6,
+                "{frame:?}: {}",
+                e.max_bytes
+            );
+        }
+        // The worst ratio of the report is under the constant with a margin.
+        const { assert!(CQP_WORST_CASE >= 3.6 * 1.1) };
+        // The typical size is not offered for constant quality; WebM and VP9 ignore the flag.
+        let m = master(800.0, (1920, 1080), 20.0);
+        assert!(estimate_bound(&i(false), Some(&m)).typical_bytes.is_some());
+        assert_eq!(estimate_bound(&i(true), Some(&m)).typical_bytes, None);
+        assert_eq!(estimate_bound(&i(true), Some(&m)).typical_label, None);
     }
 }

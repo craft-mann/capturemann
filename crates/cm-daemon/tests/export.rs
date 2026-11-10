@@ -795,35 +795,41 @@ async fn exp5_estimate_export_and_the_size_parameters() {
     assert!(a["label"].as_str().unwrap().starts_with("Up to "), "{a}");
     // The typical size from the 705 kbps master: well under the bound, the formula's own number
     // (`cm_media::estimate::typical_video_bps`), labelled "About".
-    let typical = a["typical_bytes"].as_u64().unwrap();
-    assert!(typical < hi / 2, "{a}");
-    assert!(
-        a["typical_label"].as_str().unwrap().starts_with("About "),
-        "{a}"
-    );
-    {
-        use cm_media::estimate::{self as est, Codec, Format, Inputs, MasterRate};
-        // The scripted recorder writes no `quality` on its screen track: an imported file's rule.
-        let m = MasterRate {
-            bytes: 705_000 * 60 / 8,
-            duration_s: 60.0,
-            frame: (2880, 1800),
-            fps: 30.0,
-            recorded: false,
-        };
-        let i = Inputs {
-            codec: if cfg!(target_os = "linux") {
-                Codec::parse_or_h264(a["codec"].as_str())
-            } else {
-                Codec::H264
-            },
-            format: Format::Mp4,
-            frame: (2880, 1800),
-            fps: 30.0,
-            duration_s: 60.0,
-            audio_channels: Some(1),
-        };
-        assert_eq!(typical, est::typical_of(est::typical_bytes_of(&i, &m), hi));
+    if a["constant_quality"] == true {
+        // VA-API in constant-quality mode: the bound stands alone (EXP-5).
+        assert!(a["typical_bytes"].is_null(), "{a}");
+    } else {
+        let typical = a["typical_bytes"].as_u64().unwrap();
+        assert!(typical < hi / 2, "{a}");
+        assert!(
+            a["typical_label"].as_str().unwrap().starts_with("About "),
+            "{a}"
+        );
+        {
+            use cm_media::estimate::{self as est, Codec, Format, Inputs, MasterRate};
+            // The scripted recorder writes no `quality` on its screen track: an imported file's rule.
+            let m = MasterRate {
+                bytes: 705_000 * 60 / 8,
+                duration_s: 60.0,
+                frame: (2880, 1800),
+                fps: 30.0,
+                recorded: false,
+            };
+            let i = Inputs {
+                codec: if cfg!(target_os = "linux") {
+                    Codec::parse_or_h264(a["codec"].as_str())
+                } else {
+                    Codec::H264
+                },
+                format: Format::Mp4,
+                frame: (2880, 1800),
+                fps: 30.0,
+                duration_s: 60.0,
+                audio_channels: Some(1),
+                cqp: false,
+            };
+            assert_eq!(typical, est::typical_of(est::typical_bytes_of(&i, &m), hi));
+        }
     }
     if !cfg!(target_os = "linux") {
         assert_eq!(a["codec"], "h264");

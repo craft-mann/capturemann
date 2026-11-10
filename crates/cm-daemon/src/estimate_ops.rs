@@ -8,7 +8,7 @@
 //! `max_mb`) and refuses what `export_video` refuses, with the same text.
 
 use cm_core::CmError;
-use cm_media::estimate::{self, Choice, Codec, Estimated, Format, MasterRate, SizeChoice};
+use cm_media::estimate::{self, Choice, Codec, Estimated, Format, MasterRate, Mp4Plan, SizeChoice};
 use serde_json::{json, Value};
 
 use crate::action::{parse_export_options, parse_export_size, Action, Fields};
@@ -69,9 +69,9 @@ pub(crate) fn master_rate_of(dir: &std::path::Path, manifest: &Value) -> Option<
 }
 
 /// The codec of an MP4 here. FFmpeg is looked up only where the answer needs it (Linux).
-pub(crate) fn mp4_codec_here() -> Result<Codec, CmError> {
+pub(crate) fn mp4_codec_here() -> Result<Mp4Plan, CmError> {
     let tools = cm_media::tools::locate().ok();
-    estimate::mp4_codec(tools.as_ref())
+    estimate::mp4_plan(tools.as_ref())
 }
 
 /// The sizes the chooser lists for a recording: the recording's size, the steps below it and the
@@ -93,7 +93,7 @@ pub(crate) fn options_json(master: (u32, u32)) -> Value {
 pub(crate) fn estimate_json(
     manifest: &Value,
     choice: &Choice,
-    mp4_codec: Codec,
+    mp4_codec: impl Into<Mp4Plan>,
     master: Option<&MasterRate>,
 ) -> Result<Value, CmError> {
     let spec = cm_media::QuickSpec::from_manifest(manifest)?;
@@ -101,7 +101,8 @@ pub(crate) fn estimate_json(
         Estimated::Bound(e) => json!({
             "max_bytes": e.max_bytes, "label": e.label,
             "typical_bytes": e.typical_bytes, "typical_label": e.typical_label,
-            "codec": e.codec.as_str(), "width": e.width, "height": e.height,
+            "codec": e.codec.as_str(), "constant_quality": e.constant_quality,
+            "width": e.width, "height": e.height,
             "fps": e.fps, "duration_s": e.duration_s,
         }),
         Estimated::KnownAfterExport { duration_s } => {
@@ -128,7 +129,7 @@ impl Inner {
             let codec = if choice.format == Format::Mp4 {
                 mp4_codec_here()?
             } else {
-                Codec::H264
+                Codec::H264.into()
             };
             let master = master_rate_of(&dir, &manifest);
             estimate_json(&manifest, &choice, codec, master.as_ref())

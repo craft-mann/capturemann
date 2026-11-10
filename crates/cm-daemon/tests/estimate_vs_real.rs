@@ -98,7 +98,7 @@ fn exp5_ac6_the_range_contains_the_real_size() {
         eprintln!("SKIPPED: FFmpeg was not found");
         return;
     };
-    let codec = estimate::mp4_codec(Some(&tools)).unwrap();
+    let codec = estimate::mp4_plan(Some(&tools)).unwrap();
     let lib = tempfile::tempdir().unwrap();
     let mut rows: Vec<Row> = Vec::new();
     let mut quality: Vec<String> = Vec::new();
@@ -181,13 +181,14 @@ fn exp5_ac6_the_range_contains_the_real_size() {
                         codec: if format == Format::WebM {
                             estimate::Codec::Vp9
                         } else {
-                            codec
+                            codec.codec
                         },
                         format,
                         frame: (e.width, e.height),
                         fps: e.fps,
                         duration_s: e.duration_s,
                         audio_channels: Some(2),
+                        cqp: e.constant_quality,
                     }),
                     real: out.size_bytes,
                     est_s: e.duration_s,

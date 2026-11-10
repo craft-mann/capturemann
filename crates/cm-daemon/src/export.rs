@@ -757,7 +757,7 @@ impl Inner {
             let codec = if format == cm_media::estimate::Format::Mp4 {
                 crate::estimate_ops::mp4_codec_here()?
             } else {
-                cm_media::estimate::Codec::H264
+                cm_media::estimate::Codec::H264.into()
             };
             let choice = cm_media::estimate::Choice {
                 format,

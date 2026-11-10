@@ -76,4 +76,6 @@ Same samples and the VP9 rows at the typical sample (before the cap, `-b:v 0 -cr
 
 Cause: hardware H.264 and constant-quality VP9 adapt their size to the picture (0.56 MB for a static screen to 40.6 MB for motion in WebM at 1080p, a ratio of 70), and a window of 1.4x cannot cover that. The first VP9 table (guessed at 0.3 to 2.6 Mbps) failed all 9 WebM samples. The maintainer chose to change what the label promises (an upper bound) and to make the bound true by capping the encoder.
 
+Update, Nov 10, 2026: the Linux run on an Intel UHD 620 (VA-API, constant quality because the iHD driver refuses `-b:v`) had 3 of 18 samples above this bound, all high-motion MP4 (real / bound 3.57, 1.50 and 1.00; `verification/L1-linux-0.3.1-estimate-vs-real-x11-uhd620-vaapi-2026-11-10-claude.md`). The table above is a ceiling only for encoders that take a rate; for VA-API in CQP mode the exporter now counts the video at 4.0 times (`CQP_WORST_CASE`) and omits the typical size.
+
 Not measured: Windows (Media Foundation, NVENC, QSV, AMF), Linux (VA-API, and VP9 in MP4), 60 fps, 1440p and 4K sources, a camera bubble, clips longer than 20 s, real screen recordings.
