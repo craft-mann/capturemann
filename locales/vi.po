@@ -2040,7 +2040,6 @@ msgstr "Lời của đoạn này vẫn đang được tạo."
 msgid "The transcript is being written on {this_computer}. The first part is below and the rest follows by itself. Speaker labels follow when it is complete."
 msgstr "Bản chép lời đang được tạo trên {this_computer}. Phần đầu ở bên dưới, phần còn lại sẽ tự đến. Nhãn người nói được thêm khi bản chép lời hoàn tất."
 
-#, fuzzy
 msgid "Partial transcript"
 msgstr "Bản chép lời một phần"
 
@@ -3521,10 +3520,9 @@ msgstr "Chép lời bản ghi"
 msgid "Transcribing needs a speech model. Add one on the AI page."
 msgstr "Chép lời cần một mô hình giọng nói. Hãy thêm một mô hình ở trang AI."
 
-#, fuzzy
 msgid "Transcribing: the first {n} minute is ready. The rest follows."
 msgid_plural "Transcribing: the first {n} minutes are ready. The rest follows."
-msgstr[0] "Đang chép lời: {n} phút đầu đã sẵn sàng. Phần còn lại sẽ tiếp tục."
+msgstr[0] "Đang chép lời: đã có bản chép lời của {n} phút đầu. Phần còn lại đang được xử lý."
 
 msgid "Transcribing…"
 msgstr "Đang chép lời…"
@@ -8647,7 +8645,7 @@ msgid "Noise-reduced copy"
 msgstr "Bản đã khử nhiễu"
 
 msgid "The original microphone keeps quiet and distant voices that noise reduction can drop. A recording made without noise reduction has only the original. Applies to transcripts started from now on."
-msgstr "Micrô gốc giữ được những giọng nhỏ và ở xa mà khử nhiễu có thể làm mất. Bản ghi không dùng khử nhiễu chỉ có micrô gốc. Áp dụng cho các bản chép lời bắt đầu từ bây giờ."
+msgstr "Âm thanh micrô gốc giữ được cả tiếng nói nhỏ và tiếng nói từ xa, vốn có thể bị mất khi khử nhiễu. Nếu lúc ghi không bật khử nhiễu, chỉ có âm thanh micrô gốc. Lựa chọn này áp dụng cho các lượt chép lời bắt đầu từ bây giờ."
 
 msgctxt "field"
 msgid "Audio"
@@ -9684,55 +9682,44 @@ msgstr "Linux không hỏi quyền theo từng ứng dụng. Môi trường desk
 msgid "Shown in the video only: this desktop does not let programs record the pointer’s position or clicks"
 msgstr "Chỉ hiện trong video: desktop này không cho chương trình ghi vị trí hay lượt nhấp của con trỏ"
 
-#, fuzzy
 msgid "Can't fit under {max} MB at {width} px and {fps} fps."
-msgstr "Không thể giữ dưới {max} MB ở {width} px và {fps} fps."
+msgstr "Không thể xuất tệp dưới {max} MB với chiều rộng {width} px và tốc độ {fps} khung hình/giây."
 
-#, fuzzy
 msgid "Estimate the size of an export"
-msgstr "Ước tính dung lượng khi xuất"
+msgstr "Ước tính dung lượng tệp xuất"
 
 msgid "GIF is for clips of {max} s or less. This one is {duration}."
 msgstr "GIF chỉ dành cho đoạn từ {max} giây trở xuống. Đoạn này dài {duration}."
 
 msgid "Set In and Out on the timeline to pick a short part, or choose MP4 or WebM."
-msgstr "Đặt In và Out trên dòng thời gian để chọn một đoạn ngắn, hoặc chọn MP4 hay WebM."
+msgstr "Đặt điểm vào và điểm ra trên dòng thời gian để chọn một đoạn ngắn, hoặc chọn định dạng MP4 hay WebM."
 
-#, fuzzy
 msgid "{size} is larger than the recording ({width} × {height}). Choose the recording size or a smaller one."
-msgstr "{size} lớn hơn bản ghi ({width} × {height}). Hãy chọn kích thước gốc hoặc nhỏ hơn."
+msgstr "Kích thước {size} vượt quá kích thước gốc ({width} × {height}). Hãy chọn kích thước gốc hoặc nhỏ hơn."
 
-#, fuzzy
 msgid "Under 5 MB"
 msgstr "Dưới 5 MB"
 
-#, fuzzy
 msgid "Up to {size}"
 msgstr "Tối đa {size}"
 
-#, fuzzy
 msgid "About {size}"
 msgstr "Khoảng {size}"
 
-#, fuzzy
 msgid "up to {size}"
 msgstr "tối đa {size}"
 
-#, fuzzy
 msgid "estimate: under 5 MB"
 msgstr "ước tính: dưới 5 MB"
 
-#, fuzzy
 msgid "estimate: up to {size}"
 msgstr "ước tính: tối đa {size}"
 
-#, fuzzy
 msgid "estimate: about {size}, up to {max}"
-msgstr "ước tính: khoảng {size}, tối đa {max}"
+msgstr "ước tính: thường khoảng {size}, tối đa {max}"
 
-#, fuzzy
 msgid "estimate: under 5 MB, up to {max}"
-msgstr "ước tính: dưới 5 MB, tối đa {max}"
+msgstr "ước tính: thường dưới 5 MB, tối đa {max}"
 
 msgctxt "export popover"
 msgid "Export"
@@ -9742,7 +9729,7 @@ msgid "Recording size"
 msgstr "Kích thước gốc"
 
 msgid "Plays almost everywhere"
-msgstr "Phát được hầu hết mọi nơi"
+msgstr "Tương thích với hầu hết trình phát"
 
 msgid "Smaller, for the web"
 msgstr "Nhỏ hơn, dùng cho web"
@@ -9751,27 +9738,24 @@ msgid "Short loop for docs and PRs"
 msgstr "Ảnh động ngắn cho tài liệu, PR"
 
 msgid "Never larger than the recording"
-msgstr "Không lớn hơn bản ghi"
+msgstr "Kích thước khung hình không vượt quá bản ghi gốc"
 
 msgid "Width"
 msgstr "Chiều rộng"
 
 msgid "Keep the file under"
-msgstr "Giữ tệp dưới"
+msgstr "Giới hạn dung lượng tệp"
 
 msgid "Keep the file under {mb} MB"
-msgstr "Giữ tệp dưới {mb} MB"
+msgstr "Giữ dung lượng tệp dưới {mb} MB"
 
-#, fuzzy
 msgid "Megabytes"
 msgstr "Megabyte"
 
-#, fuzzy
 msgctxt "field"
 msgid "MB"
 msgstr "MB"
 
-#, fuzzy
 msgctxt "unit"
 msgid "MB"
 msgstr "MB"
@@ -9783,12 +9767,11 @@ msgctxt "size tag"
 msgid "Estimate"
 msgstr "Ước tính"
 
-#, fuzzy
 msgid "File size"
 msgstr "Dung lượng tệp"
 
 msgid "Size known after export"
-msgstr "Biết dung lượng sau khi xuất"
+msgstr "Hiển thị dung lượng sau khi xuất"
 
 msgid "Can’t export as GIF"
 msgstr "Không xuất được GIF"
@@ -9802,45 +9785,36 @@ msgstr "Đã xuất · {size}"
 msgid "{time} after cuts"
 msgstr "{time} sau khi cắt"
 
-#, fuzzy
 msgid "{time} between In and Out"
-msgstr "{time} giữa In và Out"
+msgstr "{time} từ điểm vào đến điểm ra"
 
-#, fuzzy
 msgid "In {from} → Out {to} · {secs} s ({max} s at most)"
-msgstr "In {from} → Out {to} · {secs} giây (tối đa {max} giây)"
+msgstr "Vào {from} → Ra {to} · {secs} giây (tối đa {max} giây)"
 
 msgid "Whole recording · {length} ({max} s at most)"
 msgstr "Cả bản ghi · {length} (tối đa {max} giây)"
 
-#, fuzzy
 msgid "GIF size can’t be estimated. It will stay under {mb} MB: width, then frame rate, step down to fit."
-msgstr "Không thể ước tính dung lượng GIF. Tệp sẽ dưới {mb} MB: giảm chiều rộng, rồi tốc độ khung hình cho vừa."
+msgstr "Không thể ước tính dung lượng GIF. Để tệp dưới {mb} MB, ứng dụng sẽ giảm chiều rộng trước, rồi giảm tốc độ khung hình nếu cần."
 
-#, fuzzy
 msgid "GIF size can’t be estimated. The real size is shown after export."
-msgstr "Không thể ước tính dung lượng GIF. Dung lượng thật hiện sau khi xuất."
+msgstr "Không thể ước tính dung lượng GIF. Dung lượng thực tế sẽ hiển thị sau khi xuất."
 
 msgid "The real size is shown after export."
-msgstr "Dung lượng thật hiện sau khi xuất."
+msgstr "Dung lượng thực tế sẽ hiển thị sau khi xuất."
 
-#, fuzzy
 msgid "{format} · {codec} · {width} × {height}. A quiet screen usually comes out much smaller. The real size is shown after export."
-msgstr "{format} · {codec} · {width} × {height}. Màn hình ít chuyển động thường nhỏ hơn nhiều. Dung lượng thật hiện sau khi xuất."
+msgstr "{format} · {codec} · {width} × {height}. Nếu nội dung trên màn hình ít thay đổi, tệp xuất thường có dung lượng nhỏ hơn nhiều. Dung lượng thực tế sẽ hiển thị sau khi xuất."
 
-#, fuzzy
 msgid "{format}, {width} × {height}. The original tracks are untouched."
-msgstr "{format}, {width} × {height}. Các track gốc không bị thay đổi."
+msgstr "{format}, {width} × {height}. Các bản ghi gốc được giữ nguyên."
 
-#, fuzzy
 msgid "This computer has no H.264 video encoder, so MP4 files use VP9 video. Browsers play them; some older players and editors may not."
-msgstr "Máy này không có bộ mã hoá video H.264, nên tệp MP4 dùng video VP9. Trình duyệt phát được; một số trình phát và trình chỉnh sửa cũ có thể không phát được."
+msgstr "Máy tính này không có bộ mã hóa video H.264 nên tệp MP4 dùng VP9. Trình duyệt có thể phát các tệp này, nhưng một số trình phát và phần mềm chỉnh sửa cũ có thể không hỗ trợ."
 
-#, fuzzy
 msgid "Press Export… to choose a format and size for one file with the screen, camera bubble and audio."
-msgstr "Nhấn Xuất… để chọn định dạng và kích thước cho một tệp gồm màn hình, bong bóng camera và âm thanh."
+msgstr "Nhấn Xuất… để chọn định dạng và kích thước khung hình cho tệp chứa bản ghi màn hình, bong bóng camera và âm thanh."
 
-#, fuzzy
 msgctxt "button"
 msgid "Export…"
 msgstr "Xuất…"
@@ -9850,26 +9824,20 @@ msgctxt "button"
 msgid "Exporting {pct}%"
 msgstr "Đang xuất {pct}%"
 
-#, fuzzy
 msgid "{format} · {codec} · {width} × {height}. At most {size}. The real size is shown after export."
-msgstr "{format} · {codec} · {width} × {height}. Tối đa {size}. Dung lượng thật hiện sau khi xuất."
+msgstr "{format} · {codec} · {width} × {height}. Tối đa {size}. Dung lượng thực tế sẽ hiển thị sau khi xuất."
 
-#, fuzzy
 msgid "{format} · {codec} · {width} × {height}. The real size is shown after export."
-msgstr "{format} · {codec} · {width} × {height}. Dung lượng thật hiện sau khi xuất."
+msgstr "{format} · {codec} · {width} × {height}. Dung lượng thực tế sẽ hiển thị sau khi xuất."
 
-#, fuzzy
 msgid "Making one WebM with the camera bubble and audio: {pct}%"
-msgstr "Đang tạo một WebM gồm bong bóng camera và âm thanh: {pct}%"
+msgstr "Đang tạo tệp WebM có bong bóng camera và âm thanh: {pct}%"
 
-#, fuzzy
 msgid "{title} · Making one WebM with the camera bubble and audio: {pct}%"
-msgstr "{title} · Đang tạo một WebM có bong bóng camera và âm thanh: {pct}%"
+msgstr "{title} · Đang tạo tệp WebM có bong bóng camera và âm thanh: {pct}%"
 
-#, fuzzy
 msgid "Making a GIF of the screen: {pct}%"
-msgstr "Đang tạo ảnh GIF của màn hình: {pct}%"
+msgstr "Đang tạo GIF từ bản ghi màn hình: {pct}%"
 
-#, fuzzy
 msgid "{title} · Making a GIF of the screen: {pct}%"
-msgstr "{title} · Đang tạo ảnh GIF của màn hình: {pct}%"
+msgstr "{title} · Đang tạo GIF từ bản ghi màn hình: {pct}%"
