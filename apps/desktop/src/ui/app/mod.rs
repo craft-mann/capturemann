@@ -284,6 +284,13 @@ impl AppModel {
                     .get(cm_ai::pipeline::KEY_RAW_MIC)
                     .and_then(|v| v.as_bool()),
                 glossary: cm_ai::glossary::from_value(settings.get(crate::ui::ai::KEY_GLOSSARY)),
+                ignore_phrases: cm_ai::guard::phrases_from_value(
+                    settings.get(cm_ai::guard::SETTING_IGNORE_PHRASES),
+                ),
+                drop_unsupported_off: settings
+                    .get(cm_ai::pipeline::KEY_DROP_UNSUPPORTED)
+                    .and_then(|v| v.as_bool())
+                    == Some(false),
                 languages: crate::ai::models::languages_from_value(
                     settings.get(crate::ui::ai::KEY_LANGUAGES),
                 ),

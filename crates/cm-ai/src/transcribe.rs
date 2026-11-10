@@ -47,6 +47,10 @@ pub struct Transcript {
     /// read from disk has none.
     #[serde(default, skip)]
     pub segments: Vec<SegmentStat>,
+    /// Lines the guard left out (AI-1.AC12 to AC14): kept with their time ranges so nothing
+    /// disappears silently. Additive: an older `transcript.json` has none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dropped: Vec<crate::guard::DroppedLine>,
 }
 
 /// One decoded segment's own numbers, in the same time as the words.
@@ -285,6 +289,7 @@ impl Transcriber for ScriptedTranscriber {
             note,
             sounds: Vec::new(),
             segments: Vec::new(),
+            dropped: Vec::new(),
         })
     }
 
@@ -323,6 +328,7 @@ impl Transcriber for ScriptedTranscriber {
             note,
             sounds: Vec::new(),
             segments: Vec::new(),
+            dropped: Vec::new(),
         })
     }
 }

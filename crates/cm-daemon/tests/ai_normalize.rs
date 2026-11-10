@@ -138,6 +138,7 @@ fn transcript(words: usize) -> Transcript {
         note: None,
         sounds: Vec::new(),
         segments: Vec::new(),
+        dropped: Vec::new(),
     }
 }
 

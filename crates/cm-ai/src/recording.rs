@@ -40,6 +40,9 @@ pub struct TranscribeOptions<'a> {
     pub original_audio: bool,
     /// The decoder options of the run, as text (see `LiveKey::variant`).
     pub variant: &'a str,
+    /// Drop the lines the audio does not support (`ai.drop_unsupported_lines`, AI-1.AC12). Off
+    /// by default here; the daemon passes the setting, which is on unless the user turned it off.
+    pub drop_unsupported_lines: bool,
 }
 
 /// Path of `transcript.json` in a bundle folder.
@@ -147,6 +150,7 @@ pub fn partial_from_checkpoint(bundle: &Path, checkpoint: &Value) -> Option<Part
             words,
             sounds,
             segments: Vec::new(),
+            dropped: Vec::new(),
         },
         partial: true,
         covered_secs: covered.min(total_secs),
@@ -402,6 +406,21 @@ fn run_recording(
         )?
         .0
     };
+    // The shape check against text nobody said (AI-1.AC12): on the words in file time, with the
+    // audio they were read from. The lines it drops are kept in the transcript.
+    if opts.drop_unsupported_lines && !translate {
+        let (kept, dropped) =
+            crate::guard::drop_unsupported(std::mem::take(&mut t.words), &mixed, base);
+        t.words = kept;
+        t.dropped = dropped
+            .into_iter()
+            .map(|d| crate::guard::DroppedLine {
+                start: file_to_session(gaps, d.start, false),
+                end: file_to_session(gaps, d.end, true),
+                ..d
+            })
+            .collect();
+    }
     t.words = t
         .words
         .into_iter()
@@ -458,6 +477,7 @@ mod tests {
                 note: None,
                 sounds: vec![],
                 segments: vec![],
+                dropped: Vec::new(),
             },
             partial: true,
             covered_secs: 300.0,
@@ -537,6 +557,7 @@ mod tests {
             note: None,
             sounds: Vec::new(),
             segments: Vec::new(),
+            dropped: Vec::new(),
         };
         write_transcript(dir.path(), &t).unwrap();
         assert_eq!(read_transcript(dir.path()).unwrap().unwrap(), t);

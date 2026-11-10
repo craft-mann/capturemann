@@ -1412,6 +1412,70 @@ async fn ai_6a_glossary_is_app_only_primes_the_run_and_fixes_the_words() {
     );
 }
 
+/// AI-1.AC13: the ignore list is an app-only setting (agents can read it, not write it), empty by
+/// default; with a phrase set, a new transcription leaves out the lines that contain it (folded
+/// text) and counts them; without one nothing changes.
+#[tokio::test]
+async fn ai_1_ac13_ignore_phrases_are_app_only_empty_by_default_and_drop_lines() {
+    let r = rig(FakeAi::new().with_small_installed(), Decision::Approve).await;
+    r.ai.set_words(vec![
+        word("Open", 1.0, 1.4, 0.9),
+        word("the", 1.5, 1.7, 0.9),
+        word("file", 1.8, 2.3, 0.9),
+        word("Hãy", 6.0, 6.3, 0.9),
+        word("Subscribe", 6.4, 6.8, 0.9),
+        word("cho", 6.9, 7.2, 0.9),
+        word("kênh", 7.3, 7.6, 0.9),
+        word("X", 7.7, 8.0, 0.9),
+        word("then", 12.0, 12.3, 0.9),
+        word("save", 12.4, 12.8, 0.9),
+    ]);
+    let phrases = json!(["subscribe CHO kenh"]);
+    let e = r
+        .daemon
+        .execute_method(
+            agent("claude"),
+            0,
+            "set_settings",
+            &json!({"values": {"ai.ignore_phrases": phrases}}),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(reason(&e), "app_only_setting");
+    // Empty by default: nothing is dropped.
+    let t = user(&r, "transcribe", json!({})).await.unwrap();
+    let job = job_done(&r, t["job_id"].as_str().unwrap()).await;
+    assert_eq!(job["result"]["lines_ignored"], 0);
+    assert_eq!(job["result"]["words"], 10);
+    r.daemon
+        .execute_method(
+            Actor::User,
+            0,
+            "set_settings",
+            &json!({"values": {"ai.ignore_phrases": phrases}}),
+        )
+        .await
+        .unwrap();
+    let got = r
+        .daemon
+        .execute_method(agent("claude"), 0, "get_settings", &json!({}))
+        .await
+        .unwrap();
+    assert_eq!(
+        got["settings"]["ai.ignore_phrases"][0],
+        "subscribe CHO kenh"
+    );
+    let t = user(&r, "transcribe", json!({})).await.unwrap();
+    let job = job_done(&r, t["job_id"].as_str().unwrap()).await;
+    assert_eq!(job["state"], "done", "{job}");
+    assert_eq!(job["result"]["lines_ignored"], 1);
+    assert_eq!(job["result"]["words"], 5);
+    let tr = user(&r, "get_transcript", json!({})).await.unwrap();
+    let dropped = &tr["transcript"]["dropped"];
+    assert_eq!(dropped[0]["reason"], "ignored");
+    assert_eq!(dropped[0]["words"], 5);
+}
+
 /// AI-6a: a re-generate keeps the caption edits where the same words are heard again and counts
 /// the ones it cannot place; one undo step brings back the previous captions.
 #[tokio::test]

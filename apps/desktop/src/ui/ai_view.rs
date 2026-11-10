@@ -13,6 +13,7 @@ mod voice;
 use voice::VoiceField;
 
 use crate::ai::glossary::{heard_text, remove, row_hint, upsert, GlossaryError};
+use crate::ai::ignore::IgnoreError;
 use crate::ui::text_field::{CaretAt, TextField, TextFieldEvent};
 
 use crate::ai::models::{
@@ -39,6 +40,9 @@ pub struct AiPage {
     /// The glossary form: `None` closed, `Some(None)` adding, `Some(Some(i))` editing entry `i`.
     glossary_edit: Option<Option<usize>>,
     glossary_error: Option<GlossaryError>,
+    /// The ignore list's box (AI-1.AC13) and the message for a phrase that was not added.
+    ignore_field: Entity<TextField>,
+    ignore_error: Option<IgnoreError>,
     term_field: Entity<TextField>,
     heard_field: Entity<TextField>,
     /// The voice sections' box (V8): your name.
@@ -60,6 +64,14 @@ impl AiPage {
         let heard_field = cx.new(|cx| {
             TextField::new(tr!("Often heard as"), tr!("Logo Drive, Gu gồ Drai"), cx).without_icon()
         });
+        let ignore_field = cx.new(|cx| {
+            TextField::new(
+                tr!("Phrase to leave out"),
+                tr!("Part of a line, any capitals or accents"),
+                cx,
+            )
+            .without_icon()
+        });
         let lang_field = cx
             .new(|cx| TextField::new(tr!("Languages you speak"), tr!("vi, en"), cx).without_icon());
         let me = voice_default_name();
@@ -76,6 +88,11 @@ impl AiPage {
             cx.subscribe(&lang_field, |this, _f, ev: &TextFieldEvent, cx| {
                 if matches!(ev, TextFieldEvent::Submitted) {
                     this.languages_save(cx);
+                }
+            }),
+            cx.subscribe(&ignore_field, |this, _f, ev: &TextFieldEvent, cx| {
+                if matches!(ev, TextFieldEvent::Submitted) {
+                    this.ignore_add(cx);
                 }
             }),
             cx.subscribe(&term_field, |this, _f, ev: &TextFieldEvent, cx| {
@@ -95,6 +112,8 @@ impl AiPage {
             lang_error: None,
             glossary_edit: None,
             glossary_error: None,
+            ignore_field,
+            ignore_error: None,
             term_field,
             heard_field,
             _subs: subs,
@@ -216,6 +235,109 @@ impl AiPage {
             ai::set_glossary(&self.app, list, cx);
         }
         cx.notify();
+    }
+
+    // ---- the lines to leave out (AI-1.AC13) -------------------------------------------------
+
+    fn ignore_add(&mut self, cx: &mut Context<Self>) {
+        let text = self.ignore_field.read(cx).text().to_owned();
+        let mut list = self.app.read(cx).ai.ignore_phrases.clone();
+        match crate::ai::ignore::add(&mut list, &text) {
+            Ok(()) => {
+                self.ignore_error = None;
+                self.ignore_field
+                    .update(cx, |f, cx| f.load("", CaretAt::End, cx));
+                ai::set_ignore_phrases(&self.app, list, cx);
+            }
+            Err(e) => self.ignore_error = Some(e),
+        }
+        cx.notify();
+    }
+
+    fn ignore_remove(&mut self, i: usize, cx: &mut Context<Self>) {
+        let mut list = self.app.read(cx).ai.ignore_phrases.clone();
+        if crate::ai::ignore::remove(&mut list, i) {
+            ai::set_ignore_phrases(&self.app, list, cx);
+        }
+        cx.notify();
+    }
+
+    /// The "Lines to leave out" section: your own list, empty until you add a phrase.
+    fn ignore_section(&self, t: &Theme, cx: &mut Context<Self>) -> AnyElement {
+        let phrases = self.app.read(cx).ai.ignore_phrases.clone();
+        let mut rows = list_card(t)
+            .id("ai-ignore")
+            .role(Role::List)
+            .aria_label(SharedString::from(tr!("Lines to leave out")));
+        if phrases.is_empty() {
+            rows = rows.child(div().px(px(18.)).py(px(16.)).child(caption(
+                t,
+                tr!("No phrases yet. Nothing is left out unless you add one."),
+            )));
+        }
+        for (i, p) in phrases.iter().enumerate() {
+            let rm = small_button_with_icon(
+                t,
+                SharedString::from(format!("ai-ignore-remove-{i}")),
+                &tr_ctx!("ignored phrase", "Remove"),
+                Some("trash-2"),
+            )
+            .aria_label(SharedString::from(tr!(
+                "Remove {phrase}",
+                phrase = p.clone()
+            )))
+            .on_click(cx.listener(move |this, _, _, cx| this.ignore_remove(i, cx)));
+            rows = rows.child(
+                settings_row(
+                    t,
+                    Some("captions"),
+                    p.clone(),
+                    None,
+                    Some(rm.into_any_element()),
+                    i + 1 == phrases.len(),
+                )
+                .id(SharedString::from(format!("ai-ignore-{i}")))
+                .role(Role::ListItem)
+                .aria_label(SharedString::from(p.clone())),
+            );
+        }
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(12.))
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(2.))
+                    .child(
+                        div()
+                            .text_size(px(type_scale::BODY))
+                            .font_weight(FontWeight::MEDIUM)
+                            .child(tr!("Lines to leave out")),
+                    )
+                    .child(caption(
+                        t,
+                        tr!(
+                            "Lines of a new transcript that contain one of these phrases are left out and counted. Capitals, accents and punctuation do not matter."
+                        ),
+                    )),
+            )
+            .child(rows)
+            .child(self.ignore_field.clone())
+            .children(self.ignore_error.map(|e| {
+                div()
+                    .text_size(px(type_scale::CAPTION))
+                    .text_color(rgba_of(t.warning))
+                    .child(SharedString::from(e.text()))
+            }))
+            .child(
+                div().flex().child(
+                    small_button_with_icon(t, "ai-ignore-add", &tr!("Add a phrase"), Some("plus"))
+                        .on_click(cx.listener(|this, _, _, cx| this.ignore_add(cx))),
+                ),
+            )
+            .into_any_element()
     }
 
     /// The Glossary section: what it is for, the entries, and the add or edit form.
@@ -665,6 +787,19 @@ impl Render for AiPage {
             let app = self.app.clone();
             cx.listener(move |_, _, _, cx| ai::set_auto_suggest_cuts(&app, !cuts_on, cx))
         });
+        let drop_on = !self.app.read(cx).ai.drop_unsupported_off;
+        let drop_switch = switch(
+            &t,
+            "ai-drop-unsupported",
+            tr!("Leave out lines the audio does not hold"),
+            drop_on,
+            true,
+        )
+        .on_click({
+            let app = self.app.clone();
+            cx.listener(move |_, _, _, cx| ai::set_drop_unsupported(&app, !drop_on, cx))
+        });
+        let ignore = self.ignore_section(&t, cx);
         let glossary = self.glossary_section(&t, cx);
         let speakers = self.speakers_section(&t, cx);
         let text_model = self.text_model_section(&t, window, cx);
@@ -824,6 +959,16 @@ impl Render for AiPage {
                                             Some(cuts_switch.into_any_element()),
                                             false,
                                         ))
+                                        .child(settings_row(
+                                            &t,
+                                            Some("audio-lines"),
+                                            tr!("Leave out lines the audio does not hold"),
+                                            Some(SharedString::from(tr!(
+                                                "Sometimes a transcript has a sentence that nobody said, over a stretch with no speech. Such lines are left out of new transcripts and counted; the check looks at the sound, not at the words."
+                                            ))),
+                                            Some(drop_switch.into_any_element()),
+                                            false,
+                                        ))
                                         .child(self.languages_row(&t, cx)),
                                 )
                                 .child(speakers),
@@ -838,7 +983,8 @@ impl Render for AiPage {
                                 .flex_col()
                                 .gap(px(24.))
                                 .child(text_model)
-                                .child(glossary),
+                                .child(glossary)
+                                .child(ignore),
                         ),
                 )
         )

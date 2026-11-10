@@ -331,6 +331,11 @@ pub struct ModelsVm {
     pub transcribe_raw_mic: Option<bool>,
     /// `ai.glossary` (AI-6a): names and terms spelled the user's way in new transcripts.
     pub glossary: Vec<cm_ai::glossary::GlossaryEntry>,
+    /// `ai.ignore_phrases` (AI-1.AC13): lines containing one of these are left out of new
+    /// transcripts. Empty until the user adds a phrase.
+    pub ignore_phrases: Vec<String>,
+    /// `ai.drop_unsupported_lines` is off (stored inverted so that the default, on, is `false`).
+    pub drop_unsupported_off: bool,
     /// `ai.languages`: the languages the user speaks, as codes joined by commas (`vi,en`); empty
     /// means Whisper chooses among all of them.
     pub languages: String,

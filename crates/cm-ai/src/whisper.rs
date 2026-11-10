@@ -857,6 +857,7 @@ impl WhisperTranscriber {
                 note: Some("No speech detected".to_owned()),
                 sounds: Vec::new(),
                 segments: Vec::new(),
+                dropped: Vec::new(),
             });
         }
         let pct = Arc::new(AtomicI32::new(0));
@@ -918,6 +919,7 @@ impl WhisperTranscriber {
                     avg_logprob: *lp,
                 })
                 .collect(),
+            dropped: Vec::new(),
         })
     }
 }

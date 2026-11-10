@@ -54,6 +54,8 @@ pub const KEY_RAW_MIC: &str = "ai.transcribe_raw_mic";
 pub const KEY_REPAIR_WORD_TIMES: &str = "ai.repair_word_times";
 /// Windows read again (loops, broken words, speech with no words) are decoded with beam search.
 pub const KEY_CAREFUL_REREADS: &str = "ai.careful_rereads";
+/// Lines of text over audio that holds no speech are dropped and counted (AI-1.AC12; default on).
+pub const KEY_DROP_UNSUPPORTED: &str = "ai.drop_unsupported_lines";
 
 /// Which of the review's behaviours are on for a run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,6 +79,9 @@ pub struct PipelineSettings {
     /// Windows read again by the pipeline use beam search (5 beams, no temperature fallback); the
     /// first reading is unchanged.
     pub careful_rereads: bool,
+    /// Lines the shape check finds unsupported by the audio are dropped after the transcription
+    /// ([`crate::guard::drop_unsupported`]).
+    pub drop_unsupported_lines: bool,
 }
 
 impl Default for PipelineSettings {
@@ -89,6 +94,7 @@ impl Default for PipelineSettings {
             transcribe_raw_mic: true,
             repair_word_times: true,
             careful_rereads: false,
+            drop_unsupported_lines: true,
         }
     }
 }
@@ -110,6 +116,7 @@ impl PipelineSettings {
             transcribe_raw_mic: b(KEY_RAW_MIC, d.transcribe_raw_mic),
             repair_word_times: b(KEY_REPAIR_WORD_TIMES, d.repair_word_times),
             careful_rereads: b(KEY_CAREFUL_REREADS, d.careful_rereads),
+            drop_unsupported_lines: b(KEY_DROP_UNSUPPORTED, d.drop_unsupported_lines),
         }
     }
 
@@ -123,6 +130,7 @@ impl PipelineSettings {
             transcribe_raw_mic: false,
             repair_word_times: false,
             careful_rereads: false,
+            drop_unsupported_lines: false,
         }
     }
 }
@@ -348,6 +356,7 @@ mod tests {
             KEY_RAW_MIC,
             KEY_REPAIR_WORD_TIMES,
             KEY_CAREFUL_REREADS,
+            KEY_DROP_UNSUPPORTED,
         ] {
             m.insert(k.into(), serde_json::Value::Bool(false));
         }
@@ -360,6 +369,8 @@ mod tests {
         // that never stored the key). A stored `false` keeps the noise-reduced copy; a stored
         // `true` is kept too.
         assert!(PipelineSettings::from_settings(&none).transcribe_raw_mic);
+        // AI-1.AC12: the shape check is on unless the user turns it off.
+        assert!(PipelineSettings::from_settings(&none).drop_unsupported_lines);
         let mut off = serde_json::Map::new();
         off.insert(KEY_RAW_MIC.into(), serde_json::Value::Bool(false));
         assert!(!PipelineSettings::from_settings(&off).transcribe_raw_mic);

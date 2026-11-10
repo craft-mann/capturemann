@@ -279,6 +279,7 @@ impl TranscribeService for RealTranscribe {
             prompt: prompt.as_deref(),
             original_audio: req.original_audio,
             variant: &format!("{:?}", req.pipeline),
+            drop_unsupported_lines: req.pipeline.drop_unsupported_lines,
         };
         match cm_ai::recording::transcribe_recording_resumable(
             &req.bundle_dir,

@@ -421,6 +421,7 @@ fn a_bad_reading_is_read_again_from_the_other_file_of_the_recording() {
                 note: None,
                 sounds: Vec::new(),
                 segments: Vec::new(),
+                dropped: Vec::new(),
             })
         }
     }
@@ -480,4 +481,132 @@ fn a_bad_reading_is_read_again_from_the_other_file_of_the_recording() {
     )
     .unwrap();
     assert!(out.words.len() < 20, "{} words", out.words.len());
+}
+
+/// A script in file time that answers only for the window it is given (the pipeline reads
+/// stretches again).
+struct Windowed(Vec<cm_ai::transcribe::Word>);
+
+impl Transcriber for Windowed {
+    fn transcribe(
+        &self,
+        audio: Pcm16k<'_>,
+        _language: Option<&str>,
+        _progress: &mut dyn FnMut(f32) -> bool,
+    ) -> Result<Transcript, CmError> {
+        let (from, to) = (
+            audio.start,
+            audio.start + media_secs(audio.samples.len() as f64 / 16_000.0),
+        );
+        Ok(Transcript {
+            version: cm_ai::transcribe::TRANSCRIPT_VERSION,
+            language: "vi".into(),
+            model: "scripted".into(),
+            words: self
+                .0
+                .iter()
+                .filter(|w| w.start >= from && w.start < to)
+                .cloned()
+                .collect(),
+            note: None,
+            sounds: Vec::new(),
+            segments: Vec::new(),
+            dropped: Vec::new(),
+        })
+    }
+}
+
+/// A 16 kHz mono WAV: speech-level noise except 20 s to 40 s, which is the room only.
+fn write_room_wav(path: &Path) {
+    let rate = 16_000u32;
+    let n = 60 * rate as usize;
+    let mut data = Vec::with_capacity(n * 2);
+    for i in 0..n {
+        let loud = !(20 * rate as usize..40 * rate as usize).contains(&i);
+        let amp = if loud { 0.2 } else { 0.002 };
+        let s = (amp * (i as f32 * 0.37).sin() * 32767.0) as i16;
+        data.extend_from_slice(&s.to_le_bytes());
+    }
+    let mut out = Vec::new();
+    out.extend_from_slice(b"RIFF");
+    out.extend_from_slice(&(36 + data.len() as u32).to_le_bytes());
+    out.extend_from_slice(b"WAVEfmt ");
+    out.extend_from_slice(&16u32.to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&rate.to_le_bytes());
+    out.extend_from_slice(&(rate * 2).to_le_bytes());
+    out.extend_from_slice(&2u16.to_le_bytes());
+    out.extend_from_slice(&16u16.to_le_bytes());
+    out.extend_from_slice(b"data");
+    out.extend_from_slice(&(data.len() as u32).to_le_bytes());
+    out.extend_from_slice(&data);
+    std::fs::write(path, out).unwrap();
+}
+
+/// AI-1.AC12: a sign-off written over the quiet stretch is dropped and kept as a time range; the
+/// same words with the option off (the default of `TranscribeOptions`) stay, and so does real
+/// speech either way.
+#[test]
+fn a_line_written_over_a_stretch_with_no_speech_is_dropped_and_recorded() {
+    if ffmpeg().is_none() {
+        println!("SKIPPED: FFmpeg not found");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    write_room_wav(&dir.path().join("mic.wav"));
+    std::fs::write(
+        dir.path().join("manifest.json"),
+        manifest(
+            serde_json::json!({"mic": {"file": "mic.wav", "start": 0, "end": ticks(60.0)}}),
+            serde_json::json!([]),
+        ),
+    )
+    .unwrap();
+    let at = |text: &str, secs: f64| cm_ai::transcribe::Word {
+        text: text.into(),
+        start: media_secs(secs),
+        end: media_secs(secs + 0.4),
+        confidence: 0.9,
+    };
+    let t = Windowed(vec![
+        at("so", 5.0),
+        at("this", 5.5),
+        at("works.", 6.0),
+        at("Hãy", 25.0),
+        at("subscribe", 25.5),
+        at("cho", 26.0),
+        at("kênh", 26.5),
+        at("La", 27.0),
+        at("School", 27.5),
+        at("next", 45.0),
+        at("item", 45.5),
+    ]);
+    let run = |drop: bool| {
+        transcribe_recording(
+            dir.path(),
+            &t,
+            &TranscribeOptions {
+                model_id: Some("scripted"),
+                drop_unsupported_lines: drop,
+                ..Default::default()
+            },
+            &mut |_| true,
+        )
+        .unwrap()
+    };
+    let on = run(true);
+    assert_eq!(on.words.len(), 5, "{:?}", on.words);
+    assert_eq!(on.dropped.len(), 1);
+    assert_eq!(on.dropped[0].words, 6);
+    assert!((on.dropped[0].start.as_secs_f64() - 25.0).abs() < 1e-3);
+    let off = run(false);
+    assert_eq!(off.words.len(), 11, "off keeps everything, as before");
+    assert!(off.dropped.is_empty());
+    // The record survives the file.
+    write_transcript(dir.path(), &on).unwrap();
+    assert_eq!(
+        read_transcript(dir.path()).unwrap().unwrap().dropped,
+        on.dropped
+    );
 }

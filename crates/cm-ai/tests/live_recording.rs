@@ -52,6 +52,7 @@ impl Transcriber for Checksum {
             note: None,
             sounds: Vec::new(),
             segments: Vec::new(),
+            dropped: Vec::new(),
         })
     }
 }

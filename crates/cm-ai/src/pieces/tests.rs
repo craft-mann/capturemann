@@ -214,6 +214,7 @@ impl Transcriber for Engine {
             note: None,
             sounds: Vec::new(),
             segments: Vec::new(),
+            dropped: Vec::new(),
         })
     }
 }
@@ -370,6 +371,7 @@ fn a_silent_recording_keeps_the_engines_note() {
                 note: Some("No speech detected".into()),
                 sounds: Vec::new(),
                 segments: Vec::new(),
+                dropped: Vec::new(),
             })
         }
     }
@@ -675,6 +677,7 @@ impl Transcriber for TwoAudios {
             note: None,
             sounds: Vec::new(),
             segments: Vec::new(),
+            dropped: Vec::new(),
         })
     }
 }
@@ -814,6 +817,7 @@ impl Transcriber for BrokenThenClean {
             note: None,
             sounds: Vec::new(),
             segments: Vec::new(),
+            dropped: Vec::new(),
         })
     }
 }

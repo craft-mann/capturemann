@@ -605,6 +605,7 @@ fn transcript(language: &str, words: Vec<Word>) -> Transcript {
         note: None,
         sounds: Vec::new(),
         segments: Vec::new(),
+        dropped: Vec::new(),
     }
 }
 

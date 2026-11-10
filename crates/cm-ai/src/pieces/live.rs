@@ -266,6 +266,7 @@ impl LiveTranscription {
                 note,
                 sounds,
                 segments: Vec::new(),
+                dropped: Vec::new(),
             },
             report,
         ))
@@ -317,6 +318,7 @@ mod tests {
                 note: None,
                 sounds: Vec::new(),
                 segments: Vec::new(),
+                dropped: Vec::new(),
             })
         }
     }

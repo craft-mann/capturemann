@@ -235,6 +235,7 @@ impl Transcriber for VadFirst<'_> {
             note: None,
             sounds: Vec::new(),
             segments: Vec::new(),
+            dropped: Vec::new(),
         });
         let _ = MediaTime::ZERO;
         Ok(Transcript {
@@ -242,6 +243,7 @@ impl Transcriber for VadFirst<'_> {
             note: words.is_empty().then(|| "No speech detected".to_owned()),
             words,
             segments: Vec::new(),
+            dropped: Vec::new(),
             ..base
         })
     }

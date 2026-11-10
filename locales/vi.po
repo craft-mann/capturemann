@@ -1,5 +1,5 @@
 # Vietnamese (Tiếng Việt) catalogue of the CaptureMann UI.
-# Entries marked `#, fuzzy` are drafts (117 entries added after the Nov 6, 2026 full review: Windows and Linux wording, plus 2 of Nov 10, 2026: the partial transcript); the app shows them anyway.
+# Entries marked `#, fuzzy` are drafts (117 entries added after the Nov 6, 2026 full review: Windows and Linux wording, plus 2 of Nov 10, 2026: the partial transcript, and 13 of Nov 10, 2026: the AI page options for lines to leave out); the app shows them anyway.
 # The rest of the catalogue was reviewed by the maintainer (native reading: 0.2.0 strings Oct 27, 2026; the remaining draft sheet Nov 6, 2026) and carries no `fuzzy` flag.
 # Entries with `# FACT: owner review required` state what the app really does (privacy, permissions,
 # deletion, confirmations): read each one. Terms follow locales/vi-glossary.md.
@@ -9841,3 +9841,56 @@ msgstr "Đang tạo GIF từ bản ghi màn hình: {pct}%"
 
 msgid "{title} · Making a GIF of the screen: {pct}%"
 msgstr "{title} · Đang tạo GIF từ bản ghi màn hình: {pct}%"
+
+#, fuzzy
+msgid "Add a phrase"
+msgstr "Thêm một cụm từ"
+
+#, fuzzy
+msgid "Leave out lines the audio does not hold"
+msgstr "Bỏ các dòng mà âm thanh không có"
+
+#, fuzzy
+msgid "Lines of a new transcript that contain one of these phrases are left out and counted. Capitals, accents and punctuation do not matter."
+msgstr "Các dòng của bản ghi mới có chứa một trong những cụm từ này sẽ bị bỏ và được đếm. Chữ hoa, dấu và dấu câu không ảnh hưởng."
+
+#, fuzzy
+msgid "Lines to leave out"
+msgstr "Các dòng cần bỏ"
+
+#, fuzzy
+msgid "No phrases yet. Nothing is left out unless you add one."
+msgstr "Chưa có cụm từ nào. Sẽ không bỏ dòng nào nếu bạn chưa thêm."
+
+#, fuzzy
+msgid "Part of a line, any capitals or accents"
+msgstr "Một phần của dòng, chữ hoa hay dấu đều được"
+
+#, fuzzy
+msgid "Phrase to leave out"
+msgstr "Cụm từ cần bỏ"
+
+#, fuzzy
+msgid "Remove {phrase}"
+msgstr "Xóa {phrase}"
+
+#, fuzzy
+msgid "Sometimes a transcript has a sentence that nobody said, over a stretch with no speech. Such lines are left out of new transcripts and counted; the check looks at the sound, not at the words."
+msgstr "Đôi khi bản ghi có một câu không ai nói, nằm ở đoạn không có tiếng nói. Những dòng như vậy sẽ bị bỏ khỏi bản ghi mới và được đếm; việc kiểm tra dựa vào âm thanh, không dựa vào từ ngữ."
+
+#, fuzzy
+msgid "That phrase is already in the list."
+msgstr "Cụm từ này đã có trong danh sách."
+
+#, fuzzy
+msgid "The list is full. Remove a phrase to add another."
+msgstr "Danh sách đã đầy. Hãy xóa một cụm từ để thêm cụm khác."
+
+#, fuzzy
+msgid "Type at least three letters first."
+msgstr "Hãy nhập ít nhất ba chữ cái trước."
+
+#, fuzzy
+msgctxt "ignored phrase"
+msgid "Remove"
+msgstr "Xóa"

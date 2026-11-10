@@ -309,6 +309,13 @@ impl JobHandler for TranscribeHandler {
                 .as_ref()
                 .and_then(|m| m.get(cm_ai::glossary::SETTING_GLOSSARY)),
         );
+        let ignore_phrases = cm_ai::guard::phrases_from_value(
+            self.settings
+                .all()
+                .ok()
+                .as_ref()
+                .and_then(|m| m.get(cm_ai::guard::SETTING_IGNORE_PHRASES)),
+        );
         let req = TranscribeRequest {
             capture_id: capture_id.clone(),
             bundle_dir: dir.clone(),
@@ -400,8 +407,19 @@ impl JobHandler for TranscribeHandler {
         };
         // What Whisper tends to get wrong for this user, spelled their way (AI-6a). The words are
         // replaced before anything is stored, so captions, TXT and the suggestions all see them.
-        let (words, glossary_replaced) =
-            cm_ai::glossary::apply(std::mem::take(&mut transcript.words), &glossary);
+        // The user's ignore list (AI-1.AC13) goes first, on the text as heard; the lines it and the
+        // shape check dropped stay in the transcript as time ranges (AI-1.AC12).
+        let (words, ignored) =
+            cm_ai::guard::drop_ignored(std::mem::take(&mut transcript.words), &ignore_phrases);
+        transcript.dropped.extend(ignored);
+        let count = |r: cm_ai::guard::DropReason| {
+            transcript.dropped.iter().filter(|d| d.reason == r).count()
+        };
+        let (lines_dropped, lines_ignored) = (
+            count(cm_ai::guard::DropReason::Unsupported),
+            count(cm_ai::guard::DropReason::Ignored),
+        );
+        let (words, glossary_replaced) = cm_ai::glossary::apply(words, &glossary);
         transcript.words = words;
         let bytes = serde_json::to_vec_pretty(&transcript)
             .map_err(|e| CmError::internal(format!("transcript: {e}")))?;
@@ -499,14 +517,16 @@ impl JobHandler for TranscribeHandler {
                     "language": transcript.language, "words": transcript.words.len(),
                     "replaced": replaced, "captions_cleared": revision.is_some(),
                     "captions_shown": shown, "reapplied": reapplied, "dropped": dropped,
-                    "glossary_replaced": glossary_replaced }),
+                    "glossary_replaced": glossary_replaced,
+                    "lines_dropped": lines_dropped, "lines_ignored": lines_ignored }),
         );
         Ok(json!({ "capture_id": capture_id, "model": transcript.model,
                    "language": transcript.language, "words": transcript.words.len(),
                    "path": path, "replaced": replaced,
                    "captions_cleared": revision.is_some(),
                    "captions_shown": shown, "reapplied": reapplied, "dropped": dropped,
-                   "glossary_replaced": glossary_replaced }))
+                   "glossary_replaced": glossary_replaced,
+                   "lines_dropped": lines_dropped, "lines_ignored": lines_ignored }))
     }
 }
 

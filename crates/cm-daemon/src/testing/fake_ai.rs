@@ -270,6 +270,7 @@ impl FakeAi {
             note: None,
             sounds: Vec::new(),
             segments: Vec::new(),
+            dropped: Vec::new(),
         }
     }
 }
@@ -491,6 +492,7 @@ impl TranslateService for FakeAi {
             note: None,
             sounds: Vec::new(),
             segments: Vec::new(),
+            dropped: Vec::new(),
         };
         Ok(Some(TranslateOutput {
             lines: cm_ai::translate::whisper_lines(&english, &req.source_lines),

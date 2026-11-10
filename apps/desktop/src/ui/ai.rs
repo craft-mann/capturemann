@@ -600,6 +600,31 @@ pub fn set_glossary(
     app::set_setting(app, KEY_GLOSSARY, value, cx);
 }
 
+/// Saves the ignore list (AI-1.AC13): the page shows it at once and the daemon's settings follow
+/// (the next transcription uses it).
+pub fn set_ignore_phrases(app: &Entity<AppModel>, phrases: Vec<String>, cx: &mut App) {
+    app.update(cx, |m, cx| {
+        m.ai.ignore_phrases = phrases.clone();
+        cx.notify();
+    });
+    let value = serde_json::to_value(&phrases).unwrap_or(Value::Array(Vec::new()));
+    app::set_setting(app, cm_ai::guard::SETTING_IGNORE_PHRASES, value, cx);
+}
+
+/// The "Leave out lines the audio does not hold" switch (AI-1.AC12); on by default.
+pub fn set_drop_unsupported(app: &Entity<AppModel>, on: bool, cx: &mut App) {
+    app.update(cx, |m, cx| {
+        m.ai.drop_unsupported_off = !on;
+        cx.notify();
+    });
+    app::set_setting(
+        app,
+        cm_ai::pipeline::KEY_DROP_UNSUPPORTED,
+        Value::Bool(on),
+        cx,
+    );
+}
+
 /// Saves the languages the user speaks (`vi, en`): the page shows the cleaned list at once and the
 /// daemon's settings follow, so the next transcript chooses among them. `Err` is a message for the
 /// page when a code is not one Whisper knows; nothing is saved then.

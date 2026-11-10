@@ -11,6 +11,7 @@ pub mod caption_view;
 pub mod captions;
 pub mod client;
 pub mod glossary;
+pub mod ignore;
 pub mod jobs;
 pub mod models;
 pub mod partial;

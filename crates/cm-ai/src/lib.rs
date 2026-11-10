@@ -48,6 +48,7 @@ pub mod caption;
 pub mod doubtful;
 pub mod failure_kinds;
 pub mod glossary;
+pub mod guard;
 pub mod measure;
 pub mod model;
 pub mod normalize;

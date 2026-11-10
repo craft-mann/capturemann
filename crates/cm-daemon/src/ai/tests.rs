@@ -281,6 +281,7 @@ fn m2i_upgrade_sounds_makes_heard_noise_unclear() {
         note: None,
         sounds: vec![sound(11.0, 13.0), sound(30.0, 33.0)],
         segments: Vec::new(),
+        dropped: Vec::new(),
     };
     std::fs::write(
         dir.path().join(TRANSCRIPT_FILE),
