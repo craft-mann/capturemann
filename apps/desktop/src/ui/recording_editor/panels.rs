@@ -258,7 +258,7 @@ impl RecordingEditor {
         let (label, warnings): (Option<String>, Vec<String>) = {
             let warn = [
                 s.source_note.clone(),
-                s.audio_note.clone(),
+                s.sound_line(),
                 s.preview_error.clone(),
                 s.plain.then(|| {
                     tr!(

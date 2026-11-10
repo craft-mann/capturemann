@@ -19,6 +19,7 @@ use std::fmt;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Stdio};
+use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::{sync_channel, Receiver};
 use std::sync::Arc;
 use std::thread::JoinHandle;
@@ -26,7 +27,7 @@ use std::thread::JoinHandle;
 use cm_audio::mix::{mix_tracks, MixParams, MixedAudio, TrackAudio};
 use cm_core::{track_time, CmError, EditList, MediaTime, PauseGap, TICKS_PER_SECOND};
 
-use crate::dsp_audio::decode_pcm;
+use crate::dsp_audio::decode_pcm_with;
 use crate::edit_plan::AudioKind;
 use crate::graph::AUDIO_RATE;
 
@@ -500,15 +501,43 @@ pub struct AudioBank {
 impl AudioBank {
     /// Decodes every file (a file that cannot be read fails the whole load).
     pub fn load(ffmpeg: &Path, files: &[AudioFile]) -> Result<AudioBank, CmError> {
+        AudioBank::load_with(ffmpeg, files, 0.0, &AtomicBool::new(false), &|_| {})
+    }
+
+    /// [`AudioBank::load`] for the editor (EDT-6): `expect_secs` is the length the manifest
+    /// promises (for the one reservation and the progress), `progress` is told the fraction done
+    /// (0.0 to 1.0, over all files), and setting `cancel` kills FFmpeg and returns an error.
+    pub fn load_with(
+        ffmpeg: &Path,
+        files: &[AudioFile],
+        expect_secs: f64,
+        cancel: &AtomicBool,
+        progress: &dyn Fn(f64),
+    ) -> Result<AudioBank, CmError> {
+        let expect = |f: &AudioFile| {
+            (expect_secs.max(0.0) * f64::from(AUDIO_RATE)) as usize * usize::from(f.channels)
+        };
+        let total: usize = files.iter().map(expect).sum();
+        let mut done = 0usize;
         let mut tracks = Vec::with_capacity(files.len());
         for f in files {
+            let want = expect(f);
+            let base = done;
+            let report = |n: usize| {
+                if total > 0 {
+                    progress(((base + n) as f64 / total as f64).min(0.99));
+                }
+            };
+            let samples = decode_pcm_with(ffmpeg, &f.file, f.channels, want, cancel, &report)?;
+            done += want.max(samples.len());
             tracks.push(PcmTrack {
                 kind: f.kind,
                 start: f.start,
                 channels: f.channels,
-                samples: decode_pcm(ffmpeg, &f.file, f.channels)?,
+                samples,
             });
         }
+        progress(1.0);
         Ok(AudioBank { tracks })
     }
 
@@ -609,6 +638,64 @@ mod tests {
         assert!(super::peaks(&[], 1, 48_000, 20).is_empty());
         // A partial last bucket still counts.
         assert_eq!(super::peaks(&[0.25; 5], 1, 4, 1), vec![0.25, 0.25]);
+    }
+
+    /// A mono 16-bit 48 kHz WAV of `secs` seconds of a tone.
+    fn tone_wav(secs: usize) -> Vec<u8> {
+        let n = 48_000 * secs;
+        let mut data = Vec::with_capacity(n * 2);
+        for i in 0..n {
+            data.extend_from_slice(&(((i as f32 / 48.0).sin() * 8_000.0) as i16).to_le_bytes());
+        }
+        let mut out = Vec::new();
+        out.extend_from_slice(b"RIFF");
+        out.extend_from_slice(&(36 + data.len() as u32).to_le_bytes());
+        out.extend_from_slice(b"WAVEfmt ");
+        for v in [16u32, 0x0001_0001, 48_000, 96_000, 0x0010_0002] {
+            out.extend_from_slice(&v.to_le_bytes());
+        }
+        out.extend_from_slice(b"data");
+        out.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        out.extend_from_slice(&data);
+        out
+    }
+
+    /// VOC-2.AC6/AC7/AC9: the editor's load reports its progress up to 1.0, keeps every sample
+    /// (the streamed read equals the one-shot read) and stops at once when cancelled. Skipped
+    /// without FFmpeg.
+    #[test]
+    fn load_with_reports_progress_and_can_be_cancelled() {
+        let Ok(tools) = crate::tools::locate() else {
+            eprintln!("SKIPPED: FFmpeg is not installed");
+            return;
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("mic.wav");
+        std::fs::write(&file, tone_wav(3)).unwrap();
+        let files = vec![AudioFile {
+            kind: AudioKind::Mic,
+            file,
+            start: t(0),
+            channels: 1,
+        }];
+        let seen = std::sync::Mutex::new(Vec::<f64>::new());
+        let bank =
+            AudioBank::load_with(&tools.ffmpeg, &files, 3.0, &AtomicBool::new(false), &|f| {
+                seen.lock().unwrap().push(f)
+            })
+            .unwrap();
+        let once = AudioBank::load(&tools.ffmpeg, &files).unwrap();
+        assert_eq!(bank.tracks[0].samples.len(), 3 * 48_000);
+        assert_eq!(bank.tracks[0].samples, once.tracks[0].samples);
+        let seen = seen.into_inner().unwrap();
+        assert!(
+            seen.len() >= 2 && seen.windows(2).all(|w| w[0] <= w[1]),
+            "{seen:?}"
+        );
+        assert_eq!(*seen.last().unwrap(), 1.0);
+        // Cancelled before the first read: an error, no samples.
+        let r = AudioBank::load_with(&tools.ffmpeg, &files, 3.0, &AtomicBool::new(true), &|_| {});
+        assert!(r.unwrap_err().to_string().contains("cancelled"));
     }
 
     #[test]

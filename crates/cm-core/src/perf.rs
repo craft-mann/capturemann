@@ -64,6 +64,39 @@ pub fn finish(run: &str) {
     log::debug!("perf: {}", summary_line(r));
 }
 
+/// Adds `secs` to `phase` of `run` (a phase measured from a start that is not a scope, such as
+/// the time since the user clicked) and, when the run does not exist yet, creates it.
+pub fn add_phase(run: &str, phase: &str, secs: f64) {
+    let mut g = runs();
+    let r = g.entry(run.to_owned()).or_insert_with(|| RunRecord {
+        run: run.to_owned(),
+        wall_secs: None,
+        peak_rss_bytes: None,
+        phases: Vec::new(),
+        started: None,
+    });
+    match r.phases.iter_mut().find(|p| p.name == phase) {
+        Some(p) => {
+            p.secs += secs;
+            p.count += 1;
+        }
+        None => r.phases.push(Phase {
+            name: phase.to_owned(),
+            secs,
+            count: 1,
+        }),
+    }
+}
+
+/// Reads the process's peak memory again into `run` (a run whose last phase ended after
+/// [`finish`], such as the editor's sound). The wall time stays as [`finish`] left it.
+pub fn refresh_peak(run: &str) {
+    let peak = peak_rss_bytes();
+    if let Some(r) = runs().get_mut(run) {
+        r.peak_rss_bytes = peak;
+    }
+}
+
 /// A timer for one phase of `run`; the time is added when it drops.
 #[must_use = "the phase is timed until this guard drops"]
 pub struct Span {

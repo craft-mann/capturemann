@@ -232,7 +232,12 @@ fn editor(cx: &mut TestAppContext) -> (World, Entity<RecordingEditor>, &mut Visu
         vcx.run_until_parked();
         let ready = entity.read_with(vcx, |e, _| matches!(e.load, Load::Ready(_)));
         let ai = entity.read_with(vcx, |e, _| e.ai.has_transcript);
-        if ready && ai {
+        // The sound decodes after the window is open (VOC-2.AC6): wait for it as well.
+        let sound = entity.read_with(vcx, |e, _| match &e.load {
+            Load::Ready(s) => !s.sound.is_preparing(),
+            _ => false,
+        });
+        if ready && ai && sound {
             break;
         }
         // A frame: the editor reads the transcript while it draws.
@@ -818,5 +823,87 @@ fn the_translate_panel_knows_when_whisper_cannot_translate(cx: &mut TestAppConte
     assert_eq!(
         app.read_with(vcx, |m, _| m.ai.whisper_translate()),
         WhisperTranslate::Ready("large".into())
+    );
+}
+
+/// Timing of opening a long audio recording (VOC-2.AC6): not part of the suite. Run with
+/// `CM_LONG_WAV=<48 kHz mono float WAV> CM_LONG_SECS=<its length> [CM_LONG_MODE=old]
+/// cargo test -p cm-desktop --lib measure_long_open -- --ignored --nocapture`. It builds a
+/// bundle in a temp folder around a copy of the file (a link, no copy), prints `ui_ready` (the
+/// load without the sound), `audio_ready` (decode and lanes) and the process's peak memory. Mode
+/// `old` decodes the way 0.3.0 did (all bytes, then a second copy) for the comparison.
+#[test]
+#[ignore = "needs CM_LONG_WAV; decodes a long file"]
+#[allow(clippy::chunks_exact_to_as_chunks)]
+fn measure_long_open() {
+    let (Ok(wav), Ok(secs)) = (std::env::var("CM_LONG_WAV"), std::env::var("CM_LONG_SECS")) else {
+        eprintln!("SKIPPED: set CM_LONG_WAV and CM_LONG_SECS");
+        return;
+    };
+    let secs: i64 = secs.parse().unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let bundle = dir.path().join("lib").join("Long.cmrec");
+    std::fs::create_dir_all(&bundle).unwrap();
+    let tps = 120_000_i64;
+    std::fs::write(
+        bundle.join("manifest.json"),
+        serde_json::json!({
+            "schema": 1, "id": "rec_long", "title": "Long", "kind": "audio",
+            "created": "2026-11-10T10:00:00Z", "tick_rate": tps,
+            "tracks": {"mic": {"file": "mic.wav", "start": 0, "end": secs * tps, "channels": 1}},
+            "edits": [], "revisions": [], "gaps": [], "duration": secs * tps,
+        })
+        .to_string(),
+    )
+    .unwrap();
+    std::os::unix::fs::symlink(&wav, bundle.join("mic.wav")).unwrap();
+    let t = Instant::now();
+    let loaded = load_blocking(Some(dir.path().join("lib")), "rec_long").unwrap();
+    let ui_ready = t.elapsed().as_secs_f64();
+    let job = loaded.sound_job.as_ref().unwrap();
+    let end = loaded.basis.end;
+    let t = Instant::now();
+    if std::env::var("CM_LONG_MODE").as_deref() == Ok("old") {
+        let tools = cm_media::tools::locate().unwrap();
+        let out = std::process::Command::new(&tools.ffmpeg)
+            .args(["-v", "error", "-nostdin", "-i"])
+            .arg(&job.files[0].file)
+            .args(["-vn", "-f", "f32le", "-ac", "1", "-ar", "48000", "pipe:1"])
+            .stdout(std::process::Stdio::piped())
+            .output()
+            .unwrap();
+        let samples: Vec<f32> = out
+            .stdout
+            .chunks_exact(4)
+            .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+            .collect();
+        drop(out);
+        let bank = AudioBank::from_tracks(vec![cm_media::decode::PcmTrack {
+            kind: cm_media::edit_plan::AudioKind::Mic,
+            start: MediaTime::ZERO,
+            channels: 1,
+            samples,
+        }]);
+        let lane = bank
+            .lane_peaks(cm_media::edit_plan::AudioKind::Mic, WAVE_PER_SEC)
+            .unwrap();
+        let _ = Wave::from_lane(&lane, &[], end);
+    } else {
+        let flag = AtomicBool::new(false);
+        let p = AtomicU32::new(0);
+        decode_sound(job, &[], end, &flag, &p).unwrap();
+    }
+    let audio_ready = t.elapsed().as_secs_f64();
+    cm_core::perf::begin("measure");
+    cm_core::perf::finish("measure");
+    let peak = cm_core::perf::records()
+        .into_iter()
+        .find(|r| r.run == "measure")
+        .and_then(|r| r.peak_rss_bytes)
+        .unwrap_or(0);
+    println!(
+        "MEASURE mode={} secs={secs} ui_ready={ui_ready:.3}s sound_decode={audio_ready:.1}s peak_rss={:.2} GB",
+        std::env::var("CM_LONG_MODE").unwrap_or_else(|_| "new".into()),
+        peak as f64 / 1e9
     );
 }

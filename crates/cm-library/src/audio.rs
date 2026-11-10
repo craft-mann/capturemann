@@ -108,6 +108,37 @@ fn read_manifest(dir: &Path) -> Option<RecManifest> {
     RecManifest::from_json(&text).ok()
 }
 
+/// The cached bars of `dir` when `peaks.json` still matches the sources; never reads a WAV and
+/// never writes (the editor shows these at once while the sound decodes, VOC-2.AC8).
+pub fn cached_bundle_peaks(dir: &Path) -> Option<Vec<u8>> {
+    let manifest = read_manifest(dir);
+    let sources = source_files(dir, manifest.as_ref());
+    cached_for(dir, &sources_key(&sources))
+}
+
+fn sources_key(sources: &[(String, u64)]) -> Value {
+    json!(sources
+        .iter()
+        .map(|(f, n)| json!([f, n]))
+        .collect::<Vec<_>>())
+}
+
+fn cached_for(dir: &Path, key: &Value) -> Option<Vec<u8>> {
+    let cached = std::fs::read_to_string(dir.join(PEAKS_FILE))
+        .ok()
+        .and_then(|t| serde_json::from_str::<Value>(&t).ok())?;
+    if cached.get("sources") != Some(key) {
+        return None;
+    }
+    let bars: Vec<u8> = cached
+        .get("peaks")?
+        .as_array()?
+        .iter()
+        .filter_map(|v| v.as_u64().and_then(|n| u8::try_from(n).ok()))
+        .collect();
+    (!bars.is_empty()).then_some(bars)
+}
+
 /// Peaks of an audio bundle: the cached `peaks.json` when it still matches the sources,
 /// otherwise computed now and cached. `None` when the bundle has no readable WAV track. A failed
 /// cache write is not an error (the bars are still returned).
@@ -117,25 +148,9 @@ pub fn bundle_peaks(dir: &Path) -> Option<Vec<u8>> {
     if sources.is_empty() {
         return None;
     }
-    let key = json!(sources
-        .iter()
-        .map(|(f, n)| json!([f, n]))
-        .collect::<Vec<_>>());
-    if let Some(cached) = std::fs::read_to_string(dir.join(PEAKS_FILE))
-        .ok()
-        .and_then(|t| serde_json::from_str::<Value>(&t).ok())
-    {
-        if cached.get("sources") == Some(&key) {
-            if let Some(bars) = cached.get("peaks").and_then(Value::as_array) {
-                let bars: Vec<u8> = bars
-                    .iter()
-                    .filter_map(|v| v.as_u64().and_then(|n| u8::try_from(n).ok()))
-                    .collect();
-                if !bars.is_empty() {
-                    return Some(bars);
-                }
-            }
-        }
+    let key = sources_key(&sources);
+    if let Some(bars) = cached_for(dir, &key) {
+        return Some(bars);
     }
     let tracks: Vec<Vec<f32>> = sources
         .iter()
@@ -284,6 +299,22 @@ mod tests {
         // No tracks: nothing.
         let empty = tempfile::tempdir().unwrap();
         assert!(bundle_peaks(empty.path()).is_none());
+    }
+
+    /// VOC-2.AC8: the cached read never computes and never writes.
+    #[test]
+    fn cached_peaks_do_not_compute() {
+        let dir = tempfile::tempdir().unwrap();
+        write_wav(&dir.path().join("mic.wav"), 1, false, &vec![0.3f32; 8000]);
+        assert!(cached_bundle_peaks(dir.path()).is_none());
+        assert!(!dir.path().join(PEAKS_FILE).exists());
+        let bars = bundle_peaks(dir.path()).unwrap();
+        assert_eq!(cached_bundle_peaks(dir.path()).unwrap(), bars);
+        write_wav(&dir.path().join("mic.wav"), 1, false, &vec![0.3f32; 16000]);
+        assert!(
+            cached_bundle_peaks(dir.path()).is_none(),
+            "stale after a change"
+        );
     }
 
     #[test]

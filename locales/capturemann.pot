@@ -3426,6 +3426,9 @@ msgstr ""
 msgid "Preparing the preview…"
 msgstr ""
 
+msgid "Preparing the sound… {pct} %"
+msgstr ""
+
 msgid "Press Export… to choose a format and size for one file with the screen, camera bubble and audio."
 msgstr ""
 

@@ -708,7 +708,7 @@ impl RecordingEditor {
                     .child(hint(&["M"], tr_ctx!("editor shortcut", "Marker")))
                     .child(hint(&["\u{232B}"], tr_ctx!("editor shortcut", "Cut"))),
             );
-        let notes: Vec<String> = [s.audio_note.clone(), m.note.map(|n| n.to_string())]
+        let notes: Vec<String> = [s.sound_line(), m.note.map(|n| n.to_string())]
             .into_iter()
             .flatten()
             .collect();

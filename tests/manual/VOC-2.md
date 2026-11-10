@@ -95,6 +95,29 @@ people?" answered on the Record sheet uses that number. Open a recording of
 17. **Vietnamese.** Switch the language: the tab tooltips, the lanes' names, the sheet and the toasts
     are in Vietnamese and fit.
 
+## Opening a long recording (VOC-2.AC6 to AC10, 0.3.1)
+
+Needs an audio recording or import of an hour or more (for example the 4 h file of the
+benchmark). Activity Monitor open on the app (Memory column).
+
+1. Click the recording. Expected: the editor shows at once (under a second): title, timeline,
+   Transcript tab (partial or final), Speakers, Report, markers. The lanes show a rough shape
+   (the overview of the library card) or a thin line.
+2. Expected: the line under the transport reads "Preparing the sound... N %" and N grows. No
+   spinner without a number.
+3. Press Space at once. Expected: the playhead does not run; when the sound is ready it starts
+   by itself with the sound. Press Space during the wait on another try: it stays stopped.
+4. When ready: the note goes, the lanes show the real waveform, Space plays with sound. Add a
+   cut (select, Delete): it applies while the sound was still preparing too (repeat 1 and cut at
+   once: the cut shows hatched, no wait).
+5. Settings > About > Diagnostics, "Last runs": `editor_load` shows `ui_ready` (well under 1 s)
+   and `audio_ready` (the decode time) and the peak memory.
+6. Click the recording again, and while it says "Preparing the sound" go back to the library or
+   open another recording. Expected: in Activity Monitor no `ffmpeg` process stays and the
+   app's memory falls back (it does not keep gigabytes of the abandoned file).
+7. Same with a screen recording that has a microphone: it opens, plays without sound for a
+   moment if you press Play at once (it waits), then with sound.
+
 Pass: every expected result above, the keys work with the focus on the editor, nothing is
 recorded or sent anywhere except the Upload you ask for.
 

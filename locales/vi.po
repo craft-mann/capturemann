@@ -1,5 +1,5 @@
 # Vietnamese (Tiếng Việt) catalogue of the CaptureMann UI.
-# Entries marked `#, fuzzy` are drafts (117 entries added after the Nov 6, 2026 full review: Windows and Linux wording, plus 2 of Nov 10, 2026: the partial transcript, and 13 of Nov 10, 2026: the AI page options for lines to leave out); the app shows them anyway.
+# Entries marked `#, fuzzy` are drafts (117 entries added after the Nov 6, 2026 full review: Windows and Linux wording, plus 2 of Nov 10, 2026: the partial transcript, 13 of Nov 10, 2026: the AI page options for lines to leave out, and 1 of Nov 10, 2026: preparing the sound in the editor); the app shows them anyway.
 # The rest of the catalogue was reviewed by the maintainer (native reading: 0.2.0 strings Oct 27, 2026; the remaining draft sheet Nov 6, 2026) and carries no `fuzzy` flag.
 # Entries with `# FACT: owner review required` state what the app really does (privacy, permissions,
 # deletion, confirmations): read each one. Terms follow locales/vi-glossary.md.
@@ -2241,6 +2241,10 @@ msgstr "Đăng lên một Trang bạn quản lý."
 
 msgid "Preparing the preview…"
 msgstr "Đang chuẩn bị bản xem trước…"
+
+#, fuzzy
+msgid "Preparing the sound… {pct} %"
+msgstr "Đang chuẩn bị âm thanh… {pct} %"
 
 msgid "Press Z to add one at the playhead."
 msgstr "Nhấn Z để thêm một điểm tại đầu phát."
