@@ -585,15 +585,19 @@ impl TurnEngine for SherpaEngine {
             min_duration_on: 0.3,
             min_duration_off: 0.5,
         };
-        let engine = OfflineSpeakerDiarization::create(&config).ok_or_else(|| {
+        let engine = ort_guard::create(models.embedding.as_path(), || {
+            OfflineSpeakerDiarization::create(&config)
+        })
+        .ok_or_else(|| {
             CmError::invalid_input(
                 "The speaker models could not be loaded. Reinstall CaptureMann; if you imported a copy of a model, remove it with `remove_model`.",
             )
         })?;
         if engine.sample_rate() != 16_000 {
+            let rate = engine.sample_rate();
+            ort_guard::destroy(engine);
             return Err(CmError::internal(format!(
-                "the speaker model wants {} Hz audio, not 16000",
-                engine.sample_rate()
+                "the speaker model wants {rate} Hz audio, not 16000"
             )));
         }
         let mut stopped = false;
@@ -606,6 +610,8 @@ impl TurnEngine for SherpaEngine {
             !stopped
         });
         drop(pass);
+        // The result holds no ONNX Runtime object; the engine does, and its teardown is serialised.
+        ort_guard::destroy(engine);
         if stopped {
             return Err(cancelled());
         }
@@ -631,10 +637,12 @@ impl TurnEngine for SherpaEngine {
         let Some(model) = models.embedding.to_str().map(str::to_owned) else {
             return Ok(None);
         };
-        let extractor = SpeakerEmbeddingExtractor::create(&SpeakerEmbeddingExtractorConfig {
-            model: Some(model),
-            num_threads: 2,
-            ..Default::default()
+        let extractor = ort_guard::create(models.embedding.as_path(), || {
+            SpeakerEmbeddingExtractor::create(&SpeakerEmbeddingExtractorConfig {
+                model: Some(model),
+                num_threads: 2,
+                ..Default::default()
+            })
         });
         let Some(extractor) = extractor else {
             return Ok(None);
@@ -642,6 +650,7 @@ impl TurnEngine for SherpaEngine {
         let mut out = Vec::with_capacity(clips.len());
         for clip in clips {
             let Some(stream) = extractor.create_stream() else {
+                ort_guard::destroy(extractor);
                 return Ok(None);
             };
             stream.accept_waveform(16_000, clip);
@@ -653,8 +662,20 @@ impl TurnEngine for SherpaEngine {
                 out.push(e);
             }
         }
+        ort_guard::destroy(extractor);
         Ok(Some(out))
     }
+}
+
+#[cfg(feature = "sherpa")]
+pub(crate) mod ort_guard;
+
+/// How many keep-alive environment holders this process made (1 after any speaker run, never
+/// more); for the teardown stress test.
+#[cfg(feature = "sherpa")]
+#[doc(hidden)]
+pub fn ort_keepers() -> usize {
+    ort_guard::keepers()
 }
 
 #[cfg(test)]
