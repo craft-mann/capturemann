@@ -98,7 +98,7 @@ encoders, KDE and other Linux distributions, a second monitor.
 
 ## Install and checks
 
-<FILL on release day, from the final files: the table of SHA-256 sums (`SHA256SUMS.txt`), the minisign public key line, and the winget (microsoft/winget-pkgs PR number) and Homebrew cask (tap commit) status.>
+<FILL on release day, from the final files: the table of SHA-256 sums (`SHA256SUMS.txt`), the minisign public key line, and the Homebrew cask (tap commit) status. winget: pull request 472327 (0.2.8) was still open on Nov 10, 2026, so **0.3.1 is not in winget**; use the wording of `release-0.2.9-winget-note.md` with 0.3.1 as the newer version.>
 
 ### Install with APT (Ubuntu 24.04 or newer, amd64 and arm64)
 
