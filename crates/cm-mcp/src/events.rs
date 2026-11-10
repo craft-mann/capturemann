@@ -48,6 +48,8 @@ pub const TOPICS: &[&str] = &[
     "model.changed",
     "transcript.started",
     "transcript.ready",
+    // AI-1.AC6: a long run finished a piece; `get_transcript` then answers `partial: true`.
+    "transcript.partial",
     "translation.ready",
     // AI-8: the speakers of a recording were found (and the automatic step queued a run).
     "speakers.started",

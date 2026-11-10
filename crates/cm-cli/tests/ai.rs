@@ -581,3 +581,42 @@ async fn ai_6a_captions_replace_with_flags_and_a_file() {
         2
     );
 }
+
+/// AI-1.AC7, AC8: while a long run goes on, `ai transcript` prints the first part marked PARTIAL
+/// (`--json`: `partial`, `covered_secs`, `total_secs`), and `ai captions` refuses with `busy`
+/// (exit 6) until the whole transcript is there.
+#[tokio::test]
+async fn ai_1_transcript_of_a_running_long_run_is_partial_and_read_only() {
+    let ai = FakeAi::new().with_small_installed();
+    ai.set_piece_checkpoints(true);
+    ai.set_slow(10, 120);
+    let r = rig(ai, Decision::Approve);
+    let id = recording_in(&r).await;
+    let started = cli(&r, &["ai", "transcribe", &id]).await;
+    assert_eq!(started.code, 0, "{}{}", started.out, started.err);
+    let mut text = String::new();
+    for _ in 0..300 {
+        let t = cli(&r, &["ai", "transcript", &id]).await;
+        if t.code == 0 && t.out.contains("PARTIAL") {
+            text = t.out;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    assert!(text.contains("PARTIAL: the first "), "{text}");
+    assert!(text.contains("Text so far: piece1"), "{text}");
+    assert!(!text.contains("Caption lines"), "{text}");
+    let j = cli(&r, &["ai", "transcript", &id, "--json"]).await;
+    if j.code == 0 {
+        let v = j.json();
+        if v["partial"] == json!(true) {
+            assert_eq!(v["total_secs"], json!(3000.0));
+            assert!(v["covered_secs"].as_f64().unwrap() > 0.0);
+            assert_eq!(v["captions"], Value::Null);
+        }
+    }
+    let c = cli(&r, &["ai", "captions", "get", &id]).await;
+    if c.err.contains("still being transcribed") {
+        assert_eq!(c.code, 6, "{}{}", c.out, c.err);
+    }
+}

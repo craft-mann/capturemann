@@ -73,10 +73,15 @@ impl RecordingEditor {
                     this_computer = crate::platform_text::this_computer()
                 )
             };
-            return shell(vec![
-                hint(t, "captions", message).into_any_element(),
-                crate::ui::ai_view::transcribe_row(t, &self.app, &id, "re", cx),
-            ]);
+            // The first part of a long run, read-only, grows here while the rest is made.
+            crate::ui::ai_view::prime_transcript_info(&self.app, &id, cx);
+            let partial = crate::ui::ai_view::partial_transcript(t, &self.app, &id, "re", cx);
+            let mut body = vec![hint(t, "captions", message).into_any_element()];
+            body.extend(partial);
+            body.push(crate::ui::ai_view::transcribe_row(
+                t, &self.app, &id, "re", cx,
+            ));
+            return shell(body);
         }
         // Re-generate: another model or language can give a better transcript, so the tab offers
         // the details page's panel (model, language, what it replaces). The summary of the stored

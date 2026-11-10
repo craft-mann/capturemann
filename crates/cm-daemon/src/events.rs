@@ -107,6 +107,10 @@ pub const MODEL_CHANGED: &str = "model.changed";
 pub const TRANSCRIPT_STARTED: &str = "transcript.started";
 /// A transcript was written: `{ capture_id, model, language, words }`.
 pub const TRANSCRIPT_READY: &str = "transcript.ready";
+/// A long transcription finished a piece and its partial transcript (`transcript.partial.json`)
+/// grew (AI-1.AC6): `{ capture_id, covered_secs, total_secs, words }`. Small on purpose: the
+/// reader fetches the words with `get_transcript`, which marks the answer `partial: true`.
+pub const TRANSCRIPT_PARTIAL: &str = "transcript.partial";
 /// A caption translation was written (AI-5): `{ capture_id, language, engine, model, lines,
 /// untranslated, path, kept_edits, dropped_edits }`.
 pub const TRANSLATION_READY: &str = "translation.ready";

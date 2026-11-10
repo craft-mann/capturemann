@@ -119,6 +119,7 @@ impl LiveTranscription {
             total_samples: samples.len(),
             pieces: plan.len(),
             done,
+            covered_samples: self.from,
             words: self.words.clone(),
             language: self.language.clone(),
             first: self.first.clone(),

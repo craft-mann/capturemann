@@ -25,9 +25,11 @@ impl Inner {
             let path = dir.join(TRANSCRIPT_FILE);
             let text = std::fs::read_to_string(&path).map_err(|e| {
                 if e.kind() == std::io::ErrorKind::NotFound {
-                    CmError::not_found(format!(
-                        "`{id}` has no captions yet; run `transcribe` first"
-                    ))
+                    super::no_transcript_error(
+                        &dir,
+                        &id,
+                        format!("`{id}` has no captions yet; run `transcribe` first"),
+                    )
                 } else {
                     CmError::internal(format!("cannot read `{}`: {e}", path.display()))
                 }
@@ -127,9 +129,11 @@ impl Inner {
                     .map_err(|e| CmError::internal(format!("stored captions: {e}")))?,
                 None => {
                     let text = std::fs::read_to_string(dir.join(TRANSCRIPT_FILE)).map_err(|_| {
-                        CmError::not_found(format!(
-                            "`{id}` has no captions yet; run `transcribe` first"
-                        ))
+                        super::no_transcript_error(
+                            &dir,
+                            &id,
+                            format!("`{id}` has no captions yet; run `transcribe` first"),
+                        )
                     })?;
                     let t: Transcript = serde_json::from_str(&text)
                         .map_err(|e| CmError::internal(format!("transcript: {e}")))?;
@@ -213,9 +217,13 @@ impl Inner {
                 None => {
                     let text =
                         std::fs::read_to_string(dir.join(TRANSCRIPT_FILE)).map_err(|_| {
-                            CmError::not_found(format!(
+                            super::no_transcript_error(
+                                &dir,
+                                &id,
+                                format!(
                             "`{id}` has no captions yet; run `transcribe` or `set_captions` first"
-                        ))
+                        ),
+                            )
                         })?;
                     let t: Transcript = serde_json::from_str(&text)
                         .map_err(|e| CmError::internal(format!("transcript: {e}")))?;

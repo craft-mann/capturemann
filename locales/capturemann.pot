@@ -3270,6 +3270,9 @@ msgstr ""
 msgid "Padding"
 msgstr ""
 
+msgid "Partial transcript"
+msgstr ""
+
 msgid "Paste (+10 px)"
 msgstr ""
 
@@ -5389,6 +5392,11 @@ msgstr ""
 
 msgid "Transcribing needs a speech model. Add one on the AI page."
 msgstr ""
+
+msgid "Transcribing: the first {n} minute is ready. The rest follows."
+msgid_plural "Transcribing: the first {n} minutes are ready. The rest follows."
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "Transcribing…"
 msgstr ""

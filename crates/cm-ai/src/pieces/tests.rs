@@ -469,6 +469,7 @@ fn a_checkpoint_that_does_not_fit_is_ignored() {
         total_samples: x.len() + 1,
         pieces,
         done: 2,
+        covered_samples: 0,
         words: vec![word("stale", 1.0)],
         language: Some("en".into()),
         first: None,

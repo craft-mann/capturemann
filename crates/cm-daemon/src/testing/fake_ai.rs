@@ -46,6 +46,9 @@ struct State {
     mic_activity: Option<(f64, f64)>,
     diarize_calls: Vec<DiarizeRequest>,
     fail_diarize: Option<CmError>,
+    /// Hand out real piece checkpoints (one word per piece, 300 s pieces) so the daemon can write
+    /// the partial transcript (AI-1.AC6), instead of the bare `fake_step` counter.
+    piece_checkpoints: bool,
 }
 
 /// The shared fake. Cheap to clone.
@@ -91,6 +94,7 @@ impl FakeAi {
             mic_activity: None,
             diarize_calls: vec![],
             fail_diarize: None,
+            piece_checkpoints: false,
         })))
     }
 
@@ -163,6 +167,11 @@ impl FakeAi {
         let mut s = self.state();
         s.download_steps = steps;
         s.step_ms = step_ms;
+    }
+
+    /// From now on a transcription hands out real piece checkpoints (see `State::piece_checkpoints`).
+    pub fn set_piece_checkpoints(&self, on: bool) {
+        self.state().piece_checkpoints = on;
     }
 
     /// The next transcription fails with this error.
@@ -370,7 +379,7 @@ impl TranscribeService for FakeAi {
         on_checkpoint: &mut dyn FnMut(serde_json::Value),
         progress: &mut dyn FnMut(f32) -> bool,
     ) -> Result<Option<Transcript>, CmError> {
-        let (steps, step_ms, fail, words) = {
+        let (steps, step_ms, fail, words, pieces) = {
             let mut s = self.state();
             s.transcribe_calls.push(req.clone());
             (
@@ -378,6 +387,7 @@ impl TranscribeService for FakeAi {
                 s.step_ms,
                 s.fail_transcribe.take(),
                 s.words.clone(),
+                s.piece_checkpoints,
             )
         };
         let from = req
@@ -393,7 +403,39 @@ impl TranscribeService for FakeAi {
             if !progress(i as f32 / steps as f32) {
                 return Ok(None);
             }
-            on_checkpoint(serde_json::json!({ "fake_step": i }));
+            if pieces && i < steps {
+                let piece = 300 * 16_000;
+                let mut c = serde_json::to_value(cm_ai::pieces::Checkpoint {
+                    total_samples: piece * steps as usize,
+                    pieces: steps as usize,
+                    done: i as usize,
+                    covered_samples: piece * i as usize,
+                    words: (1..=i)
+                        .map(|k| Word {
+                            text: format!("piece{k}"),
+                            start: t(f64::from(k - 1) * 300.0 + 1.0),
+                            end: t(f64::from(k - 1) * 300.0 + 1.5),
+                            confidence: 0.9,
+                        })
+                        .collect(),
+                    language: Some("en".into()),
+                    first: Some(("en".into(), req.model.clone(), None)),
+                    split: 0,
+                    repeats_dropped: 0,
+                    other_audio: 0,
+                    other_audio_kept: 0,
+                    broken_reread: 0,
+                    broken_dropped: 0,
+                    gaps_reread: 0,
+                    gaps_filled: 0,
+                    sounds: Vec::new(),
+                })
+                .unwrap_or_default();
+                c["fake_step"] = serde_json::json!(i);
+                on_checkpoint(c);
+            } else {
+                on_checkpoint(serde_json::json!({ "fake_step": i }));
+            }
         }
         if let Some(e) = fail {
             return Err(e);

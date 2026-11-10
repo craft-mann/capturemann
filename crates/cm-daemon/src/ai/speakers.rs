@@ -189,6 +189,12 @@ impl Inner {
             }
             let dir = lib.bundle_path(&rec);
             this.ensure_idle(&rec, &dir, "diarize")?;
+            // Only the first part of the transcript exists: wait for the whole (AI-1.AC8).
+            if !dir.join(TRANSCRIPT_FILE).is_file()
+                && dir.join(cm_ai::recording::PARTIAL_FILE).is_file()
+            {
+                return Err(super::no_transcript_error(&dir, &id, String::new()));
+            }
             let manifest = cm_library::read_manifest(&dir)?;
             if !has_speech_track(&manifest) {
                 return Err(CmError::invalid_input(format!(

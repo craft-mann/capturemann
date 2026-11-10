@@ -230,6 +230,32 @@ fn remove_model(app: &Entity<AppModel>, model: &str, cx: &mut App) {
     .detach();
 }
 
+/// Reads the first part of a running long transcription (AI-1.AC10) and keeps it for the pages
+/// that show it. Nothing happens for a recording that is not shown as running.
+pub fn read_partial(app: &Entity<AppModel>, capture_id: &str, cx: &mut App) {
+    if !app.read(cx).transcribe.is_running(capture_id) {
+        return;
+    }
+    let Some(client) = client_of(app, cx) else {
+        return;
+    };
+    let (app2, id) = (app.clone(), capture_id.to_owned());
+    cx.spawn(async move |cx| {
+        let res = client.get_partial_transcript(&id).await;
+        cx.update(|cx| {
+            if let Ok(Some(view)) = res {
+                app2.update(cx, |m, cx| {
+                    if m.transcribe.is_running(&id) {
+                        m.transcribe.set_partial(&id, view);
+                        cx.notify();
+                    }
+                });
+            }
+        });
+    })
+    .detach();
+}
+
 /// Reads the transcript summary of a recording when the details page needs it (never asked, or
 /// something may have changed it since). The page keeps showing the previous answer meanwhile.
 pub fn ensure_transcript_info(app: &Entity<AppModel>, capture_id: &str, cx: &mut App) {
@@ -752,6 +778,12 @@ pub fn on_event(app: &Entity<AppModel>, ev: &cm_daemon::events::Event, cx: &mut 
                     m.transcribe.started(&id, job);
                     cx.notify();
                 });
+            }
+        }
+        // AI-1.AC10: a long transcription finished a piece; the page reads the first part again.
+        "transcript.partial" => {
+            if let Some(id) = str_of("capture_id") {
+                read_partial(app, &id, cx);
             }
         }
         "transcript.ready" => {

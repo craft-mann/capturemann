@@ -225,6 +225,10 @@ pub struct Checkpoint {
     pub pieces: usize,
     /// Pieces finished, in order.
     pub done: usize,
+    /// Samples the finished pieces cover (the end of the last one), for the partial transcript
+    /// (AI-1.AC6). 0 in a checkpoint saved by an older build: then it is estimated from `done`.
+    #[serde(default)]
+    pub covered_samples: usize,
     /// The words of the finished pieces.
     pub words: Vec<Word>,
     /// The language fixed so far (asked for, or heard in the first piece).
@@ -1095,12 +1099,14 @@ pub fn transcribe_pieces_resumable<'p>(
     }
     let total_pieces = pieces.len();
     for (i, range) in pieces.into_iter().enumerate().skip(start) {
+        let range_end = range.end;
         words.extend(job.piece(range, 0)?);
         if i + 1 < total_pieces {
             on_checkpoint(&Checkpoint {
                 total_samples: audio.samples.len(),
                 pieces: total_pieces,
                 done: i + 1,
+                covered_samples: range_end,
                 words: words.clone(),
                 language: job.language.clone(),
                 first: job.first.clone(),

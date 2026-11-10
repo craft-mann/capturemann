@@ -326,6 +326,24 @@ impl JobHandler for TranscribeHandler {
         };
         let (service, reporter, run_flag) = (self.service.clone(), ctx.reporter.clone(), flag);
         let saver = reporter.clone();
+        // AI-1.AC6: the first part of a long transcription is readable while the rest runs. A
+        // resumed job shows what its checkpoint already holds.
+        let partial = (
+            self.library.clone(),
+            self.events.clone(),
+            capture_id.clone(),
+            dir.clone(),
+            glossary.clone(),
+        );
+        if let Some(c) = &ctx.job.checkpoint {
+            let (l, e, id, d, g) = partial.clone();
+            let c = c.clone();
+            let _ = blocking(move || {
+                super::transcripts::refresh_partial(&l, &e, &id, &d, &c, &g);
+                Ok(())
+            })
+            .await;
+        }
         let joined = tokio::task::spawn_blocking(move || {
             let _low = cm_platform::priority::lower_current_thread(req.background);
             let mut last = -1.0_f32;
@@ -334,6 +352,8 @@ impl JobHandler for TranscribeHandler {
                 // A failed save only costs the resume, never the run.
                 &mut |checkpoint| {
                     let _ = saver.save_checkpoint(&checkpoint);
+                    let (l, e, id, d, g) = &partial;
+                    super::transcripts::refresh_partial(l, e, id, d, &checkpoint, g);
                 },
                 &mut |p| {
                     if p >= 1.0 || p - last >= 0.01 {
@@ -357,8 +377,21 @@ impl JobHandler for TranscribeHandler {
         watcher.abort();
         let mut transcript = match joined {
             Ok(Ok(Some(t))) => t,
-            Ok(Ok(None)) => return Err(CmError::internal("The transcription was interrupted")),
-            Ok(Err(e)) => return Err(e),
+            Ok(Ok(None)) => {
+                // Cancelled: the first part goes. Held or shut down: it stays, the job goes on
+                // from its checkpoint.
+                if ctx.cancel.is_cancelled() {
+                    self.remove_partial(&capture_id, &dir).await;
+                }
+                return Err(CmError::internal("The transcription was interrupted"));
+            }
+            Ok(Err(e)) => {
+                // A failure that will not be retried leaves nothing behind.
+                if !e.is_retryable() {
+                    self.remove_partial(&capture_id, &dir).await;
+                }
+                return Err(e);
+            }
             Err(e) => {
                 return Err(CmError::internal(format!(
                     "transcription worker failed: {e}"
@@ -416,6 +449,8 @@ impl JobHandler for TranscribeHandler {
                 }
             });
             let p = write_atomic(&write_dir, TRANSCRIPT_FILE, &bytes)?;
+            // The whole is there: the first part is not needed any more.
+            cm_ai::recording::remove_partial(&write_dir);
             // The pieces read while the recording ran are in the transcript now.
             cm_ai::recording::live::remove_live_state(&write_dir);
             let mut lib = lock_library(&library);
@@ -472,6 +507,23 @@ impl JobHandler for TranscribeHandler {
                    "captions_cleared": revision.is_some(),
                    "captions_shown": shown, "reapplied": reapplied, "dropped": dropped,
                    "glossary_replaced": glossary_replaced }))
+    }
+}
+
+impl TranscribeHandler {
+    /// Deletes the capture's partial transcript (cancel, or a failure for good).
+    async fn remove_partial(&self, capture_id: &str, fallback: &Path) {
+        let (library, id, fallback) = (
+            self.library.clone(),
+            capture_id.to_owned(),
+            fallback.to_path_buf(),
+        );
+        let _ = blocking(move || {
+            let dir = super::current_bundle_dir(&library, &id).unwrap_or(fallback);
+            cm_ai::recording::remove_partial(&dir);
+            Ok(())
+        })
+        .await;
     }
 }
 

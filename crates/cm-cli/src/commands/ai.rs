@@ -22,6 +22,16 @@ fn secs(v: &Value) -> f64 {
 }
 
 /// `mm:ss.mmm`, or `h:mm:ss.mmm` past an hour.
+/// `25 min` or `1 h 13 min`, for the partial transcript's header.
+fn minutes(seconds: f64) -> String {
+    let m = (seconds / 60.0).floor().max(0.0) as u64;
+    if m >= 60 {
+        format!("{} h {:02} min", m / 60, m % 60)
+    } else {
+        format!("{m} min")
+    }
+}
+
 fn stamp(seconds: f64) -> String {
     let ms = (seconds * 1000.0).round().max(0.0) as u64;
     let (h, m, s, ms) = (ms / 3_600_000, ms / 60_000 % 60, ms / 1000 % 60, ms % 1000);
@@ -1032,6 +1042,18 @@ async fn transcript(cx: &mut Ctx<'_>, id: String, words: bool) -> Result<(), Cli
         if let Some(note) = t["note"].as_str() {
             let _ = writeln!(s, "  {note}");
         }
+        // AI-1.AC7: the first part of a transcription that is still running.
+        let partial = r["partial"] == json!(true);
+        if partial {
+            let _ = writeln!(
+                s,
+                "PARTIAL: the first {} of {} are ready; the rest follows. Captions, exports, \
+                 reports and translation need the whole transcript (wait for the job: \
+                 `capturemann jobs`).",
+                minutes(r["covered_secs"].as_f64().unwrap_or(0.0)),
+                minutes(r["total_secs"].as_f64().unwrap_or(0.0)),
+            );
+        }
         if words {
             for w in &ws {
                 let _ = writeln!(
@@ -1043,6 +1065,9 @@ async fn transcript(cx: &mut Ctx<'_>, id: String, words: bool) -> Result<(), Cli
                     w["confidence"].as_f64().unwrap_or(0.0) * 100.0
                 );
             }
+        } else if partial {
+            let text: Vec<String> = ws.iter().map(|w| plain(&w["text"])).collect();
+            let _ = writeln!(s, "Text so far: {}", text.join(" "));
         } else if let Some(lines) = r["captions"].as_array() {
             let _ = writeln!(
                 s,

@@ -84,9 +84,11 @@ pub(crate) fn load_source(
     let path = dir.join(TRANSCRIPT_FILE);
     let text = std::fs::read_to_string(&path).map_err(|e| {
         if e.kind() == std::io::ErrorKind::NotFound {
-            CmError::not_found(format!(
-                "`{id}` has no transcript to write a report from; run `transcribe` first"
-            ))
+            super::no_transcript_error(
+                dir,
+                id,
+                format!("`{id}` has no transcript to write a report from; run `transcribe` first"),
+            )
         } else {
             CmError::internal(format!("cannot read `{}`: {e}", path.display()))
         }

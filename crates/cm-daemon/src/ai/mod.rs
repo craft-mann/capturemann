@@ -146,6 +146,20 @@ pub fn is_ai_method(name: &str) -> bool {
 /// The folder of capture `id` as it is now. Renaming a capture moves its folder, so a job that began
 /// earlier asks again before it writes instead of using the path it saw at the start (Nov 8, 2026: the
 /// title was edited while the model ran and the finished transcript could not be saved).
+/// The error for an action that needs the finished transcript while only a partial one exists
+/// (AI-1.AC8): `busy`, saying what to wait for. Without a partial transcript it is the
+/// ordinary `not_found` with `missing` as the message.
+pub(crate) fn no_transcript_error(dir: &Path, id: &str, missing: String) -> CmError {
+    if dir.join(cm_ai::recording::PARTIAL_FILE).is_file() {
+        CmError::busy(format!(
+            "`{id}` is still being transcribed and only the first part is ready; wait for the \
+             transcription to finish (`transcript.ready`) and try again"
+        ))
+    } else {
+        CmError::not_found(missing)
+    }
+}
+
 pub(crate) fn current_bundle_dir(
     library: &Arc<std::sync::Mutex<cm_library::Library>>,
     id: &str,

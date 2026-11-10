@@ -1,5 +1,5 @@
 # Vietnamese (Tiếng Việt) catalogue of the CaptureMann UI.
-# Entries marked `#, fuzzy` are drafts (117 entries added after the Nov 6, 2026 full review: Windows and Linux wording); the app shows them anyway.
+# Entries marked `#, fuzzy` are drafts (117 entries added after the Nov 6, 2026 full review: Windows and Linux wording, plus 2 of Nov 10, 2026: the partial transcript); the app shows them anyway.
 # The rest of the catalogue was reviewed by the maintainer (native reading: 0.2.0 strings Oct 27, 2026; the remaining draft sheet Nov 6, 2026) and carries no `fuzzy` flag.
 # Entries with `# FACT: owner review required` state what the app really does (privacy, permissions,
 # deletion, confirmations): read each one. Terms follow locales/vi-glossary.md.
@@ -2032,6 +2032,10 @@ msgstr "Một tệp MP4 chỉ gồm màn hình. Các bản ghi gốc được gi
 msgid "One MP4 with the screen. The original tracks are untouched. {captions}"
 msgstr "Một tệp MP4 chỉ gồm màn hình. Các bản ghi gốc được giữ nguyên. {captions}"
 
+#, fuzzy
+msgid "Partial transcript"
+msgstr "Bản chép lời một phần"
+
 msgid "The video is VP9, not H.264, because this computer has no usable hardware H.264 encoder."
 msgstr "Video là VP9, không phải H.264, vì máy tính này không có bộ mã hóa H.264 phần cứng dùng được."
 
@@ -3508,6 +3512,11 @@ msgstr "Chép lời bản ghi"
 
 msgid "Transcribing needs a speech model. Add one on the AI page."
 msgstr "Chép lời cần một mô hình giọng nói. Hãy thêm một mô hình ở trang AI."
+
+#, fuzzy
+msgid "Transcribing: the first {n} minute is ready. The rest follows."
+msgid_plural "Transcribing: the first {n} minutes are ready. The rest follows."
+msgstr[0] "Đang chép lời: {n} phút đầu đã sẵn sàng. Phần còn lại sẽ tiếp tục."
 
 msgid "Transcribing…"
 msgstr "Đang chép lời…"

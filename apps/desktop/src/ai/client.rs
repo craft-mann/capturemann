@@ -55,6 +55,11 @@ impl std::fmt::Display for AiError {
 }
 
 /// One JSON-RPC style call: the method name and its params, the result object.
+/// Whether a `get_transcript` answer is the first part of a running transcription.
+fn is_partial(answer: &Value) -> bool {
+    answer.get("partial") == Some(&Value::Bool(true))
+}
+
 #[async_trait]
 pub trait AiTransport: Send + Sync {
     async fn call(&self, method: &str, params: Value) -> Result<Value, AiError>;
@@ -339,9 +344,29 @@ impl AiClient {
             .await
         {
             Ok(Value::Null) => Ok(None),
+            // The first part of a transcription that is still running is not "the transcript":
+            // nothing may be edited or exported from it (AI-1.AC8).
+            Ok(v) if is_partial(&v) => Ok(None),
             // The daemon answers `{ "capture_id": ..., "transcript": {...} }`; a bare transcript is
             // accepted too (the scripted tests and older callers use it).
             Ok(v) => parse("get_transcript", v.get("transcript").cloned().unwrap_or(v)).map(Some),
+            Err(e) if e.code.as_deref() == Some("not_found") => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// The first part of a transcription that is still running, read-only (AI-1.AC10); `None`
+    /// when there is none (no run, a finished transcript, or the run has not finished a piece).
+    pub async fn get_partial_transcript(
+        &self,
+        capture_id: &str,
+    ) -> Result<Option<super::partial::PartialView>, AiError> {
+        match self
+            .transport
+            .call("get_transcript", json!({ "capture_id": capture_id }))
+            .await
+        {
+            Ok(v) => Ok(super::partial::parse_partial(&v)),
             Err(e) if e.code.as_deref() == Some("not_found") => Ok(None),
             Err(e) => Err(e),
         }
@@ -359,6 +384,7 @@ impl AiClient {
             .await
         {
             Ok(Value::Null) => return Ok(None),
+            Ok(v) if is_partial(&v) => return Ok(None),
             Ok(v) => v,
             Err(e) if e.code.as_deref() == Some("not_found") => return Ok(None),
             Err(e) => return Err(e),
@@ -387,6 +413,7 @@ impl AiClient {
             .await
         {
             Ok(Value::Null) => return Ok(None),
+            Ok(v) if is_partial(&v) => return Ok(None),
             Ok(v) => v,
             Err(e) if e.code.as_deref() == Some("not_found") => return Ok(None),
             Err(e) => return Err(e),
@@ -923,6 +950,30 @@ mod tests {
         );
         let c = AiClient::new(t);
         assert_eq!(run(c.get_transcript("cap_1")).unwrap(), None);
+    }
+
+    /// AI-1.AC8, AC10: the first part of a running transcription is read as a partial view, and
+    /// every reader that wants "the transcript" (edit, export, summary) sees none.
+    #[test]
+    fn a_partial_transcript_is_not_the_transcript() {
+        let t = ScriptedTransport::new();
+        let answer = json!({"capture_id": "cap_1", "partial": true, "covered_secs": 300.0,
+            "total_secs": 4400.0,
+            "transcript": {"version": 1, "language": "en", "model": "small", "note": null,
+                           "words": [{"text": "Hello", "start": 120000, "end": 150000,
+                                      "confidence": 0.9}]}});
+        t.answer("get_transcript", Ok(answer));
+        let c = AiClient::new(t);
+        assert_eq!(run(c.get_transcript("cap_1")).unwrap(), None);
+        assert_eq!(run(c.transcript_info("cap_1")).unwrap(), None);
+        assert!(run(c.get_transcript_with_options("cap_1"))
+            .unwrap()
+            .is_none());
+        let p = run(c.get_partial_transcript("cap_1")).unwrap().unwrap();
+        assert_eq!(p.covered_secs, 300.0);
+        assert_eq!(p.rows.len(), 1);
+        assert_eq!(p.rows[0].text, "Hello");
+        assert_eq!(p.rows[0].start_secs, 1.0);
     }
 
     /// Regression: the real daemon wraps the transcript (`{ capture_id, transcript }`). Reading the

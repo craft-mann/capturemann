@@ -1600,3 +1600,134 @@ async fn the_background_priority_setting_reaches_the_transcription_job() {
             .collect();
     assert_eq!(asked, vec![true, false]);
 }
+
+// ---- AI-1.AC6 to AC9: the partial transcript of a long run -------------------------------------
+
+fn partial_path(r: &Rig) -> std::path::PathBuf {
+    r.dir.join("transcript.partial.json")
+}
+
+/// Waits until `get_transcript` answers with a partial transcript covering more than `above`
+/// seconds; returns the answer.
+async fn partial_above(r: &Rig, above: f64) -> Value {
+    until(async || {
+        let v = user(r, "get_transcript", json!({})).await.ok()?;
+        (v["partial"] == json!(true) && v["covered_secs"].as_f64().unwrap_or(0.0) > above)
+            .then_some(v)
+    })
+    .await
+}
+
+/// AI-1.AC6, AC7, AC8, AC9: after each finished piece `transcript.partial.json` holds the words so
+/// far (growing `covered_secs`), `transcript.partial` is published, `get_transcript` marks the
+/// answer partial, the edit actions refuse with `busy`, and the final transcript removes the file.
+#[tokio::test]
+async fn ai_1_a_running_transcription_shows_its_first_part_and_cleans_up() {
+    let r = rig(FakeAi::new().with_small_installed(), Decision::Approve).await;
+    r.ai.set_piece_checkpoints(true);
+    r.ai.set_slow(8, 150);
+    let mut rx = r.daemon.subscribe();
+    let started = user(&r, "transcribe", json!({})).await.unwrap();
+    let id = started["job_id"].as_str().unwrap().to_owned();
+    let first = partial_above(&r, 0.0).await;
+    let covered = first["covered_secs"].as_f64().unwrap();
+    assert_eq!(first["total_secs"].as_f64(), Some(8.0 * 300.0));
+    assert!(!first["transcript"]["words"].as_array().unwrap().is_empty());
+    assert_eq!(first["captions"], Value::Null);
+    let file: Value =
+        serde_json::from_str(&std::fs::read_to_string(partial_path(&r)).unwrap()).unwrap();
+    assert_eq!(file["partial"], json!(true));
+    assert!(file["covered_secs"].as_f64().unwrap() > 0.0);
+    // It grows.
+    let later = partial_above(&r, covered).await;
+    assert!(
+        later["transcript"]["words"].as_array().unwrap().len()
+            > first["transcript"]["words"].as_array().unwrap().len()
+    );
+    // AC8: nothing that needs the whole transcript works on the first part.
+    for (m, p) in [
+        ("get_captions", json!({})),
+        ("export_captions", json!({"format": "srt"})),
+        (
+            "replace_in_captions",
+            json!({"replacements": [{"find": "a", "replace": "b"}]}),
+        ),
+    ] {
+        let e = user(&r, m, p).await.unwrap_err();
+        assert_eq!(code(&e), ErrorCode::Busy, "{m}: {e:?}");
+    }
+    let done = job_done(&r, &id).await;
+    assert_eq!(done["state"], "done", "{done}");
+    // AC9: gone with the final transcript, which is not marked partial.
+    assert!(!partial_path(&r).exists());
+    assert!(r.dir.join("transcript.json").is_file());
+    let fin = user(&r, "get_transcript", json!({})).await.unwrap();
+    assert_eq!(fin["partial"], json!(false));
+    let events = drain(&mut rx);
+    let partials: Vec<&Event> = events
+        .iter()
+        .filter(|e| e.name == "transcript.partial")
+        .collect();
+    assert!(partials.len() >= 2, "{events:?}");
+    assert!(partials.iter().all(|e| e.data["capture_id"] == json!(r.id)
+        && e.data.get("words").is_some()
+        && e.data["total_secs"].as_f64() == Some(2400.0)));
+}
+
+/// AI-1.AC9: a cancelled run leaves no partial transcript (and no transcript).
+#[tokio::test]
+async fn ai_1_a_cancelled_run_removes_the_partial_transcript() {
+    let r = rig(FakeAi::new().with_small_installed(), Decision::Approve).await;
+    r.ai.set_piece_checkpoints(true);
+    r.ai.set_slow(40, 30);
+    let started = user(&r, "transcribe", json!({})).await.unwrap();
+    let id = started["job_id"].as_str().unwrap().to_owned();
+    partial_above(&r, 0.0).await;
+    assert!(partial_path(&r).is_file());
+    user(&r, "cancel_job", json!({"job_id": id})).await.unwrap();
+    assert_eq!(job_done(&r, &id).await["state"], "cancelled");
+    until(async || (!partial_path(&r).exists()).then_some(())).await;
+    let e = user(&r, "get_transcript", json!({})).await.unwrap_err();
+    assert_eq!(code(&e), ErrorCode::NotFound);
+}
+
+/// AI-1.AC9: a held run keeps the partial transcript and the resumed run goes on from it.
+#[tokio::test]
+async fn ai_1_a_held_run_keeps_the_partial_transcript_and_resumes() {
+    let r = rig(FakeAi::new().with_small_installed(), Decision::Approve).await;
+    r.ai.set_piece_checkpoints(true);
+    r.ai.set_slow(12, 40);
+    let started = user(&r, "transcribe", json!({})).await.unwrap();
+    let id = started["job_id"].as_str().unwrap().to_owned();
+    let before = partial_above(&r, 300.0).await;
+    assert!(r.daemon.hold_job_type(cm_jobs::JOB_TRANSCRIBE));
+    until(async || {
+        let j = user(&r, "get_job", json!({"job_id": id})).await.unwrap();
+        (j["state"] == "paused").then_some(())
+    })
+    .await;
+    // Paused: the first part is still readable.
+    let paused = user(&r, "get_transcript", json!({})).await.unwrap();
+    assert_eq!(paused["partial"], json!(true));
+    assert!(paused["covered_secs"].as_f64() >= before["covered_secs"].as_f64());
+    assert!(r.daemon.resume_job_type(cm_jobs::JOB_TRANSCRIBE));
+    assert_eq!(job_done(&r, &id).await["state"], "done");
+    assert!(!partial_path(&r).exists());
+    assert_eq!(r.ai.transcribe_calls().len(), 2);
+}
+
+/// AI-1.AC7: a partial file with no transcription behind it is stale: ignored and removed.
+#[tokio::test]
+async fn ai_1_a_stale_partial_transcript_is_ignored_and_removed() {
+    let r = rig(FakeAi::new().with_small_installed(), Decision::Approve).await;
+    std::fs::write(
+        partial_path(&r),
+        json!({"version": 1, "language": "en", "model": "small", "words": [], "note": null,
+               "partial": true, "covered_secs": 300.0, "total_secs": 900.0})
+        .to_string(),
+    )
+    .unwrap();
+    let e = user(&r, "get_transcript", json!({})).await.unwrap_err();
+    assert_eq!(code(&e), ErrorCode::NotFound);
+    assert!(!partial_path(&r).exists());
+}

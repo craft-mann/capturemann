@@ -62,4 +62,18 @@ looked at the screen yet. Run it on macOS, Windows 11 and Ubuntu (one pass each)
     Pass: the import card's strip and, after the import step, the transcription's strip look as before (dark strip with
     the "Imported" badge).
 
+11. **The first part appears while the rest runs (AI-1.AC10).** Use a recording or audio capture of 25 minutes or more
+    (import a long file you own; do not record sound after 22:00). Press Transcribe and open the page (the recording's
+    details page, and in a second pass the audio editor's Transcript tab).
+    Pass: below the progress strip a banner says "Transcribing: the first N minutes are ready. The rest follows." after
+    the first piece (about 5 minutes of audio, a minute or two of waiting); under it the first part reads as rows (a time
+    over the text), no edit, download or Re-generate control is offered; every few minutes N and the rows grow without the
+    list jumping back to the top (scroll down a little, wait for the next piece: the position stays). In a terminal,
+    `capturemann ai transcript <id>` prints "PARTIAL: the first N min of M min are ready" and `capturemann ai captions get
+    <id>` says the recording is still being transcribed (exit 6). Look in the capture's folder: `transcript.partial.json`
+    exists. Press Cancel: the rows and the banner go and `transcript.partial.json` is deleted. Start again and let it
+    finish: the page switches to the final transcript and the file is gone. Start again, start a recording to hold the
+    job, and see the first part stay; stop the recording and see the run go on.
+    Layout: repeat once with `CAPTUREMANN_PSEUDO_LOCALE=1` at the smallest window width: the banner wraps, nothing is cut.
+
 Record the result in `verification/` (template in its README) with the platform, the build and which steps were run.

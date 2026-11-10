@@ -86,6 +86,99 @@ pub fn remove_transcript(bundle: &Path) -> Result<bool, CmError> {
     }
 }
 
+/// The partial transcript file inside a bundle: the words of the finished pieces of a long
+/// transcription that is still running (AI-1.AC6). Derived data, not a revision.
+pub const PARTIAL_FILE: &str = "transcript.partial.json";
+
+/// `transcript.partial.json`: a [`Transcript`] of the first part of the recording, marked
+/// `partial: true`, with how much of the audio it covers.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct PartialTranscript {
+    #[serde(flatten)]
+    pub transcript: Transcript,
+    /// Always true; a reader that finds it knows this is not the final transcript.
+    pub partial: bool,
+    /// Seconds of audio the finished pieces cover, and the length of all of it.
+    pub covered_secs: f64,
+    pub total_secs: f64,
+}
+
+/// The partial transcript of a [`crate::pieces::Checkpoint`] (the value a job saves after every
+/// finished piece), with the word times on the session clock like the final transcript. `None`
+/// for a value that is not a checkpoint or has no finished piece.
+pub fn partial_from_checkpoint(bundle: &Path, checkpoint: &Value) -> Option<PartialTranscript> {
+    let c: crate::pieces::Checkpoint = serde_json::from_value(checkpoint.clone()).ok()?;
+    if c.done == 0 || c.pieces == 0 {
+        return None;
+    }
+    let rate = f64::from(SAMPLE_RATE);
+    let total_secs = c.total_samples as f64 / rate;
+    let covered = if c.covered_samples > 0 {
+        c.covered_samples as f64 / rate
+    } else {
+        total_secs * c.done as f64 / c.pieces as f64
+    };
+    let gaps = cm_library::rec::read_manifest(bundle).ok()?.gaps;
+    let (language, model, note) = c.first.unwrap_or_default();
+    let words: Vec<Word> = c
+        .words
+        .into_iter()
+        .map(|w| Word {
+            start: file_to_session(&gaps, w.start, false),
+            end: file_to_session(&gaps, w.end, true),
+            ..w
+        })
+        .collect();
+    let sounds = c
+        .sounds
+        .into_iter()
+        .map(|s| crate::transcribe::Sound {
+            start: file_to_session(&gaps, s.start, false),
+            end: file_to_session(&gaps, s.end, true),
+            ..s
+        })
+        .collect();
+    Some(PartialTranscript {
+        transcript: Transcript {
+            version: TRANSCRIPT_VERSION,
+            language: c.language.unwrap_or(language),
+            model,
+            note: if words.is_empty() { note } else { None },
+            words,
+            sounds,
+            segments: Vec::new(),
+        },
+        partial: true,
+        covered_secs: covered.min(total_secs),
+        total_secs,
+    })
+}
+
+/// Reads the bundle's partial transcript; `None` when there is none or it cannot be read.
+pub fn read_partial(bundle: &Path) -> Option<PartialTranscript> {
+    let text = fs::read_to_string(bundle.join(PARTIAL_FILE)).ok()?;
+    serde_json::from_str(&text).ok()
+}
+
+/// Writes the bundle's partial transcript atomically (a temporary file, then a rename).
+pub fn write_partial(bundle: &Path, p: &PartialTranscript) -> Result<(), CmError> {
+    let tmp = bundle.join(format!(".{PARTIAL_FILE}.tmp"));
+    let body =
+        serde_json::to_vec_pretty(p).map_err(|e| CmError::internal(format!("partial: {e}")))?;
+    let target = bundle.join(PARTIAL_FILE);
+    let done = fs::write(&tmp, body).and_then(|()| fs::rename(&tmp, &target));
+    if let Err(e) = done {
+        let _ = fs::remove_file(&tmp);
+        return Err(CmError::internal(format!("{}: {e}", target.display())));
+    }
+    Ok(())
+}
+
+/// Deletes the bundle's partial transcript. Returns whether there was one.
+pub fn remove_partial(bundle: &Path) -> bool {
+    fs::remove_file(bundle.join(PARTIAL_FILE)).is_ok()
+}
+
 /// Session time of a position in a media file (file time).
 ///
 /// `gaps` are the pause gaps in session time, sorted. A position exactly at a pause belongs
@@ -350,6 +443,36 @@ fn run_recording(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// AI-1.AC6: the partial file round-trips, is atomic (no temp file left), and a value that is
+    /// not a checkpoint gives none.
+    #[test]
+    fn the_partial_transcript_round_trips_and_is_removed() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = PartialTranscript {
+            transcript: Transcript {
+                version: TRANSCRIPT_VERSION,
+                language: "en".into(),
+                model: "small".into(),
+                words: vec![],
+                note: None,
+                sounds: vec![],
+                segments: vec![],
+            },
+            partial: true,
+            covered_secs: 300.0,
+            total_secs: 3000.0,
+        };
+        write_partial(dir.path(), &p).unwrap();
+        assert_eq!(read_partial(dir.path()), Some(p));
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1, "no temp file");
+        assert!(remove_partial(dir.path()));
+        assert!(read_partial(dir.path()).is_none());
+        assert!(!remove_partial(dir.path()));
+        assert!(
+            partial_from_checkpoint(dir.path(), &serde_json::json!({"fake_step": 1})).is_none()
+        );
+    }
 
     fn gap(from: f64, to: f64) -> PauseGap {
         PauseGap {

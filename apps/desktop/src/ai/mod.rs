@@ -13,6 +13,7 @@ pub mod client;
 pub mod glossary;
 pub mod jobs;
 pub mod models;
+pub mod partial;
 pub mod report_offer;
 pub mod sounds;
 pub mod suggest;

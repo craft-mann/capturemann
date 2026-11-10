@@ -1685,6 +1685,10 @@ mod notifications {
             "model.changed",
             json!({ "model": "small", "change": "downloaded" }),
         );
+        bus.publish(
+            "transcript.partial",
+            json!({ "capture_id": "rec_1", "covered_secs": 300.0, "total_secs": 3000.0 }),
+        );
         bus.publish("transcript.ready", json!({ "capture_id": "rec_1" }));
         wait_for(&seen, "transcript.ready").await;
         // (The subscription probe may still deliver a late `job.progress`.)
@@ -1694,7 +1698,11 @@ mod notifications {
             .collect();
         assert_eq!(
             got,
-            vec!["model.changed".to_owned(), "transcript.ready".to_owned()]
+            vec![
+                "model.changed".to_owned(),
+                "transcript.partial".to_owned(),
+                "transcript.ready".to_owned()
+            ]
         );
     }
 }

@@ -1613,11 +1613,14 @@ fn ai_tools() -> Vec<ToolSpec> {
             Tier::Free,
             false,
             "AI-1",
-            "Read a recording's transcript (words with start and end in session time, ticks of 1/120000 s, and confidence) and its caption lines: the user's edited lines if there are any (`captions_source: \"edited\"`), else lines generated from the transcript (`\"generated\"`). Fails with `not_found` until transcribe has finished.",
+            "Read a recording's transcript (words with start and end in session time, ticks of 1/120000 s, and confidence) and its caption lines: the user's edited lines if there are any (`captions_source: \"edited\"`), else lines generated from the transcript (`\"generated\"`). Fails with `not_found` until transcribe has started to produce text. **While a long recording (over 10 minutes) is still being transcribed in 5-minute pieces, the answer is the first part only: `partial: true`, `covered_secs` and `total_secs` say how much of the audio it covers, `captions` and `captions_source` are null and there are no speakers.** A partial transcript is read-only: get_captions, set_captions, replace_in_captions, export_captions, translate_captions, normalize_transcript, diarize and the report actions fail with `busy` until `transcript.ready`; `transcript.partial` is published after each piece. It is removed when the job is cancelled or fails, and it is not searched.",
             json!({ "capture_id": capture_id() }),
             &["capture_id"],
             json!({ "type": "object", "properties": {
                 "capture_id": { "type": "string" },
+                "partial": { "type": "boolean", "description": "true: only the first part of a transcription that is still running; false: the whole transcript." },
+                "covered_secs": { "type": "number", "description": "Only when `partial`: seconds of audio the words cover." },
+                "total_secs": { "type": "number", "description": "Only when `partial`: the length of the audio being transcribed." },
                 "transcript": { "type": "object", "properties": {
                     "version": { "type": "integer" }, "language": { "type": "string" },
                     "model": { "type": "string" },

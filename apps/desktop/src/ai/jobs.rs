@@ -6,6 +6,7 @@ use std::collections::HashMap;
 
 use cm_i18n::tr;
 
+use super::partial::PartialView;
 use super::summary::{RegenDraft, TranscriptCache};
 use crate::daemon_text::ErrorNote;
 
@@ -86,6 +87,13 @@ pub struct TranscribeVm {
     voice_ended: Vec<(String, VoiceEnd)>,
     running: HashMap<String, Run>,
     errors: HashMap<String, ErrorNote>,
+    /// The first part of each running long transcription (AI-1.AC10), read-only; only shown while
+    /// the run is shown as running.
+    partials: HashMap<String, PartialView>,
+    /// Recordings whose partial transcript was already asked for during this run.
+    partial_asked: std::collections::HashSet<String>,
+    /// The scroll state of each partial list, so it keeps its place while rows are added.
+    partial_scrolls: HashMap<String, gpui::ScrollHandle>,
     /// Bumped whenever a transcript was written (or a run ended): readers reload.
     pub epoch: u64,
     /// What the details page knows about each recording's transcript.
@@ -268,6 +276,41 @@ impl TranscribeVm {
         mine.into_iter().map(|(_, e)| e).collect()
     }
 
+    /// The partial transcript to show: only while the run is shown as running.
+    pub fn partial_of(&self, capture_id: &str) -> Option<&PartialView> {
+        self.running
+            .contains_key(capture_id)
+            .then(|| self.partials.get(capture_id))
+            .flatten()
+    }
+
+    /// A newer partial transcript arrived (`transcript.partial`, or the first read).
+    pub fn set_partial(&mut self, capture_id: &str, view: PartialView) {
+        self.partial_scrolls
+            .entry(capture_id.to_owned())
+            .or_default();
+        self.partials.insert(capture_id.to_owned(), view);
+    }
+
+    /// The scroll handle of the partial list of a recording.
+    pub fn partial_scroll(&self, capture_id: &str) -> Option<gpui::ScrollHandle> {
+        self.partial_scrolls.get(capture_id).cloned()
+    }
+
+    /// Whether the page should ask for the partial transcript now: the run is shown, nothing was
+    /// asked for yet in this run. Marks it asked.
+    pub fn take_partial_ask(&mut self, capture_id: &str) -> bool {
+        self.running.contains_key(capture_id)
+            && !self.partials.contains_key(capture_id)
+            && self.partial_asked.insert(capture_id.to_owned())
+    }
+
+    fn forget_partial(&mut self, capture_id: &str) {
+        self.partials.remove(capture_id);
+        self.partial_scrolls.remove(capture_id);
+        self.partial_asked.remove(capture_id);
+    }
+
     pub fn is_running(&self, capture_id: &str) -> bool {
         self.running.contains_key(capture_id)
     }
@@ -278,6 +321,7 @@ impl TranscribeVm {
             return false;
         }
         self.errors.remove(capture_id);
+        self.forget_partial(capture_id);
         self.running.insert(capture_id.to_owned(), Run::default());
         true
     }
@@ -319,6 +363,7 @@ impl TranscribeVm {
 
     /// `transcript.ready`.
     pub fn ready(&mut self, capture_id: &str) {
+        self.forget_partial(capture_id);
         self.running.remove(capture_id);
         self.errors.remove(capture_id);
         self.regen.remove(capture_id);
@@ -366,6 +411,7 @@ impl TranscribeVm {
     }
 
     pub fn failed(&mut self, capture_id: &str, message: impl Into<ErrorNote>) {
+        self.forget_partial(capture_id);
         self.running.remove(capture_id);
         self.errors.insert(capture_id.to_owned(), message.into());
         self.epoch += 1;
@@ -442,6 +488,7 @@ impl TranscribeVm {
             .collect();
         for id in &gone {
             self.running.remove(id);
+            self.forget_partial(id);
         }
         if !gone.is_empty() {
             self.epoch += 1;
@@ -452,6 +499,7 @@ impl TranscribeVm {
     /// The user cancelled the run: it is not running and it is not an error. (A cancelled job
     /// sends no bus event, so the window must say so itself.)
     pub fn cancelled(&mut self, capture_id: &str) {
+        self.forget_partial(capture_id);
         self.running.remove(capture_id);
         self.errors.remove(capture_id);
         self.epoch += 1;
@@ -465,6 +513,44 @@ impl TranscribeVm {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// AI-1.AC10: the partial transcript is shown only while the run is shown as running, is asked
+    /// for once per run, and goes with the run (ready, failed, cancelled).
+    #[test]
+    fn the_partial_transcript_lives_and_dies_with_the_run() {
+        let view = PartialView {
+            rows: vec![],
+            covered_secs: 300.0,
+            total_secs: 3000.0,
+        };
+        let mut v = TranscribeVm::default();
+        assert!(
+            !v.take_partial_ask("rec_1"),
+            "nothing running, nothing to ask"
+        );
+        v.start("rec_1");
+        assert!(v.take_partial_ask("rec_1"));
+        assert!(!v.take_partial_ask("rec_1"), "once per run");
+        v.set_partial("rec_1", view.clone());
+        assert_eq!(v.partial_of("rec_1"), Some(&view));
+        assert!(v.partial_scroll("rec_1").is_some());
+        v.ready("rec_1");
+        assert_eq!(v.partial_of("rec_1"), None);
+        for end in ["cancel", "fail"] {
+            v.start("rec_1");
+            v.set_partial("rec_1", view.clone());
+            if end == "cancel" {
+                v.cancelled("rec_1");
+            } else {
+                v.failed("rec_1", "boom");
+            }
+            assert_eq!(v.partial_of("rec_1"), None, "{end}");
+            assert!(v.partial_scroll("rec_1").is_none(), "{end}");
+        }
+        // A new run asks again.
+        v.start("rec_1");
+        assert!(v.take_partial_ask("rec_1"));
+    }
 
     /// Jobs the daemon already had (picked up after a restart) are shown like a click, with their
     /// progress, and asking again changes nothing.

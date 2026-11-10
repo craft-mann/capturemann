@@ -937,6 +937,96 @@ pub fn transcribe_row(
         .into_any_element()
 }
 
+/// The first part of a long transcription, read-only, while the rest is still being made
+/// (AI-1.AC10; DESIGN §5.5 "Transcript" rows: a time chip over the text, `row_divider` rules). A
+/// banner says how much is ready, and the list grows as pieces finish without losing its scroll
+/// position. `None` when the recording has no partial transcript to show. Asking for it is done by
+/// `prime_transcript_info` (once per run), so a page opened in the middle of a run fills in.
+pub fn partial_transcript(
+    t: &Theme,
+    app: &Entity<AppModel>,
+    capture_id: &str,
+    prefix: &'static str,
+    cx: &gpui::App,
+) -> Option<AnyElement> {
+    let (view, handle) = {
+        let m = &app.read(cx).transcribe;
+        (
+            m.partial_of(capture_id)?.clone(),
+            m.partial_scroll(capture_id)?,
+        )
+    };
+    let banner = div()
+        .flex()
+        .items_start()
+        .gap(px(10.))
+        .text_size(px(13.))
+        .text_color(rgba_of(t.text_3))
+        .child(div().pt(px(2.)).child(icon("loader-circle", 16., t.mist)))
+        .child(
+            div()
+                .id(SharedString::from(format!("{prefix}-partial-banner")))
+                .flex_1()
+                .min_w(px(0.))
+                .child(SharedString::from(crate::ai::partial::banner(
+                    view.covered_secs,
+                ))),
+        );
+    let rows = view.rows.iter().enumerate().map(|(i, r)| {
+        div()
+            .id(SharedString::from(format!("{prefix}-partial-row-{i}")))
+            .role(Role::ListItem)
+            .px(px(14.))
+            .py(px(10.))
+            .flex()
+            .flex_col()
+            .gap(px(2.))
+            .border_b_1()
+            .border_color(rgba_of(t.row_divider()))
+            .child(
+                div()
+                    .mono()
+                    .tnum()
+                    .text_size(px(12.5))
+                    .text_color(rgba_of(t.mist))
+                    .child(SharedString::from(crate::ai::partial::clock(r.start_secs))),
+            )
+            .child(
+                div()
+                    .text_size(px(14.5))
+                    .line_height(px(22.))
+                    .text_color(rgba_of(t.text_2))
+                    .child(SharedString::from(r.text.clone())),
+            )
+    });
+    let list = div()
+        .id(SharedString::from(format!("{prefix}-partial-list")))
+        .role(Role::List)
+        .aria_label(SharedString::from(crate::ai::partial::list_label()))
+        .w_full()
+        .flex()
+        .flex_col()
+        .children(rows);
+    Some(
+        div()
+            .w_full()
+            .flex()
+            .flex_col()
+            .gap(px(10.))
+            .child(banner)
+            .child(
+                div()
+                    .w_full()
+                    .rounded(px(scale::RADIUS_SM))
+                    .border_1()
+                    .border_color(rgba_of(t.border))
+                    .overflow_hidden()
+                    .child(crate::ui::scroll::nested_scroll(t, &handle, 260., list)),
+            )
+            .into_any_element(),
+    )
+}
+
 /// The progress of a running transcription, the same strip an imported file shows (stage,
 /// percent, bar: `import_cards::progress_body`), with Cancel (`cancel_job`, the CLI's too) once
 /// the job has an id. On the recording's page, the editor tabs and the audio page.
@@ -1041,6 +1131,11 @@ pub fn prime_transcript_info<V: 'static>(
         )
     };
     let _ = epoch;
+    // A long run is going on: read its first part once (later ones come with `transcript.partial`).
+    if app.update(cx, |m, _| m.transcribe.take_partial_ask(capture_id)) {
+        let (app, id) = (app.clone(), capture_id.to_owned());
+        cx.defer(move |cx| ai::read_partial(&app, &id, cx));
+    }
     if needs {
         let (app, id) = (app.clone(), capture_id.to_owned());
         cx.defer(move |cx| ai::ensure_transcript_info(&app, &id, cx));

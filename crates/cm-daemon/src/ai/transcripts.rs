@@ -109,9 +109,37 @@ impl Inner {
             capture_id.to_owned(),
             self.ai.captions.clone(),
         );
+        let queue = self.jobs.as_ref().map(|rt| rt.queue.clone());
         blocking(move || {
             let (dir, manifest) = recording_bundle(&library, &id)?;
             let path = dir.join(TRANSCRIPT_FILE);
+            if !path.is_file() {
+                // AI-1.AC7: while a transcription runs, the first part is readable.
+                if let Some(p) = cm_ai::recording::read_partial(&dir) {
+                    if transcribe_active(queue.as_ref(), &id) {
+                        let options = cm_library::rec_edit::caption_options(&manifest);
+                        let made_at = std::fs::metadata(dir.join(cm_ai::recording::PARTIAL_FILE))
+                            .and_then(|m| m.modified())
+                            .ok()
+                            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                            .map(|d| d.as_secs());
+                        return Ok(json!({
+                            "capture_id": id,
+                            "transcript": p.transcript,
+                            "partial": true,
+                            "covered_secs": p.covered_secs,
+                            "total_secs": p.total_secs,
+                            "made_at": made_at,
+                            "captions": Value::Null,
+                            "captions_source": Value::Null,
+                            "caption_options": {"enabled": options.enabled,
+                                                "burn_in": options.burn_in},
+                        }));
+                    }
+                    // Left behind by a job that is gone: stale.
+                    cm_ai::recording::remove_partial(&dir);
+                }
+            }
             let text = std::fs::read_to_string(&path).map_err(|e| {
                 if e.kind() == std::io::ErrorKind::NotFound {
                     CmError::not_found(format!(
@@ -151,6 +179,7 @@ impl Inner {
             let mut out = json!({
                 "capture_id": id,
                 "transcript": transcript_json,
+                "partial": false,
                 "made_at": made_at,
                 "captions": lines,
                 "captions_source": source,
@@ -163,6 +192,51 @@ impl Inner {
         })
         .await
     }
+}
+
+/// Whether a transcription of the capture is queued, running or paused (a partial transcript
+/// belongs to one of those; anything else left behind is stale).
+fn transcribe_active(queue: Option<&cm_jobs::JobQueue>, capture_id: &str) -> bool {
+    let Some(queue) = queue else { return false };
+    queue
+        .list(&JobFilter {
+            job_type: Some(JOB_TRANSCRIBE.to_owned()),
+            states: Some(vec![JobState::Queued, JobState::Running, JobState::Paused]),
+            limit: Some(200),
+        })
+        .is_ok_and(|jobs| {
+            jobs.iter()
+                .any(|j| j.inputs.get("capture_id").and_then(Value::as_str) == Some(capture_id))
+        })
+}
+
+/// Writes `transcript.partial.json` from a job checkpoint (the first part of a long transcription,
+/// AI-1.AC6) and announces it with `transcript.partial`. Best effort: a failure costs the early
+/// view, never the run. Not a revision: derived data, nothing to undo.
+pub(super) fn refresh_partial(
+    library: &Arc<std::sync::Mutex<cm_library::Library>>,
+    events: &EventBus,
+    capture_id: &str,
+    fallback_dir: &Path,
+    checkpoint: &Value,
+    glossary: &[cm_ai::glossary::GlossaryEntry],
+) {
+    // The folder is asked for each time: the title may have been edited during the run.
+    let dir = super::current_bundle_dir(library, capture_id)
+        .unwrap_or_else(|_| fallback_dir.to_path_buf());
+    let Some(mut p) = cm_ai::recording::partial_from_checkpoint(&dir, checkpoint) else {
+        return;
+    };
+    p.transcript.words =
+        cm_ai::glossary::apply(std::mem::take(&mut p.transcript.words), glossary).0;
+    if cm_ai::recording::write_partial(&dir, &p).is_err() {
+        return;
+    }
+    events.publish(
+        events::TRANSCRIPT_PARTIAL,
+        json!({ "capture_id": capture_id, "covered_secs": p.covered_secs,
+                "total_secs": p.total_secs, "words": p.transcript.words.len() }),
+    );
 }
 
 /// Upgrades the `[noise]` sounds of the bundle's transcript to `[unclear]` wherever the speaker
