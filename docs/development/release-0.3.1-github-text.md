@@ -41,6 +41,17 @@ without a stored report in `verification/` (CLAUDE.md wording rule). Steps: `rel
   it; a held job (a recording started) keeps it. `capturemann ai transcript` and the MCP `get_transcript` return it marked
   `partial: true` with `covered_secs` and `total_secs`. Captions, translation, speakers and reports wait for the final transcript.
 
+- **A long recording opens at once.** The editor window shows first and the sound is prepared behind it ("Preparing the sound... 40 %");
+  Play pressed early starts by itself when it is ready. A 4 hour audio file used to hold the window at "Loading..." for 21 s on the
+  test Mac (macOS, as reported by the maintainer; the other systems share the code but were not timed).
+- **A temporary guard against sentences nobody said, for Vietnamese transcripts.** Whisper sometimes writes a sign-off ("subscribe to
+  the channel", "thanks for watching") over a stretch with no speech. New Vietnamese transcripts leave out a line when the audio under
+  it is no louder than the room and the line is long or every word is certain (switch "Leave out lines the audio does not hold" on the
+  AI page, on by default) and you can add your own "Lines to leave out". Every dropped line is kept with its time range in the
+  transcript. **It runs on Vietnamese only for now:** on one English call it dropped a sentence a person had said softly, so other
+  languages keep every line. It does not catch every invented line. Three drops of a 4 hour Vietnamese file were listened to by the
+  maintainer and were all noise; the other nine were not.
+
 ## Changed
 
 - **Transcripts use the original microphone by default.** The noise-reduced copy can drop quiet or distant speakers. Settings
@@ -48,6 +59,8 @@ without a stored report in `verification/` (CLAUDE.md wording rule). Steps: `rel
 
 ## Fixed
 
+- "Find speakers" on a very long recording (4 h 13 min, automatic speaker count) could quit the app while the speech engine's runtime
+  shut down between two windows; the runtime is now kept for the life of the app. It did not recur in one run on the test Mac.
 - The app no longer quits during a transcription when the speech engine meets a decode window whose text ends within its first
   160 ms (found on a 73-minute imported MP3).
 - Cancelling an export no longer waits on a pipe held by another process (a Windows CI flake); wind-down waits are bounded.
@@ -81,8 +94,23 @@ encoders, KDE and other Linux distributions, a second monitor.
 - A rare failure of one test of the daemon's local socket (`r2_7_stale_socket_is_replaced_live_one_is_not`) was seen once in CI
   and did not repeat in more than 200 runs; the cause is not known.
 - Not run in this release: the Linux `.deb` install on a clean computer, the Linux Wayland session, transcription and speakers
-  on Linux, the transcript of a 4-hour file (the 73-minute file was tested by the maintainer by hand).
+  on Linux, long recordings on Windows and Linux by hand (a 2 h 07 min and a 4 h 13 min file were transcribed on one Mac only: 5.1 and 3.0 times real time with large-v3, 4.3 GB of memory for the transcript alone and 11.7 GB with the speaker job at the same time; `verification/benchmarks/`). The peak with the speaker job at the same time was 11.7 GB on a 48 GB Mac; **it was not tried on a 16 GB Mac** (it may swap), so start speakers after the transcript on a small Mac.
 
 ## Install and checks
 
-<FILL: as in the 0.3.0 and 0.2.9 texts: winget, Homebrew cask, APT lines and key fingerprint, checksums, minisign key>
+<FILL on release day, from the final files: the table of SHA-256 sums (`SHA256SUMS.txt`), the minisign public key line, and the winget (microsoft/winget-pkgs PR number) and Homebrew cask (tap commit) status.>
+
+### Install with APT (Ubuntu 24.04 or newer, amd64 and arm64)
+
+```sh
+U=https://github.com/craft-mann/capturemann/releases/download/apt
+sudo curl -fsSL --retry 5 --retry-all-errors $U/capturemann-archive-keyring.gpg -o /usr/share/keyrings/capturemann-archive-keyring.gpg
+sudo curl -fsSL --retry 5 --retry-all-errors $U/capturemann.sources -o /etc/apt/sources.list.d/capturemann.sources
+sudo apt -o Acquire::Retries=5 update && sudo apt -o Acquire::Retries=5 install capturemann
+```
+
+GitHub's release host sometimes answers the first download of a file with a `504`; repeating the command works (the `Retries` option does it for you). The repository is hosted on GitHub release assets for now.
+
+Repository key fingerprint: `516C CD4F C7B3 5167 8803  F71B DEB1 BB54 FAEF 557D` (RSA 4096, signing only, expires Nov 8, 2031). The repository is the set of files of the release tagged [`apt`](https://github.com/craft-mann/capturemann/releases/tag/apt). The key and source files must be the ones from that release; check the fingerprint with `gpg --show-keys /usr/share/keyrings/capturemann-archive-keyring.gpg`.
+
+Install a file: Windows `capturemann-0.3.1-windows-x64-setup.exe` (or the zip), macOS the DMG of your chip, Linux `sudo apt install ./capturemann_0.3.1_amd64.deb` (or the tarball and `install.sh`).
