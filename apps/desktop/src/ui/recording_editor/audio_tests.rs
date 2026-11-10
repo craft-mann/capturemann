@@ -834,6 +834,7 @@ fn the_translate_panel_knows_when_whisper_cannot_translate(cx: &mut TestAppConte
 /// `old` decodes the way 0.3.0 did (all bytes, then a second copy) for the comparison.
 #[test]
 #[ignore = "needs CM_LONG_WAV; decodes a long file"]
+#[cfg(unix)]
 #[allow(clippy::chunks_exact_to_as_chunks)]
 fn measure_long_open() {
     let (Ok(wav), Ok(secs)) = (std::env::var("CM_LONG_WAV"), std::env::var("CM_LONG_SECS")) else {
@@ -865,7 +866,7 @@ fn measure_long_open() {
     let t = Instant::now();
     if std::env::var("CM_LONG_MODE").as_deref() == Ok("old") {
         let tools = cm_media::tools::locate().unwrap();
-        let out = std::process::Command::new(&tools.ffmpeg)
+        let out = cm_platform::process::command(&tools.ffmpeg)
             .args(["-v", "error", "-nostdin", "-i"])
             .arg(&job.files[0].file)
             .args(["-vn", "-f", "f32le", "-ac", "1", "-ar", "48000", "pipe:1"])
