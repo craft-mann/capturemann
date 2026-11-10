@@ -61,6 +61,17 @@ const SURE_MIN_WORDS: usize = 3;
 /// 20 ms frames.
 const FRAME: usize = (SAMPLE_RATE as usize) / 50;
 
+/// Languages the shape check runs on for now (ISO 639-1 codes of the transcript). The invented
+/// sign-offs it was built for were found in Vietnamese transcripts; on the English files of the
+/// measurement it made one drop, a real sentence spoken softly (maintainer's listening, Nov 10,
+/// 2026), so until the shape check has a second opinion (a speech detector) it stays off there.
+pub const LANGUAGES: [&str; 1] = ["vi"];
+
+/// Whether the shape check runs on a transcript in `language`.
+pub fn applies_to(language: &str) -> bool {
+    LANGUAGES.iter().any(|l| language.eq_ignore_ascii_case(l))
+}
+
 /// Why a line was dropped.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -131,7 +142,7 @@ impl Reference {
     }
 
     /// How far (dB) the 80th percentile level between `a` and `b` seconds is over the room.
-    fn margin(&self, a: f64, b: f64) -> Option<f32> {
+    pub fn margin(&self, a: f64, b: f64) -> Option<f32> {
         let fa = (a.max(0.0) * 50.0) as usize;
         let fb = ((b * 50.0) as usize).max(fa + 1).min(self.db.len());
         if fa >= fb {
@@ -293,6 +304,15 @@ pub fn drop_ignored(words: Vec<Word>, phrases: &[String]) -> (Vec<Word>, Vec<Dro
 mod tests {
     use super::*;
     use crate::transcribe::media_secs;
+
+    /// AI-1.AC12: the shape check runs on Vietnamese only for now.
+    #[test]
+    fn the_shape_check_runs_on_vietnamese_only() {
+        assert!(applies_to("vi"));
+        assert!(applies_to("VI"));
+        assert!(!applies_to("en"));
+        assert!(!applies_to(""));
+    }
 
     fn w(text: &str, at: f64, conf: f32) -> Word {
         Word {

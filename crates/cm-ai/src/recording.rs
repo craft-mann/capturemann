@@ -408,7 +408,7 @@ fn run_recording(
     };
     // The shape check against text nobody said (AI-1.AC12): on the words in file time, with the
     // audio they were read from. The lines it drops are kept in the transcript.
-    if opts.drop_unsupported_lines && !translate {
+    if opts.drop_unsupported_lines && !translate && crate::guard::applies_to(&t.language) {
         let (kept, dropped) =
             crate::guard::drop_unsupported(std::mem::take(&mut t.words), &mixed, base);
         t.words = kept;
