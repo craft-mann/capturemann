@@ -5,6 +5,7 @@
 
 pub mod audio;
 pub mod audio_export;
+pub mod audio_load;
 pub mod camera;
 pub mod captions;
 #[cfg(test)]

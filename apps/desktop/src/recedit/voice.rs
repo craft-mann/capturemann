@@ -429,6 +429,25 @@ impl Wave {
         }
     }
 
+    /// A rough lane from the 96 cached bars of the library card (VOC-2.AC8), one bucket per
+    /// second, shown while the real peaks are computed. The bars are square-root scaled and
+    /// relative to the loudest, so they are squared back to the scale the lane draws. An empty
+    /// `bars` gives an empty lane (a thin line).
+    pub fn from_overview(bars: &[u8], end: MediaTime) -> Wave {
+        let len = end.as_secs_f64().ceil() as usize + 1;
+        let peaks = if bars.is_empty() {
+            Vec::new()
+        } else {
+            (0..len)
+                .map(|i| {
+                    let b = bars[(i * bars.len() / len).min(bars.len() - 1)];
+                    (f32::from(b) / 255.0).powi(2)
+                })
+                .collect()
+        };
+        Wave { per_sec: 1, peaks }
+    }
+
     /// `cols` heights (0.0 to 1.0) for the time from `from` to `to`: the loudest peak under each
     /// column.
     pub fn columns(&self, from: MediaTime, to: MediaTime, cols: usize) -> Vec<f32> {
@@ -722,6 +741,19 @@ pub fn audio_key(key: &str, shift: bool, cmd: bool, alt: bool, playing: bool) ->
 
 #[cfg(test)]
 mod tests {
+    /// VOC-2.AC8: the overview from the library card fills a lane with one bucket per second; no
+    /// bars give an empty lane (a thin line).
+    #[test]
+    fn an_overview_lane_spreads_the_card_bars_over_the_length() {
+        use cm_core::MediaTime;
+        let w = super::Wave::from_overview(&[255, 0], MediaTime::from_secs(10));
+        assert_eq!(w.per_sec, 1);
+        assert!(w.peaks.len() >= 10);
+        assert!((w.peaks[0] - 1.0).abs() < 1e-6 && w.peaks[9] == 0.0);
+        assert!(super::Wave::from_overview(&[], MediaTime::from_secs(10))
+            .peaks
+            .is_empty());
+    }
     use super::*;
 
     fn t(ms: i64) -> MediaTime {

@@ -29,6 +29,7 @@ use std::cell::Cell;
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -45,6 +46,7 @@ use crate::backend::Backend;
 use crate::flows;
 use crate::preview::{default_path, Presenter};
 use crate::recedit::audio::AudioEngine;
+use crate::recedit::audio_load::{CancelOnDrop, OpenTimes, SoundLoad};
 use crate::recedit::captions::{build_track, PreviewCaptions};
 use crate::recedit::geom::{self, Geom, Hit};
 use crate::recedit::keys::{map_key, Cmd};
@@ -160,6 +162,17 @@ pub(crate) struct Session {
     audio: Option<AudioEngine>,
     /// Why there is no sound, for the status strip.
     pub audio_note: Option<String>,
+    /// Where the background decode of the sound is (VOC-2.AC6 to AC10).
+    pub sound: SoundLoad,
+    /// Set when this session is dropped: the decode kills FFmpeg and frees what it read.
+    cancel: CancelOnDrop,
+    /// The decode's progress in thousandths, written by the worker, read by the ticker.
+    sound_progress: Arc<AtomicU32>,
+    /// Taken when the decode starts.
+    sound_job: Option<SoundJob>,
+    /// When the open began, and the two times the diagnostics get.
+    opened: Instant,
+    times: OpenTimes,
     /// Output time (seconds) of the picture last shown while playing.
     out_now: f64,
     pub drag: Option<Drag>,
@@ -191,9 +204,10 @@ struct Loaded {
     source: Box<dyn source::FrameSource>,
     view_ctx: ViewContext,
     note: Option<String>,
-    /// The decoded audio tracks (read in the background so opening never blocks the window).
-    audio: Option<AudioBank>,
-    audio_note: Option<String>,
+    /// The sound to decode after the window is open (VOC-2.AC6); `None` without sound tracks.
+    sound_job: Option<SoundJob>,
+    /// When the open began (the click), for `ui_ready` and `audio_ready`.
+    t0: Instant,
     voice: VoiceData,
     waves: Vec<(RowKind, Wave)>,
     /// The manifest's last revision number (M2f: the automatic cut suggestions run once per revision).
@@ -202,6 +216,21 @@ struct Loaded {
     imported: Option<Imported>,
     /// How long each stage of the load took (logged when the whole open took over a second).
     stages: LoadStages,
+}
+
+/// What the background decode of the sound needs.
+struct SoundJob {
+    files: Vec<cm_media::decode::AudioFile>,
+    /// The length the manifest promises, for one reservation and for the progress.
+    expect_secs: f64,
+    /// Build the waveform lanes (audio recordings only; a video shows none).
+    lanes: bool,
+}
+
+/// The sound as the background hands it over: the bank for the engine and the real lanes.
+struct SoundReady {
+    bank: AudioBank,
+    waves: Vec<(RowKind, Wave)>,
 }
 
 /// A load that takes longer than this is written to the log, with its slowest stage named.
@@ -214,6 +243,17 @@ const SLOW_LOAD: std::time::Duration = std::time::Duration::from_secs(1);
 pub(crate) struct LoadStages(Vec<(&'static str, f64)>);
 
 impl LoadStages {
+    /// The phase for the time until the window showed (the click to the editor on screen).
+    pub(crate) const UI_READY: &'static str = "ui_ready";
+    /// The phase for the time until the sound was decoded and the engine open.
+    pub(crate) const AUDIO_READY: &'static str = "audio_ready";
+
+    /// Records a time measured from the click (not a stage that adds to the total), as a phase of
+    /// the run `editor_load`.
+    pub(crate) fn mark(name: &'static str, secs: f64) {
+        cm_core::perf::add_phase("editor_load", name, secs);
+    }
+
     /// Runs `f` as the stage `name`.
     pub(crate) fn time<T>(&mut self, name: &'static str, f: impl FnOnce() -> T) -> T {
         let _span = cm_core::perf::span("editor_load", name);
@@ -288,6 +328,7 @@ pub struct RecordingEditor {
 const WAVE_PER_SEC: u32 = 20;
 
 fn load_blocking(root: Option<PathBuf>, id: &str) -> Result<Loaded, files::FileError> {
+    let t0 = Instant::now();
     let mut st = LoadStages::default();
     cm_core::perf::begin("editor_load");
     let root = root.ok_or(files::FileError::NoLibrary)?;
@@ -378,32 +419,30 @@ fn load_blocking(root: Option<PathBuf>, id: &str) -> Result<Loaded, files::FileE
         cursor_separate: screen_info.as_ref().is_some_and(|s| s.cursor_separate),
     };
     let files = source::audio_files(&dir, &m);
-    let (audio, audio_note) = if files.is_empty() {
-        (None, None)
-    } else {
-        match cm_media::tools::locate() {
-            Ok(tools) => match st.time("audio_bank", || AudioBank::load(&tools.ffmpeg, &files)) {
-                Ok(bank) => (Some(bank), None),
-                Err(e) => (None, Some(tr!("No sound in the preview: {e}", e = e))),
-            },
-            Err(_) => (
-                None,
-                Some(tr!("No sound in the preview: FFmpeg is not installed.")),
-            ),
+    // The sound decodes after the window is open (VOC-2.AC6). Until then an audio recording
+    // draws its lanes from the cached overview of the library card, when there is one.
+    let waves = st.time("waves", || {
+        if !voice.audio || files.is_empty() {
+            return Vec::new();
         }
-    };
-    let waves = st.time("waves", || match (&audio, voice.audio) {
-        (Some(bank), true) => [
-            (RowKind::Mic, cm_media::edit_plan::AudioKind::Mic),
-            (RowKind::System, cm_media::edit_plan::AudioKind::System),
-        ]
-        .into_iter()
-        .filter_map(|(row, kind)| {
-            let lane = bank.lane_peaks(kind, WAVE_PER_SEC)?;
-            Some((row, Wave::from_lane(&lane, &basis.gaps, basis.end)))
-        })
-        .collect(),
-        _ => Vec::new(),
+        let bars = if basis.gaps.is_empty() {
+            cm_library::audio::cached_bundle_peaks(&dir).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        files
+            .iter()
+            .map(|f| match f.kind {
+                cm_media::edit_plan::AudioKind::Mic => RowKind::Mic,
+                cm_media::edit_plan::AudioKind::System => RowKind::System,
+            })
+            .map(|row| (row, Wave::from_overview(&bars, basis.end)))
+            .collect()
+    });
+    let sound_job = (!files.is_empty()).then(|| SoundJob {
+        files,
+        expect_secs: basis.end.as_secs_f64(),
+        lanes: voice.audio,
     });
     let imported = serde_json::to_value(&m).ok().and_then(|v| {
         let line = crate::import_flow::source_line(&v)?;
@@ -419,8 +458,8 @@ fn load_blocking(root: Option<PathBuf>, id: &str) -> Result<Loaded, files::FileE
         voice,
         waves,
         revision: m.revisions.last().map_or(0, |r| r.rev),
-        audio,
-        audio_note,
+        sound_job,
+        t0,
         title: details.title,
         stats: details.video.unwrap_or_default(),
         fps: grid.fps,
@@ -434,6 +473,44 @@ fn load_blocking(root: Option<PathBuf>, id: &str) -> Result<Loaded, files::FileE
         note,
         stages: st,
     })
+}
+
+/// How often the sound's progress reaches the window.
+const SOUND_TICK: std::time::Duration = std::time::Duration::from_millis(250);
+
+/// Decodes the sound and builds the lanes; runs off the UI thread. Setting `cancel` kills FFmpeg.
+fn decode_sound(
+    job: &SoundJob,
+    gaps: &[cm_core::PauseGap],
+    end: MediaTime,
+    cancel: &AtomicBool,
+    progress: &AtomicU32,
+) -> Result<SoundReady, String> {
+    let tools = cm_media::tools::locate()
+        .map_err(|_| tr!("No sound in the preview: FFmpeg is not installed."))?;
+    let bank = {
+        let _span = cm_core::perf::span("editor_load", "audio_bank");
+        AudioBank::load_with(&tools.ffmpeg, &job.files, job.expect_secs, cancel, &|f| {
+            progress.store((f * 1000.0) as u32, Ordering::Relaxed)
+        })
+        .map_err(|e| tr!("No sound in the preview: {e}", e = e))?
+    };
+    let waves = if !job.lanes {
+        Vec::new()
+    } else {
+        let _span = cm_core::perf::span("editor_load", "audio_waves");
+        [
+            (RowKind::Mic, cm_media::edit_plan::AudioKind::Mic),
+            (RowKind::System, cm_media::edit_plan::AudioKind::System),
+        ]
+        .into_iter()
+        .filter_map(|(row, kind)| {
+            let lane = bank.lane_peaks(kind, WAVE_PER_SEC)?;
+            Some((row, Wave::from_lane(&lane, gaps, end)))
+        })
+        .collect()
+    };
+    Ok(SoundReady { bank, waves })
 }
 
 impl RecordingEditor {
@@ -512,11 +589,98 @@ impl RecordingEditor {
                         Load::Failed(e)
                     }
                 };
+                this.start_sound(&key, cx);
                 cx.notify();
             })
             .ok();
         })
         .detach();
+    }
+
+    /// Starts decoding the sound in the background now that the window is open (VOC-2.AC6): one
+    /// task decodes and builds the lanes off the UI thread, one ticker copies the progress into
+    /// the state a few times a second.
+    fn start_sound(&mut self, id: &str, cx: &mut Context<Self>) {
+        let Some(s) = self.session() else { return };
+        let Some(job) = s.sound_job.take() else {
+            return;
+        };
+        let (cancel, progress) = (s.cancel.flag(), s.sound_progress.clone());
+        let (gaps, end) = (s.model.basis.gaps.clone(), s.model.basis.end);
+        let key = id.to_owned();
+        let ticker_key = key.clone();
+        cx.spawn(async move |this, cx| loop {
+            cx.background_executor().timer(SOUND_TICK).await;
+            let go = this
+                .update(cx, |this, cx| {
+                    let id_ok = this.id.as_deref() == Some(ticker_key.as_str());
+                    match this.session() {
+                        Some(s) if id_ok && s.sound.is_preparing() => {
+                            s.sound.progress(
+                                f64::from(s.sound_progress.load(Ordering::Relaxed)) / 1000.0,
+                            );
+                            cx.notify();
+                            true
+                        }
+                        _ => false,
+                    }
+                })
+                .unwrap_or(false);
+            if !go {
+                break;
+            }
+        })
+        .detach();
+        cx.spawn(async move |this, cx| {
+            let flag = cancel.clone();
+            let res = cx
+                .background_executor()
+                .spawn(async move { decode_sound(&job, &gaps, end, &flag, &progress) })
+                .await;
+            this.update(cx, |this, cx| {
+                if this.id.as_deref() != Some(key.as_str()) || cancel.load(Ordering::Relaxed) {
+                    return;
+                }
+                this.sound_done(res, cx);
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    /// The sound is decoded (or could not be): open the engine on the UI thread (it is quick),
+    /// put the real lanes in, and let a waiting Play start.
+    fn sound_done(&mut self, res: Result<SoundReady, String>, cx: &mut Context<Self>) {
+        let Some(s) = self.session() else { return };
+        match res {
+            Ok(ready) => {
+                let _span = cm_core::perf::span("editor_load", "audio_engine_open");
+                match AudioEngine::open(ready.bank, s.model.basis.gaps.clone()) {
+                    Ok(a) => {
+                        s.audio = Some(a);
+                        s.sound.ready();
+                    }
+                    Err(e) => {
+                        let why = tr!("No sound in the preview: {e}", e = e);
+                        s.audio_note = Some(why.clone());
+                        s.sound.failed(why);
+                    }
+                }
+                if !ready.waves.is_empty() {
+                    s.waves = ready.waves;
+                }
+            }
+            Err(why) => {
+                s.audio_note = Some(why.clone());
+                s.sound.failed(why);
+            }
+        }
+        let secs = s.opened.elapsed().as_secs_f64();
+        s.times.audio(secs);
+        LoadStages::mark(LoadStages::AUDIO_READY, secs);
+        cm_core::perf::refresh_peak("editor_load");
+        // A search for silences (the suggested cuts) and Play both wait for nothing else.
+        cx.notify();
     }
 
     /// Leaves the recording: stops the renderer thread and releases the picture.
@@ -864,7 +1028,7 @@ impl RecordingEditor {
 }
 
 impl Session {
-    fn new(id: &str, mut l: Loaded) -> Session {
+    fn new(id: &str, l: Loaded) -> Session {
         let end = l.basis.end;
         let cursor_separate = l.view_ctx.cursor_separate;
         let view = Arc::new(ViewSpec {
@@ -872,27 +1036,33 @@ impl Session {
             list: l.list.clone(),
             aspect: crate::recedit::PreviewAspect::default(),
         });
-        let (audio, audio_note) = match l.audio {
-            Some(bank) => match l.stages.time("audio_engine_open", || {
-                AudioEngine::open(bank, l.basis.gaps.clone())
-            }) {
-                Ok(a) => (Some(a), None),
-                Err(e) => (None, Some(tr!("No sound in the preview: {e}", e = e))),
-            },
-            None => (None, l.audio_note),
-        };
         let stages = l.stages;
         cm_core::perf::finish("editor_load");
+        let mut times = OpenTimes::default();
+        let ui_secs = l.t0.elapsed().as_secs_f64();
+        times.ui(ui_secs);
+        LoadStages::mark(LoadStages::UI_READY, ui_secs);
         if let Some(line) = stages.slow_line(id) {
             log::info!("{line}");
         }
+        let sound = if l.sound_job.is_some() {
+            SoundLoad::preparing()
+        } else {
+            SoundLoad::none()
+        };
         Session {
+            sound,
+            cancel: CancelOnDrop::default(),
+            sound_progress: Arc::new(AtomicU32::new(0)),
+            sound_job: l.sound_job,
+            opened: l.t0,
+            times,
             imported: l.imported,
             voice: l.voice,
             waves: l.waves,
             model: EditorModel::new(id, l.basis, l.list, l.grid, l.flags),
-            audio,
-            audio_note,
+            audio: None,
+            audio_note: None,
             pacer: Pacer::default(),
             out_now: 0.0,
             geom: Geom::new(800.0, end),
@@ -918,6 +1088,12 @@ impl Session {
         }
     }
 
+    /// The transport's note about the sound: how far it is while it prepares, else why there is
+    /// none.
+    pub(crate) fn sound_line(&self) -> Option<String> {
+        self.sound.label().or_else(|| self.audio_note.clone())
+    }
+
     /// Advances playback to the output time the clock says: the audio device while it plays, the
     /// wall clock otherwise (no audio, no device, or the mix is still being rendered).
     fn tick(&mut self) {
@@ -926,6 +1102,12 @@ impl Session {
             // What is heard follows the edit list; a finished mix replaces the old one.
             a.sync(&self.model.list);
             a.poll();
+        }
+        if self.model.playing && self.sound.holds_playback() {
+            // Play was pressed before the sound is ready: nothing moves, and it starts by
+            // itself when the sound is ready (VOC-2.AC7).
+            self.pacer.stop();
+            return;
         }
         if !self.model.playing {
             if self.pacer.is_running() {
@@ -1197,5 +1379,18 @@ mod load_stage_tests {
             .find(|r| r.run == "editor_load")
             .unwrap();
         assert!(r.phases.iter().any(|p| p.name == "read_manifest"));
+        // The two times from the click are phases too, and do not count as stages (VOC-2.AC6).
+        LoadStages::mark(LoadStages::UI_READY, 0.3);
+        LoadStages::mark(LoadStages::AUDIO_READY, 21.0);
+        let r = cm_core::perf::records()
+            .into_iter()
+            .find(|r| r.run == "editor_load")
+            .unwrap();
+        assert!(r
+            .phases
+            .iter()
+            .any(|p| p.name == "ui_ready" && p.secs == 0.3));
+        assert!(r.phases.iter().any(|p| p.name == "audio_ready"));
+        assert!(st.slow_line("x").is_none());
     }
 }
