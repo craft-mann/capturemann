@@ -1,6 +1,6 @@
 # CaptureMann vs Loom
 
-*Checked Nov 11, 2026 · CaptureMann 0.3.1 · [all comparisons](README.md)*
+*Checked Nov 11, 2026 · CaptureMann 0.3.2 · [all comparisons](README.md)*
 
 **In short:** Loom is built for teams that send video messages: record, get a link, collect comments and reactions.
 CaptureMann is built for people who want the recording itself: full resolution, no time limits, files on their own
@@ -30,7 +30,7 @@ and comments, Loom fits better; if you want quality, privacy and no subscription
 | **Export** | MP4 with platform presets, GIF, WebM; audio as M4A or WAV | Download from the Loom library (details not checked) |
 | **AI** | On your computer, free: Whisper transcripts and captions (SRT, VTT, TXT, burned in), translation, speaker labels, meeting minutes and reports | In the cloud: titles, summaries, chapters and filler-word removal on the Business + AI plan |
 | **Sharing and teamwork** | Local folders, Google Drive and YouTube (private by default); no hosted links, comments or view analytics | Instant share links, timestamped comments, emoji reactions, viewer insights, workspace library |
-| **AI agents and automation** | 74 MCP tools plus resources and prompts, and an identical `capturemann` CLI; recording, publishing and deleting need your on-screen confirmation | Not found |
+| **AI agents and automation** | 81 MCP tools plus resources and prompts, and an identical `capturemann` CLI; recording, publishing and deleting need your on-screen confirmation | Not found |
 | **Privacy** | No telemetry; no network traffic unless you connect a destination or download a model | Recordings are uploaded and stored by Loom |
 
 ## Where Loom is stronger
@@ -67,6 +67,6 @@ and comments, Loom fits better; if you want quality, privacy and no subscription
   checked Nov 11, 2026.
 - Loom's sharing, team and platform features (comments, reactions, viewer insights, integrations, mobile apps, Chrome
   extension) are as Loom describes them on its site; we did not re-check each one on Nov 11, 2026.
-- CaptureMann: [README](../README.md) and [user guide](../docs/user/user-guide.md), version 0.3.1.
+- CaptureMann: [README](../README.md) and [user guide](../docs/user/user-guide.md), version 0.3.2.
 
 Loom is a trademark of Atlassian. CaptureMann is not affiliated with or endorsed by Atlassian.

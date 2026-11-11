@@ -1,6 +1,6 @@
 # CaptureMann vs Cap
 
-*Checked Nov 11, 2026 · CaptureMann 0.3.1 · [all comparisons](README.md)*
+*Checked Nov 11, 2026 · CaptureMann 0.3.2 · [all comparisons](README.md)*
 
 **In short:** Cap and CaptureMann are both open-source, Rust-based screen recorders for macOS, Windows and Linux. Cap is
 "the open source alternative to Loom": its strength is instant share links, comments, analytics and team workspaces,
@@ -30,7 +30,7 @@ differ too: CaptureMann is Apache-2.0 for any use, while Cap's free desktop app 
 | **AI** | On your computer, free: Whisper transcripts and captions, translation, speaker labels, meeting minutes and reports | Cap AI in the cloud on Cap Pro: titles, summaries, clickable chapters, captions and transcripts |
 | **Sharing and teamwork** | Local folders, Google Drive and YouTube (private by default); no hosted links | Share links with comments and viewer analytics, team workspaces, custom domains, password protection (Pro); free links up to 5 minutes, 25 per month |
 | **Self-hosting** | Not needed (no server) | Self-host the sharing platform |
-| **AI agents and automation** | 74 MCP tools plus resources and prompts, and an identical CLI; risky actions need on-screen confirmation | A Rust CLI; an MCP server was not found in Cap's README |
+| **AI agents and automation** | 81 MCP tools plus resources and prompts, and an identical CLI; risky actions need on-screen confirmation | A Rust CLI; an MCP server was not found in Cap's README |
 | **Privacy** | No telemetry; no network traffic unless you connect a destination or download a model | Local in Studio Mode; Instant Mode and Cap AI use Cap's cloud or your own server |
 
 ## Where Cap is stronger
@@ -64,6 +64,6 @@ differ too: CaptureMann is Apache-2.0 for any use, while Cap's free desktop app 
   [Cap commercial licensing](https://cap.so/docs/commercial-license), checked Nov 11, 2026.
 - Cap features, platforms, CLI and licence: [Cap README](https://github.com/CapSoftware/Cap) and
   [LICENSE](https://github.com/CapSoftware/Cap/blob/main/LICENSE), checked Nov 11, 2026.
-- CaptureMann: [README](../README.md) and [user guide](../docs/user/user-guide.md), version 0.3.1.
+- CaptureMann: [README](../README.md) and [user guide](../docs/user/user-guide.md), version 0.3.2.
 
 Cap is a trademark of Cap Software, Inc. CaptureMann is not affiliated with or endorsed by Cap Software.

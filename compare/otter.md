@@ -1,6 +1,6 @@
 # CaptureMann vs Otter.ai
 
-*Checked Nov 11, 2026 · CaptureMann 0.3.1 · [all comparisons](README.md)*
+*Checked Nov 11, 2026 · CaptureMann 0.3.2 · [all comparisons](README.md)*
 
 **In short:** Otter.ai is a cloud meeting assistant: it joins Zoom, Google Meet and Teams calls, transcribes live, and
 writes summaries and action items in a shared team workspace. Its free plan has monthly minute and length limits.
@@ -32,7 +32,7 @@ including languages Otter does not list such as Vietnamese, CaptureMann.
 | **Translation** | English via Whisper, other languages via the local text model | Not checked |
 | **Teamwork** | Exports to files, Google Drive and YouTube; no shared workspace | **Shared team workspaces**, action-item assignment, CRM sync on Enterprise |
 | **Screen and video** | Screen recording with webcam bubble, editor and screenshots | Not offered |
-| **AI agents** | 74 MCP tools and an identical CLI | Not checked |
+| **AI agents** | 81 MCP tools and an identical CLI | Not checked |
 | **Privacy and consent** | No telemetry; nothing leaves your computer; a consent reminder before recording others | Audio is uploaded to and processed in Otter's cloud |
 
 ## Where Otter.ai is stronger
@@ -66,7 +66,7 @@ including languages Otter does not list such as Vietnamese, CaptureMann.
   prices may differ from the annual ones shown.
 - Otter.ai languages: [Raptor Group, "Otter.ai can transcribe in more languages now"](https://www.raptorgroup.com/news/otter-ai-can-transcribe-in-more-languages-now-with-more-on-the-way/)
   (Nov 18, 2024); Otter planned more languages, so check its help pages for the current list.
-- CaptureMann: [README](../README.md) and [user guide](../docs/user/user-guide.md), version 0.3.1, including the long-recording
+- CaptureMann: [README](../README.md) and [user guide](../docs/user/user-guide.md), version 0.3.2, including the long-recording
   measurements in the README.
 
 Otter, Otter.ai and OtterPilot are trademarks of Otter.ai, Inc. CaptureMann is not affiliated with or endorsed by Otter.ai.

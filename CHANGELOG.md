@@ -5,6 +5,19 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
+### Added
+- **Copy text from a screenshot (OCR).** A "Copy text" button and a Select text tool (key G) in the editor, a "Copy text" item in the library menu and a button on the capture toast read the text of a screenshot and put it on the clipboard. It uses the same on-device recognizer as Auto-redact (Apple Vision, the Windows recognizer, `tesseract` on Linux) and reads the **rendered image**, so a blurred or pixelated region never comes back as text. For agents: the `recognize_text` MCP tool and `capturemann text`. Windows reads only the OCR languages you have installed; Linux reads English unless you install more `tesseract` language data.
+- **A Claude plugin.** `claude plugin marketplace add craft-mann/capturemann` then `claude plugin install capturemann@capturemann-plugins` connects the CaptureMann MCP server to Claude Code and adds skills for screenshots with redaction, screen recording, meeting notes and export. CaptureMann must be installed and running; the plugin adds no network traffic.
+- **Agent clients appear in Settings → Agents & CLI as soon as they connect**, with their last tool and call count, so you can allow, restrict or block a client before it asks for anything that needs confirmation.
+
+### Fixed
+- **The library thumbnail of a redacted screenshot kept showing the old picture** until the app restarted; the grid now drops its cached crop when a capture changes.
+- **Change shortcuts:** a combination with Shift and a digit (Option+Shift+5) is accepted; the shortcuts are released while you press a new combination, so one that is already taken shows "Already used by ..." instead of starting that action; the reason a key is refused is shown under the row you are changing, not at the end of the page; Reset to defaults no longer loses a shortcut when two of them swap places.
+- **The sidebar counts now follow a new screenshot or recording on every page** (they stayed behind on the Screenshots, Recordings and Audio pages and during a search), and the screenshot is announced before the clipboard copy.
+
+### Changed
+- The "Add client" form preselects Allowed (the documented default) instead of Blocked.
+
 ## [0.3.1] - 2026-11-11
 
 ### Fixed

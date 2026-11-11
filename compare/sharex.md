@@ -1,6 +1,6 @@
 # CaptureMann vs ShareX
 
-*Checked Nov 11, 2026 · CaptureMann 0.3.1 · [all comparisons](README.md)*
+*Checked Nov 11, 2026 · CaptureMann 0.3.2 · [all comparisons](README.md)*
 
 **In short:** ShareX is the free, open-source power tool for screenshots and quick uploads on Windows: many capture modes,
 scrolling capture, OCR, a large annotation and photo editor, and automated workflows that upload to many services. It
@@ -32,7 +32,7 @@ AI agents. For screenshot depth and upload automation on Windows, ShareX leads; 
 | **Audio and meetings** | Audio-only recording; transcripts, speaker labels, minutes and reports | Not found |
 | **AI** | Local and free: Whisper transcripts and captions, translation, speaker labels, meeting reports | OCR only (no speech transcription found) |
 | **Sharing** | Local folders, Google Drive, YouTube (private by default) | **Many upload destinations** and custom uploaders, with after-capture actions (copy, save, upload, print and more) |
-| **Automation** | 74 MCP tools for AI agents and an identical CLI; risky actions need your on-screen confirmation | Hotkeys and custom workflows that chain actions after a capture |
+| **Automation** | 81 MCP tools for AI agents and an identical CLI; risky actions need your on-screen confirmation | Hotkeys and custom workflows that chain actions after a capture |
 
 ## Where ShareX is stronger
 
@@ -64,6 +64,6 @@ AI agents. For screenshot depth and upload automation on Windows, ShareX leads; 
 - ShareX features, platform and licence: [ShareX README](https://github.com/ShareX/ShareX) and
   [LICENSE.txt](https://github.com/ShareX/ShareX/blob/develop/LICENSE.txt), checked Nov 11, 2026.
 - CaptureMann: [README](../README.md), [user guide](../docs/user/user-guide.md) and [Auto-redact guide](../docs/user/redaction.md),
-  version 0.3.1.
+  version 0.3.2.
 
 ShareX is a trademark of its owners. CaptureMann is not affiliated with or endorsed by the ShareX project.

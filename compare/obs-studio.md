@@ -1,6 +1,6 @@
 # CaptureMann vs OBS Studio
 
-*Checked Nov 11, 2026 · CaptureMann 0.3.1 · [all comparisons](README.md)*
+*Checked Nov 11, 2026 · CaptureMann 0.3.2 · [all comparisons](README.md)*
 
 **In short:** OBS Studio is the free, open-source studio for live streaming and complex recordings: scenes, many sources,
 an audio mixer with filters, plugins and scripting. It runs on Windows, macOS and Linux, but expects you to set up scenes
@@ -32,7 +32,7 @@ CaptureMann.
 | **Audio and meetings** | Audio-only recording; transcripts, speaker labels, minutes and reports | Not found |
 | **AI** | Local and free: Whisper transcripts and captions, translation, speaker labels, meeting reports | Not found built in |
 | **Sharing** | Local folders, Google Drive, YouTube (private by default) | Streams live; recordings are local files |
-| **Extending and automation** | 74 MCP tools for AI agents and an identical CLI | **Plugin API**, native plugins, and Lua or Python scripts; hotkeys |
+| **Extending and automation** | 81 MCP tools for AI agents and an identical CLI | **Plugin API**, native plugins, and Lua or Python scripts; hotkeys |
 
 ## Where OBS Studio is stronger
 
@@ -64,6 +64,6 @@ CaptureMann.
 - OBS Studio features, platforms and latest version (33.0.1): [obsproject.com](https://obsproject.com/), checked Nov 11, 2026.
 - OBS Studio licence: [README](https://github.com/obsproject/obs-studio) and
   [COPYING](https://github.com/obsproject/obs-studio/blob/master/COPYING), checked Nov 11, 2026.
-- CaptureMann: [README](../README.md) and [user guide](../docs/user/user-guide.md), version 0.3.1.
+- CaptureMann: [README](../README.md) and [user guide](../docs/user/user-guide.md), version 0.3.2.
 
 OBS and OBS Studio are trademarks of their owners. CaptureMann is not affiliated with or endorsed by the OBS Project.

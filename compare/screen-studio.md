@@ -1,6 +1,6 @@
 # CaptureMann vs Screen Studio
 
-*Checked Nov 11, 2026 · CaptureMann 0.3.1 · [all comparisons](README.md)*
+*Checked Nov 11, 2026 · CaptureMann 0.3.2 · [all comparisons](README.md)*
 
 **In short:** Screen Studio is the benchmark for beautiful product-demo videos on the Mac: automatic zoom on clicks,
 smooth cursor motion, motion blur and backgrounds with very little editing. CaptureMann has the same building blocks
@@ -30,7 +30,7 @@ on a Mac, Screen Studio leads; for everything around it, CaptureMann covers more
 | **Audio and meetings** | Audio-only recording; transcripts, speaker labels, minutes and reports | Not found |
 | **AI** | Local and free: Whisper transcripts and captions, translation, speaker labels, meeting reports | On-device transcript generation (per a third-party review) |
 | **Sharing** | Local folders, Google Drive, YouTube (private by default) | Shareable links; no hosted video library |
-| **AI agents and automation** | 74 MCP tools and an identical CLI; risky actions need your on-screen confirmation | Not found |
+| **AI agents and automation** | 81 MCP tools and an identical CLI; risky actions need your on-screen confirmation | Not found |
 
 ## Where Screen Studio is stronger
 
@@ -62,6 +62,6 @@ on a Mac, Screen Studio leads; for everything around it, CaptureMann covers more
 - Screen Studio prices, seats, requirements and features: [Trainn, Screen Studio pricing](https://trainn.co/blog/screen-studio-pricing/)
   (published Aug 26, 2026, updated Sep 23, 2026), checked Nov 11, 2026. Trainn sells a competing product; we could not
   read screen.studio directly, and its pricing page is the current source.
-- CaptureMann: [README](../README.md) and [user guide](../docs/user/user-guide.md), version 0.3.1.
+- CaptureMann: [README](../README.md) and [user guide](../docs/user/user-guide.md), version 0.3.2.
 
 Screen Studio is a trademark of its owner. CaptureMann is not affiliated with or endorsed by Screen Studio.

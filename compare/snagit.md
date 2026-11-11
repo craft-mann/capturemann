@@ -1,6 +1,6 @@
 # CaptureMann vs Snagit
 
-*Checked Nov 11, 2026 · CaptureMann 0.3.1 · [all comparisons](README.md)*
+*Checked Nov 11, 2026 · CaptureMann 0.3.2 · [all comparisons](README.md)*
 
 **In short:** Snagit (TechSmith) is the long-standing screenshot tool for documentation and support teams, with the
 deepest screenshot toolset: scrolling capture, text grabbing, step guides and Smart Redact. CaptureMann covers
@@ -33,7 +33,7 @@ server for AI agents, all for free.
 | **Audio and meetings** | Audio-only recording for meetings and lectures; transcripts, speaker labels, minutes and reports | Not found |
 | **AI** | Local and free: Whisper transcripts and captions, translation, speaker labels, meeting reports | Not checked (TechSmith's 2026 release notes for Snagit Mac do not describe features as AI) |
 | **Sharing** | Local folders, Google Drive, YouTube (private by default) | Screencast, Camtasia Online, Microsoft Word and other share destinations |
-| **AI agents and automation** | 74 MCP tools and an identical CLI; risky actions need your on-screen confirmation | Not found |
+| **AI agents and automation** | 81 MCP tools and an identical CLI; risky actions need your on-screen confirmation | Not found |
 | **Privacy** | No telemetry; no network traffic unless you connect a destination or download a model | Cloud features send media to TechSmith services when used |
 
 ## Where Snagit is stronger
@@ -70,7 +70,7 @@ server for AI agents, all for free.
   [Snagit Mac 2026 version history](https://support.techsmith.com/hc/en-us/articles/41975263481613-Snagit-Mac-2026-Version-History),
   checked Nov 11, 2026.
 - CaptureMann: [README](../README.md), [user guide](../docs/user/user-guide.md) and [Auto-redact guide](../docs/user/redaction.md),
-  version 0.3.1.
+  version 0.3.2.
 
 Snagit, Camtasia and Screencast are trademarks of TechSmith Corporation. CaptureMann is not affiliated with or endorsed by
 TechSmith.

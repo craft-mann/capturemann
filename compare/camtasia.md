@@ -1,6 +1,6 @@
 # CaptureMann vs Camtasia
 
-*Checked Nov 11, 2026 · CaptureMann 0.3.1 · [all comparisons](README.md)*
+*Checked Nov 11, 2026 · CaptureMann 0.3.2 · [all comparisons](README.md)*
 
 **In short:** Camtasia (TechSmith) is a recorder plus a full timeline editor for training videos and courses, with
 quizzes, SCORM export and, on higher plans, AI voices, avatars and dubbing. It runs on Windows and macOS and is sold as a
@@ -29,7 +29,7 @@ Camtasia goes much further; for everyday recordings and local AI without a subsc
 | **Screenshots** | Region, window and display with annotation and Auto-redact | Snagit is included in the plans |
 | **Audio and meetings** | Audio-only recording; transcripts, speaker labels, minutes and reports | Not found |
 | **Sharing** | Local folders, Google Drive, YouTube (private by default) | Screencast hosting (Pro) and other TechSmith services |
-| **AI agents and automation** | 74 MCP tools and an identical CLI; risky actions need your on-screen confirmation | Not found |
+| **AI agents and automation** | 81 MCP tools and an identical CLI; risky actions need your on-screen confirmation | Not found |
 | **Privacy** | No telemetry; no network traffic unless you connect a destination or download a model | Sign-in for individual plans; AI features use TechSmith's services |
 
 ## Where Camtasia is stronger
@@ -62,7 +62,7 @@ Camtasia goes much further; for everyday recordings and local AI without a subsc
 - Camtasia plans, prices, watermark, plan features and sign-in: [Trainn, Camtasia pricing](https://trainn.co/blog/camtasia-pricing/)
   (published Aug 25, 2026, updated Sep 23, 2026), checked Nov 11, 2026. Trainn sells a competing product; we could not read
   techsmith.com directly, and TechSmith's store is the current source.
-- CaptureMann: [README](../README.md) and [user guide](../docs/user/user-guide.md), version 0.3.1.
+- CaptureMann: [README](../README.md) and [user guide](../docs/user/user-guide.md), version 0.3.2.
 
 Camtasia, Snagit, Audiate and Screencast are trademarks of TechSmith Corporation. CaptureMann is not affiliated with or
 endorsed by TechSmith.

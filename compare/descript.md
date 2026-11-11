@@ -1,6 +1,6 @@
 # CaptureMann vs Descript
 
-*Checked Nov 11, 2026 · CaptureMann 0.3.1 · [all comparisons](README.md)*
+*Checked Nov 11, 2026 · CaptureMann 0.3.2 · [all comparisons](README.md)*
 
 **In short:** Descript is a cloud-based video and audio editor where you edit by editing the transcript, with strong AI
 tools: Studio Sound, filler-word and retake removal, AI voices, Eye Contact and the Underlord co-editor. It runs on
@@ -33,7 +33,7 @@ editing and podcasts, Descript; for private, unlimited recording and transcripti
 | **Translation** | Local: English via Whisper, other languages via the local text model | Translation (cloud) |
 | **Meetings** | Audio-only recording; speaker labels, minutes and reports | Not its focus |
 | **Sharing** | Local folders, Google Drive, YouTube (private by default) | Publishing and sharing from Descript |
-| **AI agents** | 74 MCP tools running locally, and an identical CLI; risky actions need your on-screen confirmation | **Descript MCP** for Claude and other assistants, connected to your Descript account; imports and edits use your media minutes and AI credits |
+| **AI agents** | 81 MCP tools running locally, and an identical CLI; risky actions need your on-screen confirmation | **Descript MCP** for Claude and other assistants, connected to your Descript account; imports and edits use your media minutes and AI credits |
 | **Privacy** | No telemetry; no network traffic unless you connect a destination or download a model | Media is uploaded to and processed in Descript's cloud |
 
 ## Where Descript is stronger
@@ -67,7 +67,7 @@ editing and podcasts, Descript; for private, unlimited recording and transcripti
 - Descript platforms and features: [Dupple, Descript review](https://dupple.com/reviews/descript) (May 2026), checked Nov 11, 2026.
 - Descript MCP: [Use Descript with an AI assistant (MCP)](https://help.descript.com/hc/en-us/articles/45008080343053),
   checked Nov 11, 2026.
-- CaptureMann: [README](../README.md) and [user guide](../docs/user/user-guide.md), version 0.3.1.
+- CaptureMann: [README](../README.md) and [user guide](../docs/user/user-guide.md), version 0.3.2.
 
 Descript, Overdub, Studio Sound and Underlord are trademarks of Descript, Inc. CaptureMann is not affiliated with or
 endorsed by Descript.

@@ -39,7 +39,7 @@ then five neighbours in open source, video editing and meeting notes.
 | Meeting recording (audio only) with minutes | Yes, local | Not found | Not found | Not found | Not found | Not found |
 | AI transcripts and summaries | Local, free | Cloud, paid plan | Not checked | Not found | Cloud, paid plan | Transcripts (per a review) |
 | Hosted share links | No | Yes | Yes (Screencast) | Yes (cloud plan) | Yes | Yes (per a review) |
-| MCP server for AI agents | Yes (74 tools) | Not found | Not found | Not found | Not found (has a CLI) | Not found |
+| MCP server for AI agents | Yes (81 tools) | Not found | Not found | Not found | Not found (has a CLI) | Not found |
 
 ## At a glance: open-source tools, editors and meeting notes
 
@@ -53,7 +53,7 @@ then five neighbours in open source, video editing and meeting notes.
 | Live streaming | No | No | Yes | No | No | No |
 | Transcripts | Local, unlimited | Not found | Not found | Not checked | Cloud, within media minutes | Cloud, within plan minutes |
 | Meeting minutes | Local | Not found | Not found | Not found | Not its focus | Cloud |
-| MCP server for AI agents | Yes, local (74 tools) | Not found | Not found | Not found | Yes, cloud (uses account credits) | Not checked |
+| MCP server for AI agents | Yes, local (81 tools) | Not found | Not found | Not found | Yes, cloud (uses account credits) | Not checked |
 
 "Not found" means we looked on the product's site or repository and did not find it; it may still exist.
 
@@ -61,7 +61,7 @@ Read each page for the details, the sources and where the other tool is the bett
 
 ## How these pages are written
 
-- **CaptureMann facts** come from this repository at version 0.3.1 (the [README](../README.md), the
+- **CaptureMann facts** come from this repository at version 0.3.2 (the [README](../README.md), the
   [user guide](../docs/user/user-guide.md) and the [changelog](../CHANGELOG.md)). Platform limits are stated as the README
   states them.
 - **Competitor facts** come from the competitor's own website or repository where we could read it, otherwise from a

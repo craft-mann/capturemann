@@ -1,6 +1,6 @@
 # CaptureMann vs CleanShot X
 
-*Checked Nov 11, 2026 · CaptureMann 0.3.1 · [all comparisons](README.md)*
+*Checked Nov 11, 2026 · CaptureMann 0.3.2 · [all comparisons](README.md)*
 
 **In short:** CleanShot X is the benchmark for fast, polished screenshots and short recordings on the Mac, with scrolling
 capture, text recognition, a quick-access overlay and cloud links. It is Mac only. CaptureMann runs on macOS, Windows
@@ -31,7 +31,7 @@ record, work across systems or want local AI, CaptureMann covers more.
 | **Audio and meetings** | Audio-only recording; transcripts, speaker labels, minutes and reports | Not found |
 | **AI** | Local and free: Whisper transcripts and captions, translation, speaker labels, meeting reports | Not found beyond text recognition |
 | **Sharing** | Local folders, Google Drive, YouTube (private by default) | CleanShot Cloud links with password protection and custom domains |
-| **AI agents and automation** | 74 MCP tools and an identical CLI; risky actions need your on-screen confirmation | Not found |
+| **AI agents and automation** | 81 MCP tools and an identical CLI; risky actions need your on-screen confirmation | Not found |
 
 ## Where CleanShot X is stronger
 
@@ -62,6 +62,6 @@ record, work across systems or want local AI, CaptureMann covers more.
 - CleanShot X prices and features: [Hack Design, CleanShot X](https://www.hackdesign.org/toolkit/cleanshot-x/) (dated
   Dec 15, 2025) and [Toolradar, CleanShot X pricing](https://toolradar.com/tools/cleanshot-x/pricing) (updated Jan 22,
   2026), both checked Nov 11, 2026. We could not read cleanshot.com directly; its pricing page is the current source.
-- CaptureMann: [README](../README.md) and [user guide](../docs/user/user-guide.md), version 0.3.1.
+- CaptureMann: [README](../README.md) and [user guide](../docs/user/user-guide.md), version 0.3.2.
 
 CleanShot is a trademark of its owner. CaptureMann is not affiliated with or endorsed by CleanShot.
