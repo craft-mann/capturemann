@@ -29,7 +29,10 @@ Status: **plan written Nov 11, 2026 (scope from the maintainer); decisions below
    winget (which does not remove SmartScreen for a browser download), Microsoft Store (MSIX). Output: a recommendation and, if chosen,
    signing in `windows-package.yml`.
 
-4. **Claude Code plugin** (added Nov 11, 2026): MCP server plus skills, from this repository's own marketplace; see the Order section, item 4.
+4. **Claude plugin: develop and submit to Anthropic's directory** (added Nov 11, 2026; maintainer decision: submit, not only self-host): MCP server plus skills; see the Order section, item 4.
+5. **Agent clients must show up in Settings → Agents & CLI** (bug found Nov 11, 2026). Reported: Claude was connected and asked to write a report from a meeting, and the Clients list stayed empty ("No clients yet", "No agent requests yet").
+   Cause (code read, not run): the list is built from stored policies and the activity log, and the log records only confirmed or refused requests; `generate_report` and most tools are Free tier, so a connected client that only calls them never appears (`apps/desktop/src/ui/settings/model.rs::client_rows`, `crates/cm-daemon/src/daemon.rs::log_with`).
+   Also: the "Add client" policy is preselected Blocked (`ui/settings/mod.rs:191`) while the spec default is Allowed. Fix: register every client on `session.hello` and list it with last seen and last tool; show Free calls too (or at least the last one per client); preselect Allowed or require a choice; reword the empty state; AC in AGT-2 and a test through the daemon with a scripted client. Matters for the plugin: Claude Code and Claude Desktop must be visible and blockable.
 
 ## Carried over from 0.3.1
 
@@ -55,9 +58,9 @@ Work on `main`; the maintainer pushes, tags and publishes. Follow `docs/developm
    - Need: one real Vietnamese recording and its reference lines (private, counts only in the report); ask which file.
    - Convert medium and large with `packaging/phowhisper/convert.sh` (pins in the script; check the converted tokens first, see `broken-tokens-2026-11-03.md`); compare each with its Whisper equivalent (medium, large-v3 Turbo) on WER, speed, coverage, invented lines (guard) and memory; store a benchmark in `verification/benchmarks/`.
    - Only if a model clearly wins: pin it in `crates/cm-ai/data/models.json` (`pending_pin` today) and upload to the Hugging Face org `craftmann`.
-5. **Carry-over bugs** (section above): the process-tree kill on cancel and the redaction box left-edge trim first (known bugs); windowed audio is moved to 0.3.3 (decision above).
+6. **Carry-over bugs** (section above): the process-tree kill on cancel and the redaction box left-edge trim first (known bugs); windowed audio is moved to 0.3.3 (decision above).
 
-4. **Claude Code plugin (added by the maintainer, Nov 11, 2026).** Ship a plugin so Claude Code users get CaptureMann's MCP server and
+4. **Claude plugin, submitted to Anthropic's directory (added by the maintainer, Nov 11, 2026).** Ship a plugin so Claude users get CaptureMann's MCP server and
    a few skills with one command. Analysis of https://code.claude.com/docs/en/plugins/overview (and the components, manifest and publish pages):
    - **What a plugin is:** a directory with an optional `.claude-plugin/plugin.json` (only `name` is required), plus skills (`skills/<name>/SKILL.md`,
      run as `/<plugin>:<name>`), agents, hooks, MCP servers (`.mcp.json`, appears as `plugin:<plugin>:<server>`, tools `mcp__plugin_<plugin>_<server>__<tool>`),
@@ -74,8 +77,8 @@ Work on `main`; the maintainer pushes, tags and publishes. Follow `docs/developm
    - **Constraints from the docs:** the plugin `name` must be kebab-case and must not start with `claude-` or `anthropic-` (`capturemann` is fine; so is a marketplace name such as `capturemann-plugins`; check the reserved list before choosing);
      `version` must be bumped on every release or users keep the old copy (tie it to the workspace version and add a check next to the existing version-consistency checks); `claude plugin validate --strict` in CI;
      a plugin's skill and MCP descriptions cost context in every session, so keep descriptions short (the 74 tool names are loaded through MCP tool search).
-   - **Distribution:** (1) own marketplace in this repository, root `.claude-plugin/marketplace.json` listing `./plugins/capturemann`: no review, works for Claude Code the day it is pushed. (2) Anthropic's directory
-     (claude.ai/directory/manage): needs a paid claude.ai plan and a review, and the stdio server does not run on claude.ai (it does in Claude Code and in Cowork on the desktop), so only after (1) works and only if the maintainer wants it.
+   - **Distribution:** (1) own marketplace in this repository, root `.claude-plugin/marketplace.json` listing `./plugins/capturemann`: no review, works for Claude Code the day it is pushed. (2) **Anthropic's directory (decided: submit)**
+     (claude.ai/directory/manage): the maintainer submits from a paid claude.ai plan (Pro, Max, Team or Enterprise owner); every version goes through review (what is checked: claude.com/docs/directory/publish, to read before building); the portal applies rules `claude plugin validate` does not, so run the pre-submission checklist (claude.com/docs/plugins/pre-submission-checklist). Directory fields in `plugin.json`: `icon`, `documentationUrl`, `supportUrl`, `privacyPolicyUrl`, `termsOfServiceUrl` (https), plus `description`, `author`, `homepage`, `repository`, `license` (Apache-2.0) and a README; the privacy policy exists at craftmann.app/capturemann/privacy. **Limit to state in the listing:** a local stdio server does not run on claude.ai in the browser (it does in Claude Code and in Cowork on the desktop), and the app must be installed; ask the review whether a listing that needs a local app is accepted, and whether the skills alone are useful on claude.ai. Do (1) first, it also serves as the test bed.
    - **Private by design stays true:** the plugin adds no network traffic and no telemetry; the MCP server is the existing local one. State this in the plugin README.
    - **Steps:** create `plugins/capturemann/` (manifest, `.mcp.json`, skills, README), the root marketplace file, `claude plugin validate --strict` for both; load it with `claude --plugin-dir plugins/capturemann` and run a real tool call
      against the dev app (free read-only tools only: `list_library`, `get_settings`; no recording or capture without the maintainer asking); a manual script `tests/manual/PLUGIN-1.md`; a README section and a docs page (`docs/user/claude-code-plugin.md`);
