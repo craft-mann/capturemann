@@ -191,16 +191,29 @@ impl Inner {
     ) -> Result<Value, DaemonError> {
         let (library, clipboard) = (self.library.clone(), self.clipboard.clone());
         let now = self.clock.now();
+        let t0 = std::time::Instant::now();
         let out = blocking(move || {
             let cap = take()?;
+            let t_take = t0.elapsed();
             let png = cap.frame.to_png()?;
+            let t_png = t0.elapsed();
             let bundle = lock_library(&library).create_screenshot_without_poster(
                 &png,
                 title.as_deref(),
                 now,
             )?;
+            let t_bundle = t0.elapsed();
             let mut warnings: Vec<String> = bundle.warnings().to_vec();
             warnings.extend(write_poster_unlocked(&library, &bundle, "created"));
+            // Stages of the screenshot up to the `capture.created` event (the sidebar count
+            // waits for it), cumulative ms: `tests/manual/COUNT-LATENCY.md`.
+            log::debug!(
+                "screenshot stages (cumulative ms): capture={} png={} bundle={} poster={}",
+                t_take.as_millis(),
+                t_png.as_millis(),
+                t_bundle.as_millis(),
+                t0.elapsed().as_millis()
+            );
             let copied = if copy {
                 match clipboard.copy_png(&png) {
                     Ok(()) => true,
