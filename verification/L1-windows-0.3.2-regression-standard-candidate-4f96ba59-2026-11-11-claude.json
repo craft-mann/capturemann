@@ -1,0 +1,1186 @@
+{
+  "cases": [
+    {
+      "area": "pkg",
+      "duration_ms": 612,
+      "evidence": [
+        "capturemann.exe: 4713984 bytes",
+        "cm-mcp.exe: 8653824 bytes",
+        "cm-daemon.exe: 56649728 bytes",
+        "cm-desktop.exe: 95746560 bytes",
+        "cm-overlay.exe: 2789888 bytes",
+        "licence: Some(\"C:\\\\Users\\\\trung\\\\AppData\\\\Local\\\\Programs\\\\CaptureMann\\\\doc\\\\LICENSE\"), third party: Some(\"C:\\\\Users\\\\trung\\\\AppData\\\\Local\\\\Programs\\\\CaptureMann\\\\doc\\\\THIRD_PARTY_LICENSES.md\"), notice: Some(\"C:\\\\Users\\\\trung\\\\AppData\\\\Local\\\\Programs\\\\CaptureMann\\\\doc\\\\NOTICE\")"
+      ],
+      "id": "pkg.files",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "NFR-licence",
+        "PKG-contents"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "the package holds the programs, FFmpeg, the helper and the licences"
+    },
+    {
+      "area": "pkg",
+      "duration_ms": 2263,
+      "evidence": [
+        "capturemann --version: exit 0 (0x00000000) in 32 ms",
+        "cm-mcp --bogus: exit 2 (0x00000002) in 238 ms",
+        "cm-daemon --bogus: exit 2 (0x00000002) in 466 ms",
+        "cm-overlay --help: exit 0 (0x00000000) in 130 ms",
+        "ffmpeg -hide_banner -version: exit 0 (0x00000000) in 32 ms",
+        "ffprobe -hide_banner -version: exit 0 (0x00000000) in 290 ms",
+        "llama-server --version: exit 0 (0x00000000) in 428 ms"
+      ],
+      "id": "pkg.startup",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "bug: Transcribe illegal instruction (AVX-512 in the build)",
+        "bug: 0xC0000409 at start"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "every program starts without a crash (illegal instruction, fast fail)"
+    },
+    {
+      "area": "pkg",
+      "duration_ms": 1251,
+      "evidence": [
+        "version 0.3.2",
+        "daemon pid 8824 answered after 320 ms",
+        "- windows x86_64",
+        "- GPU Intel(R) UHD Graphics 620, driver 31.0.101.2137, 134 MB dedicated memory, vendor id 0x8086",
+        "- GPU Microsoft Basic Render Driver (software renderer: no hardware GPU is in use), driver 10.0.26100.9711, vendor id 0x1414",
+        "- speech model speaker-segmentation (6 MB)",
+        "- speech model speaker-embedding (29 MB)",
+        "- ffmpeg at ~\\AppData\\Local\\Programs\\CaptureMann\\ffmpeg.exe",
+        "- llama-server at ~\\AppData\\Local\\Programs\\CaptureMann\\llama-server.exe (bundled with this build, llama.cpp v0.7.0)",
+        "- text recognizer: windows_ocr (available; reads en-US (the first language of your Windows language list with OCR); OCR languages installed: en-US)",
+        "- speaker engine built in: true",
+        "- speaker models at ~\\AppData\\Local\\Programs\\CaptureMann\\Resources\\Models\\speaker (bundled with this build)",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "pkg.diagnostics",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "DIAG-1"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "diagnostics reports app, system, models and engines, FFmpeg and the helper"
+    },
+    {
+      "area": "daemon",
+      "duration_ms": 1924,
+      "evidence": [
+        "daemon pid 10852 answered after 318 ms",
+        "pid 10852, 88 actions",
+        "stop: killed (Windows has no signal for a hidden process)",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "daemon.lifecycle",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-1",
+        "R2-8"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "daemon starts on a private endpoint, answers, stops, and the endpoint is gone"
+    },
+    {
+      "area": "daemon",
+      "duration_ms": 2059,
+      "evidence": [
+        "daemon pid 8692 answered after 319 ms",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "daemon.library_created",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "LIB-1",
+        "AI-7: the text engine starts only when asked"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "a fresh library is created and lists no captures; no helper program runs while idle"
+    },
+    {
+      "area": "daemon",
+      "duration_ms": 1420,
+      "evidence": [
+        "daemon pid 3720 answered after 322 ms",
+        "second daemon: exit 0 (0x00000000) in 33 ms; output: [INFO cm_core::logging] daemon 0.3.2 started [WARN cm_daemon] cm-daemon: the CaptureMann app or another daemon is already serving \\\\.\\pipe\\cm-regress-8676-6; nothing to do",
+        "log hygiene: 2 WARN line(s) in the case's logs"
+      ],
+      "id": "daemon.second_instance",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-1"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "a second daemon on a busy endpoint exits cleanly and leaves the first one working"
+    },
+    {
+      "area": "daemon",
+      "duration_ms": 2042,
+      "evidence": [
+        "piped run: exit 0 (0x00000000); new cm-daemon pids [14112]",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "daemon.autostart",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-1"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "the CLI starts a daemon when none runs"
+    },
+    {
+      "area": "settings",
+      "duration_ms": 1689,
+      "evidence": [
+        "daemon pid 10088 answered after 319 ms",
+        "daemon pid 10948 answered after 316 ms",
+        "recording.fps=47: exit 0 (0x00000000) None",
+        "47 was accepted: {\"settings\":{\"recording.fps\":47}}",
+        "log hygiene: 2 WARN line(s) in the case's logs"
+      ],
+      "id": "settings.roundtrip",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-1"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "settings set and get round trip, and survive a daemon restart"
+    },
+    {
+      "area": "settings",
+      "duration_ms": 1234,
+      "evidence": [
+        "daemon pid 8624 answered after 319 ms",
+        "set agents.tool_policy: exit 3 (0x00000003) Some(\"user_declined\") `agents.tool_policy` can only be changed in the CaptureMann app (Settings)",
+        "set library.path: exit 3 (0x00000003) Some(\"user_declined\") `library.path` can only be changed in the CaptureMann app (Settings)",
+        "set privacy.recording_indicator: exit 3 (0x00000003) Some(\"user_declined\") `privacy.recording_indicator` can only be changed in the CaptureMann app (Settings)",
+        "set auth.token: exit 2 (0x00000002) Some(\"invalid_input\") values: `auth.token` is not available to clients",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "settings.app_only_refused",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-POLICY",
+        "OD-24"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "app-only settings keys are refused to agents and change nothing"
+    },
+    {
+      "area": "targets",
+      "duration_ms": 1163,
+      "evidence": [
+        "daemon pid 5544 answered after 320 ms",
+        "display 65537 'Display 1' 1920x1080 at (0,0) scale 1.5 primary",
+        "2 windows; capabilities {\"capture_region\":true,\"capture_window\":true,\"list_windows\":true,\"pick\":false}",
+        "apps: Windows Terminal",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "targets.list",
+      "message": "",
+      "needs": [
+        "desktop_session"
+      ],
+      "specs": [
+        "CAP-1",
+        "CAP-3",
+        "bug: Windows Terminal Host name",
+        "bug: window name garbled"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "targets lists displays and windows with readable names and real sizes"
+    },
+    {
+      "area": "shot",
+      "duration_ms": 0,
+      "evidence": [],
+      "id": "shot.display",
+      "message": "needs --allow screen",
+      "needs": [
+        "desktop_session",
+        "screen"
+      ],
+      "specs": [
+        "CAP-1.AC1"
+      ],
+      "status": "SKIP",
+      "tier": "smoke",
+      "title": "a display screenshot is a valid PNG of the display's physical size"
+    },
+    {
+      "area": "shot",
+      "duration_ms": 0,
+      "evidence": [],
+      "id": "shot.region",
+      "message": "needs --allow screen",
+      "needs": [
+        "desktop_session",
+        "screen"
+      ],
+      "specs": [
+        "CAP-1.AC2"
+      ],
+      "status": "SKIP",
+      "tier": "standard",
+      "title": "a region screenshot has the requested size"
+    },
+    {
+      "area": "shot",
+      "duration_ms": 0,
+      "evidence": [],
+      "id": "shot.window",
+      "message": "needs --allow screen",
+      "needs": [
+        "desktop_session",
+        "screen"
+      ],
+      "specs": [
+        "CAP-1.AC4",
+        "bug: window shot saved at 960x485 while listed 1426x721 (headless daemon not DPI aware)"
+      ],
+      "status": "SKIP",
+      "tier": "standard",
+      "title": "a window screenshot is saved at the size the window is listed with"
+    },
+    {
+      "area": "shot",
+      "duration_ms": 1347,
+      "evidence": [
+        "daemon pid 6432 answered after 319 ms",
+        "unknown display: exit 2 (0x00000002) Some(\"not_found\")",
+        "empty region: exit 2 (0x00000002) Some(\"invalid_input\")",
+        "region off the display: exit 2 (0x00000002) Some(\"invalid_input\")",
+        "unknown window: exit 2 (0x00000002) Some(\"not_found\")",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "shot.invalid",
+      "message": "",
+      "needs": [
+        "desktop_session"
+      ],
+      "specs": [
+        "CAP-1",
+        "errors: invalid_input, not_found"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "bad targets are refused with the shared error codes and create no capture"
+    },
+    {
+      "area": "lib",
+      "duration_ms": 1194,
+      "evidence": [
+        "daemon pid 3828 answered after 321 ms",
+        "manifest keys ok; exported PNG 1000x260, 35254 bytes",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "lib.manifest",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "LIB-1",
+        "CAP-4: export_image",
+        "data model: bundles are the source of truth"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "the library lists a bundle; manifest.json has the schema keys; export of the image is a valid PNG"
+    },
+    {
+      "area": "lib",
+      "duration_ms": 1219,
+      "evidence": [
+        "daemon pid 8304 answered after 320 ms",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "lib.rename",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "LIB-1"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "rename changes the title and the bundle folder, and is not an undo step"
+    },
+    {
+      "area": "lib",
+      "duration_ms": 1427,
+      "evidence": [
+        "daemon pid 13960 answered after 320 ms",
+        "after annotate: 1 op(s), 1 revision(s)",
+        "redo with nothing to redo: exit 0 (0x00000000) None",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "lib.annotate_undo",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "ANN-3",
+        "AGT-3"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "annotate adds a revision; undo and redo move through it; one call is one step"
+    },
+    {
+      "area": "lib",
+      "duration_ms": 1169,
+      "evidence": [
+        "daemon pid 3988 answered after 321 ms",
+        "library rm: exit 3 (0x00000003) Some(\"user_declined\") No confirmation UI is attached to this daemon",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "lib.delete_needs_confirmation",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-POLICY",
+        "AGT tiers: Confirm"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "deleting a capture is refused without an on-screen confirmation and deletes nothing"
+    },
+    {
+      "area": "redact",
+      "duration_ms": 1284,
+      "evidence": [
+        "daemon pid 8668 answered after 319 ms",
+        "recogniser Some(String(\"windows_ocr\")); 2 suggestion(s): email,ip_address",
+        "--redact-emails: exit 2 (0x00000002) None (not asserted)",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "redact.fixture",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "ANN-2",
+        "AI-9 / RED-1: Auto-redact",
+        "Windows.Media.Ocr recogniser"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "Auto-redact finds the e-mail address and the IPv4 address in a picture with known text"
+    },
+    {
+      "area": "redact",
+      "duration_ms": 0,
+      "evidence": [],
+      "id": "redact.window_text",
+      "message": "needs --allow screen",
+      "needs": [
+        "desktop_session",
+        "screen"
+      ],
+      "specs": [
+        "ANN-2",
+        "RED-1"
+      ],
+      "status": "SKIP",
+      "tier": "standard",
+      "title": "Auto-redact on a screenshot of a real window that shows an e-mail address"
+    },
+    {
+      "area": "import",
+      "duration_ms": 4470,
+      "evidence": [
+        "daemon pid 7376 answered after 322 ms",
+        "clip-h264.mp4: rec_06GWP7NWPDGGT3NX, 320x240, 3.00 s, job 371 ms",
+        "clip-h264.mov: rec_06GWP7NZC53WM2AZ, 320x240, 3.00 s, job 401 ms",
+        "clip-h264.mkv: rec_06GWP7P21S55JFPF, 320x240, 3.02 s, job 1605 ms",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "import.formats",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "IMP-1",
+        "IMP-2"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "mp4, mov and mkv import as recordings with the right size and duration"
+    },
+    {
+      "area": "import",
+      "duration_ms": 3082,
+      "evidence": [
+        "daemon pid 1216 answered after 322 ms",
+        "library size 240x320 (stored 320x240 with a 90 degree tag)",
+        "stored track screen.edit.mp4: 240x320 rotation 0 fps Some(30.0)",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "import.rotated",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "IMP-2",
+        "bug: Import editing copy not upright"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "a source with a rotation tag imports upright"
+    },
+    {
+      "area": "import",
+      "duration_ms": 2834,
+      "evidence": [
+        "daemon pid 8024 answered after 319 ms",
+        "stored track: h264 320x240 r Some(28.0) avg Some(28.0) 4.00 s; prepared [\"variable_frame_rate\"]",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "import.vfr",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "IMP-2",
+        "bug: yuv420p refused by Quick Sync (NV12 needed)",
+        "bug: Import copy not constant 30 fps"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "a variable-frame-rate source gets a constant-rate editing copy (hardware H.264, or labelled software VP9 on Linux)"
+    },
+    {
+      "area": "import",
+      "duration_ms": 1889,
+      "evidence": [
+        "daemon pid 6832 answered after 321 ms",
+        "rec_06GWP7Q9TXCJW3ZF: kind Some(String(\"audio\")), 2.00 s",
+        "mp3 rec_06GWP7QBAKGPBR6J: kind Some(String(\"audio\")), 2.09 s",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "import.audio",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "IMP-1",
+        "VOC-2"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "a WAV file and an MP3 file import as an audio capture of the right length"
+    },
+    {
+      "area": "import",
+      "duration_ms": 2161,
+      "evidence": [
+        "daemon pid 13096 answered after 321 ms",
+        "not a media file: exit 2 (0x00000002) state None {\"error\":{\"code\":\"invalid_input\",\"data\":{\"files\":[{\"error\":{\"message\":\"The file can't be read. It may be damaged, cut short or not a media file.\",\"reason\":\"unre...",
+        "a PNG picture: exit 2 (0x00000002) state None {\"error\":{\"code\":\"invalid_input\",\"data\":{\"files\":[{\"container\":\"image2\",\"duration_s\":0.04,\"error\":{\"codec\":\"png\",\"message\":\"The video codec Png is not supported...",
+        "missing file: exit 2 (0x00000002) Some(\"not_found\")",
+        "file open elsewhere: exit 2 (0x00000002) state None {\"error\":{\"code\":\"invalid_input\",\"data\":{\"files\":[{\"error\":{\"message\":\"`C:\\\\Users\\\\trung\\\\AppData\\\\Local\\\\Temp\\\\cmr8676\\\\21\\\\held.mp4` is open in another progra...",
+        "Unicode name imported as title 'Chào bạn – bản ghi màn hình đầy đủ ✓'",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "import.errors",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "IMP-3",
+        "IMP-WIN error paths"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "not a media file, a missing file, a file held open and a Unicode name end cleanly"
+    },
+    {
+      "area": "import",
+      "duration_ms": 1315,
+      "evidence": [
+        "daemon pid 3860 answered after 321 ms",
+        "dry run: exit 0 (0x00000000) { \"files\": [ { \"audio_channels\": 1, \"audio_codec\": \"aac\", \"container\": \"mov\", \"duration_s\": 3.0, \"fps\": 30.0, \"hdr\": false, \"kind\": \"video\", \"name\": \"clip-h264.mp4\", \"needed_bytes\": 662456, \"other_aud...",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "import.dry_run",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "IMP-4"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "import --dry-run reports and creates nothing"
+    },
+    {
+      "area": "export",
+      "duration_ms": 2384,
+      "evidence": [
+        "daemon pid 11044 answered after 322 ms",
+        "export --preset quick: clip-h264 - quick.mp4 by h264_mf, 342 ms",
+        "h264 320x240 yuv420p range tv space bt709 trc bt709 prim bt709, 3.00 s",
+        "encoder h264_mf: colour tags not asserted (only the Media Foundation path had the bug)",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "export.quick",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "EXP-1",
+        "bug: export colour tags (NV12 encoders converted with BT.601, stream untagged)"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "the quick export is H.264 MP4 of the right length, tagged BT.709 limited range"
+    },
+    {
+      "area": "export",
+      "duration_ms": 2687,
+      "evidence": [
+        "daemon pid 11268 answered after 321 ms",
+        "export --audio --format wav: clip-h264 - audio.wav by , 0 ms",
+        "wav: pcm_s24le 48000 Hz 1 ch 3.00 s",
+        "export --audio --format m4a: clip-h264 - audio.m4a by , 0 ms",
+        "m4a: aac 48000 Hz 1 ch 3.00 s",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "export.audio",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "VOC-2",
+        "AUD-4"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "audio export to WAV and M4A has the right codec and length"
+    },
+    {
+      "area": "export",
+      "duration_ms": 1934,
+      "evidence": [
+        "daemon pid 4868 answered after 320 ms",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "export.estimate",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "EXP-5.AC3",
+        "EXP-5.AC4"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "export --estimate prints About N MB, up to M MB with codec and pixels; a GIF has none; the refusals are the shared ones"
+    },
+    {
+      "area": "export",
+      "duration_ms": 1853,
+      "evidence": [
+        "daemon pid 12808 answered after 321 ms",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "export.estimate_mcp",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "EXP-5.AC3",
+        "AGT-1"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "the MCP tool estimate_export answers the same bound and typical size as the CLI"
+    },
+    {
+      "area": "export",
+      "duration_ms": 1829,
+      "evidence": [
+        "daemon pid 7184 answered after 320 ms",
+        "unknown preset: exit 2 (0x00000002) Some(\"invalid_input\") preset: unknown preset `no-such-preset`; use one of: quick, youtube-4k, youtube-1440p, youtube-1080p, vertical-1080, square-1080, source, gi...",
+        "unknown capture: exit 2 (0x00000002) Some(\"not_found\")",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "export.errors",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "EXP-1",
+        "errors: invalid_input, not_found"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "an unknown preset or capture is refused with the shared error codes"
+    },
+    {
+      "area": "mcp",
+      "duration_ms": 1268,
+      "evidence": [
+        "daemon pid 4140 answered after 320 ms",
+        "server capturemann 0.3.2, protocol \"2025-06-18\"",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "mcp.handshake",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-2",
+        "MCP protocol"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "initialize answers with the server name, the product version and tool support"
+    },
+    {
+      "area": "mcp",
+      "duration_ms": 1198,
+      "evidence": [
+        "daemon pid 10720 answered after 319 ms",
+        "81 tools",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "mcp.tools_list",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-2",
+        "specs/02-agent-interface.md tool table"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "tools/list matches the tool table of the spec (no drift either way)"
+    },
+    {
+      "area": "mcp",
+      "duration_ms": 1596,
+      "evidence": [
+        "daemon pid 7456 answered after 322 ms",
+        "get_settings: ok, 15 chars",
+        "list_library: ok, 241 chars",
+        "get_capture: ok, 534 chars",
+        "get_diagnostics: ok, 4137 chars",
+        "list_models: ok, 2039 chars",
+        "get_text_model: ok, 253 chars",
+        "list_jobs: ok, 11 chars",
+        "list_destinations: ok, 19 chars",
+        "list_report_templates: ok, 2917 chars",
+        "list_text_models: ok, 1339 chars",
+        "list_targets: ok, 255 chars",
+        "list_devices: ok, 1369 chars",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "mcp.read_only_calls",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-2"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "the read-only tools answer without error"
+    },
+    {
+      "area": "mcp",
+      "duration_ms": 1228,
+      "evidence": [
+        "daemon pid 1540 answered after 320 ms",
+        "start_recording: error=true code=Some(\"user_declined\") user_declined: No confirmation UI is attached to this daemon {\"reason\":\"no_confirmer\"}",
+        "get_recording_status after the refusal: state 'idle'",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "mcp.confirm_tier",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-POLICY",
+        "tier: Confirm"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "start_recording and delete_capture do not run without an on-screen confirmation"
+    },
+    {
+      "area": "mcp",
+      "duration_ms": 1224,
+      "evidence": [
+        "daemon pid 14176 answered after 320 ms",
+        "CLI with policy allow: exit 2 (0x00000002) Some(\"not_found\")",
+        "MCP with policy allow: Some(\"not_found\")",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "mcp.policy_allow",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "OD-24",
+        "AGT-POLICY"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "agents.tool_policy allow for start_recording is honoured by the daemon (CLI and MCP)"
+    },
+    {
+      "area": "mcp",
+      "duration_ms": 1236,
+      "evidence": [
+        "daemon pid 15032 answered after 320 ms",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "mcp.request_id",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT idempotency"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "a repeated request_id returns the first result and acts once"
+    },
+    {
+      "area": "mcp",
+      "duration_ms": 1228,
+      "evidence": [
+        "daemon pid 8288 answered after 321 ms",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "mcp.errors",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "specs/README.md shared error codes",
+        "AGT-1"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "errors map to structuredContent.code, JSON-RPC codes and CLI exit codes"
+    },
+    {
+      "area": "mcp",
+      "duration_ms": 8283,
+      "evidence": [
+        "daemon pid 1132 answered after 321 ms",
+        "1 notification(s); capture.revised seen: true",
+        "events after import: capture.revised, job.progress, job.progress, job.progress, job.progress, capture.created, job.progress, job.progress, job.done",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "mcp.events",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-2 events",
+        "recording events"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "daemon events arrive as notifications (capture.revised, job.*) for changes any client makes"
+    },
+    {
+      "area": "mcp",
+      "duration_ms": 1270,
+      "evidence": [
+        "daemon pid 8400 answered after 319 ms",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "mcp.cli_parity",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-1: every tool has the same name as its CLI subcommand"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "CLI and MCP return the same fields for library list, settings and targets"
+    },
+    {
+      "area": "mcp",
+      "duration_ms": 1342,
+      "evidence": [
+        "daemon pid 8824 answered after 318 ms",
+        "port 59843: no token 401, wrong token 401, right token 200",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "mcp.http",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AGT-2 transport"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "cm-mcp --http needs the bearer token and answers initialize"
+    },
+    {
+      "area": "ai",
+      "duration_ms": 2017,
+      "evidence": [
+        "daemon pid 2592 answered after 319 ms",
+        "transcribe without a model: exit 2 (0x00000002) Some(\"invalid_input\") No speech model is installed, so nothing can be transcribed. Open the AI page in CaptureMann, or run `capturemann ai models`, to download or import one. Nothing...",
+        "text-model test: exit 2 (0x00000002) Some(\"invalid_input\")",
+        "MCP transcribe without a model: error true {\"code\":\"invalid_input\",\"data\":{\"hint\":\"capturemann ai models download small\",\"reason\":\"no_model\"},\"message\":\"No speech model is installed, so nothing can be transcribed. Open the AI page in CaptureMa...",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "ai.no_model",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AI-1",
+        "AI-7"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "without a model, transcribe and the text model say what to do (exit 2) instead of failing"
+    },
+    {
+      "area": "ai",
+      "duration_ms": 1966,
+      "evidence": [
+        "llama-server --version: exit 0 (0x00000000) version: 0.7.0-dev (build 0, commit unknown) built with GNU 16.2.0 for Windows AMD64",
+        "daemon pid 14244 answered after 318 ms",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "ai.llama_version",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "AI-7",
+        "bug class: llama-server missing in the Windows package"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "the bundled llama-server runs --version and is not started by the daemon"
+    },
+    {
+      "area": "desktop",
+      "duration_ms": 11702,
+      "evidence": [
+        "1 visible window(s) of the app: 'CaptureMann' 1792x992"
+      ],
+      "id": "desktop.stays_up",
+      "message": "",
+      "needs": [
+        "desktop_session"
+      ],
+      "specs": [
+        "bug: cm-desktop panic at start (tokio pipe outside a runtime)",
+        "bug class: illegal instruction"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "cm-desktop starts, stays up for 10 s and leaves no crash event"
+    },
+    {
+      "area": "desktop",
+      "duration_ms": 8114,
+      "evidence": [
+        "second launch: exit 0 (0x00000000) after 50 ms",
+        "visible windows of the first instance: 1 before, 1 after"
+      ],
+      "id": "desktop.second_launch",
+      "message": "",
+      "needs": [
+        "desktop_session"
+      ],
+      "specs": [
+        "IMP-4: second launch opens Import",
+        "named pipe single instance"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "a second launch with a file forwards it to the running app and exits"
+    },
+    {
+      "area": "desktop",
+      "duration_ms": 0,
+      "evidence": [],
+      "id": "desktop.hotkey_overlay",
+      "message": "needs --allow screen",
+      "needs": [
+        "desktop_session",
+        "screen"
+      ],
+      "specs": [
+        "CAP-1 overlay",
+        "CAP-3",
+        "DPI-WIN"
+      ],
+      "status": "SKIP",
+      "tier": "standard",
+      "title": "the screenshot hotkey (Ctrl+Alt+Shift+1; Option+Shift+1 on macOS) opens one overlay window per monitor on its exact rectangle; Esc ends it"
+    },
+    {
+      "area": "desktop",
+      "duration_ms": 0,
+      "evidence": [],
+      "id": "desktop.no_console_flash",
+      "message": "needs --allow screen",
+      "needs": [
+        "desktop_session",
+        "screen"
+      ],
+      "specs": [
+        "bug: console window flashes (child programs without CREATE_NO_WINDOW)"
+      ],
+      "status": "SKIP",
+      "tier": "standard",
+      "title": "no console window appears during import, export and a screenshot"
+    },
+    {
+      "area": "desktop",
+      "duration_ms": 0,
+      "evidence": [],
+      "id": "desktop.settings_applied",
+      "message": "needs --allow screen",
+      "needs": [
+        "desktop_session",
+        "screen"
+      ],
+      "specs": [
+        "bug: settings set not applied to the running app",
+        "AGT-1"
+      ],
+      "status": "SKIP",
+      "tier": "standard",
+      "title": "settings set capture.delay_s (0, 3, 5 or 10) reaches the running app: a forwarded display capture waits that long"
+    },
+    {
+      "area": "desktop",
+      "duration_ms": 11848,
+      "evidence": [
+        "tray probe: exit 0 (0x00000000) TRAY 0",
+        "tray probe: exit 0 (0x00000000) TRAY 1 button",
+        "tray buttons named CaptureMann: 0 before the app, 1 with it"
+      ],
+      "id": "desktop.tray_icon",
+      "message": "",
+      "needs": [
+        "desktop_session"
+      ],
+      "specs": [
+        "REC-5 tray"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "the tray icon appears in the notification area while the app runs (UI Automation probe)"
+    },
+    {
+      "area": "linux",
+      "duration_ms": 0,
+      "evidence": [],
+      "id": "linux.session",
+      "message": "not implemented for windows",
+      "needs": [
+        "desktop_session"
+      ],
+      "specs": [
+        "LINUX-1",
+        "platform-acceptance"
+      ],
+      "status": "SKIP",
+      "tier": "smoke",
+      "title": "the run sees a desktop session; the report names X11 or Wayland, the desktop and the portal"
+    },
+    {
+      "area": "linux",
+      "duration_ms": 0,
+      "evidence": [],
+      "id": "linux.displays",
+      "message": "not implemented for windows",
+      "needs": [
+        "desktop_session"
+      ],
+      "specs": [
+        "CAP-3",
+        "LINUX-1"
+      ],
+      "status": "SKIP",
+      "tier": "standard",
+      "title": "xrandr and the product list the same monitors"
+    },
+    {
+      "area": "linux",
+      "duration_ms": 0,
+      "evidence": [],
+      "id": "linux.desktop_stays_up",
+      "message": "not implemented for windows",
+      "needs": [
+        "desktop_session"
+      ],
+      "specs": [
+        "bug class: crash at start",
+        "LINUX-1"
+      ],
+      "status": "SKIP",
+      "tier": "standard",
+      "title": "cm-desktop starts, stays up for 10 s and (X11) shows a window of its own"
+    },
+    {
+      "area": "linux",
+      "duration_ms": 0,
+      "evidence": [],
+      "id": "linux.second_launch",
+      "message": "not implemented for windows",
+      "needs": [
+        "desktop_session"
+      ],
+      "specs": [
+        "IMP-4: second launch opens Import"
+      ],
+      "status": "SKIP",
+      "tier": "standard",
+      "title": "a second launch with a file forwards it to the running app and exits"
+    },
+    {
+      "area": "linux",
+      "duration_ms": 0,
+      "evidence": [],
+      "id": "linux.tray_icon",
+      "message": "not implemented for windows",
+      "needs": [
+        "desktop_session"
+      ],
+      "specs": [
+        "REC-5 tray"
+      ],
+      "status": "SKIP",
+      "tier": "standard",
+      "title": "the tray icon registers as a StatusNotifierItem while the app runs"
+    },
+    {
+      "area": "linux",
+      "duration_ms": 0,
+      "evidence": [],
+      "id": "linux.hotkey_overlay",
+      "message": "not implemented for windows",
+      "needs": [
+        "desktop_session",
+        "screen"
+      ],
+      "specs": [
+        "CAP-1 overlay"
+      ],
+      "status": "SKIP",
+      "tier": "standard",
+      "title": "the capture hotkey opens the overlay on every monitor"
+    },
+    {
+      "area": "linux",
+      "duration_ms": 0,
+      "evidence": [],
+      "id": "linux.vaapi_encoder",
+      "message": "not implemented for windows",
+      "needs": [],
+      "specs": [
+        "REC-1",
+        "DIAG-1",
+        "D-R2 software VP9 fallback"
+      ],
+      "status": "SKIP",
+      "tier": "standard",
+      "title": "VA-API (vainfo) and the product's diagnostics agree on hardware or software encoding"
+    },
+    {
+      "area": "regress",
+      "duration_ms": 1809,
+      "evidence": [
+        "daemon pid 6984 answered after 457 ms",
+        "diagnostics: - ffmpeg not found: looked next to ~\\AppData\\Local\\Temp\\cmr8676\\43\\bin-no-ffmpeg, in the settings and on PATH; this build should include it",
+        "import without FFmpeg: exit 2 (0x00000002) {\"error\":{\"code\":\"not_found\",\"data\":null,\"exit_code\":2,\"message\":\"FFmpeg was not found: CaptureMann includes its own copy, so reinstall CaptureMann, or set CM_FFMPEG to the path of ffmpeg.exe. (For development: winget install Gyan.FFmpeg.)\"}}",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "regress.ffmpeg_missing_wording",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "bug: FFmpeg-missing text named Homebrew on Windows",
+        "R5-3"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "with no FFmpeg anywhere the message says so in the platform's own words (no Homebrew on Windows)"
+    },
+    {
+      "area": "zz",
+      "duration_ms": 637,
+      "evidence": [],
+      "id": "zz.crash_events",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "bug: recording stop crash 0xC0000409",
+        "bug: illegal instruction"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "no crash of a CaptureMann program was logged (Windows event log, macOS DiagnosticReports) during the whole run"
+    }
+  ],
+  "run": {
+    "commit": "4f96ba59",
+    "ffmpeg": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
+    "finished": "2026-11-11T15:00:45Z",
+    "flags": "--tier standard --out C:\\lab\\regress-out\\20261111T145837Z --who win-regress --verdict PARTIAL --commit 4f96ba59",
+    "gpu": "Intel(R) UHD Graphics 620 (driver 31.0.101.2137)",
+    "hashes": [
+      [
+        "capturemann.exe",
+        "d5f1b03ac2ffa2779da16f6c332b27e5a33be1b3545a6648aa2faaaf1a8dbcfe"
+      ],
+      [
+        "cm-mcp.exe",
+        "4125b5b09aac28601d2cff625d92d62356267935764474f626a578a04476a1e4"
+      ],
+      [
+        "cm-daemon.exe",
+        "9a7db3874ad61d61254d444a565a8c503b349672768a00f54eead1cb34adfe20"
+      ],
+      [
+        "cm-desktop.exe",
+        "9f9dbfb9c5da6a550ee575de54aa0441837ead957c21bcf772c23c7330a09b83"
+      ],
+      [
+        "cm-overlay.exe",
+        "5b0343becd6d44b87e407e49756366c522f5fb30cee13efa84ce122c0cdcbbd0"
+      ],
+      [
+        "ffmpeg.exe",
+        "d4eb242a9a247b61c759b8e2b1e39f6fa761c12c9b228480e201e9ebf3c2fc9c"
+      ],
+      [
+        "ffprobe.exe",
+        "48d7c62a4bd062c6bfa7c8f2c9cf364426cbbf00dd7c852e2cca8f2c0bcb2fa6"
+      ],
+      [
+        "llama-server.exe",
+        "5e7ea405d049d122a7ab47347fe248a6b3152897c678d0b3c3b16f78a59800e8"
+      ]
+    ],
+    "os": "Microsoft Windows 11 Pro 10.0.26200 build 26200",
+    "package_dir": "C:\\Users\\trung\\AppData\\Local\\Programs\\CaptureMann",
+    "platform": "windows",
+    "started": "2026-11-11T14:58:39Z",
+    "tier": "standard",
+    "verdict": "PARTIAL",
+    "version": "0.3.2",
+    "who": "win-regress"
+  },
+  "schema": 1,
+  "summary": {
+    "fail": 0,
+    "pass": 44,
+    "skip": 14,
+    "total": 58
+  }
+}
