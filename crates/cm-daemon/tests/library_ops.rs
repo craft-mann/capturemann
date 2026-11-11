@@ -774,3 +774,125 @@ async fn posters_are_written_and_counted_in_the_index_size() {
         "the row counts the new render and poster"
     );
 }
+
+// ---- the library thumbnail follows the redaction (17-redaction AC "poster follows ops") -------
+
+const PIXELATE: &str = r##"[{"op":"pixelate","rect":[100,100,300,200],"block":32}]"##;
+const CROP: &str = r##"[{"op":"crop","rect":[0,0,400,300]}]"##;
+
+/// The poster as RGB, `None` when there is none.
+fn poster(shot: &Value) -> Option<image::RgbImage> {
+    let bundle = PathBuf::from(shot["path"].as_str().unwrap());
+    let bundle = if bundle.is_dir() {
+        bundle
+    } else {
+        bundle.parent().unwrap().to_owned()
+    };
+    Some(
+        image::open(bundle.join("thumbs").join("poster.jpg"))
+            .ok()?
+            .to_rgb8(),
+    )
+}
+
+/// Mean absolute red difference between the poster and `base` inside x 110..300, y 110..290
+/// (inside the pixelate rect of the 400x300 fake capture; the poster is not scaled). The fake
+/// capture is a smooth gradient and a 32 px pixelate flattens it, so a redacted poster differs
+/// from the original's by several levels; an unredacted one by JPEG noise only.
+fn region_diff(shot: &Value, base: &image::RgbImage) -> f64 {
+    let img = poster(shot).expect("a poster");
+    assert_eq!(img.dimensions(), base.dimensions());
+    let mut sum = 0u64;
+    for y in 110..290 {
+        for x in 110..300 {
+            sum += u64::from(img.get_pixel(x, y)[0].abs_diff(base.get_pixel(x, y)[0]));
+        }
+    }
+    sum as f64 / (180.0 * 190.0)
+}
+
+async fn call(d: &Daemon, m: &str, p: Value) -> Value {
+    d.execute_method(Actor::User, 0, m, &p).await.unwrap()
+}
+
+#[tokio::test]
+async fn poster_follows_redaction_undo_redo_replace_and_revert() {
+    let r = rig(Decision::Decline);
+    let d = &r.daemon;
+    let s = shot(d, "Poster").await;
+    let id = s["capture_id"].as_str().unwrap().to_owned();
+    let base = poster(&s).expect("a poster after capture");
+    let (same, changed) = (|v: f64| v < 1.5, |v: f64| v > 3.0);
+    let pix: Value = serde_json::from_str(PIXELATE).unwrap();
+    call(d, "annotate", json!({"capture_id": id, "ops": pix})).await;
+    let v = region_diff(&s, &base);
+    assert!(
+        changed(v),
+        "poster still shows the original after pixelate: {v}"
+    );
+    call(d, "undo", json!({"capture_id": id})).await;
+    let v = region_diff(&s, &base);
+    assert!(same(v), "undo: {v}");
+    call(d, "redo", json!({"capture_id": id})).await;
+    let v = region_diff(&s, &base);
+    assert!(changed(v), "redo: {v}");
+    // replace: true with a non-redaction op drops the redaction.
+    let rect: Value = serde_json::from_str(RECT).unwrap();
+    call(
+        d,
+        "annotate",
+        json!({"capture_id": id, "ops": rect, "replace": true}),
+    )
+    .await;
+    let v = region_diff(&s, &base);
+    assert!(same(v), "replace: {v}");
+    call(d, "undo", json!({"capture_id": id})).await;
+    let v = region_diff(&s, &base);
+    assert!(changed(v), "undo of replace: {v}");
+    // revert to original
+    call(
+        d,
+        "annotate",
+        json!({"capture_id": id, "ops": [], "replace": true}),
+    )
+    .await;
+    let v = region_diff(&s, &base);
+    assert!(same(v), "revert: {v}");
+}
+
+/// Auto-redact proposals are accepted as `blur` ops (ANN-2.AC4); an agent does the same. A later
+/// non-redaction op, a rescan and a crop must not bring the unredacted pixels back.
+#[tokio::test]
+async fn poster_keeps_a_blur_through_later_edits_and_a_rescan() {
+    let r = rig(Decision::Decline);
+    let d = &r.daemon;
+    let s = shot(d, "Blur").await;
+    let id = s["capture_id"].as_str().unwrap().to_owned();
+    let base = poster(&s).unwrap();
+    let blur = json!([{"op":"blur","rect":[100,100,300,200],"strength":32}]);
+    d.execute_method(
+        agent("redactor"),
+        0,
+        "annotate",
+        &json!({"capture_id": id, "ops": blur}),
+    )
+    .await
+    .unwrap();
+    let blurred = region_diff(&s, &base);
+    assert!(blurred > 1.0, "blur not in the poster: {blurred}");
+    let rect: Value = serde_json::from_str(RECT).unwrap();
+    call(d, "annotate", json!({"capture_id": id, "ops": rect})).await;
+    assert!(
+        region_diff(&s, &base) > 1.0,
+        "a later rect brought the original back"
+    );
+    call(d, "rescan_library", json!({})).await;
+    assert!(
+        region_diff(&s, &base) > 1.0,
+        "rescan brought the original back"
+    );
+    let crop: Value = serde_json::from_str(CROP).unwrap();
+    call(d, "annotate", json!({"capture_id": id, "ops": crop})).await;
+    let cropped = poster(&s).unwrap();
+    assert!(cropped.width() <= base.width(), "crop");
+}
