@@ -180,7 +180,8 @@ impl Inner {
         .await
     }
 
-    /// Takes a finished capture, makes the bundle, optionally copies, announces it.
+    /// Takes a finished capture, makes the bundle, announces it (`capture.created`, right after the
+    /// bundle and its poster exist), then optionally copies it.
     async fn store_capture(
         &self,
         actor: &Actor,
@@ -190,6 +191,7 @@ impl Inner {
         take: impl FnOnce() -> Result<Capture, CmError> + Send + 'static,
     ) -> Result<Value, DaemonError> {
         let (library, clipboard) = (self.library.clone(), self.clipboard.clone());
+        let (events, by) = (self.events.clone(), actor.clone());
         let now = self.clock.now();
         let t0 = std::time::Instant::now();
         let out = blocking(move || {
@@ -213,6 +215,12 @@ impl Inner {
                 t_png.as_millis(),
                 t_bundle.as_millis(),
                 t0.elapsed().as_millis()
+            );
+            // The capture is in the library with its poster: announce it now, so the sidebar
+            // count and the grid follow before the clipboard copy and the inline image below.
+            events.publish(
+                events::CAPTURE_CREATED,
+                json!({ "capture_id": bundle.manifest().id, "by": by }),
             );
             let copied = if copy {
                 match clipboard.copy_png(&png) {
@@ -242,10 +250,6 @@ impl Inner {
             Ok(out)
         })
         .await?;
-        self.events.publish(
-            events::CAPTURE_CREATED,
-            json!({ "capture_id": out["capture_id"], "by": actor }),
-        );
         Ok(out)
     }
 

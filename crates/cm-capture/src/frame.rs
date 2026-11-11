@@ -137,11 +137,6 @@ impl Frame {
         let mut enc = png::Encoder::new(&mut out, self.width, self.height);
         enc.set_color(png::ColorType::Rgba);
         enc.set_depth(png::BitDepth::Eight);
-        // Level 2, not the default 6: this runs between the shutter and the library row (the
-        // sidebar count waits for it). Measured on a 5120x2880 frame (`count_latency_bench`):
-        // 107 ms instead of 492 ms for a UI-like frame, 3 MB instead of 2 MB. The `Fast`
-        // (fdeflate) mode is quicker still but made the same frame 10 MB.
-        enc.set_deflate_compression(png::DeflateCompression::Level(2));
         let mut writer = enc
             .write_header()
             .map_err(|e| CmError::internal(format!("PNG encoding failed: {e}")))?;
