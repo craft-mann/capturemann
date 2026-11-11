@@ -14,6 +14,7 @@ Rules for every agent are in the plan and in the brief: worktree branch `track/<
 | 7 | Redaction box left-edge trim | | | queued | start when disk allows |
 | 9 | In-app update (Velopack) | | `docs/development/velopack-spike-0.3.2.md` | **moved to 0.3.3 (Nov 11)**; Mac spike done (GO WITH CHANGES); Windows spike finishing, its report is kept for 0.3.3 | see `release-0.3.3-plan.md` |
 | 10 | Copy text from a screenshot (OCR), ANN-4 | `track/ocr` | `crates/cm-render/src/ocr`, `crates/cm-core`, `cm-daemon` (new action), `cm-mcp`, `cm-cli`, editor and library UI, specs, docs, `compare/` | planned (plan item 8) | start after the merge check; languages (Vietnamese) to verify |
+| 11 | Sidebar counts lag about 2 s after a capture or recording | `track/count-latency` | `crates/cm-daemon/src/handlers.rs` (store_capture, recording finalize), `apps/desktop/src/ui/app/watch.rs`, `ui/library_view.rs`, `nav.rs` | running (Nov 11) | measure first; hypotheses: event published after poster and base64, recording finalize order, list_library cost |
 | 8 | Version bump, CHANGELOG, THIRD_PARTY_LICENSES, release text, regression | | | after 1 to 7 merge | follow `docs/development/release-day-0.3.1.md` |
 
 Maintainer decisions pending: SignPath result; marketplace and plugin names; which skills first.
