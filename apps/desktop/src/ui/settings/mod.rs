@@ -86,6 +86,8 @@ pub struct SettingsView {
     pub(super) lib_size: std::cell::RefCell<crate::library_move::SizeCache>,
     rebind_error: Option<app::RebindError>,
     rebind_focus: FocusHandle,
+    /// Ends the recording when the page loses focus (the global shortcuts must not stay released).
+    _rebind_blur: Option<gpui::Subscription>,
     _perm_poll: Task<()>,
     /// Agents page: scroll state of the Permissions list (it scrolls inside the page).
     pub(super) caps_scroll: gpui::ScrollHandle,
@@ -182,6 +184,7 @@ impl SettingsView {
             lib_size: Default::default(),
             rebind_error: None,
             rebind_focus: cx.focus_handle(),
+            _rebind_blur: None,
             _perm_poll: poll,
             caps_scroll: gpui::ScrollHandle::new(),
             labels_epoch: cm_i18n::epoch(),
@@ -196,6 +199,10 @@ impl SettingsView {
             copied_timer: None,
         };
         view.yt_reload(cx);
+        // Closing Settings while a combination is recorded gives the shortcuts back.
+        let app_release = view.app.clone();
+        cx.on_release(move |_, cx| app::resume_shortcuts(&app_release, cx))
+            .detach();
         // A copy that was running when the app quit resumes by itself; the row shows it again.
         let app3 = view.app.clone();
         crate::ui::library_move_flow::adopt_running(&app3, cx);
@@ -264,7 +271,34 @@ impl SettingsView {
         if !matches!(s, SettingsSection::Destinations | SettingsSection::Agents) {
             self.section = s;
         }
+        self.end_rebind(cx);
         cx.notify();
+    }
+
+    /// Settings -> Shortcuts: "Change" was chosen. The global shortcuts are released while the page
+    /// waits, so a press of a registered combination reaches it (CAP-2.AC2).
+    pub(super) fn start_rebind(
+        &mut self,
+        action: crate::shortcuts::ShortcutAction,
+        window: &mut gpui::Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.rebinding = Some(action);
+        self.rebind_error = None;
+        window.focus(&self.rebind_focus, cx);
+        app::suspend_shortcuts(&self.app.clone(), cx);
+        self._rebind_blur = Some(cx.on_blur(&self.rebind_focus, window, |this, _, cx| {
+            this.end_rebind(cx);
+            cx.notify();
+        }));
+    }
+
+    /// Recording ended (Cancel, Esc, a key taken, focus left): the shortcuts are registered again.
+    pub(super) fn end_rebind(&mut self, cx: &mut Context<Self>) {
+        self.rebinding = None;
+        self.rebind_error = None;
+        self._rebind_blur = None;
+        app::resume_shortcuts(&self.app.clone(), cx);
     }
 
     /// A key press while a shortcut waits to be recorded (CAP-2.AC2): Esc cancels, anything else
@@ -275,12 +309,14 @@ impl SettingsView {
         };
         let k = &ev.keystroke;
         if k.key == "escape" {
-            self.rebinding = None;
-            self.rebind_error = None;
+            self.end_rebind(cx);
             cx.notify();
             return;
         }
         let m = k.modifiers;
+        // The OS registration is moved (and refused when another app owns the new combination)
+        // with the shortcuts registered, so release is undone for the attempt.
+        app::resume_shortcuts(&self.app.clone(), cx);
         let result =
             crate::shortcuts::Chord::from_pressed(m.control, m.alt, m.shift, m.platform, &k.key)
                 .map_err(|e| match e {
@@ -292,11 +328,12 @@ impl SettingsView {
                     app::rebind_shortcut(&app, action, chord, cx)
                 });
         match result {
-            Ok(()) => {
-                self.rebinding = None;
-                self.rebind_error = None;
+            Ok(()) => self.end_rebind(cx),
+            Err(e) => {
+                // Still waiting for another try: release the shortcuts again.
+                self.rebind_error = Some(e);
+                app::suspend_shortcuts(&self.app.clone(), cx);
             }
-            Err(e) => self.rebind_error = Some(e),
         }
         cx.notify();
     }

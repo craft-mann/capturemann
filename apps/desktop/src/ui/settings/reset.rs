@@ -63,6 +63,30 @@ pub fn shortcut_reset_values(targets: &[ShortcutAction], platform: Platform) -> 
         .collect()
 }
 
+/// Updates the id table and the per-shortcut status after the OS hotkeys moved: `moved` is
+/// `(action, old id, new id or the OS error)`. All old ids go first, then the new ones come in: a
+/// swap (A holds B's default and B holds A's) would otherwise have B's removal of its old id delete
+/// the entry A just inserted, and A's default would be registered but ignored.
+pub fn apply_moves(
+    ids: &mut std::collections::HashMap<u32, ShortcutAction>,
+    registration: &mut crate::platform::Registration,
+    moved: &[(ShortcutAction, u32, Result<u32, String>)],
+) {
+    for (_, old_id, _) in moved {
+        ids.remove(old_id);
+    }
+    for (a, _, res) in moved {
+        if let Ok(id) = res {
+            ids.insert(*id, *a);
+        }
+        for (x, r) in registration.iter_mut() {
+            if x == a {
+                *r = res.as_ref().map(|_| ()).map_err(|e| e.clone());
+            }
+        }
+    }
+}
+
 /// The effective bindings once the reset is applied.
 pub fn map_after_reset(
     map: &ShortcutMap,
@@ -199,17 +223,7 @@ pub fn reset_shortcuts(app: &gpui::Entity<AppModel>, cx: &mut gpui::App) {
     let next = map_after_reset(&map, &targets, platform);
     app.update(cx, |m, cx| {
         m.shortcuts = next;
-        for (a, old_id, res) in &moved {
-            m.hotkey_ids.remove(old_id);
-            if let Ok(id) = res {
-                m.hotkey_ids.insert(*id, *a);
-            }
-            for (x, r) in &mut m.registration {
-                if x == a {
-                    *r = res.as_ref().map(|_| ()).map_err(|e| e.clone());
-                }
-            }
-        }
+        apply_moves(&mut m.hotkey_ids, &mut m.registration, &moved);
         cx.notify();
     });
     let backend = app.read(cx).backend.clone();
@@ -339,6 +353,30 @@ mod tests {
             .conflicts()
             .is_empty());
         assert!(ShortcutMap::defaults(P).conflicts().is_empty());
+    }
+
+    /// CAP-2: after a reset that swaps two shortcuts back, both defaults fire their own action.
+    #[test]
+    fn a_swap_reset_keeps_both_hotkey_ids() {
+        use crate::platform::chord_to_hotkey;
+        let id = |s: &str| {
+            chord_to_hotkey(&crate::shortcuts::Chord::parse(s).unwrap())
+                .unwrap()
+                .id()
+        };
+        let (r, w) = (ShortcutAction::CaptureRegion, ShortcutAction::CaptureWindow);
+        // Region holds Window's default (alt+shift+2) and the other way round.
+        let mut ids =
+            std::collections::HashMap::from([(id("alt+shift+2"), r), (id("alt+shift+1"), w)]);
+        let mut reg = vec![(r, Ok(())), (w, Ok(()))];
+        let moved = vec![
+            (r, id("alt+shift+2"), Ok(id("alt+shift+1"))),
+            (w, id("alt+shift+1"), Ok(id("alt+shift+2"))),
+        ];
+        apply_moves(&mut ids, &mut reg, &moved);
+        assert_eq!(ids.get(&id("alt+shift+1")), Some(&r));
+        assert_eq!(ids.get(&id("alt+shift+2")), Some(&w));
+        assert_eq!(ids.len(), 2);
     }
 
     #[test]

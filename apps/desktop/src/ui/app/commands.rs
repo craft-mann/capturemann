@@ -122,6 +122,43 @@ impl RebindError {
     }
 }
 
+/// Set while the Shortcuts page waits for a new combination and every global shortcut is released
+/// (see [`suspend_shortcuts`]).
+struct ShortcutsSuspended;
+impl gpui::Global for ShortcutsSuspended {}
+
+/// The Shortcuts page starts recording a combination: releases every global shortcut, so a press
+/// of one that is registered reaches the page instead of starting its action (the OS gives a
+/// registered combination to the hot key, never to the window). Idempotent.
+pub fn suspend_shortcuts(app: &Entity<AppModel>, cx: &mut App) {
+    if cx.has_global::<ShortcutsSuspended>() {
+        return;
+    }
+    let Some(h) = cx.try_global::<crate::platform::HotkeyHolder>() else {
+        return;
+    };
+    crate::platform::suspend_shortcuts(&h.0, &app.read(cx).shortcuts);
+    cx.set_global(ShortcutsSuspended);
+}
+
+/// Recording ended (a key was taken, Esc, the page lost focus or closed): registers every global
+/// shortcut again and records which ones the OS refused. Idempotent.
+pub fn resume_shortcuts(app: &Entity<AppModel>, cx: &mut App) {
+    if !cx.has_global::<ShortcutsSuspended>() {
+        return;
+    }
+    cx.remove_global::<ShortcutsSuspended>();
+    let Some(h) = cx.try_global::<crate::platform::HotkeyHolder>() else {
+        return;
+    };
+    let (ids, status) = crate::platform::register_shortcuts(&h.0, &app.read(cx).shortcuts);
+    app.update(cx, |m, cx| {
+        m.hotkey_ids = ids;
+        m.registration = status;
+        cx.notify();
+    });
+}
+
 pub fn rebind_shortcut(
     app: &Entity<AppModel>,
     action: ShortcutAction,

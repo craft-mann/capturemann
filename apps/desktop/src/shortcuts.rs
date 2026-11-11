@@ -130,7 +130,13 @@ impl Chord {
         meta: bool,
         key: &str,
     ) -> Result<Chord, ChordError> {
-        let key = key.trim().to_ascii_lowercase();
+        let mut shift = shift;
+        let mut key = key.trim().to_ascii_lowercase();
+        // The window systems report Shift+1 as `!` with Shift cleared; the chord is Shift + digit.
+        if let Some(i) = "!@#$%^&*()".find(key.as_str()).filter(|_| key.len() == 1) {
+            key = "1234567890"[i..=i].to_owned();
+            shift = true;
+        }
         if !is_key_name(&key) {
             return Err(ChordError::UnknownToken(key));
         }
@@ -613,6 +619,28 @@ mod tests {
         let old = map.get(ShortcutAction::CaptureRegion);
         assert!(next.check_rebind(ShortcutAction::OpenLibrary, &old).is_ok());
         assert!(next.conflicts().is_empty());
+    }
+
+    /// CAP-2.AC2: macOS, Windows and Linux report Shift+1 as the key `!` with Shift cleared (the
+    /// window system's "shifted key" form), so the default-style chords Option+Shift+1 and
+    /// Ctrl+Alt+Shift+3 could not be recorded: the page said "That key can't be used". The digit
+    /// row symbols of a US keyboard are mapped back to the digit with Shift held.
+    #[test]
+    fn a_shifted_digit_is_recorded_as_digit_plus_shift() {
+        for (sym, digit) in "!@#$%^&*()".chars().zip("1234567890".chars()) {
+            let c = Chord::from_pressed(false, true, false, false, &sym.to_string()).unwrap();
+            assert_eq!(c.to_setting(), format!("alt+shift+{digit}"), "{sym}");
+        }
+        let c = Chord::from_pressed(true, true, false, false, "#").unwrap();
+        assert_eq!(c.to_setting(), "ctrl+alt+shift+3");
+        // With Shift still reported it is the same chord.
+        let c = Chord::from_pressed(false, true, true, false, "1").unwrap();
+        assert_eq!(c.to_setting(), "alt+shift+1");
+        // Other symbols stay refused.
+        assert!(matches!(
+            Chord::from_pressed(false, true, false, false, "-"),
+            Err(ChordError::UnknownToken(_))
+        ));
     }
 
     /// R4-12: Discard, Restart and Annotate-last have their own shortcuts, none collides with the
