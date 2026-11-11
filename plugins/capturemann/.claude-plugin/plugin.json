@@ -1,0 +1,35 @@
+{
+  "name": "capturemann",
+  "displayName": "CaptureMann",
+  "version": "0.3.1",
+  "description": "Screenshots, screen and audio recording, local transcripts, speaker labels and meeting notes, export and publishing, through the CaptureMann app installed on this computer.",
+  "author": {
+    "name": "CraftMann",
+    "url": "https://www.craftmann.app/"
+  },
+  "homepage": "https://www.craftmann.app/capturemann/",
+  "repository": "https://github.com/craft-mann/capturemann",
+  "license": "Apache-2.0",
+  "keywords": [
+    "screenshot",
+    "screen-recording",
+    "audio-recording",
+    "transcription",
+    "meeting-notes",
+    "redaction",
+    "local-ai",
+    "mcp"
+  ],
+  "icon": "./icon.png",
+  "documentationUrl": "https://github.com/craft-mann/capturemann/blob/main/docs/user/claude-code-plugin.md",
+  "supportUrl": "https://github.com/craft-mann/capturemann/issues",
+  "privacyPolicyUrl": "https://www.craftmann.app/capturemann/privacy/",
+  "userConfig": {
+    "capturemann_path": {
+      "type": "string",
+      "title": "CaptureMann command",
+      "description": "Path to the capturemann program that CaptureMann installs. Leave the default when capturemann is on your PATH (Linux packages, the Windows installer's PATH option, or a Homebrew or manual link on macOS). On macOS without the link use /Applications/CaptureMann.app/Contents/MacOS/capturemann.",
+      "default": "capturemann"
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "capturemann": {
+      "command": "${user_config.capturemann_path}",
+      "args": ["mcp"]
+    }
+  }
+}
