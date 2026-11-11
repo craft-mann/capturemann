@@ -4,6 +4,29 @@ Written by the overnight orchestrator (the main Claude Code session) for the mai
 night; the **running log** at the end says how far it got. Same pattern as `release-0.3.1-final-morning-report.md`. Wording rule: PARTIAL
 reports only; "verified" is not used without a stored report. Plan: `release-0.3.2-plan.md`; board: `release-0.3.2-status.md`.
 
+## Where things stand at 01:30 (read this first)
+
+**Code is final: `77af6b04` (pushed). `public/main` is `5d493d08` = the same code plus docs, reports and the dated CHANGELOG (docs-only push, authorized as "make the release ready": it lets the tag commit contain the CHANGELOG that `release.yml` reads). CI on `5d493d08` was started at 01:30 and takes about 1.5 h: wait for it to be green before tagging.**
+
+| Gate | State |
+| --- | --- |
+| CI on `77af6b04` (macOS, Windows, Ubuntu, Security scan) | green (macOS `check` hung once in `cm-media` `vp9_export` on the runner, green on re-run) |
+| Dependabot alerts | 0 open (the 10 `zip` alerts closed after the spike crates were removed) |
+| `windows-tests.yml` five consecutive green runs on the final code | met (`77af6b04`: 43056869830, 43058966521, 43060553064, 43062596263, 43064395521) |
+| fmt, check scripts, i18n check, `cargo deny`, Trivy gate | clean |
+| Workspace clippy (local) | <running at 01:30, see the log below> |
+| Windows 11 candidate regression (ThinkPad) | standard 44/0, full 45/0, ai 2/0, installer 1/0 (PARTIAL) |
+| macOS candidate DMGs + regression | built, Developer ID signed, **not notarized**; standard 37/0, full 38/0 (PARTIAL; 6 desktop-session cases not run, rerun them in your Terminal) |
+| Linux aarch64 candidate + regression (VM) | full 37/0, tarball and `.deb` install 1/0 (PARTIAL) |
+| Linux x86_64 | **candidate built on GitHub only (CI artifacts), NOT regressed: the ThinkPad did not come back from the reboot into Ubuntu** |
+| Release text and release-day steps | written; `<FILL>` items need the final files |
+
+**Needs you, in this order:**
+1. **The ThinkPad:** look at it (boot menu? GRUB? new address?). It was left on the Ubuntu boot entry; if it boots Ubuntu, tell me the address (or let me find it) and I will build/regress Linux x86_64 on it, then `lab.sh switch windows`. Without it the Linux x86_64 files have no hardware regression (say so in the text, or hold them).
+2. **CI green on `5d493d08`** (about 1.5 h from 01:30), then tag: `git tag -a v0.3.2 -m "CaptureMann 0.3.2"` on that commit and `git push public v0.3.2` (never reuse a tag).
+3. Final files from the tag: Windows package workflow on `v0.3.2`; macOS: `Release` workflow on the tag, **or** notarize the overnight DMGs (`bash packaging/macos/notarize.sh <dmg>`, then recompute the `.sha256`; valid only because the tag commit has the same code as the one built, see `~/release-0.3.2/macos/NOTES.md`); Linux: x86_64 per item 1, aarch64 either reuse the candidate (same code) or rebuild; sign the Linux files with minisign.
+4. Fill the `<FILL>` items of `docs/development/release-0.3.2-github-text.md` from the reports and the final SHA-256 sums, save the body as `release-body.md`, upload to the draft release, publish. Then APT, winget (472327 and 477195 are open), Homebrew cask, plugin submission (`docs/development/plugin-submission-0.3.2.md`). All steps: `docs/development/release-day-0.3.2.md`.
+
 ## Authorizations given by the maintainer (Nov 11, 2026, about 21:30)
 
 - The orchestrator may **push fixes to `public/main`** that turn CI green (small, after `cargo fmt`, clippy, `cargo deny` and the Trivy gate run
