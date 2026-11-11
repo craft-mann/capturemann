@@ -12,6 +12,25 @@ the user page is `docs/user/claude-code-plugin.md`; the manual check is `tests/m
 Nothing here has been submitted. The portal was not opened while preparing this; every field below is
 what the docs say the portal asks, with the answer to give.
 
+## How to submit, step by step (for the maintainer)
+
+Nothing here has been done, and the portal pages were read in the docs, not opened. If the portal differs from this, trust the portal and fix this page.
+
+1. **Get the plugin on public `main`** (after 0.3.2 is merged and pushed by you): `git push public main`. The portal reads GitHub; the repository must be public.
+2. **Bump the version first** (the 0.3.2 bump of `Cargo.toml`), then `python3 scripts/check_plugin_version.py --fix` so `plugin.json` says 0.3.2, commit, push.
+3. **Test the plugin yourself once** (30 minutes, `tests/manual/PLUGIN-1.md`): in a terminal `claude --plugin-dir plugins/capturemann`, run `/mcp` and see `plugin:capturemann:capturemann` connected, ask Claude to run `list_library`, and look at Settings → Agents & CLI. Save a short report in `verification/`.
+4. **Check the validators locally:** `claude plugin validate --strict plugins/capturemann` and `claude plugin validate .` (both passed on Nov 11).
+5. **Sign in at https://claude.ai/directory/manage** with the claude.ai account that has a paid plan (Pro, Max, Ultra, or a Team or Enterprise Owner). Connect your **GitHub account** there (it asks for it) and make sure that account can push to `craft-mann/capturemann`. The first organization that submits the folder owns the listing, so pick the right account now.
+6. **Submit new → Plugin bundle.** Repository `craft-mann/capturemann`, plugin path `plugins/capturemann`, branch empty (follows `main`). Click **Validate**.
+   - Fix every **Blocking** finding, push, click **Re-validate**.
+   - Expected: a **hold** for a reviewer because the MCP server is the app's own binary (not a rejection). Possible block: `${user_config.capturemann_path}` in the command. If the portal says "Command path can't be followed", switch to Variant B below (one line in `.mcp.json`, delete `userConfig`), push, re-validate.
+7. **Listing details:** read from `plugin.json` and the README; check them, do not retype. Decide the author name ("CraftMann" or "The CaptureMann contributors").
+8. **Data handling:** four questions; use the answers in the table below.
+9. **Compliance:** give a contact email, tick the acknowledgements after reading them (Directory Terms and Policy).
+10. **Review and submit:** keep "GitHub push webhook" if you are admin of the repository; choose auto-publish or manual. Submit. Limit: 10 submissions per organization per 24 hours.
+11. **Wait.** Status is on the Review tab (`claude.com/docs/directory/submission-status`). A **hold** is not a rejection. If the security scan rejects, use **Resubmit for review**. Do not hold the 0.3.2 release for it: the plugin installs through our own marketplace as soon as the files are pushed (`claude plugin marketplace add craft-mann/capturemann`).
+12. **Each later release:** raise the plugin `version` with the app version (`check_plugin_version.py`), push; the directory picks up the tracked branch.
+
 ## Before opening the portal
 
 | Step | State | Note |
