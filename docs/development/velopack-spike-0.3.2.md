@@ -1,5 +1,8 @@
 # Velopack spike for 0.3.2: macOS, crate audit, hosting (Nov 11, 2026)
 
+
+> **Scratch code removed from the tree (Nov 11, 2026):** `spikes/velopack-mac` (and its `Cargo.lock` with `zip` 8.6.0, flagged CRITICAL by the Trivy gate, CVE-2026-115905) was deleted from `main`; it stays in git history at commit `9e3c37da` (`git show 9e3c37da:spikes/velopack-mac/...`). The findings below are the record.
+
 Scope: Phase 0 of the in-app update workstream (`specs/plans/release-0.3.2-plan.md`, section "In-app update with Velopack"), Mac side only. The Windows side is a separate spike on the ThinkPad. Nothing here is product code; the scratch code is `spikes/velopack-mac/` (its own workspace, scripts in `spikes/velopack-mac/scripts/`). Nothing was published, tagged, uploaded or pushed; the maintainer's installed apps, library and settings were not touched. Wording rule: every result below is "run on this Mac (Apple Silicon, macOS 26.6.2, Nov 11, 2026)" unless it says "not verified".
 
 Versions used: `velopack` crate **1.2.161** (MIT, Sep 29, 2026; the newest stable), `vpk` **1.2.161** (`dotnet tool install --tool-path`, .NET SDK 8.0.428 installed user-locally into `/tmp/cm-velo-mac/dotnet`, removed afterwards), `ureq` 3.5.1, `rustls` 0.23.46, `ring` 0.17.14, `zip` 8.6.0.
