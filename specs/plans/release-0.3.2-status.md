@@ -12,7 +12,7 @@ Rules for every agent are in the plan and in the brief: worktree branch `track/<
 | 5 | Windows signing research (no build) | `track/signing` | `docs/development/windows-signing-options.md` | merged Nov 11; recommendation SignPath Foundation | maintainer is checking SignPath |
 | 6 | Process-tree kill on cancel | | | queued | start when disk allows |
 | 7 | Redaction box left-edge trim | | | queued | start when disk allows |
-| 9 | In-app update (Velopack): Phase 0 spike, then go or no-go | | `docs/development/velopack-spike-0.3.2.md` | analysis in the plan; spike running (Mac and Windows agents, Nov 11) | decisions 1 to 6 in the plan section pending |
+| 9 | In-app update (Velopack) | | `docs/development/velopack-spike-0.3.2.md` | **moved to 0.3.3 (Nov 11)**; Mac spike done (GO WITH CHANGES); Windows spike finishing, its report is kept for 0.3.3 | see `release-0.3.3-plan.md` |
 | 8 | Version bump, CHANGELOG, THIRD_PARTY_LICENSES, release text, regression | | | after 1 to 7 merge | follow `docs/development/release-day-0.3.1.md` |
 
 Maintainer decisions pending: SignPath result; marketplace and plugin names; which skills first.

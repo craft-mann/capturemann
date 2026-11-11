@@ -85,7 +85,11 @@ Work on `main`; the maintainer pushes, tags and publishes. Follow `docs/developm
      a `cm-regress` or CI check that the plugin version equals the workspace version; spec: add an agent-interface section and an AC to `specs/02-agent-interface.md`.
    - **Open questions for the maintainer:** marketplace and plugin names; whether to submit to Anthropic's directory in 0.3.2 or later; which skills to include first; whether Windows and Linux put `capturemann` on `PATH` (I will check the installers).
 
-## In-app update with Velopack (added by the maintainer, Nov 11, 2026): analysis and plan
+## In-app update with Velopack: MOVED TO 0.3.3 (maintainer decision, Nov 11, 2026)
+
+**Not part of 0.3.2.** The whole in-app update workstream (Velopack Apply and the opt-in notify-only check) moves to 0.3.3; see `specs/plans/release-0.3.3-plan.md`. The analysis and the spike results below are kept as the starting point. The 0.3.2 release text and the code stay as they are today: updates are manual (the Oct 25, 2026 decision stands for 0.3.2).
+
+Original heading: In-app update with Velopack (added Nov 11, 2026): analysis and plan
 
 Sources read Nov 11, 2026: docs.velopack.io (introduction, Rust, Windows, macOS, Linux, distributing) and docs.rs/velopack (crate 1.2.161 dated Sep 29, 2026, MIT). Items marked **verify** were not stated by those pages and need the spike below.
 
