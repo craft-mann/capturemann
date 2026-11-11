@@ -1,0 +1,49 @@
+# L1 linux 0.3.2 regression report (full)
+
+> PARTIAL. Candidate files of commit 4f96ba5978 (`4f96ba59784a60631c1cb17aebf8ed6f034b315f`, what `public/main` pointed to), built in the aarch64 VM (Ubuntu 24.04, no desktop session, no GPU, no sound, no hardware tier) with `packaging/linux/release-build.sh --jobs 3`; tarball SHA-256 `fecc4939312644275a7a780f26072c1a8756894eb1cb87428c6c0fe3b277141b`, .deb `cb235d27f62a87f18de7d7cdba3c301796d44ec7ee31c1aa2ac5ced7741bd267`. Not signed. The 0.3.1 night had full 37/0, tarball install 1/0, .deb install 1/0.
+
+- **Date:** 2026-11-11T14:47:22Z to 2026-11-11T14:47:26Z
+- **Who:** linux-aarch64 agent (Claude)
+- **Machine:** Linux 6.8.0-147-generic aarch64; GPU: n/a
+- **Build:** commit 4f96ba59, package folder `/home/dev/wt/pkg032/capturemann-0.3.2-linux-aarch64/lib/capturemann`
+- **FFmpeg:** ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers
+- **Suite:** `cm-regress --tier full --only linux.tarball_install --installer /home/dev/wt/release-out/4f96ba59-aarch64/capturemann-0.3.2-linux-aarch64.tar.gz --package-dir /home/dev/wt/pkg032/capturemann-0.3.2-linux-aarch64/lib/capturemann --out /home/dev/wt/regress-out-032-tarball --commit 4f96ba59 --who linux-aarch64 agent (Claude) --verdict PARTIAL`, tier `full`
+- **Result:** 1 passed, 0 failed, 0 skipped of 1 cases
+- **SHA-256 of the files under test:**
+  - `capturemann` `ae8041cd4b30106081894de92974ce2b33a390727b49c52716901365808981ad`
+  - `cm-mcp` `a20f9007ca7d3f0a96001b6c665da6ba15f8130085007b6e2dd219f64ba85d76`
+  - `cm-daemon` `b12c8715dc85a50fc05e91db6a94b91a4393b8f617f2e705cf3ebdf87da07189`
+  - `cm-desktop` `2d12c92e39c56fcda3d8c2d5b25546ee9e59506b9126859af9e2b6b0af023f91`
+  - `cm-overlay` `9215f7b477ee56c65472faeacb06439eaecafad9157b59761533d267bb670f13`
+  - `ffmpeg` `de98b82888aa13557dd426a5b7515a258b57d7f6b2b3c22d2761297504b21114`
+  - `ffprobe` `cd12dfd2ee13f2323f5f71eb89e388c413ca3fa28b1931c1473efa9ad417ab62`
+  - `llama-server` `b2441dead0aab16ef630552e9dcec8ebe68d0b1227cf40cd0d5e0162bbc6ed25`
+  - `capturemann-0.3.2-linux-aarch64.tar.gz` `fecc4939312644275a7a780f26072c1a8756894eb1cb87428c6c0fe3b277141b`
+
+## Steps
+
+| Case | Result | Notes |
+| --- | --- | --- |
+| `linux.tarball_install` | PASS | the tarball installs into a temporary prefix, its programs run, --uninstall leaves nothing |
+
+## Acceptance criteria and bug classes
+
+| Item | Result | Cases |
+| --- | --- | --- |
+| PKG-tarball | PASS | `linux.tarball_install` |
+| packaging/linux/install.sh | PASS | `linux.tarball_install` |
+
+## Problems found
+
+- None in the cases that ran.
+## Not run
+
+- Every selected case ran.
+
+## Evidence of passing cases
+
+- `linux.tarball_install` (2087 ms): /tmp/cmr1084874/1/prefix/lib/capturemann/capturemann --version: capturemann 0.3.2; documents checked in /tmp/cmr1084874/1/prefix/share/doc/capturemann
+
+## Verdict
+
+PARTIAL. An automated run on one machine; it covers what `docs/development/regression.md` lists and does not replace the manual scripts in `tests/manual/`. Nothing here is "verified" until a person has read it and says so.
