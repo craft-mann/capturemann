@@ -423,11 +423,11 @@ impl EditorView {
                                 16.,
                                 c,
                             ))
-                            .child(if running {
+                            .child(shrink_text(if running {
                                 tr!("Reading text\u{2026}")
                             } else {
                                 tr!("Copy text")
-                            })
+                            }))
                             .into_any_element(),
                         &[],
                         !running,
@@ -451,7 +451,7 @@ impl EditorView {
                             .items_center()
                             .gap(px(6.))
                             .child(icon("scan-text", 16., c))
-                            .child(tr!("Copy text"))
+                            .child(shrink_text(tr!("Copy text")))
                             .into_any_element(),
                         &[],
                         false,
