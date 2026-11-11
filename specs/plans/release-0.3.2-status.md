@@ -5,11 +5,11 @@ Rules for every agent are in the plan and in the brief: worktree branch `track/<
 
 | # | Workstream | Branch | Owns (files) | State | Notes |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Thumbnail shows the redaction | `track/thumbnail` | `crates/cm-library`, `crates/cm-daemon/src/handlers.rs`, specs 09 and 17 | not started | test first; code reads correct on paper, reproduce before fixing |
-| 2 | Change shortcuts has no effect (QC report) | `track/shortcuts` | `apps/desktop/src/shortcuts.rs`, `platform_hotkeys.rs`, `settings.rs`, shortcut UI | not started | find the cause before changing code; platform unknown |
-| 3 | Agent clients list stays empty | `track/clients` | `crates/cm-daemon/src/gate.rs`, `daemon.rs`, `apps/desktop/src/ui/settings/agents.rs`, `model.rs`, `mod.rs`, spec 12 | not started | register on `session.hello`; default policy |
-| 4 | Claude plugin (build, validate, submission pack) | `track/plugin` | `plugins/`, `.claude-plugin/`, `docs/user/claude-code-plugin.md`, `tests/manual/PLUGIN-1.md`, `scripts/` (new files only) | not started | maintainer submits |
-| 5 | Windows signing research (no build) | `track/signing` | `docs/development/windows-signing-options.md` | not started | maintainer is checking SignPath |
+| 1 | Thumbnail shows the redaction | `track/thumbnail` | `crates/cm-library`, `crates/cm-daemon/src/handlers.rs`, specs 09 and 17 | running (Nov 11) | test first; code reads correct on paper, reproduce before fixing |
+| 2 | Change shortcuts has no effect (QC report) | `track/shortcuts` | `apps/desktop/src/shortcuts.rs`, `platform_hotkeys.rs`, `settings.rs`, shortcut UI | running (Nov 11) | find the cause before changing code; platform unknown |
+| 3 | Agent clients list stays empty | `track/clients` | `crates/cm-daemon/src/gate.rs`, `daemon.rs`, `apps/desktop/src/ui/settings/agents.rs`, `model.rs`, `mod.rs`, spec 12 | running (Nov 11) | register on `session.hello`; default policy |
+| 4 | Claude plugin (build, validate, submission pack) | `track/plugin` | `plugins/`, `.claude-plugin/`, `docs/user/claude-code-plugin.md`, `tests/manual/PLUGIN-1.md`, `scripts/` (new files only) | running (Nov 11) | maintainer submits |
+| 5 | Windows signing research (no build) | `track/signing` | `docs/development/windows-signing-options.md` | running (Nov 11) | maintainer is checking SignPath |
 | 6 | Process-tree kill on cancel | | | queued | start when disk allows |
 | 7 | Redaction box left-edge trim | | | queued | start when disk allows |
 | 8 | Version bump, CHANGELOG, THIRD_PARTY_LICENSES, release text, regression | | | after 1 to 7 merge | follow `docs/development/release-day-0.3.1.md` |
