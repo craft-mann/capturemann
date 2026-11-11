@@ -1,0 +1,45 @@
+# 0.3.2 final morning report (night of Nov 11 to 12, 2026)
+
+Written by the overnight orchestrator (the main Claude Code session) for the maintainer's review on Nov 12. It is updated during the
+night; the **running log** at the end says how far it got. Same pattern as `release-0.3.1-final-morning-report.md`. Wording rule: PARTIAL
+reports only; "verified" is not used without a stored report. Plan: `release-0.3.2-plan.md`; board: `release-0.3.2-status.md`.
+
+## Authorizations given by the maintainer (Nov 11, 2026, about 21:30)
+
+- The orchestrator may **push fixes to `public/main`** that turn CI green (small, after `cargo fmt`, clippy, `cargo deny` and the Trivy gate run
+  locally; see `feedback-security-scan-before-merge`). **Never a tag, never a force push.**
+- **Candidates tonight, the maintainer tags in the morning.** Candidate files are built from the same commit the tag will point to; after the
+  tag, the final files build from the tag (Windows package workflow on the tag, macOS Release workflow, Linux builds) and are re-checked. A
+  report on candidate files says "candidate files of commit <sha>", not "final files".
+- The orchestrator may **reboot the ThinkPad between Windows and Ubuntu** (`scripts/testlab/lab.sh switch`) and use the aarch64 VM.
+- Not allowed without a new answer: hardware regression tiers (screen, sound, microphone, camera), anything with sound after 22:00, touching
+  `/Applications`, `target/bundle` (Claude Desktop uses it), `~/Movies/CaptureMann`, or the maintainer's installed apps.
+
+## Gates for "ready to tag" (all must hold on one commit)
+
+1. `ci.yml` green on macOS, Windows and Linux, and the Security scan green on that commit.
+2. `exp4_ac4_cancel_deletes_partial_output` and the Windows tests: five consecutive green `windows-tests.yml` runs on that commit.
+3. Local: `cargo fmt`, `clippy --workspace --all-targets --locked -D warnings`, `cargo test --workspace --locked --no-fail-fast`, `cargo deny check`, `check_target_os.py`, `check_no_bare_command.py`, `cm-i18n check`, Trivy gate; `THIRD_PARTY_LICENSES.md` unchanged by `make licenses` (or regenerated and committed).
+4. A stored `cm-regress` report per system for candidate files: macOS arm64 (and the x86_64 DMG checked on Apple Silicon), Windows 11, Linux x86_64, Linux aarch64.
+5. Release text with no `<FILL>` left that can be filled without the maintainer; claims without a report removed.
+
+## Roster
+
+| Role | Task | Output |
+| --- | --- | --- |
+| Orchestrator (main session) | CI watch and fixes, `windows-tests.yml` x5, final local checks, merges, this report, the commits | this file, `verification/` commits |
+| `materials` (agent) | release text, release-day 0.3.2 steps, status, CLAUDE.md, plan headers | `docs/development/release-0.3.2-github-text.md`, `release-day-0.3.2.md` |
+| `mac-release` (agent) | both DMGs from the release commit, notarized when the credentials work, `.sha256`, DMG checks, macOS regression standard and full | `~/release-0.3.2/macos`, reports |
+| `win-regress` (agent) | Windows package candidate on the ThinkPad: standard, full, ai and installer cases | reports |
+| `linux-aarch64` (agent) | build, `check-package.sh`, `full` regression in the VM | `~/release-0.3.2/linux/aarch64`, report |
+| `linux-x86` (agent) | after Windows: reboot to Ubuntu, build and regress, back to Windows | `~/release-0.3.2/linux/x86_64`, report |
+
+## What stays with the maintainer (M)
+
+Tag `v0.3.2` and push it; run the final-file builds from the tag (or tell me to); minisign the Linux files (`sign-linux.sh`, secret key never
+leaves your machine); upload to the draft release and publish; APT upload; winget pull request (472327 and 477195 are still open); Homebrew
+cask; website and announcement; plugin submission; SignPath; Intel Mac, Windows 10 and other hardware not run. Steps: `docs/development/release-day-0.3.2.md`.
+
+## Running log
+
+- Nov 11 21:30: authorizations received; runbook written; local full tests at 1,599 passed, 1 failed (`exp5_webm_width_works_end_to_end_and_is_refused_elsewhere`, a 120 s WebM export timeout under machine load; to be re-run alone); CI on `4f96ba59`: Security scan green, CI running.
