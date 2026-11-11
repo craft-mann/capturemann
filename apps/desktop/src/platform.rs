@@ -48,10 +48,26 @@ pub fn chord_to_hotkey(c: &Chord) -> Result<HotKey, String> {
 pub struct HotkeyHolder(pub GlobalHotKeyManager);
 impl gpui::Global for HotkeyHolder {}
 
+/// The two OS calls the shortcut code needs, so the sequences around them (rebind, suspend while a
+/// new combination is recorded, resume) are tested with a fake that holds a set of combinations.
+pub trait HotkeyOs {
+    fn register_hotkey(&self, hk: HotKey) -> Result<(), String>;
+    fn unregister_hotkey(&self, hk: HotKey) -> Result<(), String>;
+}
+
+impl HotkeyOs for GlobalHotKeyManager {
+    fn register_hotkey(&self, hk: HotKey) -> Result<(), String> {
+        self.register(hk).map_err(|e| e.to_string())
+    }
+    fn unregister_hotkey(&self, hk: HotKey) -> Result<(), String> {
+        self.unregister(hk).map_err(|e| e.to_string())
+    }
+}
+
 /// Moves one registration from `old` to `new`. On failure (another app owns `new`) the old
 /// registration is restored, and the error says so. Returns the ids `(old, new)` of the hotkeys.
 pub fn rebind_hotkey(
-    manager: &GlobalHotKeyManager,
+    manager: &impl HotkeyOs,
     old: &Chord,
     new: &Chord,
 ) -> Result<(u32, u32), String> {
@@ -62,12 +78,12 @@ pub fn rebind_hotkey(
     }
     // Unregister first: a Carbon hot key is per combination, and a failed registration of the new
     // one must leave the old working.
-    let _ = manager.unregister(old_hk);
-    match manager.register(new_hk) {
+    let _ = manager.unregister_hotkey(old_hk);
+    match manager.register_hotkey(new_hk) {
         Ok(()) => Ok((old_hk.id(), new_hk.id())),
         Err(e) => {
-            let _ = manager.register(old_hk);
-            Err(e.to_string())
+            let _ = manager.register_hotkey(old_hk);
+            Err(e)
         }
     }
 }
@@ -78,7 +94,7 @@ pub type Registration = Vec<(ShortcutAction, Result<(), String>)>;
 /// Registers every available shortcut. A failure (another app owns the combination) is
 /// recorded per shortcut and does not stop the others (CAP-2.AC3).
 pub fn register_shortcuts(
-    manager: &GlobalHotKeyManager,
+    manager: &impl HotkeyOs,
     map: &ShortcutMap,
 ) -> (HashMap<u32, ShortcutAction>, Registration) {
     let mut ids = HashMap::new();
@@ -89,16 +105,25 @@ pub fn register_shortcuts(
             continue;
         }
         let result = chord_to_hotkey(chord).and_then(|hk| {
-            manager
-                .register(hk)
-                .map(|()| {
-                    ids.insert(hk.id(), action);
-                })
-                .map_err(|e| e.to_string())
+            manager.register_hotkey(hk).map(|()| {
+                ids.insert(hk.id(), action);
+            })
         });
         status.push((action, result));
     }
     (ids, status)
+}
+
+/// Releases every shortcut of `map` while the Shortcuts page waits for a new combination. The OS
+/// delivers a registered combination to the hot key, not to the window, so a press of a combination
+/// that is registered (another action's, or the one being replaced) would start that action
+/// instead of reaching the page, and "Already used by ..." could never show (CAP-2.AC2).
+pub fn suspend_shortcuts(manager: &impl HotkeyOs, map: &ShortcutMap) {
+    for (_, chord) in map.iter() {
+        if let Ok(hk) = chord_to_hotkey(chord) {
+            let _ = manager.unregister_hotkey(hk);
+        }
+    }
 }
 
 /// Menu item ids of the tray menu (CAP-2).
@@ -622,6 +647,82 @@ pub fn allow_foreground_for(pid: u32) -> bool {
 
 #[cfg(test)]
 mod tests {
+    /// An OS that keeps a set of registered combinations. A press of a registered one goes to the
+    /// hot key (as Carbon, RegisterHotKey and XGrabKey do), never to the window.
+    #[derive(Default)]
+    struct FakeOs {
+        held: std::cell::RefCell<std::collections::HashSet<u32>>,
+        /// Combinations another app owns: registering them fails.
+        foreign: std::collections::HashSet<u32>,
+    }
+
+    impl HotkeyOs for FakeOs {
+        fn register_hotkey(&self, hk: HotKey) -> Result<(), String> {
+            if self.foreign.contains(&hk.id()) || !self.held.borrow_mut().insert(hk.id()) {
+                return Err("already registered".to_owned());
+            }
+            Ok(())
+        }
+        fn unregister_hotkey(&self, hk: HotKey) -> Result<(), String> {
+            if self.held.borrow_mut().remove(&hk.id()) {
+                Ok(())
+            } else {
+                Err("not registered".to_owned())
+            }
+        }
+    }
+
+    impl FakeOs {
+        /// Does a press of `chord` reach the window?
+        fn reaches_window(&self, chord: &Chord) -> bool {
+            !self
+                .held
+                .borrow()
+                .contains(&chord_to_hotkey(chord).unwrap().id())
+        }
+    }
+
+    /// CAP-2.AC2: while a new combination is recorded, a press of a combination another action
+    /// owns must reach the page (to say "Already used by ..."), not start that action. With the
+    /// shortcuts registered it does not (the failing half); suspended, it does; resumed, every
+    /// shortcut works again with the same ids.
+    #[test]
+    fn cap2_ac2_recording_a_chord_sees_registered_chords() {
+        let map = ShortcutMap::defaults(Platform::Mac);
+        let os = FakeOs::default();
+        let (ids, status) = register_shortcuts(&os, &map);
+        assert!(status.iter().all(|(_, r)| r.is_ok()));
+        let others = map.get(ShortcutAction::CaptureWindow);
+        assert!(!os.reaches_window(&others), "registered: the OS keeps it");
+        suspend_shortcuts(&os, &map);
+        for (_, c) in map.iter() {
+            assert!(os.reaches_window(c));
+        }
+        let (ids2, status2) = register_shortcuts(&os, &map);
+        assert_eq!(ids, ids2);
+        assert!(status2.iter().all(|(_, r)| r.is_ok()));
+        assert!(!os.reaches_window(&others));
+    }
+
+    /// A rebind moves exactly one registration; when another app owns the new combination the old
+    /// one keeps working (CAP-2.AC3).
+    #[test]
+    fn rebind_moves_one_registration_and_restores_on_refusal() {
+        let map = ShortcutMap::defaults(Platform::Mac);
+        let old = map.get(ShortcutAction::OpenLibrary);
+        let new = Chord::parse("ctrl+alt+9").unwrap();
+        let os = FakeOs::default();
+        register_shortcuts(&os, &map);
+        let (o, n) = rebind_hotkey(&os, &old, &new).unwrap();
+        assert_ne!(o, n);
+        assert!(os.reaches_window(&old) && !os.reaches_window(&new));
+        let mut os2 = FakeOs::default();
+        register_shortcuts(&os2, &map);
+        os2.foreign.insert(chord_to_hotkey(&new).unwrap().id());
+        assert!(rebind_hotkey(&os2, &old, &new).is_err());
+        assert!(!os2.reaches_window(&old), "the old one is registered again");
+    }
+
     use super::*;
     use crate::shortcuts::Platform;
 

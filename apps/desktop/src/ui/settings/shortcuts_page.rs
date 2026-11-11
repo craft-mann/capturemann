@@ -149,8 +149,7 @@ impl SettingsView {
                                     None,
                                 )
                                 .on_click(cx.listener(|this, _, _, cx| {
-                                    this.rebinding = None;
-                                    this.rebind_error = None;
+                                    this.end_rebind(cx);
                                     cx.notify();
                                 }))
                                 .into_any_element()
@@ -166,9 +165,7 @@ impl SettingsView {
                                     action = label
                                 )))
                                 .on_click(cx.listener(move |this, _, window, cx| {
-                                    this.rebinding = Some(action_for_click);
-                                    this.rebind_error = None;
-                                    window.focus(&this.rebind_focus, cx);
+                                    this.start_rebind(action_for_click, window, cx);
                                     cx.notify();
                                 }))
                                 .into_any_element()

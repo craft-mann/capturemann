@@ -71,7 +71,7 @@
 
 **Acceptance criteria**
 - **AC1** Given CaptureMann is running with no window open, when the user presses the region shortcut, then the region overlay appears within NFR-1 (≤ 150 ms).
-- **AC2** Given the user rebinds a shortcut to a combination already used by CaptureMann, then the editor shows "Already used by `<action>`" and refuses to save.
+- **AC2** Given the user rebinds a shortcut to a combination already used by CaptureMann, then the editor shows "Already used by `<action>`" and refuses to save. While the page waits for the new combination, every global shortcut is released (the OS gives a registered combination to its hot key, never to the window, so without that the press would start the other action and no message could show) and registered again when recording ends (a key is taken, Esc, Cancel, focus leaves, Settings closes). Shift plus a digit is recorded as the digit with Shift (the window systems report it as `!` with Shift cleared). Tested with fakes (`shortcuts.rs`, `platform.rs`, `ui/settings/reset.rs`); manual script `tests/manual/SHORTCUTS-1.md` (not yet run).
 - **AC3** Given the OS or another app already owns a combination, when registration fails, then Settings shows "Couldn't register — used by another app" next to that shortcut and the other shortcuts still work.
 - **AC4** Given recording is active, then the tray icon shows the recording state and its first menu item stops the recording.
 - **AC5** (deliberate deviation: default off, see Description) Given "Launch at login" is on, when the user logs in, then CaptureMann starts in the tray with no window.
