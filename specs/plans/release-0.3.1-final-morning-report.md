@@ -11,7 +11,7 @@ reports only; "verified" is not used.
 | macOS arm64 + x86_64 | green (`check (macos-latest)`, `bundle-macos`) | standard 43/0, full 45/0 on reruns (first full 43/2, cm-overlay exit race, fixed in `bded21fe`), hardware 54/0 | `~/release-0.3.1/macos` (both DMGs, notarized and stapled, `.sha256` checked) |
 | Windows 11 | green (clippy, tests, `exp4`) | standard 44/0, full 58/0, ai.transcribe + ai.speakers + installer.silent 3/0 (PARTIAL, `L1-windows-0.3.1-regression-*final*`) | `~/release-0.3.1/win` (package of run 42838999379) |
 | Linux aarch64 | green (ubuntu check) | VM `full` 37/0, tarball install 1/0, `.deb` install 1/0 | `~/release-0.3.1/linux/aarch64` (checked with `check-package.sh` in the VM: PASS both) |
-| Linux x86_64 | green | not run | not built (ThinkPad stayed on Windows) (needs the ThinkPad in Ubuntu) |
+| Linux x86_64 | green | standard 46/0 (run 2), full 59/0, .deb install 1/0 on the tarball and .deb built from `5e1a0d9d` (PARTIAL; first standard run 45/1, see log) | `~/release-0.3.1/linux/x86_64` (built 07:17-07:39, `check-package.sh` PASS inside the build) (needs the ThinkPad in Ubuntu) |
 
 ## Commits made during the night (all local, nothing pushed)
 
@@ -49,3 +49,4 @@ marked fuzzy in the file because I did not clear the flags.)
 
 - 22:14 started. macOS hardware tier (no sound) 54/0, `rec.system_audio` with sound 1/0 (dev bundle). aarch64 VM final files: PASS.
 - Nov 11: Windows final-file regression reports committed. `windows-tests.yml` had 4 consecutive green runs on `5e1a0d9d`; a fifth was triggered (run 42929895419). Still open: Linux x86_64 build and regression, `estimate_vs_real`, `<FILL>` items in the release text (release day).
+- Nov 11 08:00: fifth `windows-tests.yml` run (42929895419) green: five consecutive on `5e1a0d9d`. Linux x86_64 built from `5e1a0d9d` on the ThinkPad. First Linux standard run failed `export.estimate` (typical size absent on VA-API constant-quality video, which is by design since `f79fbf11`; the regression case expected it; product unchanged), case fixed in cm-regress, reruns pass. The old 0.2.9 .deb on the laptop was purged for the install case.

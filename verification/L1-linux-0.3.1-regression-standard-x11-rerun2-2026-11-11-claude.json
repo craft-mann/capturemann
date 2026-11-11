@@ -1,0 +1,95 @@
+{
+  "cases": [
+    {
+      "area": "export",
+      "duration_ms": 996,
+      "evidence": [
+        "daemon pid 41000 answered after 281 ms"
+      ],
+      "id": "export.estimate",
+      "message": "no typical size at or below the bound: {\"codec\":\"h264\",\"constant_quality\":true,\"duration_s\":3.0,\"format\":\"mp4\",\"fps\":30.0,\"height\":240,\"label\":\"Under 5 MB\",\"max_bytes\":3300000,\"options\":{\"gif_widths\":[480],\"sizes\":[{\"height\":240,\"size\":\"source\",\"width\":320}],\"source\":{\"height\":240,\"width\":320}},\"typical_bytes\":null,\"typical_label\":null,\"width\":320}",
+      "needs": [],
+      "specs": [
+        "EXP-5.AC3",
+        "EXP-5.AC4"
+      ],
+      "status": "FAIL",
+      "tier": "standard",
+      "title": "export --estimate prints About N MB, up to M MB with codec and pixels; a GIF has none; the refusals are the shared ones"
+    },
+    {
+      "area": "export",
+      "duration_ms": 1166,
+      "evidence": [
+        "daemon pid 41196 answered after 282 ms",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "export.estimate_mcp",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "EXP-5.AC3",
+        "AGT-1"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "the MCP tool estimate_export answers the same bound and typical size as the CLI"
+    }
+  ],
+  "run": {
+    "commit": "5e1a0d9d",
+    "ffmpeg": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
+    "finished": "2026-11-11T00:53:34Z",
+    "flags": "--tier standard --out /home/trung/lab/regress-out/20261111T005330Z --who cm-regress via regress.sh --verdict PARTIAL --only export.estimate,export.estimate_mcp --package-dir /home/trung/lab/pkg-0.3.1/capturemann-0.3.1-linux-x86_64/lib/capturemann --commit 5e1a0d9d",
+    "gpu": "Intel Corporation WhiskeyLake-U GT2 [UHD Graphics 620]",
+    "hashes": [
+      [
+        "capturemann",
+        "13f8eef07abddbdbeced18d24d89935f03dfd08d0a61da60846fd5b88c67929b"
+      ],
+      [
+        "cm-mcp",
+        "3d326b4d7d5c4a390d50f0bf1bbfacdf95778b9b520e01683d428b1c1e8f4cd2"
+      ],
+      [
+        "cm-daemon",
+        "e571a30b686af90148cec0c072fa56116c33e7596d672436e5cfeddfcaf8b298"
+      ],
+      [
+        "cm-desktop",
+        "3ece2fd78d2e709d87bd4d6508580e50a384d5a2a125e7fa3c5b3b75d37344cc"
+      ],
+      [
+        "cm-overlay",
+        "567bf63e28a789b1187e8fbe24a835b37a9e6063390be9115a3573c91c4bf86e"
+      ],
+      [
+        "ffmpeg",
+        "938493953ab257b6e930a3da39c5c813111a447f1eff5c162378e3b774429ba6"
+      ],
+      [
+        "ffprobe",
+        "cac1da599bda11125bb6b86baa4ae6aa2f8221fbeff519f68ae6c9fb0d6d7760"
+      ],
+      [
+        "llama-server",
+        "6b75848a8a8e358a2e0421f8de74b4b111b93acc6d327d8e0450ce6131c64727"
+      ]
+    ],
+    "os": "Linux 7.0.0-42-generic x86_64",
+    "package_dir": "/home/trung/lab/pkg-0.3.1/capturemann-0.3.1-linux-x86_64/lib/capturemann",
+    "platform": "linux",
+    "started": "2026-11-11T00:53:30Z",
+    "tier": "standard",
+    "verdict": "PARTIAL",
+    "version": "0.3.1",
+    "who": "cm-regress via regress.sh"
+  },
+  "schema": 1,
+  "summary": {
+    "fail": 1,
+    "pass": 1,
+    "skip": 0,
+    "total": 2
+  }
+}
