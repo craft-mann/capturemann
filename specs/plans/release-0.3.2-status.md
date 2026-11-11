@@ -25,3 +25,13 @@ Maintainer decisions pending: SignPath result; marketplace and plugin names; whi
 - **Shortcuts:** QC's exact case not reproduced; three real bugs fixed: Shift+digit refused (GPUI reports `!`), registered chords not released while recording a new one (the OS delivered them to the hotkey, not the page), reset-to-defaults dropping an id after a swap. Needs a keyboard on macOS, Windows 11 and Linux X11: `tests/manual/SHORTCUTS-1.md`. **Maintainer, Nov 11, 2026: moving the refusal message under the row being changed fixed the reported problem (the page already refused the key but showed the reason at the end of the page); no further questions to QC are needed.** The three bugs above stay fixed; the keyboard check on the other systems remains optional (`tests/manual/SHORTCUTS-1.md`).
 - **Signing:** `docs/development/windows-signing-options.md`; SignPath Foundation recommended, fallback unsigned with release-text paragraph, optional Store MSIX; the first signed release still shows a warning until reputation builds.
 - **Plugin:** `plugins/capturemann`, root `.claude-plugin/marketplace.json`, skills, docs, submission pack `docs/development/plugin-submission-0.3.2.md`; `claude plugin validate --strict` passes; likely portal blocker: `${user_config}` in the MCP command (Variant B in the pack).
+
+## Dev bundle checks (0.3.2, Nov 11, 2026; maintainer, `~/Applications/CaptureMann-dev.app`)
+
+| Check | Result |
+| --- | --- |
+| 1. Shortcuts (Option+Shift+5, refusal under the row, Already used, Reset) | **Passed** (maintainer, on macOS) |
+| 2. Agent clients list | pending |
+| 3. Redacted thumbnail | pending |
+| 4. Copy text (button, Select text G, menu, toast, redaction, Vietnamese) | pending |
+| 5. Sidebar counts (screenshot, audio, screen recording; Screenshots page and Settings) | pending |
