@@ -115,7 +115,11 @@ encoders, KDE and other Linux distributions, a second monitor.
 | `capturemann-0.3.1-linux-aarch64.tar.gz` | `d5875e59b44b519ee1ecde7c3d749a5efb6e8962e9235610d749e34055eedf3d` |
 | `capturemann_0.3.1_arm64.deb` | `5920160c2695794a6ae8be81eebcca0cd3452d5f108058df9b83653c8c813cba` |
 
-<FILL on release day: **check these sums against the files that are uploaded** (a rebuild on the tag gives other sums), the minisign public key line, and the Homebrew cask (tap commit) status. winget: pull request 472327 (0.2.8) was still open on Nov 10, 2026, so **0.3.1 is not in winget**; use the wording of `release-0.2.9-winget-note.md` with 0.3.1 as the newer version.>
+Minisign public key: `packaging/linux/minisign.pub`; public key `RWTeQv8ogB2CCuZ7j0rr3MovdHod4QATmVn+I329YC8pomOC6R9Rxc2k` (verify: `minisign -Vm <file> -P <that key>`).
+
+winget: pull request 472327 (0.2.8) was still open on Nov 10, 2026, so **0.3.1 is not in winget**; use the wording of `release-0.2.9-winget-note.md` with 0.3.1 as the newer version.
+
+<FILL after upload: the Homebrew cask (tap commit) status, and a check of the table above against the uploaded files (the macOS DMGs were built locally by the maintainer, the Windows files by run 42942883045 on the tag).>
 
 ### Install with APT (Ubuntu 24.04 or newer, amd64 and arm64)
 
