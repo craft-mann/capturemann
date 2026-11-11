@@ -96,7 +96,8 @@ pub use events::{Event, EventBus, JobEvent, JobEventKind, JobEvents};
 pub use frames::{DEFAULT_FRAME_TTL, MAX_FRAMES, MAX_FRAME_BYTES};
 pub use gate::{
     ActivityDecision, ActivityEntry, Approval, ClientPolicies, ClientPolicy, ConfirmationRequest,
-    Confirmer, Decision, DenyAll, DEFAULT_CONFIRM_TIMEOUT, FIRST_PARTY_CLIENTS,
+    Confirmer, Decision, DenyAll, KnownClient, DEFAULT_CONFIRM_TIMEOUT, FIRST_PARTY_CLIENTS,
+    MAX_KNOWN_CLIENTS,
 };
 pub use ipc::{connect, Endpoint, IpcServer};
 pub use jobs::{library_job_queue, library_jobs_path, JOBS_RELATIVE_PATH};

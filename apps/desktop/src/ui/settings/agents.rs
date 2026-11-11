@@ -356,13 +356,14 @@ impl SettingsView {
     }
 
     pub(super) fn agents(&self, t: &Theme, cx: &mut Context<Self>) -> AnyElement {
-        let (endpoint, activity, policies, status) = {
+        let (endpoint, activity, policies, known, status) = {
             let m = self.app.read(cx);
             let d = m.backend.daemon.as_ref();
             (
                 m.backend.endpoint.clone(),
                 d.map(|d| d.activity()).unwrap_or_default(),
                 d.map(|d| d.policies().all()).unwrap_or_default(),
+                d.map(|d| d.known_clients()).unwrap_or_default(),
                 agent_status_of(&m.backend),
             )
         };
@@ -671,7 +672,7 @@ impl SettingsView {
             .daemon
             .as_ref()
             .is_some_and(|d| d.policies().default_policy() == ClientPolicy::Blocked);
-        let clients = client_rows(&policies, &activity);
+        let clients = client_rows(&policies, &activity, &known);
         let nclients = clients.len();
         let client_items = clients.into_iter().enumerate().map(|(i, c)| {
             let name = c.name.clone();
@@ -776,7 +777,7 @@ impl SettingsView {
                             .border_color(rgba_of(t.line))
                             .text_color(rgba_of(t.text_3))
                             .child(icon("bot", 18., t.mist))
-                            .child(label_fill(tr!("No clients yet. A client appears here after its first confirmed or refused request, or when you add it below."))),
+                            .child(label_fill(tr!("No clients yet. A client appears here as soon as it connects, or when you add it below."))),
                     ),
                 )
             })

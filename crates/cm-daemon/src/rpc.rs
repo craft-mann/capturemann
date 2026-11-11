@@ -413,6 +413,7 @@ impl Conn {
         if !self.named {
             self.client = name.to_owned();
             self.named = true;
+            self.daemon.note_client_hello(&self.client);
         }
         if let Some(e) = self.blocked() {
             return Err(e);

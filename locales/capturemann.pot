@@ -2809,7 +2809,7 @@ msgstr ""
 msgid "No captures yet"
 msgstr ""
 
-msgid "No clients yet. A client appears here after its first confirmed or refused request, or when you add it below."
+msgid "No clients yet. A client appears here as soon as it connects, or when you add it below."
 msgstr ""
 
 msgid "No commands match"

@@ -89,6 +89,8 @@ pub struct SettingsView {
     /// Ends the recording when the page loses focus (the global shortcuts must not stay released).
     _rebind_blur: Option<gpui::Subscription>,
     _perm_poll: Task<()>,
+    /// What the Clients list showed at the last poll (AGT-2.AC15).
+    clients_sig: (u64, usize),
     /// Agents page: scroll state of the Permissions list (it scrolls inside the page).
     pub(super) caps_scroll: gpui::ScrollHandle,
     /// Destinations page: the stored "Save to" folders and the open Manage panel (STO-1).
@@ -160,14 +162,40 @@ impl SettingsView {
         let app2 = app.clone();
         let poll = cx.spawn(async move |this, cx| loop {
             cx.background_executor().timer(Duration::from_secs(2)).await;
-            let Ok(on_page) = this.update(cx, |this, cx| {
-                this.section == SettingsSection::Permissions
-                    && this.app.read(cx).route == Route::Settings
+            let Ok((on_page, on_agents)) = this.update(cx, |this, cx| {
+                let shown = this.app.read(cx).route == Route::Settings;
+                (
+                    this.section == SettingsSection::Permissions && shown,
+                    this.section == SettingsSection::Agents && shown,
+                )
             }) else {
                 break;
             };
             if on_page {
                 cx.update(|cx| app::refresh_permissions(&app2, cx));
+            }
+            // AGT-2.AC15: a client that connects (or calls a tool) shows up without leaving
+            // and re-entering the page. Redraw only when the list changed.
+            if on_agents {
+                let _ = this.update(cx, |this, cx| {
+                    let sig = this
+                        .app
+                        .read(cx)
+                        .backend
+                        .daemon
+                        .as_ref()
+                        .map(|d| {
+                            (
+                                d.known_clients().iter().map(|k| k.calls + 1).sum::<u64>(),
+                                d.activity().len(),
+                            )
+                        })
+                        .unwrap_or_default();
+                    if sig != this.clients_sig {
+                        this.clients_sig = sig;
+                        cx.notify();
+                    }
+                });
             }
         });
         let dest = destinations::DestState::new(cx);
@@ -186,12 +214,15 @@ impl SettingsView {
             rebind_focus: cx.focus_handle(),
             _rebind_blur: None,
             _perm_poll: poll,
+            clients_sig: (0, 0),
             caps_scroll: gpui::ScrollHandle::new(),
             labels_epoch: cm_i18n::epoch(),
             exclude_input,
             exclude_error: None,
             client_input,
-            new_policy: cm_daemon::ClientPolicy::Blocked,
+            // AGT-2: unknown clients are Allowed by default, so the form starts there; a person
+            // who types a name usually means to let it in (blocking is one click away).
+            new_policy: cm_daemon::ClientPolicy::Allowed,
             policy_error: None,
             app,
             section: SettingsSection::General,
