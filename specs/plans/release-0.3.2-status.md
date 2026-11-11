@@ -31,7 +31,7 @@ Maintainer decisions pending: SignPath result; marketplace and plugin names; whi
 | Check | Result |
 | --- | --- |
 | 1. Shortcuts (Option+Shift+5, refusal under the row, Already used, Reset) | **Passed** (maintainer, on macOS) |
-| 2. Agent clients list | pending |
-| 3. Redacted thumbnail | pending |
-| 4. Copy text (button, Select text G, menu, toast, redaction, Vietnamese) | pending |
-| 5. Sidebar counts (screenshot, audio, screen recording; Screenshots page and Settings) | pending |
+| 2. Agent clients list | **Passed** (maintainer, on macOS; reported Nov 11, 2026, no stopwatch numbers given for 5) |
+| 3. Redacted thumbnail | **Passed** (maintainer, on macOS; reported Nov 11, 2026, no stopwatch numbers given for 5) |
+| 4. Copy text (button, Select text G, menu, toast, redaction, Vietnamese) | **Passed** (maintainer, on macOS; reported Nov 11, 2026, no stopwatch numbers given for 5) |
+| 5. Sidebar counts (screenshot, audio, screen recording; Screenshots page and Settings) | **Passed** (maintainer, on macOS; reported Nov 11, 2026, no stopwatch numbers given for 5) |
