@@ -74,7 +74,7 @@ without a stored report in `verification/` (CLAUDE.md wording rule). Steps: `rel
 ## Checked, and what was not
 
 Reports in `verification/` (all PARTIAL; one computer each), run on the release files built from `5e1a0d9d` (the code of the release):
-`L1-windows-0.3.1-regression-standard-final-*`, `-full-final-*`, `-full-final-ai-*`; `L1-macos-0.3.1-regression-standard-final-dmg-arm64-*`,
+`L1-windows-0.3.1-regression-standard-tag-package-*`, `-full-tag-package-*`, `-full-tag-package-ai-*` (the files built from the tag, standard 51, full 58, transcription, speakers and silent installer 3 of 3; earlier runs on the CI package of `5e1a0d9d`: `-standard-final-*`, `-full-final-*`, `-full-final-ai-*`); `L1-macos-0.3.1-regression-standard-final-dmg-arm64-*`,
 `-full-final-dmg-arm64-*` (and `-run2`, `-run3`), `-hardware-final-hw-nosound-*`, `-hardware-final-hw-sound-*`;
 `L1-linux-0.3.1-regression-standard-x11-final-tarball-*` (and `-run2`), `-full-x11-final-tarball-full-*`, `-full-x11-final-deb-install-*`,
 `L1-linux-0.3.1-aarch64-vm-final-*`. 0 failed in the runs listed here, except that two runs each had a failure that was found, explained and
