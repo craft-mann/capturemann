@@ -1,6 +1,6 @@
 # Release 0.3.1 plan
 
-Status: **reviewed Nov 9, 2026, decisions applied**. Nothing built. Platforms: Windows, macOS and Linux
+Status: **released Nov 11, 2026** (reviewed Nov 9, decisions applied; release steps `docs/development/release-day-0.3.1.md`, overnight record `specs/plans/release-0.3.1-final-morning-report.md`). Platforms: Windows, macOS and Linux
 (0.3.1 is the first release since 0.2.9 that covers all three, so it becomes the next "Latest" on GitHub).
 
 The earlier backlog of this file (27 items, Nov 8 to 9, 2026) was cleared at the maintainer's request; it is in git history

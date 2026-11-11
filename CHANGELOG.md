@@ -5,6 +5,8 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-11
+
 ### Fixed
 - **"Find speakers" on a very long recording could quit the app.** A crash (Nov 10, 2026, 4 h 13 min of audio, automatic speaker count, at 76 %) came from the speech engine's runtime tearing down its shared environment between two windows. The environment is now kept for the life of the app and all engine objects are created and removed one at a time. Not reproduced on the test Mac before the change (PARTIAL; `verification/benchmarks/speaker-engine-teardown-abort-2026-11-10.md`).
 
