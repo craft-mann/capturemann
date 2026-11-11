@@ -184,15 +184,14 @@ Report problems at the issue tracker with the output of `capturemann diagnostics
 
 Apache-2.0. The packages carry `THIRD_PARTY_LICENSES.md`. FFmpeg is an LGPL build (no GPL code, no libx264); its source offer is in the
 package. The Windows build and the Linux `.deb` and tarball use the recognizer of the system (Windows.Media.Ocr, the `tesseract` program);
-nothing GPL is linked or bundled. <FILL: "The Rust dependency set did not change from 0.3.1 (`make licenses` left `THIRD_PARTY_LICENSES.md`
-unchanged)" or what `git diff v0.3.1 -- THIRD_PARTY_LICENSES.md` shows.>
+nothing GPL is linked or bundled. The Rust dependency set did not change from 0.3.1 (`Cargo.lock` differs only by the workspace version; `THIRD_PARTY_LICENSES.md` is unchanged since 0.3.1).
 
 ---
 
 ## CHANGELOG section (turn `## [Unreleased]` into this on the release day; `release.yml` reads it)
 
 ```
-## [0.3.2] - 2026-11-<FILL: day>
+## [0.3.2] - 2026-11-12
 ```
 
 The body under it is the current `[Unreleased]` text of `CHANGELOG.md` (Added: Copy text, the Claude plugin, agent clients in the list;

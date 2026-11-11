@@ -5,6 +5,8 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-11-12
+
 ### Added
 - **Copy text from a screenshot (OCR).** A "Copy text" button and a Select text tool (key G) in the editor, a "Copy text" item in the library menu and a button on the capture toast read the text of a screenshot and put it on the clipboard. It uses the same on-device recognizer as Auto-redact (Apple Vision, the Windows recognizer, `tesseract` on Linux) and reads the **rendered image**, so a blurred or pixelated region never comes back as text. For agents: the `recognize_text` MCP tool and `capturemann text`. Windows reads only the OCR languages you have installed; Linux reads English unless you install more `tesseract` language data.
 - **A Claude plugin.** `claude plugin marketplace add craft-mann/capturemann` then `claude plugin install capturemann@capturemann-plugins` connects the CaptureMann MCP server to Claude Code and adds skills for screenshots with redaction, screen recording, meeting notes and export. CaptureMann must be installed and running; the plugin adds no network traffic.
