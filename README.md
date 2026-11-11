@@ -208,6 +208,13 @@ cargo run -p cm-render --example redaction_bench --release --locked -- run --set
 - It is not a compliance tool. **A blurred screenshot is not proof that nothing sensitive remains**: look at
   the result before you share it.
 
+## How it compares
+
+Side-by-side pages, with sources and where the other tool is the better choice:
+[Loom](compare/loom.md), [Snagit](compare/snagit.md), [CleanShot X](compare/cleanshot-x.md), [Cap](compare/cap.md)
+and [Screen Studio](compare/screen-studio.md). Start at the [overview](compare/README.md). Checked on Nov 11, 2026;
+competitor details change, so their own sites are the current source.
+
 ## Install
 
 Pick your system: [macOS](#macos) (below), [Windows](#windows) or [Linux](#linux).
