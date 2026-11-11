@@ -2,7 +2,10 @@
 
 CaptureMann is a free, open-source (Apache-2.0) app for screenshots, screen recording and audio recording on macOS,
 Windows and Linux, with local AI transcripts, speaker labels and meeting reports, and every feature available to AI
-agents through MCP and a CLI. These pages compare it with the five tools people most often ask about.
+agents through MCP and a CLI. These pages compare it with ten tools people often ask about: five direct competitors,
+then five neighbours in open source, video editing and meeting notes.
+
+## Direct competitors
 
 | Compare with | Best known for | One-line difference |
 | --- | --- | --- |
@@ -12,7 +15,17 @@ agents through MCP and a CLI. These pages compare it with the five tools people 
 | [Cap](cap.md) | Open-source Loom alternative | Both are open source; Cap focuses on hosted sharing, CaptureMann on local AI, audio and agents |
 | [Screen Studio](screen-studio.md) | Beautiful product-demo videos | Screen Studio is the benchmark for motion polish; CaptureMann covers screenshots, audio and AI too |
 
-## At a glance
+## Open-source tools, editors and meeting notes
+
+| Compare with | Best known for | One-line difference |
+| --- | --- | --- |
+| [ShareX](sharex.md) | Free screenshots and upload automation on Windows | ShareX leads on screenshot tools and uploads; CaptureMann on recording, local AI and other systems |
+| [OBS Studio](obs-studio.md) | Free live streaming and multi-source recording | OBS is a production studio; CaptureMann is a quick recorder with an editor and AI |
+| [Camtasia](camtasia.md) | Recording plus a full editor for courses | Camtasia goes further for produced eLearning; CaptureMann is free, local and on Linux |
+| [Descript](descript.md) | Editing video by editing the transcript | Descript leads on AI editing in the cloud; CaptureMann keeps recording and transcription local and unlimited |
+| [Otter.ai](otter.md) | Cloud meeting notes from a call bot | Otter gives live team notes; CaptureMann keeps meeting audio and minutes on your computer, with more languages |
+
+## At a glance: direct competitors
 
 | | CaptureMann | Loom | Snagit | CleanShot X | Cap | Screen Studio |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -27,6 +40,20 @@ agents through MCP and a CLI. These pages compare it with the five tools people 
 | AI transcripts and summaries | Local, free | Cloud, paid plan | Not checked | Not found | Cloud, paid plan | Transcripts (per a review) |
 | Hosted share links | No | Yes | Yes (Screencast) | Yes (cloud plan) | Yes | Yes (per a review) |
 | MCP server for AI agents | Yes (74 tools) | Not found | Not found | Not found | Not found (has a CLI) | Not found |
+
+## At a glance: open-source tools, editors and meeting notes
+
+| | CaptureMann | ShareX | OBS Studio | Camtasia | Descript | Otter.ai |
+| --- | --- | --- | --- | --- | --- | --- |
+| Price | Free | Free | Free | $39–599 per user / year | Free plan; paid from $16 per person / month | Free plan; paid from $8.33 per user / month (annual) |
+| Open source | Yes, Apache-2.0 | Yes, GPL-3.0 | Yes, GPL-2.0+ | No | No | No |
+| macOS / Windows / Linux | Yes / Yes / Yes | No / Yes / No | Yes / Yes / Yes | Yes / Yes / No | Yes / Yes / No (plus web) | Web and apps; joins calls |
+| Screenshots with annotation | Yes | Yes | Not checked | Through bundled Snagit | Not found | No |
+| Built-in video editor | Yes | Not found | No | Yes, multitrack | Yes, text-based and multitrack | No |
+| Live streaming | No | No | Yes | No | No | No |
+| Transcripts | Local, unlimited | Not found | Not found | Not checked | Cloud, within media minutes | Cloud, within plan minutes |
+| Meeting minutes | Local | Not found | Not found | Not found | Not its focus | Cloud |
+| MCP server for AI agents | Yes, local (74 tools) | Not found | Not found | Not found | Yes, cloud (uses account credits) | Not checked |
 
 "Not found" means we looked on the product's site or repository and did not find it; it may still exist.
 

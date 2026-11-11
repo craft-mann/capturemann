@@ -211,9 +211,11 @@ cargo run -p cm-render --example redaction_bench --release --locked -- run --set
 ## How it compares
 
 Side-by-side pages, with sources and where the other tool is the better choice:
-[Loom](compare/loom.md), [Snagit](compare/snagit.md), [CleanShot X](compare/cleanshot-x.md), [Cap](compare/cap.md)
-and [Screen Studio](compare/screen-studio.md). Start at the [overview](compare/README.md). Checked on Nov 11, 2026;
-competitor details change, so their own sites are the current source.
+[Loom](compare/loom.md), [Snagit](compare/snagit.md), [CleanShot X](compare/cleanshot-x.md), [Cap](compare/cap.md),
+[Screen Studio](compare/screen-studio.md), [ShareX](compare/sharex.md), [OBS Studio](compare/obs-studio.md),
+[Camtasia](compare/camtasia.md), [Descript](compare/descript.md) and [Otter.ai](compare/otter.md). Start at the
+[overview](compare/README.md). Checked on Nov 11, 2026; competitor details change, so their own sites are the current
+source.
 
 ## Install
 
