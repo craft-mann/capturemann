@@ -8,14 +8,14 @@ reports only; "verified" is not used.
 
 | System | CI on `5e1a0d9d` | Final-file regression | Files |
 |---|---|---|---|
-| macOS arm64 + x86_64 | green (`check (macos-latest)`, `bundle-macos`) | **see below** | `~/release-0.3.1/macos` (both DMGs, notarized and stapled, `.sha256` checked) |
-| Windows 11 | green (clippy, tests, `exp4`) | **see below** | `~/release-0.3.1/win` (package of run 42838999379) |
+| macOS arm64 + x86_64 | green (`check (macos-latest)`, `bundle-macos`) | standard 43/0, full 45/0 on reruns (first full 43/2, cm-overlay exit race, fixed in `bded21fe`), hardware 54/0 | `~/release-0.3.1/macos` (both DMGs, notarized and stapled, `.sha256` checked) |
+| Windows 11 | green (clippy, tests, `exp4`) | standard 44/0, full 58/0, ai.transcribe + ai.speakers + installer.silent 3/0 (PARTIAL, `L1-windows-0.3.1-regression-*final*`) | `~/release-0.3.1/win` (package of run 42838999379) |
 | Linux aarch64 | green (ubuntu check) | VM `full` 37/0, tarball install 1/0, `.deb` install 1/0 | `~/release-0.3.1/linux/aarch64` (checked with `check-package.sh` in the VM: PASS both) |
-| Linux x86_64 | green | **see below** | not yet built (needs the ThinkPad in Ubuntu) |
+| Linux x86_64 | green | not run | not built (ThinkPad stayed on Windows) (needs the ThinkPad in Ubuntu) |
 
 ## Commits made during the night (all local, nothing pushed)
 
-(filled in at the end)
+`49d196d9`, `bded21fe` (earlier), and one commit with the Windows final-file reports and this report. Nothing pushed.
 
 ## What you must do, in order
 
@@ -48,3 +48,4 @@ marked fuzzy in the file because I did not clear the flags.)
 ## Running log
 
 - 22:14 started. macOS hardware tier (no sound) 54/0, `rec.system_audio` with sound 1/0 (dev bundle). aarch64 VM final files: PASS.
+- Nov 11: Windows final-file regression reports committed. `windows-tests.yml` had 4 consecutive green runs on `5e1a0d9d`; a fifth was triggered (run 42929895419). Still open: Linux x86_64 build and regression, `estimate_vs_real`, `<FILL>` items in the release text (release day).
