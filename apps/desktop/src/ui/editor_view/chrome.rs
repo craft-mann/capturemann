@@ -403,6 +403,63 @@ impl EditorView {
                 },
                 cx,
             ))
+            .when(s.text_available, |d| {
+                let running = s.text_running;
+                d.child(
+                    self.ibtn(
+                        t,
+                        "editor-copy-text",
+                        tr!("Copy text"),
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(6.))
+                            .child(icon(
+                                if running {
+                                    "loader-circle"
+                                } else {
+                                    "scan-text"
+                                },
+                                16.,
+                                c,
+                            ))
+                            .child(if running {
+                                tr!("Reading text\u{2026}")
+                            } else {
+                                tr!("Copy text")
+                            })
+                            .into_any_element(),
+                        &[],
+                        !running,
+                        |this, _, cx| {
+                            if let Some(d) = &this.doc {
+                                d.update(cx, |d, cx| d.copy_text(None, cx));
+                            }
+                        },
+                        cx,
+                    ),
+                )
+            })
+            .when_some(s.text_hint.filter(|_| !s.text_available), |d, hint| {
+                d.child(
+                    self.ibtn(
+                        t,
+                        "editor-copy-text-unavailable",
+                        hint.to_owned(),
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(6.))
+                            .child(icon("scan-text", 16., c))
+                            .child(tr!("Copy text"))
+                            .into_any_element(),
+                        &[],
+                        false,
+                        |_, _, _| {},
+                        cx,
+                    ),
+                )
+            })
             .when(s.redact_available, |d| {
                 d.child(
                     self.ibtn(

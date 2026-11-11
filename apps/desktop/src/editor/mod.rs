@@ -2,6 +2,7 @@
 //! testing, the interaction state machine and the daemon session. The GPUI view in
 //! `ui::editor_view` only draws this state and forwards events.
 
+pub mod copytext;
 pub mod geom;
 pub mod keys;
 pub mod preview;

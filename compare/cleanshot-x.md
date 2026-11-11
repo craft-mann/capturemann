@@ -24,7 +24,7 @@ record, work across systems or want local AI, CaptureMann covers more.
 | **Screenshots** | Region, window and display | Region, window, display, **scrolling capture** |
 | **Annotation** | Arrows, rectangles, ellipses, text, pen, highlight, blur | Arrows, text, shapes, blur, background removal (full list not re-checked) |
 | **Redaction** | **Auto-redact** proposes blurs for 20 kinds of personal data and secrets, on your computer; you accept each one | Manual blur |
-| **Text from images** | Not offered (OCR is used only for Auto-redact) | Text recognition (OCR) |
+| **Text from images** | **Copy text**: select a region or the whole screenshot and copy the text, recognized on your computer (macOS: Apple Vision; Windows: the OCR languages installed in Windows; Linux: `tesseract`, English by default); not compared on accuracy | Text recognition (OCR) |
 | **After a capture** | Saved to your library; copy, annotate or export from there | Quick-access overlay in the corner to annotate, copy or share at once |
 | **Screen recording** | Display, window or region up to native resolution at 30 or 60 fps; pause, resume and crash recovery; microphone with noise suppression and system audio on separate tracks | Screen recording with audio and a webcam overlay; MP4 or GIF; trimming |
 | **Editing** | Trim, cut, split, speed, backgrounds, zoom regions with suggestions, restyled cursor, 9:16 and 1:1 reframe | Trimming (other recording effects not re-checked) |
@@ -36,7 +36,7 @@ record, work across systems or want local AI, CaptureMann covers more.
 ## Where CleanShot X is stronger
 
 - **Mac polish and speed.** A refined capture flow with the quick-access overlay, built only for macOS.
-- **Screenshot extras.** Scrolling capture and text recognition, which CaptureMann does not have yet.
+- **Screenshot extras.** Scrolling capture, which CaptureMann does not have yet.
 - **Instant cloud links** with passwords and custom domains.
 
 ## Where CaptureMann is stronger
@@ -52,7 +52,7 @@ record, work across systems or want local AI, CaptureMann covers more.
 | If you… | Choose |
 | --- | --- |
 | Use only a Mac and mostly take screenshots and short clips | CleanShot X |
-| Need scrolling capture or to copy text from images | CleanShot X |
+| Need scrolling capture | CleanShot X |
 | Work on Windows or Linux, or across systems | CaptureMann |
 | Record tutorials or meetings and want transcripts or minutes | CaptureMann |
 | Want an AI agent to drive captures and recordings | CaptureMann |

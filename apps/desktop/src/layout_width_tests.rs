@@ -1145,6 +1145,20 @@ fn cases() -> Vec<Case> {
         .text("Dismiss", || cm_i18n::tr_ctx!("button", "Dismiss")),
     );
 
+    // Editor view pill (ANN-5): the Copy text button is 8 px side padding, 1 px border, a 16 px icon
+    // and a 6 px gap; the pill wraps, so the label must fit in about 150 px beside the icon.
+    v.push(
+        Case::new(
+            "Editor Copy text button",
+            "150 - 16 padding - 2 border - 16 icon - 6 gap",
+            150. - 40.,
+            cap,
+            400,
+            one,
+        )
+        .text("Copy text", || cm_i18n::tr!("Copy text"))
+        .text("Reading text", || cm_i18n::tr!("Reading text\u{2026}")),
+    );
     // Settings -> Shortcuts header button (R16): 32 px, 12 px side padding, 1 px border, a 14 px
     // icon and its gap; the header wraps, so the button must fit alone in a 260 px room.
     v.push(

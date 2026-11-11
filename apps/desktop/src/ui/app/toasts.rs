@@ -557,6 +557,39 @@ pub(crate) fn sync_toasts(app: &Entity<AppModel>, cx: &mut App) {
     app.update(cx, |m, _| m.toast_timer = timer);
 }
 
+/// ANN-5: reads the text in a screenshot (the daemon reads the rendered image and copies the
+/// text) and says how many words were copied. Used by the capture toast and the library menu.
+pub(crate) fn copy_text_of(app: &Entity<AppModel>, id: &str, cx: &mut App) {
+    let backend = app.read(cx).backend.clone();
+    let Some(daemon) = backend.daemon.clone() else {
+        return;
+    };
+    let (app2, id) = (app.clone(), id.to_owned());
+    cx.spawn(async move |cx| {
+        let res = backend
+            .rt
+            .spawn(async move { crate::editor::copytext::run(&daemon, &id, None).await })
+            .await
+            .unwrap_or_else(|e| Err(e.to_string()));
+        cx.update(|cx| match res {
+            Ok(o) => {
+                let kind = if o.is_success() {
+                    ToastKind::Success
+                } else {
+                    ToastKind::Info
+                };
+                push_toast(&app2, ToastSpec::new(kind, o.message()), cx);
+            }
+            Err(e) => push_toast(
+                &app2,
+                flows::error_toast_live(|| tr!("Couldn\u{2019}t read the text"), e),
+                cx,
+            ),
+        });
+    })
+    .detach();
+}
+
 pub(super) fn toast_action(app: &Entity<AppModel>, action: ToastAction, cx: &mut App) {
     match action {
         ToastAction::OpenLibrary => navigate(app, Route::Library, cx),
@@ -591,6 +624,7 @@ pub(super) fn toast_action(app: &Entity<AppModel>, action: ToastAction, cx: &mut
             })
             .detach();
         }
+        ToastAction::CopyText(id) => copy_text_of(app, &id, cx),
         ToastAction::SaveCaptureAs(id) => save_capture_as(app, &id, cx),
         ToastAction::DeleteCapture(id) => {
             let title = app

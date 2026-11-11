@@ -119,7 +119,7 @@ Annotations are vector operations stored in `manifest.json` (`ops` list) and ren
 ---
 
 ### ANN-5 Copy text from a screenshot
-**Priority** P1 · **Status** In progress (the headless part is built and tested with a scripted recognizer: `ocr::layout_text` and the region crop in `cm-render`, the action `recognize_text` through daemon, MCP and CLI; the editor part (button, Select text tool, menu entries) is built after it; no real recognizer has been run on a screenshot of real content except the checks recorded in `verification/`) · **Crates** cm-render, cm-daemon, cm-mcp, cm-cli, apps/desktop · **Depends on** ANN-1, ANN-3, ANN-2 (the recognizer)
+**Priority** P1 · **Status** In progress (the headless part is built and tested with a scripted recognizer: `ocr::layout_text` and the region crop in `cm-render`, the action `recognize_text` through daemon, MCP and CLI; the editor part is built too: a Copy text button, the Select text tool (key G), a library menu entry and a capture-toast button, with the pure parts (region mapping, outcomes, enabled state) tested and the window not seen by eye; `tests/manual/ANN-5.md` has not been run; the real recognizer ran only on synthetic PNGs, recorded in `verification/benchmarks/ocr-copy-text-synthetic-macos-2026-11-11.md`) · **Crates** cm-render, cm-daemon, cm-mcp, cm-cli, apps/desktop · **Depends on** ANN-1, ANN-3, ANN-2 (the recognizer)
 
 ID note: the plan for 0.3.2 called this ANN-4, but ANN-4 is the draft "Callouts, stamps and image overlays" (and FR row ANN-4), so this feature is ANN-5.
 

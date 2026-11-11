@@ -35,6 +35,19 @@ ID, bank and health numbers, phone numbers and IP addresses and offers to blur t
 dismiss each one; see [Auto-redact](redaction.md) for what it finds and its limits). You can also copy to
 the clipboard, or save a PNG to a folder you choose (Settings → Capture).
 
+**Copy text.** To copy the words in a screenshot instead of retyping them, open it in the editor and
+press **Copy text** (the whole image), or choose the **Select text** tool (key G) and drag a box
+around the part you want. A message says how many words were copied, or that no text was found. The
+same entry is in the library item menu and on the new-screenshot message. The text is read on your
+computer and nothing is sent anywhere. It is read from the picture as you see it, so text you have
+blurred or pixelated is not copied. Nothing is saved with the capture and it is not an undo step.
+What it can read depends on your system: on a Mac it reads what Apple's text recognition supports;
+on Windows only the text recognition languages installed in Windows (Settings, Time & language,
+Language & region); on Linux it uses the `tesseract` program, which reads English unless you install
+the data for other languages. Handwriting and very stylised text are not promised, and layout is
+approximate (columns and paragraphs are kept apart when the picture makes them clear). From a
+terminal or an agent: `capturemann text <id> [--region x,y,w,h] [--copy] [--lines]`.
+
 ### On Linux (early build)
 
 The shortcuts above are Ctrl+Alt+Shift+key on Linux. How they work depends on your session:

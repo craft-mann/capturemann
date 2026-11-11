@@ -29,6 +29,7 @@ manual script with a report in `verification/`.
 | [`transcription-baseline-en-synthetic-2026-11-03.md`](transcription-baseline-en-synthetic-2026-11-03.md) | 0.2.7 baseline: WER, real-time factor and re-read cost of Turbo, Medium and Large v3 on synthetic English meetings; M2d failure-kind counters (Apple M4 Pro) |
 | [`speaker-detection-3plus-synthetic-2026-11-03.md`](speaker-detection-3plus-synthetic-2026-11-03.md) | 0.2.7 baseline: DER, time and memory for 3, 4 and 6 synthetic speakers at the shipped settings |
 | [`text-model-report-translation-baseline-2026-11-03.md`](text-model-report-translation-baseline-2026-11-03.md) | 0.2.7 baseline: tokens/s and wall time of reports and translation, with the report floor check (rubric) |
+| [`ocr-copy-text-synthetic-macos-2026-11-11.md`](ocr-copy-text-synthetic-macos-2026-11-11.md) | ANN-5: does Apple Vision read Vietnamese tone marks on a synthetic image, and does automatic language detection change it? (5 lines, one Mac) |
 | [`public-corpora-proposal-0.2.7.md`](public-corpora-proposal-0.2.7.md) | Public corpora proposed for the 0.2.7 benchmarks (English and Vietnamese); nothing downloaded |
 
 Tools used: `crates/cm-ai/src/measure.rs` (word and diarization error rates, with tests),

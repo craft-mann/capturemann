@@ -16,6 +16,7 @@ use std::sync::Arc;
 
 use crate::backend::Backend;
 use crate::daemon_text::{AppNote, ErrorNote};
+use crate::editor::copytext;
 use crate::editor::session::{self, Job, JobResult};
 use crate::editor::state::{Chrome, Edit, EditorState, EscapeOutcome};
 use crate::editor::tools::{ParamValue, Styles, Tool};
@@ -59,6 +60,8 @@ enum Step {
     /// setting itself).
     Folder,
     Save(PathBuf),
+    /// ANN-5: copy the text of the rendered image (or of a region of it), beside the queue.
+    CopyText(Option<Rc>),
 }
 
 enum StepOut {
@@ -100,6 +103,8 @@ pub struct EditorDoc {
     pub redact: RedactPhase,
     /// Whether the Auto-redact kind chooser is open (the choice is `redact::session_kinds`).
     pub kinds_open: bool,
+    /// Whether a Copy text request is running (the recognizer runs off the UI thread).
+    pub copying_text: bool,
     /// Edits were made since the editor opened.
     edited: bool,
     closing: bool,
@@ -146,6 +151,7 @@ impl EditorDoc {
             status: Status::Saved,
             redact: RedactPhase::Idle,
             kinds_open: false,
+            copying_text: false,
             edited: false,
             closing: false,
         };
@@ -415,6 +421,25 @@ impl EditorDoc {
             self.pump(cx);
             return;
         }
+        if let Step::CopyText(region) = step {
+            // Like the image copy: beside the queue, after the saves queued before it, and the
+            // recognizer runs inside the daemon call (a worker thread).
+            let backend = self.backend.clone();
+            let id = self.capture_id.clone();
+            let rt = backend.rt.clone();
+            let keep = cx.entity();
+            cx.spawn(async move |this, cx| {
+                let _keep = keep;
+                let res = rt
+                    .spawn(async move { copytext::run(&daemon, &id, region).await })
+                    .await
+                    .unwrap_or_else(|e| Err(e.to_string()));
+                this.update(cx, |d, cx| d.copy_text_done(res, cx)).ok();
+            })
+            .detach();
+            self.pump(cx);
+            return;
+        }
         self.running = true;
         if matches!(step, Step::Job(_)) {
             self.status = Status::Saving;
@@ -435,9 +460,9 @@ impl EditorDoc {
                             session::run_job(&daemon, &id, &job, remap).await,
                         )),
                         // Handled above, beside the queue; not reachable.
-                        Step::Copy(_) => StepOut::Job(Box::new(Err(String::from(
-                            "internal: a clipboard copy reached the job runner",
-                        )))),
+                        Step::Copy(_) | Step::CopyText(_) => StepOut::Job(Box::new(Err(
+                            String::from("internal: a clipboard copy reached the job runner"),
+                        ))),
                         Step::Folder => StepOut::Folder(backend.save_capture_to_folder(&id).await),
                         Step::Save(path) => StepOut::Save(save_png(&daemon, &id, path).await),
                     }
@@ -531,6 +556,42 @@ impl EditorDoc {
         }
     }
 
+    /// ANN-5: the text request finished: a toast says how many words were copied, or that there
+    /// was no text; a failure stays until dismissed.
+    fn copy_text_done(&mut self, res: Result<copytext::Outcome, String>, cx: &mut Context<Self>) {
+        self.copying_text = false;
+        match res {
+            Ok(o) => {
+                let kind = if o.is_success() {
+                    ToastKind::Success
+                } else {
+                    ToastKind::Info
+                };
+                app::push_toast(&self.app, ToastSpec::new(kind, o.message()), cx);
+            }
+            Err(e) => app::push_toast(
+                &self.app,
+                flows::error_toast_live(|| tr!("Couldn\u{2019}t read the text"), e),
+                cx,
+            ),
+        }
+        cx.notify();
+    }
+
+    /// ANN-5: copies the text of the whole image (`None`) or of a rectangle in image pixels,
+    /// once the saves queued before it have landed. The text comes from the rendered image, so
+    /// blurred or pixelated text is never copied.
+    pub fn copy_text(&mut self, region: Option<Rc>, cx: &mut Context<Self>) {
+        if !self.is_ready() || self.copying_text || !copytext::available() {
+            return;
+        }
+        self.finish_pending_input(cx);
+        self.copying_text = true;
+        self.queue.push_back(Step::CopyText(region));
+        self.pump(cx);
+        cx.notify();
+    }
+
     fn drained(&mut self, cx: &mut Context<Self>) {
         if !matches!(self.status, Status::Failed(_)) {
             self.status = Status::Saved;
@@ -618,6 +679,9 @@ impl EditorDoc {
         }
         let edits = self.state.pointer_up(p, mods, tol);
         self.after_input(edits, cx);
+        if let Some(region) = self.state.take_text_region() {
+            self.copy_text(Some(region), cx);
+        }
     }
 
     pub fn pointer_leave(&mut self, cx: &mut Context<Self>) {

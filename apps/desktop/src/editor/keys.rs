@@ -135,6 +135,7 @@ mod tests {
             ("c", Tool::Crop),
             ("b", Tool::Blur),
             ("x", Tool::Pixelate),
+            ("g", Tool::SelectText),
         ] {
             assert_eq!(interpret(k, NONE, false), Some(K::SetTool(t)));
             assert_eq!(interpret(k, NONE, true), Some(K::SetTool(t)));

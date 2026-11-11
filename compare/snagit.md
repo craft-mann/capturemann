@@ -25,7 +25,7 @@ server for AI agents, all for free.
 | **Screenshots** | Region, window and display | Region, window, display, **scrolling capture**, scheduled and time-lapse capture |
 | **Annotation** | Arrows, rectangles, ellipses, text, pen, highlight, blur | A large toolset including step numbers, callouts and stamps (full list not re-checked) |
 | **Redaction** | **Auto-redact** proposes blurs for 20 kinds of personal data and secrets (cards, IDs, keys, tokens, emails, phone numbers…), checked by formats and checksums; runs on your computer; you accept each proposal | **Smart Redact**: click text to redact it, "Redact All Matches" |
-| **Text from images** | Not offered (OCR is used only for Auto-redact) | **Grab Text** (copy text from a capture) |
+| **Text from images** | **Copy text**: select a region or the whole screenshot and copy the text, recognized on your computer (macOS: Apple Vision; Windows: the OCR languages installed in Windows; Linux: `tesseract`, English by default); not compared on accuracy | **Grab Text** (copy text from a capture) |
 | **Step guides** | Not offered | **Step Capture**, with batch and HTML export |
 | **Screen recording** | Display, window or region up to native resolution at 30 or 60 fps; pause, resume, crash recovery; microphone with noise suppression and system audio on separate tracks | Screen recording with microphone and system audio (details not re-checked) |
 | **Webcam** | Live webcam bubble you can move and resize, recorded as its own track (Linux: camera track, no live bubble) | Webcam during recording (details not re-checked) |
@@ -38,8 +38,8 @@ server for AI agents, all for free.
 
 ## Where Snagit is stronger
 
-- **Screenshot depth.** Scrolling capture, Grab Text, scheduled capture and a mature annotation editor refined over many
-  years. CaptureMann has no scrolling capture or text grabbing yet.
+- **Screenshot depth.** Scrolling capture, scheduled capture and a mature annotation editor refined over many
+  years. CaptureMann has no scrolling capture yet.
 - **Step guides for documentation.** Step Capture with HTML export is built for how-to guides and support articles.
 - **The TechSmith suite.** Hand-off to Camtasia for serious video editing, and company licensing and support.
 

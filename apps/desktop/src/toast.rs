@@ -31,6 +31,8 @@ pub enum ToastAction {
     OpenLibrary,
     OpenCapture(String),
     CopyCapture(String),
+    /// Read the text in a screenshot and copy it (ANN-5).
+    CopyText(String),
     /// Save the rendered image to a file the user picks (CAP-4.AC1).
     SaveCaptureAs(String),
     /// Ask, then delete the capture (CAP-4.AC1).
@@ -107,6 +109,7 @@ impl ToastAction {
             ToastAction::OpenLibrary => "images",
             ToastAction::OpenCapture(_) => "external-link",
             ToastAction::CopyCapture(_) => "copy",
+            ToastAction::CopyText(_) => "scan-text",
             ToastAction::SaveCaptureAs(_) => "save",
             ToastAction::DeleteCapture(_) => "trash-2",
             ToastAction::OpenScreenRecordingSettings
@@ -275,6 +278,15 @@ impl ToastSpec {
             action,
         });
         self
+    }
+
+    /// [`ToastSpec::button`] only when `show` is true.
+    pub fn button_if(self, show: bool, label: impl Into<String>, action: ToastAction) -> Self {
+        if show {
+            self.button(label, action)
+        } else {
+            self
+        }
     }
 }
 
@@ -804,6 +816,7 @@ mod tests {
             OpenLibrary,
             OpenCapture("a".into()),
             CopyCapture("a".into()),
+            CopyText("a".into()),
             SaveCaptureAs("a".into()),
             DeleteCapture("a".into()),
             OpenScreenRecordingSettings,

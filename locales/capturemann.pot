@@ -1076,6 +1076,11 @@ msgstr ""
 msgid "Copied to {destination}"
 msgstr ""
 
+msgid "Copied {n} word"
+msgid_plural "Copied {n} words"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "Copies a capture each time an export of it finishes, once the export is done."
 msgstr ""
 
@@ -1137,6 +1142,15 @@ msgid "Copy link"
 msgstr ""
 
 msgid "Copy only (don't save)"
+msgstr ""
+
+msgid "Copy text"
+msgstr ""
+
+msgid "Copy text needs a Windows text recognition language. Add one in Settings > Time & language > Language & region (it installs the text recognition part), then restart CaptureMann. It reads only the languages you install there."
+msgstr ""
+
+msgid "Copy text needs the tesseract program. Install it (Debian and Ubuntu: sudo apt install tesseract-ocr), then restart CaptureMann. It reads English; other languages need their tesseract language data."
 msgstr ""
 
 msgid "Copy the client ID and the client secret Google shows, and paste them below."
@@ -1254,6 +1268,9 @@ msgid "Couldn’t open this capture"
 msgstr ""
 
 msgid "Couldn’t read the diagnostics: {e}"
+msgstr ""
+
+msgid "Couldn’t read the text"
 msgstr ""
 
 msgid "Couldn’t read the transcript: {m}"
@@ -1944,6 +1961,9 @@ msgid "For online calls: the other people’s voices. Needs Screen Recording per
 msgstr ""
 
 msgid "Format"
+msgstr ""
+
+msgid "Found text, but could not copy it to the clipboard"
 msgstr ""
 
 msgid "Frame from the video"
@@ -2926,6 +2946,9 @@ msgstr ""
 msgid "No terms yet. Add a name or a word you want spelled your way."
 msgstr ""
 
+msgid "No text found"
+msgstr ""
+
 msgid "No transcript yet. Transcribe the microphone to get captions; it runs on {this_computer}."
 msgstr ""
 
@@ -3601,10 +3624,16 @@ msgstr ""
 msgid "Read the diagnostics"
 msgstr ""
 
+msgid "Read the text in a screenshot"
+msgstr ""
+
 msgid "Read the text model settings"
 msgstr ""
 
 msgid "Reading never needs asking."
+msgstr ""
+
+msgid "Reading text…"
 msgstr ""
 
 msgid "Reading the model list…"
@@ -9341,6 +9370,10 @@ msgstr ""
 
 msgctxt "tool"
 msgid "Select"
+msgstr ""
+
+msgctxt "tool"
+msgid "Select text"
 msgstr ""
 
 msgctxt "tool"

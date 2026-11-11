@@ -437,6 +437,12 @@ impl LibraryView {
                     cx.defer(move |cx| crate::ui::upload_ui::copy_link(&app, &link, cx));
                 }
             }
+            CardAction::CopyText => {
+                // ANN-5: the daemon reads the rendered screenshot and copies the text.
+                self.close_menu(cx);
+                let (app, id) = (self.app.clone(), item.id.clone());
+                cx.defer(move |cx| app::copy_text_of(&app, &id, cx));
+            }
             CardAction::Rename => {
                 if let Some(m) = &mut self.menu {
                     m.renaming = true;

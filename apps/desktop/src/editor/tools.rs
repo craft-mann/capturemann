@@ -21,11 +21,13 @@ pub enum Tool {
     Blur,
     Pixelate,
     Crop,
+    /// ANN-5: drag a rectangle, the text in it goes to the clipboard. Draws nothing.
+    SelectText,
 }
 
 impl Tool {
     /// Palette order (DESIGN 5.5: left vertical toolbar).
-    pub const ALL: [Tool; 11] = [
+    pub const ALL: [Tool; 12] = [
         Tool::Select,
         Tool::Arrow,
         Tool::Line,
@@ -37,6 +39,7 @@ impl Tool {
         Tool::Blur,
         Tool::Pixelate,
         Tool::Crop,
+        Tool::SelectText,
     ];
 
     pub fn label(self) -> String {
@@ -52,10 +55,11 @@ impl Tool {
             Tool::Blur => tr_ctx!("tool", "Blur"),
             Tool::Pixelate => tr_ctx!("tool", "Pixelate"),
             Tool::Crop => tr_ctx!("tool", "Crop"),
+            Tool::SelectText => tr_ctx!("tool", "Select text"),
         }
     }
 
-    /// Single-key shortcut (ANN-1: V A L R E T H N C, ANN-2: B X).
+    /// Single-key shortcut (ANN-1: V A L R E T H N C, ANN-2: B X, ANN-5: G).
     pub fn key(self) -> char {
         match self {
             Tool::Select => 'v',
@@ -69,6 +73,7 @@ impl Tool {
             Tool::Blur => 'b',
             Tool::Pixelate => 'x',
             Tool::Crop => 'c',
+            Tool::SelectText => 'g',
         }
     }
 
@@ -91,6 +96,7 @@ impl Tool {
             Tool::Blur => "droplet",
             Tool::Pixelate => "grid-3x3",
             Tool::Crop => "crop",
+            Tool::SelectText => "scan-text",
         }
     }
 
@@ -108,6 +114,7 @@ impl Tool {
             Tool::Blur => "blur",
             Tool::Pixelate => "pixelate",
             Tool::Crop => "crop",
+            Tool::SelectText => "select_text",
         }
     }
 
@@ -130,7 +137,7 @@ impl Tool {
     /// Inspector controls this tool exposes.
     pub fn params(self) -> &'static [Param] {
         match self {
-            Tool::Select | Tool::Crop => &[],
+            Tool::Select | Tool::Crop | Tool::SelectText => &[],
             Tool::Arrow | Tool::Line | Tool::Rect | Tool::Ellipse => &[Param::Color, Param::Width],
             Tool::Text => &[Param::Color, Param::TextSize],
             Tool::Highlight => &[Param::Color, Param::Opacity],
@@ -459,7 +466,11 @@ mod tests {
     fn every_drawing_tool_has_inspector_controls_except_select_and_crop() {
         for t in Tool::ALL {
             let empty = t.params().is_empty();
-            assert_eq!(empty, matches!(t, Tool::Select | Tool::Crop), "{t:?}");
+            assert_eq!(
+                empty,
+                matches!(t, Tool::Select | Tool::Crop | Tool::SelectText),
+                "{t:?}"
+            );
         }
     }
 }

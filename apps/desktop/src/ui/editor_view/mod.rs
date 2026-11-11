@@ -63,7 +63,10 @@ const HIT_PX: f64 = 6.;
 
 /// Whether `tool` opens a new group in the tool pill (draw | redact | crop dividers).
 fn tool_group_starts(tool: Tool) -> bool {
-    matches!(tool, Tool::Arrow | Tool::Blur | Tool::Crop)
+    matches!(
+        tool,
+        Tool::Arrow | Tool::Blur | Tool::Crop | Tool::SelectText
+    )
 }
 
 fn mod_label() -> &'static str {
@@ -274,6 +277,11 @@ struct Snap {
     redact_available: bool,
     /// Why Auto-redact is dimmed (the recognizer can be installed), else `None`.
     redact_hint: Option<&'static str>,
+    /// Copy text (ANN-5): shown when the OS has a text recognizer, dimmed with the install hint
+    /// when it can be installed.
+    text_available: bool,
+    text_hint: Option<&'static str>,
+    text_running: bool,
     redact: RedactPhase,
     kinds_open: bool,
     kinds: crate::editor::redact::KindChoice,
@@ -316,6 +324,9 @@ impl Snap {
             warning: doc.warnings.first().cloned(),
             redact_available: crate::editor::redact::available(),
             redact_hint: crate::editor::redact::unavailable_hint(),
+            text_available: crate::editor::copytext::available(),
+            text_hint: crate::editor::copytext::unavailable_hint(),
+            text_running: doc.copying_text,
             redact: doc.redact.clone(),
             kinds_open: doc.kinds_open,
             kinds: crate::editor::redact::session_kinds(),
@@ -350,8 +361,8 @@ fn near(a: f64, b: f64) -> bool {
 mod tests {
     use super::*;
 
-    /// Redesign R4: the tool pill lists the 11 tools in the shipped order, with dividers before
-    /// Arrow, Blur and Crop only.
+    /// Redesign R4: the tool pill lists the 12 tools in the shipped order, with dividers before
+    /// Arrow, Blur, Crop and Select text only.
     #[test]
     fn tool_pill_order_and_groups() {
         let ids: Vec<&str> = Tool::ALL.iter().map(|t| t.id()).collect();
@@ -368,7 +379,8 @@ mod tests {
                 "step",
                 "blur",
                 "pixelate",
-                "crop"
+                "crop",
+                "select_text"
             ]
         );
         let starts: Vec<&str> = Tool::ALL
@@ -376,7 +388,7 @@ mod tests {
             .filter(|t| tool_group_starts(**t))
             .map(|t| t.id())
             .collect();
-        assert_eq!(starts, ["arrow", "blur", "crop"]);
+        assert_eq!(starts, ["arrow", "blur", "crop", "select_text"]);
     }
 
     /// The fit insets are exactly the pills' footprint plus their margins, so the fitted image

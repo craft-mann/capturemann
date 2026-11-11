@@ -9898,3 +9898,45 @@ msgstr "Hãy nhập ít nhất ba chữ cái trước."
 msgctxt "ignored phrase"
 msgid "Remove"
 msgstr "Xóa"
+
+#, fuzzy
+msgid "Copied {n} word"
+msgid_plural "Copied {n} words"
+msgstr[0] "Đã sao chép {n} từ"
+
+#, fuzzy
+msgid "Copy text"
+msgstr "Sao chép văn bản"
+
+#, fuzzy
+msgid "Copy text needs a Windows text recognition language. Add one in Settings > Time & language > Language & region (it installs the text recognition part), then restart CaptureMann. It reads only the languages you install there."
+msgstr "Sao chép văn bản cần một ngôn ngữ nhận dạng văn bản của Windows. Hãy thêm một ngôn ngữ trong Settings > Time & language > Language & region (phần nhận dạng văn bản sẽ được cài đặt kèm), rồi khởi động lại CaptureMann. Chỉ đọc được các ngôn ngữ bạn cài ở đó."
+
+#, fuzzy
+msgid "Copy text needs the tesseract program. Install it (Debian and Ubuntu: sudo apt install tesseract-ocr), then restart CaptureMann. It reads English; other languages need their tesseract language data."
+msgstr "Sao chép văn bản cần chương trình tesseract. Hãy cài đặt (Debian và Ubuntu: sudo apt install tesseract-ocr), rồi khởi động lại CaptureMann. Chương trình đọc tiếng Anh; các ngôn ngữ khác cần thêm dữ liệu ngôn ngữ của tesseract."
+
+#, fuzzy
+msgid "Couldn’t read the text"
+msgstr "Không đọc được văn bản"
+
+#, fuzzy
+msgid "Found text, but could not copy it to the clipboard"
+msgstr "Đã tìm thấy văn bản nhưng không sao chép được vào bộ nhớ tạm"
+
+#, fuzzy
+msgid "No text found"
+msgstr "Không tìm thấy văn bản"
+
+#, fuzzy
+msgid "Reading text…"
+msgstr "Đang đọc văn bản…"
+
+#, fuzzy
+msgctxt "tool"
+msgid "Select text"
+msgstr "Chọn văn bản"
+
+#, fuzzy
+msgid "Read the text in a screenshot"
+msgstr "Đọc văn bản trong ảnh chụp màn hình"

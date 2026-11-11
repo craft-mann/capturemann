@@ -243,6 +243,9 @@ pub struct EditorState {
     paste_count: u32,
     tmp_seq: u64,
     pub metrics: TextMetrics,
+    /// ANN-5: a rectangle the Select text tool just finished dragging; the view takes it with
+    /// [`EditorState::take_text_region`] and asks the daemon for its text. Never an op.
+    text_region: Option<Rc>,
 }
 
 /// The lowercase name of an annotation kind in the screen-reader summary ("rect 1 of 2").
@@ -280,6 +283,7 @@ impl EditorState {
             paste_count: 0,
             tmp_seq: 0,
             metrics: TextMetrics::default(),
+            text_region: None,
         }
     }
 
@@ -290,6 +294,11 @@ impl EditorState {
 
     pub fn is_tmp_id(id: &str) -> bool {
         id.starts_with('~')
+    }
+
+    /// The rectangle (image px) the Select text tool finished dragging, once.
+    pub fn take_text_region(&mut self) -> Option<Rc> {
+        self.text_region.take()
     }
 
     pub fn take_styles_dirty(&mut self) -> bool {
@@ -390,6 +399,16 @@ impl EditorState {
     /// The shape being dragged out, for the overlay.
     pub fn draft(&self) -> Option<OpKind> {
         match &self.interaction {
+            Interaction::Drawing { start, cur, .. } if self.tool == Tool::SelectText => {
+                // A translucent selection box; it is only drawn, never stored.
+                super::copytext::selection_rect(*start, *cur, self.image).map(|rect| {
+                    OpKind::Highlight {
+                        rect,
+                        color: Color::rgb(0x2E, 0x8B, 0xFF),
+                        opacity: 0.25,
+                    }
+                })
+            }
             Interaction::Drawing { start, cur, shift } => geom::shape_from_drag(
                 self.tool,
                 &self.styles.get(self.tool),
@@ -610,6 +629,10 @@ impl EditorState {
         let inter = std::mem::replace(&mut self.interaction, Interaction::Idle);
         match inter {
             Interaction::Idle => Vec::new(),
+            Interaction::Drawing { start, cur, .. } if self.tool == Tool::SelectText => {
+                self.text_region = super::copytext::selection_rect(start, cur, self.image);
+                Vec::new()
+            }
             Interaction::Drawing { start, cur, shift } => {
                 let style = self.styles.get(self.tool);
                 let Some(kind) =
@@ -904,7 +927,7 @@ impl EditorState {
                 };
                 return vec![self.set_crop(kind)];
             }
-            Tool::Select => return Vec::new(),
+            Tool::Select | Tool::SelectText => return Vec::new(),
         };
         let id = self.tmp_id();
         let op = AnnotationOp::new(id.clone(), kind);
@@ -1262,6 +1285,42 @@ mod tests {
     }
 
     /// ANN-1: handles resize; a resize is also one edit.
+    /// ANN-5: the Select text tool drags a rectangle that is handed to the view once, draws
+    /// nothing into the capture and is clamped to the image; a click selects nothing.
+    #[test]
+    fn select_text_drag_gives_a_region_and_never_an_op() {
+        let mut s = st();
+        s.set_tool(Tool::SelectText);
+        let edits = drag(&mut s, (100.0, 50.0), (400.0, 90.0), NONE);
+        assert!(edits.is_empty(), "no annotate call");
+        assert!(s.ops.is_empty() && s.selected.is_none());
+        let r = s.take_text_region().unwrap();
+        assert_eq!((r.x, r.y, r.w, r.h), (100.0, 50.0, 300.0, 40.0));
+        assert!(s.take_text_region().is_none(), "handed over once");
+
+        // Past the edges of the image: clamped.
+        drag(&mut s, (-30.0, 700.0), (1300.0, 900.0), NONE);
+        let r = s.take_text_region().unwrap();
+        assert_eq!((r.x, r.y, r.w, r.h), (0.0, 700.0, 1200.0, 100.0));
+
+        // A click or a tiny drag is not a selection.
+        drag(&mut s, (10.0, 10.0), (12.0, 12.0), NONE);
+        assert!(s.take_text_region().is_none());
+    }
+
+    /// ANN-5: while dragging, the overlay is a translucent box (never stored).
+    #[test]
+    fn select_text_draft_is_a_translucent_box() {
+        let mut s = st();
+        s.set_tool(Tool::SelectText);
+        s.pointer_down(Pt::new(10.0, 10.0), NONE, 1, TOL);
+        s.pointer_move(Pt::new(200.0, 100.0), NONE, TOL);
+        assert!(matches!(s.draft(), Some(OpKind::Highlight { .. })));
+        s.cancel_interaction();
+        assert!(s.draft().is_none());
+        assert!(s.ops.is_empty());
+    }
+
     #[test]
     fn dragging_a_handle_resizes_in_one_edit() {
         let mut s = st();

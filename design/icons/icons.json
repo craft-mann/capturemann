@@ -1062,6 +1062,15 @@
       ]
     },
     {
+      "name": "scan-text",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Screenshot editor: Copy text button",
+        "Screenshot editor: Select text tool"
+      ]
+    },
+    {
       "name": "scissors",
       "source": "lucide@1.60.0",
       "status": "new",

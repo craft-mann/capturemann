@@ -258,6 +258,7 @@ Priority: **P1** = add now · P2 = leading icon on a text button · keep = alrea
 | Element | Icon | Priority | Size | Note |
 |---|---|---|---|---|
 | Tool rail (11 tools) | `mouse-pointer-2, move-up-right, slash, square, circle, type, highlighter, hash, droplet, grid-3x3, crop` | keep | 20 px |  |
+| Copy text button / Select text tool (ANN-5, added in 0.3.2) | `scan-text` | P2 | 16 / 20 px | not in the original board |
 | Undo / Redo / Revert / Zoom out / Zoom in | `undo-2` / `redo-2` / `rotate-ccw` / `zoom-out` / `zoom-in` | keep | 18 px |  |
 | Fit (replaces maximize) | `shrink` | **P1** | 18 px | maximize is four corner brackets, the same shape as cm-capture-region; shrink also means Fit in the Reframe card |
 | Save as… | `save` | P2 | 16 px |  |

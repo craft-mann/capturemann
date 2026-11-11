@@ -24,6 +24,10 @@ A screenshot can show passwords, tokens, emails, card numbers or private message
 
 On a computer without a text recognizer `suggest_redactions` fails with `not_implemented`: then ask the user where the sensitive text is and blur it with `annotate`.
 
+## Copy the text out of a screenshot
+
+`recognize_text` with the `capture_id` returns the text in the picture in reading order, using on-device recognition (nothing is sent anywhere, nothing is stored, no revision). Optional `region: [x, y, w, h]` (original pixels), `format: "lines"` for each line's box and `copy_to_clipboard: true` to put the text on the user's clipboard. It reads the **rendered** image, so text the user blurred is not returned. What it reads depends on the system: macOS reads what Apple Vision supports, Windows only the OCR languages installed in Windows, Linux `tesseract` (English unless more language data is installed); it can misread, so do not treat the result as exact. Do this only when the user asks for the text, and do not paste text that may contain secrets elsewhere. On a computer without a text recognizer it fails with `not_implemented`.
+
 ## Annotate
 
 `annotate` ops: `arrow`, `rect`, `ellipse`, `line`, `text`, `highlight`, `step` (numbered markers), `blur`, `pixelate`, `crop`. Pass `copy_to_clipboard: true` to copy the rendered image (annotations and blurs applied, never the original). `replace: true` replaces the op list in one undo step. `get_capture` returns the current revision and image.
@@ -31,5 +35,5 @@ On a computer without a text recognizer `suggest_redactions` fails with `not_imp
 ## Do not
 
 - Do not take screenshots the user did not ask for, and do not take one "to see the screen" without saying so.
-- Do not read the screenshot's text back to the user or into a file when it may contain secrets; describe what kind of text it is.
+- Do not read the screenshot's text back to the user or into a file when it may contain secrets; describe what kind of text it is. `recognize_text` is for when the user asks for the text.
 - Do not use `set_settings` to change capture behaviour the user did not request.

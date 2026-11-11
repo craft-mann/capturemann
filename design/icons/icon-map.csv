@@ -168,6 +168,7 @@ Screenshot editor,Fit (replaces maximize),shrink,P1,18,"maximize is four corner 
 Screenshot editor,Save as…,save,P2,16,
 Screenshot editor,Reveal,folder-open,P2,16,
 Screenshot editor,Copy image,copy,P2,16,
+Screenshot editor,Copy text button / Select text tool (ANN-5),scan-text,P2,16 / 20,added in 0.3.2; not in the original board
 Screenshot editor,Blur / Pixelate stepper − / +,minus / plus,P1,16,replaces text '-' '+'
 Screenshot editor,Reset crop,crop,P2,16,
 Screenshot editor,Duplicate,copy-plus,P2,16,

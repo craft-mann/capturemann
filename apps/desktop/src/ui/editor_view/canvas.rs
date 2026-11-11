@@ -24,7 +24,7 @@ impl EditorView {
         } else {
             match tool {
                 Tool::Select => CursorStyle::Arrow,
-                Tool::Text => CursorStyle::IBeam,
+                Tool::Text | Tool::SelectText => CursorStyle::IBeam,
                 _ => CursorStyle::Crosshair,
             }
         };

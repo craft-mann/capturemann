@@ -39,6 +39,7 @@ in the release notes and in [`verification/`](verification/).
 | **Screenshots** of a display or a region, with an annotation editor | ✓ | ✓ | ✓ |
 | Window screenshots | ✓ | ✓ | ✓ [Wayland: through the desktop's own picker] |
 | **Auto-redact** of personal data and secrets in screenshots (see below) | ✓ | ✓ | ✓ [uses the system `tesseract`] |
+| **Copy text** from a screenshot (on-device text recognition; reads the rendered image, so blurred text is not copied) | ✓ | ✓ [reads the OCR languages installed in Windows] | ✓ [uses the system `tesseract`, English unless more language data is installed] |
 | **Screen recording** (display, up to native resolution, 30 or 60 fps), pause, resume, crash recovery | ✓ | ✓ | ✓ [GNOME records without the share dialog; other desktops ask through the portal] |
 | Window and region recording | ✓ | ✓ | ✓ [window recording on X11 only] |
 | Microphone (noise suppression) and system audio | ✓ | ✓ | ✓ |

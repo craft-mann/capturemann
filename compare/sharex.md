@@ -24,7 +24,8 @@ AI agents. For screenshot depth and upload automation on Windows, ShareX leads; 
 | **Capture modes** | Region, window and display | Fullscreen, active window, active monitor, region, last region, custom region, **scrolling capture**, auto capture |
 | **Annotation** | Arrows, rectangles, ellipses, text, pen, highlight, blur | Rectangles, ellipses, lines, arrows, freehand, text, speech balloons, **step numbers**, images, blur, pixelate, smart eraser; plus a layer-based photo editor |
 | **Redaction** | **Auto-redact** proposes blurs for 20 kinds of personal data and secrets, checked by formats and checksums; you accept each one | Manual blur, pixelate and smart eraser |
-| **Tools** | — | **OCR** (extract text), QR code scanning, color picker and other utilities |
+| **Text from images** | **Copy text**: select a region or the whole screenshot and copy the text, recognized on your computer (Windows: the OCR languages installed in Windows; macOS: Apple Vision; Linux: `tesseract`, English by default); not compared on accuracy | **OCR** (extract text) |
+| **Tools** | — | QR code scanning, color picker and other utilities |
 | **Screen recording** | Display, window or region up to native resolution at 30 or 60 fps; pause, resume, crash recovery; microphone with noise suppression and system audio on separate tracks | Screen recording and GIF recording (frame rates and webcam options not re-checked) |
 | **Webcam** | Live webcam bubble recorded as its own track (Linux: camera track, no live bubble) | Not checked |
 | **Video editing** | Trim, cut, split, speed, backgrounds, zoom regions with suggestions, restyled cursor, 9:16 and 1:1 reframe; MP4, GIF and WebM export | Not found beyond basic tools |
@@ -35,7 +36,7 @@ AI agents. For screenshot depth and upload automation on Windows, ShareX leads; 
 
 ## Where ShareX is stronger
 
-- **Screenshot depth:** scrolling capture, OCR, step numbers, a photo editor and many small utilities.
+- **Screenshot depth:** scrolling capture, step numbers, a photo editor and many small utilities.
 - **Upload automation:** after-capture workflows that upload to the service you choose and copy the link.
 - **Mature and widely used** on Windows, with a large community.
 
@@ -53,7 +54,7 @@ AI agents. For screenshot depth and upload automation on Windows, ShareX leads; 
 | If you… | Choose |
 | --- | --- |
 | Take many screenshots on Windows and upload them automatically | ShareX |
-| Need scrolling capture, OCR or a photo editor | ShareX |
+| Need scrolling capture or a photo editor | ShareX |
 | Record tutorials or meetings, on any system | CaptureMann |
 | Want transcripts, captions or meeting minutes without the cloud | CaptureMann |
 | Want an AI agent to capture and record for you | CaptureMann |

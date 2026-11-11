@@ -53,6 +53,8 @@ fn english_page_is_read_in_order() {
     let lines = system_recognizer().recognize(&img).unwrap();
     let text = layout_text(&lines, &LayoutOptions::default());
     println!("english: {text:?}");
+    let expected = "Save the file before closing\n\nError 404: page not found";
+    println!("english character error rate: {:.3}", cer(expected, &text));
     assert!(text.contains("Save the file"), "{text}");
     assert!(text.find("Save").unwrap() < text.find("Error").unwrap());
 }

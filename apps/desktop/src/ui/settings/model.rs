@@ -348,6 +348,7 @@ pub(crate) fn tool_title(name: &str) -> String {
         "annotate" => tr!("Annotate captures"),
         "get_capture" => tr!("Read a capture"),
         "suggest_redactions" => tr!("Suggest redactions"),
+        "recognize_text" => tr!("Read the text in a screenshot"),
         "get_settings" => tr!("Read settings"),
         "set_settings" => tr!("Change settings"),
         "undo" => tr!("Undo"),

@@ -15,7 +15,14 @@ pub fn capture_done_toast(
     shortcuts: &ShortcutMap,
 ) -> ToastSpec {
     let (done, shortcuts) = (done.clone(), shortcuts.clone());
-    ToastSpec::live(move || capture_done_toast_now(&done, platform, &shortcuts))
+    ToastSpec::live(move || {
+        capture_done_toast_now(
+            &done,
+            platform,
+            &shortcuts,
+            crate::editor::copytext::available(),
+        )
+    })
 }
 
 /// CAP-4.AC1: after a capture, a toast offers Annotate, Copy, Save as and Delete, with keycap
@@ -25,6 +32,7 @@ fn capture_done_toast_now(
     done: &AfterCapture,
     platform: Platform,
     shortcuts: &ShortcutMap,
+    can_copy_text: bool,
 ) -> ToastSpec {
     let paste: Vec<String> = match platform {
         Platform::Mac => vec!["\u{2318}".into(), "V".into()],
@@ -48,6 +56,11 @@ fn capture_done_toast_now(
     .button(
         tr_ctx!("button", "Copy"),
         ToastAction::CopyCapture(id.clone()),
+    )
+    .button_if(
+        can_copy_text,
+        tr!("Copy text"),
+        ToastAction::CopyText(id.clone()),
     )
     .button(
         tr!("Save as\u{2026}"),
@@ -145,7 +158,7 @@ mod tests {
     #[test]
     fn success_toast_has_annotate_and_keycap_hints() {
         let map = ShortcutMap::defaults(Platform::Mac);
-        let t = capture_done_toast(&done(CopyResult::Copied), Platform::Mac, &map);
+        let t = capture_done_toast_now(&done(CopyResult::Copied), Platform::Mac, &map, false);
         assert_eq!(t.title, "Copied to clipboard");
         assert_eq!(t.buttons[0].label, "Annotate");
         assert_eq!(
@@ -164,6 +177,22 @@ mod tests {
         assert_eq!(
             t.buttons[2].action,
             ToastAction::SaveCaptureAs("shot_1".into())
+        );
+    }
+
+    /// ANN-5: where the computer has a text recognizer the toast also offers Copy text, after Copy.
+    #[test]
+    fn the_toast_offers_copy_text_only_with_a_recognizer() {
+        let map = ShortcutMap::defaults(Platform::Mac);
+        let with = capture_done_toast_now(&done(CopyResult::Copied), Platform::Mac, &map, true);
+        let labels: Vec<_> = with.buttons.iter().map(|b| b.label.as_str()).collect();
+        assert_eq!(
+            labels,
+            ["Annotate", "Copy", "Copy text", "Save as\u{2026}", "Delete"]
+        );
+        assert_eq!(
+            with.buttons[2].action,
+            ToastAction::CopyText("shot_1".into())
         );
     }
 

@@ -22,6 +22,8 @@ pub enum CardAction {
     Reveal,
     /// Only for captures with an upload that has a share link (STO-4.AC3).
     CopyLink,
+    /// Only for a screenshot, and only where this computer has a text recognizer (ANN-5).
+    CopyText,
     Rename,
     Delete,
 }
@@ -40,6 +42,13 @@ impl CardAction {
         if crate::published::share_link_of(&item.uploads).is_some() {
             v.insert(2, CardAction::CopyLink);
         }
+        if item.kind == Kind::Screenshot && !item.broken && crate::editor::copytext::available() {
+            let at = v
+                .iter()
+                .position(|a| *a == CardAction::Rename)
+                .unwrap_or(v.len());
+            v.insert(at, CardAction::CopyText);
+        }
         v
     }
 
@@ -47,6 +56,7 @@ impl CardAction {
         match self {
             CardAction::Open => tr_ctx!("card menu", "Open"),
             CardAction::CopyLink => tr!("Copy link"),
+            CardAction::CopyText => tr!("Copy text"),
             CardAction::Reveal => {
                 crate::platform_text::term(platform, crate::platform_text::Term::RevealLabel)
             }
@@ -60,6 +70,7 @@ impl CardAction {
         match self {
             CardAction::Open => "Open",
             CardAction::CopyLink => "Copy link",
+            CardAction::CopyText => "Copy text",
             CardAction::Reveal if mac => "Reveal in Finder",
             CardAction::Reveal => "Show in folder",
             CardAction::Rename => "Rename\u{2026}",
@@ -72,6 +83,7 @@ impl CardAction {
         match self {
             CardAction::Open => "external-link",
             CardAction::CopyLink => "link",
+            CardAction::CopyText => "scan-text",
             CardAction::Reveal => "folder-open",
             CardAction::Rename => "pencil",
             CardAction::Delete => "trash-2",
