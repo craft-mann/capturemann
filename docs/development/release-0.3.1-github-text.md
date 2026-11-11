@@ -73,11 +73,17 @@ without a stored report in `verification/` (CLAUDE.md wording rule). Steps: `rel
 
 ## Checked, and what was not
 
-Reports in `verification/` (all PARTIAL; one computer each): <FILL: the final-files runs (after the last push, on the release files): `L1-windows-0.3.1-*`, `L1-macos-0.3.1-*`,
-`L1-linux-0.3.1-*`>. Runs so far, on the dev bundle or CI packages of earlier commits, 0 failed in each: macOS `standard` 43 passed,
-`full` 52, `hardware` 55; Windows 11 (ThinkPad T490) `standard` 44, `full` 58, plus transcription, speakers and the silent installer 3 of 3;
-Linux x86_64 (same laptop, X11) `standard` 51, `full` 59; Linux aarch64 VM `full` 37. The export-size test: macOS 18 of 18 samples within
-the ceiling, Linux UHD 620 18 of 18 after the fix. Not run: **Intel Mac hardware**, Windows 10, SmartScreen, mixed DPI, NVIDIA/AMD
+Reports in `verification/` (all PARTIAL; one computer each), run on the release files built from `5e1a0d9d` (the code of the release):
+`L1-windows-0.3.1-regression-standard-final-*`, `-full-final-*`, `-full-final-ai-*`; `L1-macos-0.3.1-regression-standard-final-dmg-arm64-*`,
+`-full-final-dmg-arm64-*` (and `-run2`, `-run3`), `-hardware-final-hw-nosound-*`, `-hardware-final-hw-sound-*`;
+`L1-linux-0.3.1-regression-standard-x11-final-tarball-*` (and `-run2`), `-full-x11-final-tarball-full-*`, `-full-x11-final-deb-install-*`,
+`L1-linux-0.3.1-aarch64-vm-final-*`. 0 failed in the runs listed here, except that two runs each had a failure that was found, explained and
+fixed in the test or a later rerun, and the report is kept: macOS `full` (cm-overlay still exiting at the end of two cases; reruns 45 of 45
+twice) and Linux `standard` (45 of 46: a test that expected a typical export size on a GPU that gives none by design; 46 of 46 after the test
+was fixed). Counts: macOS `standard` 43, `full` 45, `hardware` 54 and the sound case 1; Windows 11 (ThinkPad T490) `standard` 44, `full` 58,
+plus transcription, speakers and the silent installer 3 of 3; Linux x86_64 (same laptop, X11) `standard` 46, `full` 59, `.deb` install 1;
+Linux aarch64 VM `full` 37. The export-size test: macOS 18 of 18 samples within the ceiling, Linux UHD 620 18 of 18 after the fix.
+Not run: **Intel Mac hardware**, Windows 10, SmartScreen, mixed DPI, NVIDIA/AMD
 encoders, KDE and other Linux distributions, a second monitor.
 
 ## Known limits
@@ -98,7 +104,18 @@ encoders, KDE and other Linux distributions, a second monitor.
 
 ## Install and checks
 
-<FILL on release day, from the final files: the table of SHA-256 sums (`SHA256SUMS.txt`), the minisign public key line, and the Homebrew cask (tap commit) status. winget: pull request 472327 (0.2.8) was still open on Nov 10, 2026, so **0.3.1 is not in winget**; use the wording of `release-0.2.9-winget-note.md` with 0.3.1 as the newer version.>
+| File | SHA-256 |
+|---|---|
+| `capturemann-0.3.1-windows-x64-setup.exe` | `e352619477f41d433b150f79f0c714fadd31694364ee72d1954550d679919898` |
+| `capturemann-0.3.1-windows-x64.zip` | `7360cfa16421d0d76e0f4d69f3392911f1e711400fb9dfe92bcaf77777c0b13d` |
+| `CaptureMann-0.3.1-arm64.dmg` | `5a8b05f231f7514e8cc4016d852cd7c99ae2a154ece5bdb4c4d6d0bbd8c83dce` |
+| `CaptureMann-0.3.1-x86_64.dmg` | `80a16c813b2c0f5ee5c36d3bc5cbac3fa4062162af3e038e8272a27bbd46b6a6` |
+| `capturemann-0.3.1-linux-x86_64.tar.gz` | `0c6b77c20b6eb047cd615bbf72ba863445713b75ce0df232e080d635c023a3e1` |
+| `capturemann_0.3.1_amd64.deb` | `b9f8195a79e0fdf4b45df65c4cc4bc3d990db0459d272f7bad9ee1282a1b7f8d` |
+| `capturemann-0.3.1-linux-aarch64.tar.gz` | `d5875e59b44b519ee1ecde7c3d749a5efb6e8962e9235610d749e34055eedf3d` |
+| `capturemann_0.3.1_arm64.deb` | `5920160c2695794a6ae8be81eebcca0cd3452d5f108058df9b83653c8c813cba` |
+
+<FILL on release day: **check these sums against the files that are uploaded** (a rebuild on the tag gives other sums), the minisign public key line, and the Homebrew cask (tap commit) status. winget: pull request 472327 (0.2.8) was still open on Nov 10, 2026, so **0.3.1 is not in winget**; use the wording of `release-0.2.9-winget-note.md` with 0.3.1 as the newer version.>
 
 ### Install with APT (Ubuntu 24.04 or newer, amd64 and arm64)
 
