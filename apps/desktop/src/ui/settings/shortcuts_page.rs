@@ -96,6 +96,14 @@ impl SettingsView {
                             None => None,
                         };
                         let waiting = self.rebinding == Some(r.action);
+                        // Why the last press was refused, shown under this row (not at the end of the page).
+                        let row_error = waiting
+                            .then(|| {
+                                self.rebind_error
+                                    .as_ref()
+                                    .map(crate::ui::app::RebindError::text)
+                            })
+                            .flatten();
                         let change_id = SharedString::from(format!("rebind-{}", r.key));
                         let action_for_click = r.action;
                         let label = r.label.clone();
@@ -179,6 +187,16 @@ impl SettingsView {
                                 Some(control.into_any_element()),
                                 i == last,
                             )
+                            .children(row_error.map(|e| {
+                                div()
+                                    .w_full()
+                                    .id(SharedString::from(format!("rebind-error-{}", r.key)))
+                                    .role(Role::Alert)
+                                    .aria_label(SharedString::from(e.clone()))
+                                    .text_size(px(type_scale::CAPTION))
+                                    .text_color(rgba_of(t.warning))
+                                    .child(SharedString::from(e))
+                            }))
                             .id(SharedString::from(format!("shortcut-{}", r.key)))
                             .role(Role::ListItem)
                             .aria_label(SharedString::from(if mode.can_change {
@@ -207,10 +225,6 @@ impl SettingsView {
             == crate::platform_hotkeys::Backend::WaylandPortal
             && reg.iter().any(|(_, r)| r.is_ok());
         let conflicts = map.conflicts();
-        let rebind_error = self
-            .rebind_error
-            .as_ref()
-            .map(crate::ui::app::RebindError::text);
         div()
             .id("shortcuts-page")
             .track_focus(&self.rebind_focus)
@@ -218,13 +232,6 @@ impl SettingsView {
             .flex()
             .flex_col()
             .gap(px(24.))
-            // The refusal comes first so it is seen next to the row being changed, not below the list.
-            .children(rebind_error.map(|e| {
-                warning_caption(t, SharedString::from(e.clone()))
-                    .id("rebind-error")
-                    .role(Role::Alert)
-                    .aria_label(SharedString::from(e))
-            }))
             .children(groups)
             .when(none_registered, |d| {
                 d.child(warning_caption(
