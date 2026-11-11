@@ -6,11 +6,12 @@ reports only; "verified" is not used without a stored report. Plan: `release-0.3
 
 ## Where things stand at 01:30 (read this first)
 
-**Code is final: `77af6b04` (pushed). `public/main` is `5d493d08` = the same code plus docs, reports and the dated CHANGELOG (docs-only push, authorized as "make the release ready": it lets the tag commit contain the CHANGELOG that `release.yml` reads). CI on `5d493d08` was started at 01:30 and takes about 1.5 h: wait for it to be green before tagging.**
+**Code is final: `77af6b04` (pushed). `public/main` is `5d493d08` = the same code plus docs, reports and the dated CHANGELOG (docs-only push, authorized as "make the release ready": it lets the tag commit contain the CHANGELOG that `release.yml` reads). CI on `5d493d08` (run 43076360809) finished GREEN at 02:05 (all jobs and the Security scan): `5d493d08` is the commit to tag. The local commits after it (`8418b5c4` and later) are docs only and are not pushed: pushing them restarts CI, so push them after the tag or skip them.**
 
 | Gate | State |
 | --- | --- |
 | CI on `77af6b04` (macOS, Windows, Ubuntu, Security scan) | green (macOS `check` hung once in `cm-media` `vp9_export` on the runner, green on re-run) |
+| CI on `5d493d08` (the commit to tag; docs-only on top of `77af6b04`) | **green, all jobs and the Security scan (02:05)** |
 | Dependabot alerts | 0 open (the 10 `zip` alerts closed after the spike crates were removed) |
 | `windows-tests.yml` five consecutive green runs on the final code | met (`77af6b04`: 43056869830, 43058966521, 43060553064, 43062596263, 43064395521) |
 | fmt, check scripts, i18n check, `cargo deny`, Trivy gate | clean |
@@ -23,7 +24,7 @@ reports only; "verified" is not used without a stored report. Plan: `release-0.3
 
 **Needs you, in this order:**
 1. **The ThinkPad:** look at it (boot menu? GRUB? new address?). It was left on the Ubuntu boot entry; if it boots Ubuntu, tell me the address (or let me find it) and I will build/regress Linux x86_64 on it, then `lab.sh switch windows`. Without it the Linux x86_64 files have no hardware regression (say so in the text, or hold them).
-2. **CI green on `5d493d08`** (about 1.5 h from 01:30), then tag: `git tag -a v0.3.2 -m "CaptureMann 0.3.2"` on that commit and `git push public v0.3.2` (never reuse a tag).
+2. **CI is already green on `5d493d08`**, so tag it straight away: `git tag -a v0.3.2 -m "CaptureMann 0.3.2"` on that commit and `git push public v0.3.2` (never reuse a tag).
 3. Final files from the tag: Windows package workflow on `v0.3.2`; macOS: `Release` workflow on the tag, **or** notarize the overnight DMGs (`bash packaging/macos/notarize.sh <dmg>`, then recompute the `.sha256`; valid only because the tag commit has the same code as the one built, see `~/release-0.3.2/macos/NOTES.md`); Linux: x86_64 per item 1, aarch64 either reuse the candidate (same code) or rebuild; sign the Linux files with minisign.
 4. Fill the `<FILL>` items of `docs/development/release-0.3.2-github-text.md` from the reports and the final SHA-256 sums, save the body as `release-body.md`, upload to the draft release, publish. Then APT, winget (472327 and 477195 are open), Homebrew cask, plugin submission (`docs/development/plugin-submission-0.3.2.md`). All steps: `docs/development/release-day-0.3.2.md`.
 
@@ -80,3 +81,4 @@ cask; website and announcement; plugin submission; SignPath; Intel Mac, Windows 
 - Nov 12 00:45: `windows-tests.yml` **five consecutive green runs on the final code `77af6b04`** (runs 43056869830, 43058966521, 43060553064, 43062596263, 43064395521).
 - Nov 12 01:11: **CI green on `77af6b04`** (run 43056825513): msrv, docs, plan, licenses, bundle-macos, check (ubuntu), check (windows) green on the first run; `check (macos-latest)` hung inside `cm-media` test `a_vp9_mp4_recording_exports_with_an_encoder_the_host_may_use` (a stuck `ffmpeg`, cancelled at the 90 minute limit; the test and `cm-media` code are unchanged in 0.3.2, it passes locally and on earlier macOS runs) and **passed on the re-run of the failed job**. Security scan green. If the hang returns on the tag run, root-cause it (an `ffmpeg` hang on the macOS runner image; the test has no timeout of its own).
 - Nov 12 02:01: workspace clippy clean (exit 0). Note: the first attempt had been killed when its watcher timed out (it ran as a child of a non-persistent Monitor); re-run standalone. CI on `5d493d08` (docs-only push, run 43076360809): plan, docs, licenses, msrv, bundle-macos, check (ubuntu), check (macos) and the Security scan green; `check (windows-latest)` still running at 02:01. ThinkPad: not on the network (broadcast ping and ARP at 01:30 found only the router and two other devices).
+- Nov 12 02:05: **CI on `5d493d08` green** (run 43076360809, all jobs, Security scan green). Everything the night could do without the maintainer or the ThinkPad is done; the only watcher left checks whether the ThinkPad comes back.
