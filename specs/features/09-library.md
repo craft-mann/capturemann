@@ -20,6 +20,7 @@
 - **AC3** Given the SQLite index is deleted, when the app starts, then it rebuilds from the bundles and all captures reappear.
 - **AC4** Given Delete, then a confirmation lists what will be removed (local bundle, and optionally remote uploads) and the bundle moves to the OS Trash/Recycle Bin, not permanent deletion.
 - **AC5** Given rename to "K8s probes", then the folder becomes `K8s probes.cmrec` (with a suffix if taken) and the library entry updates.
+- **AC6** Given a screenshot whose annotations include a blur or pixelate, then its library thumbnail shows the redacted image (never `original.png`) after every change of its annotations (edit, undo, redo, revert, Auto-redact), without restarting the app; the card-shaped cut the grid keeps is dropped with the poster when the capture changes (see RED-2.AC5; tests `poster_follows_redaction_undo_redo_replace_and_revert`, `invalidating_a_capture_also_drops_its_card_cuts`).
 
 **Edge cases and errors** — Bundles added by copying into the library folder appear within a few seconds through the library watcher (or at once after "Rescan library"); a bundle is indexed only after its folder has stopped changing for 1 s and its `manifest.json` parses (an unreadable one becomes a broken row after a further 10 s), and a folder with `recording.lock` is never indexed; unreadable bundles show a broken badge with "Repair" (runs REC-8 recovery).
 

@@ -69,6 +69,21 @@ fn cover_crop(image: &RenderImage, aspect: f32) -> Option<Arc<RenderImage>> {
     Some(Arc::new(RenderImage::new([Frame::new(cropped)])))
 }
 
+/// Drops everything cached for capture `id` and returns the decoded images to release.
+fn forget_poster(
+    entries: &mut HashMap<String, Entry>,
+    crops: &mut HashMap<(String, u32), Arc<RenderImage>>,
+    id: &str,
+) -> Vec<Arc<RenderImage>> {
+    let mut out = Vec::new();
+    if let Some(Entry::Ready { image, .. }) = entries.remove(id) {
+        out.push(image);
+    }
+    let cut: Vec<(String, u32)> = crops.keys().filter(|(k, _)| k == id).cloned().collect();
+    out.extend(cut.into_iter().filter_map(|key| crops.remove(&key)));
+    out
+}
+
 impl ThumbCache {
     pub fn new(backend: Arc<Backend>) -> Self {
         ThumbCache {
@@ -214,7 +229,7 @@ impl ThumbCache {
 
     /// Forget a poster (the capture changed) so it reloads.
     pub fn invalidate(&mut self, id: &str, cx: &mut Context<Self>) {
-        if let Some(Entry::Ready { image, .. }) = self.entries.remove(id) {
+        for image in forget_poster(&mut self.entries, &mut self.crops, id) {
             cx.drop_image(image, None);
         }
         cx.notify();
@@ -232,6 +247,9 @@ impl ThumbCache {
             if let Entry::Ready { image, .. } = e {
                 cx.drop_image(image, None);
             }
+        }
+        for (_, c) in self.crops.drain() {
+            cx.drop_image(c, None);
         }
         cx.notify();
     }
@@ -301,6 +319,41 @@ mod tests {
             (u32::from(sq.size(0).width), u32::from(sq.size(0).height)),
             (100, 100)
         );
+    }
+
+    /// The thumbnail of an edited screenshot (17-redaction AC "poster follows ops"): a changed
+    /// capture must lose its card-shaped cut as well as its decoded poster, or the grid keeps
+    /// showing the pre-redaction pixels.
+    #[test]
+    fn invalidating_a_capture_also_drops_its_card_cuts() {
+        let mut entries = HashMap::new();
+        let mut crops = HashMap::new();
+        entries.insert(
+            "a".to_owned(),
+            Entry::Ready {
+                image: Arc::new(render(200, 100)),
+                used: 1,
+            },
+        );
+        crops.insert(
+            ("a".to_owned(), 1000),
+            cover_crop(&render(200, 100), 1.0).unwrap(),
+        );
+        crops.insert(
+            ("b".to_owned(), 1000),
+            cover_crop(&render(200, 100), 1.0).unwrap(),
+        );
+        let freed = forget_poster(&mut entries, &mut crops, "a");
+        assert!(entries.is_empty());
+        assert!(
+            !crops.contains_key(&("a".to_owned(), 1000)),
+            "the cut of the edited capture survived"
+        );
+        assert!(
+            crops.contains_key(&("b".to_owned(), 1000)),
+            "other captures keep theirs"
+        );
+        assert_eq!(freed.len(), 2);
     }
 
     #[test]
