@@ -452,6 +452,83 @@ impl ClientPolicies {
     }
 }
 
+/// Most known clients kept in memory (the oldest by last-seen drop out): names are
+/// self-declared, so a process that invents a new one per connection cannot grow the list.
+pub const MAX_KNOWN_CLIENTS: usize = 64;
+
+/// One client that has connected during this run of the daemon (AGT-2.AC15).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KnownClient {
+    pub name: String,
+    pub first_seen: OffsetDateTime,
+    pub last_seen: OffsetDateTime,
+    /// The last tool it called, Free tier included. `None` if it only said hello.
+    pub last_tool: Option<String>,
+    /// Calls it made since the daemon started.
+    pub calls: u64,
+}
+
+/// Clients seen by `session.hello` and by calls, in memory only: nothing is written per call
+/// and nothing leaves the computer. Separate from [`ActivityLog`], which keeps only requests
+/// that needed a confirmation or were refused (AGT-2.AC6).
+#[derive(Debug, Default)]
+pub(crate) struct KnownClients {
+    map: Mutex<HashMap<String, KnownClient>>,
+}
+
+impl KnownClients {
+    /// Registers a hello; returns `true` if the name is new.
+    pub(crate) fn hello(&self, name: &str, now: OffsetDateTime) -> bool {
+        self.touch(name, now, None)
+    }
+
+    /// Registers a call (any tier); returns `true` if the name is new.
+    pub(crate) fn call(&self, name: &str, tool: &str, now: OffsetDateTime) -> bool {
+        self.touch(name, now, Some(tool))
+    }
+
+    fn touch(&self, name: &str, now: OffsetDateTime, tool: Option<&str>) -> bool {
+        let mut g = self.map.lock().unwrap_or_else(PoisonError::into_inner);
+        let fresh = !g.contains_key(name);
+        if fresh && g.len() >= MAX_KNOWN_CLIENTS {
+            if let Some(oldest) = g
+                .values()
+                .min_by_key(|c| c.last_seen)
+                .map(|c| c.name.clone())
+            {
+                g.remove(&oldest);
+            }
+        }
+        let c = g.entry(name.to_owned()).or_insert_with(|| KnownClient {
+            name: name.to_owned(),
+            first_seen: now,
+            last_seen: now,
+            last_tool: None,
+            calls: 0,
+        });
+        c.last_seen = now;
+        if let Some(t) = tool {
+            let mut t = t.to_owned();
+            truncate_chars(&mut t, MAX_ACTIVITY_TOOL_CHARS);
+            c.last_tool = Some(t);
+            c.calls += 1;
+        }
+        fresh
+    }
+
+    pub(crate) fn all(&self) -> Vec<KnownClient> {
+        let mut v: Vec<_> = self
+            .map
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .values()
+            .cloned()
+            .collect();
+        v.sort_by(|a, b| a.name.cmp(&b.name));
+        v
+    }
+}
+
 /// Who approved a call that ran (AGT-2.AC6, AC13): the person at a confirmation dialog, or the
 /// user's own setting (`start_recording` set to Allow in Settings -> Agents & CLI).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

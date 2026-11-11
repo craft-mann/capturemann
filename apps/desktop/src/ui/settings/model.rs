@@ -7,7 +7,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use cm_daemon::tool_policy::{self, ToolControl, ToolSetting};
-use cm_daemon::{ActionSpec, ActivityEntry, ClientPolicy, Endpoint, Tier, ACTIONS};
+use cm_daemon::{ActionSpec, ActivityEntry, ClientPolicy, Endpoint, KnownClient, Tier, ACTIONS};
 use cm_i18n::{tr, tr_ctx};
 
 use crate::shortcuts::{Platform, ShortcutAction, ShortcutMap};
@@ -556,15 +556,20 @@ pub fn policy_hint(p: ClientPolicy) -> String {
 pub struct ClientRow {
     pub name: String,
     pub policy: ClientPolicy,
-    /// Most recent tool this client was gated or refused on, if any.
+    /// Most recent tool this client called (any tier, from the known-clients list) or was
+    /// gated or refused on, if any.
     pub last_tool: Option<String>,
+    /// Calls this session (0 if it only connected or only has a stored policy).
+    pub calls: u64,
 }
 
-/// Clients the daemon has heard of: those with a stored policy plus those in the activity log
-/// (an unknown client is Allowed). Sorted by name.
+/// Clients the daemon has heard of: those with a stored policy, those that connected
+/// (`session.hello`, AGT-2.AC15) and those in the activity log (an unknown client is
+/// Allowed). Sorted by name.
 pub fn client_rows(
     policies: &[(String, ClientPolicy)],
     activity: &[ActivityEntry],
+    known: &[KnownClient],
 ) -> Vec<ClientRow> {
     let mut map: BTreeMap<String, ClientRow> = BTreeMap::new();
     for (name, policy) in policies {
@@ -574,6 +579,7 @@ pub fn client_rows(
                 name: name.clone(),
                 policy: *policy,
                 last_tool: None,
+                calls: 0,
             },
         );
     }
@@ -582,8 +588,22 @@ pub fn client_rows(
             name: e.client.clone(),
             policy: ClientPolicy::default(),
             last_tool: None,
+            calls: 0,
         });
         row.last_tool = Some(e.tool.clone());
+    }
+    for k in known {
+        let row = map.entry(k.name.clone()).or_insert_with(|| ClientRow {
+            name: k.name.clone(),
+            policy: ClientPolicy::default(),
+            last_tool: None,
+            calls: 0,
+        });
+        row.calls = k.calls;
+        // The known-clients list sees every call, so its last tool is the newest.
+        if k.last_tool.is_some() {
+            row.last_tool = k.last_tool.clone();
+        }
     }
     map.into_values().collect()
 }
@@ -1140,14 +1160,49 @@ mod tests {
             entry("cursor", "delete_capture"),
             entry("claude-desktop", "publish_video"),
         ];
-        let rows = client_rows(&policies, &log);
+        let rows = client_rows(&policies, &log, &[]);
         let names: Vec<_> = rows.iter().map(|r| r.name.as_str()).collect();
         assert_eq!(names, ["claude-desktop", "cursor", "zed"]);
         assert_eq!(rows[0].policy, ClientPolicy::Allowed);
         assert_eq!(rows[0].last_tool.as_deref(), Some("publish_video"));
         assert_eq!(rows[1].policy, ClientPolicy::ReadOnly);
         assert_eq!(rows[2].last_tool, None);
-        assert!(client_rows(&[], &[]).is_empty());
+        assert!(client_rows(&[], &[], &[]).is_empty());
+    }
+
+    /// AGT-2.AC15: a client that only connected, or only called Free tools, is listed; its
+    /// newest tool wins over an older log entry.
+    #[test]
+    fn agt_2_ac15_connected_clients_show_with_their_last_free_tool() {
+        let now = OffsetDateTime::UNIX_EPOCH;
+        let known = |name: &str, tool: Option<&str>, calls| KnownClient {
+            name: name.to_owned(),
+            first_seen: now,
+            last_seen: now,
+            last_tool: tool.map(str::to_owned),
+            calls,
+        };
+        let policies = vec![("claude".to_owned(), ClientPolicy::ReadOnly)];
+        let log = [entry("claude", "delete_capture")];
+        let rows = client_rows(
+            &policies,
+            &log,
+            &[
+                known("claude", Some("generate_report"), 3),
+                known("capturemann-cli", None, 0),
+            ],
+        );
+        let view: Vec<_> = rows
+            .iter()
+            .map(|r| (r.name.as_str(), r.policy, r.last_tool.as_deref(), r.calls))
+            .collect();
+        assert_eq!(
+            view,
+            [
+                ("capturemann-cli", ClientPolicy::Allowed, None, 0),
+                ("claude", ClientPolicy::ReadOnly, Some("generate_report"), 3),
+            ]
+        );
     }
 
     /// AGT-2.AC4: a stored policy lists the client before it ever connects, and an
@@ -1157,7 +1212,7 @@ mod tests {
         let loaded = crate::settings::parse_client_policies(Some(&serde_json::json!({
             "never-seen": "blocked", "claude-desktop": "allowed", "junk": 7
         })));
-        let rows = client_rows(&loaded.policies, &[entry("late-comer", "annotate")]);
+        let rows = client_rows(&loaded.policies, &[entry("late-comer", "annotate")], &[]);
         let view: Vec<_> = rows
             .iter()
             .map(|r| (r.name.as_str(), r.policy, r.last_tool.is_some()))

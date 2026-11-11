@@ -1808,8 +1808,8 @@ msgstr "Không có bản chụp nào khớp “{query}”."
 msgid "No captures yet"
 msgstr "Chưa có bản chụp"
 
-msgid "No clients yet. A client appears here after its first confirmed or refused request, or when you add it below."
-msgstr "Chưa có ứng dụng khách nào. Ứng dụng khách xuất hiện ở đây sau yêu cầu đầu tiên được xác nhận hoặc bị từ chối, hoặc khi bạn thêm ở bên dưới."
+msgid "No clients yet. A client appears here as soon as it connects, or when you add it below."
+msgstr "Chưa có ứng dụng khách nào. Ứng dụng khách xuất hiện ở đây ngay khi kết nối, hoặc khi bạn thêm ở bên dưới."
 
 msgid "No commands match"
 msgstr "Không có lệnh nào khớp"

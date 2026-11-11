@@ -177,6 +177,7 @@ pub(crate) struct Inner {
     gate: ConfirmationGate,
     policies: ClientPolicies,
     activity: ActivityLog,
+    known_clients: crate::gate::KnownClients,
     idempotency: Mutex<crate::idem::ResultCache>,
     request_locks: LockMap,
     pub(crate) capture_locks: Arc<LockMap>,
@@ -507,6 +508,7 @@ impl DaemonBuilder {
                 events,
                 policies: ClientPolicies::default(),
                 activity: ActivityLog::default(),
+                known_clients: crate::gate::KnownClients::default(),
                 idempotency: Mutex::new(crate::idem::ResultCache::default()),
                 request_locks: LockMap::default(),
                 capture_locks: Arc::new(LockMap::default()),
@@ -589,6 +591,18 @@ impl Daemon {
     /// The Agent activity log, newest last, last 30 days (AGT-2.AC6).
     pub fn activity(&self) -> Vec<ActivityEntry> {
         self.inner.activity.entries(self.inner.clock.now())
+    }
+
+    /// Clients that connected since the daemon started, by name (AGT-2.AC15). Free-tier calls
+    /// count here; they are not in [`Daemon::activity`].
+    pub fn known_clients(&self) -> Vec<crate::gate::KnownClient> {
+        self.inner.known_clients.all()
+    }
+
+    /// A connection named itself with `session.hello` (also a blocked one: the person should
+    /// see who knocked). No bus event: Settings polls the list while it is open.
+    pub fn note_client_hello(&self, name: &str) {
+        self.inner.known_clients.hello(name, self.inner.clock.now());
     }
 
     /// Subscribes to the event stream.
@@ -884,6 +898,13 @@ impl Daemon {
             Actor::Agent(name) => Some(name.clone()),
             Actor::User => None,
         };
+
+        // 0. Remember the client and its tool (every tier, refused calls too) in memory only.
+        if let Some(name) = &agent {
+            self.inner
+                .known_clients
+                .call(name, action.method(), self.inner.clock.now());
+        }
 
         // 1. Policy.
         if let Some(name) = &agent {
