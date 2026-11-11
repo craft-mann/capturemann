@@ -1809,7 +1809,7 @@ msgid "No captures yet"
 msgstr "Chưa có bản chụp"
 
 msgid "No clients yet. A client appears here as soon as it connects, or when you add it below."
-msgstr "Chưa có ứng dụng khách nào. Ứng dụng khách xuất hiện ở đây ngay khi kết nối, hoặc khi bạn thêm ở bên dưới."
+msgstr "Chưa có ứng dụng khách nào. Ứng dụng khách sẽ xuất hiện trong danh sách ngay khi kết nối hoặc khi bạn thêm ứng dụng đó ở bên dưới."
 
 msgid "No commands match"
 msgstr "Không có lệnh nào khớp"
@@ -9899,44 +9899,34 @@ msgctxt "ignored phrase"
 msgid "Remove"
 msgstr "Xóa"
 
-#, fuzzy
 msgid "Copied {n} word"
 msgid_plural "Copied {n} words"
 msgstr[0] "Đã sao chép {n} từ"
 
-#, fuzzy
 msgid "Copy text"
 msgstr "Sao chép văn bản"
 
-#, fuzzy
 msgid "Copy text needs a Windows text recognition language. Add one in Settings > Time & language > Language & region (it installs the text recognition part), then restart CaptureMann. It reads only the languages you install there."
-msgstr "Sao chép văn bản cần một ngôn ngữ nhận dạng văn bản của Windows. Hãy thêm một ngôn ngữ trong Settings > Time & language > Language & region (phần nhận dạng văn bản sẽ được cài đặt kèm), rồi khởi động lại CaptureMann. Chỉ đọc được các ngôn ngữ bạn cài ở đó."
+msgstr "Để sao chép văn bản, hãy thêm một ngôn ngữ có hỗ trợ nhận dạng văn bản trong Windows. Vào Settings > Time & language > Language & region để thêm ngôn ngữ và cài kèm tính năng nhận dạng văn bản, rồi khởi động lại CaptureMann. CaptureMann chỉ nhận dạng được văn bản bằng các ngôn ngữ đã cài tại đó."
 
-#, fuzzy
 msgid "Copy text needs the tesseract program. Install it (Debian and Ubuntu: sudo apt install tesseract-ocr), then restart CaptureMann. It reads English; other languages need their tesseract language data."
-msgstr "Sao chép văn bản cần chương trình tesseract. Hãy cài đặt (Debian và Ubuntu: sudo apt install tesseract-ocr), rồi khởi động lại CaptureMann. Chương trình đọc tiếng Anh; các ngôn ngữ khác cần thêm dữ liệu ngôn ngữ của tesseract."
+msgstr "Để sao chép văn bản, hãy cài Tesseract rồi khởi động lại CaptureMann. Trên Debian và Ubuntu, dùng lệnh sudo apt install tesseract-ocr. Tesseract nhận dạng được văn bản tiếng Anh. Với các ngôn ngữ khác, hãy cài thêm gói dữ liệu tương ứng."
 
-#, fuzzy
 msgid "Couldn’t read the text"
 msgstr "Không đọc được văn bản"
 
-#, fuzzy
 msgid "Found text, but could not copy it to the clipboard"
 msgstr "Đã tìm thấy văn bản nhưng không sao chép được vào bộ nhớ tạm"
 
-#, fuzzy
 msgid "No text found"
 msgstr "Không tìm thấy văn bản"
 
-#, fuzzy
 msgid "Reading text…"
-msgstr "Đang đọc văn bản…"
+msgstr "Đang nhận dạng văn bản…"
 
-#, fuzzy
 msgctxt "tool"
 msgid "Select text"
-msgstr "Chọn văn bản"
+msgstr "Chọn vùng văn bản"
 
-#, fuzzy
 msgid "Read the text in a screenshot"
-msgstr "Đọc văn bản trong ảnh chụp màn hình"
+msgstr "Nhận dạng văn bản trong ảnh chụp màn hình"
