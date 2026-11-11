@@ -218,6 +218,13 @@ impl SettingsView {
             .flex()
             .flex_col()
             .gap(px(24.))
+            // The refusal comes first so it is seen next to the row being changed, not below the list.
+            .children(rebind_error.map(|e| {
+                warning_caption(t, SharedString::from(e.clone()))
+                    .id("rebind-error")
+                    .role(Role::Alert)
+                    .aria_label(SharedString::from(e))
+            }))
             .children(groups)
             .when(none_registered, |d| {
                 d.child(warning_caption(
@@ -237,12 +244,6 @@ impl SettingsView {
                     tr!("Two actions share a shortcut; only the first one is registered."),
                 ))
             })
-            .children(rebind_error.map(|e| {
-                warning_caption(t, SharedString::from(e.clone()))
-                    .id("rebind-error")
-                    .role(Role::Alert)
-                    .aria_label(SharedString::from(e))
-            }))
             .when(mode.can_change, |d| {
                 d.child(caption(t, tr!("Choose Change, then press the new combination. A shortcut another action or another app already uses is refused. Esc cancels.")))
             })
