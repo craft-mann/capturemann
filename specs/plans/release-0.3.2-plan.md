@@ -1,6 +1,14 @@
 # Release 0.3.2: plan (draft)
 
-Status: **plan written Nov 11, 2026 (scope from the maintainer); nothing built.** Follows 0.3.1 (published Nov 11, 2026).
+Status: **plan written Nov 11, 2026 (scope from the maintainer); decisions below made the same day; nothing built.** Follows 0.3.1 (published Nov 11, 2026).
+
+## Decisions (maintainer, Nov 11, 2026)
+
+- **Systems:** 0.3.2 ships on all three platforms (macOS, Windows, Linux); version bump to 0.3.2, release process and release material as for 0.3.1.
+- **PhoWhisper:** benchmark the equivalent PhoWhisper models against the original Whisper models, Vietnamese transcription only: PhoWhisper-medium vs Whisper medium, PhoWhisper-large vs Whisper large-v3 Turbo. PhoWhisper-small is out of scope (it makes no difference); do not compare small with Turbo. Purpose: decide whether to bring PhoWhisper into the app.
+- **Windows signing:** the maintainer checks SignPath Foundation (eligibility, application); the research table still covers the other options.
+- **Thumbnail:** no migration of existing bundles is required.
+- **Carry-overs:** windowed audio moves to 0.3.3; the redaction box left-edge trim and the process-tree kill on cancel are the must-haves, the rest best-effort.
 
 ## Scope (maintainer)
 
@@ -9,7 +17,7 @@ Status: **plan written Nov 11, 2026 (scope from the maintainer); nothing built.*
    (`packaging/phowhisper/convert.sh`) was not usable with the app's settings (mean WER 60.9 % on FLEURS, mostly deleted words; Large v3
    Turbo 10.6 %); `phowhisper-medium` and `-large` are `pending_pin` (not converted); `verification/benchmarks/vietnamese-models-2026-11-03.md`,
    `broken-tokens-2026-11-03.md`. First step: a fair comparison on one real Vietnamese meeting recording of the maintainer (private: counts only
-   in the report) with the maintainer's reference lines, against large-v3 and Turbo, in WER, speed, coverage, invented lines (the guard) and memory.
+   in the report) with the maintainer's reference lines, against the original Whisper medium and large-v3 Turbo (equivalent sizes, see Decisions), in WER, speed, coverage, invented lines (the guard) and memory.
 2. **The screenshot thumbnail must reflect the redaction.** A screenshot with Auto-redact boxes applied (or drawn by hand) must show the
    redacted image in the library thumbnail, not the original. Check where the thumbnail is made (library index, `.cmshot` bundle) and that
    it is rebuilt when a redaction is added, changed or removed; a test with a known pixel region. Spec: `specs/features/09-library.md`, the redaction
@@ -43,9 +51,9 @@ Work on `main`; the maintainer pushes, tags and publishes. Follow `docs/developm
    - Expect reputation to build slowly even when signed; say so in the release text.
 3. **PhoWhisper (item 1), needs the maintainer.**
    - Need: one real Vietnamese recording and its reference lines (private, counts only in the report); ask which file.
-   - Convert medium and large with `packaging/phowhisper/convert.sh` (pins in the script), or small again with the 0.3.1 settings; compare with large-v3 and Turbo on WER, speed, coverage, invented lines (guard) and memory; store a benchmark in `verification/benchmarks/`.
+   - Convert medium and large with `packaging/phowhisper/convert.sh` (pins in the script; check the converted tokens first, see `broken-tokens-2026-11-03.md`); compare each with its Whisper equivalent (medium, large-v3 Turbo) on WER, speed, coverage, invented lines (guard) and memory; store a benchmark in `verification/benchmarks/`.
    - Only if a model clearly wins: pin it in `crates/cm-ai/data/models.json` (`pending_pin` today) and upload to the Hugging Face org `craftmann`.
-4. **Carry-over bugs** (section above): the process-tree kill on cancel and the redaction box left-edge trim first (known bugs); windowed audio is the largest piece and can move to 0.3.3 if time is short.
+4. **Carry-over bugs** (section above): the process-tree kill on cancel and the redaction box left-edge trim first (known bugs); windowed audio is moved to 0.3.3 (decision above).
 
 ## Release gate (as in 0.3.1)
 
