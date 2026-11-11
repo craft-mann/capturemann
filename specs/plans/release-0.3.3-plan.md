@@ -22,4 +22,4 @@ macOS: `docs/development/velopack-spike-0.3.2.md` (GO WITH CHANGES). Windows: `d
 
 ## Carried over from 0.3.2
 
-Whatever of the 0.3.2 carry-over list is not done by release day: the speech-detector second opinion for the outro guard, "Always ignore this line", `estimate_vs_real` on Windows, Intel Mac hardware, Windows 10, a 16 GB Mac for long recordings, the cm-overlay exit race, the keyboard check of the shortcut fixes on macOS, Windows 11 and Linux X11 (`tests/manual/SHORTCUTS-1.md`).
+Whatever of the 0.3.2 carry-over list is not done by release day: the speech-detector second opinion for the outro guard, "Always ignore this line", `estimate_vs_real` on Windows, Intel Mac hardware, Windows 10, a 16 GB Mac for long recordings, the cm-overlay exit race, the optional keyboard check of the shortcut fixes on Windows 11 and Linux X11 (`tests/manual/SHORTCUTS-1.md`; the macOS report is closed).
