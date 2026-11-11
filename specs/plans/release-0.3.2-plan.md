@@ -1,6 +1,6 @@
 # Release 0.3.2: plan (draft)
 
-Status: **draft, scope from the maintainer on Nov 11, 2026, nothing built.** Follows 0.3.1 (published Nov 11, 2026).
+Status: **plan written Nov 11, 2026 (scope from the maintainer); nothing built.** Follows 0.3.1 (published Nov 11, 2026).
 
 ## Scope (maintainer)
 
@@ -27,3 +27,26 @@ Windowed audio (flat memory for long files and speakers), process-tree kill on c
 second opinion for the outro guard (Vietnamese only today), an "Always ignore this line" action, `estimate_vs_real` on Windows, Intel Mac
 hardware, Windows 10, a 16 GB Mac for long recordings, the cm-overlay exit race (grace added in `bded21fe`, unexplained), winget (PR 472327
 and 477195 open).
+
+## Order and first steps (for the session that starts 0.3.2)
+
+Work on `main`; the maintainer pushes, tags and publishes. Follow `docs/development/release-day-0.3.1.md` for the release; ask only product or scope questions.
+
+1. **Thumbnail (item 2), first: small, clear test.**
+   - Find where the `.cmshot` thumbnail is made (`cm-library`, `cm-render`) and which redaction path skips it (Auto-redact apply, hand-drawn box, remove).
+   - Fix: rebuild the thumbnail from the edited image whenever redaction changes (add, change, remove, undo).
+   - Test: a bundle with a known solid region; after a redaction the thumbnail pixels in that region are the redaction fill; after undo they are the original. Cite the AC id in the test and commit.
+   - Spec: add an AC to the redaction feature file and to `specs/features/09-library.md`; status line in `docs/project/status.md`.
+2. **Windows signing (item 3), research with no build.**
+   - Table: cost, eligibility, who holds the key, CI fit, SmartScreen effect, for SignPath Foundation, Azure Artifact Signing, OV/EV certificate, Microsoft Store (MSIX). Check current conditions on the vendors' pages; do not rely on memory.
+   - Recommendation to the maintainer (it needs an account or a payment, so it is their decision). If chosen: signing step in `windows-package.yml`, installer and CLI/app executables signed, `release-files.sh` and the release text updated, a clean-PC download check with the SmartScreen screens recorded in `verification/`.
+   - Expect reputation to build slowly even when signed; say so in the release text.
+3. **PhoWhisper (item 1), needs the maintainer.**
+   - Need: one real Vietnamese recording and its reference lines (private, counts only in the report); ask which file.
+   - Convert medium and large with `packaging/phowhisper/convert.sh` (pins in the script), or small again with the 0.3.1 settings; compare with large-v3 and Turbo on WER, speed, coverage, invented lines (guard) and memory; store a benchmark in `verification/benchmarks/`.
+   - Only if a model clearly wins: pin it in `crates/cm-ai/data/models.json` (`pending_pin` today) and upload to the Hugging Face org `craftmann`.
+4. **Carry-over bugs** (section above): the process-tree kill on cancel and the redaction box left-edge trim first (known bugs); windowed audio is the largest piece and can move to 0.3.3 if time is short.
+
+## Release gate (as in 0.3.1)
+
+CI green on three systems; `exp4_ac4_cancel_deletes_partial_output` on five consecutive `windows-tests.yml` runs; a stored `cm-regress` report of the final files per system; release text with no `<FILL>` left; assets named `CaptureMann-v<ver>-macos-<arch>.dmg` for the cask. Lab: ThinkPad T490 addresses in `~/.config/capturemann-lab`; aarch64 VM through `/tmp/cm-vm.sh`.

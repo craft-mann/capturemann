@@ -117,9 +117,9 @@ encoders, KDE and other Linux distributions, a second monitor.
 
 Minisign public key: `packaging/linux/minisign.pub`; public key `RWTeQv8ogB2CCuZ7j0rr3MovdHod4QATmVn+I329YC8pomOC6R9Rxc2k` (verify: `minisign -Vm <file> -P <that key>`).
 
-winget: pull request 472327 (0.2.8) was still open on Nov 10, 2026, so **0.3.1 is not in winget**; use the wording of `release-0.2.9-winget-note.md` with 0.3.1 as the newer version.
+winget: pull request 472327 (0.2.8) was still open on Nov 10, 2026, so **0.3.1 is not in winget yet** (pull request 477195 is open); use the wording of `release-0.2.9-winget-note.md` with 0.3.1 as the newer version.
 
-<FILL after upload: the Homebrew cask (tap commit) status, and a check of the table above against the uploaded files (the macOS DMGs were built locally by the maintainer, the Windows files by run 42942883045 on the tag).>
+Homebrew: the cask is at 0.3.1 (tap commit `9d73d13`). The table above was checked against the uploaded files on Nov 11, 2026.
 
 ### Install with APT (Ubuntu 24.04 or newer, amd64 and arm64)
 
