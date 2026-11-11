@@ -1,0 +1,17 @@
+{
+  "name": "capturemann-plugins",
+  "description": "Plugins for CaptureMann, the open-source screen recorder and screenshot tool with local AI.",
+  "owner": {
+    "name": "CraftMann",
+    "url": "https://www.craftmann.app/"
+  },
+  "plugins": [
+    {
+      "name": "capturemann",
+      "source": "./plugins/capturemann",
+      "description": "Screenshots, screen and audio recording, local transcripts and meeting notes, export and publishing through the CaptureMann app on this computer.",
+      "category": "productivity",
+      "tags": ["screenshot", "screen-recording", "transcription", "meeting-notes", "mcp"]
+    }
+  ]
+}
