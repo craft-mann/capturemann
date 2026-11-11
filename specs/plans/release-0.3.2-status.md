@@ -10,8 +10,8 @@ Rules for every agent are in the plan and in the brief: worktree branch `track/<
 | 3 | Agent clients list stays empty | `track/clients` | `crates/cm-daemon/src/gate.rs`, `daemon.rs`, `apps/desktop/src/ui/settings/agents.rs`, `model.rs`, `mod.rs`, spec 12 | running (Nov 11) | register on `session.hello`; default policy |
 | 4 | Claude plugin (build, validate, submission pack) | `track/plugin` | `plugins/`, `.claude-plugin/`, `docs/user/claude-code-plugin.md`, `tests/manual/PLUGIN-1.md`, `scripts/` (new files only) | merged Nov 11; maintainer decisions pending | maintainer submits |
 | 5 | Windows signing research (no build) | `track/signing` | `docs/development/windows-signing-options.md` | merged Nov 11; recommendation SignPath Foundation | maintainer is checking SignPath |
-| 6 | Process-tree kill on cancel | | | queued | start when disk allows |
-| 7 | Redaction box left-edge trim | | | queued | start when disk allows |
+| 6 | Process-tree kill on cancel | | | **skipped (maintainer, Nov 11)** | no details or reproduction known; fix if it comes back |
+| 7 | Redaction box left-edge trim | | | **skipped (maintainer, Nov 11)** | no details or reproduction known; fix if it comes back |
 | 9 | In-app update (Velopack) | | `docs/development/velopack-spike-0.3.2.md` | **moved to 0.3.3 (Nov 11)**; Mac spike done (GO WITH CHANGES); Windows spike finishing, its report is kept for 0.3.3 | see `release-0.3.3-plan.md` |
 | 10 | Copy text from a screenshot (OCR), ANN-5 | `track/ocr` | `crates/cm-render/src/ocr`, `crates/cm-core`, `cm-daemon` (new action), `cm-mcp`, `cm-cli`, editor and library UI, specs, docs, `compare/` | running (Nov 11) | two phases: headless action first, then editor UI; Vietnamese to verify |
 | 11 | Sidebar counts lag about 2 s after a capture or recording | `track/count-latency` | `crates/cm-daemon/src/handlers.rs` (store_capture, recording finalize), `apps/desktop/src/ui/app/watch.rs`, `ui/library_view.rs`, `nav.rs` | running (Nov 11) | measure first; hypotheses: event published after poster and base64, recording finalize order, list_library cost |

@@ -58,7 +58,7 @@ Work on `main`; the maintainer pushes, tags and publishes. Follow `docs/developm
    - Need: one real Vietnamese recording and its reference lines (private, counts only in the report); ask which file.
    - Convert medium and large with `packaging/phowhisper/convert.sh` (pins in the script; check the converted tokens first, see `broken-tokens-2026-11-03.md`); compare each with its Whisper equivalent (medium, large-v3 Turbo) on WER, speed, coverage, invented lines (guard) and memory; store a benchmark in `verification/benchmarks/`.
    - Only if a model clearly wins: pin it in `crates/cm-ai/data/models.json` (`pending_pin` today) and upload to the Hugging Face org `craftmann`.
-6. **Carry-over bugs** (section above): the process-tree kill on cancel and the redaction box left-edge trim first (known bugs); windowed audio is moved to 0.3.3 (decision above).
+6. **Carry-over bugs** (section above): the process-tree kill on cancel and the redaction box left-edge trim are **skipped for 0.3.2 (maintainer, Nov 11, 2026): there are no details or reproduction; they are fixed only if the problem comes back**.: the process-tree kill on cancel and the redaction box left-edge trim first (known bugs); windowed audio is moved to 0.3.3 (decision above).
 
 4. **Claude plugin, submitted to Anthropic's directory (added by the maintainer, Nov 11, 2026).** Ship a plugin so Claude users get CaptureMann's MCP server and
    a few skills with one command. Analysis of https://code.claude.com/docs/en/plugins/overview (and the components, manifest and publish pages):
