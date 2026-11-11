@@ -106,8 +106,8 @@ encoders, KDE and other Linux distributions, a second monitor.
 
 | File | SHA-256 |
 |---|---|
-| `capturemann-0.3.1-windows-x64-setup.exe` | `e352619477f41d433b150f79f0c714fadd31694364ee72d1954550d679919898` |
-| `capturemann-0.3.1-windows-x64.zip` | `7360cfa16421d0d76e0f4d69f3392911f1e711400fb9dfe92bcaf77777c0b13d` |
+| `capturemann-0.3.1-windows-x64-setup.exe` | `d9ffd95665117c1c635e749df27c2f8dbc36d11844aa716abdfe738bf947cc78` |
+| `capturemann-0.3.1-windows-x64.zip` | `44c3584bb23bb5c13f10f6911c36e35b0d3fa79a119123b31d2a7214e677d098` |
 | `CaptureMann-0.3.1-arm64.dmg` | `5a8b05f231f7514e8cc4016d852cd7c99ae2a154ece5bdb4c4d6d0bbd8c83dce` |
 | `CaptureMann-0.3.1-x86_64.dmg` | `80a16c813b2c0f5ee5c36d3bc5cbac3fa4062162af3e038e8272a27bbd46b6a6` |
 | `capturemann-0.3.1-linux-x86_64.tar.gz` | `0c6b77c20b6eb047cd615bbf72ba863445713b75ce0df232e080d635c023a3e1` |
