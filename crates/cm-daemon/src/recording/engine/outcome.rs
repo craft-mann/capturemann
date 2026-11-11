@@ -51,9 +51,19 @@ pub(super) fn finalize_blocking(
         stopped.wall_end,
         stopped.stop_ms,
     );
+    let t_finish = std::time::Instant::now();
     let mut lib = lock_library(library);
     let record = stopped.finish_into(&mut lib)?;
     let path = lib.bundle_path(&record);
+    // Where the time goes between "stop" and the library row (the sidebar count follows
+    // `capture.created`, published right after this): `stop_ms` is the tracks' own stop (encoder
+    // flush), `finish_ms` the manifest and the index row. `tests/manual/COUNT-LATENCY.md`.
+    log::debug!(
+        "recording finalized: capture {} stop_ms={:.0} finish_ms={:.0}",
+        record.id,
+        stop_ms,
+        t_finish.elapsed().as_secs_f64() * 1e3
+    );
     Ok(StopDone {
         record,
         path,

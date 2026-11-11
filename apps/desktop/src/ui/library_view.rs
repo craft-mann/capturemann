@@ -17,8 +17,9 @@ use crate::ai::models::NoticeSite;
 use crate::backend::Backend;
 use crate::daemon_text::{AppNote, ErrorNote};
 use crate::library::{
-    columns_for_width, format_duration, format_size, row_of_item, CaptureItem, CardAction, Chip,
-    EmptyKind, Filter, Kind, LibraryState, LibraryStatus, LocalClock, Row, SortKey, GRID_GAP,
+    columns_for_width, format_duration, format_size, kind_counts, row_of_item, CaptureItem,
+    CardAction, Chip, EmptyKind, Filter, Kind, LibraryState, LibraryStatus, LocalClock, Row,
+    SortKey, GRID_GAP,
 };
 use crate::nav::{self, NavCounts};
 use crate::overlay::CaptureMode;
@@ -87,6 +88,8 @@ pub struct LibraryView {
     focus_list_next: bool,
     /// The library changed while another page was showing: reload when this one shows (R1-7).
     stale: bool,
+    /// Generation of the last sidebar-count read: an older answer never overwrites a newer one.
+    counts_gen: u64,
     /// The next list rebuild comes from a library change (a watcher event, a rescan), not from
     /// the user's search or filter: keep the scroll position (the selection is kept by id).
     keep_scroll: bool,
@@ -133,13 +136,19 @@ impl LibraryView {
                     let changed = app.update(cx, |m, _| std::mem::take(&mut m.changed_captures));
                     this.pending_invalidate.extend(changed);
                     // Not on screen: remember, and reload when it is (R1-7).
-                    if matches!(
+                    let on_screen = matches!(
                         app.read(cx).route,
                         Route::Library | Route::Screenshots | Route::Recordings | Route::Audio
-                    ) {
+                    );
+                    if on_screen {
                         this.reload(cx);
                     } else {
                         this.stale = true;
+                    }
+                    // The sidebar counts follow the event at once (LIB-1.AC7): a kind page, a
+                    // search or another page never shows this list's totals, so ask for them.
+                    if !on_screen || !this.state.is_whole_library() {
+                        this.refresh_counts(cx);
                     }
                 }
                 cx.notify();
@@ -176,6 +185,7 @@ impl LibraryView {
             debounce: None,
             focus_list_next: false,
             stale: false,
+            counts_gen: 0,
             keep_scroll: false,
             pending_invalidate: Vec::new(),
             _subs: subs,
@@ -246,33 +256,58 @@ impl LibraryView {
 
     /// Publishes the real per-kind totals to the sidebar after an unfiltered load.
     fn publish_counts(&self, cx: &mut Context<Self>) {
-        if !self.state.query.is_empty()
-            || self.state.filter != Filter::All
-            || self.state.remote.is_some()
-        {
+        if !self.state.is_whole_library() {
             return;
         }
+        let published = self.app.read(cx).counts.published;
         let counts = if matches!(self.state.status, LibraryStatus::Ready) {
-            let n = |k: Kind| self.state.items().iter().filter(|i| i.kind == k).count();
-            NavCounts {
-                screenshots: Some(n(Kind::Screenshot)),
-                recordings: Some(n(Kind::Recording)),
-                audio: Some(n(Kind::Audio)),
-                // Not this view's to know: the Published page counts its own.
-                published: self.app.read(cx).counts.published,
-            }
+            kind_counts(self.state.items(), published)
         } else {
             NavCounts {
-                published: self.app.read(cx).counts.published,
+                published,
                 ..NavCounts::default()
             }
         };
+        self.set_counts(counts, cx);
+    }
+
+    fn set_counts(&self, counts: NavCounts, cx: &mut Context<Self>) {
         self.app.update(cx, |m, cx| {
             if m.counts != counts {
                 m.counts = counts;
                 cx.notify();
             }
         });
+    }
+
+    /// Counts for the sidebar when this view's own list is not the whole library (a kind page,
+    /// a search, a chip) or is not on screen: one unfiltered read of the library, about 5 ms for
+    /// 250 captures (measured, `count_latency_bench`), nothing else is touched.
+    fn refresh_counts(&mut self, cx: &mut Context<Self>) {
+        let backend = self.app.read(cx).backend.clone();
+        let Some(daemon) = backend.daemon.clone() else {
+            return;
+        };
+        let rt = backend.rt.clone();
+        self.counts_gen += 1;
+        let generation = self.counts_gen;
+        cx.spawn(async move |this, cx| {
+            let res = rt
+                .spawn(async move { Backend::list_library(&daemon, "", None, None).await })
+                .await;
+            let Ok(Ok(all)) = res else {
+                return;
+            };
+            this.update(cx, |this, cx| {
+                if generation != this.counts_gen {
+                    return;
+                }
+                let published = this.app.read(cx).counts.published;
+                this.set_counts(kind_counts(&all.items, published), cx);
+            })
+            .ok();
+        })
+        .detach();
     }
 
     fn sync_items(&mut self) {

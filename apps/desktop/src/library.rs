@@ -110,6 +110,18 @@ impl Kind {
     }
 }
 
+/// The sidebar's per-kind totals of a list of the whole library (`published` is not this
+/// list's to know and is carried over).
+pub fn kind_counts(items: &[CaptureItem], published: Option<usize>) -> crate::nav::NavCounts {
+    let n = |k: Kind| items.iter().filter(|i| i.kind == k).count();
+    crate::nav::NavCounts {
+        screenshots: Some(n(Kind::Screenshot)),
+        recordings: Some(n(Kind::Recording)),
+        audio: Some(n(Kind::Audio)),
+        published,
+    }
+}
+
 /// One row of `list_library`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CaptureItem {
@@ -513,6 +525,12 @@ impl LibraryState {
                     .count(),
             ));
         }
+    }
+
+    /// Whether the loaded list is the whole library (no query, remote chip or kind page): only
+    /// then are its per-kind totals the sidebar's counts.
+    pub fn is_whole_library(&self) -> bool {
+        self.query.is_empty() && self.filter == Filter::All && self.remote.is_none()
     }
 
     /// Starts a (re)load and returns its generation token.
@@ -991,6 +1009,46 @@ mod tests {
 
     fn item(id: &str, title: &str, created: &str, dur: Option<i64>, size: u64) -> CaptureItem {
         CaptureItem::from_json(&rec(id, title, "screenshot", created, dur, size)).unwrap()
+    }
+
+    /// LIB-1.AC7: the sidebar counts come from the whole library, whatever page is showing: a
+    /// kind page, a search or a chip is not "the whole library" (the view then asks for its own
+    /// unfiltered list), and the totals count each kind and carry `published` over.
+    #[test]
+    fn lib1_ac7_sidebar_counts_follow_the_whole_library() {
+        let mk = |id: &str, kind: &str| {
+            CaptureItem::from_json(&rec(id, id, kind, "2026-10-20T09:30:00Z", None, 1)).unwrap()
+        };
+        let items = vec![
+            mk("a", "screenshot"),
+            mk("b", "screenshot"),
+            mk("c", "recording"),
+            mk("d", "audio"),
+        ];
+        let c = kind_counts(&items, Some(7));
+        assert_eq!(
+            (c.screenshots, c.recordings, c.audio, c.published),
+            (Some(2), Some(1), Some(1), Some(7))
+        );
+        // A new screenshot moves only its own count, and never backwards.
+        let mut more = items.clone();
+        more.push(mk("e", "screenshot"));
+        let c2 = kind_counts(&more, Some(7));
+        assert_eq!(c2.screenshots, Some(3));
+        assert_eq!((c2.recordings, c2.audio), (c.recordings, c.audio));
+        // An empty library reads 0, not "unknown".
+        assert_eq!(kind_counts(&[], None).screenshots, Some(0));
+
+        let mut s = LibraryState::new(LibraryStatus::Ready);
+        assert!(s.is_whole_library());
+        s.filter = Filter::Screenshots;
+        assert!(!s.is_whole_library(), "a kind page lists one kind");
+        s.filter = Filter::All;
+        s.query = "k8s".into();
+        assert!(!s.is_whole_library(), "a search lists some captures");
+        s.query.clear();
+        assert!(s.click_chip(Chip::Uploaded));
+        assert!(!s.is_whole_library(), "a chip lists some captures");
     }
 
     #[test]
