@@ -108,8 +108,8 @@ encoders, KDE and other Linux distributions, a second monitor.
 |---|---|
 | `capturemann-0.3.1-windows-x64-setup.exe` | `d9ffd95665117c1c635e749df27c2f8dbc36d11844aa716abdfe738bf947cc78` |
 | `capturemann-0.3.1-windows-x64.zip` | `44c3584bb23bb5c13f10f6911c36e35b0d3fa79a119123b31d2a7214e677d098` |
-| `CaptureMann-0.3.1-arm64.dmg` | `fe9974c41dc206b9e05b14b87ae507ef5f935f8baf0265ae37fd205438a32342` |
-| `CaptureMann-0.3.1-x86_64.dmg` | `e360ae60f939f37e51ffe19b9c812d693822a0d8619b1d11228703c5f36a3db5` |
+| `CaptureMann-v0.3.1-macos-arm64.dmg` | `fe9974c41dc206b9e05b14b87ae507ef5f935f8baf0265ae37fd205438a32342` |
+| `CaptureMann-v0.3.1-macos-x86_64.dmg` | `e360ae60f939f37e51ffe19b9c812d693822a0d8619b1d11228703c5f36a3db5` |
 | `capturemann-0.3.1-linux-x86_64.tar.gz` | `0c6b77c20b6eb047cd615bbf72ba863445713b75ce0df232e080d635c023a3e1` |
 | `capturemann_0.3.1_amd64.deb` | `b9f8195a79e0fdf4b45df65c4cc4bc3d990db0459d272f7bad9ee1282a1b7f8d` |
 | `capturemann-0.3.1-linux-aarch64.tar.gz` | `d5875e59b44b519ee1ecde7c3d749a5efb6e8962e9235610d749e34055eedf3d` |
