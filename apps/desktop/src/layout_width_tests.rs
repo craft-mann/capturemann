@@ -1146,12 +1146,13 @@ fn cases() -> Vec<Case> {
     );
 
     // Editor view pill (ANN-5): the Copy text button is 8 px side padding, 1 px border, a 16 px icon
-    // and a 6 px gap; the pill wraps, so the label must fit in about 150 px beside the icon.
+    // and a 6 px gap; the pill wraps, so the button may be as wide as the pill. The reviewed
+    // Vietnamese "Đang nhận dạng văn bản…" is 144 px, so the pinned button width is 190 px (it was 150).
     v.push(
         Case::new(
             "Editor Copy text button",
-            "150 - 16 padding - 2 border - 16 icon - 6 gap",
-            150. - 40.,
+            "190 - 16 padding - 2 border - 16 icon - 6 gap",
+            190. - 40.,
             cap,
             400,
             one,
