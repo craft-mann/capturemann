@@ -44,6 +44,7 @@ pub const CLI_COMMANDS: &[(&str, Option<&str>)] = &[
     ("annotate", Some("annotate")),
     ("get_capture", Some("capture get")),
     ("suggest_redactions", Some("annotate --suggest-redactions")),
+    ("recognize_text", Some("text")),
     ("get_settings", Some("settings get")),
     ("set_settings", Some("settings set")),
     ("undo", Some("undo")),

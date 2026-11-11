@@ -310,6 +310,56 @@ async fn ann_2_ac4_suggest_redactions_proposes_and_applies_nothing() {
     c.cancel().await.unwrap();
 }
 
+/// ANN-5 over MCP: Free and read-only, text in reading order, bad params refused, schema listed.
+#[tokio::test]
+async fn ann_5_recognize_text_returns_the_text_and_changes_nothing() {
+    use cm_daemon::testing::{ScriptedRecognizer, TextLine};
+    let (b, _dir) = builder();
+    let rec = ScriptedRecognizer::new(vec![
+        TextLine::laid_out("second", 50.0, 90.0, 10.0, 20.0),
+        TextLine::laid_out("first line", 50.0, 60.0, 10.0, 20.0),
+    ]);
+    let (conn, _) = duplex_connector(b.text_recognizer(rec).build());
+    let c = mcp_client(conn, "claude-desktop").await;
+    let tools = c.list_all_tools().await.unwrap();
+    let t = tools.iter().find(|t| t.name == "recognize_text").unwrap();
+    assert_eq!(t.annotations.as_ref().unwrap().read_only_hint, Some(true));
+    assert!(t.description.as_deref().unwrap().contains("Tier: Free"));
+
+    let shot = call(
+        &c,
+        "capture_screenshot",
+        json!({"target": {"display_id": 1}}),
+    )
+    .await;
+    let id = ok(&shot)["capture_id"].as_str().unwrap().to_owned();
+    let r = call(
+        &c,
+        "recognize_text",
+        json!({"capture_id": id, "format": "lines"}),
+    )
+    .await;
+    let v = ok(&r);
+    assert_eq!(v["text"], "first line\nsecond", "{v}");
+    assert_eq!(v["lines"].as_array().unwrap().len(), 2);
+    assert_eq!(v["copied_to_clipboard"], false);
+    let got = call(
+        &c,
+        "get_capture",
+        json!({"capture_id": id, "include_image": false}),
+    )
+    .await;
+    assert_eq!(ok(&got)["revision"], 0);
+    let bad = call(
+        &c,
+        "recognize_text",
+        json!({"capture_id": id, "region": [1, 2]}),
+    )
+    .await;
+    assert_eq!(err_code(&bad), "invalid_input");
+    c.cancel().await.unwrap();
+}
+
 #[tokio::test]
 async fn settings_round_trip_and_secret_keys_are_refused() {
     let (b, _dir) = builder();

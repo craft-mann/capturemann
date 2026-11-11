@@ -38,6 +38,9 @@ pub const ACTIONS: &[ActionSpec] = &[
     // Auto-redact (ANN-2.AC4): reads the original with the on-device text recognizer and proposes
     // blur rectangles. Read-only: accepting a proposal is an ordinary `annotate` with blur ops.
     spec("suggest_redactions", Tier::Free, false),
+    // Copy text from a screenshot (ANN-5): reads the RENDERED image with the on-device text
+    // recognizer. Read-only: nothing is stored; `copy_to_clipboard` only sets the clipboard.
+    spec("recognize_text", Tier::Free, false),
     spec("get_settings", Tier::Free, false),
     spec("set_settings", Tier::Free, true),
     spec("undo", Tier::Free, true),

@@ -76,6 +76,10 @@ pub enum Command {
         #[command(subcommand)]
         cmd: RecordCmd,
     },
+    /// Print the text in a screenshot (`recognize_text`, read-only, on this computer only): plain
+    /// text in reading order from the rendered image (annotations and redactions applied, so
+    /// blurred text is not read). `--region` limits it; `--copy` puts it on the clipboard.
+    Text(TextArgs),
     /// List cameras, microphones and system-audio support (`list_devices`).
     Devices,
     /// Print the diagnostics report to paste into an issue (`get_diagnostics`): versions, system,
@@ -1440,4 +1444,21 @@ pub struct RecordStartArgs {
     /// Keep this window id out of the recording; repeatable.
     #[arg(long = "exclude-window", value_name = "ID")]
     pub exclude_windows: Vec<u32>,
+}
+
+/// `text <id>` (ANN-5).
+#[derive(Debug, clap::Args)]
+pub struct TextArgs {
+    /// Capture id of a screenshot.
+    pub id: String,
+    /// Only this part of the image: `x,y,w,h` in pixels of the original image.
+    #[arg(long, value_name = "X,Y,W,H", allow_hyphen_values = true)]
+    pub region: Option<String>,
+    /// Also put the text on the clipboard (only when text was found).
+    #[arg(long)]
+    pub copy: bool,
+    /// Print each line with its box and confidence instead of the plain text (`--json` always
+    /// has the text; with this flag it has the lines too).
+    #[arg(long)]
+    pub lines: bool,
 }

@@ -15,6 +15,7 @@ mod library;
 mod publish;
 mod record;
 mod settings;
+mod text;
 
 use crate::args::{
     CaptureCmd, Cli, Command, DaemonCmd, JobsCmd, LibraryCmd, LibraryListArgs, RecordCmd,
@@ -38,6 +39,7 @@ use settings::{
     cursor_track, daemon_start, daemon_status, devices, diagnostics, mcp, platform_rules,
     settings_get, settings_set,
 };
+use text::text;
 
 struct Ctx<'a> {
     json: bool,
@@ -103,6 +105,7 @@ pub async fn execute(cli: Cli, env: &mut Env) -> Result<(), CliError> {
                 record_watch(&mut cx, topics, max_events).await
             }
         },
+        Command::Text(a) => text(&mut cx, a).await,
         Command::Devices => devices(&mut cx).await,
         Command::Diagnostics => diagnostics(&mut cx).await,
         Command::Cursor {

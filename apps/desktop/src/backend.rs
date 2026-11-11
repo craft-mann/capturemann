@@ -670,6 +670,10 @@ impl Clipboard for ArcClipboard {
     fn copy_png(&self, png: &[u8]) -> Result<(), CmError> {
         self.0.copy_png(png)
     }
+
+    fn copy_text(&self, text: &str) -> Result<(), CmError> {
+        self.0.copy_text(text)
+    }
 }
 
 /// The clipboard the app uses by default.

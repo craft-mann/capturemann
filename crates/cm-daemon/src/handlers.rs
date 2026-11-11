@@ -41,7 +41,7 @@ fn image_json(png: &[u8]) -> Value {
     })
 }
 
-fn render_png(bundle: &ShotBundle) -> Result<Vec<u8>, CmError> {
+pub(crate) fn render_png(bundle: &ShotBundle) -> Result<Vec<u8>, CmError> {
     let base = image::open(bundle.original_path())
         .map_err(|e| CmError::internal(format!("cannot read original.png: {e}")))?
         .to_rgba8();

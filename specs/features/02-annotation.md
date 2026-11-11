@@ -115,3 +115,39 @@ Annotations are vector operations stored in `manifest.json` (`ops` list) and ren
 **Summary** — New op types `callout` (text box with a pointer tail), `stamp` (built-in vector icons), `image` (pasted PNG with scale and rotation).
 
 **Key criteria (to refine)** — New ops follow the same schema rules, undo, and golden-render tests as ANN-1.
+
+---
+
+### ANN-5 Copy text from a screenshot
+**Priority** P1 · **Status** In progress (the headless part is built and tested with a scripted recognizer: `ocr::layout_text` and the region crop in `cm-render`, the action `recognize_text` through daemon, MCP and CLI; the editor part (button, Select text tool, menu entries) is built after it; no real recognizer has been run on a screenshot of real content except the checks recorded in `verification/`) · **Crates** cm-render, cm-daemon, cm-mcp, cm-cli, apps/desktop · **Depends on** ANN-1, ANN-3, ANN-2 (the recognizer)
+
+ID note: the plan for 0.3.2 called this ANN-4, but ANN-4 is the draft "Callouts, stamps and image overlays" (and FR row ANN-4), so this feature is ANN-5.
+
+**User story** — As anyone who screenshots an error message, a table or a chat, I want to select the text in the image and copy it, so that I do not retype it.
+
+**Description**
+- Action `recognize_text { capture_id, region?: [x, y, w, h], copy_to_clipboard?, format?: "text" | "lines" }` → `{ capture_id, recognizer, region, text, word_count, truncated, copied_to_clipboard, warnings, lines? }`. `region` is in pixels of the original image (like annotation ops); with none, the whole image. `format: "lines"` adds `lines: [{ text, rect, confidence }]`.
+- **It reads the rendered image** (annotations and redactions applied; rendered on the fly when `render.png` is missing or stale), never `original.png`. This is the opposite of Auto-redact on purpose: text under a blur or pixelate must not come back (RED-2.AC1 applies to copied text too). With no ops the render equals the original. With a crop op, the numbers stay original pixels (the handler shifts them).
+- **Layout** (`cm_render::ocr::layout_text`, general, no language or phrase lists): lines in reading order from their boxes; pieces on one row joined left to right; a blank line where the vertical gap is more than 0.9 of the median line height; columns (no line covers a stretch of at least 2 median heights between them) read one after the other with a blank line between; a line that spans the gutter (a wide heading) makes the page one column; trailing spaces trimmed; hyphenated line ends are not joined.
+- **Region**: cropped with an 8 px margin so edge glyphs are not cut, recognized, boxes mapped back, lines whose centre is outside the region dropped.
+- **Limits**: a region of more than 64 million pixels is `invalid_input`; text is cut at 100,000 characters with `truncated: true`; a region outside the image or empty is `invalid_input`.
+- Free tier, read-only, on this computer only: no network, nothing stored (no sidecar, no manifest change, no revision, not an undo step). `copy_to_clipboard` copies the same text, only when some was found; an empty result leaves the clipboard alone.
+- **Editor**: a **Copy text** button (the whole image) and a **Select text** tool (drag a rectangle); the text goes to the clipboard through the action; a toast says "Copied N words" or "No text found". **Library**: a "Copy text" entry in the item menu and in the capture toast. Recognition runs off the UI thread with a spinner. Where there is no recognizer the entries are dimmed with the install hint, as Auto-redact is.
+- **What each system reads** (be exact in the UI hint and the docs): macOS (Apple Vision) reads the languages Vision supports; Windows (`Windows.Media.Ocr`) reads only the OCR languages installed in Windows (Settings, Time and language, Language and region), and falls back to `tesseract` when none is usable; Linux uses the system `tesseract`, which reads English with the `eng.traineddata` it comes with, and other languages only when their traineddata is installed (`CM_TESSDATA`). Handwriting and heavily stylised text are not promised on any system. Accuracy is not claimed beyond what `verification/` records.
+
+**Acceptance criteria**
+- **AC1** Given a screenshot whose recognizer returns lines out of order, in two columns and with a large vertical gap, then `text` has the lines in reading order, the columns one after the other and a blank line at the gap.
+- **AC2** Given a pixelate op over text, when `recognize_text` runs, then the recognizer is given the rendered image (pixel for pixel the image `annotate` returns), which differs from the original inside the rectangle; and after undo it is given the original again.
+- **AC3** Given `region`, then only that region (plus the margin) is given to the recognizer and the returned boxes are in original pixels, also after a crop op.
+- **AC4** Given `copy_to_clipboard: true` and text found, then the clipboard holds the same text, the image slot is untouched, and the capture's revision and ops are unchanged; with no text found nothing is copied.
+- **AC5** Given no recognizer, then the action answers `not_implemented` with the install hint, before any work, and the editor shows the entries dimmed with that hint.
+- **AC6** Given a bad `region`, `format` or other parameter, then `invalid_input` before any recognition.
+- **AC7** (editor) Given the Select text tool and a dragged rectangle, then the daemon action runs with that rectangle in image pixels and the toast reports the number of words or that none was found.
+
+**Edge cases and errors** — Very large screenshot: runs off the UI thread; rotated or vertical text is read as the recognizer reads it. No text: `text: ""`, not an error. Another app holding the clipboard: `copied_to_clipboard: false` and a warning.
+
+**Agent interface** — MCP `recognize_text` (Free, read-only), CLI `capturemann text <id> [--region x,y,w,h] [--copy] [--lines]`; same parameters and result.
+
+**Out of scope** — Recognizing text in recordings or video frames, a searchable text index of the library, translating the recognized text, a PDF with a text layer.
+
+**Test notes** — `layout_text` and the region crop with scripted `TextLine`s (`crates/cm-render/src/ocr/text.rs`); the action with the daemon rig and a recording recognizer (`crates/cm-daemon/tests/recognize_text.rs`); MCP and CLI tests; the real-engine check on synthetic PNGs is ignored by default (`crates/cm-render/tests/ocr_real.rs`); `tests/manual/ANN-5.md` for the editor.

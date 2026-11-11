@@ -1224,6 +1224,7 @@ impl Daemon {
             Action::Annotate(p) => inner.annotate(actor, p).await,
             Action::GetCapture(p) => inner.get_capture(p).await,
             Action::SuggestRedactions(p) => inner.suggest_redactions(p).await,
+            Action::RecognizeText(p) => inner.recognize_text(p).await,
             Action::GetSettings(p) => inner.get_settings(p),
             Action::SetSettings(p) => inner.set_settings(actor, p).await,
             Action::Undo(p) => inner.undo_redo(actor, p, true).await,

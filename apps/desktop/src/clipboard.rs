@@ -66,6 +66,20 @@ impl<P: Pasteboard> ClipboardWriter<P> {
 }
 
 impl<P: Pasteboard> Clipboard for ClipboardWriter<P> {
+    fn copy_text(&self, text: &str) -> Result<(), CmError> {
+        let mut tries = 0;
+        loop {
+            match self.pasteboard.set_text(text) {
+                Ok(()) => return Ok(()),
+                Err(e) if tries >= self.retries => return Err(e),
+                Err(_) => {
+                    tries += 1;
+                    std::thread::sleep(self.pause);
+                }
+            }
+        }
+    }
+
     fn copy_png(&self, png: &[u8]) -> Result<(), CmError> {
         // A TIFF that cannot be made never costs the PNG.
         let tiff = if self.with_tiff {

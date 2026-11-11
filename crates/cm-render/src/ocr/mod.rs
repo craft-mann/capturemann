@@ -25,9 +25,14 @@ mod apple;
 pub mod detect;
 pub mod rules;
 pub mod tesseract;
+pub mod text;
 pub mod winocr;
 #[cfg(windows)]
 mod winrt;
+
+pub use text::{
+    layout_text, recognize_region, word_count, LayoutOptions, PixelRegion, REGION_MARGIN,
+};
 
 pub use detect::{
     mask_preview, suggest_redactions, RedactionKind, RedactionSuggestion, SuggestOptions,

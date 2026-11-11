@@ -87,6 +87,14 @@ fn run_request(png: &[u8], width: f64, height: f64) -> Result<Vec<TextLine>, CmE
         let r: Retained<AnyObject> = msg_send![request_class, new];
         let _: () = msg_send![&*r, setRecognitionLevel: LEVEL_ACCURATE];
         let _: () = msg_send![&*r, setUsesLanguageCorrection: false];
+        // Automatic language detection (`automaticallyDetectsLanguage`, macOS 13 and later, the
+        // Vision request revision 3): without it Vision reads with its default language list. A
+        // Mac that does not answer the selector keeps the defaults.
+        let detects = objc2::sel!(setAutomaticallyDetectsLanguage:);
+        let can: bool = msg_send![&*r, respondsToSelector: detects];
+        if can {
+            let _: () = msg_send![&*r, setAutomaticallyDetectsLanguage: true];
+        }
         r
     };
 

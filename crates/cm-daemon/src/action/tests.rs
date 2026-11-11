@@ -16,6 +16,11 @@ fn samples() -> Vec<(&'static str, Value)> {
             "suggest_redactions",
             json!({"capture_id": "shot_1", "kinds": ["email", "token"]}),
         ),
+        ("recognize_text", json!({"capture_id": "shot_1"})),
+        (
+            "recognize_text",
+            json!({"capture_id": "shot_1", "region": [1, 2, 30, 40], "copy_to_clipboard": true, "format": "lines"}),
+        ),
         ("get_settings", json!({})),
         ("set_settings", json!({"values": {"recording.fps": 60}})),
         ("undo", json!({"capture_id": "shot_1"})),
@@ -464,6 +469,17 @@ fn bad_inputs_name_the_field() {
         ),
         ("undo", json!({}), "capture_id"),
         ("suggest_redactions", json!({}), "capture_id"),
+        ("recognize_text", json!({}), "capture_id"),
+        (
+            "recognize_text",
+            json!({"capture_id": "a", "region": [1, 2]}),
+            "region",
+        ),
+        (
+            "recognize_text",
+            json!({"capture_id": "a", "format": "x"}),
+            "format",
+        ),
         (
             "suggest_redactions",
             json!({"capture_id": "x", "kinds": ["face"]}),

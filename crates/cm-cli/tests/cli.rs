@@ -3371,3 +3371,59 @@ async fn exp5_webm_width_works_end_to_end_and_is_refused_elsewhere() {
         "{size} against {est}"
     );
 }
+
+/// ANN-5: `text <id>` prints the text, `--region` and `--lines` reach the daemon, `--copy` sets
+/// the (fake) clipboard, nothing is changed.
+#[tokio::test]
+async fn ann_5_text_prints_copies_and_changes_nothing() {
+    use cm_daemon::testing::{RecordingClipboard, ScriptedRecognizer, TextLine};
+    let dir = tempfile::tempdir().unwrap();
+    let endpoint = Endpoint::scratch(dir.path(), "d");
+    let lib = Library::open_or_create(&dir.path().join("lib")).unwrap();
+    let clip = Arc::new(RecordingClipboard::default());
+    let rec = ScriptedRecognizer::new(vec![
+        TextLine::laid_out("second", 50.0, 90.0, 10.0, 20.0),
+        TextLine::laid_out("first line", 50.0, 60.0, 10.0, 20.0),
+    ]);
+    let daemon = Daemon::builder(Capturer::new(desktop()).with_own_pid(None), lib)
+        .text_recognizer(rec)
+        .clipboard(clip.clone())
+        .build();
+    serve(&daemon, &endpoint);
+    let r = Rig {
+        dir,
+        endpoint,
+        daemon,
+    };
+    let id = cli(&r, &["capture", "screenshot", "--display", "1", "--json"])
+        .await
+        .json()["capture_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+
+    let plain = cli(&r, &["text", &id]).await;
+    assert_eq!(plain.code, 0, "{}", plain.err);
+    assert_eq!(plain.out.trim_end(), "first line\nsecond");
+    assert!(clip.last_text().is_none());
+
+    let copied = cli(&r, &["text", &id, "--copy", "--region", "0,0,300,200"]).await;
+    assert_eq!(copied.code, 0, "{}", copied.err);
+    assert_eq!(clip.last_text().unwrap(), "first line\nsecond");
+    assert!(copied.err.contains("copied 3 word(s)"), "{}", copied.err);
+
+    let lines = cli(&r, &["text", &id, "--lines"]).await;
+    assert!(lines.out.contains("first line"), "{}", lines.out);
+    assert!(lines.out.contains("1.00"), "{}", lines.out);
+    let j = cli(&r, &["text", &id, "--lines", "--json"]).await;
+    assert_eq!(j.json()["lines"].as_array().unwrap().len(), 2);
+    assert_eq!(j.json()["text"], "first line\nsecond");
+
+    let bad = cli(&r, &["text", &id, "--region", "1,2,3"]).await;
+    assert_eq!(bad.code, none_code(), "{}", bad.err);
+    let nope = cli(&r, &["text", "shot_nope"]).await;
+    assert_ne!(nope.code, 0);
+
+    let got = cli(&r, &["capture", "get", &id, "--json"]).await;
+    assert_eq!(got.json()["revision"], 0);
+}

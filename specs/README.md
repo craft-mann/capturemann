@@ -32,7 +32,7 @@ Plans for larger features and the design-kit traceability table live in `plans/`
 | File | Area | IDs |
 | --- | --- | --- |
 | `features/01-screenshot.md` | Screenshot | CAP-1 … CAP-6 |
-| `features/02-annotation.md` | Annotation | ANN-1 … ANN-4 |
+| `features/02-annotation.md` | Annotation | ANN-1 … ANN-5 |
 | `features/03-recording.md` | Recording | REC-1 … REC-9 |
 | `features/04-webcam.md` | Webcam | CAM-1 … CAM-5 |
 | `features/05-audio.md` | Audio | AUD-1 … AUD-4 |

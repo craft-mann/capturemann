@@ -278,6 +278,7 @@ impl Action {
                 f.only(&[])?;
                 Action::GetDiagnostics
             }
+            crate::text_ops::METHOD => return crate::text_ops::parse(&f),
             crate::read_tools::CURSOR_METHOD => {
                 return crate::read_tools::parse_cursor(&f);
             }

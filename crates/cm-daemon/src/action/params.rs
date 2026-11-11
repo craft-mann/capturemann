@@ -367,6 +367,8 @@ pub enum Action {
     Annotate(AnnotateParams),
     GetCapture(GetCaptureParams),
     SuggestRedactions(SuggestRedactionsParams),
+    /// `recognize_text` (ANN-5, see [`crate::text_ops`]).
+    RecognizeText(crate::text_ops::RecognizeTextParams),
     GetSettings(GetSettingsParams),
     SetSettings(SetSettingsParams),
     Undo(CaptureRefParams),

@@ -151,6 +151,10 @@ Bug-fix release on Windows and macOS (plan: `specs/plans/release-0.2.9-plan.md`,
 
 **macOS:** one fix, the export toast names only what the MP4 contains (issue 21, item 1). The stuck Record panel, bubble and toast reported on an Intel Mac are not explained or fixed; the reporter was asked on Nov 3, 2026 to try 0.2.6 and send the log.
 
+## Copy text from a screenshot (ANN-5, release 0.3.2 work)
+
+Spec `specs/features/02-annotation.md` (ANN-5; the plan called it ANN-4, which is the callouts draft). **Built, tested with a scripted recognizer:** `ocr::layout_text` (reading order, paragraph gaps, columns) and the region crop in `cm-render`; the Free action `recognize_text` (reads the rendered image, never `original.png`; no revision, nothing stored) through daemon, MCP and CLI (`capturemann text`). **Not done or not run:** the editor button, Select text tool and menu entries (phase 2), `tests/manual/ANN-5.md`, any accuracy figure (see `verification/` for what was recorded); Windows reads only the OCR languages installed in Windows and Linux the `tesseract` languages installed (English by default).
+
 ## Release 0.2.5 (Auto-redact for US personal data and secrets)
 
 **Released Oct 30, 2026** (tag `v0.2.5` on `f8bd6d6`, both chips, notarized, published by the maintainer; `CaptureMann-v0.2.5-macos-arm64.dmg` and `-x86_64.dmg`, each `.sha256` checked after download from the draft, DMGs stapled, "Notarized Developer ID"; the Homebrew cask is at 0.2.5, tap commit `efa455c`, not installed from a throwaway tap this time; the Intel build has not run on a real Intel Mac). CI and the Security scan were green on `f8bd6d6`. The first tag was on `8c1f4f7`, whose `msrv` job (Rust 1.95) failed on the benchmark generator (`gen/scene.rs`); the tag was moved to `f8bd6d6` before anything was public, which needed the "Protect release tags" ruleset disabled for a moment. The full workspace test run on the final code: 3,757 passed, 0 failed, 44 ignored (hardware). Two `cm-desktop` render tests had timed out only because `target/debug/deps` held 845,000 files (see `docs/development/building.md`).

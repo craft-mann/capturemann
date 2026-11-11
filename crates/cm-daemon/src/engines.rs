@@ -13,6 +13,13 @@ use crate::error::DaemonError;
 /// Copies a PNG to the system clipboard (CAP-4; `arboard` lives in `apps/desktop`).
 pub trait Clipboard: Send + Sync {
     fn copy_png(&self, png: &[u8]) -> Result<(), CmError>;
+
+    /// Copies plain text (`recognize_text`, ANN-5). The default says there is no text clipboard.
+    fn copy_text(&self, _text: &str) -> Result<(), CmError> {
+        Err(CmError::invalid_input(
+            "no text clipboard is available in this daemon",
+        ))
+    }
 }
 
 /// No clipboard available (headless daemon): copying reports an error and the capture still

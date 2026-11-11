@@ -73,13 +73,21 @@ impl Confirmer for NeverAnswers {
     }
 }
 
-/// Keeps the last PNG it was given.
+/// Keeps the last PNG and the last text it was given.
 #[derive(Debug, Default)]
 pub struct RecordingClipboard {
     last: Mutex<Option<Vec<u8>>>,
+    text: Mutex<Option<String>>,
 }
 
 impl RecordingClipboard {
+    pub fn last_text(&self) -> Option<String> {
+        self.text
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+
     pub fn last_png(&self) -> Option<Vec<u8>> {
         self.last
             .lock()
@@ -91,6 +99,11 @@ impl RecordingClipboard {
 impl Clipboard for std::sync::Arc<RecordingClipboard> {
     fn copy_png(&self, png: &[u8]) -> Result<(), CmError> {
         *self.last.lock().unwrap_or_else(PoisonError::into_inner) = Some(png.to_vec());
+        Ok(())
+    }
+
+    fn copy_text(&self, text: &str) -> Result<(), CmError> {
+        *self.text.lock().unwrap_or_else(PoisonError::into_inner) = Some(text.to_owned());
         Ok(())
     }
 }
