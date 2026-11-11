@@ -313,6 +313,17 @@ Connect an AI agent over MCP (stdio):
 See [`specs/02-agent-interface.md`](specs/02-agent-interface.md) for the tools, permission tiers and
 the CLI.
 
+### Claude plugin
+
+Claude Code users can install the CaptureMann plugin, which connects the MCP server above and adds skills for
+screenshots with redaction, screen recording, meeting notes and export. CaptureMann itself must be installed and
+running; the plugin adds no network traffic. See [`docs/user/claude-code-plugin.md`](docs/user/claude-code-plugin.md):
+
+```sh
+claude plugin marketplace add craft-mann/capturemann
+claude plugin install capturemann@capturemann-plugins
+```
+
 ## Build from source
 
 Rust 1.95, Xcode command line tools and `cmake`:

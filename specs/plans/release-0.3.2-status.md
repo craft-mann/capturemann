@@ -5,13 +5,20 @@ Rules for every agent are in the plan and in the brief: worktree branch `track/<
 
 | # | Workstream | Branch | Owns (files) | State | Notes |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Thumbnail shows the redaction | `track/thumbnail` | `crates/cm-library`, `crates/cm-daemon/src/handlers.rs`, specs 09 and 17 | running (Nov 11) | test first; code reads correct on paper, reproduce before fixing |
-| 2 | Change shortcuts has no effect (QC report) | `track/shortcuts` | `apps/desktop/src/shortcuts.rs`, `platform_hotkeys.rs`, `settings.rs`, shortcut UI | running (Nov 11) | find the cause before changing code; platform unknown |
+| 1 | Thumbnail shows the redaction | `track/thumbnail` | `crates/cm-library`, `crates/cm-daemon/src/handlers.rs`, specs 09 and 17 | merged Nov 11 (tests running) | test first; code reads correct on paper, reproduce before fixing |
+| 2 | Change shortcuts has no effect (QC report) | `track/shortcuts` | `apps/desktop/src/shortcuts.rs`, `platform_hotkeys.rs`, `settings.rs`, shortcut UI | merged Nov 11 (tests running) | find the cause before changing code; platform unknown |
 | 3 | Agent clients list stays empty | `track/clients` | `crates/cm-daemon/src/gate.rs`, `daemon.rs`, `apps/desktop/src/ui/settings/agents.rs`, `model.rs`, `mod.rs`, spec 12 | running (Nov 11) | register on `session.hello`; default policy |
-| 4 | Claude plugin (build, validate, submission pack) | `track/plugin` | `plugins/`, `.claude-plugin/`, `docs/user/claude-code-plugin.md`, `tests/manual/PLUGIN-1.md`, `scripts/` (new files only) | running (Nov 11) | maintainer submits |
-| 5 | Windows signing research (no build) | `track/signing` | `docs/development/windows-signing-options.md` | running (Nov 11) | maintainer is checking SignPath |
+| 4 | Claude plugin (build, validate, submission pack) | `track/plugin` | `plugins/`, `.claude-plugin/`, `docs/user/claude-code-plugin.md`, `tests/manual/PLUGIN-1.md`, `scripts/` (new files only) | merged Nov 11; maintainer decisions pending | maintainer submits |
+| 5 | Windows signing research (no build) | `track/signing` | `docs/development/windows-signing-options.md` | merged Nov 11; recommendation SignPath Foundation | maintainer is checking SignPath |
 | 6 | Process-tree kill on cancel | | | queued | start when disk allows |
 | 7 | Redaction box left-edge trim | | | queued | start when disk allows |
 | 8 | Version bump, CHANGELOG, THIRD_PARTY_LICENSES, release text, regression | | | after 1 to 7 merge | follow `docs/development/release-day-0.3.1.md` |
 
 Maintainer decisions pending: SignPath result; marketplace and plugin names; which skills first.
+
+## Results so far (Nov 11, 2026)
+
+- **Thumbnail:** the poster file was already correct on every daemon path; the bug was the desktop grid cache keeping a stale card-shaped cut after an edit (`ui/thumbs.rs`). Fixed with LIB-1.AC6 and RED-2.AC5. Not seen in a real window.
+- **Shortcuts:** QC's exact case not reproduced; three real bugs fixed: Shift+digit refused (GPUI reports `!`), registered chords not released while recording a new one (the OS delivered them to the hotkey, not the page), reset-to-defaults dropping an id after a swap. Needs a keyboard on macOS, Windows 11 and Linux X11: `tests/manual/SHORTCUTS-1.md`. Still needed from QC: OS, which shortcut, what the page showed, keyboard layout.
+- **Signing:** `docs/development/windows-signing-options.md`; SignPath Foundation recommended, fallback unsigned with release-text paragraph, optional Store MSIX; the first signed release still shows a warning until reputation builds.
+- **Plugin:** `plugins/capturemann`, root `.claude-plugin/marketplace.json`, skills, docs, submission pack `docs/development/plugin-submission-0.3.2.md`; `claude plugin validate --strict` passes; likely portal blocker: `${user_config}` in the MCP command (Variant B in the pack).
