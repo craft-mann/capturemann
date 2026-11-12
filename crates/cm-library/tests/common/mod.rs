@@ -47,6 +47,9 @@ pub fn step(n: u32) -> AnnotationOp {
             n,
             size: 28.0,
             color: red(),
+            style: Default::default(),
+            start: 1,
+            text: None,
         },
     )
 }

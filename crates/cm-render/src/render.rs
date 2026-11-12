@@ -159,7 +159,11 @@ impl Renderer {
                     );
                 }
             }
-            OpKind::Step { at, n, size, color } => {
+            // Phase 0 stubs (0.3.3): track A draws these (ANN-4, ANN-7).
+            OpKind::Callout { .. } | OpKind::Spotlight { .. } | OpKind::Stamp { .. } => {}
+            OpKind::Step {
+                at, n, size, color, ..
+            } => {
                 let r = (*size / 2.0) as f32;
                 if let Some(rect) =
                     Rect::from_xywh(at.x as f32 - r, at.y as f32 - r, r * 2.0, r * 2.0)

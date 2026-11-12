@@ -48,6 +48,18 @@ pub const PIXELATE_BLOCK_RANGE: std::ops::RangeInclusive<u32> = 6..=32;
 pub const MAX_SIZE: f64 = 2000.0;
 /// Longest accepted text op, in chars (R1-9). The renderer additionally caps the layer area.
 pub const MAX_TEXT_CHARS: usize = 2000;
+/// Default callout text size in px (ANN-4).
+pub const DEFAULT_CALLOUT_SIZE: f64 = 24.0;
+/// Default callout corner radius in px (ANN-4).
+pub const DEFAULT_CALLOUT_RADIUS: f64 = 12.0;
+/// Default spotlight dimming, 0 (none) to 1 (black) (ANN-7): the area outside the holes keeps 40 % of its brightness.
+pub const DEFAULT_SPOTLIGHT_DIM: f64 = 0.6;
+/// Most holes one spotlight can have (ANN-7).
+pub const MAX_SPOTLIGHT_SHAPES: usize = 8;
+/// Default stamp size in px (ANN-4).
+pub const DEFAULT_STAMP_SIZE: f64 = 34.0;
+/// Longest step label and stamp label, in chars (ANN-6, ANN-4).
+pub const MAX_LABEL_CHARS: usize = 200;
 
 /// An opaque `#RRGGBB` color; serializes as an upper-case `#RRGGBB` string.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -245,14 +257,18 @@ fn d_block() -> u32 {
 }
 
 /// One annotation: a stable `id` (`op_<n>`) plus the typed payload.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+///
+/// Fields this build does not know inside a known op (written by a newer version) are kept in
+/// `extra` and written back, so a later version never loses them when an older one saves. A key
+/// the typed payload writes always wins over the same key in `extra`.
+#[derive(Debug, Clone, PartialEq)]
 pub struct AnnotationOp {
     /// Stable id such as `op_7`. Optional on input (agents may omit it); empty means "assign
     /// one" when passed to `ShotBundle` edit methods. Omitted on output when empty.
-    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub id: String,
-    #[serde(flatten)]
     pub kind: OpKind,
+    /// Unknown fields of a known op, kept verbatim (pass-through, 0.3.3).
+    pub extra: serde_json::Map<String, Value>,
 }
 
 impl AnnotationOp {
@@ -260,7 +276,54 @@ impl AnnotationOp {
         AnnotationOp {
             id: id.into(),
             kind,
+            extra: serde_json::Map::new(),
         }
+    }
+}
+
+impl Serialize for AnnotationOp {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::Error;
+        let Value::Object(typed) = serde_json::to_value(&self.kind).map_err(S::Error::custom)?
+        else {
+            return Err(S::Error::custom("op must serialize as an object"));
+        };
+        let mut out = serde_json::Map::new();
+        if !self.id.is_empty() {
+            out.insert("id".into(), Value::String(self.id.clone()));
+        }
+        out.extend(typed);
+        for (k, v) in &self.extra {
+            if k != "id" && !out.contains_key(k) {
+                out.insert(k.clone(), v.clone());
+            }
+        }
+        Value::Object(out).serialize(s)
+    }
+}
+
+impl<'de> Deserialize<'de> for AnnotationOp {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        use serde::de::Error;
+        let Value::Object(map) = Value::deserialize(d)? else {
+            return Err(D::Error::custom("an op must be a JSON object"));
+        };
+        let id = match map.get("id") {
+            None | Some(Value::Null) => String::new(),
+            Some(Value::String(s)) => s.clone(),
+            Some(_) => return Err(D::Error::custom("id must be a string")),
+        };
+        let kind: OpKind =
+            serde_json::from_value(Value::Object(map.clone())).map_err(D::Error::custom)?;
+        // Whatever the typed payload does not write back is kept as it came.
+        let Value::Object(typed) = serde_json::to_value(&kind).map_err(D::Error::custom)? else {
+            return Err(D::Error::custom("op must serialize as an object"));
+        };
+        let extra = map
+            .into_iter()
+            .filter(|(k, _)| k != "id" && !typed.contains_key(k))
+            .collect();
+        Ok(AnnotationOp { id, kind, extra })
     }
 }
 
@@ -337,6 +400,65 @@ pub enum OpKind {
         size: f64,
         #[serde(default = "d_color")]
         color: Color,
+        /// Numbering style (ANN-6): the label is `step_label(style, start, n)`.
+        #[serde(default, skip_serializing_if = "StepStyle::is_default")]
+        style: StepStyle,
+        /// Number the first step gets (ANN-6), at least 1.
+        #[serde(default = "d_start", skip_serializing_if = "is_one")]
+        start: u32,
+        /// Label drawn next to the badge (ANN-6); absent = none.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        text: Option<String>,
+    },
+    /// Speech-bubble or box callout with a pointer tail (ANN-4).
+    ///
+    /// `rect` is the **minimum** box; the renderer draws `max(rect, text size + padding)` and the
+    /// editor writes the grown rectangle back. `tail` is the tip of the pointer in image px; moving
+    /// the box does not move it.
+    Callout {
+        rect: Rc,
+        tail: Pt,
+        #[serde(default)]
+        text: String,
+        /// Font size in px (em).
+        #[serde(default = "d_callout_size", serialize_with = "ser_num")]
+        size: f64,
+        /// Text color.
+        #[serde(default = "d_white")]
+        color: Color,
+        /// Box fill.
+        #[serde(default = "d_color")]
+        bg: Color,
+        /// Corner radius in px.
+        #[serde(default = "d_callout_radius", serialize_with = "ser_num")]
+        radius: f64,
+        #[serde(default)]
+        style: CalloutStyle,
+    },
+    /// Dims (or blurs) everything outside its holes (ANN-7). At most one per image, at most 8 holes.
+    Spotlight {
+        shapes: Vec<SpotShape>,
+        /// 0 = no dimming, 1 = black.
+        #[serde(default = "d_dim", serialize_with = "ser_num")]
+        dim: f64,
+        #[serde(default)]
+        mode: SpotMode,
+        /// Blur strength for `mode: "blur"` (a look, not a redaction).
+        #[serde(default = "d_strength")]
+        strength: u32,
+    },
+    /// A symbol drawn as vector paths, or a short word (ANN-4).
+    Stamp {
+        /// Center.
+        at: Pt,
+        kind: StampKind,
+        #[serde(default = "d_stamp_size", serialize_with = "ser_num")]
+        size: f64,
+        #[serde(default = "d_color")]
+        color: Color,
+        /// The word of a `label` stamp ("Before", "After"), written in the UI language at creation.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        text: Option<String>,
     },
     /// Gaussian blur of the original pixels under `rect`.
     Blur {
@@ -354,6 +476,122 @@ pub enum OpKind {
     Crop { rect: Rc },
 }
 
+fn d_start() -> u32 {
+    1
+}
+fn is_one(v: &u32) -> bool {
+    *v == 1
+}
+fn d_callout_size() -> f64 {
+    DEFAULT_CALLOUT_SIZE
+}
+fn d_callout_radius() -> f64 {
+    DEFAULT_CALLOUT_RADIUS
+}
+fn d_dim() -> f64 {
+    DEFAULT_SPOTLIGHT_DIM
+}
+fn d_stamp_size() -> f64 {
+    DEFAULT_STAMP_SIZE
+}
+
+/// How a step badge is numbered (ANN-6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum StepStyle {
+    /// 1, 2, 3
+    #[default]
+    Number,
+    /// A, B, C ... Z, AA, AB
+    Upper,
+    /// a, b, c ... z, aa, ab
+    Lower,
+}
+
+impl StepStyle {
+    pub fn is_default(&self) -> bool {
+        *self == StepStyle::Number
+    }
+}
+
+/// The label of a step badge: `style` applied to `start + n - 1` (ANN-6). Letters continue past Z
+/// the way spreadsheet columns do (AA, AB); `start` and `n` below 1 count as 1.
+pub fn step_label(style: StepStyle, start: u32, n: u32) -> String {
+    let v = u64::from(start.max(1)) + u64::from(n.max(1)) - 1;
+    match style {
+        StepStyle::Number => v.to_string(),
+        StepStyle::Upper | StepStyle::Lower => {
+            let base = if style == StepStyle::Upper {
+                b'A'
+            } else {
+                b'a'
+            };
+            let mut v = v;
+            let mut out = Vec::new();
+            while v > 0 {
+                v -= 1;
+                out.push(base + (v % 26) as u8);
+                v /= 26;
+            }
+            out.reverse();
+            String::from_utf8(out).unwrap_or_default()
+        }
+    }
+}
+
+/// Callout look (ANN-4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CalloutStyle {
+    /// Rounded speech bubble with a curved tail.
+    #[default]
+    Bubble,
+    /// Rectangle with a straight triangular tail.
+    Box,
+}
+
+/// What the area outside a spotlight's holes looks like (ANN-7).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SpotMode {
+    #[default]
+    Dim,
+    /// Blurs the outside. A look only: it is **not** a redaction (use `blur` or `pixelate`).
+    Blur,
+}
+
+/// Shape of one spotlight hole.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SpotShapeKind {
+    #[default]
+    Rect,
+    Ellipse,
+}
+
+/// One hole of a spotlight (ANN-7).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct SpotShape {
+    #[serde(default)]
+    pub kind: SpotShapeKind,
+    pub rect: Rc,
+    /// Corner radius of a rectangle hole, in px.
+    #[serde(default, serialize_with = "ser_num")]
+    pub radius: f64,
+}
+
+/// The symbol of a stamp (ANN-4). Drawn as paths, never as font glyphs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum StampKind {
+    Check,
+    Cross,
+    Exclaim,
+    Question,
+    /// A word on a pill (`text`).
+    Label,
+}
+
 impl OpKind {
     /// The JSON `op` tag (`"arrow"`, `"rect"`, ...).
     pub fn name(&self) -> &'static str {
@@ -365,6 +603,9 @@ impl OpKind {
             OpKind::Text { .. } => "text",
             OpKind::Highlight { .. } => "highlight",
             OpKind::Step { .. } => "step",
+            OpKind::Callout { .. } => "callout",
+            OpKind::Spotlight { .. } => "spotlight",
+            OpKind::Stamp { .. } => "stamp",
             OpKind::Blur { .. } => "blur",
             OpKind::Pixelate { .. } => "pixelate",
             OpKind::Crop { .. } => "crop",
@@ -467,10 +708,89 @@ impl OpKind {
                     Err("opacity must be in 0..=1".into())
                 }
             }
-            OpKind::Step { at, n, size: s, .. } => {
+            OpKind::Step {
+                at,
+                n,
+                size: s,
+                start,
+                text,
+                ..
+            } => {
                 finite_pt("at", &[at])?;
                 if *n < 1 {
                     return Err("n must be >= 1".into());
+                }
+                if *start < 1 {
+                    return Err("start must be >= 1".into());
+                }
+                if let Some(t) = text {
+                    if t.chars().count() > MAX_LABEL_CHARS {
+                        return Err(format!("text must be at most {MAX_LABEL_CHARS} characters"));
+                    }
+                }
+                size(*s)
+            }
+            OpKind::Callout {
+                rect,
+                tail,
+                text,
+                size: s,
+                radius,
+                ..
+            } => {
+                finite_rect(rect)?;
+                finite_pt("tail", &[tail])?;
+                if text.chars().count() > MAX_TEXT_CHARS {
+                    return Err(format!("text must be at most {MAX_TEXT_CHARS} characters"));
+                }
+                if !(radius.is_finite() && (0.0..=MAX_SIZE).contains(radius)) {
+                    return Err(format!("radius must be in 0..={MAX_SIZE}"));
+                }
+                size(*s)
+            }
+            OpKind::Spotlight {
+                shapes,
+                dim,
+                strength,
+                ..
+            } => {
+                if shapes.is_empty() || shapes.len() > MAX_SPOTLIGHT_SHAPES {
+                    return Err(format!(
+                        "a spotlight needs 1 to {MAX_SPOTLIGHT_SHAPES} shapes"
+                    ));
+                }
+                for sh in shapes {
+                    finite_rect(&sh.rect)?;
+                    has_area(&sh.rect, "spotlight shape")?;
+                    if !(sh.radius.is_finite() && (0.0..=MAX_SIZE).contains(&sh.radius)) {
+                        return Err(format!("shape radius must be in 0..={MAX_SIZE}"));
+                    }
+                }
+                if !(0.0..=1.0).contains(dim) {
+                    return Err("dim must be in 0..=1".into());
+                }
+                if BLUR_STRENGTH_RANGE.contains(strength) {
+                    Ok(())
+                } else {
+                    Err(format!("strength must be in {BLUR_STRENGTH_RANGE:?}"))
+                }
+            }
+            OpKind::Stamp {
+                at,
+                kind,
+                size: s,
+                text,
+                ..
+            } => {
+                finite_pt("at", &[at])?;
+                if *kind == StampKind::Label && text.as_deref().is_none_or(|t| t.trim().is_empty())
+                {
+                    return Err("a label stamp needs text".into());
+                }
+                if let Some(t) = text {
+                    if t.chars().count() > MAX_LABEL_CHARS {
+                        return Err(format!("text must be at most {MAX_LABEL_CHARS} characters"));
+                    }
                 }
                 size(*s)
             }
@@ -513,6 +833,24 @@ pub fn validate_op(index: usize, op: &AnnotationOp) -> Result<(), CmError> {
         .map_err(|e| CmError::invalid_field(&format!("ops[{index}]"), e))
 }
 
+/// Checks rules that span the list: at most one `spotlight` (ANN-7). The error is `invalid_input`
+/// naming the second spotlight (`ops[i]`).
+pub fn validate_list(ops: &[AnnotationOp]) -> Result<(), CmError> {
+    let mut first = None;
+    for (i, op) in ops.iter().enumerate() {
+        if matches!(op.kind, OpKind::Spotlight { .. }) {
+            if let Some(f) = first {
+                return Err(CmError::invalid_field(
+                    &format!("ops[{i}]"),
+                    format!("only one spotlight per image: add the shapes to ops[{f}]"),
+                ));
+            }
+            first = Some(i);
+        }
+    }
+    Ok(())
+}
+
 /// Parses and validates an `ops` JSON array (from a manifest, `annotate` or `--ops ops.json`).
 ///
 /// Errors are `invalid_input` and name the offending index (`ops[3]: ...`), also for an unknown
@@ -539,6 +877,7 @@ pub fn parse_ops(value: &Value) -> Result<Vec<AnnotationOp>, CmError> {
         }
         out.push(op);
     }
+    validate_list(&out)?;
     Ok(out)
 }
 
@@ -726,5 +1065,130 @@ mod tests {
             // Negative extents are normalized, not empty.
             parse_ops(&json!([{ "op": op, "rect": [5, 5, -10, 10] }])).unwrap();
         }
+    }
+
+    /// The 0.3.3 ops (ANN-4, ANN-6, ANN-7): the frozen JSON shape round-trips exactly.
+    fn pack_ops() -> Value {
+        json!([
+            { "id": "op_1", "op": "callout", "rect": [100, 80, 220, 70], "tail": [90, 200], "text": "Click here",
+              "size": 24, "color": "#FFFFFF", "bg": "#FF3B3B", "radius": 12, "style": "bubble" },
+            { "id": "op_2", "op": "spotlight",
+              "shapes": [ { "kind": "rect", "rect": [10, 10, 200, 100], "radius": 0 },
+                          { "kind": "ellipse", "rect": [300, 40, 120, 120], "radius": 0 } ],
+              "dim": 0.6, "mode": "dim", "strength": 12 },
+            { "id": "op_3", "op": "step", "at": [400, 200], "n": 2, "size": 28, "color": "#FF3B3B",
+              "style": "upper", "start": 3, "text": "Open Settings" },
+            { "id": "op_4", "op": "stamp", "at": [50, 50], "kind": "check", "size": 34, "color": "#2EB872" },
+            { "id": "op_5", "op": "stamp", "at": [90, 50], "kind": "label", "size": 34, "color": "#FF3B3B", "text": "Before" }
+        ])
+    }
+
+    #[test]
+    fn ann_4_6_7_ops_round_trip() {
+        let ops = parse_ops(&pack_ops()).unwrap();
+        assert_eq!(serde_json::to_value(&ops).unwrap(), pack_ops());
+        assert_eq!(ops[0].kind.name(), "callout");
+        assert_eq!(ops[1].kind.name(), "spotlight");
+        assert_eq!(ops[4].kind.name(), "stamp");
+    }
+
+    #[test]
+    fn old_step_keeps_its_wire_shape() {
+        // A 0.3.2 step has no style, start or text and must serialize without them.
+        let ops = parse_ops(&json!([{ "id": "s", "op": "step", "at": [1, 1], "n": 1, "size": 28, "color": "#FF3B3B" }])).unwrap();
+        let back = serde_json::to_value(&ops).unwrap();
+        assert!(
+            back[0].get("style").is_none()
+                && back[0].get("start").is_none()
+                && back[0].get("text").is_none()
+        );
+        assert!(matches!(
+            &ops[0].kind,
+            OpKind::Step {
+                style: StepStyle::Number,
+                start: 1,
+                text: None,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn ann_6_step_labels() {
+        use StepStyle::*;
+        assert_eq!(step_label(Number, 1, 3), "3");
+        assert_eq!(step_label(Number, 5, 1), "5");
+        assert_eq!(step_label(Upper, 1, 1), "A");
+        assert_eq!(step_label(Upper, 3, 1), "C");
+        assert_eq!(step_label(Upper, 3, 3), "E");
+        assert_eq!(step_label(Upper, 1, 26), "Z");
+        assert_eq!(step_label(Upper, 1, 27), "AA");
+        assert_eq!(step_label(Upper, 1, 28), "AB");
+        assert_eq!(step_label(Upper, 1, 52), "AZ");
+        assert_eq!(step_label(Upper, 1, 53), "BA");
+        assert_eq!(step_label(Lower, 1, 27), "aa");
+        assert_eq!(step_label(Lower, 0, 0), "a");
+    }
+
+    #[test]
+    fn ann_7_one_spotlight_per_image() {
+        let sp = |r: Value| json!({ "op": "spotlight", "shapes": [{ "rect": r }] });
+        parse_ops(&json!([sp(json!([0, 0, 5, 5]))])).unwrap();
+        let e = parse_ops(&json!([{ "op": "crop", "rect": [0,0,9,9] }, sp(json!([0, 0, 5, 5])), sp(json!([1, 1, 5, 5]))])).unwrap_err();
+        assert_eq!(e.code(), crate::ErrorCode::InvalidInput);
+        assert!(e.to_string().contains("ops[2]"), "{e}");
+        // 9 holes, no holes, a hole with no area, dim out of range.
+        let nine: Vec<Value> = (0..9).map(|_| json!({ "rect": [0, 0, 5, 5] })).collect();
+        for bad in [
+            json!({ "op": "spotlight", "shapes": nine }),
+            json!({ "op": "spotlight", "shapes": [] }),
+            json!({ "op": "spotlight", "shapes": [{ "rect": [0, 0, 0, 5] }] }),
+            json!({ "op": "spotlight", "shapes": [{ "rect": [0, 0, 5, 5] }], "dim": 1.5 }),
+        ] {
+            let e = parse_ops(&json!([bad.clone()])).unwrap_err();
+            assert!(e.to_string().contains("ops[0]"), "{bad}: {e}");
+        }
+        let eight: Vec<Value> = (0..8).map(|_| json!({ "rect": [0, 0, 5, 5] })).collect();
+        parse_ops(&json!([{ "op": "spotlight", "shapes": eight }])).unwrap();
+    }
+
+    #[test]
+    fn ann_4_callout_and_stamp_validation() {
+        for bad in [
+            json!({ "op": "callout", "rect": [0, 0, 10, 10] }),
+            json!({ "op": "callout", "rect": [0, 0, 10, 10], "tail": [1, 1], "size": 0 }),
+            json!({ "op": "callout", "rect": [0, 0, 10, 10], "tail": [1, 1], "style": "cloud" }),
+            json!({ "op": "stamp", "at": [1, 1], "kind": "label" }),
+            json!({ "op": "stamp", "at": [1, 1], "kind": "smile" }),
+        ] {
+            let e = parse_ops(&json!([bad.clone()])).unwrap_err();
+            assert!(e.to_string().contains("ops[0]"), "{bad}: {e}");
+        }
+        let ops = parse_ops(&json!([{ "op": "callout", "rect": [0, 0, 10, 10], "tail": [1, 1] }]))
+            .unwrap();
+        assert!(
+            matches!(&ops[0].kind, OpKind::Callout { size, bg, color, radius, style: CalloutStyle::Bubble, text, .. }
+            if *size == 24.0 && *bg == DEFAULT_COLOR && *color == Color::WHITE && *radius == 12.0 && text.is_empty())
+        );
+    }
+
+    /// Unknown fields inside a known op survive a read and a write (0.3.3 pass-through).
+    #[test]
+    fn unknown_fields_in_known_ops_pass_through() {
+        let input = json!([
+            { "id": "a", "op": "arrow", "from": [0, 0], "to": [5, 5], "color": "#FF3B3B", "width": 4, "glow": { "r": 3 }, "z": 9 },
+            { "id": "b", "op": "step", "at": [1, 1], "n": 1, "size": 28, "color": "#FF3B3B", "style": "number", "future": [1, 2] }
+        ]);
+        let ops = parse_ops(&input).unwrap();
+        assert_eq!(ops[0].extra.len(), 2);
+        assert_eq!(serde_json::to_value(&ops).unwrap(), input);
+        // The typed value wins when it is set.
+        let mut ops = ops;
+        if let OpKind::Step { style, .. } = &mut ops[1].kind {
+            *style = StepStyle::Upper;
+        }
+        let back = serde_json::to_value(&ops).unwrap();
+        assert_eq!(back[1]["style"], "upper");
+        assert_eq!(back[1]["future"], json!([1, 2]));
     }
 }

@@ -31,6 +31,17 @@ pub use ops::{
 };
 pub use render::{render_annotations, Renderer};
 
+/// The box a `callout` op is drawn with: `max(rect, measured text size + padding)` (ANN-4). The
+/// editor draws its handles from this, not from the stored `rect`. `None` for other ops.
+///
+/// **Phase 0 stub:** returns the stored `rect` (normalized) until track A measures the text.
+pub fn callout_box(op: &OpKind) -> Option<Rc> {
+    match op {
+        OpKind::Callout { rect, .. } => Some(rect.normalized()),
+        _ => None,
+    }
+}
+
 use cm_core::CmError;
 use image::RgbaImage;
 

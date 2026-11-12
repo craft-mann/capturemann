@@ -258,6 +258,9 @@ fn op_name(kind: &OpKind) -> String {
         OpKind::Text { .. } => tr_ctx!("annotation kind", "text"),
         OpKind::Highlight { .. } => tr_ctx!("annotation kind", "highlight"),
         OpKind::Step { .. } => tr_ctx!("annotation kind", "step"),
+        OpKind::Callout { .. } => tr_ctx!("annotation kind", "callout"),
+        OpKind::Spotlight { .. } => tr_ctx!("annotation kind", "spotlight"),
+        OpKind::Stamp { .. } => tr_ctx!("annotation kind", "stamp"),
         OpKind::Blur { .. } => tr_ctx!("annotation kind", "blur"),
         OpKind::Pixelate { .. } => tr_ctx!("annotation kind", "pixelate"),
         OpKind::Crop { .. } => tr_ctx!("annotation kind", "crop"),
@@ -702,6 +705,9 @@ impl EditorState {
                 n: self.next_step_number(),
                 size: style.size,
                 color: style.color,
+                style: Default::default(),
+                start: 1,
+                text: None,
             },
         );
         self.ops.push(op.clone());

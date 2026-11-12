@@ -128,6 +128,10 @@ impl Tool {
             OpKind::Text { .. } => Tool::Text,
             OpKind::Highlight { .. } => Tool::Highlight,
             OpKind::Step { .. } => Tool::Step,
+            // Track B gives these their own tools (Callout, Spotlight, Stamp).
+            OpKind::Callout { .. } | OpKind::Spotlight { .. } | OpKind::Stamp { .. } => {
+                Tool::Select
+            }
             OpKind::Blur { .. } => Tool::Blur,
             OpKind::Pixelate { .. } => Tool::Pixelate,
             OpKind::Crop { .. } => Tool::Crop,

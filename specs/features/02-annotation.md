@@ -19,6 +19,23 @@ Annotations are vector operations stored in `manifest.json` (`ops` list) and ren
 { "id": "op_16", "op": "crop", "rect": [0, 0, 1200, 800] }
 ```
 
+**0.3.3 additions (frozen Nov 12, 2026; ANN-4, ANN-6, ANN-7).** Same conventions. Omitted optional fields take the defaults shown.
+
+```json
+{ "id": "op_20", "op": "callout", "rect": [100, 80, 220, 70], "tail": [90, 200], "text": "Click here", "size": 24, "color": "#FFFFFF", "bg": "#FF3B3B", "radius": 12, "style": "bubble" }
+{ "id": "op_21", "op": "spotlight", "shapes": [ { "kind": "rect", "rect": [10, 10, 200, 100], "radius": 0 }, { "kind": "ellipse", "rect": [300, 40, 120, 120], "radius": 0 } ], "dim": 0.6, "mode": "dim", "strength": 12 }
+{ "id": "op_22", "op": "step", "at": [400, 200], "n": 2, "size": 28, "color": "#FF3B3B", "style": "upper", "start": 3, "text": "Open Settings" }
+{ "id": "op_23", "op": "stamp", "at": [50, 50], "kind": "check", "size": 34, "color": "#2EB872" }
+{ "id": "op_24", "op": "stamp", "at": [90, 50], "kind": "label", "size": 34, "color": "#FF3B3B", "text": "Before" }
+```
+
+- `callout`: `rect` is the **minimum** box, `tail` the tip of the pointer in image px, `text` at most 2000 characters (default empty), `size` 24, `color` is the text colour (`#FFFFFF`), `bg` the fill (`#FF3B3B`), `radius` 12 (0 to 2000), `style` `bubble` (rounded box, curved tail; default) or `box` (rectangle, straight triangular tail).
+- `spotlight`: `shapes` 1 to 8 holes (`kind` `rect` default or `ellipse`, `rect` with area, `radius` for rounded rectangle holes, default 0), `dim` 0 to 1 (default 0.6: the outside keeps 40 % of its brightness), `mode` `dim` (default) or `blur`, `strength` 4 to 32 (default 12, used by `blur` mode only). **At most one `spotlight` per image**: a second one is `invalid_input` naming it (`ops[i]`).
+- `step` gains `style` (`number` default, `upper`, `lower`), `start` (at least 1, default 1) and `text` (label, at most 200 characters, default none). The label drawn in the badge is `step_label(style, start + n - 1)`; letters continue Z, AA, AB. A step without these fields is exactly the 0.3.2 step; the three fields are not written while they hold their defaults.
+- `stamp`: `kind` `check`, `cross`, `exclaim`, `question` (vector paths) or `label` (a word on a pill; `text` required, at most 200 characters, written in the UI language when the stamp is placed), `at` is the centre, `size` 34 (cap 2000), `color` `#FF3B3B`.
+- **Pass-through (0.3.3).** A field this build does not know inside a known op is kept and written back unchanged (a typed field the build writes wins over a stored duplicate). An unknown `op` type is still kept whole in `manifest.unknown_ops` by `cm-library`.
+- Magnify is not in 0.3.3: the op name `magnify` and ANN-8 are reserved for it.
+
 ### ANN-1 Drawing tools: arrow, line, rectangle, ellipse, text, highlighter, step badge, crop
 **Priority** P0 · **Status** In progress (built on macOS: the op schema and validation in `cm-core`, the renderer with golden tests in `cm-render`, the editor in `apps/desktop` and the `annotate` action and tool; ACs 1 to 6 are cited by automated tests; no hands-on editor verification report is stored; the editor has not run on Windows) · **Crates** cm-core, cm-render, apps/desktop · **Depends on** CAP-1, DESIGN §5.5
 
@@ -28,7 +45,7 @@ Annotations are vector operations stored in `manifest.json` (`ops` list) and ren
 - Tools and shortcuts: Select (V), Arrow (A), Line (L), Rectangle (R), Ellipse (E), Text (T), Highlighter (H), Step badge (N), Crop (C), Blur (B, ANN-2), Pixelate (X, ANN-2).
 - Shift constrains: arrows/lines to 0/45/90°, rectangles to squares, ellipses to circles.
 - Every op is selectable, movable, resizable via handles, recolorable, and deletable (Delete/Backspace). Copy/paste duplicates ops with +10 px offset.
-- Step badges auto-number in creation order (1, 2, 3…); deleting one renumbers the rest; the next number is shown on the cursor.
+- Step badges auto-number in creation order (1, 2, 3…); deleting one renumbers the rest; the next number is shown on the cursor. Label, numbering style, start number and reordering: ANN-6.
 - Text: click to place, type, Enter for a new line, Esc to finish; default 24 px white with no outline or shadow (changed in 0.2.9, AC8; the user changes colour and size in the panel); typed text goes through the platform input method so Telex, VNI and Pinyin compose (AC7).
 - Defaults: color `#FF3B3B`, width 4 px; the last used color and width persist per tool.
 - Crop is non-destructive: it sets the visible rect; ops outside it remain stored.
@@ -109,14 +126,89 @@ Annotations are vector operations stored in `manifest.json` (`ops` list) and ren
 
 ---
 
-### ANN-4 Callouts, stamps and image overlays
-**Priority** P2 · **Status** Draft (not in 0.2.0; detail before work starts) · **Crates** cm-render
+### ANN-4 Callouts and stamps
+**Priority** P1 for `callout` and `stamp` (the pasted `image` overlay stays P2 and is not planned) · **Status** Ready (0.3.3; the op JSON is frozen above; `stamp` is the stretch goal: built last, cut first if time runs short) · **Crates** cm-core, cm-render, cm-mcp, cm-cli, apps/desktop · **Depends on** ANN-1, ANN-3
 
-**User story** — As a creator, I want speech-bubble callouts, stamps (✓, ✗, !) and pasted images, so that my screenshots look polished.
+**User story** — As a creator, I want speech-bubble callouts and stamps (check, cross, exclamation, question, "Before", "After"), so that my screenshots look polished and explain themselves.
 
-**Summary** — New op types `callout` (text box with a pointer tail), `stamp` (built-in vector icons), `image` (pasted PNG with scale and rotation).
+**Description**
+- **Callout** (key K, in the Text group of the tool palette): a text box with a pointer. Two looks: `bubble` (rounded box, curved tail) and `box` (rectangle, straight tail). Drag to place the box, click again or drag the blue handle to set the tail tip. The text uses the Text tool's input method (Telex, VNI, Pinyin compose, as ANN-1.AC7). Colours: text, fill; size and corner radius in the panel.
+- **The box grows to fit the text, and what is stored is what is drawn.** `rect` is the minimum size; the renderer draws `max(rect, measured text size + padding)` (the same in the editor and from `annotate`, so ANN-1.AC6 holds). When the user commits text the editor writes the grown rectangle back. The editor draws its selection handles from the renderer's measured box (`cm_render::callout_box`), not from the stored `rect`, because an agent-made callout can be drawn larger than stored.
+- The tail tip is stored in image coordinates: moving the box does not move the tip. The tail base is on the box edge nearest to the tip.
+- **Stamp** (key U, in the Markers group): `check`, `cross`, `exclaim`, `question` drawn as vector paths (emoji fonts differ per system and would break golden tests), and `label` stamps "Before" and "After" whose word is written into the op in the UI language when placed (stored text, not re-translated). Click to place; size and colour in the panel.
+- Limits as ANN-1: text 2000 characters, sizes capped at 2000, layer area capped as for text.
 
-**Key criteria (to refine)** — New ops follow the same schema rules, undo, and golden-render tests as ANN-1.
+**Acceptance criteria**
+- **AC1** Given a callout with `rect` smaller than its text, when rendered, then the drawn box is `max(rect, text + padding)`, the render matches the golden image within 1 %, and `callout_box` returns that box.
+- **AC2** Given a callout, when its `rect` is moved by (dx, dy) and `tail` is unchanged, then the tail tip is drawn at the same pixel (the tip pixel is inside the tail colour in both renders).
+- **AC3** Given the `box` and the `bubble` style, then each matches its golden image at 1× and 2×.
+- **AC4** Given each stamp kind, then it matches its golden image; a `label` stamp without `text` is `invalid_input` naming `ops[i]`.
+- **AC5** (editor) Given the Callout tool, when the user types text longer than the box, then the stored `rect` is the grown rectangle after the commit and the handles sit on the drawn box; typing `Tieengs Vieetj` in a Telex source gives `Tiếng Việt`.
+- **AC6** Given an agent sends the same callout and stamp ops to `annotate`, then the result renders identically to the same ops drawn in the GUI (ANN-1.AC6).
+- **AC7** Given a callout or stamp op in a manifest, when it is opened by a version that does not know it, then it is kept unchanged (`unknown_ops`) and not drawn.
+
+**Edge cases and errors** — Empty callout text draws an empty box; a tail tip inside the box draws no tail; a tip or box outside the image is clipped, not rejected.
+
+**Agent interface** — `annotate` with `callout` and `stamp` ops; no new tool.
+
+**Out of scope** — Pasted image overlays, custom stamp artwork, rotated callouts.
+
+**Test notes** — Golden PNGs per style and kind; `callout_box` tests; the editor by hand in `tests/manual/ANN-6.md`.
+
+---
+
+### ANN-6 Step badge: label, numbering style, start, reorder
+**Priority** P1 · **Status** Ready (0.3.3) · **Crates** cm-core, cm-render, apps/desktop · **Depends on** ANN-1
+
+**User story** — As someone writing a how-to, I want step badges with a short label, letters instead of numbers, a start number and a drag-to-reorder list, so that a guide reads "A. Open Settings, B. Choose Network".
+
+**Description**
+- A step keeps `n`, its creation ordinal. The drawn label is `step_label(style, start + n - 1)`: numbers, upper-case letters or lower-case letters; after Z come AA, AB (spreadsheet columns). `style` and `start` are stored on each step; the **Steps panel sets them for all steps together**, a mixed set stays possible for agents.
+- `text` is drawn in a dark pill to the right of the badge; near the right image edge it flips to the left.
+- **Reorder** (drag in the Steps panel) rewrites `n` on the affected steps in **one revision**. Deleting a step renumbers the rest, as in ANN-1.AC2, for every style.
+- Text typed in the panel goes through the platform input method (ANN-1.AC7).
+
+**Acceptance criteria**
+- **AC1** Given style `upper` and `start` 3, then the first three steps read C, D, E; after the second is deleted they read C, D.
+- **AC2** Given 27 steps in `upper`, then the 26th reads Z and the 27th AA.
+- **AC3** Given a step with `text` and its badge within the label width of the right edge, then the label is drawn left of the badge (golden image).
+- **AC4** Given a reorder of steps 1, 2, 3 to 3, 1, 2, then the `n` values change in one undo step and one undo restores them.
+- **AC5** Given a step written by 0.3.2 (no new fields), then it renders exactly as before (the 0.3.2 golden images are unchanged).
+- **AC6** Given a 0.3.3 manifest with `style`, `start` and `text` read and saved by a build that does not know them, then every other field and op is intact (the fixture round-trip test in `cm-library`); the build that does know them keeps them (pass-through for later unknown fields).
+
+**Agent interface** — `annotate` step ops with `style`, `start`, `text`.
+
+**Test notes** — `step_label` unit tests; golden images per style; `tests/manual/ANN-6.md` for the editor.
+
+---
+
+### ANN-7 Spotlight
+**Priority** P1 · **Status** Ready (0.3.3) · **Crates** cm-core, cm-render, apps/desktop · **Depends on** ANN-1, ANN-2
+
+**User story** — As someone documenting a screen, I want to dim everything except the part that matters, so that the reader looks at the right place.
+
+**Description**
+- **Spotlight** (key S, in the Emphasis group): one dim layer over the image with holes (rectangles, rounded rectangles, ellipses). `dim` 0 to 1 (default 0.6, so the outside keeps 40 % brightness).
+- **One per image.** The editor adds a second shape as a hole in the existing op, in one revision (one undo step), up to 8 holes. `annotate` with two `spotlight` ops answers `invalid_input` naming the second (`ops[i]`).
+- **Order.** The model is strictly list-ordered like every op. The **editor inserts a new spotlight before the first non-redaction op**, so arrows, steps and callouts added later stay bright; agents control the order by writing the list. Blur and pixelate stay below it as in ANN-2 (a spotlight never un-redacts anything: it only dims or blurs pixels already composited).
+- **Blur mode is a look, not a redaction.** `mode: "blur"` blurs the outside area for emphasis; the panel says so and points to Blur (B) and Pixelate (X). Copy text reads the rendered image (ANN-5.AC2), so text in a blurred area is not copied, and text in a dimmed area still is.
+
+**Acceptance criteria**
+- **AC1** Given a spotlight with dim 0.6 and one hole, then a pixel outside the hole has 40 % of the brightness it had and a pixel inside is unchanged; the render matches the golden image within 1 %.
+- **AC2** Given two `spotlight` ops, then `annotate` answers `invalid_input` naming `ops[1]`, and nothing is stored.
+- **AC3** (editor) Given a spotlight and a drawn second shape, then the op has two shapes after one undo step; undo leaves one.
+- **AC4** (editor) Given an arrow and a spotlight added afterwards, then the spotlight sits before the arrow in the list and the arrow stays bright; a blur stays before the spotlight.
+- **AC5** Given mode `blur`, then the outside is blurred with `strength` and the hole is sharp; the spec text, the panel and the docs say it is not a redaction.
+- **AC6** Given 9 shapes, no shape, a shape with no area or a dim outside 0..1, then `invalid_input` naming `ops[i]`.
+
+**Agent interface** — `annotate` with a `spotlight` op; no new tool.
+
+**Test notes** — Golden images for dim, blur, ellipse and rounded holes; `tests/manual/ANN-6.md` for the editor.
+
+---
+
+### ANN-8 Magnify (reserved)
+**Priority** P2 · **Status** Backlog (moved out of 0.3.3 on Nov 12, 2026). The ID and the op name `magnify` are reserved. Design notes to keep: the loupe renders its source rectangle again at `zoom` times from `original.png` plus the vector ops that precede it, so it is sharp; blur and pixelate always apply to every copy of those pixels, also inside a loupe (OCR on the export finds no characters in a redacted rectangle, also inside a loupe). Detail in `../plans/release-0.3.3-plan.md` section 2 items 1 and 2.
 
 ---
 

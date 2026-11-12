@@ -782,6 +782,9 @@ mod tests {
             n: 1,
             size: 28.0,
             color: Color::BLACK,
+            style: Default::default(),
+            start: 1,
+            text: None,
         };
         assert!(hit(&s, Pt::new(60.0, 55.0), 2.0, &mut tm));
         assert!(!hit(&s, Pt::new(80.0, 80.0), 2.0, &mut tm));
@@ -878,6 +881,9 @@ mod tests {
             n: 1,
             size: 28.0,
             color: Color::BLACK,
+            style: Default::default(),
+            start: 1,
+            text: None,
         };
         let k = resize(&s, Handle::Scale, Pt::new(130.0, 120.0), false, &mut tm);
         assert!(matches!(k, OpKind::Step { size, .. } if (size - 60.0).abs() < 1e-9));
@@ -917,6 +923,9 @@ mod tests {
                     n,
                     size: 28.0,
                     color: Color::BLACK,
+                    style: Default::default(),
+                    start: 1,
+                    text: None,
                 },
             )
         };

@@ -87,8 +87,11 @@ P0 items block the v0.1 release; P1 items ship in v0.1 unless they threaten the 
 | ANN-1 | Arrow, line, rectangle, ellipse, text, highlighter, numbered step badge, crop | P0 | Yes |
 | ANN-2 | Blur and pixelate regions | P0 | Yes |
 | ANN-3 | Unlimited undo/redo; non-destructive (original kept) | P0 | Yes |
-| ANN-4 | Callouts, stamps, image overlay | P2 | Yes |
+| ANN-4 | Callouts and stamps (the image overlay stays P2, not planned) | P1 | Yes |
 | ANN-5 | Copy text from a screenshot (on-device text recognition) | P1 | Yes |
+| ANN-6 | Step badge: label, numbering style (numbers, letters), start number, reorder | P1 | Yes |
+| ANN-7 | Spotlight: dim or blur everything outside chosen holes | P1 | Yes |
+| ANN-8 | Magnify (loupe); reserved, backlog | P2 | Yes |
 | **Recording** |  |  |  |
 | REC-1 | Record full display, window or region | P0 | Yes |
 | REC-2 | Resolution up to the display's native size (incl. 4K/5K), or a chosen output height (720p, 1080p, 1440p, 2160p); no cap | P0 | Yes |

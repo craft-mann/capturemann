@@ -1,6 +1,6 @@
 # Import media (IMP)
 
-**0.3.3 (IMP-6, import images; maintainer decisions of Nov 12, 2026):** images join the same `import_media` tool, job and Import form (no new screen: design pack `specs/capturemann-0.3.3-annotation-pack/`, local only). Formats JPEG (`.jpg`, `.jpeg`) and PNG (`.png`) only; limits 16 384 px per side and 100 megapixels; EXIF orientation applied, metadata dropped, source file not kept; clipboard paste is a stretch goal. Plan: `../plans/release-0.3.3-plan.md` section 3b. The IMP-6 text is written in Phase 0.
+**0.3.3 (IMP-6, import images; maintainer decisions of Nov 12, 2026):** images join the same `import_media` tool, job and Import form (no new screen: design pack `specs/capturemann-0.3.3-annotation-pack/`, local only). Formats JPEG (`.jpg`, `.jpeg`) and PNG (`.png`) only; limits 16 384 px per side and 50 megapixels (lowered from 100 on the Nov 12 review); EXIF orientation applied, metadata dropped, source file not kept; clipboard paste is a stretch goal. Plan: `../plans/release-0.3.3-plan.md` section 3b. IMP-6 below.
 
 Bring video and audio files that were not recorded by CaptureMann (a phone clip, a screen recording from another tool, a voice memo, a downloaded interview) into the library as normal captures, so that the editor, local AI (transcript, speakers, reports), export, upload and publish work on them. Design source: the redesign kit boards I0 to I4 (`capturemann-redesign 6/`: `import-media-design.md`, `screens/png/Import*.png`, `source/Import*.dc.html`), proposal and maintainer decisions of Nov 3, 2026. Release plan: `../plans/release-0.2.7-plan.md`, track M3.
 
@@ -184,6 +184,39 @@ Because the bundled FFmpeg has no demuxer for AVI, AIFF, FLAC, OGG or bare AAC (
 **Out of scope** — Folder import; dropping from a browser; a camera roll.
 
 **Test notes** — Layout tests with the pseudo-locale, the manual script `tests/manual/IMP-1.md` (a phone HEVC MOV with rotation, a variable-rate MKV, an M4A interview of about 1 hour, a 15 s voice memo, a protected file, a file on Desktop and one on an external drive, a folder drop, cancel, disk full, remove-originals), side-by-side with the PNGs at 1440 px.
+
+### IMP-6 Import images
+**Priority** P1 · **Status** Ready (0.3.3) · **Crates** cm-media, cm-library, cm-daemon, cm-mcp, cm-cli, apps/desktop · **Depends on** IMP-1 to IMP-5, ANN-1
+
+**User story** — As someone with a phone screenshot, a design mock-up or a picture from another tool, I want to bring it into the library and annotate, redact, Copy text and export it like a screenshot I took here.
+
+**Description**
+- **Same entry points, no new tool and no new screen.** `import_media` (Free; `dry_run`; `remove_originals` as Confirm, IMP-4) accepts images; the MCP tool count stays 81. CLI `capturemann import <files>`, the Import sheet (IMP-5) and drag and drop onto the library accept them. A sheet row shows the size in pixels and the status like other files.
+- **Result.** One image becomes one `.cmshot` bundle (`kind: screenshot`) with `original.png` (annotation ops are in physical px of `original.png`, so the pipeline needs PNG), a manifest with `source { path, imported_at, original_name }`, a thumbnail and an empty ops list. The editor opens it like a screenshot; the library shows it with the Imported mark and the Imported filter.
+- **Formats.** In: PNG (`.png`) and JPEG (`.jpg`, `.jpeg`). Recognised and refused with `unsupported_format` and `data.format` naming it: GIF, WebP, HEIC/HEIF, TIFF, BMP, SVG, RAW. The content decides, not the extension (as IMP-1.AC8). WebP and HEIC are later candidates.
+- **Normalisation.** The EXIF orientation is applied (a phone photo must not arrive sideways); the pixels are converted to 8-bit sRGB RGBA (16-bit PNG, palette PNG, greyscale and wide-gamut profiles are converted; the row says "converted"); transparency is kept; CMYK JPEG is converted or refused with `unsupported_format` and `data.format: "jpeg_cmyk"`. **Metadata is not copied** (EXIF with GPS and camera data stays out of `original.png`), and the source file is not kept unless the user keeps it by not removing the original.
+- **Limits.** At most 16 384 px per side and 50 megapixels, checked from the header before decoding, so a decompression bomb never allocates; refused as `unsupported_format` with `data.reason: "too_large"`. Corrupt or empty: `unreadable_file`. The scale factor is 1 (physical = logical); a PNG `pHYs` of 144 dpi is a hint only.
+- **Privacy.** Local only, as everything else. Auto-redact and Copy text work on imported images with no change.
+- **Stretch goal, after stamps:** paste an image from the clipboard as a new capture.
+
+**Acceptance criteria**
+- **AC1** Given a PNG and a JPEG, when imported, then two `.cmshot` bundles exist with a valid `original.png` of the right size, an empty ops list, a thumbnail and `source.original_name`; `annotate` and `recognize_text` work on them.
+- **AC2** Given a JPEG with EXIF orientation 6 (rotate 90), then `original.png` has the displayed orientation and no EXIF or other ancillary chunk (checked by parsing chunks).
+- **AC3** Given an image of 16 385 px on a side, or over 50 megapixels, then the status is `unsupported_format` with `data.reason: "too_large"`, decided from the header (the decoder is not run).
+- **AC4** Given a GIF, WebP, HEIC, TIFF, BMP or SVG whose extension says `.png`, then it is refused by its content, naming the real format; a `.png` that is really a JPEG imports as a JPEG.
+- **AC5** Given a 16-bit PNG, a palette PNG and a PNG with transparency, then each imports as 8-bit RGBA with the transparency kept and the row says converted when it was.
+- **AC6** Given a truncated or empty image file, then `unreadable_file` and nothing is created.
+- **AC7** Given `dry_run` on a mix of images, video and a folder, then each row has its own status and nothing is written.
+- **AC8** Given `remove_originals: true`, then the call is Confirm tier and the original goes to the Trash only after its bundle is verified (IMP-4).
+- **AC9** (app) Given an image dropped on the library window, then the Import sheet lists it with its size in pixels.
+
+**Edge cases and errors** — As IMP-1 to IMP-4. A very large allowed image (up to 50 MP) imports without more than one decoded copy in memory at a time. An animated PNG imports its first frame and the row says so.
+
+**Agent interface** — `import_media` with image paths; the result rows gain `width` and `height` for images.
+
+**Out of scope** — WebP, HEIC, TIFF, BMP, SVG, RAW; multi-page files; keeping the source file; folders.
+
+**Test notes** — Pure tests on headers (orientation, size limits, bombs, CMYK JPEG, 16-bit, palette PNG); golden `annotate` on an imported image; an `import_media dry_run` row test; a `cm-regress` case (import a PNG and a JPEG, annotate, export); `tests/manual/IMP-6.md` for drag and drop.
 
 ## Windows (0.2.8)
 

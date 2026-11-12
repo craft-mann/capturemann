@@ -507,6 +507,7 @@ impl ShotBundle {
         let after = AnnotationOp {
             id: before.id.clone(),
             kind,
+            extra: before.extra.clone(),
         };
         self.execute(
             "update_op",
@@ -535,23 +536,13 @@ impl ShotBundle {
         }];
         if let OpKind::Step { n: removed, .. } = op.kind {
             for (i, o) in self.manifest.ops.iter().enumerate() {
-                if let OpKind::Step {
-                    at: p,
-                    n,
-                    size,
-                    color,
-                } = &o.kind
-                {
+                if let OpKind::Step { n, .. } = &o.kind {
                     if *n > removed {
-                        let after = AnnotationOp {
-                            id: o.id.clone(),
-                            kind: OpKind::Step {
-                                at: *p,
-                                n: n - 1,
-                                size: *size,
-                                color: *color,
-                            },
-                        };
+                        // Every other field (style, start, text, unknown ones) is kept.
+                        let mut after = o.clone();
+                        if let OpKind::Step { n: slot, .. } = &mut after.kind {
+                            *slot = n - 1;
+                        }
                         // Index after the removal above.
                         let idx = if i > index { i - 1 } else { i };
                         changes.push(Change::ReplaceOp {
