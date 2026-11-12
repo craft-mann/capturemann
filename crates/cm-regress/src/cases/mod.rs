@@ -2,6 +2,7 @@
 
 use crate::model::Case;
 
+mod annotate;
 pub mod common;
 mod daemon;
 pub mod desktop;
@@ -23,6 +24,7 @@ pub fn all() -> Vec<Case> {
     v.extend(daemon::cases());
     v.extend(targets::cases());
     v.extend(library::cases());
+    v.extend(annotate::cases());
     v.extend(import::cases());
     v.extend(export::cases());
     v.extend(mcp::cases());
