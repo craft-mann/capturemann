@@ -1,6 +1,6 @@
 ---
 name: capturemann-basics
-description: How CaptureMann's MCP tools work: Free and Confirm tiers, request_id, client policy, errors, and what to do when the app is not running or not installed. Read before the first CaptureMann tool call.
+description: "How CaptureMann's MCP tools work: Free and Confirm tiers, request_id, client policy, errors, and what to do when the app is not running or not installed. Read before the first CaptureMann tool call."
 ---
 
 # CaptureMann basics
@@ -37,5 +37,5 @@ Results and errors carry a shared code: `invalid_input`, `not_found`, `user_decl
 ## When the tools are missing or fail
 
 - **No `capturemann` tools in this session:** the MCP server did not start. CaptureMann is not installed, or the `capturemann` program is not on the PATH. Ask the user to install CaptureMann (https://www.craftmann.app/capturemann/) and, on macOS, to set the plugin option "CaptureMann command" to `/Applications/CaptureMann.app/Contents/MacOS/capturemann` (`/plugin configure capturemann`), then restart the session. Do not install anything yourself.
-- **The app is not open:** the server starts a headless daemon with the same library and settings. Free tools work; a Confirm tool fails with `user_declined` and `data.reason: "no_confirmer"`. Ask the user to open the CaptureMann app and retry.
-- **`daemon_unavailable`:** the daemon could not be reached or started; ask the user to open the app.
+- **The app is not open:** the MCP server does not start a daemon of its own, so every tool answers `daemon_unavailable`. Ask the user to open the CaptureMann app and retry.
+- **`daemon_unavailable`:** the daemon could not be reached; ask the user to open the app. (If a daemon runs without the app, Free tools work and a Confirm tool fails with `user_declined` and `data.reason: "no_confirmer"`.)

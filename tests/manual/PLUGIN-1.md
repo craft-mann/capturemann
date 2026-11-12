@@ -59,11 +59,10 @@ screenshot and no recording.
    and the call ends `user_declined`. Nothing is recorded either way. (Do not click Allow in this
    script.)
 8. **The app closed.** Quit CaptureMann, start a new session with `--plugin-dir`, ask for the library
-   again. Pass: `list_library` still answers (a headless daemon was started), and asking Claude to
-   publish a capture is refused: either Claude explains the app must be open, or the call fails with
-   `user_declined` / `no_confirmer`. Afterwards end the headless daemon (the CLI started the
-   `cm-daemon` binary detached; it shuts down on SIGTERM: `pkill -TERM cm-daemon`, after checking with
-   `ps` that it is the only one) and reopen the app.
+   again. Pass: `list_library` answers `daemon_unavailable` (the MCP server does not start a daemon;
+   the app provides it) and Claude asks you to open the app. Reopen the app. (Run Nov 12, 2026 with a
+   hand-started daemon instead of the app: Free tools answered, `start_recording` ended `user_declined`
+   / `no_confirmer`; `verification/L1-macos-0.3.2-plugin-1-2026-11-12-claude.md`.)
 9. **The wrong path fails clearly.** `/plugin configure capturemann`, set the command to
    `/nonexistent/capturemann`, `/reload-plugins`, `/mcp`. Pass: the server shows as failed, and the
    `capturemann` tools are gone; the Errors tab names the command. Restore the right value.

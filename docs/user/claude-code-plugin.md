@@ -21,8 +21,8 @@ The plugin has no hooks, no agents, no background processes and no executables. 
 ## Requirements
 
 1. **CaptureMann 0.3.x installed and open** on the same computer. Start the app before the session:
-   when it is closed, the server starts a headless daemon and anything that needs your confirmation
-   (recording, publishing, deleting) fails with `no_confirmer` until the app is open.
+   when it is closed, every tool answers `daemon_unavailable` until you open it (the app provides the
+   daemon), and anything that needs your confirmation (recording, publishing, deleting) waits for your Allow in the app.
 2. **The `capturemann` command.** On Linux the packages install it in `/usr/bin`. On Windows tick
    "Add capturemann.exe and cm-mcp.exe to my PATH" in the installer (or re-run it with `/ADDPATH`).
    On macOS, Homebrew links it; with the DMG it stays inside the app, so either link it once:
@@ -94,7 +94,7 @@ tool result you asked for) is governed by your Claude plan. Policy: https://www.
 | --- | --- |
 | `/mcp` shows the server failed or no `capturemann` tools exist | `capturemann` is not on the PATH or the option points at a wrong path. Fix the **CaptureMann command** option (`/plugin configure capturemann`) and restart the session. |
 | A tool answers `daemon_unavailable` | The app could not be reached or started. Open CaptureMann. |
-| A recording, publish or delete fails with `user_declined` and `no_confirmer` | The app is closed (headless daemon). Open CaptureMann and ask again. |
+| A recording, publish or delete fails with `user_declined` and `no_confirmer` | A daemon is running without the app's confirmation dialog. Open CaptureMann and ask again. |
 | `user_declined` with `client_read_only` or `client_blocked` | You limited this client in Settings → Agents & CLI. |
 | `permission_missing` | Grant Screen Recording, Camera or Microphone in the OS and in CaptureMann's Permissions page. |
 

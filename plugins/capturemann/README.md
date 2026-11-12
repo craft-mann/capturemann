@@ -79,8 +79,8 @@ the same border, timer and Stop button as one you start yourself.
 ## Limits
 
 - Needs the CaptureMann app installed; the plugin cannot install it or start it for you. When the app
-  is closed, the server starts a headless daemon: Free tools work, Confirm tools fail with
-  `user_declined` / `no_confirmer` until you open the app.
+  is closed, every tool answers `daemon_unavailable` until you open the app (the app provides the
+  daemon). Confirm tools, such as recording or publishing, wait for your Allow in the app.
 - Does not run on claude.ai in the browser, on mobile, or in a cloud Claude Code session (local MCP
   servers do not run there).
 - Windows and Linux: window recording, the cursor track and global shortcuts have platform limits
