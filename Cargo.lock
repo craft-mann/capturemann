@@ -1696,6 +1696,7 @@ dependencies = [
 name = "cm-regress"
 version = "0.3.2"
 dependencies = [
+ "png 0.18.1",
  "serde",
  "serde_json",
  "windows 0.61.3",

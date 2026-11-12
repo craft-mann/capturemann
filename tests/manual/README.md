@@ -14,6 +14,8 @@ are run by hand, see [`CLAUDE.md`](../../CLAUDE.md).
 | Script | What it checks |
 |---|---|
 | [`ANN-2`](ANN-2.md) | Auto-redact (emails and keys) in the annotation editor |
+| [`ANN-6`](ANN-6.md) | The 0.3.3 screenshot editor by eye: grouped palette, callout, spotlight, steps, stamps, view bar, image strip |
+| [`IMP-6`](IMP-6.md) | Importing PNG and JPEG images: Import sheet, drag and drop, orientation, limits, refusals |
 | [`RED-1`](RED-1.md) | Auto-redact on real app screenshots: counts only (found, missed, false alarms) |
 | [`CAP-1-overlay`](CAP-1-overlay.md) | CAP-1 / CAP-3 manual script: the overlay picker (`apps/overlay`, `cm-overlay`) |
 | [`CAP-1`](CAP-1.md) | Capture display, window, region (`cm-capture` library side) |

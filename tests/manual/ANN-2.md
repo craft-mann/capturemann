@@ -24,8 +24,8 @@ Plain sentence with no secrets in it.
 
 Show it at a normal size (14 pt or larger) and take a screenshot of that window or region.
 
-1. **Button.** Open the screenshot in the editor. Expected: an "Auto-redact" button in the row under
-   the canvas, next to Revert. (On Linux the button needs the `tesseract` program: without it the
+1. **Button.** Open the screenshot in the editor. Expected: an "Auto-redact" button in the view bar
+   at the bottom of the stage, next to Copy text (0.3.3; before it was a row under the canvas next to Revert). (On Linux the button needs the `tesseract` program: without it the
    button is dimmed and its tooltip says how to install it; on Windows today it is not there at all: see step 9.)
 2. **Propose.** Press Auto-redact. Expected: a moment of "Looking for emails and keys...", then
    dashed boxes with a light tint over the two email addresses, the API key and, at lower

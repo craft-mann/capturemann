@@ -48,6 +48,52 @@ the data for other languages. Handwriting and very stylised text are not promise
 approximate (columns and paragraphs are kept apart when the picture makes them clear). From a
 terminal or an agent: `capturemann text <id> [--region x,y,w,h] [--copy] [--lines]`.
 
+### The editor in 0.3.3
+
+**Tool palette.** The tools on the left are grouped into 8 buttons: Select (Select and Select text),
+Shapes (arrow, line, rectangle, ellipse), Text (text and callout), Highlighter, Markers (step badge
+and stamp), Emphasis (spotlight), Redact (blur and pixelate) and Crop. A button shows the tool you
+used last in its group; click it to use that tool, or click its corner mark (or press and hold, or
+right-click) to pick another from a menu. Every tool also has its own key and picking by key changes
+the button: V Select, G Select text, A Arrow, L Line, R Rectangle, E Ellipse, T Text, K Callout,
+H Highlighter, N Step badge, U Stamp, S Spotlight, B Blur, X Pixelate, C Crop.
+
+**Callout (K).** A text box with a pointer, as a rounded bubble or a plain box. Drag to place the
+box, then click again or drag the blue "Tail tip" dot to aim the pointer. The box grows to fit what
+you type; moving the box keeps the pointer tip where it is.
+
+**Spotlight (S).** Dims everything except the parts you mark. There is one spotlight per image:
+drawing another shape adds a hole to it (up to 8). It sits under your arrows and callouts, so those
+stay bright. Setting "Outside the holes" to Blur only blurs for looks; it does not hide anything.
+To hide information use Blur (B) or Pixelate (X), or Auto-redact.
+
+**Step badges (N).** The Steps panel sets the numbering (1 2 3, A B C or a b c) and the start for all
+steps, and lists the steps so you can drag them into a new order; the numbers follow. A step can
+carry a short label, drawn in a pill beside the badge. Stamps (U) add a check, cross, exclamation or
+question mark, or a "Before" or "After" label, where this version has them.
+
+**View bar.** Undo and Redo, Copy text and Auto-redact, zoom out, the zoom value, zoom in, Images,
+Keyboard and a three-dot menu. The zoom value opens a menu (Fit to window, Actual size, 200% or a
+custom value); there are no separate Fit and 100% buttons. **Revert to original** is in the
+three-dot menu and still asks first; it removes every annotation, crop and redaction.
+
+**Image strip.** When you open an image from a library view that lists more than one image, a strip
+of thumbnails under the picture lets you jump to another image of the same list in the same order.
+Edits are saved as you go, so switching never asks to save, and each image keeps its own undo. The
+Images button hides or shows the strip; it also hides when the window is shorter than 640 px.
+
+**Import pictures.** Besides video and audio, Import (and dragging files onto the library) accepts
+PNG and JPEG pictures. Each becomes a screenshot you can annotate, redact, copy text from and export.
+A phone photo is turned upright, picture information such as location is not copied, and a picture
+over 16,384 px on a side or 50 megapixels is refused. WebP, HEIC, GIF and other picture formats are
+not supported yet; the Import window names the format.
+
+From a terminal or an agent the same drawing is `capturemann annotate <id> --ops ops.json`; the ops
+are `arrow`, `line`, `rect`, `ellipse`, `text`, `highlight`, `step`, `blur`, `pixelate`, `crop` and,
+from 0.3.3, `callout`, `spotlight` and `stamp`. A capture saved by 0.3.3 and opened by 0.3.2 keeps
+the new annotations but 0.3.2 does not draw them, and if 0.3.2 saves it the step labels and
+numbering style are lost.
+
 ### On Linux (early build)
 
 The shortcuts above are Ctrl+Alt+Shift+key on Linux. How they work depends on your session:
