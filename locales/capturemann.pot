@@ -10,6 +10,12 @@ msgstr ""
 msgid "(untitled)"
 msgstr ""
 
+msgid "+ Ellipse"
+msgstr ""
+
+msgid "+ Rectangle"
+msgstr ""
+
 msgid "1 audio file"
 msgstr ""
 
@@ -189,6 +195,9 @@ msgid "Add a competency"
 msgstr ""
 
 msgid "Add a competency and press Enter"
+msgstr ""
+
+msgid "Add a label"
 msgstr ""
 
 msgid "Add a label (optional)"
@@ -534,6 +543,9 @@ msgstr ""
 msgid "Best matches first, then front to back"
 msgstr ""
 
+msgid "Blur here is only a look. To hide information, use Blur (B) or Pixelate (X)."
+msgstr ""
+
 msgid "Bring in a video or audio file"
 msgstr ""
 
@@ -565,6 +577,9 @@ msgid "Burn in captions on next export"
 msgstr ""
 
 msgid "Burned into new exports unless you turn it off when exporting."
+msgstr ""
+
+msgid "Callout text"
 msgstr ""
 
 msgid "Camera"
@@ -951,6 +966,9 @@ msgid "Click a window"
 msgstr ""
 
 msgid "Click effect"
+msgstr ""
+
+msgid "Click the image to place a stamp. Symbols are drawn as shapes, so they look the same on macOS, Windows and Linux."
 msgstr ""
 
 msgid "Click, then Space skips · Esc cancels"
@@ -1467,6 +1485,9 @@ msgstr ""
 msgid "Delete capture?"
 msgstr ""
 
+msgid "Delete step {badge}"
+msgstr ""
+
 msgid "Delete the report"
 msgstr ""
 
@@ -1626,13 +1647,22 @@ msgstr ""
 msgid "Downloads the model from the internet"
 msgstr ""
 
+msgid "Drag on the image to place a callout, then type its text."
+msgstr ""
+
 msgid "Drag on the image to set the visible area. The original and the annotations outside it are kept."
+msgstr ""
+
+msgid "Drag the blue dot to aim the tail. Moving the box keeps the tail tip where it is. The box grows to fit the text."
 msgstr ""
 
 msgid "Drag the bubble anywhere before or during a recording. It snaps to corners and edge midpoints."
 msgstr ""
 
 msgid "Drag the slider or use the arrow keys (Shift for bigger steps). JPG or PNG up to 2 MB; 1280 × 720 is best."
+msgstr ""
+
+msgid "Drag to reorder: the numbers follow. Deleting a step renumbers the rest. Labels sit right of the badge and flip left near the image edge. After Z come AA, AB."
 msgstr ""
 
 msgid "Drag to select"
@@ -1699,6 +1729,9 @@ msgid "Editor toolbar"
 msgstr ""
 
 msgid "Edits are saved with the recording and never change the original tracks."
+msgstr ""
+
+msgid "Ellipse {n}"
 msgstr ""
 
 msgid "Engine loading the model…"
@@ -2069,6 +2102,9 @@ msgid "Hold a modifier key (Control, Option or Shift, Command or Windows) too."
 msgstr ""
 
 msgid "Hold and drag to pan"
+msgstr ""
+
+msgid "Holes {n} of {max}"
 msgstr ""
 
 msgid "How many people"
@@ -2868,6 +2904,9 @@ msgstr ""
 msgid "No key assigned yet; choose one in your desktop’s keyboard settings"
 msgstr ""
 
+msgid "No label"
+msgstr ""
+
 msgid "No limit"
 msgstr ""
 
@@ -3103,6 +3142,9 @@ msgstr ""
 msgid "Now speaking"
 msgstr ""
 
+msgid "Numbering {text}"
+msgstr ""
+
 msgid "Off"
 msgstr ""
 
@@ -3170,6 +3212,9 @@ msgid "One MP4 with the screen. The original tracks are untouched. {captions}"
 msgstr ""
 
 msgid "One speaker, a room"
+msgstr ""
+
+msgid "One spotlight per image: drawing another shape adds a hole to it. It goes under your arrows and callouts, so they stay bright."
 msgstr ""
 
 msgid "Online meeting"
@@ -3883,6 +3928,9 @@ msgstr ""
 msgid "Recovered recording from {when} (lost up to {secs} s)"
 msgstr ""
 
+msgid "Rectangle {n}"
+msgstr ""
+
 msgid "Redo"
 msgstr ""
 
@@ -3947,6 +3995,9 @@ msgid "Remove this zoom suggestion"
 msgstr ""
 
 msgid "Remove zoom"
+msgstr ""
+
+msgid "Remove {name}"
 msgstr ""
 
 msgid "Remove {phrase}"
@@ -4551,6 +4602,15 @@ msgstr ""
 msgid "Start a recording first, then add markers while it runs."
 msgstr ""
 
+msgid "Start at"
+msgstr ""
+
+msgid "Start at one less"
+msgstr ""
+
+msgid "Start at one more"
+msgstr ""
+
 msgid "Start in 5 s"
 msgstr ""
 
@@ -4612,6 +4672,15 @@ msgid "States are read without asking the system."
 msgstr ""
 
 msgid "States are read without asking the system. Granting only happens when you press “Grant access…”."
+msgstr ""
+
+msgid "Step label"
+msgstr ""
+
+msgid "Step {badge}"
+msgstr ""
+
+msgid "Step {badge}: {text}"
 msgstr ""
 
 msgid "Still online: {items}."
@@ -5538,6 +5607,9 @@ msgstr ""
 msgid "Type at least three letters first."
 msgstr ""
 
+msgid "Type the callout text"
+msgstr ""
+
 msgid "Type the caption"
 msgstr ""
 
@@ -6433,6 +6505,9 @@ msgstr ""
 msgid "{group} shortcuts"
 msgstr ""
 
+msgid "{group}: {tool}"
+msgstr ""
+
 msgid "{hint} · last request: {tool}"
 msgstr ""
 
@@ -7041,6 +7116,10 @@ msgid "blur"
 msgstr ""
 
 msgctxt "annotation kind"
+msgid "callout"
+msgstr ""
+
+msgctxt "annotation kind"
 msgid "crop"
 msgstr ""
 
@@ -7065,6 +7144,14 @@ msgid "rect"
 msgstr ""
 
 msgctxt "annotation kind"
+msgid "spotlight"
+msgstr ""
+
+msgctxt "annotation kind"
+msgid "stamp"
+msgstr ""
+
+msgctxt "annotation kind"
 msgid "step"
 msgstr ""
 
@@ -7085,7 +7172,39 @@ msgid "Color"
 msgstr ""
 
 msgctxt "annotation setting"
+msgid "Corners"
+msgstr ""
+
+msgctxt "annotation setting"
+msgid "Dim"
+msgstr ""
+
+msgctxt "annotation setting"
+msgid "Fill"
+msgstr ""
+
+msgctxt "annotation setting"
+msgid "Kind"
+msgstr ""
+
+msgctxt "annotation setting"
+msgid "Label"
+msgstr ""
+
+msgctxt "annotation setting"
+msgid "Numbering"
+msgstr ""
+
+msgctxt "annotation setting"
 msgid "Opacity"
+msgstr ""
+
+msgctxt "annotation setting"
+msgid "Order"
+msgstr ""
+
+msgctxt "annotation setting"
+msgid "Outside the holes"
 msgstr ""
 
 msgctxt "annotation setting"
@@ -7093,7 +7212,23 @@ msgid "Pixel size"
 msgstr ""
 
 msgctxt "annotation setting"
+msgid "Size"
+msgstr ""
+
+msgctxt "annotation setting"
+msgid "Start at"
+msgstr ""
+
+msgctxt "annotation setting"
 msgid "Stroke width"
+msgstr ""
+
+msgctxt "annotation setting"
+msgid "Style"
+msgstr ""
+
+msgctxt "annotation setting"
+msgid "Text"
 msgstr ""
 
 msgctxt "annotation setting"
@@ -7470,6 +7605,18 @@ msgstr ""
 
 msgctxt "button, after the link was copied"
 msgid "Copied"
+msgstr ""
+
+msgctxt "callout handle"
+msgid "Tail tip"
+msgstr ""
+
+msgctxt "callout style"
+msgid "Box"
+msgstr ""
+
+msgctxt "callout style"
+msgid "Bubble"
 msgstr ""
 
 msgctxt "camera"
@@ -8412,6 +8559,10 @@ msgctxt "page title"
 msgid "Screenshot"
 msgstr ""
 
+msgctxt "panel badge"
+msgid "New in 0.3.3"
+msgstr ""
+
 msgctxt "people hint"
 msgid "optional"
 msgstr ""
@@ -9248,6 +9399,42 @@ msgctxt "speech model"
 msgid "Resume"
 msgstr ""
 
+msgctxt "spotlight outside"
+msgid "Blur"
+msgstr ""
+
+msgctxt "spotlight outside"
+msgid "Dim"
+msgstr ""
+
+msgctxt "stamp"
+msgid "Check mark"
+msgstr ""
+
+msgctxt "stamp"
+msgid "Cross"
+msgstr ""
+
+msgctxt "stamp"
+msgid "Exclamation mark"
+msgstr ""
+
+msgctxt "stamp"
+msgid "Question mark"
+msgstr ""
+
+msgctxt "stamp glyph"
+msgid "?"
+msgstr ""
+
+msgctxt "stamp label"
+msgid "After"
+msgstr ""
+
+msgctxt "stamp label"
+msgid "Before"
+msgstr ""
+
 msgctxt "stat tile"
 msgid "Length"
 msgstr ""
@@ -9345,6 +9532,10 @@ msgid "Blur"
 msgstr ""
 
 msgctxt "tool"
+msgid "Callout"
+msgstr ""
+
+msgctxt "tool"
 msgid "Crop"
 msgstr ""
 
@@ -9377,6 +9568,14 @@ msgid "Select text"
 msgstr ""
 
 msgctxt "tool"
+msgid "Spotlight"
+msgstr ""
+
+msgctxt "tool"
+msgid "Stamp"
+msgstr ""
+
+msgctxt "tool"
 msgid "Step badge"
 msgstr ""
 
@@ -9384,8 +9583,44 @@ msgctxt "tool"
 msgid "Text"
 msgstr ""
 
+msgctxt "tool group"
+msgid "Crop"
+msgstr ""
+
+msgctxt "tool group"
+msgid "Emphasis"
+msgstr ""
+
+msgctxt "tool group"
+msgid "Highlighter"
+msgstr ""
+
+msgctxt "tool group"
+msgid "Markers"
+msgstr ""
+
+msgctxt "tool group"
+msgid "Redact"
+msgstr ""
+
+msgctxt "tool group"
+msgid "Select"
+msgstr ""
+
+msgctxt "tool group"
+msgid "Shapes"
+msgstr ""
+
+msgctxt "tool group"
+msgid "Text"
+msgstr ""
+
 msgctxt "tool permission"
 msgid "Changed"
+msgstr ""
+
+msgctxt "tool tooltip"
+msgid "in {group}"
 msgstr ""
 
 msgctxt "track"
