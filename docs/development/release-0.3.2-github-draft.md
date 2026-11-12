@@ -152,7 +152,7 @@ Minisign public key: `packaging/linux/minisign.pub`; public key `RWTeQv8ogB2CCuZ
 - **macOS 13+:** `CaptureMann-v0.3.2-macos-arm64.dmg` (Apple Silicon) or `CaptureMann-v0.3.2-macos-x86_64.dmg` (Intel);
   signed with a Developer ID, notarized and stapled.
   Or `brew upgrade --cask craft-mann/tap/capturemann` (`brew install --cask craft-mann/tap/capturemann` for a first install; the cask
-  is at <FILL: 0.3.2, tap commit ...> ). Check with `shasum -a 256 -c <file>.sha256`.
+  is at 0.3.2, tap commit `94067f5`). Check with `shasum -a 256 -c <file>.sha256`.
 - **Linux (Ubuntu 24.04 or newer, Debian 13, or glibc 2.39+; amd64 and arm64):** `sudo apt install ./capturemann_0.3.2_amd64.deb` (or
   `_arm64.deb`), or the tarball with `./check-runtime.sh` and `./install.sh`. Copy text and Auto-redact need
   `sudo apt install tesseract-ocr` (and `tesseract-ocr-<lang>` for other languages). Or the APT repository:
@@ -165,8 +165,7 @@ sudo apt -o Acquire::Retries=5 update && sudo apt -o Acquire::Retries=5 install 
 ```
 
 GitHub's release host sometimes answers the first download of a file with a `504`; repeating the command works (the `Retries` option does
-it for you). The repository is hosted on GitHub release assets for now; it carries <FILL: "0.3.0, 0.3.1 and 0.3.2" once make-apt-repo.sh
-has run>.
+it for you). The repository is hosted on GitHub release assets for now; it carries 0.3.0, 0.3.1 and 0.3.2.
 
 Repository key fingerprint: `516C CD4F C7B3 5167 8803  F71B DEB1 BB54 FAEF 557D` (RSA 4096, signing only, expires Nov 8, 2031). The
 repository is the set of files of the release tagged [`apt`](https://github.com/craft-mann/capturemann/releases/tag/apt). The key and
