@@ -74,7 +74,7 @@ Rough size: A about 2 days, B about 3 days, C about 1 day, verification and rele
 
 ## 5. Questions for the maintainer
 1. (Answered Nov 12: the annotation pack is 0.3.3 and in-app update is not in this phase.) Windowed audio: 0.3.4, or later?
-2. Section 2 item 7: accept that 0.3.2 will not draw the new ops and drops the new step fields when it saves (the ops themselves are kept), and add field pass-through from 0.3.3 on?
+2. (Answered Nov 12: **accepted**.) Section 2 item 7: 0.3.2 will not draw the new ops and drops the new step fields when it saves (the ops themselves are kept); 0.3.3 adds field pass-through, a round-trip fixture test and a note in the release text.
 3. Are the proposed rules for spotlight order (inserted before the first non-redaction op) and magnify (always redacted) fine?
 4. Are stamps in scope or a stretch goal?
 5. `capturemann mcp` starting a headless daemon, from `release-0.3.3-plan.md`: leave it as is (the app must be open) or build it?
