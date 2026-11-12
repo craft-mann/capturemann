@@ -79,14 +79,14 @@ from the candidate reports plus the smoke check of the final files (see the rele
 ## Checked, and what was not
 
 Reports in `verification/` (all PARTIAL; one computer each). Candidate files were built overnight from `5d493d08`,
-the commit the tag points to, and regressed; the final files built from the tag were the Windows files and Linux aarch64 files are the candidates (same code); the macOS DMGs were rebuilt by the maintainer on Nov 12 from the same code and notarized (not the files the macOS reports ran on, see below); Linux x86_64 was built on the ThinkPad on Nov 12.
+the commit the tag points to, and regressed; the final files built from the tag were the Windows files and Linux aarch64 files are the candidates (same code); the macOS DMGs were rebuilt by the maintainer on Nov 12 from the same code and notarized (not the files the macOS reports ran on, see below); Linux x86_64 was built and regressed on the ThinkPad on Nov 12.
 
 | System | Files and computer | Tiers run (passed/failed) | Reports |
 | --- | --- | --- | --- |
 | Windows 11 x64 (ThinkPad T490, Intel UHD 620) | installer and zip from the **Windows package** workflow, run for candidate `4f96ba59`; silent install | standard 44/0, full 45/0, transcription and speakers 2/0, silent installer 1/0 (first run failed to start the program, passed on the second run) | `L1-windows-0.3.2-*` (4f96ba59) |
 | macOS arm64 (the maintainer's Mac, Apple M4 Pro) | `CaptureMann-v0.3.2-macos-arm64.dmg`, signed with a Developer ID, notarized and stapled (rebuilt Nov 12); the app copied out of the DMG | standard 37/0, full 38/0 on the overnight candidate (6f95def3); hardware not run; six desktop-session cases not run | `L1-macos-0.3.2-*` (6f95def3) |
 | macOS x86_64 (Intel) | `CaptureMann-v0.3.2-macos-x86_64.dmg`, same build; **checked on Apple Silicon only** (DMG install check, the command-line tool under Rosetta) | not run on Intel hardware | `L1-macos-0.3.2-extra-candidate-6f95def3-*` |
-| Linux x86_64 (same ThinkPad, Ubuntu 24.04, X11) | tarball and `.deb` from `release-build.sh` | <FILL: pending, the build is running on the ThinkPad; if no regression runs, replace the row with: built on GitHub (run 43051585284, commit 4f96ba59) and by `release-build.sh`, `check-package.sh` only, **not regressed on hardware**> | `<FILL: L1-linux-0.3.2-regression-*>` |
+| Linux x86_64 (same ThinkPad, Ubuntu 24.04, X11) | tarball and `.deb` from `release-build.sh` | standard 46/0, full 47/0, `.deb` and tarball install cases 7/0 each (X11 session; the build is the one made on the ThinkPad from `5d493d08`) | `L1-linux-0.3.2-regression-*-x11-*` (5d493d08) |
 | Linux aarch64 (Ubuntu 24.04 VM, headless) | tarball and `.deb` from `release-build.sh` | full 37/0 | `L1-linux-0.3.2-aarch64-vm-*` (4f96ba59) |
 
 Six macOS desktop-session cases (`targets.list`, `shot.invalid`, `desktop.stays_up`, `desktop.second_launch`, `desktop.tray_icon`, `mcp.confirm_tier`) were not run.
@@ -135,8 +135,8 @@ the Linux Wayland session, the macOS 13 floor of the text recognizer.
 | `capturemann-0.3.2-windows-x64.zip` | `3e2beed96f86212055a0f2f157c976a3298dc961e66f1c406d97c74784707801` |
 | `CaptureMann-v0.3.2-macos-arm64.dmg` | `e289c29c0c3d75d65d907174e3e53cbe55b7a2c524980a254722400a885b90c2` |
 | `CaptureMann-v0.3.2-macos-x86_64.dmg` | `afd4aed0bdae26aac4dc47b0dacaaa013b36e3d78a44ac86f27c5bef7b120118` |
-| `capturemann-0.3.2-linux-x86_64.tar.gz` | `<FILL>` |
-| `capturemann_0.3.2_amd64.deb` | `<FILL>` |
+| `capturemann-0.3.2-linux-x86_64.tar.gz` | `6e91a3fb7b2176e4955cf444c815a1d6690a8e5eebbd8e1039024082f79630f2` |
+| `capturemann_0.3.2_amd64.deb` | `fe80b52b95a15a57cbcf35368ca0f12ffc0bccb077fae53a7635a1953cb1ba7f` |
 | `capturemann-0.3.2-linux-aarch64.tar.gz` | `fecc4939312644275a7a780f26072c1a8756894eb1cb87428c6c0fe3b277141b` |
 | `capturemann_0.3.2_arm64.deb` | `cb235d27f62a87f18de7d7cdba3c301796d44ec7ee31c1aa2ac5ced7741bd267` |
 

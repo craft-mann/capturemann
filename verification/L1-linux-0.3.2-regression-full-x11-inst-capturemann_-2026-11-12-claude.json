@@ -1,0 +1,238 @@
+{
+  "cases": [
+    {
+      "area": "linux",
+      "duration_ms": 329,
+      "evidence": [
+        "session x11 desktop ubuntu:GNOME runtime dir /run/user/1000",
+        "desktop portal answers on the session bus"
+      ],
+      "id": "linux.session",
+      "message": "",
+      "needs": [
+        "desktop_session"
+      ],
+      "specs": [
+        "LINUX-1",
+        "platform-acceptance"
+      ],
+      "status": "PASS",
+      "tier": "smoke",
+      "title": "the run sees a desktop session; the report names X11 or Wayland, the desktop and the portal"
+    },
+    {
+      "area": "linux",
+      "duration_ms": 847,
+      "evidence": [
+        "xrandr: eDP-1 1920x1080 at (0,0) primary",
+        "daemon pid 47290 answered after 281 ms",
+        "product: display 65 'eDP-1' 1920x1080 at (0,0) scale 1",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "linux.displays",
+      "message": "",
+      "needs": [
+        "desktop_session"
+      ],
+      "specs": [
+        "CAP-3",
+        "LINUX-1"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "xrandr and the product list the same monitors"
+    },
+    {
+      "area": "linux",
+      "duration_ms": 10945,
+      "evidence": [
+        "1 visible window(s) of the app: hwnd 0x1e00001 pid 47343 class 'dev.capturemann.app' title 'CaptureMann' rect [402, 152, 1582, 912] ex 0x0"
+      ],
+      "id": "linux.desktop_stays_up",
+      "message": "",
+      "needs": [
+        "desktop_session"
+      ],
+      "specs": [
+        "bug class: crash at start",
+        "LINUX-1"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "cm-desktop starts, stays up for 10 s and (X11) shows a window of its own"
+    },
+    {
+      "area": "linux",
+      "duration_ms": 6994,
+      "evidence": [
+        "second launch: exit 0 (0x00000000) after 31 ms"
+      ],
+      "id": "linux.second_launch",
+      "message": "",
+      "needs": [
+        "desktop_session"
+      ],
+      "specs": [
+        "IMP-4: second launch opens Import"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "a second launch with a file forwards it to the running app and exits"
+    },
+    {
+      "area": "linux",
+      "duration_ms": 6932,
+      "evidence": [
+        "tray items: 3 before, 3 with the app; CaptureMann's: org.kde.StatusNotifierItem-47543-1"
+      ],
+      "id": "linux.tray_icon",
+      "message": "",
+      "needs": [
+        "desktop_session"
+      ],
+      "specs": [
+        "REC-5 tray"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "the tray icon registers as a StatusNotifierItem while the app runs"
+    },
+    {
+      "area": "linux",
+      "duration_ms": 0,
+      "evidence": [],
+      "id": "linux.hotkey_overlay",
+      "message": "needs --allow screen",
+      "needs": [
+        "desktop_session",
+        "screen"
+      ],
+      "specs": [
+        "CAP-1 overlay"
+      ],
+      "status": "SKIP",
+      "tier": "standard",
+      "title": "the capture hotkey opens the overlay on every monitor"
+    },
+    {
+      "area": "linux",
+      "duration_ms": 954,
+      "evidence": [
+        "vainfo: VA-API hardware H.264 encode available (Intel iHD driver for Intel(R) Gen Graphics - 24.1.0 ()): hardware encoder",
+        "profiles: VAProfileMPEG2Simple, VAProfileMPEG2Main, VAProfileH264Main, VAProfileH264High, VAProfileJPEGBaseline, VAProfileH264ConstrainedBaseline, VAProfileVP8Version0_3, VAProfileHEVCMain, VAProfileHEVCMain10, VAProfileVP9Profile0, VAProfileVP9Profile2",
+        "daemon pid 47625 answered after 281 ms",
+        "diagnostics: - VAAPI render device /dev/dri/renderD128",
+        "log hygiene: 1 WARN line(s) in the case's logs"
+      ],
+      "id": "linux.vaapi_encoder",
+      "message": "",
+      "needs": [],
+      "specs": [
+        "REC-1",
+        "DIAG-1",
+        "D-R2 software VP9 fallback"
+      ],
+      "status": "PASS",
+      "tier": "standard",
+      "title": "VA-API (vainfo) and the product's diagnostics agree on hardware or software encoding"
+    },
+    {
+      "area": "linux",
+      "duration_ms": 11024,
+      "evidence": [
+        "/home/trung/lab/capturemann_0.3.2_amd64.deb version 0.3.2",
+        "/opt/capturemann/lib/capturemann/capturemann --version: capturemann 0.3.2",
+        "documents checked in /usr/share/doc/capturemann"
+      ],
+      "id": "linux.deb_install",
+      "message": "",
+      "needs": [
+        "installer"
+      ],
+      "specs": [
+        "PKG-deb",
+        "packaging/linux/build-deb.sh"
+      ],
+      "status": "PASS",
+      "tier": "full",
+      "title": "the .deb installs, its programs find their libraries and run, remove and purge leave nothing"
+    },
+    {
+      "area": "linux",
+      "duration_ms": 326,
+      "evidence": [],
+      "id": "linux.tarball_install",
+      "message": "--installer is /home/trung/lab/capturemann_0.3.2_amd64.deb, this case wants a file ending in .tar.gz or .tgz",
+      "needs": [
+        "installer"
+      ],
+      "specs": [
+        "PKG-tarball",
+        "packaging/linux/install.sh"
+      ],
+      "status": "SKIP",
+      "tier": "full",
+      "title": "the tarball installs into a temporary prefix, its programs run, --uninstall leaves nothing"
+    }
+  ],
+  "run": {
+    "commit": "5d493d08",
+    "ffmpeg": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
+    "finished": "2026-11-12T00:26:23Z",
+    "flags": "--tier full --out /home/trung/lab/regress-out/20261112T002539Z --who cm-regress via regress.sh --verdict PARTIAL --only linux --installer /home/trung/lab/capturemann_0.3.2_amd64.deb --commit 5d493d08",
+    "gpu": "Intel Corporation WhiskeyLake-U GT2 [UHD Graphics 620]",
+    "hashes": [
+      [
+        "capturemann",
+        "db817b5dfcf5b7287b0aec9b0bc4b778dd124718b09d85edbf8de502802a7a56"
+      ],
+      [
+        "cm-mcp",
+        "2c172c8774b2774d819b535d12d6fde8eda9c2d5cef677c84628d1b4c04d9ae1"
+      ],
+      [
+        "cm-daemon",
+        "48da124b29d14143715ec7c046f430d278b935bf12d861b1fbf1e82e2f488e5a"
+      ],
+      [
+        "cm-desktop",
+        "445fba43eba115f908b2fcd2a82004d1b599357a0e47c00ee6d2e6e55892bee1"
+      ],
+      [
+        "cm-overlay",
+        "a0875b5852ccfb3411a2e5f8d44db0349835818816cd8eb16132fc7c0d4b8273"
+      ],
+      [
+        "ffmpeg",
+        "6c0178f77641bb7a45d71bd599fd56313a2cb376c2617900ba4ecfe21a1e8bf4"
+      ],
+      [
+        "ffprobe",
+        "be61c3bfa8d0389de8a1f62c1369d05ba37a097847f360e321123c54a64b6972"
+      ],
+      [
+        "llama-server",
+        "83319f88df0c5ed4a02a2f26a8c90554f600de887aeeab4026c7bb9ac9f2dc20"
+      ],
+      [
+        "capturemann_0.3.2_amd64.deb",
+        "fe80b52b95a15a57cbcf35368ca0f12ffc0bccb077fae53a7635a1953cb1ba7f"
+      ]
+    ],
+    "os": "Linux 7.0.0-42-generic x86_64",
+    "package_dir": "/home/trung/.local/lib/capturemann",
+    "platform": "linux",
+    "started": "2026-11-12T00:25:40Z",
+    "tier": "full",
+    "verdict": "PARTIAL",
+    "version": "0.3.2",
+    "who": "cm-regress via regress.sh"
+  },
+  "schema": 1,
+  "summary": {
+    "fail": 0,
+    "pass": 7,
+    "skip": 2,
+    "total": 9
+  }
+}
