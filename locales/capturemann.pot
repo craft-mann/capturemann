@@ -182,6 +182,9 @@ msgstr ""
 msgid "Actions for {title}"
 msgstr ""
 
+msgid "Actual size (100%)"
+msgstr ""
+
 msgid "Add a client by name"
 msgstr ""
 
@@ -1090,6 +1093,9 @@ msgstr ""
 msgid "Copies a new recording as soon as it stops. The export is made first, then copied."
 msgstr ""
 
+msgid "Copies all the text in the image. Select text copies only the part you select."
+msgstr ""
+
 msgid "Copies go to the folders above when you upload a capture. Drives and accounts are connected with your own credentials."
 msgstr ""
 
@@ -1383,6 +1389,9 @@ msgid "Cursor position is saved with the recording on X11, so the editor can dra
 msgstr ""
 
 msgid "Cursor smoothing"
+msgstr ""
+
+msgid "Custom: {n}%"
 msgstr ""
 
 msgid "Cut (⌫)"
@@ -1924,6 +1933,9 @@ msgstr ""
 msgid "Fit shows the whole screen on the background. Choose Fixed to crop a window, or Follow to keep the window on the cursor."
 msgstr ""
 
+msgid "Fit to window"
+msgstr ""
+
 msgid "Fix the problem and delete again; only the copies that are left are tried."
 msgstr ""
 
@@ -2089,7 +2101,13 @@ msgstr ""
 msgid "If your Google Cloud project is not verified, YouTube may keep the video {privacy} whatever you choose here. CaptureMann tells you when that happens and never changes a video’s visibility afterwards."
 msgstr ""
 
+msgid "Image strip"
+msgstr ""
+
 msgid "Image {iw} by {ih} pixels. Pointer {pointer}"
+msgstr ""
+
+msgid "Images"
 msgstr ""
 
 msgid "Import 1 file"
@@ -2779,6 +2797,9 @@ msgid "New title"
 msgstr ""
 
 msgid "Next doubtful word"
+msgstr ""
+
+msgid "Next image"
 msgstr ""
 
 msgid "Next match"
@@ -3485,6 +3506,9 @@ msgstr ""
 msgid "Previous doubtful word"
 msgstr ""
 
+msgid "Previous image"
+msgstr ""
+
 msgid "Previous match"
 msgstr ""
 
@@ -3958,6 +3982,9 @@ msgstr ""
 msgid "Remove “{name}”? It leaves this list. Files already copied there stay where they are."
 msgstr ""
 
+msgid "Removes every annotation, crop and redaction."
+msgstr ""
+
 msgid "Rename a capture"
 msgstr ""
 
@@ -4396,6 +4423,9 @@ msgid "Show in preview"
 msgstr ""
 
 msgid "Show or hide captions"
+msgstr ""
+
+msgid "Show or hide the image strip"
 msgstr ""
 
 msgid "Show original"
@@ -6001,6 +6031,9 @@ msgid_plural "Your {n} captures ({size}) are copied to the new folder and checke
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "Zoom"
+msgstr ""
+
 msgid "Zoom in"
 msgstr ""
 
@@ -6596,6 +6629,11 @@ msgid_plural "{n} accounts connected"
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "{n} annotation"
+msgid_plural "{n} annotations"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "{n} annotation, none selected"
 msgid_plural "{n} annotations, none selected"
 msgstr[0] ""
@@ -6792,6 +6830,9 @@ msgstr ""
 msgid "{platform} · {when}"
 msgstr ""
 
+msgid "{pos} of {total}"
+msgstr ""
+
 msgid "{provider} said no: {error} {hint}"
 msgstr ""
 
@@ -6888,6 +6929,9 @@ msgstr ""
 msgid "{title}, unavailable"
 msgstr ""
 
+msgid "{title}, {annotations}, {place}"
+msgstr ""
+
 msgid "{title}, {app}, {size}"
 msgstr ""
 
@@ -6907,6 +6951,9 @@ msgid "{title}, {hint}, shortcut {shortcut}"
 msgstr ""
 
 msgid "{title}, {hint}, unavailable"
+msgstr ""
+
+msgid "{title}, {place}"
 msgstr ""
 
 msgid "{title}, {platform}, {privacy}, {status}"
@@ -7041,6 +7088,10 @@ msgid "blur"
 msgstr ""
 
 msgctxt "annotation kind"
+msgid "callout"
+msgstr ""
+
+msgctxt "annotation kind"
 msgid "crop"
 msgstr ""
 
@@ -7062,6 +7113,14 @@ msgstr ""
 
 msgctxt "annotation kind"
 msgid "rect"
+msgstr ""
+
+msgctxt "annotation kind"
+msgid "spotlight"
+msgstr ""
+
+msgctxt "annotation kind"
+msgid "stamp"
 msgstr ""
 
 msgctxt "annotation kind"
@@ -9610,10 +9669,6 @@ msgstr ""
 
 msgctxt "window picker footer"
 msgid "Move"
-msgstr ""
-
-msgctxt "zoom"
-msgid "Fit"
 msgstr ""
 
 msgctxt "zoom"

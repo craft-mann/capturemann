@@ -115,6 +115,9 @@ pub struct AppModel {
     pub library_route: Route,
     /// Bumped whenever the library may have changed; the library view reloads.
     pub library_epoch: u64,
+    /// The images of the Library view as last shown (its filter, search and sort), for the
+    /// editor's image strip (0.3.3). Set by the library view; empty until it has loaded.
+    pub editor_strip: Arc<Vec<crate::editor::strip_model::StripItem>>,
     /// Captures whose files changed since the library view last reloaded (`capture.created` and
     /// `capture.revised`): only their thumbnails are dropped (R1-7).
     pub changed_captures: Vec<String>,
@@ -248,6 +251,7 @@ impl AppModel {
             route: Route::Library,
             library_route: Route::Library,
             library_epoch: 0,
+            editor_strip: Arc::new(Vec::new()),
             changed_captures: Vec::new(),
             last_rescan: None,
             rescan_busy: false,

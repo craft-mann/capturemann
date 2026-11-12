@@ -67,7 +67,21 @@ impl EditorView {
         let snap = Snap::of(doc_e.read(cx), self.viewport.zoom());
         let toolbar = self.toolbar(t, &snap, cx);
         let canvas = self.canvas_pane(t, &snap, overlay, cx);
-        let pills = self.floating_chrome(t, &snap, cx);
+        // The image strip (0.3.3): the Library's list, shown under the canvas.
+        let list = self.strip_list(cx);
+        self.warm_neighbors(&list, cx);
+        let images = self.images_state(&list);
+        let strip = crate::editor::strip_model::strip_visible(
+            &list,
+            &self.capture_id,
+            f32::from(window.viewport_size().height),
+            self.strip.pref_shown,
+        )
+        .then(|| {
+            let live = doc_e.read(cx).state.ops.len();
+            self.image_strip(t, &list, live, window, cx)
+        });
+        let pills = self.floating_chrome(t, &snap, images, cx);
         let popover = self.shortcuts_open.then(|| self.shortcuts_popover(t, cx));
         let inspector = self.inspector(t, &snap, cx);
         let warn = snap.warning.clone();
@@ -113,14 +127,24 @@ impl EditorView {
                     // so the canvas element and its hit testing are untouched.
                     .child(
                         div()
-                            .relative()
                             .flex_1()
                             .min_w(px(0.))
                             .min_h(px(0.))
                             .flex()
-                            .child(canvas)
-                            .child(pills)
-                            .children(popover),
+                            .flex_col()
+                            .gap(px(10.))
+                            .child(
+                                div()
+                                    .relative()
+                                    .flex_1()
+                                    .min_w(px(0.))
+                                    .min_h(px(0.))
+                                    .flex()
+                                    .child(canvas)
+                                    .child(pills)
+                                    .children(popover),
+                            )
+                            .children(strip),
                     )
                     .child(inspector),
             )
@@ -153,53 +177,6 @@ impl EditorView {
                 .into_any_element()
         } else {
             b.opacity(0.45).cursor_default().into_any_element()
-        }
-    }
-
-    /// Icon (or short text) button, 44 px target, kit radius 10; `enabled == false` dims it.
-    #[allow(clippy::too_many_arguments)]
-    fn ibtn(
-        &self,
-        t: &Theme,
-        id: &'static str,
-        label: String,
-        content: AnyElement,
-        keys: &[String],
-        enabled: bool,
-        on: impl Fn(&mut Self, &mut Window, &mut Context<Self>) + 'static,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        let hover = rgba_of(t.raised);
-        let focus = rgba_of(t.text);
-        let b = div()
-            .id(id)
-            .role(Role::Button)
-            .aria_label(label.clone())
-            .focusable()
-            .tab_stop(true)
-            .h(px(TOOL_BTN))
-            .min_w(px(TOOL_BTN))
-            .px(px(8.))
-            .flex()
-            .flex_none()
-            .items_center()
-            .justify_center()
-            .rounded(px(scale::RADIUS_MD))
-            .border_1()
-            .border_color(gpui::transparent_black())
-            .text_size(px(type_scale::CAPTION))
-            .text_color(rgba_of(t.text_2))
-            .mono()
-            .hover(move |s| s.bg(hover))
-            .focus_visible(move |s| s.border_color(focus))
-            .tooltip(tooltip::tip(label, keys.to_vec()))
-            .child(content);
-        if enabled {
-            b.cursor_pointer()
-                .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| on(this, window, cx)))
-                .into_any_element()
-        } else {
-            b.opacity(0.4).cursor_default().into_any_element()
         }
     }
 
@@ -303,7 +280,13 @@ impl EditorView {
     /// transport pill at the bottom. Both are absolute SIBLINGS of the canvas: their wrappers
     /// have no hitbox (pointer events beside the pills reach the canvas) and the pills occlude
     /// (events on them never reach the canvas).
-    fn floating_chrome(&self, t: &Theme, s: &Snap, cx: &mut Context<Self>) -> AnyElement {
+    fn floating_chrome(
+        &mut self,
+        t: &Theme,
+        s: &Snap,
+        images: Option<bool>,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let tools = div()
             .absolute()
             .left(px(PILL_MARGIN))
@@ -319,7 +302,7 @@ impl EditorView {
             .bottom(px(PILL_MARGIN))
             .flex()
             .justify_center()
-            .child(self.transport(t, s, cx));
+            .child(self.view_bar(t, s, images, cx));
         div()
             .absolute()
             .size_full()
@@ -328,18 +311,8 @@ impl EditorView {
             .into_any_element()
     }
 
-    /// A thin divider between button groups inside a pill.
-    fn pill_divider(t: &Theme) -> Div {
-        div()
-            .w(px(1.))
-            .h(px(24.))
-            .mx(px(4.))
-            .flex_none()
-            .bg(rgba_of(t.line))
-    }
-
     /// The pill's surface: `surface`, `line` border, radius 14, above the canvas.
-    fn pill_surface(t: &Theme) -> Div {
+    pub(super) fn pill_surface(t: &Theme) -> Div {
         div()
             .occlude()
             .p(px(6.))
@@ -347,258 +320,6 @@ impl EditorView {
             .border_1()
             .border_color(rgba_of(t.line))
             .bg(rgba_of(t.surface))
-    }
-
-    /// The view pill under the canvas: undo, redo, (auto-redact), revert, zoom, Fit, 100% and
-    /// the keyboard-shortcuts toggle.
-    pub(super) fn transport(&self, t: &Theme, s: &Snap, cx: &mut Context<Self>) -> AnyElement {
-        let (can_undo, can_redo, has_ops) = (s.can_undo, s.can_redo, s.has_ops);
-        let m = mod_label().to_owned();
-        let plain = |k: &str| vec![m.clone(), k.to_owned()];
-        let shifted = |k: &str| {
-            if cfg!(target_os = "macos") {
-                vec![shift_label().to_owned(), m.clone(), k.to_owned()]
-            } else {
-                vec![m.clone(), shift_label().to_owned(), k.to_owned()]
-            }
-        };
-        let c = t.text_2;
-        let zoom = format!("{:.0}%", self.viewport.zoom_percent());
-        let open = self.shortcuts_open;
-
-        Self::pill_surface(t)
-            .id("editor-transport")
-            .role(Role::Toolbar)
-            .aria_label(tr!("Undo and zoom"))
-            .max_w_full()
-            .flex_none()
-            .flex()
-            .items_center()
-            .gap(px(2.))
-            .child(self.ibtn(
-                t,
-                "editor-undo",
-                tr!("Undo"),
-                icon("undo-2", 18., c).into_any_element(),
-                &plain("Z"),
-                can_undo,
-                |this, _, cx| {
-                    if let Some(d) = &this.doc {
-                        d.update(cx, |d, cx| d.undo(cx));
-                    }
-                },
-                cx,
-            ))
-            .child(self.ibtn(
-                t,
-                "editor-redo",
-                tr!("Redo"),
-                icon("redo-2", 18., c).into_any_element(),
-                &shifted("Z"),
-                can_redo,
-                |this, _, cx| {
-                    if let Some(d) = &this.doc {
-                        d.update(cx, |d, cx| d.redo(cx));
-                    }
-                },
-                cx,
-            ))
-            .when(s.text_available, |d| {
-                let running = s.text_running;
-                d.child(
-                    self.ibtn(
-                        t,
-                        "editor-copy-text",
-                        tr!("Copy text"),
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap(px(6.))
-                            .child(icon(
-                                if running {
-                                    "loader-circle"
-                                } else {
-                                    "scan-text"
-                                },
-                                16.,
-                                c,
-                            ))
-                            .child(shrink_text(if running {
-                                tr!("Reading text\u{2026}")
-                            } else {
-                                tr!("Copy text")
-                            }))
-                            .into_any_element(),
-                        &[],
-                        !running,
-                        |this, _, cx| {
-                            if let Some(d) = &this.doc {
-                                d.update(cx, |d, cx| d.copy_text(None, cx));
-                            }
-                        },
-                        cx,
-                    ),
-                )
-            })
-            .when_some(s.text_hint.filter(|_| !s.text_available), |d, hint| {
-                d.child(
-                    self.ibtn(
-                        t,
-                        "editor-copy-text-unavailable",
-                        hint.to_owned(),
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap(px(6.))
-                            .child(icon("scan-text", 16., c))
-                            .child(shrink_text(tr!("Copy text")))
-                            .into_any_element(),
-                        &[],
-                        false,
-                        |_, _, _| {},
-                        cx,
-                    ),
-                )
-            })
-            .when(s.redact_available, |d| {
-                d.child(
-                    self.ibtn(
-                        t,
-                        "editor-auto-redact",
-                        tr!("Auto-redact"),
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap(px(6.))
-                            .child(icon("eye-off", 16., c))
-                            .child(tr!("Auto-redact"))
-                            .into_any_element(),
-                        &[],
-                        s.redact != RedactPhase::Running,
-                        |this, _, cx| {
-                            if let Some(d) = &this.doc {
-                                d.update(cx, |d, cx| d.auto_redact(cx));
-                            }
-                        },
-                        cx,
-                    ),
-                )
-            })
-            .when_some(s.redact_hint.filter(|_| !s.redact_available), |d, hint| {
-                d.child(
-                    self.ibtn(
-                        t,
-                        "editor-auto-redact-unavailable",
-                        hint.to_owned(),
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap(px(6.))
-                            .child(icon("eye-off", 16., c))
-                            .child(tr!("Auto-redact"))
-                            .into_any_element(),
-                        &[],
-                        false,
-                        |_, _, _| {},
-                        cx,
-                    ),
-                )
-            })
-            .child(self.ibtn(
-                t,
-                "editor-revert",
-                tr!("Revert to original"),
-                icon("rotate-ccw", 18., c).into_any_element(),
-                &[],
-                has_ops,
-                |this, _, cx| {
-                    if let Some(d) = &this.doc {
-                        d.update(cx, |d, cx| d.revert(cx));
-                    }
-                },
-                cx,
-            ))
-            .child(Self::pill_divider(t))
-            .child(self.ibtn(
-                t,
-                "editor-zoom-out",
-                tr!("Zoom out"),
-                icon("zoom-out", 18., c).into_any_element(),
-                &plain("-"),
-                true,
-                |this, _, _| this.viewport.zoom_step(false),
-                cx,
-            ))
-            .child(
-                div()
-                    .id("editor-zoom")
-                    .role(Role::Label)
-                    .aria_label(SharedString::from(tr_ctx!(
-                        "zoom level",
-                        "Zoom {zoom}",
-                        zoom = zoom
-                    )))
-                    .min_w(px(48.))
-                    .flex()
-                    .justify_center()
-                    .text_size(px(type_scale::CAPTION))
-                    .text_color(rgba_of(t.text))
-                    .mono()
-                    .tnum()
-                    .child(SharedString::from(zoom)),
-            )
-            .child(self.ibtn(
-                t,
-                "editor-zoom-in",
-                tr!("Zoom in"),
-                icon("zoom-in", 18., c).into_any_element(),
-                &plain("+"),
-                true,
-                |this, _, _| this.viewport.zoom_step(true),
-                cx,
-            ))
-            .child(self.ibtn(
-                t,
-                "editor-zoom-fit",
-                tr_ctx!("zoom", "Fit"),
-                icon("shrink", 18., c).into_any_element(),
-                &plain("0"),
-                true,
-                |this, _, _| this.viewport.fit_view(),
-                cx,
-            ))
-            .child(
-                self.ibtn(
-                    t,
-                    "editor-zoom-100",
-                    "100%".to_owned(),
-                    div()
-                        .text_color(rgba_of(t.mist))
-                        .child("100%")
-                        .into_any_element(),
-                    &plain("1"),
-                    true,
-                    |this, _, _| this.viewport.actual_size(),
-                    cx,
-                ),
-            )
-            .child(Self::pill_divider(t))
-            .child(
-                icon_button(
-                    t,
-                    "editor-shortcuts",
-                    "keyboard",
-                    tr!("Keyboard shortcuts"),
-                    open,
-                    Some(Vec::new()),
-                )
-                .aria_expanded(open)
-                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    this.shortcuts_open = !this.shortcuts_open;
-                    cx.notify();
-                })),
-            )
-            .into_any_element()
     }
 
     /// The shortcuts popover: hidden by default, opened by the keyboard button, closed by Esc,
