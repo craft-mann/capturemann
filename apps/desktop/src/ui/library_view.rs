@@ -213,7 +213,7 @@ impl LibraryView {
         let Some(daemon) = backend.daemon.clone() else {
             self.state
                 .finish_load(token, Err(ErrorNote::app(AppNote::LibraryUnavailable)));
-            self.sync_items();
+            self.sync_items(cx);
             cx.notify();
             return;
         };
@@ -232,7 +232,7 @@ impl LibraryView {
                 if this.state.finish_load(token, res) {
                     this.state.update_remote_counts();
                     this.publish_counts(cx);
-                    this.sync_items();
+                    this.sync_items(cx);
                     // Only the captures that changed lose their poster; the rest keep theirs.
                     let changed = std::mem::take(&mut this.pending_invalidate);
                     this.audio.update(cx, |a, cx| {
@@ -310,7 +310,7 @@ impl LibraryView {
         .detach();
     }
 
-    fn sync_items(&mut self) {
+    fn sync_items(&mut self, cx: &mut Context<Self>) {
         let only = self.state.imported_only;
         self.items = Arc::new(
             self.state
@@ -321,6 +321,9 @@ impl LibraryView {
                 .collect(),
         );
         self.rows_dirty = true;
+        // The editor's image strip lists the same images in the same order (0.3.3).
+        let strip = Arc::new(crate::editor::strip_model::from_library(&self.items));
+        self.app.update(cx, |m, _| m.editor_strip = strip);
     }
 
     /// The sidebar section changed (Screenshots or Recordings): show that kind.
@@ -338,14 +341,14 @@ impl LibraryView {
         } else if chip == Chip::Imported {
             // Filtered here: the page is already loaded.
             self.keep_scroll = false;
-            self.sync_items();
+            self.sync_items(cx);
             cx.notify();
         }
     }
 
     fn set_sort(&mut self, key: SortKey, cx: &mut Context<Self>) {
         self.state.set_sort(key);
-        self.sync_items();
+        self.sync_items(cx);
         cx.notify();
     }
 
