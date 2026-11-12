@@ -16,6 +16,10 @@ use crate::daemon_text::{duration_text, size_text};
 /// Shown in the sheet and the drop overlay: only what the shipped FFmpeg reads.
 pub const SUPPORTED_VIDEO: &str = "MP4, MOV, M4V, MKV";
 pub const SUPPORTED_AUDIO: &str = "M4A, WAV, MP3";
+/// Pictures (IMP-6).
+pub const SUPPORTED_IMAGE: &str = "PNG, JPEG";
+/// Extensions the drop overlay counts as pictures (the content decides for real).
+pub const IMAGE_EXT: [&str; 3] = ["png", "jpg", "jpeg"];
 /// Extensions the drop overlay counts as media (the probe decides for real).
 pub const VIDEO_EXT: [&str; 5] = ["mp4", "mov", "m4v", "mkv", "webm"];
 pub const AUDIO_EXT: [&str; 4] = ["m4a", "wav", "aac", "mp3"];
@@ -29,6 +33,8 @@ pub const FLOOR_BYTES: u64 = 1_000_000_000;
 pub enum Kind {
     Video,
     Audio,
+    /// A PNG or JPEG picture (IMP-6).
+    Image,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -112,6 +118,11 @@ pub fn meta_line(r: &Value) -> String {
             parts.push(format!("{w}\u{d7}{h}"));
         }
     }
+    if r["kind"] == "image" {
+        if let Some(c) = r["container"].as_str() {
+            parts.push(c.to_uppercase());
+        }
+    }
     if let Some(c) = r["video_codec"].as_str() {
         parts.push(c.to_uppercase());
     }
@@ -126,13 +137,17 @@ pub fn meta_line(r: &Value) -> String {
     parts.join(" \u{b7} ")
 }
 
+fn kind_of(v: &Value) -> Kind {
+    match v.as_str() {
+        Some("audio") => Kind::Audio,
+        Some("image") => Kind::Image,
+        _ => Kind::Video,
+    }
+}
+
 /// One `dry_run` row as a [`Row`].
 pub fn row_from_json(r: &Value) -> Row {
-    let kind = if r["kind"] == "audio" {
-        Kind::Audio
-    } else {
-        Kind::Video
-    };
+    let kind = kind_of(&r["kind"]);
     let status = match r["status"].as_str() {
         Some("ready") => Status::Ready,
         Some("prepared") => Status::Prepared(
@@ -177,6 +192,7 @@ pub fn cant_text(reason: &str, message: &str) -> String {
     match reason {
         "protected_media" => tr!("Protected by the store it came from (DRM); it can't be opened"),
         "unsupported_format" => tr!("This kind of file isn't supported yet"),
+        "too_large" => tr!("Too large: pictures up to 16,384 px on a side and 50 megapixels"),
         "no_streams" => tr!("No video or audio stream could be read. The file may be damaged."),
         "unreadable_file" => tr!("The file can't be read. It may be damaged or cut short."),
         _ if !message.is_empty() => message.to_owned(),
@@ -188,9 +204,17 @@ pub fn cant_text(reason: &str, message: &str) -> String {
 pub fn chip_label(s: &Status) -> String {
     match s {
         Status::Ready => tr_ctx!("import status", "Ready"),
+        Status::Prepared(why) if why.iter().any(|w| is_picture_reason(w)) => {
+            tr_ctx!("import status", "Converted")
+        }
         Status::Prepared(_) => tr_ctx!("import status", "Prepared for editing"),
         Status::Cant(..) => tr_ctx!("import status", "Can't import"),
     }
+}
+
+/// Reasons that only pictures have (IMP-6).
+fn is_picture_reason(id: &str) -> bool {
+    matches!(id, "converted" | "oriented" | "first_frame_only")
 }
 
 /// Words for a "prepared" reason, inside the info note.
@@ -200,6 +224,9 @@ pub fn prepare_reason_text(id: &str) -> String {
         "container_mkv" => tr!("an MKV container"),
         "rotated" => tr!("a rotated picture"),
         "pixel_format" => tr!("a colour format editing doesn't use"),
+        "converted" => tr!("colours converted to 8-bit RGB"),
+        "oriented" => tr!("turned upright"),
+        "first_frame_only" => tr!("an animation, first frame only"),
         _ => tr!("an unusual format"),
     }
 }
@@ -273,6 +300,14 @@ impl Sheet {
         !self.busy && self.importable() > 0 && !self.too_big()
     }
 
+    /// Whether a video or audio file can be imported (the transcript options apply to them).
+    pub fn has_media(&self) -> bool {
+        self.rows
+            .iter()
+            .any(|r| r.importable() && r.kind != Kind::Image)
+            || self.rows.is_empty()
+    }
+
     pub fn has_audio(&self) -> bool {
         self.rows
             .iter()
@@ -335,7 +370,7 @@ impl Sheet {
         let p: Vec<&Row> = self
             .rows
             .iter()
-            .filter(|r| matches!(r.status, Status::Prepared(_)))
+            .filter(|r| matches!(r.status, Status::Prepared(_)) && r.kind != Kind::Image)
             .collect();
         let first = p.first()?;
         let Status::Prepared(why) = &first.status else {
@@ -362,6 +397,35 @@ impl Sheet {
         })
     }
 
+    /// The note about pictures that were changed on the way in, `None` when there are none.
+    /// Pictures are always stored as PNG without their metadata (IMP-6).
+    pub fn picture_note(&self) -> Option<String> {
+        let p: Vec<&Row> = self
+            .rows
+            .iter()
+            .filter(|r| r.kind == Kind::Image && r.importable())
+            .collect();
+        let first = p.first()?;
+        let changed = matches!(&first.status, Status::Prepared(w) if !w.is_empty());
+        Some(if p.len() == 1 && changed {
+            let Status::Prepared(why) = &first.status else {
+                return None;
+            };
+            let reasons = why
+                .iter()
+                .map(|w| prepare_reason_text(w))
+                .collect::<Vec<_>>()
+                .join(", ");
+            tr!(
+                "{name} is saved as a PNG ({reason}). Camera and location data are not copied.",
+                name = first.name.clone(),
+                reason = reasons
+            )
+        } else {
+            tr!("Pictures are saved as PNG. Camera and location data are not copied.")
+        })
+    }
+
     /// The `import_media` input for this sheet (as the user: the sheet is the consent).
     pub fn request(&self) -> Value {
         let go: Vec<&Row> = self.rows.iter().filter(|r| r.importable()).collect();
@@ -380,7 +444,7 @@ impl Sheet {
         if self.remove_originals {
             p.insert("remove_originals".into(), json!(true));
         }
-        if self.transcribe {
+        if self.transcribe && self.has_media() {
             let mut after = Map::new();
             after.insert("transcribe".into(), json!(true));
             if self.diarize && self.speaker_model {
@@ -417,6 +481,8 @@ pub enum PageKinds {
     All,
     Video,
     Audio,
+    /// The Screenshots page (imported pictures are screenshots).
+    Images,
     None,
 }
 
@@ -487,6 +553,7 @@ impl ImportUi {
                     PageKinds::All => true,
                     PageKinds::Video => c.kind == Kind::Video,
                     PageKinds::Audio => c.kind == Kind::Audio,
+                    PageKinds::Images => c.kind == Kind::Image,
                     PageKinds::None => false,
                 };
                 let has_capture = c
@@ -549,6 +616,8 @@ pub fn paths_from_urls(urls: &[String]) -> Vec<PathBuf> {
 pub struct DropCount {
     pub videos: usize,
     pub audio: usize,
+    /// PNG and JPEG pictures, by extension (IMP-6).
+    pub images: usize,
     /// Files that are neither (they may still be probed and refused).
     pub other: usize,
     pub folders: usize,
@@ -556,7 +625,7 @@ pub struct DropCount {
 
 impl DropCount {
     pub fn files(&self) -> usize {
-        self.videos + self.audio + self.other
+        self.videos + self.audio + self.images + self.other
     }
 }
 
@@ -576,6 +645,8 @@ pub fn count_drop(paths: &[PathBuf], is_dir: impl Fn(&Path) -> bool) -> DropCoun
             c.videos += 1;
         } else if AUDIO_EXT.contains(&ext_of(p).as_str()) {
             c.audio += 1;
+        } else if IMAGE_EXT.contains(&ext_of(p).as_str()) {
+            c.images += 1;
         } else {
             c.other += 1;
         }
@@ -594,9 +665,10 @@ pub fn drop_title() -> String {
 
 pub fn drop_formats_line() -> String {
     tr!(
-        "Video: {video} \u{b7} Audio: {audio}",
+        "Video: {video} \u{b7} Audio: {audio} \u{b7} Pictures: {image}",
         video = SUPPORTED_VIDEO,
-        audio = SUPPORTED_AUDIO
+        audio = SUPPORTED_AUDIO,
+        image = SUPPORTED_IMAGE
     )
 }
 
@@ -627,6 +699,13 @@ pub fn drop_counts_line(c: &DropCount) -> String {
             tr!("1 audio file")
         } else {
             tr!("{n} audio files", n = c.audio)
+        });
+    }
+    if c.images > 0 {
+        parts.push(if c.images == 1 {
+            tr!("1 picture")
+        } else {
+            tr!("{n} pictures", n = c.images)
         });
     }
     if c.other > 0 {
@@ -693,11 +772,7 @@ impl ImportRun {
                 Card {
                     capture_id: c["capture_id"].as_str().map(str::to_owned),
                     title: c["title"].as_str().unwrap_or("").to_owned(),
-                    kind: if c["kind"] == "audio" {
-                        Kind::Audio
-                    } else {
-                        Kind::Video
-                    },
+                    kind: kind_of(&c["kind"]),
                     size_bytes: size,
                     state: if queued {
                         CardState::Waiting
@@ -839,6 +914,8 @@ pub fn step_label(message: &str) -> String {
         "Preparing for editing" => tr!("Preparing for editing"),
         "Reading the sound" => tr!("Reading the sound"),
         "Checking the copy" => tr!("Checking the copy"),
+        "Reading the picture" => tr!("Reading the picture"),
+        "Saving into the library" => tr!("Saving into the library"),
         other => other.to_owned(),
     }
 }
@@ -1034,7 +1111,65 @@ mod tests {
         assert!(folder_hint().starts_with("Folders can't be imported yet"));
         assert_eq!(
             drop_formats_line(),
-            "Video: MP4, MOV, M4V, MKV \u{b7} Audio: M4A, WAV, MP3"
+            "Video: MP4, MOV, M4V, MKV \u{b7} Audio: M4A, WAV, MP3 \u{b7} Pictures: PNG, JPEG"
+        );
+    }
+
+    /// IMP-6.AC9: a picture dropped on the library is counted as a picture, and its row shows
+    /// the size in pixels and the format.
+    #[test]
+    fn a_dropped_picture_is_counted_and_listed_with_its_size_in_pixels() {
+        let paths: Vec<PathBuf> = ["/d/a.PNG", "/d/b.jpg", "/d/c.jpeg", "/d/d.mov", "/d/e.gif"]
+            .iter()
+            .map(PathBuf::from)
+            .collect();
+        let c = count_drop(&paths, |_| false);
+        assert_eq!((c.images, c.videos, c.other), (3, 1, 1));
+        assert_eq!(
+            drop_counts_line(&c),
+            "1 video \u{b7} 3 pictures \u{b7} 1 file that may not open"
+        );
+        let r = row_from_json(&json!({
+            "path": "/d/shot.png", "name": "shot.png", "title": "shot", "size_bytes": 120_000,
+            "kind": "image", "status": "ready", "reasons": [], "container": "png",
+            "width": 1170, "height": 2532, "size": [1170, 2532], "needed_bytes": 11_850_000
+        }));
+        assert_eq!(r.kind, Kind::Image);
+        assert!(r.importable());
+        assert!(r.meta.contains("1170\u{d7}2532"), "{}", r.meta);
+        assert!(r.meta.contains("PNG"), "{}", r.meta);
+        assert!(
+            !r.meta.contains(':'),
+            "a picture has no duration: {}",
+            r.meta
+        );
+    }
+
+    #[test]
+    fn a_converted_picture_says_so_and_the_sheet_has_no_transcript_options_for_pictures_only() {
+        let converted = row_from_json(&json!({
+            "path": "/d/p.png", "name": "p.png", "title": "p", "size_bytes": 5, "kind": "image",
+            "status": "prepared", "reasons": ["converted", "oriented"], "size": [10, 20],
+        }));
+        assert_eq!(chip_label(&converted.status), "Converted");
+        let video = row_from_json(&row("a.mov", "video", "prepared", 5));
+        assert_eq!(chip_label(&video.status), "Prepared for editing");
+        let mut sheet = Sheet::default();
+        sheet.rows.push(converted);
+        assert!(
+            sheet.prepared_note().is_none(),
+            "no editing-copy note for a picture"
+        );
+        assert!(sheet.picture_note().unwrap().contains("p.png"));
+        assert!(!sheet.has_media());
+        sheet.transcribe = true;
+        assert!(sheet.request().get("after").is_none());
+        sheet.rows.push(video);
+        assert!(sheet.has_media());
+        assert!(sheet.request().get("after").is_some());
+        assert_eq!(
+            cant_text("too_large", ""),
+            "Too large: pictures up to 16,384 px on a side and 50 megapixels"
         );
     }
 

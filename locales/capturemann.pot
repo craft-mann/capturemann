@@ -19,6 +19,9 @@ msgstr ""
 msgid "1 folder skipped"
 msgstr ""
 
+msgid "1 picture"
+msgstr ""
+
 msgid "1 video"
 msgstr ""
 
@@ -3383,6 +3386,9 @@ msgstr ""
 msgid "Pick one or more files. Edit, transcribe and write reports as if you'd recorded them here."
 msgstr ""
 
+msgid "Pictures are saved as PNG. Camera and location data are not copied."
+msgstr ""
+
 msgid "Place at the center"
 msgstr ""
 
@@ -3637,6 +3643,9 @@ msgid "Reading text…"
 msgstr ""
 
 msgid "Reading the model list…"
+msgstr ""
+
+msgid "Reading the picture"
 msgstr ""
 
 msgid "Reading the sound"
@@ -4179,6 +4188,9 @@ msgid "Saved to your library"
 msgstr ""
 
 msgid "Saved without a single MP4"
+msgstr ""
+
+msgid "Saving into the library"
 msgstr ""
 
 msgid "Saving the account…"
@@ -5422,6 +5434,9 @@ msgstr ""
 msgid "Today {time}"
 msgstr ""
 
+msgid "Too large: pictures up to 16,384 px on a side and 50 megapixels"
+msgstr ""
+
 msgid "Too loud, clipping"
 msgstr ""
 
@@ -5688,7 +5703,7 @@ msgstr ""
 msgid "Video to upload"
 msgstr ""
 
-msgid "Video: {video} · Audio: {audio}"
+msgid "Video: {video} · Audio: {audio} · Pictures: {image}"
 msgstr ""
 
 msgid "Vietnamese speech, balanced. Fine-tuned from Whisper small for Vietnamese; not for other languages."
@@ -6081,6 +6096,9 @@ msgstr ""
 msgid "an MKV container"
 msgstr ""
 
+msgid "an animation, first frame only"
+msgstr ""
+
 msgid "an earlier session"
 msgstr ""
 
@@ -6106,6 +6124,9 @@ msgid "cannot write {path}: {e}"
 msgstr ""
 
 msgid "click a time to jump there"
+msgstr ""
+
+msgid "colours converted to 8-bit RGB"
 msgstr ""
 
 msgid "comma separated"
@@ -6312,6 +6333,9 @@ msgstr ""
 msgid "timed out after {secs} s"
 msgstr ""
 
+msgid "turned upright"
+msgstr ""
+
 msgid "two keys in one shortcut: `{a}` and `{b}`"
 msgstr ""
 
@@ -6510,6 +6534,9 @@ msgstr ""
 msgid "{name} has {reason}. A copy is prepared for smooth editing; the original file is kept unchanged in the bundle."
 msgstr ""
 
+msgid "{name} is saved as a PNG ({reason}). Camera and location data are not copied."
+msgstr ""
+
 msgid "{name} needs an app that you create yourself, so the sign-in belongs to you. It takes a few minutes, once. The ID you paste (no secret is involved) go to your {secret_store}, never to a file, and are only sent to {service}."
 msgstr ""
 
@@ -6688,6 +6715,9 @@ msgid "{n} of {m}"
 msgstr ""
 
 msgid "{n} percent"
+msgstr ""
+
+msgid "{n} pictures"
 msgstr ""
 
 msgid "{n} pixel"
@@ -7041,6 +7071,10 @@ msgid "blur"
 msgstr ""
 
 msgctxt "annotation kind"
+msgid "callout"
+msgstr ""
+
+msgctxt "annotation kind"
 msgid "crop"
 msgstr ""
 
@@ -7062,6 +7096,14 @@ msgstr ""
 
 msgctxt "annotation kind"
 msgid "rect"
+msgstr ""
+
+msgctxt "annotation kind"
+msgid "spotlight"
+msgstr ""
+
+msgctxt "annotation kind"
+msgid "stamp"
 msgstr ""
 
 msgctxt "annotation kind"
@@ -7966,6 +8008,10 @@ msgstr ""
 
 msgctxt "import status"
 msgid "Can't import"
+msgstr ""
+
+msgctxt "import status"
+msgid "Converted"
 msgstr ""
 
 msgctxt "import status"

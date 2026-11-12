@@ -18,6 +18,7 @@
 //! needed to name a codec. The lists are in [`classify`] and mirror `packaging/ffmpeg/build-macos.sh`.
 
 pub mod classify;
+pub mod picture;
 pub mod prepare;
 pub mod probe;
 
@@ -38,6 +39,8 @@ pub enum Reason {
     UnreadableFile,
     /// A readable file with no usable video or audio stream.
     NoStreams,
+    /// A picture over the size limits (IMP-6), decided from its header.
+    TooLarge,
 }
 
 impl Reason {
@@ -47,6 +50,7 @@ impl Reason {
             Reason::ProtectedMedia => "protected_media",
             Reason::UnreadableFile => "unreadable_file",
             Reason::NoStreams => "no_streams",
+            Reason::TooLarge => "too_large",
         }
     }
 }
@@ -117,6 +121,9 @@ fn display_name(s: &str) -> String {
     match s {
         "mp3" | "avi" | "aac" | "flac" | "aiff" | "ogg" | "webm" | "vp8" | "vp9" | "ac3"
         | "eac3" | "dts" | "wmv" | "asf" | "flv" | "mpeg" | "opus" | "av1" => s.to_uppercase(),
+        "webp" => "WebP".to_owned(),
+        "gif" | "heic" | "avif" | "tiff" | "bmp" | "svg" => s.to_uppercase(),
+        "raw" => "Camera RAW".to_owned(),
         other => {
             let mut c = other.chars();
             c.next()

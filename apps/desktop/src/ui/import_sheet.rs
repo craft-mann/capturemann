@@ -127,6 +127,7 @@ fn thumb(t: &Theme, r: &Row) -> AnyElement {
         (Status::Cant(..), _) => "file-x",
         (_, Kind::Audio) => "cm-import-audio",
         (_, Kind::Video) => "cm-import-video",
+        (_, Kind::Image) => "image",
     };
     div()
         .w(px(122.))
@@ -294,7 +295,11 @@ impl Render for ImportSheetView {
             })
             .collect();
 
-        let note = sheet.prepared_note().map(|n| {
+        let notes = [sheet.prepared_note(), sheet.picture_note()]
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+        let note = (!notes.is_empty()).then(|| notes.join("\n\n")).map(|n| {
             div()
                 .mt(px(14.))
                 .px(px(16.))
@@ -518,15 +523,16 @@ impl Render for ImportSheetView {
                             .children(rows),
                     )
                     .children(note)
-                    .child(
+                    // Transcript and speakers are for video and audio; pictures have no sound.
+                    .children(sheet.has_media().then(|| {
                         div()
                             .mt(px(18.))
                             .mb(px(8.))
                             .text_size(px(13.))
                             .text_color(rgba_of(t.text_3))
-                            .child(tr!("After import")),
-                    )
-                    .child(after)
+                            .child(tr!("After import"))
+                    }))
+                    .children(sheet.has_media().then_some(after))
                     .child(remove)
                     .children((sheet.folders_skipped > 0).then(|| {
                         div()

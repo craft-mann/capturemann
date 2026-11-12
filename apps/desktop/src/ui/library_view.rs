@@ -1237,7 +1237,7 @@ impl Render for LibraryView {
                 Filter::All => crate::import_flow::PageKinds::All,
                 Filter::Recordings => crate::import_flow::PageKinds::Video,
                 Filter::Audio => crate::import_flow::PageKinds::Audio,
-                Filter::Screenshots => crate::import_flow::PageKinds::None,
+                Filter::Screenshots => crate::import_flow::PageKinds::Images,
             };
             let list = self.app.read(cx).import.pending_cards(&existing, kinds);
             if self.state.imported_only

@@ -56,8 +56,8 @@ pub enum Command {
     /// Render a recording to one combined MP4 with the FFmpeg sidecar (`export_video`). Starts a
     /// background job (`jobs get <id>`); `--wait` blocks until it ends.
     Export(ExportArgs),
-    /// Bring media files that CaptureMann did not record into the library as captures
-    /// (`import_media`): `import clip.mov memo.m4a --transcribe --wait`. Files only. Starts a
+    /// Bring media files and pictures that CaptureMann did not record into the library as captures
+    /// (`import_media`): `import clip.mov memo.m4a photo.jpg --transcribe --wait`. Files only. Starts a
     /// background job (`jobs get <id>`); `--wait` blocks until it ends. `--remove-originals`
     /// moves each original to the Trash after its copy is verified and asks on screen first.
     Import(ImportArgs),
@@ -954,7 +954,8 @@ pub enum LibraryCmd {
 
 #[derive(Debug, Args)]
 pub struct ImportArgs {
-    /// The files to import (video: MP4, MOV, M4V, MKV with H.264 or HEVC; audio: M4A, WAV, MP3).
+    /// The files to import (video: MP4, MOV, M4V, MKV with H.264 or HEVC; audio: M4A, WAV, MP3;
+    /// pictures: PNG, JPEG, which become screenshots you can annotate).
     /// Relative paths and `~` are resolved here. Folders are refused.
     #[arg(required = true, num_args = 1.., value_name = "FILE")]
     pub files: Vec<String>,

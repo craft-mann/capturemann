@@ -92,6 +92,46 @@ pub fn mint_id(now: OffsetDateTime) -> String {
     new_id("rec", now)
 }
 
+/// A fresh capture id for an imported picture (`shot_`, like a screenshot).
+pub fn mint_shot_id(now: OffsetDateTime) -> String {
+    new_id("shot", now)
+}
+
+/// Builds the `.cmshot` of an imported picture inside `stage` and returns its folder (IMP-6): a
+/// plain `original.png`, a manifest with `source { path, imported_at, original_name }`, an empty
+/// ops list and the thumbnail. The folder is complete, ready for [`install_as`].
+///
+/// `id` is the capture id reserved when the import was queued. The thumbnail is best effort; a
+/// failure is returned in the second field.
+pub fn build_picture_bundle(
+    stage: &Path,
+    id: &str,
+    title: &str,
+    png: &[u8],
+    source: &ImportSource,
+) -> Result<(PathBuf, Option<String>), CmError> {
+    let bundle = crate::bundle::ShotBundle::create(stage, title, png, source.imported_at)?;
+    let dir = bundle.dir().to_path_buf();
+    let thumb_warning = crate::thumbs::write_poster(&bundle, crate::thumbs::DEFAULT_POSTER_EDGE)
+        .err()
+        .map(|e| e.to_string());
+    // The id and the source go into the manifest as plain JSON: every other key stays as the
+    // bundle wrote it.
+    let mpath = dir.join(crate::bundle::MANIFEST_FILE);
+    let text = std::fs::read_to_string(&mpath).map_err(|e| io_err("cannot read", &mpath, &e))?;
+    let mut m: serde_json::Value =
+        serde_json::from_str(&text).map_err(|e| json_err("manifest.json", &e))?;
+    m["id"] = json!(id);
+    m["source"] = json!({
+        "path": source.path,
+        "imported_at": rfc3339(source.imported_at),
+        "original_name": source.original_name,
+    });
+    let out = serde_json::to_string_pretty(&m).map_err(|e| json_err("manifest.json", &e))?;
+    write_atomic(&mpath, out.as_bytes())?;
+    Ok((dir, thumb_warning))
+}
+
 fn ticks(seconds: f64) -> i64 {
     (seconds * f64::from(cm_core::TICKS_PER_SECOND as u32)).round() as i64
 }
@@ -199,6 +239,32 @@ pub fn new_staging_dir(library_root: &Path, job_id: &str, n: usize) -> Result<Pa
     Ok(dir)
 }
 
+/// Removes a staging folder, also when it holds a bundle whose `original.png` is read-only
+/// (an imported picture, IMP-6; Windows refuses to delete a read-only file).
+pub fn remove_staging(dir: &Path) {
+    if std::fs::remove_dir_all(dir).is_ok() {
+        return;
+    }
+    fn writable(dir: &Path) {
+        let Ok(rd) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                writable(&p);
+            } else if let Ok(md) = std::fs::metadata(&p) {
+                let mut perms = md.permissions();
+                #[allow(clippy::permissions_set_readonly_false)]
+                perms.set_readonly(false);
+                let _ = std::fs::set_permissions(&p, perms);
+            }
+        }
+    }
+    writable(dir);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
 /// Removes staging folders. With `job_id`, only that job's (a cancelled or restarted import);
 /// without, all of them (the start of the daemon, when no import can be running).
 pub fn sweep_staging(library_root: &Path, job_id: Option<&str>) {
@@ -210,7 +276,7 @@ pub fn sweep_staging(library_root: &Path, job_id: Option<&str>) {
         let name = e.file_name().to_string_lossy().into_owned();
         let mine = job_id.is_none_or(|j| name.starts_with(&format!("{j}-")));
         if mine {
-            let _ = std::fs::remove_dir_all(e.path());
+            remove_staging(&e.path());
         }
     }
 }
@@ -222,8 +288,18 @@ pub fn install(
     staging: &Path,
     title: &str,
 ) -> Result<CaptureRecord, CmError> {
+    install_as(library, staging, title, CaptureKind::Recording)
+}
+
+/// [`install`] for a bundle of another kind (an imported picture is a `.cmshot`).
+pub fn install_as(
+    library: &mut Library,
+    staging: &Path,
+    title: &str,
+    kind: CaptureKind,
+) -> Result<CaptureRecord, CmError> {
     let base = sanitize_title(title)?;
-    let ext = CaptureKind::Recording.extension();
+    let ext = kind.extension();
     let root = library.root().to_path_buf();
     for n in 1..10_000u32 {
         let name = if n == 1 {

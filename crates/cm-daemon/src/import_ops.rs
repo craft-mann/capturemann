@@ -28,10 +28,11 @@ use async_trait::async_trait;
 use cm_core::{Actor, CmError, Permission};
 use cm_jobs::{Job, JobContext, JobHandler, JobQueue, NewJob, JOB_IMPORT};
 use cm_library::import::{
-    install, mint_id, new_staging_dir, sweep_staging, write_manifest, ImportBundle, ImportSource,
-    SoundTrack, VideoTrack, EDITING_COPY_FILE, SOUND_FILE,
+    install, mint_id, mint_shot_id, new_staging_dir, sweep_staging, write_manifest, ImportBundle,
+    ImportSource, SoundTrack, VideoTrack, EDITING_COPY_FILE, SOUND_FILE,
 };
 use cm_media::import::classify::{classify, MediaKind, Status};
+use cm_media::import::picture::{self, ImageInfo, Sniff};
 use cm_media::import::prepare::{
     decode_sound, make_editing_copy, sound_channels, verify, RunFailure, VerifyInput,
 };
@@ -48,6 +49,8 @@ use crate::daemon::{blocking, lock_library, Inner};
 use crate::error::DaemonError;
 use crate::events;
 use crate::library_ops::{human_size, Trasher};
+
+mod picture_job;
 
 /// `kind` of the confirmation of `remove_originals`.
 pub const DIALOG_KIND: &str = "import_remove_originals";
@@ -326,6 +329,72 @@ fn need_bytes(f: &ProbedFile, prepared: bool) -> u64 {
     f.size_bytes * if prepared { 2 } else { 1 } + sound
 }
 
+/// A picture file of a call (IMP-6): the header is read, the limits are applied, nothing is
+/// decoded.
+fn plan_picture(
+    path: &Path,
+    name: String,
+    given: Option<String>,
+    size_bytes: u64,
+    mtime_ms: i64,
+    sniffed: Sniff,
+) -> PlannedFile {
+    let title = given.unwrap_or_else(|| default_title(path));
+    let checked: Result<ImageInfo, Problem> = match sniffed {
+        Sniff::Refused(f) => Err(Problem::unsupported_format(f)),
+        _ => picture::inspect(path),
+    };
+    let (status, prepared, problem, info) = match checked {
+        Ok(info) => {
+            let c = picture::classify_image(&info);
+            match c.status {
+                Status::Prepared(why) => (
+                    "prepared",
+                    why.iter().map(|r| r.as_str()).collect::<Vec<_>>(),
+                    None,
+                    Some(info),
+                ),
+                _ => ("ready", Vec::new(), None, Some(info)),
+            }
+        }
+        Err(p) => ("cant_import", Vec::new(), Some(p), None),
+    };
+    let err_value = problem.as_ref().map(error_value);
+    // The PNG it writes is at most the decoded size.
+    let need = info.as_ref().map_or(0, |i| {
+        let (w, h) = i.displayed();
+        u64::from(w) * u64::from(h) * 4
+    });
+    let mut row = json!({
+        "path": path, "name": name, "size_bytes": size_bytes, "title": title,
+        "kind": MediaKind::Image.as_str(), "status": status, "reasons": prepared,
+        "needed_bytes": need,
+    });
+    if let Some(i) = &info {
+        let (w, h) = i.displayed();
+        row["container"] = json!(i.format.as_str());
+        row["width"] = json!(w);
+        row["height"] = json!(h);
+        row["size"] = json!([w, h]);
+    }
+    if let Some(e) = &err_value {
+        row["error"] = e.clone();
+    }
+    PlannedFile {
+        row,
+        path: path.to_path_buf(),
+        name,
+        size_bytes,
+        mtime_ms,
+        title,
+        kind: MediaKind::Image,
+        status,
+        prepared,
+        error: err_value,
+        need_bytes: need,
+    }
+}
+
 /// Probes and classifies every path; the first problem that concerns the whole call (a folder, a
 /// missing file, a refused permission, a file inside the library, no free space) is returned as
 /// the error and nothing else happens. Runs on a blocking thread.
@@ -387,8 +456,9 @@ pub(crate) fn make_plan(
             },
         }
     }
-    // Pass 2: probe.
-    let tools: Tools = locate()?;
+    // Pass 2: probe. Pictures need no FFmpeg, so the tools are looked up at the first video or
+    // audio file.
+    let mut tools: Option<Tools> = None;
     let mut files = Vec::new();
     for (i, path, meta) in metas {
         let name = file_name(&path);
@@ -400,7 +470,22 @@ pub(crate) fn make_plan(
             .map(str::to_owned);
         let size_bytes = meta.len();
         let mtime = mtime_ms(&meta);
-        let (probed, error): (Option<ProbedFile>, Option<Problem>) = match probe(&tools, &path) {
+        // A picture (IMP-6): the first bytes decide, never the extension.
+        let sniffed = match read_head(&path, 2048) {
+            Ok((head, _)) => picture::sniff(&head),
+            Err(_) => Sniff::Other,
+        };
+        if sniffed != Sniff::Other {
+            files.push(plan_picture(&path, name, given, size_bytes, mtime, sniffed));
+            continue;
+        }
+        if tools.is_none() {
+            tools = Some(locate()?);
+        }
+        let Some(tools) = tools.as_ref() else {
+            unreachable!("looked up above")
+        };
+        let (probed, error): (Option<ProbedFile>, Option<Problem>) = match probe(tools, &path) {
             Ok(f) => (Some(f), None),
             Err(ProbeError::Problem(pr)) => (None, Some(pr)),
             Err(ProbeError::Permission { path, message }) => {
@@ -652,7 +737,14 @@ impl Inner {
             .files
             .iter()
             .filter(|f| f.importable())
-            .map(|f| (f.path.clone(), mint_id(now)))
+            .map(|f| {
+                let id = if f.kind == MediaKind::Image {
+                    mint_shot_id(now)
+                } else {
+                    mint_id(now)
+                };
+                (f.path.clone(), id)
+            })
             .collect();
         let files: Vec<Value> = plan
             .files
@@ -857,7 +949,8 @@ struct ImportRun {
     library: Arc<std::sync::Mutex<cm_library::Library>>,
     events: crate::events::EventBus,
     trasher: Arc<dyn Trasher>,
-    tools: Tools,
+    /// FFmpeg, or why it is missing: only video and audio files need it (pictures do not).
+    tools: Result<Tools, CmError>,
     by: Actor,
     job_id: String,
     remove_originals: bool,
@@ -913,7 +1006,15 @@ impl ImportRun {
                 detail,
             ));
         }
-        let source = match probe(&self.tools, &path) {
+        // A picture (IMP-6) is its own, shorter path: no FFmpeg.
+        if f["kind"] == MediaKind::Image.as_str() {
+            return self.one_picture(index, f, cancel, prog);
+        }
+        let tools = match &self.tools {
+            Ok(t) => t,
+            Err(e) => return Err(fail(e.clone(), None, None)),
+        };
+        let source = match probe(tools, &path) {
             Ok(s) => s,
             Err(ProbeError::Problem(p)) => {
                 return Err(Stop::Failed(FileOutcome::problem(&path_s, &p)))
@@ -971,7 +1072,7 @@ impl ImportRun {
             let out = stage.join(EDITING_COPY_FILE);
             prog.set(copy_share, "Preparing for editing");
             let mut on = |p: f64| prog.set(copy_share + 0.4 * p, "Preparing for editing");
-            match make_editing_copy(&self.tools, &source, &out, &mut on, cancel) {
+            match make_editing_copy(tools, &source, &out, &mut on, cancel) {
                 Ok(copy) => {
                     screen_file = EDITING_COPY_FILE.to_owned();
                     editing_copy = Some(json!({
@@ -1002,7 +1103,7 @@ impl ImportRun {
             let out = stage.join(SOUND_FILE);
             prog.set(0.85, "Reading the sound");
             let mut on = |p: f64| prog.set(0.85 + 0.1 * p, "Reading the sound");
-            match decode_sound(&self.tools, &source, &out, &mut on, cancel) {
+            match decode_sound(tools, &source, &out, &mut on, cancel) {
                 Ok(channels) => {
                     let secs =
                         cm_media::import::prepare::wav_seconds(&out).unwrap_or(source.duration_s);
@@ -1030,7 +1131,7 @@ impl ImportRun {
         let sound_path = stage.join(SOUND_FILE);
         let edit_path = stage.join(EDITING_COPY_FILE);
         let verdict = verify(&VerifyInput {
-            tools: &self.tools,
+            tools,
             source: &source,
             kind,
             master: &master_path,
@@ -1136,7 +1237,7 @@ impl JobHandler for ImportHandler {
             .iter()
             .map(|f| f["size_bytes"].as_f64().unwrap_or(0.0))
             .sum();
-        let tools = (self.tools)()?;
+        let tools = (self.tools)();
         let root = lock_library(&self.library).root().to_path_buf();
         // A disk that filled up since the call.
         if let Some(free) = self.free_space.free_bytes(&root) {
@@ -1229,7 +1330,7 @@ impl JobHandler for ImportHandler {
             match res {
                 Ok(o) => {
                     let mut j = o.to_json();
-                    if o.status == "imported" {
+                    if o.status == "imported" && f["kind"] != MediaKind::Image.as_str() {
                         if let Some(a) = self.queue_after(&inputs["after"], &id).await {
                             j["after_jobs"] = a;
                         }

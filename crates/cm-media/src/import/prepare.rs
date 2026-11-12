@@ -652,7 +652,7 @@ pub fn duration_tolerance(kind: MediaKind, fps: Option<f64>) -> f64 {
     match (kind, fps) {
         (MediaKind::Video, Some(f)) if f > 0.0 => 1.0 / f,
         (MediaKind::Video, _) => 1.0 / 24.0,
-        (MediaKind::Audio, _) => 0.025,
+        (MediaKind::Audio | MediaKind::Image, _) => 0.025,
     }
 }
 

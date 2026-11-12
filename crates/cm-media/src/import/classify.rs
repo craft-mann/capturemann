@@ -24,6 +24,8 @@ const PLAIN_PIX_FMTS: [&str; 3] = ["yuv420p", "yuvj420p", "nv12"];
 pub enum MediaKind {
     Video,
     Audio,
+    /// A PNG or JPEG picture (IMP-6).
+    Image,
 }
 
 impl MediaKind {
@@ -31,6 +33,7 @@ impl MediaKind {
         match self {
             MediaKind::Video => "video",
             MediaKind::Audio => "audio",
+            MediaKind::Image => "image",
         }
     }
 }
@@ -42,6 +45,12 @@ pub enum PrepareReason {
     ContainerMkv,
     Rotated,
     PixelFormat,
+    /// A picture converted to 8-bit RGBA (16-bit, palette or greyscale; IMP-6).
+    Converted,
+    /// The picture was turned upright from its EXIF orientation (IMP-6).
+    Oriented,
+    /// An animated PNG: only the first frame is imported (IMP-6).
+    FirstFrameOnly,
 }
 
 impl PrepareReason {
@@ -51,6 +60,9 @@ impl PrepareReason {
             PrepareReason::ContainerMkv => "container_mkv",
             PrepareReason::Rotated => "rotated",
             PrepareReason::PixelFormat => "pixel_format",
+            PrepareReason::Converted => "converted",
+            PrepareReason::Oriented => "oriented",
+            PrepareReason::FirstFrameOnly => "first_frame_only",
         }
     }
 
@@ -61,6 +73,9 @@ impl PrepareReason {
             PrepareReason::ContainerMkv => "MKV container",
             PrepareReason::Rotated => "rotated picture",
             PrepareReason::PixelFormat => "10-bit or non-standard colour format",
+            PrepareReason::Converted => "converted to 8-bit colour",
+            PrepareReason::Oriented => "turned upright",
+            PrepareReason::FirstFrameOnly => "animated: first frame only",
         }
     }
 }

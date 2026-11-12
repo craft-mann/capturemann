@@ -150,6 +150,8 @@ pub fn pending_card(
         "file-x"
     } else if c.kind == Kind::Audio {
         "cm-import-audio"
+    } else if c.kind == Kind::Image {
+        "image"
     } else {
         "cm-import-video"
     };

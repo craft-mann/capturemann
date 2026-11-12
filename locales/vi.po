@@ -9233,8 +9233,8 @@ msgstr "Loại tệp này chưa được hỗ trợ"
 msgid "Transcribing"
 msgstr "Đang chép lời"
 
-msgid "Video: {video} · Audio: {audio}"
-msgstr "Video: {video} · Âm thanh: {audio}"
+msgid "Video: {video} · Audio: {audio} · Pictures: {image}"
+msgstr "Video: {video} · Âm thanh: {audio} · Ảnh: {image}"
 
 msgid "Waiting"
 msgstr "Đang chờ"
@@ -9930,3 +9930,48 @@ msgstr "Chọn vùng văn bản"
 
 msgid "Read the text in a screenshot"
 msgstr "Nhận dạng văn bản trong ảnh chụp màn hình"
+
+#, fuzzy
+msgid "1 picture"
+msgstr "1 ảnh"
+
+#, fuzzy
+msgid "{n} pictures"
+msgstr "{n} ảnh"
+
+#, fuzzy
+msgid "Pictures are saved as PNG. Camera and location data are not copied."
+msgstr "Ảnh được lưu dưới dạng PNG. Dữ liệu máy ảnh và vị trí không được sao chép."
+
+#, fuzzy
+msgid "{name} is saved as a PNG ({reason}). Camera and location data are not copied."
+msgstr "{name} được lưu dưới dạng PNG ({reason}). Dữ liệu máy ảnh và vị trí không được sao chép."
+
+#, fuzzy
+msgid "Reading the picture"
+msgstr "Đang đọc ảnh"
+
+#, fuzzy
+msgid "Saving into the library"
+msgstr "Đang lưu vào thư viện"
+
+#, fuzzy
+msgid "Too large: pictures up to 16,384 px on a side and 50 megapixels"
+msgstr "Quá lớn: ảnh tối đa 16.384 px mỗi cạnh và 50 megapixel"
+
+#, fuzzy
+msgid "colours converted to 8-bit RGB"
+msgstr "màu được chuyển sang RGB 8 bit"
+
+#, fuzzy
+msgid "turned upright"
+msgstr "được xoay đúng chiều"
+
+#, fuzzy
+msgid "an animation, first frame only"
+msgstr "ảnh động, chỉ giữ khung hình đầu tiên"
+
+#, fuzzy
+msgctxt "import status"
+msgid "Converted"
+msgstr "Đã chuyển đổi"
