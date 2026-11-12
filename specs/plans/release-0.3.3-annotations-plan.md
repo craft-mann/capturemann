@@ -29,7 +29,7 @@ IDs are never renumbered; ANN-5 is Copy text (0.3.2). FR table rows to add in `0
 4. **"Only one spotlight per image; a second shape adds a hole to the existing op."** The editor does that as one revision (one undo step). `annotate` with two spotlight ops answers `invalid_input` naming `ops[i]` (shared error code, no new one).
 5. **Callout "grows to fit the text".** A stored `rect` that the renderer silently enlarges would draw differently in the GUI and from an agent (ANN-1 AC6 parity). Resolve: `rect` is the **minimum** size; the renderer draws `max(rect, text size + padding)`; the editor writes the grown rectangle back when the text is committed, so what is stored is what is drawn. The tail tip is stored in image coordinates; moving the box does not move it (AC).
 6. **Step numbering model.** Today `n` is the creation ordinal and deletion renumbers (ANN-1 AC2). With `style` and `start`, the label is `format(style, start + n − 1)`; `style` and `start` live on each op, and the Steps panel sets them for all steps together (a mixed set stays possible for agents). Reorder rewrites `n` on the affected ops in **one revision**. Letters past Z continue AA, AB (spreadsheet style). The label `text` goes to the right of the badge and flips to the left near the image edge.
-7. **Older apps and new manifests (compatibility risk).** `annotation.rs` says an unknown `op` type is `invalid_input` and unknown fields inside a known op are dropped on the next save. So a 0.3.3 capture with a callout fails to open its ops in 0.3.2, and step `style`, `start` and `text` would be lost if 0.3.2 saves it. Decide: accept (bundles sync between versions rarely) and document it, or make readers skip unknown ops. First verify what the library does with a manifest it cannot parse. Also say it in the release text.
+7. **Older apps and new manifests (smaller than first written).** `annotation.rs` makes an unknown `op` type an `invalid_input` error, but the **library already protects the capture**: `cm-library` keeps such ops in `manifest.unknown_ops`, writes them back untouched at their place on every save, shows the warning "Kept an annotation this version cannot show", and keeps the thumbnail conservative (`thumbs.rs`). So a 0.3.3 capture opens in 0.3.2 and keeps its callouts, spotlights and loupes; 0.3.2 just does not draw them (its own renders and exports leave them out). The one real loss is **unknown fields inside a known op**: the step's new `style`, `start` and `text` are dropped when 0.3.2 saves an edit (the badge keeps its number). 0.3.2 is already shipped and cannot change, so this stays; recommendation: accept it, say it in the release text, and give the 0.3.3 reader a pass-through for unknown fields in known ops so later versions never repeat it. Check by test before release: a 0.3.3 manifest with every new op goes through the 0.3.2 library code (keep a fixture) and comes back unchanged apart from the step fields.
 8. **Stamps.** Draw ✓ ✗ ! ? as vector paths (emoji fonts differ per system and break golden tests). "Before" and "After" are words: the label is written into the op at creation in the UI language (so it is stored text, not re-translated), with the Vietnamese strings reviewed by the maintainer as in 0.3.2.
 9. **Spotlight and Copy text.** Copy text reads the rendered image, so text in a spotlight's blur-mode area is not copied. That is consistent (ANN-5 AC2); say it in the spec.
 
@@ -58,7 +58,7 @@ IDs are never renumbered; ANN-5 is Copy text (0.3.2). FR table rows to add in `0
 
 ### Phase 3: verify and release
 - Unit and golden tests per AC; `cm-regress` gets one case that applies every new op through the CLI and checks the render (pixel statistics, redaction inside a loupe), run on the three systems; PARTIAL reports in `verification/`; `tests/manual/ANN-6.md` for the editor by eye (the editor has no hands-on report for ANN-1 yet, so do both).
-- Compatibility note in the release text (section 2, item 7).
+- Compatibility note in the release text (section 2, item 7) and a fixture test that a 0.3.3 manifest survives a round trip through the 0.3.2 library code.
 - Release as 0.3.2 and 0.3.1: Security scan before merging, CI green, candidate files overnight, the maintainer tags and publishes. Windows files stay unsigned. The Homebrew cask goes through `/Users/trungtran/source/repos/homebrew-tap`.
 
 ### Agents and files (disjoint)
@@ -74,7 +74,7 @@ Rough size: A about 2 days, B about 3 days, C about 1 day, verification and rele
 
 ## 5. Questions for the maintainer
 1. (Answered Nov 12: the annotation pack is 0.3.3 and in-app update is not in this phase.) Windowed audio: 0.3.4, or later?
-2. Section 2 item 7: accept that 0.3.2 cannot read the new ops (and document it), or make older readers skip unknown ops?
+2. Section 2 item 7: accept that 0.3.2 will not draw the new ops and drops the new step fields when it saves (the ops themselves are kept), and add field pass-through from 0.3.3 on?
 3. Are the proposed rules for spotlight order (inserted before the first non-redaction op) and magnify (always redacted) fine?
 4. Are stamps in scope or a stretch goal?
 5. `capturemann mcp` starting a headless daemon, from `release-0.3.3-plan.md`: leave it as is (the app must be open) or build it?
