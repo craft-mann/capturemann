@@ -709,7 +709,7 @@ mod tests {
                 empty,
                 matches!(
                     t,
-                    Tool::Select | Tool::Crop | Tool::SelectText | Tool::Stamp
+                    Tool::Select | Tool::Crop | Tool::SelectText
                 ),
                 "{t:?}"
             );

@@ -53,7 +53,10 @@ fn icons_registered_and_wellformed() {
     for (path, svg) in ASSETS.iter().filter(|(p, _)| p.starts_with("icons/")) {
         n += 1;
         assert!(svg.contains("<svg"), "{path}");
-        assert!(svg.contains("viewBox=\"0 0 24 24\""), "{path}");
+        // The group corner mark is the one custom 6 px icon.
+        if *path != "icons/cm-group-corner.svg" {
+            assert!(svg.contains("viewBox=\"0 0 24 24\""), "{path}");
+        }
         assert!(svg.contains("currentColor"), "{path} must use currentColor");
         assert!(!svg.contains("#000"), "{path} has a hard-coded colour");
         assert!(

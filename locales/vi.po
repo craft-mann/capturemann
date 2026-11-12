@@ -10253,8 +10253,8 @@ msgid "Drag to reorder: the numbers follow. Deleting a step renumbers the rest. 
 msgstr "Kéo để sắp xếp lại: số thứ tự đi theo. Xoá một bước sẽ đánh số lại các bước còn lại. Nhãn nằm bên phải huy hiệu và lật sang trái gần mép ảnh. Sau Z là AA, AB."
 
 #, fuzzy
-msgid "Click the image to place a stamp. Symbols are drawn as shapes, so they look the same on macOS, Windows and Linux."
-msgstr "Nhấp vào ảnh để đặt con dấu. Ký hiệu được vẽ bằng hình nên trông giống nhau trên macOS, Windows và Linux."
+msgid "Click the image to place a stamp. Symbols are drawn as shapes, so they look the same on every system."
+msgstr "Nhấp vào ảnh để đặt con dấu. Ký hiệu được vẽ bằng hình nên trông giống nhau trên mọi hệ thống."
 
 msgid "Fit to window"
 msgstr "Vừa cửa sổ"

@@ -974,7 +974,7 @@ msgstr ""
 msgid "Click effect"
 msgstr ""
 
-msgid "Click the image to place a stamp. Symbols are drawn as shapes, so they look the same on macOS, Windows and Linux."
+msgid "Click the image to place a stamp. Symbols are drawn as shapes, so they look the same on every system."
 msgstr ""
 
 msgid "Click, then Space skips · Esc cancels"

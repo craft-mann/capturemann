@@ -205,11 +205,11 @@ async fn a_png_and_a_jpeg_become_two_screenshot_bundles() {
     assert_eq!(ma["source"]["original_name"], "Mock-up.png");
     assert_eq!(ma["source"]["path"], s(&png));
     assert!(ma["source"]["imported_at"].is_string());
-    assert_eq!(ma["original"]["size"], json!({"width": 40, "height": 30}));
+    assert_eq!(ma["original"]["size"], json!([40, 30]));
     assert!(a.join("thumbs/poster.jpg").is_file());
     // The orientation 6 JPEG is stored upright: 32x16 becomes 16x32; no metadata.
     let mb = manifest(&b);
-    assert_eq!(mb["original"]["size"], json!({"width": 16, "height": 32}));
+    assert_eq!(mb["original"]["size"], json!([16, 32]));
     let bytes = std::fs::read(b.join("original.png")).unwrap();
     assert_eq!(chunks(&bytes), ["IHDR", "IDAT", "IEND"]);
     let img = image::load_from_memory(&bytes).unwrap();
@@ -270,6 +270,8 @@ async fn a_dry_run_gives_each_file_its_own_row_and_writes_nothing() {
     ihdr.extend_from_slice(&60_000u32.to_be_bytes());
     ihdr.extend_from_slice(&[8, 6, 0, 0, 0, 0, 0, 0, 0]);
     bomb.extend(ihdr);
+    // An empty IDAT, then IEND (the header reader does not check CRCs).
+    bomb.extend_from_slice(&[0, 0, 0, 0, b'I', b'D', b'A', b'T', 0, 0, 0, 0]);
     bomb.extend_from_slice(&[0, 0, 0, 0, b'I', b'E', b'N', b'D', 0xAE, 0x42, 0x60, 0x82]);
     let bomb = r.put("bomb.png", &bomb);
     let paths: Vec<&str> = [&good, &rotated, &gif, &webp, &svg, &empty, &cut, &bomb]

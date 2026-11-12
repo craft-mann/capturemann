@@ -133,6 +133,7 @@ mod tests {
     /// that names macOS things must go through the vocabulary (`{this_computer}`, `{settings_app}`,
     /// `{trash}`, ...), so a new "this Mac" in a sentence fails here.
     const MACOS_ONLY_BY_DESIGN: &[(&str, &str)] = &[
+        ("Spotlight", "the annotation tool of that name (ANN-7), not the macOS search"),
         ("Another copy ({name}) is running", "macOS-only code path (cfg(target_os = \"macos\") in main.rs: osascript dialog about a second app bundle)"),
         ("CaptureMann isn't allowed to read these files. Allow it in System Settings", "the macOS branch; the other systems have their own message"),
         ("Deleting remote copies is permanent", "Google Drive's own Trash, not the system's"),

@@ -130,7 +130,7 @@ impl EditorView {
                     None,
                     tr!(
                         "Click the image to place a stamp. Symbols are drawn as shapes, so they \
-                         look the same on macOS, Windows and Linux."
+                         look the same on every system."
                     ),
                 )
                 .into_any_element(),
