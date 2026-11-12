@@ -83,12 +83,12 @@ the commit the tag points to, and regressed; the final files built from the tag 
 | System | Files and computer | Tiers run (passed/failed) | Reports |
 | --- | --- | --- | --- |
 | Windows 11 x64 (ThinkPad T490, Intel UHD 620) | installer and zip from the **Windows package** workflow, run for candidate `4f96ba59`; silent install | standard 44/0, full 45/0, transcription and speakers 2/0, silent installer 1/0 (first run failed to start the program, passed on the second run) | `L1-windows-0.3.2-*` (4f96ba59) |
-| macOS arm64 (the maintainer's Mac, Apple M4 Pro) | `CaptureMann-v0.3.2-macos-arm64.dmg`, signed with a Developer ID, notarized and stapled (rebuilt Nov 12); the app copied out of the DMG | standard 37/0, full 38/0 on the overnight candidate (6f95def3); hardware not run; six desktop-session cases not run | `L1-macos-0.3.2-*` (6f95def3) |
+| macOS arm64 (the maintainer's Mac, Apple M4 Pro) | `CaptureMann-v0.3.2-macos-arm64.dmg`, signed with a Developer ID, notarized and stapled (rebuilt Nov 12); the app copied out of the DMG | standard 37/0, full 38/0 on the overnight candidate (6f95def3), standard 43/0 on the released notarized DMG; hardware not run | `L1-macos-0.3.2-*` (6f95def3) |
 | macOS x86_64 (Intel) | `CaptureMann-v0.3.2-macos-x86_64.dmg`, same build; **checked on Apple Silicon only** (DMG install check, the command-line tool under Rosetta) | not run on Intel hardware | `L1-macos-0.3.2-extra-candidate-6f95def3-*` |
 | Linux x86_64 (same ThinkPad, Ubuntu 24.04, X11) | tarball and `.deb` from `release-build.sh` | standard 46/0, full 47/0, `.deb` and tarball install cases 7/0 each (X11 session; the build is the one made on the ThinkPad from `5d493d08`) | `L1-linux-0.3.2-regression-*-x11-*` (5d493d08) |
 | Linux aarch64 (Ubuntu 24.04 VM, headless) | tarball and `.deb` from `release-build.sh` | full 37/0 | `L1-linux-0.3.2-aarch64-vm-*` (4f96ba59) |
 
-Six macOS desktop-session cases (`targets.list`, `shot.invalid`, `desktop.stays_up`, `desktop.second_launch`, `desktop.tray_icon`, `mcp.confirm_tier`) were not run.
+The six macOS desktop-session cases that the overnight run skipped (`targets.list`, `shot.invalid`, `desktop.stays_up`, `desktop.second_launch`, `desktop.tray_icon`, `mcp.confirm_tier`) were run on Nov 12, 2026 on the released, notarized arm64 DMG from a logged-in session: standard 43 passed, 0 failed (`L1-macos-0.3.2-regression-standard-final-dmg-*`).
 
 The new features were checked like this: Copy text, the clients list, the redacted thumbnail, the shortcut fixes and the sidebar counts
 have unit tests with fakes (ANN-5, AGT-2.AC15, LIB-1.AC6 and RED-2.AC5, CAP-2.AC2 and AC3, LIB-1.AC7) and were tried by the maintainer
