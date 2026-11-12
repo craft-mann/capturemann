@@ -70,10 +70,10 @@ IDs are never renumbered; ANN-5 is Copy text (0.3.2). FR table rows to add in `0
 
 ## 4. Size and what else fits in 0.3.3
 
-Rough size: A about 2 days, B about 3 days, C about 1 day, verification and release 1 day. The annotation pack alone is a normal release. `release-0.3.3-plan.md` also holds **in-app update (Velopack)** and **windowed audio**, each a release of its own size. **Recommendation:** 0.3.3 = the annotation pack plus the small carried-over fixes; in-app update as 0.3.4 (its spikes are done, it touches packaging and the release workflow, not the editor, so it can start in parallel but should not gate this release); windowed audio after that. PhoWhisper stays out. The maintainer decides.
+Rough size: A about 2 days, B about 3 days, C about 1 day, verification and release 1 day: a normal release. **Decision (maintainer, Nov 12, 2026): in-app update (Velopack) is not brought in at this phase** (parked in `release-0.3.3-plan.md`, spikes kept). 0.3.3 is the annotation pack plus the small carried-over fixes. Windowed audio and PhoWhisper have no release assigned; PhoWhisper stays out unless the maintainer asks.
 
 ## 5. Questions for the maintainer
-1. Is the annotation pack the 0.3.3 headline, with in-app update and windowed audio moved to 0.3.4 and later?
+1. (Answered Nov 12: the annotation pack is 0.3.3 and in-app update is not in this phase.) Windowed audio: 0.3.4, or later?
 2. Section 2 item 7: accept that 0.3.2 cannot read the new ops (and document it), or make older readers skip unknown ops?
 3. Are the proposed rules for spotlight order (inserted before the first non-redaction op) and magnify (always redacted) fine?
 4. Are stamps in scope or a stretch goal?
