@@ -1,9 +1,8 @@
 {
   "mcpServers": {
     "capturemann": {
-      "command": "sh",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/capturemann-mcp.sh"],
-      "env": { "CAPTUREMANN_COMMAND": "${user_config.capturemann_path}" }
+      "command": "${user_config.capturemann_path}",
+      "args": ["mcp"]
     }
   }
 }
