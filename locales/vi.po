@@ -9972,6 +9972,290 @@ msgctxt "import status"
 msgid "Converted"
 msgstr "Đã chuyển đổi"
 
+msgctxt "tool group"
+msgid "Select"
+msgstr "Chọn"
+
+#, fuzzy
+msgctxt "tool group"
+msgid "Shapes"
+msgstr "Hình"
+
+#, fuzzy
+msgctxt "tool group"
+msgid "Text"
+msgstr "Văn bản"
+
+#, fuzzy
+msgctxt "tool group"
+msgid "Highlighter"
+msgstr "Bút tô sáng"
+
+#, fuzzy
+msgctxt "tool group"
+msgid "Markers"
+msgstr "Dấu"
+
+#, fuzzy
+msgctxt "tool group"
+msgid "Emphasis"
+msgstr "Nhấn mạnh"
+
+#, fuzzy
+msgctxt "tool group"
+msgid "Redact"
+msgstr "Che thông tin"
+
+#, fuzzy
+msgctxt "tool group"
+msgid "Crop"
+msgstr "Cắt xén"
+
+#, fuzzy
+msgctxt "tool"
+msgid "Callout"
+msgstr "Chú thích"
+
+#, fuzzy
+msgctxt "tool"
+msgid "Spotlight"
+msgstr "Tiêu điểm"
+
+#, fuzzy
+msgctxt "tool"
+msgid "Stamp"
+msgstr "Con dấu"
+
+#, fuzzy
+msgctxt "tool tooltip"
+msgid "in {group}"
+msgstr "trong {group}"
+
+#, fuzzy
+msgid "{group}: {tool}"
+msgstr "{group}: {tool}"
+
+#, fuzzy
+msgctxt "annotation setting"
+msgid "Corners"
+msgstr "Bo góc"
+
+#, fuzzy
+msgctxt "annotation setting"
+msgid "Dim"
+msgstr "Làm tối"
+
+#, fuzzy
+msgctxt "annotation setting"
+msgid "Fill"
+msgstr "Màu nền"
+
+#, fuzzy
+msgctxt "annotation setting"
+msgid "Kind"
+msgstr "Loại"
+
+#, fuzzy
+msgctxt "annotation setting"
+msgid "Label"
+msgstr "Nhãn"
+
+#, fuzzy
+msgctxt "annotation setting"
+msgid "Numbering"
+msgstr "Cách đánh số"
+
+#, fuzzy
+msgctxt "annotation setting"
+msgid "Order"
+msgstr "Thứ tự"
+
+#, fuzzy
+msgctxt "annotation setting"
+msgid "Outside the holes"
+msgstr "Vùng bên ngoài các lỗ"
+
+#, fuzzy
+msgctxt "annotation setting"
+msgid "Size"
+msgstr "Kích thước"
+
+#, fuzzy
+msgctxt "annotation setting"
+msgid "Start at"
+msgstr "Bắt đầu từ"
+
+#, fuzzy
+msgctxt "annotation setting"
+msgid "Style"
+msgstr "Kiểu"
+
+#, fuzzy
+msgctxt "annotation setting"
+msgid "Text"
+msgstr "Văn bản"
+
+#, fuzzy
+msgctxt "callout handle"
+msgid "Tail tip"
+msgstr "Đầu đuôi"
+
+#, fuzzy
+msgctxt "callout style"
+msgid "Box"
+msgstr "Hộp"
+
+#, fuzzy
+msgctxt "callout style"
+msgid "Bubble"
+msgstr "Bong bóng"
+
+#, fuzzy
+msgctxt "panel badge"
+msgid "New in 0.3.3"
+msgstr "Mới trong 0.3.3"
+
+#, fuzzy
+msgctxt "spotlight outside"
+msgid "Blur"
+msgstr "Làm mờ"
+
+#, fuzzy
+msgctxt "spotlight outside"
+msgid "Dim"
+msgstr "Làm tối"
+
+#, fuzzy
+msgctxt "stamp glyph"
+msgid "?"
+msgstr "?"
+
+#, fuzzy
+msgctxt "stamp label"
+msgid "After"
+msgstr "Sau"
+
+#, fuzzy
+msgctxt "stamp label"
+msgid "Before"
+msgstr "Trước"
+
+#, fuzzy
+msgctxt "stamp"
+msgid "Check mark"
+msgstr "Dấu tích"
+
+#, fuzzy
+msgctxt "stamp"
+msgid "Cross"
+msgstr "Dấu gạch chéo"
+
+#, fuzzy
+msgctxt "stamp"
+msgid "Exclamation mark"
+msgstr "Dấu chấm than"
+
+#, fuzzy
+msgctxt "stamp"
+msgid "Question mark"
+msgstr "Dấu hỏi"
+
+#, fuzzy
+msgid "+ Ellipse"
+msgstr "+ Elip"
+
+#, fuzzy
+msgid "+ Rectangle"
+msgstr "+ Hình chữ nhật"
+
+#, fuzzy
+msgid "Add a label"
+msgstr "Thêm nhãn"
+
+#, fuzzy
+msgid "Callout text"
+msgstr "Nội dung chú thích"
+
+#, fuzzy
+msgid "Delete step {badge}"
+msgstr "Xoá bước {badge}"
+
+#, fuzzy
+msgid "Drag on the image to place a callout, then type its text."
+msgstr "Kéo trên ảnh để đặt chú thích, rồi nhập nội dung."
+
+#, fuzzy
+msgid "Ellipse {n}"
+msgstr "Elip {n}"
+
+#, fuzzy
+msgid "Holes {n} of {max}"
+msgstr "Lỗ {n} trên {max}"
+
+#, fuzzy
+msgid "No label"
+msgstr "Không có nhãn"
+
+#, fuzzy
+msgid "Numbering {text}"
+msgstr "Đánh số {text}"
+
+#, fuzzy
+msgid "Rectangle {n}"
+msgstr "Hình chữ nhật {n}"
+
+#, fuzzy
+msgid "Remove {name}"
+msgstr "Xoá {name}"
+
+#, fuzzy
+msgid "Start at one less"
+msgstr "Giảm số bắt đầu"
+
+#, fuzzy
+msgid "Start at one more"
+msgstr "Tăng số bắt đầu"
+
+#, fuzzy
+msgid "Start at"
+msgstr "Bắt đầu từ"
+
+#, fuzzy
+msgid "Step {badge}: {text}"
+msgstr "Bước {badge}: {text}"
+
+#, fuzzy
+msgid "Step {badge}"
+msgstr "Bước {badge}"
+
+#, fuzzy
+msgid "Step label"
+msgstr "Nhãn bước"
+
+#, fuzzy
+msgid "Type the callout text"
+msgstr "Nhập nội dung chú thích"
+
+#, fuzzy
+msgid "Drag the blue dot to aim the tail. Moving the box keeps the tail tip where it is. The box grows to fit the text."
+msgstr "Kéo chấm xanh để chỉnh đuôi. Di chuyển hộp không làm dịch đầu đuôi. Hộp tự giãn theo nội dung."
+
+#, fuzzy
+msgid "One spotlight per image: drawing another shape adds a hole to it. It goes under your arrows and callouts, so they stay bright."
+msgstr "Mỗi ảnh có một tiêu điểm: vẽ thêm hình sẽ thêm một lỗ vào đó. Nó nằm dưới mũi tên và chú thích nên chúng vẫn sáng."
+
+#, fuzzy
+msgid "Blur here is only a look. To hide information, use Blur (B) or Pixelate (X)."
+msgstr "Làm mờ ở đây chỉ là hiệu ứng nhìn. Để che thông tin, hãy dùng Làm mờ (B) hoặc Pixel hoá (X)."
+
+#, fuzzy
+msgid "Drag to reorder: the numbers follow. Deleting a step renumbers the rest. Labels sit right of the badge and flip left near the image edge. After Z come AA, AB."
+msgstr "Kéo để sắp xếp lại: số thứ tự đi theo. Xoá một bước sẽ đánh số lại các bước còn lại. Nhãn nằm bên phải huy hiệu và lật sang trái gần mép ảnh. Sau Z là AA, AB."
+
+#, fuzzy
+msgid "Click the image to place a stamp. Symbols are drawn as shapes, so they look the same on macOS, Windows and Linux."
+msgstr "Nhấp vào ảnh để đặt con dấu. Ký hiệu được vẽ bằng hình nên trông giống nhau trên macOS, Windows và Linux."
+
 msgid "Fit to window"
 msgstr "Vừa cửa sổ"
 

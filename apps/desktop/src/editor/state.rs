@@ -5,13 +5,19 @@
 //! The local op list is optimistic: it is updated at once and mirrored to the daemon by the
 //! session, which later reconciles ids (new ops get daemon ids) and history flags.
 
+use cm_core::annotation::StampKind;
+use cm_core::annotation::{
+    step_label, CalloutStyle, SpotMode, SpotShape, SpotShapeKind, StepStyle, MAX_LABEL_CHARS,
+    MAX_SPOTLIGHT_SHAPES,
+};
 use cm_core::{visible_rect, AnnotationOp, Color, OpKind, Pt, Rc};
 use cm_i18n::{tr, tr_ctx, trn};
 use std::collections::HashMap;
 
 use super::geom::{self, Handle, TextMetrics};
 use super::keys::Mods;
-use super::tools::{Param, ParamValue, Styles, Tool, ToolStyle};
+use super::palette::Faces;
+use super::tools::{Param, ParamValue, StampWord, Styles, Tool, ToolStyle};
 
 /// One user-visible change, sent to the daemon as a single `annotate` call.
 #[derive(Debug, Clone, PartialEq)]
@@ -23,10 +29,23 @@ pub enum Edit {
     Replace(Vec<AnnotationOp>),
 }
 
+/// What the text being typed belongs to. Callouts and step labels use the same input method
+/// as the Text tool (ANN-4.AC5, ANN-6), so Telex, VNI and Pinyin compose in them too.
+#[derive(Debug, Clone, PartialEq)]
+pub enum TextTarget {
+    /// A text annotation.
+    Text,
+    /// A callout; the op is the base its text, size and colour are written onto.
+    Callout(OpKind),
+    /// The label of a step badge (ANN-6); one line.
+    Step(OpKind),
+}
+
 /// Text being typed on the canvas (ANN-1: click to place, type, Enter for a new line,
 /// Esc to finish).
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextEdit {
+    pub target: TextTarget,
     /// The op being re-edited, or `None` for a new one.
     pub existing: Option<String>,
     pub at: Pt,
@@ -175,15 +194,66 @@ impl TextEdit {
         }
     }
 
+    /// The op this edit would store. A callout keeps its stored box here: the grown box is
+    /// written by [`EditorState::finish_text`] (ANN-4.AC5).
     fn kind(&self) -> OpKind {
-        OpKind::Text {
-            at: self.at,
-            text: self.text.clone(),
-            size: self.size,
-            color: self.color,
-            outline: self.outline,
-            bg: self.bg,
+        match &self.target {
+            TextTarget::Callout(OpKind::Callout {
+                rect,
+                tail,
+                bg,
+                radius,
+                style,
+                ..
+            }) => OpKind::Callout {
+                rect: *rect,
+                tail: *tail,
+                text: self.text.clone(),
+                size: self.size,
+                color: self.color,
+                bg: *bg,
+                radius: *radius,
+                style: *style,
+            },
+            TextTarget::Step(OpKind::Step {
+                at,
+                n,
+                size,
+                color,
+                style,
+                start,
+                ..
+            }) => {
+                let label: String = self.text.trim().chars().take(MAX_LABEL_CHARS).collect();
+                OpKind::Step {
+                    at: *at,
+                    n: *n,
+                    size: *size,
+                    color: *color,
+                    style: *style,
+                    start: *start,
+                    text: (!label.is_empty()).then_some(label),
+                }
+            }
+            _ => OpKind::Text {
+                at: self.at,
+                text: self.text.clone(),
+                size: self.size,
+                color: self.color,
+                outline: self.outline,
+                bg: self.bg,
+            },
         }
+    }
+
+    /// A step label is one line: Enter commits it.
+    pub fn single_line(&self) -> bool {
+        matches!(self.target, TextTarget::Step(_))
+    }
+
+    /// An empty callout is still a box (ANN-4 edge cases); empty text is not an annotation.
+    fn keeps_when_empty(&self) -> bool {
+        matches!(self.target, TextTarget::Callout(_) | TextTarget::Step(_))
     }
 }
 
@@ -217,6 +287,65 @@ pub enum EscapeOutcome {
     Leave,
 }
 
+/// What the stamp picker shows (see [`EditorState::stamp_info`]).
+#[derive(Debug, Clone, PartialEq)]
+pub struct StampInfo {
+    pub kind: StampKind,
+    /// The word of a label stamp.
+    pub word: Option<StampWord>,
+    pub has_op: bool,
+}
+
+/// One row of the Steps panel.
+#[derive(Debug, Clone, PartialEq)]
+pub struct StepRow {
+    pub id: String,
+    /// What the badge reads (`3`, `C`, `c`).
+    pub badge: String,
+    /// The label, empty when there is none.
+    pub text: String,
+}
+
+/// What the Steps panel shows (see [`EditorState::steps_info`]).
+#[derive(Debug, Clone, PartialEq)]
+pub struct StepsInfo {
+    pub style: StepStyle,
+    pub start: u32,
+    pub rows: Vec<StepRow>,
+    /// The row of the selected step.
+    pub selected: Option<usize>,
+    /// A label is being typed on the canvas.
+    pub editing: bool,
+}
+
+/// What the Spotlight panel shows (see [`EditorState::spot_info`]).
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpotInfo {
+    /// The shape of each hole, in order.
+    pub holes: Vec<SpotShapeKind>,
+    /// The hole the handles act on.
+    pub selected: usize,
+    pub mode: SpotMode,
+    pub dim: f64,
+    /// The spotlight exists as an op (not just the settings of the next one).
+    pub has_op: bool,
+    /// Eight holes: no more can be added.
+    pub at_limit: bool,
+    /// The shape the next drag makes.
+    pub next_shape: SpotShapeKind,
+}
+
+/// What the Callout panel shows (see [`EditorState::callout_info`]).
+#[derive(Debug, Clone, PartialEq)]
+pub struct CalloutInfo {
+    pub text: String,
+    pub style: CalloutStyle,
+    /// The text is being typed on the canvas.
+    pub editing: bool,
+    /// The callout exists as an op (not just the settings of the next one).
+    pub has_op: bool,
+}
+
 /// Selection box and handles to paint.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Chrome {
@@ -239,6 +368,11 @@ pub struct EditorState {
     pub hover: Option<Pt>,
     /// The style table changed since the last `take_styles_dirty` (persist it).
     styles_dirty: bool,
+    /// The hole of the selected spotlight that handles, moves and Alt+arrows act on (ANN-7).
+    pub spot_sel: usize,
+    /// The tool each palette group's button shows (remembered per user).
+    pub faces: Faces,
+    faces_dirty: bool,
     clip: Vec<AnnotationOp>,
     paste_count: u32,
     tmp_seq: u64,
@@ -282,6 +416,9 @@ impl EditorState {
             can_redo: false,
             hover: None,
             styles_dirty: false,
+            spot_sel: 0,
+            faces: Faces::default(),
+            faces_dirty: false,
             clip: Vec::new(),
             paste_count: 0,
             tmp_seq: 0,
@@ -306,6 +443,20 @@ impl EditorState {
 
     pub fn take_styles_dirty(&mut self) -> bool {
         std::mem::take(&mut self.styles_dirty)
+    }
+
+    /// The palette faces changed since the last call (persist them).
+    pub fn take_faces_dirty(&mut self) -> bool {
+        std::mem::take(&mut self.faces_dirty)
+    }
+
+    /// Makes `tool` the active tool and the face of its palette group. Every path that changes
+    /// the tool goes through here, so the keys, the buttons and the group menu agree.
+    fn activate(&mut self, tool: Tool) {
+        self.tool = tool;
+        if tool.in_palette() && self.faces.note(tool) {
+            self.faces_dirty = true;
+        }
     }
 
     fn index_of(&self, id: &str) -> Option<usize> {
@@ -372,7 +523,7 @@ impl EditorState {
             match editing {
                 Some(t) if t.existing.as_deref() == Some(o.id.as_str()) => {
                     replaced = true;
-                    if !t.text.is_empty() {
+                    if !t.text.is_empty() || t.keeps_when_empty() {
                         out.push(AnnotationOp::new(o.id.clone(), t.kind()));
                     }
                 }
@@ -380,7 +531,7 @@ impl EditorState {
             }
         }
         if let Some(t) = editing {
-            if !replaced && !t.text.is_empty() {
+            if !replaced && (!t.text.is_empty() || t.keeps_when_empty()) {
                 out.push(AnnotationOp::new("~draft", t.kind()));
             }
         }
@@ -430,6 +581,14 @@ impl EditorState {
             return None;
         }
         let kind = self.ops[i].kind.clone();
+        if let OpKind::Spotlight { shapes, .. } = &kind {
+            // A spotlight shows the handles of one hole at a time (the selected one).
+            let h = self.spot_sel.min(shapes.len().saturating_sub(1));
+            return Some(Chrome {
+                bounds: shapes.get(h)?.rect.normalized(),
+                handles: geom::hole_handles(&kind, h),
+            });
+        }
         let bounds = geom::bounds(&kind, &mut self.metrics);
         Some(Chrome {
             bounds,
@@ -470,10 +629,17 @@ impl EditorState {
         let edits = self.finish_text().into_iter().collect();
         self.cancel_interaction();
         if self.tool != tool {
-            self.tool = tool;
+            self.activate(tool);
             if let Some(k) = self.selected_kind() {
                 if tool != Tool::Select && Tool::for_kind(k) != tool {
                     self.selected = None;
+                }
+            }
+            // There is one spotlight per image: choosing the tool shows it.
+            if tool == Tool::Spotlight && self.selected.is_none() {
+                if let Some(i) = self.spotlight_index() {
+                    self.selected = Some(self.ops[i].id.clone());
+                    self.spot_sel = 0;
                 }
             }
         }
@@ -508,7 +674,7 @@ impl EditorState {
         };
         self.selected = Some(self.ops[list[next]].id.clone());
         if self.tool != Tool::Select {
-            self.tool = Tool::Select;
+            self.activate(Tool::Select);
         }
     }
 
@@ -520,7 +686,12 @@ impl EditorState {
         self.hover = Some(p);
         if let Some(i) = self.active_index() {
             let kind = self.ops[i].kind.clone();
-            if let Some(h) = geom::hit_handle(&kind, p, tol * 1.6, &mut self.metrics) {
+            let found = if matches!(kind, OpKind::Spotlight { .. }) {
+                geom::pick_handle(&geom::hole_handles(&kind, self.spot_sel), p, tol * 1.6)
+            } else {
+                geom::hit_handle(&kind, p, tol * 1.6, &mut self.metrics)
+            };
+            if let Some(h) = found {
                 self.interaction = Interaction::Resizing {
                     id: self.ops[i].id.clone(),
                     handle: h,
@@ -532,20 +703,37 @@ impl EditorState {
         }
         match self.tool {
             Tool::Select => match geom::topmost_hit(&self.ops, p, tol, &mut self.metrics) {
-                Some(i) => {
-                    self.selected = Some(self.ops[i].id.clone());
-                    if clicks >= 2 && matches!(self.ops[i].kind, OpKind::Text { .. }) {
-                        self.begin_text_edit(i);
-                    } else {
-                        self.interaction = Interaction::Dragging {
-                            id: self.ops[i].id.clone(),
-                            start: p,
-                            orig: self.ops[i].kind.clone(),
-                            moved: false,
-                        };
-                    }
-                }
+                Some(i) => self.grab(i, p, clicks),
                 None => self.selected = None,
+            },
+            // Inside an existing hole the spotlight is grabbed; anywhere else a new hole is
+            // dragged out (ANN-7: a second shape becomes a hole of the one spotlight).
+            Tool::Spotlight => match geom::topmost_hit(&self.ops, p, tol, &mut self.metrics)
+                .filter(|&i| matches!(self.ops[i].kind, OpKind::Spotlight { .. }))
+            {
+                Some(i) => self.grab(i, p, clicks),
+                None => {
+                    self.interaction = Interaction::Drawing {
+                        start: p,
+                        cur: p,
+                        shift: mods.shift,
+                    };
+                }
+            },
+            // Clicking a callout selects it (double click edits its text); anywhere else
+            // drags out a new box.
+            Tool::Callout => match geom::topmost_hit(&self.ops, p, tol, &mut self.metrics)
+                .filter(|&i| matches!(self.ops[i].kind, OpKind::Callout { .. }))
+            {
+                Some(i) => self.grab(i, p, clicks),
+                None => {
+                    self.selected = None;
+                    self.interaction = Interaction::Drawing {
+                        start: p,
+                        cur: p,
+                        shift: mods.shift,
+                    };
+                }
             },
             Tool::Text => {
                 match geom::topmost_hit(&self.ops, p, tol, &mut self.metrics)
@@ -556,6 +744,7 @@ impl EditorState {
                 }
             }
             Tool::Step => edits.push(self.place_step(p)),
+            Tool::Stamp => edits.push(self.place_stamp(p)),
             _ => {
                 self.selected = None;
                 self.interaction = Interaction::Drawing {
@@ -568,9 +757,33 @@ impl EditorState {
         edits
     }
 
+    /// Selects op `i` and starts dragging it; a double click on text or a callout edits it.
+    fn grab(&mut self, i: usize, p: Pt, clicks: usize) {
+        self.selected = Some(self.ops[i].id.clone());
+        if matches!(self.ops[i].kind, OpKind::Spotlight { .. }) {
+            self.spot_sel = geom::hit_hole(&self.ops[i].kind, p, 0.0).unwrap_or(self.spot_sel);
+        }
+        if clicks >= 2
+            && matches!(
+                self.ops[i].kind,
+                OpKind::Text { .. } | OpKind::Callout { .. } | OpKind::Step { .. }
+            )
+        {
+            self.begin_text_edit(i);
+        } else {
+            self.interaction = Interaction::Dragging {
+                id: self.ops[i].id.clone(),
+                start: p,
+                orig: self.ops[i].kind.clone(),
+                moved: false,
+            };
+        }
+    }
+
     pub fn pointer_move(&mut self, p: Pt, mods: Mods, tol: f64) {
         self.hover = Some(p);
         let image = self.image;
+        let hole = self.spot_sel;
         let tm = &mut self.metrics;
         match &mut self.interaction {
             Interaction::Idle => {}
@@ -589,7 +802,7 @@ impl EditorState {
                     return;
                 }
                 *moved = true;
-                let kind = geom::translate(orig, dx, dy);
+                let kind = geom::translate_op(orig, dx, dy, hole);
                 if let Some(o) = self.ops.iter_mut().find(|o| o.id == *id) {
                     o.kind = kind;
                 }
@@ -601,7 +814,11 @@ impl EditorState {
                 moved,
             } => {
                 *moved = true;
-                let kind = geom::resize(orig, *handle, p, mods.shift, tm);
+                let kind = if matches!(orig, OpKind::Spotlight { .. }) {
+                    geom::resize_hole(orig, hole, *handle, p, mods.shift)
+                } else {
+                    geom::resize(orig, *handle, p, mods.shift, tm)
+                };
                 let kind = Self::clamp_crop(image, kind);
                 if let Some(o) = self.ops.iter_mut().find(|o| o.id == *id) {
                     o.kind = kind;
@@ -645,6 +862,15 @@ impl EditorState {
                 };
                 if matches!(kind, OpKind::Crop { .. }) {
                     return vec![self.set_crop(kind)];
+                }
+                if let OpKind::Spotlight { shapes, .. } = &kind {
+                    return self.add_spot_shape(shapes[0]).into_iter().collect();
+                }
+                if matches!(kind, OpKind::Callout { .. }) {
+                    // The box is not stored yet: the text goes in first and one commit stores
+                    // box and text together (one undo step).
+                    self.begin_callout_text(kind);
+                    return Vec::new();
                 }
                 let id = self.tmp_id();
                 let op = AnnotationOp::new(id.clone(), kind);
@@ -695,8 +921,28 @@ impl EditorState {
         Some(Edit::Replace(self.ops.clone()))
     }
 
+    /// The numbering new steps get: that of the existing steps (the panel sets it for all of
+    /// them together), else the remembered one.
+    fn step_numbering(&self) -> (StepStyle, u32) {
+        let first = self.ops.iter().find_map(|o| match &o.kind {
+            OpKind::Step { style, start, .. } => Some((*style, *start)),
+            _ => None,
+        });
+        first.unwrap_or_else(|| {
+            let s = self.styles.get(Tool::Step);
+            (s.step_style, s.step_start)
+        })
+    }
+
+    /// What the next step badge reads (shown on the cursor): `A` in letter style, and so on.
+    pub fn next_step_label(&self) -> String {
+        let (style, start) = self.step_numbering();
+        step_label(style, start, self.next_step_number())
+    }
+
     fn place_step(&mut self, p: Pt) -> Edit {
         let style = self.styles.get(Tool::Step);
+        let (numbering, start) = self.step_numbering();
         let id = self.tmp_id();
         let op = AnnotationOp::new(
             id.clone(),
@@ -705,8 +951,8 @@ impl EditorState {
                 n: self.next_step_number(),
                 size: style.size,
                 color: style.color,
-                style: Default::default(),
-                start: 1,
+                style: numbering,
+                start,
                 text: None,
             },
         );
@@ -721,6 +967,7 @@ impl EditorState {
         let s = self.styles.get(Tool::Text);
         self.selected = None;
         self.text = Some(TextEdit {
+            target: TextTarget::Text,
             existing: None,
             at: p,
             text: String::new(),
@@ -736,27 +983,102 @@ impl EditorState {
     }
 
     fn begin_text_edit(&mut self, i: usize) {
-        if let OpKind::Text {
-            at,
-            text,
-            size,
-            color,
-            outline,
-            bg,
-        } = self.ops[i].kind.clone()
-        {
-            self.interaction = Interaction::Idle;
-            self.text = Some(TextEdit {
-                existing: Some(self.ops[i].id.clone()),
+        match self.ops[i].kind.clone() {
+            OpKind::Text {
                 at,
-                cursor: text.chars().count(),
                 text,
                 size,
                 color,
                 outline,
                 bg,
-                marked: None,
-            });
+            } => {
+                self.interaction = Interaction::Idle;
+                self.text = Some(TextEdit {
+                    target: TextTarget::Text,
+                    existing: Some(self.ops[i].id.clone()),
+                    at,
+                    cursor: text.chars().count(),
+                    text,
+                    size,
+                    color,
+                    outline,
+                    bg,
+                    marked: None,
+                });
+            }
+            kind @ OpKind::Callout { .. } => {
+                self.interaction = Interaction::Idle;
+                self.text = Some(Self::callout_edit(kind, Some(self.ops[i].id.clone())));
+            }
+            kind @ OpKind::Step { .. } => {
+                self.interaction = Interaction::Idle;
+                let (at, size, color, text) = match &kind {
+                    OpKind::Step {
+                        at,
+                        size,
+                        color,
+                        text,
+                        ..
+                    } => (*at, *size, *color, text.clone().unwrap_or_default()),
+                    _ => unreachable!(),
+                };
+                self.text = Some(TextEdit {
+                    target: TextTarget::Step(kind),
+                    existing: Some(self.ops[i].id.clone()),
+                    at,
+                    cursor: text.chars().count(),
+                    text,
+                    size,
+                    color,
+                    outline: None,
+                    bg: None,
+                    marked: None,
+                });
+            }
+            _ => {}
+        }
+    }
+
+    /// Typing into a callout: the text, size and colour come from the op.
+    fn callout_edit(kind: OpKind, existing: Option<String>) -> TextEdit {
+        let (at, text, size, color) = match &kind {
+            OpKind::Callout {
+                rect,
+                text,
+                size,
+                color,
+                ..
+            } => {
+                let r = rect.normalized();
+                let pad = size * 0.5;
+                (Pt::new(r.x + pad, r.y + pad), text.clone(), *size, *color)
+            }
+            _ => (Pt::new(0.0, 0.0), String::new(), 24.0, Color::WHITE),
+        };
+        TextEdit {
+            target: TextTarget::Callout(kind),
+            existing,
+            at,
+            cursor: text.chars().count(),
+            text,
+            size,
+            color,
+            outline: None,
+            bg: None,
+            marked: None,
+        }
+    }
+
+    /// A new callout whose box was just dragged (or placed with Enter): typing starts at once.
+    fn begin_callout_text(&mut self, kind: OpKind) {
+        self.selected = None;
+        self.text = Some(Self::callout_edit(kind, None));
+    }
+
+    /// The inspector's text field: edits the text of the selected callout on the canvas.
+    pub fn edit_selected_text(&mut self) {
+        if let Some(i) = self.selected_index() {
+            self.begin_text_edit(i);
         }
     }
 
@@ -764,15 +1086,16 @@ impl EditorState {
     /// nothing, and removes an existing text op.
     pub fn finish_text(&mut self) -> Option<Edit> {
         let t = self.text.take()?;
+        // What gets stored: a callout is written with the box the renderer draws (ANN-4.AC5).
+        let kind = geom::with_drawn_box(&t.kind());
         match t.existing.clone() {
             Some(id) => {
                 let i = self.index_of(&id)?;
-                if t.text.is_empty() {
+                if t.text.is_empty() && !t.keeps_when_empty() {
                     self.ops.remove(i);
                     self.selected = None;
                     return Some(Edit::Replace(self.ops.clone()));
                 }
-                let kind = t.kind();
                 if self.ops[i].kind == kind {
                     self.selected = Some(id);
                     return None;
@@ -782,11 +1105,11 @@ impl EditorState {
                 Some(Edit::Replace(self.ops.clone()))
             }
             None => {
-                if t.text.is_empty() {
+                if t.text.is_empty() && !t.keeps_when_empty() {
                     return None;
                 }
                 let id = self.tmp_id();
-                let op = AnnotationOp::new(id.clone(), t.kind());
+                let op = AnnotationOp::new(id.clone(), kind);
                 self.ops.push(op.clone());
                 self.selected = Some(id);
                 Some(Edit::Append(vec![op]))
@@ -819,6 +1142,8 @@ impl EditorState {
 
     pub fn copy_selection(&mut self) -> bool {
         match self.selected_index() {
+            // One spotlight per image (ANN-7): it is never duplicated.
+            Some(i) if matches!(self.ops[i].kind, OpKind::Spotlight { .. }) => false,
             Some(i) => {
                 self.clip = vec![self.ops[i].clone()];
                 self.paste_count = 0;
@@ -866,7 +1191,13 @@ impl EditorState {
         let step = if big { 10.0 } else { 1.0 };
         let (dx, dy) = (f64::from(dx) * step, f64::from(dy) * step);
         let kind = &self.ops[i].kind;
-        let new = if resize {
+        let new = if matches!(kind, OpKind::Spotlight { .. }) {
+            if resize {
+                geom::resize_hole_by(kind, self.spot_sel, dx, dy)
+            } else {
+                geom::translate_hole(kind, self.spot_sel, dx, dy)
+            }
+        } else if resize {
             geom::resize_by(kind, dx, dy, &mut self.metrics)
         } else {
             geom::translate(kind, dx, dy)
@@ -920,6 +1251,22 @@ impl EditorState {
                 block: style.block,
             },
             Tool::Step => return vec![self.place_step(center)],
+            Tool::Callout => {
+                self.finish_text();
+                let r = rect(s * 1.6, s * 0.6);
+                let kind = OpKind::Callout {
+                    rect: r,
+                    tail: geom::default_tail(r, self.image),
+                    text: String::new(),
+                    size: style.size,
+                    color: geom::text_on(style.color),
+                    bg: style.color,
+                    radius: style.radius,
+                    style: style.callout_style,
+                };
+                self.begin_callout_text(kind);
+                return Vec::new();
+            }
             Tool::Text => {
                 self.finish_text();
                 self.begin_text_new(center);
@@ -933,6 +1280,11 @@ impl EditorState {
                 };
                 return vec![self.set_crop(kind)];
             }
+            Tool::Spotlight => {
+                let shape = geom::default_hole(style.spot_shape, center, self.image);
+                return self.add_spot_shape(shape).into_iter().collect();
+            }
+            Tool::Stamp => return vec![self.place_stamp(center)],
             Tool::Select | Tool::SelectText => return Vec::new(),
         };
         let id = self.tmp_id();
@@ -955,10 +1307,322 @@ impl EditorState {
             return EscapeOutcome::Edits(Vec::new());
         }
         if self.tool != Tool::Select {
-            self.tool = Tool::Select;
+            self.activate(Tool::Select);
             return EscapeOutcome::Edits(Vec::new());
         }
         EscapeOutcome::Leave
+    }
+
+    // ---- stamps (ANN-4) ---------------------------------------------------------------------
+
+    /// Click to place the stamp the picker has chosen. A label stamp carries its word in the UI
+    /// language, written into the op.
+    fn place_stamp(&mut self, p: Pt) -> Edit {
+        let st = self.styles.get(Tool::Stamp);
+        let id = self.tmp_id();
+        let op = AnnotationOp::new(
+            id.clone(),
+            OpKind::Stamp {
+                at: p,
+                kind: st.stamp_kind,
+                size: st.size,
+                color: st.color,
+                text: (st.stamp_kind == StampKind::Label).then(|| st.stamp_word.text()),
+            },
+        );
+        self.ops.push(op.clone());
+        self.selected = Some(id);
+        Edit::Append(vec![op])
+    }
+
+    /// The picker: a symbol or a word. Applies to the selected stamp (one revision) and is
+    /// what the next click places; each kind brings its usual colour.
+    pub fn set_stamp(&mut self, kind: StampKind, word: StampWord) -> Option<Edit> {
+        self.styles.set_stamp_kind(kind, word);
+        self.styles_dirty = true;
+        let color = self.styles.get(Tool::Stamp).color;
+        let i = self.selected_index()?;
+        match &mut self.ops[i].kind {
+            OpKind::Stamp {
+                kind: k,
+                color: c,
+                text,
+                ..
+            } => {
+                *k = kind;
+                *c = color;
+                *text = (kind == StampKind::Label).then(|| word.text());
+            }
+            _ => return None,
+        }
+        Some(Edit::Replace(self.ops.clone()))
+    }
+
+    /// What the picker shows as chosen: the selected stamp, else the next one's settings.
+    pub fn stamp_info(&self) -> Option<StampInfo> {
+        if self.inspector_tool() != Tool::Stamp || self.text.is_some() {
+            return None;
+        }
+        let st = self.styles.get(Tool::Stamp);
+        match self.selected_kind() {
+            Some(OpKind::Stamp { kind, text, .. }) => Some(StampInfo {
+                kind: *kind,
+                word: StampWord::ALL
+                    .into_iter()
+                    .find(|w| text.as_deref() == Some(w.text().as_str())),
+                has_op: true,
+            }),
+            _ => Some(StampInfo {
+                kind: st.stamp_kind,
+                word: (st.stamp_kind == StampKind::Label).then_some(st.stamp_word),
+                has_op: false,
+            }),
+        }
+    }
+
+    // ---- steps (ANN-6) ---------------------------------------------------------------------
+
+    /// Indices of the step ops in the order of their numbers.
+    fn steps_in_order(&self) -> Vec<usize> {
+        let mut v: Vec<(u32, usize)> = self
+            .ops
+            .iter()
+            .enumerate()
+            .filter_map(|(i, o)| match &o.kind {
+                OpKind::Step { n, .. } => Some((*n, i)),
+                _ => None,
+            })
+            .collect();
+        v.sort_unstable();
+        v.into_iter().map(|(_, i)| i).collect()
+    }
+
+    /// What the Steps panel shows: the numbering and the steps in order.
+    pub fn steps_info(&self) -> Option<StepsInfo> {
+        if self.inspector_tool() != Tool::Step {
+            return None;
+        }
+        let (style, start) = self.step_numbering();
+        let order = self.steps_in_order();
+        let sel = self.selected_index();
+        let rows = order
+            .iter()
+            .map(|&i| match &self.ops[i].kind {
+                OpKind::Step { n, text, .. } => StepRow {
+                    id: self.ops[i].id.clone(),
+                    badge: step_label(style, start, *n),
+                    text: text.clone().unwrap_or_default(),
+                },
+                _ => unreachable!(),
+            })
+            .collect();
+        Some(StepsInfo {
+            style,
+            start,
+            rows,
+            selected: sel.and_then(|s| order.iter().position(|&i| i == s)),
+            editing: self.text.is_some(),
+        })
+    }
+
+    /// Numbering style and first number for **all** steps together (one revision), remembered
+    /// for new ones. `None` changes nothing.
+    pub fn set_step_numbering(
+        &mut self,
+        style: Option<StepStyle>,
+        start: Option<u32>,
+    ) -> Option<Edit> {
+        let (cur_style, cur_start) = self.step_numbering();
+        let style = style.unwrap_or(cur_style);
+        let start = start.unwrap_or(cur_start).clamp(1, 9999);
+        self.styles.set_step_numbering(style, start);
+        self.styles_dirty = true;
+        let mut changed = false;
+        for o in &mut self.ops {
+            if let OpKind::Step {
+                style: st,
+                start: s0,
+                ..
+            } = &mut o.kind
+            {
+                if *st != style || *s0 != start {
+                    *st = style;
+                    *s0 = start;
+                    changed = true;
+                }
+            }
+        }
+        changed.then(|| Edit::Replace(self.ops.clone()))
+    }
+
+    /// Moves the step at row `from` of the panel list to row `to`: the numbers follow, in one
+    /// revision (ANN-6.AC4). The ops keep their place in the list, so nothing jumps in front of
+    /// something else.
+    pub fn reorder_steps(&mut self, from: usize, to: usize) -> Option<Edit> {
+        let mut order = self.steps_in_order();
+        if from >= order.len() || to >= order.len() || from == to {
+            return None;
+        }
+        let moved = order.remove(from);
+        order.insert(to, moved);
+        for (rank, i) in order.into_iter().enumerate() {
+            if let OpKind::Step { n, .. } = &mut self.ops[i].kind {
+                *n = rank as u32 + 1;
+            }
+        }
+        Some(Edit::Replace(self.ops.clone()))
+    }
+
+    /// Deletes the step at row `row` of the panel list; the rest renumber.
+    pub fn delete_step_row(&mut self, row: usize) -> Option<Edit> {
+        let i = *self.steps_in_order().get(row)?;
+        self.ops.remove(i);
+        if self.selected_index().is_none() {
+            self.selected = None;
+        }
+        geom::renumber_steps(&mut self.ops);
+        Some(Edit::Replace(self.ops.clone()))
+    }
+
+    /// Selects the step at row `row` of the panel list.
+    pub fn select_step_row(&mut self, row: usize) {
+        if let Some(&i) = self.steps_in_order().get(row) {
+            self.selected = Some(self.ops[i].id.clone());
+        }
+    }
+
+    // ---- spotlight (ANN-7) ----------------------------------------------------------------
+
+    /// The index of the image's one spotlight.
+    pub fn spotlight_index(&self) -> Option<usize> {
+        self.ops
+            .iter()
+            .position(|o| matches!(o.kind, OpKind::Spotlight { .. }))
+    }
+
+    /// Where a new spotlight goes: before the first op that is not a redaction (or crop), so
+    /// arrows, steps and callouts added later stay bright and blurs stay below it (ANN-7.AC4).
+    fn spotlight_insert_at(&self) -> usize {
+        self.ops
+            .iter()
+            .position(|o| {
+                !matches!(
+                    o.kind,
+                    OpKind::Blur { .. } | OpKind::Pixelate { .. } | OpKind::Crop { .. }
+                )
+            })
+            .unwrap_or(self.ops.len())
+    }
+
+    /// Adds a hole: to the existing spotlight (one revision, up to 8, ANN-7.AC3) or as a new
+    /// spotlight at the right place in the list. `None` at the limit.
+    pub fn add_spot_shape(&mut self, shape: SpotShape) -> Option<Edit> {
+        if let Some(i) = self.spotlight_index() {
+            let new = geom::add_hole(&self.ops[i].kind, shape)?;
+            self.ops[i].kind = new;
+            self.spot_sel = geom::spot_shapes(&self.ops[i].kind).len() - 1;
+            self.selected = Some(self.ops[i].id.clone());
+            return Some(Edit::Replace(self.ops.clone()));
+        }
+        let style = self.styles.get(Tool::Spotlight);
+        let id = self.tmp_id();
+        let op = AnnotationOp::new(
+            id.clone(),
+            OpKind::Spotlight {
+                shapes: vec![shape],
+                dim: style.dim,
+                mode: style.spot_mode,
+                strength: style.strength,
+            },
+        );
+        let at = self.spotlight_insert_at();
+        self.ops.insert(at, op);
+        self.spot_sel = 0;
+        self.selected = Some(id);
+        Some(Edit::Replace(self.ops.clone()))
+    }
+
+    /// The panel's "+ Rectangle" / "+ Ellipse": a default hole in the middle of what is shown.
+    /// The shape is also what the next drag makes.
+    pub fn add_default_hole(&mut self, kind: SpotShapeKind) -> Option<Edit> {
+        self.styles.set_spotlight(None, Some(kind));
+        self.styles_dirty = true;
+        let r = self.content_rect();
+        let c = Pt::new(r.x + r.w / 2.0, r.y + r.h / 2.0);
+        let shape = geom::default_hole(kind, c, self.image);
+        self.add_spot_shape(shape)
+    }
+
+    /// Makes hole `i` of the selected spotlight the one the handles act on.
+    pub fn select_hole(&mut self, i: usize) {
+        if let Some(k) = self.selected_kind() {
+            if i < geom::spot_shapes(k).len() {
+                self.spot_sel = i;
+            }
+        }
+    }
+
+    /// Deletes hole `i`; the last hole takes the spotlight with it (one revision either way).
+    pub fn remove_hole(&mut self, i: usize) -> Option<Edit> {
+        let idx = self.selected_index()?;
+        if !matches!(self.ops[idx].kind, OpKind::Spotlight { .. }) {
+            return None;
+        }
+        match geom::remove_hole(&self.ops[idx].kind, i) {
+            Some(new) => {
+                self.ops[idx].kind = new;
+                let n = geom::spot_shapes(&self.ops[idx].kind).len();
+                self.spot_sel = self.spot_sel.min(n.saturating_sub(1));
+            }
+            None => {
+                self.ops.remove(idx);
+                self.selected = None;
+                self.spot_sel = 0;
+            }
+        }
+        Some(Edit::Replace(self.ops.clone()))
+    }
+
+    /// Dim or Blur for the outside: the selected spotlight (one revision) and new ones.
+    pub fn set_spot_mode(&mut self, mode: SpotMode) -> Option<Edit> {
+        self.styles.set_spotlight(Some(mode), None);
+        self.styles_dirty = true;
+        let i = self.selected_index()?;
+        match &mut self.ops[i].kind {
+            OpKind::Spotlight { mode: m, .. } if *m != mode => *m = mode,
+            _ => return None,
+        }
+        Some(Edit::Replace(self.ops.clone()))
+    }
+
+    /// What the Spotlight panel shows, when the inspector is about a spotlight.
+    pub fn spot_info(&self) -> Option<SpotInfo> {
+        if self.inspector_tool() != Tool::Spotlight || self.text.is_some() {
+            return None;
+        }
+        let style = self.styles.get(Tool::Spotlight);
+        match self.selected_kind() {
+            Some(OpKind::Spotlight {
+                shapes, mode, dim, ..
+            }) => Some(SpotInfo {
+                holes: shapes.iter().map(|s| s.kind).collect(),
+                selected: self.spot_sel.min(shapes.len().saturating_sub(1)),
+                mode: *mode,
+                dim: *dim,
+                has_op: true,
+                at_limit: shapes.len() >= MAX_SPOTLIGHT_SHAPES,
+                next_shape: style.spot_shape,
+            }),
+            _ => Some(SpotInfo {
+                holes: Vec::new(),
+                selected: 0,
+                mode: style.spot_mode,
+                dim: style.dim,
+                has_op: false,
+                at_limit: false,
+                next_shape: style.spot_shape,
+            }),
+        }
     }
 
     // ---- text keys ----------------------------------------------------------------------
@@ -1014,8 +1678,12 @@ impl EditorState {
     /// Controls the inspector shows: those of the op being edited or selected, else the
     /// active tool's.
     pub fn inspector_params(&self) -> &'static [Param] {
-        if self.text.is_some() {
-            return Tool::Text.params();
+        if let Some(t) = &self.text {
+            return match t.target {
+                TextTarget::Callout(_) => Tool::Callout.params(),
+                TextTarget::Step(_) => Tool::Step.params(),
+                TextTarget::Text => Tool::Text.params(),
+            };
         }
         match self.selected_kind() {
             Some(k) => geom::params_of(k),
@@ -1025,6 +1693,9 @@ impl EditorState {
 
     pub fn inspector_value(&self, p: Param) -> Option<ParamValue> {
         if let Some(t) = &self.text {
+            if matches!(t.target, TextTarget::Callout(_) | TextTarget::Step(_)) {
+                return geom::param_value(&t.kind(), p);
+            }
             return match p {
                 Param::Color => Some(ParamValue::Color(t.color)),
                 Param::TextSize => Some(ParamValue::TextSize(t.size)),
@@ -1041,20 +1712,44 @@ impl EditorState {
         }
     }
 
-    /// What the inspector heading names.
-    pub fn inspector_title(&self) -> String {
-        if self.text.is_some() {
-            return Tool::Text.label();
+    /// The tool the inspector is about: the text being typed, the selected op, else the
+    /// active tool.
+    pub fn inspector_tool(&self) -> Tool {
+        if let Some(t) = &self.text {
+            return match t.target {
+                TextTarget::Callout(_) => Tool::Callout,
+                TextTarget::Step(_) => Tool::Step,
+                TextTarget::Text => Tool::Text,
+            };
         }
         match self.selected_kind() {
-            Some(k) => Tool::for_kind(k).label(),
-            None => self.tool.label(),
+            Some(k) => Tool::for_kind(k),
+            None => self.tool,
         }
+    }
+
+    /// What the inspector heading names.
+    pub fn inspector_title(&self) -> String {
+        self.inspector_tool().label()
     }
 
     /// Applies a parameter change (ANN-1.AC5: one undo step, only the target op changes).
     pub fn set_param(&mut self, v: ParamValue) -> Option<Edit> {
         if let Some(t) = self.text.as_mut() {
+            if let TextTarget::Callout(base) | TextTarget::Step(base) = &mut t.target {
+                // A callout or step label being typed: the change goes into the op that is
+                // committed with the text.
+                let new = geom::with_param(base, v)?;
+                if let OpKind::Callout { size, color, .. } = &new {
+                    t.size = *size;
+                    t.color = *color;
+                }
+                let tool = Tool::for_kind(&new);
+                *base = new;
+                self.styles.apply(tool, v);
+                self.styles_dirty = true;
+                return None;
+            }
             match v {
                 ParamValue::Color(c) => t.color = c,
                 ParamValue::TextSize(s) => t.size = s.clamp(8.0, 400.0),
@@ -1082,6 +1777,57 @@ impl EditorState {
 
     pub fn tool_style(&self) -> ToolStyle {
         self.styles.get(self.tool)
+    }
+
+    /// What the Callout panel shows: the callout being typed, the selected one, or (with the
+    /// Callout tool and nothing selected) the settings a new one gets.
+    pub fn callout_info(&self) -> Option<CalloutInfo> {
+        if let Some(t) = &self.text {
+            return match &t.target {
+                TextTarget::Callout(OpKind::Callout { style, .. }) => Some(CalloutInfo {
+                    text: t.text.clone(),
+                    style: *style,
+                    editing: true,
+                    has_op: t.existing.is_some(),
+                }),
+                _ => None,
+            };
+        }
+        match self.selected_kind() {
+            Some(OpKind::Callout { text, style, .. }) => Some(CalloutInfo {
+                text: text.clone(),
+                style: *style,
+                editing: false,
+                has_op: true,
+            }),
+            Some(_) => None,
+            None if self.tool == Tool::Callout => Some(CalloutInfo {
+                text: String::new(),
+                style: self.styles.get(Tool::Callout).callout_style,
+                editing: false,
+                has_op: false,
+            }),
+            None => None,
+        }
+    }
+
+    /// Bubble or Box: applies to the callout being typed or selected (one undo step), and is
+    /// remembered for new ones.
+    pub fn set_callout_style(&mut self, style: CalloutStyle) -> Option<Edit> {
+        self.styles.set_callout_style(style);
+        self.styles_dirty = true;
+        if let Some(t) = self.text.as_mut() {
+            if let TextTarget::Callout(OpKind::Callout { style: st, .. }) = &mut t.target {
+                *st = style;
+            }
+            return None;
+        }
+        let i = self.selected_index()?;
+        match &mut self.ops[i].kind {
+            OpKind::Callout { style: st, .. } if *st != style => *st = style,
+            _ => return None,
+        }
+        Some(Edit::Replace(self.ops.clone()))
     }
 
     // ---- reconciliation with the daemon ---------------------------------------------------
@@ -1526,6 +2272,7 @@ mod tests {
     #[test]
     fn text_editing_caret_and_unicode() {
         let mut t = TextEdit {
+            target: TextTarget::Text,
             existing: None,
             at: Pt::new(0.0, 0.0),
             text: String::new(),
@@ -1735,6 +2482,7 @@ mod tests {
 
     fn blank_text() -> TextEdit {
         TextEdit {
+            target: TextTarget::Text,
             existing: None,
             at: Pt::new(0.0, 0.0),
             text: String::new(),
@@ -1827,5 +2575,817 @@ mod tests {
         let t = s.text.as_ref().unwrap();
         assert_eq!(t.text, "Tiếng Việt có dấu");
         assert!(t.marked.is_none());
+    }
+
+    // ---- ANN-4: callouts ------------------------------------------------------------------
+
+    fn callout_op(s: &EditorState) -> (&AnnotationOp, &OpKind) {
+        let o = s
+            .ops
+            .iter()
+            .find(|o| matches!(o.kind, OpKind::Callout { .. }))
+            .expect("a callout");
+        (o, &o.kind)
+    }
+
+    /// ANN-4: dragging with the Callout tool does not store anything yet; typing starts at once
+    /// and one commit stores box and text together as one Append (one undo step).
+    #[test]
+    fn ann_4_callout_drag_then_type_is_one_append() {
+        let mut s = st();
+        s.set_tool(Tool::Callout);
+        let edits = drag(&mut s, (100.0, 100.0), (320.0, 170.0), NONE);
+        assert!(edits.is_empty(), "nothing stored while typing");
+        assert!(s.ops.is_empty());
+        let t = s.text.as_ref().expect("typing started");
+        assert!(matches!(t.target, TextTarget::Callout(_)));
+        s.text_ime(None, "Click here", false);
+        let e = s.finish_text().expect("one edit");
+        let op = only_append(&[e]).clone();
+        match op.kind {
+            OpKind::Callout {
+                rect,
+                tail,
+                text,
+                style,
+                bg,
+                ..
+            } => {
+                assert_eq!(text, "Click here");
+                assert_eq!(rect, Rc::new(100.0, 100.0, 220.0, 70.0));
+                assert_eq!(style, CalloutStyle::Bubble);
+                assert_eq!(bg, cm_core::annotation::DEFAULT_COLOR);
+                // The default tail sits below the box, inside the image.
+                assert!(tail.y > 170.0 && tail.y <= 800.0, "{tail:?}");
+            }
+            other => panic!("{other:?}"),
+        }
+        assert!(s.selected.is_some());
+    }
+
+    /// ANN-4.AC5: the stored rect is the box the renderer draws after the commit (the editor
+    /// writes the grown rectangle back), and the handles sit on that box.
+    #[test]
+    fn ann_4_ac5_commit_writes_the_drawn_box_and_handles_use_it() {
+        let mut s = st();
+        s.set_tool(Tool::Callout);
+        drag(&mut s, (100.0, 100.0), (180.0, 140.0), NONE);
+        s.text_ime(None, "a long line of callout text", false);
+        s.finish_text();
+        let k = &callout_op(&s).1.clone();
+        let drawn = cm_render::callout_box(k).unwrap();
+        match k {
+            OpKind::Callout { rect, .. } => assert_eq!(rect.normalized(), drawn),
+            _ => unreachable!(),
+        }
+        let hs = geom::handles(k, &mut s.metrics);
+        let corners: Vec<Pt> = hs
+            .iter()
+            .filter(|(h, _)| *h != Handle::Tail)
+            .map(|(_, p)| *p)
+            .collect();
+        assert_eq!(corners.len(), 4);
+        assert!(corners.contains(&Pt::new(drawn.x, drawn.y)));
+        assert!(corners.contains(&Pt::new(drawn.x + drawn.w, drawn.y + drawn.h)));
+        assert!(hs.iter().any(|(h, _)| *h == Handle::Tail));
+    }
+
+    /// ANN-4.AC5: Telex typing composes in a callout like in the Text tool.
+    #[test]
+    fn ann_4_ac5_callout_text_composes_telex() {
+        let mut s = st();
+        s.set_tool(Tool::Callout);
+        drag(&mut s, (50.0, 50.0), (300.0, 120.0), NONE);
+        assert!(
+            !s.text_key("t", Some("t"), NONE),
+            "typed keys go to the input method"
+        );
+        for st_ in ["T", "Ti", "Tie", "Tiê", "Tiêng", "Tiếng"] {
+            s.text_ime(None, st_, true);
+        }
+        s.text_ime(None, "Tiếng", false);
+        s.text_ime(None, " ", false);
+        for st_ in ["V", "Vi", "Viê", "Việ", "Việt"] {
+            s.text_ime(None, st_, true);
+        }
+        s.text_ime(None, "Việt", false);
+        s.finish_text();
+        match &callout_op(&s).1 {
+            OpKind::Callout { text, .. } => assert_eq!(text, "Tiếng Việt"),
+            _ => unreachable!(),
+        }
+    }
+
+    /// ANN-4.AC2: moving the box keeps the tail tip where it is; dragging the tail handle moves
+    /// only the tip. Each is one Replace edit.
+    #[test]
+    fn ann_4_ac2_moving_the_box_keeps_the_tail_tip() {
+        let mut s = st();
+        s.set_tool(Tool::Callout);
+        drag(&mut s, (100.0, 100.0), (300.0, 160.0), NONE);
+        s.text_ime(None, "Hi", false);
+        s.finish_text();
+        let tail0 = match &callout_op(&s).1 {
+            OpKind::Callout { tail, .. } => *tail,
+            _ => unreachable!(),
+        };
+        s.set_tool(Tool::Select);
+        let e = drag(&mut s, (200.0, 130.0), (260.0, 190.0), NONE);
+        assert_eq!(e.len(), 1);
+        match &callout_op(&s).1 {
+            OpKind::Callout { rect, tail, .. } => {
+                assert_eq!(*tail, tail0, "the tip did not move");
+                assert_eq!(rect.normalized().x, 160.0);
+                assert_eq!(rect.normalized().y, 160.0);
+            }
+            _ => unreachable!(),
+        }
+        // The blue dot moves only the tip.
+        let e = drag(&mut s, (tail0.x, tail0.y), (500.0, 400.0), NONE);
+        assert_eq!(e.len(), 1);
+        match &callout_op(&s).1 {
+            OpKind::Callout { rect, tail, .. } => {
+                assert_eq!(*tail, Pt::new(500.0, 400.0));
+                assert_eq!(rect.normalized().x, 160.0);
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    /// ANN-4: double-clicking a callout types in it again; changing the text is one Replace.
+    #[test]
+    fn ann_4_double_click_edits_the_text_of_an_existing_callout() {
+        let mut s = st();
+        s.set_tool(Tool::Callout);
+        drag(&mut s, (100.0, 100.0), (300.0, 160.0), NONE);
+        s.text_ime(None, "One", false);
+        s.finish_text();
+        s.set_tool(Tool::Select);
+        s.pointer_down(Pt::new(150.0, 120.0), NONE, 2, TOL);
+        s.pointer_up(Pt::new(150.0, 120.0), NONE, TOL);
+        assert_eq!(s.text.as_ref().map(|t| t.text.as_str()), Some("One"));
+        s.text_ime(None, " two", false);
+        let e = s.finish_text().expect("changed");
+        assert!(matches!(e, Edit::Replace(_)));
+        match &callout_op(&s).1 {
+            OpKind::Callout { text, .. } => assert_eq!(text, "One two"),
+            _ => unreachable!(),
+        }
+        // Unchanged text commits nothing.
+        s.edit_selected_text();
+        assert!(s.finish_text().is_none());
+    }
+
+    /// ANN-4 edge case: an empty callout is still a box (and not removed by empty text).
+    #[test]
+    fn ann_4_empty_callout_text_keeps_the_box() {
+        let mut s = st();
+        s.set_tool(Tool::Callout);
+        drag(&mut s, (100.0, 100.0), (300.0, 160.0), NONE);
+        let e = s.finish_text().expect("stored");
+        assert!(matches!(e, Edit::Append(_)));
+        assert_eq!(s.ops.len(), 1);
+        // The preview shows the box while it is typed, with no text yet.
+        s.edit_selected_text();
+        assert_eq!(s.render_ops().len(), 1);
+        assert!(s.finish_text().is_none());
+        assert_eq!(s.ops.len(), 1);
+    }
+
+    /// ANN-4: Bubble or Box applies to the selected callout in one Replace and is remembered for
+    /// new ones; the fill changes the text colour to stay readable.
+    #[test]
+    fn ann_4_style_and_fill_apply_to_the_selected_callout() {
+        let mut s = st();
+        s.set_tool(Tool::Callout);
+        drag(&mut s, (100.0, 100.0), (300.0, 160.0), NONE);
+        s.finish_text();
+        let e = s.set_callout_style(CalloutStyle::Box).expect("one edit");
+        assert!(matches!(e, Edit::Replace(_)));
+        assert!(
+            s.set_callout_style(CalloutStyle::Box).is_none(),
+            "unchanged"
+        );
+        assert_eq!(s.callout_info().map(|i| i.style), Some(CalloutStyle::Box));
+        let yellow = Color::rgb(0xFF, 0xD6, 0x0A);
+        s.set_param(ParamValue::Color(yellow)).expect("edit");
+        match &callout_op(&s).1 {
+            OpKind::Callout { bg, color, .. } => {
+                assert_eq!(*bg, yellow);
+                assert_eq!(*color, Color::rgb(0x11, 0x11, 0x11), "dark text on yellow");
+            }
+            _ => unreachable!(),
+        }
+        s.set_param(ParamValue::Radius(0.0)).expect("edit");
+        s.set_param(ParamValue::TextSize(32.0)).expect("edit");
+        // A new callout starts with the remembered look.
+        s.select(None);
+        drag(&mut s, (400.0, 400.0), (600.0, 460.0), NONE);
+        s.finish_text();
+        match &s.ops[1].kind {
+            OpKind::Callout {
+                style,
+                bg,
+                radius,
+                size,
+                ..
+            } => {
+                assert_eq!(*style, CalloutStyle::Box);
+                assert_eq!(*bg, yellow);
+                assert_eq!((*radius, *size), (0.0, 32.0));
+            }
+            _ => panic!(),
+        }
+        // The remembered look survives the settings round trip.
+        let back = Styles::from_json(&s.styles.to_json());
+        assert_eq!(back.get(Tool::Callout).callout_style, CalloutStyle::Box);
+    }
+
+    /// ANN-4: with the Callout tool nothing is selected until a callout is clicked, so the panel
+    /// shows the settings of the next one.
+    #[test]
+    fn ann_4_callout_panel_info() {
+        let mut s = st();
+        assert!(s.callout_info().is_none());
+        s.set_tool(Tool::Callout);
+        let i = s.callout_info().unwrap();
+        assert!(!i.has_op && !i.editing);
+        drag(&mut s, (100.0, 100.0), (300.0, 160.0), NONE);
+        let i = s.callout_info().unwrap();
+        assert!(i.editing && !i.has_op);
+        s.finish_text();
+        assert!(s.callout_info().unwrap().has_op);
+        assert_eq!(s.inspector_tool(), Tool::Callout);
+    }
+
+    /// The Enter key places a default callout at the view centre and starts typing, so the tool
+    /// works without a pointer.
+    #[test]
+    fn ann_4_enter_places_a_default_callout_and_types() {
+        let mut s = st();
+        s.set_tool(Tool::Callout);
+        assert!(s.place_default(Pt::new(600.0, 400.0)).is_empty());
+        assert!(matches!(
+            s.text.as_ref().map(|t| &t.target),
+            Some(TextTarget::Callout(_))
+        ));
+        s.text_ime(None, "Here", false);
+        assert!(matches!(s.finish_text(), Some(Edit::Append(_))));
+    }
+
+    /// Callouts are tools of the Text group; the tool for a callout op is Callout.
+    #[test]
+    fn ann_4_callout_tool_for_kind_and_group() {
+        let k = OpKind::Callout {
+            rect: Rc::new(0.0, 0.0, 10.0, 10.0),
+            tail: Pt::new(5.0, 20.0),
+            text: String::new(),
+            size: 24.0,
+            color: Color::WHITE,
+            bg: Color::BLACK,
+            radius: 12.0,
+            style: CalloutStyle::Bubble,
+        };
+        assert_eq!(Tool::for_kind(&k), Tool::Callout);
+        assert_eq!(Tool::Callout.group(), crate::editor::Group::Text);
+        assert_eq!(Tool::from_key('k'), Some(Tool::Callout));
+    }
+
+    // ---- ANN-7: spotlight -----------------------------------------------------------------
+
+    fn spot_holes(s: &EditorState) -> usize {
+        s.ops
+            .iter()
+            .find_map(|o| match &o.kind {
+                OpKind::Spotlight { shapes, .. } => Some(shapes.len()),
+                _ => None,
+            })
+            .unwrap_or(0)
+    }
+
+    fn spot_count(s: &EditorState) -> usize {
+        s.ops
+            .iter()
+            .filter(|o| matches!(o.kind, OpKind::Spotlight { .. }))
+            .count()
+    }
+
+    /// ANN-7.AC3: a second drawn shape is a hole of the existing spotlight, in one revision; the
+    /// whole op list is one `Replace`, so one undo leaves one hole.
+    #[test]
+    fn ann_7_ac3_second_shape_is_a_hole_in_one_edit() {
+        let mut s = st();
+        s.set_tool(Tool::Spotlight);
+        let e1 = drag(&mut s, (100.0, 100.0), (300.0, 200.0), NONE);
+        assert_eq!(e1.len(), 1);
+        assert_eq!(spot_holes(&s), 1);
+        let before = s.ops.clone();
+        let e2 = drag(&mut s, (400.0, 300.0), (500.0, 380.0), NONE);
+        assert_eq!(e2.len(), 1, "one revision");
+        assert_eq!((spot_count(&s), spot_holes(&s)), (1, 2));
+        match &e2[0] {
+            Edit::Replace(ops) => {
+                assert_eq!(ops.len(), 1);
+                assert_ne!(ops, &before);
+            }
+            other => panic!("{other:?}"),
+        }
+        // The new hole is the one the handles act on.
+        assert_eq!(s.spot_sel, 1);
+        assert_eq!(
+            s.chrome().unwrap().bounds,
+            Rc::new(400.0, 300.0, 100.0, 80.0)
+        );
+    }
+
+    /// ANN-7: up to 8 holes; the ninth is refused and nothing changes.
+    #[test]
+    fn ann_7_eight_holes_at_most() {
+        let mut s = st();
+        s.set_tool(Tool::Spotlight);
+        for i in 0..8 {
+            let x = 20.0 + f64::from(i) * 120.0;
+            assert_eq!(drag(&mut s, (x, 100.0), (x + 80.0, 160.0), NONE).len(), 1);
+        }
+        assert_eq!(spot_holes(&s), 8);
+        assert!(s.spot_info().unwrap().at_limit);
+        let before = s.ops.clone();
+        assert!(drag(&mut s, (20.0, 300.0), (100.0, 360.0), NONE).is_empty());
+        assert!(s.add_default_hole(SpotShapeKind::Ellipse).is_none());
+        assert_eq!(s.ops, before);
+    }
+
+    /// ANN-7.AC4: a new spotlight goes before the first non-redaction op; a blur stays below it.
+    #[test]
+    fn ann_7_ac4_spotlight_goes_before_the_first_non_redaction_op() {
+        let mut s = st();
+        s.set_tool(Tool::Blur);
+        drag(&mut s, (10.0, 10.0), (100.0, 60.0), NONE);
+        s.set_tool(Tool::Arrow);
+        drag(&mut s, (200.0, 200.0), (300.0, 260.0), NONE);
+        s.set_tool(Tool::Spotlight);
+        drag(&mut s, (150.0, 150.0), (350.0, 300.0), NONE);
+        let names: Vec<&str> = s.ops.iter().map(|o| o.kind.name()).collect();
+        assert_eq!(names, ["blur", "spotlight", "arrow"]);
+        // Later ops are appended after it and stay bright.
+        s.set_tool(Tool::Rect);
+        drag(&mut s, (400.0, 400.0), (450.0, 450.0), NONE);
+        let names: Vec<&str> = s.ops.iter().map(|o| o.kind.name()).collect();
+        assert_eq!(names, ["blur", "spotlight", "arrow", "rect"]);
+        // Only redactions: the spotlight goes last.
+        let mut t = st();
+        t.set_tool(Tool::Pixelate);
+        drag(&mut t, (10.0, 10.0), (100.0, 60.0), NONE);
+        t.set_tool(Tool::Spotlight);
+        drag(&mut t, (150.0, 150.0), (350.0, 300.0), NONE);
+        let names: Vec<&str> = t.ops.iter().map(|o| o.kind.name()).collect();
+        assert_eq!(names, ["pixelate", "spotlight"]);
+        // The list is valid for `annotate`: one spotlight.
+        assert!(cm_core::annotation::validate_list(&s.ops).is_ok());
+    }
+
+    /// ANN-7: moving and resizing act on one hole; Delete on the op; the inspector deletes a
+    /// hole, and the last hole takes the op with it, each as one Replace.
+    #[test]
+    fn ann_7_holes_move_resize_and_delete() {
+        let mut s = st();
+        s.set_tool(Tool::Spotlight);
+        drag(&mut s, (100.0, 100.0), (200.0, 200.0), NONE);
+        drag(&mut s, (400.0, 100.0), (500.0, 200.0), NONE);
+        s.set_tool(Tool::Select);
+        // Click inside the first hole picks it and drags only it.
+        let e = drag(&mut s, (150.0, 150.0), (170.0, 180.0), NONE);
+        assert_eq!(e.len(), 1);
+        assert_eq!(s.spot_sel, 0);
+        let shapes = geom::spot_shapes(&s.ops[0].kind).to_vec();
+        assert_eq!(shapes[0].rect, Rc::new(120.0, 130.0, 100.0, 100.0));
+        assert_eq!(
+            shapes[1].rect,
+            Rc::new(400.0, 100.0, 100.0, 100.0),
+            "untouched"
+        );
+        // A corner handle of the selected hole resizes it.
+        let e = drag(&mut s, (220.0, 230.0), (260.0, 280.0), NONE);
+        assert_eq!(e.len(), 1);
+        let shapes = geom::spot_shapes(&s.ops[0].kind).to_vec();
+        assert_eq!(shapes[0].rect, Rc::new(120.0, 130.0, 140.0, 150.0));
+        // Alt+arrows resize and arrows move the selected hole only.
+        s.nudge(1, 0, false, true).unwrap();
+        assert_eq!(geom::spot_shapes(&s.ops[0].kind)[0].rect.x, 130.0);
+        assert_eq!(geom::spot_shapes(&s.ops[0].kind)[1].rect.x, 400.0);
+        // Remove the first hole: one left. Remove that: the op goes.
+        s.select_hole(0);
+        assert!(matches!(s.remove_hole(0), Some(Edit::Replace(_))));
+        assert_eq!(spot_holes(&s), 1);
+        assert!(matches!(s.remove_hole(0), Some(Edit::Replace(ref o)) if o.is_empty()));
+        assert_eq!(spot_count(&s), 0);
+        assert!(s.selected.is_none());
+    }
+
+    /// ANN-7: one spotlight per image, so copy, paste and duplicate never copy it.
+    #[test]
+    fn ann_7_a_spotlight_is_never_duplicated() {
+        let mut s = st();
+        s.set_tool(Tool::Spotlight);
+        drag(&mut s, (100.0, 100.0), (200.0, 200.0), NONE);
+        assert!(s.selected.is_some());
+        assert!(!s.copy_selection());
+        assert!(s.duplicate().is_none());
+        assert!(s.paste().is_none());
+        assert_eq!(spot_count(&s), 1);
+    }
+
+    /// ANN-7: Dim and Blur apply to the selected spotlight in one revision; the dim level and
+    /// the mode are remembered for new ones; the default dim is 60 %.
+    #[test]
+    fn ann_7_dim_mode_and_defaults() {
+        let mut s = st();
+        s.set_tool(Tool::Spotlight);
+        drag(&mut s, (100.0, 100.0), (200.0, 200.0), NONE);
+        match &s.ops[0].kind {
+            OpKind::Spotlight {
+                dim,
+                mode,
+                strength,
+                ..
+            } => {
+                assert_eq!((*dim, *mode, *strength), (0.6, SpotMode::Dim, 12));
+            }
+            _ => unreachable!(),
+        }
+        assert!(matches!(
+            s.set_param(ParamValue::Dim(0.8)),
+            Some(Edit::Replace(_))
+        ));
+        assert!(matches!(
+            s.set_spot_mode(SpotMode::Blur),
+            Some(Edit::Replace(_))
+        ));
+        assert!(s.set_spot_mode(SpotMode::Blur).is_none(), "unchanged");
+        assert!(matches!(
+            s.set_param(ParamValue::Strength(20)),
+            Some(Edit::Replace(_))
+        ));
+        match &s.ops[0].kind {
+            OpKind::Spotlight {
+                dim,
+                mode,
+                strength,
+                ..
+            } => {
+                assert_eq!((*dim, *mode, *strength), (0.8, SpotMode::Blur, 20));
+            }
+            _ => unreachable!(),
+        }
+        let info = s.spot_info().unwrap();
+        assert_eq!(
+            (info.mode, info.dim, info.holes.len()),
+            (SpotMode::Blur, 0.8, 1)
+        );
+        // Without a spotlight the panel shows the next one's settings.
+        s.delete_selected();
+        s.set_tool(Tool::Select);
+        s.set_tool(Tool::Spotlight);
+        let info = s.spot_info().unwrap();
+        assert!(!info.has_op);
+        assert_eq!((info.mode, info.dim), (SpotMode::Blur, 0.8));
+        let back = Styles::from_json(&s.styles.to_json());
+        assert_eq!(back.get(Tool::Spotlight).spot_mode, SpotMode::Blur);
+        assert_eq!(back.get(Tool::Spotlight).dim, 0.8);
+    }
+
+    /// ANN-7: choosing the tool selects the image's spotlight; "+ Ellipse" adds an ellipse hole
+    /// and makes ellipse the shape of the next drag.
+    #[test]
+    fn ann_7_buttons_add_default_holes() {
+        let mut s = st();
+        s.set_tool(Tool::Spotlight);
+        let e = s.add_default_hole(SpotShapeKind::Ellipse).expect("an edit");
+        assert!(matches!(e, Edit::Replace(_)));
+        match &s.ops[0].kind {
+            OpKind::Spotlight { shapes, .. } => {
+                assert_eq!(shapes[0].kind, SpotShapeKind::Ellipse);
+                let r = shapes[0].rect;
+                assert!(r.x >= 0.0 && r.x + r.w <= 1200.0 && r.y >= 0.0 && r.y + r.h <= 800.0);
+            }
+            _ => unreachable!(),
+        }
+        drag(&mut s, (900.0, 100.0), (1000.0, 200.0), NONE);
+        assert_eq!(
+            geom::spot_shapes(&s.ops[0].kind)[1].kind,
+            SpotShapeKind::Ellipse
+        );
+        s.set_tool(Tool::Select);
+        s.select(None);
+        s.set_tool(Tool::Spotlight);
+        assert!(s.selected.is_some(), "the one spotlight is shown");
+        assert_eq!(s.spotlight_index(), Some(0));
+    }
+
+    /// Emphasis group: the S key picks Spotlight and Enter places a default hole.
+    #[test]
+    fn ann_7_key_s_and_enter() {
+        assert_eq!(Tool::from_key('s'), Some(Tool::Spotlight));
+        assert_eq!(Tool::Spotlight.group(), crate::editor::Group::Emphasis);
+        let mut s = st();
+        s.set_tool(Tool::Spotlight);
+        let e = s.place_default(Pt::new(600.0, 400.0));
+        assert_eq!(e.len(), 1);
+        assert_eq!(spot_holes(&s), 1);
+        assert_eq!(Tool::for_kind(&s.ops[0].kind), Tool::Spotlight);
+    }
+
+    // ---- ANN-6: steps panel ---------------------------------------------------------------
+
+    fn place_steps(s: &mut EditorState, n: usize) {
+        s.set_tool(Tool::Step);
+        for i in 0..n {
+            let x = 50.0 + 60.0 * i as f64;
+            s.pointer_down(Pt::new(x, 100.0), NONE, 1, TOL);
+            s.pointer_up(Pt::new(x, 100.0), NONE, TOL);
+        }
+    }
+
+    fn step_ns(s: &EditorState) -> Vec<u32> {
+        s.ops
+            .iter()
+            .filter_map(|o| match &o.kind {
+                OpKind::Step { n, .. } => Some(*n),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn badges(s: &EditorState) -> Vec<String> {
+        s.steps_info()
+            .unwrap()
+            .rows
+            .into_iter()
+            .map(|r| r.badge)
+            .collect()
+    }
+
+    /// ANN-6.AC1: style `upper` and start 3 read C, D, E; after the second is deleted, C, D. The
+    /// style applies to all steps in one edit and new steps follow it.
+    #[test]
+    fn ann_6_ac1_numbering_applies_to_all_steps() {
+        let mut s = st();
+        place_steps(&mut s, 3);
+        assert_eq!(badges(&s), ["1", "2", "3"]);
+        let e = s
+            .set_step_numbering(Some(StepStyle::Upper), Some(3))
+            .expect("one edit");
+        assert!(matches!(e, Edit::Replace(_)));
+        assert_eq!(badges(&s), ["C", "D", "E"]);
+        assert!(s
+            .set_step_numbering(Some(StepStyle::Upper), Some(3))
+            .is_none());
+        // The next badge reads F and is stored with the same numbering.
+        assert_eq!(s.next_step_label(), "F");
+        s.pointer_down(Pt::new(500.0, 100.0), NONE, 1, TOL);
+        s.pointer_up(Pt::new(500.0, 100.0), NONE, TOL);
+        match &s.ops[3].kind {
+            OpKind::Step {
+                n, style, start, ..
+            } => {
+                assert_eq!((*n, *style, *start), (4, StepStyle::Upper, 3));
+            }
+            _ => unreachable!(),
+        }
+        // Delete the second: C, D, E.
+        s.select_step_row(1);
+        s.delete_step_row(1).expect("edit");
+        assert_eq!(badges(&s), ["C", "D", "E"]);
+        // The remembered numbering reaches the settings and back.
+        let back = Styles::from_json(&s.styles.to_json());
+        assert_eq!(back.get(Tool::Step).step_style, StepStyle::Upper);
+        assert_eq!(back.get(Tool::Step).step_start, 3);
+    }
+
+    /// ANN-6.AC2: the 26th step reads Z and the 27th AA.
+    #[test]
+    fn ann_6_ac2_letters_continue_past_z() {
+        let mut s = st();
+        place_steps(&mut s, 27);
+        s.set_step_numbering(Some(StepStyle::Upper), Some(1));
+        let b = badges(&s);
+        assert_eq!((b[25].as_str(), b[26].as_str()), ("Z", "AA"));
+        s.set_step_numbering(Some(StepStyle::Lower), None);
+        assert_eq!(badges(&s)[26], "aa");
+    }
+
+    /// ANN-6.AC4: reordering steps 1, 2, 3 to 3, 1, 2 rewrites `n` in ONE edit; the ops keep
+    /// their place in the list; deleting afterwards keeps the new order.
+    #[test]
+    fn ann_6_ac4_reorder_is_one_edit_and_survives_a_delete() {
+        let mut s = st();
+        place_steps(&mut s, 3);
+        let ids: Vec<String> = s.ops.iter().map(|o| o.id.clone()).collect();
+        let e = s.reorder_steps(2, 0).expect("one edit");
+        let Edit::Replace(ops) = e else { panic!() };
+        assert_eq!(ops.iter().map(|o| o.id.clone()).collect::<Vec<_>>(), ids);
+        assert_eq!(step_ns(&s), [2, 3, 1]);
+        assert_eq!(s.steps_info().unwrap().rows[0].id, ids[2]);
+        assert!(s.reorder_steps(1, 1).is_none());
+        assert!(s.reorder_steps(0, 7).is_none());
+        // Delete the step that is now first: the rest close up in their new order.
+        s.delete_step_row(0).expect("edit");
+        assert_eq!(step_ns(&s), [1, 2]);
+        assert_eq!(s.steps_info().unwrap().rows[0].id, ids[0]);
+    }
+
+    /// ANN-1.AC2 still holds with the new fields: deleting renumbers and keeps style, start and
+    /// label.
+    #[test]
+    fn ann_6_delete_keeps_style_start_and_text() {
+        let mut s = st();
+        place_steps(&mut s, 3);
+        s.set_step_numbering(Some(StepStyle::Lower), Some(2));
+        s.select_step_row(2);
+        s.edit_selected_text();
+        s.text_ime(None, "Open Settings", false);
+        s.finish_text().expect("edit");
+        s.select_step_row(1);
+        s.delete_selected().expect("edit");
+        assert_eq!(step_ns(&s), [1, 2]);
+        match &s.ops[1].kind {
+            OpKind::Step {
+                style, start, text, ..
+            } => {
+                assert_eq!(*style, StepStyle::Lower);
+                assert_eq!(*start, 2);
+                assert_eq!(text.as_deref(), Some("Open Settings"));
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    /// ANN-6: the label goes through the Text tool's input method (Telex composes), is one
+    /// line, is trimmed, and an empty label removes it without removing the step.
+    #[test]
+    fn ann_6_label_is_typed_on_the_image_and_can_be_cleared() {
+        let mut s = st();
+        place_steps(&mut s, 1);
+        s.edit_selected_text();
+        let t = s.text.as_ref().unwrap();
+        assert!(t.single_line());
+        assert!(matches!(t.target, TextTarget::Step(_)));
+        for st_ in ["M", "Mơ", "Mở"] {
+            s.text_ime(None, st_, true);
+        }
+        s.text_ime(None, "Mở  ", false);
+        s.finish_text().expect("edit");
+        match &s.ops[0].kind {
+            OpKind::Step { text, .. } => assert_eq!(text.as_deref(), Some("Mở")),
+            _ => unreachable!(),
+        }
+        assert_eq!(s.steps_info().unwrap().rows[0].text, "Mở");
+        // Clearing it keeps the step.
+        s.edit_selected_text();
+        s.text.as_mut().unwrap().text.clear();
+        s.finish_text().expect("edit");
+        assert_eq!(s.ops.len(), 1);
+        match &s.ops[0].kind {
+            OpKind::Step { text, .. } => assert!(text.is_none()),
+            _ => unreachable!(),
+        }
+        // Double click on the badge edits its label too.
+        s.set_tool(Tool::Select);
+        s.pointer_down(Pt::new(50.0, 100.0), NONE, 2, TOL);
+        assert!(s.text.is_some());
+    }
+
+    /// ANN-6: the panel exists for the Step tool or a selected step, and nothing else.
+    #[test]
+    fn ann_6_steps_panel_visibility() {
+        let mut s = st();
+        assert!(s.steps_info().is_none());
+        s.set_tool(Tool::Step);
+        let i = s.steps_info().unwrap();
+        assert!(i.rows.is_empty() && i.selected.is_none());
+        place_steps(&mut s, 2);
+        assert_eq!(s.steps_info().unwrap().selected, Some(1));
+        s.set_tool(Tool::Rect);
+        assert!(s.steps_info().is_none());
+    }
+
+    // ---- ANN-4: stamps --------------------------------------------------------------------
+
+    fn stamp_of(s: &EditorState, i: usize) -> (StampKind, Option<String>, f64, Color) {
+        match &s.ops[i].kind {
+            OpKind::Stamp {
+                kind,
+                text,
+                size,
+                color,
+                ..
+            } => (*kind, text.clone(), *size, *color),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    /// ANN-4: a click places a check mark (green, 34 px) in one Append.
+    #[test]
+    fn ann_4_click_places_a_stamp() {
+        let mut s = st();
+        s.set_tool(Tool::Stamp);
+        let e = s.pointer_down(Pt::new(300.0, 200.0), NONE, 1, TOL);
+        let op = only_append(&e).clone();
+        match op.kind {
+            OpKind::Stamp {
+                at,
+                kind,
+                size,
+                color,
+                text,
+            } => {
+                assert_eq!(at, Pt::new(300.0, 200.0));
+                assert_eq!((kind, size), (StampKind::Check, 34.0));
+                assert_eq!(color, Color::rgb(0x2E, 0xB8, 0x72));
+                assert!(text.is_none());
+            }
+            other => panic!("{other:?}"),
+        }
+        assert!(s.pointer_up(Pt::new(300.0, 200.0), NONE, TOL).is_empty());
+    }
+
+    /// ANN-4: BEFORE / AFTER write their word into the op in the UI language; the op passes the
+    /// core validation (a label stamp needs text); symbols carry no text.
+    #[test]
+    fn ann_4_label_stamps_carry_their_word() {
+        let mut s = st();
+        s.set_tool(Tool::Stamp);
+        assert!(s.set_stamp(StampKind::Label, StampWord::After).is_none());
+        s.pointer_down(Pt::new(100.0, 100.0), NONE, 1, TOL);
+        let (kind, text, _, color) = stamp_of(&s, 0);
+        assert_eq!((kind, text.as_deref()), (StampKind::Label, Some("After")));
+        assert_eq!(color, cm_core::annotation::DEFAULT_COLOR);
+        assert!(cm_core::annotation::validate_op(0, &s.ops[0]).is_ok());
+        // Changing the selected stamp in the picker is one Replace and fixes text and colour.
+        let e = s
+            .set_stamp(StampKind::Check, StampWord::Before)
+            .expect("edit");
+        assert!(matches!(e, Edit::Replace(_)));
+        let (kind, text, _, color) = stamp_of(&s, 0);
+        assert_eq!((kind, text), (StampKind::Check, None));
+        assert_eq!(color, Color::rgb(0x2E, 0xB8, 0x72));
+        let e = s
+            .set_stamp(StampKind::Label, StampWord::Before)
+            .expect("edit");
+        assert!(matches!(e, Edit::Replace(_)));
+        assert_eq!(stamp_of(&s, 0).1.as_deref(), Some("Before"));
+        assert!(cm_core::annotation::validate_op(0, &s.ops[0]).is_ok());
+        let info = s.stamp_info().unwrap();
+        assert_eq!(
+            (info.kind, info.word),
+            (StampKind::Label, Some(StampWord::Before))
+        );
+    }
+
+    /// ANN-4: size and colour apply to the selected stamp; move and scale work; Enter places one.
+    #[test]
+    fn ann_4_stamp_size_colour_move_and_enter() {
+        let mut s = st();
+        s.set_tool(Tool::Stamp);
+        s.set_stamp(StampKind::Cross, StampWord::Before);
+        s.pointer_down(Pt::new(300.0, 200.0), NONE, 1, TOL);
+        assert_eq!(stamp_of(&s, 0).3, cm_core::annotation::DEFAULT_COLOR);
+        assert!(matches!(
+            s.set_param(ParamValue::StampSize(64.0)),
+            Some(Edit::Replace(_))
+        ));
+        assert_eq!(stamp_of(&s, 0).2, 64.0);
+        let blue = Color::rgb(0x2E, 0x8B, 0xFF);
+        s.set_param(ParamValue::Color(blue)).expect("edit");
+        assert_eq!(stamp_of(&s, 0).3, blue);
+        // Move with the Select tool.
+        s.set_tool(Tool::Select);
+        let e = drag(&mut s, (300.0, 200.0), (340.0, 230.0), NONE);
+        assert_eq!(e.len(), 1);
+        match &s.ops[0].kind {
+            OpKind::Stamp { at, .. } => assert_eq!(*at, Pt::new(340.0, 230.0)),
+            _ => unreachable!(),
+        }
+        // The scale handle sits on the bottom-right of the stamp.
+        let ch = s.chrome().unwrap();
+        assert_eq!(ch.bounds, Rc::new(308.0, 198.0, 64.0, 64.0));
+        assert_eq!(ch.handles, vec![(Handle::Scale, Pt::new(372.0, 262.0))]);
+        // Enter places one at the centre.
+        s.set_tool(Tool::Stamp);
+        let e = s.place_default(Pt::new(600.0, 400.0));
+        assert_eq!(e.len(), 1);
+        assert_eq!(s.ops.len(), 2);
+        assert_eq!(Tool::from_key('u'), Some(Tool::Stamp));
+        assert_eq!(Tool::Stamp.group(), crate::editor::Group::Markers);
+    }
+
+    /// The remembered stamp kind and word survive the settings round trip.
+    #[test]
+    fn ann_4_stamp_choice_persists() {
+        let mut s = st();
+        s.set_stamp(StampKind::Label, StampWord::After);
+        let back = Styles::from_json(&s.styles.to_json());
+        assert_eq!(back.get(Tool::Stamp).stamp_kind, StampKind::Label);
+        assert_eq!(back.get(Tool::Stamp).stamp_word, StampWord::After);
     }
 }

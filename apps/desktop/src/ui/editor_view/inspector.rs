@@ -1,7 +1,7 @@
 use super::*;
 
 impl EditorView {
-    fn doc_action(
+    pub(super) fn doc_action(
         &self,
         f: impl Fn(&mut EditorDoc, &mut Context<EditorDoc>) + 'static,
     ) -> impl Fn(&ClickEvent, &mut Window, &mut App) + 'static {
@@ -26,7 +26,7 @@ impl EditorView {
         self.doc_action(move |d, cx| d.set_param(v, cx))
     }
 
-    fn seg_button(
+    pub(super) fn seg_button(
         &self,
         t: &Theme,
         id: ElementId,
@@ -195,6 +195,7 @@ impl EditorView {
         t: &Theme,
         p: Param,
         cur: ParamValue,
+        fill: bool,
         cx: &mut Context<Self>,
     ) -> Option<AnyElement> {
         let body: AnyElement =
@@ -246,6 +247,37 @@ impl EditorView {
                     w,
                     ParamValue::Opacity,
                 ),
+                (Param::StampSize, ParamValue::StampSize(w)) => self.segments(
+                    t,
+                    "stamp-size",
+                    STAMP_SIZES
+                        .iter()
+                        .map(|v| (*v, format!("{v:.0}"), pixels_label(*v))),
+                    w,
+                    ParamValue::StampSize,
+                ),
+                (Param::Dim, ParamValue::Dim(w)) => self.segments(
+                    t,
+                    "dim",
+                    DIM_LEVELS.iter().map(|v| {
+                        (
+                            *v,
+                            format!("{:.0}%", v * 100.0),
+                            tr!("{n} percent", n = format!("{:.0}", v * 100.0)),
+                        )
+                    }),
+                    w,
+                    ParamValue::Dim,
+                ),
+                (Param::Radius, ParamValue::Radius(w)) => self.segments(
+                    t,
+                    "radius",
+                    CORNER_RADII
+                        .iter()
+                        .map(|v| (*v, format!("{v:.0}"), pixels_label(*v))),
+                    w,
+                    ParamValue::Radius,
+                ),
                 (Param::Strength, ParamValue::Strength(v)) => self.stepper(
                     t,
                     "strength",
@@ -268,12 +300,16 @@ impl EditorView {
                 ),
                 _ => return None,
             };
+        let label = match (p, fill) {
+            (Param::Color, true) => tr_ctx!("annotation setting", "Fill"),
+            _ => p.label(),
+        };
         Some(
             div()
                 .flex()
                 .flex_col()
                 .gap(px(8.))
-                .child(section_label(t, &p.label()))
+                .child(section_label(t, &label))
                 .child(body)
                 .into_any_element(),
         )
@@ -305,7 +341,9 @@ impl EditorView {
 
     pub(super) fn inspector(&self, t: &Theme, s: &Snap, cx: &mut Context<Self>) -> AnyElement {
         let title = s.inspector_title.clone();
-        let tool_icon = s.tool.icon();
+        let tool_icon = s.inspector_tool.icon();
+        // A callout's colour is its fill.
+        let fill = s.inspector_tool == Tool::Callout;
         let subtitle = if s.selected {
             tr!("Changes apply to the selected annotation.")
         } else if s.tool == Tool::Select {
@@ -316,9 +354,13 @@ impl EditorView {
         let params: Vec<AnyElement> = s
             .params
             .iter()
-            .filter_map(|(p, v)| self.param_group(t, *p, *v, cx))
+            .filter_map(|(p, v)| self.param_group(t, *p, *v, fill, cx))
             .collect();
+        let top = self.panel_top(t, s, cx);
+        let bottom = self.panel_bottom(t, s);
+        let is_new = crate::editor::palette::SHOW_NEW_DOT && s.inspector_tool.is_new();
         let selected = s.selected && !s.editing_text;
+        let can_duplicate = s.inspector_tool != Tool::Spotlight;
         let has_crop = s.has_crop;
         let (iw, ih) = s.image;
         let pointer = s
@@ -392,7 +434,8 @@ impl EditorView {
                                                     .text_size(px(type_scale::BODY))
                                                     .font_weight(FontWeight::SEMIBOLD)
                                                     .child(SharedString::from(title)),
-                                            ),
+                                            )
+                                            .when(is_new, |d| d.child(panels::new_pill(t))),
                                     )
                                     .child(
                                         div()
@@ -401,7 +444,9 @@ impl EditorView {
                                             .child(subtitle),
                                     ),
                             )
-                            .children(params),
+                            .children(top)
+                            .children(params)
+                            .children(bottom),
                     )
                     .when(
                         s.redact_available
@@ -441,17 +486,20 @@ impl EditorView {
                                     .flex()
                                     .flex_wrap()
                                     .gap(px(8.))
-                                    .child(
-                                        button_with_icon(
-                                            t,
-                                            "ann-duplicate",
-                                            tr!("Duplicate"),
-                                            ButtonKind::Secondary,
-                                            Some("copy"),
+                                    // One spotlight per image: it is never duplicated (ANN-7).
+                                    .when(can_duplicate, |d| {
+                                        d.child(
+                                            button_with_icon(
+                                                t,
+                                                "ann-duplicate",
+                                                tr!("Duplicate"),
+                                                ButtonKind::Secondary,
+                                                Some("copy"),
+                                            )
+                                            .on_click(self.doc_action(|d, cx| d.duplicate(cx)))
+                                            .child(keycaps(t, &[m.clone(), "D".into()])),
                                         )
-                                        .on_click(self.doc_action(|d, cx| d.duplicate(cx)))
-                                        .child(keycaps(t, &[m.clone(), "D".into()])),
-                                    )
+                                    })
                                     .child(
                                         // An undoable immediate delete, not a confirmation: neutral.
                                         button_with_icon(

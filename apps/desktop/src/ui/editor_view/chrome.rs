@@ -83,6 +83,7 @@ impl EditorView {
         });
         let pills = self.floating_chrome(t, &snap, images, cx);
         let popover = self.shortcuts_open.then(|| self.shortcuts_popover(t, cx));
+        let group_menu = self.group_menu.map(|m| self.group_menu_view(t, m, cx));
         let inspector = self.inspector(t, &snap, cx);
         let warn = snap.warning.clone();
 
@@ -142,7 +143,8 @@ impl EditorView {
                                     .flex()
                                     .child(canvas)
                                     .child(pills)
-                                    .children(popover),
+                                    .children(popover)
+                                    .children(group_menu),
                             )
                             .children(strip),
                     )
@@ -294,7 +296,7 @@ impl EditorView {
             .bottom(px(PILL_MARGIN))
             .flex()
             .items_center()
-            .child(self.tool_rail(t, s.tool, cx));
+            .child(self.tool_rail(t, s, cx));
         let transport = div()
             .absolute()
             .left(px(CHROME_INSETS.left as f32))
@@ -399,77 +401,5 @@ impl EditorView {
         )
         .with_priority(10)
         .into_any_element()
-    }
-
-    // ---- tool palette -------------------------------------------------------------------
-
-    /// The tool pill: 11 tools in three groups (draw, redact, crop), 44 px targets. The selected
-    /// tool is the board's filled tile (accent fill, button-text glyph).
-    fn tool_rail(&self, t: &Theme, active: Tool, cx: &mut Context<Self>) -> AnyElement {
-        let mut rail = Self::pill_surface(t)
-            .id("editor-tools")
-            .role(Role::Toolbar)
-            .aria_label(tr!("Annotation tools"))
-            .aria_orientation(gpui::Orientation::Vertical)
-            .w(px(TOOL_RAIL_W))
-            .max_h_full()
-            .flex_none()
-            .flex()
-            .flex_col()
-            .items_center()
-            .gap(px(2.))
-            .overflow_y_scroll();
-        for (i, tool) in Tool::ALL.into_iter().enumerate() {
-            if tool_group_starts(tool) {
-                rail = rail.child(
-                    div()
-                        .w(px(24.))
-                        .h(px(1.))
-                        .my(px(4.))
-                        .flex_none()
-                        .bg(rgba_of(t.line)),
-                );
-            }
-            let on = tool == active;
-            let key = tool.key().to_ascii_uppercase().to_string();
-            let tip_key = vec![key.clone()];
-            let hover = rgba_of(t.raised);
-            rail = rail.child(
-                div()
-                    .id(ElementId::from(("tool", i)))
-                    .role(Role::Button)
-                    .aria_label(tool.label())
-                    .aria_description(SharedString::from(tr!("Shortcut {key}", key = key)))
-                    .aria_keyshortcuts(SharedString::from(key))
-                    .aria_toggled(toggled(on))
-                    .focusable()
-                    .tab_stop(true)
-                    .size(px(TOOL_BTN))
-                    .flex()
-                    .flex_none()
-                    .items_center()
-                    .justify_center()
-                    .rounded(px(scale::RADIUS_MD))
-                    .border_1()
-                    .border_color(gpui::transparent_black())
-                    .cursor_pointer()
-                    .when(on, |d| d.bg(rgba_of(accent(t))))
-                    .when(!on, |d| d.hover(move |s| s.bg(hover)))
-                    .focus_visible(|s| s.border_color(rgba_of(t.text)))
-                    .tooltip(tooltip::tip(tool.label(), tip_key.clone()))
-                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                        if let Some(d) = &this.doc {
-                            d.update(cx, |d, cx| d.set_tool(tool, cx));
-                        }
-                        window.focus(&this.canvas_focus, cx);
-                    }))
-                    .child(icon(
-                        tool.icon(),
-                        20.,
-                        if on { t.primary_fg } else { t.text_2 },
-                    )),
-            );
-        }
-        rail.into_any_element()
     }
 }

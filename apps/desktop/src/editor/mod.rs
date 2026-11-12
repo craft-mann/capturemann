@@ -5,6 +5,7 @@
 pub mod copytext;
 pub mod geom;
 pub mod keys;
+pub mod palette;
 pub mod preview;
 pub mod redact;
 pub mod session;
@@ -16,6 +17,7 @@ pub mod viewport;
 
 pub use geom::{Handle, TextMetrics};
 pub use keys::{KeyCommand, Mods};
+pub use palette::{Faces, Group};
 pub use redact::Proposal;
 pub use state::{Chrome, Edit, EditorState, EscapeOutcome, Interaction, TextEdit};
 pub use tools::{Param, ParamValue, Styles, Tool, ToolStyle};
