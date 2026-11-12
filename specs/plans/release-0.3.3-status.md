@@ -2,16 +2,21 @@
 
 Plan: `release-0.3.3-plan.md` (decisions final, section 5). Orchestrator log, local main only; nothing pushed, tagged or published.
 
-| Track | Scope | Branch | State |
-| --- | --- | --- | --- |
-| Phase 0 | Specs ANN-4/6/7 (ANN-8 reserved), IMP-6, FR rows, annotate schema text; op JSON frozen; core types, validation, pass-through, `step_label`, render stubs, `cm_render::callout_box` stub | main (c286c007) | done, committed |
-| A | Renderer (callout, spotlight, stamps, step labels), goldens, `callout_box`, mcp schema, CLI, fixture round trip | `track/a-core-render` | alive (Nov 12 20:56): renderer + callout_box committed (9aaa8e56); goldens, mcp schema and fixture test uncommitted, tests queued on the shared cargo lock; ETA about 1 h |
-| B1 | Editor: palette, tools K/S/U, steps panel, stamps, icons, locales | `track/b1-editor` | alive: palette, callout, spotlight, steps committed (94115dec); stamps and tests in progress; ETA about 1.5 h |
-| B2 | View bar, image strip | `track/b2-viewbar` | alive: view bar and strip committed (57533f2a); polishing tests; ETA about 1 h |
-| C | Docs, regress case, manual scripts | merged | merged into main (b23d92a7); Trivy and cargo deny clean |
-| D | Image import (IMP-6) | `track/d-import` | alive, 17 files dirty, nothing committed after 2 h; asked to commit WIP and rename the branch; ETA about 1.5 h |
-| Release | Candidate files, release text, status docs, `cm-regress` on this Mac | main | not started |
+## Status at 22:45 (Nov 12)
 
-Cut list (first to go): stamps (editor part), clipboard paste for images (stretch).
+All five tracks have delivered; all agents have finished (none alive, none blocked). Integration is done on branch `release/0.3.3` (worktree `.claude/worktrees/agent-aeae7820b95d4cd94`), because the harness pinned the orchestrator to that worktree for a while; main (099fa2f4: Phase 0, C, B2) will be fast-forwarded to it once the gate is green.
 
-Note (20:56): all agents build into the shared main target dir, so cargo runs queue on one lock; this slows every track but keeps disk and load low.
+| Track | Scope | State |
+| --- | --- | --- |
+| Phase 0 | specs, frozen op JSON, core types, pass-through | merged on main |
+| A | renderer, `callout_box`, mcp schema, fixture | merged into release/0.3.3 (69f06a04) |
+| B1 | palette, callout, spotlight, steps panel, stamps | merged into release/0.3.3 (b942ce00); stamps NOT cut |
+| B2 | view bar, image strip | merged on main (099fa2f4) |
+| C | docs, regress cases, manual scripts, release text drafts | merged on main (b23d92a7) |
+| D | image import IMP-6 | is the base of release/0.3.3 (clipboard paste cut as stretch) |
+| Gate | fmt, clippy workspace -D warnings | clippy green after two small fixes (22:40); workspace tests running |
+
+Next: workspace tests, cargo deny, Trivy, layout_width_tests, then ff main, one push, Windows candidate and regress (full tier) on the ThinkPad, macOS regress, release material.
+
+Cause of the earlier slowness: all agents shared one cargo target dir, so their cargo runs queued on one lock (0 percent CPU); the private-target clones were too slow and were dropped.
+
