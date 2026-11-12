@@ -1,6 +1,6 @@
 # Release 0.3.3: annotation pack (analysis of `0.3.3.md` and detail plan)
 
-Status: **all open questions answered Nov 12, 2026 (section 5); waiting for the maintainer's review of this plan before Phase 0; nothing built.** Source: the maintainer's `0.3.3.md` at the repository root (callout, step badge upgrades, spotlight, magnify, stamps). The earlier scope list, the Velopack spike notes and what 0.3.2 taught us are in section 6 below.
+Status: **all open questions answered Nov 12, 2026 (section 5); waiting for the maintainer's review of this plan before Phase 0; nothing built.** Source: the maintainer's `0.3.3.md` at the repository root (callout, step badge upgrades, spotlight, magnify, stamps).
 
 ## 1. What the proposal is, and how it fits the repository
 
@@ -85,7 +85,7 @@ IDs are never renumbered; ANN-5 is Copy text (0.3.2). FR table rows to add in `0
 
 ## 4. Size and what else fits in 0.3.3
 
-Rough size: A about 2 days, B about 3 days, C about 1 day, D (image import) about 1.5 days, verification and release 1 day: still a normal release. **Decision (maintainer, Nov 12, 2026): in-app update (Velopack) is not brought in at this phase** (parked, spikes kept: section 6). 0.3.3 is the annotation pack plus the small carried-over fixes. Windowed audio and PhoWhisper have no release assigned; PhoWhisper stays out unless the maintainer asks.
+Rough size: A about 2 days, B about 3 days, C about 1 day, D (image import) about 1.5 days, verification and release 1 day: still a normal release. **Decision (maintainer, Nov 12, 2026): in-app update (Velopack) is not brought in at this phase** (parked; the spike reports stay in `docs/development/`). 0.3.3 is the annotation pack plus the small carried-over fixes. Windowed audio and PhoWhisper have no release assigned; PhoWhisper stays out unless the maintainer asks.
 
 ## 5. Questions for the maintainer
 1. (Answered Nov 12: the annotation pack is 0.3.3 and in-app update is not in this phase.) Windowed audio: **later** (Nov 12; no release assigned).
@@ -94,40 +94,3 @@ Rough size: A about 2 days, B about 3 days, C about 1 day, D (image import) abou
 4. (Answered Nov 12: **stretch goal, built last**; cut first if time runs short.) Stamps.
 5. (Answered Nov 12: **leave as is**.) `capturemann mcp` starts no daemon in 0.3.3: the app must be open and tools answer `daemon_unavailable`. A headless daemon (or MCP launching the app) goes on the 0.3.4+ list; open design point: Confirm-tier tools need an on-screen dialog, which a headless daemon lacks.
 6. (Answered Nov 12: **accepted**.) Image import (IMP-6, section 3b): (a) formats **JPEG (`.jpg`, `.jpeg`) and PNG (`.png`) only** in 0.3.3, the rest later; (b) paste from the clipboard is a stretch goal after stamps; (c) metadata is dropped and the source file is not kept; (d) limits 16 384 px per side and 100 megapixels.
-
-## 6. Earlier scope, spike notes and carry-over (moved here from the former plan file, Nov 12, 2026)
-
-This section is the content of the former `release-0.3.3-plan.md` (draft of Nov 11, 2026, updated Nov 12), merged when that file was removed so the Velopack spike results and the 0.3.2 lessons are not lost.
-The earlier scope list (Nov 11, 2026), kept as the record; 0.3.3 is now the annotation pack plus image import (sections 1 to 5). Windowed audio is later and PhoWhisper is out unless asked.
-
-1. **In-app update: NOT in 0.3.3 (maintainer, Nov 12, 2026: "we do not bring in-app update at this phase"); parked, no release assigned.** The Velopack spikes and notes below stay as the record. Earlier text: moved from 0.3.2 by the maintainer, Nov 11, 2026. Everything: Velopack Apply on Windows and macOS, and the opt-in notify-only check (also the Linux path, with the `apt` command). Start from the section "In-app update with Velopack" in `release-0.3.2-plan.md` (analysis, conflicts with the Oct 25, 2026 "no network call" decision and NFR-9, the six decisions still open) and the spike reports `docs/development/velopack-spike-0.3.2.md` (macOS, GO WITH CHANGES) and `docs/development/velopack-spike-win-0.3.2.md` (Windows, when it lands). Decisions still needed: opt-in default off; Linux notify-only; feed host (a release tagged `updates`); Windows signing before Apply (depends on the SignPath outcome of 0.3.2); first-install formats; the three `deny.toml` questions (`webpki-roots`, `derivative`, `zip`); our own `UpdateSource` that sends no identifiers and verifies minisign. The maintainer must run the permission-survival check on a Developer ID build. Order: the opt-in check first (small, no packaging change), Apply after.
-2. **Windowed audio** (flat memory for long files and speakers), moved from 0.3.2.
-3. **PhoWhisper**, only if the maintainer wants it again: dropped from 0.3.2 because the models are fine-tuned without timestamp tokens, so adopting them means rebuilding word timing and decoding (captions, seek, speakers and reports depend on word times).
-
-#### Spike results for item 1 (Nov 11, 2026)
-
-macOS: `docs/development/velopack-spike-0.3.2.md` (GO WITH CHANGES). Windows: `docs/development/velopack-spike-win-0.3.2.md` (GO WITH CHANGES; ThinkPad, public 0.3.1 zip as payload, velopack and vpk 1.2.161). Windows findings to carry:
-- The updater silently kills every process whose exe is in the install folder (daemon, overlay, MCP server: about 1.4 s down); a terminal whose working directory is `current\` makes the update fail after 10 retries and the old version restarts.
-- No rollback and no health check: a new version that will not start leaves a dead install; vpk packs any exe without checking it uses Velopack, so CI needs its own smoke test.
-- Defaults to change: `run()` auto-applies a downloaded package at startup (set `set_auto_apply_on_startup(false)`, else the Confirm tier is bypassed); the stock HTTP source has no timeout and sends a persistent random `stagingId`.
-- Integrity on unsigned Windows is only the feed SHA-256 over HTTPS; a minisign check works only inside a custom `UpdateSource` (delta files are deleted after patching and the rebuilt full package differs from the published one).
-- Numbers: Velopack install 2.1 s (NSIS 17.2 s), no admin, 373 MB on disk (NSIS 246 MB), Setup.exe 119.9 MB (NSIS 86.6 MB); the 0.2.9 to 0.3.1 delta is 28.7 MB (25 % of full), the 33 MB speaker models never travel in a delta; rebuilding from a delta costs about 7 s CPU on the T490; skipped versions work through chained deltas; `run()` costs 2 to 3 ms and 2.8 MB.
-- Coexistence: Velopack Setup does not detect an NSIS install (two "CaptureMann" entries); a hook that runs the NSIS uninstaller silently works (6 s, keeps settings); NSIS and flat-zip installs return `NotInstalled` and can never self-update; do not use pack id `CaptureMann` (collides with the NSIS Apps key); Setup silently downgrades over a newer install; feed JSON must have no UTF-8 BOM.
-- Hosting correction: GitHub shows v0.3.1 as a full release and `releases/latest/download` resolves to it, so "all 0.3.x are pre-releases" is out of date; old deltas live in older releases (a client several versions behind falls back to the full package).
-- The maintainer must check Edge, SmartScreen and the non-silent Setup on a real desktop, choose the Windows integrity policy (SignPath, minisign in a custom source, or notify-only), decide the NSIS migration (hook removes the old copy or only warns), pick the pack id, approve the winget manifest change (`InstallerType: exe`, `--silent`), and if SignPath goes ahead spike signing all 13 files with `--signTemplate` on a Windows runner.
-
-### Carried over from 0.3.2
-
-Known by name only, no reproduction (skipped for 0.3.2 by the maintainer, Nov 11, 2026; fix when it comes back): process-tree kill on cancel (a cancelled job may leave a child process such as ffmpeg running), the redaction box left-edge trim.
-
-
-Whatever of the 0.3.2 carry-over list is not done by release day: the speech-detector second opinion for the outro guard, "Always ignore this line", `estimate_vs_real` on Windows, Intel Mac hardware, Windows 10, a 16 GB Mac for long recordings, the cm-overlay exit race, the optional keyboard check of the shortcut fixes on Windows 11 and Linux X11 (`tests/manual/SHORTCUTS-1.md`; the macOS report is closed).
-
-### Found while releasing 0.3.2 (Nov 12, 2026)
-
-1. **Claude plugin and the directory.** Submitted; the portal **refused** the version on Nov 12 ("Local MCP servers accepted only from Verified organizations"); the maintainer decided to pursue verification and distribute from the repository meanwhile (state and the question to ask in `docs/development/plugin-submission-0.3.2.md`). The directory puts a policy hold on any plugin that runs a local command or MCP server unless the publisher is a **Verified organization** (a launcher script did not help and was reverted); until then the plugin installs from the repository marketplace. To do: find out how CraftMann becomes Verified (portal), then answer the review. Raise `plugin.json` `version` with every plugin release (pinned to the workspace version by `scripts/check_plugin_version.py`; the push webhook is set up, the directory follows `main`).
-2. **The MCP server starts no daemon.** `capturemann mcp` runs `cm-mcp`, which connects to a daemon that is already running; with the app closed every tool answers `daemon_unavailable`, and the macOS bundle has no `cm-daemon` (the app embeds it). The plugin docs said the opposite until Nov 12 (corrected on `main`). **Decided Nov 12, 2026: leave it in 0.3.3 (the app must be open); a headless daemon is 0.3.4+.** Options were: leave it or make `capturemann mcp` start a headless daemon (Free tools only, Confirm tools refused). The maintainer's remark "app closed -> opened" on PLUGIN-1 check 8 was not clarified: ask what he saw.
-3. **PLUGIN-1 not complete:** check 5 (the client in Settings, Agents and CLI), 9 and 10 not run; nothing run on Windows or Linux (`sh`-free: the plugin starts `capturemann mcp` directly).
-4. **Regression gaps from 0.3.2:** the Windows files were the overnight candidates, not rebuilt from the tag (same code); macOS reports were run on the overnight candidates plus a standard run on the released DMG (43/0); full and hardware tiers on the released DMGs were not run; Linux aarch64 is a candidate from CI (VM regression only).
-5. **winget:** PRs 472327 (0.2.8) and 477195 (0.3.1) still wait for a moderator; submit 0.3.2 after the first is accepted.
-6. **Release process:** `regress.sh` on a Mac uses the dev bundle by default (stale `target/release/cm-daemon` once caused a false failure): pass `--installer <dmg>` for a release run. `make-apt-repo.sh` needs `apt-ftparchive`, which the Mac lacks: run it on the aarch64 VM (staging recipe in the Nov 12 session; key copied in and shredded). The maintainer builds and notarizes the DMGs himself (no notary credentials in agent sessions).
