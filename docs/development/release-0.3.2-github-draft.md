@@ -52,8 +52,7 @@ from the candidate reports plus the smoke check of the final files (see the rele
   (`sudo ln -s /Applications/CaptureMann.app/Contents/MacOS/capturemann /usr/local/bin/capturemann`) or give the full path when Claude
   Code asks for **CaptureMann command** at install. The plugin version follows the app version (0.3.2); install the matching app
   release first. How it works and what to do when it does not: `docs/user/claude-code-plugin.md`. The plugin is also prepared for
-  Anthropic's directory (`docs/development/plugin-submission-0.3.2.md`); <FILL: "it is submitted and under review" or "the submission
-  follows the release", whichever the maintainer did>. The local MCP server does not run in Claude on the web or on a phone; there the
+  Anthropic's directory (`docs/development/plugin-submission-0.3.2.md`); it is submitted and under review (the directory's first check held the MCP server command; the fix, a launcher script in the plugin, is on `main` and the plugin in this release's tag does not have it). The local MCP server does not run in Claude on the web or on a phone; there the
   skills load but the tools are missing, and the plugin says so.
 - **Agent clients appear in Settings → Agents & CLI as soon as they connect**, with their last tool and call count, so you can allow,
   restrict or block a client before it asks for anything that needs confirmation. Before, a client that only called Free tools (most
@@ -95,7 +94,7 @@ The new features were checked like this: Copy text, the clients list, the redact
 have unit tests with fakes (ANN-5, AGT-2.AC15, LIB-1.AC6 and RED-2.AC5, CAP-2.AC2 and AC3, LIB-1.AC7) and were tried by the maintainer
 on a macOS dev build on Nov 11, 2026 (as reported, `specs/plans/release-0.3.2-status.md`, "Dev bundle checks"; nothing stored in
 `verification/`). The plugin passed `claude plugin validate --strict` (Claude Code 2.1.311) on Nov 11, 2026; `tests/manual/PLUGIN-1.md`
-(a real session against the app) <FILL: "was run by the maintainer, report ..." or "was not run">.
+(a real session against the app) was run in part on Nov 12, 2026 by a script with `claude -p` (checks 1 to 4, 6 and 7 passed; checks 5, 9 and 10 not run), `verification/L1-macos-0.3.2-plugin-1-2026-11-12-claude.md`. It showed that the server starts no daemon: with CaptureMann closed every tool answers `daemon_unavailable`, so open the app first (the README and the plugin skill in this tag still say otherwise; corrected on `main`).
 
 Not run: **Intel Mac hardware**, Windows 10, SmartScreen after "Keep" (the Edge "isn't commonly downloaded" panel was seen on 0.3.1,
 `verification/L1-windows-0.3.1-download-smartscreen-edge-2026-11-11-maintainer.md`), mixed DPI, NVIDIA and AMD encoders, KDE and
