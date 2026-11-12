@@ -1,5 +1,7 @@
 # Annotation (ANN)
 
+**Design source for 0.3.3 (ANN-4, ANN-6, ANN-7, ANN-8):** the maintainer's design pack `specs/capturemann-0.3.3-annotation-pack/` (local only, git-ignored): `release-0.3.3-design-spec.md`, boards N0 to N8b, icons. Plan: `../plans/release-0.3.3-plan.md`.
+
 Annotations are vector operations stored in `manifest.json` (`ops` list) and rendered on top of `original.png` by `cm-render`; the original is never modified. The same op schema is used by the editor UI, `annotate` (MCP) and `--annotate ops.json` (CLI).
 
 **Op schema (shared by ANN-1, ANN-2)** — coordinates are physical px of the original image; colors are `#RRGGBB`.

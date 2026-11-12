@@ -1,6 +1,6 @@
 # Release 0.3.3: annotation pack (analysis of `0.3.3.md` and detail plan)
 
-Status: **all open questions answered Nov 12, 2026 (section 5); waiting for the maintainer's review of this plan before Phase 0; nothing built.** Source: the maintainer's `0.3.3.md` at the repository root (callout, step badge upgrades, spotlight, magnify, stamps).
+Status: **all open questions answered Nov 12, 2026 (section 5); waiting for the maintainer's review of this plan before Phase 0; nothing built.** Design hand-off (maintainer, Nov 12, 2026): `specs/capturemann-0.3.3-annotation-pack/` (git-ignored, local only; start with `release-0.3.3-design-spec.md`, boards N0 to N8b in `screens/png`, icons in `icons/`, sources in `source/`). Source: the maintainer's `0.3.3.md` at the repository root (callout, step badge upgrades, spotlight, magnify, stamps).
 
 ## 1. What the proposal is, and how it fits the repository
 
@@ -48,13 +48,13 @@ IDs are never renumbered; ANN-5 is Copy text (0.3.2). FR table rows to add in `0
 4. Agent surface: `annotate` schema variants in `cm-mcp/src/tools.rs`, the CLI file form, `docs/user` text, the plugin skill `screenshot-and-redact` (mention the new ops). Parity test: the same op list from the GUI and from `annotate` renders identically (ANN-1 AC6).
 
 ### Phase 2: editor (track B, starts after the schema freeze; files: `apps/desktop/src/editor/*`, `ui/editor_view/*`, icons, `locales`)
-1. Tools K, S, M, U in `Tool` (12 to 16: check the vertical toolbar at small window heights against DESIGN 5.5 and the layout guard `shrink_text`), keys in `keys.rs`, palette order, tooltips with the key.
+1. Tools K, S, M, U in `Tool` (12 to 16), keys in `keys.rs`. **The design groups the 16 tools into 8 palette buttons** (design spec section 2, board N6: Select V/G, Shapes A/L/R/E, Text T/K, Highlighter H, Markers N/U, Emphasis S/M, Redact B/X, Crop C; the face shows the last tool used per group, remembered per user; group menu on corner click, press-and-hold or right-click; every key still picks its tool directly; blue "new" dot; tooltips like `Callout [K] in Text`; accessible names and radio-item menu). This replaces the earlier "check 16 buttons at small heights" item: the palette is about 380 px tall. Follow `design/CLAUDE.md` and DESIGN 5.5.
 2. Callout: place box, drag the tail tip (own handle), text through the Text tool's input method (Vietnamese Telex and VNI must work, ANN-1 AC7 pattern), box grows and writes back.
 3. Spotlight: draw shapes, add a hole to the existing op, dim slider, dim or blur toggle, delete shape or op.
 4. Magnify: draw the source, place the loupe, zoom, shape, connector.
 5. Steps panel: label field, numbering style, start number, drag-to-reorder list.
 6. Stamp picker (last, optional).
-7. Icons: the kit has `zoom-in` and `search` already; new ones needed for callout, spotlight, stamp and the step label, following `design/icons/CLAUDE.md` (Lucide set; proposals: `message-square`, `focus`, `stamp`). Per-surface rules in `design/CLAUDE.md` apply.
+7. Icons: the design pack ships them in `specs/capturemann-0.3.3-annotation-pack/icons/` (Lucide 1.60.0, ISC, licence file included): `message-square` (Callout), `focus` (Spotlight), `stamp`, `text-select`, `list-ordered`, `grip-vertical`, `layers`, `gallery-horizontal-end`, `ellipsis`, `chevron-down`, `chevron-right`, `scan-text`, plus the custom `cm-group-corner.svg`; Magnify uses `search` from the main kit. Copy them into `design/icons/` through the usual icon process (`design/icons/CLAUDE.md`, licence list, `specs/icon-inventory`).
 8. i18n: wrap every string, `cm-i18n extract`, Vietnamese drafts marked fuzzy for the maintainer's review, `cargo test -p cm-desktop --lib layout_width_tests` and the pseudo-locale check.
 
 ### Phase 3: verify and release
@@ -83,9 +83,20 @@ IDs are never renumbered; ANN-5 is Copy text (0.3.2). FR table rows to add in `0
 - **Tests.** Pure tests on headers (orientation, size limits, bombs, CMYK JPEG, 16-bit, palette PNG), golden `annotate` on an imported image, an `import_media dry_run` row test, a `cm-regress` case (import a PNG and a JPEG, annotate, export), and `tests/manual/IMP-6.md` for drag and drop.
 - **Size.** About 1.5 days, one agent, files disjoint from tracks A and B: `cm-media/src/import.rs` (probe/classify), `cm-library/src/import.rs` (bundle), `cm-mcp` schema text, `apps/desktop` Import sheet and drop target, `specs/features/18-import.md`, `locales`. The sheet change touches `apps/desktop`, so run it after track B's toolbar work lands, or in a separate files set (the Import sheet is not in `editor/`).
 
+### 3c. Design pack: what it adds beyond the five items (Nov 12, 2026, track B)
+
+The pack's scope line: "only the screenshot editor changes". Besides the tools it specifies three editor changes that were **not** in `0.3.3.md` or in this plan before; they are part of 0.3.3 because the maintainer supplied the design:
+- **Grouped tool palette** (N6): see Phase 2 item 1.
+- **View bar** (N7): `Undo · Redo | Copy text · Auto-redact | Zoom out · [68% ▾] · Zoom in | Images · Keyboard · ⋯`. The zoom value opens a menu (Fit to window, Actual size 100%, 200%, Custom n%) and replaces the separate Fit and 100% buttons; **Revert to original… moves into the ⋯ menu** (same name and confirm step as today, with the helper line "Removes every annotation, crop and redaction."); Copy text stays, its tooltip explains the difference from Select text (G).
+- **Image strip** (N8, N8b): a thumbnail strip under the canvas for quick navigation to another image: same list and order as the Library view the image was opened from, library thumbnails loaded lazily, an annotation-count pill, name and date only in the hover tooltip, hidden below 640 px window height or by the Images button (remembered per user), listbox accessibility, each image keeps its own undo history, no save prompt, existing previous and next shortcuts unchanged, UI only (no agent change). Preload the previous and next full images. This needs the editor to know the Library list it was opened from (new state in `apps/desktop`; check how the editor is opened today).
+- Image import (IMP-6) needs **no new screen**: it uses the existing Import form.
+- Rules in the pack that the plan above already follows: spotlight (one per image, up to 8 holes, inserted before the first non-redaction op, Blur mode only a look), magnify (from `original.png`, redaction inside the loupe, connector and zoom badge), callout (tail-tip handle, box grows and writes back), steps (22 to 26 px badges, label pill flips near the edge, letters Z, AA, AB), text input through the Text tool's method. Stamps stay last and first to cut.
+- New in the pack, to settle in Phase 0: Magnify uses `search`; the blue "new" dot is removed after first use or after one release (decide which).
+- Size: the palette, view bar and strip add about 2 days to track B (B becomes about 5 days); the total rises to about 9 days.
+
 ## 4. Size and what else fits in 0.3.3
 
-Rough size: A about 2 days, B about 3 days, C about 1 day, D (image import) about 1.5 days, verification and release 1 day: still a normal release. **Decision (maintainer, Nov 12, 2026): in-app update (Velopack) is not brought in at this phase** (parked; the spike reports stay in `docs/development/`). 0.3.3 is the annotation pack plus the small carried-over fixes. Windowed audio and PhoWhisper have no release assigned; PhoWhisper stays out unless the maintainer asks.
+Rough size: A about 2 days, B about 5 days (with the palette, view bar and image strip, section 3c), C about 1 day, D (image import) about 1.5 days, verification and release 1 day: still a normal release. **Decision (maintainer, Nov 12, 2026): in-app update (Velopack) is not brought in at this phase** (parked; the spike reports stay in `docs/development/`). 0.3.3 is the annotation pack plus the small carried-over fixes. Windowed audio and PhoWhisper have no release assigned; PhoWhisper stays out unless the maintainer asks.
 
 ## 5. Questions for the maintainer
 1. (Answered Nov 12: the annotation pack is 0.3.3 and in-app update is not in this phase.) Windowed audio: **later** (Nov 12; no release assigned).

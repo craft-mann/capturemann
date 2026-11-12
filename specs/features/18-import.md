@@ -1,5 +1,7 @@
 # Import media (IMP)
 
+**0.3.3 (IMP-6, import images; maintainer decisions of Nov 12, 2026):** images join the same `import_media` tool, job and Import form (no new screen: design pack `specs/capturemann-0.3.3-annotation-pack/`, local only). Formats JPEG (`.jpg`, `.jpeg`) and PNG (`.png`) only; limits 16 384 px per side and 100 megapixels; EXIF orientation applied, metadata dropped, source file not kept; clipboard paste is a stretch goal. Plan: `../plans/release-0.3.3-plan.md` section 3b. The IMP-6 text is written in Phase 0.
+
 Bring video and audio files that were not recorded by CaptureMann (a phone clip, a screen recording from another tool, a voice memo, a downloaded interview) into the library as normal captures, so that the editor, local AI (transcript, speakers, reports), export, upload and publish work on them. Design source: the redesign kit boards I0 to I4 (`capturemann-redesign 6/`: `import-media-design.md`, `screens/png/Import*.png`, `source/Import*.dc.html`), proposal and maintainer decisions of Nov 3, 2026. Release plan: `../plans/release-0.2.7-plan.md`, track M3.
 
 **Decisions of Nov 3, 2026 (product maintainer), binding for this file.**
