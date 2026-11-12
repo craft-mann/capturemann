@@ -22,7 +22,8 @@ use crate::editor::geom::Handle;
 use crate::editor::keys;
 use crate::editor::state::Interaction;
 use crate::editor::tools::{
-    palette_name, Param, ParamValue, Tool, OPACITIES, PALETTE, STEP_SIZES, TEXT_SIZES, WIDTHS,
+    palette_name, Param, ParamValue, Tool, CORNER_RADII, DIM_LEVELS, OPACITIES, PALETTE,
+    STEP_SIZES, TEXT_SIZES, WIDTHS,
 };
 use crate::editor::{Insets, KeyCommand, Mods, Viewport};
 use crate::theme::{scale, type_scale, Color, Mode, Theme};
@@ -41,6 +42,8 @@ mod canvas;
 mod chrome;
 mod input;
 mod inspector;
+mod palette;
+mod panels;
 
 /// Tool buttons are 44 px hit targets (DESIGN 4); the rail card adds 6 px padding and a border.
 const TOOL_BTN: f32 = 44.;
@@ -60,14 +63,6 @@ const CHROME_INSETS: Insets = Insets {
 const HANDLE: f32 = 8.;
 /// Pointer tolerance for hit tests, logical px.
 const HIT_PX: f64 = 6.;
-
-/// Whether `tool` opens a new group in the tool pill (draw | redact | crop dividers).
-fn tool_group_starts(tool: Tool) -> bool {
-    matches!(
-        tool,
-        Tool::Arrow | Tool::Blur | Tool::Crop | Tool::SelectText
-    )
-}
 
 fn mod_label() -> &'static str {
     if cfg!(target_os = "macos") {
@@ -151,6 +146,13 @@ pub struct EditorView {
     want_focus: bool,
     /// The keyboard shortcuts popover (hidden by default; opened by the keyboard button).
     shortcuts_open: bool,
+    /// The open tool-group menu (palette), with the item the arrow keys are on.
+    group_menu: Option<palette::GroupMenu>,
+    /// Press-and-hold on a group button: the timer's token while the button is held.
+    hold: Option<u64>,
+    hold_seq: u64,
+    /// The hold already opened the menu, so the click that follows must not pick a tool.
+    hold_fired: bool,
     space_down: bool,
     /// Last pointer position while panning (window px).
     pan_from: Option<(f32, f32)>,
@@ -183,6 +185,10 @@ impl EditorView {
             canvas_focus: cx.focus_handle(),
             want_focus: false,
             shortcuts_open: false,
+            group_menu: None,
+            hold: None,
+            hold_seq: 0,
+            hold_fired: false,
             space_down: false,
             pan_from: None,
             last_epoch: epoch,
@@ -256,6 +262,16 @@ impl Render for EditorView {
 /// listeners are built.
 struct Snap {
     tool: Tool,
+    /// The tool the inspector is about: the one being typed or selected, else the active one.
+    inspector_tool: Tool,
+    /// The Callout panel (ANN-4), when a callout is typed, selected or about to be drawn.
+    callout: Option<crate::editor::state::CalloutInfo>,
+    /// The Steps panel (ANN-6).
+    steps: Option<crate::editor::state::StepsInfo>,
+    /// The Spotlight panel (ANN-7).
+    spot: Option<crate::editor::state::SpotInfo>,
+    /// The tool each palette group's button shows.
+    faces: crate::editor::Faces,
     can_undo: bool,
     can_redo: bool,
     has_ops: bool,
@@ -264,8 +280,8 @@ struct Snap {
     image_handle: Option<std::sync::Arc<gpui::RenderImage>>,
     summary: String,
     hover: Option<Pt>,
-    /// Pointer position in image px, number, diameter in image px, color.
-    step_hint: Option<(Pt, u32, f64, OpColor)>,
+    /// Pointer position in image px, label, diameter in image px, color.
+    step_hint: Option<(Pt, String, f64, OpColor)>,
     status: Status,
     selected: bool,
     editing_text: bool,
@@ -296,12 +312,17 @@ impl Snap {
         let step_hint = match (st.tool, st.hover, idle) {
             (Tool::Step, Some(p), true) => {
                 let style = st.styles.get(Tool::Step);
-                Some((p, st.next_step_number(), style.size, style.color))
+                Some((p, st.next_step_label(), style.size, style.color))
             }
             _ => None,
         };
         Snap {
             tool: st.tool,
+            inspector_tool: st.inspector_tool(),
+            callout: st.callout_info(),
+            spot: st.spot_info(),
+            steps: st.steps_info(),
+            faces: st.faces,
             can_undo: st.can_undo || doc.pending() > 0,
             can_redo: st.can_redo,
             has_ops: !st.ops.is_empty(),
@@ -360,36 +381,6 @@ fn near(a: f64, b: f64) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// Redesign R4: the tool pill lists the 12 tools in the shipped order, with dividers before
-    /// Arrow, Blur, Crop and Select text only.
-    #[test]
-    fn tool_pill_order_and_groups() {
-        let ids: Vec<&str> = Tool::ALL.iter().map(|t| t.id()).collect();
-        assert_eq!(
-            ids,
-            [
-                "select",
-                "arrow",
-                "line",
-                "rect",
-                "ellipse",
-                "text",
-                "highlight",
-                "step",
-                "blur",
-                "pixelate",
-                "crop",
-                "select_text"
-            ]
-        );
-        let starts: Vec<&str> = Tool::ALL
-            .iter()
-            .filter(|t| tool_group_starts(**t))
-            .map(|t| t.id())
-            .collect();
-        assert_eq!(starts, ["arrow", "blur", "crop", "select_text"]);
-    }
 
     /// The fit insets are exactly the pills' footprint plus their margins, so the fitted image
     /// never sits under either pill, and the canvas itself keeps the full stage rect.

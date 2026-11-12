@@ -309,6 +309,14 @@
       ]
     },
     {
+      "name": "cm-group-corner",
+      "source": "custom",
+      "status": "new",
+      "used_for": [
+        "Screenshot editor: tool palette, marks a group with more than one tool (0.3.3)"
+      ]
+    },
+    {
       "name": "cm-import",
       "source": "custom",
       "status": "new",
@@ -469,6 +477,14 @@
       ]
     },
     {
+      "name": "ellipsis",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Screenshot editor: more menu (0.3.3, view bar)"
+      ]
+    },
+    {
       "name": "external-link",
       "source": "lucide@1.60.0",
       "status": "new",
@@ -576,6 +592,14 @@
       ]
     },
     {
+      "name": "focus",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Screenshot editor: Spotlight tool (0.3.3)"
+      ]
+    },
+    {
       "name": "folder",
       "source": "lucide@1.60.0",
       "status": "new",
@@ -621,6 +645,14 @@
       ]
     },
     {
+      "name": "gallery-horizontal-end",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Screenshot editor: Images button (0.3.3, view bar)"
+      ]
+    },
+    {
       "name": "gauge",
       "source": "lucide@1.60.0",
       "status": "new",
@@ -645,6 +677,14 @@
       "status": "in app today",
       "used_for": [
         "Screenshot editor: Tool rail (11 tools)"
+      ]
+    },
+    {
+      "name": "grip-vertical",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Screenshot editor: Steps panel drag handle (0.3.3)"
       ]
     },
     {
@@ -746,6 +786,14 @@
       ]
     },
     {
+      "name": "layers",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Screenshot editor: Spotlight info line (0.3.3)"
+      ]
+    },
+    {
       "name": "layout-grid",
       "source": "lucide@1.60.0",
       "status": "new",
@@ -773,6 +821,14 @@
       "status": "new",
       "used_for": [
         "Settings: Permissions: Reopen setup / Check again"
+      ]
+    },
+    {
+      "name": "list-ordered",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Screenshot editor: Steps panel header (0.3.3)"
       ]
     },
     {
@@ -837,6 +893,14 @@
       "status": "new",
       "used_for": [
         "Recording editor: Caption line: Split / Merge with next / Remove"
+      ]
+    },
+    {
+      "name": "message-square",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Screenshot editor: Callout tool (0.3.3)"
       ]
     },
     {
@@ -1214,6 +1278,14 @@
       ]
     },
     {
+      "name": "stamp",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Screenshot editor: Stamp tool (0.3.3)"
+      ]
+    },
+    {
       "name": "star",
       "source": "lucide@1.60.0",
       "status": "new",
@@ -1244,6 +1316,14 @@
       "status": "new",
       "used_for": [
         "Settings: General: Theme: System / Dark / Light"
+      ]
+    },
+    {
+      "name": "text-select",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Screenshot editor: Select text tool (0.3.3)"
       ]
     },
     {

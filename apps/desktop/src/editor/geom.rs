@@ -1,7 +1,9 @@
 //! Geometry of annotation ops: bounds, hit testing, handles, move/resize, constraints and
 //! parameter edits. Pure functions over `cm_core::OpKind` in original-image px.
 
-use cm_core::annotation::{BLUR_STRENGTH_RANGE, PIXELATE_BLOCK_RANGE};
+use cm_core::annotation::{
+    SpotShape, SpotShapeKind, BLUR_STRENGTH_RANGE, MAX_SPOTLIGHT_SHAPES, PIXELATE_BLOCK_RANGE,
+};
 use cm_core::{AnnotationOp, Color, OpKind, Pt, Rc};
 use std::collections::HashMap;
 
@@ -141,6 +143,8 @@ pub enum Handle {
     W,
     /// Text and step badges scale from one corner handle.
     Scale,
+    /// A callout's tail tip (ANN-4): its own handle, drawn as a blue dot.
+    Tail,
 }
 
 fn rect_of(kind: &OpKind) -> Option<Rc> {
@@ -151,6 +155,8 @@ fn rect_of(kind: &OpKind) -> Option<Rc> {
         | OpKind::Blur { rect, .. }
         | OpKind::Pixelate { rect, .. }
         | OpKind::Crop { rect } => Some(rect.normalized()),
+        // The box the renderer draws, not the stored minimum (ANN-4.AC5).
+        OpKind::Callout { .. } => cm_render::callout_box(kind),
         _ => None,
     }
 }
@@ -164,6 +170,7 @@ fn with_rect(kind: &OpKind, r: Rc) -> OpKind {
         | OpKind::Blur { rect, .. }
         | OpKind::Pixelate { rect, .. }
         | OpKind::Crop { rect } => *rect = r,
+        OpKind::Callout { rect, .. } => *rect = r,
         _ => {}
     }
     k
@@ -185,6 +192,15 @@ pub fn bounds(kind: &OpKind, tm: &mut TextMetrics) -> Rc {
         OpKind::Step { at, size, .. } => {
             Rc::new(at.x - size / 2.0, at.y - size / 2.0, *size, *size)
         }
+        OpKind::Spotlight { shapes, .. } => shapes
+            .iter()
+            .map(|s| s.rect.normalized())
+            .reduce(|a, b| {
+                let (x0, y0) = (a.x.min(b.x), a.y.min(b.y));
+                let (x1, y1) = ((a.x + a.w).max(b.x + b.w), (a.y + a.h).max(b.y + b.h));
+                Rc::new(x0, y0, x1 - x0, y1 - y0)
+            })
+            .unwrap_or(Rc::new(0.0, 0.0, 0.0, 0.0)),
         other => rect_of(other).unwrap_or(Rc::new(0.0, 0.0, 0.0, 0.0)),
     }
 }
@@ -247,6 +263,11 @@ pub fn hit(kind: &OpKind, p: Pt, tol: f64, tm: &mut TextMetrics) -> bool {
             ((p.x - at.x).powi(2) + (p.y - at.y).powi(2)).sqrt() <= size / 2.0 + tol
         }
         OpKind::Crop { .. } => false,
+        OpKind::Spotlight { .. } => hit_hole(kind, p, tol).is_some(),
+        OpKind::Callout { tail, .. } => {
+            let near_tip = ((p.x - tail.x).powi(2) + (p.y - tail.y).powi(2)).sqrt() <= tol * 1.5;
+            near_tip || inside(bounds(kind, tm), p, tol)
+        }
         other => inside(bounds(other, tm), p, tol),
     }
 }
@@ -267,6 +288,19 @@ pub fn handles(kind: &OpKind, tm: &mut TextMetrics) -> Vec<(Handle, Pt)> {
         OpKind::Text { .. } | OpKind::Step { .. } => {
             let b = bounds(kind, tm);
             vec![(Handle::Scale, Pt::new(b.x + b.w, b.y + b.h))]
+        }
+        OpKind::Callout { tail, .. } => {
+            // Four corners on the drawn box and the tail tip (ANN-4, design spec section 6).
+            let Some(r) = rect_of(kind) else {
+                return Vec::new();
+            };
+            vec![
+                (Handle::Nw, Pt::new(r.x, r.y)),
+                (Handle::Ne, Pt::new(r.x + r.w, r.y)),
+                (Handle::Se, Pt::new(r.x + r.w, r.y + r.h)),
+                (Handle::Sw, Pt::new(r.x, r.y + r.h)),
+                (Handle::Tail, *tail),
+            ]
         }
         other => {
             let Some(r) = rect_of(other) else {
@@ -290,14 +324,164 @@ pub fn handles(kind: &OpKind, tm: &mut TextMetrics) -> Vec<(Handle, Pt)> {
 
 /// The handle under `p` (within `tol` image px), preferring corners and endpoints.
 pub fn hit_handle(kind: &OpKind, p: Pt, tol: f64, tm: &mut TextMetrics) -> Option<Handle> {
+    pick_handle(&handles(kind, tm), p, tol)
+}
+
+/// The handle of `hs` under `p`, preferring the nearest.
+pub fn pick_handle(hs: &[(Handle, Pt)], p: Pt, tol: f64) -> Option<Handle> {
     let mut best: Option<(f64, Handle)> = None;
-    for (h, at) in handles(kind, tm) {
+    for &(h, at) in hs {
         let d = ((p.x - at.x).powi(2) + (p.y - at.y).powi(2)).sqrt();
         if d <= tol && best.is_none_or(|(bd, _)| d < bd) {
             best = Some((d, h));
         }
     }
     best.map(|(_, h)| h)
+}
+
+// ---- spotlight holes (ANN-7) ---------------------------------------------------------------
+
+/// The holes of a spotlight (empty for other ops).
+pub fn spot_shapes(kind: &OpKind) -> &[SpotShape] {
+    match kind {
+        OpKind::Spotlight { shapes, .. } => shapes,
+        _ => &[],
+    }
+}
+
+fn hole_contains(sh: &SpotShape, p: Pt, tol: f64) -> bool {
+    let r = sh.rect.normalized();
+    match sh.kind {
+        SpotShapeKind::Rect => inside(r, p, tol),
+        SpotShapeKind::Ellipse => {
+            let (rx, ry) = (r.w / 2.0 + tol, r.h / 2.0 + tol);
+            if rx <= 0.0 || ry <= 0.0 {
+                return false;
+            }
+            let (cx, cy) = (r.x + r.w / 2.0, r.y + r.h / 2.0);
+            ((p.x - cx) / rx).powi(2) + ((p.y - cy) / ry).powi(2) <= 1.0
+        }
+    }
+}
+
+/// The topmost (last) hole under `p`.
+pub fn hit_hole(kind: &OpKind, p: Pt, tol: f64) -> Option<usize> {
+    spot_shapes(kind)
+        .iter()
+        .rposition(|sh| hole_contains(sh, p, tol))
+}
+
+/// The eight handles of hole `i`.
+pub fn hole_handles(kind: &OpKind, i: usize) -> Vec<(Handle, Pt)> {
+    let Some(sh) = spot_shapes(kind).get(i) else {
+        return Vec::new();
+    };
+    let r = sh.rect.normalized();
+    let (x1, y1) = (r.x + r.w, r.y + r.h);
+    let (mx, my) = (r.x + r.w / 2.0, r.y + r.h / 2.0);
+    vec![
+        (Handle::Nw, Pt::new(r.x, r.y)),
+        (Handle::N, Pt::new(mx, r.y)),
+        (Handle::Ne, Pt::new(x1, r.y)),
+        (Handle::E, Pt::new(x1, my)),
+        (Handle::Se, Pt::new(x1, y1)),
+        (Handle::S, Pt::new(mx, y1)),
+        (Handle::Sw, Pt::new(r.x, y1)),
+        (Handle::W, Pt::new(r.x, my)),
+    ]
+}
+
+/// Moves hole `i` by `(dx, dy)`; the other holes stay.
+pub fn translate_hole(kind: &OpKind, i: usize, dx: f64, dy: f64) -> OpKind {
+    let mut k = kind.clone();
+    if let OpKind::Spotlight { shapes, .. } = &mut k {
+        if let Some(sh) = shapes.get_mut(i) {
+            let r = sh.rect.normalized();
+            sh.rect = Rc::new(r.x + dx, r.y + dy, r.w, r.h);
+        }
+    }
+    k
+}
+
+/// Resizes hole `i` by dragging `handle` to `p` (Shift keeps it square).
+pub fn resize_hole(kind: &OpKind, i: usize, handle: Handle, p: Pt, shift: bool) -> OpKind {
+    let mut k = kind.clone();
+    if let OpKind::Spotlight { shapes, .. } = &mut k {
+        if let Some(sh) = shapes.get_mut(i) {
+            let r = sh.rect.normalized();
+            let (x1, y1) = (r.x + r.w, r.y + r.h);
+            let corner = |anchor: Pt| {
+                let q = if shift { square_from(anchor, p) } else { p };
+                rect_between(anchor, q)
+            };
+            sh.rect = match handle {
+                Handle::Nw => corner(Pt::new(x1, y1)),
+                Handle::Ne => corner(Pt::new(r.x, y1)),
+                Handle::Se => corner(Pt::new(r.x, r.y)),
+                Handle::Sw => corner(Pt::new(x1, r.y)),
+                Handle::N => rect_between(Pt::new(r.x, y1), Pt::new(x1, p.y)),
+                Handle::S => rect_between(Pt::new(r.x, r.y), Pt::new(x1, p.y)),
+                Handle::W => rect_between(Pt::new(x1, r.y), Pt::new(p.x, y1)),
+                Handle::E => rect_between(Pt::new(r.x, r.y), Pt::new(p.x, y1)),
+                _ => r,
+            };
+        }
+    }
+    k
+}
+
+/// Keyboard resize of hole `i` (Alt+arrows): grows its bottom-right corner.
+pub fn resize_hole_by(kind: &OpKind, i: usize, dx: f64, dy: f64) -> OpKind {
+    let mut k = kind.clone();
+    if let OpKind::Spotlight { shapes, .. } = &mut k {
+        if let Some(sh) = shapes.get_mut(i) {
+            let r = sh.rect.normalized();
+            sh.rect = Rc::new(r.x, r.y, (r.w + dx).max(MIN_DRAG), (r.h + dy).max(MIN_DRAG));
+        }
+    }
+    k
+}
+
+/// The spotlight with one more hole, or `None` at the limit of 8 (ANN-7).
+pub fn add_hole(kind: &OpKind, shape: SpotShape) -> Option<OpKind> {
+    let mut k = kind.clone();
+    match &mut k {
+        OpKind::Spotlight { shapes, .. } if shapes.len() < MAX_SPOTLIGHT_SHAPES => {
+            shapes.push(shape);
+            Some(k)
+        }
+        _ => None,
+    }
+}
+
+/// The spotlight without hole `i`; `None` when it was the last hole (the op goes away).
+pub fn remove_hole(kind: &OpKind, i: usize) -> Option<OpKind> {
+    let mut k = kind.clone();
+    match &mut k {
+        OpKind::Spotlight { shapes, .. } if shapes.len() > 1 && i < shapes.len() => {
+            shapes.remove(i);
+            Some(k)
+        }
+        _ => None,
+    }
+}
+
+/// A default hole of the given shape centred at `c`, a quarter of the image's short side wide.
+pub fn default_hole(kind: SpotShapeKind, c: Pt, image: (u32, u32)) -> SpotShape {
+    let s = (f64::from(image.0.min(image.1)) / 4.0).max(40.0);
+    SpotShape {
+        kind,
+        rect: Rc::new(c.x - s * 0.8, c.y - s * 0.5, s * 1.6, s),
+        radius: 0.0,
+    }
+}
+
+/// Moves the op by `(dx, dy)`; for a spotlight only hole `hole` moves.
+pub fn translate_op(kind: &OpKind, dx: f64, dy: f64, hole: usize) -> OpKind {
+    match kind {
+        OpKind::Spotlight { .. } => translate_hole(kind, hole, dx, dy),
+        _ => translate(kind, dx, dy),
+    }
 }
 
 /// Moves the op by `(dx, dy)`.
@@ -433,6 +617,48 @@ pub fn shape_from_drag(
                 _ => OpKind::Crop { rect },
             })
         }
+        Tool::Spotlight => {
+            let (a, b) = {
+                let clamp = |p: Pt| {
+                    Pt::new(
+                        p.x.clamp(0.0, f64::from(image.0)),
+                        p.y.clamp(0.0, f64::from(image.1)),
+                    )
+                };
+                (clamp(a), clamp(b))
+            };
+            let b = if shift { square_from(a, b) } else { b };
+            let rect = rect_between(a, b);
+            if !big_enough(rect) {
+                return None;
+            }
+            Some(OpKind::Spotlight {
+                shapes: vec![SpotShape {
+                    kind: style.spot_shape,
+                    rect,
+                    radius: 0.0,
+                }],
+                dim: style.dim,
+                mode: style.spot_mode,
+                strength: style.strength,
+            })
+        }
+        Tool::Callout => {
+            let rect = rect_between(a, b);
+            if !big_enough(rect) {
+                return None;
+            }
+            Some(OpKind::Callout {
+                rect,
+                tail: default_tail(rect, image),
+                text: String::new(),
+                size: style.size,
+                color: text_on(style.color),
+                bg: style.color,
+                radius: style.radius,
+                style: style.callout_style,
+            })
+        }
         _ => None,
     }
 }
@@ -447,6 +673,7 @@ pub fn resize(orig: &OpKind, handle: Handle, p: Pt, shift: bool, tm: &mut TextMe
         (OpKind::Arrow { from, to, .. } | OpKind::Line { from, to, .. }, Handle::To) => {
             *to = if shift { constrain_angle(*from, p) } else { p };
         }
+        (OpKind::Callout { tail, .. }, Handle::Tail) => *tail = p,
         (OpKind::Text { at, size, .. }, Handle::Scale) => {
             let b = bounds(orig, tm);
             let denom = (b.x + b.w - at.x).max(1.0);
@@ -503,14 +730,58 @@ pub fn resize_by(kind: &OpKind, dx: f64, dy: f64, tm: &mut TextMetrics) -> OpKin
     k
 }
 
-/// Renumbers step badges 1, 2, 3 in list order (ANN-1.AC2).
+/// Renumbers step badges 1, 2, 3 in the order of their current numbers (ties: list order), so
+/// a deleted step closes the gap and a reordered list keeps its order (ANN-1.AC2, ANN-6.AC4).
+/// Only `n` changes: style, start and label stay.
 pub fn renumber_steps(ops: &mut [AnnotationOp]) {
-    let mut n = 0;
-    for op in ops {
-        if let OpKind::Step { n: slot, .. } = &mut op.kind {
-            n += 1;
-            *slot = n;
+    let mut idx: Vec<(u32, usize)> = ops
+        .iter()
+        .enumerate()
+        .filter_map(|(i, o)| match &o.kind {
+            OpKind::Step { n, .. } => Some((*n, i)),
+            _ => None,
+        })
+        .collect();
+    idx.sort_unstable();
+    for (rank, (_, i)) in idx.into_iter().enumerate() {
+        if let OpKind::Step { n, .. } = &mut ops[i].kind {
+            *n = rank as u32 + 1;
         }
+    }
+}
+
+/// The text colour that reads on a `fill`: black on a light fill, white on a dark one. A
+/// callout's text follows its fill when the user picks a new one.
+pub fn text_on(fill: Color) -> Color {
+    let lum = 0.2126 * f64::from(fill.r) + 0.7152 * f64::from(fill.g) + 0.0722 * f64::from(fill.b);
+    if lum > 160.0 {
+        Color::rgb(0x11, 0x11, 0x11)
+    } else {
+        Color::WHITE
+    }
+}
+
+/// Where a new callout's tail tip goes: below the box, else above, else to the right, inside
+/// the image (the user then drags the blue dot).
+pub fn default_tail(r: Rc, image: (u32, u32)) -> Pt {
+    let (iw, ih) = (f64::from(image.0), f64::from(image.1));
+    let gap = (r.h * 0.6).max(24.0);
+    let cx = (r.x + r.w / 2.0).clamp(0.0, iw);
+    if r.y + r.h + gap <= ih {
+        Pt::new(cx, r.y + r.h + gap)
+    } else if r.y - gap >= 0.0 {
+        Pt::new(cx, r.y - gap)
+    } else {
+        Pt::new((r.x + r.w + gap).min(iw), (r.y + r.h / 2.0).clamp(0.0, ih))
+    }
+}
+
+/// A callout with its stored `rect` replaced by the box the renderer draws, so what is stored
+/// is what is drawn (ANN-4.AC5). Other ops are returned as they are.
+pub fn with_drawn_box(kind: &OpKind) -> OpKind {
+    match (kind, cm_render::callout_box(kind)) {
+        (OpKind::Callout { .. }, Some(b)) => with_rect(kind, b),
+        _ => kind.clone(),
     }
 }
 
@@ -532,6 +803,14 @@ pub fn param_value(kind: &OpKind, p: Param) -> Option<ParamValue> {
             | OpKind::Step { color, .. },
             Param::Color,
         ) => Some(ParamValue::Color(*color)),
+        // A callout's colour is its fill (the text colour follows it, see `text_on`).
+        (OpKind::Callout { bg, .. }, Param::Color) => Some(ParamValue::Color(*bg)),
+        (OpKind::Callout { size, .. }, Param::TextSize) => Some(ParamValue::TextSize(*size)),
+        (OpKind::Callout { radius, .. }, Param::Radius) => Some(ParamValue::Radius(*radius)),
+        (OpKind::Spotlight { dim, .. }, Param::Dim) => Some(ParamValue::Dim(*dim)),
+        (OpKind::Spotlight { strength, .. }, Param::Strength) => {
+            Some(ParamValue::Strength(*strength))
+        }
         (
             OpKind::Arrow { width, .. }
             | OpKind::Line { width, .. }
@@ -571,7 +850,17 @@ pub fn with_param(kind: &OpKind, v: ParamValue) -> Option<OpKind> {
             | OpKind::Ellipse { width, .. },
             ParamValue::Width(w),
         ) => *width = w.clamp(1.0, 64.0),
+        (OpKind::Callout { bg, color, .. }, ParamValue::Color(c)) => {
+            *bg = c;
+            *color = text_on(c);
+        }
+        (OpKind::Callout { radius, .. }, ParamValue::Radius(r)) => *radius = r.clamp(0.0, 200.0),
+        (OpKind::Spotlight { dim, .. }, ParamValue::Dim(d)) => *dim = d.clamp(0.0, 1.0),
+        (OpKind::Spotlight { strength, .. }, ParamValue::Strength(s)) => {
+            *strength = s.clamp(*BLUR_STRENGTH_RANGE.start(), *BLUR_STRENGTH_RANGE.end())
+        }
         (OpKind::Text { size, .. }, ParamValue::TextSize(s))
+        | (OpKind::Callout { size, .. }, ParamValue::TextSize(s))
         | (OpKind::Step { size, .. }, ParamValue::StepSize(s)) => *size = s.clamp(8.0, 400.0),
         (OpKind::Highlight { opacity, .. }, ParamValue::Opacity(o)) => {
             *opacity = o.clamp(0.05, 1.0)
@@ -1046,5 +1335,119 @@ mod tests {
             Some(0)
         );
         assert_eq!(topmost_hit(&ops, Pt::new(500.0, 80.0), 2.0, &mut tm), None);
+    }
+
+    fn callout(rect: Rc, tail: Pt) -> OpKind {
+        OpKind::Callout {
+            rect,
+            tail,
+            text: "Hi".into(),
+            size: 24.0,
+            color: Color::WHITE,
+            bg: Color::rgb(0xFF, 0x3B, 0x3B),
+            radius: 12.0,
+            style: cm_core::annotation::CalloutStyle::Bubble,
+        }
+    }
+
+    /// ANN-4.AC2: translating a callout moves the box and leaves the tail tip alone.
+    #[test]
+    fn ann_4_ac2_translate_keeps_the_tail() {
+        let k = callout(Rc::new(100.0, 80.0, 220.0, 70.0), Pt::new(90.0, 200.0));
+        match translate(&k, 30.0, -10.0) {
+            OpKind::Callout { rect, tail, .. } => {
+                assert_eq!(rect, Rc::new(130.0, 70.0, 220.0, 70.0));
+                assert_eq!(tail, Pt::new(90.0, 200.0));
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    /// Design spec section 6: four corner handles plus the tail tip; hit testing takes the box
+    /// and the area around the tip; the tail handle resizes nothing else.
+    #[test]
+    fn callout_handles_hit_and_tail_drag() {
+        let mut tm = TextMetrics::default();
+        let k = callout(Rc::new(100.0, 80.0, 220.0, 70.0), Pt::new(90.0, 200.0));
+        let hs = handles(&k, &mut tm);
+        assert_eq!(hs.len(), 5);
+        assert_eq!(
+            hit_handle(&k, Pt::new(91.0, 201.0), 6.0, &mut tm),
+            Some(Handle::Tail)
+        );
+        assert_eq!(
+            hit_handle(&k, Pt::new(321.0, 151.0), 6.0, &mut tm),
+            Some(Handle::Se)
+        );
+        assert!(hit(&k, Pt::new(200.0, 110.0), 4.0, &mut tm));
+        assert!(!hit(&k, Pt::new(600.0, 600.0), 4.0, &mut tm));
+        match resize(&k, Handle::Tail, Pt::new(10.0, 300.0), false, &mut tm) {
+            OpKind::Callout { rect, tail, .. } => {
+                assert_eq!(tail, Pt::new(10.0, 300.0));
+                assert_eq!(rect, Rc::new(100.0, 80.0, 220.0, 70.0));
+            }
+            other => panic!("{other:?}"),
+        }
+        match resize(&k, Handle::Se, Pt::new(400.0, 200.0), false, &mut tm) {
+            OpKind::Callout { rect, tail, .. } => {
+                assert_eq!(rect, Rc::new(100.0, 80.0, 300.0, 120.0));
+                assert_eq!(tail, Pt::new(90.0, 200.0));
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    /// The text colour follows the fill so a callout stays readable.
+    #[test]
+    fn text_colour_follows_the_fill() {
+        assert_eq!(text_on(Color::rgb(0xFF, 0x3B, 0x3B)), Color::WHITE);
+        assert_eq!(text_on(Color::rgb(0x2E, 0x8B, 0xFF)), Color::WHITE);
+        assert_ne!(text_on(Color::rgb(0xFF, 0xD6, 0x0A)), Color::WHITE);
+        assert_ne!(text_on(Color::WHITE), Color::WHITE);
+    }
+
+    /// The default tail goes below the box, else above, else beside it, always inside the image.
+    #[test]
+    fn default_tail_stays_inside_the_image() {
+        let img = (400, 300);
+        let below = default_tail(Rc::new(100.0, 50.0, 100.0, 40.0), img);
+        assert!(below.y > 90.0 && below.y <= 300.0);
+        let above = default_tail(Rc::new(100.0, 250.0, 100.0, 40.0), img);
+        assert!(above.y < 250.0);
+        let side = default_tail(Rc::new(100.0, 10.0, 100.0, 280.0), img);
+        assert!(side.x >= 200.0 && side.x <= 400.0 && side.y <= 300.0);
+    }
+
+    /// ANN-4: a Callout drag makes the box; too small is a click.
+    #[test]
+    fn callout_drag_makes_a_box() {
+        let st = ToolStyle::defaults(Tool::Callout);
+        let k = shape_from_drag(
+            Tool::Callout,
+            &st,
+            Pt::new(300.0, 100.0),
+            Pt::new(100.0, 40.0),
+            false,
+            (800, 600),
+        )
+        .unwrap();
+        match k {
+            OpKind::Callout {
+                rect, size, radius, ..
+            } => {
+                assert_eq!(rect, Rc::new(100.0, 40.0, 200.0, 60.0), "normalised");
+                assert_eq!((size, radius), (24.0, 12.0));
+            }
+            other => panic!("{other:?}"),
+        }
+        assert!(shape_from_drag(
+            Tool::Callout,
+            &st,
+            Pt::new(1.0, 1.0),
+            Pt::new(2.0, 2.0),
+            false,
+            (800, 600)
+        )
+        .is_none());
     }
 }

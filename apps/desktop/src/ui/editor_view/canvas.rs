@@ -29,11 +29,17 @@ impl EditorView {
             }
         };
         let summary = s.summary.clone();
-        let step_hint = s.step_hint.map(|(p, n, size, color)| {
+        let step_hint = s.step_hint.clone().map(|(p, n, size, color)| {
             let (x, y) = vp.to_screen(p);
             (x, y, n, size * z, color)
         });
         let image = s.image_handle.clone();
+        // The callout's tail tip is a blue dot (painted below) with a "Tail tip" label.
+        let tail_label = overlay
+            .chrome
+            .as_ref()
+            .and_then(|c| c.handles.iter().find(|(h, _)| *h == Handle::Tail))
+            .map(|(_, p)| vp.to_screen(*p));
 
         let image_layer = image.map(|im| {
             div()
@@ -131,6 +137,21 @@ impl EditorView {
                     .child(dot_grid(t))
                     .children(image_layer)
                     .child(measure)
+                    .children(tail_label.map(|(x, y)| {
+                        div()
+                            .absolute()
+                            .left(px(x as f32 + 10.))
+                            .top(px(y as f32 - 10.))
+                            .px(px(6.))
+                            .py(px(2.))
+                            .rounded(px(scale::RADIUS_XS))
+                            .bg(rgba_of(t.raised))
+                            .border_1()
+                            .border_color(rgba_of(palette::INFO_BLUE))
+                            .text_size(px(11.))
+                            .text_color(rgba_of(t.text))
+                            .child(SharedString::from(tr_ctx!("callout handle", "Tail tip")))
+                    }))
                     .children(step_hint.map(|(x, y, n, d, c)| {
                         // The next step number rides on the cursor (ANN-1).
                         let d = d.max(14.0);
@@ -149,7 +170,7 @@ impl EditorView {
                             .text_size(px((d * 0.5) as f32))
                             .font_weight(FontWeight::SEMIBOLD)
                             .tnum()
-                            .child(SharedString::from(n.to_string()))
+                            .child(SharedString::from(n))
                     })),
             )
             .into_any_element()
@@ -306,8 +327,24 @@ fn paint_overlay(
                     BorderStyle::Solid,
                 ));
             }
-            for (_, p) in &ch.handles {
+            for (h, p) in &ch.handles {
                 let c = pt(*p);
+                if *h == Handle::Tail {
+                    // The tail tip: a blue dot with a white ring.
+                    let r = px(HANDLE * 0.75);
+                    window.paint_quad(gpui::quad(
+                        Bounds {
+                            origin: point(c.x - r, c.y - r),
+                            size: size(r * 2.0, r * 2.0),
+                        },
+                        r,
+                        hsla(palette::INFO_BLUE),
+                        2.,
+                        gpui::white(),
+                        BorderStyle::Solid,
+                    ));
+                    continue;
+                }
                 let half = px(HANDLE / 2.0);
                 window.paint_quad(gpui::quad(
                     Bounds {
@@ -454,6 +491,22 @@ fn paint_draft(
                 hsla(t.text),
                 BorderStyle::Dashed,
             ));
+        }
+        OpKind::Callout { rect, bg, tail, .. } => {
+            // The box being dragged out, filled so it reads as the callout it will be.
+            let mut fill = Hsla::from(gpui_rgb(*bg));
+            fill.a = 0.85;
+            let b = rect_b(*rect);
+            window.paint_quad(gpui::fill(b, fill));
+            let r = rect.normalized();
+            let c = Pt::new(r.x + r.w / 2.0, r.y + r.h / 2.0);
+            stroke_line(
+                window,
+                &[pt(c), pt(*tail)],
+                (3.0 * z) as f32,
+                Hsla::from(gpui_rgb(*bg)),
+                false,
+            );
         }
         _ => {}
     }

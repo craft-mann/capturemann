@@ -1,8 +1,10 @@
 //! Tools, their shortcuts and the per-tool style that persists between uses (ANN-1, ANN-2).
 
 use cm_core::annotation::{
-    DEFAULT_BLUR_STRENGTH, DEFAULT_COLOR, DEFAULT_HIGHLIGHT_COLOR, DEFAULT_HIGHLIGHT_OPACITY,
-    DEFAULT_PIXELATE_BLOCK, DEFAULT_STEP_SIZE, DEFAULT_TEXT_SIZE, DEFAULT_WIDTH,
+    CalloutStyle, SpotMode, SpotShapeKind, StepStyle, DEFAULT_BLUR_STRENGTH,
+    DEFAULT_CALLOUT_RADIUS, DEFAULT_CALLOUT_SIZE, DEFAULT_COLOR, DEFAULT_HIGHLIGHT_COLOR,
+    DEFAULT_HIGHLIGHT_OPACITY, DEFAULT_PIXELATE_BLOCK, DEFAULT_SPOTLIGHT_DIM, DEFAULT_STEP_SIZE,
+    DEFAULT_TEXT_SIZE, DEFAULT_WIDTH,
 };
 use cm_core::{Color, OpKind};
 use cm_i18n::tr_ctx;
@@ -23,23 +25,33 @@ pub enum Tool {
     Crop,
     /// ANN-5: drag a rectangle, the text in it goes to the clipboard. Draws nothing.
     SelectText,
+    /// ANN-4: a speech bubble or box with a pointer tail and text (key K).
+    Callout,
+    /// ANN-7: dims or blurs everything outside its holes (key S).
+    Spotlight,
+    /// ANN-4: a check, cross, `!`, `?` or a BEFORE / AFTER label (key U).
+    Stamp,
 }
 
 impl Tool {
-    /// Palette order (DESIGN 5.5: left vertical toolbar).
-    pub const ALL: [Tool; 12] = [
+    /// Palette order (design spec 0.3.3 section 2): the tools of each palette group are next to
+    /// each other, in the order of the group menu.
+    pub const ALL: [Tool; 15] = [
         Tool::Select,
+        Tool::SelectText,
         Tool::Arrow,
         Tool::Line,
         Tool::Rect,
         Tool::Ellipse,
         Tool::Text,
+        Tool::Callout,
         Tool::Highlight,
         Tool::Step,
+        Tool::Stamp,
+        Tool::Spotlight,
         Tool::Blur,
         Tool::Pixelate,
         Tool::Crop,
-        Tool::SelectText,
     ];
 
     pub fn label(self) -> String {
@@ -56,10 +68,14 @@ impl Tool {
             Tool::Pixelate => tr_ctx!("tool", "Pixelate"),
             Tool::Crop => tr_ctx!("tool", "Crop"),
             Tool::SelectText => tr_ctx!("tool", "Select text"),
+            Tool::Callout => tr_ctx!("tool", "Callout"),
+            Tool::Spotlight => tr_ctx!("tool", "Spotlight"),
+            Tool::Stamp => tr_ctx!("tool", "Stamp"),
         }
     }
 
-    /// Single-key shortcut (ANN-1: V A L R E T H N C, ANN-2: B X, ANN-5: G).
+    /// Single-key shortcut (ANN-1: V A L R E T H N C, ANN-2: B X, ANN-5: G, ANN-4: K U,
+    /// ANN-7: S; M is reserved for Magnify).
     pub fn key(self) -> char {
         match self {
             Tool::Select => 'v',
@@ -74,12 +90,18 @@ impl Tool {
             Tool::Pixelate => 'x',
             Tool::Crop => 'c',
             Tool::SelectText => 'g',
+            Tool::Callout => 'k',
+            Tool::Spotlight => 's',
+            Tool::Stamp => 'u',
         }
     }
 
     pub fn from_key(c: char) -> Option<Tool> {
         let c = c.to_ascii_lowercase();
-        Tool::ALL.into_iter().find(|t| t.key() == c)
+        // Only tools the palette offers have a key (a tool left out of its group is off).
+        Tool::ALL
+            .into_iter()
+            .find(|t| t.key() == c && t.in_palette())
     }
 
     /// Lucide icon name for the palette button (the name is the accessible label).
@@ -96,7 +118,10 @@ impl Tool {
             Tool::Blur => "droplet",
             Tool::Pixelate => "grid-3x3",
             Tool::Crop => "crop",
-            Tool::SelectText => "scan-text",
+            Tool::SelectText => "text-select",
+            Tool::Callout => "message-square",
+            Tool::Spotlight => "focus",
+            Tool::Stamp => "stamp",
         }
     }
 
@@ -115,6 +140,9 @@ impl Tool {
             Tool::Pixelate => "pixelate",
             Tool::Crop => "crop",
             Tool::SelectText => "select_text",
+            Tool::Callout => "callout",
+            Tool::Spotlight => "spotlight",
+            Tool::Stamp => "stamp",
         }
     }
 
@@ -128,10 +156,9 @@ impl Tool {
             OpKind::Text { .. } => Tool::Text,
             OpKind::Highlight { .. } => Tool::Highlight,
             OpKind::Step { .. } => Tool::Step,
-            // Track B gives these their own tools (Callout, Spotlight, Stamp).
-            OpKind::Callout { .. } | OpKind::Spotlight { .. } | OpKind::Stamp { .. } => {
-                Tool::Select
-            }
+            OpKind::Callout { .. } => Tool::Callout,
+            OpKind::Spotlight { .. } => Tool::Spotlight,
+            OpKind::Stamp { .. } => Tool::Stamp,
             OpKind::Blur { .. } => Tool::Blur,
             OpKind::Pixelate { .. } => Tool::Pixelate,
             OpKind::Crop { .. } => Tool::Crop,
@@ -141,7 +168,9 @@ impl Tool {
     /// Inspector controls this tool exposes.
     pub fn params(self) -> &'static [Param] {
         match self {
-            Tool::Select | Tool::Crop | Tool::SelectText => &[],
+            Tool::Callout => &[Param::Color, Param::TextSize, Param::Radius],
+            Tool::Spotlight => &[Param::Dim],
+            Tool::Select | Tool::Crop | Tool::SelectText | Tool::Stamp => &[],
             Tool::Arrow | Tool::Line | Tool::Rect | Tool::Ellipse => &[Param::Color, Param::Width],
             Tool::Text => &[Param::Color, Param::TextSize],
             Tool::Highlight => &[Param::Color, Param::Opacity],
@@ -162,6 +191,10 @@ pub enum Param {
     Opacity,
     Strength,
     Block,
+    /// Corner radius of a callout box.
+    Radius,
+    /// How dark a spotlight makes the outside (0 to 1).
+    Dim,
 }
 
 impl Param {
@@ -174,6 +207,8 @@ impl Param {
             Param::Opacity => tr_ctx!("annotation setting", "Opacity"),
             Param::Strength => tr_ctx!("annotation setting", "Blur strength"),
             Param::Block => tr_ctx!("annotation setting", "Pixel size"),
+            Param::Radius => tr_ctx!("annotation setting", "Corners"),
+            Param::Dim => tr_ctx!("annotation setting", "Dim"),
         }
     }
 }
@@ -188,6 +223,8 @@ pub enum ParamValue {
     Opacity(f64),
     Strength(u32),
     Block(u32),
+    Radius(f64),
+    Dim(f64),
 }
 
 impl ParamValue {
@@ -200,6 +237,8 @@ impl ParamValue {
             ParamValue::Opacity(_) => Param::Opacity,
             ParamValue::Strength(_) => Param::Strength,
             ParamValue::Block(_) => Param::Block,
+            ParamValue::Radius(_) => Param::Radius,
+            ParamValue::Dim(_) => Param::Dim,
         }
     }
 }
@@ -236,6 +275,11 @@ pub const WIDTHS: [f64; 4] = [2.0, 4.0, 6.0, 8.0];
 pub const TEXT_SIZES: [f64; 5] = [16.0, 24.0, 32.0, 48.0, 64.0];
 pub const STEP_SIZES: [f64; 4] = [20.0, 28.0, 40.0, 56.0];
 pub const OPACITIES: [f64; 4] = [0.2, 0.35, 0.5, 0.7];
+/// Callout text sizes (px) and corner radii offered in the inspector.
+pub const CALLOUT_SIZES: [f64; 5] = [16.0, 20.0, 24.0, 32.0, 40.0];
+pub const CORNER_RADII: [f64; 4] = [0.0, 6.0, 12.0, 20.0];
+/// Spotlight dim levels offered in the inspector (default 60 %).
+pub const DIM_LEVELS: [f64; 4] = [0.2, 0.4, 0.6, 0.8];
 
 /// The values a tool draws with. Fields a tool does not use keep their defaults.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -246,6 +290,19 @@ pub struct ToolStyle {
     pub opacity: f64,
     pub strength: u32,
     pub block: u32,
+    /// Callout corner radius (ANN-4).
+    pub radius: f64,
+    /// Callout look: bubble or box (ANN-4).
+    pub callout_style: CalloutStyle,
+    /// Spotlight: how dark the outside is (ANN-7).
+    pub dim: f64,
+    /// Spotlight: dim or blur the outside (ANN-7).
+    pub spot_mode: SpotMode,
+    /// Spotlight: the shape the next drag makes (ANN-7).
+    pub spot_shape: SpotShapeKind,
+    /// Step badges: numbering style and first number of new steps (ANN-6).
+    pub step_style: StepStyle,
+    pub step_start: u32,
 }
 
 impl ToolStyle {
@@ -257,8 +314,19 @@ impl ToolStyle {
             opacity: DEFAULT_HIGHLIGHT_OPACITY,
             strength: DEFAULT_BLUR_STRENGTH,
             block: DEFAULT_PIXELATE_BLOCK,
+            radius: DEFAULT_CALLOUT_RADIUS,
+            callout_style: CalloutStyle::Bubble,
+            dim: DEFAULT_SPOTLIGHT_DIM,
+            spot_mode: SpotMode::Dim,
+            spot_shape: SpotShapeKind::Rect,
+            step_style: StepStyle::Number,
+            step_start: 1,
         };
         match tool {
+            Tool::Callout => ToolStyle {
+                size: DEFAULT_CALLOUT_SIZE,
+                ..base
+            },
             Tool::Text => ToolStyle {
                 color: Color::WHITE,
                 ..base
@@ -283,6 +351,8 @@ impl ToolStyle {
             ParamValue::Opacity(o) => self.opacity = o,
             ParamValue::Strength(s) => self.strength = s,
             ParamValue::Block(b) => self.block = b,
+            ParamValue::Radius(r) => self.radius = r,
+            ParamValue::Dim(d) => self.dim = d,
         }
     }
 
@@ -295,6 +365,8 @@ impl ToolStyle {
             Param::Opacity => ParamValue::Opacity(self.opacity),
             Param::Strength => ParamValue::Strength(self.strength),
             Param::Block => ParamValue::Block(self.block),
+            Param::Radius => ParamValue::Radius(self.radius),
+            Param::Dim => ParamValue::Dim(self.dim),
         }
     }
 }
@@ -331,6 +403,33 @@ impl Styles {
         }
     }
 
+    /// What new spotlights are made of: the outside look and the shape of the next hole.
+    pub fn set_spotlight(&mut self, mode: Option<SpotMode>, shape: Option<SpotShapeKind>) {
+        if let Some((_, s)) = self.by_tool.iter_mut().find(|(t, _)| *t == Tool::Spotlight) {
+            if let Some(m) = mode {
+                s.spot_mode = m;
+            }
+            if let Some(k) = shape {
+                s.spot_shape = k;
+            }
+        }
+    }
+
+    /// The numbering new step badges get.
+    pub fn set_step_numbering(&mut self, style: StepStyle, start: u32) {
+        if let Some((_, s)) = self.by_tool.iter_mut().find(|(t, _)| *t == Tool::Step) {
+            s.step_style = style;
+            s.step_start = start;
+        }
+    }
+
+    /// The look new callouts get (bubble or box).
+    pub fn set_callout_style(&mut self, style: CalloutStyle) {
+        if let Some((_, s)) = self.by_tool.iter_mut().find(|(t, _)| *t == Tool::Callout) {
+            s.callout_style = style;
+        }
+    }
+
     /// JSON for the `editor.tool_styles` setting.
     pub fn to_json(&self) -> Value {
         let mut m = serde_json::Map::new();
@@ -340,6 +439,25 @@ impl Styles {
                 json!({
                     "color": s.color.to_hex(), "width": s.width, "size": s.size,
                     "opacity": s.opacity, "strength": s.strength, "block": s.block,
+                    "radius": s.radius, "dim": s.dim,
+                    "spot_mode": match s.spot_mode {
+                        SpotMode::Dim => "dim",
+                        SpotMode::Blur => "blur",
+                    },
+                    "step_style": match s.step_style {
+                        StepStyle::Number => "number",
+                        StepStyle::Upper => "upper",
+                        StepStyle::Lower => "lower",
+                    },
+                    "step_start": s.step_start,
+                    "spot_shape": match s.spot_shape {
+                        SpotShapeKind::Rect => "rect",
+                        SpotShapeKind::Ellipse => "ellipse",
+                    },
+                    "callout": match s.callout_style {
+                        CalloutStyle::Bubble => "bubble",
+                        CalloutStyle::Box => "box",
+                    },
                 }),
             );
         }
@@ -379,6 +497,36 @@ impl Styles {
             if let Some(w) = num("block", 6.0, 32.0) {
                 s.block = w as u32;
             }
+            if let Some(w) = num("radius", 0.0, 2000.0) {
+                s.radius = w;
+            }
+            if let Some(w) = num("dim", 0.0, 1.0) {
+                s.dim = w;
+            }
+            match o.get("step_style").and_then(Value::as_str) {
+                Some("number") => s.step_style = StepStyle::Number,
+                Some("upper") => s.step_style = StepStyle::Upper,
+                Some("lower") => s.step_style = StepStyle::Lower,
+                _ => {}
+            }
+            if let Some(w) = num("step_start", 1.0, 9999.0) {
+                s.step_start = w as u32;
+            }
+            match o.get("spot_mode").and_then(Value::as_str) {
+                Some("dim") => s.spot_mode = SpotMode::Dim,
+                Some("blur") => s.spot_mode = SpotMode::Blur,
+                _ => {}
+            }
+            match o.get("spot_shape").and_then(Value::as_str) {
+                Some("rect") => s.spot_shape = SpotShapeKind::Rect,
+                Some("ellipse") => s.spot_shape = SpotShapeKind::Ellipse,
+                _ => {}
+            }
+            match o.get("callout").and_then(Value::as_str) {
+                Some("bubble") => s.callout_style = CalloutStyle::Bubble,
+                Some("box") => s.callout_style = CalloutStyle::Box,
+                _ => {}
+            }
         }
         out
     }
@@ -403,6 +551,9 @@ mod tests {
             ('c', Tool::Crop),
             ('b', Tool::Blur),
             ('x', Tool::Pixelate),
+            ('k', Tool::Callout),
+            ('s', Tool::Spotlight),
+            ('g', Tool::SelectText),
         ];
         for (k, t) in spec {
             assert_eq!(Tool::from_key(k), Some(t));
@@ -472,7 +623,10 @@ mod tests {
             let empty = t.params().is_empty();
             assert_eq!(
                 empty,
-                matches!(t, Tool::Select | Tool::Crop | Tool::SelectText),
+                matches!(
+                    t,
+                    Tool::Select | Tool::Crop | Tool::SelectText | Tool::Stamp
+                ),
                 "{t:?}"
             );
         }

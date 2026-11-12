@@ -289,3 +289,11 @@ Planned,Timeline Fit,shrink,plan,16,
 Planned,Export preset picker,file-video,plan,16,
 Planned,Export Cancel / Retry / Copy path,x / rotate-cw / copy,plan,16,
 Planned,Library rescan,refresh-cw,plan,16,
+Screenshot editor,Callout tool (K),message-square,P1,18 / 20,added in 0.3.3
+Screenshot editor,Spotlight tool (S),focus,P1,18 / 20,added in 0.3.3
+Screenshot editor,Stamp tool (U),stamp,P1,18 / 20,added in 0.3.3
+Screenshot editor,Select text tool (G),text-select,P1,18 / 20,0.3.3: moved from scan-text so Copy text keeps scan-text
+Screenshot editor,Steps panel header,list-ordered,P2,16,added in 0.3.3
+Screenshot editor,Steps panel drag handle,grip-vertical,P1,16,added in 0.3.3
+Screenshot editor,Spotlight info line,layers,P2,16,added in 0.3.3
+Screenshot editor,Tool palette group mark,cm-group-corner,P1,6,added in 0.3.3

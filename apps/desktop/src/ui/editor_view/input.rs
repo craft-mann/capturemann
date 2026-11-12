@@ -66,6 +66,10 @@ impl EditorView {
                 return;
             }
         }
+        if !editing && self.menu_key(&k.key, window, cx) {
+            cx.stop_propagation();
+            return;
+        }
         if k.key == "escape" && self.shortcuts_open && !editing {
             self.shortcuts_open = false;
             cx.stop_propagation();
@@ -117,6 +121,9 @@ impl EditorView {
     ) {
         let Some(doc) = self.doc.clone() else { return };
         window.focus(&self.canvas_focus, cx);
+        if self.group_menu.take().is_some() {
+            cx.notify();
+        }
         if self.shortcuts_open {
             // A press on the canvas is "outside" the shortcuts popover.
             self.shortcuts_open = false;

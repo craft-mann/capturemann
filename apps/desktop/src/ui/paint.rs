@@ -536,6 +536,46 @@ pub(crate) const ASSETS: &[(&str, &str)] = &[
         include_str!("../../assets/icons/scan-text.svg"),
     ),
     (
+        "icons/message-square.svg",
+        include_str!("../../assets/icons/message-square.svg"),
+    ),
+    (
+        "icons/focus.svg",
+        include_str!("../../assets/icons/focus.svg"),
+    ),
+    (
+        "icons/stamp.svg",
+        include_str!("../../assets/icons/stamp.svg"),
+    ),
+    (
+        "icons/text-select.svg",
+        include_str!("../../assets/icons/text-select.svg"),
+    ),
+    (
+        "icons/list-ordered.svg",
+        include_str!("../../assets/icons/list-ordered.svg"),
+    ),
+    (
+        "icons/grip-vertical.svg",
+        include_str!("../../assets/icons/grip-vertical.svg"),
+    ),
+    (
+        "icons/layers.svg",
+        include_str!("../../assets/icons/layers.svg"),
+    ),
+    (
+        "icons/gallery-horizontal-end.svg",
+        include_str!("../../assets/icons/gallery-horizontal-end.svg"),
+    ),
+    (
+        "icons/ellipsis.svg",
+        include_str!("../../assets/icons/ellipsis.svg"),
+    ),
+    (
+        "icons/cm-group-corner.svg",
+        include_str!("../../assets/icons/cm-group-corner.svg"),
+    ),
+    (
         "icons/loader-circle.svg",
         include_str!("../../assets/icons/loader-circle.svg"),
     ),

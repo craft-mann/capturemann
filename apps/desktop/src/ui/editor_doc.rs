@@ -17,6 +17,7 @@ use std::sync::Arc;
 use crate::backend::Backend;
 use crate::daemon_text::{AppNote, ErrorNote};
 use crate::editor::copytext;
+use crate::editor::palette::{self, Faces};
 use crate::editor::session::{self, Job, JobResult};
 use crate::editor::state::{Chrome, Edit, EditorState, EscapeOutcome};
 use crate::editor::tools::{ParamValue, Styles, Tool};
@@ -24,6 +25,7 @@ use crate::editor::{preview, KeyCommand, Mods};
 use crate::flows;
 use crate::toast::{ToastKind, ToastSpec};
 use crate::ui::app::{self, AppModel};
+use cm_core::annotation::{CalloutStyle, SpotMode, SpotShapeKind, StepStyle};
 
 pub const STYLES_KEY: &str = "editor.tool_styles";
 
@@ -127,6 +129,12 @@ impl EditorDoc {
             .get(STYLES_KEY)
             .map(Styles::from_json)
             .unwrap_or_default();
+        let faces = backend
+            .settings
+            .snapshot()
+            .get(palette::FACES_KEY)
+            .map(Faces::from_json)
+            .unwrap_or_default();
         let mut doc = EditorDoc {
             capture_id,
             app,
@@ -155,6 +163,7 @@ impl EditorDoc {
             edited: false,
             closing: false,
         };
+        doc.state.faces = faces;
         doc.start_load(cx);
         doc
     }
@@ -640,6 +649,14 @@ impl EditorDoc {
         if self.state.take_styles_dirty() {
             app::set_setting(&self.app, STYLES_KEY, self.state.styles.to_json(), cx);
         }
+        if self.state.take_faces_dirty() {
+            app::set_setting(
+                &self.app,
+                palette::FACES_KEY,
+                self.state.faces.to_json(),
+                cx,
+            );
+        }
     }
 
     pub fn pointer_down(
@@ -703,6 +720,90 @@ impl EditorDoc {
         }
         let edit = self.state.set_param(v);
         self.after_input(edit.into_iter().collect(), cx);
+    }
+
+    /// Bubble or Box for the callout being typed or selected, and for new ones.
+    pub fn set_callout_style(&mut self, style: CalloutStyle, cx: &mut Context<Self>) {
+        if self.locked() {
+            return;
+        }
+        let edit = self.state.set_callout_style(style);
+        self.after_input(edit.into_iter().collect(), cx);
+    }
+
+    /// The Callout panel's text field: type the selected callout's text on the image.
+    pub fn edit_selected_text(&mut self, cx: &mut Context<Self>) {
+        if self.locked() {
+            return;
+        }
+        self.state.edit_selected_text();
+        self.after_input(Vec::new(), cx);
+    }
+
+    /// "+ Rectangle" / "+ Ellipse" in the Spotlight panel.
+    pub fn add_default_hole(&mut self, kind: SpotShapeKind, cx: &mut Context<Self>) {
+        if self.locked() {
+            return;
+        }
+        let edit = self.state.add_default_hole(kind);
+        self.after_input(edit.into_iter().collect(), cx);
+    }
+
+    pub fn select_hole(&mut self, i: usize, cx: &mut Context<Self>) {
+        self.state.select_hole(i);
+        cx.notify();
+    }
+
+    pub fn remove_hole(&mut self, i: usize, cx: &mut Context<Self>) {
+        if self.locked() {
+            return;
+        }
+        let edit = self.state.remove_hole(i);
+        self.after_input(edit.into_iter().collect(), cx);
+    }
+
+    pub fn set_spot_mode(&mut self, mode: SpotMode, cx: &mut Context<Self>) {
+        if self.locked() {
+            return;
+        }
+        let edit = self.state.set_spot_mode(mode);
+        self.after_input(edit.into_iter().collect(), cx);
+    }
+
+    /// Numbering style and start number of all steps together (ANN-6).
+    pub fn set_step_numbering(
+        &mut self,
+        style: Option<StepStyle>,
+        start: Option<u32>,
+        cx: &mut Context<Self>,
+    ) {
+        if self.locked() {
+            return;
+        }
+        let edit = self.state.set_step_numbering(style, start);
+        self.after_input(edit.into_iter().collect(), cx);
+    }
+
+    /// A drag in the Steps panel: row `from` goes to row `to` (ANN-6.AC4).
+    pub fn reorder_steps(&mut self, from: usize, to: usize, cx: &mut Context<Self>) {
+        if self.locked() {
+            return;
+        }
+        let edit = self.state.reorder_steps(from, to);
+        self.after_input(edit.into_iter().collect(), cx);
+    }
+
+    pub fn delete_step_row(&mut self, row: usize, cx: &mut Context<Self>) {
+        if self.locked() {
+            return;
+        }
+        let edit = self.state.delete_step_row(row);
+        self.after_input(edit.into_iter().collect(), cx);
+    }
+
+    pub fn select_step_row(&mut self, row: usize, cx: &mut Context<Self>) {
+        self.state.select_step_row(row);
+        cx.notify();
     }
 
     pub fn clear_crop(&mut self, cx: &mut Context<Self>) {
@@ -925,6 +1026,12 @@ impl EditorDoc {
     ) -> bool {
         if self.state.text.is_none() {
             return false;
+        }
+        if key == "enter" && self.state.text.as_ref().is_some_and(|t| t.single_line()) {
+            // A step label is one line: Enter commits it.
+            let edits: Vec<Edit> = self.state.finish_text().into_iter().collect();
+            self.after_input(edits, cx);
+            return true;
         }
         let used = self.state.text_key(key, key_char, mods);
         if used {
