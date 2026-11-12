@@ -25,7 +25,7 @@ capturemann annotate <id> --suggest-redactions          # print proposals for th
 capturemann annotate <id> --redact-emails               # email addresses only
 ```
 
-Both only print the proposals (rectangles in pixels of the original image, kind, confidence, masked preview). Accepting is a separate call: pass the rectangles you accept to `capturemann annotate <id> --ops` as `blur` ops.
+Both only print the proposals (rectangles in pixels of the original image, kind, confidence, masked preview). Accepting is a separate call: pass the rectangles you accept to `capturemann annotate <id> --ops` as `blur` ops (or `pixelate`). Only Blur and Pixelate hide text: the Blur mode of the Spotlight tool (0.3.3) blurs the outside of the holes for looks only and is not a redaction.
 
 Choose kinds with `--kinds` (comma separated or repeated), for example `capturemann annotate <id> --suggest-redactions --kinds ssn,card`. A `kinds` list replaces the default list, it does not add to it. `--kinds` without `--suggest-redactions` is an error.
 

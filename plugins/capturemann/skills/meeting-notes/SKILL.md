@@ -13,7 +13,7 @@ Read `capturemann-basics` first if you have not. Everything here runs on this co
 
 **Consent:** the dialog itself says "Let everyone know they're being recorded." Remind the user to tell the other participants before the recording starts. During the meeting `add_marker` with a `label` marks decisions and action items; `set_mic_muted` mutes without stopping. `stop_recording` returns the `capture_id`.
 
-An existing file (a call recording, an MP3 or M4A) comes in with `import_media` (`paths`, optional `after: { transcribe, diarize, report_template }`). `remove_originals: true` is Confirm; prefer leaving the originals in place.
+An existing file (a call recording, an MP3 or M4A; from 0.3.3 also a PNG or JPEG picture, which becomes a screenshot) comes in with `import_media` (`paths`, optional `after: { transcribe, diarize, report_template }`). `remove_originals: true` is Confirm; prefer leaving the originals in place.
 
 ## Transcribe
 

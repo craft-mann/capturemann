@@ -27,15 +27,15 @@ Contact: jane.doe@example.com
 and, if you write Vietnamese, one more line such as `Xin chào, đây là ảnh chụp màn hình`.
 Show it at 14 pt or larger and take a screenshot of that window.
 
-1. **Button.** Open the screenshot in the editor. Expected: a "Copy text" button in the row under
-   the canvas, beside Undo and Redo, with a text-frame icon. On Linux without `tesseract`, and on
+1. **Button.** Open the screenshot in the editor. Expected: a "Copy text" button in the view bar at
+   the bottom of the stage (0.3.3; before it was a row under the canvas), after Undo and Redo, with a text-frame icon. On Linux without `tesseract`, and on
    Windows without an installed OCR language, the button is dimmed and its tooltip says what to
    install; on those systems install it as the tooltip says and restart the app, then continue.
 2. **Whole image.** Click Copy text. Expected: the button shows "Reading text..." for a moment,
    then a toast "Copied N words" (N matches your text roughly). Paste into a text editor.
    Expected: the lines in reading order, the blank line between the two paragraphs kept, no
    trailing spaces, line breaks where the lines break. (ANN-5.AC1, AC4)
-3. **Region.** Press G (or choose Select text, the last tool in the rail) and drag a rectangle
+3. **Region.** Press G (or choose Select text, in the Select group of the tool palette: click the corner mark of the first button) and drag a rectangle
    over only the "Contact" line. Expected: a translucent blue box while dragging, then a toast
    "Copied 2 words" (or the number of words in the line) and only that line on the clipboard. A
    click without dragging, or a drag smaller than a few pixels, does nothing. (ANN-5.AC3, AC7)
