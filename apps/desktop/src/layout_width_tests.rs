@@ -1145,6 +1145,101 @@ fn cases() -> Vec<Case> {
         .text("Dismiss", || cm_i18n::tr_ctx!("button", "Dismiss")),
     );
 
+    // ---- annotation editor, 0.3.3 tools (the 300 px inspector, 266 px of room) -------------------
+    // Callout style and Spotlight outside: two flex-1 segments with a 6 px gap, 1 px border and
+    // text centred: (266 - 6) / 2 - 2 = 128.
+    v.push(
+        Case::new(
+            "Callout style switch",
+            "(266 - 6) / 2 - 2 border",
+            128.,
+            13.,
+            400,
+            one,
+        )
+        .text("Bubble", || cm_i18n::tr_ctx!("callout style", "Bubble"))
+        .text("Box", || cm_i18n::tr_ctx!("callout style", "Box")),
+    );
+    v.push(
+        Case::new(
+            "Spotlight outside switch",
+            "(266 - 6) / 2 - 2 border",
+            128.,
+            13.,
+            400,
+            one,
+        )
+        .text("Dim", || cm_i18n::tr_ctx!("spotlight outside", "Dim"))
+        .text("Blur", || cm_i18n::tr_ctx!("spotlight outside", "Blur")),
+    );
+    // + Rectangle / + Ellipse wrap, so each must fit alone: 266 - 2 border - 32 padding - 16 icon
+    // - 8 gap.
+    v.push(
+        Case::new(
+            "Spotlight add hole buttons",
+            "266 - 2 - 32 - 16 - 8",
+            208.,
+            ui,
+            600,
+            one,
+        )
+        .text("+ Rectangle", || cm_i18n::tr!("+ Rectangle"))
+        .text("+ Ellipse", || cm_i18n::tr!("+ Ellipse")),
+    );
+    // The BEFORE / AFTER tiles of the stamp picker: two flex-1 tiles, 6 px gap, 1 px border, 8 px
+    // breathing room each side: (266 - 6) / 2 - 2 - 16 = 112. Shown in capitals.
+    v.push(
+        Case::new(
+            "Stamp word tile",
+            "(266 - 6) / 2 - 2 border - 16",
+            112.,
+            12.,
+            600,
+            one,
+        )
+        .text("Before", || {
+            crate::editor::tools::StampWord::Before
+                .text()
+                .to_uppercase()
+        })
+        .text("After", || {
+            crate::editor::tools::StampWord::After.text().to_uppercase()
+        }),
+    );
+    // A group menu row: 220 wide, 6 px padding each side, 8 px row padding each side, 16 px icon,
+    // two 8 px gaps and the key chip (about 28): 220 - 12 - 16 - 16 - 16 - 28 = 132.
+    v.push(
+        Case::new(
+            "Tool group menu item",
+            "220 - 12 - 16 - 16 icon - 16 gaps - 28 key",
+            132.,
+            13.,
+            400,
+            one,
+        )
+        .text("Select", || crate::editor::Tool::Select.label())
+        .text("Select text", || crate::editor::Tool::SelectText.label())
+        .text("Arrow", || crate::editor::Tool::Arrow.label())
+        .text("Line", || crate::editor::Tool::Line.label())
+        .text("Rectangle", || crate::editor::Tool::Rect.label())
+        .text("Ellipse", || crate::editor::Tool::Ellipse.label())
+        .text("Text", || crate::editor::Tool::Text.label())
+        .text("Callout", || crate::editor::Tool::Callout.label())
+        .text("Step badge", || crate::editor::Tool::Step.label())
+        .text("Stamp", || crate::editor::Tool::Stamp.label())
+        .text("Spotlight", || crate::editor::Tool::Spotlight.label())
+        .text("Blur", || crate::editor::Tool::Blur.label())
+        .text("Pixelate", || crate::editor::Tool::Pixelate.label()),
+    );
+    // The "New in 0.3.3" pill next to the panel title: 11 px, 16 px padding; it may take at most
+    // 120 px of the 266 - 26 left of the icon, so the title keeps room.
+    v.push(
+        Case::new("Panel New pill", "120 - 16 padding", 104., 11., 400, one)
+            .text("New in 0.3.3", || {
+                cm_i18n::tr_ctx!("panel badge", "New in 0.3.3")
+            }),
+    );
+
     // Editor view pill (ANN-5): the Copy text button is 8 px side padding, 1 px border, a 16 px icon
     // and a 6 px gap; the pill wraps, so the button may be as wide as the pill. The reviewed
     // Vietnamese "Đang nhận dạng văn bản…" is 144 px, so the pinned button width is 190 px (it was 150).
