@@ -370,6 +370,24 @@ impl ShotBundle {
                 op,
             });
         }
+        // At most one spotlight per image (ANN-7.AC2), counting the ones already stored; the
+        // error names the new op by its index in `ops`.
+        let existing = scratch.ops[..base]
+            .iter()
+            .filter(|o| matches!(o.kind, OpKind::Spotlight { .. }))
+            .count();
+        let mut seen = existing;
+        for (i, o) in scratch.ops[base..].iter().enumerate() {
+            if matches!(o.kind, OpKind::Spotlight { .. }) {
+                if seen > 0 {
+                    return Err(CmError::invalid_field(
+                        &format!("ops[{i}]"),
+                        "only one spotlight per image: add the shapes to the existing one",
+                    ));
+                }
+                seen += 1;
+            }
+        }
         // Keep the id counter ahead of anything we minted (it is not part of undo).
         self.manifest.op_seq = self.manifest.op_seq.max(scratch.op_seq);
         self.execute(name, by, at, changes)
@@ -423,6 +441,7 @@ impl ShotBundle {
             }
             new.push(op);
         }
+        cm_core::annotation::validate_list(&new)?;
         self.manifest.op_seq = self.manifest.op_seq.max(seq);
 
         let new_by_id: HashMap<&str, &AnnotationOp> =
@@ -504,6 +523,18 @@ impl ShotBundle {
     ) -> Result<Revision, CmError> {
         kind.validate()?;
         let (index, before) = self.find_op(id)?;
+        if matches!(kind, OpKind::Spotlight { .. })
+            && self
+                .manifest
+                .ops
+                .iter()
+                .enumerate()
+                .any(|(i, o)| i != index && matches!(o.kind, OpKind::Spotlight { .. }))
+        {
+            return Err(CmError::invalid_input(
+                "only one spotlight per image: add the shapes to the existing one",
+            ));
+        }
         let after = AnnotationOp {
             id: before.id.clone(),
             kind,

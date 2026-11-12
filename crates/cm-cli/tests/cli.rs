@@ -394,6 +394,48 @@ async fn annotate_get_undo_redo_roundtrip() {
     assert_eq!(png_size(&std::fs::read(&got).unwrap()), (400, 300));
 }
 
+/// ANN-4/ANN-6/ANN-7: `annotate --ops` takes the 0.3.3 ops (callout, spotlight, stamp, step with
+/// style/start/text); a second spotlight and a label stamp without text are `invalid_input`
+/// (exit 2) naming the op, and nothing is stored.
+#[tokio::test]
+async fn ann_033_annotate_new_ops_and_errors() {
+    let r = rig();
+    let id = cli(&r, &["capture", "screenshot", "--display", "1", "--json"])
+        .await
+        .json()["capture_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let all = r##"[
+        {"op":"callout","rect":[20,20,120,40],"tail":[60,120],"text":"Click here","bg":"#2E8BFF"},
+        {"op":"spotlight","shapes":[{"kind":"ellipse","rect":[200,100,80,80]}],"dim":0.5},
+        {"op":"step","at":[300,40],"n":1,"style":"upper","start":3,"text":"Open"},
+        {"op":"stamp","at":[50,200],"kind":"check"},
+        {"op":"stamp","at":[120,200],"kind":"label","text":"Before"}]"##;
+    let a = cli(&r, &["annotate", &id, "--ops", all, "--json"]).await;
+    assert_eq!(a.code, 0, "{}", a.err);
+    let g = cli(&r, &["capture", "get", &id, "--json"]).await.json();
+    assert_eq!(g["ops"].as_array().unwrap().len(), 5);
+
+    let second = r##"[{"op":"spotlight","shapes":[{"rect":[1,1,9,9]}]}]"##;
+    let e = cli(&r, &["annotate", &id, "--ops", second]).await;
+    assert_eq!(e.code, none_code(), "{}", e.err);
+    assert!(e.err.contains("ops[0]"), "{}", e.err);
+
+    let two = r##"[{"op":"spotlight","shapes":[{"rect":[1,1,9,9]}]},{"op":"spotlight","shapes":[{"rect":[1,1,9,9]}]}]"##;
+    let e = cli(&r, &["annotate", &id, "--ops", two, "--replace"]).await;
+    assert_eq!(e.code, none_code(), "{}", e.err);
+    assert!(e.err.contains("ops[1]"), "{}", e.err);
+
+    let bad = r##"[{"op":"stamp","at":[1,1],"kind":"label"}]"##;
+    let e = cli(&r, &["annotate", &id, "--ops", bad]).await;
+    assert_eq!(e.code, none_code(), "{}", e.err);
+    assert!(e.err.contains("ops[0]"), "{}", e.err);
+
+    let g = cli(&r, &["capture", "get", &id, "--json"]).await.json();
+    assert_eq!(g["ops"].as_array().unwrap().len(), 5, "nothing stored");
+}
+
 #[tokio::test]
 async fn undo_with_nothing_to_undo_is_not_an_error() {
     let r = rig();
