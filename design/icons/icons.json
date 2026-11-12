@@ -732,6 +732,22 @@
       ]
     },
     {
+      "name": "ellipsis",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Screenshot editor: view bar, more menu"
+      ]
+    },
+    {
+      "name": "gallery-horizontal-end",
+      "source": "lucide@1.60.0",
+      "status": "new",
+      "used_for": [
+        "Screenshot editor: view bar, Images (image strip)"
+      ]
+    },
+    {
       "name": "image",
       "source": "lucide@1.60.0",
       "status": "in app today",

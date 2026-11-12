@@ -10,7 +10,9 @@ pub mod preview;
 pub mod redact;
 pub mod session;
 pub mod state;
+pub mod strip_model;
 pub mod tools;
+pub mod view_model;
 pub mod viewport;
 
 pub use geom::{Handle, TextMetrics};

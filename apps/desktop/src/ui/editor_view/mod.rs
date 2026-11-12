@@ -40,10 +40,12 @@ use crate::ui::tooltip;
 
 mod canvas;
 mod chrome;
+mod image_strip;
 mod input;
 mod inspector;
 mod palette;
 mod panels;
+mod view_bar;
 
 /// Tool buttons are 44 px hit targets (DESIGN 4); the rail card adds 6 px padding and a border.
 const TOOL_BTN: f32 = 44.;
@@ -51,8 +53,8 @@ const TOOL_RAIL_W: f32 = TOOL_BTN + 14.;
 const INSPECTOR_W: f32 = 300.;
 /// Gap between the window edge of the canvas and the floating pills.
 const PILL_MARGIN: f32 = 16.;
-/// Height of the transport pill (44 px buttons plus padding and border).
-const TRANSPORT_H: f32 = TOOL_BTN + 14.;
+/// Height of the view bar (34 px buttons, 5 px padding, 1 px border).
+const TRANSPORT_H: f32 = 46.;
 /// Canvas space the floating pills take: the image is fitted in the rest (redesign R4).
 const CHROME_INSETS: Insets = Insets {
     left: PILL_MARGIN as f64 + TOOL_RAIL_W as f64 + PILL_MARGIN as f64,
@@ -153,6 +155,10 @@ pub struct EditorView {
     hold_seq: u64,
     /// The hold already opened the menu, so the click that follows must not pick a tool.
     hold_fired: bool,
+    /// The view bar's open menu (zoom or more).
+    bar: view_bar::BarState,
+    /// The image strip's state (0.3.3).
+    strip: image_strip::StripState,
     space_down: bool,
     /// Last pointer position while panning (window px).
     pan_from: Option<(f32, f32)>,
@@ -167,6 +173,7 @@ impl EditorView {
             let e = app.read(cx).library_epoch;
             if e != this.last_epoch {
                 this.last_epoch = e;
+                this.strip.forget_asked();
                 if let Some(doc) = &this.doc {
                     doc.update(cx, |d, cx| d.refresh_if_changed(cx));
                 }
@@ -175,6 +182,7 @@ impl EditorView {
         let mut viewport = Viewport::new(Rc::new(0.0, 0.0, 1.0, 1.0), (800.0, 500.0), 2.0);
         viewport.set_insets(CHROME_INSETS);
         viewport.fit_view();
+        let strip = image_strip::StripState::new(&app, cx);
         EditorView {
             app,
             doc: None,
@@ -189,6 +197,8 @@ impl EditorView {
             hold: None,
             hold_seq: 0,
             hold_fired: false,
+            bar: view_bar::BarState::default(),
+            strip,
             space_down: false,
             pan_from: None,
             last_epoch: epoch,
@@ -223,6 +233,9 @@ impl EditorView {
     /// the images are released.
     pub fn close(&mut self, cx: &mut Context<Self>) {
         if let Some(doc) = self.doc.take() {
+            let (id, ops) = (self.capture_id.clone(), doc.read(cx).state.ops.len());
+            self.strip_leaving(&id, ops, cx);
+            self.bar.open = None;
             doc.update(cx, |d, cx| d.close(cx));
             self.capture_id.clear();
             // Keep only the epoch observer.
