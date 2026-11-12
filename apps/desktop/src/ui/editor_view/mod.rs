@@ -23,7 +23,7 @@ use crate::editor::keys;
 use crate::editor::state::Interaction;
 use crate::editor::tools::{
     palette_name, Param, ParamValue, Tool, CORNER_RADII, DIM_LEVELS, OPACITIES, PALETTE,
-    STEP_SIZES, TEXT_SIZES, WIDTHS,
+    STAMP_SIZES, STEP_SIZES, TEXT_SIZES, WIDTHS,
 };
 use crate::editor::{Insets, KeyCommand, Mods, Viewport};
 use crate::theme::{scale, type_scale, Color, Mode, Theme};
@@ -266,6 +266,8 @@ struct Snap {
     inspector_tool: Tool,
     /// The Callout panel (ANN-4), when a callout is typed, selected or about to be drawn.
     callout: Option<crate::editor::state::CalloutInfo>,
+    /// The stamp picker (ANN-4).
+    stamp: Option<crate::editor::state::StampInfo>,
     /// The Steps panel (ANN-6).
     steps: Option<crate::editor::state::StepsInfo>,
     /// The Spotlight panel (ANN-7).
@@ -322,6 +324,7 @@ impl Snap {
             callout: st.callout_info(),
             spot: st.spot_info(),
             steps: st.steps_info(),
+            stamp: st.stamp_info(),
             faces: st.faces,
             can_undo: st.can_undo || doc.pending() > 0,
             can_redo: st.can_redo,

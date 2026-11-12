@@ -5,6 +5,7 @@
 //! The local op list is optimistic: it is updated at once and mirrored to the daemon by the
 //! session, which later reconciles ids (new ops get daemon ids) and history flags.
 
+use cm_core::annotation::StampKind;
 use cm_core::annotation::{
     step_label, CalloutStyle, SpotMode, SpotShape, SpotShapeKind, StepStyle, MAX_LABEL_CHARS,
     MAX_SPOTLIGHT_SHAPES,
@@ -16,7 +17,7 @@ use std::collections::HashMap;
 use super::geom::{self, Handle, TextMetrics};
 use super::keys::Mods;
 use super::palette::Faces;
-use super::tools::{Param, ParamValue, Styles, Tool, ToolStyle};
+use super::tools::{Param, ParamValue, StampWord, Styles, Tool, ToolStyle};
 
 /// One user-visible change, sent to the daemon as a single `annotate` call.
 #[derive(Debug, Clone, PartialEq)]
@@ -284,6 +285,15 @@ pub enum EscapeOutcome {
     Edits(Vec<Edit>),
     /// Nothing left to cancel: leave the editor.
     Leave,
+}
+
+/// What the stamp picker shows (see [`EditorState::stamp_info`]).
+#[derive(Debug, Clone, PartialEq)]
+pub struct StampInfo {
+    pub kind: StampKind,
+    /// The word of a label stamp.
+    pub word: Option<StampWord>,
+    pub has_op: bool,
 }
 
 /// One row of the Steps panel.
@@ -734,6 +744,7 @@ impl EditorState {
                 }
             }
             Tool::Step => edits.push(self.place_step(p)),
+            Tool::Stamp => edits.push(self.place_stamp(p)),
             _ => {
                 self.selected = None;
                 self.interaction = Interaction::Drawing {
@@ -1273,7 +1284,8 @@ impl EditorState {
                 let shape = geom::default_hole(style.spot_shape, center, self.image);
                 return self.add_spot_shape(shape).into_iter().collect();
             }
-            Tool::Select | Tool::SelectText | Tool::Stamp => return Vec::new(),
+            Tool::Stamp => return vec![self.place_stamp(center)],
+            Tool::Select | Tool::SelectText => return Vec::new(),
         };
         let id = self.tmp_id();
         let op = AnnotationOp::new(id.clone(), kind);
@@ -1299,6 +1311,73 @@ impl EditorState {
             return EscapeOutcome::Edits(Vec::new());
         }
         EscapeOutcome::Leave
+    }
+
+    // ---- stamps (ANN-4) ---------------------------------------------------------------------
+
+    /// Click to place the stamp the picker has chosen. A label stamp carries its word in the UI
+    /// language, written into the op.
+    fn place_stamp(&mut self, p: Pt) -> Edit {
+        let st = self.styles.get(Tool::Stamp);
+        let id = self.tmp_id();
+        let op = AnnotationOp::new(
+            id.clone(),
+            OpKind::Stamp {
+                at: p,
+                kind: st.stamp_kind,
+                size: st.size,
+                color: st.color,
+                text: (st.stamp_kind == StampKind::Label).then(|| st.stamp_word.text()),
+            },
+        );
+        self.ops.push(op.clone());
+        self.selected = Some(id);
+        Edit::Append(vec![op])
+    }
+
+    /// The picker: a symbol or a word. Applies to the selected stamp (one revision) and is
+    /// what the next click places; each kind brings its usual colour.
+    pub fn set_stamp(&mut self, kind: StampKind, word: StampWord) -> Option<Edit> {
+        self.styles.set_stamp_kind(kind, word);
+        self.styles_dirty = true;
+        let color = self.styles.get(Tool::Stamp).color;
+        let i = self.selected_index()?;
+        match &mut self.ops[i].kind {
+            OpKind::Stamp {
+                kind: k,
+                color: c,
+                text,
+                ..
+            } => {
+                *k = kind;
+                *c = color;
+                *text = (kind == StampKind::Label).then(|| word.text());
+            }
+            _ => return None,
+        }
+        Some(Edit::Replace(self.ops.clone()))
+    }
+
+    /// What the picker shows as chosen: the selected stamp, else the next one's settings.
+    pub fn stamp_info(&self) -> Option<StampInfo> {
+        if self.inspector_tool() != Tool::Stamp || self.text.is_some() {
+            return None;
+        }
+        let st = self.styles.get(Tool::Stamp);
+        match self.selected_kind() {
+            Some(OpKind::Stamp { kind, text, .. }) => Some(StampInfo {
+                kind: *kind,
+                word: StampWord::ALL
+                    .into_iter()
+                    .find(|w| text.as_deref() == Some(w.text().as_str())),
+                has_op: true,
+            }),
+            _ => Some(StampInfo {
+                kind: st.stamp_kind,
+                word: (st.stamp_kind == StampKind::Label).then_some(st.stamp_word),
+                has_op: false,
+            }),
+        }
     }
 
     // ---- steps (ANN-6) ---------------------------------------------------------------------
@@ -3188,5 +3267,125 @@ mod tests {
         assert_eq!(s.steps_info().unwrap().selected, Some(1));
         s.set_tool(Tool::Rect);
         assert!(s.steps_info().is_none());
+    }
+
+    // ---- ANN-4: stamps --------------------------------------------------------------------
+
+    fn stamp_of(s: &EditorState, i: usize) -> (StampKind, Option<String>, f64, Color) {
+        match &s.ops[i].kind {
+            OpKind::Stamp {
+                kind,
+                text,
+                size,
+                color,
+                ..
+            } => (*kind, text.clone(), *size, *color),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    /// ANN-4: a click places a check mark (green, 34 px) in one Append.
+    #[test]
+    fn ann_4_click_places_a_stamp() {
+        let mut s = st();
+        s.set_tool(Tool::Stamp);
+        let e = s.pointer_down(Pt::new(300.0, 200.0), NONE, 1, TOL);
+        let op = only_append(&e).clone();
+        match op.kind {
+            OpKind::Stamp {
+                at,
+                kind,
+                size,
+                color,
+                text,
+            } => {
+                assert_eq!(at, Pt::new(300.0, 200.0));
+                assert_eq!((kind, size), (StampKind::Check, 34.0));
+                assert_eq!(color, Color::rgb(0x2E, 0xB8, 0x72));
+                assert!(text.is_none());
+            }
+            other => panic!("{other:?}"),
+        }
+        assert!(s.pointer_up(Pt::new(300.0, 200.0), NONE, TOL).is_empty());
+    }
+
+    /// ANN-4: BEFORE / AFTER write their word into the op in the UI language; the op passes the
+    /// core validation (a label stamp needs text); symbols carry no text.
+    #[test]
+    fn ann_4_label_stamps_carry_their_word() {
+        let mut s = st();
+        s.set_tool(Tool::Stamp);
+        assert!(s.set_stamp(StampKind::Label, StampWord::After).is_none());
+        s.pointer_down(Pt::new(100.0, 100.0), NONE, 1, TOL);
+        let (kind, text, _, color) = stamp_of(&s, 0);
+        assert_eq!((kind, text.as_deref()), (StampKind::Label, Some("After")));
+        assert_eq!(color, cm_core::annotation::DEFAULT_COLOR);
+        assert!(cm_core::annotation::validate_op(0, &s.ops[0]).is_ok());
+        // Changing the selected stamp in the picker is one Replace and fixes text and colour.
+        let e = s
+            .set_stamp(StampKind::Check, StampWord::Before)
+            .expect("edit");
+        assert!(matches!(e, Edit::Replace(_)));
+        let (kind, text, _, color) = stamp_of(&s, 0);
+        assert_eq!((kind, text), (StampKind::Check, None));
+        assert_eq!(color, Color::rgb(0x2E, 0xB8, 0x72));
+        let e = s
+            .set_stamp(StampKind::Label, StampWord::Before)
+            .expect("edit");
+        assert!(matches!(e, Edit::Replace(_)));
+        assert_eq!(stamp_of(&s, 0).1.as_deref(), Some("Before"));
+        assert!(cm_core::annotation::validate_op(0, &s.ops[0]).is_ok());
+        let info = s.stamp_info().unwrap();
+        assert_eq!(
+            (info.kind, info.word),
+            (StampKind::Label, Some(StampWord::Before))
+        );
+    }
+
+    /// ANN-4: size and colour apply to the selected stamp; move and scale work; Enter places one.
+    #[test]
+    fn ann_4_stamp_size_colour_move_and_enter() {
+        let mut s = st();
+        s.set_tool(Tool::Stamp);
+        s.set_stamp(StampKind::Cross, StampWord::Before);
+        s.pointer_down(Pt::new(300.0, 200.0), NONE, 1, TOL);
+        assert_eq!(stamp_of(&s, 0).3, cm_core::annotation::DEFAULT_COLOR);
+        assert!(matches!(
+            s.set_param(ParamValue::StampSize(64.0)),
+            Some(Edit::Replace(_))
+        ));
+        assert_eq!(stamp_of(&s, 0).2, 64.0);
+        let blue = Color::rgb(0x2E, 0x8B, 0xFF);
+        s.set_param(ParamValue::Color(blue)).expect("edit");
+        assert_eq!(stamp_of(&s, 0).3, blue);
+        // Move with the Select tool.
+        s.set_tool(Tool::Select);
+        let e = drag(&mut s, (300.0, 200.0), (340.0, 230.0), NONE);
+        assert_eq!(e.len(), 1);
+        match &s.ops[0].kind {
+            OpKind::Stamp { at, .. } => assert_eq!(*at, Pt::new(340.0, 230.0)),
+            _ => unreachable!(),
+        }
+        // The scale handle sits on the bottom-right of the stamp.
+        let ch = s.chrome().unwrap();
+        assert_eq!(ch.bounds, Rc::new(308.0, 198.0, 64.0, 64.0));
+        assert_eq!(ch.handles, vec![(Handle::Scale, Pt::new(372.0, 262.0))]);
+        // Enter places one at the centre.
+        s.set_tool(Tool::Stamp);
+        let e = s.place_default(Pt::new(600.0, 400.0));
+        assert_eq!(e.len(), 1);
+        assert_eq!(s.ops.len(), 2);
+        assert_eq!(Tool::from_key('u'), Some(Tool::Stamp));
+        assert_eq!(Tool::Stamp.group(), crate::editor::Group::Markers);
+    }
+
+    /// The remembered stamp kind and word survive the settings round trip.
+    #[test]
+    fn ann_4_stamp_choice_persists() {
+        let mut s = st();
+        s.set_stamp(StampKind::Label, StampWord::After);
+        let back = Styles::from_json(&s.styles.to_json());
+        assert_eq!(back.get(Tool::Stamp).stamp_kind, StampKind::Label);
+        assert_eq!(back.get(Tool::Stamp).stamp_word, StampWord::After);
     }
 }

@@ -192,6 +192,16 @@ pub fn bounds(kind: &OpKind, tm: &mut TextMetrics) -> Rc {
         OpKind::Step { at, size, .. } => {
             Rc::new(at.x - size / 2.0, at.y - size / 2.0, *size, *size)
         }
+        OpKind::Stamp {
+            at,
+            size,
+            kind,
+            text,
+            ..
+        } => {
+            let w = stamp_width(*kind, text.as_deref(), *size);
+            Rc::new(at.x - w / 2.0, at.y - size / 2.0, w, *size)
+        }
         OpKind::Spotlight { shapes, .. } => shapes
             .iter()
             .map(|s| s.rect.normalized())
@@ -285,7 +295,7 @@ pub fn handles(kind: &OpKind, tm: &mut TextMetrics) -> Vec<(Handle, Pt)> {
         OpKind::Arrow { from, to, .. } | OpKind::Line { from, to, .. } => {
             vec![(Handle::From, *from), (Handle::To, *to)]
         }
-        OpKind::Text { .. } | OpKind::Step { .. } => {
+        OpKind::Text { .. } | OpKind::Step { .. } | OpKind::Stamp { .. } => {
             let b = bounds(kind, tm);
             vec![(Handle::Scale, Pt::new(b.x + b.w, b.y + b.h))]
         }
@@ -493,7 +503,9 @@ pub fn translate(kind: &OpKind, dx: f64, dy: f64) -> OpKind {
             *from = mv(from);
             *to = mv(to);
         }
-        OpKind::Text { at, .. } | OpKind::Step { at, .. } => *at = mv(at),
+        OpKind::Text { at, .. } | OpKind::Step { at, .. } | OpKind::Stamp { at, .. } => {
+            *at = mv(at)
+        }
         other => {
             if let Some(r) = rect_of(other) {
                 return with_rect(other, Rc::new(r.x + dx, r.y + dy, r.w, r.h));
@@ -680,6 +692,9 @@ pub fn resize(orig: &OpKind, handle: Handle, p: Pt, shift: bool, tm: &mut TextMe
             let ratio = ((p.x - at.x) / denom).max(0.05);
             *size = (*size * ratio).clamp(8.0, 400.0);
         }
+        (OpKind::Stamp { at, size, .. }, Handle::Scale) => {
+            *size = (2.0 * (p.x - at.x).abs().max((p.y - at.y).abs())).clamp(10.0, 400.0);
+        }
         (OpKind::Step { at, size, .. }, Handle::Scale) => {
             *size = (2.0 * (p.x - at.x).abs().max((p.y - at.y).abs())).clamp(10.0, 400.0);
         }
@@ -716,7 +731,7 @@ pub fn resize_by(kind: &OpKind, dx: f64, dy: f64, tm: &mut TextMetrics) -> OpKin
             to.x += dx;
             to.y += dy;
         }
-        OpKind::Text { size, .. } | OpKind::Step { size, .. } => {
+        OpKind::Text { size, .. } | OpKind::Step { size, .. } | OpKind::Stamp { size, .. } => {
             *size = (*size + dx + dy).clamp(8.0, 400.0);
         }
         other => {
@@ -785,6 +800,18 @@ pub fn with_drawn_box(kind: &OpKind) -> OpKind {
     }
 }
 
+/// The width of a stamp: a square for a symbol, a pill for a word (estimated; the renderer
+/// draws the exact pill and this only has to be close enough for handles and hit testing).
+pub fn stamp_width(kind: cm_core::annotation::StampKind, text: Option<&str>, size: f64) -> f64 {
+    match kind {
+        cm_core::annotation::StampKind::Label => {
+            let chars = text.map_or(1, |t| t.chars().count().max(1)) as f64;
+            (chars * 0.62 + 1.4) * size * 0.62
+        }
+        _ => size,
+    }
+}
+
 /// Which inspector controls apply to this op.
 pub fn params_of(kind: &OpKind) -> &'static [Param] {
     super::tools::Tool::for_kind(kind).params()
@@ -800,6 +827,7 @@ pub fn param_value(kind: &OpKind, p: Param) -> Option<ParamValue> {
             | OpKind::Ellipse { color, .. }
             | OpKind::Text { color, .. }
             | OpKind::Highlight { color, .. }
+            | OpKind::Stamp { color, .. }
             | OpKind::Step { color, .. },
             Param::Color,
         ) => Some(ParamValue::Color(*color)),
@@ -819,6 +847,7 @@ pub fn param_value(kind: &OpKind, p: Param) -> Option<ParamValue> {
             Param::Width,
         ) => Some(ParamValue::Width(*width)),
         (OpKind::Text { size, .. }, Param::TextSize) => Some(ParamValue::TextSize(*size)),
+        (OpKind::Stamp { size, .. }, Param::StampSize) => Some(ParamValue::StampSize(*size)),
         (OpKind::Step { size, .. }, Param::StepSize) => Some(ParamValue::StepSize(*size)),
         (OpKind::Highlight { opacity, .. }, Param::Opacity) => Some(ParamValue::Opacity(*opacity)),
         (OpKind::Blur { strength, .. }, Param::Strength) => Some(ParamValue::Strength(*strength)),
@@ -840,6 +869,7 @@ pub fn with_param(kind: &OpKind, v: ParamValue) -> Option<OpKind> {
             | OpKind::Ellipse { color, .. }
             | OpKind::Text { color, .. }
             | OpKind::Highlight { color, .. }
+            | OpKind::Stamp { color, .. }
             | OpKind::Step { color, .. },
             ParamValue::Color(c),
         ) => *color = c,
@@ -860,6 +890,7 @@ pub fn with_param(kind: &OpKind, v: ParamValue) -> Option<OpKind> {
             *strength = s.clamp(*BLUR_STRENGTH_RANGE.start(), *BLUR_STRENGTH_RANGE.end())
         }
         (OpKind::Text { size, .. }, ParamValue::TextSize(s))
+        | (OpKind::Stamp { size, .. }, ParamValue::StampSize(s))
         | (OpKind::Callout { size, .. }, ParamValue::TextSize(s))
         | (OpKind::Step { size, .. }, ParamValue::StepSize(s)) => *size = s.clamp(8.0, 400.0),
         (OpKind::Highlight { opacity, .. }, ParamValue::Opacity(o)) => {

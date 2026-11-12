@@ -247,6 +247,15 @@ impl EditorView {
                     w,
                     ParamValue::Opacity,
                 ),
+                (Param::StampSize, ParamValue::StampSize(w)) => self.segments(
+                    t,
+                    "stamp-size",
+                    STAMP_SIZES
+                        .iter()
+                        .map(|v| (*v, format!("{v:.0}"), pixels_label(*v))),
+                    w,
+                    ParamValue::StampSize,
+                ),
                 (Param::Dim, ParamValue::Dim(w)) => self.segments(
                     t,
                     "dim",

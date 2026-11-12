@@ -4,6 +4,8 @@
 //! All state changes go through `EditorDoc` and the pure `EditorState`.
 
 use super::*;
+use crate::editor::tools::StampWord;
+use cm_core::annotation::StampKind;
 use cm_core::annotation::{CalloutStyle, SpotMode, SpotShapeKind, StepStyle, MAX_SPOTLIGHT_SHAPES};
 
 /// The "New in 0.3.3" pill in a panel header (info blue). Shown for the whole release; remove
@@ -92,6 +94,9 @@ impl EditorView {
         if let Some(info) = &s.steps {
             rows.extend(self.steps_top(t, info));
         }
+        if let Some(info) = &s.stamp {
+            rows.push(self.stamp_picker(t, info));
+        }
         let _ = cx;
         rows
     }
@@ -118,14 +123,121 @@ impl EditorView {
         if let Some(info) = &s.steps {
             rows.extend(self.steps_bottom(t, info));
         }
+        if s.stamp.is_some() {
+            rows.push(
+                info_note(
+                    t,
+                    None,
+                    tr!(
+                        "Click the image to place a stamp. Symbols are drawn as shapes, so they \
+                         look the same on macOS, Windows and Linux."
+                    ),
+                )
+                .into_any_element(),
+            );
+        }
         rows
+    }
+
+    /// The stamp picker: a 4-column grid of symbols and the BEFORE / AFTER words (written in
+    /// the app language when placed).
+    fn stamp_picker(&self, t: &Theme, info: &crate::editor::state::StampInfo) -> AnyElement {
+        let symbols: [(StampKind, &'static str, String); 4] = [
+            (StampKind::Check, "check", tr_ctx!("stamp", "Check mark")),
+            (StampKind::Cross, "x", tr_ctx!("stamp", "Cross")),
+            (
+                StampKind::Exclaim,
+                "circle-alert",
+                tr_ctx!("stamp", "Exclamation mark"),
+            ),
+            (StampKind::Question, "", tr_ctx!("stamp", "Question mark")),
+        ];
+        let tile = |id: ElementId, label: String, on: bool, content: AnyElement| {
+            let hover = rgba_of(t.raised);
+            div()
+                .id(id)
+                .role(Role::RadioButton)
+                .aria_label(SharedString::from(label))
+                .aria_toggled(toggled(on))
+                .focusable()
+                .tab_stop(true)
+                .h(px(46.))
+                .flex_1()
+                .min_w(px(0.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded(px(scale::RADIUS_MD))
+                .border_1()
+                .border_color(rgba_of(if on { accent(t) } else { t.line }))
+                .cursor_pointer()
+                .when(on, |d| d.bg(rgba_of(t.raised)))
+                .when(!on, |d| d.hover(move |s| s.bg(hover)))
+                .focus_visible(|s| s.border_color(rgba_of(t.text)))
+                .child(content)
+        };
+        let grid = div()
+            .flex()
+            .gap(px(6.))
+            .children(
+                symbols
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, (kind, ic, label))| {
+                        let content: AnyElement = if ic.is_empty() {
+                            div()
+                                .text_size(px(20.))
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(rgba_of(t.text))
+                                .child(SharedString::from(tr_ctx!("stamp glyph", "?")))
+                                .into_any_element()
+                        } else {
+                            icon(ic, 20., t.text).into_any_element()
+                        };
+                        tile(
+                            ElementId::from(("stamp-kind", i)),
+                            label,
+                            info.kind == kind,
+                            content,
+                        )
+                        .on_click(
+                            self.doc_action(move |d, cx| d.set_stamp(kind, StampWord::Before, cx)),
+                        )
+                    }),
+            );
+        let words = div()
+            .flex()
+            .gap(px(6.))
+            .children(StampWord::ALL.into_iter().enumerate().map(|(i, word)| {
+                let on = info.kind == StampKind::Label && info.word == Some(word);
+                tile(
+                    ElementId::from(("stamp-word", i)),
+                    word.text(),
+                    on,
+                    div()
+                        .text_size(px(12.))
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(rgba_of(t.text))
+                        .child(SharedString::from(word.text().to_uppercase()))
+                        .into_any_element(),
+                )
+                .on_click(self.doc_action(move |d, cx| d.set_stamp(StampKind::Label, word, cx)))
+            }));
+        self.panel_group(
+            t,
+            &tr_ctx!("annotation setting", "Kind"),
+            div().flex().flex_col().gap(px(6.)).child(grid).child(words),
+        )
     }
 
     /// Numbering (1 2 3 / A B C / a b c) and the start number; both apply to all steps.
     fn steps_top(&self, t: &Theme, info: &crate::editor::state::StepsInfo) -> Vec<AnyElement> {
         let options = [
+            // i18n-ignore (the sample of each numbering style, not words)
             (StepStyle::Number, "1 2 3"),
+            // i18n-ignore
             (StepStyle::Upper, "A B C"),
+            // i18n-ignore
             (StepStyle::Lower, "a b c"),
         ];
         let numbering = div()

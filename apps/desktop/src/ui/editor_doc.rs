@@ -6,6 +6,8 @@
 //! `undo` or `redo` per user action); nothing is held back until a "Save" click. The status
 //! line shows "Saving..." while calls are queued.
 
+use crate::editor::tools::StampWord;
+use cm_core::annotation::StampKind;
 use cm_core::{AnnotationOp, OpKind, Pt, Rc};
 use cm_i18n::tr;
 use gpui::{Context, Entity, RenderImage};
@@ -804,6 +806,15 @@ impl EditorDoc {
     pub fn select_step_row(&mut self, row: usize, cx: &mut Context<Self>) {
         self.state.select_step_row(row);
         cx.notify();
+    }
+
+    /// The stamp picker: this symbol or word.
+    pub fn set_stamp(&mut self, kind: StampKind, word: StampWord, cx: &mut Context<Self>) {
+        if self.locked() {
+            return;
+        }
+        let edit = self.state.set_stamp(kind, word);
+        self.after_input(edit.into_iter().collect(), cx);
     }
 
     pub fn clear_crop(&mut self, cx: &mut Context<Self>) {

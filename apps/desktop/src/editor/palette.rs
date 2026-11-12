@@ -82,7 +82,7 @@ impl Group {
             Group::Shapes => &[Tool::Arrow, Tool::Line, Tool::Rect, Tool::Ellipse],
             Group::Text => &[Tool::Text, Tool::Callout],
             Group::Highlighter => &[Tool::Highlight],
-            Group::Markers => &[Tool::Step],
+            Group::Markers => &[Tool::Step, Tool::Stamp],
             Group::Emphasis => &[Tool::Spotlight],
             Group::Redact => &[Tool::Blur, Tool::Pixelate],
             Group::Crop => &[Tool::Crop],
@@ -228,6 +228,7 @@ mod tests {
         assert_eq!(ids(Group::Select), ["select", "select_text"]);
         assert_eq!(ids(Group::Shapes), ["arrow", "line", "rect", "ellipse"]);
         assert_eq!(ids(Group::Text), ["text", "callout"]);
+        assert_eq!(ids(Group::Markers), ["step", "stamp"]);
         assert_eq!(ids(Group::Emphasis), ["spotlight"]);
         assert_eq!(ids(Group::Highlighter), ["highlight"]);
         assert_eq!(ids(Group::Redact), ["blur", "pixelate"]);

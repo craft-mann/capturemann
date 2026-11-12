@@ -6,6 +6,7 @@ use cm_core::annotation::{
     DEFAULT_HIGHLIGHT_OPACITY, DEFAULT_PIXELATE_BLOCK, DEFAULT_SPOTLIGHT_DIM, DEFAULT_STEP_SIZE,
     DEFAULT_TEXT_SIZE, DEFAULT_WIDTH,
 };
+use cm_core::annotation::{StampKind, DEFAULT_STAMP_SIZE};
 use cm_core::{Color, OpKind};
 use cm_i18n::tr_ctx;
 use serde_json::{json, Value};
@@ -170,7 +171,8 @@ impl Tool {
         match self {
             Tool::Callout => &[Param::Color, Param::TextSize, Param::Radius],
             Tool::Spotlight => &[Param::Dim],
-            Tool::Select | Tool::Crop | Tool::SelectText | Tool::Stamp => &[],
+            Tool::Stamp => &[Param::Color, Param::StampSize],
+            Tool::Select | Tool::Crop | Tool::SelectText => &[],
             Tool::Arrow | Tool::Line | Tool::Rect | Tool::Ellipse => &[Param::Color, Param::Width],
             Tool::Text => &[Param::Color, Param::TextSize],
             Tool::Highlight => &[Param::Color, Param::Opacity],
@@ -195,6 +197,8 @@ pub enum Param {
     Radius,
     /// How dark a spotlight makes the outside (0 to 1).
     Dim,
+    /// Size of a stamp.
+    StampSize,
 }
 
 impl Param {
@@ -209,6 +213,7 @@ impl Param {
             Param::Block => tr_ctx!("annotation setting", "Pixel size"),
             Param::Radius => tr_ctx!("annotation setting", "Corners"),
             Param::Dim => tr_ctx!("annotation setting", "Dim"),
+            Param::StampSize => tr_ctx!("annotation setting", "Size"),
         }
     }
 }
@@ -225,6 +230,7 @@ pub enum ParamValue {
     Block(u32),
     Radius(f64),
     Dim(f64),
+    StampSize(f64),
 }
 
 impl ParamValue {
@@ -239,6 +245,7 @@ impl ParamValue {
             ParamValue::Block(_) => Param::Block,
             ParamValue::Radius(_) => Param::Radius,
             ParamValue::Dim(_) => Param::Dim,
+            ParamValue::StampSize(_) => Param::StampSize,
         }
     }
 }
@@ -270,6 +277,34 @@ pub fn palette_name(id: &str) -> String {
     }
 }
 
+/// The word of a label stamp. It is written into the op in the UI language when the stamp is
+/// placed (stored text, never re-translated).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StampWord {
+    Before,
+    After,
+}
+
+impl StampWord {
+    pub const ALL: [StampWord; 2] = [StampWord::Before, StampWord::After];
+
+    /// The word in the UI language.
+    pub fn text(self) -> String {
+        match self {
+            StampWord::Before => tr_ctx!("stamp label", "Before"),
+            StampWord::After => tr_ctx!("stamp label", "After"),
+        }
+    }
+}
+
+/// The usual colour of a stamp kind: green for a check, red for the rest.
+pub fn stamp_color(kind: StampKind) -> Color {
+    match kind {
+        StampKind::Check => Color::rgb(0x2E, 0xB8, 0x72),
+        _ => DEFAULT_COLOR,
+    }
+}
+
 /// DESIGN 5.5: stroke widths 2, 4, 6, 8 px.
 pub const WIDTHS: [f64; 4] = [2.0, 4.0, 6.0, 8.0];
 pub const TEXT_SIZES: [f64; 5] = [16.0, 24.0, 32.0, 48.0, 64.0];
@@ -280,6 +315,8 @@ pub const CALLOUT_SIZES: [f64; 5] = [16.0, 20.0, 24.0, 32.0, 40.0];
 pub const CORNER_RADII: [f64; 4] = [0.0, 6.0, 12.0, 20.0];
 /// Spotlight dim levels offered in the inspector (default 60 %).
 pub const DIM_LEVELS: [f64; 4] = [0.2, 0.4, 0.6, 0.8];
+/// Stamp sizes offered in the inspector (default 34).
+pub const STAMP_SIZES: [f64; 4] = [24.0, 34.0, 48.0, 64.0];
 
 /// The values a tool draws with. Fields a tool does not use keep their defaults.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -303,6 +340,10 @@ pub struct ToolStyle {
     /// Step badges: numbering style and first number of new steps (ANN-6).
     pub step_style: StepStyle,
     pub step_start: u32,
+    /// Stamp: what the next click places (ANN-4).
+    pub stamp_kind: StampKind,
+    /// Stamp: which word a label stamp carries.
+    pub stamp_word: StampWord,
 }
 
 impl ToolStyle {
@@ -321,10 +362,17 @@ impl ToolStyle {
             spot_shape: SpotShapeKind::Rect,
             step_style: StepStyle::Number,
             step_start: 1,
+            stamp_kind: StampKind::Check,
+            stamp_word: StampWord::Before,
         };
         match tool {
             Tool::Callout => ToolStyle {
                 size: DEFAULT_CALLOUT_SIZE,
+                ..base
+            },
+            Tool::Stamp => ToolStyle {
+                size: DEFAULT_STAMP_SIZE,
+                color: stamp_color(StampKind::Check),
                 ..base
             },
             Tool::Text => ToolStyle {
@@ -347,7 +395,9 @@ impl ToolStyle {
         match v {
             ParamValue::Color(c) => self.color = c,
             ParamValue::Width(w) => self.width = w,
-            ParamValue::TextSize(s) | ParamValue::StepSize(s) => self.size = s,
+            ParamValue::TextSize(s) | ParamValue::StepSize(s) | ParamValue::StampSize(s) => {
+                self.size = s
+            }
             ParamValue::Opacity(o) => self.opacity = o,
             ParamValue::Strength(s) => self.strength = s,
             ParamValue::Block(b) => self.block = b,
@@ -367,6 +417,7 @@ impl ToolStyle {
             Param::Block => ParamValue::Block(self.block),
             Param::Radius => ParamValue::Radius(self.radius),
             Param::Dim => ParamValue::Dim(self.dim),
+            Param::StampSize => ParamValue::StampSize(self.size),
         }
     }
 }
@@ -415,6 +466,15 @@ impl Styles {
         }
     }
 
+    /// What the next stamp is (and its colour: each kind has its usual one).
+    pub fn set_stamp_kind(&mut self, kind: StampKind, word: StampWord) {
+        if let Some((_, s)) = self.by_tool.iter_mut().find(|(t, _)| *t == Tool::Stamp) {
+            s.stamp_kind = kind;
+            s.stamp_word = word;
+            s.color = stamp_color(kind);
+        }
+    }
+
     /// The numbering new step badges get.
     pub fn set_step_numbering(&mut self, style: StepStyle, start: u32) {
         if let Some((_, s)) = self.by_tool.iter_mut().find(|(t, _)| *t == Tool::Step) {
@@ -450,6 +510,17 @@ impl Styles {
                         StepStyle::Lower => "lower",
                     },
                     "step_start": s.step_start,
+                    "stamp_word": match s.stamp_word {
+                        StampWord::Before => "before",
+                        StampWord::After => "after",
+                    },
+                    "stamp": match s.stamp_kind {
+                        StampKind::Check => "check",
+                        StampKind::Cross => "cross",
+                        StampKind::Exclaim => "exclaim",
+                        StampKind::Question => "question",
+                        StampKind::Label => "label",
+                    },
                     "spot_shape": match s.spot_shape {
                         SpotShapeKind::Rect => "rect",
                         SpotShapeKind::Ellipse => "ellipse",
@@ -502,6 +573,19 @@ impl Styles {
             }
             if let Some(w) = num("dim", 0.0, 1.0) {
                 s.dim = w;
+            }
+            match o.get("stamp_word").and_then(Value::as_str) {
+                Some("before") => s.stamp_word = StampWord::Before,
+                Some("after") => s.stamp_word = StampWord::After,
+                _ => {}
+            }
+            match o.get("stamp").and_then(Value::as_str) {
+                Some("check") => s.stamp_kind = StampKind::Check,
+                Some("cross") => s.stamp_kind = StampKind::Cross,
+                Some("exclaim") => s.stamp_kind = StampKind::Exclaim,
+                Some("question") => s.stamp_kind = StampKind::Question,
+                Some("label") => s.stamp_kind = StampKind::Label,
+                _ => {}
             }
             match o.get("step_style").and_then(Value::as_str) {
                 Some("number") => s.step_style = StepStyle::Number,
