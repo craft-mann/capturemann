@@ -66,8 +66,9 @@ impl EditorView {
                 return;
             }
         }
-        if k.key == "escape" && self.shortcuts_open && !editing {
+        if k.key == "escape" && (self.shortcuts_open || self.bar.open.is_some()) && !editing {
             self.shortcuts_open = false;
+            self.bar.open = None;
             cx.stop_propagation();
             cx.notify();
             return;

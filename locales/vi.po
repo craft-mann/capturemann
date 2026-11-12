@@ -6073,10 +6073,6 @@ msgid "Export"
 msgstr "Bản xuất"
 
 msgctxt "zoom"
-msgid "Fit"
-msgstr "Vừa"
-
-msgctxt "zoom"
 msgid "Length"
 msgstr "Độ dài"
 
@@ -9975,3 +9971,63 @@ msgstr "ảnh động, chỉ giữ khung hình đầu tiên"
 msgctxt "import status"
 msgid "Converted"
 msgstr "Đã chuyển đổi"
+
+msgid "Fit to window"
+msgstr "Vừa cửa sổ"
+
+#, fuzzy
+msgid "Actual size (100%)"
+msgstr "Kích thước thực (100%)"
+
+#, fuzzy
+msgid "Custom: {n}%"
+msgstr "Tùy chỉnh: {n}%"
+
+#, fuzzy
+msgid "Zoom"
+msgstr "Thu phóng"
+
+#, fuzzy
+msgid "Images"
+msgstr "Ảnh"
+
+#, fuzzy
+msgid "Show or hide the image strip"
+msgstr "Hiện hoặc ẩn dải ảnh"
+
+#, fuzzy
+msgid "Image strip"
+msgstr "Dải ảnh"
+
+#, fuzzy
+msgid "Previous image"
+msgstr "Ảnh trước"
+
+#, fuzzy
+msgid "Next image"
+msgstr "Ảnh tiếp theo"
+
+#, fuzzy
+msgid "Removes every annotation, crop and redaction."
+msgstr "Xoá mọi chú thích, vùng cắt và vùng che."
+
+#, fuzzy
+msgid "Copies all the text in the image. Select text copies only the part you select."
+msgstr "Sao chép toàn bộ văn bản trong ảnh. Chọn vùng văn bản chỉ sao chép phần bạn chọn."
+
+#, fuzzy
+msgid "{pos} of {total}"
+msgstr "{pos} trên {total}"
+
+#, fuzzy
+msgid "{title}, {annotations}, {place}"
+msgstr "{title}, {annotations}, {place}"
+
+#, fuzzy
+msgid "{title}, {place}"
+msgstr "{title}, {place}"
+
+#, fuzzy
+msgid "{n} annotation"
+msgid_plural "{n} annotations"
+msgstr[0] "{n} chú thích"

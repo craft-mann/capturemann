@@ -210,6 +210,12 @@ impl Viewport {
         self.zoom_by_at(f, cx, cy);
     }
 
+    /// Zooms to `pct` around the centre of the free area (the view bar's zoom menu).
+    pub fn zoom_to_percent(&mut self, pct: f64) {
+        let (cx, cy) = self.centre();
+        self.zoom_to_at(pct, cx, cy);
+    }
+
     /// 100% (one image px per device px), centered.
     pub fn actual_size(&mut self) {
         self.pan = (0.0, 0.0);
