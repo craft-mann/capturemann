@@ -17,6 +17,7 @@
 
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
+mod annot;
 pub mod compose;
 pub mod ocr;
 pub mod ops;
@@ -32,14 +33,23 @@ pub use ops::{
 pub use render::{render_annotations, Renderer};
 
 /// The box a `callout` op is drawn with: `max(rect, measured text size + padding)` (ANN-4). The
-/// editor draws its handles from this, not from the stored `rect`. `None` for other ops.
-///
-/// **Phase 0 stub:** returns the stored `rect` (normalized) until track A measures the text.
+/// editor draws its handles from this, not from the stored `rect`. `None` for other ops. Text
+/// that cannot be measured (too large) falls back to the stored `rect`.
 pub fn callout_box(op: &OpKind) -> Option<Rc> {
-    match op {
-        OpKind::Callout { rect, .. } => Some(rect.normalized()),
-        _ => None,
+    thread_local! {
+        static FONTS: std::cell::RefCell<Option<text::Fonts>> = const { std::cell::RefCell::new(None) };
     }
+    let OpKind::Callout { rect, .. } = op else {
+        return None;
+    };
+    FONTS.with(|f| {
+        let mut f = f.borrow_mut();
+        let fonts = f.get_or_insert_with(text::Fonts::bundled);
+        match annot::measure_callout(fonts, op) {
+            Ok(Some(g)) => Some(g.boxr),
+            _ => Some(rect.normalized()),
+        }
+    })
 }
 
 use cm_core::CmError;

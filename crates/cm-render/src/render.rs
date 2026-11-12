@@ -7,7 +7,8 @@ use tiny_skia::{
     Transform,
 };
 
-use crate::ops::{validate_op, AnnotationOp, Color, OpKind};
+use crate::annot;
+use crate::ops::{validate_list, validate_op, AnnotationOp, Color, OpKind};
 use crate::redact::{self, ordered, Region};
 use crate::text::{self, Fonts, TextStyle};
 
@@ -50,6 +51,7 @@ impl Renderer {
         for (i, op) in ops.iter().enumerate() {
             validate_op(i, op)?;
         }
+        validate_list(ops)?;
         let (w, h) = base.dimensions();
         let mut pm = to_pixmap(base)?;
         let mut crop: Option<(usize, [f64; 4])> = None;
@@ -159,42 +161,24 @@ impl Renderer {
                     );
                 }
             }
-            // Phase 0 stubs (0.3.3): track A draws these (ANN-4, ANN-7).
-            OpKind::Callout { .. } | OpKind::Spotlight { .. } | OpKind::Stamp { .. } => {}
-            OpKind::Step {
-                at, n, size, color, ..
-            } => {
-                let r = (*size / 2.0) as f32;
-                if let Some(rect) =
-                    Rect::from_xywh(at.x as f32 - r, at.y as f32 - r, r * 2.0, r * 2.0)
-                {
-                    if let Some(p) = PathBuilder::from_oval(rect) {
-                        fill_path(pm, &p, *color, 255);
-                    }
-                }
-                // Numerals fit inside the disc: shrink for 2+ digits.
-                let digits = n.to_string();
-                let px = (*size as f32) * if digits.len() <= 1 { 0.56 } else { 0.46 };
-                let style = TextStyle {
-                    px,
-                    color: Color::WHITE,
-                    outline: None,
-                    bg: None,
-                    wrap_w: None,
-                    center: false,
-                };
-                if let Some(layer) = text::layout(&mut self.fonts, &digits, &style)? {
-                    // centre horizontally on the advance box, vertically on the cap height
-                    let x = at.x as f32 - layer.text_w / 2.0;
-                    let y = at.y as f32 + 0.364 * px - layer.baseline;
-                    blit(
-                        pm,
-                        &layer.pixmap,
-                        x.round() as i32 - layer.pad,
-                        y.round() as i32 - layer.pad,
-                    );
-                }
-            }
+            OpKind::Callout { .. } => annot::draw_callout(pm, &mut self.fonts, kind)?,
+            OpKind::Spotlight { .. } => annot::draw_spotlight(pm, kind),
+            OpKind::Stamp {
+                at,
+                kind: sk,
+                size,
+                color,
+                text,
+            } => annot::draw_stamp(
+                pm,
+                &mut self.fonts,
+                *at,
+                *sk,
+                *size,
+                *color,
+                text.as_deref(),
+            )?,
+            OpKind::Step { .. } => annot::draw_step(pm, &mut self.fonts, kind)?,
             OpKind::Blur { rect, strength } => {
                 if let Some(r) = Region::outward(rect.to_array(), pm.width(), pm.height()) {
                     redact::blur(pm, r, *strength);
@@ -256,7 +240,7 @@ fn from_pixmap(pm: &Pixmap) -> RgbaImage {
     RgbaImage::from_raw(pm.width(), pm.height(), raw).unwrap_or_else(|| RgbaImage::new(0, 0))
 }
 
-fn blit(pm: &mut Pixmap, layer: &Pixmap, x: i32, y: i32) {
+pub(crate) fn blit(pm: &mut Pixmap, layer: &Pixmap, x: i32, y: i32) {
     pm.draw_pixmap(
         x,
         y,
@@ -267,14 +251,14 @@ fn blit(pm: &mut Pixmap, layer: &Pixmap, x: i32, y: i32) {
     );
 }
 
-fn paint(c: Color, alpha: u8) -> Paint<'static> {
+pub(crate) fn paint(c: Color, alpha: u8) -> Paint<'static> {
     let mut p = Paint::default();
     p.set_color_rgba8(c.r, c.g, c.b, alpha);
     p.anti_alias = true;
     p
 }
 
-fn fill_path(pm: &mut Pixmap, path: &Path, c: Color, alpha: u8) {
+pub(crate) fn fill_path(pm: &mut Pixmap, path: &Path, c: Color, alpha: u8) {
     pm.fill_path(
         path,
         &paint(c, alpha),
@@ -308,7 +292,7 @@ fn norm_rect(r: &[f64; 4]) -> Option<(f32, f32, f32, f32)> {
     (w > 0.0 && h > 0.0).then_some((x0 as f32, y0 as f32, w, h))
 }
 
-fn rounded_rect(rect: &[f64; 4], radius: f64) -> Option<Path> {
+pub(crate) fn rounded_rect(rect: &[f64; 4], radius: f64) -> Option<Path> {
     let (x, y, w, h) = norm_rect(rect)?;
     let r = (radius as f32).min(w / 2.0).min(h / 2.0);
     if r <= 0.0 {
