@@ -1,0 +1,10 @@
+[
+  { "id": "op_1", "op": "arrow", "from": [10, 10], "to": [100, 60], "color": "#FF3B3B", "width": 4, "future_arrow_field": { "k": [1, 2] } },
+  { "id": "op_2", "op": "callout", "rect": [100, 80, 220, 70], "tail": [90, 200], "text": "Click here", "size": 24, "color": "#FFFFFF", "bg": "#FF3B3B", "radius": 12, "style": "bubble", "future_callout_field": "keep me" },
+  { "id": "op_3", "op": "callout", "rect": [10, 80, 100, 40], "tail": [90, 20], "text": "Box", "size": 20, "color": "#FFFFFF", "bg": "#2E8BFF", "radius": 0, "style": "box" },
+  { "id": "op_4", "op": "spotlight", "shapes": [ { "kind": "rect", "rect": [10, 10, 200, 100], "radius": 0 }, { "kind": "ellipse", "rect": [300, 40, 120, 120], "radius": 0 } ], "dim": 0.6, "mode": "dim", "strength": 12, "future_spot_field": 7 },
+  { "id": "op_5", "op": "step", "at": [400, 200], "n": 2, "size": 28, "color": "#FF3B3B", "style": "upper", "start": 3, "text": "Open Settings", "future_step_field": true },
+  { "id": "op_6", "op": "stamp", "at": [50, 50], "kind": "check", "size": 34, "color": "#2EB872" },
+  { "id": "op_7", "op": "stamp", "at": [90, 50], "kind": "label", "size": 34, "color": "#FF3B3B", "text": "Before", "future_stamp_field": null },
+  { "id": "op_8", "op": "magnify", "source": [10, 10, 50, 50], "zoom": 2, "future": "an op type this build does not know" }
+]
