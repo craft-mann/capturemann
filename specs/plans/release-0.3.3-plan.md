@@ -1,6 +1,6 @@
 # Release 0.3.3: plan (draft)
 
-Status: **draft written Nov 11, 2026; nothing built.** Follows 0.3.2 (in progress, `release-0.3.2-plan.md`).
+Status: **draft written Nov 11, 2026, updated Nov 12; nothing built.** Follows 0.3.2 (released Nov 12, 2026, `release-0.3.2-plan.md`).
 
 ## Scope
 
@@ -26,3 +26,12 @@ Known by name only, no reproduction (skipped for 0.3.2 by the maintainer, Nov 11
 
 
 Whatever of the 0.3.2 carry-over list is not done by release day: the speech-detector second opinion for the outro guard, "Always ignore this line", `estimate_vs_real` on Windows, Intel Mac hardware, Windows 10, a 16 GB Mac for long recordings, the cm-overlay exit race, the optional keyboard check of the shortcut fixes on Windows 11 and Linux X11 (`tests/manual/SHORTCUTS-1.md`; the macOS report is closed).
+
+## Found while releasing 0.3.2 (Nov 12, 2026)
+
+1. **Claude plugin and the directory.** Submitted and under review. The directory puts a policy hold on any plugin that runs a local command or MCP server unless the publisher is a **Verified organization** (a launcher script did not help and was reverted); until then the plugin installs from the repository marketplace. To do: find out how CraftMann becomes Verified (portal), then answer the review. Raise `plugin.json` `version` with every plugin release (pinned to the workspace version by `scripts/check_plugin_version.py`; the push webhook is set up, the directory follows `main`).
+2. **The MCP server starts no daemon.** `capturemann mcp` runs `cm-mcp`, which connects to a daemon that is already running; with the app closed every tool answers `daemon_unavailable`, and the macOS bundle has no `cm-daemon` (the app embeds it). The plugin docs said the opposite until Nov 12 (corrected on `main`). Product decision: leave it (the app must be open) or make `capturemann mcp` start a headless daemon (Free tools only, Confirm tools refused). The maintainer's remark "app closed -> opened" on PLUGIN-1 check 8 was not clarified: ask what he saw.
+3. **PLUGIN-1 not complete:** check 5 (the client in Settings, Agents and CLI), 9 and 10 not run; nothing run on Windows or Linux (`sh`-free: the plugin starts `capturemann mcp` directly).
+4. **Regression gaps from 0.3.2:** the Windows files were the overnight candidates, not rebuilt from the tag (same code); macOS reports were run on the overnight candidates plus a standard run on the released DMG (43/0); full and hardware tiers on the released DMGs were not run; Linux aarch64 is a candidate from CI (VM regression only).
+5. **winget:** PRs 472327 (0.2.8) and 477195 (0.3.1) still wait for a moderator; submit 0.3.2 after the first is accepted.
+6. **Release process:** `regress.sh` on a Mac uses the dev bundle by default (stale `target/release/cm-daemon` once caused a false failure): pass `--installer <dmg>` for a release run. `make-apt-repo.sh` needs `apt-ftparchive`, which the Mac lacks: run it on the aarch64 VM (staging recipe in the Nov 12 session; key copied in and shredded). The maintainer builds and notarizes the DMGs himself (no notary credentials in agent sessions).
