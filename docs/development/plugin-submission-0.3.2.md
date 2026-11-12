@@ -9,8 +9,9 @@ and the Anthropic Software Directory Policy (support.claude.com article 13145358
 `specs/plans/release-0.3.2-plan.md`, section 4. The plugin's own README is `plugins/capturemann/README.md`;
 the user page is `docs/user/claude-code-plugin.md`; the manual check is `tests/manual/PLUGIN-1.md`.
 
-Nothing here has been submitted. The portal was not opened while preparing this; every field below is
-what the docs say the portal asks, with the answer to give.
+**State (Nov 12, 2026):** submitted by the maintainer from the developer portal; the GitHub push webhook is set up; the directory follows `main`. The portal **refused version 0.3.2**: "Local MCP servers accepted only from Verified organizations. If your organization isn't Verified, remove them from the plugin." Before that it showed two policy holds (the server command and a launcher script, which is why the launcher was reverted). **Decision (maintainer, Nov 12, 2026): pursue organization verification, and meanwhile distribute from this repository** (`claude plugin marketplace add craft-mann/capturemann`, then `claude plugin install capturemann@capturemann-plugins`). The public docs do not say how an organization becomes Verified (checked Nov 12: "Publish to the directory", "Connector verification", the pre-submission checklist). Ask `directory@anthropic.com` (what makes an organization Verified for local MCP servers; whether verifying craftmann.app is enough; whether this submission can be moved to a new organization or only the same one verified; the first organization to submit a repository folder holds the listing). Do not create a second organization before they answer. After verification: raise `plugin.json` `version`, push, check the **Versions** tab.
+
+The text below was written before the submission and is kept as the record of what each field asked.
 
 ## How to submit, step by step (for the maintainer)
 

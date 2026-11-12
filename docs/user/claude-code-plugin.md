@@ -50,7 +50,7 @@ CaptureMann library?" to make the first call (`list_library`, read-only).
 
 Once the plugin is in Anthropic's directory you can also add it from **Customize → Plugins** on
 claude.ai; it then reaches your Claude Code sessions as a synced plugin. The directory listing is
-planned for 0.3.2 and is not live yet.
+is not live yet: the directory accepts a plugin with a local MCP server only from a Verified organization, and CraftMann is working on that verification. Install from this repository (above) until then.
 
 Update: `claude plugin update capturemann@capturemann-plugins`. The plugin's version follows the
 app's version; install the matching app release first. Remove: `claude plugin uninstall capturemann@capturemann-plugins`.

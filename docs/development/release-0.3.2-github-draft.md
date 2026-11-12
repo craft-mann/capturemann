@@ -52,7 +52,7 @@ from the candidate reports plus the smoke check of the final files (see the rele
   (`sudo ln -s /Applications/CaptureMann.app/Contents/MacOS/capturemann /usr/local/bin/capturemann`) or give the full path when Claude
   Code asks for **CaptureMann command** at install. The plugin version follows the app version (0.3.2); install the matching app
   release first. How it works and what to do when it does not: `docs/user/claude-code-plugin.md`. The plugin is also prepared for
-  Anthropic's directory (`docs/development/plugin-submission-0.3.2.md`); it is submitted, and the directory holds it because it accepts a plugin that runs a local program only from a Verified organization. Until that is settled, install it from this repository: `claude plugin marketplace add craft-mann/capturemann`, then `claude plugin install capturemann@capturemann-plugins`. The local MCP server does not run in Claude on the web or on a phone; there the
+  Anthropic's directory (`docs/development/plugin-submission-0.3.2.md`); it is not in Anthropic's directory yet: the directory accepts a plugin with a local MCP server only from a Verified organization, and we are working on that verification. Until then, install it from this repository: `claude plugin marketplace add craft-mann/capturemann`, then `claude plugin install capturemann@capturemann-plugins`. The local MCP server does not run in Claude on the web or on a phone; there the
   skills load but the tools are missing, and the plugin says so.
 - **Agent clients appear in Settings → Agents & CLI as soon as they connect**, with their last tool and call count, so you can allow,
   restrict or block a client before it asks for anything that needs confirmation. Before, a client that only called Free tools (most
