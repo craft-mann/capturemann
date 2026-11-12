@@ -73,8 +73,8 @@ IDs are never renumbered; ANN-5 is Copy text (0.3.2). FR table rows to add in `0
 Rough size: A about 2 days, B about 3 days, C about 1 day, verification and release 1 day: a normal release. **Decision (maintainer, Nov 12, 2026): in-app update (Velopack) is not brought in at this phase** (parked in `release-0.3.3-plan.md`, spikes kept). 0.3.3 is the annotation pack plus the small carried-over fixes. Windowed audio and PhoWhisper have no release assigned; PhoWhisper stays out unless the maintainer asks.
 
 ## 5. Questions for the maintainer
-1. (Answered Nov 12: the annotation pack is 0.3.3 and in-app update is not in this phase.) Windowed audio: 0.3.4, or later?
+1. (Answered Nov 12: the annotation pack is 0.3.3 and in-app update is not in this phase.) Windowed audio: **later** (Nov 12; no release assigned).
 2. (Answered Nov 12: **accepted**.) Section 2 item 7: 0.3.2 will not draw the new ops and drops the new step fields when it saves (the ops themselves are kept); 0.3.3 adds field pass-through, a round-trip fixture test and a note in the release text.
 3. Are the proposed rules for spotlight order (inserted before the first non-redaction op) and magnify (always redacted) fine?
-4. Are stamps in scope or a stretch goal?
+4. (Answered Nov 12: **stretch goal, built last**; cut first if time runs short.) Stamps.
 5. `capturemann mcp` starting a headless daemon, from `release-0.3.3-plan.md`: leave it as is (the app must be open) or build it?
