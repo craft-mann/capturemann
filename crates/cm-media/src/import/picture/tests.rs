@@ -98,7 +98,8 @@ fn encode(img: &image::DynamicImage, fmt: image::ImageFormat) -> Vec<u8> {
 /// Inserts an EXIF APP1 block with one orientation entry right after SOI.
 fn with_orientation(jpeg: &[u8], orientation: u16, little: bool) -> Vec<u8> {
     let mut tiff = Vec::new();
-    let (u16b, u32b): (fn(u16) -> [u8; 2], fn(u32) -> [u8; 4]) = if little {
+    type Writers = (fn(u16) -> [u8; 2], fn(u32) -> [u8; 4]);
+    let (u16b, u32b): Writers = if little {
         tiff.extend_from_slice(b"II*\0");
         (u16::to_le_bytes, u32::to_le_bytes)
     } else {

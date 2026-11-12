@@ -216,7 +216,7 @@ fn ann7_ac2_two_spotlights() {
 #[test]
 fn ann7_ac6_invalid_spotlights() {
     let sh = r##"{"rect":[1,1,5,5]}"##;
-    let nine = vec![sh; 9].join(",");
+    let nine = [sh; 9].join(",");
     for bad in [
         format!(r##"[{{"op":"spotlight","shapes":[{nine}]}}]"##),
         r##"[{"op":"spotlight","shapes":[]}]"##.to_string(),
