@@ -1,6 +1,6 @@
 # Release 0.3.2: plan (draft)
 
-Status: **candidate files built Nov 11 to 12, 2026; release planned Nov 12** (plan written Nov 11, 2026 with the scope from the maintainer; decisions below made the same day; the work merged on Nov 11, board `release-0.3.2-status.md`; the overnight record is `release-0.3.2-final-morning-report.md`; release text `docs/development/release-0.3.2-github-text.md`, steps `docs/development/release-day-0.3.2.md`). Follows 0.3.1 (published Nov 11, 2026).
+Status: **released Nov 12, 2026 (tag `v0.3.2` on `5d493d08`)** (plan written Nov 11, 2026 with the scope from the maintainer; decisions below made the same day; the work merged on Nov 11, board `release-0.3.2-status.md`; the overnight record is `release-0.3.2-final-morning-report.md`; release text `docs/development/release-0.3.2-github-text.md`, steps `docs/development/release-day-0.3.2.md`). Follows 0.3.1 (published Nov 11, 2026).
 
 ## Decisions (maintainer, Nov 11, 2026)
 
