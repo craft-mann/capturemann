@@ -145,10 +145,7 @@ Minisign public key: `packaging/linux/minisign.pub`; public key `RWTeQv8ogB2CCuZ
 - **Windows 11, x64:** installer `capturemann-0.3.2-windows-x64-setup.exe` (per user, no administrator rights; tick "Add
   capturemann.exe and cm-mcp.exe to my PATH" if you will use the CLI or the Claude plugin) or the zip `capturemann-0.3.2-windows-x64.zip`
   (unpack anywhere, run `cm-desktop.exe`; `capturemann.exe` is the command line). Check with `certutil -hashfile <file> SHA256` or
-  `SHA256SUMS.txt`. **winget:** 0.3.2 is **not** in winget. <FILL: on the release day, one of: "Pull requests 472327 (0.2.8) and 477195
-  (0.3.1) to microsoft/winget-pkgs are still open, so `winget install CaptureMann.CaptureMann` does not work yet; use the installer or
-  the zip. A 0.3.2 update follows once the first package is accepted." or "winget has <version> (pull request <n> merged); a 0.3.2 update
-  is submitted as pull request <n>.">
+  `SHA256SUMS.txt`. **winget:** 0.3.2 is **not** in winget. Pull requests 472327 (0.2.8) and 477195 (0.3.1) to microsoft/winget-pkgs have passed validation and wait for a moderator, so `winget install CaptureMann.CaptureMann` does not work yet; use the installer or the zip. A 0.3.2 update follows once the first package is accepted.
 - **macOS 13+:** `CaptureMann-v0.3.2-macos-arm64.dmg` (Apple Silicon) or `CaptureMann-v0.3.2-macos-x86_64.dmg` (Intel);
   signed with a Developer ID, notarized and stapled.
   Or `brew upgrade --cask craft-mann/tap/capturemann` (`brew install --cask craft-mann/tap/capturemann` for a first install; the cask
