@@ -1,6 +1,6 @@
 # Release 0.3.3: annotation pack (analysis of `0.3.3.md` and detail plan)
 
-Status: **proposal written Nov 12, 2026 for the maintainer's review; nothing built.** Source: the maintainer's `0.3.3.md` at the repository root (callout, step badge upgrades, spotlight, magnify, stamps). Scope and the rest of 0.3.3: `release-0.3.3-plan.md`.
+Status: **all open questions answered Nov 12, 2026 (section 5); waiting for the maintainer's review of this plan before Phase 0; nothing built.** Source: the maintainer's `0.3.3.md` at the repository root (callout, step badge upgrades, spotlight, magnify, stamps). Scope and the rest of 0.3.3: `release-0.3.3-plan.md`.
 
 ## 1. What the proposal is, and how it fits the repository
 
@@ -75,6 +75,6 @@ Rough size: A about 2 days, B about 3 days, C about 1 day, verification and rele
 ## 5. Questions for the maintainer
 1. (Answered Nov 12: the annotation pack is 0.3.3 and in-app update is not in this phase.) Windowed audio: **later** (Nov 12; no release assigned).
 2. (Answered Nov 12: **accepted**.) Section 2 item 7: 0.3.2 will not draw the new ops and drops the new step fields when it saves (the ops themselves are kept); 0.3.3 adds field pass-through, a round-trip fixture test and a note in the release text.
-3. Are the proposed rules for spotlight order (inserted before the first non-redaction op) and magnify (always redacted) fine?
+3. (Answered Nov 12: **both accepted**.) Spotlight order: the editor inserts a new spotlight before the first non-redaction op (agents control order by writing the list). Magnify: blur and pixelate always apply to every copy of the pixels, also inside a loupe.
 4. (Answered Nov 12: **stretch goal, built last**; cut first if time runs short.) Stamps.
-5. `capturemann mcp` starting a headless daemon, from `release-0.3.3-plan.md`: leave it as is (the app must be open) or build it?
+5. (Answered Nov 12: **leave as is**.) `capturemann mcp` starts no daemon in 0.3.3: the app must be open and tools answer `daemon_unavailable`. A headless daemon (or MCP launching the app) goes on the 0.3.4+ list; open design point: Confirm-tier tools need an on-screen dialog, which a headless daemon lacks.
