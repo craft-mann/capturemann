@@ -11,6 +11,7 @@ Status: **all open questions answered Nov 12, 2026 (section 5); waiting for the 
 | 3 Spotlight | none | New **ANN-7** Spotlight |
 | 4 Magnify | none | New **ANN-8** Magnify |
 | 5 Stamps | ANN-4 | In ANN-4 (optional, last) |
+| 6 **Import existing images** (added by the maintainer Nov 12, 2026; not in `0.3.3.md`) | IMP-1 to IMP-5 cover video and audio only | New **IMP-6** "Import images" in `specs/features/18-import.md`, same tool, job and sheet; see section 3b |
 
 IDs are never renumbered; ANN-5 is Copy text (0.3.2). FR table rows to add in `00-product-spec.md`: ANN-6, ANN-7, ANN-8 (P1); ANN-4 moves from P2 to P1 for callout and stamp only.
 
@@ -68,9 +69,23 @@ IDs are never renumbered; ANN-5 is Copy text (0.3.2). FR table rows to add in `0
 | B editor and i18n | `apps/desktop/src/editor/**`, `ui/editor_view/**`, `locales/**`, `design` icons | after the schema freeze |
 | C specs, docs, regress case | `specs/**`, `docs/**`, `crates/cm-regress`, `tests/manual` | in parallel from Phase 0 |
 
+### 3b. Import existing images (IMP-6, added Nov 12, 2026; track D)
+
+**Why it fits.** The annotation pack only works on screenshots CaptureMann took. With image import, a phone screenshot, a design mock-up or a picture from another tool can be annotated, redacted, Copy-text'd and exported in the same way. The pieces exist: `import_media` (Free tier, `dry_run`, `remove_originals` as Confirm, the `import` job, cancel, resume, disk check), the Import sheet (IMP-5), and PNG/JPEG decoding (`image` crate with `png` and `jpeg` is already built into `cm-library`, `cm-media`, `cm-daemon`).
+
+**Proposal (to be written as IMP-6 with ACs):**
+- **Same entry points, no new tool.** `import_media` accepts images; the tool count stays 81. CLI `capturemann import <files>` and the app's Import sheet accept them; drag and drop onto the library as for video. The sheet row shows size in pixels and status like other files.
+- **Result.** One image becomes one `.cmshot` bundle (`kind: screenshot`) with `original.png` (annotation ops are in physical px of `original.png`, so the pipeline needs PNG), a manifest with `source: { path, imported_at, original_name }`, a thumbnail, and an empty ops list. The editor opens it like a screenshot; it shows in the library with the "imported" mark.
+- **Formats.** In: PNG and JPEG (decoders already shipped). Recognised and refused with `unsupported_format` and the format named: GIF (animated), WebP, HEIC/HEIF, TIFF, BMP, SVG, RAW. A later candidate: WebP and HEIC (iPhone), once a licence and size check is done (HEIC has patent and decoder questions). Content decides, not the extension (as IMP-1 AC8).
+- **Normalisation.** Apply the EXIF orientation (a phone photo must not arrive sideways); convert to 8-bit sRGB RGBA (16-bit PNG and wide-gamut profiles are converted; the row says so); keep transparency. **Metadata is not copied into `original.png`** (EXIF with GPS and camera data stays out), and the source file is not kept unless the user keeps it by not removing the original.
+- **Limits.** Maximum 16 384 px per side and 100 megapixels (checked from the header before decoding, so a decompression bomb never allocates), reported as `unsupported_format` with `data.reason: "too_large"`. Corrupt or empty: `unreadable_file`. A screenshot-like scale factor of 1 (physical = logical) unless the file says otherwise (PNG pHYs 144 dpi marks a 2x image: keep as a hint only).
+- **Privacy.** Imported images are local only, as everything else. Auto-redact and Copy text work on them with no change.
+- **Tests.** Pure tests on headers (orientation, size limits, bombs, CMYK JPEG, 16-bit, palette PNG), golden `annotate` on an imported image, an `import_media dry_run` row test, a `cm-regress` case (import a PNG and a JPEG, annotate, export), and `tests/manual/IMP-6.md` for drag and drop.
+- **Size.** About 1.5 days, one agent, files disjoint from tracks A and B: `cm-media/src/import.rs` (probe/classify), `cm-library/src/import.rs` (bundle), `cm-mcp` schema text, `apps/desktop` Import sheet and drop target, `specs/features/18-import.md`, `locales`. The sheet change touches `apps/desktop`, so run it after track B's toolbar work lands, or in a separate files set (the Import sheet is not in `editor/`).
+
 ## 4. Size and what else fits in 0.3.3
 
-Rough size: A about 2 days, B about 3 days, C about 1 day, verification and release 1 day: a normal release. **Decision (maintainer, Nov 12, 2026): in-app update (Velopack) is not brought in at this phase** (parked in `release-0.3.3-plan.md`, spikes kept). 0.3.3 is the annotation pack plus the small carried-over fixes. Windowed audio and PhoWhisper have no release assigned; PhoWhisper stays out unless the maintainer asks.
+Rough size: A about 2 days, B about 3 days, C about 1 day, D (image import) about 1.5 days, verification and release 1 day: still a normal release. **Decision (maintainer, Nov 12, 2026): in-app update (Velopack) is not brought in at this phase** (parked in `release-0.3.3-plan.md`, spikes kept). 0.3.3 is the annotation pack plus the small carried-over fixes. Windowed audio and PhoWhisper have no release assigned; PhoWhisper stays out unless the maintainer asks.
 
 ## 5. Questions for the maintainer
 1. (Answered Nov 12: the annotation pack is 0.3.3 and in-app update is not in this phase.) Windowed audio: **later** (Nov 12; no release assigned).
@@ -78,3 +93,4 @@ Rough size: A about 2 days, B about 3 days, C about 1 day, verification and rele
 3. (Answered Nov 12: **both accepted**.) Spotlight order: the editor inserts a new spotlight before the first non-redaction op (agents control order by writing the list). Magnify: blur and pixelate always apply to every copy of the pixels, also inside a loupe.
 4. (Answered Nov 12: **stretch goal, built last**; cut first if time runs short.) Stamps.
 5. (Answered Nov 12: **leave as is**.) `capturemann mcp` starts no daemon in 0.3.3: the app must be open and tools answer `daemon_unavailable`. A headless daemon (or MCP launching the app) goes on the 0.3.4+ list; open design point: Confirm-tier tools need an on-screen dialog, which a headless daemon lacks.
+6. Image import (IMP-6, section 3b): (a) formats PNG and JPEG only in 0.3.3, WebP and HEIC later? (b) paste an image from the clipboard as a stretch goal? (c) drop the EXIF and other metadata from `original.png` and do not keep the source file? (d) limits 16 384 px per side and 100 megapixels?
