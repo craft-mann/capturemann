@@ -611,17 +611,17 @@ pub fn from_flag(granted: bool) -> State {
 }
 
 fn screen_granted() -> bool {
-    if debug_screen_missing() {
-        return false;
-    }
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
-    {
-        cm_capture::XcapBackend::new().check_permission().is_ok()
-    }
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    {
-        true
-    }
+    !debug_screen_missing() && screen_probe()
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+fn screen_probe() -> bool {
+    cm_capture::XcapBackend::new().check_permission().is_ok()
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+fn screen_probe() -> bool {
+    true
 }
 
 #[cfg(target_os = "macos")]
