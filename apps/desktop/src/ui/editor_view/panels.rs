@@ -432,21 +432,39 @@ impl EditorView {
         });
         let list = div().flex().flex_col().gap(px(4.)).children(rows);
         let mut out = Vec::new();
-        if !info.rows.is_empty() {
-            out.push(self.panel_group(t, &tr_ctx!("annotation setting", "Order"), list));
-        }
-        out.push(
-            info_note(
-                t,
-                None,
-                tr!(
-                    "Drag to reorder: the numbers follow. Deleting a step renumbers the rest. \
-                     Labels sit right of the badge and flip left near the image edge. After Z \
-                     come AA, AB."
-                ),
-            )
-            .into_any_element(),
+        // The how-to sits in the tooltip of the (i) next to the heading, not in a note below.
+        let hint = tr!(
+            "Drag to reorder: the numbers follow. Deleting a step renumbers the rest. \
+             Labels sit right of the badge and flip left near the image edge. After Z \
+             come AA, AB."
         );
+        if !info.rows.is_empty() {
+            let heading = div()
+                .flex()
+                .items_center()
+                .gap(px(6.))
+                .child(section_label(t, &tr_ctx!("annotation setting", "Order")))
+                .child(
+                    div()
+                        .id("step-order-info")
+                        .role(Role::Image)
+                        .aria_label(SharedString::from(hint.clone()))
+                        .flex_none()
+                        .flex()
+                        .items_center()
+                        .tooltip(crate::ui::tooltip::tip(hint, Vec::new()))
+                        .child(icon("info", 14., t.mist)),
+                );
+            out.push(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(8.))
+                    .child(heading)
+                    .child(list)
+                    .into_any_element(),
+            );
+        }
         out
     }
 
