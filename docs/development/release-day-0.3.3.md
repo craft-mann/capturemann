@@ -87,7 +87,7 @@ ANN-6, ANN-7 and IMP-6 (`In progress (...)` or `Ready` only as the wording rule 
    line, notarization, the winget sentence, the Homebrew line, the plugin sentence, the APT versions, the licences sentence from a diff of
    `Cargo.lock` and `THIRD_PARTY_LICENSES.md` against `v0.3.2`, the CHANGELOG date) and delete the OPTIONAL lines of anything not built.
    Check no line says "passed" or "verified" without a stored report. Save the "Release body" section as `release-body.md` (not committed).
-2. Create the draft: `gh release create v0.3.3 -R craft-mann/capturemann --draft --prerelease --title "CaptureMann 0.3.3: callouts, spotlight and step labels, import pictures" --notes-file release-body.md`
+2. Create the draft: `gh release create v0.3.3 -R craft-mann/capturemann --draft --prerelease --title "CaptureMann 0.3.3: callouts, spotlight and step labels, import pictures, clearer text fields" --notes-file release-body.md`
    (or use the macOS draft the `Release` workflow made), upload the files as in `release-day-0.3.2.md` section 6 (2 DMGs, 2 Windows files,
    4 Linux packages, their `.sha256` and `.minisig`, `SHA256SUMS.txt`), download one file per system in a browser and check it, then **[M] publish**.
    A bad file is replaced by a new tag (0.3.4), never an edited asset; rollback is in `releasing.md`, "Rollback and yank".

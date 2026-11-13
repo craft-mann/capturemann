@@ -7,11 +7,11 @@ placeholder for a fact that only exists on the release day (commit, report names
 write "passed" or "verified" without a stored report in `verification/` (CLAUDE.md wording rule). Steps: `release-day-0.3.3.md`.
 Lines marked **OPTIONAL** describe work that may be cut (stamps, clipboard paste); keep them only if the feature is in the tagged commit.
 
-- **Tag:** `v0.3.3` (never reuse a tag). **Title:** `CaptureMann 0.3.3: callouts, spotlight and step labels, import pictures`.
+- **Tag:** `v0.3.3` (never reuse a tag). **Title:** `CaptureMann 0.3.3: callouts, spotlight and step labels, import pictures, clearer text fields`.
 - **Type:** draft, then **pre-release** (the version is 0.x). Covers Windows 11 (x64), macOS 13+ (Apple Silicon and Intel) and Linux
   (Ubuntu 24.04+, x86_64 and aarch64). It becomes the next "Latest".
 - **Files to attach:** as 0.3.2 with the version changed: Windows `capturemann-0.3.3-windows-x64-setup.exe`, `...-windows-x64.zip`,
-  `.sha256` files and `SHA256SUMS.txt`; macOS `CaptureMann-v0.3.3-macos-arm64.dmg` and `CaptureMann-v0.3.3-macos-x86_64.dmg` with
+  `.sha256` files and `SHA256SUMS.txt`; macOS `CaptureMann-0.3.3-arm64.dmg` and `CaptureMann-0.3.3-x86_64.dmg` with
   `.sha256` (rename the `make release` output `CaptureMann-0.3.3-<arch>.dmg`, write the `.sha256` files again with the new names); Linux
   `capturemann-0.3.3-linux-{x86_64,aarch64}.tar.gz`, `capturemann_0.3.3_{amd64,arm64}.deb`, `.sha256`, `.minisig`. APT repository:
   release `apt` (assets), run `make-apt-repo.sh` again with the `.deb` files of 0.3.0 to 0.3.3.
@@ -93,35 +93,37 @@ layout, and pictures can be imported.
 
 ## Changed
 
-- Revert to original, Fit and 100% moved as described above; no setting or shortcut was removed. <FILL: anything else from the CHANGELOG
-  "Changed" and "Fixed" for 0.3.3 once written; delete this line if empty.>
+- Revert to original, Fit and 100% moved as described above; no setting or shortcut was removed.
 
 ## Checked, and what was not
 
-Reports in `verification/` (all PARTIAL; one computer each). Candidate files were built from `<FILL: release commit sha>`, the commit
-the tag points to, and regressed; the final files built from the tag were <FILL: "byte-identical to the candidates (same SHA-256)" or
-"re-checked with a `cm-regress` smoke run per system (report names below)">.
+Reports in `verification/` (all PARTIAL; one computer each). The files below were built from commit `85df0235` (the commit the tag
+`v0.3.3` points to) and are the files that were regressed (the same files: no rebuild after the tests, except the macOS DMGs, which were
+made from a later commit that differs only in documents and stored reports). **This is a pre-release because the Windows regression has not
+been run on these files yet** (the lab computer could not boot Windows on release day); it follows and this page is updated.
 
 | System | Files and computer | Tiers run (passed/failed) | Reports |
 | --- | --- | --- | --- |
-| Windows 11 x64 (ThinkPad T490, Intel UHD 620) | installer and zip from the **Windows package** workflow, <FILL: run id, candidate or tag>; silent install | standard <FILL: n/0>, full <FILL: n/0> | `<FILL: L1-windows-0.3.3-regression-*>` |
-| macOS arm64 (the maintainer's Mac, Apple M4 Pro) | `CaptureMann-v0.3.3-macos-arm64.dmg`, <FILL: "signed with a Developer ID, notarized and stapled" or "not notarized">; the app copied out of the DMG | standard <FILL: n/0>, full <FILL: n/0> | `<FILL: L1-macos-0.3.3-regression-*>` |
-| macOS x86_64 (Intel) | `CaptureMann-v0.3.3-macos-x86_64.dmg`, same build; **checked on Apple Silicon only** | not run on Intel hardware | `<FILL: the x86_64 DMG check report>` |
-| Linux x86_64 (same ThinkPad, Ubuntu 24.04, X11) | tarball and `.deb` from `release-build.sh` | standard <FILL: n/0>, full <FILL: n/0>, `.deb` install <FILL: 1/0> | `<FILL: L1-linux-0.3.3-regression-*>` |
-| Linux aarch64 (Ubuntu 24.04 VM, headless) | tarball and `.deb` from `release-build.sh` | full <FILL: n/0> | `<FILL: L1-linux-0.3.3-aarch64-*>` |
+| Windows 11 x64 | installer and zip from the **Windows package** workflow (run 43376683644 on `85df0235`) | **not run**; the workflow's own Windows tests passed (run 43376687740) | none yet |
+| macOS arm64 (the maintainer's Mac, Apple M4 Pro) | `CaptureMann-0.3.3-arm64.dmg`, signed with a Developer ID, notarized and stapled | full 53/0 (22 skipped), on the dev bundle built from the same code (not on the app copied out of the DMG); earlier full runs 54/0 and 46/0 | `L1-macos-0.3.3-regression-full-release-candidate-2026-11-13-claude`, `...-candidate-screen-...`, `...-candidate3-...`, `...-candidate-textfields-...` |
+| macOS x86_64 (Intel) | `CaptureMann-0.3.3-x86_64.dmg`, same code, signed, notarized and stapled; **checked on Apple Silicon only** | not run on Intel hardware | none |
+| Linux x86_64 (ThinkPad T490, Ubuntu 24.04, X11) | tarball and `.deb` from `release-build.sh`; both pass `check-package.sh` | full 61/0 (14 skipped), tarball install case included | `L1-linux-0.3.3-regression-full-x11-release-candidate-2026-11-13-claude` |
+| Linux aarch64 (Ubuntu 24.04 VM, headless) | tarball and `.deb` from `release-build.sh`; both pass `check-package.sh` | full 40/0 (35 skipped: no desktop session) | `L1-linux-0.3.3-aarch64-vm-release-candidate-85df0235-full-2026-11-13-claude` |
 
-<FILL: delete any row or cell whose report does not exist; if a run had a failure, name it and say whether it was explained.>
+Skipped cases are the ones that need a logged-in desktop session, a model, another system or hardware; no run had a failure on the files
+above. Earlier in the day one stale case was fixed (`import.errors` still expected a PNG to be refused) and one macOS CI check and one Windows
+CI check failed for reasons that were fixed or turned out to be a flake; the CI run on `85df0235` is the one the release rests on.
 
 The new features were checked like this: the new operations, the step labels, the spotlight rules, the pass-through of unknown fields and the
 image import have unit tests and golden images (ANN-4, ANN-6, ANN-7, IMP-6; tested with fakes). The `cm-regress` cases `annotate.pack` (the
 new ops through the CLI, pixel statistics of the render, a second spotlight refused) and `import.images` (a PNG and a JPEG imported,
-annotated and exported) are part of the reports above <FILL: delete if the cases did not run>. The editor (palette, view bar, image strip,
-callout, spotlight, steps) and dragging pictures onto the library were checked by eye with `tests/manual/ANN-6.md` and
-`tests/manual/IMP-6.md` <FILL: "by the maintainer on macOS, reports ..." or "were not run">.
+annotated and exported) are part of the macOS and Linux reports above. The editor (palette, view bar, image strip,
+callout, spotlight, steps), the text fields, the spotlight drag preview, caption saving and importing pictures were **tried by the maintainer
+on macOS** (as reported; no report is stored in `verification/`, and the scripts `ANN-6.md`, `IMP-6.md` and `TEXT-FIELDS.md` were not run as
+written).
 
 Not run: **Intel Mac hardware**, Windows 10, SmartScreen after "Keep", mixed DPI, NVIDIA and AMD encoders, KDE and other Linux
-distributions, a second monitor, a 16 GB Mac for long recordings, <FILL: the editor script `ANN-6.md` and `IMP-6.md` on Windows and Linux,
-unless run>, a phone photo with an orientation tag from a real phone on Windows and Linux, the Linux `.deb` through APT on a clean
+distributions, a second monitor, a 16 GB Mac for long recordings, the **Windows regression**, the editor and the text fields on Windows and Linux, a phone photo with an orientation tag from a real phone on Windows and Linux, the Linux `.deb` through APT on a clean
 computer, the Linux Wayland session.
 
 ## Known limits
@@ -147,29 +149,27 @@ computer, the Linux Wayland session.
 
 | File | SHA-256 |
 |---|---|
-| `capturemann-0.3.3-windows-x64-setup.exe` | `<FILL>` |
-| `capturemann-0.3.3-windows-x64.zip` | `<FILL>` |
-| `CaptureMann-v0.3.3-macos-arm64.dmg` | `<FILL>` |
-| `CaptureMann-v0.3.3-macos-x86_64.dmg` | `<FILL>` |
-| `capturemann-0.3.3-linux-x86_64.tar.gz` | `<FILL>` |
-| `capturemann_0.3.3_amd64.deb` | `<FILL>` |
-| `capturemann-0.3.3-linux-aarch64.tar.gz` | `<FILL>` |
-| `capturemann_0.3.3_arm64.deb` | `<FILL>` |
+| `capturemann-0.3.3-windows-x64-setup.exe` | `7791304199c484b7eb4dba5571d4a8c4b75c4b2bdf69bbcd0bd6d3868e7af7cd` |
+| `capturemann-0.3.3-windows-x64.zip` | `185a49e5e7474c299a06360ed07239350777f0f8187454f43d7f2a47b47dd624` |
+| `CaptureMann-0.3.3-arm64.dmg` | `09747c0cc9d9bd04215c88bf03501898b944c773777df0bf65edc5472d4b1ba8` |
+| `CaptureMann-0.3.3-x86_64.dmg` | `6f493e15197ce1ab1d320c3018798ecd7d2c7cf5da53a5d0a626e54108da7d28` |
+| `capturemann-0.3.3-linux-x86_64.tar.gz` | `4f392dc303fe4f938ac464022b19d81a5e1f62eb4b6fd33295dc2548c03ef2e0` |
+| `capturemann_0.3.3_amd64.deb` | `3efc0d6594c47cee119e2ac9a809e98cbb6cd6c138f7f0065a6951a15a6b4e91` |
+| `capturemann-0.3.3-linux-aarch64.tar.gz` | `e36e2a5f9056d347c1c692673e73877130862eed0753c19c1c400df2fc4bb808` |
+| `capturemann_0.3.3_arm64.deb` | `6166840bb79e4214982a8fd8f60f26609c01b195a2c5effaf1baf2bbe8f563ef` |
 
-Minisign public key: `packaging/linux/minisign.pub`; public key `<FILL: the key line from packaging/linux/minisign.pub; 0.3.1 used
-RWTeQv8ogB2CCuZ7j0rr3MovdHod4QATmVn+I329YC8pomOC6R9Rxc2k>` (verify: `minisign -Vm <file> -P <that key>`).
+Minisign public key: `packaging/linux/minisign.pub`; public key `RWTeQv8ogB2CCuZ7j0rr3MovdHod4QATmVn+I329YC8pomOC6R9Rxc2k` (verify: `minisign -Vm <file> -P <that key>`).
 
 - **Windows 11, x64:** installer `capturemann-0.3.3-windows-x64-setup.exe` (per user, no administrator rights; tick "Add
   capturemann.exe and cm-mcp.exe to my PATH" if you will use the CLI or the Claude plugin) or the zip `capturemann-0.3.3-windows-x64.zip`
   (unpack anywhere, run `cm-desktop.exe`; `capturemann.exe` is the command line). Check with `certutil -hashfile <file> SHA256` or
-  `SHA256SUMS.txt`. **winget:** 0.3.3 is **not** in winget. <FILL: on the release day, one of: "Pull requests 472327 (0.2.8) and 477195
+  `SHA256SUMS.txt`. **winget:** 0.3.3 is **not** in winget. Pull requests 472327 (0.2.8) and 477195
   (0.3.1) to microsoft/winget-pkgs are still open, so `winget install CaptureMann.CaptureMann` does not work yet; use the installer or
-  the zip. A 0.3.3 update follows once the first package is accepted." or "winget has <version> (pull request <n> merged); a 0.3.3 update
-  is submitted as pull request <n>.">
-- **macOS 13+:** `CaptureMann-v0.3.3-macos-arm64.dmg` (Apple Silicon) or `CaptureMann-v0.3.3-macos-x86_64.dmg` (Intel);
-  <FILL: "signed with a Developer ID, notarized and stapled" or "not notarized: right-click the app and choose Open the first time">.
+  the zip. A 0.3.3 update follows once the first package is accepted.
+- **macOS 13+:** `CaptureMann-0.3.3-arm64.dmg` (Apple Silicon) or `CaptureMann-0.3.3-x86_64.dmg` (Intel);
+  signed with a Developer ID, notarized and stapled.
   Or `brew upgrade --cask craft-mann/tap/capturemann` (`brew install --cask craft-mann/tap/capturemann` for a first install; the cask
-  is at <FILL: 0.3.3, tap commit ...> ). Check with `shasum -a 256 -c <file>.sha256`.
+  moves to 0.3.3 shortly after this release is published). Check with `shasum -a 256 -c <file>.sha256`.
 - **Linux (Ubuntu 24.04 or newer, Debian 13, or glibc 2.39+; amd64 and arm64):** `sudo apt install ./capturemann_0.3.3_amd64.deb` (or
   `_arm64.deb`), or the tarball with `./check-runtime.sh` and `./install.sh`. Copy text and Auto-redact need
   `sudo apt install tesseract-ocr` (and `tesseract-ocr-<lang>` for other languages). Or the APT repository:
@@ -182,8 +182,7 @@ sudo apt -o Acquire::Retries=5 update && sudo apt -o Acquire::Retries=5 install 
 ```
 
 GitHub's release host sometimes answers the first download of a file with a `504`; repeating the command works (the `Retries` option does
-it for you). The repository is hosted on GitHub release assets for now; it carries <FILL: "0.3.0 to 0.3.3" once make-apt-repo.sh
-has run>.
+it for you). The repository is hosted on GitHub release assets for now; it carries 0.3.0 to 0.3.2 now, and 0.3.3 is added shortly after this release is published.
 
 Repository key fingerprint: `516C CD4F C7B3 5167 8803  F71B DEB1 BB54 FAEF 557D` (RSA 4096, signing only, expires Nov 8, 2031). The
 repository is the set of files of the release tagged [`apt`](https://github.com/craft-mann/capturemann/releases/tag/apt). The key and
@@ -206,7 +205,7 @@ nothing GPL is linked or bundled. No dependency was added since 0.3.2: `Cargo.lo
 ## CHANGELOG section (turn `## [Unreleased]` into this on the release day; `release.yml` reads it)
 
 ```
-## [0.3.3] - <FILL: date>
+## [0.3.3] - 2026-11-13
 ```
 
 The body under it is the current `[Unreleased]` text of `CHANGELOG.md` (Added: callout, spotlight, step label, style and start, reorder, stamps if
