@@ -1229,6 +1229,10 @@ pub struct SelectedText {
 pub struct OverlayData {
     pub chrome: Option<Chrome>,
     pub draft: Option<OpKind>,
+    /// The image's size in px, and whether it already has a spotlight: the live spotlight drag
+    /// dims everything outside the hole only when there is none yet.
+    pub image: (u32, u32),
+    pub spot_exists: bool,
     pub masks: Vec<Rc>,
     /// Auto-redact proposals, drawn dashed (not applied).
     pub proposals: Vec<Rc>,
@@ -1352,6 +1356,8 @@ impl EditorDoc {
         OverlayData {
             chrome: self.state.chrome(),
             draft: draft.filter(|d| !matches!(d, OpKind::Crop { .. })),
+            image: self.state.image,
+            spot_exists: self.state.spotlight_index().is_some(),
             masks: self.pending_redactions(),
             proposals: self.state.proposals.iter().map(|p| p.rect).collect(),
             crop,

@@ -3006,6 +3006,28 @@ mod tests {
 
     /// ANN-7.AC3: a second drawn shape is a hole of the existing spotlight, in one revision; the
     /// whole op list is one `Replace`, so one undo leaves one hole.
+    /// ANN-7: while the pointer is down the dragged hole is the draft the canvas draws live
+    /// (the dim and the outline), and nothing is stored until the pointer is released.
+    #[test]
+    fn ann_7_the_dragged_hole_is_a_draft_until_release() {
+        let mut s = st();
+        s.set_tool(Tool::Spotlight);
+        s.pointer_down(Pt::new(100.0, 100.0), NONE, 1, TOL);
+        assert!(s.draft().is_none(), "no area yet");
+        s.pointer_move(Pt::new(260.0, 180.0), NONE, TOL);
+        match s.draft() {
+            Some(OpKind::Spotlight { shapes, .. }) => {
+                let r = shapes[0].rect.normalized();
+                assert_eq!((r.x, r.y, r.w, r.h), (100.0, 100.0, 160.0, 80.0));
+            }
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(spot_count(&s), 0, "stored only on release");
+        s.pointer_up(Pt::new(260.0, 180.0), NONE, TOL);
+        assert!(s.draft().is_none());
+        assert_eq!((spot_count(&s), spot_holes(&s)), (1, 1));
+    }
+
     #[test]
     fn ann_7_ac3_second_shape_is_a_hole_in_one_edit() {
         let mut s = st();

@@ -364,7 +364,8 @@ fn paint_overlay(
         }
         // The shape being dragged out (outline only; redactions get an opaque mask).
         if let Some(d) = &o.draft {
-            paint_draft(d, &pt, &rect_b, z, t, window);
+            let image = Rc::new(0.0, 0.0, f64::from(o.image.0), f64::from(o.image.1));
+            paint_draft(d, &pt, &rect_b, z, t, (image, o.spot_exists), window);
         }
         // Selection box and handles.
         if let Some(ch) = &o.chrome {
@@ -525,9 +526,66 @@ fn paint_draft(
     rect_b: &dyn Fn(Rc) -> Bounds<Pixels>,
     z: f64,
     t: &Theme,
+    // The image rectangle and whether the image already has a spotlight.
+    (image, spot_exists): (Rc, bool),
     window: &mut Window,
 ) {
     match d {
+        OpKind::Spotlight { shapes, dim, .. } => {
+            let Some(s) = shapes.first() else { return };
+            let r = s.rect.normalized();
+            // The effect while dragging: everything outside the hole is dimmed (the bounding
+            // box for an ellipse), unless the image already is dimmed by its spotlight.
+            if !spot_exists {
+                let shade = Hsla {
+                    h: 0.,
+                    s: 0.,
+                    l: 0.,
+                    a: (*dim as f32).clamp(0.2, 0.85),
+                };
+                let (right, bottom) = (r.x + r.w, r.y + r.h);
+                let (img_r, img_b) = (image.x + image.w, image.y + image.h);
+                for band in [
+                    Rc::new(image.x, image.y, image.w, (r.y - image.y).max(0.0)),
+                    Rc::new(image.x, bottom, image.w, (img_b - bottom).max(0.0)),
+                    Rc::new(image.x, r.y, (r.x - image.x).max(0.0), r.h),
+                    Rc::new(right, r.y, (img_r - right).max(0.0), r.h),
+                ] {
+                    window.paint_quad(gpui::fill(rect_b(band), shade));
+                }
+            }
+            // The hole's outline: white on a dark line so it reads on any picture.
+            if s.kind == cm_core::annotation::SpotShapeKind::Ellipse {
+                let (cx, cy, rx, ry) = (r.x + r.w / 2.0, r.y + r.h / 2.0, r.w / 2.0, r.h / 2.0);
+                let pts: Vec<_> = (0..64)
+                    .map(|i| {
+                        let a = f64::from(i) / 64.0 * std::f64::consts::TAU;
+                        pt(Pt::new(cx + rx * a.cos(), cy + ry * a.sin()))
+                    })
+                    .collect();
+                stroke_line(window, &pts, 3.5, hsla(Color::rgb_a(0x000000, 45)), true);
+                stroke_line(window, &pts, 1.5, gpui::white(), true);
+            } else {
+                let rad = px((s.radius * z) as f32);
+                let b = rect_b(r);
+                window.paint_quad(gpui::quad(
+                    b,
+                    rad,
+                    gpui::transparent_black(),
+                    3.5,
+                    hsla(Color::rgb_a(0x000000, 45)),
+                    BorderStyle::Solid,
+                ));
+                window.paint_quad(gpui::quad(
+                    b,
+                    rad,
+                    gpui::transparent_black(),
+                    1.5,
+                    gpui::white(),
+                    BorderStyle::Solid,
+                ));
+            }
+        }
         OpKind::Arrow {
             from,
             to,
