@@ -266,9 +266,9 @@ impl<'f> Ctx<'f> {
                     continue;
                 }
                 let px = self.base.get_pixel_mut(x as u32, y as u32);
-                for ch in 0..3 {
-                    let v = i32::from(px.0[ch]) + if dark { delta } else { -delta };
-                    px.0[ch] = v.clamp(0, 255) as u8;
+                for ch in px.0.iter_mut().take(3) {
+                    let v = i32::from(*ch) + if dark { delta } else { -delta };
+                    *ch = v.clamp(0, 255) as u8;
                 }
             }
         }
