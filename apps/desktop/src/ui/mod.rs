@@ -15,6 +15,7 @@ pub mod editor_doc;
 pub mod editor_view;
 pub mod export_popover;
 pub mod export_ui;
+pub mod field_style;
 pub mod import_actions;
 pub mod import_cards;
 pub mod import_sheet;
