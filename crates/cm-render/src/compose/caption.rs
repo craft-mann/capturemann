@@ -271,8 +271,8 @@ pub(crate) fn blend(
             }
             let a = (f32::from(BOX_ALPHA) * cov).round() as u32;
             let p = img.get_pixel_mut(x as u32, y as u32);
-            for c in 0..3 {
-                p.0[c] = ((u32::from(p.0[c]) * (255 - a) + 127) / 255) as u8;
+            for ch in p.0.iter_mut().take(3) {
+                *ch = ((u32::from(*ch) * (255 - a) + 127) / 255) as u8;
             }
         }
     }
