@@ -58,6 +58,9 @@ pub struct TextEdit {
     pub bg: Option<Color>,
     /// The draft an input method is composing (Telex, Pinyin, ...), as char indexes into `text`.
     pub marked: Option<std::ops::Range<usize>>,
+    /// The whole text is selected (a step label opens like this): the next typed text or paste
+    /// replaces it, Backspace/Delete clear it, the arrow keys collapse the selection.
+    pub sel_all: bool,
 }
 
 impl TextEdit {
@@ -97,6 +100,9 @@ impl TextEdit {
 
     /// The caret as a UTF-16 range (collapsed), for the platform.
     pub fn selection_utf16(&self) -> std::ops::Range<usize> {
+        if self.sel_all {
+            return 0..self.utf16_of(self.len());
+        }
         let c = self.utf16_of(self.cursor);
         c..c
     }
@@ -126,9 +132,11 @@ impl TextEdit {
             Some(r) => (self.chars_of(r.start), self.chars_of(r.end)),
             None => match &self.marked {
                 Some(m) => (m.start.min(self.len()), m.end.min(self.len())),
+                None if self.sel_all => (0, self.len()),
                 None => (self.cursor, self.cursor),
             },
         };
+        self.sel_all = false;
         let b = b.max(a);
         let (ba, bb) = (self.byte(a), self.byte(b));
         let changed = self.text[ba..bb] != clean;
@@ -148,6 +156,10 @@ impl TextEdit {
         if clean.is_empty() {
             return;
         }
+        if std::mem::take(&mut self.sel_all) {
+            self.text.clear();
+            self.cursor = 0;
+        }
         let b = self.byte(self.cursor);
         self.text.insert_str(b, &clean);
         self.cursor += clean.chars().count();
@@ -155,6 +167,9 @@ impl TextEdit {
 
     pub fn backspace(&mut self) {
         self.marked = None;
+        if self.clear_selected() {
+            return;
+        }
         if self.cursor > 0 {
             self.cursor -= 1;
             let b = self.byte(self.cursor);
@@ -164,24 +179,46 @@ impl TextEdit {
 
     pub fn delete(&mut self) {
         self.marked = None;
+        if self.clear_selected() {
+            return;
+        }
         if self.cursor < self.len() {
             let b = self.byte(self.cursor);
             self.text.remove(b);
         }
     }
 
+    /// Removes the selected text (all of it); false when nothing is selected.
+    fn clear_selected(&mut self) -> bool {
+        if !std::mem::take(&mut self.sel_all) {
+            return false;
+        }
+        self.text.clear();
+        self.cursor = 0;
+        true
+    }
+
     pub fn left(&mut self) {
         self.marked = None;
+        if std::mem::take(&mut self.sel_all) {
+            self.cursor = 0;
+            return;
+        }
         self.cursor = self.cursor.saturating_sub(1);
     }
 
     pub fn right(&mut self) {
         self.marked = None;
+        if std::mem::take(&mut self.sel_all) {
+            self.cursor = self.len();
+            return;
+        }
         self.cursor = (self.cursor + 1).min(self.len());
     }
 
     pub fn home(&mut self) {
         self.marked = None;
+        self.sel_all = false;
         while self.cursor > 0 && self.text.chars().nth(self.cursor - 1) != Some('\n') {
             self.cursor -= 1;
         }
@@ -189,6 +226,7 @@ impl TextEdit {
 
     pub fn end(&mut self) {
         self.marked = None;
+        self.sel_all = false;
         while self.cursor < self.len() && self.text.chars().nth(self.cursor) != Some('\n') {
             self.cursor += 1;
         }
@@ -318,6 +356,8 @@ pub struct StepsInfo {
     pub selected: Option<usize>,
     /// A label is being typed on the canvas.
     pub editing: bool,
+    /// The whole label is selected (editing just started): the row shows the blue selection.
+    pub label_selected: bool,
 }
 
 /// What the Spotlight panel shows (see [`EditorState::spot_info`]).
@@ -981,6 +1021,7 @@ impl EditorState {
             outline: None,
             bg: None,
             marked: None,
+            sel_all: false,
         });
     }
 
@@ -1006,6 +1047,7 @@ impl EditorState {
                     outline,
                     bg,
                     marked: None,
+                    sel_all: false,
                 });
             }
             kind @ OpKind::Callout { .. } => {
@@ -1029,6 +1071,8 @@ impl EditorState {
                     existing: Some(self.ops[i].id.clone()),
                     at,
                     cursor: text.chars().count(),
+                    // The whole label is selected when editing starts (spec, Step list rows).
+                    sel_all: !text.is_empty(),
                     text,
                     size,
                     color,
@@ -1068,6 +1112,7 @@ impl EditorState {
             outline: None,
             bg: None,
             marked: None,
+            sel_all: false,
         }
     }
 
@@ -1297,6 +1342,11 @@ impl EditorState {
     }
 
     pub fn escape(&mut self) -> EscapeOutcome {
+        if self.text.as_ref().is_some_and(|t| t.single_line()) {
+            // Esc cancels a step label: the old label stays, the step stays selected.
+            self.text = None;
+            return EscapeOutcome::Edits(Vec::new());
+        }
         if self.text.is_some() {
             return EscapeOutcome::Edits(self.finish_text().into_iter().collect());
         }
@@ -1431,6 +1481,7 @@ impl EditorState {
             rows,
             selected: sel.and_then(|s| order.iter().position(|&i| i == s)),
             editing: self.text.is_some(),
+            label_selected: self.text.as_ref().is_some_and(|t| t.sel_all),
         })
     }
 
@@ -1485,12 +1536,54 @@ impl EditorState {
     /// Deletes the step at row `row` of the panel list; the rest renumber.
     pub fn delete_step_row(&mut self, row: usize) -> Option<Edit> {
         let i = *self.steps_in_order().get(row)?;
-        self.ops.remove(i);
+        let gone = self.ops.remove(i).id;
+        if self.text.as_ref().and_then(|t| t.existing.as_deref()) == Some(gone.as_str()) {
+            self.text = None;
+        }
         if self.selected_index().is_none() {
             self.selected = None;
         }
         geom::renumber_steps(&mut self.ops);
         Some(Edit::Replace(self.ops.clone()))
+    }
+
+    /// Enter in a step label: saves it and opens the next step's label (all selected). On the
+    /// last step it only saves.
+    pub fn finish_step_and_next(&mut self) -> Option<Edit> {
+        let cur = self.text.as_ref().and_then(|t| t.existing.clone());
+        let edit = self.finish_text();
+        if let Some(cur) = cur {
+            let order = self.steps_in_order();
+            let next = order
+                .iter()
+                .position(|&i| self.ops[i].id == cur)
+                .and_then(|p| order.get(p + 1).copied());
+            if let Some(n) = next {
+                self.selected = Some(self.ops[n].id.clone());
+                self.begin_text_edit(n);
+            }
+        }
+        edit
+    }
+
+    /// Alt+Up / Alt+Down: moves the selected step one place up (`-1`) or down (`1`) in the
+    /// order, numbers following, in one revision. A label being typed is saved first.
+    pub fn move_selected_step(&mut self, delta: i32) -> Vec<Edit> {
+        let mut edits: Vec<Edit> = self.finish_text().into_iter().collect();
+        let Some(row) = self.selected_step_row() else {
+            return edits;
+        };
+        let to = row as i64 + i64::from(delta);
+        if to >= 0 {
+            edits.extend(self.reorder_steps(row, to as usize));
+        }
+        edits
+    }
+
+    /// The row of the selected step in the panel list.
+    pub fn selected_step_row(&self) -> Option<usize> {
+        let sel = self.selected_index()?;
+        self.steps_in_order().iter().position(|&i| i == sel)
     }
 
     /// Selects the step at row `row` of the panel list.
@@ -2291,6 +2384,7 @@ mod tests {
             outline: None,
             bg: None,
             marked: None,
+            sel_all: false,
         };
         t.insert("a\u{4F60}\u{597D}");
         t.left();
@@ -2501,6 +2595,7 @@ mod tests {
             outline: None,
             bg: None,
             marked: None,
+            sel_all: false,
         }
     }
 
@@ -3287,6 +3382,126 @@ mod tests {
         s.set_tool(Tool::Select);
         s.pointer_down(Pt::new(50.0, 100.0), NONE, 2, TOL);
         assert!(s.text.is_some());
+    }
+
+    fn labels(s: &EditorState) -> Vec<String> {
+        s.steps_info()
+            .unwrap()
+            .rows
+            .into_iter()
+            .map(|r| r.text)
+            .collect()
+    }
+
+    /// Step list rows: a label opens with the whole text selected, so typing replaces it, and
+    /// Backspace clears it.
+    #[test]
+    fn steps_label_opens_all_selected() {
+        let mut s = st();
+        place_steps(&mut s, 1);
+        s.edit_selected_text();
+        s.text_ime(None, "Buoc", false);
+        s.finish_text();
+        s.select_step_row(0);
+        s.edit_selected_text();
+        let t = s.text.as_ref().unwrap();
+        assert!(t.sel_all);
+        assert_eq!(t.selection_utf16(), 0..4);
+        assert!(s.steps_info().unwrap().label_selected);
+        s.text_ime(None, "B", true);
+        assert_eq!(s.text.as_ref().unwrap().text, "B");
+        assert!(!s.text.as_ref().unwrap().sel_all);
+        s.finish_text();
+        s.edit_selected_text();
+        s.text_key("backspace", None, NONE);
+        assert_eq!(s.text.as_ref().unwrap().text, "");
+        // An arrow collapses the selection instead of deleting.
+        s.text.as_mut().unwrap().text = "ab".into();
+        s.text.as_mut().unwrap().sel_all = true;
+        s.text_key("right", None, NONE);
+        assert_eq!(s.text.as_ref().unwrap().cursor, 2);
+        assert_eq!(s.text.as_ref().unwrap().text, "ab");
+    }
+
+    /// Enter saves the label and opens the next step's label; on the last step it only saves.
+    #[test]
+    fn steps_enter_moves_to_the_next_label() {
+        let mut s = st();
+        place_steps(&mut s, 3);
+        s.select_step_row(0);
+        s.edit_selected_text();
+        s.text_ime(None, "One", false);
+        assert!(s.finish_step_and_next().is_some());
+        assert_eq!(s.steps_info().unwrap().selected, Some(1));
+        assert!(s.text.is_some());
+        s.text_ime(None, "Two", false);
+        s.finish_step_and_next();
+        s.text_ime(None, "Three", false);
+        assert_eq!(s.steps_info().unwrap().selected, Some(2));
+        assert!(s.finish_step_and_next().is_some());
+        assert!(s.text.is_none());
+        assert_eq!(s.steps_info().unwrap().selected, Some(2));
+        assert_eq!(labels(&s), ["One", "Two", "Three"]);
+    }
+
+    /// Esc cancels a label edit: the old label is back and the step stays selected.
+    #[test]
+    fn steps_escape_restores_the_old_label() {
+        let mut s = st();
+        place_steps(&mut s, 1);
+        s.edit_selected_text();
+        s.text_ime(None, "Keep", false);
+        s.finish_text();
+        s.select_step_row(0);
+        s.edit_selected_text();
+        s.text_ime(None, "Lost", false);
+        assert_eq!(labels(&s), ["Lost"]);
+        match s.escape() {
+            EscapeOutcome::Edits(e) => assert!(e.is_empty()),
+            EscapeOutcome::Leave => panic!("Esc cancels the label first"),
+        }
+        assert!(s.text.is_none());
+        assert_eq!(labels(&s), ["Keep"]);
+        assert_eq!(s.steps_info().unwrap().selected, Some(0));
+    }
+
+    /// Alt+Up / Alt+Down move the selected step in one edit; the ends do nothing.
+    #[test]
+    fn steps_alt_arrows_move_the_step() {
+        let mut s = st();
+        place_steps(&mut s, 3);
+        s.select_step_row(1);
+        let e = s.move_selected_step(-1);
+        assert_eq!(e.len(), 1);
+        assert_eq!(s.selected_step_row(), Some(0));
+        assert!(s.move_selected_step(-1).is_empty());
+        assert_eq!(s.selected_step_row(), Some(0));
+        let e = s.move_selected_step(1);
+        assert_eq!(e.len(), 1);
+        assert_eq!(s.selected_step_row(), Some(1));
+        // A label being typed is saved with the move.
+        s.edit_selected_text();
+        s.text_ime(None, "Moved", false);
+        let e = s.move_selected_step(1);
+        assert_eq!(e.len(), 2);
+        assert_eq!(labels(&s)[2], "Moved");
+    }
+
+    /// Delete removes the selected step and renumbers; one edit, so Undo restores it.
+    #[test]
+    fn steps_delete_removes_the_selected_step() {
+        let mut s = st();
+        place_steps(&mut s, 3);
+        s.select_step_row(1);
+        let e = s.delete_selected().expect("edit");
+        assert!(matches!(e, Edit::Replace(_)));
+        assert_eq!(badges(&s), ["1", "2"]);
+        // From the list, with its label open: the label goes with it.
+        s.select_step_row(0);
+        s.edit_selected_text();
+        s.delete_step_row(0).expect("edit");
+        assert!(s.text.is_none());
+        assert_eq!(badges(&s), ["1"]);
     }
 
     /// ANN-6: the panel exists for the Step tool or a selected step, and nothing else.
