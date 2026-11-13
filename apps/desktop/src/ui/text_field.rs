@@ -16,25 +16,198 @@
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
+use std::time::{Duration, Instant};
 
 use std::ops::Range;
 
+use cm_i18n::tr;
 use gpui::{
-    canvas, div, point, prelude::*, px, quad, size, BorderStyle, Bounds, Context,
+    canvas, div, point, prelude::*, px, quad, size, BorderStyle, Bounds, BoxShadow, Context,
     ElementInputHandler, EntityInputHandler, EventEmitter, FocusHandle, Focusable, HighlightStyle,
-    KeyDownEvent, MouseButton, MouseDownEvent, Pixels, Point, Render, Role, ScrollHandle,
-    SharedString, Stateful, StyledText, TextLayout, UTF16Selection, UnderlineStyle, Window,
+    KeyDownEvent, MouseButton, MouseDownEvent, MouseMoveEvent, Pixels, Point, Render, Role,
+    ScrollHandle, SharedString, Stateful, StyledText, TextLayout, UTF16Selection, UnderlineStyle,
+    Window,
 };
 
 use crate::text_buffer::TextBuffer;
-use crate::theme::{scale, type_scale};
+use crate::theme::Color;
 use crate::ui::components::icon;
+use crate::ui::field_style::{
+    FieldTokens, CARET_BLINK_MS, CARET_SOLID_MS, CARET_W, FIELD_H, FIELD_PAD_X, FIELD_RADIUS,
+    FIELD_TEXT, FOCUS_BLUE, FOCUS_RING, MULTI_LINE_HEIGHT, MULTI_MAX_H, MULTI_MIN_H, RING_W,
+};
 use crate::ui::paint::{hsla_of, rgba_of};
 use crate::ui::scroll::nested_scroll;
 use crate::ui::studio::ThemeGlobal;
 
-/// Line height of the multi-line field.
-const LINE_H: f32 = 20.;
+/// Line height of the multi-line field (13.5 px text at 1.5).
+const LINE_H: f32 = FIELD_TEXT * MULTI_LINE_HEIGHT;
+/// Padding (px) of the multi-line field above and below its text.
+const MULTI_PAD_Y: f32 = 10.;
+/// How often a focused field repaints for the caret blink (ms); the phase itself is
+/// [`caret_visible`].
+const BLINK_TICK_MS: u64 = 130;
+/// The size of the clear button of a search field (px).
+const CLEAR_D: f32 = 20.;
+/// One bullet of a secret field, and its length in bytes.
+const BULLET: &str = "\u{2022}";
+
+/// Whether the caret is drawn `since_input_ms` after the last key, click or edit: solid while
+/// typing and for [`CARET_SOLID_MS`] after, then on and off every [`CARET_BLINK_MS`].
+pub fn caret_visible(since_input_ms: u64) -> bool {
+    if since_input_ms < CARET_SOLID_MS {
+        return true;
+    }
+    (since_input_ms / CARET_BLINK_MS).is_multiple_of(2)
+}
+
+/// What a click does at `click_count` clicks in a row: the caret, a word, everything.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClickKind {
+    Caret,
+    Word,
+    All,
+}
+
+pub fn click_kind(click_count: usize) -> ClickKind {
+    match click_count {
+        0 | 1 => ClickKind::Caret,
+        2 => ClickKind::Word,
+        _ => ClickKind::All,
+    }
+}
+
+/// What the Escape key does, in order: a draft the input method left alone is dropped; a
+/// clearable (search) field with text is cleared; anything else leaves the field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EscStep {
+    DropDraft,
+    Clear,
+    Leave,
+}
+
+pub fn escape_step(composing: bool, clearable: bool, empty: bool) -> EscStep {
+    if composing {
+        EscStep::DropDraft
+    } else if clearable && !empty {
+        EscStep::Clear
+    } else {
+        EscStep::Leave
+    }
+}
+
+/// The clear (x) button of a search field shows only when there is something to clear.
+pub fn clear_visible(clearable: bool, empty: bool, disabled: bool, read_only: bool) -> bool {
+    clearable && !empty && !disabled && !read_only
+}
+
+/// How the frame of a field looks (board T0).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FrameState {
+    Rest,
+    /// Focused: blue border and the 3 px ring.
+    Focused,
+    /// Focused in a window that is not the active one: the ring is removed.
+    FocusedInactive,
+    Error,
+    ReadOnly,
+    Disabled,
+}
+
+pub fn frame_state(
+    disabled: bool,
+    read_only: bool,
+    error: bool,
+    focused: bool,
+    window_active: bool,
+) -> FrameState {
+    if disabled {
+        FrameState::Disabled
+    } else if error {
+        FrameState::Error
+    } else if read_only {
+        FrameState::ReadOnly
+    } else if focused && window_active {
+        FrameState::Focused
+    } else if focused {
+        FrameState::FocusedInactive
+    } else {
+        FrameState::Rest
+    }
+}
+
+/// The byte offset in the shown text of byte `byte` of the real text: a secret field shows one
+/// 3-byte bullet per character.
+fn shown_index(text: &str, byte: usize, secret: bool) -> usize {
+    if secret {
+        text[..byte.min(text.len())].chars().count() * BULLET.len()
+    } else {
+        byte.min(text.len())
+    }
+}
+
+/// The inverse of [`shown_index`].
+fn byte_from_shown(text: &str, shown: usize, secret: bool) -> usize {
+    if secret {
+        text.char_indices()
+            .nth(shown / BULLET.len())
+            .map_or(text.len(), |(i, _)| i)
+    } else {
+        shown.min(text.len())
+    }
+}
+
+/// The ring outside a field's border: a shadow with no blur and a 3 px spread, so nothing moves.
+fn ring(color: Color) -> Vec<BoxShadow> {
+    vec![BoxShadow {
+        color: hsla_of(color),
+        offset: point(px(0.), px(0.)),
+        blur_radius: px(0.),
+        spread_radius: px(RING_W),
+        inset: false,
+    }]
+}
+
+/// The frame of a field in `state`.
+fn framed(d: Stateful<gpui::Div>, ft: &FieldTokens, state: FrameState) -> Stateful<gpui::Div> {
+    let d = d.border_1();
+    match state {
+        FrameState::Rest => d
+            .border_color(rgba_of(ft.border))
+            .bg(rgba_of(ft.bg))
+            .hover({
+                let (b, bg) = (ft.border_hover, ft.bg_hover);
+                move |s| s.border_color(rgba_of(b)).bg(rgba_of(bg))
+            }),
+        FrameState::Focused => d
+            .border_color(rgba_of(FOCUS_BLUE))
+            .bg(rgba_of(ft.bg))
+            .shadow(ring(FOCUS_RING)),
+        FrameState::FocusedInactive => d.border_color(rgba_of(FOCUS_BLUE)).bg(rgba_of(ft.bg)),
+        FrameState::Error => d
+            .border_color(rgba_of(ft.error))
+            .bg(rgba_of(ft.bg))
+            .shadow(ring(ft.error_ring)),
+        FrameState::ReadOnly => d.border_dashed().border_color(rgba_of(ft.readonly_border)),
+        FrameState::Disabled => d
+            .border_color(rgba_of(ft.border))
+            .bg(rgba_of(ft.bg))
+            .opacity(ft.disabled_opacity as f32 / 100.),
+    }
+}
+
+/// The highlight of selected text: the strong blue (grey when the window is inactive).
+fn selection_style(ft: &FieldTokens, window_active: bool) -> HighlightStyle {
+    HighlightStyle {
+        background_color: Some(hsla_of(if window_active {
+            ft.selection
+        } else {
+            ft.selection_inactive
+        })),
+        color: window_active.then(|| hsla_of(ft.selection_text)),
+        ..Default::default()
+    }
+}
 
 /// The multi-line mode's state.
 struct Multi {
@@ -118,6 +291,11 @@ pub enum CaretAt {
         column: usize,
         last_line: bool,
     },
+    /// Everything selected, so typing replaces it (a name opened for renaming).
+    SelectAll,
+    /// The part before the extension selected (a file name: `report` in `report.pdf`); the whole
+    /// text when there is no extension.
+    SelectStem,
 }
 
 pub struct TextField {
@@ -137,6 +315,22 @@ pub struct TextField {
     /// Byte ranges drawn with a wavy warning underline (the multi-line field only): the words
     /// Whisper was unsure about. Set by the caption editor, never part of the text.
     doubtful: Vec<Range<usize>>,
+    /// A search field: shows a clear button when there is text, and Escape clears first.
+    clearable: bool,
+    /// The message under the field, which also gives it the error frame.
+    error: Option<SharedString>,
+    disabled: bool,
+    read_only: bool,
+    /// The text the field was loaded with (`load`, `set_text`): Escape puts it back.
+    baseline: Option<String>,
+    /// The layout of the last painted one-line text, for clicks and drags.
+    line_layout: Rc<RefCell<Option<TextLayout>>>,
+    /// The time of the last key, click or edit: the caret stays solid for a moment after it.
+    last_input: Instant,
+    /// Set by every paint of a focused field; the blink timer repaints only while it is set.
+    blink_wanted: bool,
+    /// The byte where a drag started.
+    drag_from: Option<usize>,
 }
 
 impl EventEmitter<TextFieldEvent> for TextField {}
@@ -164,9 +358,102 @@ impl TextField {
             multi: None,
             geometry: Rc::default(),
             h_off: Rc::default(),
-            height: scale::CONTROL_H,
+            height: FIELD_H,
             doubtful: Vec::new(),
+            clearable: false,
+            error: None,
+            disabled: false,
+            read_only: false,
+            baseline: None,
+            line_layout: Rc::default(),
+            last_input: Instant::now(),
+            blink_wanted: false,
+            drag_from: None,
         }
+        .with_blink_timer(cx)
+    }
+
+    /// Repaints a focused field every [`BLINK_TICK_MS`] so the caret blinks; idle fields do not
+    /// repaint.
+    fn with_blink_timer(self, cx: &mut Context<Self>) -> Self {
+        cx.spawn(async move |this, cx| loop {
+            cx.background_executor()
+                .timer(Duration::from_millis(BLINK_TICK_MS))
+                .await;
+            let alive = this.update(cx, |this, cx| {
+                if std::mem::take(&mut this.blink_wanted) {
+                    cx.notify();
+                }
+            });
+            if alive.is_err() {
+                break;
+            }
+        })
+        .detach();
+        self
+    }
+
+    /// A search field: a clear (x) button shows when there is text, the first Escape clears the
+    /// text and the second leaves the field.
+    pub fn clearable(mut self) -> Self {
+        self.clearable = true;
+        self
+    }
+
+    /// A field that cannot be typed in or focused (drawn at 45 % opacity).
+    pub fn disabled(mut self, on: bool) -> Self {
+        self.disabled = on;
+        self
+    }
+
+    pub fn set_disabled(&mut self, on: bool, cx: &mut Context<Self>) {
+        self.disabled = on;
+        cx.notify();
+    }
+
+    /// A field whose text can be selected and copied but not changed (dashed frame, no fill).
+    pub fn read_only(mut self, on: bool) -> Self {
+        self.read_only = on;
+        self
+    }
+
+    pub fn set_read_only(&mut self, on: bool, cx: &mut Context<Self>) {
+        self.read_only = on;
+        cx.notify();
+    }
+
+    /// The field starts in the error state with `msg` under it.
+    pub fn error(mut self, msg: impl Into<SharedString>) -> Self {
+        self.error = Some(msg.into());
+        self
+    }
+
+    /// Shows (`Some`) or clears (`None`) the error frame and the message under the field.
+    pub fn set_error(&mut self, msg: Option<String>, cx: &mut Context<Self>) {
+        self.error = msg.map(SharedString::from);
+        cx.notify();
+    }
+
+    /// Puts the text the field was loaded with back, without announcing a change (Escape does
+    /// this before it emits [`TextFieldEvent::Escaped`]). False when no text was loaded.
+    pub fn restore(&mut self, cx: &mut Context<Self>) -> bool {
+        let Some(old) = self.baseline.clone() else {
+            return false;
+        };
+        self.buffer.clear();
+        self.put(&old);
+        self.buffer.set_cursor(old.len());
+        cx.notify();
+        true
+    }
+
+    /// The caret stays solid from now for a moment (a key, a click, an edit).
+    fn touch(&mut self) {
+        self.last_input = Instant::now();
+    }
+
+    fn can_type(&self) -> bool {
+        !self.disabled && !self.read_only
     }
 
     /// The ranges (byte offsets into [`text`](Self::text)) to underline as doubtful. Ranges that
@@ -188,7 +475,7 @@ impl TextField {
         self.multi = Some(Multi {
             min_rows: min_rows.max(1),
             max_rows: max_rows.max(min_rows).max(1),
-            text_px: type_scale::UI,
+            text_px: FIELD_TEXT,
             line_h: LINE_H,
             in_place: false,
             scroll: ScrollHandle::new(),
@@ -228,7 +515,11 @@ impl TextField {
     pub fn load(&mut self, text: &str, at: CaretAt, cx: &mut Context<Self>) {
         self.buffer.clear();
         self.put(text);
+        self.baseline = Some(self.buffer.text().to_owned());
+        self.touch();
         match at {
+            CaretAt::SelectAll => self.buffer.select_all(),
+            CaretAt::SelectStem => self.buffer.select_stem(),
             CaretAt::Start => self.buffer.set_cursor(0),
             CaretAt::End => {}
             CaretAt::Byte(b) => self.buffer.set_cursor(b),
@@ -338,6 +629,8 @@ impl TextField {
         self.buffer.clear();
         self.put(text);
         self.buffer.select_all();
+        self.baseline = Some(self.buffer.text().to_owned());
+        self.touch();
         cx.emit(TextFieldEvent::Changed(self.buffer.text().to_owned()));
         cx.notify();
     }
@@ -349,16 +642,22 @@ impl TextField {
         cx.notify();
     }
 
-    fn on_key(&mut self, ev: &KeyDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
+    fn on_key(&mut self, ev: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let k = &ev.keystroke;
         let m = k.modifiers;
         let cmd = m.platform || m.control;
         let multiline = self.multi.is_some();
+        let edit = self.can_type();
+        let extend = m.shift && !cmd;
+        let anchor = self.buffer.anchor_or_cursor();
         let mut changed = false;
         let mut vertical = false;
+        self.touch();
         match k.key.as_str() {
-            "backspace" => changed = self.buffer.backspace(),
-            "delete" => changed = self.buffer.delete(),
+            "backspace" if edit => changed = self.buffer.backspace(),
+            "delete" if edit => changed = self.buffer.delete(),
+            "left" if extend => self.buffer.extend_left(),
+            "right" if extend => self.buffer.extend_right(),
             "left" => self.buffer.left(),
             "right" => self.buffer.right(),
             "home" if multiline => self.buffer.home_line(),
@@ -393,14 +692,34 @@ impl TextField {
                 vertical = true;
             }
             "escape" => {
-                // A draft the input method left alone is dropped first; the next Escape leaves.
-                if self.buffer.cancel_composition() {
-                    cx.emit(TextFieldEvent::Changed(self.buffer.text().to_owned()));
-                    cx.stop_propagation();
-                    cx.notify();
-                    return;
+                // The ladder (see `escape_step`): a draft the input method left alone is
+                // dropped, then a search field's text is cleared, then the field is left: the
+                // text it was loaded with comes back and focus goes.
+                match escape_step(
+                    self.buffer.is_composing(),
+                    self.clearable,
+                    self.buffer.is_empty(),
+                ) {
+                    EscStep::DropDraft => {
+                        self.buffer.cancel_composition();
+                        cx.emit(TextFieldEvent::Changed(self.buffer.text().to_owned()));
+                    }
+                    EscStep::Clear => {
+                        self.clear(cx);
+                    }
+                    EscStep::Leave => {
+                        if edit {
+                            self.restore(cx);
+                        }
+                        if self.clearable {
+                            window.blur(cx);
+                        }
+                        cx.emit(TextFieldEvent::Escaped);
+                        return;
+                    }
                 }
-                cx.emit(TextFieldEvent::Escaped);
+                cx.stop_propagation();
+                cx.notify();
                 return;
             }
             "enter" if multiline && self.is_in_place() => {
@@ -417,7 +736,7 @@ impl TextField {
                     return;
                 }
             }
-            "enter" if multiline && !cmd => changed = self.put("\n"),
+            "enter" if multiline && !cmd && edit => changed = self.put("\n"),
             "enter" => {
                 self.buffer.unmark();
                 cx.emit(TextFieldEvent::Submitted);
@@ -426,18 +745,18 @@ impl TextField {
             }
             "tab" => return,
             "a" if cmd => self.buffer.select_all(),
-            "c" if cmd => {
+            "c" if cmd && !self.secret => {
                 if let Some(text) = self.buffer.selected_text() {
                     cx.write_to_clipboard(gpui::ClipboardItem::new_string(text.to_owned()));
                 }
             }
-            "x" if cmd => {
+            "x" if cmd && edit && !self.secret => {
                 if let Some(text) = self.buffer.selected_text() {
                     cx.write_to_clipboard(gpui::ClipboardItem::new_string(text.to_owned()));
-                    changed = self.buffer.clear();
+                    changed = self.buffer.backspace();
                 }
             }
-            "v" if cmd => {
+            "v" if cmd && edit => {
                 if let Some(text) = cx.read_from_clipboard().and_then(|c| c.text()) {
                     changed = self.put(&text);
                 }
@@ -445,6 +764,10 @@ impl TextField {
             // Typed text is not handled here: the event propagates to the platform, which feeds
             // it through the input method into `replace_text_in_range`.
             _ => return,
+        }
+        if extend && matches!(k.key.as_str(), "home" | "end" | "up" | "down") {
+            // Shift+Home/End/Up/Down: the caret moved, the selection stays anchored.
+            self.buffer.set_anchor(anchor);
         }
         if let Some(multi) = self.multi.as_mut() {
             if !vertical {
@@ -463,6 +786,7 @@ impl TextField {
 impl TextField {
     /// After the input method changed the text or the draft.
     fn edited(&mut self, changed: bool, window: &mut Window, cx: &mut Context<Self>) {
+        self.touch();
         if let Some(multi) = self.multi.as_mut() {
             multi.goal_x = None;
             multi.reveal.set(true);
@@ -590,36 +914,160 @@ impl EntityInputHandler for TextField {
     }
 }
 
+impl TextField {
+    /// Whether the caret is drawn in this frame: focused, window active, editable, and in the
+    /// visible half of the blink.
+    fn caret_on(&self, focused: bool, active: bool) -> bool {
+        focused
+            && active
+            && self.can_type()
+            && caret_visible(self.last_input.elapsed().as_millis() as u64)
+    }
+
+    /// The byte offset of the text under `pos` (a window position), from the last painted layout.
+    fn hit(&self, pos: Point<Pixels>) -> Option<usize> {
+        let text = self.buffer.text();
+        if let Some(m) = self.multi.as_ref() {
+            let layout = m.layout.borrow().clone();
+            let l = layout.filter(|l| l.len() == text.len())?;
+            let (Ok(i) | Err(i)) = l.index_for_position(pos);
+            return Some(i);
+        }
+        let shown_len = if self.secret {
+            text.chars().count() * BULLET.len()
+        } else {
+            text.len()
+        };
+        let layout = self.line_layout.borrow().clone();
+        let l = layout.filter(|l| l.len() == shown_len)?;
+        let (Ok(i) | Err(i)) = l.index_for_position(pos);
+        Some(byte_from_shown(text, i, self.secret))
+    }
+
+    /// A left click: focus, then the caret (one click), a word (two), everything (three); Shift
+    /// extends the selection from where it was. The first click in a field that opened fully
+    /// selected therefore places the caret.
+    fn press(&mut self, ev: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if self.disabled {
+            return;
+        }
+        window.focus(&self.focus, cx);
+        self.touch();
+        self.drag_from = None;
+        if let Some(m) = self.multi.as_mut() {
+            m.goal_x = None;
+            m.reveal.set(true);
+        }
+        let at = self.hit(ev.position);
+        match click_kind(ev.click_count) {
+            ClickKind::Caret => {
+                if let Some(at) = at {
+                    if ev.modifiers.shift {
+                        let from = self.buffer.anchor_or_cursor();
+                        self.buffer.set_cursor(at);
+                        self.buffer.set_anchor(from);
+                        self.drag_from = Some(from);
+                    } else {
+                        self.buffer.set_cursor(at);
+                        self.drag_from = Some(self.buffer.cursor());
+                    }
+                }
+            }
+            ClickKind::Word => match at {
+                Some(at) if !self.secret => self.buffer.select_word_at(at),
+                _ => self.buffer.select_all(),
+            },
+            ClickKind::All => self.buffer.select_all(),
+        }
+        cx.notify();
+    }
+
+    /// Dragging with the left button held extends the selection from where the press started.
+    fn drag(&mut self, ev: &MouseMoveEvent, cx: &mut Context<Self>) {
+        if !ev.dragging() {
+            self.drag_from = None;
+            return;
+        }
+        let Some(from) = self.drag_from else {
+            return;
+        };
+        if let Some(at) = self.hit(ev.position) {
+            self.buffer.set_cursor(at);
+            self.buffer.set_anchor(from);
+            self.touch();
+            if let Some(m) = self.multi.as_mut() {
+                m.reveal.set(true);
+            }
+            cx.notify();
+        }
+    }
+}
+
 impl Render for TextField {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = cx.global::<ThemeGlobal>().0;
-        let focused = self.focus.is_focused(window);
+        let ft = FieldTokens::of(&t);
+        let focused = !self.disabled && self.focus.is_focused(window);
+        let active = window.is_window_active();
         if !focused {
             // Focus left in the middle of a composition: the draft stays as typed.
             self.buffer.unmark();
+            self.drag_from = None;
+        } else {
+            self.blink_wanted = true;
         }
-        if self.multi.is_some() {
-            return self.render_multi(window, cx);
+        let state = frame_state(
+            self.disabled,
+            self.read_only,
+            self.error.is_some(),
+            focused,
+            active,
+        );
+        let field = if self.multi.is_some() {
+            self.render_multi(window, cx, &ft, state, focused, active)
+        } else {
+            self.render_line(cx, &ft, state, focused, active)
+        };
+        match self.error.clone() {
+            Some(msg) => div()
+                .w_full()
+                .flex()
+                .flex_col()
+                .gap(px(6.))
+                .child(field)
+                .child(
+                    div()
+                        .text_size(px(12.))
+                        .text_color(rgba_of(ft.error_text))
+                        .child(msg),
+                )
+                .into_any_element(),
+            None => field,
         }
+    }
+}
+
+impl TextField {
+    fn render_line(
+        &mut self,
+        cx: &mut Context<Self>,
+        ft: &FieldTokens,
+        state: FrameState,
+        focused: bool,
+        active: bool,
+    ) -> gpui::AnyElement {
+        let t = cx.global::<ThemeGlobal>().0;
         self.geometry.set(LineGeometry::default());
         if !focused {
             // A field that is not being typed in shows the start of its text.
             self.h_off.set(0.);
         }
-        let focus = self.focus.clone();
-        let empty = self.buffer.is_empty();
-        let selected = self.buffer.all_selected();
-        let body = if empty {
-            div()
-                .text_color(rgba_of(t.text_3))
-                .child(self.placeholder.clone())
-                .into_any_element()
-        } else {
-            self.line_body(&t, focused, selected)
-        };
+        let caret_on = self.caret_on(focused, active);
+        let body = self.line_body(ft, caret_on, active);
         // The text sits in a clipped area and is shifted left when it is longer than the area,
         // so the caret (and the end of the text) can be reached with the keys.
         let (view_geometry, row_geometry) = (self.geometry.clone(), self.geometry.clone());
+        let _ = row_geometry;
         let body = div()
             .relative()
             .flex_1()
@@ -632,19 +1080,7 @@ impl Render for TextField {
                     .relative()
                     .flex_none()
                     .ml(px(-self.h_off.get()))
-                    .child(body)
-                    .child(
-                        canvas(
-                            |_, _, _| (),
-                            move |b: Bounds<Pixels>, _, _, _| {
-                                let mut g = row_geometry.get();
-                                g.row = Some(b);
-                                row_geometry.set(g);
-                            },
-                        )
-                        .absolute()
-                        .size_full(),
-                    ),
+                    .child(body),
             )
             .child(
                 canvas(
@@ -664,7 +1100,39 @@ impl Render for TextField {
             self.h_off.clone(),
         );
         let entity = cx.entity();
-        div()
+        let can_type = self.can_type();
+        let disabled = self.disabled;
+        let show_clear = clear_visible(
+            self.clearable,
+            self.buffer.is_empty(),
+            self.disabled,
+            self.read_only,
+        );
+        let clear_button = show_clear.then(|| {
+            div()
+                .id("text-field-clear")
+                .role(Role::Button)
+                .aria_label(SharedString::from(tr!("Clear search")))
+                .flex_none()
+                .size(px(CLEAR_D))
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded(px(5.))
+                .cursor_pointer()
+                .hover(|s| s.bg(rgba_of(t.raised)))
+                .on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(|this, _: &MouseDownEvent, window, cx| {
+                        this.clear(cx);
+                        this.touch();
+                        window.focus(&this.focus, cx);
+                        cx.stop_propagation();
+                    }),
+                )
+                .child(icon("x", 14., t.mist))
+        });
+        let field = div()
             .id("text-field")
             .debug_selector(|| format!("text-field:{}", self.label))
             .role(Role::TextInput)
@@ -675,32 +1143,39 @@ impl Render for TextField {
             } else {
                 self.buffer.text().to_owned()
             }))
-            .track_focus(&self.focus)
-            .tab_stop(true)
+            .when(!disabled, |d| d.track_focus(&self.focus).tab_stop(true))
             .on_key_down(cx.listener(Self::on_key))
-            .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-                window.focus(&focus, cx);
-            })
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, ev: &MouseDownEvent, window, cx| this.press(ev, window, cx)),
+            )
+            .on_mouse_move(cx.listener(|this, ev: &MouseMoveEvent, _, cx| this.drag(ev, cx)))
+            .on_mouse_up(
+                MouseButton::Left,
+                cx.listener(|this, _: &gpui::MouseUpEvent, _, _| this.drag_from = None),
+            )
+            .on_mouse_up_out(
+                MouseButton::Left,
+                cx.listener(|this, _: &gpui::MouseUpEvent, _, _| this.drag_from = None),
+            )
             .relative()
             .h(px(self.height))
-            .px(px(10.))
+            .px(px(FIELD_PAD_X))
             .flex()
             .items_center()
             .overflow_hidden()
             .gap(px(8.))
-            .rounded(px(scale::RADIUS_MD))
-            .border_1()
-            .border_color(rgba_of(t.line))
-            .bg(rgba_of(t.surface))
-            .text_color(rgba_of(t.text))
-            .text_size(px(type_scale::UI))
-            .whitespace_nowrap()
-            .cursor_text()
-            .hover(|s| s.border_color(rgba_of(t.mist)))
-            .focus(|s| s.border_color(rgba_of(t.text)))
+            .rounded(px(FIELD_RADIUS))
+            .text_color(rgba_of(ft.text))
+            .text_size(px(FIELD_TEXT))
+            .whitespace_nowrap();
+        framed(field, ft, state)
+            .when(disabled, |d| d.cursor_default())
+            .when(!disabled, |d| d.cursor_text())
             .children(self.icon.map(|name| icon(name, 16., t.mist)))
             .child(body)
-            .child(
+            .children(clear_button)
+            .children(can_type.then(|| {
                 // Hands the platform this field as the text input (typing, composing), and, once
                 // the text and the caret are painted, moves the text if the caret left the view.
                 canvas(
@@ -728,159 +1203,164 @@ impl Render for TextField {
                     },
                 )
                 .absolute()
-                .size_full(),
-            )
+                .size_full()
+            }))
             .into_any_element()
     }
-}
 
-impl TextField {
-    /// The one-line text: runs split at the caret and at the ends of the draft being composed,
-    /// the draft underlined, the caret between them.
-    fn line_body(
-        &self,
-        t: &crate::theme::Theme,
-        focused: bool,
-        selected: bool,
-    ) -> gpui::AnyElement {
+    /// The one-line text as one laid-out run: the selection highlighted, the draft being composed
+    /// underlined in the focus blue, the caret painted over it once the layout is known.
+    fn line_body(&self, ft: &FieldTokens, caret_on: bool, active: bool) -> gpui::AnyElement {
         let text = self.buffer.text();
-        let cursor = self.buffer.cursor();
-        let marked = self.buffer.marked_range();
-        let mut cuts = vec![0, cursor, text.len()];
-        if let Some(m) = &marked {
-            cuts.extend([m.start, m.end]);
-        }
-        cuts.sort_unstable();
-        cuts.dedup();
-        let show_caret = focused && !selected;
-        let mut row = div().flex().items_center();
-        let mut caret_done = false;
-        let caret = || {
-            let geometry = self.geometry.clone();
-            div()
-                .relative()
-                .w(px(1.))
-                .h(px(14.))
-                .bg(rgba_of(t.text))
-                .child(
-                    canvas(
-                        |_, _, _| (),
-                        move |b: Bounds<Pixels>, _, _, _| {
-                            let mut g = geometry.get();
-                            g.caret = Some(b);
-                            geometry.set(g);
-                        },
-                    )
-                    .absolute()
-                    .size_full(),
-                )
-        };
-        for w in cuts.windows(2) {
-            let (a, b) = (w[0], w[1]);
-            if a == cursor && show_caret && !caret_done {
-                caret_done = true;
-                row = row.child(caret());
-            }
-            let shown = if self.secret {
-                "\u{2022}".repeat(text[a..b].chars().count())
-            } else {
-                text[a..b].to_owned()
-            };
-            let composing = marked.as_ref().is_some_and(|m| a >= m.start && b <= m.end);
-            let mut run = div().relative().child(SharedString::from(shown));
-            if selected && b <= cursor {
-                run = run.bg(rgba_of(t.line));
-            }
-            if composing {
-                let geometry = self.geometry.clone();
-                run = run
-                    .underline()
-                    .text_decoration_color(hsla_of(t.text))
-                    .child(
-                        canvas(
-                            |_, _, _| (),
-                            move |b: Bounds<Pixels>, _, _, _| {
-                                let mut g = geometry.get();
-                                g.marked = Some(g.marked.map_or(b, |m| m.union(&b)));
-                                geometry.set(g);
-                            },
-                        )
-                        .absolute()
-                        .size_full(),
-                    );
-            }
-            row = row.child(run);
-        }
-        if show_caret && !caret_done {
-            row = row.child(caret());
-        }
-        row.into_any_element()
-    }
-
-    fn render_multi(&mut self, window: &mut Window, cx: &mut Context<Self>) -> gpui::AnyElement {
-        let t = cx.global::<ThemeGlobal>().0;
-        let Some(m) = self.multi.as_ref() else {
-            return div().into_any_element();
-        };
-        let focused = self.focus.is_focused(window);
-        let focus = self.focus.clone();
-        let text = self.buffer.text().to_owned();
-        let empty = text.is_empty();
-        let selected = self.buffer.all_selected();
-        let cursor = self.buffer.cursor();
-        let (min_rows, max_rows) = (m.min_rows, m.max_rows);
-        let (text_px, line_h, in_place) = (m.text_px, m.line_h, m.in_place);
-        let scroll = m.scroll.clone();
-        let store = m.layout.clone();
-        let reveal = m.reveal.clone();
-        let caret_color = hsla_of(t.text);
-        let warn_color = hsla_of(t.warning);
-        let doubtful = self.doubtful.clone();
-        let marked = self.buffer.marked_range();
-        let composing = marked.is_some();
-        let input_focus = self.focus.clone();
-        let entity = cx.entity();
-
-        let content = if empty {
-            div()
-                .relative()
-                .text_color(rgba_of(t.text_3))
-                .child(self.placeholder.clone())
-                .children(focused.then(|| {
-                    div()
-                        .absolute()
-                        .top_0()
-                        .left_0()
-                        .w(px(1.))
-                        .h(px(line_h))
-                        .bg(rgba_of(t.text))
-                }))
-                .into_any_element()
+        let secret = self.secret;
+        let map =
+            |r: Range<usize>| shown_index(text, r.start, secret)..shown_index(text, r.end, secret);
+        let cursor = shown_index(text, self.buffer.cursor(), secret);
+        let selection = self.buffer.selection().map(map);
+        let marked = self.buffer.marked_range().map(map);
+        let geometry = self.geometry.clone();
+        let store = self.line_layout.clone();
+        let caret_color = hsla_of(ft.caret);
+        let mut row = div().relative();
+        let layout = if text.is_empty() {
+            row = row
+                .text_color(rgba_of(ft.placeholder))
+                .child(self.placeholder.clone());
+            None
         } else {
-            let mut styled = StyledText::new(SharedString::from(text.clone()));
-            if selected {
-                styled = styled.with_highlights([(
-                    0..text.len(),
-                    HighlightStyle {
-                        background_color: Some(hsla_of(t.line)),
-                        ..Default::default()
-                    },
-                )]);
-            } else if let Some(m) = marked {
-                // The draft being composed is underlined.
+            let shown = if secret {
+                BULLET.repeat(text.chars().count())
+            } else {
+                text.to_owned()
+            };
+            let mut styled = StyledText::new(SharedString::from(shown));
+            if let Some(r) = selection {
+                styled = styled.with_highlights([(r, selection_style(ft, active))]);
+            } else if let Some(m) = marked.clone() {
                 styled = styled.with_highlights([(
                     m,
                     HighlightStyle {
                         underline: Some(UnderlineStyle {
                             thickness: px(1.),
-                            color: Some(caret_color),
+                            color: Some(hsla_of(FOCUS_BLUE)),
                             wavy: false,
                         }),
                         ..Default::default()
                     },
                 )]);
             }
-            if !selected && !composing && !doubtful.is_empty() {
+            let layout = styled.layout().clone();
+            row = row.child(styled);
+            Some(layout)
+        };
+        let has_selection = self.buffer.selection().is_some();
+        row.child(
+            canvas(
+                |_, _, _| (),
+                move |b: Bounds<Pixels>, _, window, _| {
+                    store.replace(layout.clone());
+                    let (origin, lh) = match &layout {
+                        Some(l) => (
+                            l.position_for_index(cursor).unwrap_or(b.origin),
+                            l.line_height(),
+                        ),
+                        None => (b.origin, px(FIELD_TEXT * 1.35)),
+                    };
+                    let caret = Bounds::new(origin, size(px(CARET_W), lh));
+                    let mut g = geometry.get();
+                    g.row = Some(b);
+                    g.caret = Some(caret);
+                    g.marked = layout.as_ref().zip(marked.as_ref()).and_then(|(l, m)| {
+                        let a = l.position_for_index(m.start)?;
+                        let z = l.position_for_index(m.end)?;
+                        Some(Bounds::new(a, size((z.x - a.x).max(px(1.)), lh)))
+                    });
+                    geometry.set(g);
+                    if caret_on && !has_selection {
+                        window.paint_quad(quad(
+                            caret,
+                            px(0.),
+                            caret_color,
+                            px(0.),
+                            gpui::transparent_black(),
+                            BorderStyle::default(),
+                        ));
+                    }
+                },
+            )
+            .absolute()
+            .size_full(),
+        )
+        .into_any_element()
+    }
+
+    fn render_multi(
+        &mut self,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+        ft: &FieldTokens,
+        state: FrameState,
+        focused: bool,
+        active: bool,
+    ) -> gpui::AnyElement {
+        let t = cx.global::<ThemeGlobal>().0;
+        let Some(m) = self.multi.as_ref() else {
+            return div().into_any_element();
+        };
+        let text = self.buffer.text().to_owned();
+        let empty = text.is_empty();
+        let selection = self.buffer.selection();
+        let cursor = self.buffer.cursor();
+        let (min_rows, max_rows) = (m.min_rows, m.max_rows);
+        let (text_px, line_h, in_place) = (m.text_px, m.line_h, m.in_place);
+        let scroll = m.scroll.clone();
+        let store = m.layout.clone();
+        let reveal = m.reveal.clone();
+        let caret_color = hsla_of(ft.caret);
+        let caret_on = self.caret_on(focused, active);
+        let warn_color = hsla_of(t.warning);
+        let doubtful = self.doubtful.clone();
+        let marked = self.buffer.marked_range();
+        let composing = marked.is_some();
+        let input_focus = self.focus.clone();
+        let entity = cx.entity();
+        let can_type = self.can_type();
+        let disabled = self.disabled;
+
+        let content = if empty {
+            div()
+                .relative()
+                .text_color(rgba_of(ft.placeholder))
+                .child(self.placeholder.clone())
+                .children((caret_on).then(|| {
+                    div()
+                        .absolute()
+                        .top_0()
+                        .left_0()
+                        .w(px(CARET_W))
+                        .h(px(line_h))
+                        .bg(caret_color)
+                }))
+                .into_any_element()
+        } else {
+            let mut styled = StyledText::new(SharedString::from(text.clone()));
+            if let Some(r) = selection.clone() {
+                styled = styled.with_highlights([(r, selection_style(ft, active))]);
+            } else if let Some(m) = marked {
+                // The draft being composed is underlined in the focus blue.
+                styled = styled.with_highlights([(
+                    m,
+                    HighlightStyle {
+                        underline: Some(UnderlineStyle {
+                            thickness: px(1.),
+                            color: Some(hsla_of(FOCUS_BLUE)),
+                            wavy: false,
+                        }),
+                        ..Default::default()
+                    },
+                )]);
+            }
+            if selection.is_none() && !composing && !doubtful.is_empty() {
                 // Doubtful words: a wavy underline in the warning tone (not the error red).
                 let mut ranges: Vec<Range<usize>> = doubtful
                     .iter()
@@ -916,6 +1396,7 @@ impl TextField {
                 }));
             }
             let layout = styled.layout().clone();
+            let has_selection = selection.is_some();
             let (scroll, store, reveal) = (scroll.clone(), store.clone(), reveal.clone());
             div()
                 .child(styled)
@@ -927,9 +1408,9 @@ impl TextField {
                             store.replace(Some(layout.clone()));
                             let lh = layout.line_height();
                             let origin = layout.position_for_index(cursor).unwrap_or(bounds.origin);
-                            if focused && !selected {
+                            if caret_on && !has_selection {
                                 window.paint_quad(quad(
-                                    Bounds::new(origin, size(px(1.), lh)),
+                                    Bounds::new(origin, size(px(CARET_W), lh)),
                                     px(0.),
                                     caret_color,
                                     px(0.),
@@ -969,8 +1450,14 @@ impl TextField {
                 // The caret needs the text's origin: the text is the one in-flow child.
                 div().relative().w_full().child(content),
             );
-        let body = nested_scroll(&t, &scroll, line_h * max_rows as f32, list);
-        div()
+        // The box grows to MULTI_MAX_H (padding and border included), then scrolls.
+        let inner_max = if in_place {
+            line_h * max_rows as f32
+        } else {
+            (line_h * max_rows as f32).min(MULTI_MAX_H - 2. * MULTI_PAD_Y - 2.)
+        };
+        let body = nested_scroll(&t, &scroll, inner_max, list);
+        let field = div()
             .id("text-field")
             .debug_selector(|| format!("text-field:{}", self.label))
             .relative()
@@ -978,49 +1465,39 @@ impl TextField {
             .aria_label(self.label.clone())
             .aria_placeholder(self.placeholder.clone())
             .aria_value(SharedString::from(text))
-            .track_focus(&self.focus)
-            .tab_stop(true)
+            .when(!disabled, |d| d.track_focus(&self.focus).tab_stop(true))
             .on_key_down(cx.listener(Self::on_key))
             .on_mouse_down(
                 MouseButton::Left,
-                cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
-                    window.focus(&focus, cx);
-                    if let Some(m) = this.multi.as_mut() {
-                        m.goal_x = None;
-                        let layout = m.layout.borrow().clone();
-                        if let Some(l) = layout.filter(|l| l.len() == this.buffer.text().len()) {
-                            let (Ok(i) | Err(i)) = l.index_for_position(ev.position);
-                            this.buffer.set_cursor(i);
-                        }
-                    }
-                    cx.notify();
-                }),
+                cx.listener(|this, ev: &MouseDownEvent, window, cx| this.press(ev, window, cx)),
+            )
+            .on_mouse_move(cx.listener(|this, ev: &MouseMoveEvent, _, cx| this.drag(ev, cx)))
+            .on_mouse_up(
+                MouseButton::Left,
+                cx.listener(|this, _: &gpui::MouseUpEvent, _, _| this.drag_from = None),
+            )
+            .on_mouse_up_out(
+                MouseButton::Left,
+                cx.listener(|this, _: &gpui::MouseUpEvent, _, _| this.drag_from = None),
             )
             .w_full()
             .when(in_place, |d| {
-                // Board R3c: a 1.5 px frame in the text colour, the field fill, 9/12 padding.
-                d.min_h(px(56.))
-                    .px(px(12.))
-                    .py(px(9.))
-                    .border(px(1.5))
-                    .border_color(rgba_of(t.text))
-                    .bg(rgba_of(t.field))
+                // Board R3c: the field's focus frame, 9/12 padding, 56 px at least.
+                d.min_h(px(56.)).px(px(12.)).py(px(9.))
             })
             .when(!in_place, |d| {
-                d.px(px(10.))
-                    .py(px(10.))
-                    .border_1()
-                    .border_color(rgba_of(t.line))
-                    .bg(rgba_of(t.surface))
-                    .hover(|s| s.border_color(rgba_of(t.mist)))
-                    .focus(|s| s.border_color(rgba_of(t.text)))
+                d.min_h(px(MULTI_MIN_H))
+                    .px(px(FIELD_PAD_X))
+                    .py(px(MULTI_PAD_Y))
             })
-            .rounded(px(if in_place { 10. } else { scale::RADIUS_MD }))
-            .text_color(rgba_of(t.text))
-            .text_size(px(text_px))
-            .cursor_text()
+            .rounded(px(if in_place { 10. } else { FIELD_RADIUS }))
+            .text_color(rgba_of(ft.text))
+            .text_size(px(if in_place { text_px } else { FIELD_TEXT }));
+        framed(field, ft, state)
+            .when(disabled, |d| d.cursor_default())
+            .when(!disabled, |d| d.cursor_text())
             .child(body)
-            .child(
+            .children(can_type.then(|| {
                 canvas(
                     |_, _, _| (),
                     move |bounds: Bounds<Pixels>, _, window, cx| {
@@ -1032,8 +1509,8 @@ impl TextField {
                     },
                 )
                 .absolute()
-                .size_full(),
-            )
+                .size_full()
+            }))
             .into_any_element()
     }
 }
@@ -1084,5 +1561,81 @@ mod follow_tests {
     #[test]
     fn without_a_caret_only_the_end_of_the_text_matters() {
         assert_eq!(follow_caret(40., VIEW, 500., None), 40.);
+    }
+}
+
+#[cfg(test)]
+mod behaviour_tests {
+    use super::*;
+
+    #[test]
+    fn the_caret_is_solid_after_a_key_then_blinks_every_530_ms() {
+        assert!(caret_visible(0));
+        assert!(caret_visible(499));
+        // After the solid half second: on for the rest of the first period, then 530 off, 530 on.
+        assert!(caret_visible(500));
+        assert!(caret_visible(529));
+        assert!(!caret_visible(530));
+        assert!(!caret_visible(1059));
+        assert!(caret_visible(1060));
+        assert!(!caret_visible(1590));
+    }
+
+    #[test]
+    fn clicks_in_a_row_place_the_caret_then_a_word_then_everything() {
+        assert_eq!(click_kind(1), ClickKind::Caret);
+        assert_eq!(click_kind(2), ClickKind::Word);
+        assert_eq!(click_kind(3), ClickKind::All);
+        assert_eq!(click_kind(5), ClickKind::All);
+    }
+
+    #[test]
+    fn the_clear_button_shows_only_with_text_in_an_editable_search_field() {
+        assert!(clear_visible(true, false, false, false));
+        assert!(!clear_visible(true, true, false, false), "no text");
+        assert!(
+            !clear_visible(false, false, false, false),
+            "not a search field"
+        );
+        assert!(!clear_visible(true, false, true, false), "disabled");
+        assert!(!clear_visible(true, false, false, true), "read-only");
+    }
+
+    #[test]
+    fn escape_goes_draft_then_clear_then_leave() {
+        assert_eq!(escape_step(true, true, false), EscStep::DropDraft);
+        assert_eq!(escape_step(false, true, false), EscStep::Clear);
+        assert_eq!(escape_step(false, true, true), EscStep::Leave);
+        // A field that is not a search field leaves at once, with text or without.
+        assert_eq!(escape_step(false, false, false), EscStep::Leave);
+        assert_eq!(escape_step(false, false, true), EscStep::Leave);
+    }
+
+    #[test]
+    fn the_frame_follows_the_state_with_the_spec_priorities() {
+        use FrameState::*;
+        assert_eq!(frame_state(false, false, false, false, true), Rest);
+        assert_eq!(frame_state(false, false, false, true, true), Focused);
+        assert_eq!(
+            frame_state(false, false, false, true, false),
+            FocusedInactive,
+            "the ring goes when the window is inactive"
+        );
+        assert_eq!(frame_state(false, false, true, true, true), Error);
+        assert_eq!(frame_state(false, true, false, true, true), ReadOnly);
+        assert_eq!(frame_state(true, true, true, true, true), Disabled);
+    }
+
+    #[test]
+    fn a_secret_field_maps_offsets_between_the_text_and_its_bullets() {
+        let t = "aé\u{1F600}b";
+        // a=1 byte, é=2, emoji=4: bullets are 3 bytes per char.
+        assert_eq!(shown_index(t, 0, true), 0);
+        assert_eq!(shown_index(t, 1, true), 3);
+        assert_eq!(shown_index(t, 3, true), 6);
+        assert_eq!(shown_index(t, t.len(), true), 12);
+        assert_eq!(byte_from_shown(t, 6, true), 3);
+        assert_eq!(byte_from_shown(t, 99, true), t.len());
+        assert_eq!(byte_from_shown(t, 3, false), 3);
     }
 }

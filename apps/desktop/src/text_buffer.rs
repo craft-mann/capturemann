@@ -20,8 +20,9 @@ pub struct TextBuffer {
     text: String,
     /// Byte offset of the caret, always on a char boundary.
     cursor: usize,
-    /// "Select all" is the only selection (Cmd/Ctrl+A); the next edit replaces everything.
-    all_selected: bool,
+    /// The other end of the selection (the caret is the moving end); `None` or equal to the caret
+    /// means nothing is selected. The next edit replaces the selected range.
+    anchor: Option<usize>,
     /// The column (in chars) vertical moves aim for, so a short line does not pull the caret
     /// left for good. Cleared by every other move or edit.
     goal_col: Option<usize>,
@@ -44,6 +45,31 @@ fn clean_multiline(s: &str) -> String {
     out
 }
 
+/// The word at `byte` for a double-click: the word-boundary segment that contains it (the one
+/// before it when `byte` is at the end of the text). A run of spaces or punctuation is selected
+/// as that run. Empty text gives `0..0`.
+pub fn word_range(text: &str, byte: usize) -> Range<usize> {
+    let at = byte.min(text.len());
+    let mut last = 0..0;
+    for (i, seg) in text.split_word_bound_indices() {
+        let r = i..i + seg.len();
+        if at < r.end || (at == r.end && r.end == text.len()) {
+            return r;
+        }
+        last = r;
+    }
+    last
+}
+
+/// The part of a file name before its extension: up to the last dot. A name with no dot, or only
+/// a leading dot (".config"), or a trailing dot, is selected whole.
+pub fn stem_range(text: &str) -> Range<usize> {
+    match text.rfind('.') {
+        Some(i) if i > 0 && i + 1 < text.len() => 0..i,
+        _ => 0..text.len(),
+    }
+}
+
 impl TextBuffer {
     pub fn text(&self) -> &str {
         &self.text
@@ -53,18 +79,41 @@ impl TextBuffer {
         self.cursor
     }
 
+    /// Everything is selected (a non-empty text selected from end to end).
     pub fn all_selected(&self) -> bool {
-        self.all_selected
+        !self.text.is_empty() && self.selection() == Some(0..self.text.len())
+    }
+
+    /// The selected byte range, `None` when nothing is selected.
+    pub fn selection(&self) -> Option<Range<usize>> {
+        let a = self.anchor?;
+        let c = self.cursor;
+        (a != c).then(|| a.min(c)..a.max(c))
+    }
+
+    /// Deletes the selected text and puts the caret where it was; false when nothing is selected.
+    fn delete_selection(&mut self) -> bool {
+        match self.selection() {
+            Some(r) => {
+                self.text.replace_range(r.clone(), "");
+                self.cursor = r.start;
+                self.anchor = None;
+                true
+            }
+            None => {
+                self.anchor = None;
+                false
+            }
+        }
     }
 
     pub fn is_empty(&self) -> bool {
         self.text.is_empty()
     }
 
-    /// The selected text: the whole text after "select all", otherwise nothing (a field has no
-    /// partial selection). What Copy and Cut put on the clipboard.
+    /// The selected text; what Copy and Cut put on the clipboard.
     pub fn selected_text(&self) -> Option<&str> {
-        (self.all_selected && !self.text.is_empty()).then_some(self.text.as_str())
+        self.selection().map(|r| &self.text[r])
     }
 
     /// Text before and after the caret.
@@ -91,11 +140,7 @@ impl TextBuffer {
         }
         self.goal_col = None;
         self.marked = None;
-        if self.all_selected {
-            self.text.clear();
-            self.cursor = 0;
-            self.all_selected = false;
-        }
+        self.delete_selection();
         self.text.insert_str(self.cursor, clean);
         self.cursor += clean.len();
         true
@@ -105,8 +150,8 @@ impl TextBuffer {
     pub fn backspace(&mut self) -> bool {
         self.goal_col = None;
         self.marked = None;
-        if self.all_selected {
-            return self.clear();
+        if self.delete_selection() {
+            return true;
         }
         let start = self.prev_boundary(self.cursor);
         if start == self.cursor {
@@ -121,8 +166,8 @@ impl TextBuffer {
     pub fn delete(&mut self) -> bool {
         self.goal_col = None;
         self.marked = None;
-        if self.all_selected {
-            return self.clear();
+        if self.delete_selection() {
+            return true;
         }
         let end = self.next_boundary(self.cursor);
         if end == self.cursor {
@@ -148,35 +193,98 @@ impl TextBuffer {
         let changed = !self.text.is_empty();
         self.text.clear();
         self.cursor = 0;
-        self.all_selected = false;
+        self.anchor = None;
         self.goal_col = None;
         self.marked = None;
         changed
     }
 
+    /// Left: with a selection the caret goes to its start, else one cluster back.
     pub fn left(&mut self) {
-        self.all_selected = false;
+        let sel = self.selection();
+        self.anchor = None;
         self.goal_col = None;
         self.marked = None;
-        self.cursor = self.prev_boundary(self.cursor);
+        self.cursor = match sel {
+            Some(r) => r.start,
+            None => self.prev_boundary(self.cursor),
+        };
     }
 
+    /// Right: with a selection the caret goes to its end, else one cluster forward.
     pub fn right(&mut self) {
-        self.all_selected = false;
+        let sel = self.selection();
+        self.anchor = None;
         self.goal_col = None;
         self.marked = None;
+        self.cursor = match sel {
+            Some(r) => r.end,
+            None => self.next_boundary(self.cursor),
+        };
+    }
+
+    /// The anchor of the selection, or the caret when nothing is selected (where a Shift move
+    /// starts from).
+    pub fn anchor_or_cursor(&self) -> usize {
+        self.anchor.unwrap_or(self.cursor)
+    }
+
+    /// Sets the anchor again after a caret move, which makes the text between them the selection
+    /// (Shift+arrow, Shift+Home, a drag).
+    pub fn set_anchor(&mut self, byte: usize) {
+        let mut at = byte.min(self.text.len());
+        while !self.text.is_char_boundary(at) {
+            at -= 1;
+        }
+        self.anchor = Some(at);
+    }
+
+    /// Shift+Left: the caret moves one cluster back and the selection follows.
+    pub fn extend_left(&mut self) {
+        let a = self.anchor_or_cursor();
+        self.marked = None;
+        self.goal_col = None;
+        self.cursor = self.prev_boundary(self.cursor);
+        self.anchor = Some(a);
+    }
+
+    /// Shift+Right.
+    pub fn extend_right(&mut self) {
+        let a = self.anchor_or_cursor();
+        self.marked = None;
+        self.goal_col = None;
         self.cursor = self.next_boundary(self.cursor);
+        self.anchor = Some(a);
+    }
+
+    /// Selects `range` (clamped to the text and to char boundaries); the caret goes to its end.
+    pub fn select_range(&mut self, range: Range<usize>) {
+        self.set_cursor(range.end);
+        let end = self.cursor;
+        self.set_anchor(range.start.min(end));
+    }
+
+    /// Double-click: selects the word (or the run of spaces) at `byte`.
+    pub fn select_word_at(&mut self, byte: usize) {
+        let r = word_range(&self.text, byte);
+        self.select_range(r);
+    }
+
+    /// Selects the part of a file name before its extension (see [`stem_range`]).
+    pub fn select_stem(&mut self) {
+        let r = stem_range(&self.text);
+        self.select_range(r);
     }
 
     pub fn home(&mut self) {
-        self.all_selected = false;
+        self.anchor = None;
         self.goal_col = None;
         self.marked = None;
         self.cursor = 0;
     }
 
     pub fn end(&mut self) {
-        self.all_selected = false;
+        self.anchor = None;
         self.goal_col = None;
         self.marked = None;
         self.cursor = self.text.len();
@@ -195,7 +303,7 @@ impl TextBuffer {
             at = self.prev_boundary(at);
         }
         self.cursor = at;
-        self.all_selected = false;
+        self.anchor = None;
         self.goal_col = None;
         self.marked = None;
     }
@@ -295,8 +403,8 @@ impl TextBuffer {
     pub fn select_all(&mut self) {
         self.goal_col = None;
         self.marked = None;
-        self.all_selected = !self.text.is_empty();
         self.cursor = self.text.len();
+        self.anchor = (!self.text.is_empty()).then_some(0);
     }
 }
 
@@ -357,11 +465,12 @@ impl TextBuffer {
 
     /// The selection as UTF-16 offsets: everything when all is selected, else the caret.
     pub fn selection_utf16(&self) -> Range<usize> {
-        if self.all_selected {
-            0..self.len_utf16()
-        } else {
-            let c = self.byte_to_utf16(self.cursor);
-            c..c
+        match self.selection() {
+            Some(r) => self.range_to_utf16(&r),
+            None => {
+                let c = self.byte_to_utf16(self.cursor);
+                c..c
+            }
         }
     }
 
@@ -381,8 +490,7 @@ impl TextBuffer {
             Some(r) => self.range_from_utf16(r),
             None => match &self.marked {
                 Some(m) => m.clone(),
-                None if self.all_selected => 0..self.text.len(),
-                None => self.cursor..self.cursor,
+                None => self.selection().unwrap_or(self.cursor..self.cursor),
             },
         }
     }
@@ -409,7 +517,7 @@ impl TextBuffer {
         self.text.replace_range(target.clone(), &clean);
         self.cursor = target.start + clean.len();
         self.marked = None;
-        self.all_selected = false;
+        self.anchor = None;
         self.goal_col = None;
         changed
     }
@@ -429,7 +537,7 @@ impl TextBuffer {
         let target = self.target_range(range.as_ref());
         let changed = self.text[target.clone()] != clean;
         self.text.replace_range(target.clone(), &clean);
-        self.all_selected = false;
+        self.anchor = None;
         self.goal_col = None;
         if clean.is_empty() {
             self.marked = None;
@@ -1044,5 +1152,121 @@ mod tests {
         b.replace_range_utf16(None, E_NFD, false);
         assert!(b.backspace());
         assert!(b.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod selection_tests {
+    use super::*;
+
+    fn buf(s: &str) -> TextBuffer {
+        let mut b = TextBuffer::default();
+        b.insert(s);
+        b
+    }
+
+    #[test]
+    fn the_stem_stops_at_the_last_dot() {
+        assert_eq!(stem_range("report.pdf"), 0..6);
+        assert_eq!(stem_range("a.tar.gz"), 0..5);
+        assert_eq!(stem_range("Meeting notes.cmrec"), 0..13);
+    }
+
+    #[test]
+    fn a_name_without_a_real_extension_is_selected_whole() {
+        assert_eq!(stem_range("README"), 0..6);
+        assert_eq!(stem_range(".config"), 0..7);
+        assert_eq!(stem_range("name."), 0..5);
+        assert_eq!(stem_range(""), 0..0);
+    }
+
+    #[test]
+    fn select_stem_selects_before_the_extension() {
+        let mut b = buf("clip one.mp4");
+        b.select_stem();
+        assert_eq!(b.selection(), Some(0..8));
+        assert_eq!(b.selected_text(), Some("clip one"));
+        assert!(!b.all_selected());
+        assert!(b.insert("x"));
+        assert_eq!(b.text(), "x.mp4");
+    }
+
+    #[test]
+    fn a_double_click_selects_the_word_under_it() {
+        let t = "hello big world";
+        assert_eq!(word_range(t, 0), 0..5);
+        assert_eq!(word_range(t, 3), 0..5);
+        assert_eq!(word_range(t, 7), 6..9);
+        assert_eq!(word_range(t, 12), 10..15);
+        // At the very end the last word is taken; on a space the space is.
+        assert_eq!(word_range(t, 15), 10..15);
+        assert_eq!(word_range(t, 5), 5..6);
+        assert_eq!(word_range("", 0), 0..0);
+    }
+
+    #[test]
+    fn a_double_click_takes_a_whole_vietnamese_word() {
+        let t = "xin chào bạn";
+        let at = t.find("chào").unwrap() + 2;
+        let mut b = buf(t);
+        b.select_word_at(at);
+        assert_eq!(b.selected_text(), Some("chào"));
+    }
+
+    #[test]
+    fn shift_arrows_extend_and_shrink_the_selection() {
+        let mut b = buf("abcdef");
+        b.home();
+        b.extend_right();
+        b.extend_right();
+        assert_eq!(b.selection(), Some(0..2));
+        b.extend_left();
+        assert_eq!(b.selection(), Some(0..1));
+        b.extend_left();
+        assert_eq!(b.selection(), None);
+        b.extend_left();
+        assert_eq!(b.selection(), None, "nothing before the start");
+        b.end();
+        b.extend_left();
+        b.extend_left();
+        assert_eq!(b.selected_text(), Some("ef"));
+        assert_eq!(b.cursor(), 4);
+    }
+
+    #[test]
+    fn a_plain_arrow_collapses_the_selection_to_its_edge() {
+        let mut b = buf("abcdef");
+        b.select_range(1..4);
+        b.left();
+        assert_eq!((b.selection(), b.cursor()), (None, 1));
+        b.select_range(1..4);
+        b.right();
+        assert_eq!((b.selection(), b.cursor()), (None, 4));
+    }
+
+    #[test]
+    fn typing_or_deleting_replaces_only_the_selection() {
+        let mut b = buf("abcdef");
+        b.select_range(1..3);
+        assert!(b.insert("XY!"));
+        assert_eq!(b.text(), "aXY!def");
+        b.select_range(0..2);
+        assert!(b.backspace());
+        assert_eq!(b.text(), "Y!def");
+        assert_eq!(b.cursor(), 0);
+        b.select_range(3..5);
+        assert!(b.delete());
+        assert_eq!(b.text(), "Y!d");
+    }
+
+    #[test]
+    fn set_anchor_after_a_move_makes_a_selection_like_a_drag() {
+        let mut b = buf("hello world");
+        b.set_cursor(2);
+        let from = b.cursor();
+        b.set_cursor(8);
+        b.set_anchor(from);
+        assert_eq!(b.selected_text(), Some("llo wo"));
+        assert_eq!(b.selection_utf16(), 2..8);
     }
 }
