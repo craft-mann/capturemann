@@ -186,7 +186,7 @@ Because the bundled FFmpeg has no demuxer for AVI, AIFF, FLAC, OGG or bare AAC (
 **Test notes** — Layout tests with the pseudo-locale, the manual script `tests/manual/IMP-1.md` (a phone HEVC MOV with rotation, a variable-rate MKV, an M4A interview of about 1 hour, a 15 s voice memo, a protected file, a file on Desktop and one on an external drive, a folder drop, cancel, disk full, remove-originals), side-by-side with the PNGs at 1440 px.
 
 ### IMP-6 Import images
-**Priority** P1 · **Status** Ready (0.3.3) · **Crates** cm-media, cm-library, cm-daemon, cm-mcp, cm-cli, apps/desktop · **Depends on** IMP-1 to IMP-5, ANN-1
+**Priority** P1 · **Status** In progress (built Nov 12 to 13, 2026 for 0.3.3: tested with unit tests, golden images and `cm-regress` cases on macOS and Linux (`verification/L1-*-0.3.3-*`); the editor was tried by the maintainer on macOS (as reported), not yet on Windows or Linux) · **Crates** cm-media, cm-library, cm-daemon, cm-mcp, cm-cli, apps/desktop · **Depends on** IMP-1 to IMP-5, ANN-1
 
 **User story** — As someone with a phone screenshot, a design mock-up or a picture from another tool, I want to bring it into the library and annotate, redact, Copy text and export it like a screenshot I took here.
 

@@ -127,7 +127,7 @@ Annotations are vector operations stored in `manifest.json` (`ops` list) and ren
 ---
 
 ### ANN-4 Callouts and stamps
-**Priority** P1 for `callout` and `stamp` (the pasted `image` overlay stays P2 and is not planned) · **Status** Ready (0.3.3; the op JSON is frozen above; `stamp` is the stretch goal: built last, cut first if time runs short) · **Crates** cm-core, cm-render, cm-mcp, cm-cli, apps/desktop · **Depends on** ANN-1, ANN-3
+**Priority** P1 for `callout` and `stamp` (the pasted `image` overlay stays P2 and is not planned) · **Status** In progress (built Nov 12 to 13, 2026 for 0.3.3: tested with unit tests, golden images and `cm-regress` cases on macOS and Linux (`verification/L1-*-0.3.3-*`); the editor was tried by the maintainer on macOS (as reported), not yet on Windows or Linux) · **Crates** cm-core, cm-render, cm-mcp, cm-cli, apps/desktop · **Depends on** ANN-1, ANN-3
 
 **User story** — As a creator, I want speech-bubble callouts and stamps (check, cross, exclamation, question, "Before", "After"), so that my screenshots look polished and explain themselves.
 
@@ -158,7 +158,7 @@ Annotations are vector operations stored in `manifest.json` (`ops` list) and ren
 ---
 
 ### ANN-6 Step badge: label, numbering style, start, reorder
-**Priority** P1 · **Status** Ready (0.3.3) · **Crates** cm-core, cm-render, apps/desktop · **Depends on** ANN-1
+**Priority** P1 · **Status** In progress (built Nov 12 to 13, 2026 for 0.3.3: tested with unit tests, golden images and `cm-regress` cases on macOS and Linux (`verification/L1-*-0.3.3-*`); the editor was tried by the maintainer on macOS (as reported), not yet on Windows or Linux) · **Crates** cm-core, cm-render, apps/desktop · **Depends on** ANN-1
 
 **User story** — As someone writing a how-to, I want step badges with a short label, letters instead of numbers, a start number and a drag-to-reorder list, so that a guide reads "A. Open Settings, B. Choose Network".
 
@@ -183,7 +183,7 @@ Annotations are vector operations stored in `manifest.json` (`ops` list) and ren
 ---
 
 ### ANN-7 Spotlight
-**Priority** P1 · **Status** Ready (0.3.3) · **Crates** cm-core, cm-render, apps/desktop · **Depends on** ANN-1, ANN-2
+**Priority** P1 · **Status** In progress (built Nov 12 to 13, 2026 for 0.3.3: tested with unit tests, golden images and `cm-regress` cases on macOS and Linux (`verification/L1-*-0.3.3-*`); the editor was tried by the maintainer on macOS (as reported), not yet on Windows or Linux) · **Crates** cm-core, cm-render, apps/desktop · **Depends on** ANN-1, ANN-2
 
 **User story** — As someone documenting a screen, I want to dim everything except the part that matters, so that the reader looks at the right place.
 

@@ -1,6 +1,6 @@
 # Release 0.3.3: annotation pack (analysis of `0.3.3.md` and detail plan)
 
-Status: **all open questions answered Nov 12, 2026 (section 5); plan reviewed with the maintainer Nov 12: scope kept, Magnify moved to the backlog, image import capped at 50 megapixels; ready for Phase 0; nothing built.** Design hand-off (maintainer, Nov 12, 2026): `specs/capturemann-0.3.3-annotation-pack/` (git-ignored, local only; start with `release-0.3.3-design-spec.md`, boards N0 to N8b in `screens/png`, icons in `icons/`, sources in `source/`). Source: the maintainer's `0.3.3.md` at the repository root (callout, step badge upgrades, spotlight, magnify, stamps).
+Status: **built and merged on `main` (Nov 13, 2026); candidates and regression in progress; not tagged or released.** Added after the plan: the shared text-field look (spec `capturemann-text-fields`, tracks A to D), Steps list rows (inline label, info-icon tooltip). Magnify is backlog (ANN-8 reserved). Design hand-off: `specs/capturemann-0.3.3-annotation-pack/` and `capturemann-text-fields/` (git-ignored, local). Source: the maintainer's `0.3.3.md`.
 
 ## 1. What the proposal is, and how it fits the repository
 

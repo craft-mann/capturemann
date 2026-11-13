@@ -48,7 +48,7 @@ in the release notes and in [`verification/`](verification/).
 | Global shortcuts | ✓ | ✓ | ✓ [X11 only] |
 | **Editor**: trim, cut, split, speed, backgrounds, zoom regions, 9:16 and 1:1 reframe | ✓ | ✓ | ✓ |
 | Export to MP4, platform presets, GIF or WebM | ✓ | ✓ | ✓ [H.264 with a hardware encoder, else labelled VP9] |
-| Import MP4, MOV, MKV and other formats | ✓ | ✓ | ✓ |
+| Import MP4, MOV, MKV and other formats, and PNG and JPEG pictures | ✓ | ✓ | ✓ |
 | **Audio recording** (meetings, lectures, voice notes), audio editor, export to M4A or WAV | ✓ | ✓ | ✓ |
 | **Local AI**: Whisper transcripts and captions (SRT, VTT, TXT, burned in), caption editor, translation | ✓ | ✓ | ✓ |
 | **Speaker labels**: who spoke when, with rename and merge | ✓ | ✓ | ✓ |
