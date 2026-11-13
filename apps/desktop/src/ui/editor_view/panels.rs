@@ -427,7 +427,7 @@ impl EditorView {
                     .flex_none()
                     .bg(rgba_of(ft.caret))
             };
-            let label = div()
+            let name_field = div()
                 .flex_1()
                 .min_w(px(0.))
                 .h(px(row::LABEL_H))
@@ -590,7 +590,7 @@ impl EditorView {
                         })
                         .child(step_badge(&badge)),
                 )
-                .child(label)
+                .child(name_field)
                 .child(delete)
                 .into_any_element()
         });
