@@ -24,6 +24,7 @@ Annotations are vector operations stored in `manifest.json` (`ops` list) and ren
 ```json
 { "id": "op_20", "op": "callout", "rect": [100, 80, 220, 70], "tail": [90, 200], "text": "Click here", "size": 24, "color": "#FFFFFF", "bg": "#FF3B3B", "radius": 12, "style": "bubble" }
 { "id": "op_21", "op": "spotlight", "shapes": [ { "kind": "rect", "rect": [10, 10, 200, 100], "radius": 0 }, { "kind": "ellipse", "rect": [300, 40, 120, 120], "radius": 0 } ], "dim": 0.6, "mode": "dim", "strength": 12 }
+{ "id": "op_30", "op": "magnify", "source": [400, 300, 120, 80], "at": [760, 180], "zoom": 3, "shape": "rounded", "border": "#FFFFFF", "border_width": 3, "connector": true, "badge": true }
 { "id": "op_22", "op": "step", "at": [400, 200], "n": 2, "size": 28, "color": "#FF3B3B", "style": "upper", "start": 3, "text": "Open Settings" }
 { "id": "op_23", "op": "stamp", "at": [50, 50], "kind": "check", "size": 34, "color": "#2EB872" }
 { "id": "op_24", "op": "stamp", "at": [90, 50], "kind": "label", "size": 34, "color": "#FF3B3B", "text": "Before" }
@@ -47,6 +48,7 @@ Annotations are vector operations stored in `manifest.json` (`ops` list) and ren
 - Every op is selectable, movable, resizable via handles, recolorable, and deletable (Delete/Backspace). Copy/paste duplicates ops with +10 px offset.
 - Step badges auto-number in creation order (1, 2, 3…); deleting one renumbers the rest; the next number is shown on the cursor. Label, numbering style, start number and reordering: ANN-6.
 - Text: click to place, type, Enter for a new line, Esc to finish; default 24 px white with no outline or shadow (changed in 0.2.9, AC8; the user changes colour and size in the panel); typed text goes through the platform input method so Telex, VNI and Pinyin compose (AC7).
+- **Selection in a text box (0.3.4).** While you type in a Text, Callout or Step-label box you can select text: drag across it, double-click a word, triple-click all of the box's text, Shift+arrows, Cmd/Ctrl+A; typing, paste, Backspace or Delete replace or remove the selection; Cmd/Ctrl+C and X copy and cut plain text, V pastes it (within the 2000-character limit). The selection is only on screen and is never stored. The caret blinks every 530 ms while idle and stays solid while typing and for 500 ms after the last key; it is hidden while the window is inactive. The look follows the text-field spec (selection colour `canvas::SELECTION`, caret in the text colour).
 - Defaults: color `#FF3B3B`, width 4 px; the last used color and width persist per tool.
 - Crop is non-destructive: it sets the visible rect; ops outside it remain stored.
 - Rendering is anti-aliased and resolution-independent; widths are physical px of the original.
@@ -61,6 +63,11 @@ Annotations are vector operations stored in `manifest.json` (`ops` list) and ren
 - **AC6** Given an agent sends the op list from the schema above to `annotate`, then the result renders identically to the same ops drawn in the GUI.
 - **AC7** Given the Text tool is open and a Vietnamese input source (Telex or VNI) is active, when the user types `Tieengs Vieetj cos daaus` (Telex), then the text reads `Tiếng Việt có dấu` in the editor, with no raw Latin letter left in front of a composed one, and the exported PNG shows the same glyphs (no missing-glyph boxes). Tested with fakes: the key handler leaves typed text to the input method and the draft/commit path builds the phrase (`editor::state` tests); glyph coverage in `cm-render` (`tests/fallback_fonts.rs`); by hand on Windows and macOS: `tests/manual/ANN-1-IME.md`. Linux (IBus, Fcitx) is not tested in 0.2.9.
 - **AC8** Given a new text annotation is placed, then it is 24 px, white, with no outline and no shadow; an existing text annotation keeps its stored colour, size and outline, and the user can still change colour and size in the panel.
+- **AC9** (0.3.4) Given a text box with "Check the billing", when the user double-clicks `billing`, then that word is selected and drawn with the selection colour; when they then type `invoice`, the text reads "Check the invoice" and nothing else changed.
+- **AC10** (0.3.4) Given a selection, then Shift+Right extends it by one character, Cmd/Ctrl+A selects all, Cmd/Ctrl+C puts the selected plain text on the clipboard, Cmd/Ctrl+X also removes it, and Cmd/Ctrl+V replaces the selection with the clipboard text (a clipboard text that would make the box exceed 2000 characters is cut at the limit).
+- **AC11** (0.3.4) Given a press inside the box and a drag that leaves the box, then the selection keeps following the pointer (the pointer is captured) and ends on release.
+- **AC12** (0.3.4) Given a text box being edited and no key pressed for 500 ms, then the caret toggles every 530 ms; while keys are pressed it is solid; with the window inactive there is no caret and the selection is grey.
+- **AC13** (0.3.4) Given a selection and a Vietnamese input source (Telex or VNI), when the user types a composed syllable, then the composition replaces the selection, the composing range is underlined in blue 1 px, and AC7 still passes.
 
 **Edge cases and errors** — Text with emoji or CJK renders with font fallback (`cosmic-text`); ops with coordinates outside the image are clipped, not rejected; invalid op type → `invalid_input` naming the op index (`ops[3]: ...`) when it comes from a client. **Forward compatibility:** an op type this build does not know that is already stored in a manifest (written by a newer version) is preserved and written back unchanged, not treated as corruption; it is not rendered.
 
@@ -207,8 +214,38 @@ Annotations are vector operations stored in `manifest.json` (`ops` list) and ren
 
 ---
 
-### ANN-8 Magnify (reserved)
-**Priority** P2 · **Status** Backlog (moved out of 0.3.3 on Nov 12, 2026). The ID and the op name `magnify` are reserved. Design notes to keep: the loupe renders its source rectangle again at `zoom` times from `original.png` plus the vector ops that precede it, so it is sharp; blur and pixelate always apply to every copy of those pixels, also inside a loupe (OCR on the export finds no characters in a redacted rectangle, also inside a loupe). Detail in `../plans/release-0.3.3-plan.md` section 2 items 1 and 2.
+### ANN-8 Magnify
+**Priority** P1 (0.3.4) · **Status** Ready (0.3.4; the op JSON is frozen above; not started) · **Crates** cm-core, cm-render, cm-mcp, cm-cli, apps/desktop · **Depends on** ANN-1, ANN-2, ANN-7
+
+**User story** — As someone documenting a screen, I want a zoomed copy of a small detail next to it, with a line back to where it comes from, so that the reader sees a tiny button or a number without squinting.
+
+**Description**
+- **Op** `magnify { source: [x, y, w, h], at: [cx, cy], zoom, shape, border, border_width, connector, badge }` (example in the op schema above). `source` is the area to enlarge, in physical px of the original; `at` is the centre of the **loupe**, which is `source` scaled by `zoom` (width `w × zoom`, height `h × zoom`) and centred on `at`. `zoom` 2 to 8 (default 3). `shape`: `circle` (the ellipse inscribed in the loupe rectangle; the editor draws a square source for it), `rounded` (default; radius 12) or `rect`. `border` is `#RRGGBB` (default `#FFFFFF`), `border_width` 0 to 32 px (default 3, 0 = no border), `connector` (default true) draws two thin lines from the source rectangle to the loupe, under the loupe, in the border colour; `badge` (default true) draws a small pill such as `×3` on the loupe's bottom right.
+- **Sharp, from the original.** The loupe renders the source rectangle again at `zoom` times the scale from `original.png` plus **the vector ops that come before the magnify in the list** (arrows, text, steps, callouts, highlights, an earlier spotlight), so it is sharp and shows what you drew. The magnify's own op is not in its loupe, and other magnifies are skipped inside a loupe (no nesting). Ops after the magnify in the list draw over the base image and over the loupe as usual and are not inside the loupe. The renderer needs a scale parameter for this; at a 2× export the loupe is rendered at `2 × zoom`.
+- **Redactions are never revealed.** Blur and pixelate apply to **every copy** of the pixels, wherever they sit in the list: a blur over text still hides it inside a loupe, whether the blur comes before or after the magnify in the list (the loupe renders its source with all redaction ops applied, their strength or block scaled with the zoom so the loupe hides as much as the base does). Auto-redact boxes are blurs and follow the same rule. `spotlight` mode `blur` is a look, not a redaction (ANN-7).
+- **Several per image**, at most 4 (`invalid_input` for the 5th, naming `ops[i]`). A loupe that falls partly outside the image is clipped, not rejected (as every op); `source` is clamped to the image. A crop is only the visible window: the source may lie outside it.
+- **Editor** (key M, in the Emphasis group with Spotlight): drag the source rectangle; while dragging, the source outline and the loupe preview show live (the loupe appears beside the source, to the right when it fits, else below, and can be dragged to move the loupe); handles resize the source and the loupe follows. The inspector has Zoom (2×, 3×, 4×, 6×, 8×), Shape (circle, rounded, rect), Border colour and width, Connector and Badge switches. One drag is one op and one undo step. With 4 on the image the tool says so.
+- **Copy text** (ANN-5) reads the rendered image, so text that is magnified is read twice: once in the base, once in the loupe, as drawn.
+- **Compatibility.** A 0.3.3 app keeps a `magnify` op in `manifest.unknown_ops` unchanged and does not draw it ("Kept an annotation this version cannot show"); 0.3.4 adds nothing that 0.3.3 drops.
+
+**Acceptance criteria**
+- **AC1** Given a screenshot with one-pixel lines and a magnify of a 100×50 source at zoom 4, then the loupe equals a direct 4× render of that region within 1 % pixel difference and is sharper than a bilinear upscale of the base image (edge-width measure), checked against a golden image.
+- **AC2** Given an arrow listed before the magnify that crosses the source, then the arrow appears in the loupe at 4× its size; an arrow listed after the magnify is not in the loupe.
+- **AC3** Given a blur over a line of text and a magnify over that area, listed before or after the blur, then OCR on the rendered image finds no characters inside the redacted rectangle and none inside the loupe, at zoom 2, 4 and 8 (extends ANN-2.AC1 and AC3, RED-2.AC1).
+- **AC4** Given an export at 2×, then the loupe is rendered at `2 × zoom` from `original.png` and its edge-width measure is not worse than at 1×.
+- **AC5** Given `zoom` 1 or 9, a source smaller than 8×8 px, `border_width` 33, a loupe over 32 megapixels or 16 384 px on a side, or a fifth magnify, then `annotate` answers `invalid_input` naming `ops[i]` and stores nothing.
+- **AC6** Given a loupe that lies partly outside the image, then the visible part is drawn and nothing is rejected; a source partly outside the image is clamped to it.
+- **AC7** (editor) Given the Magnify tool and a drag of the source, then the loupe and its connector are visible while the pointer is still down; on release one `magnify` op exists after one undo step, and undo removes it.
+- **AC8** Given the same op list drawn in the editor and sent to `annotate`, then the renders are identical (as ANN-1.AC6).
+- **AC9** Given a capture with a `magnify` op opened by 0.3.3, then the op is kept unchanged in `unknown_ops` after an edit and save there.
+
+**Edge cases and errors** — A magnify over an area that is entirely redacted shows the redacted loupe (never the pixels). Two loupes that overlap draw in list order. Zoom or source changes that would exceed the limits are refused in the editor with the panel's message and by `invalid_input` from `annotate`.
+
+**Agent interface** — `annotate` with a `magnify` op; no new tool (the MCP tool count stays 81). The plugin skill `screenshot-and-redact` mentions the op and the redaction rule.
+
+**Out of scope** — A live (video) loupe; magnifying a recording; nested loupes; a freehand source shape.
+
+**Test notes** — Golden images per shape and zoom; an OCR test at zoom 2, 4 and 8 on a screenshot of text with a blur (before and after the magnify in the list); an edge-width measure for sharpness; the fixture with every 0.3.4 op for the 0.3.3 round trip; `tests/manual/ANN-8.md` for the editor.
 
 ---
 

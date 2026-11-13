@@ -1,6 +1,6 @@
 # Release 0.3.4: plan (draft, Nov 13, 2026)
 
-Status: **scope decided Nov 13, 2026: hygiene + Magnify + canvas text selection and caret + CMYK JPEG conversion (section 4, recommended scope); questions 3 to 5 of section 5 still open; nothing built.** Written the day 0.3.3 was published (tag `v0.3.3` on `85df0235`). Inputs: the 0.3.3 plan and morning report (`release-0.3.3-plan.md`, `release-0.3.3-final-morning-report.md`), the 0.3.3 known limits, the carry-over list of `docs/development/release-day-0.3.3.md`, `docs/development/velopack-spike-0.3.2.md`, `docs/development/windows-signing-options.md`.
+Status: **scope decided Nov 13, 2026: hygiene + Magnify + canvas text selection and caret + CMYK JPEG conversion (section 4, recommended scope); **Phase 0 (spec text) written Nov 13, 2026 (section 6)**; questions 3 to 5 of section 5 and the defaults of section 6 await the maintainer; nothing built.** Written the day 0.3.3 was published (tag `v0.3.3` on `85df0235`). Inputs: the 0.3.3 plan and morning report (`release-0.3.3-plan.md`, `release-0.3.3-final-morning-report.md`), the 0.3.3 known limits, the carry-over list of `docs/development/release-day-0.3.3.md`, `docs/development/velopack-spike-0.3.2.md`, `docs/development/windows-signing-options.md`.
 
 ## 1. What 0.3.3 left open
 
@@ -69,6 +69,21 @@ Alternative scopes:
 4. Windows code signing: has the SignPath Foundation application been sent? (It decides whether 0.3.4 can ship signed files.)
 5. When can the lab laptop run Windows for the regression (a console login is needed)?
 
-## 6. Size and order (recommended scope)
+## 6. Phase 0 (spec text only; written Nov 13, 2026)
 
-Phase 0 (spec text only, half a day) then tracks: A hygiene (1 day, mostly waiting on machines), B Magnify (core and render 2 days, editor 1 day), C canvas text selection and caret (1 day), D CMYK conversion and file types (0.5 day), verification and release (1 day). One `target/` per agent, scoped tests, merge as each track finishes, release-day steps copied from `release-day-0.3.3.md` with the asset-name check added.
+Written, no code: `features/02-annotation.md` (ANN-8 Magnify in full with the frozen op JSON `magnify { source, at, zoom, shape, border, border_width, connector, badge }` and AC1 to AC9; ANN-1 text selection, copy and paste, caret blink as AC9 to AC13), `features/18-import.md` (IMP-6: CMYK and YCCK JPEG converted, AC10 to AC12; file types in the installers, AC13), `features/09-library.md` (LIB-1 AC8 to AC10: delete and rename with a paused upload, "waiting for sign-in" with Reconnect), `features/15-voice.md` (VOC-1 AC12: the audio HUD drags on every system), `00-product-spec.md` (ANN-8 P1), `02-agent-interface.md` (`annotate` lists `magnify`, at most 4), `docs/development/releasing.md` (asset names and the `check-release-assets.sh` rule).
+
+**Defaults I assumed (the maintainer answers or accepts):** up to 4 magnifiers per image; the source may lie outside a crop (a crop is only the visible window); text selection includes copy, cut and paste in 0.3.4; the loupe is the source scaled by the zoom and centred on `at`, nested loupes are skipped; Copy text reads magnified text twice (as drawn).
+
+**Frozen:** the op JSON above; the limits (zoom 2 to 8, 4 per image, source at least 8x8, loupe at most 32 Mpx and 16 384 px a side, border width 0 to 32). After this the tracks may start.
+
+## 7. Tracks (disjoint files; one `target/` per agent)
+
+| Track | Scope | Files | Size |
+| --- | --- | --- | --- |
+| A | Magnify core and render: op, validation, scale parameter in the renderer, loupe with earlier ops and redactions, connector, badge, goldens, OCR test, MCP schema, CLI, 0.3.3 round-trip fixture | `cm-core/src/annotation.rs`, `cm-render/**`, `cm-mcp` schema, CLI | 2 days |
+| B | Magnify editor (tool M, live loupe while dragging, inspector, handles) and the canvas text selection, copy and paste, caret blink | `apps/desktop/src/editor/**`, `ui/editor_view/**` | 2 days |
+| C | CMYK conversion, installer file types (`Info.plist`, Windows installer, `.desktop`), B1 (paused-upload delete and rename, "waiting for sign-in" and Reconnect), B2 (audio HUD drag, after a reproduction on Windows), remove the "new" dots | `cm-media`, `cm-library` import, `cm-daemon/src/library_ops.rs`, `ui/library_view.rs`, `ui/recording/hud.rs`, `packaging/**` | 1.5 days |
+| D | Hygiene: `scripts/check-release-assets.sh`, the Windows CI GPU crashes, the flaky socket test, a quiet-machine full test run, the plugin check, docs and manual scripts (`ANN-8.md`), `cm-regress` cases for Magnify and CMYK | `scripts/**`, `crates/cm-regress`, `tests/manual`, `docs/**`, `.github/workflows` | 1 day |
+
+Order: Phase 0 (done), the four tracks in parallel, merge each track when it is green (fmt, clippy 1.100, scoped tests), one full gate on `main`, candidates, regression on all three systems (book the lab laptop in Windows first), release.

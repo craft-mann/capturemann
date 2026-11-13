@@ -233,6 +233,19 @@ manifest instead) and are attached by hand to a pre-release. The exact steps for
 against its `.sha256` files, writes `SHA256SUMS.txt` and renders the winget manifest. Packaging details:
 `packaging/windows/README.md`.
 
+## Asset names: check before you upload (rule added for 0.3.4, after 0.3.3)
+
+The names are part of the interface: the Homebrew cask builds the URL `CaptureMann-v#{version}-macos-#{arch}.dmg` and the README tells users the same names. A release is uploaded with exactly these names (`<v>` is the version without the `v`):
+
+| System | Files |
+| --- | --- |
+| macOS | `CaptureMann-v<v>-macos-arm64.dmg`, `CaptureMann-v<v>-macos-x86_64.dmg` and a `.sha256` for each (`hash  name`, two spaces) |
+| Windows | `capturemann-<v>-windows-x64-setup.exe`, `capturemann-<v>-windows-x64.zip` and their `.sha256` |
+| Linux | `capturemann-<v>-linux-x86_64.tar.gz`, `capturemann-<v>-linux-aarch64.tar.gz`, `capturemann_<v>_amd64.deb`, `capturemann_<v>_arm64.deb`, a `.sha256` and a `.minisig` for each and for each `.sha256` |
+| All | `SHA256SUMS.txt` listing every file above with the same names |
+
+`make release` writes `CaptureMann-<v>-<arch>.dmg`: rename it to the table's name **and write the `.sha256` again** before uploading. 0.3.4 adds `scripts/check-release-assets.sh <version> <folder>`: it fails when a name is not in this table, a `.sha256` does not match its file, a `.minisig` is missing, or `SHA256SUMS.txt` disagrees; run it on the staging folder and on the draft release (`gh release view` list) before publishing, and `scripts/update-homebrew-cask.sh` runs it first.
+
 ## Rollback and yank
 
 - **Draft not published yet:** delete the draft and the tag, fix, tag again.
