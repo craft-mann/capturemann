@@ -6149,9 +6149,6 @@ msgstr "Thay thế tất cả"
 msgid "Replace with"
 msgstr "Thay bằng"
 
-msgid "Split at the text cursor · {key} done"
-msgstr "Tách tại con trỏ văn bản · {key} xong"
-
 msgid "Stop playing this line"
 msgstr "Dừng phát dòng này"
 
@@ -10188,10 +10185,6 @@ msgid "Holes {n} of {max}"
 msgstr "Lỗ {n} trên {max}"
 
 #, fuzzy
-msgid "No label"
-msgstr "Không có nhãn"
-
-#, fuzzy
 msgid "Numbering {text}"
 msgstr "Đánh số {text}"
 
@@ -10306,3 +10299,50 @@ msgstr "{title}, {place}"
 msgid "{n} annotation"
 msgid_plural "{n} annotations"
 msgstr[0] "{n} chú thích"
+
+#, fuzzy
+msgid "Type text"
+msgstr "Nhập văn bản"
+
+#, fuzzy
+msgid "Double-click or Enter to edit"
+msgstr "Nhấp đúp hoặc nhấn Enter để sửa"
+
+#, fuzzy
+msgid "click to edit"
+msgstr "nhấp để sửa"
+
+#, fuzzy
+msgctxt "field"
+msgid "Name"
+msgstr "Tên"
+
+#, fuzzy
+msgctxt "edit hint"
+msgid "save"
+msgstr "lưu"
+
+#, fuzzy
+msgctxt "edit hint"
+msgid "rename"
+msgstr "đổi tên"
+
+#, fuzzy
+msgctxt "edit hint"
+msgid "cancel"
+msgstr "hủy"
+
+#, fuzzy
+msgctxt "annotation kind"
+msgid "callout"
+msgstr "chú thích"
+
+#, fuzzy
+msgctxt "annotation kind"
+msgid "spotlight"
+msgstr "vùng nổi bật"
+
+#, fuzzy
+msgctxt "annotation kind"
+msgid "stamp"
+msgstr "dấu"

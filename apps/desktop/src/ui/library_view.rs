@@ -38,7 +38,7 @@ use crate::ui::settings::widgets::small_button;
 use crate::ui::studio::{
     OpenSelected, SelectDown, SelectLeft, SelectRight, SelectUp, ThemeGlobal, SIDEBAR_WIDTH,
 };
-use crate::ui::text_field::{TextField, TextFieldEvent};
+use crate::ui::text_field::{CaretAt, TextField, TextFieldEvent};
 use crate::ui::thumbs::{Thumb, ThumbCache};
 use crate::ui::tooltip::tip;
 
@@ -115,10 +115,11 @@ impl LibraryView {
     pub fn new(app: Entity<AppModel>, _window: &mut Window, cx: &mut Context<Self>) -> Self {
         let backend = app.read(cx).backend.clone();
         let status = backend.initial_status.clone();
-        // TODO(text-fields A): `.clearable()` here (the clear button shows only with text; the
-        // first Esc clears, the second leaves the field, which the Escaped handler below does).
-        let search =
-            cx.new(|cx| TextField::new(tr!("Search captures"), tr!("Search by title"), cx));
+        // The clear button shows only with text; the first Esc clears, the second leaves the field
+        // (the Escaped handler below).
+        let search = cx.new(|cx| {
+            TextField::new(tr!("Search captures"), tr!("Search by title"), cx).clearable()
+        });
         let thumbs = cx.new(|_| ThumbCache::new(backend.clone()));
         let audio = cx.new(|_| AudioCache::new(backend.clone()));
         let rename_input = cx.new(|cx| {
@@ -178,6 +179,7 @@ impl LibraryView {
                 // Typing clears the refusal and re-checks the Rename button.
                 TextFieldEvent::Changed(_) => {
                     this.rename_error = None;
+                    this.rename_input.update(cx, |f, cx| f.set_error(None, cx));
                     cx.notify();
                 }
             }),
@@ -512,9 +514,11 @@ impl LibraryView {
                 self.rename_error = None;
                 self.rename_busy = false;
                 // The whole title is selected: typing replaces it, a click places the caret.
-                // TODO(text-fields A): `f.load(&title, CaretAt::SelectAll, cx)` once it exists (a
-                // file name would use `CaretAt::SelectStem`; a capture title is not one).
-                self.rename_input.update(cx, |f, cx| f.set_text(&title, cx));
+                // (A file name would use `CaretAt::SelectStem`; a capture title is not one.)
+                self.rename_input.update(cx, |f, cx| {
+                    f.set_error(None, cx);
+                    f.load(&title, CaretAt::SelectAll, cx);
+                });
                 let focus = self.rename_input.read(cx).focus.clone();
                 window.focus(&focus, cx);
                 cx.notify();
@@ -541,6 +545,7 @@ impl LibraryView {
         }
         let id = self.items[ix].id.clone();
         self.rename_error = None;
+        self.rename_input.update(cx, |f, cx| f.set_error(None, cx));
         self.rename_busy = true;
         let (app, view) = (self.app.clone(), cx.entity());
         cx.defer(move |cx| {
@@ -556,6 +561,9 @@ impl LibraryView {
                             None => this.close_menu(cx),
                             // Refused: stays open with the reason under the field.
                             Some(why) => {
+                                // The field shows the red frame and the reason under it.
+                                this.rename_input
+                                    .update(cx, |f, cx| f.set_error(Some(why.clone()), cx));
                                 this.rename_error = Some(why);
                                 cx.notify();
                             }
@@ -1849,17 +1857,9 @@ impl LibraryView {
                         .child(SharedString::from(tr_ctx!("field", "Name"))),
                 )
                 .child(self.rename_input.clone())
-                // TODO(text-fields A): also ask the field for its error look (red border and
-                // ring) while `rename_error` is set.
-                .child(match &self.rename_error {
-                    Some(why) => div()
-                        .id("rename-error")
-                        .role(Role::Alert)
-                        .text_size(px(12.))
-                        .text_color(rgba_of(ft.error_text))
-                        .child(SharedString::from(why.clone()))
-                        .into_any_element(),
-                    None => div()
+                // A refusal shows in the field itself (red frame, reason under it); the hint stays.
+                .child(
+                    div()
                         .flex()
                         .items_center()
                         .gap(px(5.))
@@ -1871,9 +1871,8 @@ impl LibraryView {
                         .child(shrink_text("\u{00B7}"))
                         // i18n-ignore: a key name stays in English on its keycap
                         .child(keycap(t, "Esc"))
-                        .child(shrink_text(tr_ctx!("edit hint", "cancel")))
-                        .into_any_element(),
-                })
+                        .child(shrink_text(tr_ctx!("edit hint", "cancel"))),
+                )
                 .child(
                     div()
                         .flex()

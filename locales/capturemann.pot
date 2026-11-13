@@ -1623,6 +1623,9 @@ msgstr ""
 msgid "Don’t use a model"
 msgstr ""
 
+msgid "Double-click or Enter to edit"
+msgstr ""
+
 msgid "Download TXT"
 msgstr ""
 
@@ -2926,9 +2929,6 @@ msgid "No hardware video encoder was found; recording will use a slower software
 msgstr ""
 
 msgid "No key assigned yet; choose one in your desktop’s keyboard settings"
-msgstr ""
-
-msgid "No label"
 msgstr ""
 
 msgid "No limit"
@@ -4628,10 +4628,6 @@ msgstr ""
 msgid "Split at the playhead"
 msgstr ""
 
-#. {key} is the Esc keycap, drawn in the sentence; keep it where it reads naturally. The hint sits right of the Split, Merge and Remove buttons.
-msgid "Split at the text cursor · {key} done"
-msgstr ""
-
 msgid "Split the timeline {key} to set a different layout for each part."
 msgstr ""
 
@@ -5649,6 +5645,9 @@ msgstr ""
 msgid "Type at least three letters first."
 msgstr ""
 
+msgid "Type text"
+msgstr ""
+
 msgid "Type the callout text"
 msgstr ""
 
@@ -6226,6 +6225,9 @@ msgid "cannot write {path}: {e}"
 msgstr ""
 
 msgid "click a time to jump there"
+msgstr ""
+
+msgid "click to edit"
 msgstr ""
 
 msgid "colours converted to 8-bit RGB"
@@ -7993,6 +7995,18 @@ msgctxt "dropbox access type"
 msgid "Full Dropbox"
 msgstr ""
 
+msgctxt "edit hint"
+msgid "cancel"
+msgstr ""
+
+msgctxt "edit hint"
+msgid "rename"
+msgstr ""
+
+msgctxt "edit hint"
+msgid "save"
+msgstr ""
+
 msgctxt "editor chip"
 msgid "Imported"
 msgstr ""
@@ -8119,6 +8133,10 @@ msgstr ""
 
 msgctxt "field"
 msgid "Model"
+msgstr ""
+
+msgctxt "field"
+msgid "Name"
 msgstr ""
 
 msgctxt "field"

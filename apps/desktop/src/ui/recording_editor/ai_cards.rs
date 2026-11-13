@@ -196,6 +196,7 @@ impl AiEditor {
             TextField::new(tr!("Find in the captions"), tr!("Find"), cx)
                 .height(32.)
                 .without_icon()
+                .clearable()
         });
         let replace_field = cx.new(|cx| {
             TextField::new(tr!("Replace with"), tr!("Replace with"), cx)
