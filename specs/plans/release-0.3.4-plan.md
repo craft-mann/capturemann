@@ -39,11 +39,18 @@ Status: **scope decided Nov 13, 2026: hygiene + Magnify + canvas text selection 
 
 ## 3. Candidate scope, grouped
 
-- **A. Hygiene (always in):** Windows regression of 0.3.3 and fixes; PLUGIN-1 check; remove the "new" dots; investigate the Windows CI GPU crashes (one `--no-capture` run, or skip-list the GPU tests there); the flaky socket test; the full test pass on a quiet machine; asset-name check script; image file types in the installers; Vietnamese review (maintainer).
+- **A. Hygiene (always in), with the bug list of section 3b (B1, B2):** Windows regression of 0.3.3 and fixes; PLUGIN-1 check; remove the "new" dots; investigate the Windows CI GPU crashes (one `--no-capture` run, or skip-list the GPU tests there); the flaky socket test; the full test pass on a quiet machine; asset-name check script; image file types in the installers; Vietnamese review (maintainer).
 - **B. Annotation (user-visible):** Magnify (ANN-8: about 3 days, the Phase 1 scale spike first); canvas text selection and caret blink; clipboard paste of a picture; CMYK JPEG converted instead of refused.
 - **C. Platform and distribution:** in-app update (Velopack: about 3 to 5 days plus hosting and signing decisions, macOS first); Windows code signing (maintainer application, then CI changes); WebP import (HEIC later).
 - **D. Agents:** `capturemann mcp` starts the app when it is closed (needs the Confirm-tier decision) or a headless daemon.
 - **E. Voice:** windowed audio (flat memory for hours-long files).
+
+## 3b. Bug list (maintainer reports; more to come)
+
+| # | Report | First analysis (not confirmed by a run) | Planned fix |
+| --- | --- | --- | --- |
+| B1 | Deleting a recording fails with "couldn't delete the capture `reg...` is being uploaded (job `job...`)" (Nov 13, 2026) | Same cause as the caption-save bug fixed in 0.3.3: an upload job **paused** with `auth_expired` (Google sign-in expired) counts as active. 0.3.3 made edits ignore paused jobs but kept `ensure_idle_strict` for rename and delete, so delete and rename stay refused until the account is reconnected or the job is cancelled by hand. Two such paused uploads existed in the maintainer's library. | Delete cancels the capture's paused upload and publish jobs itself (after the existing delete confirmation) and goes on; a **running** or queued job still blocks with the same message. Rename needs no block for a paused job (jobs name the capture id, not the folder): check that and relax it. Test in `library_ops.rs` and a daemon integration test. Also show in the Library that an upload is "waiting for sign-in" with a Reconnect button, so the state is not a dead end. |
+| B2 | Windows user: the recording HUD cannot be dragged while recording **audio** (Nov 13, 2026) | Dragging is `window.start_window_move()` on the HUD bar's background (`ui/recording/hud.rs`, 0.2.9; tested for screen recordings on Windows). The audio HUD may place its own children (meter, marker field, label row) over the bar or stop the press, or the native move may behave differently for that window kind on Windows. Needs a reproduction on the ThinkPad (Windows 11). | Reproduce on Windows with an audio recording; make every non-button part of the audio HUD a grip; add a `cm-regress` desktop probe case if it can be automated (`desktop.hud_click_through` is the nearest). |
 
 ## 4. Recommended scope (for discussion)
 
