@@ -182,7 +182,7 @@ Report problems at the issue tracker with the output of `capturemann diagnostics
 
 Apache-2.0. The packages carry `THIRD_PARTY_LICENSES.md`. FFmpeg is an LGPL build (no GPL code, no libx264); its source offer is in the
 package. The Windows build and the Linux `.deb` and tarball use the recognizer of the system (Windows.Media.Ocr, the `tesseract` program);
-nothing GPL is linked or bundled. <FILL: the dependency sentence after comparing `Cargo.lock` and `THIRD_PARTY_LICENSES.md` with the tag v0.3.2: unchanged, or the new crates and their licences.>
+nothing GPL is linked or bundled. No dependency was added since 0.3.2: `Cargo.lock` differs only because the test tool `cm-regress` (not shipped) now uses the `png` crate that was already in the tree, and `THIRD_PARTY_LICENSES.md` is unchanged.
 
 ---
 
