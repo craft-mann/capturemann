@@ -120,7 +120,7 @@ impl Inner {
         let out = blocking(move || {
             let mut lib = lock_library(&library);
             let rec = lib.get(&id)?;
-            this.ensure_idle(&rec, &lib.bundle_path(&rec), "rename")?;
+            this.ensure_idle_strict(&rec, &lib.bundle_path(&rec), "rename")?;
             let renamed = lib.rename(&id, &p.title)?;
             Ok(json!({
                 "capture_id": renamed.id,
@@ -150,7 +150,7 @@ impl Inner {
             let lib = lock_library(&library);
             let rec = lib.get(&id)?;
             let dir = lib.bundle_path(&rec);
-            this.ensure_idle(&rec, &dir, "delete")?;
+            this.ensure_idle_strict(&rec, &dir, "delete")?;
             let size = human_size(rec.size_bytes);
             let remote =
                 remote.then(|| remote_delete::plan(&dir, dests.as_ref(), accounts.as_ref()));
@@ -231,7 +231,7 @@ impl Inner {
                 let lib = lock_library(&lib2);
                 let rec = lib.get(&id2)?;
                 let dir = lib.bundle_path(&rec);
-                this2.ensure_idle(&rec, &dir, "delete")?;
+                this2.ensure_idle_strict(&rec, &dir, "delete")?;
                 let plan = match pinned {
                     Some(p) => p,
                     None => remote_delete::plan(&dir, dests.as_ref(), accounts.as_ref()),
@@ -333,7 +333,7 @@ impl Inner {
             let mut lib = lock_library(&library);
             let rec = lib.get(&id)?;
             let dir = lib.bundle_path(&rec);
-            this.ensure_idle(&rec, &dir, "delete")?;
+            this.ensure_idle_strict(&rec, &dir, "delete")?;
             if dir.exists() {
                 trasher.trash(&dir)?;
             }
@@ -419,14 +419,24 @@ impl LibraryView {
         LibraryView { queue }
     }
 
-    /// The id of a queued, running or paused job of `job_type` that names the capture.
-    fn active_job(&self, job_type: &str, capture_id: &str) -> Result<Option<String>, CmError> {
+    /// The id of a queued or running job of `job_type` that names the capture, and also a paused
+    /// one (a Drive upload waiting for the account to sign in again) when `include_paused`.
+    fn active_job(
+        &self,
+        job_type: &str,
+        capture_id: &str,
+        include_paused: bool,
+    ) -> Result<Option<String>, CmError> {
         let Some(queue) = &self.queue else {
             return Ok(None);
         };
+        let mut states = vec![JobState::Queued, JobState::Running];
+        if include_paused {
+            states.push(JobState::Paused);
+        }
         let active = queue.list(&JobFilter {
             job_type: Some(job_type.to_owned()),
-            states: Some(vec![JobState::Queued, JobState::Running, JobState::Paused]),
+            states: Some(states),
             limit: Some(500),
         })?;
         Ok(active
@@ -435,11 +445,36 @@ impl LibraryView {
             .map(|j| j.id.to_string()))
     }
 
+    /// For edits that keep the folder where it is (captions, transcript, markers, the edit list,
+    /// speakers): a running or queued export, upload or publish blocks them, a **paused** one
+    /// does not (an upload waiting for the Google account to sign in again can wait for days, and
+    /// it reads the bundle again when it resumes).
     pub(crate) fn ensure_idle(
         &self,
         rec: &CaptureRecord,
         dir: &Path,
         what: &str,
+    ) -> Result<(), CmError> {
+        self.idle_check(rec, dir, what, false)
+    }
+
+    /// For renaming, moving and deleting the folder: any job of the capture that is not finished,
+    /// paused ones included, blocks it (the job would resume into a folder that is gone).
+    pub(crate) fn ensure_idle_strict(
+        &self,
+        rec: &CaptureRecord,
+        dir: &Path,
+        what: &str,
+    ) -> Result<(), CmError> {
+        self.idle_check(rec, dir, what, true)
+    }
+
+    fn idle_check(
+        &self,
+        rec: &CaptureRecord,
+        dir: &Path,
+        what: &str,
+        include_paused: bool,
     ) -> Result<(), CmError> {
         if dir.join(LOCK_FILE).exists() || dir.join(OWNER_FILE).exists() {
             return Err(CmError::busy(format!(
@@ -447,7 +482,10 @@ impl LibraryView {
                 rec.id
             )));
         }
-        if self.active_job(JOB_EXPORT, &rec.id)?.is_some() {
+        if self
+            .active_job(JOB_EXPORT, &rec.id, include_paused)?
+            .is_some()
+        {
             return Err(CmError::busy(format!(
                 "`{}` is being exported; wait for the export to finish or cancel it before you {what} it",
                 rec.id
@@ -459,7 +497,7 @@ impl LibraryView {
             (JOB_UPLOAD, "uploaded", "upload"),
             (JOB_PUBLISH, "published", "publish"),
         ] {
-            if let Some(job) = self.active_job(job_type, &rec.id)? {
+            if let Some(job) = self.active_job(job_type, &rec.id, include_paused)? {
                 return Err(CmError::busy(format!(
                     "`{}` is being {doing} (job `{job}`); wait for the {noun} to finish or cancel \
                      the job before you {what} it",
@@ -468,5 +506,36 @@ impl LibraryView {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cm_jobs::{JobQueue, NewJob, QueueConfig};
+
+    /// A Drive upload that waits for the account to sign in again is "paused": it must not stop
+    /// someone from editing the captions of that recording (it used to say "wait for the job",
+    /// which never ends), while renaming or deleting the folder still waits for it.
+    #[test]
+    fn a_paused_upload_blocks_moving_the_folder_but_not_editing_the_captions() {
+        let queue = JobQueue::in_memory(QueueConfig::default()).unwrap();
+        let view = LibraryView::new(Some(queue.clone()));
+        let job = queue
+            .enqueue(NewJob::new(JOB_UPLOAD, json!({ "capture_id": "rec_a" })))
+            .unwrap();
+        // Queued: both are blocked (the upload is about to read the files).
+        assert_eq!(
+            view.active_job(JOB_UPLOAD, "rec_a", false).unwrap(),
+            Some(job.id.to_string())
+        );
+        queue.pause(&job.id).unwrap();
+        assert_eq!(view.active_job(JOB_UPLOAD, "rec_a", false).unwrap(), None);
+        assert_eq!(
+            view.active_job(JOB_UPLOAD, "rec_a", true).unwrap(),
+            Some(job.id.to_string())
+        );
+        // Another recording is never affected.
+        assert_eq!(view.active_job(JOB_UPLOAD, "rec_b", true).unwrap(), None);
     }
 }
