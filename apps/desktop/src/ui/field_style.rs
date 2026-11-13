@@ -1,4 +1,4 @@
-//! Text field tokens (spec `capturemann-text-fields/text-field-spec.md`, boards T0 to T2): the one
+//! Text field tokens (spec `specs/capturemann-text-fields/text-field-spec.md`, boards T0 to T2): the one
 //! set of colours and sizes every place you type uses, so a field, the canvas text box, a step row
 //! and a transcript row all show focus, caret and selection the same way.
 //!

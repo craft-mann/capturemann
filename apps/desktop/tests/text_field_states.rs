@@ -1,6 +1,6 @@
 //! The text field spec's keys, run through the headless GPUI platform: selection with Shift and
 //! the opening selections of `load`, the Escape ladder of a search field, read-only and disabled
-//! fields (spec `capturemann-text-fields/text-field-spec.md`, "Behaviour").
+//! fields (spec `specs/capturemann-text-fields/text-field-spec.md`, "Behaviour").
 
 #![allow(clippy::unwrap_used)]
 

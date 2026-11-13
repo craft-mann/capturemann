@@ -1,6 +1,6 @@
 # TEXT-FIELDS: the shared text field look (0.3.3)
 
-Spec: `capturemann-text-fields/text-field-spec.md` (local design pack), tokens in `apps/desktop/src/ui/field_style.rs`.
+Spec: `specs/capturemann-text-fields/text-field-spec.md` (local design pack), tokens in `apps/desktop/src/ui/field_style.rs`.
 Run on each system with a release candidate; note the system, the theme and what you saw in `verification/TEXT-FIELDS-<date>-<who>.md`.
 
 1. **Rename** a capture (library menu): the Name label, `Enter rename · Esc cancel` under the field, the whole name selected, Rename disabled
