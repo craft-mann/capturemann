@@ -28,8 +28,10 @@ use crate::theme::{scale, type_scale, Theme};
 use crate::ui::app::{self, AppModel, Command, Route};
 use crate::ui::audio_cache::{self, AudioCache};
 use crate::ui::components::{
-    button, button_with_icon, icon, icon_size, keycaps, shrink_text, status_pill, ButtonKind,
+    button, button_with_icon, icon, icon_size, keycap, keycaps, shrink_text, status_pill,
+    ButtonKind,
 };
+use crate::ui::field_style::{FieldTokens, FIELD_H};
 use crate::ui::kit::{callout, Tone};
 use crate::ui::paint::{rgba_of, TextExt};
 use crate::ui::settings::widgets::small_button;
@@ -48,6 +50,13 @@ const HEADLINE: f32 = 30.;
 const THUMB_ASPECT: f32 = 10. / 16.;
 const SEARCH_DEBOUNCE: Duration = Duration::from_millis(150);
 
+/// Whether the Rename dialog may go ahead: the name is not empty (blank counts as empty) and is
+/// not the title the capture already has.
+fn rename_allowed(typed: &str, current: &str) -> bool {
+    let typed = typed.trim();
+    !typed.is_empty() && typed != current.trim()
+}
+
 /// The context menu of one card (LIB-1), at a window position.
 struct CardMenu {
     ix: usize,
@@ -63,6 +72,10 @@ pub struct LibraryView {
     app: Entity<AppModel>,
     menu: Option<CardMenu>,
     rename_input: Entity<TextField>,
+    /// Why the daemon refused the name in the Rename dialog; shown under the field.
+    rename_error: Option<String>,
+    /// A rename call is running: Enter and the button wait for its answer.
+    rename_busy: bool,
     state: LibraryState,
     items: Arc<Vec<CaptureItem>>,
     /// The rows of the list: day headers (date sort) and grid runs, rebuilt when the items, the
@@ -102,12 +115,16 @@ impl LibraryView {
     pub fn new(app: Entity<AppModel>, _window: &mut Window, cx: &mut Context<Self>) -> Self {
         let backend = app.read(cx).backend.clone();
         let status = backend.initial_status.clone();
+        // TODO(text-fields A): `.clearable()` here (the clear button shows only with text; the
+        // first Esc clears, the second leaves the field, which the Escaped handler below does).
         let search =
             cx.new(|cx| TextField::new(tr!("Search captures"), tr!("Search by title"), cx));
         let thumbs = cx.new(|_| ThumbCache::new(backend.clone()));
         let audio = cx.new(|_| AudioCache::new(backend.clone()));
         let rename_input = cx.new(|cx| {
-            TextField::new(tr!("New title"), tr_ctx!("field", "Title"), cx).without_icon()
+            TextField::new(tr!("New title"), tr_ctx!("field", "Title"), cx)
+                .without_icon()
+                .height(FIELD_H)
         });
         let seen_epoch = app.read(cx).library_epoch;
         let subs = vec![
@@ -158,12 +175,18 @@ impl LibraryView {
             cx.subscribe(&rename_input, |this, _, ev: &TextFieldEvent, cx| match ev {
                 TextFieldEvent::Submitted => this.commit_rename(cx),
                 TextFieldEvent::Escaped => this.close_menu(cx),
-                TextFieldEvent::Changed(_) => {}
+                // Typing clears the refusal and re-checks the Rename button.
+                TextFieldEvent::Changed(_) => {
+                    this.rename_error = None;
+                    cx.notify();
+                }
             }),
         ];
         let mut view = LibraryView {
             menu: None,
             rename_input,
+            rename_error: None,
+            rename_busy: false,
             app,
             state: LibraryState::new(match status {
                 LibraryStatus::Loading => LibraryStatus::Loading,
@@ -486,6 +509,11 @@ impl LibraryView {
                     m.renaming = true;
                 }
                 let title = item.title.clone();
+                self.rename_error = None;
+                self.rename_busy = false;
+                // The whole title is selected: typing replaces it, a click places the caret.
+                // TODO(text-fields A): `f.load(&title, CaretAt::SelectAll, cx)` once it exists (a
+                // file name would use `CaretAt::SelectStem`; a capture title is not one).
                 self.rename_input.update(cx, |f, cx| f.set_text(&title, cx));
                 let focus = self.rename_input.read(cx).focus.clone();
                 window.focus(&focus, cx);
@@ -504,12 +532,40 @@ impl LibraryView {
             return;
         };
         let title = self.rename_input.read(cx).text().to_owned();
-        let id = self.items.get(ix).map(|i| i.id.clone());
-        self.close_menu(cx);
-        if let Some(id) = id {
-            let app = self.app.clone();
-            cx.defer(move |cx| app::rename_capture(&app, &id, &title, cx));
+        let Some(old) = self.items.get(ix).map(|i| i.title.clone()) else {
+            return;
+        };
+        // Enter on an empty or unchanged name does what the disabled Rename button does: nothing.
+        if !rename_allowed(&title, &old) || self.rename_busy {
+            return;
         }
+        let id = self.items[ix].id.clone();
+        self.rename_error = None;
+        self.rename_busy = true;
+        let (app, view) = (self.app.clone(), cx.entity());
+        cx.defer(move |cx| {
+            app::rename_capture(
+                &app,
+                &id,
+                &title,
+                move |cx, problem| {
+                    view.update(cx, |this, cx| {
+                        this.rename_busy = false;
+                        match problem {
+                            // Renamed: the dialog is done.
+                            None => this.close_menu(cx),
+                            // Refused: stays open with the reason under the field.
+                            Some(why) => {
+                                this.rename_error = Some(why);
+                                cx.notify();
+                            }
+                        }
+                    })
+                },
+                cx,
+            )
+        });
+        cx.notify();
     }
 
     fn open_index(&mut self, ix: usize, cx: &mut Context<Self>) {
@@ -1762,10 +1818,62 @@ impl LibraryView {
             .text_color(rgba_of(t.text_2))
             .on_mouse_down_out(cx.listener(|this, _, _, cx| this.close_menu(cx)));
         let body = if m.renaming {
+            let ft = FieldTokens::of(t);
+            let allowed = self
+                .items
+                .get(m.ix)
+                .is_some_and(|i| rename_allowed(self.rename_input.read(cx).text(), &i.title))
+                && !self.rename_busy;
+            let mut save = button(
+                t,
+                "rename-save",
+                tr_ctx!("button", "Rename"),
+                ButtonKind::Primary,
+            );
+            save = if allowed {
+                save.on_click(cx.listener(|this, _, _, cx| this.commit_rename(cx)))
+            } else {
+                // Disabled while the name is empty or unchanged.
+                save.opacity(ft.disabled_opacity as f32 / 100.)
+                    .cursor_default()
+            };
             panel
+                .w(px(300.))
                 .gap(px(8.))
-                .p(px(8.))
+                .p(px(12.))
+                .child(
+                    div()
+                        .text_size(px(12.))
+                        .text_color(rgba_of(t.text_2))
+                        // The visible label of the field; the field keeps its own aria label.
+                        .child(SharedString::from(tr_ctx!("field", "Name"))),
+                )
                 .child(self.rename_input.clone())
+                // TODO(text-fields A): also ask the field for its error look (red border and
+                // ring) while `rename_error` is set.
+                .child(match &self.rename_error {
+                    Some(why) => div()
+                        .id("rename-error")
+                        .role(Role::Alert)
+                        .text_size(px(12.))
+                        .text_color(rgba_of(ft.error_text))
+                        .child(SharedString::from(why.clone()))
+                        .into_any_element(),
+                    None => div()
+                        .flex()
+                        .items_center()
+                        .gap(px(5.))
+                        .text_size(px(11.5))
+                        .text_color(rgba_of(t.faint))
+                        // i18n-ignore: a key name stays in English on its keycap
+                        .child(keycap(t, "Enter"))
+                        .child(shrink_text(tr_ctx!("edit hint", "rename")))
+                        .child(shrink_text("\u{00B7}"))
+                        // i18n-ignore: a key name stays in English on its keycap
+                        .child(keycap(t, "Esc"))
+                        .child(shrink_text(tr_ctx!("edit hint", "cancel")))
+                        .into_any_element(),
+                })
                 .child(
                     div()
                         .flex()
@@ -1780,15 +1888,7 @@ impl LibraryView {
                             )
                             .on_click(cx.listener(|this, _, _, cx| this.close_menu(cx))),
                         )
-                        .child(
-                            button(
-                                t,
-                                "rename-save",
-                                tr_ctx!("button", "Rename"),
-                                ButtonKind::Primary,
-                            )
-                            .on_click(cx.listener(|this, _, _, cx| this.commit_rename(cx))),
-                        ),
+                        .child(save),
                 )
         } else {
             let actions = self
@@ -1905,4 +2005,19 @@ fn empty_state(
         })
         .children(action)
         .into_any_element()
+}
+
+#[cfg(test)]
+mod rename_tests {
+    use super::rename_allowed;
+
+    #[test]
+    fn rename_needs_a_new_non_empty_name() {
+        assert!(!rename_allowed("", "Demo"));
+        assert!(!rename_allowed("   ", "Demo"));
+        assert!(!rename_allowed("Demo", "Demo"));
+        assert!(!rename_allowed(" Demo ", "Demo"));
+        assert!(rename_allowed("Demo 2", "Demo"));
+        assert!(rename_allowed("demo", "Demo"));
+    }
 }

@@ -130,6 +130,9 @@ pub(super) struct AiEditor {
     pub(super) field: Entity<TextField>,
     /// The line the text field edits.
     pub(super) field_for: Option<usize>,
+    /// What Esc puts back: the line being edited, its stored text and whether the list was dirty
+    /// before the edit began. Cleared by anything that reshapes the lines (split, merge, replace).
+    pub(super) edit_original: Option<(usize, String, bool)>,
     pub(super) saving: bool,
     /// A save was asked for while one was running: run it again when that one ends.
     pub(super) resave: bool,
@@ -223,6 +226,7 @@ impl AiEditor {
             captions: CaptionEditor::default(),
             field,
             field_for: None,
+            edit_original: None,
             saving: false,
             resave: false,
             zooms: None,
@@ -269,6 +273,7 @@ impl AiEditor {
         self.note = None;
         self.captions = CaptionEditor::default();
         self.field_for = None;
+        self.edit_original = None;
         self.saving = false;
         self.resave = false;
         self.zooms = None;

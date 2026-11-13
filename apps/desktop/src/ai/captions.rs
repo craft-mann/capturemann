@@ -253,6 +253,17 @@ impl CaptionEditor {
         true
     }
 
+    /// Esc in the row editor: puts the text the line had when editing began back, exactly as it
+    /// was (word timing markup included), and the dirty flag as it was.
+    pub fn revert_text(&mut self, i: usize, text: String, dirty: bool) -> bool {
+        let Some(l) = self.lines.get_mut(i) else {
+            return false;
+        };
+        l.text = text;
+        self.dirty = dirty;
+        true
+    }
+
     pub fn remove(&mut self, i: usize) -> bool {
         if i >= self.lines.len() {
             return false;
@@ -455,6 +466,23 @@ mod tests {
             end: t(b),
             confidence: 0.9,
         }
+    }
+
+    #[test]
+    fn esc_puts_the_text_and_the_dirty_flag_back() {
+        let mut ed = CaptionEditor::new(lines_from_words(&[
+            w("Hello", 0.0, 0.4),
+            w("there.", 0.5, 1.2),
+        ]));
+        let before = ed.lines()[0].text.clone();
+        assert!(!ed.is_dirty());
+        assert!(ed.set_text(0, "Hello world"));
+        assert!(ed.is_dirty());
+        assert!(ed.revert_text(0, before.clone(), false));
+        assert_eq!(ed.lines()[0].text, before);
+        assert!(!ed.is_dirty());
+        // A line that is gone cannot be reverted.
+        assert!(!ed.revert_text(5, before, true));
     }
 
     #[test]
