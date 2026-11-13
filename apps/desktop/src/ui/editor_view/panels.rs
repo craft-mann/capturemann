@@ -294,7 +294,7 @@ impl EditorView {
                     .text_size(px(type_scale::UI))
                     .mono()
                     .tnum()
-                    .child(SharedString::from(start.to_string())),
+                    .child(SharedString::from(info.start_label.clone())),
             )
             .child(
                 icon_button(
@@ -382,18 +382,41 @@ impl EditorView {
                         .tnum()
                         .child(SharedString::from(badge)),
                 )
-                .child(
+                .child({
+                    // The selected row is the text field: typing starts when it is selected and
+                    // shows here as it is typed (the canvas holds the input method).
+                    let typing = on && info.editing;
+                    let empty = row.text.is_empty();
+                    let shown = match (empty, typing) {
+                        (false, _) => row.text.clone(),
+                        (true, true) => tr!("Add a label"),
+                        (true, false) => tr!("No label"),
+                    };
+                    let caret = || {
+                        div()
+                            .w(px(1.5))
+                            .h(px(15.))
+                            .flex_none()
+                            .bg(rgba_of(accent(t)))
+                    };
                     div()
                         .flex_1()
                         .min_w(px(0.))
+                        .h(px(26.))
+                        .px(px(8.))
+                        .flex()
+                        .items_center()
+                        .gap(px(1.))
+                        .rounded(px(scale::RADIUS_SM))
+                        .border_1()
+                        .border_color(rgba_of(if typing { accent(t) } else { t.surface_2 }))
+                        .when(typing, |d| d.bg(rgba_of(t.field)).cursor_text())
                         .text_size(px(13.))
-                        .text_color(rgba_of(if row.text.is_empty() { t.mist } else { t.text }))
-                        .child(shrink_text(if row.text.is_empty() {
-                            tr!("No label")
-                        } else {
-                            row.text.clone()
-                        })),
-                )
+                        .text_color(rgba_of(if empty { t.mist } else { t.text }))
+                        .when(typing && empty, |d| d.child(caret()))
+                        .child(shrink_text(shown))
+                        .when(typing && !empty, |d| d.child(caret()))
+                })
                 .child(
                     icon_button(
                         t,
@@ -411,41 +434,6 @@ impl EditorView {
         let mut out = Vec::new();
         if !info.rows.is_empty() {
             out.push(self.panel_group(t, &tr_ctx!("annotation setting", "Order"), list));
-        }
-        if let Some(sel) = info.selected {
-            let row = &info.rows[sel];
-            let editing = info.editing;
-            let shown = if row.text.is_empty() {
-                tr!("Add a label")
-            } else {
-                row.text.clone()
-            };
-            let hover = rgba_of(t.raised);
-            let field = div()
-                .id("step-label")
-                .role(Role::TextInput)
-                .aria_label(tr!("Step label"))
-                .focusable()
-                .tab_stop(true)
-                .w_full()
-                .h(px(scale::CONTROL_H))
-                .px(px(10.))
-                .flex()
-                .items_center()
-                .rounded(px(scale::RADIUS_MD))
-                .border_1()
-                .border_color(rgba_of(if editing { accent(t) } else { t.line }))
-                .bg(rgba_of(t.field))
-                .text_size(px(type_scale::UI))
-                .text_color(rgba_of(if row.text.is_empty() { t.mist } else { t.text }))
-                .when(!editing, |d| {
-                    d.cursor_text()
-                        .hover(move |s| s.bg(hover))
-                        .on_click(self.doc_action(|d, cx| d.edit_selected_text(cx)))
-                })
-                .focus_visible(|s| s.border_color(rgba_of(t.text)))
-                .child(shrink_text(shown));
-            out.push(self.panel_group(t, &tr_ctx!("annotation setting", "Label"), field));
         }
         out.push(
             info_note(

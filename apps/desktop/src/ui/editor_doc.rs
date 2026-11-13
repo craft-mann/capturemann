@@ -803,9 +803,18 @@ impl EditorDoc {
         self.after_input(edit.into_iter().collect(), cx);
     }
 
+    /// Selecting a row of the Steps list opens its label for typing at once (the row is the text
+    /// field); the label of the row that was open is committed first.
     pub fn select_step_row(&mut self, row: usize, cx: &mut Context<Self>) {
+        if self.locked() {
+            self.state.select_step_row(row);
+            cx.notify();
+            return;
+        }
+        let edits: Vec<Edit> = self.state.finish_text().into_iter().collect();
         self.state.select_step_row(row);
-        cx.notify();
+        self.state.edit_selected_text();
+        self.after_input(edits, cx);
     }
 
     /// The stamp picker: this symbol or word.

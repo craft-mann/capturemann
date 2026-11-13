@@ -311,6 +311,8 @@ pub struct StepRow {
 pub struct StepsInfo {
     pub style: StepStyle,
     pub start: u32,
+    /// The first number written in the current style (`3`, `C`, `c`), as the "Start at" field shows it.
+    pub start_label: String,
     pub rows: Vec<StepRow>,
     /// The row of the selected step.
     pub selected: Option<usize>,
@@ -1411,7 +1413,13 @@ impl EditorState {
                 OpKind::Step { n, text, .. } => StepRow {
                     id: self.ops[i].id.clone(),
                     badge: step_label(style, start, *n),
-                    text: text.clone().unwrap_or_default(),
+                    // The label being typed shows in its row as it is typed.
+                    text: match &self.text {
+                        Some(t) if t.existing.as_deref() == Some(self.ops[i].id.as_str()) => {
+                            t.text.clone()
+                        }
+                        _ => text.clone().unwrap_or_default(),
+                    },
                 },
                 _ => unreachable!(),
             })
@@ -1419,6 +1427,7 @@ impl EditorState {
         Some(StepsInfo {
             style,
             start,
+            start_label: step_label(style, start, 1),
             rows,
             selected: sel.and_then(|s| order.iter().position(|&i| i == s)),
             editing: self.text.is_some(),
@@ -3160,6 +3169,31 @@ mod tests {
         let back = Styles::from_json(&s.styles.to_json());
         assert_eq!(back.get(Tool::Step).step_style, StepStyle::Upper);
         assert_eq!(back.get(Tool::Step).step_start, 3);
+    }
+
+    /// ANN-6: the "Start at" field reads the first number in the current style, and a row shows
+    /// the label typed into it before it is committed.
+    #[test]
+    fn ann_6_start_reads_in_the_style_and_rows_show_the_label_as_typed() {
+        let mut s = st();
+        place_steps(&mut s, 2);
+        assert_eq!(s.steps_info().unwrap().start_label, "1");
+        s.set_step_numbering(Some(StepStyle::Upper), Some(3));
+        assert_eq!(s.steps_info().unwrap().start_label, "C");
+        s.set_step_numbering(Some(StepStyle::Lower), None);
+        assert_eq!(s.steps_info().unwrap().start_label, "c");
+        s.set_step_numbering(Some(StepStyle::Number), None);
+        assert_eq!(s.steps_info().unwrap().start_label, "3");
+        // Selecting a row and typing: the row shows the text at once.
+        s.select_step_row(1);
+        s.edit_selected_text();
+        s.text_ime(None, "Open", false);
+        let i = s.steps_info().unwrap();
+        assert!(i.editing);
+        assert_eq!(i.rows[1].text, "Open");
+        assert_eq!(i.rows[0].text, "");
+        assert!(s.finish_text().is_some());
+        assert_eq!(s.steps_info().unwrap().rows[1].text, "Open");
     }
 
     /// ANN-6.AC2: the 26th step reads Z and the 27th AA.

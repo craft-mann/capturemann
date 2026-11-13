@@ -10057,11 +10057,6 @@ msgstr "Loại"
 
 #, fuzzy
 msgctxt "annotation setting"
-msgid "Label"
-msgstr "Nhãn"
-
-#, fuzzy
-msgctxt "annotation setting"
 msgid "Numbering"
 msgstr "Cách đánh số"
 
@@ -10227,10 +10222,6 @@ msgstr "Bước {badge}: {text}"
 #, fuzzy
 msgid "Step {badge}"
 msgstr "Bước {badge}"
-
-#, fuzzy
-msgid "Step label"
-msgstr "Nhãn bước"
 
 #, fuzzy
 msgid "Type the callout text"

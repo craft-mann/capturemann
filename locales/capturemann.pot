@@ -4716,9 +4716,6 @@ msgstr ""
 msgid "States are read without asking the system. Granting only happens when you press “Grant access…”."
 msgstr ""
 
-msgid "Step label"
-msgstr ""
-
 msgid "Step {badge}"
 msgstr ""
 
@@ -7262,10 +7259,6 @@ msgstr ""
 
 msgctxt "annotation setting"
 msgid "Kind"
-msgstr ""
-
-msgctxt "annotation setting"
-msgid "Label"
 msgstr ""
 
 msgctxt "annotation setting"
