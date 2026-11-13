@@ -707,10 +707,7 @@ mod tests {
             let empty = t.params().is_empty();
             assert_eq!(
                 empty,
-                matches!(
-                    t,
-                    Tool::Select | Tool::Crop | Tool::SelectText
-                ),
+                matches!(t, Tool::Select | Tool::Crop | Tool::SelectText),
                 "{t:?}"
             );
         }
