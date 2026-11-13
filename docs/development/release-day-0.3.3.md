@@ -68,8 +68,8 @@ ANN-6, ANN-7 and IMP-6 (`In progress (...)` or `Ready` only as the wording rule 
    equivalents (`docs/development/regression.md`), then `--tier full`. Store the reports as `L1-<system>-0.3.3-regression-*`. In the standard
    tier look for `annotate.pack` and `import.images`: both must be PASS. Mac check of the CLI/MCP cases from a build tree:
    `cargo build -p cm-daemon -p cm-cli -p cm-mcp -p cm-regress && target/debug/cm-regress --dev --package-dir target/debug --tier standard`.
-3. **Manual scripts [M]:** `tests/manual/ANN-6.md` and `tests/manual/IMP-6.md` on the macOS candidate (use `make run-bundle-dev`; never
-   `/Applications` while the release app runs), reports `verification/ANN-6-<date>-maintainer.md` and `IMP-6-<date>-maintainer.md`. Run on
+3. **Manual scripts [M]:** `tests/manual/ANN-6.md`, `tests/manual/IMP-6.md` and `tests/manual/TEXT-FIELDS.md` (the new text field look) on the macOS candidate (use `make run-bundle-dev`; never
+   `/Applications` while the release app runs), reports `verification/ANN-6-<date>-maintainer.md`, `IMP-6-<date>-maintainer.md` and `TEXT-FIELDS-<date>-maintainer.md`. Run on
    Windows 11 and Linux if time allows; otherwise the text lists it under "Not run".
 4. **[M] Tag:** `git tag -a v0.3.3 -m "CaptureMann 0.3.3"` on the release commit and `git push public v0.3.3` (never reuse a tag; pushing a
    tag starts no workflow). Then build the final files from the tag exactly as in `release-day-0.3.2.md`, section 3 (Windows package run on
