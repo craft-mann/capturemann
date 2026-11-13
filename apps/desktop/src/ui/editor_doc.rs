@@ -817,6 +817,42 @@ impl EditorDoc {
         self.after_input(edits, cx);
     }
 
+    /// Keys on a focused row of the Steps list (no label open): Enter edits its label, Alt+Up /
+    /// Alt+Down move the step, Delete or Backspace remove it (Undo restores it). Returns whether
+    /// the key was used.
+    pub fn step_row_key(
+        &mut self,
+        row: usize,
+        key: &str,
+        alt: bool,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        match key {
+            "enter" => {
+                self.select_step_row(row, cx);
+                true
+            }
+            "up" | "down" if alt => {
+                if !self.locked() {
+                    let edits = self.state.finish_text().into_iter().collect::<Vec<_>>();
+                    self.state.select_step_row(row);
+                    let mut edits = edits;
+                    edits.extend(
+                        self.state
+                            .move_selected_step(if key == "up" { -1 } else { 1 }),
+                    );
+                    self.after_input(edits, cx);
+                }
+                true
+            }
+            "delete" | "backspace" => {
+                self.delete_step_row(row, cx);
+                true
+            }
+            _ => false,
+        }
+    }
+
     /// The stamp picker: this symbol or word.
     pub fn set_stamp(&mut self, kind: StampKind, word: StampWord, cx: &mut Context<Self>) {
         if self.locked() {
@@ -996,6 +1032,18 @@ impl EditorDoc {
                 self.state.select_step(cmd == KeyCommand::SelectNext);
                 cx.notify();
             }
+            // Alt+Up / Alt+Down on a selected step move it in the order (Steps list).
+            KeyCommand::Nudge {
+                dx: 0,
+                dy,
+                resize: true,
+                ..
+            } if self.state.selected_step_row().is_some() => {
+                if !self.locked() {
+                    let e = self.state.move_selected_step(dy.signum());
+                    self.after_input(e, cx);
+                }
+            }
             KeyCommand::Nudge {
                 dx,
                 dy,
@@ -1048,8 +1096,8 @@ impl EditorDoc {
             return false;
         }
         if key == "enter" && self.state.text.as_ref().is_some_and(|t| t.single_line()) {
-            // A step label is one line: Enter commits it.
-            let edits: Vec<Edit> = self.state.finish_text().into_iter().collect();
+            // A step label is one line: Enter commits it and opens the next step's label.
+            let edits: Vec<Edit> = self.state.finish_step_and_next().into_iter().collect();
             self.after_input(edits, cx);
             return true;
         }

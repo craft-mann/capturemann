@@ -5,6 +5,10 @@
 
 use super::*;
 use crate::editor::tools::StampWord;
+use crate::ui::components::ellipsis_text;
+use crate::ui::field_style::{
+    row, FieldTokens, CARET_W, FIELD_PAD_X, FOCUS_BLUE, FOCUS_RING, RING_W,
+};
 use cm_core::annotation::StampKind;
 use cm_core::annotation::{CalloutStyle, SpotMode, SpotShapeKind, StepStyle, MAX_SPOTLIGHT_SHAPES};
 
@@ -39,34 +43,71 @@ pub(super) fn info_note(t: &Theme, icon_name: Option<&'static str>, text: String
         .child(div().flex_1().min_w(px(0.)).child(SharedString::from(text)))
 }
 
+thread_local! {
+    /// The row being dragged (the drop line's style callback sees only the style).
+    static STEP_DRAG_FROM: std::cell::Cell<usize> = const { std::cell::Cell::new(usize::MAX) };
+}
+
 /// A step row being dragged in the order list.
 struct StepDrag {
     from: usize,
     badge: String,
+    text: String,
 }
 
-/// The lifted row that follows the pointer while a step is dragged.
+/// The lifted row that follows the pointer while a step is dragged (board T2, 7).
 struct StepGhost {
     badge: SharedString,
+    text: SharedString,
 }
 
 impl Render for StepGhost {
     fn render(&mut self, _w: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = cx.global::<ThemeGlobal>().0;
+        let (bg, line) = step_row_colors(&t);
         div()
-            .h(px(34.))
-            .px(px(12.))
+            .h(px(row::STEP_H))
+            .w(px(240.))
+            .px(px(10.))
             .flex()
             .items_center()
-            .rounded(px(scale::RADIUS_SM))
+            .gap(px(row::STEP_GAP))
+            .rounded(px(row::STEP_RADIUS))
             .border_1()
-            .border_color(rgba_of(palette::INFO_BLUE))
-            .bg(rgba_of(t.surface_2))
+            .border_color(rgba_of(line))
+            .bg(rgba_of(bg))
             .shadow_lg()
-            .text_size(px(13.))
+            .text_size(px(row::LABEL_TEXT))
             .text_color(rgba_of(t.text))
-            .child(self.badge.clone())
+            .child(step_badge(&self.badge))
+            .child(ellipsis_text(self.text.clone()))
     }
+}
+
+/// Background and border of a selected row (the spec's dark values; light follows the theme).
+fn step_row_colors(t: &Theme) -> (Color, Color) {
+    if t.mode == Mode::Dark {
+        (row::STEP_SELECTED_BG, row::STEP_SELECTED_BORDER)
+    } else {
+        (t.raised, t.line)
+    }
+}
+
+/// The red 22 px badge (red marks the step itself, never focus).
+fn step_badge(label: &str) -> Div {
+    div()
+        .size(px(row::BADGE_D))
+        .flex_none()
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded_full()
+        .bg(rgba_of(row::BADGE))
+        .text_color(gpui::white())
+        .text_size(px(11.))
+        .font_weight(FontWeight::BOLD)
+        .tnum()
+        .child(SharedString::from(label.to_owned()))
 }
 
 impl EditorView {
@@ -318,44 +359,204 @@ impl EditorView {
     /// The order list (drag a row to reorder; the numbers follow), the label of the selected
     /// step and the info line.
     fn steps_bottom(&self, t: &Theme, info: &crate::editor::state::StepsInfo) -> Vec<AnyElement> {
-        let rows = info.rows.iter().enumerate().map(|(i, row)| {
+        let ft = FieldTokens::of(t);
+        let dark = t.mode == Mode::Dark;
+        let (sel_bg, sel_line) = step_row_colors(t);
+        let (hover_bg, label_hover_bg, label_hover_line) = if dark {
+            (
+                row::STEP_HOVER_BG,
+                row::LABEL_HOVER_BG,
+                row::LABEL_HOVER_BORDER,
+            )
+        } else {
+            (t.raised, ft.bg, ft.border)
+        };
+        let rows = info.rows.iter().enumerate().map(|(i, srow)| {
             let on = info.selected == Some(i);
-            let hover = rgba_of(t.raised);
-            let name = if row.text.is_empty() {
-                tr!("Step {badge}", badge = row.badge)
+            let typing = on && info.editing;
+            let group = SharedString::from(format!("step-row-g-{i}"));
+            let name = if srow.text.is_empty() {
+                tr!("Step {badge}", badge = srow.badge)
             } else {
-                tr!("Step {badge}: {text}", badge = row.badge, text = row.text)
+                tr!("Step {badge}: {text}", badge = srow.badge, text = srow.text)
             };
-            let badge = row.badge.clone();
+            let badge = srow.badge.clone();
             let doc = self.doc.clone();
+            let key_doc = self.doc.clone();
+            let canvas_focus = self.canvas_focus.clone();
+            // The drop line sits in the gap above the row when a step comes from below, and
+            // below it when it comes from above (the dragged step takes this row's place).
+            let line = |above: bool| {
+                let g = group.clone();
+                div()
+                    .absolute()
+                    .left(px(4.))
+                    .right(px(4.))
+                    .when(above, |d| d.top(px(-row::STEP_GAP / 2. - 1.)))
+                    .when(!above, |d| d.bottom(px(-row::STEP_GAP / 2. - 1.)))
+                    .h(px(row::DROP_LINE_W))
+                    .rounded_full()
+                    .bg(rgba_of(FOCUS_BLUE))
+                    .shadow(vec![gpui::BoxShadow {
+                        color: gpui::Hsla::from(rgba_of(FOCUS_RING)),
+                        offset: gpui::point(px(0.), px(0.)),
+                        blur_radius: px(0.),
+                        inset: false,
+                        spread_radius: px(row::DROP_RING_W / 2.),
+                    }])
+                    .opacity(0.)
+                    .group_drag_over::<StepDrag>(g, move |s| {
+                        let from = STEP_DRAG_FROM.with(std::cell::Cell::get);
+                        if (from > i) == above && from != i {
+                            s.opacity(1.)
+                        } else {
+                            s
+                        }
+                    })
+            };
+            let empty = srow.text.is_empty();
+            let shown = if empty {
+                tr!("Add a label")
+            } else {
+                srow.text.clone()
+            };
+            let caret = || {
+                div()
+                    .w(px(CARET_W))
+                    .h(px(15.))
+                    .flex_none()
+                    .bg(rgba_of(ft.caret))
+            };
+            let name_field = div()
+                .flex_1()
+                .min_w(px(0.))
+                .h(px(row::LABEL_H))
+                .px(px(FIELD_PAD_X - 3.))
+                .flex()
+                .items_center()
+                .rounded(px(row::LABEL_RADIUS))
+                .border_1()
+                .border_color(gpui::transparent_black())
+                .text_size(px(row::LABEL_TEXT))
+                .text_color(rgba_of(if empty { ft.placeholder } else { ft.text }))
+                .overflow_hidden()
+                .cursor_text()
+                .when(!typing, |d| {
+                    d.group_hover(group.clone(), move |s| {
+                        s.bg(rgba_of(label_hover_bg))
+                            .border_color(rgba_of(label_hover_line))
+                    })
+                })
+                .when(typing, |d| {
+                    d.bg(rgba_of(ft.bg))
+                        .border_color(rgba_of(FOCUS_BLUE))
+                        .shadow(vec![gpui::BoxShadow {
+                            color: gpui::Hsla::from(rgba_of(FOCUS_RING)),
+                            offset: gpui::point(px(0.), px(0.)),
+                            blur_radius: px(0.),
+                            inset: false,
+                            spread_radius: px(RING_W),
+                        }])
+                })
+                .when(typing && empty, |d| d.child(caret()))
+                .child(if typing && info.label_selected && !empty {
+                    // The whole label is selected: blue behind the text.
+                    div()
+                        .min_w(px(0.))
+                        .bg(rgba_of(ft.selection))
+                        .text_color(rgba_of(ft.selection_text))
+                        .child(SharedString::from(shown))
+                } else {
+                    ellipsis_text(shown)
+                })
+                .when(typing && !empty && !info.label_selected, |d| {
+                    d.child(caret())
+                });
+            let del_group = SharedString::from(format!("step-del-g-{i}"));
+            let delete = div()
+                .id(ElementId::from(("step-row-delete", i)))
+                .role(Role::Button)
+                .aria_label(SharedString::from(tr!(
+                    "Delete step {badge}",
+                    badge = srow.badge
+                )))
+                .focusable()
+                .tab_stop(true)
+                .group(del_group.clone())
+                .relative()
+                .size(px(row::DELETE_SIZE))
+                .flex_none()
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded(px(scale::RADIUS_MD))
+                .cursor_pointer()
+                .opacity(if on { 0.7 } else { 0. })
+                .group_hover(group.clone(), |s| s.opacity(1.))
+                .focus_visible(|s| s.opacity(1.))
+                .on_click(self.doc_action(move |d, cx| d.delete_step_row(i, cx)))
+                .child(icon("x", 14., t.text_2))
+                .child(
+                    div()
+                        .absolute()
+                        .size_full()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .opacity(0.)
+                        .group_hover(del_group, |s| s.opacity(1.))
+                        .child(icon("x", 14., row::DELETE_HOVER)),
+                );
             div()
                 .id(ElementId::from(("step-row", i)))
+                .group(group.clone())
+                .relative()
                 .role(Role::Button)
                 .aria_label(SharedString::from(name))
                 .aria_toggled(toggled(on))
                 .focusable()
                 .tab_stop(true)
-                .h(px(34.))
-                .px(px(6.))
+                .h(px(row::STEP_H))
+                .pl(px(4.))
+                .pr(px(6.))
                 .flex()
                 .items_center()
-                .gap(px(8.))
-                .rounded(px(scale::RADIUS_SM))
+                .gap(px(row::STEP_GAP))
+                .rounded(px(row::STEP_RADIUS))
                 .border_1()
-                .border_color(rgba_of(if on { accent(t) } else { t.line }))
+                .border_color(if on { rgba_of(sel_line) } else { gpui::rgba(0) })
                 .cursor_pointer()
-                .when(on, |d| d.bg(rgba_of(t.raised)))
-                .when(!on, |d| d.hover(move |s| s.bg(hover)))
+                .when(on, |d| d.bg(rgba_of(sel_bg)))
+                .when(!on, |d| d.hover(move |s| s.bg(rgba_of(hover_bg))))
                 .focus_visible(|s| s.border_color(rgba_of(t.text)))
-                .drag_over::<StepDrag>(|s, _, _, _| s.border_color(rgba_of(palette::INFO_BLUE)))
+                .on_key_down(move |ev, window, cx| {
+                    // Keys on the focused row while no label is open (Enter, Alt+arrows,
+                    // Delete); an open label gets its keys through the canvas.
+                    let Some(doc) = &key_doc else { return };
+                    if doc.read(cx).state.text.is_some() {
+                        return;
+                    }
+                    let k = &ev.keystroke;
+                    let used =
+                        doc.update(cx, |d, cx| d.step_row_key(i, &k.key, k.modifiers.alt, cx));
+                    if used {
+                        if doc.read(cx).state.text.is_some() {
+                            window.focus(&canvas_focus, cx);
+                        }
+                        cx.stop_propagation();
+                    }
+                })
                 .on_drag(
                     StepDrag {
                         from: i,
                         badge: badge.clone(),
+                        text: srow.text.clone(),
                     },
                     |d, _, _, cx| {
+                        STEP_DRAG_FROM.with(|c| c.set(d.from));
                         cx.new(|_| StepGhost {
                             badge: SharedString::from(d.badge.clone()),
+                            text: SharedString::from(d.text.clone()),
                         })
                     },
                 )
@@ -366,71 +567,38 @@ impl EditorView {
                     }
                 })
                 .on_click(self.doc_action(move |d, cx| d.select_step_row(i, cx)))
-                .child(icon("grip-vertical", 16., t.mist))
+                .child(line(true))
+                .child(line(false))
                 .child(
                     div()
-                        .size(px(22.))
                         .flex_none()
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .rounded_full()
-                        .bg(rgba_of(t.rec))
-                        .text_color(gpui::white())
-                        .text_size(px(11.))
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .tnum()
-                        .child(SharedString::from(badge)),
+                        .opacity(row::GRIP_REST_OPACITY as f32 / 100.)
+                        .group_hover(group.clone(), |s| s.opacity(1.))
+                        .child(icon("grip-vertical", 16., t.mist)),
                 )
-                .child({
-                    // The selected row is the text field: typing starts when it is selected and
-                    // shows here as it is typed (the canvas holds the input method).
-                    let typing = on && info.editing;
-                    let empty = row.text.is_empty();
-                    let shown = match (empty, typing) {
-                        (false, _) => row.text.clone(),
-                        (true, true) => tr!("Add a label"),
-                        (true, false) => tr!("No label"),
-                    };
-                    let caret = || {
-                        div()
-                            .w(px(1.5))
-                            .h(px(15.))
-                            .flex_none()
-                            .bg(rgba_of(accent(t)))
-                    };
-                    div()
-                        .flex_1()
-                        .min_w(px(0.))
-                        .h(px(26.))
-                        .px(px(8.))
-                        .flex()
-                        .items_center()
-                        .gap(px(1.))
-                        .rounded(px(scale::RADIUS_SM))
-                        .border_1()
-                        .border_color(rgba_of(if typing { accent(t) } else { t.surface_2 }))
-                        .when(typing, |d| d.bg(rgba_of(t.field)).cursor_text())
-                        .text_size(px(13.))
-                        .text_color(rgba_of(if empty { t.mist } else { t.text }))
-                        .when(typing && empty, |d| d.child(caret()))
-                        .child(shrink_text(shown))
-                        .when(typing && !empty, |d| d.child(caret()))
-                })
                 .child(
-                    icon_button(
-                        t,
-                        ("step-row-delete", i),
-                        "x",
-                        SharedString::from(tr!("Delete step {badge}", badge = row.badge)),
-                        false,
-                        None,
-                    )
-                    .on_click(self.doc_action(move |d, cx| d.delete_step_row(i, cx))),
+                    // The selected step's badge gets the canvas ring: 1.5 px blue, 2 px gap.
+                    div()
+                        .flex_none()
+                        .p(px(row::BADGE_RING_GAP))
+                        .rounded_full()
+                        .border(px(row::BADGE_RING_W))
+                        .border_color(if on {
+                            rgba_of(FOCUS_BLUE)
+                        } else {
+                            gpui::rgba(0)
+                        })
+                        .child(step_badge(&badge)),
                 )
+                .child(name_field)
+                .child(delete)
                 .into_any_element()
         });
-        let list = div().flex().flex_col().gap(px(4.)).children(rows);
+        let list = div()
+            .flex()
+            .flex_col()
+            .gap(px(row::STEP_GAP))
+            .children(rows);
         let mut out = Vec::new();
         // The how-to sits in the tooltip of the (i) next to the heading, not in a note below.
         let hint = tr!(
