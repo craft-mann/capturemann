@@ -359,16 +359,17 @@ fn errors(ctx: &mut Ctx) -> R {
         !text.trim().is_empty(),
         "the failure of a text file said nothing"
     );
-    // 1b. A picture is not media either.
-    let png = ctx.write_file(
-        "picture.png",
-        &fixtures::make_png(64, 48, |x, y| [x as u8 * 4, y as u8 * 5, 90]),
+    // 1b. A picture format the product does not import (GIF) is refused, not made a capture.
+    // PNG and JPEG are imported since 0.3.3 (IMP-6, case `import.images`).
+    let gif = ctx.write_file(
+        "picture.gif",
+        b"GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;",
     )?;
-    bad_import(ctx, "a PNG picture", &png)?;
+    bad_import(ctx, "a GIF picture", &gif)?;
     let v = ctx.cli_ok(&["library", "list"])?;
     check!(
         v["captures"].as_array().is_some_and(Vec::is_empty),
-        "a picture became a capture"
+        "a GIF picture became a capture"
     );
     // 2. A file that does not exist is refused up front.
     let r = ctx.cli(&[
