@@ -1,6 +1,6 @@
 # Release 0.3.4: plan (draft, Nov 13, 2026)
 
-Status: **draft for the maintainer's review; scope not decided; nothing built.** Written the day 0.3.3 was published (tag `v0.3.3` on `85df0235`). Inputs: the 0.3.3 plan and morning report (`release-0.3.3-plan.md`, `release-0.3.3-final-morning-report.md`), the 0.3.3 known limits, the carry-over list of `docs/development/release-day-0.3.3.md`, `docs/development/velopack-spike-0.3.2.md`, `docs/development/windows-signing-options.md`.
+Status: **scope decided Nov 13, 2026: hygiene + Magnify + canvas text selection and caret + CMYK JPEG conversion (section 4, recommended scope); questions 3 to 5 of section 5 still open; nothing built.** Written the day 0.3.3 was published (tag `v0.3.3` on `85df0235`). Inputs: the 0.3.3 plan and morning report (`release-0.3.3-plan.md`, `release-0.3.3-final-morning-report.md`), the 0.3.3 known limits, the carry-over list of `docs/development/release-day-0.3.3.md`, `docs/development/velopack-spike-0.3.2.md`, `docs/development/windows-signing-options.md`.
 
 ## 1. What 0.3.3 left open
 
@@ -56,8 +56,8 @@ Alternative scopes:
 
 ## 5. Questions for the maintainer
 
-1. Which scope: the recommended one, or one of the alternatives (section 4)?
-2. CMYK JPEG: convert to sRGB (needs a colour-management step; `moxcms` is already in the tree) or keep refusing?
+1. (Answered Nov 13: **the recommended scope**.) Which scope: the recommended one, or one of the alternatives (section 4)?
+2. (Answered Nov 13: **convert to sRGB**.) CMYK JPEG: convert to sRGB (needs a colour-management step; `moxcms` is already in the tree) or keep refusing?
 3. Does Magnify keep the decided rules (the loupe renders the source from `original.png` again at the zoom with the earlier ops; blur and pixelate always apply to every copy of the pixels)?
 4. Windows code signing: has the SignPath Foundation application been sent? (It decides whether 0.3.4 can ship signed files.)
 5. When can the lab laptop run Windows for the regression (a console login is needed)?
