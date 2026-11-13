@@ -5,6 +5,25 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
+### Added
+- **Callout.** A speech bubble or box with text and a tail you drag to point at something (tool K). The box grows to fit its text and the stored box is the drawn box, so the editor, the CLI and agents render the same.
+- **Spotlight.** Dim everything except one or more areas (tool S): one spotlight per image, up to 8 holes, dim strength, and a Blur mode that is a look and not a redaction. Added last, it sits under the arrows and callouts you already drew.
+- **Step badges: a label, a numbering style and reorder.** Each step can carry a label that sits beside the badge; numbering is 1 2 3, A B C or a b c (after Z come AA, AB), with a start number for all steps; drag a row in the Steps list to reorder, and the numbers follow in one undo step.
+- **Stamps** (tool U): check, cross, exclamation, question mark, and the words BEFORE and AFTER, drawn as shapes so they look the same on every system.
+- **Import pictures.** PNG and JPEG files import as screenshots (the Import sheet, drag and drop, `capturemann import`, the `import_media` tool): the phone's orientation is applied, the file is converted to 8-bit sRGB, the metadata (including the location) is not copied, and a picture over 16,384 px a side or 50 megapixels is refused. Other picture formats are refused with the format named.
+- **A grouped tool palette, a view bar and an image strip in the editor.** The tools sit in eight groups (the last used tool shows on each; every key still picks its tool); the view bar holds Undo, Redo, Copy text, Auto-redact, zoom with a Fit / 100% / 200% menu, and a ⋯ menu with Revert to original; the strip under the canvas moves to the next image in the Library order without leaving the editor.
+
+### Changed
+- **Text fields look and behave the same everywhere you type.** A focused field gets a blue frame and ring (mouse or keyboard), a 2 px caret that blinks, a strong blue selection that turns grey when the window is inactive, and error, disabled and read-only states. Double-click selects a word, triple-click everything, Shift+arrows extend the selection; search fields have a clear button and Esc clears before it leaves the field; fields are 36 px high.
+- **Text on the screenshot** shows a clear box while you type (an outline that reads on light and dark images, a "Type text" hint), a selected box shows its handles and a hint to double-click or press Enter, and a hovered box shows a dashed outline. A text box can be resized from all four corners.
+- **Step rows** use one blue focus colour: the label is plain text at rest and a field while you edit it; Enter saves and opens the next step, Esc restores, Alt+Up and Alt+Down move the step, Delete removes it.
+- **Rename** shows a Name label and the keys under the field, selects the whole name on opening, disables Rename while the name is empty or unchanged, and shows a refusal under the field instead of a toast.
+- **Editing a caption or transcript line:** Esc now cancels and restores the original text (it used to keep the edit); hovering a line says "click to edit".
+- Revert to original, Fit and 100% moved (to the ⋯ menu and the zoom menu); no setting or shortcut was removed.
+
+### Fixed
+- An older CaptureMann that opens a 0.3.3 capture keeps the callouts, spotlight and stamps unchanged (it does not draw them and shows "Kept an annotation this version cannot show"); a step's new label and numbering fields are the one thing it drops if it saves an edit.
+
 ## [0.3.2] - 2026-11-12
 
 ### Added

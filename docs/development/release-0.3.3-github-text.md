@@ -23,7 +23,7 @@ Lines marked **OPTIONAL** describe work that may be cut (stamps, clipboard paste
 
 ## Release body
 
-# CaptureMann 0.3.3: callouts, spotlight and step labels, import pictures
+# CaptureMann 0.3.3: callouts, spotlight and step labels, import pictures, clearer text fields
 
 0.3.3 has files for **Windows 11, macOS and Linux**. Main changes: the screenshot editor gets new annotation tools and a tidier
 layout, and pictures can be imported.
@@ -40,19 +40,29 @@ layout, and pictures can be imported.
 - **Step badges with a label, a numbering style and a start number.** The Steps panel sets 1 2 3, A B C or a b c (after Z come AA, AB)
   and the start number for all steps, lists the steps so you can **drag them into a new order** (the numbers follow, in one undo step),
   and a step can carry a short label drawn in a pill beside the badge (it flips to the left near the image edge).
-- **Stamps (key U). OPTIONAL: keep only if built.** A check, cross, exclamation or question mark drawn as shapes (the same on every
+- **Stamps (key U).** A check, cross, exclamation or question mark drawn as shapes (the same on every
   system) and "Before" and "After" labels written in the app language when placed.
 - **Import pictures.** Import (the button, Ctrl+I or Cmd+I, drag and drop, `capturemann import`, `import_media`) now accepts **PNG and
   JPEG** pictures. Each becomes a screenshot in the library with the Imported mark; annotate, redact, Copy text and export work as on
   a screenshot taken here. A phone photo is turned upright, transparency is kept, and picture information such as GPS and camera data is
   **not** copied. Limits: 16,384 px on a side and 50 megapixels. WebP, HEIC, GIF, TIFF, BMP and SVG are refused by their content, with
-  the format named. **OPTIONAL:** pasting a picture from the clipboard as a new capture, only if built.
+  the format named. 
 - **A tidier editor.** The 16 tool buttons are now **8 grouped buttons** (Select, Shapes, Text, Highlighter, Markers, Emphasis, Redact,
   Crop); a button shows the tool you used last in its group and every tool keeps its key. The bottom **view bar** holds Undo, Redo, Copy
   text, Auto-redact, zoom, Images, Keyboard and a three-dot menu: the zoom value opens a menu (Fit to window, Actual size, 200%, custom)
   and replaces the Fit and 100% buttons, and **Revert to original** moved into the three-dot menu (it still asks first). An **image
   strip** under the picture jumps to another image of the list you opened it from (same list and order as the Library); switching never
   asks to save and each image keeps its own undo; the Images button hides it, and it hides below 640 px of window height.
+- **Text fields that are easy to see.** Everywhere you type (rename, search, the inspector, settings, captions and transcript lines, text on a
+  screenshot) a focused field now has a **blue frame and ring** (for mouse and keyboard alike), a 2 px **blinking caret** and a **strong blue
+  selection** that turns grey when the window is not active; there are error, disabled and read-only looks. Double-click selects a word,
+  triple-click selects all, Shift+arrows extend the selection. Search fields get a clear button and **Esc clears first, then leaves the field**.
+  **Rename** has a Name label, shows `Enter rename, Esc cancel`, selects the whole name on opening, is disabled while the name is empty or
+  unchanged and shows a refusal under the field. **Text on a screenshot** shows an outline that reads on light and dark pictures and a "Type
+  text" hint; a selected box shows handles and a "Double-click or Enter to edit" hint, a hovered box a dashed outline, and a text box can be
+  resized from all four corners. **Step rows** in the Steps panel: the label is plain text until you edit it; click it or press Enter to edit
+  (the whole label is selected), Enter saves and opens the next step, Esc restores, Alt+Up and Alt+Down move the step, Delete removes it.
+  **Editing a caption line:** Esc now **cancels** and restores the text (it used to keep the edit).
 - **For agents.** `annotate` takes the ops `callout`, `spotlight` and `stamp`, and `step` takes `style`, `start` and `text`; `import_media`
   takes pictures (rows gain `width` and `height`). A second `spotlight` in one call is `invalid_input` naming it (`ops[1]`). No new
   MCP tool: the server still lists 81. The plugin skill `screenshot-and-redact` documents the new ops.
