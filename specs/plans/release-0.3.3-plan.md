@@ -1,6 +1,6 @@
 # Release 0.3.3: annotation pack (analysis of `0.3.3.md` and detail plan)
 
-Status: **built and merged on `main` (Nov 13, 2026); candidates and regression in progress; not tagged or released.** Added after the plan: the shared text-field look (spec `specs/capturemann-text-fields`, tracks A to D), Steps list rows (inline label, info-icon tooltip). Magnify is backlog (ANN-8 reserved). Design hand-off: `specs/capturemann-0.3.3-annotation-pack/` and `specs/capturemann-text-fields/` (git-ignored, local). Source: the maintainer's `0.3.3.md`.
+Status: **released Nov 13, 2026 (tag `v0.3.3` on `85df0235`, published as Latest).** Added after the plan: the shared text-field look (design pack `specs/capturemann-text-fields/`, local), Steps list rows, the spotlight live drag preview, the paused-upload caption-save fix. Magnify is backlog (ANN-8 reserved). Windows regression not run on release day. Design hand-off: `specs/capturemann-0.3.3-annotation-pack/` (git-ignored, local). Source: the maintainer's `0.3.3.md`.
 
 ## 1. What the proposal is, and how it fits the repository
 

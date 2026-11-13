@@ -5,6 +5,8 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-11-13
+
 ### Added
 - **Callout.** A speech bubble or box with text and a tail you drag to point at something (tool K). The box grows to fit its text and the stored box is the drawn box, so the editor, the CLI and agents render the same.
 - **Spotlight.** While you drag, the dim and the outline show live. Dim everything except one or more areas (tool S): one spotlight per image, up to 8 holes, dim strength, and a Blur mode that is a look and not a redaction. Added last, it sits under the arrows and callouts you already drew.

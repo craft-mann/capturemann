@@ -11,8 +11,8 @@ Lines marked **OPTIONAL** describe work that may be cut (stamps, clipboard paste
 - **Type:** draft, then **pre-release** (the version is 0.x). Covers Windows 11 (x64), macOS 13+ (Apple Silicon and Intel) and Linux
   (Ubuntu 24.04+, x86_64 and aarch64). It becomes the next "Latest".
 - **Files to attach:** as 0.3.2 with the version changed: Windows `capturemann-0.3.3-windows-x64-setup.exe`, `...-windows-x64.zip`,
-  `.sha256` files and `SHA256SUMS.txt`; macOS `CaptureMann-0.3.3-arm64.dmg` and `CaptureMann-0.3.3-x86_64.dmg` with
-  `.sha256` (rename the `make release` output `CaptureMann-0.3.3-<arch>.dmg`, write the `.sha256` files again with the new names); Linux
+  `.sha256` files and `SHA256SUMS.txt`; macOS `CaptureMann-v0.3.3-macos-arm64.dmg` and `CaptureMann-v0.3.3-macos-x86_64.dmg` with
+  `.sha256` (rename the `make release` output `CaptureMann-0.3.3-<arch>.dmg` to `CaptureMann-v0.3.3-macos-<arch>.dmg`, write the `.sha256` files again with the new names); Linux
   `capturemann-0.3.3-linux-{x86_64,aarch64}.tar.gz`, `capturemann_0.3.3_{amd64,arm64}.deb`, `.sha256`, `.minisig`. APT repository:
   release `apt` (assets), run `make-apt-repo.sh` again with the `.deb` files of 0.3.0 to 0.3.3.
 - **Headline numbers, where they come from:** 81 MCP tools (unchanged from 0.3.2: no new tool, the new ops and the image import use
@@ -105,8 +105,8 @@ been run on these files yet** (the lab computer could not boot Windows on releas
 | System | Files and computer | Tiers run (passed/failed) | Reports |
 | --- | --- | --- | --- |
 | Windows 11 x64 | installer and zip from the **Windows package** workflow (run 43376683644 on `85df0235`) | **not run**; the workflow's own Windows tests passed (run 43376687740) | none yet |
-| macOS arm64 (the maintainer's Mac, Apple M4 Pro) | `CaptureMann-0.3.3-arm64.dmg`, signed with a Developer ID, notarized and stapled | full 53/0 (22 skipped), on the dev bundle built from the same code (not on the app copied out of the DMG); earlier full runs 54/0 and 46/0 | `L1-macos-0.3.3-regression-full-release-candidate-2026-11-13-claude`, `...-candidate-screen-...`, `...-candidate3-...`, `...-candidate-textfields-...` |
-| macOS x86_64 (Intel) | `CaptureMann-0.3.3-x86_64.dmg`, same code, signed, notarized and stapled; **checked on Apple Silicon only** | not run on Intel hardware | none |
+| macOS arm64 (the maintainer's Mac, Apple M4 Pro) | `CaptureMann-v0.3.3-macos-arm64.dmg`, signed with a Developer ID, notarized and stapled | full 53/0 (22 skipped), on the dev bundle built from the same code (not on the app copied out of the DMG); earlier full runs 54/0 and 46/0 | `L1-macos-0.3.3-regression-full-release-candidate-2026-11-13-claude`, `...-candidate-screen-...`, `...-candidate3-...`, `...-candidate-textfields-...` |
+| macOS x86_64 (Intel) | `CaptureMann-v0.3.3-macos-x86_64.dmg`, same code, signed, notarized and stapled; **checked on Apple Silicon only** | not run on Intel hardware | none |
 | Linux x86_64 (ThinkPad T490, Ubuntu 24.04, X11) | tarball and `.deb` from `release-build.sh`; both pass `check-package.sh` | full 61/0 (14 skipped), tarball install case included | `L1-linux-0.3.3-regression-full-x11-release-candidate-2026-11-13-claude` |
 | Linux aarch64 (Ubuntu 24.04 VM, headless) | tarball and `.deb` from `release-build.sh`; both pass `check-package.sh` | full 40/0 (35 skipped: no desktop session) | `L1-linux-0.3.3-aarch64-vm-release-candidate-85df0235-full-2026-11-13-claude` |
 
@@ -151,8 +151,8 @@ computer, the Linux Wayland session.
 |---|---|
 | `capturemann-0.3.3-windows-x64-setup.exe` | `7791304199c484b7eb4dba5571d4a8c4b75c4b2bdf69bbcd0bd6d3868e7af7cd` |
 | `capturemann-0.3.3-windows-x64.zip` | `185a49e5e7474c299a06360ed07239350777f0f8187454f43d7f2a47b47dd624` |
-| `CaptureMann-0.3.3-arm64.dmg` | `09747c0cc9d9bd04215c88bf03501898b944c773777df0bf65edc5472d4b1ba8` |
-| `CaptureMann-0.3.3-x86_64.dmg` | `6f493e15197ce1ab1d320c3018798ecd7d2c7cf5da53a5d0a626e54108da7d28` |
+| `CaptureMann-v0.3.3-macos-arm64.dmg` | `09747c0cc9d9bd04215c88bf03501898b944c773777df0bf65edc5472d4b1ba8` |
+| `CaptureMann-v0.3.3-macos-x86_64.dmg` | `6f493e15197ce1ab1d320c3018798ecd7d2c7cf5da53a5d0a626e54108da7d28` |
 | `capturemann-0.3.3-linux-x86_64.tar.gz` | `4f392dc303fe4f938ac464022b19d81a5e1f62eb4b6fd33295dc2548c03ef2e0` |
 | `capturemann_0.3.3_amd64.deb` | `3efc0d6594c47cee119e2ac9a809e98cbb6cd6c138f7f0065a6951a15a6b4e91` |
 | `capturemann-0.3.3-linux-aarch64.tar.gz` | `e36e2a5f9056d347c1c692673e73877130862eed0753c19c1c400df2fc4bb808` |
@@ -166,7 +166,7 @@ Minisign public key: `packaging/linux/minisign.pub`; public key `RWTeQv8ogB2CCuZ
   `SHA256SUMS.txt`. **winget:** 0.3.3 is **not** in winget. Pull requests 472327 (0.2.8) and 477195
   (0.3.1) to microsoft/winget-pkgs are still open, so `winget install CaptureMann.CaptureMann` does not work yet; use the installer or
   the zip. A 0.3.3 update follows once the first package is accepted.
-- **macOS 13+:** `CaptureMann-0.3.3-arm64.dmg` (Apple Silicon) or `CaptureMann-0.3.3-x86_64.dmg` (Intel);
+- **macOS 13+:** `CaptureMann-v0.3.3-macos-arm64.dmg` (Apple Silicon) or `CaptureMann-v0.3.3-macos-x86_64.dmg` (Intel);
   signed with a Developer ID, notarized and stapled.
   Or `brew upgrade --cask craft-mann/tap/capturemann` (`brew install --cask craft-mann/tap/capturemann` for a first install; the cask
   moves to 0.3.3 shortly after this release is published). Check with `shasum -a 256 -c <file>.sha256`.
