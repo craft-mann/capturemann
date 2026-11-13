@@ -1,4 +1,5 @@
 use super::*;
+use crate::ui::field_style::canvas as canvas_tok;
 
 impl EditorView {
     pub(super) fn canvas_pane(
@@ -60,6 +61,25 @@ impl EditorView {
                 )
         });
 
+        // "Type text" (just placed) and the hint pill (selected, not editing) are text, so they
+        // are elements over the canvas rather than quads.
+        let placeholder = overlay.text.as_ref().and_then(|tg| {
+            let text = tg.placeholder.clone()?;
+            let (x, y) = vp.to_screen(Pt::new(tg.frame.x, tg.frame.y));
+            let mut c = Hsla::from(gpui_rgb(tg.color));
+            c.a = placeholder_alpha(tg.light);
+            Some((x as f32, y as f32, (tg.size * z) as f32, c, text))
+        });
+        let hint_pill = overlay
+            .selected_text
+            .as_ref()
+            .filter(|st| st.hint)
+            .map(|st| {
+                let (x0, _) = vp.to_screen(Pt::new(st.frame.x, st.frame.y));
+                let (x1, y1) =
+                    vp.to_screen(Pt::new(st.frame.x + st.frame.w, st.frame.y + st.frame.h));
+                (((x0 + x1) / 2.0) as f32, y1 as f32)
+            });
         // While a text annotation is open the canvas is the platform's text input (composition).
         let editing_text = overlay.text.is_some();
         let input_focus = self.canvas_focus.clone();
@@ -151,6 +171,41 @@ impl EditorView {
                             .text_size(px(11.))
                             .text_color(rgba_of(t.text))
                             .child(SharedString::from(tr_ctx!("callout handle", "Tail tip")))
+                    }))
+                    .children(placeholder.map(|(x, y, size, color, text)| {
+                        div()
+                            .absolute()
+                            .left(px(x))
+                            .top(px(y))
+                            .text_size(px(size))
+                            .text_color(color)
+                            .whitespace_nowrap()
+                            .child(SharedString::from(text))
+                    }))
+                    .children(hint_pill.map(|(cx_, y)| {
+                        const W: f32 = 240.;
+                        div()
+                            .absolute()
+                            .left(px(cx_ - W / 2.))
+                            .top(px(y + HINT_GAP))
+                            .w(px(W))
+                            .flex()
+                            .justify_center()
+                            .child(
+                                div()
+                                    .px(px(8.))
+                                    .py(px(3.))
+                                    .rounded_full()
+                                    .bg(rgba_of(t.raised))
+                                    .border_1()
+                                    .border_color(rgba_of(t.border))
+                                    .text_size(px(11.))
+                                    .text_color(rgba_of(t.text))
+                                    .whitespace_nowrap()
+                                    .child(SharedString::from(tr!(
+                                        "Double-click or Enter to edit"
+                                    ))),
+                            )
                     }))
                     .children(step_hint.map(|(x, y, n, d, c)| {
                         // The next step number rides on the cursor (ANN-1).
@@ -317,7 +372,11 @@ fn paint_overlay(
                 .handles
                 .iter()
                 .any(|(h, _)| matches!(h, Handle::From | Handle::To));
-            if !is_line {
+            let blue = o.selected_text.as_ref();
+            if let Some(st) = blue {
+                // A selected text box: solid blue outline on a halo, handles below.
+                outline_with_halo(window, rect_b(ch.bounds), st.light);
+            } else if !is_line {
                 window.paint_quad(gpui::quad(
                     rect_b(ch.bounds),
                     0.,
@@ -354,21 +413,33 @@ fn paint_overlay(
                     px(2.),
                     gpui::white(),
                     1.5,
-                    hsla(t.text),
+                    if blue.is_some() {
+                        hsla(canvas_tok::OUTLINE)
+                    } else {
+                        hsla(t.text)
+                    },
                     BorderStyle::Solid,
                 ));
             }
         }
-        // Text frame and caret.
-        if let Some(tg) = &o.text {
+        // A text box under the pointer that is not selected: thin dashed blue outline.
+        if let Some(r) = o.text_hover {
             window.paint_quad(gpui::quad(
-                rect_b(tg.frame),
+                rect_b(r),
                 0.,
                 gpui::transparent_black(),
-                1.,
-                hsla(t.text),
+                canvas_tok::HOVER_W,
+                hsla(canvas_tok::OUTLINE),
                 BorderStyle::Dashed,
             ));
+        }
+        // Text being typed: blue outline on a halo, the composing span, the caret in the text
+        // colour (the "Type text" placeholder is an element, see `canvas_pane`).
+        if let Some(tg) = &o.text {
+            outline_with_halo(window, rect_b(tg.frame), tg.light);
+            for m in &tg.marked {
+                window.paint_quad(gpui::fill(rect_b(*m), hsla(canvas_tok::SELECTION)));
+            }
             let c = pt(tg.caret);
             let ch = px((tg.caret_h * z) as f32);
             window.paint_quad(gpui::fill(
@@ -376,10 +447,52 @@ fn paint_overlay(
                     origin: c,
                     size: size(px(2.), ch),
                 },
-                hsla(t.text),
+                Hsla::from(gpui_rgb(tg.color)),
             ));
         }
     });
+}
+
+/// Gap between a selected text box and its hint pill (px).
+const HINT_GAP: f32 = 10.;
+
+/// Alpha (0..=1) of the placeholder over a light or a dark image (spec: 38 % / 45 %).
+fn placeholder_alpha(light_image: bool) -> f32 {
+    let pct = if light_image {
+        canvas_tok::PLACEHOLDER_ON_LIGHT_PCT
+    } else {
+        canvas_tok::PLACEHOLDER_ON_DARK_PCT
+    };
+    pct as f32 / 100.0
+}
+
+/// `b` grown by `by` px on every side.
+fn grow(b: Bounds<Pixels>, by: f32) -> Bounds<Pixels> {
+    Bounds {
+        origin: point(b.origin.x - px(by), b.origin.y - px(by)),
+        size: size(b.size.width + px(2. * by), b.size.height + px(2. * by)),
+    }
+}
+
+/// The 1.5 px blue outline just outside `b` and the 3 px halo outside that (white on a light
+/// image, near-black on a dark one), so the box shows on any screenshot.
+fn outline_with_halo(window: &mut Window, b: Bounds<Pixels>, light_image: bool) {
+    window.paint_quad(gpui::quad(
+        grow(b, canvas_tok::OUTLINE_W + canvas_tok::HALO_W),
+        0.,
+        gpui::transparent_black(),
+        canvas_tok::HALO_W,
+        hsla(canvas_tok::halo(light_image)),
+        BorderStyle::Solid,
+    ));
+    window.paint_quad(gpui::quad(
+        grow(b, canvas_tok::OUTLINE_W),
+        0.,
+        gpui::transparent_black(),
+        canvas_tok::OUTLINE_W,
+        hsla(canvas_tok::OUTLINE),
+        BorderStyle::Solid,
+    ));
 }
 
 fn stroke_line(
@@ -509,5 +622,18 @@ fn paint_draft(
             );
         }
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn placeholder_is_stronger_on_dark_images_and_the_halo_flips() {
+        assert!((placeholder_alpha(true) - 0.38).abs() < 1e-6);
+        assert!((placeholder_alpha(false) - 0.45).abs() < 1e-6);
+        assert_eq!(canvas_tok::halo(true), canvas_tok::HALO_ON_LIGHT);
+        assert_eq!(canvas_tok::halo(false), canvas_tok::HALO_ON_DARK);
     }
 }

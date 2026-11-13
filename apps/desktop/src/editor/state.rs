@@ -598,6 +598,30 @@ impl EditorState {
         })
     }
 
+    /// The box to outline with a dashed line because the pointer is over a text box, callout or
+    /// step label that is not selected (nothing while typing or while dragging).
+    pub fn text_hover(&mut self) -> Option<Rc> {
+        let p = self.hover?;
+        if self.text.is_some() || !matches!(self.interaction, Interaction::Idle) {
+            return None;
+        }
+        if !matches!(self.tool, Tool::Select | Tool::Text | Tool::Callout) {
+            return None;
+        }
+        geom::text_hover_target(&self.ops, self.selected.as_deref(), p, &mut self.metrics)
+    }
+
+    /// The box of the selected text box, callout or step label that is not being edited, for the
+    /// blue outline, the four handles and the hint pill.
+    pub fn selected_text_box(&mut self) -> Option<Rc> {
+        if self.text.is_some() {
+            return None;
+        }
+        let i = self.selected_index()?;
+        let kind = self.ops[i].kind.clone();
+        geom::is_text_like(&kind).then(|| geom::bounds(&kind, &mut self.metrics))
+    }
+
     pub fn selected_kind(&self) -> Option<&OpKind> {
         self.selected_index().map(|i| &self.ops[i].kind)
     }
@@ -1211,6 +1235,12 @@ impl EditorState {
     /// Enter on the canvas: a default-sized op of the active tool centered at `center`, so the
     /// whole editor works without a pointer.
     pub fn place_default(&mut self, center: Pt) -> Vec<Edit> {
+        // Enter on a selected text box, callout or step label edits it again (text-fields
+        // spec, "Selected, not editing") instead of placing a new one.
+        if self.text.is_none() && self.selected_kind().is_some_and(geom::is_text_like) {
+            self.edit_selected_text();
+            return Vec::new();
+        }
         let s = (f64::from(self.image.0.min(self.image.1)) / 6.0).max(40.0);
         let style = self.styles.get(self.tool);
         let rect = |w: f64, h: f64| Rc::new(center.x - w / 2.0, center.y - h / 2.0, w, h);
@@ -3421,5 +3451,70 @@ mod tests {
         let back = Styles::from_json(&s.styles.to_json());
         assert_eq!(back.get(Tool::Stamp).stamp_kind, StampKind::Label);
         assert_eq!(back.get(Tool::Stamp).stamp_word, StampWord::After);
+    }
+
+    /// Text-fields spec, "Text on the canvas": selected (not editing) shows the box, Enter edits
+    /// it again, and an unselected box is outlined on hover only.
+    #[test]
+    fn text_box_states_selected_hover_and_enter_to_edit() {
+        let mut s = st();
+        s.set_tool(Tool::Text);
+        s.pointer_down(Pt::new(130.0, 320.0), NONE, 1, TOL);
+        s.text_ime(None, "Hello", false);
+        let EscapeOutcome::Edits(_) = s.escape() else {
+            panic!()
+        };
+        // Committed text may be selected or not; start from nothing selected.
+        s.selected = None;
+        s.set_tool(Tool::Select);
+        assert!(s.selected_text_box().is_none());
+        // Hover over it: the dashed outline target is its box.
+        s.pointer_move(Pt::new(140.0, 330.0), NONE, TOL);
+        let hov = s.text_hover().expect("hover target");
+        assert!(hov.w > 0.0 && hov.h > 0.0);
+        // Away from it: nothing.
+        s.pointer_move(Pt::new(900.0, 700.0), NONE, TOL);
+        assert!(s.text_hover().is_none());
+        // A click selects it: no hover outline any more, the selected box is shown, no caret.
+        s.pointer_move(Pt::new(140.0, 330.0), NONE, TOL);
+        s.pointer_down(Pt::new(140.0, 330.0), NONE, 1, TOL);
+        s.pointer_up(Pt::new(140.0, 330.0), NONE, TOL);
+        assert!(s.text.is_none());
+        assert!(s.text_hover().is_none());
+        assert_eq!(s.selected_text_box(), Some(hov));
+        let ch = s.chrome().unwrap();
+        assert_eq!(ch.handles.len(), 4, "a handle on each corner");
+        // Enter starts editing again with the caret at the end; no new op is placed.
+        assert!(s.place_default(Pt::new(600.0, 400.0)).is_empty());
+        let t = s.text.as_ref().expect("editing");
+        assert_eq!((t.text.as_str(), t.cursor), ("Hello", 5));
+        assert!(
+            s.selected_text_box().is_none(),
+            "no selected look while typing"
+        );
+        assert!(s.text_hover().is_none());
+    }
+
+    #[test]
+    fn scaling_a_text_box_from_another_corner_keeps_the_opposite_corner() {
+        let mut s = st();
+        s.set_tool(Tool::Text);
+        s.pointer_down(Pt::new(200.0, 300.0), NONE, 1, TOL);
+        s.text_ime(None, "Scale me", false);
+        let _ = s.escape();
+        let kind = s.ops[0].kind.clone();
+        let b = geom::bounds(&kind, &mut s.metrics);
+        // Drag the top-left corner outwards to double the width: the bottom-right stays.
+        let k = geom::resize(
+            &kind,
+            Handle::Nw,
+            Pt::new(b.x + b.w - 2.0 * b.w, b.y),
+            false,
+            &mut s.metrics,
+        );
+        let nb = geom::bounds(&k, &mut s.metrics);
+        assert!((nb.w / b.w - 2.0).abs() < 0.15, "{} vs {}", nb.w, b.w);
+        assert!(((nb.x + nb.w) - (b.x + b.w)).abs() < 4.0, "{nb:?} vs {b:?}");
+        assert!(((nb.y + nb.h) - (b.y + b.h)).abs() < 4.0);
     }
 }

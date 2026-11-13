@@ -289,13 +289,87 @@ pub fn topmost_hit(ops: &[AnnotationOp], p: Pt, tol: f64, tm: &mut TextMetrics) 
         .find(|&i| hit(&ops[i].kind, p, tol, tm))
 }
 
+/// The text-like op (text, callout, step) under `p` that is not the selected one, as the box to
+/// outline when the pointer hovers it. The topmost op of any kind wins, so a shape drawn over a
+/// text box does not show the box through it.
+pub fn text_hover_target(
+    ops: &[AnnotationOp],
+    selected: Option<&str>,
+    p: Pt,
+    tm: &mut TextMetrics,
+) -> Option<Rc> {
+    let i = topmost_hit(ops, p, 0.0, tm)?;
+    let op = &ops[i];
+    if selected == Some(op.id.as_str()) {
+        return None;
+    }
+    match op.kind {
+        OpKind::Text { .. } | OpKind::Callout { .. } | OpKind::Step { .. } => {
+            Some(bounds(&op.kind, tm))
+        }
+        _ => None,
+    }
+}
+
+/// Whether an op is typed text on the canvas (text, callout, step label).
+pub fn is_text_like(kind: &OpKind) -> bool {
+    matches!(
+        kind,
+        OpKind::Text { .. } | OpKind::Callout { .. } | OpKind::Step { .. }
+    )
+}
+
+/// Mean luminance (0..=1, sRGB luma) of the pixels of `rgba` (`w` x `h`, 4 bytes each) under
+/// `r`, sampled on a grid of at most 16 x 16 points. 0.0 for an empty region or buffer. Decides
+/// whether a halo or placeholder is drawn for a light or a dark image.
+pub fn region_luminance(rgba: &[u8], w: u32, h: u32, r: Rc) -> f64 {
+    if w == 0 || h == 0 || rgba.len() < (w as usize) * (h as usize) * 4 {
+        return 0.0;
+    }
+    let r = r.normalized();
+    let x0 = r.x.max(0.0).min(f64::from(w - 1));
+    let y0 = r.y.max(0.0).min(f64::from(h - 1));
+    let x1 = (r.x + r.w).max(x0).min(f64::from(w - 1));
+    let y1 = (r.y + r.h).max(y0).min(f64::from(h - 1));
+    const N: u32 = 16;
+    let (mut sum, mut n) = (0.0, 0.0);
+    for j in 0..N {
+        for i in 0..N {
+            let fx = (f64::from(i) + 0.5) / f64::from(N);
+            let fy = (f64::from(j) + 0.5) / f64::from(N);
+            let x = (x0 + (x1 - x0) * fx) as usize;
+            let y = (y0 + (y1 - y0) * fy) as usize;
+            let k = (y * w as usize + x) * 4;
+            let (r8, g8, b8) = (
+                f64::from(rgba[k]),
+                f64::from(rgba[k + 1]),
+                f64::from(rgba[k + 2]),
+            );
+            sum += (0.2126 * r8 + 0.7152 * g8 + 0.0722 * b8) / 255.0;
+            n += 1.0;
+        }
+    }
+    sum / n
+}
+
 /// Handles of an op with their positions.
 pub fn handles(kind: &OpKind, tm: &mut TextMetrics) -> Vec<(Handle, Pt)> {
     match kind {
         OpKind::Arrow { from, to, .. } | OpKind::Line { from, to, .. } => {
             vec![(Handle::From, *from), (Handle::To, *to)]
         }
-        OpKind::Text { .. } | OpKind::Step { .. } | OpKind::Stamp { .. } => {
+        // A text box has a handle on each corner (text-fields spec, "Text on the canvas");
+        // the bottom-right one is the original scale handle.
+        OpKind::Text { .. } => {
+            let b = bounds(kind, tm);
+            vec![
+                (Handle::Nw, Pt::new(b.x, b.y)),
+                (Handle::Ne, Pt::new(b.x + b.w, b.y)),
+                (Handle::Sw, Pt::new(b.x, b.y + b.h)),
+                (Handle::Scale, Pt::new(b.x + b.w, b.y + b.h)),
+            ]
+        }
+        OpKind::Step { .. } | OpKind::Stamp { .. } => {
             let b = bounds(kind, tm);
             vec![(Handle::Scale, Pt::new(b.x + b.w, b.y + b.h))]
         }
@@ -691,6 +765,21 @@ pub fn resize(orig: &OpKind, handle: Handle, p: Pt, shift: bool, tm: &mut TextMe
             let denom = (b.x + b.w - at.x).max(1.0);
             let ratio = ((p.x - at.x) / denom).max(0.05);
             *size = (*size * ratio).clamp(8.0, 400.0);
+        }
+        (OpKind::Text { at, size, .. }, Handle::Nw | Handle::Ne | Handle::Sw) => {
+            // Scale about the opposite corner, which stays where it is.
+            let b = bounds(orig, tm);
+            let anchor = match handle {
+                Handle::Nw => Pt::new(b.x + b.w, b.y + b.h),
+                Handle::Ne => Pt::new(b.x, b.y + b.h),
+                _ => Pt::new(b.x + b.w, b.y),
+            };
+            let ratio = ((p.x - anchor.x).abs() / b.w.max(1.0)).max(0.05);
+            let new = (*size * ratio).clamp(8.0, 400.0);
+            let f = new / *size;
+            at.x = anchor.x + (at.x - anchor.x) * f;
+            at.y = anchor.y + (at.y - anchor.y) * f;
+            *size = new;
         }
         (OpKind::Stamp { at, size, .. }, Handle::Scale) => {
             *size = (2.0 * (p.x - at.x).abs().max((p.y - at.y).abs())).clamp(10.0, 400.0);
@@ -1480,5 +1569,56 @@ mod tests {
             (800, 600)
         )
         .is_none());
+    }
+
+    fn solid(w: u32, h: u32, v: u8) -> Vec<u8> {
+        (0..w * h).flat_map(|_| [v, v, v, 255]).collect()
+    }
+
+    #[test]
+    fn luminance_tells_light_from_dark_images() {
+        let r = Rc::new(2.0, 2.0, 10.0, 10.0);
+        let white = region_luminance(&solid(40, 40, 255), 40, 40, r);
+        let black = region_luminance(&solid(40, 40, 0), 40, 40, r);
+        let grey = region_luminance(&solid(40, 40, 128), 40, 40, r);
+        assert!(white > 0.99 && black < 0.01);
+        assert!((grey - 0.5).abs() < 0.02);
+        // Only the pixels under the box count: left half white, right half black.
+        let mut img = solid(40, 40, 0);
+        for y in 0..40usize {
+            for x in 0..20usize {
+                let k = (y * 40 + x) * 4;
+                img[k..k + 3].copy_from_slice(&[255, 255, 255]);
+            }
+        }
+        assert!(region_luminance(&img, 40, 40, Rc::new(0.0, 0.0, 10.0, 10.0)) > 0.99);
+        assert!(region_luminance(&img, 40, 40, Rc::new(30.0, 0.0, 9.0, 10.0)) < 0.01);
+        // Regions outside the image and empty buffers do not panic.
+        let _ = region_luminance(&img, 40, 40, Rc::new(-50.0, 900.0, 5.0, 5.0));
+        assert_eq!(region_luminance(&[], 0, 0, r), 0.0);
+        assert_eq!(region_luminance(&[0; 4], 40, 40, r), 0.0);
+    }
+
+    #[test]
+    fn hover_target_is_the_topmost_unselected_text_box() {
+        let mut tm = TextMetrics::default();
+        let text = AnnotationOp::new(
+            "t1",
+            OpKind::Text {
+                at: Pt::new(100.0, 100.0),
+                text: "Hi there".into(),
+                size: 24.0,
+                color: Color::WHITE,
+                outline: None,
+                bg: None,
+            },
+        );
+        let rect = AnnotationOp::new("r1", rect_op(300.0, 300.0, 50.0, 50.0));
+        let ops = vec![text, rect];
+        let over = Pt::new(105.0, 110.0);
+        assert!(text_hover_target(&ops, None, over, &mut tm).is_some());
+        assert!(text_hover_target(&ops, Some("t1"), over, &mut tm).is_none());
+        assert!(text_hover_target(&ops, None, Pt::new(320.0, 320.0), &mut tm).is_none());
+        assert!(text_hover_target(&ops, None, Pt::new(900.0, 900.0), &mut tm).is_none());
     }
 }

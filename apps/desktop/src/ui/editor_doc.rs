@@ -1157,6 +1157,24 @@ pub struct TextGeom {
     pub frame: Rc,
     pub caret: Pt,
     pub caret_h: f64,
+    /// The image under the box is light (decides the halo and the placeholder strength).
+    pub light: bool,
+    /// The text colour and size (image px) for the caret and the placeholder.
+    pub color: cm_core::Color,
+    pub size: f64,
+    /// "Type text" while nothing is typed yet (and no input method is composing).
+    pub placeholder: Option<String>,
+    /// The span an input method is composing, one rectangle per line.
+    pub marked: Vec<Rc>,
+}
+
+/// A selected text box, callout or step label that is not being edited.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SelectedText {
+    pub frame: Rc,
+    pub light: bool,
+    /// Show the "Double-click or Enter to edit" pill (not while it is being dragged).
+    pub hint: bool,
 }
 
 /// Everything the canvas overlay paints on top of the preview, in image px.
@@ -1168,6 +1186,9 @@ pub struct OverlayData {
     pub proposals: Vec<Rc>,
     pub crop: Option<Rc>,
     pub text: Option<TextGeom>,
+    pub selected_text: Option<SelectedText>,
+    /// A text box under the pointer that is not selected: drawn as a thin dashed outline.
+    pub text_hover: Option<Rc>,
 }
 
 impl EditorDoc {
@@ -1183,6 +1204,14 @@ impl EditorDoc {
             crop_draft.or_else(|| self.state.crop_rect())
         } else {
             None
+        };
+        let base = self.base.clone();
+        let light_under = |r: Rc| -> bool {
+            base.as_ref().is_some_and(|b| {
+                let lum =
+                    crate::editor::geom::region_luminance(b.as_raw(), b.width(), b.height(), r);
+                crate::ui::field_style::canvas::is_light_image(lum)
+            })
         };
         let text = self.state.text.clone().map(|t| {
             let m = &mut self.state.metrics;
@@ -1203,17 +1232,75 @@ impl EditorDoc {
             };
             let lines = t.text.split('\n').count().max(1);
             let b = m.measure(&t.text, t.size);
-            let w = if t.text.is_empty() {
+            let placeholder = (t.text.is_empty() && t.marked.is_none()).then(|| tr!("Type text"));
+            let w = if let Some(ph) = &placeholder {
+                // Room for the placeholder, so the box does not read as a sliver.
+                let pb = m.measure(ph, t.size);
+                (pb.dx + pb.w).max(t.size * 0.6)
+            } else if t.text.is_empty() {
                 t.size * 0.6
             } else {
                 b.dx + b.w
             };
+            // The composing span, as one rectangle per line it touches.
+            let mut marked = Vec::new();
+            if let Some(range) = &t.marked {
+                for (li, ltext) in t.text.split('\n').enumerate() {
+                    let start: usize = t
+                        .text
+                        .split('\n')
+                        .take(li)
+                        .map(|l| l.chars().count() + 1)
+                        .sum();
+                    let end = start + ltext.chars().count();
+                    let (a, z) = (range.start.max(start), range.end.min(end));
+                    if a >= z {
+                        continue;
+                    }
+                    let pre: String = ltext.chars().take(a - start).collect();
+                    let mid: String = ltext.chars().skip(a - start).take(z - a).collect();
+                    let x0 = if pre.is_empty() {
+                        0.0
+                    } else {
+                        let b = m.measure(&pre, t.size);
+                        b.dx + b.w
+                    };
+                    let full: String = ltext.chars().take(z - start).collect();
+                    let x1 = if mid.is_empty() {
+                        x0
+                    } else {
+                        let b = m.measure(&full, t.size);
+                        b.dx + b.w
+                    };
+                    marked.push(Rc::new(
+                        t.at.x + x0,
+                        t.at.y + lh * li as f64,
+                        (x1 - x0).max(0.0),
+                        lh,
+                    ));
+                }
+            }
+            let frame = Rc::new(t.at.x, t.at.y, w.max(t.size * 0.6), lh * lines as f64);
             TextGeom {
-                frame: Rc::new(t.at.x, t.at.y, w.max(t.size * 0.6), lh * lines as f64),
+                frame,
                 caret: Pt::new(t.at.x + cx0, t.at.y + lh * line_idx as f64),
                 caret_h: lh,
+                light: light_under(frame),
+                color: t.color,
+                size: t.size,
+                placeholder,
+                marked,
             }
         });
+        let selected_text = self.state.selected_text_box().map(|frame| SelectedText {
+            frame,
+            light: light_under(frame),
+            hint: matches!(
+                self.state.interaction,
+                crate::editor::state::Interaction::Idle
+            ),
+        });
+        let text_hover = self.state.text_hover();
         OverlayData {
             chrome: self.state.chrome(),
             draft: draft.filter(|d| !matches!(d, OpKind::Crop { .. })),
@@ -1221,6 +1308,8 @@ impl EditorDoc {
             proposals: self.state.proposals.iter().map(|p| p.rect).collect(),
             crop,
             text,
+            selected_text,
+            text_hover,
         }
     }
 }
