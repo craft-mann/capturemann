@@ -572,14 +572,6 @@ pub(crate) const ASSETS: &[(&str, &str)] = &[
         include_str!("../../assets/icons/layers.svg"),
     ),
     (
-        "icons/gallery-horizontal-end.svg",
-        include_str!("../../assets/icons/gallery-horizontal-end.svg"),
-    ),
-    (
-        "icons/ellipsis.svg",
-        include_str!("../../assets/icons/ellipsis.svg"),
-    ),
-    (
         "icons/cm-group-corner.svg",
         include_str!("../../assets/icons/cm-group-corner.svg"),
     ),
