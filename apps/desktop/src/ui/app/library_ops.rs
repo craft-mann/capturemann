@@ -184,16 +184,20 @@ pub fn delete_capture(app: &Entity<AppModel>, id: &str, title: &str, cx: &mut Ap
     .detach();
 }
 
-/// LIB-1 "Rename": `rename_capture { capture_id, title }`. The daemon has no such action yet, so
-/// the call is expected to say `not_implemented` or `method not found`; the user is told that
-/// plainly and nothing else happens.
-pub fn rename_capture(app: &Entity<AppModel>, id: &str, title: &str, cx: &mut App) {
+/// LIB-1 "Rename": `rename_capture { capture_id, title }`. The answer goes to `done`: `None` when
+/// the capture was renamed, else the words for the Rename dialog to show under its field (the
+/// text fields spec: a refused name is shown where it is typed, not as a toast).
+pub fn rename_capture(
+    app: &Entity<AppModel>,
+    id: &str,
+    title: &str,
+    done: impl FnOnce(&mut App, Option<String>) + 'static,
+    cx: &mut App,
+) {
     let title = title.trim().to_owned();
-    if title.is_empty() {
-        return;
-    }
     let backend = app.read(cx).backend.clone();
-    let Some(daemon) = backend.daemon.clone() else {
+    let Some(daemon) = backend.daemon.clone().filter(|_| !title.is_empty()) else {
+        done(cx, Some(tr!("Couldn\u{2019}t rename the capture")));
         return;
     };
     let (app2, id) = (app.clone(), id.to_owned());
@@ -204,20 +208,19 @@ pub fn rename_capture(app: &Entity<AppModel>, id: &str, title: &str, cx: &mut Ap
             .spawn(async move { Backend::call_coded(&daemon, "rename_capture", params).await })
             .await;
         cx.update(|cx| match res {
-            Ok(Ok(_)) => capture_changed(&app2, Some(&id), cx),
-            Ok(Err(e)) => push_toast(
-                &app2,
-                unavailable_or_error(&tr!("Couldn\u{2019}t rename the capture"), &e),
-                cx,
-            ),
-            Err(e) => push_toast(
-                &app2,
-                flows::error_toast_live(
-                    || tr!("Couldn\u{2019}t rename the capture"),
-                    e.to_string(),
-                ),
-                cx,
-            ),
+            Ok(Ok(_)) => {
+                capture_changed(&app2, Some(&id), cx);
+                done(cx, None);
+            }
+            Ok(Err(e)) => {
+                let why = if is_unavailable(&e) {
+                    tr!("This action isn\u{2019}t built into CaptureMann yet.")
+                } else {
+                    crate::daemon_text::call_error_text(&e)
+                };
+                done(cx, Some(why));
+            }
+            Err(e) => done(cx, Some(e.to_string())),
         });
     })
     .detach();

@@ -18,7 +18,7 @@ use gpui::{
 };
 
 use super::ai_cards::{stamp, AiNote, Pending};
-use super::tabs::{hint, panel, split_at_key, Inspector, KEY_MARK};
+use super::tabs::{hint, panel, Inspector};
 use super::{RecordingEditor, Session};
 use crate::ai::caption_find::{line_ranges, line_text, search, Match};
 use crate::ai::caption_view::{
@@ -30,6 +30,7 @@ use crate::recedit::geom::LABEL_W;
 use crate::theme::{scale, type_scale, Theme};
 use crate::ui::ai;
 use crate::ui::components::{ellipsis_text, icon, keycap, shrink_text, switch};
+use crate::ui::field_style::{row, FOCUS_BLUE};
 use crate::ui::paint::{hsla_of, rgba_of, TextExt};
 use crate::ui::scroll::fill_scroll;
 use crate::ui::settings::widgets::small_button_with_icon;
@@ -73,9 +74,18 @@ impl RecordingEditor {
                 }
                 cx.notify();
             }
-            // Esc: done, the edit is kept (and saved).
+            // Esc: cancel, the line goes back to what it was when editing began (text fields
+            // spec, "Transcript and caption editing"). After a split, merge or replace there is
+            // nothing to go back to, so what was typed stays and is saved.
             TextFieldEvent::Escaped => {
                 self.ai.line_play = None;
+                if let (Some(i), Some((line, text, dirty))) =
+                    (self.ai.field_for, self.ai.edit_original.take())
+                {
+                    if line == i {
+                        self.ai.captions.revert_text(i, text, dirty);
+                    }
+                }
                 self.ai_finish_edit(cx);
                 cx.notify();
             }
@@ -86,6 +96,7 @@ impl RecordingEditor {
     fn ai_finish_edit(&mut self, cx: &mut Context<Self>) {
         self.ai_save(cx);
         self.ai.field_for = None;
+        self.ai.edit_original = None;
         self.ai.pending = Some(Pending::Defocus);
     }
 
@@ -128,6 +139,7 @@ impl RecordingEditor {
         }
         self.ai_save(cx);
         self.ai.field_for = None;
+        self.ai.edit_original = None;
         self.ai.find_open = false;
         self.ai.pending = None;
         window.focus(&self.focus, cx);
@@ -222,6 +234,11 @@ impl RecordingEditor {
             return;
         };
         let (text, start) = (line_text(line), line.start);
+        let stored = line.text.clone();
+        if self.ai.field_for != Some(i) || self.ai.edit_original.as_ref().map(|o| o.0) != Some(i) {
+            let dirty = self.ai.captions.is_dirty();
+            self.ai.edit_original = Some((i, stored, dirty));
+        }
         self.ai.captions.select(Some(i));
         self.ai.field_for = Some(i);
         self.ai.line_play = None;
@@ -299,6 +316,7 @@ impl RecordingEditor {
         if !ok {
             return;
         }
+        self.ai.edit_original = None;
         if editing {
             self.ai.pending = Some(if at_caret {
                 Pending::Edit {
@@ -329,6 +347,7 @@ impl RecordingEditor {
         if !ok {
             return;
         }
+        self.ai.edit_original = None;
         self.ai.line_play = None;
         match (op, own) {
             (RowOp::Merge, true) => {
@@ -381,6 +400,7 @@ impl RecordingEditor {
     /// The field shows the text of the line it edits again (after a replace changed it).
     fn ai_reload_field(&mut self, cx: &mut Context<Self>) {
         let Some(j) = self.ai.field_for else { return };
+        self.ai.edit_original = None;
         match self.ai.captions.lines().get(j) {
             Some(l) => {
                 let text = line_text(l);
@@ -538,6 +558,26 @@ impl RecordingEditor {
             .focus_visible(move |s| s.opacity(1.0).border_color(focus))
             .tooltip(crate::ui::tooltip::tip(aria, Vec::new()))
             .child(icon(glyph, 14., color))
+    }
+
+    /// The hint at the right of a row being edited: `Enter save · Esc cancel`, keycaps drawn as
+    /// in the tooltips.
+    fn edit_hint(t: &Theme) -> gpui::Div {
+        div()
+            .ml_auto()
+            .min_w(px(0.))
+            .flex()
+            .items_center()
+            .gap(px(5.))
+            .text_size(px(11.5))
+            .text_color(rgba_of(t.faint))
+            // i18n-ignore: a key name stays in English on its keycap
+            .child(keycap(t, "Enter"))
+            .child(shrink_text(tr_ctx!("edit hint", "save")))
+            .child(shrink_text("\u{00B7}"))
+            // i18n-ignore: a key name stays in English on its keycap
+            .child(keycap(t, "Esc"))
+            .child(shrink_text(tr_ctx!("edit hint", "cancel")))
     }
 
     /// One action of the slim row under the field being edited.
@@ -751,7 +791,10 @@ impl RecordingEditor {
         let playing_this = self.ai.line_play.is_some_and(|p| p.line == i);
         let keys_here = is_sel || is_active;
 
-        let time_color = if is_active || is_sel {
+        let time_color = if editing {
+            // Editing: the blue of the field's focus (text fields spec).
+            FOCUS_BLUE
+        } else if is_active || is_sel {
             t.text
         } else {
             t.text_3
@@ -842,12 +885,6 @@ impl RecordingEditor {
                         .child(SharedString::from(LineIssue::message(issue))),
                 );
             }
-            // TRANSLATORS: {key} is the Esc keycap, drawn in the sentence; keep it where it reads
-            // naturally. The hint sits right of the Split, Merge and Remove buttons.
-            let (before, after) = split_at_key(&tr!(
-                "Split at the text cursor \u{00B7} {key} done",
-                key = KEY_MARK
-            ));
             let mut bar = div().flex().flex_wrap().items_center().gap(px(6.)).child(
                 Self::edit_action(
                     t,
@@ -879,20 +916,7 @@ impl RecordingEditor {
                         cx.listener(move |this, _, _, cx| this.ai_row_op(i, RowOp::Remove, cx)),
                     ),
                 )
-                .child(
-                    div()
-                        .ml_auto()
-                        .min_w(px(0.))
-                        .flex()
-                        .items_center()
-                        .gap(px(5.))
-                        .text_size(px(11.5))
-                        .text_color(rgba_of(t.faint))
-                        .child(shrink_text(before))
-                        // i18n-ignore: a key name stays in English on its keycap
-                        .child(keycap(t, "Esc"))
-                        .child(shrink_text(after)),
-                );
+                .child(Self::edit_hint(t));
             col.child(bar).into_any_element()
         } else {
             let text = self.row_text(t, i, &shown, hits, doubtful, is_active || is_sel, cx);
@@ -913,6 +937,16 @@ impl RecordingEditor {
             r.into_any_element()
         };
 
+        let click_hint = (!editing).then(|| {
+            div()
+                .flex_none()
+                .pt(px(4.))
+                .text_size(px(11.5))
+                .text_color(rgba_of(t.faint))
+                .opacity(0.0)
+                .group_hover(group.clone(), |s| s.opacity(1.0))
+                .child(SharedString::from(tr!("click to edit")))
+        });
         let actions = (!editing).then(|| {
             let mut a = div().flex().flex_none().gap(px(2.)).items_start();
             a = a.child(
@@ -973,7 +1007,7 @@ impl RecordingEditor {
                 text = shown.replace('\n', " ")
             )
         };
-        let hover_bg = rgba_of(t.surface_2);
+        let hover_bg = rgba_of(row::TRANSCRIPT_HOVER_BG);
         let bar_color = if is_active {
             Some(t.text)
         } else if is_sel {
@@ -1010,7 +1044,7 @@ impl RecordingEditor {
                 rgba_of(t.row_divider()).into()
             })
             .when(is_sel || is_active, |d| d.bg(rgba_of(t.surface_2)))
-            .hover(move |s| s.bg(hover_bg))
+            .when(!editing, |d| d.hover(move |s| s.bg(hover_bg)))
             .children(bar_color.map(|c| {
                 div()
                     .absolute()
@@ -1022,6 +1056,7 @@ impl RecordingEditor {
             }))
             .child(time_col)
             .child(div().flex_1().min_w(px(0.)).child(body))
+            .children(click_hint)
             .children(actions)
             .into_any_element()
     }
