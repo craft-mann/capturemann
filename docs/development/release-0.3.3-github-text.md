@@ -33,7 +33,7 @@ layout, and pictures can be imported.
 - **Callout (key K).** A text box with a pointer, as a rounded bubble or a plain box. Drag to place the box, then click again or drag
   the blue "Tail tip" dot to aim the pointer; moving the box keeps the tip where it is. The box grows to fit what you type, and what
   is saved is what is drawn. Vietnamese Telex and VNI typing work as in the Text tool.
-- **Spotlight (key S).** Dims everything except the parts you mark (rectangles, rounded rectangles, ellipses). One spotlight per
+- **Spotlight (key S).** While you drag, the dim and the outline show live. Dims everything except the parts you mark (rectangles, rounded rectangles, ellipses). One spotlight per
   image: drawing another shape adds a hole to it, up to 8, in one undo step. A new spotlight goes under your arrows and callouts, so
   they stay bright. "Outside the holes" can be Dim (default 60 %) or Blur; **Blur here is only a look and hides nothing**: use Blur (B),
   Pixelate (X) or Auto-redact to hide information. Copy text reads the picture as drawn, so text under a blurred spotlight is not copied.
@@ -74,6 +74,13 @@ layout, and pictures can be imported.
 - **Windowed audio** and **PhoWhisper** have no release assigned.
 - **A headless daemon:** `capturemann mcp` still starts no daemon; the app must be open and tools answer `daemon_unavailable` otherwise.
 - WebP and HEIC pictures, and keeping the source file of an imported picture.
+
+## Fixed
+
+- **Saving captions while a Google Drive upload waits for you to sign in again.** Editing captions, the transcript or markers of a recording was
+  refused ("is being uploaded (job ...); wait for the job") while its upload was paused for the Google sign-in, and the pause never ends by
+  itself. A paused upload no longer blocks these edits; an upload that is running still does, and renaming or deleting still waits for any
+  unfinished job.
 
 ## Compatibility with 0.3.2
 

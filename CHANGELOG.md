@@ -7,7 +7,7 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ### Added
 - **Callout.** A speech bubble or box with text and a tail you drag to point at something (tool K). The box grows to fit its text and the stored box is the drawn box, so the editor, the CLI and agents render the same.
-- **Spotlight.** Dim everything except one or more areas (tool S): one spotlight per image, up to 8 holes, dim strength, and a Blur mode that is a look and not a redaction. Added last, it sits under the arrows and callouts you already drew.
+- **Spotlight.** While you drag, the dim and the outline show live. Dim everything except one or more areas (tool S): one spotlight per image, up to 8 holes, dim strength, and a Blur mode that is a look and not a redaction. Added last, it sits under the arrows and callouts you already drew.
 - **Step badges: a label, a numbering style and reorder.** Each step can carry a label that sits beside the badge; numbering is 1 2 3, A B C or a b c (after Z come AA, AB), with a start number for all steps; drag a row in the Steps list to reorder, and the numbers follow in one undo step.
 - **Stamps** (tool U): check, cross, exclamation, question mark, and the words BEFORE and AFTER, drawn as shapes so they look the same on every system.
 - **Import pictures.** PNG and JPEG files import as screenshots (the Import sheet, drag and drop, `capturemann import`, the `import_media` tool): the phone's orientation is applied, the file is converted to 8-bit sRGB, the metadata (including the location) is not copied, and a picture over 16,384 px a side or 50 megapixels is refused. Other picture formats are refused with the format named.
@@ -22,6 +22,7 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 - Revert to original, Fit and 100% moved (to the ⋯ menu and the zoom menu); no setting or shortcut was removed.
 
 ### Fixed
+- **Saving captions while a Google Drive upload waits for you to sign in again.** Editing captions, the transcript or markers was refused ("is being uploaded; wait for the job") while the upload was paused for the Google sign-in; a paused upload no longer blocks these edits (a running one still does, and rename and delete still wait).
 - An older CaptureMann that opens a 0.3.3 capture keeps the callouts, spotlight and stamps unchanged (it does not draw them and shows "Kept an annotation this version cannot show"); a step's new label and numbering fields are the one thing it drops if it saves an edit.
 
 ## [0.3.2] - 2026-11-12
