@@ -23,6 +23,7 @@ use std::sync::Arc;
 #[cfg(target_os = "macos")]
 mod apple;
 pub mod detect;
+pub mod lines;
 pub mod rules;
 pub mod tesseract;
 pub mod text;
@@ -33,6 +34,8 @@ mod winrt;
 pub use text::{
     layout_text, recognize_region, word_count, LayoutOptions, PixelRegion, REGION_MARGIN,
 };
+
+pub use lines::{looks_like_text, refine_lines};
 
 pub use detect::{
     mask_preview, suggest_redactions, RedactionKind, RedactionSuggestion, SuggestOptions,
