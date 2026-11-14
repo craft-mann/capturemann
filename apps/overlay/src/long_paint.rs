@@ -68,7 +68,7 @@ fn keycap(canvas: &mut Canvas<'_>, r: IRect, s: f64) {
 }
 
 /// One button: a selected mode is `ink` on the light `text` fill, a selected segment is `text` on
-/// `raised`, a primary button is `rec`, the rest are plain (segments `text_3`); each has its icon
+/// `raised`, a primary button is light in the bar and `rec` in the card, the rest are plain (segments `text_3`); each has its icon
 /// before the label, the direction segment only the icon.
 fn button(canvas: &mut Canvas<'_>, scene: &Scene<'_>, e: &Entry, in_card: bool) {
     let s = scene.scale;
@@ -76,7 +76,12 @@ fn button(canvas: &mut Canvas<'_>, scene: &Scene<'_>, e: &Entry, in_card: bool) 
     let radius = dev(10.0, s) as f32;
     let segment = matches!(e.item, Item::Scroll(_) | Item::Dir(_));
     let (fill, label) = if e.primary {
-        (Some(tokens::REC), tokens::INK)
+        // Start in the bar is light like the selected mode (design S1); the card's primary
+        // button keeps the record colour.
+        (
+            Some(if in_card { tokens::REC } else { tokens::TEXT }),
+            tokens::INK,
+        )
     } else if e.inert {
         (None, tokens::TEXT_2)
     } else if e.selected && segment {

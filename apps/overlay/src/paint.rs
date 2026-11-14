@@ -1022,7 +1022,8 @@ mod tests {
         let start = l.entries.iter().find(|e| e.item == Item::Start).unwrap();
         assert_eq!(
             at(start.rect.x + 4, start.rect.y + start.rect.h / 2),
-            tokens::REC
+            tokens::TEXT,
+            "Start is light like the selected mode (design S1)"
         );
         let long = l
             .entries
