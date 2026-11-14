@@ -77,10 +77,36 @@ pub fn run_auto(
     stop: &mut dyn FnMut() -> bool,
     on_progress: &mut dyn FnMut(LongShotProgress),
 ) -> Result<LongShotResult, CmError> {
+    run_auto_ex(
+        src,
+        scroller,
+        sleeper,
+        cfg,
+        stop,
+        on_progress,
+        &mut |_: &Stitcher| {},
+    )
+}
+
+/// [`run_auto`] that also hands the stitcher to `on_stitch` after every joined frame (the daemon
+/// renders the side preview from it).
+#[allow(clippy::too_many_arguments)]
+pub fn run_auto_ex(
+    src: &mut dyn FrameSource,
+    scroller: &mut dyn Scroller,
+    sleeper: &mut dyn Sleeper,
+    cfg: LongShotConfig,
+    stop: &mut dyn FnMut() -> bool,
+    on_progress: &mut dyn FnMut(LongShotProgress),
+    on_stitch: &mut dyn FnMut(&Stitcher),
+) -> Result<LongShotResult, CmError> {
     let mut stitcher = Stitcher::new(cfg.direction, cfg.limits);
     let first = wait_settled(src, sleeper, cfg.settle)?;
     stitcher.push(&first.frame, None);
-    on_progress(progress(&stitcher));
+    {
+        on_progress(progress(&stitcher));
+        on_stitch(&stitcher);
+    }
     let size = f64::from(extent(&first.frame, cfg.direction));
     let mut step = ((size * cfg.first_step_fraction) as u32).max(1);
     let end = loop {
@@ -91,7 +117,10 @@ pub fn run_auto(
         let next = wait_settled(src, sleeper, cfg.settle)?;
         match stitcher.push(&next.frame, Some(step)) {
             PushOutcome::Added { .. } => {
-                on_progress(progress(&stitcher));
+                {
+        on_progress(progress(&stitcher));
+        on_stitch(&stitcher);
+    }
                 // 80 % of what actually scrolls: the area without the fixed bands.
                 let (h, f) = stitcher.bands();
                 let content = (size - f64::from(h) - f64::from(f)).max(1.0);
@@ -100,7 +129,10 @@ pub fn run_auto(
             PushOutcome::NoChange => break EndReason::ReachedEnd,
             PushOutcome::NoOverlap => break EndReason::NoOverlap,
             PushOutcome::LimitReached { .. } => {
-                on_progress(progress(&stitcher));
+                {
+        on_progress(progress(&stitcher));
+        on_stitch(&stitcher);
+    }
                 break EndReason::LimitReached;
             }
         }
@@ -121,10 +153,32 @@ pub fn run_hand(
     stop: &mut dyn FnMut() -> bool,
     on_progress: &mut dyn FnMut(LongShotProgress),
 ) -> Result<LongShotResult, CmError> {
+    run_hand_ex(
+        src,
+        sleeper,
+        cfg,
+        stop,
+        on_progress,
+        &mut |_: &Stitcher| {},
+    )
+}
+
+/// [`run_hand`] with the `on_stitch` hook of [`run_auto_ex`].
+pub fn run_hand_ex(
+    src: &mut dyn FrameSource,
+    sleeper: &mut dyn Sleeper,
+    cfg: LongShotConfig,
+    stop: &mut dyn FnMut() -> bool,
+    on_progress: &mut dyn FnMut(LongShotProgress),
+    on_stitch: &mut dyn FnMut(&Stitcher),
+) -> Result<LongShotResult, CmError> {
     let mut stitcher = Stitcher::new(cfg.direction, cfg.limits);
     let first = wait_settled(src, sleeper, cfg.settle)?;
     stitcher.push(&first.frame, None);
-    on_progress(progress(&stitcher));
+    {
+        on_progress(progress(&stitcher));
+        on_stitch(&stitcher);
+    }
     let mut last_taken = first.frame;
     let mut prev_poll = last_taken.clone();
     let end = loop {
@@ -140,13 +194,19 @@ pub fn run_hand(
         }
         match stitcher.push(&g, None) {
             PushOutcome::Added { .. } => {
-                on_progress(progress(&stitcher));
+                {
+        on_progress(progress(&stitcher));
+        on_stitch(&stitcher);
+    }
                 last_taken = g;
             }
             PushOutcome::NoChange => {}
             PushOutcome::NoOverlap => break EndReason::NoOverlap,
             PushOutcome::LimitReached { .. } => {
-                on_progress(progress(&stitcher));
+                {
+        on_progress(progress(&stitcher));
+        on_stitch(&stitcher);
+    }
                 break EndReason::LimitReached;
             }
         }

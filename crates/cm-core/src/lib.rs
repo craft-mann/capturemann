@@ -16,6 +16,7 @@ pub mod geometry;
 pub mod guard;
 pub mod idempotency;
 pub mod logfile;
+pub mod long_shot_hud;
 pub mod logging;
 pub mod media_time;
 pub mod message;

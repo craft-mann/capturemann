@@ -10,7 +10,7 @@
 //!   and XTest on X11 are lab work (spike S1); Wayland cannot inject scrolling at all.
 
 pub mod fake;
-pub mod hud;
+pub use cm_core::long_shot_hud as hud;
 pub mod run;
 
 pub mod stitch;
@@ -23,7 +23,7 @@ pub use crate::sys::long_scroll::{
     accessibility_trusted, auto_scroll_support, platform_scroller, request_accessibility,
     AutoScrollSupport,
 };
-pub use run::{run_auto, run_hand, LongShotConfig, LongShotProgress, LongShotResult};
+pub use run::{run_auto, run_auto_ex, run_hand, run_hand_ex, LongShotConfig, LongShotProgress, LongShotResult};
 pub use stitch::{
     Direction, EndReason, Limits, PushOutcome, Stitched, Stitcher, MAX_LONG_SIDE, MAX_PIXELS,
 };
