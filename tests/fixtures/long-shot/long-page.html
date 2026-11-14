@@ -1,0 +1,100 @@
+<!doctype html>
+<!-- Test page for Long Shot (CAP-6). Open it in a browser and run a Long Shot of the window.
+     Every row carries its own number, so a duplicated or missing row shows in the stitched image
+     (and in `capturemann text <id>`).
+
+     Variants (query string; separate several with `&` or `,`):
+       ?screens=5   page length in screen heights (default 5; AC1 wants 5, AC4 wants more)
+       ?bands=1     fixed header and footer (AC2)
+       ?jump=1      the page jumps forward by a screen and a half once the reader passes the
+                    middle, so two frames have no overlap (AC3)
+       ?wide=1      also 5 screen widths wide, with the column number in every row (horizontal)
+       ?self=1      scrolls itself in small steps when you click the page (Hand scroll check, AC5:
+                    a scripted wheel through the page's own JavaScript)
+       ?rows=N      exact number of rows (overrides screens)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Long Shot test page</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { color-scheme: light; }
+  html, body { margin: 0; background: #fff; color: #111; font: 600 22px/1 "Segoe UI", Arial, "Liberation Sans", Helvetica, sans-serif; }
+  .row { box-sizing: border-box; height: 44px; display: flex; align-items: center; gap: 24px;
+         padding: 0 20px; border-bottom: 1px solid #d0d0d0; white-space: nowrap; }
+  .row:nth-child(even) { background: #f1f4fb; }
+  .num { min-width: 120px; font-size: 26px; }
+  .bar { height: 10px; background: #3b6fd8; border-radius: 5px; }
+  .fixed { position: fixed; left: 0; right: 0; height: 48px; background: #14233f; color: #fff;
+           display: flex; align-items: center; padding: 0 20px; z-index: 2; letter-spacing: .04em; }
+  [hidden] { display: none !important; }
+  #head { top: 0; }
+  #foot { bottom: 0; }
+  body.bands main { padding-top: 48px; padding-bottom: 48px; }
+  .cell { min-width: 170px; color: #555; }
+  #info { position: fixed; right: 12px; bottom: 60px; background: #fff8; font-size: 14px; padding: 4px 8px; }
+</style>
+</head>
+<body>
+<div id="head" class="fixed" hidden>HEADER - stays on screen</div>
+<main id="rows"></main>
+<div id="foot" class="fixed" hidden>FOOTER - stays on screen</div>
+<script>
+(function () {
+  // `&`, `,` or `;` separate the options (a shell passes `,` where `&` is awkward).
+  var q = new URLSearchParams(location.search.replace(/[,;]/g, '&'));
+  var rowH = 44;
+  var screens = parseFloat(q.get('screens') || '5');
+  var rows = parseInt(q.get('rows') || '0', 10) || Math.round(screens * window.innerHeight / rowH);
+  var bands = q.get('bands') === '1';
+  var wide = q.get('wide') === '1';
+  if (bands) {
+    document.body.classList.add('bands');
+    document.getElementById('head').hidden = false;
+    document.getElementById('foot').hidden = false;
+  }
+  var main = document.getElementById('rows');
+  var html = [];
+  for (var i = 1; i <= rows; i++) {
+    var n = ('0000' + i).slice(-4);
+    var cells = '';
+    if (wide) {
+      for (var c = 1; c <= 5 * Math.ceil(window.innerWidth / 170); c++) {
+        cells += '<span class="cell">c' + ('000' + c).slice(-3) + '</span>';
+      }
+    }
+    html.push('<div class="row"><span class="num">ROW ' + n + '</span><span class="bar" style="width:' +
+              (40 + (i * 37) % 260) + 'px"></span>' + cells + '</div>');
+  }
+  main.innerHTML = html.join('');
+  if (wide) { main.style.width = 'max-content'; }
+
+  if (q.get('jump') === '1') {
+    var jumped = false;
+    window.addEventListener('scroll', function () {
+      var max = document.documentElement.scrollHeight - window.innerHeight;
+      if (!jumped && window.scrollY > max / 2) {
+        jumped = true;
+        window.scrollTo(0, Math.min(max, window.scrollY + window.innerHeight * 1.5));
+      }
+    });
+  }
+
+  if (q.get('self') === '1') {
+    var info = document.createElement('div');
+    info.id = 'info';
+    info.textContent = 'click the page to start scrolling by itself';
+    document.body.appendChild(info);
+    document.addEventListener('click', function () {
+      var t = setInterval(function () {
+        var max = document.documentElement.scrollHeight - window.innerHeight;
+        window.scrollBy(0, 40);
+        if (window.scrollY >= max - 1) { clearInterval(t); info.textContent = 'end'; }
+      }, 120);
+    }, { once: true });
+  }
+})();
+</script>
+</body>
+</html>

@@ -12,6 +12,13 @@
 //!   before is kept.
 //! * The result stops at 16,384 px on its long side and 50 megapixels ([`Limits`]).
 //! * Horizontal capture is the same method on columns (the frames are transposed in and out).
+//! * **The edges of a window do not hold still**: a scrollbar's thumb moves with the content and
+//!   the window's border and rounded corners blend with it, so the lines of a real window never
+//!   match exactly (found on a real Windows window, Nov 14, 2026). When the first two frames do
+//!   not join as they are, the engine finds the join on the middle half of every line, then looks
+//!   for columns that differ in the overlap and cuts the strips at the edges that hold them
+//!   (`edge_strip`). The strips are cut from every frame of that capture, so the image is that
+//!   many pixels narrower and has no scrollbar.
 
 use cm_core::CmError;
 
@@ -146,6 +153,25 @@ impl Lines {
         }
     }
 
+    /// The same lines keeping only pixels `from..to` across (the edge strips cut off).
+    fn cropped(&self, from: usize, to: usize) -> Lines {
+        let (b0, b1) = (from * 4, to * 4);
+        let mut data = Vec::with_capacity(self.count * (b1 - b0));
+        for i in 0..self.count {
+            data.extend_from_slice(&self.line(i)[b0..b1]);
+        }
+        let keep = b1 - b0;
+        let hashes = (0..self.count)
+            .map(|i| fnv(&data[i * keep..(i + 1) * keep]))
+            .collect();
+        Lines {
+            line_len: keep,
+            count: self.count,
+            data,
+            hashes,
+        }
+    }
+
     fn line(&self, i: usize) -> &[u8] {
         &self.data[i * self.line_len..(i + 1) * self.line_len]
     }
@@ -176,6 +202,8 @@ fn fnv(bytes: &[u8]) -> u64 {
 struct Join {
     /// Lines the content moved between the two frames.
     shift: usize,
+    /// Lines at each end of the overlap that were not compared (see [`GUARD`]).
+    guard: usize,
     header: usize,
     footer: usize,
 }
@@ -185,6 +213,23 @@ enum NoJoin {
     Same,
     NoOverlap,
 }
+
+/// Columns that differ in at least this share of the overlapping lines (and at least 3 lines)
+/// belong to a moving edge (scrollbar, border).
+const VOLATILE_SHARE: f64 = 0.01;
+/// The widest strips cut from the start and the end of every line: a window's border and a
+/// scrollbar with its edge (34 px at 200 % scale, and more with a border) at most.
+const MAX_LEFT_STRIP: usize = 48;
+const MAX_RIGHT_STRIP: usize = 64;
+/// A strip of moving columns may have gaps of this many columns (a scrollbar's thumb, its arrows
+/// and its border are not one block).
+const STRIP_GAP: usize = 16;
+
+/// Lines at each end of the overlap that are not compared when two frames are matched. They lie
+/// next to the fixed bands, where a window draws its rounded corners and its edge line over
+/// whatever scrolls under them: the pixels there are different in every frame (a real Edge window
+/// at 150 %, Nov 14, 2026). Those lines are not trusted: the next frame's lines replace them.
+const GUARD: usize = 8;
 
 /// Fixed bands may not take more than this share of a frame: more means the detection is not to
 /// be trusted.
@@ -246,7 +291,8 @@ fn find_join(
         };
         // Row hashes first; then the pixel check of every line the hash called equal.
         let mut bad = 0;
-        for i in 0..overlap {
+        let g = GUARD.min(overlap / 3);
+        for i in g..overlap - g {
             let (ia, ib) = (header + s + i, header + i);
             if a.hashes[ia] != b.hashes[ib] || a.line(ia) != b.line(ib) {
                 bad += 1;
@@ -279,9 +325,52 @@ fn find_join(
     };
     Ok(Join {
         shift,
+        guard: GUARD.min((cw - shift) / 3),
         header,
         footer,
     })
+}
+
+/// The widths of the strips at the start and the end of every line that hold columns which
+/// differ between the two frames once they are aligned by `core` (a join found on the middle of
+/// the lines). `None` when no column differs (the difference is not at the edges).
+fn edge_strips(a: &Lines, b: &Lines, core: &Join, max: (usize, usize)) -> Option<(usize, usize)> {
+    let n = a.count;
+    let cross = a.line_len / 4;
+    let overlap = n - core.header - core.footer - core.shift;
+    let limit = (overlap as f64 * VOLATILE_SHARE) as usize;
+    let mut bad = vec![0usize; cross];
+    for i in core.guard..overlap - core.guard {
+        let (la, lb) = (
+            a.line(core.header + core.shift + i),
+            b.line(core.header + i),
+        );
+        for (x, c) in bad.iter_mut().enumerate() {
+            if la[x * 4..x * 4 + 4] != lb[x * 4..x * 4 + 4] {
+                *c += 1;
+            }
+        }
+    }
+    let volatile: Vec<bool> = bad.iter().map(|&c| c >= limit.max(3)).collect();
+    let strip = |from_end: bool| {
+        let max = if from_end { max.1 } else { max.0 };
+        let (mut strip, mut gap) = (0, 0);
+        for k in 0..max {
+            let x = if from_end { cross - 1 - k } else { k };
+            if volatile[x] {
+                strip = k + 1;
+                gap = 0;
+            } else {
+                gap += 1;
+                if gap > STRIP_GAP {
+                    break;
+                }
+            }
+        }
+        strip
+    };
+    let (l, r) = (strip(false), strip(true));
+    (l + r > 0).then_some((l, r))
 }
 
 /// Collects frames and builds the long image.
@@ -292,6 +381,9 @@ pub struct Stitcher {
     /// Size of the frames (all must match).
     size: Option<(u32, u32)>,
     bands: Option<(usize, usize)>,
+    /// Pixels cut from the start and the end of every line, once the first pair of frames has
+    /// joined.
+    trim: Option<(usize, usize)>,
     header: Vec<u8>,
     content: Vec<u8>,
     footer: Vec<u8>,
@@ -309,6 +401,7 @@ impl Stitcher {
             prev: None,
             size: None,
             bands: None,
+            trim: None,
             header: Vec::new(),
             content: Vec::new(),
             footer: Vec::new(),
@@ -357,6 +450,7 @@ impl Stitcher {
                 new_len: self.len as u32,
             };
         };
+        let (prev, lines) = self.apply_trim(prev, lines, hint);
         let outcome = self.join(&prev, &lines, size, hint);
         // The newest accepted frame is the one the next frame is matched against.
         self.prev = Some(if matches!(outcome, PushOutcome::Added { .. }) {
@@ -365,6 +459,62 @@ impl Stitcher {
             prev
         });
         outcome
+    }
+
+    /// Cuts the edge strips from both frames' lines: with the trim chosen so far, or (the first
+    /// pair) the one the two frames need to join.
+    fn apply_trim(&mut self, prev: Lines, lines: Lines, hint: Option<u32>) -> (Lines, Lines) {
+        let cross = lines.line_len / 4;
+        if let Some((l, r)) = self.trim {
+            if l == 0 && r == 0 {
+                return (prev, lines);
+            }
+            // `prev` was cropped when it was accepted; a frame kept uncropped is cropped now.
+            let prev = if prev.line_len / 4 == cross {
+                prev.cropped(l, cross - r)
+            } else {
+                prev
+            };
+            return (prev, lines.cropped(l, cross - r));
+        }
+        if prev.line_len != lines.line_len {
+            return (prev, lines);
+        }
+        let hint = hint.map(|h| h as usize);
+        match find_join(&prev, &lines, hint, None) {
+            Ok(_) => {
+                self.trim = Some((0, 0));
+                return (prev, lines);
+            }
+            // Identical frames say nothing about the edges.
+            Err(NoJoin::Same) => return (prev, lines),
+            Err(NoJoin::NoOverlap) => {}
+        }
+        // Too narrow to have edges to cut.
+        if cross < 64 {
+            return (prev, lines);
+        }
+        // The join is first looked for without the widest strips an edge can be (a scrollbar and
+        // a window border), which holds the content that matters and none of the moving edges.
+        let (ml, mr) = (
+            (cross / 8).min(MAX_LEFT_STRIP),
+            (cross / 8).min(MAX_RIGHT_STRIP),
+        );
+        let (c0, c1) = (ml, cross - mr);
+        let core = find_join(&prev.cropped(c0, c1), &lines.cropped(c0, c1), hint, None);
+        let Ok(core) = core else {
+            return (prev, lines);
+        };
+        let Some((l, r)) = edge_strips(&prev, &lines, &core, (ml, mr)) else {
+            return (prev, lines);
+        };
+        let (p, n) = (prev.cropped(l, cross - r), lines.cropped(l, cross - r));
+        if find_join(&p, &n, hint, None).is_ok() {
+            self.trim = Some((l, r));
+            (p, n)
+        } else {
+            (prev, lines)
+        }
     }
 
     fn join(
@@ -396,9 +546,12 @@ impl Stitcher {
         let room = self.room(line_len / 4);
         // The new content is the bottom `shift` lines of this frame's content area.
         let from = join.header + cw - join.shift;
+        // The last `guard` lines of the content were not compared: this frame's lines replace them.
+        let keep = self.content.len() - join.guard * line_len;
         if total <= room {
+            self.content.truncate(keep);
             self.content
-                .extend_from_slice(lines.range(from, from + join.shift));
+                .extend_from_slice(lines.range(from - join.guard, from + join.shift));
             self.footer = lines.range(n - join.footer, n).to_vec();
             self.len = total;
             self.frames += 1;
@@ -408,8 +561,9 @@ impl Stitcher {
         }
         // Over the limit: fill up to it, drop the footer (the content under it was cut off).
         let take = room.saturating_sub(have).min(join.shift);
+        self.content.truncate(keep);
         self.content
-            .extend_from_slice(lines.range(from, from + take));
+            .extend_from_slice(lines.range(from - join.guard, from + take));
         self.footer.clear();
         self.len = have + take;
         self.limit_hit = true;
@@ -421,10 +575,12 @@ impl Stitcher {
 
     /// The image so far. Errors when no frame was pushed.
     pub fn finish(&self) -> Result<Stitched, CmError> {
-        let (Some(prev), Some((w, h))) = (&self.prev, self.size) else {
+        let (Some(prev), Some(_)) = (&self.prev, self.size) else {
             return Err(CmError::invalid_input("Long Shot has no frames"));
         };
         let line_len = prev.line_len;
+        // Pixels across the scroll direction after the trim.
+        let cross = (line_len / 4) as u32;
         let (lines, header_len, footer_len) = if self.bands.is_none() {
             (prev.data.clone(), 0, 0)
         } else {
@@ -441,10 +597,10 @@ impl Stitcher {
         };
         let count = lines.len() / line_len;
         let frame = match self.dir {
-            Direction::Vertical => Frame::new(w, count as u32, lines)?,
+            Direction::Vertical => Frame::new(cross, count as u32, lines)?,
             Direction::Horizontal => {
                 // Lines are columns of `h` pixels: transpose back.
-                let hh = h as usize;
+                let hh = cross as usize;
                 let mut out = vec![0u8; lines.len()];
                 for x in 0..count {
                     for y in 0..hh {
@@ -453,7 +609,7 @@ impl Stitcher {
                         out[d..d + 4].copy_from_slice(&lines[s..s + 4]);
                     }
                 }
-                Frame::new(count as u32, h, out)?
+                Frame::new(count as u32, cross, out)?
             }
         };
         Ok(Stitched {

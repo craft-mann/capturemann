@@ -34,7 +34,9 @@ pub trait LongShotSystem: Send + Sync {
         capturer: Arc<Capturer>,
         target: cm_capture::CaptureTarget,
     ) -> Box<dyn FrameSource + Send>;
-    fn scroller(&self) -> Result<Box<dyn Scroller + Send>, CmError>;
+    /// `anchor`: a point of the area in global physical px, where the pointer is put before each
+    /// scroll (a wheel event goes to the window under the pointer).
+    fn scroller(&self, anchor: Option<(i32, i32)>) -> Result<Box<dyn Scroller + Send>, CmError>;
     fn auto_scroll(&self) -> AutoScrollSupport;
 }
 
@@ -64,8 +66,8 @@ impl LongShotSystem for RealLongShot {
         Box::new(CapturerFrames { capturer, target })
     }
 
-    fn scroller(&self) -> Result<Box<dyn Scroller + Send>, CmError> {
-        long_shot::platform_scroller()
+    fn scroller(&self, anchor: Option<(i32, i32)>) -> Result<Box<dyn Scroller + Send>, CmError> {
+        long_shot::platform_scroller_at(anchor)
     }
 
     fn auto_scroll(&self) -> AutoScrollSupport {
@@ -138,6 +140,50 @@ impl CaptureLongParams {
     }
 }
 
+/// The centre of the area in global physical px: where the pointer goes so that the wheel
+/// reaches the area. `None` when the target cannot be found (the scroll then goes wherever the
+/// pointer is).
+fn area_centre(capturer: &Capturer, target: cm_capture::CaptureTarget) -> Option<(i32, i32)> {
+    use cm_capture::{CaptureTarget, RegionRect};
+    let targets = capturer.list_targets().ok()?;
+    let centre = |r: PhysicalRect, ox: i32, oy: i32| {
+        (
+            ox + r.origin.x + (r.size.width / 2) as i32,
+            oy + r.origin.y + (r.size.height / 2) as i32,
+        )
+    };
+    match target {
+        CaptureTarget::Display { display_id } => {
+            let d = targets.displays.iter().find(|d| d.id == display_id)?;
+            Some(centre(d.bounds, 0, 0))
+        }
+        CaptureTarget::Window { window_id } => {
+            let w = targets.windows.iter().find(|w| w.id == window_id)?;
+            Some(centre(w.bounds, 0, 0))
+        }
+        CaptureTarget::Region { display_id, rect } => {
+            let d = targets.displays.iter().find(|d| d.id == display_id)?;
+            let r = match rect {
+                RegionRect::Physical(r) => r,
+                RegionRect::Logical(l) => {
+                    let s = d.scale.get();
+                    PhysicalRect {
+                        origin: PhysicalPoint {
+                            x: (l.origin.x * s).round() as i32,
+                            y: (l.origin.y * s).round() as i32,
+                        },
+                        size: PhysicalSize {
+                            width: (l.size.width * s).round() as u32,
+                            height: (l.size.height * s).round() as u32,
+                        },
+                    }
+                }
+            };
+            Some(centre(r, d.bounds.origin.x, d.bounds.origin.y))
+        }
+    }
+}
+
 /// AC7: Hand scroll is refused for agents.
 pub(crate) fn refuse_hand_for_agent(p: &CaptureLongParams) -> Result<(), DaemonError> {
     if p.scroll == ScrollMode::Hand {
@@ -195,6 +241,7 @@ impl Inner {
         let guard = self.delayed.register(p.request_id.clone());
         let token = guard.token();
         let capturer = self.capturer.clone();
+        let capturer_for_anchor = self.capturer.clone();
         let target = p.target.to_capture_target();
         let delay = cm_capture::delay_from_secs(p.delay_s.unwrap_or(0.0))?;
         let (direction, max_px, scroll) = (p.direction, p.max_px, p.scroll);
@@ -234,7 +281,8 @@ impl Inner {
                 };
                 let result = match scroll {
                     ScrollMode::Auto => {
-                        let mut scroller = system.scroller()?;
+                        let anchor = area_centre(&capturer_for_anchor, target);
+                        let mut scroller = system.scroller(anchor)?;
                         long_shot::run_auto(
                             frames.as_mut(),
                             scroller.as_mut(),

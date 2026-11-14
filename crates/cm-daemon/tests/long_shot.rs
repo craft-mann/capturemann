@@ -54,7 +54,7 @@ impl LongShotSystem for Scripted {
     fn frames(&self, _c: Arc<Capturer>, _t: CaptureTarget) -> Box<dyn FrameSource + Send> {
         Box::new(self.clone())
     }
-    fn scroller(&self) -> Result<Box<dyn Scroller + Send>, CmError> {
+    fn scroller(&self, _anchor: Option<(i32, i32)>) -> Result<Box<dyn Scroller + Send>, CmError> {
         Ok(Box::new(self.clone()))
     }
     fn auto_scroll(&self) -> AutoScrollSupport {
