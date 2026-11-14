@@ -189,6 +189,8 @@
 
 **Systems.** macOS posts scroll events with `CGEventPost`, which needs **Accessibility** (a new optional row on the permissions page, PRM-1; today no feature needs it). Windows uses `SendInput` (no permission), Linux X11 uses XTest. **Wayland cannot inject scrolling**, so Hand scroll is its only mode; whether frames can be taken repeatedly without a prompt each time is spike S6 (when it fails, Long Shot is shown disabled with the reason). A mouse-wheel step differs per app, so the 80 % step and the settle wait are measured, not assumed (spike S1).
 
+**HUD and preview placement (design board S2b, Nov 14, 2026).** The Long Shot HUD (56 px, excluded from the frames) avoids the content being scrolled. Its place is chosen once when the capture starts and does not jump while it runs: above the area, centred, 12 px gap, when at least 64 px of room is above; else below the area; else, when the area fills the display height, inside the area at the bottom centre, 16 px up. The side preview goes on the side of the area with more room (right first); when neither side has 200 px it becomes a **Preview** button on the HUD that opens it as a floating panel. The HUD stays on the display that holds the area and never goes off-screen; it can be dragged at any time (on Windows through a declared drag region, B3) and a dragged place is kept for that Long Shot only. Click Guide uses the same rule for its HUD and step toast, measured against the followed target.
+
 **Keys and names.** The UI name is **Long Shot**; no default hotkey (the user sets one in Settings, CAP-2).
 
 **Acceptance criteria**

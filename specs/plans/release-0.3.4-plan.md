@@ -416,7 +416,7 @@ Written Nov 13, 2026 (old plan): ANN-8 Magnify, ANN-1 text selection, IMP-6 CMYK
 
 ## 11. UI and UX design (Claude Design): delivered Nov 14, 2026
 
-The design pack is `specs/capturemann-0.3.4-design/` (local, git-ignored like the earlier packs): 14 boards S0 to S13 and `release-0.3.4-design-spec.md` with 7 decisions to confirm. Review notes and the spec lines it added are in section 11.1. The original brief follows.
+The design pack is `specs/capturemann-0.3.4-design/` (local, git-ignored like the earlier packs): 15 boards (S0 to S13 and S2b) and `release-0.3.4-design-spec.md` with 7 decisions to confirm; revised the same day. Review notes and the spec lines it added are in section 11.1. The original brief follows.
 
 ### 11.0 The brief
 
@@ -434,3 +434,4 @@ The maintainer will give Claude Design the surfaces below, after the specs are a
 - **Gaps the design exposed, now in the specs:** GDE-3 export options (headings, image size, switches); board background choices (the spec pointed at a screenshot background setting that does not exist); Library chips and selection bar; Cancel upload (LIB-1.AC11); Retry skipped (BLK-1).
 - **Decisions to confirm (the design's 7):** Touch-up as a separate group; a neutral "New in 0.3.4" pill in the inspector instead of blue dots (this also replaces the planned dot removal); Blueprint taking over the inspector column; the Long Shot HUD top centre; Click Guides sidebar item and chips; the guide editor as a full page; pink snap guides on the canvas only.
 - **Change requests to Claude Design:** (1) the selection bar's **Copy** has no defined meaning for several images: remove it, or say what it copies; (2) the plan's colour rule says `rec` red is only for Stop, the record dot, step badges and click rings, but the active palette tile is filled with the accent (as in 0.3.3): state in S0 that the palette tile follows the 0.3.3 accent; (3) the Long Shot HUD sits at the top centre over the content being scrolled: show where it goes when the area touches the top edge.
+- **Revision received Nov 14, 2026 (`capturemann-0.3.4-design 2`, now the pack's content):** all three change requests applied: Copy removed from the selection bar; the palette accent stated in S0 and in the `rec` uses list; new board **S2b** (HUD placement, rules now in CAP-6). Nothing else changed.
