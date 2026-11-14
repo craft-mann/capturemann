@@ -30,6 +30,11 @@ pub fn floating_handle(cx: &App) -> Option<WindowHandle<LongPreview>> {
     cx.try_global::<Floating>().and_then(|f| f.0)
 }
 
+/// Forgets the floating preview after it was closed with the other windows.
+pub fn clear_floating(cx: &mut App) {
+    cx.set_global(Floating(None));
+}
+
 /// Opens the HUD at `rect` (global points) on `display`.
 pub fn open_hud(
     model: &Entity<LongModel>,

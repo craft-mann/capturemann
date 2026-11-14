@@ -331,6 +331,7 @@ fn close_windows(cx: &mut App) {
         if let Some(p) = hud::floating_handle(cx) {
             crate::surfaces::close(cx, p);
         }
+        hud::clear_floating(cx);
     }
     cx.set_global(Holder(None));
 }
