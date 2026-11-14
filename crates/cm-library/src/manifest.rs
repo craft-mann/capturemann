@@ -21,6 +21,9 @@ pub enum CaptureKind {
     Screenshot,
     Recording,
     Audio,
+    /// A Click Guide (GDE-1): a `.cmguide` folder with `guide.json` and one screenshot bundle per
+    /// step. A 0.3.3 app does not know the extension, so it neither lists nor damages it.
+    Guide,
 }
 
 impl CaptureKind {
@@ -29,6 +32,7 @@ impl CaptureKind {
             CaptureKind::Screenshot => "screenshot",
             CaptureKind::Recording => "recording",
             CaptureKind::Audio => "audio",
+            CaptureKind::Guide => "guide",
         }
     }
     /// A `.cmrec` bundle: a screen recording or an audio recording. Both are edited, transcribed
@@ -41,6 +45,7 @@ impl CaptureKind {
             "screenshot" => Some(CaptureKind::Screenshot),
             "recording" => Some(CaptureKind::Recording),
             "audio" => Some(CaptureKind::Audio),
+            "guide" => Some(CaptureKind::Guide),
             _ => None,
         }
     }
@@ -49,6 +54,7 @@ impl CaptureKind {
         match self {
             CaptureKind::Screenshot => "cmshot",
             CaptureKind::Recording | CaptureKind::Audio => "cmrec",
+            CaptureKind::Guide => "cmguide",
         }
     }
     /// The kind a folder extension stands for. `cmrec` gives `Recording`; an audio recording is
@@ -57,6 +63,7 @@ impl CaptureKind {
         match ext {
             "cmshot" => Some(CaptureKind::Screenshot),
             "cmrec" => Some(CaptureKind::Recording),
+            "cmguide" => Some(CaptureKind::Guide),
             _ => None,
         }
     }
