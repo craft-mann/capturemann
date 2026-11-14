@@ -717,6 +717,108 @@ fn s2_fill_quality_on_repo_screenshots() {
     );
 }
 
+/// S2 on a folder of real screenshots (`CM_S2_DIR`, searched recursively; nothing is copied into
+/// the repository). Prints one `BOX` line per recognised text line and, with `CM_S2_CROPS=<dir>`,
+/// writes before/after crops (Retype with an empty text: the fill alone) of every `CM_S2_STEP`-th
+/// box and of some failing ones, for looking at seams. Counts only; no text is printed.
+#[test]
+#[ignore = "needs CM_S2_DIR, a recognizer"]
+fn s2_real_set() {
+    use cm_render::ocr::system_recognizer;
+    let Ok(dir) = std::env::var("CM_S2_DIR") else {
+        println!("SKIPPED: CM_S2_DIR");
+        return;
+    };
+    if !system_recognizer().is_available() {
+        println!("SKIPPED: no recognizer");
+        return;
+    }
+    let crops = std::env::var("CM_S2_CROPS").ok();
+    let step: usize = std::env::var("CM_S2_STEP")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(25);
+    let mut files = Vec::new();
+    let mut stack = vec![std::path::PathBuf::from(&dir)];
+    while let Some(d) = stack.pop() {
+        for e in std::fs::read_dir(&d).unwrap().flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                stack.push(p);
+            } else if p.extension().is_some_and(|x| x == "png") {
+                files.push(p);
+            }
+        }
+    }
+    files.sort();
+    let mut k = 0usize;
+    for f in &files {
+        let img = image::open(f).unwrap().to_rgba8();
+        let rel = f
+            .strip_prefix(&dir)
+            .unwrap()
+            .to_string_lossy()
+            .replace(' ', "_");
+        let lines = system_recognizer().recognize(&img).unwrap();
+        for l in lines.iter().filter(|l| !l.text.trim().is_empty()) {
+            let r = Rc::new(
+                l.rect.x.floor(),
+                l.rect.y.floor(),
+                l.rect.w.ceil() + 1.0,
+                l.rect.h.ceil() + 1.0,
+            );
+            let m = measure_fill(&img, r);
+            println!(
+                "BOX {rel} {} {} {} {} err={} max={} kind={:?} busy={} sides={}",
+                r.x,
+                r.y,
+                r.w,
+                r.h,
+                m.ring_p98_error,
+                m.ring_max_error,
+                m.fill.kind,
+                m.busy,
+                m.sides_used
+            );
+            k += 1;
+            let failing = m.ring_p98_error > 6;
+            let Some(out_dir) = &crops else { continue };
+            if !k.is_multiple_of(step) && !(failing && k.is_multiple_of(4)) {
+                continue;
+            }
+            let retype = format!(
+                r##"[{{"op":"retype","rect":[{},{},{},{}],"fill":{},"text":"","size":12}}]"##,
+                r.x,
+                r.y,
+                r.w,
+                r.h,
+                serde_json::to_string(&m.fill).unwrap()
+            );
+            let out = render_annotations(&img, &ops(&retype)).unwrap();
+            let pad = 24.0;
+            let x0 = (r.x - pad).max(0.0) as u32;
+            let y0 = (r.y - pad).max(0.0) as u32;
+            let w = ((r.w + 2.0 * pad) as u32).min(img.width() - x0).min(900);
+            let h = ((r.h + 2.0 * pad) as u32).min(img.height() - y0);
+            let mut sheet = RgbaImage::new(w * 2 + 6, h);
+            imageops::replace(
+                &mut sheet,
+                &imageops::crop_imm(&img, x0, y0, w, h).to_image(),
+                0,
+                0,
+            );
+            imageops::replace(
+                &mut sheet,
+                &imageops::crop_imm(&out, x0, y0, w, h).to_image(),
+                i64::from(w) + 6,
+                0,
+            );
+            let name = format!("{out_dir}/crop_{k:04}_err{}.png", m.ring_p98_error);
+            sheet.save(name).unwrap();
+        }
+    }
+}
+
 /// S5 (GPU part): the adapter's texture limit and whether a 16384 px texture can be created,
 /// cleared and read back here (the same device settings as the compositor). Prints only; run by
 /// hand: `cargo test -p cm-render --test touchup_034 s5_gpu -- --ignored --nocapture`.
