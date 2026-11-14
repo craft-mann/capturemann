@@ -151,6 +151,27 @@ pub fn footer_hints(platform: Platform) -> [(String, String); 4] {
 /// Hotkey, dock tile or tray: opens the picker, or closes it when it is already open. Ignored
 /// while another capture or delay runs (CAP-2).
 pub fn open(app: &Entity<AppModel>, cx: &mut App) {
+    open_for(app, Purpose::Screenshot, cx);
+}
+
+/// What the chosen window is for: a screenshot, or "Click Guide of a window" (GDE-1: the guide
+/// follows that window and only its clicks are steps).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Purpose {
+    Screenshot,
+    ClickGuide,
+}
+
+/// The primary button's text: the screenshot's, or the guide's.
+pub fn action_label(purpose: Purpose) -> String {
+    match purpose {
+        Purpose::Screenshot => capture_window(),
+        Purpose::ClickGuide => tr_ctx!("window picker for a Click Guide", "Start guide"),
+    }
+}
+
+/// Like [`open`], for the given purpose.
+pub fn open_for(app: &Entity<AppModel>, purpose: Purpose, cx: &mut App) {
     crate::trace::mark("window_picker_open");
     let open = cx.try_global::<PickerSlot>().and_then(|s| s.0).filter(|h| {
         h.update(cx, |this, window, cx| this.close(window, cx, true))
@@ -189,7 +210,7 @@ pub fn open(app: &Entity<AppModel>, cx: &mut App) {
             })
             .await;
         cx.update(|cx| match answer {
-            Ok(Ok(v)) => present(&app2, &v, cx),
+            Ok(Ok(v)) => present(&app2, &v, purpose, cx),
             Ok(Err(e)) => fail(&app2, &e, cx),
             Err(e) => fail(
                 &app2,
@@ -213,7 +234,7 @@ fn fail(app: &Entity<AppModel>, e: &crate::backend::CallError, cx: &mut App) {
     app::push_toast(app, spec, cx);
 }
 
-fn present(app: &Entity<AppModel>, targets: &serde_json::Value, cx: &mut App) {
+fn present(app: &Entity<AppModel>, targets: &serde_json::Value, purpose: Purpose, cx: &mut App) {
     let listing = match session::parse_targets(targets, &crate::platform_window::display_frame) {
         Ok(l) => l,
         Err(e) => {
@@ -247,7 +268,7 @@ fn present(app: &Entity<AppModel>, targets: &serde_json::Value, cx: &mut App) {
     let opened = match display {
         Some(d) => cx.open_window(
             crate::ui::recording::panel_options(d, global, true, false),
-            view_builder(app.clone(), state, listing.outlines, platform),
+            view_builder(app.clone(), state, listing.outlines, platform, purpose),
         ),
         None => cx.open_window(
             WindowOptions {
@@ -268,7 +289,7 @@ fn present(app: &Entity<AppModel>, targets: &serde_json::Value, cx: &mut App) {
                 window_background: gpui::WindowBackgroundAppearance::Transparent,
                 ..crate::platform_window::popup_base()
             },
-            view_builder(app.clone(), state, listing.outlines, platform),
+            view_builder(app.clone(), state, listing.outlines, platform, purpose),
         ),
     };
     match opened {
@@ -325,11 +346,12 @@ fn view_builder(
     state: PickerState,
     outlines: HashMap<u32, OutlineRect>,
     platform: Platform,
+    purpose: Purpose,
 ) -> impl FnOnce(&mut Window, &mut App) -> Entity<PickerView> {
     move |window, cx| {
         // A screenshot taken while the picker is open must not contain it (R4-6).
         crate::platform_window::exclude_from_capture(window);
-        cx.new(|cx| PickerView::new(app, state, outlines, platform, window, cx))
+        cx.new(|cx| PickerView::new(app, state, outlines, platform, purpose, window, cx))
     }
 }
 
@@ -341,6 +363,7 @@ pub(crate) struct PickerView {
     state: PickerState,
     outlines: HashMap<u32, OutlineRect>,
     platform: Platform,
+    purpose: Purpose,
     input: TextBuffer,
     focus: FocusHandle,
     scroll: ScrollHandle,
@@ -367,6 +390,7 @@ impl PickerView {
         state: PickerState,
         outlines: HashMap<u32, OutlineRect>,
         platform: Platform,
+        purpose: Purpose,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
@@ -392,6 +416,7 @@ impl PickerView {
             state,
             outlines,
             platform,
+            purpose,
             input: TextBuffer::default(),
             focus,
             scroll: ScrollHandle::new(),
@@ -454,13 +479,21 @@ impl PickerView {
                 app: owner,
                 title,
             } => {
+                let purpose = self.purpose;
                 let remembered = self.state.touch_last_used(&owner, &title).clone();
                 self.remember(remembered, cx);
                 // Close first (the previous app's focus returns), then capture exactly as the
                 // hover mode did.
                 self.close(window, cx, true);
                 let app = self.app.clone();
-                cx.defer(move |cx| app::run_window_capture(&app, window_id, cx));
+                match purpose {
+                    Purpose::Screenshot => {
+                        cx.defer(move |cx| app::run_window_capture(&app, window_id, cx));
+                    }
+                    Purpose::ClickGuide => cx.defer(move |cx| {
+                        crate::ui::guide_view::hud::start_window(&app, window_id, cx)
+                    }),
+                }
                 return;
             }
         }
@@ -997,7 +1030,7 @@ impl PickerView {
                 div()
                     .id("window-picker-capture")
                     .role(Role::Button)
-                    .aria_label(capture_window())
+                    .aria_label(action_label(self.purpose))
                     .focusable()
                     .tab_stop(true)
                     .h(px(36.))
@@ -1017,7 +1050,7 @@ impl PickerView {
                     })
                     .when(!can_capture, |d| d.opacity(0.4))
                     .child(icon("camera", 15., t.primary_fg))
-                    .child(SharedString::from(capture_window()))
+                    .child(SharedString::from(action_label(self.purpose)))
                     .child(
                         div()
                             .mono()

@@ -37,6 +37,7 @@ actions!(
         ShowLibrary,
         ShowSettings,
         NewClickGuide,
+        NewClickGuideWindow,
         LongShotAction,
         ImportMedia,
         QuitApp,
@@ -81,6 +82,10 @@ pub fn app_menus() -> Vec<Menu> {
         MenuItem::action(tr_ctx!("menu", "Library"), ShowLibrary),
         MenuItem::action(tr_ctx!("menu", "Long Shot"), LongShotAction),
         MenuItem::action(tr_ctx!("menu", "New Click Guide"), NewClickGuide),
+        MenuItem::action(
+            tr_ctx!("menu", "Click Guide of a window\u{2026}"),
+            NewClickGuideWindow,
+        ),
         MenuItem::action(tr_ctx!("menu", "Import file\u{2026}"), ImportMedia),
         MenuItem::action(tr_ctx!("menu", "Settings\u{2026}"), ShowSettings),
         MenuItem::separator(),
@@ -104,6 +109,11 @@ pub fn install_app_actions(cx: &mut App) {
     cx.on_action(|_: &NewClickGuide, cx| {
         if let Some(app) = cx.try_global::<AppHandle>().map(|h| h.0.clone()) {
             app::handle_command(&app, Command::NewClickGuide, cx);
+        }
+    });
+    cx.on_action(|_: &NewClickGuideWindow, cx| {
+        if let Some(app) = cx.try_global::<AppHandle>().map(|h| h.0.clone()) {
+            app::handle_command(&app, Command::NewClickGuideWindow, cx);
         }
     });
     cx.on_action(|_: &LongShotAction, cx| {

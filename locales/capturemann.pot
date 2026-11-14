@@ -1084,6 +1084,9 @@ msgstr ""
 msgid "Click Guide needs Input Monitoring"
 msgstr ""
 
+msgid "Click Guide of a window…"
+msgstr ""
+
 msgid "Click Guide only needs to know where you click. Nothing records until you grant access."
 msgstr ""
 
@@ -7516,6 +7519,9 @@ msgstr ""
 msgid "{name}, {size}, {status}"
 msgstr ""
 
+msgid "{name}, {status}"
+msgstr ""
+
 msgid "{name}, {status}."
 msgstr ""
 
@@ -7912,9 +7918,6 @@ msgid "{title}, {tool}: {tier}, locked"
 msgstr ""
 
 msgid "{title}. {body}"
-msgstr ""
-
-msgid "{title}. {details}. Opens Agents and CLI"
 msgstr ""
 
 msgid "{title}. {text}"
@@ -9651,6 +9654,10 @@ msgid "Marker"
 msgstr ""
 
 msgctxt "menu"
+msgid "Click Guide of a window…"
+msgstr ""
+
+msgctxt "menu"
 msgid "Import file…"
 msgstr ""
 
@@ -11092,6 +11099,10 @@ msgstr ""
 
 msgctxt "window picker footer"
 msgid "Move"
+msgstr ""
+
+msgctxt "window picker for a Click Guide"
+msgid "Start guide"
 msgstr ""
 
 msgctxt "zoom"

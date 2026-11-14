@@ -98,6 +98,8 @@ pub enum Command {
     ShowSettings,
     /// "New Click Guide" (GDE-1): the bar, then the clicks.
     NewClickGuide,
+    /// "Click Guide of a window" (GDE-1): the window picker, then the guide follows that window.
+    NewClickGuideWindow,
     /// "Long Shot" (CAP-6): the overlay picks the area, then the scrolling capture runs.
     LongShot,
     /// Import these files (the Dock, Open With, a drop); no path opens the file picker.

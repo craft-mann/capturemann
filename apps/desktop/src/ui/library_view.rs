@@ -1025,6 +1025,34 @@ fn new_click_guide_button(t: &Theme, app: &Entity<AppModel>) -> gpui::Stateful<g
     .on_click(move |_, _, cx| app::handle_command(&app, Command::NewClickGuide, cx))
 }
 
+/// "Click Guide of a window..." next to it (GDE-1): the window picker, then the guide follows
+/// that window only.
+fn new_window_guide_button(t: &Theme, app: &Entity<AppModel>) -> gpui::Stateful<gpui::Div> {
+    let app = app.clone();
+    button_with_icon(
+        t,
+        "library-new-window-guide",
+        tr!("Click Guide of a window\u{2026}"),
+        ButtonKind::Secondary,
+        Some("app-window"),
+    )
+    .when_some(
+        crate::ui::guide_view::preflight::disabled_reason(),
+        |b, reason| b.opacity(0.45).tooltip(tip(reason, Vec::new())),
+    )
+    .on_click(move |_, _, cx| app::handle_command(&app, Command::NewClickGuideWindow, cx))
+}
+
+/// Both Click Guide entries, side by side.
+fn click_guide_buttons(t: &Theme, app: &Entity<AppModel>) -> gpui::Div {
+    div()
+        .flex()
+        .items_center()
+        .gap(px(8.))
+        .child(new_click_guide_button(t, app))
+        .child(new_window_guide_button(t, app))
+}
+
 fn record_audio_header_button(t: &Theme, keys: &[String], app: &Entity<AppModel>) -> AnyElement {
     let app = app.clone();
     let focus = rgba_of(t.text);
@@ -1706,7 +1734,7 @@ impl Render for LibraryView {
             }))
             .children(
                 matches!(route, Route::Guides | Route::Library)
-                    .then(|| new_click_guide_button(&t, &self.app).into_any_element()),
+                    .then(|| click_guide_buttons(&t, &self.app).into_any_element()),
             );
 
         // ---- toolbar: the chips and the sort bar -------------------------------------------
@@ -1960,7 +1988,7 @@ impl Render for LibraryView {
                 "mouse-pointer-click",
                 &tr!("No Click Guides yet"),
                 &tr!("Click through a task and CaptureMann writes the steps. It records clicks only, never keystrokes."),
-                Some(new_click_guide_button(&t, &app).into_any_element()),
+                Some(click_guide_buttons(&t, &app).into_any_element()),
             ),
             (_, Some(EmptyKind::NoCaptures)) => {
                 let keys = shortcuts
