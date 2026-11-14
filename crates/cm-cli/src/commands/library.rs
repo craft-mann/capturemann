@@ -30,6 +30,15 @@ fn paging_params(p: &LibraryPaging, query: Option<String>) -> Value {
     Value::Object(o)
 }
 
+/// `WxH` for a row that has a pixel size, `-` for one that has none (a Click Guide is a folder of
+/// step images, so it has no width or height of its own).
+fn size_label(row: &Value) -> String {
+    match (row["width"].as_u64(), row["height"].as_u64()) {
+        (Some(w), Some(h)) => format!("{w}x{h}"),
+        _ => "-".to_owned(),
+    }
+}
+
 pub(super) async fn library_list(cx: &mut Ctx<'_>, a: LibraryListArgs) -> Result<(), CliError> {
     let params = paging_params(&a.paging, a.query);
     let mut c = cx.client().await?;
@@ -43,11 +52,10 @@ pub(super) async fn library_list(cx: &mut Ctx<'_>, a: LibraryListArgs) -> Result
         for x in &rows {
             let _ = writeln!(
                 s,
-                "{}  {}  {}x{}  {}  {}{}",
+                "{}  {}  {}  {}  {}{}",
                 plain(&x["id"]),
                 plain(&x["kind"]),
-                x["width"],
-                x["height"],
+                size_label(x),
                 plain(&x["created"]),
                 plain(&x["title"]),
                 if x["broken"] == json!(true) {
@@ -240,4 +248,24 @@ pub(super) async fn library_rm(
         s
     });
     Ok(())
+}
+
+#[cfg(test)]
+mod size_label_tests {
+    use super::size_label;
+    use serde_json::json;
+
+    #[test]
+    fn a_row_with_a_size_prints_it() {
+        assert_eq!(size_label(&json!({"width": 800, "height": 600})), "800x600");
+    }
+
+    #[test]
+    fn a_row_without_a_size_prints_a_dash_not_nullxnull() {
+        assert_eq!(
+            size_label(&json!({"kind": "guide", "width": null, "height": null})),
+            "-"
+        );
+        assert_eq!(size_label(&json!({"kind": "guide"})), "-");
+    }
 }
