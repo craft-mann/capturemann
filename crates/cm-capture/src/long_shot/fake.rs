@@ -33,6 +33,13 @@ pub struct SyntheticPage {
     /// moves with the position, so no two frames have equal rows. The expected image has no
     /// scrollbar (the engine trims it).
     pub scrollbar: u32,
+    /// Width of an overlay scrollbar (Chrome on macOS): drawn over the whole viewport, bands
+    /// included, only once the page has scrolled, and short, so that near the top of the page
+    /// its thumb lies on the header rows alone.
+    pub overlay_scrollbar: u32,
+    /// A sticky header that hides once the page has scrolled to this position or further: the
+    /// viewport then shows content where the header was.
+    pub hide_header_from: Option<u32>,
     /// Content rows at each end of the viewport that differ in every frame (a window's rounded
     /// corners and edge line drawn over what scrolls under them).
     pub corner_rows: u32,
@@ -49,6 +56,8 @@ impl SyntheticPage {
             direction: Direction::Vertical,
             jump: None,
             scrollbar: 0,
+            overlay_scrollbar: 0,
+            hide_header_from: None,
             corner_rows: 0,
         }
     }
@@ -60,6 +69,16 @@ impl SyntheticPage {
 
     pub fn with_scrollbar(mut self, width: u32) -> Self {
         self.scrollbar = width;
+        self
+    }
+
+    pub fn with_hiding_header(mut self, from: u32) -> Self {
+        self.hide_header_from = Some(from);
+        self
+    }
+
+    pub fn with_overlay_scrollbar(mut self, width: u32) -> Self {
+        self.overlay_scrollbar = width;
         self
     }
 
@@ -139,16 +158,25 @@ impl SyntheticPage {
     /// What the viewport shows with the content scrolled to `pos`.
     pub fn frame_at(&self, pos: u32) -> Frame {
         let mut lines = Vec::new();
-        for i in 0..self.header {
-            lines.push(self.line(Kind::Header, i));
+        let hidden = self.hide_header_from.is_some_and(|t| pos >= t);
+        // With the header hidden, the rows it covered show the content above the first row.
+        let (top_rows, base) = if hidden {
+            (self.header, pos - self.header)
+        } else {
+            (0, pos)
+        };
+        if !hidden {
+            for i in 0..self.header {
+                lines.push(self.line(Kind::Header, i));
+            }
         }
         let view = self.content_view();
         // The thumb: a bar whose top follows the position.
         let thumb_len = (view / 4).max(1);
         let thumb_top = (u64::from(pos) * u64::from(view - thumb_len)
             / u64::from(self.max_pos().max(1))) as u32;
-        for i in 0..view {
-            let mut line = self.line(Kind::Content, pos + i);
+        for i in 0..view + top_rows {
+            let mut line = self.line(Kind::Content, base + i);
             let in_thumb = (thumb_top..thumb_top + thumb_len).contains(&i);
             for p in line.iter_mut().skip((self.cross - self.scrollbar) as usize) {
                 *p = if in_thumb {
@@ -157,7 +185,7 @@ impl SyntheticPage {
                     [235, 235, 235, 255]
                 };
             }
-            if i < self.corner_rows || i >= view - self.corner_rows {
+            if self.corner_rows > 0 && (i < self.corner_rows || i >= view - self.corner_rows) {
                 for p in line.iter_mut() {
                     *p = [(pos & 255) as u8, (i & 255) as u8, 7, 255];
                 }
@@ -166,6 +194,20 @@ impl SyntheticPage {
         }
         for i in 0..self.footer {
             lines.push(self.line(Kind::Footer, i));
+        }
+        if self.overlay_scrollbar > 0 && pos > 0 {
+            let total = lines.len() as u32;
+            let len = (self.header.max(8) / 2).max(1);
+            let top =
+                (u64::from(pos) * u64::from(total - len) / u64::from(self.max_pos().max(1))) as u32;
+            for i in top..top + len {
+                for p in lines[i as usize]
+                    .iter_mut()
+                    .skip((self.cross - self.overlay_scrollbar) as usize)
+                {
+                    *p = [90, 90, 90, 255];
+                }
+            }
         }
         self.assemble(lines)
     }
