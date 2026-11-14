@@ -901,8 +901,15 @@ fn thumb_frame(ctx: &RowCtx, item: &CaptureItem, width: f32, cx: &mut gpui::App)
     let t = &ctx.t;
     let id = item.id.clone();
     let (frame_w, frame_h) = (width, (width * THUMB_ASPECT).round());
+    // A board keeps its own proportions (a strip or a pair is far wider than the card): the whole
+    // board is shown, not the middle of it cut to the card's shape.
+    let is_board = item.board.is_some();
     let state = ctx.thumbs.update(cx, |c, cx| {
-        c.get_cover(&id, (frame_w - 2.) / (frame_h - 2.), cx)
+        if is_board {
+            c.get(&id, cx)
+        } else {
+            c.get_cover(&id, (frame_w - 2.) / (frame_h - 2.), cx)
+        }
     });
     let mut frame = div()
         .relative()
@@ -919,7 +926,11 @@ fn thumb_frame(ctx: &RowCtx, item: &CaptureItem, width: f32, cx: &mut gpui::App)
                 img(image)
                     .size_full()
                     .rounded(px(scale::RADIUS_LG - 1.))
-                    .object_fit(ObjectFit::Fill),
+                    .object_fit(if is_board {
+                        ObjectFit::Contain
+                    } else {
+                        ObjectFit::Fill
+                    }),
             );
         }
         Thumb::Loading => {}

@@ -13,8 +13,9 @@
 use cm_i18n::{tr, trn};
 use cm_render::compose_board::LayoutKind;
 use gpui::{
-    div, prelude::*, px, AnyElement, App, Context, CursorStyle, Entity, FocusHandle, FontWeight,
-    KeyDownEvent, MouseButton, Render, Role, SharedString, Subscription, Window,
+    div, img, prelude::*, px, AnyElement, App, Context, CursorStyle, Entity, FocusHandle,
+    FontWeight, KeyDownEvent, MouseButton, ObjectFit, Render, Role, SharedString, Subscription,
+    Window,
 };
 use serde_json::{json, Value};
 
@@ -23,19 +24,59 @@ use crate::board_flow::{layout_label, BgChoice, BoardSheet, Grip, LAYOUTS};
 use crate::daemon_text::call_error_text;
 use crate::theme::{scale, Theme};
 use crate::ui::app::{self, AppModel};
-use crate::ui::bulk_sheet::{section, seg};
+use crate::ui::bulk_sheet::seg;
 use crate::ui::components::{button_with_icon, icon, switch, ButtonKind};
 use crate::ui::paint::{rgba_of, TextExt};
 use crate::ui::studio::ThemeGlobal;
 use crate::ui::text_field::{TextField, TextFieldEvent};
+use crate::ui::thumbs::{Thumb, ThumbCache};
 
-const SHEET_W: f32 = 980.;
-/// The canvas box the board is drawn into.
-const CANVAS_W: f32 = 520.;
-const CANVAS_H: f32 = 360.;
+/// The widest and tallest the sheet gets; it shrinks with the window (see `Geometry`).
+const SHEET_MAX_W: f32 = 1180.;
+const SHEET_MAX_H: f32 = 820.;
+/// Space kept free around the sheet in the window.
+const SHEET_MARGIN: f32 = 24.;
+const SHEET_PAD: f32 = 24.;
+const COL_GAP: f32 = 16.;
+const HEADER_H: f32 = 64.;
+const FOOTER_H: f32 = 66.;
+/// What sits under the canvas (the size chip and the hints).
+const UNDER_CANVAS_H: f32 = 170.;
+
+/// The sheet's sizes for a window: the panel, the three columns and the canvas box. Pure, so the
+/// responsive rules are unit tested.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct Geometry {
+    pub sheet_w: f32,
+    pub sheet_h: f32,
+    pub left_w: f32,
+    pub inspector_w: f32,
+    pub canvas_w: f32,
+    pub canvas_h: f32,
+}
+
+impl Geometry {
+    pub(crate) fn for_window(win_w: f32, win_h: f32) -> Geometry {
+        let sheet_w = (win_w - 2. * SHEET_MARGIN).clamp(640., SHEET_MAX_W);
+        let sheet_h = (win_h - 2. * SHEET_MARGIN).clamp(420., SHEET_MAX_H);
+        let narrow = sheet_w < 900.;
+        let (left_w, inspector_w) = if narrow { (180., 240.) } else { (220., 280.) };
+        let body_w = sheet_w - 2. * SHEET_PAD;
+        let body_h = sheet_h - HEADER_H - FOOTER_H;
+        Geometry {
+            sheet_w,
+            sheet_h,
+            left_w,
+            inspector_w,
+            canvas_w: (body_w - left_w - inspector_w - 2. * COL_GAP).max(160.),
+            canvas_h: (body_h - UNDER_CANVAS_H).max(160.),
+        }
+    }
+}
 
 pub struct BoardSheetView {
     app: Entity<AppModel>,
+    thumbs: Entity<ThumbCache>,
     title_field: Entity<TextField>,
     tint_field: Entity<TextField>,
     seen_epoch: u64,
@@ -47,12 +88,16 @@ pub struct BoardSheetView {
 impl BoardSheetView {
     pub fn new(app: Entity<AppModel>, cx: &mut Context<Self>) -> Self {
         let observe = cx.observe(&app, |_, _, cx| cx.notify());
+        let backend = app.read(cx).backend.clone();
+        let thumbs = cx.new(|_| ThumbCache::new(backend));
+        let thumbs_observe = cx.observe(&thumbs, |_, _, cx| cx.notify());
         let title_field =
             cx.new(|cx| TextField::new(tr!("Board title"), tr!("Board title"), cx).without_icon());
         let tint_field =
             cx.new(|cx| TextField::new(tr!("Tint colour"), "#DCE6F5", cx).without_icon());
         let subs = vec![
             observe,
+            thumbs_observe,
             cx.subscribe(&title_field, |this, _, ev: &TextFieldEvent, cx| {
                 this.on_field(ev, cx, |s, t| s.title = t.to_owned());
             }),
@@ -62,6 +107,7 @@ impl BoardSheetView {
         ];
         BoardSheetView {
             app,
+            thumbs,
             title_field,
             tint_field,
             seen_epoch: u64::MAX,
@@ -128,10 +174,18 @@ fn row() -> gpui::Div {
 }
 
 /// The canvas: the board at its real proportions, a box per picture.
-fn canvas(t: &Theme, s: &BoardSheet, app: &Entity<AppModel>) -> AnyElement {
+fn canvas(
+    t: &Theme,
+    s: &BoardSheet,
+    app: &Entity<AppModel>,
+    thumbs: &Entity<ThumbCache>,
+    (canvas_w, canvas_h): (f32, f32),
+    cx: &mut App,
+) -> AnyElement {
     let frame = div()
-        .w(px(CANVAS_W))
-        .h(px(CANVAS_H))
+        .w(px(canvas_w))
+        .h(px(canvas_h))
+        .flex_none()
         .flex()
         .items_center()
         .justify_center()
@@ -149,16 +203,10 @@ fn canvas(t: &Theme, s: &BoardSheet, app: &Entity<AppModel>) -> AnyElement {
             )
             .into_any_element();
     };
-    let k = (CANVAS_W - 40.) / plan.width as f32;
-    let k = k.min((CANVAS_H - 40.) / plan.height as f32);
+    let k = (canvas_w - 40.) / plan.width as f32;
+    let k = k.min((canvas_h - 40.) / plan.height as f32);
     let (w, h) = (plan.width as f32 * k, plan.height as f32 * k);
-    let bg = match s.background {
-        BgChoice::Transparent => t.field,
-        BgChoice::White => crate::theme::Color::rgb(0xFFFFFF),
-        BgChoice::LightGrey => crate::theme::Color::rgb(0xECEDF0),
-        BgChoice::Dark => crate::theme::Color::rgb(0x18191C),
-        BgChoice::Tint => parse_tint(&s.tint).unwrap_or(t.field),
-    };
+    let bg = bg_color(t, s.background, &s.tint);
     let ink = if matches!(s.background, BgChoice::Dark) {
         crate::theme::Color::rgb(0xF2F2F4)
     } else {
@@ -221,43 +269,69 @@ fn canvas(t: &Theme, s: &BoardSheet, app: &Entity<AppModel>) -> AnyElement {
                 update(&a, cx, |s| s.begin_drag(i, Grip::Move, at));
             }
         });
-        board = board
-            .child(
+        let thumb = thumbs.update(cx, |c, cx| c.get(&src.id, cx));
+        let round = px((s.radius as f32 * k).min(12.));
+        let mut cell_box = div()
+            .absolute()
+            .left(px(cell.x as f32 * k))
+            .top(px(cell.y as f32 * k))
+            .w(px(cell.w as f32 * k))
+            .h(px(cell.h as f32 * k))
+            .rounded(round)
+            .overflow_hidden()
+            .bg(rgba_of(t.raised))
+            .when_some(pick, |d, f| {
+                d.cursor(CursorStyle::OpenHand)
+                    .on_mouse_down(MouseButton::Left, f)
+            });
+        cell_box = match thumb {
+            Thumb::Ready(image) => cell_box.child(
+                img(image)
+                    .size_full()
+                    .rounded(round)
+                    .object_fit(ObjectFit::Fill),
+            ),
+            _ => cell_box
+                .p(px(4.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .text_size(px(11.))
+                .text_color(rgba_of(t.text_2))
+                .child(SharedString::from(src.title.clone())),
+        };
+        board = board.child(cell_box).children(label.map(|l| {
+            let (x, y) = (cell.x as f32 * k + 6., cell.y as f32 * k + 6.);
+            if s.layout == LayoutKind::Pair {
+                // The stamp of design board S10: bold red BEFORE and green AFTER with a frame.
+                let ink = crate::theme::Color::rgb(if i == 0 { 0xDC2626 } else { 0x16A34A });
                 div()
                     .absolute()
-                    .left(px(cell.x as f32 * k))
-                    .top(px(cell.y as f32 * k))
-                    .w(px(cell.w as f32 * k))
-                    .h(px(cell.h as f32 * k))
-                    .rounded(px((s.radius as f32 * k).min(12.)))
-                    .border_1()
-                    .border_color(rgba_of(t.line))
-                    .bg(rgba_of(t.raised))
-                    .overflow_hidden()
-                    .p(px(4.))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .text_size(px(11.))
-                    .text_color(rgba_of(t.text_2))
-                    .when_some(pick, |d, f| {
-                        d.cursor(CursorStyle::OpenHand)
-                            .on_mouse_down(MouseButton::Left, f)
-                    })
-                    .child(SharedString::from(src.title.clone())),
-            )
-            .children(label.map(|l| {
+                    .left(px(x))
+                    .top(px(y))
+                    .px(px(8.))
+                    .py(px(1.))
+                    .rounded(px(4.))
+                    .border_2()
+                    .border_color(rgba_of(ink))
+                    .bg(rgba_of(crate::theme::Color::rgb(0xFFFFFF)))
+                    .text_size(px(13.))
+                    .font_weight(FontWeight::BOLD)
+                    .text_color(rgba_of(ink))
+                    .child(SharedString::from(l))
+            } else {
                 div()
                     .absolute()
-                    .left(px(cell.x as f32 * k + 4.))
-                    .top(px(cell.y as f32 * k + 4.))
+                    .left(px(x))
+                    .top(px(y))
                     .px(px(5.))
                     .rounded(px(4.))
                     .bg(rgba_of(crate::theme::Color::rgb(0x1B1C1F)))
                     .text_size(px(10.))
                     .text_color(rgba_of(crate::theme::Color::rgb(0xFFFFFF)))
                     .child(SharedString::from(l))
-            }));
+            }
+        }));
     }
     if free {
         // Corner handles on every picture (a corner drag resizes, keeping the proportions).
@@ -345,6 +419,16 @@ fn canvas(t: &Theme, s: &BoardSheet, app: &Entity<AppModel>) -> AnyElement {
     frame.child(board).into_any_element()
 }
 
+fn bg_color(t: &Theme, b: BgChoice, tint: &str) -> crate::theme::Color {
+    match b {
+        BgChoice::Transparent => t.field,
+        BgChoice::White => crate::theme::Color::rgb(0xFFFFFF),
+        BgChoice::LightGrey => crate::theme::Color::rgb(0xECEDF0),
+        BgChoice::Dark => crate::theme::Color::rgb(0x18191C),
+        BgChoice::Tint => parse_tint(tint).unwrap_or(crate::theme::Color::rgb(0xDCE6F5)),
+    }
+}
+
 fn parse_tint(s: &str) -> Option<crate::theme::Color> {
     let h = s.trim().strip_prefix('#')?;
     if h.len() != 6 {
@@ -354,6 +438,7 @@ fn parse_tint(s: &str) -> Option<crate::theme::Color> {
     Some(crate::theme::Color::rgb(n))
 }
 
+/// A segmented row of number choices that always stays on one line.
 fn preset(
     t: &Theme,
     app: &Entity<AppModel>,
@@ -362,16 +447,67 @@ fn preset(
     current: u32,
     set: fn(&mut BoardSheet, u32),
 ) -> gpui::Div {
-    row().children(values.iter().map(|&v| {
-        let a = app.clone();
-        seg(
-            t,
-            SharedString::from(format!("{id}-{v}")),
-            v.to_string(),
-            current == v,
+    row()
+        .flex_nowrap()
+        .gap(px(4.))
+        .children(values.iter().map(|&v| {
+            let a = app.clone();
+            seg(
+                t,
+                SharedString::from(format!("{id}-{v}")),
+                v.to_string(),
+                current == v,
+            )
+            .flex_1()
+            .min_w(px(0.))
+            .justify_center()
+            .px(px(2.))
+            .on_click(move |_, _, cx| update(&a, cx, |s| set(s, v)))
+        }))
+}
+
+fn field_label(t: &Theme, text: String) -> gpui::Div {
+    div()
+        .text_size(px(13.))
+        .font_weight(FontWeight::MEDIUM)
+        .text_color(rgba_of(t.text_2))
+        .child(SharedString::from(text))
+}
+
+/// One setting of the inspector: its label (with the value) above the control.
+fn block(t: &Theme, label: String, hint: Option<String>, body: AnyElement) -> AnyElement {
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(8.))
+        .child(field_label(t, label))
+        .child(body)
+        .children(hint.map(|h| {
+            div()
+                .text_size(px(12.))
+                .text_color(rgba_of(t.mist))
+                .child(SharedString::from(h))
+        }))
+        .into_any_element()
+}
+
+/// A label on the left and its switch on the right.
+fn toggle_row(t: &Theme, switch: impl IntoElement, label: String) -> AnyElement {
+    div()
+        .flex()
+        .items_center()
+        .justify_between()
+        .gap(px(8.))
+        .child(
+            div()
+                .flex_1()
+                .min_w(px(0.))
+                .text_size(px(13.))
+                .text_color(rgba_of(t.text))
+                .child(SharedString::from(label)),
         )
-        .on_click(move |_, _, cx| update(&a, cx, |s| set(s, v)))
-    }))
+        .child(switch)
+        .into_any_element()
 }
 
 impl Render for BoardSheetView {
@@ -388,10 +524,15 @@ impl Render for BoardSheetView {
         }
         let app = self.app.clone();
 
+        let geo = {
+            let v = window.viewport_size();
+            Geometry::for_window(f32::from(v.width), f32::from(v.height))
+        };
+
         // Left column: layouts and the source list.
         let layouts = div()
             .flex()
-            .flex_col()
+            .flex_wrap()
             .gap(px(6.))
             .children(LAYOUTS.map(|k| {
                 let a = app.clone();
@@ -401,7 +542,11 @@ impl Render for BoardSheetView {
                     SharedString::from(format!("board-layout-{}", k.as_str())),
                     layout_label(k),
                     s.layout == k,
-                );
+                )
+                .w(px((geo.left_w - 6.) / 2.))
+                .h(px(44.))
+                .flex_none()
+                .justify_center();
                 if enabled {
                     b.on_click(move |_, _, cx| update(&a, cx, |s| s.set_layout(k)))
                 } else {
@@ -409,6 +554,7 @@ impl Render for BoardSheetView {
                 }
             }));
         let n = s.sources.len();
+        let thumbs = self.thumbs.clone();
         let sources =
             div()
                 .flex()
@@ -416,28 +562,38 @@ impl Render for BoardSheetView {
                 .gap(px(4.))
                 .children(s.sources.iter().enumerate().map(|(i, src)| {
                     let (a_up, a_down, a_rm) = (app.clone(), app.clone(), app.clone());
+                    let mini = div()
+                        .w(px(36.))
+                        .h(px(26.))
+                        .flex_none()
+                        .rounded(px(4.))
+                        .overflow_hidden()
+                        .bg(rgba_of(t.raised))
+                        .children(match thumbs.update(cx, |c, cx| c.get(&src.id, cx)) {
+                            Thumb::Ready(image) => Some(
+                                img(image)
+                                    .size_full()
+                                    .rounded(px(4.))
+                                    .object_fit(ObjectFit::Cover),
+                            ),
+                            _ => None,
+                        });
                     div()
                         .flex()
                         .items_center()
                         .gap(px(4.))
-                        .h(px(32.))
+                        .h(px(40.))
                         .px(px(6.))
                         .rounded(px(scale::RADIUS_SM))
                         .border_1()
                         .border_color(rgba_of(t.border))
                         .bg(rgba_of(t.field))
-                        .child(
-                            div()
-                                .w(px(16.))
-                                .text_size(px(11.))
-                                .text_color(rgba_of(t.mist))
-                                .mono()
-                                .child((i + 1).to_string()),
-                        )
+                        .child(mini)
                         .child(
                             div()
                                 .flex_1()
                                 .min_w(px(0.))
+                                .pl(px(2.))
                                 .truncate()
                                 .text_size(px(12.5))
                                 .child(SharedString::from(src.title.clone())),
@@ -475,11 +631,15 @@ impl Render for BoardSheetView {
                 }));
         let left =
             div()
-                .w(px(210.))
+                .id("board-left")
+                .w(px(geo.left_w))
                 .flex_none()
+                .min_h(px(0.))
+                .overflow_y_scroll()
                 .flex()
                 .flex_col()
                 .gap(px(14.))
+                .child(field_label(&t, tr!("Layout")))
                 .child(layouts)
                 .child(div().text_size(px(12.5)).text_color(rgba_of(t.mist)).child(
                     SharedString::from(trn!(
@@ -490,33 +650,41 @@ impl Render for BoardSheetView {
                 ))
                 .child(sources);
 
-        // Inspector.
+        // Inspector: one stacked block per setting, the column scrolls when it does not fit.
         let a = app.clone();
         let arrangement = (matches!(s.layout, LayoutKind::Pair | LayoutKind::Strip)).then(|| {
             let (a1, a2) = (a.clone(), a.clone());
-            section(
+            block(
                 &t,
                 tr!("Arrangement"),
                 None,
                 row()
                     .child(
                         seg(&t, "board-side", tr!("Side by side"), !s.stacked)
+                            .flex_1()
+                            .justify_center()
+                            .px(px(6.))
                             .on_click(move |_, _, cx| update(&a1, cx, |s| s.stacked = false)),
                     )
                     .child(
                         seg(&t, "board-stack", tr!("Stacked"), s.stacked)
+                            .flex_1()
+                            .justify_center()
+                            .px(px(6.))
                             .on_click(move |_, _, cx| update(&a2, cx, |s| s.stacked = true)),
                     )
+                    .flex_nowrap()
                     .into_any_element(),
             )
         });
         let columns = (s.layout == LayoutKind::Grid).then(|| {
             let a = a.clone();
-            section(
+            block(
                 &t,
                 tr!("Columns"),
                 None,
                 row()
+                    .flex_nowrap()
                     .children([0u32, 2, 3, 4].map(|c| {
                         let a = a.clone();
                         seg(
@@ -525,6 +693,9 @@ impl Render for BoardSheetView {
                             if c == 0 { tr!("Auto") } else { c.to_string() },
                             s.columns.unwrap_or(0) == c,
                         )
+                        .flex_1()
+                        .justify_center()
+                        .px(px(4.))
                         .on_click(move |_, _, cx| {
                             update(&a, cx, |s| s.columns = (c != 0).then_some(c))
                         })
@@ -534,43 +705,31 @@ impl Render for BoardSheetView {
         });
         let labels = (s.layout == LayoutKind::Pair).then(|| {
             let a = a.clone();
-            section(
+            toggle_row(
                 &t,
-                tr!("Labels"),
-                None,
-                row()
-                    .child(
-                        switch(
-                            &t,
-                            "board-ba",
-                            tr!("BEFORE and AFTER labels"),
-                            s.before_after,
-                            true,
-                        )
-                        .on_click(move |_, _, cx| {
-                            update(&a, cx, |s| s.before_after = !s.before_after)
-                        }),
-                    )
-                    .child(
-                        div()
-                            .text_size(px(13.))
-                            .child(tr!("BEFORE and AFTER labels")),
-                    )
-                    .into_any_element(),
+                switch(
+                    &t,
+                    "board-ba",
+                    tr!("BEFORE and AFTER labels"),
+                    s.before_after,
+                    true,
+                )
+                .on_click(move |_, _, cx| update(&a, cx, |s| s.before_after = !s.before_after)),
+                tr!("BEFORE and AFTER labels"),
             )
         });
-        let gap = section(
+        let gap = block(
             &t,
-            tr!("Gap"),
+            format!("{}  \u{b7}  {} px", tr!("Gap"), s.gap),
             None,
             preset(&t, &a, "board-gap", &[0, 8, 16, 24, 40], s.gap, |s, v| {
                 s.gap = v
             })
             .into_any_element(),
         );
-        let margin = section(
+        let margin = block(
             &t,
-            tr!("Outer margin"),
+            format!("{}  \u{b7}  {} px", tr!("Outer margin"), s.margin),
             None,
             preset(
                 &t,
@@ -582,9 +741,37 @@ impl Render for BoardSheetView {
             )
             .into_any_element(),
         );
-        let background = section(
+        let swatches = row().gap(px(10.)).children(BgChoice::ALL.map(|b| {
+            let a = a.clone();
+            let on = s.background == b;
+            let ring = if on { t.text } else { t.border };
+            div()
+                .id(SharedString::from(format!("board-bg-{b:?}")))
+                .role(Role::Button)
+                .aria_label(SharedString::from(b.label()))
+                .aria_selected(on)
+                .focusable()
+                .tab_stop(true)
+                .size(px(30.))
+                .flex_none()
+                .rounded(px(15.))
+                .border_2()
+                .border_color(rgba_of(ring))
+                .p(px(2.))
+                .cursor_pointer()
+                .child(
+                    div()
+                        .size_full()
+                        .rounded(px(12.))
+                        .border_1()
+                        .border_color(rgba_of(t.border))
+                        .bg(rgba_of(bg_color(&t, b, &s.tint))),
+                )
+                .on_click(move |_, _, cx| update(&a, cx, |s| s.background = b))
+        }));
+        let background = block(
             &t,
-            tr!("Background"),
+            format!("{}  \u{b7}  {}", tr!("Background"), s.background.label()),
             Some(tr!(
                 "Transparent is for PNG; a JPEG export puts it on white"
             )),
@@ -592,64 +779,41 @@ impl Render for BoardSheetView {
                 .flex()
                 .flex_col()
                 .gap(px(8.))
-                .child(row().children(BgChoice::ALL.map(|b| {
-                    let a = a.clone();
-                    seg(
-                        &t,
-                        SharedString::from(format!("board-bg-{b:?}")),
-                        b.label(),
-                        s.background == b,
-                    )
-                    .on_click(move |_, _, cx| update(&a, cx, |s| s.background = b))
-                })))
+                .child(swatches)
                 .children(
                     (s.background == BgChoice::Tint)
-                        .then(|| div().w(px(160.)).h(px(32.)).child(self.tint_field.clone())),
+                        .then(|| div().w_full().h(px(32.)).child(self.tint_field.clone())),
                 )
                 .into_any_element(),
         );
-        let radius = section(
+        let radius = block(
             &t,
-            tr!("Corner radius"),
+            format!("{}  \u{b7}  {} px", tr!("Corner radius"), s.radius),
             None,
             preset(&t, &a, "board-radius", &[0, 8, 16, 24], s.radius, |s, v| {
                 s.radius = v
             })
             .into_any_element(),
         );
-        let toggles = {
-            let (a1, a2) = (a.clone(), a.clone());
-            section(
+        let shadow = {
+            let a1 = a.clone();
+            toggle_row(
                 &t,
-                tr!("Extras"),
-                None,
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap(px(4.))
-                    .child(
-                        row()
-                            .child(
-                                switch(&t, "board-shadow", tr!("Shadow"), s.shadow, true).on_click(
-                                    move |_, _, cx| update(&a1, cx, |s| s.shadow = !s.shadow),
-                                ),
-                            )
-                            .child(div().text_size(px(13.)).child(tr!("Shadow"))),
-                    )
-                    .child(
-                        row()
-                            .child(
-                                switch(&t, "board-captions", tr!("Captions"), s.captions, true)
-                                    .on_click(move |_, _, cx| {
-                                        update(&a2, cx, |s| s.captions = !s.captions)
-                                    }),
-                            )
-                            .child(div().text_size(px(13.)).child(tr!("Captions"))),
-                    )
-                    .into_any_element(),
+                switch(&t, "board-shadow", tr!("Shadow"), s.shadow, true)
+                    .on_click(move |_, _, cx| update(&a1, cx, |s| s.shadow = !s.shadow)),
+                tr!("Shadow"),
             )
         };
-        let title = section(
+        let captions = {
+            let a2 = a.clone();
+            toggle_row(
+                &t,
+                switch(&t, "board-captions", tr!("Captions"), s.captions, true)
+                    .on_click(move |_, _, cx| update(&a2, cx, |s| s.captions = !s.captions)),
+                tr!("Captions"),
+            )
+        };
+        let title = block(
             &t,
             tr!("Title"),
             None,
@@ -659,12 +823,19 @@ impl Render for BoardSheetView {
                 .into_any_element(),
         );
         let inspector = div()
-            .w(px(250.))
+            .id("board-inspector")
+            .w(px(geo.inspector_w))
             .flex_none()
+            .min_h(px(0.))
+            .overflow_y_scroll()
+            .flex()
+            .flex_col()
+            .gap(px(12.))
             .rounded(px(scale::RADIUS_LG))
             .border_1()
             .border_color(rgba_of(t.border))
             .bg(rgba_of(t.surface))
+            .p(px(14.))
             .children(arrangement)
             .children(columns)
             .children(labels)
@@ -672,17 +843,22 @@ impl Render for BoardSheetView {
             .child(margin)
             .child(background)
             .child(radius)
-            .child(toggles)
+            .child(shadow)
+            .child(captions)
             .child(title);
 
+        let canvas_el = canvas(&t, &s, &app, &self.thumbs, (geo.canvas_w, geo.canvas_h), cx);
         let centre = div()
+            .id("board-centre")
             .flex_1()
             .min_w(px(0.))
+            .min_h(px(0.))
+            .overflow_y_scroll()
             .flex()
             .flex_col()
             .items_center()
             .gap(px(10.))
-            .child(canvas(&t, &s, &app))
+            .child(canvas_el)
             .child(
                 div()
                     .px(px(10.))
@@ -697,6 +873,7 @@ impl Render for BoardSheetView {
             )
             .children((s.layout == LayoutKind::Free).then(|| {
                 div()
+                    .max_w(px(geo.canvas_w))
                     .text_size(px(12.5))
                     .text_color(rgba_of(t.mist))
                     .child(tr!(
@@ -705,6 +882,7 @@ impl Render for BoardSheetView {
             }))
             .child(
                 div()
+                    .max_w(px(geo.canvas_w))
                     .text_size(px(12.5))
                     .text_color(rgba_of(t.mist))
                     .child(tr!("Finish copies the screenshots into the board, with their annotations drawn in. The originals are not changed.")),
@@ -716,8 +894,8 @@ impl Render for BoardSheetView {
             .id("board-sheet")
             .role(Role::Dialog)
             .aria_label(SharedString::from(s.title_text()))
-            .w(px(SHEET_W))
-            .max_h(px(780.))
+            .w(px(geo.sheet_w))
+            .h(px(geo.sheet_h))
             .flex()
             .flex_col()
             .rounded(px(18.))
@@ -776,11 +954,10 @@ impl Render for BoardSheetView {
                     .id("board-body")
                     .flex_1()
                     .min_h(px(0.))
-                    .overflow_y_scroll()
-                    .px(px(24.))
+                    .px(px(SHEET_PAD))
                     .pb(px(16.))
                     .flex()
-                    .gap(px(18.))
+                    .gap(px(COL_GAP))
                     .child(left)
                     .child(centre)
                     .child(inspector),
@@ -1020,4 +1197,28 @@ pub fn finish(app: &Entity<AppModel>, cx: &mut App) {
         let _ = json!(null);
     })
     .detach();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_columns_fit_the_sheet_at_the_default_window_sizes() {
+        for (w, h) in [(1180., 792.), (1346., 827.), (1920., 1080.), (900., 600.)] {
+            let g = Geometry::for_window(w, h);
+            let used = g.left_w + g.inspector_w + g.canvas_w + 2. * COL_GAP + 2. * SHEET_PAD;
+            assert!(used <= g.sheet_w + 0.5, "{w}x{h}: {used} > {}", g.sheet_w);
+            assert!(g.sheet_w <= w - 2. * SHEET_MARGIN + 0.5 || g.sheet_w == 640.);
+            assert!(g.sheet_h <= h || g.sheet_h == 420.);
+            assert!(g.canvas_w >= 160. && g.canvas_h >= 160.);
+        }
+    }
+
+    #[test]
+    fn a_larger_window_gives_the_canvas_more_room() {
+        let small = Geometry::for_window(1180., 792.);
+        let big = Geometry::for_window(1600., 1000.);
+        assert!(big.canvas_w > small.canvas_w && big.canvas_h > small.canvas_h);
+    }
 }
