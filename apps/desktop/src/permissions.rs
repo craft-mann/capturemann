@@ -646,50 +646,6 @@ mod ffi {
         pub fn CGRequestScreenCaptureAccess() -> bool;
         pub fn CGRequestListenEventAccess() -> bool;
     }
-
-    use std::ffi::c_void;
-
-    #[link(name = "ApplicationServices", kind = "framework")]
-    extern "C" {
-        static kAXTrustedCheckOptionPrompt: *const c_void;
-        fn AXIsProcessTrustedWithOptions(options: *const c_void) -> bool;
-    }
-    #[link(name = "CoreFoundation", kind = "framework")]
-    extern "C" {
-        static kCFBooleanTrue: *const c_void;
-        fn CFDictionaryCreate(
-            allocator: *const c_void,
-            keys: *const *const c_void,
-            values: *const *const c_void,
-            count: isize,
-            key_callbacks: *const c_void,
-            value_callbacks: *const c_void,
-        ) -> *const c_void;
-        fn CFRelease(cf: *const c_void);
-    }
-
-    /// Asks macOS to show its Accessibility prompt (it adds the app to the list and offers to
-    /// open System Settings). Not run in tests.
-    pub fn request_accessibility() {
-        // SAFETY: both keys and values are CoreFoundation constants that outlive the dictionary
-        // (null callbacks: it does not retain them); the dictionary is released after the call.
-        unsafe {
-            let keys = [kAXTrustedCheckOptionPrompt];
-            let values = [kCFBooleanTrue];
-            let dict = CFDictionaryCreate(
-                std::ptr::null(),
-                keys.as_ptr(),
-                values.as_ptr(),
-                1,
-                std::ptr::null(),
-                std::ptr::null(),
-            );
-            if !dict.is_null() {
-                let _ = AXIsProcessTrustedWithOptions(dict);
-                CFRelease(dict);
-            }
-        }
-    }
 }
 
 impl Provider for SystemProvider {
@@ -727,10 +683,7 @@ impl Provider for SystemProvider {
                     let _ = unsafe { ffi::CGRequestListenEventAccess() };
                 }
             }
-            Id::Accessibility => {
-                #[cfg(target_os = "macos")]
-                ffi::request_accessibility();
-            }
+            Id::Accessibility => cm_capture::long_shot::request_accessibility(),
         }
         self.check(id)
     }

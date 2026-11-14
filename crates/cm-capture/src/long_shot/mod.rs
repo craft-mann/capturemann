@@ -20,7 +20,8 @@ use std::time::Duration;
 use cm_core::CmError;
 
 pub use crate::sys::long_scroll::{
-    accessibility_trusted, auto_scroll_support, platform_scroller, AutoScrollSupport,
+    accessibility_trusted, auto_scroll_support, platform_scroller, request_accessibility,
+    AutoScrollSupport,
 };
 pub use run::{run_auto, run_hand, LongShotConfig, LongShotProgress, LongShotResult};
 pub use stitch::{

@@ -30,6 +30,11 @@ pub fn accessibility_trusted() -> bool {
     imp::trusted()
 }
 
+/// Asks macOS to show its Accessibility prompt (nothing elsewhere). Not run in tests.
+pub fn request_accessibility() {
+    imp::request_accessibility();
+}
+
 pub fn auto_scroll_support() -> AutoScrollSupport {
     imp::support()
 }
@@ -79,6 +84,47 @@ mod imp {
     const TAP_HID: u32 = 0;
     /// One event moves at most this many px; larger steps are sent as several.
     const MAX_EVENT_PX: i32 = 400;
+
+    #[link(name = "ApplicationServices", kind = "framework")]
+    extern "C" {
+        static kAXTrustedCheckOptionPrompt: *const c_void;
+        fn AXIsProcessTrustedWithOptions(options: *const c_void) -> bool;
+    }
+    #[link(name = "CoreFoundation", kind = "framework")]
+    extern "C" {
+        static kCFBooleanTrue: *const c_void;
+        fn CFDictionaryCreate(
+            allocator: *const c_void,
+            keys: *const *const c_void,
+            values: *const *const c_void,
+            count: isize,
+            key_callbacks: *const c_void,
+            value_callbacks: *const c_void,
+        ) -> *const c_void;
+    }
+
+    /// Asks macOS to show its Accessibility prompt (it adds the app to the list and offers to
+    /// open System Settings). Not run in tests.
+    pub fn request_accessibility() {
+        // SAFETY: both keys and values are CoreFoundation constants that outlive the dictionary
+        // (null callbacks: it does not retain them); the dictionary is released after the call.
+        unsafe {
+            let keys = [kAXTrustedCheckOptionPrompt];
+            let values = [kCFBooleanTrue];
+            let dict = CFDictionaryCreate(
+                std::ptr::null(),
+                keys.as_ptr(),
+                values.as_ptr(),
+                1,
+                std::ptr::null(),
+                std::ptr::null(),
+            );
+            if !dict.is_null() {
+                let _ = AXIsProcessTrustedWithOptions(dict);
+                CFRelease(dict);
+            }
+        }
+    }
 
     pub fn trusted() -> bool {
         // SAFETY: argument-less query, no preconditions.
@@ -136,6 +182,8 @@ mod imp {
         true
     }
 
+    pub fn request_accessibility() {}
+
     pub fn support() -> AutoScrollSupport {
         match session::from_env() {
             DisplayServer::Wayland => AutoScrollSupport::NoInjection,
@@ -156,6 +204,8 @@ mod imp {
     pub fn trusted() -> bool {
         true
     }
+
+    pub fn request_accessibility() {}
 
     pub fn support() -> AutoScrollSupport {
         // `SendInput` is spike S1 (W1).
