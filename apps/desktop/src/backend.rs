@@ -682,6 +682,10 @@ impl Clipboard for ArcClipboard {
     fn copy_text(&self, text: &str) -> Result<(), CmError> {
         self.0.copy_text(text)
     }
+
+    fn copy_rich_text(&self, html: &str, text: &str) -> Result<(), CmError> {
+        self.0.copy_rich_text(html, text)
+    }
 }
 
 /// The clipboard the app uses by default.
@@ -744,6 +748,16 @@ mod tests {
     use cm_capture::fake::FakeBackend;
     use cm_daemon::testing::RecordingClipboard;
     use cm_daemon::DenyAll;
+
+    /// The wrapper the daemon is built with passes all three kinds of copy on (GDE-3: "Copy as
+    /// rich text" answered "no rich-text clipboard" while it dropped `copy_rich_text`).
+    #[test]
+    fn arc_clipboard_forwards_rich_text_gde_3() {
+        let clip = Arc::new(RecordingClipboard::default());
+        let wrapped = ArcClipboard(Arc::new(clip.clone()));
+        wrapped.copy_rich_text("<p>Hi</p>", "Hi").unwrap();
+        assert_eq!(clip.last_html().as_deref(), Some("<p>Hi</p>"));
+    }
 
     fn fake_capturer() -> Capturer {
         Capturer::new(FakeBackend::new().with_display(1, 0, 0, 40, 30, 1.0)).with_own_pid(None)

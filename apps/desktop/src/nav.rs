@@ -300,11 +300,10 @@ pub enum RailEntry {
     Divider,
     Nav(NavItem),
     Spacer,
-    Mcp,
 }
 
 /// The rail from the top: brand mark, Record, Region, a divider, the seven destinations, then
-/// Settings and the MCP status button at the bottom.
+/// Settings at the bottom.
 pub fn rail_layout() -> Vec<RailEntry> {
     vec![
         RailEntry::Brand,
@@ -322,7 +321,6 @@ pub fn rail_layout() -> Vec<RailEntry> {
         RailEntry::Nav(NavItem::Agents),
         RailEntry::Spacer,
         RailEntry::Nav(NavItem::Settings),
-        RailEntry::Mcp,
     ]
 }
 
@@ -827,7 +825,7 @@ mod tests {
     fn rail_items_and_their_order() {
         let rail = rail_layout();
         assert_eq!(rail.first(), Some(&RailEntry::Brand));
-        assert_eq!(rail.last(), Some(&RailEntry::Mcp));
+        assert_eq!(rail.last(), Some(&RailEntry::Nav(NavItem::Settings)));
         let nav: Vec<_> = rail
             .iter()
             .filter_map(|e| match e {
@@ -856,9 +854,8 @@ mod tests {
         assert!(pos(RailEntry::RecordAudio) < pos(RailEntry::Divider));
         assert!(pos(RailEntry::Divider) < pos(RailEntry::Nav(NavItem::AllCaptures)));
         assert!(pos(RailEntry::Nav(NavItem::Agents)) < pos(RailEntry::Spacer));
-        // Settings and the MCP button are pinned below the spacer.
+        // Settings is pinned below the spacer.
         assert!(pos(RailEntry::Spacer) < pos(RailEntry::Nav(NavItem::Settings)));
-        assert!(pos(RailEntry::Nav(NavItem::Settings)) < pos(RailEntry::Mcp));
     }
 
     #[test]

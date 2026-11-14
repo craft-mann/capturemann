@@ -37,6 +37,7 @@ pub mod canvas;
 pub mod client;
 pub mod error;
 pub mod gate;
+pub mod icons;
 pub mod lifetime;
 pub mod long_bar;
 pub mod long_paint;

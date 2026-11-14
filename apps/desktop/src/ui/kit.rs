@@ -258,6 +258,20 @@ pub fn nav_row(
     count: Option<usize>,
     active: bool,
 ) -> Stateful<Div> {
+    nav_row_tinted(t, id, glyph, label, count, active, None)
+}
+
+/// [`nav_row`] with the icon in `tint` instead of the text colour (the Agents & CLI row shows
+/// the MCP status this way).
+pub fn nav_row_tinted(
+    t: &Theme,
+    id: impl Into<ElementId>,
+    glyph: &'static str,
+    label: impl Into<SharedString>,
+    count: Option<usize>,
+    active: bool,
+    tint: Option<Color>,
+) -> Stateful<Div> {
     let label: SharedString = label.into();
     let (hover, focus) = (rgba_of(t.raised), rgba_of(t.text));
     let fg = if active { t.text } else { t.text_2 };
@@ -288,7 +302,7 @@ pub fn nav_row(
         })
         .when(!active, |d| d.hover(move |s| s.bg(hover)))
         .focus_visible(move |s| s.border_color(focus))
-        .child(icon(glyph, icon_size::NAV, fg))
+        .child(icon(glyph, icon_size::NAV, tint.unwrap_or(fg)))
         .child(div().flex_1().truncate().child(label))
         .children(count.map(|n| {
             div()

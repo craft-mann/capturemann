@@ -1724,6 +1724,7 @@ impl EditorState {
                 rect: rect(s * 1.6, s),
                 color: style.color,
                 width: style.width,
+                glow: 0.0,
             },
             Tool::Highlight => OpKind::Highlight {
                 rect: rect(s * 2.0, s / 2.0),

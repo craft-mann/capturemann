@@ -919,6 +919,68 @@ mod tests {
         assert!(!paint(&mut c, &frame, &scene));
     }
 
+    /// Paints the Long Shot bar over a dark backdrop at 2x. With `CM_BAR_PNG=<file>` it also writes
+    /// the bar's rows to a PNG for a by-eye check against design board S1 (`CM_BAR_AUTO=wayland`
+    /// or `needs` picks the other states). Always checks that every icon entry drew something.
+    #[test]
+    fn long_shot_bar_icons_are_painted_and_can_be_written_to_png() {
+        use crate::long_bar::{layout, AutoSupport, BarState};
+        let (w, h) = (2000u32, 500u32);
+        let rgba: Vec<u8> = [10u8, 10, 12, 255].repeat((w * h) as usize);
+        let frame = Frame::from_rgba(w, h, &rgba).unwrap();
+        let picker = Picker::new(
+            Mode::Long,
+            PhysicalSize {
+                width: w,
+                height: h,
+            },
+            2.0,
+            vec![],
+            false,
+        );
+        let text = TextPainter::new().unwrap();
+        let auto = match std::env::var("CM_BAR_AUTO").as_deref() {
+            Ok("wayland") => AutoSupport::Unavailable,
+            Ok("needs") => AutoSupport::NeedsAccessibility,
+            _ => AutoSupport::Available,
+        };
+        let state = BarState::new(auto);
+        let l = layout(&state, w as i32, h as i32, 2.0, &|s, px| {
+            text.measure(s, px)
+        });
+        let mut buf = vec![0u32; (w * h) as usize];
+        let mut c = Canvas::new(&mut buf, w, h).unwrap();
+        let scene = Scene {
+            picker: &picker,
+            scale: 2.0,
+            text: &text,
+            show_loupe: false,
+            show_hint: false,
+            tab_to_list: false,
+            long: Some(crate::long_paint::LongScene { layout: &l }),
+        };
+        assert!(paint(&mut c, &frame, &scene));
+        assert!(l.bar.x >= 0 && l.bar.x + l.bar.w <= w as i32);
+        for e in l.entries.iter().filter(|e| e.icon.is_some()) {
+            let mut distinct = std::collections::HashSet::new();
+            for y in e.rect.y..e.rect.y + e.rect.h {
+                for x in e.rect.x..e.rect.x + e.rect.w {
+                    distinct.insert(buf[(y as usize) * w as usize + x as usize]);
+                }
+            }
+            assert!(distinct.len() > 2, "{:?} drew nothing", e.item);
+        }
+        if let Ok(path) = std::env::var("CM_BAR_PNG") {
+            let y0 = (l.bar.y - 20).max(0) as usize;
+            let y1 = ((l.bar.y + l.bar.h + 20) as usize).min(h as usize);
+            let mut out = Vec::new();
+            for px in &buf[y0 * w as usize..y1 * w as usize] {
+                out.extend_from_slice(&[(px >> 16) as u8, (px >> 8) as u8, *px as u8]);
+            }
+            image::save_buffer(path, &out, w, (y1 - y0) as u32, image::ColorType::Rgb8).unwrap();
+        }
+    }
+
     /// CAP-6 (S1): in Long Shot mode the bar is painted where its layout says (the selected mode
     /// in `text`, Start in `rec`), and the card appears only when asked. Not seen on a screen.
     #[test]
@@ -960,7 +1022,8 @@ mod tests {
         let start = l.entries.iter().find(|e| e.item == Item::Start).unwrap();
         assert_eq!(
             at(start.rect.x + 4, start.rect.y + start.rect.h / 2),
-            tokens::REC
+            tokens::TEXT,
+            "Start is light like the selected mode (design S1)"
         );
         let long = l
             .entries

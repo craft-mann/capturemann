@@ -333,6 +333,17 @@ impl Chip {
         }
     }
 
+    /// Whether the chip means something on a page of this kind: a recording is the only thing
+    /// that is published (YouTube), a board is a screenshot, and a Click Guide has its own page.
+    pub fn applies_to(self, page: Filter) -> bool {
+        match self {
+            Chip::Imported | Chip::Uploaded => page != Filter::Guides,
+            Chip::Published => matches!(page, Filter::All | Filter::Recordings),
+            Chip::Boards => matches!(page, Filter::All | Filter::Screenshots),
+            Chip::Guides => page == Filter::All,
+        }
+    }
+
     /// A stable element id part (never translated).
     pub fn key(self) -> &'static str {
         match self {
@@ -506,6 +517,37 @@ impl LibraryState {
             Chip::Guides => self.guides_only,
             Chip::Uploaded => self.remote == Some(RemoteFilter::Uploaded),
             Chip::Published => self.remote == Some(RemoteFilter::Published),
+        }
+    }
+
+    /// The chips the current page shows, in order.
+    pub fn page_chips(&self) -> Vec<Chip> {
+        Chip::ALL
+            .into_iter()
+            .filter(|c| c.applies_to(self.filter))
+            .collect()
+    }
+
+    /// Turns off the chips the page does not show (after a change of page), so a hidden filter
+    /// never keeps hiding captures.
+    pub fn drop_inapplicable_chips(&mut self) {
+        let page = self.filter;
+        if !Chip::Imported.applies_to(page) {
+            self.imported_only = false;
+        }
+        if !Chip::Boards.applies_to(page) {
+            self.boards_only = false;
+        }
+        if !Chip::Guides.applies_to(page) {
+            self.guides_only = false;
+        }
+        let drop_remote = match self.remote {
+            Some(RemoteFilter::Uploaded) => !Chip::Uploaded.applies_to(page),
+            Some(RemoteFilter::Published) => !Chip::Published.applies_to(page),
+            None => false,
+        };
+        if drop_remote {
+            self.remote = None;
         }
     }
 
@@ -922,6 +964,35 @@ mod tests {
         assert_eq!(s.filter, Filter::Recordings);
         assert_eq!(Chip::Uploaded.glyph(), "cloud-upload");
         assert_eq!(Chip::Published.glyph(), "send");
+    }
+
+    /// The chips follow the page: Audio has no Boards, Click Guides or Published; only recordings
+    /// are published; a hidden chip is switched off when the page changes.
+    #[test]
+    fn lib1_chips_follow_the_page() {
+        let on = |f: Filter| {
+            let mut s = LibraryState::new(LibraryStatus::Ready);
+            s.filter = f;
+            s.page_chips()
+        };
+        assert_eq!(on(Filter::All), Chip::ALL.to_vec());
+        assert_eq!(
+            on(Filter::Recordings),
+            [Chip::Imported, Chip::Uploaded, Chip::Published]
+        );
+        assert_eq!(
+            on(Filter::Screenshots),
+            [Chip::Imported, Chip::Uploaded, Chip::Boards]
+        );
+        assert_eq!(on(Filter::Audio), [Chip::Imported, Chip::Uploaded]);
+        assert!(on(Filter::Guides).is_empty());
+        let mut s = LibraryState::new(LibraryStatus::Ready);
+        s.boards_only = true;
+        s.guides_only = true;
+        s.remote = Some(RemoteFilter::Published);
+        s.filter = Filter::Audio;
+        s.drop_inapplicable_chips();
+        assert!(!s.boards_only && !s.guides_only && s.remote.is_none());
     }
 
     /// LIB-1: the chips show how many captures are uploaded and published, counted from an

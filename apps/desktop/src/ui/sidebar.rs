@@ -17,9 +17,9 @@ use crate::shortcuts::{Platform, ShortcutMap};
 use crate::theme::{scale, type_scale, Mode, Theme};
 use crate::ui::app::{self, AppModel, Command, Route};
 use crate::ui::components::{
-    badge, button_with_icon, dot, ellipsis_text, icon, icon_button, label_fill, logo, ButtonKind,
+    badge, button_with_icon, ellipsis_text, icon, icon_button, icon_button_tinted, logo, ButtonKind,
 };
-use crate::ui::kit::nav_row;
+use crate::ui::kit::{nav_row, nav_row_tinted};
 use crate::ui::paint::{rgba_of, TextExt};
 use crate::ui::settings::model::SettingsSection;
 use crate::ui::settings_view::SettingsView;
@@ -143,21 +143,35 @@ fn record_audio_button(
         .child(icon("mic", 18., t.rec_soft))
 }
 
+/// The Agents & CLI icon shows the MCP status: agent blue when the app serves the IPC endpoint,
+/// grey when nothing can connect. Other items keep the text colour.
+fn item_tint(t: &Theme, p: &SidebarProps, item: nav::NavItem) -> Option<crate::theme::Color> {
+    (item == nav::NavItem::Agents).then(|| {
+        if p.status.is_ready() {
+            t.agent_text
+        } else {
+            t.mist
+        }
+    })
+}
+
 fn nav_button(
     t: &Theme,
     app: &Entity<AppModel>,
     e: &NavEntry,
     label: Option<String>,
+    tint: Option<crate::theme::Color>,
 ) -> Stateful<gpui::Div> {
     let route = e.item.route();
     let app = app.clone();
-    nav_row(
+    nav_row_tinted(
         t,
         e.item.id(),
         e.item.icon(),
         label.unwrap_or_else(|| e.item.label()),
         e.count,
         e.active,
+        tint,
     )
     .on_click(move |_, _, cx| app::set_route(&app, route.clone(), cx))
 }
@@ -192,58 +206,6 @@ fn brand_row(t: &Theme) -> AnyElement {
         // "v0.2.1": the exact version of this build, the same text as Settings > About (it showed
         // only major.minor until Oct 28, 2026, and a patch release looked like no release).
         .child(badge(t, format!("v{}", env!("CARGO_PKG_VERSION"))))
-        .into_any_element()
-}
-
-/// The sidebar card: the real MCP status only (agent blue): "MCP ready" or "MCP offline" with its
-/// dot. The last request and the offline reason are not drawn here (owner, Oct 23, 2026); they stay in
-/// the accessible label and on the Agents & CLI page, which the card opens.
-fn mcp_card(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> AnyElement {
-    let status = &p.status;
-    let lines = status.lines();
-    let app = app.clone();
-    let focus = rgba_of(t.text);
-    div()
-        .id("mcp-card")
-        .role(Role::Button)
-        .aria_label(SharedString::from(tr!(
-            "{title}. {details}. Opens Agents and CLI",
-            title = status.title(),
-            details = lines.join(". ")
-        )))
-        .focusable()
-        .tab_stop(true)
-        .mt(px(12.))
-        .px(px(14.))
-        .py(px(12.))
-        .flex()
-        .flex_col()
-        .rounded(px(scale::RADIUS_LG - 2.))
-        .border_1()
-        .border_color(rgba_of(t.agent_border))
-        .bg(rgba_of(t.agent_fill))
-        .cursor_pointer()
-        .focus_visible(move |s| s.border_color(focus))
-        .on_click(move |_, _, cx| app::set_route(&app, Route::Agents, cx))
-        .child(
-            div()
-                .flex()
-                .items_center()
-                .gap(px(8.))
-                .text_size(px(13.))
-                .font_weight(FontWeight::MEDIUM)
-                .child(icon(
-                    "bot",
-                    14.,
-                    if status.is_ready() {
-                        t.agent_text
-                    } else {
-                        t.mist
-                    },
-                ))
-                .child(label_fill(status.title()))
-                .child(dot(if status.is_ready() { t.agent } else { t.mist }, 7.)),
-        )
         .into_any_element()
 }
 
@@ -378,21 +340,20 @@ fn app_body(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> Vec<AnyEleme
     out.extend(
         nav::library_entries(&p.highlight(), &p.counts)
             .iter()
-            .map(|e| nav_button(t, app, e, None).into_any_element()),
+            .map(|e| nav_button(t, app, e, None, item_tint(t, p, e.item)).into_any_element()),
     );
     out.push(group_label(t, tr_ctx!("sidebar group", "INTELLIGENCE")));
     out.extend(
         nav::intelligence_entries(&p.highlight(), &p.counts)
             .iter()
-            .map(|e| nav_button(t, app, e, None).into_any_element()),
+            .map(|e| nav_button(t, app, e, None, item_tint(t, p, e.item)).into_any_element()),
     );
     out.push(div().flex_1().into_any_element());
     let settings = nav::entries(&p.highlight(), &p.counts)
         .into_iter()
         .find(|e| e.item == nav::NavItem::Settings)
         .expect("Settings is a nav item");
-    out.push(nav_button(t, app, &settings, None).into_any_element());
-    out.push(mcp_card(t, p, app));
+    out.push(nav_button(t, app, &settings, None, None).into_any_element());
     out
 }
 
@@ -480,61 +441,28 @@ fn rail_body(t: &Theme, p: &SidebarProps, app: &Entity<AppModel>) -> Vec<AnyElem
                 let active = nav::NavItem::of_route(&p.highlight()) == item;
                 let label = match item.count(counts) {
                     Some(n) => tr!("{name}, {n}", name = item.label(), n = n),
+                    None if item == nav::NavItem::Agents => {
+                        tr!(
+                            "{name}, {status}",
+                            name = item.label(),
+                            status = p.status.title()
+                        )
+                    }
                     None => item.label(),
                 };
-                icon_button(t, item.id(), item.icon(), label, active, Some(Vec::new()))
-                    .on_click(move |_, _, cx| app::set_route(&app, route.clone(), cx))
-                    .into_any_element()
+                icon_button_tinted(
+                    t,
+                    item.id(),
+                    item.icon(),
+                    label,
+                    active,
+                    Some(Vec::new()),
+                    item_tint(t, p, item),
+                )
+                .on_click(move |_, _, cx| app::set_route(&app, route.clone(), cx))
+                .into_any_element()
             }
             RailEntry::Spacer => div().flex_1().into_any_element(),
-            RailEntry::Mcp => {
-                let status = &p.status;
-                let app = app.clone();
-                let (hover, focus) = (rgba_of(t.raised), rgba_of(t.text));
-                div()
-                    .id("mcp-card")
-                    .role(Role::Button)
-                    .aria_label(SharedString::from(tr!(
-                        "{title}. {details}. Opens Agents and CLI",
-                        title = status.title(),
-                        details = status.lines().join(". ")
-                    )))
-                    .focusable()
-                    .tab_stop(true)
-                    .relative()
-                    .size(px(scale::TARGET))
-                    .mt(px(4.))
-                    .flex()
-                    .flex_none()
-                    .items_center()
-                    .justify_center()
-                    .rounded(px(scale::RADIUS_MD))
-                    .border_1()
-                    .border_color(rgba_of(t.agent_border))
-                    .bg(rgba_of(t.agent_fill))
-                    .cursor_pointer()
-                    .hover(move |s| s.bg(hover))
-                    .focus_visible(move |s| s.border_color(focus))
-                    .tooltip(tip(status.title(), Vec::new()))
-                    .on_click(move |_, _, cx| app::set_route(&app, Route::Agents, cx))
-                    .child(icon(
-                        "bot",
-                        18.,
-                        if status.is_ready() {
-                            t.agent_text
-                        } else {
-                            t.mist
-                        },
-                    ))
-                    .child(
-                        div()
-                            .absolute()
-                            .top(px(7.))
-                            .right(px(7.))
-                            .child(dot(if status.is_ready() { t.agent } else { t.mist }, 7.)),
-                    )
-                    .into_any_element()
-            }
         })
         .collect()
 }
@@ -602,6 +530,5 @@ fn settings_body(
             .into_any_element(),
     ];
     out.push(div().flex_1().into_any_element());
-    out.push(mcp_card(t, p, app));
     out
 }

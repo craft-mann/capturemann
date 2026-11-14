@@ -42,7 +42,8 @@ fn main() {
     let mut stitcher = Stitcher::new(Direction::Vertical, Limits::default());
     for f in &files {
         let frame = load(f);
-        let outcome = stitcher.push(&frame, None);
+        let hint = std::env::var("LS_HINT").ok().and_then(|h| h.parse().ok());
+        let outcome = stitcher.push(&frame, hint);
         println!(
             "{} {}x{} -> {outcome:?} (len {}, bands {:?})",
             f.file_name().and_then(|n| n.to_str()).unwrap_or("?"),

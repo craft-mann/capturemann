@@ -7,7 +7,7 @@ use crate::recording::geometry::{area_points, Rect};
 use crate::recording::monitors::EngineDisplay;
 
 /// The HUD's width, points: Stop, the counter, the direction label, Pause and the mode label.
-pub const HUD_W: f64 = 440.0;
+pub const HUD_W: f64 = 480.0;
 
 /// What to open.
 #[derive(Debug, Clone, Copy, PartialEq)]

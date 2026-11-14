@@ -914,7 +914,9 @@ fn paint_draft(
                 BorderStyle::Solid,
             ));
         }
-        OpKind::Ellipse { rect, color, width } => {
+        OpKind::Ellipse {
+            rect, color, width, ..
+        } => {
             let r = rect.normalized();
             let (cx, cy, rx, ry) = (r.x + r.w / 2.0, r.y + r.h / 2.0, r.w / 2.0, r.h / 2.0);
             let pts: Vec<_> = (0..64)

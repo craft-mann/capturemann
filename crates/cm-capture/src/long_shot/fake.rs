@@ -285,6 +285,8 @@ impl SyntheticPage {
             pos: 0,
             jumped: false,
             scrolls: 0,
+            smooth: Vec::new(),
+            pending: None,
         })))
     }
 }
@@ -301,6 +303,10 @@ struct State {
     pos: u32,
     jumped: bool,
     scrolls: u32,
+    /// Smooth scrolling: the share of the scroll distance shown at each grab after a scroll.
+    smooth: Vec<f64>,
+    /// (start, target, next entry of `smooth`) of the scroll in flight.
+    pending: Option<(u32, u32, usize)>,
 }
 
 /// One viewport onto a [`SyntheticPage`]; clone it to use it as both source and scroller.
@@ -311,11 +317,24 @@ impl PageView {
     pub fn scrolls(&self) -> u32 {
         self.0.borrow().scrolls
     }
+
+    /// A smooth-scrolling app on the first scroll: the next grabs show `shares` of the distance,
+    /// one per grab (a repeated share looks settled; the last one stays). Later scrolls are instant.
+    pub fn with_smooth(self, shares: &[f64]) -> Self {
+        self.0.borrow_mut().smooth = shares.to_vec();
+        self
+    }
 }
 
 impl FrameSource for PageView {
     fn grab(&mut self) -> Result<Frame, CmError> {
-        let s = self.0.borrow();
+        let mut s = self.0.borrow_mut();
+        if let Some((start, target, i)) = s.pending {
+            let share = s.smooth.get(i).copied().unwrap_or(1.0);
+            let moved = (f64::from(target - start) * share).round() as u32;
+            s.pos = start + moved;
+            s.pending = (share < 1.0 && i + 1 < s.smooth.len()).then_some((start, target, i + 1));
+        }
         Ok(s.page.frame_at(s.pos))
     }
 }
@@ -334,7 +353,12 @@ impl Scroller for PageView {
                 pos += skip;
             }
         }
-        s.pos = pos.min(s.page.max_pos());
+        let target = pos.min(s.page.max_pos());
+        if s.smooth.is_empty() || s.scrolls > 1 {
+            s.pos = target;
+        } else {
+            s.pending = Some((s.pos, target, 0));
+        }
         Ok(())
     }
 }

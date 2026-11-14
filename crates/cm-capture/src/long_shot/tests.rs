@@ -726,3 +726,43 @@ fn a_scroll_that_moves_nothing_is_not_the_end_of_the_content() {
     assert_eq!(sc.0, 2, "one retry");
     assert!(r.end.note().is_some());
 }
+
+/// Windows, Edge (Nov 14, 2026): smooth scrolling paused near the start of a scroll for two
+/// grabs, which looked settled; the distance learned from it was far too short, the next step
+/// was huge and the join was lost ("did not line up" after one frame). What arrives late is
+/// joined on top and the capture goes on to the end of the page.
+#[test]
+fn cap_6_smooth_scroll_that_pauses_early_is_not_believed() {
+    struct Wheel(fake::PageView, f64);
+    impl Scroller for Wheel {
+        fn scroll(&mut self, d: Direction, amount_px: u32) -> Result<(), CmError> {
+            self.0.scroll(d, (f64::from(amount_px) * self.1) as u32)
+        }
+    }
+    for ratio in [1.0, 2.0, 2.6] {
+        for shares in [&[0.05, 0.05, 0.05, 1.0][..], &[0.1, 0.1, 0.1, 0.6, 1.0][..]] {
+            let page = SyntheticPage::new(40, 5 * 300, 300);
+            let view = page.clone().view().with_smooth(shares);
+            let (mut src, mut sc) = (view.clone(), Wheel(view, ratio));
+            let r = run_auto(
+                &mut src,
+                &mut sc,
+                &mut NoSleep::default(),
+                cfg(page.direction),
+                &mut || false,
+                &mut |_| {},
+            )
+            .unwrap();
+            assert_eq!(
+                r.end,
+                EndReason::ReachedEnd,
+                "ratio {ratio} shares {shares:?}"
+            );
+            assert_eq!(
+                r.image.frame,
+                page.expected(),
+                "ratio {ratio} shares {shares:?}"
+            );
+        }
+    }
+}

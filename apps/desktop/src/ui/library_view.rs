@@ -378,6 +378,7 @@ impl LibraryView {
     pub fn show_kind(&mut self, f: Filter, cx: &mut Context<Self>) {
         if f != self.state.filter {
             self.state.filter = f;
+            self.state.drop_inapplicable_chips();
             self.reload(cx);
         }
     }
@@ -1709,9 +1710,10 @@ impl Render for LibraryView {
             );
 
         // ---- toolbar: the chips and the sort bar -------------------------------------------
-        let chips = Chip::ALL.iter().map(|c| {
+        let page_chips = self.state.page_chips();
+        let has_chips = !page_chips.is_empty();
+        let chips = page_chips.into_iter().map(|c| {
             let v = view.clone();
-            let c = *c;
             filter_chip(&t, c, self.state.chip_count(c), self.state.chip_active(c)).on_click(
                 move |_, _, cx| {
                     v.update(cx, |this, cx| this.click_chip(c, cx)).ok();
@@ -1736,22 +1738,22 @@ impl Render for LibraryView {
             .gap(px(10.))
             .border_b_1()
             .border_color(rgba_of(t.border))
-            .child(
+            .children(has_chips.then(|| {
                 div()
                     .mr(px(2.))
                     .text_size(px(type_scale::CAPTION))
                     .text_color(rgba_of(t.faint))
-                    .child(tr_ctx!("filter label", "Show")),
-            )
-            .child(
+                    .child(tr_ctx!("filter label", "Show"))
+            }))
+            .children(has_chips.then(|| {
                 div()
                     .id("filters")
                     .role(Role::TabList)
                     .aria_label(tr!("Filter captures"))
                     .flex()
                     .gap(px(10.))
-                    .children(chips),
-            )
+                    .children(chips)
+            }))
             .child(
                 div()
                     .id("sorts")
