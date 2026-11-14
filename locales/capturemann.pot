@@ -2126,9 +2126,6 @@ msgstr ""
 msgid "Export…"
 msgstr ""
 
-msgid "Extras"
-msgstr ""
-
 msgid "FFmpeg at `{path}` cannot be run (permission denied). FFmpeg was not found: CaptureMann includes its own copy, so reinstall CaptureMann, or set CM_FFMPEG to the path of ffmpeg.exe. (For development: winget install Gyan.FFmpeg.)"
 msgstr ""
 
@@ -2670,9 +2667,6 @@ msgid "Kind"
 msgstr ""
 
 msgid "Kinds to look for"
-msgstr ""
-
-msgid "Labels"
 msgstr ""
 
 msgid "Language"

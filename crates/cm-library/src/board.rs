@@ -13,6 +13,10 @@ use time::OffsetDateTime;
 use crate::bundle::{ShotBundle, MANIFEST_FILE};
 use crate::util::{io_err, json_err, new_id, write_atomic};
 
+/// Longest edge of a board's poster in physical px. Boards are wide or tall (a strip is 1641 x 364),
+/// so the 512 px default left a few dozen pixels of height that the Library card then stretched.
+pub const BOARD_POSTER_EDGE: u32 = 1280;
+
 /// A fresh capture id for a board (`shot_`, like any screenshot).
 pub fn mint_id(now: OffsetDateTime) -> String {
     new_id("shot", now)
@@ -31,7 +35,7 @@ pub fn build_board_bundle(
 ) -> Result<(PathBuf, Option<String>), CmError> {
     let bundle = ShotBundle::create(stage, title, png, now)?;
     let dir = bundle.dir().to_path_buf();
-    let thumb_warning = crate::thumbs::write_poster(&bundle, crate::thumbs::DEFAULT_POSTER_EDGE)
+    let thumb_warning = crate::thumbs::write_poster(&bundle, BOARD_POSTER_EDGE)
         .err()
         .map(|e| e.to_string());
     let mpath = dir.join(MANIFEST_FILE);
