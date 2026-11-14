@@ -105,9 +105,23 @@ Written from `verification/L1-windows-0.2.8-hardware-2026-11-05-claude.md` and i
 
 Windows 11 x64 recording release, Windows files only (zip, installer, SHA-256 files; unsigned; pre-release). Package: run 42201119181 (tag v0.2.8), commit `e54cc665`; the earlier candidate was `eb3cb47c` (run 42160646234); on the rebuilt files: standard 49/49, hardware 60 passed, 1 failed (camera in a dark room), the camera case passed alone in a lit room (`...-hardware-rebuilt-camera-2026-11-06-claude.md`), 6 skipped on one monitor (`...-{standard,hardware}-rebuilt-2026-11-06-claude.md`); zip SHA-256 `5169e7ebdc5d8d0c34ac5b20f32913fc5267538bced5d5b6af414c12eda1fdcd`, setup SHA-256 `a10f52729bf3b5d9c8ebb44b0b96d0fc7441580f16615efccc5c32473860f0f7` (recomputed with `packaging/windows/release-files.sh` against the downloaded `.sha256` files). Tested with the `cm-regress` suite on one ThinkPad T490 (Intel UHD 620, Windows 11), PARTIAL reports: smoke 13/13, standard 49/49, hardware 64 passed, 2 failed (suite bugs, fixed), 1 skipped (`verification/L1-windows-0.2.8-regression-{smoke,standard,hardware}-final-2026-11-06-claude.md`); rerun of the two fixed cases on the same install, both passed (`...-hardware-final2-2026-11-06-claude.md`); the speaker case rerun hit another suite bug, fixed and not run again (`...-final2-speakers-...`), its result rests on a by-hand check in the final hardware report. Not tested: Windows 10, NVIDIA/AMD, mixed-DPI second monitor, SmartScreen; the A/V sync estimate (28 to 37 ms, uncertainty 10 to 20 ms) is not confirmed with a phone. Release text: `docs/development/release-0.2.8-github-text.md`; steps: `docs/development/release-day-0.2.8.md`. Open for the maintainer: merge, tag, publish, winget pull request. This section becomes "published" only after step 8 of the release-day steps.
 
-## Release 0.3.4 (screenshot catch-up; planned, not built)
+## Release 0.3.4 (screenshot catch-up; in progress, release candidate not built)
 
-Specs final and defaults accepted Nov 14, 2026; plan `specs/plans/release-0.3.4-plan.md`; design pack local at `specs/capturemann-0.3.4-design/`. Nothing is built. Spec files: `features/01-screenshot.md` (CAP-6), `02-annotation.md` (ANN-8 to ANN-11), `19-click-guide.md`, `20-boards-and-bulk.md`, with REC-5.AC18, LIB-1.AC8 to AC11, PRM-1.AC1b, IMP-6.AC10 to AC13. Windows regression of 0.3.3 ran Nov 14 (hardware tier 63/0, 19 skipped).
+Specs final and defaults accepted Nov 14, 2026; plan `specs/plans/release-0.3.4-plan.md`; design pack local at `specs/capturemann-0.3.4-design/`. The feature tracks are merged on `main` (Nov 14, 2026); no release candidate is built, nothing is tagged. Spec files: `features/01-screenshot.md` (CAP-6), `02-annotation.md` (ANN-8 to ANN-11), `19-click-guide.md`, `20-boards-and-bulk.md`, with REC-5.AC18, LIB-1.AC8 to AC11, PRM-1.AC1b, IMP-6.AC10 to AC13. Windows regression of 0.3.3 ran Nov 14 (hardware tier 63/0, 19 skipped).
+
+| Feature | Built on `main` | How it was checked (Nov 14, 2026) |
+|---|---|---|
+| Long Shot (CAP-6) | scrolling capture, auto and by hand | tested with fakes; Windows PARTIAL report `verification/L1-windows-0.3.4-long-shot-scroll-2026-11-14-claude.md`; not run on Linux, Intel Mac |
+| Click Guide (GDE-1 to GDE-4) | the `guide` capture kind, `start_guide` | tested with fakes; Windows PARTIAL report `verification/GDE-windows-0.3.3-guide-cases-2026-11-14-claude.md` (cases run on the 0.3.3 install) |
+| Touch-up: Retype, Move area (ANN-9, ANN-10) | base-edit ops with a measured fill | tested with fakes and golden images (`cm-render` `touchup_034`); fill quality measured on real macOS and Windows screens, PARTIAL report `verification/S2-fill-quality-0.3.4-2026-11-14-claude.md` (a busy-fill warning fires on an icon or control in the box, not on a busy photo: wording changed; the erased box is padded by 1 px) |
+| Zoom Lens (ANN-8, op `magnify`) | loupe op | tested with fakes and golden images; not seen by eye on Windows or Linux |
+| Blueprint (ANN-11) | bars over text, kept lines | tested with fakes and golden images; fill quality as the S2 report above |
+| Boards (BRD-1) | board compose | tested with fakes; no hardware report |
+| Bulk export (BLK-1) | bulk compose | tested with fakes; no hardware report |
+| CMYK JPEG conversion | import | tested with fakes; no report |
+| Recording HUD and bubble drag on Windows (B2, B3, REC-5.AC18) | snap, remember, settle | Windows PARTIAL reports `verification/HUD-1-windows-before-fix-2026-11-14-claude.md`, `HUD-1-windows-checks-2026-11-14-claude.md`, `HUD-1-windows-after-fix-2026-11-14-claude.md`; the bubble position on the CLI start path was not restored with `camera.remember_position` (fixed on `main` in the polish pass, tested with fakes) |
+
+Not run: Intel Mac hardware, Windows 10, a second monitor, the full `cm-regress` tiers on the 0.3.4 files (none exist yet).
 
 ## Release 0.3.3 (annotation pack, text fields; released Nov 13, 2026, tag `v0.3.3` on `85df0235`)
 
