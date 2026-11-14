@@ -8,7 +8,7 @@ use krilla::color::rgb;
 use krilla::geom::{PathBuilder, Point, Rect, Size, Transform};
 use krilla::image::Image;
 use krilla::page::PageSettings;
-use krilla::paint::Stroke;
+use krilla::paint::{Fill, Stroke};
 use krilla::text::{Font, TextDirection};
 use krilla::Document;
 
@@ -152,11 +152,18 @@ pub fn pdf(
     let mut i = 0;
     while i < blocks.len() {
         let (h, _, keep) = &blocks[i];
-        let need = if *keep && i + 1 < blocks.len() {
-            h + blocks[i + 1].0
-        } else {
-            *h
-        };
+        // A run of `keep` blocks (heading, note, gap) goes with the block after it (the picture).
+        let mut need = *h;
+        if *keep {
+            let mut j = i + 1;
+            while j < blocks.len() {
+                need += blocks[j].0;
+                if !blocks[j].2 {
+                    break;
+                }
+                j += 1;
+            }
+        }
         if y + need > bottom && y > MARGIN {
             pages.push(Vec::new());
             y = MARGIN;
@@ -211,6 +218,9 @@ pub fn pdf(
                             ..Stroke::default()
                         }));
                         s.draw_path(&path);
+                        // The text that follows is filled and not outlined.
+                        s.set_stroke(None);
+                        s.set_fill(Some(Fill::default()));
                     }
                     s.pop();
                 }
