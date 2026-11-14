@@ -78,11 +78,20 @@ impl Confirmer for NeverAnswers {
 pub struct RecordingClipboard {
     last: Mutex<Option<Vec<u8>>>,
     text: Mutex<Option<String>>,
+    html: Mutex<Option<String>>,
 }
 
 impl RecordingClipboard {
     pub fn last_text(&self) -> Option<String> {
         self.text
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+
+    /// The HTML half of the last rich-text copy.
+    pub fn last_html(&self) -> Option<String> {
+        self.html
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .clone()
@@ -103,6 +112,12 @@ impl Clipboard for std::sync::Arc<RecordingClipboard> {
     }
 
     fn copy_text(&self, text: &str) -> Result<(), CmError> {
+        *self.text.lock().unwrap_or_else(PoisonError::into_inner) = Some(text.to_owned());
+        Ok(())
+    }
+
+    fn copy_rich_text(&self, html: &str, text: &str) -> Result<(), CmError> {
+        *self.html.lock().unwrap_or_else(PoisonError::into_inner) = Some(html.to_owned());
         *self.text.lock().unwrap_or_else(PoisonError::into_inner) = Some(text.to_owned());
         Ok(())
     }

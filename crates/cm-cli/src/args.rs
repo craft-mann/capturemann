@@ -76,6 +76,12 @@ pub enum Command {
         #[command(subcommand)]
         cmd: RecordCmd,
     },
+    /// Click Guide (`start_guide`, `stop_guide`, `get_guide`, `set_guide`, `export_guide`): click
+    /// through a task once and get a numbered guide with a screenshot of each click.
+    Guide {
+        #[command(subcommand)]
+        cmd: crate::commands::guide::GuideCmd,
+    },
     /// Print the text in a screenshot (`recognize_text`, read-only, on this computer only): plain
     /// text in reading order from the rendered image (annotations and redactions applied, so
     /// blurred text is not read). `--region` limits it; `--copy` puts it on the clipboard.

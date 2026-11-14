@@ -1446,6 +1446,8 @@ pub fn all() -> Vec<ToolSpec> {
     tools.extend(edit_tools());
     // Local AI (M5).
     tools.extend(ai_tools());
+    // Click Guide (GDE-4).
+    tools.extend(crate::guide_tools::tools());
     tools
 }
 

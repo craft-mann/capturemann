@@ -188,6 +188,8 @@ pub(crate) struct Inner {
     pub(crate) jobs: Option<JobsRuntime>,
     /// The recording engine, when one was configured ([`DaemonBuilder::recording_sources`]).
     pub(crate) recording: Option<RecordingEngine>,
+    /// The Click Guide session and its click source (GDE-1).
+    pub(crate) guide: crate::guide::GuideRuntime,
     next_session: AtomicU64,
     confirm_timeout: Duration,
     /// The library watcher task, once started (ends when the daemon is dropped).
@@ -243,6 +245,7 @@ pub struct DaemonBuilder {
     recording_options: EngineOptions,
     kept_windows: Option<Arc<dyn Fn() -> Vec<u32> + Send + Sync>>,
     camera_watcher: Option<Box<dyn cm_camera::CameraWatcher>>,
+    guide_clicks: Arc<dyn crate::guide::GuideClicks>,
     /// `recording_system` was used: audio recordings hold the OS power assertion (VOC-1).
     system_idle_sleep: bool,
 }
@@ -273,8 +276,22 @@ impl DaemonBuilder {
             recording_options: EngineOptions::default(),
             kept_windows: None,
             camera_watcher: None,
+            guide_clicks: Arc::new(crate::guide::NoClicks),
             system_idle_sleep: false,
         }
+    }
+
+    /// The click source of Click Guide (GDE-1). Without one `start_guide` answers
+    /// `not_implemented`. Tests pass [`crate::guide::ScriptedClicks`].
+    pub fn guide_clicks(mut self, clicks: impl crate::guide::GuideClicks + 'static) -> Self {
+        self.guide_clicks = Arc::new(clicks);
+        self
+    }
+
+    /// Click Guide on this system's real mouse-down listener (REC-7's source, clicks only).
+    /// Only turn this on in a process that shows the recording HUD.
+    pub fn guide_system(self) -> Self {
+        self.guide_clicks(crate::guide::clicks::sys::SystemClicks::default())
     }
 
     /// Turns on the recording engine with these track sources. Without it the recording actions
@@ -516,6 +533,7 @@ impl DaemonBuilder {
                 frames: Arc::new(FrameCache::new(self.frame_ttl)),
                 jobs: self.jobs.map(JobsRuntime::new),
                 recording,
+                guide: crate::guide::GuideRuntime::new(self.guide_clicks.clone()),
                 next_session: AtomicU64::new(1),
                 confirm_timeout: self.confirm_timeout,
                 watcher: Mutex::new(None),
@@ -608,6 +626,13 @@ impl Daemon {
     /// Subscribes to the event stream.
     pub fn subscribe(&self) -> broadcast::Receiver<Event> {
         self.inner.events.subscribe()
+    }
+
+    /// The rectangles of CaptureMann's own HUD windows in the OS's global space `[x, y, w, h]`.
+    /// A click inside one is never a Click Guide step (GDE-1.AC2). The app sets this whenever its
+    /// HUD moves or appears.
+    pub fn set_guide_exclusions(&self, rects: Vec<[f64; 4]>) {
+        self.inner.guide.set_exclusions(rects);
     }
 
     /// The bus itself, for layers that publish their own events (recording, jobs).
@@ -1225,6 +1250,17 @@ impl Daemon {
             Action::GetCapture(p) => inner.get_capture(p).await,
             Action::SuggestRedactions(p) => inner.suggest_redactions(p).await,
             Action::RecognizeText(p) => inner.recognize_text(p).await,
+            Action::Guide(p) => match p.op {
+                crate::guide::GuideOp::Start {
+                    target,
+                    title,
+                    countdown_s,
+                } => inner.start_guide(actor, target, title, countdown_s).await,
+                crate::guide::GuideOp::Stop { guide_id } => inner.stop_guide(actor, guide_id).await,
+                crate::guide::GuideOp::Get { guide_id } => inner.get_guide(guide_id).await,
+                crate::guide::GuideOp::Set(a) => inner.set_guide(actor, *a).await,
+                crate::guide::GuideOp::Export(a) => inner.export_guide(actor, *a).await,
+            },
             Action::GetSettings(p) => inner.get_settings(p),
             Action::SetSettings(p) => inner.set_settings(actor, p).await,
             Action::Undo(p) => inner.undo_redo(actor, p, true).await,
@@ -1362,7 +1398,11 @@ impl Inner {
         let n = spec.name;
         // The local part of `delete_capture` is built in; an external engine, if it claims the
         // action, takes over (it then owns the remote copies too).
-        if n == "delete_capture" || n == "move_library" || n == "import_media" {
+        if n == "delete_capture"
+            || n == "move_library"
+            || n == "import_media"
+            || crate::guide::handles(n)
+        {
             return true;
         }
         // The built-in YouTube publisher needs the accounts file; an external engine, if it

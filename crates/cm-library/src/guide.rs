@@ -131,6 +131,20 @@ impl GuideStep {
     }
 }
 
+/// One entry of `set_guide { steps }`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct StepEdit {
+    /// An existing step; `None` makes a new note step (then `title` is required).
+    pub id: Option<String>,
+    pub title: Option<String>,
+    pub note: Option<String>,
+    #[serde(default)]
+    pub delete: bool,
+    /// Adds a copy of the step right after it.
+    #[serde(default)]
+    pub duplicate: bool,
+}
+
 /// The editable state a history entry stores.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GuideState {
@@ -365,7 +379,12 @@ impl GuideBundle {
         let manifest = GuideManifest::from_json(&text)?;
         let gp = dir.join(GUIDE_FILE);
         let text = fs::read_to_string(&gp).map_err(|e| io_err("cannot read", &gp, &e))?;
-        let doc: GuideDoc = serde_json::from_str(&text).map_err(|e| json_err("guide.json", &e))?;
+        let mut doc: GuideDoc =
+            serde_json::from_str(&text).map_err(|e| json_err("guide.json", &e))?;
+        // The manifest is what the library (rename_capture) edits: it wins.
+        if doc.title != manifest.title {
+            doc.title.clone_from(&manifest.title);
+        }
         if doc.schema > SCHEMA_VERSION {
             return Err(CmError::invalid_input(format!(
                 "guide.json schema {} is newer than this version ({SCHEMA_VERSION})",
@@ -661,6 +680,22 @@ impl GuideBundle {
         Ok(Some(s))
     }
 
+    /// A second mouse-down at the same spot is a double click: the newest image step keeps its
+    /// frame and takes the new title and click count (GDE-1).
+    pub fn amend_last_click(&mut self, count: u32, title: &str) -> Result<Option<String>, CmError> {
+        let title = clean(title, "title")?;
+        let Some(s) = self.doc.steps.iter_mut().rev().find(|s| s.click.is_some()) else {
+            return Ok(None);
+        };
+        if let Some(c) = &mut s.click {
+            c.count = count;
+        }
+        s.title = title;
+        let id = s.id.clone();
+        self.save()?;
+        Ok(Some(id))
+    }
+
     pub fn set_has_proposals(&mut self, step_id: &str, v: bool) -> Result<(), CmError> {
         let s = self
             .doc
@@ -846,21 +881,14 @@ impl GuideBundle {
         })
     }
 
-    /// Copies a step (image bundle included) right after the original.
-    pub fn duplicate_step(
-        &mut self,
-        id: &str,
-        by: &Actor,
-        at: OffsetDateTime,
-    ) -> Result<String, CmError> {
-        let src = self.step(id)?.clone();
+    /// Makes a copy of `src` with a new id and its own image folder (not yet in the step list).
+    fn copy_step(&mut self, src: &GuideStep, at: OffsetDateTime) -> Result<GuideStep, CmError> {
         if self.doc.steps.len() >= MAX_STEPS {
             return Err(CmError::invalid_input("the guide is full"));
         }
         let new_id = self.mint_step_id();
         let mut copy = src.clone();
         copy.id.clone_from(&new_id);
-        copy.has_proposals = src.has_proposals;
         if let Some(img) = &src.image {
             let steps = self.dir.join(STEPS_DIR);
             let name = format!("{new_id}.cmshot");
@@ -885,6 +913,19 @@ impl GuideBundle {
             }
             copy.image = Some(name);
         }
+        Ok(copy)
+    }
+
+    /// Copies a step (image bundle included) right after the original.
+    pub fn duplicate_step(
+        &mut self,
+        id: &str,
+        by: &Actor,
+        at: OffsetDateTime,
+    ) -> Result<String, CmError> {
+        let src = self.step(id)?.clone();
+        let copy = self.copy_step(&src, at)?;
+        let new_id = copy.id.clone();
         self.change("duplicate_step", by, at, |g| {
             let p = g
                 .doc
@@ -896,6 +937,94 @@ impl GuideBundle {
             Ok(())
         })?;
         Ok(new_id)
+    }
+
+    /// `set_guide { steps }`: the new order, titles, notes, deletions, duplicates and new note
+    /// steps as ONE undo step. Steps the list does not name keep their order after the named
+    /// ones.
+    pub fn edit_steps(
+        &mut self,
+        edits: &[StepEdit],
+        by: &Actor,
+        at: OffsetDateTime,
+    ) -> Result<(), CmError> {
+        let mut copies: Vec<Option<GuideStep>> = Vec::with_capacity(edits.len());
+        for (i, e) in edits.iter().enumerate() {
+            let field = format!("steps[{i}]");
+            match &e.id {
+                Some(id) => {
+                    self.step(id)
+                        .map_err(|_| CmError::invalid_field(&field, format!("no step `{id}`")))?;
+                    if let Some(t) = &e.title {
+                        clean(t, &field)?;
+                    }
+                    if let Some(t) = &e.note {
+                        clean(t, &field)?;
+                    }
+                }
+                None if e.title.is_none() => {
+                    return Err(CmError::invalid_field(
+                        &field,
+                        "a step without `id` is a new note step and needs a `title`",
+                    ))
+                }
+                None => {}
+            }
+            copies.push(None);
+        }
+        for (i, e) in edits.iter().enumerate() {
+            if let (true, false, Some(id)) = (e.duplicate, e.delete, &e.id) {
+                let src = self.step(id)?.clone();
+                copies[i] = Some(self.copy_step(&src, at)?);
+            }
+        }
+        let mut notes = Vec::new();
+        for (e, c) in edits.iter().zip(&copies) {
+            if e.id.is_none() && c.is_none() {
+                let id = self.mint_step_id();
+                notes.push(GuideStep {
+                    id,
+                    kind: "note".to_owned(),
+                    title: clean(e.title.as_deref().unwrap_or_default(), "title")?,
+                    note: clean(e.note.as_deref().unwrap_or_default(), "note")?,
+                    image: None,
+                    click: None,
+                    focus_crop: false,
+                    has_proposals: false,
+                    extra: Map::new(),
+                });
+            }
+        }
+        self.change("edit_steps", by, at, |g| {
+            let mut rest = std::mem::take(&mut g.doc.steps);
+            let mut out = Vec::with_capacity(rest.len() + edits.len());
+            let mut notes = notes.into_iter();
+            for (e, copy) in edits.iter().zip(copies) {
+                let Some(id) = &e.id else {
+                    out.extend(notes.next());
+                    continue;
+                };
+                let Some(p) = rest.iter().position(|s| &s.id == id) else {
+                    continue;
+                };
+                let mut s = rest.remove(p);
+                if e.delete {
+                    continue;
+                }
+                if let Some(t) = &e.title {
+                    s.title = t.trim().to_owned();
+                }
+                if let Some(t) = &e.note {
+                    s.note = t.trim().to_owned();
+                }
+                out.push(s);
+                out.extend(copy);
+            }
+            out.extend(rest);
+            g.doc.steps = out;
+            Ok(())
+        })?;
+        self.reconcile()
     }
 
     /// Inserts a note step after `after` (or at the end).

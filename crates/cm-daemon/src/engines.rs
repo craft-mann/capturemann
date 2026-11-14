@@ -14,6 +14,15 @@ use crate::error::DaemonError;
 pub trait Clipboard: Send + Sync {
     fn copy_png(&self, png: &[u8]) -> Result<(), CmError>;
 
+    /// Copies rich text: `html` for apps that paste formatted text and pictures (a ticket,
+    /// Notion, Google Docs) and `text` for the rest (`export_guide` as `rich_text`, GDE-3). The
+    /// default says there is no rich-text clipboard.
+    fn copy_rich_text(&self, _html: &str, _text: &str) -> Result<(), CmError> {
+        Err(CmError::invalid_input(
+            "no rich-text clipboard is available in this daemon",
+        ))
+    }
+
     /// Copies plain text (`recognize_text`, ANN-5). The default says there is no text clipboard.
     fn copy_text(&self, _text: &str) -> Result<(), CmError> {
         Err(CmError::invalid_input(

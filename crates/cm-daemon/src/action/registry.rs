@@ -41,6 +41,12 @@ pub const ACTIONS: &[ActionSpec] = &[
     // Copy text from a screenshot (ANN-5): reads the RENDERED image with the on-device text
     // recognizer. Read-only: nothing is stored; `copy_to_clipboard` only sets the clipboard.
     spec("recognize_text", Tier::Free, false),
+    // Click Guide (GDE-4): starting listens to clicks, so it asks; the rest only works on guides.
+    spec("start_guide", Tier::Confirm, true),
+    spec("stop_guide", Tier::Free, true),
+    spec("get_guide", Tier::Free, false),
+    spec("set_guide", Tier::Free, true),
+    spec("export_guide", Tier::Free, true),
     spec("get_settings", Tier::Free, false),
     spec("set_settings", Tier::Free, true),
     spec("undo", Tier::Free, true),

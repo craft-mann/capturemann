@@ -23,6 +23,7 @@
 
 pub mod conn;
 pub mod events;
+pub mod guide_tools;
 pub mod http;
 pub mod prompts;
 pub mod resources;

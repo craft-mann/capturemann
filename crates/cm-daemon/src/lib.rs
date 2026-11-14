@@ -55,6 +55,7 @@ pub mod export_audio;
 pub mod fixture;
 mod frames;
 pub mod gate;
+pub mod guide;
 mod handlers;
 mod idem;
 pub mod import_ops;
