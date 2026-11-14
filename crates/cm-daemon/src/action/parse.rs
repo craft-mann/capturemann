@@ -311,6 +311,7 @@ impl Action {
                 Action::GetDiagnostics
             }
             crate::text_ops::METHOD => return crate::text_ops::parse(&f),
+            crate::blueprint_ops::METHOD => return crate::blueprint_ops::parse(&f),
             crate::read_tools::CURSOR_METHOD => {
                 return crate::read_tools::parse_cursor(&f);
             }

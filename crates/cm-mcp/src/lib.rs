@@ -28,6 +28,7 @@ pub mod prompts;
 pub mod resources;
 pub mod server;
 pub mod tools;
+pub mod tools_annotate;
 
 pub use conn::{endpoint_connector, ConnError, Connector, DaemonConn, RpcError};
 pub use http::{generate_token, serve_http, HttpOptions, HttpServer};

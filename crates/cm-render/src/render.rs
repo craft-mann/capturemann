@@ -8,13 +8,15 @@ use tiny_skia::{
 };
 
 use crate::annot;
-use crate::ops::{validate_list, validate_op, AnnotationOp, Color, OpKind};
+use crate::magnify::{transform_op, Xf};
+use crate::ops::{sort_base_edits_first, validate_list, validate_op, AnnotationOp, Color, OpKind};
 use crate::redact::{self, ordered, Region};
 use crate::text::{self, Fonts, TextStyle};
+use crate::touchup;
 
 /// Stateful renderer holding the font system (so repeated renders do not re-parse fonts).
 pub struct Renderer {
-    fonts: Fonts,
+    pub(crate) fonts: Fonts,
 }
 
 impl Default for Renderer {
@@ -46,19 +48,53 @@ impl Renderer {
     /// clipped, not rejected. If the list contains `crop` ops, the **last** one selects the
     /// visible rect (clipped to the image) and the result has that size; ops are never re-based.
     ///
+    /// Base edits (`retype`, `move_area`, `blueprint`) are sorted to the front first (stable), so
+    /// a list saved by a 0.3.3 app renders like the sorted one; `annotate` is the strict check.
+    ///
     /// Errors: `invalid_input` naming `ops[i]` for out-of-range parameters or an empty crop.
     pub fn render(&mut self, base: &RgbaImage, ops: &[AnnotationOp]) -> Result<RgbaImage, CmError> {
+        self.render_scaled(base, ops, 1.0)
+    }
+
+    /// [`Renderer::render`] at `scale` times the size (an export at 2x): the result is
+    /// `round(w * scale) x round(h * scale)`, every op is drawn at that scale and each Zoom Lens
+    /// is rendered again from `base` at `scale * zoom` (ANN-8.AC4), not enlarged from the scaled
+    /// image. `scale` must be in 0.1 to 8.
+    pub fn render_scaled(
+        &mut self,
+        base: &RgbaImage,
+        ops: &[AnnotationOp],
+        scale: f64,
+    ) -> Result<RgbaImage, CmError> {
+        if !(scale.is_finite() && (0.1..=8.0).contains(&scale)) {
+            return Err(CmError::invalid_field("scale", "must be in 0.1..=8"));
+        }
+        let mut sorted;
+        let ops = if ops.iter().is_sorted_by_key(|o| !o.kind.is_base_edit()) {
+            ops
+        } else {
+            sorted = ops.to_vec();
+            sort_base_edits_first(&mut sorted);
+            &sorted[..]
+        };
         for (i, op) in ops.iter().enumerate() {
             validate_op(i, op)?;
         }
         validate_list(ops)?;
         let (w, h) = base.dimensions();
-        let mut pm = to_pixmap(base)?;
+        let xf = Xf {
+            ox: 0.0,
+            oy: 0.0,
+            s: scale,
+        };
+        let mut pm = self.layer(base, [0, 0, w, h], scale)?;
+        let (ow, oh) = (pm.width(), pm.height());
         let mut crop: Option<(usize, [f64; 4])> = None;
         for (i, op) in ops.iter().enumerate() {
             match &op.kind {
                 OpKind::Crop { rect } => crop = Some((i, rect.to_array())),
-                kind => self.apply(&mut pm, kind).map_err(|e| {
+                OpKind::Magnify { .. } => self.draw_magnify(&mut pm, base, ops, i, scale)?,
+                kind => self.apply(&mut pm, &transform_op(kind, &xf)).map_err(|e| {
                     // Name the op (R1-9): the layer-size and text-length refusals come from
                     // the text layout, which does not know its index.
                     if e.code() == cm_core::ErrorCode::InvalidInput {
@@ -73,7 +109,13 @@ impl Renderer {
         match crop {
             None => Ok(out),
             Some((i, rect)) => {
-                let r = Region::outward_round(rect, w, h).ok_or_else(|| {
+                let rect = [
+                    rect[0] * scale,
+                    rect[1] * scale,
+                    rect[2] * scale,
+                    rect[3] * scale,
+                ];
+                let r = Region::outward_round(rect, ow, oh).ok_or_else(|| {
                     CmError::invalid_field(&format!("ops[{i}]"), "crop rect is outside the image")
                 })?;
                 Ok(
@@ -84,7 +126,47 @@ impl Renderer {
         }
     }
 
-    fn apply(&mut self, pm: &mut Pixmap, kind: &OpKind) -> Result<(), CmError> {
+    /// A layer holding the image region `reg` (`[x0, y0, x1, y1]`) at scale `s`: a plain copy at
+    /// 1, otherwise resampled from the original pixels with a cubic filter (sharper than a
+    /// bilinear enlargement).
+    pub(crate) fn layer(
+        &mut self,
+        base: &RgbaImage,
+        reg: [u32; 4],
+        s: f64,
+    ) -> Result<Pixmap, CmError> {
+        let (rw, rh) = (reg[2] - reg[0], reg[3] - reg[1]);
+        let whole = reg == [0, 0, base.width(), base.height()];
+        if s == 1.0 && whole {
+            return to_pixmap(base);
+        }
+        let (tw, th) = (
+            (f64::from(rw) * s).round().max(1.0),
+            (f64::from(rh) * s).round().max(1.0),
+        );
+        if tw * th > 150_000_000.0 || tw > 65_535.0 || th > 65_535.0 {
+            return Err(CmError::invalid_input("the image is too large to render"));
+        }
+        let region;
+        let src: &RgbaImage = if whole {
+            base
+        } else {
+            region = image::imageops::crop_imm(base, reg[0], reg[1], rw, rh).to_image();
+            &region
+        };
+        if s == 1.0 {
+            return to_pixmap(src);
+        }
+        let big = image::imageops::resize(
+            src,
+            tw as u32,
+            th as u32,
+            image::imageops::FilterType::CatmullRom,
+        );
+        to_pixmap(&big)
+    }
+
+    pub(crate) fn apply(&mut self, pm: &mut Pixmap, kind: &OpKind) -> Result<(), CmError> {
         match kind {
             OpKind::Arrow {
                 from,
@@ -189,7 +271,10 @@ impl Renderer {
                     redact::pixelate(pm, r, *block);
                 }
             }
-            OpKind::Crop { .. } => {}
+            OpKind::Crop { .. } | OpKind::Magnify { .. } => {}
+            OpKind::Retype { .. } => touchup::apply_retype(pm, &mut self.fonts, kind)?,
+            OpKind::MoveArea { .. } => touchup::apply_move_area(pm, kind),
+            OpKind::Blueprint { .. } => touchup::apply_blueprint(pm, kind),
         }
         Ok(())
     }

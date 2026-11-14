@@ -388,6 +388,37 @@ impl ShotBundle {
                 seen += 1;
             }
         }
+        // At most 4 zoom lenses (ANN-8.AC5) and base edits before every other op (ANN-9.AC4),
+        // counting the stored ops; errors name the new op by its index in `ops`.
+        let mut lenses = scratch.ops[..base]
+            .iter()
+            .filter(|o| matches!(o.kind, OpKind::Magnify { .. }))
+            .count();
+        let mut non_base = scratch.ops[..base].iter().any(|o| !o.kind.is_base_edit());
+        for (i, o) in scratch.ops[base..].iter().enumerate() {
+            if matches!(o.kind, OpKind::Magnify { .. }) {
+                lenses += 1;
+                if lenses > cm_core::annotation::MAX_MAGNIFY {
+                    return Err(CmError::invalid_field(
+                        &format!("ops[{i}]"),
+                        "at most 4 zoom lenses per image",
+                    ));
+                }
+            }
+            if o.kind.is_base_edit() {
+                if non_base {
+                    return Err(CmError::invalid_field(
+                        &format!("ops[{i}]"),
+                        format!(
+                            "`{}` is a base edit and must come before every other op; send the whole list with replace: true",
+                            o.kind.name()
+                        ),
+                    ));
+                }
+            } else {
+                non_base = true;
+            }
+        }
         // Keep the id counter ahead of anything we minted (it is not part of undo).
         self.manifest.op_seq = self.manifest.op_seq.max(scratch.op_seq);
         self.execute(name, by, at, changes)

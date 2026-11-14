@@ -41,6 +41,8 @@ pub const ACTIONS: &[ActionSpec] = &[
     // Copy text from a screenshot (ANN-5): reads the RENDERED image with the on-device text
     // recognizer. Read-only: nothing is stored; `copy_to_clipboard` only sets the clipboard.
     spec("recognize_text", Tier::Free, false),
+    // Blueprint (ANN-11): the text lines as boxes for a `blueprint` op. Read-only.
+    spec("suggest_blueprint", Tier::Free, false),
     spec("get_settings", Tier::Free, false),
     spec("set_settings", Tier::Free, true),
     spec("undo", Tier::Free, true),

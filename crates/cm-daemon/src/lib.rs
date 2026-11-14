@@ -40,6 +40,7 @@ pub mod action;
 pub mod ai;
 pub mod ai_engine;
 pub mod auto_upload;
+pub mod blueprint_ops;
 pub mod caption_options;
 pub mod clock;
 pub mod config;

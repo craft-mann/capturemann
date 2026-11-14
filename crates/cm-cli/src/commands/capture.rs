@@ -364,7 +364,46 @@ async fn suggest_redactions(cx: &mut Ctx<'_>, a: AnnotateArgs) -> Result<(), Cli
     Ok(())
 }
 
+/// `annotate <id> --suggest-blueprint` (ANN-11): read-only.
+async fn suggest_blueprint(cx: &mut Ctx<'_>, a: AnnotateArgs) -> Result<(), CliError> {
+    let mut c = cx.client().await?;
+    let r = c
+        .call("suggest_blueprint", json!({ "capture_id": a.id }))
+        .await?;
+    cx.emit(&r, |r| {
+        let boxes = r["boxes"].as_array().map_or(&[][..], Vec::as_slice);
+        let mut s = format!(
+            "{} text line(s) in {} (nothing applied)\n",
+            boxes.len(),
+            plain(&r["capture_id"])
+        );
+        for x in boxes {
+            let n = |i: usize| x["rect"][i].as_f64().unwrap_or(0.0);
+            let _ = writeln!(
+                s,
+                "  [{}, {}, {}, {}]  confidence {:.2}  {}",
+                n(0),
+                n(1),
+                n(2),
+                n(3),
+                x["confidence"].as_f64().unwrap_or(0.0),
+                plain(&x["text_preview"])
+            );
+        }
+        if !boxes.is_empty() {
+            s.push_str(
+                "  apply with: annotate <id> --replace --ops '[{\"op\":\"blueprint\",\"boxes\":[[x,y,w,h]],\"fills\":[...],\"colors\":[...]}]' (use --json for the fills and colours)\n",
+            );
+        }
+        s
+    });
+    Ok(())
+}
+
 pub(super) async fn annotate(cx: &mut Ctx<'_>, a: AnnotateArgs) -> Result<(), CliError> {
+    if a.suggest_blueprint {
+        return suggest_blueprint(cx, a).await;
+    }
     if a.suggest_redactions || a.redact_emails || !a.kinds.is_empty() {
         return suggest_redactions(cx, a).await;
     }

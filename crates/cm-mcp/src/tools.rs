@@ -102,7 +102,7 @@ pub fn op_schema() -> Value {
         req.extend_from_slice(required);
         json!({ "type": "object", "properties": p, "required": req })
     };
-    json!({
+    let mut schema = json!({
         "oneOf": [
             variant("arrow", json!({ "from": point(), "to": point(), "color": color, "width": width }), &["from", "to"]),
             variant("line", json!({ "from": point(), "to": point(), "color": color, "width": width }), &["from", "to"]),
@@ -146,7 +146,12 @@ pub fn op_schema() -> Value {
             variant("pixelate", json!({ "rect": rect(), "block": { "type": "integer", "minimum": 6, "maximum": 32, "default": 12 } }), &["rect"]),
             variant("crop", json!({ "rect": rect() }), &["rect"]),
         ]
-    })
+    });
+    // 0.3.4: magnify, retype, move_area, blueprint (ANN-8 to ANN-11).
+    if let Some(a) = schema["oneOf"].as_array_mut() {
+        a.extend(crate::tools_annotate::op_variants());
+    }
+    schema
 }
 
 fn image_ref() -> Value {
@@ -534,7 +539,7 @@ pub fn all() -> Vec<ToolSpec> {
             mutating: true,
             destructive: false,
             spec: "ANN-1, ANN-2",
-            summary: "Add annotation ops (arrow, line, rect, ellipse, text, highlight, step, callout, spotlight, stamp, blur, pixelate, crop) to a screenshot. `callout` is a text box with a pointer (its `rect` is the minimum size: the box grows to fit the text); `spotlight` dims or blurs everything outside its shapes (at most one per image; `blur` mode is a look, not a redaction); `stamp` is a check, cross, exclaim, question mark or a `label` word; `step` can carry a `style` (number, upper, lower), a `start` and a `text` label. Ops are drawn in list order. One call is one revision and one undo step. Coordinates are physical px of the original image. Returns the revision and the rendered image.",
+            summary: "Add annotation ops (arrow, line, rect, ellipse, text, highlight, step, callout, spotlight, stamp, magnify, retype, move_area, blueprint, blur, pixelate, crop) to a screenshot. `magnify` is the Zoom Lens (at most 4; rendered from the original with the ops listed before it inside, and with every blur or pixelate applied to it); `retype`, `move_area` and `blueprint` are BASE EDITS that change pixels and must come before every other op (`invalid_input` naming `ops[i]` otherwise; to add one to an image that already has ops, send the whole list with `replace: true`), they are not redaction (use blur or pixelate for secrets), and their `fill` is measured once and stored in the op (`suggest_blueprint` returns measured fills and colours). `callout` is a text box with a pointer (its `rect` is the minimum size: the box grows to fit the text); `spotlight` dims or blurs everything outside its shapes (at most one per image; `blur` mode is a look, not a redaction); `stamp` is a check, cross, exclaim, question mark or a `label` word; `step` can carry a `style` (number, upper, lower), a `start` and a `text` label. Ops are drawn in list order. One call is one revision and one undo step. Coordinates are physical px of the original image. Returns the revision and the rendered image.",
             input: json!({ "type": "object", "properties": {
                 "capture_id": capture_id(),
                 "ops": { "type": "array", "items": op_schema(), "description": "The ops to add. Empty is allowed only with `replace: true`, which clears every annotation (revert to the original)." },
@@ -1452,6 +1457,8 @@ pub fn all() -> Vec<ToolSpec> {
     tools.extend(edit_tools());
     // Local AI (M5).
     tools.extend(ai_tools());
+    // 0.3.4 annotation tools (suggest_blueprint, ANN-11).
+    tools.extend(crate::tools_annotate::tools());
     tools
 }
 

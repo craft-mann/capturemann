@@ -19,11 +19,13 @@
 
 mod annot;
 pub mod compose;
+mod magnify;
 pub mod ocr;
 pub mod ops;
 mod redact;
 mod render;
 mod text;
+pub mod touchup;
 
 pub use compose::{ClickMark, ClickStyle, Compositor, CursorLayer, CursorSprite, MAX_CLICKS};
 pub use ops::{
@@ -31,6 +33,10 @@ pub use ops::{
     BLUR_STRENGTH_RANGE, PIXELATE_BLOCK_RANGE,
 };
 pub use render::{render_annotations, Renderer};
+pub use touchup::{
+    blueprint_bars, measure_blueprint, measure_fill, measure_text_style, retype_text_extent,
+    ring_error, BlueprintBoxStyle, FillMeasure, TextMeasure,
+};
 
 /// The box a `callout` op is drawn with: `max(rect, measured text size + padding)` (ANN-4). The
 /// editor draws its handles from this, not from the stored `rect`. `None` for other ops. Text

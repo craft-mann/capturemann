@@ -45,6 +45,7 @@ pub const CLI_COMMANDS: &[(&str, Option<&str>)] = &[
     ("get_capture", Some("capture get")),
     ("suggest_redactions", Some("annotate --suggest-redactions")),
     ("recognize_text", Some("text")),
+    ("suggest_blueprint", Some("annotate --suggest-blueprint")),
     ("get_settings", Some("settings get")),
     ("set_settings", Some("settings set")),
     ("undo", Some("undo")),
