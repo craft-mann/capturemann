@@ -213,8 +213,10 @@ impl Lines {
         let mut bad = 0;
         for (p, q) in self
             .line(ia)
-            .chunks_exact(4)
-            .zip(other.line(ib).chunks_exact(4))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .zip(other.line(ib).as_chunks::<4>().0.iter())
         {
             if p.iter()
                 .zip(q)
@@ -788,7 +790,7 @@ impl Stitcher {
     /// `max_h` rows are kept (the preview follows the growing end). Horizontal captures are
     /// fitted whole into `max_w` x `max_h`. `None` before the first frame.
     pub fn thumbnail(&self, max_w: u32, max_h: u32) -> Option<Frame> {
-        let (w, _) = self.size?;
+        self.size?;
         let (max_w, max_h) = (max_w.max(1), max_h.max(1));
         if self.dir == Direction::Horizontal {
             let whole = self.finish().ok()?.frame;

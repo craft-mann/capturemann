@@ -193,7 +193,7 @@ impl SyntheticPage {
                     .take(self.header_clock as usize)
                     .enumerate()
                 {
-                    if (k as u32 / 2 + pos / 7) % 2 == 0 {
+                    if (k as u32 / 2 + pos / 7).is_multiple_of(2) {
                         *p = [255, 255, 255, 255];
                     }
                 }
