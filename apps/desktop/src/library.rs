@@ -13,6 +13,8 @@ pub enum Kind {
     Recording,
     /// An audio-only recording (`kind: "audio"`, VOC-1).
     Audio,
+    /// A Click Guide (`kind: "guide"`, GDE-1).
+    Guide,
 }
 
 /// What the context menu of a library card offers (LIB-1): Open, Reveal in Finder, Rename, Delete.
@@ -106,6 +108,7 @@ impl Kind {
             Kind::Screenshot => tr_ctx!("capture kind", "Screenshot"),
             Kind::Recording => tr_ctx!("capture kind", "Recording"),
             Kind::Audio => tr_ctx!("capture kind", "Audio"),
+            Kind::Guide => tr_ctx!("capture kind", "Click Guide"),
         }
     }
 }
@@ -151,6 +154,7 @@ impl CaptureItem {
             "screenshot" => Kind::Screenshot,
             "recording" => Kind::Recording,
             "audio" => Kind::Audio,
+            "guide" => Kind::Guide,
             _ => return None,
         };
         let created = OffsetDateTime::parse(

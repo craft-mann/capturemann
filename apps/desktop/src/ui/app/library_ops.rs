@@ -247,7 +247,9 @@ pub fn is_unavailable(e: &crate::backend::CallError) -> bool {
 
 /// A recording opens its details card, a screenshot the editor (recording ids start with `rec_`).
 pub fn open_route(id: &str) -> Route {
-    if id.starts_with("rec_") {
+    if id.starts_with("guide_") {
+        Route::Guide(id.to_owned())
+    } else if id.starts_with("rec_") {
         Route::Recording(id.to_owned())
     } else {
         Route::Editor(id.to_owned())

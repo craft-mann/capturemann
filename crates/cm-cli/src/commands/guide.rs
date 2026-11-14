@@ -101,16 +101,19 @@ pub struct GuideSetArgs {
 pub struct GuideExportArgs {
     /// The guide.
     pub id: String,
-    /// `markdown` (a folder with guide.md and images/), `html` (one file), `rich-text` (clipboard)
-    /// or `pdf` (not in this version).
+    /// `markdown` (a folder with guide.md and images/), `html` (one file), `pdf` (one file) or
+    /// `rich-text` (clipboard).
     #[arg(long, value_parser = ["markdown", "html", "pdf", "rich-text"])]
     pub format: String,
-    /// Where to write: a folder for markdown, a file or folder for html. Not used by rich-text.
+    /// Where to write: a folder for markdown, a file or folder for html and pdf. Not used by rich-text.
     #[arg(long, value_name = "PATH")]
     pub dest: Option<String>,
     /// Step headings: `numbered` (`1. Title`), `step` (`Step 1 · Title`) or `title-only`.
     #[arg(long, value_parser = ["numbered", "step", "title-only"])]
     pub headings: Option<String>,
+    /// PDF paper size (default `a4`).
+    #[arg(long, value_parser = ["a4", "letter"])]
+    pub paper: Option<String>,
     /// Image size: 1 (at most 800 px wide) or 2 (1600 px, never larger than the frame).
     #[arg(long, value_parser = ["1", "2"])]
     pub image_scale: Option<String>,
@@ -260,6 +263,9 @@ async fn export(cx: &mut Ctx<'_>, a: GuideExportArgs) -> Result<(), CliError> {
     }
     if let Some(h) = &a.headings {
         p.insert("headings".into(), json!(h.replace('-', "_")));
+    }
+    if let Some(s) = &a.paper {
+        p.insert("paper".into(), json!(s));
     }
     if let Some(s) = &a.image_scale {
         p.insert("image_scale".into(), json!(s.parse::<u32>().unwrap_or(1)));

@@ -302,13 +302,6 @@ impl Inner {
         if self.guide.active_id().as_deref() == Some(a.guide_id.as_str()) {
             return Err(CmError::busy("stop the guide before exporting it").into());
         }
-        if a.format == Format::Pdf {
-            return Err(DaemonError::NotImplemented(
-                "PDF export is not in this version: export HTML and print it (its print styles \
-                 are made for that)"
-                    .to_owned(),
-            ));
-        }
         let _serial = self.capture_locks.lock(&a.guide_id).await;
         let dir = {
             let lib = lock_library(&self.library);
@@ -391,7 +384,18 @@ impl Inner {
                     out["copied_to_clipboard"] = json!(copied);
                     out["html"] = json!(frag);
                 }
-                Format::Pdf => {}
+                Format::Pdf => {
+                    let dest = PathBuf::from(a.dest.as_deref().unwrap_or_default());
+                    let path = if dest.is_dir() || dest.extension().is_none() {
+                        dest.join(format!("{}.pdf", file_stem(&doc.title)))
+                    } else {
+                        dest
+                    };
+                    let bytes = super::pdf::pdf(&doc, a.headings, a.intro, a.notes, a.paper)?;
+                    write_file(&path, &bytes)?;
+                    out["path"] = json!(path);
+                    out["files"] = json!([path.file_name().map(|n| n.to_string_lossy())]);
+                }
             }
             out["warnings"] = json!(warnings);
             Ok(out)

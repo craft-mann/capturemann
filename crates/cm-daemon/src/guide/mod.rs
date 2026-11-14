@@ -18,6 +18,7 @@ use crate::action::{Action, Fields, ScreenshotTarget};
 
 pub mod clicks;
 pub mod export;
+pub mod pdf;
 pub mod ring;
 pub mod session;
 pub mod titles;
@@ -159,6 +160,8 @@ pub struct ExportArgs {
     pub intro: bool,
     pub notes: bool,
     pub note_steps: bool,
+    /// PDF only: `a4` (default) or `letter`.
+    pub paper: pdf::Paper,
 }
 
 pub(crate) fn parse(method: &str, f: &Fields<'_>) -> Result<Action, CmError> {
@@ -345,8 +348,14 @@ fn parse_export(f: &Fields<'_>) -> Result<ExportArgs, CmError> {
         "intro",
         "notes",
         "note_steps",
+        "paper",
         "request_id",
     ])?;
+    let paper = match f.str_opt("paper")?.as_deref() {
+        None | Some("a4") => pdf::Paper::A4,
+        Some("letter") => pdf::Paper::Letter,
+        Some(_) => return Err(CmError::invalid_field("paper", "must be `a4` or `letter`")),
+    };
     let format = match f.str_req("format")?.as_str() {
         "markdown" => Format::Markdown,
         "html" => Format::Html,
@@ -392,6 +401,7 @@ fn parse_export(f: &Fields<'_>) -> Result<ExportArgs, CmError> {
         intro: f.bool_or("intro", true)?,
         notes: f.bool_or("notes", true)?,
         note_steps: f.bool_or("note_steps", true)?,
+        paper,
     })
 }
 
@@ -449,8 +459,12 @@ pub(crate) fn guide_json(id: &str, g: &cm_library::guide::GuideBundle, state: &s
             o.insert("type".into(), json!(s.kind));
             o.insert("title".into(), json!(s.title));
             o.insert("note".into(), json!(s.note));
-            if s.image.is_some() {
+            if let Some(img) = &s.image {
                 o.insert("image_id".into(), json!(format!("{id}/{}", s.id)));
+                o.insert(
+                    "image_file".into(),
+                    json!(format!("steps/{img}/original.png")),
+                );
             }
             if let Some(c) = &s.click {
                 o.insert("click".into(), json!(c));
@@ -462,6 +476,7 @@ pub(crate) fn guide_json(id: &str, g: &cm_library::guide::GuideBundle, state: &s
         .collect();
     json!({
         "guide_id": id,
+        "path": g.dir(),
         "title": doc.title,
         "intro": doc.intro,
         "numbering": doc.numbering,

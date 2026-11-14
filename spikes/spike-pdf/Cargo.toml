@@ -1,0 +1,14 @@
+[package]
+name = "spike-pdf"
+description = "S4: a pure-Rust PDF writer for Click Guide export (krilla), Vietnamese text, 10 steps"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+# MIT OR Apache-2.0. Subsets and embeds the fonts it draws with.
+krilla = "0.8"
+ttf-parser = "0.25"
+image = { version = "0.25", default-features = false, features = ["png"] }

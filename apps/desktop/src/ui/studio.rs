@@ -36,6 +36,7 @@ actions!(
         OpenExport,
         ShowLibrary,
         ShowSettings,
+        NewClickGuide,
         ImportMedia,
         QuitApp,
         CloseWindow,
@@ -77,6 +78,7 @@ pub fn bind_keys(cx: &mut App) {
 pub fn app_menus() -> Vec<Menu> {
     vec![Menu::new("CaptureMann").items([
         MenuItem::action(tr_ctx!("menu", "Library"), ShowLibrary),
+        MenuItem::action(tr_ctx!("menu", "New Click Guide"), NewClickGuide),
         MenuItem::action(tr_ctx!("menu", "Import file\u{2026}"), ImportMedia),
         MenuItem::action(tr_ctx!("menu", "Settings\u{2026}"), ShowSettings),
         MenuItem::separator(),
@@ -95,6 +97,11 @@ pub fn install_app_actions(cx: &mut App) {
     cx.on_action(|_: &ShowLibrary, cx| {
         if let Some(app) = cx.try_global::<AppHandle>().map(|h| h.0.clone()) {
             app::handle_command(&app, Command::ShowLibrary, cx);
+        }
+    });
+    cx.on_action(|_: &NewClickGuide, cx| {
+        if let Some(app) = cx.try_global::<AppHandle>().map(|h| h.0.clone()) {
+            app::handle_command(&app, Command::NewClickGuide, cx);
         }
     });
     cx.on_action(|_: &ImportMedia, cx| {
@@ -116,6 +123,7 @@ pub struct Studio {
     permissions: Entity<PermissionsScreen>,
     editor: Entity<EditorView>,
     details: Entity<RecordingDetails>,
+    guide: Entity<crate::ui::guide_view::GuideView>,
     rec_editor: Entity<RecordingEditor>,
     publish: Entity<PublishPage>,
     ai: Entity<AiPage>,
@@ -156,6 +164,7 @@ impl Studio {
         let permissions = cx.new(|cx| PermissionsScreen::new(app.clone(), cx));
         let editor = cx.new(|cx| EditorView::new(app.clone(), cx));
         let details = cx.new(|cx| RecordingDetails::new(app.clone(), cx));
+        let guide = cx.new(|cx| crate::ui::guide_view::GuideView::new(app.clone(), cx));
         let rec_editor = cx.new(|cx| RecordingEditor::new(app.clone(), cx));
         let publish = cx.new(|cx| PublishPage::new(app.clone(), cx));
         let ai = cx.new(|cx| AiPage::new(app.clone(), cx));
@@ -194,6 +203,7 @@ impl Studio {
             permissions,
             editor,
             details,
+            guide,
             rec_editor,
             publish,
             ai,
@@ -321,6 +331,10 @@ impl Render for Studio {
             Route::Recording(id) => {
                 self.details.update(cx, |d, cx| d.set_capture(id, cx));
                 self.details.clone().into_any_element()
+            }
+            Route::Guide(id) => {
+                self.guide.update(cx, |g, cx| g.set_guide(id, cx));
+                self.guide.clone().into_any_element()
             }
             Route::RecordingEditor(id) => {
                 self.rec_editor.update(cx, |e, cx| e.set_capture(id, cx));
@@ -506,6 +520,6 @@ mod tests {
         let menus = app_menus();
         assert_eq!(menus.len(), 1);
         assert_eq!(menus[0].name.as_ref(), "CaptureMann");
-        assert_eq!(menus[0].items.len(), 5);
+        assert_eq!(menus[0].items.len(), 6);
     }
 }

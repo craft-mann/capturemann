@@ -468,6 +468,9 @@ impl Library {
     pub fn index_shot(&mut self, bundle: &ShotBundle) -> Result<CaptureRecord, CmError> {
         // A step image of a guide is not a library row; its guide's row is refreshed instead.
         if let Some(guide_dir) = crate::guide::guide_dir_of_step(bundle.dir()) {
+            // The guide's card picture may show what a new blur is meant to hide: drop it; the
+            // next guide edit draws a current one from the rendered step.
+            let _ = std::fs::remove_file(guide_dir.join(THUMBS_DIR).join(POSTER_FILE));
             return self.index_dir(&guide_dir);
         }
         self.index_dir(bundle.dir())

@@ -270,6 +270,46 @@ impl Worker {
     }
 }
 
+/// The card picture of a guide: its first image step, rendered (a blur is in it), 512 px.
+/// Best effort; a guide with no picture yet has none.
+pub(crate) fn write_guide_poster(dir: &std::path::Path) {
+    let Ok(g) = GuideBundle::open(dir) else {
+        return;
+    };
+    let Some(first) = g.steps().iter().find(|s| s.image.is_some()) else {
+        return;
+    };
+    let res = (|| -> Result<(), CmError> {
+        let bundle = g.open_step(&first.id)?;
+        let png = crate::handlers::render_png(&bundle)?;
+        let img = image::load_from_memory(&png)
+            .map_err(|e| CmError::internal(e.to_string()))?
+            .to_rgb8();
+        let (w, h) = img.dimensions();
+        let scale = 512.0 / f64::from(w.max(h)).max(1.0);
+        let img = if scale < 1.0 {
+            image::imageops::resize(
+                &img,
+                ((f64::from(w) * scale) as u32).max(1),
+                ((f64::from(h) * scale) as u32).max(1),
+                image::imageops::FilterType::Triangle,
+            )
+        } else {
+            img
+        };
+        let mut out = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, 85)
+            .encode_image(&img)
+            .map_err(|e| CmError::internal(e.to_string()))?;
+        let thumbs = dir.join("thumbs");
+        std::fs::create_dir_all(&thumbs).map_err(|e| CmError::internal(e.to_string()))?;
+        std::fs::write(thumbs.join("poster.jpg"), out).map_err(|e| CmError::internal(e.to_string()))
+    })();
+    if let Err(e) = res {
+        log::debug!("guide poster not written: {e}");
+    }
+}
+
 async fn ask(
     tx: &mpsc::Sender<Job>,
     make: impl FnOnce(Reply) -> Job,
@@ -499,6 +539,7 @@ impl Inner {
                                   "steps": [], "discarded": true }),
                 );
             }
+            write_guide_poster(&dir);
             lock_library(&library).index_dir(&dir)?;
             Ok(guide_json(&gid, &g, "stopped"))
         })
@@ -629,6 +670,7 @@ impl Inner {
                     g.retake_step(s, &cap.frame.to_png()?, &by, now)?;
                 }
             }
+            write_guide_poster(&dir);
             lock_library(&library).index_dir(&dir)?;
             events.publish(
                 events::CAPTURE_REVISED,
@@ -660,6 +702,7 @@ impl Inner {
             } else {
                 g.redo(&by, now)?
             };
+            write_guide_poster(&dir);
             lock_library(&library).index_dir(&dir)?;
             Ok(json!({
                 "capture_id": gid,

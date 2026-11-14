@@ -31,6 +31,9 @@ msgstr ""
 msgid "1 video"
 msgstr ""
 
+msgid "1. Title"
+msgstr ""
+
 msgid "30 fps suits most screens; 60 fps is smoother for motion."
 msgstr ""
 
@@ -92,6 +95,9 @@ msgstr ""
 msgid "A local folder has no connection to test."
 msgstr ""
 
+msgid "A note (optional)"
+msgstr ""
+
 msgid "A personal Microsoft account can make “anyone with the link” links but not “people in my organization” links. A work or school account can make both, unless its administrator forbids public links; then CaptureMann makes the organization link instead and says so. If sign-in later says the redirect does not match, add http://127.0.0.1/callback as a second redirect URI."
 msgstr ""
 
@@ -111,6 +117,9 @@ msgid "A report for an audio file is offered after its transcript is ready."
 msgstr ""
 
 msgid "A report is written from the transcript. Transcribe the recording first."
+msgstr ""
+
+msgid "A sentence or two before step 1"
 msgstr ""
 
 msgid "A text model is needed"
@@ -525,6 +534,9 @@ msgstr ""
 msgid "Back to recordings"
 msgstr ""
 
+msgid "Back to the library"
+msgstr ""
+
 msgid "Back to the recording"
 msgstr ""
 
@@ -745,6 +757,9 @@ msgstr ""
 msgid "CaptureMann couldn’t open the microphone. Pick another one, or try again."
 msgstr ""
 
+msgid "CaptureMann has no library to save the guide in."
+msgstr ""
+
 msgid "CaptureMann is already running"
 msgstr ""
 
@@ -953,6 +968,9 @@ msgstr ""
 msgid "Choose “Scoped access”, then the access type: “App folder” (Dropbox gives CaptureMann its own folder under Apps) or “Full Dropbox”. Name the app and create it."
 msgstr ""
 
+msgid "Choose…"
+msgstr ""
+
 msgid "Cited by “{section} · {n}”, playing from {time}"
 msgstr ""
 
@@ -960,6 +978,21 @@ msgid "Cited moment"
 msgstr ""
 
 msgid "Clear search"
+msgstr ""
+
+msgid "Click Guide"
+msgstr ""
+
+msgid "Click Guide did not start"
+msgstr ""
+
+msgid "Click Guide is unavailable"
+msgstr ""
+
+msgid "Click Guide needs Input Monitoring"
+msgstr ""
+
+msgid "Click Guide · clicks only"
 msgstr ""
 
 msgid "Click a display"
@@ -1091,6 +1124,9 @@ msgstr ""
 msgid "Copied"
 msgstr ""
 
+msgid "Copied the guide"
+msgstr ""
+
 msgid "Copied to clipboard"
 msgstr ""
 
@@ -1151,6 +1187,9 @@ msgid "Copy and save"
 msgstr ""
 
 msgid "Copy annotation"
+msgstr ""
+
+msgid "Copy as rich text"
 msgstr ""
 
 msgid "Copy client config to the clipboard"
@@ -1468,6 +1507,9 @@ msgstr ""
 msgid "Defaults were restored. The old file is saved as {name}."
 msgstr ""
 
+msgid "Delete"
+msgstr ""
+
 msgid "Delete \"{title}\" ({size})"
 msgstr ""
 
@@ -1719,6 +1761,9 @@ msgstr ""
 msgid "Each segment has its own window: split the recording, then move the playhead into a segment to move its window."
 msgstr ""
 
+msgid "Edit a Click Guide"
+msgstr ""
+
 msgid "Edit a report"
 msgstr ""
 
@@ -1729,6 +1774,9 @@ msgid "Edit as Markdown"
 msgstr ""
 
 msgid "Edit captions"
+msgstr ""
+
+msgid "Edit image"
 msgstr ""
 
 msgid "Edit opens the trim, cut, split, speed, background, camera, zoom, cursor and reframe tools. The MP4 export applies them to a copy; the recording itself is never changed by looking at it, editing it or exporting it."
@@ -1804,7 +1852,19 @@ msgstr ""
 msgid "Expand recording controls"
 msgstr ""
 
+msgid "Export HTML"
+msgstr ""
+
 msgid "Export MP4"
+msgstr ""
+
+msgid "Export Markdown"
+msgstr ""
+
+msgid "Export PDF"
+msgstr ""
+
+msgid "Export a Click Guide"
 msgstr ""
 
 msgid "Export a recording to MP4"
@@ -1829,6 +1889,9 @@ msgid "Export captions (SRT, VTT, TXT)"
 msgstr ""
 
 msgid "Export failed"
+msgstr ""
+
+msgid "Export guide"
 msgstr ""
 
 msgid "Export the audio of a capture"
@@ -1865,6 +1928,9 @@ msgid "Exports & uploads"
 msgstr ""
 
 msgid "Exports go to the default first"
+msgstr ""
+
+msgid "Export…"
 msgstr ""
 
 msgid "FFmpeg at `{path}` cannot be run (permission denied). FFmpeg was not found: CaptureMann includes its own copy, so reinstall CaptureMann, or set CM_FFMPEG to the path of ffmpeg.exe. (For development: winget install Gyan.FFmpeg.)"
@@ -1976,6 +2042,9 @@ msgid "Fit to window"
 msgstr ""
 
 msgid "Fix the problem and delete again; only the copies that are left are tried."
+msgstr ""
+
+msgid "Focus crop"
 msgstr ""
 
 msgid "Focus left/right"
@@ -2095,6 +2164,15 @@ msgstr ""
 msgid "Grid"
 msgstr ""
 
+msgid "Guide exported"
+msgstr ""
+
+msgid "Guide title"
+msgstr ""
+
+msgid "HTML"
+msgstr ""
+
 msgid "Helps pick the right language for short recordings, for example vi, en"
 msgstr ""
 
@@ -2141,6 +2219,9 @@ msgid "If the switch for CaptureMann already looks on in System Settings, select
 msgstr ""
 
 msgid "If your Google Cloud project is not verified, YouTube may keep the video {privacy} whatever you choose here. CaptureMann tells you when that happens and never changes a video’s visibility afterwards."
+msgstr ""
+
+msgid "Image size"
 msgstr ""
 
 msgid "Image strip"
@@ -2269,6 +2350,9 @@ msgstr ""
 msgid "Interview, 1:1, meeting around a laptop"
 msgstr ""
 
+msgid "Intro"
+msgstr ""
+
 msgid "Introduction or demo call"
 msgstr ""
 
@@ -2279,6 +2363,9 @@ msgid "It is removed from your library and moved to {trash}."
 msgstr ""
 
 msgid "It is removed from your library and moved to {trash}. Its copies online stay there unless you tick the box: deleting them cannot be undone ({services})."
+msgstr ""
+
+msgid "It never records what you type."
 msgstr ""
 
 msgid "Its own windows, toolbars and the webcam bubble preview"
@@ -2713,6 +2800,9 @@ msgstr ""
 msgid "Move (Alt resizes)"
 msgstr ""
 
+msgid "Move down"
+msgstr ""
+
 msgid "Move my captures to the new folder"
 msgstr ""
 
@@ -2762,6 +2852,9 @@ msgid "Move the zoom focus up"
 msgstr ""
 
 msgid "Move to {trash}"
+msgstr ""
+
+msgid "Move up"
 msgstr ""
 
 msgid "Moved to {trash}"
@@ -2830,6 +2923,9 @@ msgid "New captures are saved to a folder on this computer until it is back. {pa
 msgstr ""
 
 msgid "New glossary entry"
+msgstr ""
+
+msgid "New note step"
 msgstr ""
 
 msgid "New report"
@@ -2998,6 +3094,9 @@ msgstr ""
 msgid "No speech model yet"
 msgstr ""
 
+msgid "No steps were taken"
+msgstr ""
+
 #. FACT: owner review required
 msgid "No telemetry"
 msgstr ""
@@ -3112,6 +3211,12 @@ msgid "Not sure"
 msgstr ""
 
 msgid "Note"
+msgstr ""
+
+msgid "Note step"
+msgstr ""
+
+msgid "Note steps without an image"
 msgstr ""
 
 msgid "Notes only — CaptureMann doesn’t score candidates. Using AI to assess candidates is regulated in some places."
@@ -3365,6 +3470,9 @@ msgstr ""
 msgid "Owners can only be attendees or speakers; anyone else becomes “Unassigned”."
 msgstr ""
 
+msgid "PDF"
+msgstr ""
+
 msgid "PLxxxxxxxxxxxxxxxx or a playlist address"
 msgstr ""
 
@@ -3386,6 +3494,9 @@ msgstr ""
 msgid "Paste (+10 px)"
 msgstr ""
 
+msgid "Paste it into a ticket or a document: the text and the pictures are on the clipboard."
+msgstr ""
+
 msgid "Paste the App key below and say which access type you chose."
 msgstr ""
 
@@ -3401,6 +3512,9 @@ msgstr ""
 msgid "Paste the client secret."
 msgstr ""
 
+msgid "Pause"
+msgstr ""
+
 msgid "Pause a recording"
 msgstr ""
 
@@ -3411,6 +3525,9 @@ msgid "Pause recording"
 msgstr ""
 
 msgid "Paused at {percent}%"
+msgstr ""
+
+msgid "Paused · clicks are not recorded"
 msgstr ""
 
 msgid "Paused, {t}"
@@ -3450,6 +3567,9 @@ msgid "Pick on screen"
 msgstr ""
 
 msgid "Pick one or more files. Edit, transcribe and write reports as if you'd recorded them here."
+msgstr ""
+
+msgid "Pictures are rendered with your annotations and blurs. Links in the Markdown are relative, so it pastes into a wiki or a docs repo as it is."
 msgstr ""
 
 msgid "Pictures are saved as PNG. Camera and location data are not copied."
@@ -3667,6 +3787,9 @@ msgid "Re-generating replaces this transcript with a new one."
 msgstr ""
 
 msgid "Re-generating replaces this transcript. Your caption edits are kept where the same words are heard again; the others are dropped. You can undo that from the editor."
+msgstr ""
+
+msgid "Read a Click Guide"
 msgstr ""
 
 msgid "Read a capture"
@@ -3964,6 +4087,9 @@ msgstr ""
 msgid "Rectangle {n}"
 msgstr ""
 
+msgid "Redaction proposals to review"
+msgstr ""
+
 msgid "Redo"
 msgstr ""
 
@@ -4164,6 +4290,9 @@ msgstr ""
 msgid "Result"
 msgstr ""
 
+msgid "Resume"
+msgstr ""
+
 msgid "Resume a recording"
 msgstr ""
 
@@ -4174,6 +4303,9 @@ msgid "Resuming in {remaining}"
 msgstr ""
 
 msgid "Resuming, {t}"
+msgstr ""
+
+msgid "Retake"
 msgstr ""
 
 msgid "Retry"
@@ -4192,6 +4324,9 @@ msgid "Reveal in Finder"
 msgstr ""
 
 msgid "Revert to original"
+msgstr ""
+
+msgid "Review step {n}"
 msgstr ""
 
 msgid "Role"
@@ -4631,6 +4766,9 @@ msgstr ""
 msgid "Split the timeline {key} to set a different layout for each part."
 msgstr ""
 
+msgid "Start a Click Guide"
+msgstr ""
+
 msgid "Start a new empty library at {to}; the captures in {from} stay where they are"
 msgstr ""
 
@@ -4694,6 +4832,9 @@ msgstr ""
 msgid "Starting the camera…"
 msgstr ""
 
+msgid "Starting…"
+msgstr ""
+
 msgid "Starts CaptureMann in the {tray_area} with no window. Takes effect for the installed app only."
 msgstr ""
 
@@ -4712,13 +4853,40 @@ msgstr ""
 msgid "States are read without asking the system. Granting only happens when you press “Grant access…”."
 msgstr ""
 
+msgid "Step 1 · Title"
+msgstr ""
+
+msgid "Step headings"
+msgstr ""
+
+msgid "Step note"
+msgstr ""
+
+msgid "Step notes"
+msgstr ""
+
+msgid "Step title"
+msgstr ""
+
 msgid "Step {badge}"
 msgstr ""
 
 msgid "Step {badge}: {text}"
 msgstr ""
 
+msgid "Step {n}"
+msgstr ""
+
+msgid "Step {n} still has redaction proposals. Exporting anyway writes it without those blurs."
+msgstr ""
+
 msgid "Still online: {items}."
+msgstr ""
+
+msgid "Stop"
+msgstr ""
+
+msgid "Stop a Click Guide"
 msgstr ""
 
 msgid "Stop a recording"
@@ -5055,6 +5223,9 @@ msgstr ""
 msgid "The displays could not be listed."
 msgstr ""
 
+msgid "The empty guide was not kept."
+msgstr ""
+
 msgid "The engine could not start."
 msgstr ""
 
@@ -5080,6 +5251,12 @@ msgid "The folder pattern can’t be empty."
 msgstr ""
 
 msgid "The glossary is full. Remove an entry to add another."
+msgstr ""
+
+msgid "The guide did not stop cleanly"
+msgstr ""
+
+msgid "The guide was not copied"
 msgstr ""
 
 msgid "The import did not start."
@@ -5451,6 +5628,12 @@ msgid_plural "This folder already holds a CaptureMann library with {n} captures 
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "This guide could not be opened"
+msgstr ""
+
+msgid "This guide has no steps yet"
+msgstr ""
+
 msgid "This is a different channel than before; the account now publishes to it."
 msgstr ""
 
@@ -5518,6 +5701,9 @@ msgid "Title"
 msgstr ""
 
 msgid "Title and date are written into the file"
+msgstr ""
+
+msgid "Title only"
 msgstr ""
 
 msgid "To"
@@ -5684,6 +5870,9 @@ msgstr ""
 msgid "Undo brings it back."
 msgstr ""
 
+msgid "Undo step"
+msgstr ""
+
 msgid "Unfinished jobs go on the next time CaptureMann opens."
 msgstr ""
 
@@ -5700,6 +5889,9 @@ msgid "Unmute microphone"
 msgstr ""
 
 msgid "Unreadable"
+msgstr ""
+
+msgid "Untitled step"
 msgstr ""
 
 msgid "Up to {size}"
@@ -5891,6 +6083,9 @@ msgstr ""
 msgid "What is this video about?"
 msgstr ""
 
+msgid "What the reader does"
+msgstr ""
+
 msgid "What this system is missing"
 msgstr ""
 
@@ -5935,6 +6130,9 @@ msgid "Whole recording"
 msgstr ""
 
 msgid "Whole recording · {length} ({max} s at most)"
+msgstr ""
+
+msgid "Whole window"
 msgstr ""
 
 msgid "Width"
@@ -6227,6 +6425,9 @@ msgstr ""
 msgid "click a time to jump there"
 msgstr ""
 
+msgid "click at {x}, {y}"
+msgstr ""
+
 msgid "click to edit"
 msgstr ""
 
@@ -6360,6 +6561,9 @@ msgid "stereo"
 msgstr ""
 
 msgid "system audio"
+msgstr ""
+
+msgid "taken on mouse-down"
 msgstr ""
 
 msgid "that YouTube account is not connected any more; connect it again to delete the video"
@@ -6854,6 +7058,14 @@ msgid "{n} speaker"
 msgid_plural "{n} speakers"
 msgstr[0] ""
 msgstr[1] ""
+
+msgid "{n} step"
+msgid_plural "{n} steps"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{n} steps written to {path}"
+msgstr ""
 
 msgid "{n} suggested. Nothing is blurred until you accept. Click a dashed box on the image to accept just that one."
 msgid_plural "{n} suggested. Nothing is blurred until you accept. Click a dashed box on the image to accept just that one."
@@ -7772,6 +7984,10 @@ msgid "Audio"
 msgstr ""
 
 msgctxt "capture kind"
+msgid "Click Guide"
+msgstr ""
+
+msgctxt "capture kind"
 msgid "Recording"
 msgstr ""
 
@@ -7781,6 +7997,10 @@ msgstr ""
 
 msgctxt "card badge"
 msgid "AUDIO"
+msgstr ""
+
+msgctxt "card badge"
+msgid "GUIDE"
 msgstr ""
 
 msgctxt "card badge"
@@ -8572,6 +8792,10 @@ msgid "Library"
 msgstr ""
 
 msgctxt "menu"
+msgid "New Click Guide"
+msgstr ""
+
+msgctxt "menu"
 msgid "Settings…"
 msgstr ""
 
@@ -8625,6 +8849,10 @@ msgstr ""
 
 msgctxt "output"
 msgid "Length"
+msgstr ""
+
+msgctxt "page title"
+msgid "Click Guide"
 msgstr ""
 
 msgctxt "page title"

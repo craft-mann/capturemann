@@ -11,9 +11,10 @@ publish it once you confirm.
 - **One MCP server**, `capturemann`, which runs the command `capturemann mcp`: the MCP server that
   ships inside the CaptureMann app. It talks to the app over a local socket. The plugin contains no
   server code of its own and downloads nothing.
-- **Five skills** that teach Claude how to use the tools well: `capturemann-basics` (tiers,
+- **Six skills** that teach Claude how to use the tools well: `capturemann-basics` (tiers,
   confirmations, errors, what to do when the app is not running), `screenshot-and-redact`,
-  `record-screen`, `meeting-notes` and `export-and-publish`. Run one by name, for example
+  `record-screen`, `meeting-notes`, `export-and-publish` and `write-a-how-to` (Click Guide, from
+  CaptureMann 0.3.4). Run one by name, for example
   `/capturemann:meeting-notes`, or let Claude pick it.
 
 There are no hooks, agents, background processes or executables in this plugin.

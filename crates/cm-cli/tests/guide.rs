@@ -139,11 +139,18 @@ async fn gde_4_the_cli_runs_the_whole_flow() {
             &id,
             "--format",
             "pdf",
+            "--paper",
+            "letter",
             "--dest",
             dest.to_str().unwrap(),
         ],
     )
     .await;
-    assert_ne!(r.code, 0);
-    assert!(r.err.contains("not_implemented"), "{}", r.err);
+    assert_eq!(r.code, 0, "{}", r.err);
+    let pdf = std::fs::read_dir(&dest)
+        .unwrap()
+        .flatten()
+        .find(|e| e.path().extension().is_some_and(|x| x == "pdf"))
+        .unwrap();
+    assert!(std::fs::read(pdf.path()).unwrap().starts_with(b"%PDF-"));
 }

@@ -72,6 +72,15 @@ fn rig(clicks: ScriptedClicks, with_email: bool, decision: Decision) -> Rig {
     }
 }
 
+fn guide_folder(r: &Rig) -> std::path::PathBuf {
+    std::fs::read_dir(r.dir.path())
+        .unwrap()
+        .flatten()
+        .find(|e| e.path().extension().is_some_and(|x| x == "cmguide"))
+        .unwrap()
+        .path()
+}
+
 fn ok(r: &Value) -> &Value {
     assert!(r.get("error").is_none(), "unexpected error: {r}");
     &r["result"]
@@ -130,6 +139,8 @@ async fn gde_1_ac1_five_clicks_make_five_steps_in_order() {
         assert!((at[1].as_f64().unwrap() - y).abs() <= 2.0);
         assert!(ops.iter().any(|o| o["op"] == "ellipse"));
     }
+    // The card picture is the rendered first step.
+    assert!(guide_folder(&r).join("thumbs/poster.jpg").is_file());
     // The guide is in the library as its own kind.
     let list = c.call("list_library", json!({})).await;
     let items = ok(&list)["captures"]
@@ -365,6 +376,8 @@ async fn gde_3_markdown_export_has_relative_images_and_the_blur_is_in_them() {
                    "return_image": false}),
         )
         .await);
+    // A new blur makes the card picture stale: it is dropped, never left showing the old pixels.
+    assert!(!guide_folder(&r).join("thumbs/poster.jpg").exists());
     let out = r.dir.path().join("export-md");
     let ex = c
         .call(
@@ -429,14 +442,18 @@ async fn gde_3_html_is_one_file_and_rich_text_reaches_the_clipboard() {
     assert_eq!(ok(&rich)["copied_to_clipboard"], true);
     assert!(r.clip.last_html().unwrap().contains("<img"));
     assert!(r.clip.last_text().unwrap().contains("Click \"Alpha\""));
-    // PDF is not in this build.
+    // PDF (GDE-3, spike S4): one file with the fonts embedded, on the paper asked for.
+    let pdf_path = r.dir.path().join("guide.pdf");
     let pdf = c
         .call(
             "export_guide",
-            json!({"guide_id": id, "format": "pdf", "dest": out}),
+            json!({"guide_id": id, "format": "pdf", "dest": pdf_path, "paper": "letter"}),
         )
         .await;
-    assert_eq!(pdf["error"]["data"]["code"], "not_implemented");
+    ok(&pdf);
+    let bytes = std::fs::read(&pdf_path).unwrap();
+    assert!(bytes.starts_with(b"%PDF-"));
+    assert!(String::from_utf8_lossy(&bytes).contains("Geist"));
 }
 
 #[tokio::test]

@@ -122,6 +122,7 @@ impl NavItem {
             Route::Library => NavItem::AllCaptures,
             Route::Audio => NavItem::Audio,
             Route::Screenshots | Route::Editor(_) => NavItem::Screenshots,
+            Route::Guide(_) => NavItem::AllCaptures,
             Route::Recordings | Route::Recording(_) | Route::RecordingEditor(_) => {
                 NavItem::Recordings
             }
@@ -246,6 +247,7 @@ impl SidebarMode {
             Route::Recording(_)
             | Route::RecordingEditor(_)
             | Route::Editor(_)
+            | Route::Guide(_)
             | Route::Publish(_) => SidebarMode::Rail,
             Route::Settings | Route::Destinations => SidebarMode::Settings,
             // The setup screen keeps the app sidebar (dimmed by the shell).
@@ -447,6 +449,10 @@ pub fn page_heading(route: &Route) -> (String, String) {
         Route::Editor(_) => (
             tr_ctx!("breadcrumb", "Screenshots /"),
             tr_ctx!("page title", "Screenshot"),
+        ),
+        Route::Guide(_) => (
+            tr_ctx!("breadcrumb", "Library /"),
+            tr_ctx!("page title", "Click Guide"),
         ),
         Route::Recordings => (
             tr_ctx!("breadcrumb", "Library /"),

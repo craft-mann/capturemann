@@ -293,7 +293,7 @@ impl Backend {
                 RecordingMode::Off => builder,
                 // Where recording is not built yet the engine stays off, as the UI says.
                 RecordingMode::System if !recording_enabled => builder,
-                RecordingMode::System => builder.recording_system(),
+                RecordingMode::System => builder.recording_system().guide_system(),
                 RecordingMode::Fake(sources) => builder.recording_sources(sources.clone()),
             };
             let daemon = builder.build();

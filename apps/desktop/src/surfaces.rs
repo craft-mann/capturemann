@@ -29,6 +29,8 @@ pub enum Surface {
     Launcher,
     Picker,
     DelayPill,
+    /// The Click Guide bar (GDE-1).
+    GuideHud,
     Confirm,
     Dialog,
 }
@@ -47,6 +49,7 @@ impl Surface {
             Surface::Launcher => "launcher",
             Surface::Picker => "picker",
             Surface::DelayPill => "delay_pill",
+            Surface::GuideHud => "guide_hud",
             Surface::Confirm => "confirm",
             Surface::Dialog => "dialog",
         }

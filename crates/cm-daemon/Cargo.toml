@@ -49,6 +49,11 @@ async-trait.workspace = true
 base64.workspace = true
 # MIT OR Apache-2.0
 image = { workspace = true, features = ["png", "jpeg"] }
+# PDF export of a Click Guide (GDE-3, spike S4): a pure-Rust writer that embeds font subsets.
+# MIT OR Apache-2.0
+krilla = "0.8"
+# Text widths for the PDF line breaks. MIT OR Apache-2.0
+ttf-parser = "0.25"
 
 # macOS: `delete_capture` moves a bundle to the Trash with NSFileManager. Same objc2 family and
 # versions the capture and camera crates already use (MIT / Zlib / Apache-2.0).
