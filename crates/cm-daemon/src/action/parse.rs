@@ -24,11 +24,43 @@ impl Action {
                     "copy_to_clipboard",
                     "title",
                     "request_id",
+                    "mode",
+                    "direction",
+                    "max_px",
+                    "scroll",
                 ])?;
+                let long = match f.str_opt("mode")?.as_deref() {
+                    None => false,
+                    Some("long") => true,
+                    Some(_) => {
+                        return Err(CmError::invalid_field("mode", "must be `long` when given"))
+                    }
+                };
+                if !long {
+                    if let Some(k) = crate::long_shot_ops::LONG_ONLY_KEYS
+                        .iter()
+                        .find(|k| f.obj.get(**k).is_some_and(|v| !v.is_null()))
+                    {
+                        return Err(CmError::invalid_field(k, "needs `mode: \"long\"`"));
+                    }
+                }
                 let target_value = f
                     .obj
                     .get("target")
                     .ok_or_else(|| CmError::invalid_field("target", "is required"))?;
+                if long {
+                    if target_value.get("frame_id").is_some() || target_value.get("pick").is_some()
+                    {
+                        return Err(CmError::invalid_field(
+                            "target",
+                            "a Long Shot needs a window, a display or a region (not `frame_id` or `pick`)",
+                        ));
+                    }
+                    let target = ScreenshotTarget::parse(target_value)?;
+                    return Ok(Action::CaptureLong(crate::long_shot_ops::parse(
+                        &f, target,
+                    )?));
+                }
                 if target_value.get("frame_id").is_some() {
                     return Ok(Action::CaptureFromFrame(parse_from_frame(
                         &f,

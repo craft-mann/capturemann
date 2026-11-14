@@ -644,6 +644,19 @@ pub struct ScreenshotArgs {
     /// Library title (default: `Screenshot yyyy-MM-dd HH.mm`).
     #[arg(long)]
     pub title: Option<String>,
+    /// Long Shot (CAP-6): scroll the window (or area) and stitch one tall image. CaptureMann
+    /// scrolls for you (the user confirms it when an agent runs this).
+    #[arg(long, conflicts_with = "pick")]
+    pub long: bool,
+    /// Long Shot: scroll sideways instead of down.
+    #[arg(long, requires = "long")]
+    pub horizontal: bool,
+    /// Long Shot: stop at this length in px (at most 16384).
+    #[arg(long, value_name = "PX", requires = "long")]
+    pub max_px: Option<u32>,
+    /// Long Shot: you scroll by hand (refused for agents).
+    #[arg(long, requires = "long")]
+    pub hand: bool,
 }
 
 #[derive(Debug, Args)]

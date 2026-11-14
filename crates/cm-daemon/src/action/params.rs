@@ -94,6 +94,31 @@ pub struct CaptureScreenshotParams {
     pub request_id: Option<String>,
 }
 
+/// How a Long Shot scrolls (CAP-6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScrollMode {
+    /// CaptureMann scrolls (Confirm tier for an agent).
+    Auto,
+    /// The user scrolls (refused for agents: `needs_user`).
+    Hand,
+}
+
+/// `capture_screenshot { mode: "long", target, direction?, max_px?, scroll? }` (CAP-6 Long
+/// Shot). `scroll` is `auto` (default) or `hand`.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct CaptureLongParams {
+    pub target: ScreenshotTarget,
+    pub direction: cm_capture::long_shot::Direction,
+    pub max_px: Option<u32>,
+    pub scroll: ScrollMode,
+    /// 0..=30 s before the first frame (CAP-5); validated when executed.
+    pub delay_s: Option<f64>,
+    pub copy_to_clipboard: bool,
+    pub title: Option<String>,
+    pub request_id: Option<String>,
+}
+
 /// `capture_screenshot` from a frozen frame (see [`FreezeDisplayParams`]): the frame is
 /// cropped, not captured again (CAP-1.AC2).
 ///
@@ -355,6 +380,8 @@ pub enum Action {
     CaptureFromFrame(CaptureFromFrameParams),
     /// `capture_screenshot` with `target: { pick: true }` (same method name and tier).
     CapturePick(CapturePickParams),
+    /// `capture_screenshot` with `mode: "long"` (CAP-6; same method name; Confirm for an agent's Auto scroll).
+    CaptureLong(CaptureLongParams),
     FreezeDisplay(FreezeDisplayParams),
     ReleaseFrame(ReleaseFrameParams),
     WindowThumbnail(WindowThumbnailParams),
