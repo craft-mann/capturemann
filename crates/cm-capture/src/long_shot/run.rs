@@ -116,6 +116,7 @@ pub fn run_auto_ex(
         on_stitch(&stitcher);
     }
     let size = f64::from(extent(&first.frame, cfg.direction));
+    let mut last_ok = first.frame.clone();
     let mut step = ((size * cfg.first_step_fraction) as u32).max(1);
     let end = loop {
         if stop() {
@@ -149,6 +150,7 @@ pub fn run_auto_ex(
         }
         match outcome {
             PushOutcome::Added { new_len } => {
+                last_ok = next.frame.clone();
                 // A browser's smooth scrolling can pause part-way (seen on Edge, Windows: a frame
                 // at a tenth of the asked distance that looked settled). Believing it taught a
                 // distance far too short, the next step was huge and the join was lost. When much
@@ -164,7 +166,10 @@ pub fn run_auto_ex(
                     sleeper.sleep(LATE_SCROLL_WAIT);
                     let more = wait_settled(src, sleeper, cfg.settle)?;
                     match stitcher.push(&more.frame, Some(step)) {
-                        PushOutcome::Added { new_len: n } => new_len += n,
+                        PushOutcome::Added { new_len: n } => {
+                            new_len += n;
+                            last_ok = more.frame.clone();
+                        }
                         PushOutcome::NoChange => break,
                         PushOutcome::NoOverlap => {
                             ended = Some(EndReason::NoOverlap);
@@ -191,7 +196,15 @@ pub fn run_auto_ex(
                 step = ((content * cfg.step_fraction / moved_per_asked) as u32).max(1);
             }
             PushOutcome::NoChange => break EndReason::ReachedEnd,
-            PushOutcome::NoOverlap => break EndReason::NoOverlap,
+            PushOutcome::NoOverlap => {
+                super::debug::dump_refused(
+                    &last_ok,
+                    &next.frame,
+                    stitcher.last_refusal(),
+                    "auto scroll",
+                );
+                break EndReason::NoOverlap;
+            }
             PushOutcome::LimitReached { .. } => {
                 {
                     on_progress(progress(&stitcher));
@@ -208,7 +221,8 @@ pub fn run_auto_ex(
 }
 
 /// Hand scroll: the user scrolls. A frame is taken whenever the content has stopped moving
-/// (two polls `settle.interval` apart are equal) and differs from the last frame taken.
+/// (two polls `settle.interval` apart are equal) and differs from the last frame taken; a
+/// frame from the middle of a long flick is taken too when waiting would lose the overlap.
 /// Ends when `stop` returns true or at the limit. A frame that does not line up with the last
 /// one taken does not end the capture (the user may scroll back, or less, or a bar on the page
 /// may be fading): it is left out and the next frame that joins is taken. When the user stops
@@ -222,6 +236,32 @@ pub fn run_hand(
     on_progress: &mut dyn FnMut(LongShotProgress),
 ) -> Result<LongShotResult, CmError> {
     run_hand_ex(src, sleeper, cfg, stop, on_progress, &mut |_: &Stitcher| {})
+}
+
+/// Polls without two equal frames in a row after which Hand scroll takes a frame anyway.
+const HAND_MAX_MOVING_POLLS: u32 = 20;
+
+/// A frame seen while the content moves is taken when it is this share of the content area on
+/// from the last one taken (the overlap kept is the rest).
+const HAND_TAKE_SHARE: f64 = 0.7;
+
+/// Pushes a frame that was checked to join (see [`Stitcher::joins`]) and reports it. `Some` is
+/// the end of the capture (the limit was reached by it).
+fn take_frame(
+    stitcher: &mut Stitcher,
+    frame: &Frame,
+    on_progress: &mut dyn FnMut(LongShotProgress),
+    on_stitch: &mut dyn FnMut(&Stitcher),
+) -> Option<EndReason> {
+    let outcome = stitcher.push(frame, None);
+    if matches!(
+        outcome,
+        PushOutcome::Added { .. } | PushOutcome::LimitReached { .. }
+    ) {
+        on_progress(progress(stitcher));
+        on_stitch(stitcher);
+    }
+    matches!(outcome, PushOutcome::LimitReached { .. }).then_some(EndReason::LimitReached)
 }
 
 /// [`run_hand`] with the `on_stitch` hook of [`run_auto_ex`].
@@ -245,6 +285,14 @@ pub fn run_hand_ex(
     // The settled frame that did not join the last one taken (the stitcher's state has not
     // changed since, so the same frame would be refused again).
     let mut refused: Option<Frame> = None;
+    // The newest frame seen while the content was still moving that joins the last one taken.
+    // A flick (a trackpad, a wheel with momentum, Page Down in a terminal) can carry the content
+    // further than one screen before it settles: the frame at the settled place then has no
+    // overlap with the last one taken. This frame, the furthest one that still had, is taken
+    // first so nothing between is lost. It is only ever taken for that: a frame in the middle of
+    // an animation (an image fading in) is not what the person scrolled to.
+    let mut bridge: Option<Frame> = None;
+    let mut moving_polls = 0u32;
     let end = loop {
         if stop() {
             break if refused.is_some() {
@@ -255,20 +303,61 @@ pub fn run_hand_ex(
         }
         sleeper.sleep(cfg.settle.interval);
         let g = src.grab()?;
-        let settled = g == prev_poll;
+        // Content that never holds still (a video, a spinner) is taken after a second anyway.
+        let settled = g == prev_poll || moving_polls >= HAND_MAX_MOVING_POLLS;
         prev_poll = g.clone();
-        if !settled {
-            continue;
-        }
         if g == last_taken {
             // Back at the last good frame: nothing is left out any more.
             refused = None;
+            bridge = None;
+            moving_polls = 0;
             continue;
         }
+        if !settled {
+            moving_polls += 1;
+            let share = stitcher.join_share(&g);
+            if share.is_some_and(|s| s >= HAND_TAKE_SHARE) {
+                // Continuous scrolling never settles (small wheel steps one after the other):
+                // a frame that is this far on is taken as it is, before the overlap is gone.
+                if let Some(end) = take_frame(&mut stitcher, &g, on_progress, on_stitch) {
+                    break end;
+                }
+                last_taken = g;
+                bridge = None;
+                moving_polls = 0;
+            } else if share.is_some() {
+                bridge = Some(g);
+            } else if let Some(b) = bridge.take() {
+                // This frame is past the overlap: take the furthest one that was not.
+                if let Some(end) = take_frame(&mut stitcher, &b, on_progress, on_stitch) {
+                    break end;
+                }
+                last_taken = b;
+                if stitcher.join_share(&g).is_some() {
+                    bridge = Some(g);
+                }
+            }
+            continue;
+        }
+        moving_polls = 0;
         if refused.as_ref() == Some(&g) {
             continue;
         }
-        match stitcher.push(&g, None) {
+        let mut outcome = stitcher.push(&g, None);
+        if outcome == PushOutcome::NoOverlap {
+            if let Some(b) = bridge.take() {
+                // The settled frame is past the overlap of the last one taken: bridge first.
+                match take_frame(&mut stitcher, &b, on_progress, on_stitch) {
+                    Some(end) => break end,
+                    None => {
+                        last_taken = b;
+                        outcome = stitcher.push(&g, None);
+                    }
+                }
+            }
+        }
+        bridge = None;
+        match outcome {
             PushOutcome::Added { .. } => {
                 refused = None;
                 {
@@ -278,7 +367,10 @@ pub fn run_hand_ex(
                 last_taken = g;
             }
             PushOutcome::NoChange => refused = None,
-            PushOutcome::NoOverlap => refused = Some(g),
+            PushOutcome::NoOverlap => {
+                super::debug::dump_refused(&last_taken, &g, stitcher.last_refusal(), "hand scroll");
+                refused = Some(g);
+            }
             PushOutcome::LimitReached { .. } => {
                 {
                     on_progress(progress(&stitcher));

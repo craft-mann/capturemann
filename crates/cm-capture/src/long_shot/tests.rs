@@ -237,6 +237,68 @@ fn cap_6_hand_scroll_continues_after_a_frame_that_did_not_line_up() {
     assert_eq!(r.image.frame, page.expected_range(0, 330 + 270));
 }
 
+/// Found in a Terminal window and a Chrome tab through the daemon (macOS, Nov 14, 2026): a
+/// trackpad flick or a wheel with momentum carries the content further than one screen before it
+/// settles, so the settled frame has no overlap with the last one taken. The frames seen on the
+/// way (not settled) bridge it: the furthest one that still joined is taken first.
+#[test]
+fn cap_6_hand_scroll_flick_longer_than_a_screen_is_bridged() {
+    let page = SyntheticPage::new(400, 6000, 1000).with_bands(30, 0);
+    let script = vec![
+        0, 0, 0, // settled
+        200, 500, 800, // moving: each joins the first frame
+        1300, 1300, 1300, // settled, 1,300 rows on: no overlap with the first frame
+        1500, 1500, 1500,
+    ];
+    let r = hand(&page, script, 40);
+    assert_eq!(r.end, EndReason::StoppedByUser);
+    assert_eq!(r.image.frame, page.expected_range(0, 1500 + 970));
+}
+
+/// Found on Windows (Nov 14, 2026): small wheel steps one after the other (40 px every 250 ms)
+/// keep the content moving, no two polls are ever equal, and no frame was taken at all. A frame
+/// that is far enough on is taken as it is.
+#[test]
+fn cap_6_hand_scroll_that_never_settles_still_takes_frames() {
+    let page = SyntheticPage::new(400, 8000, 1000).with_bands(30, 0);
+    // 40 rows per poll, never the same twice, 60 polls: from 0 to 2,400.
+    let script: Vec<u32> = (0..61).map(|i| i * 40).collect();
+    let r = hand(&page, script, 80);
+    assert_eq!(r.end, EndReason::StoppedByUser);
+    // The last frame was taken too (the script ends there and holds still).
+    // The first frame is the one the settle wait gave up on (120); the last one is 2,400.
+    assert_eq!(r.image.frame, page.expected_range(120, 2400 + 970));
+    assert!(r.image.frames >= 4, "frames: {}", r.image.frames);
+}
+
+/// Found on Windows (Nov 14, 2026): a first Hand step of 18 px moves an overlay scrollbar's thumb
+/// by 2 px, too little to be taken for a moving edge, and the pair was refused. A thumb is a few
+/// pixels of a wide line: the tolerant look joins it.
+#[test]
+fn cap_6_a_tiny_first_step_with_a_scrollbar_thumb_joins() {
+    let page = SyntheticPage::new(800, 20_000, 600).with_scrollbar(15);
+    let r = hand(&page, vec![0, 0, 0, 18, 18, 18, 300, 300, 300], 30);
+    assert_eq!(r.end, EndReason::StoppedByUser);
+    assert_eq!(r.image.frames, 3);
+    assert_eq!(
+        r.image.frame.height(),
+        page.expected_range(0, 300 + 600).height()
+    );
+}
+
+/// Frames from the middle of a scroll are not taken when the settled frame joins: the pixels of a
+/// page that is still animating are not what the person scrolled to.
+#[test]
+fn cap_6_hand_scroll_takes_no_moving_frame_when_the_settled_one_joins() {
+    let page = SyntheticPage::new(400, 6000, 1000);
+    // 100 and 250 are seen moving; only the settled 400 is taken (two frames in all).
+    let script = vec![0, 0, 0, 100, 250, 400, 400, 400];
+    let r = hand(&page, script, 30);
+    assert_eq!(r.end, EndReason::StoppedByUser);
+    assert_eq!(r.image.frame, page.expected_range(0, 400 + 1000));
+    assert_eq!(r.image.frames, 2);
+}
+
 /// Back at the last good frame after a frame that was left out: a plain stop, no note.
 #[test]
 fn cap_6_hand_scroll_back_to_the_last_frame_clears_the_note() {
@@ -245,6 +307,73 @@ fn cap_6_hand_scroll_back_to_the_last_frame_clears_the_note() {
     let r = hand(&page, script, 20);
     assert_eq!(r.end, EndReason::StoppedByUser);
     assert_eq!(r.image.frame, page.expected_range(0, 400));
+}
+
+/// Checks the image against the page on two columns the clock and the cursor never touch: the
+/// column that carries the row number and one in the middle. Every row once and in order.
+fn assert_rows_match(got: &Frame, want: &Frame, what: &str) {
+    assert_eq!(got.height(), want.height(), "{what}: height");
+    let w = got.width();
+    for y in 0..want.height() {
+        for x in [0, w / 2] {
+            assert_eq!(got.pixel(x, y), want.pixel(x, y), "{what}: at {x},{y}");
+        }
+    }
+}
+
+/// Found on Chrome through the daemon (macOS, Nov 14, 2026): a sticky header with a clock and a
+/// blinking caret changes in every frame. The first pair then had no fixed band, the bar was taken
+/// for content that does not move, and no frame joined any more. A few differing pixels in a line
+/// are not a different line.
+#[test]
+fn cap_6_ac1_a_clock_in_the_fixed_header_does_not_stop_the_join() {
+    let page = SyntheticPage::new(800, 1500, 300)
+        .with_bands(40, 0)
+        .with_header_clock(10);
+    let (r, _) = auto(page.clone(), None);
+    assert_eq!(r.end, EndReason::ReachedEnd);
+    assert_rows_match(&r.image.frame, &page.expected(), "auto");
+    let r = hand(
+        &page,
+        vec![0, 0, 0, 70, 70, 70, 150, 150, 150, 260, 260, 260],
+        30,
+    );
+    assert_eq!(r.end, EndReason::StoppedByUser);
+    assert_rows_match(&r.image.frame, &page.expected_range(0, 260 + 260), "hand");
+}
+
+/// A frame that differs from the last one only by the clock or a caret is not a frame that did
+/// not line up: nothing changed.
+#[test]
+fn cap_6_a_blink_alone_is_no_change() {
+    let page = SyntheticPage::new(800, 1500, 300)
+        .with_bands(40, 0)
+        .with_header_clock(10);
+    // Positions 0 and 7 give different clocks, the same content.
+    let mut s = Stitcher::new(Direction::Vertical, Limits::default());
+    s.push(&page.frame_at(0), None);
+    let mut other = page.clone();
+    other.header_clock = 12;
+    assert_eq!(s.push(&other.frame_at(0), None), PushOutcome::NoChange);
+}
+
+/// A terminal's block cursor: 34 rows of a 1,500-row view, blinking, on the line that scrolls.
+/// It is more than the 2 % of lines the overlap may differ by, and it used to refuse the join.
+#[test]
+fn cap_6_ac1_a_blinking_cursor_in_the_content_does_not_stop_the_join() {
+    let page = SyntheticPage::new(400, 5000, 1500).with_blinking_cursor(900, 34, 18);
+    let positions = vec![0, 0, 0, 305, 305, 305, 700, 700, 700, 1105, 1105, 1105];
+    let mut seen_blink = 0;
+    for p in [0u32, 305, 700, 1105] {
+        seen_blink += (p / 5) % 2;
+    }
+    assert!(
+        seen_blink > 0 && seen_blink < 4,
+        "the cursor must blink in the script"
+    );
+    let r = hand(&page, positions, 30);
+    assert_eq!(r.end, EndReason::StoppedByUser);
+    assert_rows_match(&r.image.frame, &page.expected_range(0, 1105 + 1500), "hand");
 }
 
 /// A sticky header that hides once the page scrolls down (the Chrome toolbar-style "headroom"
@@ -483,6 +612,32 @@ fn cap_6_preview_thumbnail_is_scaled_and_follows_the_end() {
     let mut st = Stitcher::new(Direction::Vertical, Limits::default());
     st.push(&page.frame_at(0), None);
     assert_eq!(st.thumbnail(400, 400).unwrap().width(), 40);
+}
+
+/// The preview of a capture whose lines were trimmed (a scrollbar cut off): the daemon asks for it
+/// after every joined frame, and it used to index past the trimmed lines (found on Chrome, Nov 14,
+/// 2026: the worker panicked and the capture failed).
+#[test]
+fn cap_6_preview_of_a_trimmed_capture_does_not_panic() {
+    let page = SyntheticPage::new(300, 1500, 300).with_scrollbar(20);
+    let view = page.clone().view();
+    let (mut src, mut sc) = (view.clone(), view.clone());
+    let mut sizes = Vec::new();
+    let r = run_auto_ex(
+        &mut src,
+        &mut sc,
+        &mut NoSleep::default(),
+        cfg(Direction::Vertical),
+        &mut || false,
+        &mut |_| {},
+        &mut |st: &Stitcher| {
+            sizes.push(st.thumbnail(150, 400).map(|f| (f.width(), f.height())));
+        },
+    )
+    .unwrap();
+    assert_eq!(r.end, EndReason::ReachedEnd);
+    assert!(r.image.frame.width() < 300);
+    assert!(sizes.iter().all(Option::is_some));
 }
 
 /// Chrome on a Retina Mac (Nov 14, 2026): the toolbar of two captures differs by one colour step
