@@ -42,7 +42,9 @@ pub fn target_size(w: u32, h: u32, rule: &SizeRule, allow_larger: bool) -> (u32,
 /// Checks a rule's value.
 pub fn validate_rule(rule: &SizeRule) -> Result<(), CmError> {
     let ok = match *rule {
-        SizeRule::Width(x) | SizeRule::Height(x) | SizeRule::Longest(x) => (1..=16_384).contains(&x),
+        SizeRule::Width(x) | SizeRule::Height(x) | SizeRule::Longest(x) => {
+            (1..=16_384).contains(&x)
+        }
         SizeRule::Percent(p) => (1.0..=400.0).contains(&p),
     };
     if ok {
@@ -208,12 +210,30 @@ mod tests {
 
     #[test]
     fn sizes_never_grow_unless_allowed() {
-        assert_eq!(target_size(3200, 1600, &SizeRule::Longest(1600), false), (1600, 800));
-        assert_eq!(target_size(800, 400, &SizeRule::Longest(1600), false), (800, 400));
-        assert_eq!(target_size(800, 400, &SizeRule::Longest(1600), true), (1600, 800));
-        assert_eq!(target_size(1000, 500, &SizeRule::Width(250), false), (250, 125));
-        assert_eq!(target_size(1000, 500, &SizeRule::Height(100), false), (200, 100));
-        assert_eq!(target_size(1000, 500, &SizeRule::Percent(50.0), false), (500, 250));
+        assert_eq!(
+            target_size(3200, 1600, &SizeRule::Longest(1600), false),
+            (1600, 800)
+        );
+        assert_eq!(
+            target_size(800, 400, &SizeRule::Longest(1600), false),
+            (800, 400)
+        );
+        assert_eq!(
+            target_size(800, 400, &SizeRule::Longest(1600), true),
+            (1600, 800)
+        );
+        assert_eq!(
+            target_size(1000, 500, &SizeRule::Width(250), false),
+            (250, 125)
+        );
+        assert_eq!(
+            target_size(1000, 500, &SizeRule::Height(100), false),
+            (200, 100)
+        );
+        assert_eq!(
+            target_size(1000, 500, &SizeRule::Percent(50.0), false),
+            (500, 250)
+        );
         assert!(validate_rule(&SizeRule::Percent(0.0)).is_err());
         assert!(validate_rule(&SizeRule::Width(0)).is_err());
     }

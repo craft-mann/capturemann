@@ -106,7 +106,12 @@ pub(crate) fn parse_board(f: &Fields<'_>) -> Result<Action, CmError> {
                 "is required: pair, grid, strip or free, or an object with `kind`",
             ))
         }
-        Some(_) => return Err(CmError::invalid_field("layout", "must be a name or an object")),
+        Some(_) => {
+            return Err(CmError::invalid_field(
+                "layout",
+                "must be a name or an object",
+            ))
+        }
     };
     let options: BoardOptions = match f.obj.get("options") {
         None | Some(Value::Null) => BoardOptions::default(),
@@ -326,7 +331,10 @@ pub(crate) fn parse_export(f: &Fields<'_>) -> Result<Action, CmError> {
     let capture_ids = capture_ids(f, 1, MAX_CAPTURES)?;
     let dest = f.str_req("dest")?;
     if !Path::new(&dest).is_absolute() {
-        return Err(CmError::invalid_field("dest", "must be an absolute folder path"));
+        return Err(CmError::invalid_field(
+            "dest",
+            "must be an absolute folder path",
+        ));
     }
     let size = match f.obj.get("size") {
         None | Some(Value::Null) => None,
@@ -577,7 +585,8 @@ fn export_one(
         }
     }
     if let Some(step) = &p.size {
-        let (w, h) = compose_bulk::target_size(img.width(), img.height(), &step.rule, step.allow_larger);
+        let (w, h) =
+            compose_bulk::target_size(img.width(), img.height(), &step.rule, step.allow_larger);
         img = compose_bulk::resize_to(&img, w, h);
     }
     if let Some(m) = mark {
@@ -660,7 +669,8 @@ impl Inner {
             ));
         }
         if p.blueprint {
-            return Err(DaemonError::from(apply_blueprint(&mut RgbaImage::new(1, 1)).unwrap_err()));
+            // Fails now while the step is not available (Track A), before anything is queued.
+            apply_blueprint(&mut RgbaImage::new(1, 1))?;
         }
         let (dest, wm) = (p.dest.clone(), p.watermark.clone());
         blocking(move || {
@@ -785,7 +795,14 @@ mod tests {
             assert!(check_pattern(bad).is_err(), "{bad}");
         }
         assert_eq!(
-            file_stem("{date} {name} {w}x{h} #{n}", "Login", "2026-11-14", 3, 800, 600),
+            file_stem(
+                "{date} {name} {w}x{h} #{n}",
+                "Login",
+                "2026-11-14",
+                3,
+                800,
+                600
+            ),
             "2026-11-14 Login 800x600 #3"
         );
         // Path characters never reach the file system.

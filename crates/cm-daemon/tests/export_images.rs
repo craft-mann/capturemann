@@ -112,7 +112,10 @@ async fn create_board_makes_a_new_screenshot_capture() {
     assert_eq!(out["kind"], "screenshot");
     assert_eq!(out["layout"], "pair");
     assert!(out["image"]["data"].as_str().unwrap().len() > 100);
-    let (w, h) = (out["width"].as_u64().unwrap(), out["height"].as_u64().unwrap());
+    let (w, h) = (
+        out["width"].as_u64().unwrap(),
+        out["height"].as_u64().unwrap(),
+    );
     let dir = PathBuf::from(out["path"].as_str().unwrap());
     let m: Value =
         serde_json::from_str(&std::fs::read_to_string(dir.join("manifest.json")).unwrap()).unwrap();
@@ -243,7 +246,10 @@ async fn export_images_resizes_converts_watermarks_and_never_overwrites() {
         r.files(),
         ["Alpha (2).jpg", "Alpha.jpg", "Beta.jpg", "Gamma.jpg"]
     );
-    assert_eq!(std::fs::read(r.out.path().join("Alpha.jpg")).unwrap(), b"mine");
+    assert_eq!(
+        std::fs::read(r.out.path().join("Alpha.jpg")).unwrap(),
+        b"mine"
+    );
     for f in ["Alpha (2).jpg", "Beta.jpg", "Gamma.jpg"] {
         let img = decode(&r.out.path().join(f));
         assert_eq!(img.width().max(img.height()), 200, "{f}");
@@ -262,7 +268,10 @@ async fn export_images_resizes_converts_watermarks_and_never_overwrites() {
         )
         .await
         .unwrap();
-    assert_eq!(r.finished(plain["job_id"].as_str().unwrap()).await["state"], "done");
+    assert_eq!(
+        r.finished(plain["job_id"].as_str().unwrap()).await["state"],
+        "done"
+    );
 }
 
 async fn ids_first(r: &Rig) -> String {
@@ -340,12 +349,17 @@ async fn cancel_keeps_the_written_files_and_leaves_no_partial_file() {
     let files = r.files();
     assert!(!files.is_empty());
     assert!(
-        files.iter().all(|f| f.ends_with(".png") && !f.starts_with('.')),
+        files
+            .iter()
+            .all(|f| f.ends_with(".png") && !f.starts_with('.')),
         "{files:?}"
     );
     for f in &files {
         let len = std::fs::metadata(r.out.path().join(f)).unwrap().len();
         assert!(len > 0 && image::open(r.out.path().join(f)).is_ok(), "{f}");
     }
-    assert!(matches!(j["state"].as_str(), Some("cancelled" | "done")), "{j}");
+    assert!(
+        matches!(j["state"].as_str(), Some("cancelled" | "done")),
+        "{j}"
+    );
 }

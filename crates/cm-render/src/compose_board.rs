@@ -13,9 +13,7 @@
 use cm_core::CmError;
 use image::{imageops::FilterType, RgbaImage};
 use serde::{Deserialize, Serialize};
-use tiny_skia::{
-    FillRule, Mask, Paint, PathBuilder, Pixmap, PixmapPaint, Rect, Transform,
-};
+use tiny_skia::{FillRule, Mask, Paint, PathBuilder, Pixmap, PixmapPaint, Rect, Transform};
 
 use crate::ops::Color;
 use crate::text::{self, Fonts, TextStyle};
@@ -348,12 +346,18 @@ fn plan_k(
             if horizontal {
                 let h = src.iter().map(|s| s.1).min().unwrap_or(1);
                 dims.extend(src.iter().map(|&(w0, h0)| {
-                    (((f64::from(w0) * f64::from(h) / f64::from(h0)).round() as u32).max(1), h)
+                    (
+                        ((f64::from(w0) * f64::from(h) / f64::from(h0)).round() as u32).max(1),
+                        h,
+                    )
                 }));
             } else {
                 let w = src.iter().map(|s| s.0).min().unwrap_or(1);
                 dims.extend(src.iter().map(|&(w0, h0)| {
-                    (w, ((f64::from(h0) * f64::from(w) / f64::from(w0)).round() as u32).max(1))
+                    (
+                        w,
+                        ((f64::from(h0) * f64::from(w) / f64::from(w0)).round() as u32).max(1),
+                    )
                 }));
                 (cols, rows) = (1, n);
             }
@@ -363,10 +367,7 @@ fn plan_k(
                 .columns
                 .map_or(if n <= 4 { 2 } else { 3 }, |c| c as usize);
             if !(1..=6).contains(&c) {
-                return Err(CmError::invalid_field(
-                    "layout.columns",
-                    "must be 1 to 6",
-                ));
+                return Err(CmError::invalid_field("layout.columns", "must be 1 to 6"));
             }
             cols = c.min(n);
             rows = n.div_ceil(cols);
@@ -440,7 +441,9 @@ fn plan_k(
                 });
             }
             let unit = text_unit(&cells.iter().map(|c| (c.w, c.h)).collect::<Vec<_>>());
-            let (mut w, mut h) = layout.canvas.map_or((0, 0), |c| (scaled(c[0], k), scaled(c[1], k)));
+            let (mut w, mut h) = layout
+                .canvas
+                .map_or((0, 0), |c| (scaled(c[0], k), scaled(c[1], k)));
             if layout.canvas.is_none() {
                 for c in &cells {
                     w = w.max((c.x.max(0) as u32) + c.w + margin as u32);
@@ -545,7 +548,7 @@ fn round_rect(x: f32, y: f32, w: f32, h: f32, r: f32) -> Option<tiny_skia::Path>
         pb.push_rect(Rect::from_xywh(x, y, w, h)?);
         return pb.finish();
     }
-    let k = 0.552_284_75 * r;
+    let k = 0.552_284_8 * r;
     pb.move_to(x + r, y);
     pb.line_to(x + w - r, y);
     pb.cubic_to(x + w - r + k, y, x + w, y + r - k, x + w, y + r);
@@ -559,6 +562,7 @@ fn round_rect(x: f32, y: f32, w: f32, h: f32, r: f32) -> Option<tiny_skia::Path>
     pb.finish()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_text(
     pm: &mut Pixmap,
     fonts: &mut Fonts,
@@ -598,8 +602,8 @@ pub fn render_board(
 ) -> Result<RgbaImage, CmError> {
     let sizes: Vec<(u32, u32)> = sources.iter().map(RgbaImage::dimensions).collect();
     let plan = plan(&sizes, layout, opts)?;
-    let mut canvas = Pixmap::new(plan.width, plan.height)
-        .ok_or_else(|| invalid("the board is too large"))?;
+    let mut canvas =
+        Pixmap::new(plan.width, plan.height).ok_or_else(|| invalid("the board is too large"))?;
     let [r, g, b, a] = opts.background.rgba();
     if a > 0 {
         canvas.fill(tiny_skia::Color::from_rgba8(r, g, b, a));
@@ -614,7 +618,16 @@ pub fn render_board(
     let mut fonts = Fonts::bundled();
 
     if let (Some(t), Some(at)) = (&opts.title, plan.title_at) {
-        draw_text(&mut canvas, &mut fonts, t, plan.unit * 1.6, ink, None, at, None)?;
+        draw_text(
+            &mut canvas,
+            &mut fonts,
+            t,
+            plan.unit * 1.6,
+            ink,
+            None,
+            at,
+            None,
+        )?;
     }
     for (i, (src, cell)) in sources.iter().zip(&plan.cells).enumerate() {
         let resized = if src.dimensions() == (cell.w, cell.h) {
@@ -665,9 +678,10 @@ pub fn render_board(
 
         // BEFORE and AFTER (Pair).
         if opts.before_after && layout.kind == LayoutKind::Pair {
-            let words = opts.label_words.clone().unwrap_or_else(|| {
-                ["BEFORE".to_owned(), "AFTER".to_owned()]
-            });
+            let words = opts
+                .label_words
+                .clone()
+                .unwrap_or_else(|| ["BEFORE".to_owned(), "AFTER".to_owned()]);
             let bg = if i == 0 {
                 Color::rgb(0x55, 0x5B, 0x66)
             } else {
@@ -758,8 +772,12 @@ mod tests {
             margin: 10,
             ..Default::default()
         };
-        let p = plan(&[(400, 200), (300, 300)], &BoardLayout::new(LayoutKind::Pair), &opts)
-            .unwrap();
+        let p = plan(
+            &[(400, 200), (300, 300)],
+            &BoardLayout::new(LayoutKind::Pair),
+            &opts,
+        )
+        .unwrap();
         assert_eq!(p.cells[0].h, 200);
         assert_eq!(p.cells[1].h, 200);
         assert_eq!((p.cells[0].w, p.cells[1].w), (400, 200));
@@ -767,7 +785,10 @@ mod tests {
         assert_eq!(p.cells[1].x, 10 + 400 + 20);
         assert_eq!((p.width, p.height), (10 + 400 + 20 + 200 + 10, 220));
         let img = render_board(
-            &[solid(400, 200, [255, 0, 0, 255]), solid(300, 300, [0, 0, 255, 255])],
+            &[
+                solid(400, 200, [255, 0, 0, 255]),
+                solid(300, 300, [0, 0, 255, 255]),
+            ],
             &BoardLayout::new(LayoutKind::Pair),
             &opts,
         )
@@ -793,18 +814,36 @@ mod tests {
     #[test]
     fn grid_fills_in_order_and_free_needs_slots() {
         let sizes = vec![(100, 80); 5];
-        let p = plan(&sizes, &BoardLayout::new(LayoutKind::Grid), &BoardOptions::default())
-            .unwrap();
+        let p = plan(
+            &sizes,
+            &BoardLayout::new(LayoutKind::Grid),
+            &BoardOptions::default(),
+        )
+        .unwrap();
         // 5 images: 3 columns, 2 rows.
         assert_eq!(p.cells[3].y, p.cells[0].y + 80 + 24);
         assert_eq!(p.cells[2].x, 32 + 2 * (100 + 24));
-        let e = plan(&sizes[..2], &BoardLayout::new(LayoutKind::Free), &BoardOptions::default())
-            .unwrap_err();
+        let e = plan(
+            &sizes[..2],
+            &BoardLayout::new(LayoutKind::Free),
+            &BoardOptions::default(),
+        )
+        .unwrap_err();
         assert!(e.to_string().contains("layout.slots"));
         let free = BoardLayout {
             slots: vec![
-                Slot { x: 0, y: 0, w: 50, h: 50 },
-                Slot { x: 60, y: 10, w: 40, h: 40 },
+                Slot {
+                    x: 0,
+                    y: 0,
+                    w: 50,
+                    h: 50,
+                },
+                Slot {
+                    x: 60,
+                    y: 10,
+                    w: 40,
+                    h: 40,
+                },
             ],
             ..BoardLayout::new(LayoutKind::Free)
         };
@@ -815,14 +854,28 @@ mod tests {
     #[test]
     fn the_count_and_the_options_are_checked() {
         let one = [(10, 10)];
-        assert!(plan(&one, &BoardLayout::new(LayoutKind::Grid), &BoardOptions::default()).is_err());
+        assert!(plan(
+            &one,
+            &BoardLayout::new(LayoutKind::Grid),
+            &BoardOptions::default()
+        )
+        .is_err());
         let three = [(10, 10); 3];
-        assert!(plan(&three, &BoardLayout::new(LayoutKind::Pair), &BoardOptions::default()).is_err());
+        assert!(plan(
+            &three,
+            &BoardLayout::new(LayoutKind::Pair),
+            &BoardOptions::default()
+        )
+        .is_err());
         let o = BoardOptions {
             gap: 500,
             ..Default::default()
         };
-        assert!(o.validate().unwrap_err().to_string().contains("options.gap"));
+        assert!(o
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("options.gap"));
         assert_eq!(Background::parse("#102030").unwrap().as_string(), "#102030");
         assert!(Background::parse("blue").is_err());
     }
@@ -830,8 +883,12 @@ mod tests {
     #[test]
     fn a_huge_board_is_scaled_down_as_a_whole() {
         let sizes = vec![(9000, 9000); 2];
-        let p = plan(&sizes, &BoardLayout::new(LayoutKind::Pair), &BoardOptions::default())
-            .unwrap();
+        let p = plan(
+            &sizes,
+            &BoardLayout::new(LayoutKind::Pair),
+            &BoardOptions::default(),
+        )
+        .unwrap();
         assert!(p.width <= MAX_EDGE && u64::from(p.width) * u64::from(p.height) <= MAX_PIXELS);
     }
 
@@ -846,13 +903,18 @@ mod tests {
             background: Background::Dark,
             ..Default::default()
         };
-        let src = [solid(300, 200, [200, 200, 200, 255]), solid(300, 200, [100, 100, 100, 255])];
+        let src = [
+            solid(300, 200, [200, 200, 200, 255]),
+            solid(300, 200, [100, 100, 100, 255]),
+        ];
         let a = render_board(&src, &BoardLayout::new(LayoutKind::Pair), &opts).unwrap();
         let strip = BoardLayout::new(LayoutKind::Strip);
         let b = render_board(&src, &strip, &BoardOptions::default()).unwrap();
         assert!(a.height() > 200 && b.width() > 600);
         // Rounded corner: the picture's own corner pixel is background, not grey.
-        let cell = plan(&[(300, 200); 2], &BoardLayout::new(LayoutKind::Pair), &opts).unwrap().cells[0];
+        let cell = plan(&[(300, 200); 2], &BoardLayout::new(LayoutKind::Pair), &opts)
+            .unwrap()
+            .cells[0];
         let corner = a.get_pixel(cell.x as u32, cell.y as u32);
         assert_ne!(corner.0, [200, 200, 200, 255]);
         // Deterministic.
@@ -869,6 +931,9 @@ mod tests {
         let src = [solid(40, 40, [0, 0, 0, 255]), solid(40, 40, [0, 0, 0, 255])];
         let img = render_board(&src, &BoardLayout::new(LayoutKind::Pair), &opts).unwrap();
         assert_eq!(img.get_pixel(1, 1).0[3], 0);
-        assert_eq!(flatten_on_white(&img).get_pixel(1, 1).0, [255, 255, 255, 255]);
+        assert_eq!(
+            flatten_on_white(&img).get_pixel(1, 1).0,
+            [255, 255, 255, 255]
+        );
     }
 }
