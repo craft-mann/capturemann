@@ -50,6 +50,19 @@ fn rendered(
     library: &Arc<Mutex<Library>>,
     id: &str,
 ) -> Result<(cm_library::index::CaptureRecord, RgbaImage), CmError> {
+    rendered_with(library, id, None)
+}
+
+/// [`rendered`], and with `blueprint` the text lines of the picture are replaced by bars (BLK-1,
+/// ANN-11): the boxes are found once on the original with its base edits, stored in a `blueprint`
+/// op that is added to a copy of the op list (never saved to the bundle, so the original capture
+/// does not change, problem 11) and the picture is rendered from that list. The default keep-list
+/// is empty: every line becomes a bar.
+fn rendered_with(
+    library: &Arc<Mutex<Library>>,
+    id: &str,
+    blueprint: Option<&dyn cm_render::ocr::TextRecognizer>,
+) -> Result<(cm_library::index::CaptureRecord, RgbaImage), CmError> {
     let (rec, dir) = {
         let lib = lock_library(library);
         let rec = lib.get(id)?;
@@ -66,12 +79,54 @@ fn rendered(
     let base = image::open(bundle.original_path())
         .map_err(|e| CmError::internal(format!("cannot read the picture of `{id}`: {e}")))?
         .to_rgba8();
-    let out = if bundle.ops().is_empty() {
+    let mut ops = bundle.ops().to_vec();
+    if let Some(rec) = blueprint {
+        if let Some(op) = blueprint_op(rec, &base, &ops)? {
+            ops.push(op);
+        }
+    }
+    let out = if ops.is_empty() {
         base
     } else {
-        cm_render::render_annotations(&base, bundle.ops())?
+        cm_render::render_annotations(&base, &ops)?
     };
     Ok((rec, out))
+}
+
+/// The `blueprint` op for a picture: every recognized text line of `original` with its base edits
+/// applied (what `suggest_blueprint` shows), the measured fill and bar colour stored per box.
+/// `None` when the picture has no text.
+fn blueprint_op(
+    recognizer: &dyn cm_render::ocr::TextRecognizer,
+    original: &RgbaImage,
+    ops: &[cm_core::annotation::AnnotationOp],
+) -> Result<Option<cm_core::annotation::AnnotationOp>, CmError> {
+    use cm_core::annotation::{BlueprintColor, BlueprintStyle, OpKind, DEFAULT_BLUEPRINT_RADIUS};
+    let base_ops: Vec<_> = ops
+        .iter()
+        .filter(|o| o.kind.is_base_edit())
+        .cloned()
+        .collect();
+    let surface = if base_ops.is_empty() {
+        original.clone()
+    } else {
+        cm_render::render_annotations(original, &base_ops)?
+    };
+    let (_, rects, styles) = crate::blueprint_ops::detect(recognizer, &surface)?;
+    if rects.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(cm_core::annotation::AnnotationOp::new(
+        "op_bulk_blueprint",
+        OpKind::Blueprint {
+            boxes: rects,
+            style: BlueprintStyle::Bar,
+            color: BlueprintColor::Auto,
+            radius: DEFAULT_BLUEPRINT_RADIUS,
+            colors: styles.iter().map(|s| s.color).collect(),
+            fills: styles.iter().map(|s| s.fill.clone()).collect(),
+        },
+    )))
 }
 
 // ---- create_board ---------------------------------------------------------------------------
@@ -305,7 +360,7 @@ pub struct ExportImagesParams {
     /// JPEG quality, 60 to 100.
     pub quality: u8,
     pub watermark: Option<WatermarkStep>,
-    /// BLK-1 Blueprint step (ANN-11). Not available until the `blueprint` op lands (Track A).
+    /// BLK-1 Blueprint step (ANN-11): every text line becomes a bar (keep-list empty).
     pub blueprint: bool,
     /// `{name}`, `{date}`, `{n}`, `{w}`, `{h}`.
     pub name_pattern: String,
@@ -537,16 +592,6 @@ fn encode(img: &RgbaImage, format: ImageFormat, quality: u8) -> Result<Vec<u8>, 
     Ok(buf)
 }
 
-/// What the Blueprint step does (ANN-11).
-///
-/// TODO(Track A): call `cm_render`'s `blueprint` op here once Track A merges it. Until then the
-/// step is a clearly refused hook, so a call that asks for it fails before anything is written.
-fn apply_blueprint(_img: &mut RgbaImage) -> Result<(), CmError> {
-    Err(CmError::not_implemented(
-        "the Blueprint step of Bulk export is not available yet",
-    ))
-}
-
 fn date_of(t: time::OffsetDateTime) -> String {
     format!("{:04}-{:02}-{:02}", t.year(), u8::from(t.month()), t.day())
 }
@@ -565,10 +610,11 @@ fn export_one(
     index: usize,
     p: &ExportImagesParams,
     mark: Option<&Watermark>,
+    recognizer: Option<&dyn cm_render::ocr::TextRecognizer>,
     dest: &Path,
     job_id: &str,
 ) -> Value {
-    let (rec, mut img) = match rendered(library, id) {
+    let (rec, mut img) = match rendered_with(library, id, recognizer) {
         Ok(r) => r,
         Err(e) => {
             let reason = match e.code() {
@@ -579,11 +625,6 @@ fn export_one(
             return skipped(id, reason, e.to_string());
         }
     };
-    if p.blueprint {
-        if let Err(e) = apply_blueprint(&mut img) {
-            return skipped(id, "blueprint_unavailable", e.to_string());
-        }
-    }
     if let Some(step) = &p.size {
         let (w, h) =
             compose_bulk::target_size(img.width(), img.height(), &step.rule, step.allow_larger);
@@ -668,9 +709,19 @@ impl Inner {
                 "export is not available: this daemon has no exporter registered".to_owned(),
             ));
         }
-        if p.blueprint {
-            // Fails now while the step is not available (Track A), before anything is queued.
-            apply_blueprint(&mut RgbaImage::new(1, 1))?;
+        if p.blueprint && !self.recognizer.is_available() {
+            // Fails now, before anything is queued: no file would be written without the step.
+            let how = self.recognizer.install_hint().unwrap_or_default();
+            return Err(CmError::not_implemented(format!(
+                "text recognition is not available on this machine, so the Blueprint step cannot \
+                 run{}",
+                if how.is_empty() {
+                    String::new()
+                } else {
+                    format!(" ({how})")
+                }
+            ))
+            .into());
         }
         let (dest, wm) = (p.dest.clone(), p.watermark.clone());
         blocking(move || {
@@ -729,6 +780,7 @@ pub(crate) async fn run_job(h: &ExportHandler, ctx: JobContext) -> Result<Value,
         .await
         .map_err(|e| CmError::internal(format!("worker failed: {e}")))??;
     }
+    let blueprint_recognizer = p.blueprint.then(|| h.recognizer.clone());
     // Rows finished by an earlier attempt of this job (the checkpoint).
     let mut rows: Vec<Value> = ctx
         .job
@@ -750,16 +802,26 @@ pub(crate) async fn run_job(h: &ExportHandler, ctx: JobContext) -> Result<Value,
             i as f64 / total.max(1) as f64,
             Some(format!("Exporting {} of {total}", i + 1)),
         );
-        let (library, params, mark, dest, job_id, id) = (
+        let (library, params, mark, dest, job_id, id, recognizer) = (
             h.library.clone(),
             p.clone(),
             mark.clone(),
             dest.clone(),
             ctx.job.id.clone(),
             id.clone(),
+            blueprint_recognizer.clone(),
         );
         let row = tokio::task::spawn_blocking(move || {
-            export_one(&library, &id, i, &params, mark.as_ref(), &dest, &job_id)
+            export_one(
+                &library,
+                &id,
+                i,
+                &params,
+                mark.as_ref(),
+                recognizer.as_deref(),
+                &dest,
+                &job_id,
+            )
         })
         .await
         .map_err(|e| CmError::internal(format!("export worker failed: {e}")))?;

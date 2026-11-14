@@ -5,19 +5,21 @@
 //! `board_flow`.
 //!
 //! The canvas is a schematic of the board at its real proportions (the plan the renderer will
-//! use, one box per picture with its title); the real picture is made at Finish. Free layout has
-//! no drag canvas here yet: it is available to agents through `create_board`.
+//! use, one box per picture with its title); the real picture is made at Finish. In the Free
+//! layout the pictures are dragged on the canvas (move, and resize by a corner) with pink snap
+//! guides and a pink gap measure while dragging (design board S10); the geometry is in
+//! `crate::board_flow` (`snap_move`, `snap_resize`, `gap_measure`).
 
 use cm_i18n::{tr, trn};
 use cm_render::compose_board::LayoutKind;
 use gpui::{
-    div, prelude::*, px, AnyElement, App, Context, Entity, FocusHandle, FontWeight, KeyDownEvent,
-    Render, Role, SharedString, Subscription, Window,
+    div, prelude::*, px, AnyElement, App, Context, CursorStyle, Entity, FocusHandle, FontWeight,
+    KeyDownEvent, MouseButton, Render, Role, SharedString, Subscription, Window,
 };
 use serde_json::{json, Value};
 
 use crate::backend::Backend;
-use crate::board_flow::{layout_label, BgChoice, BoardSheet, LAYOUTS};
+use crate::board_flow::{layout_label, BgChoice, BoardSheet, Grip, LAYOUTS};
 use crate::daemon_text::call_error_text;
 use crate::theme::{scale, Theme};
 use crate::ui::app::{self, AppModel};
@@ -126,7 +128,7 @@ fn row() -> gpui::Div {
 }
 
 /// The canvas: the board at its real proportions, a box per picture.
-fn canvas(t: &Theme, s: &BoardSheet) -> AnyElement {
+fn canvas(t: &Theme, s: &BoardSheet, app: &Entity<AppModel>) -> AnyElement {
     let frame = div()
         .w(px(CANVAS_W))
         .h(px(CANVAS_H))
@@ -162,6 +164,9 @@ fn canvas(t: &Theme, s: &BoardSheet) -> AnyElement {
     } else {
         crate::theme::Color::rgb(0x1B1C1F)
     };
+    let free = s.layout == LayoutKind::Free;
+    // Window pixels per slot pixel (a board too large for its limits is scaled down by the plan).
+    let kd = k * plan.scale as f32;
     let mut board = div()
         .relative()
         .w(px(w))
@@ -169,6 +174,26 @@ fn canvas(t: &Theme, s: &BoardSheet) -> AnyElement {
         .flex_none()
         .overflow_hidden()
         .bg(rgba_of(bg));
+    if free {
+        let (a_move, a_up, a_out) = (app.clone(), app.clone(), app.clone());
+        board = board
+            .on_mouse_move(move |ev, _, cx| {
+                if ev.pressed_button != Some(MouseButton::Left) {
+                    // The button was let go outside the window: finish the drag.
+                    update(&a_move, cx, |s| s.end_drag());
+                    return;
+                }
+                let at = (f32::from(ev.position.x), f32::from(ev.position.y));
+                let (alt, shift) = (ev.modifiers.alt, ev.modifiers.shift);
+                update(&a_move, cx, |s| s.drag_to(at, kd, alt, shift));
+            })
+            .on_mouse_up(MouseButton::Left, move |_, _, cx| {
+                update(&a_up, cx, |s| s.end_drag())
+            })
+            .on_mouse_up_out(MouseButton::Left, move |_, _, cx| {
+                update(&a_out, cx, |s| s.end_drag())
+            });
+    }
     if let (Some(title), Some((x, y))) = (s.options().ok().and_then(|o| o.title), plan.title_at) {
         board = board.child(
             div()
@@ -189,6 +214,13 @@ fn canvas(t: &Theme, s: &BoardSheet) -> AnyElement {
         } else {
             None
         };
+        let pick = free.then(|| {
+            let a = app.clone();
+            move |ev: &gpui::MouseDownEvent, _: &mut Window, cx: &mut App| {
+                let at = (f32::from(ev.position.x), f32::from(ev.position.y));
+                update(&a, cx, |s| s.begin_drag(i, Grip::Move, at));
+            }
+        });
         board = board
             .child(
                 div()
@@ -208,6 +240,10 @@ fn canvas(t: &Theme, s: &BoardSheet) -> AnyElement {
                     .justify_center()
                     .text_size(px(11.))
                     .text_color(rgba_of(t.text_2))
+                    .when_some(pick, |d, f| {
+                        d.cursor(CursorStyle::OpenHand)
+                            .on_mouse_down(MouseButton::Left, f)
+                    })
                     .child(SharedString::from(src.title.clone())),
             )
             .children(label.map(|l| {
@@ -222,6 +258,89 @@ fn canvas(t: &Theme, s: &BoardSheet) -> AnyElement {
                     .text_color(rgba_of(crate::theme::Color::rgb(0xFFFFFF)))
                     .child(SharedString::from(l))
             }));
+    }
+    if free {
+        // Corner handles on every picture (a corner drag resizes, keeping the proportions).
+        for (i, cell) in plan.cells.iter().enumerate() {
+            let (x0, y0) = (cell.x as f32 * k, cell.y as f32 * k);
+            let (x1, y1) = (x0 + cell.w as f32 * k, y0 + cell.h as f32 * k);
+            for (grip, cx_, cy_, cursor) in [
+                (Grip::TopLeft, x0, y0, CursorStyle::ResizeUpLeftDownRight),
+                (Grip::TopRight, x1, y0, CursorStyle::ResizeUpRightDownLeft),
+                (Grip::BottomLeft, x0, y1, CursorStyle::ResizeUpRightDownLeft),
+                (
+                    Grip::BottomRight,
+                    x1,
+                    y1,
+                    CursorStyle::ResizeUpLeftDownRight,
+                ),
+            ] {
+                let a = app.clone();
+                board = board.child(
+                    div()
+                        .absolute()
+                        .left(px(cx_ - 5.))
+                        .top(px(cy_ - 5.))
+                        .w(px(10.))
+                        .h(px(10.))
+                        .rounded(px(2.))
+                        .border_1()
+                        .border_color(rgba_of(t.agent))
+                        .bg(rgba_of(crate::theme::Color::rgb(0xFFFFFF)))
+                        .cursor(cursor)
+                        .on_mouse_down(MouseButton::Left, move |ev, _, cx| {
+                            cx.stop_propagation();
+                            let at = (f32::from(ev.position.x), f32::from(ev.position.y));
+                            update(&a, cx, |s| s.begin_drag(i, grip, at));
+                        }),
+                );
+            }
+        }
+        // Pink snap guides and the gap measure, only while dragging.
+        let pink = crate::theme::Color::rgb(0xF472B6);
+        for g in &s.guides {
+            let at = g.at as f32 * kd;
+            board = board.child(
+                if g.vertical {
+                    div().absolute().left(px(at)).top(px(0.)).w(px(1.)).h_full()
+                } else {
+                    div().absolute().top(px(at)).left(px(0.)).h(px(1.)).w_full()
+                }
+                .bg(rgba_of(pink)),
+            );
+        }
+        if let Some(m) = s.measure.filter(|_| s.drag.is_some()) {
+            let (x0, y0) = (m.from.0 as f32 * kd, m.from.1 as f32 * kd);
+            let (x1, y1) = (m.to.0 as f32 * kd, m.to.1 as f32 * kd);
+            let line = if (y1 - y0).abs() < 0.5 {
+                div()
+                    .absolute()
+                    .left(px(x0.min(x1)))
+                    .top(px(y0))
+                    .w(px((x1 - x0).abs()))
+                    .h(px(1.))
+            } else {
+                div()
+                    .absolute()
+                    .left(px(x0))
+                    .top(px(y0.min(y1)))
+                    .w(px(1.))
+                    .h(px((y1 - y0).abs()))
+            };
+            board = board.child(line.bg(rgba_of(pink))).child(
+                div()
+                    .absolute()
+                    .left(px((x0 + x1) / 2. + 3.))
+                    .top(px((y0 + y1) / 2. + 3.))
+                    .px(px(5.))
+                    .rounded(px(4.))
+                    .bg(rgba_of(pink))
+                    .text_size(px(10.))
+                    .mono()
+                    .text_color(rgba_of(crate::theme::Color::rgb(0x18191C)))
+                    .child(SharedString::from(format!("{} px", m.px))),
+            );
+        }
     }
     frame.child(board).into_any_element()
 }
@@ -563,7 +682,7 @@ impl Render for BoardSheetView {
             .flex_col()
             .items_center()
             .gap(px(10.))
-            .child(canvas(&t, &s))
+            .child(canvas(&t, &s, &app))
             .child(
                 div()
                     .px(px(10.))
@@ -576,6 +695,14 @@ impl Render for BoardSheetView {
                     .text_color(rgba_of(t.text_2))
                     .child(SharedString::from(s.size_chip())),
             )
+            .children((s.layout == LayoutKind::Free).then(|| {
+                div()
+                    .text_size(px(12.5))
+                    .text_color(rgba_of(t.mist))
+                    .child(tr!(
+                        "Drag a picture to place it, drag a corner to resize it. Hold Alt to turn snapping off, Shift to keep a line."
+                    ))
+            }))
             .child(
                 div()
                     .text_size(px(12.5))
@@ -774,6 +901,50 @@ pub fn open(app: &Entity<AppModel>, shots: Vec<(String, String, u32, u32)>, cx: 
         m.bulk.epoch += 1;
         cx.notify();
     });
+    refine_sizes(app, cx);
+}
+
+/// A source with a crop counts with its cropped size on the canvas (the size its picture has in
+/// the board). The library row only knows the original size, so the ops are read (`get_capture`
+/// without the image, read-only) and the sizes are corrected a moment after the sheet opens.
+fn refine_sizes(app: &Entity<AppModel>, cx: &mut App) {
+    let ids: Vec<String> = match app.read(cx).bulk.board.as_ref() {
+        Some(s) => s.sources.iter().map(|x| x.id.clone()).collect(),
+        None => return,
+    };
+    let backend = app.read(cx).backend.clone();
+    let Some(daemon) = backend.daemon.clone() else {
+        return;
+    };
+    let app = app.clone();
+    cx.spawn(async move |cx| {
+        let found = backend
+            .rt
+            .spawn(async move {
+                let mut out = Vec::new();
+                for id in ids {
+                    let p = json!({ "capture_id": id, "include_image": false });
+                    if let Ok(v) = Backend::call_coded(&daemon, "get_capture", p).await {
+                        out.push((id, v["ops"].clone()));
+                    }
+                }
+                out
+            })
+            .await
+            .unwrap_or_default();
+        cx.update(|cx| {
+            update(&app, cx, |s| {
+                for (id, ops) in &found {
+                    if let Some(src) = s.sources.iter_mut().find(|x| &x.id == id) {
+                        let (w, h) = crate::board_flow::cropped_size(ops, (src.width, src.height));
+                        src.width = w;
+                        src.height = h;
+                    }
+                }
+            })
+        });
+    })
+    .detach();
 }
 
 pub fn close(app: &Entity<AppModel>, cx: &mut App) {

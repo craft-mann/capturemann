@@ -1144,9 +1144,6 @@ msgstr ""
 msgid "Coming soon"
 msgstr ""
 
-msgid "Coming with the Blueprint tool"
-msgstr ""
-
 msgid "Command launcher"
 msgstr ""
 
@@ -1643,6 +1640,16 @@ msgstr ""
 msgid "Delete this report?"
 msgstr ""
 
+msgid "Delete {n} capture"
+msgid_plural "Delete {n} captures"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Delete {n} capture?"
+msgid_plural "Delete {n} captures?"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "Deleted online: {items}."
 msgstr ""
 
@@ -1800,6 +1807,9 @@ msgid "Drag a box over what to move or remove"
 msgstr ""
 
 msgid "Drag a box over what to move, then drag its contents to the new place."
+msgstr ""
+
+msgid "Drag a picture to place it, drag a corner to resize it. Hold Alt to turn snapping off, Shift to keep a line."
 msgstr ""
 
 msgid "Drag on the image to place a callout, then type its text."
@@ -4473,6 +4483,9 @@ msgstr ""
 msgid "Replace text in captions"
 msgstr ""
 
+msgid "Replace text with bars"
+msgstr ""
+
 msgid "Replace the text lines with neutral bars, keeping the ones you choose"
 msgstr ""
 
@@ -4483,6 +4496,9 @@ msgid "Replaced {n} place in the captions."
 msgid_plural "Replaced {n} places in the captions."
 msgstr[0] ""
 msgstr[1] ""
+
+msgid "Replaces every line of text with a bar in the files; the screenshots stay as they are"
+msgstr ""
 
 msgid "Replied in {seconds} s"
 msgstr ""
@@ -5952,6 +5968,12 @@ msgstr ""
 msgid "These are the defaults for every recording, including ones an agent starts. A request can override them for one recording."
 msgstr ""
 
+msgid "They are removed from your library and moved to {trash}."
+msgstr ""
+
+msgid "They are removed from your library and moved to {trash}. Their copies online stay there unless you tick the box: deleting them cannot be undone ({services})."
+msgstr ""
+
 msgid "This account is not connected. Connect it again in Settings → Destinations."
 msgstr ""
 
@@ -6820,6 +6842,11 @@ msgstr ""
 msgid "an unusual format"
 msgstr ""
 
+msgid "and {n} more"
+msgid_plural "and {n} more"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "cannot decode poster: {error}"
 msgstr ""
 
@@ -7393,6 +7420,11 @@ msgid_plural "{n} caption edits were kept where the same words were heard again.
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "{n} capture deleted"
+msgid_plural "{n} captures deleted"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "{n} capture in the old folder was copied and checked. It moves to {trash}, where you can restore it. Anything that changed since the copy stays where it is."
 msgid_plural "{n} captures in the old folder were copied and checked. They move to {trash}, where you can restore them. Anything that changed since the copy stays where it is."
 msgstr[0] ""
@@ -7400,6 +7432,11 @@ msgstr[1] ""
 
 msgid "{n} capture stayed in the old folder: it changed after it was copied, or it was not found."
 msgid_plural "{n} captures stayed in the old folder: they changed after they were copied, or they were not found."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{n} capture wasn’t deleted"
+msgid_plural "{n} captures weren’t deleted"
 msgstr[0] ""
 msgstr[1] ""
 
@@ -7743,6 +7780,9 @@ msgid "{title}. {details}. Opens Agents and CLI"
 msgstr ""
 
 msgid "{title}. {text}"
+msgstr ""
+
+msgid "{title}: {reason}"
 msgstr ""
 
 msgid "{tool} from {client}, {decision}"

@@ -184,6 +184,89 @@ pub fn delete_capture(app: &Entity<AppModel>, id: &str, title: &str, cx: &mut Ap
     .detach();
 }
 
+/// The selection bar's Delete: ONE confirmation for all the selected captures (the count, the
+/// first titles and, when some have copies online, one unticked box), then `delete_capture` for
+/// each, and one toast for the run. One capture takes the single-capture flow.
+pub fn delete_captures(app: &Entity<AppModel>, items: Vec<(String, String)>, cx: &mut App) {
+    use crate::bulk_flow::{bulk_delete_notice, BulkDeletePrompt};
+    use crate::delete_flow::{self, DaemonApi, Notice};
+    if let [(id, title)] = items.as_slice() {
+        delete_capture(app, id, title, cx);
+        return;
+    }
+    let backend = app.read(cx).backend.clone();
+    let Some(daemon) = backend.daemon.clone() else {
+        return;
+    };
+    let app = app.clone();
+    cx.spawn(async move |cx| {
+        let api = std::sync::Arc::new(DaemonApi(daemon));
+        let prompt = {
+            let (api, items) = (api.clone(), items.clone());
+            backend
+                .rt
+                .spawn(async move {
+                    let mut out = BulkDeletePrompt::default();
+                    for (id, title) in items {
+                        let p = delete_flow::prepare(api.as_ref(), &id).await;
+                        out.items.push((id, title, p));
+                    }
+                    out
+                })
+                .await
+                .unwrap_or_default()
+        };
+        if prompt.items.is_empty() {
+            return;
+        }
+        cx.update(|cx| {
+            let model = prompt.dialog();
+            ask_confirm(
+                &app,
+                model,
+                move |app, decision, cx| {
+                    if prompt.also_remote(decision, "").is_none() {
+                        return;
+                    }
+                    let (app2, rt) = (app.clone(), backend.rt.clone());
+                    cx.spawn(async move |cx| {
+                        let results: Vec<(String, Notice)> = rt
+                            .spawn(async move {
+                                let mut out = Vec::new();
+                                for (id, title, _) in &prompt.items {
+                                    let remote = prompt.also_remote(decision, id).unwrap_or(false);
+                                    let n = delete_flow::finish(api.as_ref(), id, remote).await;
+                                    out.push((title.clone(), n));
+                                }
+                                out
+                            })
+                            .await
+                            .unwrap_or_default();
+                        cx.update(|cx| {
+                            let n = bulk_delete_notice(&results);
+                            if n.local_deleted {
+                                capture_changed(&app2, None, cx);
+                            }
+                            let kind = match n.level {
+                                delete_flow::Level::Success => ToastKind::Success,
+                                delete_flow::Level::Error => ToastKind::Error,
+                            };
+                            let mut spec = ToastSpec::new(kind, n.title);
+                            if let Some(b) = n.body {
+                                spec = spec.body(b);
+                            }
+                            push_toast(&app2, spec, cx);
+                        });
+                    })
+                    .detach();
+                },
+                cx,
+            );
+        });
+    })
+    .detach();
+}
+
 /// LIB-1 "Rename": `rename_capture { capture_id, title }`. The answer goes to `done`: `None` when
 /// the capture was renamed, else the words for the Rename dialog to show under its field (the
 /// text fields spec: a refused name is shown where it is typed, not as a toast).

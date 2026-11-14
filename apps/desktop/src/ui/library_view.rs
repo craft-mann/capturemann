@@ -456,18 +456,18 @@ impl LibraryView {
         cx.defer(move |cx| crate::ui::bulk_sheet::open(&app, caps, cx));
     }
 
-    /// Delete: each selected capture goes through the usual delete question.
+    /// Delete: one question for all the selected captures.
     fn delete_selected(&mut self, cx: &mut Context<Self>) {
         let items = self.multi_items();
         let app = self.app.clone();
         self.select_mode = false;
         self.multi.clear();
         cx.notify();
-        cx.defer(move |cx| {
-            for i in &items {
-                app::delete_capture(&app, &i.id, &i.title, cx);
-            }
-        });
+        let caps: Vec<(String, String)> = items
+            .iter()
+            .map(|i| (i.id.clone(), i.title.clone()))
+            .collect();
+        cx.defer(move |cx| app::delete_captures(&app, caps, cx));
     }
 
     /// Looks for uploads and publishes that wait for a sign-in (B1): a paused job with the reason
