@@ -149,7 +149,7 @@ pub struct MeasureRequest {
     pub text: String,
 }
 
-/// "The background is too busy to fill cleanly": shown before the op is created, with Cancel
+/// "This area has an image or a control in it, so the fill may show": shown before the op is created, with Cancel
 /// (default, stores nothing) and Use anyway.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BusyPrompt {

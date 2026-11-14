@@ -168,6 +168,10 @@ pub struct CameraParams {
     pub size: String,
     /// A named anchor (`bottom-left`, the default) or `[x, y]` fractions of the recorded area.
     pub position: Value,
+    /// The request named a `position`: a remembered one (`camera.remember_position`) never
+    /// replaces it. Not part of the stored bubble facts.
+    #[serde(skip)]
+    pub position_explicit: bool,
 }
 
 impl CameraParams {
@@ -179,6 +183,7 @@ impl CameraParams {
             shape: "circle".to_owned(),
             size: "m".to_owned(),
             position: json!("bottom-left"),
+            position_explicit: false,
         }
     }
 
@@ -481,6 +486,7 @@ fn parse_camera(v: &Value) -> Result<Option<CameraParams>, CmError> {
             }
             if let Some(p) = o.get("position").filter(|p| !p.is_null()) {
                 c.position = parse_position(p)?;
+                c.position_explicit = true;
             }
             Ok(Some(c))
         }
@@ -859,7 +865,22 @@ impl StartParams {
                 .quality
                 .or_else(|| setting(settings, "recording.quality"))
                 .unwrap_or_default(),
-            camera: self.camera.clone(),
+            camera: self.camera.clone().map(|mut c| {
+                // CAM-1.AC8: with `camera.remember_position` on, a start that names no position
+                // (CLI, MCP, launcher) opens the bubble where it was last dragged, as the start
+                // sheet does; the sheet always sends its own.
+                if !c.position_explicit
+                    && setting::<bool>(settings, "camera.remember_position") == Some(true)
+                {
+                    if let Some(p) = settings
+                        .get("camera.position")
+                        .and_then(|p| parse_position(p).ok())
+                    {
+                        c.position = p;
+                    }
+                }
+                c
+            }),
             mic: self.mic.clone().map(|m| MicParams {
                 denoise: Some(m.denoise.unwrap_or(denoise_default)),
                 ..m
@@ -1007,6 +1028,27 @@ mod tests {
         ))
         .unwrap();
         assert_eq!(p.camera.unwrap().position, json!("bottom-right"));
+    }
+
+    /// CAM-1.AC8 on the action path: the remembered position is used only when the setting is on
+    /// and the request names none.
+    #[test]
+    fn camera_position_remembered_for_a_start_without_one() {
+        let parse = |cam: Value| {
+            StartParams::parse(&rest(json!({"target": {"display_id": 1}, "camera": cam}))).unwrap()
+        };
+        let settings = |on: bool| {
+            rest(json!({"camera.remember_position": on, "camera.position": [0.5, 0.25]}))
+        };
+        let at = |p: &StartParams, s: &Map<String, Value>| p.resolve(s).camera.unwrap().position;
+        let p = parse(json!(true));
+        assert_eq!(at(&p, &settings(true)), json!([0.5, 0.25]));
+        assert_eq!(at(&p, &settings(false)), json!("bottom-left"));
+        assert_eq!(at(&p, &Map::new()), json!("bottom-left"));
+        let bad = rest(json!({"camera.remember_position": true, "camera.position": [3, 3]}));
+        assert_eq!(at(&p, &bad), json!("bottom-left"));
+        let named = parse(json!({"position": "bottom-right"}));
+        assert_eq!(at(&named, &settings(true)), json!("bottom-right"));
     }
 
     #[test]

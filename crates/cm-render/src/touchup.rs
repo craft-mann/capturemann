@@ -173,7 +173,7 @@ fn ring_stats(v: &PixView<'_>, inner: Region, pts: &[(u32, u32)], fill: &Fill) -
 /// largest-channel differences in levels.
 pub fn ring_error(base: &RgbaImage, rect: Rc, fill: &Fill) -> Option<(u8, u8)> {
     let v = PixView::from_image(base);
-    let inner = Region::outward(rect.to_array(), v.w, v.h)?;
+    let inner = fill_region(rect, v.w, v.h)?;
     let pts = ring(inner, v.w, v.h);
     (!pts.is_empty()).then(|| ring_stats(&v, inner, &pts, fill))
 }
@@ -187,7 +187,25 @@ fn median(vals: &mut [u8]) -> u8 {
 /// colour when the ring is flat, a linear gradient when it changes smoothly, otherwise `busy`.
 /// A box that covers the whole image has no ring and gets a white solid fill marked busy.
 pub fn measure_fill(base: &RgbaImage, rect: Rc) -> FillMeasure {
-    measure_fill_view(&PixView::from_image(base), rect)
+    let v = PixView::from_image(base);
+    measure_fill_in(&v, fill_region(rect, v.w, v.h))
+}
+
+/// Pixels the erased region of Retype and Move area grows beyond the box on every side (clamped
+/// to the image): a recognizer box can be tight, and a glyph top or tail just outside it would
+/// stay as a sliver. The ring is measured outside this padded region. Not stored in the op.
+const ERASE_PAD_PX: u32 = 1;
+
+/// The region a Retype or Move area fill covers and measures around: the box rounded outward,
+/// grown by `ERASE_PAD_PX`, clipped to the `w x h` image.
+pub(crate) fn fill_region(rect: Rc, w: u32, h: u32) -> Option<Region> {
+    let r = Region::outward(rect.to_array(), w, h)?;
+    Some(Region {
+        x0: r.x0.saturating_sub(ERASE_PAD_PX),
+        y0: r.y0.saturating_sub(ERASE_PAD_PX),
+        x1: (r.x1 + ERASE_PAD_PX).min(w),
+        y1: (r.y1 + ERASE_PAD_PX).min(h),
+    })
 }
 
 /// The ring split into its four sides: top, bottom (with the corners), left and right.
@@ -236,6 +254,10 @@ fn solid_fit(v: &PixView<'_>, pts: &[(u32, u32)]) -> Fill {
 }
 
 pub(crate) fn measure_fill_view(v: &PixView<'_>, rect: Rc) -> FillMeasure {
+    measure_fill_in(v, Region::outward(rect.to_array(), v.w, v.h))
+}
+
+fn measure_fill_in(v: &PixView<'_>, inner: Option<Region>) -> FillMeasure {
     let none = FillMeasure {
         fill: Fill::solid(Color::WHITE),
         busy: true,
@@ -245,7 +267,7 @@ pub(crate) fn measure_fill_view(v: &PixView<'_>, rect: Rc) -> FillMeasure {
         sides_used: 0,
         ring_pixels: 0,
     };
-    let Some(inner) = Region::outward(rect.to_array(), v.w, v.h) else {
+    let Some(inner) = inner else {
         return none;
     };
     let sides = ring_sides(inner, v.w, v.h);
@@ -605,7 +627,12 @@ pub(crate) fn apply_retype(
     let Some(r) = Region::outward(rect.to_array(), pm.width(), pm.height()) else {
         return Ok(());
     };
-    paint_fill(pm, r, fill);
+    // The erase is padded; the new text stays clipped to the box itself.
+    paint_fill(
+        pm,
+        fill_region(*rect, pm.width(), pm.height()).unwrap_or(r),
+        fill,
+    );
     let style = TextStyle {
         px: *size as f32,
         color: *color,
@@ -700,7 +727,7 @@ pub(crate) fn apply_move_area(pm: &mut Pixmap, kind: &OpKind) {
         let o = (r.y0 as usize + y) * stride + r.x0 as usize * 4;
         block[y * bw * 4..(y + 1) * bw * 4].copy_from_slice(&pm.data()[o..o + bw * 4]);
     }
-    paint_fill(pm, r, fill);
+    paint_fill(pm, fill_region(*source, w, h).unwrap_or(r), fill);
     let Some(to) = to else {
         return;
     };

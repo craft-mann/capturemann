@@ -937,3 +937,28 @@ fn s5_gpu_texture_limits() {
         );
     }
 }
+
+/// A tight recognizer box (one pixel above a glyph top) leaves no sliver: the erase is padded
+/// by a pixel, the stored op is unchanged, and the ring is measured outside the padded region.
+#[test]
+fn ann9_tight_box_erases_a_one_pixel_glyph_top() {
+    let mut img = white(120, 60);
+    for x in 20..60 {
+        // Ink on rows 19 (one above the box) and 20..40 (inside it).
+        for y in 19..40 {
+            img.put_pixel(x, y, image::Rgba([10, 10, 10, 255]));
+        }
+    }
+    let rect = Rc::new(18.0, 20.0, 50.0, 20.0);
+    let m = measure_fill(&img, rect);
+    assert!(!m.busy, "{m:?}");
+    let j = format!(
+        r##"[{{"op":"retype","rect":[18,20,50,20],"fill":{},"text":"","size":20}}]"##,
+        serde_json::to_string(&m.fill).unwrap()
+    );
+    let out = render_annotations(&img, &ops(&j)).unwrap();
+    assert_eq!(out.get_pixel(30, 19).0, [255, 255, 255, 255], "sliver left");
+    assert_eq!(out.get_pixel(30, 30).0, [255, 255, 255, 255]);
+    // Two pixels away is untouched.
+    assert_eq!(out.get_pixel(30, 18).0, [255, 255, 255, 255]);
+}

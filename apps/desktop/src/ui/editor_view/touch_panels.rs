@@ -725,7 +725,7 @@ impl EditorView {
 
     // ---- the busy background sheet ------------------------------------------------------------
 
-    /// "The background is too busy to fill cleanly": shown before the op is created. Cancel has
+    /// "This area has an image or a control in it, so the fill may show": shown before the op is created. Cancel has
     /// the default focus and stores nothing; Use anyway goes on (ANN-9.AC3).
     pub(super) fn busy_sheet(
         &self,
@@ -756,7 +756,7 @@ impl EditorView {
                     .id("editor-busy-sheet")
                     .role(Role::Dialog)
                     .aria_label(SharedString::from(tr!(
-                        "The background is too busy to fill cleanly"
+                        "This area has an image or a control in it, so the fill may show"
                     )))
                     .w(px(380.))
                     .p(px(20.))
@@ -772,7 +772,7 @@ impl EditorView {
                             .text_size(px(type_scale::BODY))
                             .font_weight(FontWeight::SEMIBOLD)
                             .child(SharedString::from(tr!(
-                                "The background is too busy to fill cleanly"
+                                "This area has an image or a control in it, so the fill may show"
                             ))),
                     )
                     .child(

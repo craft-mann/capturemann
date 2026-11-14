@@ -55,7 +55,7 @@ in the release notes and in [`verification/`](verification/).
 | **Meeting minutes and reports** by a built-in text model (no cloud, no account) | ✓ | ✓ | ✓ |
 | **Library** of self-contained capture bundles, in a folder you choose | ✓ | ✓ | ✓ |
 | **Share**: local folders, Google Drive, YouTube (private by default) | ✓ | ✓ | ✓ [not run on Linux yet] |
-| **For agents**: 81 MCP tools plus resources and prompts, and an identical `capturemann` CLI; risky actions need an on-screen confirmation | ✓ | ✓ | ✓ |
+| **For agents**: 89 MCP tools plus resources and prompts, and an identical `capturemann` CLI; risky actions need an on-screen confirmation | ✓ | ✓ | ✓ |
 | Secrets stored in the system keychain | ✓ [Keychain] | ✓ [Credential Manager] | ✓ [Secret Service, else an owner-only file] |
 | Install through an APT repository | — | — | ✓ |
 | English and Vietnamese interface | ✓ | ✓ | ✓ |
