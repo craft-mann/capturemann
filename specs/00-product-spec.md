@@ -82,7 +82,7 @@ P0 items block the v0.1 release; P1 items ship in v0.1 unless they threaten the 
 | CAP-3 | Magnifier with pixel coordinates in the region picker | P1 | — |
 | CAP-4 | Copy to clipboard and save to the default destination after capture (configurable) | P0 | Yes |
 | CAP-5 | Delayed capture (3/5/10 s) | P1 | Yes |
-| CAP-6 | Scrolling capture | P2 | Yes |
+| CAP-6 | Long Shot: scrolling capture of a window or area into one tall image (auto scroll on macOS, Windows and X11; hand scroll everywhere; limit 16,384 px) (0.3.4) | P1 | Yes |
 | **Annotation** |  |  |  |
 | ANN-1 | Arrow, line, rectangle, ellipse, text, highlighter, numbered step badge, crop | P0 | Yes |
 | ANN-2 | Blur and pixelate regions | P0 | Yes |
@@ -91,7 +91,10 @@ P0 items block the v0.1 release; P1 items ship in v0.1 unless they threaten the 
 | ANN-5 | Copy text from a screenshot (on-device text recognition) | P1 | Yes |
 | ANN-6 | Step badge: label, numbering style (numbers, letters), start number, reorder | P1 | Yes |
 | ANN-7 | Spotlight: dim or blur everything outside chosen holes | P1 | Yes |
-| ANN-8 | Magnify: a zoomed, sharp copy of a detail with a connector line (0.3.4) | P1 | Yes |
+| ANN-8 | Magnify, shown as Zoom Lens: a zoomed, sharp copy of a detail with a connector line (0.3.4) | P1 | Yes |
+| ANN-9 | Retype: change text in a flat screenshot (on-device recognition plus a stored background fill) (0.3.4) | P1 | Yes |
+| ANN-10 | Move area: move or remove a part of a flat screenshot (0.3.4) | P1 | Yes |
+| ANN-11 | Blueprint: replace recognized text lines with neutral bars (0.3.4) | P1 | Yes |
 | **Recording** |  |  |  |
 | REC-1 | Record full display, window or region | P0 | Yes |
 | REC-2 | Resolution up to the display's native size (incl. 4K/5K), or a chosen output height (720p, 1080p, 1440p, 2160p); no cap | P0 | Yes |
@@ -143,6 +146,13 @@ P0 items block the v0.1 release; P1 items ship in v0.1 unless they threaten the 
 | LIB-1 | Local library with thumbnails, search by title, date and transcript text | P0 | Yes |
 | LIB-2 | Library folder configurable (internal, external drive or NAS) | P0 | Yes |
 | LIB-3 | Tags and folders | P2 | Yes |
+| **Guides, boards and bulk work** (0.3.4) |  |  |  |
+| GDE-1 | Click Guide: click through a task once, get a numbered guide with a screenshot per click | P1 | Yes |
+| GDE-2 | Click Guide editor: reorder, retitle, note, retake, edit each image | P1 | Yes |
+| GDE-3 | Click Guide export: Markdown, HTML, PDF (if the spike passes), copy as rich text | P1 | Yes |
+| GDE-4 | Click Guide for agents: `start_guide`, `stop_guide`, `get_guide`, `set_guide`, `export_guide` | P1 | Yes |
+| BRD-1 | Boards: 2 to 12 screenshots in one layout (pair, grid, strip, free) | P1 | Yes |
+| BLK-1 | Bulk export: resize, convert, watermark and rename many screenshots as one job | P1 | Yes |
 | **Storage** |  |  |  |
 | STO-1 | Destinations: local folder, external drive, NAS (SMB path) | P0 | Yes |
 | STO-2 | Google Drive via OAuth; pick a target folder (OneDrive and Dropbox: built, "Coming soon", later release) | P0 | Yes |

@@ -35,7 +35,7 @@ Annotations are vector operations stored in `manifest.json` (`ops` list) and ren
 - `step` gains `style` (`number` default, `upper`, `lower`), `start` (at least 1, default 1) and `text` (label, at most 200 characters, default none). The label drawn in the badge is `step_label(style, start + n - 1)`; letters continue Z, AA, AB. A step without these fields is exactly the 0.3.2 step; the three fields are not written while they hold their defaults.
 - `stamp`: `kind` `check`, `cross`, `exclaim`, `question` (vector paths) or `label` (a word on a pill; `text` required, at most 200 characters, written in the UI language when the stamp is placed), `at` is the centre, `size` 34 (cap 2000), `color` `#FF3B3B`.
 - **Pass-through (0.3.3).** A field this build does not know inside a known op is kept and written back unchanged (a typed field the build writes wins over a stored duplicate). An unknown `op` type is still kept whole in `manifest.unknown_ops` by `cm-library`.
-- Magnify is not in 0.3.3: the op name `magnify` and ANN-8 are reserved for it.
+- Magnify is not in 0.3.3: the op name `magnify` and ANN-8 are reserved for it. 0.3.4 adds `retype`, `move_area` and `blueprint` (ANN-9 to ANN-11, base edits); a 0.3.3 app keeps them in `unknown_ops`.
 
 ### ANN-1 Drawing tools: arrow, line, rectangle, ellipse, text, highlighter, step badge, crop
 **Priority** P0 · **Status** In progress (built on macOS: the op schema and validation in `cm-core`, the renderer with golden tests in `cm-render`, the editor in `apps/desktop` and the `annotate` action and tool; ACs 1 to 6 are cited by automated tests; no hands-on editor verification report is stored; the editor has not run on Windows) · **Crates** cm-core, cm-render, apps/desktop · **Depends on** CAP-1, DESIGN §5.5
@@ -214,7 +214,9 @@ Annotations are vector operations stored in `manifest.json` (`ops` list) and ren
 
 ---
 
-### ANN-8 Magnify
+### ANN-8 Magnify (UI name: **Zoom Lens**)
+
+**UI name (Nov 14, 2026).** The tool, menus and docs say **Zoom Lens**; the op stays `magnify` and the key stays M (the frozen JSON does not change). Added: **AC10** Given a Retype, Move area or Blueprint base edit inside the lens source, then the lens shows the edited pixels, because base edits come first in the list (see Base edits).
 **Priority** P1 (0.3.4) · **Status** Ready (0.3.4; the op JSON is frozen above; not started) · **Crates** cm-core, cm-render, cm-mcp, cm-cli, apps/desktop · **Depends on** ANN-1, ANN-2, ANN-7
 
 **User story** — As someone documenting a screen, I want a zoomed copy of a small detail next to it, with a line back to where it comes from, so that the reader sees a tiny button or a number without squinting.
@@ -248,6 +250,74 @@ Annotations are vector operations stored in `manifest.json` (`ops` list) and ren
 **Test notes** — Golden images per shape and zoom; an OCR test at zoom 2, 4 and 8 on a screenshot of text with a blur (before and after the magnify in the list); an edge-width measure for sharpness; the fixture with every 0.3.4 op for the 0.3.3 round trip; `tests/manual/ANN-8.md` for the editor.
 
 ---
+
+### Base edits (0.3.4): Retype, Move area, Blueprint
+These three ops change pixels before anything is drawn on them. Rules, decided Nov 14, 2026 (they apply to ANN-9 to ANN-11):
+1. **They come first.** In the op list a base edit comes before every non-base op. The editor inserts it there. `annotate` refuses a base edit after a non-base op (`invalid_input` naming `ops[i]`). So the Zoom Lens, blur, pixelate, Spotlight and Copy text (ANN-5) all see the edited picture, and no list order can show the old text next to the new.
+2. **Loading is tolerant.** When a file is loaded, the renderer and the editor **sort base edits to the front** (stable, so their own order is kept) and the next save writes that order. Reason: 0.3.3 keeps unknown ops in `unknown_ops` and writes them back after the known ops, so a file saved by 0.3.3 can hold a base edit after an arrow. A 0.3.3 app shows the original pixels where a base edit applies and says "Kept an annotation this version cannot show"; it never drops the op.
+3. **`original.png` is never changed** (ANN-3). Revert to original removes every base edit.
+4. **They are not redaction.** The fill hides the old pixels in the export, but secrets are removed with blur or pixelate (ANN-2); the bundle still holds `original.png`. Auto-redact (REDACT) runs on the rendered image.
+5. **The fill is measured once and stored.** The fill comes from the ring of pixels around the box: a solid colour when the ring is flat, a linear gradient when it changes smoothly. When the ring varies too much (a photo or a pattern) the tool says "The background is too busy to fill cleanly" and offers Cancel or Use anyway. The fill colours are **stored in the op** when it is created, so the editor, the CLI and agents render the same (ANN-1.AC6). No model and no network are involved. Object detection and inpainting are a later item.
+6. **The font is approximate.** Retype keeps the box, the text colour (the darkest or lightest cluster inside the box) and the cap height measured from the box, and draws in the system UI font through the existing `cosmic-text` fallback. A custom font is not matched, and the spec says so in the UI hint.
+
+### ANN-9 Retype (change text in a screenshot)
+**Priority** P1 · **Status** Ready (0.3.4, lite version) · **Crates** cm-core, cm-render, cm-mcp, apps/desktop · **Depends on** ANN-5 (OCR), ANN-1, ANN-3
+
+**User story.** As someone writing documentation, I want to fix a typo, a name or a number in a screenshot without taking it again, so that the guide matches what I describe.
+
+**Description**
+- **Tool:** Retype (key Y, in a new **Touch-up** group with Move area). Hovering shows the recognized text lines as dashed boxes; a click on one opens it for editing with the recognized text filled in. The user can also drag a box over text the recognizer missed and type.
+- **Op:** `retype { rect, fill: { kind: "solid" | "linear", colors: [..], angle? }, text, size, color, weight, align }`. `fill` and the text style are measured when the op is created (base-edit rules, fill and font) and stored. The new text is drawn in the system UI font, vertically centred in `rect`, and clipped to `rect` (with a warning in the panel when the text does not fit).
+- **A base edit** (base-edit rules): the editor inserts it before the first non-base op.
+- **Busy background:** the warning in the base-edit rules, with Cancel or Use anyway.
+
+**Acceptance criteria**
+- **AC1** A screenshot of a dialog on a flat background where "Save" is retyped to "Save all". The exported PNG shows "Save all", OCR reads "Save all" and not "Save", and the pixels outside `rect` are unchanged.
+- **AC2** A button with a vertical gradient. The fill is `linear`, and the largest difference between the fill and the original background ring is at most 6 levels per channel.
+- **AC3** A photo background. The tool warns before it creates the op, and Cancel stores nothing.
+- **AC4** `annotate` with a `retype` op after an arrow answers `invalid_input` naming `ops[i]` (base edits come first).
+- **AC5** An agent sends the same op that the editor drew, and the renders are identical (ANN-1.AC6).
+- **AC6** Revert to original removes every Retype, and `original.png` is byte-identical before and after.
+- **AC7** An older app (0.3.3) keeps the op in `unknown_ops`, unchanged ("Kept an annotation this version cannot show").
+
+**Out of scope:** matching custom fonts; text on photos; editing text inside a Zoom Lens.
+
+### ANN-10 Move area
+**Priority** P1 · **Status** Ready (0.3.4, lite version) · **Crates** cm-core, cm-render, cm-mcp, apps/desktop · **Depends on** ANN-9 (fill), ANN-3
+
+**User story.** As a designer or writer, I want to move a button, an icon or a block in a screenshot, or remove it, so that I can show a layout change or tidy the shot without a design tool.
+
+**Description**
+- **Tool:** Move area (key J, Touch-up group). Drag a rectangle, then drag its contents to a new place, or press Delete to remove them. The hole left behind is filled the same way as in Retype.
+- **Op:** `move_area { source: [x, y, w, h], to: [x, y] | null, fill }`. `to: null` removes the contents. This is a base edit (base-edit rules).
+- **Snapping:** while dragging, the area snaps to the source row or column (Shift locks the axis).
+
+**Acceptance criteria**
+- **AC1** A toolbar icon on a flat bar, moved 120 px to the right. The icon appears at the new place pixel for pixel, and the hole matches the bar colour within 6 levels per channel.
+- **AC2** `to: null` removes the contents, and the area is filled.
+- **AC3** The source overlaps the destination. The result is the same as cutting, filling, then pasting (one defined order, with a golden test).
+- **AC4** to **AC6**: parity, base-edit order and older-app rules, the same as ANN-9 AC4, AC5 and AC7.
+
+**Out of scope:** detecting objects automatically (a click to select an icon); filling busy backgrounds well. Both wait for a later on-device model (`specs/plans/release-0.3.4-plan.md`, section 7).
+
+### ANN-11 Blueprint (placeholder text)
+**Priority** P1 · **Status** Ready (0.3.4, lite version) · **Crates** cm-core, cm-render, cm-mcp, apps/desktop · **Depends on** ANN-5
+
+**User story.** As a technical writer, I want the UI text in a screenshot replaced by neutral bars, so that my guide still fits when a label changes, and the reader looks at the layout and not at the words.
+
+**Description**
+- **Command:** **Blueprint** in the editor's view bar. CaptureMann runs text recognition, shows every text line as a bar preview, and lets the user click a line to keep its real text (for example, the button the step is about). Apply makes one op, in one undo step.
+- **Op:** `blueprint { boxes: [[x, y, w, h], ...], style: "bar" | "box", color: "auto" | "#RRGGBB", radius }`. With `color: "auto"`, each bar takes the text colour of its line, lightened toward the background, and the computed colours are stored per box. The area behind each bar is filled as in ANN-9, so the old letters do not show around the bar. This is a base edit (base-edit rules).
+- **Also for whole libraries:** Bulk export (BLK-1) can apply Blueprint to each image it exports.
+
+**Acceptance criteria**
+- **AC1** A settings window with 20 text lines, with Blueprint applied and 2 lines kept. OCR on the export finds only the 2 kept lines.
+- **AC2** Each bar lies inside its line's box. The bars of one paragraph have the same height and line gap.
+- **AC3** A keep-list change is one op update and one undo step.
+- **AC4** The CLI and agents run `suggest_blueprint { capture_id }` → `{ boxes: [{ rect, text_preview, confidence }] }`, then `annotate` with a `blueprint` op. The render is identical to the editor's.
+- **AC5** Copy text after Blueprint returns only the kept lines, because it reads the rendered image (ANN-5).
+
+**Out of scope:** replacing icons and images (it needs detection); turning a whole UI into a wireframe.
 
 ### ANN-5 Copy text from a screenshot
 **Priority** P1 · **Status** In progress (the headless part is built and tested with a scripted recognizer: `ocr::layout_text` and the region crop in `cm-render`, the action `recognize_text` through daemon, MCP and CLI; the editor part is built too: a Copy text button, the Select text tool (key G), a library menu entry and a capture-toast button, with the pure parts (region mapping, outcomes, enabled state) tested and the window not seen by eye; `tests/manual/ANN-5.md` has not been run; the real recognizer ran only on synthetic PNGs, recorded in `verification/benchmarks/ocr-copy-text-synthetic-macos-2026-11-11.md`) · **Crates** cm-render, cm-daemon, cm-mcp, cm-cli, apps/desktop · **Depends on** ANN-1, ANN-3, ANN-2 (the recognizer)

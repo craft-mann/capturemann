@@ -36,6 +36,8 @@
 
 ---
 
+**Capture kinds (0.3.4).** The library lists screenshots, recordings, audio recordings and, new in 0.3.4, **guides** (`<name>.cmguide`, GDE-1). A board (BRD-1) is an ordinary screenshot. Search, filters, delete, rename, move and the sidebar counts handle guides: a guide appears with its step count and first step image as thumbnail; a 0.3.3 app ignores `cmguide` folders and leaves them untouched.
+
 ### LIB-2 Configurable library location
 **Priority** P0 · **Status** In progress (built on macOS: while the library folder is unavailable the watcher pauses, removes nothing from the index and resumes by diffing when it returns (tested with fakes; `tests/manual/LIB-2.md` covers the real unplug, AC2 and AC3 as far as the watcher goes); the `library.path` setting and its default resolution (`~/Movies/CaptureMann`), the fallback folder and the "Library unavailable" hint; the library move is built (Oct 25, 2026, tested with fakes and temp folders, never run on a real external drive, the UI not seen by eye: Settings → General → Change..., the checks, the verified copy as the `library_move` job, the restart prompt and the optional Trash step, AC5 to AC13; `tests/manual/LIB-MOVE.md` is not run); the SHA-256 check of AC1 is replaced by file counts, byte sizes and the manifest; the fallback-recording move (AC2, AC3) and the banner flow are not built; the setting is app-only: an agent cannot write it, and changes it only through `move_library`) · **Crates** cm-library, apps/desktop, cm-daemon · **Depends on** LIB-1, STO-1
 

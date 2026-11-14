@@ -32,7 +32,7 @@ Plans for larger features and the design-kit traceability table live in `plans/`
 | File | Area | IDs |
 | --- | --- | --- |
 | `features/01-screenshot.md` | Screenshot | CAP-1 … CAP-6 |
-| `features/02-annotation.md` | Annotation | ANN-1 … ANN-5 |
+| `features/02-annotation.md` | Annotation | ANN-1 … ANN-11 |
 | `features/03-recording.md` | Recording | REC-1 … REC-9 |
 | `features/04-webcam.md` | Webcam | CAM-1 … CAM-5 |
 | `features/05-audio.md` | Audio | AUD-1 … AUD-4 |
@@ -46,6 +46,8 @@ Plans for larger features and the design-kit traceability table live in `plans/`
 | `features/13-launcher.md` | Launcher | LNC-1 |
 | `features/14-permissions.md` | Permissions | PRM-1 |
 | `features/15-voice.md` | Voice and meetings | VOC-1 … VOC-3 |
+| `features/19-click-guide.md` | Click Guide (0.3.4) | GDE-1 … GDE-4 |
+| `features/20-boards-and-bulk.md` | Boards and Bulk export (0.3.4) | BRD-1, BLK-1 |
 | `features/17-redaction.md` | Redaction (Auto-redact kinds, benchmark, generated docs) | RED-1 … RED-3 |
 | `features/18-import.md` | Import media (probe, bundle, the `import` job and `import_media`, remove originals, the app's sheet) | IMP-1 … IMP-5 |
 

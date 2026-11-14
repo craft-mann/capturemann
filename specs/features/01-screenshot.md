@@ -35,7 +35,7 @@
 - CLI `capturemann capture screenshot --display 1 | --window "<title substring>" | --region x,y,w,h [--out file.png]`.
 - Events: `capture.created`.
 
-**Out of scope** — Scrolling capture (CAP-6), capturing across displays in one image, capturing menus that close on focus change (P2 note).
+**Out of scope** — (Scrolling capture is CAP-6 below, 0.3.4), capturing across displays in one image, capturing menus that close on focus change (P2 note).
 
 **Test notes** — Golden pattern display (checkerboard with coordinates) for AC2; manual script for AC3 on a notched Mac and AC7 with two monitors; Windows at 100% and 150% scaling.
 
@@ -169,13 +169,37 @@
 
 ---
 
-### CAP-6 Scrolling capture
-**Priority** P2 · **Status** Draft (not in 0.2.0; detail before work starts) · **Crates** cm-capture
+### CAP-6 Long Shot (scrolling capture)
+**Priority** P1 · **Status** Ready (0.3.4; was Draft, P2) · **Crates** cm-capture, cm-render, cm-daemon, apps/desktop · **Depends on** CAP-1, CAP-4, PRM
 
-**User story** — As a developer, I want to capture a long web page or document that scrolls, so that I get one tall image.
+**User story.** As someone who documents or reports bugs, I want a whole web page, spreadsheet or chat thread as one image, so that I don't paste five screenshots in a row.
 
-**Summary** — Select a region inside a scrollable window; CaptureMann scrolls it step by step, captures each step, and stitches the frames by matching overlapping rows; sticky headers are detected and kept once.
+**Description**
+- **Start:** a **Long Shot** mode in the capture overlay, a launcher command, and a configurable hotkey with no default. The user picks a window, then the scrollable area inside it (CaptureMann highlights the area under the pointer). A region drag works too.
+- **Auto scroll** (macOS with Accessibility, Windows, X11):
+  - CaptureMann scrolls by about 80 % of the area height each time, and waits until two frames 50 ms apart are the same (to a 150 ms limit).
+  - It stops at the end (no change after a scroll), at the limit (the limits above), or when the user presses Esc or Stop. Stopping early keeps what has been captured.
+- **Hand scroll** (every system; the only mode on Wayland): the user scrolls. CaptureMann takes a frame whenever the content settles and shows the image growing in a side preview.
+- **Limits (0.3.4):** the stitched image stops at **16,384 px on its long side and 50 megapixels**, the same limits as an imported picture and the renderer; the old 30,000 px goal waits for tiled rendering. The capture ends cleanly with "Reached the longest image CaptureMann can edit" and the image is saved.
+- **Direction:** vertical by default. Horizontal is a switch in the HUD (and the `direction` parameter); auto scroll uses horizontal wheel events.
+- **Stitching:** the rules below. The result is a normal screenshot capture that can be annotated, redacted, exported and shared like any other. Its manifest records `source: "long_shot"`, the frame count and the stops found.
+- **Retina and HiDPI:** frames stay in physical pixels. Mixed-DPI displays are not a case, because the area belongs to one window.
 
-**Key criteria (to refine)** — Stitched image has no duplicated or missing rows on a test page of 5 screen heights; user can stop early; max height 30,000 px.
+**Stitching rules (decisions of Nov 14, 2026).** Frames are matched by their overlapping rows (an exact or near-exact row hash, then a check on the pixels). Fixed headers and footers are found as bands that stay the same in every frame and are kept once. When no overlap is found (a jump, an animation, a virtualized list that redraws), the capture **stops there and keeps what it has**, with a note; it never guesses a join. Horizontal scrolling uses the same method on columns.
 
-**Open questions** — Synthetic scroll events vs. accessibility APIs per OS; behavior for virtualized lists.
+**Systems.** macOS posts scroll events with `CGEventPost`, which needs **Accessibility** (a new optional row on the permissions page, PRM-1; today no feature needs it). Windows uses `SendInput` (no permission), Linux X11 uses XTest. **Wayland cannot inject scrolling**, so Hand scroll is its only mode; whether frames can be taken repeatedly without a prompt each time is spike S6 (when it fails, Long Shot is shown disabled with the reason). A mouse-wheel step differs per app, so the 80 % step and the settle wait are measured, not assumed (spike S1).
+
+**Keys and names.** The UI name is **Long Shot**; no default hotkey (the user sets one in Settings, CAP-2).
+
+**Acceptance criteria**
+- **AC1** A test page 5 screen heights long with a numbered line on every row. After an auto-scroll Long Shot, every number appears exactly once and in order: no duplicated or missing rows (an OCR check plus a row-hash check).
+- **AC2** The same page with a fixed header and footer. The stitched image shows each of them once, at the top and the bottom.
+- **AC3** A page that jumps (no overlap between two frames). The capture stops at the last good join, keeps the frames before it, and says "Stopped: the next part did not line up". It never guesses a join.
+- **AC4** A page longer than the limit. The capture stops at 16,384 px with the limit message, and the image is saved.
+- **AC5** Wayland. Hand scroll is the only mode offered, and AC1 passes when the test scrolls by hand (a scripted wheel through the test page's own JavaScript).
+- **AC6** macOS without Accessibility. Auto scroll is shown disabled with "Allow Accessibility to scroll for you", a button to grant it, and Hand scroll still works.
+- **AC7** (agent) `capture_screenshot { mode: "long", target, direction?, max_px? }` returns the stitched image, like a normal capture. Auto scroll from an agent is **Confirm** tier because it moves the user's screen, and Hand scroll is refused for agents (`invalid_input`, reason `needs_user`).
+
+**Out of scope:** tiled images over 16,384 px; scrolling inside nested frames in one shot; video of the scroll.
+
+**Test notes:** golden stitching tests on recorded frame sequences (no screen needed); a test page in `tests/fixtures/long-shot/`; `tests/manual/CAP-6.md` for Chrome, Excel or LibreOffice Calc, Slack or Discord, and a PDF viewer on each system.
