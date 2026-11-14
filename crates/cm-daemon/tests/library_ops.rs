@@ -305,13 +305,19 @@ async fn rename_and_delete_refuse_a_capture_while_an_upload_or_publish_job_is_ac
         // No dialog was shown for the refused deletes.
         assert!(r.confirmer.shown().is_empty());
 
-        // Paused still blocks.
+        // Paused (LIB-1.AC11, B1): rename works; delete is covered by its own test.
         queue.pause(&job.id).unwrap();
-        let e = d
-            .execute_method(Actor::User, 0, "rename_capture", &rename)
+        d.execute_method(Actor::User, 0, "rename_capture", &rename)
             .await
-            .unwrap_err();
-        blocked("paused rename", &e);
+            .unwrap();
+        d.execute_method(
+            Actor::User,
+            0,
+            "rename_capture",
+            &json!({"capture_id": id, "title": "Being uploaded"}),
+        )
+        .await
+        .unwrap();
 
         // Cancelled: free again.
         queue.cancel(&job.id).unwrap();
@@ -895,4 +901,41 @@ async fn poster_keeps_a_blur_through_later_edits_and_a_rescan() {
     call(d, "annotate", json!({"capture_id": id, "ops": crop})).await;
     let cropped = poster(&s).unwrap();
     assert!(cropped.width() <= base.width(), "crop");
+}
+
+/// LIB-1.AC11 (B1): a delete cancels the capture's PAUSED upload and publish jobs itself; a
+/// running or queued job still blocks with the same message.
+#[tokio::test]
+async fn delete_cancels_paused_upload_and_publish_jobs_but_queued_ones_still_block() {
+    let r = rig(Decision::Approve);
+    let d = &r.daemon;
+    let s = shot(d, "Paused upload").await;
+    let id = s["capture_id"].as_str().unwrap().to_owned();
+    let queue = d.job_queue().unwrap();
+    let up = queue
+        .enqueue(NewJob::new(JOB_UPLOAD, json!({"capture_id": id})))
+        .unwrap();
+    let delete = json!({"capture_id": id});
+    // Queued: blocked.
+    let e = d
+        .execute_method(Actor::User, 0, "delete_capture", &delete)
+        .await
+        .unwrap_err();
+    assert_eq!(code(&e), ErrorCode::Busy);
+    assert!(e.to_string().contains(&up.id.to_string()));
+    queue.pause(&up.id).unwrap();
+    let publish = queue
+        .enqueue(NewJob::new(JOB_PUBLISH, json!({"capture_id": id})))
+        .unwrap();
+    queue.pause(&publish.id).unwrap();
+    d.execute_method(Actor::User, 0, "delete_capture", &delete)
+        .await
+        .unwrap();
+    assert_eq!(r.trasher.trashed().len(), 1);
+    for j in [&up, &publish] {
+        assert_eq!(
+            queue.get(&j.id.to_string()).unwrap().state,
+            cm_jobs::JobState::Cancelled
+        );
+    }
 }
