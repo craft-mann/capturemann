@@ -40,6 +40,11 @@ pub struct SyntheticPage {
     /// A sticky header that hides once the page has scrolled to this position or further: the
     /// viewport then shows content where the header was.
     pub hide_header_from: Option<u32>,
+    /// Width of a clock in the header: its pixels are different in every frame.
+    pub header_clock: u32,
+    /// `(content row, rows, width)`: a block cursor on the page that shows in every other frame
+    /// (a terminal's), at the left edge of the content.
+    pub blink: Option<(u32, u32, u32)>,
     /// Content rows at each end of the viewport that differ in every frame (a window's rounded
     /// corners and edge line drawn over what scrolls under them).
     pub corner_rows: u32,
@@ -58,6 +63,8 @@ impl SyntheticPage {
             scrollbar: 0,
             overlay_scrollbar: 0,
             hide_header_from: None,
+            header_clock: 0,
+            blink: None,
             corner_rows: 0,
         }
     }
@@ -69,6 +76,16 @@ impl SyntheticPage {
 
     pub fn with_scrollbar(mut self, width: u32) -> Self {
         self.scrollbar = width;
+        self
+    }
+
+    pub fn with_header_clock(mut self, width: u32) -> Self {
+        self.header_clock = width;
+        self
+    }
+
+    pub fn with_blinking_cursor(mut self, row: u32, rows: u32, width: u32) -> Self {
+        self.blink = Some((row, rows, width));
         self
     }
 
@@ -167,7 +184,20 @@ impl SyntheticPage {
         };
         if !hidden {
             for i in 0..self.header {
-                lines.push(self.line(Kind::Header, i));
+                let mut line = self.line(Kind::Header, i);
+                // A clock near the right edge: changes every frame.
+                let end = (self.cross as usize).saturating_sub(10);
+                for (k, p) in line[..end]
+                    .iter_mut()
+                    .rev()
+                    .take(self.header_clock as usize)
+                    .enumerate()
+                {
+                    if (k as u32 / 2 + pos / 7) % 2 == 0 {
+                        *p = [255, 255, 255, 255];
+                    }
+                }
+                lines.push(line);
             }
         }
         let view = self.content_view();
@@ -184,6 +214,18 @@ impl SyntheticPage {
                 } else {
                     [235, 235, 235, 255]
                 };
+            }
+            if let Some((row, rows, w)) = self.blink {
+                let at = base + i;
+                if (row..row + rows).contains(&at) && (pos / 5) % 2 == 1 {
+                    for p in line
+                        .iter_mut()
+                        .skip(self.cross as usize / 3)
+                        .take(w as usize)
+                    {
+                        *p = [0, 0, 0, 255];
+                    }
+                }
             }
             if self.corner_rows > 0 && (i < self.corner_rows || i >= view - self.corner_rows) {
                 for p in line.iter_mut() {

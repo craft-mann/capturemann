@@ -201,8 +201,36 @@ impl Lines {
             .all(|(a, b)| a.abs_diff(*b) <= NOISE_TOLERANCE)
     }
 
-    fn same_line(&self, other: &Lines, i: usize) -> bool {
-        self.near(i, other, i)
+    /// [`Lines::near`], or, when `max_px` is more than 0, a line in which at most `max_px`
+    /// pixels differ beyond the tolerance (a blinking caret, a clock, a terminal's cursor).
+    fn near_tol(&self, ia: usize, other: &Lines, ib: usize, max_px: usize) -> bool {
+        if self.near(ia, other, ib) {
+            return true;
+        }
+        if max_px == 0 {
+            return false;
+        }
+        let mut bad = 0;
+        for (p, q) in self
+            .line(ia)
+            .chunks_exact(4)
+            .zip(other.line(ib).chunks_exact(4))
+        {
+            if p.iter()
+                .zip(q)
+                .any(|(a, b)| a.abs_diff(*b) > NOISE_TOLERANCE)
+            {
+                bad += 1;
+                if bad > max_px {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
+    fn same_line_tol(&self, other: &Lines, i: usize, max_px: usize) -> bool {
+        self.near_tol(i, other, i, max_px)
     }
 }
 
@@ -219,6 +247,11 @@ fn fnv(bytes: &[u8]) -> u64 {
     h
 }
 
+/// The shift of a join as a share of the content area it was found in.
+fn share(j: &Join, n: usize) -> f64 {
+    j.shift as f64 / (n - j.header - j.footer).max(1) as f64
+}
+
 /// Where two consecutive frames join.
 struct Join {
     /// Lines the content moved between the two frames.
@@ -232,7 +265,8 @@ struct Join {
 /// Why two frames do not join.
 enum NoJoin {
     Same,
-    NoOverlap,
+    /// Why (for the debug dump and the tests, never shown to the user).
+    NoOverlap(String),
 }
 
 /// Columns that differ in at least this share of the overlapping lines (and at least 3 lines)
@@ -266,31 +300,91 @@ const MIN_OVERLAP_SHARE: f64 = 0.05;
 const NOISE_SHARE: f64 = 0.02;
 const NOISE_MIN_LINES: usize = 50;
 
+/// For the debug dump: the shift whose overlap has the fewest differing lines, as text.
+fn closest_shift(a: &Lines, b: &Lines, header: usize, cw: usize, min_ov: usize) -> String {
+    let mut best: Option<(usize, usize, usize)> = None;
+    for s in 1..=(cw - min_ov) {
+        let overlap = cw - s;
+        let g = GUARD.min(overlap / 3);
+        let bad = (g..overlap - g)
+            .filter(|&i| !a.near(header + s + i, b, header + i))
+            .count();
+        if best.is_none_or(|(_, bb, _)| bad < bb) {
+            best = Some((s, bad, overlap - 2 * g));
+        }
+    }
+    best.map_or_else(String::new, |(s, bad, of)| {
+        format!("; closest: shift {s} with {bad} of {of} compared lines differing")
+    })
+}
+
+/// The share of a line's pixels that may differ in a second, more tolerant look at two frames
+/// that did not join: a blinking caret, a clock or a spinner in a fixed bar, a terminal's block
+/// cursor (a real Chrome page with a sticky header, a Terminal window, Nov 14, 2026: such a
+/// change made every frame "not line up"). At least [`LENIENT_MIN_PX`] pixels.
+const LENIENT_SHARE: f64 = 0.03;
+const LENIENT_MIN_PX: usize = 8;
+/// Lines narrower than this (in pixels) are only ever compared exactly.
+const LENIENT_MIN_LINE: usize = 256;
+
+/// Where two frames join: exact lines first (the clean case, and the only one that never meets
+/// an ambiguity from the tolerance); when that finds nothing, again with lines that differ in a
+/// few pixels counted as the same.
 fn find_join(
     a: &Lines,
     b: &Lines,
     hint: Option<usize>,
     bands: Option<(usize, usize)>,
 ) -> Result<Join, NoJoin> {
+    match find_join_with(a, b, hint, bands, 0) {
+        Err(NoJoin::NoOverlap(strict)) => {
+            // Narrow lines have no room for a tolerance.
+            if a.line_len / 4 < LENIENT_MIN_LINE {
+                return Err(NoJoin::NoOverlap(strict));
+            }
+            let max_px = ((a.line_len / 4) as f64 * LENIENT_SHARE) as usize;
+            match find_join_with(a, b, hint, bands, max_px.max(LENIENT_MIN_PX)) {
+                Err(NoJoin::NoOverlap(lenient)) => Err(NoJoin::NoOverlap(format!(
+                    "{strict}; with up to {} differing pixels per line allowed: {lenient}",
+                    max_px.max(LENIENT_MIN_PX)
+                ))),
+                other => other,
+            }
+        }
+        other => other,
+    }
+}
+
+fn find_join_with(
+    a: &Lines,
+    b: &Lines,
+    hint: Option<usize>,
+    bands: Option<(usize, usize)>,
+    max_px: usize,
+) -> Result<Join, NoJoin> {
     let n = a.count;
-    if a.data == b.data || (0..n).all(|i| a.same_line(b, i)) {
+    if a.data == b.data || (0..n).all(|i| a.same_line_tol(b, i, max_px)) {
         return Err(NoJoin::Same);
     }
     let (header, footer) = match bands {
         Some((h, f)) => {
             // A header or footer that changed since the first pair: do not trust the join.
-            if (0..h).any(|i| !a.same_line(b, i)) || (n - f..n).any(|i| !a.same_line(b, i)) {
-                return Err(NoJoin::NoOverlap);
+            if (0..h).any(|i| !a.same_line_tol(b, i, max_px))
+                || (n - f..n).any(|i| !a.same_line_tol(b, i, max_px))
+            {
+                return Err(NoJoin::NoOverlap(format!(
+                    "a fixed band changed since the first pair (header {h}, footer {f} lines)"
+                )));
             }
             (h, f)
         }
         None => {
             let mut h = 0;
-            while h < n && a.same_line(b, h) {
+            while h < n && a.same_line_tol(b, h, max_px) {
                 h += 1;
             }
             let mut f = 0;
-            while f < n - h && a.same_line(b, n - 1 - f) {
+            while f < n - h && a.same_line_tol(b, n - 1 - f, max_px) {
                 f += 1;
             }
             if (h + f) as f64 > MAX_BAND_SHARE * n as f64 {
@@ -303,7 +397,9 @@ fn find_join(
     let cw = n - header - footer;
     let min_ov = MIN_OVERLAP_LINES.max((cw as f64 * MIN_OVERLAP_SHARE) as usize);
     if cw <= min_ov {
-        return Err(NoJoin::NoOverlap);
+        return Err(NoJoin::NoOverlap(format!(
+            "too little content between the bands ({cw} lines, header {header}, footer {footer})"
+        )));
     }
     let mut candidates = Vec::new();
     for s in 1..=(cw - min_ov) {
@@ -318,7 +414,7 @@ fn find_join(
         let g = GUARD.min(overlap / 3);
         for i in g..overlap - g {
             let (ia, ib) = (header + s + i, header + i);
-            if !a.near(ia, b, ib) {
+            if !a.near_tol(ia, b, ib, max_px) {
                 bad += 1;
                 if bad > allowed {
                     break;
@@ -330,9 +426,22 @@ fn find_join(
         }
     }
     let shift = match (candidates.len(), hint) {
-        (0, _) => return Err(NoJoin::NoOverlap),
+        (0, _) => {
+            let near_miss = if super::debug::enabled() {
+                closest_shift(a, b, header, cw, min_ov)
+            } else {
+                String::new()
+            };
+            return Err(NoJoin::NoOverlap(format!(
+                "no shift matches (header {header}, footer {footer}, {n} lines){near_miss}"
+            )));
+        }
         (1, _) => candidates[0],
-        (_, None) => return Err(NoJoin::NoOverlap),
+        (k, None) => {
+            return Err(NoJoin::NoOverlap(format!(
+                "{k} shifts match equally well (blank or repeating content) and no step is known"
+            )))
+        }
         (_, Some(h)) => {
             // Several equally good overlaps (repeating or blank content): the expected step may
             // choose, but only when it names one candidate clearly.
@@ -342,7 +451,9 @@ fn find_join(
             let (d0, s0) = by_dist[0];
             let tol = (cw / 20).max(2);
             if d0 > tol || by_dist[1].0 <= d0 + tol {
-                return Err(NoJoin::NoOverlap);
+                return Err(NoJoin::NoOverlap(
+                    "several shifts match and the expected step names none of them".into(),
+                ));
             }
             s0
         }
@@ -419,6 +530,8 @@ pub struct Stitcher {
     /// Lines in the image so far (header + content + footer).
     len: usize,
     limit_hit: bool,
+    /// Why the last frame was refused (see [`Stitcher::last_refusal`]).
+    refusal: Option<String>,
 }
 
 impl Stitcher {
@@ -436,7 +549,45 @@ impl Stitcher {
             frames: 0,
             len: 0,
             limit_hit: false,
+            refusal: None,
         }
+    }
+
+    /// The lines `frame` is on from the last accepted one when it would join it (and is not the
+    /// same), as a share of the content area; nothing is changed. Hand scroll asks it of frames
+    /// taken while the content still moves.
+    pub fn join_share(&self, frame: &Frame) -> Option<f64> {
+        let Some(prev) = &self.prev else {
+            return None;
+        };
+        if self.limit_hit || self.size != Some((frame.width(), frame.height())) {
+            return None;
+        }
+        let mut lines = Lines::from_frame(frame, self.dir);
+        if let Some((l, r)) = self.trim {
+            if (l, r) != (0, 0) {
+                let cross = lines.line_len / 4;
+                lines = lines.cropped(l, cross - r);
+            }
+        }
+        if lines.line_len != prev.line_len {
+            return None;
+        }
+        match find_join(prev, &lines, None, self.bands) {
+            Ok(j) => Some(share(&j, lines.count)),
+            Err(NoJoin::Same) => None,
+            Err(NoJoin::NoOverlap(_)) => match (self.bands, find_join(prev, &lines, None, None)) {
+                (Some((h, f)), Ok(j)) if j.header <= h && j.footer <= f => {
+                    Some(share(&j, lines.count))
+                }
+                _ => None,
+            },
+        }
+    }
+
+    /// Why the last refused frame did not join, as text for the debug dump.
+    pub fn last_refusal(&self) -> Option<&str> {
+        self.refusal.as_deref()
     }
 
     /// Frames that joined so far.
@@ -516,7 +667,7 @@ impl Stitcher {
             }
             // Identical frames say nothing about the edges.
             Err(NoJoin::Same) => return (prev, lines),
-            Err(NoJoin::NoOverlap) => {}
+            Err(NoJoin::NoOverlap(_)) => {}
         }
         // Too narrow to have edges to cut.
         if cross < 64 {
@@ -553,6 +704,17 @@ impl Stitcher {
         hint: Option<u32>,
     ) -> PushOutcome {
         if self.limit_hit || self.size != Some(size) {
+            self.refusal = Some(format!(
+                "the frame is {}x{} px, the first was {:?}{}",
+                size.0,
+                size.1,
+                self.size,
+                if self.limit_hit {
+                    " (limit reached)"
+                } else {
+                    ""
+                }
+            ));
             return PushOutcome::NoOverlap;
         }
         let hint = hint.map(|h| h as usize);
@@ -561,7 +723,8 @@ impl Stitcher {
         let join = match find_join(prev, lines, hint, self.bands) {
             Ok(j) => j,
             Err(NoJoin::Same) => return PushOutcome::NoChange,
-            Err(NoJoin::NoOverlap) => {
+            Err(NoJoin::NoOverlap(why)) => {
+                self.refusal = Some(why);
                 // A band that went away (a sticky header that hides while the page scrolls
                 // down): the bands are found again from this pair, and only narrower ones are
                 // accepted. The rows that were band become content.
@@ -642,6 +805,8 @@ impl Stitcher {
         }
         let prev = self.prev.as_ref()?;
         let line_len = prev.line_len;
+        // The lines were trimmed (a scrollbar, a border): the picture is as wide as they are.
+        let w = (line_len / 4) as u32;
         let (header, content, footer): (&[u8], &[u8], &[u8]) = if self.bands.is_some() {
             (&self.header, &self.content, &self.footer)
         } else {

@@ -9,6 +9,7 @@
 //! * [`platform_scroller`]: `CGEventPost` on macOS (needs Accessibility), `SendInput` on Windows,
 //!   XTest on X11; Wayland cannot inject scrolling at all.
 
+pub mod debug;
 pub mod fake;
 pub use cm_core::long_shot_hud as hud;
 pub mod run;
