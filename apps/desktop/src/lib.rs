@@ -17,6 +17,8 @@ pub mod confirm;
 pub mod daemon_text;
 pub mod delay;
 pub mod delete_flow;
+pub mod board_flow;
+pub mod bulk_flow;
 pub mod destinations;
 pub mod editor;
 pub mod export_flow;
