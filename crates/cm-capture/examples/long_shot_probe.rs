@@ -5,7 +5,7 @@
 //! It scrolls a real window and captures the screen: run it only on a machine set up for that.
 //!
 //! ```text
-//! long_shot_probe --window "Long Shot test page" --out result.png [--max-px 16384] [--horizontal] [--hand-secs 30] [--dump dir]
+//! long_shot_probe (--window "Long Shot test page" | --region x,y,w,h) --out result.png [--max-px 16384] [--horizontal] [--hand-secs 30] [--dump dir]
 //! ```
 //!
 //! `--hand-secs N`: Hand scroll for N seconds (the user, or the page's own script, scrolls).
@@ -75,11 +75,13 @@ fn run() -> Result<(), CmError> {
     cm_capture::ensure_dpi_aware();
     let mut args = std::env::args().skip(1);
     let (mut window, mut out, mut dump) = (None, None, None);
+    let mut region: Option<String> = None;
     let (mut max_px, mut hand_secs, mut horizontal) = (MAX_LONG_SIDE, 0u64, false);
     while let Some(a) = args.next() {
         match a.as_str() {
             "--window" => window = args.next(),
             "--out" => out = args.next(),
+            "--region" => region = args.next(),
             "--max-px" => max_px = args.next().and_then(|v| v.parse().ok()).unwrap_or(max_px),
             "--hand-secs" => hand_secs = args.next().and_then(|v| v.parse().ok()).unwrap_or(0),
             "--horizontal" => horizontal = true,
@@ -87,17 +89,52 @@ fn run() -> Result<(), CmError> {
             other => return Err(CmError::invalid_input(format!("unknown argument {other}"))),
         }
     }
-    let window = window.ok_or_else(|| CmError::invalid_input("--window <title part> needed"))?;
     let out = out.ok_or_else(|| CmError::invalid_input("--out <png> needed"))?;
     let capturer = Capturer::system();
-    let w = capturer.find_window(&window)?;
-    let centre = (
-        w.bounds.origin.x + (w.bounds.size.width / 2) as i32,
-        w.bounds.origin.y + (w.bounds.size.height / 2) as i32,
-    );
+    let (target, centre, label) = if let Some(r) = region {
+        // `--region x,y,w,h` in physical px on the primary display: the scrollable area only,
+        // as the overlay's area pick gives it (a window's own toolbar is not part of it).
+        let v: Vec<i32> = r.split(',').filter_map(|p| p.trim().parse().ok()).collect();
+        let [x, y, w, h] = v[..] else {
+            return Err(CmError::invalid_input("--region needs x,y,w,h"));
+        };
+        let d = capturer
+            .list_displays()?
+            .displays
+            .into_iter()
+            .find(|d| d.is_primary)
+            .ok_or_else(|| CmError::invalid_input("no primary display"))?;
+        let rect = cm_core::PhysicalRect {
+            origin: cm_core::PhysicalPoint { x, y },
+            size: cm_core::PhysicalSize {
+                width: w.max(1) as u32,
+                height: h.max(1) as u32,
+            },
+        };
+        (
+            CaptureTarget::Region {
+                display_id: d.id,
+                rect: cm_capture::RegionRect::Physical(rect),
+            },
+            (d.bounds.origin.x + x + w / 2, d.bounds.origin.y + y + h / 2),
+            format!("region {r}"),
+        )
+    } else {
+        let window = window
+            .ok_or_else(|| CmError::invalid_input("--window <title part> or --region needed"))?;
+        let w = capturer.find_window(&window)?;
+        (
+            CaptureTarget::Window { window_id: w.id },
+            (
+                w.bounds.origin.x + (w.bounds.size.width / 2) as i32,
+                w.bounds.origin.y + (w.bounds.size.height / 2) as i32,
+            ),
+            w.title.clone(),
+        )
+    };
     let mut frames = Frames {
         capturer,
-        target: CaptureTarget::Window { window_id: w.id },
+        target,
         dump,
         kept: Default::default(),
     };
@@ -146,8 +183,7 @@ fn run() -> Result<(), CmError> {
     println!(
         "{}",
         serde_json::json!({
-            "window": w.title,
-            "window_px": [w.bounds.size.width, w.bounds.size.height],
+            "window": label,
             "frames": result.image.frames,
             "end": result.end,
             "note": result.end.note(),

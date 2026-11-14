@@ -39,7 +39,12 @@ fn main() {
         .filter(|p| p.extension().is_some_and(|e| e == "png"))
         .collect();
     files.sort();
-    let mut stitcher = Stitcher::new(Direction::Vertical, Limits::default());
+    let direction = if std::env::var_os("LS_HORIZONTAL").is_some() {
+        Direction::Horizontal
+    } else {
+        Direction::Vertical
+    };
+    let mut stitcher = Stitcher::new(direction, Limits::default());
     for f in &files {
         let frame = load(f);
         let hint = std::env::var("LS_HINT").ok().and_then(|h| h.parse().ok());
