@@ -530,7 +530,7 @@ pub fn all() -> Vec<ToolSpec> {
                 "warnings": { "type": "array", "items": { "type": "string" } },
                 "image": image_ref(),
                 "source": { "const": "long_shot", "description": "Only for mode long." },
-                "long_shot": { "type": "object", "description": "Only for mode long: frames, end (reached_end, no_overlap, limit_reached, stopped_by_user), note, header_px, footer_px, direction." } },
+                "long_shot": { "type": "object", "description": "Only for mode long: frames, end (reached_end, no_overlap, limit_reached, stopped_by_user, nothing_scrolled), note, header_px, footer_px, direction." } },
                 "required": ["capture_id", "path", "width", "height", "image"] }),
         },
         ToolSpec {

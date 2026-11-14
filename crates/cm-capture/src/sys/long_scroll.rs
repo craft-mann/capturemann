@@ -51,7 +51,7 @@ pub fn platform_scroller() -> Result<Box<dyn Scroller + Send>, CmError> {
 }
 
 /// Like [`platform_scroller`]; `anchor` is a point of the area in global physical px, where the
-/// pointer is put before each scroll (Windows, X11; macOS posts at the pointer's place).
+/// pointer is put before each scroll (all systems; macOS converts it to points).
 pub fn platform_scroller_at(
     anchor: Option<(i32, i32)>,
 ) -> Result<Box<dyn Scroller + Send>, CmError> {
@@ -92,6 +92,80 @@ mod imp {
     #[link(name = "ApplicationServices", kind = "framework")]
     extern "C" {
         fn AXIsProcessTrusted() -> bool;
+    }
+
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub(super) struct CGPoint {
+        x: f64,
+        y: f64,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    struct CGRect {
+        x: f64,
+        y: f64,
+        w: f64,
+        h: f64,
+    }
+    #[link(name = "CoreGraphics", kind = "framework")]
+    extern "C" {
+        fn CGGetActiveDisplayList(max: u32, ids: *mut u32, count: *mut u32) -> i32;
+        fn CGDisplayBounds(id: u32) -> CGRect;
+        fn CGDisplayCopyDisplayMode(id: u32) -> *const c_void;
+        fn CGDisplayModeGetPixelWidth(mode: *const c_void) -> usize;
+        fn CGDisplayModeRelease(mode: *const c_void);
+        fn CGWarpMouseCursorPosition(p: CGPoint) -> i32;
+        fn CGAssociateMouseAndMouseCursorPosition(connected: bool) -> i32;
+        fn CGEventSetLocation(ev: *mut c_void, p: CGPoint);
+    }
+
+    /// The anchor (global physical px) as a point in macOS's global point space: the display
+    /// whose point bounds, scaled by its own backing scale, contain it decides the scale.
+    pub(super) fn anchor_to_points(anchor: (i32, i32)) -> (CGPoint, f64) {
+        let (ax, ay) = (f64::from(anchor.0), f64::from(anchor.1));
+        let mut ids = [0u32; 16];
+        let mut n = 0u32;
+        // SAFETY: the buffer holds 16 ids; `n` receives how many were written.
+        let ok = unsafe { CGGetActiveDisplayList(16, ids.as_mut_ptr(), &mut n) } == 0;
+        let mut best: Option<(CGPoint, f64)> = None;
+        let mut main_scale = 1.0;
+        if ok {
+            for (i, id) in ids.iter().take(n as usize).enumerate() {
+                // SAFETY: `id` is an active display; the mode is released after use.
+                let (b, scale) = unsafe {
+                    let b = CGDisplayBounds(*id);
+                    let mode = CGDisplayCopyDisplayMode(*id);
+                    let px = if mode.is_null() {
+                        0
+                    } else {
+                        let w = CGDisplayModeGetPixelWidth(mode);
+                        CGDisplayModeRelease(mode);
+                        w
+                    };
+                    let scale = if px > 0 && b.w > 0.0 {
+                        px as f64 / b.w
+                    } else {
+                        1.0
+                    };
+                    (b, scale)
+                };
+                if i == 0 {
+                    main_scale = scale;
+                }
+                let (x, y) = (ax / scale, ay / scale);
+                if best.is_none() && x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h {
+                    best = Some((CGPoint { x, y }, scale));
+                }
+            }
+        }
+        best.unwrap_or((
+            CGPoint {
+                x: ax / main_scale,
+                y: ay / main_scale,
+            },
+            main_scale,
+        ))
     }
 
     const UNIT_PIXEL: u32 = 0;
@@ -153,11 +227,26 @@ mod imp {
         }
     }
 
-    struct MacScroller;
+    struct MacScroller {
+        /// Where the pointer is put before scrolling (points); the wheel goes to the window
+        /// under it, so without this the content under the pointer's last place scrolls.
+        anchor: Option<CGPoint>,
+        /// Physical px per point of the display under the anchor: a pixel-unit wheel event
+        /// counts points, `amount_px` is physical.
+        scale: f64,
+    }
 
     impl Scroller for MacScroller {
         fn scroll(&mut self, direction: Direction, amount_px: u32) -> Result<(), CmError> {
-            let mut left = i32::try_from(amount_px).unwrap_or(i32::MAX);
+            if let Some(p) = self.anchor {
+                // SAFETY: plain calls with a value point; no pointers.
+                unsafe {
+                    CGAssociateMouseAndMouseCursorPosition(true);
+                    CGWarpMouseCursorPosition(p);
+                }
+                std::thread::sleep(std::time::Duration::from_millis(60));
+            }
+            let mut left = ((f64::from(amount_px) / self.scale).round() as i32).max(1);
             while left > 0 {
                 let part = left.min(MAX_EVENT_PX);
                 left -= part;
@@ -174,16 +263,26 @@ mod imp {
                     if ev.is_null() {
                         return Err(CmError::internal("could not create a scroll event"));
                     }
+                    if let Some(p) = self.anchor {
+                        CGEventSetLocation(ev, p);
+                    }
                     CGEventPost(TAP_HID, ev);
                     CFRelease(ev);
+                }
+                if left > 0 {
+                    std::thread::sleep(std::time::Duration::from_millis(8));
                 }
             }
             Ok(())
         }
     }
 
-    pub fn scroller(_anchor: Option<(i32, i32)>) -> Result<Box<dyn Scroller + Send>, CmError> {
-        Ok(Box::new(MacScroller))
+    pub fn scroller(anchor: Option<(i32, i32)>) -> Result<Box<dyn Scroller + Send>, CmError> {
+        let (anchor, scale) = match anchor.map(anchor_to_points) {
+            Some((p, s)) => (Some(p), s),
+            None => (None, 1.0),
+        };
+        Ok(Box::new(MacScroller { anchor, scale }))
     }
 }
 

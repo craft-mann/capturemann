@@ -3603,6 +3603,9 @@ msgstr ""
 msgid "Nothing published yet"
 msgstr ""
 
+msgid "Nothing scrolled: check that the window can scroll"
+msgstr ""
+
 msgid "Nothing to redo"
 msgstr ""
 

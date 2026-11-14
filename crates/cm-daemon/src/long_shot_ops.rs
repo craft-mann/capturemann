@@ -368,6 +368,11 @@ impl Inner {
                     }
                     std::thread::sleep(std::time::Duration::from_millis(20));
                 }
+                // The confirmation panel (agents) or the picker has just closed: give the system
+                // a moment to take it off the screen so it is not in the first frame.
+                if matches!(scroll, ScrollMode::Auto) {
+                    std::thread::sleep(std::time::Duration::from_millis(400));
+                }
                 let mut frames = system.frames(capturer, target);
                 let cfg = LongShotConfig {
                     direction,
