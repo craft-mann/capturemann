@@ -458,7 +458,10 @@ mod tests {
     use super::*;
 
     fn sheet() -> BulkSheet {
-        let mut s = BulkSheet::new(vec![("a".into(), "Login".into()), ("b".into(), "Home".into())]);
+        let mut s = BulkSheet::new(vec![
+            ("a".into(), "Login".into()),
+            ("b".into(), "Home".into()),
+        ]);
         s.dest = Some("/tmp/out".into());
         s
     }
@@ -555,7 +558,10 @@ mod tests {
             current: String::new(),
             dest: String::new(),
         };
-        run.apply_job(&json!({"state": "running", "progress": 0.5, "message": "x"}), &[]);
+        run.apply_job(
+            &json!({"state": "running", "progress": 0.5, "message": "x"}),
+            &[],
+        );
         assert_eq!(run.done, 2);
         assert_eq!(run.progress_line(), "Exporting 3 of 4");
     }

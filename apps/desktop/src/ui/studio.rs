@@ -167,8 +167,7 @@ impl Studio {
         let import_sheet =
             cx.new(|cx| crate::ui::import_sheet::ImportSheetView::new(app.clone(), cx));
         let bulk_sheet = cx.new(|cx| crate::ui::bulk_sheet::BulkSheetView::new(app.clone(), cx));
-        let board_sheet =
-            cx.new(|cx| crate::ui::board_sheet::BoardSheetView::new(app.clone(), cx));
+        let board_sheet = cx.new(|cx| crate::ui::board_sheet::BoardSheetView::new(app.clone(), cx));
         let export_popover =
             cx.new(|cx| crate::ui::export_popover::ExportPopoverView::new(app.clone(), cx));
         let focus = cx.focus_handle();

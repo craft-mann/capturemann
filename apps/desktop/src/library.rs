@@ -305,7 +305,12 @@ pub enum Chip {
 }
 
 impl Chip {
-    pub const ALL: [Chip; 4] = [Chip::Imported, Chip::Uploaded, Chip::Published, Chip::Boards];
+    pub const ALL: [Chip; 4] = [
+        Chip::Imported,
+        Chip::Uploaded,
+        Chip::Published,
+        Chip::Boards,
+    ];
 
     pub fn label(self) -> String {
         match self {
@@ -868,7 +873,12 @@ mod tests {
         let mut s = LibraryState::new(LibraryStatus::Ready);
         assert_eq!(
             Chip::ALL,
-            [Chip::Imported, Chip::Uploaded, Chip::Published, Chip::Boards]
+            [
+                Chip::Imported,
+                Chip::Uploaded,
+                Chip::Published,
+                Chip::Boards
+            ]
         );
         assert!(!s.chip_active(Chip::Uploaded) && !s.chip_active(Chip::Published));
         s.filter = Filter::Recordings;

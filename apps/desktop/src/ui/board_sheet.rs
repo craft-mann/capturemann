@@ -45,9 +45,8 @@ pub struct BoardSheetView {
 impl BoardSheetView {
     pub fn new(app: Entity<AppModel>, cx: &mut Context<Self>) -> Self {
         let observe = cx.observe(&app, |_, _, cx| cx.notify());
-        let title_field = cx.new(|cx| {
-            TextField::new(tr!("Board title"), tr!("Board title"), cx).without_icon()
-        });
+        let title_field =
+            cx.new(|cx| TextField::new(tr!("Board title"), tr!("Board title"), cx).without_icon());
         let tint_field =
             cx.new(|cx| TextField::new(tr!("Tint colour"), "#DCE6F5", cx).without_icon());
         let subs = vec![
@@ -271,77 +270,106 @@ impl Render for BoardSheetView {
         let app = self.app.clone();
 
         // Left column: layouts and the source list.
-        let layouts = div().flex().flex_col().gap(px(6.)).children(LAYOUTS.map(|k| {
-            let a = app.clone();
-            let enabled = s.layout_enabled(k);
-            let b = seg(
-                &t,
-                SharedString::from(format!("board-layout-{}", k.as_str())),
-                layout_label(k),
-                s.layout == k,
-            );
-            if enabled {
-                b.on_click(move |_, _, cx| update(&a, cx, |s| s.set_layout(k)))
-            } else {
-                b.opacity(0.45)
-            }
-        }));
-        let n = s.sources.len();
-        let sources = div().flex().flex_col().gap(px(4.)).children(
-            s.sources.iter().enumerate().map(|(i, src)| {
-                let (a_up, a_down, a_rm) = (app.clone(), app.clone(), app.clone());
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(4.))
-                    .h(px(32.))
-                    .px(px(6.))
-                    .rounded(px(scale::RADIUS_SM))
-                    .border_1()
-                    .border_color(rgba_of(t.border))
-                    .bg(rgba_of(t.field))
-                    .child(
-                        div()
-                            .w(px(16.))
-                            .text_size(px(11.))
-                            .text_color(rgba_of(t.mist))
-                            .mono()
-                            .child((i + 1).to_string()),
-                    )
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w(px(0.))
-                            .truncate()
-                            .text_size(px(12.5))
-                            .child(SharedString::from(src.title.clone())),
-                    )
-                    .child(small_icon(&t, SharedString::from(format!("board-up-{i}")), "arrow-up", tr!("Move up"), i > 0)
-                        .on_click(move |_, _, cx| update(&a_up, cx, |s| s.move_source(i, -1))))
-                    .child(small_icon(&t, SharedString::from(format!("board-down-{i}")), "arrow-down", tr!("Move down"), i + 1 < n)
-                        .on_click(move |_, _, cx| update(&a_down, cx, |s| s.move_source(i, 1))))
-                    .child(small_icon(&t, SharedString::from(format!("board-rm-{i}")), "x", tr!("Remove from the board"), n > 2)
-                        .on_click(move |_, _, cx| update(&a_rm, cx, |s| s.remove_source(i))))
-            }),
-        );
-        let left = div()
-            .w(px(210.))
-            .flex_none()
+        let layouts = div()
             .flex()
             .flex_col()
-            .gap(px(14.))
-            .child(layouts)
-            .child(
-                div()
-                    .text_size(px(12.5))
-                    .text_color(rgba_of(t.mist))
-                    .child(SharedString::from(trn!(
+            .gap(px(6.))
+            .children(LAYOUTS.map(|k| {
+                let a = app.clone();
+                let enabled = s.layout_enabled(k);
+                let b = seg(
+                    &t,
+                    SharedString::from(format!("board-layout-{}", k.as_str())),
+                    layout_label(k),
+                    s.layout == k,
+                );
+                if enabled {
+                    b.on_click(move |_, _, cx| update(&a, cx, |s| s.set_layout(k)))
+                } else {
+                    b.opacity(0.45)
+                }
+            }));
+        let n = s.sources.len();
+        let sources =
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(4.))
+                .children(s.sources.iter().enumerate().map(|(i, src)| {
+                    let (a_up, a_down, a_rm) = (app.clone(), app.clone(), app.clone());
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(px(4.))
+                        .h(px(32.))
+                        .px(px(6.))
+                        .rounded(px(scale::RADIUS_SM))
+                        .border_1()
+                        .border_color(rgba_of(t.border))
+                        .bg(rgba_of(t.field))
+                        .child(
+                            div()
+                                .w(px(16.))
+                                .text_size(px(11.))
+                                .text_color(rgba_of(t.mist))
+                                .mono()
+                                .child((i + 1).to_string()),
+                        )
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w(px(0.))
+                                .truncate()
+                                .text_size(px(12.5))
+                                .child(SharedString::from(src.title.clone())),
+                        )
+                        .child(
+                            small_icon(
+                                &t,
+                                SharedString::from(format!("board-up-{i}")),
+                                "arrow-up",
+                                tr!("Move up"),
+                                i > 0,
+                            )
+                            .on_click(move |_, _, cx| update(&a_up, cx, |s| s.move_source(i, -1))),
+                        )
+                        .child(
+                            small_icon(
+                                &t,
+                                SharedString::from(format!("board-down-{i}")),
+                                "arrow-down",
+                                tr!("Move down"),
+                                i + 1 < n,
+                            )
+                            .on_click(move |_, _, cx| update(&a_down, cx, |s| s.move_source(i, 1))),
+                        )
+                        .child(
+                            small_icon(
+                                &t,
+                                SharedString::from(format!("board-rm-{i}")),
+                                "x",
+                                tr!("Remove from the board"),
+                                n > 2,
+                            )
+                            .on_click(move |_, _, cx| update(&a_rm, cx, |s| s.remove_source(i))),
+                        )
+                }));
+        let left =
+            div()
+                .w(px(210.))
+                .flex_none()
+                .flex()
+                .flex_col()
+                .gap(px(14.))
+                .child(layouts)
+                .child(div().text_size(px(12.5)).text_color(rgba_of(t.mist)).child(
+                    SharedString::from(trn!(
                         "{n} screenshot, drag order = list order",
                         "{n} screenshots, drag order = list order",
                         n
-                    ))),
-            )
-            .child(sources);
+                    )),
+                ))
+                .child(sources);
 
         // Inspector.
         let a = app.clone();
@@ -393,10 +421,22 @@ impl Render for BoardSheetView {
                 None,
                 row()
                     .child(
-                        switch(&t, "board-ba", tr!("BEFORE and AFTER labels"), s.before_after, true)
-                            .on_click(move |_, _, cx| update(&a, cx, |s| s.before_after = !s.before_after)),
+                        switch(
+                            &t,
+                            "board-ba",
+                            tr!("BEFORE and AFTER labels"),
+                            s.before_after,
+                            true,
+                        )
+                        .on_click(move |_, _, cx| {
+                            update(&a, cx, |s| s.before_after = !s.before_after)
+                        }),
                     )
-                    .child(div().text_size(px(13.)).child(tr!("BEFORE and AFTER labels")))
+                    .child(
+                        div()
+                            .text_size(px(13.))
+                            .child(tr!("BEFORE and AFTER labels")),
+                    )
                     .into_any_element(),
             )
         });
@@ -404,19 +444,31 @@ impl Render for BoardSheetView {
             &t,
             tr!("Gap"),
             None,
-            preset(&t, &a, "board-gap", &[0, 8, 16, 24, 40], s.gap, |s, v| s.gap = v).into_any_element(),
+            preset(&t, &a, "board-gap", &[0, 8, 16, 24, 40], s.gap, |s, v| {
+                s.gap = v
+            })
+            .into_any_element(),
         );
         let margin = section(
             &t,
             tr!("Outer margin"),
             None,
-            preset(&t, &a, "board-margin", &[0, 16, 32, 48, 64], s.margin, |s, v| s.margin = v)
-                .into_any_element(),
+            preset(
+                &t,
+                &a,
+                "board-margin",
+                &[0, 16, 32, 48, 64],
+                s.margin,
+                |s, v| s.margin = v,
+            )
+            .into_any_element(),
         );
         let background = section(
             &t,
             tr!("Background"),
-            Some(tr!("Transparent is for PNG; a JPEG export puts it on white")),
+            Some(tr!(
+                "Transparent is for PNG; a JPEG export puts it on white"
+            )),
             div()
                 .flex()
                 .flex_col()
@@ -431,17 +483,20 @@ impl Render for BoardSheetView {
                     )
                     .on_click(move |_, _, cx| update(&a, cx, |s| s.background = b))
                 })))
-                .children((s.background == BgChoice::Tint).then(|| {
-                    div().w(px(160.)).h(px(32.)).child(self.tint_field.clone())
-                }))
+                .children(
+                    (s.background == BgChoice::Tint)
+                        .then(|| div().w(px(160.)).h(px(32.)).child(self.tint_field.clone())),
+                )
                 .into_any_element(),
         );
         let radius = section(
             &t,
             tr!("Corner radius"),
             None,
-            preset(&t, &a, "board-radius", &[0, 8, 16, 24], s.radius, |s, v| s.radius = v)
-                .into_any_element(),
+            preset(&t, &a, "board-radius", &[0, 8, 16, 24], s.radius, |s, v| {
+                s.radius = v
+            })
+            .into_any_element(),
         );
         let toggles = {
             let (a1, a2) = (a.clone(), a.clone());
@@ -456,8 +511,9 @@ impl Render for BoardSheetView {
                     .child(
                         row()
                             .child(
-                                switch(&t, "board-shadow", tr!("Shadow"), s.shadow, true)
-                                    .on_click(move |_, _, cx| update(&a1, cx, |s| s.shadow = !s.shadow)),
+                                switch(&t, "board-shadow", tr!("Shadow"), s.shadow, true).on_click(
+                                    move |_, _, cx| update(&a1, cx, |s| s.shadow = !s.shadow),
+                                ),
                             )
                             .child(div().text_size(px(13.)).child(tr!("Shadow"))),
                     )
@@ -465,7 +521,9 @@ impl Render for BoardSheetView {
                         row()
                             .child(
                                 switch(&t, "board-captions", tr!("Captions"), s.captions, true)
-                                    .on_click(move |_, _, cx| update(&a2, cx, |s| s.captions = !s.captions)),
+                                    .on_click(move |_, _, cx| {
+                                        update(&a2, cx, |s| s.captions = !s.captions)
+                                    }),
                             )
                             .child(div().text_size(px(13.)).child(tr!("Captions"))),
                     )
@@ -476,7 +534,10 @@ impl Render for BoardSheetView {
             &t,
             tr!("Title"),
             None,
-            div().h(px(32.)).child(self.title_field.clone()).into_any_element(),
+            div()
+                .h(px(32.))
+                .child(self.title_field.clone())
+                .into_any_element(),
         );
         let inspector = div()
             .w(px(250.))
@@ -616,14 +677,24 @@ impl Render for BoardSheetView {
                     .border_t_1()
                     .border_color(rgba_of(t.border))
                     .child(
-                        button_with_icon(&t, "board-cancel", tr!("Cancel"), ButtonKind::Secondary, None)
-                            .on_click(move |_, _, cx| close(&a_cancel, cx)),
+                        button_with_icon(
+                            &t,
+                            "board-cancel",
+                            tr!("Cancel"),
+                            ButtonKind::Secondary,
+                            None,
+                        )
+                        .on_click(move |_, _, cx| close(&a_cancel, cx)),
                     )
                     .child({
                         let b = button_with_icon(
                             &t,
                             "board-finish",
-                            if s.busy { tr!("Making the board\u{2026}") } else { tr!("Finish board") },
+                            if s.busy {
+                                tr!("Making the board\u{2026}")
+                            } else {
+                                tr!("Finish board")
+                            },
                             ButtonKind::Primary,
                             None,
                         );
@@ -731,7 +802,9 @@ pub fn finish(app: &Entity<AppModel>, cx: &mut App) {
     let backend = app.read(cx).backend.clone();
     let Some(daemon) = backend.daemon.clone() else {
         update(app, cx, |s| {
-            s.error = Some(tr!("Making a board needs the CaptureMann engine, which is not running."))
+            s.error = Some(tr!(
+                "Making a board needs the CaptureMann engine, which is not running."
+            ))
         });
         return;
     };

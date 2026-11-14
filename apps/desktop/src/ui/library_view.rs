@@ -7,6 +7,7 @@ use gpui::{
     Context, Entity, FocusHandle, FontWeight, ListAlignment, ListState, MouseButton, ObjectFit,
     Pixels, Point, Render, Role, SharedString, Subscription, Task, WeakEntity, Window,
 };
+use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 use std::time::Duration;
 use time::OffsetDateTime;
@@ -108,6 +109,13 @@ pub struct LibraryView {
     keep_scroll: bool,
     /// Captures whose thumbnails to drop when the next load lands (R1-7).
     pending_invalidate: Vec<String>,
+    /// Selection mode (BRD-1, BLK-1): a click on a card selects it instead of opening it, and a
+    /// bar offers Make a board, Export selected and Delete.
+    select_mode: bool,
+    /// The selected captures, by id (kept across reloads).
+    multi: BTreeSet<String>,
+    /// Captures whose upload or publish waits for a Google sign-in (B1): capture id -> job id.
+    waiting: Arc<HashMap<String, String>>,
     _subs: Vec<Subscription>,
 }
 
@@ -213,6 +221,9 @@ impl LibraryView {
             counts_gen: 0,
             keep_scroll: false,
             pending_invalidate: Vec::new(),
+            select_mode: false,
+            multi: BTreeSet::new(),
+            waiting: Arc::new(HashMap::new()),
             _subs: subs,
         };
         view.reload(cx);
@@ -258,6 +269,7 @@ impl LibraryView {
                     this.state.update_remote_counts();
                     this.publish_counts(cx);
                     this.sync_items(cx);
+                    this.refresh_waiting(cx);
                     // Only the captures that changed lose their poster; the rest keep theirs.
                     let changed = std::mem::take(&mut this.pending_invalidate);
                     this.audio.update(cx, |a, cx| {
@@ -337,14 +349,19 @@ impl LibraryView {
 
     fn sync_items(&mut self, cx: &mut Context<Self>) {
         let only = self.state.imported_only;
+        let boards = self.state.boards_only;
         self.items = Arc::new(
             self.state
                 .items()
                 .iter()
                 .filter(|i| !only || i.imported_from.is_some())
+                .filter(|i| !boards || i.board.is_some())
                 .cloned()
                 .collect(),
         );
+        // A selected capture that left the list is no longer selected.
+        let ids: BTreeSet<&str> = self.items.iter().map(|i| i.id.as_str()).collect();
+        self.multi.retain(|id| ids.contains(id.as_str()));
         self.rows_dirty = true;
         // The editor's image strip lists the same images in the same order (0.3.3).
         let strip = Arc::new(crate::editor::strip_model::from_library(&self.items));
@@ -363,12 +380,164 @@ impl LibraryView {
         if self.state.click_chip(chip) {
             self.keep_scroll = false;
             self.reload(cx);
-        } else if chip == Chip::Imported {
+        } else if matches!(chip, Chip::Imported | Chip::Boards) {
             // Filtered here: the page is already loaded.
             self.keep_scroll = false;
             self.sync_items(cx);
             cx.notify();
         }
+    }
+
+    // ---- selection mode (BRD-1, BLK-1) -----------------------------------------------------
+
+    fn toggle_select_mode(&mut self, cx: &mut Context<Self>) {
+        self.select_mode = !self.select_mode;
+        if !self.select_mode {
+            self.multi.clear();
+        }
+        self.close_menu(cx);
+        cx.notify();
+    }
+
+    fn toggle_multi(&mut self, ix: usize, cx: &mut Context<Self>) {
+        let Some(item) = self.items.get(ix) else {
+            return;
+        };
+        self.state.selected = Some(ix);
+        if !self.multi.remove(&item.id) {
+            self.multi.insert(item.id.clone());
+        }
+        cx.notify();
+    }
+
+    /// The selected captures in library order.
+    fn multi_items(&self) -> Vec<CaptureItem> {
+        self.items
+            .iter()
+            .filter(|i| self.multi.contains(&i.id))
+            .cloned()
+            .collect()
+    }
+
+    /// Make a board: 2 to 12 selected screenshots.
+    fn make_board(&mut self, cx: &mut Context<Self>) {
+        let shots: Vec<(String, String, u32, u32)> = self
+            .multi_items()
+            .iter()
+            .filter(|i| i.kind == Kind::Screenshot)
+            .map(|i| {
+                (
+                    i.id.clone(),
+                    i.title.clone(),
+                    i.width.unwrap_or(1200),
+                    i.height.unwrap_or(800),
+                )
+            })
+            .collect();
+        if !(2..=12).contains(&shots.len()) || shots.len() != self.multi.len() {
+            return;
+        }
+        let app = self.app.clone();
+        cx.defer(move |cx| crate::ui::board_sheet::open(&app, shots, cx));
+    }
+
+    /// Export selected: the selected screenshots go to the Bulk export sheet.
+    fn export_selected(&mut self, cx: &mut Context<Self>) {
+        let caps: Vec<(String, String)> = self
+            .multi_items()
+            .iter()
+            .filter(|i| i.kind == Kind::Screenshot && !i.broken)
+            .map(|i| (i.id.clone(), i.title.clone()))
+            .collect();
+        if caps.is_empty() {
+            return;
+        }
+        let app = self.app.clone();
+        cx.defer(move |cx| crate::ui::bulk_sheet::open(&app, caps, cx));
+    }
+
+    /// Delete: each selected capture goes through the usual delete question.
+    fn delete_selected(&mut self, cx: &mut Context<Self>) {
+        let items = self.multi_items();
+        let app = self.app.clone();
+        self.select_mode = false;
+        self.multi.clear();
+        cx.notify();
+        cx.defer(move |cx| {
+            for i in &items {
+                app::delete_capture(&app, &i.id, &i.title, cx);
+            }
+        });
+    }
+
+    /// Looks for uploads and publishes that wait for a sign-in (B1): a paused job with the reason
+    /// `auth_expired` names the capture. The card says so and offers Reconnect and Cancel upload.
+    fn refresh_waiting(&mut self, cx: &mut Context<Self>) {
+        let backend = self.app.read(cx).backend.clone();
+        let Some(daemon) = backend.daemon.clone() else {
+            return;
+        };
+        let rt = backend.rt.clone();
+        cx.spawn(async move |this, cx| {
+            let found = rt
+                .spawn(async move {
+                    let mut map: HashMap<String, String> = HashMap::new();
+                    for ty in ["upload", "publish"] {
+                        let params =
+                            serde_json::json!({ "state": "paused", "type": ty, "limit": 200 });
+                        if let Ok(v) = Backend::call(&daemon, "list_jobs", params).await {
+                            for j in v["jobs"].as_array().into_iter().flatten() {
+                                if j["pause_reason"] == "auth_expired" {
+                                    if let (Some(c), Some(id)) =
+                                        (j["inputs"]["capture_id"].as_str(), j["job_id"].as_str())
+                                    {
+                                        map.insert(c.to_owned(), id.to_owned());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    map
+                })
+                .await;
+            if let Ok(map) = found {
+                this.update(cx, |this, cx| {
+                    if *this.waiting != map {
+                        this.waiting = Arc::new(map);
+                        cx.notify();
+                    }
+                })
+                .ok();
+            }
+        })
+        .detach();
+    }
+
+    /// Cancel upload (LIB-1.AC11): `cancel_job` on the capture's paused job.
+    fn cancel_upload(&mut self, capture_id: &str, cx: &mut Context<Self>) {
+        let Some(job_id) = self.waiting.get(capture_id).cloned() else {
+            return;
+        };
+        let backend = self.app.read(cx).backend.clone();
+        let Some(daemon) = backend.daemon.clone() else {
+            return;
+        };
+        self.close_menu(cx);
+        let rt = backend.rt.clone();
+        cx.spawn(async move |this, cx| {
+            let _ = rt
+                .spawn(async move {
+                    Backend::call(
+                        &daemon,
+                        "cancel_job",
+                        serde_json::json!({ "job_id": job_id }),
+                    )
+                    .await
+                })
+                .await;
+            this.update(cx, |this, cx| this.refresh_waiting(cx)).ok();
+        })
+        .detach();
     }
 
     fn set_sort(&mut self, key: SortKey, cx: &mut Context<Self>) {
@@ -645,6 +814,11 @@ struct RowCtx {
     /// Imported captures whose own transcription runs (the same `TranscribeVm` the editor reads,
     /// fed by `transcript.started` and `job.progress`), with its fraction when known.
     transcribing: Arc<std::collections::HashMap<String, (String, Option<f32>)>>,
+    /// Selection mode and the selected captures (BRD-1, BLK-1).
+    select_mode: bool,
+    multi: Arc<BTreeSet<String>>,
+    /// Captures whose upload waits for a sign-in (B1).
+    waiting: Arc<HashMap<String, String>>,
 }
 
 /// The darkened overlay behind the pills on a thumbnail (the thumbnail is an image, so the
@@ -653,10 +827,47 @@ fn overlay_bg(alpha: u32) -> gpui::Rgba {
     rgba_of(Theme::DARK.ink.with_alpha(alpha))
 }
 
+/// The layout of a board, as the card badge words it.
+fn board_layout_label(layout: &str) -> String {
+    match layout {
+        "pair" => tr_ctx!("card badge", "PAIR"),
+        "grid" => tr_ctx!("card badge", "GRID"),
+        "strip" => tr_ctx!("card badge", "STRIP"),
+        _ => tr_ctx!("card badge", "FREE"),
+    }
+}
+
+/// The check circle of a card in selection mode (design S11): 20 px at the top left.
+fn select_check(t: &Theme, on: bool) -> AnyElement {
+    div()
+        .absolute()
+        .top(px(10.))
+        .left(px(10.))
+        .size(px(20.))
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded(px(10.))
+        .border_1()
+        .border_color(rgba_of(if on { t.text } else { Theme::DARK.text }))
+        .bg(if on { rgba_of(t.text) } else { overlay_bg(60) })
+        .children(on.then(|| icon("check", 13., t.ground)))
+        .into_any_element()
+}
+
 /// The kind pill of a card: icon and "REC" or "SHOT" (a screenshot has no duration badge).
 fn kind_pill(item: &CaptureItem) -> AnyElement {
     let (glyph, label) = match item.kind {
         Kind::Recording => ("film", tr_ctx!("card badge", "REC")),
+        // A board says which layout it has: "BOARD \u{00B7} PAIR" (BRD-1).
+        Kind::Screenshot if item.board.is_some() => (
+            "layout-panel-left",
+            format!(
+                "{} \u{00B7} {}",
+                tr_ctx!("card badge", "BOARD"),
+                board_layout_label(item.board.as_deref().unwrap_or(""))
+            ),
+        ),
         Kind::Screenshot => ("image", tr_ctx!("card badge", "SHOT")),
         Kind::Audio => ("audio-lines", tr_ctx!("card badge", "AUDIO")),
     };
@@ -722,7 +933,11 @@ fn thumb_frame(ctx: &RowCtx, item: &CaptureItem, width: f32, cx: &mut gpui::App)
             );
         }
     }
-    frame = frame.child(kind_pill(item));
+    frame = if ctx.select_mode {
+        frame.child(select_check(t, ctx.multi.contains(&item.id)))
+    } else {
+        frame.child(kind_pill(item))
+    };
     if let (Kind::Recording, Some(ticks)) = (item.kind, item.duration_ticks) {
         frame = frame.child(
             div()
@@ -746,6 +961,27 @@ fn thumb_frame(ctx: &RowCtx, item: &CaptureItem, width: f32, cx: &mut gpui::App)
             frame.child(div().absolute().bottom(px(10.)).left(px(10.)).child(
                 status_pill(t, t.warning, tr_ctx!("status", "Broken")).bg(rgba_of(t.surface)),
             ));
+    } else if ctx.waiting.contains_key(&item.id) {
+        // B1: the upload is paused, not lost; Reconnect and Cancel upload are in the card menu.
+        frame = frame.child(
+            div()
+                .absolute()
+                .bottom(px(10.))
+                .left(px(10.))
+                .h(px(24.))
+                .px(px(8.))
+                .flex()
+                .items_center()
+                .gap(px(5.))
+                .rounded(px(scale::RADIUS_PILL))
+                .border_1()
+                .border_color(rgba_of(t.warning.with_alpha(60)))
+                .bg(rgba_of(t.surface))
+                .text_size(px(11.5))
+                .text_color(rgba_of(t.warning))
+                .child(icon("cloud-alert", 13., t.warning))
+                .child(SharedString::from(tr!("Upload waiting for sign-in"))),
+        );
     }
     frame
 }
@@ -943,7 +1179,10 @@ fn card(ctx: &RowCtx, ix: usize, width: f32, cx: &mut gpui::App) -> AnyElement {
         }
         m
     };
-    let border = if selected {
+    let multi_on = ctx.select_mode && ctx.multi.contains(&item.id);
+    let border = if multi_on {
+        t.text
+    } else if selected {
         if ctx.list_focused {
             t.text
         } else {
@@ -1034,8 +1273,18 @@ fn card(ctx: &RowCtx, ix: usize, width: f32, cx: &mut gpui::App) -> AnyElement {
         .flex_col()
         .gap(px(10.))
         .cursor_pointer()
-        .on_click(move |_, _, cx| {
-            view.update(cx, |this, cx| this.open_index(ix, cx)).ok();
+        .on_click({
+            let select = ctx.select_mode;
+            move |_, _, cx| {
+                view.update(cx, |this, cx| {
+                    if select {
+                        this.toggle_multi(ix, cx)
+                    } else {
+                        this.open_index(ix, cx)
+                    }
+                })
+                .ok();
+            }
         })
         // LIB-1: right click opens the card's menu.
         .on_mouse_down(MouseButton::Right, {
@@ -1392,6 +1641,24 @@ impl Render for LibraryView {
                     .child(self.search.clone()),
             )
             .child(crate::ui::import_cards::header_button(&t, &self.app))
+            .child({
+                let v = view.clone();
+                let on = self.select_mode;
+                button_with_icon(
+                    &t,
+                    "library-select",
+                    if on { tr!("Done") } else { tr!("Select") },
+                    if on {
+                        ButtonKind::Primary
+                    } else {
+                        ButtonKind::Secondary
+                    },
+                    Some("check-check"),
+                )
+                .on_click(move |_, _, cx| {
+                    v.update(cx, |this, cx| this.toggle_select_mode(cx)).ok();
+                })
+            })
             .children((route == Route::Audio).then(|| {
                 record_audio_header_button(
                     &t,
@@ -1730,6 +1997,9 @@ impl Render for LibraryView {
                     imports: Arc::new(self.app.read(cx).import.clone()),
                     pending: self.pending.clone(),
                     app: self.app.clone(),
+                    select_mode: self.select_mode,
+                    multi: Arc::new(self.multi.clone()),
+                    waiting: self.waiting.clone(),
                     transcribing: Arc::new({
                         let m = self.app.read(cx);
                         self.items
@@ -1778,7 +2048,9 @@ impl Render for LibraryView {
             .menu
             .as_ref()
             .map(|m| self.card_menu(&t, m, window, cx));
+        let bar = (self.select_mode && !self.multi.is_empty()).then(|| self.selection_bar(&t, cx));
         div()
+            .relative()
             .size_full()
             .flex()
             .flex_col()
@@ -1789,11 +2061,141 @@ impl Render for LibraryView {
             .children(banners)
             .child(toolbar)
             .child(body)
+            .children(bar)
             .children(menu)
     }
 }
 
 impl LibraryView {
+    /// The floating selection bar (design S11): `3 selected | Make a board, Export selected...,
+    /// Delete | x`. No Copy: several images have no single clipboard meaning.
+    fn selection_bar(&self, t: &Theme, cx: &mut Context<Self>) -> AnyElement {
+        let items = self.multi_items();
+        let shots = items.iter().filter(|i| i.kind == Kind::Screenshot).count();
+        let n = items.len();
+        // Make a board: 2 to 12 screenshots, and nothing else selected.
+        let can_board = (2..=12).contains(&shots) && shots == n;
+        let can_export = shots > 0;
+        let v = cx.entity().downgrade();
+        let action =
+            |id: &'static str, label: String, glyph: &'static str, enabled: bool, warn: bool| {
+                let fg = if warn { t.warning } else { t.text };
+                div()
+                    .id(id)
+                    .role(Role::Button)
+                    .aria_label(SharedString::from(label.clone()))
+                    .focusable()
+                    .tab_stop(enabled)
+                    .h(px(34.))
+                    .px(px(12.))
+                    .flex()
+                    .items_center()
+                    .gap(px(7.))
+                    .rounded(px(scale::RADIUS_SM))
+                    .text_size(px(13.5))
+                    .text_color(rgba_of(fg))
+                    .when(enabled, |d| {
+                        d.cursor_pointer().hover(|s| s.bg(rgba_of(t.raised)))
+                    })
+                    .when(!enabled, |d| d.opacity(0.4))
+                    .child(icon(glyph, 15., fg))
+                    .child(SharedString::from(label))
+            };
+        let (v1, v2, v3, v4) = (v.clone(), v.clone(), v.clone(), v);
+        div()
+            .absolute()
+            .bottom(px(24.))
+            .left_0()
+            .right_0()
+            .flex()
+            .justify_center()
+            .child(
+                div()
+                    .id("selection-bar")
+                    .role(Role::Toolbar)
+                    .aria_label(tr!("Selection"))
+                    .occlude()
+                    .p(px(6.))
+                    .flex()
+                    .items_center()
+                    .gap(px(4.))
+                    .rounded(px(14.))
+                    .border_1()
+                    .border_color(rgba_of(t.line))
+                    .bg(rgba_of(t.surface_2))
+                    .shadow_lg()
+                    .child(
+                        div()
+                            .px(px(12.))
+                            .text_size(px(13.5))
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(rgba_of(t.text))
+                            .child(SharedString::from(trn!("{n} selected", "{n} selected", n))),
+                    )
+                    .child(div().w(px(1.)).h(px(20.)).bg(rgba_of(t.border)))
+                    .child({
+                        let b = action(
+                            "bar-board",
+                            tr!("Make a board"),
+                            "layout-panel-left",
+                            can_board,
+                            false,
+                        );
+                        if can_board {
+                            b.on_click(move |_, _, cx| {
+                                v1.update(cx, |this, cx| this.make_board(cx)).ok();
+                            })
+                        } else {
+                            b
+                        }
+                    })
+                    .child({
+                        let b = action(
+                            "bar-export",
+                            tr!("Export selected\u{2026}"),
+                            "folder-output",
+                            can_export,
+                            false,
+                        );
+                        if can_export {
+                            b.on_click(move |_, _, cx| {
+                                v2.update(cx, |this, cx| this.export_selected(cx)).ok();
+                            })
+                        } else {
+                            b
+                        }
+                    })
+                    .child(
+                        action("bar-delete", tr!("Delete"), "trash-2", true, true).on_click(
+                            move |_, _, cx| {
+                                v3.update(cx, |this, cx| this.delete_selected(cx)).ok();
+                            },
+                        ),
+                    )
+                    .child(div().w(px(1.)).h(px(20.)).bg(rgba_of(t.border)))
+                    .child(
+                        div()
+                            .id("bar-clear")
+                            .role(Role::Button)
+                            .aria_label(tr!("Clear selection"))
+                            .focusable()
+                            .tab_stop(true)
+                            .size(px(34.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .rounded(px(scale::RADIUS_SM))
+                            .cursor_pointer()
+                            .hover(|s| s.bg(rgba_of(t.raised)))
+                            .child(icon("x", 16., t.text_2))
+                            .on_click(move |_, _, cx| {
+                                v4.update(cx, |this, cx| this.toggle_select_mode(cx)).ok();
+                            }),
+                    ),
+            )
+            .into_any_element()
+    }
+
     /// The card's context menu (LIB-1): a 220 px popover with an icon on every row, a key hint
     /// where one exists and a rule before Delete. While renaming it holds the title box instead.
     fn card_menu(
@@ -1895,6 +2297,73 @@ impl LibraryView {
                 .get(m.ix)
                 .map_or_else(|| CardAction::ALL.to_vec(), CardAction::for_item);
             let mut panel = panel;
+            // B1: the upload of this capture waits for a sign-in; say what the choices do.
+            let waiting_id = self
+                .items
+                .get(m.ix)
+                .filter(|i| self.waiting.contains_key(&i.id))
+                .map(|i| i.id.clone());
+            if let Some(id) = waiting_id {
+                let (a_re, a_cancel) = (self.app.clone(), id.clone());
+                panel = panel
+                    .child(
+                        div()
+                            .px(px(10.))
+                            .py(px(6.))
+                            .text_size(px(12.))
+                            .text_color(rgba_of(t.warning))
+                            .child(SharedString::from(tr!(
+                                "The upload is paused, not lost. Delete and rename still work; deleting cancels the paused upload."
+                            ))),
+                    )
+                    .child(
+                        div()
+                            .id("card-menu-reconnect")
+                            .role(Role::MenuItem)
+                            .aria_label(tr!("Reconnect"))
+                            .focusable()
+                            .tab_stop(true)
+                            .min_h(px(34.))
+                            .px(px(10.))
+                            .flex()
+                            .items_center()
+                            .gap(px(10.))
+                            .rounded(px(scale::RADIUS_SM))
+                            .text_color(rgba_of(t.text))
+                            .cursor_pointer()
+                            .hover(move |s| s.bg(hover))
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.close_menu(cx);
+                                // Accounts are reconnected where they are set up.
+                                app::set_route(&a_re, Route::Destinations, cx);
+                            }))
+                            .child(icon("cloud-alert", 15., t.text))
+                            .child(tr!("Reconnect")),
+                    )
+                    .child(
+                        div()
+                            .id("card-menu-cancel-upload")
+                            .role(Role::MenuItem)
+                            .aria_label(tr!("Cancel upload"))
+                            .focusable()
+                            .tab_stop(true)
+                            .min_h(px(34.))
+                            .px(px(10.))
+                            .flex()
+                            .items_center()
+                            .gap(px(10.))
+                            .rounded(px(scale::RADIUS_SM))
+                            .text_color(rgba_of(t.text_2))
+                            .cursor_pointer()
+                            .hover(move |s| s.bg(hover))
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.cancel_upload(&a_cancel, cx)
+                            }))
+                            .child(icon("x", 15., t.text_2))
+                            .child(tr!("Cancel upload")),
+                    )
+                    .child(div().h(px(1.)).mx(px(6.)).my(px(4.)).bg(rgba_of(t.border)));
+            }
             for a in actions {
                 let fg = if a == CardAction::Delete {
                     t.warning

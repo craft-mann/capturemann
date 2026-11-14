@@ -190,10 +190,7 @@ impl BoardSheet {
             },
             title: Some(self.title.trim().to_owned()).filter(|t| !t.is_empty()),
             before_after: self.layout == LayoutKind::Pair && self.before_after,
-            label_words: Some([
-                tr!("BEFORE").to_uppercase(),
-                tr!("AFTER").to_uppercase(),
-            ]),
+            label_words: Some([tr!("BEFORE").to_uppercase(), tr!("AFTER").to_uppercase()]),
         })
     }
 
@@ -271,7 +268,10 @@ mod tests {
         assert!(s.before_after);
         let p = s.plan().unwrap();
         assert_eq!(p.cells[0].h, p.cells[1].h);
-        assert_eq!(s.size_chip(), format!("{} \u{00D7} {} px", p.width, p.height));
+        assert_eq!(
+            s.size_chip(),
+            format!("{} \u{00D7} {} px", p.width, p.height)
+        );
         let r = s.request().unwrap();
         assert_eq!(r["layout"]["kind"], "pair");
         assert_eq!(r["options"]["before_after"], true);

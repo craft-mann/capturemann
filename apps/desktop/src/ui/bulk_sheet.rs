@@ -44,23 +44,29 @@ pub struct BulkSheetView {
 impl BulkSheetView {
     pub fn new(app: Entity<AppModel>, cx: &mut Context<Self>) -> Self {
         let observe = cx.observe(&app, |_, _, cx| cx.notify());
-        let size_field = cx.new(|cx| {
-            TextField::new(tr!("Size"), tr_ctx!("field", "1600"), cx).without_icon()
-        });
+        let size_field =
+            cx.new(|cx| TextField::new(tr!("Size"), tr_ctx!("field", "1600"), cx).without_icon());
         let mark_field = cx.new(|cx| {
-            TextField::new(tr!("Watermark text"), tr_ctx!("field", "Watermark text"), cx)
-                .without_icon()
+            TextField::new(
+                tr!("Watermark text"),
+                tr_ctx!("field", "Watermark text"),
+                cx,
+            )
+            .without_icon()
         });
-        let pattern_field = cx.new(|cx| {
-            TextField::new(tr!("File name pattern"), "{name}", cx).without_icon()
-        });
+        let pattern_field =
+            cx.new(|cx| TextField::new(tr!("File name pattern"), "{name}", cx).without_icon());
         let mut subs = vec![observe];
-        subs.push(cx.subscribe(&size_field, |this, _, ev: &TextFieldEvent, cx| {
-            this.on_field(ev, cx, |s, t| s.size_value = t.to_owned());
-        }));
-        subs.push(cx.subscribe(&mark_field, |this, _, ev: &TextFieldEvent, cx| {
-            this.on_field(ev, cx, |s, t| s.mark_text = t.to_owned());
-        }));
+        subs.push(
+            cx.subscribe(&size_field, |this, _, ev: &TextFieldEvent, cx| {
+                this.on_field(ev, cx, |s, t| s.size_value = t.to_owned());
+            }),
+        );
+        subs.push(
+            cx.subscribe(&mark_field, |this, _, ev: &TextFieldEvent, cx| {
+                this.on_field(ev, cx, |s, t| s.mark_text = t.to_owned());
+            }),
+        );
         subs.push(
             cx.subscribe(&pattern_field, |this, _, ev: &TextFieldEvent, cx| {
                 this.on_field(ev, cx, |s, t| s.pattern = t.to_owned());
@@ -125,7 +131,12 @@ impl BulkSheetView {
 }
 
 /// A segment of a segmented control.
-pub(crate) fn seg(t: &Theme, id: impl Into<ElementId>, label: String, active: bool) -> Stateful<gpui::Div> {
+pub(crate) fn seg(
+    t: &Theme,
+    id: impl Into<ElementId>,
+    label: String,
+    active: bool,
+) -> Stateful<gpui::Div> {
     let focus = rgba_of(t.text);
     div()
         .id(id)
@@ -152,7 +163,12 @@ pub(crate) fn seg(t: &Theme, id: impl Into<ElementId>, label: String, active: bo
 }
 
 /// One section: a 130 px label column with a hint under it, then the controls.
-pub(crate) fn section(t: &Theme, label: String, hint: Option<String>, body: AnyElement) -> AnyElement {
+pub(crate) fn section(
+    t: &Theme,
+    label: String,
+    hint: Option<String>,
+    body: AnyElement,
+) -> AnyElement {
     div()
         .px(px(20.))
         .py(px(14.))
@@ -375,25 +391,28 @@ fn form(t: &Theme, s: &BulkSheet, v: &BulkSheetView, app: &Entity<AppModel>) -> 
             .children(size_on.then(|| {
                 row()
                     .child(div().w(px(120.)).h(px(32.)).child(v.size_field.clone()))
-                    .child(
-                        div()
-                            .text_size(px(13.))
-                            .text_color(rgba_of(t.mist))
-                            .child(if s.size_mode == SizeMode::Percent {
-                                "%"
-                            } else {
-                                "px"
-                            }),
-                    )
+                    .child(div().text_size(px(13.)).text_color(rgba_of(t.mist)).child(
+                        if s.size_mode == SizeMode::Percent {
+                            "%"
+                        } else {
+                            "px"
+                        },
+                    ))
                     .child({
                         let a = a.clone();
                         let on = s.allow_larger;
                         row()
                             .child(
-                                switch(t, "bulk-larger", tr!("Allow larger than the original"), on, true)
-                                    .on_click(move |_, _, cx| {
-                                        update(&a, cx, |s| s.allow_larger = !s.allow_larger)
-                                    }),
+                                switch(
+                                    t,
+                                    "bulk-larger",
+                                    tr!("Allow larger than the original"),
+                                    on,
+                                    true,
+                                )
+                                .on_click(move |_, _, cx| {
+                                    update(&a, cx, |s| s.allow_larger = !s.allow_larger)
+                                }),
                             )
                             .child(
                                 div()
@@ -476,9 +495,9 @@ fn form(t: &Theme, s: &BulkSheet, v: &BulkSheetView, app: &Entity<AppModel>) -> 
                     }),
                 ),
             )
-            .children((s.mark == MarkKind::Text).then(|| {
-                div().h(px(32.)).child(v.mark_field.clone())
-            }))
+            .children(
+                (s.mark == MarkKind::Text).then(|| div().h(px(32.)).child(v.mark_field.clone())),
+            )
             .children((s.mark == MarkKind::Image).then(|| {
                 let a = a.clone();
                 row()
@@ -501,7 +520,9 @@ fn form(t: &Theme, s: &BulkSheet, v: &BulkSheetView, app: &Entity<AppModel>) -> 
                             .text_color(rgba_of(t.mist))
                             .mono()
                             .child(SharedString::from(
-                                s.mark_image.clone().unwrap_or_else(|| tr!("No picture yet")),
+                                s.mark_image
+                                    .clone()
+                                    .unwrap_or_else(|| tr!("No picture yet")),
                             )),
                     )
             }))
@@ -511,34 +532,30 @@ fn form(t: &Theme, s: &BulkSheet, v: &BulkSheetView, app: &Entity<AppModel>) -> 
                     .flex()
                     .flex_col()
                     .gap(px(10.))
-                    .child(
-                        row()
-                            .child(small_label(t, tr!("Opacity")))
-                            .children([20u8, 35, 50, 75, 100].map(|o| {
-                                let a = a1.clone();
-                                seg(
-                                    t,
-                                    SharedString::from(format!("bulk-opacity-{o}")),
-                                    format!("{o}%"),
-                                    s.mark_opacity == o,
-                                )
-                                .on_click(move |_, _, cx| update(&a, cx, |s| s.mark_opacity = o))
-                            })),
-                    )
-                    .child(
-                        row()
-                            .child(small_label(t, tr!("Size")))
-                            .children([10u8, 15, 25, 40, 60].map(|z| {
-                                let a = a2.clone();
-                                seg(
-                                    t,
-                                    SharedString::from(format!("bulk-marksize-{z}")),
-                                    format!("{z}%"),
-                                    s.mark_size == z,
-                                )
-                                .on_click(move |_, _, cx| update(&a, cx, |s| s.mark_size = z))
-                            })),
-                    )
+                    .child(row().child(small_label(t, tr!("Opacity"))).children(
+                        [20u8, 35, 50, 75, 100].map(|o| {
+                            let a = a1.clone();
+                            seg(
+                                t,
+                                SharedString::from(format!("bulk-opacity-{o}")),
+                                format!("{o}%"),
+                                s.mark_opacity == o,
+                            )
+                            .on_click(move |_, _, cx| update(&a, cx, |s| s.mark_opacity = o))
+                        }),
+                    ))
+                    .child(row().child(small_label(t, tr!("Size"))).children(
+                        [10u8, 15, 25, 40, 60].map(|z| {
+                            let a = a2.clone();
+                            seg(
+                                t,
+                                SharedString::from(format!("bulk-marksize-{z}")),
+                                format!("{z}%"),
+                                s.mark_size == z,
+                            )
+                            .on_click(move |_, _, cx| update(&a, cx, |s| s.mark_size = z))
+                        }),
+                    ))
                     .child(position_grid(t, s.mark_pos, &a))
             }))
             .into_any_element(),
@@ -550,9 +567,7 @@ fn form(t: &Theme, s: &BulkSheet, v: &BulkSheetView, app: &Entity<AppModel>) -> 
         tr!("Blueprint"),
         Some(tr!("Coming with the Blueprint tool")),
         div()
-            .child(
-                switch(t, "bulk-blueprint", tr!("Blueprint"), false, false),
-            )
+            .child(switch(t, "bulk-blueprint", tr!("Blueprint"), false, false))
             .into_any_element(),
     );
 
@@ -561,7 +576,9 @@ fn form(t: &Theme, s: &BulkSheet, v: &BulkSheetView, app: &Entity<AppModel>) -> 
     let names = section(
         t,
         tr!("File names"),
-        Some(tr!("A name that exists gets a number; nothing is overwritten")),
+        Some(tr!(
+            "A name that exists gets a number; nothing is overwritten"
+        )),
         div()
             .flex()
             .flex_col()
@@ -571,26 +588,34 @@ fn form(t: &Theme, s: &BulkSheet, v: &BulkSheetView, app: &Entity<AppModel>) -> 
                 let a = a.clone();
                 let token = (*tok).to_owned();
                 let shown = (*tok).to_owned();
-                seg(t, SharedString::from(format!("bulk-token-{tok}")), shown, false)
-                    .mono()
-                    .on_click(move |_, _, cx| {
-                        let token = token.clone();
-                        a.update(cx, |m, cx| {
-                            if let Some(s) = m.bulk.sheet.as_mut() {
-                                s.insert_token(&token);
-                            }
-                            // The field shows the new pattern.
-                            m.bulk.epoch += 1;
-                            cx.notify();
-                        });
-                    })
+                seg(
+                    t,
+                    SharedString::from(format!("bulk-token-{tok}")),
+                    shown,
+                    false,
+                )
+                .mono()
+                .on_click(move |_, _, cx| {
+                    let token = token.clone();
+                    a.update(cx, |m, cx| {
+                        if let Some(s) = m.bulk.sheet.as_mut() {
+                            s.insert_token(&token);
+                        }
+                        // The field shows the new pattern.
+                        m.bulk.epoch += 1;
+                        cx.notify();
+                    });
+                })
             })))
             .child(
                 div()
                     .text_size(px(12.5))
                     .text_color(rgba_of(t.mist))
                     .mono()
-                    .child(SharedString::from(tr!("Example: {name}", name = s.example()))),
+                    .child(SharedString::from(tr!(
+                        "Example: {name}",
+                        name = s.example()
+                    ))),
             )
             .into_any_element(),
     );
@@ -761,9 +786,17 @@ fn run_panel(t: &Theme, _s: &BulkSheet, run: &Run, _app: &Entity<AppModel>) -> A
                     .items_center()
                     .gap(px(10.))
                     .child(icon(
-                        if run.skipped.is_empty() { "circle-check" } else { "circle-alert" },
+                        if run.skipped.is_empty() {
+                            "circle-check"
+                        } else {
+                            "circle-alert"
+                        },
                         20.,
-                        if run.skipped.is_empty() { t.success } else { t.warning },
+                        if run.skipped.is_empty() {
+                            t.success
+                        } else {
+                            t.warning
+                        },
                     ))
                     .child(
                         div()
@@ -942,7 +975,9 @@ fn pick_mark_image(app: &Entity<AppModel>, cx: &mut App) {
             return;
         };
         cx.update(|cx| {
-            update(&app, cx, |s| s.mark_image = Some(path.to_string_lossy().into_owned()))
+            update(&app, cx, |s| {
+                s.mark_image = Some(path.to_string_lossy().into_owned())
+            })
         });
     })
     .detach();
@@ -968,7 +1003,9 @@ pub fn start(app: &Entity<AppModel>, cx: &mut App) {
     let backend = app.read(cx).backend.clone();
     let Some(daemon) = backend.daemon.clone() else {
         update(app, cx, |s| {
-            s.error = Some(tr!("Exporting needs the CaptureMann engine, which is not running."))
+            s.error = Some(tr!(
+                "Exporting needs the CaptureMann engine, which is not running."
+            ))
         });
         return;
     };
@@ -1022,7 +1059,9 @@ pub fn start(app: &Entity<AppModel>, cx: &mut App) {
         });
         // Follow the job until it ends, even when the sheet was closed meanwhile.
         loop {
-            cx.background_executor().timer(Duration::from_millis(400)).await;
+            cx.background_executor()
+                .timer(Duration::from_millis(400))
+                .await;
             let (d, id) = (daemon.clone(), job_id.clone());
             let job = backend
                 .rt
@@ -1031,10 +1070,7 @@ pub fn start(app: &Entity<AppModel>, cx: &mut App) {
             let Ok(Ok(job)) = job else {
                 continue;
             };
-            let ended = matches!(
-                job["state"].as_str(),
-                Some("done" | "failed" | "cancelled")
-            );
+            let ended = matches!(job["state"].as_str(), Some("done" | "failed" | "cancelled"));
             let titles = captures.clone();
             let (a, ended2) = (app2.clone(), ended);
             let alive = cx.update(|cx| {
