@@ -25,6 +25,12 @@ serde_json = "1"
 toml = { version = "0.8", default-features = false, features = ["parse"] }
 # MIT OR Apache-2.0: renders the bubble mask and ring PNGs the filter graph reads.
 image = { workspace = true, features = ["png", "jpeg"] }
+# CMYK and YCCK JPEG pictures (IMP-6.AC10 to AC12): the decoder the `image` crate already uses, read
+# directly for its four-component output, and a pure Rust colour engine for ICC profiles
+# (MIT / Apache-2.0 and BSD-3-Clause / Apache-2.0).
+zune-jpeg = "0.5"
+zune-core = "0.5"
+moxcms = "0.8"
 
 [target.'cfg(unix)'.dependencies]
 # kill(pid, 0): is the process that owns a `.work-*` folder still running?

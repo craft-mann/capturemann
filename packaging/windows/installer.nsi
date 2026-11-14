@@ -101,7 +101,7 @@ Section "${APPNAME}" SecApp
   WriteRegDWORD HKCU "${UNINSTKEY}" "EstimatedSize" "$0"
 SectionEnd
 
-Section "Offer CaptureMann in the Open with menu of video and audio files" SecOpenWith
+Section "Offer CaptureMann in the Open with menu of video, audio and picture files" SecOpenWith
   ; Per user (HKCU), never the default program: the file types stay with whatever opens them now.
   ; The extensions are the ones the import reads (DOCUMENT_EXT in apps/desktop/src/import_flow.rs).
   ; Open with > CaptureMann starts `cm-desktop.exe "<file>"`; a running CaptureMann gets the file.
@@ -122,6 +122,12 @@ Section "Offer CaptureMann in the Open with menu of video and audio files" SecOp
   WriteRegStr HKCU "Software\Classes\.wav\OpenWithList\cm-desktop.exe" "" ""
   WriteRegStr HKCU "Software\Classes\Applications\cm-desktop.exe\SupportedTypes" ".mp3" ""
   WriteRegStr HKCU "Software\Classes\.mp3\OpenWithList\cm-desktop.exe" "" ""
+  WriteRegStr HKCU "Software\Classes\Applications\cm-desktop.exe\SupportedTypes" ".png" ""
+  WriteRegStr HKCU "Software\Classes\.png\OpenWithList\cm-desktop.exe" "" ""
+  WriteRegStr HKCU "Software\Classes\Applications\cm-desktop.exe\SupportedTypes" ".jpg" ""
+  WriteRegStr HKCU "Software\Classes\.jpg\OpenWithList\cm-desktop.exe" "" ""
+  WriteRegStr HKCU "Software\Classes\Applications\cm-desktop.exe\SupportedTypes" ".jpeg" ""
+  WriteRegStr HKCU "Software\Classes\.jpeg\OpenWithList\cm-desktop.exe" "" ""
   ; Tell Explorer the associations changed (SHCNE_ASSOCCHANGED).
   System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
   WriteRegStr HKCU "Software\${APPNAME}" "OpenWith" "1"
@@ -149,7 +155,7 @@ Section "-pathflag"
 SectionEnd
 
 LangString DESC_SecApp ${LANG_ENGLISH} "CaptureMann, the command line, the MCP server, the speaker-label models and the licence files."
-LangString DESC_SecOpenWith ${LANG_ENGLISH} "Lists CaptureMann under Open with for MP4, MOV, M4V, MKV, M4A, WAV and MP3 files so you can import them. It does not become the default program."
+LangString DESC_SecOpenWith ${LANG_ENGLISH} "Lists CaptureMann under Open with for MP4, MOV, M4V, MKV, M4A, WAV, MP3, PNG and JPEG files so you can import them. It does not become the default program."
 LangString DESC_SecPath ${LANG_ENGLISH} "So that you can type capturemann and cm-mcp in a new terminal. Removed again by the uninstaller."
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
   !insertmacro MUI_DESCRIPTION_TEXT ${SecApp} $(DESC_SecApp)
@@ -177,6 +183,9 @@ Section "Uninstall"
     DeleteRegKey HKCU "Software\Classes\.m4a\OpenWithList\cm-desktop.exe"
     DeleteRegKey HKCU "Software\Classes\.wav\OpenWithList\cm-desktop.exe"
     DeleteRegKey HKCU "Software\Classes\.mp3\OpenWithList\cm-desktop.exe"
+    DeleteRegKey HKCU "Software\Classes\.png\OpenWithList\cm-desktop.exe"
+    DeleteRegKey HKCU "Software\Classes\.jpg\OpenWithList\cm-desktop.exe"
+    DeleteRegKey HKCU "Software\Classes\.jpeg\OpenWithList\cm-desktop.exe"
     System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
   ${EndIf}
   Delete "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk"

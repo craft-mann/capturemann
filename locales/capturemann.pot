@@ -6784,6 +6784,9 @@ msgstr ""
 msgid "a colour format editing doesn't use"
 msgstr ""
 
+msgid "a colour profile that could not be read (standard conversion used)"
+msgstr ""
+
 msgid "a copy"
 msgstr ""
 

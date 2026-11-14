@@ -359,7 +359,10 @@ fn hud_button_with(
         .when(enabled, |d| d.cursor_pointer().hover(move |s| s.bg(hover)))
         .when(!enabled, |d| d.cursor_default())
         .focus_visible(move |s| s.border_color(focus))
-        // A click on a button is not the start of a window drag.
+        // A click on a button is not the start of a window drag. `occlude` keeps the bar's drag
+        // region (declared for Windows, REC-5.AC18) from also covering the button: the OS would
+        // otherwise treat a press on it as a title-bar press and the click would never arrive.
+        .occlude()
         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
 }
 
@@ -830,6 +833,8 @@ impl Render for HudView {
             // The bar's background (and the timer, the meter and the chip on it) is the grip:
             // the buttons stop the press, so a click on one never starts a drag.
             .cursor_grab()
+            // Windows moves a window only through a declared drag region (REC-5.AC18).
+            .map(crate::platform_window::drag_grip)
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, _, window, _| {

@@ -24,7 +24,9 @@ pub const IMAGE_EXT: [&str; 3] = ["png", "jpg", "jpeg"];
 pub const VIDEO_EXT: [&str; 5] = ["mp4", "mov", "m4v", "mkv", "webm"];
 pub const AUDIO_EXT: [&str; 4] = ["m4a", "wav", "aac", "mp3"];
 /// The extensions the macOS bundle registers for Open With and the Dock (`CFBundleDocumentTypes`).
-pub const DOCUMENT_EXT: [&str; 7] = ["mp4", "mov", "m4v", "mkv", "m4a", "wav", "mp3"];
+pub const DOCUMENT_EXT: [&str; 10] = [
+    "mp4", "mov", "m4v", "mkv", "m4a", "wav", "mp3", "png", "jpg", "jpeg",
+];
 
 /// The free-space floor the daemon keeps (NFR-7), for the footer's "free" figure.
 pub const FLOOR_BYTES: u64 = 1_000_000_000;
@@ -214,7 +216,10 @@ pub fn chip_label(s: &Status) -> String {
 
 /// Reasons that only pictures have (IMP-6).
 fn is_picture_reason(id: &str) -> bool {
-    matches!(id, "converted" | "oriented" | "first_frame_only")
+    matches!(
+        id,
+        "converted" | "oriented" | "first_frame_only" | "profile_not_read"
+    )
 }
 
 /// Words for a "prepared" reason, inside the info note.
@@ -227,6 +232,9 @@ pub fn prepare_reason_text(id: &str) -> String {
         "converted" => tr!("colours converted to 8-bit RGB"),
         "oriented" => tr!("turned upright"),
         "first_frame_only" => tr!("an animation, first frame only"),
+        "profile_not_read" => {
+            tr!("a colour profile that could not be read (standard conversion used)")
+        }
         _ => tr!("an unusual format"),
     }
 }
@@ -1301,6 +1309,23 @@ mod tests {
         }
         // Never the default: no value is written on the extension key itself.
         assert!(!nsi.contains(r#"Classes\.mp4" """#));
+    }
+
+    /// IMP-6.AC13: the Linux entry lists the picture types too (Open with, never the default).
+    #[test]
+    fn imp6_ac13_the_desktop_file_lists_the_picture_types() {
+        let desktop = include_str!("../../../packaging/linux/dev.capturemann.app.desktop");
+        let mime = desktop
+            .lines()
+            .find_map(|l| l.strip_prefix("MimeType="))
+            .unwrap();
+        for t in ["image/png", "image/jpeg", "video/mp4", "audio/mpeg"] {
+            assert!(mime.split(';').any(|m| m == t), "{t}");
+        }
+        for e in ["png", "jpg", "jpeg"] {
+            assert!(DOCUMENT_EXT.contains(&e), "{e}");
+            assert!(IMAGE_EXT.contains(&e), "{e}");
+        }
     }
 
     fn ui_with(answer: &Value, sizes: &[(PathBuf, u64)]) -> ImportUi {

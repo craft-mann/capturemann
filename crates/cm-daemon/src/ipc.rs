@@ -57,6 +57,25 @@ mod imp {
         path: PathBuf,
     }
 
+    /// What a probe connection to an existing socket file says: `Ok(false)` a daemon answered,
+    /// `Ok(true)` nobody listens (refused, or the file vanished meanwhile), `Err` it cannot be
+    /// told (for example `EMFILE` when the process is out of descriptors: the old code took that
+    /// for "stale" and deleted a live daemon's socket, a flake under load, R2-7).
+    pub(super) fn socket_is_stale(probe: io::Result<()>) -> io::Result<bool> {
+        match probe {
+            Ok(()) => Ok(false),
+            Err(e)
+                if matches!(
+                    e.kind(),
+                    io::ErrorKind::ConnectionRefused | io::ErrorKind::NotFound
+                ) =>
+            {
+                Ok(true)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
     pub fn bind(endpoint: &Endpoint) -> io::Result<Listener> {
         let Endpoint::Path(path) = endpoint else {
             return Err(io::Error::new(
@@ -69,13 +88,22 @@ mod imp {
         match std::fs::symlink_metadata(path) {
             Ok(meta) if meta.file_type().is_socket() => {
                 // A live daemon answers; a leftover socket from a crash does not.
-                if std::os::unix::net::UnixStream::connect(path).is_ok() {
+                // Only a refused connection proves the socket is a leftover. Any other failure
+                // (no file descriptor left under load, an interrupted call) says nothing about
+                // whether a daemon is listening, so it is reported and the socket stays.
+                let probe = std::os::unix::net::UnixStream::connect(path).map(drop);
+                if socket_is_stale(probe)? {
+                    match std::fs::remove_file(path) {
+                        Ok(()) => {}
+                        Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+                        Err(e) => return Err(e),
+                    }
+                } else {
                     return Err(io::Error::new(
                         io::ErrorKind::AddrInUse,
                         format!("a daemon is already listening on {}", path.display()),
                     ));
                 }
-                std::fs::remove_file(path)?;
             }
             Ok(_) => {
                 return Err(io::Error::new(
@@ -212,6 +240,39 @@ mod tests {
             .unwrap();
         assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
         assert!(link.exists());
+    }
+
+    /// R2-7 (the flake): only a refused connection means "stale". Running out of descriptors
+    /// (`EMFILE`, which parallel tests that hold many connections cause) or an interrupted call
+    /// must not make `bind` delete a socket a live daemon may own.
+    #[test]
+    fn r2_7_only_a_refused_connection_makes_a_socket_stale() {
+        use super::imp::socket_is_stale;
+        // EMFILE on Linux and macOS: too many open files in this process.
+        const EMFILE: i32 = 24;
+        assert!(!socket_is_stale(Ok(())).unwrap());
+        for kind in [io::ErrorKind::ConnectionRefused, io::ErrorKind::NotFound] {
+            assert!(
+                socket_is_stale(Err(io::Error::from(kind))).unwrap(),
+                "{kind:?}"
+            );
+        }
+        let emfile = io::Error::from_raw_os_error(EMFILE);
+        assert_eq!(
+            socket_is_stale(Err(emfile)).unwrap_err().raw_os_error(),
+            Some(EMFILE)
+        );
+        for kind in [
+            io::ErrorKind::Interrupted,
+            io::ErrorKind::WouldBlock,
+            io::ErrorKind::PermissionDenied,
+            io::ErrorKind::TimedOut,
+        ] {
+            assert!(
+                socket_is_stale(Err(io::Error::from(kind))).is_err(),
+                "{kind:?}"
+            );
+        }
     }
 
     /// R2-7: a stale socket is replaced, a live one is `AddrInUse`, and the socket is 0600.

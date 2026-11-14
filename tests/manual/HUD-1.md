@@ -1,4 +1,4 @@
-# HUD-1 manual script: move and collapse the recording HUD (REC-5.AC4, AC16, AC17)
+# HUD-1 manual script: move and collapse the recording HUD (REC-5.AC4, AC16, AC17, AC18)
 
 Covers what unit tests cannot: the native window drag, the window resize on Collapse and Expand,
 a real display being unplugged, keyboard access with a screen reader, and the guarantee that the
@@ -14,6 +14,7 @@ one display; step 7 needs a second monitor you can unplug. Recordings made here 
 delete them from the library at the end. The recording captures your screen and microphone: close
 anything private first.
 
+Automated check on Windows: `cm-regress` case `desktop.hud_drag` (full tier; injected pointer drag).
 Record the result in `verification/HUD-1-<date>-<platform>.md` (template in
 `verification/README.md`).
 
@@ -28,7 +29,17 @@ Record the result in `verification/HUD-1-<date>-<platform>.md` (template in
 4. Drop the HUD 20 px from the right edge. **Pass:** it snaps to the edge margin and is wholly on
    the display. Try to drop it half off the bottom edge. **Pass:** it is pulled back on screen.
    On Windows it never covers the taskbar.
-5. Click outside the HUD (on the desktop or the recorded app). **Pass:** the click reaches what is
+   **Windows (REC-5.AC18, 0.3.4):** the drag works only through a drag region declared in the app (the
+   native move call is empty in GPUI's Windows backend). Check each of: bar background, timer, the
+   meter (audio recording), the agent chip; a press on a button must not drag and a full click must
+   still run it (Stop, Pause, Mic, Webcam, Draw, Restart, Discard, collapse chevron, Marker). The HUD must
+   keep working while it is a non-activating window: the recorded app keeps the keyboard focus during
+   and after the drag. After the drop it snaps and is remembered as above (quit, start again, same place).
+   Run the same on an **audio** recording (step 4).
+5. Webcam bubble (CAM-3, REC-5.AC18; needs a camera): with the camera on, drag the bubble by its picture.
+   **Pass:** it follows the pointer and keeps its place per display; its toolbar buttons still click.
+   (Windows: the bubble body is a drag region; the toolbar sits outside it.)
+6. Click outside the HUD (on the desktop or the recorded app). **Pass:** the click reaches what is
    under it; the HUD takes no clicks outside its own bar.
 
 ## 2. Collapse and expand (screen recording)

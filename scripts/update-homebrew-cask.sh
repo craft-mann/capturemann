@@ -17,6 +17,15 @@ version="${version#v}"
 cask="$tap/Casks/capturemann.rb"
 [ -f "$cask" ] || { echo "no $cask (pass the path of the homebrew-tap checkout)" >&2; exit 1; }
 
+# The asset names are an interface (docs/development/releasing.md, "Asset names"): check the published
+# release against the table and the cask's url pattern before reading any checksum from it.
+if command -v gh >/dev/null; then
+  "$(dirname "$0")/check-release-assets.sh" "$version" --github craft-mann/capturemann --cask "$cask" \
+    || { echo "the release's asset names do not match the table; fix the release first" >&2; exit 1; }
+else
+  echo "warning: gh is not installed, so the asset names were not checked (scripts/check-release-assets.sh)" >&2
+fi
+
 # sum_of <arch>: the SHA-256 of that chip's DMG from its .sha256 asset, or nothing when there is none.
 sum_of() {
   local asset="CaptureMann-v${version}-macos-$1.dmg"

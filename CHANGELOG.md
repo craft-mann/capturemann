@@ -5,6 +5,13 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
 
 ## [Unreleased]
 
+### Added
+- **CMYK and YCCK JPEG pictures import** (IMP-6.AC10 to AC12): they are converted to 8-bit sRGB with the embedded colour profile, or with the standard formula (honouring Adobe's inverted values) when there is none or it cannot be read; the row says "Converted" and, for an unreadable profile, "profile not read". 0.3.3 refused them as `jpeg_cmyk`.
+- **Open with for pictures** (IMP-6.AC13): CaptureMann is listed under Open with for PNG and JPEG files on macOS, Windows (per user, installer component) and Linux; it is never made the default.
+
+### Fixed
+- Windows: the recording HUD (screen and audio) and the webcam bubble can be dragged. Since 0.2.9 the release text said they could, but the Windows window had no drag region, so the press did nothing (REC-5.AC18). macOS and Linux were not affected.
+
 ## [0.3.3] - 2026-11-13
 
 ### Added
@@ -102,7 +109,7 @@ and the project follows [Semantic Versioning](https://semver.org/) once it reach
   Windows run an extra command).
 
 ### Improved
-- Recording HUD: drag it by its background and collapse it; position and state are remembered.
+- Recording HUD: drag it by its background and collapse it; position and state are remembered. (Correction: on Windows the drag did not work until 0.3.4.)
 - Windows 11: no grey frame or white line around the recording HUD.
 - Thumbnails and notification stripes follow the rounded corners of their frame.
 
