@@ -666,21 +666,21 @@ pub struct AnnotateArgs {
     #[arg(
         long,
         value_name = "JSON|FILE|-",
-        required_unless_present_any = ["suggest_redactions", "redact_emails", "kinds"],
-        conflicts_with_all = ["suggest_redactions", "redact_emails"]
+        required_unless_present_any = ["suggest_redactions", "redact_emails", "kinds", "suggest_blueprint"],
+        conflicts_with_all = ["suggest_redactions", "redact_emails", "suggest_blueprint"]
     )]
     pub ops: Option<String>,
     /// Replace the existing ops instead of appending (still one undo step).
-    #[arg(long, conflicts_with_all = ["suggest_redactions", "redact_emails"])]
+    #[arg(long, conflicts_with_all = ["suggest_redactions", "redact_emails", "suggest_blueprint"])]
     pub replace: bool,
     /// Write the rendered PNG to this file.
-    #[arg(long, value_name = "FILE", conflicts_with_all = ["suggest_redactions", "redact_emails"])]
+    #[arg(long, value_name = "FILE", conflicts_with_all = ["suggest_redactions", "redact_emails", "suggest_blueprint"])]
     pub out: Option<PathBuf>,
     /// Also copy the rendered image (annotations and redactions applied) to the clipboard.
-    #[arg(long, conflicts_with_all = ["suggest_redactions", "redact_emails"])]
+    #[arg(long, conflicts_with_all = ["suggest_redactions", "redact_emails", "suggest_blueprint"])]
     pub copy: bool,
     /// Do not ask the daemon to send the rendered image back (`return_image: false`).
-    #[arg(long, conflicts_with_all = ["out", "suggest_redactions", "redact_emails"])]
+    #[arg(long, conflicts_with_all = ["out", "suggest_redactions", "redact_emails", "suggest_blueprint"])]
     pub no_image: bool,
     /// Read-only (`suggest_redactions`): find emails, API keys and other tokens (and phone
     /// numbers and IPv4 addresses) with on-device text recognition and print blur rectangles.
@@ -688,13 +688,18 @@ pub struct AnnotateArgs {
     #[arg(long)]
     pub suggest_redactions: bool,
     /// Like `--suggest-redactions`, but email addresses only.
-    #[arg(long, conflicts_with = "suggest_redactions")]
+    #[arg(long, conflicts_with_all = ["suggest_redactions", "suggest_blueprint"])]
     pub redact_emails: bool,
     /// With `--suggest-redactions`: which kinds to look for, comma separated or repeated
     /// (`--kinds email,token --kinds phone`). Default: every kind except `npi`, which is
     /// off unless named. The daemon rejects unknown names.
     #[arg(long, value_name = "KIND[,KIND...]", value_delimiter = ',')]
     pub kinds: Vec<String>,
+    /// Read-only (`suggest_blueprint`): find the text lines with on-device text recognition and
+    /// print them as boxes (with the measured fill and bar colour) for a `blueprint` op. Nothing
+    /// is applied; pass the boxes you want replaced to `annotate --ops` (base edits first).
+    #[arg(long, conflicts_with_all = ["suggest_redactions", "redact_emails", "kinds"])]
+    pub suggest_blueprint: bool,
 }
 
 #[derive(Debug, Args)]

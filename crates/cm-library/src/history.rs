@@ -13,6 +13,9 @@ use serde::{Deserialize, Serialize};
 /// One reversible mutation of `manifest.ops`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "change", rename_all = "snake_case")]
+// `ReplaceOp` holds two ops, and the 0.3.4 ops (fills, box lists) made an op bigger; a change is
+// short-lived and boxing it would change the history JSON code for nothing.
+#[allow(clippy::large_enum_variant)]
 pub enum Change {
     AddOp {
         index: usize,

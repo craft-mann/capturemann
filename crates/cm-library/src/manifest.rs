@@ -186,6 +186,9 @@ pub(crate) fn split_ops(value: &Value) -> Result<(Vec<AnnotationOp>, Vec<Unknown
             }),
         }
     }
+    // A 0.3.3 app writes ops it does not know after the known ones, so a base edit can follow an
+    // arrow: put base edits first, stable (0.3.4 plan, problem 12). The next save writes this.
+    cm_core::annotation::sort_base_edits_first(&mut ops);
     Ok((ops, unknown))
 }
 

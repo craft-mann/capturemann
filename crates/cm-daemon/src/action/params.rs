@@ -369,6 +369,8 @@ pub enum Action {
     SuggestRedactions(SuggestRedactionsParams),
     /// `recognize_text` (ANN-5, see [`crate::text_ops`]).
     RecognizeText(crate::text_ops::RecognizeTextParams),
+    /// `suggest_blueprint` (ANN-11, see [`crate::blueprint_ops`]).
+    SuggestBlueprint(crate::blueprint_ops::SuggestBlueprintParams),
     GetSettings(GetSettingsParams),
     SetSettings(SetSettingsParams),
     Undo(CaptureRefParams),

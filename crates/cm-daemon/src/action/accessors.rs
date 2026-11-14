@@ -21,6 +21,7 @@ impl Action {
             Action::GetCapture(_) => "get_capture",
             Action::SuggestRedactions(_) => "suggest_redactions",
             Action::RecognizeText(_) => crate::text_ops::METHOD,
+            Action::SuggestBlueprint(_) => crate::blueprint_ops::METHOD,
             Action::GetSettings(_) => "get_settings",
             Action::SetSettings(_) => "set_settings",
             Action::Undo(_) => "undo",
@@ -189,6 +190,7 @@ impl Action {
             Action::GetDiagnostics => "Show the diagnostics".to_owned(),
             Action::GetCursorTrack(p) => format!("Read the cursor track of {}", p.capture_id),
             Action::RecognizeText(p) => format!("Read the text in {}", p.capture_id),
+            Action::SuggestBlueprint(p) => format!("Find the text lines in {}", p.capture_id),
             Action::GetPlatformRules(p) => format!("Read the {} publishing rules", p.platform),
             Action::EstimateExport(p) => {
                 format!("Estimate the size of an export of {}", p.capture_id)

@@ -156,7 +156,7 @@ async fn agt_1_ac1_lists_all_tools_with_schemas_and_tiers() {
     // Annotate carries the op schema of ANN-1/ANN-2.
     let annotate = tools.iter().find(|t| t.name == "annotate").unwrap();
     let ops = &annotate.input_schema["properties"]["ops"]["items"]["oneOf"];
-    assert_eq!(ops.as_array().unwrap().len(), 13); // + callout, spotlight, stamp (0.3.3)
+    assert_eq!(ops.as_array().unwrap().len(), 17); // + callout, spotlight, stamp (0.3.3); magnify, retype, move_area, blueprint (0.3.4)
     c.cancel().await.unwrap();
 }
 

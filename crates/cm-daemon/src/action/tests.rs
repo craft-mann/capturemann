@@ -17,6 +17,7 @@ fn samples() -> Vec<(&'static str, Value)> {
             json!({"capture_id": "shot_1", "kinds": ["email", "token"]}),
         ),
         ("recognize_text", json!({"capture_id": "shot_1"})),
+        ("suggest_blueprint", json!({"capture_id": "shot_1"})),
         (
             "recognize_text",
             json!({"capture_id": "shot_1", "region": [1, 2, 30, 40], "copy_to_clipboard": true, "format": "lines"}),
