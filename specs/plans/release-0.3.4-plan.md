@@ -1,6 +1,6 @@
 # Release 0.3.4: screenshot catch-up (plan, draft, Nov 14, 2026)
 
-Status: **merged Nov 14, 2026 (the maintainer's screenshot catch-up plan plus the plan of Nov 13); Phase 0 spec text written (section 10); nothing built.** It replaces the 0.3.4 plan of Nov 13, 2026. The maintainer asked on Nov 14, 2026 for 0.3.4 to close the screenshot gaps found in the competitor review. The decided items of the old plan that are about images stay in this release: Magnify (ANN-8), canvas text selection, CMYK conversion and the hygiene list. Video features move to a later release (section 7). Nothing is built yet. The defaults in section 8 wait for the maintainer. After the specs are final, the maintainer hands the UI and UX design to Claude Design (section 11).
+Status: **specs final and defaults accepted Nov 14, 2026; next the UI and UX design (Claude Design, section 11), then the build.** Merged Nov 14, 2026 (the maintainer's screenshot catch-up plan plus the plan of Nov 13); Phase 0 spec text written (section 10); nothing built.** It replaces the 0.3.4 plan of Nov 13, 2026. The maintainer asked on Nov 14, 2026 for 0.3.4 to close the screenshot gaps found in the competitor review. The decided items of the old plan that are about images stay in this release: Magnify (ANN-8), canvas text selection, CMYK conversion and the hygiene list. Video features move to a later release (section 7). Nothing is built yet. The defaults in section 8 wait for the maintainer. After the specs are final, the maintainer hands the UI and UX design to Claude Design (section 11).
 
 Input: the maintainer's gap list of Nov 14, 2026, which compares CaptureMann with Snagit and names 6 gaps:
 1. scrolling capture;
@@ -342,7 +342,7 @@ The tool count goes from 81 to 89. Update `02-agent-interface.md`, the tier tabl
 | Clipboard paste of a picture as a capture; WebP and HEIC import | Unchanged from the old plan | 0.3.5 |
 | In-app update (Velopack), Windows code signing (SignPath; removed from 0.3.4 by the maintainer on Nov 14, 2026), a headless daemon, windowed audio | Platform work | 0.3.5 or later |
 
-## 8. Open questions for the maintainer (each with the default I assumed)
+## 8. Questions for the maintainer: all 11 answered "defaults ok" on Nov 14, 2026 (the defaults below are decisions)
 
 Duration is not a constraint (maintainer, Nov 14, 2026): everything in this plan is in 0.3.4, and an item that is not green at the gate waits for the next release rather than shipping broken. Windows code signing (SignPath) is **not part of 0.3.4**; it is no longer asked here.
 
@@ -358,7 +358,7 @@ Duration is not a constraint (maintainer, Nov 14, 2026): everything in this plan
 10. **Canvas text:** copy, cut and paste inside a canvas text box are in 0.3.4 (ANN-1 AC9 to AC13). *(Default: yes.)*
 11. **B3 confirmation:** the cause of the Windows HUD drag comes from the code and a failed synthetic drag; a real drag on the ThinkPad before the fix would confirm it. May the first track-F step be that check? *(Default: yes.)*
 
-Answered or dropped: scope (decided Nov 13), CMYK conversion (Nov 13), Windows lab availability (Windows ran Nov 14), the audio HUD details (B3), SignPath (out of 0.3.4), scope cuts and scope risk (duration is not a constraint).
+Already settled (nothing to answer): scope (decided Nov 13), CMYK conversion (Nov 13), Windows lab availability (Windows ran Nov 14), the audio HUD details (B3), SignPath (out of 0.3.4), scope cuts and scope risk (duration is not a constraint).
 
 ## 9. Carried over from the plan of Nov 13: open items, lessons, bugs
 
