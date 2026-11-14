@@ -150,6 +150,8 @@ impl DelayedCaptures {
 pub(crate) struct Inner {
     /// Frames and scrolling of a Long Shot (CAP-6); the real screen unless a test gives its own.
     pub(crate) long_shot: Arc<dyn crate::long_shot_ops::LongShotSystem>,
+    /// What a running Long Shot shows the HUD (`long_shot_state`).
+    pub(crate) long_states: crate::long_shot_ops::LongStates,
     pub(crate) capturer: Arc<Capturer>,
     pub(crate) library: Arc<Mutex<Library>>,
     pub(crate) clipboard: Arc<dyn Clipboard>,
@@ -519,6 +521,7 @@ impl DaemonBuilder {
         Daemon {
             inner: Arc::new(Inner {
                 long_shot: self.long_shot,
+                long_states: Default::default(),
                 capturer,
                 library,
                 clipboard: self.clipboard,
@@ -1264,6 +1267,7 @@ impl Daemon {
             Action::FreezeDisplay(p) => inner.freeze_display(actor, p).await,
             Action::ReleaseFrame(p) => inner.release_frame(&p),
             Action::WindowThumbnail(p) => inner.window_thumbnail(p).await,
+            Action::LongShotState(p) => inner.long_shot_state(p),
             Action::GetJob(p) => inner.get_job(p).await,
             Action::ListJobs(p) => inner.list_jobs(p).await,
             Action::CancelJob(p) => inner.cancel_job(p).await,

@@ -74,6 +74,7 @@ pub const ACTIONS: &[ActionSpec] = &[
     spec("freeze_display", Tier::Free, true),
     spec("release_frame", Tier::Free, false),
     spec("window_thumbnail", Tier::Free, true),
+    spec("long_shot_state", Tier::Free, true),
     // Jobs (EXP-4, STO-3): Free per the spec's tool table, `cancel_job` included. Cancelling
     // changes state (so read-only clients are refused) but never reaches remote services.
     spec("get_job", Tier::Free, false),
@@ -203,6 +204,11 @@ pub const ACTIONS: &[ActionSpec] = &[
 ///   agent that wants to see a window calls `capture_screenshot`. It hands out screen pixels, so
 ///   it counts as mutating for read-only clients, like `freeze_display`.
 ///
+/// * `long_shot_state` serves the Long Shot HUD and side preview (CAP-6): it pauses or resumes
+///   the running Long Shot and returns its counts and a small PNG of the image so far. It hands
+///   out screen pixels, so it counts as mutating, like `freeze_display`. An agent gets the
+///   counts from the `capture.long_shot.progress` events.
+///
 /// * `discard_recording`, `restart_recording` and `skip_countdown` are the HUD's Discard, Restart
 ///   and "Space skips the countdown" (REC-5, REC-1.AC5). The spec gives Restart and Discard no MCP
 ///   tool or CLI command on purpose: an agent stops (`stop_recording`) and starts again
@@ -220,6 +226,7 @@ pub const INTERNAL_ACTIONS: &[&str] = &[
     "freeze_display",
     "release_frame",
     "window_thumbnail",
+    "long_shot_state",
     "discard_recording",
     "restart_recording",
     "skip_countdown",

@@ -194,3 +194,115 @@ async fn cap_6_parameters_are_validated() {
         assert_eq!(e.code().unwrap(), ErrorCode::InvalidInput, "{p}");
     }
 }
+
+/// A scroller that takes its time, so a test can look at the run while it goes on.
+#[derive(Clone)]
+struct Slow(Scripted);
+
+impl Scroller for Slow {
+    fn scroll(&mut self, d: Direction, amount_px: u32) -> Result<(), CmError> {
+        std::thread::sleep(std::time::Duration::from_millis(40));
+        self.0.scroll(d, amount_px)
+    }
+}
+
+impl LongShotSystem for Slow {
+    fn frames(&self, c: Arc<Capturer>, t: CaptureTarget) -> Box<dyn FrameSource + Send> {
+        self.0.frames(c, t)
+    }
+    fn scroller(&self, _anchor: Option<(i32, i32)>) -> Result<Box<dyn Scroller + Send>, CmError> {
+        Ok(Box::new(self.clone()))
+    }
+    fn auto_scroll(&self) -> AutoScrollSupport {
+        AutoScrollSupport::Available
+    }
+}
+
+async fn state(d: &Daemon, extra: Value) -> Value {
+    let mut p = json!({"request_id": "ls-1"});
+    for (k, v) in extra.as_object().unwrap() {
+        p[k] = v.clone();
+    }
+    d.execute_method(Actor::User, 0, "long_shot_state", &p)
+        .await
+        .unwrap()
+}
+
+/// CAP-6 HUD: `long_shot_state` reports the counts and a preview picture, Pause holds the run,
+/// Resume lets it finish, and the stored manifest says `source: "long_shot"` with the frame count.
+#[tokio::test]
+async fn cap_6_hud_state_pause_resume_and_manifest_source() {
+    let page = SyntheticPage::new(24, 3000, 300);
+    let (b, _dir) = builder(desktop());
+    let d = b.long_shot_system(Slow(Scripted::new(page))).build();
+    // Before: nothing runs under this id.
+    assert_eq!(state(&d, json!({})).await["running"], false);
+    let d2 = d.clone();
+    let run = tokio::spawn(async move {
+        call(
+            &d2,
+            Actor::User,
+            params(json!({"request_id": "ls-1", "max_px": 16384})),
+        )
+        .await
+    });
+    // Wait for the first picture.
+    let mut s = Value::Null;
+    for _ in 0..300 {
+        s = state(&d, json!({})).await;
+        if s["running"] == true && s["preview"].is_object() {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    assert_eq!(s["running"], true, "{s}");
+    assert!(s["preview"]["png_base64"].as_str().unwrap().len() > 20);
+    assert!(s["preview"]["width"].as_u64().unwrap() <= 360);
+    // Asking again with a newer seq gives the counts but no picture.
+    let s = state(&d, json!({"since_seq": u64::MAX})).await;
+    assert!(s.get("preview").is_none());
+    // Pause: the frame count stops moving.
+    state(&d, json!({"paused": true})).await;
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    let a = state(&d, json!({})).await;
+    tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+    let b2 = state(&d, json!({})).await;
+    assert_eq!(a["paused"], true);
+    assert_eq!(a["frames"], b2["frames"], "paused: no new frame");
+    state(&d, json!({"paused": false})).await;
+    let out = run.await.unwrap().unwrap();
+    assert_eq!(out["long_shot"]["end"], "reached_end");
+    assert_eq!(state(&d, json!({})).await["running"], false);
+    // The manifest carries the source and the frame count.
+    let path = std::path::PathBuf::from(out["path"].as_str().unwrap());
+    let manifest: Value =
+        serde_json::from_slice(&std::fs::read(path.with_file_name("manifest.json")).unwrap())
+            .unwrap();
+    assert_eq!(manifest["source"], "long_shot");
+    assert_eq!(manifest["frames"], out["long_shot"]["frames"]);
+}
+
+/// Stop while paused ends the run and keeps what was captured.
+#[tokio::test]
+async fn cap_6_stop_while_paused_keeps_the_image() {
+    let page = SyntheticPage::new(24, 3000, 300);
+    let (b, _dir) = builder(desktop());
+    let d = b.long_shot_system(Slow(Scripted::new(page))).build();
+    let d2 = d.clone();
+    let run =
+        tokio::spawn(
+            async move { call(&d2, Actor::User, params(json!({"request_id": "ls-1"}))).await },
+        );
+    for _ in 0..300 {
+        if state(&d, json!({})).await["running"] == true {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    state(&d, json!({"paused": true})).await;
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    assert!(d.cancel_delayed_capture("ls-1"));
+    let out = run.await.unwrap().unwrap();
+    assert_eq!(out["long_shot"]["end"], "stopped_by_user");
+    assert!(out["capture_id"].as_str().is_some());
+}

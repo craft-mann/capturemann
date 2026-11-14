@@ -190,12 +190,30 @@ impl Inner {
         frame_id: Option<String>,
         take: impl FnOnce() -> Result<Capture, CmError> + Send + 'static,
     ) -> Result<Value, DaemonError> {
+        self.store_capture_ex(actor, copy, title, frame_id, move || {
+            take().map(|c| (c, serde_json::Map::new()))
+        })
+        .await
+    }
+
+    /// [`Inner::store_capture`] where the capture also names manifest fields to record
+    /// (`source`, `frames` of a Long Shot).
+    pub(crate) async fn store_capture_ex(
+        &self,
+        actor: &Actor,
+        copy: bool,
+        title: Option<String>,
+        frame_id: Option<String>,
+        take: impl FnOnce() -> Result<(Capture, serde_json::Map<String, Value>), CmError>
+            + Send
+            + 'static,
+    ) -> Result<Value, DaemonError> {
         let (library, clipboard) = (self.library.clone(), self.clipboard.clone());
         let (events, by) = (self.events.clone(), actor.clone());
         let now = self.clock.now();
         let t0 = std::time::Instant::now();
         let out = blocking(move || {
-            let cap = take()?;
+            let (cap, extra) = take()?;
             let t_take = t0.elapsed();
             let png = cap.frame.to_png()?;
             let t_png = t0.elapsed();
@@ -204,6 +222,13 @@ impl Inner {
                 title.as_deref(),
                 now,
             )?;
+            let mut bundle = bundle;
+            if !extra.is_empty() {
+                for (k, v) in extra {
+                    bundle.set_extra(&k, v);
+                }
+                bundle.save()?;
+            }
             let t_bundle = t0.elapsed();
             let mut warnings: Vec<String> = bundle.warnings().to_vec();
             warnings.extend(write_poster_unlocked(&library, &bundle, "created"));
