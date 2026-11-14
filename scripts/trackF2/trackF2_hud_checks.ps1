@@ -2,12 +2,13 @@
 # drop half off the screen, drag at the edge, collapse after a drag, remembered place after a restart.
 # Runs in the logged-in desktop session (scripts/trackF/trackF_insession.sh). Private library, config, pipe.
 # -Inst: folder with capturemann.exe and cm-desktop.exe. -Mode hud|bubble. -Audio: audio recording instead of screen.
-param([string]$Inst='C:\lab\trackF2-inst',[string]$Mode='hud',[switch]$Audio,[string]$Tag='f2')
+param([string]$Inst='C:\lab\trackF2-inst',[string]$Mode='hud',[switch]$Audio,[switch]$Remember,[string]$Tag='f2')
 $ErrorActionPreference='Continue'
+Start-Transcript -Path "C:\lab\trackF2-transcript-$Mode.txt" -Force | Out-Null
 $root="C:\lab\trackF2-run-$Tag"; Remove-Item -Recurse -Force $root -ErrorAction SilentlyContinue; New-Item -ItemType Directory "$root\cfg" -Force | Out-Null
 $env:CAPTUREMANN_LIBRARY="$root\lib"; $env:CAPTUREMANN_CONFIG_DIR="$root\cfg"; $env:CAPTUREMANN_SOCKET="\\.\pipe\cm-trackf2-$Tag"
 $settings = @{ 'agents.tool_policy' = @{ start_recording = 'allow' } }
-if($Mode -eq 'bubble'){ $settings['camera.remember_position'] = $true }
+if($Mode -eq 'bubble' -and $Remember){ $settings['camera.remember_position'] = $true }
 ($settings | ConvertTo-Json -Depth 5) | Set-Content "$root\cfg\settings.json" -Encoding ascii
 Add-Type @"
 using System;using System.Runtime.InteropServices;using System.Collections.Generic;using System.Text;
@@ -22,6 +23,7 @@ public class W{
  [StructLayout(LayoutKind.Sequential)] public struct PT{public int x,y;}
  [DllImport("user32.dll")] public static extern int GetWindowLong(IntPtr h,int i);
  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+ [DllImport("user32.dll")] public static extern uint GetDpiForSystem();
  [DllImport("user32.dll")] public static extern int GetSystemMetrics(int i);
  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
@@ -48,15 +50,16 @@ public class W{
 [void][W]::SetProcessDPIAware()
 $cli="$Inst\capturemann.exe"; $desk="$Inst\cm-desktop.exe"
 $wk=[W]::Work().Split(','); $work=@{l=[int]$wk[0];t=[int]$wk[1];r=[int]$wk[2];b=[int]$wk[3]}
-"screen $([W]::Screen()) work area $([W]::Work())"
+$sc=[W]::GetDpiForSystem()/96.0; $m=[int][Math]::Round(16*$sc)
+"screen $([W]::Screen()) work area $([W]::Work()) scale $sc (16 pt margin = $m px)"
 $script:app=$null
-function StartApp { $script:app=Start-Process $desk -PassThru; Start-Sleep 8 }
+function StartApp { $script:app=Start-Process $desk -PassThru -RedirectStandardError "$root\app-err-$((Get-Date).Ticks).txt" -RedirectStandardOutput "$root\app-out-$((Get-Date).Ticks).txt"; Start-Sleep 8 }
 function StopApp { (& $cli record stop 2>&1) | Out-Null; Start-Sleep 3; Get-Process cm-desktop,cm-daemon,cm-overlay -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$Inst*" } | Stop-Process -Force; Start-Sleep 2 }
 function StartRec { if($Audio){ (& $cli record start --audio 2>&1) | Out-String } else { (& $cli record start --countdown 0 --size 720p 2>&1) | Out-String }; Start-Sleep 5 }
 function Rects{ $o=@(); foreach($s in [W]::Find($script:app.Id)){ $f=$s.Split(','); $o+=[pscustomobject]@{h=[int64]$f[0];l=[int]$f[1];t=[int]$f[2];r=[int]$f[3];b=[int]$f[4];ex=[int]$f[5];ol=[int]$f[6];ot=[int]$f[7];orr=[int]$f[8];ob=[int]$f[9]} }; return $o }
 # The HUD: topmost, wide and short (bar about 1183 x 152, audio 1293 x 152, collapsed narrower); widest match.
 function Hud { Rects | Where-Object { ($_.b-$_.t) -le 170 -and ($_.r-$_.l) -ge 300 -and ($_.r-$_.l) -le 1500 -and ($_.ex -band 8) } | Sort-Object { -($_.r-$_.l) } | Select-Object -First 1 }
-function Bubble { Rects | Where-Object { ($_.r-$_.l) -ge 150 -and ($_.r-$_.l) -le 700 -and ($_.b-$_.t) -ge 150 -and ($_.b-$_.t) -le 800 -and -not (($_.r-$_.l) -eq 682 -and ($_.b-$_.t) -eq 218) } | Sort-Object { -($_.r-$_.l)*($_.b-$_.t) } | Select-Object -First 1 }
+function Bubble { Rects | Where-Object { ($_.r-$_.l) -ge 150 -and ($_.r-$_.l) -le 700 -and ($_.b-$_.t) -ge 150 -and ($_.b-$_.t) -le 800 -and (($_.b-$_.t) -ge 0.8*($_.r-$_.l)) -and (($_.ex -band 8) -ne 0) } | Sort-Object { -($_.r-$_.l)*($_.b-$_.t) } | Select-Object -First 1 }
 function Desc($w){ if(-not $w){ return 'none' }; "x=$($w.l) y=$($w.t) w=$($w.r-$w.l) h=$($w.b-$w.t) right=$($w.r) bottom=$($w.b) ex=0x$('{0:X}' -f $w.ex) hwnd=$($w.h) [outer $($w.ol),$($w.ot),$($w.orr),$($w.ob)]" }
 function Cfg($k){ (& $cli settings get $k 2>&1) | Out-String }
 # Finds a point that drags the HUD (a press on a button never drags): tries the grid, moves the HUD back each time.
@@ -66,7 +69,7 @@ function Grab { # returns @{fx;fy} or $null; leaves the HUD where it was
     $h=Hud; if(-not $h){ return $null }
     $x=$h.l+[int](($h.r-$h.l)*$fx); $y=$h.t+[int](($h.b-$h.t)*$fy)
     $x=[Math]::Max(5,[Math]::Min($x,[int]($work.r-5)))
-    $dir=$(if($h.l -lt 200){60}else{-60})
+    $dir=$(if($h.l -lt 400){200}else{-200})
     [void][W]::Drag($x,$y,$dir,0)
     $a=Hud; if(-not $a){ return $null }
     $d=$a.l-$h.l
@@ -82,11 +85,13 @@ if($Mode -eq 'hud'){
  StartApp
  # a stand-in for the recorded app: a form with a text box, kept in the foreground
  $form='Add-Type -AssemblyName System.Windows.Forms; $f=New-Object System.Windows.Forms.Form; $f.Text="f2-recorded-app"; $f.StartPosition="Manual"; $f.Location=New-Object System.Drawing.Point(300,200); $f.Size=New-Object System.Drawing.Size(500,300); $tb=New-Object System.Windows.Forms.TextBox; $tb.Dock="Fill"; $f.Controls.Add($tb); $f.Add_Shown({ $f.Activate(); $tb.Focus(); $t=New-Object System.Windows.Forms.Timer; $t.Interval=280000; $t.Add_Tick({ $f.Close() }); $t.Start() }); [void]$f.ShowDialog()'
- StartRec | Write-Output
  $np=Start-Process powershell.exe -ArgumentList '-NoProfile','-Command',$form -PassThru; Start-Sleep 4
  $formH=0; foreach($s in [W]::Find($np.Id)){ $formH=[int64]($s.Split(',')[0]) }
  $fr=@(); foreach($s2 in [W]::Find($np.Id)){ $fr=$s2.Split(',') }; [W]::Click([int]$fr[1]+100,[int]$fr[2]+60); Start-Sleep 1
- "form window $formH foreground $([W]::Fg()) focus $([W]::Focus()) active $([W]::Active())"
+ $fg0=[W]::Fg(); "recorded-app stand-in is foreground: $fg0"
+ StartRec | Write-Output
+ $fg1=[W]::Fg()
+ Report 'hud-open-keeps-focus' ($fg0 -eq $fg1) "foreground before the recording $fg0, after the HUD opened $fg1"
  $hud=Hud; "HUD at start: $(Desc $hud)"
  if(-not $hud){ Report 'hud-found' $false 'no HUD window'; }
  else {
@@ -104,7 +109,7 @@ if($Mode -eq 'hud'){
   $hud=Hud; $p=Pt $hud $g; $dx=($work.r-25)-$hud.r
   [void][W]::Drag($p[0],$p[1],$dx,0); Start-Sleep 1
   $hud=Hud; "after drop 25 px from the right edge: $(Desc $hud)"
-  Report 'snap-right' ([Math]::Abs($hud.r-($work.r-16)) -le 2) "right edge $($hud.r), expected $($work.r-16) (work right $($work.r), margin 16)"
+  Report 'snap-right' ([Math]::Abs($hud.r-($work.r-$m)) -le 2) "right edge $($hud.r), expected $($work.r-$m) (work right $($work.r), margin $m)"
   Report 'bottom-stays-in-work-area' ($hud.b -le $work.b) "bottom $($hud.b), work area bottom $($work.b) (taskbar not covered)"
   # 3. drag when at the edge: from the right-snapped place, up and left by 400 px
   $p=Pt $hud $g; $before=$hud
@@ -115,7 +120,7 @@ if($Mode -eq 'hud'){
   $p=Pt $hud $g
   [void][W]::Drag($p[0],$p[1],-($p[0]+200),-($p[1]+200)); Start-Sleep 1
   $hud=Hud; "after a drop half off the top-left: $(Desc $hud)"
-  Report 'pulled-back-on-screen' ((InWork $hud) -and [Math]::Abs($hud.l-($work.l+16)) -le 2 -and [Math]::Abs($hud.t-($work.t+16)) -le 2) "at $($hud.l),$($hud.t), expected $($work.l+16),$($work.t+16)"
+  Report 'pulled-back-on-screen' ((InWork $hud) -and [Math]::Abs($hud.l-($work.l+$m)) -le 2 -and [Math]::Abs($hud.t-($work.t+$m)) -le 2) "at $($hud.l),$($hud.t), expected $($work.l+$m),$($work.t+$m)"
   # 5. drop half off the bottom
   $p=Pt $hud $g
   [void][W]::Drag($p[0],$p[1],0,([W]::Screen().Split(',')[1]-$p[1]+100)); Start-Sleep 1
@@ -129,7 +134,7 @@ if($Mode -eq 'hud'){
   $w0=$hud.r-$hud.l; $cy=$hud.t+[int](($hud.b-$hud.t)*0.75); $collapsed=$null
   foreach($k in 36,48,60,72,24){
    $h=Hud; if(-not $h){ break }
-   [W]::Click($h.r-$k,$cy); $a=Hud
+   [W]::Click($h.r-$k,$cy); $a=Hud; "  click right-$k -> $(Desc $a) status: $((& $cli record status 2>&1 | Out-String) -replace '\s+',' ')"
    if($a -and ($a.r-$a.l) -lt $w0-100){ $collapsed=$a; "chevron clicked at right-$k"; break }
   }
   "after collapse: $(Desc $collapsed)"
@@ -139,11 +144,11 @@ if($Mode -eq 'hud'){
    $g2=Grab; "collapsed grab point: $($g2.fx),$($g2.fy)"
    if($g2){ $h=Hud; $p=Pt $h $g2; [void][W]::Drag($p[0],$p[1],($work.r-25)-$h.r,($work.b-25)-$h.b); Start-Sleep 1
     $h=Hud; "collapsed bar dropped at the bottom-right: $(Desc $h)"
-    Report 'collapsed-snap-bottom-right' (([Math]::Abs($h.r-($work.r-16)) -le 2) -and ([Math]::Abs($h.b-($work.b-16)) -le 2)) "right $($h.r) bottom $($h.b), expected $($work.r-16),$($work.b-16)" }
+    Report 'collapsed-snap-bottom-right' (([Math]::Abs($h.r-($work.r-$m)) -le 2) -and ([Math]::Abs($h.b-($work.b-$m)) -le 2)) "right $($h.r) bottom $($h.b), expected $($work.r-$m),$($work.b-$m)" }
    $h=Hud; $rightEdge=$h.r; $cw=$h.r-$h.l
    # expand again: click the chevron (the last control)
    $expanded=$null; $cy=$h.t+[int](($h.b-$h.t)*0.75)
-   foreach($k in 36,48,60,72,24){ $h=Hud; if(-not $h){ break }; [W]::Click($h.r-$k,$cy); $a=Hud; if($a -and ($a.r-$a.l) -gt $cw+100){ $expanded=$a; break } }
+   foreach($k in 36,48,60,72,24){ $h=Hud; if(-not $h){ break }; [W]::Click($h.r-$k,$cy); $a=Hud; "  click right-$k -> $(Desc $a) status: $((& $cli record status 2>&1 | Out-String) -replace '\s+',' ')"; if($a -and ($a.r-$a.l) -gt $cw+100){ $expanded=$a; break } }
    "after expand: $(Desc $expanded)"
    if($expanded){ Report 'expand-keeps-right-edge' (([Math]::Abs($expanded.r-$rightEdge) -le 2) -and (InWork $expanded)) "right $($expanded.r), was $rightEdge" }
    else { Report 'expand' $false 'the width did not grow' }
@@ -166,13 +171,16 @@ if($Mode -eq 'hud'){
 }
 
 if($Mode -eq 'bubble'){
+ StartApp
  $dev=(& $cli devices 2>&1) | Out-String
  $camId=[regex]::Match($dev,'(?m)^\s+(\S+)\s{2}.*\(default\)').Groups[1].Value
  "camera id: $camId"
- StartApp
- (& $cli record start --countdown 0 --size 720p --camera $camId 2>&1) | Out-String | Write-Output
- Start-Sleep 5
+ (& $cli record start --display 65537 --countdown 0 --size 720p --camera $camId 2>&1) | Out-String | Write-Output
+ Start-Sleep 12
  Rects | ForEach-Object { "win $(Desc $_)" }
+ foreach($pr in (Get-Process cm-desktop,cm-overlay,cm-daemon -ErrorAction SilentlyContinue)){ "proc $($pr.Name) $($pr.Id) app=$($script:app.Id)"; foreach($s3 in [W]::Find([uint32]$pr.Id)){ "  $s3" } }
+ (& $cli record status 2>&1) | Out-String | Write-Output
+ Get-ChildItem $root -Filter app-err-* | ForEach-Object { "stderr $($_.Name):"; Get-Content $_.FullName -Tail 25 }
  $b=Bubble; "bubble window: $(Desc $b)"
  if($b){
   $cx=($b.l+$b.r)/2; $cy=$b.t+($b.b-$b.t)/2
@@ -212,7 +220,7 @@ if($Mode -eq 'bubble'){
   $pos=Cfg 'camera.position'; "camera.position: $pos"
   StopApp
   StartApp
-  (& $cli record start --countdown 0 --size 720p --camera $camId 2>&1) | Out-Null; Start-Sleep 5
+  (& $cli record start --display 65537 --countdown 0 --size 720p --camera $camId 2>&1) | Out-Null; Start-Sleep 5
   $r2=Bubble; "bubble after restart: $(Desc $r2) (before the restart: $(Desc $a4))"
   Report 'bubble-position-remembered' ($r2 -and [Math]::Abs($r2.l-$a4.l) -le 5 -and [Math]::Abs($r2.t-$a4.t) -le 5) "now $($r2.l),$($r2.t) before $($a4.l),$($a4.t)"
  } else { Report 'bubble-found' $false 'no bubble window' }
@@ -220,3 +228,4 @@ if($Mode -eq 'bubble'){
 }
 Remove-Item -Recurse -Force $root -ErrorAction SilentlyContinue
 "done"
+Stop-Transcript | Out-Null

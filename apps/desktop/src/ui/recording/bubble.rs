@@ -88,7 +88,9 @@ impl BubbleView {
             drag: DragState::default(),
             settle: None,
             layout,
-            native: NativeWindow::of(window),
+            // `for_frame`: on Windows `of` is `None` (activations go through GPUI there), which
+            // left the snap, the toolbar flip and the first placement without a window to move.
+            native: NativeWindow::for_frame(window),
             placed: false,
             _subs: subs,
         }
