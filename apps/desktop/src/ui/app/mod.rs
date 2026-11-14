@@ -73,6 +73,8 @@ pub enum Route {
     Recording(String),
     /// The recording editor: preview, timeline, inspector (EDT-1 to EDT-3).
     RecordingEditor(String),
+    /// The guide editor of a Click Guide (GDE-2).
+    Guide(String),
     /// The publish sheet for a recording (PUB-2).
     Publish(String),
     Settings,
@@ -92,6 +94,8 @@ pub enum Command {
     Capture(CaptureMode),
     ShowLibrary,
     ShowSettings,
+    /// "New Click Guide" (GDE-1): the bar, then the clicks.
+    NewClickGuide,
     /// Import these files (the Dock, Open With, a drop); no path opens the file picker.
     ImportFiles(Vec<std::path::PathBuf>),
     OpenCapture(String),

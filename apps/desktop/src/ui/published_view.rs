@@ -180,6 +180,7 @@ impl PublishedView {
                             Route::Recording(id)
                         }
                         crate::library::Kind::Screenshot => Route::Editor(id),
+                        crate::library::Kind::Guide => Route::Guide(id),
                     };
                     app::set_route(&app, route, cx)
                 });

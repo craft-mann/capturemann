@@ -8,6 +8,7 @@
 
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
+pub mod clicks;
 #[cfg_attr(not(windows), allow(dead_code))]
 mod dpi;
 pub mod image;
@@ -21,6 +22,7 @@ mod sys;
 mod target;
 pub mod view;
 
+pub use clicks::{ClickEvent, ClickListener};
 pub use image::{CursorImage, ImageEntry, ImageIndex};
 pub use platform::preflight;
 pub use reader::CursorLog;

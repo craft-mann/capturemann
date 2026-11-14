@@ -22,6 +22,20 @@ fn samples() -> Vec<(&'static str, Value)> {
             "recognize_text",
             json!({"capture_id": "shot_1", "region": [1, 2, 30, 40], "copy_to_clipboard": true, "format": "lines"}),
         ),
+        (
+            "start_guide",
+            json!({"target": {"display_id": 1}, "title": "Set up", "countdown_s": 3}),
+        ),
+        ("stop_guide", json!({"guide_id": "guide_1"})),
+        ("get_guide", json!({"guide_id": "guide_1"})),
+        (
+            "set_guide",
+            json!({"guide_id": "guide_1", "steps": [{"id": "step_2"}, {"id": "step_1", "title": "x"}]}),
+        ),
+        (
+            "export_guide",
+            json!({"guide_id": "guide_1", "format": "markdown", "dest": "/tmp/g"}),
+        ),
         ("get_settings", json!({})),
         ("set_settings", json!({"values": {"recording.fps": 60}})),
         ("undo", json!({"capture_id": "shot_1"})),
@@ -269,6 +283,7 @@ fn agt_2_tier_table() {
         let confirm = matches!(
             s.name,
             "start_recording"
+                | "start_guide"
                 | "run_fps_selftest"
                 | "publish_video"
                 | "delete_capture"

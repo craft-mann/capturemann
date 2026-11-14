@@ -870,6 +870,7 @@ fn kind_pill(item: &CaptureItem) -> AnyElement {
         ),
         Kind::Screenshot => ("image", tr_ctx!("card badge", "SHOT")),
         Kind::Audio => ("audio-lines", tr_ctx!("card badge", "AUDIO")),
+        Kind::Guide => ("mouse-pointer-click", tr_ctx!("card badge", "GUIDE")),
     };
     div()
         .absolute()

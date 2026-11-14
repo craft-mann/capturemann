@@ -426,9 +426,19 @@ impl Inner {
         let _serial = self.capture_locks.lock(&p.capture_id).await;
         // A recording's undo steps are its edits (EDT-1 to EDT-3), not annotation ops.
         let (library, id) = (self.library.clone(), p.capture_id.clone());
-        let is_recording =
-            blocking(move || Ok(lock_library(&library).get(&id)?.kind.is_recording())).await?;
-        if is_recording {
+        // `<guide id>/<step id>` is a screenshot inside a guide: the ordinary path below.
+        let kind = blocking(move || {
+            Ok(if id.contains('/') {
+                cm_library::manifest::CaptureKind::Screenshot
+            } else {
+                lock_library(&library).get(&id)?.kind
+            })
+        })
+        .await?;
+        if kind == cm_library::manifest::CaptureKind::Guide {
+            return self.undo_redo_guide(actor, &p.capture_id, undo).await;
+        }
+        if kind.is_recording() {
             return self.undo_redo_recording(actor, &p.capture_id, undo).await;
         }
         let (library, now, by) = (self.library.clone(), self.clock.now(), actor.clone());

@@ -35,6 +35,11 @@ pub fn set_text(text: &str) -> Result<(), CmError> {
     first
 }
 
+/// Formatted text onto the clipboard: HTML with a plain-text alternative.
+pub fn set_rich_text(html: &str, text: &str) -> Result<(), CmError> {
+    with_clipboard(|c| c.set().html(html.to_owned(), Some(text.to_owned())))
+}
+
 fn set_image_arboard(png: &[u8]) -> Result<(), CmError> {
     let (width, height, bytes) = crate::clipboard::png_to_rgba(png)?;
     with_clipboard(|c| {

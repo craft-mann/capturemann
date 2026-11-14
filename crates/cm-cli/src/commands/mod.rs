@@ -10,6 +10,7 @@ mod board;
 mod capture;
 mod edit;
 mod export;
+pub(crate) mod guide;
 mod import;
 mod jobs;
 mod library;
@@ -110,6 +111,7 @@ pub async fn execute(cli: Cli, env: &mut Env) -> Result<(), CliError> {
             }
         },
         Command::Text(a) => text(&mut cx, a).await,
+        Command::Guide { cmd } => guide::guide(&mut cx, cmd).await,
         Command::Devices => devices(&mut cx).await,
         Command::Diagnostics => diagnostics(&mut cx).await,
         Command::Cursor {

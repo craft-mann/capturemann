@@ -43,6 +43,12 @@ pub const ACTIONS: &[ActionSpec] = &[
     spec("recognize_text", Tier::Free, false),
     // Blueprint (ANN-11): the text lines as boxes for a `blueprint` op. Read-only.
     spec("suggest_blueprint", Tier::Free, false),
+    // Click Guide (GDE-4): starting listens to clicks, so it asks; the rest only works on guides.
+    spec("start_guide", Tier::Confirm, true),
+    spec("stop_guide", Tier::Free, true),
+    spec("get_guide", Tier::Free, false),
+    spec("set_guide", Tier::Free, true),
+    spec("export_guide", Tier::Free, true),
     spec("get_settings", Tier::Free, false),
     spec("set_settings", Tier::Free, true),
     spec("undo", Tier::Free, true),

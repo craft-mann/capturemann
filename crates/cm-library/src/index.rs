@@ -20,7 +20,7 @@ use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
 /// `PRAGMA user_version` of the index this build writes. A different value means "rebuild".
-pub const INDEX_SCHEMA_VERSION: i32 = 3;
+pub const INDEX_SCHEMA_VERSION: i32 = 4;
 /// Index file location relative to the library root.
 pub const INDEX_RELATIVE_PATH: &str = ".capturemann/index.sqlite";
 
@@ -344,6 +344,10 @@ impl Library {
             // transcript search rows, which cannot be recovered from the folders.
             conn.execute_batch(MIGRATE_2_TO_3)
                 .map_err(InitError::from_sql)?;
+        } else if version == 3 {
+            // Version 4 lets `kind` be `guide` (GDE-1), rebuilt in place as above.
+            conn.execute_batch(MIGRATE_3_TO_4)
+                .map_err(InitError::from_sql)?;
         } else if version != INDEX_SCHEMA_VERSION {
             return Err(InitError::Unusable);
         }
@@ -420,6 +424,15 @@ impl Library {
 
     /// Opens a library screenshot by capture id.
     pub fn open_screenshot(&self, id: &str) -> Result<ShotBundle, CmError> {
+        // `<guide id>/<step id>` names the screenshot inside a guide (GDE-2: Edit image).
+        if let Some((gid, step)) = id.split_once('/') {
+            let rec = self.get(gid)?;
+            if rec.kind != CaptureKind::Guide {
+                return Err(CmError::not_found(format!("no capture `{id}`")));
+            }
+            let g = crate::guide::GuideBundle::open(&self.bundle_path(&rec))?;
+            return g.open_step(step);
+        }
         let rec = self.get(id)?;
         if rec.kind != CaptureKind::Screenshot {
             return Err(CmError::invalid_field(
@@ -453,6 +466,13 @@ impl Library {
 
     /// Upserts the index row for an open bundle inside the library root.
     pub fn index_shot(&mut self, bundle: &ShotBundle) -> Result<CaptureRecord, CmError> {
+        // A step image of a guide is not a library row; its guide's row is refreshed instead.
+        if let Some(guide_dir) = crate::guide::guide_dir_of_step(bundle.dir()) {
+            // The guide's card picture may show what a new blur is meant to hide: drop it; the
+            // next guide edit draws a current one from the rendered step.
+            let _ = std::fs::remove_file(guide_dir.join(THUMBS_DIR).join(POSTER_FILE));
+            return self.index_dir(&guide_dir);
+        }
         self.index_dir(bundle.dir())
     }
 
@@ -859,10 +879,10 @@ impl Library {
                 std::fs::read_to_string(&mpath).map_err(|e| io_err("cannot read", &mpath, &e))?;
             let mut v: Value =
                 serde_json::from_str(&text).map_err(|e| json_err("manifest.json", &e))?;
-            let prefix = if rec.kind == CaptureKind::Screenshot {
-                "shot"
-            } else {
-                "rec"
+            let prefix = match rec.kind {
+                CaptureKind::Screenshot => "shot",
+                CaptureKind::Guide => "guide",
+                _ => "rec",
             };
             if let Some(m) = v.as_object_mut() {
                 m.insert(
@@ -1020,6 +1040,23 @@ impl Library {
                     publish_count: counts.1,
                 })
             }
+            CaptureKind::Guide => {
+                let m = crate::guide::GuideManifest::from_json(&text)?;
+                Ok(CaptureRecord {
+                    id: m.id,
+                    path: rel,
+                    title: m.title,
+                    kind,
+                    duration: None,
+                    created: m.created,
+                    size_bytes,
+                    width: None,
+                    height: None,
+                    broken: false,
+                    upload_count: counts.0,
+                    publish_count: counts.1,
+                })
+            }
             CaptureKind::Recording | CaptureKind::Audio => {
                 let m = RecManifest::from_json(&text).map_err(ManifestProblem::into_error)?;
                 // An audio recording has no screen track (VOC-1): no size, kind `audio`.
@@ -1143,12 +1180,39 @@ PRAGMA user_version = 3;
 COMMIT;
 ";
 
+const MIGRATE_3_TO_4: &str = "
+BEGIN;
+CREATE TABLE captures_v4 (
+  id           TEXT PRIMARY KEY,
+  path         TEXT NOT NULL UNIQUE,
+  title        TEXT NOT NULL,
+  kind         TEXT NOT NULL CHECK (kind IN ('screenshot', 'recording', 'audio', 'guide')),
+  duration     INTEGER,
+  created      TEXT NOT NULL,
+  created_unix INTEGER NOT NULL,
+  size_bytes   INTEGER NOT NULL DEFAULT 0,
+  width        INTEGER,
+  height       INTEGER,
+  broken       INTEGER NOT NULL DEFAULT 0,
+  upload_count  INTEGER NOT NULL DEFAULT 0,
+  publish_count INTEGER NOT NULL DEFAULT 0
+);
+INSERT INTO captures_v4 (id, path, title, kind, duration, created, created_unix, size_bytes, width, height, broken, upload_count, publish_count)
+  SELECT id, path, title, kind, duration, created, created_unix, size_bytes, width, height, broken, upload_count, publish_count FROM captures;
+DROP TABLE captures;
+ALTER TABLE captures_v4 RENAME TO captures;
+CREATE INDEX captures_created ON captures (created_unix DESC);
+CREATE INDEX captures_kind ON captures (kind);
+PRAGMA user_version = 4;
+COMMIT;
+";
+
 const SCHEMA: &str = "
 CREATE TABLE captures (
   id           TEXT PRIMARY KEY,
   path         TEXT NOT NULL UNIQUE,
   title        TEXT NOT NULL,
-  kind         TEXT NOT NULL CHECK (kind IN ('screenshot', 'recording', 'audio')),
+  kind         TEXT NOT NULL CHECK (kind IN ('screenshot', 'recording', 'audio', 'guide')),
   duration     INTEGER,
   created      TEXT NOT NULL,
   created_unix INTEGER NOT NULL,

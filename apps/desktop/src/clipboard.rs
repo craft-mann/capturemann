@@ -36,6 +36,12 @@ pub trait Pasteboard: Send + Sync {
     fn set_text(&self, _text: &str) -> Result<(), CmError> {
         Err(CmError::not_implemented("text clipboard"))
     }
+
+    /// Formatted text: `html` for apps that paste rich text, `text` for the rest (a Click Guide,
+    /// GDE-3).
+    fn set_rich_text(&self, _html: &str, _text: &str) -> Result<(), CmError> {
+        Err(CmError::not_implemented("rich-text clipboard"))
+    }
 }
 
 /// The system clipboard behind the daemon's `Clipboard` hook: PNG always, TIFF as well when
@@ -66,6 +72,20 @@ impl<P: Pasteboard> ClipboardWriter<P> {
 }
 
 impl<P: Pasteboard> Clipboard for ClipboardWriter<P> {
+    fn copy_rich_text(&self, html: &str, text: &str) -> Result<(), CmError> {
+        let mut tries = 0;
+        loop {
+            match self.pasteboard.set_rich_text(html, text) {
+                Ok(()) => return Ok(()),
+                Err(e) if tries >= self.retries => return Err(e),
+                Err(_) => {
+                    tries += 1;
+                    std::thread::sleep(self.pause);
+                }
+            }
+        }
+    }
+
     fn copy_text(&self, text: &str) -> Result<(), CmError> {
         let mut tries = 0;
         loop {
@@ -143,6 +163,22 @@ impl Pasteboard for NativePasteboard {
             Err(CmError::internal("cannot copy the text to the clipboard"))
         }
     }
+
+    fn set_rich_text(&self, html: &str, text: &str) -> Result<(), CmError> {
+        use objc2_app_kit::{NSPasteboard, NSPasteboardTypeHTML, NSPasteboardTypeString};
+        use objc2_foundation::NSString;
+        let pb = NSPasteboard::generalPasteboard();
+        pb.clearContents();
+        // SAFETY: reading AppKit string constants.
+        let (h, s) = unsafe { (NSPasteboardTypeHTML, NSPasteboardTypeString) };
+        let ok = pb.setString_forType(&NSString::from_str(html), h)
+            & pb.setString_forType(&NSString::from_str(text), s);
+        if ok {
+            Ok(())
+        } else {
+            Err(CmError::internal("cannot copy the guide to the clipboard"))
+        }
+    }
 }
 
 /// Windows and Linux: `arboard` (and on Linux a helper program), see `platform_clipboard`.
@@ -158,6 +194,10 @@ impl Pasteboard for NativePasteboard {
 
     fn set_text(&self, text: &str) -> Result<(), CmError> {
         crate::platform_clipboard::set_text(text)
+    }
+
+    fn set_rich_text(&self, html: &str, text: &str) -> Result<(), CmError> {
+        crate::platform_clipboard::set_rich_text(html, text)
     }
 }
 

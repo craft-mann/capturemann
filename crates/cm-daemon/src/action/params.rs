@@ -416,6 +416,8 @@ pub enum Action {
     /// `transcribe`, `get_transcript`, `set_captions`, `replace_in_captions`, `export_captions`,
     /// `suggest_zooms`, `suggest_cuts` (see [`crate::ai`]).
     Ai(crate::ai::AiParams),
+    /// `start_guide`, `stop_guide`, `get_guide`, `set_guide`, `export_guide` (see [`crate::guide`]).
+    Guide(crate::guide::GuideParams),
     /// `set_caption_options` (see [`crate::caption_options`]).
     CaptionOptions(crate::caption_options::CaptionOptionsParams),
     /// `list_destinations` (see [`crate::storage_ops`]).

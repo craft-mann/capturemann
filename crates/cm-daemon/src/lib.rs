@@ -57,6 +57,7 @@ pub mod export_images;
 pub mod fixture;
 mod frames;
 pub mod gate;
+pub mod guide;
 mod handlers;
 mod idem;
 pub mod import_ops;

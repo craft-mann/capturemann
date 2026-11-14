@@ -1548,6 +1548,8 @@ pub fn all() -> Vec<ToolSpec> {
     tools.extend(ai_tools());
     // 0.3.4 annotation tools (suggest_blueprint, ANN-11).
     tools.extend(crate::tools_annotate::tools());
+    // Click Guide (GDE-4).
+    tools.extend(crate::guide_tools::tools());
     tools
 }
 

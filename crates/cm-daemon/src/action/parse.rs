@@ -314,6 +314,7 @@ impl Action {
             }
             crate::text_ops::METHOD => return crate::text_ops::parse(&f),
             crate::blueprint_ops::METHOD => return crate::blueprint_ops::parse(&f),
+            m if crate::guide::handles(m) => return crate::guide::parse(m, &f),
             crate::read_tools::CURSOR_METHOD => {
                 return crate::read_tools::parse_cursor(&f);
             }
