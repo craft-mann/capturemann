@@ -22,6 +22,7 @@ pub mod disk;
 pub mod fake;
 mod frame;
 pub mod layout;
+pub mod long_shot;
 pub mod record;
 mod region;
 #[cfg(target_os = "macos")]
