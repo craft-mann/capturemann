@@ -139,7 +139,7 @@ impl Tool {
             Tool::Callout => "message-square",
             Tool::Spotlight => "focus",
             Tool::Stamp => "stamp",
-            Tool::Magnify => "scan-search",
+            Tool::Magnify => "zoom-in",
             Tool::Retype => "text-cursor-input",
             Tool::MoveArea => "move",
         }
@@ -358,6 +358,8 @@ pub const DIM_LEVELS: [f64; 4] = [0.2, 0.4, 0.6, 0.8];
 pub const STAMP_SIZES: [f64; 4] = [24.0, 34.0, 48.0, 64.0];
 /// Zoom Lens magnifications offered in the inspector (default 3).
 pub const ZOOMS: [f64; 5] = [2.0, 3.0, 4.0, 6.0, 8.0];
+/// Zoom Lens border widths offered in the inspector, px (default 3; 0 is no border).
+pub const BORDER_WIDTHS: [f64; 6] = [0.0, 2.0, 3.0, 4.0, 6.0, 8.0];
 /// Retype font weights offered in the inspector: Regular, Medium, Bold.
 pub const WEIGHTS: [u16; 3] = [400, 500, 700];
 
@@ -839,6 +841,44 @@ mod tests {
         for (name, _) in PALETTE {
             assert_eq!(palette_name(name), name);
         }
+    }
+
+    /// ANN-8 / ANN-9: the Zoom Lens and Retype settings are remembered per tool and survive the
+    /// settings round trip; the tool is named Zoom Lens in the UI (the op stays `magnify`).
+    #[test]
+    fn lens_and_retype_styles_persist_and_the_names_are_the_ui_names() {
+        let mut s = Styles::default();
+        s.apply(Tool::Magnify, ParamValue::Zoom(6.0));
+        s.apply(Tool::Magnify, ParamValue::BorderWidth(8.0));
+        s.set_lens(Some(MagnifyShape::Circle), Some(false), Some(false));
+        s.set_retype(Some(700), Some(TextAlign::Center));
+        let back = Styles::from_json(&s.to_json());
+        assert_eq!(back, s);
+        let m = back.get(Tool::Magnify);
+        assert_eq!(
+            (m.zoom, m.width, m.lens_shape, m.connector, m.badge),
+            (6.0, 8.0, MagnifyShape::Circle, false, false)
+        );
+        let r = back.get(Tool::Retype);
+        assert_eq!((r.weight, r.align), (700, TextAlign::Center));
+        assert_eq!(Tool::Magnify.label(), "Zoom Lens");
+        assert_eq!(Tool::Magnify.id(), "magnify");
+        assert_eq!(
+            Tool::for_kind(&OpKind::Magnify {
+                source: cm_core::Rc::new(0.0, 0.0, 10.0, 10.0),
+                at: cm_core::Pt::new(5.0, 5.0),
+                zoom: 3.0,
+                shape: MagnifyShape::Rounded,
+                border: Color::WHITE,
+                border_width: 3.0,
+                connector: true,
+                badge: true,
+            }),
+            Tool::Magnify
+        );
+        // A border width of 0 (no border) is a valid stored value.
+        let none = json!({"magnify": {"width": 0}});
+        assert_eq!(Styles::from_json(&none).get(Tool::Magnify).width, 0.0);
     }
 
     #[test]

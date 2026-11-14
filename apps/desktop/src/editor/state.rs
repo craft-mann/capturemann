@@ -20,7 +20,7 @@ use super::palette::Faces;
 use super::tools::{Param, ParamValue, StampWord, Styles, Tool, ToolStyle};
 use super::touchup;
 
-mod touch;
+pub mod touch;
 pub use touch::{BlueprintInfo, LensInfo, MoveInfo, RetypeInfo, Touch};
 
 /// One user-visible change, sent to the daemon as a single `annotate` call.

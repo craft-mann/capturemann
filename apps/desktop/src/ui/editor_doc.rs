@@ -29,6 +29,8 @@ use crate::toast::{ToastKind, ToastSpec};
 use crate::ui::app::{self, AppModel};
 use cm_core::annotation::{CalloutStyle, SpotMode, SpotShapeKind, StepStyle};
 
+mod touch;
+
 pub const STYLES_KEY: &str = "editor.tool_styles";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -112,6 +114,9 @@ pub struct EditorDoc {
     /// Edits were made since the editor opened.
     edited: bool,
     closing: bool,
+    /// The Blueprint command was pressed while saves were queued: it asks the recognizer once
+    /// they have landed (the daemon reads the stored base edits).
+    bp_after_drain: bool,
 }
 
 fn same_kinds(a: &[AnnotationOp], b: &[AnnotationOp]) -> bool {
@@ -164,6 +169,7 @@ impl EditorDoc {
             copying_text: false,
             edited: false,
             closing: false,
+            bp_after_drain: false,
         };
         doc.state.faces = faces;
         doc.start_load(cx);
@@ -607,6 +613,7 @@ impl EditorDoc {
         if !matches!(self.status, Status::Failed(_)) {
             self.status = Status::Saved;
         }
+        self.touch_tick(cx);
         cx.notify();
     }
 
@@ -644,6 +651,7 @@ impl EditorDoc {
         self.persist_styles_if_changed(cx);
         self.submit(edits, cx);
         self.sync_preview(cx);
+        self.touch_tick(cx);
         cx.notify();
     }
 
@@ -974,6 +982,11 @@ impl EditorDoc {
     }
 
     pub fn undo(&mut self, cx: &mut Context<Self>) {
+        // Inside an open Blueprint draft, undo takes back the last keep-list change.
+        if self.state.blueprint_undo_keep() {
+            cx.notify();
+            return;
+        }
         self.history(Job::Undo, cx);
     }
 
@@ -1214,6 +1227,56 @@ pub struct TextGeom {
     pub placeholder: Option<String>,
     /// The span an input method is composing, one rectangle per line.
     pub marked: Vec<Rc>,
+    /// The selected text (ANN-1.AC9 to AC11), one rectangle per line.
+    pub selection: Vec<Rc>,
+    /// Milliseconds since the last key, press or input-method event: the caret is solid for
+    /// the first 500 and then blinks (ANN-1.AC12, `editor::caret`).
+    pub idle_ms: u64,
+}
+
+/// One rectangle per line for the chars `range` of the text being typed.
+fn range_rects(
+    m: &mut crate::editor::TextMetrics,
+    t: &crate::editor::TextEdit,
+    lh: f64,
+    range: &std::ops::Range<usize>,
+) -> Vec<Rc> {
+    let mut out = Vec::new();
+    for (li, ltext) in t.text.split('\n').enumerate() {
+        let start: usize = t
+            .text
+            .split('\n')
+            .take(li)
+            .map(|l| l.chars().count() + 1)
+            .sum();
+        let end = start + ltext.chars().count();
+        let (a, z) = (range.start.max(start), range.end.min(end));
+        if a >= z {
+            continue;
+        }
+        let pre: String = ltext.chars().take(a - start).collect();
+        let mid: String = ltext.chars().skip(a - start).take(z - a).collect();
+        let x0 = if pre.is_empty() {
+            0.0
+        } else {
+            let b = m.measure(&pre, t.size);
+            b.dx + b.w
+        };
+        let full: String = ltext.chars().take(z - start).collect();
+        let x1 = if mid.is_empty() {
+            x0
+        } else {
+            let b = m.measure(&full, t.size);
+            b.dx + b.w
+        };
+        out.push(Rc::new(
+            t.at.x + x0,
+            t.at.y + lh * li as f64,
+            (x1 - x0).max(0.0),
+            lh,
+        ));
+    }
+    out
 }
 
 /// A selected text box, callout or step label that is not being edited.
@@ -1241,6 +1304,16 @@ pub struct OverlayData {
     pub selected_text: Option<SelectedText>,
     /// A text box under the pointer that is not selected: drawn as a thin dashed outline.
     pub text_hover: Option<Rc>,
+    /// Retype: every recognized line as a dashed box, the hovered one marked (ANN-9).
+    pub retype_boxes: Vec<crate::editor::state::touch::LineBox>,
+    /// Move area: the source outline with its tag, and the moved contents (ANN-10).
+    pub move_overlay: Option<crate::editor::state::touch::MoveOverlay>,
+    /// The pink snap guide of a Move area drag (canvas only).
+    pub guide: Option<crate::editor::touchup::SnapGuide>,
+    /// Blueprint: every line, the kept ones outlined green (ANN-11).
+    pub bp_boxes: Vec<crate::editor::state::touch::BlueprintBox>,
+    /// A text drag is selecting: the view keeps feeding the pointer (ANN-1.AC11).
+    pub text_dragging: bool,
 }
 
 impl EditorDoc {
@@ -1294,44 +1367,16 @@ impl EditorDoc {
             } else {
                 b.dx + b.w
             };
-            // The composing span, as one rectangle per line it touches.
-            let mut marked = Vec::new();
-            if let Some(range) = &t.marked {
-                for (li, ltext) in t.text.split('\n').enumerate() {
-                    let start: usize = t
-                        .text
-                        .split('\n')
-                        .take(li)
-                        .map(|l| l.chars().count() + 1)
-                        .sum();
-                    let end = start + ltext.chars().count();
-                    let (a, z) = (range.start.max(start), range.end.min(end));
-                    if a >= z {
-                        continue;
-                    }
-                    let pre: String = ltext.chars().take(a - start).collect();
-                    let mid: String = ltext.chars().skip(a - start).take(z - a).collect();
-                    let x0 = if pre.is_empty() {
-                        0.0
-                    } else {
-                        let b = m.measure(&pre, t.size);
-                        b.dx + b.w
-                    };
-                    let full: String = ltext.chars().take(z - start).collect();
-                    let x1 = if mid.is_empty() {
-                        x0
-                    } else {
-                        let b = m.measure(&full, t.size);
-                        b.dx + b.w
-                    };
-                    marked.push(Rc::new(
-                        t.at.x + x0,
-                        t.at.y + lh * li as f64,
-                        (x1 - x0).max(0.0),
-                        lh,
-                    ));
-                }
-            }
+            // The composing span and the selection, as one rectangle per line they touch.
+            let marked = t
+                .marked
+                .as_ref()
+                .map(|r| range_rects(m, &t, lh, r))
+                .unwrap_or_default();
+            let selection = t
+                .selection()
+                .map(|r| range_rects(m, &t, lh, &r))
+                .unwrap_or_default();
             let frame = Rc::new(t.at.x, t.at.y, w.max(t.size * 0.6), lh * lines as f64);
             TextGeom {
                 frame,
@@ -1342,6 +1387,11 @@ impl EditorDoc {
                 size: t.size,
                 placeholder,
                 marked,
+                selection,
+                idle_ms: self
+                    .state
+                    .last_text_input
+                    .map_or(u64::MAX / 2, |i| i.elapsed().as_millis() as u64),
             }
         });
         let selected_text = self.state.selected_text_box().map(|frame| SelectedText {
@@ -1364,6 +1414,11 @@ impl EditorDoc {
             text,
             selected_text,
             text_hover,
+            retype_boxes: self.state.retype_boxes(),
+            move_overlay: self.state.move_overlay(),
+            guide: self.state.touch.guide.clone(),
+            bp_boxes: self.state.blueprint_boxes(),
+            text_dragging: self.state.text_drag,
         }
     }
 }

@@ -776,7 +776,7 @@ impl EditorState {
             return false;
         };
         let s = mv.source.normalized();
-        let cur = mv.dest.map_or(Pt::new(s.x, s.y), |d| d);
+        let cur = mv.dest.unwrap_or(Pt::new(s.x, s.y));
         let inside_now = inside(Rc::new(cur.x, cur.y, s.w, s.h), p, tol);
         if !inside_now {
             return false;

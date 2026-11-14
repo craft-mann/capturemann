@@ -38,7 +38,7 @@ Annotations are vector operations stored in `manifest.json` (`ops` list) and ren
 - Magnify is not in 0.3.3: the op name `magnify` and ANN-8 are reserved for it. 0.3.4 adds `retype`, `move_area` and `blueprint` (ANN-9 to ANN-11, base edits); a 0.3.3 app keeps them in `unknown_ops`.
 
 ### ANN-1 Drawing tools: arrow, line, rectangle, ellipse, text, highlighter, step badge, crop
-**Priority** P0 · **Status** In progress (built on macOS: the op schema and validation in `cm-core`, the renderer with golden tests in `cm-render`, the editor in `apps/desktop` and the `annotate` action and tool; ACs 1 to 6 are cited by automated tests; no hands-on editor verification report is stored; the editor has not run on Windows) · **Crates** cm-core, cm-render, apps/desktop · **Depends on** CAP-1, DESIGN §5.5
+**Priority** P0 · **Status** In progress (built on macOS: the op schema and validation in `cm-core`, the renderer with golden tests in `cm-render`, the editor in `apps/desktop` and the `annotate` action and tool; ACs 1 to 6 are cited by automated tests; AC9 to AC13 (0.3.4: word selection, Shift+arrows, select all, copy, cut and paste inside a canvas text box, pointer capture, caret blink, composition over a selection) are built in the editor state and tested there (`editor::state::touch`, `editor::caret`), not looked at on a screen; no hands-on editor verification report is stored; the editor has not run on Windows) · **Crates** cm-core, cm-render, apps/desktop · **Depends on** CAP-1, DESIGN §5.5
 
 **User story** — As a developer, I want to draw arrows, boxes, text and numbered steps on a screenshot, so that others understand it without extra explanation.
 
@@ -217,7 +217,7 @@ Annotations are vector operations stored in `manifest.json` (`ops` list) and ren
 ### ANN-8 Magnify (UI name: **Zoom Lens**)
 
 **UI name (Nov 14, 2026).** The tool, menus and docs say **Zoom Lens**; the op stays `magnify` and the key stays M (the frozen JSON does not change). Added: **AC10** Given a Retype, Move area or Blueprint base edit inside the lens source, then the lens shows the edited pixels, because base edits come first in the list (see Base edits).
-**Priority** P1 (0.3.4) · **Status** Ready (0.3.4; the op JSON is frozen above; not started) · **Crates** cm-core, cm-render, cm-mcp, cm-cli, apps/desktop · **Depends on** ANN-1, ANN-2, ANN-7
+**Priority** P1 (0.3.4) · **Status** In progress (0.3.4; the op JSON is frozen above; the editor part is built (Track B, Nov 14, 2026): the Zoom Lens tool (key M, Emphasis group), inspector, live loupe while dragging, the limit of 4, AC5 refusals and AC7; tested with unit tests on the display-free editor state (`apps/desktop/src/editor`), not looked at on a screen, no stored verification report) · **Crates** cm-core, cm-render, cm-mcp, cm-cli, apps/desktop · **Depends on** ANN-1, ANN-2, ANN-7
 
 **User story** — As someone documenting a screen, I want a zoomed copy of a small detail next to it, with a line back to where it comes from, so that the reader sees a tiny button or a number without squinting.
 
@@ -261,7 +261,7 @@ These three ops change pixels before anything is drawn on them. Rules, decided N
 6. **The font is approximate.** Retype keeps the box, the text colour (the darkest or lightest cluster inside the box) and the cap height measured from the box, and draws in the system UI font through the existing `cosmic-text` fallback. A custom font is not matched, and the spec says so in the UI hint.
 
 ### ANN-9 Retype (change text in a screenshot)
-**Priority** P1 · **Status** Ready (0.3.4, lite version) · **Crates** cm-core, cm-render, cm-mcp, apps/desktop · **Depends on** ANN-5 (OCR), ANN-1, ANN-3
+**Priority** P1 · **Status** In progress (0.3.4, lite version; the editor part is built (Track B, Nov 14, 2026): Retype (key Y, Touch-up group): recognized lines from `suggest_blueprint`, a dragged box as the fallback, the busy-background sheet before the op is made (AC3), the op inserted before the first non-base op and sent as the whole list (AC4), measuring on the picture with the earlier base edits applied, the size, colour, weight, align and fit warning in the panel; tested with unit tests on the display-free editor state (`apps/desktop/src/editor`), not looked at on a screen, no stored verification report) · **Crates** cm-core, cm-render, cm-mcp, apps/desktop · **Depends on** ANN-5 (OCR), ANN-1, ANN-3
 
 **User story.** As someone writing documentation, I want to fix a typo, a name or a number in a screenshot without taking it again, so that the guide matches what I describe.
 
@@ -283,7 +283,7 @@ These three ops change pixels before anything is drawn on them. Rules, decided N
 **Out of scope:** matching custom fonts; text on photos; editing text inside a Zoom Lens.
 
 ### ANN-10 Move area
-**Priority** P1 · **Status** Ready (0.3.4, lite version) · **Crates** cm-core, cm-render, cm-mcp, apps/desktop · **Depends on** ANN-9 (fill), ANN-3
+**Priority** P1 · **Status** In progress (0.3.4, lite version; the editor part is built (Track B, Nov 14, 2026): Move area (key J, Touch-up group): drag a source, drag its contents with axis snap, Shift lock and the pink guide, Delete or Remove contents (AC2), one op, base-edit order; tested with unit tests on the display-free editor state (`apps/desktop/src/editor`), not looked at on a screen, no stored verification report) · **Crates** cm-core, cm-render, cm-mcp, apps/desktop · **Depends on** ANN-9 (fill), ANN-3
 
 **User story.** As a designer or writer, I want to move a button, an icon or a block in a screenshot, or remove it, so that I can show a layout change or tidy the shot without a design tool.
 
@@ -301,7 +301,7 @@ These three ops change pixels before anything is drawn on them. Rules, decided N
 **Out of scope:** detecting objects automatically (a click to select an icon); filling busy backgrounds well. Both wait for a later on-device model (`specs/plans/release-0.3.4-plan.md`, section 7).
 
 ### ANN-11 Blueprint (placeholder text)
-**Priority** P1 · **Status** Ready (0.3.4, lite version) · **Crates** cm-core, cm-render, cm-mcp, apps/desktop · **Depends on** ANN-5
+**Priority** P1 · **Status** In progress (0.3.4, lite version; the editor part is built (Track B, Nov 14, 2026): Blueprint (view-bar command, panel that takes over the inspector column): the keep-list by clicking lines, one op on Apply, each change of a stored Blueprint one op update (AC3), `suggest_blueprint` through the action bus; tested with unit tests on the display-free editor state (`apps/desktop/src/editor`), not looked at on a screen, no stored verification report) · **Crates** cm-core, cm-render, cm-mcp, apps/desktop · **Depends on** ANN-5
 
 **User story.** As a technical writer, I want the UI text in a screenshot replaced by neutral bars, so that my guide still fits when a label changes, and the reader looks at the layout and not at the words.
 

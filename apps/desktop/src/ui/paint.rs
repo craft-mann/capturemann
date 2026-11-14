@@ -801,6 +801,15 @@ pub(crate) const ASSETS: &[(&str, &str)] = &[
         include_str!("../../assets/icons/wifi-off.svg"),
     ),
     ("icons/zap.svg", include_str!("../../assets/icons/zap.svg")),
+    // 0.3.4 (Track B): Retype (Lucide) and Blueprint (custom, three rounded bars).
+    (
+        "icons/text-cursor-input.svg",
+        include_str!("../../assets/icons/text-cursor-input.svg"),
+    ),
+    (
+        "icons/cm-blueprint.svg",
+        include_str!("../../assets/icons/cm-blueprint.svg"),
+    ),
 ];
 
 impl AssetSource for Assets {

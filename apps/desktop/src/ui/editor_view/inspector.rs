@@ -195,7 +195,8 @@ impl EditorView {
         t: &Theme,
         p: Param,
         cur: ParamValue,
-        fill: bool,
+        color_label: &str,
+        tool: Tool,
         cx: &mut Context<Self>,
     ) -> Option<AnyElement> {
         let body: AnyElement =
@@ -207,6 +208,20 @@ impl EditorView {
                         self.swatch(t, i, palette_name(name), *col, *col == c)
                     }))
                     .into_any_element(),
+                (Param::TextSize, ParamValue::TextSize(v)) if tool == Tool::Retype => {
+                    // A retype's size is measured from the box (any whole px), so it is a
+                    // stepper rather than the list of standard sizes.
+                    self.stepper(
+                        t,
+                        "retype-size",
+                        tr_ctx!("annotation setting", "Text size"),
+                        (tr!("Decrease text size"), tr!("Increase text size")),
+                        v.round().max(6.0) as u32,
+                        (6, 400),
+                        |v| ParamValue::TextSize(f64::from(v)),
+                        cx,
+                    )
+                }
                 (Param::Width, ParamValue::Width(w)) => self.segments(
                     t,
                     "width",
@@ -269,6 +284,28 @@ impl EditorView {
                     w,
                     ParamValue::Dim,
                 ),
+                (Param::Zoom, ParamValue::Zoom(w)) => self.segments(
+                    t,
+                    "lens-zoom",
+                    ZOOMS.iter().map(|v| {
+                        (
+                            *v,
+                            format!("{v:.0}\u{D7}"),
+                            tr!("{n} times", n = format!("{v:.0}")),
+                        )
+                    }),
+                    w,
+                    ParamValue::Zoom,
+                ),
+                (Param::BorderWidth, ParamValue::BorderWidth(w)) => self.segments(
+                    t,
+                    "lens-border",
+                    BORDER_WIDTHS
+                        .iter()
+                        .map(|v| (*v, format!("{v:.0}"), pixels_label(*v))),
+                    w,
+                    ParamValue::BorderWidth,
+                ),
                 (Param::Radius, ParamValue::Radius(w)) => self.segments(
                     t,
                     "radius",
@@ -300,8 +337,8 @@ impl EditorView {
                 ),
                 _ => return None,
             };
-        let label = match (p, fill) {
-            (Param::Color, true) => tr_ctx!("annotation setting", "Fill"),
+        let label = match p {
+            Param::Color => color_label.to_owned(),
             _ => p.label(),
         };
         Some(
@@ -342,8 +379,13 @@ impl EditorView {
     pub(super) fn inspector(&self, t: &Theme, s: &Snap, cx: &mut Context<Self>) -> AnyElement {
         let title = s.inspector_title.clone();
         let tool_icon = s.inspector_tool.icon();
-        // A callout's colour is its fill.
-        let fill = s.inspector_tool == Tool::Callout;
+        // A callout's colour is its fill; a Zoom Lens's is its border; a retype's is its text.
+        let color_label = match s.inspector_tool {
+            Tool::Callout => tr_ctx!("annotation setting", "Fill"),
+            Tool::Magnify => tr_ctx!("annotation setting", "Border"),
+            Tool::Retype => tr_ctx!("annotation setting", "Text colour"),
+            _ => tr_ctx!("annotation setting", "Color"),
+        };
         let subtitle = if s.selected {
             tr!("Changes apply to the selected annotation.")
         } else if s.tool == Tool::Select {
@@ -354,7 +396,7 @@ impl EditorView {
         let params: Vec<AnyElement> = s
             .params
             .iter()
-            .filter_map(|(p, v)| self.param_group(t, *p, *v, fill, cx))
+            .filter_map(|(p, v)| self.param_group(t, *p, *v, &color_label, s.inspector_tool, cx))
             .collect();
         let top = self.panel_top(t, s, cx);
         let bottom = self.panel_bottom(t, s);
@@ -392,6 +434,10 @@ impl EditorView {
         let col = || card(t).flex().flex_col().gap(px(12.)).flex_none();
 
         let status_card = self.statusbar(t, s);
+        // The Blueprint panel takes the place of the inspector column (design decision 3).
+        if let Some(info) = &s.blueprint {
+            return self.blueprint_panel(t, info);
+        }
         div()
             .id("editor-inspector")
             .role(Role::Group)

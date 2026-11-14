@@ -139,6 +139,12 @@ impl EditorView {
         if let Some(info) = &s.stamp {
             rows.push(self.stamp_picker(t, info));
         }
+        if let Some(info) = &s.retype {
+            rows.extend(self.retype_top(t, info));
+        }
+        if let Some(info) = &s.mv {
+            rows.extend(self.move_top(t, info));
+        }
         let _ = cx;
         rows
     }
@@ -164,6 +170,29 @@ impl EditorView {
         }
         if let Some(info) = &s.steps {
             rows.extend(self.steps_bottom(t, info));
+        }
+        if let Some(info) = &s.lens {
+            rows.extend(self.lens_bottom(t, info));
+        }
+        if let Some(info) = &s.retype {
+            rows.extend(self.retype_bottom(t, info));
+        }
+        if s.mv.is_some() {
+            rows.extend(self.move_bottom(t));
+        }
+        if s.retype.is_none() && s.mv.is_none() && s.lens.is_none() {
+            if let Some(n) = &s.touch_notice {
+                rows.push(
+                    div()
+                        .p(px(10.))
+                        .rounded(px(scale::RADIUS_SM))
+                        .bg(gpui::rgba(0xF5B8_4A14))
+                        .text_size(px(12.))
+                        .text_color(gpui::rgb(0xF5B84A))
+                        .child(SharedString::from(n.clone()))
+                        .into_any_element(),
+                );
+            }
         }
         if s.stamp.is_some() {
             rows.push(

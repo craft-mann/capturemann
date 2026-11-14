@@ -275,6 +275,59 @@ impl EditorView {
             })
         };
 
+        // Blueprint (ANN-11): shown pressed while its panel is open; it needs text recognition
+        // like Auto-redact and Copy text.
+        let blueprint = if s.redact_available {
+            let on = s.blueprint.is_some();
+            let busy = s.bp_loading;
+            Some(
+                self.bar_btn(
+                    t,
+                    "editor-blueprint",
+                    tr!("Blueprint"),
+                    tr!("Replace the text lines with neutral bars, keeping the ones you choose"),
+                    Self::bar_icon_label(
+                        if busy {
+                            "loader-circle"
+                        } else {
+                            "cm-blueprint"
+                        },
+                        if on { t.text } else { c },
+                        if busy {
+                            tr!("Reading text\u{2026}")
+                        } else {
+                            tr!("Blueprint")
+                        },
+                    ),
+                    &[],
+                    !busy,
+                    on,
+                    |this, _, cx| {
+                        if let Some(d) = &this.doc {
+                            d.update(cx, |d, cx| d.blueprint_start(cx));
+                        }
+                    },
+                    cx,
+                )
+                .aria_toggled(toggled(on)),
+            )
+        } else {
+            s.redact_hint.map(|hint| {
+                self.bar_btn(
+                    t,
+                    "editor-blueprint-unavailable",
+                    hint.to_owned(),
+                    hint.to_owned(),
+                    Self::bar_icon_label("cm-blueprint", c, tr!("Blueprint")),
+                    &[],
+                    false,
+                    false,
+                    |_, _, _| {},
+                    cx,
+                )
+            })
+        };
+
         let zoom_out = self.bar_btn(
             t,
             "editor-zoom-out",
@@ -404,11 +457,13 @@ impl EditorView {
             .rounded(px(14.))
             .child(undo)
             .child(redo)
-            .when(copy_text.is_some() || auto_redact.is_some(), |d| {
-                d.child(Self::bar_divider(t))
-            })
+            .when(
+                copy_text.is_some() || auto_redact.is_some() || blueprint.is_some(),
+                |d| d.child(Self::bar_divider(t)),
+            )
             .children(copy_text)
             .children(auto_redact)
+            .children(blueprint)
             .child(Self::bar_divider(t))
             .child(zoom_out)
             .child(zoom_cell)

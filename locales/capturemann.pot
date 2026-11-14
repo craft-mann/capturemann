@@ -88,6 +88,9 @@ msgstr ""
 msgid "A folder on {this_computer}, an external drive or a mounted network folder."
 msgstr ""
 
+msgid "A line you kept"
+msgstr ""
+
 #. FACT: owner review required
 msgid "A listed app’s windows are left out of the recording (the desktop shows through). Screenshots leave out only CaptureMann’s own windows. CaptureMann’s own windows are always left out and can’t be removed. Changes apply to the next recording."
 msgstr ""
@@ -468,7 +471,13 @@ msgstr ""
 msgid "Application (client) ID"
 msgstr ""
 
+msgid "Applied as one edit and one undo step. Copy text will read only the kept lines."
+msgstr ""
+
 msgid "Applied for now, but it could not be saved: {reason}"
+msgstr ""
+
+msgid "Apply Blueprint"
 msgstr ""
 
 msgid "Apps"
@@ -1027,6 +1036,15 @@ msgstr ""
 msgid "Click a display"
 msgstr ""
 
+msgid "Click a line on the image to keep its real text."
+msgstr ""
+
+msgid "Click a line on the image, or drag a box over text that was not found."
+msgstr ""
+
+msgid "Click a line to retype it, or drag a box over text that was not found"
+msgstr ""
+
 msgid "Click a time in the report to see the moment it comes from."
 msgstr ""
 
@@ -1518,6 +1536,9 @@ msgstr ""
 msgid "Decrease pixel size"
 msgstr ""
 
+msgid "Decrease text size"
+msgstr ""
+
 msgid "Decrease zoom length"
 msgstr ""
 
@@ -1739,6 +1760,12 @@ msgstr ""
 msgid "Downloads the model from the internet"
 msgstr ""
 
+msgid "Drag a box over what to move or remove"
+msgstr ""
+
+msgid "Drag a box over what to move, then drag its contents to the new place."
+msgstr ""
+
 msgid "Drag on the image to place a callout, then type its text."
 msgstr ""
 
@@ -1749,6 +1776,9 @@ msgid "Drag the blue dot to aim the tail. Moving the box keeps the tail tip wher
 msgstr ""
 
 msgid "Drag the bubble anywhere before or during a recording. It snaps to corners and edge midpoints."
+msgstr ""
+
+msgid "Drag the contents to move them, or press Delete to remove them"
 msgstr ""
 
 msgid "Drag the slider or use the arrow keys (Shift for bigger steps). JPG or PNG up to 2 MB; 1280 × 720 is best."
@@ -1772,6 +1802,12 @@ msgstr ""
 msgid "Draw — Coming soon"
 msgstr ""
 
+msgid "Drawn from the original, so it stays sharp and shows what you drew before it. Blur and Pixelate always apply inside the lens."
+msgstr ""
+
+msgid "Drawn in the system font, with the size and colour measured from the box. Custom fonts are not matched. It is a base edit: it sits under your other annotations."
+msgstr ""
+
 msgid "Drawn on each file, not stored"
 msgstr ""
 
@@ -1791,6 +1827,9 @@ msgid "Duplicate"
 msgstr ""
 
 msgid "Each Google Cloud project may upload to YouTube about 100 times a day. YouTube can also keep videos from an unverified project private; CaptureMann tells you when that happens and never changes a video’s visibility afterwards."
+msgstr ""
+
+msgid "Each change is one undo step. Copy text will read only the kept lines."
 msgstr ""
 
 msgid "Each original goes to {trash} after its copy is checked"
@@ -2251,6 +2290,9 @@ msgstr ""
 msgid "Higher quality makes bigger files."
 msgstr ""
 
+msgid "Hold Shift to keep the move on one row or column. It is a base edit: it sits under your other annotations, and the hole is filled with the background colour."
+msgstr ""
+
 msgid "Hold a modifier key (Control, Option or Shift, Command or Windows) too."
 msgstr ""
 
@@ -2267,6 +2309,9 @@ msgid "How many people?"
 msgstr ""
 
 msgid "I understand that everyone will be able to find and watch this video."
+msgstr ""
+
+msgid "Icons and pictures stay as they are in 0.3.4."
 msgstr ""
 
 msgid "Id"
@@ -2383,6 +2428,9 @@ msgstr ""
 msgid "Increase pixel size"
 msgstr ""
 
+msgid "Increase text size"
+msgstr ""
+
 msgid "Increase zoom length"
 msgstr ""
 
@@ -2458,6 +2506,9 @@ msgstr ""
 msgid "Keep the name to {max} characters."
 msgstr ""
 
+msgid "Kept lines"
+msgstr ""
+
 msgid "Keyboard shortcuts"
 msgstr ""
 
@@ -2483,6 +2534,9 @@ msgid "Languages you speak"
 msgstr ""
 
 msgid "Large v3 isn’t installed"
+msgstr ""
+
+msgid "Larger corners"
 msgstr ""
 
 msgid "Last call: {tool}"
@@ -2775,6 +2829,9 @@ msgid "Maximize"
 msgstr ""
 
 msgid "Measures late and dropped frames at 60 fps; only the result (pass or fail) is kept"
+msgstr ""
+
+msgid "Measuring the background…"
 msgstr ""
 
 msgid "Meeting minutes"
@@ -3205,6 +3262,9 @@ msgstr ""
 msgid "No text found"
 msgstr ""
 
+msgid "No text was found in this image, so there is nothing to turn into bars."
+msgstr ""
+
 msgid "No transcript yet. Transcribe the microphone to get captions; it runs on {this_computer}."
 msgstr ""
 
@@ -3254,6 +3314,9 @@ msgid "None"
 msgstr ""
 
 msgid "Normalise to {lufs} LUFS, the level podcasts and players expect"
+msgstr ""
+
+msgid "Not a redaction. To hide secrets, use Blur (B) or Pixelate (X)."
 msgstr ""
 
 msgid "Not a screenshot"
@@ -4224,6 +4287,9 @@ msgstr ""
 msgid "Remote left {n}"
 msgstr ""
 
+msgid "Remove contents"
+msgstr ""
+
 msgid "Remove destination"
 msgstr ""
 
@@ -4291,6 +4357,9 @@ msgid "Replace all"
 msgstr ""
 
 msgid "Replace text in captions"
+msgstr ""
+
+msgid "Replace the text lines with neutral bars, keeping the ones you choose"
 msgstr ""
 
 msgid "Replace with"
@@ -4771,6 +4840,9 @@ msgstr ""
 msgid "Size {size}"
 msgstr ""
 
+msgid "Smaller corners"
+msgstr ""
+
 msgid "Smaller, for the web"
 msgstr ""
 
@@ -4793,6 +4865,9 @@ msgid "Snap (N): off"
 msgstr ""
 
 msgid "Snap (N): on"
+msgstr ""
+
+msgid "Snap to the source row and column"
 msgstr ""
 
 msgid "Some online copies weren’t deleted"
@@ -5101,6 +5176,12 @@ msgstr ""
 msgid "Text model, line by line"
 msgstr ""
 
+msgid "Text recognition is not available here, so Blueprint cannot find the text."
+msgstr ""
+
+msgid "Text recognition is not available here."
+msgstr ""
+
 msgid "That account no longer exists."
 msgstr ""
 
@@ -5140,10 +5221,16 @@ msgstr ""
 msgid "That key can’t be used in a shortcut. Try a letter, a digit, Space or F1 to F24."
 msgstr ""
 
+msgid "That lens would be too large (16,384 px a side, 32 megapixels). Draw a smaller source."
+msgstr ""
+
 msgid "That phrase is already in the list."
 msgstr ""
 
 msgid "That term is already in the glossary."
+msgstr ""
+
+msgid "That zoom would make the lens too large (16,384 px a side, 32 megapixels)."
 msgstr ""
 
 msgid "The 16:9 export is never changed by a reframe."
@@ -5199,6 +5286,9 @@ msgid "The audio couldn’t be exported"
 msgstr ""
 
 msgid "The audio file could not be written ({detail}); the track ends here and the recording continues"
+msgstr ""
+
+msgid "The background is too busy to fill cleanly"
 msgstr ""
 
 msgid "The bubble is not shown on screen while recording on Linux. Its shape and size are used when the recording is exported, and the editor can move it."
@@ -5339,6 +5429,9 @@ msgstr ""
 msgid "The glossary is full. Remove an entry to add another."
 msgstr ""
 
+msgid "The hole left behind will not match what is around it. You can still go on, or cancel and nothing is stored."
+msgstr ""
+
 msgid "The import did not start."
 msgstr ""
 
@@ -5419,6 +5512,12 @@ msgid "The move stopped"
 msgstr ""
 
 msgid "The move was cancelled"
+msgstr ""
+
+msgid "The new text is wider than the box and will be cut. Widen the box or shorten the text."
+msgstr ""
+
+msgid "The new text will sit on a patch that does not match what is around it. You can still go on, or cancel and nothing is stored."
 msgstr ""
 
 msgid "The old library is still in use. The captures copied so far stay in {path}."
@@ -5729,6 +5828,12 @@ msgid_plural "This folder already holds a CaptureMann library with {n} captures 
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "This image already has 4 zoom lenses, the most it can have. Delete one to add another."
+msgstr ""
+
+msgid "This image has 4 zoom lenses, the most it can have. Delete one to add another."
+msgstr ""
+
 msgid "This is a different channel than before; the account now publishes to it."
 msgstr ""
 
@@ -5742,6 +5847,9 @@ msgid "This is the latest export. To upload the current edits, export again firs
 msgstr ""
 
 msgid "This kind of file isn't supported yet"
+msgstr ""
+
+msgid "This line"
 msgstr ""
 
 msgid "This recording has no camera track."
@@ -5926,6 +6034,9 @@ msgstr ""
 msgid "Turn on the microphone or system audio to record."
 msgstr ""
 
+msgid "Turn this line back into a bar"
+msgstr ""
+
 msgid "Two actions share a shortcut; only the first one is registered."
 msgstr ""
 
@@ -6059,6 +6170,9 @@ msgid "Use 60 characters or fewer."
 msgstr ""
 
 msgid "Use a different client ID…"
+msgstr ""
+
+msgid "Use anyway"
 msgstr ""
 
 msgid "Use only {yyyy}, {MM}, {dd} and {title} between braces."
@@ -6595,6 +6709,9 @@ msgstr ""
 msgid "ffmpeg: {error}"
 msgstr ""
 
+msgid "filled · {hex}"
+msgstr ""
+
 msgid "folder \"{path}\""
 msgstr ""
 
@@ -6860,6 +6977,9 @@ msgstr ""
 msgid "{format}, {width} × {height}. The original tracks are untouched."
 msgstr ""
 
+msgid "{found} text lines found · {bars} become bars · {kept} kept"
+msgstr ""
+
 msgid "{free} GB free, room for about {left} at this setting (an estimate)"
 msgstr ""
 
@@ -6923,6 +7043,12 @@ msgid "{language} needs a text model"
 msgstr ""
 
 msgid "{language} …"
+msgstr ""
+
+msgid "{line} · click to keep the real text"
+msgstr ""
+
+msgid "{line} · click to make it a bar again"
 msgstr ""
 
 msgid "{model} on {this_computer}. Any language; each line keeps its start and end."
@@ -7138,6 +7264,9 @@ msgid_plural "{n} more parameters not shown"
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "{n} of {max}"
+msgstr ""
+
 #. the find bar's match counter: the current match and how many there are.
 msgid "{n} of {m}"
 msgstr ""
@@ -7185,6 +7314,9 @@ msgid "{n} suggested. Nothing is blurred until you accept. Click a dashed box on
 msgid_plural "{n} suggested. Nothing is blurred until you accept. Click a dashed box on the image to accept just that one."
 msgstr[0] ""
 msgstr[1] ""
+
+msgid "{n} times"
+msgstr ""
 
 msgid "{n} tool is set differently from its default. Resetting puts every tool back to its default: tools that change something run without asking, and starting a recording asks first."
 msgid_plural "{n} tools are set differently from their defaults. Resetting puts every tool back to its default: tools that change something run without asking, and starting a recording asks first."
@@ -7448,6 +7580,12 @@ msgstr ""
 msgid "{w} x {h} px, {fps} fps, {codec}, about {mb} MB per minute (an estimate: the real size varies with what is on screen)"
 msgstr ""
 
+msgid "{x}, {y} · column locked"
+msgstr ""
+
+msgid "{x}, {y} · row locked"
+msgstr ""
+
 msgid "{yyyy} year, {MM} month, {dd} day, {title} capture title"
 msgstr ""
 
@@ -7467,6 +7605,9 @@ msgid "“{path}” is not a full folder path."
 msgstr ""
 
 msgid "“{word}”"
+msgstr ""
+
+msgid "↵ Enter to apply · Esc to cancel"
 msgstr ""
 
 msgctxt "account status"
@@ -7514,6 +7655,10 @@ msgid "arrow"
 msgstr ""
 
 msgctxt "annotation kind"
+msgid "blueprint"
+msgstr ""
+
+msgctxt "annotation kind"
 msgid "blur"
 msgstr ""
 
@@ -7538,11 +7683,19 @@ msgid "line"
 msgstr ""
 
 msgctxt "annotation kind"
+msgid "move area"
+msgstr ""
+
+msgctxt "annotation kind"
 msgid "pixelate"
 msgstr ""
 
 msgctxt "annotation kind"
 msgid "rect"
+msgstr ""
+
+msgctxt "annotation kind"
+msgid "retype"
 msgstr ""
 
 msgctxt "annotation kind"
@@ -7561,6 +7714,18 @@ msgctxt "annotation kind"
 msgid "text"
 msgstr ""
 
+msgctxt "annotation kind"
+msgid "zoom lens"
+msgstr ""
+
+msgctxt "annotation setting"
+msgid "Align"
+msgstr ""
+
+msgctxt "annotation setting"
+msgid "Background"
+msgstr ""
+
 msgctxt "annotation setting"
 msgid "Badge size"
 msgstr ""
@@ -7570,7 +7735,23 @@ msgid "Blur strength"
 msgstr ""
 
 msgctxt "annotation setting"
+msgid "Border"
+msgstr ""
+
+msgctxt "annotation setting"
+msgid "Border width"
+msgstr ""
+
+msgctxt "annotation setting"
 msgid "Color"
+msgstr ""
+
+msgctxt "annotation setting"
+msgid "Colour"
+msgstr ""
+
+msgctxt "annotation setting"
+msgid "Corner radius"
 msgstr ""
 
 msgctxt "annotation setting"
@@ -7583,6 +7764,10 @@ msgstr ""
 
 msgctxt "annotation setting"
 msgid "Fill"
+msgstr ""
+
+msgctxt "annotation setting"
+msgid "Fill behind"
 msgstr ""
 
 msgctxt "annotation setting"
@@ -7610,6 +7795,10 @@ msgid "Pixel size"
 msgstr ""
 
 msgctxt "annotation setting"
+msgid "Shape"
+msgstr ""
+
+msgctxt "annotation setting"
 msgid "Size"
 msgstr ""
 
@@ -7630,7 +7819,19 @@ msgid "Text"
 msgstr ""
 
 msgctxt "annotation setting"
+msgid "Text colour"
+msgstr ""
+
+msgctxt "annotation setting"
 msgid "Text size"
+msgstr ""
+
+msgctxt "annotation setting"
+msgid "Weight"
+msgstr ""
+
+msgctxt "annotation setting"
+msgid "Zoom"
 msgstr ""
 
 msgctxt "audio badge"
@@ -7707,6 +7908,26 @@ msgstr ""
 
 msgctxt "background preset"
 msgid "Soft gray"
+msgstr ""
+
+msgctxt "blueprint"
+msgid "kept"
+msgstr ""
+
+msgctxt "blueprint colour"
+msgid "Auto"
+msgstr ""
+
+msgctxt "blueprint colour"
+msgid "One colour"
+msgstr ""
+
+msgctxt "blueprint style"
+msgid "Bars"
+msgstr ""
+
+msgctxt "blueprint style"
+msgid "Boxes"
 msgstr ""
 
 msgctxt "breadcrumb"
@@ -8222,7 +8443,23 @@ msgid "Blue"
 msgstr ""
 
 msgctxt "colour"
+msgid "Charcoal"
+msgstr ""
+
+msgctxt "colour"
+msgid "Dark grey"
+msgstr ""
+
+msgctxt "colour"
 msgid "Green"
+msgstr ""
+
+msgctxt "colour"
+msgid "Grey"
+msgstr ""
+
+msgctxt "colour"
+msgid "Light grey"
 msgstr ""
 
 msgctxt "colour"
@@ -8505,6 +8742,14 @@ msgctxt "file dialog"
 msgid "Choose picture"
 msgstr ""
 
+msgctxt "fill kind"
+msgid "Gradient"
+msgstr ""
+
+msgctxt "fill kind"
+msgid "Solid"
+msgstr ""
+
 msgctxt "filter chip"
 msgid "Boards"
 msgstr ""
@@ -8539,6 +8784,18 @@ msgstr ""
 
 msgctxt "folder status"
 msgid "Online"
+msgstr ""
+
+msgctxt "font weight"
+msgid "Bold"
+msgstr ""
+
+msgctxt "font weight"
+msgid "Medium"
+msgstr ""
+
+msgctxt "font weight"
+msgid "Regular"
 msgstr ""
 
 msgctxt "glossary entry"
@@ -8913,6 +9170,34 @@ msgctxt "launcher verb"
 msgid "Publish"
 msgstr ""
 
+msgctxt "lens setting"
+msgid "Connector"
+msgstr ""
+
+msgctxt "lens setting"
+msgid "Lenses on this image"
+msgstr ""
+
+msgctxt "lens setting"
+msgid "Source"
+msgstr ""
+
+msgctxt "lens setting"
+msgid "Zoom badge"
+msgstr ""
+
+msgctxt "lens shape"
+msgid "Circle"
+msgstr ""
+
+msgctxt "lens shape"
+msgid "Rect"
+msgstr ""
+
+msgctxt "lens shape"
+msgid "Rounded"
+msgstr ""
+
 msgctxt "list"
 msgid "Captures"
 msgstr ""
@@ -8955,6 +9240,18 @@ msgstr ""
 
 msgctxt "mic verdict"
 msgid "Too quiet"
+msgstr ""
+
+msgctxt "move area"
+msgid "Moved to"
+msgstr ""
+
+msgctxt "move area"
+msgid "Removed"
+msgstr ""
+
+msgctxt "move area"
+msgid "Source"
 msgstr ""
 
 msgctxt "navigation"
@@ -9015,6 +9312,10 @@ msgstr ""
 
 msgctxt "panel badge"
 msgid "New in 0.3.3"
+msgstr ""
+
+msgctxt "panel badge"
+msgid "New in 0.3.4"
 msgstr ""
 
 msgctxt "people hint"
@@ -9933,6 +10234,18 @@ msgctxt "system audio status"
 msgid "Listening…"
 msgstr ""
 
+msgctxt "text alignment"
+msgid "Center"
+msgstr ""
+
+msgctxt "text alignment"
+msgid "Left"
+msgstr ""
+
+msgctxt "text alignment"
+msgid "Right"
+msgstr ""
+
 msgctxt "text model"
 msgid "Test"
 msgstr ""
@@ -10006,11 +10319,19 @@ msgid "Line"
 msgstr ""
 
 msgctxt "tool"
+msgid "Move area"
+msgstr ""
+
+msgctxt "tool"
 msgid "Pixelate"
 msgstr ""
 
 msgctxt "tool"
 msgid "Rectangle"
+msgstr ""
+
+msgctxt "tool"
+msgid "Retype"
 msgstr ""
 
 msgctxt "tool"
@@ -10035,6 +10356,10 @@ msgstr ""
 
 msgctxt "tool"
 msgid "Text"
+msgstr ""
+
+msgctxt "tool"
+msgid "Zoom Lens"
 msgstr ""
 
 msgctxt "tool group"
@@ -10067,6 +10392,10 @@ msgstr ""
 
 msgctxt "tool group"
 msgid "Text"
+msgstr ""
+
+msgctxt "tool group"
+msgid "Touch-up"
 msgstr ""
 
 msgctxt "tool permission"
