@@ -27,7 +27,7 @@ by the maintainer). Steps: `release-day-0.2.9.md`.
 
 0.2.9 is a bug-fix release. It fixes seven problems reported on 0.2.8 and earlier, polishes a few edges, and has **files for
 Windows 11 (x64) and macOS 13+ (Apple Silicon and Intel)**. The one addition: **you can drag the recording HUD to where you
-want it and collapse it** (see "Improved"). **macOS users also get everything that came in 0.2.8** (see
+want it and collapse it** (see "Improved"; **correction of Nov 14, 2026: the drag worked on macOS only. On Windows the HUD could not be dragged in 0.2.9 to 0.3.3; the fix is in 0.3.4, REC-5.AC18**). **macOS users also get everything that came in 0.2.8** (see
 "Also new for macOS" below), because 0.2.8 was Windows only. Linux stays at 0.2.6; the next Linux release is 0.3.0.
 
 ## Fixed
@@ -59,7 +59,7 @@ want it and collapse it** (see "Improved"). **macOS users also get everything th
 
 ## Improved
 
-- **Recording HUD: drag it, collapse it.** While recording (screen or audio) you can drag the HUD by its background, and a
+- **Recording HUD: drag it, collapse it.** (Correction, Nov 14, 2026: the drag worked on macOS and Linux; on Windows it did not move the window until 0.3.4. The collapse worked everywhere.) While recording (screen or audio) you can drag the HUD by its background, and a
   new button collapses it to Stop, the timer and Pause (and the agent chip when an agent started the recording). The
   position (per display) and the collapsed state are remembered; if the display is unplugged the HUD comes back to a
   visible place. Agents cannot change this setting.
@@ -191,7 +191,7 @@ versions).
   Windows run an extra command).
 
 ### Improved
-- Recording HUD: drag it by its background and collapse it; position and state are remembered.
+- Recording HUD: drag it by its background (macOS only until 0.3.4, see the correction above) and collapse it; position and state are remembered.
 - Windows 11: no grey frame or white line around the recording HUD.
 - Thumbnails and notification stripes follow the rounded corners of their frame.
 

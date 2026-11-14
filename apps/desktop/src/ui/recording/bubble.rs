@@ -435,6 +435,8 @@ impl Render for BubbleView {
             .border_color(rgba_of(t.rec))
             .bg(rgba_of(crate::theme::derived::BUBBLE_PLACEHOLDER))
             .cursor_grab()
+            // Windows moves a window only through a declared drag region (CAM-3, REC-5.AC18).
+            .map(crate::platform_window::drag_grip)
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, _, window, _| {

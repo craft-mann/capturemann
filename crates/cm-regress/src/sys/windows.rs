@@ -13,11 +13,14 @@ use windows::Win32::UI::HiDpi::{
     SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    keybd_event, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, VK_CONTROL, VK_ESCAPE, VK_MENU, VK_SHIFT,
+    keybd_event, mouse_event, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, MOUSEEVENTF_ABSOLUTE,
+    MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MOVE, VK_CONTROL, VK_ESCAPE, VK_MENU,
+    VK_SHIFT,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, GetAncestor, GetClassNameW, GetWindowLongW, GetWindowRect, GetWindowTextW,
-    GetWindowThreadProcessId, IsWindowVisible, WindowFromPoint, GA_ROOT, GWL_EXSTYLE,
+    EnumWindows, GetAncestor, GetClassNameW, GetSystemMetrics, GetWindowLongW, GetWindowRect,
+    GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible, WindowFromPoint, GA_ROOT,
+    GWL_EXSTYLE, SM_CXSCREEN, SM_CYSCREEN,
 };
 
 pub const PLATFORM: &str = "windows";
@@ -147,6 +150,43 @@ pub fn send_chord(keys: &[Key]) -> Result<(), String> {
             keybd_event(vk(*k), 0, KEYEVENTF_KEYUP, 0);
         }
     }
+    Ok(())
+}
+
+/// Moves the pointer to a physical-pixel point with an injected absolute move.
+fn pointer_to(x: i32, y: i32) {
+    // SAFETY: plain input injection into the current desktop; the metrics are queries.
+    unsafe {
+        let (w, h) = (
+            GetSystemMetrics(SM_CXSCREEN).max(2),
+            GetSystemMetrics(SM_CYSCREEN).max(2),
+        );
+        let nx = (i64::from(x) * 65535 / i64::from(w - 1)) as i32;
+        let ny = (i64::from(y) * 65535 / i64::from(h - 1)) as i32;
+        mouse_event(MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE, nx, ny, 0, 0);
+    }
+}
+
+/// Presses the left button at `from`, moves in 15 steps to `to` and releases (injected input).
+pub fn drag_mouse(from: (i32, i32), to: (i32, i32)) -> Result<(), String> {
+    use std::thread::sleep;
+    use std::time::Duration;
+    pointer_to(from.0, from.1);
+    sleep(Duration::from_millis(300));
+    // SAFETY: plain input injection into the current desktop.
+    unsafe { mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0) };
+    sleep(Duration::from_millis(300));
+    for i in 1..=15 {
+        pointer_to(
+            from.0 + (to.0 - from.0) * i / 15,
+            from.1 + (to.1 - from.1) * i / 15,
+        );
+        sleep(Duration::from_millis(40));
+    }
+    sleep(Duration::from_millis(300));
+    // SAFETY: as above.
+    unsafe { mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0) };
+    sleep(Duration::from_millis(600));
     Ok(())
 }
 

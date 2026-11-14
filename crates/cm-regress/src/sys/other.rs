@@ -77,6 +77,10 @@ pub fn window_from_point(_x: i32, _y: i32) -> Option<WinInfo> {
     None
 }
 
+pub fn drag_mouse(_from: (i32, i32), _to: (i32, i32)) -> Result<(), String> {
+    Err("an injected pointer drag is only implemented on Windows".to_owned())
+}
+
 pub fn send_chord(_keys: &[Key]) -> Result<(), String> {
     Err("injected keys are only implemented on Windows".to_owned())
 }
