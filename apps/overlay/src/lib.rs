@@ -38,6 +38,8 @@ pub mod client;
 pub mod error;
 pub mod gate;
 pub mod lifetime;
+pub mod long_bar;
+pub mod long_paint;
 pub mod magnifier;
 pub mod paint;
 pub mod picker;
@@ -123,6 +125,7 @@ pub fn run(args: &Args, started: Instant) -> Result<Value, OverlayError> {
         hint: args.hint,
         confirm_on_release: args.confirm_on_release,
         tab_to_list: args.tab_to_list && args.mode == picker::Mode::Window,
+        auto_scroll: args.auto_scroll,
         exit_after_first_frame: args.exit_after_first_frame,
     };
     // Windows are closed when `app::run` returns, before the final capture is taken.
@@ -165,9 +168,18 @@ pub fn run(args: &Args, started: Instant) -> Result<Value, OverlayError> {
             ..
         }) => Ok(json!({ "first_frame_ms": tracer.summary() })),
         Ok(app::Finished {
-            finish: Finish::Chosen(choice),
+            finish: Finish::Switch(name),
             ..
-        }) if args.pick => Ok(session::pick_json(args.mode, choice)),
+        }) => Ok(json!({ "switch_to": name })),
+        // Long Shot only picks: the desktop app starts the HUD and the capture.
+        Ok(app::Finished {
+            finish: Finish::Chosen(choice),
+            long,
+            ..
+        }) if args.pick || args.mode == picker::Mode::Long => Ok(session::with_long(
+            session::pick_json(args.mode, choice),
+            long,
+        )),
         Ok(app::Finished {
             finish: Finish::Chosen(choice),
             ..

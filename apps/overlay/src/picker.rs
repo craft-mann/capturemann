@@ -19,6 +19,16 @@ pub enum Mode {
     Region,
     Window,
     Display,
+    /// Long Shot (CAP-6): picks like Region (click the window, or drag an area) and the bar
+    /// carries the scroll options; the capture itself is taken by the desktop app afterwards.
+    Long,
+}
+
+impl Mode {
+    /// Picks a window by click or a dragged area (Region and Long Shot).
+    pub fn is_region_like(self) -> bool {
+        matches!(self, Mode::Region | Mode::Long)
+    }
 }
 
 /// The user's decision on one display.
@@ -210,7 +220,7 @@ impl Picker {
                     Hover::None
                 }
             }
-            Mode::Window | Mode::Region => {
+            Mode::Window | Mode::Region | Mode::Long => {
                 if self.has_selection() || self.is_dragging() {
                     return Hover::None;
                 }
@@ -244,7 +254,7 @@ impl Picker {
     pub fn cursor(&self) -> CursorHint {
         match self.mode {
             Mode::Window | Mode::Display => CursorHint::Pointer,
-            Mode::Region => match (self.state, self.selection, self.pointer) {
+            Mode::Region | Mode::Long => match (self.state, self.selection, self.pointer) {
                 (State::Resizing { handle, .. }, _, _) => CursorHint::Resize(handle),
                 (State::Moving { .. }, _, _) => CursorHint::Move,
                 (State::Idle, Some(sel), Some(p)) => {
@@ -318,7 +328,7 @@ impl Picker {
         let Some(p) = self.pointer else {
             return Effect::Nothing;
         };
-        if self.mode != Mode::Region {
+        if !self.mode.is_region_like() {
             self.state = State::Pressed { down: p };
             return Effect::Nothing;
         }
@@ -416,7 +426,7 @@ impl Picker {
     fn pick_hover(&self) -> Effect {
         match self.mode {
             Mode::Display => Effect::Done(Outcome::Display),
-            Mode::Window | Mode::Region => match self.hover_window() {
+            Mode::Window | Mode::Region | Mode::Long => match self.hover_window() {
                 Some(w) => Effect::Done(Outcome::Window { window_id: w.id }),
                 None => Effect::Redraw,
             },
@@ -435,11 +445,13 @@ impl Picker {
                 }
             }
             Key::Enter => match self.selection {
-                Some(rect) if self.mode == Mode::Region && !self.is_dragging() => {
+                Some(rect) if self.mode.is_region_like() && !self.is_dragging() => {
                     Effect::Done(Outcome::Region { rect })
                 }
                 _ => match self.mode {
-                    Mode::Region | Mode::Window if self.hover_window().is_none() => Effect::Nothing,
+                    Mode::Region | Mode::Window | Mode::Long if self.hover_window().is_none() => {
+                        Effect::Nothing
+                    }
                     _ => self.pick_hover(),
                 },
             },
@@ -448,7 +460,7 @@ impl Picker {
     }
 
     fn nudge(&mut self, dx: i32, dy: i32, step: i32) -> Effect {
-        if self.mode != Mode::Region {
+        if !self.mode.is_region_like() {
             return Effect::Nothing;
         }
         let (dx, dy) = (dx * step, dy * step);

@@ -157,9 +157,11 @@ pub struct Scene<'a> {
     pub show_hint: bool,
     /// Window mode: Tab leaves for the desktop app's window list (the hint says so).
     pub tab_to_list: bool,
+    /// Long Shot: the mode bar (CAP-6); the hint then sits above it.
+    pub long: Option<crate::long_paint::LongScene<'a>>,
 }
 
-fn dev(logical: f64, scale: f64) -> i32 {
+pub(crate) fn dev(logical: f64, scale: f64) -> i32 {
     (logical * scale).round().max(1.0) as i32
 }
 
@@ -183,7 +185,7 @@ pub fn paint(canvas: &mut Canvas<'_>, frame: &Frame, scene: &Scene<'_>) -> bool 
     let picker = scene.picker;
 
     // 1. Crosshair until a selection starts (DESIGN §5.1: 1 px white at 50%).
-    if picker.mode() == Mode::Region && !picker.has_selection() {
+    if picker.mode().is_region_like() && !picker.has_selection() {
         if let Some(p) = picker.pixel() {
             canvas.hline(0, p.y, canvas.w, 0x00FF_FFFF, 128);
             canvas.vline(p.x, 0, canvas.h, 0x00FF_FFFF, 128);
@@ -194,6 +196,9 @@ pub fn paint(canvas: &mut Canvas<'_>, frame: &Frame, scene: &Scene<'_>) -> bool 
     if let Some(r) = picker.hover_rect() {
         reveal(canvas, frame, r);
         outline(canvas, r, scale);
+        if picker.mode() == Mode::Long {
+            long_area_chips(canvas, r, scene);
+        }
     }
 
     // 3. Selection: bright inside, outline, handles, size readout.
@@ -209,7 +214,7 @@ pub fn paint(canvas: &mut Canvas<'_>, frame: &Frame, scene: &Scene<'_>) -> bool 
     }
 
     // 4. Magnifier.
-    if scene.show_loupe && picker.mode() == Mode::Region {
+    if scene.show_loupe && picker.mode().is_region_like() {
         if let Some(px) = picker.pixel() {
             loupe(canvas, frame, px, scene);
         }
@@ -218,6 +223,10 @@ pub fn paint(canvas: &mut Canvas<'_>, frame: &Frame, scene: &Scene<'_>) -> bool 
     // 5. Key hints.
     if scene.show_hint {
         hint(canvas, scene);
+    }
+    // 6. The Long Shot bar and its card.
+    if let Some(long) = &scene.long {
+        crate::long_paint::draw(canvas, scene, long);
     }
     true
 }
@@ -303,7 +312,7 @@ fn handles(canvas: &mut Canvas<'_>, r: PhysicalRect, scale: f64) {
 }
 
 /// A floating panel: `surface` at 96% with a 1 px `line` border outside it (DESIGN §4).
-fn panel(canvas: &mut Canvas<'_>, r: IRect, radius: f32, scale: f64) {
+pub(crate) fn panel(canvas: &mut Canvas<'_>, r: IRect, radius: f32, scale: f64) {
     let t = dev(1.0, scale);
     canvas.fill_rrect(r.grow(t), radius + t as f32, tokens::LINE, 255);
     canvas.fill_rrect(r, radius, tokens::SURFACE, tokens::PANEL_ALPHA);
@@ -354,6 +363,34 @@ fn readout(canvas: &mut Canvas<'_>, sel: PhysicalRect, scene: &Scene<'_>) {
     }
     x = x.clamp(0, (canvas.w - total).max(0));
     let right = chip(canvas, x, y, &size, tokens::TEXT, scene);
+    chip(canvas, right + gap, y, &scale_label, tokens::TEXT_3, scene);
+}
+
+/// Long Shot (S1): the chips above the highlighted area, "Scrollable area" and its size. The
+/// area is the window under the pointer: CaptureMann has no way to ask a window which part of it
+/// scrolls, so a fixed header or footer is found by the stitcher and kept once instead.
+fn long_area_chips(canvas: &mut Canvas<'_>, r: PhysicalRect, scene: &Scene<'_>) {
+    let s = scene.scale;
+    let gap = dev(6.0, s);
+    let h = dev(22.0, s);
+    let label = tr!("Scrollable area");
+    let size = format!("{} \u{d7} {}", r.size.width, r.size.height);
+    let px = 12.0 * s as f32;
+    let (padx, _) = (dev(8.0, s), 0);
+    let w1 = scene.text.measure_mono(&label, px).ceil() as i32 + 2 * padx;
+    let w2 = scene.text.measure_mono(&size, px).ceil() as i32 + 2 * padx;
+    let scale_label = scale_chip(s);
+    let w3 = scene.text.measure_mono(&scale_label, px).ceil() as i32 + 2 * padx;
+    let total = w1 + gap + w2 + gap + w3;
+    let mut x = r.origin.x;
+    let mut y = r.origin.y - dev(tokens::BRACKET_STROKE, s) - gap - h;
+    if y < 0 {
+        y = r.origin.y + gap;
+        x += gap;
+    }
+    x = x.clamp(0, (canvas.w - total).max(0));
+    let right = chip(canvas, x, y, &label, tokens::TEXT, scene);
+    let right = chip(canvas, right + gap, y, &size, tokens::TEXT, scene);
     chip(canvas, right + gap, y, &scale_label, tokens::TEXT_3, scene);
 }
 
@@ -502,6 +539,18 @@ fn hint_items(scene: &Scene<'_>) -> Vec<HintItem> {
             Key("Esc"),
             Label(tr!("Cancel")),
         ],
+        Mode::Long if p.is_drawing() => vec![Key("Esc"), Label(tr!("Cancel"))],
+        Mode::Long if p.has_selection() => vec![
+            Key("Enter"),
+            Label(tr!("Start")),
+            Key("Esc"),
+            Label(tr!("Cancel")),
+        ],
+        Mode::Long => vec![
+            Label(tr!("Click to use this area, or drag a region")),
+            Key("Esc"),
+            Label(tr!("Cancel")),
+        ],
         Mode::Display => vec![
             Label(tr!("Click a display")),
             Key("Esc"),
@@ -513,6 +562,10 @@ fn hint_items(scene: &Scene<'_>) -> Vec<HintItem> {
 /// Bottom-center pill with keycaps (DESIGN §4 Keycaps, §5.1): keycaps are Geist Mono 12 on
 /// `raised`, radius 6, a 1 px `line` edge; labels are Geist.
 fn hint(canvas: &mut Canvas<'_>, scene: &Scene<'_>) {
+    // The Accessibility card sits where the hint would be.
+    if scene.long.as_ref().is_some_and(|l| l.layout.card.is_some()) {
+        return;
+    }
     let s = scene.scale;
     let items = hint_items(scene);
     let label_px = 12.0 * s as f32;
@@ -531,7 +584,11 @@ fn hint(canvas: &mut Canvas<'_>, scene: &Scene<'_>) {
     let total: i32 =
         items.iter().map(&width_of).sum::<i32>() + gap * (items.len() as i32 - 1) + 2 * padx;
     let x0 = (canvas.w - total) / 2;
-    let y0 = canvas.h - dev(24.0, s) - h;
+    // Above the Long Shot bar when there is one.
+    let y0 = match &scene.long {
+        Some(l) => l.layout.bar.y - dev(12.0, s) - h,
+        None => canvas.h - dev(24.0, s) - h,
+    };
     let pill = IRect::new(x0.max(0), y0.max(0), total, h);
     panel(canvas, pill, h as f32 / 2.0, s);
     let mut x = pill.x + padx;
@@ -614,6 +671,7 @@ mod tests {
             show_loupe: loupe,
             show_hint: hint,
             tab_to_list: false,
+            long: None,
         };
         assert!(paint(&mut c, frame, &scene));
         buf
@@ -856,7 +914,74 @@ mod tests {
             show_loupe: false,
             show_hint: false,
             tab_to_list: false,
+            long: None,
         };
         assert!(!paint(&mut c, &frame, &scene));
+    }
+
+    /// CAP-6 (S1): in Long Shot mode the bar is painted where its layout says (the selected mode
+    /// in `text`, Start in `rec`), and the card appears only when asked. Not seen on a screen.
+    #[test]
+    fn long_shot_bar_is_painted_where_the_layout_puts_it() {
+        use crate::long_bar::{layout, AutoSupport, BarState, Item, Scroll};
+        let (w, h) = (1600u32, 900u32);
+        let rgba = vec![60u8; (w * h * 4) as usize];
+        let frame = Frame::from_rgba(w, h, &rgba).unwrap();
+        let picker = Picker::new(
+            Mode::Long,
+            PhysicalSize {
+                width: w,
+                height: h,
+            },
+            1.0,
+            vec![],
+            false,
+        );
+        let text = TextPainter::new().unwrap();
+        let mut state = BarState::new(AutoSupport::NeedsAccessibility);
+        let render = |state: &BarState| -> (Vec<u32>, crate::long_bar::BarLayout) {
+            let l = layout(state, w as i32, h as i32, 1.0, &|s, px| text.measure(s, px));
+            let mut buf = vec![0u32; (w * h) as usize];
+            let mut c = Canvas::new(&mut buf, w, h).unwrap();
+            let scene = Scene {
+                picker: &picker,
+                scale: 1.0,
+                text: &text,
+                show_loupe: false,
+                show_hint: true,
+                tab_to_list: false,
+                long: Some(crate::long_paint::LongScene { layout: &l }),
+            };
+            assert!(paint(&mut c, &frame, &scene));
+            (buf, l)
+        };
+        let (buf, l) = render(&state);
+        let at = |x: i32, y: i32| buf[(y as usize) * w as usize + x as usize] & 0x00FF_FFFF;
+        let start = l.entries.iter().find(|e| e.item == Item::Start).unwrap();
+        assert_eq!(
+            at(start.rect.x + 4, start.rect.y + start.rect.h / 2),
+            tokens::REC
+        );
+        let long = l
+            .entries
+            .iter()
+            .find(|e| e.item == Item::Mode(crate::long_bar::BarMode::LongShot))
+            .unwrap();
+        assert_eq!(
+            at(long.rect.x + 4, long.rect.y + long.rect.h / 2),
+            tokens::TEXT
+        );
+        // The bar is a panel: its middle gap row is not the dimmed frame.
+        assert_ne!(at(l.bar.x + 1, l.bar.y + l.bar.h / 2), at(5, 5));
+        assert!(l.card.is_none());
+        // Auto scroll without Accessibility, chosen: the card is drawn above the bar.
+        state.activate(Item::Scroll(Scroll::Auto));
+        let (buf2, l2) = render(&state);
+        let card = l2.card.as_ref().unwrap();
+        let grant = &card.buttons[0];
+        let px = buf2[((grant.rect.y + grant.rect.h / 2) as usize) * w as usize
+            + (grant.rect.x + 4) as usize]
+            & 0x00FF_FFFF;
+        assert_eq!(px, tokens::REC, "Grant access is the primary button");
     }
 }

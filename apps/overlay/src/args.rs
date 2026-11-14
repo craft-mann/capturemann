@@ -5,11 +5,12 @@ use std::path::PathBuf;
 use cm_ipc::Endpoint;
 
 use crate::error::OverlayError;
+use crate::long_bar::AutoSupport;
 use crate::picker::Mode;
 
-pub const USAGE: &str = "usage: cm-overlay <region|window|display> [--socket PATH] \
+pub const USAGE: &str = "usage: cm-overlay <region|window|display|long> [--socket PATH] \
 [--confirm-on-release] [--no-magnifier] [--no-hint] [--pick] [--tab-to-list] \
-[--exit-after-first-frame]
+[--auto-scroll available|needs_accessibility|unavailable] [--exit-after-first-frame]
 
 Shows a frozen, dimmed copy of every display and lets you pick a region (drag, then Enter),
 a window (click) or a display (click). Prints the capture as JSON on stdout.
@@ -21,6 +22,12 @@ Esc cancels (exit 3, nothing saved). Exit codes follow the shared error table.
   --no-hint             hide the key hints
   --pick                only choose: print the chosen target as JSON (`{\"picked\": ...}`) and take no
                         screenshot (the desktop app uses it to pick what to record)
+  --auto-scroll STATE   long mode (Long Shot, CAP-6): whether Auto scroll can run (the desktop app
+                        asks the capture crate): `available`, `needs_accessibility` (shown
+                        dimmed with the Accessibility card) or `unavailable` (not shown, as on
+                        Wayland). Default `unavailable`. `long` always behaves like `--pick`:
+                        it prints {\"picked\": {..., \"long\": {\"scroll\", \"direction\"}}} or
+                        {\"switch_to\": \"region|window|display|guide|accessibility\"}
   --tab-to-list         window mode: Tab leaves the picker and prints {\"switch_to\": \"list\"} with no
                         screenshot (the desktop app then shows its window list)
   --exit-after-first-frame
@@ -38,6 +45,8 @@ pub struct Args {
     pub pick: bool,
     /// Window mode: Tab hands over to the desktop app's window list (R19).
     pub tab_to_list: bool,
+    /// Long Shot: whether the bar offers Auto scroll.
+    pub auto_scroll: AutoSupport,
     pub exit_after_first_frame: bool,
 }
 
@@ -67,6 +76,7 @@ pub fn parse<I: IntoIterator<Item = String>>(
     let mut exit_after_first_frame = false;
     let mut pick = false;
     let mut tab_to_list = false;
+    let mut auto_scroll = AutoSupport::Unavailable;
     let mut it = args.into_iter();
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -82,14 +92,25 @@ pub fn parse<I: IntoIterator<Item = String>>(
             "--no-hint" => hint = false,
             "--pick" => pick = true,
             "--tab-to-list" => tab_to_list = true,
+            "--auto-scroll" => {
+                let v = it
+                    .next()
+                    .ok_or_else(|| OverlayError::invalid_input("--auto-scroll needs a value"))?;
+                auto_scroll = AutoSupport::parse(&v).ok_or_else(|| {
+                    OverlayError::invalid_input(
+                        "--auto-scroll must be available, needs_accessibility or unavailable",
+                    )
+                })?;
+            }
             "--exit-after-first-frame" => exit_after_first_frame = true,
-            "region" | "window" | "display" => {
+            "region" | "window" | "display" | "long" => {
                 if mode.is_some() {
                     return Err(OverlayError::invalid_input("only one mode may be given"));
                 }
                 mode = Some(match a.as_str() {
                     "region" => Mode::Region,
                     "window" => Mode::Window,
+                    "long" => Mode::Long,
                     _ => Mode::Display,
                 });
             }
@@ -101,7 +122,7 @@ pub fn parse<I: IntoIterator<Item = String>>(
         }
     }
     let mode = mode.ok_or_else(|| {
-        OverlayError::invalid_input("a mode is required: region, window or display")
+        OverlayError::invalid_input("a mode is required: region, window, display or long")
     })?;
     Ok(Parsed::Run(Args {
         mode,
@@ -113,6 +134,7 @@ pub fn parse<I: IntoIterator<Item = String>>(
         hint,
         pick,
         tab_to_list,
+        auto_scroll,
         exit_after_first_frame,
     }))
 }
@@ -160,6 +182,25 @@ mod tests {
             panic!("expected Run");
         };
         assert!(!b.pick);
+    }
+
+    #[test]
+    fn long_mode_takes_the_auto_scroll_state() {
+        let Ok(Parsed::Run(a)) = p(&["long", "--auto-scroll", "needs_accessibility"]) else {
+            panic!("expected Run");
+        };
+        assert_eq!(a.mode, Mode::Long);
+        assert_eq!(a.auto_scroll, AutoSupport::NeedsAccessibility);
+        let Ok(Parsed::Run(b)) = p(&["long"]) else {
+            panic!("expected Run");
+        };
+        assert_eq!(
+            b.auto_scroll,
+            AutoSupport::Unavailable,
+            "Hand scroll only by default"
+        );
+        assert!(p(&["long", "--auto-scroll", "maybe"]).is_err());
+        assert!(p(&["long", "--auto-scroll"]).is_err());
     }
 
     #[test]
