@@ -484,6 +484,7 @@ fn execute(id: CommandId, option: LaunchOption, cx: &mut App) {
                 delayed_capture(app, mode, plan, cx);
             }
         }
+        CommandId::LongShot => crate::ui::long_shot::start(&app, cx),
         CommandId::OpenLibrary => app::navigate(&app, Route::Library, cx),
         CommandId::OpenSettings => app::navigate(&app, Route::Settings, cx),
         CommandId::OpenPermissions => app::open_permissions_page(&app, cx),

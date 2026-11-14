@@ -77,6 +77,7 @@ pub fn shortcut_tile(key: &str) -> &'static str {
         "shortcuts.annotate_last" => "pencil",
         "shortcuts.toggle_audio_recording" => "mic",
         "shortcuts.add_marker" => "bookmark",
+        "shortcuts.long_shot" => "cm-capture-region",
         _ => tile::SHORTCUT_FALLBACK,
     }
 }

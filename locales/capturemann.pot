@@ -25,6 +25,9 @@ msgstr ""
 msgid "1 folder skipped"
 msgstr ""
 
+msgid "1 frame"
+msgstr ""
+
 msgid "1 picture"
 msgstr ""
 
@@ -297,6 +300,9 @@ msgstr ""
 msgid "Added by you"
 msgstr ""
 
+msgid "Adding frame {n}…"
+msgstr ""
+
 msgid "Adds a [mm:ss] start time before every line of the TXT file."
 msgstr ""
 
@@ -364,6 +370,12 @@ msgid "All set. Every permission is granted."
 msgstr ""
 
 msgid "All windows"
+msgstr ""
+
+msgid "Allow Accessibility to scroll for you. Hand scroll still works without it."
+msgstr ""
+
+msgid "Allow CaptureMann in Accessibility"
 msgstr ""
 
 msgid "Allow access"
@@ -532,6 +544,12 @@ msgid "Auto"
 msgstr ""
 
 msgid "Auto picks HEVC when this computer’s encoder supports it, else H.264."
+msgstr ""
+
+msgid "Auto scroll"
+msgstr ""
+
+msgid "Auto scroll needs Accessibility"
 msgstr ""
 
 msgid "Auto-redact"
@@ -1085,6 +1103,9 @@ msgid "Click effect"
 msgstr ""
 
 msgid "Click the image to place a stamp. Symbols are drawn as shapes, so they look the same on every system."
+msgstr ""
+
+msgid "Click to use this area, or drag a region"
 msgstr ""
 
 msgid "Click, then Space skips · Esc cancels"
@@ -1721,6 +1742,9 @@ msgstr ""
 msgid "Dismiss notification"
 msgstr ""
 
+msgid "Display"
+msgstr ""
+
 msgid "Display {display_id}"
 msgstr ""
 
@@ -2227,6 +2251,9 @@ msgstr ""
 msgid "Follow cursor"
 msgstr ""
 
+msgid "Footer kept once"
+msgstr ""
+
 msgid "For a call or an interview. Runs after the transcript"
 msgstr ""
 
@@ -2338,6 +2365,15 @@ msgstr ""
 msgid "HTML"
 msgstr ""
 
+msgid "Hand"
+msgstr ""
+
+msgid "Hand scroll"
+msgstr ""
+
+msgid "Header kept once"
+msgstr ""
+
 msgid "Height"
 msgstr ""
 
@@ -2372,6 +2408,9 @@ msgid "Hold and drag to pan"
 msgstr ""
 
 msgid "Holes {n} of {max}"
+msgstr ""
+
+msgid "Horizontal"
 msgstr ""
 
 msgid "How many people"
@@ -2781,6 +2820,18 @@ msgid "Local-first"
 msgstr ""
 
 msgid "Logo Drive, Gu gồ Drai"
+msgstr ""
+
+msgid "Long Shot"
+msgstr ""
+
+msgid "Long Shot failed"
+msgstr ""
+
+msgid "Long Shot needs a permission"
+msgstr ""
+
+msgid "Long Shot saved"
 msgstr ""
 
 msgid "Long Shot: Auto scroll"
@@ -3614,6 +3665,9 @@ msgstr ""
 msgid "Opacity"
 msgstr ""
 
+msgid "Open"
+msgstr ""
+
 msgid "Open AI"
 msgstr ""
 
@@ -3790,6 +3844,9 @@ msgstr ""
 msgid "Pause recording"
 msgstr ""
 
+msgid "Paused"
+msgstr ""
+
 msgid "Paused at {percent}%"
 msgstr ""
 
@@ -3928,6 +3985,9 @@ msgstr ""
 msgid "Press {key} to add a zoom at the playhead"
 msgstr ""
 
+msgid "Preview"
+msgstr ""
+
 msgid "Preview a 9:16 or 1:1 export to reframe it."
 msgstr ""
 
@@ -4056,6 +4116,9 @@ msgid "Re-generating replaces this transcript with a new one."
 msgstr ""
 
 msgid "Re-generating replaces this transcript. Your caption edits are kept where the same words are heard again; the others are dropped. You can undo that from the editor."
+msgstr ""
+
+msgid "Reached the longest image CaptureMann can edit"
 msgstr ""
 
 msgid "Read a Click Guide"
@@ -4375,6 +4438,9 @@ msgid "Reframe mode"
 msgstr ""
 
 msgid "Regenerate"
+msgstr ""
+
+msgid "Region"
 msgstr ""
 
 msgid "Region with the bubble"
@@ -4791,6 +4857,15 @@ msgstr ""
 msgid "Screenshots, screen recording, the capture overlay, system audio"
 msgstr ""
 
+msgid "Scroll at your own pace…"
+msgstr ""
+
+msgid "Scrollable area"
+msgstr ""
+
+msgid "Scrolling capture"
+msgstr ""
+
 msgid "Search by title"
 msgstr ""
 
@@ -5068,6 +5143,12 @@ msgstr ""
 msgid "Stacked"
 msgstr ""
 
+msgid "Start"
+msgstr ""
+
+msgid "Start Long Shot"
+msgstr ""
+
 msgid "Start a Click Guide"
 msgstr ""
 
@@ -5201,6 +5282,9 @@ msgid "Stop playing this line"
 msgstr ""
 
 msgid "Stop recording"
+msgstr ""
+
+msgid "Stopped: the next part did not line up"
 msgstr ""
 
 msgid "Stopping background work…"
@@ -5925,6 +6009,9 @@ msgstr ""
 msgid "Theme"
 msgstr ""
 
+msgid "Then start Long Shot again. Until then, Hand scroll still works."
+msgstr ""
+
 msgid "There are no caption lines yet. Add one at the playhead."
 msgstr ""
 
@@ -6352,6 +6439,9 @@ msgstr ""
 msgid "Use 60 characters or fewer."
 msgstr ""
 
+msgid "Use Hand scroll"
+msgstr ""
+
 msgid "Use a different client ID…"
 msgstr ""
 
@@ -6383,6 +6473,9 @@ msgid "Using the system default until it is plugged in."
 msgstr ""
 
 msgid "Version, licence and credits."
+msgstr ""
+
+msgid "Vertical"
 msgstr ""
 
 msgid "Vertical 9:16 export with auto-reframed bubble."
@@ -6552,6 +6645,9 @@ msgid "Width"
 msgstr ""
 
 msgid "Will change"
+msgstr ""
+
+msgid "Window"
 msgstr ""
 
 msgid "Window \"{title}\" of {app}"
@@ -7434,6 +7530,9 @@ msgid "{n} folders skipped"
 msgstr ""
 
 msgid "{n} found from the voices · whole recording"
+msgstr ""
+
+msgid "{n} frames"
 msgstr ""
 
 msgid "{n} h ago"
@@ -9293,6 +9392,10 @@ msgid "json"
 msgstr ""
 
 msgctxt "launcher keyword"
+msgid "long"
+msgstr ""
+
+msgctxt "launcher keyword"
 msgid "meeting"
 msgstr ""
 
@@ -9310,6 +9413,10 @@ msgstr ""
 
 msgctxt "launcher keyword"
 msgid "options"
+msgstr ""
+
+msgctxt "launcher keyword"
+msgid "page"
 msgstr ""
 
 msgctxt "launcher keyword"
@@ -9338,6 +9445,14 @@ msgstr ""
 
 msgctxt "launcher keyword"
 msgid "screenshots"
+msgstr ""
+
+msgctxt "launcher keyword"
+msgid "scroll"
+msgstr ""
+
+msgctxt "launcher keyword"
+msgid "scrolling"
 msgstr ""
 
 msgctxt "launcher keyword"
@@ -9430,6 +9545,10 @@ msgstr ""
 
 msgctxt "menu"
 msgid "Library"
+msgstr ""
+
+msgctxt "menu"
+msgid "Long Shot"
 msgstr ""
 
 msgctxt "menu"
@@ -10269,6 +10388,10 @@ msgid "Discard recording"
 msgstr ""
 
 msgctxt "shortcut"
+msgid "Long Shot"
+msgstr ""
+
+msgctxt "shortcut"
 msgid "Open launcher"
 msgstr ""
 
@@ -10282,6 +10405,10 @@ msgstr ""
 
 msgctxt "shortcut"
 msgid "Restart recording"
+msgstr ""
+
+msgctxt "shortcut"
+msgid "Set"
 msgstr ""
 
 msgctxt "shortcut"

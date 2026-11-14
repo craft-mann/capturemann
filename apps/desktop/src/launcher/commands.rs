@@ -19,6 +19,8 @@ pub enum CommandId {
     ScreenshotRegion,
     ScreenshotWindow,
     ScreenshotDisplay,
+    /// "Long Shot" (CAP-6): a scrolling capture of a window or an area.
+    LongShot,
     OpenLibrary,
     /// "Import media" (IMP-5): opens the file picker and the import sheet.
     ImportMedia,
@@ -517,8 +519,30 @@ fn build_rows(env: &Env<'_>) -> Vec<Command> {
             glyph: Glyph::Monitor,
             hint: shot_hint,
             shortcut: key(ShortcutAction::CaptureDisplay),
-            disabled: capture_off,
+            disabled: capture_off.clone(),
             verb: tr!("Take screenshot"),
+            options: Vec::new(),
+        },
+        Command {
+            id: CommandId::LongShot,
+            group: Group::Capture,
+            title: tr!("Long Shot"),
+            keywords: keywords(
+                vec![
+                    tr_ctx!("launcher keyword", "scrolling"),
+                    tr_ctx!("launcher keyword", "scroll"),
+                    tr_ctx!("launcher keyword", "capture"),
+                    tr_ctx!("launcher keyword", "page"),
+                    tr_ctx!("launcher keyword", "long"),
+                ],
+                "Long Shot", // i18n-ignore: the English title is searched too
+                &["scrolling", "scroll", "capture", "page", "long"],
+            ),
+            glyph: Glyph::Frame,
+            hint: Hint::Text(tr!("Scrolling capture")),
+            shortcut: key(ShortcutAction::LongShot),
+            disabled: capture_off,
+            verb: tr!("Start Long Shot"),
             options: Vec::new(),
         },
         Command {

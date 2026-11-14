@@ -335,14 +335,11 @@ fn close_windows(cx: &mut App) {
     cx.set_global(Holder(None));
 }
 
-fn finish(
-    app: &Entity<AppModel>,
-    result: Result<
-        Result<(Value, Result<crate::backend::AfterCapture, String>), crate::backend::CallError>,
-        tokio::task::JoinError,
-    >,
-    cx: &mut App,
-) {
+/// What the capture call came back with: the daemon's answer and the CAP-4 finish (clipboard, folder).
+type Finished =
+    Result<(Value, Result<crate::backend::AfterCapture, String>), crate::backend::CallError>;
+
+fn finish(app: &Entity<AppModel>, result: Result<Finished, tokio::task::JoinError>, cx: &mut App) {
     close_windows(cx);
     free(app, cx);
     match result {

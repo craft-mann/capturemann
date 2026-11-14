@@ -21,6 +21,7 @@ pub fn handle_command(app: &Entity<AppModel>, cmd: Command, cx: &mut App) {
                     recording::toggle_audio_hotkey(app, cx)
                 }
                 Some(ShortcutAction::AddMarker) => recording::add_marker_hotkey(app, cx),
+                Some(ShortcutAction::LongShot) => crate::ui::long_shot::start(app, cx),
                 None if id == crate::ui::delay_pill::escape_hotkey_id() => {
                     crate::ui::delay_pill::cancel(app, cx)
                 }
