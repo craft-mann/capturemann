@@ -9,6 +9,9 @@ use crate::Frame;
 /// How often, and after what wait, an unchanged frame after a scroll is looked at again.
 const LATE_SCROLL_POLLS: u32 = 3;
 const LATE_SCROLL_WAIT: std::time::Duration = std::time::Duration::from_millis(150);
+/// A join that moved less than this share of the asked distance is looked at again (see
+/// `run_auto_ex`): real wheel steps move about as much as asked or more.
+const MIN_MOVED_PER_ASKED: f64 = 0.5;
 
 /// Settings of one Long Shot.
 #[derive(Debug, Clone, Copy)]
@@ -146,8 +149,38 @@ pub fn run_auto_ex(
         }
         match outcome {
             PushOutcome::Added { new_len } => {
+                // A browser's smooth scrolling can pause part-way (seen on Edge, Windows: a frame
+                // at a tenth of the asked distance that looked settled). Believing it taught a
+                // distance far too short, the next step was huge and the join was lost. When much
+                // less than asked arrived, the screen is looked at again; what moves later is
+                // joined on top, and only the total teaches the distance.
+                let mut new_len = new_len;
+                let mut ended = None;
+                let mut tail = 0;
+                while f64::from(new_len) < f64::from(step) * MIN_MOVED_PER_ASKED
+                    && tail < LATE_SCROLL_POLLS
+                {
+                    tail += 1;
+                    sleeper.sleep(LATE_SCROLL_WAIT);
+                    let more = wait_settled(src, sleeper, cfg.settle)?;
+                    match stitcher.push(&more.frame, Some(step)) {
+                        PushOutcome::Added { new_len: n } => new_len += n,
+                        PushOutcome::NoChange => break,
+                        PushOutcome::NoOverlap => {
+                            ended = Some(EndReason::NoOverlap);
+                            break;
+                        }
+                        PushOutcome::LimitReached { .. } => {
+                            ended = Some(EndReason::LimitReached);
+                            break;
+                        }
+                    }
+                }
                 on_progress(progress(&stitcher));
                 on_stitch(&stitcher);
+                if let Some(e) = ended {
+                    break e;
+                }
                 // Pixels the content really moved per pixel asked (a wheel step differs per app
                 // and per display scale): learned from each join, so the next request lands on
                 // about 80 %.
