@@ -64,12 +64,20 @@ fn recorded_steps_have_badge_at_click_gde_1_ac1() {
             _ => None,
         })
         .unwrap();
-    assert_eq!((at.x, at.y), (50.0, 20.0));
-    assert_eq!(badge_n(&g, &s.id), 3);
-    assert!(b
+    // The ring is centred on the click (within 2 px); the badge sits on the ring, close by.
+    let ring = b
         .ops()
         .iter()
-        .any(|o| matches!(o.kind, OpKind::Ellipse { .. })));
+        .find_map(|o| match &o.kind {
+            OpKind::Ellipse { rect, .. } => Some(*rect),
+            _ => None,
+        })
+        .expect("a ring");
+    assert!((ring.x + ring.w / 2.0 - 50.0).abs() <= 2.0);
+    assert!((ring.y + ring.h / 2.0 - 20.0).abs() <= 2.0);
+    let dist = ((at.x - 50.0).powi(2) + (at.y - 20.0).powi(2)).sqrt();
+    assert!(dist <= ring.w / 2.0 * 1.2, "badge {dist} from the click");
+    assert_eq!(badge_n(&g, &s.id), 3);
     assert_eq!(s.title, "Click \"B2\"");
 }
 

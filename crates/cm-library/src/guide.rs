@@ -242,8 +242,10 @@ pub fn focus_rect(w: u32, h: u32, click: (f64, f64), scale: f64) -> Option<Rc> {
     Some(Rc::new(x, y, cw, ch))
 }
 
-/// The badge and ring ops of a click on a frame of `w` x `h` (GDE-1): the numbered badge is
-/// centred on the click point, the ring is around it.
+/// The badge and ring ops of a click on a frame of `w` x `h` (GDE-1): the hollow ring is centred
+/// on the click point, so the thing that was clicked stays visible inside it, and the numbered
+/// badge sits on the ring's upper-left (maintainer review of a real guide, Nov 14, 2026: a badge
+/// centred on the click hid the label it pointed at).
 pub fn click_ops(
     n: u32,
     click: (f64, f64),
@@ -253,9 +255,11 @@ pub fn click_ops(
     scale: f64,
 ) -> Vec<AnnotationOp> {
     let long = f64::from(frame.0.max(frame.1));
-    let size = (long * 0.012).clamp(28.0, 56.0).round();
-    let r = size * 1.1;
-    let at = Pt::new(click.0, click.1);
+    let size = (long * 0.016).clamp(30.0, 64.0).round();
+    let r = (size * 1.6).round();
+    // The badge's centre on the ring, up and to the left (45 degrees).
+    let off = r * std::f64::consts::FRAC_1_SQRT_2;
+    let at = Pt::new((click.0 - off).max(size), (click.1 - off).max(size));
     let mut ops = vec![
         AnnotationOp::new(
             "",

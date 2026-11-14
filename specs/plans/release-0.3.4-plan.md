@@ -175,7 +175,7 @@ Unchanged from the Phase 0 text of Nov 13, 2026: the op JSON is frozen, and AC1 
 - **Start:** **New Click Guide** from the capture overlay, the tray, the launcher and the library. The user picks a display, a window or a region to follow, then presses Start (a 3-second countdown, as in REC-4).
 - **Each mouse-down** inside the target becomes a step:
   - CaptureMann takes a frame of the target (problem 9) and records the click point and the button.
-  - It adds a step badge at the click point and a highlight ring around it, as normal ops, so the user can edit them.
+  - It adds a hollow highlight ring centred on the click point and a numbered step badge on the ring's upper-left, as normal ops, so the user can edit them. (Changed Nov 14, 2026 after the first real guide: a badge on the click hid the label.)
   - It writes a draft step title from the text recognized nearest the click, for example `Click "Save"`. With no text near the click, the title is `Click here`.
   - Double-clicks and right-clicks are noted in the title (`Double-click`, `Right-click`).
 - **Step crop:** each step can show the whole target or a **focus crop** around the click (default 1200 × 800 logical px, that is 2400 × 1600 physical px on a 2x display, centred, clamped to the target so the click stays inside it; the crop op itself is stored in physical px). Both are stored: the frame is the image, and the crop is a non-destructive `crop` op (ANN-1).
@@ -184,7 +184,7 @@ Unchanged from the Phase 0 text of Nov 13, 2026: the op JSON is frozen, and AC1 
 - **Result:** a capture of the new kind `guide`. Its folder holds `guide.json` (the title, intro, and the ordered steps with title, note, image id and click point) and one screenshot per step. Each step image is a full screenshot capture inside the guide, so every editor tool works on it.
 
 **Acceptance criteria**
-- **AC1** A scripted run that clicks 5 buttons in a test app produces a guide with 5 steps in order. Each step image shows the button's state before the click, its badge is at the click point within 2 px, and its title names the button text.
+- **AC1** A scripted run that clicks 5 buttons in a test app produces a guide with 5 steps in order. Each step image shows the button's state before the click, its ring is centred on the click point within 2 px with the badge on the ring, and its title names the button text.
 - **AC2** Clicks on the HUD, or outside the target, add no step.
 - **AC3** Pause, 3 clicks, Resume. No steps are added while paused.
 - **AC4** One step shows an email address. That step is marked "Has redaction proposals", and nothing is blurred until the user accepts.

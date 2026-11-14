@@ -127,7 +127,8 @@ async fn gde_1_ac1_five_clicks_make_five_steps_in_order() {
         let (x, y) = on_button(i);
         assert_eq!(s["click"]["x"].as_f64(), Some(x));
         assert_eq!(s["click"]["y"].as_f64(), Some(y));
-        // The step picture is an ordinary screenshot: its ops hold the badge at the click.
+        // The step picture is an ordinary screenshot: its ops hold the ring on the click and the
+        // badge on the ring.
         let cap = c
             .call("get_capture", json!({"capture_id": s["image_id"]}))
             .await;
@@ -135,9 +136,19 @@ async fn gde_1_ac1_five_clicks_make_five_steps_in_order() {
         let badge = ops.iter().find(|o| o["op"] == "step").unwrap();
         assert_eq!(badge["n"], i + 1);
         let at = badge["at"].as_array().unwrap();
-        assert!((at[0].as_f64().unwrap() - x).abs() <= 2.0);
-        assert!((at[1].as_f64().unwrap() - y).abs() <= 2.0);
-        assert!(ops.iter().any(|o| o["op"] == "ellipse"));
+        let ring = ops.iter().find(|o| o["op"] == "ellipse").expect("a ring");
+        let r = ring["rect"].as_array().unwrap();
+        let (rx, ry, rw, rh) = (
+            r[0].as_f64().unwrap(),
+            r[1].as_f64().unwrap(),
+            r[2].as_f64().unwrap(),
+            r[3].as_f64().unwrap(),
+        );
+        assert!((rx + rw / 2.0 - x).abs() <= 2.0);
+        assert!((ry + rh / 2.0 - y).abs() <= 2.0);
+        let dist = ((at[0].as_f64().unwrap() - x).powi(2) + (at[1].as_f64().unwrap() - y).powi(2))
+            .sqrt();
+        assert!(dist <= rw / 2.0 * 1.2, "badge {dist} from the click");
     }
     // The card picture is the rendered first step.
     assert!(guide_folder(&r).join("thumbs/poster.jpg").is_file());

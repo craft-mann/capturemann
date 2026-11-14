@@ -43,7 +43,7 @@ const BODY_PT: f32 = 11.0;
 /// Space between a step heading (or its note) and its picture.
 const HEAD_TO_PICTURE: f32 = 6.0;
 /// The tallest a picture is drawn, so two steps fit on most pages.
-const MAX_IMAGE_H: f32 = 330.0;
+const MAX_IMAGE_H: f32 = 280.0;
 
 fn err(what: &str, e: impl std::fmt::Debug) -> CmError {
     CmError::internal(format!("PDF export: {what}: {e:?}"))
