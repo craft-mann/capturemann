@@ -190,6 +190,7 @@ impl EditorView {
             .into_any_element()
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn param_group(
         &self,
         t: &Theme,
@@ -197,146 +198,157 @@ impl EditorView {
         cur: ParamValue,
         color_label: &str,
         tool: Tool,
+        retype_pick: bool,
         cx: &mut Context<Self>,
     ) -> Option<AnyElement> {
-        let body: AnyElement =
-            match (p, cur) {
-                (Param::Color, ParamValue::Color(c)) => div()
+        let body: AnyElement = match (p, cur) {
+            (Param::Color, ParamValue::Color(c)) => {
+                // Retype: the colour is measured from the picked line, so it is the first,
+                // selected swatch when it is not one of the palette colours; before a line
+                // is picked nothing is selected.
+                let retype = tool == Tool::Retype;
+                let custom = retype && retype_pick && !PALETTE.iter().any(|(_, p)| *p == c);
+                div()
                     .flex()
                     .gap(px(2.))
+                    .when(custom, |d| {
+                        d.child(self.swatch(t, 100, tr!("Measured colour"), c, true))
+                    })
                     .children(PALETTE.iter().enumerate().map(|(i, (name, col))| {
-                        self.swatch(t, i, palette_name(name), *col, *col == c)
+                        let on = (!retype || retype_pick) && *col == c;
+                        self.swatch(t, i, palette_name(name), *col, on)
                     }))
-                    .into_any_element(),
-                (Param::TextSize, ParamValue::TextSize(v)) if tool == Tool::Retype => {
-                    // A retype's size is measured from the box (any whole px), so it is a
-                    // stepper rather than the list of standard sizes.
-                    self.stepper(
-                        t,
-                        "retype-size",
-                        tr_ctx!("annotation setting", "Text size"),
-                        (tr!("Decrease text size"), tr!("Increase text size")),
-                        v.round().max(6.0) as u32,
-                        (6, 400),
-                        |v| ParamValue::TextSize(f64::from(v)),
-                        cx,
+                    .into_any_element()
+            }
+            (Param::TextSize, ParamValue::TextSize(v)) if tool == Tool::Retype => {
+                // A retype's size is measured from the box (any whole px), so it is a
+                // stepper rather than the list of standard sizes.
+                self.stepper(
+                    t,
+                    "retype-size",
+                    tr_ctx!("annotation setting", "Text size"),
+                    (tr!("Decrease text size"), tr!("Increase text size")),
+                    v.round().max(6.0) as u32,
+                    (6, 400),
+                    |v| ParamValue::TextSize(f64::from(v)),
+                    cx,
+                )
+            }
+            (Param::Width, ParamValue::Width(w)) => self.segments(
+                t,
+                "width",
+                WIDTHS
+                    .iter()
+                    .map(|v| (*v, format!("{v:.0} px"), pixels_label(*v))),
+                w,
+                ParamValue::Width,
+            ),
+            (Param::TextSize, ParamValue::TextSize(w)) => self.segments(
+                t,
+                "tsize",
+                TEXT_SIZES
+                    .iter()
+                    .map(|v| (*v, format!("{v:.0}"), pixels_label(*v))),
+                w,
+                ParamValue::TextSize,
+            ),
+            (Param::StepSize, ParamValue::StepSize(w)) => self.segments(
+                t,
+                "ssize",
+                STEP_SIZES
+                    .iter()
+                    .map(|v| (*v, format!("{v:.0}"), pixels_label(*v))),
+                w,
+                ParamValue::StepSize,
+            ),
+            (Param::Opacity, ParamValue::Opacity(w)) => self.segments(
+                t,
+                "opacity",
+                OPACITIES.iter().map(|v| {
+                    (
+                        *v,
+                        format!("{:.0}%", v * 100.0),
+                        tr!("{n} percent", n = format!("{:.0}", v * 100.0)),
                     )
-                }
-                (Param::Width, ParamValue::Width(w)) => self.segments(
-                    t,
-                    "width",
-                    WIDTHS
-                        .iter()
-                        .map(|v| (*v, format!("{v:.0} px"), pixels_label(*v))),
-                    w,
-                    ParamValue::Width,
-                ),
-                (Param::TextSize, ParamValue::TextSize(w)) => self.segments(
-                    t,
-                    "tsize",
-                    TEXT_SIZES
-                        .iter()
-                        .map(|v| (*v, format!("{v:.0}"), pixels_label(*v))),
-                    w,
-                    ParamValue::TextSize,
-                ),
-                (Param::StepSize, ParamValue::StepSize(w)) => self.segments(
-                    t,
-                    "ssize",
-                    STEP_SIZES
-                        .iter()
-                        .map(|v| (*v, format!("{v:.0}"), pixels_label(*v))),
-                    w,
-                    ParamValue::StepSize,
-                ),
-                (Param::Opacity, ParamValue::Opacity(w)) => self.segments(
-                    t,
-                    "opacity",
-                    OPACITIES.iter().map(|v| {
-                        (
-                            *v,
-                            format!("{:.0}%", v * 100.0),
-                            tr!("{n} percent", n = format!("{:.0}", v * 100.0)),
-                        )
-                    }),
-                    w,
-                    ParamValue::Opacity,
-                ),
-                (Param::StampSize, ParamValue::StampSize(w)) => self.segments(
-                    t,
-                    "stamp-size",
-                    STAMP_SIZES
-                        .iter()
-                        .map(|v| (*v, format!("{v:.0}"), pixels_label(*v))),
-                    w,
-                    ParamValue::StampSize,
-                ),
-                (Param::Dim, ParamValue::Dim(w)) => self.segments(
-                    t,
-                    "dim",
-                    DIM_LEVELS.iter().map(|v| {
-                        (
-                            *v,
-                            format!("{:.0}%", v * 100.0),
-                            tr!("{n} percent", n = format!("{:.0}", v * 100.0)),
-                        )
-                    }),
-                    w,
-                    ParamValue::Dim,
-                ),
-                (Param::Zoom, ParamValue::Zoom(w)) => self.segments(
-                    t,
-                    "lens-zoom",
-                    ZOOMS.iter().map(|v| {
-                        (
-                            *v,
-                            format!("{v:.0}\u{D7}"),
-                            tr!("{n} times", n = format!("{v:.0}")),
-                        )
-                    }),
-                    w,
-                    ParamValue::Zoom,
-                ),
-                (Param::BorderWidth, ParamValue::BorderWidth(w)) => self.segments(
-                    t,
-                    "lens-border",
-                    BORDER_WIDTHS
-                        .iter()
-                        .map(|v| (*v, format!("{v:.0}"), pixels_label(*v))),
-                    w,
-                    ParamValue::BorderWidth,
-                ),
-                (Param::Radius, ParamValue::Radius(w)) => self.segments(
-                    t,
-                    "radius",
-                    CORNER_RADII
-                        .iter()
-                        .map(|v| (*v, format!("{v:.0}"), pixels_label(*v))),
-                    w,
-                    ParamValue::Radius,
-                ),
-                (Param::Strength, ParamValue::Strength(v)) => self.stepper(
-                    t,
-                    "strength",
-                    tr_ctx!("annotation setting", "Blur strength"),
-                    (tr!("Decrease blur strength"), tr!("Increase blur strength")),
-                    v,
-                    (4, 32),
-                    ParamValue::Strength,
-                    cx,
-                ),
-                (Param::Block, ParamValue::Block(v)) => self.stepper(
-                    t,
-                    "block",
-                    tr_ctx!("annotation setting", "Pixel size"),
-                    (tr!("Decrease pixel size"), tr!("Increase pixel size")),
-                    v,
-                    (6, 32),
-                    ParamValue::Block,
-                    cx,
-                ),
-                _ => return None,
-            };
+                }),
+                w,
+                ParamValue::Opacity,
+            ),
+            (Param::StampSize, ParamValue::StampSize(w)) => self.segments(
+                t,
+                "stamp-size",
+                STAMP_SIZES
+                    .iter()
+                    .map(|v| (*v, format!("{v:.0}"), pixels_label(*v))),
+                w,
+                ParamValue::StampSize,
+            ),
+            (Param::Dim, ParamValue::Dim(w)) => self.segments(
+                t,
+                "dim",
+                DIM_LEVELS.iter().map(|v| {
+                    (
+                        *v,
+                        format!("{:.0}%", v * 100.0),
+                        tr!("{n} percent", n = format!("{:.0}", v * 100.0)),
+                    )
+                }),
+                w,
+                ParamValue::Dim,
+            ),
+            (Param::Zoom, ParamValue::Zoom(w)) => self.segments(
+                t,
+                "lens-zoom",
+                ZOOMS.iter().map(|v| {
+                    (
+                        *v,
+                        format!("{v:.0}\u{D7}"),
+                        tr!("{n} times", n = format!("{v:.0}")),
+                    )
+                }),
+                w,
+                ParamValue::Zoom,
+            ),
+            (Param::BorderWidth, ParamValue::BorderWidth(w)) => self.segments(
+                t,
+                "lens-border",
+                BORDER_WIDTHS
+                    .iter()
+                    .map(|v| (*v, format!("{v:.0}"), pixels_label(*v))),
+                w,
+                ParamValue::BorderWidth,
+            ),
+            (Param::Radius, ParamValue::Radius(w)) => self.segments(
+                t,
+                "radius",
+                CORNER_RADII
+                    .iter()
+                    .map(|v| (*v, format!("{v:.0}"), pixels_label(*v))),
+                w,
+                ParamValue::Radius,
+            ),
+            (Param::Strength, ParamValue::Strength(v)) => self.stepper(
+                t,
+                "strength",
+                tr_ctx!("annotation setting", "Blur strength"),
+                (tr!("Decrease blur strength"), tr!("Increase blur strength")),
+                v,
+                (4, 32),
+                ParamValue::Strength,
+                cx,
+            ),
+            (Param::Block, ParamValue::Block(v)) => self.stepper(
+                t,
+                "block",
+                tr_ctx!("annotation setting", "Pixel size"),
+                (tr!("Decrease pixel size"), tr!("Increase pixel size")),
+                v,
+                (6, 32),
+                ParamValue::Block,
+                cx,
+            ),
+            _ => return None,
+        };
         let label = match p {
             Param::Color => color_label.to_owned(),
             _ => p.label(),
@@ -393,10 +405,13 @@ impl EditorView {
         } else {
             tr!("Settings for new annotations.")
         };
+        let retype_pick = s.retype.as_ref().is_some_and(|r| r.has_op || r.editing);
         let params: Vec<AnyElement> = s
             .params
             .iter()
-            .filter_map(|(p, v)| self.param_group(t, *p, *v, &color_label, s.inspector_tool, cx))
+            .filter_map(|(p, v)| {
+                self.param_group(t, *p, *v, &color_label, s.inspector_tool, retype_pick, cx)
+            })
             .collect();
         let top = self.panel_top(t, s, cx);
         let bottom = self.panel_bottom(t, s);
@@ -448,15 +463,14 @@ impl EditorView {
             .flex()
             .flex_col()
             .gap(px(14.))
-            .child(
+            .child(crate::ui::scroll::fill_scroll(
+                t,
+                &self.inspector_scroll,
                 div()
                     .id("editor-inspector-scroll")
-                    .flex_1()
-                    .min_h(px(0.))
                     .flex()
                     .flex_col()
                     .gap(px(14.))
-                    .overflow_y_scroll()
                     .child(
                         col()
                             .child(
@@ -591,7 +605,8 @@ impl EditorView {
                                     .child(info_row(tr_ctx!("image info", "Pointer"), pointer)),
                             ),
                     ),
-            )
+                || {},
+            ))
             .child(status_card)
             .into_any_element()
     }

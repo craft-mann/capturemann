@@ -1597,7 +1597,7 @@ pub struct ExportImagesArgs {
     /// Replace every text line of each picture with a bar in the exported files (on-device text recognition; the screenshots are not changed).
     #[arg(long)]
     pub blueprint: bool,
-    /// File names: {name}, {date}, {n}, {w} and {h} (default {name}).
+    /// File names: {name}, {date}, {w} and {h}, and the running number as the letter n in braces (default {name}). Help text cannot print that token literally.
     #[arg(long = "name-pattern", value_name = "PATTERN")]
     pub name_pattern: Option<String>,
     /// Wait for the job and print what was exported and skipped.

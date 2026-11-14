@@ -177,6 +177,12 @@ impl EditorView {
         cx: &mut Context<Self>,
     ) {
         let Some(doc) = self.doc.clone() else { return };
+        if self.pan_from.is_some() && !pan_still_held(ev.pressed_button) {
+            // The release happened outside the canvas (or was never delivered): a pan that
+            // follows a hovering pointer would drag the image away with no button down.
+            self.pan_from = None;
+            cx.notify();
+        }
         if let Some((lx, ly)) = self.pan_from {
             let (x, y) = (f32::from(ev.position.x), f32::from(ev.position.y));
             self.viewport.pan_by(f64::from(x - lx), f64::from(y - ly));
@@ -384,5 +390,23 @@ impl gpui::EntityInputHandler for EditorView {
         _cx: &mut Context<Self>,
     ) -> Option<usize> {
         None
+    }
+}
+
+/// A pan drag goes on only while a mouse button is still down; GPUI reports the held button on
+/// every move, so a lost release cannot leave the canvas panning with the pointer hovering.
+pub(super) fn pan_still_held(pressed: Option<MouseButton>) -> bool {
+    pressed.is_some()
+}
+
+#[cfg(test)]
+mod pan_tests {
+    use super::*;
+
+    #[test]
+    fn a_pan_stops_when_no_button_is_held() {
+        assert!(!pan_still_held(None));
+        assert!(pan_still_held(Some(MouseButton::Middle)));
+        assert!(pan_still_held(Some(MouseButton::Left)));
     }
 }

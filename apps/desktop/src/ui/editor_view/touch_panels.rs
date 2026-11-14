@@ -624,15 +624,14 @@ impl EditorView {
             .flex()
             .flex_col()
             .gap(px(14.))
-            .child(
+            .child(crate::ui::scroll::fill_scroll(
+                t,
+                &self.inspector_scroll,
                 div()
                     .id("editor-blueprint-scroll")
-                    .flex_1()
-                    .min_h(px(0.))
                     .flex()
                     .flex_col()
                     .gap(px(14.))
-                    .overflow_y_scroll()
                     .child(
                         col()
                             .child(
@@ -719,7 +718,8 @@ impl EditorView {
                             ))
                             .child(actions),
                     ),
-            )
+                || {},
+            ))
             .into_any_element()
     }
 

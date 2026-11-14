@@ -166,6 +166,8 @@ pub struct EditorView {
     /// Last pointer position while panning (window px).
     pan_from: Option<(f32, f32)>,
     last_epoch: u64,
+    /// Scroll state of the inspector column (and the Blueprint panel in its place).
+    inspector_scroll: gpui::ScrollHandle,
     _subs: Vec<Subscription>,
 }
 
@@ -194,6 +196,7 @@ impl EditorView {
             canvas_bounds: Shared::new(Cell::new(Bounds::default())),
             root_focus: cx.focus_handle(),
             canvas_focus: cx.focus_handle(),
+            inspector_scroll: gpui::ScrollHandle::new(),
             want_focus: false,
             shortcuts_open: false,
             group_menu: None,
