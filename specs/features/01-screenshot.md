@@ -170,7 +170,7 @@
 ---
 
 ### CAP-6 Long Shot (scrolling capture)
-**Priority** P1 · **Status** Ready (0.3.4; was Draft, P2) · **Crates** cm-capture, cm-render, cm-daemon, apps/desktop · **Depends on** CAP-1, CAP-4, PRM
+**Priority** P1 · **Status** In progress (0.3.4; was Draft, P2). Built and tested with fakes, not seen on a screen or run against a real window: the stitching engine and both scroll loops (AC1 to AC5 on synthetic pages), the daemon action with its tiers (AC6 daemon side, AC7), Windows `SendInput` and X11 XTest scrollers, the Accessibility row, the overlay's Long Shot mode (mode bar with Auto and Hand scroll, direction, Start, the Accessibility card of AC6, hover highlight of the window, region drag), the HUD and the side preview (placement rules S2b in `cm-core::long_shot_hud`), the launcher command, the menu item, the Settings hotkey row ("Not set", no default) and `source: "long_shot"` with the frame count in the stored manifest. Not built: Esc as a global key during the run (the HUD never takes the focus, so Stop is the HUD button), the direction switch in the HUD (the direction is chosen before Start and shown), the dashed header and footer lines in the preview (they are tags), and a scrollable-area highlight finer than the window (the area is the window; the stitcher keeps fixed bands once). Lab: `verification/L1-windows-0.3.4-long-shot-scroll-2026-11-14-claude.md` (engine and scroller on Windows); the overlay, HUD and preview have no report yet · **Crates** cm-capture, cm-render, cm-daemon, apps/desktop · **Depends on** CAP-1, CAP-4, PRM
 
 **User story.** As someone who documents or reports bugs, I want a whole web page, spreadsheet or chat thread as one image, so that I don't paste five screenshots in a row.
 
