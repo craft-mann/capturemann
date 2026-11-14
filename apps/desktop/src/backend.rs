@@ -462,12 +462,20 @@ impl Backend {
 
     /// Bundle folder of a capture (for its poster).
     pub async fn capture_dir(daemon: &Daemon, id: &str) -> Result<PathBuf, String> {
-        let v = Self::call(
+        let v = match Self::call(
             daemon,
             "get_capture",
             json!({ "capture_id": id, "include_image": false }),
         )
-        .await?;
+        .await
+        {
+            Ok(v) => v,
+            // A Click Guide is not a screenshot: its folder (and card picture) come from
+            // `get_guide`.
+            Err(e) => Self::call(daemon, "get_guide", json!({ "guide_id": id }))
+                .await
+                .map_err(|_| e)?,
+        };
         v.get("path")
             .and_then(Value::as_str)
             .map(PathBuf::from)

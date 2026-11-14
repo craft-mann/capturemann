@@ -376,8 +376,25 @@ async fn gde_3_markdown_export_has_relative_images_and_the_blur_is_in_them() {
                    "return_image": false}),
         )
         .await);
-    // A new blur makes the card picture stale: it is dropped, never left showing the old pixels.
-    assert!(!guide_folder(&r).join("thumbs/poster.jpg").exists());
+    // A new blur makes the card picture stale: it is drawn again at once from the rendered
+    // first step, never dropped (the Library card showed "No preview") nor left with old pixels.
+    let poster = guide_folder(&r).join("thumbs/poster.jpg");
+    assert!(poster.is_file());
+    let before = std::fs::read(&poster).unwrap();
+    let step1 = g["steps"][0]["image_id"].as_str().unwrap();
+    ok(&c
+        .call(
+            "annotate",
+            json!({"capture_id": step1, "ops": [{"op": "pixelate", "rect": [100, 100, 150, 150], "block": 32}],
+                   "return_image": false}),
+        )
+        .await);
+    assert!(poster.is_file());
+    assert_ne!(
+        std::fs::read(&poster).unwrap(),
+        before,
+        "the blur is in the poster"
+    );
     let out = r.dir.path().join("export-md");
     let ex = c
         .call(
@@ -465,4 +482,60 @@ async fn gde_1_stopping_with_no_step_keeps_no_guide() {
     assert_eq!(ok(&g)["discarded"], true);
     let list = c.call("list_library", json!({})).await;
     assert!(ok(&list)["captures"].as_array().unwrap().is_empty());
+}
+
+/// The Library card of a stopped guide: its size counts the step bundles and the poster, and the
+/// stop is announced as a revision so the open Library reloads the row.
+#[tokio::test]
+async fn gde_1_a_stopped_guide_row_has_the_size_of_its_steps_and_a_poster() {
+    let r = rig(ScriptedClicks::new(), false, Decision::Approve);
+    let mut c = Client::connect(&r.daemon, "agent");
+    let g = recorded(&r, &mut c, 2).await;
+    let id = g["guide_id"].as_str().unwrap();
+    let list = c.call("list_library", json!({})).await;
+    let row = &ok(&list)["captures"][0];
+    assert_eq!(row["id"], id);
+    let step_bytes: u64 = std::fs::read_dir(guide_folder(&r).join("steps"))
+        .unwrap()
+        .flatten()
+        .map(|e| {
+            std::fs::read_dir(e.path())
+                .unwrap()
+                .flatten()
+                .map(|f| f.metadata().unwrap().len())
+                .sum::<u64>()
+        })
+        .sum();
+    assert!(step_bytes > 1000);
+    assert!(row["size_bytes"].as_u64().unwrap() >= step_bytes, "{row}");
+    assert!(guide_folder(&r).join("thumbs/poster.jpg").is_file());
+}
+
+/// A Retina display (scale 2): the step keeps the display scale, the focus crop is 1200 x 800
+/// points (2400 x 1600 physical) and the title names text up to 80 points (160 px) away.
+#[tokio::test]
+async fn gde_1_retina_step_crops_in_logical_px_and_names_text_in_logical_px() {
+    let (b, _dir) =
+        builder(cm_capture::fake::FakeBackend::new().with_display(1, 0, 0, 2880, 1800, 2.0));
+    let clicks = ScriptedClicks::new();
+    let daemon = b
+        .guide_clicks(clicks.clone())
+        .text_recognizer(Screen { with_email: false })
+        .confirmer(Arc::new(FixedConfirmer::new(Decision::Approve)))
+        .build();
+    let mut c = Client::connect(&daemon, "agent");
+    let id = start(&mut c).await;
+    // 130 physical px (65 points) below the "Alpha" label: named at scale 2.
+    assert!(clicks.click(24.0, 36.0 + 130.0));
+    let done = c.call("stop_guide", json!({"guide_id": id})).await;
+    let s = &ok(&done)["steps"][0];
+    assert_eq!(s["title"], "Click \"Alpha\"");
+    assert_eq!(s["click"]["scale"].as_f64(), Some(2.0));
+    let cap = c
+        .call("get_capture", json!({"capture_id": s["image_id"]}))
+        .await;
+    let ops = ok(&cap)["ops"].as_array().unwrap().clone();
+    let crop = ops.iter().find(|o| o["op"] == "crop").unwrap();
+    assert_eq!(crop["rect"][2].as_f64(), Some(2400.0), "{crop}");
+    assert_eq!(crop["rect"][3].as_f64(), Some(1600.0), "{crop}");
 }

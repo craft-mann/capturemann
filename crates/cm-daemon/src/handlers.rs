@@ -87,6 +87,12 @@ fn write_poster_unlocked(
         .map(|e| format!("Thumbnail not {what}: {e}"));
     // The row already exists; a failure here only leaves a slightly stale size.
     let _ = lock_library(library).index_shot(bundle);
+    // A step picture of a Click Guide: the guide's card picture was dropped by the index (it may
+    // have shown what a blur hides); draw it again from the rendered first step.
+    if let Some(guide_dir) = cm_library::guide::guide_dir_of_step(bundle.dir()) {
+        crate::guide::session::write_guide_poster(&guide_dir);
+        let _ = lock_library(library).index_dir(&guide_dir);
+    }
     warning
 }
 

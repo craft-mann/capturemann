@@ -15,6 +15,7 @@ fn click(x: f64) -> ClickPoint {
         y: 20.0,
         button: "left".into(),
         count: 1,
+        scale: 1.0,
     }
 }
 
@@ -178,4 +179,72 @@ fn library_indexes_a_guide_and_not_its_steps() {
     let r = l.rename(&rec.id, "Renamed guide").unwrap();
     assert!(r.path.ends_with(".cmguide"));
     assert!(l.remove(&rec.id).unwrap());
+}
+
+fn click_scaled(x: f64, y: f64, scale: f64) -> ClickPoint {
+    ClickPoint {
+        x,
+        y,
+        button: "left".into(),
+        count: 1,
+        scale,
+    }
+}
+
+#[test]
+fn focus_crop_is_1200x800_logical_scaled_by_the_display_gde_1() {
+    use cm_library::guide::focus_rect;
+    // Scale 1: 1200 x 800 physical, centred on the click.
+    let r = focus_rect(3000, 2000, (1500.0, 1000.0), 1.0).unwrap();
+    assert_eq!((r.x, r.y, r.w, r.h), (900.0, 600.0, 1200.0, 800.0));
+    // Scale 2 (Retina): 2400 x 1600 physical px = the same 1200 x 800 points.
+    let r = focus_rect(3000, 2000, (1500.0, 1000.0), 2.0).unwrap();
+    assert_eq!((r.x, r.y, r.w, r.h), (300.0, 200.0, 2400.0, 1600.0));
+    // A frame no larger than the crop has nothing to crop.
+    assert!(focus_rect(1200, 800, (10.0, 10.0), 1.0).is_none());
+    assert!(focus_rect(2400, 1600, (10.0, 10.0), 2.0).is_none());
+    // The crop is clamped to the frame, and the click stays inside it, at every edge.
+    for scale in [1.0, 2.0] {
+        for click in [
+            (0.0, 0.0),
+            (2999.0, 0.0),
+            (0.0, 1999.0),
+            (2999.0, 1999.0),
+            (5.0, 1000.0),
+        ] {
+            let r = focus_rect(3000, 2000, click, scale).unwrap();
+            assert!(r.x >= 0.0 && r.y >= 0.0 && r.x + r.w <= 3000.0 && r.y + r.h <= 2000.0);
+            assert!(
+                click.0 >= r.x && click.0 <= r.x + r.w && click.1 >= r.y && click.1 <= r.y + r.h,
+                "click {click:?} outside {r:?} at scale {scale}"
+            );
+        }
+    }
+    // A frame narrower than the crop keeps its full width.
+    let r = focus_rect(1000, 2000, (500.0, 1000.0), 1.0).unwrap();
+    assert_eq!((r.x, r.w, r.h), (0.0, 1000.0, 800.0));
+}
+
+#[test]
+fn a_retina_step_gets_the_logical_sized_crop_gde_1() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut g = GuideBundle::create(tmp.path(), "Retina", serde_json::json!({}), T0).unwrap();
+    let s = g
+        .add_click_step(
+            &png(2880, 1800, 3),
+            click_scaled(2870.0, 10.0, 2.0),
+            "Click here",
+            &Actor::User,
+            T0,
+        )
+        .unwrap();
+    assert!(s.focus_crop);
+    let r = g.open_step(&s.id).unwrap().visible_rect().unwrap();
+    assert_eq!((r.w, r.h), (2400.0, 1600.0));
+    assert_eq!((r.x, r.y), (480.0, 0.0));
+    // Showing the crop again after hiding it uses the same scale.
+    g.set_focus_crop(&s.id, false, &Actor::User, T0).unwrap();
+    g.set_focus_crop(&s.id, true, &Actor::User, T0).unwrap();
+    let r = g.open_step(&s.id).unwrap().visible_rect().unwrap();
+    assert_eq!((r.w, r.h), (2400.0, 1600.0));
 }
