@@ -45,6 +45,7 @@
 - **HTML:** one self-contained file with the images embedded, light and dark styles, a table of contents and print styles.
 - **PDF** (*if spike S4 passes*): A4 or Letter, one or two steps per page. If the spike fails, PDF moves to 0.3.5 and HTML's print styles are the fallback.
 - **Copy as rich text:** pastes into a ticket, Notion or Google Docs.
+- **Options** (design of Nov 14, 2026, board S9): where to save; step headings as `1. Title`, `Step 1 · Title` or `Title only`; image size 1× or 2× (2× writes the images at twice the guide's reading size, never larger than the frame); switches for the intro, the step notes, and note steps that have no image. The sheet names any step that still has redaction proposals to review (GDE-1.AC4) and offers **Review step N** before the export; exporting anyway is allowed, and the files are then written without those blurs.
 - DOCX and PPTX are out of scope (section 7).
 - **AC1** The Markdown export of a 5-step guide renders on GitHub with 5 images, in order, with titles. No absolute paths.
 - **AC2** In any export, a step image with a blur shows the blur. OCR finds no text inside the blurred rectangle.

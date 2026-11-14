@@ -19,7 +19,7 @@
   - **Grid** (2 × 2 or 3 × 3, filled in order).
   - **Strip** (a numbered row or column of frames, for a sequence).
   - **Free** (place and size each image yourself).
-- **Settings:** gap, outer margin, background (the same choices as the screenshot background setting), corner radius, shadow, a caption under each image, and one title.
+- **Settings:** gap, outer margin, background (**transparent, white, light grey, dark or a tint colour**; no screenshot background setting exists, so this list is the definition; transparent is for PNG, and a JPEG or lossy export puts it on white), corner radius, shadow, a caption under each image, and one title.
 - **Storage** (storage rules below): the board is a new capture holding flattened copies of the sources. After **Finish** it is a normal screenshot capture that can be annotated, redacted, copied and shared. Until then, the layout stays editable.
 - **AC1** Two screenshots of different sizes in Pair, side by side. Both are scaled to the same height, the gap and margin are as set, and the export matches the golden image within 1 %.
 - **AC2** A source with a blur. The board shows the blur, and its copy holds no unblurred pixels.
@@ -38,6 +38,7 @@
   - **Watermark:** text or a PNG, a corner or the centre, opacity, and a size relative to the image.
   - **Blueprint:** on or off (ANN-11), with the default keep-list (none).
   - **File names:** a pattern with `{name}`, `{date}`, `{n}` and `{w}x{h}`, and a duplicate rule (number them, never overwrite).
+- **Summary:** `23 exported, 1 skipped` lists each skipped file with the reason and offers **Show in folder** and **Retry skipped** (a new job for the skipped files only).
 - **Runs as one background job** with progress, Cancel, and a summary (`23 exported, 1 skipped: no space`). The originals are never changed (the originals are never changed).
 - **AC1** 50 screenshots exported as JPEG at a longest side of 1600 px with a text watermark gives 50 files of the right size, each with the watermark. The library entries are unchanged.
 - **AC2** Cancel at 50 % keeps the files already written and leaves no partial file.

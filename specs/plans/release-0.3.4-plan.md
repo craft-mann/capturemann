@@ -414,7 +414,11 @@ Order of the carry-over inside track F: B1, B3 (with B2), CMYK, file types, hygi
 
 Written Nov 13, 2026 (old plan): ANN-8 Magnify, ANN-1 text selection, IMP-6 CMYK and file types, LIB-1 paused uploads, VOC-1.AC12. Written Nov 14, 2026 (this merge): CAP-6 in `features/01-screenshot.md`; ANN-9, ANN-10, ANN-11, the base-edit rule and the Zoom Lens name in `features/02-annotation.md`; the new files `features/19-click-guide.md` (GDE-1 to GDE-4) and `features/20-boards-and-bulk.md` (BRD-1, BLK-1); REC-5.AC18 in `features/03-recording.md`; the optional Accessibility row in `features/14-permissions.md`; FR rows in `00-product-spec.md`; the 8 new tools in `02-agent-interface.md`; `specs/README.md` and `platform-acceptance.md`. **Frozen:** the op JSON for `retype`, `move_area` and `blueprint`, the `guide.json` shape and the 8 tool names (the tool count goes from 81 to 89). After the maintainer accepts the defaults in section 8, the build can start.
 
-## 11. After the specs: UI and UX design (Claude Design)
+## 11. UI and UX design (Claude Design): delivered Nov 14, 2026
+
+The design pack is `specs/capturemann-0.3.4-design/` (local, git-ignored like the earlier packs): 14 boards S0 to S13 and `release-0.3.4-design-spec.md` with 7 decisions to confirm. Review notes and the spec lines it added are in section 11.1. The original brief follows.
+
+### 11.0 The brief
 
 The maintainer will give Claude Design the surfaces below, after the specs are accepted. Each needs the kit's rules (`design/CLAUDE.md`, `docs/development/design-surfaces.md`), the text-field spec and the 0.3.3 palette:
 1. Capture overlay: Long Shot mode, area highlight, the side preview while hand scrolling, the limit message, the Accessibility card.
@@ -424,3 +428,9 @@ The maintainer will give Claude Design the surfaces below, after the specs are a
 5. Boards: the Make a board sheet, layout picker, settings and the editable layout canvas.
 6. Library: selection bar, Export selected… sheet (Bulk export), guide and board thumbnails and badges, "Upload waiting for sign-in" with Reconnect (B1).
 7. Settings: hotkeys for Long Shot and Click Guide (none by default), the permissions page rows.
+
+### 11.1 Review of the design (Nov 14, 2026)
+- **Matches the specs:** every board maps to an AC; the palette is the 0.3.3 palette (8 groups) plus **Touch-up** as a 9th, about 430 px tall; Wayland, Accessibility and Input Monitoring cards, Confirm-tier agent card, limits and messages as written.
+- **Gaps the design exposed, now in the specs:** GDE-3 export options (headings, image size, switches); board background choices (the spec pointed at a screenshot background setting that does not exist); Library chips and selection bar; Cancel upload (LIB-1.AC11); Retry skipped (BLK-1).
+- **Decisions to confirm (the design's 7):** Touch-up as a separate group; a neutral "New in 0.3.4" pill in the inspector instead of blue dots (this also replaces the planned dot removal); Blueprint taking over the inspector column; the Long Shot HUD top centre; Click Guides sidebar item and chips; the guide editor as a full page; pink snap guides on the canvas only.
+- **Change requests to Claude Design:** (1) the selection bar's **Copy** has no defined meaning for several images: remove it, or say what it copies; (2) the plan's colour rule says `rec` red is only for Stop, the record dot, step badges and click rings, but the active palette tile is filled with the accent (as in 0.3.3): state in S0 that the palette tile follows the 0.3.3 accent; (3) the Long Shot HUD sits at the top centre over the content being scrolled: show where it goes when the area touches the top edge.

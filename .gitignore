@@ -80,3 +80,4 @@ packaging/ffmpeg/out-linux-*/
 packaging/windows/out/
 packaging/ffmpeg/out-windows-*/
 .testlab-downloads/
+specs/capturemann-0.3.4-design/
