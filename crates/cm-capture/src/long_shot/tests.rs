@@ -191,21 +191,111 @@ fn cap_6_ac5_hand_scroll_settles_then_takes_a_frame() {
     assert_eq!(r.image.frame, page.expected_range(0, 1400));
 }
 
-/// Hand scroll that jumps too far stops with the same note.
-#[test]
-fn cap_6_hand_scroll_too_fast_stops() {
-    let page = SyntheticPage::new(40, 3000, 300);
-    let mut src = HandScript::new(page.clone(), vec![0, 0, 0, 100, 100, 100, 1500, 1500, 1500]);
-    let r = run_hand(
+/// Runs Hand scroll over `script`, then stops the user's way after `polls` polls.
+fn hand(page: &SyntheticPage, script: Vec<u32>, polls: u32) -> LongShotResult {
+    let mut src = HandScript::new(page.clone(), script);
+    let mut n = 0;
+    run_hand(
         &mut src,
         &mut NoSleep::default(),
         cfg(Direction::Vertical),
-        &mut || false,
+        &mut || {
+            n += 1;
+            n > polls
+        },
         &mut |_| {},
     )
-    .unwrap();
+    .unwrap()
+}
+
+/// Hand scroll that jumps too far does not end the capture: the frame is left out. When the user
+/// stops there, the end is the "did not line up" note and the image so far is kept.
+#[test]
+fn cap_6_hand_scroll_too_fast_is_left_out_and_noted_on_stop() {
+    let page = SyntheticPage::new(40, 3000, 300);
+    let r = hand(&page, vec![0, 0, 0, 100, 100, 100, 1500, 1500, 1500], 20);
     assert_eq!(r.end, EndReason::NoOverlap);
+    assert_eq!(r.end.note(), Some("Stopped: the next part did not line up"));
     assert_eq!(r.image.frame, page.expected_range(0, 400));
+}
+
+/// A frame that does not join (a fast flick) does not stop Hand scroll: the user scrolls back,
+/// or less, and the next frame that joins is taken. No row is missing or doubled.
+#[test]
+fn cap_6_hand_scroll_continues_after_a_frame_that_did_not_line_up() {
+    let page = SyntheticPage::new(40, 3000, 300).with_bands(30, 0);
+    let script = vec![
+        0, 0, 0, 100, 100, 100, // joins
+        1500, 1500, 1500, // too far: left out
+        1500, 1500, // the same frame again: not tried again
+        200, 200, 200, // a position that joins the last good frame
+        330, 330, 330,
+    ];
+    let r = hand(&page, script, 40);
+    assert_eq!(r.end, EndReason::StoppedByUser);
+    assert_eq!(r.end.note(), None);
+    assert_eq!(r.image.frame, page.expected_range(0, 330 + 270));
+}
+
+/// Back at the last good frame after a frame that was left out: a plain stop, no note.
+#[test]
+fn cap_6_hand_scroll_back_to_the_last_frame_clears_the_note() {
+    let page = SyntheticPage::new(40, 3000, 300);
+    let script = vec![0, 0, 0, 100, 100, 100, 1500, 1500, 1500, 100, 100, 100];
+    let r = hand(&page, script, 20);
+    assert_eq!(r.end, EndReason::StoppedByUser);
+    assert_eq!(r.image.frame, page.expected_range(0, 400));
+}
+
+/// A sticky header that hides once the page scrolls down (the Chrome toolbar-style "headroom"
+/// bar): the fixed band shrinks, the capture goes on, and the image still has every row once and
+/// in order (the bar stays once at the top).
+#[test]
+fn cap_6_a_header_that_hides_while_scrolling_does_not_stop_the_capture() {
+    let page = SyntheticPage::new(40, 2000, 300)
+        .with_bands(40, 0)
+        .with_hiding_header(150);
+    let r = hand(
+        &page,
+        vec![
+            0, 0, 0, 60, 60, 60, 160, 160, 160, 300, 300, 300, 460, 460, 460,
+        ],
+        40,
+    );
+    assert_eq!(r.end, EndReason::StoppedByUser);
+    // The last viewport shows content rows up to 460 + 260.
+    let plain = SyntheticPage::new(40, 2000, 300).with_bands(40, 0);
+    assert_eq!(r.image.frame, plain.expected_range(0, 460 + 260));
+    let (r, _) = auto(page.clone(), None);
+    assert_eq!(r.end, EndReason::ReachedEnd);
+    assert_eq!(r.image.frame, plain.expected());
+}
+
+/// Found on Chrome (macOS, Nov 14, 2026): the overlay scrollbar appears once the page scrolls and
+/// its short thumb, near the top of the page, lies on the sticky header's rows alone. The first
+/// pair then looked as if the header ended where the thumb starts, and nothing joined. The
+/// moving columns are found in the bands too, and cut.
+#[test]
+fn cap_6_ac1_an_overlay_scrollbar_over_the_header_does_not_stop_the_join() {
+    for sb in [10, 15, 30] {
+        let page = SyntheticPage::new(300, 3 * 300, 300)
+            .with_bands(60, 0)
+            .with_overlay_scrollbar(sb);
+        let (r, _) = auto(page.clone(), None);
+        assert_eq!(r.end, EndReason::ReachedEnd, "auto, scrollbar {sb}");
+        assert_eq!(
+            r.image.frame.height(),
+            page.expected().height(),
+            "auto {sb}"
+        );
+        let r = hand(&page, vec![0, 0, 0, 90, 90, 90, 180, 180, 180], 20);
+        assert_eq!(r.end, EndReason::StoppedByUser, "hand, scrollbar {sb}");
+        assert_eq!(
+            r.image.frame.height(),
+            page.expected_range(0, 180 + 240).height(),
+            "hand {sb}"
+        );
+    }
 }
 
 /// A blank stretch gives several equal joins: without a hint (hand scroll) it stops rather than

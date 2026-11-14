@@ -176,7 +176,11 @@ pub fn run_auto_ex(
 
 /// Hand scroll: the user scrolls. A frame is taken whenever the content has stopped moving
 /// (two polls `settle.interval` apart are equal) and differs from the last frame taken.
-/// Ends when `stop` returns true, at the limit, or when a frame does not line up.
+/// Ends when `stop` returns true or at the limit. A frame that does not line up with the last
+/// one taken does not end the capture (the user may scroll back, or less, or a bar on the page
+/// may be fading): it is left out and the next frame that joins is taken. When the user stops
+/// while the last frame seen was left out, the end is [`EndReason::NoOverlap`], so the note
+/// "Stopped: the next part did not line up" is shown; the image so far is kept either way.
 pub fn run_hand(
     src: &mut dyn FrameSource,
     sleeper: &mut dyn Sleeper,
@@ -205,27 +209,43 @@ pub fn run_hand_ex(
     }
     let mut last_taken = first.frame;
     let mut prev_poll = last_taken.clone();
+    // The settled frame that did not join the last one taken (the stitcher's state has not
+    // changed since, so the same frame would be refused again).
+    let mut refused: Option<Frame> = None;
     let end = loop {
         if stop() {
-            break EndReason::StoppedByUser;
+            break if refused.is_some() {
+                EndReason::NoOverlap
+            } else {
+                EndReason::StoppedByUser
+            };
         }
         sleeper.sleep(cfg.settle.interval);
         let g = src.grab()?;
         let settled = g == prev_poll;
         prev_poll = g.clone();
-        if !settled || g == last_taken {
+        if !settled {
+            continue;
+        }
+        if g == last_taken {
+            // Back at the last good frame: nothing is left out any more.
+            refused = None;
+            continue;
+        }
+        if refused.as_ref() == Some(&g) {
             continue;
         }
         match stitcher.push(&g, None) {
             PushOutcome::Added { .. } => {
+                refused = None;
                 {
                     on_progress(progress(&stitcher));
                     on_stitch(&stitcher);
                 }
                 last_taken = g;
             }
-            PushOutcome::NoChange => {}
-            PushOutcome::NoOverlap => break EndReason::NoOverlap,
+            PushOutcome::NoChange => refused = None,
+            PushOutcome::NoOverlap => refused = Some(g),
             PushOutcome::LimitReached { .. } => {
                 {
                     on_progress(progress(&stitcher));

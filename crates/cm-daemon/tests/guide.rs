@@ -146,8 +146,8 @@ async fn gde_1_ac1_five_clicks_make_five_steps_in_order() {
         );
         assert!((rx + rw / 2.0 - x).abs() <= 2.0);
         assert!((ry + rh / 2.0 - y).abs() <= 2.0);
-        let dist = ((at[0].as_f64().unwrap() - x).powi(2) + (at[1].as_f64().unwrap() - y).powi(2))
-            .sqrt();
+        let dist =
+            ((at[0].as_f64().unwrap() - x).powi(2) + (at[1].as_f64().unwrap() - y).powi(2)).sqrt();
         assert!(dist <= rw / 2.0 * 1.2, "badge {dist} from the click");
     }
     // The card picture is the rendered first step.

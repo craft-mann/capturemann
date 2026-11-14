@@ -362,13 +362,17 @@ fn edge_strips(a: &Lines, b: &Lines, core: &Join, max: (usize, usize)) -> Option
     let n = a.count;
     let cross = a.line_len / 4;
     let overlap = n - core.header - core.footer - core.shift;
-    let limit = (overlap as f64 * VOLATILE_SHARE) as usize;
+    // The rows compared: the overlap (aligned by the shift) and the fixed bands (aligned as they
+    // are). A moving edge can lie in the bands alone: an overlay scrollbar's thumb sits at the top
+    // of the page, next to a sticky header, in the first pair (Chrome, Nov 14, 2026).
+    let band_rows = (0..core.header).chain(n - core.footer..n);
+    let overlap_rows =
+        (core.guard..overlap - core.guard).map(|i| (core.header + core.shift + i, core.header + i));
+    let rows: Vec<(usize, usize)> = band_rows.map(|i| (i, i)).chain(overlap_rows).collect();
+    let limit = (rows.len() as f64 * VOLATILE_SHARE) as usize;
     let mut bad = vec![0usize; cross];
-    for i in core.guard..overlap - core.guard {
-        let (la, lb) = (
-            a.line(core.header + core.shift + i),
-            b.line(core.header + i),
-        );
+    for (ia, ib) in rows {
+        let (la, lb) = (a.line(ia), b.line(ib));
         for (x, c) in bad.iter_mut().enumerate() {
             if la[x * 4..x * 4 + 4] != lb[x * 4..x * 4 + 4] {
                 *c += 1;
@@ -551,13 +555,32 @@ impl Stitcher {
         if self.limit_hit || self.size != Some(size) {
             return PushOutcome::NoOverlap;
         }
-        let join = match find_join(prev, lines, hint.map(|h| h as usize), self.bands) {
-            Ok(j) => j,
-            Err(NoJoin::Same) => return PushOutcome::NoChange,
-            Err(NoJoin::NoOverlap) => return PushOutcome::NoOverlap,
-        };
+        let hint = hint.map(|h| h as usize);
         let n = lines.count;
         let line_len = lines.line_len;
+        let join = match find_join(prev, lines, hint, self.bands) {
+            Ok(j) => j,
+            Err(NoJoin::Same) => return PushOutcome::NoChange,
+            Err(NoJoin::NoOverlap) => {
+                // A band that went away (a sticky header that hides while the page scrolls
+                // down): the bands are found again from this pair, and only narrower ones are
+                // accepted. The rows that were band become content.
+                let (Some((h, f)), Ok(j)) = (self.bands, find_join(prev, lines, hint, None)) else {
+                    return PushOutcome::NoOverlap;
+                };
+                if j.header > h || j.footer > f || (j.header == h && j.footer == f) {
+                    return PushOutcome::NoOverlap;
+                }
+                let foot_cut = (f - j.footer) * line_len;
+                let mut content = self.header.split_off(j.header * line_len);
+                content.extend_from_slice(&self.content);
+                content.extend_from_slice(&self.footer[..foot_cut]);
+                self.footer.drain(..foot_cut);
+                self.content = content;
+                self.bands = Some((j.header, j.footer));
+                j
+            }
+        };
         if self.bands.is_none() {
             // The second frame fixes the bands; the content starts with the first frame's.
             self.header = prev.range(0, join.header).to_vec();

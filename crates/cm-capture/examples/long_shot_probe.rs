@@ -25,7 +25,7 @@ struct Frames {
     /// `--dump <dir>`: every frame taken is written there (diagnosis).
     dump: Option<(std::path::PathBuf, u32)>,
     /// The frames are kept in memory and written when the run ends, so that writing PNGs does
-    /// not slow the run down (only the last 12 are kept).
+    /// not slow the run down (only the last 12 different ones are kept).
     kept: std::collections::VecDeque<(u32, Frame)>,
 }
 
@@ -50,6 +50,10 @@ impl FrameSource for Frames {
             .ok_or_else(|| CmError::invalid_input("capture was cancelled"))?;
         if let Some((_, n)) = &mut self.dump {
             *n += 1;
+            // A frame equal to the one kept before it adds nothing to a diagnosis.
+            if self.kept.back().is_some_and(|(_, last)| *last == frame) {
+                return Ok(frame);
+            }
             self.kept.push_back((*n, frame.clone()));
             if self.kept.len() > 12 {
                 self.kept.pop_front();
