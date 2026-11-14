@@ -33,7 +33,7 @@ use crate::ui::settings::model::SettingsSection;
 use crate::ui::studio::{Studio, ThemeGlobal};
 use crate::ui::toast_window::ToastHost;
 
-mod capture_flow;
+pub(crate) mod capture_flow;
 mod commands;
 mod library_ops;
 mod permission_flow;
@@ -96,6 +96,8 @@ pub enum Command {
     ShowSettings,
     /// "New Click Guide" (GDE-1): the bar, then the clicks.
     NewClickGuide,
+    /// "Long Shot" (CAP-6): the overlay picks the area, then the scrolling capture runs.
+    LongShot,
     /// Import these files (the Dock, Open With, a drop); no path opens the file picker.
     ImportFiles(Vec<std::path::PathBuf>),
     OpenCapture(String),

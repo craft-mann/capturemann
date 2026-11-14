@@ -438,6 +438,11 @@ pub fn pick_json(mode: Mode, choice: Choice) -> Value {
 pub fn with_long(mut v: Value, long: Option<crate::app::LongChoice>) -> Value {
     if let Some(l) = long {
         v["picked"]["long"] = json!({ "scroll": l.scroll.name(), "direction": l.dir.name() });
+        if let Some(a) = l.area {
+            v["picked"]["long"]["area"] =
+                json!([a.origin.x, a.origin.y, a.size.width, a.size.height]);
+            v["picked"]["long"]["scale"] = json!(l.scale);
+        }
     }
     v
 }
@@ -508,12 +513,22 @@ mod tests {
             Some(LongChoice {
                 scroll: Scroll::Hand,
                 dir: Dir::Horizontal,
+                area: Some(PhysicalRect {
+                    origin: cm_core::PhysicalPoint { x: 5, y: 6 },
+                    size: PhysicalSize {
+                        width: 70,
+                        height: 80,
+                    },
+                }),
+                scale: 2.0,
             }),
         );
         assert_eq!(v["picked"]["mode"], "long");
         assert_eq!(v["picked"]["window_id"], 9);
         assert_eq!(v["picked"]["long"]["scroll"], "hand");
         assert_eq!(v["picked"]["long"]["direction"], "horizontal");
+        assert_eq!(v["picked"]["long"]["area"], json!([5, 6, 70, 80]));
+        assert_eq!(v["picked"]["long"]["scale"], 2.0);
         // A region keeps its rectangle.
         let c = Choice {
             display_id: 1,

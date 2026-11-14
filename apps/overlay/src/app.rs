@@ -36,7 +36,7 @@ use crate::gate::{Gate, Held, Pointer};
 use crate::long_bar::{self, AutoSupport, BarEffect, BarLayout, BarState, Dir, Item, Scroll};
 use crate::long_paint::LongScene;
 use crate::paint::{paint, tokens, Scene};
-use crate::picker::{CursorHint, Effect, Key, Mode, Picker};
+use crate::picker::{CursorHint, Effect, Key, Mode, Outcome, Picker};
 use crate::platform::{describe_window, escape_is_down, prepare_overlay_window, take_foreground};
 use crate::selection::Handle;
 use crate::session::{Choice, Frozen, SessionEvent};
@@ -84,10 +84,15 @@ pub enum Finish {
 }
 
 /// The Long Shot options chosen on the bar.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LongChoice {
     pub scroll: Scroll,
     pub dir: Dir,
+    /// The area to capture, physical px relative to the display (the window's rectangle, the
+    /// dragged region, or the whole display), and the display's scale: the desktop app places the
+    /// HUD from them (S2b).
+    pub area: Option<cm_core::PhysicalRect>,
+    pub scale: f64,
 }
 
 /// What [`run`] hands back.
@@ -190,6 +195,8 @@ struct App {
     bar: BarState,
     pointer_at: Option<(usize, f64, f64)>,
     bar_press: Option<Item>,
+    long_area: Option<cm_core::PhysicalRect>,
+    long_scale: f64,
 }
 
 /// Shows the overlay on every display as the session's events arrive and blocks until the
@@ -227,6 +234,8 @@ pub fn run(inbox: &Arc<Inbox>, opts: Options, tracer: &Tracer) -> Result<Finishe
         bar: BarState::new(opts.auto_scroll),
         pointer_at: None,
         bar_press: None,
+        long_area: None,
+        long_scale: 1.0,
     };
     let ended = event_loop.run_app(&mut app);
     // The windows go with `app`; say so, so a window that outlives the process is attributable.
@@ -248,6 +257,8 @@ pub fn run(inbox: &Arc<Inbox>, opts: Options, tracer: &Tracer) -> Result<Finishe
     let long = (opts.mode == Mode::Long).then_some(LongChoice {
         scroll: app.bar.scroll,
         dir: app.bar.dir,
+        area: app.long_area,
+        scale: app.long_scale,
     });
     Ok(Finished {
         finish: app.finish.unwrap_or(Finish::Cancelled),
@@ -805,6 +816,25 @@ impl App {
             }
             Effect::Done(outcome) => {
                 log::info!("overlay ends: the user chose a target");
+                if self.opts.mode == Mode::Long {
+                    let v = &self.views[i];
+                    self.long_scale = v.scale;
+                    self.long_area = Some(match outcome {
+                        Outcome::Region { rect } => rect,
+                        Outcome::Window { window_id } => {
+                            v.picker
+                                .window_rect(window_id)
+                                .unwrap_or(cm_core::PhysicalRect {
+                                    origin: cm_core::PhysicalPoint { x: 0, y: 0 },
+                                    size: v.display.bounds.size,
+                                })
+                        }
+                        Outcome::Display => cm_core::PhysicalRect {
+                            origin: cm_core::PhysicalPoint { x: 0, y: 0 },
+                            size: v.display.bounds.size,
+                        },
+                    });
+                }
                 self.finish = Some(Finish::Chosen(Choice {
                     display_id: self.views[i].display.id,
                     outcome,

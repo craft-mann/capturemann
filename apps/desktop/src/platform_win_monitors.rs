@@ -324,6 +324,31 @@ pub fn make_click_through(h: HWND) -> bool {
     }
 }
 
+/// Makes a window that takes clicks but never the focus: `WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW`
+/// (no Alt-Tab or taskbar entry either). Unlike [`make_click_through`] the mouse still reaches it.
+pub fn make_no_activate(h: HWND) -> bool {
+    use crate::recording::zorder::{WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW};
+    // SAFETY: `h` is a live top-level window of this process, used from its own thread.
+    unsafe {
+        let old = GetWindowLongPtrW(h, GWL_EXSTYLE) as u32;
+        SetWindowLongPtrW(
+            h,
+            GWL_EXSTYLE,
+            (old | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW) as isize,
+        );
+        let _ = SetWindowPos(
+            h,
+            None,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
+        );
+        GetWindowLongPtrW(h, GWL_EXSTYLE) as u32 & WS_EX_NOACTIVATE != 0
+    }
+}
+
 /// Windows 11 draws a grey 1 px border and rounds the corners of every top-level window, so the
 /// transparent strip above the recording HUD (room for hints and chips) showed as a framed empty
 /// box. Asks DWM for no border, square corners and no non-client rendering (without that last

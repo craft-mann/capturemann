@@ -20,6 +20,8 @@ pub enum CaptureMode {
     Region,
     Window,
     Display,
+    /// Long Shot (CAP-6): the overlay only picks the area and the scroll options.
+    Long,
 }
 
 impl CaptureMode {
@@ -28,7 +30,116 @@ impl CaptureMode {
             CaptureMode::Region => "region",
             CaptureMode::Window => "window",
             CaptureMode::Display => "display",
+            CaptureMode::Long => "long",
         }
+    }
+}
+
+/// What a Long Shot overlay run returns (`cm-overlay long`).
+#[derive(Debug, Clone, PartialEq)]
+pub enum LongOutcome {
+    Picked(LongPick),
+    /// Esc.
+    Cancelled,
+    /// A mode chip of the bar, or "Grant access...": `region`, `window`, `display`, `guide` or
+    /// `accessibility`.
+    Switch(String),
+}
+
+/// The area and the options picked on the Long Shot bar.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LongPick {
+    pub display_id: u32,
+    pub window_id: Option<u32>,
+    /// `[x, y, w, h]` physical px relative to the display (the dragged region).
+    pub rect: Option<[i64; 4]>,
+    /// The area the capture covers, same space (the window's rectangle, the region, or the
+    /// display), for placing the HUD.
+    pub area: Option<[i64; 4]>,
+    pub scale: f64,
+    /// `auto` or `hand`.
+    pub scroll: String,
+    /// `vertical` or `horizontal`.
+    pub direction: String,
+}
+
+impl LongPick {
+    /// The `capture_screenshot` target of this pick.
+    pub fn target_json(&self) -> Value {
+        match (self.window_id, self.rect) {
+            (Some(window_id), _) => serde_json::json!({ "window_id": window_id }),
+            (None, Some(rect)) => {
+                serde_json::json!({ "display_id": self.display_id, "rect": rect })
+            }
+            (None, None) => serde_json::json!({ "display_id": self.display_id }),
+        }
+    }
+}
+
+/// Interprets a Long Shot overlay run (`cm-overlay long ...`).
+pub fn parse_long(
+    exit_code: Option<i32>,
+    stdout: &str,
+    stderr: &str,
+) -> Result<LongOutcome, OverlayError> {
+    let last = stdout.lines().rev().find(|l| !l.trim().is_empty());
+    let v: Option<Value> = last.and_then(|l| serde_json::from_str(l.trim()).ok());
+    if let Some(v) = &v {
+        if exit_code.unwrap_or(0) == 0 {
+            if let Some(name) = v.get("switch_to").and_then(Value::as_str) {
+                return match name {
+                    "region" | "window" | "display" | "guide" | "accessibility" => {
+                        Ok(LongOutcome::Switch(name.to_owned()))
+                    }
+                    other => Err(OverlayError::BadOutput(other.to_owned())),
+                };
+            }
+            if let Some(p) = v.get("picked") {
+                let bad = || OverlayError::BadOutput(p.to_string());
+                let arr4 = |x: Option<&Value>| -> Option<[i64; 4]> {
+                    let a = x?.as_array()?;
+                    Some([
+                        a.first()?.as_i64()?,
+                        a.get(1)?.as_i64()?,
+                        a.get(2)?.as_i64()?,
+                        a.get(3)?.as_i64()?,
+                    ])
+                };
+                let long = p.get("long").ok_or_else(bad)?;
+                let name = |k: &str, ok: &[&str]| -> Result<String, OverlayError> {
+                    long.get(k)
+                        .and_then(Value::as_str)
+                        .filter(|s| ok.contains(s))
+                        .map(str::to_owned)
+                        .ok_or_else(bad)
+                };
+                return Ok(LongOutcome::Picked(LongPick {
+                    display_id: p
+                        .get("display_id")
+                        .and_then(Value::as_u64)
+                        .and_then(|n| u32::try_from(n).ok())
+                        .ok_or_else(bad)?,
+                    window_id: p
+                        .get("window_id")
+                        .and_then(Value::as_u64)
+                        .and_then(|n| u32::try_from(n).ok()),
+                    rect: arr4(p.get("rect")),
+                    area: arr4(long.get("area")),
+                    scale: long
+                        .get("scale")
+                        .and_then(Value::as_f64)
+                        .filter(|s| s.is_finite() && *s > 0.0)
+                        .unwrap_or(1.0),
+                    scroll: name("scroll", &["auto", "hand"])?,
+                    direction: name("direction", &["vertical", "horizontal"])?,
+                }));
+            }
+        }
+    }
+    // Esc, errors and exit codes read like any other overlay run.
+    match parse_result(exit_code, stdout, stderr)? {
+        OverlayOutcome::Cancelled => Ok(LongOutcome::Cancelled),
+        _ => Err(OverlayError::BadOutput(last.unwrap_or_default().to_owned())),
     }
 }
 
@@ -273,6 +384,19 @@ impl OverlayLauncher {
         self
     }
 
+    /// Runs the Long Shot overlay: picks the area and the options, takes no screenshot.
+    /// `auto_scroll` is `available`, `needs_accessibility` or `unavailable`.
+    pub async fn pick_long(&self, auto_scroll: &str) -> Result<LongOutcome, OverlayError> {
+        let (code, out, err) = self
+            .run_raw_with(
+                CaptureMode::Long,
+                true,
+                &["--auto-scroll".into(), auto_scroll.into()],
+            )
+            .await?;
+        parse_long(code, &out, &err)
+    }
+
     pub fn args(&self, mode: CaptureMode) -> Vec<OsString> {
         self.args_with(mode, false)
     }
@@ -318,12 +442,22 @@ impl OverlayLauncher {
         mode: CaptureMode,
         pick: bool,
     ) -> Result<(Option<i32>, String, String), OverlayError> {
+        self.run_raw_with(mode, pick, &[]).await
+    }
+
+    async fn run_raw_with(
+        &self,
+        mode: CaptureMode,
+        pick: bool,
+        extra_args: &[OsString],
+    ) -> Result<(Option<i32>, String, String), OverlayError> {
         let Some(bin) = &self.binary else {
             return Err(OverlayError::NotFound);
         };
         crate::trace::mark("overlay_task_started");
         let mut cmd = tokio::process::Command::from(cm_platform::process::command(bin));
         cmd.args(self.args_with(mode, pick));
+        cmd.args(extra_args);
         if Self::tab_to_list(mode, pick) {
             cmd.arg("--tab-to-list");
         }
@@ -464,6 +598,48 @@ mod tests {
         assert!(!OverlayLauncher::tab_to_list(CaptureMode::Window, true));
         assert!(!OverlayLauncher::tab_to_list(CaptureMode::Region, false));
         assert!(!OverlayLauncher::tab_to_list(CaptureMode::Display, false));
+    }
+
+    /// CAP-6: the Long Shot overlay hands back the area and the options, or a switch, or Esc.
+    #[test]
+    fn long_shot_overlay_output_is_read() {
+        let picked = r#"{"picked":{"mode":"long","display_id":2,"window_id":9,"long":{"scroll":"hand","direction":"horizontal","area":[10,20,300,400],"scale":2.0}}}"#;
+        let Ok(LongOutcome::Picked(p)) = parse_long(Some(0), picked, "") else {
+            panic!("picked")
+        };
+        assert_eq!((p.display_id, p.window_id), (2, Some(9)));
+        assert_eq!(p.area, Some([10, 20, 300, 400]));
+        assert_eq!(
+            (p.scroll.as_str(), p.direction.as_str()),
+            ("hand", "horizontal")
+        );
+        assert_eq!(p.scale, 2.0);
+        assert_eq!(p.target_json(), serde_json::json!({"window_id": 9}));
+        // A dragged region is a display rectangle.
+        let region = r#"{"picked":{"display_id":1,"rect":[5,6,70,80],"long":{"scroll":"auto","direction":"vertical","area":[5,6,70,80],"scale":1.0}}}"#;
+        let Ok(LongOutcome::Picked(p)) = parse_long(Some(0), region, "") else {
+            panic!("region")
+        };
+        assert_eq!(
+            p.target_json(),
+            serde_json::json!({"display_id": 1, "rect": [5, 6, 70, 80]})
+        );
+        // Switches, Esc, and nonsense.
+        assert_eq!(
+            parse_long(Some(0), r#"{"switch_to":"accessibility"}"#, ""),
+            Ok(LongOutcome::Switch("accessibility".into()))
+        );
+        assert_eq!(
+            parse_long(Some(0), r#"{"switch_to":"guide"}"#, ""),
+            Ok(LongOutcome::Switch("guide".into()))
+        );
+        assert!(parse_long(Some(0), r#"{"switch_to":"moon"}"#, "").is_err());
+        assert_eq!(
+            parse_long(Some(3), r#"{"cancelled":true}"#, ""),
+            Ok(LongOutcome::Cancelled)
+        );
+        assert!(parse_long(Some(0), r#"{"picked":{"display_id":1}}"#, "").is_err());
+        assert!(parse_long(Some(0), r#"{"capture_id":"shot_1"}"#, "").is_err());
     }
 
     /// CAP-1.AC6: Esc closes the overlay and nothing is saved: no error, no capture.

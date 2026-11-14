@@ -244,6 +244,11 @@ impl Picker {
         }
     }
 
+    /// The rectangle (display px) of the pickable window `id`.
+    pub fn window_rect(&self, id: u32) -> Option<PhysicalRect> {
+        self.windows.iter().find(|w| w.id == id).map(|w| w.rect)
+    }
+
     pub fn hover_window(&self) -> Option<&PickableWindow> {
         match self.hover() {
             Hover::Window(i) => self.windows.get(i),
