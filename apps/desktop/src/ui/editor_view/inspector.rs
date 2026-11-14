@@ -358,7 +358,7 @@ impl EditorView {
             .collect();
         let top = self.panel_top(t, s, cx);
         let bottom = self.panel_bottom(t, s);
-        let is_new = crate::editor::palette::SHOW_NEW_DOT && s.inspector_tool.is_new();
+        let is_new = s.inspector_tool.is_new();
         let selected = s.selected && !s.editing_text;
         let can_duplicate = s.inspector_tool != Tool::Spotlight;
         let has_crop = s.has_crop;

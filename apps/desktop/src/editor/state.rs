@@ -18,6 +18,10 @@ use super::geom::{self, Handle, TextMetrics};
 use super::keys::Mods;
 use super::palette::Faces;
 use super::tools::{Param, ParamValue, StampWord, Styles, Tool, ToolStyle};
+use super::touchup;
+
+mod touch;
+pub use touch::{BlueprintInfo, LensInfo, MoveInfo, RetypeInfo, Touch};
 
 /// One user-visible change, sent to the daemon as a single `annotate` call.
 #[derive(Debug, Clone, PartialEq)]
@@ -39,6 +43,12 @@ pub enum TextTarget {
     Callout(OpKind),
     /// The label of a step badge (ANN-6); one line.
     Step(OpKind),
+    /// The new text of a Retype (ANN-9); one line. `base` carries the box, fill and style;
+    /// `original` is the recognized text, so retyping to the same text stores nothing.
+    Retype {
+        base: OpKind,
+        original: Option<String>,
+    },
 }
 
 /// Text being typed on the canvas (ANN-1: click to place, type, Enter for a new line,
@@ -61,6 +71,9 @@ pub struct TextEdit {
     /// The whole text is selected (a step label opens like this): the next typed text or paste
     /// replaces it, Backspace/Delete clear it, the arrow keys collapse the selection.
     pub sel_all: bool,
+    /// The other end of a selection made with the pointer or Shift+arrows (ANN-1.AC9 to AC11):
+    /// the selection runs between `anchor` and `cursor`. `None` when nothing is selected.
+    pub anchor: Option<usize>,
 }
 
 impl TextEdit {
@@ -100,11 +113,165 @@ impl TextEdit {
 
     /// The caret as a UTF-16 range (collapsed), for the platform.
     pub fn selection_utf16(&self) -> std::ops::Range<usize> {
-        if self.sel_all {
-            return 0..self.utf16_of(self.len());
+        if let Some(r) = self.selection() {
+            return self.utf16_of(r.start)..self.utf16_of(r.end);
         }
         let c = self.utf16_of(self.cursor);
         c..c
+    }
+
+    /// The selected characters as a char range (a step label that opens selected counts), or
+    /// `None` when nothing is selected.
+    pub fn selection(&self) -> Option<std::ops::Range<usize>> {
+        if self.sel_all {
+            let n = self.len();
+            return (n > 0).then_some(0..n);
+        }
+        let a = self.anchor?.min(self.len());
+        let c = self.cursor.min(self.len());
+        (a != c).then(|| a.min(c)..a.max(c))
+    }
+
+    /// The selected plain text (what Copy puts on the clipboard).
+    pub fn selected_text(&self) -> Option<String> {
+        let r = self.selection()?;
+        Some(
+            self.text
+                .chars()
+                .skip(r.start)
+                .take(r.end - r.start)
+                .collect(),
+        )
+    }
+
+    /// Removes the selection and puts the caret where it was; false when nothing is selected.
+    fn delete_selection(&mut self) -> bool {
+        let Some(r) = self.selection() else {
+            self.anchor = None;
+            self.sel_all = false;
+            return false;
+        };
+        let (a, b) = (self.byte(r.start), self.byte(r.end));
+        self.text.replace_range(a..b, "");
+        self.cursor = r.start;
+        self.anchor = None;
+        self.sel_all = false;
+        true
+    }
+
+    /// Cmd/Ctrl+X: the selected text, removed.
+    pub fn cut(&mut self) -> Option<String> {
+        let t = self.selected_text()?;
+        self.marked = None;
+        self.delete_selection();
+        Some(t)
+    }
+
+    /// Cmd/Ctrl+A.
+    pub fn select_all(&mut self) {
+        self.marked = None;
+        self.sel_all = false;
+        self.anchor = Some(0);
+        self.cursor = self.len();
+    }
+
+    /// Turns "the whole label is selected" into an ordinary selection a key can extend.
+    fn settle_selection(&mut self) {
+        if std::mem::take(&mut self.sel_all) {
+            self.anchor = Some(0);
+            self.cursor = self.len();
+        }
+    }
+
+    /// Shift+Left / Shift+Right: moves the caret one character and keeps the other end.
+    pub fn extend(&mut self, forward: bool) {
+        self.marked = None;
+        self.settle_selection();
+        if self.anchor.is_none() {
+            self.anchor = Some(self.cursor);
+        }
+        self.cursor = if forward {
+            (self.cursor + 1).min(self.len())
+        } else {
+            self.cursor.saturating_sub(1)
+        };
+    }
+
+    /// Shift+Home / Shift+End: extends to the start or end of the line.
+    pub fn extend_line(&mut self, to_end: bool) {
+        self.marked = None;
+        self.settle_selection();
+        if self.anchor.is_none() {
+            self.anchor = Some(self.cursor);
+        }
+        let chars: Vec<char> = self.text.chars().collect();
+        let mut c = self.cursor.min(chars.len());
+        if to_end {
+            while c < chars.len() && chars[c] != '\n' {
+                c += 1;
+            }
+        } else {
+            while c > 0 && chars[c - 1] != '\n' {
+                c -= 1;
+            }
+        }
+        self.cursor = c;
+    }
+
+    /// A press at char index `i`: the caret goes there and a drag extends from it (ANN-1.AC11);
+    /// with Shift the selection grows to `i` from where the caret was.
+    pub fn press_at(&mut self, i: usize, extend: bool) {
+        self.marked = None;
+        self.settle_selection();
+        let i = i.min(self.len());
+        if extend {
+            if self.anchor.is_none() {
+                self.anchor = Some(self.cursor);
+            }
+        } else {
+            self.anchor = Some(i);
+        }
+        self.cursor = i;
+    }
+
+    /// The pointer moved with the button down: the caret follows, the anchor stays.
+    pub fn drag_to(&mut self, i: usize) {
+        self.cursor = i.min(self.len());
+    }
+
+    /// A double click at char index `i`: the word there is selected (ANN-1.AC9).
+    pub fn select_word_at(&mut self, i: usize) {
+        self.marked = None;
+        self.sel_all = false;
+        let chars: Vec<char> = self.text.chars().collect();
+        if chars.is_empty() {
+            return;
+        }
+        let i = i.min(chars.len() - 1);
+        let class = |c: char| {
+            if c.is_alphanumeric() || c == '_' {
+                0
+            } else if c.is_whitespace() {
+                1
+            } else {
+                2
+            }
+        };
+        let k = class(chars[i]);
+        let (mut a, mut b) = (i, i + 1);
+        while a > 0 && class(chars[a - 1]) == k && chars[a - 1] != '\n' {
+            a -= 1;
+        }
+        while b < chars.len() && class(chars[b]) == k && chars[b] != '\n' {
+            b += 1;
+        }
+        self.anchor = Some(a);
+        self.cursor = b;
+    }
+
+    /// The characters that may still be added before the 2000 character limit.
+    fn room(&self) -> usize {
+        cm_core::annotation::MAX_TEXT_CHARS.saturating_sub(self.len())
     }
 
     /// The text in a UTF-16 range, and the range actually used.
@@ -132,11 +299,14 @@ impl TextEdit {
             Some(r) => (self.chars_of(r.start), self.chars_of(r.end)),
             None => match &self.marked {
                 Some(m) => (m.start.min(self.len()), m.end.min(self.len())),
-                None if self.sel_all => (0, self.len()),
-                None => (self.cursor, self.cursor),
+                None => match self.selection() {
+                    Some(r) => (r.start, r.end),
+                    None => (self.cursor, self.cursor),
+                },
             },
         };
         self.sel_all = false;
+        self.anchor = None;
         let b = b.max(a);
         let (ba, bb) = (self.byte(a), self.byte(b));
         let changed = self.text[ba..bb] != clean;
@@ -156,10 +326,9 @@ impl TextEdit {
         if clean.is_empty() {
             return;
         }
-        if std::mem::take(&mut self.sel_all) {
-            self.text.clear();
-            self.cursor = 0;
-        }
+        self.delete_selection();
+        // The 2000 character limit: pasted text is cut there (ANN-1.AC10).
+        let clean: String = clean.chars().take(self.room()).collect();
         let b = self.byte(self.cursor);
         self.text.insert_str(b, &clean);
         self.cursor += clean.chars().count();
@@ -188,37 +357,43 @@ impl TextEdit {
         }
     }
 
-    /// Removes the selected text (all of it); false when nothing is selected.
+    /// Removes the selected text; false when nothing is selected.
     fn clear_selected(&mut self) -> bool {
-        if !std::mem::take(&mut self.sel_all) {
-            return false;
-        }
-        self.text.clear();
-        self.cursor = 0;
-        true
+        self.delete_selection()
     }
 
+    /// Left collapses a selection to its start; otherwise the caret moves one character.
     pub fn left(&mut self) {
         self.marked = None;
-        if std::mem::take(&mut self.sel_all) {
-            self.cursor = 0;
+        if let Some(r) = self.selection() {
+            self.cursor = r.start;
+            self.anchor = None;
+            self.sel_all = false;
             return;
         }
+        self.anchor = None;
+        self.sel_all = false;
         self.cursor = self.cursor.saturating_sub(1);
     }
 
+    /// Right collapses a selection to its end; otherwise the caret moves one character.
     pub fn right(&mut self) {
         self.marked = None;
-        if std::mem::take(&mut self.sel_all) {
-            self.cursor = self.len();
+        if let Some(r) = self.selection() {
+            self.cursor = r.end;
+            self.anchor = None;
+            self.sel_all = false;
             return;
         }
+        self.anchor = None;
+        self.sel_all = false;
         self.cursor = (self.cursor + 1).min(self.len());
     }
 
     pub fn home(&mut self) {
         self.marked = None;
         self.sel_all = false;
+        self.anchor = None;
         while self.cursor > 0 && self.text.chars().nth(self.cursor - 1) != Some('\n') {
             self.cursor -= 1;
         }
@@ -227,6 +402,7 @@ impl TextEdit {
     pub fn end(&mut self) {
         self.marked = None;
         self.sel_all = false;
+        self.anchor = None;
         while self.cursor < self.len() && self.text.chars().nth(self.cursor) != Some('\n') {
             self.cursor += 1;
         }
@@ -273,6 +449,24 @@ impl TextEdit {
                     text: (!label.is_empty()).then_some(label),
                 }
             }
+            TextTarget::Retype { base, .. } => match base {
+                OpKind::Retype {
+                    rect,
+                    fill,
+                    weight,
+                    align,
+                    ..
+                } => OpKind::Retype {
+                    rect: *rect,
+                    fill: fill.clone(),
+                    text: self.text.clone(),
+                    size: self.size,
+                    color: self.color,
+                    weight: *weight,
+                    align: *align,
+                },
+                other => other.clone(),
+            },
             _ => OpKind::Text {
                 at: self.at,
                 text: self.text.clone(),
@@ -284,14 +478,20 @@ impl TextEdit {
         }
     }
 
-    /// A step label is one line: Enter commits it.
+    /// A step label and a retype are one line: Enter commits it.
     pub fn single_line(&self) -> bool {
-        matches!(self.target, TextTarget::Step(_))
+        matches!(self.target, TextTarget::Step(_) | TextTarget::Retype { .. })
     }
 
     /// An empty callout is still a box (ANN-4 edge cases); empty text is not an annotation.
     fn keeps_when_empty(&self) -> bool {
         matches!(self.target, TextTarget::Callout(_) | TextTarget::Step(_))
+    }
+
+    /// Whether the preview draws the op while the text is empty: a retype shows the filled box
+    /// at once (ANN-9), though it stores nothing for empty text.
+    fn shows_when_empty(&self) -> bool {
+        self.keeps_when_empty() || matches!(self.target, TextTarget::Retype { .. })
     }
 }
 
@@ -393,6 +593,8 @@ pub struct CalloutInfo {
 pub struct Chrome {
     pub bounds: Rc,
     pub handles: Vec<(Handle, Pt)>,
+    /// The loupe of a selected Zoom Lens (drawn dashed: dragging it moves only the loupe).
+    pub loupe: Option<Rc>,
 }
 
 pub struct EditorState {
@@ -422,6 +624,16 @@ pub struct EditorState {
     /// ANN-5: a rectangle the Select text tool just finished dragging; the view takes it with
     /// [`EditorState::take_text_region`] and asks the daemon for its text. Never an op.
     text_region: Option<Rc>,
+    /// Which part of a Zoom Lens a drag moves: 0 the whole lens, `geom::LOUPE_PART` the loupe.
+    lens_part: usize,
+    /// A pointer press inside the text being edited is selecting text (ANN-1.AC11): the view
+    /// keeps feeding it the pointer, also outside the box.
+    pub text_drag: bool,
+    /// When a key, a press or an input method last changed the text: the caret is solid for
+    /// 500 ms after it (ANN-1.AC12).
+    pub last_text_input: Option<std::time::Instant>,
+    /// Retype, Move area, Blueprint and the Zoom Lens notice (0.3.4).
+    pub touch: Touch,
 }
 
 /// The lowercase name of an annotation kind in the screen-reader summary ("rect 1 of 2").
@@ -448,7 +660,11 @@ fn op_name(kind: &OpKind) -> String {
 }
 
 impl EditorState {
-    pub fn new(image: (u32, u32), ops: Vec<AnnotationOp>, styles: Styles) -> Self {
+    pub fn new(image: (u32, u32), mut ops: Vec<AnnotationOp>, styles: Styles) -> Self {
+        // A file written by 0.3.3 can hold a base edit after an arrow (it writes the ops it does
+        // not know after the ones it does): base edits go first when a file is loaded, and the
+        // next save writes that order (release plan, problem 12).
+        cm_core::annotation::sort_base_edits_first(&mut ops);
         EditorState {
             image,
             ops,
@@ -470,6 +686,10 @@ impl EditorState {
             tmp_seq: 0,
             metrics: TextMetrics::default(),
             text_region: None,
+            lens_part: 0,
+            text_drag: false,
+            last_text_input: None,
+            touch: Touch::new(),
         }
     }
 
@@ -569,7 +789,7 @@ impl EditorState {
             match editing {
                 Some(t) if t.existing.as_deref() == Some(o.id.as_str()) => {
                     replaced = true;
-                    if !t.text.is_empty() || t.keeps_when_empty() {
+                    if !t.text.is_empty() || t.shows_when_empty() {
                         out.push(AnnotationOp::new(o.id.clone(), t.kind()));
                     }
                 }
@@ -577,10 +797,15 @@ impl EditorState {
             }
         }
         if let Some(t) = editing {
-            if !replaced && (!t.text.is_empty() || t.keeps_when_empty()) {
+            if !replaced && (!t.text.is_empty() || t.shows_when_empty()) {
                 out.push(AnnotationOp::new("~draft", t.kind()));
             }
         }
+        // Zoom Lens drag, Move area drag and Blueprint drafts go through the real renderer, so
+        // the loupe is live while the pointer is down (ANN-8.AC7).
+        self.touch_draft_ops(&mut out);
+        // Base edits first, whatever drafted them (stable: their own order is kept).
+        cm_core::annotation::sort_base_edits_first(&mut out);
         out
     }
 
@@ -599,7 +824,9 @@ impl EditorState {
     /// The shape being dragged out, for the overlay.
     pub fn draft(&self) -> Option<OpKind> {
         match &self.interaction {
-            Interaction::Drawing { start, cur, .. } if self.tool == Tool::SelectText => {
+            Interaction::Drawing { start, cur, .. }
+                if matches!(self.tool, Tool::SelectText | Tool::Retype | Tool::MoveArea) =>
+            {
                 // A translucent selection box; it is only drawn, never stored.
                 super::copytext::selection_rect(*start, *cur, self.image).map(|rect| {
                     OpKind::Highlight {
@@ -616,12 +843,27 @@ impl EditorState {
                 *cur,
                 *shift,
                 self.image,
-            ),
+            )
+            .map(|k| match k {
+                // The loupe is drawn by the renderer (see `render_ops`); the overlay only
+                // outlines the source.
+                OpKind::Magnify { source, .. } => OpKind::Rect {
+                    rect: source,
+                    color: Color::WHITE,
+                    width: 1.5,
+                    fill: None,
+                    radius: 0.0,
+                },
+                other => other,
+            }),
             _ => None,
         }
     }
 
     pub fn chrome(&mut self) -> Option<Chrome> {
+        if let Some(c) = self.touch_chrome() {
+            return Some(c);
+        }
         let i = self.active_index()?;
         if self.text.is_some() {
             return None;
@@ -633,12 +875,14 @@ impl EditorState {
             return Some(Chrome {
                 bounds: shapes.get(h)?.rect.normalized(),
                 handles: geom::hole_handles(&kind, h),
+                loupe: None,
             });
         }
         let bounds = geom::bounds(&kind, &mut self.metrics);
         Some(Chrome {
             bounds,
             handles: geom::handles(&kind, &mut self.metrics),
+            loupe: geom::loupe_rect(&kind).map(|l| l.normalized()),
         })
     }
 
@@ -699,6 +943,7 @@ impl EditorState {
         let edits = self.finish_text().into_iter().collect();
         self.cancel_interaction();
         if self.tool != tool {
+            self.touch.leave_tool();
             self.activate(tool);
             if let Some(k) = self.selected_kind() {
                 if tool != Tool::Select && Tool::for_kind(k) != tool {
@@ -722,7 +967,12 @@ impl EditorState {
 
     fn selectable(&self) -> Vec<usize> {
         (0..self.ops.len())
-            .filter(|&i| !matches!(self.ops[i].kind, OpKind::Crop { .. }))
+            .filter(|&i| {
+                !matches!(
+                    self.ops[i].kind,
+                    OpKind::Crop { .. } | OpKind::Blueprint { .. }
+                )
+            })
             .collect()
     }
 
@@ -752,8 +1002,23 @@ impl EditorState {
 
     /// `tol` is the pointer tolerance in image px (about 6 logical px).
     pub fn pointer_down(&mut self, p: Pt, mods: Mods, clicks: usize, tol: f64) -> Vec<Edit> {
+        // A press inside the text being edited places the caret and starts a selection; a
+        // double click selects the word (ANN-1.AC9, AC11). Elsewhere it commits the text.
+        if self.press_in_text(p, mods, clicks, tol) {
+            self.hover = Some(p);
+            return Vec::new();
+        }
         let mut edits: Vec<Edit> = self.finish_text().into_iter().collect();
         self.hover = Some(p);
+        // Blueprint is a mode: a click on a line keeps its real text (or makes it a bar again).
+        if self.touch.bp.is_some() {
+            edits.extend(self.blueprint_click(p));
+            return edits;
+        }
+        // Move area: the contents of a chosen source are dragged from inside it.
+        if self.tool == Tool::MoveArea && self.begin_move_drag(p, tol) {
+            return edits;
+        }
         if let Some(i) = self.active_index() {
             let kind = self.ops[i].kind.clone();
             let found = if matches!(kind, OpKind::Spotlight { .. }) {
@@ -805,6 +1070,25 @@ impl EditorState {
                     };
                 }
             },
+            // The lens, a retype and a moved area are grabbed where they are; anywhere else a
+            // new one is dragged out.
+            Tool::Magnify | Tool::Retype | Tool::MoveArea => {
+                let tool = self.tool;
+                match geom::topmost_hit(&self.ops, p, tol, &mut self.metrics)
+                    .filter(|&i| Tool::for_kind(&self.ops[i].kind) == tool)
+                {
+                    Some(i) => self.grab(i, p, clicks),
+                    None => {
+                        self.selected = None;
+                        self.touch.mv = None;
+                        self.interaction = Interaction::Drawing {
+                            start: p,
+                            cur: p,
+                            shift: mods.shift,
+                        };
+                    }
+                }
+            }
             Tool::Text => {
                 match geom::topmost_hit(&self.ops, p, tol, &mut self.metrics)
                     .filter(|&i| matches!(self.ops[i].kind, OpKind::Text { .. }))
@@ -833,10 +1117,28 @@ impl EditorState {
         if matches!(self.ops[i].kind, OpKind::Spotlight { .. }) {
             self.spot_sel = geom::hit_hole(&self.ops[i].kind, p, 0.0).unwrap_or(self.spot_sel);
         }
+        if let OpKind::Magnify { source, .. } = &self.ops[i].kind {
+            // Pressing on the loupe (and not on the source) moves only the loupe.
+            let on_source = geom::bounds(&self.ops[i].kind, &mut self.metrics);
+            let _ = source;
+            let in_source = p.x >= on_source.x
+                && p.x <= on_source.x + on_source.w
+                && p.y >= on_source.y
+                && p.y <= on_source.y + on_source.h;
+            self.lens_part = if in_source { 0 } else { geom::LOUPE_PART };
+        }
+        if matches!(self.ops[i].kind, OpKind::MoveArea { to: None, .. }) {
+            // Removed contents have nothing to drag.
+            self.interaction = Interaction::Idle;
+            return;
+        }
         if clicks >= 2
             && matches!(
                 self.ops[i].kind,
-                OpKind::Text { .. } | OpKind::Callout { .. } | OpKind::Step { .. }
+                OpKind::Text { .. }
+                    | OpKind::Callout { .. }
+                    | OpKind::Step { .. }
+                    | OpKind::Retype { .. }
             )
         {
             self.begin_text_edit(i);
@@ -852,8 +1154,33 @@ impl EditorState {
 
     pub fn pointer_move(&mut self, p: Pt, mods: Mods, tol: f64) {
         self.hover = Some(p);
+        if self.text_drag {
+            // Selecting text: the caret follows the pointer, also outside the box (AC11).
+            if let Some(i) = self.char_index_at(p) {
+                if let Some(t) = self.text.as_mut() {
+                    t.drag_to(i);
+                }
+                self.last_text_input = Some(std::time::Instant::now());
+            }
+            return;
+        }
+        if let Some(bp) = self.touch.bp.as_mut() {
+            bp.hover = bp.line_at(p);
+            return;
+        }
+        if self.move_drag_to(p, mods, tol) {
+            return;
+        }
         let image = self.image;
-        let hole = self.spot_sel;
+        let snap_on = self.touch.snap_on;
+        let mut new_guide: Option<Option<touchup::SnapGuide>> = None;
+        let hole = match &self.interaction {
+            Interaction::Dragging {
+                orig: OpKind::Magnify { .. },
+                ..
+            } => self.lens_part,
+            _ => self.spot_sel,
+        };
         let tm = &mut self.metrics;
         match &mut self.interaction {
             Interaction::Idle => {}
@@ -872,7 +1199,31 @@ impl EditorState {
                     return;
                 }
                 *moved = true;
-                let kind = geom::translate_op(orig, dx, dy, hole);
+                let kind = match orig {
+                    // A moved area snaps to its source row and column (ANN-10).
+                    OpKind::MoveArea {
+                        source,
+                        to: Some(t),
+                        fill,
+                    } => {
+                        let (to, guide) = touchup::moved_to(
+                            *source,
+                            *t,
+                            (dx, dy),
+                            mods.shift,
+                            snap_on,
+                            tol * touchup::SNAP_PX / 6.0,
+                            image,
+                        );
+                        new_guide = Some(guide);
+                        OpKind::MoveArea {
+                            source: *source,
+                            to: Some(to),
+                            fill: fill.clone(),
+                        }
+                    }
+                    _ => geom::translate_op(orig, dx, dy, hole),
+                };
                 if let Some(o) = self.ops.iter_mut().find(|o| o.id == *id) {
                     o.kind = kind;
                 }
@@ -890,10 +1241,18 @@ impl EditorState {
                     geom::resize(orig, *handle, p, mods.shift, tm)
                 };
                 let kind = Self::clamp_crop(image, kind);
-                if let Some(o) = self.ops.iter_mut().find(|o| o.id == *id) {
-                    o.kind = kind;
+                // A lens the schema would refuse (loupe too large, source under 8 px) is not
+                // taken: the last good size stays (ANN-8.AC5).
+                let refused = matches!(kind, OpKind::Magnify { .. }) && !geom::lens_ok(&kind);
+                if !refused {
+                    if let Some(o) = self.ops.iter_mut().find(|o| o.id == *id) {
+                        o.kind = kind;
+                    }
                 }
             }
+        }
+        if let Some(g) = new_guide {
+            self.touch.guide = g;
         }
     }
 
@@ -915,10 +1274,27 @@ impl EditorState {
     }
 
     pub fn pointer_up(&mut self, p: Pt, mods: Mods, tol: f64) -> Vec<Edit> {
+        if std::mem::take(&mut self.text_drag) {
+            self.pointer_move_text_end(p);
+            return Vec::new();
+        }
+        if self.touch.bp.is_some() {
+            return Vec::new();
+        }
         self.pointer_move(p, mods, tol);
+        if self.touch.mv_drag.is_some() {
+            return self.end_move_drag().into_iter().collect();
+        }
         let inter = std::mem::replace(&mut self.interaction, Interaction::Idle);
+        self.touch.guide = None;
         match inter {
             Interaction::Idle => Vec::new(),
+            Interaction::Drawing { start, cur, .. }
+                if matches!(self.tool, Tool::Retype | Tool::MoveArea) =>
+            {
+                self.touch_drawn(start, cur);
+                Vec::new()
+            }
             Interaction::Drawing { start, cur, .. } if self.tool == Tool::SelectText => {
                 self.text_region = super::copytext::selection_rect(start, cur, self.image);
                 Vec::new()
@@ -935,6 +1311,9 @@ impl EditorState {
                 }
                 if let OpKind::Spotlight { shapes, .. } = &kind {
                     return self.add_spot_shape(shapes[0]).into_iter().collect();
+                }
+                if matches!(kind, OpKind::Magnify { .. }) {
+                    return self.add_lens(kind).into_iter().collect();
                 }
                 if matches!(kind, OpKind::Callout { .. }) {
                     // The box is not stored yet: the text goes in first and one commit stores
@@ -960,6 +1339,8 @@ impl EditorState {
 
     /// Esc during a drag, or a lost mouse-up: put the op back.
     pub fn cancel_interaction(&mut self) {
+        self.text_drag = false;
+        self.touch.cancel_drag();
         match std::mem::replace(&mut self.interaction, Interaction::Idle) {
             Interaction::Dragging { id, orig, .. } | Interaction::Resizing { id, orig, .. } => {
                 if let Some(o) = self.ops.iter_mut().find(|o| o.id == id) {
@@ -1050,6 +1431,7 @@ impl EditorState {
             bg: None,
             marked: None,
             sel_all: false,
+            anchor: None,
         });
     }
 
@@ -1076,6 +1458,7 @@ impl EditorState {
                     bg,
                     marked: None,
                     sel_all: false,
+                    anchor: None,
                 });
             }
             kind @ OpKind::Callout { .. } => {
@@ -1101,6 +1484,7 @@ impl EditorState {
                     cursor: text.chars().count(),
                     // The whole label is selected when editing starts (spec, Step list rows).
                     sel_all: !text.is_empty(),
+                    anchor: None,
                     text,
                     size,
                     color,
@@ -1108,6 +1492,10 @@ impl EditorState {
                     bg: None,
                     marked: None,
                 });
+            }
+            kind @ OpKind::Retype { .. } => {
+                self.interaction = Interaction::Idle;
+                self.text = Some(Self::retype_edit(kind, Some(self.ops[i].id.clone()), None));
             }
             _ => {}
         }
@@ -1141,6 +1529,7 @@ impl EditorState {
             bg: None,
             marked: None,
             sel_all: false,
+            anchor: None,
         }
     }
 
@@ -1161,6 +1550,11 @@ impl EditorState {
     /// nothing, and removes an existing text op.
     pub fn finish_text(&mut self) -> Option<Edit> {
         let t = self.text.take()?;
+        self.text_drag = false;
+        if let TextTarget::Retype { original, .. } = &t.target {
+            let original = original.clone();
+            return self.finish_retype(&t, original);
+        }
         // What gets stored: a callout is written with the box the renderer draws (ANN-4.AC5).
         let kind = geom::with_drawn_box(&t.kind());
         match t.existing.clone() {
@@ -1196,6 +1590,10 @@ impl EditorState {
 
     /// Delete/Backspace (ANN-1.AC2: deleting a step renumbers the rest, in the same step).
     pub fn delete_selected(&mut self) -> Option<Edit> {
+        // Delete on a chosen Move area source removes its contents (ANN-10.AC2).
+        if self.touch.mv.is_some() {
+            return self.remove_contents();
+        }
         let i = self.selected_index()?;
         self.ops.remove(i);
         self.selected = None;
@@ -1219,6 +1617,15 @@ impl EditorState {
         match self.selected_index() {
             // One spotlight per image (ANN-7): it is never duplicated.
             Some(i) if matches!(self.ops[i].kind, OpKind::Spotlight { .. }) => false,
+            // A base edit pasted at the end of the list would break "base edits first".
+            Some(i) if self.ops[i].kind.is_base_edit() => false,
+            // A fifth lens is refused (ANN-8.AC5).
+            Some(i)
+                if matches!(self.ops[i].kind, OpKind::Magnify { .. })
+                    && self.lens_count() >= cm_core::annotation::MAX_MAGNIFY =>
+            {
+                false
+            }
             Some(i) => {
                 self.clip = vec![self.ops[i].clone()];
                 self.paste_count = 0;
@@ -1366,7 +1773,22 @@ impl EditorState {
                 return self.add_spot_shape(shape).into_iter().collect();
             }
             Tool::Stamp => return vec![self.place_stamp(center)],
-            Tool::Select | Tool::SelectText => return Vec::new(),
+            Tool::Magnify => {
+                let source = rect(s * 0.7, s * 0.4);
+                let kind = OpKind::Magnify {
+                    source,
+                    at: geom::default_loupe_at(source, style.zoom, self.image),
+                    zoom: style.zoom,
+                    shape: style.lens_shape,
+                    border: style.color,
+                    border_width: style.width,
+                    connector: style.connector,
+                    badge: style.badge,
+                };
+                return self.add_lens(kind).into_iter().collect();
+            }
+            // Retype and Move area need a place on the picture: they are pointer tools.
+            Tool::Select | Tool::SelectText | Tool::Retype | Tool::MoveArea => return Vec::new(),
         };
         let id = self.tmp_id();
         let op = AnnotationOp::new(id.clone(), kind);
@@ -1376,6 +1798,9 @@ impl EditorState {
     }
 
     pub fn escape(&mut self) -> EscapeOutcome {
+        if self.touch.escape() {
+            return EscapeOutcome::Edits(Vec::new());
+        }
         if self.text.as_ref().is_some_and(|t| t.single_line()) {
             // Esc cancels a step label: the old label stays, the step stays selected.
             self.text = None;
@@ -1642,10 +2067,11 @@ impl EditorState {
         self.ops
             .iter()
             .position(|o| {
-                !matches!(
-                    o.kind,
-                    OpKind::Blur { .. } | OpKind::Pixelate { .. } | OpKind::Crop { .. }
-                )
+                !(o.kind.is_base_edit()
+                    || matches!(
+                        o.kind,
+                        OpKind::Blur { .. } | OpKind::Pixelate { .. } | OpKind::Crop { .. }
+                    ))
             })
             .unwrap_or(self.ops.len())
     }
@@ -1769,13 +2195,21 @@ impl EditorState {
         let Some(t) = self.text.as_mut() else {
             return false;
         };
+        self.last_text_input = Some(std::time::Instant::now());
+        let select = mods.shift && !mods.secondary;
         match key {
             "backspace" => t.backspace(),
             "delete" => t.delete(),
+            // Shift+arrows extend the selection by one character (ANN-1.AC10).
+            "left" if select => t.extend(false),
+            "right" if select => t.extend(true),
+            "home" if select => t.extend_line(false),
+            "end" if select => t.extend_line(true),
             "left" => t.left(),
             "right" => t.right(),
             "home" => t.home(),
             "end" => t.end(),
+            "a" if mods.secondary => t.select_all(),
             "enter" => t.insert("\n"),
             "escape" => return false,
             _ => {
@@ -1798,15 +2232,31 @@ impl EditorState {
 
     /// An input method committed or is composing text in the text being typed.
     pub fn text_ime(&mut self, range: Option<std::ops::Range<usize>>, s: &str, mark: bool) -> bool {
+        self.last_text_input = Some(std::time::Instant::now());
         self.text
             .as_mut()
             .is_some_and(|t| t.ime_replace(range, s, mark))
     }
 
+    /// Paste (Cmd/Ctrl+V) into the text being typed: it replaces the selection and is cut at
+    /// the 2000 character limit (ANN-1.AC10).
     pub fn text_insert(&mut self, s: &str) {
+        self.last_text_input = Some(std::time::Instant::now());
         if let Some(t) = self.text.as_mut() {
             t.insert(s);
         }
+    }
+
+    /// Cmd/Ctrl+C inside the text being typed: the selected plain text, or `None` when nothing
+    /// is selected (the caller then leaves the clipboard alone).
+    pub fn text_copy(&self) -> Option<String> {
+        self.text.as_ref()?.selected_text()
+    }
+
+    /// Cmd/Ctrl+X: the selected text, removed from the box.
+    pub fn text_cut(&mut self) -> Option<String> {
+        self.last_text_input = Some(std::time::Instant::now());
+        self.text.as_mut()?.cut()
     }
 
     // ---- inspector ----------------------------------------------------------------------
@@ -1818,6 +2268,7 @@ impl EditorState {
             return match t.target {
                 TextTarget::Callout(_) => Tool::Callout.params(),
                 TextTarget::Step(_) => Tool::Step.params(),
+                TextTarget::Retype { .. } => Tool::Retype.params(),
                 TextTarget::Text => Tool::Text.params(),
             };
         }
@@ -1829,7 +2280,10 @@ impl EditorState {
 
     pub fn inspector_value(&self, p: Param) -> Option<ParamValue> {
         if let Some(t) = &self.text {
-            if matches!(t.target, TextTarget::Callout(_) | TextTarget::Step(_)) {
+            if matches!(
+                t.target,
+                TextTarget::Callout(_) | TextTarget::Step(_) | TextTarget::Retype { .. }
+            ) {
                 return geom::param_value(&t.kind(), p);
             }
             return match p {
@@ -1855,6 +2309,7 @@ impl EditorState {
             return match t.target {
                 TextTarget::Callout(_) => Tool::Callout,
                 TextTarget::Step(_) => Tool::Step,
+                TextTarget::Retype { .. } => Tool::Retype,
                 TextTarget::Text => Tool::Text,
             };
         }
@@ -1872,6 +2327,17 @@ impl EditorState {
     /// Applies a parameter change (ANN-1.AC5: one undo step, only the target op changes).
     pub fn set_param(&mut self, v: ParamValue) -> Option<Edit> {
         if let Some(t) = self.text.as_mut() {
+            if let TextTarget::Retype { base, .. } = &mut t.target {
+                // The size and colour are measured per box: a change goes into the op that is
+                // committed with the text and is not remembered for the next retype.
+                let new = geom::with_param(base, v)?;
+                if let OpKind::Retype { size, color, .. } = &new {
+                    t.size = *size;
+                    t.color = *color;
+                }
+                *base = new;
+                return None;
+            }
             if let TextTarget::Callout(base) | TextTarget::Step(base) = &mut t.target {
                 // A callout or step label being typed: the change goes into the op that is
                 // committed with the text.
@@ -1896,10 +2362,20 @@ impl EditorState {
             return None;
         }
         if let Some(i) = self.selected_index() {
-            let new = geom::with_param(&self.ops[i].kind, v)?;
+            let Some(new) = geom::with_param(&self.ops[i].kind, v) else {
+                if matches!(self.ops[i].kind, OpKind::Magnify { .. }) {
+                    self.touch.notice = Some(tr!(
+                        "That zoom would make the lens too large (16,384 px a side, 32 megapixels)."
+                    ));
+                }
+                return None;
+            };
             let tool = Tool::for_kind(&new);
-            self.styles.apply(tool, v);
-            self.styles_dirty = true;
+            // A retype's size and colour are measured per box, not a habit of the user.
+            if tool != Tool::Retype {
+                self.styles.apply(tool, v);
+                self.styles_dirty = true;
+            }
             self.ops[i].kind = new;
             return Some(Edit::Replace(self.ops.clone()));
         }
@@ -2000,6 +2476,8 @@ impl EditorState {
     /// Adopts the daemon's op list (after undo, redo, or when all edits are confirmed).
     pub fn adopt_ops(&mut self, ops: Vec<AnnotationOp>) {
         self.ops = ops;
+        cm_core::annotation::sort_base_edits_first(&mut self.ops);
+        self.touch.ops_adopted(&self.ops);
         if self
             .selected
             .as_deref()
@@ -2021,7 +2499,7 @@ impl EditorState {
     /// True while a pointer gesture or text entry is in progress (the session must not
     /// overwrite the local ops then).
     pub fn busy(&self) -> bool {
-        self.text.is_some() || self.interaction != Interaction::Idle
+        self.text.is_some() || self.interaction != Interaction::Idle || self.touch.busy()
     }
 }
 
@@ -2419,6 +2897,7 @@ mod tests {
             bg: None,
             marked: None,
             sel_all: false,
+            anchor: None,
         };
         t.insert("a\u{4F60}\u{597D}");
         t.left();
@@ -2630,6 +3109,7 @@ mod tests {
             bg: None,
             marked: None,
             sel_all: false,
+            anchor: None,
         }
     }
 

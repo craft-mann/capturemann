@@ -227,17 +227,6 @@ impl EditorView {
                         .child(icon("cm-group-corner", 6., fg)),
                 );
         }
-        if g.has_new_tool() {
-            b = b.child(
-                div()
-                    .absolute()
-                    .top(px(5.))
-                    .right(px(5.))
-                    .size(px(6.))
-                    .rounded_full()
-                    .bg(rgba_of(INFO_BLUE)),
-            );
-        }
         b.into_any_element()
     }
 
@@ -438,11 +427,13 @@ impl EditorView {
 mod tests {
     use super::*;
 
-    /// Board N6: about 380 px tall with 8 buttons and 4 dividers.
+    /// 0.3.4 design spec: about 430 px tall with 9 buttons and 5 dividers; it fits the 660 px
+    /// minimum stage.
     #[test]
-    fn rail_height_is_about_380() {
-        let h = rail_height(8, 4);
-        assert!((360.0..=420.0).contains(&h), "{h}");
+    fn rail_height_is_about_430() {
+        let h = rail_height(9, 5);
+        assert!((410.0..=450.0).contains(&h), "{h}");
+        assert!(h < 660.0 - 2.0 * 16.0);
     }
 
     /// The menu is placed from the same arithmetic as the pill: the first button starts at the

@@ -12,19 +12,20 @@ use crate::ui::field_style::{
 use cm_core::annotation::StampKind;
 use cm_core::annotation::{CalloutStyle, SpotMode, SpotShapeKind, StepStyle, MAX_SPOTLIGHT_SHAPES};
 
-/// The "New in 0.3.3" pill in a panel header (info blue). Shown for the whole release; remove
-/// with the palette dot in 0.3.4.
+/// The neutral "New in 0.3.4" pill in a panel header (0.3.4 design decision 2: `raised`
+/// background, 1 px `line`, `text-2`; blue is reserved for agents, so it is not used here).
 pub(super) fn new_pill(t: &Theme) -> Div {
-    let _ = t;
     div()
         .flex_none()
         .px(px(8.))
         .py(px(2.))
         .rounded_full()
-        .bg(gpui::rgba(0x5B8C_FF24))
+        .bg(rgba_of(t.raised))
+        .border_1()
+        .border_color(rgba_of(t.line))
         .text_size(px(11.))
-        .text_color(gpui::rgb(0x8FB0FF))
-        .child(SharedString::from(tr_ctx!("panel badge", "New in 0.3.3")))
+        .text_color(rgba_of(t.text_2))
+        .child(SharedString::from(tr_ctx!("panel badge", "New in 0.3.4")))
 }
 
 /// A blue-tinted note under a panel (the design's info line).
@@ -856,6 +857,6 @@ mod tests {
 
     #[test]
     fn the_new_pill_text_is_translatable() {
-        assert_eq!(tr_ctx!("panel badge", "New in 0.3.3"), "New in 0.3.3");
+        assert_eq!(tr_ctx!("panel badge", "New in 0.3.4"), "New in 0.3.4");
     }
 }
