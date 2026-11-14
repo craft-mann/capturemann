@@ -278,6 +278,7 @@ mod tests {
             capture_available: true,
             copy_after_capture,
             recording_off: recording_off.map(str::to_owned),
+            guide_off: recording_off.map(str::to_owned),
             fps60_ready,
         });
         LauncherModel::new(cmds, recent)
@@ -305,7 +306,7 @@ mod tests {
     #[test]
     fn empty_query_shows_all_in_group_order() {
         let m = model(vec![]);
-        assert_eq!(m.visible_len(), 14);
+        assert_eq!(m.visible_len(), 15);
         assert_eq!(m.groups(), Group::ORDER.to_vec());
         let v = ids(&m);
         // Capture: the recording commands lead (kit order, Record audio after the screen ones),
@@ -316,8 +317,9 @@ mod tests {
         assert_eq!(v[3], CommandId::ScreenshotRegion);
         assert_eq!(v[6], CommandId::LongShot);
         assert_eq!(v[7], CommandId::ImportMedia);
-        assert_eq!(v[10], CommandId::OpenPermissions);
-        assert_eq!(v[13], CommandId::CopyMcpConfig);
+        assert_eq!(v[8], CommandId::NewClickGuide);
+        assert_eq!(v[11], CommandId::OpenPermissions);
+        assert_eq!(v[14], CommandId::CopyMcpConfig);
     }
 
     /// LNC-1.AC2: typing "rec" keeps only matching commands and selects the first.

@@ -197,6 +197,7 @@ fn main() {
         "settings-permissions" => Some(Route::Settings),
         "recordings" => Some(Route::Recordings),
         "audio" => Some(Route::Audio),
+        "guides" => Some(Route::Guides),
         "screenshots" => Some(Route::Screenshots),
         "library" | "all" => Some(Route::Library),
         "published" => Some(Route::Published),

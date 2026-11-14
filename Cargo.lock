@@ -1465,6 +1465,7 @@ dependencies = [
  "cm-publish",
  "cm-render",
  "cm-storage",
+ "flate2",
  "image",
  "krilla",
  "log",

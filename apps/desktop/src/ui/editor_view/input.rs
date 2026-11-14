@@ -30,7 +30,8 @@ impl EditorView {
     }
 
     pub(super) fn leave(&mut self, cx: &mut Context<Self>) {
-        app::set_route(&self.app, Route::Screenshots, cx);
+        let back = app::editor_back_route(&self.app, cx);
+        app::set_route(&self.app, back, cx);
     }
 
     // ---- events -------------------------------------------------------------------------

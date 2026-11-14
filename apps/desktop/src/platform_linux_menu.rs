@@ -80,6 +80,7 @@ pub fn item_id(key: &str) -> i32 {
         ids::SETTINGS => 12,
         ids::PERMISSIONS => 13,
         ids::QUIT => 14,
+        ids::NEW_CLICK_GUIDE => 15,
         _ => -1,
     }
 }
@@ -189,6 +190,7 @@ pub fn build_menu(inp: &MenuInputs) -> Vec<MenuNode> {
         separator(0),
         node(ids::OPEN_LIBRARY, true),
         node(ids::OPEN_LAUNCHER, true),
+        node(ids::NEW_CLICK_GUIDE, true),
         recent,
         separator(1),
         node(ids::SETTINGS, true),
@@ -374,6 +376,7 @@ mod tests {
                 "",
                 "open_library",
                 "open_launcher",
+                "new_click_guide",
                 "recent",
                 "",
                 "settings",
@@ -529,6 +532,7 @@ mod tests {
             ids::REC_STOP,
             ids::OPEN_LIBRARY,
             ids::OPEN_LAUNCHER,
+            ids::NEW_CLICK_GUIDE,
             ids::SETTINGS,
             ids::PERMISSIONS,
             ids::QUIT,

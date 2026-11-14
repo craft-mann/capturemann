@@ -585,6 +585,9 @@ msgstr ""
 msgid "Back to recordings"
 msgstr ""
 
+msgid "Back to the guide"
+msgstr ""
+
 msgid "Back to the library"
 msgstr ""
 
@@ -1072,10 +1075,16 @@ msgstr ""
 msgid "Click Guide did not start"
 msgstr ""
 
+msgid "Click Guide is not available here"
+msgstr ""
+
 msgid "Click Guide is unavailable"
 msgstr ""
 
 msgid "Click Guide needs Input Monitoring"
+msgstr ""
+
+msgid "Click Guide only needs to know where you click. Nothing records until you grant access."
 msgstr ""
 
 msgid "Click Guide · clicks only"
@@ -1103,6 +1112,12 @@ msgid "Click effect"
 msgstr ""
 
 msgid "Click the image to place a stamp. Symbols are drawn as shapes, so they look the same on every system."
+msgstr ""
+
+msgid "Click through a task and CaptureMann writes the steps. It records clicks only, never keystrokes."
+msgstr ""
+
+msgid "Click through a task, get the steps"
 msgstr ""
 
 msgid "Click to use this area, or drag a region"
@@ -2363,7 +2378,13 @@ msgstr ""
 msgid "Grant access…"
 msgstr ""
 
+msgid "Granted"
+msgstr ""
+
 msgid "Grid"
+msgstr ""
+
+msgid "Guide"
 msgstr ""
 
 msgid "Guide exported"
@@ -3206,6 +3227,9 @@ msgstr ""
 msgid "Never larger than the recording"
 msgstr ""
 
+msgid "New Click Guide"
+msgstr ""
+
 msgid "New board"
 msgstr ""
 
@@ -3237,6 +3261,9 @@ msgid "Next match"
 msgstr ""
 
 msgid "No"
+msgstr ""
+
+msgid "No Click Guides yet"
 msgstr ""
 
 msgid "No GPU adapter: the preview shows the screen without the background or the camera bubble."
@@ -3498,6 +3525,9 @@ msgid "Not deleted online: {items}."
 msgstr ""
 
 msgid "Not enough room to move"
+msgstr ""
+
+msgid "Not granted"
 msgstr ""
 
 msgid "Not installed"
@@ -5168,6 +5198,9 @@ msgstr ""
 msgid "Start a Click Guide"
 msgstr ""
 
+msgid "Start a guide"
+msgstr ""
+
 msgid "Start a new empty library at {to}; the captures in {from} stay where they are"
 msgstr ""
 
@@ -5349,6 +5382,9 @@ msgid "Suggested cut: {detail} at {time} (and {more} more)"
 msgstr ""
 
 msgid "Summary"
+msgstr ""
+
+msgid "Switch CaptureMann on under Input Monitoring in the privacy settings. This card closes by itself and the guide starts."
 msgstr ""
 
 msgid "Switch to the existing library at {to} ({n} captures); the captures in {from} stay where they are"
@@ -6154,6 +6190,9 @@ msgid "This report was made with a template this version doesn’t know."
 msgstr ""
 
 msgid "This runs on {this_computer} and takes a few minutes for a long recording. You don’t need to press anything: the speakers appear here when it’s done."
+msgstr ""
+
+msgid "This session gives no click events, so a Click Guide cannot see where you click."
 msgstr ""
 
 msgid "Thumbnail"
@@ -8280,6 +8319,14 @@ msgid "Audio /"
 msgstr ""
 
 msgctxt "breadcrumb"
+msgid "Click Guide /"
+msgstr ""
+
+msgctxt "breadcrumb"
+msgid "Click Guides /"
+msgstr ""
+
+msgctxt "breadcrumb"
 msgid "Intelligence /"
 msgstr ""
 
@@ -9108,6 +9155,10 @@ msgid "Boards"
 msgstr ""
 
 msgctxt "filter chip"
+msgid "Click Guides"
+msgstr ""
+
+msgctxt "filter chip"
 msgid "Imported"
 msgstr ""
 
@@ -9372,6 +9423,10 @@ msgid "claude"
 msgstr ""
 
 msgctxt "launcher keyword"
+msgid "clicks"
+msgstr ""
+
+msgctxt "launcher keyword"
 msgid "client"
 msgstr ""
 
@@ -9409,6 +9464,14 @@ msgstr ""
 
 msgctxt "launcher keyword"
 msgid "grant"
+msgstr ""
+
+msgctxt "launcher keyword"
+msgid "guide"
+msgstr ""
+
+msgctxt "launcher keyword"
+msgid "how-to"
 msgstr ""
 
 msgctxt "launcher keyword"
@@ -9504,6 +9567,10 @@ msgid "shortcuts"
 msgstr ""
 
 msgctxt "launcher keyword"
+msgid "steps"
+msgstr ""
+
+msgctxt "launcher keyword"
 msgid "studio"
 msgstr ""
 
@@ -9513,6 +9580,10 @@ msgstr ""
 
 msgctxt "launcher keyword"
 msgid "tiktok"
+msgstr ""
+
+msgctxt "launcher keyword"
+msgid "tutorial"
 msgstr ""
 
 msgctxt "launcher keyword"
@@ -9633,6 +9704,10 @@ msgstr ""
 
 msgctxt "navigation"
 msgid "Audio"
+msgstr ""
+
+msgctxt "navigation"
+msgid "Click Guides"
 msgstr ""
 
 msgctxt "navigation"

@@ -89,6 +89,7 @@ fn glyph_path(g: Glyph) -> Option<&'static str> {
         Glyph::Record => return None,
         Glyph::Mic => "icons/mic.svg",
         Glyph::Import => "icons/cm-import.svg",
+        Glyph::ClickGuide => "icons/mouse-pointer-click.svg",
         Glyph::Frame => "icons/launcher-frame.svg",
         Glyph::Window => "icons/launcher-window.svg",
         Glyph::Monitor => "icons/launcher-monitor.svg",
@@ -188,6 +189,8 @@ pub fn open_launcher_with(app: &Entity<AppModel>, cx: &mut App, query: &str) {
         capture_available: backend.daemon.is_some(),
         copy_after_capture: copy,
         recording_off: recording_off(app, cx),
+        guide_off: recording_off(app, cx)
+            .or_else(crate::ui::guide_view::preflight::disabled_reason),
         fps60_ready: commands::fps60_ready(
             &backend.settings.snapshot(),
             time::OffsetDateTime::now_utc(),
@@ -536,6 +539,15 @@ fn execute(id: CommandId, option: LaunchOption, cx: &mut App) {
             .detach();
         }
         // Opens the start sheet in Audio mode (VOC-1); pressing Start is the confirmation.
+        CommandId::NewClickGuide => {
+            cx.spawn(async move |cx| {
+                cx.background_executor()
+                    .timer(Duration::from_millis(CAPTURE_DELAY_MS))
+                    .await;
+                cx.update(|cx| crate::ui::guide_view::hud::start(&app, cx));
+            })
+            .detach();
+        }
         CommandId::RecordAudio => {
             cx.spawn(async move |cx| {
                 cx.background_executor()

@@ -63,6 +63,8 @@ objc2 = { workspace = true, features = ["exception"] }
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSFileManager", "NSURL", "NSString", "NSError", "NSException"] }
 
 [dev-dependencies]
+# Reads the images out of an exported PDF (the Click Guide OCR check, GDE-3.AC2).
+flate2 = "1"
 # The fake Drive server for the cloud upload tests.
 cm-storage = { workspace = true, features = ["testing"] }
 # The fake YouTube server for the publish tests.

@@ -8,6 +8,7 @@ pub mod common;
 mod daemon;
 pub mod desktop;
 mod export;
+mod guide;
 mod import;
 mod installer;
 mod library;
@@ -28,6 +29,7 @@ pub fn all() -> Vec<Case> {
     v.extend(annotate::cases());
     v.extend(board::cases());
     v.extend(import::cases());
+    v.extend(guide::cases());
     v.extend(export::cases());
     v.extend(mcp::cases());
     v.extend(record::cases());
