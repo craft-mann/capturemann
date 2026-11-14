@@ -10,6 +10,7 @@
 //!   and XTest on X11 are lab work (spike S1); Wayland cannot inject scrolling at all.
 
 pub mod fake;
+pub mod hud;
 pub mod run;
 
 pub mod stitch;
