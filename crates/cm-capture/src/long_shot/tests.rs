@@ -152,15 +152,15 @@ fn cap_6_stop_keeps_the_frames_so_far() {
     assert_eq!(r.image.frame, page.expected_range(0, kept));
 }
 
-/// A page that does not scroll gives the single frame, and ends at once.
+/// A page that does not scroll gives the single frame, kept, and says that nothing scrolled (it cannot be told from a window that ignored the wheel).
 #[test]
 fn cap_6_page_shorter_than_the_area_is_one_frame() {
     let page = SyntheticPage::new(20, 200, 300);
     let (r, view) = auto(page.clone(), None);
-    assert_eq!(r.end, EndReason::ReachedEnd);
+    assert_eq!(r.end, EndReason::NothingScrolled);
     assert_eq!(r.image.frames, 1);
     assert_eq!(r.image.frame, page.frame_at(0));
-    assert_eq!(view.scrolls(), 1);
+    assert_eq!(view.scrolls(), 2);
 }
 
 /// CAP-6.AC5 (engine part): hand scrolling, at an uneven pace with mid-scroll frames that are
@@ -222,8 +222,8 @@ fn cap_6_ambiguous_overlap_is_not_guessed() {
         crate::Frame::new(w, h, d).unwrap()
     };
     let mut s = Stitcher::new(Direction::Vertical, Limits::default());
-    s.push(&blank(1), None);
-    assert_eq!(s.push(&blank(2), None), PushOutcome::NoOverlap);
+    s.push(&blank(100), None);
+    assert_eq!(s.push(&blank(200), None), PushOutcome::NoOverlap);
     assert_eq!(s.frames(), 1);
 }
 
@@ -393,4 +393,91 @@ fn cap_6_preview_thumbnail_is_scaled_and_follows_the_end() {
     let mut st = Stitcher::new(Direction::Vertical, Limits::default());
     st.push(&page.frame_at(0), None);
     assert_eq!(st.thumbnail(400, 400).unwrap().width(), 40);
+}
+
+/// Chrome on a Retina Mac (Nov 14, 2026): the toolbar of two captures differs by one colour step
+/// in some pixels, so an exact comparison found no header and no join. The bands are found
+/// with a small per-channel tolerance.
+#[test]
+fn header_with_one_step_noise_still_joins() {
+    const W: usize = 120;
+    const H: usize = 300;
+    const HEADER: usize = 40;
+    // The page: row r of the document has a unique pattern.
+    let doc_row = |r: usize| -> Vec<u8> {
+        (0..W)
+            .flat_map(|x| {
+                let v = ((r * 37 + x * 11) % 251) as u8;
+                [v, v ^ 0x55, (r % 256) as u8, 255]
+            })
+            .collect()
+    };
+    let frame = |scroll: usize, noise: u8| -> Frame {
+        let mut data = Vec::new();
+        for y in 0..H {
+            if y < HEADER {
+                // The toolbar: fixed, plus a one-step change in a few channels.
+                data.extend((0..W).flat_map(|x| {
+                    let n = u8::from(noise == 1 && (x + y) % 7 == 0);
+                    [30 + n, 30, 40, 255]
+                }));
+            } else {
+                let mut row = doc_row(scroll + y - HEADER);
+                if noise == 1 {
+                    // The page itself is re-composited too: one step in scattered pixels.
+                    for x in (y % 5..W).step_by(5) {
+                        row[x * 4] = row[x * 4].wrapping_add(1);
+                    }
+                }
+                data.extend(row);
+            }
+        }
+        Frame::new(W as u32, H as u32, data).unwrap()
+    };
+    let mut st = Stitcher::new(Direction::Vertical, Limits::default());
+    st.push(&frame(0, 0), None);
+    let out = st.push(&frame(150, 1), Some(150));
+    assert_eq!(out, PushOutcome::Added { new_len: 150 });
+    assert_eq!(st.bands(), (HEADER as u32, 0));
+    // The end of the page: the same content again, noise differing: no change, not "no overlap".
+    assert_eq!(
+        st.push(&frame(150, 0), Some(150)),
+        PushOutcome::NoChange,
+        "a frame that differs by one colour step is the same frame"
+    );
+}
+
+/// QA, Nov 14, 2026: a run whose scrolls changed nothing was reported as the end of the content
+/// (one frame, `reached_end`, no note). It must say that nothing scrolled.
+#[test]
+fn a_scroll_that_moves_nothing_is_not_the_end_of_the_content() {
+    struct Still(crate::Frame);
+    impl FrameSource for Still {
+        fn grab(&mut self) -> Result<crate::Frame, cm_core::CmError> {
+            Ok(self.0.clone())
+        }
+    }
+    #[derive(Default)]
+    struct Deaf(u32);
+    impl Scroller for Deaf {
+        fn scroll(&mut self, _: Direction, _: u32) -> Result<(), cm_core::CmError> {
+            self.0 += 1;
+            Ok(())
+        }
+    }
+    let frame = crate::Frame::new(40, 100, vec![200; 40 * 100 * 4]).unwrap();
+    let (mut src, mut sc) = (Still(frame), Deaf::default());
+    let r = run_auto(
+        &mut src,
+        &mut sc,
+        &mut NoSleep::default(),
+        cfg(Direction::Vertical),
+        &mut || false,
+        &mut |_| {},
+    )
+    .unwrap();
+    assert_eq!(r.end, EndReason::NothingScrolled);
+    assert_eq!(r.image.frames, 1);
+    assert_eq!(sc.0, 2, "one retry");
+    assert!(r.end.note().is_some());
 }

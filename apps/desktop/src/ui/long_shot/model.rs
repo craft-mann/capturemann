@@ -164,6 +164,10 @@ pub fn done_toast(result: &Value) -> Option<ToastSpec> {
             ToastKind::Warning,
             tr!("Stopped: the next part did not line up"),
         ),
+        "nothing_scrolled" => (
+            ToastKind::Warning,
+            tr!("Nothing scrolled: check that the window can scroll"),
+        ),
         "limit_reached" => (
             ToastKind::Warning,
             tr!("Reached the longest image CaptureMann can edit"),

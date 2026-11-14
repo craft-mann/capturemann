@@ -24,6 +24,21 @@ struct Frames {
     target: CaptureTarget,
     /// `--dump <dir>`: every frame taken is written there (diagnosis).
     dump: Option<(std::path::PathBuf, u32)>,
+    /// The frames are kept in memory and written when the run ends, so that writing PNGs does
+    /// not slow the run down (only the last 12 are kept).
+    kept: std::collections::VecDeque<(u32, Frame)>,
+}
+
+impl Frames {
+    fn flush(&mut self) {
+        if let Some((dir, _)) = &self.dump {
+            for (n, f) in self.kept.drain(..) {
+                if let Ok(png) = f.to_png() {
+                    let _ = std::fs::write(dir.join(format!("f{n:03}.png")), png);
+                }
+            }
+        }
+    }
 }
 
 impl FrameSource for Frames {
@@ -33,9 +48,12 @@ impl FrameSource for Frames {
             .capture(CaptureRequest::new(self.target), None)?
             .map(|c| c.frame)
             .ok_or_else(|| CmError::invalid_input("capture was cancelled"))?;
-        if let Some((dir, n)) = &mut self.dump {
+        if let Some((_, n)) = &mut self.dump {
             *n += 1;
-            let _ = std::fs::write(dir.join(format!("f{n:03}.png")), frame.to_png()?);
+            self.kept.push_back((*n, frame.clone()));
+            if self.kept.len() > 12 {
+                self.kept.pop_front();
+            }
         }
         Ok(frame)
     }
@@ -76,6 +94,7 @@ fn run() -> Result<(), CmError> {
         capturer,
         target: CaptureTarget::Window { window_id: w.id },
         dump,
+        kept: Default::default(),
     };
     let direction = if horizontal {
         Direction::Horizontal
@@ -116,6 +135,7 @@ fn run() -> Result<(), CmError> {
             &mut on_progress,
         )?
     };
+    frames.flush();
     std::fs::write(&out, result.image.frame.to_png()?)
         .map_err(|e| CmError::internal(format!("cannot write {out}: {e}")))?;
     println!(

@@ -6,6 +6,10 @@ use super::stitch::{Direction, EndReason, Limits, PushOutcome, Stitched, Stitche
 use super::{wait_settled, FrameSource, Scroller, Settle, Sleeper};
 use crate::Frame;
 
+/// How often, and after what wait, an unchanged frame after a scroll is looked at again.
+const LATE_SCROLL_POLLS: u32 = 3;
+const LATE_SCROLL_WAIT: std::time::Duration = std::time::Duration::from_millis(150);
+
 /// Settings of one Long Shot.
 #[derive(Debug, Clone, Copy)]
 pub struct LongShotConfig {
@@ -115,8 +119,32 @@ pub fn run_auto_ex(
             break EndReason::StoppedByUser;
         }
         scroller.scroll(cfg.direction, step)?;
-        let next = wait_settled(src, sleeper, cfg.settle)?;
-        match stitcher.push(&next.frame, Some(step)) {
+        let mut next = wait_settled(src, sleeper, cfg.settle)?;
+        let mut outcome = stitcher.push(&next.frame, Some(step));
+        // An unchanged frame is the end of the content only when something has scrolled before.
+        // A wheel event can arrive late (a browser's smooth scrolling starts after the settle
+        // check), so the screen is looked at again a few times before "nothing changed" is
+        // believed.
+        for _ in 0..LATE_SCROLL_POLLS {
+            if outcome != PushOutcome::NoChange {
+                break;
+            }
+            sleeper.sleep(LATE_SCROLL_WAIT);
+            next = wait_settled(src, sleeper, cfg.settle)?;
+            outcome = stitcher.push(&next.frame, Some(step));
+        }
+        if outcome == PushOutcome::NoChange && stitcher.frames() == 1 {
+            // The first scroll moved nothing: scroll once more (the scroller puts its pointer
+            // back on the area first) before giving up.
+            scroller.scroll(cfg.direction, step)?;
+            sleeper.sleep(LATE_SCROLL_WAIT);
+            next = wait_settled(src, sleeper, cfg.settle)?;
+            outcome = stitcher.push(&next.frame, Some(step));
+            if outcome == PushOutcome::NoChange {
+                break EndReason::NothingScrolled;
+            }
+        }
+        match outcome {
             PushOutcome::Added { new_len } => {
                 on_progress(progress(&stitcher));
                 on_stitch(&stitcher);

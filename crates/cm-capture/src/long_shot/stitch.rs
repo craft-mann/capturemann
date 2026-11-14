@@ -73,6 +73,9 @@ pub enum EndReason {
     /// "Reached the longest image CaptureMann can edit".
     LimitReached,
     StoppedByUser,
+    /// The first scroll changed nothing, twice: the window did not scroll (the wheel went to
+    /// another window, or the content does not scroll). Never reported as the end of content.
+    NothingScrolled,
 }
 
 impl EndReason {
@@ -81,6 +84,9 @@ impl EndReason {
         match self {
             EndReason::NoOverlap => Some("Stopped: the next part did not line up"),
             EndReason::LimitReached => Some("Reached the longest image CaptureMann can edit"),
+            EndReason::NothingScrolled => {
+                Some("Nothing scrolled: check that the window can scroll")
+            }
             EndReason::ReachedEnd | EndReason::StoppedByUser => None,
         }
     }
@@ -180,8 +186,23 @@ impl Lines {
         &self.data[from * self.line_len..to * self.line_len]
     }
 
+    /// Whether line `ia` of `self` and line `ib` of `other` are the same line: equal, or within
+    /// [`NOISE_TOLERANCE`] per channel everywhere. Two captures of the same pixels of a Chrome
+    /// window differ by one colour step in scattered pixels, in the toolbar and in the page
+    /// alike (Retina Mac, Nov 14, 2026): an exact comparison found no header, rejected every
+    /// join, and called the end of the page "did not line up".
+    fn near(&self, ia: usize, other: &Lines, ib: usize) -> bool {
+        if self.hashes[ia] == other.hashes[ib] && self.line(ia) == other.line(ib) {
+            return true;
+        }
+        self.line(ia)
+            .iter()
+            .zip(other.line(ib))
+            .all(|(a, b)| a.abs_diff(*b) <= NOISE_TOLERANCE)
+    }
+
     fn same_line(&self, other: &Lines, i: usize) -> bool {
-        self.hashes[i] == other.hashes[i] && self.line(i) == other.line(i)
+        self.near(i, other, i)
     }
 }
 
@@ -231,6 +252,9 @@ const STRIP_GAP: usize = 16;
 /// at 150 %, Nov 14, 2026). Those lines are not trusted: the next frame's lines replace them.
 const GUARD: usize = 8;
 
+/// Per-channel difference that still counts as "the same" pixel between two captures.
+const NOISE_TOLERANCE: u8 = 2;
+
 /// Fixed bands may not take more than this share of a frame: more means the detection is not to
 /// be trusted.
 const MAX_BAND_SHARE: f64 = 0.6;
@@ -249,7 +273,7 @@ fn find_join(
     bands: Option<(usize, usize)>,
 ) -> Result<Join, NoJoin> {
     let n = a.count;
-    if a.data == b.data {
+    if a.data == b.data || (0..n).all(|i| a.same_line(b, i)) {
         return Err(NoJoin::Same);
     }
     let (header, footer) = match bands {
@@ -294,7 +318,7 @@ fn find_join(
         let g = GUARD.min(overlap / 3);
         for i in g..overlap - g {
             let (ia, ib) = (header + s + i, header + i);
-            if a.hashes[ia] != b.hashes[ib] || a.line(ia) != b.line(ib) {
+            if !a.near(ia, b, ib) {
                 bad += 1;
                 if bad > allowed {
                     break;
