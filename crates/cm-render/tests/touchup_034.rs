@@ -783,7 +783,7 @@ fn s2_real_set() {
             k += 1;
             let failing = m.ring_p98_error > 6;
             let Some(out_dir) = &crops else { continue };
-            if k % step != 0 && !(failing && k % 4 == 0) {
+            if !k.is_multiple_of(step) && !(failing && k.is_multiple_of(4)) {
                 continue;
             }
             let retype = format!(
