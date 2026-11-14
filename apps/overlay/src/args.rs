@@ -1,7 +1,5 @@
 //! Command line: `cm-overlay <region|window|display> [options]`.
 
-use std::path::PathBuf;
-
 use cm_ipc::Endpoint;
 
 use crate::error::OverlayError;
@@ -58,11 +56,8 @@ pub enum Parsed {
 }
 
 fn endpoint_from(s: &str) -> Endpoint {
-    if cfg!(windows) {
-        Endpoint::Pipe(s.to_owned())
-    } else {
-        Endpoint::Path(PathBuf::from(s))
-    }
+    // The same rule as the CLI and the daemon: a bare pipe name gets the `\\.\pipe\` prefix.
+    Endpoint::from_arg(s)
 }
 
 /// Parses `args` (without the program name). `env_socket` is `CAPTUREMANN_SOCKET`.

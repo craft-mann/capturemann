@@ -301,13 +301,21 @@ fn canvas(
                 .child(SharedString::from(src.title.clone())),
         };
         board = board.child(cell_box).children(label.map(|l| {
-            let (x, y) = (cell.x as f32 * k + 6., cell.y as f32 * k + 6.);
+            let (x, mut y) = (cell.x as f32 * k + 6., cell.y as f32 * k + 6.);
             if s.layout == LayoutKind::Pair {
+                // BEFORE and AFTER sit in the band above the picture, not over it (the board
+                // renderer reserves the same band).
+                let band = s
+                    .options()
+                    .ok()
+                    .map(|o| cm_render::compose_board::label_band(&o, LayoutKind::Pair, plan.unit))
+                    .unwrap_or(0) as f32;
+                y = (cell.y as f32 - band) * k + 1.;
                 // The stamp of design board S10: bold red BEFORE and green AFTER with a frame.
                 let ink = crate::theme::Color::rgb(if i == 0 { 0xDC2626 } else { 0x16A34A });
                 div()
                     .absolute()
-                    .left(px(x))
+                    .left(px(cell.x as f32 * k))
                     .top(px(y))
                     .px(px(8.))
                     .py(px(1.))
@@ -873,7 +881,7 @@ impl Render for BoardSheetView {
             )
             .children((s.layout == LayoutKind::Free).then(|| {
                 div()
-                    .max_w(px(geo.canvas_w))
+                    .w(px(geo.canvas_w))
                     .text_size(px(12.5))
                     .text_color(rgba_of(t.mist))
                     .child(tr!(
@@ -882,7 +890,7 @@ impl Render for BoardSheetView {
             }))
             .child(
                 div()
-                    .max_w(px(geo.canvas_w))
+                    .w(px(geo.canvas_w))
                     .text_size(px(12.5))
                     .text_color(rgba_of(t.mist))
                     .child(tr!("Finish copies the screenshots into the board, with their annotations drawn in. The originals are not changed.")),

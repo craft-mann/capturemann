@@ -473,14 +473,15 @@ fn plan_k(
         0
     };
     let title_h = title_band(opts, unit, gap);
+    let label_h = label_band(opts, layout.kind, unit) as i32;
     let mut cells = Vec::with_capacity(n);
-    let (mut x, mut y) = (margin, margin + title_h);
+    let (mut x, mut y) = (margin, margin + title_h + label_h);
     for &(w, h) in &dims {
         cells.push(Placed { x, y, w, h });
         if horizontal {
             x += w as i32 + gap;
         } else {
-            y += (h + caption_h) as i32 + gap;
+            y += (h + caption_h) as i32 + gap + label_h;
         }
     }
     let _ = (cols, rows);
@@ -488,12 +489,13 @@ fn plan_k(
         let w = x - gap + margin;
         let h = margin * 2
             + title_h
+            + label_h
             + dims.iter().map(|d| d.1).max().unwrap_or(0) as i32
             + caption_h as i32;
         (w, h)
     } else {
         let w = margin * 2 + dims.iter().map(|d| d.0).max().unwrap_or(0) as i32;
-        (w, y - gap + margin)
+        (w, y - gap - label_h + margin)
     };
     Ok(BoardPlan {
         width: width as u32,
@@ -504,6 +506,16 @@ fn plan_k(
         caption_h,
         scale: k,
     })
+}
+
+/// The band above each Pair picture that holds its BEFORE or AFTER label, so the label never
+/// covers the screenshot (maintainer, Nov 14, 2026). Zero when there are no labels.
+pub fn label_band(opts: &BoardOptions, kind: LayoutKind, unit: f32) -> u32 {
+    if opts.before_after && kind == LayoutKind::Pair {
+        (unit * 0.9 * 1.35).ceil() as u32 + 8
+    } else {
+        0
+    }
 }
 
 fn title_band(opts: &BoardOptions, unit: f32, gap: i32) -> i32 {
@@ -687,7 +699,8 @@ pub fn render_board(
             } else {
                 Color::rgb(0x1F, 0x8A, 0x4C)
             };
-            let off = (plan.unit * 0.5) as i32 + 4;
+            // In the band above the picture, left-aligned with it.
+            let band = label_band(opts, layout.kind, plan.unit) as i32;
             draw_text(
                 &mut canvas,
                 &mut fonts,
@@ -695,7 +708,7 @@ pub fn render_board(
                 plan.unit * 0.9,
                 Color::WHITE,
                 Some(bg),
-                (cell.x + off, cell.y + off),
+                (cell.x, cell.y - band + 3),
                 None,
             )?;
         }
