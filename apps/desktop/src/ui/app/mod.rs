@@ -62,6 +62,8 @@ pub enum Route {
     Recordings,
     /// The audio library (nav item "Audio", the grid filtered to `kind: "audio"`, VOC-1.AC10).
     Audio,
+    /// The Click Guides library (nav item "Click Guides", the grid filtered to `kind: "guide"`).
+    Guides,
     /// Not built yet: publishing and drive destinations show an honest "Not available yet" page.
     Published,
     Destinations,
@@ -117,6 +119,9 @@ pub struct AppModel {
     /// The last library page shown (All captures, Screenshots, Recordings or Published): where
     /// "Back to library" in the settings sidebar returns to.
     pub library_route: Route,
+    /// Where the screenshot editor returns to when another page opened it: the guide
+    /// editor's "Edit image" (GDE-2). Cleared when the route leaves the editor.
+    pub editor_return: Option<Route>,
     /// Bumped whenever the library may have changed; the library view reloads.
     pub library_epoch: u64,
     /// The images of the Library view as last shown (its filter, search and sort), for the
@@ -256,6 +261,7 @@ impl AppModel {
             toasts: ToastQueue::default(),
             route: Route::Library,
             library_route: Route::Library,
+            editor_return: None,
             library_epoch: 0,
             editor_strip: Arc::new(Vec::new()),
             changed_captures: Vec::new(),

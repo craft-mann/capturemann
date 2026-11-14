@@ -55,6 +55,31 @@ pub fn bar_rect(visible: &Rect) -> Rect {
     )
 }
 
+/// The bar's rectangle in the space the daemon's click events use (GDE-1.AC2): GPUI's points on
+/// macOS, where the pointer is reported in points too, and physical px on Windows, where it is
+/// not. `display_px` is the display's rectangle in physical px (`None` where points are the
+/// OS's space); the scale is what the display's physical width makes of its width in points, so
+/// a display at 150 % moves and grows the bar by 1.5, and a second monitor keeps its offset.
+pub fn exclusion_in_os_space(
+    bar: &Rect,
+    display_pts: &Rect,
+    display_px: Option<[i64; 4]>,
+) -> [f64; 4] {
+    let Some(px) = display_px else {
+        return [bar.x, bar.y, bar.w, bar.h];
+    };
+    if display_pts.w <= 0.0 || display_pts.h <= 0.0 {
+        return [bar.x, bar.y, bar.w, bar.h];
+    }
+    let (sx, sy) = (px[2] as f64 / display_pts.w, px[3] as f64 / display_pts.h);
+    [
+        px[0] as f64 + (bar.x - display_pts.x) * sx,
+        px[1] as f64 + (bar.y - display_pts.y) * sy,
+        bar.w * sx,
+        bar.h * sy,
+    ]
+}
+
 fn toast(app: &Entity<AppModel>, spec: ToastSpec, cx: &mut App) {
     app::push_toast(app, spec, cx);
 }
@@ -75,6 +100,23 @@ pub fn start(app: &Entity<AppModel>, cx: &mut App) {
         );
         return;
     };
+    // GDE-1.AC5, AC6: the permission card or the reason, before anything is shown or recorded.
+    match super::preflight::current() {
+        super::preflight::Gate::Ready => {}
+        super::preflight::Gate::NeedsInputMonitoring => {
+            super::card::open(app, start, cx);
+            return;
+        }
+        super::preflight::Gate::Unavailable(reason) => {
+            toast(
+                app,
+                ToastSpec::new(ToastKind::Warning, tr!("Click Guide is not available here"))
+                    .body(reason),
+                cx,
+            );
+            return;
+        }
+    }
     let Some(display) = pointer_display(cx) else {
         return;
     };
@@ -94,7 +136,10 @@ pub fn start(app: &Entity<AppModel>, cx: &mut App) {
     crate::surfaces::opened(crate::surfaces::Surface::GuideHud, h);
     cx.set_global(Holder(Some(h)));
     // Clicks on the bar are not steps (the bar's own rectangle, in the OS's global space).
-    daemon.set_guide_exclusions(vec![[rect.x, rect.y, rect.w, rect.h]]);
+    // (Windows reports clicks in physical px: the rectangle is converted with the display's scale.)
+    let display_px = crate::platform_window::gpui_monitor_rects_px()
+        .and_then(|v| v.into_iter().find(|(id, _)| *id == gpui_id).map(|(_, r)| r));
+    daemon.set_guide_exclusions(vec![exclusion_in_os_space(&rect, &display.1, display_px)]);
 
     let (app3, backend2) = (app.clone(), backend.clone());
     cx.spawn(async move |cx| {
@@ -399,5 +444,50 @@ impl Render for GuideHud {
                     },
                 )),
             )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// GDE-1.AC2: on a 150 % Windows display the bar's rectangle is given in physical px, so a
+    /// click on the bar is never a step; on macOS (no px rectangle) it stays in points.
+    #[test]
+    fn the_exclusion_is_in_physical_px_on_a_scaled_display() {
+        let bar = Rect::new(500.0, 12.0, 470.0, 64.0);
+        let display = Rect::new(0.0, 0.0, 1280.0, 720.0);
+        let px = [0, 0, 1920, 1080];
+        assert_eq!(
+            exclusion_in_os_space(&bar, &display, Some(px)),
+            [750.0, 18.0, 705.0, 96.0]
+        );
+        assert_eq!(
+            exclusion_in_os_space(&bar, &display, None),
+            [500.0, 12.0, 470.0, 64.0]
+        );
+    }
+
+    /// A second monitor keeps its physical origin and its own scale (here 200 %).
+    #[test]
+    fn a_second_monitor_keeps_its_offset_and_scale() {
+        let display = Rect::new(1280.0, 0.0, 960.0, 540.0);
+        let bar = Rect::new(1280.0 + 245.0, 12.0, 470.0, 64.0);
+        let px = [1920, 0, 1920, 1080];
+        assert_eq!(
+            exclusion_in_os_space(&bar, &display, Some(px)),
+            [1920.0 + 490.0, 24.0, 940.0, 128.0]
+        );
+    }
+
+    /// An empty display rectangle must not divide by zero.
+    #[test]
+    fn an_empty_display_falls_back_to_the_points() {
+        let bar = Rect::new(1.0, 2.0, 3.0, 4.0);
+        let d = Rect::new(0.0, 0.0, 0.0, 0.0);
+        assert_eq!(
+            exclusion_in_os_space(&bar, &d, Some([0, 0, 100, 100])),
+            [1.0, 2.0, 3.0, 4.0]
+        );
     }
 }

@@ -133,6 +133,8 @@ pub mod ids {
     pub const CAPTURE_DISPLAY: &str = "capture_display";
     pub const OPEN_LIBRARY: &str = "open_library";
     pub const OPEN_LAUNCHER: &str = "open_launcher";
+    /// "New Click Guide" (GDE-1): starts a guide on the display under the pointer.
+    pub const NEW_CLICK_GUIDE: &str = "new_click_guide";
     pub const SETTINGS: &str = "settings";
     /// "Import file…" (IMP-5): the tray's stand-in for the macOS menu bar item, on Windows where
     /// the window has no menu bar.
@@ -342,6 +344,7 @@ pub fn plain_menu_ids(with_import: bool) -> Vec<&'static str> {
         ids::CAPTURE_DISPLAY,
         ids::OPEN_LIBRARY,
         ids::OPEN_LAUNCHER,
+        ids::NEW_CLICK_GUIDE,
     ];
     if with_import {
         v.push(ids::IMPORT);
@@ -364,6 +367,7 @@ pub fn menu_text(id: &str) -> String {
         ids::REC_STOP => tr!("Stop recording"),
         ids::OPEN_LIBRARY => tr!("Open library"),
         ids::OPEN_LAUNCHER => tr!("Open launcher"),
+        ids::NEW_CLICK_GUIDE => tr!("New Click Guide"),
         ids::IMPORT => tr_ctx!("menu", "Import file\u{2026}"),
         ids::SETTINGS => tr_ctx!("tray menu", "Settings"),
         ids::PERMISSIONS => tr!("Permissions\u{2026}"),
@@ -582,6 +586,7 @@ pub fn build_native_tray() -> Result<NativeTray, String> {
         &sep_a,
         plain_item(ids::OPEN_LIBRARY),
         plain_item(ids::OPEN_LAUNCHER),
+        plain_item(ids::NEW_CLICK_GUIDE),
     ];
     if let Some((_, import)) = plain.iter().find(|(i, _)| *i == ids::IMPORT) {
         entries.push(import);

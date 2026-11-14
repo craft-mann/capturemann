@@ -164,7 +164,11 @@ impl LibraryView {
                     // Not on screen: remember, and reload when it is (R1-7).
                     let on_screen = matches!(
                         app.read(cx).route,
-                        Route::Library | Route::Screenshots | Route::Recordings | Route::Audio
+                        Route::Library
+                            | Route::Screenshots
+                            | Route::Recordings
+                            | Route::Audio
+                            | Route::Guides
                     );
                     if on_screen {
                         this.reload(cx);
@@ -350,12 +354,14 @@ impl LibraryView {
     fn sync_items(&mut self, cx: &mut Context<Self>) {
         let only = self.state.imported_only;
         let boards = self.state.boards_only;
+        let guides = self.state.guides_only;
         self.items = Arc::new(
             self.state
                 .items()
                 .iter()
                 .filter(|i| !only || i.imported_from.is_some())
                 .filter(|i| !boards || i.board.is_some())
+                .filter(|i| !guides || i.kind == Kind::Guide)
                 .cloned()
                 .collect(),
         );
@@ -380,7 +386,7 @@ impl LibraryView {
         if self.state.click_chip(chip) {
             self.keep_scroll = false;
             self.reload(cx);
-        } else if matches!(chip, Chip::Imported | Chip::Boards) {
+        } else if matches!(chip, Chip::Imported | Chip::Boards | Chip::Guides) {
             // Filtered here: the page is already loaded.
             self.keep_scroll = false;
             self.sync_items(cx);
@@ -989,6 +995,24 @@ fn thumb_frame(ctx: &RowCtx, item: &CaptureItem, width: f32, cx: &mut gpui::App)
 
 /// The "Record audio" button of the Audio page header (board V3): the rec tint of the sidebar's
 /// mic button, the label and the chord.
+/// "New Click Guide" in the header of All captures and Click Guides (GDE-1, design S11).
+fn new_click_guide_button(t: &Theme, app: &Entity<AppModel>) -> gpui::Stateful<gpui::Div> {
+    let app = app.clone();
+    button_with_icon(
+        t,
+        "library-new-guide",
+        tr!("New Click Guide"),
+        ButtonKind::Secondary,
+        Some("mouse-pointer-click"),
+    )
+    // GDE-1.AC6: a session with no click events (Wayland) shows the entry off, with the reason.
+    .when_some(
+        crate::ui::guide_view::preflight::disabled_reason(),
+        |b, reason| b.opacity(0.45).tooltip(tip(reason, Vec::new())),
+    )
+    .on_click(move |_, _, cx| app::handle_command(&app, Command::NewClickGuide, cx))
+}
+
 fn record_audio_header_button(t: &Theme, keys: &[String], app: &Entity<AppModel>) -> AnyElement {
     let app = app.clone();
     let focus = rgba_of(t.text);
@@ -1555,6 +1579,7 @@ impl Render for LibraryView {
                 Filter::Recordings => crate::import_flow::PageKinds::Video,
                 Filter::Audio => crate::import_flow::PageKinds::Audio,
                 Filter::Screenshots => crate::import_flow::PageKinds::Images,
+                Filter::Guides => crate::import_flow::PageKinds::None,
             };
             let list = self.app.read(cx).import.pending_cards(&existing, kinds);
             if self.state.imported_only
@@ -1666,7 +1691,11 @@ impl Render for LibraryView {
                     &nav::record_audio_keys(&shortcuts, platform),
                     &self.app,
                 )
-            }));
+            }))
+            .children(
+                matches!(route, Route::Guides | Route::Library)
+                    .then(|| new_click_guide_button(&t, &self.app).into_any_element()),
+            );
 
         // ---- toolbar: the chips and the sort bar -------------------------------------------
         let chips = Chip::ALL.iter().map(|c| {
@@ -1912,6 +1941,13 @@ impl Render for LibraryView {
                     &nav::record_audio_keys(&shortcuts, platform),
                     &app,
                 )),
+            ),
+            (_, Some(EmptyKind::NoCaptures)) if route == Route::Guides => empty_state(
+                &t,
+                "mouse-pointer-click",
+                &tr!("No Click Guides yet"),
+                &tr!("Click through a task and CaptureMann writes the steps. It records clicks only, never keystrokes."),
+                Some(new_click_guide_button(&t, &app).into_any_element()),
             ),
             (_, Some(EmptyKind::NoCaptures)) => {
                 let keys = shortcuts

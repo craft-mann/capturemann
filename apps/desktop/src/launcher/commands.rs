@@ -22,6 +22,8 @@ pub enum CommandId {
     OpenLibrary,
     /// "Import media" (IMP-5): opens the file picker and the import sheet.
     ImportMedia,
+    /// "New Click Guide" (GDE-1): the bar, a countdown, then clicks become steps.
+    NewClickGuide,
     OpenSettings,
     OpenPermissions,
     PublishLast,
@@ -56,6 +58,8 @@ pub enum Glyph {
     Mic,
     /// Import media.
     Import,
+    /// Click Guide (the pointer with click lines).
+    ClickGuide,
     Frame,
     Window,
     Monitor,
@@ -315,6 +319,9 @@ pub struct Env<'a> {
     /// Why recording cannot start right now (library unavailable, a recording is running), or
     /// `None` when it can.
     pub recording_off: Option<String>,
+    /// Why "New Click Guide" is off (a recording is running, or the session delivers no click
+    /// events, GDE-1.AC6), or `None` when it can run.
+    pub guide_off: Option<String>,
     /// A 60 fps self-test passed on this machine and is still current, so "Record at 60 fps"
     /// can be offered (REC-3). The engine makes the final decision when the recording starts.
     pub fps60_ready: bool,
@@ -543,6 +550,28 @@ fn build_rows(env: &Env<'_>) -> Vec<Command> {
             options: Vec::new(),
         },
         Command {
+            id: CommandId::NewClickGuide,
+            group: Group::Capture,
+            title: tr!("New Click Guide"),
+            keywords: keywords(
+                vec![
+                    tr_ctx!("launcher keyword", "guide"),
+                    tr_ctx!("launcher keyword", "how-to"),
+                    tr_ctx!("launcher keyword", "steps"),
+                    tr_ctx!("launcher keyword", "tutorial"),
+                    tr_ctx!("launcher keyword", "clicks"),
+                ],
+                "New Click Guide", // i18n-ignore: the English title is searched too
+                &["guide", "how-to", "steps", "tutorial", "clicks"],
+            ),
+            glyph: Glyph::ClickGuide,
+            hint: Hint::Text(tr!("Click through a task, get the steps")),
+            shortcut: Vec::new(),
+            disabled: env.guide_off.clone(),
+            verb: tr!("Start a guide"),
+            options: Vec::new(),
+        },
+        Command {
             id: CommandId::OpenLibrary,
             group: Group::Capture,
             title: tr!("Open library"),
@@ -704,8 +733,26 @@ mod tests {
             capture_available: available,
             copy_after_capture: true,
             recording_off: (!available).then(|| "Library unavailable".to_owned()),
+            guide_off: (!available).then(|| "Library unavailable".to_owned()),
             fps60_ready: false,
         }
+    }
+
+    /// GDE-1.AC6: where the session has no click events the command is listed but off, and the
+    /// reason is its disabled text.
+    #[test]
+    fn new_click_guide_is_off_with_its_reason() {
+        let map = ShortcutMap::defaults(Platform::Mac);
+        let mcp = derive(true, true, None, &[]);
+        let mut env = env_for(Platform::Mac, &map, &mcp, true);
+        assert_eq!(find(&build(&env), CommandId::NewClickGuide).disabled, None);
+        env.guide_off = Some("no click events here".to_owned());
+        assert_eq!(
+            find(&build(&env), CommandId::NewClickGuide)
+                .disabled
+                .as_deref(),
+            Some("no click events here")
+        );
     }
 
     fn find(cmds: &[Command], id: CommandId) -> &Command {

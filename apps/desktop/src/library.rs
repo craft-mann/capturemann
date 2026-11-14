@@ -121,6 +121,7 @@ pub fn kind_counts(items: &[CaptureItem], published: Option<usize>) -> crate::na
         screenshots: Some(n(Kind::Screenshot)),
         recordings: Some(n(Kind::Recording)),
         audio: Some(n(Kind::Audio)),
+        guides: Some(n(Kind::Guide)),
         published,
     }
 }
@@ -264,6 +265,8 @@ pub enum Filter {
     Screenshots,
     /// Audio-only recordings (the Audio sidebar item).
     Audio,
+    /// Click Guides (GDE-2, the Click Guides sidebar item).
+    Guides,
 }
 
 impl Filter {
@@ -273,6 +276,7 @@ impl Filter {
             Filter::Recordings => Some("recording"),
             Filter::Screenshots => Some("screenshot"),
             Filter::Audio => Some("audio"),
+            Filter::Guides => Some("guide"),
             Filter::All => None,
         }
     }
@@ -306,14 +310,17 @@ pub enum Chip {
     Published,
     /// Boards (BRD-1): screenshots made with "Make a board"; filtered on this side.
     Boards,
+    /// Click Guides (S11): only guides, on "All captures" (applied to the loaded page).
+    Guides,
 }
 
 impl Chip {
-    pub const ALL: [Chip; 4] = [
+    pub const ALL: [Chip; 5] = [
         Chip::Imported,
         Chip::Uploaded,
         Chip::Published,
         Chip::Boards,
+        Chip::Guides,
     ];
 
     pub fn label(self) -> String {
@@ -322,6 +329,7 @@ impl Chip {
             Chip::Uploaded => tr_ctx!("filter chip", "Uploaded"),
             Chip::Published => tr_ctx!("filter chip", "Published"),
             Chip::Boards => tr_ctx!("filter chip", "Boards"),
+            Chip::Guides => tr_ctx!("filter chip", "Click Guides"),
         }
     }
 
@@ -332,6 +340,7 @@ impl Chip {
             Chip::Uploaded => "Uploaded",
             Chip::Published => "Published",
             Chip::Boards => "Boards",
+            Chip::Guides => "Guides",
         }
     }
 
@@ -342,6 +351,7 @@ impl Chip {
             Chip::Uploaded => "cloud-upload",
             Chip::Published => "send",
             Chip::Boards => "layout-panel-left",
+            Chip::Guides => "mouse-pointer-click",
         }
     }
 }
@@ -449,6 +459,8 @@ pub struct LibraryState {
     pub imported_only: bool,
     /// The "Boards" chip: only boards (applied to the loaded page, like Imported).
     pub boards_only: bool,
+    /// The "Click Guides" chip: only guides (applied to the loaded page).
+    pub guides_only: bool,
     /// How many captures of the page are uploaded and published, from the last load without a
     /// chip or query (the chips show them).
     pub remote_counts: Option<(usize, usize)>,
@@ -470,6 +482,7 @@ impl LibraryState {
             remote: None,
             imported_only: false,
             boards_only: false,
+            guides_only: false,
             remote_counts: None,
             sort: SortKey::Date,
             descending: true,
@@ -490,6 +503,7 @@ impl LibraryState {
         match chip {
             Chip::Imported => self.imported_only,
             Chip::Boards => self.boards_only,
+            Chip::Guides => self.guides_only,
             Chip::Uploaded => self.remote == Some(RemoteFilter::Uploaded),
             Chip::Published => self.remote == Some(RemoteFilter::Published),
         }
@@ -506,6 +520,11 @@ impl LibraryState {
             }
             Chip::Boards => {
                 self.boards_only = !self.boards_only;
+                self.selected = None;
+                return false;
+            }
+            Chip::Guides => {
+                self.guides_only = !self.guides_only;
                 self.selected = None;
                 return false;
             }
@@ -534,9 +553,12 @@ impl LibraryState {
         if chip == Chip::Boards {
             return Some(self.items.iter().filter(|i| i.board.is_some()).count());
         }
+        if chip == Chip::Guides {
+            return Some(self.items.iter().filter(|i| i.kind == Kind::Guide).count());
+        }
         let (up, publ) = self.remote_counts?;
         match chip {
-            Chip::Imported | Chip::Boards => None,
+            Chip::Imported | Chip::Boards | Chip::Guides => None,
             Chip::Uploaded => Some(up),
             Chip::Published => Some(publ),
         }
@@ -881,7 +903,8 @@ mod tests {
                 Chip::Imported,
                 Chip::Uploaded,
                 Chip::Published,
-                Chip::Boards
+                Chip::Boards,
+                Chip::Guides
             ]
         );
         assert!(!s.chip_active(Chip::Uploaded) && !s.chip_active(Chip::Published));

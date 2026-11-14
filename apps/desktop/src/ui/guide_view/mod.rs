@@ -31,8 +31,10 @@ use crate::ui::paint::{rgba_of, TextExt};
 use crate::ui::studio::ThemeGlobal;
 use crate::ui::text_field::{CaretAt, TextField, TextFieldEvent};
 
+pub mod card;
 pub mod export;
 pub mod hud;
+pub mod preflight;
 
 /// One step as `get_guide` describes it.
 #[derive(Debug, Clone, PartialEq)]
@@ -94,6 +96,73 @@ impl GuideData {
     }
 }
 
+/// The new order after moving the step at `from` to the place of the step at `to` (a drop on a
+/// row puts the dragged step where that row was). Out-of-range or equal indices change nothing.
+pub fn reordered(ids: &[String], from: usize, to: usize) -> Vec<String> {
+    let mut v = ids.to_vec();
+    if from >= v.len() || to >= v.len() || from == to {
+        return v;
+    }
+    let s = v.remove(from);
+    v.insert(to, s);
+    v
+}
+
+/// A step row being dragged in the list (GDE-2, design S8: grip on the left, the lifted row
+/// follows the pointer, a drop puts it where the row it lands on was).
+struct StepDrag {
+    from: usize,
+    label: String,
+    title: String,
+}
+
+/// The lifted row.
+struct StepGhost {
+    label: SharedString,
+    title: SharedString,
+}
+
+impl Render for StepGhost {
+    fn render(&mut self, _w: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let t = cx.global::<ThemeGlobal>().0;
+        div()
+            .h(px(48.))
+            .w(px(260.))
+            .px(px(10.))
+            .flex()
+            .items_center()
+            .gap(px(10.))
+            .rounded(px(scale::RADIUS_SM))
+            .border_1()
+            .border_color(rgba_of(t.line))
+            .bg(rgba_of(t.raised))
+            .shadow_lg()
+            .text_size(px(type_scale::UI))
+            .text_color(rgba_of(t.text))
+            .child(
+                div()
+                    .size(px(26.))
+                    .flex_none()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .rounded(px(13.))
+                    .bg(rgba_of(t.rec))
+                    .text_color(rgba_of(t.on_rec))
+                    .text_size(px(type_scale::CAPTION))
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .child(self.label.clone()),
+            )
+            .child(
+                div()
+                    .flex_1()
+                    .min_w(px(0.))
+                    .overflow_hidden()
+                    .child(self.title.clone()),
+            )
+    }
+}
+
 enum Load {
     Idle,
     Loading,
@@ -116,6 +185,9 @@ pub struct GuideView {
     pub(crate) error: Option<String>,
     pub(crate) export: Option<export::ExportState>,
     epoch: u64,
+    /// "Edit image" opened the editor: the next time the page shows, the guide and its
+    /// pictures are read again (the step's image may have changed), keeping the selection.
+    away: bool,
     _subs: Vec<Subscription>,
 }
 
@@ -185,6 +257,7 @@ impl GuideView {
             error: None,
             export: None,
             epoch,
+            away: false,
             _subs: subs,
         }
     }
@@ -192,8 +265,12 @@ impl GuideView {
     /// Shows guide `id` (a no-op while it is already shown).
     pub fn set_guide(&mut self, id: &str, cx: &mut Context<Self>) {
         if self.id.as_deref() == Some(id) {
+            if std::mem::take(&mut self.away) {
+                self.reload(cx);
+            }
             return;
         }
+        self.away = false;
         self.id = Some(id.to_owned());
         self.load = Load::Loading;
         self.selected = None;
@@ -451,14 +528,22 @@ impl GuideView {
     }
 
     fn move_step(&mut self, id: &str, by: isize, cx: &mut Context<Self>) {
-        let mut ids = self.ids();
+        let ids = self.ids();
         let Some(p) = ids.iter().position(|s| s == id) else {
             return;
         };
         let to = p.saturating_add_signed(by).min(ids.len().saturating_sub(1));
-        let s = ids.remove(p);
-        ids.insert(to, s);
-        self.step_edit(ids.into_iter().map(|i| json!({ "id": i })).collect(), cx);
+        self.reorder(p, to, cx);
+    }
+
+    /// Moves the step at `from` to the place of the step at `to`: one `set_guide`, one undo step.
+    fn reorder(&mut self, from: usize, to: usize, cx: &mut Context<Self>) {
+        let ids = self.ids();
+        let new = reordered(&ids, from, to);
+        if new == ids {
+            return;
+        }
+        self.step_edit(new.into_iter().map(|i| json!({ "id": i })).collect(), cx);
     }
 
     fn duplicate(&mut self, id: &str, cx: &mut Context<Self>) {
@@ -523,7 +608,12 @@ impl GuideView {
         self.commit(cx);
         if let Some(image_id) = self.selected_row().and_then(|s| s.image_id.clone()) {
             let app = self.app.clone();
-            cx.defer(move |cx| app::set_route(&app, Route::Editor(image_id), cx));
+            let back = self.id.clone().map(Route::Guide);
+            self.away = true;
+            cx.defer(move |cx| match back {
+                Some(b) => app::open_editor_from(&app, &image_id, b, cx),
+                None => app::set_route(&app, Route::Editor(image_id), cx),
+            });
         }
     }
 
@@ -539,6 +629,7 @@ fn step_row_view(
     t: &Theme,
     this: &GuideView,
     s: &StepRow,
+    index: usize,
     first: bool,
     last: bool,
     cx: &mut Context<GuideView>,
@@ -567,6 +658,27 @@ fn step_row_view(
         .on_click(cx.listener({
             let id = id.clone();
             move |this, _, _, cx| this.select(&id, cx)
+        }))
+        .on_drag(
+            StepDrag {
+                from: index,
+                label: s.label.clone(),
+                title: s.title.clone(),
+            },
+            |d, _, _, cx| {
+                cx.new(|_| StepGhost {
+                    label: SharedString::from(d.label.clone()),
+                    title: SharedString::from(d.title.clone()),
+                })
+            },
+        )
+        .drag_over::<StepDrag>({
+            let c = rgba_of(t.raised);
+            let line = rgba_of(t.text);
+            move |d, _, _, _| d.bg(c).border_t_2().border_color(line)
+        })
+        .on_drop::<StepDrag>(cx.listener(move |this, d: &StepDrag, _, cx| {
+            this.reorder(d.from, index, cx);
         }));
     row = row
         .child(icon("grip-vertical", 14., t.faint))
@@ -775,7 +887,7 @@ impl Render for GuideView {
                     .steps
                     .iter()
                     .enumerate()
-                    .map(|(i, s)| step_row_view(&t, self, s, i == 0, i + 1 == n, cx))
+                    .map(|(i, s)| step_row_view(&t, self, s, i, i == 0, i + 1 == n, cx))
                     .collect();
                 let numbering = |label: &'static str, key: &'static str, id: &'static str| {
                     let on = d.numbering == key;
@@ -1020,5 +1132,33 @@ impl GuideView {
             );
         }
         col.into_any_element()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ids(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| (*s).to_owned()).collect()
+    }
+
+    /// GDE-2: a drop on a row puts the dragged step where that row was, in both directions.
+    #[test]
+    fn a_drop_puts_the_step_where_the_row_was() {
+        let v = ids(&["a", "b", "c", "d"]);
+        assert_eq!(reordered(&v, 0, 2), ids(&["b", "c", "a", "d"]));
+        assert_eq!(reordered(&v, 3, 1), ids(&["a", "d", "b", "c"]));
+        assert_eq!(reordered(&v, 1, 0), ids(&["b", "a", "c", "d"]));
+    }
+
+    /// A drop on itself or off the list changes nothing (no undo step is made).
+    #[test]
+    fn a_drop_on_itself_or_outside_changes_nothing() {
+        let v = ids(&["a", "b", "c"]);
+        assert_eq!(reordered(&v, 1, 1), v);
+        assert_eq!(reordered(&v, 5, 0), v);
+        assert_eq!(reordered(&v, 0, 9), v);
+        assert!(reordered(&[], 0, 0).is_empty());
     }
 }

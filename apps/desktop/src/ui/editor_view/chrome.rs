@@ -41,7 +41,10 @@ impl EditorView {
                     tr!("Back to library"),
                     ButtonKind::Secondary,
                 )
-                .on_click(move |_, _, cx| app::set_route(&app, Route::Screenshots, cx)),
+                .on_click(move |_, _, cx| {
+                    let back = app::editor_back_route(&app, cx);
+                    app::set_route(&app, back, cx)
+                }),
             )
             .into_any_element()
     }
@@ -204,14 +207,31 @@ impl EditorView {
             }
         };
         let back_keys = vec![m.clone(), "[".to_owned()];
+        // Opened from a Click Guide's "Edit image": Back returns to the guide (GDE-2).
+        let from_guide = matches!(self.app.read(cx).editor_return, Some(Route::Guide(_)));
         let crumb = crumb_link(
             t,
             "editor-back",
-            tr_ctx!("breadcrumb", "Screenshots /"),
-            tr!("Library"),
+            if from_guide {
+                tr_ctx!("breadcrumb", "Click Guide /")
+            } else {
+                tr_ctx!("breadcrumb", "Screenshots /")
+            },
+            if from_guide {
+                tr!("Guide")
+            } else {
+                tr!("Library")
+            },
         )
         .aria_keyshortcuts("[")
-        .tooltip(tooltip::tip(tr!("Back to library"), back_keys))
+        .tooltip(tooltip::tip(
+            if from_guide {
+                tr!("Back to the guide")
+            } else {
+                tr!("Back to library")
+            },
+            back_keys,
+        ))
         .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.leave(cx)));
         let reveal = Self::reveal_label();
         let actions: Vec<AnyElement> = vec![

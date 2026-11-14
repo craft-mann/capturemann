@@ -56,12 +56,30 @@ pub fn set_route(app: &Entity<AppModel>, route: Route, cx: &mut App) {
         crate::ui::upload_ui::publishes_seen(app, cx);
     }
     app.update(cx, |m, cx| {
+        if !matches!(route, Route::Editor(_)) {
+            m.editor_return = None;
+        }
         if crate::nav::is_library_page(&route) {
             m.library_route = route.clone();
         }
         m.route = route;
         cx.notify();
     });
+}
+
+/// Opens the screenshot editor on `capture_id` and makes Back return to `back` (the guide
+/// editor's "Edit image", GDE-2). Like [`set_route`], for the Studio window's own handlers.
+pub fn open_editor_from(app: &Entity<AppModel>, capture_id: &str, back: Route, cx: &mut App) {
+    set_route(app, Route::Editor(capture_id.to_owned()), cx);
+    app.update(cx, |m, _| m.editor_return = Some(back));
+}
+
+/// Where the editor's Back goes: the page that opened it, else the Screenshots library.
+pub fn editor_back_route(app: &Entity<AppModel>, cx: &App) -> Route {
+    app.read(cx)
+        .editor_return
+        .clone()
+        .unwrap_or(Route::Screenshots)
 }
 
 /// Changes the route and shows the Studio window (hotkeys, tray, toasts).

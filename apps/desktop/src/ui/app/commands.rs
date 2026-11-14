@@ -42,6 +42,7 @@ pub fn handle_command(app: &Entity<AppModel>, cmd: Command, cx: &mut App) {
                 "capture_display" => start_capture(app, CaptureMode::Display, cx),
                 "open_library" => navigate(app, Route::Library, cx),
                 "open_launcher" => crate::ui::launcher_window::toggle(app, cx),
+                crate::platform::ids::NEW_CLICK_GUIDE => crate::ui::guide_view::hud::start(app, cx),
                 "settings" => navigate(app, Route::Settings, cx),
                 crate::platform::ids::IMPORT => {
                     crate::ui::import_actions::open(app, Vec::new(), cx)
