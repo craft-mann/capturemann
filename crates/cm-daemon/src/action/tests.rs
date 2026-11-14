@@ -858,3 +858,17 @@ fn external_params_pass_through() {
         json!({"capture_id":"rec_1","rest":{"platform":"youtube","privacy":"unlisted"}})
     );
 }
+
+/// GDE-1: the Library's "Click Guides" filter sends `kind: "guide"`; the other kinds still work and
+/// anything else is `invalid_input` (found by eye on Nov 14, 2026: the whole Library page failed).
+#[test]
+fn gde_1_list_library_accepts_every_capture_kind() {
+    for k in ["screenshot", "recording", "audio", "guide"] {
+        assert!(
+            Action::parse("list_library", &json!({"kind": k})).is_ok(),
+            "{k}"
+        );
+    }
+    let e = Action::parse("list_library", &json!({"kind": "board"})).unwrap_err();
+    assert_eq!(e.code(), cm_core::ErrorCode::InvalidInput);
+}

@@ -670,7 +670,7 @@ pub fn all() -> Vec<ToolSpec> {
             summary: "List or search captures in the library, newest first, with paging.",
             input: json!({ "type": "object", "properties": {
                 "query": { "type": "string", "description": "Full-text search." },
-                "kind": { "type": "string", "enum": ["screenshot", "recording", "audio"], "description": "`audio` lists audio-only recordings (VOC-1); `recording` lists screen recordings." },
+                "kind": { "type": "string", "enum": ["screenshot", "recording", "audio", "guide"], "description": "`audio` lists audio-only recordings (VOC-1); `recording` lists screen recordings; `guide` lists Click Guides (GDE-1)." },
                 "status": { "type": "string", "enum": ["uploaded", "not_uploaded", "published", "not_published"], "description": "Only captures with (or without) an upload record (`uploaded`: sent to a storage destination) or a publish record (`published`: on YouTube and the like). Combines with `kind` and `query`; paging stays correct." },
                 "limit": { "type": "integer", "minimum": 1, "maximum": 200, "default": 50 },
                 "cursor": { "type": "string", "description": "`next_cursor` of the previous page." } },

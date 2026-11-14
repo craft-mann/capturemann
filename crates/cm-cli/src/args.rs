@@ -1048,8 +1048,8 @@ pub struct MoveArgs {
 
 #[derive(Debug, Args)]
 pub struct LibraryPaging {
-    /// Only `screenshot`, `recording` (screen) or `audio`.
-    #[arg(long, value_parser = ["screenshot", "recording", "audio"])]
+    /// Only `screenshot`, `recording` (screen), `audio` or `guide` (Click Guides).
+    #[arg(long, value_parser = ["screenshot", "recording", "audio", "guide"])]
     pub kind: Option<String>,
     /// Only captures with or without upload or publish records.
     #[arg(long, value_parser = ["uploaded", "not_uploaded", "published", "not_published"])]

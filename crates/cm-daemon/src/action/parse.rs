@@ -507,10 +507,10 @@ impl Action {
                 }
                 let kind = f.str_opt("kind")?;
                 if let Some(k) = &kind {
-                    if !matches!(k.as_str(), "screenshot" | "recording" | "audio") {
+                    if !matches!(k.as_str(), "screenshot" | "recording" | "audio" | "guide") {
                         return Err(CmError::invalid_field(
                             "kind",
-                            "must be `screenshot`, `recording` or `audio`",
+                            "must be `screenshot`, `recording`, `audio` or `guide`",
                         ));
                     }
                 }
