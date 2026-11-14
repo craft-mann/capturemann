@@ -22,7 +22,33 @@ struct Rig {
 }
 
 fn rig() -> Rig {
-    let (b, lib) = builder(desktop());
+    rig_with(None)
+}
+
+/// Scripted recognizer: the same lines for every picture (no real OCR engine).
+#[derive(Clone)]
+struct Fixed(Vec<cm_render::ocr::TextLine>, bool);
+
+impl cm_render::ocr::TextRecognizer for Fixed {
+    fn name(&self) -> &'static str {
+        "fixed"
+    }
+    fn is_available(&self) -> bool {
+        self.1
+    }
+    fn recognize(
+        &self,
+        _image: &image::RgbaImage,
+    ) -> Result<Vec<cm_render::ocr::TextLine>, cm_core::CmError> {
+        Ok(self.0.clone())
+    }
+}
+
+fn rig_with(rec: Option<Fixed>) -> Rig {
+    let (mut b, lib) = builder(desktop());
+    if let Some(r) = rec {
+        b = b.text_recognizer(r);
+    }
     let trash = tempfile::tempdir().unwrap();
     let daemon = b
         .confirmer(Arc::new(FixedConfirmer::new(Decision::Approve)))
@@ -319,6 +345,15 @@ async fn skipped_files_are_listed_with_a_reason() {
         .await
         .unwrap_err();
     assert_eq!(code(&e), ErrorCode::InvalidInput);
+    assert_eq!(r.files(), ["Good.webp"]);
+}
+
+/// BLK-1 / ANN-11: without a text recognizer a Blueprint request fails before anything is queued
+/// or written.
+#[tokio::test]
+async fn blueprint_without_a_recognizer_fails_before_anything_is_written() {
+    let r = rig_with(Some(Fixed(Vec::new(), false)));
+    let a = r.shot("Good").await;
     let e = r
         .call(
             "export_images",
@@ -327,7 +362,58 @@ async fn skipped_files_are_listed_with_a_reason() {
         .await
         .unwrap_err();
     assert_eq!(code(&e), ErrorCode::NotImplemented);
-    assert_eq!(r.files(), ["Good.webp"]);
+    assert!(r.files().is_empty());
+}
+
+/// BLK-1 Blueprint step: the box is painted over, the rest of the picture is the same as the
+/// plain export, and the capture itself (its `original.png` and manifest) is not changed
+/// (problem 11). The same call twice gives the same file.
+#[tokio::test]
+async fn blueprint_step_replaces_text_boxes_and_leaves_the_capture_alone() {
+    let line = cm_render::ocr::TextLine::laid_out("Secret name", 40.0, 40.0, 8.0, 16.0);
+    let r = rig_with(Some(Fixed(vec![line], true)));
+    let a = r.shot("Shot").await;
+    let dir = r.bundle_dir("Shot");
+    let before = (
+        std::fs::read(dir.join("original.png")).unwrap(),
+        std::fs::read(dir.join("manifest.json")).unwrap(),
+    );
+    for (blueprint, name) in [
+        (false, "plain-{n}"),
+        (true, "plan-{n}"),
+        (true, "again-{n}"),
+    ] {
+        let job = r
+            .call(
+                "export_images",
+                json!({"capture_ids": [a.clone()], "dest": r.dest(), "blueprint": blueprint,
+                       "name_pattern": name}),
+            )
+            .await
+            .unwrap();
+        let done = r.finished(job["job_id"].as_str().unwrap()).await;
+        assert_eq!(done["result"]["exported"], 1, "{done}");
+    }
+    let plain = decode(&r.out.path().join("plain-1.png"));
+    let plan = decode(&r.out.path().join("plan-1.png"));
+    assert_eq!(plain.dimensions(), plan.dimensions());
+    let (mut inside, mut outside) = (0, 0);
+    for (x, y, p) in plain.enumerate_pixels() {
+        if plan.get_pixel(x, y) != p {
+            // laid_out(text, x, y, char_w, h): 11 chars of 8 px, 16 px tall; allow the outward
+            // rounding of the box.
+            if (39..131).contains(&x) && (39..57).contains(&y) {
+                inside += 1;
+            } else {
+                outside += 1;
+            }
+        }
+    }
+    assert!(inside > 0, "the Blueprint step changed nothing");
+    assert_eq!(outside, 0, "pixels outside the box changed");
+    assert_eq!(std::fs::read(dir.join("original.png")).unwrap(), before.0);
+    assert_eq!(std::fs::read(dir.join("manifest.json")).unwrap(), before.1);
+    assert_eq!(decode(&r.out.path().join("again-1.png")), plan);
 }
 
 /// BLK-1.AC2: a cancel keeps the files already written and leaves no partial file.

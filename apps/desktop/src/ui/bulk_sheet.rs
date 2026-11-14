@@ -561,13 +561,25 @@ fn form(t: &Theme, s: &BulkSheet, v: &BulkSheetView, app: &Entity<AppModel>) -> 
             .into_any_element(),
     );
 
-    // Blueprint: the hook is here, switched off until the `blueprint` op lands (Track A).
+    // Blueprint (ANN-11): every text line of each picture becomes a bar in the file; the
+    // screenshots themselves are not changed.
+    let a = app.clone();
     let blueprint = section(
         t,
         tr!("Blueprint"),
-        Some(tr!("Coming with the Blueprint tool")),
-        div()
-            .child(switch(t, "bulk-blueprint", tr!("Blueprint"), false, false))
+        Some(tr!(
+            "Replaces every line of text with a bar in the files; the screenshots stay as they are"
+        )),
+        row()
+            .child(
+                switch(t, "bulk-blueprint", tr!("Blueprint"), s.blueprint, true)
+                    .on_click(move |_, _, cx| update(&a, cx, |s| s.blueprint = !s.blueprint)),
+            )
+            .child(
+                div()
+                    .text_size(px(13.))
+                    .child(tr!("Replace text with bars")),
+            )
             .into_any_element(),
     );
 

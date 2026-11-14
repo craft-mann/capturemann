@@ -40,6 +40,50 @@ fn preview(text: &str) -> String {
     }
 }
 
+/// Text lines, their whole-pixel boxes and the measured style of each box.
+pub(crate) type Detected = (
+    Vec<cm_render::ocr::TextLine>,
+    Vec<cm_core::Rc>,
+    Vec<cm_render::BlueprintBoxStyle>,
+);
+
+/// The text lines of `image` as whole-pixel boxes (reading order, at most
+/// [`MAX_BLUEPRINT_BOXES`]) with the fill and bar colour measured for each. Shared by
+/// `suggest_blueprint` and the Blueprint step of Bulk export (BLK-1).
+pub(crate) fn detect(
+    recognizer: &dyn cm_render::ocr::TextRecognizer,
+    image: &image::RgbaImage,
+) -> Result<Detected, CmError> {
+    let mut lines: Vec<_> = recognizer
+        .recognize(image)?
+        .into_iter()
+        .filter(|l| !l.text.trim().is_empty() && l.rect.w >= 1.0 && l.rect.h >= 1.0)
+        .collect();
+    // Reading order: top to bottom, then left to right.
+    lines.sort_by(|a, b| {
+        a.rect
+            .y
+            .total_cmp(&b.rect.y)
+            .then(a.rect.x.total_cmp(&b.rect.x))
+    });
+    lines.truncate(MAX_BLUEPRINT_BOXES);
+    let (iw, ih) = (f64::from(image.width()), f64::from(image.height()));
+    // Whole pixels, outward, inside the image.
+    let rects: Vec<cm_core::Rc> = lines
+        .iter()
+        .map(|l| {
+            let (x0, y0) = (l.rect.x.floor().max(0.0), l.rect.y.floor().max(0.0));
+            let (x1, y1) = (
+                (l.rect.x + l.rect.w).ceil().min(iw),
+                (l.rect.y + l.rect.h).ceil().min(ih),
+            );
+            cm_core::Rc::new(x0, y0, (x1 - x0).max(1.0), (y1 - y0).max(1.0))
+        })
+        .collect();
+    let styles = cm_render::measure_blueprint(image, &rects);
+    Ok((lines, rects, styles))
+}
+
 impl Inner {
     pub(crate) async fn suggest_blueprint(
         &self,
@@ -77,33 +121,7 @@ impl Inner {
             } else {
                 cm_render::render_annotations(&original, &base_ops)?
             };
-            let mut lines: Vec<_> = recognizer
-                .recognize(&image)?
-                .into_iter()
-                .filter(|l| !l.text.trim().is_empty() && l.rect.w >= 1.0 && l.rect.h >= 1.0)
-                .collect();
-            // Reading order: top to bottom, then left to right.
-            lines.sort_by(|a, b| {
-                a.rect
-                    .y
-                    .total_cmp(&b.rect.y)
-                    .then(a.rect.x.total_cmp(&b.rect.x))
-            });
-            lines.truncate(MAX_BLUEPRINT_BOXES);
-            let (iw, ih) = (f64::from(image.width()), f64::from(image.height()));
-            // Whole pixels, outward, inside the image.
-            let rects: Vec<cm_core::Rc> = lines
-                .iter()
-                .map(|l| {
-                    let (x0, y0) = (l.rect.x.floor().max(0.0), l.rect.y.floor().max(0.0));
-                    let (x1, y1) = (
-                        (l.rect.x + l.rect.w).ceil().min(iw),
-                        (l.rect.y + l.rect.h).ceil().min(ih),
-                    );
-                    cm_core::Rc::new(x0, y0, (x1 - x0).max(1.0), (y1 - y0).max(1.0))
-                })
-                .collect();
-            let styles = cm_render::measure_blueprint(&image, &rects);
+            let (lines, rects, styles) = detect(recognizer.as_ref(), &image)?;
             let boxes: Vec<Value> = lines
                 .iter()
                 .zip(&rects)

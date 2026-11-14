@@ -1594,7 +1594,7 @@ pub struct ExportImagesArgs {
     /// The mark's width as a fraction of the picture, 0.05 to 1.
     #[arg(long = "watermark-size", value_name = "S")]
     pub watermark_size: Option<f64>,
-    /// Apply Blueprint (not available yet).
+    /// Replace every text line of each picture with a bar in the exported files (on-device text recognition; the screenshots are not changed).
     #[arg(long)]
     pub blueprint: bool,
     /// File names: {name}, {date}, {n}, {w} and {h} (default {name}).

@@ -257,8 +257,7 @@ pub struct BulkSheet {
     pub mark_opacity: u8,
     /// Percent of the picture width, 5 to 100.
     pub mark_size: u8,
-    /// Blueprint (ANN-11): the switch is shown off and disabled until the `blueprint` op lands
-    /// (the daemon answers `not_implemented` for it).
+    /// Blueprint (ANN-11): every text line becomes a bar in the exported files (keep-list empty).
     pub blueprint: bool,
     pub pattern: String,
     /// The folder to write to.
@@ -453,6 +452,115 @@ impl BulkSheet {
     }
 }
 
+// ---- Delete selected: one confirmation for all (LIB-1, BLK-1 selection bar) -------------------
+
+use crate::confirm::{delete_dialog, DialogModel};
+use crate::delete_flow::{self, DeletePrompt, Level, Notice};
+
+/// The titles listed in the combined delete question; the rest is "and N more".
+const DELETE_LIST_MAX: usize = 5;
+
+/// What the one question for N captures knows: each capture's own remote copies (the daemon's
+/// `describe_delete`, as for a single delete).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct BulkDeletePrompt {
+    /// Capture id, title and its copies online.
+    pub items: Vec<(String, String, DeletePrompt)>,
+}
+
+impl BulkDeletePrompt {
+    /// All copies the tick would delete, as one prompt (for the option text and the services).
+    fn merged(&self) -> DeletePrompt {
+        let mut m = DeletePrompt::default();
+        for (_, _, p) in &self.items {
+            m.removable.extend(p.removable.iter().cloned());
+            m.stays.extend(p.stays.iter().cloned());
+        }
+        m
+    }
+
+    /// The one confirmation: the count, the first titles, and (only when something is online)
+    /// the unticked-by-default option that covers every capture that has copies.
+    pub fn dialog(&self) -> DialogModel {
+        let n = self.items.len();
+        let merged = self.merged();
+        let trash = crate::platform_text::here(crate::platform_text::Term::Trash);
+        let mut m = delete_dialog("");
+        m.title = trn!("Delete {n} capture?", "Delete {n} captures?", n);
+        m.summary = if merged.offers_remote() {
+            tr!(
+                "They are removed from your library and moved to {trash}. Their copies online stay there unless you tick the box: deleting them cannot be undone ({services}).",
+                services = merged.services().join(", "),
+                trash = trash
+            )
+        } else {
+            tr!(
+                "They are removed from your library and moved to {trash}.",
+                trash = trash
+            )
+        };
+        m.details = self
+            .items
+            .iter()
+            .take(DELETE_LIST_MAX)
+            .map(|(_, t, _)| (tr!("Capture"), t.clone()))
+            .collect();
+        if n > DELETE_LIST_MAX {
+            let more = n - DELETE_LIST_MAX;
+            m.details
+                .push((tr!("Capture"), trn!("and {n} more", "and {n} more", more)));
+        }
+        m.primary_label = trn!("Delete {n} capture", "Delete {n} captures", n);
+        m.option = merged.option_label();
+        m
+    }
+
+    /// The `also_delete_remote` of one capture for the user's answer; `None` = declined.
+    pub fn also_remote(&self, decision: cm_daemon::Decision, id: &str) -> Option<bool> {
+        let own = self
+            .items
+            .iter()
+            .find(|(i, _, _)| i == id)
+            .map(|(_, _, p)| p.clone())
+            .unwrap_or_default();
+        delete_flow::also_remote(decision, &own)
+    }
+}
+
+/// One toast for the whole run: how many left the library, and what went wrong for the others
+/// (each with its title and the daemon's words).
+pub fn bulk_delete_notice(results: &[(String, Notice)]) -> Notice {
+    let ok = results.iter().filter(|(_, n)| n.local_deleted).count();
+    let failed: Vec<String> = results
+        .iter()
+        .filter(|(_, n)| !n.local_deleted)
+        .map(|(t, n)| match &n.body {
+            Some(b) => tr!("{title}: {reason}", title = t.clone(), reason = b.clone()),
+            None => t.clone(),
+        })
+        .collect();
+    if failed.is_empty() {
+        Notice {
+            level: Level::Success,
+            title: trn!("{n} capture deleted", "{n} captures deleted", ok),
+            body: None,
+            local_deleted: true,
+        }
+    } else {
+        let kept = failed.len();
+        Notice {
+            level: Level::Error,
+            title: trn!(
+                "{n} capture wasn\u{2019}t deleted",
+                "{n} captures weren\u{2019}t deleted",
+                kept
+            ),
+            body: Some(failed.join(" ")),
+            local_deleted: ok > 0,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -486,6 +594,8 @@ mod tests {
         assert_eq!(p["watermark"]["opacity"], 0.5);
         assert_eq!(p["name_pattern"], "{name}-{n}");
         assert!(p.get("blueprint").is_none());
+        s.blueprint = true;
+        assert_eq!(s.request().unwrap()["blueprint"], json!(true));
     }
 
     #[test]
@@ -564,5 +674,71 @@ mod tests {
         );
         assert_eq!(run.done, 2);
         assert_eq!(run.progress_line(), "Exporting 3 of 4");
+    }
+
+    fn prompt_item(id: &str, title: &str, remote: bool) -> (String, String, DeletePrompt) {
+        let mut p = DeletePrompt::default();
+        if remote {
+            p.removable
+                .push(json!({"form": "drive_file", "name": "a.png"}));
+        }
+        (id.to_owned(), title.to_owned(), p)
+    }
+
+    #[test]
+    fn bulk_delete_asks_once_and_lists_the_first_titles() {
+        let items: Vec<_> = (0..8)
+            .map(|i| prompt_item(&format!("c{i}"), &format!("Shot {i}"), false))
+            .collect();
+        let d = BulkDeletePrompt { items }.dialog();
+        assert!(d.title.contains('8'), "{}", d.title);
+        assert!(d.primary_is_danger);
+        assert!(d.primary_label.contains('8'));
+        // Five titles and "and 3 more".
+        assert_eq!(d.details.len(), 6);
+        assert!(d.details[5].1.contains('3'));
+        assert!(d.option.is_none());
+    }
+
+    #[test]
+    fn bulk_delete_offers_the_remote_option_only_for_captures_that_have_copies() {
+        let p = BulkDeletePrompt {
+            items: vec![prompt_item("a", "A", false), prompt_item("b", "B", true)],
+        };
+        assert!(p.dialog().option.is_some());
+        use cm_daemon::Decision::{Approve, ApproveForSession, Decline};
+        assert_eq!(p.also_remote(Decline, "a"), None);
+        assert_eq!(p.also_remote(Approve, "b"), Some(false));
+        // Ticked: only the capture with copies online asks for them to go.
+        assert_eq!(p.also_remote(ApproveForSession, "a"), Some(false));
+        assert_eq!(p.also_remote(ApproveForSession, "b"), Some(true));
+        let none = BulkDeletePrompt {
+            items: vec![prompt_item("a", "A", false)],
+        };
+        assert!(none.dialog().option.is_none());
+    }
+
+    #[test]
+    fn bulk_delete_notice_counts_and_names_the_failures() {
+        let good = Notice {
+            level: Level::Success,
+            title: "x".into(),
+            body: None,
+            local_deleted: true,
+        };
+        let bad = Notice {
+            level: Level::Error,
+            title: "y".into(),
+            body: Some("busy".into()),
+            local_deleted: false,
+        };
+        let n = bulk_delete_notice(&[("A".into(), good.clone()), ("B".into(), good.clone())]);
+        assert_eq!(n.level, Level::Success);
+        assert!(n.title.contains('2'));
+        let n = bulk_delete_notice(&[("A".into(), good), ("B".into(), bad)]);
+        assert_eq!(n.level, Level::Error);
+        assert!(n.local_deleted);
+        assert!(n.title.contains('1'));
+        assert!(n.body.unwrap().contains("B"));
     }
 }

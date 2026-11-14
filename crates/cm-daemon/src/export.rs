@@ -391,14 +391,22 @@ pub struct ExportHandler {
     pub(crate) library: Arc<Mutex<Library>>,
     pub(crate) events: EventBus,
     pub(crate) tools: ToolsFn,
+    /// The text recognizer of the daemon (the Blueprint step of `export_images`).
+    pub(crate) recognizer: Arc<dyn cm_render::ocr::TextRecognizer>,
 }
 
 impl ExportHandler {
-    pub(crate) fn new(library: Arc<Mutex<Library>>, events: EventBus, tools: ToolsFn) -> Self {
+    pub(crate) fn new(
+        library: Arc<Mutex<Library>>,
+        events: EventBus,
+        tools: ToolsFn,
+        recognizer: Arc<dyn cm_render::ocr::TextRecognizer>,
+    ) -> Self {
         ExportHandler {
             library,
             events,
             tools,
+            recognizer,
         }
     }
 }
@@ -637,6 +645,7 @@ impl Daemon {
             self.inner.library.clone(),
             self.inner.events.clone(),
             tools,
+            self.inner.recognizer.clone(),
         ))
     }
 
