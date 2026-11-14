@@ -664,7 +664,10 @@ fn s2_fill_quality_on_repo_screenshots() {
     let mut worst: Vec<u8> = Vec::new();
     for f in &files {
         let img = image::open(f).unwrap().to_rgba8();
-        let lines = system_recognizer().recognize(&img).unwrap();
+        let mut lines = system_recognizer().recognize(&img).unwrap();
+        if std::env::var("CM_S2_REFINE").as_deref() == Ok("1") {
+            lines = cm_render::ocr::refine_lines(system_recognizer().as_ref(), &img, lines);
+        }
         let (mut p, mut b, mut n) = (0, 0, 0);
         for l in lines.iter().filter(|l| !l.text.trim().is_empty()) {
             let r = Rc::new(

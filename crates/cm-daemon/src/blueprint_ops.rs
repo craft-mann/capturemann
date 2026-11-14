@@ -54,11 +54,14 @@ pub(crate) fn detect(
     recognizer: &dyn cm_render::ocr::TextRecognizer,
     image: &image::RgbaImage,
 ) -> Result<Detected, CmError> {
-    let mut lines: Vec<_> = recognizer
+    let found: Vec<_> = recognizer
         .recognize(image)?
         .into_iter()
         .filter(|l| !l.text.trim().is_empty() && l.rect.w >= 1.0 && l.rect.h >= 1.0)
         .collect();
+    // Split lines the recognizer merged across a wide gap (two buttons), drop shapes it read as
+    // letters (a round icon) and fit each box to its ink (no glyph edge left beside a bar).
+    let mut lines = cm_render::ocr::refine_lines(recognizer, image, found);
     // Reading order: top to bottom, then left to right.
     lines.sort_by(|a, b| {
         a.rect
