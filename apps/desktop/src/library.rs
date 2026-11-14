@@ -142,6 +142,8 @@ pub struct CaptureItem {
     pub publishes: Vec<PublishRecord>,
     /// The file it was imported from (`source.path`): an imported capture (IMP-2).
     pub imported_from: Option<String>,
+    /// The layout of a board (`pair`, `grid`, `strip`, `free`; BRD-1), `None` for any other capture.
+    pub board: Option<String>,
 }
 
 impl CaptureItem {
@@ -181,6 +183,7 @@ impl CaptureItem {
                 .and_then(|s| s.get("path"))
                 .and_then(Value::as_str)
                 .map(str::to_owned),
+            board: v.get("board").and_then(Value::as_str).map(str::to_owned),
         })
     }
 
@@ -297,16 +300,19 @@ pub enum Chip {
     Imported,
     Uploaded,
     Published,
+    /// Boards (BRD-1): screenshots made with "Make a board"; filtered on this side.
+    Boards,
 }
 
 impl Chip {
-    pub const ALL: [Chip; 3] = [Chip::Imported, Chip::Uploaded, Chip::Published];
+    pub const ALL: [Chip; 4] = [Chip::Imported, Chip::Uploaded, Chip::Published, Chip::Boards];
 
     pub fn label(self) -> String {
         match self {
             Chip::Imported => tr_ctx!("filter chip", "Imported"),
             Chip::Uploaded => tr_ctx!("filter chip", "Uploaded"),
             Chip::Published => tr_ctx!("filter chip", "Published"),
+            Chip::Boards => tr_ctx!("filter chip", "Boards"),
         }
     }
 
@@ -316,6 +322,7 @@ impl Chip {
             Chip::Imported => "Imported",
             Chip::Uploaded => "Uploaded",
             Chip::Published => "Published",
+            Chip::Boards => "Boards",
         }
     }
 
@@ -325,6 +332,7 @@ impl Chip {
             Chip::Imported => "cm-import",
             Chip::Uploaded => "cloud-upload",
             Chip::Published => "send",
+            Chip::Boards => "layout-panel-left",
         }
     }
 }
@@ -430,6 +438,8 @@ pub struct LibraryState {
     pub remote: Option<RemoteFilter>,
     /// The "Imported" chip: only captures that have a `source` (applied to the loaded page).
     pub imported_only: bool,
+    /// The "Boards" chip: only boards (applied to the loaded page, like Imported).
+    pub boards_only: bool,
     /// How many captures of the page are uploaded and published, from the last load without a
     /// chip or query (the chips show them).
     pub remote_counts: Option<(usize, usize)>,
@@ -450,6 +460,7 @@ impl LibraryState {
             filter: Filter::All,
             remote: None,
             imported_only: false,
+            boards_only: false,
             remote_counts: None,
             sort: SortKey::Date,
             descending: true,
@@ -469,6 +480,7 @@ impl LibraryState {
     pub fn chip_active(&self, chip: Chip) -> bool {
         match chip {
             Chip::Imported => self.imported_only,
+            Chip::Boards => self.boards_only,
             Chip::Uploaded => self.remote == Some(RemoteFilter::Uploaded),
             Chip::Published => self.remote == Some(RemoteFilter::Published),
         }
@@ -480,6 +492,11 @@ impl LibraryState {
         let want = match chip {
             Chip::Imported => {
                 self.imported_only = !self.imported_only;
+                self.selected = None;
+                return false;
+            }
+            Chip::Boards => {
+                self.boards_only = !self.boards_only;
                 self.selected = None;
                 return false;
             }
@@ -505,9 +522,12 @@ impl LibraryState {
                     .count(),
             );
         }
+        if chip == Chip::Boards {
+            return Some(self.items.iter().filter(|i| i.board.is_some()).count());
+        }
         let (up, publ) = self.remote_counts?;
         match chip {
-            Chip::Imported => None,
+            Chip::Imported | Chip::Boards => None,
             Chip::Uploaded => Some(up),
             Chip::Published => Some(publ),
         }
@@ -846,7 +866,10 @@ mod tests {
     #[test]
     fn lib1_remote_chips_toggle_and_keep_the_kind() {
         let mut s = LibraryState::new(LibraryStatus::Ready);
-        assert_eq!(Chip::ALL, [Chip::Imported, Chip::Uploaded, Chip::Published]);
+        assert_eq!(
+            Chip::ALL,
+            [Chip::Imported, Chip::Uploaded, Chip::Published, Chip::Boards]
+        );
         assert!(!s.chip_active(Chip::Uploaded) && !s.chip_active(Chip::Published));
         s.filter = Filter::Recordings;
         assert!(s.click_chip(Chip::Uploaded));

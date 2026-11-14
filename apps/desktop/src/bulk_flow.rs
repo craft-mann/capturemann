@@ -226,6 +226,15 @@ pub fn reason_text(reason: &str) -> String {
     }
 }
 
+/// What the app keeps: the Export selected sheet and the Make a board sheet (at most one is open).
+#[derive(Debug, Clone, Default)]
+pub struct BulkUi {
+    pub sheet: Option<BulkSheet>,
+    pub board: Option<crate::board_flow::BoardSheet>,
+    /// Bumped when a sheet opens, so its text fields are refilled.
+    pub epoch: u64,
+}
+
 /// The state of the sheet.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BulkSheet {

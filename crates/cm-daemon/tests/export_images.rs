@@ -123,6 +123,15 @@ async fn create_board_makes_a_new_screenshot_capture() {
     assert_eq!(m["board"]["layout"]["kind"], "pair");
     assert_eq!(m["board"]["sources"].as_array().unwrap().len(), 2);
     assert!(m["ops"].as_array().is_none_or(Vec::is_empty));
+    // The Library row says which layout the board has.
+    let rows = r.call("list_library", json!({})).await.unwrap();
+    let row = rows["captures"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["id"] == out["capture_id"])
+        .unwrap();
+    assert_eq!(row["board"], "pair");
     let img = decode(&dir.join("original.png"));
     assert_eq!((u64::from(img.width()), u64::from(img.height())), (w, h));
     // The library lists three screenshots; the sources still have no ops.

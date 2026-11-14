@@ -153,6 +153,8 @@ pub struct AppModel {
     pub library_move: crate::library_move::Phase,
     /// Import media (IMP-5): the sheet, the running imports and the drop overlay.
     pub import: crate::import_flow::ImportUi,
+    /// Bulk export (BLK-1) and Make a board (BRD-1): the sheets, open or not.
+    pub bulk: crate::bulk_flow::BulkUi,
     /// The Export popover (EXP-5), open or not; nothing of it is kept between exports.
     pub export_popover: Option<crate::export_flow::Popover>,
     /// The AI page: speech models, downloads the user started, the notice and the switches.
@@ -269,6 +271,7 @@ impl AppModel {
             copy_after_capture,
             library_move: crate::library_move::Phase::default(),
             import: Default::default(),
+            bulk: Default::default(),
             export_popover: None,
             ai: crate::ai::models::ModelsVm {
                 notice_dismissed: settings
