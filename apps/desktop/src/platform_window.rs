@@ -195,6 +195,12 @@ pub fn grip_press_is_native() -> bool {
     cfg!(windows)
 }
 
+/// Whether a new window may open a few px away from the rectangle it was asked for, so a window
+/// whose place matters is set to it once more after it opens (Windows).
+pub fn open_frame_is_approximate() -> bool {
+    cfg!(windows)
+}
+
 /// Whether the primary mouse button is held down right now (a drag or click in progress).
 pub fn left_button_down() -> bool {
     imp::left_button_down()

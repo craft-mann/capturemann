@@ -968,6 +968,21 @@ fn open_recording_windows(app: &Entity<AppModel>, cx: &mut App) {
         );
         if let Ok(h) = opened {
             crate::surfaces::opened(crate::surfaces::Surface::Hud, h);
+            // Windows opens a window about 5 px above the asked client rectangle (the frame the
+            // system adds), so a HUD reopened at its remembered place was off by that much and
+            // drifted further with every collapse and restart: put it where it was asked.
+            if platform_window::open_frame_is_approximate() {
+                let native = h
+                    .update(cx, |_, window, _| {
+                        platform_window::NativeWindow::for_frame(window)
+                    })
+                    .ok()
+                    .flatten();
+                if let Some(n) = native {
+                    cx.spawn(async move |_| n.set_frame(rect.x, rect.y, rect.w, rect.h))
+                        .detach();
+                }
+            }
             rec.update(cx, |r, _| r.hud_win = Some(h));
         }
     }
