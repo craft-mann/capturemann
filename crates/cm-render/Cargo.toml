@@ -18,6 +18,7 @@ cm-platform.workspace = true
 cm-core.workspace = true
 cosmic-text = { version = "0.19", default-features = false, features = ["std", "swash"] }
 image = { workspace = true, features = ["png"] }
+serde.workspace = true
 serde_json.workspace = true
 tiny-skia = "0.11"
 # MIT OR Apache-2.0 (the headless GPU compositor)

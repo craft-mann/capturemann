@@ -480,6 +480,14 @@ pub(crate) const ASSETS: &[(&str, &str)] = &[
         include_str!("../../assets/icons/folder-open.svg"),
     ),
     (
+        "icons/cloud-alert.svg",
+        include_str!("../../assets/icons/cloud-alert.svg"),
+    ),
+    (
+        "icons/layout-panel-left.svg",
+        include_str!("../../assets/icons/layout-panel-left.svg"),
+    ),
+    (
         "icons/folder-output.svg",
         include_str!("../../assets/icons/folder-output.svg"),
     ),

@@ -105,6 +105,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
 pub mod audio;
+pub mod board;
 pub mod bundle;
 pub mod history;
 pub mod import;

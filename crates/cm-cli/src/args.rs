@@ -61,6 +61,16 @@ pub enum Command {
     /// background job (`jobs get <id>`); `--wait` blocks until it ends. `--remove-originals`
     /// moves each original to the Trash after its copy is verified and asks on screen first.
     Import(ImportArgs),
+    /// Put 2 to 12 screenshots into one new picture (`create_board`): `board <id> <id> --layout
+    /// pair --before-after`. Layouts: pair, grid, strip, free (`--slot x,y,w,h` per image). The
+    /// board is a new screenshot capture; the sources are copied in as they are now and not
+    /// changed.
+    Board(BoardArgs),
+    /// Resize, convert, watermark and rename many screenshots at once (`export_images`, Bulk
+    /// export): `export-images <id>... --dest ~/Pictures/site --longest 1600 --format jpeg
+    /// --watermark-text DRAFT`. Writes new files, never overwrites, never changes the library.
+    /// Starts a background job (`jobs get <id>`); `--wait` blocks until it ends.
+    ExportImages(ExportImagesArgs),
     /// Browse the library (`list_library`).
     Library {
         #[command(subcommand)]
@@ -1480,4 +1490,114 @@ pub struct TextArgs {
     /// has the text; with this flag it has the lines too).
     #[arg(long)]
     pub lines: bool,
+}
+
+/// `board <id>... --layout ...` (BRD-1).
+#[derive(Debug, Args)]
+pub struct BoardArgs {
+    /// Capture ids of 2 to 12 screenshots, in order.
+    #[arg(required = true, num_args = 2..=12)]
+    pub ids: Vec<String>,
+    /// pair (exactly 2), grid, strip or free.
+    #[arg(long, value_parser = ["pair", "grid", "strip", "free"])]
+    pub layout: String,
+    /// Pair and strip: stack them in a column instead of a row.
+    #[arg(long)]
+    pub stacked: bool,
+    /// Grid: columns (1 to 6).
+    #[arg(long, value_name = "N")]
+    pub columns: Option<u32>,
+    /// Free: the rectangle of one image, `x,y,w,h` in board pixels; give one per image.
+    #[arg(long = "slot", value_name = "X,Y,W,H", allow_hyphen_values = true)]
+    pub slots: Vec<String>,
+    /// Space between images in px (0 to 200).
+    #[arg(long)]
+    pub gap: Option<u32>,
+    /// Space around the board in px (0 to 400).
+    #[arg(long)]
+    pub margin: Option<u32>,
+    /// transparent, white, light_grey, dark or #RRGGBB.
+    #[arg(long)]
+    pub background: Option<String>,
+    /// Corner radius in px (0 to 100).
+    #[arg(long)]
+    pub radius: Option<u32>,
+    /// A soft shadow under each image.
+    #[arg(long)]
+    pub shadow: bool,
+    /// Pair: BEFORE and AFTER labels.
+    #[arg(long = "before-after")]
+    pub before_after: bool,
+    /// A caption under an image; repeat once per image, in order.
+    #[arg(long = "caption", value_name = "TEXT")]
+    pub captions: Vec<String>,
+    /// A title drawn on the board.
+    #[arg(long = "title", value_name = "TEXT")]
+    pub board_title: Option<String>,
+    /// The new capture's title.
+    #[arg(long, value_name = "TITLE")]
+    pub name: Option<String>,
+}
+
+/// `export-images <id>... --dest <folder>` (BLK-1).
+#[derive(Debug, Args)]
+pub struct ExportImagesArgs {
+    /// Capture ids of the screenshots (at most 500).
+    #[arg(required = true)]
+    pub ids: Vec<String>,
+    /// The folder to write to (created when missing).
+    #[arg(long, value_name = "DIR")]
+    pub dest: String,
+    /// Size: the longest side in px.
+    #[arg(long, value_name = "PX", conflicts_with_all = ["width", "height", "percent"])]
+    pub longest: Option<u32>,
+    /// Size: the width in px.
+    #[arg(long, value_name = "PX", conflicts_with_all = ["height", "percent"])]
+    pub width: Option<u32>,
+    /// Size: the height in px.
+    #[arg(long, value_name = "PX", conflicts_with = "percent")]
+    pub height: Option<u32>,
+    /// Size: a percentage of the original (1 to 400).
+    #[arg(long, value_name = "P")]
+    pub percent: Option<f64>,
+    /// Allow a picture to become larger than the original.
+    #[arg(long = "allow-larger")]
+    pub allow_larger: bool,
+    /// png (default), jpeg or webp (lossless).
+    #[arg(long, value_parser = ["png", "jpeg", "webp"])]
+    pub format: Option<String>,
+    /// JPEG quality, 60 to 100.
+    #[arg(long)]
+    pub quality: Option<u8>,
+    /// A text watermark.
+    #[arg(
+        long = "watermark-text",
+        value_name = "TEXT",
+        conflicts_with = "watermark_image"
+    )]
+    pub watermark_text: Option<String>,
+    /// A PNG or JPEG watermark.
+    #[arg(long = "watermark-image", value_name = "FILE")]
+    pub watermark_image: Option<String>,
+    /// top_left, top, top_right, left, center, right, bottom_left, bottom or bottom_right.
+    #[arg(long = "watermark-position", value_name = "WHERE")]
+    pub watermark_position: Option<String>,
+    /// 0.05 to 1.
+    #[arg(long = "watermark-opacity", value_name = "O")]
+    pub watermark_opacity: Option<f64>,
+    /// The mark's width as a fraction of the picture, 0.05 to 1.
+    #[arg(long = "watermark-size", value_name = "S")]
+    pub watermark_size: Option<f64>,
+    /// Apply Blueprint (not available yet).
+    #[arg(long)]
+    pub blueprint: bool,
+    /// File names: {name}, {date}, {n}, {w} and {h} (default {name}).
+    #[arg(long = "name-pattern", value_name = "PATTERN")]
+    pub name_pattern: Option<String>,
+    /// Wait for the job and print what was exported and skipped.
+    #[arg(long)]
+    pub wait: bool,
+    /// With `--wait`: give up after this many seconds (exit 6; the job keeps running).
+    #[arg(long, value_name = "SECS", requires = "wait", value_parser = positive_secs)]
+    pub timeout: Option<f64>,
 }

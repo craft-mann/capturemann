@@ -373,6 +373,8 @@ pub(crate) fn tool_title(name: &str) -> String {
         "delete_capture" => tr!("Delete a capture"),
         "move_library" => tr!("Change the library folder"),
         "import_media" => tr!("Import video and audio files"),
+        "create_board" => tr!("Make a board of screenshots"),
+        "export_images" => tr!("Export screenshots as picture files"),
         "run_fps_selftest" => tr!("Run the 60 fps self-test"),
         "trim" => tr!("Trim a recording"),
         "cut_segments" => tr!("Cut parts of a recording"),

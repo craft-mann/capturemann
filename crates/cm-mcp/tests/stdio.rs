@@ -90,8 +90,8 @@ async fn agt_1_ac1_stdio_binary_lists_tools_and_calls_list_targets() {
     // and get_diagnostics (DIAG-1).
     // and import_media (IMP-3).
     // and get_cursor_track (REC-7), get_platform_rules (EXP-2), estimate_export (EXP-5).
-    // and recognize_text (ANN-5), and suggest_blueprint (ANN-11).
-    assert_eq!(list.len(), 82);
+    // and recognize_text (ANN-5), suggest_blueprint (ANN-11), create_board and export_images (BRD-1, BLK-1).
+    assert_eq!(list.len(), 84);
     assert!(list
         .iter()
         .all(|t| t["inputSchema"].is_object() && t["outputSchema"].is_object()));

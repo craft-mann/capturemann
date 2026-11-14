@@ -120,7 +120,8 @@ impl Inner {
         let out = blocking(move || {
             let mut lib = lock_library(&library);
             let rec = lib.get(&id)?;
-            this.ensure_idle_strict(&rec, &lib.bundle_path(&rec), "rename")?;
+            // A paused upload or publish names the capture id, not the folder (B1): no block.
+            this.ensure_idle(&rec, &lib.bundle_path(&rec), "rename")?;
             let renamed = lib.rename(&id, &p.title)?;
             Ok(json!({
                 "capture_id": renamed.id,
@@ -150,7 +151,7 @@ impl Inner {
             let lib = lock_library(&library);
             let rec = lib.get(&id)?;
             let dir = lib.bundle_path(&rec);
-            this.ensure_idle_strict(&rec, &dir, "delete")?;
+            this.ensure_idle(&rec, &dir, "delete")?;
             let size = human_size(rec.size_bytes);
             let remote =
                 remote.then(|| remote_delete::plan(&dir, dests.as_ref(), accounts.as_ref()));
@@ -231,7 +232,7 @@ impl Inner {
                 let lib = lock_library(&lib2);
                 let rec = lib.get(&id2)?;
                 let dir = lib.bundle_path(&rec);
-                this2.ensure_idle_strict(&rec, &dir, "delete")?;
+                this2.ensure_idle(&rec, &dir, "delete")?;
                 let plan = match pinned {
                     Some(p) => p,
                     None => remote_delete::plan(&dir, dests.as_ref(), accounts.as_ref()),
@@ -333,6 +334,10 @@ impl Inner {
             let mut lib = lock_library(&library);
             let rec = lib.get(&id)?;
             let dir = lib.bundle_path(&rec);
+            // B1 (LIB-1.AC11): the delete was confirmed, so the capture's paused upload and
+            // publish jobs are cancelled; a running or queued one still blocks.
+            this.ensure_idle(&rec, &dir, "delete")?;
+            this.cancel_paused(&rec.id)?;
             this.ensure_idle_strict(&rec, &dir, "delete")?;
             if dir.exists() {
                 trasher.trash(&dir)?;
@@ -445,6 +450,29 @@ impl LibraryView {
             .map(|j| j.id.to_string()))
     }
 
+    /// Cancels the capture's paused upload and publish jobs (a Drive upload waiting for the
+    /// account to sign in again). Returns the ids it cancelled.
+    pub(crate) fn cancel_paused(&self, capture_id: &str) -> Result<Vec<String>, CmError> {
+        let Some(queue) = &self.queue else {
+            return Ok(Vec::new());
+        };
+        let mut out = Vec::new();
+        for job_type in [JOB_UPLOAD, JOB_PUBLISH] {
+            let paused = queue.list(&JobFilter {
+                job_type: Some(job_type.to_owned()),
+                states: Some(vec![JobState::Paused]),
+                limit: Some(500),
+            })?;
+            for j in paused {
+                if j.inputs.get("capture_id").and_then(Value::as_str) == Some(capture_id) {
+                    queue.cancel(&j.id.to_string())?;
+                    out.push(j.id.to_string());
+                }
+            }
+        }
+        Ok(out)
+    }
+
     /// For edits that keep the folder where it is (captions, transcript, markers, the edit list,
     /// speakers): a running or queued export, upload or publish blocks them, a **paused** one
     /// does not (an upload waiting for the Google account to sign in again can wait for days, and
@@ -458,7 +486,7 @@ impl LibraryView {
         self.idle_check(rec, dir, what, false)
     }
 
-    /// For renaming, moving and deleting the folder: any job of the capture that is not finished,
+    /// For moving the folder (and the last check of a delete, after its paused jobs were cancelled): any job of the capture that is not finished,
     /// paused ones included, blocks it (the job would resume into a folder that is gone).
     pub(crate) fn ensure_idle_strict(
         &self,

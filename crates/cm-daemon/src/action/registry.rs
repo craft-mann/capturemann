@@ -111,6 +111,10 @@ pub const ACTIONS: &[ActionSpec] = &[
     // IMP-3/IMP-4: bring media files into the library as captures. Free in the table; a call with
     // `remove_originals: true` is Confirm (`Action::gating_spec`, a parameter-dependent tier).
     spec("import_media", Tier::Free, true),
+    // BRD-1: a new screenshot capture from 2 to 12 screenshots (changes no other capture).
+    spec("create_board", Tier::Free, true),
+    // BLK-1: new picture files in a chosen folder, as one `export` job (kind `images`).
+    spec("export_images", Tier::Free, true),
     // Local AI (M5, specs/features/07-ai.md). Everything is Free except what uses the network or
     // deletes a model file: `download_model` (the only network traffic of the AI features, only
     // when asked) and `remove_model`. Suggestions only read; accepting one is `set_zooms` or

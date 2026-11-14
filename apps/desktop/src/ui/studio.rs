@@ -122,6 +122,9 @@ pub struct Studio {
     published: Entity<PublishedView>,
     /// The import sheet (IMP-5), drawn over the window while it is open.
     import_sheet: Entity<crate::ui::import_sheet::ImportSheetView>,
+    /// The Export selected sheet (BLK-1) and the Make a board sheet (BRD-1).
+    bulk_sheet: Entity<crate::ui::bulk_sheet::BulkSheetView>,
+    board_sheet: Entity<crate::ui::board_sheet::BoardSheetView>,
     /// The Export popover (EXP-5), drawn over the window while it is open.
     export_popover: Entity<crate::ui::export_popover::ExportPopoverView>,
     /// The toast cards drawn inside this window (Wayland banners, `AppModel::toasts_in_studio`).
@@ -163,6 +166,8 @@ impl Studio {
         let published = cx.new(|cx| PublishedView::new(app.clone(), cx));
         let import_sheet =
             cx.new(|cx| crate::ui::import_sheet::ImportSheetView::new(app.clone(), cx));
+        let bulk_sheet = cx.new(|cx| crate::ui::bulk_sheet::BulkSheetView::new(app.clone(), cx));
+        let board_sheet = cx.new(|cx| crate::ui::board_sheet::BoardSheetView::new(app.clone(), cx));
         let export_popover =
             cx.new(|cx| crate::ui::export_popover::ExportPopoverView::new(app.clone(), cx));
         let focus = cx.focus_handle();
@@ -199,6 +204,8 @@ impl Studio {
             ai,
             published,
             import_sheet,
+            bulk_sheet,
+            board_sheet,
             export_popover,
             toast_host,
             rec_banner,
@@ -446,6 +453,12 @@ impl Render for Studio {
             )
             .when(self.app.read(cx).import.sheet.is_some(), |d| {
                 d.child(self.import_sheet.clone())
+            })
+            .when(self.app.read(cx).bulk.sheet.is_some(), |d| {
+                d.child(self.bulk_sheet.clone())
+            })
+            .when(self.app.read(cx).bulk.board.is_some(), |d| {
+                d.child(self.board_sheet.clone())
             })
             .when(self.app.read(cx).export_popover.is_some(), |d| {
                 d.child(self.export_popover.clone())

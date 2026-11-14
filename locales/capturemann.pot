@@ -52,6 +52,9 @@ msgstr ""
 msgid "A 5 second countdown"
 msgstr ""
 
+msgid "A board needs 2 to 12 screenshots."
+msgstr ""
+
 msgid "A browser window opened. Sign in there and allow access; this page continues by itself. Closing the window without allowing it ends the attempt after a few minutes, or press Cancel."
 msgstr ""
 
@@ -92,6 +95,9 @@ msgstr ""
 msgid "A local folder has no connection to test."
 msgstr ""
 
+msgid "A name that exists gets a number; nothing is overwritten"
+msgstr ""
+
 msgid "A personal Microsoft account can make “anyone with the link” links but not “people in my organization” links. A work or school account can make both, unless its administrator forbids public links; then CaptureMann makes the organization link instead and says so. If sign-in later says the redirect does not match, add http://127.0.0.1/callback as a second redirect URI."
 msgstr ""
 
@@ -120,6 +126,9 @@ msgid "A zoom eases in over {secs} seconds, holds, and eases out"
 msgstr ""
 
 msgid "AAC, 48 kHz · 128 kbps mono or 192 kbps stereo. Plays everywhere."
+msgstr ""
+
+msgid "AFTER"
 msgstr ""
 
 msgid "AI agents can start recordings without asking. The indicator still shows and you can stop from the toast."
@@ -354,6 +363,9 @@ msgstr ""
 msgid "Allow for this session"
 msgstr ""
 
+msgid "Allow larger than the original"
+msgstr ""
+
 #. FACT: owner review required (confirmation guarantee)
 msgid "Allow runs immediately. Ask first shows a confirmation on screen before the tool runs. Tools that change something can be set either way. Publishing and deleting always ask first and stay locked. Reading tools never need asking. Restrict a whole client below."
 msgstr ""
@@ -468,6 +480,9 @@ msgstr ""
 msgid "Apps that never appear in recordings"
 msgstr ""
 
+msgid "Arrangement"
+msgstr ""
+
 msgid "Attendees"
 msgstr ""
 
@@ -495,6 +510,9 @@ msgstr ""
 msgid "Audio settings"
 msgstr ""
 
+msgid "Auto"
+msgstr ""
+
 msgid "Auto picks HEVC when this computer’s encoder supports it, else H.264."
 msgstr ""
 
@@ -516,6 +534,12 @@ msgstr ""
 msgid "Available"
 msgstr ""
 
+msgid "BEFORE"
+msgstr ""
+
+msgid "BEFORE and AFTER labels"
+msgstr ""
+
 msgid "Back to Audio"
 msgstr ""
 
@@ -529,6 +553,9 @@ msgid "Back to the recording"
 msgstr ""
 
 msgid "Back to the report"
+msgstr ""
+
+msgid "Background"
 msgstr ""
 
 msgid "Background color {hex}"
@@ -549,7 +576,21 @@ msgstr ""
 msgid "Best matches first, then front to back"
 msgstr ""
 
+msgid "Blueprint"
+msgstr ""
+
 msgid "Blur here is only a look. To hide information, use Blur (B) or Pixelate (X)."
+msgstr ""
+
+msgid "Board created"
+msgstr ""
+
+msgid "Board of {n} screenshot"
+msgid_plural "Board of {n} screenshots"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Board title"
 msgstr ""
 
 msgid "Bring in a video or audio file"
@@ -633,10 +674,16 @@ msgstr ""
 msgid "Cancel a job"
 msgstr ""
 
+msgid "Cancel keeps the files already written."
+msgstr ""
+
 msgid "Cancel the 60 fps test"
 msgstr ""
 
 msgid "Cancel the upload to YouTube"
+msgstr ""
+
+msgid "Cancel upload"
 msgstr ""
 
 msgid "Cancelled"
@@ -890,6 +937,9 @@ msgstr ""
 msgid "Choose a folder by its full path."
 msgstr ""
 
+msgid "Choose a folder to save to."
+msgstr ""
+
 msgid "Choose a folder…"
 msgstr ""
 
@@ -935,6 +985,9 @@ msgstr ""
 msgid "Choose mic"
 msgstr ""
 
+msgid "Choose picture"
+msgstr ""
+
 msgid "Choose the built-in text model"
 msgstr ""
 
@@ -947,10 +1000,16 @@ msgstr ""
 msgid "Choose the speech model"
 msgstr ""
 
+msgid "Choose the watermark picture."
+msgstr ""
+
 msgid "Choose what goes in the recording."
 msgstr ""
 
 msgid "Choose “Scoped access”, then the access type: “App folder” (Dropbox gives CaptureMann its own folder under Apps) or “Full Dropbox”. Name the app and create it."
+msgstr ""
+
+msgid "Choose…"
 msgstr ""
 
 msgid "Cited by “{section} · {n}”, playing from {time}"
@@ -960,6 +1019,9 @@ msgid "Cited moment"
 msgstr ""
 
 msgid "Clear search"
+msgstr ""
+
+msgid "Clear selection"
 msgstr ""
 
 msgid "Click a display"
@@ -1028,7 +1090,13 @@ msgstr ""
 msgid "Collapse recording controls"
 msgstr ""
 
+msgid "Columns"
+msgstr ""
+
 msgid "Coming soon"
+msgstr ""
+
+msgid "Coming with the Blueprint tool"
 msgstr ""
 
 msgid "Command launcher"
@@ -1429,6 +1497,9 @@ msgid_plural "Cuts ({n})"
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "Dark"
+msgstr ""
+
 msgid "Decoded from the recording with FFmpeg"
 msgstr ""
 
@@ -1466,6 +1537,9 @@ msgid "Default visibility: {visibility}"
 msgstr ""
 
 msgid "Defaults were restored. The old file is saved as {name}."
+msgstr ""
+
+msgid "Delete"
 msgstr ""
 
 msgid "Delete \"{title}\" ({size})"
@@ -1614,6 +1688,9 @@ msgstr ""
 msgid "Displays unavailable"
 msgstr ""
 
+msgid "Done"
+msgstr ""
+
 msgid "Don’t save a copy"
 msgstr ""
 
@@ -1693,6 +1770,9 @@ msgid "Draw on screen, coming soon"
 msgstr ""
 
 msgid "Draw — Coming soon"
+msgstr ""
+
+msgid "Drawn on each file, not stored"
 msgstr ""
 
 msgid "Drawn on the video in the editor."
@@ -1798,6 +1878,9 @@ msgstr ""
 msgid "Everything here runs on {this_computer}. Nothing is downloaded unless you press Download, and nothing is sent anywhere."
 msgstr ""
 
+msgid "Example: {name}"
+msgstr ""
+
 msgid "Excluded windows"
 msgstr ""
 
@@ -1825,10 +1908,22 @@ msgstr ""
 msgid "Export audio…"
 msgstr ""
 
+msgid "Export cancelled. The files already written are in the folder."
+msgstr ""
+
 msgid "Export captions (SRT, VTT, TXT)"
 msgstr ""
 
 msgid "Export failed"
+msgstr ""
+
+msgid "Export progress"
+msgstr ""
+
+msgid "Export screenshots as picture files"
+msgstr ""
+
+msgid "Export selected…"
 msgstr ""
 
 msgid "Export the audio of a capture"
@@ -1839,6 +1934,16 @@ msgstr ""
 
 msgid "Export {format}"
 msgstr ""
+
+msgid "Export {n} image"
+msgid_plural "Export {n} images"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Export {n} screenshot"
+msgid_plural "Export {n} screenshots"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "Exported first with the `{preset}` preset"
 msgstr ""
@@ -1852,7 +1957,13 @@ msgstr ""
 msgid "Exporting audio…"
 msgstr ""
 
+msgid "Exporting needs the CaptureMann engine, which is not running."
+msgstr ""
+
 msgid "Exporting the audio: {pct}%"
+msgstr ""
+
+msgid "Exporting {n} of {total}"
 msgstr ""
 
 msgid "Exporting {pct}%"
@@ -1865,6 +1976,9 @@ msgid "Exports & uploads"
 msgstr ""
 
 msgid "Exports go to the default first"
+msgstr ""
+
+msgid "Extras"
 msgstr ""
 
 msgid "FFmpeg at `{path}` cannot be run (permission denied). FFmpeg was not found: CaptureMann includes its own copy, so reinstall CaptureMann, or set CM_FFMPEG to the path of ffmpeg.exe. (For development: winget install Gyan.FFmpeg.)"
@@ -1921,6 +2035,12 @@ msgstr ""
 msgid "File"
 msgstr ""
 
+msgid "File name pattern"
+msgstr ""
+
+msgid "File names"
+msgstr ""
+
 msgid "File size"
 msgstr ""
 
@@ -1967,6 +2087,12 @@ msgid "Finds where people speak so the transcription can skip noise. 0.9 MB."
 msgstr ""
 
 msgid "Finds where speech happens and who overlaps. First of the two files that tell speakers apart."
+msgstr ""
+
+msgid "Finish board"
+msgstr ""
+
+msgid "Finish copies the screenshots into the board, with their annotations drawn in. The originals are not changed."
 msgstr ""
 
 msgid "Fit shows the whole screen on the background. Choose Fixed to crop a window, or Follow to keep the window on the cursor."
@@ -2023,6 +2149,9 @@ msgstr ""
 msgid "Frame rate"
 msgstr ""
 
+msgid "Free"
+msgstr ""
+
 msgid "Free and open source under Apache-2.0."
 msgstr ""
 
@@ -2042,6 +2171,9 @@ msgid "GIF size can’t be estimated. It will stay under {mb} MB: width, then fr
 msgstr ""
 
 msgid "GIF size can’t be estimated. The real size is shown after export."
+msgstr ""
+
+msgid "Gap"
 msgstr ""
 
 msgid "Getting the picture…"
@@ -2095,6 +2227,9 @@ msgstr ""
 msgid "Grid"
 msgstr ""
 
+msgid "Height"
+msgstr ""
+
 msgid "Helps pick the right language for short recordings, for example vi, en"
 msgstr ""
 
@@ -2141,6 +2276,9 @@ msgid "If the switch for CaptureMann already looks on in System Settings, select
 msgstr ""
 
 msgid "If your Google Cloud project is not verified, YouTube may keep the video {privacy} whatever you choose here. CaptureMann tells you when that happens and never changes a video’s visibility afterwards."
+msgstr ""
+
+msgid "Image"
 msgstr ""
 
 msgid "Image strip"
@@ -2305,6 +2443,9 @@ msgstr ""
 msgid "Keep it"
 msgstr ""
 
+msgid "Keep size"
+msgstr ""
+
 msgid "Keep the file under"
 msgstr ""
 
@@ -2329,6 +2470,9 @@ msgstr ""
 msgid "Kinds to look for"
 msgstr ""
 
+msgid "Labels"
+msgstr ""
+
 msgid "Language"
 msgstr ""
 
@@ -2351,6 +2495,9 @@ msgid "Launch at login"
 msgstr ""
 
 msgid "Layout"
+msgstr ""
+
+msgid "Layout editable until Finish"
 msgstr ""
 
 msgid "Leave out lines the audio does not hold"
@@ -2412,6 +2559,9 @@ msgid "Library unavailable"
 msgstr ""
 
 msgid "Library unavailable — connect {hint}"
+msgstr ""
+
+msgid "Light grey"
 msgstr ""
 
 #. the line that is selected or under the playhead, and how many lines there are; short, in the panel header.
@@ -2504,6 +2654,9 @@ msgstr ""
 msgid "Long recordings are read in parts, then merged. You can keep editing."
 msgstr ""
 
+msgid "Longest side"
+msgstr ""
+
 msgid "Look again"
 msgstr ""
 
@@ -2552,6 +2705,12 @@ msgstr ""
 msgid "Made for kids"
 msgstr ""
 
+msgid "Make a board"
+msgstr ""
+
+msgid "Make a board of screenshots"
+msgstr ""
+
 msgid "Make default"
 msgstr ""
 
@@ -2561,10 +2720,16 @@ msgstr ""
 msgid "Making a GIF of the screen: {pct}%"
 msgstr ""
 
+msgid "Making a board needs the CaptureMann engine, which is not running."
+msgstr ""
+
 msgid "Making one MP4 with the camera bubble and audio: {pct}%"
 msgstr ""
 
 msgid "Making one WebM with the camera bubble and audio: {pct}%"
+msgstr ""
+
+msgid "Making the board…"
 msgstr ""
 
 msgid "Manage {name}"
@@ -2720,6 +2885,9 @@ msgstr ""
 msgid "Move (Alt resizes)"
 msgstr ""
 
+msgid "Move down"
+msgstr ""
+
 msgid "Move my captures to the new folder"
 msgstr ""
 
@@ -2769,6 +2937,9 @@ msgid "Move the zoom focus up"
 msgstr ""
 
 msgid "Move to {trash}"
+msgstr ""
+
+msgid "Move up"
 msgstr ""
 
 msgid "Moved to {trash}"
@@ -2830,10 +3001,19 @@ msgstr ""
 msgid "Network"
 msgstr ""
 
+msgid "Never larger than the original unless you allow it"
+msgstr ""
+
 msgid "Never larger than the recording"
 msgstr ""
 
+msgid "New board"
+msgstr ""
+
 msgid "New captures are saved to a folder on this computer until it is back. {path} ({reason})"
+msgstr ""
+
+msgid "New files are written; the originals are never changed. Annotations and redactions are drawn into every file."
 msgstr ""
 
 msgid "New glossary entry"
@@ -2963,6 +3143,9 @@ msgstr ""
 msgid "No phrases yet. Nothing is left out unless you add one."
 msgstr ""
 
+msgid "No picture yet"
+msgstr ""
+
 msgid "No preview"
 msgstr ""
 
@@ -3000,6 +3183,9 @@ msgid "No sound in the preview: FFmpeg is not installed."
 msgstr ""
 
 msgid "No sound in the preview: {e}"
+msgstr ""
+
+msgid "No space left"
 msgstr ""
 
 msgid "No speech model yet"
@@ -3064,7 +3250,13 @@ msgstr ""
 msgid "Noise-reduced copy"
 msgstr ""
 
+msgid "None"
+msgstr ""
+
 msgid "Normalise to {lufs} LUFS, the level podcasts and players expect"
+msgstr ""
+
+msgid "Not a screenshot"
 msgstr ""
 
 msgid "Not available for this recording"
@@ -3152,6 +3344,9 @@ msgid "Nothing is missing on this system for screenshots."
 msgstr ""
 
 msgid "Nothing is saved: the test video is deleted when the test ends"
+msgstr ""
+
+msgid "Nothing is selected."
 msgstr ""
 
 msgid "Nothing is shown until you ask. The light on your camera stays off."
@@ -3258,6 +3453,9 @@ msgid "Only you can watch it."
 msgstr ""
 
 msgid "Only {mb} MB free; recording needs more than 1 GB free to start"
+msgstr ""
+
+msgid "Opacity"
 msgstr ""
 
 msgid "Open AI"
@@ -3370,6 +3568,9 @@ msgstr ""
 msgid "Out (O)"
 msgstr ""
 
+msgid "Outer margin"
+msgstr ""
+
 msgid "Output"
 msgstr ""
 
@@ -3386,6 +3587,9 @@ msgid "PNG · save"
 msgstr ""
 
 msgid "Padding"
+msgstr ""
+
+msgid "Pair"
 msgstr ""
 
 msgid "Part of a line, any capitals or accents"
@@ -3431,6 +3635,9 @@ msgid "Peaks hit the top. Lower the input volume in {settings_app}."
 msgstr ""
 
 msgid "People in my organization"
+msgstr ""
+
+msgid "Percent"
 msgstr ""
 
 msgid "Permanent"
@@ -3755,6 +3962,9 @@ msgstr ""
 msgid "Recommended: fast and accurate for most recordings. Not for translation."
 msgstr ""
 
+msgid "Reconnect"
+msgstr ""
+
 msgid "Reconnect YouTube"
 msgstr ""
 
@@ -4017,6 +4227,9 @@ msgstr ""
 msgid "Remove destination"
 msgstr ""
 
+msgid "Remove from the board"
+msgstr ""
+
 msgid "Remove from the list"
 msgstr ""
 
@@ -4191,6 +4404,9 @@ msgid "Retry"
 msgstr ""
 
 msgid "Retry a job"
+msgstr ""
+
+msgid "Retry skipped"
 msgstr ""
 
 msgid "Retrying the upload…"
@@ -4412,6 +4628,9 @@ msgid_plural "Search {n} windows by title or app"
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "Select"
+msgstr ""
+
 msgid "Select a cut (the hatched part) to restore it"
 msgstr ""
 
@@ -4437,6 +4656,9 @@ msgid "Selected segment or range"
 msgstr ""
 
 msgid "Selected segment, or the one under the playhead"
+msgstr ""
+
+msgid "Selection"
 msgstr ""
 
 msgid "Sends"
@@ -4529,6 +4751,9 @@ msgstr ""
 
 #. FACT: owner review required (what the permission is for; Linux has no prompt)
 msgid "Shows your webcam in the bubble and records it as its own track. Linux has no camera prompt: if access is denied, add your user to the video group and log in again."
+msgstr ""
+
+msgid "Side by side"
 msgstr ""
 
 msgid "Sign in again"
@@ -4642,6 +4867,9 @@ msgstr ""
 msgid "Split the timeline {key} to set a different layout for each part."
 msgstr ""
 
+msgid "Stacked"
+msgstr ""
+
 msgid "Start a new empty library at {to}; the captures in {from} stay where they are"
 msgstr ""
 
@@ -4748,6 +4976,9 @@ msgid "Stopping background work…"
 msgstr ""
 
 msgid "Stops by itself after {duration}"
+msgstr ""
+
+msgid "Strip"
 msgstr ""
 
 msgid "Structured output did not work; replies are checked and retried"
@@ -4859,6 +5090,9 @@ msgid "Testing 60 fps · {left}"
 msgstr ""
 
 msgid "Testing…"
+msgstr ""
+
+msgid "Text"
 msgstr ""
 
 msgid "Text model"
@@ -5003,6 +5237,9 @@ msgstr ""
 msgid "The capture is always saved to the library."
 msgstr ""
 
+msgid "The capture is not in the library"
+msgstr ""
+
 msgid "The capture is saved in your library."
 msgstr ""
 
@@ -5075,10 +5312,19 @@ msgstr ""
 msgid "The export failed."
 msgstr ""
 
+msgid "The export stopped: {reason}"
+msgstr ""
+
 msgid "The file can't be imported"
 msgstr ""
 
 msgid "The file can't be read. It may be damaged or cut short."
+msgstr ""
+
+msgid "The file could not be written"
+msgstr ""
+
+msgid "The file name pattern is empty."
 msgstr ""
 
 msgid "The files already imported are in your library."
@@ -5199,6 +5445,12 @@ msgstr ""
 msgid "The picture can’t be shown here ({reason}); it is still uploaded if the type and size are accepted."
 msgstr ""
 
+msgid "The picture could not be encoded"
+msgstr ""
+
+msgid "The picture could not be read"
+msgstr ""
+
 msgid "The playhead is inside a caption: move it to a gap"
 msgstr ""
 
@@ -5307,6 +5559,12 @@ msgstr ""
 msgid "The sign-in was refused."
 msgstr ""
 
+msgid "The size must be a number of pixels from 1 to 16384."
+msgstr ""
+
+msgid "The size must be a percentage from 1 to 400."
+msgstr ""
+
 msgid "The system opener failed (code {code})."
 msgstr ""
 
@@ -5325,6 +5583,9 @@ msgstr ""
 msgid "The text model did not answer."
 msgstr ""
 
+msgid "The tint must be a colour like #DCE6F5."
+msgstr ""
+
 msgid "The transcript is being written on {this_computer}. A long recording takes several minutes. You don’t need to press anything: it appears here when it’s done, and speaker labels follow."
 msgstr ""
 
@@ -5338,6 +5599,9 @@ msgid "The upload failed."
 msgstr ""
 
 msgid "The upload finished but the daemon sent no link."
+msgstr ""
+
+msgid "The upload is paused, not lost. Delete and rename still work; deleting cancels the paused upload."
 msgstr ""
 
 msgid "The upload is stopping."
@@ -5368,6 +5632,9 @@ msgid "The video is on YouTube, but it refused the thumbnail: a custom thumbnail
 msgstr ""
 
 msgid "The video is on YouTube, but the thumbnail was not set: {warning}"
+msgstr ""
+
+msgid "The watermark could not be drawn"
 msgstr ""
 
 msgid "The window follows the cursor and only moves when the cursor leaves its middle 80%."
@@ -5525,6 +5792,12 @@ msgstr ""
 msgid "Timestamps in the TXT file"
 msgstr ""
 
+msgid "Tint"
+msgstr ""
+
+msgid "Tint colour"
+msgstr ""
+
 msgid "Title"
 msgstr ""
 
@@ -5623,6 +5896,12 @@ msgstr ""
 msgid "Translation ready: {language}"
 msgstr ""
 
+msgid "Transparent"
+msgstr ""
+
+msgid "Transparent is for PNG; a JPEG export puts it on white"
+msgstr ""
+
 msgid "Tray icon unavailable"
 msgstr ""
 
@@ -5666,6 +5945,9 @@ msgid "Type the caption"
 msgstr ""
 
 msgid "Type the term first."
+msgstr ""
+
+msgid "Type the watermark text."
 msgstr ""
 
 msgid "UI fonts: Geist and Geist Mono (SIL Open Font License 1.1), bundled. Icons: Lucide (ISC)."
@@ -5735,6 +6017,9 @@ msgid "Upload to {destination} failed"
 msgstr ""
 
 msgid "Upload waiting"
+msgstr ""
+
+msgid "Upload waiting for sign-in"
 msgstr ""
 
 msgid "Uploaded to YouTube"
@@ -5859,6 +6144,15 @@ msgstr ""
 msgid "Warning: {w}"
 msgstr ""
 
+msgid "Watermark"
+msgstr ""
+
+msgid "Watermark text"
+msgstr ""
+
+msgid "WebP (lossless)"
+msgstr ""
+
 msgid "Webcam bubble"
 msgstr ""
 
@@ -5937,6 +6231,9 @@ msgid "Whisper · transcripts, captions, translation to English"
 msgstr ""
 
 msgid "Whisper, from the audio"
+msgstr ""
+
+msgid "White"
 msgstr ""
 
 msgid "Who spoke when, from the voices"
@@ -6533,6 +6830,9 @@ msgstr ""
 msgid "{err} It stays on disk and is recovered the next time CaptureMann starts."
 msgstr ""
 
+msgid "{exported}, {skipped} skipped"
+msgstr ""
+
 msgid "{factor} · native"
 msgstr ""
 
@@ -6798,6 +7098,11 @@ msgstr[1] ""
 msgid "{n} doubtful"
 msgstr ""
 
+msgid "{n} exported"
+msgid_plural "{n} exported"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "{n} files that may not open"
 msgstr ""
 
@@ -6856,8 +7161,18 @@ msgstr[1] ""
 msgid "{n} rows (the limit is {limit})"
 msgstr ""
 
+msgid "{n} screenshot, drag order = list order"
+msgid_plural "{n} screenshots, drag order = list order"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "{n} second"
 msgid_plural "{n} seconds"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{n} selected"
+msgid_plural "{n} selected"
 msgstr[0] ""
 msgstr[1] ""
 
@@ -7795,7 +8110,23 @@ msgid "AUDIO"
 msgstr ""
 
 msgctxt "card badge"
+msgid "BOARD"
+msgstr ""
+
+msgctxt "card badge"
+msgid "FREE"
+msgstr ""
+
+msgctxt "card badge"
+msgid "GRID"
+msgstr ""
+
+msgctxt "card badge"
 msgid "Imported"
+msgstr ""
+
+msgctxt "card badge"
+msgid "PAIR"
 msgstr ""
 
 msgctxt "card badge"
@@ -7804,6 +8135,10 @@ msgstr ""
 
 msgctxt "card badge"
 msgid "SHOT"
+msgstr ""
+
+msgctxt "card badge"
+msgid "STRIP"
 msgstr ""
 
 msgctxt "card heading"
@@ -8123,6 +8458,10 @@ msgid "recording"
 msgstr ""
 
 msgctxt "field"
+msgid "1600"
+msgstr ""
+
+msgctxt "field"
 msgid "App bundle id"
 msgstr ""
 
@@ -8154,8 +8493,20 @@ msgctxt "field"
 msgid "Title"
 msgstr ""
 
+msgctxt "field"
+msgid "Watermark text"
+msgstr ""
+
 msgctxt "file dialog"
 msgid "Choose files"
+msgstr ""
+
+msgctxt "file dialog"
+msgid "Choose picture"
+msgstr ""
+
+msgctxt "filter chip"
+msgid "Boards"
 msgstr ""
 
 msgctxt "filter chip"

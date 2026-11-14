@@ -177,6 +177,7 @@ mod tests {
             uploads: Vec::new(),
             publishes: Vec::new(),
             imported_from: None,
+            board: None,
         }
     }
 

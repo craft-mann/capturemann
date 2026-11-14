@@ -630,6 +630,10 @@ impl Inner {
                     if let Some(s) = cm_library::source_of(&dir) {
                         v["source"] = s;
                     }
+                    // A board (BRD-1) says which layout it was made with.
+                    if let Some(b) = cm_library::board::board_layout(&dir) {
+                        v["board"] = json!(b);
+                    }
                     // Transcript matches (search only): the snippet around the hit and where in
                     // the recording it starts.
                     if searching {

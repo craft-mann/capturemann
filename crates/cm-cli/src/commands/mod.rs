@@ -6,6 +6,7 @@ use cm_ipc::Endpoint;
 use serde_json::{json, Value};
 
 mod ai;
+mod board;
 mod capture;
 mod edit;
 mod export;
@@ -24,6 +25,7 @@ use crate::args::{
 use crate::client::Client;
 use crate::error::CliError;
 use crate::Env;
+use board::{board, export_images};
 use capture::{annotate, get_capture, screenshot, targets, undo_redo};
 use edit::edit;
 use export::export_video;
@@ -72,6 +74,8 @@ pub async fn execute(cli: Cli, env: &mut Env) -> Result<(), CliError> {
         Command::Redo(a) => undo_redo(&mut cx, a, false).await,
         Command::Export(a) => export_video(&mut cx, a).await,
         Command::Import(a) => import_media(&mut cx, a).await,
+        Command::Board(a) => board(&mut cx, a).await,
+        Command::ExportImages(a) => export_images(&mut cx, a).await,
         Command::Library { cmd } => match cmd {
             LibraryCmd::List(a) => library_list(&mut cx, a).await,
             LibraryCmd::Rename { id, title } => library_rename(&mut cx, id, title).await,

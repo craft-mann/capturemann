@@ -86,6 +86,8 @@ pub const CLI_COMMANDS: &[(&str, Option<&str>)] = &[
     ("delete_capture", Some("library rm")),
     ("move_library", Some("library move")),
     ("import_media", Some("import")),
+    ("create_board", Some("board")),
+    ("export_images", Some("export-images")),
     ("list_models", Some("ai models")),
     ("download_model", Some("ai models download")),
     ("import_model", Some("ai models import")),

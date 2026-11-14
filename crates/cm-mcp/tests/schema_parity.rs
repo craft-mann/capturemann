@@ -126,6 +126,10 @@ fn field(path: &str, schema: &Value, all: bool, variant: usize) -> Value {
         p if p.ends_with("import_media.after") => {
             json!({ "transcribe": { "language": "en" }, "diarize": true, "report_template": "summary" })
         }
+        // BLK-1: an absolute folder, one size rule, one watermark source.
+        p if p.ends_with("export_images.dest") => json!(std::env::temp_dir()),
+        p if p.ends_with("export_images.size") => json!({ "longest": 1600 }),
+        p if p.ends_with("export_images.watermark") => json!({ "text": "x" }),
         p if p.ends_with("set_captions.lines") => {
             json!([{ "start": 1, "end": 2, "text": "Hi" }])
         }

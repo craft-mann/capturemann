@@ -452,6 +452,10 @@ impl JobHandler for ExportHandler {
         if inputs.get("kind").and_then(Value::as_str) == Some(crate::export_audio::AUDIO_KIND) {
             return crate::export_audio::run_job(self, ctx).await;
         }
+        // BLK-1: Bulk export of pictures is an `export` job with `kind: "images"`.
+        if inputs.get("kind").and_then(Value::as_str) == Some(crate::export_images::KIND) {
+            return crate::export_images::run_job(self, ctx).await;
+        }
         let capture_id = inputs
             .get("capture_id")
             .and_then(Value::as_str)
