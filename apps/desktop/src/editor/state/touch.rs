@@ -40,7 +40,7 @@ pub struct Touch {
     request: Option<MeasureRequest>,
     /// A measurement is running off the UI thread.
     pub measuring: bool,
-    /// "The background is too busy to fill cleanly" is on screen.
+    /// "This area has an image or a control in it, so the fill may show" is on screen.
     pub busy_prompt: Option<BusyPrompt>,
     /// The chosen Move area source.
     pub mv: Option<MovePending>,

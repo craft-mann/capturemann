@@ -57,3 +57,8 @@ hound.workspace = true
 [[example]]
 name = "baseline"
 required-features = ["sherpa"]
+
+# Needs the speaker engine's sherpa-onnx crate.
+[[example]]
+name = "zipformer_probe"
+required-features = ["sherpa"]

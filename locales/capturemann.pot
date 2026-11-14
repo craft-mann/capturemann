@@ -5583,9 +5583,6 @@ msgstr ""
 msgid "The audio file could not be written ({detail}); the track ends here and the recording continues"
 msgstr ""
 
-msgid "The background is too busy to fill cleanly"
-msgstr ""
-
 msgid "The bubble is not shown on screen while recording on Linux. Its shape and size are used when the recording is exported, and the editor can move it."
 msgstr ""
 
@@ -6104,6 +6101,9 @@ msgid "This action isn’t built into CaptureMann yet."
 msgstr ""
 
 msgid "This app is not serving a socket, so the snippet has no --socket."
+msgstr ""
+
+msgid "This area has an image or a control in it, so the fill may show"
 msgstr ""
 
 msgid "This build doesn’t include the speaker models that tell voices apart. CaptureMann releases include them."

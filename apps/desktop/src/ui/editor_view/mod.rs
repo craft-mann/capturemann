@@ -294,7 +294,7 @@ struct Snap {
     retype: Option<crate::editor::state::touch::RetypeInfo>,
     mv: Option<crate::editor::state::touch::MoveInfo>,
     blueprint: Option<crate::editor::state::touch::BlueprintInfo>,
-    /// "The background is too busy to fill cleanly" is open.
+    /// "This area has an image or a control in it, so the fill may show" is open.
     busy_prompt: Option<crate::editor::touchup::BusyPrompt>,
     /// A refusal or a note of the touch-up tools, under the panel.
     touch_notice: Option<String>,
