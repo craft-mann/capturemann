@@ -2389,6 +2389,10 @@ msgid "Lets CaptureMann see your screen so it can take screenshots and record. S
 msgstr ""
 
 #. FACT: owner review required (what the permission is for)
+msgid "Lets Long Shot scroll for you. Without it, scroll by hand and Long Shot still works."
+msgstr ""
+
+#. FACT: owner review required (what the permission is for)
 msgid "Lets recordings note mouse clicks and scroll direction. Without it only the cursor position is recorded."
 msgstr ""
 
@@ -2492,6 +2496,9 @@ msgid "Local-first"
 msgstr ""
 
 msgid "Logo Drive, Gu gồ Drai"
+msgstr ""
+
+msgid "Long Shot: Auto scroll"
 msgstr ""
 
 msgid "Long recordings are read in parts, then merged. You can keep editing."
@@ -3329,6 +3336,10 @@ msgid "Opening the capture…"
 msgstr ""
 
 msgid "Optional: best for translation into other languages. Needs about 4 GB of memory."
+msgstr ""
+
+#. FACT: owner review required (every permission note states what macOS does)
+msgid "Optional: without it Long Shot offers Hand scroll only. Allow Accessibility to scroll for you."
 msgstr ""
 
 #. FACT: owner review required (every permission note states what macOS does)

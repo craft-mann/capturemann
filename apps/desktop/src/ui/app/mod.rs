@@ -338,11 +338,12 @@ mod tests {
     use super::*;
     use crate::permissions::{FakeProvider, Id, Os, State};
 
-    const MISSING: [(Id, State); 4] = [
+    const MISSING: [(Id, State); 5] = [
         (Id::ScreenRecording, State::NotGranted),
         (Id::Microphone, State::NotDetermined),
         (Id::Camera, State::Denied),
         (Id::InputMonitoring, State::NotGranted),
+        (Id::Accessibility, State::NotGranted),
     ];
 
     fn show(raw: &[(Id, State)], at_start: bool, onboarded: bool) -> bool {
@@ -364,6 +365,7 @@ mod tests {
             (Id::Microphone, State::Granted),
             (Id::Camera, State::Granted),
             (Id::InputMonitoring, State::Granted),
+            (Id::Accessibility, State::Granted),
         ];
         let due = show(&granted, true, false);
         assert_eq!(startup_route(due, false, None), Some(Route::Library));
@@ -483,7 +485,12 @@ mod tests {
             "optional ones missing: stay on the screen"
         );
         assert!(permissions::closing_marks_onboarded(&s));
-        for id in [Id::Microphone, Id::Camera, Id::InputMonitoring] {
+        for id in [
+            Id::Microphone,
+            Id::Camera,
+            Id::InputMonitoring,
+            Id::Accessibility,
+        ] {
             p.set(id, State::Granted);
         }
         assert!(permissions::probe(&p, Some(true)).all_granted());
