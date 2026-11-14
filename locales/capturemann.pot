@@ -2991,6 +2991,9 @@ msgstr ""
 msgid "Maximize"
 msgstr ""
 
+msgid "Measured colour"
+msgstr ""
+
 msgid "Measures late and dropped frames at 60 fps; only the result (pass or fail) is kept"
 msgstr ""
 
@@ -4582,7 +4585,7 @@ msgstr ""
 msgid "Replace text with bars"
 msgstr ""
 
-msgid "Replace the text lines with neutral bars, keeping the ones you choose"
+msgid "Replace text with neutral bars"
 msgstr ""
 
 msgid "Replace with"

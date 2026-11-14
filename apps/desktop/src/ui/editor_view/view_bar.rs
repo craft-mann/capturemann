@@ -13,6 +13,8 @@ use crate::editor::view_model::{self, ZoomChoice};
 
 /// Bar buttons are 34 px tall with 16 px icons (board N7).
 const BAR_BTN: f32 = 34.;
+/// Free width (px) under which the view bar drops its text labels.
+const COMPACT_BELOW: f64 = 820.;
 /// A press right after a menu closed itself (a click outside) is the same press that closed it.
 const REOPEN_GUARD: Duration = Duration::from_millis(250);
 
@@ -112,13 +114,18 @@ impl EditorView {
     }
 
     /// An icon and a label side by side (Copy text, Auto-redact, Images).
-    fn bar_icon_label(glyph: &'static str, color: Color, label: String) -> AnyElement {
+    fn bar_icon_label(
+        compact: bool,
+        glyph: &'static str,
+        color: Color,
+        label: String,
+    ) -> AnyElement {
         div()
             .flex()
             .items_center()
             .gap(px(6.))
             .child(icon(glyph, 16., color))
-            .child(shrink_text(label))
+            .when(!compact, |d| d.child(shrink_text(label)))
             .into_any_element()
     }
 
@@ -145,6 +152,10 @@ impl EditorView {
         let percent = self.viewport.zoom_percent();
         let zoom = view_model::zoom_label(percent);
         let open = self.shortcuts_open;
+        // The labelled bar needs about 800 px beside the tool rail; narrower than that (the
+        // default 1180 px window, the image strip open) the four text buttons show only their
+        // icon (the name stays in the aria label and the tooltip), so the bar stays whole.
+        let compact = self.canvas_size().0 - CHROME_INSETS.left < COMPACT_BELOW;
 
         let history = |this: &Self,
                        id: &'static str,
@@ -203,6 +214,7 @@ impl EditorView {
                 tr!("Copy text"),
                 copy_tip.clone(),
                 Self::bar_icon_label(
+                    compact,
                     if running {
                         "loader-circle"
                     } else {
@@ -232,7 +244,7 @@ impl EditorView {
                     "editor-copy-text-unavailable",
                     hint.to_owned(),
                     hint.to_owned(),
-                    Self::bar_icon_label("scan-text", c, tr!("Copy text")),
+                    Self::bar_icon_label(compact, "scan-text", c, tr!("Copy text")),
                     &[],
                     false,
                     false,
@@ -247,7 +259,7 @@ impl EditorView {
                 "editor-auto-redact",
                 tr!("Auto-redact"),
                 tr!("Auto-redact"),
-                Self::bar_icon_label("eye-off", c, tr!("Auto-redact")),
+                Self::bar_icon_label(compact, "eye-off", c, tr!("Auto-redact")),
                 &[],
                 s.redact != RedactPhase::Running,
                 false,
@@ -265,7 +277,7 @@ impl EditorView {
                     "editor-auto-redact-unavailable",
                     hint.to_owned(),
                     hint.to_owned(),
-                    Self::bar_icon_label("eye-off", c, tr!("Auto-redact")),
+                    Self::bar_icon_label(compact, "eye-off", c, tr!("Auto-redact")),
                     &[],
                     false,
                     false,
@@ -285,8 +297,13 @@ impl EditorView {
                     t,
                     "editor-blueprint",
                     tr!("Blueprint"),
-                    tr!("Replace the text lines with neutral bars, keeping the ones you choose"),
+                    if on {
+                        tr!("Blueprint")
+                    } else {
+                        tr!("Replace text with neutral bars")
+                    },
                     Self::bar_icon_label(
+                        compact,
                         if busy {
                             "loader-circle"
                         } else {
@@ -318,7 +335,7 @@ impl EditorView {
                     "editor-blueprint-unavailable",
                     hint.to_owned(),
                     hint.to_owned(),
-                    Self::bar_icon_label("cm-blueprint", c, tr!("Blueprint")),
+                    Self::bar_icon_label(compact, "cm-blueprint", c, tr!("Blueprint")),
                     &[],
                     false,
                     false,
@@ -395,6 +412,7 @@ impl EditorView {
                 tr!("Images"),
                 tr!("Show or hide the image strip"),
                 Self::bar_icon_label(
+                    compact,
                     "gallery-horizontal-end",
                     if on { t.text } else { c },
                     tr!("Images"),
