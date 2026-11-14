@@ -464,6 +464,22 @@ fn hotkey_overlay(ctx: &mut Ctx) -> R {
     }
 }
 
+/// The recording HUD among the visible windows of the app: a topmost window that is wide and short (the
+/// full screen bar is about 1183 x 152 px, the audio bar 1293 x 152, at the bottom centre). The toast and
+/// the cards that can also be on screen are taller (for example 682 x 218), the area frame is as large
+/// as the display, and the webcam bubble is roughly square, so none of them fits. The widest match wins.
+fn pick_hud<'a>(windows: impl Iterator<Item = &'a WinInfo>) -> Option<&'a WinInfo> {
+    windows
+        .filter(|w| {
+            w.visible
+                && w.ex_style & sys::WS_EX_TOPMOST != 0
+                && w.width() >= 300
+                && w.height() > 0
+                && w.height() <= 170
+        })
+        .max_by_key(|w| w.width())
+}
+
 fn hud(ctx: &mut Ctx) -> R {
     ctx.allow_recording_without_dialog()?;
     let app = start_app(ctx, &[])?;
@@ -491,11 +507,7 @@ fn hud(ctx: &mut Ctx) -> R {
     let (area, rest): (Vec<&WinInfo>, Vec<&WinInfo>) = all
         .iter()
         .partition(|w| i64::from(w.width()) >= d.w - 60 && i64::from(w.height()) >= d.h - 60);
-    let hud = rest
-        .iter()
-        .filter(|w| w.ex_style & sys::WS_EX_TOPMOST != 0 && w.width() <= 900 && w.height() <= 300)
-        .min_by_key(|w| w.width() * w.height())
-        .copied();
+    let hud = pick_hud(rest.iter().copied());
     let mut problems = Vec::new();
     let consoles = ConsoleWatch::start();
     match hud {
@@ -575,17 +587,8 @@ fn hud_drag(ctx: &mut Ctx) -> R {
     ])?;
     std::thread::sleep(Duration::from_secs(4));
     let find_hud = |app_pid: u32| -> Option<WinInfo> {
-        sys::enum_windows()
-            .into_iter()
-            .filter(|w| {
-                w.pid == app_pid
-                    && w.visible
-                    && w.ex_style & sys::WS_EX_TOPMOST != 0
-                    // The HUD is the wide, short window (the full bar is about 1200 x 152 px).
-                    && w.width() >= 300
-                    && w.height() <= 170
-            })
-            .max_by_key(|w| w.width())
+        let all = sys::enum_windows();
+        pick_hud(all.iter().filter(|w| w.pid == app_pid && w.visible)).cloned()
     };
     let mut problems = Vec::new();
     match find_hud(app.pid) {
