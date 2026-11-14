@@ -364,6 +364,10 @@ pub enum Action {
     RetryJob(RetryJobParams),
     ExportVideo(ExportVideoParams),
     ExportAudio(crate::export_audio::ExportAudioParams),
+    /// `create_board` (BRD-1, see [`crate::export_images`]).
+    CreateBoard(crate::export_images::CreateBoardParams),
+    /// `export_images` (BLK-1, see [`crate::export_images`]).
+    ExportImages(crate::export_images::ExportImagesParams),
     Annotate(AnnotateParams),
     GetCapture(GetCaptureParams),
     SuggestRedactions(SuggestRedactionsParams),

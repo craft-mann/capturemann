@@ -52,6 +52,7 @@ pub mod estimate_ops;
 pub mod events;
 pub mod export;
 pub mod export_audio;
+pub mod export_images;
 pub mod fixture;
 mod frames;
 pub mod gate;

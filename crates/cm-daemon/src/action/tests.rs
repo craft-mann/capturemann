@@ -118,6 +118,14 @@ fn samples() -> Vec<(&'static str, Value)> {
             "import_media",
             json!({"paths": [std::env::temp_dir().join("a.mov")], "titles": ["A"], "dry_run": true, "request_id": "r"}),
         ),
+        (
+            "create_board",
+            json!({"capture_ids": ["shot_1", "shot_2"], "layout": "pair", "options": {"gap": 10}, "request_id": "r"}),
+        ),
+        (
+            "export_images",
+            json!({"capture_ids": ["shot_1"], "dest": std::env::temp_dir(), "size": {"longest": 1600}, "format": "jpeg", "quality": 80, "watermark": {"text": "x"}, "name_pattern": "{name}-{n}", "request_id": "r"}),
+        ),
         ("list_models", json!({})),
         (
             "download_model",
