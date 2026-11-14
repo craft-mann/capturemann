@@ -33,8 +33,9 @@ Record the result in `verification/HUD-1-<date>-<platform>.md` (template in
    native move call is empty in GPUI's Windows backend). Check each of: bar background, timer, the
    meter (audio recording), the agent chip; a press on a button must not drag and a full click must
    still run it (Stop, Pause, Mic, Webcam, Draw, Restart, Discard, collapse chevron, Marker). The HUD must
-   keep working while it is a non-activating window: the recorded app keeps the keyboard focus during
-   and after the drag. After the drop it snaps and is remembered as above (quit, start again, same place).
+   open without taking the keyboard (the recorded app keeps it when the HUD opens). A press on the
+   HUD, a drag or a click, makes the HUD the foreground window (REC-5: a click makes it key; measured
+   Nov 14, 2026), so click the recorded app again before typing in it. After the drop it snaps and is remembered as above (quit, start again, same place).
    Run the same on an **audio** recording (step 4).
 5. Webcam bubble (CAM-3, REC-5.AC18; needs a camera): with the camera on, drag the bubble by its picture.
    **Pass:** it follows the pointer and keeps its place per display; its toolbar buttons still click.

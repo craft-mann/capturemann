@@ -27,6 +27,15 @@ impl DragState {
         }
     }
 
+    /// The window's bounds changed. Where the press on the grip is the system's own (Windows: the
+    /// grip is a title-bar region, so the view never sees the mouse-down, `press_is_native`), a
+    /// change while the primary button is held starts the drag.
+    pub fn observe_move(&mut self, now: Instant, button_down: bool, press_is_native: bool) {
+        if press_is_native && button_down && self.since.is_none() {
+            self.since = Some(now);
+        }
+    }
+
     /// Mouse-up or the drag settled.
     pub fn clear(&mut self) {
         self.since = None;
@@ -53,6 +62,24 @@ mod tests {
 
     fn ms(n: u64) -> Duration {
         Duration::from_millis(n)
+    }
+
+    /// REC-5.AC4 on Windows: no mouse-down arrives, a move with the button held is the drag.
+    #[test]
+    fn a_native_press_is_recognised_from_the_move_with_the_button_held() {
+        let t = Instant::now();
+        let mut d = DragState::default();
+        d.observe_move(t, false, true);
+        assert!(!d.is_live(t, false), "button up: not a drag");
+        d.observe_move(t, true, false);
+        assert!(
+            !d.is_live(t, false),
+            "the view sees presses itself: not a drag"
+        );
+        d.observe_move(t, true, true);
+        assert!(d.is_live(t, true));
+        d.moved(t + ms(10));
+        assert!(!d.is_live(t + ms(400), false));
     }
 
     /// R4-8: a click without a drag clears itself, so hover and click-through resume.
