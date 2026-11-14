@@ -19,6 +19,8 @@
 
 mod annot;
 pub mod compose;
+pub mod compose_board;
+pub mod compose_bulk;
 pub mod ocr;
 pub mod ops;
 mod redact;
