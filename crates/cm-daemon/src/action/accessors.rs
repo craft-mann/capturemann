@@ -5,9 +5,10 @@ impl Action {
     pub fn method(&self) -> &'static str {
         match self {
             Action::ListTargets | Action::ListDisplays => "list_targets",
-            Action::CaptureScreenshot(_) | Action::CaptureFromFrame(_) | Action::CapturePick(_) => {
-                "capture_screenshot"
-            }
+            Action::CaptureScreenshot(_)
+            | Action::CaptureFromFrame(_)
+            | Action::CapturePick(_)
+            | Action::CaptureLong(_) => "capture_screenshot",
             Action::FreezeDisplay(_) => "freeze_display",
             Action::ReleaseFrame(_) => "release_frame",
             Action::WindowThumbnail(_) => "window_thumbnail",
@@ -86,6 +87,7 @@ impl Action {
             Action::CaptureScreenshot(p) => p.request_id.as_deref(),
             Action::CaptureFromFrame(p) => p.request_id.as_deref(),
             Action::CapturePick(p) => p.request_id.as_deref(),
+            Action::CaptureLong(p) => p.request_id.as_deref(),
             Action::Annotate(p) => p.request_id.as_deref(),
             Action::SetSettings(p) => p.request_id.as_deref(),
             Action::Undo(p) | Action::Redo(p) => p.request_id.as_deref(),
@@ -144,6 +146,9 @@ impl Action {
                 "Start an audio recording".to_owned()
             }
             Action::StartRecording(_) => "Start a screen recording".to_owned(),
+            Action::CaptureLong(p) if p.moves_the_screen() => {
+                "Scroll the window under the pointer to capture a Long Shot".to_owned()
+            }
             Action::AddMarker(p) => crate::markers::summary(p),
             Action::RunFpsSelftest(_) => {
                 "Record the screen for about 10 s to test 60 fps (nothing is saved)".to_owned()

@@ -259,6 +259,7 @@ fn corpus() -> Vec<(String, String)> {
             Id::Microphone,
             Id::Camera,
             Id::InputMonitoring,
+            Id::Accessibility,
         ] {
             if let Some(n) = crate::ui::permissions_view::state_note(id, s) {
                 c.add(format!("state_note({id:?}, {s:?})"), n);

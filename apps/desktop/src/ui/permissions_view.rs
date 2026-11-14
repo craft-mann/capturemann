@@ -54,6 +54,9 @@ pub fn state_note(id: Id, state: State) -> Option<String> {
         (Id::InputMonitoring, State::NotGranted) => Some(
             tr!("Optional: without it recordings keep the cursor position but not clicks or scroll. After granting, quit and reopen CaptureMann."),
         ),
+        (Id::Accessibility, State::NotGranted) => Some(
+            tr!("Optional: without it Long Shot offers Hand scroll only. Allow Accessibility to scroll for you."),
+        ),
         _ => None,
     }
 }
@@ -64,7 +67,7 @@ pub fn permission_icon(id: Id) -> &'static str {
         Id::ScreenRecording => "monitor",
         Id::Microphone => "mic",
         Id::Camera => "camera",
-        Id::InputMonitoring => "keyboard",
+        Id::InputMonitoring | Id::Accessibility => "keyboard",
     }
 }
 

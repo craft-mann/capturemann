@@ -182,7 +182,7 @@ impl Inner {
 
     /// Takes a finished capture, makes the bundle, announces it (`capture.created`, right after the
     /// bundle and its poster exist), then optionally copies it.
-    async fn store_capture(
+    pub(crate) async fn store_capture(
         &self,
         actor: &Actor,
         copy: bool,

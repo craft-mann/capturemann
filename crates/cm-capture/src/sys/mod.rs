@@ -2,6 +2,7 @@
 //! process capture. (`target_os` belongs here, see `scripts/check_target_os.py`.)
 
 pub mod linux_recorder;
+pub mod long_scroll;
 pub mod mutter;
 pub mod mutter_cast;
 pub mod permission;

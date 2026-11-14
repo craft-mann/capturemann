@@ -30,6 +30,8 @@ pub enum Id {
     Microphone,
     Camera,
     InputMonitoring,
+    /// Optional, macOS only (CAP-6, PRM-1.AC1b): lets Long Shot scroll for you.
+    Accessibility,
 }
 
 impl Id {
@@ -40,6 +42,7 @@ impl Id {
             Id::Microphone => "microphone",
             Id::Camera => "camera",
             Id::InputMonitoring => "input-monitoring",
+            Id::Accessibility => "accessibility",
         }
     }
 }
@@ -188,6 +191,15 @@ pub fn specs(os: Os) -> Vec<Spec> {
             features: tr!("Recording: cursor clicks and scroll"),
             required: false,
         });
+        // PRM-1.AC1b (0.3.4, CAP-6): optional; without it Long Shot offers Hand scroll only.
+        v.push(Spec {
+            id: Id::Accessibility,
+            name: tr_ctx!("permission", "Accessibility"),
+            // TRANSLATORS: FACT: owner review required (what the permission is for)
+            why: tr!("Lets Long Shot scroll for you. Without it, scroll by hand and Long Shot still works."),
+            features: tr!("Long Shot: Auto scroll"),
+            required: false,
+        });
     }
     v
 }
@@ -292,6 +304,9 @@ pub fn settings_link(os: Os, id: Id) -> Option<&'static str> {
         }
         (Os::Mac, Id::InputMonitoring) => {
             Some("x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")
+        }
+        (Os::Mac, Id::Accessibility) => {
+            Some("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
         }
         (Os::Windows, Id::Microphone) => Some("ms-settings:privacy-microphone"),
         (Os::Windows, Id::Camera) => Some("ms-settings:privacy-webcam"),
@@ -644,6 +659,7 @@ impl Provider for SystemProvider {
             Id::Microphone => from_audio(cm_audio::microphone_permission()),
             Id::Camera => from_camera(cm_camera::check_camera_permission()),
             Id::InputMonitoring => from_cursor(&cm_cursor::preflight()),
+            Id::Accessibility => from_flag(cm_capture::long_shot::accessibility_trusted()),
         }
     }
 
@@ -667,6 +683,7 @@ impl Provider for SystemProvider {
                     let _ = unsafe { ffi::CGRequestListenEventAccess() };
                 }
             }
+            Id::Accessibility => cm_capture::long_shot::request_accessibility(),
         }
         self.check(id)
     }
@@ -705,6 +722,7 @@ pub fn demo_provider(scenario: &str) -> (std::sync::Arc<dyn Provider>, Option<bo
                 (Id::Microphone, mic),
                 (Id::Camera, cam),
                 (Id::InputMonitoring, input),
+                (Id::Accessibility, input),
             ],
         )) as std::sync::Arc<dyn Provider>
     };
@@ -813,15 +831,16 @@ mod tests {
         }
     }
 
-    const ALL_MISSING: [(Id, State); 4] = [
+    const ALL_MISSING: [(Id, State); 5] = [
         (Id::ScreenRecording, State::NotGranted),
         (Id::Microphone, State::NotDetermined),
         (Id::Camera, State::Denied),
         (Id::InputMonitoring, State::NotGranted),
+        (Id::Accessibility, State::NotGranted),
     ];
 
-    /// PRM-1.AC1: macOS lists Screen Recording (required) and the three optional ones; Accessibility
-    /// is not listed; Windows lists only microphone and camera.
+    /// PRM-1.AC1 and AC1b: macOS lists Screen Recording (required) and the optional ones, Accessibility
+    /// last (Long Shot); Windows lists only microphone and camera.
     #[test]
     fn prm1_lists_what_the_os_needs() {
         let mac = specs(Os::Mac);
@@ -832,7 +851,8 @@ mod tests {
                 "Screen Recording",
                 "Microphone",
                 "Camera",
-                "Input Monitoring"
+                "Input Monitoring",
+                "Accessibility"
             ]
         );
         assert_eq!(
@@ -845,7 +865,8 @@ mod tests {
         assert!(mac
             .iter()
             .all(|s| !s.why.is_empty() && !s.features.is_empty()));
-        assert!(!names.iter().any(|n| n == "Accessibility"));
+        // PRM-1.AC1b: Accessibility is the optional row of Long Shot, macOS only.
+        assert!(mac.iter().any(|s| s.id == Id::Accessibility && !s.required));
         let win = specs(Os::Windows);
         assert_eq!(
             win.iter().map(|s| s.id).collect::<Vec<_>>(),
@@ -1031,6 +1052,7 @@ mod tests {
             (Id::Microphone, State::Granted),
             (Id::Camera, State::Granted),
             (Id::InputMonitoring, State::Granted),
+            (Id::Accessibility, State::Granted),
         ];
         Snapshot::from_raw(Os::Mac, &raw, Some(true))
     }
@@ -1105,6 +1127,7 @@ mod tests {
         p.set(Id::Microphone, State::Granted);
         p.set(Id::Camera, State::Granted);
         p.set(Id::InputMonitoring, State::Granted);
+        p.set(Id::Accessibility, State::Granted);
         assert!(probe(&p, Some(true)).all_granted(), "auto-advance");
         // Restart required is not "all set".
         let r = probe(&p, Some(false));
@@ -1122,6 +1145,7 @@ mod tests {
                 (Id::Microphone, State::Granted),
                 (Id::Camera, State::Granted),
                 (Id::InputMonitoring, State::Granted),
+                (Id::Accessibility, State::Granted),
             ],
         );
         // First look of a new process: screen_at_start is None, then fixed to Some(true).

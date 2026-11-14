@@ -226,6 +226,18 @@ pub(super) async fn screenshot(cx: &mut Ctx<'_>, a: ScreenshotArgs) -> Result<()
     if let Some(t) = &a.title {
         params["title"] = json!(t);
     }
+    if a.long {
+        params["mode"] = json!("long");
+        if a.horizontal {
+            params["direction"] = json!("horizontal");
+        }
+        if let Some(px) = a.max_px {
+            params["max_px"] = json!(px);
+        }
+        if a.hand {
+            params["scroll"] = json!("hand");
+        }
+    }
     let params = cx.mutating(params, "");
     let mut result = c.call("capture_screenshot", params).await?;
     if let Some(ops) = ops {

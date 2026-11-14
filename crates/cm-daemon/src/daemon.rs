@@ -148,6 +148,8 @@ impl DelayedCaptures {
 }
 
 pub(crate) struct Inner {
+    /// Frames and scrolling of a Long Shot (CAP-6); the real screen unless a test gives its own.
+    pub(crate) long_shot: Arc<dyn crate::long_shot_ops::LongShotSystem>,
     pub(crate) capturer: Arc<Capturer>,
     pub(crate) library: Arc<Mutex<Library>>,
     pub(crate) clipboard: Arc<dyn Clipboard>,
@@ -245,6 +247,7 @@ pub struct DaemonBuilder {
     camera_watcher: Option<Box<dyn cm_camera::CameraWatcher>>,
     /// `recording_system` was used: audio recordings hold the OS power assertion (VOC-1).
     system_idle_sleep: bool,
+    long_shot: Arc<dyn crate::long_shot_ops::LongShotSystem>,
 }
 
 impl DaemonBuilder {
@@ -274,7 +277,17 @@ impl DaemonBuilder {
             kept_windows: None,
             camera_watcher: None,
             system_idle_sleep: false,
+            long_shot: Arc::new(crate::long_shot_ops::RealLongShot),
         }
+    }
+
+    /// Replaces the screen and scroller a Long Shot uses (tests pass scripted ones).
+    pub fn long_shot_system(
+        mut self,
+        system: impl crate::long_shot_ops::LongShotSystem + 'static,
+    ) -> Self {
+        self.long_shot = Arc::new(system);
+        self
     }
 
     /// Turns on the recording engine with these track sources. Without it the recording actions
@@ -488,6 +501,7 @@ impl DaemonBuilder {
         });
         Daemon {
             inner: Arc::new(Inner {
+                long_shot: self.long_shot,
                 capturer,
                 library,
                 clipboard: self.clipboard,
@@ -984,8 +998,17 @@ impl Daemon {
         // AGT-2.AC9: the tier this call is gated by. The table's tier for the user; for an
         // agent, changed by the live per-tool permissions (read now, so a setting changed while
         // this call waits behind another dialog applies to the next call, not to this one).
+        // CAP-6.AC7: Hand scroll needs a person; an agent's Auto scroll moves the user's screen,
+        // so it is Confirm whatever the table says.
+        if let (Some(_), Action::CaptureLong(p)) = (&agent, &action) {
+            crate::long_shot_ops::refuse_hand_for_agent(p)?;
+        }
         let tier = if agent.is_some() {
-            self.inner.effective_tier(&spec)
+            if matches!(&action, Action::CaptureLong(p) if p.moves_the_screen()) {
+                Tier::Confirm
+            } else {
+                self.inner.effective_tier(&spec)
+            }
         } else {
             spec.tier
         };
@@ -1212,6 +1235,7 @@ impl Daemon {
             Action::CaptureScreenshot(p) => inner.capture_screenshot(actor, p).await,
             Action::CaptureFromFrame(p) => inner.capture_from_frame(actor, p).await,
             Action::CapturePick(p) => inner.capture_pick(actor, p).await,
+            Action::CaptureLong(p) => inner.capture_long(actor, p).await,
             Action::FreezeDisplay(p) => inner.freeze_display(actor, p).await,
             Action::ReleaseFrame(p) => inner.release_frame(&p),
             Action::WindowThumbnail(p) => inner.window_thumbnail(p).await,
