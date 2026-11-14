@@ -188,6 +188,13 @@ pub fn drag_grip<E: gpui::InteractiveElement>(el: E) -> E {
     }
 }
 
+/// Whether a press on a [`drag_grip`] is handled by the system, so the view never gets its
+/// mouse-down (Windows: the grip is answered as the title bar). A drag is then recognised by the
+/// window's bounds changing while the primary button is held.
+pub fn grip_press_is_native() -> bool {
+    cfg!(windows)
+}
+
 /// Whether the primary mouse button is held down right now (a drag or click in progress).
 pub fn left_button_down() -> bool {
     imp::left_button_down()

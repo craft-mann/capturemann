@@ -279,10 +279,12 @@ impl HudView {
 
     fn moved(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let now = Instant::now();
-        if !self
-            .drag
-            .is_live(now, crate::platform_window::left_button_down())
-        {
+        let down = crate::platform_window::left_button_down();
+        // Windows: the press on the grip is the system's (a title-bar press), so no mouse-down
+        // reached the view; a bounds change with the button held is the drag itself.
+        self.drag
+            .observe_move(now, down, crate::platform_window::grip_press_is_native());
+        if !self.drag.is_live(now, down) {
             return;
         }
         self.drag.moved(now);
