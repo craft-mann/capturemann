@@ -144,6 +144,7 @@ fn command_for(request: cm_desktop::instance::Request) -> Command {
 }
 
 fn main() {
+    cm_library::index::remember_local_offset();
     // Windows: per-monitor-v2 DPI awareness before any window exists (the executable has no manifest and GPUI does
     // not set it). Without it the window is scaled by the system and the in-process daemon's capture code would
     // switch the process to aware later, in the middle of the session. Nothing on other systems.

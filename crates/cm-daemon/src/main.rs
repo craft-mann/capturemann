@@ -79,8 +79,14 @@ fn capturer() -> Result<cm_capture::Capturer, String> {
     Err("this platform has no screen capture backend (macOS, Windows and Linux only)".to_owned())
 }
 
+fn main() -> ExitCode {
+    // Before the runtime starts its worker threads: the local UTC offset can only be read now.
+    cm_library::index::remember_local_offset();
+    run()
+}
+
 #[tokio::main]
-async fn main() -> ExitCode {
+async fn run() -> ExitCode {
     cm_daemon::logs::init_logging("daemon");
     cm_capture::ensure_dpi_aware();
     let mut library: Option<PathBuf> = std::env::var_os("CAPTUREMANN_LIBRARY").map(PathBuf::from);

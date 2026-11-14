@@ -1144,8 +1144,20 @@ fn broken_record(dir: &Path, name: &str) -> CaptureRecord {
     }
 }
 
-/// `"<prefix> yyyy-MM-dd HH.mm"` (LIB-1 default title).
+static LOCAL_OFFSET: std::sync::OnceLock<time::UtcOffset> = std::sync::OnceLock::new();
+
+/// Reads the computer's UTC offset once, for default titles. Call it first thing in `main`, before
+/// any other thread exists (the `time` crate refuses to read it from a multi-threaded process);
+/// without it titles stay in UTC.
+pub fn remember_local_offset() {
+    if let Ok(o) = time::UtcOffset::current_local_offset() {
+        let _ = LOCAL_OFFSET.set(o);
+    }
+}
+
+/// `"<prefix> yyyy-MM-dd HH.mm"` in local time (LIB-1 default title).
 pub fn default_title(prefix: &str, now: OffsetDateTime) -> Result<String, CmError> {
+    let now = LOCAL_OFFSET.get().map_or(now, |o| now.to_offset(*o));
     let fmt = time::macros::format_description!("[year]-[month]-[day] [hour].[minute]");
     let stamp = now
         .format(&fmt)
