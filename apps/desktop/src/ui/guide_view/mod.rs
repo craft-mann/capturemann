@@ -1022,14 +1022,19 @@ impl GuideView {
             .as_ref()
             .filter(|(i, _)| Some(i) == s.image_id.as_ref())
         {
+            // The box takes the picture's own proportions: with only a width, the picture sat at
+            // the bottom of an oversized box and was clipped (QA G1).
+            let size = im.size(0);
+            let ratio = u32::from(size.width).max(1) as f32 / u32::from(size.height).max(1) as f32;
             col = col.child(
                 div()
                     .w_full()
+                    .aspect_ratio(ratio)
                     .rounded(px(scale::RADIUS_MD))
                     .overflow_hidden()
                     .border_1()
                     .border_color(rgba_of(t.border))
-                    .child(img(im.clone()).w_full().object_fit(ObjectFit::Contain)),
+                    .child(img(im.clone()).size_full().object_fit(ObjectFit::Contain)),
             );
         }
         if !s.is_note {
