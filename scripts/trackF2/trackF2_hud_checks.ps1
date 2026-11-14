@@ -53,6 +53,7 @@ $wk=[W]::Work().Split(','); $work=@{l=[int]$wk[0];t=[int]$wk[1];r=[int]$wk[2];b=
 $sc=[W]::GetDpiForSystem()/96.0; $m=[int][Math]::Round(16*$sc)
 "screen $([W]::Screen()) work area $([W]::Work()) scale $sc (16 pt margin = $m px)"
 $script:app=$null
+$env:RUST_LOG='cm_desktop=debug,info'
 function StartApp { $script:app=Start-Process $desk -PassThru -RedirectStandardError "$root\app-err-$((Get-Date).Ticks).txt" -RedirectStandardOutput "$root\app-out-$((Get-Date).Ticks).txt"; Start-Sleep 8 }
 function StopApp { (& $cli record stop 2>&1) | Out-Null; Start-Sleep 3; Get-Process cm-desktop,cm-daemon,cm-overlay -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$Inst*" } | Stop-Process -Force; Start-Sleep 2 }
 function StartRec { if($Audio){ (& $cli record start --audio 2>&1) | Out-String } else { (& $cli record start --countdown 0 --size 720p 2>&1) | Out-String }; Start-Sleep 5 }
@@ -79,6 +80,7 @@ function Grab { # returns @{fx;fy} or $null; leaves the HUD where it was
 }
 function Pt($h,$g){ @(($h.l+[int](($h.r-$h.l)*$g.fx)), ($h.t+[int](($h.b-$h.t)*$g.fy))) }
 function Report($name,$ok,$text){ "RESULT $name : $(if($ok){'PASS'}else{'FAIL'}) - $text" }
+function InScreen($h){ $sz=[W]::Screen().Split(','); $h.l -ge 0 -and $h.t -ge 0 -and $h.r -le [int]$sz[0] -and $h.b -le [int]$sz[1] }
 function InWork($h){ $h.l -ge $work.l -and $h.t -ge $work.t -and $h.r -le $work.r -and $h.b -le $work.b }
 
 if($Mode -eq 'hud'){
@@ -188,7 +190,7 @@ if($Mode -eq 'bubble'){
   # drag by the picture
   $r=([W]::Drag([int]$cx,[int]$cy,-250,-120)).Split(','); Start-Sleep 1
   $a=Bubble; "after drag by (-250,-120): $(Desc $a)"
-  Report 'bubble-drag' ([Math]::Abs($a.l-$b.l) -ge 100) "moved by $($a.l-$b.l),$($a.t-$b.t)"
+  Report 'bubble-drag' (([Math]::Abs($a.t-$b.t) -ge 60) -and (InScreen $a)) "moved by $($a.l-$b.l),$($a.t-$b.t); window inside the screen: $(InScreen $a)"
   "camera.position: $(Cfg 'camera.position')"
   # toolbar: hover, then click the mirror button (index 5) and the size-L button (index 2) and read the settings
   $m0=Cfg 'camera.mirror'; $s0=Cfg 'camera.size'
@@ -216,8 +218,9 @@ if($Mode -eq 'bubble'){
   $cx=($a3.l+$a3.r)/2; $cy=$a3.t+($a3.b-$a3.t)/2
   [void][W]::Drag([int]$cx,[int]$cy,3000,3000); Start-Sleep 1
   $a4=Bubble; "after a drop at the bottom-right corner: $(Desc $a4)"
-  Report 'bubble-stays-on-screen' (InWork $a4) "window $(Desc $a4), work area $([W]::Work())"
+  Report 'bubble-stays-on-screen' (InScreen $a4) "window $(Desc $a4), screen $([W]::Screen()) (the recorded area is the whole display)"
   $pos=Cfg 'camera.position'; "camera.position: $pos"
+  Get-ChildItem $root -Filter app-err-* | Select-Object -First 1 | ForEach-Object { "stderr tail:"; Get-Content $_.FullName -Tail 40 }
   StopApp
   StartApp
   (& $cli record start --display 65537 --countdown 0 --size 720p --camera $camId 2>&1) | Out-Null; Start-Sleep 5

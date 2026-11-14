@@ -174,10 +174,26 @@ impl BubbleView {
             return;
         }
         self.drag.moved(now);
+        self.arm_settle(window, cx);
+    }
+
+    /// Settles the drag once the pointer has been still for [`SETTLE`].
+    fn arm_settle(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.settle = Some(cx.spawn_in(window, async move |this, cx| {
             cx.background_executor().timer(SETTLE).await;
-            this.update_in(cx, |this, window, cx| this.settled(window, cx))
-                .ok();
+            this.update_in(cx, |this, window, cx| {
+                // Windows: the system's move loop runs until the button is released and puts the
+                // window back under the pointer on its next move, so a snap before the release
+                // could be undone (or fought): wait for the release.
+                if crate::platform_window::grip_press_is_native()
+                    && crate::platform_window::left_button_down()
+                {
+                    this.arm_settle(window, cx);
+                } else {
+                    this.settled(window, cx);
+                }
+            })
+            .ok();
         }));
     }
 
