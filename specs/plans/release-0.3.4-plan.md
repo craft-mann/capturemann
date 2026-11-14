@@ -299,7 +299,7 @@ Unchanged from the Phase 0 text of Nov 13, 2026: the op JSON is frozen, and AC1 
 6. Regression on all three systems: book the lab laptop for Windows first.
 7. Release.
 
-**Size:** about two to three times 0.3.3. If time runs short, cut in this order:
+**Size:** about two to three times 0.3.3; duration is not a constraint (maintainer, Nov 14). An item that is not green at the gate waits for 0.3.5 instead of shipping broken, in this order of cuts:
 1. PDF export;
 2. horizontal Long Shot;
 3. Move area;
@@ -340,9 +340,11 @@ The tool count goes from 81 to 89. Update `02-agent-interface.md`, the tier tabl
 | Long Shot over 16,384 px (tiled rendering) | Renderer change | Later |
 | Boards that refresh from their sources | Linked captures and change tracking | Later |
 | Clipboard paste of a picture as a capture; WebP and HEIC import | Unchanged from the old plan | 0.3.5 |
-| In-app update (Velopack), Windows code signing, a headless daemon, windowed audio | Platform work, unchanged from the old plan | 0.3.5 or later |
+| In-app update (Velopack), Windows code signing (SignPath; removed from 0.3.4 by the maintainer on Nov 14, 2026), a headless daemon, windowed audio | Platform work | 0.3.5 or later |
 
-## 8. Questions for the maintainer (with the default I assumed)
+## 8. Open questions for the maintainer (each with the default I assumed)
+
+Duration is not a constraint (maintainer, Nov 14, 2026): everything in this plan is in 0.3.4, and an item that is not green at the gate waits for the next release rather than shipping broken. Windows code signing (SignPath) is **not part of 0.3.4**; it is no longer asked here.
 
 1. **Names:** Long Shot, Click Guide, Touch-up (Retype, Move area), Blueprint, Boards, Bulk export, Zoom Lens. Keep, or rename? *(Default: keep.)*
 2. **Long Shot limit:** 16,384 px on the long side in 0.3.4, with 30,000 px later? *(Default: yes, after S5.)*
@@ -350,11 +352,13 @@ The tool count goes from 81 to 89. Update `02-agent-interface.md`, the tier tabl
 4. **Keys:** Y for Retype, J for Move area, and no default hotkeys for Long Shot or Click Guide (the user sets them)? *(Default: yes. Y and J are not used by any editor tool in 0.3.3.)*
 5. **Click Guide focus crop:** on by default at 1200 × 800? *(Default: on.)*
 6. **PDF:** in 0.3.4 only if S4 passes, otherwise 0.3.5? *(Default: yes.)*
-7. **Scope cuts:** is the cut order in section 6 right if the release runs long?
-8. **Windows code signing:** has the SignPath Foundation application been sent? (Carried over; it decides whether 0.3.4 ships signed files.)
-9. **Guide folder:** `cmguide` for the guide's folder extension, and a board stays an ordinary screenshot capture (problem 13)? *(Default: yes.)*
-10. **WebP in Bulk export:** lossless only, or leave WebP out of 0.3.4 (problem 14)? *(Default: lossless if it adds no dependency, else out.)*
-11. **Scope risk:** this is about 22 to 25 agent-days across six tracks, two to three times 0.3.3, which already ran long. Ship what is green at the gate, in the must-ship order of section 6? *(Default: yes; the cut order in section 6 applies, and any Must-ship item that is not green moves to 0.3.5 rather than delaying the rest.)*
+7. **Guide folder:** `cmguide` for the guide's folder extension, and a board stays an ordinary screenshot capture (problem 13)? *(Default: yes.)*
+8. **WebP in Bulk export:** lossless only, or leave WebP out of 0.3.4 (problem 14)? *(Default: lossless if it adds no dependency, else out.)*
+9. **Zoom Lens rules** (from the Nov 13 Phase 0): up to 4 per image; the source may lie outside a crop (a crop is only the visible window); the loupe is the source scaled by the zoom, centred on `at`; nested lenses are skipped; Copy text reads magnified text twice, as drawn. *(Default: all as written.)*
+10. **Canvas text:** copy, cut and paste inside a canvas text box are in 0.3.4 (ANN-1 AC9 to AC13). *(Default: yes.)*
+11. **B3 confirmation:** the cause of the Windows HUD drag comes from the code and a failed synthetic drag; a real drag on the ThinkPad before the fix would confirm it. May the first track-F step be that check? *(Default: yes.)*
+
+Answered or dropped: scope (decided Nov 13), CMYK conversion (Nov 13), Windows lab availability (Windows ran Nov 14), the audio HUD details (B3), SignPath (out of 0.3.4), scope cuts and scope risk (duration is not a constraint).
 
 ## 9. Carried over from the plan of Nov 13: open items, lessons, bugs
 
@@ -378,7 +382,7 @@ The tool count goes from 81 to 89. Update `02-agent-interface.md`, the tier tabl
 | **Clipboard paste of a picture as a capture** | stretch goal of 0.3.3, not built | |
 | **WebP and HEIC import** | refused in 0.3.3 | needs a licence and size check (HEIC: patents, decoder) |
 | **In-app update** | Velopack spikes: macOS "go with changes"; needs hosting and the maintainer's decisions | parked |
-| **Windows code signing** | SignPath Foundation recommended; the application is the maintainer's | files unsigned |
+| **Windows code signing** | SignPath Foundation recommended; the application is the maintainer's | files unsigned; **not in 0.3.4** |
 | **Headless daemon / `capturemann mcp` starting the app** | tools answer `daemon_unavailable` without the app | design point: Confirm-tier dialogs need a screen |
 | **Windowed audio** | flat memory for long files and speakers | no release assigned |
 | **PhoWhisper** | "not considered for now" | stays out |
