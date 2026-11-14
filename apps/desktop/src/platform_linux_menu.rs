@@ -376,6 +376,7 @@ mod tests {
                 "",
                 "open_library",
                 "open_launcher",
+                "new_click_guide",
                 "recent",
                 "",
                 "settings",

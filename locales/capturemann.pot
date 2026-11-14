@@ -5284,6 +5284,9 @@ msgstr ""
 msgid "Summary"
 msgstr ""
 
+msgid "Switch CaptureMann on under Input Monitoring in the privacy settings. This card closes by itself and the guide starts."
+msgstr ""
+
 msgid "Switch to the existing library at {to} ({n} captures); the captures in {from} stay where they are"
 msgstr ""
 
@@ -6233,9 +6236,6 @@ msgid "Try again"
 msgstr ""
 
 msgid "Try another word, or clear the search to see every window."
-msgstr ""
-
-msgid "Turn CaptureMann on in System Settings, Privacy and Security, Input Monitoring. This card closes by itself and the guide starts."
 msgstr ""
 
 msgid "Turn off camera"

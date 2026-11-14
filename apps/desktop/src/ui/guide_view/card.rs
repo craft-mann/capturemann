@@ -179,7 +179,7 @@ impl Render for InputMonitoringCard {
                         .text_size(px(type_scale::CAPTION))
                         .text_color(rgba_of(t.text_3))
                         .child(tr!(
-                            "Turn CaptureMann on in System Settings, Privacy and Security, Input Monitoring. This card closes by itself and the guide starts."
+                            "Switch CaptureMann on under Input Monitoring in the privacy settings. This card closes by itself and the guide starts."
                         )),
                 )
             })
