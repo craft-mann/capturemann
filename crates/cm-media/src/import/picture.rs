@@ -14,6 +14,9 @@ use image::{DynamicImage, ImageReader, Limits, RgbaImage};
 use super::classify::{Classification, MediaKind, PrepareReason, Status};
 use super::{Problem, Reason};
 
+mod cmyk;
+pub use cmyk::{CmykInfo, ProfileState};
+
 /// Longest side accepted, in pixels.
 pub const MAX_SIDE: u32 = 16_384;
 /// Most pixels accepted (50 megapixels; maintainer decision of Nov 12, 2026).
@@ -129,6 +132,8 @@ pub struct ImageInfo {
     pub converted: bool,
     /// An animated PNG: only its first frame is imported.
     pub animated: bool,
+    /// A CMYK or YCCK JPEG (0.3.4): converted to sRGB with its profile or the standard formula.
+    pub cmyk: Option<CmykInfo>,
 }
 
 impl ImageInfo {
@@ -207,6 +212,7 @@ pub fn parse_png_header(head: &[u8]) -> Result<ImageInfo, Problem> {
                     // Truecolour and truecolour-with-alpha at 8 bits are used as they are.
                     converted: depth == 16 || color == 3 || color == 0 || color == 4,
                     animated: false,
+                    cmyk: None,
                 });
             }
             b"acTL" => {
@@ -232,7 +238,7 @@ pub fn parse_png_header(head: &[u8]) -> Result<ImageInfo, Problem> {
 }
 
 /// Reads a JPEG's segments up to the start of the frame. Pure. Does not apply the limits.
-/// A CMYK or YCCK file is [`Problem`] `unsupported_format` with `format: "jpeg_cmyk"`.
+/// A CMYK or YCCK file is described by [`ImageInfo::cmyk`] (the refusal `jpeg_cmyk` of 0.3.3 is gone).
 pub fn parse_jpeg_header(head: &[u8]) -> Result<ImageInfo, Problem> {
     let bad = || cut_short(ImageFormat::Jpeg);
     if !head.starts_with(&[0xFF, 0xD8]) {
@@ -282,11 +288,7 @@ pub fn parse_jpeg_header(head: &[u8]) -> Result<ImageInfo, Problem> {
                     u32::from(u16::from_be_bytes([data[3], data[4]])),
                     data[5],
                 );
-                if comps == 4 {
-                    let mut p = Problem::unsupported_format("jpeg_cmyk");
-                    p.message = "CMYK JPEG files are not supported yet. Export the picture as RGB and import that.".to_owned();
-                    return Err(p);
-                }
+                let cmyk = (comps == 4).then(|| cmyk::info_from(head));
                 // Baseline, extended sequential and progressive Huffman, 8 bits; the decoder
                 // reads nothing else (arithmetic, lossless and 12-bit files).
                 if !matches!(code, 0xC0..=0xC2) || precision != 8 {
@@ -299,8 +301,9 @@ pub fn parse_jpeg_header(head: &[u8]) -> Result<ImageInfo, Problem> {
                     width,
                     height,
                     orientation,
-                    converted: comps == 1,
+                    converted: comps == 1 || cmyk.is_some(),
                     animated: false,
+                    cmyk,
                 });
             }
             _ => {}
@@ -408,6 +411,12 @@ pub fn classify_image(info: &ImageInfo) -> Classification {
     if info.animated {
         why.push(PrepareReason::FirstFrameOnly);
     }
+    if info
+        .cmyk
+        .is_some_and(|c| c.profile == ProfileState::Unreadable)
+    {
+        why.push(PrepareReason::ProfileNotRead);
+    }
     Classification {
         kind: MediaKind::Image,
         status: if why.is_empty() {
@@ -450,6 +459,33 @@ pub fn load(path: &Path, cancel: &dyn Fn() -> bool) -> Result<Option<Loaded>, Lo
         .map_err(|e| LoadError::Problem(unreadable(&format!("The file can't be read: {e}."))))?;
     if cancel() {
         return Ok(None);
+    }
+    if let Some(c) = &info.cmyk {
+        // CMYK and YCCK: the colour work is done here, not by the `image` crate.
+        let mut img = DynamicImage::ImageRgba8(
+            cmyk::decode_to_rgba(&bytes, c)
+                .map_err(|_| LoadError::Problem(cut_short(info.format)))?,
+        );
+        if img.width() != info.width || img.height() != info.height {
+            return Err(LoadError::Problem(cut_short(info.format)));
+        }
+        if cancel() {
+            return Ok(None);
+        }
+        if info.orientation != 1 {
+            if let Some(o) = image::metadata::Orientation::from_exif(info.orientation) {
+                img.apply_orientation(o);
+            }
+        }
+        let rgba = img.into_rgba8();
+        let (width, height) = (rgba.width(), rgba.height());
+        let png = encode_plain_png(&rgba).map_err(LoadError::Other)?;
+        return Ok(Some(Loaded {
+            info,
+            width,
+            height,
+            png,
+        }));
     }
     let mut limits = Limits::default();
     limits.max_image_width = Some(MAX_SIDE);

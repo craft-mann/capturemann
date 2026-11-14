@@ -129,6 +129,11 @@ pub fn window_from_point(x: i32, y: i32) -> Option<WinInfo> {
     imp::window_from_point(x, y)
 }
 
+/// Windows only: presses the left button at `from`, drags to `to` and releases (injected input, physical px).
+pub fn drag_mouse(from: (i32, i32), to: (i32, i32)) -> Result<(), String> {
+    imp::drag_mouse(from, to)
+}
+
 /// Presses the keys together in order, then releases them in reverse order (injected input).
 pub fn send_chord(keys: &[Key]) -> Result<(), String> {
     imp::send_chord(keys)

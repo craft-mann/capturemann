@@ -175,6 +175,19 @@ pub fn reduce_motion() -> bool {
     imp::reduce_motion()
 }
 
+/// Declares `el` as the grip that moves its window (REC-5.AC18). On Windows GPUI's
+/// `start_window_move` does nothing: the window moves only when the element is a
+/// `WindowControlArea::Drag` region (answered as `HTCAPTION`), and a press on a child that is not
+/// `occlude`d is also a title-bar press. On macOS and Linux the native move call started by the
+/// element's mouse-down does the job and the element stays as it is.
+pub fn drag_grip<E: gpui::InteractiveElement>(el: E) -> E {
+    if cfg!(windows) {
+        el.window_control_area(gpui::WindowControlArea::Drag)
+    } else {
+        el
+    }
+}
+
 /// Whether the primary mouse button is held down right now (a drag or click in progress).
 pub fn left_button_down() -> bool {
     imp::left_button_down()

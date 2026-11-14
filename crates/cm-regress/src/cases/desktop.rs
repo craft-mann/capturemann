@@ -61,6 +61,17 @@ pub fn cases() -> Vec<Case> {
             run: hud,
         },
         Case {
+            id: "desktop.hud_drag",
+            title: "during a recording a pointer drag on the HUD bar moves the HUD window",
+            area: "desktop",
+            specs: &["REC-5.AC18", "bug B3: the HUD could not be dragged on Windows"],
+            tier: Tier::Full,
+            needs: &[Need::DesktopSession, Need::Screen],
+            platforms: WIN,
+            timeout_s: 240,
+            run: hud_drag,
+        },
+        Case {
             id: "desktop.recording_banner",
             title: "Linux: during a recording the app shows its banner window and no floating HUD or screen-sized topmost window that would be in the video",
             area: "desktop",
@@ -530,6 +541,98 @@ fn hud(ctx: &mut Ctx) -> R {
             "console windows appeared while stopping: {}",
             seen.join("; ")
         ));
+    }
+    if problems.is_empty() {
+        Ok(())
+    } else {
+        fail(problems.join("; "))
+    }
+}
+
+/// REC-5.AC18: a real pointer drag (injected input) on the HUD moves its window. The bar is grid-probed
+/// (a press on a button never drags, so some points do not move it); the case passes when one point
+/// moves the window, and fails when none of them does.
+fn hud_drag(ctx: &mut Ctx) -> R {
+    // A press on the HUD activates it; when it closes at the stop, GPUI's activation callback finds the
+    // window already removed and logs this line (gpui-pre-0.3.9 window.rs:2017, seen on the lab laptop on
+    // Nov 14, 2026). Third-party noise; the HUD does close.
+    ctx.log_allow
+        .push("gpui-pre-0.3.9/src/window.rs:2017: window not found".to_owned());
+    ctx.allow_recording_without_dialog()?;
+    let app = start_app(ctx, &[])?;
+    std::thread::sleep(Duration::from_secs(3));
+    let d = ctx.primary_display()?;
+    let id = d.id.to_string();
+    ctx.cli_ok(&[
+        "record",
+        "start",
+        "--display",
+        &id,
+        "--countdown",
+        "0",
+        "--size",
+        "720p",
+    ])?;
+    std::thread::sleep(Duration::from_secs(4));
+    let find_hud = |app_pid: u32| -> Option<WinInfo> {
+        sys::enum_windows()
+            .into_iter()
+            .filter(|w| {
+                w.pid == app_pid
+                    && w.visible
+                    && w.ex_style & sys::WS_EX_TOPMOST != 0
+                    // The HUD is the wide, short window (the full bar is about 1200 x 152 px).
+                    && w.width() >= 300
+                    && w.height() <= 170
+            })
+            .max_by_key(|w| w.width())
+    };
+    let mut problems = Vec::new();
+    match find_hud(app.pid) {
+        None => problems.push("no HUD window (small topmost window of the app)".to_owned()),
+        Some(hud) => {
+            let mut moved = false;
+            'grid: for fy in [60, 75, 90] {
+                for fx in [2, 15, 30, 45, 60, 75, 90, 98] {
+                    let Some(cur) = sys::enum_windows().into_iter().find(|w| w.hwnd == hud.hwnd)
+                    else {
+                        problems.push("the HUD window disappeared during the drag".to_owned());
+                        break 'grid;
+                    };
+                    let x = cur.rect[0] + cur.width() * fx / 100;
+                    let y = cur.rect[1] + cur.height() * fy / 100;
+                    if sys::window_from_point(x, y).map(|w| w.hwnd) != Some(hud.hwnd) {
+                        continue;
+                    }
+                    if let Err(e) = sys::drag_mouse((x, y), (x - 90, y - 50)) {
+                        return skip(e);
+                    }
+                    let after = sys::enum_windows().into_iter().find(|w| w.hwnd == hud.hwnd);
+                    if let Some(a) = after {
+                        // The HUD also changes height when a hover hint opens, so only a sideways move counts.
+                        if (a.rect[0] - cur.rect[0]).abs() >= 40 {
+                            ctx.note(format!(
+                                "a drag from ({x},{y}) moved the HUD by ({},{})",
+                                a.rect[0] - cur.rect[0],
+                                a.rect[1] - cur.rect[1]
+                            ));
+                            moved = true;
+                            break 'grid;
+                        }
+                    }
+                }
+            }
+            if !moved && problems.is_empty() {
+                problems.push(
+                    "no pointer drag on the HUD moved it (24 points tried; REC-5.AC18)".to_owned(),
+                );
+            }
+        }
+    }
+    let stop = ctx.cli_long(&["record", "stop"], 90)?;
+    super::record::wait_idle_exports(ctx);
+    if !stop.ok() {
+        problems.push(format!("record stop failed: {}", exit_text(stop.code())));
     }
     if problems.is_empty() {
         Ok(())

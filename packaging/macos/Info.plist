@@ -54,6 +54,14 @@
             <key>CFBundleTypeExtensions</key>
             <array><string>m4a</string><string>wav</string><string>mp3</string></array>
         </dict>
+        <!-- Pictures (IMP-6.AC13, 0.3.4): Open With only, never the default viewer. -->
+        <dict>
+            <key>CFBundleTypeName</key><string>Picture</string>
+            <key>CFBundleTypeRole</key><string>Viewer</string>
+            <key>LSHandlerRank</key><string>Alternate</string>
+            <key>CFBundleTypeExtensions</key>
+            <array><string>png</string><string>jpg</string><string>jpeg</string></array>
+        </dict>
     </array>
     <key>NSDesktopFolderUsageDescription</key>
     <string>CaptureMann reads the files you choose to import from your Desktop.</string>

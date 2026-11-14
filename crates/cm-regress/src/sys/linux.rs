@@ -699,6 +699,10 @@ pub fn window_from_point(x: i32, y: i32) -> Option<WinInfo> {
     window_at(&enum_windows(), x, y)
 }
 
+pub fn drag_mouse(_from: (i32, i32), _to: (i32, i32)) -> Result<(), String> {
+    Err("an injected pointer drag is only implemented on Windows".to_owned())
+}
+
 pub fn send_chord(_keys: &[Key]) -> Result<(), String> {
     Err("injected keys are not implemented on Linux (the suite never injects input into the lab laptop's session)".to_owned())
 }
