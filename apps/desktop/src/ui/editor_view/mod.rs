@@ -22,8 +22,8 @@ use crate::editor::geom::Handle;
 use crate::editor::keys;
 use crate::editor::state::Interaction;
 use crate::editor::tools::{
-    palette_name, Param, ParamValue, Tool, CORNER_RADII, DIM_LEVELS, OPACITIES, PALETTE,
-    STAMP_SIZES, STEP_SIZES, TEXT_SIZES, WIDTHS,
+    palette_name, Param, ParamValue, Tool, BORDER_WIDTHS, CORNER_RADII, DIM_LEVELS, OPACITIES,
+    PALETTE, STAMP_SIZES, STEP_SIZES, TEXT_SIZES, WIDTHS, ZOOMS,
 };
 use crate::editor::{Insets, KeyCommand, Mods, Viewport};
 use crate::theme::{scale, type_scale, Color, Mode, Theme};
@@ -45,6 +45,7 @@ mod input;
 mod inspector;
 mod palette;
 mod panels;
+mod touch_panels;
 mod view_bar;
 
 /// Tool buttons are 44 px hit targets (DESIGN 4); the rail card adds 6 px padding and a border.
@@ -160,6 +161,8 @@ pub struct EditorView {
     /// The image strip's state (0.3.3).
     strip: image_strip::StripState,
     space_down: bool,
+    /// A caret repaint is already scheduled (the caret blinks, ANN-1.AC12).
+    caret_timer: bool,
     /// Last pointer position while panning (window px).
     pan_from: Option<(f32, f32)>,
     last_epoch: u64,
@@ -200,6 +203,7 @@ impl EditorView {
             bar: view_bar::BarState::default(),
             strip,
             space_down: false,
+            caret_timer: false,
             pan_from: None,
             last_epoch: epoch,
             _subs: vec![sub],
@@ -285,6 +289,19 @@ struct Snap {
     steps: Option<crate::editor::state::StepsInfo>,
     /// The Spotlight panel (ANN-7).
     spot: Option<crate::editor::state::SpotInfo>,
+    /// The Zoom Lens, Retype, Move area and Blueprint panels (0.3.4).
+    lens: Option<crate::editor::state::touch::LensInfo>,
+    retype: Option<crate::editor::state::touch::RetypeInfo>,
+    mv: Option<crate::editor::state::touch::MoveInfo>,
+    blueprint: Option<crate::editor::state::touch::BlueprintInfo>,
+    /// "The background is too busy to fill cleanly" is open.
+    busy_prompt: Option<crate::editor::touchup::BusyPrompt>,
+    /// A refusal or a note of the touch-up tools, under the panel.
+    touch_notice: Option<String>,
+    /// The Blueprint command is waiting for the recognizer.
+    bp_loading: bool,
+    /// A fill is being measured.
+    measuring: bool,
     /// The tool each palette group's button shows.
     faces: crate::editor::Faces,
     can_undo: bool,
@@ -336,6 +353,14 @@ impl Snap {
             inspector_tool: st.inspector_tool(),
             callout: st.callout_info(),
             spot: st.spot_info(),
+            lens: st.lens_info(),
+            retype: st.retype_info(),
+            mv: st.move_info(),
+            blueprint: st.blueprint_info(),
+            busy_prompt: st.touch.busy_prompt.clone(),
+            touch_notice: st.touch.notice.clone(),
+            bp_loading: st.touch.bp_loading,
+            measuring: st.touch.measuring,
             steps: st.steps_info(),
             stamp: st.stamp_info(),
             faces: st.faces,

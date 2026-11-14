@@ -14,7 +14,8 @@ pub struct LongShotConfig {
     /// Share of the scrollable content scrolled each time (CAP-6: about 80 %).
     pub step_fraction: f64,
     /// The first scroll happens before the fixed header and footer are known, so it is shorter
-    /// (it must stay inside the content area).
+    /// (it must stay inside the content area), and before the real distance of one wheel step in
+    /// this app is known: a real wheel can move up to three times what was asked.
     pub first_step_fraction: f64,
     pub settle: Settle,
 }
@@ -25,7 +26,7 @@ impl Default for LongShotConfig {
             direction: Direction::Vertical,
             limits: Limits::default(),
             step_fraction: 0.8,
-            first_step_fraction: 0.5,
+            first_step_fraction: 0.3,
             settle: Settle::default(),
         }
     }
@@ -116,23 +117,25 @@ pub fn run_auto_ex(
         scroller.scroll(cfg.direction, step)?;
         let next = wait_settled(src, sleeper, cfg.settle)?;
         match stitcher.push(&next.frame, Some(step)) {
-            PushOutcome::Added { .. } => {
-                {
-        on_progress(progress(&stitcher));
-        on_stitch(&stitcher);
-    }
+            PushOutcome::Added { new_len } => {
+                on_progress(progress(&stitcher));
+                on_stitch(&stitcher);
+                // Pixels the content really moved per pixel asked (a wheel step differs per app
+                // and per display scale): learned from each join, so the next request lands on
+                // about 80 %.
+                let moved_per_asked = (f64::from(new_len) / f64::from(step)).clamp(0.25, 4.0);
                 // 80 % of what actually scrolls: the area without the fixed bands.
                 let (h, f) = stitcher.bands();
                 let content = (size - f64::from(h) - f64::from(f)).max(1.0);
-                step = ((content * cfg.step_fraction) as u32).max(1);
+                step = ((content * cfg.step_fraction / moved_per_asked) as u32).max(1);
             }
             PushOutcome::NoChange => break EndReason::ReachedEnd,
             PushOutcome::NoOverlap => break EndReason::NoOverlap,
             PushOutcome::LimitReached { .. } => {
                 {
-        on_progress(progress(&stitcher));
-        on_stitch(&stitcher);
-    }
+                    on_progress(progress(&stitcher));
+                    on_stitch(&stitcher);
+                }
                 break EndReason::LimitReached;
             }
         }
@@ -153,14 +156,7 @@ pub fn run_hand(
     stop: &mut dyn FnMut() -> bool,
     on_progress: &mut dyn FnMut(LongShotProgress),
 ) -> Result<LongShotResult, CmError> {
-    run_hand_ex(
-        src,
-        sleeper,
-        cfg,
-        stop,
-        on_progress,
-        &mut |_: &Stitcher| {},
-    )
+    run_hand_ex(src, sleeper, cfg, stop, on_progress, &mut |_: &Stitcher| {})
 }
 
 /// [`run_hand`] with the `on_stitch` hook of [`run_auto_ex`].
@@ -195,18 +191,18 @@ pub fn run_hand_ex(
         match stitcher.push(&g, None) {
             PushOutcome::Added { .. } => {
                 {
-        on_progress(progress(&stitcher));
-        on_stitch(&stitcher);
-    }
+                    on_progress(progress(&stitcher));
+                    on_stitch(&stitcher);
+                }
                 last_taken = g;
             }
             PushOutcome::NoChange => {}
             PushOutcome::NoOverlap => break EndReason::NoOverlap,
             PushOutcome::LimitReached { .. } => {
                 {
-        on_progress(progress(&stitcher));
-        on_stitch(&stitcher);
-    }
+                    on_progress(progress(&stitcher));
+                    on_stitch(&stitcher);
+                }
                 break EndReason::LimitReached;
             }
         }

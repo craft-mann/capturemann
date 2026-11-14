@@ -6,13 +6,9 @@ use super::tools::Tool;
 use cm_i18n::tr_ctx;
 use serde_json::{Map, Value};
 
-/// The blue "new" dot on groups that hold a tool new in this release. It carries no per-user
-/// state: it is shown for the whole release. **Remove in 0.3.4** (delete this constant, the
-/// `Tool::is_new` arms and the dot in `ui/editor_view/palette.rs`).
-pub const RELEASE_NEW_DOT_UNTIL: &str = "0.3.4";
-
-/// Whether this build still shows the "new" dot (see [`RELEASE_NEW_DOT_UNTIL`]).
-pub const SHOW_NEW_DOT: bool = true;
+// 0.3.4 design decision 2: the blue "new" dots of 0.3.3 are gone and not reused (blue means
+// agent). A tool that is new in this release shows the neutral "New in 0.3.4" pill in its
+// inspector header instead (see `Tool::is_new`).
 
 /// The `editor.palette_faces` setting: the tool each group's button shows.
 pub const FACES_KEY: &str = "editor.palette_faces";
@@ -25,6 +21,8 @@ pub enum Group {
     Text,
     Highlighter,
     Markers,
+    /// 0.3.4: Retype and Move area (design decision 1: its own group, after Markers).
+    Touchup,
     Emphasis,
     Redact,
     Crop,
@@ -32,12 +30,13 @@ pub enum Group {
 
 impl Group {
     /// Top to bottom, as drawn.
-    pub const ALL: [Group; 8] = [
+    pub const ALL: [Group; 9] = [
         Group::Select,
         Group::Shapes,
         Group::Text,
         Group::Highlighter,
         Group::Markers,
+        Group::Touchup,
         Group::Emphasis,
         Group::Redact,
         Group::Crop,
@@ -55,6 +54,7 @@ impl Group {
             Group::Text => "text",
             Group::Highlighter => "highlighter",
             Group::Markers => "markers",
+            Group::Touchup => "touchup",
             Group::Emphasis => "emphasis",
             Group::Redact => "redact",
             Group::Crop => "crop",
@@ -68,6 +68,7 @@ impl Group {
             Group::Text => tr_ctx!("tool group", "Text"),
             Group::Highlighter => tr_ctx!("tool group", "Highlighter"),
             Group::Markers => tr_ctx!("tool group", "Markers"),
+            Group::Touchup => tr_ctx!("tool group", "Touch-up"),
             Group::Emphasis => tr_ctx!("tool group", "Emphasis"),
             Group::Redact => tr_ctx!("tool group", "Redact"),
             Group::Crop => tr_ctx!("tool group", "Crop"),
@@ -83,7 +84,8 @@ impl Group {
             Group::Text => &[Tool::Text, Tool::Callout],
             Group::Highlighter => &[Tool::Highlight],
             Group::Markers => &[Tool::Step, Tool::Stamp],
-            Group::Emphasis => &[Tool::Spotlight],
+            Group::Touchup => &[Tool::Retype, Tool::MoveArea],
+            Group::Emphasis => &[Tool::Spotlight, Tool::Magnify],
             Group::Redact => &[Tool::Blur, Tool::Pixelate],
             Group::Crop => &[Tool::Crop],
         }
@@ -99,17 +101,13 @@ impl Group {
         self.tools().len() > 1
     }
 
-    /// A divider is drawn above this button (before Shapes, Emphasis, Redact and Crop).
+    /// A divider is drawn above this button (before Shapes, Touch-up, Emphasis, Redact and
+    /// Crop).
     pub fn starts_section(self) -> bool {
         matches!(
             self,
-            Group::Shapes | Group::Emphasis | Group::Redact | Group::Crop
+            Group::Shapes | Group::Touchup | Group::Emphasis | Group::Redact | Group::Crop
         )
-    }
-
-    /// Whether the blue "new" dot is drawn on the button.
-    pub fn has_new_tool(self) -> bool {
-        SHOW_NEW_DOT && self.tools().iter().any(|t| t.is_new())
     }
 
     pub fn default_face(self) -> Tool {
@@ -136,15 +134,15 @@ impl Tool {
         Group::ALL.iter().any(|g| g.tools().contains(&self))
     }
 
-    /// New in 0.3.3 (drives the blue dot; remove with it in 0.3.4).
+    /// New in 0.3.4: the inspector header shows the neutral "New in 0.3.4" pill.
     pub fn is_new(self) -> bool {
-        matches!(self, Tool::Callout | Tool::Spotlight | Tool::Stamp)
+        matches!(self, Tool::Magnify | Tool::Retype | Tool::MoveArea)
     }
 }
 
 /// The tool each group's button shows, remembered per user.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Faces([Tool; 8]);
+pub struct Faces([Tool; 9]);
 
 impl Default for Faces {
     fn default() -> Self {
@@ -229,7 +227,8 @@ mod tests {
         assert_eq!(ids(Group::Shapes), ["arrow", "line", "rect", "ellipse"]);
         assert_eq!(ids(Group::Text), ["text", "callout"]);
         assert_eq!(ids(Group::Markers), ["step", "stamp"]);
-        assert_eq!(ids(Group::Emphasis), ["spotlight"]);
+        assert_eq!(ids(Group::Emphasis), ["spotlight", "magnify"]);
+        assert_eq!(ids(Group::Touchup), ["retype", "move_area"]);
         assert_eq!(ids(Group::Highlighter), ["highlight"]);
         assert_eq!(ids(Group::Redact), ["blur", "pixelate"]);
         assert_eq!(ids(Group::Crop), ["crop"]);
@@ -238,7 +237,12 @@ mod tests {
             .filter(|g| g.starts_section())
             .map(|g| g.id())
             .collect();
-        assert_eq!(dividers, ["shapes", "emphasis", "redact", "crop"]);
+        assert_eq!(
+            dividers,
+            ["shapes", "touchup", "emphasis", "redact", "crop"]
+        );
+        assert_eq!(Group::ALL.len(), 9, "nine palette buttons (0.3.4)");
+        assert_eq!(Group::ALL[5], Group::Touchup, "Touch-up follows Markers");
         assert!(Group::Shapes.has_menu() && !Group::Crop.has_menu());
     }
 

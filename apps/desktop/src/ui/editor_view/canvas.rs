@@ -80,6 +80,24 @@ impl EditorView {
                     vp.to_screen(Pt::new(st.frame.x + st.frame.w, st.frame.y + st.frame.h));
                 (((x0 + x1) / 2.0) as f32, y1 as f32)
             });
+        // The caret blinks: one repaint is scheduled for its next change (ANN-1.AC12).
+        if let Some(tg) = &overlay.text {
+            if !self.caret_timer {
+                self.caret_timer = true;
+                let wait = crate::editor::caret::next_change(tg.idle_ms);
+                cx.spawn(async move |this, cx| {
+                    cx.background_executor().timer(wait).await;
+                    this.update(cx, |this, cx| {
+                        this.caret_timer = false;
+                        cx.notify();
+                    })
+                    .ok();
+                })
+                .detach();
+            }
+        }
+        let tags = touch_tags(t, s, &overlay, &vp);
+        let tool_hint = tool_hint(s, &overlay);
         // While a text annotation is open the canvas is the platform's text input (composition).
         let editing_text = overlay.text.is_some();
         let input_focus = self.canvas_focus.clone();
@@ -101,6 +119,22 @@ impl EditorView {
                         gpui::ElementInputHandler::new(bounds, input_entity.clone()),
                         cx,
                     );
+                }
+                if overlay.text_dragging {
+                    // The pointer is captured while a press inside the text selects: the
+                    // selection follows it outside the canvas and ends on release (ANN-1.AC11).
+                    let e = input_entity.clone();
+                    window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
+                        if phase == gpui::DispatchPhase::Capture {
+                            e.update(cx, |v, cx| v.on_mouse_move(ev, window, cx));
+                        }
+                    });
+                    let e = input_entity.clone();
+                    window.on_mouse_event(move |ev: &MouseUpEvent, phase, window, cx| {
+                        if phase == gpui::DispatchPhase::Capture && ev.button == MouseButton::Left {
+                            e.update(cx, |v, cx| v.on_mouse_up(ev, window, cx));
+                        }
+                    });
                 }
                 paint_overlay(bounds, &overlay, vp, &theme, window)
             },
@@ -207,6 +241,28 @@ impl EditorView {
                                     ))),
                             )
                     }))
+                    .children(tags)
+                    .children(tool_hint.map(|h| {
+                        div()
+                            .absolute()
+                            .left_0()
+                            .right_0()
+                            .bottom(px(PILL_MARGIN + TRANSPORT_H + PILL_MARGIN + 8.))
+                            .flex()
+                            .justify_center()
+                            .child(
+                                div()
+                                    .px(px(10.))
+                                    .py(px(4.))
+                                    .rounded_full()
+                                    .bg(rgba_of(t.raised))
+                                    .border_1()
+                                    .border_color(rgba_of(t.border))
+                                    .text_size(px(12.))
+                                    .text_color(rgba_of(t.text_2))
+                                    .child(SharedString::from(h)),
+                            )
+                    }))
                     .children(step_hint.map(|(x, y, n, d, c)| {
                         // The next step number rides on the cursor (ANN-1).
                         let d = d.max(14.0);
@@ -270,6 +326,108 @@ const DOT_STEP: f32 = 24.;
 
 fn hsla(c: crate::theme::Color) -> Hsla {
     Hsla::from(rgba_of(c))
+}
+
+/// The pink of live guides on the canvas (design decision 7): never used for selection.
+const GUIDE_PINK: Color = Color::rgb(0xF472B6);
+/// A kept Blueprint line's dashed outline.
+const KEPT_GREEN: Color = Color::rgb(0x34D399);
+
+/// A small label on the canvas at image point `at` (offset in px from it).
+fn canvas_tag(t: &Theme, x: f32, y: f32, text: String, border: Color) -> AnyElement {
+    div()
+        .absolute()
+        .left(px(x))
+        .top(px(y))
+        .px(px(6.))
+        .py(px(2.))
+        .rounded(px(scale::RADIUS_XS))
+        .bg(rgba_of(t.raised))
+        .border_1()
+        .border_color(rgba_of(border))
+        .text_size(px(11.))
+        .text_color(rgba_of(t.text))
+        .whitespace_nowrap()
+        .child(SharedString::from(text))
+        .into_any_element()
+}
+
+/// The text tags of the touch-up overlays: the Move area source tag and snap tag, the `kept`
+/// tags of Blueprint and the hint of the hovered line.
+fn touch_tags(t: &Theme, s: &Snap, o: &OverlayData, vp: &Viewport) -> Vec<AnyElement> {
+    let mut out = Vec::new();
+    if let Some(mv) = &o.move_overlay {
+        let (x, y) = vp.to_screen(Pt::new(mv.source.x, mv.source.y + mv.source.h));
+        out.push(canvas_tag(
+            t,
+            x as f32,
+            y as f32 + 4.,
+            mv.tag.clone(),
+            t.mist,
+        ));
+        if let (Some(g), Some(d)) = (&o.guide, mv.dest) {
+            let (x, y) = vp.to_screen(Pt::new(d.x, d.y));
+            out.push(canvas_tag(
+                t,
+                x as f32,
+                y as f32 - 24.,
+                g.tag.clone(),
+                GUIDE_PINK,
+            ));
+        }
+    }
+    for b in &o.bp_boxes {
+        if b.kept {
+            let (x, y) = vp.to_screen(Pt::new(b.rect.x, b.rect.y));
+            out.push(canvas_tag(
+                t,
+                x as f32,
+                y as f32 - 18.,
+                tr_ctx!("blueprint", "kept"),
+                KEPT_GREEN,
+            ));
+        }
+        if b.hovered {
+            if let Some((text, bar)) = s.blueprint.as_ref().and_then(|i| i.hover.clone()) {
+                let quoted = if text.is_empty() {
+                    tr!("This line")
+                } else {
+                    format!("\u{201C}{text}\u{201D}")
+                };
+                let hint = if bar {
+                    tr!("{line} \u{B7} click to keep the real text", line = quoted)
+                } else {
+                    tr!("{line} \u{B7} click to make it a bar again", line = quoted)
+                };
+                let (x, y) = vp.to_screen(Pt::new(b.rect.x, b.rect.y + b.rect.h));
+                out.push(canvas_tag(t, x as f32, y as f32 + 4., hint, t.border));
+            }
+        }
+    }
+    out
+}
+
+/// The line at the bottom of the canvas for the touch-up tools (design boards S4, S5).
+fn tool_hint(s: &Snap, o: &OverlayData) -> Option<String> {
+    if s.blueprint.is_some() || s.busy_prompt.is_some() {
+        return None;
+    }
+    if o.text.is_some() && s.retype.as_ref().is_some_and(|r| r.editing) {
+        return Some(tr!("\u{21B5} Enter to apply \u{B7} Esc to cancel"));
+    }
+    match s.tool {
+        Tool::Retype if o.text.is_none() => Some(if s.measuring {
+            tr!("Measuring the background\u{2026}")
+        } else {
+            tr!("Click a line to retype it, or drag a box over text that was not found")
+        }),
+        Tool::MoveArea if s.measuring => Some(tr!("Measuring the background\u{2026}")),
+        Tool::MoveArea if s.mv.as_ref().is_some_and(|m| m.pending) => Some(tr!(
+            "Drag the contents to move them, or press Delete to remove them"
+        )),
+        Tool::MoveArea => Some(tr!("Drag a box over what to move or remove")),
+        _ => None,
+    }
 }
 
 fn paint_overlay(
@@ -423,6 +581,117 @@ fn paint_overlay(
                 ));
             }
         }
+        // The loupe of a selected Zoom Lens: dashed, so it reads as a second thing to grab.
+        if let Some(l) = o.chrome.as_ref().and_then(|c| c.loupe) {
+            window.paint_quad(gpui::quad(
+                rect_b(l),
+                0.,
+                gpui::transparent_black(),
+                1.,
+                gpui::white(),
+                BorderStyle::Dashed,
+            ));
+        }
+        // Retype: every recognized line as a dashed blue box, the hovered one stronger.
+        for b in &o.retype_boxes {
+            let r = rect_b(b.rect);
+            if b.hovered {
+                let mut tint = hsla(canvas_tok::OUTLINE);
+                tint.a = 0.12;
+                window.paint_quad(gpui::fill(r, tint));
+            }
+            window.paint_quad(gpui::quad(
+                r,
+                0.,
+                gpui::transparent_black(),
+                if b.hovered { 1.5 } else { canvas_tok::HOVER_W },
+                hsla(canvas_tok::OUTLINE),
+                BorderStyle::Dashed,
+            ));
+        }
+        // Move area: the source keeps a dashed mist outline and a light wash (its hatch); the
+        // moved contents get the blue outline.
+        if let Some(mv) = &o.move_overlay {
+            let sb = rect_b(mv.source);
+            let mut wash = hsla(t.mist);
+            wash.a = 0.18;
+            window.paint_quad(gpui::fill(sb, wash));
+            window.paint_quad(gpui::quad(
+                sb,
+                0.,
+                gpui::transparent_black(),
+                1.,
+                hsla(t.mist),
+                BorderStyle::Dashed,
+            ));
+            if let Some(d) = mv.dest {
+                let db = rect_b(d);
+                window.paint_quad(gpui::quad(
+                    db,
+                    0.,
+                    gpui::transparent_black(),
+                    1.5,
+                    hsla(canvas_tok::OUTLINE),
+                    BorderStyle::Solid,
+                ));
+                let half = px(canvas_tok::HANDLE / 2.0);
+                for c in [
+                    db.origin,
+                    point(db.origin.x + db.size.width, db.origin.y),
+                    point(db.origin.x, db.origin.y + db.size.height),
+                    point(db.origin.x + db.size.width, db.origin.y + db.size.height),
+                ] {
+                    window.paint_quad(gpui::quad(
+                        Bounds {
+                            origin: point(c.x - half, c.y - half),
+                            size: size(px(canvas_tok::HANDLE), px(canvas_tok::HANDLE)),
+                        },
+                        px(2.),
+                        gpui::white(),
+                        1.5,
+                        hsla(canvas_tok::OUTLINE),
+                        BorderStyle::Solid,
+                    ));
+                }
+            }
+        }
+        // The snap guide: pink, only on the canvas and only while dragging.
+        if let Some(g) = &o.guide {
+            let c = vp.content;
+            let (a, b) = match g.axis {
+                crate::editor::touchup::Axis::Row => {
+                    (pt(Pt::new(c.x, g.at)), pt(Pt::new(c.x + c.w, g.at)))
+                }
+                crate::editor::touchup::Axis::Column => {
+                    (pt(Pt::new(g.at, c.y)), pt(Pt::new(g.at, c.y + c.h)))
+                }
+            };
+            stroke_line(window, &[a, b], 1.5, hsla(GUIDE_PINK), false);
+        }
+        // Blueprint: kept lines in a dashed green outline, the hovered line in blue.
+        for b in &o.bp_boxes {
+            let r = rect_b(b.rect);
+            if b.kept {
+                window.paint_quad(gpui::quad(
+                    r,
+                    0.,
+                    gpui::transparent_black(),
+                    1.5,
+                    hsla(KEPT_GREEN),
+                    BorderStyle::Dashed,
+                ));
+            }
+            if b.hovered {
+                window.paint_quad(gpui::quad(
+                    r,
+                    0.,
+                    gpui::transparent_black(),
+                    1.5,
+                    hsla(canvas_tok::OUTLINE),
+                    BorderStyle::Solid,
+                ));
+            }
+        }
         // A text box under the pointer that is not selected: thin dashed blue outline.
         if let Some(r) = o.text_hover {
             window.paint_quad(gpui::quad(
@@ -438,18 +707,40 @@ fn paint_overlay(
         // colour (the "Type text" placeholder is an element, see `canvas_pane`).
         if let Some(tg) = &o.text {
             outline_with_halo(window, rect_b(tg.frame), tg.light);
-            for m in &tg.marked {
-                window.paint_quad(gpui::fill(rect_b(*m), hsla(canvas_tok::SELECTION)));
+            // The selection is blue in the active window and grey when another window has the
+            // focus (ANN-1.AC12).
+            let active = window.is_window_active();
+            let sel = if active {
+                hsla(canvas_tok::SELECTION)
+            } else {
+                hsla(Color::rgb_a(0x8A8A90, 45))
+            };
+            for r in &tg.selection {
+                window.paint_quad(gpui::fill(rect_b(*r), sel));
             }
-            let c = pt(tg.caret);
-            let ch = px((tg.caret_h * z) as f32);
-            window.paint_quad(gpui::fill(
-                Bounds {
-                    origin: c,
-                    size: size(px(2.), ch),
-                },
-                Hsla::from(gpui_rgb(tg.color)),
-            ));
+            // The composing span is underlined in blue, 1 px (ANN-1.AC13).
+            for m in &tg.marked {
+                let b = rect_b(*m);
+                window.paint_quad(gpui::fill(
+                    Bounds {
+                        origin: point(b.origin.x, b.origin.y + b.size.height - px(1.)),
+                        size: size(b.size.width, px(1.)),
+                    },
+                    hsla(canvas_tok::OUTLINE),
+                ));
+            }
+            // Solid for 500 ms after a key, then blinking every 530 ms; none when inactive.
+            if crate::editor::caret::visible(tg.idle_ms, active) {
+                let c = pt(tg.caret);
+                let ch = px((tg.caret_h * z) as f32);
+                window.paint_quad(gpui::fill(
+                    Bounds {
+                        origin: c,
+                        size: size(px(2.), ch),
+                    },
+                    Hsla::from(gpui_rgb(tg.color)),
+                ));
+            }
         }
     });
 }

@@ -29,6 +29,13 @@ pub struct SyntheticPage {
     /// `(position, skip)`: when a scroll reaches `position`, the content jumps by `skip` more
     /// (a virtualized list that redraws: no overlap between the two frames).
     pub jump: Option<(u32, u32)>,
+    /// Width of a scrollbar down the right edge of the content (vertical pages only): its thumb
+    /// moves with the position, so no two frames have equal rows. The expected image has no
+    /// scrollbar (the engine trims it).
+    pub scrollbar: u32,
+    /// Content rows at each end of the viewport that differ in every frame (a window's rounded
+    /// corners and edge line drawn over what scrolls under them).
+    pub corner_rows: u32,
 }
 
 impl SyntheticPage {
@@ -41,7 +48,19 @@ impl SyntheticPage {
             view,
             direction: Direction::Vertical,
             jump: None,
+            scrollbar: 0,
+            corner_rows: 0,
         }
+    }
+
+    pub fn with_corner_rows(mut self, rows: u32) -> Self {
+        self.corner_rows = rows;
+        self
+    }
+
+    pub fn with_scrollbar(mut self, width: u32) -> Self {
+        self.scrollbar = width;
+        self
     }
 
     pub fn with_bands(mut self, header: u32, footer: u32) -> Self {
@@ -103,7 +122,7 @@ impl SyntheticPage {
                         data.extend_from_slice(p);
                     }
                 }
-                (self.cross, n)
+                (lines.first().map_or(0, Vec::len) as u32, n)
             }
             Direction::Horizontal => {
                 for y in 0..self.cross as usize {
@@ -123,8 +142,27 @@ impl SyntheticPage {
         for i in 0..self.header {
             lines.push(self.line(Kind::Header, i));
         }
-        for i in 0..self.content_view() {
-            lines.push(self.line(Kind::Content, pos + i));
+        let view = self.content_view();
+        // The thumb: a bar whose top follows the position.
+        let thumb_len = (view / 4).max(1);
+        let thumb_top = (u64::from(pos) * u64::from(view - thumb_len)
+            / u64::from(self.max_pos().max(1))) as u32;
+        for i in 0..view {
+            let mut line = self.line(Kind::Content, pos + i);
+            let in_thumb = (thumb_top..thumb_top + thumb_len).contains(&i);
+            for p in line.iter_mut().skip((self.cross - self.scrollbar) as usize) {
+                *p = if in_thumb {
+                    [90, 90, 90, 255]
+                } else {
+                    [235, 235, 235, 255]
+                };
+            }
+            if i < self.corner_rows || i >= view - self.corner_rows {
+                for p in line.iter_mut() {
+                    *p = [(pos & 255) as u8, (i & 255) as u8, 7, 255];
+                }
+            }
+            lines.push(line);
         }
         for i in 0..self.footer {
             lines.push(self.line(Kind::Footer, i));
@@ -140,14 +178,15 @@ impl SyntheticPage {
     /// Header, content rows `from..to`, footer.
     pub fn expected_range(&self, from: u32, to: u32) -> Frame {
         let mut lines = Vec::new();
+        let keep = (self.cross - self.scrollbar) as usize;
         for i in 0..self.header {
-            lines.push(self.line(Kind::Header, i));
+            lines.push(self.line(Kind::Header, i)[..keep].to_vec());
         }
         for i in from..to {
-            lines.push(self.line(Kind::Content, i));
+            lines.push(self.line(Kind::Content, i)[..keep].to_vec());
         }
         for i in 0..self.footer {
-            lines.push(self.line(Kind::Footer, i));
+            lines.push(self.line(Kind::Footer, i)[..keep].to_vec());
         }
         self.assemble(lines)
     }

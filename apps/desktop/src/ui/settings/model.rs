@@ -349,6 +349,7 @@ pub(crate) fn tool_title(name: &str) -> String {
         "get_capture" => tr!("Read a capture"),
         "suggest_redactions" => tr!("Suggest redactions"),
         "recognize_text" => tr!("Read the text in a screenshot"),
+        "suggest_blueprint" => tr!("Suggest placeholder bars for text"),
         "start_guide" => tr!("Start a Click Guide"),
         "stop_guide" => tr!("Stop a Click Guide"),
         "get_guide" => tr!("Read a Click Guide"),

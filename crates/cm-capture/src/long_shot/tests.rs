@@ -270,3 +270,95 @@ fn near_exact_overlap_tolerates_a_blinking_caret() {
         PushOutcome::Added { new_len: 160 }
     ));
 }
+
+/// A real wheel moves more or less than asked (it differs per app): the driver learns the ratio
+/// from the joins and still gets every row once, with no overlap lost.
+#[test]
+fn cap_6_ac1_a_wheel_that_moves_two_and_a_half_times_the_request() {
+    struct Wheel(fake::PageView, f64);
+    impl Scroller for Wheel {
+        fn scroll(&mut self, d: Direction, amount_px: u32) -> Result<(), CmError> {
+            self.0.scroll(d, (f64::from(amount_px) * self.1) as u32)
+        }
+    }
+    for ratio in [0.5, 1.0, 2.5] {
+        let page = SyntheticPage::new(40, 5 * 300, 300);
+        let view = page.clone().view();
+        let (mut src, mut sc) = (view.clone(), Wheel(view, ratio));
+        let r = run_auto(
+            &mut src,
+            &mut sc,
+            &mut NoSleep::default(),
+            cfg(Direction::Vertical),
+            &mut || false,
+            &mut |_| {},
+        )
+        .unwrap();
+        assert_eq!(r.end, EndReason::ReachedEnd, "ratio {ratio}");
+        assert_eq!(r.image.frame, page.expected(), "ratio {ratio}");
+    }
+}
+
+/// Found on a real window (Windows, Nov 14, 2026): the thumb of the scrollbar moves with the
+/// content, so no two frames have equal rows. The engine joins without the scrollbar columns and
+/// the image is the page without them, every row once and in order.
+#[test]
+fn cap_6_ac1_a_moving_scrollbar_does_not_stop_the_join() {
+    for sb in [15, 17, 26, 34] {
+        let page = SyntheticPage::new(300, 5 * 300, 300).with_scrollbar(sb);
+        let (r, _) = auto(page.clone(), None);
+        assert_eq!(r.end, EndReason::ReachedEnd, "scrollbar {sb}");
+        let w = r.image.frame.width();
+        assert!(w >= 300 - sb - 4, "trim not too wide: {w}");
+        let want = page.expected();
+        assert_eq!(r.image.frame.height(), want.height(), "scrollbar {sb}");
+        for y in (0..want.height()).step_by(7) {
+            for x in [0, 1, w / 2, w - 5] {
+                assert_eq!(
+                    r.image.frame.pixel(x, y),
+                    want.pixel(x, y),
+                    "scrollbar {sb} at {x},{y}"
+                );
+            }
+        }
+    }
+}
+
+/// A real window draws its rounded corners and edge line next to the fixed bands, so the lines
+/// there differ in every frame (Edge on Windows at 150 %, Nov 14, 2026). They are not compared
+/// and the next frame's lines replace them: every row in between is still once and in order.
+#[test]
+fn cap_6_ac1_corner_rows_that_differ_in_every_frame() {
+    for steps in [300, 150] {
+        let page = SyntheticPage::new(300, 5 * 300, steps)
+            .with_bands(40, 8)
+            .with_corner_rows(5)
+            .with_scrollbar(17);
+        let (r, _) = auto(page.clone(), None);
+        assert_eq!(r.end, EndReason::ReachedEnd, "view {steps}");
+        let want = page.expected();
+        assert_eq!(r.image.frame.height(), want.height(), "view {steps}");
+        let w = r.image.frame.width();
+        // Compare every row except the 5 under the header and the 5 above the footer, which
+        // belong to the first and the last frame and are the corner artifacts themselves.
+        for y in (40 + 5..want.height() - 8 - 5).step_by(3) {
+            for x in [0, 1, w / 2, w - 1] {
+                assert_eq!(
+                    r.image.frame.pixel(x, y),
+                    want.pixel(x, y),
+                    "view {steps} at {x},{y}"
+                );
+            }
+        }
+    }
+}
+
+/// A jump is still refused with the trim attempts: no wrong join is made to fit.
+#[test]
+fn cap_6_ac3_a_jump_with_a_scrollbar_still_stops() {
+    let page = SyntheticPage::new(300, 2000, 300)
+        .with_jump(500, 700)
+        .with_scrollbar(17);
+    let (r, _) = auto(page, None);
+    assert_eq!(r.end, EndReason::NoOverlap);
+}

@@ -1,10 +1,11 @@
 //! Tools, their shortcuts and the per-tool style that persists between uses (ANN-1, ANN-2).
 
 use cm_core::annotation::{
-    CalloutStyle, SpotMode, SpotShapeKind, StepStyle, DEFAULT_BLUR_STRENGTH,
-    DEFAULT_CALLOUT_RADIUS, DEFAULT_CALLOUT_SIZE, DEFAULT_COLOR, DEFAULT_HIGHLIGHT_COLOR,
-    DEFAULT_HIGHLIGHT_OPACITY, DEFAULT_PIXELATE_BLOCK, DEFAULT_SPOTLIGHT_DIM, DEFAULT_STEP_SIZE,
-    DEFAULT_TEXT_SIZE, DEFAULT_WIDTH,
+    CalloutStyle, MagnifyShape, SpotMode, SpotShapeKind, StepStyle, TextAlign,
+    DEFAULT_BLUR_STRENGTH, DEFAULT_CALLOUT_RADIUS, DEFAULT_CALLOUT_SIZE, DEFAULT_COLOR,
+    DEFAULT_HIGHLIGHT_COLOR, DEFAULT_HIGHLIGHT_OPACITY, DEFAULT_MAGNIFY_ZOOM,
+    DEFAULT_PIXELATE_BLOCK, DEFAULT_SPOTLIGHT_DIM, DEFAULT_STEP_SIZE, DEFAULT_TEXT_SIZE,
+    DEFAULT_WIDTH,
 };
 use cm_core::annotation::{StampKind, DEFAULT_STAMP_SIZE};
 use cm_core::{Color, OpKind};
@@ -32,12 +33,18 @@ pub enum Tool {
     Spotlight,
     /// ANN-4: a check, cross, `!`, `?` or a BEFORE / AFTER label (key U).
     Stamp,
+    /// ANN-8: the Zoom Lens, a zoomed copy of a detail with a line back to it (key M).
+    Magnify,
+    /// ANN-9: change the text in a screenshot (key Y, Touch-up group).
+    Retype,
+    /// ANN-10: move or remove an area of the picture (key J, Touch-up group).
+    MoveArea,
 }
 
 impl Tool {
     /// Palette order (design spec 0.3.3 section 2): the tools of each palette group are next to
     /// each other, in the order of the group menu.
-    pub const ALL: [Tool; 15] = [
+    pub const ALL: [Tool; 18] = [
         Tool::Select,
         Tool::SelectText,
         Tool::Arrow,
@@ -49,7 +56,10 @@ impl Tool {
         Tool::Highlight,
         Tool::Step,
         Tool::Stamp,
+        Tool::Retype,
+        Tool::MoveArea,
         Tool::Spotlight,
+        Tool::Magnify,
         Tool::Blur,
         Tool::Pixelate,
         Tool::Crop,
@@ -72,11 +82,14 @@ impl Tool {
             Tool::Callout => tr_ctx!("tool", "Callout"),
             Tool::Spotlight => tr_ctx!("tool", "Spotlight"),
             Tool::Stamp => tr_ctx!("tool", "Stamp"),
+            Tool::Magnify => tr_ctx!("tool", "Zoom Lens"),
+            Tool::Retype => tr_ctx!("tool", "Retype"),
+            Tool::MoveArea => tr_ctx!("tool", "Move area"),
         }
     }
 
     /// Single-key shortcut (ANN-1: V A L R E T H N C, ANN-2: B X, ANN-5: G, ANN-4: K U,
-    /// ANN-7: S; M is reserved for Magnify).
+    /// ANN-7: S, ANN-8: M, ANN-9: Y, ANN-10: J).
     pub fn key(self) -> char {
         match self {
             Tool::Select => 'v',
@@ -94,6 +107,9 @@ impl Tool {
             Tool::Callout => 'k',
             Tool::Spotlight => 's',
             Tool::Stamp => 'u',
+            Tool::Magnify => 'm',
+            Tool::Retype => 'y',
+            Tool::MoveArea => 'j',
         }
     }
 
@@ -123,6 +139,9 @@ impl Tool {
             Tool::Callout => "message-square",
             Tool::Spotlight => "focus",
             Tool::Stamp => "stamp",
+            Tool::Magnify => "zoom-in",
+            Tool::Retype => "text-cursor-input",
+            Tool::MoveArea => "move",
         }
     }
 
@@ -144,6 +163,9 @@ impl Tool {
             Tool::Callout => "callout",
             Tool::Spotlight => "spotlight",
             Tool::Stamp => "stamp",
+            Tool::Magnify => "magnify",
+            Tool::Retype => "retype",
+            Tool::MoveArea => "move_area",
         }
     }
 
@@ -163,8 +185,11 @@ impl Tool {
             OpKind::Blur { .. } => Tool::Blur,
             OpKind::Pixelate { .. } => Tool::Pixelate,
             OpKind::Crop { .. } => Tool::Crop,
-            // Track B gives these their tools; until then they select.
-            OpKind::Magnify { .. } | OpKind::Retype { .. } | OpKind::MoveArea { .. } | OpKind::Blueprint { .. } => Tool::Select,
+            OpKind::Magnify { .. } => Tool::Magnify,
+            OpKind::Retype { .. } => Tool::Retype,
+            OpKind::MoveArea { .. } => Tool::MoveArea,
+            // Blueprint is a view-bar command, not a tool: its op selects like the pointer.
+            OpKind::Blueprint { .. } => Tool::Select,
         }
     }
 
@@ -174,7 +199,9 @@ impl Tool {
             Tool::Callout => &[Param::Color, Param::TextSize, Param::Radius],
             Tool::Spotlight => &[Param::Dim],
             Tool::Stamp => &[Param::Color, Param::StampSize],
-            Tool::Select | Tool::Crop | Tool::SelectText => &[],
+            Tool::Magnify => &[Param::Zoom, Param::Color, Param::BorderWidth],
+            Tool::Retype => &[Param::Color, Param::TextSize],
+            Tool::Select | Tool::Crop | Tool::SelectText | Tool::MoveArea => &[],
             Tool::Arrow | Tool::Line | Tool::Rect | Tool::Ellipse => &[Param::Color, Param::Width],
             Tool::Text => &[Param::Color, Param::TextSize],
             Tool::Highlight => &[Param::Color, Param::Opacity],
@@ -201,6 +228,10 @@ pub enum Param {
     Dim,
     /// Size of a stamp.
     StampSize,
+    /// Zoom Lens magnification (2 to 8).
+    Zoom,
+    /// Zoom Lens border width (0 to 32 px).
+    BorderWidth,
 }
 
 impl Param {
@@ -216,6 +247,8 @@ impl Param {
             Param::Radius => tr_ctx!("annotation setting", "Corners"),
             Param::Dim => tr_ctx!("annotation setting", "Dim"),
             Param::StampSize => tr_ctx!("annotation setting", "Size"),
+            Param::Zoom => tr_ctx!("annotation setting", "Zoom"),
+            Param::BorderWidth => tr_ctx!("annotation setting", "Border width"),
         }
     }
 }
@@ -233,6 +266,8 @@ pub enum ParamValue {
     Radius(f64),
     Dim(f64),
     StampSize(f64),
+    Zoom(f64),
+    BorderWidth(f64),
 }
 
 impl ParamValue {
@@ -248,6 +283,8 @@ impl ParamValue {
             ParamValue::Radius(_) => Param::Radius,
             ParamValue::Dim(_) => Param::Dim,
             ParamValue::StampSize(_) => Param::StampSize,
+            ParamValue::Zoom(_) => Param::Zoom,
+            ParamValue::BorderWidth(_) => Param::BorderWidth,
         }
     }
 }
@@ -319,6 +356,12 @@ pub const CORNER_RADII: [f64; 4] = [0.0, 6.0, 12.0, 20.0];
 pub const DIM_LEVELS: [f64; 4] = [0.2, 0.4, 0.6, 0.8];
 /// Stamp sizes offered in the inspector (default 34).
 pub const STAMP_SIZES: [f64; 4] = [24.0, 34.0, 48.0, 64.0];
+/// Zoom Lens magnifications offered in the inspector (default 3).
+pub const ZOOMS: [f64; 5] = [2.0, 3.0, 4.0, 6.0, 8.0];
+/// Zoom Lens border widths offered in the inspector, px (default 3; 0 is no border).
+pub const BORDER_WIDTHS: [f64; 6] = [0.0, 2.0, 3.0, 4.0, 6.0, 8.0];
+/// Retype font weights offered in the inspector: Regular, Medium, Bold.
+pub const WEIGHTS: [u16; 3] = [400, 500, 700];
 
 /// The values a tool draws with. Fields a tool does not use keep their defaults.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -346,6 +389,15 @@ pub struct ToolStyle {
     pub stamp_kind: StampKind,
     /// Stamp: which word a label stamp carries.
     pub stamp_word: StampWord,
+    /// Zoom Lens: magnification, loupe shape, connector line and zoom badge (ANN-8). The
+    /// border colour is `color` and the border width is `width`.
+    pub zoom: f64,
+    pub lens_shape: MagnifyShape,
+    pub connector: bool,
+    pub badge: bool,
+    /// Retype: font weight and alignment of the new text (ANN-9).
+    pub weight: u16,
+    pub align: TextAlign,
 }
 
 impl ToolStyle {
@@ -366,8 +418,19 @@ impl ToolStyle {
             step_start: 1,
             stamp_kind: StampKind::Check,
             stamp_word: StampWord::Before,
+            zoom: DEFAULT_MAGNIFY_ZOOM,
+            lens_shape: MagnifyShape::Rounded,
+            connector: true,
+            badge: true,
+            weight: 400,
+            align: TextAlign::Left,
         };
         match tool {
+            Tool::Magnify => ToolStyle {
+                color: Color::WHITE,
+                width: 3.0,
+                ..base
+            },
             Tool::Callout => ToolStyle {
                 size: DEFAULT_CALLOUT_SIZE,
                 ..base
@@ -405,6 +468,8 @@ impl ToolStyle {
             ParamValue::Block(b) => self.block = b,
             ParamValue::Radius(r) => self.radius = r,
             ParamValue::Dim(d) => self.dim = d,
+            ParamValue::Zoom(z) => self.zoom = z,
+            ParamValue::BorderWidth(w) => self.width = w,
         }
     }
 
@@ -420,6 +485,8 @@ impl ToolStyle {
             Param::Radius => ParamValue::Radius(self.radius),
             Param::Dim => ParamValue::Dim(self.dim),
             Param::StampSize => ParamValue::StampSize(self.size),
+            Param::Zoom => ParamValue::Zoom(self.zoom),
+            Param::BorderWidth => ParamValue::BorderWidth(self.width),
         }
     }
 }
@@ -492,6 +559,38 @@ impl Styles {
         }
     }
 
+    /// What new Zoom Lenses are made of: shape, connector and badge (None keeps the field).
+    pub fn set_lens(
+        &mut self,
+        shape: Option<MagnifyShape>,
+        connector: Option<bool>,
+        badge: Option<bool>,
+    ) {
+        if let Some((_, s)) = self.by_tool.iter_mut().find(|(t, _)| *t == Tool::Magnify) {
+            if let Some(v) = shape {
+                s.lens_shape = v;
+            }
+            if let Some(v) = connector {
+                s.connector = v;
+            }
+            if let Some(v) = badge {
+                s.badge = v;
+            }
+        }
+    }
+
+    /// What new Retype text is made of: weight and alignment (None keeps the field).
+    pub fn set_retype(&mut self, weight: Option<u16>, align: Option<TextAlign>) {
+        if let Some((_, s)) = self.by_tool.iter_mut().find(|(t, _)| *t == Tool::Retype) {
+            if let Some(v) = weight {
+                s.weight = v;
+            }
+            if let Some(v) = align {
+                s.align = v;
+            }
+        }
+    }
+
     /// JSON for the `editor.tool_styles` setting.
     pub fn to_json(&self) -> Value {
         let mut m = serde_json::Map::new();
@@ -531,6 +630,20 @@ impl Styles {
                         CalloutStyle::Bubble => "bubble",
                         CalloutStyle::Box => "box",
                     },
+                    "zoom": s.zoom,
+                    "lens_shape": match s.lens_shape {
+                        MagnifyShape::Circle => "circle",
+                        MagnifyShape::Rounded => "rounded",
+                        MagnifyShape::Rect => "rect",
+                    },
+                    "connector": s.connector,
+                    "badge": s.badge,
+                    "weight": s.weight,
+                    "align": match s.align {
+                        TextAlign::Left => "left",
+                        TextAlign::Center => "center",
+                        TextAlign::Right => "right",
+                    },
                 }),
             );
         }
@@ -555,7 +668,7 @@ impl Styles {
                     .and_then(Value::as_f64)
                     .filter(|x| x.is_finite() && (lo..=hi).contains(x))
             };
-            if let Some(w) = num("width", 1.0, 64.0) {
+            if let Some(w) = num("width", 0.0, 64.0) {
                 s.width = w;
             }
             if let Some(w) = num("size", 6.0, 400.0) {
@@ -613,6 +726,30 @@ impl Styles {
                 Some("box") => s.callout_style = CalloutStyle::Box,
                 _ => {}
             }
+            if let Some(z) = num("zoom", 2.0, 8.0) {
+                s.zoom = z;
+            }
+            match o.get("lens_shape").and_then(Value::as_str) {
+                Some("circle") => s.lens_shape = MagnifyShape::Circle,
+                Some("rounded") => s.lens_shape = MagnifyShape::Rounded,
+                Some("rect") => s.lens_shape = MagnifyShape::Rect,
+                _ => {}
+            }
+            if let Some(b) = o.get("connector").and_then(Value::as_bool) {
+                s.connector = b;
+            }
+            if let Some(b) = o.get("badge").and_then(Value::as_bool) {
+                s.badge = b;
+            }
+            if let Some(w) = num("weight", 100.0, 900.0) {
+                s.weight = w as u16;
+            }
+            match o.get("align").and_then(Value::as_str) {
+                Some("left") => s.align = TextAlign::Left,
+                Some("center") => s.align = TextAlign::Center,
+                Some("right") => s.align = TextAlign::Right,
+                _ => {}
+            }
         }
         out
     }
@@ -640,6 +777,9 @@ mod tests {
             ('k', Tool::Callout),
             ('s', Tool::Spotlight),
             ('g', Tool::SelectText),
+            ('m', Tool::Magnify),
+            ('y', Tool::Retype),
+            ('j', Tool::MoveArea),
         ];
         for (k, t) in spec {
             assert_eq!(Tool::from_key(k), Some(t));
@@ -703,13 +843,54 @@ mod tests {
         }
     }
 
+    /// ANN-8 / ANN-9: the Zoom Lens and Retype settings are remembered per tool and survive the
+    /// settings round trip; the tool is named Zoom Lens in the UI (the op stays `magnify`).
+    #[test]
+    fn lens_and_retype_styles_persist_and_the_names_are_the_ui_names() {
+        let mut s = Styles::default();
+        s.apply(Tool::Magnify, ParamValue::Zoom(6.0));
+        s.apply(Tool::Magnify, ParamValue::BorderWidth(8.0));
+        s.set_lens(Some(MagnifyShape::Circle), Some(false), Some(false));
+        s.set_retype(Some(700), Some(TextAlign::Center));
+        let back = Styles::from_json(&s.to_json());
+        assert_eq!(back, s);
+        let m = back.get(Tool::Magnify);
+        assert_eq!(
+            (m.zoom, m.width, m.lens_shape, m.connector, m.badge),
+            (6.0, 8.0, MagnifyShape::Circle, false, false)
+        );
+        let r = back.get(Tool::Retype);
+        assert_eq!((r.weight, r.align), (700, TextAlign::Center));
+        assert_eq!(Tool::Magnify.label(), "Zoom Lens");
+        assert_eq!(Tool::Magnify.id(), "magnify");
+        assert_eq!(
+            Tool::for_kind(&OpKind::Magnify {
+                source: cm_core::Rc::new(0.0, 0.0, 10.0, 10.0),
+                at: cm_core::Pt::new(5.0, 5.0),
+                zoom: 3.0,
+                shape: MagnifyShape::Rounded,
+                border: Color::WHITE,
+                border_width: 3.0,
+                connector: true,
+                badge: true,
+            }),
+            Tool::Magnify
+        );
+        // A border width of 0 (no border) is a valid stored value.
+        let none = json!({"magnify": {"width": 0}});
+        assert_eq!(Styles::from_json(&none).get(Tool::Magnify).width, 0.0);
+    }
+
     #[test]
     fn every_drawing_tool_has_inspector_controls_except_select_and_crop() {
         for t in Tool::ALL {
             let empty = t.params().is_empty();
             assert_eq!(
                 empty,
-                matches!(t, Tool::Select | Tool::Crop | Tool::SelectText),
+                matches!(
+                    t,
+                    Tool::Select | Tool::Crop | Tool::SelectText | Tool::MoveArea
+                ),
                 "{t:?}"
             );
         }
