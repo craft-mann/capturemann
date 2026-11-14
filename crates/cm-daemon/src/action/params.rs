@@ -187,6 +187,20 @@ pub struct WindowThumbnailParams {
     pub max_px: u32,
 }
 
+/// `long_shot_state { request_id, paused?, since_seq?, preview_w?, preview_h? }` (CAP-6): serves
+/// the Long Shot HUD. `request_id` is the one the `capture_screenshot { mode: "long" }` call
+/// carries. `paused` pauses or resumes it. The answer has the counts and, when the image changed
+/// since `since_seq`, a small PNG of it (`preview`, at most `preview_w` x `preview_h`, default
+/// 360 x 560; the newest rows when it is taller).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct LongShotStateParams {
+    pub request_id: String,
+    pub paused: Option<bool>,
+    pub since_seq: Option<u64>,
+    pub preview_w: u32,
+    pub preview_h: u32,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct AnnotateParams {
     pub capture_id: String,
@@ -385,6 +399,8 @@ pub enum Action {
     FreezeDisplay(FreezeDisplayParams),
     ReleaseFrame(ReleaseFrameParams),
     WindowThumbnail(WindowThumbnailParams),
+    /// `long_shot_state` (CAP-6): the HUD's pull of a running Long Shot.
+    LongShotState(LongShotStateParams),
     GetJob(GetJobParams),
     ListJobs(ListJobsParams),
     CancelJob(CancelJobParams),

@@ -142,6 +142,15 @@ pub struct Tweaks {
     pub no_shadow: bool,
 }
 
+/// Makes `window` take clicks without ever becoming the active window, so the window the user is
+/// working in keeps the focus (the Long Shot HUD: the target of a Long Shot must stay active
+/// while it is scrolled and captured). Windows: `WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW`. macOS
+/// pop-ups are non-activating panels already; X11 and Wayland: nothing to set. Call it right
+/// after the window is opened.
+pub fn set_no_activate(window: &Window) {
+    imp::set_no_activate(window);
+}
+
 /// What was applied after the capture-exclusion call: `exclude_from_capture` counts only when it
 /// was asked for and the OS accepted it (`ok`); the other tweaks are not applied on this path.
 #[cfg_attr(not(windows), allow(dead_code))]
@@ -438,6 +447,9 @@ mod imp {
         None
     }
 
+    /// macOS pop-ups are non-activating panels already (GPUI).
+    pub fn set_no_activate(_window: &Window) {}
+
     pub fn toasts_belong_in_window() -> bool {
         false
     }
@@ -706,6 +718,18 @@ mod imp {
         }
         Ok(done)
     }
+
+    #[cfg(windows)]
+    pub fn set_no_activate(window: &Window) {
+        if let Some(h) = crate::platform_win_monitors::hwnd(window) {
+            if !crate::platform_win_monitors::make_no_activate(h) {
+                log::warn!("a floating window could not be made non-activating");
+            }
+        }
+    }
+
+    #[cfg(not(windows))]
+    pub fn set_no_activate(_window: &Window) {}
 
     #[cfg(not(any(target_os = "linux", windows)))]
     pub fn apply(_window: &Window, _tweaks: Tweaks) -> Result<Applied, String> {

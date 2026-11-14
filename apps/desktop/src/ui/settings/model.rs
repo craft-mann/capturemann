@@ -647,6 +647,7 @@ pub fn shortcut_label(a: ShortcutAction) -> String {
             tr_ctx!("shortcut", "Start or stop audio recording")
         }
         ShortcutAction::AddMarker => tr_ctx!("shortcut", "Add a marker"),
+        ShortcutAction::LongShot => tr_ctx!("shortcut", "Long Shot"),
     }
 }
 
@@ -674,6 +675,7 @@ pub fn shortcut_groups() -> [(String, String, Vec<ShortcutAction>); 2] {
                 ShortcutAction::CaptureRegion,
                 ShortcutAction::CaptureWindow,
                 ShortcutAction::CaptureDisplay,
+                ShortcutAction::LongShot,
                 ShortcutAction::OpenLauncher,
                 ShortcutAction::OpenLibrary,
                 ShortcutAction::AnnotateLast,

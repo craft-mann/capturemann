@@ -31,6 +31,9 @@ pub enum Surface {
     DelayPill,
     /// The Click Guide bar (GDE-1).
     GuideHud,
+    /// The Long Shot HUD and its side preview (CAP-6).
+    LongShotHud,
+    LongShotPreview,
     Confirm,
     Dialog,
 }
@@ -50,6 +53,8 @@ impl Surface {
             Surface::Picker => "picker",
             Surface::DelayPill => "delay_pill",
             Surface::GuideHud => "guide_hud",
+            Surface::LongShotHud => "long_shot_hud",
+            Surface::LongShotPreview => "long_shot_preview",
             Surface::Confirm => "confirm",
             Surface::Dialog => "dialog",
         }

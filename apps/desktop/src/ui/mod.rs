@@ -26,6 +26,7 @@ pub mod kit;
 pub mod launcher_window;
 pub mod library_move_flow;
 pub mod library_view;
+pub mod long_shot;
 pub mod pages;
 pub mod paint;
 pub mod permissions_view;

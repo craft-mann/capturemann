@@ -262,6 +262,12 @@ impl ShotBundle {
     pub fn manifest(&self) -> &ShotManifest {
         &self.manifest
     }
+
+    /// Records an extra top-level field of the manifest (kept in `extra`, written by the next
+    /// [`ShotBundle::save`]). A Long Shot writes `source: "long_shot"` and its `frames` this way.
+    pub fn set_extra(&mut self, key: &str, value: serde_json::Value) {
+        self.manifest.extra.insert(key.to_owned(), value);
+    }
     pub fn ops(&self) -> &[AnnotationOp] {
         &self.manifest.ops
     }

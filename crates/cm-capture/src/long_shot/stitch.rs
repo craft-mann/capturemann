@@ -573,6 +573,53 @@ impl Stitcher {
         }
     }
 
+    /// A small picture of the image so far for the side preview (S2): scaled to at most
+    /// `max_w` px wide (never enlarged); when it would be taller than `max_h`, the newest
+    /// `max_h` rows are kept (the preview follows the growing end). Horizontal captures are
+    /// fitted whole into `max_w` x `max_h`. `None` before the first frame.
+    pub fn thumbnail(&self, max_w: u32, max_h: u32) -> Option<Frame> {
+        let (w, _) = self.size?;
+        let (max_w, max_h) = (max_w.max(1), max_h.max(1));
+        if self.dir == Direction::Horizontal {
+            let whole = self.finish().ok()?.frame;
+            let scale = (f64::from(max_w) / f64::from(whole.width()))
+                .min(f64::from(max_h) / f64::from(whole.height()))
+                .min(1.0);
+            return box_scale(
+                whole.rgba(),
+                whole.width() as usize,
+                whole.height() as usize,
+                scale,
+                usize::MAX,
+            );
+        }
+        let prev = self.prev.as_ref()?;
+        let line_len = prev.line_len;
+        let (header, content, footer): (&[u8], &[u8], &[u8]) = if self.bands.is_some() {
+            (&self.header, &self.content, &self.footer)
+        } else {
+            (&prev.data, &[], &[])
+        };
+        let (hn, cn, fnn) = (
+            header.len() / line_len,
+            content.len() / line_len,
+            footer.len() / line_len,
+        );
+        let row = |i: usize| -> &[u8] {
+            let (src, at) = if i < hn {
+                (header, i)
+            } else if i < hn + cn {
+                (content, i - hn)
+            } else {
+                (footer, i - hn - cn)
+            };
+            &src[at * line_len..(at + 1) * line_len]
+        };
+        let total = hn + cn + fnn;
+        let scale = (f64::from(max_w) / f64::from(w)).min(1.0);
+        box_rows(&row, total, w as usize, scale, max_h as usize)
+    }
+
     /// The image so far. Errors when no frame was pushed.
     pub fn finish(&self) -> Result<Stitched, CmError> {
         let (Some(prev), Some(_)) = (&self.prev, self.size) else {
@@ -619,4 +666,57 @@ impl Stitcher {
             footer_len: footer_len as u32,
         })
     }
+}
+
+/// Averages `row(i)` (rows of `w` RGBA pixels, `total` rows) down by `scale`, keeping the last
+/// `max_h` output rows.
+fn box_rows<'a>(
+    row: &dyn Fn(usize) -> &'a [u8],
+    total: usize,
+    w: usize,
+    scale: f64,
+    max_h: usize,
+) -> Option<Frame> {
+    let out_w = ((w as f64 * scale).round() as usize).max(1);
+    let out_total = ((total as f64 * scale).round() as usize).max(1);
+    let out_h = out_total.min(max_h.max(1));
+    let first = out_total - out_h;
+    let mut out = vec![0u8; out_w * out_h * 4];
+    for oy in 0..out_h {
+        let gy = first + oy;
+        let y0 = (gy as f64 / scale).floor() as usize;
+        let y1 = (((gy + 1) as f64 / scale).ceil() as usize)
+            .clamp(y0 + 1, total.max(y0 + 1))
+            .min(total);
+        let y0 = y0.min(total.saturating_sub(1));
+        for ox in 0..out_w {
+            let x0 = (ox as f64 / scale).floor() as usize;
+            let x1 = (((ox + 1) as f64 / scale).ceil() as usize)
+                .clamp(x0 + 1, w.max(x0 + 1))
+                .min(w);
+            let x0 = x0.min(w.saturating_sub(1));
+            let mut acc = [0u32; 4];
+            let mut n = 0u32;
+            for y in y0..y1.max(y0 + 1) {
+                let r = row(y);
+                for x in x0..x1.max(x0 + 1) {
+                    let p = &r[x * 4..x * 4 + 4];
+                    for c in 0..4 {
+                        acc[c] += u32::from(p[c]);
+                    }
+                    n += 1;
+                }
+            }
+            let d = (oy * out_w + ox) * 4;
+            for c in 0..4 {
+                out[d + c] = (acc[c] / n.max(1)) as u8;
+            }
+        }
+    }
+    Frame::new(out_w as u32, out_h as u32, out).ok()
+}
+
+/// `box_rows` over one contiguous RGBA buffer.
+fn box_scale(rgba: &[u8], w: usize, h: usize, scale: f64, max_h: usize) -> Option<Frame> {
+    box_rows(&|i| &rgba[i * w * 4..(i + 1) * w * 4], h, w, scale, max_h)
 }

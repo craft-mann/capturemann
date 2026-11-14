@@ -387,6 +387,7 @@ pub fn summarize(
         Mode::Region => "region",
         Mode::Window => "window",
         Mode::Display => "display",
+        Mode::Long => "long",
     };
     let mut out = json!({
         "mode": mode_name,
@@ -415,6 +416,7 @@ pub fn pick_json(mode: Mode, choice: Choice) -> Value {
         Mode::Region => "region",
         Mode::Window => "window",
         Mode::Display => "display",
+        Mode::Long => "long",
     };
     let mut picked = json!({ "mode": mode_name, "display_id": choice.display_id });
     match choice.outcome {
@@ -430,6 +432,19 @@ pub fn pick_json(mode: Mode, choice: Choice) -> Value {
         }
     }
     json!({ "picked": picked })
+}
+
+/// Long Shot: adds the bar's options to a `picked` JSON (`long: { scroll, direction }`).
+pub fn with_long(mut v: Value, long: Option<crate::app::LongChoice>) -> Value {
+    if let Some(l) = long {
+        v["picked"]["long"] = json!({ "scroll": l.scroll.name(), "direction": l.dir.name() });
+        if let Some(a) = l.area {
+            v["picked"]["long"]["area"] =
+                json!([a.origin.x, a.origin.y, a.size.width, a.size.height]);
+            v["picked"]["long"]["scale"] = json!(l.scale);
+        }
+    }
+    v
 }
 
 /// Turns the user's choice into a capture and returns the JSON to print.
@@ -484,6 +499,54 @@ mod tests {
     use cm_core::{PhysicalPoint, PhysicalSize};
 
     /// CAP-1 on Linux: Wayland is recognised by the session type, then by the display variable.
+    /// CAP-6: Long Shot prints the picked target and the bar's options, never a capture.
+    #[test]
+    fn long_shot_picks_a_window_with_its_options() {
+        use crate::app::LongChoice;
+        use crate::long_bar::{Dir, Scroll};
+        let c = Choice {
+            display_id: 3,
+            outcome: Outcome::Window { window_id: 9 },
+        };
+        let v = with_long(
+            pick_json(Mode::Long, c),
+            Some(LongChoice {
+                scroll: Scroll::Hand,
+                dir: Dir::Horizontal,
+                area: Some(PhysicalRect {
+                    origin: cm_core::PhysicalPoint { x: 5, y: 6 },
+                    size: PhysicalSize {
+                        width: 70,
+                        height: 80,
+                    },
+                }),
+                scale: 2.0,
+            }),
+        );
+        assert_eq!(v["picked"]["mode"], "long");
+        assert_eq!(v["picked"]["window_id"], 9);
+        assert_eq!(v["picked"]["long"]["scroll"], "hand");
+        assert_eq!(v["picked"]["long"]["direction"], "horizontal");
+        assert_eq!(v["picked"]["long"]["area"], json!([5, 6, 70, 80]));
+        assert_eq!(v["picked"]["long"]["scale"], 2.0);
+        // A region keeps its rectangle.
+        let c = Choice {
+            display_id: 1,
+            outcome: Outcome::Region {
+                rect: PhysicalRect {
+                    origin: cm_core::PhysicalPoint { x: 10, y: 20 },
+                    size: PhysicalSize {
+                        width: 300,
+                        height: 400,
+                    },
+                },
+            },
+        };
+        let v = with_long(pick_json(Mode::Long, c), None);
+        assert_eq!(v["picked"]["rect"], json!([10, 20, 300, 400]));
+        assert!(v["picked"].get("long").is_none());
+    }
+
     #[test]
     fn wayland_is_told_by_the_session_type_then_the_display() {
         assert!(is_wayland_session(Some("wayland"), None));

@@ -19,9 +19,9 @@
 
 mod annot;
 pub mod compose;
-mod magnify;
 pub mod compose_board;
 pub mod compose_bulk;
+mod magnify;
 pub mod ocr;
 pub mod ops;
 mod redact;

@@ -362,3 +362,35 @@ fn cap_6_ac3_a_jump_with_a_scrollbar_still_stops() {
     let (r, _) = auto(page, None);
     assert_eq!(r.end, EndReason::NoOverlap);
 }
+
+/// The side preview (S2): scaled to the panel width, never enlarged, newest rows kept when taller.
+#[test]
+fn cap_6_preview_thumbnail_is_scaled_and_follows_the_end() {
+    let page = SyntheticPage::new(40, 1200, 300);
+    let view = page.clone().view();
+    let (mut src, mut sc) = (view.clone(), view.clone());
+    let mut seen = Vec::new();
+    let r = run_auto_ex(
+        &mut src,
+        &mut sc,
+        &mut NoSleep::default(),
+        cfg(Direction::Vertical),
+        &mut || false,
+        &mut |_| {},
+        &mut |st: &Stitcher| {
+            seen.push(st.thumbnail(20, 50).unwrap());
+        },
+    )
+    .unwrap();
+    assert_eq!(seen.len() as u32, r.image.frames);
+    // 40 px wide into 20: half size; 50 rows at most (the newest ones).
+    let last = seen.last().unwrap();
+    assert_eq!(last.width(), 20);
+    assert_eq!(last.height(), 50);
+    // Never enlarged: a wide panel leaves the width alone.
+    let st = Stitcher::new(Direction::Vertical, Limits::default());
+    assert!(st.thumbnail(20, 50).is_none());
+    let mut st = Stitcher::new(Direction::Vertical, Limits::default());
+    st.push(&page.frame_at(0), None);
+    assert_eq!(st.thumbnail(400, 400).unwrap().width(), 40);
+}

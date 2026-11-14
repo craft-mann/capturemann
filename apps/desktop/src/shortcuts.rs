@@ -82,6 +82,22 @@ fn is_key_name(t: &str) -> bool {
 }
 
 impl Chord {
+    /// No shortcut set (Long Shot has no default, CAP-6): an empty key. It is never registered,
+    /// never conflicts, shows no keycaps and is stored as an empty string.
+    pub fn unset() -> Chord {
+        Chord {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            meta: false,
+            key: String::new(),
+        }
+    }
+
+    pub fn is_unset(&self) -> bool {
+        self.key.is_empty()
+    }
+
     pub fn parse(s: &str) -> Result<Chord, ChordError> {
         let s = s.trim();
         if s.is_empty() {
@@ -173,6 +189,9 @@ impl Chord {
 
     /// Keycap labels (DESIGN section 4): symbols on macOS, words on Windows.
     pub fn keycaps(&self, platform: Platform) -> Vec<String> {
+        if self.is_unset() {
+            return Vec::new();
+        }
         let mut out = Vec::new();
         match platform {
             Platform::Mac => {
@@ -249,10 +268,12 @@ pub enum ShortcutAction {
     ToggleAudioRecording,
     /// Add a marker to the running recording at the HUD timer (VOC-1, Option+Shift+M).
     AddMarker,
+    /// Long Shot (CAP-6): a scrolling capture. **No default chord** (design S13: "Not set").
+    LongShot,
 }
 
 impl ShortcutAction {
-    pub const ALL: [ShortcutAction; 12] = [
+    pub const ALL: [ShortcutAction; 13] = [
         ShortcutAction::CaptureRegion,
         ShortcutAction::CaptureWindow,
         ShortcutAction::CaptureDisplay,
@@ -265,6 +286,7 @@ impl ShortcutAction {
         ShortcutAction::AnnotateLast,
         ShortcutAction::ToggleAudioRecording,
         ShortcutAction::AddMarker,
+        ShortcutAction::LongShot,
     ];
 
     /// Settings key (`get_settings` / `set_settings` can read and change `shortcuts.*`).
@@ -282,6 +304,7 @@ impl ShortcutAction {
             Self::AnnotateLast => "shortcuts.annotate_last",
             Self::ToggleAudioRecording => "shortcuts.toggle_audio_recording",
             Self::AddMarker => "shortcuts.add_marker",
+            Self::LongShot => "shortcuts.long_shot",
         }
     }
 
@@ -299,6 +322,7 @@ impl ShortcutAction {
             Self::AnnotateLast => tr!("Annotate last capture"),
             Self::ToggleAudioRecording => tr!("Start or stop audio recording"),
             Self::AddMarker => tr!("Add a marker"),
+            Self::LongShot => tr!("Long Shot"),
         }
     }
 
@@ -321,11 +345,16 @@ impl ShortcutAction {
             Self::AnnotateLast => "a",
             Self::ToggleAudioRecording => "v",
             Self::AddMarker => "m",
+            // No default: the chord is unset (see `default_chord`).
+            Self::LongShot => "",
         }
     }
 
     /// CAP-2 defaults: macOS Option+Shift+key, Windows Ctrl+Alt+Shift+key.
     pub fn default_chord(self, platform: Platform) -> Chord {
+        if self.default_key().is_empty() {
+            return Chord::unset();
+        }
         Chord {
             ctrl: platform != Platform::Mac,
             alt: true,
@@ -364,6 +393,8 @@ impl ShortcutMap {
         let mut invalid = Vec::new();
         for a in ShortcutAction::ALL {
             let chord = match settings.get(a.key()).and_then(Value::as_str) {
+                // An empty string is "not set", the stored form of an unset chord.
+                Some(s) if s.trim().is_empty() => Chord::unset(),
                 Some(s) => match Chord::parse(s) {
                     Ok(c) => c,
                     Err(_) => {
@@ -414,7 +445,7 @@ impl ShortcutMap {
     pub fn conflicts(&self) -> Vec<(ShortcutAction, ShortcutAction)> {
         let mut seen: HashMap<&Chord, ShortcutAction> = HashMap::new();
         let mut out = Vec::new();
-        for (a, c) in &self.bindings {
+        for (a, c) in self.bindings.iter().filter(|(_, c)| !c.is_unset()) {
             if let Some(first) = seen.get(c) {
                 out.push((*first, *a));
             } else {
@@ -464,6 +495,9 @@ mod tests {
     fn defaults_avoid_os_screenshot_keys() {
         for p in [Platform::Mac, Platform::Windows] {
             for (_, c) in ShortcutMap::defaults(p).iter() {
+                if c.is_unset() {
+                    continue; // Long Shot has no default
+                }
                 assert!(c.alt && c.shift, "{c:?}");
                 assert!(!c.meta);
             }
@@ -493,6 +527,35 @@ mod tests {
             Chord::parse("alt+?"),
             Err(ChordError::UnknownToken(_))
         ));
+    }
+
+    /// CAP-6 (design S13): Long Shot has no default hotkey; it reads "not set", is stored as an
+    /// empty string, never conflicts with another unset action, and can be set like any other.
+    #[test]
+    fn long_shot_has_no_default_shortcut() {
+        for p in [Platform::Mac, Platform::Windows, Platform::Linux] {
+            let map = ShortcutMap::defaults(p);
+            let c = map.get(ShortcutAction::LongShot);
+            assert!(c.is_unset());
+            assert_eq!(c.to_setting(), "");
+            assert!(c.keycaps(p).is_empty());
+            assert!(map.conflicts().is_empty());
+            assert!(map.invalid.is_empty());
+        }
+        // The stored empty string is "not set", not an invalid entry.
+        let mut s = Map::new();
+        s.insert("shortcuts.long_shot".into(), json!(""));
+        let map = ShortcutMap::from_settings(&s, Platform::Mac);
+        assert!(map.get(ShortcutAction::LongShot).is_unset());
+        assert!(map.invalid.is_empty());
+        // Setting one: a chord of another action is refused, a free one is accepted.
+        let taken = ShortcutAction::CaptureRegion.default_chord(Platform::Mac);
+        assert!(map.check_rebind(ShortcutAction::LongShot, &taken).is_err());
+        let free = Chord::parse("alt+shift+x").unwrap();
+        assert!(map.check_rebind(ShortcutAction::LongShot, &free).is_ok());
+        let next = map.with(ShortcutAction::LongShot, free.clone());
+        assert_eq!(next.get(ShortcutAction::LongShot), free);
+        assert_eq!(ShortcutAction::LongShot.key(), "shortcuts.long_shot");
     }
 
     /// DESIGN section 4: macOS shows symbols, Windows shows words.

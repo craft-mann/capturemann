@@ -37,6 +37,7 @@ actions!(
         ShowLibrary,
         ShowSettings,
         NewClickGuide,
+        LongShotAction,
         ImportMedia,
         QuitApp,
         CloseWindow,
@@ -78,6 +79,7 @@ pub fn bind_keys(cx: &mut App) {
 pub fn app_menus() -> Vec<Menu> {
     vec![Menu::new("CaptureMann").items([
         MenuItem::action(tr_ctx!("menu", "Library"), ShowLibrary),
+        MenuItem::action(tr_ctx!("menu", "Long Shot"), LongShotAction),
         MenuItem::action(tr_ctx!("menu", "New Click Guide"), NewClickGuide),
         MenuItem::action(tr_ctx!("menu", "Import file\u{2026}"), ImportMedia),
         MenuItem::action(tr_ctx!("menu", "Settings\u{2026}"), ShowSettings),
@@ -102,6 +104,11 @@ pub fn install_app_actions(cx: &mut App) {
     cx.on_action(|_: &NewClickGuide, cx| {
         if let Some(app) = cx.try_global::<AppHandle>().map(|h| h.0.clone()) {
             app::handle_command(&app, Command::NewClickGuide, cx);
+        }
+    });
+    cx.on_action(|_: &LongShotAction, cx| {
+        if let Some(app) = cx.try_global::<AppHandle>().map(|h| h.0.clone()) {
+            app::handle_command(&app, Command::LongShot, cx);
         }
     });
     cx.on_action(|_: &ImportMedia, cx| {
@@ -533,6 +540,7 @@ mod tests {
         let menus = app_menus();
         assert_eq!(menus.len(), 1);
         assert_eq!(menus[0].name.as_ref(), "CaptureMann");
-        assert_eq!(menus[0].items.len(), 6);
+        // Library, Long Shot, New Click Guide, Import, Settings, a separator and Quit.
+        assert_eq!(menus[0].items.len(), 7);
     }
 }

@@ -71,6 +71,21 @@ pub fn rebind_hotkey(
     old: &Chord,
     new: &Chord,
 ) -> Result<(u32, u32), String> {
+    // An action with no shortcut yet (Long Shot) has nothing to release; clearing one releases
+    // the old combination and registers nothing.
+    if old.is_unset() && new.is_unset() {
+        return Ok((0, 0));
+    }
+    if old.is_unset() {
+        let new_hk = chord_to_hotkey(new)?;
+        manager.register_hotkey(new_hk)?;
+        return Ok((0, new_hk.id()));
+    }
+    if new.is_unset() {
+        let old_hk = chord_to_hotkey(old)?;
+        let _ = manager.unregister_hotkey(old_hk);
+        return Ok((old_hk.id(), 0));
+    }
     let old_hk = chord_to_hotkey(old)?;
     let new_hk = chord_to_hotkey(new)?;
     if old_hk.id() == new_hk.id() {
@@ -102,6 +117,11 @@ pub fn register_shortcuts(
     for (action, chord) in map.iter() {
         if !action.is_available() {
             status.push((action, Err(tr!("Not available yet"))));
+            continue;
+        }
+        // No shortcut set (Long Shot): nothing to register, and nothing to report.
+        if chord.is_unset() {
+            status.push((action, Ok(())));
             continue;
         }
         let result = chord_to_hotkey(chord).and_then(|hk| {
@@ -695,13 +715,36 @@ mod tests {
         let others = map.get(ShortcutAction::CaptureWindow);
         assert!(!os.reaches_window(&others), "registered: the OS keeps it");
         suspend_shortcuts(&os, &map);
-        for (_, c) in map.iter() {
+        for (_, c) in map.iter().filter(|(_, c)| !c.is_unset()) {
             assert!(os.reaches_window(c));
         }
         let (ids2, status2) = register_shortcuts(&os, &map);
         assert_eq!(ids, ids2);
         assert!(status2.iter().all(|(_, r)| r.is_ok()));
         assert!(!os.reaches_window(&others));
+    }
+
+    /// CAP-6: an action with no shortcut registers nothing, reports no failure, and can be given
+    /// one (registered) or have it cleared again (released).
+    #[test]
+    fn an_unset_shortcut_registers_nothing_and_can_be_set_and_cleared() {
+        let map = ShortcutMap::defaults(Platform::Mac);
+        let os = FakeOs::default();
+        let (ids, status) = register_shortcuts(&os, &map);
+        assert_eq!(ids.len(), ShortcutAction::ALL.len() - 1);
+        assert!(!ids.values().any(|a| *a == ShortcutAction::LongShot));
+        assert!(status
+            .iter()
+            .any(|(a, r)| *a == ShortcutAction::LongShot && r.is_ok()));
+        let unset = map.get(ShortcutAction::LongShot);
+        let chord = Chord::parse("alt+shift+x").unwrap();
+        let (o, n) = rebind_hotkey(&os, &unset, &chord).unwrap();
+        assert_eq!(o, 0);
+        assert!(n != 0 && !os.reaches_window(&chord), "registered");
+        let (o, n) = rebind_hotkey(&os, &chord, &Chord::unset()).unwrap();
+        assert!(o != 0 && n == 0);
+        assert!(os.reaches_window(&chord), "released");
+        assert_eq!(rebind_hotkey(&os, &unset, &Chord::unset()), Ok((0, 0)));
     }
 
     /// A rebind moves exactly one registration; when another app owns the new combination the old
@@ -749,6 +792,11 @@ mod tests {
     fn default_chords_convert() {
         for p in [Platform::Mac, Platform::Windows] {
             for (a, c) in ShortcutMap::defaults(p).iter() {
+                // Long Shot has no default shortcut (CAP-6): nothing to convert.
+                if c.is_unset() {
+                    assert_eq!(a, ShortcutAction::LongShot);
+                    continue;
+                }
                 assert!(chord_to_hotkey(c).is_ok(), "{a:?}");
             }
         }
@@ -758,7 +806,7 @@ mod tests {
     fn hotkey_ids_are_distinct_per_action() {
         let map = ShortcutMap::defaults(Platform::Mac);
         let mut seen = std::collections::HashSet::new();
-        for (_, c) in map.iter() {
+        for (_, c) in map.iter().filter(|(_, c)| !c.is_unset()) {
             assert!(seen.insert(chord_to_hotkey(c).unwrap().id()));
         }
     }

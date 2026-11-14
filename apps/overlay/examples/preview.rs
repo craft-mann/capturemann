@@ -2,10 +2,14 @@
 //!
 //! `cargo run -p cm-overlay --example preview -- in.png out.png [scale] [x0 y0 x1 y1]`
 //! The pointer ends at (x1, y1) with a drag from (x0, y0); without coordinates only the
-//! crosshair, loupe and hint are drawn.
+//! crosshair, loupe and hint are drawn. With `CM_PREVIEW_LONG=available|needs_accessibility|
+//! unavailable` the picker is in Long Shot mode and the bar is drawn; `CM_PREVIEW_CARD=1` opens
+//! the Accessibility card.
 
 use cm_core::PhysicalSize;
 use cm_overlay::canvas::Canvas;
+use cm_overlay::long_bar::{self, AutoSupport, BarState, Item, Scroll};
+use cm_overlay::long_paint::LongScene;
 use cm_overlay::paint::{paint, Frame, Scene};
 use cm_overlay::picker::{Mode, Picker};
 use cm_overlay::text::TextPainter;
@@ -17,8 +21,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let img = image::open(input)?.to_rgba8();
     let (w, h) = (img.width(), img.height());
     let frame = Frame::from_rgba(w, h, img.as_raw()).ok_or("bad frame")?;
+    let long_env = std::env::var("CM_PREVIEW_LONG").ok();
     let mut picker = Picker::new(
-        Mode::Region,
+        if long_env.is_some() {
+            Mode::Long
+        } else {
+            Mode::Region
+        },
         PhysicalSize {
             width: w,
             height: h,
@@ -40,7 +49,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let text = TextPainter::new().ok_or("font")?;
     let mut buf = vec![0u32; (w * h) as usize];
     let mut canvas = Canvas::new(&mut buf, w, h).ok_or("canvas")?;
+    let long_state = long_env.as_deref().and_then(AutoSupport::parse).map(|a| {
+        let mut st = BarState::new(a);
+        if std::env::var_os("CM_PREVIEW_CARD").is_some() {
+            st.activate(Item::Scroll(Scroll::Auto));
+        }
+        st
+    });
+    let layout = long_state
+        .map(|st| long_bar::layout(&st, w as i32, h as i32, scale, &|s, px| text.measure(s, px)));
     let scene = Scene {
+        long: layout.as_ref().map(|layout| LongScene { layout }),
         picker: &picker,
         scale,
         text: &text,

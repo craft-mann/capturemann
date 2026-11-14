@@ -382,7 +382,8 @@ mod tests {
     #[test]
     fn every_default_has_an_id_and_a_trigger() {
         let map = ShortcutMap::defaults(Platform::Windows);
-        assert_eq!(hotkey_ids(&map).len(), ShortcutAction::ALL.len());
+        // Long Shot has no default shortcut (CAP-6), so it has no id.
+        assert_eq!(hotkey_ids(&map).len(), ShortcutAction::ALL.len() - 1);
         assert_eq!(unsupported(&map).len(), ShortcutAction::ALL.len());
         assert!(unsupported(&map)
             .iter()

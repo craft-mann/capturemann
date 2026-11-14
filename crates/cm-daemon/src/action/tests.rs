@@ -90,6 +90,10 @@ fn samples() -> Vec<(&'static str, Value)> {
         ("freeze_display", json!({"display_id": 1})),
         ("release_frame", json!({"frame_id": "frame_1"})),
         ("window_thumbnail", json!({"window_id": 5, "max_px": 200})),
+        (
+            "long_shot_state",
+            json!({"request_id": "r1", "paused": true, "since_seq": 2}),
+        ),
         ("get_job", json!({"job_id": "job_1"})),
         (
             "list_jobs",
@@ -438,7 +442,7 @@ fn agt_1_ac4_internal_actions_are_explicit() {
     ] {
         assert!(!is_internal(public), "{public}");
     }
-    assert_eq!(INTERNAL_ACTIONS.len(), 7);
+    assert_eq!(INTERNAL_ACTIONS.len(), 8);
 }
 
 #[test]

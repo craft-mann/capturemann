@@ -12,6 +12,7 @@ impl Action {
             Action::FreezeDisplay(_) => "freeze_display",
             Action::ReleaseFrame(_) => "release_frame",
             Action::WindowThumbnail(_) => "window_thumbnail",
+            Action::LongShotState(_) => "long_shot_state",
             Action::GetJob(_) => "get_job",
             Action::ListJobs(_) => "list_jobs",
             Action::CancelJob(_) => "cancel_job",

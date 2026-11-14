@@ -437,7 +437,7 @@ mod tests {
     fn cap5_ac2_escape_hotkey_is_distinct_from_every_default_shortcut() {
         let esc = escape_hotkey_id();
         let map = crate::shortcuts::ShortcutMap::defaults(crate::shortcuts::Platform::Mac);
-        for (_, chord) in map.iter() {
+        for (_, chord) in map.iter().filter(|(_, c)| !c.is_unset()) {
             let id = crate::platform::chord_to_hotkey(chord).unwrap().id();
             assert_ne!(id, esc);
         }

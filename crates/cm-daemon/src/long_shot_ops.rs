@@ -26,6 +26,65 @@ use crate::error::DaemonError;
 /// `footer_px`, `request_id`): the HUD counter and the side preview follow it.
 pub const PROGRESS_EVENT: &str = "capture.long_shot.progress";
 
+/// What a running Long Shot shows the HUD and the side preview, keyed by the call's
+/// `request_id` (`long_shot_state`). Counts only on the bus; the pixels of the preview leave the
+/// daemon only through that pull and are never logged.
+#[derive(Default)]
+pub struct LongStates(Mutex<std::collections::HashMap<String, Arc<LongState>>>);
+
+#[derive(Default)]
+pub struct LongState {
+    paused: std::sync::atomic::AtomicBool,
+    inner: Mutex<LongSnapshot>,
+}
+
+#[derive(Default, Clone)]
+struct LongSnapshot {
+    seq: u64,
+    frames: u32,
+    len_px: u32,
+    max_len: u32,
+    header_px: u32,
+    footer_px: u32,
+    preview: Option<(u32, u32, Vec<u8>)>,
+}
+
+impl LongStates {
+    fn start(&self, id: &str) -> Arc<LongState> {
+        let st = Arc::new(LongState::default());
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(id.to_owned(), st.clone());
+        st
+    }
+
+    fn get(&self, id: &str) -> Option<Arc<LongState>> {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(id)
+            .cloned()
+    }
+
+    fn finish(&self, id: &str) {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(id);
+    }
+}
+
+impl LongState {
+    fn is_paused(&self) -> bool {
+        self.paused.load(std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
+/// Largest preview the daemon renders; the HUD's panel scales it.
+const PREVIEW_MAX_W: u32 = 360;
+const PREVIEW_MAX_H: u32 = 1200;
+
 /// What touches the screen: frames of the target and the scroller. The real one uses the
 /// capturer and `cm_capture::long_shot::platform_scroller`; tests give scripted ones.
 pub trait LongShotSystem: Send + Sync {
@@ -197,6 +256,53 @@ pub(crate) fn refuse_hand_for_agent(p: &CaptureLongParams) -> Result<(), DaemonE
     Ok(())
 }
 
+impl Inner {
+    /// `long_shot_state`: pauses or resumes a running Long Shot and reports it (see
+    /// [`crate::action::LongShotStateParams`]). `{ "running": false }` once it has ended.
+    pub(crate) fn long_shot_state(
+        &self,
+        p: crate::action::LongShotStateParams,
+    ) -> Result<Value, DaemonError> {
+        let Some(st) = self.long_states.get(&p.request_id) else {
+            return Ok(json!({ "running": false }));
+        };
+        if let Some(paused) = p.paused {
+            st.paused.store(paused, std::sync::atomic::Ordering::SeqCst);
+        }
+        let s = st
+            .inner
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
+        let mut out = json!({
+            "running": true,
+            "paused": st.is_paused(),
+            "seq": s.seq,
+            "frames": s.frames,
+            "len_px": s.len_px,
+            "max_len": s.max_len,
+            "header_px": s.header_px,
+            "footer_px": s.footer_px,
+        });
+        if p.since_seq.is_none_or(|n| n < s.seq) {
+            if let Some((w, h, png)) = &s.preview {
+                // The preview was made for the size the first caller asked; a later size is
+                // served by the same picture (the panel scales it).
+                let _ = (p.preview_w, p.preview_h);
+                out["preview"] = json!({
+                    "width": w,
+                    "height": h,
+                    "png_base64": base64::Engine::encode(
+                        &base64::engine::general_purpose::STANDARD,
+                        png,
+                    ),
+                });
+            }
+        }
+        Ok(out)
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 struct LongMeta {
     frames: u32,
@@ -247,10 +353,13 @@ impl Inner {
         let (direction, max_px, scroll) = (p.direction, p.max_px, p.scroll);
         let events = self.events.clone();
         let request_id = p.request_id.clone();
+        let request_id_after = p.request_id.clone();
         let meta: Arc<Mutex<Option<LongMeta>>> = Arc::default();
         let meta_in = meta.clone();
-        let mut out = self
-            .store_capture(actor, p.copy_to_clipboard, p.title, None, move || {
+        let state = request_id.as_deref().map(|id| self.long_states.start(id));
+        let state_in = state.clone();
+        let out = self
+            .store_capture_ex(actor, p.copy_to_clipboard, p.title, None, move || {
                 // The delay, in steps so Esc cancels it.
                 let end = std::time::Instant::now() + delay;
                 while std::time::Instant::now() < end {
@@ -265,8 +374,27 @@ impl Inner {
                     limits: Limits::with_max_px(max_px),
                     ..Default::default()
                 };
-                let mut stop = || token.is_cancelled();
+                // Pause holds the loop at its next step (what is on screen is not captured until
+                // Resume); Stop while paused still ends it.
+                let pause_state = state_in.clone();
+                let mut stop = || {
+                    while pause_state.as_ref().is_some_and(|s| s.is_paused())
+                        && !token.is_cancelled()
+                    {
+                        std::thread::sleep(std::time::Duration::from_millis(30));
+                    }
+                    token.is_cancelled()
+                };
+                let progress_state = state_in.clone();
                 let mut on_progress = |pr: long_shot::LongShotProgress| {
+                    if let Some(s) = &progress_state {
+                        let mut g = s.inner.lock().unwrap_or_else(PoisonError::into_inner);
+                        g.frames = pr.frames;
+                        g.len_px = pr.len_px;
+                        g.max_len = pr.max_len;
+                        g.header_px = pr.header_px;
+                        g.footer_px = pr.footer_px;
+                    }
                     events.publish(
                         PROGRESS_EVENT,
                         json!({
@@ -279,25 +407,37 @@ impl Inner {
                         }),
                     );
                 };
+                let preview_state = state_in.clone();
+                let mut on_stitch = |st: &long_shot::Stitcher| {
+                    let Some(s) = &preview_state else { return };
+                    let preview = st
+                        .thumbnail(PREVIEW_MAX_W, PREVIEW_MAX_H)
+                        .and_then(|f| f.to_png().ok().map(|png| (f.width(), f.height(), png)));
+                    let mut g = s.inner.lock().unwrap_or_else(PoisonError::into_inner);
+                    g.preview = preview;
+                    g.seq += 1;
+                };
                 let result = match scroll {
                     ScrollMode::Auto => {
                         let anchor = area_centre(&capturer_for_anchor, target);
                         let mut scroller = system.scroller(anchor)?;
-                        long_shot::run_auto(
+                        long_shot::run_auto_ex(
                             frames.as_mut(),
                             scroller.as_mut(),
                             &mut ThreadSleeper,
                             cfg,
                             &mut stop,
                             &mut on_progress,
+                            &mut on_stitch,
                         )?
                     }
-                    ScrollMode::Hand => long_shot::run_hand(
+                    ScrollMode::Hand => long_shot::run_hand_ex(
                         frames.as_mut(),
                         &mut ThreadSleeper,
                         cfg,
                         &mut stop,
                         &mut on_progress,
+                        &mut on_stitch,
                     )?,
                 };
                 *meta_in.lock().unwrap_or_else(PoisonError::into_inner) = Some(LongMeta {
@@ -310,23 +450,34 @@ impl Inner {
                 });
                 let frame = result.image.frame;
                 let size = frame.size();
-                Ok(Capture {
-                    frame,
-                    kind: CaptureKind::Region,
-                    display_id: None,
-                    window_id: None,
-                    scale: cm_core::ScaleFactor::ONE,
-                    source: PhysicalRect {
-                        origin: PhysicalPoint { x: 0, y: 0 },
-                        size: PhysicalSize {
-                            width: size.width,
-                            height: size.height,
+                let mut extra = serde_json::Map::new();
+                extra.insert("source".into(), json!("long_shot"));
+                extra.insert("frames".into(), json!(result.image.frames));
+                extra.insert("long_shot_end".into(), json!(result.end));
+                Ok((
+                    Capture {
+                        frame,
+                        kind: CaptureKind::Region,
+                        display_id: None,
+                        window_id: None,
+                        scale: cm_core::ScaleFactor::ONE,
+                        source: PhysicalRect {
+                            origin: PhysicalPoint { x: 0, y: 0 },
+                            size: PhysicalSize {
+                                width: size.width,
+                                height: size.height,
+                            },
                         },
+                        waited: std::time::Duration::ZERO,
                     },
-                    waited: std::time::Duration::ZERO,
-                })
+                    extra,
+                ))
             })
-            .await?;
+            .await;
+        if let Some(id) = request_id_after.as_deref() {
+            self.long_states.finish(id);
+        }
+        let mut out = out?;
         drop(guard);
         let m = meta.lock().unwrap_or_else(PoisonError::into_inner).take();
         if let Some(m) = m {

@@ -139,6 +139,44 @@ impl Action {
                 };
                 Action::WindowThumbnail(WindowThumbnailParams { window_id, max_px })
             }
+            "long_shot_state" => {
+                f.only(&[
+                    "request_id",
+                    "paused",
+                    "since_seq",
+                    "preview_w",
+                    "preview_h",
+                ])?;
+                let dim = |k: &str, default: u32| -> Result<u32, CmError> {
+                    match f.obj.get(k) {
+                        None | Some(Value::Null) => Ok(default),
+                        Some(v) => v
+                            .as_u64()
+                            .map(|n| n.clamp(32, 1024) as u32)
+                            .ok_or_else(|| CmError::invalid_field(k, "must be a positive integer")),
+                    }
+                };
+                let paused = match f.obj.get("paused") {
+                    None | Some(Value::Null) => None,
+                    Some(v) => Some(
+                        v.as_bool()
+                            .ok_or_else(|| CmError::invalid_field("paused", "must be a boolean"))?,
+                    ),
+                };
+                let since_seq = match f.obj.get("since_seq") {
+                    None | Some(Value::Null) => None,
+                    Some(v) => Some(v.as_u64().ok_or_else(|| {
+                        CmError::invalid_field("since_seq", "must be a non-negative integer")
+                    })?),
+                };
+                Action::LongShotState(LongShotStateParams {
+                    request_id: f.str_req("request_id")?,
+                    paused,
+                    since_seq,
+                    preview_w: dim("preview_w", 360)?,
+                    preview_h: dim("preview_h", 560)?,
+                })
+            }
             "get_job" => {
                 f.only(&["job_id"])?;
                 Action::GetJob(GetJobParams {

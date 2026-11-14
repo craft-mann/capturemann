@@ -105,6 +105,7 @@ impl SettingsView {
                             })
                             .flatten();
                         let change_id = SharedString::from(format!("rebind-{}", r.key));
+                        let unset = r.keycaps.is_empty();
                         let action_for_click = r.action;
                         let label = r.label.clone();
                         // Wayland: the keys the desktop chose, read-only, under the row's name.
@@ -142,12 +143,23 @@ impl SettingsView {
                                 // The desktop owns the keys: our defaults are only a wish.
                                 div().into_any_element()
                             } else {
-                                div()
-                                    .flex()
-                                    .items_center()
-                                    .gap(px(4.))
-                                    .children(r.keycaps.iter().map(|k| keycap_lg(t, k.clone())))
-                                    .into_any_element()
+                                // No shortcut yet (Long Shot, CAP-6): "Not set" and a Set button.
+                                if r.keycaps.is_empty() {
+                                    div()
+                                        .text_size(px(type_scale::CAPTION))
+                                        .text_color(rgba_of(t.text_3))
+                                        .child(tr!("Not set"))
+                                        .into_any_element()
+                                } else {
+                                    div()
+                                        .flex()
+                                        .items_center()
+                                        .gap(px(4.))
+                                        .children(
+                                            r.keycaps.iter().map(|k| keycap_lg(t, k.clone())),
+                                        )
+                                        .into_any_element()
+                                }
                             })
                             .children((mode.can_change).then(|| if waiting {
                                 small_button_with_icon(
@@ -165,7 +177,11 @@ impl SettingsView {
                                 small_button_with_icon(
                                     t,
                                     change_id,
-                                    &tr_ctx!("shortcut", "Change"),
+                                    &if unset {
+                                        tr_ctx!("shortcut", "Set")
+                                    } else {
+                                        tr_ctx!("shortcut", "Change")
+                                    },
                                     Some("pen-line"),
                                 )
                                 .aria_label(SharedString::from(tr!(

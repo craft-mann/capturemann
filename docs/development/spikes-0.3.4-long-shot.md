@@ -59,8 +59,12 @@ Long Shot on Wayland must be treated as untested.
 
 ## Not part of the spikes, still open
 
-* The overlay (Long Shot mode in the mode bar, area highlight, Auto/Hand control, Accessibility
-  card, the HUD, the side preview): not built. The placement rules are built and tested
-  (`long_shot::hud`), and progress events (`capture.long_shot.progress`) are on the bus.
-* `source: "long_shot"` in the stored manifest (the result of the action carries it, the
-  manifest does not: that needs a field in `cm-library`, which is another track's area).
+* Track C3 (Nov 14, 2026): the overlay (Long Shot mode in a bottom bar, window highlight, Auto and
+  Hand scroll, direction, Start, the Accessibility card), the HUD and side preview in the desktop
+  app, the launcher command, menu item, hotkey row (no default) and `source: "long_shot"` with the
+  frame count in the manifest are built and tested with pure models and fakes. Nothing of it was
+  seen on a real screen when this was written; `tests/manual/CAP-6.md` steps 10 to 21 are the first
+  run. The HUD and the preview are separate windows of the desktop app (the overlay process ends
+  when the area is picked), excluded from capture, and on Windows non-activating
+  (`WS_EX_NOACTIVATE`), so the scrolled window keeps the focus. The preview picture comes from a
+  pull action, `long_shot_state` (counts and a small PNG, never logged), not from the bus event.

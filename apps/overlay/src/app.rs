@@ -33,8 +33,10 @@ use winit::window::{CursorIcon, Window, WindowId, WindowLevel};
 use crate::canvas::Canvas;
 use crate::error::OverlayError;
 use crate::gate::{Gate, Held, Pointer};
+use crate::long_bar::{self, AutoSupport, BarEffect, BarLayout, BarState, Dir, Item, Scroll};
+use crate::long_paint::LongScene;
 use crate::paint::{paint, tokens, Scene};
-use crate::picker::{CursorHint, Effect, Key, Mode, Picker};
+use crate::picker::{CursorHint, Effect, Key, Mode, Outcome, Picker};
 use crate::platform::{describe_window, escape_is_down, prepare_overlay_window, take_foreground};
 use crate::selection::Handle;
 use crate::session::{Choice, Frozen, SessionEvent};
@@ -59,6 +61,8 @@ pub struct Options {
     pub confirm_on_release: bool,
     /// Window mode: Tab ends the overlay with [`Finish::SwitchToList`] (R19 "Pick on screen").
     pub tab_to_list: bool,
+    /// Long Shot: whether the bar offers Auto scroll.
+    pub auto_scroll: AutoSupport,
     /// Benchmark: finish as soon as every display has painted its first frame.
     pub exit_after_first_frame: bool,
 }
@@ -74,6 +78,21 @@ pub enum Finish {
     SwitchToList,
     /// `exit_after_first_frame`: every display showed its first frame.
     FirstFrame,
+    /// A mode chip of the Long Shot bar, or "Grant access...": nothing is picked, the desktop app
+    /// continues with the named mode (`region`, `window`, `display`, `guide`, `accessibility`).
+    Switch(&'static str),
+}
+
+/// The Long Shot options chosen on the bar.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LongChoice {
+    pub scroll: Scroll,
+    pub dir: Dir,
+    /// The area to capture, physical px relative to the display (the window's rectangle, the
+    /// dragged region, or the whole display), and the display's scale: the desktop app places the
+    /// HUD from them (S2b).
+    pub area: Option<cm_core::PhysicalRect>,
+    pub scale: f64,
 }
 
 /// What [`run`] hands back.
@@ -81,6 +100,8 @@ pub struct Finished {
     pub finish: Finish,
     /// Every display whose frame had arrived by the time the overlay ended.
     pub frozen: Vec<Frozen>,
+    /// Long Shot mode: the bar's options at the end.
+    pub long: Option<LongChoice>,
 }
 
 /// Mailbox between the session task (any thread) and the event loop (main thread).
@@ -169,6 +190,13 @@ struct App {
     finish: Option<Finish>,
     error: Option<OverlayError>,
     next_monitor_check: Instant,
+    /// Long Shot: the bar's state, the last pointer position (view, physical px) and the bar
+    /// entry a press started on (it acts on release, over the same entry).
+    bar: BarState,
+    pointer_at: Option<(usize, f64, f64)>,
+    bar_press: Option<Item>,
+    long_area: Option<cm_core::PhysicalRect>,
+    long_scale: f64,
 }
 
 /// Shows the overlay on every display as the session's events arrive and blocks until the
@@ -203,6 +231,11 @@ pub fn run(inbox: &Arc<Inbox>, opts: Options, tracer: &Tracer) -> Result<Finishe
         finish: None,
         error: None,
         next_monitor_check: Instant::now() + MONITOR_POLL,
+        bar: BarState::new(opts.auto_scroll),
+        pointer_at: None,
+        bar_press: None,
+        long_area: None,
+        long_scale: 1.0,
     };
     let ended = event_loop.run_app(&mut app);
     // The windows go with `app`; say so, so a window that outlives the process is attributable.
@@ -221,9 +254,16 @@ pub fn run(inbox: &Arc<Inbox>, opts: Options, tracer: &Tracer) -> Result<Finishe
             app.frozen.push(f);
         }
     }
+    let long = (opts.mode == Mode::Long).then_some(LongChoice {
+        scroll: app.bar.scroll,
+        dir: app.bar.dir,
+        area: app.long_area,
+        scale: app.long_scale,
+    });
     Ok(Finished {
         finish: app.finish.unwrap_or(Finish::Cancelled),
         frozen: app.frozen,
+        long,
     })
 }
 
@@ -524,7 +564,85 @@ impl App {
         }
     }
 
+    /// The bar's layout on view `i` (Long Shot mode only).
+    fn bar_layout(&self, i: usize) -> Option<BarLayout> {
+        if self.opts.mode != Mode::Long {
+            return None;
+        }
+        let v = self.views.get(i)?;
+        let size = v.display.bounds.size;
+        let text = &self.text;
+        Some(long_bar::layout(
+            &self.bar,
+            size.width as i32,
+            size.height as i32,
+            v.scale,
+            &|s, px| text.measure(s, px),
+        ))
+    }
+
+    /// Long Shot: a press or release over the bar belongs to the bar, not to the picker
+    /// (a click on a button must not pick the window behind it). Returns true when taken.
+    fn bar_pointer(&mut self, i: usize, ev: Pointer, el: &ActiveEventLoop) -> bool {
+        let Some(layout) = self.bar_layout(i) else {
+            return false;
+        };
+        let at = self.pointer_at.filter(|(v, _, _)| *v == i);
+        let over = at.is_some_and(|(_, x, y)| layout.covers(x, y));
+        match ev {
+            Pointer::Moved { .. } => false,
+            Pointer::Pressed => {
+                if !over {
+                    // A press elsewhere closes the card.
+                    if self.bar.card {
+                        self.bar.card = false;
+                        self.redraw(i);
+                    }
+                    return false;
+                }
+                self.bar_press = at.and_then(|(_, x, y)| layout.hit(x, y));
+                true
+            }
+            Pointer::Released => {
+                let Some(pressed) = self.bar_press.take() else {
+                    return false;
+                };
+                let still = at.and_then(|(_, x, y)| layout.hit(x, y));
+                if still == Some(pressed) {
+                    let effect = self.bar.activate(pressed);
+                    self.bar_effect(i, effect, el);
+                }
+                self.redraw(i);
+                true
+            }
+        }
+    }
+
+    fn bar_effect(&mut self, i: usize, effect: BarEffect, el: &ActiveEventLoop) {
+        match effect {
+            BarEffect::Nothing | BarEffect::Redraw => {}
+            BarEffect::Start => {
+                let e = self.views[i].picker.key(Key::Enter);
+                self.apply(i, e, el);
+            }
+            BarEffect::SwitchTo(name) => {
+                self.finish = Some(Finish::Switch(name));
+                el.exit();
+            }
+            BarEffect::GrantAccessibility => {
+                self.finish = Some(Finish::Switch("accessibility"));
+                el.exit();
+            }
+        }
+    }
+
     fn apply_pointer(&mut self, (i, ev): Held, el: &ActiveEventLoop) {
+        if let Pointer::Moved { x, y } = ev {
+            self.pointer_at = Some((i, x, y));
+        }
+        if self.bar_pointer(i, ev, el) {
+            return;
+        }
         let Some(view) = self.views.get_mut(i) else {
             return;
         };
@@ -591,6 +709,14 @@ impl App {
         let tracer = self.tracer.clone();
         let text = &self.text;
         let magnifier = self.opts.magnifier;
+        // The bar goes on the display the pointer is on (the first one before it moves).
+        let bar_layout = if self.active == i
+            || self.views.iter().all(|v| v.picker.pointer().is_none()) && i == 0
+        {
+            self.bar_layout(i)
+        } else {
+            None
+        };
         let view = &mut self.views[i];
         let (Some(window), Some(surface)) = (view.window.as_ref(), view.surface.as_mut()) else {
             return;
@@ -626,6 +752,7 @@ impl App {
                     show_loupe: magnifier,
                     show_hint,
                     tab_to_list: self.opts.tab_to_list,
+                    long: bar_layout.as_ref().map(|layout| LongScene { layout }),
                 };
                 if !paint(&mut canvas, frame, &scene) {
                     // Window and frame disagree (see the `mapping` trace): show black, not junk.
@@ -689,6 +816,25 @@ impl App {
             }
             Effect::Done(outcome) => {
                 log::info!("overlay ends: the user chose a target");
+                if self.opts.mode == Mode::Long {
+                    let v = &self.views[i];
+                    self.long_scale = v.scale;
+                    self.long_area = Some(match outcome {
+                        Outcome::Region { rect } => rect,
+                        Outcome::Window { window_id } => {
+                            v.picker
+                                .window_rect(window_id)
+                                .unwrap_or(cm_core::PhysicalRect {
+                                    origin: cm_core::PhysicalPoint { x: 0, y: 0 },
+                                    size: v.display.bounds.size,
+                                })
+                        }
+                        Outcome::Display => cm_core::PhysicalRect {
+                            origin: cm_core::PhysicalPoint { x: 0, y: 0 },
+                            size: v.display.bounds.size,
+                        },
+                    });
+                }
                 self.finish = Some(Finish::Chosen(Choice {
                     display_id: self.views[i].display.id,
                     outcome,
@@ -887,6 +1033,15 @@ impl ApplicationHandler<()> for App {
                         } else {
                             i
                         };
+                        // Long Shot: Enter is Start, which asks for Accessibility first when
+                        // Auto scroll is chosen and cannot run (CAP-6.AC6).
+                        if key == Key::Enter
+                            && self.opts.mode == Mode::Long
+                            && !self.bar.try_start()
+                        {
+                            self.redraw(target);
+                            return;
+                        }
                         let e = self.views[target].picker.key(key);
                         self.apply(target, e, el);
                     }
